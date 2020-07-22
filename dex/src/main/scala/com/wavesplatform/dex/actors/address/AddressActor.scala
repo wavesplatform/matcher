@@ -145,6 +145,7 @@ class AddressActor(owner: Address,
     case msg: Message.BalanceChanged =>
       if (wsAddressState.hasActiveSubscriptions) {
         wsAddressState = wsAddressState.putSpendableAssets(msg.changedAssets)
+        scheduleNextDiffSending()
       }
 
       val toCancel = getOrdersToCancel(msg.changesForAudit).filterNot(ao => isCancelling(ao.order.id()))
@@ -193,8 +194,10 @@ class AddressActor(owner: Address,
           case QueueEvent.Placed(_) | QueueEvent.PlacedMarket(_) =>
             activeOrders.remove(orderId).foreach { ao =>
               openVolume = openVolume |-| ao.reservableBalance
-              if (wsAddressState.hasActiveSubscriptions)
+              if (wsAddressState.hasActiveSubscriptions) {
                 wsAddressState = wsAddressState.putReservedAssets(ao.reservableBalance.keySet)
+                scheduleNextDiffSending()
+              }
             }
           case _ =>
         }
@@ -296,7 +299,6 @@ class AddressActor(owner: Address,
             balances = mkWsBalances(spendableBalance),
             orders = activeOrders.values.map(WsOrder.fromDomain(_)).to(Seq),
           )
-          if (!wsAddressState.hasActiveSubscriptions) scheduleNextDiffSending()
           wsAddressState = wsAddressState.flushPendingSubscriptions()
         case Left(matcherError) =>
           wsAddressState.pendingSubscription.foreach { _.unsafeUpcast[WsServerMessage] ! WsError.from(matcherError, time.correctedTime()) }
@@ -305,19 +307,17 @@ class AddressActor(owner: Address,
 
     // It is time to send updates to clients. This block of code asks balances
     case WsCommand.PrepareDiffForWsSubscribers =>
-      if (wsAddressState.hasActiveSubscriptions) {
-        if (wsAddressState.hasChanges) {
-          spendableBalancesActor ! SpendableBalancesActor.Query.GetState(owner, wsAddressState.getAllChangedAssets)
-          // We asked balances for current changedAssets and clean it here,
-          // because there are could be new changes between sent Query.GetState and received Reply.GetState.
-          wsAddressState = wsAddressState.cleanBalanceChanges()
-        } else scheduleNextDiffSending()
+      if (wsAddressState.hasActiveSubscriptions && wsAddressState.hasChanges) {
+        spendableBalancesActor ! SpendableBalancesActor.Query.GetState(owner, wsAddressState.getAllChangedAssets)
+        // We asked balances for current changedAssets and clean it here,
+        // because there are could be new changes between sent Query.GetState and received Reply.GetState.
+        wsAddressState = wsAddressState.cleanBalanceChanges()
       }
+      wsSendSchedule = Cancellable.alreadyCancelled
 
     // It is time to send updates to clients. This block of code sends balances
     case SpendableBalancesActor.Reply.GetState(spendableBalances) =>
       wsAddressState = if (wsAddressState.hasActiveSubscriptions) {
-        scheduleNextDiffSending()
         wsAddressState.sendDiffs(
           balances = mkWsBalances(spendableBalances),
           orders = wsAddressState.getAllOrderChanges
@@ -331,9 +331,10 @@ class AddressActor(owner: Address,
     case classic.Terminated(wsSource) => wsAddressState = wsAddressState.removeSubscription(wsSource)
   }
 
+  /** Schedules next balances and order changes sending only if it wasn't scheduled before */
   private def scheduleNextDiffSending(): Unit = {
-    wsSendSchedule.cancel()
-    wsSendSchedule = context.system.scheduler.scheduleOnce(settings.wsMessagesInterval, self, WsCommand.PrepareDiffForWsSubscribers)
+    if (wsSendSchedule.isCancelled)
+      wsSendSchedule = context.system.scheduler.scheduleOnce(settings.wsMessagesInterval, self, WsCommand.PrepareDiffForWsSubscribers)
   }
 
   private def denormalizedBalanceValue(asset: Asset, decimals: Int)(balanceSource: Map[Asset, Long]): Double =
@@ -453,6 +454,8 @@ class AddressActor(owner: Address,
       //  - for slave DEX it is a new order and we have to send balance changes via WS API
       if (status != OrderStatus.Accepted || origActiveOrder.isEmpty)
         wsAddressState = wsAddressState.putReservedAssets(openVolumeDiff.keySet)
+
+      scheduleNextDiffSending()
     }
   }
 
@@ -494,7 +497,10 @@ class AddressActor(owner: Address,
     openVolume = openVolume |+| ao.reservableBalance
     activeOrders.put(ao.id, ao)
 
-    if (wsAddressState.hasActiveSubscriptions) wsAddressState = wsAddressState.putReservedAssets(ao.reservableBalance.keySet)
+    if (wsAddressState.hasActiveSubscriptions) {
+      wsAddressState = wsAddressState.putReservedAssets(ao.reservableBalance.keySet)
+      scheduleNextDiffSending()
+    }
 
     storeEvent(ao.id)(
       ao match {

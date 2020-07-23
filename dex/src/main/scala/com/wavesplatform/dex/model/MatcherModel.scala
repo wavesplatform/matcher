@@ -395,9 +395,11 @@ object Events {
     lazy val executedAmount: Long             = AcceptedOrder.executedAmount(submitted, counter)
     lazy val executedAmountOfPriceAsset: Long = MatcherModel.getCost(executedAmount, executedPrice)
 
-    def counterRemainingAmount: Long      = math.max(counter.amount - executedAmount, 0)
-    def counterRemainingFee: Long         = math.max(counter.fee - counterExecutedFee, 0)
-    lazy val counterRemaining: LimitOrder = counter.partial(counterRemainingAmount, counterRemainingFee, executedWeighedPriceNominator)
+    def counterRemainingAmount: Long = math.max(counter.amount - executedAmount, 0)
+    def counterRemainingFee: Long    = math.max(counter.fee - counterExecutedFee, 0)
+
+    lazy val counterRemaining: LimitOrder =
+      counter.partial(counterRemainingAmount, counterRemainingFee, counter.avgWeighedPriceNominator.add(executedWeighedPriceNominator))
 
     def submittedRemainingAmount: Long = math.max(submitted.amount - executedAmount, 0)
     def submittedRemainingFee: Long    = math.max(submitted.fee - submittedExecutedFee, 0)

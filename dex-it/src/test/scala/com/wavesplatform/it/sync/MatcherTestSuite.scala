@@ -33,20 +33,23 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
   private val IssueResults(issueBob2Asset2Tx, _, bobAsset2) = mkIssueExtended(bob, "Bob-2-X", someAssetAmount, 0)
   private val bob2WavesPair                                 = AssetPair(bobAsset2, Waves)
 
+  private val IssueResults(issueUsdNTx, usdNId, usdn) = mkIssueExtended(alice, "USD-N", defaultAssetQuantity, 6)
+  private val btcUsdnPair                             = AssetPair(btc, usdn)
+
   private val order1 = mkOrder(alice, aliceWavesPair, SELL, aliceSellAmount, 2000.waves, ttl = 10.minutes) // TTL?
 
   private val maxOrders = 99
 
   override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(
     s"""waves.dex {
-       |  price-assets = [ "$BtcId", "$UsdId", "WAVES" ]
+       |  price-assets = [ "$usdNId", "$BtcId", "$UsdId", "WAVES" ]
        |  order-db.max-orders = $maxOrders
        |}""".stripMargin
   )
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
-    broadcastAndAwait(issueAliceAssetTx, issueBob1Asset1Tx, issueBob2Asset2Tx, IssueUsdTx, IssueBtcTx)
+    broadcastAndAwait(issueAliceAssetTx, issueBob1Asset1Tx, issueBob2Asset2Tx, IssueUsdTx, IssueBtcTx, issueUsdNTx)
     dex1.start()
   }
 
@@ -489,6 +492,19 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       )
 
       dex1.api.tryOrderStatusInfoByIdWithSignature(alice, notPlacedOrder.id()) should failWith(notFoundError.code, notFoundError.message.text)
+    }
+
+    "correctly calculate average weighed price when submitted becomes counter" in {
+
+      val sellOrder = mkOrder(bob, btcUsdnPair, SELL, 30000000L, 9350000000L)
+      val buyOrder1 = mkOrder(alice, btcUsdnPair, BUY, 26779477L, 9351930000L)
+      val buyOrder2 = mkOrder(alice, btcUsdnPair, BUY, 25915611L, 9351330000L)
+
+      placeAndAwaitAtDex(buyOrder1)
+      placeAndAwaitAtDex(sellOrder, Status.PartiallyFilled)
+      placeAndAwaitAtNode(buyOrder2)
+
+      dex1.api.tryOrderStatusInfoByIdWithSignature(bob, sellOrder.id()).map(_.avgWeighedPrice) shouldBe Right(9351722813L)
     }
   }
 }

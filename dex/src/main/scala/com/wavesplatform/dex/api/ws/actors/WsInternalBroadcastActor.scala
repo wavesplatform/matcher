@@ -18,13 +18,10 @@ object WsInternalBroadcastActor {
   sealed trait Command extends Message
 
   object Command {
-
     case class Subscribe(clientRef: ActorRef[WsInternalClientHandlerActor.Message]) extends Command
+    case class Collect(update: WsOrdersUpdate)                                      extends Command
 
     private[WsInternalBroadcastActor] case object SendWsUpdates extends Command
-
-    case class Collect(update: WsOrdersUpdate) extends Command
-
   }
 
   final case class Settings(messagesInterval: FiniteDuration)
@@ -58,7 +55,7 @@ object WsInternalBroadcastActor {
                 .foreach { message =>
                   state.subscriptions.foreach(_ ! message)
                 }
-              default(state.withoutUpdates.withCompletedSchedule.runSchedule(settings.messagesInterval, context))
+              default(state.withoutUpdates.withCompletedSchedule)
           }
           .receiveSignal {
             case (_, Terminated(clientRef)) =>
@@ -72,6 +69,7 @@ object WsInternalBroadcastActor {
   private type Subscriptions = Set[ActorRef[WsInternalClientHandlerActor.Message]]
 
   private case class State(collectedUpdates: Option[WsOrdersUpdate], subscriptions: Subscriptions, schedule: Cancellable) {
+
     def updateSubscriptions(f: Subscriptions => Subscriptions): State = {
       val updated = f(subscriptions)
       val s       = copy(subscriptions = updated)
@@ -100,5 +98,4 @@ object WsInternalBroadcastActor {
             .some
         )
   }
-
 }

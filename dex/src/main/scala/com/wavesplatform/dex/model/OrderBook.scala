@@ -131,43 +131,47 @@ object OrderBook {
         case Some((levelPrice, counter)) if overlaps(submitted, levelPrice) =>
           if (!submitted.isValid(counter.price)) currentUpdates.copy(events = currentUpdates.events enqueue systemCancelEvent(submitted))
           else if (counter.order.isValid(eventTs)) {
+
             val (counterExecutedFee, submittedExecutedFee) = getMakerTakerMaxFee(submitted, counter)
+            val orderExecutedEvent                         = OrderExecuted(submitted, counter, eventTs, counterExecutedFee, submittedExecutedFee)
 
-            val orderExecutedEvent = OrderExecuted(submitted, counter, eventTs, counterExecutedFee, submittedExecutedFee)
-            val updatedEvents      = currentUpdates.events.enqueue(orderExecutedEvent)
-            val lastTrade          = Some(LastTrade(counter.price, orderExecutedEvent.executedAmount, submitted.order.orderType))
+            if (orderExecutedEvent.executedAmount != 0) {
 
-            val submittedRemaining = orderExecutedEvent.submittedRemaining
-            val counterRemaining   = orderExecutedEvent.counterRemaining
+              val updatedEvents = currentUpdates.events.enqueue(orderExecutedEvent)
+              val lastTrade     = Some(LastTrade(counter.price, orderExecutedEvent.executedAmount, submitted.order.orderType))
 
-            val (updatedOrderBook, updatedLevelChanges) = {
-              val updatedLevelChanges = currentUpdates.levelChanges.subtract(levelPrice, orderExecutedEvent)
-              val ob                  = currentUpdates.orderBook.copy(lastTrade = lastTrade)
+              val submittedRemaining = orderExecutedEvent.submittedRemaining
+              val counterRemaining   = orderExecutedEvent.counterRemaining
 
-              if (counterRemaining.isValid) (ob.unsafeUpdateBest(counterRemaining), updatedLevelChanges)
-              else
-                (
-                  ob.unsafeWithoutBest(counter.order.orderType),
-                  updatedLevelChanges |-| LevelAmounts.mkDiff(levelPrice, counterRemaining)
-                )
-            }
+              val (updatedOrderBook, updatedLevelChanges) = {
+                val updatedLevelChanges = currentUpdates.levelChanges.subtract(levelPrice, orderExecutedEvent)
+                val ob                  = currentUpdates.orderBook.copy(lastTrade = lastTrade)
 
-            val newUpdates = currentUpdates.copy(updatedOrderBook, updatedEvents, updatedLevelChanges, lastTrade)
-
-            if (submittedRemaining.isValid) {
-              if (counterRemaining.isValid)
-                // if submitted is not filled (e.g. LimitOrder: rounding issues, MarkerOrder: afs = 0) cancel its remaining
-                newUpdates.copy(events = updatedEvents enqueue systemCancelEvent(submittedRemaining))
-              else {
-                submittedRemaining match {
-                  case submittedRemaining: LimitOrder => loop(submittedRemaining, newUpdates)
-                  case submittedRemaining: MarketOrder =>
-                    val canSpendMore = submittedRemaining.availableForSpending > 0
-                    if (canSpendMore) loop(submittedRemaining, newUpdates)
-                    else newUpdates.copy(events = updatedEvents enqueue systemCancelEvent(submittedRemaining))
-                }
+                if (counterRemaining.isValid) (ob.unsafeUpdateBest(counterRemaining), updatedLevelChanges)
+                else
+                  (
+                    ob.unsafeWithoutBest(counter.order.orderType),
+                    updatedLevelChanges |-| LevelAmounts.mkDiff(levelPrice, counterRemaining)
+                  )
               }
-            } else newUpdates
+
+              val newUpdates = currentUpdates.copy(updatedOrderBook, updatedEvents, updatedLevelChanges, lastTrade)
+
+              if (submittedRemaining.isValid) {
+                if (counterRemaining.isValid)
+                  // if submitted is not filled (e.g. LimitOrder: rounding issues, MarkerOrder: afs = 0) cancel its remaining
+                  newUpdates.copy(events = updatedEvents enqueue systemCancelEvent(submittedRemaining))
+                else {
+                  submittedRemaining match {
+                    case submittedRemaining: LimitOrder => loop(submittedRemaining, newUpdates)
+                    case submittedRemaining: MarketOrder =>
+                      val canSpendMore = submittedRemaining.availableForSpending > 0
+                      if (canSpendMore) loop(submittedRemaining, newUpdates)
+                      else newUpdates.copy(events = updatedEvents enqueue systemCancelEvent(submittedRemaining))
+                  }
+                }
+              } else newUpdates
+            } else currentUpdates.copy(events = currentUpdates.events enqueue systemCancelEvent(submitted))
           } else
             loop(
               submitted = submitted,
@@ -188,7 +192,7 @@ object OrderBook {
               currentUpdates.copy(orderBook = updatedOrderBook, levelChanges = updatedLevelChanges)
             case submitted: MarketOrder =>
               // Cancel market order in the absence of counters
-              currentUpdates.copy(events = currentUpdates.events.enqueue(OrderCanceled(submitted, isSystemCancel = true, eventTs)))
+              currentUpdates.copy(events = currentUpdates.events enqueue systemCancelEvent(submitted))
           }
       }
 

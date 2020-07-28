@@ -117,12 +117,6 @@ trait ApiExtensions extends NodeApiExtensions {
           dex1.api.tradableBalance(account, pair).getOrElse(asset, 0L) shouldBe balance
       }
     }
-    eventually {
-      balances.foreach(b => {
-        val pair = if (b._2 == Waves) wavesUsdPair else if (b._2.compatId > Waves.compatId) AssetPair(b._2, Waves) else AssetPair(Waves, b._2)
-        dex1.api.tradableBalance(account, pair).getOrElse(b._2, 0L) shouldBe b._1
-      })
-    }
     account
   }
 

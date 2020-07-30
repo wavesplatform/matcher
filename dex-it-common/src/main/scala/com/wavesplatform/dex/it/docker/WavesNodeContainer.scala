@@ -79,7 +79,7 @@ object WavesNodeContainer extends ScorexLogging {
       waitStrategy = ignoreWaitStrategy
     ).configure { c =>
       c.withNetwork(network)
-      netAlias.foreach(c.withNetworkAliases(_))
+      netAlias.foreach { c.withNetworkAliases(_) }
       c.withFileSystemBind(localLogsDir.toString, containerLogsPath, BindMode.READ_WRITE)
       c.withCreateContainerCmdModifier {
         _.withName(s"$networkName-$name") // network.getName returns random id
@@ -88,7 +88,7 @@ object WavesNodeContainer extends ScorexLogging {
 
       // Copy files to container
       List(
-        ("waves-base.conf", getRawContentFromResource(s"nodes/waves-base.conf"), false),
+        ("waves-base.conf", getRawContentFromResource("nodes/waves-base.conf"), false),
         (s"$name.conf", getRawContentFromResource(s"nodes/$name.conf"), false),
         ("run.conf", runConfig.rendered, true),
         ("suite.conf", suiteInitialConfig.rendered, true),

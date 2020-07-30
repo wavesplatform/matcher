@@ -91,9 +91,9 @@ inTask(docker)(
         (Universal / stage).value                                                   -> s"$sourcesPath/", // sources
         (Compile / sourceDirectory).value / "container" / "start-matcher-server.sh" -> s"$sourcesPath/bin/", // entry point
         (Compile / sourceDirectory).value / "container" / "dex.conf"                -> s"$sourcesPath/conf/" // base config
-      ) foreach { case (source, destination) => add(source = source, destination = destination, chown = s"$user:$group") }
+      ) foreach { case (source, destination) => add(source = source, destination = destination, chown = s"$userId:$groupId") }
 
-      user(s"$user:$group")
+      user(s"$userId:$groupId")
 
       runShell("chmod", "+x", entryPointSh)
       workDir(userPath)

@@ -28,7 +28,7 @@ inTask(docker)(
           (Test / resourceDirectory).value / "nodes" / "logback-container.xml" // logs management
         ),
         destination = s"$basePath/",
-        chown = "waves:waves"
+        chown = "143:143"
       )
 
       runShell("chmod", "+x", entryPointSh)

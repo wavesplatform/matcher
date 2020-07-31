@@ -1,7 +1,6 @@
-sudo su
-systemctl stop waves-dex.service
-rm -rf /var/lib/waves-dex/data
-dpkg -r waves-dex
-dpkg -P waves-dex
-dpkg -i /home/buildagent-matcher/*dex*.deb
-systemctl start waves-dex
+sudo systemctl stop waves-dex.service
+sudo rm -rf /var/lib/waves-dex/data
+sudo dpkg -r waves-dex
+sudo dpkg -P waves-dex
+sudo dpkg -i /home/buildagent-matcher/*dex*.deb
+sudo systemctl start waves-dex

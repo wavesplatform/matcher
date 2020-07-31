@@ -7,6 +7,20 @@ description := "DEX integration tests"
 
 libraryDependencies ++= Dependencies.Module.dexIt
 
+
+
+
+
+val allureScalaTestVersion = "2.13.3"
+
+val allureScalaTest = "io.qameta.allure" % "allure-scalatest_2.13" % allureScalaTestVersion % Test
+
+testOptions in Test ++= Seq(
+  Tests.Argument(TestFrameworks.ScalaTest, "-oD"),
+  Tests.Argument(TestFrameworks.ScalaTest, "-C", "io.qameta.allure.scalatest.AllureScalatest")
+)
+
+
 // Additional files required for dex-it image
 itArtifactDescriptions := {
 

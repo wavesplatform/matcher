@@ -27,9 +27,9 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
   override protected def dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(
       """waves.dex {
-      |  price-assets = ["WAVES"]
-      |  snapshots-interval = 51
-      |}""".stripMargin
+        |  price-assets = ["WAVES"]
+        |  snapshots-interval = 51
+        |}""".stripMargin
     )
 
   protected lazy val dex2: DexContainer = createDex("dex-2")
@@ -73,8 +73,9 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
     val bobPlaces   = bobOrders.map(MatcherCommand.Place(dex2.asyncApi, _))
     val places      = Random.shuffle(alicePlaces ++ bobPlaces)
 
-    val aliceCancels = (1 to cancelsNumber).map(_ => choose(aliceOrders)).map(MatcherCommand.Cancel(dex1.asyncApi, alice, _))
-    val bobCancels   = (1 to cancelsNumber).map(_ => choose(bobOrders)).map(MatcherCommand.Cancel(dex2.asyncApi, bob, _))
+    // .toSet to remove duplications
+    val aliceCancels = (1 to cancelsNumber).map(_ => choose(aliceOrders)).toSet.map(MatcherCommand.Cancel(dex1.asyncApi, alice, _))
+    val bobCancels   = (1 to cancelsNumber).map(_ => choose(bobOrders)).toSet.map(MatcherCommand.Cancel(dex2.asyncApi, bob, _))
     val cancels      = Random.shuffle(aliceCancels ++ bobCancels)
 
     successfulCommandsNumber = executeCommands(places ++ cancels)

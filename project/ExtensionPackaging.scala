@@ -49,7 +49,7 @@ object ExtensionPackaging extends AutoPlugin {
         val appropriateFiles = List(s"waves_${wavesNodeVersion.value}_all.deb", s"waves-stagenet_${wavesNodeVersion.value}_all.deb").map(baseDir / _)
         val debFile          = appropriateFiles.find(_.isFile).getOrElse(throw new RuntimeException("Can't find a deb file to check dependencies"))
         val inDeb = filesInDeb(debFile)
-          .filter(x => x.endsWith(".jar") && x.startsWith("./usr/share/waves/lib"))
+          .filter(x => x.endsWith(".jar") && x.startsWith("./usr/share"))
           .map(_.split('/').last)
           .map {
             case jar(name, rev) => name -> rev

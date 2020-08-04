@@ -135,7 +135,8 @@ object OrderBook {
             val (counterExecutedFee, submittedExecutedFee) = getMakerTakerMaxFee(submitted, counter)
             val orderExecutedEvent                         = OrderExecuted(submitted, counter, eventTs, counterExecutedFee, submittedExecutedFee)
 
-            if (orderExecutedEvent.executedAmount != 0) {
+            if (orderExecutedEvent.executedAmount == 0) currentUpdates.copy(events = currentUpdates.events enqueue systemCancelEvent(submitted))
+            else {
 
               val updatedEvents = currentUpdates.events.enqueue(orderExecutedEvent)
               val lastTrade     = Some(LastTrade(counter.price, orderExecutedEvent.executedAmount, submitted.order.orderType))
@@ -171,7 +172,7 @@ object OrderBook {
                   }
                 }
               } else newUpdates
-            } else currentUpdates.copy(events = currentUpdates.events enqueue systemCancelEvent(submitted))
+            }
           } else
             loop(
               submitted = submitted,

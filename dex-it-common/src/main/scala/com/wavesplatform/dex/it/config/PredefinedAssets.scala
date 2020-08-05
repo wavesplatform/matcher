@@ -17,6 +17,11 @@ trait PredefinedAssets {
   val UsdId: ByteStr               = toVanilla(IssueUsdTx.getId)
   val usd: IssuedAsset             = IssuedAsset(UsdId)
 
+  val usdnAssetName: String         = "USD-N"
+  val IssueUsdnTx: IssueTransaction = mkIssue(alice, usdnAssetName, defaultAssetQuantity, 6)
+  val UsdnId: ByteStr               = toVanilla(IssueUsdnTx.getId)
+  val usdn: IssuedAsset             = IssuedAsset(UsdnId)
+
   val wctAssetName: String         = "WCT-X"
   val IssueWctTx: IssueTransaction = mkIssue(bob, wctAssetName, defaultAssetQuantity, 2)
   val WctId: ByteStr               = toVanilla(IssueWctTx.getId)
@@ -32,17 +37,19 @@ trait PredefinedAssets {
   val BtcId: ByteStr               = toVanilla(IssueBtcTx.getId)
   val btc: IssuedAsset             = IssuedAsset(BtcId)
 
-  val wctUsdPair: AssetPair   = AssetPair(wct, usd)
-  val wctWavesPair: AssetPair = AssetPair(wct, Waves)
-  val ethWavesPair: AssetPair = AssetPair(eth, Waves)
-  val ethBtcPair: AssetPair   = AssetPair(eth, btc)
-  val wavesUsdPair: AssetPair = AssetPair(Waves, usd)
-  val ethUsdPair: AssetPair   = AssetPair(eth, usd)
-  val wavesBtcPair: AssetPair = AssetPair(Waves, btc)
-  val btcUsdPair: AssetPair   = AssetPair(btc, usd)
+  val wctUsdPair: AssetPair    = AssetPair(wct, usd)
+  val wctWavesPair: AssetPair  = AssetPair(wct, Waves)
+  val ethWavesPair: AssetPair  = AssetPair(eth, Waves)
+  val ethBtcPair: AssetPair    = AssetPair(eth, btc)
+  val wavesUsdPair: AssetPair  = AssetPair(Waves, usd)
+  val ethUsdPair: AssetPair    = AssetPair(eth, usd)
+  val wavesBtcPair: AssetPair  = AssetPair(Waves, btc)
+  val btcUsdPair: AssetPair    = AssetPair(btc, usd)
+  val wavesUsdnPair: AssetPair = AssetPair(Waves, usdn)
+  val btcUsdnPair: AssetPair   = AssetPair(btc, usdn)
 
   val ForbiddenAssetId: ByteStr   = ByteStr.decodeBase58("FdbnAsset").get
   val ForbiddenAsset: IssuedAsset = IssuedAsset(ForbiddenAssetId)
 
-  implicit val assetDecimalsMap: Map[Asset, Int] = Map[Asset, Int](Waves -> 8, usd -> 2, wct -> 2, eth -> 8, btc -> 8).withDefaultValue(8)
+  implicit val assetDecimalsMap: Map[Asset, Int] = Map[Asset, Int](Waves -> 8, usd -> 2, usdn -> 6, wct -> 2, eth -> 8, btc -> 8).withDefaultValue(8)
 }

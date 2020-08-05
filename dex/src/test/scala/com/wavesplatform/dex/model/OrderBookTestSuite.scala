@@ -462,6 +462,21 @@ class OrderBookTestSuite
     }
   }
 
+  "not create OrderExecuted event with executed amount = 0 and the last trade should not have amount = 0" in {
+    val sellOrder = LimitOrder(rawSell(pair, 345506L, 9337000000L))
+    val buyOrder  = MarketOrder(rawBuy(pair, 80902L, 10270700000L), 26L)
+
+    val r = OrderBook.empty.appendAllAccepted(List(sellOrder, buyOrder), now)
+    r.events should have size (3)
+    val lastEvent = r.events.last match {
+      case x: OrderCanceled => x
+      case x                => fail(s"Expected cancel, but got $x")
+    }
+
+    lastEvent should matchTo(OrderCanceled(buyOrder, isSystemCancel = true, 0L))
+    r.lastTrade.isEmpty shouldBe true
+  }
+
   "correctly calculates average price" in {
 
     val balance   = Map[Asset, Long](usd -> 500.usd).withDefaultValue(0L)

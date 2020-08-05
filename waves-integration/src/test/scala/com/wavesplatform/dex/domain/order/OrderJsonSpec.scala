@@ -1,16 +1,16 @@
 package com.wavesplatform.dex.domain.order
 
 import cats.syntax.option._
+import com.wavesplatform.dex.WavesIntegrationSuiteBase
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.OrderJson.orderFormat
 import com.wavesplatform.dex.domain.order.OrderOps._
 import org.scalatest.matchers.should.Matchers
-import org.scalatest.wordspec.AnyWordSpecLike
 import play.api.libs.json.Json
 
-class OrderJsonSpec extends AnyWordSpecLike with Matchers {
+class OrderJsonSpec extends WavesIntegrationSuiteBase with Matchers {
 
   private val usd: IssuedAsset        = IssuedAsset("USDN".getBytes)
   private val wavesUsdPair: AssetPair = AssetPair(Waves, usd)

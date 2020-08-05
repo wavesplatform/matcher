@@ -139,7 +139,7 @@ object Dependencies {
   private val commonsNet    = "commons-net" % "commons-net" % Version.commonsNet
   private val sttpClient    = "com.softwaremill.sttp.client" %% "core" % Version.sttpClient
   private val pureConfig    = "com.github.pureconfig" %% "pureconfig" % Version.pureConfig
-  private val allureScalaTest = "io.qameta.allure" % "allure-scalatest_2.13" % "2.13.3" % Test
+  private val allureScalaTest = "io.qameta.allure" %% "allure-scalatest" % "2.13.3" % Test
 
   private val monocle: Seq[ModuleID] = Seq(
     "com.github.julien-truffaut" %% "monocle-core"  % Version.monocle,

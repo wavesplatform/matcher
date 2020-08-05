@@ -39,3 +39,5 @@ Dockerfile
 *.log
 
 native
+
+allure-results

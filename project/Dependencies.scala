@@ -75,7 +75,8 @@ object Dependencies {
     val nettyCodec = "4.1.33.Final"
     val jwt        = "4.3.0"
 
-    val pureConfig = "0.13.0"
+    val pureConfig      = "0.13.0"
+    val allureScalaTest = "2.13.5"
   }
 
   private def akkaModule(module: String, version: String): ModuleID  = "com.typesafe.akka"             %% module            % version
@@ -121,24 +122,25 @@ object Dependencies {
     ExclusionRule("com.wavesplatform", "protobuf-schemas")
   )
 
-  private val toxiProxy     = "org.testcontainers" % "toxiproxy" % Version.testContainersToxiProxy
-  private val googleGuava   = "com.google.guava" % "guava" % Version.googleGuava
-  private val kafka         = "org.apache.kafka" % "kafka-clients" % Version.kafka
-  private val grpcNetty     = "io.grpc" % "grpc-netty" % scalapb.compiler.Version.grpcJavaVersion
-  private val nettyCodec    = "io.netty" % "netty-codec-http2" % Version.nettyCodec
-  private val swagger       = "com.github.swagger-akka-http" %% "swagger-akka-http" % Version.swagger
-  private val swaggerUi     = "org.webjars" % "swagger-ui" % Version.swaggerUi
-  private val playJson      = "com.typesafe.play" %% "play-json" % Version.playJson
-  private val scorexCrypto  = "org.scorexfoundation" %% "scrypto" % Version.scorexCrypto
-  private val grpcScalaPb   = "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion
-  private val monixReactive = monixModule("reactive")
-  private val supertagged   = "org.rudogma" %% "supertagged" % Version.supertagged
-  private val javaLevelDb   = "org.iq80.leveldb" % "leveldb" % Version.javaLevelDb
-  private val jniLevelDb    = "org.ethereum" % "leveldbjni-all" % Version.jniLevelDb
-  private val influxDb      = "org.influxdb" % "influxdb-java" % Version.influxDb
-  private val commonsNet    = "commons-net" % "commons-net" % Version.commonsNet
-  private val sttpClient    = "com.softwaremill.sttp.client" %% "core" % Version.sttpClient
-  private val pureConfig    = "com.github.pureconfig" %% "pureconfig" % Version.pureConfig
+  private val toxiProxy       = "org.testcontainers" % "toxiproxy" % Version.testContainersToxiProxy
+  private val googleGuava     = "com.google.guava" % "guava" % Version.googleGuava
+  private val kafka           = "org.apache.kafka" % "kafka-clients" % Version.kafka
+  private val grpcNetty       = "io.grpc" % "grpc-netty" % scalapb.compiler.Version.grpcJavaVersion
+  private val nettyCodec      = "io.netty" % "netty-codec-http2" % Version.nettyCodec
+  private val swagger         = "com.github.swagger-akka-http" %% "swagger-akka-http" % Version.swagger
+  private val swaggerUi       = "org.webjars" % "swagger-ui" % Version.swaggerUi
+  private val playJson        = "com.typesafe.play" %% "play-json" % Version.playJson
+  private val scorexCrypto    = "org.scorexfoundation" %% "scrypto" % Version.scorexCrypto
+  private val grpcScalaPb     = "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion
+  private val monixReactive   = monixModule("reactive")
+  private val supertagged     = "org.rudogma" %% "supertagged" % Version.supertagged
+  private val javaLevelDb     = "org.iq80.leveldb" % "leveldb" % Version.javaLevelDb
+  private val jniLevelDb      = "org.ethereum" % "leveldbjni-all" % Version.jniLevelDb
+  private val influxDb        = "org.influxdb" % "influxdb-java" % Version.influxDb
+  private val commonsNet      = "commons-net" % "commons-net" % Version.commonsNet
+  private val sttpClient      = "com.softwaremill.sttp.client" %% "core" % Version.sttpClient
+  private val pureConfig      = "com.github.pureconfig" %% "pureconfig" % Version.pureConfig
+  private val allureScalaTest = "io.qameta.allure" %% "allure-scalatest" % Version.allureScalaTest
 
   private val monocle: Seq[ModuleID] = Seq(
     "com.github.julien-truffaut" %% "monocle-core"  % Version.monocle,
@@ -169,7 +171,8 @@ object Dependencies {
     scalaCheck,
     scalaTestPlusCheck,
     scalaMock,
-    javaLevelDb
+    javaLevelDb,
+    allureScalaTest
   ) map (_ % Test)
 
   private val integrationTestKit: Seq[ModuleID] = Seq(wavesJ, logback % Test) ++ testKit
@@ -253,7 +256,7 @@ object Dependencies {
       wavesJ
     ) ++ testContainers
 
-    lazy val dexTestCommon: Seq[ModuleID] = Seq(diffx, scalaTest, scalaCheck, scalaTestPlusCheck)
+    lazy val dexTestCommon: Seq[ModuleID] = Seq(diffx, scalaTest, scalaCheck, scalaTestPlusCheck, allureScalaTest)
 
     lazy val wavesExt: Seq[ModuleID] = Seq(
       grpcNetty

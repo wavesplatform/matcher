@@ -103,8 +103,6 @@ inScope(Global)(
       "-Ywarn-unused:-implicits",
       "-Xlint",
       "-Ypartial-unification",
-      "-opt:l:inline",
-      "-opt-inline-from:**",
       "-Yrangepos" // required for scalafix
     ),
     crossPaths := false,

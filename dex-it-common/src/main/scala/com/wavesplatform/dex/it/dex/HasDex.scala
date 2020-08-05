@@ -11,8 +11,6 @@ import com.wavesplatform.dex.it.fp.CanExtract
 import mouse.any._
 import org.apache.kafka.clients.admin.{AdminClient, NewTopic}
 
-import scala.collection.JavaConverters._
-
 trait HasDex { self: BaseContainersKit =>
   private val defaultTag = Option(System.getenv("DEX_TAG")).getOrElse("latest")
 
@@ -48,14 +46,14 @@ trait HasDex { self: BaseContainersKit =>
 
   protected def createKafkaTopic(name: String): Unit = kafkaServer.foreach { server =>
     val properties = new Properties()
-    properties.putAll(
-      Map(
-        "bootstrap.servers"  -> server,
-        "group.id"           -> s"create-$name",
-        "key.deserializer"   -> "org.apache.kafka.common.serialization.StringDeserializer",
-        "value.deserializer" -> "org.apache.kafka.common.serialization.StringDeserializer"
-      ).asJava
-    )
+    Map(
+      "bootstrap.servers"  -> server,
+      "group.id"           -> s"create-$name",
+      "key.deserializer"   -> "org.apache.kafka.common.serialization.StringDeserializer",
+      "value.deserializer" -> "org.apache.kafka.common.serialization.StringDeserializer"
+    ).foreach {
+      case (k, v) => properties.put(k, v)
+    }
 
     val adminClient = AdminClient.create(properties)
 

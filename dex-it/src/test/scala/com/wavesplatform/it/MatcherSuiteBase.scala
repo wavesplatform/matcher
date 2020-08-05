@@ -19,6 +19,7 @@ import com.wavesplatform.dex.it.waves.{MkWavesEntities, ToWavesJConversions}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.waves.WavesFeeConstants
 import com.wavesplatform.it.api.ApiExtensions
+import io.qameta.allure.scalatest.AllureScalatestContext
 import org.scalatest.concurrent.Eventually
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
@@ -28,6 +29,7 @@ import scala.concurrent.duration.DurationInt
 
 trait MatcherSuiteBase
     extends AnyFreeSpec
+    with AllureScalatestContext
     with Matchers
     with CancelAfterFailure
     with BeforeAndAfterAll

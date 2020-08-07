@@ -66,12 +66,15 @@ object AssetPair {
       a2 <- extractAsset(priceAsset)
     } yield AssetPair(a1, a2)
 
-  def fromBytes(xs: Array[Byte]): AssetPair = {
-    val (amount, offset) = deser.parseByteArrayOption(xs, 0, Asset.AssetIdLength)
-    val (price, _)       = deser.parseByteArrayOption(xs, offset, Asset.AssetIdLength)
-    AssetPair(
-      Asset.fromCompatId(amount.map(ByteStr(_))),
-      Asset.fromCompatId(price.map(ByteStr(_)))
+  def fromBytes(xs: Array[Byte]): (AssetPair, Int) = {
+    val (amount, offset1) = deser.parseByteArrayOption(xs, 0, Asset.AssetIdLength)
+    val (price, offset2)  = deser.parseByteArrayOption(xs, offset1, Asset.AssetIdLength)
+    (
+      AssetPair(
+        Asset.fromCompatId(amount.map(ByteStr(_))),
+        Asset.fromCompatId(price.map(ByteStr(_)))
+      ),
+      offset2
     )
   }
 

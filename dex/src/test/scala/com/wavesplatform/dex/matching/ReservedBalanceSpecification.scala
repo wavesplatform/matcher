@@ -18,7 +18,7 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.meta.getSimpleName
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
-import com.wavesplatform.dex.model.{LimitOrder, MarketOrder}
+import com.wavesplatform.dex.model.{Events, LimitOrder, MarketOrder}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.propspec.AnyPropSpecLike
@@ -507,7 +507,7 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
   }
 
   private def systemCancelMarketOrder(addressDir: ActorRef, marketOrder: MarketOrder): Unit = {
-    addressDir ! OrderCanceled(marketOrder, isSystemCancel = true, System.currentTimeMillis)
+    addressDir ! OrderCanceled(marketOrder, Events.OrderCanceled.Reason.Unmatchable, System.currentTimeMillis)
   }
 
   private def executeMarketOrder(addressDirWithOrderBookCache: ActorRef, marketOrder: MarketOrder, limitOrder: LimitOrder): OrderExecuted = {

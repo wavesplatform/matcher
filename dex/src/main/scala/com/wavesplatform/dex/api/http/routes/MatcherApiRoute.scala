@@ -476,7 +476,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       (timestamp, orderId) match {
         case (Some(ts), None) => askAddressActor(sender, AddressActor.Command.CancelAllOrders(assetPair, ts))(handleBatchCancelResponse)
         case (None, Some(oid)) =>
-          askAddressActor(sender, AddressActor.Command.CancelOrder(oid)) {
+          askAddressActor(sender, AddressActor.Command.CancelOrder(oid, AddressActor.Command.CancelOrder.Source.Request)) {
             case AddressActor.Event.OrderCanceled(x) => SimpleResponse(HttpSuccessfulSingleCancel(x))
             case x: error.MatcherError =>
               if (x == error.CanNotPersistEvent) StatusCodes.ServiceUnavailable -> HttpError.from(x, "WavesNodeUnavailable")

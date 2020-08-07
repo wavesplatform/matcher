@@ -473,7 +473,7 @@ class OrderBookTestSuite
       case x                => fail(s"Expected cancel, but got $x")
     }
 
-    lastEvent should matchTo(OrderCanceled(buyOrder, isSystemCancel = true, 0L))
+    lastEvent should matchTo(OrderCanceled(buyOrder, Events.OrderCanceled.Reason.Unmatchable, 0L))
     r.lastTrade.isEmpty shouldBe true
   }
 
@@ -529,7 +529,7 @@ class OrderBookTestSuite
 
           events(7) shouldBe a[OrderCanceled]
           events(7).asInstanceOf[OrderCanceled] should matchTo {
-            OrderCanceled(buyMo.partial(remainingAmount, remainingFee, 10.usd, awpNominator), isSystemCancel = true, now + 3)
+            OrderCanceled(buyMo.partial(remainingAmount, remainingFee, 10.usd, awpNominator), Events.OrderCanceled.Reason.Unmatchable, now + 3)
           }
         }
       }

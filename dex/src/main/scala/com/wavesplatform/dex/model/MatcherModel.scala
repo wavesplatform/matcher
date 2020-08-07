@@ -11,6 +11,8 @@ import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.fp.MapImplicits.cleaningGroup
 import com.wavesplatform.dex.model.AcceptedOrder.FillingInfo
+import com.wavesplatform.dex.model.Events.OrderCanceled
+import com.wavesplatform.dex.model.Events.OrderCanceled.Reason
 
 object MatcherModel {
 
@@ -372,10 +374,11 @@ object OrderStatus {
     val name = "Cancelled"
   }
 
-  def finalCancelStatus(ao: AcceptedOrder, isSystemCancel: Boolean): Final = {
+  def finalCancelStatus(ao: AcceptedOrder, reason: OrderCanceled.Reason): Final = {
     val filledAmount     = ao.order.amount - ao.amount
     val filledMatcherFee = ao.order.matcherFee - ao.fee
-    if (isSystemCancel && (filledAmount > 0 || ao.isMarket)) Filled(filledAmount, filledMatcherFee) else Cancelled(filledAmount, filledMatcherFee)
+    val unmatchable      = Reason.isUnmatchable(reason)
+    if (unmatchable && (filledAmount > 0 || ao.isMarket)) Filled(filledAmount, filledMatcherFee) else Cancelled(filledAmount, filledMatcherFee)
   }
 }
 
@@ -432,7 +435,24 @@ object Events {
 
   case class OrderAdded(order: AcceptedOrder, timestamp: Long) extends Event
 
-  case class OrderCanceled(acceptedOrder: AcceptedOrder, isSystemCancel: Boolean, timestamp: Long) extends Event
+  case class OrderCanceled(acceptedOrder: AcceptedOrder, reason: OrderCanceled.Reason, timestamp: Long) extends Event
+  object OrderCanceled {
+    sealed trait Reason extends Product with Serializable
+    object Reason {
+      case object NotTracked          extends Reason
+      case object RequestExecuted     extends Reason
+      case object OrderBookDeleted    extends Reason
+      case object Expired             extends Reason
+      case object Unmatchable         extends Reason
+      case object InsufficientBalance extends Reason
+      case object NotValid            extends Reason
+
+      def isUnmatchable(reason: Reason): Boolean = reason match {
+        case Unmatchable => true
+        case _           => false
+      }
+    }
+  }
 
   case class OrderCancelFailed(id: Order.Id, reason: error.MatcherError)
 

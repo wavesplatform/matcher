@@ -9,6 +9,7 @@ import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import cats.kernel.Monoid
 import com.wavesplatform.dex.MatcherSpecBase
 import com.wavesplatform.dex.actors.SpendableBalancesActor
+import com.wavesplatform.dex.actors.address.AddressActor.Command.CancelOrder
 import com.wavesplatform.dex.actors.address.AddressActor.Query.GetTradableBalance
 import com.wavesplatform.dex.actors.address.AddressActor.Reply.Balance
 import com.wavesplatform.dex.api.ws.protocol.WsAddressChanges
@@ -96,7 +97,7 @@ class AddressActorSpecification
         addOrder(LimitOrder(sellTokenOrder1))
 
         updatePortfolio(initPortfolio.copy(assets = Map.empty))
-        eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder1.assetPair, sellTokenOrder1.id()))
+        eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder1.assetPair, sellTokenOrder1.id(), CancelOrder.Source.BalanceTracking))
       }
 
       "waves balance changed" when {
@@ -110,7 +111,7 @@ class AddressActorSpecification
           addOrder(LimitOrder(sellWavesOrder))
 
           updatePortfolio(initPortfolio.copy(balance = restWaves))
-          eventsProbe.expectMsg(QueueEvent.Canceled(sellWavesOrder.assetPair, sellWavesOrder.id()))
+          eventsProbe.expectMsg(QueueEvent.Canceled(sellWavesOrder.assetPair, sellWavesOrder.id(), CancelOrder.Source.BalanceTracking))
         }
       }
 
@@ -125,7 +126,7 @@ class AddressActorSpecification
           addOrder(LimitOrder(sellWavesOrder))
 
           updatePortfolio(initPortfolio.copy(lease = LeaseBalance(0, leasedWaves(initPortfolio))))
-          eventsProbe.expectMsg(QueueEvent.Canceled(sellWavesOrder.assetPair, sellWavesOrder.id()))
+          eventsProbe.expectMsg(QueueEvent.Canceled(sellWavesOrder.assetPair, sellWavesOrder.id(), CancelOrder.Source.BalanceTracking))
         }
       }
     }
@@ -151,7 +152,7 @@ class AddressActorSpecification
       addOrder(LimitOrder(sellTokenOrder2))
 
       updatePortfolio(sellToken1Portfolio)
-      eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder2.assetPair, sellTokenOrder2.id()))
+      eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder2.assetPair, sellTokenOrder2.id(), CancelOrder.Source.BalanceTracking))
 
       updatePortfolio(sellToken1Portfolio) // same event
       eventsProbe.expectNoMessage()
@@ -165,8 +166,8 @@ class AddressActorSpecification
       addOrder(LimitOrder(sellTokenOrder2))
 
       updatePortfolio(sellWavesPortfolio)
-      eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder1.assetPair, sellTokenOrder1.id()))
-      eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder2.assetPair, sellTokenOrder2.id()))
+      eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder1.assetPair, sellTokenOrder1.id(), CancelOrder.Source.BalanceTracking))
+      eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder2.assetPair, sellTokenOrder2.id(), CancelOrder.Source.BalanceTracking))
     }
 
     "cancel only orders, those aren't fit" in test { (_, eventsProbe, addOrder, updatePortfolio) =>
@@ -176,8 +177,8 @@ class AddressActorSpecification
       Seq(sellTokenOrder1, sellWavesOrder, sellTokenOrder2).foreach(o => addOrder(LimitOrder(o)))
 
       updatePortfolio(sellWavesPortfolio)
-      eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder1.assetPair, sellTokenOrder1.id()))
-      eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder2.assetPair, sellTokenOrder2.id()))
+      eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder1.assetPair, sellTokenOrder1.id(), CancelOrder.Source.BalanceTracking))
+      eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder2.assetPair, sellTokenOrder2.id(), CancelOrder.Source.BalanceTracking))
     }
 
     "cancel expired orders" in test { (ref, eventsProbe, addOrder, updatePortfolio) =>
@@ -199,7 +200,7 @@ class AddressActorSpecification
         ))
       addOrder(lo)
 
-      eventsProbe.expectMsg(QueueEvent.Canceled(lo.order.assetPair, lo.id))
+      eventsProbe.expectMsg(QueueEvent.Canceled(lo.order.assetPair, lo.id, CancelOrder.Source.Expiration))
     }
 
     "should not send a message multiple times" in test { (ref, _, addOrder, updatePortfolio) =>

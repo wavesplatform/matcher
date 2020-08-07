@@ -378,7 +378,7 @@ class OrderHistoryBalanceSpecification
 
     oh.process(OrderAdded(LimitOrder(counter), time.getTimestamp()))
     val exec = mkOrderExecutedRaw(submitted, counter)
-    oh.processAll(exec, OrderCanceled(exec.submittedRemaining, isSystemCancel = true, time.getTimestamp()))
+    oh.processAll(exec, OrderCanceled(exec.submittedRemaining, Events.OrderCanceled.Reason.Unmatchable, time.getTimestamp()))
 
     withClue(s"account checks, counter.senderPublicKey: ${counter.senderPublicKey}, counter.order.id=${counter.id()}") {
       openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe 205L
@@ -421,7 +421,7 @@ class OrderHistoryBalanceSpecification
     val exec1 = mkOrderExecuted(submitted, counter1)
     oh.processAll(
       exec1,
-      OrderCanceled(exec1.counterRemaining, isSystemCancel = true, time.getTimestamp()),
+      OrderCanceled(exec1.counterRemaining, Events.OrderCanceled.Reason.Unmatchable, time.getTimestamp()),
       mkOrderExecuted(exec1.submittedLimitRemaining(submitted), counter2)
     )
 
@@ -441,8 +441,8 @@ class OrderHistoryBalanceSpecification
     val exec = mkOrderExecutedRaw(submitted, counter)
     oh.processAll(
       exec,
-      OrderCanceled(exec.submittedRemaining, isSystemCancel = true, time.getTimestamp()),
-      OrderCanceled(exec.counterRemaining, isSystemCancel = false, time.getTimestamp()) // Cancelled by user
+      OrderCanceled(exec.submittedRemaining, Events.OrderCanceled.Reason.Unmatchable, time.getTimestamp()),
+      OrderCanceled(exec.counterRemaining, Events.OrderCanceled.Reason.RequestExecuted, time.getTimestamp())
     )
 
     withClue(s"account checks, submitted.senderPublicKey: ${submitted.senderPublicKey}, submitted.order.id=${submitted.id()}") {
@@ -502,7 +502,7 @@ class OrderHistoryBalanceSpecification
   property("Cancel buy order") {
     val ord1 = buy(WctBtc, 100000000, 0.0008, matcherFee = Some(300000L))
 
-    oh.processAll(OrderAdded(LimitOrder(ord1), time.getTimestamp()), OrderCanceled(LimitOrder(ord1), isSystemCancel = false, time.getTimestamp()))
+    oh.processAll(OrderAdded(LimitOrder(ord1), time.getTimestamp()), OrderCanceled(LimitOrder(ord1), Events.OrderCanceled.Reason.RequestExecuted, time.getTimestamp()))
 
     orderStatus(ord1.id()) shouldBe OrderStatus.Cancelled(0, 0)
 
@@ -524,7 +524,7 @@ class OrderHistoryBalanceSpecification
     val ord1 = sell(WctBtc, 100000000, 0.0008, matcherFee = Some(300000L))
 
     oh.process(OrderAdded(LimitOrder(ord1), time.getTimestamp()))
-    oh.process(OrderCanceled(LimitOrder(ord1), isSystemCancel = false, time.getTimestamp()))
+    oh.process(OrderCanceled(LimitOrder(ord1), Events.OrderCanceled.Reason.RequestExecuted, time.getTimestamp()))
 
     orderStatus(ord1.id()) shouldBe OrderStatus.Cancelled(0, 0)
 
@@ -542,7 +542,7 @@ class OrderHistoryBalanceSpecification
     oh.processAll(
       exec1,
       OrderCanceled(exec1.counter.partial(exec1.counterRemainingAmount, exec1.counterRemainingFee, BigInteger.ZERO),
-                    isSystemCancel = false,
+                    Events.OrderCanceled.Reason.RequestExecuted,
                     time.getTimestamp())
     )
 
@@ -582,7 +582,7 @@ class OrderHistoryBalanceSpecification
     oh.processAll(
       exec,
       OrderAdded(exec.submittedLimitRemaining(ord4), time.getTimestamp()),
-      OrderCanceled(ord3, isSystemCancel = false, time.getTimestamp()),
+      OrderCanceled(ord3, Events.OrderCanceled.Reason.RequestExecuted, time.getTimestamp()),
       OrderAdded(ord5, time.getTimestamp())
     )
 
@@ -614,7 +614,7 @@ class OrderHistoryBalanceSpecification
     }.toVector
 
     val canceledOrder = origOrders.last
-    oh.process(OrderCanceled(LimitOrder(canceledOrder), isSystemCancel = false, time.getTimestamp()))
+    oh.process(OrderCanceled(LimitOrder(canceledOrder), Events.OrderCanceled.Reason.RequestExecuted, time.getTimestamp()))
 
     val newOrder = buy(WavesBtc, 100000000, 0.001, Some(pk), Some(300000L), Some(1L))
     oh.process(OrderAdded(LimitOrder(newOrder), time.getTimestamp()))
@@ -640,7 +640,7 @@ class OrderHistoryBalanceSpecification
     }.toVector
 
     val canceledOrder = origOrders.last
-    oh.process(OrderCanceled(LimitOrder(canceledOrder), isSystemCancel = false, time.getTimestamp()))
+    oh.process(OrderCanceled(LimitOrder(canceledOrder), Events.OrderCanceled.Reason.RequestExecuted, time.getTimestamp()))
 
     withClue("orders list") {
       // 'last' is canceled, remove it
@@ -688,7 +688,7 @@ class OrderHistoryBalanceSpecification
     }.toVector
 
     val (ordersToCancel, activeOrders) = allOrders.splitAt(ordersToFinalize)
-    ordersToCancel.foreach(o => oh.process(OrderCanceled(LimitOrder(o), isSystemCancel = false, time.getTimestamp())))
+    ordersToCancel.foreach(o => oh.process(OrderCanceled(LimitOrder(o), Events.OrderCanceled.Reason.RequestExecuted, time.getTimestamp())))
     val expectedActiveOrderIds = activeOrders.map(_.id()).reverse
 
     withClue("common") {
@@ -719,7 +719,7 @@ class OrderHistoryBalanceSpecification
       o
     }.toVector
 
-    pair1Orders.foreach(o => oh.process(OrderCanceled(LimitOrder(o), isSystemCancel = false, time.getTimestamp())))
+    pair1Orders.foreach(o => oh.process(OrderCanceled(LimitOrder(o), Events.OrderCanceled.Reason.RequestExecuted, time.getTimestamp())))
 
     withClue("after 1 step") {
       activeOrderIds(pk) shouldBe empty
@@ -750,7 +750,7 @@ class OrderHistoryBalanceSpecification
       o
     }.toVector
 
-    pair2Orders.foreach(o => oh.process(OrderCanceled(LimitOrder(o), isSystemCancel = false, time.getTimestamp())))
+    pair2Orders.foreach(o => oh.process(OrderCanceled(LimitOrder(o), Events.OrderCanceled.Reason.RequestExecuted, time.getTimestamp())))
 
     withClue("after 2 step") {
       activeOrderIds(pk) shouldBe empty
@@ -874,7 +874,7 @@ class OrderHistoryBalanceSpecification
 
   property("Idempotence - OrderCancelled") {
     val ord1   = buy(WctBtc, 100000000, 0.0008, matcherFee = Some(300000L))
-    val cancel = OrderCanceled(LimitOrder(ord1), isSystemCancel = false, time.getTimestamp())
+    val cancel = OrderCanceled(LimitOrder(ord1), Events.OrderCanceled.Reason.RequestExecuted, time.getTimestamp())
     oh.processAll(OrderAdded(LimitOrder(ord1), time.getTimestamp()), cancel, cancel)
 
     orderStatus(ord1.id()) shouldBe OrderStatus.Cancelled(0, 0)

@@ -104,12 +104,17 @@ class ActorsWebSocketInteractionsSpecification
       addressDir ! OrderAdded(ao, System.currentTimeMillis)
     }
 
-    def cancelOrder(ao: AcceptedOrder, isSystemCancel: Boolean): Unit = {
+    def cancelOrder(ao: AcceptedOrder, unmatchable: Boolean): Unit = {
       if (ao.isLimit) {
-        addressDir ! AddressDirectoryActor.Envelope(address, AddressActor.Command.CancelOrder(ao.id))
-        eventsProbe.expectMsg(QueueEvent.Canceled(ao.order.assetPair, ao.id))
+        val source =
+          if (unmatchable) AddressActor.Command.CancelOrder.Source.Request // Have no idea
+          else AddressActor.Command.CancelOrder.Source.Request
+        addressDir ! AddressDirectoryActor.Envelope(address, AddressActor.Command.CancelOrder(ao.id, source))
+        eventsProbe.expectMsg(QueueEvent.Canceled(ao.order.assetPair, ao.id, source))
       }
-      addressDir ! OrderCanceled(ao, isSystemCancel, System.currentTimeMillis)
+
+      val reason = if (unmatchable) Events.OrderCanceled.Reason.Unmatchable else Events.OrderCanceled.Reason.RequestExecuted
+      addressDir ! OrderCanceled(ao, reason, System.currentTimeMillis)
     }
 
     def executeOrder(s: AcceptedOrder, c: LimitOrder): OrderExecuted = {

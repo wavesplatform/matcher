@@ -1125,7 +1125,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
               if (orderId == okOrder.id()) AddressActor.Reply.GetOrderStatus(OrderStatus.Accepted)
               else Status.Failure(new RuntimeException(s"Unknown order $orderId"))
 
-            case AddressActor.Command.CancelOrder(orderId) =>
+            case AddressActor.Command.CancelOrder(orderId, _) =>
               if (orderId == okOrder.id() || orderId == orderToCancel.id()) AddressActor.Event.OrderCanceled(orderId)
               else error.OrderNotFound(orderId)
 

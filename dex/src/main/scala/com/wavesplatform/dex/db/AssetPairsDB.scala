@@ -21,7 +21,7 @@ object AssetPairsDB {
       val r = Set.newBuilder[AssetPair]
 
       ro.iterateOver(DbKeys.AssetPairsPrefix) { pair =>
-        r += AssetPair.fromBytes(pair.getKey.drop(2))
+        r += AssetPair.fromBytes(pair.getKey.drop(2))._1
       }
 
       r.result()

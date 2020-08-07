@@ -12,7 +12,7 @@ import com.wavesplatform.dex.domain.model.Denormalization
 import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV1}
 import com.wavesplatform.dex.history.HistoryRouter.{SaveEvent, SaveOrder}
 import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCanceled, OrderExecuted}
-import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder}
+import com.wavesplatform.dex.model.{AcceptedOrder, Events, LimitOrder}
 import com.wavesplatform.dex.time.SystemTime
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
@@ -73,7 +73,7 @@ class HistoryRouterSpecification
   }
 
   def orderAdded(submitted: LimitOrder): OrderAdded           = OrderAdded(submitted, time.getTimestamp())
-  def orderCancelled(submitted: AcceptedOrder): OrderCanceled = OrderCanceled(submitted, isSystemCancel = false, time.getTimestamp())
+  def orderCancelled(submitted: AcceptedOrder): OrderCanceled = OrderCanceled(submitted, Events.OrderCanceled.Reason.RequestExecuted, time.getTimestamp()) // TODO
 
   def orderExecuted(submitted: AcceptedOrder, counter: LimitOrder): OrderExecuted = {
     OrderExecuted(submitted, counter, time.getTimestamp(), counter.matcherFee, submitted.matcherFee)

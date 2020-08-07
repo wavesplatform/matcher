@@ -15,6 +15,10 @@ pipeline {
     stages {
         stage('Cleanup & Compile') {    
             steps {
+                if (env.BRANCH_NAME ==~ /(DEX\-.*|master)/) {
+                    currentBuild.result = 'ABORTED'
+                    error('The branch have an incorrect name. Allowed names: master, version-, DEX-')
+                }
                 sh 'git fetch --tags'
                 sh 'find ~/.sbt/1.0/staging/*/waves -type d -name target | xargs -I{} rm -rf {}'
                 sh 'find . -type d -name target | xargs -I{} rm -rf {}'

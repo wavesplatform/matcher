@@ -45,10 +45,11 @@ object QueueEvent {
   def fromBytes(xs: Array[Byte]): QueueEvent = xs.head match {
     case 1 => Placed(LimitOrder(Order.fromBytes(xs(1), xs.slice(2, Int.MaxValue))))
     case 2 =>
-      val (assetPair, offset1) = AssetPair.fromBytes(xs.tail)
+      val bodyBytes            = xs.tail
+      val (assetPair, offset1) = AssetPair.fromBytes(bodyBytes)
       val offset2              = offset1 + DigestSize
-      val orderId              = ByteStr(xs.slice(offset1, offset2))
-      Canceled(assetPair, orderId, bytesToSource(xs.drop(offset2)))
+      val orderId              = ByteStr(bodyBytes.slice(offset1, offset2))
+      Canceled(assetPair, orderId, bytesToSource(bodyBytes.drop(offset2)))
 
     case 3 => OrderBookDeleted(AssetPair.fromBytes(xs.tail)._1)
     case 4 => val afs = Longs.fromByteArray(xs.slice(1, 9)); PlacedMarket(MarketOrder(Order.fromBytes(xs(9), xs.slice(10, Int.MaxValue)), afs))
@@ -64,7 +65,7 @@ object QueueEvent {
   )
 
   def bytesToSource(xs: Array[Byte]): CancelOrder.Source =
-    if (xs.length > 1) throw new IllegalArgumentException("Can't parse Source from array")
+    if (xs.length > 1) throw new IllegalArgumentException(s"Can't parse Source from array, ${}")
     else if (xs.isEmpty) Source.NotTracked
     else
       xs.head match {

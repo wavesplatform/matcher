@@ -154,7 +154,6 @@ class AddressActor(owner: Address,
 
       if (toCancel.isEmpty) log.trace(s"Got $msg, nothing to cancel")
       else {
-        // TODO log balance
         val cancelledText = toCancel.map(x => s"${x.insufficientAmount} ${x.assetId} for ${x.order.idStr()}").mkString(", ")
         log.debug(s"Got $msg, canceling ${toCancel.size} of ${activeOrders.size}: doesn't have $cancelledText")
         toCancel.foreach { x =>
@@ -445,13 +444,12 @@ class AddressActor(owner: Address,
     }
 
     if (wsAddressState.hasActiveSubscriptions) {
-      // Further improvements will be made in DEX-467 TODO
       wsAddressState = status match {
-        case OrderStatus.Accepted     => wsAddressState.putOrderUpdate(remaining.id, WsOrder.fromDomain(remaining, status))
-        case _: OrderStatus.Cancelled => wsAddressState.putOrderStatusUpdate(remaining.id, status)
-        case _ =>
-          if (unmatchable) wsAddressState.putOrderStatusUpdate(remaining.id, status)
-          else wsAddressState.putOrderFillingInfoAndStatusUpdate(remaining, status)
+        case OrderStatus.Accepted           => wsAddressState.putOrderUpdate(remaining.id, WsOrder.fromDomain(remaining, status))
+        case _: OrderStatus.PartiallyFilled => wsAddressState.putOrderFillingInfoAndStatusNameUpdate(remaining, status)
+        case _: OrderStatus.Final =>
+          if (unmatchable) wsAddressState.putOrderStatusNameUpdate(remaining.id, status)
+          else wsAddressState.putOrderFillingInfoAndStatusNameUpdate(remaining, status)
       }
 
       // OrderStatus.Accepted means that we've already notified clients about these balance changes after order passed validation (see def place)

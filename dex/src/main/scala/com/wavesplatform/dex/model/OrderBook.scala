@@ -179,7 +179,7 @@ object OrderBook {
               currentUpdates = currentUpdates
                 .copy(
                   orderBook = currentUpdates.orderBook.unsafeWithoutBest(counter.order.orderType),
-                  events = currentUpdates.events.enqueue(OrderCanceled(counter, OrderCanceled.Reason.NotValid, eventTs)), // isSystem == false
+                  events = currentUpdates.events.enqueue(OrderCanceled(counter, OrderCanceled.Reason.NotValid, eventTs)),
                   levelChanges = currentUpdates.levelChanges |-| LevelAmounts.mkDiff(levelPrice, counter)
                 )
             )

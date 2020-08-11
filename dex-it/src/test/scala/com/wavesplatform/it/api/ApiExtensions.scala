@@ -63,7 +63,7 @@ trait ApiExtensions extends NodeApiExtensions {
     val snapshots            = dexApi.allSnapshotOffsets
     val orderBooks           = assetPairs.map(x => (x, (dexApi.orderBook(x), dexApi.orderBookStatus(x))))
     val orderStatuses        = orders.map(x => x.idStr() -> dexApi.orderStatus(x))
-    val orderTransactionIds  = orders.map(x => x.idStr() -> dexApi.transactionsByOrder(x).map(_.getId.getBase58String))
+    val orderTransactionIds  = orders.map(x => x.idStr() -> dexApi.transactionsByOrder(x).map(_.getId.getBase58String).toSet)
     val reservedBalances     = accounts.map(x => x -> dexApi.reservedBalance(x))
     val accountsOrderHistory = accounts.flatMap(a => assetPairs.map(p => a -> p))
 

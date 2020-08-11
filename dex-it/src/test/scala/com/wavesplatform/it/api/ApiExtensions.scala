@@ -16,7 +16,6 @@ import com.wavesplatform.it.{MatcherSuiteBase, api}
 import com.wavesplatform.wavesj.transactions.ExchangeTransaction
 import mouse.any._
 
-import scala.Ordered._
 import scala.collection.immutable.TreeMap
 import scala.collection.parallel.CollectionConverters._
 
@@ -112,9 +111,15 @@ trait ApiExtensions extends NodeApiExtensions {
     transfers.par.foreach { broadcastAndAwait(_) }
     eventually {
       balances.foreach {
-        case (balance, asset) =>
-          val pair = if (asset == Waves) wavesUsdPair else if (asset.compatId > Waves.compatId) AssetPair(asset, Waves) else AssetPair(Waves, asset)
-          dex1.api.tradableBalance(account, pair).getOrElse(asset, 0L) shouldBe balance
+        case (expectedBalance, asset) =>
+          // Sadly, this won't work because of price assets, we need a better API to make this simpler.
+          // val pair = if (asset == Waves) wavesUsdPair else if (asset.compatId > Waves.compatId) AssetPair(asset, Waves) else AssetPair(Waves, asset)
+          // dex1.api.tradableBalance(account, pair).getOrElse(asset, 0L) shouldBe balance
+          val actualBalance = asset match {
+            case Waves              => wavesNode1.api.wavesBalance(account).balance
+            case asset: IssuedAsset => wavesNode1.api.assetBalance(account, asset).balance
+          }
+          actualBalance shouldBe expectedBalance
       }
     }
     account

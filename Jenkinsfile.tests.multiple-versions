@@ -30,8 +30,17 @@ pipeline {
             }
         }        
         stage('Build Docker') {
-            steps { 
+            steps {
                 sh 'docker rmi com.wavesplatform/it com.wavesplatform/node-it com.wavesplatform/dex-it || true'
+                sh "docker pull registry.wvservices.com/waves/dex/${DEX_MULTIPLE_VERSIONS_PREVIOUS_TAG}"
+                sh "docker pull registry.wvservices.com/waves/dex/${NODE_MULTIPLE_VERSIONS_PREVIOUS_TAG}"
+                sh ```
+                    IMAGES=$(docker image ls | grep 'registry.wvservices.com/waves/dex/' | awk '{gsub("registry.wvservices.com/waves/dex/", "", $1); print $1 ":" $2}')
+                    for i in $IMAGES
+                    do
+                      docker tag "registry.wvservices.com/waves/dex/"$i "wavesplatform/"$i
+                    done
+                ```
                 sh 'sbt dex-it/docker'
             }
         }

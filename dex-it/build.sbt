@@ -36,23 +36,20 @@ inTask(docker)(
   Seq(
     nameOfImage := "wavesplatform/dex-it",
     dockerfile := new Dockerfile {
-
-      val basePath     = "/opt/waves-dex"
-      val entryPointSh = s"$basePath/start-matcher-server-it.sh"
+      val appPath      = "/usr/share/waves-dex"
+      val entryPointSh = s"$appPath/bin/start-matcher-server-it.sh"
 
       from("wavesplatform/matcher-server:latest")
       user("root:root")
 
-      add(
-        sources = Seq(
-          (Test / sourceDirectory).value / "container" / "start-matcher-server-it.sh", // entry point
-          (Test / resourceDirectory).value / "dex-servers" / "logback-container.xml", // logs management
-          itArtifactsCacheDir.value / "aspectjweaver.jar" // profiler, see https://www.yourkit.com/docs/java/help/docker.jsp
-        ),
-        destination = s"$basePath/",
-        chown = "waves-dex:waves-dex"
-      )
-      add(itArtifactsCacheDir.value / "yourKit", "/usr/local") // profiler archive
+      List(
+        (Test / sourceDirectory).value / "container" / "start-matcher-server-it.sh" -> s"$appPath/bin/", // entry point
+        (Test / resourceDirectory).value / "dex-servers" / "logback-container.xml"  -> s"$appPath/doc/", // logs management
+        itArtifactsCacheDir.value / "aspectjweaver.jar"                             -> s"$appPath/lib", // profiler, see https://www.yourkit.com/docs/java/help/docker.jsp
+        itArtifactsCacheDir.value / "yourKit"                                       -> "/usr/local" // profiler archive
+      ).foreach {
+        case (src, dest) => add(src, dest, chown = "waves-dex:waves-dex")
+      }
 
       runShell("chmod", "+x", entryPointSh)
       entryPoint(entryPointSh)

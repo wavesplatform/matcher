@@ -19,38 +19,51 @@ object ItTestPlugin extends AutoPlugin {
             val formatter = DateTimeFormatter.ofPattern("MM-dd--HH_mm_ss")
             formatter.format(LocalDateTime.now()) // git branch?
           }
-          val r = target.value / "logs" / runId
+          val r = (Test / target).value / "logs" / runId
           IO.createDirectory(r)
           r
         },
         // Example: SCALATEST_EXCLUDE_TAGS="package1.Tag1 package2.Tag2 package3.Tag3"
         testOptions += {
-          val excludeTags = sys.env.get("SCALATEST_EXCLUDE_TAGS").fold(Seq.empty[String])(Seq("-l", _))
-          val includeTags = sys.env.get("SCALATEST_INCLUDE_TAGS").fold(Seq.empty[String])(Seq("-n", _))
+          val sbtEnv = (Test / envVars).value
+
+          val excludeTags = sys.env.get("SCALATEST_EXCLUDE_TAGS")
+            .orElse(sbtEnv.get("SCALATEST_EXCLUDE_TAGS"))
+            .fold(Seq.empty[String])(Seq("-l", _))
+
+          val includeTags = sys.env.get("SCALATEST_INCLUDE_TAGS")
+            .orElse(sbtEnv.get("SCALATEST_INCLUDE_TAGS"))
+            .fold(Seq.empty[String])(Seq("-n", _))
+
           /* http://www.scalatest.org/user_guide/using_the_runner
            * f - select the file reporter with output directory
            * F - show full stack traces
            * W - without color
            * D - show all durations
            */
-          val args = Seq("-fFWD", (logDirectory.value / "summary.log").toString) ++ excludeTags ++ includeTags
+          val args = Seq("-fFWD", ((Test / logDirectory).value / "summary.log").toString) ++ excludeTags ++ includeTags
           Tests.Argument(TestFrameworks.ScalaTest, args: _*)
         },
-        parallelExecution in Test := true,
-        tags in test += Tags.ForkedTestGroup      -> 1,
-        tags in testOnly += Tags.ForkedTestGroup  -> 1,
-        tags in testQuick += Tags.ForkedTestGroup -> 1,
+        parallelExecution := true,
+        test / tags += Tags.ForkedTestGroup      -> 1,
+        testOnly / tags += Tags.ForkedTestGroup  -> 1,
+        testQuick / tags += Tags.ForkedTestGroup -> 1,
+        javaOptions := { // TODO Doesn't work because this part of process is not forked
+          val resourceDirectoryValue = (Test / resourceDirectory).value
+          List(
+            s"-Djava.util.logging.config.file=${resourceDirectoryValue / "jul.properties"}",
+            s"-Dlogback.configurationFile=${resourceDirectoryValue / "logback-test.xml"}",
+            "-Dwaves.it.logging.appender=FILE"
+          ) ++ (Test / javaOptions).value
+        },
         testGrouping := {
-          // ffs, sbt!
-          // https://github.com/sbt/sbt/issues/3266
-          val javaHomeValue          = javaHome.value
-          val logDirectoryValue      = logDirectory.value
-          val envVarsValue           = envVars.value
-          val javaOptionsValue       = javaOptions.value
-          val resourceDirectoryValue = resourceDirectory.value
+          val javaHomeValue     = (test / javaHome).value
+          val logDirectoryValue = (Test / logDirectory).value
+          val envVarsValue      = (Test / envVars).value
+          val javaOptionsValue  = (Test / javaOptions).value
 
           for {
-            group <- testGrouping.value
+            group <- (Test / testGrouping).value
             suite <- group.tests
           } yield
             Group(
@@ -59,13 +72,10 @@ object ItTestPlugin extends AutoPlugin {
               Tests.SubProcess(
                 ForkOptions(
                   javaHome = javaHomeValue,
-                  outputStrategy = outputStrategy.value,
+                  outputStrategy = (Test / outputStrategy).value,
                   bootJars = Vector.empty[java.io.File],
-                  workingDirectory = Option(baseDirectory.value),
+                  workingDirectory = Option((Test / baseDirectory).value),
                   runJVMOptions = Vector(
-                    s"-Djava.util.logging.config.file=${resourceDirectoryValue / "jul.properties"}",
-                    s"-Dlogback.configurationFile=${resourceDirectoryValue / "logback-test.xml"}",
-                    "-Dwaves.it.logging.appender=FILE",
                     s"-Dwaves.it.logging.dir=${logDirectoryValue / suite.name.replaceAll("""(\w)\w*\.""", "$1.")}" // foo.bar.Baz -> f.b.Baz
                   ) ++ javaOptionsValue,
                   connectInput = false,

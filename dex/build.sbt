@@ -73,30 +73,30 @@ inTask(docker)(
       val (user, userId)   = ("waves-dex", "113")
       val (group, groupId) = ("waves-dex", "116")
 
-      val userPath    = s"/var/lib/$user"
-      val sourcesPath = s"/usr/share/$user"
+      val runtimePath = s"/var/lib/$user"
+      val appPath     = s"/usr/share/$user"
 
-      val entryPointSh = s"$sourcesPath/bin/start-matcher-server.sh"
+      val entryPointSh = s"$appPath/bin/start-matcher-server.sh"
 
       from("openjdk:8-jre-slim-buster")
 
-      runRaw(s"""mkdir -p $userPath $sourcesPath $userPath/runtime && \\
-                  |groupadd -g $groupId $group && \\
-                  |useradd -d $userPath -g $groupId -u $userId -s /bin/bash -M $user && \\
-                  |chown -R $userId:$groupId $userPath $sourcesPath && \\
-                  |chmod -R 755 $userPath $sourcesPath && \\
-                  |ln -fs $userPath/log var/log/waves-dex""".stripMargin)
+      runRaw(s"""mkdir -p $runtimePath $appPath $runtimePath/runtime && \\
+                |groupadd -g $groupId $group && \\
+                |useradd -d $runtimePath -g $groupId -u $userId -s /bin/bash -M $user && \\
+                |chown -R $userId:$groupId $runtimePath $appPath && \\
+                |chmod -R 755 $runtimePath $appPath && \\
+                |ln -fs $runtimePath/log var/log/waves-dex""".stripMargin)
 
       Seq(
-        (Universal / stage).value                                                   -> s"$sourcesPath/", // sources
-        (Compile / sourceDirectory).value / "container" / "start-matcher-server.sh" -> s"$sourcesPath/bin/", // entry point
-        (Compile / sourceDirectory).value / "container" / "dex.conf"                -> s"$sourcesPath/conf/" // base config
+        (Universal / stage).value                                                   -> s"$appPath/", // sources
+        (Compile / sourceDirectory).value / "container" / "start-matcher-server.sh" -> s"$appPath/bin/", // entry point
+        (Compile / sourceDirectory).value / "container" / "dex.conf"                -> s"$appPath/conf/" // base config
       ) foreach { case (source, destination) => add(source = source, destination = destination, chown = s"$userId:$groupId") }
 
       user(s"$userId:$groupId")
 
       runShell("chmod", "+x", entryPointSh)
-      workDir(userPath)
+      workDir(runtimePath)
       entryPoint(entryPointSh)
       expose(6886)
     },

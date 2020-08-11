@@ -26,7 +26,7 @@ trait ApiExtensions extends NodeApiExtensions {
                                    expectedStatus: HttpOrderStatus.Status = Status.Accepted,
                                    dex: DexContainer = dex1,
                                    isMarketOrder: Boolean = false): HttpOrderStatus = {
-    if (isMarketOrder) dex1.api.placeMarket(order) else dex1.api.place(order)
+    if (isMarketOrder) dex.api.placeMarket(order) else dex.api.place(order)
     dex.api.waitForOrderStatus(order, expectedStatus)
   }
 
@@ -34,7 +34,7 @@ trait ApiExtensions extends NodeApiExtensions {
                                     dexApi: DexApi[Id] = dex1.api,
                                     wavesNodeApi: NodeApi[Id] = wavesNode1.api,
                                     isMarketOrder: Boolean = false): Seq[ExchangeTransaction] = {
-    if (isMarketOrder) dex1.api.placeMarket(order) else dex1.api.place(order)
+    if (isMarketOrder) dexApi.placeMarket(order) else dexApi.place(order)
     waitForOrderAtNode(order.id(), dexApi, wavesNodeApi)
   }
 

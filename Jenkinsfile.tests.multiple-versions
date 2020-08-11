@@ -38,7 +38,7 @@ pipeline {
                     IMAGES=$(docker image ls | grep 'registry.wvservices.com/waves/dex/' | awk '{gsub("registry.wvservices.com/waves/dex/", "", $1); print $1 ":" $2}')
                     for i in $IMAGES
                     do
-                      docker tag "registry.wvservices.com/waves/dex/"$i "wavesplatform/"$i
+                      docker tag $REGISTRY"/waves/dex/"$i "wavesplatform/"$i
                     done
                 ```
                 sh 'sbt dex-it/docker'

@@ -1,0 +1,53 @@
+pipeline {
+    agent {
+        label 'buildagent-matcher'
+    }
+    parameters {
+        string(name: 'SBT_THREAD_NUMBER', defaultValue: '6', description: '')
+    }
+    environment {
+        SBT_HOME = tool name: 'sbt-1.2.6', type: 'org.jvnet.hudson.plugins.SbtPluginBuilder$SbtInstallation'
+        SBT_THREAD_NUMBER = "${SBT_THREAD_NUMBER}"
+        SBT_OPTS = '-Xmx2g -XX:ReservedCodeCacheSize=128m -XX:+CMSClassUnloadingEnabled'
+        SCALATEST_INCLUDE_TAGS = 'com.wavesplatform.it.tags.DexMultipleVersions'
+        KAFKA_SERVER = "${KAFKA_SERVER}"
+        DEX_MULTIPLE_VERSIONS_PREVIOUS_TAG = "${DEX_MULTIPLE_VERSIONS_PREVIOUS_TAG}"
+        NODE_MULTIPLE_VERSIONS_PREVIOUS_TAG = "${NODE_MULTIPLE_VERSIONS_PREVIOUS_TAG}"
+        PATH = "${env.SBT_HOME}/bin:${env.PATH}"
+    }
+    stages {
+        stage('Cleanup & Compile') {    
+            steps {
+                sh 'git fetch --tags'
+                sh 'find ~/.sbt/1.0/staging/*/waves -type d -name target | xargs -I{} rm -rf {}'
+                sh 'find . -type d -name target | xargs -I{} rm -rf {}'
+                sh 'sbt "set Global / scalacOptions ++= Seq(\\"-Xfatal-warnings\\", \\"-Ywarn-unused:-imports\\");session save;cleanAll;compile"'
+            }
+        } 
+        stage('Run Unit Tests') {
+            steps { 
+                sh 'sbt "waves-ext/test;waves-integration/test;dex/test"'
+            }
+        }        
+        stage('Build Docker') {
+            steps { 
+                sh 'docker rmi com.wavesplatform/it com.wavesplatform/node-it com.wavesplatform/dex-it || true'
+                sh 'sbt dex-it/docker'
+            }
+        }
+        stage ('Run Integration Tests with multiple versions') {
+            steps {
+                sh 'sbt dex-it/test'
+            }
+        }
+    }
+    post {
+        always {
+            sh 'tar zcf logs.tar.gz ./dex-it/target/logs* || true'
+            archiveArtifacts artifacts: 'logs.tar.gz', fingerprint: true
+            junit '**/test-reports/*.xml'
+            allure results: [[path: 'allure-results']]
+            cleanWs()
+        }
+    }
+}

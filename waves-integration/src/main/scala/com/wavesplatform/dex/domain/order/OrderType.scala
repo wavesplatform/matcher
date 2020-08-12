@@ -40,12 +40,12 @@ object OrderType {
 
   implicit val orderTypeFormat: Format[OrderType] = Format(
     {
-      case JsString("BUY")  => JsSuccess(BUY)
-      case JsString("SELL") => JsSuccess(SELL)
-      case x                => JsError(JsPath, s"Can't read OrderType from ${x.getClass.getName}")
+      case JsString("BUY") | JsString("buy")   => JsSuccess(BUY)
+      case JsString("SELL") | JsString("sell") => JsSuccess(SELL)
+      case x                                   => JsError(JsPath, s"Can't read OrderType from ${x.getClass.getName}")
     }, {
-      case BUY  => JsString("BUY")
-      case SELL => JsString("SELL")
+      case BUY  => JsString("buy")
+      case SELL => JsString("sell")
     }
   )
 

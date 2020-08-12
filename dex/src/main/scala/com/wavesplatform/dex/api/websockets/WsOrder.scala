@@ -64,11 +64,11 @@ object WsOrder {
 
   val isMarketFormat: Format[Boolean] = Format(
     {
-      case JsString("MARKET") => JsSuccess(true)
-      case JsString("LIMIT")  => JsSuccess(false)
-      case _                  => JsError("Cannot parse order type (MARKET or LIMIT)!")
+      case JsString("MARKET") | JsString("market") => JsSuccess(true)
+      case JsString("LIMIT") | JsString("limit")   => JsSuccess(false)
+      case _                                       => JsError("Cannot parse order type (market or limit)!")
     },
-    if (_) JsString("MARKET") else JsString("LIMIT")
+    if (_) JsString("market") else JsString("limit")
   )
 
   object Status extends Enumeration {
@@ -78,16 +78,17 @@ object WsOrder {
 
   val orderStatusFormat: Format[String] = Format(
     {
-      case JsString(s) if s == Status.ACCEPTED.toString         => JsSuccess(OrderStatus.Accepted.name)
-      case JsString(s) if s == Status.FILLED.toString           => JsSuccess(OrderStatus.Filled.name)
-      case JsString(s) if s == Status.PARTIALLY_FILLED.toString => JsSuccess(OrderStatus.PartiallyFilled.name)
-      case JsString(s) if s == Status.CANCELLED.toString        => JsSuccess(OrderStatus.Cancelled.name)
-      case _                                                    => JsError("Cannot parse order status")
+      case JsString(s) if s == Status.ACCEPTED.toString || s == OrderStatus.Accepted.name => JsSuccess(OrderStatus.Accepted.name)
+      case JsString(s) if s == Status.FILLED.toString || s == OrderStatus.Filled.name     => JsSuccess(OrderStatus.Filled.name)
+      case JsString(s) if s == Status.PARTIALLY_FILLED.toString || s == OrderStatus.PartiallyFilled.name =>
+        JsSuccess(OrderStatus.PartiallyFilled.name)
+      case JsString(s) if s == Status.CANCELLED.toString || s == OrderStatus.Cancelled.name => JsSuccess(OrderStatus.Cancelled.name)
+      case _                                                                                => JsError("Cannot parse order status")
     }, {
-      case OrderStatus.Accepted.name        => JsString(Status.ACCEPTED.toString)
-      case OrderStatus.Filled.name          => JsString(Status.FILLED.toString)
-      case OrderStatus.PartiallyFilled.name => JsString(Status.PARTIALLY_FILLED.toString)
-      case OrderStatus.Cancelled.name       => JsString(Status.CANCELLED.toString)
+      case OrderStatus.Accepted.name        => JsString(OrderStatus.Accepted.name)
+      case OrderStatus.Filled.name          => JsString(OrderStatus.Filled.name)
+      case OrderStatus.PartiallyFilled.name => JsString(OrderStatus.PartiallyFilled.name)
+      case OrderStatus.Cancelled.name       => JsString(OrderStatus.Cancelled.name)
     }
   )
 

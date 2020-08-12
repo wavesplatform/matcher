@@ -42,7 +42,6 @@ pipeline {
                      done
                  '''
                  sh 'sbt dex-it/docker'
-                 sh 'sbt dex-it/docker'
             }
         }
         stage ('Run Integration Tests with specified versions') {

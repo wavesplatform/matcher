@@ -16,7 +16,6 @@ import com.wavesplatform.it.{MatcherSuiteBase, api}
 import com.wavesplatform.wavesj.transactions.ExchangeTransaction
 import mouse.any._
 
-import scala.Ordered._
 import scala.collection.immutable.TreeMap
 import scala.collection.parallel.CollectionConverters._
 
@@ -27,7 +26,7 @@ trait ApiExtensions extends NodeApiExtensions {
                                    expectedStatus: HttpOrderStatus.Status = Status.Accepted,
                                    dex: DexContainer = dex1,
                                    isMarketOrder: Boolean = false): HttpOrderStatus = {
-    if (isMarketOrder) dex1.api.placeMarket(order) else dex1.api.place(order)
+    if (isMarketOrder) dex.api.placeMarket(order) else dex.api.place(order)
     dex.api.waitForOrderStatus(order, expectedStatus)
   }
 
@@ -35,7 +34,7 @@ trait ApiExtensions extends NodeApiExtensions {
                                     dexApi: DexApi[Id] = dex1.api,
                                     wavesNodeApi: NodeApi[Id] = wavesNode1.api,
                                     isMarketOrder: Boolean = false): Seq[ExchangeTransaction] = {
-    if (isMarketOrder) dex1.api.placeMarket(order) else dex1.api.place(order)
+    if (isMarketOrder) dexApi.placeMarket(order) else dexApi.place(order)
     waitForOrderAtNode(order.id(), dexApi, wavesNodeApi)
   }
 
@@ -112,9 +111,15 @@ trait ApiExtensions extends NodeApiExtensions {
     transfers.par.foreach { broadcastAndAwait(_) }
     eventually {
       balances.foreach {
-        case (balance, asset) =>
-          val pair = if (asset == Waves) wavesUsdPair else if (asset.compatId > Waves.compatId) AssetPair(asset, Waves) else AssetPair(Waves, asset)
-          dex1.api.tradableBalance(account, pair).getOrElse(asset, 0L) shouldBe balance
+        case (expectedBalance, asset) =>
+          // Sadly, this won't work because of price assets, we need a better API to make this simpler.
+          // val pair = if (asset == Waves) wavesUsdPair else if (asset.compatId > Waves.compatId) AssetPair(asset, Waves) else AssetPair(Waves, asset)
+          // dex1.api.tradableBalance(account, pair).getOrElse(asset, 0L) shouldBe balance
+          val actualBalance = asset match {
+            case Waves              => wavesNode1.api.wavesBalance(account).balance
+            case asset: IssuedAsset => wavesNode1.api.assetBalance(account, asset).balance
+          }
+          actualBalance shouldBe expectedBalance
       }
     }
     account

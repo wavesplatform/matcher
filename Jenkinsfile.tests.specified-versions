@@ -19,6 +19,8 @@ pipeline {
         stage('Cleanup & Compile') {
             steps {
                 sh 'git fetch --tags'
+                sh 'docker system prune -f || true'
+                sh 'docker rmi `docker images --format "{{.Repository}}:{{.Tag}}" | grep "wavesplatform"` || true'
                 sh 'find ~/.sbt/1.0/staging/*/waves -type d -name target | xargs -I{} rm -rf {}'
                 sh 'find . -type d -name target | xargs -I{} rm -rf {}'
                 sh 'sbt "set Global / scalacOptions ++= Seq(\\"-Xfatal-warnings\\", \\"-Ywarn-unused:-imports\\");session save;cleanAll;compile"'
@@ -31,7 +33,6 @@ pipeline {
         }
         stage('Build Docker') {
             steps {
-                 sh 'docker rmi com.wavesplatform/it com.wavesplatform/node-it com.wavesplatform/dex-it || true'
                  sh "docker pull ${REGISTRY}/waves/dex/dex-it:${DEX_TAG}"
                  sh "docker pull ${REGISTRY}/waves/dex/waves-integration-it:${NODE_TAG}"
                  sh '''

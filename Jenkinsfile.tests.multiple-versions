@@ -28,11 +28,20 @@ pipeline {
             steps { 
                 sh 'sbt "waves-ext/test;waves-integration/test;dex/test"'
             }
-        }        
+        }
         stage('Build Docker') {
-            steps { 
-                sh 'docker rmi com.wavesplatform/it com.wavesplatform/node-it com.wavesplatform/dex-it || true'
-                sh 'sbt dex-it/docker'
+            steps {
+                 sh 'docker rmi com.wavesplatform/it com.wavesplatform/node-it com.wavesplatform/dex-it || true'
+                 sh "docker pull ${REGISTRY}/waves/dex/dex-it:${DEX_MULTIPLE_VERSIONS_PREVIOUS_TAG}"
+                 sh "docker pull ${REGISTRY}/waves/dex/waves-integration-it:${NODE_MULTIPLE_VERSIONS_PREVIOUS_TAG}"
+                 sh '''
+                     IMAGES=`docker image ls | grep "${REGISTRY}/waves/dex/" | awk -v r=${REGISTRY} '{gsub(r "/waves/dex/", "", $1); print $1 ":" $2}'`
+                     for i in $IMAGES
+                     do
+                         docker tag ${REGISTRY}"/waves/dex/"$i "wavesplatform/"$i
+                     done
+                 '''
+                 sh 'sbt dex-it/docker'
             }
         }
         stage ('Run Integration Tests with multiple versions') {

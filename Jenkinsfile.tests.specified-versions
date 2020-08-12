@@ -35,7 +35,7 @@ pipeline {
                  sh "docker pull ${REGISTRY}/waves/dex/dex-it:${DEX_TAG}"
                  sh "docker pull ${REGISTRY}/waves/dex/waves-integration-it:${NODE_TAG}"
                  sh '''
-                     IMAGES=$(docker image ls | grep '${REGISTRY}/waves/dex/' | awk '{gsub(${REGISTRY}"/waves/dex/", "", $1); print $1 ":" $2}')
+                     IMAGES=`docker image ls | grep "${REGISTRY}/waves/dex/" | awk -v r=${REGISTRY} '{gsub(r "/waves/dex/", "", $1); print $1 ":" $2}'`
                      for i in $IMAGES
                      do
                          docker tag ${REGISTRY}"/waves/dex/"$i "wavesplatform/"$i

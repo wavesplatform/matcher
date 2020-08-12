@@ -23,7 +23,7 @@ trait ApiExtensions extends NodeApiExtensions { this: MatcherSuiteBase =>
                                    expectedStatus: OrderStatus = OrderStatus.Accepted,
                                    dex: DexContainer = dex1,
                                    isMarketOrder: Boolean = false): OrderStatusResponse = {
-    if (isMarketOrder) dex1.api.placeMarket(order) else dex1.api.place(order)
+    if (isMarketOrder) dex.api.placeMarket(order) else dex.api.place(order)
     dex.api.waitForOrderStatus(order, expectedStatus)
   }
 
@@ -31,7 +31,7 @@ trait ApiExtensions extends NodeApiExtensions { this: MatcherSuiteBase =>
                                     dexApi: DexApi[Id] = dex1.api,
                                     wavesNodeApi: NodeApi[Id] = wavesNode1.api,
                                     isMarketOrder: Boolean = false): Seq[ExchangeTransaction] = {
-    if (isMarketOrder) dex1.api.placeMarket(order) else dex1.api.place(order)
+    if (isMarketOrder) dexApi.placeMarket(order) else dexApi.place(order)
     waitForOrderAtNode(order.id(), dexApi, wavesNodeApi)
   }
 
@@ -59,7 +59,7 @@ trait ApiExtensions extends NodeApiExtensions { this: MatcherSuiteBase =>
     val snapshots            = dex1.api.allSnapshotOffsets
     val orderBooks           = assetPairs.map(x => (x, (dex1.api.orderBook(x), dex1.api.orderBookStatus(x))))
     val orderStatuses        = orders.map(x => x.idStr() -> dex1.api.orderStatus(x))
-    val orderTransactionIds  = orders.map(x => x.idStr() -> dex1.api.transactionsByOrder(x).map(_.getId.getBase58String))
+    val orderTransactionIds  = orders.map(x => x.idStr() -> dex1.api.transactionsByOrder(x).map(_.getId.getBase58String).toSet)
     val reservedBalances     = accounts.map(x => x -> dex1.api.reservedBalance(x))
     val accountsOrderHistory = accounts.flatMap(a => assetPairs.map(p => a -> p))
 

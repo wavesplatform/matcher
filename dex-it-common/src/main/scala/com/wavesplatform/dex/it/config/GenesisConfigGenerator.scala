@@ -114,6 +114,7 @@ object GenesisConfigGenerator {
     ConfigFactory.parseString(
       s"""waves.blockchain.custom {
          |  address-scheme-character = "${generatorSettings.chainId.toChar}"
+         |  functionality.min-block-time = ${settings.averageBlockDelay.toMillis}ms
          |  genesis {
          |    timestamp: ${settings.timestamp}
          |    signature: ${genesisBlock.signerData.signature}

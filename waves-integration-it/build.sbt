@@ -8,7 +8,7 @@ libraryDependencies ++= Dependencies.Module.wavesIntegrationIt
 
 inTask(docker)(
   Seq(
-    imageNames := Seq(ImageName("com.wavesplatform/waves-integration-it:latest")),
+    imageNames := Seq(ImageName("wavesplatform/waves-integration-it:latest")),
     exposedPorts := Set(6887),
     additionalFiles ++= Seq(
       (LocalProject("waves-ext") / Universal / stage).value,

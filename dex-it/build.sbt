@@ -10,7 +10,7 @@ libraryDependencies ++= Dependencies.Module.dexIt
 docker := docker.dependsOn(LocalProject("waves-integration-it") / docker).value
 inTask(docker)(
   Seq(
-    imageNames := Seq(ImageName("com.wavesplatform/dex-it:latest")),
+    imageNames := Seq(ImageName("wavesplatform/dex-it:latest")),
     exposedPorts += 6886,
     additionalFiles ++= Seq(
       (Test / resourceDirectory).value / "dex-servers" / "logback-container.xml"

@@ -51,13 +51,13 @@ object DexContainer extends ScorexLogging {
             runConfig: Config,
             suiteInitialConfig: Config,
             localLogsDir: Path,
-            tag: String)(implicit
-                         tryHttpBackend: LoggingSttpBackend[Try, Nothing],
-                         futureHttpBackend: LoggingSttpBackend[Future, Nothing],
-                         ec: ExecutionContext): DexContainer = {
+            image: String)(implicit
+                           tryHttpBackend: LoggingSttpBackend[Try, Nothing],
+                           futureHttpBackend: LoggingSttpBackend[Future, Nothing],
+                           ec: ExecutionContext): DexContainer = {
 
     val underlying = GenericContainer(
-      dockerImage = s"wavesplatform/dex-it:$tag",
+      dockerImage = image,
       exposedPorts = Seq(restApiPort),
       env = getEnv(name),
       waitStrategy = ignoreWaitStrategy

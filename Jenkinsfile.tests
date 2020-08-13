@@ -13,7 +13,7 @@ pipeline {
         PATH = "${env.SBT_HOME}/bin:${env.PATH}"
     }
     stages {
-        stage('Cleanup & Compile') {
+        stage('Cleanup') {
             steps {
                 script {
                     if (!(BRANCH_NAME ==~ /(DEX\-.*|master|version\-.*)/)) {
@@ -21,29 +21,24 @@ pipeline {
                     }
                 }
                 sh 'git fetch --tags'
+                sh 'docker system prune -f || true'
+                sh 'docker rmi `docker images --format "{{.Repository}}:{{.Tag}}" | grep "wavesplatform"` || true'
                 sh 'find ~/.sbt/1.0/staging/*/waves -type d -name target | xargs -I{} rm -rf {}'
-                sh 'find . -type d \\( -name "test-reports" -o -name "allure-results" -o -name "target" \\) | xargs -I{} rm -rf {}'
-                sh 'sbt "set Global / scalacOptions ++= Seq(\\"-Xfatal-warnings\\", \\"-Ywarn-unused:-imports\\");session save;cleanAll;compile"'
-            }
-        } 
-        stage('Run Unit Tests') {
-            steps { 
-                sh 'sbt "waves-ext/test;waves-integration/test;dex/test"'
-            }
-        }        
-        stage('Build Docker') {
-            steps { 
-                sh 'docker rmi com.wavesplatform/it com.wavesplatform/node-it com.wavesplatform/dex-it || true'
-                sh 'sbt dex-it/docker'
+                sh 'find . -type d -name target | xargs -I{} rm -rf {}'
+                sh 'sbt "cleanAll"'
             }
         }
-        stage ('Run Integration Tests') {
+        stage('Build & Run All Tests') {
             steps {
-                sh 'sbt dex-it/test'
+                sh 'sbt "fullCheck"'
+            }
+        }
+        stage ('Push images') {
+            steps {
                 build job: 'Waves.Exchange/Matcher/Push Docker Images', propagate: false, wait: false, parameters: [
                   [$class: 'StringParameterValue', name: 'BRANCH', value: "${BRANCH_NAME}"]
                 ]
-            }             
+            }
         }
     }
     post {

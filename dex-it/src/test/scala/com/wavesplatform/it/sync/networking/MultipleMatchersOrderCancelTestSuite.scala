@@ -58,7 +58,7 @@ class MultipleMatchersOrderCancelTestSuite extends MatcherSuiteBase {
     val submittedOrders = (1 to 3).map { amt =>
       mkOrderDP(acc2, wavesUsdPair, OrderType.BUY, amt.waves, amt)
     }
-    submittedOrders.foreach(placeAndAwaitAtDex(_, Status.Filled, dex2)) // <--
+    submittedOrders.foreach(placeAndAwaitAtDex(_, Status.Filled, dex2))
     submittedOrders.foreach(waitForOrderAtNode(_, dex2.api))
 
     (0 to 2).foreach { i =>

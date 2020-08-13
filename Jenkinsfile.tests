@@ -28,19 +28,13 @@ pipeline {
                 sh 'sbt "cleanAll"'
             }
         } 
-        stage('Run Unit Tests') {
+        stage('Build & Run All Tests') {
             steps { 
-                sh 'sbt "quickCheck"'
-            }
-        }        
-        stage('Build Docker') {
-            steps { 
-                sh 'sbt dex-it/docker'
+                sh 'sbt "fullCheck"'
             }
         }
-        stage ('Run Integration Tests') {
+        stage ('Push images') {
             steps {
-                sh 'sbt dex-it/test'
                 build job: 'Waves.Exchange/Matcher/Push Docker Images', propagate: false, wait: false, parameters: [
                   [$class: 'StringParameterValue', name: 'BRANCH', value: "${BRANCH_NAME}"]
                 ]

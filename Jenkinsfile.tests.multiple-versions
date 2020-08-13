@@ -11,8 +11,8 @@ pipeline {
         SBT_OPTS = '-Xmx2g -XX:ReservedCodeCacheSize=128m -XX:+CMSClassUnloadingEnabled'
         SCALATEST_INCLUDE_TAGS = 'com.wavesplatform.it.tags.DexMultipleVersions'
         KAFKA_SERVER = "${KAFKA_SERVER}"
-        DEX_MULTIPLE_VERSIONS_PREVIOUS_TAG = "${DEX_MULTIPLE_VERSIONS_PREVIOUS_TAG}"
-        NODE_MULTIPLE_VERSIONS_PREVIOUS_TAG = "${NODE_MULTIPLE_VERSIONS_PREVIOUS_TAG}"
+        OTHER_DEX_IMAGE = "${OTHER_DEX_IMAGE}"
+        OTHER_NODE_IMAGE = "${OTHER_NODE_IMAGE}"
         PATH = "${env.SBT_HOME}/bin:${env.PATH}"
     }
     stages {
@@ -24,19 +24,6 @@ pipeline {
                 sh 'find ~/.sbt/1.0/staging/*/waves -type d -name target | xargs -I{} rm -rf {}'
                 sh 'find . -type d -name target | xargs -I{} rm -rf {}'
                 sh 'sbt "cleanAll"'
-            }
-        }
-        stage('Pull images') {
-            steps {
-                sh '''
-                    docker pull ${REGISTRY}/waves/dex/dex-it:${DEX_MULTIPLE_VERSIONS_PREVIOUS_TAG}
-                    docker pull ${REGISTRY}/waves/dex/waves-integration-it:${NODE_MULTIPLE_VERSIONS_PREVIOUS_TAG}
-                    IMAGES=`docker image ls | grep "${REGISTRY}/waves/dex/" | awk -v r=${REGISTRY} '{gsub(r "/waves/dex/", "", $1); print $1 ":" $2}'`
-                    for i in $IMAGES
-                    do
-                        docker tag ${REGISTRY}"/waves/dex/"$i "wavesplatform/"$i
-                    done
-                '''
             }
         }
         stage('Build Docker') {

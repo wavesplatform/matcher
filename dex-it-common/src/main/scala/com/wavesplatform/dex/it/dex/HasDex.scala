@@ -12,7 +12,8 @@ import mouse.any._
 import org.apache.kafka.clients.admin.{AdminClient, NewTopic}
 
 trait HasDex { self: BaseContainersKit =>
-  private val defaultTag = Option(System.getenv("DEX_TAG")).getOrElse("latest")
+  protected val defaultDexImage = "wavesplatform/dex-it:latest"
+  private val dexImage          = Option(System.getenv("DEX_IMAGE")).getOrElse(defaultDexImage)
 
   protected implicit def toDexExplicitGetOps[F[_]: CanExtract: Functor](self: DexApi[F]): DexApiOps.ExplicitGetDexApiOps[F] = {
     new DexApiOps.ExplicitGetDexApiOps[F](self)
@@ -39,8 +40,8 @@ trait HasDex { self: BaseContainersKit =>
   protected def createDex(name: String,
                           runConfig: Config = dexRunConfig,
                           suiteInitialConfig: Config = dexInitialSuiteConfig,
-                          tag: String = defaultTag): DexContainer =
-    DexContainer(name, networkName, network, getIp(name), runConfig, suiteInitialConfig, localLogsDir, tag) unsafeTap addKnownContainer
+                          image: String = dexImage): DexContainer =
+    DexContainer(name, networkName, network, getIp(name), runConfig, suiteInitialConfig, localLogsDir, image) unsafeTap addKnownContainer
 
   lazy val dex1: DexContainer = createDex("dex-1")
 

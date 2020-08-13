@@ -8,12 +8,12 @@ pipeline {
         PATH = "${env.SBT_HOME}/bin:${env.PATH}"
     }
     stages {
-        stage('Clean & Compile') {
+        stage('Cleanup') {
             steps {   
                 sh 'git fetch --tags'
                 sh 'find ~/.sbt/1.0/staging/*/waves -type d -name target | xargs -I{} rm -rf {}'
                 sh 'find . -type d -name target | xargs -I{} rm -rf {}'
-                sh 'sbt "set Global / scalacOptions ++= Seq(\\"-Xfatal-warnings\\", \\"-Ywarn-unused:-imports\\");session save;cleanAll;compile"'
+                sh 'sbt "cleanAll"'
             }
         }
         stage('Release') {

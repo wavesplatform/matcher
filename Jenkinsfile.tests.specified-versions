@@ -16,33 +16,32 @@ pipeline {
         PATH = "${env.SBT_HOME}/bin:${env.PATH}"
     }
     stages {
-        stage('Cleanup & Compile') {
+        stage('Cleanup') {
             steps {
                 sh 'git fetch --tags'
                 sh 'docker system prune -f || true'
                 sh 'docker rmi `docker images --format "{{.Repository}}:{{.Tag}}" | grep "wavesplatform"` || true'
                 sh 'find ~/.sbt/1.0/staging/*/waves -type d -name target | xargs -I{} rm -rf {}'
                 sh 'find . -type d -name target | xargs -I{} rm -rf {}'
-                sh 'sbt "set Global / scalacOptions ++= Seq(\\"-Xfatal-warnings\\", \\"-Ywarn-unused:-imports\\");session save;cleanAll;compile"'
+                sh 'sbt "cleanAll"'
             }
         }
-        stage('Run Unit Tests') {
+        stage('Pull images') {
             steps {
-                sh 'sbt "waves-ext/test;waves-integration/test;dex/test"'
+                sh '''
+                    docker pull ${REGISTRY}/waves/dex/dex-it:${DEX_TAG}
+                    docker pull ${REGISTRY}/waves/dex/waves-integration-it:${NODE_TAG}
+                    IMAGES=`docker image ls | grep "${REGISTRY}/waves/dex/" | awk -v r=${REGISTRY} '{gsub(r "/waves/dex/", "", $1); print $1 ":" $2}'`
+                    for i in $IMAGES
+                    do
+                        docker tag ${REGISTRY}"/waves/dex/"$i "wavesplatform/"$i
+                    done
+                '''
             }
         }
         stage('Build Docker') {
             steps {
-                 sh "docker pull ${REGISTRY}/waves/dex/dex-it:${DEX_TAG}"
-                 sh "docker pull ${REGISTRY}/waves/dex/waves-integration-it:${NODE_TAG}"
-                 sh '''
-                     IMAGES=`docker image ls | grep "${REGISTRY}/waves/dex/" | awk -v r=${REGISTRY} '{gsub(r "/waves/dex/", "", $1); print $1 ":" $2}'`
-                     for i in $IMAGES
-                     do
-                         docker tag ${REGISTRY}"/waves/dex/"$i "wavesplatform/"$i
-                     done
-                 '''
-                 sh 'sbt dex-it/docker'
+                sh 'sbt dex-it/docker'
             }
         }
         stage ('Run Integration Tests with specified versions') {

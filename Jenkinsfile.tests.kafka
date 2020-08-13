@@ -15,21 +15,16 @@ pipeline {
         PATH = "${env.SBT_HOME}/bin:${env.PATH}"
     }
     stages {
-        stage('Cleanup & Compile') {    
+        stage('Cleanup') {
             steps {
                 sh 'git fetch --tags'
                 sh 'docker system prune -f || true'
                 sh 'docker rmi `docker images --format "{{.Repository}}:{{.Tag}}" | grep "wavesplatform"` || true'
                 sh 'find ~/.sbt/1.0/staging/*/waves -type d -name target | xargs -I{} rm -rf {}'
                 sh 'find . -type d -name target | xargs -I{} rm -rf {}'
-                sh 'sbt "set Global / scalacOptions ++= Seq(\\"-Xfatal-warnings\\", \\"-Ywarn-unused:-imports\\");session save;cleanAll;compile"'
+                sh 'sbt "cleanAll"'
             }
-        } 
-        stage('Run Unit Tests') {
-            steps { 
-                sh 'sbt "waves-ext/test;waves-integration/test;dex/test"'
-            }
-        }        
+        }
         stage('Build Docker') {
             steps {
                 sh 'sbt dex-it/docker'

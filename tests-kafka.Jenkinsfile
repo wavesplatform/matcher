@@ -19,6 +19,9 @@ pipeline {
     }
     stages {
         stage('Cleanup') {
+            script {
+                currentBuild.displayName = "${params.BRANCH}"
+            }
             steps {
                 sh 'git fetch --tags'
                 sh 'docker rmi `docker images --format "{{.Repository}}:{{.Tag}}" | grep "wavesplatform"` || true'

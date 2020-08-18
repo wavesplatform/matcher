@@ -5,3 +5,4 @@ dpkg -P waves-dex || true
 dpkg -i /home/buildagent-matcher/waves-dex*.deb
 systemctl start waves-dex
 echo "dex installed and started"
+rm -rf /home/buildagent-matcher/*

@@ -1,9 +1,13 @@
-def makeStage (test) {
-  return {
-    stage('Cleanup') {
-      echo "Hello World ${test}"
+def deployNode (host) {
+    return {
+         sshagent (credentials: ['buildagent-matcher']) {
+             sh "ssh -o StrictHostKeyChecking=no -l buildagent-matcher ${host} hostname"
+
+             sh "scp ./waves/node/target/waves-devnet*all*.deb buildagent-matcher@${host}:/home/buildagent-matcher"
+             sh "scp ./matcher/dex-load/src/main/resources/reinstallNode.sh buildagent-matcher@${host}:/home/buildagent-matcher"
+             sh "ssh -q buildagent-matcher@${host} sudo sh reinstallNode.sh"
+         }
     }
-  }
 }
 
 def cleanup = {
@@ -27,30 +31,31 @@ pipeline {
     stages {
         stage('Compile Node') {
             steps {
-                script {
-                    makeStage("123").call()
-                }
                 dir('waves') {
                     git url: 'https://github.com/wavesplatform/waves.git'
                 }
                 sh 'find ~/.sbt/1.0/staging/*/waves -type d -name target | xargs -I{} rm -rf {}'
                 sh 'find . -type d -name target | xargs -I{} rm -rf {}'
                 sh 'cd waves && sbt compile && sbt packageAll'
+                sh 'ls ./matcher/dex-load/src/main/resources/r'
             }
         }
         stage('Deploy nodes') {
             parallel {
-                 stage('Deploy node 1') {
+                 stage("Deploy node 2") {
                     steps {
-                        sshagent (credentials: ['buildagent-matcher']) {
-                            sh "ssh -o StrictHostKeyChecking=no -l buildagent-matcher ${NODE2} hostname"
-
-                            sh "scp ./waves/node/target/waves-devnet_1.2.10_all.deb buildagent-matcher@${NODE2}:/home/buildagent-matcher"
-                            sh "scp ./matcher/dex-load/src/main/resources/reinstallNode.sh buildagent-matcher@${NODE2}:/home/buildagent-matcher"
-                            sh "ssh -q buildagent-matcher@${NODE2} sudo sh reinstallNode.sh"
+                        script {
+                            deployNode("${NODE2}").call()
                         }
                     }
-                }
+                 }
+                 stage("Deploy node 3") {
+                    steps {
+                        script {
+                            deployNode("${NODE3}").call()
+                        }
+                    }
+                 }
             }
         }
         stage('Compile Matcher') {
@@ -66,11 +71,14 @@ pipeline {
         stage('Deploy matcher') {
             steps {
                 sshagent (credentials: ['buildagent-matcher']) {
-                    sh 'ssh -o StrictHostKeyChecking=no -l buildagent-matcher ${MATCHER} hostname'
+                    sh "ssh -o StrictHostKeyChecking=no -l buildagent-matcher ${MATCHER} hostname"
 
-                    sh 'scp ./matcher/target/waves-devnet_1.2.10_all.deb buildagent-matcher@${MATCHER}:/home/buildagent-matcher'
-                    sh 'scp ./matcher/dex-load/src/main/resources/reinstallMatcher.sh buildagent-matcher@${MATCHER}:/home/buildagent-matcher'
-                    sh 'ssh -q buildagent-matcher@${MATCHER} sudo sh reinstallMatcher.sh'
+                    sh "scp ./matcher/target/waves-devnet*all*.deb buildagent-matcher@${MATCHER}:/home/buildagent-matcher"
+                    sh "scp ./matcher/target/*ext*devnet*all*.deb buildagent-matcher@${NODE4}:/home/buildagent-matcher"
+                    sh "scp ./matcher/dex-load/src/main/resources/reinstallExtension.sh buildagent-matcher@${NODE4}:/home/buildagent-matcher"
+                    sh "scp ./matcher/dex-load/src/main/resources/reinstallMatcher.sh buildagent-matcher@${MATCHER}:/home/buildagent-matcher"
+                    sh "ssh -q buildagent-matcher@${NODE4} sudo sh reinstallExtension.sh"
+                    sh "ssh -q buildagent-matcher@${MATCHER} sudo sh reinstallMatcher.sh"
                 }
             }
         }

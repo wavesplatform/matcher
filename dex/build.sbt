@@ -15,8 +15,7 @@ enablePlugins(
   GitVersioning,
   VersionSourcePlugin,
   sbtdocker.DockerPlugin,
-  ImageVersionPlugin,
-  CleanupDanglingImagesPlugin
+  ImageVersionPlugin
 )
 
 V.scalaPackage := "com.wavesplatform.dex"
@@ -60,9 +59,6 @@ inConfig(Compile)(
     run / fork := true
   )
 )
-
-// taskDyn motivation: https://www.scala-sbt.org/1.x/docs/Howto-Dynamic-Task.html#build.sbt+v2
-docker := Def.taskDyn { val imageId = docker.value; Def.task { cleanupDandlingImages.value; imageId } }.value
 
 // Docker
 inTask(docker)(

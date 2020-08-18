@@ -1,4 +1,4 @@
-def makeStage (test) = {
+def makeStage (test) {
   return {
     stage('Cleanup') {
       echo "Hello World ${test}"

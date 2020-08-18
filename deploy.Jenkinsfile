@@ -6,10 +6,10 @@ def makeStage (test) {
   }
 }
 
-def cleanup () = {
+def cleanup = {
   return {
     stage('a1') {
-      echo "Hello World ${test}"
+      echo "Hello World"
     }
   }
 }
@@ -43,11 +43,11 @@ pipeline {
                  stage('Deploy node 1') {
                     steps {
                         sshagent (credentials: ['buildagent-matcher']) {
-                            sh 'ssh -o StrictHostKeyChecking=no -l buildagent-matcher devnet2-htz-nbg1-2.wavesnodes.com hostname'
+                            sh "ssh -o StrictHostKeyChecking=no -l buildagent-matcher ${NODE2} hostname"
 
-                            sh 'scp ./waves/node/target/waves-devnet_1.2.10_all.deb buildagent-matcher@devnet2-htz-nbg1-2.wavesnodes.com:/home/buildagent-matcher'
-                            sh 'scp ./matcher/dex-load/src/main/resources/reinstallNode.sh buildagent-matcher@devnet2-htz-nbg1-2.wavesnodes.com:/home/buildagent-matcher'
-                            sh 'ssh -q buildagent-matcher@devnet2-htz-nbg1-2.wavesnodes.com sudo sh reinstallNode.sh'
+                            sh "scp ./waves/node/target/waves-devnet_1.2.10_all.deb buildagent-matcher@${NODE2}:/home/buildagent-matcher"
+                            sh "scp ./matcher/dex-load/src/main/resources/reinstallNode.sh buildagent-matcher@${NODE2}:/home/buildagent-matcher"
+                            sh "ssh -q buildagent-matcher@${NODE2} sudo sh reinstallNode.sh"
                         }
                     }
                 }
@@ -66,11 +66,11 @@ pipeline {
         stage('Deploy matcher') {
             steps {
                 sshagent (credentials: ['buildagent-matcher']) {
-                    sh 'ssh -o StrictHostKeyChecking=no -l buildagent-matcher devnet2-htz-nbg1-1.wavesnodes.com hostname'
+                    sh 'ssh -o StrictHostKeyChecking=no -l buildagent-matcher ${MATCHER} hostname'
 
-                    sh 'scp ./matcher/target/waves-devnet_1.2.10_all.deb buildagent-matcher@devnet2-htz-nbg1-1.wavesnodes.com:/home/buildagent-matcher'
-                    sh 'scp ./matcher/dex-load/src/main/resources/reinstallMatcher.sh buildagent-matcher@devnet2-htz-nbg1-1.wavesnodes.com:/home/buildagent-matcher'
-                    sh 'ssh -q buildagent-matcher@devnet2-htz-nbg1-1.wavesnodes.com sudo sh reinstallMatcher.sh'
+                    sh 'scp ./matcher/target/waves-devnet_1.2.10_all.deb buildagent-matcher@${MATCHER}:/home/buildagent-matcher'
+                    sh 'scp ./matcher/dex-load/src/main/resources/reinstallMatcher.sh buildagent-matcher@${MATCHER}:/home/buildagent-matcher'
+                    sh 'ssh -q buildagent-matcher@${MATCHER} sudo sh reinstallMatcher.sh'
                 }
             }
         }

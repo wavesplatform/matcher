@@ -10,14 +10,6 @@ def deployNode (host) {
     }
 }
 
-def cleanup = {
-  return {
-    stage('a1') {
-      echo "Hello World"
-    }
-  }
-}
-
 pipeline {
     agent {
         label 'buildagent-matcher'
@@ -37,7 +29,7 @@ pipeline {
                 sh 'find ~/.sbt/1.0/staging/*/waves -type d -name target | xargs -I{} rm -rf {}'
                 sh 'find . -type d -name target | xargs -I{} rm -rf {}'
                 sh 'cd waves && sbt compile && sbt packageAll'
-                sh 'ls ./matcher/dex-load/src/main/resources/r'
+                sh 'ls ./matcher/dex-load/src/main/resources/'
             }
         }
         stage('Deploy nodes') {
@@ -68,7 +60,7 @@ pipeline {
                 sh 'cd matcher && sbt compile && sbt packageAll'
             }
         }
-        stage('Deploy matcher') {
+        stage('Deploy Matcher') {
             steps {
                 sshagent (credentials: ['buildagent-matcher']) {
                     sh "ssh -o StrictHostKeyChecking=no -l buildagent-matcher ${MATCHER} hostname"

@@ -10,7 +10,7 @@ import cats.data.NonEmptyList
 import cats.syntax.option._
 import com.wavesplatform.dex.MatcherSpecBase
 import com.wavesplatform.dex.actors.MatcherActor.SaveSnapshot
-import com.wavesplatform.dex.actors.address.AddressActor.Command.CancelOrder
+import com.wavesplatform.dex.actors.address.AddressActor.Command.Source
 import com.wavesplatform.dex.actors.orderbook.OrderBookActor.{MarketStatus, OrderBookRecovered, OrderBookSnapshotUpdateCompleted}
 import com.wavesplatform.dex.actors.{MatcherSpec, OrderBookAskAdapter}
 import com.wavesplatform.dex.caches.OrderFeeSettingsCache
@@ -318,7 +318,7 @@ class OrderBookActorSpecification
       orderBook ! wrapLimitOrder(1, buyOrder)
       tp.expectMsgType[OrderAdded]
 
-      orderBook ! wrapEvent(2, Canceled(buyOrder.assetPair, buyOrder.id(), CancelOrder.Source.Request))
+      orderBook ! wrapEvent(2, Canceled(buyOrder.assetPair, buyOrder.id(), Source.Request))
       tp.expectMsgType[OrderCanceled]
     }
 
@@ -407,7 +407,7 @@ class OrderBookActorSpecification
         bids.last.price shouldBe 0.0000040 * Order.PriceConstant
       }
 
-      orderBook ! wrapEvent(2, Canceled(buyOrder1.assetPair, buyOrder1.id(), CancelOrder.Source.Request)) // order book is looking for the price level of buyOrder1 correctly (41 but not 40)
+      orderBook ! wrapEvent(2, Canceled(buyOrder1.assetPair, buyOrder1.id(), Source.Request)) // order book is looking for the price level of buyOrder1 correctly (41 but not 40)
       tp.expectMsgType[OrderCanceled]
 
       eventually {
@@ -548,7 +548,7 @@ class OrderBookActorSpecification
           val oc = tp.expectMsgType[OrderCanceled]
 
           oc.acceptedOrder shouldBe marketOrder
-          oc.reason shouldBe Events.OrderCanceled.Reason.Unmatchable
+          oc.reason shouldBe Events.OrderCanceled.Reason.BecameUnmatchable
           getAggregatedSnapshot(orderBook).asks shouldBe empty
 
           tp.receiveN(0)
@@ -568,7 +568,7 @@ class OrderBookActorSpecification
           val oc2 = tp.expectMsgType[OrderCanceled]
 
           oc2.acceptedOrder shouldBe oe.submittedMarketRemaining(marketOrder)
-          oc2.reason shouldBe Events.OrderCanceled.Reason.Unmatchable
+          oc2.reason shouldBe Events.OrderCanceled.Reason.BecameUnmatchable
 
           eventually {
             val ob = getAggregatedSnapshot(orderBook)
@@ -641,7 +641,7 @@ class OrderBookActorSpecification
           val oc = tp.expectMsgType[OrderCanceled]
 
           oc.acceptedOrder shouldBe oe.submittedMarketRemaining(marketOrder)
-          oc.reason shouldBe Events.OrderCanceled.Reason.Unmatchable
+          oc.reason shouldBe Events.OrderCanceled.Reason.BecameUnmatchable
 
           tp.receiveN(0)
 
@@ -684,7 +684,7 @@ class OrderBookActorSpecification
       orderBook ! wrapLimitOrder(submittedOrder)
       tp.expectMsgType[OrderAdded]
       // The amount=1000 should >= ceil(10^8 / 90000) = 1112
-      tp.expectMsgType[OrderCanceled].reason shouldBe Events.OrderCanceled.Reason.Unmatchable
+      tp.expectMsgType[OrderCanceled].reason shouldBe Events.OrderCanceled.Reason.BecameUnmatchable
     }
   }
 

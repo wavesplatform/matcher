@@ -377,7 +377,7 @@ object OrderStatus {
   def finalCancelStatus(ao: AcceptedOrder, reason: OrderCanceled.Reason): Final = {
     val filledAmount     = ao.order.amount - ao.amount
     val filledMatcherFee = ao.order.matcherFee - ao.fee
-    val unmatchable      = Reason.isUnmatchable(reason)
+    val unmatchable      = Reason.becameUnmatchable(reason)
     if (unmatchable && (filledAmount > 0 || ao.isMarket)) Filled(filledAmount, filledMatcherFee) else Cancelled(filledAmount, filledMatcherFee)
   }
 }
@@ -443,13 +443,13 @@ object Events {
       case object RequestExecuted     extends Reason
       case object OrderBookDeleted    extends Reason
       case object Expired             extends Reason
-      case object Unmatchable         extends Reason
+      case object BecameUnmatchable   extends Reason
+      case object BecameInvalid       extends Reason
       case object InsufficientBalance extends Reason
-      case object NotValid            extends Reason
 
-      def isUnmatchable(reason: Reason): Boolean = reason match {
-        case Unmatchable => true
-        case _           => false
+      def becameUnmatchable(reason: Reason): Boolean = reason match {
+        case BecameUnmatchable => true
+        case _                 => false
       }
     }
   }

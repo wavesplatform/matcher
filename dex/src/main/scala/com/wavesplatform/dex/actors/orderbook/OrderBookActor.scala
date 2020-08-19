@@ -205,15 +205,15 @@ class OrderBookActor(settings: Settings,
     }
   }
 
-  private def toReason(source: AddressActor.Command.CancelOrder.Source): Events.OrderCanceled.Reason = {
-    import AddressActor.Command.CancelOrder.Source
+  private def toReason(source: AddressActor.Command.Source): Events.OrderCanceled.Reason = {
+    import AddressActor.Command.Source
     import Events.OrderCanceled.Reason
     source match {
-      case Source.NotTracked       => Reason.NotTracked
-      case Source.Request          => Reason.RequestExecuted
-      case Source.DeletedOrderBook => Reason.OrderBookDeleted
-      case Source.Expiration       => Reason.Expired
-      case Source.BalanceTracking  => Reason.InsufficientBalance
+      case Source.NotTracked        => Reason.NotTracked
+      case Source.Request           => Reason.RequestExecuted
+      case Source.OrderBookDeletion => Reason.OrderBookDeleted
+      case Source.Expiration        => Reason.Expired
+      case Source.BalanceTracking   => Reason.InsufficientBalance
     }
   }
 

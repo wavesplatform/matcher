@@ -507,7 +507,7 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
   }
 
   private def systemCancelMarketOrder(addressDir: ActorRef, marketOrder: MarketOrder): Unit = {
-    addressDir ! OrderCanceled(marketOrder, Events.OrderCanceled.Reason.Unmatchable, System.currentTimeMillis)
+    addressDir ! OrderCanceled(marketOrder, Events.OrderCanceled.Reason.BecameUnmatchable, System.currentTimeMillis)
   }
 
   private def executeMarketOrder(addressDirWithOrderBookCache: ActorRef, marketOrder: MarketOrder, limitOrder: LimitOrder): OrderExecuted = {

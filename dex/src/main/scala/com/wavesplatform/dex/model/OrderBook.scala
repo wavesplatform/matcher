@@ -60,7 +60,7 @@ case class OrderBook private (bids: Side, asks: Side, lastTrade: Option[LastTrad
           tickSize: Long = MatchingRule.DefaultRule.tickSize): OrderBookUpdates = {
     val events = Queue(OrderAdded(submitted, eventTs))
     if (submitted.order.isValid(eventTs)) doMatch(eventTs, tickSize, getMakerTakerFee, submitted, events, this)
-    else OrderBookUpdates(this, events.enqueue(OrderCanceled(submitted, OrderCanceled.Reason.NotValid, eventTs)), LevelAmounts.empty, None)
+    else OrderBookUpdates(this, events.enqueue(OrderCanceled(submitted, OrderCanceled.Reason.BecameInvalid, eventTs)), LevelAmounts.empty, None)
   }
 
   def snapshot: OrderBookSnapshot                     = OrderBookSnapshot(bids, asks, lastTrade)
@@ -123,7 +123,7 @@ object OrderBook {
                       events: Queue[Event],
                       orderBook: OrderBook): OrderBookUpdates = {
 
-    def unmatchable(ao: AcceptedOrder): OrderCanceled = OrderCanceled(ao, OrderCanceled.Reason.Unmatchable, eventTs)
+    def unmatchable(ao: AcceptedOrder): OrderCanceled = OrderCanceled(ao, OrderCanceled.Reason.BecameUnmatchable, eventTs)
 
     @scala.annotation.tailrec
     def loop(submitted: AcceptedOrder, currentUpdates: OrderBookUpdates): OrderBookUpdates =
@@ -179,7 +179,7 @@ object OrderBook {
               currentUpdates = currentUpdates
                 .copy(
                   orderBook = currentUpdates.orderBook.unsafeWithoutBest(counter.order.orderType),
-                  events = currentUpdates.events.enqueue(OrderCanceled(counter, OrderCanceled.Reason.NotValid, eventTs)),
+                  events = currentUpdates.events.enqueue(OrderCanceled(counter, OrderCanceled.Reason.BecameInvalid, eventTs)),
                   levelChanges = currentUpdates.levelChanges |-| LevelAmounts.mkDiff(levelPrice, counter)
                 )
             )

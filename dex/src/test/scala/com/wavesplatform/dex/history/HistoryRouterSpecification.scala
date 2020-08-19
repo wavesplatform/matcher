@@ -73,7 +73,7 @@ class HistoryRouterSpecification
   }
 
   def orderAdded(submitted: LimitOrder): OrderAdded           = OrderAdded(submitted, time.getTimestamp())
-  def orderCancelled(submitted: AcceptedOrder): OrderCanceled = OrderCanceled(submitted, Events.OrderCanceled.Reason.RequestExecuted, time.getTimestamp()) // TODO
+  def orderCancelled(submitted: AcceptedOrder): OrderCanceled = OrderCanceled(submitted, Events.OrderCanceled.Reason.RequestExecuted, time.getTimestamp())
 
   def orderExecuted(submitted: AcceptedOrder, counter: LimitOrder): OrderExecuted = {
     OrderExecuted(submitted, counter, time.getTimestamp(), counter.matcherFee, submitted.matcherFee)
@@ -88,6 +88,7 @@ class HistoryRouterSpecification
     def senderPublicKey: String = limitOrder.order.senderPublicKey.toString
   }
 
+  // TODO add reason
   case class OrderShortenedInfo(id: String, senderPublicKey: String, side: Byte, price: BigDecimal, amount: BigDecimal)
   case class EventShortenedInfo(orderId: String, eventType: Byte, filled: BigDecimal, totalFilled: BigDecimal, status: Byte)
 

@@ -378,7 +378,7 @@ class OrderHistoryBalanceSpecification
 
     oh.process(OrderAdded(LimitOrder(counter), time.getTimestamp()))
     val exec = mkOrderExecutedRaw(submitted, counter)
-    oh.processAll(exec, OrderCanceled(exec.submittedRemaining, Events.OrderCanceled.Reason.Unmatchable, time.getTimestamp()))
+    oh.processAll(exec, OrderCanceled(exec.submittedRemaining, Events.OrderCanceled.Reason.BecameUnmatchable, time.getTimestamp()))
 
     withClue(s"account checks, counter.senderPublicKey: ${counter.senderPublicKey}, counter.order.id=${counter.id()}") {
       openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe 205L
@@ -421,7 +421,7 @@ class OrderHistoryBalanceSpecification
     val exec1 = mkOrderExecuted(submitted, counter1)
     oh.processAll(
       exec1,
-      OrderCanceled(exec1.counterRemaining, Events.OrderCanceled.Reason.Unmatchable, time.getTimestamp()),
+      OrderCanceled(exec1.counterRemaining, Events.OrderCanceled.Reason.BecameUnmatchable, time.getTimestamp()),
       mkOrderExecuted(exec1.submittedLimitRemaining(submitted), counter2)
     )
 
@@ -441,7 +441,7 @@ class OrderHistoryBalanceSpecification
     val exec = mkOrderExecutedRaw(submitted, counter)
     oh.processAll(
       exec,
-      OrderCanceled(exec.submittedRemaining, Events.OrderCanceled.Reason.Unmatchable, time.getTimestamp()),
+      OrderCanceled(exec.submittedRemaining, Events.OrderCanceled.Reason.BecameUnmatchable, time.getTimestamp()),
       OrderCanceled(exec.counterRemaining, Events.OrderCanceled.Reason.RequestExecuted, time.getTimestamp())
     )
 

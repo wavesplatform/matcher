@@ -113,7 +113,7 @@ class AddressActor(owner: Address,
               if (ao.isMarket) sender ! error.MarketOrderCancel(orderId)
               else {
                 pendingCommands.put(orderId, PendingCommand(command, sender))
-                cancel(ao.order, Command.CancelOrder.Source.Request)
+                cancel(ao.order, command.source)
               }
           }
       }
@@ -125,7 +125,7 @@ class AddressActor(owner: Address,
         sender ! Event.BatchCancelCompleted(Map.empty)
       } else {
         log.debug(s"Got $command, to cancel: ${toCancelIds.mkString(", ")}")
-        context.actorOf(BatchOrderCancelActor.props(toCancelIds.toSet, Command.CancelOrder.Source.Request, self, sender, settings.batchCancelTimeout))
+        context.actorOf(BatchOrderCancelActor.props(toCancelIds.toSet, command.source, self, sender, settings.batchCancelTimeout))
       }
 
     case command: Command.CancelOrders =>
@@ -141,8 +141,7 @@ class AddressActor(owner: Address,
       val initResponse = unknownIds.map(id => id -> error.OrderNotFound(id).asLeft[AddressActor.Event.OrderCanceled]).toMap
       if (toCancelIds.isEmpty) sender ! Event.BatchCancelCompleted(initResponse)
       else
-        context.actorOf(
-          BatchOrderCancelActor.props(toCancelIds, Command.CancelOrder.Source.Request, self, sender, settings.batchCancelTimeout, initResponse))
+        context.actorOf(BatchOrderCancelActor.props(toCancelIds, command.source, self, sender, settings.batchCancelTimeout, initResponse))
 
     case msg: Message.BalanceChanged =>
       if (wsAddressState.hasActiveSubscriptions) {
@@ -158,8 +157,8 @@ class AddressActor(owner: Address,
         log.debug(s"Got $msg, canceling ${toCancel.size} of ${activeOrders.size}: doesn't have $cancelledText")
         toCancel.foreach { x =>
           val id = x.order.id()
-          pendingCommands.put(id, PendingCommand(Command.CancelOrder(id, Command.CancelOrder.Source.BalanceTracking), ignoreRef)) // To prevent orders being cancelled twice
-          cancel(x.order, Command.CancelOrder.Source.BalanceTracking)
+          pendingCommands.put(id, PendingCommand(Command.CancelOrder(id, Command.Source.BalanceTracking), ignoreRef)) // To prevent orders being cancelled twice
+          cancel(x.order, Command.Source.BalanceTracking)
         }
       }
 
@@ -266,8 +265,8 @@ class AddressActor(owner: Address,
         case Some(ao) =>
           if ((ao.order.expiration - time.correctedTime()).max(0L).millis <= ExpirationThreshold) {
             log.debug(s"$prefix, storing cancel event")
-            pendingCommands.put(id, PendingCommand(Command.CancelOrder(id, Command.CancelOrder.Source.Expiration), ignoreRef)) // To prevent orders being cancelled twice
-            cancel(ao.order, Command.CancelOrder.Source.Expiration)
+            pendingCommands.put(id, PendingCommand(Command.CancelOrder(id, Command.Source.Expiration), ignoreRef)) // To prevent orders being cancelled twice
+            cancel(ao.order, Command.Source.Expiration)
           } else {
             log.trace(s"$prefix, can't find an active order")
             scheduleExpiration(ao.order)
@@ -418,7 +417,7 @@ class AddressActor(owner: Address,
 
     val (status, unmatchable) = event match {
       case event: OrderCanceled =>
-        val isSystemCancel = Events.OrderCanceled.Reason.isUnmatchable(event.reason)
+        val isSystemCancel = Events.OrderCanceled.Reason.becameUnmatchable(event.reason)
         (OrderStatus.finalCancelStatus(remaining, event.reason), isSystemCancel)
 
       case _ => (remaining.status, false)
@@ -445,9 +444,9 @@ class AddressActor(owner: Address,
 
     if (wsAddressState.hasActiveSubscriptions) {
       wsAddressState = status match {
-        case OrderStatus.Accepted           => wsAddressState.putOrderUpdate(remaining.id, WsOrder.fromDomain(remaining, status))
-        case _: OrderStatus.PartiallyFilled => wsAddressState.putOrderFillingInfoAndStatusNameUpdate(remaining, status)
-        case _: OrderStatus.Final =>
+        case OrderStatus.Accepted     => wsAddressState.putOrderUpdate(remaining.id, WsOrder.fromDomain(remaining, status))
+        case _: OrderStatus.Cancelled => wsAddressState.putOrderStatusNameUpdate(remaining.id, status)
+        case _                        =>
           if (unmatchable) wsAddressState.putOrderStatusNameUpdate(remaining.id, status)
           else wsAddressState.putOrderFillingInfoAndStatusNameUpdate(remaining, status)
       }
@@ -514,7 +513,7 @@ class AddressActor(owner: Address,
     )
   }
 
-  private def cancel(o: Order, source: Command.CancelOrder.Source): Unit = storeEvent(o.id())(QueueEvent.Canceled(o.assetPair, o.id(), source))
+  private def cancel(o: Order, source: Command.Source): Unit = storeEvent(o.id())(QueueEvent.Canceled(o.assetPair, o.id(), source))
 
   private def storeEvent(orderId: Order.Id)(event: QueueEvent): Unit =
     store(event)
@@ -608,20 +607,18 @@ object AddressActor {
       def toAcceptedOrder(tradableBalance: Map[Asset, Long]): AcceptedOrder = if (isMarket) MarketOrder(order, tradableBalance) else LimitOrder(order)
     }
 
-    case class CancelOrder(orderId: Order.Id, source: CancelOrder.Source) extends OneOrderCommand
-    object CancelOrder {
-      sealed trait Source extends Product with Serializable
-      object Source {
-        case object NotTracked       extends Source
-        case object Request          extends Source // User or admin, we don't know
-        case object DeletedOrderBook extends Source
-        case object Expiration       extends Source
-        case object BalanceTracking  extends Source
-      }
-    }
+    case class CancelOrder(orderId: Order.Id, source: Source)                            extends OneOrderCommand
+    case class CancelOrders(orderIds: Set[Order.Id], source: Source)                     extends Command
+    case class CancelAllOrders(pair: Option[AssetPair], timestamp: Long, source: Source) extends Command
 
-    case class CancelOrders(orderIds: Set[Order.Id])                     extends Command
-    case class CancelAllOrders(pair: Option[AssetPair], timestamp: Long) extends Command
+    sealed trait Source extends Product with Serializable
+    object Source {
+      case object NotTracked        extends Source
+      case object Request           extends Source // User or admin, we don't know
+      case object OrderBookDeletion extends Source
+      case object Expiration        extends Source
+      case object BalanceTracking   extends Source
+    }
   }
 
   sealed trait Event

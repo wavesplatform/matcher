@@ -1,8 +1,7 @@
 package com.wavesplatform.dex.queue
 
 import com.google.common.primitives.Longs
-import com.wavesplatform.dex.actors.address.AddressActor.Command.CancelOrder
-import com.wavesplatform.dex.actors.address.AddressActor.Command.CancelOrder.Source
+import com.wavesplatform.dex.actors.address.AddressActor.Command.Source
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.crypto.DigestSize
@@ -23,8 +22,8 @@ object QueueEvent {
     override def assetPair: AssetPair = marketOrder.order.assetPair
   }
 
-  case class Canceled(assetPair: AssetPair, orderId: Order.Id, source: CancelOrder.Source) extends QueueEvent
-  case class OrderBookDeleted(assetPair: AssetPair)                                        extends QueueEvent
+  case class Canceled(assetPair: AssetPair, orderId: Order.Id, source: Source) extends QueueEvent
+  case class OrderBookDeleted(assetPair: AssetPair)                            extends QueueEvent
 
   implicit final class Ops(val self: QueueEvent) extends AnyVal {
     def assets: Set[Asset] = self match {
@@ -56,21 +55,21 @@ object QueueEvent {
     case x => throw new IllegalArgumentException(s"Unknown event type: $x")
   }
 
-  val sourceToBytes: Map[CancelOrder.Source, Array[Byte]] = Map(
-    Source.NotTracked       -> Array.emptyByteArray,
-    Source.Request          -> Array(0),
-    Source.DeletedOrderBook -> Array(1),
-    Source.Expiration       -> Array(2),
-    Source.BalanceTracking  -> Array(3)
+  val sourceToBytes: Map[Source, Array[Byte]] = Map(
+    Source.NotTracked        -> Array.emptyByteArray,
+    Source.Request           -> Array(0),
+    Source.OrderBookDeletion -> Array(1),
+    Source.Expiration        -> Array(2),
+    Source.BalanceTracking   -> Array(3)
   )
 
-  def bytesToSource(xs: Array[Byte]): CancelOrder.Source =
+  def bytesToSource(xs: Array[Byte]): Source =
     if (xs.length > 1) throw new IllegalArgumentException(s"Can't parse Source from array, ${}")
     else if (xs.isEmpty) Source.NotTracked
     else
       xs.head match {
         case 0 => Source.Request
-        case 1 => Source.DeletedOrderBook
+        case 1 => Source.OrderBookDeletion
         case 2 => Source.Expiration
         case 3 => Source.BalanceTracking
         case x => throw new IllegalArgumentException(s"Unknown source type: $x")

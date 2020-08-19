@@ -3,7 +3,7 @@ package com.wavesplatform.dex.actors.address
 import akka.actor.{Actor, ActorRef, Cancellable, Props}
 import com.wavesplatform.dex.actors.TimedOut
 import com.wavesplatform.dex.actors.address.AddressActor.Command.CancelOrder
-import com.wavesplatform.dex.actors.address.AddressActor.Event
+import com.wavesplatform.dex.actors.address.AddressActor.{Command, Event}
 import com.wavesplatform.dex.actors.address.BatchOrderCancelActor.CancelResponse.OrderCancelResult
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.utils.ScorexLogging
@@ -13,7 +13,7 @@ import scala.concurrent.duration.FiniteDuration
 
 class BatchOrderCancelActor private (
     orderIds: Set[Order.Id],
-    source: CancelOrder.Source,
+    source: Command.Source,
     processorActor: ActorRef,
     clientActor: ActorRef,
     timeout: FiniteDuration,
@@ -52,7 +52,7 @@ class BatchOrderCancelActor private (
 
 object BatchOrderCancelActor {
   def props(orderIds: Set[Order.Id],
-            source: CancelOrder.Source,
+            source: Command.Source,
             processorActor: ActorRef,
             clientActor: ActorRef,
             timeout: FiniteDuration,

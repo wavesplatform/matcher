@@ -1129,7 +1129,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
               if (orderId == okOrder.id() || orderId == orderToCancel.id()) AddressActor.Event.OrderCanceled(orderId)
               else error.OrderNotFound(orderId)
 
-            case x @ AddressActor.Command.CancelAllOrders(pair, _) =>
+            case x @ AddressActor.Command.CancelAllOrders(pair, _, _) =>
               if (pair.contains(badOrder.assetPair)) error.AddressIsBlacklisted(badOrder.sender)
               else if (pair.forall(_ == okOrder.assetPair))
                 AddressActor.Event.BatchCancelCompleted(
@@ -1140,7 +1140,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
                 )
               else Status.Failure(new RuntimeException(s"Can't handle $x"))
 
-            case AddressActor.Command.CancelOrders(ids) =>
+            case AddressActor.Command.CancelOrders(ids, _) =>
               AddressActor.Event.BatchCancelCompleted(
                 ids.map { id =>
                   id -> (if (id == orderToCancel.id()) Right(AddressActor.Event.OrderCanceled(okOrder.id())) else Left(error.CanNotPersistEvent))

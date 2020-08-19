@@ -111,7 +111,7 @@ class OrderBookActor(settings: Settings,
       context.watch(aggregatedRef)
 
       // Timestamp here doesn't matter
-      processEvents(time.getTimestamp(), orderBook.allOrders.map(lo => OrderAdded(lo, lo.order.timestamp, OrderAdded.Reason.OrderBookRecovered)))
+      processEvents(time.getTimestamp(), orderBook.allOrders.map(lo => OrderAdded(lo, OrderAdded.Reason.OrderBookRecovered, lo.order.timestamp)))
 
       owner ! OrderBookRecovered(assetPair, lastSavedSnapshotOffset)
       context.become(working)

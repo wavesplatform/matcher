@@ -101,7 +101,7 @@ class ActorsWebSocketInteractionsSpecification
     def placeOrder(ao: AcceptedOrder): Unit = {
       addressDir ! AddressDirectoryActor.Envelope(address, AddressActor.Command.PlaceOrder(ao.order, ao.isMarket))
       eventsProbe.expectMsg(ao match { case lo: LimitOrder => QueueEvent.Placed(lo); case mo: MarketOrder => QueueEvent.PlacedMarket(mo) })
-      addressDir ! OrderAdded(ao, System.currentTimeMillis, OrderAdded.Reason.RequestExecuted)
+      addressDir ! OrderAdded(ao, OrderAdded.Reason.RequestExecuted, System.currentTimeMillis)
     }
 
     def cancelOrder(ao: AcceptedOrder, unmatchable: Boolean): Unit = {
@@ -481,12 +481,12 @@ class ActorsWebSocketInteractionsSpecification
           )
 
           val now = System.currentTimeMillis()
-          ad ! OrderAdded(counter, now, OrderAdded.Reason.RequestExecuted)
+          ad ! OrderAdded(counter, OrderAdded.Reason.RequestExecuted, now)
 
           ad ! AddressDirectoryActor.Envelope(address, AddressActor.Command.PlaceOrder(submitted.order, submitted.isMarket))
           ep.expectMsg(QueueEvent.Placed(submitted))
 
-          ad ! OrderAdded(submitted, now, OrderAdded.Reason.RequestExecuted)
+          ad ! OrderAdded(submitted, OrderAdded.Reason.RequestExecuted, now)
           val oe = OrderExecuted(submitted, counter, System.currentTimeMillis, submitted.matcherFee, counter.matcherFee)
           ad ! oe
 
@@ -511,12 +511,12 @@ class ActorsWebSocketInteractionsSpecification
         )
 
         val now = System.currentTimeMillis()
-        ad ! OrderAdded(counter, now, OrderAdded.Reason.RequestExecuted)
+        ad ! OrderAdded(counter, OrderAdded.Reason.RequestExecuted, now)
 
         ad ! AddressDirectoryActor.Envelope(address, AddressActor.Command.PlaceOrder(submitted.order, submitted.isMarket))
         ep.expectMsg(QueueEvent.Placed(submitted))
 
-        ad ! OrderAdded(submitted, now, OrderAdded.Reason.RequestExecuted)
+        ad ! OrderAdded(submitted, OrderAdded.Reason.RequestExecuted, now)
         val oe = OrderExecuted(submitted, counter, System.currentTimeMillis, submitted.matcherFee, counter.matcherFee)
         ad ! oe
 

@@ -30,6 +30,7 @@ object DBRecords {
                          totalFilled: BigDecimal,
                          feeFilled: BigDecimal,
                          feeTotalFilled: BigDecimal,
-                         status: Byte)
+                         status: Byte,
+                         reason: Option[Byte])
       extends Record
 }

@@ -69,12 +69,12 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
   }
 
   private def createTables(): Unit = {
-
+    log.info("Creating tables")
     val orderHistoryDDLFileName = "/order-history/order-history-ddl.sql"
 
     def getFileContentStr(fileName: String): String = {
       val fileStream = getClass.getResourceAsStream(fileName)
-      Source.fromInputStream(fileStream).getLines.toSeq.mkString
+      Source.fromInputStream(fileStream).getLines.mkString
     }
 
     def executeCreateTablesStatement(sqlConnection: Connection): Try[Unit] = Try {
@@ -87,7 +87,8 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
     }
 
     val sqlConnection = DriverManager.getConnection(postgres.jdbcUrl, postgres.username, postgres.password)
-    executeCreateTablesStatement(sqlConnection).map(_ => sqlConnection.close())
+    executeCreateTablesStatement(sqlConnection).map(_ => sqlConnection.close()).get // Force throw
+    log.info("Tables created")
   }
 
   override protected def beforeAll(): Unit = {
@@ -142,7 +143,8 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
                                     totalFilled: Double,
                                     feeFilled: Double,
                                     feeTotalFilled: Double,
-                                    status: Byte)
+                                    status: Byte,
+                                    reason: Option[Byte])
 
   private def getOrderInfoById(orderId: Order.Id): Option[OrderBriefInfo] =
     ctx
@@ -174,7 +176,8 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
           _.feeFilled      -> "fee_filled",
           _.feeTotalFilled -> "fee_total_filled",
           _.status         -> "status",
-          _.timestamp      -> "timestamp"
+          _.timestamp      -> "timestamp",
+          _.reason         -> "reason"
         ).filter(_.orderId == lift(orderId.toString))
       )
       .sortWith { (l, r) =>
@@ -183,7 +186,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
         (l.totalFilled <= r.totalFilled)
       }
       .map { r =>
-        EventBriefInfo(r.orderId, r.eventType, r.filled.toDouble, r.totalFilled.toDouble, r.feeFilled.toDouble, r.feeTotalFilled.toDouble, r.status)
+        EventBriefInfo(r.orderId, r.eventType, r.filled.toDouble, r.totalFilled.toDouble, r.feeFilled.toDouble, r.feeTotalFilled.toDouble, r.status, r.reason)
       }
 
   "Postgres order history should save all orders and events" in {
@@ -238,7 +241,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
           )
 
           getEventsInfoByOrderId(order.id()) should matchTo(
-            List(EventBriefInfo(order.idStr(), eventTrade, 100, 100, 0.00000030, 0.00000030, statusFilled))
+            List(EventBriefInfo(order.idStr(), eventTrade, 100, 100, 0.00000030, 0.00000030, statusFilled, None))
           )
         }
       }
@@ -259,9 +262,9 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
 
         getEventsInfoByOrderId(buyOrder.id()) should matchTo(
           List(
-            EventBriefInfo(buyOrder.idStr(), eventTrade, 100, 100, 0.00000567, 0.00000567, statusPartiallyFilled),
-            EventBriefInfo(buyOrder.idStr(), eventTrade, 100, 200, 0.00000567, 0.00001134, statusPartiallyFilled),
-            EventBriefInfo(buyOrder.idStr(), eventCancel, 0, 200, 0, 0.00001134, statusCancelled)
+            EventBriefInfo(buyOrder.idStr(), eventTrade, 100, 100, 0.00000567, 0.00000567, statusPartiallyFilled, None),
+            EventBriefInfo(buyOrder.idStr(), eventTrade, 100, 200, 0.00000567, 0.00001134, statusPartiallyFilled, None),
+            EventBriefInfo(buyOrder.idStr(), eventCancel, 0, 200, 0, 0.00001134, statusCancelled, Some(2)) // RequestExecuted
           )
         )
       }
@@ -284,7 +287,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
           OrderBriefInfo(buyOrder.idStr(), limitOrderType, alice.publicKey.toString, buySide, "WAVES", usd.toString, "WAVES", 300, 0.35, 0.00370300)
         )
         getEventsInfoByOrderId(buyOrder.id()) should matchTo(
-          List(EventBriefInfo(buyOrder.idStr(), eventTrade, 300, 300, 0.00370300, 0.00370300, statusFilled))
+          List(EventBriefInfo(buyOrder.idStr(), eventTrade, 300, 300, 0.00370300, 0.00370300, statusFilled, None))
         )
       }
 
@@ -294,7 +297,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
         )
 
         getEventsInfoByOrderId(sellOrder.id()) should matchTo(
-          List(EventBriefInfo(sellOrder.idStr(), eventTrade, 300, 300, 0.30, 0.30, statusFilled))
+          List(EventBriefInfo(sellOrder.idStr(), eventTrade, 300, 300, 0.30, 0.30, statusFilled, None))
         )
       }
     }
@@ -327,7 +330,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
         )
 
         getEventsInfoByOrderId(smallBuyOrder.id()) should matchTo(
-          List(EventBriefInfo(smallBuyOrder.idStr(), eventTrade, 300, 300, 0.00001703, 0.00001703, statusFilled))
+          List(EventBriefInfo(smallBuyOrder.idStr(), eventTrade, 300, 300, 0.00001703, 0.00001703, statusFilled, None))
         )
       }
 
@@ -346,7 +349,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
         )
 
         getEventsInfoByOrderId(bigSellOrder.id()) should matchTo(
-          List(EventBriefInfo(bigSellOrder.idStr(), eventTrade, 300, 300, 0.00000010, 0.00000010, statusPartiallyFilled))
+          List(EventBriefInfo(bigSellOrder.idStr(), eventTrade, 300, 300, 0.00000010, 0.00000010, statusPartiallyFilled, None))
         )
       }
     }
@@ -380,7 +383,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
         )
 
         getEventsInfoByOrderId(unmatchableMarketBuyOrder.id()) should matchTo(
-          List(EventBriefInfo(unmatchableMarketBuyOrder.idStr(), eventCancel, 0, 0, 0, 0, statusFilled))
+          List(EventBriefInfo(unmatchableMarketBuyOrder.idStr(), eventCancel, 0, 0, 0, 0, statusFilled, Some(5))) // BecameUnmatchable
         )
       }
     }
@@ -420,10 +423,10 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
 
         getEventsInfoByOrderId(marketBuyOrder.id()) should matchTo(
           List(
-            EventBriefInfo(marketBuyOrder.idStr(), eventTrade, 100, 100, 0.00000340, 0.00000340, statusPartiallyFilled),
-            EventBriefInfo(marketBuyOrder.idStr(), eventTrade, 100, 200, 0.00000340, 0.00000680, statusPartiallyFilled),
-            EventBriefInfo(marketBuyOrder.idStr(), eventTrade, 100, 300, 0.00000340, 0.00001020, statusPartiallyFilled),
-            EventBriefInfo(marketBuyOrder.idStr(), eventCancel, 0, 300, 0, 0.00001020, statusFilled)
+            EventBriefInfo(marketBuyOrder.idStr(), eventTrade, 100, 100, 0.00000340, 0.00000340, statusPartiallyFilled, None),
+            EventBriefInfo(marketBuyOrder.idStr(), eventTrade, 100, 200, 0.00000340, 0.00000680, statusPartiallyFilled, None),
+            EventBriefInfo(marketBuyOrder.idStr(), eventTrade, 100, 300, 0.00000340, 0.00001020, statusPartiallyFilled, None),
+            EventBriefInfo(marketBuyOrder.idStr(), eventCancel, 0, 300, 0, 0.00001020, statusFilled, Some(5)) // BecameUnmatchable
           )
         )
       }

@@ -58,7 +58,7 @@ case class OrderBook private (bids: Side, asks: Side, lastTrade: Option[LastTrad
           eventTs: Long,
           getMakerTakerFee: (AcceptedOrder, LimitOrder) => (Long, Long),
           tickSize: Long = MatchingRule.DefaultRule.tickSize): OrderBookUpdates = {
-    val events = Queue(OrderAdded(submitted, eventTs, OrderAdded.Reason.RequestExecuted))
+    val events = Queue(OrderAdded(submitted, OrderAdded.Reason.RequestExecuted, eventTs))
     if (submitted.order.isValid(eventTs)) doMatch(eventTs, tickSize, getMakerTakerFee, submitted, events, this)
     else OrderBookUpdates(this, events.enqueue(OrderCanceled(submitted, OrderCanceled.Reason.BecameInvalid, eventTs)), LevelAmounts.empty, None)
   }

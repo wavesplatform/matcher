@@ -433,7 +433,7 @@ object Events {
     }
   }
 
-  case class OrderAdded(order: AcceptedOrder, timestamp: Long, reason: OrderAdded.Reason) extends Event
+  case class OrderAdded(order: AcceptedOrder, reason: OrderAdded.Reason, timestamp: Price) extends Event
   object OrderAdded {
     sealed trait Reason extends Product with Serializable
     object Reason {

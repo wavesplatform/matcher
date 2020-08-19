@@ -146,7 +146,7 @@ class OrderBookActorSpecification
       tp.expectMsgType[OrderBookSnapshotUpdateCompleted]
       orderBook ! RestartActor
 
-      tp.receiveN(2) shouldEqual Seq(ord1, ord2).map(o => OrderAdded(LimitOrder(o), o.timestamp, OrderAdded.Reason.OrderBookRecovered))
+      tp.receiveN(2) shouldEqual Seq(ord1, ord2).map(o => OrderAdded(LimitOrder(o), OrderAdded.Reason.OrderBookRecovered, o.timestamp))
       tp.expectMsgType[OrderBookRecovered]
     }
 
@@ -166,16 +166,12 @@ class OrderBookActorSpecification
 
       actor ! RestartActor
       tp.expectMsgType[OrderAdded] should matchTo(
-        OrderAdded(
-          SellLimitOrder(
+        OrderAdded(SellLimitOrder(
             ord2.amount - ord1.amount,
             ord2.matcherFee - AcceptedOrder.partialFee(ord2.matcherFee, ord2.amount, ord1.amount),
             ord2,
             (BigInt(10) * Order.PriceConstant * 100 * Order.PriceConstant).bigInteger
-          ),
-          ord2.timestamp,
-          OrderAdded.Reason.OrderBookRecovered
-        )
+          ), OrderAdded.Reason.OrderBookRecovered, ord2.timestamp)
       )
       tp.expectMsgType[OrderBookRecovered]
     }
@@ -196,16 +192,12 @@ class OrderBookActorSpecification
 
       val restAmount = ord1.amount + ord2.amount - ord3.amount
       tp.expectMsg(
-        OrderAdded(
-          BuyLimitOrder(
+        OrderAdded(BuyLimitOrder(
             restAmount,
             ord2.matcherFee - AcceptedOrder.partialFee(ord2.matcherFee, ord2.amount, ord2.amount - restAmount),
             ord2,
             (BigInt(2) * Order.PriceConstant * 100 * Order.PriceConstant).bigInteger
-          ),
-          ord2.timestamp,
-          OrderAdded.Reason.OrderBookRecovered
-        )
+          ), OrderAdded.Reason.OrderBookRecovered, ord2.timestamp)
       )
       tp.expectMsgType[OrderBookRecovered]
     }
@@ -228,16 +220,12 @@ class OrderBookActorSpecification
 
       val restAmount = ord1.amount + ord2.amount + ord3.amount - ord4.amount
       tp.expectMsg(
-        OrderAdded(
-          SellLimitOrder(
+        OrderAdded(SellLimitOrder(
             restAmount,
             ord2.matcherFee - AcceptedOrder.partialFee(ord2.matcherFee, ord2.amount, ord2.amount - restAmount),
             ord2,
             (BigInt(4) * Order.PriceConstant * 100 * Order.PriceConstant).bigInteger
-          ),
-          ord2.timestamp,
-          OrderAdded.Reason.OrderBookRecovered
-        )
+          ), OrderAdded.Reason.OrderBookRecovered, ord2.timestamp)
       )
       tp.expectMsgType[OrderBookRecovered]
     }

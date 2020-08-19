@@ -25,7 +25,7 @@ pipeline {
             steps {
                 cleanWs()
                 dir('matcher') {
-                    checkout scm: [$class: 'GitSCM', userRemoteConfigs: [[url: 'https://github.com/wavesplatform/matcher.git', credentialsId: null]], extensions: [[$class: 'CloneOption', noTags: false, reference: '', shallow: false]], branches: [[name: '*/DEX-822-devnet-deployment-via-jenkins']]], poll: false
+                    checkout scm: [$class: 'GitSCM', userRemoteConfigs: [[url: 'https://github.com/wavesplatform/matcher.git', credentialsId: null]], extensions: [[$class: 'CloneOption', noTags: false, reference: '', shallow: false]], branches: [[name: "${BRANCH_DEX}"]]], poll: false
                 }
                 script {
                     BRANCH_NODE = sh(

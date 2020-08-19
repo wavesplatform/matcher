@@ -28,7 +28,7 @@ import io.qameta.allure.Story
 
 import scala.concurrent.duration.DurationInt
 
-@Stoty("Integration tests")
+@Story("Integration tests")
 trait MatcherSuiteBase
     extends AnyFreeSpec
     with AllureScalatestContext

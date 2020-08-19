@@ -41,7 +41,7 @@ import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
-@Stoty("Unit tests")
+@Story("Unit tests")
 trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with DoubleOps with WavesFeeConstants with AllureScalatestContext { _: Suite =>
 
   protected implicit val wsErrorDiff: Diff[WsError]             = Derived[Diff[WsError]].ignore[WsError, Long](_.timestamp)

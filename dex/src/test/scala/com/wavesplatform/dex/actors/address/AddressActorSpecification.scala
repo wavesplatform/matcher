@@ -271,7 +271,7 @@ class AddressActorSpecification
       ao match {
         case lo: LimitOrder =>
           eventsProbe.expectMsg(QueueEvent.Placed(lo))
-          addressDir ! OrderAdded(lo, System.currentTimeMillis)
+          addressDir ! OrderAdded(lo, System.currentTimeMillis, OrderAdded.Reason.RequestExecuted)
         case mo: MarketOrder => eventsProbe.expectMsg(QueueEvent.PlacedMarket(mo))
       }
     }

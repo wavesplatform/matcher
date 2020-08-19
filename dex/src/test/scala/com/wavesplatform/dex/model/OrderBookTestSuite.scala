@@ -169,8 +169,8 @@ class OrderBookTestSuite
 
       events should matchTo(
         Queue[Event](
-          OrderAdded(counterSellOrder, now),
-          OrderAdded(submittedBuyOrder, now + 1),
+          OrderAdded(counterSellOrder, now, OrderAdded.Reason.RequestExecuted),
+          OrderAdded(submittedBuyOrder, now + 1, OrderAdded.Reason.RequestExecuted),
           OrderExecuted(submittedBuyOrder, counterSellOrder, now + 1, counterSellOrder.matcherFee, submittedBuyOrder.matcherFee)
         )
       )
@@ -210,11 +210,14 @@ class OrderBookTestSuite
 
     withClue("Counter SELL order (price = 3.15, tick size disabled) and submitted BUY order (price = 3.15, tick size = 0.1) should be matched:\n") {
       val OrderBookUpdates(ob1, events1, _, _) = OrderBook.empty.append(counter, counterTs)
-      events1 should matchTo(Queue[Event](OrderAdded(counter, counterTs)))
+      events1 should matchTo(Queue[Event](OrderAdded(counter, counterTs, OrderAdded.Reason.RequestExecuted)))
 
       val OrderBookUpdates(ob2, events2, _, _) = ob1.append(submitted, submittedTs, tickSize = normalizedTickSize(0.1))
       events2 should matchTo(
-        Queue[Event](OrderAdded(submitted, submittedTs), OrderExecuted(submitted, counter, submittedTs, submitted.matcherFee, counter.matcherFee)))
+        Queue[Event](
+          OrderAdded(submitted, submittedTs, OrderAdded.Reason.RequestExecuted),
+          OrderExecuted(submitted, counter, submittedTs, submitted.matcherFee, counter.matcherFee)
+        ))
 
       ob2.asks shouldBe empty
       ob2.bids shouldBe empty

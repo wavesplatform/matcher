@@ -72,7 +72,7 @@ class HistoryRouterSpecification
     )
   }
 
-  def orderAdded(submitted: LimitOrder): OrderAdded           = OrderAdded(submitted, time.getTimestamp())
+  def orderAdded(submitted: LimitOrder): OrderAdded           = OrderAdded(submitted, time.getTimestamp(), OrderAdded.Reason.RequestExecuted)
   def orderCancelled(submitted: AcceptedOrder): OrderCanceled = OrderCanceled(submitted, Events.OrderCanceled.Reason.RequestExecuted, time.getTimestamp())
 
   def orderExecuted(submitted: AcceptedOrder, counter: LimitOrder): OrderExecuted = {

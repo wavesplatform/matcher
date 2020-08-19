@@ -225,13 +225,13 @@ class AddressActor(owner: Address,
           } else log.warn(s"Received stale $event for $orderId")
       }
 
-    case event @ OrderAdded(submitted, _) =>
-      import submitted.order
-      log.debug(s"OrderAdded(${order.id()})")
-      refreshOrderState(submitted, event)
-      pendingCommands.remove(order.id()).foreach { command =>
-        log.trace(s"Confirming placement for ${order.id()}")
-        command.client ! Event.OrderAccepted(order)
+    case event: OrderAdded =>
+      import event.order
+      log.debug(s"OrderAdded(${order.id}, ${event.reason}, ${event.timestamp})")
+      refreshOrderState(order, event)
+      pendingCommands.remove(order.id).foreach { command =>
+        log.trace(s"Confirming placement for ${order.id}")
+        command.client ! Event.OrderAccepted(order.order)
       }
 
     case event: OrderExecuted =>
@@ -239,10 +239,10 @@ class AddressActor(owner: Address,
       List(event.submittedRemaining, event.counterRemaining).filter(_.order.sender.toAddress == owner).foreach(refreshOrderState(_, event))
       context.system.eventStream.publish(CreateExchangeTransactionActor.OrderExecutedObserved(owner, event))
 
-    case event @ OrderCanceled(ao, isSystemCancel, _) =>
+    case event @ OrderCanceled(ao, reason, ts) =>
       val id       = ao.id
       val isActive = activeOrders.contains(id)
-      log.debug(s"OrderCanceled($id, system=$isSystemCancel, isActive=$isActive)")
+      log.debug(s"OrderCanceled($id, $reason, $ts, isActive=$isActive)")
       if (isActive) refreshOrderState(ao, event)
       pendingCommands.remove(id).foreach { pc =>
         log.trace(s"Confirming cancellation for $id")
@@ -615,7 +615,6 @@ object AddressActor {
     object Source {
       case object NotTracked        extends Source
       case object Request           extends Source // User or admin, we don't know
-      case object OrderBookDeletion extends Source
       case object Expiration        extends Source
       case object BalanceTracking   extends Source
     }

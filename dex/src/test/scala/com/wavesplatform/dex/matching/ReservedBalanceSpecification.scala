@@ -129,8 +129,8 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
   def execute(counter: Order, submitted: Order): OrderExecuted = {
     val now = time.getTimestamp()
 
-    addressDir ! OrderAdded(LimitOrder(submitted), now)
-    addressDir ! OrderAdded(LimitOrder(counter), now)
+    addressDir ! OrderAdded(LimitOrder(submitted), now, OrderAdded.Reason.RequestExecuted)
+    addressDir ! OrderAdded(LimitOrder(counter), now, OrderAdded.Reason.RequestExecuted)
     val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter), submitted.timestamp, counter.matcherFee, submitted.matcherFee)
     addressDir ! exec
     exec
@@ -513,7 +513,7 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
   private def executeMarketOrder(addressDirWithOrderBookCache: ActorRef, marketOrder: MarketOrder, limitOrder: LimitOrder): OrderExecuted = {
     val executionEvent = mkOrderExecuted(marketOrder, limitOrder, marketOrder.order.timestamp)
 
-    addressDirWithOrderBookCache ! OrderAdded(limitOrder, time.getTimestamp())
+    addressDirWithOrderBookCache ! OrderAdded(limitOrder, time.getTimestamp(), OrderAdded.Reason.RequestExecuted)
     addressDirWithOrderBookCache ! executionEvent
 
     executionEvent

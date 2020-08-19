@@ -66,20 +66,20 @@ object WavesNodeContainer extends ScorexLogging {
             runConfig: Config,
             suiteInitialConfig: Config,
             localLogsDir: Path,
-            tag: String,
+            image: String,
             netAlias: Option[String] = Some(wavesNodeNetAlias))(implicit
                                                                 tryHttpBackend: LoggingSttpBackend[Try, Nothing],
                                                                 futureHttpBackend: LoggingSttpBackend[Future, Nothing],
                                                                 ec: ExecutionContext): WavesNodeContainer = {
 
     val underlying = GenericContainer(
-      dockerImage = s"wavesplatform/waves-integration-it:$tag",
+      dockerImage = image,
       exposedPorts = List(restApiPort, networkPort, dexGrpcExtensionPort),
       env = getEnv(name, internalIp),
       waitStrategy = ignoreWaitStrategy
     ).configure { c =>
       c.withNetwork(network)
-      netAlias.foreach(c.withNetworkAliases(_))
+      netAlias.foreach { c.withNetworkAliases(_) }
       c.withFileSystemBind(localLogsDir.toString, containerLogsPath, BindMode.READ_WRITE)
       c.withCreateContainerCmdModifier {
         _.withName(s"$networkName-$name") // network.getName returns random id
@@ -88,7 +88,7 @@ object WavesNodeContainer extends ScorexLogging {
 
       // Copy files to container
       List(
-        ("waves-base.conf", getRawContentFromResource(s"nodes/waves-base.conf"), false),
+        ("waves-base.conf", getRawContentFromResource("nodes/waves-base.conf"), false),
         (s"$name.conf", getRawContentFromResource(s"nodes/$name.conf"), false),
         ("run.conf", runConfig.rendered, true),
         ("suite.conf", suiteInitialConfig.rendered, true),

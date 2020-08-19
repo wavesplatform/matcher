@@ -39,7 +39,7 @@ final case class DexContainer private (override val internalIp: String, underlyi
 object DexContainer extends ScorexLogging {
 
   private val isProfilingEnabled: Boolean = Option(System.getenv("WAVES_DEX_PROFILING")).getOrElse("false").toBoolean
-  private val baseContainerPath: String   = "/opt/waves-dex"
+  private val baseContainerPath: String   = "/usr/share/waves-dex"
   private val containerLogsPath: String   = s"$baseContainerPath/logs"
 
   private val restApiPort: Int = 6886 // application.conf waves.dex.rest-api.port
@@ -51,13 +51,13 @@ object DexContainer extends ScorexLogging {
             runConfig: Config,
             suiteInitialConfig: Config,
             localLogsDir: Path,
-            tag: String)(implicit
-                         tryHttpBackend: LoggingSttpBackend[Try, Nothing],
-                         futureHttpBackend: LoggingSttpBackend[Future, Nothing],
-                         ec: ExecutionContext): DexContainer = {
+            image: String)(implicit
+                           tryHttpBackend: LoggingSttpBackend[Try, Nothing],
+                           futureHttpBackend: LoggingSttpBackend[Future, Nothing],
+                           ec: ExecutionContext): DexContainer = {
 
     val underlying = GenericContainer(
-      dockerImage = s"wavesplatform/dex-it:$tag",
+      dockerImage = image,
       exposedPorts = Seq(restApiPort),
       env = getEnv(name),
       waitStrategy = ignoreWaitStrategy

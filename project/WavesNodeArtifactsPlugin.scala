@@ -50,6 +50,7 @@ object WavesNodeArtifactsPlugin extends AutoPlugin {
 
         if (artifactsToDownload.isEmpty) log.info("Waves Node artifacts have been cached")
         else {
+          log.info(s"Artifacts to download: ${artifactsToDownload.mkString(", ")}")
           log.info("Opening releases page...")
           val request = Request("https://api.github.com/repos/wavesplatform/Waves/releases").withHeaders("User-Agent" -> "SBT")
           val r = Http.http.run(request).map {
@@ -94,7 +95,10 @@ object WavesNodeArtifactsPlugin extends AutoPlugin {
                 case x                                => throw new RuntimeException(s"Can't find assets in: $x")
               }
           }
-          .getOrElse(throw new RuntimeException(s"Can't find version: $version (tag_name=v$version)"))
+          .getOrElse {
+            log.warn(s"Can't find version: $version (tag_name=v$version)")
+            List.empty
+          }
       case x => throw new RuntimeException(s"Can't parse releases as array: $x")
     }
 

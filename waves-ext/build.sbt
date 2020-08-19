@@ -78,22 +78,13 @@ inTask(docker)(
     nameOfImage := "wavesplatform/matcher-node",
     imageTagMakeFunction := (gitTag => s"${wavesNodeVersion.value}_$gitTag"),
     dockerfile := new Dockerfile {
-
-      val basePath     = "/opt/waves"
-      val entryPointSh = s"$basePath/start-matcher-node.sh"
-
       from(s"wavesplatform/wavesnode:${wavesNodeVersion.value}")
-      user("waves:waves")
+      user("143:143") // waves:waves
       add(
-        sources = Seq(
-          (Universal / stage).value, // sources
-          (Compile / sourceDirectory).value / "container" / "start-matcher-node.sh" // entry point
-        ),
-        destination = s"$basePath/",
-        chown = "waves:waves"
+        sources = Seq((Universal / stage).value / "lib"), // sources
+        destination = "/usr/share/waves/lib/plugins/",
+        chown = "143:143"
       )
-      runShell("chmod", "+x", entryPointSh)
-      entryPoint(entryPointSh)
       expose(6887, 6871) // DEX Extension, Stagenet REST API
     },
     buildOptions := BuildOptions(removeIntermediateContainers = BuildOptions.Remove.OnSuccess)

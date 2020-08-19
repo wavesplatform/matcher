@@ -140,7 +140,7 @@ inScope(Global)(
      * F - show full stack traces
      * u - select the JUnit XML reporter with output directory
      */
-    testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports"),
+    testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports", "-C", "io.qameta.allure.scalatest.AllureScalatest"),
     testOptions += Tests.Setup(_ => sys.props("sbt-testing") = "true"),
     concurrentRestrictions := {
       val threadNumber = Option(System.getenv("SBT_THREAD_NUMBER")).fold(1)(_.toInt)

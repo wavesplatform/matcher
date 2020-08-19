@@ -9,7 +9,8 @@ import com.wavesplatform.dex.it.fp.CanExtract
 import mouse.any._
 
 trait HasWavesNode { self: BaseContainersKit =>
-  private val defaultTag = Option(System.getenv("NODE_TAG")).getOrElse("latest")
+  protected val defaultNodeImage = "wavesplatform/waves-integration-it:latest"
+  private val nodeImage          = Option(System.getenv("NODE_IMAGE")).getOrElse(defaultNodeImage)
 
   protected implicit def toNodeExplicitGetOps[F[_]: Functor: CanExtract](self: NodeApi[F]): NodeApiOps.ExplicitGetNodeApiOps[F] = {
     new NodeApiOps.ExplicitGetNodeApiOps[F](self)
@@ -22,9 +23,9 @@ trait HasWavesNode { self: BaseContainersKit =>
   protected def createWavesNode(name: String,
                                 runConfig: Config = wavesNodeRunConfig,
                                 suiteInitialConfig: Config = wavesNodeInitialSuiteConfig,
-                                tag: String = defaultTag,
+                                image: String = nodeImage,
                                 netAlias: Option[String] = Some(WavesNodeContainer.wavesNodeNetAlias)): WavesNodeContainer =
-    WavesNodeContainer(name, networkName, network, getIp(name), runConfig, suiteInitialConfig, localLogsDir, tag, netAlias) unsafeTap addKnownContainer
+    WavesNodeContainer(name, networkName, network, getIp(name), runConfig, suiteInitialConfig, localLogsDir, image, netAlias) unsafeTap addKnownContainer
 
   lazy val wavesNode1: WavesNodeContainer = createWavesNode("waves-1")
 }

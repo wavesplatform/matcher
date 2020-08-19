@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.dex.WavesExtSuiteBase
 import com.wavesplatform.dex.grpc.integration.smart.MatcherScriptRunner
 import com.wavesplatform.dex.test.matchers.ProduceError.produce
 import com.wavesplatform.lang.script.Script
@@ -13,10 +14,8 @@ import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import org.scalatest.freespec.AnyFreeSpecLike
-import org.scalatest.matchers.should.Matchers
 
-class MatcherScriptRunnerSpecification extends AnyFreeSpecLike with Matchers {
+class MatcherScriptRunnerSpecification extends WavesExtSuiteBase {
 
   private val sampleOrder = Order.selfSigned(
     version = 1.toByte,

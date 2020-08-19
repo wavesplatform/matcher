@@ -40,4 +40,8 @@ Dockerfile
 
 native
 
+<<<<<<< HEAD
 allure-results
+=======
+allure-results
+>>>>>>> ab1f61d8adf602bd8441f9be68a1fe485087b5eb

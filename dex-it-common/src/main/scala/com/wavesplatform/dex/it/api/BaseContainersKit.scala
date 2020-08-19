@@ -28,16 +28,19 @@ trait BaseContainersKit extends ScorexLogging {
 
   protected val moduleName: String
 
-  private val networkSeed           = Random.nextInt(0x100000) << 4 | 0x0A000000 // a random network in 10.x.x.x range
-  private val networkPrefix         = s"${InetAddress.getByAddress(toByteArray(networkSeed)).getHostAddress}/28" // 10.x.x.x/28 network will accommodate up to 13 nodes
-  protected val networkName: String = s"waves-${Random.nextInt(Int.MaxValue)}"
-  protected val network: NetworkImpl = Network
-    .builder()
-    .createNetworkCmdModifier { cmd: CreateNetworkCmd =>
-      cmd.withIpam(new Ipam().withConfig(new Ipam.Config().withSubnet(networkPrefix).withIpRange(networkPrefix).withGateway(getIp(0xE))))
-      cmd.withName(networkName)
-    }
-    .build()
+  private val networkSeed   = Random.nextInt(0x100000) << 4 | 0x0A000000                                 // a random network in 10.x.x.x range
+  private val networkPrefix = s"${InetAddress.getByAddress(toByteArray(networkSeed)).getHostAddress}/28" // 10.x.x.x/28 network will accommodate up to 13 nodes
+
+  protected val networkName = s"waves-${Random.nextInt(Int.MaxValue)}"
+
+  protected val network: NetworkImpl =
+    Network
+      .builder()
+      .createNetworkCmdModifier { cmd: CreateNetworkCmd =>
+        cmd.withIpam(new Ipam().withConfig(new Ipam.Config().withSubnet(networkPrefix).withIpRange(networkPrefix).withGateway(getIp(0xE))))
+        cmd.withName(networkName)
+      }
+      .build()
 
   protected def getIp(name: String): String         = getIp(getNumber(name))
   protected def getIp(containerNumber: Int): String = InetAddress.getByAddress(toByteArray(containerNumber & 0xF | networkSeed)).getHostAddress

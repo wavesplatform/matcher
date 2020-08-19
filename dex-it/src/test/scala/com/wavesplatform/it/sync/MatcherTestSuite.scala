@@ -33,23 +33,20 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
   private val IssueResults(issueBob2Asset2Tx, _, bobAsset2) = mkIssueExtended(bob, "Bob-2-X", someAssetAmount, 0)
   private val bob2WavesPair                                 = AssetPair(bobAsset2, Waves)
 
-  private val IssueResults(issueUsdNTx, usdNId, usdn) = mkIssueExtended(alice, "USD-N", defaultAssetQuantity, 6)
-  private val btcUsdnPair                             = AssetPair(btc, usdn)
-
   private val order1 = mkOrder(alice, aliceWavesPair, SELL, aliceSellAmount, 2000.waves, ttl = 10.minutes) // TTL?
 
   private val maxOrders = 99
 
   override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(
     s"""waves.dex {
-       |  price-assets = [ "$usdNId", "$BtcId", "$UsdId", "WAVES" ]
+       |  price-assets = [ "$UsdnId", "$BtcId", "$UsdId", "WAVES" ]
        |  order-db.max-orders = $maxOrders
        |}""".stripMargin
   )
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
-    broadcastAndAwait(issueAliceAssetTx, issueBob1Asset1Tx, issueBob2Asset2Tx, IssueUsdTx, IssueBtcTx, issueUsdNTx)
+    broadcastAndAwait(issueAliceAssetTx, issueBob1Asset1Tx, issueBob2Asset2Tx, IssueUsdTx, IssueBtcTx, IssueUsdnTx)
     dex1.start()
   }
 
@@ -505,6 +502,35 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       placeAndAwaitAtNode(buyOrder2)
 
       dex1.api.tryOrderStatusInfoByIdWithSignature(bob, sellOrder.id()).map(_.avgWeighedPrice) shouldBe Right(9351722813L)
+
+      Seq(alice, bob).foreach { owner =>
+        dex1.api.cancelAll(owner)
+      }
+    }
+
+    "not create OrderExecuted event with executed amount = 0 and the last trade should not have amount = 0" in {
+
+      val btcUsdnPairLastTrade = dex1.api.orderBookStatus(btcUsdnPair).lastTrade
+      val carol                = mkAccountWithBalance(26L -> usdn, 1.waves -> Waves)
+
+      val sellOrder = mkOrder(bob, btcUsdnPair, SELL, 345506L, 9337000000L)  // 1594779890545
+      val buyOrder  = mkOrder(carol, btcUsdnPair, BUY, 80902L, 10270700000L) // 1594780069600
+
+      placeAndAwaitAtDex(sellOrder)
+
+      dex1.api.placeMarket(buyOrder)
+      dex1.api.waitForOrderStatus(buyOrder, Status.Filled)
+
+      val ob = dex1.api.orderBook(btcUsdnPair)
+
+      ob.asks shouldBe List(HttpV0LevelAgg(345506L, 9337000000L))
+      ob.bids shouldBe empty
+
+      dex1.api.orderBookStatus(btcUsdnPair).lastTrade should matchTo(btcUsdnPairLastTrade)
+
+      Seq(bob, carol).foreach { owner =>
+        dex1.api.cancelAll(owner)
+      }
     }
   }
 }

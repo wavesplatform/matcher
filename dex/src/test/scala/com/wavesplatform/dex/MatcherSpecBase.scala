@@ -21,7 +21,7 @@ import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.domain.{crypto => wcrypto}
 import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
-import com.wavesplatform.dex.model.Events.OrderExecuted
+import com.wavesplatform.dex.model.Events.{OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model.OrderValidator.Result
 import com.wavesplatform.dex.model.{BuyLimitOrder, LimitOrder, OrderValidator, SellLimitOrder, _}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
@@ -30,6 +30,7 @@ import com.wavesplatform.dex.settings.{AssetType, MatcherSettings, OrderFeeSetti
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.time.SystemTime
 import com.wavesplatform.dex.waves.WavesFeeConstants
+import io.qameta.allure.scalatest.AllureScalatestContext
 import mouse.any._
 import net.ceedubs.ficus.Ficus._
 import org.scalacheck.{Arbitrary, Gen}
@@ -39,9 +40,10 @@ import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
-trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with DoubleOps with WavesFeeConstants { _: Suite =>
+trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with DoubleOps with WavesFeeConstants with AllureScalatestContext { _: Suite =>
 
-  protected implicit val wsErrorDiff: Diff[WsError] = Derived[Diff[WsError]].ignore[WsError, Long](_.timestamp)
+  protected implicit val wsErrorDiff: Diff[WsError]             = Derived[Diff[WsError]].ignore[WsError, Long](_.timestamp)
+  protected implicit val orderCanceledDiff: Diff[OrderCanceled] = Derived[Diff[OrderCanceled]].ignore[OrderCanceled, Long](_.timestamp)
 
   private val WalletSeed: ByteStr      = ByteStr("Matcher".getBytes("utf-8"))
   private val MatcherSeed: Array[Byte] = wcrypto.secureHash(Bytes.concat(Ints.toByteArray(0), WalletSeed.arr))

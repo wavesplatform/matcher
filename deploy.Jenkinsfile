@@ -5,9 +5,7 @@ def deployNode (host) {
 
              sh "scp ./waves/node/target/waves-devnet*all*.deb buildagent-matcher@${host}:/home/buildagent-matcher"
              sh "scp ./matcher/dex-load/src/main/resources/reinstallNode.sh buildagent-matcher@${host}:/home/buildagent-matcher"
-             sleep time: 100000, unit: 'MILLISECONDS'
              sh "ssh -q buildagent-matcher@${host} sudo sh reinstallNode.sh"
-             sleep time: 20000, unit: 'MILLISECONDS'
          }
     }
 }
@@ -91,11 +89,8 @@ pipeline {
                     sh "scp ./matcher/target/release/waves-dex-extension-devnet*all*.deb buildagent-matcher@${NODE4}:/home/buildagent-matcher"
                     sh "scp ./matcher/dex-load/src/main/resources/reinstallExtension.sh buildagent-matcher@${NODE4}:/home/buildagent-matcher"
                     sh "scp ./matcher/dex-load/src/main/resources/reinstallMatcher.sh buildagent-matcher@${MATCHER}:/home/buildagent-matcher"
-                    sleep time: 60000, unit: 'MILLISECONDS'
                     sh "ssh -q buildagent-matcher@${NODE4} sudo sh reinstallExtension.sh"
-                    sleep time: 10000, unit: 'MILLISECONDS'
                     sh "ssh -q buildagent-matcher@${MATCHER} sudo sh reinstallMatcher.sh"
-                    sleep time: 10000, unit: 'MILLISECONDS'
                 }
             }
         }

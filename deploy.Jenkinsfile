@@ -27,11 +27,16 @@ pipeline {
             steps {
                 cleanWs()
                 dir('matcher') {
-                    checkout scm: [$class: 'GitSCM', userRemoteConfigs: [[url: 'https://github.com/wavesplatform/matcher.git', credentialsId: null]], extensions: [[$class: 'CloneOption', noTags: false, reference: '', shallow: false]], branches: [[name: "${BRANCH_DEX}"]]], poll: false
+                    checkout scm: [$class: 'GitSCM', userRemoteConfigs: [[url: 'https://github.com/wavesplatform/matcher.git', credentialsId: null]], extensions: [[$class: 'CloneOption', noTags: false, reference: '', shallow: false]], branches: [[name: '*/DEX-822-devnet-deployment-via-jenkins']]], poll: false
+                }
+                script {
+                    BRANCH_NODE = sh(
+                        script: 'echo $(cat ./matcher/wavesNode.sbt | grep -Po "[0-9].[0-9].[0-9]+")',
+                        returnStdout: true,
+                    )
                 }
                 dir('waves') {
-                    checkout scm: [$class: 'GitSCM', userRemoteConfigs: [[url: 'https://github.com/wavesplatform/waves.git', credentialsId: null]], extensions: [[$class: 'CloneOption', noTags: false, reference: '', shallow: false]], branches: [[name: "${BRANCH_NODE}"]]], poll: false
-
+                    checkout scm: [$class: 'GitSCM', userRemoteConfigs: [[url: 'https://github.com/wavesplatform/waves.git', credentialsId: null]], extensions: [[$class: 'CloneOption', noTags: false, reference: '', shallow: false]], branches: [[name: "refs/tags/v${BRANCH_NODE}"]]], poll: false
                 }
             }
         }

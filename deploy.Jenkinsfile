@@ -5,8 +5,9 @@ def deployNode (host) {
 
              sh "scp ./waves/node/target/waves-devnet*all*.deb buildagent-matcher@${host}:/home/buildagent-matcher"
              sh "scp ./matcher/dex-load/src/main/resources/reinstallNode.sh buildagent-matcher@${host}:/home/buildagent-matcher"
-             sleep time: 80000, unit: 'MILLISECONDS'
+             sleep time: 100000, unit: 'MILLISECONDS'
              sh "ssh -q buildagent-matcher@${host} sudo sh reinstallNode.sh"
+             sleep time: 10000, unit: 'MILLISECONDS'
          }
     }
 }
@@ -26,7 +27,7 @@ pipeline {
             steps {
                 cleanWs()
                 dir('matcher') {
-                    checkout scm: [$class: 'GitSCM', userRemoteConfigs: [[url: 'https://github.com/wavesplatform/matcher.git', credentialsId: null]], extensions: [[$class: 'CloneOption', noTags: false, reference: '', shallow: false]], branches: [[name: '*/DEX-822']]], poll: false
+                    checkout scm: [$class: 'GitSCM', userRemoteConfigs: [[url: 'https://github.com/wavesplatform/matcher.git', credentialsId: null]], extensions: [[$class: 'CloneOption', noTags: false, reference: '', shallow: false]], branches: [[name: '*/DEX-822-devnet-deployment-via-jenkins']]], poll: false
                 }
                 dir('waves') {
                     checkout scm: [$class: 'GitSCM', userRemoteConfigs: [[url: 'https://github.com/wavesplatform/waves.git', credentialsId: null]], extensions: [[$class: 'CloneOption', noTags: false, reference: '', shallow: false]], branches: [[name: '*/master']]], poll: false
@@ -37,8 +38,6 @@ pipeline {
         stage('Compile Matcher') {
             steps {
                 dir('matcher') {
-                    sh 'printenv'
-                    sh 'git fetch --tags'
                     sh 'find ~/.sbt/1.0/staging/*/waves -type d -name target | xargs -I{} rm -rf {}'
                     sh 'find . -type d -name target | xargs -I{} rm -rf {}'
                     sh 'sbt "set Global / scalacOptions ++= Seq(\\"-Xfatal-warnings\\", \\"-Ywarn-unused:-imports\\");session save;cleanAll;compile;packageAll"'
@@ -90,6 +89,7 @@ pipeline {
                     sleep time: 80000, unit: 'MILLISECONDS'
                     sh "ssh -q buildagent-matcher@${NODE4} sudo sh reinstallExtension.sh"
                     sh "ssh -q buildagent-matcher@${MATCHER} sudo sh reinstallMatcher.sh"
+                    sleep time: 10000, unit: 'MILLISECONDS'
                 }
             }
         }

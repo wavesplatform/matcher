@@ -45,7 +45,7 @@ pipeline {
                 dir('matcher') {
                     sh 'find ~/.sbt/1.0/staging/*/waves -type d -name target | xargs -I{} rm -rf {}'
                     sh 'find . -type d -name target | xargs -I{} rm -rf {}'
-                    sh 'sbt "set Global / scalacOptions ++= Seq(\\"-Xfatal-warnings\\", \\"-Ywarn-unused:-imports\\");session save;cleanAll;compile;packageAll"'
+                    sh 'sbt packageAll'
                 }
             }
         }

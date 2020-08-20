@@ -417,8 +417,8 @@ class AddressActor(owner: Address,
 
     val (status, unmatchable) = event match {
       case event: OrderCanceled =>
-        val isSystemCancel = OrderCanceledReason.becameUnmatchable(event.reason)
-        (OrderStatus.finalCancelStatus(remaining, event.reason), isSystemCancel)
+        val unmatchable = OrderCanceledReason.becameUnmatchable(event.reason)
+        (OrderStatus.finalCancelStatus(remaining, event.reason), unmatchable)
 
       case _ => (remaining.status, false)
     }
@@ -613,6 +613,7 @@ object AddressActor {
 
     sealed trait Source extends Product with Serializable
     object Source {
+      // If you change this list, don't forget to change sourceToBytes
       case object NotTracked        extends Source
       case object Request           extends Source // User or admin, we don't know
       case object Expiration        extends Source

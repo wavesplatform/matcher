@@ -23,6 +23,9 @@ pipeline {
         RC = "${RC}"
         RT = "${RT}"
         AS = "${AS}"
+        NODE = "${NODE}"
+        MATCHER = "${MATCHER}"
+        AIM = "${AIM}"
     }
     stages {
         stage('Cleanup') {

@@ -35,13 +35,14 @@ import mouse.any._
 import net.ceedubs.ficus.Ficus._
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Suite
-import io.qameta.allure.Feature
+import io.qameta.allure.{Feature, Story}
 
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
-@Feature("dex root")
+@Story("dex root")
+@Feature("tests")
 trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with DoubleOps with WavesFeeConstants with AllureScalatestContext { _: Suite =>
 
   protected implicit val wsErrorDiff: Diff[WsError]             = Derived[Diff[WsError]].ignore[WsError, Long](_.timestamp)

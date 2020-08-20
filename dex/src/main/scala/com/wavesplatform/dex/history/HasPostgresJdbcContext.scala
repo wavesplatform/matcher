@@ -5,14 +5,14 @@ import com.wavesplatform.dex.model.Events
 import com.wavesplatform.dex.model.Events.EventReason
 import io.getquill.{MappedEncoding, PostgresJdbcContext, SnakeCase}
 
-import scala.annotation.nowarn
+import scala.annotation.unused
 
 trait HasPostgresJdbcContext {
   def connectionConfig: Config
 
   protected lazy val ctx = new PostgresJdbcContext(SnakeCase, connectionConfig)
 
-  @nowarn("msg=private val encodeEventReason in class HistoryRouter is never used")
+  @unused
   protected implicit val encodeEventReason = MappedEncoding[EventReason, Byte] {
     case Events.NotTracked                              => 0
     case Events.OrderAddedReason.RequestExecuted        => 1
@@ -26,7 +26,7 @@ trait HasPostgresJdbcContext {
     case Events.OrderCanceledReason.InsufficientBalance => 9
   }
 
-  @nowarn("msg=private val decodeEventReason in class HistoryRouter is never used")
+  @unused
   protected implicit val decodeEventReason = MappedEncoding[Byte, EventReason] {
     case 0 => Events.NotTracked
     case 1 => Events.OrderAddedReason.RequestExecuted

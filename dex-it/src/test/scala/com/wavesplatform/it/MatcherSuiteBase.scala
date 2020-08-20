@@ -24,11 +24,9 @@ import org.scalatest.concurrent.Eventually
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, CancelAfterFailure}
-import io.qameta.allure.{Story}
 
 import scala.concurrent.duration.DurationInt
 
-@Story("dex-it")
 trait MatcherSuiteBase
     extends AnyFreeSpec
     with AllureScalatestContext

@@ -36,9 +36,21 @@ pipeline {
                 sh 'sbt "cleanAll"'
             }
         }
-        stage('Generate') {
+        stage('Generate ammo file') {
             steps {
                 sh 'sbt "project dex-load" generate'
+            }
+        }
+        stage('Transfer ammo to agent') {
+            steps {
+                sh 'sbt "project dex-load" generate'
+                sshagent (credentials: ['buildagent-matcher']) {
+                     sh "ssh -o StrictHostKeyChecking=no -l buildagent-matcher ${LOADGEN} hostname"
+
+                     sh "scp ./requests-*.txt buildagent-matcher@${LOADGEN}:/home/buildagent-matcher"
+                     sh "scp ./dex-load/src/main/resources/prepareLoadProfile.sh buildagent-matcher@${LOADGEN}:/home/buildagent-matcher"
+                     sh "ssh -q buildagent-matcher@${LOADGEN} sudo sh prepareLoadProfile.sh"
+                }
             }
         }
     }

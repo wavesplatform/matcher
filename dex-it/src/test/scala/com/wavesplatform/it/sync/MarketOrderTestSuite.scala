@@ -15,7 +15,6 @@ import com.wavesplatform.it.MatcherSuiteBase
 
 import scala.concurrent.duration.DurationInt
 
-
 class MarketOrderTestSuite extends MatcherSuiteBase {
 
   val fixedFee: Long  = 0.003.waves

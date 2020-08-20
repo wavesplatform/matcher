@@ -9,7 +9,7 @@ import com.wavesplatform.dex.it.test.InformativeTestStart
 import com.wavesplatform.dex.it.waves.{MkWavesEntities, ToWavesJConversions}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.waves.WavesFeeConstants
-import io.qameta.allure.Story
+import io.qameta.allure.Feature
 import io.qameta.allure.scalatest.AllureScalatestContext
 import org.scalatest.concurrent.Eventually
 import org.scalatest.freespec.AnyFreeSpec
@@ -18,7 +18,7 @@ import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}
 
 import scala.concurrent.duration.DurationInt
 
-@Story("waves-integration-it")
+@Feature("waves-integration-it")
 trait IntegrationSuiteBase
     extends AnyFreeSpec
     with Matchers

@@ -7,7 +7,7 @@ import cats.syntax.group._
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.model.Price
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCanceled, OrderExecuted}
+import com.wavesplatform.dex.model.Events._
 import com.wavesplatform.dex.settings.MatchingRule
 
 import scala.collection.immutable.{HashMap, Queue, TreeMap}
@@ -20,7 +20,7 @@ case class OrderBook private (bids: Side, asks: Side, lastTrade: Option[LastTrad
 
   def allOrders: Iterator[LimitOrder] = (bids.valuesIterator ++ asks.valuesIterator).flatten
 
-  def cancel(orderId: ByteStr, reason: OrderCanceled.Reason, timestamp: Long): (OrderBook, Option[Event], LevelAmounts) = {
+  def cancel(orderId: ByteStr, reason: OrderCanceledReason, timestamp: Long): (OrderBook, Option[Event], LevelAmounts) = {
     def mkEvent(lo: LimitOrder): Option[OrderCanceled] = Some(OrderCanceled(lo, reason, timestamp))
 
     orderIds.get(orderId).fold((this, Option.empty[OrderCanceled], LevelAmounts.empty)) {
@@ -43,7 +43,7 @@ case class OrderBook private (bids: Side, asks: Side, lastTrade: Option[LastTrad
     }
   }
 
-  def cancelAll(ts: Long, reason: OrderCanceled.Reason): OrderBookUpdates = {
+  def cancelAll(ts: Long, reason: OrderCanceledReason): OrderBookUpdates = {
     val orders         = allOrders.toList
     val canceledOrders = Queue(orders.map { OrderCanceled(_, reason, ts) }: _*)
     val levelAmounts = orders.foldMap { o =>
@@ -58,9 +58,9 @@ case class OrderBook private (bids: Side, asks: Side, lastTrade: Option[LastTrad
           eventTs: Long,
           getMakerTakerFee: (AcceptedOrder, LimitOrder) => (Long, Long),
           tickSize: Long = MatchingRule.DefaultRule.tickSize): OrderBookUpdates = {
-    val events = Queue(OrderAdded(submitted, OrderAdded.Reason.RequestExecuted, eventTs))
+    val events = Queue(OrderAdded(submitted, OrderAddedReason.RequestExecuted, eventTs))
     if (submitted.order.isValid(eventTs)) doMatch(eventTs, tickSize, getMakerTakerFee, submitted, events, this)
-    else OrderBookUpdates(this, events.enqueue(OrderCanceled(submitted, OrderCanceled.Reason.BecameInvalid, eventTs)), LevelAmounts.empty, None)
+    else OrderBookUpdates(this, events.enqueue(OrderCanceled(submitted, OrderCanceledReason.BecameInvalid, eventTs)), LevelAmounts.empty, None)
   }
 
   def snapshot: OrderBookSnapshot                     = OrderBookSnapshot(bids, asks, lastTrade)
@@ -123,7 +123,7 @@ object OrderBook {
                       events: Queue[Event],
                       orderBook: OrderBook): OrderBookUpdates = {
 
-    def unmatchable(ao: AcceptedOrder): OrderCanceled = OrderCanceled(ao, OrderCanceled.Reason.BecameUnmatchable, eventTs)
+    def unmatchable(ao: AcceptedOrder): OrderCanceled = OrderCanceled(ao, OrderCanceledReason.BecameUnmatchable, eventTs)
 
     @scala.annotation.tailrec
     def loop(submitted: AcceptedOrder, currentUpdates: OrderBookUpdates): OrderBookUpdates =
@@ -179,7 +179,7 @@ object OrderBook {
               currentUpdates = currentUpdates
                 .copy(
                   orderBook = currentUpdates.orderBook.unsafeWithoutBest(counter.order.orderType),
-                  events = currentUpdates.events.enqueue(OrderCanceled(counter, OrderCanceled.Reason.BecameInvalid, eventTs)),
+                  events = currentUpdates.events.enqueue(OrderCanceled(counter, OrderCanceledReason.BecameInvalid, eventTs)),
                   levelChanges = currentUpdates.levelChanges |-| LevelAmounts.mkDiff(levelPrice, counter)
                 )
             )

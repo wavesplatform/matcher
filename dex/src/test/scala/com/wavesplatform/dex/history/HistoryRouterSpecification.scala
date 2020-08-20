@@ -2,7 +2,6 @@ package com.wavesplatform.dex.history
 
 import akka.actor.ActorSystem
 import akka.testkit.TestKit
-import cats.syntax.option._
 import com.google.common.base.Charsets
 import com.wavesplatform.dex.MatcherSpecBase
 import com.wavesplatform.dex.domain.account.{KeyPair, PublicKey}
@@ -11,8 +10,8 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.model.Denormalization
 import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV1}
-import com.wavesplatform.dex.history.HistoryRouter.{SaveEvent, SaveOrder, eventReasonToByte => toByte}
-import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCanceled, OrderExecuted}
+import com.wavesplatform.dex.history.HistoryRouter.{SaveEvent, SaveOrder}
+import com.wavesplatform.dex.model.Events._
 import com.wavesplatform.dex.model.{AcceptedOrder, Events, LimitOrder}
 import com.wavesplatform.dex.time.SystemTime
 import org.scalatest.BeforeAndAfterAll
@@ -20,7 +19,7 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 
 class HistoryRouterSpecification
-    extends TestKit(ActorSystem("AddressActorSpecification"))
+    extends TestKit(ActorSystem("HistoryRouterSpecification"))
     with AnyWordSpecLike
     with Matchers
     with BeforeAndAfterAll
@@ -73,9 +72,9 @@ class HistoryRouterSpecification
     )
   }
 
-  def orderAdded(submitted: LimitOrder): OrderAdded = OrderAdded(submitted, OrderAdded.Reason.RequestExecuted, time.getTimestamp())
+  def orderAdded(submitted: LimitOrder): OrderAdded = OrderAdded(submitted, OrderAddedReason.RequestExecuted, time.getTimestamp())
   def orderCancelled(submitted: AcceptedOrder): OrderCanceled =
-    OrderCanceled(submitted, Events.OrderCanceled.Reason.RequestExecuted, time.getTimestamp())
+    OrderCanceled(submitted, OrderCanceledReason.RequestExecuted, time.getTimestamp())
 
   def orderExecuted(submitted: AcceptedOrder, counter: LimitOrder): OrderExecuted = {
     OrderExecuted(submitted, counter, time.getTimestamp(), counter.matcherFee, submitted.matcherFee)
@@ -91,7 +90,12 @@ class HistoryRouterSpecification
   }
 
   case class OrderShortenedInfo(id: String, senderPublicKey: String, side: Byte, price: BigDecimal, amount: BigDecimal)
-  case class EventShortenedInfo(orderId: String, eventType: Byte, filled: BigDecimal, totalFilled: BigDecimal, status: Byte, reason: Option[Byte])
+  case class EventShortenedInfo(orderId: String,
+                                eventType: Byte,
+                                filled: BigDecimal,
+                                totalFilled: BigDecimal,
+                                status: Byte,
+                                reason: EventReason = Events.NotTracked)
 
   def getOrderInfo(orderAddedEvent: OrderAdded): OrderShortenedInfo = {
     SaveOrder(orderAddedEvent.order, orderAddedEvent.timestamp)
@@ -122,8 +126,8 @@ class HistoryRouterSpecification
       // big buy order executed first time
       val orderExecutedEvent1 = orderExecuted(buyWavesOrder, sellWavesOrder1)
       getEventsInfo(orderExecutedEvent1) shouldBe Set(
-        EventShortenedInfo(buyWavesOrder.orderId, eventTrade, filled = 100, totalFilled = 100, statusPartiallyFilled, None),
-        EventShortenedInfo(sellWavesOrder1.orderId, eventTrade, filled = 100, totalFilled = 100, statusFilled, None)
+        EventShortenedInfo(buyWavesOrder.orderId, eventTrade, filled = 100, totalFilled = 100, statusPartiallyFilled, OrderExecutedReason),
+        EventShortenedInfo(sellWavesOrder1.orderId, eventTrade, filled = 100, totalFilled = 100, statusFilled, OrderExecutedReason)
       )
 
       // place small sell order 2
@@ -133,8 +137,8 @@ class HistoryRouterSpecification
       // big buy order executed second time
       val orderExecutedEvent2 = orderExecuted(orderExecutedEvent1.submittedRemaining, sellWavesOrder2)
       getEventsInfo(orderExecutedEvent2) shouldBe Set(
-        EventShortenedInfo(buyWavesOrder.orderId, eventTrade, filled = 100, totalFilled = 200, statusPartiallyFilled, None),
-        EventShortenedInfo(sellWavesOrder2.orderId, eventTrade, filled = 100, totalFilled = 100, statusFilled, None)
+        EventShortenedInfo(buyWavesOrder.orderId, eventTrade, filled = 100, totalFilled = 200, statusPartiallyFilled, OrderExecutedReason),
+        EventShortenedInfo(sellWavesOrder2.orderId, eventTrade, filled = 100, totalFilled = 100, statusFilled, OrderExecutedReason)
       )
 
       // place small sell order 3
@@ -144,8 +148,8 @@ class HistoryRouterSpecification
       // big buy order executed third time and filled
       val orderExecutedEvent3 = orderExecuted(orderExecutedEvent2.submittedRemaining, sellWavesOrder3)
       getEventsInfo(orderExecutedEvent3) shouldBe Set(
-        EventShortenedInfo(buyWavesOrder.orderId, eventTrade, filled = 100, totalFilled = 300, statusFilled, None),
-        EventShortenedInfo(sellWavesOrder3.orderId, eventTrade, filled = 100, totalFilled = 100, statusFilled, None)
+        EventShortenedInfo(buyWavesOrder.orderId, eventTrade, filled = 100, totalFilled = 300, statusFilled, OrderExecutedReason),
+        EventShortenedInfo(sellWavesOrder3.orderId, eventTrade, filled = 100, totalFilled = 100, statusFilled, OrderExecutedReason)
       )
 
       // place order and then cancel
@@ -158,7 +162,7 @@ class HistoryRouterSpecification
                            filled = 0,
                            totalFilled = 0,
                            statusCancelled,
-                           toByte(OrderCanceled.Reason.RequestExecuted).some),
+                           OrderCanceledReason.RequestExecuted),
       )
 
       // place buy order
@@ -172,8 +176,13 @@ class HistoryRouterSpecification
       // buy order partially filled
       val cancellingOrderExecutedEvent = orderExecuted(buyWavesOrderFilledAndCancelled, sellWavesOrder4)
       getEventsInfo(cancellingOrderExecutedEvent) shouldBe Set(
-        EventShortenedInfo(buyWavesOrderFilledAndCancelled.orderId, eventTrade, filled = 100, totalFilled = 100, statusPartiallyFilled, None),
-        EventShortenedInfo(sellWavesOrder4.orderId, eventTrade, filled = 100, totalFilled = 100, statusFilled, None)
+        EventShortenedInfo(buyWavesOrderFilledAndCancelled.orderId,
+                           eventTrade,
+                           filled = 100,
+                           totalFilled = 100,
+                           statusPartiallyFilled,
+                           OrderExecutedReason),
+        EventShortenedInfo(sellWavesOrder4.orderId, eventTrade, filled = 100, totalFilled = 100, statusFilled, OrderExecutedReason)
       )
 
       // buy order cancelled
@@ -183,7 +192,7 @@ class HistoryRouterSpecification
                            filled = 0,
                            totalFilled = 100,
                            statusCancelled,
-                           toByte(OrderCanceled.Reason.RequestExecuted).some),
+                           OrderCanceledReason.RequestExecuted),
       )
     }
   }

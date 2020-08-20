@@ -21,7 +21,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV1}
 import com.wavesplatform.dex.domain.state.{LeaseBalance, Portfolio}
 import com.wavesplatform.dex.error.ErrorFormatterContext
-import com.wavesplatform.dex.model.Events.OrderAdded
+import com.wavesplatform.dex.model.Events.{OrderAdded, OrderAddedReason}
 import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder, MarketOrder}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
@@ -271,7 +271,7 @@ class AddressActorSpecification
       ao match {
         case lo: LimitOrder =>
           eventsProbe.expectMsg(QueueEvent.Placed(lo))
-          addressDir ! OrderAdded(lo, OrderAdded.Reason.RequestExecuted, System.currentTimeMillis)
+          addressDir ! OrderAdded(lo, OrderAddedReason.RequestExecuted, System.currentTimeMillis)
         case mo: MarketOrder => eventsProbe.expectMsg(QueueEvent.PlacedMarket(mo))
       }
     }

@@ -286,7 +286,7 @@ $updatedSnapshot
 
     def test(gen: Gen[(OrderBook, Order.Id)])(f: (OrderBook, Order.Id, OrderBook, Seq[Event], LevelAmounts) => Any): Unit = forAll(gen) {
       case (origOb, orderIdToCancel) =>
-        val (updatedOb, events, levelChanges) = origOb.cancel(orderIdToCancel, Events.OrderCanceled.Reason.RequestExecuted, ts)
+        val (updatedOb, events, levelChanges) = origOb.cancel(orderIdToCancel, Events.OrderCanceledReason.RequestExecuted, ts)
         withClue(mkClue(orderIdToCancel, origOb, updatedOb, events, levelChanges)) {
           f(origOb, orderIdToCancel, updatedOb, events.toSeq, levelChanges)
         }
@@ -318,7 +318,7 @@ $levelChanges
         val obBefore       = format(ob)
         val orderIdsBefore = orderIds(ob)
 
-        val OrderBookUpdates(obAfter, events, _, _) = ob.cancelAll(ts, Events.OrderCanceled.Reason.RequestExecuted)
+        val OrderBookUpdates(obAfter, events, _, _) = ob.cancelAll(ts, Events.OrderCanceledReason.RequestExecuted)
         val canceledOrders                          = events.collect { case evt: OrderCanceled => evt.acceptedOrder.order.id() }.toSet
         val clue =
           s"""
@@ -349,7 +349,7 @@ ${canceledOrders.mkString("\n")}
       case (askOrders, bidOrders) =>
         val ob = mkOrderBook(askOrders, bidOrders)
 
-        val OrderBookUpdates(_, _, levelChanges, _) = ob.cancelAll(ts, Events.OrderCanceled.Reason.RequestExecuted)
+        val OrderBookUpdates(_, _, levelChanges, _) = ob.cancelAll(ts, Events.OrderCanceledReason.RequestExecuted)
         val expectedLevelChanges                    = Group.inverse(toLevelAmounts(ob.aggregatedSnapshot))
 
         expectedLevelChanges should matchTo(levelChanges)

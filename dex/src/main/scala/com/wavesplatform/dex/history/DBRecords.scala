@@ -2,6 +2,8 @@ package com.wavesplatform.dex.history
 
 import java.time.LocalDateTime
 
+import com.wavesplatform.dex.model.Events.EventReason
+
 object DBRecords {
 
   sealed trait Record
@@ -31,6 +33,6 @@ object DBRecords {
                          feeFilled: BigDecimal,
                          feeTotalFilled: BigDecimal,
                          status: Byte,
-                         reason: Option[Byte])
+                         reason: EventReason)
       extends Record
 }

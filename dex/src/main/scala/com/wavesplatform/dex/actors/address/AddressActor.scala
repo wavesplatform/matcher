@@ -30,7 +30,7 @@ import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError, Unexpec
 import com.wavesplatform.dex.fp.MapImplicits.group
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.SpendableBalance
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
-import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCancelFailed, OrderCanceled, OrderExecuted, Event => OrderEvent}
+import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCancelFailed, OrderCanceled, OrderCanceledReason, OrderExecuted, Event => OrderEvent}
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.QueueEvent
 import com.wavesplatform.dex.time.Time
@@ -417,7 +417,7 @@ class AddressActor(owner: Address,
 
     val (status, unmatchable) = event match {
       case event: OrderCanceled =>
-        val isSystemCancel = Events.OrderCanceled.Reason.becameUnmatchable(event.reason)
+        val isSystemCancel = OrderCanceledReason.becameUnmatchable(event.reason)
         (OrderStatus.finalCancelStatus(remaining, event.reason), isSystemCancel)
 
       case _ => (remaining.status, false)

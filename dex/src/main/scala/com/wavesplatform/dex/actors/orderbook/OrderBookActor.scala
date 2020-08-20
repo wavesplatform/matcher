@@ -18,7 +18,7 @@ import com.wavesplatform.dex.domain.utils.{LoggerFacade, ScorexLogging}
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.metrics.TimerExt
-import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCancelFailed}
+import com.wavesplatform.dex.model.Events._
 import com.wavesplatform.dex.model.OrderBook.OrderBookUpdates
 import com.wavesplatform.dex.model.{LastTrade, _}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
@@ -111,7 +111,7 @@ class OrderBookActor(settings: Settings,
       context.watch(aggregatedRef)
 
       // Timestamp here doesn't matter
-      processEvents(time.getTimestamp(), orderBook.allOrders.map(lo => OrderAdded(lo, OrderAdded.Reason.OrderBookRecovered, lo.order.timestamp)))
+      processEvents(time.getTimestamp(), orderBook.allOrders.map(lo => OrderAdded(lo, OrderAddedReason.OrderBookRecovered, lo.order.timestamp)))
 
       owner ! OrderBookRecovered(assetPair, lastSavedSnapshotOffset)
       context.become(working)
@@ -132,7 +132,7 @@ class OrderBookActor(settings: Settings,
             case QueueEvent.PlacedMarket(marketOrder) => onAddOrder(request, marketOrder)
             case x: QueueEvent.Canceled               => onCancelOrder(request, x)
             case _: QueueEvent.OrderBookDeleted =>
-              process(request.timestamp, orderBook.cancelAll(request.timestamp, Events.OrderCanceled.Reason.OrderBookDeleted))
+              process(request.timestamp, orderBook.cancelAll(request.timestamp, OrderCanceledReason.OrderBookDeleted))
               // We don't delete the snapshot, because it could be required after restart
               // snapshotStore ! OrderBookSnapshotStoreActor.Message.Delete(assetPair)
               aggregatedRef ! AggregatedOrderBookActor.Event.OrderBookRemoved
@@ -205,14 +205,13 @@ class OrderBookActor(settings: Settings,
     }
   }
 
-  private def toReason(source: AddressActor.Command.Source): Events.OrderCanceled.Reason = {
+  private def toReason(source: AddressActor.Command.Source): OrderCanceledReason = {
     import AddressActor.Command.Source
-    import Events.OrderCanceled.Reason
     source match {
-      case Source.NotTracked        => Reason.NotTracked
-      case Source.Request           => Reason.RequestExecuted
-      case Source.Expiration        => Reason.Expired
-      case Source.BalanceTracking   => Reason.InsufficientBalance
+      case Source.NotTracked        => Events.NotTracked
+      case Source.Request           => OrderCanceledReason.RequestExecuted
+      case Source.Expiration        => OrderCanceledReason.Expired
+      case Source.BalanceTracking   => OrderCanceledReason.InsufficientBalance
     }
   }
 

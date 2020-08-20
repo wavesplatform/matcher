@@ -57,9 +57,9 @@ object QueueEvent {
 
   val sourceToBytes: Map[Source, Array[Byte]] = Map(
     Source.NotTracked        -> Array.emptyByteArray,
-    Source.Request           -> Array(0),
-    Source.Expiration        -> Array(1),
-    Source.BalanceTracking   -> Array(2)
+    Source.Request           -> Array(1),
+    Source.Expiration        -> Array(2),
+    Source.BalanceTracking   -> Array(3)
   )
 
   def bytesToSource(xs: Array[Byte]): Source =
@@ -67,9 +67,9 @@ object QueueEvent {
     else if (xs.isEmpty) Source.NotTracked
     else
       xs.head match {
-        case 0 => Source.Request
-        case 1 => Source.Expiration
-        case 2 => Source.BalanceTracking
+        case 1 => Source.Request
+        case 2 => Source.Expiration
+        case 3 => Source.BalanceTracking
         case x => throw new IllegalArgumentException(s"Unknown source type: $x")
       }
 }

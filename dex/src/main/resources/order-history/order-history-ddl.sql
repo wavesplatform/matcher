@@ -25,6 +25,6 @@ CREATE TABLE IF NOT EXISTS events (
   fee_filled       NUMERIC (27, 8),
   fee_total_filled NUMERIC (27, 8),
   status           SMALLINT,
-  reason           SMALLINT,
+  reason           SMALLINT NOT NULL DEFAULT 0,
   PRIMARY KEY (order_id, total_filled, status)
 );

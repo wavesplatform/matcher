@@ -12,9 +12,11 @@ import com.wavesplatform.dex.model.AcceptedOrderType
 import com.wavesplatform.dex.settings.AssetType._
 import com.wavesplatform.dex.settings.FeeMode._
 import com.wavesplatform.it.MatcherSuiteBase
+import io.qameta.allure.{Feature, Story}
 
 import scala.concurrent.duration.DurationInt
 
+@Story("Integration tests")
 class MarketOrderTestSuite extends MatcherSuiteBase {
 
   val fixedFee: Long  = 0.003.waves

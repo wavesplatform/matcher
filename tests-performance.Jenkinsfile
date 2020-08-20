@@ -43,7 +43,6 @@ pipeline {
         }
         stage('Transfer ammo to agent') {
             steps {
-                sh 'sbt "project dex-load" generate'
                 sshagent (credentials: ['buildagent-matcher']) {
                      sh "ssh -o StrictHostKeyChecking=no -l buildagent-matcher ${LOADGEN} hostname"
 

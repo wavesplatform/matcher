@@ -55,16 +55,16 @@ trait ApiExtensions extends NodeApiExtensions { this: MatcherSuiteBase =>
                              accounts: Seq[KeyPair],
                              dexApi: DexApi[Id] = dex1.api): MatcherState = {
 
-    val offset               = dex1.api.currentOffset
-    val snapshots            = dex1.api.allSnapshotOffsets
-    val orderBooks           = assetPairs.map(x => (x, (dex1.api.orderBook(x), dex1.api.orderBookStatus(x))))
-    val orderStatuses        = orders.map(x => x.idStr() -> dex1.api.orderStatus(x))
-    val orderTransactionIds  = orders.map(x => x.idStr() -> dex1.api.transactionsByOrder(x).map(_.getId.getBase58String).toSet)
-    val reservedBalances     = accounts.map(x => x -> dex1.api.reservedBalance(x))
+    val offset               = dexApi.currentOffset
+    val snapshots            = dexApi.allSnapshotOffsets
+    val orderBooks           = assetPairs.map(x => (x, (dexApi.orderBook(x), dexApi.orderBookStatus(x))))
+    val orderStatuses        = orders.map(x => x.idStr() -> dexApi.orderStatus(x))
+    val orderTransactionIds  = orders.map(x => x.idStr() -> dexApi.transactionsByOrder(x).map(_.getId.getBase58String).toSet)
+    val reservedBalances     = accounts.map(x => x -> dexApi.reservedBalance(x))
     val accountsOrderHistory = accounts.flatMap(a => assetPairs.map(p => a -> p))
 
     val orderHistory = accountsOrderHistory.map {
-      case (account, pair) => (account, pair, dex1.api.orderHistoryByPair(account, pair))
+      case (account, pair) => (account, pair, dexApi.orderHistoryByPair(account, pair))
     }
 
     val orderHistoryMap = orderHistory

@@ -30,6 +30,7 @@ pipeline {
     stages {
         stage('Cleanup') {
             steps {
+                sh 'rm -rf ./dex-load/*.txt'
                 sh 'git fetch --tags'
                 sh 'find ~/.sbt/1.0/staging/*/waves -type d -name target | xargs -I{} rm -rf {}'
                 sh 'find . -type d -name target | xargs -I{} rm -rf {}'
@@ -46,7 +47,7 @@ pipeline {
                 sshagent (credentials: ['buildagent-matcher']) {
                      sh "ssh -o StrictHostKeyChecking=no -l buildagent-matcher ${LOADGEN} hostname"
 
-                     sh "scp ./requests-*.txt buildagent-matcher@${LOADGEN}:/home/buildagent-matcher"
+                     sh "scp ./dex-load/requests-*.txt buildagent-matcher@${LOADGEN}:/home/buildagent-matcher"
                      sh "scp ./dex-load/src/main/resources/prepareLoadProfile.sh buildagent-matcher@${LOADGEN}:/home/buildagent-matcher"
                      sh "ssh -q buildagent-matcher@${LOADGEN} sudo sh prepareLoadProfile.sh"
                 }

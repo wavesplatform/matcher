@@ -23,6 +23,7 @@ class DatabaseBackwardCompatTestSuite extends BackwardCompatSuiteBase {
     orders.foreach(dex2.api.place)
 
     dex2.api.waitForOrder(orders.last)(_.status != OrderStatus.NotFound)
+    val state2 = state(dex2.api, orders)
     dex2.stopWithoutRemove()
 
     dex1.start()
@@ -32,7 +33,6 @@ class DatabaseBackwardCompatTestSuite extends BackwardCompatSuiteBase {
     Thread.sleep(3.seconds.toMillis) // An additional time to wait the concurrent processing
 
     val state1 = state(dex1.api, orders)
-    val state2 = state(dex2.api, orders)
     state1 should matchTo(state2)
   }
 

@@ -45,9 +45,6 @@ object ItTestPlugin extends AutoPlugin {
           Tests.Argument(TestFrameworks.ScalaTest, args: _*)
         },
         parallelExecution := true,
-        test / tags += Tags.ForkedTestGroup      -> 1,
-        testOnly / tags += Tags.ForkedTestGroup  -> 1,
-        testQuick / tags += Tags.ForkedTestGroup -> 1,
         javaOptions := { // TODO Doesn't work because this part of process is not forked
           val resourceDirectoryValue = (Test / resourceDirectory).value
           List(
@@ -62,10 +59,7 @@ object ItTestPlugin extends AutoPlugin {
           val envVarsValue      = (Test / envVars).value
           val javaOptionsValue  = (Test / javaOptions).value
 
-          for {
-            group <- (Test / testGrouping).value
-            suite <- group.tests
-          } yield
+          (Test / definedTests).value.map { suite =>
             Group(
               suite.name,
               Seq(suite),
@@ -82,6 +76,7 @@ object ItTestPlugin extends AutoPlugin {
                   envVars = envVarsValue
                 ))
             )
+          }
         }
       ))
 }

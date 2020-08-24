@@ -293,7 +293,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         dex1.api.place(mkOrder(alice, bob2WavesPair, BUY, bidAmount, bid))
 
         val resp2 = dex1.api.orderBookStatus(bob2WavesPair)
-        resp2.lastTrade should matchTo { Option(LastTrade(ask, askAmount, OrderType.BUY)) }
+        resp2.lastTrade should matchTo { Option(LastTrade(ask, askAmount, OrderType.SELL)) } // BUY
         resp2.bestBid should matchTo { Option(LevelAgg(bidAmount - askAmount, bid)) }
         resp2.bestAsk shouldBe None
       }

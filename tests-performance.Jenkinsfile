@@ -55,7 +55,7 @@ pipeline {
                         GRAFANA = sh( script: '''
                                                 echo "https://grafana.wvservices.com/d/WsyjIiHiz/system-metrics?orgId=5&var-hostname=devnet2-htz-nbg1-1_wavesnodes_com&from=$(date -d '- 20 minutes' +'%s')000&to=$(date -d '+ 5 minutes' +'%s')000"
                                               ''', returnStdout: true)
-                        currentBuild.description = "yandex=${OVERLOAD}\r\ngrafana=${GRAFANA}"
+                        currentBuild.description = "<a href='${OVERLOAD}'>Yandex</a> <br/> <a href='${GRAFANA}'>Grafana</a>"
                      }
                 }
             }

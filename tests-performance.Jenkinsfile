@@ -49,9 +49,8 @@ pipeline {
 
                      sh "scp ./dex-load/requests-*.txt buildagent-matcher@${LOADGEN}:/home/buildagent-matcher"
                      sh "scp ./dex-load/src/main/resources/runLoadTest.sh buildagent-matcher@${LOADGEN}:/home/buildagent-matcher"
-                     sh "ssh -q buildagent-matcher@${LOADGEN} sudo sh runLoadTest.sh"
                      script {
-                        OVERLOAD = sh(script: "ssh -q buildagent-matcher@${LOADGEN} sudo docker logs da469fa869cd -f --tail 1000 | grep -Po -m 1  http.*overload.*[0-9]+", returnStdout: true)
+                        OVERLOAD = sh(script: "sh ssh -q buildagent-matcher@${LOADGEN} sudo sh runLoadTest.sh", returnStdout: true)
                         GRAFANA = sh( script: '''
                                                 echo "https://grafana.wvservices.com/d/WsyjIiHiz/system-metrics?orgId=5&var-hostname=devnet2-htz-nbg1-1_wavesnodes_com&from=$(date -d '- 20 minutes' +'%s')000&to=$(date -d '+ 5 minutes' +'%s')000"
                                               ''', returnStdout: true)

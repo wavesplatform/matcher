@@ -4,6 +4,7 @@ pipeline {
     }
     options {
         ansiColor('xterm')
+        timeout(time: 40, unit: 'MINUTES')
     }
     parameters {
         string(name: 'SBT_THREAD_NUMBER', defaultValue: '6', description: '')

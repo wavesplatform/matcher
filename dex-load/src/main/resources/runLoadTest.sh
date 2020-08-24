@@ -2,6 +2,6 @@ sed -i "6s/.*/ ammofile: $(ls | grep requests)/" /home/yatank/loadtest/dexload.y
 mv $(ls | grep requests) /home/yatank/loadtest/
 rm -rf /home/yatank/loadtest/logs/*
 echo "The performance test has been launched, but we made the decision not to print its stdout. Keep patience, it will be finished near $(date -d '+ 9 minutes')"
-docker exec -i da469fa869cd yandex-tank -c dexload.yaml &> /dev/null
+docker exec -i da469fa869cd yandex-tank -c dexload.yaml
 echo "The performance has been finished"
-cat /home/yatank/loadtest/logs/lunapark/$(ls /home/yatank/loadtest/logs/lunapark)/finish_status.yaml | grep -Po -m 1 https://overload.yandex.net/[0-9]+
+echo "$(cat /home/yatank/loadtest/logs/lunapark/$(ls /home/yatank/loadtest/logs/lunapark)/finish_status.yaml | grep -Po -m 1 https://overload.yandex.net/[0-9]+)"

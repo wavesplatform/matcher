@@ -4,6 +4,8 @@ pipeline {
     }
     options {
         ansiColor('xterm')
+        timeout(time: 40, unit: 'MINUTES')
+        timestamps()
     }
     parameters {
         string(name: 'SBT_THREAD_NUMBER', defaultValue: '6', description: '')
@@ -50,6 +52,8 @@ pipeline {
             sh 'tar zcf logs.tar.gz ./dex-it/target/logs* ./waves-integration-it/target/logs* || true'
             archiveArtifacts artifacts: 'logs.tar.gz', fingerprint: true
             junit '**/test-reports/*.xml'
+            sh "mkdir allure-results || true"
+            sh '''echo "TARGET_NODE=$(cat wavesNode.sbt | grep -Po '[0-9].[0-9].[0-9]+')" > ./allure-results/environment.properties'''
             allure results: [[path: 'allure-results']]
         }
         cleanup {

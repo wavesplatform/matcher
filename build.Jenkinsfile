@@ -5,6 +5,7 @@ pipeline {
     options {
         ansiColor('xterm')
         timeout(time: 10, unit: 'MINUTES')
+        timestamps()
     }
     environment {
         SBT_HOME = tool name: 'sbt-1.2.6', type: 'org.jvnet.hudson.plugins.SbtPluginBuilder$SbtInstallation'

@@ -11,6 +11,7 @@ import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.fp.MapImplicits.cleaningGroup
 import com.wavesplatform.dex.model.AcceptedOrder.FillingInfo
+import com.wavesplatform.dex.model.Events.OrderCanceledReason
 
 object MatcherModel {
 
@@ -372,17 +373,20 @@ object OrderStatus {
     val name = "Cancelled"
   }
 
-  def finalCancelStatus(ao: AcceptedOrder, isSystemCancel: Boolean): Final = {
+  def finalCancelStatus(ao: AcceptedOrder, reason: OrderCanceledReason): Final = {
     val filledAmount     = ao.order.amount - ao.amount
     val filledMatcherFee = ao.order.matcherFee - ao.fee
-    if (isSystemCancel && (filledAmount > 0 || ao.isMarket)) Filled(filledAmount, filledMatcherFee) else Cancelled(filledAmount, filledMatcherFee)
+    val unmatchable      = OrderCanceledReason.becameUnmatchable(reason)
+    if (unmatchable && (filledAmount > 0 || ao.isMarket)) Filled(filledAmount, filledMatcherFee) else Cancelled(filledAmount, filledMatcherFee)
   }
 }
 
 object Events {
 
+  sealed trait EventReason extends Product with Serializable
   sealed trait Event extends Product with Serializable {
     def timestamp: Long
+    def reason: EventReason
   }
 
   case class OrderExecuted(submitted: AcceptedOrder, counter: LimitOrder, timestamp: Long, counterExecutedFee: Price, submittedExecutedFee: Price)
@@ -428,11 +432,35 @@ object Events {
       case lo: LimitOrder  => submittedLimitRemaining(lo)
       case mo: MarketOrder => submittedMarketRemaining(mo)
     }
+
+    override def reason: EventReason = OrderExecutedReason
+  }
+  case object OrderExecutedReason extends EventReason
+
+  case class OrderAdded(order: AcceptedOrder, reason: OrderAddedReason, timestamp: Price) extends Event
+  sealed trait OrderAddedReason                                                           extends EventReason
+  object OrderAddedReason {
+    case object RequestExecuted    extends OrderAddedReason
+    case object OrderBookRecovered extends OrderAddedReason
   }
 
-  case class OrderAdded(order: AcceptedOrder, timestamp: Long) extends Event
+  case class OrderCanceled(acceptedOrder: AcceptedOrder, reason: OrderCanceledReason, timestamp: Long) extends Event
+  sealed trait OrderCanceledReason                                                                     extends EventReason
+  object OrderCanceledReason {
+    case object RequestExecuted     extends OrderCanceledReason
+    case object OrderBookDeleted    extends OrderCanceledReason
+    case object Expired             extends OrderCanceledReason
+    case object BecameUnmatchable   extends OrderCanceledReason
+    case object BecameInvalid       extends OrderCanceledReason
+    case object InsufficientBalance extends OrderCanceledReason
 
-  case class OrderCanceled(acceptedOrder: AcceptedOrder, isSystemCancel: Boolean, timestamp: Long) extends Event
+    def becameUnmatchable(reason: OrderCanceledReason): Boolean = reason match {
+      case BecameUnmatchable => true
+      case _                 => false
+    }
+  }
+
+  case object NotTracked extends EventReason with OrderAddedReason with OrderCanceledReason
 
   case class OrderCancelFailed(id: Order.Id, reason: error.MatcherError)
 

@@ -3,15 +3,15 @@ package com.wavesplatform.dex.history
 import java.time.{Instant, LocalDateTime, ZoneOffset}
 
 import akka.actor.{Actor, ActorRef, Props}
+import com.typesafe.config.Config
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.model.Denormalization
 import com.wavesplatform.dex.history.DBRecords.{EventRecord, OrderRecord, Record}
 import com.wavesplatform.dex.history.HistoryRouter.{SaveEvent, SaveOrder}
-import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCanceled, OrderExecuted}
+import com.wavesplatform.dex.model.Events._
 import com.wavesplatform.dex.model.OrderStatus.Filled
 import com.wavesplatform.dex.model.{AcceptedOrder, OrderStatus}
 import com.wavesplatform.dex.settings.{OrderHistorySettings, PostgresConnection}
-import io.getquill.{PostgresJdbcContext, SnakeCase}
 
 object HistoryRouter {
 
@@ -87,11 +87,12 @@ object HistoryRouter {
                 totalFilled = denormalizeAmountAndFee(acceptedOrder.order.amount - remainingAmount, assetPair.amountAsset),
                 feeFilled = denormalizeAmountAndFee(executedFee, acceptedOrder.order.feeAsset),
                 feeTotalFilled = denormalizeAmountAndFee(acceptedOrder.order.matcherFee - remainingFee, acceptedOrder.order.feeAsset),
-                status = if (remainingAmount == 0) statusFilled else statusPartiallyFilled
+                status = if (remainingAmount == 0) statusFilled else statusPartiallyFilled,
+                reason = e.reason
               )
           }
 
-        case OrderCanceled(submitted, isSystemCancel, timestamp) =>
+        case OrderCanceled(submitted, reason, timestamp) =>
           val assetPair = submitted.order.assetPair
           Set(
             EventRecord(
@@ -103,7 +104,8 @@ object HistoryRouter {
               totalFilled = denormalizeAmountAndFee(submitted.order.amount - submitted.amount, assetPair.amountAsset),
               feeFilled = 0,
               feeTotalFilled = denormalizeAmountAndFee(submitted.order.matcherFee - submitted.fee, submitted.order.feeAsset),
-              status = OrderStatus.finalCancelStatus(submitted, isSystemCancel) match { case _: Filled => statusFilled; case _ => statusCancelled }
+              status = OrderStatus.finalCancelStatus(submitted, reason) match { case _: Filled => statusFilled; case _ => statusCancelled },
+              reason = reason
             )
           )
       }
@@ -111,9 +113,13 @@ object HistoryRouter {
   }
 
   final case object StopAccumulate
+
 }
 
-class HistoryRouter(assetDecimals: Asset => Int, postgresConnection: PostgresConnection, orderHistorySettings: OrderHistorySettings) extends Actor {
+class HistoryRouter(assetDecimals: Asset => Int, postgresConnection: PostgresConnection, orderHistorySettings: OrderHistorySettings)
+    extends Actor
+    with HasPostgresJdbcContext {
+  import ctx._
 
   private def denormalizeAmountAndFee(value: Long, asset: Asset): BigDecimal =
     Denormalization.denormalizeAmountAndFee(value, assetDecimals(asset))
@@ -121,7 +127,7 @@ class HistoryRouter(assetDecimals: Asset => Int, postgresConnection: PostgresCon
   private def denormalizePrice(value: Long, pair: AssetPair): BigDecimal =
     Denormalization.denormalizePrice(value, assetDecimals(pair.amountAsset), assetDecimals(pair.priceAsset))
 
-  private val ctx = new PostgresJdbcContext(SnakeCase, postgresConnection.getConfig); import ctx._
+  override def connectionConfig: Config = postgresConnection.getConfig
 
   private val ordersHistory: ActorRef = context.actorOf(
     Props(
@@ -177,7 +183,8 @@ class HistoryRouter(assetDecimals: Asset => Int, postgresConnection: PostgresCon
                 _.totalFilled    -> "total_filled",
                 _.feeFilled      -> "fee_filled",
                 _.feeTotalFilled -> "fee_total_filled",
-                _.status         -> "status"
+                _.status         -> "status",
+                _.reason         -> "reason"
               ).insert(eventRecord).onConflictIgnore
             }
           }

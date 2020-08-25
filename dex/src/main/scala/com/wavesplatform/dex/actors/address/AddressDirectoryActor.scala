@@ -35,7 +35,7 @@ class AddressDirectoryActor(orderDB: OrderDB, addressActorProps: (Address, Boole
   override def receive: Receive = {
     case Envelope(address, cmd) => forward(address, cmd)
 
-    case e @ Events.OrderAdded(lo, timestamp) =>
+    case e @ Events.OrderAdded(lo, _, timestamp) =>
       forward(lo.order.sender, e)
       historyRouter foreach { _ ! SaveOrder(lo, timestamp) }
 

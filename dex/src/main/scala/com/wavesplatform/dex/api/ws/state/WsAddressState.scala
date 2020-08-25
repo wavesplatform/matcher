@@ -41,13 +41,13 @@ case class WsAddressState(address: Address,
 
   def putOrderUpdate(id: Order.Id, update: WsOrder): WsAddressState = copy(ordersChanges = ordersChanges + (id -> update))
 
-  def putOrderStatusUpdate(id: Order.Id, newStatus: OrderStatus): WsAddressState =
+  def putOrderStatusNameUpdate(id: Order.Id, newStatus: OrderStatus): WsAddressState =
     putOrderUpdate(
       id = id,
       update = ordersChanges.getOrElse(id, WsOrder(id)).copy(status = newStatus.name.some)
     )
 
-  def putOrderFillingInfoAndStatusUpdate(ao: AcceptedOrder, newStatus: OrderStatus)(implicit efc: ErrorFormatterContext): WsAddressState = {
+  def putOrderFillingInfoAndStatusNameUpdate(ao: AcceptedOrder, newStatus: OrderStatus)(implicit efc: ErrorFormatterContext): WsAddressState = {
 
     val ad = efc.unsafeAssetDecimals(ao.order.assetPair.amountAsset)
     val pd = efc.unsafeAssetDecimals(ao.order.assetPair.priceAsset)

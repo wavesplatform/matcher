@@ -11,7 +11,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.model.{Normalization, Price}
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCanceled, OrderExecuted}
+import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderAddedReason, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model.OrderBook.OrderBookUpdates
 import com.wavesplatform.dex.settings.OrderFeeSettings.DynamicSettings
 import com.wavesplatform.dex.settings.{MatchingRule, OrderFeeSettings}
@@ -169,8 +169,8 @@ class OrderBookTestSuite
 
       events should matchTo(
         Queue[Event](
-          OrderAdded(counterSellOrder, now),
-          OrderAdded(submittedBuyOrder, now + 1),
+          OrderAdded(counterSellOrder, OrderAddedReason.RequestExecuted, now),
+          OrderAdded(submittedBuyOrder, OrderAddedReason.RequestExecuted, now + 1),
           OrderExecuted(submittedBuyOrder, counterSellOrder, now + 1, counterSellOrder.matcherFee, submittedBuyOrder.matcherFee)
         )
       )
@@ -210,11 +210,14 @@ class OrderBookTestSuite
 
     withClue("Counter SELL order (price = 3.15, tick size disabled) and submitted BUY order (price = 3.15, tick size = 0.1) should be matched:\n") {
       val OrderBookUpdates(ob1, events1, _, _) = OrderBook.empty.append(counter, counterTs)
-      events1 should matchTo(Queue[Event](OrderAdded(counter, counterTs)))
+      events1 should matchTo(Queue[Event](OrderAdded(counter, OrderAddedReason.RequestExecuted, counterTs)))
 
       val OrderBookUpdates(ob2, events2, _, _) = ob1.append(submitted, submittedTs, tickSize = normalizedTickSize(0.1))
       events2 should matchTo(
-        Queue[Event](OrderAdded(submitted, submittedTs), OrderExecuted(submitted, counter, submittedTs, submitted.matcherFee, counter.matcherFee)))
+        Queue[Event](
+          OrderAdded(submitted, OrderAddedReason.RequestExecuted, submittedTs),
+          OrderExecuted(submitted, counter, submittedTs, submitted.matcherFee, counter.matcherFee)
+        ))
 
       ob2.asks shouldBe empty
       ob2.bids shouldBe empty
@@ -473,7 +476,7 @@ class OrderBookTestSuite
       case x                => fail(s"Expected cancel, but got $x")
     }
 
-    lastEvent should matchTo(OrderCanceled(buyOrder, isSystemCancel = true, 0L))
+    lastEvent should matchTo(OrderCanceled(buyOrder, Events.OrderCanceledReason.BecameUnmatchable, 0L))
     r.lastTrade.isEmpty shouldBe true
   }
 
@@ -529,7 +532,7 @@ class OrderBookTestSuite
 
           events(7) shouldBe a[OrderCanceled]
           events(7).asInstanceOf[OrderCanceled] should matchTo {
-            OrderCanceled(buyMo.partial(remainingAmount, remainingFee, 10.usd, awpNominator), isSystemCancel = true, now + 3)
+            OrderCanceled(buyMo.partial(remainingAmount, remainingFee, 10.usd, awpNominator), Events.OrderCanceledReason.BecameUnmatchable, now + 3)
           }
         }
       }

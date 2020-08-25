@@ -8,17 +8,17 @@ import cats.instances.option.catsStdInstancesForOption
 import cats.syntax.apply._
 import cats.syntax.option._
 import com.wavesplatform.dex.actors.MatcherActor.{ForceStartOrderBook, OrderBookCreated, SaveSnapshot}
+import com.wavesplatform.dex.actors.address.AddressActor
 import com.wavesplatform.dex.actors.orderbook.OrderBookActor._
 import com.wavesplatform.dex.actors.{MatcherActor, WorkingStash, orderbook}
 import com.wavesplatform.dex.api.ws.actors.WsInternalBroadcastActor
 import com.wavesplatform.dex.api.ws.protocol.WsOrdersUpdate
 import com.wavesplatform.dex.domain.asset.AssetPair
-import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.utils.{LoggerFacade, ScorexLogging}
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.metrics.TimerExt
-import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCancelFailed}
+import com.wavesplatform.dex.model.Events._
 import com.wavesplatform.dex.model.OrderBook.OrderBookUpdates
 import com.wavesplatform.dex.model.{LastTrade, _}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
@@ -111,7 +111,7 @@ class OrderBookActor(settings: Settings,
       context.watch(aggregatedRef)
 
       // Timestamp here doesn't matter
-      processEvents(time.getTimestamp(), orderBook.allOrders.map(lo => OrderAdded(lo, lo.order.timestamp)))
+      processEvents(time.getTimestamp(), orderBook.allOrders.map(lo => OrderAdded(lo, OrderAddedReason.OrderBookRecovered, lo.order.timestamp)))
 
       owner ! OrderBookRecovered(assetPair, lastSavedSnapshotOffset)
       context.become(working)
@@ -130,9 +130,9 @@ class OrderBookActor(settings: Settings,
           request.event match {
             case QueueEvent.Placed(limitOrder)        => onAddOrder(request, limitOrder)
             case QueueEvent.PlacedMarket(marketOrder) => onAddOrder(request, marketOrder)
-            case x: QueueEvent.Canceled               => onCancelOrder(request, x.orderId)
+            case x: QueueEvent.Canceled               => onCancelOrder(request, x)
             case _: QueueEvent.OrderBookDeleted =>
-              process(request.timestamp, orderBook.cancelAll(request.timestamp))
+              process(request.timestamp, orderBook.cancelAll(request.timestamp, OrderCanceledReason.OrderBookDeleted))
               // We don't delete the snapshot, because it could be required after restart
               // snapshotStore ! OrderBookSnapshotStoreActor.Message.Delete(assetPair)
               aggregatedRef ! AggregatedOrderBookActor.Event.OrderBookRemoved
@@ -187,21 +187,31 @@ class OrderBookActor(settings: Settings,
     import Events._
     e match {
       case e: OrderAdded    => s"OrderAdded(${e.order.order.id()}, amount=${e.order.amount})"
-      case e: OrderCanceled => s"OrderCanceled(${e.acceptedOrder.order.id()}, system=${e.isSystemCancel})"
+      case e: OrderCanceled => s"OrderCanceled(${e.acceptedOrder.order.id()}, ${e.reason})"
       case e: OrderExecuted => s"OrderExecuted(s=${e.submitted.order.id()}, c=${e.counter.order.id()}, amount=${e.executedAmount}, ts=${e.timestamp})"
     }
   }
 
-  private def onCancelOrder(event: QueueEventWithMeta, id: Order.Id): Unit = cancelTimer.measure {
-    orderBook.cancel(id, event.timestamp) match {
+  private def onCancelOrder(eventWithMeta: QueueEventWithMeta, event: QueueEvent.Canceled): Unit = cancelTimer.measure {
+    orderBook.cancel(event.orderId, toReason(event.source), eventWithMeta.timestamp) match {
       case (updatedOrderBook, Some(cancelEvent), levelChanges) =>
         // TODO replace by process() in Scala 2.13
         orderBook = updatedOrderBook
         aggregatedRef ! AggregatedOrderBookActor.Command.ApplyChanges(levelChanges, None, None, cancelEvent.timestamp)
         processEvents(cancelEvent.timestamp, List(cancelEvent))
       case _ =>
-        log.warn(s"Error applying $event: order not found")
-        addressActor ! OrderCancelFailed(id, error.OrderNotFound(id))
+        log.warn(s"Error applying $eventWithMeta: order not found")
+        addressActor ! OrderCancelFailed(event.orderId, error.OrderNotFound(event.orderId))
+    }
+  }
+
+  private def toReason(source: AddressActor.Command.Source): OrderCanceledReason = {
+    import AddressActor.Command.Source
+    source match {
+      case Source.NotTracked        => Events.NotTracked
+      case Source.Request           => OrderCanceledReason.RequestExecuted
+      case Source.Expiration        => OrderCanceledReason.Expired
+      case Source.BalanceTracking   => OrderCanceledReason.InsufficientBalance
     }
   }
 

@@ -3,7 +3,7 @@ package com.wavesplatform.dex.actors.address
 import akka.actor.{Actor, ActorRef, Cancellable, Props}
 import com.wavesplatform.dex.actors.TimedOut
 import com.wavesplatform.dex.actors.address.AddressActor.Command.CancelOrder
-import com.wavesplatform.dex.actors.address.AddressActor.Event
+import com.wavesplatform.dex.actors.address.AddressActor.{Command, Event}
 import com.wavesplatform.dex.actors.address.BatchOrderCancelActor.CancelResponse.OrderCancelResult
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.utils.ScorexLogging
@@ -13,6 +13,7 @@ import scala.concurrent.duration.FiniteDuration
 
 class BatchOrderCancelActor private (
     orderIds: Set[Order.Id],
+    source: Command.Source,
     processorActor: ActorRef,
     clientActor: ActorRef,
     timeout: FiniteDuration,
@@ -23,7 +24,7 @@ class BatchOrderCancelActor private (
   import BatchOrderCancelActor._
   import context.dispatcher
 
-  orderIds.foreach(processorActor ! CancelOrder(_))
+  orderIds.foreach(processorActor ! CancelOrder(_, source))
 
   override def receive: Receive = state(orderIds, initResponse, context.system.scheduler.scheduleOnce(timeout, self, TimedOut))
 
@@ -51,12 +52,13 @@ class BatchOrderCancelActor private (
 
 object BatchOrderCancelActor {
   def props(orderIds: Set[Order.Id],
+            source: Command.Source,
             processorActor: ActorRef,
             clientActor: ActorRef,
             timeout: FiniteDuration,
             initResponse: Map[Order.Id, OrderCancelResult] = Map.empty): Props = {
     require(orderIds.nonEmpty, "orderIds is empty")
-    Props(new BatchOrderCancelActor(orderIds, processorActor, clientActor, timeout, initResponse))
+    Props(new BatchOrderCancelActor(orderIds, source, processorActor, clientActor, timeout, initResponse))
   }
 
   object CancelResponse {

@@ -52,6 +52,9 @@ pipeline {
                      sh "ssh -q buildagent-matcher@${LOADGEN} sudo sh runLoadTest.sh"
                      script {
 
+                        OVERLOAD = sh( script: '''
+                                                ssh -q buildagent-matcher@${LOADGEN} echo "$(cat /home/yatank/loadtest/logs/lunapark/$(ls /home/yatank/loadtest/logs/lunapark)/finish_status.yaml | grep -Po -m 1 https://overload.yandex.net/[0-9]+)"
+                                               ''', returnStdout: true)
                         GRAFANA = sh( script: '''
                                                 echo "https://grafana.wvservices.com/d/WsyjIiHiz/system-metrics?orgId=5&var-hostname=devnet2-htz-nbg1-1_wavesnodes_com&from=$(date -d '- 20 minutes' +'%s')000&to=$(date -d '+ 5 minutes' +'%s')000"
                                               ''', returnStdout: true)

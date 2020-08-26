@@ -7,7 +7,7 @@ object Dependencies {
 
     val parCollections = "0.2.0"
 
-    val akka     = "2.6.6"
+    val akka     = "2.6.8"
     val akkaHttp = "10.1.12"
 
     val scalaTest          = "3.1.2"
@@ -93,6 +93,8 @@ object Dependencies {
   private val akkaActorTyped       = akkaModule("akka-actor-typed", Version.akka)
   private val akkaStreamsTyped     = akkaModule("akka-stream-typed", Version.akka)
   private val akkaHttp             = akkaModule("akka-http", Version.akkaHttp)
+  private val akkaClusterTyped     = akkaModule("akka-cluster-typed", Version.akka)
+  private val akkaClusterShardingTyped = akkaModule("akka-cluster-sharding-typed", Version.akka)
   private val scalaTest            = "org.scalatest" %% "scalatest" % Version.scalaTest
   private val scalaCheck           = "org.scalacheck" %% "scalacheck" % Version.scalaCheck
   private val scalaTestPlusCheck   = "org.scalatestplus" %% "scalacheck-1-14" % Version.scalaTestPlusCheck
@@ -183,6 +185,8 @@ object Dependencies {
       akkaActorTyped,
       akkaStreamsTyped,
       akkaHttp,
+      akkaClusterTyped,
+      akkaClusterShardingTyped,
       akkaModule("akka-stream", Version.akka),
       jacksonModule("core", "core"),
       jacksonModule("core", "annotations"),
@@ -213,6 +217,9 @@ object Dependencies {
       akkaActor,
       akkaActorTyped,
       akkaStreamsTyped,
+      akkaClusterTyped,
+      akkaClusterShardingTyped,
+      "com.typesafe.akka" %% "akka-serialization-jackson" % Version.akka,
       akkaHttp,
       akkaModule("akka-slf4j", Version.akka),
       julToSlf4j,

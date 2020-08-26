@@ -15,6 +15,7 @@ import com.wavesplatform.dex.actors.SpendableBalancesActor
 import com.wavesplatform.dex.actors.address.AddressActor._
 import com.wavesplatform.dex.actors.tx.CreateExchangeTransactionActor
 import com.wavesplatform.dex.api.http.entities.MatcherResponse
+import com.wavesplatform.dex.api.http.routes.WithMySerialization
 import com.wavesplatform.dex.api.ws.entities.{WsBalances, WsOrder}
 import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsError, WsServerMessage}
 import com.wavesplatform.dex.api.ws.state.WsAddressState
@@ -635,8 +636,8 @@ object AddressActor {
     case class StoreFailed(orderId: Order.Id, reason: MatcherError, queueEvent: QueueEvent) extends Event
     case class StoreSucceeded(orderId: Order.Id, queueEvent: QueueEvent)                    extends Event
     // Now it doesn't matter whether an order executed or just added
-    case class OrderAccepted(order: Order)                                                      extends Event
-    case class OrderCanceled(orderId: Order.Id)                                                 extends Event
+    case class OrderAccepted(order: Order)                                                      extends Event with WithMySerialization
+    case class OrderCanceled(orderId: Order.Id)                                                 extends Event with WithMySerialization
     case class BatchCancelCompleted(result: Map[Order.Id, Either[MatcherError, OrderCanceled]]) extends Event
   }
 

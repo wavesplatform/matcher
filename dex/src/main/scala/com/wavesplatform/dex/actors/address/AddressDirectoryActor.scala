@@ -1,6 +1,7 @@
 package com.wavesplatform.dex.actors.address
 
 import akka.actor.{Actor, ActorRef, Props, SupervisorStrategy, Terminated}
+import com.wavesplatform.dex.api.http.routes.WithMySerialization
 import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.utils.{EitherExt2, ScorexLogging}
@@ -70,6 +71,6 @@ class AddressDirectoryActor(orderDB: OrderDB, addressActorProps: (Address, Boole
 }
 
 object AddressDirectoryActor {
-  case class Envelope(address: Address, cmd: AddressActor.Message)
+  case class Envelope(address: Address, cmd: AddressActor.Message) extends WithMySerialization
   case object StartSchedules
 }

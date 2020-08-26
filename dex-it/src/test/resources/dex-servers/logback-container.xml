@@ -53,4 +53,7 @@
         <appender-ref ref="BRIEF"/>
         <appender-ref ref="DETAILED"/>
     </logger>
+
+    <!-- Akka -->
+    <logger name="akka.cluster" level="INFO"/>
 </included>

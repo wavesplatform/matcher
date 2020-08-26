@@ -115,7 +115,7 @@ object Application {
     log.info("Starting...")
     sys.addShutdownHook { SystemInformationReporter.report(config) }
 
-    RootActorSystem.start("wavesplatform", config) { implicit actorSystem =>
+    RootActorSystem.start("matcher", config) { implicit actorSystem =>
       log.info(s"${s"DEX v${Version.VersionString}"} Blockchain Id: ${settings.addressSchemeCharacter}")
       new Application(settings)
     }

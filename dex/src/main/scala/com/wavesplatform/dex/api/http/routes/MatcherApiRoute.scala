@@ -83,6 +83,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   private implicit val executionContext: ExecutionContext = mat.executionContext
   private implicit val timeout: Timeout                   = matcherSettings.actorResponseTimeout
 
+  private val apiService = new ApiService(mat.system, addressActor)
+
   private type LogicResponseHandler = PartialFunction[Any, ToResponseMarshallable]
 
   private val timer      = Kamon.timer("matcher.api-requests")
@@ -175,7 +177,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
               orderValidator(order).value flatMap {
                 case Right(o) =>
                   placeTimer.measureFuture {
-                    askAddressActor(o.sender, AddressActor.Command.PlaceOrder(o, isMarket)) {
+                    askApiService(o.sender, AddressActor.Command.PlaceOrder(o, isMarket)) {
                       case AddressActor.Event.OrderAccepted(x) => SimpleResponse(HttpSuccessfulPlace(x))
                       case x: error.MatcherError =>
                         if (x == error.CanNotPersistEvent) StatusCodes.ServiceUnavailable -> HttpError.from(x, "WavesNodeUnavailable")
@@ -1081,9 +1083,18 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       entities.InternalError
   }
 
-  @inline
   private def askAddressActor(sender: Address, msg: AddressActor.Message)(handleResponse: LogicResponseHandler): Future[ToResponseMarshallable] = {
     (addressActor ? AddressDirectoryActor.Envelope(sender, msg))
+      .map(handleResponse.orElse(handleUnknownResponse))
+      .recover {
+        case e: AskTimeoutException =>
+          log.error(s"Error processing $msg", e)
+          TimedOut
+      }
+  }
+
+  private def askApiService(sender: Address, msg: AddressActor.Message)(handleResponse: LogicResponseHandler): Future[ToResponseMarshallable] = {
+    apiService.askMessage(AddressDirectoryActor.Envelope(sender, msg))
       .map(handleResponse.orElse(handleUnknownResponse))
       .recover {
         case e: AskTimeoutException =>

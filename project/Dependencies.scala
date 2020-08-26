@@ -77,6 +77,11 @@ object Dependencies {
 
     val pureConfig      = "0.13.0"
     val allureScalaTest = "2.13.5"
+
+    val gatling           = "3.3.1"
+    val gatlingHighcharts = "3.3.1"
+    val scalactic         = "3.0.8"
+    val scalaj            = "2.3.0"
   }
 
   private def akkaModule(module: String, version: String): ModuleID  = "com.typesafe.akka"             %% module            % version
@@ -121,6 +126,10 @@ object Dependencies {
     ExclusionRule(organization = "io.grpc"),
     ExclusionRule("com.wavesplatform", "protobuf-schemas")
   )
+  private val gatling           = "io.gatling"            % "gatling-test-framework"    % Version.gatling % "test,it"
+  private val gatlingHighcharts = "io.gatling.highcharts" % "gatling-charts-highcharts" % Version.gatlingHighcharts % "test,it"
+  private val scalactic         = "org.scalactic"         %% "scalactic"                % Version.scalactic
+  private val scalaj            = "org.scalaj"            % "scalaj-http_2.11"          % Version.scalaj
 
   private val toxiProxy       = "org.testcontainers" % "toxiproxy" % Version.testContainersToxiProxy
   private val googleGuava     = "com.google.guava" % "guava" % Version.googleGuava
@@ -239,7 +248,7 @@ object Dependencies {
       betterMonadicFor
     ) ++ testKit ++ quill ++ monocle
 
-    lazy val dexLoad: Seq[ModuleID] = Seq(diffx, pureConfig)
+    lazy val dexLoad: Seq[ModuleID] = Seq(diffx, pureConfig, gatling, gatlingHighcharts, scalactic, scalaj)
 
     lazy val dexIt: Seq[ModuleID] = integrationTestKit ++ Seq(parCollections)
 

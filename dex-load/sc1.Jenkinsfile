@@ -39,7 +39,7 @@ pipeline {
         }
         stage('Generate ammo file') {
             steps {
-                sh 'sbt "project dex-load" generate'
+                sh 'sbt "project dex-load" generate-ammo'
             }
         }
         stage('Performance Test') {
@@ -51,14 +51,11 @@ pipeline {
                      sh "scp ./dex-load/src/main/resources/runLoadTest.sh buildagent-matcher@${LOADGEN}:/home/buildagent-matcher"
                      sh "ssh -q buildagent-matcher@${LOADGEN} sudo sh runLoadTest.sh"
                      script {
-
-                        OVERLOAD = sh( script: '''
-                                                ssh -q buildagent-matcher@${LOADGEN} echo "$(cat /home/yatank/loadtest/logs/lunapark/$(ls /home/yatank/loadtest/logs/lunapark)/finish_status.yaml | grep -Po -m 1 https://overload.yandex.net/[0-9]+)"
-                                               ''', returnStdout: true)
+                        OVERLOAD = sh(script:"ssh -q buildagent-matcher@${LOADGEN} ls /home/yatank/loadtest/logs/lunapark", returnStdout: true)
                         GRAFANA = sh( script: '''
-                                                echo "https://grafana.wvservices.com/d/WsyjIiHiz/system-metrics?orgId=5&var-hostname=devnet2-htz-nbg1-1_wavesnodes_com&from=$(date -d '- 20 minutes' +'%s')000&to=$(date -d '+ 5 minutes' +'%s')000"
+                                                echo "https://${GRAFANA_URL}/d/WsyjIiHiz/system-metrics?orgId=5&var-hostname=${MATCHER_URL}&from=$(date -d '- 20 minutes' +'%s')000&to=$(date -d '+ 5 minutes' +'%s')000"
                                               ''', returnStdout: true)
-                        currentBuild.description = "<a href='${OVERLOAD}'>Yandex</a> <br/> <a href='${GRAFANA}'>Grafana</a>"
+                        currentBuild.description = "<a href='https://overload.yandex.net/${OVERLOAD}'>Yandex</a> <br/> <a href='${GRAFANA}'>Grafana</a>"
                      }
                 }
             }

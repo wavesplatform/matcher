@@ -129,7 +129,7 @@ object Dependencies {
   private val gatling           = "io.gatling"            % "gatling-test-framework"    % Version.gatling % "test,it"
   private val gatlingHighcharts = "io.gatling.highcharts" % "gatling-charts-highcharts" % Version.gatlingHighcharts % "test,it"
   private val scalactic         = "org.scalactic"         %% "scalactic"                % Version.scalactic
-  private val scalaj            = "org.scalaj"            % "scalaj-http_2.11"          % Version.scalaj
+  private val scalaj            = "org.scalaj"            %% "scalaj-http_2.11"          % Version.scalaj
 
   private val toxiProxy       = "org.testcontainers" % "toxiproxy" % Version.testContainersToxiProxy
   private val googleGuava     = "com.google.guava" % "guava" % Version.googleGuava

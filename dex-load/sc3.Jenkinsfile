@@ -39,7 +39,7 @@ pipeline {
         }
         stage('Generate feeder file') {
             steps {
-                sh 'sbt "project dex-load" generate-feeder'
+                sh 'sbt "project dex-load" generateFeeder'
             }
         }
         stage("Web Socket") {

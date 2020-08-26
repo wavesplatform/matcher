@@ -39,7 +39,7 @@ pipeline {
         }
         stage('Generate ammo file') {
             steps {
-                sh 'sbt "project dex-load" generate-ammo'
+                sh 'sbt "project dex-load" generateAmmo'
             }
         }
         stage('Performance Test') {

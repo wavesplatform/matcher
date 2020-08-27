@@ -78,8 +78,8 @@ object Dependencies {
     val pureConfig      = "0.13.0"
     val allureScalaTest = "2.13.5"
 
-    val gatling           = "3.3.1"
-    val gatlingHighcharts = "3.3.1"
+    val gatling           = "3.2.0"
+    val gatlingHighcharts = "3.2.0"
   }
 
   private def akkaModule(module: String, version: String): ModuleID  = "com.typesafe.akka"             %% module            % version
@@ -244,7 +244,7 @@ object Dependencies {
       betterMonadicFor
     ) ++ testKit ++ quill ++ monocle
 
-    lazy val dexLoad: Seq[ModuleID] = Seq(diffx, pureConfig, gatling, gatlingHighcharts)
+    lazy val dexLoad: Seq[ModuleID] = Seq(diffx, pureConfig)
 
     lazy val dexIt: Seq[ModuleID] = integrationTestKit ++ Seq(parCollections)
 

@@ -21,7 +21,8 @@ object DBRecords {
                          timestamp: LocalDateTime,
                          expiration: LocalDateTime,
                          fee: BigDecimal,
-                         created: LocalDateTime)
+                         created: LocalDateTime,
+                         closedAt: Option[LocalDateTime])
       extends Record
 
   case class EventRecord(orderId: String,

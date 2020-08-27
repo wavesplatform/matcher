@@ -8,9 +8,10 @@ import io.getquill.{MappedEncoding, PostgresJdbcContext, SnakeCase}
 import scala.annotation.unused
 
 trait HasPostgresJdbcContext {
+
   def connectionConfig: Config
 
-  protected lazy val ctx = new PostgresJdbcContext(SnakeCase, connectionConfig)
+  protected lazy val ctx: PostgresJdbcContext[SnakeCase.type] = new PostgresJdbcContext(SnakeCase, connectionConfig)
 
   @unused
   protected implicit val encodeEventReason = MappedEncoding[EventReason, Byte] {

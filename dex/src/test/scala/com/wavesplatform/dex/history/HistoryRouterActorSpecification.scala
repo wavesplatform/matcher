@@ -10,7 +10,7 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.model.Denormalization
 import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV1}
-import com.wavesplatform.dex.history.HistoryRouter.{SaveEvent, SaveOrder}
+import com.wavesplatform.dex.history.HistoryRouterActor.HistoryInsertMsg.{SaveEvent, SaveOrder}
 import com.wavesplatform.dex.model.Events._
 import com.wavesplatform.dex.model.{AcceptedOrder, Events, LimitOrder}
 import com.wavesplatform.dex.time.SystemTime
@@ -18,7 +18,7 @@ import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 
-class HistoryRouterSpecification
+class HistoryRouterActorSpecification
     extends TestKit(ActorSystem("HistoryRouterSpecification"))
     with AnyWordSpecLike
     with Matchers
@@ -113,7 +113,7 @@ class HistoryRouterSpecification
   "HistoryRouter" should {
     "correctly convert events to records" in {
 
-      import HistoryRouter._
+      import HistoryRouterActor._
 
       // place big buy order
       getOrderInfo(orderAdded(buyWavesOrder)) shouldBe

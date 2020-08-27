@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS orders (
   "timestamp"       TIMESTAMP(3) WITH TIME ZONE,
   expiration        TIMESTAMP(3) WITH TIME ZONE,
   fee               NUMERIC (27, 8),
-  created           TIMESTAMP(3) WITH TIME ZONE
+  created           TIMESTAMP(3) WITH TIME ZONE,
+  closed_at         TIMESTAMP(3) WITH TIME ZONE
 );
 
 CREATE TABLE IF NOT EXISTS events (

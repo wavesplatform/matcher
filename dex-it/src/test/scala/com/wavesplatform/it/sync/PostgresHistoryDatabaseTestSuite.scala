@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync
 
 import java.sql.{Connection, DriverManager}
+import java.time.LocalDateTime
 
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.typesafe.config.{Config, ConfigFactory}
@@ -11,7 +12,7 @@ import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.history.DBRecords.{EventRecord, OrderRecord}
 import com.wavesplatform.dex.history.HasPostgresJdbcContext
-import com.wavesplatform.dex.history.HistoryRouter._
+import com.wavesplatform.dex.history.HistoryRouterActor._
 import com.wavesplatform.dex.model.Events
 import com.wavesplatform.dex.model.Events.{EventReason, OrderCanceledReason, OrderExecutedReason}
 import com.wavesplatform.dex.settings.PostgresConnection
@@ -24,6 +25,7 @@ import scala.io.Source
 import scala.util.Try
 
 class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgresJdbcContext {
+
   override def connectionConfig: Config =
     ConfigFactory
       .parseString(getPostgresConnectionCfgString("localhost", postgres mappedPort postgresContainerPort))
@@ -132,7 +134,8 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
                                     feeAsset: String,
                                     amount: Double,
                                     price: Double,
-                                    fee: Double)
+                                    fee: Double,
+                                    closedAt: Option[LocalDateTime])
 
   private case class EventBriefInfo(orderId: String,
                                     eventType: Byte,
@@ -157,7 +160,8 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
           _.feeAsset        -> "fee_asset_id",
           _.amount          -> "amount",
           _.price           -> "price",
-          _.fee             -> "fee"
+          _.fee             -> "fee",
+          _.closedAt        -> "closed_at"
         ).filter(_.id == lift(orderId.toString))
       )
       .headOption
@@ -192,6 +196,45 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
                        r.status,
                        r.reason)
       }
+
+  private def cleanTables(): Unit = {
+    ctx.run { querySchema[OrderRecord]("orders").delete }
+    ctx.run { querySchema[EventRecord]("events").delete }
+  }
+
+  "Postgres order history should update closedAt timestamps of orders" in {
+
+    withClue("after order cancel") {
+
+      val cancelledOrder = mkOrderDP(alice, wavesUsdPair, BUY, 1.waves, 3.50)
+
+      placeAndAwaitAtDex(cancelledOrder)
+      eventually { getOrderInfoById(cancelledOrder.id()).get.closedAt shouldBe None }
+
+      cancelAndAwait(alice, cancelledOrder)
+      eventually { getOrderInfoById(cancelledOrder.id()).get.closedAt.nonEmpty shouldBe true }
+
+      cleanTables()
+    }
+
+    withClue("after order execution") {
+
+      val counter   = mkOrderDP(alice, wavesUsdPair, BUY, 1.waves, 3.50)
+      val submitted = mkOrderDP(alice, wavesUsdPair, SELL, 1.waves, 3.50)
+
+      placeAndAwaitAtDex(counter)
+      placeAndAwaitAtNode(submitted)
+
+      val filledEventTimestamp = expectFinalization(submitted.idStr())
+      eventually {
+        Seq(counter, submitted).foreach { order =>
+          getOrderInfoById(order.id()).get.closedAt should matchTo(filledEventTimestamp)
+        }
+      }
+
+      cleanTables()
+    }
+  }
 
   "Postgres order history should save all orders and events" in {
     (1 to maxOrders)
@@ -230,6 +273,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
     withClue("checking info for 2 small submitted orders\n") {
       Set(sellOrder1, sellOrder2).foreach { order =>
         eventually {
+          val finalizeTimestamp = expectFinalization(order.idStr())
           withClue(s"${order.id()}\n") {
             getOrderInfoById(order.id()).get should matchTo(
               OrderBriefInfo(order.idStr(),
@@ -241,7 +285,8 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
                              btc.toString,
                              100,
                              0.35,
-                             0.00000030)
+                             0.00000030,
+                             finalizeTimestamp)
             )
 
             getEventsInfoByOrderId(order.id()) should matchTo(
@@ -252,18 +297,22 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
       }
 
       withClue("checking info for 1 big counter order\n") {
-        getOrderInfoById(buyOrder.id()).get should matchTo(
-          OrderBriefInfo(buyOrder.idStr(),
-                         limitOrderType,
-                         alice.publicKey.toString,
-                         buySide,
-                         wct.toString,
-                         usd.toString,
-                         eth.toString,
-                         300,
-                         0.35,
-                         0.00001703)
-        )
+        eventually {
+          val finalizeTimestamp = expectFinalization(buyOrder.idStr())
+          getOrderInfoById(buyOrder.id()).get should matchTo(
+            OrderBriefInfo(buyOrder.idStr(),
+                           limitOrderType,
+                           alice.publicKey.toString,
+                           buySide,
+                           wct.toString,
+                           usd.toString,
+                           eth.toString,
+                           300,
+                           0.35,
+                           0.00001703,
+                           finalizeTimestamp)
+          )
+        }
 
         getEventsInfoByOrderId(buyOrder.id()) should matchTo(
           List(
@@ -286,19 +335,43 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
     dex1.api.waitForOrderStatus(buyOrder, Status.Filled)
     dex1.api.waitForOrderStatus(sellOrder, Status.Filled)
 
-    eventually {
-      withClue("checking info for counter order\n") {
+    withClue("checking info for counter order\n") {
+      eventually {
+        val finalizeTimestamp = expectFinalization(buyOrder.idStr())
         getOrderInfoById(buyOrder.id()).get should matchTo(
-          OrderBriefInfo(buyOrder.idStr(), limitOrderType, alice.publicKey.toString, buySide, "WAVES", usd.toString, "WAVES", 300, 0.35, 0.00370300)
+          OrderBriefInfo(buyOrder.idStr(),
+                         limitOrderType,
+                         alice.publicKey.toString,
+                         buySide,
+                         "WAVES",
+                         usd.toString,
+                         "WAVES",
+                         300,
+                         0.35,
+                         0.00370300,
+                         finalizeTimestamp)
         )
         getEventsInfoByOrderId(buyOrder.id()) should matchTo(
           List(EventBriefInfo(buyOrder.idStr(), eventTrade, 300, 300, 0.00370300, 0.00370300, statusFilled, OrderExecutedReason))
         )
       }
+    }
 
-      withClue("checking info for submitted order\n") {
+    withClue("checking info for submitted order\n") {
+      eventually {
+        val finalizeTimestamp = expectFinalization(sellOrder.idStr())
         getOrderInfoById(sellOrder.id()).get should matchTo(
-          OrderBriefInfo(sellOrder.idStr(), limitOrderType, bob.publicKey.toString, sellSide, "WAVES", usd.toString, usd.toString, 300, 0.35, 0.30)
+          OrderBriefInfo(sellOrder.idStr(),
+                         limitOrderType,
+                         bob.publicKey.toString,
+                         sellSide,
+                         "WAVES",
+                         usd.toString,
+                         usd.toString,
+                         300,
+                         0.35,
+                         0.30,
+                         finalizeTimestamp)
         )
 
         getEventsInfoByOrderId(sellOrder.id()) should matchTo(
@@ -319,8 +392,9 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
     dex1.api.waitForOrderStatus(smallBuyOrder, Status.Filled)
     dex1.api.waitForOrderStatus(bigSellOrder, Status.PartiallyFilled)
 
-    eventually {
-      withClue("checking info for small counter order\n") {
+    withClue("checking info for small counter order\n") {
+      eventually {
+        val finalizeTimestamp = expectFinalization(smallBuyOrder.idStr())
         getOrderInfoById(smallBuyOrder.id()).get should matchTo(
           OrderBriefInfo(smallBuyOrder.idStr(),
                          limitOrderType,
@@ -331,15 +405,18 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
                          eth.toString,
                          300,
                          0.35,
-                         0.00001703)
+                         0.00001703,
+                         finalizeTimestamp)
         )
 
         getEventsInfoByOrderId(smallBuyOrder.id()) should matchTo(
           List(EventBriefInfo(smallBuyOrder.idStr(), eventTrade, 300, 300, 0.00001703, 0.00001703, statusFilled, OrderExecutedReason))
         )
       }
+    }
 
-      withClue("checking info for big submitted order\n") {
+    withClue("checking info for big submitted order\n") {
+      eventually {
         getOrderInfoById(bigSellOrder.id()).get should matchTo(
           OrderBriefInfo(bigSellOrder.idStr(),
                          limitOrderType,
@@ -350,7 +427,8 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
                          btc.toString,
                          900,
                          0.35,
-                         0.00000030)
+                         0.00000030,
+                         None)
         )
 
         getEventsInfoByOrderId(bigSellOrder.id()) should matchTo(
@@ -374,17 +452,21 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
       )
 
       eventually {
+        val finalizeTimestamp = expectFinalization(unmatchableMarketBuyOrder.idStr())
         getOrderInfoById(unmatchableMarketBuyOrder.id()).get should matchTo(
-          OrderBriefInfo(unmatchableMarketBuyOrder.idStr(),
-                         marketOrderType,
-                         alice.publicKey.toString,
-                         buySide,
-                         wct.toString,
-                         usd.toString,
-                         eth.toString,
-                         500,
-                         0.35,
-                         0.00001703)
+          OrderBriefInfo(
+            unmatchableMarketBuyOrder.idStr(),
+            marketOrderType,
+            alice.publicKey.toString,
+            buySide,
+            wct.toString,
+            usd.toString,
+            eth.toString,
+            500,
+            0.35,
+            0.00001703,
+            finalizeTimestamp
+          )
         )
 
         getEventsInfoByOrderId(unmatchableMarketBuyOrder.id()) should matchTo(
@@ -413,6 +495,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
       dex1.api.waitForOrder(marketBuyOrder)(_ == HttpOrderStatus(Status.Filled, filledAmount = Some(300.wct), filledFee = Some(1020L)))
 
       eventually {
+        val finalizeTimestamp = expectFinalization(marketBuyOrder.idStr())
         getOrderInfoById(marketBuyOrder.id()).get should matchTo(
           OrderBriefInfo(marketBuyOrder.idStr(),
                          marketOrderType,
@@ -423,7 +506,8 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
                          eth.toString,
                          500,
                          0.35,
-                         0.00001703)
+                         0.00001703,
+                         finalizeTimestamp)
         )
 
         getEventsInfoByOrderId(marketBuyOrder.id()) should matchTo(
@@ -438,29 +522,54 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
     }
   }
 
-  "Postgres order history should save orders that are filled with rounding issues" in {
+  // TODO Enable in DEX-895
+  "Postgres order history should save orders that are filled with rounding issues" ignore {
     Seq(limitOrderType, marketOrderType).foreach { orderType =>
       val buyOrder = mkOrderDP(alice, wavesUsdPair, BUY, 1.23456789.waves, 1.03)
 
       dex1.api.place(mkOrderDP(bob, wavesUsdPair, SELL, 2.waves, 1.03))
       if (orderType == limitOrderType) dex1.api.place(buyOrder) else dex1.api.placeMarket(buyOrder)
+      dex1.api.waitForOrderStatus(buyOrder, Status.Filled)
 
-      eventually {
-        getOrderInfoById(buyOrder.id()).get should matchTo(
-          OrderBriefInfo(buyOrder.idStr(),
-                         orderType,
-                         alice.publicKey.toString,
-                         buySide,
-                         Waves.toString,
-                         usd.toString,
-                         Waves.toString,
-                         1.23456789,
-                         1.03,
-                         0.003)
-        )
+      withClue(s"${if (orderType == limitOrderType) "limit" else "market"} ${buyOrder.idStr()}\n") {
+        eventually {
+          val finalizeTimestamp = expectFinalization(buyOrder.idStr())
+          getOrderInfoById(buyOrder.id()).get should matchTo(
+            OrderBriefInfo(buyOrder.idStr(),
+                           orderType,
+                           alice.publicKey.toString,
+                           buySide,
+                           Waves.toString,
+                           usd.toString,
+                           Waves.toString,
+                           1.23456789,
+                           1.03,
+                           0.003,
+                           finalizeTimestamp)
+          )
+        }
       }
 
       Seq(alice, bob).foreach { dex1.api.cancelAll(_) }
     }
   }
+
+  private def expectFinalization(orderId: String): Option[LocalDateTime] = withClue(s"finalization of $orderId\n") {
+    val r = finalizeEventTimestampOf(orderId)
+    r should not be empty
+    r
+  }
+
+  private val finalizeEventStatus = List(statusFilled, statusCancelled)
+  private def finalizeEventTimestampOf(orderId: String): Option[LocalDateTime] =
+    ctx
+      .run(
+        querySchema[EventRecord](
+          "events",
+          _.eventType -> "event_type",
+          _.status    -> "status"
+        ).filter(record => record.orderId == lift(orderId) && liftQuery(finalizeEventStatus).contains(record.status))
+      )
+      .map(_.timestamp)
+      .headOption
 }

@@ -126,7 +126,7 @@ object HistoryRouterActor {
   sealed trait HistoryUpdateMsg extends HistoryMsg
 
   object HistoryUpdateMsg {
-    final case class UpdateOrder(id: Order.Id, closedAt: Long) extends HistoryUpdateMsg
+    final case class UpdateOrder(id: String, closedAt: Option[LocalDateTime]) extends HistoryUpdateMsg
   }
 
   final case object StopAccumulate
@@ -158,14 +158,15 @@ class HistoryRouterActor(assetDecimals: Asset => Int, postgresConnection: Postgr
 
         override def createAndSendBatch(batchBuffer: Iterable[HistoryMsg]): Unit = {
 
-          val (newOrders, updates) = batchBuffer.foldLeft { (Map.empty[Order.Id, OrderRecord], List.empty[UpdateOrder]) } {
-            case ((newOrders, updates), msg) =>
+          val (updates, newOrders) = batchBuffer.foldLeft { (List.empty[UpdateOrder], Map.empty[String, OrderRecord]) } {
+            case ((updates, newOrders), msg) =>
               msg match {
-                case newOrder: SaveOrder => (newOrders + (newOrder.acceptedOrder.id -> toRecord(newOrder))) -> updates
+                case _: SaveEvent        => updates -> newOrders // Impossible here
+                case newOrder: SaveOrder => updates -> newOrders.updated(newOrder.acceptedOrder.id.base58, toRecord(newOrder))
                 case update @ UpdateOrder(updatedOrderId, closedAt) =>
                   newOrders.get(updatedOrderId) match {
-                    case None        => newOrders                                                                                -> (update :: updates)
-                    case Some(order) => newOrders.updated(updatedOrderId, order.copy(closedAt = toLocalDateTime(closedAt).some)) -> updates
+                    case None        => (update :: updates) -> newOrders
+                    case Some(order) => updates             -> newOrders.updated(updatedOrderId, order.copy(closedAt = closedAt))
                   }
               }
           }
@@ -193,11 +194,14 @@ class HistoryRouterActor(assetDecimals: Asset => Int, postgresConnection: Postgr
             }
           }
 
-          updates.foreach {
-            case UpdateOrder(id, closedAt) =>
-              ctx.run {
-                querySchema[OrderRecord]("orders").withFilter(_.id == lift(id.base58)).update(_.closedAt -> lift(toLocalDateTime(closedAt).some))
+          ctx.run {
+            quote {
+              liftQuery(updates) foreach { x =>
+                querySchema[OrderRecord]("orders")
+                  .filter(_.id == x.id)
+                  .update(_.closedAt -> x.closedAt)
               }
+            }
           }
         }
       }
@@ -249,7 +253,7 @@ class HistoryRouterActor(assetDecimals: Asset => Int, postgresConnection: Postgr
       case _ => Map.empty[Order.Id, Long]
     }
 
-    ids2ts.foreach { case (orderId, closedAt) => ordersHistory ! UpdateOrder(orderId, closedAt) }
+    ids2ts.foreach { case (orderId, closedAt) => ordersHistory ! UpdateOrder(orderId.base58, toLocalDateTime(closedAt).some) }
   }
 
   def receive: Receive = {

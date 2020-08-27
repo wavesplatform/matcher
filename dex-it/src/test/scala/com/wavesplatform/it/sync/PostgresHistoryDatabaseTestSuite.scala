@@ -225,12 +225,10 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
       placeAndAwaitAtDex(counter)
       placeAndAwaitAtNode(submitted)
 
-      val filledEventTimestamp = finalizeEventTimestampOf(submitted.idStr())
-      filledEventTimestamp.size shouldBe 1
-
+      val filledEventTimestamp = expectFinalization(submitted.idStr())
       eventually {
         Seq(counter, submitted).foreach { order =>
-          getOrderInfoById(order.id()).get.closedAt should matchTo { Option(filledEventTimestamp.head) }
+          getOrderInfoById(order.id()).get.closedAt should matchTo(filledEventTimestamp)
         }
       }
 
@@ -275,9 +273,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
     withClue("checking info for 2 small submitted orders\n") {
       Set(sellOrder1, sellOrder2).foreach { order =>
         eventually {
-          val finalizeTimestamp = finalizeEventTimestampOf(order.idStr())
-          finalizeTimestamp should not be empty
-
+          val finalizeTimestamp = expectFinalization(order.idStr())
           withClue(s"${order.id()}\n") {
             getOrderInfoById(order.id()).get should matchTo(
               OrderBriefInfo(order.idStr(),
@@ -302,9 +298,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
 
       withClue("checking info for 1 big counter order\n") {
         eventually {
-          val finalizeTimestamp = finalizeEventTimestampOf(buyOrder.idStr())
-          finalizeTimestamp should not be empty
-
+          val finalizeTimestamp = expectFinalization(buyOrder.idStr())
           getOrderInfoById(buyOrder.id()).get should matchTo(
             OrderBriefInfo(buyOrder.idStr(),
                            limitOrderType,
@@ -343,9 +337,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
 
     withClue("checking info for counter order\n") {
       eventually {
-        val finalizeTimestamp = finalizeEventTimestampOf(buyOrder.idStr())
-        finalizeTimestamp should not be empty
-
+        val finalizeTimestamp = expectFinalization(buyOrder.idStr())
         getOrderInfoById(buyOrder.id()).get should matchTo(
           OrderBriefInfo(buyOrder.idStr(),
                          limitOrderType,
@@ -367,9 +359,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
 
     withClue("checking info for submitted order\n") {
       eventually {
-        val finalizeTimestamp = finalizeEventTimestampOf(sellOrder.idStr())
-        finalizeTimestamp should not be empty
-
+        val finalizeTimestamp = expectFinalization(sellOrder.idStr())
         getOrderInfoById(sellOrder.id()).get should matchTo(
           OrderBriefInfo(sellOrder.idStr(),
                          limitOrderType,
@@ -404,9 +394,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
 
     withClue("checking info for small counter order\n") {
       eventually {
-        val finalizeTimestamp = finalizeEventTimestampOf(smallBuyOrder.idStr())
-        finalizeTimestamp should not be empty
-
+        val finalizeTimestamp = expectFinalization(smallBuyOrder.idStr())
         getOrderInfoById(smallBuyOrder.id()).get should matchTo(
           OrderBriefInfo(smallBuyOrder.idStr(),
                          limitOrderType,
@@ -464,9 +452,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
       )
 
       eventually {
-        val finalizeTimestamp = finalizeEventTimestampOf(unmatchableMarketBuyOrder.idStr())
-        finalizeTimestamp should not be empty
-
+        val finalizeTimestamp = expectFinalization(unmatchableMarketBuyOrder.idStr())
         getOrderInfoById(unmatchableMarketBuyOrder.id()).get should matchTo(
           OrderBriefInfo(
             unmatchableMarketBuyOrder.idStr(),
@@ -509,9 +495,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
       dex1.api.waitForOrder(marketBuyOrder)(_ == HttpOrderStatus(Status.Filled, filledAmount = Some(300.wct), filledFee = Some(1020L)))
 
       eventually {
-        val finalizeTimestamp = finalizeEventTimestampOf(marketBuyOrder.idStr())
-        finalizeTimestamp should not be empty
-
+        val finalizeTimestamp = expectFinalization(marketBuyOrder.idStr())
         getOrderInfoById(marketBuyOrder.id()).get should matchTo(
           OrderBriefInfo(marketBuyOrder.idStr(),
                          marketOrderType,
@@ -546,14 +530,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
       if (orderType == limitOrderType) dex1.api.place(buyOrder) else dex1.api.placeMarket(buyOrder)
 
       eventually {
-        val finalizeTimestamp =
-          if (orderType == limitOrderType) None
-          else {
-            val r = finalizeEventTimestampOf(buyOrder.idStr())
-            r should not be empty
-            r
-          }
-
+        val finalizeTimestamp = if (orderType == limitOrderType) None else expectFinalization(buyOrder.idStr())
         getOrderInfoById(buyOrder.id()).get should matchTo(
           OrderBriefInfo(buyOrder.idStr(),
                          orderType,
@@ -571,6 +548,12 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
 
       Seq(alice, bob).foreach { dex1.api.cancelAll(_) }
     }
+  }
+
+  private def expectFinalization(orderId: String): Option[LocalDateTime] = withClue(s"finalization of $orderId\n") {
+    val r = finalizeEventTimestampOf(orderId)
+    r should not be empty
+    r
   }
 
   private val finalizeEventStatus = List(statusFilled, statusCancelled)

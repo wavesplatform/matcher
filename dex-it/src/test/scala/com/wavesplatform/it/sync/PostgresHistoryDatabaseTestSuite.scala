@@ -3,6 +3,7 @@ package com.wavesplatform.it.sync
 import java.sql.{Connection, DriverManager}
 import java.time.LocalDateTime
 
+import cats.syntax.option._
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus
@@ -200,6 +201,28 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
   private def cleanTables(): Unit = {
     ctx.run { querySchema[OrderRecord]("orders").delete }
     ctx.run { querySchema[EventRecord]("events").delete }
+  }
+
+  "Postgres order history should save correct filled status of closed orders" in {
+
+    val buyOrder  = mkOrder(bob, wavesBtcPair, BUY, 270477189L, 28259L)
+    val sellOrder = mkOrder(alice, wavesBtcPair, SELL, 274413799L, 28259L)
+
+    placeAndAwaitAtDex(buyOrder)
+    placeAndAwaitAtNode(sellOrder)
+
+    // buy counter order is not executed completely, but has filled status
+    dex1.api.orderStatus(buyOrder) should matchTo(HttpOrderStatus(Status.Filled, 270476663L.some, 299999L.some))
+
+    val buyOrderEvents = getEventsInfoByOrderId(buyOrder.id())
+
+    buyOrderEvents should have size 1
+    buyOrderEvents.head.status shouldBe statusFilled
+
+    getEventsInfoByOrderId(sellOrder.id()).last.status shouldBe statusPartiallyFilled
+
+    Seq(alice, bob).foreach { dex1.api.cancelAll(_) }
+    cleanTables()
   }
 
   "Postgres order history should update closedAt timestamps of orders" in {
@@ -522,8 +545,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
     }
   }
 
-  // TODO Enable in DEX-895
-  "Postgres order history should save orders that are filled with rounding issues" ignore {
+  "Postgres order history should save orders that are filled with rounding issues" in {
     Seq(limitOrderType, marketOrderType).foreach { orderType =>
       val buyOrder = mkOrderDP(alice, wavesUsdPair, BUY, 1.23456789.waves, 1.03)
 

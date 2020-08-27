@@ -84,10 +84,10 @@ object HistoryRouterActor {
             val assetPair = submitted.order.assetPair
 
             Set(
-              (submitted, e.submittedRemainingAmount, e.submittedExecutedFee, e.submittedRemainingFee),
-              (counter, e.counterRemainingAmount, e.counterExecutedFee, e.counterRemainingFee)
+              (submitted, e.submittedRemainingAmount, e.submittedExecutedFee, e.submittedRemainingFee, e.submittedRemaining),
+              (counter, e.counterRemainingAmount, e.counterExecutedFee, e.counterRemainingFee, e.counterRemaining)
             ) map {
-              case (acceptedOrder, remainingAmount, executedFee, remainingFee) =>
+              case (acceptedOrder, remainingAmount, executedFee, remainingFee, remaining) =>
                 EventRecord(
                   orderId = acceptedOrder.order.id().toString,
                   eventType = eventTrade,
@@ -97,7 +97,7 @@ object HistoryRouterActor {
                   totalFilled = denormalizeAmountAndFee(acceptedOrder.order.amount - remainingAmount, assetPair.amountAsset),
                   feeFilled = denormalizeAmountAndFee(executedFee, acceptedOrder.order.feeAsset),
                   feeTotalFilled = denormalizeAmountAndFee(acceptedOrder.order.matcherFee - remainingFee, acceptedOrder.order.feeAsset),
-                  status = if (remainingAmount == 0) statusFilled else statusPartiallyFilled,
+                  status = if (remaining.isFilled) statusFilled else statusPartiallyFilled,
                   reason = e.reason
                 )
             }
@@ -206,7 +206,7 @@ class HistoryRouterActor(assetDecimals: Asset => Int, postgresConnection: Postgr
         }
       }
     ),
-    name = "orders-history-new"
+    name = "orders-history"
   )
 
   private val eventsHistory: ActorRef = context.actorOf(
@@ -243,12 +243,9 @@ class HistoryRouterActor(assetDecimals: Asset => Int, postgresConnection: Postgr
 
     val ids2ts = event match {
       case OrderCanceled(ao, _, timestamp) => Map(ao.id -> timestamp)
-      case e @ OrderExecuted(submitted, counter, timestamp, _, _) => // looking for for filled orders
-        Seq(
-          submitted -> e.submittedRemainingAmount,
-          counter   -> e.counterRemainingAmount
-        ).foldLeft(Map.empty[Order.Id, Long]) {
-          case (result, (ao, remainingAmount)) => if (remainingAmount == 0) result + (ao.id -> timestamp) else result
+      case e @ OrderExecuted(_, _, timestamp, _, _) => // looking for filled orders
+        Seq(e.submittedRemaining, e.counterRemaining).foldLeft(Map.empty[Order.Id, Long]) {
+          case (result, ao) => if (ao.isFilled) result + (ao.id -> timestamp) else result
         }
       case _ => Map.empty[Order.Id, Long]
     }

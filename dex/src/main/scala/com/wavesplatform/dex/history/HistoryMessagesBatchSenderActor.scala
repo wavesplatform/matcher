@@ -17,7 +17,10 @@ abstract class HistoryMessagesBatchSenderActor[M <: HistoryMsg: ClassTag] extend
 
   private val batchBuffer: mutable.Set[M] = mutable.Set.empty[M]
 
-  private def scheduleStopAccumulating: Cancellable = context.system.scheduler.scheduleOnce(batchLinger.millis, self, StopAccumulate)
+  private def scheduleStopAccumulating: Cancellable = {
+    // Zero batch linger means that batch is restricted only by entries
+    if (batchLinger == 0) Cancellable.alreadyCancelled else context.system.scheduler.scheduleOnce(batchLinger.millis, self, StopAccumulate)
+  }
 
   private def sendBatch(): Unit = {
     if (batchBuffer.nonEmpty) {
@@ -30,20 +33,21 @@ abstract class HistoryMessagesBatchSenderActor[M <: HistoryMsg: ClassTag] extend
 
   private def awaitingHistoryMessages: Receive = {
     case msg: M =>
-      scheduleStopAccumulating
-      context become accumulateBuffer(scheduleStopAccumulating)
       batchBuffer += msg
+      // if batchEntries == 1, we send batch immediately without scheduling;
+      // zero batch entries means that batch is restricted only by batch linger
+      if (batchBuffer.size == batchEntries) sendBatch()
+      else context become accumulateBuffer(scheduleStopAccumulating)
   }
 
   private def accumulateBuffer(scheduledStop: Cancellable): Receive = {
     case msg: M =>
+      batchBuffer += msg
       if (batchBuffer.size == batchEntries) {
         scheduledStop.cancel()
         sendBatch()
-        context become accumulateBuffer(scheduleStopAccumulating)
+        context become awaitingHistoryMessages
       }
-
-      batchBuffer += msg
 
     case StopAccumulate => sendBatch(); context become awaitingHistoryMessages
   }

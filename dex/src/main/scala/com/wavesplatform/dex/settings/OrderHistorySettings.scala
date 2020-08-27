@@ -17,7 +17,7 @@ object OrderHistorySettings {
     val cfgValidator = ConfigSettingsValidator(cfg)
 
     def validateBatchSettings(settingName: String, defaultValue: Long): ErrorsListOr[Long] =
-      cfgValidator.validateByPredicateWithDefault(s"$path.$settingName")(_ > 0, s"required 0 < ${settingName.replace("-", " ")}", defaultValue)
+      cfgValidator.validateByPredicateWithDefault(s"$path.$settingName")(_ >= 0, s"required 0 <= ${settingName.replace("-", " ")}", defaultValue)
 
     if (cfgValidator.validateWithDefault(s"$path.enabled", false) getValueOrThrowErrors) {
       Some(

@@ -522,28 +522,32 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
     }
   }
 
-  "Postgres order history should save orders that are filled with rounding issues" in {
+  // TODO Enable in DEX-895
+  "Postgres order history should save orders that are filled with rounding issues" ignore {
     Seq(limitOrderType, marketOrderType).foreach { orderType =>
       val buyOrder = mkOrderDP(alice, wavesUsdPair, BUY, 1.23456789.waves, 1.03)
 
       dex1.api.place(mkOrderDP(bob, wavesUsdPair, SELL, 2.waves, 1.03))
       if (orderType == limitOrderType) dex1.api.place(buyOrder) else dex1.api.placeMarket(buyOrder)
+      dex1.api.waitForOrderStatus(buyOrder, Status.Filled)
 
-      eventually {
-        val finalizeTimestamp = if (orderType == limitOrderType) None else expectFinalization(buyOrder.idStr())
-        getOrderInfoById(buyOrder.id()).get should matchTo(
-          OrderBriefInfo(buyOrder.idStr(),
-                         orderType,
-                         alice.publicKey.toString,
-                         buySide,
-                         Waves.toString,
-                         usd.toString,
-                         Waves.toString,
-                         1.23456789,
-                         1.03,
-                         0.003,
-                         finalizeTimestamp)
-        )
+      withClue(s"${if (orderType == limitOrderType) "limit" else "market"} ${buyOrder.idStr()}\n") {
+        eventually {
+          val finalizeTimestamp = expectFinalization(buyOrder.idStr())
+          getOrderInfoById(buyOrder.id()).get should matchTo(
+            OrderBriefInfo(buyOrder.idStr(),
+                           orderType,
+                           alice.publicKey.toString,
+                           buySide,
+                           Waves.toString,
+                           usd.toString,
+                           Waves.toString,
+                           1.23456789,
+                           1.03,
+                           0.003,
+                           finalizeTimestamp)
+          )
+        }
       }
 
       Seq(alice, bob).foreach { dex1.api.cancelAll(_) }

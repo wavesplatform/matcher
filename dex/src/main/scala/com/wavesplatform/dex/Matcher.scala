@@ -37,7 +37,7 @@ import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
 import com.wavesplatform.dex.grpc.integration.WavesBlockchainClientBuilder
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.BalanceChanges
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
-import com.wavesplatform.dex.history.HistoryRouter
+import com.wavesplatform.dex.history.HistoryRouterActor
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue._
 import com.wavesplatform.dex.settings.{MatcherSettings, OrderFeeSettings}
@@ -317,7 +317,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     )
 
   private lazy val historyRouter = settings.orderHistory.map { orderHistorySettings =>
-    actorSystem.actorOf(HistoryRouter.props(assetsCache.unsafeGetDecimals, settings.postgresConnection, orderHistorySettings), "history-router")
+    actorSystem.actorOf(HistoryRouterActor.props(assetsCache.unsafeGetDecimals, settings.postgresConnection, orderHistorySettings), "history-router")
   }
 
   private lazy val addressActors =

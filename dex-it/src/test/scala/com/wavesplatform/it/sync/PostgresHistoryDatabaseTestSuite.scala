@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync
 
 import java.sql.{Connection, DriverManager}
+import java.time.LocalDateTime
 
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.typesafe.config.{Config, ConfigFactory}
@@ -11,7 +12,7 @@ import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.history.DBRecords.{EventRecord, OrderRecord}
 import com.wavesplatform.dex.history.HasPostgresJdbcContext
-import com.wavesplatform.dex.history.HistoryRouter._
+import com.wavesplatform.dex.history.HistoryRouterActor._
 import com.wavesplatform.dex.model.Events
 import com.wavesplatform.dex.model.Events.{EventReason, OrderCanceledReason, OrderExecutedReason}
 import com.wavesplatform.dex.settings.PostgresConnection
@@ -24,6 +25,7 @@ import scala.io.Source
 import scala.util.Try
 
 class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgresJdbcContext {
+
   override def connectionConfig: Config =
     ConfigFactory
       .parseString(getPostgresConnectionCfgString("localhost", postgres mappedPort postgresContainerPort))
@@ -132,7 +134,8 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
                                     feeAsset: String,
                                     amount: Double,
                                     price: Double,
-                                    fee: Double)
+                                    fee: Double,
+                                    closedAt: Option[LocalDateTime])
 
   private case class EventBriefInfo(orderId: String,
                                     eventType: Byte,
@@ -157,7 +160,8 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
           _.feeAsset        -> "fee_asset_id",
           _.amount          -> "amount",
           _.price           -> "price",
-          _.fee             -> "fee"
+          _.fee             -> "fee",
+          _.closedAt        -> "closed_at"
         ).filter(_.id == lift(orderId.toString))
       )
       .headOption
@@ -192,6 +196,57 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
                        r.status,
                        r.reason)
       }
+
+  private def cleanTables(): Unit = {
+    ctx.run { querySchema[OrderRecord]("orders").delete }
+    ctx.run { querySchema[EventRecord]("events").delete }
+  }
+
+  "Postgres order history should update closedAt timestamps of orders" in {
+
+    withClue("after order cancel") {
+
+      val cancelledOrder = mkOrderDP(alice, wavesUsdPair, BUY, 1.waves, 3.50)
+
+      placeAndAwaitAtDex(cancelledOrder)
+      eventually { getOrderInfoById(cancelledOrder.id()).get.closedAt shouldBe None }
+
+      cancelAndAwait(alice, cancelledOrder)
+      eventually { getOrderInfoById(cancelledOrder.id()).get.closedAt.nonEmpty shouldBe true }
+
+      cleanTables()
+    }
+
+    withClue("after order execution") {
+
+      val counter   = mkOrderDP(alice, wavesUsdPair, BUY, 1.waves, 3.50)
+      val submitted = mkOrderDP(alice, wavesUsdPair, SELL, 1.waves, 3.50)
+
+      placeAndAwaitAtDex(counter)
+      placeAndAwaitAtNode(submitted)
+
+      val filledEventTimestamp =
+        ctx
+          .run(
+            querySchema[EventRecord](
+              "events",
+              _.eventType -> "event_type",
+              _.status    -> "status"
+            ).filter(record => record.orderId == lift(submitted.idStr()) && record.status == lift(statusFilled))
+          )
+          .map(_.timestamp)
+
+      filledEventTimestamp.size shouldBe 1
+
+      eventually {
+        Seq(counter, submitted).foreach { order =>
+          getOrderInfoById(order.id()).get.closedAt should matchTo { Option(filledEventTimestamp.head) }
+        }
+      }
+
+      cleanTables()
+    }
+  }
 
   "Postgres order history should save all orders and events" in {
     (1 to maxOrders)
@@ -241,7 +296,8 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
                              btc.toString,
                              100,
                              0.35,
-                             0.00000030)
+                             0.00000030,
+                             None)
             )
 
             getEventsInfoByOrderId(order.id()) should matchTo(
@@ -262,7 +318,8 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
                          eth.toString,
                          300,
                          0.35,
-                         0.00001703)
+                         0.00001703,
+                         None)
         )
 
         getEventsInfoByOrderId(buyOrder.id()) should matchTo(
@@ -289,7 +346,17 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
     eventually {
       withClue("checking info for counter order\n") {
         getOrderInfoById(buyOrder.id()).get should matchTo(
-          OrderBriefInfo(buyOrder.idStr(), limitOrderType, alice.publicKey.toString, buySide, "WAVES", usd.toString, "WAVES", 300, 0.35, 0.00370300)
+          OrderBriefInfo(buyOrder.idStr(),
+                         limitOrderType,
+                         alice.publicKey.toString,
+                         buySide,
+                         "WAVES",
+                         usd.toString,
+                         "WAVES",
+                         300,
+                         0.35,
+                         0.00370300,
+                         None)
         )
         getEventsInfoByOrderId(buyOrder.id()) should matchTo(
           List(EventBriefInfo(buyOrder.idStr(), eventTrade, 300, 300, 0.00370300, 0.00370300, statusFilled, OrderExecutedReason))
@@ -298,7 +365,17 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
 
       withClue("checking info for submitted order\n") {
         getOrderInfoById(sellOrder.id()).get should matchTo(
-          OrderBriefInfo(sellOrder.idStr(), limitOrderType, bob.publicKey.toString, sellSide, "WAVES", usd.toString, usd.toString, 300, 0.35, 0.30)
+          OrderBriefInfo(sellOrder.idStr(),
+                         limitOrderType,
+                         bob.publicKey.toString,
+                         sellSide,
+                         "WAVES",
+                         usd.toString,
+                         usd.toString,
+                         300,
+                         0.35,
+                         0.30,
+                         None)
         )
 
         getEventsInfoByOrderId(sellOrder.id()) should matchTo(
@@ -331,7 +408,8 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
                          eth.toString,
                          300,
                          0.35,
-                         0.00001703)
+                         0.00001703,
+                         None)
         )
 
         getEventsInfoByOrderId(smallBuyOrder.id()) should matchTo(
@@ -350,7 +428,8 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
                          btc.toString,
                          900,
                          0.35,
-                         0.00000030)
+                         0.00000030,
+                         None)
         )
 
         getEventsInfoByOrderId(bigSellOrder.id()) should matchTo(
@@ -384,7 +463,8 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
                          eth.toString,
                          500,
                          0.35,
-                         0.00001703)
+                         0.00001703,
+                         None)
         )
 
         getEventsInfoByOrderId(unmatchableMarketBuyOrder.id()) should matchTo(
@@ -423,7 +503,8 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
                          eth.toString,
                          500,
                          0.35,
-                         0.00001703)
+                         0.00001703,
+                         None)
         )
 
         getEventsInfoByOrderId(marketBuyOrder.id()) should matchTo(
@@ -456,7 +537,8 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
                          Waves.toString,
                          1.23456789,
                          1.03,
-                         0.003)
+                         0.003,
+                         None)
         )
       }
 

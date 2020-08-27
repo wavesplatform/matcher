@@ -1,14 +1,14 @@
 package com.wavesplatform.dex.history
 
 import akka.actor.{Actor, Cancellable}
-import com.wavesplatform.dex.history.HistoryRouter.{HistoryMsg, StopAccumulate}
+import com.wavesplatform.dex.history.HistoryRouterActor.{HistoryMsg, StopAccumulate}
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.reflect.ClassTag
 
-abstract class HistoryMessagesBatchSender[M <: HistoryMsg: ClassTag] extends Actor {
+abstract class HistoryMessagesBatchSenderActor[M <: HistoryMsg: ClassTag] extends Actor {
 
   val batchLinger: Long
   val batchEntries: Long

@@ -22,6 +22,10 @@
     <!-- Instrumentation -->
     <logger name="org.aspectj" level="INFO"/>
 
+    <!-- Postgres -->
+    <logger name="com.zaxxer.hikari" level="WARN"/>
+    <logger name="io.getquill.context.jdbc" level="WARN"/>
+
     <!-- Cryptography -->
     <logger name="scorex.crypto.signatures.Curve25519" level="INFO"/>
 

@@ -62,8 +62,8 @@ sealed trait AcceptedOrder {
 
   val matcherFee: Long = order.matcherFee
 
-  def filledAmount = order.amount - amount
-  def filledFee    = order.matcherFee - fee
+  def filledAmount: Long = order.amount - amount
+  def filledFee: Long    = order.matcherFee - fee
 
   def fillingInfo: FillingInfo = {
     val isNew           = amount == order.amount
@@ -85,11 +85,13 @@ sealed trait AcceptedOrder {
     .scaleByPowerOfTen(-Order.PriceConstantExponent)
     .setScale(0, RoundingMode.FLOOR)
     .longValue()
+
   lazy val amountOfAmountAsset: Long = correctedAmountOfAmountAsset(amount, price)
 
   protected def executionAmount(counterPrice: Price): Long = correctedAmountOfAmountAsset(amount, counterPrice)
 
-  lazy val isValid: Boolean = isValid(price)
+  lazy val isValid: Boolean  = isValid(price)
+  lazy val isFilled: Boolean = !isValid
 
   def isValid(counterPrice: Price): Boolean = {
     amount > 0 && amount >= minimalAmountOfAmountAssetByPrice(counterPrice) && amount < Order.MaxAmount && spentAmount > 0 && receiveAmount > 0

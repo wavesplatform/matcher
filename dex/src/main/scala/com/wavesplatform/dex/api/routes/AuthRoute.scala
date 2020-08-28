@@ -21,10 +21,10 @@ trait AuthRoute { this: ApiRoute =>
       case _                        => SimpleErrorResponse(statusCode, matcherError)
     }
     apiKeyHash.fold[Directive0] { complete(SimpleErrorResponse(StatusCodes.InternalServerError, ApiKeyIsNotProvided)) } { hashFromSettings =>
-      optionalHeaderValueByType[`X-Api-Key`](()).flatMap {
+      optionalHeaderValueByType(`X-Api-Key`).flatMap {
         case Some(key) if java.util.Arrays.equals(crypto secureHash key.value, hashFromSettings) => pass
         case _ =>
-          optionalHeaderValueByType[api_key](()).flatMap {
+          optionalHeaderValueByType(api_key).flatMap {
             case Some(key) if java.util.Arrays.equals(crypto secureHash key.value, hashFromSettings) => pass
             case _                                                                                   => complete { correctResponse(StatusCodes.Forbidden, ApiKeyIsNotValid) }
           }
@@ -33,7 +33,7 @@ trait AuthRoute { this: ApiRoute =>
   }
 
   def withUserPublicKeyOpt(implicit matcherResponseTrm: ToResponseMarshaller[MatcherResponse]): Directive1[Option[PublicKey]] =
-    optionalHeaderValueByType[`X-User-Public-Key`](()).flatMap {
+    optionalHeaderValueByType(`X-User-Public-Key`).flatMap {
       case None => provide(None)
       case Some(rawPublicKey) =>
         PublicKey.fromBase58String(rawPublicKey.value) match {

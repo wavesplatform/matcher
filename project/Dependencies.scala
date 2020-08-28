@@ -8,7 +8,7 @@ object Dependencies {
     val parCollections = "0.2.0"
 
     val akka     = "2.6.6"
-    val akkaHttp = "10.1.12"
+    val akkaHttp = "10.2.0"
 
     val scalaTest          = "3.1.2"
     val scalaCheck         = "1.14.3"
@@ -60,6 +60,7 @@ object Dependencies {
 
     val swagger   = "1.1.2"
     val swaggerUi = "3.26.1"
+    val jaxbApi   = "2.3.1"
 
     val scorexCrypto = "2.1.8"
 
@@ -141,6 +142,7 @@ object Dependencies {
   private val sttpClient      = "com.softwaremill.sttp.client" %% "core" % Version.sttpClient
   private val pureConfig      = "com.github.pureconfig" %% "pureconfig" % Version.pureConfig
   private val allureScalaTest = "io.qameta.allure" %% "allure-scalatest" % Version.allureScalaTest
+  private val jaxbApi         = "javax.xml.bind" % "jaxb-api" % Version.jaxbApi
 
   private val monocle: Seq[ModuleID] = Seq(
     "com.github.julien-truffaut" %% "monocle-core"  % Version.monocle,
@@ -231,7 +233,7 @@ object Dependencies {
       influxDb,
       commonsNet,
       swaggerUi,
-      "javax.xml.bind" % "jaxb-api" % "2.3.1", // Required for Swagger UI in JRE 11 because of javax/xml/bind/annotation/XmlRootElement
+      jaxbApi, // Required for Swagger UI in JRE 11 because of javax/xml/bind/annotation/XmlRootElement
       jwtModule("core"),
       jwtModule("play-json"),
       sttpClient,

@@ -472,7 +472,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         val combinedRoute = new CompositeHttpService(matcherApiTypes, matcherApiRoutes, settings.restApi).compositeRoute
 
         log.info(s"Binding REST and WebSocket API ${settings.restApi.address}:${settings.restApi.port} ...")
-        http.bindAndHandle(combinedRoute, settings.restApi.address, settings.restApi.port)
+        http.newServerAt(settings.restApi.address, settings.restApi.port).bind(combinedRoute)
       } map { serverBinding =>
         matcherServerBinding = serverBinding
         log.info(s"REST and WebSocket API bound to ${matcherServerBinding.localAddress}")

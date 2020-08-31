@@ -40,6 +40,14 @@ pipeline {
         stage('Generate ammo file') {
             steps {
                 sh 'sbt "project dex-load" generateAmmo'
+            }
+        }
+        stage('Generate feeder file') {
+            steps {
+                sshagent (credentials: ['buildagent-matcher']) {
+                    sh "scp buildagent-matcher@${LOADGEN}:/home/buildagent-matcher/key.txt ./dex-load"
+                    sh "scp buildagent-matcher@${LOADGEN}:/home/buildagent-matcher/pairs.txt ./dex-load"
+                }
                 sh 'sbt "project dex-load" generateFeeder'
             }
         }
@@ -66,7 +74,8 @@ pipeline {
                  }
                  stage("Web Socket") {
                     steps {
-                        sh 'echo "gatling launch command here"'
+                        sh 'mv ./dex-load/feeder.csv ./dex-ws-load/'
+                        sh "cd ./dex-ws-load && sbt gatling:testOnly load.ConnectionsOnlyTest -Dff=feeder.csv -Dws=${WS_URL} -Drt=30"
                     }
                  }
             }

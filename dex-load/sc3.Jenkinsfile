@@ -39,7 +39,7 @@ pipeline {
         }
         stage('Generate feeder file') {
             steps {
-
+                sh 'echo "$KEY" > ./dex-load/'
                 sh 'sbt "project dex-load" generateFeeder'
             }
         }

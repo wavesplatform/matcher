@@ -16,7 +16,6 @@ Seq(
   "com.typesafe.sbt"   % "sbt-git"                % "1.0.0",
   "org.scalameta"      % "sbt-scalafmt"           % "2.0.1",
   "ch.epfl.scala"      % "sbt-scalafix"           % "0.9.19",
-  "io.gatling"         % "gatling-sbt"            % "3.1.0",
   /*
   undeclaredCompileDependencies{test}
   unusedCompileDependencies{test}

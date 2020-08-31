@@ -39,12 +39,14 @@ pipeline {
         }
         stage('Generate feeder file') {
             steps {
+
                 sh 'sbt "project dex-load" generateFeeder'
             }
         }
         stage("Web Socket") {
             steps {
-                sh 'echo "gatling launch command here"'
+                sh 'mv ./dex-load/feeder.csv ./dex-ws-load/'
+                sh "cd ./dex-ws-load && sbt gatling:testOnly load.ConnectionsOnlyTest -Dff=feeder.csv -Dws=${WS_URL} -Drt=30"
                 script {
                     GRAFANA = sh(script: '''
                                             echo "https://${GRAFANA_URL}/d/WsyjIiHiz/system-metrics?orgId=5&var-hostname=${MATCHER_URL}&from=$(date -d '- 20 minutes' +'%s')000&to=$(date -d '+ 5 minutes' +'%s')000"

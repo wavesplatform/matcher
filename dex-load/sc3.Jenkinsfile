@@ -39,7 +39,9 @@ pipeline {
         }
         stage('Generate feeder file') {
             steps {
-                sh 'echo "$KEY" > ./dex-load/'
+                sshagent (credentials: ['buildagent-matcher']) {
+                    sh "scp buildagent-matcher@${LOADGEN}:/home/buildagent-matcher/key.txt ./dex-load"
+                }
                 sh 'sbt "project dex-load" generateFeeder'
             }
         }

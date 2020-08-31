@@ -4,11 +4,11 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.ws.protocol.WsError
 
 import scala.concurrent.Await
-import scala.concurrent.duration.DurationInt
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
 class WsPingPongExternalTestSuite extends WsPingPongBaseSuite {
 
-  protected val maxConnectionLifetime = 6.seconds
+  protected val maxConnectionLifetime: FiniteDuration = 6.seconds
 
   override protected lazy val wsStreamUri: String = getWsStreamUri(dex1)
 
@@ -27,20 +27,26 @@ class WsPingPongExternalTestSuite extends WsPingPongBaseSuite {
 
   "Web socket connection should be closed " - {
     s"by max-connection-lifetime = $maxConnectionLifetime" in {
+
       val wsac               = mkWsAddressConnection(alice, dex1)
       val connectionLifetime = Await.result(wsac.connectionLifetime, maxConnectionLifetime + delta)
+      val (pings, errors)    = wsac.receiveAtLeastNPingsOrErrors(6) // 5 pings + 1 error
 
       connectionLifetime should (be >= maxConnectionLifetime and be <= maxConnectionLifetime + delta)
-      wsac.pings.size should be >= 5
-      wsac.isClosed shouldBe true
 
-      wsac.collectMessages[WsError].head should matchTo(
-        WsError(
-          timestamp = 0L, // ignored
-          code = 109077767, // WsConnectionMaxLifetimeExceeded
-          message = "WebSocket has reached max allowed lifetime"
+      pings.size should (be >= 5 and be <= 6)
+
+      errors should matchTo {
+        List(
+          WsError(
+            timestamp = 0L, // ignored
+            code = 109077767, // WsConnectionMaxLifetimeExceeded
+            message = "WebSocket has reached max allowed lifetime"
+          )
         )
-      )
+      }
+
+      wsac.isClosed shouldBe true
     }
   }
 }

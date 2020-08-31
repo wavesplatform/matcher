@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.api.ws
 
 import akka.http.scaladsl.model.ws.TextMessage
 import com.wavesplatform.dex.api.ws.connection.WsConnection
-import com.wavesplatform.dex.api.ws.protocol.{WsClientMessage, WsError, WsMessage, WsPingOrPong}
+import com.wavesplatform.dex.api.ws.protocol._
 import com.wavesplatform.dex.error.InvalidJson
 import com.wavesplatform.it.WsSuiteBase
 
@@ -11,11 +11,18 @@ import scala.concurrent.duration._
 
 abstract class WsPingPongBaseSuite extends WsSuiteBase {
 
-  protected val pingInterval = 1.second
-  protected val pongTimeout  = pingInterval * 3
+  protected val pingInterval: FiniteDuration = 1.second
+  protected val pongTimeout: FiniteDuration  = pingInterval * 3
 
-  protected val delta = 1.second
+  protected val delta: FiniteDuration = 1.second
 
+  protected val pongTimeoutError: WsError = WsError(
+    timestamp = 0L, // ignored
+    code = 109077772, // WsConnectionPongTimeout
+    message = "WebSocket has reached pong timeout"
+  )
+
+  override implicit def patienceConfig: PatienceConfig          = super.patienceConfig.copy(timeout = 30.seconds, interval = 200.millis)
   protected implicit def duration2Long(d: FiniteDuration): Long = d.toMillis
 
   protected def wsStreamUri: String
@@ -26,43 +33,45 @@ abstract class WsPingPongBaseSuite extends WsSuiteBase {
     s"by pong timeout (ping-interval = $pingInterval, pong-timeout = 3 * ping-interval = $pongTimeout)" - {
 
       "without sending pong" in {
-        val wsac                       = mkWsUnmanagedConnection()
+        val wsac = mkWsUnmanagedConnection()
+
+        val (pings, errors) = wsac.receiveAtLeastNPingsOrErrors(4) // 3 pings + 1 error
+
+        pings.size should (be >= 3 and be <= 4)
+        errors should matchTo { List(pongTimeoutError) }
+
         val expectedConnectionLifetime = pingInterval + pongTimeout
         val connectionLifetime         = Await.result(wsac.connectionLifetime, expectedConnectionLifetime + delta)
 
         connectionLifetime should (be >= expectedConnectionLifetime and be <= expectedConnectionLifetime + delta)
-        wsac.pings.size should (be >= 3 and be <= 4)
         wsac.isClosed shouldBe true
-
-        wsac.collectMessages[WsError].head should matchTo(
-          WsError(
-            timestamp = 0L, // ignored
-            code = 109077772, // WsConnectionPongTimeout
-            message = "WebSocket has reached pong timeout"
-          )
-        )
       }
 
       "with sending pong" in {
         val wsac = mkWsUnmanagedConnection()
 
-        Thread.sleep(pingInterval + 0.1.second)
-        wsac.isClosed shouldBe false
-        wsac.pings should have size 1
+        val firstPingList = wsac.receiveAtLeastN[WsPingOrPong](1)
+        firstPingList should have size 1
+        wsac.clearMessages()
 
-        wsac.send(wsac.pings.last) // sending pong to keep connection alive
+        val firstPing = firstPingList.head
+        wsac.send(firstPing) // sending pong to keep connection alive
 
-        Thread.sleep(pingInterval + 0.1.second)
-        wsac.isClosed shouldBe false
-        wsac.pings should have size 2
+        val secondPingList = wsac.receiveAtLeastN[WsPingOrPong](1)
+        secondPingList should have size 1
+        wsac.clearMessages()
 
-        wsac.send(wsac.pings.head) // sending outdated pong will not prolong connection lifetime
+        wsac.send(firstPing) // sending outdated pong will not prolong connection lifetime
+
+        val (pings, errors) = wsac.receiveAtLeastNPingsOrErrors(3) // 2 pings and 1 error
+
+        pings.size should (be >= 2 and be <= 3)
+        errors should matchTo { List(pongTimeoutError) }
 
         val connectionLifetime         = Await.result(wsac.connectionLifetime, pongTimeout + delta)
         val expectedConnectionLifetime = pingInterval * 2 + pongTimeout
 
         connectionLifetime should (be >= expectedConnectionLifetime and be <= expectedConnectionLifetime + delta)
-        wsac.pings.size should (be >= 4 and be <= 5)
         wsac.isClosed shouldBe true
       }
 
@@ -70,17 +79,12 @@ abstract class WsPingPongBaseSuite extends WsSuiteBase {
         val wsac1 = mkWsUnmanagedConnection()
         val wsac2 = mkWsUnmanagedConnection()
 
-        wsac1.isClosed shouldBe false
-        wsac2.isClosed shouldBe false
-
-        Thread.sleep(pingInterval + 0.1.second)
-
-        Seq(wsac1, wsac2).foreach {
-          _.pings should have size 1
-        }
+        Seq(wsac1, wsac2).foreach { _.receiveAtLeastN[WsPingOrPong](1) should have size 1 } // first ping received
 
         wsac1.send(wsac2.pings.head) // send correct pong but from another connection
         wsac2.send(wsac1.pings.head) // send correct pong but from another connection
+
+        Seq(wsac1, wsac2).foreach { _.clearMessages() }
 
         val expectedConnectionsLifetime = pingInterval + pongTimeout
         val connection1Lifetime         = Await.result(wsac1.connectionLifetime, pongTimeout + delta)
@@ -88,8 +92,10 @@ abstract class WsPingPongBaseSuite extends WsSuiteBase {
 
         Seq(wsac1 -> connection1Lifetime, wsac2 -> connection2Lifetime).foreach {
           case (conn, connLifetime) =>
+            val (pings, errors) = conn.receiveAtLeastNPingsOrErrors(3) // 2 pings + 1 error
             connLifetime should (be >= expectedConnectionsLifetime and be <= expectedConnectionsLifetime + delta)
-            conn.pings.size should (be >= 3 and be <= 4)
+            pings.size should (be >= 2 and be <= 3)
+            errors should matchTo { List(pongTimeoutError) }
             conn.isClosed shouldBe true
         }
       }
@@ -98,7 +104,8 @@ abstract class WsPingPongBaseSuite extends WsSuiteBase {
 
   "Web socket connection should not be closed " - {
 
-    "when incorrect message has been sent to te Matcher" in {
+    "when incorrect message has been sent to the Matcher" in {
+
       val wsc = new WsConnection(wsStreamUri, keepAlive = false) {
         override def stringifyClientMessage(cm: WsClientMessage): TextMessage.Strict = cm match {
           case WsPingOrPong(timestamp) if timestamp == -1 => TextMessage.Strict(s"broken")
@@ -106,32 +113,31 @@ abstract class WsPingPongBaseSuite extends WsSuiteBase {
         }
       }
 
-      Thread.sleep(pingInterval + 0.1.second)
-      wsc.isClosed shouldBe false
-      wsc.pings should have size 1
+      val firstPingList = wsc.receiveAtLeastN[WsPingOrPong](1) // first ping received
+      firstPingList should have size 1
+      val firstPing = firstPingList.head
 
-      wsc.send(wsc.pings.last)
-      wsc.send(wsc.pings.last.copy(timestamp = -1))
+      wsc.send(firstPing)                      // first pong sent
+      wsc.send(firstPing.copy(timestamp = -1)) // wrong message sent
+      wsc.clearMessages()
 
       val connectionLifetime          = Await.result(wsc.connectionLifetime, pingInterval + pongTimeout + delta)
       val expectedConnectionsLifetime = pingInterval * 2 + pongTimeout
+      val (pings, errors)             = wsc.receiveAtLeastNPingsOrErrors(4) // 3 pings + 1 error
+      val expectedError               = InvalidJson(Nil)
+
       connectionLifetime should (be >= expectedConnectionsLifetime and be <= expectedConnectionsLifetime + delta)
 
-      wsc.pings should have size 4
-      wsc.isClosed shouldBe true
+      pings.size should (be >= 3 and be <= 4)
 
-      val expectedError = InvalidJson(Nil)
-
-      wsc.collectMessages[WsError] should matchTo {
+      errors should matchTo {
         List(
           WsError(0L, expectedError.code, expectedError.message.text),
-          WsError(
-            timestamp = 0L, // ignored
-            code = 109077772, // WsConnectionPongTimeout
-            message = "WebSocket has reached pong timeout"
-          )
+          pongTimeoutError
         )
       }
+
+      wsc.isClosed shouldBe true
     }
   }
 }

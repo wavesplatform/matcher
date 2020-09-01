@@ -75,7 +75,7 @@ pipeline {
                     steps {
                         sleep time: 1, unit: 'MINUTES'
                         sh 'mv ./dex-load/feeder.csv ./dex-ws-load/'
-                        sh "cd ./dex-ws-load && sbt gatling:testOnly load.ConnectionsAndStreamsTest -Dff=feeder.csv -Dws=${WS_URL} -Drt=30"
+                        sh "cd ./dex-ws-load && sbt gatling:testOnly load.ConnectionsAndStreamsTest -Dff=feeder.csv -Dws=ws://${AIM}:6886/ws/v0" -Drt=30"
                         script {
                             GRAFANA = sh(script: '''
                                                     echo "https://${GRAFANA_URL}/d/WsyjIiHiz/system-metrics?orgId=5&var-hostname=${MATCHER_URL}&from=$(date -d '- 20 minutes' +'%s')000&to=$(date -d '+ 5 minutes' +'%s')000"

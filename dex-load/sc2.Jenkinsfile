@@ -75,7 +75,7 @@ pipeline {
                  stage("Web Socket") {
                     steps {
                         sh 'mv ./dex-load/feeder.csv ./dex-ws-load/'
-                        sh "cd ./dex-ws-load && sbt gatling:testOnly load.ConnectionsOnlyTest -Dff=feeder.csv -Dws=ws://${AIM}:6886/ws/v0 -Drt=30"
+                        sh "cd ./dex-ws-load && sbt gatling:testOnly load.ConnectionsOnlyTest -Dff=feeder.csv -Dws=ws://${AIM}:6886/ws/v0 -Drt=30 -Duc=${AN}"
                     }
                  }
             }

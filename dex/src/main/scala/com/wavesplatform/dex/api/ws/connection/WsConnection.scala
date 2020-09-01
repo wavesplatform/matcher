@@ -57,17 +57,16 @@ class WsConnection(uri: String, keepAlive: Boolean = true)(implicit system: Acto
       for {
         strictText <- tm.toStrict(1.second).map(_.getStrictText)
         clientMessage <- {
-          log.trace(s"Got $strictText")
+          log.debug(s"Got $strictText")
           Try { Json.parse(strictText).as[WsServerMessage] } match {
             case Failure(exception) => Future.failed(exception)
-            case Success(x) => {
+            case Success(x) =>
               messagesBuffer.add(x)
               if (keepAlive) x match {
                 case value: WsPingOrPong => wsHandlerRef ! value
                 case _                   =>
               }
               Future.successful(x)
-            }
           }
         }
       } yield clientMessage

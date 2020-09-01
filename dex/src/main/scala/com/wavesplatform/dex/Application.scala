@@ -2,9 +2,9 @@ package com.wavesplatform.dex
 
 import java.io.File
 import java.security.Security
-import java.util.concurrent.atomic.AtomicBoolean
 
-import akka.actor.ActorSystem
+import akka.Done
+import akka.actor.{ActorSystem, CoordinatedShutdown}
 import ch.qos.logback.classic.LoggerContext
 import com.typesafe.config._
 import com.wavesplatform.dex.actors.RootActorSystem
@@ -17,46 +17,28 @@ import kamon.influxdb.InfluxDBReporter
 import net.ceedubs.ficus.Ficus._
 import org.slf4j.LoggerFactory
 
-import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, ExecutionContext}
-import scala.util.{Failure, Success}
+import scala.concurrent.{ExecutionContext, Future}
 
 class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) extends ScorexLogging {
   app =>
 
   private implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
 
-  private val shutdownInProgress = new AtomicBoolean(false)
-  private val matcher: Matcher   = new Matcher(settings)
+  private val matcher: Matcher = new Matcher(settings)
   matcher.start()
 
-  // on unexpected shutdown
-  sys.addShutdownHook {
-    shutdown()
+  private val coordinatedShutdown = CoordinatedShutdown(actorSystem)
+  matcher.registerShutdownHooks(coordinatedShutdown)
+
+  coordinatedShutdown.addCancellableTask(CoordinatedShutdown.PhaseBeforeActorSystemTerminate, "Kamon") { () =>
+    Kamon.stopModules().map(_ => Done)
   }
 
-  def shutdown(): Unit =
-    if (shutdownInProgress.compareAndSet(false, true)) {
-      log.info("Shutting down initiated")
-
-      log.info("Shutting down reporters...")
-      val kamonShutdown = Kamon.stopModules().andThen {
-        case Success(_) => log.info("Reporters stopped")
-        case Failure(e) => log.error("Failed to stop reporters", e)
-      }
-
-      val task = matcher
-        .shutdown()
-        .zip(kamonShutdown)
-        .andThen {
-          case Success(_) => log.info("Shutdown complete")
-          case Failure(e) => log.error("Can't stop DEX correctly", e)
-        }
-
-      Await.ready(task, Duration.Inf)
-      val loggerContext = LoggerFactory.getILoggerFactory.asInstanceOf[LoggerContext]
-      loggerContext.stop()
-    }
+  coordinatedShutdown.addCancellableTask(CoordinatedShutdown.PhaseActorSystemTerminate, "Logger") { () =>
+    val loggerContext = LoggerFactory.getILoggerFactory.asInstanceOf[LoggerContext]
+    loggerContext.stop()
+    Future.successful(Done)
+  }
 }
 
 object Application {
@@ -113,10 +95,14 @@ object Application {
 
     val log = LoggerFacade(LoggerFactory getLogger getClass)
     log.info("Starting...")
-    sys.addShutdownHook { SystemInformationReporter.report(config) }
 
     RootActorSystem.start("wavesplatform", config) { implicit actorSystem =>
       log.info(s"${s"DEX v${Version.VersionString}"} Blockchain Id: ${settings.addressSchemeCharacter}")
+
+      CoordinatedShutdown(actorSystem).addCancellableJvmShutdownHook {
+        SystemInformationReporter.report(config)
+      }
+
       new Application(settings)
     }
   }

@@ -18,7 +18,7 @@ trait MatcherQueue {
     * @return -1 if topic is empty or even it doesn't exist
     */
   def lastEventOffset: Future[QueueEventWithMeta.Offset]
-  def close(timeout: FiniteDuration): Unit
+  def close(timeout: FiniteDuration): Future[Unit]
 }
 
 object MatcherQueue {

@@ -199,7 +199,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
   private val maybeApiKeyHash: Option[Array[Byte]] = Option(settings.restApi.apiKeyHash) filter (_.nonEmpty) map Base58.decode
 
   private lazy val httpApiRouteV0: MatcherApiRoute =
-    MatcherApiRoute(
+    new MatcherApiRoute(
       pairBuilder,
       matcherPublicKey,
       matcherActor,
@@ -233,13 +233,12 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
 
   private lazy val httpApiRouteV1 = MatcherApiRouteV1(pairBuilder, orderBookHttpInfo, () => status.get(), maybeApiKeyHash)
 
-  private lazy val wsApiRoute = MatcherWebSocketRoute(
+  private lazy val wsApiRoute = new MatcherWebSocketRoute(
     wsInternalBroadcast, // safe, wsApiRoute is used after initialization of wsInternalBroadcast
     addressActors,
     matcherActor,
     time,
     pairBuilder,
-    p => Option { orderBooks.get() } flatMap (_ get p),
     maybeApiKeyHash,
     settings.webSocketSettings,
     () => status.get()

@@ -13,17 +13,20 @@ import akka.stream.typed.scaladsl.{ActorSink, ActorSource}
 import akka.stream.{Materializer, OverflowStrategy}
 import akka.{Done, NotUsed}
 import cats.syntax.either._
+import com.wavesplatform.dex.api.http.SwaggerDocService
+import com.wavesplatform.dex.api.http.entities.{HttpWebSocketConnections, HttpWebSocketDropFilter, HttpWebSocketDropResult}
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
 import com.wavesplatform.dex.api.ws.actors.{WsExternalClientHandlerActor, WsInternalBroadcastActor, WsInternalClientHandlerActor}
 import com.wavesplatform.dex.api.ws.protocol._
 import com.wavesplatform.dex.api.ws.routes.MatcherWebSocketRoute.CloseHandler
-import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.error.{InvalidJson, MatcherIsStopping}
 import com.wavesplatform.dex.model.AssetPairBuilder
 import com.wavesplatform.dex.settings.WebSocketSettings
 import com.wavesplatform.dex.time.Time
 import com.wavesplatform.dex.{Matcher, error}
+import io.swagger.annotations._
+import javax.ws.rs.Path
 import play.api.libs.json.{Json, Reads}
 
 import scala.concurrent.duration.FiniteDuration
@@ -31,15 +34,16 @@ import scala.concurrent.{Future, Promise}
 import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success}
 
-case class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsInternalBroadcastActor.Command],
-                                 addressDirectory: ActorRef,
-                                 matcher: ActorRef,
-                                 time: Time,
-                                 assetPairBuilder: AssetPairBuilder,
-                                 orderBook: AssetPair => Option[Either[Unit, ActorRef]],
-                                 apiKeyHash: Option[Array[Byte]],
-                                 webSocketSettings: WebSocketSettings,
-                                 matcherStatus: () => Matcher.Status)(implicit mat: Materializer)
+@Path("/ws/v0")
+@Api()
+class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsInternalBroadcastActor.Command],
+                            addressDirectory: ActorRef,
+                            matcher: ActorRef,
+                            time: Time,
+                            assetPairBuilder: AssetPairBuilder,
+                            override val apiKeyHash: Option[Array[Byte]],
+                            webSocketSettings: WebSocketSettings,
+                            matcherStatus: () => Matcher.Status)(implicit mat: Materializer)
     extends ApiRoute
     with AuthRoute
     with ScorexLogging {
@@ -50,7 +54,48 @@ case class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsIntern
 
   override def route: Route = pathPrefix("ws" / "v0") {
     matcherStatusBarrier {
-      internalWsRoute ~ commonWsRoute
+      getWebSocketConnections ~ dropSocketConnections ~ internalWsRoute ~ commonWsRoute
+    }
+  }
+
+  @Path("/info")
+  @ApiOperation(
+    value = "Returns an information about current WebSocket connections",
+    httpMethod = "GET",
+    authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
+    tags = Array("ws"),
+    response = classOf[HttpWebSocketConnections]
+  )
+  def getWebSocketConnections: Route = (pathPrefix("info") & get & withAuth) {
+    complete {
+      HttpWebSocketConnections(0)
+    }
+  }
+
+  @Path("/drop")
+  @ApiOperation(
+    value = "Drops WebSocket connections by specified filter",
+    httpMethod = "POST",
+    authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
+    tags = Array("ws"),
+    response = classOf[HttpWebSocketDropResult]
+  )
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(
+        name = "body",
+        value = "Json with a drop filter",
+        required = true,
+        paramType = "body",
+        dataType = "com.wavesplatform.dex.api.http.entities.HttpWebSocketDropFilter"
+      )
+    )
+  )
+  def dropSocketConnections: Route = (pathPrefix("drop") & post & withAuth) {
+    entity(as[HttpWebSocketDropFilter]) { req =>
+      complete {
+        HttpWebSocketDropResult(0)
+      }
     }
   }
 

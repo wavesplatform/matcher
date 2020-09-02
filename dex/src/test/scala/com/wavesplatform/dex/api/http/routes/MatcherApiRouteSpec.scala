@@ -1265,7 +1265,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       )
 
     val route =
-      MatcherApiRoute(
+      new MatcherApiRoute(
         assetPairBuilder = new AssetPairBuilder(
           settings, {
             case `smartAsset` => liftValueAsync[BriefAssetDescription](smartAssetDesc)
@@ -1298,7 +1298,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         matcherSettings = settings,
         matcherStatus = () => Matcher.Status.Working,
         orderDb = odb,
-        time = time,
         currentOffset = () => 0L,
         lastOffset = () => Future.successful(0L),
         matcherAccountFee = 300000L,

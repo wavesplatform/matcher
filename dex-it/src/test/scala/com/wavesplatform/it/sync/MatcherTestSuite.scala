@@ -281,7 +281,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         placeAndAwaitAtDex(order7, Status.Filled)
 
         waitForOrderAtNode(order7)
-        // Bob tries to do the same operation, but at now he have no assets
+        // Bob tries to do the same operation, but at now he has no assets
         dex1.api.tryPlace(mkBobOrder) should failWith(3147270) // BalanceNotEnough
       }
 

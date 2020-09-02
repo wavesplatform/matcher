@@ -3,7 +3,10 @@ package com.wavesplatform.dex.grpc.integration.services
 import java.net.InetAddress
 import java.util.concurrent.ConcurrentHashMap
 
+import cats.instances.map._
+import cats.instances.set._
 import cats.syntax.either._
+import cats.syntax.monoid._
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.Address
 import com.wavesplatform.dex.grpc.integration._
@@ -11,21 +14,26 @@ import com.wavesplatform.dex.grpc.integration.protobuf.EitherVEExt
 import com.wavesplatform.dex.grpc.integration.protobuf.PbToWavesConversions._
 import com.wavesplatform.dex.grpc.integration.protobuf.WavesToPbConversions._
 import com.wavesplatform.dex.grpc.integration.smart.MatcherScriptRunner
+import com.wavesplatform.events.UtxEvent.{TxAdded, TxRemoved}
+import com.wavesplatform.events._
 import com.wavesplatform.extensions.{Context => ExtensionContext}
 import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.{ExecutionError, ValidationError}
-import com.wavesplatform.transaction.Asset
+import com.wavesplatform.state.Diff
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.smart.script.ScriptRunner
+import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.stub.{ServerCallStreamObserver, StreamObserver}
 import io.grpc.{Metadata, Status, StatusRuntimeException}
 import monix.eval.{Coeval, Task}
 import monix.execution.{CancelableFuture, Scheduler}
+import monix.reactive.Observable
 import shapeless.Coproduct
 
 import scala.concurrent.Future
@@ -40,41 +48,68 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
 
   private val allSpendableBalances = new ConcurrentHashMap[Address, Map[Asset, Long]]()
 
-  // A clean logic requires more actions, see DEX-606
   // TODO rename to balanceChangesSubscribers after release 2.1.2
   private val realTimeBalanceChangesSubscribers = ConcurrentHashMap.newKeySet[StreamObserver[BalanceChangesFlattenResponse]](2)
 
   private val cleanupTask: Task[Unit] = Task {
     log.info("Closing balance changes stream...")
+
     // https://github.com/grpc/grpc/blob/master/doc/statuscodes.md
-    val metadata = new Metadata()
-    metadata.put(descKey, "Shutting down")
+    val metadata      = new Metadata(); metadata.put(descKey, "Shutting down")
     val shutdownError = new StatusRuntimeException(Status.UNAVAILABLE, metadata) // Because it should try to connect to other DEX Extension
 
     realTimeBalanceChangesSubscribers.forEach { _.onError(shutdownError) }
     realTimeBalanceChangesSubscribers.clear()
   }
 
-  private val realTimeBalanceChanges: Coeval[CancelableFuture[Unit]] = Coeval.evalOnce {
-    context.spendableBalanceChanged
-      .map {
-        case (address, asset) =>
-          val newAssetBalance = spendableBalance(address, asset)
-          val addressBalance  = allSpendableBalances.getOrDefault(address, Map.empty)
-          val needUpdate      = !addressBalance.get(asset).contains(newAssetBalance)
+  private def getAddressesChangedAssets(transactionStateUpdates: Seq[StateUpdate]): Map[Address, Set[Asset]] = {
+    transactionStateUpdates.foldLeft(Map.empty[Address, Set[Asset]]) {
+      case (result, stateUpdate) => result |+| stateUpdate.balances.groupBy(_._1).view.mapValues(_.map(_._2).toSet).toMap
+    }
+  }
 
-          if (needUpdate) {
-            allSpendableBalances.put(address, addressBalance + (asset -> newAssetBalance))
-            Some(BalanceChangesFlattenResponse(address.toPB, asset.toPB, newAssetBalance))
-          } else Option.empty[BalanceChangesFlattenResponse]
+  private val txDiffs = new ConcurrentHashMap[Transaction, Diff]()
+
+  private val blockchainBalanceUpdates: Observable[Map[Address, Set[Asset]]] = context.blockchainUpdated.map {
+    case BlockAppended(_, _, _, _, _, transactionStateUpdates)   => getAddressesChangedAssets(transactionStateUpdates)
+    case MicroBlockAppended(_, _, _, _, transactionStateUpdates) => getAddressesChangedAssets(transactionStateUpdates)
+    case MicroBlockRollbackCompleted(toId, toHeight)             => Map.empty[Address, Set[Asset]]
+    case RollbackCompleted(toId, toHeight)                       => Map.empty[Address, Set[Asset]]
+  }
+
+  private val utxBalanceUpdates: Observable[Map[Address, Set[Asset]]] = context.utxEvents.map {
+    case TxAdded(tx, diff) =>
+      tx match {
+        case _: ExchangeTransaction => Map.empty[Address, Set[Asset]]
+        case otherTx                => txDiffs.putIfAbsent(otherTx, diff); diff.portfolios.view.mapValues(_.assetIds).toMap
       }
-      .collect { case Some(response) => response }
+    case TxRemoved(tx, _) => Option(txDiffs remove tx).map(_.portfolios.view.mapValues(_.assetIds).toMap).getOrElse(Map.empty)
+  }
+
+  private val realTimeBalanceChanges: Coeval[CancelableFuture[Unit]] = Coeval.evalOnce {
+    Observable(blockchainBalanceUpdates, utxBalanceUpdates).merge
+      .map {
+        _.flatMap {
+          case (address, assets) =>
+            val addressBalance = allSpendableBalances.getOrDefault(address, Map.empty)
+            assets.map { asset =>
+              val newAssetBalance = spendableBalance(address, asset)
+              val needUpdate      = !addressBalance.get(asset).contains(newAssetBalance)
+              if (needUpdate) {
+                allSpendableBalances.put(address, addressBalance + (asset -> newAssetBalance))
+                Some(BalanceChangesFlattenResponse(address.toPB, asset.toPB, newAssetBalance))
+              } else Option.empty[BalanceChangesFlattenResponse]
+            }
+        }.collect { case Some(response) => response }
+      }
       .doOnSubscriptionCancel(cleanupTask)
       .doOnComplete(cleanupTask)
-      .foreach { x =>
-        realTimeBalanceChangesSubscribers.forEach { subscriber =>
-          try subscriber.onNext(x)
-          catch { case e: Throwable => log.warn(s"Can't send balance changes to $subscriber", e) }
+      .foreach { batch =>
+        if (batch.nonEmpty) {
+          realTimeBalanceChangesSubscribers.forEach { subscriber =>
+            try batch.foreach(subscriber.onNext)
+            catch { case e: Throwable => log.warn(s"Can't send balance changes to $subscriber", e) }
+          }
         }
       }
   }

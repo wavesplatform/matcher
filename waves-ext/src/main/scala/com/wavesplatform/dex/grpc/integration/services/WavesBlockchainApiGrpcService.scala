@@ -40,7 +40,7 @@ import scala.concurrent.Future
 import scala.util.Try
 import scala.util.control.NonFatal
 
-class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Scheduler)
+class WavesBlockchainApiGrpcService(context: ExtensionContext, ignoredExchangeTxSenderPublicKey: Option[String])(implicit sc: Scheduler)
     extends WavesBlockchainApiGrpc.WavesBlockchainApi
     with ScorexLogging {
 
@@ -80,8 +80,9 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
   private val utxBalanceUpdates: Observable[Map[Address, Set[Asset]]] = context.utxEvents.map {
     case TxAdded(tx, diff) =>
       tx match {
-        case _: ExchangeTransaction => Map.empty[Address, Set[Asset]]
-        case otherTx                => txDiffs.putIfAbsent(otherTx, diff); diff.portfolios.view.mapValues(_.assetIds).toMap
+        case et: ExchangeTransaction if ignoredExchangeTxSenderPublicKey.contains(et.sender.toString) => Map.empty[Address, Set[Asset]]
+        case otherTx =>
+          txDiffs.putIfAbsent(otherTx, diff); diff.portfolios.view.mapValues(_.assetIds).toMap
       }
     case TxRemoved(tx, _) => Option(txDiffs remove tx).map(_.portfolios.view.mapValues(_.assetIds).toMap).getOrElse(Map.empty)
   }

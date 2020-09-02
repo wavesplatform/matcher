@@ -13,6 +13,7 @@ import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.NameMapper
 
 import scala.concurrent.Future
+import scala.util.Try
 
 class DEXExtension(context: ExtensionContext) extends Extension with ScorexLogging {
 
@@ -31,8 +32,12 @@ class DEXExtension(context: ExtensionContext) extends Extension with ScorexLoggi
     val host: String = context.settings.config.as[String]("waves.dex.grpc.integration.host")
     val port: Int    = context.settings.config.as[Int]("waves.dex.grpc.integration.port")
 
+    val ignoredExchangeTxSenderPublicKey: Option[String] = Try {
+      context.settings.config.as[String]("waves.utx.ignore-exchange-sender-pk-in-pessimistic-portfolio")
+    }.toOption
+
     val bindAddress = new InetSocketAddress(host, port)
-    apiService = new WavesBlockchainApiGrpcService(context)
+    apiService = new WavesBlockchainApiGrpcService(context, ignoredExchangeTxSenderPublicKey)
 
     server = NettyServerBuilder
       .forAddress(bindAddress)

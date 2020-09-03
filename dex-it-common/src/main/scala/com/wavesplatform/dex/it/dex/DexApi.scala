@@ -119,6 +119,9 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
 
   def trySettings: F[Either[MatcherError, HttpMatcherPublicSettings]]
 
+  def tryWsConnections: F[Either[MatcherError, HttpWebSocketConnections]]
+  def tryCloseWsConnections(oldestNumber: Int): F[Either[MatcherError, HttpMessage]]
+
   // TODO move
 
   def waitForOrder(order: Order)(pred: HttpOrderStatus => Boolean): F[HttpOrderStatus] = waitForOrder(order.assetPair, order.id())(pred)
@@ -138,6 +141,8 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
   def waitForTransactionsByOrder(id: Order.Id)(pred: List[ExchangeTransaction] => Boolean): F[List[ExchangeTransaction]]
 
   def waitForCurrentOffset(pred: Long => Boolean): F[HttpOffset]
+
+  def waitForWsConnections(pred: HttpWebSocketConnections => Boolean): F[HttpWebSocketConnections]
 }
 
 object DexApi {
@@ -170,22 +175,22 @@ object DexApi {
 
       def apiUri: String = {
         val savedHost = host
-        s"http://${savedHost.getAddress.getHostAddress}:${savedHost.getPort}/matcher"
+        s"http://${savedHost.getAddress.getHostAddress}:${savedHost.getPort}"
       }
 
-      override def tryPublicKey: F[Either[MatcherError, HttpMatcherPublicKey]] = tryParseJson(sttp.get(uri"$apiUri"))
+      override def tryPublicKey: F[Either[MatcherError, HttpMatcherPublicKey]] = tryParseJson(sttp.get(uri"$apiUri/matcher"))
 
       override def tryReservedBalance(of: KeyPair, timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, Map[Asset, Long]]] =
         tryParseJson {
           sttp
-            .get(uri"$apiUri/balance/reserved/${Base58.encode(of.publicKey)}")
+            .get(uri"$apiUri/matcher/balance/reserved/${Base58.encode(of.publicKey)}")
             .headers(timestampAndSignatureHeaders(of, timestamp))
         }
 
       override def tryReservedBalanceWithApiKey(of: KeyPair, xUserPublicKey: Option[PublicKey]): F[Either[MatcherError, Map[Asset, Long]]] =
         tryParseJson {
           sttp
-            .get(uri"$apiUri/balance/reserved/${Base58.encode(of.publicKey)}")
+            .get(uri"$apiUri/matcher/balance/reserved/${Base58.encode(of.publicKey)}")
             .headers(apiKeyWithUserPublicKeyHeaders(xUserPublicKey))
         }
 
@@ -194,26 +199,26 @@ object DexApi {
                                       timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, Map[Asset, Long]]] =
         tryParseJson {
           sttp
-            .get(uri"$apiUri/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/tradableBalance/${of.publicKey.toAddress.stringRepr}")
+            .get(uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/tradableBalance/${of.publicKey.toAddress.stringRepr}")
             .headers(timestampAndSignatureHeaders(of, timestamp))
         }
 
       override def tryPlace(order: Order): F[Either[MatcherError, HttpSuccessfulPlace]] = tryParseJson {
         sttp
-          .post(uri"$apiUri/orderbook")
+          .post(uri"$apiUri/matcher/orderbook")
           .readTimeout(3.minutes) // TODO find way to decrease timeout!
           .followRedirects(false) // TODO move ?
           .body(order)
       }
 
       override def tryPlaceMarket(order: Order): F[Either[MatcherError, HttpSuccessfulPlace]] =
-        tryParseJson(sttp.post(uri"$apiUri/orderbook/market").body(order))
+        tryParseJson(sttp.post(uri"$apiUri/matcher/orderbook/market").body(order))
 
       override def tryCancel(owner: KeyPair, assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, HttpSuccessfulSingleCancel]] =
         tryParseJson {
           val body = Json.stringify(Json.toJson(cancelRequest(owner, id.toString)))
           sttp
-            .post(uri"$apiUri/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/cancel")
+            .post(uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/cancel")
             .readTimeout(3.minutes) // TODO find way to decrease timeout!
             .followRedirects(false)
             .body(body)
@@ -224,7 +229,7 @@ object DexApi {
         tryParseJson {
           val body = Json.stringify(Json.toJson(batchCancelRequest(owner, timestamp)))
           sttp
-            .post(uri"$apiUri/orderbook/cancel")
+            .post(uri"$apiUri/matcher/orderbook/cancel")
             .body(body)
             .contentType("application/json", "UTF-8")
         }
@@ -234,7 +239,7 @@ object DexApi {
                                       timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, HttpSuccessfulBatchCancel]] = tryParseJson {
         val body = Json.stringify(Json.toJson(batchCancelRequest(owner, timestamp)))
         sttp
-          .post(uri"$apiUri/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/cancel")
+          .post(uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/cancel")
           .body(body)
           .contentType("application/json", "UTF-8")
       }
@@ -243,7 +248,7 @@ object DexApi {
                                                orderIds: Set[Order.Id],
                                                xUserPublicKey: Option[PublicKey]): F[Either[MatcherError, HttpSuccessfulBatchCancel]] = tryParseJson {
         sttp
-          .post(uri"$apiUri/orders/$owner/cancel")
+          .post(uri"$apiUri/matcher/orders/$owner/cancel")
           .headers(apiKeyWithUserPublicKeyHeaders(xUserPublicKey))
           .body(Json.stringify(Json.toJson(orderIds)))
           .contentType("application/json", "UTF-8")
@@ -252,7 +257,7 @@ object DexApi {
       override def tryCancelWithApiKey(id: Order.Id, xUserPublicKey: Option[PublicKey]): F[Either[MatcherError, HttpSuccessfulSingleCancel]] =
         tryParseJson {
           sttp
-            .post(uri"$apiUri/orders/cancel/${id.toString}")
+            .post(uri"$apiUri/matcher/orders/cancel/${id.toString}")
             .headers(apiKeyWithUserPublicKeyHeaders(xUserPublicKey))
             .contentType("application/json", "UTF-8")
         }
@@ -260,7 +265,7 @@ object DexApi {
       override def tryOrderStatus(assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, HttpOrderStatus]] = {
         tryParseJson {
           sttp
-            .get(uri"$apiUri/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/$id")
+            .get(uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/$id")
             .readTimeout(3.minutes) // TODO find way to decrease timeout!
             .followRedirects(false)
         }
@@ -271,7 +276,7 @@ object DexApi {
                                                     xUserPublicKey: Option[PublicKey]): F[Either[MatcherError, HttpOrderBookHistoryItem]] =
         tryParseJson {
           sttp
-            .get(uri"$apiUri/orders/$owner/${orderId.toString}")
+            .get(uri"$apiUri/matcher/orders/$owner/${orderId.toString}")
             .headers(apiKeyWithUserPublicKeyHeaders(xUserPublicKey))
         }
 
@@ -280,12 +285,12 @@ object DexApi {
                                                        timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, HttpOrderBookHistoryItem]] =
         tryParseJson {
           sttp
-            .get(uri"$apiUri/orderbook/${owner.publicKey}/${orderId.toString}")
+            .get(uri"$apiUri/matcher/orderbook/${owner.publicKey}/${orderId.toString}")
             .headers(timestampAndSignatureHeaders(owner, timestamp))
         }
 
       override def tryTransactionsByOrder(id: Order.Id): F[Either[MatcherError, List[ExchangeTransaction]]] =
-        tryParseJson(sttp.get(uri"$apiUri/transactions/$id"))
+        tryParseJson(sttp.get(uri"$apiUri/matcher/transactions/$id"))
 
       override def tryOrderHistory(owner: KeyPair,
                                    activeOnly: Option[Boolean] = None,
@@ -293,7 +298,7 @@ object DexApi {
                                    timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, List[HttpOrderBookHistoryItem]]] =
         tryParseJson {
           sttp
-            .get(appendFilters(uri"$apiUri/orderbook/${Base58.encode(owner.publicKey)}", activeOnly, closedOnly))
+            .get(appendFilters(uri"$apiUri/matcher/orderbook/${Base58.encode(owner.publicKey)}", activeOnly, closedOnly))
             .headers(timestampAndSignatureHeaders(owner, timestamp))
         }
 
@@ -303,7 +308,7 @@ object DexApi {
                                              xUserPublicKey: Option[PublicKey] = None): F[Either[MatcherError, List[HttpOrderBookHistoryItem]]] =
         tryParseJson {
           sttp
-            .get(appendFilters(uri"$apiUri/orders/${owner.stringRepr}", activeOnly, closedOnly))
+            .get(appendFilters(uri"$apiUri/matcher/orders/${owner.stringRepr}", activeOnly, closedOnly))
             .headers(apiKeyWithUserPublicKeyHeaders(xUserPublicKey))
         }
 
@@ -316,7 +321,7 @@ object DexApi {
           sttp
             .get(
               appendFilters(
-                uri"$apiUri/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/publicKey/${Base58.encode(owner.publicKey)}",
+                uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/publicKey/${Base58.encode(owner.publicKey)}",
                 activeOnly,
                 closedOnly
               )
@@ -324,36 +329,36 @@ object DexApi {
             .headers(timestampAndSignatureHeaders(owner, timestamp))
         }
 
-      override def tryAllOrderBooks: F[Either[MatcherError, HttpTradingMarkets]] = tryParseJson(sttp.get(uri"$apiUri/orderbook"))
+      override def tryAllOrderBooks: F[Either[MatcherError, HttpTradingMarkets]] = tryParseJson(sttp.get(uri"$apiUri/matcher/orderbook"))
 
       override def tryOrderBook(assetPair: AssetPair): F[Either[MatcherError, HttpV0OrderBook]] = tryParseJson {
         sttp
-          .get(uri"$apiUri/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}")
+          .get(uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}")
           .followRedirects(false)
       }
 
       override def tryOrderBook(assetPair: AssetPair, depth: Int): F[Either[MatcherError, HttpV0OrderBook]] = tryParseJson {
         sttp
-          .get(uri"$apiUri/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}?depth=$depth")
+          .get(uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}?depth=$depth")
           .followRedirects(true)
       }
 
       override def tryOrderBookInfo(assetPair: AssetPair): F[Either[MatcherError, HttpOrderBookInfo]] = tryParseJson {
         sttp
-          .get(uri"$apiUri/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/info")
+          .get(uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/info")
           .followRedirects(false)
       }
 
       override def tryOrderBookStatus(assetPair: AssetPair): F[Either[MatcherError, HttpMarketStatus]] = tryParseJson {
         sttp
-          .get(uri"$apiUri/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/status")
+          .get(uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/status")
           .followRedirects(false)
           .headers(apiKeyHeaders)
       }
 
       override def tryDeleteOrderBook(assetPair: AssetPair): F[Either[MatcherError, HttpMessage]] = tryParseJson {
         sttp
-          .delete(uri"$apiUri/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}")
+          .delete(uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}")
           .followRedirects(false)
           .headers(apiKeyHeaders)
       }
@@ -362,7 +367,7 @@ object DexApi {
       override def tryUpsertRate(asset: Asset, rate: Double): F[Either[MatcherError, (StatusCode, HttpMessage)]] = {
         val req =
           sttp
-            .put(uri"$apiUri/settings/rates/${asset.toString}")
+            .put(uri"$apiUri/matcher/settings/rates/${asset.toString}")
             .body(Json.stringify(Json.toJson(rate)))
             .contentType("application/json", "UTF-8")
             .headers(apiKeyHeaders)
@@ -377,40 +382,40 @@ object DexApi {
 
       override def tryDeleteRate(asset: Asset): F[Either[MatcherError, HttpMessage]] = tryParseJson {
         sttp
-          .delete(uri"$apiUri/settings/rates/${asset.toString}")
+          .delete(uri"$apiUri/matcher/settings/rates/${asset.toString}")
           .contentType("application/json", "UTF-8")
           .headers(apiKeyHeaders)
       }
 
       override def tryRates: F[Either[MatcherError, HttpRates]] =
-        tryParseJson[HttpRates](sttp.get(uri"$apiUri/settings/rates").headers(apiKeyHeaders))
+        tryParseJson[HttpRates](sttp.get(uri"$apiUri/matcher/settings/rates").headers(apiKeyHeaders))
 
       override def tryCurrentOffset: F[Either[MatcherError, HttpOffset]] = tryParse {
         sttp
-          .get(uri"$apiUri/debug/currentOffset")
+          .get(uri"$apiUri/matcher/debug/currentOffset")
           .headers(apiKeyHeaders)
           .response(asLong)
       }
 
       override def tryLastOffset: F[Either[MatcherError, HttpOffset]] = tryParse {
         sttp
-          .get(uri"$apiUri/debug/lastOffset")
+          .get(uri"$apiUri/matcher/debug/lastOffset")
           .headers(apiKeyHeaders)
           .response(asLong)
       }
 
       override def tryOldestSnapshotOffset: F[Either[MatcherError, HttpOffset]] = tryParse {
         sttp
-          .get(uri"$apiUri/debug/oldestSnapshotOffset")
+          .get(uri"$apiUri/matcher/debug/oldestSnapshotOffset")
           .headers(apiKeyHeaders)
           .response(asLong)
       }
 
       override def tryAllSnapshotOffsets: F[Either[MatcherError, HttpSnapshotOffsets]] =
-        tryParseJson(sttp.get(uri"$apiUri/debug/allSnapshotOffsets").headers(apiKeyHeaders))
+        tryParseJson(sttp.get(uri"$apiUri/matcher/debug/allSnapshotOffsets").headers(apiKeyHeaders))
 
       override def trySaveSnapshots: F[Either[MatcherError, Unit]] = tryUnit {
-        sttp.post(uri"$apiUri/debug/saveSnapshots").headers(apiKeyHeaders)
+        sttp.post(uri"$apiUri/matcher/debug/saveSnapshots").headers(apiKeyHeaders)
       }
 
       override def waitReady: F[Unit] = {
@@ -456,9 +461,29 @@ object DexApi {
           case Right(x) => pred(x)
         }.map(_.explicitGet())
 
+      override def waitForWsConnections(pred: HttpWebSocketConnections => Boolean): F[HttpWebSocketConnections] =
+        repeatUntil[Either[MatcherError, HttpWebSocketConnections]](tryWsConnections, RepeatRequestOptions(1.second, 120)) {
+          case Left(_)  => false
+          case Right(x) => pred(x)
+        }.map(_.explicitGet())
+
       override def trySettings: F[Either[MatcherError, HttpMatcherPublicSettings]] = tryParseJson {
         sttp
-          .get(uri"$apiUri/settings")
+          .get(uri"$apiUri/matcher/settings")
+          .headers(apiKeyHeaders)
+      }
+
+      override def tryWsConnections: F[Either[MatcherError, HttpWebSocketConnections]] = tryParseJson {
+        sttp
+          .get(uri"$apiUri/ws/v0/connections")
+          .headers(apiKeyHeaders)
+      }
+      
+      override def tryCloseWsConnections(oldestNumber: Int): F[Either[MatcherError, HttpMessage]] = tryParseJson {
+        sttp
+          .delete(uri"$apiUri/ws/v0/connections")
+          .body(Json.toJson(HttpWebSocketCloseFilter(oldestNumber)).toString())
+          .contentType("application/json", "UTF-8")
           .headers(apiKeyHeaders)
       }
 

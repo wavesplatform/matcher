@@ -97,8 +97,11 @@ object DexApiOps {
     def lastOffset: F[HttpOffset]                  = explicitGet(self.tryLastOffset)
     def oldestSnapshotOffset: F[HttpOffset]        = explicitGet(self.tryOldestSnapshotOffset)
     def allSnapshotOffsets: F[HttpSnapshotOffsets] = explicitGet(self.tryAllSnapshotOffsets)
-    def saveSnapshots: F[Unit]                    = explicitGet(self.trySaveSnapshots)
+    def saveSnapshots: F[Unit]                     = explicitGet(self.trySaveSnapshots)
 
     def settings: F[HttpMatcherPublicSettings] = explicitGet(self.trySettings)
+
+    def wsConnections: F[HttpWebSocketConnections]         = explicitGet(self.tryWsConnections)
+    def closeWsConnections(oldestNumber: Int): F[HttpMessage] = explicitGet(self.tryCloseWsConnections(oldestNumber))
   }
 }

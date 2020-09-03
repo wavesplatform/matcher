@@ -239,7 +239,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     time,
     pairBuilder,
     maybeApiKeyHash,
-    settings.webSocketSettings,
+    settings,
     () => status.get()
   )
 

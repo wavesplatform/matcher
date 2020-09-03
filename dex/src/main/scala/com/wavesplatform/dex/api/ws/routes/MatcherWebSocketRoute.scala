@@ -24,14 +24,14 @@ import com.wavesplatform.dex.api.ws.routes.MatcherWebSocketRoute.CloseHandler
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.error.{InvalidJson, MatcherIsStopping}
 import com.wavesplatform.dex.model.AssetPairBuilder
-import com.wavesplatform.dex.settings.WebSocketSettings
+import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.dex.time.Time
 import com.wavesplatform.dex.{Matcher, error}
 import io.swagger.annotations._
 import javax.ws.rs.Path
 import play.api.libs.json.{Json, Reads}
 
-import scala.concurrent.duration.{DurationInt, FiniteDuration}
+import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{Future, Promise}
 import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Random, Success}
@@ -44,7 +44,7 @@ class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsInternalBro
                             time: Time,
                             assetPairBuilder: AssetPairBuilder,
                             override val apiKeyHash: Option[Array[Byte]],
-                            webSocketSettings: WebSocketSettings,
+                            matcherSettings: MatcherSettings,
                             matcherStatus: () => Matcher.Status)(implicit mat: Materializer)
     extends ApiRoute
     with AuthRoute
@@ -53,7 +53,7 @@ class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsInternalBro
   import mat.executionContext
 
   private implicit val scheduler = mat.system.scheduler.toTyped
-  private implicit val timeout   = Timeout(5.seconds) // TODO
+  private implicit val timeout   = Timeout(matcherSettings.actorResponseTimeout)
 
   private val wsHandlers = ConcurrentHashMap.newKeySet[CloseHandler]()
 
@@ -62,7 +62,7 @@ class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsInternalBro
 
   override def route: Route = pathPrefix("ws" / "v0") {
     matcherStatusBarrier {
-      internalWsRoute ~ commonWsRoute ~ (pathPrefix("connections") & withAuth)(getConnections ~ closeConnections)
+      internalWsRoute ~ commonWsRoute ~ (pathPrefix("connections") & withAuth)(connectionsRoute ~ closeConnectionsRoute)
     }
   }
 
@@ -74,7 +74,7 @@ class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsInternalBro
     tags = Array("ws"),
     response = classOf[HttpWebSocketConnections]
   )
-  def getConnections: Route = get {
+  def connectionsRoute: Route = get {
     complete {
       externalClientDirectoryRef.ask(WsExternalClientDirectoryActor.Query.GetActiveNumber).map(HttpWebSocketConnections(_))
     }
@@ -99,7 +99,7 @@ class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsInternalBro
       )
     )
   )
-  def closeConnections: Route = delete {
+  def closeConnectionsRoute: Route = delete {
     entity(as[HttpWebSocketCloseFilter]) { req =>
       externalClientDirectoryRef ! WsExternalClientDirectoryActor.Command.CloseOldest(req.oldest)
       complete {
@@ -109,7 +109,7 @@ class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsInternalBro
   }
 
   private val commonWsRoute: Route = (pathEnd & get) {
-    import webSocketSettings.externalClientHandler
+    import matcherSettings.webSocketSettings.externalClientHandler
 
     val clientId = UUID.randomUUID().toString
 
@@ -147,7 +147,7 @@ class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsInternalBro
   }
 
   private val internalWsRoute: Route = (path("internal") & get) {
-    import webSocketSettings.internalClientHandler
+    import matcherSettings.webSocketSettings.internalClientHandler
 
     val clientId = UUID.randomUUID().toString
 

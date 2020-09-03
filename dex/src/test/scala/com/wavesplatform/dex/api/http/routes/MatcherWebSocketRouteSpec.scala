@@ -39,7 +39,7 @@ class MatcherWebSocketRouteSpec extends RouteSpec("/ws/v0") with MatcherSpecBase
       .copy(priceAssets = Seq(Waves))
 
   routePath("/connections") - {
-    "getConnections" - {
+    "connectionsRoute" - {
       "returns connections info" in test(
         { route =>
           Get(routePath("/connections")).withHeaders(apiKeyHeader) ~> route ~> check {
@@ -51,7 +51,7 @@ class MatcherWebSocketRouteSpec extends RouteSpec("/ws/v0") with MatcherSpecBase
       )
     }
 
-    "closeConnections" - {
+    "closeConnectionsRoute" - {
       "returns a closed connections info" in test(
         { route =>
           Delete(routePath("/connections"), HttpWebSocketCloseFilter(100)).withHeaders(apiKeyHeader) ~> route ~> check {
@@ -79,7 +79,7 @@ class MatcherWebSocketRouteSpec extends RouteSpec("/ws/v0") with MatcherSpecBase
           Set.empty
         ),
         apiKeyHash = Some(crypto secureHash apiKey),
-        webSocketSettings = settings.webSocketSettings,
+        matcherSettings = settings,
         matcherStatus = () => Matcher.Status.Working
       )
 

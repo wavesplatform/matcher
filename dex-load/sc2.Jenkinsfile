@@ -75,15 +75,18 @@ pipeline {
     }
     post {
         always {
-                sshagent (credentials: ['buildagent-matcher']) {
-                     script {
-                        OVERLOAD = sh(script:"ssh -q buildagent-matcher@${LOADGEN} ls /home/yatank/loadtest/logs/lunapark", returnStdout: true)
-                        GRAFANA = sh( script: '''
-                                                echo "https://${GRAFANA_URL}/d/WsyjIiHiz/system-metrics?orgId=5&var-hostname=${MATCHER_URL}&from=$(date -d '- 20 minutes' +'%s')000&to=$(date -d '+ 5 minutes' +'%s')000"
-                                              ''', returnStdout: true)
-                        currentBuild.description = "<a href='https://overload.yandex.net/${OVERLOAD}'>Yandex</a> <br/> <a href='${GRAFANA}'>Grafana</a>"
-                     }
+            sshagent (credentials: ['buildagent-matcher']) {
+                script {
+                    OVERLOAD = sh(script:"ssh -q buildagent-matcher@${LOADGEN} ls /home/yatank/loadtest/logs/lunapark", returnStdout: true)
+                    GRAFANA = sh( script: '''
+                                            echo "https://${GRAFANA_URL}/d/WsyjIiHiz/system-metrics?orgId=5&var-hostname=${MATCHER_URL}&from=$(date -d '- 20 minutes' +'%s')000&to=$(date -d '+ 5 minutes' +'%s')000"
+                                          ''', returnStdout: true)
+                    currentBuild.description = "<a href='https://overload.yandex.net/${OVERLOAD}'>Yandex</a> <br/> <a href='${GRAFANA}'>Grafana</a>"
                 }
+                cleanup {
+                    cleanWs()
+                }
+            }
         }
     }
 }

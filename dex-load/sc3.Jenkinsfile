@@ -69,7 +69,6 @@ pipeline {
                                     echo "https://${GRAFANA_URL}/d/WsyjIiHiz/system-metrics?orgId=5&var-hostname=${MATCHER_URL}&from=$(date -d '- 20 minutes' +'%s')000&to=$(date -d '+ 5 minutes' +'%s')000"
                                     ''', returnStdout: true)
                 currentBuild.description = "<a href='${GRAFANA}'>Grafana</a>"
-                }
             }
             cleanup {
                 cleanWs()

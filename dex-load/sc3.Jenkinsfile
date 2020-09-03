@@ -44,7 +44,7 @@ pipeline {
                     sh "scp buildagent-matcher@${LOADGEN}:/home/buildagent-matcher/key.txt ./dex-load"
                     sh "scp buildagent-matcher@${LOADGEN}:/home/buildagent-matcher/pairs.txt ./dex-load"
                 }
-                sh 'sbt "project dex-load" generateFeeder'
+                sh 'sbt "dex-load/generateFeeder"'
             }
         }
         stage("Web Socket") {

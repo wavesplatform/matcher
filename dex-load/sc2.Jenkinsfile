@@ -7,11 +7,11 @@ pipeline {
     }
     parameters {
         string(name: 'SBT_THREAD_NUMBER', defaultValue: '6', description: '')
-        string(name: 'SEED', defaultValue: 'test-seed', description: '')
-        string(name: 'AN', defaultValue: '60', description: '')
-        string(name: 'RC', defaultValue: '10000', description: '')
-        string(name: 'RT', defaultValue: '6', description: '')
-        string(name: 'AS', defaultValue: 'D', description: '')
+        string(name: 'SEED', defaultValue: 'test-seed', description: 'Seed prefix of generated accounts')
+        string(name: 'AN', defaultValue: '60', description: 'Count of generated accounts')
+        string(name: 'RC', defaultValue: '10000', description: 'Count of requests')
+        string(name: 'RT', defaultValue: '6', description: 'Generation type')
+        string(name: 'AS', defaultValue: 'D', description: 'Chain ID')
     }
     environment {
         SBT_HOME = tool name: 'sbt-1.2.6', type: 'org.jvnet.hudson.plugins.SbtPluginBuilder$SbtInstallation'
@@ -58,17 +58,9 @@ pipeline {
                         sleep time: 1, unit: 'MINUTES'
                         sshagent (credentials: ['buildagent-matcher']) {
                              sh "ssh -o StrictHostKeyChecking=no -l buildagent-matcher ${LOADGEN} hostname"
-
                              sh "scp ./dex-load/requests-*.txt buildagent-matcher@${LOADGEN}:/home/buildagent-matcher"
                              sh "scp ./dex-load/src/main/resources/runLoadTest.sh buildagent-matcher@${LOADGEN}:/home/buildagent-matcher"
                              sh "ssh -q buildagent-matcher@${LOADGEN} sudo sh runLoadTest.sh"
-                             script {
-                                OVERLOAD = sh(script:"ssh -q buildagent-matcher@${LOADGEN} ls /home/yatank/loadtest/logs/lunapark", returnStdout: true)
-                                GRAFANA = sh( script: '''
-                                                        echo "https://${GRAFANA_URL}/d/WsyjIiHiz/system-metrics?orgId=5&var-hostname=${MATCHER_URL}&from=$(date -d '- 20 minutes' +'%s')000&to=$(date -d '+ 5 minutes' +'%s')000"
-                                                      ''', returnStdout: true)
-                                currentBuild.description = "<a href='https://overload.yandex.net/${OVERLOAD}'>Yandex</a> <br/> <a href='${GRAFANA}'>Grafana</a>"
-                             }
                         }
                     }
                  }
@@ -79,6 +71,19 @@ pipeline {
                     }
                  }
             }
+        }
+    }
+    post {
+        always {
+                sshagent (credentials: ['buildagent-matcher']) {
+                     script {
+                        OVERLOAD = sh(script:"ssh -q buildagent-matcher@${LOADGEN} ls /home/yatank/loadtest/logs/lunapark", returnStdout: true)
+                        GRAFANA = sh( script: '''
+                                                echo "https://${GRAFANA_URL}/d/WsyjIiHiz/system-metrics?orgId=5&var-hostname=${MATCHER_URL}&from=$(date -d '- 20 minutes' +'%s')000&to=$(date -d '+ 5 minutes' +'%s')000"
+                                              ''', returnStdout: true)
+                        currentBuild.description = "<a href='https://overload.yandex.net/${OVERLOAD}'>Yandex</a> <br/> <a href='${GRAFANA}'>Grafana</a>"
+                     }
+                }
         }
     }
 }

@@ -67,6 +67,7 @@ case object MatcherIsStopping     extends MatcherError(commonEntity, commonEntit
 case object RequestTimeout        extends MatcherError(request, commonEntity, stopping, e"Request timed out. Please retry later")
 case object FeatureNotImplemented extends MatcherError(commonEntity, feature, unsupported, e"This feature is not implemented")
 case object FeatureDisabled       extends MatcherError(commonEntity, feature, disabled, e"This feature is disabled, contact with the administrator")
+case object Balancing             extends MatcherError(webSocket, commonEntity, optimization, e"System is balancing the load. Please reconnect")
 
 case class OrderBookBroken(theAssetPair: AssetPair)
     extends MatcherError(orderBook,
@@ -589,4 +590,5 @@ object Class {
   object outOfBound   extends Class(15)
   object disabled     extends Class(16)
   object notProvided  extends Class(17)
+  object optimization extends Class(18)
 }

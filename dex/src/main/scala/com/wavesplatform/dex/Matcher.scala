@@ -214,7 +214,6 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       settings,
       () => status.get(),
       orderDB,
-      time,
       () => lastProcessedOffset,
       () => matcherQueue.lastEventOffset,
       ExchangeTransactionCreator.getAdditionalFeeForScript(hasMatcherAccountScript),

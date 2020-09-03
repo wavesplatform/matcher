@@ -3,6 +3,7 @@ package com.wavesplatform.dex.api.ws.routes
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
+import akka.actor.typed.scaladsl.AskPattern._
 import akka.actor.typed.scaladsl.adapter._
 import akka.actor.{ActorRef, typed}
 import akka.http.scaladsl.model.StatusCodes
@@ -11,12 +12,13 @@ import akka.http.scaladsl.server.{Directive0, Route}
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.stream.typed.scaladsl.{ActorSink, ActorSource}
 import akka.stream.{Materializer, OverflowStrategy}
+import akka.util.Timeout
 import akka.{Done, NotUsed}
 import cats.syntax.either._
 import com.wavesplatform.dex.api.http.SwaggerDocService
-import com.wavesplatform.dex.api.http.entities.{HttpWebSocketConnections, HttpWebSocketDropFilter, HttpWebSocketDropResult}
+import com.wavesplatform.dex.api.http.entities.{HttpMessage, HttpWebSocketCloseFilter, HttpWebSocketConnections}
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
-import com.wavesplatform.dex.api.ws.actors.{WsExternalClientHandlerActor, WsInternalBroadcastActor, WsInternalClientHandlerActor}
+import com.wavesplatform.dex.api.ws.actors.{WsExternalClientDirectoryActor, WsExternalClientHandlerActor, WsInternalBroadcastActor, WsInternalClientHandlerActor}
 import com.wavesplatform.dex.api.ws.protocol._
 import com.wavesplatform.dex.api.ws.routes.MatcherWebSocketRoute.CloseHandler
 import com.wavesplatform.dex.domain.utils.ScorexLogging
@@ -29,10 +31,10 @@ import io.swagger.annotations._
 import javax.ws.rs.Path
 import play.api.libs.json.{Json, Reads}
 
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.concurrent.{Future, Promise}
 import scala.jdk.CollectionConverters._
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Random, Success}
 
 @Path("/ws/v0")
 @Api()
@@ -50,15 +52,21 @@ class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsInternalBro
 
   import mat.executionContext
 
+  private implicit val scheduler = mat.system.scheduler.toTyped
+  private implicit val timeout   = Timeout(5.seconds) // TODO
+
   private val wsHandlers = ConcurrentHashMap.newKeySet[CloseHandler]()
+
+  // Random to make this actor unique in tests
+  private val externalClientDirectoryRef = mat.system.spawn(WsExternalClientDirectoryActor(), s"ws-external-cd-${Random.nextInt(Int.MaxValue)}")
 
   override def route: Route = pathPrefix("ws" / "v0") {
     matcherStatusBarrier {
-      getWebSocketConnections ~ dropSocketConnections ~ internalWsRoute ~ commonWsRoute
+      internalWsRoute ~ commonWsRoute ~ (pathPrefix("connections") & withAuth)(getConnections ~ closeConnections)
     }
   }
 
-  @Path("/info")
+  @Path("/connections")
   @ApiOperation(
     value = "Returns an information about current WebSocket connections",
     httpMethod = "GET",
@@ -66,19 +74,19 @@ class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsInternalBro
     tags = Array("ws"),
     response = classOf[HttpWebSocketConnections]
   )
-  def getWebSocketConnections: Route = (pathPrefix("info") & get & withAuth) {
+  def getConnections: Route = get {
     complete {
-      HttpWebSocketConnections(0)
+      externalClientDirectoryRef.ask(WsExternalClientDirectoryActor.Query.GetActiveNumber).map(HttpWebSocketConnections(_))
     }
   }
 
-  @Path("/drop")
+  @Path("/connections")
   @ApiOperation(
-    value = "Drops WebSocket connections by specified filter",
-    httpMethod = "POST",
+    value = "Closes WebSocket connections by specified filter",
+    httpMethod = "DELETE",
     authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
     tags = Array("ws"),
-    response = classOf[HttpWebSocketDropResult]
+    response = classOf[HttpMessage]
   )
   @ApiImplicitParams(
     Array(
@@ -87,14 +95,15 @@ class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsInternalBro
         value = "Json with a drop filter",
         required = true,
         paramType = "body",
-        dataType = "com.wavesplatform.dex.api.http.entities.HttpWebSocketDropFilter"
+        dataType = "com.wavesplatform.dex.api.http.entities.HttpWebSocketCloseFilter"
       )
     )
   )
-  def dropSocketConnections: Route = (pathPrefix("drop") & post & withAuth) {
-    entity(as[HttpWebSocketDropFilter]) { req =>
+  def closeConnections: Route = delete {
+    entity(as[HttpWebSocketCloseFilter]) { req =>
+      externalClientDirectoryRef ! WsExternalClientDirectoryActor.Command.CloseOldest(req.oldest)
       complete {
-        HttpWebSocketDropResult(0)
+        HttpMessage("In progress")
       }
     }
   }
@@ -115,6 +124,7 @@ class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsInternalBro
 
     val closeHandler = new CloseHandler(() => webSocketHandlerRef ! WsExternalClientHandlerActor.Command.CloseConnection(MatcherIsStopping))
     wsHandlers.add(closeHandler)
+    externalClientDirectoryRef ! WsExternalClientDirectoryActor.Command.Subscribe(webSocketHandlerRef)
 
     val server: Sink[WsExternalClientHandlerActor.Message, NotUsed] =
       ActorSink

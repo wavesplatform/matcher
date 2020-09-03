@@ -42,7 +42,6 @@ import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.settings.{MatcherSettings, OrderFeeSettings}
-import com.wavesplatform.dex.time.Time
 import io.swagger.annotations._
 import javax.ws.rs.Path
 import kamon.Kamon

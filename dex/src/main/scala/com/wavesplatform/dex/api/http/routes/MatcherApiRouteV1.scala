@@ -6,6 +6,7 @@ import akka.http.scaladsl.server.directives.FutureDirectives
 import akka.http.scaladsl.server.{Directive1, Route}
 import com.wavesplatform.dex.Matcher
 import com.wavesplatform.dex.api.http.entities.{HttpV1OrderBook, InfoNotFound}
+import com.wavesplatform.dex.api.http.headers.MatcherHttpServer
 import com.wavesplatform.dex.api.http.{HasStatusBarrier, OrderBookHttpInfo}
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute, PathMatchers}
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -17,7 +18,8 @@ import javax.ws.rs.Path
 
 @Path("/api/v1")
 @Api(value = "/api v1/")
-case class MatcherApiRouteV1(assetPairBuilder: AssetPairBuilder,
+case class MatcherApiRouteV1(matcherId: String,
+                             assetPairBuilder: AssetPairBuilder,
                              orderBookHttpInfo: OrderBookHttpInfo,
                              matcherStatus: () => Matcher.Status,
                              apiKeyHash: Option[Array[Byte]])(implicit val errorContext: ErrorFormatterContext)
@@ -29,8 +31,10 @@ case class MatcherApiRouteV1(assetPairBuilder: AssetPairBuilder,
   import PathMatchers._
 
   override lazy val route: Route = pathPrefix("api" / "v1") {
-    matcherStatusBarrier {
-      getOrderBook
+    respondWithDefaultHeader(MatcherHttpServer(matcherId)) {
+      matcherStatusBarrier {
+        getOrderBook
+      }
     }
   }
 

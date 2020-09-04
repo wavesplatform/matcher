@@ -76,6 +76,7 @@ class BaseSettingsSpecification extends AnyFlatSpec {
       s"""waves {
          |  directory = /waves
          |  dex {
+         |    id = "matcher-1"
          |    account-storage {
          |      type = "in-mem"
          |      in-mem.seed-in-base64 = "c3lrYWJsZXlhdA=="

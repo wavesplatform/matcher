@@ -5,12 +5,13 @@ import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.server.Route
+import cats.syntax.option._
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.api.RouteSpec
 import com.wavesplatform.dex.api.http.ApiMarshallers._
 import com.wavesplatform.dex.api.http.entities._
-import com.wavesplatform.dex.api.http.headers.`X-Api-Key`
+import com.wavesplatform.dex.api.http.headers.{MatcherHttpServer, `X-Api-Key`}
 import com.wavesplatform.dex.api.ws.actors.WsInternalBroadcastActor
 import com.wavesplatform.dex.api.ws.routes.MatcherWebSocketRoute
 import com.wavesplatform.dex.domain.asset.Asset.Waves
@@ -36,7 +37,7 @@ class MatcherWebSocketRouteSpec extends RouteSpec("/ws/v0") with MatcherSpecBase
   private val settings =
     MatcherSettings.valueReader
       .read(ConfigFactory.load(), "waves.dex")
-      .copy(priceAssets = Seq(Waves))
+      .copy(id = "iddqd", priceAssets = Seq(Waves))
 
   routePath("/connections") - {
     "connectionsRoute" - {
@@ -44,6 +45,7 @@ class MatcherWebSocketRouteSpec extends RouteSpec("/ws/v0") with MatcherSpecBase
         { route =>
           Get(routePath("/connections")).withHeaders(apiKeyHeader) ~> route ~> check {
             status shouldEqual StatusCodes.OK
+            hasExpectedBackendHeader()
             responseAs[HttpWebSocketConnections] should matchTo(HttpWebSocketConnections(0))
           }
         },
@@ -56,6 +58,7 @@ class MatcherWebSocketRouteSpec extends RouteSpec("/ws/v0") with MatcherSpecBase
         { route =>
           Delete(routePath("/connections"), HttpWebSocketCloseFilter(100)).withHeaders(apiKeyHeader) ~> route ~> check {
             status shouldEqual StatusCodes.OK
+            hasExpectedBackendHeader()
             responseAs[HttpMessage] should matchTo(HttpMessage("In progress"))
           }
         },
@@ -85,4 +88,6 @@ class MatcherWebSocketRouteSpec extends RouteSpec("/ws/v0") with MatcherSpecBase
 
     f(route.route)
   }
+
+  def hasExpectedBackendHeader(): Unit = header[MatcherHttpServer].map(_.value) shouldBe settings.id.some
 }

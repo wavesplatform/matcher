@@ -3,6 +3,7 @@ package com.wavesplatform.dex.api.http.routes
 import akka.actor.ActorRef
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.server
 import akka.http.scaladsl.server._
 import akka.http.scaladsl.server.directives.FutureDirectives
@@ -18,7 +19,7 @@ import com.wavesplatform.dex.actors.address.AddressActor.OrderListType
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.api.http._
 import com.wavesplatform.dex.api.http.entities._
-import com.wavesplatform.dex.api.http.headers.`X-User-Public-Key`
+import com.wavesplatform.dex.api.http.headers.{MatcherHttpServer, `X-User-Public-Key`}
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
 import com.wavesplatform.dex.caches.RateCache
@@ -134,7 +135,9 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   }
 
   override lazy val route: Route = pathPrefix("matcher") {
-    getMatcherPublicKey ~ settingsRoutes ~ debugRoutes ~ orderBookRoutes ~ ordersRoutes ~ balanceRoutes ~ transactionsRoutes
+    respondWithDefaultHeader(MatcherHttpServer(matcherSettings.id)) {
+      getMatcherPublicKey ~ settingsRoutes ~ debugRoutes ~ orderBookRoutes ~ ordersRoutes ~ balanceRoutes ~ transactionsRoutes
+    }
   }
 
   private def unavailableOrderBookBarrier(p: AssetPair): Directive0 = orderBook(p) match {

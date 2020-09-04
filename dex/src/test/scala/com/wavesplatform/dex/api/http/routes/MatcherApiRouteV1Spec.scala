@@ -15,6 +15,7 @@ import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor
 import com.wavesplatform.dex.api.RouteSpec
 import com.wavesplatform.dex.api.http.ApiMarshallers._
 import com.wavesplatform.dex.api.http.entities.{HttpOrderBook, HttpV1LevelAgg, HttpV1OrderBook}
+import com.wavesplatform.dex.api.http.headers.MatcherHttpServer
 import com.wavesplatform.dex.api.http.{OrderBookHttpInfo, entities}
 import com.wavesplatform.dex.db.WithDB
 import com.wavesplatform.dex.domain.asset.Asset.Waves
@@ -31,7 +32,7 @@ import scala.concurrent.duration.DurationInt
 
 class MatcherApiRouteV1Spec extends RouteSpec("/api/v1") with MatcherSpecBase with PathMockFactory with Eventually with WithDB {
 
-  private val settings = MatcherSettings.valueReader.read(ConfigFactory.load(), "waves.dex").copy(priceAssets = Seq(usd, Waves))
+  private val settings = MatcherSettings.valueReader.read(ConfigFactory.load(), "waves.dex").copy(id = "iddqd", priceAssets = Seq(usd, Waves))
 
   private implicit val efc: ErrorFormatterContext = {
     case `usd` => 2.some
@@ -98,6 +99,7 @@ class MatcherApiRouteV1Spec extends RouteSpec("/api/v1") with MatcherSpecBase wi
 
     val route =
       MatcherApiRouteV1(
+        matcherId = settings.id,
         assetPairBuilder = new AssetPairBuilder(
           settings, {
             case `usd` => liftValueAsync(BriefAssetDescription("USD", 8, hasScript = false))
@@ -119,6 +121,7 @@ class MatcherApiRouteV1Spec extends RouteSpec("/api/v1") with MatcherSpecBase wi
       { route =>
         Get(routePath(s"/orderbook/WAVES/${usd.id}")) ~> route ~> check {
           status shouldEqual StatusCodes.OK
+          hasExpectedBackendHeader()
           responseAs[HttpV1OrderBook] should matchTo(
             entities.HttpV1OrderBook(
               timestamp = 0L,
@@ -130,4 +133,6 @@ class MatcherApiRouteV1Spec extends RouteSpec("/api/v1") with MatcherSpecBase wi
       }
     )
   }
+
+  def hasExpectedBackendHeader(): Unit = header[MatcherHttpServer].map(_.value) shouldBe settings.id.some
 }

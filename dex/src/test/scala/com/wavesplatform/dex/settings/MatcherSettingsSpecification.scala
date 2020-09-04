@@ -29,6 +29,7 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
     val config   = configWithSettings()
     val settings = config.as[MatcherSettings]("waves.dex")
 
+    settings.id should be("matcher-1")
     settings.accountStorage should be(AccountStorage.Settings.InMem(ByteStr.decodeBase64("c3lrYWJsZXlhdA==").get))
     settings.restApi shouldBe RestAPISettings(
       address = "127.1.2.3",

@@ -230,7 +230,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       () => orderFeeSettingsCache.getSettingsForOffset(lastProcessedOffset + 1)
     )
 
-  private lazy val httpApiRouteV1 = MatcherApiRouteV1(pairBuilder, orderBookHttpInfo, () => status.get(), maybeApiKeyHash)
+  private lazy val httpApiRouteV1 = MatcherApiRouteV1(settings.id, pairBuilder, orderBookHttpInfo, () => status.get(), maybeApiKeyHash)
 
   private lazy val wsApiRoute = new MatcherWebSocketRoute(
     wsInternalBroadcast, // safe, wsApiRoute is used after initialization of wsInternalBroadcast

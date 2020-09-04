@@ -17,6 +17,7 @@ import akka.{Done, NotUsed}
 import cats.syntax.either._
 import com.wavesplatform.dex.api.http.SwaggerDocService
 import com.wavesplatform.dex.api.http.entities.{HttpMessage, HttpWebSocketCloseFilter, HttpWebSocketConnections}
+import com.wavesplatform.dex.api.http.headers.MatcherHttpServer
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
 import com.wavesplatform.dex.api.ws.actors.{WsExternalClientDirectoryActor, WsExternalClientHandlerActor, WsInternalBroadcastActor, WsInternalClientHandlerActor}
 import com.wavesplatform.dex.api.ws.protocol._
@@ -61,8 +62,10 @@ class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsInternalBro
   private val externalClientDirectoryRef = mat.system.spawn(WsExternalClientDirectoryActor(), s"ws-external-cd-${Random.nextInt(Int.MaxValue)}")
 
   override def route: Route = pathPrefix("ws" / "v0") {
-    matcherStatusBarrier {
-      internalWsRoute ~ commonWsRoute ~ (pathPrefix("connections") & withAuth)(connectionsRoute ~ closeConnectionsRoute)
+    respondWithDefaultHeader(MatcherHttpServer(matcherSettings.id)) {
+      matcherStatusBarrier {
+        internalWsRoute ~ commonWsRoute ~ (pathPrefix("connections") & withAuth) (connectionsRoute ~ closeConnectionsRoute)
+      }
     }
   }
 

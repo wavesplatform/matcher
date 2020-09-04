@@ -25,7 +25,7 @@ import com.wavesplatform.dex.actors.tx.WriteExchangeTransactionActor
 import com.wavesplatform.dex.api.RouteSpec
 import com.wavesplatform.dex.api.http.ApiMarshallers._
 import com.wavesplatform.dex.api.http.entities._
-import com.wavesplatform.dex.api.http.headers.{MatcherHttpServer, `X-Api-Key`}
+import com.wavesplatform.dex.api.http.headers.`X-Api-Key`
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
 import com.wavesplatform.dex.api.http.{OrderBookHttpInfo, entities}
 import com.wavesplatform.dex.caches.RateCache
@@ -118,7 +118,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     MatcherSettings.valueReader
       .read(ConfigFactory.load(), "waves.dex")
       .copy(
-        id = "iddqd",
         priceAssets = Seq(badOrder.assetPair.priceAsset, okOrder.assetPair.priceAsset, priceAsset, Waves),
         orderRestrictions = Map(smartWavesPair -> orderRestrictions)
       )
@@ -149,7 +148,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     "returns a public key" in test { route =>
       Get(routePath("/")) ~> route ~> check {
         status shouldEqual StatusCodes.OK
-        hasExpectedBackendHeader()
         responseAs[HttpMatcherPublicKey] should matchTo(PublicKey.fromBase58String("J6ghck2hA2GNJTHGSLSeuCjKuLDGz8i83NfCMFVoWhvf").explicitGet())
       }
     }
@@ -160,7 +158,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     "returns an order book information" in test { route =>
       Get(routePath(s"/orderbook/$smartAssetId/WAVES/info")) ~> route ~> check {
         status shouldEqual StatusCodes.OK
-        hasExpectedBackendHeader()
         responseAs[HttpOrderBookInfo] should matchTo(
           HttpOrderBookInfo(
             restrictions = Some(HttpOrderRestrictions.fromSettings(orderRestrictions)),
@@ -176,7 +173,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     "returns matcher's settings" in test { route =>
       Get(routePath("/settings")) ~> route ~> check {
         status shouldEqual StatusCodes.OK
-        hasExpectedBackendHeader()
         responseAs[HttpMatcherPublicSettings] should matchTo(
           HttpMatcherPublicSettings(
             matcherPublicKey = matcherKeyPair.publicKey,
@@ -199,7 +195,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     "returns available rates for fee" in test { route =>
       Get(routePath("/settings/rates")) ~> route ~> check {
         status shouldEqual StatusCodes.OK
-        hasExpectedBackendHeader()
         responseAs[HttpRates] should matchTo(Map[Asset, Double](Waves -> 1.0))
       }
     }
@@ -211,7 +206,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       { route =>
         Get(routePath("/debug/currentOffset")).withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          hasExpectedBackendHeader()
           responseAs[HttpOffset] should matchTo(0L)
         }
       },
@@ -225,7 +219,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       { route =>
         Get(routePath("/debug/lastOffset")).withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          hasExpectedBackendHeader()
           responseAs[HttpOffset] should matchTo(0L)
         }
       },
@@ -239,7 +232,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       { route =>
         Get(routePath("/debug/oldestSnapshotOffset")).withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          hasExpectedBackendHeader()
           responseAs[HttpOffset] should matchTo(100L)
         }
       },
@@ -253,7 +245,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       { route =>
         Get(routePath("/debug/allSnapshotOffsets")).withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          hasExpectedBackendHeader()
           responseAs[HttpSnapshotOffsets] should matchTo(
             Map(
               AssetPair(Waves, priceAsset) -> 100L,
@@ -271,8 +262,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     "returns that all is fine" in test(
       { route =>
         Post(routePath("/debug/saveSnapshots")).withHeaders(apiKeyHeader) ~> route ~> check {
-          status shouldEqual StatusCodes.OK
-          hasExpectedBackendHeader()
           responseAs[HttpMessage] should matchTo(HttpMessage("Saving started"))
         }
       },
@@ -286,7 +275,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       { route =>
         Get(routePath(s"/orderbook/$smartAssetId/WAVES")) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          hasExpectedBackendHeader()
           responseAs[HttpV0OrderBook] should matchTo(
             HttpV0OrderBook(
               timestamp = 0L,
@@ -306,7 +294,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       { route =>
         Get(routePath(s"/orderbook/$smartAssetId/WAVES/status")) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          hasExpectedBackendHeader()
           responseAs[HttpMarketStatus] should matchTo(HttpMarketStatus fromMarketStatus smartWavesMarketStatus)
         }
       }
@@ -319,7 +306,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       { route =>
         Post(routePath("/orderbook"), Json.toJson(okOrder)) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          hasExpectedBackendHeader()
           responseAs[HttpSuccessfulPlace] should matchTo(HttpSuccessfulPlace(okOrder))
         }
       }
@@ -349,7 +335,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       { route =>
         Post(routePath("/orderbook/market"), Json.toJson(okOrder)) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          hasExpectedBackendHeader()
           responseAs[HttpSuccessfulPlace] should matchTo(HttpSuccessfulPlace(okOrder))
         }
       }
@@ -387,7 +372,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
             RawHeader("Signature", s"$signature")
           ) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          hasExpectedBackendHeader()
           responseAs[List[HttpOrderBookHistoryItem]] should matchTo(List(historyItem))
         }
       }
@@ -406,7 +390,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
             RawHeader("Signature", s"$signature")
           ) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          hasExpectedBackendHeader()
           responseAs[List[HttpOrderBookHistoryItem]] should matchTo(List(historyItem))
         }
       }
@@ -419,7 +402,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       { route =>
         Get(routePath(s"/orders/${okOrder.senderPublicKey.toAddress}")).withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          hasExpectedBackendHeader()
           responseAs[List[HttpOrderBookHistoryItem]] should matchTo(List(historyItem))
         }
       },
@@ -434,7 +416,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       { route =>
         Get(routePath(s"/orderbook/$smartAssetId/WAVES/tradableBalance/${okOrder.senderPublicKey.toAddress}")) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          hasExpectedBackendHeader()
           responseAs[HttpBalance] should matchTo(
             Map(
               smartAsset -> 100L,
@@ -484,8 +465,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
 
     "returns a reserved balance for specified publicKey" in test { route =>
       mkGet(route)(Base58.encode(publicKey), ts, Base58.encode(signature)) ~> check {
-        status shouldEqual StatusCodes.OK
-        hasExpectedBackendHeader()
+        status shouldBe StatusCodes.OK
         responseAs[HttpBalance] should matchTo { Map[Asset, Long](Waves -> 350L) }
       }
     }
@@ -529,7 +509,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       { route =>
         Get(routePath(s"/orderbook/$smartAssetId/WAVES/${okOrder.id()}")) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          hasExpectedBackendHeader()
           responseAs[HttpOrderStatus] should matchTo(entities.HttpOrderStatus(HttpOrderStatus.Status.Accepted))
         }
       }
@@ -574,7 +553,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         Get(routePath(s"/orders/$address/$orderId"))
           .withHeaders(apiKeyHeader, RawHeader("X-User-Public-Key", orderToCancel.senderPublicKey.base58)) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          hasExpectedBackendHeader()
           responseAs[HttpOrderBookHistoryItem] should matchTo(mkHistoryItem(orderToCancel, OrderStatus.Accepted.name))
         }
       },
@@ -598,7 +576,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
           RawHeader("Signature", signature)
         ) ~> route ~> check {
         status shouldEqual StatusCodes.OK
-        hasExpectedBackendHeader()
         responseAs[HttpOrderBookHistoryItem] should matchTo(mkHistoryItem(orderToCancel, OrderStatus.Accepted.name))
       }
     }
@@ -626,7 +603,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
 
           Post(routePath(s"/orderbook/${okOrder.assetPair.amountAssetStr}/${okOrder.assetPair.priceAssetStr}/cancel"), signedRequest) ~> route ~> check {
             status shouldEqual StatusCodes.OK
-            hasExpectedBackendHeader()
             responseAs[HttpSuccessfulSingleCancel] should matchTo(HttpSuccessfulSingleCancel(okOrder.id()))
           }
         }
@@ -667,7 +643,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
 
           Post(routePath(s"/orderbook/${okOrder.assetPair.amountAssetStr}/${okOrder.assetPair.priceAssetStr}/cancel"), signedRequest) ~> route ~> check {
             status shouldEqual StatusCodes.OK
-            hasExpectedBackendHeader()
             responseAs[HttpSuccessfulBatchCancel] should matchTo(
               HttpSuccessfulBatchCancel(
                 List(
@@ -728,7 +703,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
 
         Post(routePath("/orderbook/cancel"), signedRequest) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          hasExpectedBackendHeader()
           responseAs[HttpSuccessfulBatchCancel] should matchTo(
             HttpSuccessfulBatchCancel(
               List(
@@ -781,7 +755,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
           HttpEntity(ContentTypes.`application/json`, Json.toJson(Set(orderId)).toString())
         ).withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          hasExpectedBackendHeader()
           responseAs[HttpSuccessfulBatchCancel] should matchTo(
             HttpSuccessfulBatchCancel(List(Right(HttpSuccessfulSingleCancel(orderId = orderToCancel.id()))))
           )
@@ -797,7 +770,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       { route =>
         Get(routePath("/orderbook")) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          hasExpectedBackendHeader()
           responseAs[HttpTradingMarkets] should matchTo(
             HttpTradingMarkets(
               matcherKeyPair.publicKey,
@@ -841,7 +813,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         Delete(routePath(s"/orderbook/${okOrder.assetPair.amountAssetStr}/${okOrder.assetPair.priceAssetStr}"))
           .withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldEqual StatusCodes.Accepted
-          hasExpectedBackendHeader()
           responseAs[HttpMessage] should matchTo(HttpMessage("Deleting order book"))
         }
       },
@@ -854,8 +825,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     "returns known transactions with this order" in test(
       { route =>
         Get(routePath(s"/transactions/${okOrder.idStr()}")) ~> route ~> check {
-          status shouldEqual StatusCodes.OK
-          hasExpectedBackendHeader()
           responseAs[JsArray].value should have size 1 // we don't have deserializer for domain exchange transaction (only for WavesJ tx)
         }
       }
@@ -916,7 +885,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
           Post(routePath(s"/orders/cancel/${okOrder.id()}"))
             .withHeaders(RawHeader("X-API-KEY", apiKey), RawHeader("X-User-Public-Key", okOrder.senderPublicKey.base58)) ~> route ~> check {
             status shouldEqual StatusCodes.OK
-            hasExpectedBackendHeader()
             responseAs[HttpSuccessfulSingleCancel] should matchTo(HttpSuccessfulSingleCancel(okOrder.id()))
           }
         },
@@ -949,7 +917,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       { route =>
         Put(routePath(s"/settings/rates/$smartAssetId"), updatedRate).withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          hasExpectedBackendHeader()
           responseAs[HttpMessage] should matchTo(
             HttpMessage(s"The rate for the asset $smartAssetId updated, old value = $rate, new value = $updatedRate"))
           rateCache.getAllRates(smartAsset) shouldBe updatedRate
@@ -997,7 +964,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       { route =>
         Delete(routePath(s"/settings/rates/$smartAssetId")).withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          hasExpectedBackendHeader()
           responseAs[HttpMessage] should matchTo(HttpMessage(s"The rate for the asset $smartAssetId deleted, old value = $updatedRate"))
           rateCache.getAllRates.keySet should not contain smartAsset
         }
@@ -1107,7 +1073,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
 
       Post(routePath("/orderbook"), HttpEntity(ContentTypes.`application/json`, orderJson)) ~> route ~> check {
         status shouldEqual StatusCodes.BadRequest
-        hasExpectedBackendHeader()
         responseAs[HttpError] should matchTo(
           HttpError(
             error = 1048577,
@@ -1344,6 +1309,4 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
 
     f(route.route)
   }
-
-  def hasExpectedBackendHeader(): Unit = header[MatcherHttpServer].map(_.value) shouldBe settings.id.some
 }

@@ -4,6 +4,7 @@ import com.softwaremill.sttp._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.api.http.entities.{HttpAssetInfo, HttpOrderBookHistoryItem, HttpV0LevelAgg}
+import com.wavesplatform.dex.api.http.headers.MatcherHttpServer
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.OrderType._
@@ -17,6 +18,7 @@ import com.wavesplatform.it.config.DexTestConfig.issueAssetPair
 import org.scalatest.prop.TableDrivenPropertyChecks
 
 import scala.concurrent.duration._
+import cats.syntax.option._
 
 class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
@@ -58,6 +60,10 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
   "Check cross ordering between Alice and Bob" - {
     "/matcher should respond with the matcher's public key" in {
       dex1.api.publicKey shouldBe matcher.publicKey
+    }
+
+    "/matcher should contain a header with HTTP server" in {
+      dex1.api.tryPublicKeyWithResponse._1.header(MatcherHttpServer.name) shouldBe "matcher-1".some
     }
 
     "sell order could be placed correctly" - {

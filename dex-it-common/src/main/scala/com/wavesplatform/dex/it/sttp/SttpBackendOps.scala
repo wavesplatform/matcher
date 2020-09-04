@@ -3,8 +3,9 @@ package com.wavesplatform.dex.it.sttp
 import java.util.UUID
 
 import cats.syntax.flatMap._
+import cats.syntax.functor._
 import com.softwaremill.sttp.playJson.asJson
-import com.softwaremill.sttp.{DeserializationError, Id, RequestT, SttpBackend}
+import com.softwaremill.sttp.{DeserializationError, Id, RequestT, Response, SttpBackend}
 import com.wavesplatform.dex.it.fp.{CanWait, FOps, ThrowableMonadError}
 import play.api.libs.json.{JsError, Reads}
 
@@ -17,6 +18,11 @@ class SttpBackendOps[F[_]: CanWait: ThrowableMonadError, ErrorT: Reads](implicit
 
   def tryParseJson[ResultT: Reads](req: RequestT[Id, String, Nothing]): F[Either[ErrorT, ResultT]] =
     httpBackend.send(req.response(asJson[ResultT]).tag("requestId", UUID.randomUUID)).flatMap(parseTryResponseEither[ErrorT, ResultT])
+
+  def tryParseJsonWithResponse[ResultT: Reads](req: RequestT[Id, String, Nothing]): F[(Response[_], Either[ErrorT, ResultT])] =
+    httpBackend.send(req.response(asJson[ResultT]).tag("requestId", UUID.randomUUID)).flatMap { raw =>
+      parseTryResponseEither[ErrorT, ResultT](raw).map((raw, _))
+    }
 
   def tryUnit(req: RequestT[Id, String, Nothing]): F[Either[ErrorT, Unit]] =
     httpBackend.send(req.mapResponse(_ => ()).tag("requestId", UUID.randomUUID)).flatMap(parseTryResponse[ErrorT, Unit])

@@ -119,7 +119,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
       "when user places and cancels limit orders" in {
 
-        val acc = mkAccountWithBalance(150.usd -> usd, 10.waves -> Waves); Thread.sleep(150)
+        val acc = mkAccountWithBalance(150.usd -> usd, 10.waves -> Waves)
         val wsc = mkWsAddressConnection(acc)
 
         assertChanges(wsc, squash = false) { Map(Waves -> WsBalances(10, 0), usd -> WsBalances(150.0, 0.0)) }()
@@ -162,7 +162,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           15.waves -> 1.2,
           25.waves -> 1.1,
           40.waves -> 1.0
-        ).foreach { case (a, p) => placeAndAwaitAtDex(mkOrderDP(alice, wavesUsdPair, BUY, a, p)) }; Thread.sleep(150)
+        ).foreach { case (a, p) => placeAndAwaitAtDex(mkOrderDP(alice, wavesUsdPair, BUY, a, p)) }
 
         dex1.api.placeMarket(smo)
         waitForOrderAtNode(smo)
@@ -188,7 +188,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
       "when user's order is fully filled with another one" in {
 
-        val acc = mkAccountWithBalance(10.usd -> usd, 10.waves -> Waves); Thread.sleep(150)
+        val acc = mkAccountWithBalance(10.usd -> usd, 10.waves -> Waves)
         val wsc = mkWsAddressConnection(acc)
 
         assertChanges(wsc, squash = false) { Map(Waves -> WsBalances(10, 0), usd -> WsBalances(10, 0)) }()
@@ -214,7 +214,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
       "when user's order is partially filled with another one" in {
 
-        val acc = mkAccountWithBalance(10.usd -> usd, 10.waves -> Waves); Thread.sleep(150)
+        val acc = mkAccountWithBalance(10.usd -> usd, 10.waves -> Waves)
         val wsc = mkWsAddressConnection(acc)
 
         assertChanges(wsc, squash = false) { Map(Waves -> WsBalances(10, 0), usd -> WsBalances(10, 0)) }()
@@ -262,7 +262,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
       "when user make a transfer" in {
 
-        val acc = mkAccountWithBalance(10.waves -> Waves, 10.usd -> usd); Thread.sleep(150)
+        val acc = mkAccountWithBalance(10.waves -> Waves, 10.usd -> usd)
         val wsc = mkWsAddressConnection(acc)
 
         assertChanges(wsc, squash = false) { Map(Waves -> WsBalances(10, 0), usd -> WsBalances(10, 0)) }()
@@ -274,7 +274,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
       "user issued a new asset after establishing the connection" in {
 
-        val acc = mkAccountWithBalance(10.waves -> Waves); Thread.sleep(150)
+        val acc = mkAccountWithBalance(10.waves -> Waves)
         val wsc = mkWsAddressConnection(acc)
 
         assertChanges(wsc, squash = false) { Map(Waves -> WsBalances(10, 0)) }()
@@ -294,7 +294,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
         val acc                                   = mkAccountWithBalance(10.waves -> Waves)
         val IssueResults(txIssue, _, issuedAsset) = mkIssueExtended(acc, "testAsset", 1000.asset8)
 
-        broadcastAndAwait(txIssue); Thread.sleep(150)
+        broadcastAndAwait(txIssue)
 
         val wsc = mkWsAddressConnection(acc)
         assertChanges(wsc)(
@@ -307,7 +307,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
       "user burnt part of the asset amount" in {
 
-        val acc = mkAccountWithBalance(10.waves -> Waves, 20.usd -> usd); Thread.sleep(150)
+        val acc = mkAccountWithBalance(10.waves -> Waves, 20.usd -> usd)
         val wsc = mkWsAddressConnection(acc)
 
         assertChanges(wsc, squash = false) { Map(Waves -> WsBalances(10, 0), usd -> WsBalances(20, 0)) }()
@@ -323,7 +323,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
       "user burnt all of the asset amount" in {
 
-        val acc = mkAccountWithBalance(10.waves -> Waves, 20.usd -> usd); Thread.sleep(150)
+        val acc = mkAccountWithBalance(10.waves -> Waves, 20.usd -> usd)
         val wsc = mkWsAddressConnection(acc)
 
         assertChanges(wsc, squash = false) { Map(Waves -> WsBalances(10, 0), usd -> WsBalances(20, 0)) }()
@@ -341,7 +341,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
   "Second connection should get the actual data" in {
 
-    val acc  = mkAccountWithBalance(500.usd -> usd, 10.waves -> Waves); Thread.sleep(150)
+    val acc  = mkAccountWithBalance(500.usd -> usd, 10.waves -> Waves)
     val wsc1 = mkWsAddressConnection(acc, dex1)
 
     assertChanges(wsc1, squash = false) { Map(Waves -> WsBalances(10, 0), usd -> WsBalances(500, 0)) }()
@@ -376,7 +376,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
   }
 
   "Zero balances should not be in initial message" in {
-    val acc  = mkAccountWithBalance(10.waves -> Waves, 10.usd -> usd); Thread.sleep(150)
+    val acc  = mkAccountWithBalance(10.waves -> Waves, 10.usd -> usd)
     val wsc1 = mkWsAddressConnection(acc)
 
     assertChanges(wsc1, squash = false) { Map(Waves -> WsBalances(10, 0), usd -> WsBalances(10, 0)) }()
@@ -393,7 +393,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
   "Subscription should be cancelled after jwt expiration" in {
 
-    val acc = mkAccountWithBalance(10.waves -> Waves); Thread.sleep(150)
+    val acc = mkAccountWithBalance(10.waves -> Waves)
     val wsc = mkWsAddressConnection(acc, dex1, subscriptionLifetime = 3.seconds)
 
     wsc.receiveAtLeastN[WsAddressChanges](1) // snapshot

@@ -18,7 +18,7 @@ import scala.concurrent.{Await, Future}
 class AutoCancelOrderTestSuite extends MatcherSuiteBase {
 
   override protected val wavesNodeInitialSuiteConfig: Config = ConfigFactory.parseString(
-    s"""waves {
+    s"""waves.dex {
        |  utx.ignore-exchange-sender-pk-in-pessimistic-portfolio = "${matcher.publicKey.base58}"
        |}""".stripMargin
   )

@@ -33,7 +33,7 @@ class DEXExtension(context: ExtensionContext) extends Extension with ScorexLoggi
     val port: Int    = context.settings.config.as[Int]("waves.dex.grpc.integration.port")
 
     val ignoredExchangeTxSenderPublicKey: Option[String] = Try {
-      context.settings.config.as[String]("waves.utx.ignore-exchange-sender-pk-in-pessimistic-portfolio")
+      context.settings.config.as[String]("waves.dex.utx.ignore-exchange-sender-pk-in-pessimistic-portfolio")
     }.toOption
 
     val bindAddress = new InetSocketAddress(host, port)

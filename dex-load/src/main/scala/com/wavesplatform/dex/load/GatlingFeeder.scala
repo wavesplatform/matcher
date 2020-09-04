@@ -67,6 +67,11 @@ object GatlingFeeder {
              feederFile: File): Unit = {
     val output = new PrintWriter(feederFile, "utf-8")
     try {
+      output.print("a;m")
+      (0 until orderBookNumberPerAccount).foreach(i => {
+        output.print(s";o$i")
+      })
+      output.println()
       (0 until accountsNumber).foreach { i =>
         val pk = PrivateKeyAccount.fromSeed(s"$seedPrefix$i", 0, AddressScheme.current.chainId)
         output.println(s"""${pk.getAddress};${mkAusString(pk, authKp)};${mkObsStrings(pairsFile, orderBookNumberPerAccount)}""")

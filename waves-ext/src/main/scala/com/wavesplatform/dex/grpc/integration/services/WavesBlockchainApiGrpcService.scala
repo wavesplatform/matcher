@@ -45,9 +45,12 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, ignoredExchangeTx
     extends WavesBlockchainApiGrpc.WavesBlockchainApi
     with ScorexLogging {
 
+  private type AddressesAssetsChanges = Map[Address, Set[Asset]]
+
   private val descKey = Metadata.Key.of("desc", Metadata.ASCII_STRING_MARSHALLER)
 
-  private val allSpendableBalances = new ConcurrentHashMap[Address, Map[Asset, Long]]()
+  private val emptyAddressAssetsChanges = Map.empty[Address, Set[Asset]]
+  private val allSpendableBalances      = new ConcurrentHashMap[Address, Map[Asset, Long]]()
 
   // TODO rename to balanceChangesSubscribers after release 2.1.2
   private val realTimeBalanceChangesSubscribers = ConcurrentHashMap.newKeySet[StreamObserver[BalanceChangesFlattenResponse]](2)
@@ -63,25 +66,25 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, ignoredExchangeTx
     realTimeBalanceChangesSubscribers.clear()
   }
 
-  private def getAddressesChangedAssets(transactionStateUpdates: Seq[StateUpdate]): Map[Address, Set[Asset]] = {
+  private def getAddressesChangedAssets(transactionStateUpdates: Seq[StateUpdate]): AddressesAssetsChanges = {
     transactionStateUpdates.foldLeft(Map.empty[Address, Set[Asset]]) {
       case (result, stateUpdate) => result |+| stateUpdate.balances.groupBy(_._1).view.mapValues(_.map(_._2).toSet).toMap
     }
   }
 
-  private def getAddressesChangedAssets(diff: Diff): Map[Address, Set[Asset]] = diff.portfolios.view.mapValues(_.assetIds).toMap
+  private def getAddressesChangedAssets(diff: Diff): AddressesAssetsChanges = diff.portfolios.view.mapValues(_.assetIds).toMap
 
-  private val txDiffs                                                                 = new ConcurrentHashMap[Transaction, Diff]()
-  private val currentMaxHeight: AtomicInteger                                         = new AtomicInteger(context.blockchain.height)
-  private val isRollback: AtomicBoolean                                               = new AtomicBoolean(false)
-  private val storingChangesDuringRollback: AtomicReference[Map[Address, Set[Asset]]] = new AtomicReference(Map.empty)
+  private val txAddressesAssetsChanges                                              = new ConcurrentHashMap[Transaction, AddressesAssetsChanges]()
+  private val currentMaxHeight                                                      = new AtomicInteger(context.blockchain.height)
+  private val isRollback                                                            = new AtomicBoolean(false)
+  private val storingChangesDuringRollback: AtomicReference[AddressesAssetsChanges] = new AtomicReference(Map.empty)
 
-  private val blockchainBalanceUpdates: Observable[Map[Address, Set[Asset]]] = context.blockchainUpdated.map {
+  private val blockchainBalanceUpdates: Observable[AddressesAssetsChanges] = context.blockchainUpdated.map {
     case BlockAppended(_, newHeight, _, _, _, transactionStateUpdates) =>
       val changes = getAddressesChangedAssets(transactionStateUpdates)
       if (isRollback.get()) {
         storingChangesDuringRollback.updateAndGet(_ |+| changes)
-        if (newHeight != currentMaxHeight.get) Map.empty[Address, Set[Asset]]
+        if (newHeight != currentMaxHeight.get) emptyAddressAssetsChanges
         else {
           isRollback.set(false)
           storingChangesDuringRollback.getAndSet(Map.empty)
@@ -92,19 +95,20 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, ignoredExchangeTx
       }
 
     case MicroBlockAppended(_, _, _, _, transactionStateUpdates) => getAddressesChangedAssets(transactionStateUpdates)
-    case MicroBlockRollbackCompleted(_, _)                       => Map.empty[Address, Set[Asset]]
-    case RollbackCompleted(_, _)                                 => isRollback.set(true); Map.empty[Address, Set[Asset]]
+    case MicroBlockRollbackCompleted(_, _)                       => emptyAddressAssetsChanges
+    case RollbackCompleted(_, _)                                 => isRollback.set(true); emptyAddressAssetsChanges
   }
 
-  private val utxBalanceUpdates: Observable[Map[Address, Set[Asset]]] = context.utxEvents.map {
+  private val utxBalanceUpdates: Observable[AddressesAssetsChanges] = context.utxEvents.map {
     case TxAdded(tx, diff) =>
       tx match {
-        case et: ExchangeTransaction if ignoredExchangeTxSenderPublicKey.contains(et.sender.toString) => Map.empty[Address, Set[Asset]]
+        case et: ExchangeTransaction if ignoredExchangeTxSenderPublicKey.contains(et.sender.toString) => emptyAddressAssetsChanges
         case otherTx =>
-          txDiffs.putIfAbsent(otherTx, diff)
-          getAddressesChangedAssets(diff)
+          val changes = getAddressesChangedAssets(diff)
+          txAddressesAssetsChanges.putIfAbsent(otherTx, changes)
+          changes
       }
-    case TxRemoved(tx, _) => Option(txDiffs remove tx).map(getAddressesChangedAssets).getOrElse(Map.empty)
+    case TxRemoved(tx, _) => Option(txAddressesAssetsChanges remove tx).getOrElse(Map.empty)
   }
 
   private val realTimeBalanceChanges: Coeval[CancelableFuture[Unit]] = Coeval.evalOnce {

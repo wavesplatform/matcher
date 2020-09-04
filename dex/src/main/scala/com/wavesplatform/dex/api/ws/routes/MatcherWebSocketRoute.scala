@@ -3,6 +3,7 @@ package com.wavesplatform.dex.api.ws.routes
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
+import akka.actor.typed.scaladsl.AskPattern._
 import akka.actor.typed.scaladsl.adapter._
 import akka.actor.{ActorRef, typed}
 import akka.http.scaladsl.model.StatusCodes
@@ -11,51 +12,104 @@ import akka.http.scaladsl.server.{Directive0, Route}
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.stream.typed.scaladsl.{ActorSink, ActorSource}
 import akka.stream.{Materializer, OverflowStrategy}
+import akka.util.Timeout
 import akka.{Done, NotUsed}
 import cats.syntax.either._
+import com.wavesplatform.dex.api.http.SwaggerDocService
+import com.wavesplatform.dex.api.http.entities.{HttpMessage, HttpWebSocketCloseFilter, HttpWebSocketConnections}
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
-import com.wavesplatform.dex.api.ws.actors.{WsExternalClientHandlerActor, WsInternalBroadcastActor, WsInternalClientHandlerActor}
+import com.wavesplatform.dex.api.ws.actors.{WsExternalClientDirectoryActor, WsExternalClientHandlerActor, WsInternalBroadcastActor, WsInternalClientHandlerActor}
 import com.wavesplatform.dex.api.ws.protocol._
 import com.wavesplatform.dex.api.ws.routes.MatcherWebSocketRoute.CloseHandler
-import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.error.{InvalidJson, MatcherIsStopping}
 import com.wavesplatform.dex.model.AssetPairBuilder
-import com.wavesplatform.dex.settings.WebSocketSettings
+import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.dex.time.Time
 import com.wavesplatform.dex.{Matcher, error}
+import io.swagger.annotations._
+import javax.ws.rs.Path
 import play.api.libs.json.{Json, Reads}
 
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{Future, Promise}
 import scala.jdk.CollectionConverters._
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Random, Success}
 
-case class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsInternalBroadcastActor.Command],
-                                 addressDirectory: ActorRef,
-                                 matcher: ActorRef,
-                                 time: Time,
-                                 assetPairBuilder: AssetPairBuilder,
-                                 orderBook: AssetPair => Option[Either[Unit, ActorRef]],
-                                 apiKeyHash: Option[Array[Byte]],
-                                 webSocketSettings: WebSocketSettings,
-                                 matcherStatus: () => Matcher.Status)(implicit mat: Materializer)
+@Path("/ws/v0")
+@Api()
+class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsInternalBroadcastActor.Command],
+                            addressDirectory: ActorRef,
+                            matcher: ActorRef,
+                            time: Time,
+                            assetPairBuilder: AssetPairBuilder,
+                            override val apiKeyHash: Option[Array[Byte]],
+                            matcherSettings: MatcherSettings,
+                            matcherStatus: () => Matcher.Status)(implicit mat: Materializer)
     extends ApiRoute
     with AuthRoute
     with ScorexLogging {
 
   import mat.executionContext
 
+  private implicit val scheduler = mat.system.scheduler.toTyped
+  private implicit val timeout   = Timeout(matcherSettings.actorResponseTimeout)
+
   private val wsHandlers = ConcurrentHashMap.newKeySet[CloseHandler]()
+
+  // Random to make this actor unique in tests
+  private val externalClientDirectoryRef = mat.system.spawn(WsExternalClientDirectoryActor(), s"ws-external-cd-${Random.nextInt(Int.MaxValue)}")
 
   override def route: Route = pathPrefix("ws" / "v0") {
     matcherStatusBarrier {
-      internalWsRoute ~ commonWsRoute
+      internalWsRoute ~ commonWsRoute ~ (pathPrefix("connections") & withAuth)(connectionsRoute ~ closeConnectionsRoute)
+    }
+  }
+
+  @Path("/connections")
+  @ApiOperation(
+    value = "Returns an information about current WebSocket connections",
+    httpMethod = "GET",
+    authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
+    tags = Array("ws"),
+    response = classOf[HttpWebSocketConnections]
+  )
+  def connectionsRoute: Route = get {
+    complete {
+      externalClientDirectoryRef.ask(WsExternalClientDirectoryActor.Query.GetActiveNumber).map(HttpWebSocketConnections(_))
+    }
+  }
+
+  @Path("/connections")
+  @ApiOperation(
+    value = "Closes WebSocket connections by specified filter",
+    httpMethod = "DELETE",
+    authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
+    tags = Array("ws"),
+    response = classOf[HttpMessage]
+  )
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(
+        name = "body",
+        value = "Json with a drop filter",
+        required = true,
+        paramType = "body",
+        dataType = "com.wavesplatform.dex.api.http.entities.HttpWebSocketCloseFilter"
+      )
+    )
+  )
+  def closeConnectionsRoute: Route = delete {
+    entity(as[HttpWebSocketCloseFilter]) { req =>
+      externalClientDirectoryRef ! WsExternalClientDirectoryActor.Command.CloseOldest(req.oldest)
+      complete {
+        HttpMessage("In progress")
+      }
     }
   }
 
   private val commonWsRoute: Route = (pathEnd & get) {
-    import webSocketSettings.externalClientHandler
+    import matcherSettings.webSocketSettings.externalClientHandler
 
     val clientId = UUID.randomUUID().toString
 
@@ -70,6 +124,7 @@ case class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsIntern
 
     val closeHandler = new CloseHandler(() => webSocketHandlerRef ! WsExternalClientHandlerActor.Command.CloseConnection(MatcherIsStopping))
     wsHandlers.add(closeHandler)
+    externalClientDirectoryRef ! WsExternalClientDirectoryActor.Command.Subscribe(webSocketHandlerRef)
 
     val server: Sink[WsExternalClientHandlerActor.Message, NotUsed] =
       ActorSink
@@ -92,7 +147,7 @@ case class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsIntern
   }
 
   private val internalWsRoute: Route = (path("internal") & get) {
-    import webSocketSettings.internalClientHandler
+    import matcherSettings.webSocketSettings.internalClientHandler
 
     val clientId = UUID.randomUUID().toString
 

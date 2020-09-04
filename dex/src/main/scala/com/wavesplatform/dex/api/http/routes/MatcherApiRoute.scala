@@ -42,7 +42,6 @@ import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.settings.{MatcherSettings, OrderFeeSettings}
-import com.wavesplatform.dex.time.Time
 import io.swagger.annotations._
 import javax.ws.rs.Path
 import kamon.Kamon
@@ -54,26 +53,25 @@ import scala.util.Success
 
 @Path("/matcher")
 @Api()
-case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
-                           matcherPublicKey: PublicKey,
-                           matcher: ActorRef,
-                           addressActor: ActorRef,
-                           storeEvent: StoreEvent,
-                           orderBook: AssetPair => Option[Either[Unit, ActorRef]],
-                           orderBookHttpInfo: OrderBookHttpInfo,
-                           getActualTickSize: AssetPair => BigDecimal,
-                           orderValidator: Order => FutureResult[Order],
-                           matcherSettings: MatcherSettings,
-                           matcherStatus: () => Matcher.Status,
-                           orderDb: OrderDB,
-                           time: Time,
-                           currentOffset: () => QueueEventWithMeta.Offset,
-                           lastOffset: () => Future[QueueEventWithMeta.Offset],
-                           matcherAccountFee: Long,
-                           apiKeyHash: Option[Array[Byte]],
-                           rateCache: RateCache,
-                           validatedAllowedOrderVersions: () => Future[Set[Byte]],
-                           getActualOrderFeeSettings: () => OrderFeeSettings)(implicit mat: Materializer)
+class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
+                      matcherPublicKey: PublicKey,
+                      matcher: ActorRef,
+                      addressActor: ActorRef,
+                      storeEvent: StoreEvent,
+                      orderBook: AssetPair => Option[Either[Unit, ActorRef]],
+                      orderBookHttpInfo: OrderBookHttpInfo,
+                      getActualTickSize: AssetPair => BigDecimal,
+                      orderValidator: Order => FutureResult[Order],
+                      matcherSettings: MatcherSettings,
+                      override val matcherStatus: () => Matcher.Status,
+                      orderDb: OrderDB,
+                      currentOffset: () => QueueEventWithMeta.Offset,
+                      lastOffset: () => Future[QueueEventWithMeta.Offset],
+                      matcherAccountFee: Long,
+                      override val apiKeyHash: Option[Array[Byte]],
+                      rateCache: RateCache,
+                      validatedAllowedOrderVersions: () => Future[Set[Byte]],
+                      getActualOrderFeeSettings: () => OrderFeeSettings)(implicit mat: Materializer)
     extends ApiRoute
     with AuthRoute
     with HasStatusBarrier
@@ -655,7 +653,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       )
     )
   )
-  def historyDelete: Route = (path(AssetPairPM / "delete") & post) { _ =>
+  def historyDelete: Route = path(AssetPairPM / "delete") { _ =>
     post {
       entity(as[HttpCancelOrder]) { req =>
         complete {

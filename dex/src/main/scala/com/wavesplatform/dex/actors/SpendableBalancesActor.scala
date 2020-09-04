@@ -65,7 +65,7 @@ class SpendableBalancesActor(spendableBalances: (Address, Set[Asset]) => Future[
     case SpendableBalancesActor.Query.GetSnapshot(address) =>
       val requestSender = sender
       fullState.get(address) match {
-        case Some(state) => requestSender ! SpendableBalancesActor.Reply.GetSnapshot(state.asRight)
+        case Some(state) => requestSender ! SpendableBalancesActor.Reply.GetSnapshot(state.filterNot(_._2 == 0).asRight)
         case None =>
           allAssetsSpendableBalances(address).onComplete {
             case Success(balance) => self.tell(SpendableBalancesActor.Command.SetState(address, balance), requestSender)

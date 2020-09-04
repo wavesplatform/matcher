@@ -2,6 +2,8 @@ package com.wavesplatform.dex.history
 
 import java.time.LocalDateTime
 
+import com.wavesplatform.dex.model.Events.EventReason
+
 object DBRecords {
 
   sealed trait Record
@@ -19,7 +21,8 @@ object DBRecords {
                          timestamp: LocalDateTime,
                          expiration: LocalDateTime,
                          fee: BigDecimal,
-                         created: LocalDateTime)
+                         created: LocalDateTime,
+                         closedAt: Option[LocalDateTime])
       extends Record
 
   case class EventRecord(orderId: String,
@@ -30,6 +33,7 @@ object DBRecords {
                          totalFilled: BigDecimal,
                          feeFilled: BigDecimal,
                          feeTotalFilled: BigDecimal,
-                         status: Byte)
+                         status: Byte,
+                         reason: EventReason)
       extends Record
 }

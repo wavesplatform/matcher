@@ -16,7 +16,7 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.actors.MatcherActor._
 import com.wavesplatform.dex.actors.OrderBookAskAdapter
-import com.wavesplatform.dex.actors.address.AddressActor.Command.PlaceOrder
+import com.wavesplatform.dex.actors.address.AddressActor.Command.{PlaceOrder, Source}
 import com.wavesplatform.dex.actors.address.AddressActor.Query.GetTradableBalance
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor
@@ -1125,11 +1125,11 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
               if (orderId == okOrder.id()) AddressActor.Reply.GetOrderStatus(OrderStatus.Accepted)
               else Status.Failure(new RuntimeException(s"Unknown order $orderId"))
 
-            case AddressActor.Command.CancelOrder(orderId) =>
+            case AddressActor.Command.CancelOrder(orderId, Source.Request) =>
               if (orderId == okOrder.id() || orderId == orderToCancel.id()) AddressActor.Event.OrderCanceled(orderId)
               else error.OrderNotFound(orderId)
 
-            case x @ AddressActor.Command.CancelAllOrders(pair, _) =>
+            case x @ AddressActor.Command.CancelAllOrders(pair, _, Source.Request) =>
               if (pair.contains(badOrder.assetPair)) error.AddressIsBlacklisted(badOrder.sender)
               else if (pair.forall(_ == okOrder.assetPair))
                 AddressActor.Event.BatchCancelCompleted(
@@ -1140,7 +1140,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
                 )
               else Status.Failure(new RuntimeException(s"Can't handle $x"))
 
-            case AddressActor.Command.CancelOrders(ids) =>
+            case AddressActor.Command.CancelOrders(ids, Source.Request) =>
               AddressActor.Event.BatchCancelCompleted(
                 ids.map { id =>
                   id -> (if (id == orderToCancel.id()) Right(AddressActor.Event.OrderCanceled(okOrder.id())) else Left(error.CanNotPersistEvent))
@@ -1265,7 +1265,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       )
 
     val route =
-      MatcherApiRoute(
+      new MatcherApiRoute(
         assetPairBuilder = new AssetPairBuilder(
           settings, {
             case `smartAsset` => liftValueAsync[BriefAssetDescription](smartAssetDesc)
@@ -1298,7 +1298,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         matcherSettings = settings,
         matcherStatus = () => Matcher.Status.Working,
         orderDb = odb,
-        time = time,
         currentOffset = () => 0L,
         lastOffset = () => Future.successful(0L),
         matcherAccountFee = 300000L,

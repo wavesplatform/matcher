@@ -19,7 +19,7 @@ import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.state.{LeaseBalance, Portfolio}
 import com.wavesplatform.dex.error.{ErrorFormatterContext, WavesNodeConnectionBroken}
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
-import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
+import com.wavesplatform.dex.model.Events.{OrderAdded, OrderAddedReason, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder, MarketOrder, _}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.settings.OrderFeeSettings.DynamicSettings
@@ -101,15 +101,20 @@ class ActorsWebSocketInteractionsSpecification
     def placeOrder(ao: AcceptedOrder): Unit = {
       addressDir ! AddressDirectoryActor.Envelope(address, AddressActor.Command.PlaceOrder(ao.order, ao.isMarket))
       eventsProbe.expectMsg(ao match { case lo: LimitOrder => QueueEvent.Placed(lo); case mo: MarketOrder => QueueEvent.PlacedMarket(mo) })
-      addressDir ! OrderAdded(ao, System.currentTimeMillis)
+      addressDir ! OrderAdded(ao, OrderAddedReason.RequestExecuted, System.currentTimeMillis)
     }
 
-    def cancelOrder(ao: AcceptedOrder, isSystemCancel: Boolean): Unit = {
+    def cancelOrder(ao: AcceptedOrder, unmatchable: Boolean): Unit = {
       if (ao.isLimit) {
-        addressDir ! AddressDirectoryActor.Envelope(address, AddressActor.Command.CancelOrder(ao.id))
-        eventsProbe.expectMsg(QueueEvent.Canceled(ao.order.assetPair, ao.id))
+        val source =
+          if (unmatchable) AddressActor.Command.Source.Request // Not important in this test suite
+          else AddressActor.Command.Source.Request
+        addressDir ! AddressDirectoryActor.Envelope(address, AddressActor.Command.CancelOrder(ao.id, source))
+        eventsProbe.expectMsg(QueueEvent.Canceled(ao.order.assetPair, ao.id, source))
       }
-      addressDir ! OrderCanceled(ao, isSystemCancel, System.currentTimeMillis)
+
+      val reason = if (unmatchable) Events.OrderCanceledReason.BecameUnmatchable else Events.OrderCanceledReason.RequestExecuted
+      addressDir ! OrderCanceled(ao, reason, System.currentTimeMillis)
     }
 
     def executeOrder(s: AcceptedOrder, c: LimitOrder): OrderExecuted = {
@@ -476,12 +481,12 @@ class ActorsWebSocketInteractionsSpecification
           )
 
           val now = System.currentTimeMillis()
-          ad ! OrderAdded(counter, now)
+          ad ! OrderAdded(counter, OrderAddedReason.RequestExecuted, now)
 
           ad ! AddressDirectoryActor.Envelope(address, AddressActor.Command.PlaceOrder(submitted.order, submitted.isMarket))
           ep.expectMsg(QueueEvent.Placed(submitted))
 
-          ad ! OrderAdded(submitted, now)
+          ad ! OrderAdded(submitted, OrderAddedReason.RequestExecuted, now)
           val oe = OrderExecuted(submitted, counter, System.currentTimeMillis, submitted.matcherFee, counter.matcherFee)
           ad ! oe
 
@@ -506,12 +511,12 @@ class ActorsWebSocketInteractionsSpecification
         )
 
         val now = System.currentTimeMillis()
-        ad ! OrderAdded(counter, now)
+        ad ! OrderAdded(counter, OrderAddedReason.RequestExecuted, now)
 
         ad ! AddressDirectoryActor.Envelope(address, AddressActor.Command.PlaceOrder(submitted.order, submitted.isMarket))
         ep.expectMsg(QueueEvent.Placed(submitted))
 
-        ad ! OrderAdded(submitted, now)
+        ad ! OrderAdded(submitted, OrderAddedReason.RequestExecuted, now)
         val oe = OrderExecuted(submitted, counter, System.currentTimeMillis, submitted.matcherFee, counter.matcherFee)
         ad ! oe
 

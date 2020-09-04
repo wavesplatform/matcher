@@ -81,10 +81,11 @@ trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with Doub
 
   protected def toNormalized(value: Long): Long                           = value * Order.PriceConstant
   protected def wrapEvent(n: Long, event: QueueEvent): QueueEventWithMeta = QueueEventWithMeta(n, System.currentTimeMillis(), event)
+  protected def wrapEvent(event: QueueEvent): QueueEventWithMeta          = QueueEventWithMeta(seqNr.incrementAndGet(), System.currentTimeMillis(), event)
 
   protected def wrapLimitOrder(x: Order): QueueEventWithMeta          = wrapLimitOrder(seqNr.incrementAndGet(), x)
   protected def wrapLimitOrder(n: Long, x: Order): QueueEventWithMeta = wrapEvent(n, QueueEvent.Placed(LimitOrder(x)))
-  protected def wrapMarketOrder(mo: MarketOrder): QueueEventWithMeta  = wrapEvent(seqNr.incrementAndGet(), QueueEvent.PlacedMarket(mo))
+  protected def wrapMarketOrder(mo: MarketOrder): QueueEventWithMeta  = wrapEvent(QueueEvent.PlacedMarket(mo))
 
   protected def awaitResult[A](result: FutureResult[A]): Result[A] = Await.result(result.value, Duration.Inf)
   protected def awaitResult[A](result: Future[A]): A               = Await.result(result, Duration.Inf)

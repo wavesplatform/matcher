@@ -4,6 +4,8 @@ pipeline {
     }
     options {
         ansiColor('xterm')
+        timeout(time: 40, unit: 'MINUTES')
+        timestamps()
     }
     parameters {
         string(name: 'SBT_THREAD_NUMBER', defaultValue: '6', description: '')
@@ -28,7 +30,7 @@ pipeline {
                 sh 'docker rmi `docker images --format "{{.Repository}}:{{.Tag}}" | grep "wavesplatform"` || true'
                 sh 'docker system prune -f || true'
                 sh 'find ~/.sbt/1.0/staging/*/waves -type d -name target | xargs -I{} rm -rf {}'
-                sh 'find . -type d -name target | xargs -I{} rm -rf {}'
+                sh 'find . -type d \\( -name "test-reports" -o -name "allure-results" -o -name "target" \\) | xargs -I{} rm -rf {}'
                 sh 'sbt "cleanAll"'
             }
         }

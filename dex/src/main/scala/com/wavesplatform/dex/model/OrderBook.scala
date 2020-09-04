@@ -7,7 +7,7 @@ import cats.syntax.group._
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.model.Price
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCanceled, OrderExecuted}
+import com.wavesplatform.dex.model.Events._
 import com.wavesplatform.dex.settings.MatchingRule
 
 import scala.collection.immutable.{HashMap, Queue, TreeMap}
@@ -20,8 +20,8 @@ case class OrderBook private (bids: Side, asks: Side, lastTrade: Option[LastTrad
 
   def allOrders: Iterator[LimitOrder] = (bids.valuesIterator ++ asks.valuesIterator).flatten
 
-  def cancel(orderId: ByteStr, timestamp: Long): (OrderBook, Option[Event], LevelAmounts) = {
-    def mkEvent(lo: LimitOrder): Option[OrderCanceled] = Some(OrderCanceled(lo, isSystemCancel = false, timestamp))
+  def cancel(orderId: ByteStr, reason: OrderCanceledReason, timestamp: Long): (OrderBook, Option[Event], LevelAmounts) = {
+    def mkEvent(lo: LimitOrder): Option[OrderCanceled] = Some(OrderCanceled(lo, reason, timestamp))
 
     orderIds.get(orderId).fold((this, Option.empty[OrderCanceled], LevelAmounts.empty)) {
       case (orderType, price) =>
@@ -43,9 +43,9 @@ case class OrderBook private (bids: Side, asks: Side, lastTrade: Option[LastTrad
     }
   }
 
-  def cancelAll(ts: Long): OrderBookUpdates = {
+  def cancelAll(ts: Long, reason: OrderCanceledReason): OrderBookUpdates = {
     val orders         = allOrders.toList
-    val canceledOrders = Queue(orders.map { OrderCanceled(_, isSystemCancel = false, ts) }: _*)
+    val canceledOrders = Queue(orders.map { OrderCanceled(_, reason, ts) }: _*)
     val levelAmounts = orders.foldMap { o =>
       // Order MUST be in orderIds. It's okay to fail here with Map.apply if the implementation is wrong
       LevelAmounts.mkDiff(orderIds.getOrElse(o.id, throw new IllegalStateException(s"Order ids doesn't contain the order ${o.id}"))._2, o)
@@ -58,9 +58,9 @@ case class OrderBook private (bids: Side, asks: Side, lastTrade: Option[LastTrad
           eventTs: Long,
           getMakerTakerFee: (AcceptedOrder, LimitOrder) => (Long, Long),
           tickSize: Long = MatchingRule.DefaultRule.tickSize): OrderBookUpdates = {
-    val events = Queue(OrderAdded(submitted, eventTs))
+    val events = Queue(OrderAdded(submitted, OrderAddedReason.RequestExecuted, eventTs))
     if (submitted.order.isValid(eventTs)) doMatch(eventTs, tickSize, getMakerTakerFee, submitted, events, this)
-    else OrderBookUpdates(this, events.enqueue(OrderCanceled(submitted, isSystemCancel = false, eventTs)), LevelAmounts.empty, None)
+    else OrderBookUpdates(this, events.enqueue(OrderCanceled(submitted, OrderCanceledReason.BecameInvalid, eventTs)), LevelAmounts.empty, None)
   }
 
   def snapshot: OrderBookSnapshot                     = OrderBookSnapshot(bids, asks, lastTrade)
@@ -123,19 +123,19 @@ object OrderBook {
                       events: Queue[Event],
                       orderBook: OrderBook): OrderBookUpdates = {
 
-    def systemCancelEvent(ao: AcceptedOrder): OrderCanceled = OrderCanceled(ao, isSystemCancel = true, eventTs)
+    def unmatchable(ao: AcceptedOrder): OrderCanceled = OrderCanceled(ao, OrderCanceledReason.BecameUnmatchable, eventTs)
 
     @scala.annotation.tailrec
     def loop(submitted: AcceptedOrder, currentUpdates: OrderBookUpdates): OrderBookUpdates =
       currentUpdates.orderBook.best(submitted.order.orderType.opposite) match {
         case Some((levelPrice, counter)) if overlaps(submitted, levelPrice) =>
-          if (!submitted.isValid(counter.price)) currentUpdates.copy(events = currentUpdates.events enqueue systemCancelEvent(submitted))
+          if (!submitted.isValid(counter.price)) currentUpdates.copy(events = currentUpdates.events enqueue unmatchable(submitted))
           else if (counter.order.isValid(eventTs)) {
 
             val (counterExecutedFee, submittedExecutedFee) = getMakerTakerMaxFee(submitted, counter)
             val orderExecutedEvent                         = OrderExecuted(submitted, counter, eventTs, counterExecutedFee, submittedExecutedFee)
 
-            if (orderExecutedEvent.executedAmount == 0) currentUpdates.copy(events = currentUpdates.events enqueue systemCancelEvent(submitted))
+            if (orderExecutedEvent.executedAmount == 0) currentUpdates.copy(events = currentUpdates.events enqueue unmatchable(submitted))
             else {
 
               val updatedEvents = currentUpdates.events.enqueue(orderExecutedEvent)
@@ -161,14 +161,14 @@ object OrderBook {
               if (submittedRemaining.isValid) {
                 if (counterRemaining.isValid)
                   // if submitted is not filled (e.g. LimitOrder: rounding issues, MarkerOrder: afs = 0) cancel its remaining
-                  newUpdates.copy(events = updatedEvents enqueue systemCancelEvent(submittedRemaining))
+                  newUpdates.copy(events = updatedEvents enqueue unmatchable(submittedRemaining))
                 else {
                   submittedRemaining match {
                     case submittedRemaining: LimitOrder => loop(submittedRemaining, newUpdates)
                     case submittedRemaining: MarketOrder =>
                       val canSpendMore = submittedRemaining.availableForSpending > 0
                       if (canSpendMore) loop(submittedRemaining, newUpdates)
-                      else newUpdates.copy(events = updatedEvents enqueue systemCancelEvent(submittedRemaining))
+                      else newUpdates.copy(events = updatedEvents enqueue unmatchable(submittedRemaining))
                   }
                 }
               } else newUpdates
@@ -179,7 +179,7 @@ object OrderBook {
               currentUpdates = currentUpdates
                 .copy(
                   orderBook = currentUpdates.orderBook.unsafeWithoutBest(counter.order.orderType),
-                  events = currentUpdates.events.enqueue(OrderCanceled(counter, isSystemCancel = false, eventTs)),
+                  events = currentUpdates.events.enqueue(OrderCanceled(counter, OrderCanceledReason.BecameInvalid, eventTs)),
                   levelChanges = currentUpdates.levelChanges |-| LevelAmounts.mkDiff(levelPrice, counter)
                 )
             )
@@ -193,7 +193,7 @@ object OrderBook {
               currentUpdates.copy(orderBook = updatedOrderBook, levelChanges = updatedLevelChanges)
             case submitted: MarketOrder =>
               // Cancel market order in the absence of counters
-              currentUpdates.copy(events = currentUpdates.events enqueue systemCancelEvent(submitted))
+              currentUpdates.copy(events = currentUpdates.events enqueue unmatchable(submitted))
           }
       }
 

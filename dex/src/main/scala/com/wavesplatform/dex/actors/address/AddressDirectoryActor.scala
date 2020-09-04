@@ -4,7 +4,7 @@ import akka.actor.{Actor, ActorRef, Props, SupervisorStrategy, Terminated}
 import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.utils.{EitherExt2, ScorexLogging}
-import com.wavesplatform.dex.history.HistoryRouter._
+import com.wavesplatform.dex.history.HistoryRouterActor._
 import com.wavesplatform.dex.model.Events
 import com.wavesplatform.dex.model.Events.OrderCancelFailed
 
@@ -35,19 +35,19 @@ class AddressDirectoryActor(orderDB: OrderDB, addressActorProps: (Address, Boole
   override def receive: Receive = {
     case Envelope(address, cmd) => forward(address, cmd)
 
-    case e @ Events.OrderAdded(lo, timestamp) =>
+    case e @ Events.OrderAdded(lo, _, timestamp) =>
       forward(lo.order.sender, e)
-      historyRouter foreach { _ ! SaveOrder(lo, timestamp) }
+      historyRouter foreach { _ ! HistoryInsertMsg.SaveOrder(lo, timestamp) }
 
     case e: Events.OrderExecuted =>
       import e.{counter, submitted}
       forward(submitted.order.sender, e)
       if (counter.order.sender != submitted.order.sender) forward(counter.order.sender, e)
-      historyRouter foreach { _ ! SaveEvent(e) }
+      historyRouter foreach { _ ! HistoryInsertMsg.SaveEvent(e) }
 
     case e: Events.OrderCanceled =>
       forward(e.acceptedOrder.order.sender, e)
-      historyRouter foreach { _ ! SaveEvent(e) }
+      historyRouter foreach { _ ! HistoryInsertMsg.SaveEvent(e) }
 
     case e: OrderCancelFailed =>
       orderDB.get(e.id) match {

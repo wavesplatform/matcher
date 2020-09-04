@@ -3,10 +3,10 @@ package com.wavesplatform.dex
 import java.util.concurrent._
 import java.util.concurrent.atomic.AtomicReference
 
+import akka.Done
 import akka.actor.typed.scaladsl.adapter._
-import akka.actor.{ActorRef, ActorSystem, Props, typed}
+import akka.actor.{ActorRef, ActorSystem, CoordinatedShutdown, Props, typed}
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.Http.{HttpServerTerminated, HttpTerminated, ServerBinding}
 import akka.pattern.{CircuitBreaker, ask, gracefulStop}
 import akka.stream.Materializer
 import akka.util.Timeout
@@ -37,7 +37,7 @@ import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
 import com.wavesplatform.dex.grpc.integration.WavesBlockchainClientBuilder
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.BalanceChanges
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
-import com.wavesplatform.dex.history.HistoryRouter
+import com.wavesplatform.dex.history.HistoryRouterActor
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue._
 import com.wavesplatform.dex.settings.{MatcherSettings, OrderFeeSettings}
@@ -199,7 +199,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
   private val maybeApiKeyHash: Option[Array[Byte]] = Option(settings.restApi.apiKeyHash) filter (_.nonEmpty) map Base58.decode
 
   private lazy val httpApiRouteV0: MatcherApiRoute =
-    MatcherApiRoute(
+    new MatcherApiRoute(
       pairBuilder,
       matcherPublicKey,
       matcherActor,
@@ -214,7 +214,6 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       settings,
       () => status.get(),
       orderDB,
-      time,
       () => lastProcessedOffset,
       () => matcherQueue.lastEventOffset,
       ExchangeTransactionCreator.getAdditionalFeeForScript(hasMatcherAccountScript),
@@ -233,15 +232,14 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
 
   private lazy val httpApiRouteV1 = MatcherApiRouteV1(pairBuilder, orderBookHttpInfo, () => status.get(), maybeApiKeyHash)
 
-  private lazy val wsApiRoute = MatcherWebSocketRoute(
+  private lazy val wsApiRoute = new MatcherWebSocketRoute(
     wsInternalBroadcast, // safe, wsApiRoute is used after initialization of wsInternalBroadcast
     addressActors,
     matcherActor,
     time,
     pairBuilder,
-    p => Option { orderBooks.get() } flatMap (_ get p),
     maybeApiKeyHash,
-    settings.webSocketSettings,
+    settings,
     () => status.get()
   )
 
@@ -317,7 +315,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     )
 
   private lazy val historyRouter = settings.orderHistory.map { orderHistorySettings =>
-    actorSystem.actorOf(HistoryRouter.props(assetsCache.unsafeGetDecimals, settings.postgresConnection, orderHistorySettings), "history-router")
+    actorSystem.actorOf(HistoryRouterActor.props(assetsCache.unsafeGetDecimals, settings.postgresConnection, orderHistorySettings), "history-router")
   }
 
   private lazy val addressActors =
@@ -387,28 +385,34 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     )
   }
 
-  @volatile var matcherServerBinding: ServerBinding = _
+  def registerShutdownHooks(cs: CoordinatedShutdown): Unit = {
+    cs.addJvmShutdownHook(setStatus(Status.Stopping))
 
-  def shutdown(): Future[Unit] = {
+    cs.addTask(CoordinatedShutdown.PhaseBeforeServiceUnbind, "WebSockets")(() => wsApiRoute.gracefulShutdown().map(_ => Done))
 
-    setStatus(Status.Stopping)
+    cs.addTask(CoordinatedShutdown.PhaseServiceRequestsDone, "Actors") { () =>
+      gracefulStop(matcherActor, 3.seconds, MatcherActor.Shutdown).map(_ => Done)
+    }
 
-    val r = for {
-      _ <- { log.info("Shutting down all WebSocket connections..."); wsApiRoute.gracefulShutdown() }
-      _ <- {
-        log.info("Shutting down HTTP and WS servers...")
-        Option(matcherServerBinding).fold[Future[HttpTerminated]](Future.successful(HttpServerTerminated))(_.terminate(1.second))
-      }
-      _ <- { log.info("Shutting down actors..."); gracefulStop(matcherActor, 3.seconds, MatcherActor.Shutdown) }
-      _ <- { log.info("Shutting down gRPC client..."); wavesBlockchainAsyncClient.close() }
-      _ <- { log.info("Shutting down queue..."); Future { blocking(matcherQueue close 5.seconds) } }
-      _ <- { log.info("Shutting down materializer..."); Future.successful(materializer.shutdown()) }
-      _ <- { log.info("Shutting down DB..."); Future { blocking(db.close()) } }
-    } yield ()
+    cs.addTask(CoordinatedShutdown.PhaseServiceStop, "gRPC client") { () =>
+      wavesBlockchainAsyncClient.close().map(_ => Done)
+    }
 
-    r.andThen {
-      case Success(_) => log.info("Matcher stopped")
-      case Failure(e) => log.error("Failed to stop matcher", e)
+    cs.addTask(CoordinatedShutdown.PhaseServiceStop, "Queue") { () =>
+      matcherQueue.close(5.seconds).map(_ => Done)
+    }
+
+    cs.addTask(CoordinatedShutdown.PhaseBeforeActorSystemTerminate, "Materializer") { () =>
+      materializer.shutdown()
+      Future.successful(Done)
+    }
+
+    cs.addTask(CoordinatedShutdown.PhaseActorSystemTerminate, "DB") { () =>
+      Future { blocking(db.close()); Done }
+    }
+
+    cs.addTask(CoordinatedShutdown.PhaseActorSystemTerminate, "NTP") { () =>
+      Future { blocking(time.close()); Done }
     }
   }
 
@@ -472,10 +476,12 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         val combinedRoute = new CompositeHttpService(matcherApiTypes, matcherApiRoutes, settings.restApi).compositeRoute
 
         log.info(s"Binding REST and WebSocket API ${settings.restApi.address}:${settings.restApi.port} ...")
-        http.bindAndHandle(combinedRoute, settings.restApi.address, settings.restApi.port)
+        http
+          .newServerAt(settings.restApi.address, settings.restApi.port)
+          .bind(combinedRoute)
+          .map(_.addToCoordinatedShutdown(hardTerminationDeadline = 5.seconds))
       } map { serverBinding =>
-        matcherServerBinding = serverBinding
-        log.info(s"REST and WebSocket API bound to ${matcherServerBinding.localAddress}")
+        log.info(s"REST and WebSocket API bound to ${serverBinding.localAddress}")
       }
 
       deadline = settings.startEventsProcessingTimeout.fromNow

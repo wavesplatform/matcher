@@ -3,9 +3,9 @@ package com.wavesplatform.dex.model.orderbook
 import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
 
 import com.wavesplatform.dex.domain.order.Order
-import com.wavesplatform.dex.model.OrderBook
 import com.wavesplatform.dex.model.orderbook.OrderBookCancelBenchmark._
 import com.wavesplatform.dex.model.state.OrderBookBenchmarkState
+import com.wavesplatform.dex.model.{Events, OrderBook}
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 import org.scalacheck.Gen
@@ -20,7 +20,7 @@ import scala.util.Random
 @Measurement(iterations = 10)
 class OrderBookCancelBenchmark {
 //  @Benchmark def cancel_2500_to_1250_test(st: Cancel_2500_To_1250_State, bh: Blackhole): Unit = bh.consume { st.run() }
-  @Benchmark def cancel_1250_to_0_test(st: Cancel_1250_To_0_State, bh: Blackhole): Unit       = bh.consume { st.run() }
+  @Benchmark def cancel_1250_to_0_test(st: Cancel_1250_To_0_State, bh: Blackhole): Unit = bh.consume { st.run() }
 }
 
 object OrderBookCancelBenchmark {
@@ -48,7 +48,7 @@ object OrderBookCancelBenchmark {
       new Random(ThreadLocalRandom.current()).shuffle(xs).take(initOrderNumber - orderNumberAfterCancel)
     }
 
-    def run(): OrderBook = orders.foldLeft(orderBook) { case (r, id) => r.cancel(id, ts)._1 }
+    def run(): OrderBook = orders.foldLeft(orderBook) { case (r, id) => r.cancel(id, Events.OrderCanceledReason.RequestExecuted, ts)._1 }
   }
 
 }

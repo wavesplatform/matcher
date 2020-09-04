@@ -17,8 +17,8 @@ import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.meta.getSimpleName
-import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
-import com.wavesplatform.dex.model.{LimitOrder, MarketOrder}
+import com.wavesplatform.dex.model.Events.{OrderAdded, OrderAddedReason, OrderCanceled, OrderExecuted}
+import com.wavesplatform.dex.model.{Events, LimitOrder, MarketOrder}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.propspec.AnyPropSpecLike
@@ -129,8 +129,8 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
   def execute(counter: Order, submitted: Order): OrderExecuted = {
     val now = time.getTimestamp()
 
-    addressDir ! OrderAdded(LimitOrder(submitted), now)
-    addressDir ! OrderAdded(LimitOrder(counter), now)
+    addressDir ! OrderAdded(LimitOrder(submitted), OrderAddedReason.RequestExecuted, now)
+    addressDir ! OrderAdded(LimitOrder(counter), OrderAddedReason.RequestExecuted, now)
     val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter), submitted.timestamp, counter.matcherFee, submitted.matcherFee)
     addressDir ! exec
     exec
@@ -507,13 +507,13 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
   }
 
   private def systemCancelMarketOrder(addressDir: ActorRef, marketOrder: MarketOrder): Unit = {
-    addressDir ! OrderCanceled(marketOrder, isSystemCancel = true, System.currentTimeMillis)
+    addressDir ! OrderCanceled(marketOrder, Events.OrderCanceledReason.BecameUnmatchable, System.currentTimeMillis)
   }
 
   private def executeMarketOrder(addressDirWithOrderBookCache: ActorRef, marketOrder: MarketOrder, limitOrder: LimitOrder): OrderExecuted = {
     val executionEvent = mkOrderExecuted(marketOrder, limitOrder, marketOrder.order.timestamp)
 
-    addressDirWithOrderBookCache ! OrderAdded(limitOrder, time.getTimestamp())
+    addressDirWithOrderBookCache ! OrderAdded(limitOrder, OrderAddedReason.RequestExecuted, time.getTimestamp())
     addressDirWithOrderBookCache ! executionEvent
 
     executionEvent

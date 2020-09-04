@@ -9,6 +9,7 @@ import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import cats.kernel.Monoid
 import com.wavesplatform.dex.MatcherSpecBase
 import com.wavesplatform.dex.actors.SpendableBalancesActor
+import com.wavesplatform.dex.actors.address.AddressActor.Command.Source
 import com.wavesplatform.dex.actors.address.AddressActor.Query.GetTradableBalance
 import com.wavesplatform.dex.actors.address.AddressActor.Reply.Balance
 import com.wavesplatform.dex.api.ws.protocol.WsAddressChanges
@@ -20,7 +21,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV1}
 import com.wavesplatform.dex.domain.state.{LeaseBalance, Portfolio}
 import com.wavesplatform.dex.error.ErrorFormatterContext
-import com.wavesplatform.dex.model.Events.OrderAdded
+import com.wavesplatform.dex.model.Events.{OrderAdded, OrderAddedReason}
 import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder, MarketOrder}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
@@ -96,7 +97,7 @@ class AddressActorSpecification
         addOrder(LimitOrder(sellTokenOrder1))
 
         updatePortfolio(initPortfolio.copy(assets = Map.empty))
-        eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder1.assetPair, sellTokenOrder1.id()))
+        eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder1.assetPair, sellTokenOrder1.id(), Source.BalanceTracking))
       }
 
       "waves balance changed" when {
@@ -110,7 +111,7 @@ class AddressActorSpecification
           addOrder(LimitOrder(sellWavesOrder))
 
           updatePortfolio(initPortfolio.copy(balance = restWaves))
-          eventsProbe.expectMsg(QueueEvent.Canceled(sellWavesOrder.assetPair, sellWavesOrder.id()))
+          eventsProbe.expectMsg(QueueEvent.Canceled(sellWavesOrder.assetPair, sellWavesOrder.id(), Source.BalanceTracking))
         }
       }
 
@@ -125,7 +126,7 @@ class AddressActorSpecification
           addOrder(LimitOrder(sellWavesOrder))
 
           updatePortfolio(initPortfolio.copy(lease = LeaseBalance(0, leasedWaves(initPortfolio))))
-          eventsProbe.expectMsg(QueueEvent.Canceled(sellWavesOrder.assetPair, sellWavesOrder.id()))
+          eventsProbe.expectMsg(QueueEvent.Canceled(sellWavesOrder.assetPair, sellWavesOrder.id(), Source.BalanceTracking))
         }
       }
     }
@@ -151,7 +152,7 @@ class AddressActorSpecification
       addOrder(LimitOrder(sellTokenOrder2))
 
       updatePortfolio(sellToken1Portfolio)
-      eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder2.assetPair, sellTokenOrder2.id()))
+      eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder2.assetPair, sellTokenOrder2.id(), Source.BalanceTracking))
 
       updatePortfolio(sellToken1Portfolio) // same event
       eventsProbe.expectNoMessage()
@@ -165,8 +166,8 @@ class AddressActorSpecification
       addOrder(LimitOrder(sellTokenOrder2))
 
       updatePortfolio(sellWavesPortfolio)
-      eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder1.assetPair, sellTokenOrder1.id()))
-      eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder2.assetPair, sellTokenOrder2.id()))
+      eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder1.assetPair, sellTokenOrder1.id(), Source.BalanceTracking))
+      eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder2.assetPair, sellTokenOrder2.id(), Source.BalanceTracking))
     }
 
     "cancel only orders, those aren't fit" in test { (_, eventsProbe, addOrder, updatePortfolio) =>
@@ -176,8 +177,8 @@ class AddressActorSpecification
       Seq(sellTokenOrder1, sellWavesOrder, sellTokenOrder2).foreach(o => addOrder(LimitOrder(o)))
 
       updatePortfolio(sellWavesPortfolio)
-      eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder1.assetPair, sellTokenOrder1.id()))
-      eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder2.assetPair, sellTokenOrder2.id()))
+      eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder1.assetPair, sellTokenOrder1.id(), Source.BalanceTracking))
+      eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder2.assetPair, sellTokenOrder2.id(), Source.BalanceTracking))
     }
 
     "cancel expired orders" in test { (ref, eventsProbe, addOrder, updatePortfolio) =>
@@ -199,7 +200,7 @@ class AddressActorSpecification
         ))
       addOrder(lo)
 
-      eventsProbe.expectMsg(QueueEvent.Canceled(lo.order.assetPair, lo.id))
+      eventsProbe.expectMsg(QueueEvent.Canceled(lo.order.assetPair, lo.id, Source.Expiration))
     }
 
     "should not send a message multiple times" in test { (ref, _, addOrder, updatePortfolio) =>
@@ -270,7 +271,7 @@ class AddressActorSpecification
       ao match {
         case lo: LimitOrder =>
           eventsProbe.expectMsg(QueueEvent.Placed(lo))
-          addressDir ! OrderAdded(lo, System.currentTimeMillis)
+          addressDir ! OrderAdded(lo, OrderAddedReason.RequestExecuted, System.currentTimeMillis)
         case mo: MarketOrder => eventsProbe.expectMsg(QueueEvent.PlacedMarket(mo))
       }
     }

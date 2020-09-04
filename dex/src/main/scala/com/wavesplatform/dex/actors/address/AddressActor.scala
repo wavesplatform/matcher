@@ -30,7 +30,7 @@ import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError, Unexpec
 import com.wavesplatform.dex.fp.MapImplicits.group
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.SpendableBalance
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
-import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCancelFailed, OrderCanceled, OrderExecuted, Event => OrderEvent}
+import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCancelFailed, OrderCanceled, OrderCanceledReason, OrderExecuted, Event => OrderEvent}
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.QueueEvent
 import com.wavesplatform.dex.time.Time
@@ -113,7 +113,7 @@ class AddressActor(owner: Address,
               if (ao.isMarket) sender ! error.MarketOrderCancel(orderId)
               else {
                 pendingCommands.put(orderId, PendingCommand(command, sender))
-                cancel(ao.order)
+                cancel(ao.order, command.source)
               }
           }
       }
@@ -125,7 +125,7 @@ class AddressActor(owner: Address,
         sender ! Event.BatchCancelCompleted(Map.empty)
       } else {
         log.debug(s"Got $command, to cancel: ${toCancelIds.mkString(", ")}")
-        context.actorOf(BatchOrderCancelActor.props(toCancelIds.toSet, self, sender, settings.batchCancelTimeout))
+        context.actorOf(BatchOrderCancelActor.props(toCancelIds.toSet, command.source, self, sender, settings.batchCancelTimeout))
       }
 
     case command: Command.CancelOrders =>
@@ -140,7 +140,8 @@ class AddressActor(owner: Address,
 
       val initResponse = unknownIds.map(id => id -> error.OrderNotFound(id).asLeft[AddressActor.Event.OrderCanceled]).toMap
       if (toCancelIds.isEmpty) sender ! Event.BatchCancelCompleted(initResponse)
-      else context.actorOf(BatchOrderCancelActor.props(toCancelIds, self, sender, settings.batchCancelTimeout, initResponse))
+      else
+        context.actorOf(BatchOrderCancelActor.props(toCancelIds, command.source, self, sender, settings.batchCancelTimeout, initResponse))
 
     case msg: Message.BalanceChanged =>
       if (wsAddressState.hasActiveSubscriptions) {
@@ -156,8 +157,8 @@ class AddressActor(owner: Address,
         log.debug(s"Got $msg, canceling ${toCancel.size} of ${activeOrders.size}: doesn't have $cancelledText")
         toCancel.foreach { x =>
           val id = x.order.id()
-          pendingCommands.put(id, PendingCommand(Command.CancelOrder(id), ignoreRef)) // To prevent orders being cancelled twice
-          cancel(x.order)
+          pendingCommands.put(id, PendingCommand(Command.CancelOrder(id, Command.Source.BalanceTracking), ignoreRef)) // To prevent orders being cancelled twice
+          cancel(x.order, Command.Source.BalanceTracking)
         }
       }
 
@@ -224,13 +225,13 @@ class AddressActor(owner: Address,
           } else log.warn(s"Received stale $event for $orderId")
       }
 
-    case event @ OrderAdded(submitted, _) =>
-      import submitted.order
-      log.debug(s"OrderAdded(${order.id()})")
-      refreshOrderState(submitted, event)
-      pendingCommands.remove(order.id()).foreach { command =>
-        log.trace(s"Confirming placement for ${order.id()}")
-        command.client ! Event.OrderAccepted(order)
+    case event: OrderAdded =>
+      import event.order
+      log.debug(s"OrderAdded(${order.id}, ${event.reason}, ${event.timestamp})")
+      refreshOrderState(order, event)
+      pendingCommands.remove(order.id).foreach { command =>
+        log.trace(s"Confirming placement for ${order.id}")
+        command.client ! Event.OrderAccepted(order.order)
       }
 
     case event: OrderExecuted =>
@@ -238,10 +239,10 @@ class AddressActor(owner: Address,
       List(event.submittedRemaining, event.counterRemaining).filter(_.order.sender.toAddress == owner).foreach(refreshOrderState(_, event))
       context.system.eventStream.publish(CreateExchangeTransactionActor.OrderExecutedObserved(owner, event))
 
-    case event @ OrderCanceled(ao, isSystemCancel, _) =>
+    case event @ OrderCanceled(ao, reason, ts) =>
       val id       = ao.id
       val isActive = activeOrders.contains(id)
-      log.debug(s"OrderCanceled($id, system=$isSystemCancel, isActive=$isActive)")
+      log.debug(s"OrderCanceled($id, $reason, $ts, isActive=$isActive)")
       if (isActive) refreshOrderState(ao, event)
       pendingCommands.remove(id).foreach { pc =>
         log.trace(s"Confirming cancellation for $id")
@@ -264,8 +265,8 @@ class AddressActor(owner: Address,
         case Some(ao) =>
           if ((ao.order.expiration - time.correctedTime()).max(0L).millis <= ExpirationThreshold) {
             log.debug(s"$prefix, storing cancel event")
-            pendingCommands.put(id, PendingCommand(Command.CancelOrder(id), ignoreRef)) // To prevent orders being cancelled twice
-            cancel(ao.order)
+            pendingCommands.put(id, PendingCommand(Command.CancelOrder(id, Command.Source.Expiration), ignoreRef)) // To prevent orders being cancelled twice
+            cancel(ao.order, Command.Source.Expiration)
           } else {
             log.trace(s"$prefix, can't find an active order")
             scheduleExpiration(ao.order)
@@ -414,9 +415,12 @@ class AddressActor(owner: Address,
     lazy val origReservableBalance = origActiveOrder.fold(Map.empty[Asset, Long])(_.reservableBalance)
     lazy val openVolumeDiff        = remaining.reservableBalance |-| origReservableBalance
 
-    val (status, isSystemCancel) = event match {
-      case event: OrderCanceled => (OrderStatus.finalCancelStatus(remaining, event.isSystemCancel), event.isSystemCancel)
-      case _                    => (remaining.status, false)
+    val (status, unmatchable) = event match {
+      case event: OrderCanceled =>
+        val unmatchable = OrderCanceledReason.becameUnmatchable(event.reason)
+        (OrderStatus.finalCancelStatus(remaining, event.reason), unmatchable)
+
+      case _ => (remaining.status, false)
     }
 
     log.trace(s"New status of ${remaining.id} is $status")
@@ -439,13 +443,12 @@ class AddressActor(owner: Address,
     }
 
     if (wsAddressState.hasActiveSubscriptions) {
-      // Further improvements will be made in DEX-467
       wsAddressState = status match {
         case OrderStatus.Accepted     => wsAddressState.putOrderUpdate(remaining.id, WsOrder.fromDomain(remaining, status))
-        case _: OrderStatus.Cancelled => wsAddressState.putOrderStatusUpdate(remaining.id, status)
-        case _ =>
-          if (isSystemCancel) wsAddressState.putOrderStatusUpdate(remaining.id, status)
-          else wsAddressState.putOrderFillingInfoAndStatusUpdate(remaining, status)
+        case _: OrderStatus.Cancelled => wsAddressState.putOrderStatusNameUpdate(remaining.id, status)
+        case _                        =>
+          if (unmatchable) wsAddressState.putOrderStatusNameUpdate(remaining.id, status)
+          else wsAddressState.putOrderFillingInfoAndStatusNameUpdate(remaining, status)
       }
 
       // OrderStatus.Accepted means that we've already notified clients about these balance changes after order passed validation (see def place)
@@ -483,13 +486,13 @@ class AddressActor(owner: Address,
 
   private def pendingCancels: Set[Order.Id] =
     pendingCommands.collect {
-      case (_, PendingCommand(Command.CancelOrder(id), _)) => id
+      case (_, PendingCommand(Command.CancelOrder(id, _), _)) => id
     }.toSet
 
   private def cancellationInProgress(id: Order.Id): Boolean = pendingCommands.get(id).fold(false) {
     _.command match {
-      case Command.CancelOrder(`id`) => true
-      case _                         => false
+      case Command.CancelOrder(`id`, _) => true
+      case _                            => false
     }
   }
 
@@ -510,7 +513,7 @@ class AddressActor(owner: Address,
     )
   }
 
-  private def cancel(o: Order): Unit = storeEvent(o.id())(QueueEvent.Canceled(o.assetPair, o.id()))
+  private def cancel(o: Order, source: Command.Source): Unit = storeEvent(o.id())(QueueEvent.Canceled(o.assetPair, o.id(), source))
 
   private def storeEvent(orderId: Order.Id)(event: QueueEvent): Unit =
     store(event)
@@ -604,9 +607,18 @@ object AddressActor {
       def toAcceptedOrder(tradableBalance: Map[Asset, Long]): AcceptedOrder = if (isMarket) MarketOrder(order, tradableBalance) else LimitOrder(order)
     }
 
-    case class CancelOrder(orderId: Order.Id)                            extends OneOrderCommand
-    case class CancelOrders(orderIds: Set[Order.Id])                     extends Command
-    case class CancelAllOrders(pair: Option[AssetPair], timestamp: Long) extends Command
+    case class CancelOrder(orderId: Order.Id, source: Source)                            extends OneOrderCommand
+    case class CancelOrders(orderIds: Set[Order.Id], source: Source)                     extends Command
+    case class CancelAllOrders(pair: Option[AssetPair], timestamp: Long, source: Source) extends Command
+
+    sealed trait Source extends Product with Serializable
+    object Source {
+      // If you change this list, don't forget to change sourceToBytes
+      case object NotTracked        extends Source
+      case object Request           extends Source // User or admin, we don't know
+      case object Expiration        extends Source
+      case object BalanceTracking   extends Source
+    }
   }
 
   sealed trait Event

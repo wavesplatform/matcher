@@ -14,6 +14,9 @@ pipeline {
     agent {
         label 'buildagent-matcher'
     }
+    options {
+        timestamps()
+    }
     environment {
         SBT_HOME = tool name: 'sbt-1.2.6', type: 'org.jvnet.hudson.plugins.SbtPluginBuilder$SbtInstallation'
         SBT_THREAD_NUMBER = "${SBT_THREAD_NUMBER}"

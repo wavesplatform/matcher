@@ -375,6 +375,22 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
     dex1.api.cancelAll(acc)
   }
 
+  "Zero balances should not be in initial message" in {
+    val acc  = mkAccountWithBalance(10.waves -> Waves, 10.usd -> usd); Thread.sleep(150)
+    val wsc1 = mkWsAddressConnection(acc)
+
+    assertChanges(wsc1, squash = false) { Map(Waves -> WsBalances(10, 0), usd -> WsBalances(10, 0)) }()
+
+    broadcastAndAwait(mkBurn(acc, usd, 10.usd))
+    assertChanges(mkWsAddressConnection(acc), squash = false) { Map(Waves -> WsBalances(9, 0)) }()
+
+    broadcastAndAwait(mkTransfer(alice, acc, 5.usd, usd, 1.waves))
+    assertChanges(mkWsAddressConnection(acc), squash = false) { Map(Waves -> WsBalances(9, 0), usd -> WsBalances(5, 0)) }()
+
+    broadcastAndAwait(mkTransfer(acc, alice, 5.usd, usd, 1.waves))
+    assertChanges(mkWsAddressConnection(acc), squash = false) { Map(Waves -> WsBalances(8, 0)) }()
+  }
+
   "Subscription should be cancelled after jwt expiration" in {
 
     val acc = mkAccountWithBalance(10.waves -> Waves); Thread.sleep(150)

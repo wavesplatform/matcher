@@ -44,5 +44,7 @@ object NodeApiOps {
 
     def activationStatus: F[ActivationStatusResponse] = explicitGet(self.tryActivationStatus)
     def config: F[Config]                             = explicitGet(self.tryConfig)
+
+    def rollback(toHeight: Int, returnTransactionsToUtx: Boolean): F[Unit] = explicitGet(self.tryRollback(toHeight, returnTransactionsToUtx))
   }
 }

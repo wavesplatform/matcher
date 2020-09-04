@@ -49,6 +49,8 @@ trait NodeApi[F[_]] extends HasWaitReady[F] {
   def waitForTransaction(id: ByteStr): F[Unit]
   def waitForTransaction(tx: Transaction): F[Unit] = waitForTransaction(tx.getId)
   def waitForActivationStatus(f: ActivationStatusResponse => Boolean): F[Unit]
+
+  def tryRollback(toHeight: Int, returnTransactionsToUtx: Boolean): F[Either[ErrorResponse, Unit]]
 }
 
 object NodeApi {
@@ -131,6 +133,10 @@ object NodeApi {
         // See DexApi
         repeatUntil(request, RepeatRequestOptions(1.second, 60 + 20))(_ == true).map(_ => ())
       }
+
+      override def tryRollback(toHeight: Int, returnTransactionsToUtx: Boolean): F[Either[ErrorResponse, Unit]] = tryUnit {
+        sttp.post(uri"$apiUri/debug/rollback").body(RollbackReq(toHeight, returnTransactionsToUtx)).header("X-API-Key", apiKey)
+      }
     }
 
   private case class ConnectReq(host: String, port: Int)
@@ -138,4 +144,8 @@ object NodeApi {
     implicit val connectFormat: Format[ConnectReq] = Json.format
   }
 
+  private case class RollbackReq(rollbackTo: Int, returnTransactionsToUtx: Boolean)
+  private object RollbackReq {
+    implicit val rollbackFormat: Format[RollbackReq] = Json.format
+  }
 }

@@ -29,7 +29,7 @@ trait WsSuiteBase extends MatcherSuiteBase with HasWebSockets {
       r
     }
 
-    def receiveAtLeastNErrorsAndPings(pingsNumber: Int, errorsNumber: Int): (List[WsError], List[WsPingOrPong]) =
+    def receiveAtLeastNErrorsAndPings(errorsNumber: Int, pingsNumber: Int): (List[WsError], List[WsPingOrPong]) =
       eventually {
         val (errors, pings) = self
           .collectMessages[WsServerMessage]

@@ -30,7 +30,7 @@ class WsPingPongExternalTestSuite extends WsPingPongBaseSuite {
 
       val wsac               = mkWsAddressConnection(alice, dex1)
       val connectionLifetime = Await.result(wsac.connectionLifetime, maxConnectionLifetime + delta)
-      val (pings, errors)    = wsac.receiveAtLeastNPingsOrErrors(6) // 5 pings + 1 error
+      val (errors, pings)    = wsac.receiveAtLeastNErrorsAndPings(1, 5)
 
       connectionLifetime should (be >= maxConnectionLifetime and be <= maxConnectionLifetime + delta)
 

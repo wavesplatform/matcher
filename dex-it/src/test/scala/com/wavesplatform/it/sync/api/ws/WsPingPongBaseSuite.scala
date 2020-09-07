@@ -35,7 +35,7 @@ abstract class WsPingPongBaseSuite extends WsSuiteBase {
       "without sending pong" in {
         val wsac = mkWsUnmanagedConnection()
 
-        val (pings, errors) = wsac.receiveAtLeastNPingsOrErrors(4) // 3 pings + 1 error
+        val (errors, pings) = wsac.receiveAtLeastNErrorsAndPings(1, 3)
 
         pings.size should (be >= 3 and be <= 4)
         errors should matchTo { List(pongTimeoutError) }
@@ -63,7 +63,7 @@ abstract class WsPingPongBaseSuite extends WsSuiteBase {
 
         wsac.send(firstPing) // sending outdated pong will not prolong connection lifetime
 
-        val (pings, errors) = wsac.receiveAtLeastNPingsOrErrors(3) // 2 pings and 1 error
+        val (errors, pings) = wsac.receiveAtLeastNErrorsAndPings(1, 2)
 
         pings.size should (be >= 2 and be <= 3)
         errors should matchTo { List(pongTimeoutError) }
@@ -92,7 +92,7 @@ abstract class WsPingPongBaseSuite extends WsSuiteBase {
 
         Seq(wsac1 -> connection1Lifetime, wsac2 -> connection2Lifetime).foreach {
           case (conn, connLifetime) =>
-            val (pings, errors) = conn.receiveAtLeastNPingsOrErrors(3) // 2 pings + 1 error
+            val (errors, pings) = conn.receiveAtLeastNErrorsAndPings(1, 2)
             connLifetime should (be >= expectedConnectionsLifetime and be <= expectedConnectionsLifetime + delta)
             pings.size should (be >= 2 and be <= 3)
             errors should matchTo { List(pongTimeoutError) }
@@ -123,7 +123,7 @@ abstract class WsPingPongBaseSuite extends WsSuiteBase {
 
       val connectionLifetime          = Await.result(wsc.connectionLifetime, pingInterval + pongTimeout + delta)
       val expectedConnectionsLifetime = pingInterval * 2 + pongTimeout
-      val (pings, errors)             = wsc.receiveAtLeastNPingsOrErrors(4) // 3 pings + 1 error
+      val (errors, pings)             = wsc.receiveAtLeastNErrorsAndPings(1, 3)
       val expectedError               = InvalidJson(Nil)
 
       connectionLifetime should (be >= expectedConnectionsLifetime and be <= expectedConnectionsLifetime + delta)

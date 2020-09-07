@@ -74,7 +74,11 @@ class WsConnectionTestSuite extends WsSuiteBase {
     val (closed, active) = wscs.splitAt(3)
 
     withClue("closed\n") {
-      closed.foreach(_.isClosed shouldBe true)
+      closed.foreach { x =>
+        eventually {
+          x.isClosed shouldBe true
+        }
+      }
     }
 
     withClue("active\n") {

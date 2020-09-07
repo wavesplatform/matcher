@@ -27,7 +27,8 @@ import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
 import scala.concurrent.duration.FiniteDuration
 import scala.util.matching.Regex
 
-case class MatcherSettings(addressSchemeCharacter: Char,
+case class MatcherSettings(id: String,
+                           addressSchemeCharacter: Char,
                            accountStorage: AccountStorage.Settings,
                            wavesBlockchainClient: WavesBlockchainClientSettings,
                            ntpServer: String,
@@ -153,6 +154,7 @@ object MatcherSettings {
     val addressActorSettings    = config.as[AddressActor.Settings]("address-actor")
 
     MatcherSettings(
+      config.as[String]("id"),
       addressSchemeCharacter,
       accountStorage,
       wavesBlockchainClient,

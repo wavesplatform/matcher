@@ -1,5 +1,6 @@
 package com.wavesplatform.it
 
+import cats.syntax.either._
 import com.softwaremill.diffx.{Derived, Diff}
 import com.wavesplatform.dex.api.ws.connection.WsConnection
 import com.wavesplatform.dex.api.ws.entities.WsFullOrder
@@ -28,16 +29,24 @@ trait WsSuiteBase extends MatcherSuiteBase with HasWebSockets {
       r
     }
 
-    def receiveAtLeastNPingsOrErrors(n: Int): (List[WsPingOrPong], List[WsError]) = {
-      receiveAtLeastN[WsServerMessage](n).foldLeft { (List.empty[WsPingOrPong], List.empty[WsError]) } {
-        case ((pings, errors), message) =>
-          message match {
-            case p: WsPingOrPong => (pings :+ p, errors)
-            case e: WsError      => (pings, errors :+ e)
-            case _               => (pings, errors)
+    def receiveAtLeastNErrorsAndPings(errorsNumber: Int, pingsNumber: Int): (List[WsError], List[WsPingOrPong]) =
+      eventually {
+        val (errors, pings) = self
+          .collectMessages[WsServerMessage]
+          .filter {
+            case _: WsPingOrPong => true
+            case _: WsError      => true
+            case _               => false
           }
+          .partitionMap {
+            case x: WsError      => x.asLeft
+            case x: WsPingOrPong => x.asRight
+          }
+
+        errors.size should be >= errorsNumber
+        pings.size should be >= pingsNumber
+        (errors, pings)
       }
-    }
 
     def receiveNoMessages(duration: FiniteDuration = 1.second): Unit = {
       val sizeBefore = self.messages.size

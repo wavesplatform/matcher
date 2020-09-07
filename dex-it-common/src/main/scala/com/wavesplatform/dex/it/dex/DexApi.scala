@@ -36,6 +36,7 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
   // Won't work with type TryF[T] = F[Either[MatcherError, T]]
 
   def tryPublicKey: F[Either[MatcherError, HttpMatcherPublicKey]]
+  def tryPublicKeyWithResponse: F[(Response[_], Either[MatcherError, HttpMatcherPublicKey])]
 
   def tryReservedBalance(of: KeyPair, timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, HttpBalance]]
   def tryReservedBalanceWithApiKey(of: KeyPair, xUserPublicKey: Option[PublicKey]): F[Either[MatcherError, HttpBalance]]
@@ -178,7 +179,8 @@ object DexApi {
         s"http://${savedHost.getAddress.getHostAddress}:${savedHost.getPort}"
       }
 
-      override def tryPublicKey: F[Either[MatcherError, HttpMatcherPublicKey]] = tryParseJson(sttp.get(uri"$apiUri/matcher"))
+      override val tryPublicKeyWithResponse = tryParseJsonWithResponse(sttp.get(uri"$apiUri/matcher"))
+      override val tryPublicKey = tryPublicKeyWithResponse.map(_._2)
 
       override def tryReservedBalance(of: KeyPair, timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, Map[Asset, Long]]] =
         tryParseJson {

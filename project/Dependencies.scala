@@ -41,7 +41,7 @@ object Dependencies {
     val wavesProtobufSchemas = "1.2.6"
     val wavesJ               = "0.17.0"
 
-    val postgresql = "42.2.14"
+    val postgresql = "42.2.16"
     val quillJdbc  = "3.5.2"
 
     val sttp       = "1.7.2"
@@ -59,7 +59,7 @@ object Dependencies {
     val kafka       = "2.6.0"
 
     val swagger   = "1.1.2"
-    val swaggerUi = "3.26.1"
+    val swaggerUi = "3.32.5"
     val jaxbApi   = "2.3.1"
 
     val scorexCrypto = "2.1.9"
@@ -70,9 +70,9 @@ object Dependencies {
 
     val javaLevelDb = "0.12"
     val jniLevelDb  = "1.18.3"
-    val influxDb    = "2.19"
+    val influxDb    = "2.20"
 
-    val commonsNet = "3.6"
+    val commonsNet = "3.7"
     val nettyCodec = "4.1.33.Final"
     val jwt        = "4.3.0"
 

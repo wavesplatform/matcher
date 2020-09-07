@@ -13,7 +13,6 @@ import com.wavesplatform.wavesj.matcher.Order.Type
 import com.wavesplatform.wavesj.{ApiJson, AssetPair, PrivateKeyAccount, Transactions}
 import play.api.libs.json.{JsValue, Json}
 import pureconfig._
-import pureconfig.generic.auto._
 
 import scala.io.Source
 import scala.util.Random
@@ -92,7 +91,8 @@ package object utils {
       val pairs =
         if (file.isEmpty) List.empty
         else
-          source.getLines
+          source
+            .getLines()
             .map(l => {
               val splitted = l.split("-")
               new AssetPair(splitted(0), splitted(1))

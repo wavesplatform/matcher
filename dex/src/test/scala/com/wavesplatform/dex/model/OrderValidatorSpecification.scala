@@ -95,7 +95,7 @@ class OrderValidatorSpecification
       "order expires too soon" in forAll(Gen.choose[Long](1, OrderValidator.MinExpiration), accountGen) { (offset, pk) =>
         val tt       = new TestTime
         val unsigned = newBuyOrder
-        val signed   = Order.sign(unsigned.updateExpiration(tt.getTimestamp + offset).updateSender(pk), pk)
+        val signed   = Order.sign(unsigned.updateExpiration(tt.getTimestamp() + offset).updateSender(pk), pk)
 
         OrderValidator.timeAware(tt)(signed) should produce("WrongExpiration")
       }

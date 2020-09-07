@@ -100,7 +100,7 @@ trait ExchangeTransaction extends ByteAndJsonSerializable with Proven {
 
   override def toString: String = json().toString
 
-  def toPrettyString: String = json.map(Json.prettyPrint).value
+  def toPrettyString: String = json.map(Json.prettyPrint).value()
 
   override def equals(other: Any): Boolean = other match {
     case tx: ExchangeTransaction => id() == tx.id()

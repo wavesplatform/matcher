@@ -29,7 +29,7 @@ class AddressDirectoryActor(orderDB: OrderDB, addressActorProps: (Address, Boole
 
   private def forward(address: Address, msg: Any): Unit = (children get address, msg) match {
     case (None, _: AddressActor.Message.BalanceChanged) =>
-    case _                                              => children getOrElseUpdate (address, createAddressActor(address)) forward msg
+    case _                                              => children.getOrElseUpdate(address, createAddressActor(address)) forward msg
   }
 
   override def receive: Receive = {

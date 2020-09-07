@@ -100,7 +100,7 @@ lazy val root = (project in file("."))
 
 inScope(Global)(
   Seq(
-    scalaVersion := "2.13.2",
+    scalaVersion := "2.13.3",
     semanticdbEnabled := true,
     semanticdbVersion := scalafixSemanticdb.revision,
     organization := "com.wavesplatform",

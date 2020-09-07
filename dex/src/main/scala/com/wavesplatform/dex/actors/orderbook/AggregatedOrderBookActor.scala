@@ -18,6 +18,7 @@ import com.wavesplatform.dex.settings.OrderRestrictionsSettings
 import com.wavesplatform.dex.time.Time
 import monocle.macros.GenLens
 
+import scala.annotation.nowarn
 import scala.collection.immutable.TreeMap
 import scala.concurrent.duration.FiniteDuration
 
@@ -251,6 +252,7 @@ object AggregatedOrderBookActor {
     case (k, v) => k -> v.view.map(_.amount).sum
   }
 
+  @nowarn
   def sum(orig: TreeMap[Price, Amount], diff: Map[Price, Amount]): TreeMap[Price, Amount] =
     diff.foldLeft(orig) {
       case (r, (price, amount)) =>

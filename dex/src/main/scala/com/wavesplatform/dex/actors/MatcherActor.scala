@@ -130,7 +130,7 @@ class MatcherActor(settings: MatcherSettings,
 
   private def working: Receive = {
 
-    case GetMarkets         => sender ! tradedPairs.values.toSeq
+    case GetMarkets         => sender() ! tradedPairs.values.toSeq
     case GetSnapshotOffsets => sender() ! SnapshotOffsetsResponse(snapshotsState.snapshotOffsets)
 
     case request: QueueEventWithMeta =>

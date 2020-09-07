@@ -153,7 +153,7 @@ object WsExternalClientHandlerActor {
                       clientRef ! WsError.from(e, matcherTime)
                       Behaviors.same
                     case Right(jwtPayload) =>
-                      val subscriptionLifetime = (jwtPayload.activeTokenExpirationInSeconds * 1000 - time.correctedTime).millis
+                      val subscriptionLifetime = (jwtPayload.activeTokenExpirationInSeconds * 1000 - time.correctedTime()).millis
                       val expiration           = scheduleOnce(subscriptionLifetime, CancelAddressSubscription(address))
 
                       addressSubscriptions

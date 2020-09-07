@@ -36,7 +36,7 @@ class BroadcastExchangeTransactionActor(settings: ExchangeTransactionBroadcastSe
 
       confirmed { toCheck.map(_.id()) }
         .flatMap { confirmations =>
-          val (confirmed, unconfirmed) = toCheck.partition(tx => confirmations(tx.id.value))
+          val (confirmed, unconfirmed) = toCheck.partition(tx => confirmations(tx.id.value()))
           val (expired, ready)         = unconfirmed.partition(_.timestamp <= expireMs)
 
           Future

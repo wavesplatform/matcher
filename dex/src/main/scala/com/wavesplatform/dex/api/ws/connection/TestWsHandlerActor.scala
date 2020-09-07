@@ -30,7 +30,7 @@ class TestWsHandlerActor(testId: Int, keepAlive: Boolean) extends Actor with Sco
   }
 
   override val receive: Receive = {
-    case AssignSourceRef => context.become { awaitPings(sourceRef = sender) }
+    case AssignSourceRef => context.become { awaitPings(sourceRef = sender()) }
   }
 }
 

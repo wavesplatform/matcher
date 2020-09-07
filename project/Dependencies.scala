@@ -7,10 +7,10 @@ object Dependencies {
 
     val parCollections = "0.2.0"
 
-    val akka     = "2.6.6"
+    val akka     = "2.6.8"
     val akkaHttp = "10.2.0"
 
-    val scalaTest          = "3.1.2"
+    val scalaTest          = "3.2.2"
     val scalaCheck         = "1.14.3"
     val scalaTestPlusCheck = "3.1.2.0"
     val scalaMock          = "4.4.0"
@@ -33,13 +33,13 @@ object Dependencies {
     val janino             = "3.1.2"
     val logbackJsonEncoder = "6.4"
 
-    val silencer = "1.7.0"
+    val silencer = "1.7.1"
 
     val kamonCore     = "2.1.1"
     val kamonInfluxDb = "2.1.1"
 
     val wavesProtobufSchemas = "1.2.5"
-    val wavesJ               = "0.16.0"
+    val wavesJ               = "0.17.0"
 
     val postgresql = "42.2.14"
     val quillJdbc  = "3.5.1"

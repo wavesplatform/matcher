@@ -102,7 +102,7 @@ object TankGenerator {
       _ =>
         accounts.map(mkOrder(
           _,
-          if (math.random < 0.5 || !matching) Type.BUY else Type.SELL,
+          if (math.random() < 0.5 || !matching) Type.BUY else Type.SELL,
           settings.defaults.minimalOrderAmount + Random.nextInt(settings.defaults.minimalOrderAmount.toInt * 10),
           settings.defaults.minimalOrderPrice + Random.nextInt(settings.defaults.minimalOrderPrice.toInt * 10),
           pairs(Random.nextInt(pairs.length))

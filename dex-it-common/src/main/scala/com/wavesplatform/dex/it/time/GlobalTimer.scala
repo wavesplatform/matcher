@@ -16,7 +16,7 @@ object GlobalTimer {
 
   implicit class TimerOpsImplicits(val timer: Timer) extends AnyVal {
     def schedule[A](f: => Future[A], delay: FiniteDuration): Future[A] = {
-      val p = Promise[A]
+      val p = Promise[A]()
       try {
         timer.newTimeout(_ => p.completeWith(f), delay.length, delay.unit)
       } catch {

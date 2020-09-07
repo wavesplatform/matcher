@@ -12,14 +12,18 @@ import com.wavesplatform.wavesj.matcher.Order
 import com.wavesplatform.wavesj.matcher.Order.Type
 import com.wavesplatform.wavesj.{ApiJson, AssetPair, PrivateKeyAccount, Transactions}
 import play.api.libs.json.{JsValue, Json}
-import pureconfig._
+import pureconfig.ConfigSource
+
+import scala.annotation.nowarn
+import pureconfig.generic.auto._
 
 import scala.io.Source
 import scala.util.Random
 
 package object utils {
 
-  val settings =
+  @nowarn
+  val settings: Settings =
     ConfigSource
       .fromConfig(ConfigFactory.parseResources(scala.util.Properties.envOrElse("CONF", "devnet.conf")).getConfig("waves.dex.load"))
       .load[Settings]

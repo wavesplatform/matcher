@@ -473,7 +473,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       }
 
       _ <- {
-        log.info("Preparing HTTP service ...")
+        log.info(s"Preparing HTTP service (Matcher's ID = ${settings.id}) ...")
         // Indirectly initializes matcherActor, so it must be after loadAllKnownAssets
         val combinedRoute = respondWithHeader(MatcherHttpServer(settings.id)) {
           new CompositeHttpService(matcherApiTypes, matcherApiRoutes, settings.restApi).compositeRoute

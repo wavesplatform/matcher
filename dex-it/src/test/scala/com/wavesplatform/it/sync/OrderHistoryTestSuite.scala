@@ -270,11 +270,13 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
   }
 
   "OrderHistory should" - {
-    "correctly save average weighed price" in {
+    "correctly save average weighed price and total executed amount of price asset" in {
       Seq(alice, bob).foreach { dex1.api.cancelAll(_) }
 
-      def assertAvgWeighedPrice(keyPair: KeyPair, avgWeighedPrices: List[Long]): Unit = {
-        dex1.api.orderHistoryByPair(keyPair, wavesUsdPair, Some(false)).map(_.avgWeighedPrice) should matchTo(avgWeighedPrices)
+      def assertAvgWeighedPrice(keyPair: KeyPair, avgWeighedPricesAndPriceAssetAmount: List[(Long, Long)]): Unit = {
+        dex1.api
+          .orderHistoryByPair(keyPair, wavesUsdPair, Some(false))
+          .map(item => item.avgWeighedPrice -> item.executedAmountOfPriceAsset) should matchTo(avgWeighedPricesAndPriceAssetAmount)
       }
 
       // checking market and limit orders because
@@ -292,8 +294,8 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
 
         placeAndAwaitAtNode(mkOrderDP(mozart, wavesUsdPair, SELL, 95.waves, 2.0), isMarketOrder = isMarketOrder)
 
-        assertAvgWeighedPrice(mozart, List(288L))
-        assertAvgWeighedPrice(salieri, List(270L, 290L, 320L))
+        assertAvgWeighedPrice(mozart, List(288L  -> 259.20.usd))
+        assertAvgWeighedPrice(salieri, List(270L -> 135.usd, 290L -> 29.usd, 320L -> 96.usd))
 
         Seq(alice, bob, mozart, salieri).foreach { dex1.api.cancelAll(_) }
       }

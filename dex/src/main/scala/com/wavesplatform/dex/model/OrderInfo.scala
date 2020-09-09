@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.model
 
+import java.math.{BigDecimal, RoundingMode}
 import java.nio.ByteBuffer
 
 import com.google.common.primitives.Longs
@@ -21,6 +22,7 @@ sealed trait OrderInfo[+S <: OrderStatus] {
   def orderType: AcceptedOrderType
   def avgWeighedPrice: Long
   def orderVersion: Byte
+  def executedAmountOfPriceAsset: Long
 }
 
 object OrderInfo {
@@ -35,10 +37,18 @@ object OrderInfo {
     case _          => 3
   }
 
+  private def getExecutedAmountOfPriceAsset(filledAmount: Long, avgWeighedPrice: Long): Long =
+    new BigDecimal(avgWeighedPrice)
+      .multiply(new BigDecimal(filledAmount))
+      .scaleByPowerOfTen(-Order.PriceConstantExponent)
+      .setScale(0, RoundingMode.FLOOR)
+      .longValue()
+
   def v1[S <: OrderStatus](side: OrderType, amount: Long, price: Long, timestamp: Long, status: S, assetPair: AssetPair): OrderInfo[S] = {
 
-    val version: Byte = 1
-    val feeAsset      = Waves
+    val version: Byte   = 1
+    val feeAsset        = Waves
+    val avgWeighedPrice = backwardCompatibleAvgWeighedPrice(status, price)
 
     Impl(
       version,
@@ -51,8 +61,9 @@ object OrderInfo {
       status,
       assetPair,
       AcceptedOrderType.Limit,
-      backwardCompatibleAvgWeighedPrice(status, price),
-      backwardCompatibleOrderVersion(version, feeAsset)
+      avgWeighedPrice,
+      backwardCompatibleOrderVersion(version, feeAsset),
+      getExecutedAmountOfPriceAsset(status.filledAmount, avgWeighedPrice)
     )
   }
 
@@ -67,7 +78,9 @@ object OrderInfo {
                            timestamp: Long,
                            status: S,
                            assetPair: AssetPair): OrderInfo[S] = {
-    val version: Byte = 2
+    val version: Byte   = 2
+    val avgWeighedPrice = backwardCompatibleAvgWeighedPrice(status, price)
+
     Impl(
       version,
       side,
@@ -79,8 +92,9 @@ object OrderInfo {
       status,
       assetPair,
       AcceptedOrderType.Limit,
-      backwardCompatibleAvgWeighedPrice(status, price),
-      backwardCompatibleOrderVersion(version, matcherFeeAssetId)
+      avgWeighedPrice,
+      backwardCompatibleOrderVersion(version, matcherFeeAssetId),
+      getExecutedAmountOfPriceAsset(status.filledAmount, avgWeighedPrice)
     )
   }
 
@@ -102,7 +116,9 @@ object OrderInfo {
                            status: S,
                            assetPair: AssetPair,
                            orderType: AcceptedOrderType): OrderInfo[S] = {
-    val version: Byte = 3
+    val version: Byte   = 3
+    val avgWeighedPrice = backwardCompatibleAvgWeighedPrice(status, price)
+
     Impl(
       version,
       side,
@@ -114,8 +130,9 @@ object OrderInfo {
       status,
       assetPair,
       orderType,
-      backwardCompatibleAvgWeighedPrice(status, price),
-      backwardCompatibleOrderVersion(version, matcherFeeAssetId)
+      avgWeighedPrice,
+      backwardCompatibleOrderVersion(version, matcherFeeAssetId),
+      getExecutedAmountOfPriceAsset(status.filledAmount, avgWeighedPrice)
     )
   }
 
@@ -142,7 +159,8 @@ object OrderInfo {
       assetPair,
       orderType,
       avgWeighedPrice,
-      backwardCompatibleOrderVersion(version, matcherFeeAssetId)
+      backwardCompatibleOrderVersion(version, matcherFeeAssetId),
+      getExecutedAmountOfPriceAsset(status.filledAmount, avgWeighedPrice)
     )
   }
 
@@ -192,7 +210,21 @@ object OrderInfo {
                            orderType: AcceptedOrderType,
                            avgWeighedPrice: Long,
                            orderVersion: Byte): OrderInfo[S] =
-    Impl(5, side, amount, price, matcherFee, matcherFeeAssetId, timestamp, status, assetPair, orderType, avgWeighedPrice, orderVersion)
+    Impl(
+      5,
+      side,
+      amount,
+      price,
+      matcherFee,
+      matcherFeeAssetId,
+      timestamp,
+      status,
+      assetPair,
+      orderType,
+      avgWeighedPrice,
+      orderVersion,
+      getExecutedAmountOfPriceAsset(status.filledAmount, avgWeighedPrice)
+    )
 
   private case class Impl[+S <: OrderStatus](version: Byte,
                                              side: OrderType,
@@ -205,7 +237,8 @@ object OrderInfo {
                                              assetPair: AssetPair,
                                              orderType: AcceptedOrderType,
                                              avgWeighedPrice: Long,
-                                             orderVersion: Byte)
+                                             orderVersion: Byte,
+                                             executedAmountOfPriceAsset: Long)
       extends OrderInfo[S]
 
   def encode(oi: FinalOrderInfo): Array[Byte] = oi.version match {

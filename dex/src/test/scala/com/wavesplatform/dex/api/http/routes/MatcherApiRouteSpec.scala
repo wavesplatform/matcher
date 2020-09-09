@@ -65,8 +65,12 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
   private val apiKeyHeader = RawHeader(`X-Api-Key`.headerName, apiKey)
 
   private val matcherKeyPair = KeyPair("matcher".getBytes("utf-8"))
-  private val smartAsset     = arbitraryAssetGen.sample.get
-  private val smartAssetId   = smartAsset.id
+
+  private val smartAsset   = arbitraryAssetGen.sample.get
+  private val smartAssetId = smartAsset.id
+
+  private val unknownAsset   = arbitraryAssetGen.sample.get
+  private val unknownAssetId = unknownAsset.id
 
   // Will be refactored in DEX-548
   private val (orderToCancel, sender) = orderGenerator.sample.get
@@ -295,6 +299,16 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         Get(routePath(s"/orderbook/$smartAssetId/WAVES/status")) ~> route ~> check {
           status shouldEqual StatusCodes.OK
           responseAs[HttpMarketStatus] should matchTo(HttpMarketStatus fromMarketStatus smartWavesMarketStatus)
+        }
+      }
+    )
+
+    "returns OK even there is no such order book" in test(
+      { route =>
+        Get(routePath(s"/orderbook/$unknownAssetId/WAVES/status")) ~> route ~> check {
+          println(responseAs[HttpMarketStatus])
+          status shouldEqual StatusCodes.OK
+          responseAs[HttpMarketStatus] should matchTo(HttpMarketStatus(None, None, None, None, None, None, None))
         }
       }
     )
@@ -1269,7 +1283,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         assetPairBuilder = new AssetPairBuilder(
           settings, {
             case `smartAsset` => liftValueAsync[BriefAssetDescription](smartAssetDesc)
-            case x if x == okOrder.assetPair.amountAsset || x == badOrder.assetPair.amountAsset =>
+            case x if x == okOrder.assetPair.amountAsset || x == badOrder.assetPair.amountAsset || x == unknownAsset =>
               liftValueAsync[BriefAssetDescription](amountAssetDesc)
             case x if x == okOrder.assetPair.priceAsset || x == badOrder.assetPair.priceAsset =>
               liftValueAsync[BriefAssetDescription](priceAssetDesc)

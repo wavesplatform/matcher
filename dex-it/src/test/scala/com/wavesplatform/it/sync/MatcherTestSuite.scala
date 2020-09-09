@@ -3,7 +3,7 @@ package com.wavesplatform.it.sync
 import com.softwaremill.sttp._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
-import com.wavesplatform.dex.api.http.entities.{HttpAssetInfo, HttpOrderBookHistoryItem, HttpV0LevelAgg}
+import com.wavesplatform.dex.api.http.entities.{HttpAssetInfo, HttpMarketStatus, HttpOrderBookHistoryItem, HttpV0LevelAgg}
 import com.wavesplatform.dex.api.http.headers.MatcherHttpServer
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -35,6 +35,9 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
   private val IssueResults(issueBob2Asset2Tx, _, bobAsset2) = mkIssueExtended(bob, "Bob-2-X", someAssetAmount, 0)
   private val bob2WavesPair                                 = AssetPair(bobAsset2, Waves)
 
+  private val IssueResults(issueBobNotTradedAssetTx, _, bobNotTradedAsset) = mkIssueExtended(bob, "Bob-Not-Traded", someAssetAmount, 0)
+  private val bobNotTradedWavesPair                                        = AssetPair(bobNotTradedAsset, Waves)
+
   private val order1 = mkOrder(alice, aliceWavesPair, SELL, aliceSellAmount, 2000.waves, ttl = 10.minutes) // TTL?
 
   private val maxOrders = 99
@@ -48,7 +51,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
-    broadcastAndAwait(issueAliceAssetTx, issueBob1Asset1Tx, issueBob2Asset2Tx, IssueUsdTx, IssueBtcTx, IssueUsdnTx)
+    broadcastAndAwait(issueAliceAssetTx, issueBob1Asset1Tx, issueBob2Asset2Tx, issueBobNotTradedAssetTx, IssueUsdTx, IssueBtcTx, IssueUsdnTx)
     dex1.start()
   }
 
@@ -282,26 +285,39 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         dex1.api.tryPlace(mkBobOrder) should failWith(3147270) // BalanceNotEnough
       }
 
-      "market status" in {
-        val ask       = 5.waves
-        val askAmount = 5000000
+      "market status" - {
+        "is updated after trade" in {
+          val ask       = 5.waves
+          val askAmount = 5000000
 
-        val bid       = 10.waves
-        val bidAmount = 10000000
+          val bid       = 10.waves
+          val bidAmount = 10000000
 
-        dex1.api.place(mkOrder(bob, bob2WavesPair, SELL, askAmount, ask))
+          dex1.api.place(mkOrder(bob, bob2WavesPair, SELL, askAmount, ask))
 
-        val resp1 = dex1.api.orderBookStatus(bob2WavesPair)
-        resp1.lastTrade shouldBe None
-        resp1.bestBid shouldBe None
-        resp1.bestAsk should matchTo { Option(LevelAgg(askAmount, ask)) }
+          val resp1 = dex1.api.orderBookStatus(bob2WavesPair)
+          resp1.lastTrade shouldBe None
+          resp1.bestBid shouldBe None
+          resp1.bestAsk should matchTo {
+            Option(LevelAgg(askAmount, ask))
+          }
 
-        dex1.api.place(mkOrder(alice, bob2WavesPair, BUY, bidAmount, bid))
+          dex1.api.place(mkOrder(alice, bob2WavesPair, BUY, bidAmount, bid))
 
-        val resp2 = dex1.api.orderBookStatus(bob2WavesPair)
-        resp2.lastTrade should matchTo { Option(LastTrade(ask, askAmount, OrderType.BUY)) }
-        resp2.bestBid should matchTo { Option(LevelAgg(bidAmount - askAmount, bid)) }
-        resp2.bestAsk shouldBe None
+          val resp2 = dex1.api.orderBookStatus(bob2WavesPair)
+          resp2.lastTrade should matchTo {
+            Option(LastTrade(ask, askAmount, OrderType.BUY))
+          }
+          resp2.bestBid should matchTo {
+            Option(LevelAgg(bidAmount - askAmount, bid))
+          }
+          resp2.bestAsk shouldBe None
+        }
+
+        "is returned even there is no such order book" in {
+          val r = dex1.api.orderBookStatus(bobNotTradedWavesPair)
+          r should matchTo(HttpMarketStatus(None, None, None, None, None, None, None))
+        }
       }
     }
   }

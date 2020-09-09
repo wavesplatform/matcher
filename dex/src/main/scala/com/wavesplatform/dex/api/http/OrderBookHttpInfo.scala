@@ -1,33 +1,33 @@
 package com.wavesplatform.dex.api.http
 
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse, StatusCodes}
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
 import com.wavesplatform.dex.actors.OrderBookAskAdapter
 import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.Depth
+import com.wavesplatform.dex.actors.orderbook.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.api.http.entities.MatcherResponse.toHttpResponse
 import com.wavesplatform.dex.api.http.entities.{HttpMarketStatus, HttpOrderBook, OrderBookUnavailable, SimpleResponse}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.model.MatcherModel.{DecimalsFormat, Denormalized}
 import com.wavesplatform.dex.time.Time
-import play.api.libs.json.Json
 
 import scala.concurrent.{ExecutionContext, Future}
 
 class OrderBookHttpInfo(settings: OrderBookHttpInfo.Settings, askAdapter: OrderBookAskAdapter, time: Time, assetDecimals: Asset => Option[Int])(
     implicit ec: ExecutionContext) {
 
-  private val marketStatusNotFound = toHttpResponse(
-    SimpleResponse(StatusCodes.NotFound, Json.obj("message" -> "There is no information about this asset pair"))
-  )
+  private val emptyMarketStatus = toHttpMarketStatusResponse(MarketStatus(None, None, None))
 
   def getMarketStatus(assetPair: AssetPair): Future[HttpResponse] =
     askAdapter.getMarketStatus(assetPair).map {
       case Left(e) => toHttpResponse(OrderBookUnavailable(e))
       case Right(maybeMarketStatus) =>
         maybeMarketStatus match {
-          case Some(ms) => toHttpResponse(SimpleResponse(HttpMarketStatus fromMarketStatus ms))
-          case None     => marketStatusNotFound
+          case Some(ms) => toHttpMarketStatusResponse(ms)
+          case None     => emptyMarketStatus
         }
     }
+
+  private def toHttpMarketStatusResponse(ms: MarketStatus): HttpResponse = toHttpResponse(SimpleResponse(HttpMarketStatus fromMarketStatus ms))
 
   def getHttpView(assetPair: AssetPair, format: DecimalsFormat, depth: Option[Depth]): Future[HttpResponse] =
     askAdapter.getHttpView(assetPair, format, settings.nearestBigger(depth)).map {
@@ -46,7 +46,7 @@ class OrderBookHttpInfo(settings: OrderBookHttpInfo.Settings, askAdapter: OrderB
   }
 
   private def assetPairDecimals(assetPair: AssetPair, format: DecimalsFormat): Option[(Depth, Depth)] = format match {
-    case Denormalized => assetDecimals(assetPair.amountAsset).zip(assetDecimals(assetPair.priceAsset)).headOption
+    case Denormalized => assetDecimals(assetPair.amountAsset).zip(assetDecimals(assetPair.priceAsset))
     case _            => None
   }
 }

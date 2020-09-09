@@ -11,7 +11,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.model.{Normalization, Price}
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderAddedReason, OrderCanceled, OrderExecuted}
+import com.wavesplatform.dex.model.Events._
 import com.wavesplatform.dex.model.OrderBook.OrderBookUpdates
 import com.wavesplatform.dex.settings.OrderFeeSettings.DynamicSettings
 import com.wavesplatform.dex.settings.{MatchingRule, OrderFeeSettings}
@@ -480,7 +480,7 @@ class OrderBookTestSuite
     r.lastTrade.isEmpty shouldBe true
   }
 
-  "correctly calculates average price" in {
+  "correctly calculates average price and total executed amount of price asset" in {
 
     val balance   = Map[Asset, Long](usd -> 500.usd).withDefaultValue(0L)
     val submitted = createOrder(wavesUsdPair, BUY, 200.waves, 3.0)
@@ -500,15 +500,17 @@ class OrderBookTestSuite
       events should have size (if (buy.isLimit) 7 else 8)
       (0 to 3).foreach(events(_) shouldBe a[OrderAdded])
 
+      Seq(buy, sell1, sell2, sell3).foreach(_.fillingInfo.totalExecutedAmountOfPriceAsset shouldBe 0)
+
+      // format: off
       forAll(
         Table(
-          ("event id", "execution number", "submitted weighed price", "submitted avg price", "counter weighed price", "counter avg price"),
-          (4, "first", 25.waves.usd, 2.5.usd, 25.waves.usd, 2.5.usd),
-          (5, "second", 160.waves.usd, 2.66.usd, 135.waves.usd, 2.7.usd),
-          (6, "third", 490.waves.usd, 2.88.usd, 330.waves.usd, 3.0.usd),
+          ("event id", "execution number", "submitted price nominator", "submitted avg price", "submitted price asset executed amount", "counter price nominator", "counter avg price", "counter price asset executed amount"),
+          (4,          "first",            25.waves.usd,                2.5.usd,                25.usd,                                 25.waves.usd,               2.5.usd,            25.usd),
+          (5,          "second",           160.waves.usd,               2.66.usd,               160.usd,                                135.waves.usd,              2.7.usd,            135.usd),
+          (6,           "third",           490.waves.usd,               2.88.usd,               490.usd,                                330.waves.usd,              3.0.usd,            330.usd),
         )
-        // format: off
-      ) { (eventId: Int, executionNumber: String, sAvgWeighedPriceNominator: Long, submittedAvgPrice: Long, cAvgWeighedPriceNominator: Long, counterAvgPrice: Long) =>
+      ) { (eventId: Int, executionNumber: String, sAvgWeighedPriceNominator: Long, submittedAvgPrice: Long, sPriceAssetExecutedAmount: Long, cAvgWeighedPriceNominator: Long, counterAvgPrice: Long, cPriceAssetExecutedAmount: Long) =>
         // format: on
 
         withClue(s"$orderType, $executionNumber execution of 3:\n") {
@@ -517,9 +519,11 @@ class OrderBookTestSuite
 
           oe.submittedRemaining.avgWeighedPriceNominator shouldBe BigInteger.valueOf(sAvgWeighedPriceNominator)
           oe.submittedRemaining.fillingInfo.avgWeighedPrice shouldBe submittedAvgPrice
+          oe.submittedRemaining.fillingInfo.totalExecutedAmountOfPriceAsset shouldBe sPriceAssetExecutedAmount
 
           oe.counterRemaining.avgWeighedPriceNominator shouldBe BigInteger.valueOf(cAvgWeighedPriceNominator)
           oe.counterRemaining.fillingInfo.avgWeighedPrice shouldBe counterAvgPrice
+          oe.counterRemaining.fillingInfo.totalExecutedAmountOfPriceAsset shouldBe cPriceAssetExecutedAmount
         }
       }
 

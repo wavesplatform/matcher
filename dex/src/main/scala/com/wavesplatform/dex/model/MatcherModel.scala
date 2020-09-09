@@ -66,10 +66,18 @@ sealed trait AcceptedOrder {
   def filledFee: Long    = order.matcherFee - fee
 
   def fillingInfo: FillingInfo = {
-    val isNew           = amount == order.amount
-    val avgWeighedPrice = if (isNew) 0 else avgWeighedPriceNominator.divide(BigInteger valueOf filledAmount).longValueExact()
+    val isNew = amount == order.amount
 
-    FillingInfo(filledAmount, filledFee, avgWeighedPrice)
+    val (avgWeighedPrice, totalExecutedAmountOfPriceAsset) = {
+      if (isNew) (0L, 0L)
+      else
+        (
+          avgWeighedPriceNominator.divide(BigInteger valueOf filledAmount).longValueExact(),
+          avgWeighedPriceNominator.divide(BigInteger valueOf Order.PriceConstant).longValueExact()
+        )
+    }
+
+    FillingInfo(filledAmount, filledFee, avgWeighedPrice, totalExecutedAmountOfPriceAsset)
   }
 
   def requiredFee: Long                 = fee
@@ -228,7 +236,7 @@ object AcceptedOrder {
     }
   }
 
-  final case class FillingInfo(filledAmount: Long, filledFee: Long, avgWeighedPrice: Long)
+  final case class FillingInfo(filledAmount: Long, filledFee: Long, avgWeighedPrice: Long, totalExecutedAmountOfPriceAsset: Long)
 }
 
 sealed trait BuyOrder extends AcceptedOrder {

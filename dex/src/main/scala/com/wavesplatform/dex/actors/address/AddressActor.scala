@@ -76,12 +76,12 @@ class AddressActor(owner: Address,
       log.debug(s"Got $command")
       val orderId = command.order.id()
 
-      if (totalActiveOrders >= settings.maxActiveOrders) sender ! error.ActiveOrdersLimitReached(settings.maxActiveOrders)
-      else if (failedPlacements.contains(orderId) || hasOrder(orderId)) sender ! error.OrderDuplicate(orderId)
+      if (totalActiveOrders >= settings.maxActiveOrders) sender() ! error.ActiveOrdersLimitReached(settings.maxActiveOrders)
+      else if (failedPlacements.contains(orderId) || hasOrder(orderId)) sender() ! error.OrderDuplicate(orderId)
       else {
         val shouldProcess = placementQueue.isEmpty
         placementQueue = placementQueue.enqueue(orderId)
-        pendingCommands.put(orderId, PendingCommand(command, sender))
+        pendingCommands.put(orderId, PendingCommand(command, sender()))
         if (shouldProcess) processNextPlacement()
         else log.trace(s"${placementQueue.headOption} is processing, moving $orderId to the queue")
       }
@@ -91,7 +91,7 @@ class AddressActor(owner: Address,
       log.debug(s"Got $command")
       pendingCommands.get(orderId) match {
         case Some(pc) =>
-          sender ! {
+          sender() ! {
             pc.command match {
               case _: Command.PlaceOrder  => error.OrderNotFound(orderId)
               case _: Command.CancelOrder => error.OrderCanceled(orderId)
@@ -101,7 +101,7 @@ class AddressActor(owner: Address,
         case None =>
           activeOrders.get(orderId) match {
             case None =>
-              sender ! {
+              sender() ! {
                 orderDB.status(orderId) match {
                   case OrderStatus.NotFound     => error.OrderNotFound(orderId)
                   case _: OrderStatus.Cancelled => error.OrderCanceled(orderId)
@@ -110,9 +110,9 @@ class AddressActor(owner: Address,
               }
 
             case Some(ao) =>
-              if (ao.isMarket) sender ! error.MarketOrderCancel(orderId)
+              if (ao.isMarket) sender() ! error.MarketOrderCancel(orderId)
               else {
-                pendingCommands.put(orderId, PendingCommand(command, sender))
+                pendingCommands.put(orderId, PendingCommand(command, sender()))
                 cancel(ao.order, command.source)
               }
           }
@@ -122,10 +122,10 @@ class AddressActor(owner: Address,
       val toCancelIds = getActiveLimitOrders(command.pair).map(_.id)
       if (toCancelIds.isEmpty) {
         log.debug(s"Got $command, nothing to cancel")
-        sender ! Event.BatchCancelCompleted(Map.empty)
+        sender() ! Event.BatchCancelCompleted(Map.empty)
       } else {
         log.debug(s"Got $command, to cancel: ${toCancelIds.mkString(", ")}")
-        context.actorOf(BatchOrderCancelActor.props(toCancelIds.toSet, command.source, self, sender, settings.batchCancelTimeout))
+        context.actorOf(BatchOrderCancelActor.props(toCancelIds.toSet, command.source, self, sender(), settings.batchCancelTimeout))
       }
 
     case command: Command.CancelOrders =>
@@ -139,9 +139,9 @@ class AddressActor(owner: Address,
       )
 
       val initResponse = unknownIds.map(id => id -> error.OrderNotFound(id).asLeft[AddressActor.Event.OrderCanceled]).toMap
-      if (toCancelIds.isEmpty) sender ! Event.BatchCancelCompleted(initResponse)
+      if (toCancelIds.isEmpty) sender() ! Event.BatchCancelCompleted(initResponse)
       else
-        context.actorOf(BatchOrderCancelActor.props(toCancelIds, command.source, self, sender, settings.batchCancelTimeout, initResponse))
+        context.actorOf(BatchOrderCancelActor.props(toCancelIds, command.source, self, sender(), settings.batchCancelTimeout, initResponse))
 
     case msg: Message.BalanceChanged =>
       if (wsAddressState.hasActiveSubscriptions) {
@@ -162,14 +162,14 @@ class AddressActor(owner: Address,
         }
       }
 
-    case Query.GetReservedBalance            => sender ! Reply.Balance(openVolume.filter(_._2 > 0))
-    case Query.GetTradableBalance(forAssets) => getTradableBalance(forAssets).map(Reply.Balance).pipeTo(sender)
+    case Query.GetReservedBalance            => sender() ! Reply.Balance(openVolume.filter(_._2 > 0))
+    case Query.GetTradableBalance(forAssets) => getTradableBalance(forAssets).map(Reply.Balance).pipeTo(sender())
 
     case Query.GetOrderStatus(orderId) =>
-      sender ! Reply.GetOrderStatus(activeOrders.get(orderId).fold[OrderStatus](orderDB.status(orderId))(_.status))
+      sender() ! Reply.GetOrderStatus(activeOrders.get(orderId).fold[OrderStatus](orderDB.status(orderId))(_.status))
 
     case Query.GetOrderStatusInfo(orderId) =>
-      sender ! Reply.OrdersStatusInfo(
+      sender() ! Reply.OrdersStatusInfo(
         activeOrders
           .get(orderId)
           .map(ao => OrderInfo.v5(ao, ao.status)) orElse orderDB.getOrderInfo(orderId)
@@ -185,7 +185,7 @@ class AddressActor(owner: Address,
         else Seq.empty
 
       val matchingClosedOrders = if (orderListType.hasClosed) orderDB.getFinalizedOrders(owner, maybePair) else Seq.empty
-      sender ! Reply.OrdersStatuses(matchingActiveOrders ++ matchingClosedOrders)
+      sender() ! Reply.OrdersStatuses(matchingActiveOrders ++ matchingClosedOrders)
 
     case Event.StoreFailed(orderId, reason, queueEvent) =>
       failedPlacements.add(orderId)
@@ -446,7 +446,7 @@ class AddressActor(owner: Address,
       wsAddressState = status match {
         case OrderStatus.Accepted     => wsAddressState.putOrderUpdate(remaining.id, WsOrder.fromDomain(remaining, status))
         case _: OrderStatus.Cancelled => wsAddressState.putOrderStatusNameUpdate(remaining.id, status)
-        case _                        =>
+        case _ =>
           if (unmatchable) wsAddressState.putOrderStatusNameUpdate(remaining.id, status)
           else wsAddressState.putOrderFillingInfoAndStatusNameUpdate(remaining, status)
       }
@@ -614,10 +614,10 @@ object AddressActor {
     sealed trait Source extends Product with Serializable
     object Source {
       // If you change this list, don't forget to change sourceToBytes
-      case object NotTracked        extends Source
-      case object Request           extends Source // User or admin, we don't know
-      case object Expiration        extends Source
-      case object BalanceTracking   extends Source
+      case object NotTracked      extends Source
+      case object Request         extends Source // User or admin, we don't know
+      case object Expiration      extends Source
+      case object BalanceTracking extends Source
     }
   }
 

@@ -83,7 +83,7 @@ object OrderValidator extends ScorexLogging {
         .ifM(verifyScript, liftErrorAsync[Unit] { error.AccountFeatureUnsupported(BlockchainFeatures.SmartAccountTrading) })
     }
 
-    liftFutureAsync { blockchain.hasScript(address) } ifM (verifyAddressScript, verifySignature(order))
+    liftFutureAsync { blockchain.hasScript(address) }.ifM(verifyAddressScript, verifySignature(order))
   }
 
   private def verifySmartToken(blockchain: AsyncBlockchain, asset: IssuedAsset, tx: ExchangeTransaction, hasAssetScript: Asset => Boolean)(
@@ -103,7 +103,7 @@ object OrderValidator extends ScorexLogging {
         .ifM(verifyScript, liftErrorAsync[Unit] { error.AssetFeatureUnsupported(BlockchainFeatures.SmartAssets, asset) })
     }
 
-    liftValueAsync { hasAssetScript(asset) } ifM (verifySmartAssetScript, successAsync)
+    liftValueAsync { hasAssetScript(asset) }.ifM(verifySmartAssetScript, successAsync)
   }
 
   private def validateDecimals(assetDecimals: Asset => Int, o: Order)(implicit ec: ExecutionContext): FutureResult[(Int, Int)] = liftAsync {
@@ -386,7 +386,7 @@ object OrderValidator extends ScorexLogging {
 
   def timeAware(time: Time)(order: Order): Result[Order] = {
     for {
-      _ <- cond(order.expiration > time.correctedTime + MinExpiration,
+      _ <- cond(order.expiration > time.correctedTime() + MinExpiration,
                 (),
                 error.WrongExpiration(time.correctedTime(), MinExpiration, order.expiration))
       _ <- order.isValid(time.correctedTime()).toEither.leftMap(error.OrderCommonValidationFailed)

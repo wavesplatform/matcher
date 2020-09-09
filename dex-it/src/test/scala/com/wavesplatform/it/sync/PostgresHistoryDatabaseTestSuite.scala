@@ -84,7 +84,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
 
     def getFileContentStr(fileName: String): String = {
       val fileStream = getClass.getResourceAsStream(fileName)
-      Source.fromInputStream(fileStream).getLines.mkString
+      Source.fromInputStream(fileStream).getLines().mkString
     }
 
     def executeCreateTablesStatement(sqlConnection: Connection): Try[Unit] = Try {

@@ -114,7 +114,7 @@ case class Checker(superConnector: SuperConnector) {
   }
 
   private def checkPlacement(assetPairInfo: AssetPairInfo): CheckLoggedResult[Order] = {
-    val orderType = if (Random.nextBoolean) BUY else SELL
+    val orderType = if (Random.nextBoolean()) BUY else SELL
     val order     = mkMatcherOrder(assetPairInfo.assetPair, orderType)
     for {
       _ <- dexRest.placeOrder(order)

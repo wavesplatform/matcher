@@ -49,7 +49,7 @@ object WavesDexLoadCli extends ScoptImplicits {
         cmd(Command.CreateFeederFile.name)
           .action((_, s) => s.copy(command = Command.CreateFeederFile.some))
           .text("Creates files for Gatling feeder")
-          children (
+          .children (
             opt[Int]("accounts-number")
               .abbr("an")
               .text("The number of generated accounts")

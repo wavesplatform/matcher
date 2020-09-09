@@ -7,12 +7,12 @@ object Dependencies {
 
     val parCollections = "0.2.0"
 
-    val akka     = "2.6.6"
+    val akka     = "2.6.8"
     val akkaHttp = "10.2.0"
 
-    val scalaTest          = "3.1.2"
+    val scalaTest          = "3.2.2"
     val scalaCheck         = "1.14.3"
-    val scalaTestPlusCheck = "3.1.2.0"
+    val scalaTestPlusCheck = "3.2.2.0"
     val scalaMock          = "4.4.0"
     val diffx              = "0.3.29"
 
@@ -22,32 +22,32 @@ object Dependencies {
     val betterMonadicFor  = "0.3.1"
     val mouse             = "0.25"
     val shapeless         = "2.3.3"
-    val monocle           = "2.0.5"
+    val monocle           = "2.1.0"
 
     val typesafeConfig = "1.4.0"
     val scopt          = "4.0.0-RC2"
-    val ficus          = "1.4.7"
+    val ficus          = "1.5.0"
 
     val logback            = "1.2.3"
     val slf4j              = "1.7.30"
     val janino             = "3.1.2"
     val logbackJsonEncoder = "6.4"
 
-    val silencer = "1.7.0"
+    val silencer = "1.7.1"
 
-    val kamonCore     = "2.1.1"
-    val kamonInfluxDb = "2.1.1"
+    val kamonCore     = "2.1.6"
+    val kamonInfluxDb = "2.1.6"
 
-    val wavesProtobufSchemas = "1.2.5"
-    val wavesJ               = "0.16.0"
+    val wavesProtobufSchemas = "1.2.6"
+    val wavesJ               = "0.17.0"
 
-    val postgresql = "42.2.14"
-    val quillJdbc  = "3.5.1"
+    val postgresql = "42.2.16"
+    val quillJdbc  = "3.5.2"
 
     val sttp       = "1.7.2"
-    val sttpClient = "2.2.0"
+    val sttpClient = "2.2.7"
 
-    val testContainers          = "0.38.0"
+    val testContainers          = "0.38.1"
     val testContainersPostgres  = "1.14.3"
     val testContainersKafka     = "1.14.3"
     val testContainersToxiProxy = "1.14.3"
@@ -56,13 +56,13 @@ object Dependencies {
     val playJson = "2.9.0"
 
     val googleGuava = "28.2-jre"
-    val kafka       = "2.5.0"
+    val kafka       = "2.6.0"
 
     val swagger   = "1.1.2"
-    val swaggerUi = "3.26.1"
+    val swaggerUi = "3.32.5"
     val jaxbApi   = "2.3.1"
 
-    val scorexCrypto = "2.1.8"
+    val scorexCrypto = "2.1.9"
 
     val monix = "3.2.2"
 
@@ -70,9 +70,9 @@ object Dependencies {
 
     val javaLevelDb = "0.12"
     val jniLevelDb  = "1.18.3"
-    val influxDb    = "2.19"
+    val influxDb    = "2.20"
 
-    val commonsNet = "3.6"
+    val commonsNet = "3.7"
     val nettyCodec = "4.1.33.Final"
     val jwt        = "4.3.0"
 

@@ -43,7 +43,7 @@ class WavesBlockchainGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: Ma
     case ex                                 => UnexpectedConnectionException("Unexpected connection error", ex)
   }
 
-  private def handlingErrors[A](f: => Future[A]): Future[A] = { f transform (identity, gRPCErrorsHandler) }
+  private def handlingErrors[A](f: => Future[A]): Future[A] = { f.transform(identity, gRPCErrorsHandler) }
 
   private val shuttingDown      = new AtomicBoolean(false)
   private val blockchainService = WavesBlockchainApiGrpc.stub(channel)

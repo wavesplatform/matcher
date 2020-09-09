@@ -214,7 +214,7 @@ class BroadcastExchangeTransactionActorSpecification
   )
 
   private def sampleEvent(expiration: FiniteDuration = 1.day): ExchangeTransactionCreated = {
-    val ts = time.getTimestamp
+    val ts = time.getTimestamp()
     ExchangeTransactionCreated(
       ExchangeTransactionV2
         .create(

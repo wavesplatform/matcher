@@ -38,9 +38,9 @@ class SpendableBalancesActor(spendableBalances: (Address, Set[Asset]) => Future[
       val (knownAssets, unknownAssets) = assetsMaybeBalances.partition { case (_, balance) => balance.isDefined }
       if (unknownAssets.isEmpty) {
         val knownPreparedState = knownAssets.collect { case (a, Some(b)) => a -> b }
-        sender ! SpendableBalancesActor.Reply.GetState(knownPreparedState)
+        sender() ! SpendableBalancesActor.Reply.GetState(knownPreparedState)
       } else {
-        val requestSender = sender
+        val requestSender = sender()
         spendableBalances(address, unknownAssets.keySet).onComplete {
           case Success(r) => self.tell(SpendableBalancesActor.NodeBalanceRequestRoundtrip(address, knownAssets.keySet, r), requestSender)
           case Failure(ex) =>
@@ -60,10 +60,10 @@ class SpendableBalancesActor(spendableBalances: (Address, Set[Asset]) => Future[
       }
 
       val result = source.filter { case (asset, _) => assets.contains(asset) }
-      sender ! SpendableBalancesActor.Reply.GetState(result)
+      sender() ! SpendableBalancesActor.Reply.GetState(result)
 
     case SpendableBalancesActor.Query.GetSnapshot(address) =>
-      val requestSender = sender
+      val requestSender = sender()
       fullState.get(address) match {
         case Some(state) => requestSender ! SpendableBalancesActor.Reply.GetSnapshot(state.filterNot(_._2 == 0).asRight)
         case None =>
@@ -85,7 +85,7 @@ class SpendableBalancesActor(spendableBalances: (Address, Set[Asset]) => Future[
           incompleteStateChanges -= address
           addressState
       }
-      sender ! SpendableBalancesActor.Reply.GetSnapshot(addressState.asRight)
+      sender() ! SpendableBalancesActor.Reply.GetSnapshot(addressState.asRight)
 
     case SpendableBalancesActor.Command.UpdateStates(changes) =>
       changes.foreach {

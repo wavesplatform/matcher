@@ -151,7 +151,7 @@ class ActorsWebSocketInteractionsSpecification
       eventsProbe,
       wsEventsProbe,
       address,
-      () => subscribe,
+      () => subscribe(),
       placeOrder,
       cancelOrder,
       executeOrder,

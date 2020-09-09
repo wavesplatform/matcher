@@ -38,7 +38,7 @@ object GenesisConfigGenerator {
 
   object Settings {
     implicit val chosenCase: NameMapper                = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
-    implicit val settingsReader: ValueReader[Settings] = arbitraryTypeValueReader[Settings]
+    implicit val settingsReader: ValueReader[Settings] = arbitraryTypeValueReader[Settings].value
   }
 
   case class FullAddressInfo(seedText: SeedText,

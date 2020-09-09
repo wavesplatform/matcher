@@ -373,10 +373,10 @@ ${canceledOrders.mkString("\n")}
   private def balancesBy(o: AcceptedOrder): Map[PublicKey, Map[Asset, Long]] = Map(o.order.senderPublicKey -> o.requiredBalance)
 
   private def spentPortfolio(ao: AcceptedOrder, executedAmount: Long, executedPrice: Long) =
-    Map(ao.spentAsset -> ao.order.getSpendAmount(executedAmount, executedPrice).explicitGet)
+    Map(ao.spentAsset -> ao.order.getSpendAmount(executedAmount, executedPrice).explicitGet())
 
   private def receivePortfolio(ao: AcceptedOrder, executedAmount: Long, executedPrice: Long) =
-    Map(ao.rcvAsset -> ao.order.getReceiveAmount(executedAmount, executedPrice).explicitGet)
+    Map(ao.rcvAsset -> ao.order.getReceiveAmount(executedAmount, executedPrice).explicitGet())
 
   private def spentFee(ao: AcceptedOrder, executedAmount: Long) =
     Map(ao.feeAsset -> AcceptedOrder.partialFee(ao.order.matcherFee, ao.order.amount, executedAmount))

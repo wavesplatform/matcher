@@ -8,6 +8,7 @@ import com.wavesplatform.dex.domain.feature.BlockchainFeature
 import com.wavesplatform.dex.domain.order.{Order, OrderV3}
 import shapeless._
 
+import scala.annotation.nowarn
 import scala.reflect.ClassTag
 
 trait Sample[T] {
@@ -60,7 +61,8 @@ object Sample {
   implicit val assetPair: Sample[AssetPair]     = mk(AssetPair(issuedAsset.sample, asset.sample))
   implicit val address: Sample[Address]         = mk(KeyPair(ByteStr("address".getBytes)).toAddress)
   implicit val publicKey: Sample[PublicKey]     = mk(PublicKey(Sample[ByteStr]))
-  implicit val order: Sample[Order]             = mk(Sample[OrderV3])
+
+  @nowarn implicit val order: Sample[Order] = mk(Sample[OrderV3])
 
   implicit val blockchainFeature: Sample[BlockchainFeature] = mk(BlockchainFeature(777, "The most stronger feature"))
 }

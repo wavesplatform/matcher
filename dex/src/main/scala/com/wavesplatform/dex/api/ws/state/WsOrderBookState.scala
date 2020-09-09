@@ -13,6 +13,7 @@ import com.wavesplatform.dex.domain.model.{Amount, Price}
 import com.wavesplatform.dex.model.{LastTrade, LevelAmounts}
 import monocle.macros.GenLens
 
+import scala.annotation.nowarn
 import scala.collection.immutable.TreeMap
 
 case class WsOrderBookState(wsConnections: Map[ActorRef[WsOrderBookChanges], Long],
@@ -74,6 +75,7 @@ case class WsOrderBookState(wsConnections: Map[ActorRef[WsOrderBookChanges], Lon
     changedTickSize = None
   )
 
+  @nowarn
   def take(xs: TreeMap[Price, Amount], levels: Set[Price]): TreeMap[Price, Amount] = {
     // 1. Levels will be always smaller, than xs
     // 2. A level could gone from xs

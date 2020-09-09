@@ -98,7 +98,7 @@ object LocalMatcherQueue {
     private implicit val executionContext: ExecutionContextExecutor = ExecutionContext.fromExecutor(executor)
 
     override def storeEvent(event: QueueEvent): Future[Option[QueueEventWithMeta]] = {
-      val p = Promise[QueueEventWithMeta]
+      val p = Promise[QueueEventWithMeta]()
       // Need to guarantee the order
       executor.submit(new Runnable {
         override def run(): Unit = {

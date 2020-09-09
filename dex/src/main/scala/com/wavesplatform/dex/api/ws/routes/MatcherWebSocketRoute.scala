@@ -244,7 +244,7 @@ class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsInternalBro
 }
 
 object MatcherWebSocketRoute {
-  private[MatcherWebSocketRoute] class CloseHandler(val close: () => Unit, val closed: Promise[Done] = Promise[Done]) {
+  private[MatcherWebSocketRoute] class CloseHandler(val close: () => Unit, val closed: Promise[Done] = Promise[Done]()) {
     def closeOn(f: Future[Done]): Unit = closed.completeWith(f)
   }
 }

@@ -15,6 +15,8 @@ pipeline {
         label 'buildagent-matcher'
     }
     options {
+        ansiColor('xterm')
+        timeout(time: 15, unit: 'MINUTES')
         timestamps()
     }
     environment {

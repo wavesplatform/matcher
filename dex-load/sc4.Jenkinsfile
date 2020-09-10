@@ -91,10 +91,10 @@ pipeline {
                                           ''', returnStdout: true)
                     currentBuild.description = "<a href='https://overload.yandex.net/${OVERLOAD}'>Yandex</a> <br/> <a href='${GRAFANA}'>Grafana</a>"
                 }
-                cleanup {
-                    cleanWs()
-                }
             }
+        }
+        cleanup {
+            cleanWs()
         }
     }
 }

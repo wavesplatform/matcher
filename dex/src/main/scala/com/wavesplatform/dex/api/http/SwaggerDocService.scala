@@ -10,12 +10,10 @@ import io.swagger.models.auth.{ApiKeyAuthDefinition, In}
 class SwaggerDocService(val apiClasses: Set[Class[_]], override val host: String) extends SwaggerHttpService {
 
   override val info: Info = Info(
-    "The Web Interface to the Waves DEX API",
-    Version.VersionString,
-    "Waves DEX",
-    "License: MIT License",
-    None,
-    Some(License("MIT License", "https://github.com/wavesplatform/dex/blob/master/LICENSE"))
+    description = "The Web Interface to the Waves Matcher Server API",
+    version = Version.VersionString,
+    title = "Waves Matcher Server",
+    license = Some(License("MIT License", "https://github.com/wavesplatform/matcher/blob/master/LICENSE"))
   )
 
   // Let swagger-ui determine the host and port

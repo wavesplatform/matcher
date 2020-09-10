@@ -9,21 +9,19 @@ import play.api.libs.json.{Format, Json, Reads, Writes}
 
 case class HttpOrderStatus(@ApiModelProperty(
                              dataType = "string",
-                             allowableValues = "Accepted, NotFound, PartiallyFilled, Filled, Cancelled"
+                             allowableValues = "Accepted, NotFound, PartiallyFilled, Filled, Cancelled",
+                             required = true
                            ) status: Status,
                            @ApiModelProperty(
                              value = "Filled amount of existed order",
-                             dataType = "integer",
-                             allowEmptyValue = true
+                             dataType = "integer"
                            ) filledAmount: Option[Long] = None,
                            @ApiModelProperty(
                              value = "Filled fee of existed order",
-                             dataType = "integer",
-                             allowEmptyValue = true
+                             dataType = "integer"
                            ) filledFee: Option[Long] = None,
                            @ApiModelProperty(
-                             value = "Brief message in case of not existed order",
-                             allowEmptyValue = true
+                             value = "Brief message in case of not existed order"
                            ) message: Option[String] = None)
 
 object HttpOrderStatus {

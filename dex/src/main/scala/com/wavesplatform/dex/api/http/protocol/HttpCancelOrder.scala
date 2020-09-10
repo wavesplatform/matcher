@@ -18,10 +18,9 @@ case class HttpCancelOrder(@ApiModelProperty(
                            @ApiModelProperty(
                              value = "Base58 encoded Order ID",
                              dataType = "string",
-                             example = "7VEr4T9icqopHWLawGAZ7AQiJbjAcnzXn65ekYvbpwnN",
-                             allowEmptyValue = true
+                             example = "7VEr4T9icqopHWLawGAZ7AQiJbjAcnzXn65ekYvbpwnN"
                            ) orderId: Option[ByteStr],
-                           @ApiModelProperty(allowEmptyValue = true, dataType = "integer") timestamp: Option[Long],
+                           @ApiModelProperty(dataType = "integer") timestamp: Option[Long],
                            @ApiModelProperty(
                              value =
                                """Base58 encoded signature

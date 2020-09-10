@@ -9,8 +9,6 @@ pipeline {
         string(name: 'SBT_THREAD_NUMBER', defaultValue: '6', description: '')
         string(name: 'SEED', defaultValue: 'test-seed', description: 'Seed prefix of generated accounts')
         string(name: 'AN', defaultValue: '60', description: 'Count of generated accounts')
-        string(name: 'RC', defaultValue: '10000', description: 'Count of requests')
-        string(name: 'RT', defaultValue: '6', description: 'Generation type')
         string(name: 'AS', defaultValue: 'D', description: 'Chain ID')
     }
     environment {
@@ -21,8 +19,6 @@ pipeline {
         PATH = "${env.SBT_HOME}/bin:${env.PATH}"
         SEED = "${SEED}"
         AN = "${AN}"
-        RC = "${RC}"
-        RT = "${RT}"
         AS = "${AS}"
         NODE = "${NODE}"
         MATCHER = "${MATCHER}"
@@ -68,9 +64,9 @@ pipeline {
                                     ''', returnStdout: true)
                 currentBuild.description = "<a href='${GRAFANA}'>Grafana</a>"
             }
-            cleanup {
-                cleanWs()
-            }
+        }
+        cleanup {
+            cleanWs()
         }
     }
 }

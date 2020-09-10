@@ -70,7 +70,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
               executedAmount = 1,
               executedFee = 0.0008,
               executedPrice = 3,
-              totalExecutedAmountOfPriceAsset = 3,
+              totalExecutedPriceAssets = 3,
               isMarket = false
             )
           )
@@ -85,7 +85,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
               executedAmount = 1,
               executedFee = 0.003,
               executedPrice = 3,
-              totalExecutedAmountOfPriceAsset = 3,
+              totalExecutedPriceAssets = 3,
               isMarket = false
             )
           )
@@ -119,7 +119,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
               executedAmount = 1,
               executedFee = 0.004,
               executedPrice = 3,
-              totalExecutedAmountOfPriceAsset = 3,
+              totalExecutedPriceAssets = 3,
               isMarket = false
             )
           )
@@ -134,7 +134,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
               executedAmount = 2,
               executedFee = 0.003,
               executedPrice = 3,
-              totalExecutedAmountOfPriceAsset = 6,
+              totalExecutedPriceAssets = 6,
               isMarket = false
             )
           )
@@ -149,7 +149,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
               executedAmount = 2,
               executedFee = 0.002,
               executedPrice = 3,
-              totalExecutedAmountOfPriceAsset = 9,
+              totalExecutedPriceAssets = 9,
               isMarket = true
             ),
             mkExecutedFullOrder(
@@ -159,7 +159,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
               executedAmount = 1,
               executedFee = 0.001,
               executedPrice = 3,
-              totalExecutedAmountOfPriceAsset = 3,
+              totalExecutedPriceAssets = 3,
               isMarket = true
             )
           )
@@ -218,7 +218,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
               executedAmount = 2,
               executedFee = 0.004,
               executedPrice = 3,
-              totalExecutedAmountOfPriceAsset = 6,
+              totalExecutedPriceAssets = 6,
               isMarket = false
             ))
         }
@@ -232,7 +232,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
               executedAmount = 2,
               executedFee = 0.003,
               executedPrice = 2,
-              totalExecutedAmountOfPriceAsset = 4,
+              totalExecutedPriceAssets = 4,
               isMarket = false
             ))
         }
@@ -246,7 +246,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
               executedAmount = 2,
               executedFee = 0.0015,
               executedPrice = 3,
-              totalExecutedAmountOfPriceAsset = 10,
+              totalExecutedPriceAssets = 10,
               isMarket = false
             ),
             mkExecutedFullOrder(
@@ -256,7 +256,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
               executedAmount = 2,
               executedFee = 0.0015,
               executedPrice = 2,
-              totalExecutedAmountOfPriceAsset = 4,
+              totalExecutedPriceAssets = 4,
               isMarket = false
             )
           )
@@ -294,7 +294,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
               executedAmount = 2,
               executedFee = 0.003,
               executedPrice = 3,
-              totalExecutedAmountOfPriceAsset = 6,
+              totalExecutedPriceAssets = 6,
               isMarket = false
             )
           )
@@ -309,7 +309,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
               executedAmount = 1,
               executedFee = 0.003,
               executedPrice = 0.005,
-              totalExecutedAmountOfPriceAsset = 0.005,
+              totalExecutedPriceAssets = 0.005,
               isMarket = false
             )
           )
@@ -329,7 +329,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
               executedAmount = 2,
               executedFee = 4,
               executedPrice = 3,
-              totalExecutedAmountOfPriceAsset = 6,
+              totalExecutedPriceAssets = 6,
               isMarket = false
             )
           )
@@ -344,7 +344,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
               executedAmount = 1,
               executedFee = 0.001,
               executedPrice = 0.005,
-              totalExecutedAmountOfPriceAsset = 0.005,
+              totalExecutedPriceAssets = 0.005,
               isMarket = false
             )
           )
@@ -362,12 +362,12 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
                                   executedAmount: Double,
                                   executedFee: Double,
                                   executedPrice: Double,
-                                  totalExecutedAmountOfPriceAsset: Double,
+                                  totalExecutedPriceAssets: Double,
                                   isMarket: Boolean): WsFullOrder =
     mkFullOrder(order,
                 status,
                 avgWeighedPrice,
-                WsExecutionInfo(executedAmount, executedFee, executedPrice, totalExecutedAmountOfPriceAsset).some,
+                WsExecutionInfo(executedAmount, executedFee, executedPrice, totalExecutedPriceAssets).some,
                 isMarket)
 
   private def mkFullOrder(order: Order,
@@ -402,7 +402,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
       executedAmount = executionInfo.map(_.amount),
       executedFee = executionInfo.map(_.fee),
       executionPrice = executionInfo.map(_.price),
-      totalExecutedAmountOfPriceAsset = executionInfo.map(_.amountOfPriceAsset)
+      totalExecutedPriceAssets = executionInfo.map(_.totalPriceAssets)
     )
   }
 

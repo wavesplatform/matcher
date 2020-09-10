@@ -17,7 +17,7 @@ class OrderInfoSpec extends AnyFreeSpec with Matchers with MatcherSpecBase with 
       status          <- Gen.oneOf(OrderStatus.Filled(filledAmount, filledFee), OrderStatus.Cancelled(filledAmount, filledFee))
       aoType          <- if (orderInfoVersion <= 2) Gen.const(AcceptedOrderType.Limit) else Gen.oneOf(AcceptedOrderType.Limit, AcceptedOrderType.Market)
       avgWeighedPrice <- if (orderInfoVersion <= 3) Gen.const(o.price) else Gen.choose(0, o.price)
-    } yield o.toInfo(orderInfoVersion, status, aoType, avgWeighedPrice)
+    } yield o.toInfo(orderInfoVersion, status, aoType, avgWeighedPrice, OrderInfo.getTotalExecutedPriceAssets(filledAmount, avgWeighedPrice))
 
   private val finalizedOrderInfoGen: Gen[OrderInfo[OrderStatus.Final]] = for {
     (o, _) <- orderGenerator
@@ -35,7 +35,11 @@ class OrderInfoSpec extends AnyFreeSpec with Matchers with MatcherSpecBase with 
 object OrderInfoSpec {
 
   implicit class OrderExt(val o: Order) extends AnyVal {
-    def toInfo[A <: OrderStatus](version: Byte, status: A, aoType: AcceptedOrderType, avgWeighedPrice: Long): OrderInfo[A] = version match {
+    def toInfo[A <: OrderStatus](version: Byte,
+                                 status: A,
+                                 aoType: AcceptedOrderType,
+                                 avgWeighedPrice: Long,
+                                 totalExecutedPriceAssets: Long): OrderInfo[A] = version match {
       case 1 => OrderInfo.v1[A](o.orderType, o.amount, o.price, o.timestamp, status, o.assetPair)
       case 2 => OrderInfo.v2[A](o.orderType, o.amount, o.price, o.matcherFee, o.feeAsset, o.timestamp, status, o.assetPair)
       case 3 => OrderInfo.v3[A](o.orderType, o.amount, o.price, o.matcherFee, o.feeAsset, o.timestamp, status, o.assetPair, aoType)
@@ -43,6 +47,19 @@ object OrderInfoSpec {
       case 5 =>
         OrderInfo
           .v5[A](o.orderType, o.amount, o.price, o.matcherFee, o.feeAsset, o.timestamp, status, o.assetPair, aoType, avgWeighedPrice, o.version)
+      case 6 =>
+        OrderInfo
+          .v6[A](o.orderType,
+                 o.amount,
+                 o.price,
+                 o.matcherFee,
+                 o.feeAsset,
+                 o.timestamp,
+                 status,
+                 o.assetPair,
+                 aoType,
+                 o.version,
+                 totalExecutedPriceAssets)
     }
   }
 }

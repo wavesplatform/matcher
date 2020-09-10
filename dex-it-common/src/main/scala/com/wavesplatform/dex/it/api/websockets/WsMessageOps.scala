@@ -23,7 +23,7 @@ trait WsMessageOps {
                   filledAmount = oc.filledAmount,
                   filledFee = oc.filledFee,
                   avgWeighedPrice = oc.avgWeighedPrice,
-                  totalExecutedAmountOfPriceAsset = oc.totalExecutedAmountOfPriceAsset
+                  totalExecutedPriceAssets = oc.totalExecutedPriceAssets
                 )
             }
         }

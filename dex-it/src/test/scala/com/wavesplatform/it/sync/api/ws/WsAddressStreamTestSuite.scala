@@ -182,19 +182,19 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
                   filledAmount = 15.0,
                   filledFee = 0.0009,
                   avgWeighedPrice = 1.2,
-                  totalExecutedAmountOfPriceAsset = 18),
+                  totalExecutedPriceAssets = 18),
           WsOrder(mo.id,
                   status = OrderStatus.PartiallyFilled.name,
                   filledAmount = 40.0,
                   filledFee = 0.0024,
                   avgWeighedPrice = 1.1375,
-                  totalExecutedAmountOfPriceAsset = 45.5),
+                  totalExecutedPriceAssets = 45.5),
           WsOrder(mo.id,
                   status = OrderStatus.Filled.name,
                   filledAmount = 50.0,
                   filledFee = 0.003,
                   avgWeighedPrice = 1.11,
-                  totalExecutedAmountOfPriceAsset = 55.5)
+                  totalExecutedPriceAssets = 55.5)
         )
 
         wsc.close()
@@ -225,7 +225,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
                   filledAmount = 10.0,
                   filledFee = 0.003,
                   avgWeighedPrice = 1.0,
-                  totalExecutedAmountOfPriceAsset = 10)
+                  totalExecutedPriceAssets = 10)
         )
 
         wsc.close()
@@ -263,7 +263,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
                   filledAmount = 5.0.some,
                   filledFee = 0.0015.some,
                   avgWeighedPrice = 1.0.some,
-                  totalExecutedAmountOfPriceAsset = 5.0.some
+                  totalExecutedPriceAssets = 5.0.some
                 )
             ))
         }

@@ -54,7 +54,7 @@ object WsFullOrder {
             executedAmount: Option[Double],
             executedFee: Option[Double],
             executionPrice: Option[Double],
-            totalExecutedAmountOfPriceAsset: Option[Double]): WsFullOrder = WsFullOrder(
+            totalExecutedPriceAssets: Option[Double]): WsFullOrder = WsFullOrder(
     id,
     owner,
     timestamp,
@@ -71,7 +71,7 @@ object WsFullOrder {
     filledFee,
     avgWeighedPrice,
     eventTimestamp,
-    (executedAmount, executedFee, executionPrice, totalExecutedAmountOfPriceAsset).mapN(WsExecutionInfo)
+    (executedAmount, executedFee, executionPrice, totalExecutedPriceAssets).mapN(WsExecutionInfo)
   )
 
   def wsUnapply(arg: WsFullOrder): Option[(
@@ -117,11 +117,11 @@ object WsFullOrder {
       executionInfo.map(_.amount),
       executionInfo.map(_.fee),
       executionInfo.map(_.price),
-      executionInfo.map(_.amountOfPriceAsset)
+      executionInfo.map(_.totalPriceAssets)
     ).some
   }
 
-  case class WsExecutionInfo(amount: Double, fee: Double, price: Double, amountOfPriceAsset: Double)
+  case class WsExecutionInfo(amount: Double, fee: Double, price: Double, totalPriceAssets: Double)
 
   def from(event: OrderCanceled)(implicit efc: ErrorFormatterContext): WsFullOrder = {
     val ao = event.acceptedOrder
@@ -185,7 +185,7 @@ object WsFullOrder {
         amount = denormalizeAmount(event.executedAmount),
         fee = denormalizeFee(executedFee),
         price = denormalizePrice(event.executedPrice),
-        amountOfPriceAsset = denormalizePrice(ao.fillingInfo.totalExecutedAmountOfPriceAsset)
+        totalPriceAssets = denormalizePrice(ao.fillingInfo.totalExecutedPriceAssets)
       ).some
     )
   }

@@ -254,7 +254,7 @@ class ActorsWebSocketInteractionsSpecification
                   filledAmount = 5.0.some,
                   filledFee = 0.0015.some,
                   avgWeighedPrice = 3.0.some,
-                  totalExecutedAmountOfPriceAsset = 15.0.some
+                  totalExecutedPriceAssets = 15.0.some
                 )
               ),
               3
@@ -330,7 +330,7 @@ class ActorsWebSocketInteractionsSpecification
                   filledAmount = 10.0.some,
                   filledFee = 0.2.some,
                   avgWeighedPrice = 3.0.some,
-                  totalExecutedAmountOfPriceAsset = 30.0.some
+                  totalExecutedPriceAssets = 30.0.some
                 )
               ),
               2
@@ -348,7 +348,7 @@ class ActorsWebSocketInteractionsSpecification
                   filledAmount = 25.0.some,
                   filledFee = 0.5.some,
                   avgWeighedPrice = 3.0.some,
-                  totalExecutedAmountOfPriceAsset = 75.0.some
+                  totalExecutedPriceAssets = 75.0.some
                 )
               ),
               3
@@ -366,7 +366,7 @@ class ActorsWebSocketInteractionsSpecification
                   filledAmount = 30.0.some,
                   filledFee = 0.6.some,
                   avgWeighedPrice = 3.0.some,
-                  totalExecutedAmountOfPriceAsset = 90.0.some
+                  totalExecutedPriceAssets = 90.0.some
                 )
               ),
               4
@@ -576,7 +576,7 @@ class ActorsWebSocketInteractionsSpecification
                 filledAmount = 5.0.some,
                 filledFee = 0.003.some,
                 avgWeighedPrice = 3.0.some,
-                totalExecutedAmountOfPriceAsset = 15.0.some
+                totalExecutedPriceAssets = 15.0.some
               )
             ),
             4
@@ -596,7 +596,7 @@ class ActorsWebSocketInteractionsSpecification
                 filledAmount = 5.0.some,
                 filledFee = 0.003.some,
                 avgWeighedPrice = 3.1.some,
-                totalExecutedAmountOfPriceAsset = 15.5.some
+                totalExecutedPriceAssets = 15.5.some
               )
             ),
             5
@@ -616,7 +616,7 @@ class ActorsWebSocketInteractionsSpecification
                 filledAmount = 2.0.some,
                 filledFee = 0.0012.some,
                 avgWeighedPrice = 3.2.some,
-                totalExecutedAmountOfPriceAsset = 6.4.some
+                totalExecutedPriceAssets = 6.4.some
               )
             ),
             6
@@ -678,7 +678,7 @@ class ActorsWebSocketInteractionsSpecification
                 filledAmount = 5.0.some,
                 filledFee = 0.00125.some,
                 avgWeighedPrice = 3.0.some,
-                totalExecutedAmountOfPriceAsset = 15.0.some
+                totalExecutedPriceAssets = 15.0.some
               )
             ),
             2
@@ -695,7 +695,7 @@ class ActorsWebSocketInteractionsSpecification
                 filledAmount = 10.0.some,
                 filledFee = 0.0025.some,
                 avgWeighedPrice = 3.05.some,
-                totalExecutedAmountOfPriceAsset = 30.5.some
+                totalExecutedPriceAssets = 30.5.some
               )
             ),
             3
@@ -712,7 +712,7 @@ class ActorsWebSocketInteractionsSpecification
                 filledAmount = 12.0.some,
                 filledFee = 0.003.some,
                 avgWeighedPrice = 3.07.some,
-                totalExecutedAmountOfPriceAsset = 36.9.some
+                totalExecutedPriceAssets = 36.9.some
               )
             ),
             4
@@ -750,7 +750,7 @@ class ActorsWebSocketInteractionsSpecification
 
         expectWsBalancesAndOrders(
           Map(usd -> WsBalances(5, 5), Waves -> WsBalances(9.9985, 0.0015)),
-          Seq(WsOrder(id = bo.id, status = OrderStatus.PartiallyFilled.name, filledAmount = 5.0, filledFee = 0.0015, avgWeighedPrice = 1.0, totalExecutedAmountOfPriceAsset = 5.0)),
+          Seq(WsOrder(id = bo.id, status = OrderStatus.PartiallyFilled.name, filledAmount = 5.0, filledFee = 0.0015, avgWeighedPrice = 1.0, totalExecutedPriceAssets = 5.0)),
           2
         )
 

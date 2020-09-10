@@ -69,7 +69,7 @@ sealed trait AcceptedOrder {
   def fillingInfo: FillingInfo = {
     val isNew = amount == order.amount
 
-    val (avgWeighedPrice, totalExecutedAmountOfPriceAsset) = {
+    val (avgWeighedPrice, totalExecutedPriceAssets) = {
       if (isNew) (0L, 0L)
       else
         (
@@ -78,7 +78,7 @@ sealed trait AcceptedOrder {
         )
     }
 
-    FillingInfo(filledAmount, filledFee, avgWeighedPrice, totalExecutedAmountOfPriceAsset)
+    FillingInfo(filledAmount, filledFee, avgWeighedPrice, totalExecutedPriceAssets)
   }
 
   def requiredFee: Long                 = fee
@@ -237,7 +237,7 @@ object AcceptedOrder {
     }
   }
 
-  final case class FillingInfo(filledAmount: Long, filledFee: Long, avgWeighedPrice: Long, totalExecutedAmountOfPriceAsset: Long)
+  final case class FillingInfo(filledAmount: Long, filledFee: Long, avgWeighedPrice: Long, totalExecutedPriceAssets: Long)
 }
 
 sealed trait BuyOrder extends AcceptedOrder {

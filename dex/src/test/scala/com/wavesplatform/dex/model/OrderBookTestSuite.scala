@@ -500,30 +500,30 @@ class OrderBookTestSuite
       events should have size (if (buy.isLimit) 7 else 8)
       (0 to 3).foreach(events(_) shouldBe a[OrderAdded])
 
-      Seq(buy, sell1, sell2, sell3).foreach(_.fillingInfo.totalExecutedAmountOfPriceAsset shouldBe 0)
+      Seq(buy, sell1, sell2, sell3).foreach(_.fillingInfo.totalExecutedPriceAssets shouldBe 0)
 
       // format: off
       forAll(
         Table(
-          ("event id", "execution number", "submitted price nominator", "submitted avg w price", "submitted price asset executed amount", "counter price nominator", "counter avg w price", "counter price asset executed amount"),
-          (4,          "first",            25.waves.usd,                2.5.usd,                25.usd,                                 25.waves.usd,               2.5.usd,            25.usd),
-          (5,          "second",           160.waves.usd,               2.66.usd,               160.usd,                                135.waves.usd,              2.7.usd,            135.usd),
-          (6,          "third",            490.waves.usd,               2.88.usd,               490.usd,                                330.waves.usd,              3.0.usd,            330.usd),
+          ("event id", "execution #", "submitted avgw price nominator", "submitted avgw price", "submitted executed price assets", "counter avgw price nominator", "counter avgw price", "counter executed price assets"),
+          (4,          "first",       25.waves.usd,                      2.5.usd,               25.usd,                            25.waves.usd,                   2.5.usd,              25.usd),
+          (5,          "second",      160.waves.usd,                     2.66.usd,              160.usd,                           135.waves.usd,                  2.7.usd,              135.usd),
+          (6,          "third",       490.waves.usd,                     2.88.usd,              490.usd,                           330.waves.usd,                  3.0.usd,              330.usd),
         )
-      ) { (eventId: Int, executionNumber: String, sAvgWeighedPriceNominator: Long, submittedAvgPrice: Long, sPriceAssetExecutedAmount: Long, cAvgWeighedPriceNominator: Long, counterAvgPrice: Long, cPriceAssetExecutedAmount: Long) =>
+      ) { (eventId: Int, executionNumber: String, sAvgWPriceNominator: Long, sAvgWPrice: Long, sExecutedPriceAssets: Long, cAvgWPriceNominator: Long, cAvgWPrice: Long, cExecutedPriceAssets: Long) =>
         // format: on
 
         withClue(s"$orderType, $executionNumber execution of 3:\n") {
           events(eventId) shouldBe a[OrderExecuted]
           val oe = events(eventId).asInstanceOf[OrderExecuted]
 
-          oe.submittedRemaining.avgWeighedPriceNominator shouldBe BigInteger.valueOf(sAvgWeighedPriceNominator)
-          oe.submittedRemaining.fillingInfo.avgWeighedPrice shouldBe submittedAvgPrice
-          oe.submittedRemaining.fillingInfo.totalExecutedAmountOfPriceAsset shouldBe sPriceAssetExecutedAmount
+          oe.submittedRemaining.avgWeighedPriceNominator shouldBe BigInteger.valueOf(sAvgWPriceNominator)
+          oe.submittedRemaining.fillingInfo.avgWeighedPrice shouldBe sAvgWPrice
+          oe.submittedRemaining.fillingInfo.totalExecutedPriceAssets shouldBe sExecutedPriceAssets
 
-          oe.counterRemaining.avgWeighedPriceNominator shouldBe BigInteger.valueOf(cAvgWeighedPriceNominator)
-          oe.counterRemaining.fillingInfo.avgWeighedPrice shouldBe counterAvgPrice
-          oe.counterRemaining.fillingInfo.totalExecutedAmountOfPriceAsset shouldBe cPriceAssetExecutedAmount
+          oe.counterRemaining.avgWeighedPriceNominator shouldBe BigInteger.valueOf(cAvgWPriceNominator)
+          oe.counterRemaining.fillingInfo.avgWeighedPrice shouldBe cAvgWPrice
+          oe.counterRemaining.fillingInfo.totalExecutedPriceAssets shouldBe cExecutedPriceAssets
         }
       }
 

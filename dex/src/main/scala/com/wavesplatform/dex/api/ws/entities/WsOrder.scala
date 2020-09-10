@@ -26,7 +26,7 @@ case class WsOrder(id: Order.Id,
                    filledAmount: Option[Double] = None,
                    filledFee: Option[Double] = None,
                    avgWeighedPrice: Option[Double] = None,
-                   totalExecutedAmountOfPriceAsset: Option[Double] = None)
+                   totalExecutedPriceAssets: Option[Double] = None)
 
 object WsOrder {
 
@@ -57,7 +57,7 @@ object WsOrder {
       ao.fillingInfo.filledAmount.some.map(denormalizeAmount),
       ao.fillingInfo.filledFee.some.map(denormalizeFee),
       ao.fillingInfo.avgWeighedPrice.some.map(denormalizePrice),
-      ao.fillingInfo.totalExecutedAmountOfPriceAsset.some.map(denormalizePrice)
+      ao.fillingInfo.totalExecutedPriceAssets.some.map(denormalizePrice)
     )
   }
 
@@ -66,14 +66,14 @@ object WsOrder {
             filledAmount: Double,
             filledFee: Double,
             avgWeighedPrice: Double,
-            totalExecutedAmountOfPriceAsset: Double): WsOrder = {
+            totalExecutedPriceAssets: Double): WsOrder = {
     WsOrder(
       id,
       status = status.some,
       filledAmount = filledAmount.some,
       filledFee = filledFee.some,
       avgWeighedPrice = avgWeighedPrice.some,
-      totalExecutedAmountOfPriceAsset = totalExecutedAmountOfPriceAsset.some
+      totalExecutedPriceAssets = totalExecutedPriceAssets.some
     )
   }
 
@@ -113,6 +113,6 @@ object WsOrder {
         (__ \ "q").formatNullable[Double](doubleAsStringFormat) and // filled amount
         (__ \ "Q").formatNullable[Double](doubleAsStringFormat) and // filled fee
         (__ \ "r").formatNullable[Double](doubleAsStringFormat) and // average weighed price among all trades
-        (__ \ "E").formatNullable[Double](doubleAsStringFormat)     // total executed amount of price asset
+        (__ \ "E").formatNullable[Double](doubleAsStringFormat)     // total executed price assets
     )(WsOrder.apply, unlift(WsOrder.unapply))
 }

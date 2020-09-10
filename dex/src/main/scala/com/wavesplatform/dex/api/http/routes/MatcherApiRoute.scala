@@ -18,7 +18,7 @@ import com.wavesplatform.dex.actors.address.AddressActor.OrderListType
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.api.http._
 import com.wavesplatform.dex.api.http.entities._
-import com.wavesplatform.dex.api.http.headers.{MatcherHttpServer, `X-User-Public-Key`}
+import com.wavesplatform.dex.api.http.headers.`X-User-Public-Key`
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
 import com.wavesplatform.dex.caches.RateCache
@@ -850,7 +850,8 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       }
   }
 
-  @Path("/orderbook/{publicKey}/{orderId}")
+  // https://github.com/OAI/OpenAPI-Specification/issues/146#issuecomment-117288707
+  @Path("/orderbook/{publicKey}/{orderId}#getOrderStatusInfoByIdWithSignature")
   @ApiOperation(
     value = "Order Status Info by Public Key and ID",
     notes = "Get Status Info of the specified order for a given public key",

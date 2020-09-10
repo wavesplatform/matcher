@@ -106,8 +106,8 @@ inScope(Global)(
     organization := "com.wavesplatform",
     organizationName := "Waves Platform",
     organizationHomepage := Some(url("https://wavesplatform.com")),
-    scmInfo := Some(ScmInfo(url("https://github.com/wavesplatform/dex"), "git@github.com:wavesplatform/dex.git", None)),
-    licenses := Seq(("MIT", url("https://github.com/wavesplatform/dex/blob/master/LICENSE"))),
+    scmInfo := Some(ScmInfo(url("https://github.com/wavesplatform/matcher"), "git@github.com:wavesplatform/matcher.git", None)),
+    licenses := Seq(("MIT", url("https://github.com/wavesplatform/matcher/blob/master/LICENSE"))),
     scalacOptions ++= Seq(
       "-feature",
       "-deprecation",

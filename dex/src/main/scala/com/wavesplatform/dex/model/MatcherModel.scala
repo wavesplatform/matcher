@@ -52,6 +52,7 @@ sealed trait AcceptedOrder {
 
   def isMarket: Boolean
   def isLimit: Boolean
+  val orderType: AcceptedOrderType = if (isLimit) AcceptedOrderType.Limit else AcceptedOrderType.Market
 
   def isBuyOrder: Boolean  = order.orderType == OrderType.BUY
   def isSellOrder: Boolean = order.orderType == OrderType.SELL

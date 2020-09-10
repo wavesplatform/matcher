@@ -70,8 +70,10 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
               executedAmount = 1,
               executedFee = 0.0008,
               executedPrice = 3,
+              totalExecutedAmountOfPriceAsset = 3,
               isMarket = false
-            ))
+            )
+          )
         }
 
         orderEvents(order2.id()) should matchTo {
@@ -83,8 +85,10 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
               executedAmount = 1,
               executedFee = 0.003,
               executedPrice = 3,
+              totalExecutedAmountOfPriceAsset = 3,
               isMarket = false
-            ))
+            )
+          )
         }
 
         wsc.close()
@@ -115,8 +119,10 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
               executedAmount = 1,
               executedFee = 0.004,
               executedPrice = 3,
+              totalExecutedAmountOfPriceAsset = 3,
               isMarket = false
-            ))
+            )
+          )
         }
 
         orderEvents(order2.id()) should matchTo {
@@ -128,8 +134,10 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
               executedAmount = 2,
               executedFee = 0.003,
               executedPrice = 3,
+              totalExecutedAmountOfPriceAsset = 6,
               isMarket = false
-            ))
+            )
+          )
         }
 
         orderEvents(order3.id()) should matchTo {
@@ -141,6 +149,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
               executedAmount = 2,
               executedFee = 0.002,
               executedPrice = 3,
+              totalExecutedAmountOfPriceAsset = 9,
               isMarket = true
             ),
             mkExecutedFullOrder(
@@ -150,6 +159,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
               executedAmount = 1,
               executedFee = 0.001,
               executedPrice = 3,
+              totalExecutedAmountOfPriceAsset = 3,
               isMarket = true
             )
           )
@@ -208,6 +218,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
               executedAmount = 2,
               executedFee = 0.004,
               executedPrice = 3,
+              totalExecutedAmountOfPriceAsset = 6,
               isMarket = false
             ))
         }
@@ -221,6 +232,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
               executedAmount = 2,
               executedFee = 0.003,
               executedPrice = 2,
+              totalExecutedAmountOfPriceAsset = 4,
               isMarket = false
             ))
         }
@@ -234,6 +246,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
               executedAmount = 2,
               executedFee = 0.0015,
               executedPrice = 3,
+              totalExecutedAmountOfPriceAsset = 10,
               isMarket = false
             ),
             mkExecutedFullOrder(
@@ -243,6 +256,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
               executedAmount = 2,
               executedFee = 0.0015,
               executedPrice = 2,
+              totalExecutedAmountOfPriceAsset = 4,
               isMarket = false
             )
           )
@@ -280,6 +294,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
               executedAmount = 2,
               executedFee = 0.003,
               executedPrice = 3,
+              totalExecutedAmountOfPriceAsset = 6,
               isMarket = false
             )
           )
@@ -294,8 +309,10 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
               executedAmount = 1,
               executedFee = 0.003,
               executedPrice = 0.005,
+              totalExecutedAmountOfPriceAsset = 0.005,
               isMarket = false
-            ))
+            )
+          )
         }
 
         orderEvents(order3.id()) should matchTo {
@@ -312,6 +329,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
               executedAmount = 2,
               executedFee = 4,
               executedPrice = 3,
+              totalExecutedAmountOfPriceAsset = 6,
               isMarket = false
             )
           )
@@ -326,8 +344,10 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
               executedAmount = 1,
               executedFee = 0.001,
               executedPrice = 0.005,
+              totalExecutedAmountOfPriceAsset = 0.005,
               isMarket = false
-            ))
+            )
+          )
         }
 
         checkItemsOrder(buffer)
@@ -342,8 +362,13 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
                                   executedAmount: Double,
                                   executedFee: Double,
                                   executedPrice: Double,
+                                  totalExecutedAmountOfPriceAsset: Double,
                                   isMarket: Boolean): WsFullOrder =
-    mkFullOrder(order, status, avgWeighedPrice, WsExecutionInfo(executedAmount, executedFee, executedPrice).some, isMarket)
+    mkFullOrder(order,
+                status,
+                avgWeighedPrice,
+                WsExecutionInfo(executedAmount, executedFee, executedPrice, totalExecutedAmountOfPriceAsset).some,
+                isMarket)
 
   private def mkFullOrder(order: Order,
                           status: OrderStatus,
@@ -376,7 +401,8 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
       eventTimestamp = 0L,
       executedAmount = executionInfo.map(_.amount),
       executedFee = executionInfo.map(_.fee),
-      executionPrice = executionInfo.map(_.price)
+      executionPrice = executionInfo.map(_.price),
+      totalExecutedAmountOfPriceAsset = executionInfo.map(_.amountOfPriceAsset)
     )
   }
 

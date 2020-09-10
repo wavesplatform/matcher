@@ -6,37 +6,18 @@ import com.wavesplatform.dex.model.{LastTrade, LevelAgg}
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{Json, OFormat}
 
-case class HttpMarketStatus(@ApiModelProperty(
-                              allowEmptyValue = true,
-                              dataType = "integer"
-                            ) lastPrice: Option[Long],
-                            @ApiModelProperty(
-                              allowEmptyValue = true,
-                              dataType = "integer"
-                            ) lastAmount: Option[Long],
+case class HttpMarketStatus(@ApiModelProperty(dataType = "integer") lastPrice: Option[Long],
+                            @ApiModelProperty(dataType = "integer") lastAmount: Option[Long],
                             @ApiModelProperty(
                               value = "Side (sell or buy)",
                               dataType = "string",
-                              example = "buy",
-                              allowEmptyValue = true
+                              example = "buy"
                             )
                             lastSide: Option[OrderType],
-                            @ApiModelProperty(
-                              allowEmptyValue = true,
-                              dataType = "integer"
-                            ) bid: Option[Long],
-                            @ApiModelProperty(
-                              allowEmptyValue = true,
-                              dataType = "integer"
-                            ) bidAmount: Option[Long],
-                            @ApiModelProperty(
-                              allowEmptyValue = true,
-                              dataType = "integer"
-                            ) ask: Option[Long],
-                            @ApiModelProperty(
-                              allowEmptyValue = true,
-                              dataType = "integer"
-                            ) askAmount: Option[Long]) {
+                            @ApiModelProperty(dataType = "integer") bid: Option[Long],
+                            @ApiModelProperty(dataType = "integer") bidAmount: Option[Long],
+                            @ApiModelProperty(dataType = "integer") ask: Option[Long],
+                            @ApiModelProperty(dataType = "integer") askAmount: Option[Long]) {
 
   @ApiModelProperty(hidden = true)
   val lastTrade: Option[LastTrade] =

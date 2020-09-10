@@ -4,7 +4,7 @@ pipeline {
     }
     options {
         ansiColor('xterm')
-        timeout(time: 40, unit: 'MINUTES')
+        timeout(time: 45, unit: 'MINUTES')
         timestamps()
     }
     parameters {
@@ -16,15 +16,15 @@ pipeline {
         SBT_OPTS = '-Xmx10g -XX:ReservedCodeCacheSize=128m -XX:+CMSClassUnloadingEnabled'
         PATH = "${env.SBT_HOME}/bin:${env.PATH}"
         SCALATEST_EXCLUDE_TAGS = 'com.wavesplatform.it.tags.DexItKafkaRequired com.wavesplatform.it.tags.DexItExternalKafkaRequired com.wavesplatform.it.tags.DexMultipleVersions'
+        KAFKA_SERVER = "${KAFKA_SERVER}"
+        DEX_TAG = "${DEX_TAG}"
+        NODE_TAG = "${NODE_TAG}"
     }
     stages {
         stage('Cleanup') {
             steps {
                 script {
-                    if (!(BRANCH_NAME ==~ /(origin\/)?(DEX\-.*|master|version\-.*|v?\d+\.\d+\.\d+(\.\d+)?)/)) {
-                        currentBuild.result = 'ABORTED'
-                        error("The branch '${BRANCH_NAME}' have an incorrect name. Allowed names: master, version-, DEX-")
-                    }
+                    currentBuild.displayName = "${params.BRANCH}"
                 }
                 sh 'git fetch --tags'
                 sh 'docker rmi `docker images --format "{{.Repository}}:{{.Tag}}" | grep "wavesplatform"` || true'
@@ -34,16 +34,14 @@ pipeline {
                 sh 'sbt "cleanAll"'
             }
         }
-        stage('Build & Run All Tests') {
+        stage('Build Docker') {
             steps {
-                sh 'sbt "fullCheck"'
+                sh 'sbt dex-it/docker'
             }
         }
-        stage ('Push images') {
+        stage ('Run Integration Tests with specified versions') {
             steps {
-                build job: 'Waves.Exchange/Matcher/Push Docker Images', propagate: false, wait: false, parameters: [
-                  [$class: 'StringParameterValue', name: 'BRANCH', value: "${BRANCH_NAME}"]
-                ]
+                sh 'sbt dex-it/test'
             }
         }
     }
@@ -53,7 +51,7 @@ pipeline {
             archiveArtifacts artifacts: 'logs.tar.gz', fingerprint: true
             junit '**/test-reports/*.xml'
             sh "mkdir allure-results || true"
-            sh '''echo "TARGET_NODE=$(cat wavesNode.sbt | grep -Po '[0-9].[0-9].[0-9]+')" > ./allure-results/environment.properties'''
+            sh "echo 'KAFKA_SERVER=${KAFKA_SERVER}\r\nDEX_TAG=${DEX_TAG}\r\nNODE_TAG=${NODE_TAG}' > allure-results/environment.properties"
             allure results: [[path: 'allure-results']]
         }
         cleanup {

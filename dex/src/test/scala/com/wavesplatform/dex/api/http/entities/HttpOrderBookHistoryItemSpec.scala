@@ -31,7 +31,7 @@ class HttpOrderBookHistoryItemSpec extends AnyFreeSpec with Matchers with DiffMa
       |  },
       |  "avgWeighedPrice" : 0,
       |  "version" : 3,
-      |  "executedAmountOfPriceAsset": 0
+      |  "totalExecutedAmountOfPriceAsset" : 0
       |}""".stripMargin
 
   private val historyItem =
@@ -53,7 +53,7 @@ class HttpOrderBookHistoryItemSpec extends AnyFreeSpec with Matchers with DiffMa
       ),
       avgWeighedPrice = 0L,
       version = 3,
-      executedAmountOfPriceAsset = 0L
+      totalExecutedAmountOfPriceAsset = 0L
     )
 
   "backward JSON compatibility" - {

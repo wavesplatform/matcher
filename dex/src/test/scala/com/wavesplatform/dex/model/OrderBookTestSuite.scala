@@ -505,10 +505,10 @@ class OrderBookTestSuite
       // format: off
       forAll(
         Table(
-          ("event id", "execution number", "submitted price nominator", "submitted avg price", "submitted price asset executed amount", "counter price nominator", "counter avg price", "counter price asset executed amount"),
+          ("event id", "execution number", "submitted price nominator", "submitted avg w price", "submitted price asset executed amount", "counter price nominator", "counter avg w price", "counter price asset executed amount"),
           (4,          "first",            25.waves.usd,                2.5.usd,                25.usd,                                 25.waves.usd,               2.5.usd,            25.usd),
           (5,          "second",           160.waves.usd,               2.66.usd,               160.usd,                                135.waves.usd,              2.7.usd,            135.usd),
-          (6,           "third",           490.waves.usd,               2.88.usd,               490.usd,                                330.waves.usd,              3.0.usd,            330.usd),
+          (6,          "third",            490.waves.usd,               2.88.usd,               490.usd,                                330.waves.usd,              3.0.usd,            330.usd),
         )
       ) { (eventId: Int, executionNumber: String, sAvgWeighedPriceNominator: Long, submittedAvgPrice: Long, sPriceAssetExecutedAmount: Long, cAvgWeighedPriceNominator: Long, counterAvgPrice: Long, cPriceAssetExecutedAmount: Long) =>
         // format: on

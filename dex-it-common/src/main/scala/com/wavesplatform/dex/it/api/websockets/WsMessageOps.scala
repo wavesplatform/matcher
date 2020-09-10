@@ -18,7 +18,13 @@ trait WsMessageOps {
           case (id, orderChanges) =>
             id -> orderChanges.foldLeft(orderChanges.head) {
               case (acc, oc) =>
-                acc.copy(status = oc.status, filledAmount = oc.filledAmount, filledFee = oc.filledFee, avgWeighedPrice = oc.avgWeighedPrice)
+                acc.copy(
+                  status = oc.status,
+                  filledAmount = oc.filledAmount,
+                  filledFee = oc.filledFee,
+                  avgWeighedPrice = oc.avgWeighedPrice,
+                  totalExecutedAmountOfPriceAsset = oc.totalExecutedAmountOfPriceAsset
+                )
             }
         }
   }

@@ -43,7 +43,7 @@ case class HttpOrderBookHistoryItem(@ApiModelProperty(
                                       dataType = "integer",
                                       example = "3"
                                     ) version: Byte,
-                                    @ApiModelProperty(value = "Total executed amount of price asset") executedAmountOfPriceAsset: Long)
+                                    @ApiModelProperty(value = "Total executed amount of price asset") totalExecutedAmountOfPriceAsset: Long)
 
 object HttpOrderBookHistoryItem {
 
@@ -64,6 +64,6 @@ object HttpOrderBookHistoryItem {
     assetPair = info.assetPair,
     avgWeighedPrice = info.avgWeighedPrice,
     version = info.orderVersion,
-    executedAmountOfPriceAsset = info.executedAmountOfPriceAsset
+    totalExecutedAmountOfPriceAsset = info.totalExecutedAmountOfPriceAsset
   )
 }

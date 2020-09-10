@@ -474,7 +474,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
             assetPair = order.assetPair,
             avgWeighedPrice = 0,
             version = order.version,
-            executedAmountOfPriceAsset = 0
+            totalExecutedAmountOfPriceAsset = 0
           )
         )
 
@@ -508,7 +508,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
           assetPair = order.assetPair,
           avgWeighedPrice = 0,
           version = order.version,
-          executedAmountOfPriceAsset = 0
+          totalExecutedAmountOfPriceAsset = 0
         )
       )
 

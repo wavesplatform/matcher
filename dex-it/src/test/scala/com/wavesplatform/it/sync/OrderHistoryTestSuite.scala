@@ -276,7 +276,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
       def assertAvgWeighedPrice(keyPair: KeyPair, avgWeighedPricesAndPriceAssetAmount: List[(Long, Long)]): Unit = {
         dex1.api
           .orderHistoryByPair(keyPair, wavesUsdPair, Some(false))
-          .map(item => item.avgWeighedPrice -> item.executedAmountOfPriceAsset) should matchTo(avgWeighedPricesAndPriceAssetAmount)
+          .map(item => item.avgWeighedPrice -> item.totalExecutedAmountOfPriceAsset) should matchTo(avgWeighedPricesAndPriceAssetAmount)
       }
 
       // checking market and limit orders because

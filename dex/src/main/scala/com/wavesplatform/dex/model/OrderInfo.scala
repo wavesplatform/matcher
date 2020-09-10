@@ -22,7 +22,7 @@ sealed trait OrderInfo[+S <: OrderStatus] {
   def orderType: AcceptedOrderType
   def avgWeighedPrice: Long
   def orderVersion: Byte
-  def executedAmountOfPriceAsset: Long
+  def totalExecutedAmountOfPriceAsset: Long
 }
 
 object OrderInfo {
@@ -37,7 +37,7 @@ object OrderInfo {
     case _          => 3
   }
 
-  private def getExecutedAmountOfPriceAsset(filledAmount: Long, avgWeighedPrice: Long): Long =
+  private def getTotalExecutedAmountOfPriceAsset(filledAmount: Long, avgWeighedPrice: Long): Long =
     new BigDecimal(avgWeighedPrice)
       .multiply(new BigDecimal(filledAmount))
       .scaleByPowerOfTen(-Order.PriceConstantExponent)
@@ -63,7 +63,7 @@ object OrderInfo {
       AcceptedOrderType.Limit,
       avgWeighedPrice,
       backwardCompatibleOrderVersion(version, feeAsset),
-      getExecutedAmountOfPriceAsset(status.filledAmount, avgWeighedPrice)
+      getTotalExecutedAmountOfPriceAsset(status.filledAmount, avgWeighedPrice)
     )
   }
 
@@ -94,7 +94,7 @@ object OrderInfo {
       AcceptedOrderType.Limit,
       avgWeighedPrice,
       backwardCompatibleOrderVersion(version, matcherFeeAssetId),
-      getExecutedAmountOfPriceAsset(status.filledAmount, avgWeighedPrice)
+      getTotalExecutedAmountOfPriceAsset(status.filledAmount, avgWeighedPrice)
     )
   }
 
@@ -132,7 +132,7 @@ object OrderInfo {
       orderType,
       avgWeighedPrice,
       backwardCompatibleOrderVersion(version, matcherFeeAssetId),
-      getExecutedAmountOfPriceAsset(status.filledAmount, avgWeighedPrice)
+      getTotalExecutedAmountOfPriceAsset(status.filledAmount, avgWeighedPrice)
     )
   }
 
@@ -160,7 +160,7 @@ object OrderInfo {
       orderType,
       avgWeighedPrice,
       backwardCompatibleOrderVersion(version, matcherFeeAssetId),
-      getExecutedAmountOfPriceAsset(status.filledAmount, avgWeighedPrice)
+      getTotalExecutedAmountOfPriceAsset(status.filledAmount, avgWeighedPrice)
     )
   }
 
@@ -223,7 +223,7 @@ object OrderInfo {
       orderType,
       avgWeighedPrice,
       orderVersion,
-      getExecutedAmountOfPriceAsset(status.filledAmount, avgWeighedPrice)
+      getTotalExecutedAmountOfPriceAsset(status.filledAmount, avgWeighedPrice)
     )
 
   private case class Impl[+S <: OrderStatus](version: Byte,
@@ -238,7 +238,7 @@ object OrderInfo {
                                              orderType: AcceptedOrderType,
                                              avgWeighedPrice: Long,
                                              orderVersion: Byte,
-                                             executedAmountOfPriceAsset: Long)
+                                             totalExecutedAmountOfPriceAsset: Long)
       extends OrderInfo[S]
 
   def encode(oi: FinalOrderInfo): Array[Byte] = oi.version match {

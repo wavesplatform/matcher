@@ -177,9 +177,24 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           Map(usd   -> WsBalances(55.5, 0))
         )(
           WsOrder.fromDomain(mo),
-          WsOrder(mo.id, status = OrderStatus.PartiallyFilled.name, filledAmount = 15.0, filledFee = 0.0009, avgWeighedPrice = 1.2),
-          WsOrder(mo.id, status = OrderStatus.PartiallyFilled.name, filledAmount = 40.0, filledFee = 0.0024, avgWeighedPrice = 1.1375),
-          WsOrder(mo.id, status = OrderStatus.Filled.name, filledAmount = 50.0, filledFee = 0.003, avgWeighedPrice = 1.11)
+          WsOrder(mo.id,
+                  status = OrderStatus.PartiallyFilled.name,
+                  filledAmount = 15.0,
+                  filledFee = 0.0009,
+                  avgWeighedPrice = 1.2,
+                  totalExecutedAmountOfPriceAsset = 18),
+          WsOrder(mo.id,
+                  status = OrderStatus.PartiallyFilled.name,
+                  filledAmount = 40.0,
+                  filledFee = 0.0024,
+                  avgWeighedPrice = 1.1375,
+                  totalExecutedAmountOfPriceAsset = 45.5),
+          WsOrder(mo.id,
+                  status = OrderStatus.Filled.name,
+                  filledAmount = 50.0,
+                  filledFee = 0.003,
+                  avgWeighedPrice = 1.11,
+                  totalExecutedAmountOfPriceAsset = 55.5)
         )
 
         wsc.close()
@@ -205,7 +220,12 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           Map(Waves -> WsBalances(19.997, 0)) // since balance increasing comes after transaction mining, + 10 - 0.003, Waves balance on Node = 19.997
         )(
           WsOrder.fromDomain(LimitOrder(bo)),
-          WsOrder(bo.id(), status = OrderStatus.Filled.name, filledAmount = 10.0, filledFee = 0.003, avgWeighedPrice = 1.0)
+          WsOrder(bo.id(),
+                  status = OrderStatus.Filled.name,
+                  filledAmount = 10.0,
+                  filledFee = 0.003,
+                  avgWeighedPrice = 1.0,
+                  totalExecutedAmountOfPriceAsset = 10)
         )
 
         wsc.close()
@@ -242,7 +262,8 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
                   status = OrderStatus.PartiallyFilled.name.some,
                   filledAmount = 5.0.some,
                   filledFee = 0.0015.some,
-                  avgWeighedPrice = 1.0.some
+                  avgWeighedPrice = 1.0.some,
+                  totalExecutedAmountOfPriceAsset = 5.0.some
                 )
             ))
         }

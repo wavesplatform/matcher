@@ -1,15 +1,17 @@
 package com.wavesplatform.dex.model
 
-import java.math.{BigDecimal, BigInteger, RoundingMode}
+import java.math.BigInteger
 import java.nio.ByteBuffer
 
-import com.google.common.primitives.Longs
+import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.dex.codecs.ByteBufferCodecs.ByteBufferExt
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 
 sealed trait OrderInfo[+S <: OrderStatus] {
+
   def version: Byte
   def side: OrderType
   def amount: Long
@@ -22,10 +24,16 @@ sealed trait OrderInfo[+S <: OrderStatus] {
   def orderType: AcceptedOrderType
   def avgWeighedPrice: Long
   def orderVersion: Byte
-  def totalExecutedPriceAssets: Long
+
+  // we save avgWeighedPriceNominator instead of totalExecutedPriceAssets since it is more precise way to calculate
+  // avgWeighedPrice for v6. AcceptedOrder.FillingInfo.totalExecutedPriceAssets discards the decimal part during
+  // conversion to Long after dividing avgWeighedPriceNominator by PriceConstant
+
+  def avgWeighedPriceNominator: BigInteger
+  val totalExecutedPriceAssets: Long = avgWeighedPriceNominator.divide(BigInteger valueOf Order.PriceConstant).longValueExact()
 }
 
-object OrderInfo {
+object OrderInfo extends ScorexLogging {
   type FinalOrderInfo = OrderInfo[OrderStatus.Final]
 
   private def backwardCompatibleAvgWeighedPrice(status: OrderStatus, price: Long): Long =
@@ -37,12 +45,8 @@ object OrderInfo {
     case _          => 3
   }
 
-  private[model] def getTotalExecutedPriceAssets(filledAmount: Long, avgWeighedPrice: Long): Long =
-    new BigDecimal(avgWeighedPrice)
-      .multiply(new BigDecimal(filledAmount))
-      .scaleByPowerOfTen(-Order.PriceConstantExponent)
-      .setScale(0, RoundingMode.FLOOR)
-      .longValue()
+  private[model] def getAvgWeighedPriceNominator(filledAmount: Long, avgWeighedPrice: Long): BigInteger =
+    BigInteger.valueOf(filledAmount).multiply(BigInteger.valueOf(avgWeighedPrice))
 
   def v1[S <: OrderStatus](side: OrderType, amount: Long, price: Long, timestamp: Long, status: S, assetPair: AssetPair): OrderInfo[S] = {
 
@@ -63,7 +67,7 @@ object OrderInfo {
       orderType = AcceptedOrderType.Limit,
       avgWeighedPrice = avgWeighedPrice,
       orderVersion = backwardCompatibleOrderVersion(version, feeAsset),
-      totalExecutedPriceAssets = getTotalExecutedPriceAssets(status.filledAmount, avgWeighedPrice)
+      avgWeighedPriceNominator = getAvgWeighedPriceNominator(status.filledAmount, avgWeighedPrice)
     )
   }
 
@@ -94,7 +98,7 @@ object OrderInfo {
       orderType = AcceptedOrderType.Limit,
       avgWeighedPrice = avgWeighedPrice,
       orderVersion = backwardCompatibleOrderVersion(version, matcherFeeAssetId),
-      totalExecutedPriceAssets = getTotalExecutedPriceAssets(status.filledAmount, avgWeighedPrice)
+      avgWeighedPriceNominator = getAvgWeighedPriceNominator(status.filledAmount, avgWeighedPrice)
     )
   }
 
@@ -132,7 +136,7 @@ object OrderInfo {
       orderType = orderType,
       avgWeighedPrice = avgWeighedPrice,
       orderVersion = backwardCompatibleOrderVersion(version, matcherFeeAssetId),
-      totalExecutedPriceAssets = getTotalExecutedPriceAssets(status.filledAmount, avgWeighedPrice)
+      avgWeighedPriceNominator = getAvgWeighedPriceNominator(status.filledAmount, avgWeighedPrice)
     )
   }
 
@@ -160,7 +164,7 @@ object OrderInfo {
       orderType = orderType,
       avgWeighedPrice = avgWeighedPrice,
       orderVersion = backwardCompatibleOrderVersion(version, matcherFeeAssetId),
-      totalExecutedPriceAssets = getTotalExecutedPriceAssets(status.filledAmount, avgWeighedPrice)
+      avgWeighedPriceNominator = getAvgWeighedPriceNominator(status.filledAmount, avgWeighedPrice)
     )
   }
 
@@ -222,7 +226,7 @@ object OrderInfo {
       orderType = orderType,
       avgWeighedPrice = avgWeighedPrice,
       orderVersion = orderVersion,
-      totalExecutedPriceAssets = getTotalExecutedPriceAssets(status.filledAmount, avgWeighedPrice)
+      avgWeighedPriceNominator = getAvgWeighedPriceNominator(status.filledAmount, avgWeighedPrice)
     )
 
   def v6[S <: OrderStatus](ao: AcceptedOrder, status: S): OrderInfo[S] = {
@@ -238,7 +242,7 @@ object OrderInfo {
       assetPair = order.assetPair,
       orderType = ao.orderType,
       orderVersion = ao.order.version,
-      totalExecutedPriceAssets = ao.fillingInfo.totalExecutedPriceAssets
+      avgWeighedPriceNominator = ao.avgWeighedPriceNominator
     )
   }
 
@@ -252,10 +256,11 @@ object OrderInfo {
                            assetPair: AssetPair,
                            orderType: AcceptedOrderType,
                            orderVersion: Byte,
-                           totalExecutedPriceAssets: Long): OrderInfo[S] = {
+                           avgWeighedPriceNominator: BigInteger): OrderInfo[S] = {
+
     val avgWeighedPrice =
       if (status.filledAmount == 0) 0L
-      else BigInteger.valueOf(totalExecutedPriceAssets).divide(BigInteger.valueOf(status.filledAmount)).longValueExact()
+      else avgWeighedPriceNominator.divide(BigInteger.valueOf(status.filledAmount)).longValueExact()
 
     Impl(
       version = 6,
@@ -270,7 +275,7 @@ object OrderInfo {
       orderType = orderType,
       avgWeighedPrice = avgWeighedPrice,
       orderVersion = orderVersion,
-      totalExecutedPriceAssets = totalExecutedPriceAssets
+      avgWeighedPriceNominator = avgWeighedPriceNominator
     )
   }
 
@@ -286,7 +291,7 @@ object OrderInfo {
                                              orderType: AcceptedOrderType,
                                              avgWeighedPrice: Long,
                                              orderVersion: Byte,
-                                             totalExecutedPriceAssets: Long)
+                                             avgWeighedPriceNominator: BigInteger)
       extends OrderInfo[S]
 
   def encode(oi: FinalOrderInfo): Array[Byte] = oi.version match {
@@ -472,11 +477,16 @@ object OrderInfo {
   }
 
   private def encodeV6(oi: OrderInfo.FinalOrderInfo): Array[Byte] = {
-    val size: Int = 52 + oi.feeAsset.byteRepr.length + oi.assetPair.bytes.length + 1 + 8
+
+    val avgWeighedPriceNominatorBytes = oi.avgWeighedPriceNominator.toByteArray
+    val avgWeighedPriceNominatorSize  = avgWeighedPriceNominatorBytes.size
+
+    val size: Int = 52 + oi.feeAsset.byteRepr.length + oi.assetPair.bytes.length + 1 + 4 + avgWeighedPriceNominatorSize
     encodeVersioned(6, size, oi)
       .putAcceptedOrderType(oi.orderType)
       .put(oi.orderVersion)
-      .put(Longs.toByteArray(oi.totalExecutedPriceAssets))
+      .put(Ints.toByteArray(avgWeighedPriceNominatorSize))
+      .put(avgWeighedPriceNominatorBytes)
       .array()
   }
 
@@ -498,7 +508,7 @@ object OrderInfo {
       assetPair = AssetPair(buf.getAssetId, buf.getAssetId),
       orderType = buf.getAcceptedOrderType,
       orderVersion = buf.get(),
-      totalExecutedPriceAssets = buf.getLong()
+      avgWeighedPriceNominator = new BigInteger(buf.getBytes)
     )
   }
 }

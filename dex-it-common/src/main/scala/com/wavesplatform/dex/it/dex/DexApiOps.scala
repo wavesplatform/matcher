@@ -55,6 +55,12 @@ object DexApiOps {
     def orderStatus(order: Order): F[HttpOrderStatus]                       = orderStatus(order.assetPair, order.id())
     def orderStatus(assetPair: AssetPair, id: Order.Id): F[HttpOrderStatus] = explicitGet(self.tryOrderStatus(assetPair, id))
 
+    def orderStatusInfoByIdWithSignature(owner: KeyPair, order: Order, timestamp: Long = System.currentTimeMillis): F[HttpOrderBookHistoryItem] =
+      orderStatusInfoByIdWithSignature(owner, order.id(), timestamp)
+
+    def orderStatusInfoByIdWithSignature(owner: KeyPair, orderId: Order.Id, timestamp: Long): F[HttpOrderBookHistoryItem] =
+      explicitGet(self.tryOrderStatusInfoByIdWithSignature(owner, orderId, timestamp))
+
     def transactionsByOrder(order: Order): F[List[ExchangeTransaction]] = transactionsByOrder(order.id())
     def transactionsByOrder(id: Order.Id): F[List[ExchangeTransaction]] = explicitGet(self.tryTransactionsByOrder(id))
 
@@ -101,7 +107,7 @@ object DexApiOps {
 
     def settings: F[HttpMatcherPublicSettings] = explicitGet(self.trySettings)
 
-    def wsConnections: F[HttpWebSocketConnections]         = explicitGet(self.tryWsConnections)
+    def wsConnections: F[HttpWebSocketConnections]            = explicitGet(self.tryWsConnections)
     def closeWsConnections(oldestNumber: Int): F[HttpMessage] = explicitGet(self.tryCloseWsConnections(oldestNumber))
   }
 }

@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync
 
+import cats.syntax.option._
 import com.softwaremill.sttp._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
@@ -18,7 +19,6 @@ import com.wavesplatform.it.config.DexTestConfig.issueAssetPair
 import org.scalatest.prop.TableDrivenPropertyChecks
 
 import scala.concurrent.duration._
-import cats.syntax.option._
 
 class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
@@ -555,6 +555,29 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       Seq(bob, carol).foreach { owner =>
         dex1.api.cancelAll(owner)
       }
+    }
+
+    "correctly calculate total executed price assets when fee in price assets" in {
+
+      val carol = mkAccountWithBalance(10.waves -> Waves, 100.usdn -> usdn)
+
+      dex1.api.upsertRate(usdn, 3.63615)
+
+      // matcherFee = baseFee * 10^(feeAssetDecimals - 8) * rate = 3 * 10^5 * 10^(6 - 8) * 3.63615 = 10908.45 = 10909 USDN cents = 0.010909 USDN
+
+      val sellOrder = mkOrderDP(carol, wavesUsdnPair, SELL, 5.waves, 2.44, feeAsset = usdn, matcherFee = 0.010909.usdn)
+      val buyOrder  = mkOrderDP(alice, wavesUsdnPair, BUY, 5.waves, 2.44)
+
+      placeAndAwaitAtDex(sellOrder)
+      placeAndAwaitAtNode(buyOrder)
+
+      val sellOrderStatus = dex1.api.orderStatusInfoByIdWithSignature(carol, sellOrder)
+      val buyOrderStatus  = dex1.api.orderStatusInfoByIdWithSignature(alice, buyOrder)
+
+      Seq(sellOrderStatus, buyOrderStatus).foreach { _.totalExecutedPriceAssets shouldBe 12.2.usdn }
+      sellOrderStatus.filledFee shouldBe 0.010909.usdn
+
+      dex1.api.deleteRate(usdn)
     }
   }
 }

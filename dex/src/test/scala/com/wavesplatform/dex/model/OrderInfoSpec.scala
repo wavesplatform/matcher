@@ -1,5 +1,7 @@
 package com.wavesplatform.dex.model
 
+import java.math.BigInteger
+
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.model.OrderInfoSpec.OrderExt
 import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
@@ -17,7 +19,7 @@ class OrderInfoSpec extends AnyFreeSpec with Matchers with MatcherSpecBase with 
       status          <- Gen.oneOf(OrderStatus.Filled(filledAmount, filledFee), OrderStatus.Cancelled(filledAmount, filledFee))
       aoType          <- if (orderInfoVersion <= 2) Gen.const(AcceptedOrderType.Limit) else Gen.oneOf(AcceptedOrderType.Limit, AcceptedOrderType.Market)
       avgWeighedPrice <- if (orderInfoVersion <= 3) Gen.const(o.price) else Gen.choose(0, o.price)
-    } yield o.toInfo(orderInfoVersion, status, aoType, avgWeighedPrice, OrderInfo.getTotalExecutedPriceAssets(filledAmount, avgWeighedPrice))
+    } yield o.toInfo(orderInfoVersion, status, aoType, avgWeighedPrice, OrderInfo.getAvgWeighedPriceNominator(filledAmount, avgWeighedPrice))
 
   private val finalizedOrderInfoGen: Gen[OrderInfo[OrderStatus.Final]] = for {
     (o, _) <- orderGenerator
@@ -39,7 +41,7 @@ object OrderInfoSpec {
                                  status: A,
                                  aoType: AcceptedOrderType,
                                  avgWeighedPrice: Long,
-                                 totalExecutedPriceAssets: Long): OrderInfo[A] = version match {
+                                 avgWeighedPriceNominator: BigInteger): OrderInfo[A] = version match {
       case 1 => OrderInfo.v1[A](o.orderType, o.amount, o.price, o.timestamp, status, o.assetPair)
       case 2 => OrderInfo.v2[A](o.orderType, o.amount, o.price, o.matcherFee, o.feeAsset, o.timestamp, status, o.assetPair)
       case 3 => OrderInfo.v3[A](o.orderType, o.amount, o.price, o.matcherFee, o.feeAsset, o.timestamp, status, o.assetPair, aoType)
@@ -59,7 +61,7 @@ object OrderInfoSpec {
                  o.assetPair,
                  aoType,
                  o.version,
-                 totalExecutedPriceAssets)
+                 avgWeighedPriceNominator)
     }
   }
 }

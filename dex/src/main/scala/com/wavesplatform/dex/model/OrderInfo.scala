@@ -8,7 +8,6 @@ import com.wavesplatform.dex.codecs.ByteBufferCodecs.ByteBufferExt
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.domain.utils.ScorexLogging
 
 sealed trait OrderInfo[+S <: OrderStatus] {
 
@@ -33,7 +32,7 @@ sealed trait OrderInfo[+S <: OrderStatus] {
   val totalExecutedPriceAssets: Long = avgWeighedPriceNominator.divide(BigInteger valueOf Order.PriceConstant).longValueExact()
 }
 
-object OrderInfo extends ScorexLogging {
+object OrderInfo {
   type FinalOrderInfo = OrderInfo[OrderStatus.Final]
 
   private def backwardCompatibleAvgWeighedPrice(status: OrderStatus, price: Long): Long =

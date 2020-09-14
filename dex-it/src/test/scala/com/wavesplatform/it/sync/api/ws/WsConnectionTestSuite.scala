@@ -2,6 +2,7 @@ package com.wavesplatform.it.sync.api.ws
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.ws.protocol._
+import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType.SELL
 import com.wavesplatform.it.WsSuiteBase
 
@@ -18,6 +19,19 @@ class WsConnectionTestSuite extends WsSuiteBase {
     wavesNode1.start()
     broadcastAndAwait(IssueBtcTx)
     dex1.start()
+  }
+
+  "Matcher should send rates snapshot after initial message" in {
+    dex1.api.upsertRate(btc, 0.00041863)
+
+    val wsc = mkDexWsConnectionWithInitialMessage(dex1)
+    wsc.receiveAtLeastN[WsInitial](1)
+
+    val rates = wsc.receiveAtLeastN[WsRatesUpdates](1)
+
+    rates should have size 1
+    rates.head.updateId shouldBe 0
+    rates.head.rates should matchTo(Map(Waves -> 1, btc -> 0.00041863))
   }
 
   "Updates both from address and order book" in {

@@ -58,12 +58,17 @@ trait HasWebSockets extends BeforeAndAfterAll with BeforeAndAfterEach with HasJw
     mkWsConnection(getWsStreamUri(dex), keepAlive)
 
   protected def mkWsConnection(uri: String, keepAlive: Boolean = true): WsConnection = {
+    mkDexWsConnectionWithInitialMessage(uri, keepAlive) unsafeTap { _.clearMessages() }
+  }
+
+  protected def mkDexWsConnectionWithInitialMessage(dex: DexContainer, keepAlive: Boolean = true): WsConnection =
+    mkDexWsConnectionWithInitialMessage(getWsStreamUri(dex), keepAlive)
+
+  protected def mkDexWsConnectionWithInitialMessage(uri: String, keepAlive: Boolean): WsConnection =
     new WsConnection(uri, keepAlive) unsafeTap { wsc =>
       addConnection(wsc)
       eventually { wsc.collectMessages[WsInitial] should have size 1 }
-      wsc.clearMessages()
     }
-  }
 
   protected def assertChanges(c: WsConnection, squash: Boolean = true)(expBs: Map[Asset, WsBalances]*)(expOs: WsOrder*): Unit = {
     eventually {

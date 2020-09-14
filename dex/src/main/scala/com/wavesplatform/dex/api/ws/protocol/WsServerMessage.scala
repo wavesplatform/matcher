@@ -22,6 +22,7 @@ object WsServerMessage {
       case WsOrdersUpdate.tpe     => json.validate[WsOrdersUpdate]
       case WsError.tpe            => json.validate[WsError]
       case WsInitial.tpe          => json.validate[WsInitial]
+      case WsRatesUpdates.tpe     => json.validate[WsRatesUpdates]
       case x                      => JsError(JsPath \ "T", s"An unknown type: $x")
     }
   }
@@ -33,6 +34,7 @@ object WsServerMessage {
     case x: WsOrdersUpdate     => Json.toJson(x)
     case x: WsError            => Json.toJson(x)
     case x: WsInitial          => Json.toJson(x)
+    case x: WsRatesUpdates     => Json.toJson(x)
     case x                     => throw new NotImplementedError(x.getClass.getName)
   }
 }

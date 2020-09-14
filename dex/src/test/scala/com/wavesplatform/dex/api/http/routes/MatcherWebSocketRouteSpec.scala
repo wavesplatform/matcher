@@ -11,7 +11,7 @@ import com.wavesplatform.dex.api.RouteSpec
 import com.wavesplatform.dex.api.http.ApiMarshallers._
 import com.wavesplatform.dex.api.http.entities._
 import com.wavesplatform.dex.api.http.headers.`X-Api-Key`
-import com.wavesplatform.dex.api.ws.actors.WsInternalBroadcastActor
+import com.wavesplatform.dex.api.ws.actors.{WsExternalClientDirectoryActor, WsInternalBroadcastActor}
 import com.wavesplatform.dex.api.ws.routes.MatcherWebSocketRoute
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.crypto
@@ -25,6 +25,7 @@ import org.scalatest.concurrent.Eventually
 import play.api.libs.json.{JsonFacade => _}
 
 import scala.annotation.nowarn
+import scala.util.Random
 
 class MatcherWebSocketRouteSpec extends RouteSpec("/ws/v0") with MatcherSpecBase with PathMockFactory with Eventually {
 
@@ -66,13 +67,15 @@ class MatcherWebSocketRouteSpec extends RouteSpec("/ws/v0") with MatcherSpecBase
 
   @nowarn("msg=default")
   private def test[U](f: Route => U, apiKey: String = ""): U = {
+    val time                   = new TestTime
     val vsInternalBroadcastRef = testKit.createTestProbe[WsInternalBroadcastActor.Command]()
     val route =
       new MatcherWebSocketRoute(
         wsInternalBroadcastRef = vsInternalBroadcastRef.ref,
+        externalClientDirectoryRef = testKit.spawn(WsExternalClientDirectoryActor(rateCache, time), s"ws-external-cd-${Random.nextInt(Int.MaxValue)}"),
         addressDirectory = ActorRef.noSender,
         matcher = ActorRef.noSender,
-        time = new TestTime,
+        time = time,
         assetPairBuilder = new AssetPairBuilder(
           settings,
           x => liftErrorAsync[BriefAssetDescription](error.AssetNotFound(x)),

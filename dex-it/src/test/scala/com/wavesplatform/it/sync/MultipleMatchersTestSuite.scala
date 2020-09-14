@@ -89,11 +89,9 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with
     dex1.api.place(buyPart3)
 
     val obs1 = wsob1.messages
-      .sortBy(_.asInstanceOf[WsOrderBookChanges].updateId)
       .reduce((m1, m2) => mergeOrderBookChanges(m1.asInstanceOf[WsOrderBookChanges], m2.asInstanceOf[WsOrderBookChanges]))
 
     val obs2 = wsob2.messages
-      .sortBy(_.asInstanceOf[WsOrderBookChanges].updateId)
       .reduce((m1, m2) => mergeOrderBookChanges(m1.asInstanceOf[WsOrderBookChanges], m2.asInstanceOf[WsOrderBookChanges]))
 
     obs1 should be equals obs2
@@ -119,11 +117,9 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with
     dex1.api.place(buyPart3)
 
     val aus1 = wsau1.messages
-      .sortBy(_.asInstanceOf[WsAddressChanges].updateId)
       .reduce((m1, m2) => mergeAddressChanges(m1.asInstanceOf[WsAddressChanges], m2.asInstanceOf[WsAddressChanges]))
 
     val aus2 = wsau1.messages
-      .sortBy(_.asInstanceOf[WsAddressChanges].updateId)
       .reduce((m1, m2) => mergeAddressChanges(m1.asInstanceOf[WsAddressChanges], m2.asInstanceOf[WsAddressChanges]))
 
     aus1 should be equals aus2

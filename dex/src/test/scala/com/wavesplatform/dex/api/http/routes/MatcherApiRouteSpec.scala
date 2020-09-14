@@ -144,7 +144,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       status = status,
       assetPair = order.assetPair,
       avgWeighedPrice = 0,
-      version = order.version
+      version = order.version,
+      totalExecutedPriceAssets = 0
     )
 
   // getMatcherPublicKey

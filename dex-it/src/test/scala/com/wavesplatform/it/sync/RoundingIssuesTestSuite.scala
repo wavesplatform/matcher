@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync
 
+import cats.syntax.option._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.api.http.entities.{HttpOrderStatus, HttpV0LevelAgg}
@@ -28,9 +29,16 @@ class RoundingIssuesTestSuite extends MatcherSuiteBase {
     val submitted = mkOrder(bob, wavesUsdPair, OrderType.SELL, 425532L, 235)
     dex1.api.place(submitted)
 
-    val filledAmount = 420169L
-    dex1.api.waitForOrder(submitted)(_ == HttpOrderStatus(Status.Filled, Some(filledAmount), Some(296219L)))
-    dex1.api.waitForOrder(counter)(_ == HttpOrderStatus(Status.PartiallyFilled, Some(filledAmount), Some(40L)))
+    val filledAmount             = 420169L
+    val totalExecutedPriceAssets = 1L // = 420169 * 238 / 10^8
+
+    dex1.api.waitForOrder(submitted)(_ == HttpOrderStatus(Status.Filled, filledAmount.some, 296219L.some))
+    dex1.api.waitForOrder(counter)(_ == HttpOrderStatus(Status.PartiallyFilled, filledAmount.some, 40L.some))
+
+    Seq(alice -> counter, bob -> submitted).foreach {
+      case (owner, ao) =>
+        dex1.api.orderStatusInfoByIdWithSignature(owner, ao).totalExecutedPriceAssets shouldBe totalExecutedPriceAssets
+    }
 
     val tx = waitForOrderAtNode(counter)
     dex1.api.cancel(alice, counter)

@@ -253,7 +253,8 @@ class ActorsWebSocketInteractionsSpecification
                   status = OrderStatus.PartiallyFilled.name.some,
                   filledAmount = 5.0.some,
                   filledFee = 0.0015.some,
-                  avgWeighedPrice = 3.0.some
+                  avgWeighedPrice = 3.0.some,
+                  totalExecutedPriceAssets = 15.0.some
                 )
               ),
               3
@@ -328,7 +329,8 @@ class ActorsWebSocketInteractionsSpecification
                   status = OrderStatus.PartiallyFilled.name.some,
                   filledAmount = 10.0.some,
                   filledFee = 0.2.some,
-                  avgWeighedPrice = 3.0.some
+                  avgWeighedPrice = 3.0.some,
+                  totalExecutedPriceAssets = 30.0.some
                 )
               ),
               2
@@ -345,7 +347,8 @@ class ActorsWebSocketInteractionsSpecification
                   status = OrderStatus.PartiallyFilled.name.some,
                   filledAmount = 25.0.some,
                   filledFee = 0.5.some,
-                  avgWeighedPrice = 3.0.some
+                  avgWeighedPrice = 3.0.some,
+                  totalExecutedPriceAssets = 75.0.some
                 )
               ),
               3
@@ -362,7 +365,8 @@ class ActorsWebSocketInteractionsSpecification
                   status = OrderStatus.PartiallyFilled.name.some,
                   filledAmount = 30.0.some,
                   filledFee = 0.6.some,
-                  avgWeighedPrice = 3.0.some
+                  avgWeighedPrice = 3.0.some,
+                  totalExecutedPriceAssets = 90.0.some
                 )
               ),
               4
@@ -566,11 +570,14 @@ class ActorsWebSocketInteractionsSpecification
               Waves -> WsBalances(99.994, 0.006) // 0.006 is a commission for counter2 + counter3, 99.994 = 100 - 0.006
             ),
             Seq(
-              WsOrder(id = counter1.id,
-                      status = OrderStatus.Filled.name.some,
-                      filledAmount = 5.0.some,
-                      filledFee = 0.003.some,
-                      avgWeighedPrice = 3.0.some)
+              WsOrder(
+                id = counter1.id,
+                status = OrderStatus.Filled.name.some,
+                filledAmount = 5.0.some,
+                filledFee = 0.003.some,
+                avgWeighedPrice = 3.0.some,
+                totalExecutedPriceAssets = 15.0.some
+              )
             ),
             4
           )
@@ -583,11 +590,14 @@ class ActorsWebSocketInteractionsSpecification
               Waves -> WsBalances(99.997, 0.003)
             ),
             Seq(
-              WsOrder(id = counter2.id,
-                      status = OrderStatus.Filled.name.some,
-                      filledAmount = 5.0.some,
-                      filledFee = 0.003.some,
-                      avgWeighedPrice = 3.1.some)
+              WsOrder(
+                id = counter2.id,
+                status = OrderStatus.Filled.name.some,
+                filledAmount = 5.0.some,
+                filledFee = 0.003.some,
+                avgWeighedPrice = 3.1.some,
+                totalExecutedPriceAssets = 15.5.some
+              )
             ),
             5
           )
@@ -600,11 +610,14 @@ class ActorsWebSocketInteractionsSpecification
               Waves -> WsBalances(99.9982, 0.0018) // executed_fee = 0.0012 = 0.003 * 2 / 5
             ),
             Seq(
-              WsOrder(id = counter3.id,
-                      status = OrderStatus.PartiallyFilled.name.some,
-                      filledAmount = 2.0.some,
-                      filledFee = 0.0012.some,
-                      avgWeighedPrice = 3.2.some)
+              WsOrder(
+                id = counter3.id,
+                status = OrderStatus.PartiallyFilled.name.some,
+                filledAmount = 2.0.some,
+                filledFee = 0.0012.some,
+                avgWeighedPrice = 3.2.some,
+                totalExecutedPriceAssets = 6.4.some
+              )
             ),
             6
           )
@@ -664,7 +677,8 @@ class ActorsWebSocketInteractionsSpecification
                 status = OrderStatus.PartiallyFilled.name.some,
                 filledAmount = 5.0.some,
                 filledFee = 0.00125.some,
-                avgWeighedPrice = 3.0.some
+                avgWeighedPrice = 3.0.some,
+                totalExecutedPriceAssets = 15.0.some
               )
             ),
             2
@@ -675,11 +689,14 @@ class ActorsWebSocketInteractionsSpecification
             // executed = 5, executed_fee = 0.003 * 5 / 12 = 0.00125, reserved = 2.0005 = 7.00175 - 5 - 0.00125, tradable = 97.9995 = 100 - 2.0005
             Map(Waves -> WsBalances(97.9995, 2.0005)),
             Seq(
-              WsOrder(id = mo.id,
-                      status = OrderStatus.PartiallyFilled.name.some,
-                      filledAmount = 10.0.some,
-                      filledFee = 0.0025.some,
-                      avgWeighedPrice = 3.05.some)
+              WsOrder(
+                id = mo.id,
+                status = OrderStatus.PartiallyFilled.name.some,
+                filledAmount = 10.0.some,
+                filledFee = 0.0025.some,
+                avgWeighedPrice = 3.05.some,
+                totalExecutedPriceAssets = 30.5.some
+              )
             ),
             3
           )
@@ -694,7 +711,8 @@ class ActorsWebSocketInteractionsSpecification
                 status = OrderStatus.Filled.name.some,
                 filledAmount = 12.0.some,
                 filledFee = 0.003.some,
-                avgWeighedPrice = 3.07.some
+                avgWeighedPrice = 3.07.some,
+                totalExecutedPriceAssets = 36.9.some
               )
             ),
             4
@@ -732,7 +750,7 @@ class ActorsWebSocketInteractionsSpecification
 
         expectWsBalancesAndOrders(
           Map(usd -> WsBalances(5, 5), Waves -> WsBalances(9.9985, 0.0015)),
-          Seq(WsOrder(id = bo.id, status = OrderStatus.PartiallyFilled.name, filledAmount = 5.0, filledFee = 0.0015, avgWeighedPrice = 1.0)),
+          Seq(WsOrder(id = bo.id, status = OrderStatus.PartiallyFilled.name, filledAmount = 5.0, filledFee = 0.0015, avgWeighedPrice = 1.0, totalExecutedPriceAssets = 5.0)),
           2
         )
 

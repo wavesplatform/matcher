@@ -25,7 +25,8 @@ case class WsOrder(id: Order.Id,
                    status: Option[String] = None,
                    filledAmount: Option[Double] = None,
                    filledFee: Option[Double] = None,
-                   avgWeighedPrice: Option[Double] = None)
+                   avgWeighedPrice: Option[Double] = None,
+                   totalExecutedPriceAssets: Option[Double] = None)
 
 object WsOrder {
 
@@ -55,12 +56,25 @@ object WsOrder {
       status.name.some,
       ao.fillingInfo.filledAmount.some.map(denormalizeAmount),
       ao.fillingInfo.filledFee.some.map(denormalizeFee),
-      ao.fillingInfo.avgWeighedPrice.some.map(denormalizePrice)
+      ao.fillingInfo.avgWeighedPrice.some.map(denormalizePrice),
+      ao.fillingInfo.totalExecutedPriceAssets.some.map(denormalizePrice)
     )
   }
 
-  def apply(id: Order.Id, status: String, filledAmount: Double, filledFee: Double, avgWeighedPrice: Double): WsOrder = {
-    WsOrder(id, status = status.some, filledAmount = filledAmount.some, filledFee = filledFee.some, avgWeighedPrice = avgWeighedPrice.some)
+  def apply(id: Order.Id,
+            status: String,
+            filledAmount: Double,
+            filledFee: Double,
+            avgWeighedPrice: Double,
+            totalExecutedPriceAssets: Double): WsOrder = {
+    WsOrder(
+      id,
+      status = status.some,
+      filledAmount = filledAmount.some,
+      filledFee = filledFee.some,
+      avgWeighedPrice = avgWeighedPrice.some,
+      totalExecutedPriceAssets = totalExecutedPriceAssets.some
+    )
   }
 
   def apply(id: Order.Id, status: String): WsOrder = WsOrder(id, status = status.some)
@@ -98,6 +112,7 @@ object WsOrder {
         (__ \ "s").formatNullable[String] and                       // status: Accepted or Filled or PartiallyFilled or Cancelled
         (__ \ "q").formatNullable[Double](doubleAsStringFormat) and // filled amount
         (__ \ "Q").formatNullable[Double](doubleAsStringFormat) and // filled fee
-        (__ \ "r").formatNullable[Double](doubleAsStringFormat)     // average weighed price among all trades
+        (__ \ "r").formatNullable[Double](doubleAsStringFormat) and // average weighed price among all trades
+        (__ \ "E").formatNullable[Double](doubleAsStringFormat)     // total executed price assets
     )(WsOrder.apply, unlift(WsOrder.unapply))
 }

@@ -151,7 +151,7 @@ class WsMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDrivenProp
     updateId   <- Gen.choose(0L, Long.MaxValue)
     ratesCount <- Gen.choose(1, 5)
     assets     <- Gen.listOfN(ratesCount, assetGen)
-    rates      <- Gen.listOfN(ratesCount, Gen.choose(0.05D, 100500D))
+    rates      <- Gen.listOfN(ratesCount, Gen.frequency((4, Gen.choose(0.05D, 100500D)), (1, Gen.const(-1D))))
   } yield WsRatesUpdates(assets.zip(rates).toMap, updateId, timestamp)
 
   private def serdeTest[T <: Product with Serializable: Diff](gen: Gen[T])(implicit format: Format[T]): Unit = forAll(gen) { original =>

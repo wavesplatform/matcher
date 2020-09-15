@@ -3,7 +3,9 @@ package com.wavesplatform.dex.api.ws.actors
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, Behavior, Terminated}
 import com.wavesplatform.dex.api.ws.protocol.WsRatesUpdates
+import com.wavesplatform.dex.api.ws.state.WsAddressState
 import com.wavesplatform.dex.caches.RateCache
+import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.time.Time
 
@@ -20,6 +22,7 @@ object WsExternalClientDirectoryActor {
   object Command {
     case class Subscribe(clientRef: ActorRef[WsExternalClientHandlerActor.Message]) extends Command
     case class CloseOldest(number: Int)                                             extends Command
+    case class BroadcastRatesUpdates(newRates: Map[Asset, Double])                  extends Command
   }
 
   sealed trait Query extends Message
@@ -47,6 +50,18 @@ object WsExternalClientDirectoryActor {
               val (updatedState, oldest) = state.withoutOldest(n)
               oldest.iterator.foreach(_ ! WsExternalClientHandlerActor.Command.CloseConnection(error.Balancing))
               default(updatedState)
+
+            case Command.BroadcastRatesUpdates(newRates) =>
+              default {
+                state.copy(
+                  all = state.all.map {
+                    case (target, meta) =>
+                      val newUpdateId = WsAddressState.getNextUpdateId(meta.ratesUpdateId)
+                      target ! WsExternalClientHandlerActor.Command.ForwardToClient(WsRatesUpdates(newRates, newUpdateId, matcherTime))
+                      target -> meta.copy(ratesUpdateId = newUpdateId)
+                  }
+                )
+              }
 
             case Query.GetActiveNumber(client) =>
               client ! state.all.size

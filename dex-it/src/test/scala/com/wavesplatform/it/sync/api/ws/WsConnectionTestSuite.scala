@@ -1,7 +1,9 @@
 package com.wavesplatform.it.sync.api.ws
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.api.ws.connection.WsConnection
 import com.wavesplatform.dex.api.ws.protocol._
+import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType.SELL
 import com.wavesplatform.it.WsSuiteBase
@@ -12,26 +14,79 @@ import scala.concurrent.{Await, Future}
 class WsConnectionTestSuite extends WsSuiteBase {
 
   override protected val dexInitialSuiteConfig: Config = ConfigFactory
-    .parseString(s"""waves.dex.price-assets = [ "$BtcId", "WAVES" ]""")
+    .parseString(s"""waves.dex.price-assets = [ "$BtcId", "$UsdId", "WAVES" ]""")
     .withFallback(jwtPublicKeyConfig)
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
-    broadcastAndAwait(IssueBtcTx)
+    broadcastAndAwait(IssueBtcTx, IssueUsdTx)
     dex1.start()
   }
 
-  "Matcher should send rates snapshot after initial message" in {
+  "Matcher should send rates snapshot after initial message and rates updates" in {
+
+    def assertRatesUpdates(wsc: WsConnection)(expectedRatesUpdates: List[(Map[Asset, Double], Long)]): Unit = {
+      wsc
+        .receiveAtLeastN[WsRatesUpdates](expectedRatesUpdates.size)
+        .map(r => r.rates -> r.updateId) should matchTo(expectedRatesUpdates)
+    }
+
     dex1.api.upsertRate(btc, 0.00041863)
 
-    val wsc = mkDexWsConnectionWithInitialMessage(dex1)
-    wsc.receiveAtLeastN[WsInitial](1)
+    val wsc1 = mkDexWsConnectionWithInitialMessage(dex1); wsc1.receiveAtLeastN[WsInitial](1)
 
-    val rates = wsc.receiveAtLeastN[WsRatesUpdates](1)
+    withClue("Rates snapshot") {
+      assertRatesUpdates(wsc1) { List((Map(Waves -> 1, btc -> 0.00041863), 0)) }
+      wsc1.clearMessages()
+    }
 
-    rates should have size 1
-    rates.head.updateId shouldBe 0
-    rates.head.rates should matchTo(Map(Waves -> 1, btc -> 0.00041863))
+    dex1.api.upsertRate(btc, 0.00041864)
+
+    val wsc2 = mkDexWsConnectionWithInitialMessage(dex1); wsc2.receiveAtLeastN[WsInitial](1)
+
+    dex1.api.upsertRate(usd, 2.76)
+
+    withClue("Rates update") {
+      assertRatesUpdates(wsc1) {
+        List(
+          Map[Asset, Double](btc -> 0.00041864) -> 1L,
+          Map[Asset, Double](usd -> 2.76)       -> 2L
+        )
+      }
+      assertRatesUpdates(wsc2) {
+        List(
+          Map[Asset, Double](Waves -> 1, btc -> 0.00041864) -> 0L,
+          Map[Asset, Double](usd   -> 2.76) -> 1L
+        )
+      }
+      Seq(wsc1, wsc2).foreach { _.clearMessages() }
+    }
+
+    Seq(btc, usd).foreach(dex1.api.deleteRate)
+
+    withClue("Rates delete") {
+      assertRatesUpdates(wsc1) {
+        List(
+          Map[Asset, Double](btc -> -1) -> 3L,
+          Map[Asset, Double](usd -> -1) -> 4L
+        )
+      }
+      assertRatesUpdates(wsc2) {
+        List(
+          Map[Asset, Double](btc -> -1) -> 2L,
+          Map[Asset, Double](usd -> -1) -> 3L
+        )
+      }
+      Seq(wsc1, wsc2).foreach { _.clearMessages() }
+    }
+
+    withClue("Rates snapshot after deleting") {
+      val wsc = mkDexWsConnectionWithInitialMessage(dex1); wsc.receiveAtLeastN[WsInitial](1)
+      assertRatesUpdates(wsc) { List(Map[Asset, Double](Waves -> 1) -> 0) }
+      wsc.close()
+    }
+
+    Seq(wsc1, wsc2).foreach { _.close() }
   }
 
   "Updates both from address and order book" in {

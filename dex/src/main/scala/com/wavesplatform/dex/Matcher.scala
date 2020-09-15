@@ -200,6 +200,9 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
 
   private val maybeApiKeyHash: Option[Array[Byte]] = Option(settings.restApi.apiKeyHash) filter (_.nonEmpty) map Base58.decode
 
+  private val externalClientDirectoryRef: typed.ActorRef[WsExternalClientDirectoryActor.Message] =
+    actorSystem.spawn(WsExternalClientDirectoryActor(rateCache, time), s"ws-external-cd-${Random.nextInt(Int.MaxValue)}")
+
   private lazy val httpApiRouteV0: MatcherApiRoute =
     new MatcherApiRoute(
       pairBuilder,
@@ -229,13 +232,11 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
           }
           .map { _.collect { case Right(version) => version } }
       },
-      () => orderFeeSettingsCache.getSettingsForOffset(lastProcessedOffset + 1)
+      () => orderFeeSettingsCache.getSettingsForOffset(lastProcessedOffset + 1),
+      externalClientDirectoryRef
     )
 
   private lazy val httpApiRouteV1 = MatcherApiRouteV1(pairBuilder, orderBookHttpInfo, () => status.get(), maybeApiKeyHash)
-
-  private val externalClientDirectoryRef: typed.ActorRef[WsExternalClientDirectoryActor.Message] =
-    actorSystem.spawn(WsExternalClientDirectoryActor(rateCache, time), s"ws-external-cd-${Random.nextInt(Int.MaxValue)}")
 
   private lazy val wsApiRoute = new MatcherWebSocketRoute(
     wsInternalBroadcast, // safe, wsApiRoute is used after initialization of wsInternalBroadcast

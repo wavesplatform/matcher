@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.api.http.routes
 
-import akka.actor.ActorRef
+import akka.actor.{ActorRef, typed}
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server
@@ -21,6 +21,7 @@ import com.wavesplatform.dex.api.http.entities._
 import com.wavesplatform.dex.api.http.headers.`X-User-Public-Key`
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
+import com.wavesplatform.dex.api.ws.actors.WsExternalClientDirectoryActor
 import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
@@ -71,7 +72,8 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                       override val apiKeyHash: Option[Array[Byte]],
                       rateCache: RateCache,
                       validatedAllowedOrderVersions: () => Future[Set[Byte]],
-                      getActualOrderFeeSettings: () => OrderFeeSettings)(implicit mat: Materializer)
+                      getActualOrderFeeSettings: () => OrderFeeSettings,
+                      externalClientDirectoryRef: typed.ActorRef[WsExternalClientDirectoryActor.Message])(implicit mat: Materializer)
     extends ApiRoute
     with AuthRoute
     with HasStatusBarrier
@@ -287,10 +289,12 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
               if (asset == Waves) RateError(error.WavesImmutableRate)
               else {
                 val assetStr = asset.toString
-                rateCache.upsertRate(asset, rate) match {
+                val response = rateCache.upsertRate(asset, rate) match {
                   case None     => SimpleResponse(StatusCodes.Created, s"The rate $rate for the asset $assetStr added")
                   case Some(pv) => SimpleResponse(StatusCodes.OK, s"The rate for the asset $assetStr updated, old value = $pv, new value = $rate")
                 }
+                externalClientDirectoryRef ! WsExternalClientDirectoryActor.Command.BroadcastRatesUpdates(Map(asset -> rate))
+                response
               }
             )
           }
@@ -317,10 +321,12 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         if (asset == Waves) RateError(error.WavesImmutableRate)
         else {
           val assetStr = asset.toString
-          rateCache.deleteRate(asset) match {
+          val response = rateCache.deleteRate(asset) match {
             case None     => RateError(error.RateNotFound(asset), StatusCodes.NotFound)
             case Some(pv) => SimpleResponse(StatusCodes.OK, s"The rate for the asset $assetStr deleted, old value = $pv")
           }
+          externalClientDirectoryRef ! WsExternalClientDirectoryActor.Command.BroadcastRatesUpdates(Map(asset -> -1))
+          response
         }
       )
     }

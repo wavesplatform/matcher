@@ -59,9 +59,6 @@ class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsInternalBro
 
   private val wsHandlers = ConcurrentHashMap.newKeySet[CloseHandler]()
 
-  // Random to make this actor unique in tests
-//  private val externalClientDirectoryRef: typed.ActorRef[WsExternalClientDirectoryActor.Message] = mat.system.spawn(WsExternalClientDirectoryActor(), s"ws-external-cd-${Random.nextInt(Int.MaxValue)}")
-
   override def route: Route = pathPrefix("ws" / "v0") {
     matcherStatusBarrier {
       internalWsRoute ~ commonWsRoute ~ (pathPrefix("connections") & withAuth)(connectionsRoute ~ closeConnectionsRoute)

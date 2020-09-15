@@ -34,7 +34,7 @@ object WsExternalClientHandlerActor {
   sealed trait Command extends Message
   object Command {
     case class ProcessClientMessage(wsMessage: WsClientMessage) extends Command
-    case class ForwardToClient(error: WsError)                  extends Command
+    case class ForwardToClient(wsMessage: WsServerMessage)      extends Command
     case class CloseConnection(reason: MatcherError)            extends Command
 
     private[WsExternalClientHandlerActor] case class CancelAddressSubscription(address: Address) extends Command

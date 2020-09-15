@@ -8,7 +8,7 @@ import com.wavesplatform.dex.MatcherSpecBase
 import com.wavesplatform.dex.api.http.PlayJsonException
 import com.wavesplatform.dex.api.ws.entities.{WsBalances, WsLastTrade, WsOrder, WsOrderBookSettings}
 import com.wavesplatform.dex.api.ws.protocol.WsOrderBookChanges.WsSide
-import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsOrderBookChanges}
+import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsOrderBookChanges, WsRatesUpdates}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.model.Denormalization
@@ -146,6 +146,14 @@ class WsMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDrivenProp
     }
   }
 
+  private val wsRatesUpdateGen: Gen[WsRatesUpdates] = for {
+    timestamp  <- Gen.choose(0L, Long.MaxValue)
+    updateId   <- Gen.choose(0L, Long.MaxValue)
+    ratesCount <- Gen.choose(1, 5)
+    assets     <- Gen.listOfN(ratesCount, assetGen)
+    rates      <- Gen.listOfN(ratesCount, Gen.frequency((4, Gen.choose(0.05D, 100500D)), (1, Gen.const(-1D))))
+  } yield WsRatesUpdates(assets.zip(rates).toMap, updateId, timestamp)
+
   private def serdeTest[T <: Product with Serializable: Diff](gen: Gen[T])(implicit format: Format[T]): Unit = forAll(gen) { original =>
     val json = format writes original
     withClue(s"${Json.stringify(json)}: ") {
@@ -166,4 +174,6 @@ class WsMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDrivenProp
   "WsAddressChanges" in serdeTest(wsAddressChangesGen)
 
   "WsOrderBookChanges" in serdeTest(wsOrderBookChangesGen)
+
+  "WsRatesUpdates" in serdeTest(wsRatesUpdateGen)
 }

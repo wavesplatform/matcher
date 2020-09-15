@@ -23,7 +23,7 @@ import com.wavesplatform.dex.api.http.headers.MatcherHttpServer
 import com.wavesplatform.dex.api.http.routes.{MatcherApiRoute, MatcherApiRouteV1}
 import com.wavesplatform.dex.api.http.{CompositeHttpService, OrderBookHttpInfo}
 import com.wavesplatform.dex.api.routes.ApiRoute
-import com.wavesplatform.dex.api.ws.actors.WsInternalBroadcastActor
+import com.wavesplatform.dex.api.ws.actors.{WsExternalClientDirectoryActor, WsInternalBroadcastActor}
 import com.wavesplatform.dex.api.ws.routes._
 import com.wavesplatform.dex.caches.{MatchingRulesCache, OrderFeeSettingsCache, RateCache}
 import com.wavesplatform.dex.db._
@@ -49,7 +49,7 @@ import mouse.any.anySyntaxMouse
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
 import scala.util.control.NonFatal
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Random, Success}
 
 // TODO Remove start, merge with Application
 class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) extends ScorexLogging {
@@ -200,6 +200,9 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
 
   private val maybeApiKeyHash: Option[Array[Byte]] = Option(settings.restApi.apiKeyHash) filter (_.nonEmpty) map Base58.decode
 
+  private val externalClientDirectoryRef: typed.ActorRef[WsExternalClientDirectoryActor.Message] =
+    actorSystem.spawn(WsExternalClientDirectoryActor(rateCache, time), s"ws-external-cd-${Random.nextInt(Int.MaxValue)}")
+
   private lazy val httpApiRouteV0: MatcherApiRoute =
     new MatcherApiRoute(
       pairBuilder,
@@ -229,13 +232,15 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
           }
           .map { _.collect { case Right(version) => version } }
       },
-      () => orderFeeSettingsCache.getSettingsForOffset(lastProcessedOffset + 1)
+      () => orderFeeSettingsCache.getSettingsForOffset(lastProcessedOffset + 1),
+      externalClientDirectoryRef
     )
 
   private lazy val httpApiRouteV1 = MatcherApiRouteV1(pairBuilder, orderBookHttpInfo, () => status.get(), maybeApiKeyHash)
 
   private lazy val wsApiRoute = new MatcherWebSocketRoute(
     wsInternalBroadcast, // safe, wsApiRoute is used after initialization of wsInternalBroadcast
+    externalClientDirectoryRef,
     addressActors,
     matcherActor,
     time,

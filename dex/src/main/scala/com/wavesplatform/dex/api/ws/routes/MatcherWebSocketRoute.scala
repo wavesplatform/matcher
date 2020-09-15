@@ -3,6 +3,7 @@ package com.wavesplatform.dex.api.ws.routes
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
+import akka.actor.typed.Scheduler
 import akka.actor.typed.scaladsl.AskPattern._
 import akka.actor.typed.scaladsl.adapter._
 import akka.actor.{ActorRef, typed}
@@ -34,11 +35,12 @@ import play.api.libs.json.{Json, Reads}
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{Future, Promise}
 import scala.jdk.CollectionConverters._
-import scala.util.{Failure, Random, Success}
+import scala.util.{Failure, Success}
 
 @Path("/ws/v0")
 @Api()
 class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsInternalBroadcastActor.Command],
+                            externalClientDirectoryRef: typed.ActorRef[WsExternalClientDirectoryActor.Message],
                             addressDirectory: ActorRef,
                             matcher: ActorRef,
                             time: Time,
@@ -52,13 +54,10 @@ class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsInternalBro
 
   import mat.executionContext
 
-  private implicit val scheduler = mat.system.scheduler.toTyped
-  private implicit val timeout   = Timeout(matcherSettings.actorResponseTimeout)
+  private implicit val scheduler: Scheduler = mat.system.scheduler.toTyped
+  private implicit val timeout: Timeout     = Timeout(matcherSettings.actorResponseTimeout)
 
   private val wsHandlers = ConcurrentHashMap.newKeySet[CloseHandler]()
-
-  // Random to make this actor unique in tests
-  private val externalClientDirectoryRef = mat.system.spawn(WsExternalClientDirectoryActor(), s"ws-external-cd-${Random.nextInt(Int.MaxValue)}")
 
   override def route: Route = pathPrefix("ws" / "v0") {
     matcherStatusBarrier {

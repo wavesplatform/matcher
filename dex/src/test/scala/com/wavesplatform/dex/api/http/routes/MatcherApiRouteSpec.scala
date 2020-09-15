@@ -3,6 +3,7 @@ package com.wavesplatform.dex.api.http.routes
 import java.util.concurrent.ThreadLocalRandom
 import java.util.concurrent.atomic.AtomicReference
 
+import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import akka.actor.{ActorRef, Status}
 import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse, StatusCodes}
@@ -28,6 +29,7 @@ import com.wavesplatform.dex.api.http.entities._
 import com.wavesplatform.dex.api.http.headers.`X-Api-Key`
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
 import com.wavesplatform.dex.api.http.{OrderBookHttpInfo, entities}
+import com.wavesplatform.dex.api.ws.actors.WsExternalClientDirectoryActor
 import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.db.leveldb.DBExt
 import com.wavesplatform.dex.db.{DbKeys, OrderDB, WithDB}
@@ -1279,6 +1281,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         assetDecimals = x => if (x == smartAsset) Some(smartAssetDesc.decimals) else throw new IllegalArgumentException(s"No information about $x")
       )
 
+    val testKit = ActorTestKit()
+
     val route =
       new MatcherApiRoute(
         assetPairBuilder = new AssetPairBuilder(
@@ -1319,7 +1323,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         apiKeyHash = Some(crypto secureHash apiKey),
         rateCache = rateCache,
         validatedAllowedOrderVersions = () => Future.successful { Set(1, 2, 3) },
-        () => DynamicSettings.symmetric(matcherFee)
+        () => DynamicSettings.symmetric(matcherFee),
+        externalClientDirectoryRef = testKit.spawn(WsExternalClientDirectoryActor(rateCache, time), s"ws-external-cd-${Random.nextInt(Int.MaxValue)}"),
       )
 
     f(route.route)

@@ -4,12 +4,16 @@ import cats.Id
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.api.http.entities.HttpSuccessfulBatchCancel
+import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsOrderBookChanges}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.it.api.websockets.HasWebSockets
 import com.wavesplatform.dex.it.dex.DexApi
 import com.wavesplatform.dex.it.docker.DexContainer
+import com.wavesplatform.dex.model.OrderStatus.Filled
 import com.wavesplatform.it._
 import com.wavesplatform.it.api.{MatcherCommand, MatcherState}
 import com.wavesplatform.it.config.DexTestConfig.createAssetPair
@@ -22,15 +26,17 @@ import scala.util.Random
 import scala.util.control.NonFatal
 
 @DexItExternalKafkaRequired
-class MultipleMatchersTestSuite extends MatcherSuiteBase {
+class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with WsSuiteBase {
 
   override protected def dexInitialSuiteConfig: Config =
-    ConfigFactory.parseString(
-      """waves.dex {
+    ConfigFactory
+      .parseString(
+        """waves.dex {
         |  price-assets = ["WAVES"]
         |  snapshots-interval = 51
         |}""".stripMargin
-    )
+      )
+      .withFallback(jwtPublicKeyConfig)
 
   protected lazy val dex2: DexContainer = createDex("dex-2")
 
@@ -65,6 +71,62 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
     broadcastAndAwait(mkTransfer(acc, alice.toAddress, 4.waves, Waves, 0.05.waves))
     dex2.api.tradableBalance(acc, ethWavesPair)(Waves) shouldBe 5.95.waves
     dex1.connectToNetwork()
+  }
+
+  "WS Order book state should be the same on two matchers" in {
+    val acc = mkAccountWithBalance(100.eth -> eth, 100.waves -> Waves)
+
+    val wsob1 = mkWsOrderBookConnection(ethWavesPair, dex1)
+    val wsob2 = mkWsOrderBookConnection(ethWavesPair, dex2)
+
+    val sell = mkOrder(acc, ethWavesPair, SELL, 10.eth, 1.waves, 0.003.waves)
+    dex1.api.place(sell)
+
+    List(
+      mkOrder(alice, ethWavesPair, BUY, 5.eth, 1.waves, 0.003.waves),
+      mkOrder(alice, ethWavesPair, BUY, 3.eth, 1.waves, 0.003.waves),
+      mkOrder(alice, ethWavesPair, BUY, 2.eth, 1.waves, 0.003.waves)
+    ).foreach(dex1.api.place)
+
+    dex1.api.waitForOrderStatus(sell, Status.Filled)
+
+    eventually {
+      val obs1 = wsob1.receiveAtLeastN[WsOrderBookChanges](1).reduce(mergeOrderBookChanges)
+      val obs2 = wsob2.receiveAtLeastN[WsOrderBookChanges](1).reduce(mergeOrderBookChanges)
+
+      obs1 should be equals obs2
+    }
+
+    wsob1.close()
+    wsob2.close()
+  }
+
+  "WS Address state should be the same on two matchers" in {
+    val acc = mkAccountWithBalance(100.eth -> eth, 100.waves -> Waves)
+
+    val wsau1 = mkWsAddressConnection(acc, dex1)
+    val wsau2 = mkWsAddressConnection(acc, dex2)
+
+    val sell = mkOrder(acc, ethWavesPair, SELL, 10.eth, 1.waves, 0.003.waves)
+    dex1.api.place(sell)
+
+    List(
+      mkOrder(alice, ethWavesPair, BUY, 5.eth, 1.waves, 0.003.waves),
+      mkOrder(alice, ethWavesPair, BUY, 3.eth, 1.waves, 0.003.waves),
+      mkOrder(alice, ethWavesPair, BUY, 2.eth, 1.waves, 0.003.waves)
+    ).foreach(dex1.api.place)
+
+    dex1.api.waitForOrderStatus(sell, Status.Filled)
+
+    eventually {
+      val aus1 = wsau1.receiveAtLeastN[WsAddressChanges](1).reduce(mergeAddressChanges)
+      val aus2 = wsau2.receiveAtLeastN[WsAddressChanges](1).reduce(mergeAddressChanges)
+
+      aus1 should be equals aus2
+    }
+
+    wsau1.close()
+    wsau2.close()
   }
 
   "Place, fill and cancel a lot of orders" in {

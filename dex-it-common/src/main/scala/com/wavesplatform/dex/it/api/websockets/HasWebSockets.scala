@@ -7,7 +7,7 @@ import akka.actor.ActorSystem
 import akka.stream.Materializer
 import com.wavesplatform.dex.api.ws.connection.{WsConnection, WsConnectionOps}
 import com.wavesplatform.dex.api.ws.entities.{WsBalances, WsOrder}
-import com.wavesplatform.dex.api.ws.protocol.{WsAddressSubscribe, WsInitial, WsOrderBookSubscribe}
+import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsAddressSubscribe, WsInitial, WsOrderBookChanges, WsOrderBookSubscribe}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.error.ErrorFormatterContext
@@ -80,6 +80,47 @@ trait HasWebSockets extends BeforeAndAfterAll with BeforeAndAfterEach with HasJw
 
     c.clearMessages()
   }
+
+  protected def mergeWsOrder(orig: WsOrder, diff: WsOrder): WsOrder = WsOrder(
+    id = orig.id,
+    timestamp = diff.timestamp,
+    amountAsset = orig.amountAsset.orElse(diff.amountAsset),
+    priceAsset = orig.priceAsset.orElse(diff.priceAsset),
+    side = orig.side.orElse(diff.side),
+    isMarket = orig.isMarket.orElse(diff.isMarket),
+    price = orig.price.orElse(diff.price),
+    amount = orig.amount.orElse(diff.amount),
+    fee = orig.fee.orElse(diff.fee),
+    feeAsset = orig.feeAsset.orElse(diff.feeAsset),
+    status = diff.status.orElse(orig.status),
+    filledAmount = diff.filledAmount.orElse(orig.filledAmount),
+    filledFee = diff.filledFee.orElse(orig.filledFee),
+    avgWeighedPrice = diff.avgWeighedPrice.orElse(orig.avgWeighedPrice),
+    totalExecutedPriceAssets = diff.totalExecutedPriceAssets.orElse(orig.totalExecutedPriceAssets)
+  )
+
+  protected def mergeAddressChanges(orig: WsAddressChanges, diff: WsAddressChanges): WsAddressChanges = WsAddressChanges(
+    address = diff.address,
+    balances = orig.balances ++ diff.balances,
+    orders = diff.orders.foldLeft(orig.orders) {
+      case (r, x) =>
+        val index = r.indexWhere(_.id == x.id)
+        if (index < 0) x +: r
+        else r.updated(index, mergeWsOrder(r(index), x))
+    },
+    updateId = diff.updateId,
+    timestamp = diff.timestamp
+  )
+
+  protected def mergeOrderBookChanges(orig: WsOrderBookChanges, diff: WsOrderBookChanges): WsOrderBookChanges = WsOrderBookChanges(
+    assetPair = orig.assetPair,
+    asks = orig.asks ++ diff.asks,
+    bids = orig.bids ++ diff.bids,
+    lastTrade = orig.lastTrade.orElse(diff.lastTrade),
+    updateId = diff.updateId,
+    settings = orig.settings.orElse(diff.settings),
+    timestamp = diff.timestamp
+  )
 
   protected def cleanupWebSockets(): Unit = if (!knownWsConnections.isEmpty) {
     knownWsConnections.forEach { _.close() }

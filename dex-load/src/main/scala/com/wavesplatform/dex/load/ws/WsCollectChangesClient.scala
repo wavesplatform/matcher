@@ -62,10 +62,11 @@ class WsCollectChangesClient(apiUri: String, address: String, aus: String, obs: 
     amount = orig.amount.orElse(diff.amount),
     fee = orig.fee.orElse(diff.fee),
     feeAsset = orig.feeAsset.orElse(diff.feeAsset),
-    status = orig.status.orElse(diff.status),
-    filledAmount = orig.filledAmount.orElse(diff.filledAmount),
-    filledFee = orig.filledFee.orElse(diff.filledFee),
-    avgWeighedPrice = orig.avgWeighedPrice.orElse(diff.avgWeighedPrice)
+    status = diff.status.orElse(orig.status),
+    filledAmount = diff.filledAmount.orElse(orig.filledAmount),
+    filledFee = diff.filledFee.orElse(orig.filledFee),
+    avgWeighedPrice = diff.avgWeighedPrice.orElse(orig.avgWeighedPrice),
+    totalExecutedPriceAssets = diff.totalExecutedPriceAssets.orElse(orig.totalExecutedPriceAssets)
   )
 
   private def merge(orig: WsOrderBookChanges, diff: WsOrderBookChanges): WsOrderBookChanges = WsOrderBookChanges(

@@ -65,7 +65,8 @@ class WsCollectChangesClient(apiUri: String, address: String, aus: String, obs: 
     status = orig.status.orElse(diff.status),
     filledAmount = orig.filledAmount.orElse(diff.filledAmount),
     filledFee = orig.filledFee.orElse(diff.filledFee),
-    avgWeighedPrice = orig.avgWeighedPrice.orElse(diff.avgWeighedPrice)
+    avgWeighedPrice = orig.avgWeighedPrice.orElse(diff.avgWeighedPrice),
+    totalExecutedPriceAssets = orig.totalExecutedPriceAssets.orElse(diff.totalExecutedPriceAssets)
   )
 
   private def merge(orig: WsOrderBookChanges, diff: WsOrderBookChanges): WsOrderBookChanges = WsOrderBookChanges(

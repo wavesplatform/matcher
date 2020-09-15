@@ -13,6 +13,7 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.it.api.websockets.HasWebSockets
 import com.wavesplatform.dex.it.dex.DexApi
 import com.wavesplatform.dex.it.docker.DexContainer
+import com.wavesplatform.dex.model.OrderStatus.Filled
 import com.wavesplatform.it._
 import com.wavesplatform.it.api.{MatcherCommand, MatcherState}
 import com.wavesplatform.it.config.DexTestConfig.createAssetPair
@@ -78,23 +79,23 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with
     val wsob1 = mkWsOrderBookConnection(ethWavesPair, dex1)
     val wsob2 = mkWsOrderBookConnection(ethWavesPair, dex2)
 
-    val sell     = mkOrder(acc, ethWavesPair, SELL, 10.eth, 1.waves, 0.003.waves)
-    val buyPart1 = mkOrder(alice, ethWavesPair, BUY, 5.eth, 1.waves, 0.003.waves)
-    val buyPart2 = mkOrder(alice, ethWavesPair, BUY, 3.eth, 1.waves, 0.003.waves)
-    val buyPart3 = mkOrder(alice, ethWavesPair, BUY, 2.eth, 1.waves, 0.003.waves)
-
+    val sell = mkOrder(acc, ethWavesPair, SELL, 10.eth, 1.waves, 0.003.waves)
     dex1.api.place(sell)
-    dex1.api.place(buyPart1)
-    dex1.api.place(buyPart2)
-    dex1.api.place(buyPart3)
 
-    val obs1 = wsob1.messages
-      .reduce((m1, m2) => mergeOrderBookChanges(m1.asInstanceOf[WsOrderBookChanges], m2.asInstanceOf[WsOrderBookChanges]))
+    List(
+      mkOrder(alice, ethWavesPair, BUY, 5.eth, 1.waves, 0.003.waves),
+      mkOrder(alice, ethWavesPair, BUY, 3.eth, 1.waves, 0.003.waves),
+      mkOrder(alice, ethWavesPair, BUY, 2.eth, 1.waves, 0.003.waves)
+    ).foreach(dex1.api.place)
 
-    val obs2 = wsob2.messages
-      .reduce((m1, m2) => mergeOrderBookChanges(m1.asInstanceOf[WsOrderBookChanges], m2.asInstanceOf[WsOrderBookChanges]))
+    dex1.api.waitForOrderStatus(sell, Status.Filled)
 
-    obs1 should be equals obs2
+    eventually {
+      val obs1 = wsob1.receiveAtLeastN[WsOrderBookChanges](1).reduce((m1, m2) => mergeOrderBookChanges(m1, m2))
+      val obs2 = wsob2.receiveAtLeastN[WsOrderBookChanges](1).reduce((m1, m2) => mergeOrderBookChanges(m1, m2))
+
+      obs1 should be equals obs2
+    }
 
     wsob1.close()
     wsob2.close()
@@ -106,23 +107,23 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with
     val wsau1 = mkWsAddressConnection(acc, dex1)
     val wsau2 = mkWsAddressConnection(acc, dex2)
 
-    val sell     = mkOrder(acc, ethWavesPair, SELL, 10.eth, 1.waves, 0.003.waves)
-    val buyPart1 = mkOrder(alice, ethWavesPair, BUY, 5.eth, 1.waves, 0.003.waves)
-    val buyPart2 = mkOrder(alice, ethWavesPair, BUY, 3.eth, 1.waves, 0.003.waves)
-    val buyPart3 = mkOrder(alice, ethWavesPair, BUY, 2.eth, 1.waves, 0.003.waves)
-
+    val sell = mkOrder(acc, ethWavesPair, SELL, 10.eth, 1.waves, 0.003.waves)
     dex1.api.place(sell)
-    dex1.api.place(buyPart1)
-    dex1.api.place(buyPart2)
-    dex1.api.place(buyPart3)
 
-    val aus1 = wsau1.messages
-      .reduce((m1, m2) => mergeAddressChanges(m1.asInstanceOf[WsAddressChanges], m2.asInstanceOf[WsAddressChanges]))
+    List(
+      mkOrder(alice, ethWavesPair, BUY, 5.eth, 1.waves, 0.003.waves),
+      mkOrder(alice, ethWavesPair, BUY, 3.eth, 1.waves, 0.003.waves),
+      mkOrder(alice, ethWavesPair, BUY, 2.eth, 1.waves, 0.003.waves)
+    ).foreach(dex1.api.place)
 
-    val aus2 = wsau1.messages
-      .reduce((m1, m2) => mergeAddressChanges(m1.asInstanceOf[WsAddressChanges], m2.asInstanceOf[WsAddressChanges]))
+    dex1.api.waitForOrderStatus(sell, Status.Filled)
 
-    aus1 should be equals aus2
+    eventually {
+      val aus1 = wsau1.receiveAtLeastN[WsAddressChanges](1).reduce((m1, m2) => mergeAddressChanges(m1, m2))
+      val aus2 = wsau2.receiveAtLeastN[WsAddressChanges](1).reduce((m1, m2) => mergeAddressChanges(m1, m2))
+
+      aus1 should be equals aus2
+    }
 
     wsau1.close()
     wsau2.close()

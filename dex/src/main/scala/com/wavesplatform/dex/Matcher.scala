@@ -258,7 +258,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     classOf[MatcherWebSocketRoute]
   )
 
-  private val snapshotsRestore = Promise[Unit]()
+  private val snapshotsRestore = Promise[QueueEventWithMeta.Offset]() // Earliest offset among snapshots
 
   private lazy val db                  = openDB(settings.dataDir)
   private lazy val assetPairsDB        = AssetPairsDB(db)
@@ -281,10 +281,10 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
             log.error(s"Can't start MatcherActor: $msg")
             forceStopApplication(RecoveryError)
 
-          case Right((self, processedOffset)) =>
-            snapshotsRestore.trySuccess(())
+          case Right((self, startOffset)) =>
+            snapshotsRestore.trySuccess(startOffset)
             matcherQueue.startConsume(
-              processedOffset + 1,
+              startOffset + 1,
               xs =>
                 if (xs.isEmpty) Future.successful { () } else {
                   val eventAssets = xs.flatMap(_.event.assets)
@@ -494,17 +494,17 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       }
 
       deadline = settings.startEventsProcessingTimeout.fromNow
-      (_, lastOffsetQueue) <- {
+      (startOffset, lastOffsetQueue) <- {
         log.info("Waiting all snapshots are restored ...")
-        waitSnapshotsRestored(settings.snapshotsLoadingTimeout).map(_ => log.info("All snapshots are restored"))
+        waitSnapshotsRestored(settings.snapshotsLoadingTimeout).andThen(_ => log.info("All snapshots are restored"))
       } zip {
         log.info("Getting last queue offset ...")
         getLastOffset(deadline)
       }
 
       _ <- {
-        log.info(s"Last queue offset is $lastOffsetQueue")
-        waitOffsetReached(lastOffsetQueue, deadline)
+        log.info(s"The safest start queue offset is $startOffset, the last queue offset is $lastOffsetQueue")
+        waitOffsetReached(startOffset, lastOffsetQueue, deadline)
       }
 
       connectedNodeAddress <- wavesBlockchainAsyncClient.getNodeAddress
@@ -527,7 +527,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     log.info(s"Status now is $newStatus")
   }
 
-  private def waitSnapshotsRestored(wait: FiniteDuration): Future[Unit] =
+  private def waitSnapshotsRestored(wait: FiniteDuration): Future[QueueEventWithMeta.Offset] =
     Future.firstCompletedOf(List(snapshotsRestore.future, timeout(wait, "wait snapshots restored")))
 
   private def getLastOffset(deadline: Deadline): Future[QueueEventWithMeta.Offset] = matcherQueue.lastEventOffset.recoverWith {
@@ -541,7 +541,9 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       throw e
   }
 
-  private def waitOffsetReached(lastQueueOffset: QueueEventWithMeta.Offset, deadline: Deadline): Future[Unit] = {
+  private def waitOffsetReached(startQueueOffset: QueueEventWithMeta.Offset,
+                                lastQueueOffset: QueueEventWithMeta.Offset,
+                                deadline: Deadline): Future[Unit] = {
     def loop(p: Promise[Unit]): Unit = {
       log.trace(s"offsets: $lastProcessedOffset >= $lastQueueOffset, deadline: ${deadline.isOverdue()}")
       if (lastProcessedOffset >= lastQueueOffset) p.success(())
@@ -550,9 +552,15 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       else actorSystem.scheduler.scheduleOnce(5.second)(loop(p))
     }
 
-    val p = Promise[Unit]()
-    loop(p)
-    p.future
+    if (startQueueOffset > lastProcessedOffset) {
+      log.error(
+        s"Earliest known offset among all snapshots is $startQueueOffset, but in the queue it is $lastProcessedOffset. Did you clear the queue?")
+      Future.failed(new RuntimeException("Recovery is not possible"))
+    } else {
+      val p = Promise[Unit]()
+      loop(p)
+      p.future
+    }
   }
 
   private def timeout(after: FiniteDuration, label: String): Future[Nothing] = {

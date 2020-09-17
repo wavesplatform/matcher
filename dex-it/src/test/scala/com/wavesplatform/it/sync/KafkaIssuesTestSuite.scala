@@ -1,6 +1,8 @@
 package com.wavesplatform.it.sync
 
+import cats.implicits.catsSyntaxOptionId
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.StartingMatcherError
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.api.ws.entities.{WsBalances, WsOrder}
 import com.wavesplatform.dex.domain.asset.Asset
@@ -137,5 +139,37 @@ class KafkaIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka 
 
     dex1.api.cancelAll(alice)
     wsac.close()
+  }
+
+  "Matcher should stop working with appropriate error if the queue was erased" in {
+    val offsetBefore = dex1.api.lastOffset
+
+    val orders = (1 to 10).map(i => mkOrderDP(alice, wavesUsdPair, SELL, 10.waves, 3.0, ttl = i.days))
+    orders.foreach(dex1.api.place)
+    orders.foreach(dex1.api.waitForOrderStatus(_, Status.Accepted))
+
+    orders.foreach(dex1.api.cancel(alice, _))
+    dex1.api.waitForOrderHistory(alice, true.some)(_.isEmpty)
+
+    dex1.api.saveSnapshots
+    eventually {
+      dex1.api.allSnapshotOffsets(wavesUsdPair) shouldBe (offsetBefore + 20) // 10 orders * 2 (place and cancel)
+    }
+
+    try {
+      dex1.restartWithNewSuiteConfig(
+        ConfigFactory
+          .parseString(
+            """waves.dex {
+  events-queue.kafka.topic = cleared-topic
+  snapshots-interval = 2
+}""")
+          .withFallback(dexInitialSuiteConfig)
+      )
+      fail("Expected Matcher stopped with the exit code of 10")
+    } catch {
+      case _: Throwable =>
+        dex1.getState().getExitCodeLong shouldBe StartingMatcherError.code
+    }
   }
 }

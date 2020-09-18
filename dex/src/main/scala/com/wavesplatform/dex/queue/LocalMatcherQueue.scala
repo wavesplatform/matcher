@@ -8,6 +8,7 @@ import com.wavesplatform.dex.db.LocalQueueStore
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.queue.LocalMatcherQueue._
 import com.wavesplatform.dex.queue.MatcherQueue.{IgnoreProducer, Producer}
+import com.wavesplatform.dex.queue.QueueEventWithMeta.Offset
 import com.wavesplatform.dex.time.Time
 
 import scala.concurrent._
@@ -71,6 +72,8 @@ class LocalMatcherQueue(settings: Settings, store: LocalQueueStore, time: Time) 
   }
 
   override def storeEvent(event: QueueEvent): Future[Option[QueueEventWithMeta]] = producer.storeEvent(event)
+
+  override def firstEventOffset: Future[Offset] = Future(store.oldestOffset.getOrElse(-1L))
 
   override def lastEventOffset: Future[QueueEventWithMeta.Offset] = Future(store.newestOffset.getOrElse(-1L))
 

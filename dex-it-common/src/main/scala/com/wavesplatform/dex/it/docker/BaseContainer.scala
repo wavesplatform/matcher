@@ -66,7 +66,7 @@ abstract class BaseContainer(protected val baseContainerPath: String, private va
                  |OOM killed: ${containerState.getOOMKilled}""".stripMargin)
   }
 
-  private def replaceSuiteConfig(newSuiteConfig: Config): Unit = underlying.configure { c =>
+  def replaceSuiteConfig(newSuiteConfig: Config): Unit = underlying.configure { c =>
     val containerPath = Paths.get(baseContainerPath, "suite.conf").toString
     val content       = newSuiteConfig.rendered
     log.trace(s"$prefix Write to '$containerPath':\n$content")

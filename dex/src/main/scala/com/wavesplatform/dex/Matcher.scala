@@ -277,42 +277,10 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       MatcherActor.props(
         settings,
         assetPairsDB, {
+          case Right((self, startOffset)) => snapshotsRestore.trySuccess(startOffset)
           case Left(msg) =>
             log.error(s"Can't start MatcherActor: $msg")
             forceStopApplication(RecoveryError)
-
-          case Right((self, startOffset)) =>
-            snapshotsRestore.trySuccess(startOffset)
-            matcherQueue.startConsume(
-              startOffset + 1,
-              xs =>
-                if (xs.isEmpty) Future.successful { () } else {
-                  val eventAssets = xs.flatMap(_.event.assets)
-                  val loadAssets  = Future.traverse(eventAssets)(getDescription(assetsCache, wavesBlockchainAsyncClient.assetDescription)(_).value)
-
-                  loadAssets.flatMap { _ =>
-                    val assetPairs: Set[AssetPair] = xs
-                      .map { eventWithMeta =>
-                        log.debug(s"Consumed $eventWithMeta")
-                        self ! eventWithMeta
-                        lastProcessedOffset = eventWithMeta.offset
-                        eventWithMeta.event.assetPair
-                      }
-                      .to(Set)
-
-                    self
-                      .ask(MatcherActor.PingAll(assetPairs))(pongTimeout)
-                      .recover { case NonFatal(e) => log.error("PingAll is timed out!", e) }
-                      .map(_ => ())
-
-                  } andThen {
-                    case Failure(ex) =>
-                      log.error("Error while event processing occurred: ", ex)
-                      forceStopApplication(EventProcessingError)
-                    case _ =>
-                  }
-              }
-            )
         },
         orderBooks,
         orderBookProps,
@@ -494,17 +462,67 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       }
 
       deadline = settings.startEventsProcessingTimeout.fromNow
-      (startOffset, lastOffsetQueue) <- {
+      earliestSnapshotOffset <- {
         log.info("Waiting all snapshots are restored ...")
         waitSnapshotsRestored(settings.snapshotsLoadingTimeout).andThen(_ => log.info("All snapshots are restored"))
+      }
+
+      (firstQueueOffset, lastOffsetQueue) <- {
+        log.info("Getting first queue offset ...")
+        getFirstOffset(deadline)
       } zip {
         log.info("Getting last queue offset ...")
         getLastOffset(deadline)
       }
 
+      firstConsumedOffset = earliestSnapshotOffset + 1
+
       _ <- {
-        log.info(s"The safest start queue offset is $startOffset, the last queue offset is $lastOffsetQueue")
-        waitOffsetReached(startOffset, lastOffsetQueue, deadline)
+        log.info(s"Offsets: earliest snapshot = $earliestSnapshotOffset, first = $firstQueueOffset, last = $lastOffsetQueue")
+        if (lastOffsetQueue < earliestSnapshotOffset) {
+          log.error(s"The queue doesn't have messages to recover all orders and continue work. Did you clear the queue?")
+          Future.failed(new RuntimeException("Recovery is not possible"))
+        } else if (earliestSnapshotOffset < firstQueueOffset) {
+          log.warn(s"The queue doesn't contain required offsets to recover all orders. Check retention settings of the queue. Continue...")
+          Future.successful(()) // Otherwise it would be hard to start the matcher
+        } else Future.successful(())
+      }
+
+      _ <- Future {
+        log.info("Starting consuming")
+        matcherQueue.startConsume(
+          firstConsumedOffset,
+          xs =>
+            if (xs.isEmpty) Future.unit
+            else {
+              val eventAssets = xs.flatMap(_.event.assets)
+              val loadAssets  = Future.traverse(eventAssets)(getDescription(assetsCache, wavesBlockchainAsyncClient.assetDescription)(_).value)
+
+              loadAssets.flatMap { _ =>
+                val assetPairs: Set[AssetPair] = xs
+                  .map { eventWithMeta =>
+                    log.debug(s"Consumed $eventWithMeta")
+                    matcherActor ! eventWithMeta
+                    lastProcessedOffset = eventWithMeta.offset
+                    eventWithMeta.event.assetPair
+                  }
+                  .to(Set)
+
+                matcherActor
+                  .ask(MatcherActor.PingAll(assetPairs))(pongTimeout)
+                  .recover { case NonFatal(e) => log.error("PingAll is timed out!", e) }
+                  .map(_ => ())
+              } andThen {
+                case Failure(ex) =>
+                  log.error("Error while event processing occurred: ", ex)
+                  forceStopApplication(EventProcessingError)
+                case _ =>
+              }
+          }
+        )
+      } zip {
+        log.info(s"Last queue offset is $lastOffsetQueue")
+        waitOffsetReached(lastOffsetQueue, deadline)
       }
 
       connectedNodeAddress <- wavesBlockchainAsyncClient.getNodeAddress
@@ -530,20 +548,21 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
   private def waitSnapshotsRestored(wait: FiniteDuration): Future[QueueEventWithMeta.Offset] =
     Future.firstCompletedOf(List(snapshotsRestore.future, timeout(wait, "wait snapshots restored")))
 
-  private def getLastOffset(deadline: Deadline): Future[QueueEventWithMeta.Offset] = matcherQueue.lastEventOffset.recoverWith {
+  private def getFirstOffset(deadline: Deadline): Future[QueueEventWithMeta.Offset] = getOffset("first", deadline, matcherQueue.firstEventOffset)
+  private def getLastOffset(deadline: Deadline): Future[QueueEventWithMeta.Offset]  = getOffset("last", deadline, matcherQueue.lastEventOffset)
+
+  private def getOffset[T](which: String, deadline: Deadline, get: => Future[T]): Future[T] = get.recoverWith {
     case e: TimeoutException =>
-      log.warn(s"During receiving last offset", e)
-      if (deadline.isOverdue()) Future.failed(new TimeoutException("Can't get the last offset from queue"))
-      else getLastOffset(deadline)
+      log.warn(s"During receiving $which offset", e)
+      if (deadline.isOverdue()) Future.failed(new TimeoutException("Can't get the $which offset from queue"))
+      else getOffset(which, deadline, get)
 
     case e: Throwable =>
       log.error(s"Can't catch ${e.getClass.getName}", e)
       throw e
   }
 
-  private def waitOffsetReached(startQueueOffset: QueueEventWithMeta.Offset,
-                                lastQueueOffset: QueueEventWithMeta.Offset,
-                                deadline: Deadline): Future[Unit] = {
+  private def waitOffsetReached(lastQueueOffset: QueueEventWithMeta.Offset, deadline: Deadline): Future[Unit] = {
     def loop(p: Promise[Unit]): Unit = {
       log.trace(s"offsets: $lastProcessedOffset >= $lastQueueOffset, deadline: ${deadline.isOverdue()}")
       if (lastProcessedOffset >= lastQueueOffset) p.success(())
@@ -552,15 +571,9 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       else actorSystem.scheduler.scheduleOnce(5.second)(loop(p))
     }
 
-    if (startQueueOffset > lastProcessedOffset) {
-      log.error(
-        s"Earliest known offset among all snapshots is $startQueueOffset, but in the queue it is $lastProcessedOffset. Did you clear the queue?")
-      Future.failed(new RuntimeException("Recovery is not possible"))
-    } else {
-      val p = Promise[Unit]()
-      loop(p)
-      p.future
-    }
+    val p = Promise[Unit]()
+    loop(p)
+    p.future
   }
 
   private def timeout(after: FiniteDuration, label: String): Future[Nothing] = {

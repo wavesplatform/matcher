@@ -554,7 +554,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
   private def getOffset[T](which: String, deadline: Deadline, get: => Future[T]): Future[T] = get.recoverWith {
     case e: TimeoutException =>
       log.warn(s"During receiving $which offset", e)
-      if (deadline.isOverdue()) Future.failed(new TimeoutException("Can't get the $which offset from queue"))
+      if (deadline.isOverdue()) Future.failed(new TimeoutException(s"Can't get the $which offset from queue"))
       else getOffset(which, deadline, get)
 
     case e: Throwable =>

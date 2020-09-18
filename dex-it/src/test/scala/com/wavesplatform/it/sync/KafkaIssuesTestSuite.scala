@@ -169,7 +169,7 @@ class KafkaIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka 
         case _: Throwable =>
           dex1.getState().getExitCodeLong shouldBe StartingMatcherError.code
       } finally {
-        dex1.replaceSuiteConfig(dexInitialSuiteConfig) // Restore the config
+        dex1.stop()
         dex1.start()
       }
     }

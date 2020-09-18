@@ -126,7 +126,7 @@ class KafkaMatcherQueue(settings: Settings) extends MatcherQueue with ScorexLogg
     val stopConsumer = Future(blocking {
       consumer.close(timeout.toJava)
       consumerTask.cancel()
-    })(producerExecutionContext).andThen(_ => consumerThreadPool.shutdown())
+    })(consumerExecutionContext).andThen(_ => consumerThreadPool.shutdown())
 
     stopProducer zip stopConsumer map (_ => ())
   }

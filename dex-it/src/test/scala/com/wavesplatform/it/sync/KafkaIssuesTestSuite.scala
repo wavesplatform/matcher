@@ -168,6 +168,9 @@ class KafkaIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka 
       } catch {
         case _: Throwable =>
           dex1.getState().getExitCodeLong shouldBe StartingMatcherError.code
+      } finally {
+        dex1.replaceSuiteConfig(dexInitialSuiteConfig) // Restore the config
+        dex1.start()
       }
     }
 
@@ -187,7 +190,7 @@ class KafkaIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka 
       } catch {
         case _: Throwable =>
           dex1.getState().getExitCodeLong shouldBe StartingMatcherError.code
-      }
+      } // Add finally (above) if you write a new test
     }
   }
 

@@ -22,3 +22,4 @@ trap - TERM INT
 wait ${PID}
 EXIT_STATUS=$?
 echo "Exit status: ${EXIT_STATUS}" >> ${DETAILED_LOG_PATH}
+exit ${EXIT_STATUS}

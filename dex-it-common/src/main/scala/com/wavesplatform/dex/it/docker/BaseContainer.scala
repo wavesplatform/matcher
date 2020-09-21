@@ -7,6 +7,7 @@ import java.nio.file._
 import cats.Id
 import com.dimafeng.testcontainers.GenericContainer
 import com.github.dockerjava.api.async.ResultCallback
+import com.github.dockerjava.api.command.InspectContainerResponse
 import com.github.dockerjava.api.exception.{NotFoundException, NotModifiedException}
 import com.github.dockerjava.api.model.{ContainerNetwork, ExposedPort, Frame, Ports}
 import com.typesafe.config.Config
@@ -57,9 +58,7 @@ abstract class BaseContainer(protected val baseContainerPath: String, private va
   protected def getInternalAddress(internalPort: Int): InetSocketAddress = new InetSocketAddress(internalIp, internalPort)
 
   private def printState(): Unit = {
-
-    val containerState = dockerClient.inspectContainerCmd(underlying.containerId).exec().getState
-
+    val containerState = getState()
     log.debug(s"""$prefix Information:
                  |Exit code:  ${containerState.getExitCodeLong}
                  |Error:      ${containerState.getError}
@@ -67,12 +66,14 @@ abstract class BaseContainer(protected val baseContainerPath: String, private va
                  |OOM killed: ${containerState.getOOMKilled}""".stripMargin)
   }
 
-  private def replaceSuiteConfig(newSuiteConfig: Config): Unit = underlying.configure { c =>
+  def replaceSuiteConfig(newSuiteConfig: Config): Unit = underlying.configure { c =>
     val containerPath = Paths.get(baseContainerPath, "suite.conf").toString
     val content       = newSuiteConfig.rendered
     log.trace(s"$prefix Write to '$containerPath':\n$content")
     c.copyFileToContainer(Transferable.of(content.getBytes(StandardCharsets.UTF_8)), containerPath)
   }
+
+  def getState(): InspectContainerResponse#ContainerState = dockerClient.inspectContainerCmd(underlying.containerId).exec().getState
 
   def printDebugMessage(text: String): Unit = {
     try {

@@ -7,7 +7,7 @@ import akka.actor.ActorSystem
 import akka.stream.Materializer
 import com.wavesplatform.dex.api.ws.connection.{WsConnection, WsConnectionOps}
 import com.wavesplatform.dex.api.ws.entities.{WsBalances, WsOrder}
-import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsAddressSubscribe, WsInitial, WsOrderBookChanges, WsOrderBookSubscribe}
+import com.wavesplatform.dex.api.ws.protocol._
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.error.ErrorFormatterContext
@@ -51,6 +51,12 @@ trait HasWebSockets extends BeforeAndAfterAll with BeforeAndAfterEach with HasJw
     connection
   }
 
+  protected def mkWsRatesUpdatesConnection(dex: DexContainer): WsConnection = {
+    val connection = mkDexWsConnection(dex)
+    connection.send(WsRatesUpdatesSubscribe())
+    connection
+  }
+
   protected def mkWsInternalConnection(dex: DexContainer, keepAlive: Boolean = true): WsConnection =
     mkWsConnection(s"${getWsStreamUri(dex)}/internal", keepAlive)
 
@@ -58,17 +64,12 @@ trait HasWebSockets extends BeforeAndAfterAll with BeforeAndAfterEach with HasJw
     mkWsConnection(getWsStreamUri(dex), keepAlive)
 
   protected def mkWsConnection(uri: String, keepAlive: Boolean = true): WsConnection = {
-    mkDexWsConnectionWithInitialMessage(uri, keepAlive) unsafeTap { _.clearMessages() }
-  }
-
-  protected def mkDexWsConnectionWithInitialMessage(dex: DexContainer, keepAlive: Boolean = true): WsConnection =
-    mkDexWsConnectionWithInitialMessage(getWsStreamUri(dex), keepAlive)
-
-  protected def mkDexWsConnectionWithInitialMessage(uri: String, keepAlive: Boolean): WsConnection =
     new WsConnection(uri, keepAlive) unsafeTap { wsc =>
       addConnection(wsc)
       eventually { wsc.collectMessages[WsInitial] should have size 1 }
+      wsc.clearMessages()
     }
+  }
 
   protected def assertChanges(c: WsConnection, squash: Boolean = true)(expBs: Map[Asset, WsBalances]*)(expOs: WsOrder*): Unit = {
     eventually {

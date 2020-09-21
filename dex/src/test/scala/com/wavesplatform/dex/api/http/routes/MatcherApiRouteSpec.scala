@@ -1324,7 +1324,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         rateCache = rateCache,
         validatedAllowedOrderVersions = () => Future.successful { Set(1, 2, 3) },
         () => DynamicSettings.symmetric(matcherFee),
-        externalClientDirectoryRef = testKit.spawn(WsExternalClientDirectoryActor(rateCache, time), s"ws-external-cd-${Random.nextInt(Int.MaxValue)}"),
+        externalClientDirectoryRef = testKit.spawn(WsExternalClientDirectoryActor(), s"ws-external-cd-${Random.nextInt(Int.MaxValue)}"),
       )
 
     f(route.route)

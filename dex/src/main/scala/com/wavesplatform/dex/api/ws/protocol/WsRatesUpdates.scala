@@ -25,4 +25,7 @@ object WsRatesUpdates {
     (_, timestamp, updateId, rates) => WsRatesUpdates(rates, updateId, timestamp),
     unlift(WsRatesUpdates.wsUnapply)
   )
+
+  /** Creates WsRatesUpdates stub, which will be enriched by update id and timestamp further in the external client handler actor */
+  def broadcastUpdates(rates: Map[Asset, Double]): WsRatesUpdates = WsRatesUpdates(rates, 0, 0)
 }

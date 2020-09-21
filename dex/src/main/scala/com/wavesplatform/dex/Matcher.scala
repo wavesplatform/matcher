@@ -201,7 +201,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
   private val maybeApiKeyHash: Option[Array[Byte]] = Option(settings.restApi.apiKeyHash) filter (_.nonEmpty) map Base58.decode
 
   private val externalClientDirectoryRef: typed.ActorRef[WsExternalClientDirectoryActor.Message] =
-    actorSystem.spawn(WsExternalClientDirectoryActor(rateCache, time), s"ws-external-cd-${Random.nextInt(Int.MaxValue)}")
+    actorSystem.spawn(WsExternalClientDirectoryActor(), s"ws-external-cd-${Random.nextInt(Int.MaxValue)}")
 
   private lazy val httpApiRouteV0: MatcherApiRoute =
     new MatcherApiRoute(
@@ -247,7 +247,8 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     pairBuilder,
     maybeApiKeyHash,
     settings,
-    () => status.get()
+    () => status.get(),
+    () => rateCache.getAllRates
   )
 
   private lazy val matcherApiRoutes: Seq[ApiRoute] = Seq(httpApiRouteV0, httpApiRouteV1, wsApiRoute)

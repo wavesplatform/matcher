@@ -315,7 +315,8 @@ class WsExternalClientHandlerActorSpec extends AnyFreeSpecLike with Matchers wit
         clientRef = clientInbox.ref,
         matcherRef = matcherProbe.ref,
         addressRef = addressProbe.ref,
-        connectionId = connectionId
+        connectionId = connectionId,
+        () => rateCache.getAllRates
       )
     )
 

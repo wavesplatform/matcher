@@ -10,8 +10,9 @@ import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor
 import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor
 import com.wavesplatform.dex.api.ws.actors.WsExternalClientHandlerActor.Command.CancelAddressSubscription
 import com.wavesplatform.dex.api.ws.protocol._
+import com.wavesplatform.dex.api.ws.state.WsAddressState
 import com.wavesplatform.dex.domain.account.{Address, AddressScheme}
-import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error.{MatcherError, SubscriptionsLimitReached, WsConnectionMaxLifetimeExceeded, WsConnectionPongTimeout}
 import com.wavesplatform.dex.model.AssetPairBuilder
@@ -59,7 +60,8 @@ object WsExternalClientHandlerActor {
             clientRef: ActorRef[WsServerMessage],
             matcherRef: classic.ActorRef,
             addressRef: classic.ActorRef,
-            connectionId: String): Behavior[Message] =
+            connectionId: String,
+            getRatesSnapshot: () => Map[Asset, Double]): Behavior[Message] =
     Behaviors.setup[Message] { context =>
       import context.executionContext
       import settings.subscriptions._
@@ -99,18 +101,28 @@ object WsExternalClientHandlerActor {
                     pongTimeout: Cancellable,
                     nextPing: Cancellable,
                     orderBookSubscriptions: Queue[AssetPair],
-                    addressSubscriptions: Queue[(Address, Cancellable)]): Behavior[Message] = {
+                    addressSubscriptions: Queue[(Address, Cancellable)],
+                    maybeRatesUpdateId: Option[Long]): Behavior[Message] = {
         Behaviors
           .receiveMessage[Message] {
 
             case Command.SendPing =>
               val (expectedPong, newNextPing)     = sendPingAndScheduleNextOne()
               val updatedPongTimeout: Cancellable = if (pongTimeout.isCancelled) schedulePongTimeout() else pongTimeout
-              awaitPong(expectedPong.some, updatedPongTimeout, newNextPing, orderBookSubscriptions, addressSubscriptions)
+              awaitPong(expectedPong.some, updatedPongTimeout, newNextPing, orderBookSubscriptions, addressSubscriptions, maybeRatesUpdateId)
 
-            case Command.ForwardToClient(x) =>
-              clientRef ! x
-              Behaviors.same
+            case Command.ForwardToClient(msg) =>
+              msg match {
+                case ru: WsRatesUpdates =>
+                  if (maybeRatesUpdateId.nonEmpty) {
+                    val newUpdateId = maybeRatesUpdateId.map(WsAddressState.getNextUpdateId).get
+                    clientRef ! WsRatesUpdates(ru.rates, newUpdateId, matcherTime)
+                    awaitPong(maybeExpectedPong, pongTimeout, nextPing, orderBookSubscriptions, addressSubscriptions, newUpdateId.some)
+                  } else awaitPong(maybeExpectedPong, pongTimeout, nextPing, orderBookSubscriptions, addressSubscriptions, maybeRatesUpdateId)
+                case other =>
+                  clientRef ! other
+                  Behaviors.same
+              }
 
             case Command.ProcessClientMessage(wsMessage) =>
               wsMessage match {
@@ -123,7 +135,7 @@ object WsExternalClientHandlerActor {
                     case Some(expectedPong) =>
                       if (pong == expectedPong) {
                         pongTimeout.cancel()
-                        awaitPong(none, Cancellable.alreadyCancelled, nextPing, orderBookSubscriptions, addressSubscriptions)
+                        awaitPong(none, Cancellable.alreadyCancelled, nextPing, orderBookSubscriptions, addressSubscriptions, maybeRatesUpdateId)
                       } else {
                         context.log.trace("Got outdated pong: {}", pong)
                         Behaviors.same
@@ -170,13 +182,14 @@ object WsExternalClientHandlerActor {
                             evictedExpiration.cancel()
                             unsubscribeAddress(evictedSubscription)
                             clientRef ! WsError.from(SubscriptionsLimitReached(maxAddressNumber, evictedSubscription.toString), matcherTime)
-                            awaitPong(maybeExpectedPong, pongTimeout, nextPing, orderBookSubscriptions, newAddressSubscriptions)
+                            awaitPong(maybeExpectedPong, pongTimeout, nextPing, orderBookSubscriptions, newAddressSubscriptions, maybeRatesUpdateId)
                           } else
                             awaitPong(maybeExpectedPong,
                                       pongTimeout,
                                       nextPing,
                                       orderBookSubscriptions,
-                                      addressSubscriptions enqueue address -> expiration)
+                                      addressSubscriptions enqueue address -> expiration,
+                                      maybeRatesUpdateId)
                         } {
                           case (_, existedExpiration) =>
                             existedExpiration.cancel()
@@ -184,8 +197,15 @@ object WsExternalClientHandlerActor {
                             val newAddressSubscriptions = addressSubscriptions.foldLeft(Queue.empty[(Address, Cancellable)]) {
                               case (result, (a, e)) => result.enqueue { a -> (if (a == address) expiration else e) }
                             }
-                            awaitPong(maybeExpectedPong, pongTimeout, nextPing, orderBookSubscriptions, newAddressSubscriptions)
+                            awaitPong(maybeExpectedPong, pongTimeout, nextPing, orderBookSubscriptions, newAddressSubscriptions, maybeRatesUpdateId)
                         }
+                  }
+
+                case _: WsRatesUpdatesSubscribe =>
+                  if (maybeRatesUpdateId.nonEmpty) Behaviors.same
+                  else {
+                    clientRef ! WsRatesUpdates(getRatesSnapshot(), 0L, matcherTime)
+                    awaitPong(maybeExpectedPong, pongTimeout, nextPing, orderBookSubscriptions, addressSubscriptions, maybeRatesUpdateId = 0L.some)
                   }
 
                 case unsubscribeRequest: WsUnsubscribe =>
@@ -193,7 +213,12 @@ object WsExternalClientHandlerActor {
                     case Inl(ap) =>
                       orderBookSubscriptions.find(_ == ap).fold[Behavior[Message]](Behaviors.same) { assetPair =>
                         unsubscribeOrderBook(assetPair)
-                        awaitPong(maybeExpectedPong, pongTimeout, nextPing, orderBookSubscriptions.filterNot(_ == assetPair), addressSubscriptions)
+                        awaitPong(maybeExpectedPong,
+                                  pongTimeout,
+                                  nextPing,
+                                  orderBookSubscriptions.filterNot(_ == assetPair),
+                                  addressSubscriptions,
+                                  maybeRatesUpdateId)
                       }
 
                     case Inr(Inl(address)) =>
@@ -202,8 +227,12 @@ object WsExternalClientHandlerActor {
                           expiration.cancel()
                           unsubscribeAddress(address)
                           val newAddressSubscriptions = addressSubscriptions.filterNot(_._1 == address)
-                          awaitPong(maybeExpectedPong, pongTimeout, nextPing, orderBookSubscriptions, newAddressSubscriptions)
+                          awaitPong(maybeExpectedPong, pongTimeout, nextPing, orderBookSubscriptions, newAddressSubscriptions, maybeRatesUpdateId)
                       }
+
+                    case Inr(Inr(Inl(_))) => // rates updates unsubscribe
+                      awaitPong(maybeExpectedPong, pongTimeout, nextPing, orderBookSubscriptions, addressSubscriptions, maybeRatesUpdateId = None)
+
                     case Inr(Inr(_)) => Behaviors.same
                   }
               }
@@ -217,14 +246,20 @@ object WsExternalClientHandlerActor {
                 val newOrderBookSubscriptions                     = remainingSubscriptions enqueue assetPair
                 unsubscribeOrderBook(evictedSubscription)
                 clientRef ! WsError.from(SubscriptionsLimitReached(maxOrderBookNumber, evictedSubscription.toString), matcherTime)
-                awaitPong(maybeExpectedPong, pongTimeout, nextPing, newOrderBookSubscriptions, addressSubscriptions)
-              } else awaitPong(maybeExpectedPong, pongTimeout, nextPing, orderBookSubscriptions enqueue assetPair, addressSubscriptions)
+                awaitPong(maybeExpectedPong, pongTimeout, nextPing, newOrderBookSubscriptions, addressSubscriptions, maybeRatesUpdateId)
+              } else
+                awaitPong(maybeExpectedPong,
+                          pongTimeout,
+                          nextPing,
+                          orderBookSubscriptions enqueue assetPair,
+                          addressSubscriptions,
+                          maybeRatesUpdateId)
 
             case Command.CancelAddressSubscription(address) =>
               clientRef ! WsError.from(error.SubscriptionTokenExpired(address), matcherTime)
               unsubscribeAddress(address)
               val newAddressSubscriptions = addressSubscriptions.filterNot(_._1 == address)
-              awaitPong(maybeExpectedPong, pongTimeout, nextPing, orderBookSubscriptions, newAddressSubscriptions)
+              awaitPong(maybeExpectedPong, pongTimeout, nextPing, orderBookSubscriptions, newAddressSubscriptions, maybeRatesUpdateId)
 
             case command: Command.CloseConnection =>
               context.log.trace("Got CloseConnection: {}", command.reason.message.text)
@@ -255,7 +290,8 @@ object WsExternalClientHandlerActor {
         pongTimeout = Cancellable.alreadyCancelled,
         nextPing = Cancellable.alreadyCancelled,
         orderBookSubscriptions = Queue.empty,
-        addressSubscriptions = Queue.empty
+        addressSubscriptions = Queue.empty,
+        maybeRatesUpdateId = None
       )
     }
 }

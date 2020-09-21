@@ -22,6 +22,7 @@ import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
 import com.wavesplatform.dex.api.ws.actors.{WsExternalClientDirectoryActor, WsExternalClientHandlerActor, WsInternalBroadcastActor, WsInternalClientHandlerActor}
 import com.wavesplatform.dex.api.ws.protocol._
 import com.wavesplatform.dex.api.ws.routes.MatcherWebSocketRoute.CloseHandler
+import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.error.{InvalidJson, MatcherIsStopping}
 import com.wavesplatform.dex.model.AssetPairBuilder
@@ -47,7 +48,8 @@ class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsInternalBro
                             assetPairBuilder: AssetPairBuilder,
                             override val apiKeyHash: Option[Array[Byte]],
                             matcherSettings: MatcherSettings,
-                            matcherStatus: () => Matcher.Status)(implicit mat: Materializer)
+                            matcherStatus: () => Matcher.Status,
+                            getRatesSnapshot: () => Map[Asset, Double])(implicit mat: Materializer)
     extends ApiRoute
     with AuthRoute
     with ScorexLogging {
@@ -117,7 +119,14 @@ class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsInternalBro
 
     val webSocketHandlerRef: typed.ActorRef[WsExternalClientHandlerActor.Message] =
       mat.system.spawn(
-        behavior = WsExternalClientHandlerActor(externalClientHandler, time, assetPairBuilder, clientRef, matcher, addressDirectory, clientId),
+        behavior = WsExternalClientHandlerActor(externalClientHandler,
+                                                time,
+                                                assetPairBuilder,
+                                                clientRef,
+                                                matcher,
+                                                addressDirectory,
+                                                clientId,
+                                                getRatesSnapshot),
         name = s"handler-$clientId"
       )
 

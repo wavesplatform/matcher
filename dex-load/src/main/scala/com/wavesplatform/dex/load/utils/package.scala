@@ -3,24 +3,25 @@ package com.wavesplatform.dex.load
 import java.io.{File, PrintWriter}
 import java.nio.file.Files
 
+import com.google.common.primitives.Longs
 import com.softwaremill.sttp.{HttpURLConnectionBackend, MonadError => _, _}
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.dex.domain.bytes.codec.Base58
+import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.utils.EitherExt2
-import com.wavesplatform.wavesj.json.WavesJsonMapper
-import com.wavesplatform.wavesj.matcher.Order
-import com.wavesplatform.wavesj.matcher.Order.Type
-import com.wavesplatform.wavesj.{ApiJson, AssetPair, PrivateKeyAccount, Transactions}
+import im.mak.waves.transactions.IssueTransaction
+import im.mak.waves.transactions.account.{PrivateKey, PublicKey}
+import im.mak.waves.transactions.common.{Amount, AssetId}
+import im.mak.waves.transactions.exchange.{AssetPair, Order, OrderType}
 import play.api.libs.json.{JsValue, Json}
 import pureconfig.ConfigSource
 
 import scala.annotation.nowarn
-import pureconfig.generic.auto._
-
 import scala.io.Source
 import scala.util.Random
 
 package object utils {
+
+  import pureconfig.generic.auto._
 
   @nowarn
   val settings: Settings =
@@ -31,19 +32,25 @@ package object utils {
 
   val services         = new Services(settings)
   val networkByte      = settings.chainId.charAt(0).toByte
-  val issuer           = PrivateKeyAccount.fromSeed(settings.richAccount, 0, networkByte)
+  val issuer           = PrivateKey.fromSeed(settings.richAccount, 0)
   implicit val backend = HttpURLConnectionBackend()
 
-  def mkOrderHistoryHeaders(account: PrivateKeyAccount, timestamp: Long = System.currentTimeMillis): Map[String, String] = Map(
+  def getSignatureByPrivateKeyAndTimestamp(pk: PrivateKey, timestamp: Long): String = {
+    crypto
+      .sign(com.wavesplatform.dex.domain.account.PrivateKey.apply(pk.bytes()), pk.publicKey().bytes() ++ Longs.toByteArray(timestamp))
+      .base58
+  }
+
+  def mkOrderHistoryHeaders(account: PrivateKey, timestamp: Long = System.currentTimeMillis): Map[String, String] = Map(
     "Timestamp" -> timestamp.toString,
-    "Signature" -> services.matcher.getOrderHistorySignature(account, timestamp)
+    "Signature" -> getSignatureByPrivateKeyAndTimestamp(account, timestamp)
   )
 
-  def getOrderBook(account: PrivateKeyAccount, activeOnly: Boolean = true): JsValue = {
+  def getOrderBook(account: PrivateKey, activeOnly: Boolean = true): JsValue = {
     Json
       .parse(
         sttp
-          .get(uri"${settings.hosts.matcher}/matcher/orderbook/${Base58.encode(account.getPublicKey)}?activeOnly=$activeOnly")
+          .get(uri"${settings.hosts.matcher}/matcher/orderbook/${account.publicKey().toString}?activeOnly=$activeOnly")
           .headers(mkOrderHistoryHeaders(account))
           .send()
           .body
@@ -58,36 +65,29 @@ package object utils {
     println("Done")
   }
 
-  def mkAsset(): String = {
+  def mkAsset(): AssetId = {
     val tx =
-      Transactions.makeIssueTx(
-        issuer,
-        networkByte,
-        Random.nextInt(10000000).toString,
-        Random.nextInt(10000000).toString,
-        settings.assets.quantity,
-        8, //TODO: random from 2 to 16
-        false,
-        null,
-        settings.assets.issueFee
-      )
-    println(s"\tSending Issue TX: ${mkJson(tx)}")
-    services.node.send(tx)
-    tx.getId.toString
+      IssueTransaction
+        .builder(Random.nextInt(10000000).toString, settings.assets.quantity, 8)
+        .description(Random.nextInt(10000000).toString)
+        .chainId(networkByte)
+        .isReissuable(false)
+        .script(null)
+        .fee(settings.assets.issueFee)
+        .getSignedWith(issuer)
+
+    println(s"\tSending Issue TX: ${tx.toJson}")
+    services.node.broadcast(tx)
+    tx.assetId()
   }
 
-  def mkOrder(acc: PrivateKeyAccount, orderType: Type, amount: Long, price: Long, pair: AssetPair): Order = {
-    Transactions.makeOrder(acc,
-                           settings.matcherPublicKey,
-                           orderType,
-                           pair,
-                           price,
-                           amount,
-                           System.currentTimeMillis + 60 * 60 * 24 * 20 * 1000,
-                           settings.defaults.matcherFee)
+  def mkOrder(acc: PrivateKey, orderType: OrderType, amount: Long, price: Long, pair: AssetPair): Order = {
+    Order
+      .builder(orderType, Amount.of(amount, pair.left()), Amount.of(price, pair.right()), PublicKey.as(settings.matcherPublicKey))
+      .expiration(System.currentTimeMillis + 60 * 60 * 24 * 20 * 1000)
+      .fee(settings.defaults.matcherFee)
+      .getSignedWith(acc)
   }
-
-  def mkJson(obj: ApiJson): String = new WavesJsonMapper(networkByte).writeValueAsString(obj)
 
   def readAssetPairs(file: Option[File]): List[AssetPair] = {
     if (Files.exists(file.get.toPath)) {
@@ -99,7 +99,7 @@ package object utils {
             .getLines()
             .map(l => {
               val splitted = l.split("-")
-              new AssetPair(splitted(0), splitted(1))
+              new AssetPair(AssetId.as(splitted(0)), AssetId.as(splitted(1)))
             })
             .toList
       source.close()
@@ -111,7 +111,7 @@ package object utils {
     val requestsFile = new File(settings.defaults.pairsFile)
     val output       = new PrintWriter(requestsFile, "utf-8")
 
-    try pairs.foreach(p => output.println(s"${p.getAmountAsset}-${p.getPriceAsset}"))
+    try pairs.foreach(p => output.println(s"${p.left().toString}-${p.right().toString}"))
     finally output.close()
 
     println(s"\tDone. Pairs have been saved to: $requestsFile")

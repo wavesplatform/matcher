@@ -15,7 +15,7 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
   override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "WAVES" ]""")
 
   private val issueAliceAssetTx = mkIssue(alice, "AliceCoinOrders", someAssetAmount, decimals = 0)
-  private val aliceAsset        = IssuedAsset(issueAliceAssetTx.getId)
+  private val aliceAsset        = IssuedAsset(issueAliceAssetTx.id())
 
   private val predefAssetPair = wavesUsdPair
   private val aliceWavesPair  = AssetPair(aliceAsset, Waves)

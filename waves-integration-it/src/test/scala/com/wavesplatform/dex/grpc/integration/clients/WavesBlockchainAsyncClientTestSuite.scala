@@ -9,7 +9,7 @@ import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV2
+import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionV2}
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.BalanceChanges
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
@@ -121,7 +121,7 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
     val aliceInitialBalance = wavesNode1.api.balance(alice, Waves)
 
     val issueAssetTx = mkIssue(alice, "name", someAssetAmount, 2)
-    val issuedAsset  = IssuedAsset(issueAssetTx.getId)
+    val issuedAsset  = IssuedAsset(issueAssetTx.id())
 
     balanceChanges = Map.empty[Address, Map[Asset, Long]]
     broadcastAndAwait(issueAssetTx)
@@ -164,8 +164,8 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
 
   "broadcastTx" - {
     "returns true" - {
-      val pair         = AssetPair.createAssetPair(UsdId.toString, "WAVES").get // TODO
-      def mkExchangeTx = mkDomainExchange(bob, alice, pair, 1L, 2 * Order.PriceConstant, matcher = matcher)
+      val pair: AssetPair                   = AssetPair.createAssetPair(UsdId.toString, "WAVES").get // TODO
+      def mkExchangeTx: ExchangeTransaction = mkDomainExchange(bob, alice, pair, 1L, 2 * Order.PriceConstant, matcher = matcher)
 
       "if the transaction passed the validation and was added to the UTX pool" in {
         val exchangeTx = mkExchangeTx
@@ -231,8 +231,8 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
       wait(client.assetDescription(usd)) should matchTo(
         Option(
           BriefAssetDescription(
-            name = IssueUsdTx.getName,
-            decimals = IssueUsdTx.getDecimals,
+            name = IssueUsdTx.name(),
+            decimals = IssueUsdTx.decimals(),
             hasScript = false
           )
         )
@@ -251,14 +251,14 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
       withClue("issue scripted asset") {
         broadcastAndAwait(issueTx)
 
-        wait(client.hasScript(IssuedAsset(issueTx.getId))) shouldBe true
+        wait(client.hasScript(IssuedAsset(issueTx.id()))) shouldBe true
       }
 
       withClue("run script") {
-        val pair       = AssetPair.createAssetPair(toVanilla(issueTx.getId).toString, "WAVES").get
+        val pair       = AssetPair.createAssetPair(toVanilla(issueTx.id()).toString, "WAVES").get
         val exchangeTx = mkDomainExchange(bob, alice, pair, 1L, 2 * Order.PriceConstant, matcherFee = 1.waves, matcher = matcher)
 
-        wait(client.runScript(IssuedAsset(issueTx.getId), exchangeTx)) shouldBe RunScriptResult.Allowed
+        wait(client.runScript(IssuedAsset(issueTx.id()), exchangeTx)) shouldBe RunScriptResult.Allowed
       }
     }
   }
@@ -329,8 +329,8 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
 
       broadcastAndAwait(exchangeTx)
 
-      wait(client.forgedOrder(exchangeTx.getOrder1.getId)) shouldBe true
-      wait(client.forgedOrder(exchangeTx.getOrder2.getId)) shouldBe true
+      wait(client.forgedOrder(exchangeTx.buyOrder().id())) shouldBe true
+      wait(client.forgedOrder(exchangeTx.sellOrder().id())) shouldBe true
     }
   }
 

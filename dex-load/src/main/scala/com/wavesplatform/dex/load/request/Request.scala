@@ -5,13 +5,12 @@ import java.io.PrintWriter
 import com.google.common.net.HttpHeaders
 import com.wavesplatform.dex.load.request.RequestTag.RequestTag
 import com.wavesplatform.dex.load.request.RequestType.RequestType
-import com.wavesplatform.dex.load.utils.{mkJson, settings}
-import com.wavesplatform.wavesj.ApiJson
+import com.wavesplatform.dex.load.utils.settings
 
 case class Request(httpType: RequestType,
                    path: String,
                    tag: RequestTag,
-                   jsonBody: ApiJson = null,
+                   jsonBody: String = null,
                    headers: Map[String, String] = Map.empty,
                    stringBody: String = "") {
   val defaultHeaders = Map(
@@ -28,8 +27,8 @@ case class Request(httpType: RequestType,
     s"${request.length} $tag\r\n$request\r\n"
   }
 
-  def mkPost(obj: ApiJson, path: String, tag: RequestTag, stringBody: String = ""): String = {
-    val body = if (stringBody.isEmpty) mkJson(obj).replace("\"matcherFeeAssetId\":\"WAVES\",", "") else stringBody
+  def mkPost(obj: String, path: String, tag: RequestTag, stringBody: String = ""): String = {
+    val body = if (stringBody.isEmpty) obj.replace("\"matcherFeeAssetId\":\"WAVES\",", "") else stringBody
 
     val headers = defaultHeaders ++ Map(
       HttpHeaders.CONTENT_LENGTH -> body.length.toString,

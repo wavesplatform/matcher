@@ -34,7 +34,7 @@ class BroadcastUntilConfirmedTestSuite extends MatcherSuiteBase {
     dex1.api.waitForOrderStatus(aliceOrder, Status.Filled)
 
     markup("Wait for a transaction")
-    val exchangeTxId = dex1.api.waitForTransactionsByOrder(aliceOrder, 1).head.getId
+    val exchangeTxId = dex1.api.waitForTransactionsByOrder(aliceOrder, 1).head.id()
 
     markup("Connect the miner node to the network")
     wavesNode1.connectToNetwork()

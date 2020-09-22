@@ -8,9 +8,10 @@ import java.util.Base64
 
 import com.wavesplatform.dex.api.ws.protocol.WsAddressSubscribe.JwtPayload
 import com.wavesplatform.dex.auth.JwtUtils
-import com.wavesplatform.dex.domain.account.{AddressScheme, PrivateKey, PublicKey}
+import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
-import com.wavesplatform.wavesj.PrivateKeyAccount
+import com.wavesplatform.dex.domain.bytes.codec.Base58
+import com.wavesplatform.dex.domain.utils.EitherExt2
 import play.api.libs.json.Json
 
 import scala.concurrent.duration._
@@ -32,22 +33,23 @@ object GatlingFeeder {
     privateKey
   }
 
-  private def mkJwtSignedPayload(a: PrivateKeyAccount): JwtPayload = {
+  private def mkJwtSignedPayload(a: KeyPair): JwtPayload = {
     val exp = System.currentTimeMillis() / 1000 + 24.hour.toSeconds
     JwtPayload(
       signature = ByteStr(Array.emptyByteArray),
-      publicKey = PublicKey(a.getPublicKey),
+      publicKey = a.publicKey,
       networkByte = AddressScheme.current.chainId.toChar.toString,
       clientId = "test",
       firstTokenExpirationInSeconds = exp,
       activeTokenExpirationInSeconds = exp,
       scope = List("general")
-    ).signed(PrivateKey(a.getPrivateKey))
+    ).signed(a.privateKey)
   }
 
-  private def mkAusString(accountPrivateKey: PrivateKeyAccount, authKp: security.PrivateKey): String = {
-    s"""{"T":"aus","S":"${accountPrivateKey.getAddress}","t":"jwt","j":"${JwtUtils.mkJwt(authKp,
-                                                                                         Json.toJsObject(mkJwtSignedPayload(accountPrivateKey)))}"}"""
+  private def mkAusString(accountKeyPair: KeyPair, authKp: security.PrivateKey): String = {
+    s"""{"T":"aus","S":"${accountKeyPair.toAddress.toString}","t":"jwt","j":"${JwtUtils.mkJwt(
+      authKp,
+      Json.toJsObject(mkJwtSignedPayload(accountKeyPair)))}"}"""
   }
 
   private def mkObsStrings(pairsFile: File, numberPerClient: Int): String = {
@@ -73,8 +75,8 @@ object GatlingFeeder {
       })
       output.println()
       (0 until accountsNumber).foreach { i =>
-        val pk = PrivateKeyAccount.fromSeed(s"$seedPrefix$i", 0, AddressScheme.current.chainId)
-        output.println(s"""${pk.getAddress};${mkAusString(pk, authKp)};${mkObsStrings(pairsFile, orderBookNumberPerAccount)}""")
+        val kp = KeyPair.fromSeed(Base58.encode(s"$seedPrefix$i".getBytes)).explicitGet()
+        output.println(s"""${kp.toAddress};${mkAusString(kp, authKp)};${mkObsStrings(pairsFile, orderBookNumberPerAccount)}""")
       }
     } finally output.close()
     println(s"Results have been saved to $feederFile")

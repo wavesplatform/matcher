@@ -7,7 +7,7 @@ import com.wavesplatform.dex.api.http.entities.{HttpOrderStatus, HttpV0LevelAgg}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.wavesj.transactions.ExchangeTransaction
+import im.mak.waves.transactions.ExchangeTransaction
 
 class RoundingIssuesTestSuite extends MatcherSuiteBase {
 
@@ -44,15 +44,15 @@ class RoundingIssuesTestSuite extends MatcherSuiteBase {
     dex1.api.cancel(alice, counter)
 
     val exchangeTx =
-      wavesNode1.api.transactionInfo(tx.head.getId).getOrElse(throw new RuntimeException(s"Can't find tx with id = '${tx.head.getId}'")) match {
+      wavesNode1.api.transactionInfo(tx.head.id()).getOrElse(throw new RuntimeException(s"Can't find tx with id = '${tx.head.id()}'")) match {
         case r: ExchangeTransaction => r
         case x                      => throw new RuntimeException(s"Expected ExchangeTransaction, but got $x")
       }
 
-    exchangeTx.getPrice shouldBe counter.price
-    exchangeTx.getAmount shouldBe filledAmount
-    exchangeTx.getBuyMatcherFee shouldBe 40L
-    exchangeTx.getSellMatcherFee shouldBe 296219L
+    exchangeTx.price() shouldBe counter.price
+    exchangeTx.amount() shouldBe filledAmount
+    exchangeTx.buyMatcherFee() shouldBe 40L
+    exchangeTx.sellMatcherFee() shouldBe 296219L
 
     val aliceBalanceAfter = wavesNode1.api.balance(alice, Waves)
     val bobBalanceAfter   = wavesNode1.api.balance(bob, Waves)

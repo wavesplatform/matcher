@@ -57,8 +57,8 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with
 
     broadcastAndAwait(IssueEthTx, IssueWctTx)
     broadcastAndAwait(
-      mkTransfer(alice, bob, IssueEthTx.getQuantity / 2, eth),
-      mkTransfer(bob, alice, IssueWctTx.getQuantity / 2, wct)
+      mkTransfer(alice, bob, IssueEthTx.quantity() / 2, eth),
+      mkTransfer(bob, alice, IssueWctTx.quantity() / 2, wct)
     )
 
     dex1.start()

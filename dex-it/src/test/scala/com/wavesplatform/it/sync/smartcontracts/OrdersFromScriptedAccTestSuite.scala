@@ -28,7 +28,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
   )
 
   private val aliceAssetTx   = mkIssue(alice, "AliceCoin", someAssetAmount, 0)
-  private val aliceAsset     = IssuedAsset(aliceAssetTx.getId)
+  private val aliceAsset     = IssuedAsset(aliceAssetTx.id())
   private val aliceWavesPair = AssetPair(aliceAsset, Waves)
 
   private def updateBobScript(binaryCodeInBase64: String): Unit =

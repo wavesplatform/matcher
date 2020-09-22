@@ -67,7 +67,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
       markets.amountAssetInfo shouldBe Some(HttpAssetInfo(8))
 
       markets.priceAssetName shouldBe usdAssetName
-      markets.priceAssetInfo shouldBe Some(HttpAssetInfo(IssueUsdTx.getDecimals))
+      markets.priceAssetInfo shouldBe Some(HttpAssetInfo(IssueUsdTx.decimals()))
     }
 
     "check usd and waves balance after fill" in {
@@ -229,10 +229,10 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
     val markets     = openMarkets.markets.last
 
     markets.amountAssetName shouldBe wctAssetName
-    markets.amountAssetInfo shouldBe Some(HttpAssetInfo(IssueWctTx.getDecimals))
+    markets.amountAssetInfo shouldBe Some(HttpAssetInfo(IssueWctTx.decimals()))
 
     markets.priceAssetName shouldBe usdAssetName
-    markets.priceAssetInfo shouldBe Some(HttpAssetInfo(IssueUsdTx.getDecimals))
+    markets.priceAssetInfo shouldBe Some(HttpAssetInfo(IssueUsdTx.decimals()))
   }
 
   "Alice and Bob trade WCT-WAVES on not enough fee when place order" - {
@@ -247,7 +247,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
       val bobOrder = mkOrder(bob, wctWavesPair, SELL, wctWavesSellAmount, wctWavesPrice)
       dex1.api.tryPlace(bobOrder) should failWith(3147270) // BalanceNotEnough
 
-      broadcastAndAwait(mkLeaseCancel(bob, leaseTx.getId))
+      broadcastAndAwait(mkLeaseCancel(bob, leaseTx.id()))
     }
   }
 

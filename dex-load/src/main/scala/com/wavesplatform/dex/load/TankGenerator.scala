@@ -7,7 +7,7 @@ import java.util.concurrent.{ExecutorService, Executors}
 
 import com.softwaremill.sttp.{MonadError => _}
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
-import com.wavesplatform.dex.domain.account.PublicKey
+import com.wavesplatform.dex.domain.account.{PrivateKey, PublicKey}
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.load.request._
 import com.wavesplatform.dex.load.utils._
@@ -18,8 +18,10 @@ import im.mak.waves.transactions.exchange.{AssetPair, Order, OrderType}
 import im.mak.waves.transactions.mass.Transfer
 import org.apache.http.HttpResponse
 import org.apache.http.client.HttpClient
+import org.apache.http.client.config.{CookieSpecs, RequestConfig}
 import org.apache.http.client.methods.RequestBuilder
 import org.apache.http.entity.{ContentType, StringEntity}
+import org.apache.http.impl.client.HttpClients
 import play.api.libs.json.{JsError, JsSuccess, JsValue}
 
 import scala.concurrent._
@@ -29,12 +31,24 @@ import scala.util.Random
 
 object TankGenerator {
 
-  val threadCount                                                = 5
-  private val executor: ExecutorService                          = Executors.newFixedThreadPool(threadCount)
+  private val threadCount: Int          = 5
+  private val executor: ExecutorService = Executors.newFixedThreadPool(threadCount)
+
   implicit private val blockingContext: ExecutionContextExecutor = ExecutionContext.fromExecutor(executor)
 
-  private val matcherHttpClient: HttpClient = services.matcher.client()
-  private val matcherHttpUri: URI           = services.matcher.uri()
+  private val matcherHttpClient: HttpClient =
+    HttpClients.custom
+      .setDefaultRequestConfig(
+        RequestConfig.custom
+          .setSocketTimeout(5000)
+          .setConnectTimeout(5000)
+          .setConnectionRequestTimeout(5000)
+          .setCookieSpec(CookieSpecs.STANDARD)
+          .build
+      )
+      .build()
+
+  private val matcherHttpUri: URI = new URI(settings.hosts.matcher)
 
   private def mkAccounts(seedPrefix: String, count: Int): List[JPrivateKey] = {
     print(s"Generating $count accounts (prefix: $seedPrefix)... ")
@@ -49,7 +63,7 @@ object TankGenerator {
     val assets = (1 to count).map(_ => mkAsset()).toList
     val asset  = assets(new Random().nextInt(assets.length))
 
-    do { waitForHeightArise() } while (services.matcher.getAssetBalance(issuer.address(), asset) <= 0)
+    do { waitForHeightArise() } while (node.getAssetBalance(issuer.address(), asset) <= 0)
 
     println("Assets have been successfully issued")
     assets.map(_.toString)
@@ -74,40 +88,42 @@ object TankGenerator {
     println(s"Distributing... ")
     val minimumNeededAssetBalance = settings.defaults.maxOrdersPerAccount * settings.defaults.minimalOrderPrice * 10000
 
-    def massTransferFee(group: List[Transfer]) = settings.defaults.massTransferFee + (group.size + 1) * settings.defaults.massTransferMultiplier
+    def massTransferFee(group: List[Transfer]): Long = settings.defaults.massTransferFee + (group.size + 1) * settings.defaults.massTransferMultiplier
 
-    assets.foreach(asset => {
+    def mkMassTransfer(transfers: List[Transfer], asset: AssetId): MassTransferTransaction =
+      MassTransferTransaction
+        .builder(transfers.asJava)
+        .assetId(asset)
+        .fee(massTransferFee(transfers))
+        .version(1)
+        .getSignedWith(issuer)
+
+    assets.foreach { asset =>
       println(s"\t -- $asset")
       accounts
         .map(account => new Transfer(account.address(), minimumNeededAssetBalance))
         .grouped(100)
-        .foreach(group => {
-          try services.node.broadcast(
-            MassTransferTransaction.builder(group.asJava).assetId(AssetId.as(asset)).fee(massTransferFee(group)).getSignedWith(issuer))
-          catch {
-            case e: Exception => println(e)
-          }
-        })
-    })
+        .foreach { group =>
+          try node.broadcast(mkMassTransfer(group, AssetId.as(asset)))
+          catch { case e: Exception => println(e) }
+        }
+    }
 
     println(s"\t -- WAVES")
 
     accounts
       .map(account => new Transfer(account.address(), settings.defaults.wavesPerAccount))
       .grouped(100)
-      .foreach(group => {
-        try services.node.broadcast(
-          MassTransferTransaction.builder(group.asJava).assetId(AssetId.WAVES).fee(massTransferFee(group)).getSignedWith(issuer))
-        catch {
-          case e: Exception => println(e)
-        }
-      })
+      .foreach { group =>
+        try node.broadcast(mkMassTransfer(group, AssetId.WAVES))
+        catch { case e: Exception => println(e) }
+      }
     println(s" Done")
 
     val asset   = AssetId.as(assets(new Random().nextInt(assets.length)))
     val account = accounts(new Random().nextInt(accounts.length))
 
-    while (services.matcher.getAssetBalance(account.address(), asset) == 0) waitForHeightArise()
+    while (node.getAssetBalance(account.address(), asset) == 0) waitForHeightArise()
   }
 
   private def mkOrders(accounts: List[JPrivateKey], pairs: List[AssetPair], matching: Boolean): List[Request] = {
@@ -138,20 +154,15 @@ object TankGenerator {
       if (Files.notExists(pairsFile.get.toPath)) mkAssets()
       else
         readAssetPairs(pairsFile)
-          .map { p =>
-            s"${p.left().toString}-${p.right().toString}"
-          }
+          .map(p => s"${p.left().toString}-${p.right().toString}")
           .mkString("-")
           .split("-")
           .toSet
           .toList
 
-    val pairs =
-      if (Files.notExists(pairsFile.get.toPath)) mkAssetPairs(assets)
-      else readAssetPairs(pairsFile)
+    val pairs: List[AssetPair] = if (Files.notExists(pairsFile.get.toPath)) mkAssetPairs(assets) else readAssetPairs(pairsFile)
+    if (!distributed) distributeAssets(accounts, assets)
 
-    if (!distributed)
-      distributeAssets(accounts, assets)
     pairs
   }
 
@@ -169,10 +180,10 @@ object TankGenerator {
     println("Making requests for cancelling...")
 
     val cancels = accounts
-      .flatMap(a => {
+      .flatMap { a =>
         getOrderBook(a)
           .as[Array[JsValue]]
-          .map(o => {
+          .map { o =>
             val id = (o \ "id").as[String]
             val aa = ((o \ "assetPair").as[JsValue] \ "amountAsset").validate[String] match {
               case JsSuccess(name, _) => name
@@ -184,17 +195,27 @@ object TankGenerator {
             }
 
             val unsignedRequest =
-              HttpCancelOrder(PublicKey(a.publicKey().bytes()), Some(id.getBytes()), timestamp = None, signature = Array.emptyByteArray)
+              HttpCancelOrder(
+                sender = PublicKey(a.publicKey().bytes()),
+                orderId = Some(id.getBytes()),
+                timestamp = None,
+                signature = Array.emptyByteArray
+              )
 
             val signedRequest =
-              unsignedRequest.copy(signature = crypto.sign(com.wavesplatform.dex.domain.account.PrivateKey(a.bytes()), unsignedRequest.toSign))
+              unsignedRequest.copy(
+                signature = crypto.sign(
+                  account = PrivateKey(a.bytes()),
+                  message = unsignedRequest.toSign
+                )
+              )
 
             Request(RequestType.POST,
                     s"/matcher/orderbook/$aa/$pa/cancel",
                     RequestTag.CANCEL,
                     HttpCancelOrder.format.writes(signedRequest).toString())
-          })
-      })
+          }
+      }
 
     cancels.take(requestsCount)
   }
@@ -248,10 +269,10 @@ object TankGenerator {
     print("Making requests for getting order status... ")
 
     val statuses = accounts
-      .flatMap(a => {
-        getOrderBook(a, false)
+      .flatMap { a =>
+        getOrderBook(a, activeOnly = false)
           .as[Array[JsValue]]
-          .map(o => {
+          .map { o =>
             val id = (o \ "id").as[String]
             val aa = ((o \ "assetPair").as[JsValue] \ "amountAsset").validate[String] match {
               case JsSuccess(name, _) => name
@@ -266,8 +287,8 @@ object TankGenerator {
               s"/matcher/orderbook/$aa/$pa/$id",
               RequestTag.ORDER_STATUS
             )
-          })
-      })
+          }
+      }
     println("Done")
 
     Random.shuffle(
@@ -283,7 +304,7 @@ object TankGenerator {
     val pairs = readAssetPairs(pairsFile)
     val ts    = System.currentTimeMillis
 
-    def mkTradableBalance(a: JPrivateKey, p: AssetPair) = {
+    def mkTradableBalance(a: JPrivateKey, p: AssetPair): Request = {
       Request(
         RequestType.GET,
         s"/matcher/orderbook/${p.left().toString}/${p.right().toString}/tradableBalance/${a.address()}",
@@ -292,9 +313,9 @@ object TankGenerator {
       )
     }
 
-    val all = accounts.flatMap(a => {
+    val all = accounts.flatMap { a =>
       pairs.map(mkTradableBalance(a, _))
-    })
+    }
 
     Random
       .shuffle(
@@ -305,12 +326,13 @@ object TankGenerator {
   }
 
   def placeOrder(order: Order): Future[HttpResponse] = Future {
-    matcherHttpClient.execute(
+    val request =
       RequestBuilder
         .post(matcherHttpUri.resolve(s"/matcher/orderbook"))
         .setEntity(new StringEntity(order.toJson, ContentType.APPLICATION_JSON))
         .build()
-    )
+
+    matcherHttpClient.execute(request)
   }
 
   def placeOrdersForCancel(accounts: List[JPrivateKey], requestsCount: Int, pairsFile: Option[File]): Unit = {
@@ -338,7 +360,10 @@ object TankGenerator {
       }
     }
 
-    Await.result(Future.sequence(futures), (requestsCount * threadCount).seconds)
+    val requestsAwaitingTime = (requestsCount * threadCount).seconds
+    print(s"Awaiting place orders requests, requests count = $requestsCount, treads count = $threadCount, waiting at most $requestsAwaitingTime... ")
+    Await.result(Future.sequence(futures), requestsAwaitingTime)
+    println("Done")
   }
 
   private def mkAllTypes(accounts: List[JPrivateKey], requestsCount: Int, pairsFile: Option[File]): List[Request] = {
@@ -347,7 +372,7 @@ object TankGenerator {
     placeOrdersForCancel(accounts, (requestsCount * settings.distribution.placeOrder).toInt, pairsFile)
     Random.shuffle(
       mkOrderStatuses(accounts, (requestsCount * settings.distribution.orderStatus).toInt) ++
-        mkMatching(accounts, (requestsCount * settings.distribution.placeOrder).toInt, pairsFile, true) ++
+        mkMatching(accounts, (requestsCount * settings.distribution.placeOrder).toInt, pairsFile, distributed = true) ++
         mkBalances(accounts, (requestsCount * settings.distribution.tradableBalance).toInt, pairsFile) ++
         mkOrderHistory(accounts, requestsCount, pairsFile) ++
         mkCancels(accounts, (requestsCount * settings.distribution.placeOrder).toInt)
@@ -380,9 +405,7 @@ object TankGenerator {
         case 4 => mkOrderHistory(accounts, requestsCount, pairsFile)
         case 5 => mkBalances(accounts, requestsCount, pairsFile)
         case 6 => mkAllTypes(accounts, requestsCount, pairsFile)
-        case _ =>
-          println("Wrong number of task ")
-          List.empty
+        case _ => println("Wrong number of task "); List.empty
       }
       svRequests(requests, outputFile)
     } finally executor.shutdownNow()

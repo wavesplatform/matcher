@@ -8,6 +8,7 @@ import com.softwaremill.sttp.{HttpURLConnectionBackend, MonadError => _, _}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.utils.EitherExt2
+import com.wavesplatform.wavesj.Node
 import im.mak.waves.transactions.IssueTransaction
 import im.mak.waves.transactions.account.{PrivateKey, PublicKey}
 import im.mak.waves.transactions.common.{Amount, AssetId}
@@ -30,7 +31,7 @@ package object utils {
       .load[Settings]
       .explicitGet()
 
-  val services         = new Services(settings)
+  val node             = new Node(settings.hosts.node)
   val networkByte      = settings.chainId.charAt(0).toByte
   val issuer           = PrivateKey.fromSeed(settings.richAccount, 0)
   implicit val backend = HttpURLConnectionBackend()
@@ -59,9 +60,9 @@ package object utils {
   }
 
   def waitForHeightArise(): Unit = {
-    val toHeight = services.node.getHeight + 1
+    val toHeight = node.getHeight + 1
     print(s"\tWaiting for the next ($toHeight) block... ")
-    while (services.node.getHeight < toHeight) Thread.sleep(5000)
+    while (node.getHeight < toHeight) Thread.sleep(5000)
     println("Done")
   }
 
@@ -74,10 +75,11 @@ package object utils {
         .isReissuable(false)
         .script(null)
         .fee(settings.assets.issueFee)
+        .version(2)
         .getSignedWith(issuer)
 
     println(s"\tSending Issue TX: ${tx.toJson}")
-    services.node.broadcast(tx)
+    node.broadcast(tx)
     tx.assetId()
   }
 

@@ -19,7 +19,12 @@ import cats.syntax.either._
 import com.wavesplatform.dex.api.http.SwaggerDocService
 import com.wavesplatform.dex.api.http.entities.{HttpMessage, HttpWebSocketCloseFilter, HttpWebSocketConnections}
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
-import com.wavesplatform.dex.api.ws.actors.{WsExternalClientDirectoryActor, WsExternalClientHandlerActor, WsInternalBroadcastActor, WsInternalClientHandlerActor}
+import com.wavesplatform.dex.api.ws.actors.{
+  WsExternalClientDirectoryActor,
+  WsExternalClientHandlerActor,
+  WsInternalBroadcastActor,
+  WsInternalClientHandlerActor
+}
 import com.wavesplatform.dex.api.ws.protocol._
 import com.wavesplatform.dex.api.ws.routes.MatcherWebSocketRoute.CloseHandler
 import com.wavesplatform.dex.domain.asset.Asset
@@ -109,7 +114,8 @@ class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsInternalBro
     }
   }
 
-  private val commonWsRoute: Route = (pathEnd & get) {
+  private val commonWsRoute: Route = (pathEnd & get &
+    parameters("a_os".withDefault("Unknown OS"), "a_client".withDefault("Unknown Client"))) { (os: String, client: String) =>
     import matcherSettings.webSocketSettings.externalClientHandler
 
     val clientId = UUID.randomUUID().toString
@@ -132,7 +138,7 @@ class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsInternalBro
 
     val closeHandler = new CloseHandler(() => webSocketHandlerRef ! WsExternalClientHandlerActor.Command.CloseConnection(MatcherIsStopping))
     wsHandlers.add(closeHandler)
-    externalClientDirectoryRef ! WsExternalClientDirectoryActor.Command.Subscribe(webSocketHandlerRef)
+    externalClientDirectoryRef ! WsExternalClientDirectoryActor.Command.Subscribe(webSocketHandlerRef, os, client)
 
     val server: Sink[WsExternalClientHandlerActor.Message, NotUsed] =
       ActorSink

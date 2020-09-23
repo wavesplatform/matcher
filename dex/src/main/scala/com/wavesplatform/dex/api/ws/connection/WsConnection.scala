@@ -5,6 +5,7 @@ import java.util.concurrent.{ConcurrentLinkedQueue, ThreadLocalRandom}
 import akka.Done
 import akka.actor.{ActorRef, ActorSystem, Status}
 import akka.http.scaladsl.Http
+import akka.http.scaladsl.model.Uri
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage, WebSocketRequest}
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.stream.{CompletionStrategy, Materializer, OverflowStrategy}
@@ -85,7 +86,8 @@ class WsConnection(uri: String, keepAlive: Boolean = true)(implicit system: Acto
       f
   }
 
-  val (connectionResponse, closed) = Http().singleWebSocketRequest(WebSocketRequest(uri), flow)
+  val akkaUri: Uri = s"$uri?client=testclient"
+  val (connectionResponse, closed) = Http().singleWebSocketRequest(WebSocketRequest(akkaUri), flow)
 
   val connectionOpenedTs: Long                   = System.currentTimeMillis
   val connectionClosedTs: Future[Long]           = closed.map(_ => System.currentTimeMillis)

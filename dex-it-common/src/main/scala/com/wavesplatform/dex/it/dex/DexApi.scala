@@ -26,7 +26,7 @@ import com.wavesplatform.dex.it.fp.{CanWait, FOps, RepeatRequestOptions, Throwab
 import com.wavesplatform.dex.it.json._
 import com.wavesplatform.dex.it.sttp.ResponseParsers.asLong
 import com.wavesplatform.dex.it.sttp.SttpBackendOps
-import com.wavesplatform.wavesj.transactions.ExchangeTransaction
+import im.mak.waves.transactions.ExchangeTransaction
 import play.api.libs.json.{JsResultException, Json}
 
 import scala.concurrent.duration.DurationInt
@@ -180,7 +180,7 @@ object DexApi {
       }
 
       override val tryPublicKeyWithResponse = tryParseJsonWithResponse(sttp.get(uri"$apiUri/matcher"))
-      override val tryPublicKey = tryPublicKeyWithResponse.map(_._2)
+      override val tryPublicKey             = tryPublicKeyWithResponse.map(_._2)
 
       override def tryReservedBalance(of: KeyPair, timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, Map[Asset, Long]]] =
         tryParseJson {
@@ -201,7 +201,8 @@ object DexApi {
                                       timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, Map[Asset, Long]]] =
         tryParseJson {
           sttp
-            .get(uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/tradableBalance/${of.publicKey.toAddress.stringRepr}")
+            .get(
+              uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/tradableBalance/${of.publicKey.toAddress.stringRepr}")
             .headers(timestampAndSignatureHeaders(of, timestamp))
         }
 
@@ -282,17 +283,19 @@ object DexApi {
             .headers(apiKeyWithUserPublicKeyHeaders(xUserPublicKey))
         }
 
-      override def tryOrderStatusInfoByIdWithSignature(owner: KeyPair,
-                                                       orderId: Order.Id,
-                                                       timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, HttpOrderBookHistoryItem]] =
+      override def tryOrderStatusInfoByIdWithSignature(
+          owner: KeyPair,
+          orderId: Order.Id,
+          timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, HttpOrderBookHistoryItem]] =
         tryParseJson {
           sttp
             .get(uri"$apiUri/matcher/orderbook/${owner.publicKey}/${orderId.toString}")
             .headers(timestampAndSignatureHeaders(owner, timestamp))
         }
 
-      override def tryTransactionsByOrder(id: Order.Id): F[Either[MatcherError, List[ExchangeTransaction]]] =
+      override def tryTransactionsByOrder(id: Order.Id): F[Either[MatcherError, List[ExchangeTransaction]]] = {
         tryParseJson(sttp.get(uri"$apiUri/matcher/transactions/$id"))
+      }
 
       override def tryOrderHistory(owner: KeyPair,
                                    activeOnly: Option[Boolean] = None,
@@ -480,7 +483,7 @@ object DexApi {
           .get(uri"$apiUri/ws/v0/connections")
           .headers(apiKeyHeaders)
       }
-      
+
       override def tryCloseWsConnections(oldestNumber: Int): F[Either[MatcherError, HttpMessage]] = tryParseJson {
         sttp
           .delete(uri"$apiUri/ws/v0/connections")

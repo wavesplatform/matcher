@@ -10,7 +10,7 @@ import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import com.wavesplatform.dex.it.test.Scripts
 import com.wavesplatform.dex.it.waves.MkWavesEntities
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.wavesj.transactions.IssueTransaction
+import im.mak.waves.transactions.IssueTransaction
 
 /**
   * Rules:
@@ -65,7 +65,7 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     val allowAsset100 = mkAllow(100)
     broadcastAndAwait(allowAsset100)
 
-    val pair = AssetPair(IssuedAsset(allowAsset100.getId), allowAsset)
+    val pair = AssetPair(IssuedAsset(allowAsset100.id()), allowAsset)
 
     info("place a counter order")
     val counter = mkOrder(matcher, pair, OrderType.SELL, 100000, 2 * Order.PriceConstant, version = 2, matcherFee = twoSmartTradeFee)
@@ -146,19 +146,19 @@ object OrdersFromScriptedAssetTestSuite {
     mkIssue(matcher, s"AllowAsset-$id", Int.MaxValue / 3, 0, smartIssueFee, Some(Scripts.alwaysTrue))
 
   private val issueUnscriptedAssetTx = mkIssue(matcher, "UnscriptedAsset", Int.MaxValue / 3, 0)
-  private val unscriptedAsset        = IssuedAsset(issueUnscriptedAssetTx.getId)
+  private val unscriptedAsset        = IssuedAsset(issueUnscriptedAssetTx.id())
 
   private val issueAllowAssetTx = mkAllow(0)
-  private val allowAsset        = IssuedAsset(issueAllowAssetTx.getId)
+  private val allowAsset        = IssuedAsset(issueAllowAssetTx.id())
 
   private val issueAllowAsset2Tx = mkAllow(1)
-  private val allowAsset2        = IssuedAsset(issueAllowAsset2Tx.getId)
+  private val allowAsset2        = IssuedAsset(issueAllowAsset2Tx.id())
 
   private val issueAllowAsset3Tx = mkAllow(2)
-  private val allowAsset3        = IssuedAsset(issueAllowAsset3Tx.getId)
+  private val allowAsset3        = IssuedAsset(issueAllowAsset3Tx.id())
 
   private val issueDenyAssetTx = mkIssue(matcher, "DenyAsset", Int.MaxValue / 3, 0, smartIssueFee, Some(Scripts.alwaysFalse))
-  private val denyAsset        = IssuedAsset(issueDenyAssetTx.getId)
+  private val denyAsset        = IssuedAsset(issueDenyAssetTx.id())
 
   /*
   {-# STDLIB_VERSION 2 #-}

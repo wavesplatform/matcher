@@ -12,7 +12,7 @@ import com.wavesplatform.dex.domain.order.Order.Id
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.wavesj.Transfer
+import im.mak.waves.transactions.mass.Transfer
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
@@ -71,7 +71,7 @@ class CorrectStatusAfterPlaceTestSuite extends MatcherSuiteBase {
     broadcastAndAwait(issueAssetTxs: _*)
 
     val transferAssetsTxs = issueAssetTxs.map { issueTx =>
-      mkMassTransfer(issuer, IssuedAsset(issueTx.getId), traders.map(x => new Transfer(x.toAddress, sendAmount)).to(List))
+      mkMassTransfer(issuer, IssuedAsset(issueTx.id()), traders.map(x => new Transfer(x.toAddress, sendAmount)).to(List))
     }
 
     broadcastAndAwait(transferAssetsTxs: _*)

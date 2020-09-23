@@ -39,7 +39,7 @@ object Dependencies {
     val kamonInfluxDb = "2.1.6"
 
     val wavesProtobufSchemas = "1.2.6"
-    val wavesJ               = "0.17.0"
+    val wavesJ               = "1.0.1"
 
     val postgresql = "42.2.16"
     val quillJdbc  = "3.5.2"
@@ -119,8 +119,7 @@ object Dependencies {
   private val wavesJ = "com.wavesplatform" % "wavesj" % Version.wavesJ excludeAll (
     // Conflicts with specified gRPC. This is the problem for waves-integration-it.
     // Also, wavesj doesn't use gRPC, so it is safe.
-    ExclusionRule(organization = "io.grpc"),
-    ExclusionRule("com.wavesplatform", "protobuf-schemas")
+    ExclusionRule(organization = "io.grpc")
   )
 
   private val toxiProxy       = "org.testcontainers" % "toxiproxy" % Version.testContainersToxiProxy

@@ -8,7 +8,7 @@ import com.wavesplatform.dex.domain.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.it.fp.CanExtract
-import com.wavesplatform.wavesj.transactions.ExchangeTransaction
+import im.mak.waves.transactions.ExchangeTransaction
 
 object DexApiOps {
   // TODO replace by a macros

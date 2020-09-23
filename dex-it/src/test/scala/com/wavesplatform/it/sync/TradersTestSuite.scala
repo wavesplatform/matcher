@@ -97,7 +97,7 @@ class TradersTestSuite extends MatcherSuiteBase {
 
           for (orderV <- orderVersions) {
             val orderAmount              = 4000
-            val transferAmount           = IssueWctTx.getQuantity - orderAmount
+            val transferAmount           = IssueWctTx.quantity() - orderAmount
             val oldestOrder, newestOrder = bobPlacesSellWctOrder(orderAmount, orderV)
 
             // Transfer all coins except required for one order
@@ -144,7 +144,7 @@ class TradersTestSuite extends MatcherSuiteBase {
               wavesNode1.api.waitForTransaction(lease)
               dex1.api.cancelAll(bob)
               dex1.api.waitForOrderStatus(oldestOrder, Status.Cancelled)
-              broadcastAndAwait(mkLeaseCancel(bob, lease.getId))
+              broadcastAndAwait(mkLeaseCancel(bob, lease.id()))
             }
           }
         }
@@ -200,7 +200,7 @@ class TradersTestSuite extends MatcherSuiteBase {
             wavesNode1.api.waitForTransaction(lease)
             dex1.api.cancelAll(bob)
             dex1.api.waitForOrderStatus(oldestOrder, Status.Cancelled)
-            broadcastAndAwait(mkLeaseCancel(bob, lease.getId))
+            broadcastAndAwait(mkLeaseCancel(bob, lease.id()))
           }
         }
 
@@ -220,7 +220,7 @@ class TradersTestSuite extends MatcherSuiteBase {
 
           withClue("Cleanup") {
             wavesNode1.api.waitForTransaction(lease)
-            broadcastAndAwait(mkLeaseCancel(bob, lease.getId))
+            broadcastAndAwait(mkLeaseCancel(bob, lease.id()))
           }
         }
 
@@ -247,7 +247,7 @@ class TradersTestSuite extends MatcherSuiteBase {
           val bobAssetQuantity = 10000
 
           val newFeeAssetTx = mkIssue(bob, "FeeCoin", bobAssetQuantity, 2, issueFee)
-          val newFeeAsset   = IssuedAsset(newFeeAssetTx.getId)
+          val newFeeAsset   = IssuedAsset(newFeeAssetTx.id())
 
           broadcastAndAwait(newFeeAssetTx)
           dex1.api.upsertRate(newFeeAsset, 2)

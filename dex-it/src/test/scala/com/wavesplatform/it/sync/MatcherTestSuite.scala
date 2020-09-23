@@ -99,7 +99,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         val markets = orderBooks.markets.head
 
         markets.amountAssetName shouldBe aliceAssetName
-        markets.amountAssetInfo shouldBe Some(HttpAssetInfo(issueAliceAssetTx.getDecimals))
+        markets.amountAssetInfo shouldBe Some(HttpAssetInfo(issueAliceAssetTx.decimals()))
 
         markets.priceAssetName shouldBe "WAVES"
         markets.priceAssetInfo shouldBe Some(HttpAssetInfo(8))

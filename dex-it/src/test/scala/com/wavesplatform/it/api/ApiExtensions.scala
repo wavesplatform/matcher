@@ -13,7 +13,7 @@ import com.wavesplatform.dex.it.api.node.{NodeApi, NodeApiExtensions}
 import com.wavesplatform.dex.it.dex.DexApi
 import com.wavesplatform.dex.it.docker.DexContainer
 import com.wavesplatform.it.{MatcherSuiteBase, api}
-import com.wavesplatform.wavesj.transactions.ExchangeTransaction
+import im.mak.waves.transactions.ExchangeTransaction
 import mouse.any._
 
 import scala.collection.immutable.TreeMap
@@ -50,7 +50,7 @@ trait ApiExtensions extends NodeApiExtensions {
 
   protected def waitForOrderAtNode(orderId: Order.Id, dexApi: DexApi[Id], wavesNodeApi: NodeApi[Id]): Seq[ExchangeTransaction] =
     dexApi.waitForTransactionsByOrder(orderId, 1).unsafeTap {
-      _.foreach(tx => wavesNodeApi.waitForTransaction(tx.getId))
+      _.foreach(tx => wavesNodeApi.waitForTransaction(tx.id()))
     }
 
   protected def matcherState(assetPairs: Seq[AssetPair],
@@ -62,7 +62,7 @@ trait ApiExtensions extends NodeApiExtensions {
     val snapshots            = dexApi.allSnapshotOffsets
     val orderBooks           = assetPairs.map(x => (x, (dexApi.orderBook(x), dexApi.orderBookStatus(x))))
     val orderStatuses        = orders.map(x => x.idStr() -> dexApi.orderStatus(x))
-    val orderTransactionIds  = orders.map(x => x.idStr() -> dexApi.transactionsByOrder(x).map(_.getId.getBase58String).toSet)
+    val orderTransactionIds  = orders.map(x => x.idStr() -> dexApi.transactionsByOrder(x).map(_.id().toString).toSet)
     val reservedBalances     = accounts.map(x => x -> dexApi.reservedBalance(x))
     val accountsOrderHistory = accounts.flatMap(a => assetPairs.map(p => a -> p))
 

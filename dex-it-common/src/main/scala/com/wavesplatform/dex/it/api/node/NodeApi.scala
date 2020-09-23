@@ -11,15 +11,14 @@ import com.softwaremill.sttp.{SttpBackend, MonadError => _, _}
 import com.typesafe.config.Config
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
-import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.it.api.HasWaitReady
 import com.wavesplatform.dex.it.api.responses.node._
 import com.wavesplatform.dex.it.fp.{CanWait, FOps, RepeatRequestOptions}
 import com.wavesplatform.dex.it.json.transactionFormat
 import com.wavesplatform.dex.it.sttp.ResponseParsers.asConfig
 import com.wavesplatform.dex.it.sttp.SttpBackendOps
-import com.wavesplatform.dex.it.waves.Implicits.toVanilla
-import com.wavesplatform.wavesj.Transaction
+import im.mak.waves.transactions.Transaction
+import im.mak.waves.transactions.common.Id
 import play.api.libs.json.{Format, JsResultException, Json}
 
 import scala.concurrent.duration.DurationInt
@@ -32,7 +31,7 @@ trait NodeApi[F[_]] extends HasWaitReady[F] {
   def tryAssetBalance(address: Address, asset: IssuedAsset): F[Either[ErrorResponse, AssetBalanceResponse]]
 
   def tryBroadcast(tx: Transaction): F[Either[ErrorResponse, Unit]]
-  def tryTransactionInfo(id: ByteStr): F[Either[ErrorResponse, Transaction]]
+  def tryTransactionInfo(id: Id): F[Either[ErrorResponse, Transaction]]
 
   def tryCurrentHeight: F[Either[ErrorResponse, Int]]
 
@@ -46,8 +45,8 @@ trait NodeApi[F[_]] extends HasWaitReady[F] {
   def waitForHeight(height: Int): F[Unit]
   def waitForHeightArise(): F[Unit]
   def waitForConnectedPeer(toNode: InetSocketAddress): F[Unit]
-  def waitForTransaction(id: ByteStr): F[Unit]
-  def waitForTransaction(tx: Transaction): F[Unit] = waitForTransaction(tx.getId)
+  def waitForTransaction(id: Id): F[Unit]
+  def waitForTransaction(tx: Transaction): F[Unit] = waitForTransaction(tx.id())
   def waitForActivationStatus(f: ActivationStatusResponse => Boolean): F[Unit]
 }
 
@@ -72,7 +71,8 @@ object NodeApi {
 
       override def tryBroadcast(tx: Transaction): F[Either[ErrorResponse, Unit]] = tryUnit(sttp.post(uri"$apiUri/transactions/broadcast").body(tx))
 
-      override def tryTransactionInfo(id: ByteStr): F[Either[ErrorResponse, Transaction]] = tryParseJson(sttp.get(uri"$apiUri/transactions/info/$id"))
+      override def tryTransactionInfo(id: Id): F[Either[ErrorResponse, Transaction]] =
+        tryParseJson(sttp.get(uri"$apiUri/transactions/info/${id.toString}"))
 
       override def tryCurrentHeight: F[Either[ErrorResponse, Int]] =
         tryParseJson[HeightResponse](sttp.get(uri"$apiUri/blocks/height")).map(_.map(_.height))
@@ -96,7 +96,7 @@ object NodeApi {
         }.map(_ => ())
       }
 
-      override def waitForTransaction(id: ByteStr): F[Unit] = repeatUntil(tryTransactionInfo(id))(_.isRight).map(_ => ())
+      override def waitForTransaction(id: Id): F[Unit] = repeatUntil(tryTransactionInfo(id))(_.isRight).map(_ => ())
 
       override def waitForActivationStatus(f: ActivationStatusResponse => Boolean): F[Unit] =
         repeatUntil(tryActivationStatus, RepeatRequestOptions(1.second, 180)) {

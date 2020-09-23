@@ -176,8 +176,8 @@ class MakerTakerFeeTestSuite extends MatcherSuiteBase with TableDrivenPropertyCh
       val tx = placeAndAwaitAtNode(takerOrder).head
       dex1.api.currentOffset shouldBe offset1
 
-      tx.getSellMatcherFee shouldBe 0.0006.waves
-      tx.getBuyMatcherFee shouldBe 0.005.waves
+      tx.sellMatcherFee() shouldBe 0.0006.waves
+      tx.buyMatcherFee() shouldBe 0.005.waves
 
       dex1.api.cancelAll(maker)
       dex1.api.cancelAll(taker)
@@ -195,8 +195,8 @@ class MakerTakerFeeTestSuite extends MatcherSuiteBase with TableDrivenPropertyCh
 
       val tx = placeAndAwaitAtNode(takerOrder, isMarketOrder = true).head
 
-      tx.getSellMatcherFee shouldBe 0.00001419.eth
-      tx.getBuyMatcherFee shouldBe 0.00000567.eth
+      tx.sellMatcherFee() shouldBe 0.00001419.eth
+      tx.buyMatcherFee() shouldBe 0.00000567.eth
 
       dex1.api.cancelAll(maker)
       dex1.api.cancelAll(taker)

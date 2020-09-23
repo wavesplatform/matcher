@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync.api.ws
 
+import cats.implicits.catsSyntaxOptionId
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.ws.protocol._
 import com.wavesplatform.dex.domain.order.OrderType.SELL
@@ -59,8 +60,19 @@ class WsConnectionTestSuite extends WsSuiteBase {
   }
 
   "getConnections returns the right number of connections" in {
-    val wscs = (1 to 10).map(_ => mkDexWsConnection(dex1))
-    dex1.api.waitForWsConnections(_.connections == 10)
+    val wscs = (1 to 1).map(_ => mkDexWsConnection(dex1, os = "Linux 5.2".some, client = "Firefox".some)) ++
+      (1 to 2).map(_ => mkDexWsConnection(dex1, os = "OS/2".some)) ++
+      (1 to 3).map(_ => mkDexWsConnection(dex1, client = "Android 10".some)) ++
+      (1 to 4).map(_ => mkDexWsConnection(dex1))
+
+    val info = dex1.api.waitForWsConnections(_.connections == 10)
+    info.clientAndOs should matchTo(
+      Map(
+        "Firefox Linux 5.2"         -> 1,
+        "Unknown Client OS/2"       -> 2,
+        "Android 10 Unknown OS"     -> 3,
+        "Unknown Client Unknown OS" -> 4
+      ))
     wscs.foreach(_.close())
   }
 

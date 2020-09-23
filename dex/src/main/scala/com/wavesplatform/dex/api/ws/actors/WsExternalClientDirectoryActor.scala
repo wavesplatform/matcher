@@ -89,7 +89,7 @@ object WsExternalClientDirectoryActor {
     }
 
     def withoutOldest(n: Int): (State, IterableOnce[TargetActor]) = {
-      val oldest = all.toArray.sortInPlaceBy { case (_, index) => index }.take(n)
+      val oldest = all.toArray.sortInPlaceBy { case (_, info) => info.index }.take(n)
 
       val infoDiff = oldest.groupMapReduce(_._2.clientAndOs)(_ => 1)(_ + _)
       val updatedInfoMap = infoDiff.foldLeft(infoMap) {

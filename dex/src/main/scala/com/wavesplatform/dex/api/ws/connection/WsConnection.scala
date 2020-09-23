@@ -19,7 +19,7 @@ import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try}
 
-class WsConnection(uri: String, keepAlive: Boolean = true)(implicit system: ActorSystem, materializer: Materializer) extends ScorexLogging {
+class WsConnection(uri: Uri, keepAlive: Boolean = true)(implicit system: ActorSystem, materializer: Materializer) extends ScorexLogging {
 
   private val testId: Int = ThreadLocalRandom.current().nextInt(10000)
 
@@ -86,8 +86,7 @@ class WsConnection(uri: String, keepAlive: Boolean = true)(implicit system: Acto
       f
   }
 
-  val akkaUri: Uri = s"$uri?client=testclient"
-  val (connectionResponse, closed) = Http().singleWebSocketRequest(WebSocketRequest(akkaUri), flow)
+  val (connectionResponse, closed) = Http().singleWebSocketRequest(WebSocketRequest(uri), flow)
 
   val connectionOpenedTs: Long                   = System.currentTimeMillis
   val connectionClosedTs: Future[Long]           = closed.map(_ => System.currentTimeMillis)

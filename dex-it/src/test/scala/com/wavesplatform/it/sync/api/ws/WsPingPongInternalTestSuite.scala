@@ -4,7 +4,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 
 class WsPingPongInternalTestSuite extends WsPingPongBaseSuite {
 
-  override protected lazy val wsStreamUri = s"${getWsStreamUri(dex1)}/internal"
+  override protected lazy val wsStreamUri = getWsInternalStreamUri(dex1)
 
   override protected val dexInitialSuiteConfig: Config = ConfigFactory
     .parseString(

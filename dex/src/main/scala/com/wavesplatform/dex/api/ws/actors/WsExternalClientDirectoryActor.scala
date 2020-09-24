@@ -68,7 +68,7 @@ object WsExternalClientDirectoryActor {
   private type TargetActor = ActorRef[WsExternalClientHandlerActor.Message]
   private type Index       = Int
 
-  private case class State(currentIndex: Index, all: HashMap[TargetActor, ConnectionInfo], infoMap: TreeMap[String, Int]) {
+  private case class State(currentIndex: Index, all: Map[TargetActor, ConnectionInfo], infoMap: Map[String, Int]) {
 
     def withActor(x: TargetActor, os: String, client: String): State = {
       val info = ConnectionInfo(currentIndex, os, client)
@@ -82,9 +82,13 @@ object WsExternalClientDirectoryActor {
     def withoutActor(x: TargetActor): State = all.get(x) match {
       case None => this
       case Some(info) =>
+        val updatedNumber = infoMap.getOrElse(info.clientAndOs, 1) - 1
+        val updatedInfoMap =
+          if (updatedNumber == 0) infoMap.removed(info.clientAndOs)
+          else infoMap.updated(info.clientAndOs, updatedNumber)
         copy(
           all = all.removed(x),
-          infoMap = infoMap.updated(info.clientAndOs, infoMap.getOrElse(info.clientAndOs, 1) - 1)
+          infoMap = updatedInfoMap
         )
     }
 
@@ -106,6 +110,6 @@ object WsExternalClientDirectoryActor {
   }
 
   private case class ConnectionInfo(index: Index, os: String, client: String) {
-    val clientAndOs = s"$client $os"
+    val clientAndOs = s"$client, $os"
   }
 }

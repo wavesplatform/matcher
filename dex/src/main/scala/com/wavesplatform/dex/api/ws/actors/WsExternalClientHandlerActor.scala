@@ -2,8 +2,9 @@ package com.wavesplatform.dex.api.ws.actors
 
 import akka.actor.Cancellable
 import akka.actor.typed.scaladsl.Behaviors
-import akka.actor.typed.{ActorRef, Behavior}
+import akka.actor.typed.{ActorRef, Behavior, Terminated}
 import akka.{actor => classic}
+import cats.implicits.catsSyntaxEitherId
 import cats.syntax.option._
 import com.wavesplatform.dex.actors.MatcherActor
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
@@ -22,6 +23,7 @@ import shapeless.{Inl, Inr}
 
 import scala.collection.immutable.Queue
 import scala.concurrent.duration._
+import scala.util.control.NoStackTrace
 import scala.util.{Failure, Success}
 
 /**
@@ -67,6 +69,7 @@ object WsExternalClientHandlerActor {
       import settings.subscriptions._
 
       context.setLoggerName(s"WsExternalHandlerActor[c=${clientRef.path.name}]")
+      context.watch(clientRef)
 
       def matcherTime: Long = time.getTimestamp()
 
@@ -280,6 +283,11 @@ object WsExternalClientHandlerActor {
               cancelSchedules(nextPing, pongTimeout)
               Behaviors.stopped
           }
+          .receiveSignal {
+            case (context, Terminated(_)) =>
+              context.self ! clientActorStoppedEvent
+              Behaviors.same
+          }
       }
 
       // send the initial message with the connection ID for further debugging
@@ -294,4 +302,7 @@ object WsExternalClientHandlerActor {
         maybeRatesUpdateId = None
       )
     }
+
+  private object ClientActorStopped extends RuntimeException("The client actor is stopped") with NoStackTrace
+  private val clientActorStoppedEvent = Event.Completed(ClientActorStopped.asLeft)
 }

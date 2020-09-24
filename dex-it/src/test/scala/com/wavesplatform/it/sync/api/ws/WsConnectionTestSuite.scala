@@ -2,8 +2,12 @@ package com.wavesplatform.it.sync.api.ws
 
 import cats.implicits.catsSyntaxOptionId
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.api.http.entities.HttpWebSocketConnections
+import com.wavesplatform.dex.api.ws.connection.WsConnection
 import com.wavesplatform.dex.api.ws.protocol._
 import com.wavesplatform.dex.domain.order.OrderType.SELL
+import com.wavesplatform.dex.fp.MapImplicits.MapNumericOps
+import com.wavesplatform.dex.it.docker.DexContainer
 import com.wavesplatform.it.WsSuiteBase
 
 import scala.concurrent.duration._
@@ -59,25 +63,51 @@ class WsConnectionTestSuite extends WsSuiteBase {
     }
   }
 
-  "getConnections returns the right number of connections" in {
-    val wscs = (1 to 1).map(_ => mkDexWsConnection(dex1, os = "Linux 5.2".some, client = "Firefox".some)) ++
-      (1 to 2).map(_ => mkDexWsConnection(dex1, os = "OS/2".some)) ++
-      (1 to 3).map(_ => mkDexWsConnection(dex1, client = "Android 10".some)) ++
-      (1 to 4).map(_ => mkDexWsConnection(dex1))
+  "getConnections returns the right statistics" in {
+    def expectClientAndOs(info: HttpWebSocketConnections,
+                          firefoxLinux: Int,
+                          unknownOs2: Int,
+                          androidUnknown: Int,
+                          unknownUnknown: Int,
+                          additional: (String, Int)*): Unit =
+      info.clientAndOs should matchTo {
+        Map
+          .empty[String, Int]
+          .appendIfNonZeroMany(
+            Seq(
+              "Firefox, Linux 5.2"         -> firefoxLinux,
+              "Unknown Client, OS/2"       -> unknownOs2,
+              "Android 10, Unknown OS"     -> androidUnknown,
+              "Unknown Client, Unknown OS" -> unknownUnknown
+            ) ++ additional: _*
+          )
+      }
 
-    val info = dex1.api.waitForWsConnections(_.connections == 10)
-    info.clientAndOs should matchTo(
-      Map(
-        "Firefox Linux 5.2"         -> 1,
-        "Unknown Client OS/2"       -> 2,
-        "Android 10 Unknown OS"     -> 3,
-        "Unknown Client Unknown OS" -> 4
-      ))
+    val firefoxLinuxWscs = mkDexWsConnections(1, os = "Linux 5.2".some, client = "Firefox".some)
+    val unknownOs2Wscs   = mkDexWsConnections(2, os = "OS/2".some)
+
+    val wscs = firefoxLinuxWscs ++
+      unknownOs2Wscs ++
+      mkDexWsConnections(3, client = "Android 10".some) ++
+      mkDexWsConnections(4)
+
+    expectClientAndOs(dex1.api.waitForWsConnections(_.connections == 10), 1, 2, 3, 4)
+
+    info("Closing all Firefox + Linux 5.2 and one Unknown + OS/2")
+    firefoxLinuxWscs.foreach(_.close())
+    unknownOs2Wscs.head.close()
+    expectClientAndOs(dex1.api.waitForWsConnections(_.connections == 8), 0, 1, 3, 4)
+
+    info("Opening a new client")
+    val newWs = mkDexWsConnection(dex1, os = "Test OS".some, client = "Test Client".some)
+    expectClientAndOs(dex1.api.waitForWsConnections(_.connections == 9), 0, 1, 3, 4, "Test Client, Test OS" -> 1)
+
+    newWs.close()
     wscs.foreach(_.close())
   }
 
   "closeConnection closes N oldest connections" in {
-    val wscs = (1 to 10).map(_ => mkDexWsConnection(dex1))
+    val wscs = mkDexWsConnections(10)
     dex1.api.waitForWsConnections(_.connections == 10)
 
     dex1.api.closeWsConnections(3)
@@ -97,4 +127,7 @@ class WsConnectionTestSuite extends WsSuiteBase {
       active.foreach(_.isClosed shouldBe false)
     }
   }
+
+  private def mkDexWsConnections(n: Int, dex: DexContainer = dex1, os: Option[String] = None, client: Option[String] = None): Seq[WsConnection] =
+    (1 to n).map(_ => mkDexWsConnection(dex, os = os, client = client))
 }

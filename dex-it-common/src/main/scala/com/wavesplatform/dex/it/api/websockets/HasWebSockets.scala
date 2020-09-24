@@ -12,6 +12,7 @@ import com.wavesplatform.dex.api.ws.protocol._
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.error.ErrorFormatterContext
+import com.wavesplatform.dex.fp.MapImplicits.MapOps
 import com.wavesplatform.dex.it.config.PredefinedAssets
 import com.wavesplatform.dex.it.docker.DexContainer
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
@@ -71,9 +72,12 @@ trait HasWebSockets extends BeforeAndAfterAll with BeforeAndAfterEach with HasJw
                                   os: Option[String] = None,
                                   client: Option[String] = None,
                                   keepAlive: Boolean = true): WsConnection = {
-    val query: Map[String, String] = Map.empty ++
-      os.fold(Map.empty[String, String])(x => Map("a_os"         -> x)) ++
-      client.fold(Map.empty[String, String])(x => Map("a_client" -> x))
+    val query: Map[String, String] = Map
+      .empty[String, String]
+      .appendIfDefinedMany(
+        "a_os"     -> os,
+        "a_client" -> client
+      )
 
     mkWsConnection(getWsStreamUri(dex, query), keepAlive)
   }

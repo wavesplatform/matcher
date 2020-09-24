@@ -45,7 +45,7 @@ class MatcherWebSocketRouteSpec extends RouteSpec("/ws/v0") with MatcherSpecBase
         { route =>
           Get(routePath("/connections")).withHeaders(apiKeyHeader) ~> route ~> check {
             status shouldEqual StatusCodes.OK
-            responseAs[HttpWebSocketConnections] should matchTo(HttpWebSocketConnections(0))
+            responseAs[HttpWebSocketConnections] should matchTo(HttpWebSocketConnections(0, Map.empty))
           }
         },
         apiKey

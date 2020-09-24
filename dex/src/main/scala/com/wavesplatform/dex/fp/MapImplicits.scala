@@ -32,4 +32,14 @@ object MapImplicits {
 
     private def nonEmpty(xs: Map[K, V]): Map[K, V] = xs.filterNot { case (_, v) => v == 0 }
   }
+
+  implicit final class MapNumericOps[K, V](val self: Map[K, V])(implicit numeric: Numeric[V]) {
+    def appendIfNonZero(k: K, v: V): Map[K, V]      = if (v == numeric.zero) self else self.updated(k, v)
+    def appendIfNonZeroMany(kv: (K, V)*): Map[K, V] = kv.foldLeft(self) { case (r, (k, v)) => r.appendIfNonZero(k, v) }
+  }
+
+  implicit final class MapOps[K, V](val self: Map[K, V]) extends AnyVal {
+    def appendIfDefined(k: K, v: Option[V]): Map[K, V]      = v.fold(self)(self.updated(k, _))
+    def appendIfDefinedMany(kv: (K, Option[V])*): Map[K, V] = kv.foldLeft(self) { case (r, (k, v)) => r.appendIfDefined(k, v) }
+  }
 }

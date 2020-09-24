@@ -4,6 +4,7 @@ import java.lang
 import java.util.concurrent.ConcurrentHashMap
 
 import akka.actor.ActorSystem
+import akka.http.scaladsl.model.Uri
 import akka.stream.Materializer
 import com.wavesplatform.dex.api.ws.connection.{WsConnection, WsConnectionOps}
 import com.wavesplatform.dex.api.ws.entities.{WsBalances, WsOrder}
@@ -11,6 +12,7 @@ import com.wavesplatform.dex.api.ws.protocol._
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.error.ErrorFormatterContext
+import com.wavesplatform.dex.fp.MapImplicits.MapOps
 import com.wavesplatform.dex.it.config.PredefinedAssets
 import com.wavesplatform.dex.it.docker.DexContainer
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
@@ -28,7 +30,13 @@ trait HasWebSockets extends BeforeAndAfterAll with BeforeAndAfterEach with HasJw
   implicit protected val materializer: Materializer = Materializer.matFromSystem(system)
   implicit protected val efc: ErrorFormatterContext = ErrorFormatterContext.from(assetDecimalsMap)
 
-  protected def getWsStreamUri(dex: DexContainer): String = s"ws://127.0.0.1:${dex.restApiAddress.getPort}/ws/v0"
+  protected def getWsStreamUri(dex: DexContainer, query: Map[String, String] = Map.empty): Uri =
+    Uri
+      .parseAbsolute(s"ws://127.0.0.1:${dex.restApiAddress.getPort}/ws/v0")
+      .withQuery(Uri.Query(query))
+
+  protected def getWsInternalStreamUri(dex: DexContainer): Uri =
+    s"ws://127.0.0.1:${dex.restApiAddress.getPort}/ws/v0/internal"
 
   protected val knownWsConnections: ConcurrentHashMap.KeySetView[WsConnection, lang.Boolean] =
     ConcurrentHashMap.newKeySet[WsConnection]()
@@ -40,7 +48,7 @@ trait HasWebSockets extends BeforeAndAfterAll with BeforeAndAfterEach with HasJw
                                       keepAlive: Boolean = true,
                                       subscriptionLifetime: FiniteDuration = 1.hour): WsConnection = {
     val jwt        = mkJwt(client, lifetime = subscriptionLifetime)
-    val connection = mkDexWsConnection(dex, keepAlive)
+    val connection = mkDexWsConnection(dex, keepAlive = keepAlive)
     connection.send(WsAddressSubscribe(client.toAddress, WsAddressSubscribe.defaultAuthType, jwt))
     connection
   }
@@ -58,12 +66,23 @@ trait HasWebSockets extends BeforeAndAfterAll with BeforeAndAfterEach with HasJw
   }
 
   protected def mkWsInternalConnection(dex: DexContainer, keepAlive: Boolean = true): WsConnection =
-    mkWsConnection(s"${getWsStreamUri(dex)}/internal", keepAlive)
+    mkWsConnection(getWsInternalStreamUri(dex), keepAlive)
 
-  protected def mkDexWsConnection(dex: DexContainer, keepAlive: Boolean = true): WsConnection =
-    mkWsConnection(getWsStreamUri(dex), keepAlive)
+  protected def mkDexWsConnection(dex: DexContainer,
+                                  os: Option[String] = None,
+                                  client: Option[String] = None,
+                                  keepAlive: Boolean = true): WsConnection = {
+    val query: Map[String, String] = Map
+      .empty[String, String]
+      .appendIfDefinedMany(
+        "a_os"     -> os,
+        "a_client" -> client
+      )
 
-  protected def mkWsConnection(uri: String, keepAlive: Boolean = true): WsConnection = {
+    mkWsConnection(getWsStreamUri(dex, query), keepAlive)
+  }
+
+  protected def mkWsConnection(uri: Uri, keepAlive: Boolean = true): WsConnection = {
     new WsConnection(uri, keepAlive) unsafeTap { wsc =>
       addConnection(wsc)
       eventually { wsc.collectMessages[WsInitial] should have size 1 }

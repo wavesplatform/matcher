@@ -36,18 +36,6 @@ object TankGenerator {
 
   implicit private val blockingContext: ExecutionContextExecutor = ExecutionContext.fromExecutor(executor)
 
-  private val matcherHttpClient: HttpClient =
-    HttpClients.custom
-      .setDefaultRequestConfig(
-        RequestConfig.custom
-          .setSocketTimeout(5000)
-          .setConnectTimeout(5000)
-          .setConnectionRequestTimeout(5000)
-          .setCookieSpec(CookieSpecs.STANDARD)
-          .build
-      )
-      .build()
-
   private val matcherHttpUri: URI = new URI(settings.hosts.matcher)
 
   private def mkAccounts(seedPrefix: String, count: Int): List[JPrivateKey] = {
@@ -326,13 +314,22 @@ object TankGenerator {
   }
 
   def placeOrder(order: Order): Future[HttpResponse] = Future {
-    val request =
-      RequestBuilder
-        .post(matcherHttpUri.resolve(s"/matcher/orderbook"))
-        .setEntity(new StringEntity(order.toJson, ContentType.APPLICATION_JSON))
-        .build()
-
-    matcherHttpClient.execute(request)
+    HttpClients.custom
+      .setDefaultRequestConfig(
+        RequestConfig.custom
+          .setSocketTimeout(5000)
+          .setConnectTimeout(5000)
+          .setConnectionRequestTimeout(5000)
+          .setCookieSpec(CookieSpecs.STANDARD)
+          .build
+      )
+      .build()
+      .execute(
+        RequestBuilder
+          .post(matcherHttpUri.resolve(s"/matcher/orderbook"))
+          .setEntity(new StringEntity(order.toJson, ContentType.APPLICATION_JSON))
+          .build()
+      )
   }
 
   def placeOrdersForCancel(accounts: List[JPrivateKey], requestsCount: Int, pairsFile: Option[File]): Unit = {
@@ -353,6 +350,7 @@ object TankGenerator {
             JPublicKey.as(settings.matcherPublicKey)
           )
           .expiration(System.currentTimeMillis + 60 * 60 * 24 * 20 * 1000)
+          .version(3)
           .getSignedWith(account)
 
       placeOrder(order).recover {
@@ -360,7 +358,7 @@ object TankGenerator {
       }
     }
 
-    val requestsAwaitingTime = (requestsCount * threadCount).seconds
+    val requestsAwaitingTime = (requestsCount / threadCount).seconds
     print(s"Awaiting place orders requests, requests count = $requestsCount, treads count = $threadCount, waiting at most $requestsAwaitingTime... ")
     Await.result(Future.sequence(futures), requestsAwaitingTime)
     println("Done")

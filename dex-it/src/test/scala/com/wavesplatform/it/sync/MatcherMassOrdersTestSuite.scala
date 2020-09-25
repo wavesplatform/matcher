@@ -29,7 +29,7 @@ class MatcherMassOrdersTestSuite extends MatcherSuiteBase {
     val assets = List(IssueUsdTx, IssueEthTx)
     broadcastAndAwait(assets: _*)
     assets
-      .map(tx => mkTransfer(alice, bob, tx.getQuantity / 2, IssuedAsset(tx.getId)))
+      .map(tx => mkTransfer(alice, bob, tx.quantity() / 2, IssuedAsset(tx.id())))
       .foreach(wavesNode1.api.broadcast)
 
     dex1.start()

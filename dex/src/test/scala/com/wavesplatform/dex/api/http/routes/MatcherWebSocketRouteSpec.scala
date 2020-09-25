@@ -45,7 +45,7 @@ class MatcherWebSocketRouteSpec extends RouteSpec("/ws/v0") with MatcherSpecBase
         { route =>
           Get(routePath("/connections")).withHeaders(apiKeyHeader) ~> route ~> check {
             status shouldEqual StatusCodes.OK
-            responseAs[HttpWebSocketConnections] should matchTo(HttpWebSocketConnections(0))
+            responseAs[HttpWebSocketConnections] should matchTo(HttpWebSocketConnections(0, Map.empty))
           }
         },
         apiKey
@@ -72,7 +72,7 @@ class MatcherWebSocketRouteSpec extends RouteSpec("/ws/v0") with MatcherSpecBase
     val route =
       new MatcherWebSocketRoute(
         wsInternalBroadcastRef = vsInternalBroadcastRef.ref,
-        externalClientDirectoryRef = testKit.spawn(WsExternalClientDirectoryActor(rateCache, time), s"ws-external-cd-${Random.nextInt(Int.MaxValue)}"),
+        externalClientDirectoryRef = testKit.spawn(WsExternalClientDirectoryActor(), s"ws-external-cd-${Random.nextInt(Int.MaxValue)}"),
         addressDirectory = ActorRef.noSender,
         matcher = ActorRef.noSender,
         time = time,
@@ -83,7 +83,8 @@ class MatcherWebSocketRouteSpec extends RouteSpec("/ws/v0") with MatcherSpecBase
         ),
         apiKeyHash = Some(crypto secureHash apiKey),
         matcherSettings = settings,
-        matcherStatus = () => Matcher.Status.Working
+        matcherStatus = () => Matcher.Status.Working,
+        () => rateCache.getAllRates
       )
 
     f(route.route)

@@ -17,9 +17,8 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV3}
 import com.wavesplatform.dex.model.OrderStatus
 import com.wavesplatform.dex.tool.connectors.DexExtensionGrpcConnector.DetailedBalance
 import com.wavesplatform.dex.tool.connectors.SuperConnector
-import com.wavesplatform.wavesj.PrivateKeyAccount
-import com.wavesplatform.wavesj.Transactions._
-import com.wavesplatform.wavesj.transactions.IssueTransactionV2
+import im.mak.waves.transactions.IssueTransaction
+import im.mak.waves.transactions.account.PrivateKey
 import play.api.libs.json.JsValue
 
 import scala.Ordered._
@@ -53,9 +52,20 @@ case class Checker(superConnector: SuperConnector) {
   }
 
   private def issueAsset(name: String, description: String, quantity: Long): CheckLoggedResult[AssetInfo] = {
-    val matcher: PrivateKeyAccount = PrivateKeyAccount.fromPrivateKey(env.matcherKeyPair.privateKey.base58, env.chainId)
-    val tx: IssueTransactionV2     = makeIssueTx(matcher, env.chainId, name, description, quantity, testAssetDecimals, false, null, issueTxFee)
-    val asset: IssuedAsset         = IssuedAsset(ByteStr(tx.getId.getBytes))
+
+    val matcher: PrivateKey = PrivateKey.as(env.matcherKeyPair.privateKey.arr)
+
+    val tx: IssueTransaction =
+      IssueTransaction
+        .builder(name, quantity, testAssetDecimals)
+        .description(description)
+        .chainId(env.chainId)
+        .isReissuable(false)
+        .fee(issueTxFee)
+        .script(null)
+        .getSignedWith(matcher)
+
+    val asset: IssuedAsset = IssuedAsset(ByteStr(tx.id().bytes()))
     for {
       _      <- nodeRest.broadcastTx(tx).leftMap(ex => s"Cannot broadcast issue transaction! $ex")
       _      <- nodeRest.repeatRequest(nodeRest getTxInfo tx)(_.isRight)
@@ -63,7 +73,7 @@ case class Checker(superConnector: SuperConnector) {
     } yield
       (
         AssetInfo(asset, name),
-        s"Issued ${denormalize(quantity)} $name, issue tx id = ${tx.getId.getBase58String}, height = ${height - 1}"
+        s"Issued ${denormalize(quantity)} $name, issue tx id = ${tx.id().toString}, height = ${height - 1}"
       )
   }
 

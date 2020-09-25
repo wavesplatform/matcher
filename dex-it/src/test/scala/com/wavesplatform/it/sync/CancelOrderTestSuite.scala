@@ -13,7 +13,7 @@ import com.wavesplatform.dex.effect.FutureOps.Implicits
 import com.wavesplatform.dex.it.time.GlobalTimer
 import com.wavesplatform.dex.it.time.GlobalTimer.TimerOpsImplicits
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.wavesj.Transfer
+import im.mak.waves.transactions.mass.Transfer
 
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, Future}
@@ -264,7 +264,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
 
       val sells = accountsAndAssets.map {
         case (account, asset) =>
-          val issuedAsset = IssuedAsset(asset.getId)
+          val issuedAsset = IssuedAsset(asset.id())
           val assetPair   = AssetPair(issuedAsset, Waves)
           eventually {
             dex1.api.tradableBalance(account, assetPair).getOrElse(issuedAsset, 0L) shouldBe oneOrderAmount
@@ -279,7 +279,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
         i          <- 1 to 10
       } yield
         mkOrder(alice,
-                AssetPair(IssuedAsset(asset.getId), Waves),
+                AssetPair(IssuedAsset(asset.id()), Waves),
                 OrderType.BUY,
                 amount = oneOrderAmount / 10,
                 price = orderPrice,

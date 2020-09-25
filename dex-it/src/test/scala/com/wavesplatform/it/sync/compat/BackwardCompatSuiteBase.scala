@@ -33,8 +33,8 @@ trait BackwardCompatSuiteBase extends MatcherSuiteBase with MultipleVersions {
     wavesNode1.api.waitForHeightArise()
     wavesNode2.api.waitForHeight(wavesNode1.api.currentHeight)
     broadcastAndAwait(
-      mkTransfer(alice, bob, IssueUsdTx.getQuantity / 2, usd),
-      mkTransfer(alice, bob, IssueEthTx.getQuantity / 2, eth)
+      mkTransfer(alice, bob, IssueUsdTx.quantity() / 2, usd),
+      mkTransfer(alice, bob, IssueEthTx.quantity() / 2, eth)
     )
   }
 

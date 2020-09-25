@@ -50,7 +50,7 @@ object WsAddressSubscribe {
 
   def wsUnapply(arg: WsAddressSubscribe): Option[(String, Address, String, String)] = (arg.tpe, arg.key, arg.authType, arg.jwt).some
 
-  implicit val wsWsAddressSubscribeFormat: Format[WsAddressSubscribe] = (
+  implicit val wsAddressSubscribeFormat: Format[WsAddressSubscribe] = (
     (__ \ "T").format[String] and
       (__ \ "S").format[Address] and
       (__ \ "t").format[String] and

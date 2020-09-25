@@ -6,7 +6,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.it.config.PredefinedAccounts._
 import com.wavesplatform.dex.it.waves.Implicits._
 import com.wavesplatform.dex.it.waves.MkWavesEntities.mkIssue
-import com.wavesplatform.wavesj.transactions.IssueTransaction
+import im.mak.waves.transactions.IssueTransaction
 
 trait PredefinedAssets {
 
@@ -14,27 +14,27 @@ trait PredefinedAssets {
 
   val usdAssetName: String         = "USD-X"
   val IssueUsdTx: IssueTransaction = mkIssue(alice, usdAssetName, defaultAssetQuantity, 2)
-  val UsdId: ByteStr               = toVanilla(IssueUsdTx.getId)
+  val UsdId: ByteStr               = toVanilla(IssueUsdTx.id())
   val usd: IssuedAsset             = IssuedAsset(UsdId)
 
   val usdnAssetName: String         = "USD-N"
   val IssueUsdnTx: IssueTransaction = mkIssue(alice, usdnAssetName, defaultAssetQuantity, 6)
-  val UsdnId: ByteStr               = toVanilla(IssueUsdnTx.getId)
+  val UsdnId: ByteStr               = toVanilla(IssueUsdnTx.id())
   val usdn: IssuedAsset             = IssuedAsset(UsdnId)
 
   val wctAssetName: String         = "WCT-X"
   val IssueWctTx: IssueTransaction = mkIssue(bob, wctAssetName, defaultAssetQuantity, 2)
-  val WctId: ByteStr               = toVanilla(IssueWctTx.getId)
+  val WctId: ByteStr               = toVanilla(IssueWctTx.id())
   val wct: IssuedAsset             = IssuedAsset(WctId)
 
   val ethAssetName: String         = "ETH-X"
   val IssueEthTx: IssueTransaction = mkIssue(alice, ethAssetName, defaultAssetQuantity, 8)
-  val EthId: ByteStr               = toVanilla(IssueEthTx.getId)
+  val EthId: ByteStr               = toVanilla(IssueEthTx.id())
   val eth: IssuedAsset             = IssuedAsset(EthId)
 
   val btcAssetName: String         = "BTC-X"
   val IssueBtcTx: IssueTransaction = mkIssue(bob, btcAssetName, defaultAssetQuantity, 8)
-  val BtcId: ByteStr               = toVanilla(IssueBtcTx.getId)
+  val BtcId: ByteStr               = toVanilla(IssueBtcTx.id())
   val btc: IssuedAsset             = IssuedAsset(BtcId)
 
   val wctUsdPair: AssetPair    = AssetPair(wct, usd)

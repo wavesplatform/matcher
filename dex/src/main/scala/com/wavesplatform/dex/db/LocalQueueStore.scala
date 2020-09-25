@@ -52,6 +52,13 @@ class LocalQueueStore(db: DB) {
         }
   }
 
+  def oldestOffset: Option[QueueEventWithMeta.Offset] =
+    new ReadOnlyDB(db, new ReadOptions())
+      .read(LqElementKeyName, LqElementPrefixBytes, lpqElement(0).keyBytes, 1) { e =>
+        Longs.fromByteArray(e.getKey.slice(Shorts.BYTES, Shorts.BYTES + Longs.BYTES))
+      }
+      .headOption
+
   def newestOffset: Option[QueueEventWithMeta.Offset] = {
     val idx      = newestIdx.get()
     val eventKey = lpqElement(idx)

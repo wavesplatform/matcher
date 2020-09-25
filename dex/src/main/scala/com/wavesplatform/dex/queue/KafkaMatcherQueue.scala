@@ -95,14 +95,20 @@ class KafkaMatcherQueue(settings: Settings) extends MatcherQueue with ScorexLogg
 
   override def storeEvent(event: QueueEvent): Future[Option[QueueEventWithMeta]] = producer.storeEvent(event)
 
-  override def lastEventOffset: Future[QueueEventWithMeta.Offset] = {
+  override def firstEventOffset: Future[QueueEventWithMeta.Offset] =
+    safeOffsetRequest(consumer.beginningOffsets(topicPartitions).get(topicPartition) - 1L)
+
+  override def lastEventOffset: Future[QueueEventWithMeta.Offset] =
+    safeOffsetRequest(consumer.endOffsets(topicPartitions).get(topicPartition) - 1L)
+
+  private def safeOffsetRequest(f: => QueueEventWithMeta.Offset): Future[QueueEventWithMeta.Offset] = {
     implicit val context = consumerExecutionContext
     Future(consumer.listTopics())
       .flatMap { topics =>
         val partitions = topics.getOrDefault(settings.topic, java.util.Collections.emptyList()).asScala
         if (partitions.size > 1) Future.failed(new IllegalStateException(s"DEX can work only with one partition, given: $partitions"))
         else if (partitions.headOption.isEmpty) Future.successful(-1L)
-        else Future(consumer.endOffsets(topicPartitions).get(topicPartition) - 1L)
+        else Future(f)
       }
       .recoverWith {
         case e: KafkaTimeoutException =>
@@ -112,16 +118,17 @@ class KafkaMatcherQueue(settings: Settings) extends MatcherQueue with ScorexLogg
   }
 
   override def close(timeout: FiniteDuration): Future[Unit] = {
+    import scala.concurrent.ExecutionContext.Implicits.global
+
     duringShutdown.set(true)
-    Future {
-      blocking {
-        producer.close(timeout)
-        producerThreadPool.shutdown()
-        consumer.close(timeout.toJava)
-        consumerTask.cancel()
-        consumerThreadPool.shutdown()
-      }
-    }(scala.concurrent.ExecutionContext.global)
+
+    val stopProducer = Future(blocking(producer.close(timeout)))(producerExecutionContext).andThen(_ => producerThreadPool.shutdown())
+    val stopConsumer = Future(blocking {
+      consumer.close(timeout.toJava)
+      consumerTask.cancel()
+    })(consumerExecutionContext).andThen(_ => consumerThreadPool.shutdown())
+
+    stopProducer zip stopConsumer map (_ => ())
   }
 }
 

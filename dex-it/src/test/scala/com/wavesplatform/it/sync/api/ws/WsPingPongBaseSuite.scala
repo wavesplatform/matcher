@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync.api.ws
 
+import akka.http.scaladsl.model.Uri
 import akka.http.scaladsl.model.ws.TextMessage
 import com.wavesplatform.dex.api.ws.connection.WsConnection
 import com.wavesplatform.dex.api.ws.protocol._
@@ -25,7 +26,7 @@ abstract class WsPingPongBaseSuite extends WsSuiteBase {
   override implicit def patienceConfig: PatienceConfig          = super.patienceConfig.copy(timeout = 30.seconds, interval = 200.millis)
   protected implicit def duration2Long(d: FiniteDuration): Long = d.toMillis
 
-  protected def wsStreamUri: String
+  protected def wsStreamUri: Uri
   protected def mkWsUnmanagedConnection(): WsConnection = mkWsConnection(wsStreamUri, keepAlive = false)
 
   "Web socket connection should be closed " - {

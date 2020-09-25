@@ -8,7 +8,7 @@ import com.wavesplatform.dex.it.waves.Implicits.toVanilla
 import com.wavesplatform.dex.it.waves.MkWavesEntities._
 import com.wavesplatform.dex.model.AssetPairBuilder
 import com.wavesplatform.dex.waves.WavesFeeConstants._
-import com.wavesplatform.wavesj.transactions.IssueTransaction
+import im.mak.waves.transactions.IssueTransaction
 
 import scala.util.Random
 
@@ -56,7 +56,7 @@ object DexTestConfig {
   def assetPairIssuePriceAsset(issuer: KeyPair, amountAsset: Asset, priceAssetDecimals: Byte): (IssueTransaction, AssetPair) = {
 
     val issuePriceAssetTx = mkIssue(issuer, Random.nextString(4), someAssetAmount, priceAssetDecimals, issueFee)
-    val priceAssetId      = toVanilla(issuePriceAssetTx.getId)
+    val priceAssetId      = toVanilla(issuePriceAssetTx.id())
     val priceAsset        = IssuedAsset(priceAssetId)
 
     if (MatcherActor.compare(Some(priceAssetId.arr), amountAsset.compatId.map(_.arr)) < 0) (issuePriceAssetTx, AssetPair(amountAsset, priceAsset))

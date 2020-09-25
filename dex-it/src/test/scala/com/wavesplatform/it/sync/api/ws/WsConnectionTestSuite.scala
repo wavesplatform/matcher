@@ -1,11 +1,13 @@
 package com.wavesplatform.it.sync.api.ws
 
+import cats.implicits.catsSyntaxOptionId
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.api.http.entities.HttpWebSocketConnections
 import com.wavesplatform.dex.api.ws.connection.WsConnection
 import com.wavesplatform.dex.api.ws.protocol._
-import com.wavesplatform.dex.domain.asset.Asset
-import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType.SELL
+import com.wavesplatform.dex.fp.MapImplicits.MapNumericOps
+import com.wavesplatform.dex.it.docker.DexContainer
 import com.wavesplatform.it.WsSuiteBase
 
 import scala.concurrent.duration._
@@ -14,79 +16,13 @@ import scala.concurrent.{Await, Future}
 class WsConnectionTestSuite extends WsSuiteBase {
 
   override protected val dexInitialSuiteConfig: Config = ConfigFactory
-    .parseString(s"""waves.dex.price-assets = [ "$BtcId", "$UsdId", "WAVES" ]""")
+    .parseString(s"""waves.dex.price-assets = [ "$BtcId", "WAVES" ]""")
     .withFallback(jwtPublicKeyConfig)
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
-    broadcastAndAwait(IssueBtcTx, IssueUsdTx)
+    broadcastAndAwait(IssueBtcTx)
     dex1.start()
-  }
-
-  "Matcher should send rates snapshot after initial message and rates updates" in {
-
-    def assertRatesUpdates(wsc: WsConnection)(expectedRatesUpdates: List[(Map[Asset, Double], Long)]): Unit = {
-      wsc
-        .receiveAtLeastN[WsRatesUpdates](expectedRatesUpdates.size)
-        .map(r => r.rates -> r.updateId) should matchTo(expectedRatesUpdates)
-    }
-
-    dex1.api.upsertRate(btc, 0.00041863)
-
-    val wsc1 = mkDexWsConnectionWithInitialMessage(dex1); wsc1.receiveAtLeastN[WsInitial](1)
-
-    withClue("Rates snapshot") {
-      assertRatesUpdates(wsc1) { List((Map(Waves -> 1, btc -> 0.00041863), 0)) }
-      wsc1.clearMessages()
-    }
-
-    dex1.api.upsertRate(btc, 0.00041864)
-
-    val wsc2 = mkDexWsConnectionWithInitialMessage(dex1); wsc2.receiveAtLeastN[WsInitial](1)
-
-    dex1.api.upsertRate(usd, 2.76)
-
-    withClue("Rates update") {
-      assertRatesUpdates(wsc1) {
-        List(
-          Map[Asset, Double](btc -> 0.00041864) -> 1L,
-          Map[Asset, Double](usd -> 2.76)       -> 2L
-        )
-      }
-      assertRatesUpdates(wsc2) {
-        List(
-          Map[Asset, Double](Waves -> 1, btc -> 0.00041864) -> 0L,
-          Map[Asset, Double](usd   -> 2.76) -> 1L
-        )
-      }
-      Seq(wsc1, wsc2).foreach { _.clearMessages() }
-    }
-
-    Seq(btc, usd).foreach(dex1.api.deleteRate)
-
-    withClue("Rates delete") {
-      assertRatesUpdates(wsc1) {
-        List(
-          Map[Asset, Double](btc -> -1) -> 3L,
-          Map[Asset, Double](usd -> -1) -> 4L
-        )
-      }
-      assertRatesUpdates(wsc2) {
-        List(
-          Map[Asset, Double](btc -> -1) -> 2L,
-          Map[Asset, Double](usd -> -1) -> 3L
-        )
-      }
-      Seq(wsc1, wsc2).foreach { _.clearMessages() }
-    }
-
-    withClue("Rates snapshot after deleting") {
-      val wsc = mkDexWsConnectionWithInitialMessage(dex1); wsc.receiveAtLeastN[WsInitial](1)
-      assertRatesUpdates(wsc) { List(Map[Asset, Double](Waves -> 1) -> 0) }
-      wsc.close()
-    }
-
-    Seq(wsc1, wsc2).foreach { _.close() }
   }
 
   "Updates both from address and order book" in {
@@ -127,14 +63,51 @@ class WsConnectionTestSuite extends WsSuiteBase {
     }
   }
 
-  "getConnections returns the right number of connections" in {
-    val wscs = (1 to 10).map(_ => mkDexWsConnection(dex1))
-    dex1.api.waitForWsConnections(_.connections == 10)
+  "getConnections returns the right statistics" in {
+    def expectClientAndOs(info: HttpWebSocketConnections,
+                          firefoxLinux: Int,
+                          unknownOs2: Int,
+                          androidUnknown: Int,
+                          unknownUnknown: Int,
+                          additional: (String, Int)*): Unit =
+      info.clientAndOs should matchTo {
+        Map
+          .empty[String, Int]
+          .appendIfNonZeroMany(
+            Seq(
+              "Firefox, Linux 5.2"         -> firefoxLinux,
+              "Unknown Client, OS/2"       -> unknownOs2,
+              "Android 10, Unknown OS"     -> androidUnknown,
+              "Unknown Client, Unknown OS" -> unknownUnknown
+            ) ++ additional: _*
+          )
+      }
+
+    val firefoxLinuxWscs = mkDexWsConnections(1, os = "Linux 5.2".some, client = "Firefox".some)
+    val unknownOs2Wscs   = mkDexWsConnections(2, os = "OS/2".some)
+
+    val wscs = firefoxLinuxWscs ++
+      unknownOs2Wscs ++
+      mkDexWsConnections(3, client = "Android 10".some) ++
+      mkDexWsConnections(4)
+
+    expectClientAndOs(dex1.api.waitForWsConnections(_.connections == 10), 1, 2, 3, 4)
+
+    info("Closing all Firefox + Linux 5.2 and one Unknown + OS/2")
+    firefoxLinuxWscs.foreach(_.close())
+    unknownOs2Wscs.head.close()
+    expectClientAndOs(dex1.api.waitForWsConnections(_.connections == 8), 0, 1, 3, 4)
+
+    info("Opening a new client")
+    val newWs = mkDexWsConnection(dex1, os = "Test OS".some, client = "Test Client".some)
+    expectClientAndOs(dex1.api.waitForWsConnections(_.connections == 9), 0, 1, 3, 4, "Test Client, Test OS" -> 1)
+
+    newWs.close()
     wscs.foreach(_.close())
   }
 
   "closeConnection closes N oldest connections" in {
-    val wscs = (1 to 10).map(_ => mkDexWsConnection(dex1))
+    val wscs = mkDexWsConnections(10)
     dex1.api.waitForWsConnections(_.connections == 10)
 
     dex1.api.closeWsConnections(3)
@@ -154,4 +127,7 @@ class WsConnectionTestSuite extends WsSuiteBase {
       active.foreach(_.isClosed shouldBe false)
     }
   }
+
+  private def mkDexWsConnections(n: Int, dex: DexContainer = dex1, os: Option[String] = None, client: Option[String] = None): Seq[WsConnection] =
+    (1 to n).map(_ => mkDexWsConnection(dex, os = os, client = client))
 }

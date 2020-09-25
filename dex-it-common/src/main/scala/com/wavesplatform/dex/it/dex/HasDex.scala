@@ -48,23 +48,25 @@ trait HasDex { self: BaseContainersKit =>
   lazy val dex1: DexContainer = createDex("dex-1")
 
   protected def createKafkaTopic(name: String): Unit = kafkaServer.foreach { server =>
-    val properties = new Properties()
-    properties.putAll(
-      Map(
-        "bootstrap.servers"  -> server,
-        "group.id"           -> s"create-$name",
-        "key.deserializer"   -> "org.apache.kafka.common.serialization.StringDeserializer",
-        "value.deserializer" -> "org.apache.kafka.common.serialization.StringDeserializer"
-      ).asJava
-    )
-
-    val adminClient = AdminClient.create(properties)
-
+    val adminClient = mkKafkaAdminClient(server)
     try {
       val newTopic = new NewTopic(name, 1, 1.toShort)
       adminClient.createTopics(java.util.Collections.singletonList(newTopic))
     } finally {
       adminClient.close()
     }
+  }
+
+  protected def mkKafkaAdminClient(kafkaServer: String): AdminClient = {
+    val properties = new Properties()
+    properties.putAll(
+      Map(
+        "bootstrap.servers"  -> kafkaServer,
+        "key.deserializer"   -> "org.apache.kafka.common.serialization.StringDeserializer",
+        "value.deserializer" -> "org.apache.kafka.common.serialization.StringDeserializer"
+      ).asJava
+    )
+
+    AdminClient.create(properties)
   }
 }

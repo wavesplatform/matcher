@@ -283,8 +283,8 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
           dex1.api.waitForOrderStatus(bobOrd1, Status.Filled)
           dex1.api.waitForOrderStatus(bobOrd2, Status.Filled)
 
-          waitForOrderAtNode(bobOrd1).head.getFee shouldBe 300000
-          waitForOrderAtNode(bobOrd2).head.getFee shouldBe 300000
+          waitForOrderAtNode(bobOrd1).head.fee().value() shouldBe 300000
+          waitForOrderAtNode(bobOrd2).head.fee().value() shouldBe 300000
 
           dex1.api.reservedBalance(bob) shouldBe empty
         }
@@ -330,8 +330,8 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
           dex1.api.waitForOrderStatus(bobOrd1, Status.Filled)
           dex1.api.waitForOrderStatus(bobOrd2, Status.Filled)
 
-          waitForOrderAtNode(bobOrd1).head.getFee shouldBe 300000
-          waitForOrderAtNode(bobOrd2).head.getFee shouldBe 300000
+          waitForOrderAtNode(bobOrd1).head.fee().value() shouldBe 300000
+          waitForOrderAtNode(bobOrd2).head.fee().value() shouldBe 300000
 
           dex1.api.reservedBalance(bob) shouldBe empty
         }

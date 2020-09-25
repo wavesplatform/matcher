@@ -2,14 +2,12 @@ package com.wavesplatform.dex.api.ws.actors
 
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, Behavior, Terminated}
+import com.wavesplatform.dex.api.http.entities.HttpWebSocketConnections
 import com.wavesplatform.dex.api.ws.protocol.WsRatesUpdates
-import com.wavesplatform.dex.api.ws.state.WsAddressState
-import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.error
-import com.wavesplatform.dex.time.Time
 
-import scala.collection.immutable.HashMap
+import scala.collection.immutable.{HashMap, TreeMap}
 
 /**
   * Contains subscriptions for internal stream and broadcast messages.
@@ -20,31 +18,26 @@ object WsExternalClientDirectoryActor {
 
   sealed trait Command extends Message
   object Command {
-    case class Subscribe(clientRef: ActorRef[WsExternalClientHandlerActor.Message]) extends Command
-    case class CloseOldest(number: Int)                                             extends Command
-    case class BroadcastRatesUpdates(newRates: Map[Asset, Double])                  extends Command
+    case class Subscribe(clientRef: ActorRef[WsExternalClientHandlerActor.Message], os: String, client: String) extends Command
+    case class CloseOldest(number: Int)                                                                         extends Command
+    case class BroadcastRatesUpdates(newRates: Map[Asset, Double])                                              extends Command
   }
 
   sealed trait Query extends Message
   object Query {
-    case class GetActiveNumber(client: ActorRef[Int]) extends Query
+    case class GetActiveNumber(client: ActorRef[HttpWebSocketConnections]) extends Query
   }
 
-  def apply(rateCache: RateCache, time: Time): Behavior[Message] =
+  def apply(): Behavior[Message] =
     Behaviors.setup[Message] { context =>
       context.system.eventStream
-
-      def matcherTime: Long = time.getTimestamp()
-
-      def mkRatesSnapshot = WsRatesUpdates(rateCache.getAllRates, 0, matcherTime)
 
       def default(state: State): Behavior[Message] =
         Behaviors
           .receiveMessage[Message] {
-            case Command.Subscribe(clientRef) =>
+            case Command.Subscribe(clientRef, os, client) =>
               context.watch(clientRef)
-              clientRef ! WsExternalClientHandlerActor.Command.ForwardToClient(mkRatesSnapshot)
-              default(state withActor clientRef)
+              default(state.withActor(clientRef, os, client))
 
             case Command.CloseOldest(n) =>
               val (updatedState, oldest) = state.withoutOldest(n)
@@ -52,19 +45,14 @@ object WsExternalClientDirectoryActor {
               default(updatedState)
 
             case Command.BroadcastRatesUpdates(newRates) =>
-              default {
-                state.copy(
-                  all = state.all.map {
-                    case (target, meta) =>
-                      val newUpdateId = WsAddressState.getNextUpdateId(meta.ratesUpdateId)
-                      target ! WsExternalClientHandlerActor.Command.ForwardToClient(WsRatesUpdates(newRates, newUpdateId, matcherTime))
-                      target -> meta.copy(ratesUpdateId = newUpdateId)
-                  }
-                )
+              state.all.foreach {
+                case (target, _) =>
+                  target ! WsExternalClientHandlerActor.Command.ForwardToClient(WsRatesUpdates.broadcastUpdates(newRates))
               }
+              default(state)
 
             case Query.GetActiveNumber(client) =>
-              client ! state.all.size
+              client ! HttpWebSocketConnections(state.all.size, state.infoMap)
               default(state)
           }
           .receiveSignal {
@@ -74,26 +62,54 @@ object WsExternalClientDirectoryActor {
               }
           }
 
-      default(State(0, HashMap.empty))
+      default(State(0, HashMap.empty, TreeMap.empty))
     }
 
   private type TargetActor = ActorRef[WsExternalClientHandlerActor.Message]
   private type Index       = Int
 
-  private case class TargetActorMeta(index: Index, ratesUpdateId: Long)
+  private case class State(currentIndex: Index, all: Map[TargetActor, ConnectionInfo], infoMap: Map[String, Int]) {
 
-  private case class State(currentIndex: Index, all: HashMap[TargetActor, TargetActorMeta]) {
+    def withActor(x: TargetActor, os: String, client: String): State = {
+      val info = ConnectionInfo(currentIndex, os, client)
+      copy(
+        currentIndex = currentIndex + 1,
+        all = all.updated(x, info),
+        infoMap = infoMap.updated(info.clientAndOs, infoMap.getOrElse(info.clientAndOs, 0) + 1)
+      )
+    }
 
-    def withActor(x: TargetActor): State = copy(
-      currentIndex = currentIndex + 1,
-      all = all.updated(x, TargetActorMeta(currentIndex, 0L))
-    )
-
-    def withoutActor(x: TargetActor): State = copy(all = all.removed(x))
+    def withoutActor(x: TargetActor): State = all.get(x) match {
+      case None => this
+      case Some(info) =>
+        val updatedNumber = infoMap.getOrElse(info.clientAndOs, 1) - 1
+        val updatedInfoMap =
+          if (updatedNumber == 0) infoMap.removed(info.clientAndOs)
+          else infoMap.updated(info.clientAndOs, updatedNumber)
+        copy(
+          all = all.removed(x),
+          infoMap = updatedInfoMap
+        )
+    }
 
     def withoutOldest(n: Int): (State, IterableOnce[TargetActor]) = {
-      val oldest = all.toArray.sortInPlaceBy { case (_, TargetActorMeta(index, _)) => index }.take(n).map(_._1)
-      (copy(all = all -- oldest), oldest)
+      val oldest = all.toArray.sortInPlaceBy { case (_, info) => info.index }.take(n)
+
+      val infoDiff = oldest.groupMapReduce(_._2.clientAndOs)(_ => 1)(_ + _)
+      val updatedInfoMap = infoDiff.foldLeft(infoMap) {
+        case (r, (k, v)) =>
+          r.get(k) match {
+            case None        => r
+            case Some(origV) => r.updated(k, math.max(0, origV - v))
+          }
+      }
+
+      val oldestActors = oldest.map(_._1)
+      (copy(all = all -- oldestActors, infoMap = updatedInfoMap), oldestActors)
     }
+  }
+
+  private case class ConnectionInfo(index: Index, os: String, client: String) {
+    val clientAndOs = s"$client, $os"
   }
 }

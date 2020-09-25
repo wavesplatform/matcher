@@ -491,7 +491,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           ))
       }
 
-      broadcastAndAwait(mkLeaseCancel(bob, leaseTx.getId))
+      broadcastAndAwait(mkLeaseCancel(bob, leaseTx.id()))
     }
 
     "DEX-818" - {

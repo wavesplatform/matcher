@@ -20,7 +20,7 @@ class DisableProducerTestSuite extends MatcherSuiteBase {
 
   "Check no commands are written to queue" - {
     "check assets's balances" in {
-      wavesNode1.api.balance(alice, eth) shouldBe IssueEthTx.getQuantity
+      wavesNode1.api.balance(alice, eth) shouldBe IssueEthTx.quantity()
       wavesNode1.api.balance(matcher, eth) shouldBe 0L
     }
 

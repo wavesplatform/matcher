@@ -13,7 +13,6 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.it.api.websockets.HasWebSockets
 import com.wavesplatform.dex.it.dex.DexApi
 import com.wavesplatform.dex.it.docker.DexContainer
-import com.wavesplatform.dex.model.OrderStatus.Filled
 import com.wavesplatform.it._
 import com.wavesplatform.it.api.{MatcherCommand, MatcherState}
 import com.wavesplatform.it.config.DexTestConfig.createAssetPair
@@ -57,8 +56,8 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with
 
     broadcastAndAwait(IssueEthTx, IssueWctTx)
     broadcastAndAwait(
-      mkTransfer(alice, bob, IssueEthTx.getQuantity / 2, eth),
-      mkTransfer(bob, alice, IssueWctTx.getQuantity / 2, wct)
+      mkTransfer(alice, bob, IssueEthTx.quantity() / 2, eth),
+      mkTransfer(bob, alice, IssueWctTx.quantity() / 2, wct)
     )
 
     dex1.start()

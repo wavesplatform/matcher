@@ -20,6 +20,7 @@ import com.wavesplatform.dex.settings.PostgresConnection
 import com.wavesplatform.dex.settings.PostgresConnection._
 import com.wavesplatform.it.MatcherSuiteBase
 import net.ceedubs.ficus.Ficus._
+import org.scalatest.concurrent.PatienceConfiguration.{Interval, Timeout}
 
 import scala.concurrent.duration.DurationInt
 import scala.io.Source
@@ -225,9 +226,9 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
     cleanTables()
   }
 
-  "Postgres order history should update closedAt timestamps of orders" in {
+  "Postgres order history should update closedAt timestamps of orders after" - {
 
-    withClue("after order cancel") {
+    "cancel" in {
 
       val cancelledOrder = mkOrderDP(alice, wavesUsdPair, BUY, 1.waves, 3.50)
 
@@ -240,7 +241,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
       cleanTables()
     }
 
-    withClue("after order execution") {
+    "execution" in {
 
       val counter   = mkOrderDP(alice, wavesUsdPair, BUY, 1.waves, 3.50)
       val submitted = mkOrderDP(alice, wavesUsdPair, SELL, 1.waves, 3.50)
@@ -253,6 +254,23 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
         Seq(counter, submitted).foreach { order =>
           getOrderInfoById(order.id()).get.closedAt should matchTo(filledEventTimestamp)
         }
+      }
+
+      cleanTables()
+    }
+
+    "expiration" in {
+      val order = mkOrderDP(alice, wavesUsdPair, BUY, 1.waves, 3.50, ttl = 1.minute + 5.seconds) // We can't set ttl < 1.minute
+      placeAndAwaitAtDex(order)
+
+      // Because we have to wait more than 30 seconds
+      eventually(timeout = Timeout(90.seconds), interval = Interval(1.second)) {
+        dex1.api.orderStatus(order).status shouldBe Status.Cancelled
+      }
+
+      eventually {
+        val filledEventTimestamp = expectFinalization(order.idStr())
+        getOrderInfoById(order.id()).get.closedAt should matchTo(filledEventTimestamp)
       }
 
       cleanTables()

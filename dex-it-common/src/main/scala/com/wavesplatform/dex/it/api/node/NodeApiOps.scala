@@ -8,10 +8,10 @@ import com.typesafe.config.Config
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.it.api.responses.node.{ActivationStatusResponse, AssetBalanceResponse, ConnectedPeersResponse, WavesBalanceResponse}
 import com.wavesplatform.dex.it.fp.CanExtract
-import com.wavesplatform.wavesj.Transaction
+import im.mak.waves.transactions.Transaction
+import im.mak.waves.transactions.common.Id
 
 object NodeApiOps {
 
@@ -33,7 +33,7 @@ object NodeApiOps {
 
     def broadcast(tx: Transaction): F[Unit] = explicitGet(self.tryBroadcast(tx))
 
-    def transactionInfo(id: ByteStr): F[Option[Transaction]] = self.tryTransactionInfo(id).map {
+    def transactionInfo(id: Id): F[Option[Transaction]] = self.tryTransactionInfo(id).map {
       case Right(r) => Some(r)
       case Left(e) =>
         if (e.error == 311) None // node's ApiError.TransactionDoesNotExist.id

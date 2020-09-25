@@ -17,11 +17,10 @@ import im.mak.waves.transactions.common.{Amount, AssetId}
 import im.mak.waves.transactions.exchange.{AssetPair, Order, OrderType}
 import im.mak.waves.transactions.mass.Transfer
 import org.apache.http.HttpResponse
-import org.apache.http.client.HttpClient
-import org.apache.http.client.config.{CookieSpecs, RequestConfig}
 import org.apache.http.client.methods.RequestBuilder
 import org.apache.http.entity.{ContentType, StringEntity}
-import org.apache.http.impl.client.HttpClients
+import org.apache.http.impl.client.{CloseableHttpClient, HttpClients}
+import org.apache.http.impl.conn.PoolingHttpClientConnectionManager
 import play.api.libs.json.{JsError, JsSuccess, JsValue}
 
 import scala.concurrent._
@@ -37,6 +36,10 @@ object TankGenerator {
   implicit private val blockingContext: ExecutionContextExecutor = ExecutionContext.fromExecutor(executor)
 
   private val matcherHttpUri: URI = new URI(settings.hosts.matcher)
+
+  val cm = new PoolingHttpClientConnectionManager
+  cm.setDefaultMaxPerRoute(threadCount)
+  val httpClient: CloseableHttpClient = HttpClients.custom.setConnectionManager(cm).build
 
   private def mkAccounts(seedPrefix: String, count: Int): List[JPrivateKey] = {
     print(s"Generating $count accounts (prefix: $seedPrefix)... ")
@@ -314,22 +317,15 @@ object TankGenerator {
   }
 
   def placeOrder(order: Order): Future[HttpResponse] = Future {
-    HttpClients.custom
-      .setDefaultRequestConfig(
-        RequestConfig.custom
-          .setSocketTimeout(5000)
-          .setConnectTimeout(5000)
-          .setConnectionRequestTimeout(5000)
-          .setCookieSpec(CookieSpecs.STANDARD)
-          .build
-      )
-      .build()
+    val res = httpClient
       .execute(
         RequestBuilder
           .post(matcherHttpUri.resolve(s"/matcher/orderbook"))
           .setEntity(new StringEntity(order.toJson, ContentType.APPLICATION_JSON))
           .build()
       )
+    res.close()
+    res
   }
 
   def placeOrdersForCancel(accounts: List[JPrivateKey], requestsCount: Int, pairsFile: Option[File]): Unit = {
@@ -353,9 +349,7 @@ object TankGenerator {
           .version(3)
           .getSignedWith(account)
 
-      placeOrder(order).recover {
-        case e: Throwable => println(s"Error during operation: $e"); null
-      }
+      placeOrder(order)
     }
 
     val requestsAwaitingTime = (requestsCount / threadCount).seconds

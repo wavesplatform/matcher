@@ -88,7 +88,8 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
       new AddressDirectoryActor(
         EmptyOrderDB,
         createAddressActor,
-        None
+        None,
+        started = true
       )
     )
   )
@@ -98,7 +99,7 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
 
   private val spendableBalancesActor = system.actorOf(Props(new SpendableBalancesActor(spendableBalances, allAssetsSpendableBalances, addressDir)))
 
-  private def createAddressActor(address: Address, enableSchedules: Boolean): Props = {
+  private def createAddressActor(address: Address, started: Boolean): Props = {
     Props(
       new AddressActor(
         address,
@@ -106,7 +107,7 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
         new TestOrderDB(100),
         (_, _) => Future.successful(Right(())),
         _ => Future.failed(new IllegalStateException("Should not be used in the test")),
-        enableSchedules,
+        started,
         spendableBalancesActor
       )
     )
@@ -473,7 +474,8 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
         new AddressDirectoryActor(
           new TestOrderDB(100),
           createAddressActor,
-          None
+          None,
+          started = true
         )
       )
     )
@@ -482,7 +484,7 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
       system.actorOf(Props(new SpendableBalancesActor((_, assets) => spendableBalances(assets), allAssetsSpendableBalances, addressDir)))
     }
 
-    def createAddressActor(address: Address, enableSchedules: Boolean): Props = {
+    def createAddressActor(address: Address, started: Boolean): Props = {
       Props(
         new AddressActor(
           owner = address,
@@ -493,7 +495,7 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
             testProbe.ref ! event
             Future.successful { Some(QueueEventWithMeta(0L, System.currentTimeMillis, event)) }
           },
-          enableSchedules,
+          started,
           spendableBalancesActor
         )
       )

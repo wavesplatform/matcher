@@ -30,6 +30,7 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 
 import scala.concurrent.Future
+import scala.concurrent.duration.DurationInt
 
 class AddressActorSpecification
     extends TestKit(ActorSystem("AddressActorSpecification"))
@@ -53,8 +54,8 @@ class AddressActorSpecification
     orderType = OrderType.BUY,
     price = 100000000L,
     amount = 100L,
-    timestamp = 1L,
-    expiration = 1000L,
+    timestamp = System.currentTimeMillis(),
+    expiration = System.currentTimeMillis() + 5.days.toMillis,
     matcherFee = matcherFee
   )
 
@@ -67,8 +68,8 @@ class AddressActorSpecification
     orderType = OrderType.BUY,
     price = 100000000L,
     amount = 100L,
-    timestamp = 2L,
-    expiration = 1000L,
+    timestamp = System.currentTimeMillis(),
+    expiration = System.currentTimeMillis() + 5.days.toMillis,
     matcherFee = matcherFee
   )
 
@@ -81,8 +82,8 @@ class AddressActorSpecification
     orderType = OrderType.SELL,
     price = 100000000L,
     amount = 100L,
-    timestamp = 3L,
-    expiration = 1000L,
+    timestamp = System.currentTimeMillis(),
+    expiration = System.currentTimeMillis() + 5.days.toMillis,
     matcherFee = matcherFee
   )
 
@@ -184,7 +185,6 @@ class AddressActorSpecification
     "cancel expired orders" in test { (ref, eventsProbe, addOrder, updatePortfolio) =>
       val initPortfolio = sellToken1Portfolio
       updatePortfolio(initPortfolio)
-      ref ! AddressDirectoryActor.StartSchedules
 
       val lo = LimitOrder(
         OrderV1(
@@ -195,9 +195,10 @@ class AddressActorSpecification
           price = 100000000L,
           amount = 100L,
           timestamp = System.currentTimeMillis(),
-          expiration = System.currentTimeMillis() + 100,
+          expiration = System.currentTimeMillis() + 100L,
           matcherFee = matcherFee
-        ))
+        )
+      )
       addOrder(lo)
 
       eventsProbe.expectMsg(QueueEvent.Canceled(lo.order.assetPair, lo.id, Source.Expiration))
@@ -247,7 +248,7 @@ class AddressActorSpecification
         )
       )
 
-    def createAddressActor(address: Address, enableSchedules: Boolean): Props = {
+    def createAddressActor(address: Address, started: Boolean): Props = {
       Props(
         new AddressActor(
           address,
@@ -258,13 +259,13 @@ class AddressActorSpecification
             eventsProbe.ref ! event
             Future.successful { Some(QueueEventWithMeta(0L, 0L, event)) }
           },
-          enableSchedules,
+          started,
           spendableBalancesActor
         )
       )
     }
 
-    lazy val addressDir = system.actorOf(Props(new AddressDirectoryActor(EmptyOrderDB, createAddressActor, None)))
+    lazy val addressDir = system.actorOf(Props(new AddressDirectoryActor(EmptyOrderDB, createAddressActor, None, started = true)))
 
     def addOrder(ao: AcceptedOrder): Unit = {
       addressDir ! AddressDirectoryActor.Envelope(address, AddressActor.Command.PlaceOrder(ao.order, ao.isMarket))

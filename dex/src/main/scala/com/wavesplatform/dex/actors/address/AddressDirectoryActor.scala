@@ -10,21 +10,24 @@ import com.wavesplatform.dex.model.Events.OrderCancelFailed
 
 import scala.collection.mutable
 
-class AddressDirectoryActor(orderDB: OrderDB, addressActorProps: (Address, Boolean) => Props, historyRouter: Option[ActorRef])
-    extends Actor
+class AddressDirectoryActor(
+    orderDB: OrderDB,
+    addressActorProps: (Address, Boolean) => Props,
+    historyRouter: Option[ActorRef],
+    var started: Boolean = false
+) extends Actor
     with ScorexLogging {
 
   import AddressDirectoryActor._
   import context._
 
-  private var startSchedules: Boolean = false
-  private[this] val children          = mutable.AnyRefMap.empty[Address, ActorRef]
+  private[this] val children = mutable.AnyRefMap.empty[Address, ActorRef]
 
   override def supervisorStrategy: SupervisorStrategy = SupervisorStrategy.stoppingStrategy
 
   private def createAddressActor(address: Address): ActorRef = {
     log.debug(s"Creating address actor for $address")
-    watch(actorOf(addressActorProps(address, startSchedules), address.toString))
+    watch(actorOf(addressActorProps(address, started), address.toString))
   }
 
   private def forward(address: Address, msg: Any): Unit = (children get address, msg) match {
@@ -40,9 +43,7 @@ class AddressDirectoryActor(orderDB: OrderDB, addressActorProps: (Address, Boole
       historyRouter foreach { _ ! HistoryInsertMsg.SaveOrder(lo, timestamp) }
 
     case e: Events.OrderExecuted =>
-      import e.{counter, submitted}
-      forward(submitted.order.sender, e)
-      if (counter.order.sender != submitted.order.sender) forward(counter.order.sender, e)
+      Set(e.counter.order, e.submitted.order).map(_.sender).foreach(forward(_, e))
       historyRouter foreach { _ ! HistoryInsertMsg.SaveEvent(e) }
 
     case e: Events.OrderCanceled =>
@@ -55,11 +56,9 @@ class AddressDirectoryActor(orderDB: OrderDB, addressActorProps: (Address, Boole
         case None        => log.warn(s"The order '${e.id}' not found")
       }
 
-    case StartSchedules =>
-      if (!startSchedules) {
-        startSchedules = true
-        context.children.foreach(_ ! StartSchedules)
-      }
+    case StartWork =>
+      started = true
+      context.children.foreach(_ ! StartWork)
 
     case Terminated(child) =>
       val addressString = child.path.name
@@ -71,5 +70,5 @@ class AddressDirectoryActor(orderDB: OrderDB, addressActorProps: (Address, Boole
 
 object AddressDirectoryActor {
   case class Envelope(address: Address, cmd: AddressActor.Message)
-  case object StartSchedules
+  case object StartWork
 }

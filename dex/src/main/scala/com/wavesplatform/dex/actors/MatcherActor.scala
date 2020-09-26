@@ -3,6 +3,7 @@ package com.wavesplatform.dex.actors
 import java.util.concurrent.atomic.AtomicReference
 
 import akka.actor.{Actor, ActorRef, Props, SupervisorStrategy, Terminated}
+import cats.implicits.catsSyntaxEitherId
 import com.wavesplatform.dex.actors.orderbook.OrderBookActor.{OrderBookRecovered, OrderBookSnapshotUpdateCompleted}
 import com.wavesplatform.dex.actors.orderbook.{AggregatedOrderBookActor, OrderBookActor}
 import com.wavesplatform.dex.api.http.entities.OrderBookUnavailable
@@ -21,7 +22,7 @@ import scala.util.Failure
 
 class MatcherActor(settings: MatcherSettings,
                    assetPairsDB: AssetPairsDB,
-                   recoveryCompletedWithEventNr: Either[String, (ActorRef, Long)] => Unit,
+                   recoveryCompletedWithEventNr: Either[String, Long] => Unit,
                    orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
                    orderBookActorProps: (AssetPair, ActorRef) => Props,
                    assetDescription: Asset => Option[BriefAssetDescription])
@@ -42,7 +43,7 @@ class MatcherActor(settings: MatcherSettings,
     val knownAssetPairs = assetPairsDB.all()
     if (knownAssetPairs.isEmpty) {
       log.info("Recovery completed!")
-      recoveryCompletedWithEventNr(Right((self, -1L)))
+      recoveryCompletedWithEventNr(-1L asRight)
       working
     } else {
       log.info(s"Recovery completed, waiting order books to restore: ${knownAssetPairs.mkString(", ")}")
@@ -218,12 +219,12 @@ class MatcherActor(settings: MatcherSettings,
       log.error(s"$ref is terminated during start, recovery failed")
       context.children.foreach(context.unwatch)
       context.stop(self)
-      recoveryCompletedWithEventNr(Left(s"$ref is terminated"))
+      recoveryCompletedWithEventNr(s"$ref is terminated".asLeft)
 
     case Shutdown =>
       context.children.foreach(context.unwatch)
       context.stop(self)
-      recoveryCompletedWithEventNr(Left("Received Shutdown command"))
+      recoveryCompletedWithEventNr("Received Shutdown command".asLeft)
 
     case x => stash(x)
   }
@@ -262,7 +263,7 @@ class MatcherActor(settings: MatcherSettings,
     log.trace(s"Expecting next snapshots at:\n${snapshotsState.nearestSnapshotOffsets.map { case (p, x) => s"$p -> $x" }.mkString("\n")}")
 
     unstashAll()
-    recoveryCompletedWithEventNr(Right((self, safestStartOffset)))
+    recoveryCompletedWithEventNr(safestStartOffset.asRight)
   }
 }
 
@@ -272,7 +273,7 @@ object MatcherActor {
 
   def props(matcherSettings: MatcherSettings,
             assetPairsDB: AssetPairsDB,
-            recoveryCompletedWithEventNr: Either[String, (ActorRef, Long)] => Unit,
+            recoveryCompletedWithEventNr: Either[String, Long] => Unit,
             orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
             orderBookProps: (AssetPair, ActorRef) => Props,
             assetDescription: Asset => Option[BriefAssetDescription]): Props = {
@@ -288,15 +289,7 @@ object MatcherActor {
     )
   }
 
-  private case class ShutdownStatus(initiated: Boolean, oldMessagesDeleted: Boolean, oldSnapshotsDeleted: Boolean, onComplete: () => Unit) {
-    def completed: ShutdownStatus = copy(
-      initiated = true,
-      oldMessagesDeleted = true,
-      oldSnapshotsDeleted = true
-    )
-    def isCompleted: Boolean = initiated && oldMessagesDeleted && oldSnapshotsDeleted
-    def tryComplete(): Unit  = if (isCompleted) onComplete()
-  }
+  private case class ShutdownStatus(initiated: Boolean, oldMessagesDeleted: Boolean, oldSnapshotsDeleted: Boolean, onComplete: () => Unit)
 
   case object ForceSaveSnapshots
   case class SaveSnapshot(globalEventNr: EventOffset)

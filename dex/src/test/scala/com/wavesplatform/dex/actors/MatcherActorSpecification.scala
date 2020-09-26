@@ -450,7 +450,7 @@ class MatcherActorSpecification
     pairs.foreach { case (pair, offset) => obsdb.update(pair, offset, Some(OrderBookSnapshot.empty)) }
   }
 
-  private def doNothingOnRecovery(x: Either[String, (ActorRef, QueueEventWithMeta.Offset)]): Unit = {}
+  private def doNothingOnRecovery(x: Either[String, QueueEventWithMeta.Offset]): Unit = {}
 
   private def emptyOrderBookRefs   = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
   private def randomAssetId: Asset = IssuedAsset(ByteStr(randomBytes()))

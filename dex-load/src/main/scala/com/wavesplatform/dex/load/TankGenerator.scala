@@ -33,7 +33,7 @@ import org.apache.http.client.protocol.HttpClientContext
 
 object TankGenerator {
 
-  private val threadCount: Int          = 15
+  private val threadCount: Int          = 10
   private val executor: ExecutorService = Executors.newFixedThreadPool(threadCount)
 
   implicit private val blockingContext: ExecutionContextExecutor = ExecutionContext.fromExecutor(executor)

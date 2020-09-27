@@ -33,7 +33,7 @@ import org.apache.http.client.protocol.HttpClientContext
 
 object TankGenerator {
 
-  private val threadCount: Int          = 5
+  private val threadCount: Int          = 15
   private val executor: ExecutorService = Executors.newFixedThreadPool(threadCount)
 
   implicit private val blockingContext: ExecutionContextExecutor = ExecutionContext.fromExecutor(executor)
@@ -331,13 +331,15 @@ object TankGenerator {
   }
 
   def placeOrder(order: Order): Future[HttpResponse] = Future {
-    httpClient.execute(
+    val res = httpClient.execute(
       RequestBuilder
         .post(matcherHttpUri.resolve(s"/matcher/orderbook"))
         .setEntity(new StringEntity(order.toJson, ContentType.APPLICATION_JSON))
         .build(),
       HttpClientContext.create
     )
+    res.close()
+    res
   }
 
   def placeOrdersForCancel(accounts: List[JPrivateKey], requestsCount: Int, pairsFile: Option[File]): Unit = {
@@ -366,7 +368,7 @@ object TankGenerator {
       }
     }
 
-    val requestsAwaitingTime = (requestsCount * threadCount).seconds
+    val requestsAwaitingTime = (requestsCount / threadCount).seconds
     print(s"Awaiting place orders requests, requests count = $requestsCount, treads count = $threadCount, waiting at most $requestsAwaitingTime... ")
     Await.result(Future.sequence(futures), requestsAwaitingTime)
     println("Done")

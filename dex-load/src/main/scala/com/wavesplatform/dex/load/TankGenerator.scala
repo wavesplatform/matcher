@@ -366,7 +366,7 @@ object TankGenerator {
       }
     }
 
-    val requestsAwaitingTime = (requestsCount / threadCount).seconds
+    val requestsAwaitingTime = (requestsCount * threadCount).seconds
     print(s"Awaiting place orders requests, requests count = $requestsCount, treads count = $threadCount, waiting at most $requestsAwaitingTime... ")
     Await.result(Future.sequence(futures), requestsAwaitingTime)
     println("Done")

@@ -15,6 +15,9 @@ pipeline {
     stages {
         stage('Cleanup') {
             steps {
+                script {
+                    currentBuild.displayName = "${params.BRANCH_OR_TAG}"
+                }
                 sh 'git fetch --tags'
                 sh 'find ~/.sbt/1.0/staging/*/waves -type d -name target | xargs -I{} rm -rf {}'
                 sh 'find . -type d \\( -name "test-reports" -o -name "allure-results" -o -name "target" \\) | xargs -I{} rm -rf {}'

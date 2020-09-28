@@ -14,8 +14,8 @@ import akka.util.Timeout
 import cats.data.EitherT
 import cats.instances.future._
 import cats.syntax.functor._
+import com.wavesplatform.dex.actors.ActorSystemOps.ImplicitOps
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
-import com.wavesplatform.dex.actors.orderbook.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.actors.orderbook.{AggregatedOrderBookActor, OrderBookActor, OrderBookSnapshotStoreActor}
 import com.wavesplatform.dex.actors.tx.{BroadcastExchangeTransactionActor, CreateExchangeTransactionActor, WriteExchangeTransactionActor}
 import com.wavesplatform.dex.actors.{MatcherActor, OrderBookAskAdapter, SpendableBalancesActor}
@@ -25,6 +25,7 @@ import com.wavesplatform.dex.api.http.{CompositeHttpService, OrderBookHttpInfo}
 import com.wavesplatform.dex.api.routes.ApiRoute
 import com.wavesplatform.dex.api.ws.actors.{WsExternalClientDirectoryActor, WsInternalBroadcastActor}
 import com.wavesplatform.dex.api.ws.routes._
+import com.wavesplatform.dex.app._
 import com.wavesplatform.dex.caches.{MatchingRulesCache, OrderFeeSettingsCache, RateCache}
 import com.wavesplatform.dex.db._
 import com.wavesplatform.dex.db.leveldb._
@@ -32,34 +33,44 @@ import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.codec.Base58
-import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.utils.{EitherExt2, ScorexLogging}
 import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
 import com.wavesplatform.dex.grpc.integration.WavesBlockchainClientBuilder
+import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainAssetsWatchingClient
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.BalanceChanges
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.history.HistoryRouterActor
+import com.wavesplatform.dex.model.OrderValidator.AsyncBlockchain
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue._
-import com.wavesplatform.dex.settings.{MatcherSettings, OrderFeeSettings}
+import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.dex.time.NTP
-import monix.eval.Coeval
 import mouse.any.anySyntaxMouse
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
 import scala.util.control.NonFatal
-import scala.util.{Failure, Random, Success}
+import scala.util.{Failure, Success}
 
 // TODO Remove start, merge with Application
 class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) extends ScorexLogging {
 
   import com.wavesplatform.dex.Matcher._
 
-  private implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
-  private val monixScheduler                              = monix.execution.Scheduler.Implicits.global
-  private val grpcExecutionContext                        = actorSystem.dispatchers.lookup("akka.actor.grpc-dispatcher")
+  private implicit val materializer     = Materializer.matFromSystem(actorSystem)
+  private implicit val executionContext = scala.concurrent.ExecutionContext.Implicits.global
+  private val monixScheduler            = monix.execution.Scheduler.Implicits.global
+  private val grpcExecutionContext      = actorSystem.dispatchers.lookup("akka.actor.grpc-dispatcher")
+
+  private val matcherKeyPair = AccountStorage.load(settings.accountStorage).map(_.keyPair).explicitGet().unsafeTap { x =>
+    log.info(s"The DEX's public key: ${Base58.encode(x.publicKey.arr)}, account address: ${x.publicKey.toAddress.stringRepr}")
+  }
+
+  private def matcherPublicKey: PublicKey       = matcherKeyPair
+  @volatile private var lastProcessedOffset     = -1L
+  @volatile private var status: MatcherStatus   = MatcherStatus.Starting
+  @volatile private var hasMatcherAccountScript = false
 
   private val time = new NTP(settings.ntpServer)
 
@@ -76,24 +87,10 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       assetsStorage = assetsCache
     )
 
-  private implicit val materializer: Materializer = Materializer.matFromSystem(actorSystem)
-
-  private val matcherKeyPair = AccountStorage.load(settings.accountStorage).map(_.keyPair).explicitGet().unsafeTap { x =>
-    log.info(s"The DEX's public key: ${Base58.encode(x.publicKey.arr)}, account address: ${x.publicKey.toAddress.stringRepr}")
-  }
-
-  private def matcherPublicKey: PublicKey   = matcherKeyPair
-  @volatile private var lastProcessedOffset = -1L
-
-  private val status: AtomicReference[Status] = new AtomicReference(Status.Starting)
-
   private lazy val blacklistedAddresses = settings.blacklistedAddresses.map(Address.fromString(_).explicitGet())
 
-  private val pairBuilder = {
-    new AssetPairBuilder(settings, getDescription(assetsCache, wavesBlockchainAsyncClient.assetDescription)(_), settings.blacklistedAssets)
-  }
-
-  private var hasMatcherAccountScript = false
+  private val pairBuilder =
+    new AssetPairBuilder(settings, getAndCacheDescription(assetsCache, wavesBlockchainAsyncClient)(_), settings.blacklistedAssets)
 
   private val orderBooks          = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
   private val orderBookAskAdapter = new OrderBookAskAdapter(orderBooks, settings.actorResponseTimeout)
@@ -113,7 +110,8 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
   private val orderFeeSettingsCache = new OrderFeeSettingsCache(settings.orderFee)
   private val rateCache             = RateCache(db)
 
-  private def getDecimalsFromCache(asset: Asset): FutureResult[Int] = getDecimals(assetsCache, wavesBlockchainAsyncClient.assetDescription)(asset)
+  private def getDecimalsFromCache(asset: Asset): FutureResult[Int] =
+    getAndCacheDecimals(assetsCache, wavesBlockchainAsyncClient)(asset)
 
   private def orderBookProps(assetPair: AssetPair, matcherActor: ActorRef): Props = {
     matchingRulesCache.setCurrentMatchingRuleForNewOrderBook(assetPair, lastProcessedOffset, errorContext.unsafeAssetDecimals)
@@ -133,6 +131,11 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     )
   }
 
+  private val wsInternalBroadcast: typed.ActorRef[WsInternalBroadcastActor.Command] = actorSystem.spawn(
+    WsInternalBroadcastActor(settings.webSocketSettings.internalBroadcast),
+    "ws-internal-broadcast"
+  )
+
   private val matcherQueue: MatcherQueue = settings.eventsQueue.tpe match {
     case "local" =>
       log.info("Events will be stored locally")
@@ -143,50 +146,6 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       new KafkaMatcherQueue(settings.eventsQueue.kafka)
 
     case x => throw new IllegalArgumentException(s"Unknown queue type: $x")
-  }
-
-  private def validateOrder(o: Order): FutureResult[Order] = {
-
-    import OrderValidator._
-
-    def actualOrderFeeSettings: OrderFeeSettings = orderFeeSettingsCache.getSettingsForOffset(lastProcessedOffset + 1)
-
-    /** Does not need additional access to the blockchain via gRPC */
-    def syncValidation(marketStatus: Option[MarketStatus], orderAssetsDecimals: Asset => Int): Either[MatcherError, Order] = {
-
-      lazy val actualTickSize = matchingRulesCache
-        .getNormalizedRuleForNextOrder(o.assetPair, lastProcessedOffset, orderAssetsDecimals)
-        .tickSize
-
-      for {
-        _ <- matcherSettingsAware(matcherPublicKey, blacklistedAddresses, settings, orderAssetsDecimals, rateCache, actualOrderFeeSettings)(o)
-        _ <- timeAware(time)(o)
-        _ <- tickSizeAware(actualTickSize)(o)
-        _ <- if (settings.deviation.enabled) marketAware(actualOrderFeeSettings, settings.deviation, marketStatus)(o) else success
-      } yield o
-    }
-
-    /** Needs additional asynchronous access to the blockchain */
-    def asyncValidation(orderAssetsDescriptions: Asset => BriefAssetDescription): FutureResult[Order] =
-      blockchainAware(
-        wavesBlockchainAsyncClient,
-        transactionCreator.createTransaction,
-        time,
-        actualOrderFeeSettings,
-        settings.orderRestrictions.get(o.assetPair),
-        orderAssetsDescriptions,
-        rateCache,
-        hasMatcherAccountScript
-      )(o)
-
-    for {
-      marketStatus <- {
-        if (settings.deviation.enabled) EitherT(orderBookAskAdapter.getMarketStatus(o.assetPair))
-        else liftValueAsync(Option.empty[OrderBookActor.MarketStatus])
-      }
-      _ <- liftAsync { syncValidation(marketStatus, assetsCache.unsafeGetDecimals) }
-      _ <- asyncValidation(assetsCache.unsafeGet)
-    } yield o
   }
 
   private val storeBreaker = new CircuitBreaker(
@@ -202,13 +161,29 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
   private val maybeApiKeyHash: Option[Array[Byte]] = Option(settings.restApi.apiKeyHash) filter (_.nonEmpty) map Base58.decode
 
   private val externalClientDirectoryRef: typed.ActorRef[WsExternalClientDirectoryActor.Message] =
-    actorSystem.spawn(WsExternalClientDirectoryActor(), s"ws-external-cd-${Random.nextInt(Int.MaxValue)}")
+    actorSystem.spawn(WsExternalClientDirectoryActor(), s"ws-external-cd-${ThreadLocalRandom.current().nextInt(Int.MaxValue)}")
 
-  private lazy val httpApiRouteV0: MatcherApiRoute =
+  private lazy val httpApiRouteV0: MatcherApiRoute = {
+    val orderValidation = ValidationStages.mkFirst(
+      settings,
+      matcherPublicKey,
+      orderFeeSettingsCache,
+      matchingRulesCache,
+      rateCache,
+      assetsCache,
+      wavesBlockchainAsyncClient,
+      transactionCreator,
+      time,
+      orderBookAskAdapter,
+      lastProcessedOffset,
+      blacklistedAddresses,
+      hasMatcherAccountScript
+    )(_)
+
     new MatcherApiRoute(
       pairBuilder,
       matcherPublicKey,
-      matcherActor(),
+      matcherActor,
       addressActors,
       matcherQueue.storeEvent,
       p => Option { orderBooks.get() } flatMap (_ get p),
@@ -216,9 +191,9 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       getActualTickSize = assetPair => {
         matchingRulesCache.getDenormalizedRuleForNextOrder(assetPair, lastProcessedOffset, assetsCache.unsafeGetDecimals).tickSize
       },
-      validateOrder,
+      orderValidation,
       settings,
-      () => status.get(),
+      () => status,
       orderDB,
       () => lastProcessedOffset,
       () => matcherQueue.lastEventOffset,
@@ -235,29 +210,25 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       () => orderFeeSettingsCache.getSettingsForOffset(lastProcessedOffset + 1),
       externalClientDirectoryRef
     )
+  }
 
-  private lazy val httpApiRouteV1 = MatcherApiRouteV1(pairBuilder, orderBookHttpInfo, () => status.get(), maybeApiKeyHash)
+  private lazy val httpApiRouteV1 = MatcherApiRouteV1(pairBuilder, orderBookHttpInfo, () => status, maybeApiKeyHash)
 
   private lazy val wsApiRoute = new MatcherWebSocketRoute(
-    wsInternalBroadcast, // safe, wsApiRoute is used after initialization of wsInternalBroadcast
+    wsInternalBroadcast,
     externalClientDirectoryRef,
     addressActors,
-    matcherActor(),
+    matcherActor,
     time,
     pairBuilder,
     maybeApiKeyHash,
     settings,
-    () => status.get(),
+    () => status,
     () => rateCache.getAllRates
   )
 
   private lazy val matcherApiRoutes: Seq[ApiRoute] = Seq(httpApiRouteV0, httpApiRouteV1, wsApiRoute)
-
-  lazy val matcherApiTypes: Set[Class[_]] = Set(
-    classOf[MatcherApiRoute],
-    classOf[MatcherApiRouteV1],
-    classOf[MatcherWebSocketRoute]
-  )
+  lazy val matcherApiTypes: Set[Class[_]]          = matcherApiRoutes.map(_.getClass).toSet
 
   private val snapshotsRestore = Promise[QueueEventWithMeta.Offset]() // Earliest offset among snapshots
 
@@ -273,103 +244,53 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
 
   private val pongTimeout = new Timeout(settings.processConsumedTimeout * 2)
 
-  private val matcherActor: Coeval[ActorRef] = Coeval.evalOnce {
-    actorSystem.actorOf(
-      MatcherActor.props(
-        settings,
-        assetPairsDB,
-        {
-          case Right(startOffset) => snapshotsRestore.trySuccess(startOffset)
-          case Left(msg) =>
-            log.error(s"Can't start MatcherActor: $msg")
-            forceStopApplication(RecoveryError)
-        },
-        orderBooks,
-        orderBookProps,
-        assetsCache.get(_)
-      ),
-      MatcherActor.name
-    )
-  }
+  private lazy val matcherActor: ActorRef = actorSystem.actorOf(
+    MatcherActor.props(
+      settings,
+      assetPairsDB,
+      {
+        case Right(startOffset) => snapshotsRestore.success(startOffset)
+        case Left(msg)          => snapshotsRestore.failure(RecoveryError(msg))
+      },
+      orderBooks,
+      orderBookProps,
+      assetsCache.get(_)
+    ),
+    MatcherActor.name
+  )
 
   private lazy val historyRouter = settings.orderHistory.map { orderHistorySettings =>
     actorSystem.actorOf(HistoryRouterActor.props(assetsCache.unsafeGetDecimals, settings.postgresConnection, orderHistorySettings), "history-router")
   }
 
-  private lazy val addressActors =
-    actorSystem.actorOf(
-      Props(
-        new AddressDirectoryActor(
-          orderDB,
-          createAddressActor,
-          historyRouter
-        )
-      ),
-      "addresses"
-    )
-
-  private def sendBalanceChanges(recipient: ActorRef): Unit = {
-
-    def aggregateChangesByAddress(xs: List[BalanceChanges]): Map[Address, Map[Asset, Long]] = xs.foldLeft(Map.empty[Address, Map[Asset, Long]]) {
-      case (result, bc) => result.updated(bc.address, result.getOrElse(bc.address, Map.empty) + (bc.asset -> bc.balance))
-    }
-
-    wavesBlockchainAsyncClient.realTimeBalanceBatchChanges
-      .map(aggregateChangesByAddress)
-      .foreach { recipient ! SpendableBalancesActor.Command.UpdateStates(_) }(monixScheduler)
-  }
-
-  private val spendableBalancesActor = {
-    actorSystem.actorOf(
-      Props(
-        new SpendableBalancesActor(
-          wavesBlockchainAsyncClient.spendableBalances,
-          wavesBlockchainAsyncClient.allAssetsSpendableBalance,
-          addressActors
-        )
-      )
-    ) unsafeTap sendBalanceChanges
-  }
-
-  private def validateForAddress(ao: AcceptedOrder, tradableBalance: Map[Asset, Long]): Future[Either[MatcherError, Unit]] = {
-    for {
-      hasOrderInBlockchain <- liftFutureAsync(wavesBlockchainAsyncClient.forgedOrder(ao.id))
-      orderBookCache       <- EitherT(orderBookAskAdapter.getAggregatedSnapshot(ao.order.assetPair))
-      _ <- EitherT.fromEither {
-        OrderValidator
-          .accountStateAware(
-            tradableBalance.withDefaultValue(0L),
-            hasOrderInBlockchain,
-            orderBookCache.getOrElse(OrderBookAggregatedSnapshot.empty)
-          )(ao)
-      }
-    } yield ()
-  }.value
-
-  private var wsInternalBroadcast: typed.ActorRef[WsInternalBroadcastActor.Command] = actorSystem.toTyped.ignoreRef
-
-  private def createAddressActor(address: Address, startSchedules: Boolean): Props = {
+  private lazy val addressActors = actorSystem.actorOf(
     Props(
-      new AddressActor(
-        address,
-        time,
+      new AddressDirectoryActor(
         orderDB,
-        validateForAddress,
-        storeEvent,
-        startSchedules,
-        spendableBalancesActor,
-        settings.addressActorSettings
+        createAddressActor,
+        historyRouter
+      )
+    ),
+    "addresses"
+  )
+
+  private val spendableBalancesActor = actorSystem.actorOf(
+    Props(
+      new SpendableBalancesActor(
+        wavesBlockchainAsyncClient.spendableBalances,
+        wavesBlockchainAsyncClient.allAssetsSpendableBalance,
+        addressActors
       )
     )
-  }
+  ) unsafeTap sendBalanceChanges
 
   def registerShutdownHooks(cs: CoordinatedShutdown): Unit = {
-    cs.addJvmShutdownHook(setStatus(Status.Stopping))
+    cs.addJvmShutdownHook(setStatus(MatcherStatus.Stopping))
 
     cs.addTask(CoordinatedShutdown.PhaseBeforeServiceUnbind, "WebSockets")(() => wsApiRoute.gracefulShutdown().map(_ => Done))
 
     cs.addTask(CoordinatedShutdown.PhaseServiceRequestsDone, "Actors") { () =>
-      gracefulStop(matcherActor(), 3.seconds, MatcherActor.Shutdown).map(_ => Done)
+      gracefulStop(matcherActor, 3.seconds, MatcherActor.Shutdown).map(_ => Done)
     }
 
     cs.addTask(CoordinatedShutdown.PhaseServiceStop, "gRPC client") { () =>
@@ -394,180 +315,179 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     }
   }
 
-  def start(): Unit = {
+  private val txWriterRef = actorSystem.actorOf(WriteExchangeTransactionActor.props(db), WriteExchangeTransactionActor.name)
 
-    def loadAllKnownAssets(): Future[Unit] =
-      Future(blocking(assetPairsDB.all()).flatMap(_.assets) ++ settings.mentionedAssets).flatMap { assetsToLoad =>
-        Future
-          .traverse(assetsToLoad)(asset => getDecimalsFromCache(asset).value tupleLeft asset)
-          .map { xs =>
-            val notFoundAssets = xs.collect { case (id, Left(_)) => id }
-            if (notFoundAssets.nonEmpty) {
-              log.error(s"Can't load assets: ${notFoundAssets.mkString(", ")}. Try to sync up your node with the network.")
-              forceStopApplication(UnsynchronizedNodeError)
-            }
-          }
-      }
+  private val wavesNetTxBroadcasterRef = actorSystem.actorOf(
+    BroadcastExchangeTransactionActor
+      .props(
+        settings.exchangeTransactionBroadcast,
+        time,
+        wavesBlockchainAsyncClient.wereForged,
+        wavesBlockchainAsyncClient.broadcastTx
+      ),
+    "exchange-transaction-broadcast"
+  )
 
-    wsInternalBroadcast = actorSystem.spawn(
-      WsInternalBroadcastActor(settings.webSocketSettings.internalBroadcast),
-      "ws-internal-broadcast"
-    )
+  actorSystem.actorOf(
+    CreateExchangeTransactionActor.props(transactionCreator.createTransaction, List(txWriterRef, wavesNetTxBroadcasterRef)),
+    CreateExchangeTransactionActor.name
+  )
 
-    val txWriterRef = actorSystem.actorOf(WriteExchangeTransactionActor.props(db), WriteExchangeTransactionActor.name)
-
-    val wavesNetTxBroadcasterRef = actorSystem.actorOf(
-      BroadcastExchangeTransactionActor
-        .props(
-          settings.exchangeTransactionBroadcast,
-          time,
-          wavesBlockchainAsyncClient.wereForged,
-          wavesBlockchainAsyncClient.broadcastTx
-        ),
-      "exchange-transaction-broadcast"
-    )
-
-    actorSystem.actorOf(
-      CreateExchangeTransactionActor.props(transactionCreator.createTransaction, List(txWriterRef, wavesNetTxBroadcasterRef)),
-      CreateExchangeTransactionActor.name
-    )
-
-    val startGuard = for {
-      (_, http) <- {
-        log.info("Loading known assets ...")
-        loadAllKnownAssets()
-      } zip {
-        log.info("Checking matcher's account script ...")
-        wavesBlockchainAsyncClient.hasScript(matcherKeyPair).map(hasMatcherAccountScript = _)
-      } zip {
-        Future(
-          blocking {
-            log.info(s"Initializing HTTP ...")
-            Http() // May take 3+ seconds
-          }
-        )
-      }
-
-      _ <- {
-        log.info(s"Preparing HTTP service (Matcher's ID = ${settings.id}) ...")
-        // Indirectly initializes matcherActor, so it must be after loadAllKnownAssets
-        val combinedRoute = respondWithHeader(MatcherHttpServer(settings.id)) {
-          new CompositeHttpService(matcherApiTypes, matcherApiRoutes, settings.restApi).compositeRoute
+  private val startGuard = for {
+    (_, http) <- {
+      log.info("Loading known assets ...")
+      loadAllKnownAssets()
+    } zip {
+      log.info("Checking matcher's account script ...")
+      wavesBlockchainAsyncClient.hasScript(matcherKeyPair).map(hasMatcherAccountScript = _)
+    } zip {
+      Future(
+        blocking {
+          log.info(s"Initializing HTTP ...")
+          Http() // May take 3+ seconds
         }
-
-        log.info(s"Binding REST and WebSocket API ${settings.restApi.address}:${settings.restApi.port} ...")
-        http
-          .newServerAt(settings.restApi.address, settings.restApi.port)
-          .bind(combinedRoute)
-          .map(_.addToCoordinatedShutdown(hardTerminationDeadline = 5.seconds))
-      } map { serverBinding =>
-        log.info(s"REST and WebSocket API bound to ${serverBinding.localAddress}")
-      }
-
-      matcherActorRef = matcherActor()
-      deadline = settings.startEventsProcessingTimeout.fromNow
-      earliestSnapshotOffset <- {
-        log.info("Waiting all snapshots are restored ...")
-        waitSnapshotsRestored(settings.snapshotsLoadingTimeout).map { x =>
-          log.info("All snapshots are restored")
-          x
-        }
-      }
-
-      (firstQueueOffset, lastOffsetQueue) <- {
-        log.info("Getting first queue offset ...")
-        getFirstOffset(deadline)
-      } zip {
-        log.info("Getting last queue offset ...")
-        getLastOffset(deadline)
-      }
-
-      firstConsumedOffset = earliestSnapshotOffset + 1
-
-      _ <- {
-        log.info(s"Offsets: earliest snapshot = $earliestSnapshotOffset, first = $firstQueueOffset, last = $lastOffsetQueue")
-        if (lastOffsetQueue < earliestSnapshotOffset) {
-          log.error(s"The queue doesn't have messages to recover all orders and continue work. Did you clear the queue?")
-          Future.failed(new RuntimeException("Recovery is not possible"))
-        } else if (earliestSnapshotOffset < firstQueueOffset) {
-          log.warn(s"The queue doesn't contain required offsets to recover all orders. Check retention settings of the queue. Continue...")
-          Future.successful(()) // Otherwise it would be hard to start the matcher
-        } else Future.successful(())
-      }
-
-      _ <- Future {
-        log.info("Starting consuming")
-        matcherQueue.startConsume(
-          firstConsumedOffset,
-          xs =>
-            if (xs.isEmpty) Future.unit
-            else {
-              val eventAssets = xs.flatMap(_.event.assets)
-              val loadAssets  = Future.traverse(eventAssets)(getDescription(assetsCache, wavesBlockchainAsyncClient.assetDescription)(_).value)
-
-              loadAssets.flatMap { _ =>
-                val assetPairs: Set[AssetPair] = xs
-                  .map { eventWithMeta =>
-                    log.debug(s"Consumed $eventWithMeta")
-                    matcherActorRef ! eventWithMeta
-                    lastProcessedOffset = eventWithMeta.offset
-                    eventWithMeta.event.assetPair
-                  }
-                  .to(Set)
-
-                matcherActorRef
-                  .ask(MatcherActor.PingAll(assetPairs))(pongTimeout)
-                  .recover { case NonFatal(e) => log.error("PingAll is timed out!", e) }
-                  .map(_ => ())
-              } andThen {
-                case Failure(ex) =>
-                  log.error("Error while event processing occurred: ", ex)
-                  forceStopApplication(EventProcessingError)
-                case _ =>
-              }
-            }
-        )
-      } zip {
-        log.info(s"Last queue offset is $lastOffsetQueue")
-        waitOffsetReached(lastOffsetQueue, deadline)
-      }
-
-      connectedNodeAddress <- wavesBlockchainAsyncClient.getNodeAddress
-    } yield {
-      log.info("Last offset has been reached, notify addresses")
-      log.info(s"DEX server is connected to Node with an address: ${connectedNodeAddress.getHostAddress}")
-      addressActors ! AddressDirectoryActor.StartWork
+      )
     }
 
-    startGuard.onComplete {
-      case Success(_) => setStatus(Status.Working)
-      case Failure(e) =>
-        log.error(s"Can't start matcher: ${e.getMessage}", e)
-        forceStopApplication(StartingMatcherError)
+    _ <- {
+      log.info(s"Preparing HTTP service (Matcher's ID = ${settings.id}) ...")
+      // Indirectly initializes matcherActor, so it must be after loadAllKnownAssets
+      val combinedRoute = respondWithHeader(MatcherHttpServer(settings.id)) {
+        new CompositeHttpService(matcherApiTypes, matcherApiRoutes, settings.restApi).compositeRoute
+      }
+
+      log.info(s"Binding REST and WebSocket API ${settings.restApi.address}:${settings.restApi.port} ...")
+      http
+        .newServerAt(settings.restApi.address, settings.restApi.port)
+        .bind(combinedRoute)
+        .map(_.addToCoordinatedShutdown(hardTerminationDeadline = 5.seconds))
+    } map { serverBinding =>
+      log.info(s"REST and WebSocket API bound to ${serverBinding.localAddress}")
     }
+
+    earliestSnapshotOffset <- {
+      log.info("Waiting all snapshots are restored ...")
+      waitSnapshotsRestored(settings.snapshotsLoadingTimeout).andThen(_ => log.info("All snapshots are restored"))
+    }
+
+    deadline = settings.startEventsProcessingTimeout.fromNow
+    (firstQueueOffset, lastOffsetQueue) <- {
+      log.info("Gettings queue offsets ...")
+      val requests = new RepeatableRequests(matcherQueue, deadline)
+      requests.firstOffset zip requests.lastOffset
+    }
+
+    firstConsumedOffset = earliestSnapshotOffset + 1
+
+    _ <- {
+      log.info(s"Offsets: earliest snapshot = $earliestSnapshotOffset, first = $firstQueueOffset, last = $lastOffsetQueue")
+      if (lastOffsetQueue < earliestSnapshotOffset)
+        Future.failed(RecoveryError("The queue doesn't have messages to recover all orders and continue work. Did you clear the queue?"))
+      else if (earliestSnapshotOffset < firstQueueOffset) {
+        log.warn(s"The queue doesn't contain required offsets to recover all orders. Check retention settings of the queue. Continue...")
+        Future.unit // Otherwise it would be hard to start the matcher
+      } else Future.unit
+    }
+
+    _ <- Future {
+      log.info("Starting consuming")
+      matcherQueue.startConsume(firstConsumedOffset, consumeMessages)
+    } zip {
+      log.info(s"Last queue offset is $lastOffsetQueue")
+      waitOffsetReached(lastOffsetQueue, deadline)
+    }
+
+    connectedNodeAddress <- wavesBlockchainAsyncClient.getNodeAddress
+  } yield {
+    log.info("Last offset has been reached, notify addresses")
+    log.info(s"DEX server is connected to Node with an address: ${connectedNodeAddress.getHostAddress}")
+    addressActors ! AddressDirectoryActor.StartWork
   }
 
-  private def setStatus(newStatus: Status): Unit = {
-    status.set(newStatus)
+  startGuard.onComplete {
+    case Success(_) => setStatus(MatcherStatus.Working)
+    case Failure(e: ApplicationStopReason) =>
+      log.error(s"Can't start matcher: ${e.getMessage}")
+      forceStopApplication(e)
+    case Failure(e) =>
+      log.error(s"Can't start matcher: ${e.getMessage}", e)
+      forceStopApplication(StartingMatcherError)
+  }
+
+  private def sendBalanceChanges(recipient: ActorRef): Unit = {
+
+    def aggregateChangesByAddress(xs: List[BalanceChanges]): Map[Address, Map[Asset, Long]] = xs.foldLeft(Map.empty[Address, Map[Asset, Long]]) {
+      case (result, bc) => result.updated(bc.address, result.getOrElse(bc.address, Map.empty) + (bc.asset -> bc.balance))
+    }
+
+    wavesBlockchainAsyncClient.realTimeBalanceBatchChanges
+      .map(aggregateChangesByAddress)
+      .foreach { recipient ! SpendableBalancesActor.Command.UpdateStates(_) }(monixScheduler)
+  }
+
+  private def createAddressActor(address: Address, started: Boolean): Props = AddressActor.props(
+    address,
+    time,
+    orderDB,
+    ValidationStages.mkSecond(wavesBlockchainAsyncClient, orderBookAskAdapter),
+    storeEvent,
+    started,
+    spendableBalancesActor,
+    settings.addressActorSettings
+  )
+
+  private def loadAllKnownAssets(): Future[Unit] =
+    Future(blocking(assetPairsDB.all()).flatMap(_.assets) ++ settings.mentionedAssets).flatMap { assetsToLoad =>
+      Future
+        .traverse(assetsToLoad)(asset => getDecimalsFromCache(asset).value tupleLeft asset)
+        .map { xs =>
+          val notFoundAssets = xs.collect { case (id, Left(_)) => id }
+          if (notFoundAssets.nonEmpty) {
+            log.error(s"Can't load assets: ${notFoundAssets.mkString(", ")}")
+            forceStopApplication(NotSynchronizedNodeError)
+          }
+        }
+    }
+
+  private def consumeMessages(xs: Iterable[QueueEventWithMeta]): Future[Unit] =
+    if (xs.isEmpty) Future.unit
+    else {
+      val eventAssets = xs.flatMap(_.event.assets)
+      val loadAssets  = Future.traverse(eventAssets)(getAndCacheDescription(assetsCache, wavesBlockchainAsyncClient)(_).value)
+
+      loadAssets.flatMap { _ =>
+        val assetPairs: Set[AssetPair] = xs
+          .map { eventWithMeta =>
+            log.debug(s"Consumed $eventWithMeta")
+            matcherActor ! eventWithMeta
+            lastProcessedOffset = eventWithMeta.offset
+            eventWithMeta.event.assetPair
+          }
+          .to(Set)
+
+        matcherActor
+          .ask(MatcherActor.PingAll(assetPairs))(pongTimeout)
+          .recover { case NonFatal(e) => log.error("PingAll is timed out!", e) }
+          .map(_ => ())
+      } andThen {
+        case Failure(ex) =>
+          log.error("Error while event processing occurred: ", ex)
+          forceStopApplication(EventProcessingError)
+        case _ =>
+      }
+    }
+
+  private def setStatus(newStatus: MatcherStatus): Unit = {
+    status = newStatus
     log.info(s"Status now is $newStatus")
   }
 
-  private def waitSnapshotsRestored(wait: FiniteDuration): Future[QueueEventWithMeta.Offset] =
-    Future.firstCompletedOf(List(snapshotsRestore.future, timeout(wait, "wait snapshots restored")))
-
-  private def getFirstOffset(deadline: Deadline): Future[QueueEventWithMeta.Offset] = getOffset("first", deadline, matcherQueue.firstEventOffset)
-  private def getLastOffset(deadline: Deadline): Future[QueueEventWithMeta.Offset]  = getOffset("last", deadline, matcherQueue.lastEventOffset)
-
-  private def getOffset[T](which: String, deadline: Deadline, get: => Future[T]): Future[T] = get.recoverWith {
-    case e: TimeoutException =>
-      log.warn(s"During receiving $which offset", e)
-      if (deadline.isOverdue()) Future.failed(new TimeoutException(s"Can't get the $which offset from queue"))
-      else getOffset(which, deadline, get)
-
-    case e: Throwable =>
-      log.error(s"Can't catch ${e.getClass.getName}", e)
-      throw e
-  }
+  private def waitSnapshotsRestored(wait: FiniteDuration): Future[QueueEventWithMeta.Offset] = Future.firstCompletedOf(
+    List(
+      snapshotsRestore.future,
+      actorSystem.timeout(wait).recover { case _ => throw RecoveryError(s"Timeout of $wait for waiting snapshots to restore is out") }
+    )
+  )
 
   private def waitOffsetReached(lastQueueOffset: QueueEventWithMeta.Offset, deadline: Deadline): Future[Unit] = {
     def loop(p: Promise[Unit]): Unit = {
@@ -582,45 +502,28 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     loop(p)
     p.future
   }
-
-  private def timeout(after: FiniteDuration, label: String): Future[Nothing] = {
-    val failure = Promise[Nothing]()
-    actorSystem.scheduler.scheduleOnce(after) {
-      failure.failure(new TimeoutException(s"$after is out: $label"))
-    }
-    failure.future
-  }
 }
 
 object Matcher extends ScorexLogging {
 
-  def forceStopApplication(reason: ApplicationStopReason): Unit = System.exit(reason.code)
-
   type StoreEvent = QueueEvent => Future[Option[QueueEventWithMeta]]
 
-  sealed trait Status
-
-  object Status {
-    case object Starting extends Status
-    case object Working  extends Status
-    case object Stopping extends Status
-  }
-
-  private def getDecimals(assetsCache: AssetsStorage, assetDesc: IssuedAsset => Future[Option[BriefAssetDescription]])(asset: Asset)(implicit
+  private def getAndCacheDecimals(assetsCache: AssetsStorage, blockchain: AsyncBlockchain)(asset: Asset)(implicit
       ec: ExecutionContext
-  ): FutureResult[Int] =
-    getDescription(assetsCache, assetDesc)(asset).map(_.decimals)(catsStdInstancesForFuture)
+  ): FutureResult[Int] = getAndCacheDescription(assetsCache, blockchain)(asset).map(_.decimals)(catsStdInstancesForFuture)
 
-  private def getDescription(assetsCache: AssetsStorage, assetDesc: IssuedAsset => Future[Option[BriefAssetDescription]])(
+  private val wavesLifted: FutureResult[BriefAssetDescription] = liftValueAsync { BriefAssetDescription.wavesDescription }
+  private def getAndCacheDescription(assetsCache: AssetsStorage, blockchain: AsyncBlockchain)(
       asset: Asset
   )(implicit ec: ExecutionContext): FutureResult[BriefAssetDescription] = asset match {
-    case Waves => AssetsStorage.wavesLifted
+    case Waves => wavesLifted
     case asset: IssuedAsset =>
       assetsCache.get(asset) match {
         case Some(x) => liftValueAsync[BriefAssetDescription](x)
         case None =>
           EitherT {
-            assetDesc(asset)
+            blockchain
+              .assetDescription(asset)
               .map {
                 _.toRight[MatcherError](error.AssetNotFound(asset))
                   .map { desc =>

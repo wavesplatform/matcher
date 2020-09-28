@@ -22,13 +22,14 @@ import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
 import com.wavesplatform.dex.api.ws.actors.{WsExternalClientDirectoryActor, WsExternalClientHandlerActor, WsInternalBroadcastActor, WsInternalClientHandlerActor}
 import com.wavesplatform.dex.api.ws.protocol._
 import com.wavesplatform.dex.api.ws.routes.MatcherWebSocketRoute.CloseHandler
+import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.utils.ScorexLogging
+import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error.{InvalidJson, MatcherIsStopping}
 import com.wavesplatform.dex.model.AssetPairBuilder
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.dex.time.Time
-import com.wavesplatform.dex.{Matcher, error}
 import io.swagger.annotations._
 import javax.ws.rs.Path
 import play.api.libs.json.{Json, Reads}
@@ -48,7 +49,7 @@ class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsInternalBro
                             assetPairBuilder: AssetPairBuilder,
                             override val apiKeyHash: Option[Array[Byte]],
                             matcherSettings: MatcherSettings,
-                            matcherStatus: () => Matcher.Status,
+                            matcherStatus: () => MatcherStatus,
                             getRatesSnapshot: () => Map[Asset, Double])(implicit mat: Materializer)
     extends ApiRoute
     with AuthRoute
@@ -246,9 +247,9 @@ class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsInternalBro
   }
 
   private def matcherStatusBarrier: Directive0 = matcherStatus() match {
-    case Matcher.Status.Working  => pass
-    case Matcher.Status.Starting => complete(error.MatcherIsStarting.toWsHttpResponse(StatusCodes.ServiceUnavailable))
-    case Matcher.Status.Stopping => complete(error.MatcherIsStopping.toWsHttpResponse(StatusCodes.ServiceUnavailable))
+    case MatcherStatus.Working  => pass
+    case MatcherStatus.Starting => complete(error.MatcherIsStarting.toWsHttpResponse(StatusCodes.ServiceUnavailable))
+    case MatcherStatus.Stopping => complete(error.MatcherIsStopping.toWsHttpResponse(StatusCodes.ServiceUnavailable))
   }
 }
 

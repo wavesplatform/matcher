@@ -25,7 +25,6 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
   private implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
 
   private val matcher: Matcher = new Matcher(settings)
-  matcher.start()
 
   private val coordinatedShutdown = CoordinatedShutdown(actorSystem)
   matcher.registerShutdownHooks(coordinatedShutdown)

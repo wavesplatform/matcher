@@ -22,6 +22,7 @@ import com.wavesplatform.dex.api.http.headers.`X-User-Public-Key`
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
 import com.wavesplatform.dex.api.ws.actors.WsExternalClientDirectoryActor
+import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
@@ -65,7 +66,7 @@ class MatcherApiRoute(
     getActualTickSize: AssetPair => BigDecimal,
     orderValidator: Order => FutureResult[Order],
     matcherSettings: MatcherSettings,
-    override val matcherStatus: () => Matcher.Status,
+    override val matcherStatus: () => MatcherStatus,
     orderDb: OrderDB,
     currentOffset: () => QueueEventWithMeta.Offset,
     lastOffset: () => Future[QueueEventWithMeta.Offset],

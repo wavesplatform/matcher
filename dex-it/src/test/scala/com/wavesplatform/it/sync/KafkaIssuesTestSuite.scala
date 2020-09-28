@@ -155,7 +155,7 @@ class KafkaIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka 
         ConfigFactory
           .parseString("""waves.dex {
   events-queue.kafka.topic = cleared-topic
-  snapshots-interval = 2
+  snapshots-interval = 3
 }""")
           .withFallback(dexInitialSuiteConfig)
       )
@@ -182,7 +182,7 @@ class KafkaIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka 
           ConfigFactory
             .parseString("""waves.dex {
   events-queue.kafka.topic = new-topic
-  snapshots-interval = 2
+  snapshots-interval = 3
 }""")
             .withFallback(dexInitialSuiteConfig)
         )

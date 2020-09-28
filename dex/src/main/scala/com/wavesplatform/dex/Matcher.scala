@@ -44,6 +44,7 @@ import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue._
 import com.wavesplatform.dex.settings.{MatcherSettings, OrderFeeSettings}
 import com.wavesplatform.dex.time.NTP
+import monix.eval.Coeval
 import mouse.any.anySyntaxMouse
 
 import scala.concurrent.duration._
@@ -207,7 +208,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     new MatcherApiRoute(
       pairBuilder,
       matcherPublicKey,
-      matcherActor,
+      matcherActor(),
       addressActors,
       matcherQueue.storeEvent,
       p => Option { orderBooks.get() } flatMap (_ get p),
@@ -242,7 +243,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     wsInternalBroadcast, // safe, wsApiRoute is used after initialization of wsInternalBroadcast
     externalClientDirectoryRef,
     addressActors,
-    matcherActor,
+    matcherActor(),
     time,
     pairBuilder,
     maybeApiKeyHash,
@@ -273,7 +274,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
 
   private val pongTimeout = new Timeout(settings.processConsumedTimeout * 2)
 
-  private lazy val matcherActor: ActorRef =
+  private val matcherActor: Coeval[ActorRef] = Coeval.evalOnce {
     actorSystem.actorOf(
       MatcherActor.props(
         settings,
@@ -289,6 +290,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       ),
       MatcherActor.name
     )
+  }
 
   private lazy val historyRouter = settings.orderHistory.map { orderHistorySettings =>
     actorSystem.actorOf(HistoryRouterActor.props(assetsCache.unsafeGetDecimals, settings.postgresConnection, orderHistorySettings), "history-router")
@@ -367,7 +369,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     cs.addTask(CoordinatedShutdown.PhaseBeforeServiceUnbind, "WebSockets")(() => wsApiRoute.gracefulShutdown().map(_ => Done))
 
     cs.addTask(CoordinatedShutdown.PhaseServiceRequestsDone, "Actors") { () =>
-      gracefulStop(matcherActor, 3.seconds, MatcherActor.Shutdown).map(_ => Done)
+      gracefulStop(matcherActor(), 3.seconds, MatcherActor.Shutdown).map(_ => Done)
     }
 
     cs.addTask(CoordinatedShutdown.PhaseServiceStop, "gRPC client") { () =>
@@ -462,10 +464,14 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         log.info(s"REST and WebSocket API bound to ${serverBinding.localAddress}")
       }
 
+      matcherActorRef = matcherActor()
       deadline = settings.startEventsProcessingTimeout.fromNow
       earliestSnapshotOffset <- {
         log.info("Waiting all snapshots are restored ...")
-        waitSnapshotsRestored(settings.snapshotsLoadingTimeout).andThen(_ => log.info("All snapshots are restored"))
+        waitSnapshotsRestored(settings.snapshotsLoadingTimeout).map { x =>
+          log.info("All snapshots are restored")
+          x
+        }
       }
 
       (firstQueueOffset, lastOffsetQueue) <- {
@@ -503,13 +509,13 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
                 val assetPairs: Set[AssetPair] = xs
                   .map { eventWithMeta =>
                     log.debug(s"Consumed $eventWithMeta")
-                    matcherActor ! eventWithMeta
+                    matcherActorRef ! eventWithMeta
                     lastProcessedOffset = eventWithMeta.offset
                     eventWithMeta.event.assetPair
                   }
                   .to(Set)
 
-                matcherActor
+                matcherActorRef
                   .ask(MatcherActor.PingAll(assetPairs))(pongTimeout)
                   .recover { case NonFatal(e) => log.error("PingAll is timed out!", e) }
                   .map(_ => ())

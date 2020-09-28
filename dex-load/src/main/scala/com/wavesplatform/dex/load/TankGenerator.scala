@@ -17,11 +17,11 @@ import im.mak.waves.transactions.common.{Amount, AssetId}
 import im.mak.waves.transactions.exchange.{AssetPair, Order, OrderType}
 import im.mak.waves.transactions.mass.Transfer
 import org.apache.http.HttpResponse
-import org.apache.http.client.HttpClient
 import org.apache.http.client.config.{CookieSpecs, RequestConfig}
 import org.apache.http.client.methods.RequestBuilder
 import org.apache.http.entity.{ContentType, StringEntity}
-import org.apache.http.impl.client.HttpClients
+import org.apache.http.impl.client.{CloseableHttpClient, HttpClients}
+import org.apache.http.impl.conn.PoolingHttpClientConnectionManager
 import play.api.libs.json.{JsError, JsSuccess, JsValue}
 
 import scala.concurrent._
@@ -29,26 +29,31 @@ import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters._
 import scala.util.Random
 
+import org.apache.http.client.protocol.HttpClientContext
+
 object TankGenerator {
 
-  private val threadCount: Int          = 5
+  private val threadCount: Int          = 10
   private val executor: ExecutorService = Executors.newFixedThreadPool(threadCount)
 
   implicit private val blockingContext: ExecutionContextExecutor = ExecutionContext.fromExecutor(executor)
 
-  private val matcherHttpClient: HttpClient =
-    HttpClients.custom
-      .setDefaultRequestConfig(
-        RequestConfig.custom
-          .setSocketTimeout(5000)
-          .setConnectTimeout(5000)
-          .setConnectionRequestTimeout(5000)
-          .setCookieSpec(CookieSpecs.STANDARD)
-          .build
-      )
-      .build()
-
   private val matcherHttpUri: URI = new URI(settings.hosts.matcher)
+
+  val cm = new PoolingHttpClientConnectionManager
+  cm.setMaxTotal(20)
+  cm.setDefaultMaxPerRoute(threadCount)
+
+  val httpClient: CloseableHttpClient = HttpClients.custom
+    .setDefaultRequestConfig(
+      RequestConfig.custom
+        .setSocketTimeout(5000)
+        .setConnectTimeout(5000)
+        .setConnectionRequestTimeout(5000)
+        .setCookieSpec(CookieSpecs.STANDARD)
+        .build)
+    .setConnectionManager(cm)
+    .build
 
   private def mkAccounts(seedPrefix: String, count: Int): List[JPrivateKey] = {
     print(s"Generating $count accounts (prefix: $seedPrefix)... ")
@@ -326,13 +331,15 @@ object TankGenerator {
   }
 
   def placeOrder(order: Order): Future[HttpResponse] = Future {
-    val request =
+    val res = httpClient.execute(
       RequestBuilder
         .post(matcherHttpUri.resolve(s"/matcher/orderbook"))
         .setEntity(new StringEntity(order.toJson, ContentType.APPLICATION_JSON))
-        .build()
-
-    matcherHttpClient.execute(request)
+        .build(),
+      HttpClientContext.create
+    )
+    res.close()
+    res
   }
 
   def placeOrdersForCancel(accounts: List[JPrivateKey], requestsCount: Int, pairsFile: Option[File]): Unit = {
@@ -353,6 +360,7 @@ object TankGenerator {
             JPublicKey.as(settings.matcherPublicKey)
           )
           .expiration(System.currentTimeMillis + 60 * 60 * 24 * 20 * 1000)
+          .version(3)
           .getSignedWith(account)
 
       placeOrder(order).recover {
@@ -360,7 +368,7 @@ object TankGenerator {
       }
     }
 
-    val requestsAwaitingTime = (requestsCount * threadCount).seconds
+    val requestsAwaitingTime = (requestsCount / threadCount).seconds
     print(s"Awaiting place orders requests, requests count = $requestsCount, treads count = $threadCount, waiting at most $requestsAwaitingTime... ")
     Await.result(Future.sequence(futures), requestsAwaitingTime)
     println("Done")

@@ -15,14 +15,13 @@ import im.mak.waves.transactions.common.{Amount, AssetId}
 import im.mak.waves.transactions.exchange.{AssetPair, Order, OrderType}
 import play.api.libs.json.{JsValue, Json}
 import pureconfig.ConfigSource
+import pureconfig.generic.auto._
 
 import scala.annotation.nowarn
 import scala.io.Source
 import scala.util.Random
 
 package object utils {
-
-  import pureconfig.generic.auto._
 
   @nowarn
   val settings: Settings =

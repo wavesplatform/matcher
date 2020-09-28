@@ -51,6 +51,21 @@ pipeline {
         }
     }
     post {
+        always {
+            script {
+                def kafkaBuildNumber = Jenkins.instance.getItem('Waves.Exchange/Matcher/Matcher Server - OS - Test - Kafka').lastBuild.number + 1
+                def multipleBuildNumber = Jenkins.instance.getItem('Waves.Exchange/Matcher/Matcher Server - OS - Test - Multiple Versions').lastBuild.number + 1
+                def versionBuildNumber = Jenkins.instance.getItem('Waves.Exchange/Matcher/Matcher Server - OS - Test - Version').lastBuild.number + 1
+
+                def description = '''
+                    <a href='${JOB_URL}/Matcher Server - OS - Test - Kafka/${kafkaBuildNumber}'>Test - Kafka</a><br />
+                    <a href='${JOB_URL}/Matcher Server - OS - Test - Multiple Versions/${multipleBuildNumber}'>Test - Multiple Versions</a><br />
+                    <a href='${JOB_URL}/Matcher Server - OS - Test - Version/${versionBuildNumber}'>Test - Version</a><br />
+                '''
+
+                currentBuild.description = description
+            }
+        }
         cleanup {
             cleanWs()
         }

@@ -228,8 +228,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       validatedAllowedOrderVersions = () => {
         Future
           .sequence {
-            settings.allowedOrderVersions.map(version =>
-              OrderValidator.checkOrderVersion(version, wavesBlockchainAsyncClient.isFeatureActivated).value)
+            settings.allowedOrderVersions.map(OrderValidator.checkOrderVersion(_, wavesBlockchainAsyncClient.isFeatureActivated).value)
           }
           .map { _.collect { case Right(version) => version } }
       },
@@ -278,8 +277,9 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     actorSystem.actorOf(
       MatcherActor.props(
         settings,
-        assetPairsDB, {
-          case Right((self, startOffset)) => snapshotsRestore.trySuccess(startOffset)
+        assetPairsDB,
+        {
+          case Right(startOffset) => snapshotsRestore.trySuccess(startOffset)
           case Left(msg) =>
             log.error(s"Can't start MatcherActor: $msg")
             forceStopApplication(RecoveryError)
@@ -525,7 +525,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
                   forceStopApplication(EventProcessingError)
                 case _ =>
               }
-          }
+            }
         )
       } zip {
         log.info(s"Last queue offset is $lastOffsetQueue")
@@ -536,7 +536,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     } yield {
       log.info("Last offset has been reached, notify addresses")
       log.info(s"DEX server is connected to Node with an address: ${connectedNodeAddress.getHostAddress}")
-      addressActors ! AddressDirectoryActor.StartSchedules
+      addressActors ! AddressDirectoryActor.StartWork
     }
 
     startGuard.onComplete {
@@ -606,12 +606,14 @@ object Matcher extends ScorexLogging {
     case object Stopping extends Status
   }
 
-  private def getDecimals(assetsCache: AssetsStorage, assetDesc: IssuedAsset => Future[Option[BriefAssetDescription]])(asset: Asset)(
-      implicit ec: ExecutionContext): FutureResult[Int] =
+  private def getDecimals(assetsCache: AssetsStorage, assetDesc: IssuedAsset => Future[Option[BriefAssetDescription]])(asset: Asset)(implicit
+      ec: ExecutionContext
+  ): FutureResult[Int] =
     getDescription(assetsCache, assetDesc)(asset).map(_.decimals)(catsStdInstancesForFuture)
 
-  private def getDescription(assetsCache: AssetsStorage, assetDesc: IssuedAsset => Future[Option[BriefAssetDescription]])(asset: Asset)(
-      implicit ec: ExecutionContext): FutureResult[BriefAssetDescription] = asset match {
+  private def getDescription(assetsCache: AssetsStorage, assetDesc: IssuedAsset => Future[Option[BriefAssetDescription]])(
+      asset: Asset
+  )(implicit ec: ExecutionContext): FutureResult[BriefAssetDescription] = asset match {
     case Waves => AssetsStorage.wavesLifted
     case asset: IssuedAsset =>
       assetsCache.get(asset) match {

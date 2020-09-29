@@ -43,15 +43,15 @@ class ActorsWebSocketInteractionsSpecification
 
   private def webSocketTest(
       f: (
-          ActorRef, // address directory
-          TestProbe, // test probe
-          TypedTestProbe[WsMessage], // ws test probe
-          KeyPair, // owner's key pair
-          () => Unit, // subscribe
-          AcceptedOrder => Unit, // place order
-          (AcceptedOrder, Boolean) => Unit, // cancel
-          (AcceptedOrder, LimitOrder) => OrderExecuted, // execute
-          Map[Asset, Long] => Unit, // update spendable balances
+          ActorRef,                                            // address directory
+          TestProbe,                                           // test probe
+          TypedTestProbe[WsMessage],                           // ws test probe
+          KeyPair,                                             // owner's key pair
+          () => Unit,                                          // subscribe
+          AcceptedOrder => Unit,                               // place order
+          (AcceptedOrder, Boolean) => Unit,                    // cancel
+          (AcceptedOrder, LimitOrder) => OrderExecuted,        // execute
+          Map[Asset, Long] => Unit,                            // update spendable balances
           (Map[Asset, WsBalances], Seq[WsOrder], Long) => Unit // expect balances diff, orders diff and update id by web socket
       ) => Unit
   ): Unit = {
@@ -69,17 +69,18 @@ class ActorsWebSocketInteractionsSpecification
     def allAssetsSpendableBalance: Address => Future[Map[Asset, Long]] = { a =>
       if (a == address.toAddress) Future.successful {
         (currentPortfolio.get().assets ++ Map(Waves -> currentPortfolio.get().balance)).filter(_._2 > 0).toMap
-      } else Future.failed(WavesNodeConnectionLostException("Node unavailable", new IllegalStateException))
+      }
+      else Future.failed(WavesNodeConnectionLostException("Node unavailable", new IllegalStateException))
     }
 
-    lazy val addressDir = system.actorOf(Props(new AddressDirectoryActor(EmptyOrderDB, createAddressActor, None)))
+    lazy val addressDir = system.actorOf(Props(new AddressDirectoryActor(EmptyOrderDB, createAddressActor, None, started = true)))
 
     lazy val spendableBalancesActor =
       system.actorOf(
         Props(new SpendableBalancesActor(spendableBalances, allAssetsSpendableBalance, addressDir))
       )
 
-    def createAddressActor(address: Address, enableSchedules: Boolean): Props = {
+    def createAddressActor(address: Address, started: Boolean): Props = {
       Props(
         new AddressActor(
           address,
@@ -90,7 +91,7 @@ class ActorsWebSocketInteractionsSpecification
             eventsProbe.ref ! event
             Future.successful { Some(QueueEventWithMeta(0L, 0L, event)) }
           },
-          enableSchedules,
+          started,
           spendableBalancesActor
         )
       )
@@ -425,7 +426,7 @@ class ActorsWebSocketInteractionsSpecification
         val order = LimitOrder(createOrder(wavesUsdPair, BUY, 1.waves, 3.0, sender = address))
 
         placeOrder(order)
-        expectWsBalance(webSubscription, Map(usd    -> WsBalances(297, 3), Waves -> WsBalances(99.997, 0.003)), 2)
+        expectWsBalance(webSubscription, Map(usd -> WsBalances(297, 3), Waves -> WsBalances(99.997, 0.003)), 2)
         expectWsBalance(mobileSubscription, Map(usd -> WsBalances(297, 3), Waves -> WsBalances(99.997, 0.003)), 1)
 
         subscribe(desktopSubscription)
@@ -433,8 +434,8 @@ class ActorsWebSocketInteractionsSpecification
 
         cancel(order, true)
 
-        expectWsBalance(webSubscription, Map(usd     -> WsBalances(300, 0), Waves -> WsBalances(100, 0)), 3)
-        expectWsBalance(mobileSubscription, Map(usd  -> WsBalances(300, 0), Waves -> WsBalances(100, 0)), 2)
+        expectWsBalance(webSubscription, Map(usd -> WsBalances(300, 0), Waves -> WsBalances(100, 0)), 3)
+        expectWsBalance(mobileSubscription, Map(usd -> WsBalances(300, 0), Waves -> WsBalances(100, 0)), 2)
         expectWsBalance(desktopSubscription, Map(usd -> WsBalances(300, 0), Waves -> WsBalances(100, 0)), 1)
       }
 
@@ -750,7 +751,16 @@ class ActorsWebSocketInteractionsSpecification
 
         expectWsBalancesAndOrders(
           Map(usd -> WsBalances(5, 5), Waves -> WsBalances(9.9985, 0.0015)),
-          Seq(WsOrder(id = bo.id, status = OrderStatus.PartiallyFilled.name, filledAmount = 5.0, filledFee = 0.0015, avgWeighedPrice = 1.0, totalExecutedPriceAssets = 5.0)),
+          Seq(
+            WsOrder(
+              id = bo.id,
+              status = OrderStatus.PartiallyFilled.name,
+              filledAmount = 5.0,
+              filledFee = 0.0015,
+              avgWeighedPrice = 1.0,
+              totalExecutedPriceAssets = 5.0
+            )
+          ),
           2
         )
 

@@ -57,10 +57,10 @@ class SpendableBalancesActorSpecification
     }
   }
 
-  lazy val ad: ActorRef  = system.actorOf(Props(new AddressDirectoryActor(EmptyOrderDB, createAddressActor, None)))
+  lazy val ad: ActorRef  = system.actorOf(Props(new AddressDirectoryActor(EmptyOrderDB, createAddressActor, None, started = true)))
   lazy val sba: ActorRef = system.actorOf(Props(new SpendableBalancesActor(spendableBalances, allAssetsSpendableBalances, ad)))
 
-  def createAddressActor(address: Address, enableSchedules: Boolean): Props = {
+  def createAddressActor(address: Address, started: Boolean): Props = {
     Props(
       new AddressActor(
         address,
@@ -68,7 +68,7 @@ class SpendableBalancesActorSpecification
         EmptyOrderDB,
         (_, _) => Future.successful(Right(())),
         event => { testProbe.ref ! event; Future.successful { Some(QueueEventWithMeta(0L, 0, event)) } },
-        enableSchedules,
+        started,
         sba
       )
     )
@@ -110,7 +110,8 @@ class SpendableBalancesActorSpecification
 
       val spendableBalances: (Address, Set[Asset]) => Future[Map[Asset, Long]] = { (address, assets) =>
         if (address == alice)
-          Future.successful { Map(Waves -> 100.waves, usd -> 500.usd).withDefaultValue(0L).view.filterKeys(assets).toMap } else
+          Future.successful { Map(Waves -> 100.waves, usd -> 500.usd).withDefaultValue(0L).view.filterKeys(assets).toMap }
+        else
           Future.failed[Map[Asset, Long]] { WavesNodeConnectionLostException("ain't my bitch", new Exception()) }
       }
 

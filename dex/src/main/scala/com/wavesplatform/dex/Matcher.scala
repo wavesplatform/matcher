@@ -53,7 +53,7 @@ import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
-// TODO Remove start, merge with Application
+// TODO Merge with Application
 class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) extends ScorexLogging {
 
   import com.wavesplatform.dex.Matcher._
@@ -63,6 +63,12 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
   private val monixScheduler            = monix.execution.Scheduler.Implicits.global
   private val grpcExecutionContext      = actorSystem.dispatchers.lookup("akka.actor.grpc-dispatcher")
 
+  private val blacklistedAddresses  = settings.blacklistedAddresses.map(Address.fromString(_).explicitGet())
+  private val matchingRulesCache    = new MatchingRulesCache(settings)
+  private val orderFeeSettingsCache = new OrderFeeSettingsCache(settings.orderFee)
+
+  private val maybeApiKeyHash: Option[Array[Byte]] = Option(settings.restApi.apiKeyHash) filter (_.nonEmpty) map Base58.decode
+  private val processConsumedTimeout               = new Timeout(settings.processConsumedTimeout * 2)
   private val matcherKeyPair = AccountStorage.load(settings.accountStorage).map(_.keyPair).explicitGet().unsafeTap { x =>
     log.info(s"The DEX's public key: ${Base58.encode(x.publicKey.arr)}, account address: ${x.publicKey.toAddress.stringRepr}")
   }
@@ -71,70 +77,19 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
   @volatile private var lastProcessedOffset     = -1L
   @volatile private var status: MatcherStatus   = MatcherStatus.Starting
   @volatile private var hasMatcherAccountScript = false
+  private val orderBooks                        = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
+  private val snapshotsRestored                 = Promise[QueueEventWithMeta.Offset]() // Earliest offset among snapshots
 
   private val time = new NTP(settings.ntpServer)
 
-  private val assetsCache = AssetsStorage.cache { AssetsStorage.levelDB(db) }
-
-  private val wavesBlockchainAsyncClient =
-    new WavesBlockchainAssetsWatchingClient(
-      settings = settings.wavesBlockchainClient,
-      underlying = WavesBlockchainClientBuilder.async(
-        settings.wavesBlockchainClient,
-        monixScheduler = monixScheduler,
-        grpcExecutionContext = grpcExecutionContext
-      ),
-      assetsStorage = assetsCache
-    )
-
-  private lazy val blacklistedAddresses = settings.blacklistedAddresses.map(Address.fromString(_).explicitGet())
-
-  private val pairBuilder =
-    new AssetPairBuilder(settings, getAndCacheDescription(assetsCache, wavesBlockchainAsyncClient)(_), settings.blacklistedAssets)
-
-  private val orderBooks          = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
-  private val orderBookAskAdapter = new OrderBookAskAdapter(orderBooks, settings.actorResponseTimeout)
-  private val orderBookHttpInfo =
-    new OrderBookHttpInfo(settings.orderBookSnapshotHttpCache, orderBookAskAdapter, time, assetsCache.get(_).map(_.decimals))
-
-  private lazy val transactionCreator = new ExchangeTransactionCreator(
-    matcherKeyPair,
-    settings.exchangeTxBaseFee,
-    hasMatcherAccountScript,
-    assetsCache.unsafeGetHasScript
-  )
+  private val db                  = openDB(settings.dataDir)
+  private val assetPairsDB        = AssetPairsDB(db)
+  private val orderBookSnapshotDB = OrderBookSnapshotDB(db)
+  private val orderDB             = OrderDB(settings.orderDb, db)
+  private val assetsCache         = AssetsStorage.cache { AssetsStorage.levelDB(db) }
+  private val rateCache           = RateCache(db)
 
   private implicit val errorContext: ErrorFormatterContext = ErrorFormatterContext.fromOptional(assetsCache.get(_: Asset).map(_.decimals))
-
-  private val matchingRulesCache    = new MatchingRulesCache(settings)
-  private val orderFeeSettingsCache = new OrderFeeSettingsCache(settings.orderFee)
-  private val rateCache             = RateCache(db)
-
-  private def getDecimalsFromCache(asset: Asset): FutureResult[Int] =
-    getAndCacheDecimals(assetsCache, wavesBlockchainAsyncClient)(asset)
-
-  private def orderBookProps(assetPair: AssetPair, matcherActor: ActorRef): Props = {
-    matchingRulesCache.setCurrentMatchingRuleForNewOrderBook(assetPair, lastProcessedOffset, errorContext.unsafeAssetDecimals)
-    OrderBookActor.props(
-      OrderBookActor.Settings(AggregatedOrderBookActor.Settings(settings.webSocketSettings.externalClientHandler.messagesInterval)),
-      matcherActor,
-      addressActors,
-      orderBookSnapshotStore,
-      wsInternalBroadcast, // Safe to use here, because OrderBookActors are created after wsInternalBroadcast initialization
-      assetPair,
-      time,
-      matchingRules = matchingRulesCache.getMatchingRules(assetPair, errorContext.unsafeAssetDecimals),
-      updateCurrentMatchingRules = actualMatchingRule => matchingRulesCache.updateCurrentMatchingRule(assetPair, actualMatchingRule),
-      normalizeMatchingRule = denormalizedMatchingRule => denormalizedMatchingRule.normalize(assetPair, errorContext.unsafeAssetDecimals),
-      Fee.getMakerTakerFeeByOffset(orderFeeSettingsCache),
-      settings.orderRestrictions.get(assetPair)
-    )
-  }
-
-  private val wsInternalBroadcast: typed.ActorRef[WsInternalBroadcastActor.Command] = actorSystem.spawn(
-    WsInternalBroadcastActor(settings.webSocketSettings.internalBroadcast),
-    "ws-internal-broadcast"
-  )
 
   private val matcherQueue: MatcherQueue = settings.eventsQueue.tpe match {
     case "local" =>
@@ -148,6 +103,69 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     case x => throw new IllegalArgumentException(s"Unknown queue type: $x")
   }
 
+  private val orderBookAskAdapter = new OrderBookAskAdapter(orderBooks, settings.actorResponseTimeout)
+  private val orderBookHttpInfo =
+    new OrderBookHttpInfo(settings.orderBookSnapshotHttpCache, orderBookAskAdapter, time, assetsCache.get(_).map(_.decimals))
+
+  private val transactionCreator = new ExchangeTransactionCreator(
+    matcherKeyPair,
+    settings.exchangeTxBaseFee,
+    hasMatcherAccountScript,
+    assetsCache.unsafeGetHasScript
+  )
+
+  private val wavesBlockchainAsyncClient =
+    new WavesBlockchainAssetsWatchingClient(
+      settings = settings.wavesBlockchainClient,
+      underlying = WavesBlockchainClientBuilder.async(
+        settings.wavesBlockchainClient,
+        monixScheduler = monixScheduler,
+        grpcExecutionContext = grpcExecutionContext
+      ),
+      assetsStorage = assetsCache
+    )
+
+  private val pairBuilder =
+    new AssetPairBuilder(settings, getAndCacheDescription(assetsCache, wavesBlockchainAsyncClient)(_), settings.blacklistedAssets)
+
+  private val txWriterRef = actorSystem.actorOf(WriteExchangeTransactionActor.props(db), WriteExchangeTransactionActor.name)
+
+  private val wavesNetTxBroadcasterRef = actorSystem.actorOf(
+    BroadcastExchangeTransactionActor
+      .props(
+        settings.exchangeTransactionBroadcast,
+        time,
+        wavesBlockchainAsyncClient.wereForged,
+        wavesBlockchainAsyncClient.broadcastTx
+      ),
+    "exchange-transaction-broadcast"
+  )
+
+  actorSystem.actorOf(
+    CreateExchangeTransactionActor.props(transactionCreator.createTransaction, List(txWriterRef, wavesNetTxBroadcasterRef)),
+    CreateExchangeTransactionActor.name
+  )
+
+  private val wsInternalBroadcastRef: typed.ActorRef[WsInternalBroadcastActor.Command] = actorSystem.spawn(
+    WsInternalBroadcastActor(settings.webSocketSettings.internalBroadcast),
+    "ws-internal-broadcast"
+  )
+
+  private val externalClientDirectoryRef: typed.ActorRef[WsExternalClientDirectoryActor.Message] =
+    actorSystem.spawn(WsExternalClientDirectoryActor(), s"ws-external-cd-${ThreadLocalRandom.current().nextInt(Int.MaxValue)}")
+
+  private val orderBookSnapshotStoreRef: ActorRef = actorSystem.actorOf(
+    OrderBookSnapshotStoreActor.props(orderBookSnapshotDB),
+    "order-book-snapshot-store"
+  )
+
+  private val historyRouterRef = settings.orderHistory.map { orderHistorySettings =>
+    actorSystem.actorOf(HistoryRouterActor.props(assetsCache.unsafeGetDecimals, settings.postgresConnection, orderHistorySettings), "history-router")
+  }
+
+  private val addressDirectoryRef =
+    actorSystem.actorOf(AddressDirectoryActor.props(orderDB, mkAddressActorProps, historyRouterRef), AddressDirectoryActor.name)
+
   private val storeBreaker = new CircuitBreaker(
     actorSystem.scheduler,
     maxFailures = settings.eventsQueue.circuitBreaker.maxFailures,
@@ -155,15 +173,56 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     resetTimeout = settings.eventsQueue.circuitBreaker.resetTimeout
   )
 
-  private def storeEvent(payload: QueueEvent): Future[Option[QueueEventWithMeta]] =
-    storeBreaker.withCircuitBreaker(matcherQueue.storeEvent(payload))
+  private def storeEvent(payload: QueueEvent): Future[Option[QueueEventWithMeta]] = storeBreaker.withCircuitBreaker(matcherQueue.storeEvent(payload))
+  private def mkAddressActorProps(address: Address, started: Boolean): Props = AddressActor.props(
+    address,
+    time,
+    orderDB,
+    ValidationStages.mkSecond(wavesBlockchainAsyncClient, orderBookAskAdapter),
+    storeEvent,
+    started,
+    spendableBalancesRef,
+    settings.addressActorSettings
+  )
 
-  private val maybeApiKeyHash: Option[Array[Byte]] = Option(settings.restApi.apiKeyHash) filter (_.nonEmpty) map Base58.decode
+  private val spendableBalancesRef = actorSystem.actorOf(SpendableBalancesActor.props(wavesBlockchainAsyncClient, addressDirectoryRef))
 
-  private val externalClientDirectoryRef: typed.ActorRef[WsExternalClientDirectoryActor.Message] =
-    actorSystem.spawn(WsExternalClientDirectoryActor(), s"ws-external-cd-${ThreadLocalRandom.current().nextInt(Int.MaxValue)}")
+  private val matcherActorRef: ActorRef = {
+    def mkOrderBookProps(assetPair: AssetPair, matcherActor: ActorRef): Props = {
+      matchingRulesCache.setCurrentMatchingRuleForNewOrderBook(assetPair, lastProcessedOffset, errorContext.unsafeAssetDecimals)
+      OrderBookActor.props(
+        OrderBookActor.Settings(AggregatedOrderBookActor.Settings(settings.webSocketSettings.externalClientHandler.messagesInterval)),
+        matcherActor,
+        addressDirectoryRef,
+        orderBookSnapshotStoreRef,
+        wsInternalBroadcastRef,
+        assetPair,
+        time,
+        matchingRules = matchingRulesCache.getMatchingRules(assetPair, errorContext.unsafeAssetDecimals),
+        updateCurrentMatchingRules = actualMatchingRule => matchingRulesCache.updateCurrentMatchingRule(assetPair, actualMatchingRule),
+        normalizeMatchingRule = denormalizedMatchingRule => denormalizedMatchingRule.normalize(assetPair, errorContext.unsafeAssetDecimals),
+        getMakerTakerFeeByOffset = Fee.getMakerTakerFeeByOffset(orderFeeSettingsCache),
+        restrictions = settings.orderRestrictions.get(assetPair) // TODO Move this and webSocketSettings to OrderBook's settings
+      )
+    }
 
-  private lazy val httpApiRouteV0: MatcherApiRoute = {
+    actorSystem.actorOf(
+      MatcherActor.props(
+        settings,
+        assetPairsDB,
+        {
+          case Right(startOffset) => snapshotsRestored.success(startOffset)
+          case Left(msg)          => snapshotsRestored.failure(RecoveryError(msg))
+        },
+        orderBooks,
+        mkOrderBookProps,
+        assetsCache.get(_)
+      ),
+      MatcherActor.name
+    )
+  }
+
+  private val httpApiRouteV0: MatcherApiRoute = {
     val orderValidation = ValidationStages.mkFirst(
       settings,
       matcherPublicKey,
@@ -183,8 +242,8 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     new MatcherApiRoute(
       pairBuilder,
       matcherPublicKey,
-      matcherActor,
-      addressActors,
+      matcherActorRef,
+      addressDirectoryRef,
       matcherQueue.storeEvent,
       p => Option { orderBooks.get() } flatMap (_ get p),
       orderBookHttpInfo,
@@ -212,13 +271,13 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     )
   }
 
-  private lazy val httpApiRouteV1 = MatcherApiRouteV1(pairBuilder, orderBookHttpInfo, () => status, maybeApiKeyHash)
+  private val httpApiRouteV1 = MatcherApiRouteV1(pairBuilder, orderBookHttpInfo, () => status, maybeApiKeyHash)
 
-  private lazy val wsApiRoute = new MatcherWebSocketRoute(
-    wsInternalBroadcast,
+  private val wsApiRoute = new MatcherWebSocketRoute(
+    wsInternalBroadcastRef,
     externalClientDirectoryRef,
-    addressActors,
-    matcherActor,
+    addressDirectoryRef,
+    matcherActorRef,
     time,
     pairBuilder,
     maybeApiKeyHash,
@@ -227,62 +286,8 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     () => rateCache.getAllRates
   )
 
-  private lazy val matcherApiRoutes: Seq[ApiRoute] = Seq(httpApiRouteV0, httpApiRouteV1, wsApiRoute)
-  lazy val matcherApiTypes: Set[Class[_]]          = matcherApiRoutes.map(_.getClass).toSet
-
-  private val snapshotsRestore = Promise[QueueEventWithMeta.Offset]() // Earliest offset among snapshots
-
-  private lazy val db                  = openDB(settings.dataDir)
-  private lazy val assetPairsDB        = AssetPairsDB(db)
-  private lazy val orderBookSnapshotDB = OrderBookSnapshotDB(db)
-  private lazy val orderDB             = OrderDB(settings.orderDb, db)
-
-  lazy val orderBookSnapshotStore: ActorRef = actorSystem.actorOf(
-    OrderBookSnapshotStoreActor.props(orderBookSnapshotDB),
-    "order-book-snapshot-store"
-  )
-
-  private val pongTimeout = new Timeout(settings.processConsumedTimeout * 2)
-
-  private lazy val matcherActor: ActorRef = actorSystem.actorOf(
-    MatcherActor.props(
-      settings,
-      assetPairsDB,
-      {
-        case Right(startOffset) => snapshotsRestore.success(startOffset)
-        case Left(msg)          => snapshotsRestore.failure(RecoveryError(msg))
-      },
-      orderBooks,
-      orderBookProps,
-      assetsCache.get(_)
-    ),
-    MatcherActor.name
-  )
-
-  private lazy val historyRouter = settings.orderHistory.map { orderHistorySettings =>
-    actorSystem.actorOf(HistoryRouterActor.props(assetsCache.unsafeGetDecimals, settings.postgresConnection, orderHistorySettings), "history-router")
-  }
-
-  private lazy val addressActors = actorSystem.actorOf(
-    Props(
-      new AddressDirectoryActor(
-        orderDB,
-        createAddressActor,
-        historyRouter
-      )
-    ),
-    "addresses"
-  )
-
-  private val spendableBalancesActor = actorSystem.actorOf(
-    Props(
-      new SpendableBalancesActor(
-        wavesBlockchainAsyncClient.spendableBalances,
-        wavesBlockchainAsyncClient.allAssetsSpendableBalance,
-        addressActors
-      )
-    )
-  ) unsafeTap sendBalanceChanges
+  private val matcherApiRoutes: Seq[ApiRoute] = Seq(httpApiRouteV0, httpApiRouteV1, wsApiRoute)
+  private val matcherApiTypes: Set[Class[_]]          = matcherApiRoutes.map(_.getClass).toSet
 
   def registerShutdownHooks(cs: CoordinatedShutdown): Unit = {
     cs.addJvmShutdownHook(setStatus(MatcherStatus.Stopping))
@@ -290,7 +295,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     cs.addTask(CoordinatedShutdown.PhaseBeforeServiceUnbind, "WebSockets")(() => wsApiRoute.gracefulShutdown().map(_ => Done))
 
     cs.addTask(CoordinatedShutdown.PhaseServiceRequestsDone, "Actors") { () =>
-      gracefulStop(matcherActor, 3.seconds, MatcherActor.Shutdown).map(_ => Done)
+      gracefulStop(matcherActorRef, 3.seconds, MatcherActor.Shutdown).map(_ => Done)
     }
 
     cs.addTask(CoordinatedShutdown.PhaseServiceStop, "gRPC client") { () =>
@@ -314,24 +319,6 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       Future { blocking(time.close()); Done }
     }
   }
-
-  private val txWriterRef = actorSystem.actorOf(WriteExchangeTransactionActor.props(db), WriteExchangeTransactionActor.name)
-
-  private val wavesNetTxBroadcasterRef = actorSystem.actorOf(
-    BroadcastExchangeTransactionActor
-      .props(
-        settings.exchangeTransactionBroadcast,
-        time,
-        wavesBlockchainAsyncClient.wereForged,
-        wavesBlockchainAsyncClient.broadcastTx
-      ),
-    "exchange-transaction-broadcast"
-  )
-
-  actorSystem.actorOf(
-    CreateExchangeTransactionActor.props(transactionCreator.createTransaction, List(txWriterRef, wavesNetTxBroadcasterRef)),
-    CreateExchangeTransactionActor.name
-  )
 
   private val startGuard = for {
     (_, http) <- {
@@ -401,7 +388,10 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
   } yield {
     log.info("Last offset has been reached, notify addresses")
     log.info(s"DEX server is connected to Node with an address: ${connectedNodeAddress.getHostAddress}")
-    addressActors ! AddressDirectoryActor.StartWork
+    addressDirectoryRef ! AddressDirectoryActor.StartWork
+
+    log.info("Starting watching balances")
+    watchBalanceChanges(spendableBalancesRef)
   }
 
   startGuard.onComplete {
@@ -414,7 +404,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       forceStopApplication(StartingMatcherError)
   }
 
-  private def sendBalanceChanges(recipient: ActorRef): Unit = {
+  private def watchBalanceChanges(recipient: ActorRef): Unit = {
 
     def aggregateChangesByAddress(xs: List[BalanceChanges]): Map[Address, Map[Asset, Long]] = xs.foldLeft(Map.empty[Address, Map[Asset, Long]]) {
       case (result, bc) => result.updated(bc.address, result.getOrElse(bc.address, Map.empty) + (bc.asset -> bc.balance))
@@ -424,17 +414,6 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       .map(aggregateChangesByAddress)
       .foreach { recipient ! SpendableBalancesActor.Command.UpdateStates(_) }(monixScheduler)
   }
-
-  private def createAddressActor(address: Address, started: Boolean): Props = AddressActor.props(
-    address,
-    time,
-    orderDB,
-    ValidationStages.mkSecond(wavesBlockchainAsyncClient, orderBookAskAdapter),
-    storeEvent,
-    started,
-    spendableBalancesActor,
-    settings.addressActorSettings
-  )
 
   private def loadAllKnownAssets(): Future[Unit] =
     Future(blocking(assetPairsDB.all()).flatMap(_.assets) ++ settings.mentionedAssets).flatMap { assetsToLoad =>
@@ -459,14 +438,14 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         val assetPairs: Set[AssetPair] = xs
           .map { eventWithMeta =>
             log.debug(s"Consumed $eventWithMeta")
-            matcherActor ! eventWithMeta
+            matcherActorRef ! eventWithMeta
             lastProcessedOffset = eventWithMeta.offset
             eventWithMeta.event.assetPair
           }
           .to(Set)
 
-        matcherActor
-          .ask(MatcherActor.PingAll(assetPairs))(pongTimeout)
+        matcherActorRef
+          .ask(MatcherActor.PingAll(assetPairs))(processConsumedTimeout)
           .recover { case NonFatal(e) => log.error("PingAll is timed out!", e) }
           .map(_ => ())
       } andThen {
@@ -477,6 +456,9 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       }
     }
 
+  private def getDecimalsFromCache(asset: Asset): FutureResult[Int] =
+    getAndCacheDecimals(assetsCache, wavesBlockchainAsyncClient)(asset)
+
   private def setStatus(newStatus: MatcherStatus): Unit = {
     status = newStatus
     log.info(s"Status now is $newStatus")
@@ -484,7 +466,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
 
   private def waitSnapshotsRestored(wait: FiniteDuration): Future[QueueEventWithMeta.Offset] = Future.firstCompletedOf(
     List(
-      snapshotsRestore.future,
+      snapshotsRestored.future,
       actorSystem.timeout(wait).recover { case _ => throw RecoveryError(s"Timeout of $wait for waiting snapshots to restore is out") }
     )
   )

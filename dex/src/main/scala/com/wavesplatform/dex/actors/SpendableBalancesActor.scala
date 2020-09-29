@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.actors
 
-import akka.actor.{Actor, ActorRef, Status}
+import akka.actor.{Actor, ActorRef, Props, Status}
 import cats.syntax.either._
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.domain.account.Address
@@ -8,6 +8,7 @@ import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.error.{MatcherError, WavesNodeConnectionBroken}
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
+import com.wavesplatform.dex.model.OrderValidator.AsyncBlockchain
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
@@ -117,6 +118,14 @@ class SpendableBalancesActor(spendableBalances: (Address, Set[Asset]) => Future[
 }
 
 object SpendableBalancesActor {
+
+  def props(blockchain: AsyncBlockchain, addressDirectoryRef: ActorRef): Props = Props(
+    new SpendableBalancesActor(
+      blockchain.spendableBalances,
+      blockchain.allAssetsSpendableBalance,
+      addressDirectoryRef
+    )
+  )
 
   trait Command
   object Command {

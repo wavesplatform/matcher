@@ -30,7 +30,7 @@ pipeline {
             steps {
                 build job: 'Waves.Exchange/Matcher/Matcher Server - OS - Test - Kafka', propagate: false, wait: false, parameters: [
                   [$class: 'GitParameterValue', name: 'BRANCH', value: "${env.DEX_BRANCH}"],
-                  [$class: 'StringParameterValue', name: 'LABEL', value: "- PRE RELEASE"]
+                  [$class: 'StringParameterValue', name: 'LABEL', value: "- PRE RELEASE (${env.DEX_BRANCH})"]
                 ]
             }
         }
@@ -40,7 +40,7 @@ pipeline {
                   [$class: 'StringParameterValue', name: 'BRANCH', value: "${env.DEX_BRANCH}"],
                   [$class: 'StringParameterValue', name: 'OTHER_DEX_IMAGE', value: "registry.wvservices.com/waves/dex/dex-it:${dexNewImage}"],
                   [$class: 'StringParameterValue', name: 'OTHER_NODE_IMAGE', value: "registry.wvservices.com/waves/dex/waves-integration-it:${nodeNewImage}"],
-                  [$class: 'StringParameterValue', name: 'LABEL', value: "- PRE RELEASE"]
+                  [$class: 'StringParameterValue', name: 'LABEL', value: "- PRE RELEASE (${env.DEX_BRANCH})"]
                 ]
             }
         }
@@ -50,7 +50,7 @@ pipeline {
                   [$class: 'StringParameterValue', name: 'DEX_IMAGE', value: "registry.wvservices.com/waves/dex/dex-it:${dexNewImage}"],
                   [$class: 'StringParameterValue', name: 'NODE_IMAGE', value: "registry.wvservices.com/waves/dex/waves-integration-it:${nodeNewImage}"],
                   [$class: 'StringParameterValue', name: 'BRANCH', value: "${env.DEX_BRANCH}"],
-                  [$class: 'StringParameterValue', name: 'LABEL', value: "- PRE RELEASE"]
+                  [$class: 'StringParameterValue', name: 'LABEL', value: "- PRE RELEASE (${env.DEX_BRANCH})"]
                 ]
             }
         }

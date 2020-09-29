@@ -29,7 +29,8 @@ pipeline {
         stage ('Trigger job: Test - Kafka') {
             steps {
                 build job: 'Waves.Exchange/Matcher/Matcher Server - OS - Test - Kafka', propagate: false, wait: false, parameters: [
-                  [$class: 'GitParameterValue', name: 'BRANCH', value: "${env.DEX_BRANCH}"]
+                  [$class: 'GitParameterValue', name: 'BRANCH', value: "${env.DEX_BRANCH}"],
+                  [$class: 'StringParameterValue', name: 'LABEL', value: "- PRE RELEASE"]
                 ]
             }
         }
@@ -38,7 +39,8 @@ pipeline {
                 build job: 'Waves.Exchange/Matcher/Matcher Server - OS - Test - Multiple Versions', propagate: false, wait: false, parameters: [
                   [$class: 'StringParameterValue', name: 'BRANCH', value: "${env.DEX_BRANCH}"],
                   [$class: 'StringParameterValue', name: 'OTHER_DEX_IMAGE', value: "registry.wvservices.com/waves/dex/dex-it:${dexNewImage}"],
-                  [$class: 'StringParameterValue', name: 'OTHER_NODE_IMAGE', value: "registry.wvservices.com/waves/dex/waves-integration-it:${nodeNewImage}"]
+                  [$class: 'StringParameterValue', name: 'OTHER_NODE_IMAGE', value: "registry.wvservices.com/waves/dex/waves-integration-it:${nodeNewImage}"],
+                  [$class: 'StringParameterValue', name: 'LABEL', value: "- PRE RELEASE"]
                 ]
             }
         }
@@ -47,7 +49,8 @@ pipeline {
                 build job: 'Waves.Exchange/Matcher/Matcher Server - OS - Test - Version', propagate: false, wait: false, parameters: [
                   [$class: 'StringParameterValue', name: 'DEX_IMAGE', value: "registry.wvservices.com/waves/dex/dex-it:${dexNewImage}"],
                   [$class: 'StringParameterValue', name: 'NODE_IMAGE', value: "registry.wvservices.com/waves/dex/waves-integration-it:${nodeNewImage}"],
-                  [$class: 'StringParameterValue', name: 'BRANCH_OR_TAG', value: "${env.DEX_BRANCH}"]
+                  [$class: 'StringParameterValue', name: 'BRANCH', value: "${env.DEX_BRANCH}"],
+                  [$class: 'StringParameterValue', name: 'LABEL', value: "- PRE RELEASE"]
                 ]
             }
         }
@@ -63,6 +66,7 @@ pipeline {
                 multipleBuild = "<a href='/job/Waves.Exchange/job/Matcher/job/Matcher Server - OS - Test - Multiple Versions/${multipleBuildNumber}'>Multiple</a>"
                 versionBuild = "<a href='/job/Waves.Exchange/job/Matcher/job/Matcher Server - OS - Test - Version/${versionBuildNumber}'>Version</a>"
                 
+                currentBuild.displayName = "${DEX_BRANCH}"
                 currentBuild.description = "${kafkaBuild} | ${multipleBuild} | ${versionBuild}"
             }
         }

@@ -76,7 +76,7 @@ object Dependencies {
     val nettyCodec = "4.1.33.Final"
     val jwt        = "4.3.0"
 
-    val pureConfig      = "0.13.0"
+    val pureConfig      = "0.14.0"
     val allureScalaTest = "2.13.5"
   }
 
@@ -200,6 +200,7 @@ object Dependencies {
       shapeless,
       kamonCore,
       typesafeConfig,
+      pureConfig,
       scalaTest % Test,
       googleGuava,
       slf4j,
@@ -237,7 +238,8 @@ object Dependencies {
       jwtModule("play-json"),
       sttpClient,
       wavesJ,
-      betterMonadicFor
+      betterMonadicFor,
+      pureConfig
     ) ++ testKit ++ quill ++ monocle
 
     lazy val dexLoad: Seq[ModuleID] = Seq(diffx, pureConfig)

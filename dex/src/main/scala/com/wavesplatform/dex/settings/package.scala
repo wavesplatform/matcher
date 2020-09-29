@@ -2,6 +2,7 @@ package com.wavesplatform.dex
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
+import pureconfig.{ConfigObjectSource, ConfigSource}
 
 package object settings {
 
@@ -23,5 +24,17 @@ package object settings {
       .withFallback(ConfigFactory.defaultApplication())
       .withFallback(ConfigFactory.defaultReference())
       .resolve()
+  }
+
+  def loadConfig1(userConfig: Config): Config = loadConfig(Some(userConfig))
+
+  def loadConfig1(maybeUserConfig: Option[ConfigObjectSource]): ConfigObjectSource = {
+
+    val defaults = ConfigSource.defaultOverrides
+    val external = maybeUserConfig.fold(defaults)(defaults.withFallback)
+
+    external
+      .withFallback(ConfigSource.defaultApplication)
+      .withFallback(ConfigSource.defaultReference)
   }
 }

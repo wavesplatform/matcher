@@ -54,26 +54,28 @@ import scala.util.Success
 
 @Path("/matcher")
 @Api()
-class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
-                      matcherPublicKey: PublicKey,
-                      matcher: ActorRef,
-                      addressActor: ActorRef,
-                      storeEvent: StoreEvent,
-                      orderBook: AssetPair => Option[Either[Unit, ActorRef]],
-                      orderBookHttpInfo: OrderBookHttpInfo,
-                      getActualTickSize: AssetPair => BigDecimal,
-                      orderValidator: Order => FutureResult[Order],
-                      matcherSettings: MatcherSettings,
-                      override val matcherStatus: () => Matcher.Status,
-                      orderDb: OrderDB,
-                      currentOffset: () => QueueEventWithMeta.Offset,
-                      lastOffset: () => Future[QueueEventWithMeta.Offset],
-                      matcherAccountFee: Long,
-                      override val apiKeyHash: Option[Array[Byte]],
-                      rateCache: RateCache,
-                      validatedAllowedOrderVersions: () => Future[Set[Byte]],
-                      getActualOrderFeeSettings: () => OrderFeeSettings,
-                      externalClientDirectoryRef: typed.ActorRef[WsExternalClientDirectoryActor.Message])(implicit mat: Materializer)
+class MatcherApiRoute(
+    assetPairBuilder: AssetPairBuilder,
+    matcherPublicKey: PublicKey,
+    matcher: ActorRef,
+    addressActor: ActorRef,
+    storeEvent: StoreEvent,
+    orderBook: AssetPair => Option[Either[Unit, ActorRef]],
+    orderBookHttpInfo: OrderBookHttpInfo,
+    getActualTickSize: AssetPair => BigDecimal,
+    orderValidator: Order => FutureResult[Order],
+    matcherSettings: MatcherSettings,
+    override val matcherStatus: () => Matcher.Status,
+    orderDb: OrderDB,
+    currentOffset: () => QueueEventWithMeta.Offset,
+    lastOffset: () => Future[QueueEventWithMeta.Offset],
+    matcherAccountFee: Long,
+    override val apiKeyHash: Option[Array[Byte]],
+    rateCache: RateCache,
+    validatedAllowedOrderVersions: () => Future[Set[Byte]],
+    getActualOrderFeeSettings: () => OrderFeeSettings,
+    externalClientDirectoryRef: typed.ActorRef[WsExternalClientDirectoryActor.Message]
+)(implicit mat: Materializer)
     extends ApiRoute
     with AuthRoute
     with HasStatusBarrier
@@ -89,15 +91,15 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   private val timer      = Kamon.timer("matcher.api-requests")
   private val placeTimer = timer.withTag("action", "place")
 
-  private def invalidJsonResponse(fields: List[String] = Nil): StandardRoute = complete { InvalidJsonResponse(error.InvalidJson(fields)) }
-  private val invalidUserPublicKey: StandardRoute                            = complete { SimpleErrorResponse(StatusCodes.Forbidden, error.UserPublicKeyIsNotValid) }
+  private def invalidJsonResponse(error: MatcherError): StandardRoute = complete { InvalidJsonResponse(error) }
+  private val invalidUserPublicKey: StandardRoute                     = complete { SimpleErrorResponse(StatusCodes.Forbidden, error.UserPublicKeyIsNotValid) }
 
   private val invalidJsonParsingRejectionsHandler =
     server.RejectionHandler
       .newBuilder()
       .handle {
-        case ValidationRejection(_, Some(e: PlayJsonException)) => invalidJsonResponse(e.errors.map(_._1.toString).toList)
-        case _: UnsupportedRequestContentTypeRejection          => invalidJsonResponse()
+        case ValidationRejection(_, Some(e: PlayJsonException)) => invalidJsonResponse(error.InvalidJson(e.errors.map(_._1.toString).toList))
+        case _: UnsupportedRequestContentTypeRejection          => invalidJsonResponse(error.UnsupportedContentType)
       }
       .result()
 
@@ -149,10 +151,12 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     case _          => complete(OrderBookUnavailable(error.OrderBookBroken(p)))
   }
 
-  private def withAssetPair(p: AssetPair,
-                            redirectToInverse: Boolean = false,
-                            suffix: String = "",
-                            formatError: MatcherError => ToResponseMarshallable = InfoNotFound.apply): Directive1[AssetPair] = {
+  private def withAssetPair(
+      p: AssetPair,
+      redirectToInverse: Boolean = false,
+      suffix: String = "",
+      formatError: MatcherError => ToResponseMarshallable = InfoNotFound.apply
+  ): Directive1[AssetPair] = {
     FutureDirectives.onSuccess { assetPairBuilder.validateAssetPair(p).value } flatMap {
       case Right(_) => provide(p)
       case Left(e) if redirectToInverse =>
@@ -209,28 +213,31 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   }
 
   private def signedGet(publicKey: PublicKey): Directive0 =
-    (headerValueByName("Timestamp") & headerValueByName("Signature")).tflatMap {
-      case (timestamp, sig) =>
-        Base58.tryDecodeWithLimit(sig).map(crypto.verify(_, publicKey ++ Longs.toByteArray(timestamp.toLong), publicKey)) match {
-          case Success(true) => pass
-          case _             => complete(InvalidSignature)
-        }
+    (headerValueByName("Timestamp") & headerValueByName("Signature")).tflatMap { case (timestamp, sig) =>
+      Base58.tryDecodeWithLimit(sig).map(crypto.verify(_, publicKey ++ Longs.toByteArray(timestamp.toLong), publicKey)) match {
+        case Success(true) => pass
+        case _             => complete(InvalidSignature)
+      }
     }
 
   @Path("/")
-  @ApiOperation(value = "Matcher Public Key",
-                notes = "Get Matcher Public Key in Base58",
-                httpMethod = "GET",
-                tags = Array("info"),
-                response = classOf[String])
+  @ApiOperation(
+    value = "Matcher Public Key",
+    notes = "Get Matcher Public Key in Base58",
+    httpMethod = "GET",
+    tags = Array("info"),
+    response = classOf[String]
+  )
   def getMatcherPublicKey: Route = (pathEndOrSingleSlash & get) { complete(matcherPublicKey.toJson) }
 
   @Path("/settings")
-  @ApiOperation(value = "Matcher Settings",
-                notes = "Get Matcher Public Settings",
-                httpMethod = "GET",
-                tags = Array("info"),
-                response = classOf[HttpMatcherPublicSettings])
+  @ApiOperation(
+    value = "Matcher Settings",
+    notes = "Get Matcher Public Settings",
+    httpMethod = "GET",
+    tags = Array("info"),
+    response = classOf[HttpMatcherPublicSettings]
+  )
   def getSettings: Route = (pathEndOrSingleSlash & get) {
     complete(
       validatedAllowedOrderVersions() map { allowedOrderVersions =>
@@ -273,17 +280,20 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "assetId", value = "Asset for which rate is added or updated", dataType = "string", paramType = "path"),
-      new ApiImplicitParam(name = "rate",
-                           value = "Rate associated with the specified asset",
-                           dataType = "double",
-                           paramType = "body",
-                           required = true)
+      new ApiImplicitParam(
+        name = "rate",
+        value = "Rate associated with the specified asset",
+        dataType = "double",
+        paramType = "body",
+        required = true
+      )
     )
   )
   def upsertRate: Route = {
     (path(AssetPM) & put & withAuth) { a =>
       entity(as[Double]) { rate =>
-        if (rate <= 0) complete { RateError(error.NonPositiveAssetRate) } else
+        if (rate <= 0) complete { RateError(error.NonPositiveAssetRate) }
+        else
           withAsset(a) { asset =>
             complete(
               if (asset == Waves) RateError(error.WavesImmutableRate)
@@ -344,11 +354,13 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     Array(
       new ApiImplicitParam(name = "amountAsset", value = "Amount Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
       new ApiImplicitParam(name = "priceAsset", value = "Price Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
-      new ApiImplicitParam(name = "depth",
-                           value = "Limit the number of bid/ask records returned",
-                           required = false,
-                           dataType = "integer",
-                           paramType = "query")
+      new ApiImplicitParam(
+        name = "depth",
+        value = "Limit the number of bid/ask records returned",
+        required = false,
+        dataType = "integer",
+        paramType = "query"
+      )
     )
   )
   def getOrderBook: Route = (path(AssetPairPM) & get) { p =>
@@ -380,10 +392,12 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   }
 
   @Path("/orderbook/{amountAsset}/{priceAsset}/info")
-  @ApiOperation(value = "Get Order Restrictions for the specified Asset Pair",
-                httpMethod = "GET",
-                tags = Array("markets"),
-                response = classOf[HttpOrderBookInfo])
+  @ApiOperation(
+    value = "Get Order Restrictions for the specified Asset Pair",
+    httpMethod = "GET",
+    tags = Array("markets"),
+    response = classOf[HttpOrderBookInfo]
+  )
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "amountAsset", value = "Amount Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
@@ -587,7 +601,7 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         required = true,
         paramType = "body",
         dataTypeClass = classOf[Array[String]]
-      ),
+      )
     )
   )
   def cancelAllById: Route = (path(AddressPM / "cancel") & post & withAuth & withUserPublicKeyOpt) { (addressOrError, userPublicKey) =>
@@ -623,7 +637,7 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         dataType = "string",
         paramType = "header",
         defaultValue = ""
-      ),
+      )
     )
   )
   def forceCancelOrder: Route = (path("cancel" / ByteStrPM) & post & withAuth & withUserPublicKeyOpt) { (orderId, userPublicKey) =>
@@ -992,10 +1006,9 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
               case None => NotImplemented(error.FeatureDisabled)
               case _    => SimpleResponse(StatusCodes.Accepted, "Deleting order book")
             }
-            .recover {
-              case e: Throwable =>
-                log.error("Can not persist event", e)
-                CanNotPersist(error.CanNotPersistEvent)
+            .recover { case e: Throwable =>
+              log.error("Can not persist event", e)
+              CanNotPersist(error.CanNotPersistEvent)
             }
         )
       case _ => complete(OrderBookUnavailable(error.OrderBookBroken(pair)))
@@ -1091,31 +1104,29 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   }
 
   private def askMapAddressActor[A: ClassTag](sender: Address, msg: AddressActor.Message)(
-      f: A => ToResponseMarshallable): Future[ToResponseMarshallable] = {
+      f: A => ToResponseMarshallable
+  ): Future[ToResponseMarshallable] = {
     (addressActor ? AddressDirectoryActor.Envelope(sender, msg))
       .mapTo[A]
       .map(f)
-      .recover {
-        case e: AskTimeoutException =>
-          log.error(s"Error processing $msg", e)
-          TimedOut
+      .recover { case e: AskTimeoutException =>
+        log.error(s"Error processing $msg", e)
+        TimedOut
       }
   }
 
-  private val handleUnknownResponse: LogicResponseHandler = {
-    case x =>
-      log.error(s"Can't handle $x")
-      entities.InternalError
+  private val handleUnknownResponse: LogicResponseHandler = { case x =>
+    log.error(s"Can't handle $x")
+    entities.InternalError
   }
 
   @inline
   private def askAddressActor(sender: Address, msg: AddressActor.Message)(handleResponse: LogicResponseHandler): Future[ToResponseMarshallable] = {
     (addressActor ? AddressDirectoryActor.Envelope(sender, msg))
       .map(handleResponse.orElse(handleUnknownResponse))
-      .recover {
-        case e: AskTimeoutException =>
-          log.error(s"Error processing $msg", e)
-          TimedOut
+      .recover { case e: AskTimeoutException =>
+        log.error(s"Error processing $msg", e)
+        TimedOut
       }
   }
 

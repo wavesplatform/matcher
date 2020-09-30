@@ -491,7 +491,7 @@ case class InvalidJson(fields: List[String])
     )
 
 case object UnsupportedContentType
-    extends MatcherError(request, commonEntity, unsupported, e"The provided Content-Type is not supported. please provide JSON")
+    extends MatcherError(request, commonEntity, unsupported, e"The provided Content-Type is not supported, please provide JSON")
 
 case object ApiKeyIsNotProvided
     extends MatcherError(auth, commonEntity, notProvided, e"API key is not provided in the configuration, please contact with the administrator")

@@ -50,5 +50,4 @@ object OrderBookCancelBenchmark {
 
     def run(): OrderBook = orders.foldLeft(orderBook) { case (r, id) => r.cancel(id, Events.OrderCanceledReason.RequestExecuted, ts)._1 }
   }
-
 }

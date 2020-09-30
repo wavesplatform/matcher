@@ -29,6 +29,7 @@ object OrderBookAddBenchmark {
   @State(Scope.Thread) class Add_1250_To_1250_State extends AddState(initOrderNumber = 1250, orderNumberToAdd = 1250)
 
   sealed abstract class AddState(initOrderNumber: Int, orderNumberToAdd: Int) extends OrderBookBenchmarkState {
+
     val maxPrice = 1000L * Order.PriceConstant
     val minPrice = 1L * Order.PriceConstant
     val priceGen = Gen.chooseNum(minPrice, maxPrice)
@@ -40,8 +41,8 @@ object OrderBookAddBenchmark {
 
     val orders: List[AcceptedOrder] = ordersGen(orderNumberToAdd).sample.get
 
-    def run(): OrderBook = orders.foldLeft(OrderBook.empty) {
-      case (r, o) => r.add(o, ts, getMakerTakerFee).orderBook
+    def run(): OrderBook = orders.foldLeft(OrderBook.empty) { case (r, o) =>
+      r.add(o, ts, getMakerTakerFee).orderBook
     }
 
     def ordersGen(orderNumber: Int): Gen[List[AcceptedOrder]] =
@@ -55,5 +56,4 @@ object OrderBookAddBenchmark {
         }
       } yield orders.asScala.toList
   }
-
 }

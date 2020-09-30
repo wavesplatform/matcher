@@ -57,6 +57,7 @@ import mouse.any.anySyntaxMouse
 import net.ceedubs.ficus.Ficus._
 import org.slf4j.LoggerFactory
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Future, Promise, blocking}
 import scala.util.control.NonFatal
@@ -64,9 +65,8 @@ import scala.util.{Failure, Success}
 
 class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) extends ScorexLogging {
 
-  private implicit val executionContext = scala.concurrent.ExecutionContext.Implicits.global
-  private val monixScheduler            = monix.execution.Scheduler.Implicits.global
-  private val grpcExecutionContext      = actorSystem.dispatchers.lookup("akka.actor.grpc-dispatcher")
+  private val monixScheduler       = monix.execution.Scheduler.Implicits.global
+  private val grpcExecutionContext = actorSystem.dispatchers.lookup("akka.actor.grpc-dispatcher")
 
   private val cs = CoordinatedShutdown(actorSystem)
 

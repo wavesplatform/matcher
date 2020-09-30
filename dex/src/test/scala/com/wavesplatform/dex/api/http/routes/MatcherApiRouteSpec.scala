@@ -329,8 +329,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
           responseAs[HttpError] should matchTo(
             HttpError(
               error = 1048579,
-              message = "The provided Content-Type is not supported. please provide JSON",
-              template = "The provided Content-Type is not supported. please provide JSON",
+              message = "The provided Content-Type is not supported, please provide JSON",
+              template = "The provided Content-Type is not supported, please provide JSON",
               status = "InvalidJsonResponse"
             )
           )
@@ -1005,7 +1005,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         Put(routePath(s"/settings/rates/$smartAssetId"), HttpEntity(ContentTypes.`text/plain(UTF-8)`, "5"))
           .withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldEqual StatusCodes.BadRequest
-          responseAs[HttpMessage] should matchTo(HttpMessage("The provided Content-Type is not supported. please provide JSON"))
+          responseAs[HttpMessage] should matchTo(HttpMessage("The provided Content-Type is not supported, please provide JSON"))
         }
       },
       apiKey,

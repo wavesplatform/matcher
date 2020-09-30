@@ -74,7 +74,7 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                       validatedAllowedOrderVersions: () => Future[Set[Byte]],
                       getActualOrderFeeSettings: () => OrderFeeSettings,
                       externalClientDirectoryRef: typed.ActorRef[WsExternalClientDirectoryActor.Message])(implicit mat: Materializer)
-    extends ApiRoute
+  extends ApiRoute
     with AuthRoute
     with HasStatusBarrier
     with ScorexLogging {
@@ -82,45 +82,62 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   import com.wavesplatform.dex.api.routes.PathMatchers._
 
   private implicit val executionContext: ExecutionContext = mat.executionContext
-  private implicit val timeout: Timeout                   = matcherSettings.actorResponseTimeout
+  private implicit val timeout: Timeout = matcherSettings.actorResponseTimeout
 
   private type LogicResponseHandler = PartialFunction[Any, ToResponseMarshallable]
 
-  private val timer      = Kamon.timer("matcher.api-requests")
+  private val timer = Kamon.timer("matcher.api-requests")
   private val placeTimer = timer.withTag("action", "place")
 
-  private def invalidJsonResponse(fields: List[String] = Nil): StandardRoute = complete { InvalidJsonResponse(error.InvalidJson(fields)) }
-  private val invalidUserPublicKey: StandardRoute                            = complete { SimpleErrorResponse(StatusCodes.Forbidden, error.UserPublicKeyIsNotValid) }
+  private def invalidJsonResponse(fields: List[String] = Nil): StandardRoute = complete {
+    InvalidJsonResponse(error.InvalidJson(fields))
+  }
+
+  private val invalidUserPublicKey: StandardRoute = complete {
+    SimpleErrorResponse(StatusCodes.Forbidden, error.UserPublicKeyIsNotValid)
+  }
 
   private val invalidJsonParsingRejectionsHandler =
     server.RejectionHandler
       .newBuilder()
       .handle {
         case ValidationRejection(_, Some(e: PlayJsonException)) => invalidJsonResponse(e.errors.map(_._1.toString).toList)
-        case _: UnsupportedRequestContentTypeRejection          => invalidJsonResponse()
+        case _: UnsupportedRequestContentTypeRejection => invalidJsonResponse()
       }
       .result()
 
   private val gRPCExceptionsHandler: ExceptionHandler = ExceptionHandler {
     case ex: WavesNodeConnectionLostException =>
       log.error("Waves Node connection lost", ex)
-      complete { WavesNodeUnavailable(error.WavesNodeConnectionBroken) }
+      complete {
+        WavesNodeUnavailable(error.WavesNodeConnectionBroken)
+      }
     case ex =>
       log.error("An unexpected error occurred", ex)
-      complete { WavesNodeUnavailable(error.UnexpectedError) }
+      complete {
+        WavesNodeUnavailable(error.UnexpectedError)
+      }
   }
 
   private def protect(unprotected: Route) = matcherStatusBarrier {
     handleExceptions(gRPCExceptionsHandler)(handleRejections(invalidJsonParsingRejectionsHandler)(unprotected))
   }
 
-  private val ratesRoutes: Route        = pathPrefix("rates") { getRates ~ protect(upsertRate ~ deleteRate) }
-  private val settingsRoutes: Route     = pathPrefix("settings") { getSettings ~ ratesRoutes }
-  private val balanceRoutes: Route      = pathPrefix("balance") { protect(reservedBalance) }
-  private val transactionsRoutes: Route = pathPrefix("transactions") { protect(getTransactionsByOrder) }
+  private val ratesRoutes: Route = pathPrefix("rates") {
+    getRates ~ protect(upsertRate ~ deleteRate)
+  }
+  private val settingsRoutes: Route = pathPrefix("settings") {
+    getSettings ~ ratesRoutes
+  }
+  private val balanceRoutes: Route = pathPrefix("balance") {
+    protect(reservedBalance)
+  }
+  private val transactionsRoutes: Route = pathPrefix("transactions") {
+    protect(getTransactionsByOrder)
+  }
 
   private val debugRoutes: Route = pathPrefix("debug") {
-    getCurrentOffset ~ getLastOffset ~ getOldestSnapshotOffset ~ getAllSnapshotOffsets ~ protect(saveSnapshots)
+    getConfig ~ getCurrentOffset ~ getLastOffset ~ getOldestSnapshotOffset ~ getAllSnapshotOffsets ~ protect(saveSnapshots)
   }
 
   private val orderBookRoutes: Route = pathPrefix("orderbook") {
@@ -132,7 +149,9 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   }
 
   private val ordersRoutes: Route = pathPrefix("orders") {
-    protect { getAllOrderHistory ~ getOrderStatusInfoByIdWithApiKey ~ cancelAllById ~ forceCancelOrder }
+    protect {
+      getAllOrderHistory ~ getOrderStatusInfoByIdWithApiKey ~ cancelAllById ~ forceCancelOrder
+    }
   }
 
   override lazy val route: Route = pathPrefix("matcher") {
@@ -141,38 +160,52 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
 
   private def unavailableOrderBookBarrier(p: AssetPair): Directive0 = orderBook(p) match {
     case Some(x) => if (x.isRight) pass else complete(OrderBookUnavailable(error.OrderBookBroken(p)))
-    case None    => forceCheckOrderBook(p)
+    case None => forceCheckOrderBook(p)
   }
 
   private def forceCheckOrderBook(p: AssetPair): Directive0 = onComplete(matcher ? ForceStartOrderBook(p)).flatMap {
     case Success(_) => pass
-    case _          => complete(OrderBookUnavailable(error.OrderBookBroken(p)))
+    case _ => complete(OrderBookUnavailable(error.OrderBookBroken(p)))
   }
 
   private def withAssetPair(p: AssetPair,
                             redirectToInverse: Boolean = false,
                             suffix: String = "",
                             formatError: MatcherError => ToResponseMarshallable = InfoNotFound.apply): Directive1[AssetPair] = {
-    FutureDirectives.onSuccess { assetPairBuilder.validateAssetPair(p).value } flatMap {
+    FutureDirectives.onSuccess {
+      assetPairBuilder.validateAssetPair(p).value
+    } flatMap {
       case Right(_) => provide(p)
       case Left(e) if redirectToInverse =>
-        FutureDirectives.onSuccess { assetPairBuilder.validateAssetPair(p.reverse).value } flatMap {
+        FutureDirectives.onSuccess {
+          assetPairBuilder.validateAssetPair(p.reverse).value
+        } flatMap {
           case Right(_) => redirect(s"/matcher/orderbook/${p.priceAssetStr}/${p.amountAssetStr}$suffix", StatusCodes.MovedPermanently)
-          case Left(_)  => complete { formatError(e) }
+          case Left(_) => complete {
+            formatError(e)
+          }
         }
-      case Left(e) => complete { formatError(e) }
+      case Left(e) => complete {
+        formatError(e)
+      }
     }
   }
 
   private def withAsset(a: Asset): Directive1[Asset] = {
-    FutureDirectives.onSuccess { assetPairBuilder.validateAssetId(a).value } flatMap {
+    FutureDirectives.onSuccess {
+      assetPairBuilder.validateAssetId(a).value
+    } flatMap {
       case Right(_) => provide(a)
-      case Left(e)  => complete { InfoNotFound(e) }
+      case Left(e) => complete {
+        InfoNotFound(e)
+      }
     }
   }
 
   private def withCorrectAddress(addressOrError: Either[ValidationError.InvalidAddress, Address])(f: Address => Route): Route =
-    addressOrError.fold(ia => complete { InvalidAddress(ia.reason) }, f)
+    addressOrError.fold(ia => complete {
+      InvalidAddress(ia.reason)
+    }, f)
 
   private def withCancelRequest(f: HttpCancelOrder => Route): Route =
     post {
@@ -194,10 +227,12 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                       case AddressActor.Event.OrderAccepted(x) => SimpleResponse(HttpSuccessfulPlace(x))
                       case x: error.MatcherError =>
                         if (x == error.CanNotPersistEvent) StatusCodes.ServiceUnavailable -> HttpError.from(x, "WavesNodeUnavailable")
-                        else StatusCodes.BadRequest                                       -> HttpError.from(x, "OrderRejected")
+                        else StatusCodes.BadRequest -> HttpError.from(x, "OrderRejected")
                     }
                   }
-                case Left(e) => Future.successful[ToResponseMarshallable] { StatusCodes.BadRequest -> HttpError.from(e, "OrderRejected") }
+                case Left(e) => Future.successful[ToResponseMarshallable] {
+                  StatusCodes.BadRequest -> HttpError.from(e, "OrderRejected")
+                }
               }
             }
           )
@@ -205,7 +240,9 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       }
     }
 
-    endpoint.fold(route) { path(_)(route) }
+    endpoint.fold(route) {
+      path(_)(route)
+    }
   }
 
   private def signedGet(publicKey: PublicKey): Directive0 =
@@ -213,24 +250,26 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       case (timestamp, sig) =>
         Base58.tryDecodeWithLimit(sig).map(crypto.verify(_, publicKey ++ Longs.toByteArray(timestamp.toLong), publicKey)) match {
           case Success(true) => pass
-          case _             => complete(InvalidSignature)
+          case _ => complete(InvalidSignature)
         }
     }
 
   @Path("/")
   @ApiOperation(value = "Matcher Public Key",
-                notes = "Get Matcher Public Key in Base58",
-                httpMethod = "GET",
-                tags = Array("info"),
-                response = classOf[String])
-  def getMatcherPublicKey: Route = (pathEndOrSingleSlash & get) { complete(matcherPublicKey.toJson) }
+    notes = "Get Matcher Public Key in Base58",
+    httpMethod = "GET",
+    tags = Array("info"),
+    response = classOf[String])
+  def getMatcherPublicKey: Route = (pathEndOrSingleSlash & get) {
+    complete(matcherPublicKey.toJson)
+  }
 
   @Path("/settings")
   @ApiOperation(value = "Matcher Settings",
-                notes = "Get Matcher Public Settings",
-                httpMethod = "GET",
-                tags = Array("info"),
-                response = classOf[HttpMatcherPublicSettings])
+    notes = "Get Matcher Public Settings",
+    httpMethod = "GET",
+    tags = Array("info"),
+    response = classOf[HttpMatcherPublicSettings])
   def getSettings: Route = (pathEndOrSingleSlash & get) {
     complete(
       validatedAllowedOrderVersions() map { allowedOrderVersions =>
@@ -260,7 +299,9 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     tags = Array("rates"),
     response = classOf[HttpRates]
   )
-  def getRates: Route = (pathEndOrSingleSlash & get) { complete(rateCache.getAllRates.toJson) }
+  def getRates: Route = (pathEndOrSingleSlash & get) {
+    complete(rateCache.getAllRates.toJson)
+  }
 
   @Path("/settings/rates/{assetId}")
   @ApiOperation(
@@ -274,23 +315,25 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     Array(
       new ApiImplicitParam(name = "assetId", value = "Asset for which rate is added or updated", dataType = "string", paramType = "path"),
       new ApiImplicitParam(name = "rate",
-                           value = "Rate associated with the specified asset",
-                           dataType = "double",
-                           paramType = "body",
-                           required = true)
+        value = "Rate associated with the specified asset",
+        dataType = "double",
+        paramType = "body",
+        required = true)
     )
   )
   def upsertRate: Route = {
     (path(AssetPM) & put & withAuth) { a =>
       entity(as[Double]) { rate =>
-        if (rate <= 0) complete { RateError(error.NonPositiveAssetRate) } else
+        if (rate <= 0) complete {
+          RateError(error.NonPositiveAssetRate)
+        } else
           withAsset(a) { asset =>
             complete(
               if (asset == Waves) RateError(error.WavesImmutableRate)
               else {
                 val assetStr = asset.toString
                 val response = rateCache.upsertRate(asset, rate) match {
-                  case None     => SimpleResponse(StatusCodes.Created, s"The rate $rate for the asset $assetStr added")
+                  case None => SimpleResponse(StatusCodes.Created, s"The rate $rate for the asset $assetStr added")
                   case Some(pv) => SimpleResponse(StatusCodes.OK, s"The rate for the asset $assetStr updated, old value = $pv, new value = $rate")
                 }
                 externalClientDirectoryRef ! WsExternalClientDirectoryActor.Command.BroadcastRatesUpdates(Map(asset -> rate))
@@ -322,7 +365,7 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         else {
           val assetStr = asset.toString
           val response = rateCache.deleteRate(asset) match {
-            case None     => RateError(error.RateNotFound(asset), StatusCodes.NotFound)
+            case None => RateError(error.RateNotFound(asset), StatusCodes.NotFound)
             case Some(pv) => SimpleResponse(StatusCodes.OK, s"The rate for the asset $assetStr deleted, old value = $pv")
           }
           externalClientDirectoryRef ! WsExternalClientDirectoryActor.Command.BroadcastRatesUpdates(Map(asset -> -1))
@@ -345,16 +388,18 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       new ApiImplicitParam(name = "amountAsset", value = "Amount Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
       new ApiImplicitParam(name = "priceAsset", value = "Price Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
       new ApiImplicitParam(name = "depth",
-                           value = "Limit the number of bid/ask records returned",
-                           required = false,
-                           dataType = "integer",
-                           paramType = "query")
+        value = "Limit the number of bid/ask records returned",
+        required = false,
+        dataType = "integer",
+        paramType = "query")
     )
   )
   def getOrderBook: Route = (path(AssetPairPM) & get) { p =>
     parameters("depth".as[Int].?) { depth =>
       withAssetPair(p, redirectToInverse = true, depth.fold("")(d => s"?depth=$d")) { pair =>
-        complete { orderBookHttpInfo.getHttpView(pair, MatcherModel.Normalized, depth) }
+        complete {
+          orderBookHttpInfo.getHttpView(pair, MatcherModel.Normalized, depth)
+        }
       }
     }
   }
@@ -375,15 +420,17 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   )
   def marketStatus: Route = (path(AssetPairPM / "status") & get) { p =>
     withAssetPair(p, redirectToInverse = true, suffix = "/status") { pair =>
-      complete { orderBookHttpInfo.getMarketStatus(pair) }
+      complete {
+        orderBookHttpInfo.getMarketStatus(pair)
+      }
     }
   }
 
   @Path("/orderbook/{amountAsset}/{priceAsset}/info")
   @ApiOperation(value = "Get Order Restrictions for the specified Asset Pair",
-                httpMethod = "GET",
-                tags = Array("markets"),
-                response = classOf[HttpOrderBookInfo])
+    httpMethod = "GET",
+    tags = Array("markets"),
+    response = classOf[HttpOrderBookInfo])
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "amountAsset", value = "Amount Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
@@ -392,7 +439,9 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   )
   def orderBookInfo: Route = (path(AssetPairPM / "info") & get) { p =>
     withAssetPair(p, redirectToInverse = true, suffix = "/info") { pair =>
-      complete { SimpleResponse(orderBookInfo(pair)) }
+      complete {
+        SimpleResponse(orderBookInfo(pair))
+      }
     }
   }
 
@@ -486,7 +535,7 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       HttpSuccessfulBatchCancel(
         xs.map {
           case (id, Right(_)) => Right(HttpSuccessfulSingleCancel(id))
-          case (_, Left(e))   => Left(HttpError.from(e, "OrderCancelRejected"))
+          case (_, Left(e)) => Left(HttpError.from(e, "OrderCancelRejected"))
         }.toList
       )
     case x: error.MatcherError => StatusCodes.ServiceUnavailable -> HttpError.from(x, "BatchCancelRejected")
@@ -502,7 +551,7 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
             case AddressActor.Event.OrderCanceled(x) => SimpleResponse(HttpSuccessfulSingleCancel(x))
             case x: error.MatcherError =>
               if (x == error.CanNotPersistEvent) StatusCodes.ServiceUnavailable -> HttpError.from(x, "WavesNodeUnavailable")
-              else StatusCodes.BadRequest                                       -> HttpError.from(x, "OrderCancelRejected")
+              else StatusCodes.BadRequest -> HttpError.from(x, "OrderCancelRejected")
           }
         case _ => StatusCodes.BadRequest -> HttpError.from(error.CancelRequestIsIncomplete, "OrderCancelRejected")
       }
@@ -566,7 +615,9 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       )
     )
   )
-  def cancelAll: Route = (path("cancel") & post) { handleCancelRequest(None) }
+  def cancelAll: Route = (path("cancel") & post) {
+    handleCancelRequest(None)
+  }
 
   @Path("/orders/{address}/cancel")
   @ApiOperation(
@@ -628,10 +679,11 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   )
   def forceCancelOrder: Route = (path("cancel" / ByteStrPM) & post & withAuth & withUserPublicKeyOpt) { (orderId, userPublicKey) =>
     def reject: StandardRoute = complete(OrderCancelRejected(error.OrderNotFound(orderId)))
+
     (orderDb.get(orderId), userPublicKey) match {
-      case (None, _)                                                         => reject
+      case (None, _) => reject
       case (Some(order), Some(pk)) if pk.toAddress != order.sender.toAddress => reject
-      case (Some(order), _)                                                  => handleCancelRequest(None, order.sender, Some(orderId), None)
+      case (Some(order), _) => handleCancelRequest(None, order.sender, Some(orderId), None)
     }
   }
 
@@ -818,7 +870,7 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     askMapAddressActor[AddressActor.Reply.OrdersStatusInfo](address, AddressActor.Query.GetOrderStatusInfo(id)) {
       _.maybeOrderStatusInfo match {
         case Some(oi) => SimpleResponse(HttpOrderBookHistoryItem.fromOrderInfo(id, oi))
-        case None     => InfoNotFound(error.OrderNotFound(id))
+        case None => InfoNotFound(error.OrderNotFound(id))
       }
     }
   }
@@ -851,7 +903,7 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       withCorrectAddress(addressOrError) { address =>
         userPublicKey match {
           case Some(upk) if upk.toAddress != address => invalidUserPublicKey
-          case _                                     => getOrderStatusInfo(orderId, address)
+          case _ => getOrderStatusInfo(orderId, address)
         }
       }
   }
@@ -881,7 +933,9 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     )
   )
   def getOrderStatusInfoByIdWithSignature: Route = (path(PublicKeyPM / ByteStrPM) & get) { (publicKey, orderId) =>
-    signedGet(publicKey) { getOrderStatusInfo(orderId, publicKey.toAddress) }
+    signedGet(publicKey) {
+      getOrderStatusInfo(orderId, publicKey.toAddress)
+    }
   }
 
   @Path("/orderbook/{amountAsset}/{priceAsset}/tradableBalance/{address}")
@@ -902,7 +956,11 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def tradableBalance: Route = (path(AssetPairPM / "tradableBalance" / AddressPM) & get) { (pair, addressOrError) =>
     withCorrectAddress(addressOrError) { address =>
       withAssetPair(pair, redirectToInverse = true, s"/tradableBalance/$address") { pair =>
-        complete { askMapAddressActor[AddressActor.Reply.Balance](address, AddressActor.Query.GetTradableBalance(pair.assets)) { _.balance.toJson } }
+        complete {
+          askMapAddressActor[AddressActor.Reply.Balance](address, AddressActor.Query.GetTradableBalance(pair.assets)) {
+            _.balance.toJson
+          }
+        }
       }
     }
   }
@@ -933,7 +991,9 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       case Some(upk) if upk != publicKey => invalidUserPublicKey
       case _ =>
         complete {
-          askMapAddressActor[AddressActor.Reply.Balance](publicKey, AddressActor.Query.GetReservedBalance) { _.balance.toJson }
+          askMapAddressActor[AddressActor.Reply.Balance](publicKey, AddressActor.Query.GetReservedBalance) {
+            _.balance.toJson
+          }
         }
     }
   }
@@ -990,7 +1050,7 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
           storeEvent(QueueEvent.OrderBookDeleted(pair))
             .map {
               case None => NotImplemented(error.FeatureDisabled)
-              case _    => SimpleResponse(StatusCodes.Accepted, "Deleting order book")
+              case _ => SimpleResponse(StatusCodes.Accepted, "Deleting order book")
             }
             .recover {
               case e: Throwable =>
@@ -1016,7 +1076,25 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     )
   )
   def getTransactionsByOrder: Route = (path(ByteStrPM) & get) { orderId =>
-    complete { Json.toJson(orderDb.transactionsByOrder(orderId)) }
+    complete {
+      Json.toJson(orderDb.transactionsByOrder(orderId))
+    }
+  }
+
+  @Path("/debug/config")
+  @ApiOperation(
+    value = "Returns current matcher's configuration",
+    httpMethod = "GET",
+    authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
+    tags = Array("debug"),
+    response = classOf[SimpleResponse]
+  )
+  def getConfig: Route = get {
+    complete {
+      val regex = """.(user|pass|seed|private).""".r
+
+      SimpleResponse(StatusCodes.OK, scala.util.parsing.json.JSONObject(matcherSettings.toMap(matcherSettings).filter(x => regex.findFirstIn(x._1).isEmpty)).toString())
+    }
   }
 
   @Path("/debug/currentOffset")
@@ -1027,7 +1105,9 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     tags = Array("debug"),
     response = classOf[HttpOffset]
   )
-  def getCurrentOffset: Route = (path("currentOffset") & get & withAuth) { complete(currentOffset().toJson) }
+  def getCurrentOffset: Route = (path("currentOffset") & get & withAuth) {
+    complete(currentOffset().toJson)
+  }
 
   @Path("/debug/lastOffset")
   @ApiOperation(
@@ -1038,7 +1118,9 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     response = classOf[HttpOffset]
   )
   def getLastOffset: Route = (path("lastOffset") & get & withAuth) {
-    complete { lastOffset() map (_.toJson) }
+    complete {
+      lastOffset() map (_.toJson)
+    }
   }
 
   @Path("/debug/oldestSnapshotOffset")
@@ -1091,7 +1173,7 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   }
 
   private def askMapAddressActor[A: ClassTag](sender: Address, msg: AddressActor.Message)(
-      f: A => ToResponseMarshallable): Future[ToResponseMarshallable] = {
+    f: A => ToResponseMarshallable): Future[ToResponseMarshallable] = {
     (addressActor ? AddressDirectoryActor.Envelope(sender, msg))
       .mapTo[A]
       .map(f)
@@ -1123,9 +1205,9 @@ class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     if (activeOnly.isEmpty && closedOnly.isEmpty) default
     else
       (activeOnly.getOrElse(false), closedOnly.getOrElse(false)) match {
-        case (true, true)   => OrderListType.Empty
-        case (false, true)  => OrderListType.ClosedOnly
-        case (true, false)  => OrderListType.ActiveOnly
+        case (true, true) => OrderListType.Empty
+        case (false, true) => OrderListType.ClosedOnly
+        case (true, false) => OrderListType.ActiveOnly
         case (false, false) => OrderListType.All
       }
 }

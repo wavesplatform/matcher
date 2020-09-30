@@ -5,7 +5,6 @@ import java.util.concurrent.ThreadLocalRandom
 
 import cats.implicits.catsSyntaxOptionId
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.StartingMatcherError
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.api.ws.entities.{WsBalances, WsOrder}
 import com.wavesplatform.dex.domain.asset.Asset
@@ -113,7 +112,7 @@ class KafkaIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka 
 
     assertChanges(wsac, squash = false)(
       Map(Waves -> WsBalances(initialWavesBalance - 40.006, 40.006)),
-      Map(Waves -> WsBalances(initialWavesBalance - 10.003, 10.003)),
+      Map(Waves -> WsBalances(initialWavesBalance - 10.003, 10.003))
     )()
 
     val oh = dex1.api.orderHistory(alice, Some(true))
@@ -156,18 +155,17 @@ class KafkaIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka 
           .parseString("""waves.dex {
   events-queue.kafka.topic = cleared-topic
   snapshots-interval = 3
-}""")
-          .withFallback(dexInitialSuiteConfig)
+}""").withFallback(dexInitialSuiteConfig)
       )
       dex1.stopWithoutRemove()
       clearTopic(topicName)
 
       try {
         dex1.start()
-        fail("Expected Matcher stopped with the exit code of 10")
+        fail("Expected Matcher stopped with the exit code of 12")
       } catch {
         case _: Throwable =>
-          dex1.getState().getExitCodeLong shouldBe StartingMatcherError.code
+          dex1.getState().getExitCodeLong shouldBe 12 // RecoveryError.code
       } finally {
         dex1.stop()
         dex1.start()
@@ -183,14 +181,13 @@ class KafkaIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka 
             .parseString("""waves.dex {
   events-queue.kafka.topic = new-topic
   snapshots-interval = 3
-}""")
-            .withFallback(dexInitialSuiteConfig)
+}""").withFallback(dexInitialSuiteConfig)
         )
-        fail("Expected Matcher stopped with the exit code of 10")
+        fail("Expected Matcher stopped with the exit code of 12")
       } catch {
         case _: Throwable =>
-          dex1.getState().getExitCodeLong shouldBe StartingMatcherError.code
-      } // Add finally (above) if you write a new test
+          dex1.getState().getExitCodeLong shouldBe 12 // RecoveryError.code
+      }                                               // Add finally (above) if you write a new test
     }
   }
 

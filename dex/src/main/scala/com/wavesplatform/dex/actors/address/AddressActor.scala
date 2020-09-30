@@ -3,14 +3,13 @@ package com.wavesplatform.dex.actors.address
 import java.time.{Instant, Duration => JDuration}
 
 import akka.actor.typed.scaladsl.adapter._
-import akka.actor.{Actor, ActorRef, Cancellable, Status, typed}
+import akka.actor.{Actor, ActorRef, Cancellable, Props, Status, typed}
 import akka.pattern.{CircuitBreakerOpenException, ask, pipe}
 import akka.{actor => classic}
 import cats.instances.long.catsKernelStdGroupForLong
 import cats.kernel.Group
 import cats.syntax.either._
 import cats.syntax.group.{catsSyntaxGroup, catsSyntaxSemigroup}
-import com.wavesplatform.dex.Matcher.StoreEvent
 import com.wavesplatform.dex.actors.SpendableBalancesActor
 import com.wavesplatform.dex.actors.address.AddressActor._
 import com.wavesplatform.dex.actors.tx.CreateExchangeTransactionActor
@@ -32,6 +31,7 @@ import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.Spen
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCancelFailed, OrderCanceled, OrderCanceledReason, OrderExecuted, Event => OrderEvent}
 import com.wavesplatform.dex.model._
+import com.wavesplatform.dex.queue.MatcherQueue.StoreEvent
 import com.wavesplatform.dex.queue.QueueEvent
 import com.wavesplatform.dex.time.Time
 import org.slf4j.LoggerFactory
@@ -112,11 +112,10 @@ class AddressActor(
     log.error(s"Got $e", e)
   }
 
-  private val starting: Receive = eventsProcessing orElse failuresProcessing orElse {
-    case AddressDirectoryActor.StartWork =>
-      activeOrders.values.foreach(x => scheduleExpiration(x.order))
-      started = true
-      context.become(working)
+  private val starting: Receive = eventsProcessing orElse failuresProcessing orElse { case AddressDirectoryActor.StartWork =>
+    activeOrders.values.foreach(x => scheduleExpiration(x.order))
+    started = true
+    context.become(working)
   }
 
   private val working: Receive = eventsProcessing orElse failuresProcessing orElse {
@@ -569,6 +568,28 @@ object AddressActor {
   type Resp = MatcherResponse
 
   private val ExpirationThreshold = 50.millis
+
+  def props(
+      owner: Address,
+      time: Time,
+      orderDB: OrderDB,
+      validate: (AcceptedOrder, Map[Asset, Long]) => Future[Either[MatcherError, Unit]],
+      store: StoreEvent,
+      started: Boolean,
+      spendableBalancesActor: ActorRef,
+      settings: AddressActor.Settings = AddressActor.Settings.default
+  )(implicit efc: ErrorFormatterContext): Props = Props(
+    new AddressActor(
+      owner,
+      time,
+      orderDB,
+      validate,
+      store,
+      started,
+      spendableBalancesActor,
+      settings
+    )
+  )
 
   /**
     * r = currentBalance |-| requiredBalance

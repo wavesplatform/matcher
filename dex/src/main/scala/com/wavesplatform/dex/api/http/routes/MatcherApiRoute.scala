@@ -11,7 +11,6 @@ import akka.stream.Materializer
 import akka.util.Timeout
 import cats.syntax.option._
 import com.google.common.primitives.Longs
-import com.wavesplatform.dex.Matcher.StoreEvent
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.actors.MatcherActor._
 import com.wavesplatform.dex.actors.address.AddressActor.OrderListType
@@ -22,6 +21,7 @@ import com.wavesplatform.dex.api.http.headers.`X-User-Public-Key`
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
 import com.wavesplatform.dex.api.ws.actors.WsExternalClientDirectoryActor
+import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
@@ -41,6 +41,7 @@ import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
 import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model._
+import com.wavesplatform.dex.queue.MatcherQueue.StoreEvent
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.settings.{MatcherSettings, OrderFeeSettings}
 import io.swagger.annotations._
@@ -65,7 +66,7 @@ class MatcherApiRoute(
     getActualTickSize: AssetPair => BigDecimal,
     orderValidator: Order => FutureResult[Order],
     matcherSettings: MatcherSettings,
-    override val matcherStatus: () => Matcher.Status,
+    override val matcherStatus: () => MatcherStatus,
     orderDb: OrderDB,
     currentOffset: () => QueueEventWithMeta.Offset,
     lastOffset: () => Future[QueueEventWithMeta.Offset],

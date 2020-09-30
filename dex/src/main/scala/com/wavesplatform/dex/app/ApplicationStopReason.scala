@@ -21,5 +21,5 @@ case object NotSynchronizedNodeError extends ApplicationStopReason(18) {
 }
 
 case object MatcherStateCheckingFailedError extends ApplicationStopReason(20) {
-  override def getMessage: String = "Matcher checking failed, see log"
+  override val getMessage: String = "Matcher checking failed, see log"
 }

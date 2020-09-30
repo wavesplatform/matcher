@@ -401,10 +401,8 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
   }
 
   startGuard.onComplete {
-    case Success(_) => setStatus(MatcherStatus.Working)
-    case Failure(e: ApplicationStopReason) =>
-      log.error(s"Can't start matcher: ${e.getMessage}")
-      forceStopApplication(e)
+    case Success(_)                        => setStatus(MatcherStatus.Working)
+    case Failure(e: ApplicationStopReason) => forceStopApplication(e)
     case Failure(e) =>
       log.error(s"Can't start matcher: ${e.getMessage}", e)
       forceStopApplication(StartingMatcherError)

@@ -10,7 +10,6 @@ import cats.instances.long.catsKernelStdGroupForLong
 import cats.kernel.Group
 import cats.syntax.either._
 import cats.syntax.group.{catsSyntaxGroup, catsSyntaxSemigroup}
-import com.wavesplatform.dex.Matcher.StoreEvent
 import com.wavesplatform.dex.actors.SpendableBalancesActor
 import com.wavesplatform.dex.actors.address.AddressActor._
 import com.wavesplatform.dex.actors.tx.CreateExchangeTransactionActor
@@ -32,6 +31,7 @@ import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.Spen
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCancelFailed, OrderCanceled, OrderCanceledReason, OrderExecuted, Event => OrderEvent}
 import com.wavesplatform.dex.model._
+import com.wavesplatform.dex.queue.MatcherQueue.StoreEvent
 import com.wavesplatform.dex.queue.QueueEvent
 import com.wavesplatform.dex.time.Time
 import org.slf4j.LoggerFactory

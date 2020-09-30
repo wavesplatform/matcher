@@ -56,8 +56,10 @@ object Amount {
 case class Price(assetPair: AssetPair, volume: BigDecimal)
 object Price {
   private[error] def apply(assetPair: AssetPair, volume: Long)(implicit efc: ErrorFormatterContext): Price =
-    new Price(assetPair,
-              Denormalization.denormalizePrice(volume, efc.unsafeAssetDecimals(assetPair.amountAsset), efc.unsafeAssetDecimals(assetPair.priceAsset)))
+    new Price(
+      assetPair,
+      Denormalization.denormalizePrice(volume, efc.unsafeAssetDecimals(assetPair.amountAsset), efc.unsafeAssetDecimals(assetPair.priceAsset))
+    )
 }
 
 case class MatcherErrorMessage(text: String, template: String, params: JsObject)
@@ -70,22 +72,28 @@ case object FeatureDisabled       extends MatcherError(commonEntity, feature, di
 case object Balancing             extends MatcherError(webSocket, commonEntity, optimization, e"System is balancing the load. Please reconnect")
 
 case class OrderBookBroken(theAssetPair: AssetPair)
-    extends MatcherError(orderBook,
-                         commonEntity,
-                         broken,
-                         e"The order book for ${Symbol("assetPair") -> theAssetPair} is unavailable, please contact with the administrator")
+    extends MatcherError(
+      orderBook,
+      commonEntity,
+      broken,
+      e"The order book for ${Symbol("assetPair") -> theAssetPair} is unavailable, please contact with the administrator"
+    )
 
 case class OrderBookUnexpectedState(assetPair: AssetPair)
-    extends MatcherError(orderBook,
-                         commonEntity,
-                         unexpected,
-                         e"The order book for ${Symbol("assetPair") -> assetPair} is unexpected state, please contact with the administrator")
+    extends MatcherError(
+      orderBook,
+      commonEntity,
+      unexpected,
+      e"The order book for ${Symbol("assetPair") -> assetPair} is unexpected state, please contact with the administrator"
+    )
 
 case class OrderBookStopped(assetPair: AssetPair)
-    extends MatcherError(orderBook,
-                         commonEntity,
-                         disabled,
-                         e"The order book for ${Symbol("assetPair") -> assetPair} is stopped, please contact with the administrator")
+    extends MatcherError(
+      orderBook,
+      commonEntity,
+      disabled,
+      e"The order book for ${Symbol("assetPair") -> assetPair} is stopped, please contact with the administrator"
+    )
 
 case object CanNotPersistEvent
     extends MatcherError(commonEntity, producer, broken, e"Can not persist event, please retry later or contact with the administrator")
@@ -148,10 +156,12 @@ case class OrderCommonValidationFailed(details: String)
     extends MatcherError(order, commonEntity, commonClass, e"The order is invalid: ${Symbol("details") -> details}")
 
 case class InvalidAsset(theAsset: String)
-    extends MatcherError(asset,
-                         commonEntity,
-                         broken,
-                         e"The asset '${Symbol("assetId") -> theAsset}' is wrong. It should be 'WAVES' or a Base58 string")
+    extends MatcherError(
+      asset,
+      commonEntity,
+      broken,
+      e"The asset '${Symbol("assetId") -> theAsset}' is wrong. It should be 'WAVES' or a Base58 string"
+    )
 
 case class AssetBlacklisted(theAsset: IssuedAsset)
     extends MatcherError(asset, commonEntity, blacklisted, e"The asset ${Symbol("assetId") -> theAsset} is blacklisted")
@@ -231,10 +241,12 @@ case class AccountNotSupportOrderVersion(address: Address, requiredVersion: Byte
     )
 
 case class AccountScriptReturnedError(address: Address, scriptMessage: String)
-    extends MatcherError(account,
-                         script,
-                         commonClass,
-                         e"The account's script of ${Symbol("address") -> address} returned the error: ${Symbol("scriptError") -> scriptMessage}")
+    extends MatcherError(
+      account,
+      script,
+      commonClass,
+      e"The account's script of ${Symbol("address") -> address} returned the error: ${Symbol("scriptError") -> scriptMessage}"
+    )
 
 case class AccountScriptDeniedOrder(address: Address)
     extends MatcherError(account, script, denied, e"The account's script of ${Symbol("address") -> address} rejected the order")
@@ -267,10 +279,12 @@ case class AssetFeatureUnsupported(x: BlockchainFeature, theAsset: IssuedAsset)
     )
 
 case class AssetScriptReturnedError(theAsset: IssuedAsset, scriptMessage: String)
-    extends MatcherError(asset,
-                         script,
-                         commonClass,
-                         e"The asset's script of ${Symbol("assetId") -> theAsset} returned the error: ${Symbol("scriptError") -> scriptMessage}")
+    extends MatcherError(
+      asset,
+      script,
+      commonClass,
+      e"The asset's script of ${Symbol("assetId") -> theAsset} returned the error: ${Symbol("scriptError") -> scriptMessage}"
+    )
 
 case class AssetScriptDeniedOrder(theAsset: IssuedAsset)
     extends MatcherError(asset, script, denied, e"The asset's script of ${Symbol("assetId") -> theAsset} rejected the order")
@@ -319,10 +333,14 @@ case class DeviantOrderMatcherFee(orderType: OrderType, matcherFee: Amount, devi
       outOfBound,
       if (orderType == OrderType.BUY)
         e"""The buy order's matcher fee ${Symbol("matcherFee") -> matcherFee} is out of deviation bounds. It should meet the following matcher's requirements:
-       |matcher fee >= ${Symbol("bestAskFeePercent") -> (100 - deviationSettings.maxFeeDeviation)}% of fee which should be paid in case of matching with best ask"""
+       |matcher fee >= ${Symbol(
+          "bestAskFeePercent"
+        ) -> (100 - deviationSettings.maxFeeDeviation)}% of fee which should be paid in case of matching with best ask"""
       else
         e"""The sell order's matcher fee ${Symbol("matcherFee") -> matcherFee} is out of deviation bounds. It should meet the following matcher's requirements:
-         |matcher fee >= ${Symbol("bestBidFeePercent") -> (100 - deviationSettings.maxFeeDeviation)}% of fee which should be paid in case of matching with best bid"""
+         |matcher fee >= ${Symbol(
+          "bestBidFeePercent"
+        ) -> (100 - deviationSettings.maxFeeDeviation)}% of fee which should be paid in case of matching with best bid"""
     )
 object DeviantOrderMatcherFee {
   def apply(ord: Order, deviationSettings: DeviationsSettings)(implicit efc: ErrorFormatterContext): DeviantOrderMatcherFee =
@@ -380,10 +398,12 @@ object OrderInvalidAmount {
 }
 
 case class PriceLastDecimalsMustBeZero(insignificantDecimals: Int)
-    extends MatcherError(order,
-                         price,
-                         unexpected,
-                         e"Invalid price, last ${Symbol("insignificantDecimals") -> insignificantDecimals} digits must be 0")
+    extends MatcherError(
+      order,
+      price,
+      unexpected,
+      e"Invalid price, last ${Symbol("insignificantDecimals") -> insignificantDecimals} digits must be 0"
+    )
 
 case class OrderInvalidPrice(orderPrice: Price, prcSettings: OrderRestrictionsSettings)
     extends MatcherError(
@@ -470,6 +490,9 @@ case class InvalidJson(fields: List[String])
       else e"The provided JSON contains invalid fields: ${Symbol("invalidFields") -> fields}. Check the documentation"
     )
 
+case object UnsupportedContentType
+    extends MatcherError(request, commonEntity, unsupported, e"The provided Content-Type is not supported, please provide JSON")
+
 case object ApiKeyIsNotProvided
     extends MatcherError(auth, commonEntity, notProvided, e"API key is not provided in the configuration, please contact with the administrator")
 
@@ -478,10 +501,12 @@ case object ApiKeyIsNotValid extends MatcherError(auth, commonEntity, commonClas
 case object UserPublicKeyIsNotValid extends MatcherError(account, pubKey, broken, e"Provided user public key is not correct")
 
 case class AddressAndPublicKeyAreIncompatible(address: Address, publicKey: PublicKey)
-    extends MatcherError(auth,
-                         pubKey,
-                         unexpected,
-                         e"Address ${Symbol("address") -> address} and public key ${Symbol("publicKey") -> publicKey} are incompatible")
+    extends MatcherError(
+      auth,
+      pubKey,
+      unexpected,
+      e"Address ${Symbol("address") -> address} and public key ${Symbol("publicKey") -> publicKey} are incompatible"
+    )
 
 case object AuthIsRequired extends MatcherError(auth, params, notProvided, e"The authentication is required. Please read the documentation")
 
@@ -510,10 +535,12 @@ case class SubscriptionTokenExpired(address: Address)
     extends MatcherError(token, expiration, commonClass, e"The subscription token for address ${Symbol("address") -> address} expired")
 
 case class TokenNetworkUnexpected(required: Byte, given: Byte)
-    extends MatcherError(token,
-                         network,
-                         unexpected,
-                         e"The required network is ${Symbol("required") -> required}, but given ${Symbol("given") -> given}")
+    extends MatcherError(
+      token,
+      network,
+      unexpected,
+      e"The required network is ${Symbol("required") -> required}, but given ${Symbol("given") -> given}"
+    )
 
 case class SubscriptionsLimitReached(limit: Int, id: String)
     extends MatcherError(

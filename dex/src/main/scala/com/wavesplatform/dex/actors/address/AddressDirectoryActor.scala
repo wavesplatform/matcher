@@ -12,8 +12,8 @@ import scala.collection.mutable
 
 class AddressDirectoryActor(
     orderDB: OrderDB,
-    addressActorProps: (Address, Boolean) => Props,
-    historyRouter: Option[ActorRef],
+    mkAddressActorProps: (Address, Boolean) => Props,
+    historyRouterRef: Option[ActorRef],
     var started: Boolean = false
 ) extends Actor
     with ScorexLogging {
@@ -27,7 +27,7 @@ class AddressDirectoryActor(
 
   private def createAddressActor(address: Address): ActorRef = {
     log.debug(s"Creating address actor for $address")
-    watch(actorOf(addressActorProps(address, started), address.toString))
+    watch(actorOf(mkAddressActorProps(address, started), address.toString))
   }
 
   private def forward(address: Address, msg: Any): Unit = (children get address, msg) match {
@@ -40,15 +40,15 @@ class AddressDirectoryActor(
 
     case e @ Events.OrderAdded(lo, _, timestamp) =>
       forward(lo.order.sender, e)
-      historyRouter foreach { _ ! HistoryInsertMsg.SaveOrder(lo, timestamp) }
+      historyRouterRef foreach { _ ! HistoryInsertMsg.SaveOrder(lo, timestamp) }
 
     case e: Events.OrderExecuted =>
       Set(e.counter.order, e.submitted.order).map(_.sender).foreach(forward(_, e))
-      historyRouter foreach { _ ! HistoryInsertMsg.SaveEvent(e) }
+      historyRouterRef foreach { _ ! HistoryInsertMsg.SaveEvent(e) }
 
     case e: Events.OrderCanceled =>
       forward(e.acceptedOrder.order.sender, e)
-      historyRouter foreach { _ ! HistoryInsertMsg.SaveEvent(e) }
+      historyRouterRef foreach { _ ! HistoryInsertMsg.SaveEvent(e) }
 
     case e: OrderCancelFailed =>
       orderDB.get(e.id) match {
@@ -69,6 +69,17 @@ class AddressDirectoryActor(
 }
 
 object AddressDirectoryActor {
+  val name = "addresses"
+
+  def props(orderDB: OrderDB, mkAddressActorProps: (Address, Boolean) => Props, historyRouterRef: Option[ActorRef]): Props = Props(
+    new AddressDirectoryActor(
+      orderDB,
+      mkAddressActorProps,
+      historyRouterRef,
+      false
+    )
+  )
+
   case class Envelope(address: Address, cmd: AddressActor.Message)
   case object StartWork
 }

@@ -28,6 +28,8 @@ trait MatcherQueue {
 }
 
 object MatcherQueue {
+  type StoreEvent = QueueEvent => Future[Option[QueueEventWithMeta]]
+
   private val stored: Future[Option[QueueEventWithMeta]] = Future.successful(None)
 
   private[queue] trait Producer {
@@ -37,6 +39,6 @@ object MatcherQueue {
 
   private[queue] object IgnoreProducer extends Producer {
     override def storeEvent(event: QueueEvent): Future[Option[QueueEventWithMeta]] = stored
-    override def close(timeout: FiniteDuration): Unit                              = {}
+    override def close(timeout: FiniteDuration): Unit = {}
   }
 }

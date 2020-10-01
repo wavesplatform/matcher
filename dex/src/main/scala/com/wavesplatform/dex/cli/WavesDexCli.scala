@@ -9,6 +9,7 @@ import cats.catsInstancesForId
 import cats.syntax.flatMap._
 import cats.syntax.option._
 import com.wavesplatform.dex._
+import com.wavesplatform.dex.app.{MatcherStateCheckingFailedError, forceStopApplication}
 import com.wavesplatform.dex.db.AccountStorage
 import com.wavesplatform.dex.doc.MatcherErrorDoc
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair}
@@ -238,7 +239,7 @@ object WavesDexCli extends ScoptImplicits {
                 } yield checkResult
               ) match {
                 case Right(diagnosticNotes) => println(s"$diagnosticNotes\nCongratulations! All checks passed!")
-                case Left(error)            => println(error); Matcher.forceStopApplication(MatcherStateCheckingFailedError)
+                case Left(error)            => println(error); forceStopApplication(MatcherStateCheckingFailedError)
               }
           }
           println("Done")

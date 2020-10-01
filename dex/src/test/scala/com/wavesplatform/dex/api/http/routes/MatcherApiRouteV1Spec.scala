@@ -16,6 +16,7 @@ import com.wavesplatform.dex.api.RouteSpec
 import com.wavesplatform.dex.api.http.ApiMarshallers._
 import com.wavesplatform.dex.api.http.entities.{HttpOrderBook, HttpV1LevelAgg, HttpV1OrderBook}
 import com.wavesplatform.dex.api.http.{OrderBookHttpInfo, entities}
+import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.db.WithDB
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.crypto
@@ -106,7 +107,7 @@ class MatcherApiRouteV1Spec extends RouteSpec("/api/v1") with MatcherSpecBase wi
           Set.empty
         ),
         orderBookHttpInfo = orderBookHttpInfo,
-        matcherStatus = () => Matcher.Status.Working,
+        matcherStatus = () => MatcherStatus.Working,
         apiKeyHash = Some(crypto secureHash apiKey)
       )
 

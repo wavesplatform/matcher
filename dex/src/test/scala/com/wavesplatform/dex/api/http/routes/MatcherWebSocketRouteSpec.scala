@@ -13,6 +13,7 @@ import com.wavesplatform.dex.api.http.entities._
 import com.wavesplatform.dex.api.http.headers.`X-Api-Key`
 import com.wavesplatform.dex.api.ws.actors.{WsExternalClientDirectoryActor, WsInternalBroadcastActor}
 import com.wavesplatform.dex.api.ws.routes.MatcherWebSocketRoute
+import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.effect._
@@ -83,7 +84,7 @@ class MatcherWebSocketRouteSpec extends RouteSpec("/ws/v0") with MatcherSpecBase
         ),
         apiKeyHash = Some(crypto secureHash apiKey),
         matcherSettings = settings,
-        matcherStatus = () => Matcher.Status.Working,
+        matcherStatus = () => MatcherStatus.Working,
         () => rateCache.getAllRates
       )
 

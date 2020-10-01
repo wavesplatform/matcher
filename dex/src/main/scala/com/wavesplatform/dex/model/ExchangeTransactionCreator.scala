@@ -13,7 +13,7 @@ import scala.concurrent.ExecutionContext
 
 class ExchangeTransactionCreator(matcherPrivateKey: KeyPair,
                                  exchangeTxBaseFee: Long,
-                                 hasMatcherAccountScript: Boolean,
+                                 hasMatcherAccountScript: => Boolean,
                                  hasAssetScript: IssuedAsset => Boolean)(implicit ec: ExecutionContext) {
 
   def createTransaction(orderExecutedEvent: OrderExecuted): Either[ValidationError, ExchangeTransaction] = {

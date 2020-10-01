@@ -4,10 +4,10 @@ import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.directives.FutureDirectives
 import akka.http.scaladsl.server.{Directive1, Route}
-import com.wavesplatform.dex.Matcher
 import com.wavesplatform.dex.api.http.entities.{HttpV1OrderBook, InfoNotFound}
 import com.wavesplatform.dex.api.http.{HasStatusBarrier, OrderBookHttpInfo}
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute, PathMatchers}
+import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
@@ -19,7 +19,7 @@ import javax.ws.rs.Path
 @Api(value = "/api v1/")
 case class MatcherApiRouteV1(assetPairBuilder: AssetPairBuilder,
                              orderBookHttpInfo: OrderBookHttpInfo,
-                             matcherStatus: () => Matcher.Status,
+                             matcherStatus: () => MatcherStatus,
                              apiKeyHash: Option[Array[Byte]])(implicit val errorContext: ErrorFormatterContext)
     extends ApiRoute
     with AuthRoute

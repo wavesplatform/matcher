@@ -87,6 +87,7 @@ package object utils {
       .builder(orderType, Amount.of(amount, pair.left()), Amount.of(price, pair.right()), PublicKey.as(settings.matcherPublicKey))
       .expiration(System.currentTimeMillis + 60 * 60 * 24 * 20 * 1000)
       .fee(settings.defaults.matcherFee)
+      .version(3)
       .getSignedWith(acc)
   }
 

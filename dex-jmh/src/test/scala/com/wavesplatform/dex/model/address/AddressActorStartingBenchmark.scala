@@ -5,9 +5,9 @@ import java.util.concurrent.TimeUnit
 import akka.actor.{ActorRef, ActorSystem}
 import akka.pattern.ask
 import cats.syntax.either._
-import com.wavesplatform.dex.actors.address.AddressActor
 import com.wavesplatform.dex.actors.address.AddressActor.Query
-import com.wavesplatform.dex.db.EmptyOrderDB
+import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
+import com.wavesplatform.dex.db.TestOrderDB
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.order.OrderOps._
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
@@ -28,7 +28,7 @@ import scala.util.Random
 
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))
-@Threads(4)
+@Threads(1)
 @Fork(1)
 @Warmup(iterations = 10)
 @Measurement(iterations = 10)
@@ -64,7 +64,8 @@ object AddressActorStartingBenchmark {
     val minPrice: Long      = 1L * Order.PriceConstant
     val priceGen: Gen[Long] = Gen.chooseNum(minPrice, maxPrice)
 
-    val owner: KeyPair = clientGen.sample.get
+    val owner: KeyPair   = clientGen.sample.get
+    val counter: KeyPair = clientGen.sample.get
 
     val askGen: Gen[Order] = orderGen(owner, priceGen, OrderType.SELL)
     val bidGen: Gen[Order] = orderGen(owner, priceGen, OrderType.BUY)
@@ -75,7 +76,7 @@ object AddressActorStartingBenchmark {
       Seq(
         orderAddedEventCount                      -> OrderEvent.Added,
         orderCancelledEventCount                  -> OrderEvent.Cancelled,
-        orderFilledImmediatelyCount               -> OrderEvent.FilledEventually,
+        orderFilledImmediatelyCount               -> OrderEvent.FilledImmediately,
         orderFilledEventuallyCount                -> OrderEvent.FilledEventually,
         orderPartiallyFilledCount                 -> OrderEvent.PartiallyFilled,
         orderPartiallyFilledAndThenCancelledCount -> OrderEvent.PartiallyFilledAndThenCancelled
@@ -94,11 +95,7 @@ object AddressActorStartingBenchmark {
                 Seq(getOrderAddedEvent(ao), firstExecutedEvent, secondExecutedEvent)
               }
             case OrderEvent.PartiallyFilled =>
-              ordersGroup.flatMap { ao =>
-                val firstExecutedEvent  = getOrderExecutedEvent(ao, getCounter(ao, ao.amount / 2))
-                val secondExecutedEvent = getOrderExecutedEvent(firstExecutedEvent.submittedRemaining, getCounter(ao, ao.amount / 3))
-                Seq(getOrderAddedEvent(ao), firstExecutedEvent, secondExecutedEvent)
-              }
+              ordersGroup.flatMap { ao => Seq(getOrderAddedEvent(ao), getOrderExecutedEvent(ao, getCounter(ao, ao.amount / 2))) }
             case OrderEvent.PartiallyFilledAndThenCancelled =>
               ordersGroup.flatMap { ao =>
                 val firstExecutedEvent = getOrderExecutedEvent(ao, getCounter(ao, ao.amount / 2))
@@ -111,7 +108,7 @@ object AddressActorStartingBenchmark {
 
     implicit val efc: ErrorFormatterContext = ErrorFormatterContext.from(_ => 8)
 
-    def run(): Unit = {
+    def run(): AddressActor.Reply.OrdersStatuses = {
 
       val system: ActorSystem = ActorSystem("addressActorBenchmark")
 
@@ -120,7 +117,7 @@ object AddressActorStartingBenchmark {
           AddressActor.props(
             owner = owner,
             time = new TestTime(),
-            orderDB = EmptyOrderDB,
+            orderDB = new TestOrderDB(1000),
             validate = (_, _) => Future.successful(().asRight),
             store = event => Future.successful { Some(QueueEventWithMeta(0L, 0L, event)) },
             started = true,
@@ -134,8 +131,15 @@ object AddressActorStartingBenchmark {
         event  <- events
       } addressActor ! event
 
-      Await.result(addressActor.ask(Query.GetReservedBalance)(3.minutes), 3.minutes)
+      addressActor ! AddressDirectoryActor.StartWork
+
+      val ordersStatuses = Await.result(
+        addressActor.ask(Query.GetOrdersStatuses(None, AddressActor.OrderListType.All))(3.minutes).mapTo[AddressActor.Reply.OrdersStatuses],
+        3.minutes
+      )
+
       Await.result(system.terminate(), 3.seconds)
+      ordersStatuses
     }
 
     def ordersGen(orderNumber: Int): Gen[List[AcceptedOrder]] =
@@ -143,8 +147,7 @@ object AddressActorStartingBenchmark {
         orderSides <- Gen.listOfN(orderNumber, orderSideGen)
         orders <- Gen.sequence {
           orderSides.map { side =>
-            val orderGen = if (side == OrderType.SELL) askGen else bidGen
-            Gen.oneOf(limitOrderGen(orderGen), marketOrderGen(orderGen))
+            (if (side == OrderType.SELL) askGen else bidGen).map(LimitOrder.apply)
           }
         }
       } yield orders.asScala.toList
@@ -156,12 +159,7 @@ object AddressActorStartingBenchmark {
       Events.OrderCanceled(ao, Events.OrderCanceledReason.RequestExecuted, System.currentTimeMillis())
 
     def getCounter(ao: AcceptedOrder, amount: Long): LimitOrder = {
-      LimitOrder(
-        ao.order
-          .updateType(ao.order.orderType.opposite)
-          .updateSender(clientGen.sample.get)
-          .updateAmount(amount)
-      )
+      LimitOrder(orderGen(counter, priceGen, ao.order.orderType.opposite).map(_.updateAmount(amount).updatePrice(ao.price)).sample.get)
     }
 
     def getOrderExecutedEvent(ao: AcceptedOrder, counter: LimitOrder): Events.OrderExecuted = {

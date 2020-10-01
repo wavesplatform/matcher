@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.model.address
 
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 
 import akka.actor.{ActorRef, ActorSystem}
@@ -9,6 +10,7 @@ import com.wavesplatform.dex.actors.address.AddressActor.Query
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.db.TestOrderDB
 import com.wavesplatform.dex.domain.account.KeyPair
+import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.OrderOps._
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.error.ErrorFormatterContext
@@ -65,7 +67,7 @@ object AddressActorStartingBenchmark {
     val priceGen: Gen[Long] = Gen.chooseNum(minPrice, maxPrice)
 
     val owner: KeyPair   = clientGen.sample.get
-    val counter: KeyPair = clientGen.sample.get
+    val counter: KeyPair = KeyPair(ByteStr(s"counter".getBytes(StandardCharsets.UTF_8)))
 
     val askGen: Gen[Order] = orderGen(owner, priceGen, OrderType.SELL)
     val bidGen: Gen[Order] = orderGen(owner, priceGen, OrderType.BUY)
@@ -158,9 +160,7 @@ object AddressActorStartingBenchmark {
     def getOrderCancelledEvent(ao: AcceptedOrder): Events.OrderCanceled =
       Events.OrderCanceled(ao, Events.OrderCanceledReason.RequestExecuted, System.currentTimeMillis())
 
-    def getCounter(ao: AcceptedOrder, amount: Long): LimitOrder = {
-      LimitOrder(orderGen(counter, priceGen, ao.order.orderType.opposite).map(_.updateAmount(amount).updatePrice(ao.price)).sample.get)
-    }
+    def getCounter(ao: AcceptedOrder, amount: Long): LimitOrder = LimitOrder(ao.order.updateAmount(amount).updateSender(counter))
 
     def getOrderExecutedEvent(ao: AcceptedOrder, counter: LimitOrder): Events.OrderExecuted = {
       Events.OrderExecuted(

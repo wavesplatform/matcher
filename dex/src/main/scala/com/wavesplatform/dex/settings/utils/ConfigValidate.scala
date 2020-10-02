@@ -1,25 +1,25 @@
 package com.wavesplatform.dex.settings.utils
 
-import pureconfig.ConfigCursor
+import pureconfig.ConfigObjectCursor
 import pureconfig.error.ConfigReaderFailure
-import shapeless.{HList, LabelledGeneric}
+import pureconfig.generic.ProductHint
 import shapeless.ops.hlist.Selector
 import shapeless.ops.record.Keys
 import shapeless.tag.Tagged
+import shapeless.{HList, LabelledGeneric}
 
 class ConfigValidate[ObjectT, FieldName] {
   def mk[L <: HList, KeyList <: HList](f: ObjectT => Option[String])(implicit
       ev: LabelledGeneric.Aux[ObjectT, L],
       ev2: Keys.Aux[L, KeyList],
       ev3: Selector[KeyList, Symbol with Tagged[FieldName]]
-  ): (ObjectT, ConfigCursor) => Option[ConfigReaderFailure] = {
+  ): (ObjectT, ConfigObjectCursor, ProductHint[ObjectT]) => Option[ConfigReaderFailure] = {
     val keys: KeyList = Keys[ev.Repr].apply()
     val fieldName     = keys.select[Symbol with Tagged[FieldName]].name
 
-    (obj: ObjectT, c: ConfigCursor) =>
-      c.fluent.at(fieldName).cursor match {
-        case Right(c) => f(obj).map(RawFailureReason).map(c.failureFor)
-        case Left(_)  => throw new RuntimeException("Imposibru!")
-      }
+    { (obj: ObjectT, c: ConfigObjectCursor, hint: ProductHint[ObjectT]) =>
+      val action = hint.from(c, fieldName)
+      f(obj).map(RawFailureReason).map(action.cursor.failureFor)
+    }
   }
 }

@@ -46,7 +46,7 @@ object OrderValidator extends ScorexLogging {
 
   val MinExpiration: Long = 60 * 1000L
 
-  val exchangeTransactionCreationFee: Long = 30000L
+  val exchangeTransactionCreationFee: Long = 300000L
   val ScriptExtraFee                       = 400000L
 
   private[dex] def multiplyAmountByDouble(a: Long, d: Double): Long = (BigDecimal(a) * d).setScale(0, RoundingMode.HALF_UP).toLong

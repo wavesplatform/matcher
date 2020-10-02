@@ -6,21 +6,15 @@ import java.util.Base64
 
 import cats.syntax.either._
 import com.google.common.primitives.{Bytes, Ints}
-import com.typesafe.config.{ConfigObject, ConfigValue, ConfigValueType}
 import com.wavesplatform.dex.crypto.Enigma
 import com.wavesplatform.dex.db.AccountStorage.Settings.EncryptedFile
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.crypto
-import com.wavesplatform.dex.settings.utils.{ConfigCursorsOps, WrappedDescendantHint}
+import com.wavesplatform.dex.settings.utils.{ConfigCursorsOps, ConfigReaders, WrappedDescendantHint}
 import net.ceedubs.ficus.readers.ValueReader
-import pureconfig.ConfigReader.Result
-import pureconfig.error.{CollidingKeys, ConfigReaderFailures, FailureReason, WrongType}
-import pureconfig.generic.CoproductHint.Use
-import pureconfig.generic.error.{CoproductHintException, UnexpectedValueForFieldCoproductHint}
-import pureconfig.generic.{CoproductHint, FieldCoproductHint}
-import pureconfig.syntax.AnyWriterOps
-import pureconfig.{ConfigCursor, ConfigReader, error}
+import pureconfig.ConfigReader
+import pureconfig.generic.semiauto
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -32,10 +26,17 @@ object AccountStorage {
 
   object Settings extends ConfigCursorsOps {
 
-    case class InMem(seedInBase64: ByteStr)                        extends Settings
+    case class InMem(seedInBase64: ByteStr) extends Settings
+    object InMem extends ConfigReaders {
+      implicit val byteStrConfigReader = byteStr64ConfigReader
+      implicit val inMemConfigReader   = semiauto.deriveReader[InMem]
+    }
+
     case class EncryptedFile(path: File, password: String) extends Settings
 
     implicit val accountStorageHint = new WrappedDescendantHint[Settings]()
+
+    // =====
 
     implicit val valueReader: ValueReader[Settings] = ValueReader.relative[Settings] { config =>
       config.getString("type") match {
@@ -48,23 +49,6 @@ object AccountStorage {
         case x => throw new IllegalArgumentException(s"The type of account storage '$x' is unknown. Please update your settings.")
       }
     }
-
-//    implicit val valueReader1: ConfigReader[Settings] = (cur: ConfigCursor) => {
-//      for {
-//        oc  <- cur.asObjectCursor
-//        tpe <- oc.as[String]("type")
-//        settings <- tpe match {
-//          case "in-mem" => oc.as[String]("in-mem.seed-in-base64").map(seed => InMem(Base64.getDecoder.decode(seed)))
-//          case "encrypted-file" =>
-//            for {
-//              encryptedFileCursor <- oc.atKey("encrypted-file")
-//              path                <- encryptedFileCursor.as[String]("path")
-//              password            <- encryptedFileCursor.as[String]("password")
-//            } yield EncryptedFile(new File(path), password)
-//          case x => oc.failed(s"The type of account storage '$x' is unknown. Please update your settings.")
-//        }
-//      } yield settings
-//    }
   }
 
   def load(settings: Settings): Either[String, AccountStorage] = settings match {

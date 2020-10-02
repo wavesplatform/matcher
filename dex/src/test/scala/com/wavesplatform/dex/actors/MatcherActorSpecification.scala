@@ -54,9 +54,8 @@ class MatcherActorSpecification
       probe.send(actor, wrapLimitOrder(order))
       probe.send(actor, GetMarkets)
 
-      probe.expectMsgPF() {
-        case s @ Seq(MarketData(_, "Unknown", "Unknown", _, _, _)) =>
-          s.size shouldBe 1
+      probe.expectMsgPF() { case s @ Seq(MarketData(_, "Unknown", "Unknown", _, _, _)) =>
+        s.size shouldBe 1
       }
     }
 
@@ -83,7 +82,8 @@ class MatcherActorSpecification
             doNothingOnRecovery,
             ob,
             (_, _) => Props(new FailAtStartActor),
-            assetDescription
+            assetDescription,
+            _ => true
           )
         )
 
@@ -136,7 +136,8 @@ class MatcherActorSpecification
             startResult => working = startResult.isRight,
             ob,
             (_, _) => Props(new FailAtStartActor()),
-            assetDescription
+            assetDescription,
+            _ => true
           )
         )
       )
@@ -167,10 +168,12 @@ class MatcherActorSpecification
                 startResult => stopped = startResult.isLeft,
                 ob,
                 (_, _) => Props(new FailAtStartActor),
-                assetDescription
+                assetDescription,
+                _ => true
               )
             )
-          ))
+          )
+        )
 
         probe.expectTerminated(actor)
         stopped shouldBe true
@@ -194,7 +197,8 @@ class MatcherActorSpecification
                 startResult => stopped = startResult.isLeft,
                 ob,
                 (_, _) => Props(new NothingDoActor),
-                assetDescription
+                assetDescription,
+                _ => true
               )
             )
           )
@@ -300,7 +304,8 @@ class MatcherActorSpecification
               _ => {},
               ob,
               (pair, matcherActor) => Props(new RecoveringActor(matcherActor, pair)),
-              assetDescription
+              assetDescription,
+              _ => true
             )
           )
         )
@@ -323,7 +328,8 @@ class MatcherActorSpecification
             doNothingOnRecovery,
             ob,
             (assetPair, matcher) => Props(new DeletingActor(matcher, assetPair, Some(9L))),
-            assetDescription
+            assetDescription,
+            _ => true
           )
         )
 
@@ -333,8 +339,8 @@ class MatcherActorSpecification
         withClue("Removed from snapshots rotation") {
           eventually {
             probe.send(actor, GetMarkets)
-            probe.expectMsgPF() {
-              case xs @ Seq() => xs.size shouldBe 0 // To ignore annoying warnings
+            probe.expectMsgPF() { case xs @ Seq() =>
+              xs.size shouldBe 0 // To ignore annoying warnings
             }
 
             probe.send(actor, MatcherActor.GetSnapshotOffsets)
@@ -348,8 +354,8 @@ class MatcherActorSpecification
 
           eventually {
             probe.send(actor, GetMarkets)
-            probe.expectMsgPF() {
-              case Seq(x: MarketData) => x.pair shouldBe pair
+            probe.expectMsgPF() { case Seq(x: MarketData) =>
+              x.pair shouldBe pair
             }
 
             probe.send(actor, MatcherActor.GetSnapshotOffsets)
@@ -383,7 +389,8 @@ class MatcherActorSpecification
           if (idx < 0) throw new RuntimeException(s"Can't find $assetPair in $assetPairs")
           r(idx)._1
         },
-        assetDescription
+        assetDescription,
+        _ => true
       )
     )
 
@@ -410,10 +417,12 @@ class MatcherActorSpecification
     (props, probe)
   }
 
-  private def defaultActor(ob: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]] = emptyOrderBookRefs,
-                           apdb: AssetPairsDB = mkAssetPairsDB,
-                           addressActor: ActorRef = TestProbe().ref,
-                           snapshotStoreActor: ActorRef = emptySnapshotStoreActor): TestActorRef[MatcherActor] = {
+  private def defaultActor(
+      ob: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]] = emptyOrderBookRefs,
+      apdb: AssetPairsDB = mkAssetPairsDB,
+      addressActor: ActorRef = TestProbe().ref,
+      snapshotStoreActor: ActorRef = emptySnapshotStoreActor
+  ): TestActorRef[MatcherActor] = {
     implicit val efc: ErrorFormatterContext = ErrorFormatterContext.from(_ => 8)
 
     TestActorRef(
@@ -436,8 +445,9 @@ class MatcherActorSpecification
             _ => MatchingRule.DefaultRule,
             _ => makerTakerPartialFee,
             None
-        ),
-        assetDescription
+          ),
+        assetDescription,
+        _ => true
       )
     )
   }

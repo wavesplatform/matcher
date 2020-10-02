@@ -15,9 +15,11 @@ import kamon.Kamon
 
 import scala.concurrent.ExecutionContext
 
-class AssetPairBuilder(settings: MatcherSettings,
-                       assetDescription: IssuedAsset => FutureResult[BriefAssetDescription],
-                       blacklistedAssets: Set[IssuedAsset])(implicit ec: ExecutionContext) {
+class AssetPairBuilder(
+    settings: MatcherSettings,
+    assetDescription: IssuedAsset => FutureResult[BriefAssetDescription],
+    blacklistedAssets: Set[IssuedAsset]
+)(implicit ec: ExecutionContext) {
 
   import com.wavesplatform.dex.model.OrderValidator._
 
@@ -35,7 +37,7 @@ class AssetPairBuilder(settings: MatcherSettings,
     case (Some(pi), Some(ai)) => pi < ai
   }
 
-  private def isBlacklistedByName(asset: IssuedAsset, desc: BriefAssetDescription): Boolean =
+  private def isBlacklistedByName(desc: BriefAssetDescription): Boolean =
     settings.blacklistedNames.exists(_.findFirstIn(desc.name).nonEmpty)
 
   def validateAssetId(asset: Asset): FutureResult[Asset] = validateAssetId(asset, AssetSide.Unknown)
@@ -43,7 +45,7 @@ class AssetPairBuilder(settings: MatcherSettings,
   private def validateAssetId(asset: Asset, side: AssetSide): FutureResult[Asset] = {
     asset.fold[FutureResult[Asset]] { liftValueAsync(Waves) } { asset =>
       assetDescription(asset) subflatMap { desc =>
-        if (blacklistedAssets.contains(asset) || isBlacklistedByName(asset, desc))
+        if (blacklistedAssets.contains(asset) || isBlacklistedByName(desc))
           Left(
             side match {
               case AssetSide.Unknown => error.AssetBlacklisted(asset)

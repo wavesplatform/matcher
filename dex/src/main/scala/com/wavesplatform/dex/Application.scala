@@ -248,7 +248,8 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
         },
         orderBooks,
         mkOrderBookProps,
-        assetsCache.get(_)
+        assetsCache.get(_),
+        pairBuilder.isCorrectlyOrdered
       ),
       MatcherActor.name
     )

@@ -7,7 +7,9 @@ import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ValueReader
 
 /** Represents market order restrictions. Field values are in percents */
-case class DeviationsSettings(enabled: Boolean, maxPriceProfit: Double, maxPriceLoss: Double, maxFeeDeviation: Double)
+case class DeviationsSettings(enable: Boolean, profit: Double, loss: Double, fee: Double)
+// TODO: maxPriceProfit, maxPriceLoss, maxFeeDeviation
+
 
 object DeviationsSettings {
 

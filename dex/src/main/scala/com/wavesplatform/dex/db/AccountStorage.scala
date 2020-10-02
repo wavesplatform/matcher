@@ -35,7 +35,7 @@ object AccountStorage {
     case class InMem(seedInBase64: ByteStr)                        extends Settings
     case class EncryptedFile(path: File, password: String) extends Settings
 
-    implicit val hint = new WrappedDescendantHint[Settings]
+    implicit val accountStorageHint = new WrappedDescendantHint[Settings]()
 
     implicit val valueReader: ValueReader[Settings] = ValueReader.relative[Settings] { config =>
       config.getString("type") match {

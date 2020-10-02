@@ -24,16 +24,19 @@ import com.wavesplatform.dex.settings.OrderFeeSettings._
 import com.wavesplatform.dex.settings.OrderHistorySettings._
 import com.wavesplatform.dex.settings.OrderRestrictionsSettings.orderRestrictionsSettingsReader
 import com.wavesplatform.dex.settings.PostgresConnection._
-import com.wavesplatform.dex.settings.utils.{ConfigCursorsOps, ConfigSettingsValidator}
+import com.wavesplatform.dex.settings.utils.{ConfigCursorsOps, ConfigSettingsValidator, RawFailureReason}
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader.arbitraryTypeValueReader
 import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
 import pureconfig.ConfigReader.Result
+import pureconfig.configurable.genericMapReader
+import pureconfig.error.{ExceptionThrown, FailureReason}
 import pureconfig.generic.auto._
-import pureconfig.{ConfigCursor, ConfigObjectCursor, ConfigReader}
+import pureconfig.{ConfigCursor, ConfigObjectCursor, ConfigReader, Derivation}
 
 import scala.concurrent.duration.FiniteDuration
 import scala.util.matching.Regex
+import pureconfig.module.cats.nonEmptyListReader
 
 case class MatcherSettings(id: String,
                            addressSchemeCharacter: Char,
@@ -43,8 +46,7 @@ case class MatcherSettings(id: String,
                            restApi: RestAPISettings,
                            exchangeTxBaseFee: Long,
                            actorResponseTimeout: FiniteDuration,
-                           dataDir: String,
-                           recoverOrderHistory: Boolean,
+                           dataDirectory: String,
                            snapshotsInterval: Int,
                            limitEventsDuringRecovery: Option[Int],
                            snapshotsLoadingTimeout: FiniteDuration,
@@ -60,17 +62,19 @@ case class MatcherSettings(id: String,
                            eventsQueue: EventsQueueSettings,
                            processConsumedTimeout: FiniteDuration,
                            orderFee: Map[Long, OrderFeeSettings],
-                           deviation: DeviationsSettings,
+                           maxPriceDeviations: DeviationsSettings,
                            orderRestrictions: Map[AssetPair, OrderRestrictionsSettings],
                            matchingRules: Map[AssetPair, NonEmptyList[DenormalizedMatchingRule]],
                            whiteListOnly: Boolean,
                            allowedAssetPairs: Set[AssetPair],
                            allowedOrderVersions: Set[Byte],
                            exchangeTransactionBroadcast: ExchangeTransactionBroadcastSettings,
-                           postgresConnection: PostgresConnection,
+                           postgres: PostgresConnection,
                            orderHistory: Option[OrderHistorySettings],
-                           webSocketSettings: WebSocketSettings,
-                           addressActorSettings: AddressActor.Settings) {
+                           webSockets: WebSocketSettings,
+                           addressActor: AddressActor.Settings) {
+
+  val recoverOrderHistory  = !new File(dataDirectory).exists()
 
   def mentionedAssets: Set[Asset] = {
     priceAssets.toSet ++
@@ -89,12 +93,25 @@ case class RestAPISettings(address: String, port: Int, apiKeyHash: String, cors:
 
 object MatcherSettings extends ConfigCursorsOps {
 
+  implicit val longOrderFeeConfigReader = genericMapReader[Long, OrderFeeSettings] { x =>
+    x.toLongOption.fold[Either[FailureReason, Long]](RawFailureReason(s"'$x' should be numeric").asLeft)(_.asRight)
+  }
 
+  implicit val assetPairConfigReader = ConfigReader.fromString(AssetPair.extractAssetPair(_).toEither.leftMap(ExceptionThrown))
+
+  implicit val assetPairOrderRestrictionsConfigReader = genericMapReader[AssetPair, OrderRestrictionsSettings] { x =>
+    AssetPair.extractAssetPair(x).toEither.leftMap(ExceptionThrown)
+  }
+
+  implicit val matchingRulesConfigReader = genericMapReader[AssetPair, NonEmptyList[DenormalizedMatchingRule]] { x =>
+    AssetPair.extractAssetPair(x).toEither.leftMap(ExceptionThrown)
+  }(Derivation.Successful(nonEmptyListReader[DenormalizedMatchingRule])) // To solve IntelliJ IDEA issue
+
+  // implicit val matcherSettingsConfigReader: ConfigReader[MatcherSettings] = exportReader[MatcherSettings].instance
+  // ======
 
   implicit val chosenCase: NameMapper                      = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
   implicit val valueReader: ValueReader[MatcherSettings]   = (cfg, path) => fromConfig(cfg getConfig path)
-
-  // implicit val matcherSettingsConfigReader: ConfigReader[MatcherSettings] = exportReader[MatcherSettings].instance
 
   implicit val subscriptionsSettingsReader: ValueReader[SubscriptionsSettings] =
     com.wavesplatform.dex.settings.SubscriptionsSettings.subscriptionSettingsReader
@@ -125,7 +142,6 @@ object MatcherSettings extends ConfigCursorsOps {
 
     val actorResponseTimeout = config.as[FiniteDuration]("actor-response-timeout")
     val dataDirectory        = config.as[String]("data-directory")
-    val recoverOrderHistory  = !new File(dataDirectory).exists()
     val snapshotsInterval    = config.as[Int]("snapshots-interval")
 
     val limitEventsDuringRecovery = config.getAs[Int]("limit-events-during-recovery")
@@ -175,7 +191,6 @@ object MatcherSettings extends ConfigCursorsOps {
       exchangeTxBaseFee,
       actorResponseTimeout,
       dataDirectory,
-      recoverOrderHistory,
       snapshotsInterval,
       limitEventsDuringRecovery,
       snapshotsLoadingTimeout,

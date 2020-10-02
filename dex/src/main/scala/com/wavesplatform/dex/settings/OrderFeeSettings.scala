@@ -6,12 +6,12 @@ import cats.syntax.apply._
 import cats.syntax.foldable._
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.{Waves, _}
-import com.wavesplatform.dex.settings.AssetType.AssetType
-import com.wavesplatform.dex.settings.FeeMode.FeeMode
+import com.wavesplatform.dex.settings.AssetType
+import com.wavesplatform.dex.settings.FeeMode
 import com.wavesplatform.dex.settings.utils.ConfigCursorsOps.ConfigCursorOps
 import com.wavesplatform.dex.settings.utils.{ConfigCursorsOps, ConfigSettingsValidator}
 import com.wavesplatform.dex.settings.utils.ConfigSettingsValidator.ErrorsListOr
-import pureconfig.ConfigReader.Result
+import com.wavesplatform.dex.settings.utils.{ConfigCursorsOps, ConfigSettingsValidator, WrappedDescendantHint}
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.EnumerationReader._
 import net.ceedubs.ficus.readers.ValueReader
@@ -19,6 +19,7 @@ import play.api.libs.json.{Reads, Writes}
 import pureconfig.ConfigReader
 import pureconfig.generic.auto._
 import cats.syntax.either._
+import enumeratum._
 
 sealed trait OrderFeeSettings extends Product with Serializable
 
@@ -37,13 +38,17 @@ object OrderFeeSettings extends ConfigCursorsOps {
   final case class FixedSettings(defaultAsset: Asset, minFee: Long)      extends OrderFeeSettings
   final case class PercentSettings(assetType: AssetType, minFee: Double) extends OrderFeeSettings
 
+  implicit val orderFeeSettingsHint = new WrappedDescendantHint[OrderFeeSettings]("mode") {
+    override protected def fieldValue(name: String): String = name.dropRight("Settings".length).toLowerCase
+  }
+
   implicit val orderFeeSettingsReader: ValueReader[OrderFeeSettings] = { (cfg, path) =>
     val cfgValidator = ConfigSettingsValidator(cfg)
 
     def getPrefixByMode(mode: FeeMode): String = s"$path.$mode"
 
     def validateDynamicSettings: ErrorsListOr[DynamicSettings] = {
-      val prefix = getPrefixByMode(FeeMode.DYNAMIC)
+      val prefix = getPrefixByMode(FeeMode.Dynamic)
       (
         cfgValidator.validateByPredicate[Long](s"$prefix.base-maker-fee")(predicate = fee => 0 < fee, errorMsg = s"required 0 < base maker fee"),
         cfgValidator.validateByPredicate[Long](s"$prefix.base-taker-fee")(predicate = fee => 0 < fee, errorMsg = s"required 0 < base taker fee"),
@@ -52,7 +57,7 @@ object OrderFeeSettings extends ConfigCursorsOps {
 
     def validateFixedSettings: ErrorsListOr[FixedSettings] = {
 
-      val prefix         = getPrefixByMode(FeeMode.FIXED)
+      val prefix         = getPrefixByMode(FeeMode.Fixed)
       val feeValidator   = cfgValidator.validateByPredicate[Long](s"$prefix.min-fee") _
       val assetValidated = cfgValidator.validate[Asset](s"$prefix.asset")
 
@@ -65,7 +70,7 @@ object OrderFeeSettings extends ConfigCursorsOps {
     }
 
     def validatePercentSettings: ErrorsListOr[PercentSettings] = {
-      val prefix = getPrefixByMode(FeeMode.PERCENT)
+      val prefix = getPrefixByMode(FeeMode.Percent)
       (
         cfgValidator.validate[AssetType](s"$prefix.asset-type"),
         cfgValidator.validatePercent(s"$prefix.min-fee")
@@ -73,9 +78,9 @@ object OrderFeeSettings extends ConfigCursorsOps {
     }
 
     def getSettingsByMode(mode: FeeMode): ErrorsListOr[OrderFeeSettings] = mode match {
-      case FeeMode.DYNAMIC => validateDynamicSettings
-      case FeeMode.FIXED   => validateFixedSettings
-      case FeeMode.PERCENT => validatePercentSettings
+      case FeeMode.Dynamic => validateDynamicSettings
+      case FeeMode.Fixed   => validateFixedSettings
+      case FeeMode.Percent => validatePercentSettings
     }
 
     cfgValidator.validate[FeeMode](s"$path.mode").toEither flatMap (mode => getSettingsByMode(mode).toEither) match {
@@ -139,25 +144,25 @@ object OrderFeeSettings extends ConfigCursorsOps {
 
 }
 
-object AssetType extends Enumeration {
-  type AssetType = Value
+sealed trait AssetType extends EnumEntry
+object AssetType extends Enum[AssetType] with PlayLowercaseJsonEnum[AssetType] {
+  val values = findValues
 
-  val AMOUNT    = Value("amount")
-  val PRICE     = Value("price")
-  val SPENDING  = Value("spending")
-  val RECEIVING = Value("receiving")
+  case object Amount    extends AssetType
+  case object Price     extends AssetType
+  case object Spending  extends AssetType
+  case object Receiving extends AssetType
 
-  implicit val assetTypeReads: Reads[AssetType]   = Reads.enumNameReads(AssetType)
-  implicit val assetTypeWrites: Writes[AssetType] = Writes.enumNameWrites[AssetType.type]
+  implicit val valueReader: ValueReader[AssetType] = ??? // TODO REMOVE
 }
 
-object FeeMode extends Enumeration {
-  type FeeMode = Value
+sealed trait FeeMode extends EnumEntry
+object FeeMode extends Enum[FeeMode] with PlayLowercaseJsonEnum[FeeMode] {
+  val values = findValues
 
-  val DYNAMIC = Value("dynamic")
-  val FIXED   = Value("fixed")
-  val PERCENT = Value("percent")
+  case object Dynamic extends FeeMode
+  case object Fixed   extends FeeMode
+  case object Percent extends FeeMode
 
-  implicit val feeModeReads: Reads[FeeMode]   = Reads.enumNameReads(FeeMode)
-  implicit val feeModeWrites: Writes[FeeMode] = Writes.enumNameWrites[FeeMode.type]
+  implicit val valueReader: ValueReader[FeeMode] = ??? // TODO REMOVE
 }

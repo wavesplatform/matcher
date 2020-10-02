@@ -39,15 +39,15 @@ class V3OrderPercentFeeAmountTestSuite extends OrderPercentFeeAmountTestSuite(3.
 }
 
 abstract class OrderPercentFeeAmountTestSuite(version: Byte) extends OrderFeeBaseTestSuite {
-  protected val assetType = AMOUNT
+  protected val assetType = Amount
 
   override protected val dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(
       s"""waves.dex {
          |  allowed-order-versions = [1, 2, 3]
          |  order-fee.-1 {
-         |    mode = $PERCENT
-         |    $PERCENT {
+         |    mode = $Percent
+         |    $Percent {
          |      asset-type = $assetType
          |      min-fee = $percentFee
          |    }

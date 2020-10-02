@@ -50,7 +50,7 @@ object ValidationStages {
         _ <- matcherSettingsAware(matcherPublicKey, blacklistedAddresses, settings, orderAssetsDecimals, rateCache, actualOrderFeeSettings)(o)
         _ <- timeAware(time)(o)
         _ <- tickSizeAware(actualTickSize)(o)
-        _ <- if (settings.deviation.enabled) marketAware(actualOrderFeeSettings, settings.deviation, marketStatus)(o) else success
+        _ <- if (settings.maxPriceDeviations.enable) marketAware(actualOrderFeeSettings, settings.maxPriceDeviations, marketStatus)(o) else success
       } yield o
     }
 
@@ -69,7 +69,7 @@ object ValidationStages {
 
     for {
       marketStatus <- {
-        if (settings.deviation.enabled) EitherT(orderBookAskAdapter.getMarketStatus(o.assetPair))
+        if (settings.maxPriceDeviations.enable) EitherT(orderBookAskAdapter.getMarketStatus(o.assetPair))
         else liftValueAsync(Option.empty[OrderBookActor.MarketStatus])
       }
       _ <- liftAsync { syncValidation(marketStatus, assetsCache.unsafeGetDecimals) }

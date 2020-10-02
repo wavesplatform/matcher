@@ -22,7 +22,6 @@ import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.grpc.integration.clients.RunScriptResult
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.OrderValidator.{AsyncBlockchain, Result}
-import com.wavesplatform.dex.settings.AssetType.AssetType
 import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, FixedSettings, PercentSettings}
 import com.wavesplatform.dex.settings.{AssetType, DeviationsSettings, OrderFeeSettings, OrderRestrictionsSettings}
 import com.wavesplatform.dex.test.matchers.ProduceError.produce
@@ -217,7 +216,7 @@ class OrderValidatorSpecification
 
         withClue("AMOUNT/RECEIVING asset type, min fee = 0.3%, fee should be >= 1.5.waves\n") {
           val order = createOrder(wavesBtcPair, OrderType.BUY, 500.waves, price = 0.00011162, matcherFee = 1.5.waves, feeAsset = Waves)
-          Seq(AssetType.AMOUNT, AssetType.RECEIVING).foreach { assetType =>
+          Seq(AssetType.Amount, AssetType.Receiving).foreach { assetType =>
             validateByPercentSettings(assetType) { order } shouldBe Symbol("right")
             validateByPercentSettings(assetType) { order.updateFee(1.49999999.waves) } should produce("FeeNotEnough")
           }
@@ -225,7 +224,7 @@ class OrderValidatorSpecification
 
         withClue("PRICE/SPENDING asset type, min fee = 0.3%, fee should be >= 0.00016743.btc\n") {
           val order = createOrder(wavesBtcPair, OrderType.BUY, 500.waves, price = 0.00011162, matcherFee = 0.00016743.btc, feeAsset = btc)
-          Seq(AssetType.PRICE, AssetType.SPENDING).foreach { assetType =>
+          Seq(AssetType.Price, AssetType.Spending).foreach { assetType =>
             validateByPercentSettings(assetType) { order } shouldBe Symbol("right")
             validateByPercentSettings(assetType) { order.updateFee(0.00016742.btc) } should produce("FeeNotEnough")
           }
@@ -317,8 +316,8 @@ class OrderValidatorSpecification
           validateByMatcherSettings { FixedSettings(usd, 0.01.usd) } { orderOfVersion(version) } should produce("UnexpectedFeeAsset")
           validateByMatcherSettings { FixedSettings(Waves, 0.003.waves) } { orderOfVersion(version) } shouldBe Symbol("right")
 
-          validateByMatcherSettings { PercentSettings(AssetType.PRICE, 0.003) } { orderOfVersion(version) } should produce("UnexpectedFeeAsset")
-          validateByMatcherSettings { PercentSettings(AssetType.AMOUNT, 0.003) } { orderOfVersion(version) } shouldBe Symbol("right")
+          validateByMatcherSettings { PercentSettings(AssetType.Price, 0.003) } { orderOfVersion(version) } should produce("UnexpectedFeeAsset")
+          validateByMatcherSettings { PercentSettings(AssetType.Amount, 0.003) } { orderOfVersion(version) } shouldBe Symbol("right")
         }
       }
 
@@ -349,7 +348,7 @@ class OrderValidatorSpecification
       }
 
       "order's price is out of deviation bounds (market aware)" in {
-        val deviationSettings = DeviationsSettings(enabled = true, maxPriceProfit = 50, maxPriceLoss = 70, maxFeeDeviation = 50)
+        val deviationSettings = DeviationsSettings(enable = true, profit = 50, loss = 70, fee = 50)
         val orderFeeSettings  = DynamicSettings.symmetric(0.003.waves)
 
         val buyOrder  = createOrder(wavesBtcPair, OrderType.BUY, amount = 250.waves, price = 0.00011081)
@@ -470,8 +469,8 @@ class OrderValidatorSpecification
         val bestAsk = LevelAgg(amount = 800.waves, price = 0.00011082.btc)
         val bestBid = LevelAgg(amount = 600.waves, price = 0.00011080.btc)
 
-        val percentSettings   = PercentSettings(AssetType.PRICE, 1)                                // matcher fee = 1% of the deal
-        val deviationSettings = DeviationsSettings(enabled = true, 100, 100, maxFeeDeviation = 10) // fee deviation = 10%
+        val percentSettings   = PercentSettings(AssetType.Price, 1)                                // matcher fee = 1% of the deal
+        val deviationSettings = DeviationsSettings(enable = true, 100, 100, fee = 10) // fee deviation = 10%
 
         val nonEmptyMarketStatus = MarketStatus(None, Some(bestBid), Some(bestAsk))
 

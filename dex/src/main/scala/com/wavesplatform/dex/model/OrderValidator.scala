@@ -216,10 +216,10 @@ object OrderValidator extends ScorexLogging {
       case PercentSettings(assetType, _) =>
         Set(
           assetType match {
-            case AssetType.AMOUNT    => order.assetPair.amountAsset
-            case AssetType.PRICE     => order.assetPair.priceAsset
-            case AssetType.RECEIVING => order.getReceiveAssetId
-            case AssetType.SPENDING  => order.getSpendAssetId
+            case AssetType.Amount    => order.assetPair.amountAsset
+            case AssetType.Price     => order.assetPair.priceAsset
+            case AssetType.Receiving => order.getReceiveAssetId
+            case AssetType.Spending  => order.getSpendAssetId
           }
         )
     }
@@ -241,10 +241,10 @@ object OrderValidator extends ScorexLogging {
     lazy val spentAmount   = order.getSpendAmount(order.amount, matchPrice).explicitGet()
 
     val amount = percentSettings.assetType match {
-      case AssetType.AMOUNT    => order.amount
-      case AssetType.PRICE     => if (order.orderType == OrderType.BUY) spentAmount else receiveAmount
-      case AssetType.RECEIVING => receiveAmount
-      case AssetType.SPENDING  => spentAmount
+      case AssetType.Amount    => order.amount
+      case AssetType.Price     => if (order.orderType == OrderType.BUY) spentAmount else receiveAmount
+      case AssetType.Receiving => receiveAmount
+      case AssetType.Spending  => spentAmount
     }
 
     multiplyAmountByDouble(amount, percentSettings.minFee / 100)
@@ -329,8 +329,8 @@ object OrderValidator extends ScorexLogging {
     }
 
     lift(order).ensure { error.DeviantOrderPrice(order, deviationSettings) } { _ =>
-      if (order.orderType == OrderType.BUY) isPriceInDeviationBounds(deviationSettings.maxPriceProfit, deviationSettings.maxPriceLoss)
-      else isPriceInDeviationBounds(deviationSettings.maxPriceLoss, deviationSettings.maxPriceProfit)
+      if (order.orderType == OrderType.BUY) isPriceInDeviationBounds(deviationSettings.profit, deviationSettings.loss)
+      else isPriceInDeviationBounds(deviationSettings.loss, deviationSettings.profit)
     }
   }
 
@@ -358,7 +358,7 @@ object OrderValidator extends ScorexLogging {
         order.matcherFee >=
           getMinValidFeeForPercentFeeSettings(
             order,
-            PercentSettings(assetType, minFee * (1 - (deviationSettings.maxFeeDeviation / 100))),
+            PercentSettings(assetType, minFee * (1 - (deviationSettings.fee / 100))),
             matchedPrice
           )
       case _ => true
@@ -377,7 +377,7 @@ object OrderValidator extends ScorexLogging {
 
   def marketAware(orderFeeSettings: OrderFeeSettings, deviationSettings: DeviationsSettings, marketStatus: Option[MarketStatus])(order: Order)(
       implicit efc: ErrorFormatterContext): Result[Order] =
-    if (deviationSettings.enabled) {
+    if (deviationSettings.enable) {
       for {
         _ <- validatePriceDeviation(order, deviationSettings, marketStatus)
         _ <- validateFeeDeviation(order, deviationSettings, orderFeeSettings, marketStatus)

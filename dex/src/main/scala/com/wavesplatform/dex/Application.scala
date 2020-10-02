@@ -104,7 +104,7 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
     Future { blocking(time.close()); Done }
   }
 
-  private val db = openDB(settings.dataDir)
+  private val db = openDB(settings.dataDirectory)
   cs.addTask(CoordinatedShutdown.PhaseActorSystemTerminate, "DB") { () =>
     Future { blocking(db.close()); Done }
   }
@@ -180,7 +180,7 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
   )
 
   private val wsInternalBroadcastRef: typed.ActorRef[WsInternalBroadcastActor.Command] = actorSystem.spawn(
-    WsInternalBroadcastActor(settings.webSocketSettings.internalBroadcast),
+    WsInternalBroadcastActor(settings.webSockets.internalBroadcast),
     "ws-internal-broadcast"
   )
 
@@ -193,7 +193,7 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
   )
 
   private val historyRouterRef = settings.orderHistory.map { orderHistorySettings =>
-    actorSystem.actorOf(HistoryRouterActor.props(assetsCache.unsafeGetDecimals, settings.postgresConnection, orderHistorySettings), "history-router")
+    actorSystem.actorOf(HistoryRouterActor.props(assetsCache.unsafeGetDecimals, settings.postgres, orderHistorySettings), "history-router")
   }
 
   private val addressDirectoryRef =
@@ -215,7 +215,7 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
     storeEvent,
     started,
     spendableBalancesRef,
-    settings.addressActorSettings
+    settings.addressActor
   )
 
   private val spendableBalancesRef = actorSystem.actorOf(SpendableBalancesActor.props(wavesBlockchainAsyncClient, addressDirectoryRef))
@@ -224,7 +224,7 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
     def mkOrderBookProps(assetPair: AssetPair, matcherActor: ActorRef): Props = {
       matchingRulesCache.setCurrentMatchingRuleForNewOrderBook(assetPair, lastProcessedOffset, errorContext.unsafeAssetDecimals)
       OrderBookActor.props(
-        OrderBookActor.Settings(AggregatedOrderBookActor.Settings(settings.webSocketSettings.externalClientHandler.messagesInterval)),
+        OrderBookActor.Settings(AggregatedOrderBookActor.Settings(settings.webSockets.externalClientHandler.messagesInterval)),
         matcherActor,
         addressDirectoryRef,
         orderBookSnapshotStoreRef,

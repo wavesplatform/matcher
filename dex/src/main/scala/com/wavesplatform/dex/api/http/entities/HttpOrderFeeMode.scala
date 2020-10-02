@@ -2,8 +2,7 @@ package com.wavesplatform.dex.api.http.entities
 
 import com.wavesplatform.dex.api.http.entities.HttpOrderFeeMode.{FeeModeDynamic, FeeModeFixed, FeeModePercent}
 import com.wavesplatform.dex.domain.asset.Asset
-import com.wavesplatform.dex.settings.AssetType.AssetType
-import com.wavesplatform.dex.settings.OrderFeeSettings
+import com.wavesplatform.dex.settings.{AssetType, OrderFeeSettings}
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json._
 

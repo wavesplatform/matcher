@@ -9,9 +9,7 @@ import pureconfig.generic.error.{CoproductHintException, UnexpectedValueForField
 import pureconfig.generic.{CoproductHint, FieldCoproductHint}
 import pureconfig.syntax.AnyWriterOps
 
-class WrappedDescendantHint[T] extends CoproductHint[T] {
-  protected val key = "type"
-
+class WrappedDescendantHint[T](key: String = "type") extends CoproductHint[T] {
   protected def fieldValue(name: String): String = FieldCoproductHint.defaultMapping(name)
 
   override def from(cursor: ConfigCursor, options: Seq[String]): Result[CoproductHint.Action] =

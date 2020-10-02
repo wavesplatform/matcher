@@ -4,20 +4,20 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.settings.AssetType._
-import com.wavesplatform.dex.settings.FeeMode.PERCENT
+import com.wavesplatform.dex.settings.FeeMode.Percent
 
 class OrderPercentFeeReceivingTestSuite extends OrderFeeBaseTestSuite {
 
   val version   = 3.toByte
-  val assetType = RECEIVING
+  val assetType = Receiving
 
   override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""
                                                                                       |waves.dex {
                                                                                       |  allowed-order-versions = [1, 2, 3]
                                                                                       |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
                                                                                       |  order-fee.-1 {
-                                                                                      |    mode = $PERCENT
-                                                                                      |    $PERCENT {
+                                                                                      |    mode = $Percent
+                                                                                      |    $Percent {
                                                                                       |      asset-type = $assetType
                                                                                       |      min-fee = $percentFee
                                                                                       |    }

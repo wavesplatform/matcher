@@ -36,7 +36,7 @@ class HttpOrderFeeModeSpec extends AnyFreeSpec with Matchers with DiffMatcherWit
                                           |  }
                                           |}""".stripMargin
 
-  private val percentMode: HttpOrderFeeMode = FeeModePercent(AssetType.PRICE, 0.14)
+  private val percentMode: HttpOrderFeeMode = FeeModePercent(AssetType.Price, 0.14)
 
   private val dynamicMode: HttpOrderFeeMode = FeeModeDynamic(600000, Map(Waves -> 1))
 

@@ -92,8 +92,8 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
         resetTimeout = 1.day
       ))
     settings.processConsumedTimeout shouldBe 663.seconds
-    settings.orderFee should matchTo(Map[Long, OrderFeeSettings](-1L -> PercentSettings(AssetType.AMOUNT, 0.1)))
-    settings.deviation shouldBe DeviationsSettings(enabled = true, 1000000, 1000000, 1000000)
+    settings.orderFee should matchTo(Map[Long, OrderFeeSettings](-1L -> PercentSettings(AssetType.Amount, 0.1)))
+    settings.maxPriceDeviations shouldBe DeviationsSettings(enable = true, 1000000, 1000000, 1000000)
     settings.allowedAssetPairs shouldBe Set.empty[AssetPair]
     settings.allowedOrderVersions shouldBe Set(11, 22)
     settings.orderRestrictions shouldBe Map.empty[AssetPair, OrderRestrictionsSettings]
@@ -105,14 +105,14 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
     val expectedJwtPublicKey = """foo
 bar
 baz"""
-    settings.webSocketSettings should matchTo(
+    settings.webSockets should matchTo(
       WebSocketSettings(
         externalClientHandler = WsExternalClientHandlerActor.Settings(1.day, 3.days, expectedJwtPublicKey, SubscriptionsSettings(20, 20), WsHealthCheckSettings(9.minutes, 129.minutes)),
         internalBroadcast = WsInternalBroadcastActor.Settings(923.millis),
         internalClientHandler = WsInternalClientHandlerActor.Settings(WsHealthCheckSettings(10.minutes, 374.minutes))
       )
     )
-    settings.addressActorSettings should matchTo(AddressActor.Settings(100.milliseconds, 18.seconds, 400))
+    settings.addressActor should matchTo(AddressActor.Settings(100.milliseconds, 18.seconds, 400))
   }
 
   "DeviationsSettings in MatcherSettings" should "be validated" in {

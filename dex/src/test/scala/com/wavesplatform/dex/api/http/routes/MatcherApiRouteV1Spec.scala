@@ -88,7 +88,7 @@ class MatcherApiRouteV1Spec extends RouteSpec("/api/v1") with MatcherSpecBase wi
 
     val orderBookHttpInfo =
       new OrderBookHttpInfo(
-        settings = settings.orderBookSnapshotHttpCache,
+        settings = settings.orderBookHttp,
         askAdapter = orderBookAskAdapter,
         time = time,
         assetDecimals = {

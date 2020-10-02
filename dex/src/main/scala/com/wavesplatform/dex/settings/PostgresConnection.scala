@@ -6,13 +6,15 @@ import com.wavesplatform.dex.settings.utils.ConfigSettingsValidator
 import com.wavesplatform.dex.settings.utils.ConfigSettingsValidator._
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ValueReader
+import pureconfig.ConfigReader
+import pureconfig.generic.semiauto.deriveReader
 
-case class PostgresConnection(host: String, portNumber: Int, database: String, user: String, password: String, dataSourceClassName: String) {
+case class PostgresConnection(serverName: String, portNumber: Int, database: String, user: String, password: String, dataSourceClassName: String) {
 
   def getConfig: Config = {
     ConfigFactory
       .empty()
-      .withValue("dataSource.serverName", ConfigValueFactory.fromAnyRef(host))
+      .withValue("dataSource.serverName", ConfigValueFactory.fromAnyRef(serverName))
       .withValue("dataSource.portNumber", ConfigValueFactory.fromAnyRef(portNumber))
       .withValue("dataSource.databaseName", ConfigValueFactory.fromAnyRef(database))
       .withValue("dataSource.user", ConfigValueFactory.fromAnyRef(user))
@@ -35,4 +37,6 @@ object PostgresConnection {
       cfgValidator.validate[String](s"$path.data-source-class-name")
     ) mapN PostgresConnection.apply getValueOrThrowErrors
   }
+
+  implicit val postgresConnectionConfigReader: ConfigReader[PostgresConnection] = deriveReader[PostgresConnection]
 }

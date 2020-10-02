@@ -74,11 +74,11 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
     settings.blacklistedAssets shouldBe Set(AssetPair.extractAsset("AbunLGErT5ctzVN8MVjb4Ad9YgjpubB8Hqb17VxzfAck").get.asInstanceOf[IssuedAsset])
     settings.blacklistedNames.map(_.pattern.pattern()) shouldBe Seq("b")
     settings.blacklistedAddresses shouldBe Set("3N5CBq8NYBMBU3UVS3rfMgaQEpjZrkWcBAD")
-    settings.orderBookSnapshotHttpCache shouldBe OrderBookHttpInfo.Settings(
+    settings.orderBookHttp shouldBe OrderBookHttpInfo.Settings(
       depthRanges = List(1, 5, 333),
       defaultDepth = Some(5)
     )
-    settings.eventsQueue.tpe shouldBe "kafka"
+    settings.eventsQueue.`type` shouldBe "kafka"
     settings.eventsQueue.local shouldBe LocalMatcherQueue.Settings(enableStoring = false, 1.day, 99, cleanBeforeConsume = false)
     settings.eventsQueue.kafka.topic shouldBe "some-events"
     settings.eventsQueue.kafka.consumer.fetchMaxDuration shouldBe 10.seconds

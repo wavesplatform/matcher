@@ -56,7 +56,7 @@ case class MatcherSettings(id: String,
                            orderDb: OrderDB.Settings,
                            // this is not a Set[Address] because to parse an address, global AddressScheme must be initialized
                            blacklistedAddresses: Set[String],
-                           orderBookSnapshotHttpCache: OrderBookHttpInfo.Settings,
+                           orderBookHttp: OrderBookHttpInfo.Settings,
                            eventsQueue: EventsQueueSettings,
                            processConsumedTimeout: FiniteDuration,
                            orderFee: Map[Long, OrderFeeSettings],
@@ -89,9 +89,12 @@ case class RestAPISettings(address: String, port: Int, apiKeyHash: String, cors:
 
 object MatcherSettings extends ConfigCursorsOps {
 
+
+
   implicit val chosenCase: NameMapper                      = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
   implicit val valueReader: ValueReader[MatcherSettings]   = (cfg, path) => fromConfig(cfg getConfig path)
-//  implicit val valueReader1: ConfigReader[MatcherSettings] = fromConfig1 _
+
+  // implicit val matcherSettingsConfigReader: ConfigReader[MatcherSettings] = exportReader[MatcherSettings].instance
 
   implicit val subscriptionsSettingsReader: ValueReader[SubscriptionsSettings] =
     com.wavesplatform.dex.settings.SubscriptionsSettings.subscriptionSettingsReader

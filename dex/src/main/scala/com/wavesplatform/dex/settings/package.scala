@@ -28,7 +28,7 @@ package object settings {
 
   def loadConfig1(userConfig: Config): Config = loadConfig(Some(userConfig))
 
-  def loadConfig1(maybeUserConfig: Option[ConfigObjectSource]): ConfigObjectSource = {
+  def loadConfigNew(maybeUserConfig: Option[ConfigObjectSource]): ConfigObjectSource = {
 
     val defaults = ConfigSource.defaultOverrides
     val external = maybeUserConfig.fold(defaults)(defaults.withFallback)

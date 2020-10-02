@@ -56,6 +56,7 @@ import kamon.influxdb.InfluxDBReporter
 import mouse.any.anySyntaxMouse
 import net.ceedubs.ficus.Ficus._
 import org.slf4j.LoggerFactory
+import pureconfig.ConfigSource
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -116,7 +117,7 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
 
   private implicit val errorContext: ErrorFormatterContext = ErrorFormatterContext.fromOptional(assetsCache.get(_: Asset).map(_.decimals))
 
-  private val matcherQueue: MatcherQueue = settings.eventsQueue.tpe match {
+  private val matcherQueue: MatcherQueue = settings.eventsQueue.`type` match {
     case "local" =>
       log.info("Events will be stored locally")
       new LocalMatcherQueue(settings.eventsQueue.local, new LocalQueueStore(db), time)
@@ -134,7 +135,7 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
 
   private val orderBookAskAdapter = new OrderBookAskAdapter(orderBooks, settings.actorResponseTimeout)
   private val orderBookHttpInfo =
-    new OrderBookHttpInfo(settings.orderBookSnapshotHttpCache, orderBookAskAdapter, time, assetsCache.get(_).map(_.decimals))
+    new OrderBookHttpInfo(settings.orderBookHttp, orderBookAskAdapter, time, assetsCache.get(_).map(_.decimals))
 
   private val transactionCreator = new ExchangeTransactionCreator(
     matcherKeyPair,
@@ -575,6 +576,28 @@ object Application {
 
     // Initialize global var with actual address scheme
     AddressScheme.current = new AddressScheme { override val chainId: Byte = settings.addressSchemeCharacter.toByte }
+
+    // ===
+
+    import com.wavesplatform.dex.settings.{loadConfig, loadConfigNew}
+    import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
+
+    import scala.jdk.CollectionConverters._
+
+    val config1          = loadConfigNew(external map ConfigSource.file)
+
+    config.getConfig(scalaContextPath).toProperties.asScala.foreach { case (k, v) => System.setProperty(s"$scalaContextPath.$k", v) }
+
+    config1.config.foreach {
+      _.getConfig(scalaContextPath).toProperties.asScala.foreach { case (k, v) => System.setProperty(s"$scalaContextPath.$k", v) }
+    }
+
+    import pureconfig.generic.auto._
+
+    val settings2 = config.as[MatcherSettings]("waves.dex")(MatcherSettings.valueReader)
+    //    val settings1 = config1.at("waves.dex").load[MatcherSettings]
+
+    // ===
 
     // IMPORTANT: to make use of default settings for histograms and timers, it's crucial to reconfigure Kamon with
     //            our merged config BEFORE initializing any metrics, including in settings-related companion objects

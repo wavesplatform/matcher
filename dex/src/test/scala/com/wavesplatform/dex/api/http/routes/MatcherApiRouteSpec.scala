@@ -1311,7 +1311,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
 
     val orderBookHttpInfo =
       new OrderBookHttpInfo(
-        settings = settings.orderBookSnapshotHttpCache,
+        settings = settings.orderBookHttp,
         askAdapter = orderBookAskAdapter,
         time = time,
         assetDecimals = x => if (x == smartAsset) Some(smartAssetDesc.decimals) else throw new IllegalArgumentException(s"No information about $x")

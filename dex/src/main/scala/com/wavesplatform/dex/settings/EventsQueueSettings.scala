@@ -8,7 +8,7 @@ import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
 
 import scala.concurrent.duration.FiniteDuration
 
-case class EventsQueueSettings(tpe: String,
+case class EventsQueueSettings(`type`: String,
                                local: LocalMatcherQueue.Settings,
                                kafka: KafkaMatcherQueue.Settings,
                                circuitBreaker: CircuitBreakerSettings)
@@ -19,7 +19,7 @@ object EventsQueueSettings {
 
   implicit val eventsQueueSettingsReader: ValueReader[EventsQueueSettings] = { (cfg, path) =>
     EventsQueueSettings(
-      tpe = cfg.getString(s"$path.type"),
+      `type` = cfg.getString(s"$path.type"),
       local = cfg.as[LocalMatcherQueue.Settings](s"$path.local"),
       kafka = cfg.as[KafkaMatcherQueue.Settings](s"$path.kafka"),
       circuitBreaker = cfg.as[CircuitBreakerSettings](s"$path.circuit-breaker")

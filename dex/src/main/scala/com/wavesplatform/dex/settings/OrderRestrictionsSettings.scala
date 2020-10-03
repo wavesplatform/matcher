@@ -35,7 +35,7 @@ object OrderRestrictionsSettings {
       validationOf.field[OrderRestrictionsSettings, "stepPrice"].mk(x => rules.gt0(x.stepPrice)),
       validationOf.field[OrderRestrictionsSettings, "minPrice"].mk(x => rules.gt0(x.minPrice)),
       validationOf.field[OrderRestrictionsSettings, "maxPrice"].mk(x => rules.gt0(x.maxPrice)),
-      validationOf.field[OrderRestrictionsSettings, "maxAmount"].mk(x => rules.gtN(x.maxAmount, x.minAmount, "minAmount")),
-      validationOf.field[OrderRestrictionsSettings, "maxPrice"].mk(x => rules.gtN(x.maxPrice, x.minPrice, "minPrice"))
+      validationOf.field[OrderRestrictionsSettings, "maxAmount"].mk(x => rules.gtN(x.maxAmount, x.minAmount, "min-amount")),
+      validationOf.field[OrderRestrictionsSettings, "maxPrice"].mk(x => rules.gtN(x.maxPrice, x.minPrice, "min-price"))
     )
 }

@@ -26,7 +26,6 @@ object Dependencies {
 
     val typesafeConfig = "1.4.0"
     val scopt          = "4.0.0-RC2"
-    val ficus          = "1.5.0"
 
     val logback            = "1.2.3"
     val slf4j              = "1.7.30"
@@ -108,7 +107,6 @@ object Dependencies {
   private val shapeless            = "com.chuusai" %% "shapeless" % Version.shapeless
   private val typesafeConfig       = "com.typesafe" % "config" % Version.typesafeConfig
   private val scopt                = "com.github.scopt" %% "scopt" % Version.scopt
-  private val ficus                = "com.iheart" %% "ficus" % Version.ficus
   private val logback              = "ch.qos.logback" % "logback-classic" % Version.logback
   private val logbackJsonEncoder   = "net.logstash.logback" % "logstash-logback-encoder" % Version.logbackJsonEncoder
   private val slf4j                = "org.slf4j" %% "slf4j-api" % Version.slf4j
@@ -272,7 +270,6 @@ object Dependencies {
       logback,
       swagger,
       playJson,
-      ficus,
       scorexCrypto,
       catsCore,
       supertagged,

@@ -32,9 +32,9 @@ import com.wavesplatform.dex.time.SystemTime
 import com.wavesplatform.dex.waves.WavesFeeConstants
 import io.qameta.allure.scalatest.AllureScalatestContext
 import mouse.any._
-import net.ceedubs.ficus.Ficus._
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Suite
+import pureconfig.ConfigSource
 
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}
@@ -97,23 +97,24 @@ trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with Doub
 
   protected def mkKeyPair(seed: String): KeyPair = KeyPair(seed getBytes "utf-8")
 
-  protected def createOrder(pair: AssetPair,
-                            orderType: OrderType,
-                            amount: Long,
-                            price: Double,
-                            matcherFee: Long = matcherFee,
-                            version: Byte = 3,
-                            feeAsset: Asset = Waves,
-                            sender: KeyPair = senderKeyPair): Order = {
+  protected def createOrder(
+      pair: AssetPair,
+      orderType: OrderType,
+      amount: Long,
+      price: Double,
+      matcherFee: Long = matcherFee,
+      version: Byte = 3,
+      feeAsset: Asset = Waves,
+      sender: KeyPair = senderKeyPair
+  ): Order = {
     Order(
       sender = sender,
       matcher = MatcherAccount,
       pair = pair,
       orderType = orderType,
       amount = amount,
-      price = Normalization.normalizePrice(price,
-                                           getDefaultAssetDescriptions(pair.amountAsset).decimals,
-                                           getDefaultAssetDescriptions(pair.priceAsset).decimals),
+      price = Normalization
+        .normalizePrice(price, getDefaultAssetDescriptions(pair.amountAsset).decimals, getDefaultAssetDescriptions(pair.priceAsset).decimals),
       timestamp = ntpNow,
       expiration = ntpNow + (1000 * 60 * 60 * 24),
       matcherFee = matcherFee,
@@ -149,7 +150,7 @@ trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with Doub
   private val maxTimeGen: Gen[Long]     = Gen.choose(10000L, Order.MaxLiveTime).map(_ + System.currentTimeMillis())
   private val createdTimeGen: Gen[Long] = Gen.choose(0L, 10000L).map(System.currentTimeMillis() - _)
 
-  protected val matcherSettings: MatcherSettings = loadConfig(None).as[MatcherSettings]("waves.dex")
+  protected val matcherSettings: MatcherSettings = ConfigSource.fromConfig(loadConfig(None)).at("waves.dex").loadOrThrow[MatcherSettings]
 
   protected def randomBytes(howMany: Int = 32): Array[Byte] = {
     val r = new Array[Byte](howMany)
@@ -170,14 +171,16 @@ trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with Doub
   private val bytes32gen: Gen[Array[Byte]] = byteArrayGen(32)
   protected val accountGen: Gen[KeyPair]   = bytes32gen.map(arr => KeyPair(arr))
 
-  private def buyGenerator(pair: AssetPair,
-                           amount: Long,
-                           price: Long,
-                           sender: Option[KeyPair],
-                           matcherFee: Option[Long],
-                           version: Byte,
-                           timestamp: Option[Long],
-                           feeAsset: Asset): Gen[(Order, KeyPair)] =
+  private def buyGenerator(
+      pair: AssetPair,
+      amount: Long,
+      price: Long,
+      sender: Option[KeyPair],
+      matcherFee: Option[Long],
+      version: Byte,
+      timestamp: Option[Long],
+      feeAsset: Asset
+  ): Gen[(Order, KeyPair)] =
     for {
       sender: KeyPair  <- sender.map(Gen.const).getOrElse(accountGen)
       timestamp: Long  <- timestamp.map(Gen.const).getOrElse(createdTimeGen)
@@ -185,14 +188,16 @@ trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with Doub
       matcherFee: Long <- matcherFee.map(Gen.const).getOrElse(maxWavesAmountGen)
     } yield (Order.buy(sender, MatcherAccount, pair, amount, price, timestamp, expiration, matcherFee, version, feeAsset), sender)
 
-  private def sellGenerator(pair: AssetPair,
-                            amount: Price,
-                            price: Price,
-                            sender: Option[KeyPair],
-                            matcherFee: Option[Price],
-                            timestamp: Option[Price],
-                            version: Byte,
-                            feeAsset: Asset): Gen[(Order, KeyPair)] =
+  private def sellGenerator(
+      pair: AssetPair,
+      amount: Price,
+      price: Price,
+      sender: Option[KeyPair],
+      matcherFee: Option[Price],
+      timestamp: Option[Price],
+      version: Byte,
+      feeAsset: Asset
+  ): Gen[(Order, KeyPair)] =
     for {
       sender: KeyPair  <- sender.map(Gen.const).getOrElse(accountGen)
       timestamp: Long  <- timestamp.map(Gen.const).getOrElse(createdTimeGen)
@@ -200,46 +205,54 @@ trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with Doub
       matcherFee: Long <- matcherFee.map(Gen.const).getOrElse(maxWavesAmountGen)
     } yield (Order.sell(sender, MatcherAccount, pair, amount, price, timestamp, expiration, matcherFee, version, feeAsset), sender)
 
-  protected def buy(pair: AssetPair,
-                    amount: Price,
-                    price: BigDecimal,
-                    sender: Option[KeyPair] = None,
-                    matcherFee: Option[Long] = None,
-                    ts: Option[Long] = None,
-                    version: Byte = 1,
-                    feeAsset: Asset = Waves): Order = {
+  protected def buy(
+      pair: AssetPair,
+      amount: Price,
+      price: BigDecimal,
+      sender: Option[KeyPair] = None,
+      matcherFee: Option[Long] = None,
+      ts: Option[Long] = None,
+      version: Byte = 1,
+      feeAsset: Asset = Waves
+  ): Order = {
     rawBuy(pair, amount, (price * Order.PriceConstant).toLong, sender, matcherFee, ts, version, feeAsset)
   }
 
-  protected def rawBuy(pair: AssetPair,
-                       amount: Long,
-                       price: Price,
-                       sender: Option[KeyPair] = None,
-                       matcherFee: Option[Long] = None,
-                       ts: Option[Long] = None,
-                       version: Byte = 1,
-                       feeAsset: Asset = Waves): Order = {
+  protected def rawBuy(
+      pair: AssetPair,
+      amount: Long,
+      price: Price,
+      sender: Option[KeyPair] = None,
+      matcherFee: Option[Long] = None,
+      ts: Option[Long] = None,
+      version: Byte = 1,
+      feeAsset: Asset = Waves
+  ): Order = {
     valueFromGen(buyGenerator(pair, amount, price, sender, matcherFee, version, ts, feeAsset))._1
   }
 
-  protected def sell(pair: AssetPair,
-                     amount: Long,
-                     price: BigDecimal,
-                     sender: Option[KeyPair] = None,
-                     matcherFee: Option[Long] = None,
-                     ts: Option[Long] = None,
-                     version: Byte = 1,
-                     feeAsset: Asset = Waves): Order =
+  protected def sell(
+      pair: AssetPair,
+      amount: Long,
+      price: BigDecimal,
+      sender: Option[KeyPair] = None,
+      matcherFee: Option[Long] = None,
+      ts: Option[Long] = None,
+      version: Byte = 1,
+      feeAsset: Asset = Waves
+  ): Order =
     rawSell(pair, amount, (price * Order.PriceConstant).toLong, sender, matcherFee, ts, version, feeAsset)
 
-  protected def rawSell(pair: AssetPair,
-                        amount: Long,
-                        price: Price,
-                        sender: Option[KeyPair] = None,
-                        matcherFee: Option[Long] = None,
-                        ts: Option[Long] = None,
-                        version: Byte = 1,
-                        feeAsset: Asset = Waves): Order = {
+  protected def rawSell(
+      pair: AssetPair,
+      amount: Long,
+      price: Price,
+      sender: Option[KeyPair] = None,
+      matcherFee: Option[Long] = None,
+      ts: Option[Long] = None,
+      version: Byte = 1,
+      feeAsset: Asset = Waves
+  ): Order = {
     valueFromGen(sellGenerator(pair, amount, price, sender, matcherFee, ts, version, feeAsset))._1
   }
 
@@ -276,11 +289,12 @@ trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with Doub
     expiration: Long   <- maxTimeGen
     matcherFee: Long   <- maxWavesAmountGen
     orderVersion: Byte <- Gen.oneOf(1: Byte, 2: Byte)
-  } yield
-    BuyLimitOrder(amount,
-                  matcherFee,
-                  Order.buy(sender, MatcherAccount, pair, amount, price, timestamp, expiration, matcherFee, orderVersion),
-                  BigInteger.ZERO)
+  } yield BuyLimitOrder(
+    amount,
+    matcherFee,
+    Order.buy(sender, MatcherAccount, pair, amount, price, timestamp, expiration, matcherFee, orderVersion),
+    BigInteger.ZERO
+  )
 
   protected val sellLimitOrderGenerator: Gen[SellLimitOrder] = for {
     sender: KeyPair    <- accountGen
@@ -291,11 +305,12 @@ trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with Doub
     expiration: Long   <- maxTimeGen
     matcherFee: Long   <- maxWavesAmountGen
     orderVersion: Byte <- Gen.oneOf(1: Byte, 2: Byte)
-  } yield
-    SellLimitOrder(amount,
-                   matcherFee,
-                   Order.sell(sender, MatcherAccount, pair, amount, price, timestamp, expiration, matcherFee, orderVersion),
-                   BigInteger.ZERO)
+  } yield SellLimitOrder(
+    amount,
+    matcherFee,
+    Order.sell(sender, MatcherAccount, pair, amount, price, timestamp, expiration, matcherFee, orderVersion),
+    BigInteger.ZERO
+  )
 
   protected val limitOrderGenerator: Gen[LimitOrder] = Gen.oneOf(sellLimitOrderGenerator, buyLimitOrderGenerator)
 
@@ -346,26 +361,30 @@ trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with Doub
       feeAsset             <- Gen.oneOf(pair.amountAsset, pair.priceAsset, Waves, arbitraryAsset)
     } yield {
       (
-        senderBuy -> OrderV3(senderBuy,
-                             MatcherAccount,
-                             pair,
-                             OrderType.BUY,
-                             Order.correctAmount(amount, price),
-                             price,
-                             timestampBuy,
-                             expirationBuy,
-                             matcherFeeBuy,
-                             feeAsset),
-        senderSell -> OrderV3(senderSell,
-                              MatcherAccount,
-                              pair,
-                              OrderType.SELL,
-                              Order.correctAmount(amount, price),
-                              price,
-                              timestampSell,
-                              expirationSell,
-                              matcherFeeSell,
-                              feeAsset)
+        senderBuy -> OrderV3(
+          senderBuy,
+          MatcherAccount,
+          pair,
+          OrderType.BUY,
+          Order.correctAmount(amount, price),
+          price,
+          timestampBuy,
+          expirationBuy,
+          matcherFeeBuy,
+          feeAsset
+        ),
+        senderSell -> OrderV3(
+          senderSell,
+          MatcherAccount,
+          pair,
+          OrderType.SELL,
+          Order.correctAmount(amount, price),
+          price,
+          timestampSell,
+          expirationSell,
+          matcherFeeSell,
+          feeAsset
+        )
       )
     }
 
@@ -410,11 +429,13 @@ trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with Doub
     }
   }
 
-  private def correctOrderByFeeSettings(order: Order,
-                                        sender: KeyPair,
-                                        orderFeeSettings: OrderFeeSettings,
-                                        matcherFeeAssetForDynamicSettings: Option[Asset] = None,
-                                        rateForDynamicSettings: Option[Double] = None): Order = {
+  private def correctOrderByFeeSettings(
+      order: Order,
+      sender: KeyPair,
+      orderFeeSettings: OrderFeeSettings,
+      matcherFeeAssetForDynamicSettings: Option[Asset] = None,
+      rateForDynamicSettings: Option[Double] = None
+  ): Order = {
 
     val correctedOrder = (order.version, orderFeeSettings) match {
       case (3, FixedSettings(defaultAssetId, minFee)) =>

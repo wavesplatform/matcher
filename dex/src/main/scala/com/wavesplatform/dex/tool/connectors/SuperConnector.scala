@@ -6,24 +6,24 @@ import cats.instances.either._
 import cats.syntax.either._
 import cats.syntax.option._
 import com.typesafe.config.ConfigFactory._
-import com.wavesplatform.dex.cli.{ErrorOr, _}
+import com.wavesplatform.dex.cli._
 import com.wavesplatform.dex.db.AccountStorage
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair}
 import com.wavesplatform.dex.error.Implicits.ThrowableOps
-import com.wavesplatform.dex.settings.MatcherSettings.valueReader
 import com.wavesplatform.dex.settings.{MatcherSettings, loadConfig}
 import com.wavesplatform.dex.tool.connectors.SuperConnector.Env
-import net.ceedubs.ficus.Ficus._
+import pureconfig.ConfigSource
 
 import scala.util.Try
 
-case class SuperConnector private (env: Env,
-                                   dexRest: DexRestConnector,
-                                   nodeRest: NodeRestConnector,
-                                   dexExtensionGrpc: DexExtensionGrpcConnector,
-                                   dexWs: DexWsConnector,
-                                   authServiceRest: Option[AuthServiceRestConnector])
-    extends AutoCloseable {
+case class SuperConnector private (
+    env: Env,
+    dexRest: DexRestConnector,
+    nodeRest: NodeRestConnector,
+    dexExtensionGrpc: DexExtensionGrpcConnector,
+    dexWs: DexWsConnector,
+    authServiceRest: Option[AuthServiceRestConnector]
+) extends AutoCloseable {
 
   def close(): Unit = {
     Seq(dexRest, nodeRest, dexExtensionGrpc, dexWs).foreach { _.close() }
@@ -50,7 +50,7 @@ object SuperConnector {
 
     def loadMatcherSettings(confPath: String): ErrorOr[MatcherSettings] =
       Try {
-        val matcherSettings: MatcherSettings = loadConfig { parseFile(new File(dexConfigPath)) }.as[MatcherSettings]("waves.dex")
+        val matcherSettings = ConfigSource.fromConfig(loadConfig { parseFile(new File(dexConfigPath)) }).at("waves.dex").loadOrThrow[MatcherSettings]
         AddressScheme.current = new AddressScheme { override val chainId: Byte = matcherSettings.addressSchemeCharacter.toByte }
         matcherSettings
       }.toEither.leftMap(ex => s"Cannot load matcher settings by path $confPath: ${ex.getWithStackTrace}")

@@ -1,22 +1,10 @@
 package com.wavesplatform.dex.settings
 
 import cats.data.NonEmptyList
-import cats.implicits.{catsSyntaxOptionId, none}
-import cats.syntax.apply._
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.model.{Denormalization, Normalization}
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.queue.QueueEventWithMeta
-import com.wavesplatform.dex.settings.Implicits.{nonEmptyListReader => nelreader}
-import com.wavesplatform.dex.settings.utils.ConfigReaderOps.ConfigReaderMyOps
-import com.wavesplatform.dex.settings.utils.ConfigSettingsValidator.ErrorListOrOps
-import com.wavesplatform.dex.settings.utils.{ConfigSettingsValidator, validationOf}
-import net.ceedubs.ficus.Ficus._
-import net.ceedubs.ficus.readers.ValueReader
-import pureconfig.Derivation
-import pureconfig.module.cats.nonEmptyListReader
-import pureconfig.generic.auto._
-import pureconfig.generic.semiauto
 
 /** Normalized representation of the matching rule */
 case class MatchingRule(startOffset: QueueEventWithMeta.Offset, tickSize: Long) {
@@ -65,22 +53,6 @@ object DenormalizedMatchingRule extends ScorexLogging {
         case _ => rules
       }
     else rules
-
-  private implicit val denormalizedMatchingRuleReader: ValueReader[DenormalizedMatchingRule] = { (cfg, path) =>
-    val cfgValidator = ConfigSettingsValidator(cfg)
-
-    val offsetValidated   = cfgValidator.validateByPredicate[Long](s"$path.start-offset")(_ >= 0, "required 0 <= start offset")
-    val tickSizeValidated = cfgValidator.validateByPredicate[BigDecimal](s"$path.tick-size")(_ > 0, "required 0 < tick size")
-
-    (offsetValidated, tickSizeValidated) mapN DenormalizedMatchingRule.apply getValueOrThrowErrors
-  }
-
-  implicit val denormalizedMatchingRuleNelReader: ValueReader[NonEmptyList[DenormalizedMatchingRule]] =
-    nelreader[DenormalizedMatchingRule].map { xs =>
-      val isStrictOrder = xs.tail.zip(xs.toList).forall { case (next, prev) => next.startOffset > prev.startOffset }
-      if (isStrictOrder) xs
-      else throw new IllegalArgumentException(s"Rules should be ordered by offset, but they are: ${xs.map(_.startOffset).toList.mkString(", ")}")
-    }
 
   /**
     * Returns denormalized (from application.conf) matching rules for the specified asset pair.

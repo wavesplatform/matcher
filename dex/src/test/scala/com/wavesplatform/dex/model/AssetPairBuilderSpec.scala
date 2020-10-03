@@ -8,13 +8,13 @@ import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.OrderValidator.Result
-import com.wavesplatform.dex.settings.{MatcherSettings, loadConfig}
+import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.dex.test.matchers.ProduceError.produce
-import net.ceedubs.ficus.Ficus._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.prop.TableDrivenPropertyChecks._
+import pureconfig.ConfigSource
 
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -44,7 +44,7 @@ class AssetPairBuilderSpec extends AnyFreeSpec with Matchers with MockFactory {
       WUSD,
       WEUR,
       WCNY,
-      IssuedAsset(b("8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS")),
+      IssuedAsset(b("8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS"))
     )
 
   private val blacklistedAssets = Set(Asset3)
@@ -57,7 +57,7 @@ class AssetPairBuilderSpec extends AnyFreeSpec with Matchers with MockFactory {
        |  allowed-asset-pairs = [WAVES-${Asset3.id.toString}]
        |}""".stripMargin)
 
-  private val settings = loadConfig(priceAssets).as[MatcherSettings]("waves.dex")
+  private val settings = ConfigSource.fromConfig(ConfigFactory.load()).at("waves.dex").loadOrThrow[MatcherSettings]
 
   private def mkBuilder(knownAssets: (IssuedAsset, Option[BriefAssetDescription])*): AssetPairBuilder = {
     val assetDescription =
@@ -84,7 +84,7 @@ class AssetPairBuilderSpec extends AnyFreeSpec with Matchers with MockFactory {
     (Asset1.id.toString, Asset2.id.toString, Left("AssetPairReversed")),
     (Asset1.id.toString, WBTC.id.toString, Right(())),
     (WEUR.id.toString, Asset1.id.toString, Left("AssetPairReversed")),
-    (WAVES, Asset3.id.toString, Right(())),
+    (WAVES, Asset3.id.toString, Right(()))
   )
 
   "AssetPairBuilder" - {
@@ -92,13 +92,12 @@ class AssetPairBuilderSpec extends AnyFreeSpec with Matchers with MockFactory {
       val assets  = (Asset1 :: Asset2 :: Asset3 :: predefinedPriceAssets).map(_ -> mkAssetDescription())
       val builder = mkBuilder(assets: _*)
 
-      forAll(pairs) {
-        case (amountAsset, priceAsset, isValid) =>
-          val pair = awaitResult { builder.createAssetPair(amountAsset, priceAsset) }
-          isValid match {
-            case Right(_) => pair shouldBe Symbol("right")
-            case Left(e)  => pair should produce(e)
-          }
+      forAll(pairs) { case (amountAsset, priceAsset, isValid) =>
+        val pair = awaitResult { builder.createAssetPair(amountAsset, priceAsset) }
+        isValid match {
+          case Right(_) => pair shouldBe Symbol("right")
+          case Left(e)  => pair should produce(e)
+        }
       }
     }
     "rejects a pair when" - {

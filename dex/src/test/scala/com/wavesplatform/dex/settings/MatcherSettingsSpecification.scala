@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.settings
 
 import cats.data.NonEmptyList
-import com.typesafe.config.Config
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.actors.address.AddressActor
 import com.wavesplatform.dex.api.http.OrderBookHttpInfo
 import com.wavesplatform.dex.api.ws.actors.{WsExternalClientHandlerActor, WsHealthCheckSettings, WsInternalBroadcastActor, WsInternalClientHandlerActor}
@@ -17,8 +17,8 @@ import com.wavesplatform.dex.settings.EventsQueueSettings.CircuitBreakerSettings
 import com.wavesplatform.dex.settings.OrderFeeSettings.PercentSettings
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.test.matchers.ProduceError.produce
-import net.ceedubs.ficus.Ficus._
 import org.scalatest.matchers.should.Matchers
+import pureconfig.ConfigSource
 
 import scala.concurrent.duration._
 
@@ -27,7 +27,7 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
   "MatcherSettings" should "read values" in {
 
     val config   = configWithSettings()
-    val settings = config.as[MatcherSettings]("waves.dex")
+    val settings = ConfigSource.fromConfig(config).at("waves.dex").loadOrThrow[MatcherSettings]
 
     settings.id should be("matcher-1")
     settings.accountStorage should be(AccountStorage.Settings.InMem(ByteStr.decodeBase64("c3lrYWJsZXlhdA==").get))
@@ -90,7 +90,8 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
         maxFailures = 999,
         callTimeout = 123.seconds,
         resetTimeout = 1.day
-      ))
+      )
+    )
     settings.processConsumedTimeout shouldBe 663.seconds
     settings.orderFee should matchTo(Map[Long, OrderFeeSettings](-1L -> PercentSettings(AssetType.Amount, 0.1)))
     settings.maxPriceDeviations shouldBe DeviationsSettings(enable = true, 1000000, 1000000, 1000000)
@@ -107,7 +108,8 @@ bar
 baz"""
     settings.webSockets should matchTo(
       WebSocketSettings(
-        externalClientHandler = WsExternalClientHandlerActor.Settings(1.day, 3.days, expectedJwtPublicKey, SubscriptionsSettings(20, 20), WsHealthCheckSettings(9.minutes, 129.minutes)),
+        externalClientHandler = WsExternalClientHandlerActor
+          .Settings(1.day, 3.days, expectedJwtPublicKey, SubscriptionsSettings(20, 20), WsHealthCheckSettings(9.minutes, 129.minutes)),
         internalBroadcast = WsInternalBroadcastActor.Settings(923.millis),
         internalClientHandler = WsInternalClientHandlerActor.Settings(WsHealthCheckSettings(10.minutes, 374.minutes))
       )
@@ -160,7 +162,8 @@ baz"""
     settingsInvalidLossAndFee shouldBe
       Left(
         "Invalid setting max-price-deviations.loss value: 0 (required 0 < percent), " +
-          "Invalid setting max-price-deviations.fee value: -1000000 (required 0 < percent)")
+          "Invalid setting max-price-deviations.fee value: -1000000 (required 0 < percent)"
+      )
   }
 
   "OrderFeeSettings in MatcherSettings" should "be validated" in {
@@ -263,12 +266,14 @@ baz"""
     settingsInvalidTypeAndPercent shouldBe
       Left(
         "Invalid setting order-fee value: Invalid setting order-fee.-1.percent.asset-type value: test, " +
-          "Invalid setting order-fee.-1.percent.min-fee value: 121.2 (required 0 < percent <= 100)")
+          "Invalid setting order-fee.-1.percent.min-fee value: 121.2 (required 0 < percent <= 100)"
+      )
 
     settingsInvalidAssetAndFee shouldBe
       Left(
         "Invalid setting order-fee value: Invalid setting order-fee.-1.fixed.asset value: ;;;;, " +
-          "Invalid setting order-fee.-1.fixed.min-fee value: -300000 (required 0 < fee)")
+          "Invalid setting order-fee.-1.fixed.min-fee value: -300000 (required 0 < fee)"
+      )
 
     settingsInvalidFeeInDynamicMode shouldBe Left(
       s"Invalid setting order-fee value: Invalid setting order-fee.-1.dynamic.base-maker-fee value: -350000 (required 0 < base maker fee)"
@@ -415,7 +420,8 @@ baz"""
 
     withClue("incorrect min and max") {
       getSettingByConfig(configStr(incorrectMinAndMax)) should produce(
-        "Required order-restrictions.WAVES-BTC.min-price < order-restrictions.WAVES-BTC.max-price")
+        "Required order-restrictions.WAVES-BTC.min-price < order-restrictions.WAVES-BTC.max-price"
+      )
     }
   }
 
@@ -470,12 +476,14 @@ baz"""
 
     withClue("incorrect rules order: 100, 100") {
       getSettingByConfig(configStr(incorrectRulesOrder(100, 100))) should produce(
-        "Invalid setting matching-rules value: Rules should be ordered by offset, but they are: 100, 100")
+        "Invalid setting matching-rules value: Rules should be ordered by offset, but they are: 100, 100"
+      )
     }
 
     withClue("incorrect rules order: 100, 88") {
       getSettingByConfig(configStr(incorrectRulesOrder(100, 88))) should produce(
-        "Invalid setting matching-rules value: Rules should be ordered by offset, but they are: 100, 88")
+        "Invalid setting matching-rules value: Rules should be ordered by offset, but they are: 100, 88"
+      )
     }
   }
 

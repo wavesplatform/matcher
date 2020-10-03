@@ -2,7 +2,6 @@ package com.wavesplatform.dex.db
 
 import java.io.{File, FileInputStream, FileOutputStream}
 import java.nio.file.Files
-import java.util.Base64
 
 import cats.syntax.either._
 import com.google.common.primitives.{Bytes, Ints}
@@ -11,9 +10,7 @@ import com.wavesplatform.dex.db.AccountStorage.Settings.EncryptedFile
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.crypto
-import com.wavesplatform.dex.settings.utils.{ConfigCursorsOps, ConfigReaders, WrappedDescendantHint}
-import net.ceedubs.ficus.readers.ValueReader
-import pureconfig.ConfigReader
+import com.wavesplatform.dex.settings.utils.{ConfigReaders, WrappedDescendantHint}
 import pureconfig.generic.semiauto
 
 import scala.collection.mutable.ArrayBuffer
@@ -24,7 +21,7 @@ object AccountStorage {
 
   sealed trait Settings
 
-  object Settings extends ConfigCursorsOps {
+  object Settings {
 
     case class InMem(seedInBase64: ByteStr) extends Settings
     object InMem extends ConfigReaders {
@@ -35,20 +32,6 @@ object AccountStorage {
     case class EncryptedFile(path: File, password: String) extends Settings
 
     implicit val accountStorageHint = new WrappedDescendantHint[Settings]()
-
-    // =====
-
-    implicit val valueReader: ValueReader[Settings] = ValueReader.relative[Settings] { config =>
-      config.getString("type") match {
-        case "in-mem" => InMem(Base64.getDecoder.decode(config.getString("in-mem.seed-in-base64")))
-        case "encrypted-file" =>
-          EncryptedFile(
-            path = new File(config.getString("encrypted-file.path")),
-            password = config.getString("encrypted-file.password")
-          )
-        case x => throw new IllegalArgumentException(s"The type of account storage '$x' is unknown. Please update your settings.")
-      }
-    }
   }
 
   def load(settings: Settings): Either[String, AccountStorage] = settings match {

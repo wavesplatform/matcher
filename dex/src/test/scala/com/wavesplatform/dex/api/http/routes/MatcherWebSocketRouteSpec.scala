@@ -24,6 +24,7 @@ import com.wavesplatform.dex.time.TestTime
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 import play.api.libs.json.{JsonFacade => _}
+import pureconfig.ConfigSource
 
 import scala.annotation.nowarn
 import scala.util.Random
@@ -35,10 +36,7 @@ class MatcherWebSocketRouteSpec extends RouteSpec("/ws/v0") with MatcherSpecBase
   private val apiKey       = "apiKey"
   private val apiKeyHeader = RawHeader(`X-Api-Key`.headerName, apiKey)
 
-  private val settings =
-    MatcherSettings.valueReader
-      .read(ConfigFactory.load(), "waves.dex")
-      .copy(priceAssets = Seq(Waves))
+  private val settings = ConfigSource.fromConfig(ConfigFactory.load()).at("waves.dex").loadOrThrow[MatcherSettings].copy(priceAssets = Seq(Waves))
 
   routePath("/connections") - {
     "connectionsRoute" - {

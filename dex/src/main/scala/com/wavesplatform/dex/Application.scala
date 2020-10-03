@@ -54,9 +54,8 @@ import com.wavesplatform.dex.time.NTP
 import kamon.Kamon
 import kamon.influxdb.InfluxDBReporter
 import mouse.any.anySyntaxMouse
-import net.ceedubs.ficus.Ficus._
 import org.slf4j.LoggerFactory
-import pureconfig.ConfigSource
+import pureconfig.{ConfigObjectSource, ConfigSource}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -572,32 +571,10 @@ object Application {
 
     config.getConfig(scalaContextPath).toProperties.asScala.foreach { case (k, v) => System.setProperty(s"$scalaContextPath.$k", v) }
 
-    val settings = config.as[MatcherSettings]("waves.dex")(MatcherSettings.valueReader)
+    val settings = ConfigSource.fromConfig(config).at("waves.dex").loadOrThrow[MatcherSettings]
 
     // Initialize global var with actual address scheme
     AddressScheme.current = new AddressScheme { override val chainId: Byte = settings.addressSchemeCharacter.toByte }
-
-    // ===
-
-    import com.wavesplatform.dex.settings.{loadConfig, loadConfigNew}
-    import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
-
-    import scala.jdk.CollectionConverters._
-
-    val config1          = loadConfigNew(external map ConfigSource.file)
-
-    config.getConfig(scalaContextPath).toProperties.asScala.foreach { case (k, v) => System.setProperty(s"$scalaContextPath.$k", v) }
-
-    config1.config.foreach {
-      _.getConfig(scalaContextPath).toProperties.asScala.foreach { case (k, v) => System.setProperty(s"$scalaContextPath.$k", v) }
-    }
-
-    import pureconfig.generic.auto._
-
-    val settings2 = config.as[MatcherSettings]("waves.dex")(MatcherSettings.valueReader)
-    //    val settings1 = config1.at("waves.dex").load[MatcherSettings]
-
-    // ===
 
     // IMPORTANT: to make use of default settings for histograms and timers, it's crucial to reconfigure Kamon with
     //            our merged config BEFORE initializing any metrics, including in settings-related companion objects

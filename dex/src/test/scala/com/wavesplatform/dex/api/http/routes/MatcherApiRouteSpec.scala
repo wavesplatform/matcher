@@ -57,6 +57,7 @@ import com.wavesplatform.dex.settings.{MatcherSettings, OrderRestrictionsSetting
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 import play.api.libs.json.{JsArray, JsString, Json, JsonFacade => _}
+import pureconfig.ConfigSource
 
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
@@ -121,13 +122,14 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
   private val amountAssetDesc = BriefAssetDescription("AmountAsset", 8, hasScript = false)
   private val priceAssetDesc  = BriefAssetDescription("PriceAsset", 8, hasScript = false)
 
-  private val settings =
-    MatcherSettings.valueReader
-      .read(ConfigFactory.load(), "waves.dex")
-      .copy(
-        priceAssets = Seq(badOrder.assetPair.priceAsset, okOrder.assetPair.priceAsset, priceAsset, Waves),
-        orderRestrictions = Map(smartWavesPair -> orderRestrictions)
-      )
+  private val settings = ConfigSource
+    .fromConfig(ConfigFactory.load())
+    .at("waves.dex")
+    .loadOrThrow[MatcherSettings]
+    .copy(
+      priceAssets = Seq(badOrder.assetPair.priceAsset, okOrder.assetPair.priceAsset, priceAsset, Waves),
+      orderRestrictions = Map(smartWavesPair -> orderRestrictions)
+    )
 
   private implicit val httpMarketDataWithMetaDiff: Diff[HttpMarketDataWithMeta] =
     Derived[Diff[HttpMarketDataWithMeta]].ignore[HttpMarketDataWithMeta, Long](_.created)

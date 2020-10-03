@@ -8,4 +8,6 @@ object rules {
 
   def gt0[T: Numeric](x: T): Option[String]       = gtN(x, Numeric[T].zero)
   def gtN[T: Numeric](x: T, n: T): Option[String] = if (Numeric[T].gt(x, n)) none else s"$x should be > $n".some
+
+  def gtN[T: Numeric](x: T, n: T, nField: String): Option[String] = if (Numeric[T].gt(x, n)) none else s"$x should be > $nField: $n".some
 }

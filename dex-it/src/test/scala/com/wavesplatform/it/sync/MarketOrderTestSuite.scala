@@ -10,6 +10,7 @@ import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.model.AcceptedOrderType
 import com.wavesplatform.dex.settings.AssetType._
+import com.wavesplatform.dex.settings.FeeMode
 import com.wavesplatform.dex.settings.FeeMode._
 import com.wavesplatform.it.MatcherSuiteBase
 

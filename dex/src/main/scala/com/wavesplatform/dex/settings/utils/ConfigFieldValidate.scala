@@ -8,7 +8,7 @@ import shapeless.ops.record.Keys
 import shapeless.tag.Tagged
 import shapeless.{HList, LabelledGeneric}
 
-class ConfigValidate[ObjectT, FieldName] {
+class ConfigFieldValidate[ObjectT, FieldName] {
   def mk[L <: HList, KeyList <: HList](f: ObjectT => Option[String])(implicit
       ev: LabelledGeneric.Aux[ObjectT, L],
       ev2: Keys.Aux[L, KeyList],
@@ -17,9 +17,6 @@ class ConfigValidate[ObjectT, FieldName] {
     val keys: KeyList = Keys[ev.Repr].apply()
     val fieldName     = keys.select[Symbol with Tagged[FieldName]].name
 
-    { (obj: ObjectT, c: ConfigObjectCursor, hint: ProductHint[ObjectT]) =>
-      val action = hint.from(c, fieldName)
-      f(obj).map(RawFailureReason).map(action.cursor.failureFor)
-    }
+    (obj: ObjectT, c: ConfigObjectCursor, hint: ProductHint[ObjectT]) => f(obj).map(RawFailureReason).map(hint.from(c, fieldName).cursor.failureFor)
   }
 }

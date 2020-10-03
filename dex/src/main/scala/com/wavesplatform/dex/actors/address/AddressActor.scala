@@ -11,6 +11,7 @@ import cats.kernel.Group
 import cats.syntax.either._
 import cats.syntax.group.{catsSyntaxGroup, catsSyntaxSemigroup}
 import com.wavesplatform.dex.actors.SpendableBalancesActor
+import com.wavesplatform.dex.actors.address.AddressActor.Settings.default
 import com.wavesplatform.dex.actors.address.AddressActor._
 import com.wavesplatform.dex.actors.tx.CreateExchangeTransactionActor
 import com.wavesplatform.dex.api.http.entities.MatcherResponse
@@ -691,7 +692,11 @@ object AddressActor {
     case object ClosedOnly extends OrderListType(false, true)
   }
 
-  final case class Settings(wsMessagesInterval: FiniteDuration, batchCancelTimeout: FiniteDuration, maxActiveOrders: Int)
+  final case class Settings(
+      wsMessagesInterval: FiniteDuration = default.wsMessagesInterval,
+      batchCancelTimeout: FiniteDuration = default.batchCancelTimeout,
+      maxActiveOrders: Int = default.maxActiveOrders
+  )
 
   object Settings {
     val default: Settings = Settings(100.milliseconds, 20.seconds, 200)

@@ -39,9 +39,9 @@ object OrderFeeSettings extends ConfigCursorsOps {
 
     implicit val dynamicConfigReader = semiauto
       .deriveReader[DynamicSettings]
-      .validated(
-        validationOf[DynamicSettings, "baseMakerFee"].mk(x => rules.gt0(x.baseMakerFee)),
-        validationOf[DynamicSettings, "baseTakerFee"].mk(x => rules.gt0(x.baseTakerFee))
+      .validatedField(
+        validationOf.field[DynamicSettings, "baseMakerFee"].mk(x => rules.gt0(x.baseMakerFee)),
+        validationOf.field[DynamicSettings, "baseTakerFee"].mk(x => rules.gt0(x.baseTakerFee))
       )
   }
 
@@ -50,14 +50,14 @@ object OrderFeeSettings extends ConfigCursorsOps {
   object FixedSettings extends ConfigReaders {
     implicit val fixedConfigReader = semiauto
       .deriveReader[FixedSettings]
-      .validated(validationOf[FixedSettings, "minFee"].mk(x => rules.gtEq0(x.minFee)))
+      .validatedField(validationOf.field[FixedSettings, "minFee"].mk(x => rules.gtEq0(x.minFee)))
   }
 
   final case class PercentSettings(assetType: AssetType, minFee: Double) extends OrderFeeSettings
   object PercentSettings {
     implicit val percentConfigReader = semiauto
       .deriveReader[PercentSettings]
-      .validated(validationOf[PercentSettings, "minFee"].mk { x =>
+      .validatedField(validationOf.field[PercentSettings, "minFee"].mk { x =>
         if (0 < x.minFee && x.minFee <= 100) none else s"${x.minFee} ∈ (0; 100]".some
       })
   }

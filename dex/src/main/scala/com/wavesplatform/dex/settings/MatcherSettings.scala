@@ -107,16 +107,23 @@ object MatcherSettings extends ConfigCursorsOps with ConfigReaders {
 
   implicit val assetPairOrderRestrictionsConfigReader = genericMapReader[AssetPair, OrderRestrictionsSettings](assetPairKeyParser)
 
-  implicit val matchingRulesConfigReader = genericMapReader[AssetPair, NonEmptyList[DenormalizedMatchingRule]](
-    assetPairKeyParser
-  )(Derivation.Successful(nonEmptyListReader[DenormalizedMatchingRule])) // To solve IntelliJ IDEA issue
+  // TODO
+  implicit val denormalizedMatchingRuleConfigReader = nonEmptyListReader[DenormalizedMatchingRule].validatedList(
+    validationOf.list[NonEmptyList[DenormalizedMatchingRule]].mk { xs =>
+      val isStrictOrder = xs.tail.zip(xs.toList).forall { case (next, prev) => next.startOffset > prev.startOffset }
+      if (isStrictOrder) none
+      else s"Rules should be ordered by offset, but they are: ${xs.map(_.startOffset).toList.mkString(", ")}".some
+    }
+  )
 
-  val exchangeTxBaseFeeValidation = validationOf[MatcherSettings, "exchangeTxBaseFee"].mk { settings =>
+  implicit val matchingRulesConfigReader = genericMapReader[AssetPair, NonEmptyList[DenormalizedMatchingRule]](assetPairKeyParser)
+
+  val exchangeTxBaseFeeValidation = validationOf.field[MatcherSettings, "exchangeTxBaseFee"].mk { settings =>
     if (settings.exchangeTxBaseFee >= exchangeTransactionCreationFee) none
     else s"base fee must be >= $exchangeTransactionCreationFee".some
   }
 
-  val limitEventsDuringRecoveryValidation = validationOf[MatcherSettings, "limitEventsDuringRecovery"].mk { settings =>
+  val limitEventsDuringRecoveryValidation = validationOf.field[MatcherSettings, "limitEventsDuringRecovery"].mk { settings =>
     settings.limitEventsDuringRecovery match {
       case Some(value) if value < settings.snapshotsInterval =>
         s"$value should be >= snapshotsInterval: ${settings.snapshotsInterval}".some
@@ -126,7 +133,7 @@ object MatcherSettings extends ConfigCursorsOps with ConfigReaders {
 
   implicit val matcherSettingsConfigReader: ConfigReader[MatcherSettings] = semiauto
     .deriveReader[MatcherSettings]
-    .validated(
+    .validatedField(
       exchangeTxBaseFeeValidation,
       limitEventsDuringRecoveryValidation
     )

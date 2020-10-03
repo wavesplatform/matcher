@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.settings.utils
 
 object validationOf {
-  def apply[A, F]: ConfigValidate[A, F] = new ConfigValidate[A, F]
+  def field[A, F]: ConfigFieldValidate[A, F] = new ConfigFieldValidate[A, F]
+  def list[L]: ConfigListValidate[L]         = new ConfigListValidate[L]
 }

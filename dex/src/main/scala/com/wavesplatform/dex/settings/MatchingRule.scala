@@ -1,16 +1,22 @@
 package com.wavesplatform.dex.settings
 
 import cats.data.NonEmptyList
+import cats.implicits.{catsSyntaxOptionId, none}
 import cats.syntax.apply._
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.model.{Denormalization, Normalization}
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.queue.QueueEventWithMeta
-import com.wavesplatform.dex.settings.Implicits.nonEmptyListReader
-import com.wavesplatform.dex.settings.utils.ConfigSettingsValidator
+import com.wavesplatform.dex.settings.Implicits.{nonEmptyListReader => nelreader}
+import com.wavesplatform.dex.settings.utils.ConfigReaderOps.ConfigReaderMyOps
 import com.wavesplatform.dex.settings.utils.ConfigSettingsValidator.ErrorListOrOps
+import com.wavesplatform.dex.settings.utils.{ConfigSettingsValidator, validationOf}
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ValueReader
+import pureconfig.Derivation
+import pureconfig.module.cats.nonEmptyListReader
+import pureconfig.generic.auto._
+import pureconfig.generic.semiauto
 
 /** Normalized representation of the matching rule */
 case class MatchingRule(startOffset: QueueEventWithMeta.Offset, tickSize: Long) {
@@ -57,7 +63,8 @@ object DenormalizedMatchingRule extends ScorexLogging {
           else if (currOffset > x.startOffset) skipOutdated(currOffset, NonEmptyList(x, xs))
           else rules
         case _ => rules
-      } else rules
+      }
+    else rules
 
   private implicit val denormalizedMatchingRuleReader: ValueReader[DenormalizedMatchingRule] = { (cfg, path) =>
     val cfgValidator = ConfigSettingsValidator(cfg)
@@ -69,7 +76,7 @@ object DenormalizedMatchingRule extends ScorexLogging {
   }
 
   implicit val denormalizedMatchingRuleNelReader: ValueReader[NonEmptyList[DenormalizedMatchingRule]] =
-    nonEmptyListReader[DenormalizedMatchingRule].map { xs =>
+    nelreader[DenormalizedMatchingRule].map { xs =>
       val isStrictOrder = xs.tail.zip(xs.toList).forall { case (next, prev) => next.startOffset > prev.startOffset }
       if (isStrictOrder) xs
       else throw new IllegalArgumentException(s"Rules should be ordered by offset, but they are: ${xs.map(_.startOffset).toList.mkString(", ")}")
@@ -79,9 +86,11 @@ object DenormalizedMatchingRule extends ScorexLogging {
     * Returns denormalized (from application.conf) matching rules for the specified asset pair.
     * Prepends default rule if matching rules list doesn't contain element with startOffset = 0
     */
-  def getDenormalizedMatchingRules(settings: MatcherSettings,
-                                   assetDecimals: Asset => Int,
-                                   assetPair: AssetPair): NonEmptyList[DenormalizedMatchingRule] = {
+  def getDenormalizedMatchingRules(
+      settings: MatcherSettings,
+      assetDecimals: Asset => Int,
+      assetPair: AssetPair
+  ): NonEmptyList[DenormalizedMatchingRule] = {
     lazy val defaultRule = getDefaultRule(assetPair, assetDecimals)
     val rules            = settings.matchingRules.getOrElse(assetPair, NonEmptyList.one(defaultRule))
     if (rules.head.startOffset == 0) rules else defaultRule :: rules

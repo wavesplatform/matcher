@@ -1,4 +1,4 @@
--server
--Xss256m
--XX:MetaspaceSize=256m
--XX:MaxMetaspaceExpansion=0
+-J-server
+-J-Xss256m
+-J-XX:MetaspaceSize=256m
+-J-XX:MaxMetaspaceExpansion=0

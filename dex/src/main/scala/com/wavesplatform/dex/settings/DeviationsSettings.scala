@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.settings
 
-import com.wavesplatform.dex.settings.utils.ConfigReaderOps.ConfigReaderMyOps
+import com.wavesplatform.dex.settings.utils.ConfigReaderOps.Implicits
 import com.wavesplatform.dex.settings.utils.{rules, validationOf}
 import pureconfig.generic.semiauto
 
@@ -9,7 +9,6 @@ case class DeviationsSettings(enable: Boolean, profit: Double, loss: Double, fee
 // TODO: maxPriceProfit, maxPriceLoss, maxFeeDeviation
 
 object DeviationsSettings {
-
   implicit val deviationsConfigReader = semiauto
     .deriveReader[DeviationsSettings]
     .validatedField(

@@ -81,7 +81,7 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |    id = "matcher-1"
          |    account-storage {
          |      type = "in-mem"
-         |      in-mem.seed-in-base64 = "c3lrYWJsZXlhdA=="
+         |      in-mem.seed-in-base-64 = "c3lrYWJsZXlhdA=="
          |    }
          |    order-db {
          |      max-orders = 199

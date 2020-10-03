@@ -6,7 +6,7 @@ import pureconfig.generic.ProductHint
 import pureconfig.{ConfigCursor, ConfigListCursor, ConfigObjectCursor, ConfigReader}
 
 object ConfigReaderOps {
-  implicit final class ConfigReaderMyOps[T](val self: ConfigReader[T]) extends AnyVal {
+  implicit final class Implicits[T](val self: ConfigReader[T]) extends AnyVal {
     def validatedField(
         xs: (T, ConfigObjectCursor, ProductHint[T]) => Option[ConfigReaderFailure]*
     )(implicit productHint: ProductHint[T]): ConfigReader[T] = validated(_.asObjectCursor, xs)

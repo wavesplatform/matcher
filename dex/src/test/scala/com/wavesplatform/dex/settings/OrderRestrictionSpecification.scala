@@ -44,18 +44,28 @@ class OrderRestrictionSpecification extends BaseSettingsSpecification with Match
            | }
            |}
       """.stripMargin
-      for (s <- Array("min-amount", "max-amount", "step-amount", "min-price", "max-price", "step-price")) {
-        Array("0", "-5", "-100", "-1", "-0.11", "-512.123", "-100000000", "-1000000000000000").foreach(v =>
-          getSettingByConfig(configStr(testTemplate(s, v))) should
-            produce(s"Invalid setting order-restrictions value: Invalid setting order-restrictions.WAVES-BTC.$s value: $v (required 0 < value)"))
-        Array(-0.0001, -0.000000001, -0.0000000000000000000001, -15.345, -1234.1234152416346134).foreach(v =>
-          getSettingByConfig(configStr(testTemplate(s, v.toString))) should
-            produce(s"Invalid setting order-restrictions value: Invalid setting order-restrictions.WAVES-BTC.$s value: $v (required 0 < value)"))
+      Array("min-amount", "max-amount", "step-amount", "min-price", "max-price", "step-price").foreach { s =>
+        Array("0", "-5", "-100", "-1", "-0.11", "-512.123", "-100000000", "-1000000000000000").foreach { v =>
+          getSettingByConfig(configStr(testTemplate(s, v))) should produce(s"waves.dex.order-restrictions.WAVES-BTC.$s.+\n.+> 0.0".r)
+        }
+        Array(-0.0001, -0.000000001, -0.0000000000000000000001, -15.345, -1234.1234152416346134).foreach { v =>
+          getSettingByConfig(configStr(testTemplate(s, v.toString))) should produce(s"waves.dex.order-restrictions.WAVES-BTC.$s.+\n.+> 0.0".r)
+        }
       }
     }
 
-    val testMinMaxArray = Array("6" -> "3", "2" -> "1", "1.00001" -> "1", "1.0000001" -> "1", "1.000000000000001" -> "1",
-      "1" -> "0.9", "1" -> "0.99999", "1" -> "0.99999999999", "1000000000" -> "999999999", "100000000000" -> "1")
+    val testMinMaxArray = Array(
+      "6"                 -> "3",
+      "2"                 -> "1",
+      "1.00001"           -> "1",
+      "1.0000001"         -> "1",
+      "1.000000000000001" -> "1",
+      "1"                 -> "0.9",
+      "1"                 -> "0.99999",
+      "1"                 -> "0.99999999999",
+      "1000000000"        -> "999999999",
+      "100000000000"      -> "1"
+    )
     withClue("min-amount > max-amount") {
       def testTemplate(minAmount: String, maxAmount: String): String =
         s"""order-restrictions = {
@@ -67,7 +77,9 @@ class OrderRestrictionSpecification extends BaseSettingsSpecification with Match
       """.stripMargin
       for (v <- testMinMaxArray) {
         getSettingByConfig(configStr(testTemplate(v._1, v._2))) should
-          produce("Invalid setting order-restrictions value: Required order-restrictions.WAVES-BTC.min-amount < order-restrictions.WAVES-BTC.max-amount")
+          produce(
+            "Invalid setting order-restrictions value: Required order-restrictions.WAVES-BTC.min-amount < order-restrictions.WAVES-BTC.max-amount"
+          )
       }
     }
     withClue("min-price > max-price") {
@@ -81,7 +93,9 @@ class OrderRestrictionSpecification extends BaseSettingsSpecification with Match
       """.stripMargin
       for (v <- testMinMaxArray) {
         getSettingByConfig(configStr(testTemplate(v._1, v._2))) should
-          produce("Invalid setting order-restrictions value: Required order-restrictions.WAVES-BTC.min-price < order-restrictions.WAVES-BTC.max-price")
+          produce(
+            "Invalid setting order-restrictions value: Required order-restrictions.WAVES-BTC.min-price < order-restrictions.WAVES-BTC.max-price"
+          )
       }
     }
 
@@ -143,8 +157,6 @@ class OrderRestrictionSpecification extends BaseSettingsSpecification with Match
       )
     }
   }
-
-
 
   "Order restrictions" should "be validated" in {
 

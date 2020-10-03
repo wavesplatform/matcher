@@ -25,7 +25,7 @@ class WrappedDescendantHint[T](key: String = "type") extends CoproductHint[T] {
           )
     } yield Use(objCur.atKeyOrUndefined(valueStr), option)
 
-  // TODO test this
+  // HACK: Probably this wont work. We don't care because don't use this functionality
   override def to(value: ConfigValue, name: String): ConfigValue = value match {
     case co: ConfigObject if co.containsKey(key) => throw CoproductHintException(CollidingKeys(key, co.get(key)))
     case co: ConfigObject                        => Map(key -> fieldValue(name)).toConfig.withFallback(co.toConfig)

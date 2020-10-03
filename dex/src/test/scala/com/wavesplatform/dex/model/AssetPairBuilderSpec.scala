@@ -8,7 +8,7 @@ import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.OrderValidator.Result
-import com.wavesplatform.dex.settings.MatcherSettings
+import com.wavesplatform.dex.settings.{MatcherSettings, loadConfig}
 import com.wavesplatform.dex.test.matchers.ProduceError.produce
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.freespec.AnyFreeSpec
@@ -57,7 +57,7 @@ class AssetPairBuilderSpec extends AnyFreeSpec with Matchers with MockFactory {
        |  allowed-asset-pairs = [WAVES-${Asset3.id.toString}]
        |}""".stripMargin)
 
-  private val settings = ConfigSource.fromConfig(ConfigFactory.load()).at("waves.dex").loadOrThrow[MatcherSettings]
+  private val settings = ConfigSource.fromConfig(loadConfig(priceAssets)).at("waves.dex").loadOrThrow[MatcherSettings]
 
   private def mkBuilder(knownAssets: (IssuedAsset, Option[BriefAssetDescription])*): AssetPairBuilder = {
     val assetDescription =

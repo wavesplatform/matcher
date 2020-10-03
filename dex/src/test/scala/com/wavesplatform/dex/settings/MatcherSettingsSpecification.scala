@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.settings
 
 import cats.data.NonEmptyList
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.Config
 import com.wavesplatform.dex.actors.address.AddressActor
 import com.wavesplatform.dex.api.http.OrderBookHttpInfo
 import com.wavesplatform.dex.api.ws.actors.{WsExternalClientHandlerActor, WsHealthCheckSettings, WsInternalBroadcastActor, WsInternalClientHandlerActor}
@@ -154,16 +154,11 @@ baz"""
     val settingsInvalidProfit        = getSettingByConfig(configStr(invalidProfit))
     val settingsInvalidLossAndFee    = getSettingByConfig(configStr(invalidLossAndFee))
 
-    settingsInvalidEnable shouldBe Left("Invalid setting max-price-deviations.enable value: foobar")
-
-    settingsInvalidProfit shouldBe
-      Left("Invalid setting max-price-deviations.profit value: -1000000 (required 0 < percent)")
-
-    settingsInvalidLossAndFee shouldBe
-      Left(
-        "Invalid setting max-price-deviations.loss value: 0 (required 0 < percent), " +
-          "Invalid setting max-price-deviations.fee value: -1000000 (required 0 < percent)"
-      )
+    settingsInvalidEnable should produce("waves.dex.max-price-deviations.enable")
+    settingsInvalidProfit should produce("waves.dex.max-price-deviations.profit")
+    Seq("waves.dex.max-price-deviations.fee", "waves.dex.max-price-deviations.loss").foreach { message =>
+      settingsInvalidLossAndFee should produce(message)
+    }
   }
 
   "OrderFeeSettings in MatcherSettings" should "be validated" in {
@@ -189,7 +184,7 @@ baz"""
          |}
        """.stripMargin
 
-    val invalidAssetTypeAndPercent =
+    val invalidAssetType =
       s"""
          |order-fee {
          |  -1: {
@@ -210,7 +205,28 @@ baz"""
          |}
        """.stripMargin
 
-    val invalidAssetAndFee =
+    val invalidPercent =
+      s"""
+         |order-fee {
+         |  -1: {
+         |    mode = percent
+         |    dynamic {
+         |      base-maker-fee = 300000
+         |      base-taker-fee = 300000
+         |    }
+         |    fixed {
+         |      asset = WAVES
+         |      min-fee = 300000
+         |    }
+         |    percent {
+         |      asset-type = spending
+         |      min-fee = 121.2
+         |    }
+         |  }
+         |}
+       """.stripMargin
+
+    val invalidAsset =
       s"""
          |order-fee {
          |  -1: {
@@ -221,6 +237,27 @@ baz"""
          |    }
          |    fixed {
          |      asset = ;;;;
+         |      min-fee = -300000
+         |    }
+         |    percent {
+         |      asset-type = test
+         |      min-fee = 50
+         |    }
+         |  }
+         |}
+       """.stripMargin
+
+    val invalidFee =
+      s"""
+         |order-fee {
+         |  -1: {
+         |    mode = fixed
+         |    dynamic {
+         |      base-maker-fee = 300000
+         |      base-taker-fee = 300000
+         |    }
+         |    fixed {
+         |      asset = DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J
          |      min-fee = -300000
          |    }
          |    percent {
@@ -252,32 +289,15 @@ baz"""
          |}
        """.stripMargin
 
-    def configStr(x: String): Config    = configWithSettings(orderFeeStr = x)
-    val settingsInvalidMode             = getSettingByConfig(configStr(invalidMode()))
-    val settingsDeprecatedNameMode      = getSettingByConfig(configStr(invalidMode("waves")))
-    val settingsInvalidTypeAndPercent   = getSettingByConfig(configStr(invalidAssetTypeAndPercent))
-    val settingsInvalidAssetAndFee      = getSettingByConfig(configStr(invalidAssetAndFee))
-    val settingsInvalidFeeInDynamicMode = getSettingByConfig(configStr(invalidFeeInDynamicMode))
+    def configStr(x: String): Config = configWithSettings(orderFeeStr = x)
 
-    settingsInvalidMode shouldBe Left("Invalid setting order-fee value: Invalid setting order-fee.-1.mode value: invalid")
-
-    settingsDeprecatedNameMode shouldBe Left("Invalid setting order-fee value: Invalid setting order-fee.-1.mode value: waves")
-
-    settingsInvalidTypeAndPercent shouldBe
-      Left(
-        "Invalid setting order-fee value: Invalid setting order-fee.-1.percent.asset-type value: test, " +
-          "Invalid setting order-fee.-1.percent.min-fee value: 121.2 (required 0 < percent <= 100)"
-      )
-
-    settingsInvalidAssetAndFee shouldBe
-      Left(
-        "Invalid setting order-fee value: Invalid setting order-fee.-1.fixed.asset value: ;;;;, " +
-          "Invalid setting order-fee.-1.fixed.min-fee value: -300000 (required 0 < fee)"
-      )
-
-    settingsInvalidFeeInDynamicMode shouldBe Left(
-      s"Invalid setting order-fee value: Invalid setting order-fee.-1.dynamic.base-maker-fee value: -350000 (required 0 < base maker fee)"
-    )
+    getSettingByConfig(configStr(invalidMode())) should produce("waves.dex.order-fee.-1.mode.+\n.+invalid".r)
+    getSettingByConfig(configStr(invalidMode("waves"))) should produce("waves.dex.order-fee.-1.mode.+\n.+waves".r)
+    getSettingByConfig(configStr(invalidAssetType)) should produce("waves.dex.order-fee.-1.percent.asset-type.+\n.+test".r)
+    getSettingByConfig(configStr(invalidPercent)) should produce("order-fee.-1.percent.min-fee")
+    getSettingByConfig(configStr(invalidAsset)) should produce("order-fee.-1.fixed.asset.+\n.+;".r)
+    getSettingByConfig(configStr(invalidFee)) should produce("order-fee.-1.fixed.min-fee")
+    getSettingByConfig(configStr(invalidFeeInDynamicMode)) should produce("order-fee.-1.dynamic.base-maker-fee")
   }
 
   "Allowed asset pairs in MatcherSettings" should "be validated" in {
@@ -316,11 +336,14 @@ baz"""
       """.stripMargin
 
     getSettingByConfig(configStr(incorrectAssetsCount)) should produce(
-      "Invalid setting allowed-asset-pairs value: WAVES-BTC-ETH (incorrect assets count, expected 2 but got 3), ETH (incorrect assets count, expected 2 but got 1)"
+      """waves.dex.allowed-asset-pairs.1.+
+.+WAVES-BTC-ETH.+incorrect assets count, expected 2 but got 3.+
+.+waves.dex.allowed-asset-pairs.2.+
+.+ETH.+incorrect assets count, expected 2 but got 1""".r
     )
 
     getSettingByConfig(configStr(incorrectAssets)) should produce(
-      "Invalid setting allowed-asset-pairs value: WAVES-;;; (requirement failed: Wrong char ';' in Base58 string ';;;')"
+      "waves.dex.allowed-asset-pairs.0.+\n.+WAVES-;;;.+requirement failed: Wrong char ';' in Base58 string ';;;'".r
     )
 
     getSettingByConfig(configStr(duplicates)).explicitGet().allowedAssetPairs.size shouldBe 2
@@ -413,14 +436,16 @@ baz"""
 
     withClue("incorrect pair and step amount") {
       getSettingByConfig(configStr(incorrectPairAndStepAmount)) should produce(
-        "Invalid setting order-restrictions value: Can't parse asset pair 'ETH-;;;', " +
-          "Invalid setting order-restrictions.WAVES-BTC.step-amount value: -0.013 (required 0 < value)"
+        """waves.dex.order-restrictions.+
+.+ETH-;;;.+requirement failed.+
+.+waves.dex.order-restrictions.WAVES-BTC.step-amount.+
+.+-0.013 should be > 0.0""".r
       )
     }
 
     withClue("incorrect min and max") {
       getSettingByConfig(configStr(incorrectMinAndMax)) should produce(
-        "Required order-restrictions.WAVES-BTC.min-price < order-restrictions.WAVES-BTC.max-price"
+        "waves.dex.order-restrictions.WAVES-BTC.max-price.+\n.+ > minPrice.+".r
       )
     }
   }
@@ -476,13 +501,13 @@ baz"""
 
     withClue("incorrect rules order: 100, 100") {
       getSettingByConfig(configStr(incorrectRulesOrder(100, 100))) should produce(
-        "Invalid setting matching-rules value: Rules should be ordered by offset, but they are: 100, 100"
+        "waves.dex.matching-rules.WAVES-8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS.+\n.+but they are: 100, 100".r
       )
     }
 
     withClue("incorrect rules order: 100, 88") {
       getSettingByConfig(configStr(incorrectRulesOrder(100, 88))) should produce(
-        "Invalid setting matching-rules value: Rules should be ordered by offset, but they are: 100, 88"
+        "waves.dex.matching-rules.WAVES-8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS.+\n.+but they are: 100, 88".r
       )
     }
   }
@@ -493,13 +518,15 @@ baz"""
       s"""
          | subscriptions {
          |   max-order-book-number = 0
-         |   max-address-number = 1
+         |   max-address-number = 0
          | }
          """.stripMargin
 
     getSettingByConfig(configWithSettings(subscriptionsSettings = invalidSubscriptionsSettings)) should produce(
-      "Invalid setting web-sockets.external-client-handler.subscriptions.max-order-book-number value: 0 (max order book number should be > 1), " +
-        "Invalid setting web-sockets.external-client-handler.subscriptions.max-address-number value: 1 (max address number should be > 1)"
+      """waves.dex.web-sockets.external-client-handler.subscriptions.max-address-number.+
+.+should be > 0
+.+waves.dex.web-sockets.external-client-handler.subscriptions.max-order-book-number.+
+.+should be > 0""".r
     )
   }
 }

@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.settings
 
 import com.wavesplatform.dex.settings.OrderRestrictionsSettings.Default
-import com.wavesplatform.dex.settings.utils.ConfigReaderOps.ConfigReaderMyOps
+import com.wavesplatform.dex.settings.utils.ConfigReaderOps.Implicits
 import com.wavesplatform.dex.settings.utils.{rules, validationOf}
 import pureconfig.generic.semiauto
 

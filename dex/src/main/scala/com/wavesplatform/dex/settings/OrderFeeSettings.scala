@@ -2,10 +2,8 @@ package com.wavesplatform.dex.settings
 
 import cats.implicits.{catsSyntaxOptionId, none}
 import com.wavesplatform.dex.domain.asset.Asset
-import com.wavesplatform.dex.settings.utils.ConfigReaderOps.ConfigReaderMyOps
+import com.wavesplatform.dex.settings.utils.ConfigReaderOps.Implicits
 import com.wavesplatform.dex.settings.utils._
-import enumeratum._
-import pureconfig.ConfigReader
 import pureconfig.generic.auto._
 import pureconfig.generic.semiauto
 
@@ -51,16 +49,4 @@ object OrderFeeSettings {
     override protected def fieldValue(name: String): String = name.dropRight("Settings".length).toLowerCase
   }
 
-}
-
-sealed trait AssetType extends EnumEntry
-object AssetType extends Enum[AssetType] with PlayLowercaseJsonEnum[AssetType] {
-  override val values = findValues
-
-  case object Amount    extends AssetType
-  case object Price     extends AssetType
-  case object Spending  extends AssetType
-  case object Receiving extends AssetType
-
-  implicit val assetTypeConfigReader = ConfigReader.fromStringOpt(lowerCaseNamesToValuesMap.get)
 }

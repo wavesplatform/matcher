@@ -55,7 +55,7 @@ import kamon.Kamon
 import kamon.influxdb.InfluxDBReporter
 import mouse.any.anySyntaxMouse
 import org.slf4j.LoggerFactory
-import pureconfig.{ConfigObjectSource, ConfigSource}
+import pureconfig.ConfigSource
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._

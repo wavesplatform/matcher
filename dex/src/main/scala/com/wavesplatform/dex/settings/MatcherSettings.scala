@@ -11,7 +11,7 @@ import com.wavesplatform.dex.db.{AccountStorage, OrderDB}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.grpc.integration.settings.WavesBlockchainClientSettings
 import com.wavesplatform.dex.model.OrderValidator.exchangeTransactionCreationFee
-import com.wavesplatform.dex.settings.utils.ConfigReaderOps.ConfigReaderMyOps
+import com.wavesplatform.dex.settings.utils.ConfigReaderOps.Implicits
 import com.wavesplatform.dex.settings.utils.{ConfigReaders, RawFailureReason, validationOf}
 import pureconfig.ConfigReader
 import pureconfig.configurable.genericMapReader
@@ -86,7 +86,7 @@ object MatcherSettings extends ConfigReaders {
 
   implicit val assetPairOrderRestrictionsConfigReader = genericMapReader[AssetPair, OrderRestrictionsSettings](assetPairKeyParser)
 
-  // TODO
+  // TODO Create a case class for this
   implicit val denormalizedMatchingRuleConfigReader = nonEmptyListReader[DenormalizedMatchingRule].validatedList(
     validationOf.list[NonEmptyList[DenormalizedMatchingRule]].mk { xs =>
       val isStrictOrder = xs.tail.zip(xs.toList).forall { case (next, prev) => next.startOffset > prev.startOffset }

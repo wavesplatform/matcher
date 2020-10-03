@@ -1,0 +1,4 @@
+-server
+-Xss256m
+-XX:MetaspaceSize=256m
+-XX:MaxMetaspaceExpansion=0

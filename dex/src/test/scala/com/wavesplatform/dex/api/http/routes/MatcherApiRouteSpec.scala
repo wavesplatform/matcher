@@ -1334,6 +1334,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
           Set.empty
         ),
         matcherPublicKey = matcherKeyPair.publicKey,
+        config = ConfigFactory.load(),
         matcher = matcherActor.ref,
         addressActor = addressActor.ref,
         storeEvent = {

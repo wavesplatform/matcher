@@ -11,6 +11,7 @@ import akka.stream.Materializer
 import akka.util.Timeout
 import cats.syntax.option._
 import com.google.common.primitives.Longs
+import com.typesafe.config.{Config, ConfigObject, ConfigRenderOptions, ConfigValue, ConfigValueType}
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.actors.MatcherActor._
 import com.wavesplatform.dex.actors.address.AddressActor.OrderListType
@@ -43,6 +44,8 @@ import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.MatcherQueue.StoreEvent
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
+import com.wavesplatform.dex.settings.utils.ConfigOps
+import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
 import com.wavesplatform.dex.settings.{MatcherSettings, OrderFeeSettings}
 import io.swagger.annotations._
 import javax.ws.rs.Path
@@ -58,6 +61,7 @@ import scala.util.Success
 class MatcherApiRoute(
     assetPairBuilder: AssetPairBuilder,
     matcherPublicKey: PublicKey,
+    config: Config,
     matcher: ActorRef,
     addressActor: ActorRef,
     storeEvent: StoreEvent,
@@ -123,7 +127,7 @@ class MatcherApiRoute(
   private val transactionsRoutes: Route = pathPrefix("transactions") { protect(getTransactionsByOrder) }
 
   private val debugRoutes: Route = pathPrefix("debug") {
-    getCurrentOffset ~ getLastOffset ~ getOldestSnapshotOffset ~ getAllSnapshotOffsets ~ protect(saveSnapshots)
+    getConfig ~ getCurrentOffset ~ getLastOffset ~ getOldestSnapshotOffset ~ getAllSnapshotOffsets ~ protect(saveSnapshots)
   }
 
   private val orderBookRoutes: Route = pathPrefix("orderbook") {
@@ -1031,6 +1035,54 @@ class MatcherApiRoute(
   )
   def getTransactionsByOrder: Route = (path(ByteStrPM) & get) { orderId =>
     complete { Json.toJson(orderDb.transactionsByOrder(orderId)) }
+  }
+
+  @Path("/debug/config")
+  @ApiOperation(
+    value = "Returns current matcher's configuration",
+    httpMethod = "GET",
+    authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
+    tags = Array("debug"),
+    response = classOf[SimpleResponse]
+  )
+  def getConfig: Route = (path("config") & get & withAuth)  {
+    complete {
+
+      var outputConfig = config.getObject("waves").toConfig
+
+      def pathShouldNotBeDeleted(path: String): Boolean = ("(user|pass|seed|private)".r findFirstIn path).isEmpty
+
+      def modifyConfig(path: String, config: Config): Unit = {
+        val itr = config.root().entrySet().iterator()
+
+        while(itr.hasNext()){
+
+          val key = itr.next().getKey
+          val valueType = config.root().get(key).valueType()
+          val absolutePath = if(path.length > 0) s"$path.$key" else key
+
+          valueType match {
+            case ConfigValueType.OBJECT => {
+              if(pathShouldNotBeDeleted(absolutePath)) {
+                if(config.getObject(key).size() == 0) {
+                  outputConfig = outputConfig.withoutPath(absolutePath)
+                } else {
+                  modifyConfig(absolutePath, config.getObject(key).toConfig)
+                }
+              }
+            }
+            case _ => if(!pathShouldNotBeDeleted(absolutePath)) outputConfig = outputConfig.withoutPath(absolutePath)
+          }
+        }
+      }
+
+      modifyConfig("", outputConfig)
+
+      SimpleResponse(
+        StatusCodes.OK,
+        new ConfigOps(outputConfig).rendered,
+      )
+    }
   }
 
   @Path("/debug/currentOffset")

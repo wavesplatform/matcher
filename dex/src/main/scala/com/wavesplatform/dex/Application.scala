@@ -63,7 +63,7 @@ import scala.concurrent.{Future, Promise, blocking}
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
-class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) extends ScorexLogging {
+class Application(settings: MatcherSettings, config: Config)(implicit val actorSystem: ActorSystem) extends ScorexLogging {
 
   private val monixScheduler       = monix.execution.Scheduler.Implicits.global
   private val grpcExecutionContext = actorSystem.dispatchers.lookup("akka.actor.grpc-dispatcher")
@@ -278,6 +278,7 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
     new MatcherApiRoute(
       pairBuilder,
       matcherPublicKey,
+      config,
       matcherActorRef,
       addressDirectoryRef,
       matcherQueue.storeEvent,
@@ -555,7 +556,7 @@ object Application {
         Future { blocking(loggerContext.stop()); Done }
       }
 
-      new Application(settings)
+      new Application(settings, config)
     }
   }
 

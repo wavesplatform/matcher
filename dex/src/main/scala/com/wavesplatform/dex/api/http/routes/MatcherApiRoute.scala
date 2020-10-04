@@ -1058,10 +1058,9 @@ class MatcherApiRoute(
         while(itr.hasNext()){
 
           val key = itr.next().getKey
-          val valueType = config.root().get(key).valueType()
           val absolutePath = if(path.length > 0) s"$path.$key" else key
 
-          valueType match {
+          config.root().get(key).valueType() match {
             case ConfigValueType.OBJECT => {
               if(pathShouldNotBeDeleted(absolutePath)) {
                 if(config.getObject(key).size() == 0) {

@@ -2,7 +2,8 @@ package com.wavesplatform.dex.api.http.routes
 
 import akka.actor.{ActorRef, typed}
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
-import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.model.HttpHeader.ParsingResult
+import akka.http.scaladsl.model.{HttpHeader, HttpResponse, StatusCodes}
 import akka.http.scaladsl.server
 import akka.http.scaladsl.server._
 import akka.http.scaladsl.server.directives.FutureDirectives
@@ -11,7 +12,7 @@ import akka.stream.Materializer
 import akka.util.Timeout
 import cats.syntax.option._
 import com.google.common.primitives.Longs
-import com.typesafe.config.{Config, ConfigObject, ConfigRenderOptions, ConfigValue, ConfigValueType}
+import com.typesafe.config.{Config, ConfigValueType}
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.actors.MatcherActor._
 import com.wavesplatform.dex.actors.address.AddressActor.OrderListType
@@ -44,7 +45,6 @@ import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.MatcherQueue.StoreEvent
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
-import com.wavesplatform.dex.settings.utils.ConfigOps
 import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
 import com.wavesplatform.dex.settings.{MatcherSettings, OrderFeeSettings}
 import io.swagger.annotations._
@@ -1043,7 +1043,7 @@ class MatcherApiRoute(
     httpMethod = "GET",
     authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
     tags = Array("debug"),
-    response = classOf[SimpleResponse]
+    response = classOf[HttpResponse]
   )
   def getConfig: Route = (path("config") & get & withAuth)  {
     complete {
@@ -1077,10 +1077,12 @@ class MatcherApiRoute(
 
       modifyConfig("", outputConfig)
 
-      SimpleResponse(
-        StatusCodes.OK,
-        new ConfigOps(outputConfig).rendered,
-      )
+      val header = HttpHeader.parse("Content-Type", "application/hocon")  match {
+        case ParsingResult.Ok(header, _) => header
+        case ParsingResult.Error(error)  => throw new Exception(s"Unable to convert to HttpHeader: ${error.summary}")
+      }
+
+      HttpResponse(entity = new ConfigOps(outputConfig).rendered, headers = Seq(header))
     }
   }
 

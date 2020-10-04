@@ -277,6 +277,17 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     )
   }
 
+  // getConfig
+  routePath("/debug/config") - {
+    "X-Api-Key is required" in test(
+      { route =>
+        Get(routePath("/debug/config")) ~> route ~> check {
+          status shouldEqual StatusCodes.Forbidden
+        }
+      }
+    )
+  }
+
   // getOrderBook
   routePath("/orderbook/{amountAsset}/{priceAsset}") - {
     "returns an order book" in test(

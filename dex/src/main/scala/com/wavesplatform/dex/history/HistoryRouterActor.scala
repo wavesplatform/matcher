@@ -145,7 +145,7 @@ class HistoryRouterActor(assetDecimals: Asset => Int, postgresConnection: Postgr
   private def denormalizePrice(value: Long, pair: AssetPair): BigDecimal =
     Denormalization.denormalizePrice(value, assetDecimals(pair.amountAsset), assetDecimals(pair.priceAsset))
 
-  override def connectionConfig: Config = postgresConnection.getConfig
+  override def connectionConfig: Config = postgresConnection.getQuillContextConfig
 
   private val ordersHistory: ActorRef = context.actorOf(
     Props(

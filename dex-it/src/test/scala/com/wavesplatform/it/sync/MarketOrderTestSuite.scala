@@ -9,10 +9,8 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.model.AcceptedOrderType
-import com.wavesplatform.dex.settings.AssetType._
-import com.wavesplatform.dex.settings.FeeMode
-import com.wavesplatform.dex.settings.FeeMode._
 import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.sync.MarketOrderTestSuite.FeeMode
 
 import scala.concurrent.duration.DurationInt
 
@@ -35,15 +33,15 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
        |  price-assets = [ "$UsdId", "WAVES", "$EthId", "$BtcId", "$WctId" ]
        |  allowed-order-versions = [1, 2, 3]
        |  order-fee.-1 {
-       |    mode = $Percent
-       |    $Dynamic {
+       |    mode = percent
+       |    dynamic {
        |      base-fee = 300000
        |    }
-       |    $Percent {
-       |      asset-type = $Amount
+       |    percent {
+       |      asset-type = amount
        |      min-fee = $percentFee
        |    }
-       |    $Fixed {
+       |    fixed {
        |      asset =  WAVES
        |      min-fee = 300000
        |    }
@@ -65,13 +63,12 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
     dex1.api.cancelAll(bob)
   }
 
-  def placeOrders(sender: KeyPair, pair: AssetPair, orderType: OrderType, feeMode: FeeMode = Fixed)(orders: (Long, Long)*): Seq[Order] = {
+  def placeOrders(sender: KeyPair, pair: AssetPair, orderType: OrderType, feeMode: FeeMode = FeeMode.Fixed)(orders: (Long, Long)*): Seq[Order] = {
     val now = System.currentTimeMillis
-    orders.zipWithIndex.map {
-      case ((amount, price), idx) =>
-        val o = mkOrder(sender, pair, orderType, amount, price, version = 3: Byte, matcherFee = getFee(feeMode), ts = now + idx)
-        dex1.api.place(o)
-        o
+    orders.zipWithIndex.map { case ((amount, price), idx) =>
+      val o = mkOrder(sender, pair, orderType, amount, price, version = 3: Byte, matcherFee = getFee(feeMode), ts = now + idx)
+      dex1.api.place(o)
+      o
     }
   }
 
@@ -82,14 +79,13 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
   }
 
   def getFee(feeMode: FeeMode): Long = feeMode match {
-    case Percent => percentFee.waves
-    case Fixed   => fixedFee
-    case _       => 0L
+    case FeeMode.Percent => percentFee.waves
+    case FeeMode.Fixed   => fixedFee
   }
 
   def calculateFeeValue(amount: Long, feeMode: FeeMode): Long = feeMode match {
-    case Percent => amount / 100 * percentFee
-    case Fixed   => fixedFee
+    case FeeMode.Percent => amount / 100 * percentFee
+    case FeeMode.Fixed   => fixedFee
   }
 
   "Processing market orders" - {
@@ -103,12 +99,12 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
       var account2: KeyPair = null
 
       if (orderType == SELL) {
-        account1 = mkAccountWithBalance(200.usd         -> usd, fee -> Waves)
+        account1 = mkAccountWithBalance(200.usd -> usd, fee -> Waves)
         account2 = mkAccountWithBalance(200.waves + fee -> Waves)
         placeOrders(account1, wavesUsdPair, BUY, feeMode)(amount -> price)
       } else {
         account1 = mkAccountWithBalance(200.waves + fee -> Waves)
-        account2 = mkAccountWithBalance(200.usd         -> usd, fee -> Waves)
+        account2 = mkAccountWithBalance(200.usd -> usd, fee -> Waves)
         placeOrders(account1, wavesUsdPair, SELL, feeMode)(amount -> price)
       }
 
@@ -139,24 +135,24 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
     "percent fee mode" - {
 
       "processing market order (SELL)" in {
-        testFilledMarketOrder(SELL, Percent)
+        testFilledMarketOrder(SELL, FeeMode.Percent)
       }
 
       "processing market order (BUY)" in {
-        testFilledMarketOrder(BUY, Percent)
+        testFilledMarketOrder(BUY, FeeMode.Percent)
       }
     }
 
     "fixed fee mode" - {
 
       "processing market order (SELL)" in {
-        dex1.restartWithNewSuiteConfig(ConfigFactory.parseString(s"waves.dex.order-fee.-1.mode = $Fixed").withFallback(dexInitialSuiteConfig))
+        dex1.restartWithNewSuiteConfig(ConfigFactory.parseString(s"waves.dex.order-fee.-1.mode = fixed").withFallback(dexInitialSuiteConfig))
 
-        testFilledMarketOrder(SELL, Fixed)
+        testFilledMarketOrder(SELL, FeeMode.Fixed)
       }
 
       "processing market order (BUY)" in {
-        testFilledMarketOrder(BUY, Fixed)
+        testFilledMarketOrder(BUY, FeeMode.Fixed)
       }
     }
 
@@ -168,7 +164,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
       placeOrders(alice, wavesUsdPair, SELL)(
         50.waves -> 0.33.usd,
         10.waves -> bestPrice,
-        25.waves -> 0.35.usd,
+        25.waves -> 0.35.usd
       )
 
       val marketOrder = mkOrder(bob, wavesUsdPair, BUY, amount, marketPrice, fixedFee)
@@ -194,7 +190,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
       placeOrders(alice, wavesUsdPair, BUY)(
         10.waves -> bestPrice,
         50.waves -> 0.78.usd,
-        25.waves -> secondPrice,
+        25.waves -> secondPrice
       )
 
       val marketOrder = mkOrder(bob, wavesUsdPair, SELL, amount, marketPrice, fixedFee)
@@ -222,7 +218,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
       placeOrders(alice, wavesUsdPair, SELL)(
         30.waves -> 0.3.usd,
         40.waves -> 0.4.usd,
-        50.waves -> 0.5.usd,
+        50.waves -> 0.5.usd
       )
 
       val marketOrder = mkOrder(bob, wavesUsdPair, BUY, marketOrderAmount, marketPrice, fixedFee)
@@ -240,7 +236,8 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
       }
 
       wavesNode1.api.balance(bob, usd) should be(
-        bobUBefore - 0.3.usd * 30.waves / 1.waves - 0.4.usd * 40.waves / 1.waves - 0.5.usd * 50.waves / 1.waves)
+        bobUBefore - 0.3.usd * 30.waves / 1.waves - 0.4.usd * 40.waves / 1.waves - 0.5.usd * 50.waves / 1.waves
+      )
     }
 
     "should be removed from order book when the restriction by tokens count has been reached (SELL)" in {
@@ -248,13 +245,13 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
       val marketOrderAmount = 72.waves
       val ordersAmount      = 36.waves
 
-      val buyer  = mkAccountWithBalance(100.usd      -> usd, 3 * fixedFee -> Waves)
+      val buyer  = mkAccountWithBalance(100.usd -> usd, 3 * fixedFee -> Waves)
       val seller = mkAccountWithBalance(ordersAmount + fixedFee -> Waves)
 
       placeOrders(buyer, wavesUsdPair, BUY)(
         12.waves -> 0.2.usd,
         12.waves -> 0.3.usd,
-        12.waves -> 0.4.usd,
+        12.waves -> 0.4.usd
       )
 
       val marketOrder = mkOrder(seller, wavesUsdPair, SELL, marketOrderAmount, marketPrice, fixedFee)
@@ -301,7 +298,8 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
       waitForOrderAtNode(marketOrder)
       eventually {
         wavesNode1.api.balance(account, Waves) should be(
-          accountBalanceWBefore + marketOrderAmount - anotherOrderAmount - fixedFee * (marketOrderAmount - anotherOrderAmount) / marketOrderAmount)
+          accountBalanceWBefore + marketOrderAmount - anotherOrderAmount - fixedFee * (marketOrderAmount - anotherOrderAmount) / marketOrderAmount
+        )
       }
     }
 
@@ -316,7 +314,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
         15.waves  -> 0.3.usd,
         30.waves  -> 0.4.usd,
         100.waves -> 0.5.usd,
-        150.waves -> 2.usd,
+        150.waves -> 2.usd
       )
 
       val marketOrder = mkOrder(account, wavesUsdPair, BUY, marketOrderAmount, marketOrderPrice, fixedFee)
@@ -354,7 +352,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
       placeOrders(alice, wavesUsdPair, SELL)(
         1.waves -> 1.usd,
         1.waves -> 2.usd,
-        1.waves -> 3.usd,
+        1.waves -> 3.usd
       )
 
       dex1.api.tryPlaceMarket(mkOrder(bob, wavesUsdPair, BUY, 3.waves, 2.usd, fixedFee)) should failWith(
@@ -392,7 +390,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
     "should be rejected if user has enough balance to fill market order, but has not enough balance to pay fee in another asset" in {
       dex1.restartWithNewSuiteConfig(
         ConfigFactory
-          .parseString(s"waves.dex.order-fee.-1.fixed.asset = $BtcId\nwaves.dex.order-fee.-1.mode = $Fixed")
+          .parseString(s"waves.dex.order-fee.-1.fixed.asset = $BtcId\nwaves.dex.order-fee.-1.mode = fixed")
           .withFallback(dexInitialSuiteConfig)
       )
 
@@ -405,13 +403,14 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
       placeAndAwaitAtDex { mkOrder(bob, wavesUsdPair, SELL, amount, price, fixedFee, feeAsset = btc, version = 3) }
 
       dex1.api.tryPlaceMarket(mkOrder(account, wavesUsdPair, BUY, amount, price, fixedFee, feeAsset = btc)) should failWithBalanceNotEnough(
-        required = Map(btc -> fixedFee, usd -> 0.01.usd))
+        required = Map(btc -> fixedFee, usd -> 0.01.usd)
+      )
     }
   }
 
   "Market order creation is possible when spenadable balance is equal to reservable" in {
 
-    dex1.restartWithNewSuiteConfig(ConfigFactory.parseString(s"waves.dex.order-fee.-1.mode = $Dynamic").withFallback(dexInitialSuiteConfig))
+    dex1.restartWithNewSuiteConfig(ConfigFactory.parseString(s"waves.dex.order-fee.-1.mode = dynamic").withFallback(dexInitialSuiteConfig))
 
     val carol = KeyPair("carol".getBytes)
 
@@ -429,7 +428,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
 
   "Market order should be executed even if sender balance isn't enough to cover order value" in {
 
-    dex1.restartWithNewSuiteConfig(ConfigFactory.parseString(s"waves.dex.order-fee.-1.mode = $Dynamic") withFallback dexInitialSuiteConfig)
+    dex1.restartWithNewSuiteConfig(ConfigFactory.parseString(s"waves.dex.order-fee.-1.mode = dynamic") withFallback dexInitialSuiteConfig)
 
     val carol = mkAccountWithBalance(300.usd -> usd, 5.waves -> Waves)
 
@@ -438,5 +437,13 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
 
     wavesNode1.api.balance(carol, Waves) shouldBe 604.9982.waves
     wavesNode1.api.balance(carol, usd) shouldBe 0
+  }
+}
+
+object MarketOrderTestSuite {
+  sealed trait FeeMode extends Product with Serializable
+  object FeeMode {
+    case object Percent extends FeeMode
+    case object Fixed   extends FeeMode
   }
 }

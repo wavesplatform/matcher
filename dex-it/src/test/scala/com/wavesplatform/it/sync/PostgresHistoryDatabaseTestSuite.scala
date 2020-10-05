@@ -17,10 +17,10 @@ import com.wavesplatform.dex.history.HistoryRouterActor._
 import com.wavesplatform.dex.model.Events
 import com.wavesplatform.dex.model.Events.{EventReason, OrderCanceledReason, OrderExecutedReason}
 import com.wavesplatform.dex.settings.PostgresConnection
-import com.wavesplatform.dex.settings.PostgresConnection._
 import com.wavesplatform.it.MatcherSuiteBase
-import net.ceedubs.ficus.Ficus._
 import org.scalatest.concurrent.PatienceConfiguration.{Interval, Timeout}
+import pureconfig.ConfigSource
+import pureconfig.generic.auto._
 
 import scala.concurrent.duration.DurationInt
 import scala.io.Source
@@ -28,11 +28,11 @@ import scala.util.Try
 
 class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgresJdbcContext {
 
-  override def connectionConfig: Config =
-    ConfigFactory
-      .parseString(getPostgresConnectionCfgString("localhost", postgres mappedPort postgresContainerPort))
-      .as[PostgresConnection]("postgres")
-      .getConfig
+  override def connectionConfig: Config = ConfigSource
+    .string(getPostgresConnectionCfgString("localhost", postgres mappedPort postgresContainerPort))
+    .at("postgres")
+    .loadOrThrow[PostgresConnection]
+    .getQuillContextConfig
 
   private val customDB: String       = "user_db"
   private val customUser: String     = "user"
@@ -124,29 +124,33 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
   }
 
   import ctx._
-  private def getOrdersCount: Long = ctx.run(querySchema[OrderRecord]("orders", _.id      -> "id").size)
+  private def getOrdersCount: Long = ctx.run(querySchema[OrderRecord]("orders", _.id -> "id").size)
   private def getEventsCount: Long = ctx.run(querySchema[EventRecord]("events", _.orderId -> "order_id").size)
 
-  private case class OrderBriefInfo(id: String,
-                                    tpe: Byte,
-                                    senderPublicKey: String,
-                                    side: Byte,
-                                    amountAsset: String,
-                                    priceAsset: String,
-                                    feeAsset: String,
-                                    amount: Double,
-                                    price: Double,
-                                    fee: Double,
-                                    closedAt: Option[LocalDateTime])
+  private case class OrderBriefInfo(
+      id: String,
+      tpe: Byte,
+      senderPublicKey: String,
+      side: Byte,
+      amountAsset: String,
+      priceAsset: String,
+      feeAsset: String,
+      amount: Double,
+      price: Double,
+      fee: Double,
+      closedAt: Option[LocalDateTime]
+  )
 
-  private case class EventBriefInfo(orderId: String,
-                                    eventType: Byte,
-                                    filled: Double,
-                                    totalFilled: Double,
-                                    feeFilled: Double,
-                                    feeTotalFilled: Double,
-                                    status: Byte,
-                                    reason: EventReason = Events.NotTracked)
+  private case class EventBriefInfo(
+      orderId: String,
+      eventType: Byte,
+      filled: Double,
+      totalFilled: Double,
+      feeFilled: Double,
+      feeTotalFilled: Double,
+      status: Byte,
+      reason: EventReason = Events.NotTracked
+  )
 
   private def getOrderInfoById(orderId: Order.Id): Option[OrderBriefInfo] =
     ctx
@@ -189,14 +193,16 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
         (l.totalFilled <= r.totalFilled)
       }
       .map { r =>
-        EventBriefInfo(r.orderId,
-                       r.eventType,
-                       r.filled.toDouble,
-                       r.totalFilled.toDouble,
-                       r.feeFilled.toDouble,
-                       r.feeTotalFilled.toDouble,
-                       r.status,
-                       r.reason)
+        EventBriefInfo(
+          r.orderId,
+          r.eventType,
+          r.filled.toDouble,
+          r.totalFilled.toDouble,
+          r.feeFilled.toDouble,
+          r.feeTotalFilled.toDouble,
+          r.status,
+          r.reason
+        )
       }
 
   private def cleanTables(): Unit = {
@@ -317,17 +323,19 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
           val finalizeTimestamp = expectFinalization(order.idStr())
           withClue(s"${order.id()}\n") {
             getOrderInfoById(order.id()).get should matchTo(
-              OrderBriefInfo(order.idStr(),
-                             limitOrderType,
-                             bob.publicKey.toString,
-                             sellSide,
-                             wct.toString,
-                             usd.toString,
-                             btc.toString,
-                             100,
-                             0.35,
-                             0.00000030,
-                             finalizeTimestamp)
+              OrderBriefInfo(
+                order.idStr(),
+                limitOrderType,
+                bob.publicKey.toString,
+                sellSide,
+                wct.toString,
+                usd.toString,
+                btc.toString,
+                100,
+                0.35,
+                0.00000030,
+                finalizeTimestamp
+              )
             )
 
             getEventsInfoByOrderId(order.id()) should matchTo(
@@ -341,17 +349,19 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
         eventually {
           val finalizeTimestamp = expectFinalization(buyOrder.idStr())
           getOrderInfoById(buyOrder.id()).get should matchTo(
-            OrderBriefInfo(buyOrder.idStr(),
-                           limitOrderType,
-                           alice.publicKey.toString,
-                           buySide,
-                           wct.toString,
-                           usd.toString,
-                           eth.toString,
-                           300,
-                           0.35,
-                           0.00001703,
-                           finalizeTimestamp)
+            OrderBriefInfo(
+              buyOrder.idStr(),
+              limitOrderType,
+              alice.publicKey.toString,
+              buySide,
+              wct.toString,
+              usd.toString,
+              eth.toString,
+              300,
+              0.35,
+              0.00001703,
+              finalizeTimestamp
+            )
           )
         }
 
@@ -380,17 +390,19 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
       eventually {
         val finalizeTimestamp = expectFinalization(buyOrder.idStr())
         getOrderInfoById(buyOrder.id()).get should matchTo(
-          OrderBriefInfo(buyOrder.idStr(),
-                         limitOrderType,
-                         alice.publicKey.toString,
-                         buySide,
-                         "WAVES",
-                         usd.toString,
-                         "WAVES",
-                         300,
-                         0.35,
-                         0.00370300,
-                         finalizeTimestamp)
+          OrderBriefInfo(
+            buyOrder.idStr(),
+            limitOrderType,
+            alice.publicKey.toString,
+            buySide,
+            "WAVES",
+            usd.toString,
+            "WAVES",
+            300,
+            0.35,
+            0.00370300,
+            finalizeTimestamp
+          )
         )
         getEventsInfoByOrderId(buyOrder.id()) should matchTo(
           List(EventBriefInfo(buyOrder.idStr(), eventTrade, 300, 300, 0.00370300, 0.00370300, statusFilled, OrderExecutedReason))
@@ -402,17 +414,19 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
       eventually {
         val finalizeTimestamp = expectFinalization(sellOrder.idStr())
         getOrderInfoById(sellOrder.id()).get should matchTo(
-          OrderBriefInfo(sellOrder.idStr(),
-                         limitOrderType,
-                         bob.publicKey.toString,
-                         sellSide,
-                         "WAVES",
-                         usd.toString,
-                         usd.toString,
-                         300,
-                         0.35,
-                         0.30,
-                         finalizeTimestamp)
+          OrderBriefInfo(
+            sellOrder.idStr(),
+            limitOrderType,
+            bob.publicKey.toString,
+            sellSide,
+            "WAVES",
+            usd.toString,
+            usd.toString,
+            300,
+            0.35,
+            0.30,
+            finalizeTimestamp
+          )
         )
 
         getEventsInfoByOrderId(sellOrder.id()) should matchTo(
@@ -437,17 +451,19 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
       eventually {
         val finalizeTimestamp = expectFinalization(smallBuyOrder.idStr())
         getOrderInfoById(smallBuyOrder.id()).get should matchTo(
-          OrderBriefInfo(smallBuyOrder.idStr(),
-                         limitOrderType,
-                         alice.publicKey.toString,
-                         buySide,
-                         wct.toString,
-                         usd.toString,
-                         eth.toString,
-                         300,
-                         0.35,
-                         0.00001703,
-                         finalizeTimestamp)
+          OrderBriefInfo(
+            smallBuyOrder.idStr(),
+            limitOrderType,
+            alice.publicKey.toString,
+            buySide,
+            wct.toString,
+            usd.toString,
+            eth.toString,
+            300,
+            0.35,
+            0.00001703,
+            finalizeTimestamp
+          )
         )
 
         getEventsInfoByOrderId(smallBuyOrder.id()) should matchTo(
@@ -459,17 +475,19 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
     withClue("checking info for big submitted order\n") {
       eventually {
         getOrderInfoById(bigSellOrder.id()).get should matchTo(
-          OrderBriefInfo(bigSellOrder.idStr(),
-                         limitOrderType,
-                         bob.publicKey.toString,
-                         sellSide,
-                         wct.toString,
-                         usd.toString,
-                         btc.toString,
-                         900,
-                         0.35,
-                         0.00000030,
-                         None)
+          OrderBriefInfo(
+            bigSellOrder.idStr(),
+            limitOrderType,
+            bob.publicKey.toString,
+            sellSide,
+            wct.toString,
+            usd.toString,
+            btc.toString,
+            900,
+            0.35,
+            0.00000030,
+            None
+          )
         )
 
         getEventsInfoByOrderId(bigSellOrder.id()) should matchTo(
@@ -538,17 +556,19 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
       eventually {
         val finalizeTimestamp = expectFinalization(marketBuyOrder.idStr())
         getOrderInfoById(marketBuyOrder.id()).get should matchTo(
-          OrderBriefInfo(marketBuyOrder.idStr(),
-                         marketOrderType,
-                         alice.publicKey.toString,
-                         buySide,
-                         wct.toString,
-                         usd.toString,
-                         eth.toString,
-                         500,
-                         0.35,
-                         0.00001703,
-                         finalizeTimestamp)
+          OrderBriefInfo(
+            marketBuyOrder.idStr(),
+            marketOrderType,
+            alice.publicKey.toString,
+            buySide,
+            wct.toString,
+            usd.toString,
+            eth.toString,
+            500,
+            0.35,
+            0.00001703,
+            finalizeTimestamp
+          )
         )
 
         getEventsInfoByOrderId(marketBuyOrder.id()) should matchTo(
@@ -575,17 +595,19 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
         eventually {
           val finalizeTimestamp = expectFinalization(buyOrder.idStr())
           getOrderInfoById(buyOrder.id()).get should matchTo(
-            OrderBriefInfo(buyOrder.idStr(),
-                           orderType,
-                           alice.publicKey.toString,
-                           buySide,
-                           Waves.toString,
-                           usd.toString,
-                           Waves.toString,
-                           1.23456789,
-                           1.03,
-                           0.003,
-                           finalizeTimestamp)
+            OrderBriefInfo(
+              buyOrder.idStr(),
+              orderType,
+              alice.publicKey.toString,
+              buySide,
+              Waves.toString,
+              usd.toString,
+              Waves.toString,
+              1.23456789,
+              1.03,
+              0.003,
+              finalizeTimestamp
+            )
           )
         }
       }

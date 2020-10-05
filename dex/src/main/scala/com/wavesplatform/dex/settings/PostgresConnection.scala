@@ -4,7 +4,7 @@ import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 
 case class PostgresConnection(serverName: String, portNumber: Int, database: String, user: String, password: String, dataSourceClassName: String) {
 
-  def getConfig: Config = {
+  def getQuillContextConfig: Config = {
     ConfigFactory
       .empty()
       .withValue("dataSource.serverName", ConfigValueFactory.fromAnyRef(serverName))

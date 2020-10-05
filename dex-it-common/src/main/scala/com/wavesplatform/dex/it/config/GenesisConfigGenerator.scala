@@ -6,9 +6,8 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.it.config.genesis._
-import net.ceedubs.ficus.readers.ArbitraryTypeReader._
-import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
-import net.ceedubs.ficus.Ficus._
+import pureconfig.ConfigSource
+import pureconfig.generic.auto._
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -20,12 +19,14 @@ object GenesisConfigGenerator {
 
   case class DistributionItem(seedText: String, nonce: Int, amount: Share)
 
-  case class Settings(networkType: String,
-                      initialBalance: Share,
-                      baseTarget: Long,
-                      averageBlockDelay: FiniteDuration,
-                      timestamp: Option[Long],
-                      distributions: Map[AccountName, DistributionItem]) {
+  case class Settings(
+      networkType: String,
+      initialBalance: Share,
+      baseTarget: Long,
+      averageBlockDelay: FiniteDuration,
+      timestamp: Option[Long],
+      distributions: Map[AccountName, DistributionItem]
+  ) {
 
     private[this] val distributionsSum = distributions.values.map(_.amount).sum
     require(
@@ -36,17 +37,14 @@ object GenesisConfigGenerator {
     val chainId: Byte = networkType.head.toByte
   }
 
-  object Settings {
-    implicit val chosenCase: NameMapper                = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
-    implicit val settingsReader: ValueReader[Settings] = arbitraryTypeValueReader[Settings].value
-  }
-
-  case class FullAddressInfo(seedText: SeedText,
-                             seed: ByteStr,
-                             accountSeed: ByteStr,
-                             accountPrivateKey: ByteStr,
-                             accountPublicKey: ByteStr,
-                             accountAddress: Address)
+  case class FullAddressInfo(
+      seedText: SeedText,
+      seed: ByteStr,
+      accountSeed: ByteStr,
+      accountPrivateKey: ByteStr,
+      accountPublicKey: ByteStr,
+      accountAddress: Address
+  )
 
   private def toFullAddressInfo(item: DistributionItem): FullAddressInfo = {
 
@@ -65,7 +63,7 @@ object GenesisConfigGenerator {
 
   def generate(genesisGeneratorConfig: Config): Config = {
 
-    val generatorSettings = Settings.settingsReader.read(genesisGeneratorConfig, "genesis-generator")
+    val generatorSettings = ConfigSource.fromConfig(genesisGeneratorConfig).at("genesis-generator").loadOrThrow[Settings]
 
     AddressScheme.current = new AddressScheme { override val chainId: Byte = generatorSettings.chainId }
 
@@ -77,8 +75,8 @@ object GenesisConfigGenerator {
 
     val timestamp = generatorSettings.timestamp.getOrElse(System.currentTimeMillis)
 
-    val genesisTxs: Seq[GenesisTransaction] = shares.map {
-      case (_, addrInfo, part) => GenesisTransaction(addrInfo.accountAddress, part, timestamp, ByteStr.empty)
+    val genesisTxs: Seq[GenesisTransaction] = shares.map { case (_, addrInfo, part) =>
+      GenesisTransaction(addrInfo.accountAddress, part, timestamp, ByteStr.empty)
     }
 
     val genesisBlock = {

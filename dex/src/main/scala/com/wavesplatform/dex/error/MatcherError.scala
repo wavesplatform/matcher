@@ -314,12 +314,12 @@ case class DeviantOrderPrice(orderType: OrderType, orderPrice: Price, deviationS
       outOfBound,
       if (orderType == OrderType.BUY)
         e"""The buy order's price ${Symbol("price") -> orderPrice} is out of deviation bounds. It should meet the following matcher's requirements:
-         |${Symbol("bestBidPercent") -> (100 - deviationSettings.profit)}% of best bid price <= order price <=
-         |${Symbol("bestAskPercent") -> (100 + deviationSettings.loss)}% of best ask price"""
+         |${Symbol("bestBidPercent") -> (100 - deviationSettings.maxPriceProfit)}% of best bid price <= order price <=
+         |${Symbol("bestAskPercent") -> (100 + deviationSettings.maxPriceLoss)}% of best ask price"""
       else
         e"""The sell order's price ${Symbol("price") -> orderPrice} is out of deviation bounds. It should meet the following matcher's requirements:
-           |${Symbol("bestBidPercent") -> (100 - deviationSettings.loss)}% of best bid price <= order price <=
-           |${Symbol("bestAskPercent") -> (100 + deviationSettings.profit)}% of best ask price"""
+           |${Symbol("bestBidPercent") -> (100 - deviationSettings.maxPriceLoss)}% of best bid price <= order price <=
+           |${Symbol("bestAskPercent") -> (100 + deviationSettings.maxPriceProfit)}% of best ask price"""
     )
 object DeviantOrderPrice {
   def apply(ord: Order, deviationSettings: DeviationsSettings)(implicit efc: ErrorFormatterContext): DeviantOrderPrice =
@@ -335,12 +335,12 @@ case class DeviantOrderMatcherFee(orderType: OrderType, matcherFee: Amount, devi
         e"""The buy order's matcher fee ${Symbol("matcherFee") -> matcherFee} is out of deviation bounds. It should meet the following matcher's requirements:
        |matcher fee >= ${Symbol(
           "bestAskFeePercent"
-        ) -> (100 - deviationSettings.fee)}% of fee which should be paid in case of matching with best ask"""
+        ) -> (100 - deviationSettings.maxFeeDeviation)}% of fee which should be paid in case of matching with best ask"""
       else
         e"""The sell order's matcher fee ${Symbol("matcherFee") -> matcherFee} is out of deviation bounds. It should meet the following matcher's requirements:
          |matcher fee >= ${Symbol(
           "bestBidFeePercent"
-        ) -> (100 - deviationSettings.fee)}% of fee which should be paid in case of matching with best bid"""
+        ) -> (100 - deviationSettings.maxFeeDeviation)}% of fee which should be paid in case of matching with best bid"""
     )
 object DeviantOrderMatcherFee {
   def apply(ord: Order, deviationSettings: DeviationsSettings)(implicit efc: ErrorFormatterContext): DeviantOrderMatcherFee =

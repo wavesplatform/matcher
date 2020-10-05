@@ -18,8 +18,8 @@ object rules {
   def gtN(x: BigDecimal, n: BigDecimal, nField: String): Option[String] =
     if (x > n) none else s"${x.bigDecimal.toPlainString} should be > $nField: ${n.bigDecimal.toPlainString}".some
 
-  def gtN(x: Double, n: Double, nField: String): Option[String] =
-    if (x > n) none else s"${doubleFormat.format(x)} should be > $nField: ${doubleFormat.format(n)}".some
+  def gtN(x: Double, n: Double, nConfigField: String): Option[String] =
+    if (x > n) none else s"${doubleFormat.format(x)} should be > $nConfigField: ${doubleFormat.format(n)}".some
 
-  def gtN[T: Numeric](x: T, n: T, nField: String): Option[String] = if (Numeric[T].gt(x, n)) none else s"$x should be > $nField: $n".some
+  def gtN[T: Numeric](x: T, n: T, nConfigField: String): Option[String] = if (Numeric[T].gt(x, n)) none else s"$x should be > $nConfigField: $n".some
 }

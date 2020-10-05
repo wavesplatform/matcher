@@ -37,6 +37,11 @@ class BaseSettingsSpecification extends AnyFlatSpec {
     s"""
        |max-price-deviations {
        |  enable = yes
+       |  max-price-profit = 1000000
+       |  max-price-loss = 1000000
+       |  max-fee-deviation = 1000000
+       |
+       |  # TODO COMPAT
        |  profit = 1000000
        |  loss = 1000000
        |  fee = 1000000

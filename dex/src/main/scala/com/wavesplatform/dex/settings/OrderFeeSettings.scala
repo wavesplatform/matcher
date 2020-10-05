@@ -28,7 +28,6 @@ object OrderFeeSettings {
       )
   }
 
-  // defaultAsset
   final case class FixedSettings(asset: Asset, minFee: Long) extends OrderFeeSettings
   object FixedSettings extends ConfigReaders {
     implicit val fixedConfigReader = semiauto

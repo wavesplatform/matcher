@@ -123,6 +123,11 @@ baz"""
       s"""
          |max-price-deviations {
          |  enable = foobar
+         |  max-price-profit = 1000000
+         |  max-price-loss = 1000000
+         |  max-fee-deviation = 1000000
+         |
+         |  # TODO COMPAT
          |  profit = 1000000
          |  loss = 1000000
          |  fee = 1000000
@@ -133,6 +138,11 @@ baz"""
       s"""
          |max-price-deviations {
          |  enable = yes
+         |  max-price-profit = -1000000
+         |  max-price-loss = 1000000
+         |  max-fee-deviation = 1000000
+         |
+         |  # TODO COMPAT
          |  profit = -1000000
          |  loss = 1000000
          |  fee = 1000000
@@ -143,6 +153,11 @@ baz"""
       s"""
          |max-price-deviations {
          |  enable = yes
+         |  max-price-profit = 1000000
+         |  max-price-loss = 0
+         |  max-fee-deviation = -1000000
+         |
+         |  # TODO COMPAT
          |  profit = 1000000
          |  loss = 0
          |  fee = -1000000
@@ -155,8 +170,8 @@ baz"""
     val settingsInvalidLossAndFee    = getSettingByConfig(configStr(invalidLossAndFee))
 
     settingsInvalidEnable should produce("waves.dex.max-price-deviations.enable")
-    settingsInvalidProfit should produce("waves.dex.max-price-deviations.profit")
-    Seq("waves.dex.max-price-deviations.fee", "waves.dex.max-price-deviations.loss").foreach { message =>
+    settingsInvalidProfit should produce("waves.dex.max-price-deviations.max-price-profit")
+    Seq("waves.dex.max-price-deviations.max-fee-deviation", "waves.dex.max-price-deviations.max-price-loss").foreach { message =>
       settingsInvalidLossAndFee should produce(message)
     }
   }

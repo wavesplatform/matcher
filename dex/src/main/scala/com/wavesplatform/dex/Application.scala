@@ -249,7 +249,7 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
         orderBooks,
         mkOrderBookProps,
         assetsCache.get(_),
-        pairBuilder.isCorrectlyOrdered
+        pairBuilder.quickValidateAssetPair
       ),
       MatcherActor.name
     )

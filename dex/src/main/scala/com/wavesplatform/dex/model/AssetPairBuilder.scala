@@ -7,6 +7,7 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.error
+import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model.AssetPairBuilder.AssetSide
@@ -58,6 +59,19 @@ class AssetPairBuilder(
     }
   }
 
+  private def quickValidateAssetId(asset: Asset, side: AssetSide): Either[MatcherError, Asset] =
+    asset match {
+      case asset: IssuedAsset if blacklistedAssets.contains(asset) =>
+        Left(
+          side match {
+            case AssetSide.Unknown => error.AssetBlacklisted(asset)
+            case AssetSide.Amount  => error.AmountAssetBlacklisted(asset)
+            case AssetSide.Price   => error.PriceAssetBlacklisted(asset)
+          }
+        )
+      case _ => asset.asRight
+    }
+
   def validateAssetPair(pair: AssetPair): FutureResult[AssetPair] = validate.measure {
     if (settings.allowedAssetPairs contains pair) liftValueAsync(pair)
     else if (settings.whiteListOnly) liftErrorAsync(error.AssetPairIsDenied(pair))
@@ -67,6 +81,18 @@ class AssetPairBuilder(
         _ <- successAsync.ensure { error.OrderAssetPairReversed(pair) }(_ => isCorrectlyOrdered(pair))
         _ <- validateAssetId(pair.priceAsset, AssetSide.Price)
         _ <- validateAssetId(pair.amountAsset, AssetSide.Amount)
+      } yield pair
+  }
+
+  def quickValidateAssetPair(pair: AssetPair): Either[MatcherError, AssetPair] = validate.measure {
+    if (settings.allowedAssetPairs contains pair) pair.asRight
+    else if (settings.whiteListOnly) error.AssetPairIsDenied(pair).asLeft
+    else
+      for {
+        _ <- Either.cond(pair.amountAsset != pair.priceAsset, (), error.AssetPairSameAssets(pair.amountAsset))
+        _ <- Either.cond(isCorrectlyOrdered(pair), (), error.OrderAssetPairReversed(pair))
+        _ <- quickValidateAssetId(pair.priceAsset, AssetSide.Price)
+        _ <- quickValidateAssetId(pair.amountAsset, AssetSide.Amount)
       } yield pair
   }
 

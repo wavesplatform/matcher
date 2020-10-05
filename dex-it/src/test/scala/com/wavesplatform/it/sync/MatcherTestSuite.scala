@@ -4,7 +4,7 @@ import cats.syntax.option._
 import com.softwaremill.sttp._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
-import com.wavesplatform.dex.api.http.entities.{HttpAssetInfo, HttpMarketStatus, HttpOrderBookHistoryItem, HttpV0LevelAgg}
+import com.wavesplatform.dex.api.http.entities.{HttpAssetInfo, HttpMarketStatus, HttpOrderBookHistoryItem, HttpV0LevelAgg, HttpV0OrderBook}
 import com.wavesplatform.dex.api.http.headers.MatcherHttpServer
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -593,20 +593,41 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
     "delete order books if their asset pair became invalid" in {
 
-      val sellOrder = mkOrderDP(alice, ethWavesPair, SELL, 1, 135)
-      placeAndAwaitAtDex(sellOrder)
+      val sellOrder1 = mkOrderDP(alice, ethWavesPair, SELL, 1, 135)
+      placeAndAwaitAtDex(sellOrder1)
 
       val ob = dex1.api.orderBook(ethWavesPair)
       ob.asks should have size 1
       ob.bids shouldBe empty
 
+      // Before: [ "$UsdnId", "$BtcId", "$UsdId", "WAVES", $EthId ]
       dex1.restartWithNewSuiteConfig(
         ConfigFactory
           .parseString(s"""waves.dex.price-assets = [ "$UsdnId", "$BtcId", "$UsdId", $EthId, "WAVES"]""".stripMargin)
           .withFallback(dexInitialSuiteConfig)
       )
 
-      dex1.api.tryOrderBook(ethWavesPair) should failWith(1, "test")
+      withClue("The old order book is not available") {
+        val e = intercept[RuntimeException](dex1.api.orderBook(ethWavesPair))
+        e.getMessage should fullyMatch regex ".*301.*" // Redirect
+      }
+
+      val wavesEthPair = AssetPair(Waves, eth)
+      dex1.api.orderStatus(wavesEthPair, sellOrder1.id()).status shouldBe Status.Accepted
+
+      dex1.api.orderBook(wavesEthPair) should matchTo(
+        HttpV0OrderBook(
+          timestamp = 0,
+          pair = wavesEthPair,
+          bids = List.empty,
+          asks = List.empty
+        )
+      )
+
+      dex1.api.deleteOrderBook(ethWavesPair)
+      dex1.api.waitForOrderStatus(wavesEthPair, sellOrder1.id(), Status.Cancelled)
+
+      placeAndAwaitAtDex(mkOrderDP(alice, wavesEthPair, SELL, 100, 1))
     }
   }
 }

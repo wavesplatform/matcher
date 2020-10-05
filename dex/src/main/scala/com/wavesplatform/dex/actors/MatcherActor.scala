@@ -12,6 +12,7 @@ import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.error
+import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.queue.QueueEventWithMeta.{Offset => EventOffset}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
@@ -27,7 +28,7 @@ class MatcherActor(
     orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
     orderBookActorProps: (AssetPair, ActorRef) => Props,
     assetDescription: Asset => Option[BriefAssetDescription],
-    isAssetPairCorrectlyOrdered: AssetPair => Boolean
+    validateAssetPair: AssetPair => Either[MatcherError, AssetPair]
 ) extends Actor
     with WorkingStash
     with ScorexLogging {
@@ -42,31 +43,23 @@ class MatcherActor(
   private var snapshotsState = SnapshotsState.empty
 
   override val receive: Receive = {
-    val knownAssetPairs = assetPairsDB.all()
-    if (knownAssetPairs.isEmpty) {
+    val (errors, validAssetPairs) = assetPairsDB.all().partitionMap { assetPair =>
+      validateAssetPair(assetPair) match {
+        case Left(e)  => s"$assetPair: ${e.message.text}".asLeft
+        case Right(x) => x.asRight
+      }
+    }
+
+    if (errors.nonEmpty) log.warn(s"Invalid asset pairs:\n${errors.mkString("\n")}")
+
+    if (validAssetPairs.isEmpty) {
       log.info("Recovery completed!")
       recoveryCompletedWithEventNr(-1L asRight)
       working
     } else {
-      log.info(s"Recovery completed, waiting order books to restore: ${knownAssetPairs.mkString(", ")}")
-      val (validPairs, invalidPairs) = knownAssetPairs.partition(isAssetPairCorrectlyOrdered)
-      invalidPairs.foreach { assetPair =>
-        log.warn(s"Asset pair $assetPair isn't valid anymore! Deleting order book")
-        deleteOrderBook(assetPair, QueueEventWithMeta(lastProcessedNr, System.currentTimeMillis(), QueueEvent.OrderBookDeleted(assetPair)))
-      }
-      validPairs.foreach(createOrderBook)
-      collectOrderBooks(validPairs.size, None, -1L, Map.empty)
-    }
-  }
-
-  private def deleteOrderBook(assetPair: AssetPair, deleteOrderBookRequest: QueueEventWithMeta): Unit = {
-    // autoCreate = false for case, when multiple OrderBookDeleted(A1-A2) events happen one after another
-    runFor(assetPair, autoCreate = false) { (sender, ref) =>
-      ref.tell(deleteOrderBookRequest, sender)
-      orderBooks.getAndUpdate(_.filterNot { _._2.exists(_ == ref) })
-      snapshotsState = snapshotsState.without(assetPair)
-      tradedPairs -= assetPair
-      assetPairsDB.remove(assetPair)
+      log.info(s"Recovery completed, waiting order books to restore: ${validAssetPairs.mkString(", ")}")
+      validAssetPairs.foreach(createOrderBook)
+      collectOrderBooks(validAssetPairs.size, None, -1L, Map.empty)
     }
   }
 
@@ -78,9 +71,8 @@ class MatcherActor(
       case _     => desc.fold("Unknown")(_.name)
     }
 
-  private def getAssetInfo(asset: Asset, desc: Option[BriefAssetDescription]): Option[AssetInfo] = {
+  private def getAssetInfo(asset: Asset, desc: Option[BriefAssetDescription]): Option[AssetInfo] =
     asset.fold(Option(8))(_ => desc.map(_.decimals)).map(AssetInfo)
-  }
 
   private def getAssetDesc(asset: Asset): Option[BriefAssetDescription] = asset.fold[Option[BriefAssetDescription]](None)(assetDescription)
 
@@ -130,7 +122,7 @@ class MatcherActor(
     }
   }
 
-  private def createSnapshotFor(offset: QueueEventWithMeta.Offset): Unit = {
+  private def createSnapshotFor(offset: QueueEventWithMeta.Offset): Unit =
     snapshotsState.requiredSnapshot(offset).foreach { case (assetPair, updatedSnapshotState) =>
       orderBook(assetPair) match {
         case Some(Right(actorRef)) =>
@@ -144,7 +136,6 @@ class MatcherActor(
       }
       snapshotsState = updatedSnapshotState
     }
-  }
 
   private def working: Receive = {
 
@@ -153,8 +144,17 @@ class MatcherActor(
 
     case request: QueueEventWithMeta =>
       request.event match {
-        case QueueEvent.OrderBookDeleted(assetPair) => deleteOrderBook(assetPair, request)
-        case _                                      => runFor(request.event.assetPair)((sender, orderBook) => orderBook.tell(request, sender))
+        case QueueEvent.OrderBookDeleted(assetPair) =>
+          // autoCreate = false for case, when multiple OrderBookDeleted(A1-A2) events happen one after another
+          runFor(request.event.assetPair, autoCreate = false) { (sender, ref) =>
+            ref.tell(request, sender)
+            orderBooks.getAndUpdate(_.filterNot { _._2.exists(_ == ref) })
+            snapshotsState = snapshotsState.without(assetPair)
+            tradedPairs -= assetPair
+            assetPairsDB.remove(assetPair)
+          }
+
+        case _ => runFor(request.event.assetPair)((sender, orderBook) => orderBook.tell(request, sender))
       }
       lastProcessedNr = math.max(request.offset, lastProcessedNr)
       createSnapshotFor(lastProcessedNr)
@@ -291,20 +291,18 @@ object MatcherActor {
       orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
       orderBookProps: (AssetPair, ActorRef) => Props,
       assetDescription: Asset => Option[BriefAssetDescription],
-      isAssetPairCorrectlyOrdered: AssetPair => Boolean
-  ): Props = {
-    Props(
-      new MatcherActor(
-        matcherSettings,
-        assetPairsDB,
-        recoveryCompletedWithEventNr,
-        orderBooks,
-        orderBookProps,
-        assetDescription,
-        isAssetPairCorrectlyOrdered
-      )
+      validateAssetPair: AssetPair => Either[MatcherError, AssetPair]
+  ): Props = Props(
+    new MatcherActor(
+      matcherSettings,
+      assetPairsDB,
+      recoveryCompletedWithEventNr,
+      orderBooks,
+      orderBookProps,
+      assetDescription,
+      validateAssetPair
     )
-  }
+  )
 
   private case class ShutdownStatus(initiated: Boolean, oldMessagesDeleted: Boolean, oldSnapshotsDeleted: Boolean, onComplete: () => Unit)
 

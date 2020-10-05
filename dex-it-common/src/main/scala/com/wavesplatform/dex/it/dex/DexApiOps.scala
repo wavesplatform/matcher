@@ -92,6 +92,8 @@ object DexApiOps {
     def orderBook(assetPair: AssetPair): F[HttpV0OrderBook]             = explicitGet(self.tryOrderBook(assetPair))
     def orderBook(assetPair: AssetPair, depth: Int): F[HttpV0OrderBook] = explicitGet(self.tryOrderBook(assetPair, depth))
 
+    def deleteOrderBook(assetPair: AssetPair): F[HttpMessage] = explicitGet(self.tryDeleteOrderBook(assetPair))
+
     def orderBookInfo(assetPair: AssetPair): F[HttpOrderBookInfo]  = explicitGet(self.tryOrderBookInfo(assetPair))
     def orderBookStatus(assetPair: AssetPair): F[HttpMarketStatus] = explicitGet(self.tryOrderBookStatus(assetPair))
 

@@ -6,6 +6,7 @@ import akka.actor.typed.scaladsl.adapter._
 import akka.actor.{Actor, ActorRef, ActorSystem, Kill, Props, Terminated}
 import akka.testkit.{ImplicitSender, TestActor, TestActorRef, TestProbe}
 import cats.data.NonEmptyList
+import cats.implicits.catsSyntaxEitherId
 import com.wavesplatform.dex.MatcherSpecBase
 import com.wavesplatform.dex.actors.MatcherActor.{ForceStartOrderBook, GetMarkets, MarketData, SaveSnapshot}
 import com.wavesplatform.dex.actors.MatcherActorSpecification.{DeletingActor, FailAtStartActor, NothingDoActor, RecoveringActor, _}
@@ -83,7 +84,7 @@ class MatcherActorSpecification
             ob,
             (_, _) => Props(new FailAtStartActor),
             assetDescription,
-            _ => true
+            _.asRight
           )
         )
 
@@ -137,7 +138,7 @@ class MatcherActorSpecification
             ob,
             (_, _) => Props(new FailAtStartActor()),
             assetDescription,
-            _ => true
+            _.asRight
           )
         )
       )
@@ -169,7 +170,7 @@ class MatcherActorSpecification
                 ob,
                 (_, _) => Props(new FailAtStartActor),
                 assetDescription,
-                _ => true
+                _.asRight
               )
             )
           )
@@ -198,7 +199,7 @@ class MatcherActorSpecification
                 ob,
                 (_, _) => Props(new NothingDoActor),
                 assetDescription,
-                _ => true
+                _.asRight
               )
             )
           )
@@ -305,7 +306,7 @@ class MatcherActorSpecification
               ob,
               (pair, matcherActor) => Props(new RecoveringActor(matcherActor, pair)),
               assetDescription,
-              _ => true
+              _.asRight
             )
           )
         )
@@ -329,7 +330,7 @@ class MatcherActorSpecification
             ob,
             (assetPair, matcher) => Props(new DeletingActor(matcher, assetPair, Some(9L))),
             assetDescription,
-            _ => true
+            _.asRight
           )
         )
 
@@ -390,7 +391,7 @@ class MatcherActorSpecification
           r(idx)._1
         },
         assetDescription,
-        _ => true
+        _.asRight
       )
     )
 
@@ -447,7 +448,7 @@ class MatcherActorSpecification
             None
           ),
         assetDescription,
-        _ => true
+        _.asRight
       )
     )
   }

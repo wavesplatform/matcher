@@ -3,6 +3,7 @@ package com.wavesplatform.dex.api.http.routes
 import akka.actor.{ActorRef, typed}
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.HttpHeader.ParsingResult
+import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.model.{HttpHeader, HttpResponse, StatusCodes}
 import akka.http.scaladsl.server
 import akka.http.scaladsl.server._
@@ -1046,43 +1047,23 @@ class MatcherApiRoute(
     response = classOf[HttpResponse]
   )
   def getConfig: Route = (path("config") & get & withAuth)  {
-    complete {
 
-      var outputConfig = config.getObject("waves").toConfig
+    respondWithHeader (RawHeader("Content-type", "application/hocon"))  {
+      complete {
 
-      def pathShouldNotBeDeleted(path: String): Boolean = ("(user|pass|seed|private)".r findFirstIn path).isEmpty
+        //
+        //        val header = HttpHeader.parse("Content-Type", "application/hocon") match {
+        //          case ParsingResult.Ok(header, _) => header
+        //          case ParsingResult.Error(error) => throw new Exception(s"Unable to convert to HttpHeader: ${error.summary}")
+        //        }
 
-      def modifyConfig(path: String, config: Config): Unit = {
-        val itr = config.root().entrySet().iterator()
-
-        while(itr.hasNext()){
-
-          val key = itr.next().getKey
-          val absolutePath = if(path.length > 0) s"$path.$key" else key
-
-          config.root().get(key).valueType() match {
-            case ConfigValueType.OBJECT => {
-              if(pathShouldNotBeDeleted(absolutePath)) {
-                if(config.getObject(key).size() == 0) {
-                  outputConfig = outputConfig.withoutPath(absolutePath)
-                } else {
-                  modifyConfig(absolutePath, config.getObject(key).toConfig)
-                }
-              }
-            }
-            case _ => if(!pathShouldNotBeDeleted(absolutePath)) outputConfig = outputConfig.withoutPath(absolutePath)
-          }
-        }
+        HttpResponse(entity = config.getObject("waves").toConfig
+          .filterKeys("user")
+          .filterKeys("pass")
+          .filterKeys("seed")
+          .filterKeys("private")
+          .rendered)
       }
-
-      modifyConfig("", outputConfig)
-
-      val header = HttpHeader.parse("Content-Type", "application/hocon")  match {
-        case ParsingResult.Ok(header, _) => header
-        case ParsingResult.Error(error)  => throw new Exception(s"Unable to convert to HttpHeader: ${error.summary}")
-      }
-
-      HttpResponse(entity = new ConfigOps(outputConfig).rendered, headers = Seq(header))
     }
   }
 

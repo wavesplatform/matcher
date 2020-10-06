@@ -25,7 +25,7 @@ class ConfigOpsSpecification extends AnyWordSpecLike with Matchers with MatcherS
   "ConfigOps" should {
 
     "correctly filter keys" in {
-      val filtered = new ConfigOps(config).filterKeys(_.contains("seed"))
+      val filtered = config.withoutKeys(_.contains("seed"))
 
       filtered.getString("waves.dex.user") should be ("test-user")
       filtered.getString("waves.dex.private.password") should be ("test-password")

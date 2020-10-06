@@ -1048,19 +1048,13 @@ class MatcherApiRoute(
   def getConfig: Route = (path("config") & get & withAuth) {
 
     respondWithHeader(RawHeader("Content-type", "application/hocon")) {
+
       complete {
-
-        //
-        //        val header = HttpHeader.parse("Content-Type", "application/hocon") match {
-        //          case ParsingResult.Ok(header, _) => header
-        //          case ParsingResult.Error(error) => throw new Exception(s"Unable to convert to HttpHeader: ${error.summary}")
-        //        }
-
         HttpResponse(entity = config.getObject("waves").toConfig
-          .filterKeys(_.contains("user"))
-          .filterKeys(_.contains("pass"))
-          .filterKeys(_.contains("seed"))
-          .filterKeys(_.contains("private"))
+          .withoutKeys(_.contains("user"))
+          .withoutKeys(_.contains("pass"))
+          .withoutKeys(_.contains("seed"))
+          .withoutKeys(_.contains("private"))
           .rendered)
       }
     }

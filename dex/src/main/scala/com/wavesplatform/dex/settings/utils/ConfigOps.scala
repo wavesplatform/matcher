@@ -36,7 +36,7 @@ object ConfigOps {
       }
     }
 
-    def filterKeys(p: String => Boolean): Config = {
+    def withoutKeys(p: String => Boolean): Config = {
       def withoutKeys(c: ConfigObject, p: String => Boolean): ConfigObject =
         c.asScala.foldLeft(c) { case (r, (k, v)) =>
           if (p(k)) r.withoutKey(k)

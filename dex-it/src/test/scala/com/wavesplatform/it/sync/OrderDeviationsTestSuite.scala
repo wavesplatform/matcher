@@ -54,9 +54,14 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
        |  allowed-order-versions = [1, 2, 3]
        |  max-price-deviations {
        |    enable = yes
-       |    profit = $deviationProfit
-       |    loss = $deviationLoss
-       |    fee = $deviationFee
+       |    max-price-profit = $deviationProfit
+       |    max-price-loss = $deviationLoss
+       |    max-fee-deviation = $deviationFee
+       |
+       |    # TODO COMPAT
+       |    profit = $${waves.dex.max-price-deviations.max-price-profit}
+       |    loss = $${waves.dex.max-price-deviations.max-price-loss}
+       |    fee = $${waves.dex.max-price-deviations.max-fee-deviation}
        |  }
        |  order-fee.-1 {
        |    mode = "percent"

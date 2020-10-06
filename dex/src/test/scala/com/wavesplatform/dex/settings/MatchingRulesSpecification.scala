@@ -22,42 +22,36 @@ class MatchingRulesSpecification extends BaseSettingsSpecification with Matchers
         |}
       """.stripMargin
 
-    def matchingRule(startOffset: String): String =
+    def matchingRule(startOffset: Int): String =
       s"""
          |    {
          |      start-offset = $startOffset
          |      tick-size    = 0.002
          |    }""".stripMargin
 
-    val startOfsettsSets = Array(
-      Array("50", "50"),
-      Array("50", "49"),
-      Array("30", "1"),
-      Array("5", "3", "1"),
-      Array("4", "1", "4"),
-      Array("3", "1", "6"),
-      Array("5", "5", "6"),
-      Array("5", "7", "7"),
-      Array("10", "17", "10"),
-      Array("100", "100", "100"),
-      Array("50", "50", "60")
-    )
-
-    var matchingRules = ""
-
-    for (startOffsets <- startOfsettsSets) {
-      for (startOffset <- startOffsets) {
-        matchingRules ++= matchingRule(startOffset)
-      }
-      getSettingByConfig(configStr(matchingRulesSettings(matchingRules))) should
-        produce(f"Invalid setting matching-rules value: Rules should be ordered by offset, but they are: ${startOffsets.mkString(", ")}")
-      matchingRules = ""
+    Seq(
+      Seq(50, 50),
+      Seq(50, 49),
+      Seq(30, 1),
+      Seq(5, 3, 1),
+      Seq(4, 1, 4),
+      Seq(3, 1, 6),
+      Seq(5, 5, 6),
+      Seq(5, 7, 7),
+      Seq(10, 17, 10),
+      Seq(100, 100, 100),
+      Seq(50, 50, 60)
+    ).foreach { startOffsets =>
+      val matchingRules = startOffsets.map(matchingRule).mkString("\n")
+      getSettingByConfig(configStr(matchingRulesSettings(matchingRules))) should produce(
+        s"waves.dex.matching-rules.WAVES-8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS.+\n.+but they are: ${startOffsets.mkString(", ")}".r
+      )
     }
   }
 
   it can "not be negative" in {
 
-    def matchingRulesSettings(startOffset: String): String =
+    def matchingRulesSettings(startOffset: Long): String =
       s"""matching-rules = {
          |  "WAVES-8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS": [
          |    {
@@ -68,12 +62,10 @@ class MatchingRulesSpecification extends BaseSettingsSpecification with Matchers
          |}
       """.stripMargin
 
-    val startOfsetts = Array("-1", "-5", "-10", "-5000000000", "-1000000000000000000000000000")
-
-    for (startOffset <- startOfsetts) {
-      getSettingByConfig(configStr(matchingRulesSettings(startOffset))) should
-        produce(
-          s"Invalid setting matching-rules value: Invalid setting collection-entry-path.start-offset value: $startOffset (required 0 <= start offset)")
+    Seq(-1, -5, -10, -5000000000L).foreach { startOffset =>
+      getSettingByConfig(configStr(matchingRulesSettings(startOffset))) should produce(
+        s"waves.dex.matching-rules.WAVES-8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS.0.start-offset.+\n.+$startOffset should be >= 0".r
+      )
     }
   }
 
@@ -139,7 +131,7 @@ class MatchingRulesSpecification extends BaseSettingsSpecification with Matchers
 
   "tick size" should "be positive" in {
 
-    def matchingRulesSettings(tickSize: String): String =
+    def matchingRulesSettings(tickSize: Double): String =
       s"""matching-rules = {
          |  "WAVES-8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS": [
          |    {
@@ -150,24 +142,24 @@ class MatchingRulesSpecification extends BaseSettingsSpecification with Matchers
          |}
       """.stripMargin
 
-    val tickSizes = Array("0", "-1", "-5", "-10", "-5000000000", "-1000000000000000000000000000", "-0.1")
+    Seq(-0.1d, -0.00000001, -0.00000000000001, -12.123, -123.12312, -12312.14234)
+      .foreach { tickSize =>
+        getSettingByConfig(configStr(matchingRulesSettings(tickSize))) should produce(
+          s"waves.dex.matching-rules.WAVES-8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS.0.tick-size.+\n.+$tickSize should be > 0".r
+        )
+      }
 
-    for (tickSize <- tickSizes) {
-      getSettingByConfig(configStr(matchingRulesSettings(tickSize))) should
-        produce(s"Invalid setting matching-rules value: Invalid setting collection-entry-path.tick-size value: $tickSize (required 0 < tick size)")
-    }
-
-    val tickSizesDouble = Array(-0.00000001, -0.00000000000001, -12.123, -123.1231213124234234, -123123123123123.14234234234234234234)
-
-    for (tickSize <- tickSizesDouble) {
-      getSettingByConfig(configStr(matchingRulesSettings(tickSize.toString))) should
-        produce(s"Invalid setting matching-rules value: Invalid setting collection-entry-path.tick-size value: $tickSize (required 0 < tick size)")
+    // Because of formatting issues like 0 vs 0.0
+    Seq(0, -1, -5, -10, -5000000000L).foreach { tickSize =>
+      getSettingByConfig(configStr(matchingRulesSettings(tickSize.toDouble))) should produce(
+        s"waves.dex.matching-rules.WAVES-8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS.0.tick-size.+\n.+$tickSize should be > 0".r
+      )
     }
   }
 
   it can "be positive and fractional" in {
 
-    def matchingRulesSettings(tickSize: String): String =
+    def matchingRulesSettings(tickSize: Double): String =
       s"""matching-rules = {
          |  "WAVES-8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS": [
          |    {
@@ -178,11 +170,11 @@ class MatchingRulesSpecification extends BaseSettingsSpecification with Matchers
          |}
       """.stripMargin
 
-    val tickSizes = Array(1D, 5D, 10D, 5000000000D, 1000000000000000000000000000D, 0.1D, 0.00000001D, 0.00000000000001D, 12.123D,
-      123.1231213124234234D, 123123123123123.14234234234234234234D)
-
-    for (tickSize <- tickSizes) {
-      getSettingByConfig(configStr(matchingRulesSettings(tickSize.toString))).explicitGet().matchingRules shouldBe Map(
+    Seq(
+      1d, 5d, 10d, 5000000000d, 1000000000000000000000000000d, 0.1d, 0.00000001d, 0.00000000000001d, 12.123d, 123.1231213124234234d,
+      123123123123123.14234234234234234234d
+    ).foreach { tickSize =>
+      getSettingByConfig(configStr(matchingRulesSettings(tickSize))).explicitGet().matchingRules shouldBe Map(
         AssetPair.fromString("WAVES-8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS").get ->
           NonEmptyList[DenormalizedMatchingRule](
             DenormalizedMatchingRule(100L, tickSize),
@@ -200,6 +192,6 @@ class MatchingRulesSpecification extends BaseSettingsSpecification with Matchers
          |}
       """.stripMargin
 
-    getSettingByConfig(configStr(emptyTickSize)) should produce("Invalid setting matching-rules value: Expected at least one element")
+    getSettingByConfig(configStr(emptyTickSize)) should produce("waves.dex.matching-rules.WAVES-8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS.+\n.+Empty".r)
   }
 }

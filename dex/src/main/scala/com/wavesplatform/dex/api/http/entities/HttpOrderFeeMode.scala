@@ -2,8 +2,7 @@ package com.wavesplatform.dex.api.http.entities
 
 import com.wavesplatform.dex.api.http.entities.HttpOrderFeeMode.{FeeModeDynamic, FeeModeFixed, FeeModePercent}
 import com.wavesplatform.dex.domain.asset.Asset
-import com.wavesplatform.dex.settings.AssetType.AssetType
-import com.wavesplatform.dex.settings.OrderFeeSettings
+import com.wavesplatform.dex.settings.{AssetType, OrderFeeSettings}
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json._
 
@@ -20,48 +19,51 @@ sealed trait HttpOrderFeeMode extends Product with Serializable
 object HttpOrderFeeMode {
 
   @ApiModel(description = "Basic mode, fee = base fee * asset rate")
-  case class FeeModeDynamic(@ApiModelProperty(
-                              value = "Base fee in Wavelets",
-                              example = "300000"
-                            ) baseFee: Long,
-                            @ApiModelProperty(
-                              value = "Asset Rates as Map[Base58 encoded Asset ID, Long]",
-                              dataType = "Map[string,number]"
-                            ) rates: Map[Asset, Double])
-      extends HttpOrderFeeMode
+  case class FeeModeDynamic(
+      @ApiModelProperty(
+        value = "Base fee in Wavelets",
+        example = "300000"
+      ) baseFee: Long,
+      @ApiModelProperty(
+        value = "Asset Rates as Map[Base58 encoded Asset ID, Long]",
+        dataType = "Map[string,number]"
+      ) rates: Map[Asset, Double]
+  ) extends HttpOrderFeeMode
   object FeeModeDynamic {
     implicit val dynamicFormat: Format[FeeModeDynamic] = Json.format[FeeModeDynamic]
   }
 
   @ApiModel(description = "Mode with fixed min fee and fixed asset")
-  case class FeeModeFixed(@ApiModelProperty(
-                            value = "Base58 encoded accepted Asset ID",
-                            dataType = "string",
-                            example = "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS"
-                          ) assetId: Asset,
-                          @ApiModelProperty(
-                            value = "Min fee in min asset fractions",
-                            dataType = "integer",
-                            example = "5785"
-                          ) minFee: Long)
-      extends HttpOrderFeeMode
+  case class FeeModeFixed(
+      @ApiModelProperty(
+        value = "Base58 encoded accepted Asset ID",
+        dataType = "string",
+        example = "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS"
+      ) assetId: Asset,
+      @ApiModelProperty(
+        value = "Min fee in min asset fractions",
+        dataType = "integer",
+        example = "5785"
+      ) minFee: Long
+  ) extends HttpOrderFeeMode
   object FeeModeFixed {
     implicit val fixedFormat: Format[FeeModeFixed] = Json.format[FeeModeFixed]
   }
 
   @ApiModel(description = "Mode with min fee in amount/price/spending/receiving asset specified as a percentage")
-  case class FeeModePercent(@ApiModelProperty(
-                              value = "Type of percent fee",
-                              dataType = "string",
-                              allowableValues = "amount, price, spending, receiving",
-                              example = "price"
-                            ) `type`: AssetType,
-                            @ApiModelProperty(
-                              value = "Min fee in percents",
-                              dataType = "number",
-                              example = "1.5"
-                            ) minFee: Double)
-      extends HttpOrderFeeMode
+  case class FeeModePercent(
+      @ApiModelProperty(
+        value = "Type of percent fee",
+        dataType = "string",
+        allowableValues = "amount, price, spending, receiving",
+        example = "price"
+      ) `type`: AssetType,
+      @ApiModelProperty(
+        value = "Min fee in percents",
+        dataType = "number",
+        example = "1.5"
+      ) minFee: Double
+  ) extends HttpOrderFeeMode
   object FeeModePercent {
     implicit val percentFormat: Format[FeeModePercent] = Json.format[FeeModePercent]
   }
@@ -81,8 +83,8 @@ object HttpOrderFeeMode {
   private def toJson[T](key: String, x: T)(implicit w: Writes[T]): JsObject = Json.obj(key -> w.writes(x))
 
   def fromSettings(settings: OrderFeeSettings, matcherAccountFee: Long, allRates: Map[Asset, Double]): HttpOrderFeeMode = settings match {
-    case x: OrderFeeSettings.DynamicSettings                    => FeeModeDynamic(x.maxBaseFee + matcherAccountFee, allRates)
-    case OrderFeeSettings.FixedSettings(defaultAssetId, minFee) => FeeModeFixed(defaultAssetId, minFee)
-    case OrderFeeSettings.PercentSettings(assetType, minFee)    => FeeModePercent(assetType, minFee)
+    case x: OrderFeeSettings.DynamicSettings                 => FeeModeDynamic(x.maxBaseFee + matcherAccountFee, allRates)
+    case OrderFeeSettings.FixedSettings(assetId, minFee)     => FeeModeFixed(assetId, minFee)
+    case OrderFeeSettings.PercentSettings(assetType, minFee) => FeeModePercent(assetType, minFee)
   }
 }

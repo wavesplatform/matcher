@@ -112,7 +112,7 @@ class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsInternalBro
 
   private val commonWsRoute: Route = (pathEnd & get &
     parameters("a_os".withDefault("Unknown OS"), "a_client".withDefault("Unknown Client"))) { (aOs: String, aClient: String) =>
-    import matcherSettings.webSocketSettings.externalClientHandler
+    import matcherSettings.webSockets.externalClientHandler
 
     val clientId = UUID.randomUUID().toString
 
@@ -157,7 +157,7 @@ class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsInternalBro
   }
 
   private val internalWsRoute: Route = (path("internal") & get) {
-    import matcherSettings.webSocketSettings.internalClientHandler
+    import matcherSettings.webSockets.internalClientHandler
 
     val clientId = UUID.randomUUID().toString
 

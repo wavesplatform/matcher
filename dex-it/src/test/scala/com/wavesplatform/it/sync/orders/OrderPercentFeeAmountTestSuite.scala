@@ -4,7 +4,6 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.settings.AssetType._
-import com.wavesplatform.dex.settings.FeeMode._
 
 class V1OrderPercentFeeAmountTestSuite extends OrderPercentFeeAmountTestSuite(1.toByte)
 class V2OrderPercentFeeAmountTestSuite extends OrderPercentFeeAmountTestSuite(2.toByte)
@@ -39,16 +38,16 @@ class V3OrderPercentFeeAmountTestSuite extends OrderPercentFeeAmountTestSuite(3.
 }
 
 abstract class OrderPercentFeeAmountTestSuite(version: Byte) extends OrderFeeBaseTestSuite {
-  protected val assetType = AMOUNT
+  protected val assetType = Amount
 
   override protected val dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(
       s"""waves.dex {
          |  allowed-order-versions = [1, 2, 3]
          |  order-fee.-1 {
-         |    mode = $PERCENT
-         |    $PERCENT {
-         |      asset-type = $assetType
+         |    mode = percent
+         |    percent {
+         |      asset-type = amount
          |      min-fee = $percentFee
          |    }
          |  }

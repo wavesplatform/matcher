@@ -26,7 +26,6 @@ object Dependencies {
 
     val typesafeConfig = "1.4.0"
     val scopt          = "4.0.0-RC2"
-    val ficus          = "1.5.0"
 
     val logback            = "1.2.3"
     val slf4j              = "1.7.30"
@@ -76,8 +75,9 @@ object Dependencies {
     val nettyCodec = "4.1.33.Final"
     val jwt        = "4.3.0"
 
-    val pureConfig      = "0.13.0"
+    val pureConfig      = "0.14.0"
     val allureScalaTest = "2.13.5"
+    val enumeratum      = "1.6.1"
   }
 
   private def akkaModule(module: String, version: String): ModuleID  = "com.typesafe.akka"             %% module            % version
@@ -107,7 +107,6 @@ object Dependencies {
   private val shapeless            = "com.chuusai" %% "shapeless" % Version.shapeless
   private val typesafeConfig       = "com.typesafe" % "config" % Version.typesafeConfig
   private val scopt                = "com.github.scopt" %% "scopt" % Version.scopt
-  private val ficus                = "com.iheart" %% "ficus" % Version.ficus
   private val logback              = "ch.qos.logback" % "logback-classic" % Version.logback
   private val logbackJsonEncoder   = "net.logstash.logback" % "logstash-logback-encoder" % Version.logbackJsonEncoder
   private val slf4j                = "org.slf4j" %% "slf4j-api" % Version.slf4j
@@ -139,14 +138,14 @@ object Dependencies {
   private val influxDb        = "org.influxdb" % "influxdb-java" % Version.influxDb
   private val commonsNet      = "commons-net" % "commons-net" % Version.commonsNet
   private val sttpClient      = "com.softwaremill.sttp.client" %% "core" % Version.sttpClient
-  private val pureConfig      = "com.github.pureconfig" %% "pureconfig" % Version.pureConfig
   private val allureScalaTest = "io.qameta.allure" %% "allure-scalatest" % Version.allureScalaTest
   private val jaxbApi         = "javax.xml.bind" % "jaxb-api" % Version.jaxbApi
 
-  private val monocle: Seq[ModuleID] = Seq(
-    "com.github.julien-truffaut" %% "monocle-core"  % Version.monocle,
-    "com.github.julien-truffaut" %% "monocle-macro" % Version.monocle
-  )
+  private val pureConfig: Seq[ModuleID] = Seq("pureconfig", "pureconfig-cats", "pureconfig-enumeratum").map("com.github.pureconfig" %% _ % Version.pureConfig)
+
+  private val enumeratum: Seq[ModuleID] = Seq("enumeratum", "enumeratum-play-json").map("com.beachape" %% _ % Version.enumeratum)
+
+  private val monocle: Seq[ModuleID] = Seq("monocle-core", "monocle-macro").map("com.github.julien-truffaut" %% _ % Version.monocle)
 
   private val silencer: Seq[ModuleID] = Seq(
     compilerPlugin("com.github.ghik" %% "silencer-plugin" % Version.silencer cross CrossVersion.full),
@@ -157,6 +156,7 @@ object Dependencies {
     "org.postgresql" % "postgresql"  % Version.postgresql,
     "io.getquill"    %% "quill-jdbc" % Version.quillJdbc
   )
+
 
   private val testContainers: Seq[ModuleID] = Seq(
     "com.dimafeng"       %% "testcontainers-scala" % Version.testContainers,
@@ -205,7 +205,7 @@ object Dependencies {
       slf4j,
       grpcNetty,
       nettyCodec
-    )
+    ) ++ pureConfig ++ enumeratum
   )
 
   object Module {
@@ -238,9 +238,9 @@ object Dependencies {
       sttpClient,
       wavesJ,
       betterMonadicFor
-    ) ++ testKit ++ quill ++ monocle
+    ) ++ pureConfig ++ enumeratum ++ testKit ++ quill ++ monocle
 
-    lazy val dexLoad: Seq[ModuleID] = Seq(diffx, pureConfig)
+    lazy val dexLoad: Seq[ModuleID] = Seq(diffx) ++ pureConfig
 
     lazy val dexIt: Seq[ModuleID] = integrationTestKit ++ Seq(parCollections)
 
@@ -270,7 +270,6 @@ object Dependencies {
       logback,
       swagger,
       playJson,
-      ficus,
       scorexCrypto,
       catsCore,
       supertagged,

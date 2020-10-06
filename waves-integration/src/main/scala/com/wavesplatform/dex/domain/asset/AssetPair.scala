@@ -5,26 +5,26 @@ import com.wavesplatform.dex.domain.bytes.{ByteStr, deser}
 import com.wavesplatform.dex.domain.validation.Validation
 import com.wavesplatform.dex.domain.validation.Validation.booleanOperators
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
-import net.ceedubs.ficus.readers.ValueReader
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
 import scala.util.{Failure, Success, Try}
 
-@ApiModel(
-  description = """A pair of assets sorted by two rules:
+@ApiModel(description = """A pair of assets sorted by two rules:
       1. A price asset is chosen by a priority from priceAssets of /matcher/settings;
       2. If both assets are not present among priceAssets, they are sorted lexicographically: price asset bytes < amount asset bytes""")
-case class AssetPair(@ApiModelProperty(
-                       value = "Base58 encoded amount asset ID. Waves is used if field isn't specified",
-                       dataType = "string",
-                       example = "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS",
-                     ) amountAsset: Asset,
-                     @ApiModelProperty(
-                       value = "Base58 encoded price asset ID. Waves is used if field isn't specified",
-                       dataType = "string",
-                       example = "DG2xFkPdDwKUoBkzGAhQtLpSGzfXLiCYPEzeKH2Ad24p",
-                     ) priceAsset: Asset) {
+case class AssetPair(
+    @ApiModelProperty(
+      value = "Base58 encoded amount asset ID. Waves is used if field isn't specified",
+      dataType = "string",
+      example = "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS"
+    ) amountAsset: Asset,
+    @ApiModelProperty(
+      value = "Base58 encoded price asset ID. Waves is used if field isn't specified",
+      dataType = "string",
+      example = "DG2xFkPdDwKUoBkzGAhQtLpSGzfXLiCYPEzeKH2Ad24p"
+    ) priceAsset: Asset
+) {
 
   @ApiModelProperty(hidden = true)
   lazy val priceAssetStr: String = priceAsset.toString
@@ -53,8 +53,8 @@ object AssetPair {
 
   def extractAssetPair(s: String): Try[AssetPair] = s.split('-') match {
     case Array(amtAssetStr, prcAssetStr) =>
-      AssetPair.createAssetPair(amtAssetStr, prcAssetStr).recoverWith {
-        case e => Failure(new Exception(s"$s (${e.getMessage})", e))
+      AssetPair.createAssetPair(amtAssetStr, prcAssetStr).recoverWith { case e =>
+        Failure(new Exception(s"$s (${e.getMessage})", e))
       }
 
     case xs => Failure(new Exception(s"$s (incorrect assets count, expected 2 but got ${xs.length})"))
@@ -76,11 +76,6 @@ object AssetPair {
       ),
       offset2
     )
-  }
-
-  implicit val assetPairReader: ValueReader[AssetPair] = { (cfg, path) =>
-    val source = cfg.getString(path)
-    extractAssetPair(source).fold(e => throw e, identity)
   }
 
   implicit val assetPairFormat: OFormat[AssetPair] = (

@@ -3,66 +3,65 @@ package com.wavesplatform.dex.settings
 import java.io.File
 
 import cats.data.NonEmptyList
-import com.typesafe.config.Config
+import cats.implicits.{catsSyntaxOptionId, none}
+import cats.syntax.either._
 import com.wavesplatform.dex.actors.address.AddressActor
 import com.wavesplatform.dex.api.http.OrderBookHttpInfo
-import com.wavesplatform.dex.db.AccountStorage.Settings.{valueReader => accountStorageSettingsReader}
 import com.wavesplatform.dex.db.{AccountStorage, OrderDB}
-import com.wavesplatform.dex.domain.asset.AssetPair._
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.grpc.integration.settings.WavesBlockchainClientSettings
-import com.wavesplatform.dex.model.OrderValidator
-import com.wavesplatform.dex.settings.DenormalizedMatchingRule.denormalizedMatchingRuleNelReader
-import com.wavesplatform.dex.settings.DeviationsSettings._
-import com.wavesplatform.dex.settings.EventsQueueSettings.eventsQueueSettingsReader
-import com.wavesplatform.dex.settings.OrderFeeSettings._
-import com.wavesplatform.dex.settings.OrderHistorySettings._
-import com.wavesplatform.dex.settings.OrderRestrictionsSettings.orderRestrictionsSettingsReader
-import com.wavesplatform.dex.settings.PostgresConnection._
-import com.wavesplatform.dex.settings.utils.ConfigSettingsValidator
-import net.ceedubs.ficus.Ficus._
-import net.ceedubs.ficus.readers.ArbitraryTypeReader.arbitraryTypeValueReader
-import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
+import com.wavesplatform.dex.model.OrderValidator.exchangeTransactionCreationFee
+import com.wavesplatform.dex.settings.utils.ConfigReaderOps.Implicits
+import com.wavesplatform.dex.settings.utils.{ConfigReaders, RawFailureReason, validationOf}
+import pureconfig.ConfigReader
+import pureconfig.configurable.genericMapReader
+import pureconfig.error.{ExceptionThrown, FailureReason}
+import pureconfig.generic.auto._
+import pureconfig.generic.semiauto
+import pureconfig.module.cats.nonEmptyListReader
 
 import scala.concurrent.duration.FiniteDuration
 import scala.util.matching.Regex
 
-case class MatcherSettings(id: String,
-                           addressSchemeCharacter: Char,
-                           accountStorage: AccountStorage.Settings,
-                           wavesBlockchainClient: WavesBlockchainClientSettings,
-                           ntpServer: String,
-                           restApi: RestAPISettings,
-                           exchangeTxBaseFee: Long,
-                           actorResponseTimeout: FiniteDuration,
-                           dataDir: String,
-                           recoverOrderHistory: Boolean,
-                           snapshotsInterval: Int,
-                           limitEventsDuringRecovery: Option[Int],
-                           snapshotsLoadingTimeout: FiniteDuration,
-                           startEventsProcessingTimeout: FiniteDuration,
-                           orderBooksRecoveringTimeout: FiniteDuration,
-                           priceAssets: Seq[Asset],
-                           blacklistedAssets: Set[Asset.IssuedAsset],
-                           blacklistedNames: Seq[Regex],
-                           orderDb: OrderDB.Settings,
-                           // this is not a Set[Address] because to parse an address, global AddressScheme must be initialized
-                           blacklistedAddresses: Set[String],
-                           orderBookSnapshotHttpCache: OrderBookHttpInfo.Settings,
-                           eventsQueue: EventsQueueSettings,
-                           processConsumedTimeout: FiniteDuration,
-                           orderFee: Map[Long, OrderFeeSettings],
-                           deviation: DeviationsSettings,
-                           orderRestrictions: Map[AssetPair, OrderRestrictionsSettings],
-                           matchingRules: Map[AssetPair, NonEmptyList[DenormalizedMatchingRule]],
-                           whiteListOnly: Boolean,
-                           allowedAssetPairs: Set[AssetPair],
-                           allowedOrderVersions: Set[Byte],
-                           exchangeTransactionBroadcast: ExchangeTransactionBroadcastSettings,
-                           postgresConnection: PostgresConnection,
-                           orderHistory: Option[OrderHistorySettings],
-                           webSocketSettings: WebSocketSettings,
-                           addressActorSettings: AddressActor.Settings) {
+case class MatcherSettings(
+    id: String,
+    addressSchemeCharacter: Char,
+    accountStorage: AccountStorage.Settings,
+    wavesBlockchainClient: WavesBlockchainClientSettings,
+    ntpServer: String,
+    restApi: RestAPISettings,
+    exchangeTxBaseFee: Long,
+    actorResponseTimeout: FiniteDuration,
+    dataDirectory: String,
+    snapshotsInterval: Int,
+    limitEventsDuringRecovery: Option[Int],
+    snapshotsLoadingTimeout: FiniteDuration,
+    startEventsProcessingTimeout: FiniteDuration,
+    orderBooksRecoveringTimeout: FiniteDuration,
+    priceAssets: Seq[Asset],
+    blacklistedAssets: Set[Asset.IssuedAsset],
+    blacklistedNames: Seq[Regex],
+    orderDb: OrderDB.Settings,
+    // this is not a Set[Address] because to parse an address, global AddressScheme must be initialized
+    blacklistedAddresses: Set[String],
+    orderBookHttp: OrderBookHttpInfo.Settings,
+    eventsQueue: EventsQueueSettings,
+    processConsumedTimeout: FiniteDuration,
+    orderFee: Map[Long, OrderFeeSettings],
+    maxPriceDeviations: DeviationsSettings,
+    orderRestrictions: Map[AssetPair, OrderRestrictionsSettings],
+    matchingRules: Map[AssetPair, NonEmptyList[DenormalizedMatchingRule]],
+    whiteListOnly: Boolean,
+    allowedAssetPairs: Set[AssetPair],
+    allowedOrderVersions: Set[Byte],
+    exchangeTransactionBroadcast: ExchangeTransactionBroadcastSettings,
+    postgres: PostgresConnection,
+    orderHistory: Option[OrderHistorySettings],
+    webSockets: WebSocketSettings,
+    addressActor: AddressActor.Settings
+) {
+
+  val recoverOrderHistory = !new File(dataDirectory).exists()
 
   def mentionedAssets: Set[Asset] = {
     priceAssets.toSet ++
@@ -71,124 +70,52 @@ case class MatcherSettings(id: String,
       matchingRules.keySet.flatMap(_.assets) ++
       allowedAssetPairs.flatMap(_.assets) ++
       orderFee.values.toSet[OrderFeeSettings].flatMap {
-        case x: OrderFeeSettings.FixedSettings => Set(x.defaultAsset)
+        case x: OrderFeeSettings.FixedSettings => Set(x.asset)
         case _                                 => Set.empty[Asset]
       }
   }
 }
 
-case class RestAPISettings(address: String, port: Int, apiKeyHash: String, cors: Boolean, apiKeyDifferentHost: Boolean)
+object MatcherSettings extends ConfigReaders {
 
-object MatcherSettings {
+  implicit val byteStrConfigReader = byteStr58ConfigReader
 
-  implicit val chosenCase: NameMapper                    = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
-  implicit val valueReader: ValueReader[MatcherSettings] = (cfg, path) => fromConfig(cfg getConfig path)
-
-  implicit val subscriptionsSettingsReader: ValueReader[SubscriptionsSettings] =
-    com.wavesplatform.dex.settings.SubscriptionsSettings.subscriptionSettingsReader
-
-  private def unsafeParseAsset(x: String): Asset = {
-    AssetPair.extractAsset(x).getOrElse(throw new IllegalArgumentException(s"Can't parse '$x' as asset"))
+  implicit val longOrderFeeConfigReader = genericMapReader[Long, OrderFeeSettings] { x =>
+    x.toLongOption.fold[Either[FailureReason, Long]](RawFailureReason(s"'$x' should be numeric").asLeft)(_.asRight)
   }
 
-  private[this] def fromConfig(config: Config): MatcherSettings = {
+  implicit val assetPairOrderRestrictionsConfigReader = genericMapReader[AssetPair, OrderRestrictionsSettings](assetPairKeyParser)
 
-    import ConfigSettingsValidator.AdhocValidation.{validateAssetPairKey, validateOffset}
+  // TODO Create a case class for this
+  implicit val denormalizedMatchingRuleConfigReader = nonEmptyListReader[DenormalizedMatchingRule].validatedList(
+    validationOf.list[NonEmptyList[DenormalizedMatchingRule]].mk { xs =>
+      val isStrictOrder = xs.tail.zip(xs.toList).forall { case (next, prev) => next.startOffset > prev.startOffset }
+      if (isStrictOrder) none
+      else s"Rules should be ordered by offset, but they are: ${xs.map(_.startOffset).toList.mkString(", ")}".some
+    }
+  )
 
-    val addressSchemeCharacter =
-      config
-        .as[String]("address-scheme-character")
-        .headOption
-        .getOrElse(throw new IllegalArgumentException("waves.dex.address-scheme-character is mandatory!"))
+  implicit val matchingRulesConfigReader = genericMapReader[AssetPair, NonEmptyList[DenormalizedMatchingRule]](assetPairKeyParser)
 
-    val accountStorage        = accountStorageSettingsReader.read(config, "account-storage")
-    val wavesBlockchainClient = config.as[WavesBlockchainClientSettings]("waves-blockchain-client")
-    val ntpServer             = config.as[String]("ntp-server")
-    val restApiSettings       = config.as[RestAPISettings]("rest-api")
-
-    val exchangeTxBaseFee = config.getValidatedByPredicate[Long]("exchange-tx-base-fee")(
-      predicate = _ >= OrderValidator.exchangeTransactionCreationFee,
-      errorMsg = s"base fee must be >= ${OrderValidator.exchangeTransactionCreationFee}"
-    )
-
-    val actorResponseTimeout = config.as[FiniteDuration]("actor-response-timeout")
-    val dataDirectory        = config.as[String]("data-directory")
-    val recoverOrderHistory  = !new File(dataDirectory).exists()
-    val snapshotsInterval    = config.as[Int]("snapshots-interval")
-
-    val limitEventsDuringRecovery = config.getAs[Int]("limit-events-during-recovery")
-    require(limitEventsDuringRecovery.forall(_ >= snapshotsInterval), "limit-events-during-recovery should be >= snapshotsInterval")
-
-    val snapshotsLoadingTimeout      = config.as[FiniteDuration]("snapshots-loading-timeout")
-    val startEventsProcessingTimeout = config.as[FiniteDuration]("start-events-processing-timeout")
-    val orderBooksRecoveringTimeout  = config.as[FiniteDuration]("order-books-recovering-timeout")
-    val priceAssets                  = config.as[List[String]]("price-assets").map(unsafeParseAsset)
-
-    val blacklistedAssets =
-      config
-        .as[List[String]]("blacklisted-assets")
-        .map(unsafeParseAsset)
-        .map {
-          case Asset.Waves          => throw new IllegalArgumentException("Can't blacklist the main coin")
-          case x: Asset.IssuedAsset => x
-        }
-        .toSet
-
-    val blacklistedNames        = config.as[List[String]]("blacklisted-names").map(_.r)
-    val blacklistedAddresses    = config.as[Set[String]]("blacklisted-addresses")
-    val orderBookHttp           = config.as[OrderBookHttpInfo.Settings]("order-book-http")
-    val eventsQueue             = config.as[EventsQueueSettings]("events-queue")
-    val processConsumedTimeout  = config.as[FiniteDuration]("process-consumed-timeout")
-    val orderFee                = config.getValidatedMap[Long, OrderFeeSettings]("order-fee")(validateOffset)
-    val deviation               = config.as[DeviationsSettings]("max-price-deviations")
-    val orderRestrictions       = config.getValidatedMap[AssetPair, OrderRestrictionsSettings]("order-restrictions")(validateAssetPairKey)
-    val matchingRules           = config.getValidatedMap[AssetPair, NonEmptyList[DenormalizedMatchingRule]]("matching-rules")(validateAssetPairKey)
-    val whiteListOnly           = config.as[Boolean]("white-list-only")
-    val allowedAssetPairs       = config.getValidatedSet[AssetPair]("allowed-asset-pairs")
-    val allowedOrderVersions    = config.as[Set[Int]]("allowed-order-versions").map(_.toByte)
-    val broadcastUntilConfirmed = config.as[ExchangeTransactionBroadcastSettings]("exchange-transaction-broadcast")
-    val postgresConnection      = config.as[PostgresConnection]("postgres")
-    val orderHistory            = config.as[Option[OrderHistorySettings]]("order-history")
-    val orderDb                 = config.as[OrderDB.Settings]("order-db")
-    val webSocketSettings       = config.as[WebSocketSettings]("web-sockets")
-    val addressActorSettings    = config.as[AddressActor.Settings]("address-actor")
-
-    MatcherSettings(
-      config.as[String]("id"),
-      addressSchemeCharacter,
-      accountStorage,
-      wavesBlockchainClient,
-      ntpServer,
-      restApiSettings,
-      exchangeTxBaseFee,
-      actorResponseTimeout,
-      dataDirectory,
-      recoverOrderHistory,
-      snapshotsInterval,
-      limitEventsDuringRecovery,
-      snapshotsLoadingTimeout,
-      startEventsProcessingTimeout,
-      orderBooksRecoveringTimeout,
-      priceAssets,
-      blacklistedAssets,
-      blacklistedNames,
-      orderDb,
-      blacklistedAddresses,
-      orderBookHttp,
-      eventsQueue,
-      processConsumedTimeout,
-      orderFee,
-      deviation,
-      orderRestrictions,
-      matchingRules,
-      whiteListOnly,
-      allowedAssetPairs,
-      allowedOrderVersions,
-      broadcastUntilConfirmed,
-      postgresConnection,
-      orderHistory,
-      webSocketSettings,
-      addressActorSettings
-    )
+  val exchangeTxBaseFeeValidation = validationOf.field[MatcherSettings, "exchangeTxBaseFee"].mk { settings =>
+    if (settings.exchangeTxBaseFee >= exchangeTransactionCreationFee) none
+    else s"base fee must be >= $exchangeTransactionCreationFee".some
   }
+
+  val limitEventsDuringRecoveryValidation = validationOf.field[MatcherSettings, "limitEventsDuringRecovery"].mk { settings =>
+    settings.limitEventsDuringRecovery match {
+      case Some(value) if value < settings.snapshotsInterval =>
+        s"$value should be >= snapshotsInterval: ${settings.snapshotsInterval}".some
+      case _ => none
+    }
+  }
+
+  implicit val matcherSettingsConfigReader: ConfigReader[MatcherSettings] = semiauto
+    .deriveReader[MatcherSettings]
+    .validatedField(
+      exchangeTxBaseFeeValidation,
+      limitEventsDuringRecoveryValidation
+    )
+
+  def assetPairKeyParser(x: String): Either[FailureReason, AssetPair] = AssetPair.extractAssetPair(x).toEither.leftMap(ExceptionThrown)
 }

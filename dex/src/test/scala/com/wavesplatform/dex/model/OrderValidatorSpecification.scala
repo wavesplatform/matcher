@@ -22,7 +22,6 @@ import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.grpc.integration.clients.RunScriptResult
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.OrderValidator.{AsyncBlockchain, Result}
-import com.wavesplatform.dex.settings.AssetType.AssetType
 import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, FixedSettings, PercentSettings}
 import com.wavesplatform.dex.settings.{AssetType, DeviationsSettings, OrderFeeSettings, OrderRestrictionsSettings}
 import com.wavesplatform.dex.test.matchers.ProduceError.produce
@@ -163,9 +162,8 @@ class OrderValidatorSpecification
           (_, order)      <- orderV3WithPredefinedFeeAssetGenerator(Some(matcherFeeAsset))
         } yield order -> matcherFeeAsset
 
-        forAll(preconditions) {
-          case (order, matcherFeeAssetId) =>
-            validateByMatcherSettings(DynamicSettings.symmetric(matcherFee), Set(matcherFeeAssetId))(order) should produce("FeeAssetBlacklisted")
+        forAll(preconditions) { case (order, matcherFeeAssetId) =>
+          validateByMatcherSettings(DynamicSettings.symmetric(matcherFee), Set(matcherFeeAssetId))(order) should produce("FeeAssetBlacklisted")
         }
       }
 
@@ -177,8 +175,8 @@ class OrderValidatorSpecification
 
         // in percent mode it's not allowed to pay fee in arbitrary asset (only in one of the assets of the pair)
 
-        forAll(preconditions) {
-          case (order, percentFeeSettings) => validateByMatcherSettings(percentFeeSettings)(order) should produce("UnexpectedFeeAsset")
+        forAll(preconditions) { case (order, percentFeeSettings) =>
+          validateByMatcherSettings(percentFeeSettings)(order) should produce("UnexpectedFeeAsset")
         }
       }
 
@@ -190,14 +188,14 @@ class OrderValidatorSpecification
             fixedFeeSettings <- fixedSettingsGenerator(fixedFeeAsset)
           } yield (order, fixedFeeSettings)
 
-        forAll(preconditions) {
-          case (order, fixedFeeSettings) => validateByMatcherSettings(fixedFeeSettings)(order) should produce("UnexpectedFeeAsset")
+        forAll(preconditions) { case (order, fixedFeeSettings) =>
+          validateByMatcherSettings(fixedFeeSettings)(order) should produce("UnexpectedFeeAsset")
         }
       }
 
       "matcherFeeAssetId doesn't meet matcher's settings requirements (dynamic mode and incorrect asset)" in {
-        forAll(orderV3WithPredefinedFeeAssetGenerator()) {
-          case (_, order) => validateByMatcherSettings(DynamicSettings.symmetric(order.matcherFee))(order) should produce("UnexpectedFeeAsset")
+        forAll(orderV3WithPredefinedFeeAssetGenerator()) { case (_, order) =>
+          validateByMatcherSettings(DynamicSettings.symmetric(order.matcherFee))(order) should produce("UnexpectedFeeAsset")
         }
       }
 
@@ -217,7 +215,7 @@ class OrderValidatorSpecification
 
         withClue("AMOUNT/RECEIVING asset type, min fee = 0.3%, fee should be >= 1.5.waves\n") {
           val order = createOrder(wavesBtcPair, OrderType.BUY, 500.waves, price = 0.00011162, matcherFee = 1.5.waves, feeAsset = Waves)
-          Seq(AssetType.AMOUNT, AssetType.RECEIVING).foreach { assetType =>
+          Seq(AssetType.Amount, AssetType.Receiving).foreach { assetType =>
             validateByPercentSettings(assetType) { order } shouldBe Symbol("right")
             validateByPercentSettings(assetType) { order.updateFee(1.49999999.waves) } should produce("FeeNotEnough")
           }
@@ -225,7 +223,7 @@ class OrderValidatorSpecification
 
         withClue("PRICE/SPENDING asset type, min fee = 0.3%, fee should be >= 0.00016743.btc\n") {
           val order = createOrder(wavesBtcPair, OrderType.BUY, 500.waves, price = 0.00011162, matcherFee = 0.00016743.btc, feeAsset = btc)
-          Seq(AssetType.PRICE, AssetType.SPENDING).foreach { assetType =>
+          Seq(AssetType.Price, AssetType.Spending).foreach { assetType =>
             validateByPercentSettings(assetType) { order } shouldBe Symbol("right")
             validateByPercentSettings(assetType) { order.updateFee(0.00016742.btc) } should produce("FeeNotEnough")
           }
@@ -264,13 +262,17 @@ class OrderValidatorSpecification
 
       "matcherFee is not enough (blockchain aware)" in {
 
-        def validateFeeByBlockchain(priceAssetScript: Option[RunScriptResult] = None,
-                                    matcherScript: Option[RunScriptResult] = None): Order => Result[Order] = { order =>
+        def validateFeeByBlockchain(
+            priceAssetScript: Option[RunScriptResult] = None,
+            matcherScript: Option[RunScriptResult] = None
+        ): Order => Result[Order] = { order =>
           awaitResult {
-            validateByBlockchain { DynamicSettings.symmetric(0.003.waves) }(priceAssetScript = priceAssetScript,
-                                                                            matcherAccountScript = matcherScript,
-                                                                            matcherFeeAssetScript = priceAssetScript,
-                                                                            rateCache = rateCache)(order)
+            validateByBlockchain { DynamicSettings.symmetric(0.003.waves) }(
+              priceAssetScript = priceAssetScript,
+              matcherAccountScript = matcherScript,
+              matcherFeeAssetScript = priceAssetScript,
+              rateCache = rateCache
+            )(order)
           }
         }
 
@@ -317,8 +319,8 @@ class OrderValidatorSpecification
           validateByMatcherSettings { FixedSettings(usd, 0.01.usd) } { orderOfVersion(version) } should produce("UnexpectedFeeAsset")
           validateByMatcherSettings { FixedSettings(Waves, 0.003.waves) } { orderOfVersion(version) } shouldBe Symbol("right")
 
-          validateByMatcherSettings { PercentSettings(AssetType.PRICE, 0.003) } { orderOfVersion(version) } should produce("UnexpectedFeeAsset")
-          validateByMatcherSettings { PercentSettings(AssetType.AMOUNT, 0.003) } { orderOfVersion(version) } shouldBe Symbol("right")
+          validateByMatcherSettings { PercentSettings(AssetType.Price, 0.003) } { orderOfVersion(version) } should produce("UnexpectedFeeAsset")
+          validateByMatcherSettings { PercentSettings(AssetType.Amount, 0.003) } { orderOfVersion(version) } shouldBe Symbol("right")
         }
       }
 
@@ -326,9 +328,11 @@ class OrderValidatorSpecification
         case (order, _, orderFeeSettings) =>
           val trueScript = RunScriptResult.Allowed
 
-          def setAssetsAndMatcherAccountScriptsAndValidate(amountAssetScript: Option[RunScriptResult],
-                                                           priceAssetScript: Option[RunScriptResult],
-                                                           matcherAccountScript: Option[RunScriptResult]): Result[Order] =
+          def setAssetsAndMatcherAccountScriptsAndValidate(
+              amountAssetScript: Option[RunScriptResult],
+              priceAssetScript: Option[RunScriptResult],
+              matcherAccountScript: Option[RunScriptResult]
+          ): Result[Order] =
             awaitResult { validateByBlockchain(orderFeeSettings)(amountAssetScript, priceAssetScript, None, matcherAccountScript)(order) }
 
           orderFeeSettings match {
@@ -349,7 +353,7 @@ class OrderValidatorSpecification
       }
 
       "order's price is out of deviation bounds (market aware)" in {
-        val deviationSettings = DeviationsSettings(enabled = true, maxPriceProfit = 50, maxPriceLoss = 70, maxFeeDeviation = 50)
+        val deviationSettings = DeviationsSettings(enable = true, maxPriceProfit = 50, maxPriceLoss = 70, maxFeeDeviation = 50)
         val orderFeeSettings  = DynamicSettings.symmetric(0.003.waves)
 
         val buyOrder  = createOrder(wavesBtcPair, OrderType.BUY, amount = 250.waves, price = 0.00011081)
@@ -398,13 +402,15 @@ class OrderValidatorSpecification
           lowBuyOrderPrices.foreach(price => priceValidationWithLowerBound { buyOrder.updatePrice(price.btc) } should produce("DeviantOrderPrice"))
 
           (midBuyOrderPrices ++ highBuyOrderPrices).foreach(price =>
-            priceValidationWithLowerBound { buyOrder.updatePrice(price.btc) } shouldBe Symbol("right"))
+            priceValidationWithLowerBound { buyOrder.updatePrice(price.btc) } shouldBe Symbol("right")
+          )
 
           priceValidationWithNoBounds { sellOrder } shouldBe Symbol("right")
           lowSellOrderPrices.foreach(price => priceValidationWithLowerBound { sellOrder.updatePrice(price.btc) } should produce("DeviantOrderPrice"))
 
           (midSellOrderPrices ++ highSellOrderPrices).foreach(price =>
-            priceValidationWithLowerBound { sellOrder.updatePrice(price.btc) } shouldBe Symbol("right"))
+            priceValidationWithLowerBound { sellOrder.updatePrice(price.btc) } shouldBe Symbol("right")
+          )
         }
 
         val priceValidationWithUpperBound =
@@ -414,12 +420,14 @@ class OrderValidatorSpecification
           priceValidationWithNoBounds { buyOrder } shouldBe Symbol("right")
           highBuyOrderPrices.foreach(price => priceValidationWithUpperBound { buyOrder.updatePrice(price.btc) } should produce("DeviantOrderPrice"))
           (lowBuyOrderPrices ++ midBuyOrderPrices).foreach(price =>
-            priceValidationWithUpperBound { buyOrder.updatePrice(price.btc) } shouldBe Symbol("right"))
+            priceValidationWithUpperBound { buyOrder.updatePrice(price.btc) } shouldBe Symbol("right")
+          )
 
           priceValidationWithNoBounds { sellOrder } shouldBe Symbol("right")
           highSellOrderPrices.foreach(price => priceValidationWithUpperBound { sellOrder.updatePrice(price.btc) } should produce("DeviantOrderPrice"))
           (lowSellOrderPrices ++ midSellOrderPrices).foreach(price =>
-            priceValidationWithUpperBound { sellOrder.updatePrice(price.btc) } shouldBe Symbol("right"))
+            priceValidationWithUpperBound { sellOrder.updatePrice(price.btc) } shouldBe Symbol("right")
+          )
         }
 
         val nonEmptyMarketStatus = MarketStatus(None, Some(bestBid), Some(bestAsk))
@@ -470,8 +478,8 @@ class OrderValidatorSpecification
         val bestAsk = LevelAgg(amount = 800.waves, price = 0.00011082.btc)
         val bestBid = LevelAgg(amount = 600.waves, price = 0.00011080.btc)
 
-        val percentSettings   = PercentSettings(AssetType.PRICE, 1)                                // matcher fee = 1% of the deal
-        val deviationSettings = DeviationsSettings(enabled = true, 100, 100, maxFeeDeviation = 10) // fee deviation = 10%
+        val percentSettings   = PercentSettings(AssetType.Price, 1)                               // matcher fee = 1% of the deal
+        val deviationSettings = DeviationsSettings(enable = true, 100, 100, maxFeeDeviation = 10) // fee deviation = 10%
 
         val nonEmptyMarketStatus = MarketStatus(None, Some(bestBid), Some(bestAsk))
 
@@ -548,9 +556,11 @@ class OrderValidatorSpecification
       "it's price is less than the tick size (for buy orders)" in {
 
         def normalizePrice(denormalizedPrice: Double): Long = {
-          Normalization.normalizePrice(value = denormalizedPrice,
-                                       amountAssetDecimals = getDefaultAssetDescriptions(Waves).decimals,
-                                       priceAssetDecimals = getDefaultAssetDescriptions(usd).decimals)
+          Normalization.normalizePrice(
+            value = denormalizedPrice,
+            amountAssetDecimals = getDefaultAssetDescriptions(Waves).decimals,
+            priceAssetDecimals = getDefaultAssetDescriptions(usd).decimals
+          )
         }
 
         val validateByTickSize: Order => Result[Order] = OrderValidator.tickSizeAware { normalizePrice(3) }
@@ -578,8 +588,8 @@ class OrderValidatorSpecification
 
         withClue(s"Amount restrictions for the Waves/USD pair: step amount = 0.5.waves, min amount = 0.5.waves, max amount = 100.waves\n") {
           Seq(
-            orderWith(amount = 0.49999999.waves, price = 3), // too low amount
-            orderWith(amount = 0.50000001.waves, price = 3), // isn't a multiple of the step amount
+            orderWith(amount = 0.49999999.waves, price = 3),  // too low amount
+            orderWith(amount = 0.50000001.waves, price = 3),  // isn't a multiple of the step amount
             orderWith(amount = 100.00000001.waves, price = 3) // too high amount
           ) foreach { order =>
             validateByAmountAndPrice(Map.empty) { order } shouldBe Symbol("right")
@@ -589,8 +599,8 @@ class OrderValidatorSpecification
 
         withClue(s"Price restrictions for the Waves/USD pair: step price = 0.5, min price = 0.5, max price = 100\n") {
           Seq(
-            orderWith(amount = 50.waves, price = 0.49), // too low price
-            orderWith(amount = 50.waves, price = 0.51), // isn't a multiple of the step price
+            orderWith(amount = 50.waves, price = 0.49),  // too low price
+            orderWith(amount = 50.waves, price = 0.51),  // isn't a multiple of the step price
             orderWith(amount = 50.waves, price = 100.01) // too high price
           ) foreach { order =>
             validateByAmountAndPrice(Map.empty) { order } shouldBe Symbol("right")
@@ -623,16 +633,28 @@ class OrderValidatorSpecification
         val orderBook =
           OrderBookAggregatedSnapshot(
             asks = Seq(
-              LevelAgg(amount = 32.waves, price = 0.00011842.btc), // buy part of level, value = 11 * 0.00011842 = 0.00130262.btc, remain to execute =  11 - 11 =  0
-              LevelAgg(amount = 23.waves, price = 0.00011825.btc), // buy whole level,   value = 23 * 0.00011825 = 0.00271975.btc, remain to execute =  34 - 23 = 11
-              LevelAgg(amount = 36.waves, price = 0.00011824.btc), // buy whole level,   value = 36 * 0.00011824 = 0.00425664.btc, remain to execute =  70 - 36 = 34
-              LevelAgg(amount = 30.waves, price = 0.00011810.btc) //  buy whole level,   value = 30 * 0.00011810 = 0.00354300.btc, remain to execute = 100 - 30 = 70
+              LevelAgg(
+                amount = 32.waves,
+                price = 0.00011842.btc
+              ), // buy part of level, value = 11 * 0.00011842 = 0.00130262.btc, remain to execute =  11 - 11 =  0
+              LevelAgg(
+                amount = 23.waves,
+                price = 0.00011825.btc
+              ), // buy whole level,   value = 23 * 0.00011825 = 0.00271975.btc, remain to execute =  34 - 23 = 11
+              LevelAgg(
+                amount = 36.waves,
+                price = 0.00011824.btc
+              ), // buy whole level,   value = 36 * 0.00011824 = 0.00425664.btc, remain to execute =  70 - 36 = 34
+              LevelAgg(
+                amount = 30.waves,
+                price = 0.00011810.btc
+              ) //  buy whole level,   value = 30 * 0.00011810 = 0.00354300.btc, remain to execute = 100 - 30 = 70
             ).reverse,
             bids = Seq(
               LevelAgg(amount = 85.waves, price = 0.00011808.btc), // close whole level,   value = 85.waves, remain to execute = 100 - 85 = 15
               LevelAgg(amount = 12.waves, price = 0.00011805.btc), // close whole level,   value = 12.waves, remain to execute =  15 - 12 = 3
               LevelAgg(amount = 40.waves, price = 0.00011787.btc), // close part of level, value = 3.waves,  remain to execute =   3 -  3 = 0
-              LevelAgg(amount = 15.waves, price = 0.00011782.btc) //  won't be touched
+              LevelAgg(amount = 15.waves, price = 0.00011782.btc)  //  won't be touched
             )
           )
 
@@ -645,13 +667,21 @@ class OrderValidatorSpecification
         val (buyPrice, sellPrice) = (0.00011850, 0.00011750) // both prices are enough to collapse counter side
 
         withClue("BUY: in order to buy 100.waves price should be >= 0.00011842.btc, otherwise buy less\n") {
-          validateByPrice { createOrder(wavesBtcPair, BUY, amount = 100.waves, price = 0.00011842) } shouldBe Symbol("right")                  // the lowest acceptable price for buying 100.waves
-          validateByPrice { createOrder(wavesBtcPair, BUY, amount = 100.waves, price = 0.00011841) } should produce("InvalidMarketOrderPrice") // too low price (can only buy 30 + 36 + 23 = 89.waves)
+          validateByPrice { createOrder(wavesBtcPair, BUY, amount = 100.waves, price = 0.00011842) } shouldBe Symbol(
+            "right"
+          ) // the lowest acceptable price for buying 100.waves
+          validateByPrice { createOrder(wavesBtcPair, BUY, amount = 100.waves, price = 0.00011841) } should produce(
+            "InvalidMarketOrderPrice"
+          ) // too low price (can only buy 30 + 36 + 23 = 89.waves)
         }
 
         withClue("SELL: in order to sell 100.waves price should be <= 0.00011787.btc, otherwise sell less\n") {
-          validateByPrice { createOrder(wavesBtcPair, SELL, amount = 100.waves, price = 0.00011787) } shouldBe Symbol("right")                  // the highest acceptable price for selling 100.waves
-          validateByPrice { createOrder(wavesBtcPair, SELL, amount = 100.waves, price = 0.00011788) } should produce("InvalidMarketOrderPrice") // too high price (can only sell 85 + 12 = 97.waves)
+          validateByPrice { createOrder(wavesBtcPair, SELL, amount = 100.waves, price = 0.00011787) } shouldBe Symbol(
+            "right"
+          ) // the highest acceptable price for selling 100.waves
+          validateByPrice { createOrder(wavesBtcPair, SELL, amount = 100.waves, price = 0.00011788) } should produce(
+            "InvalidMarketOrderPrice"
+          ) // too high price (can only sell 85 + 12 = 97.waves)
         }
 
         withClue("BUY: fee in received asset, required balance: Waves = 0.003, BTC > 0\n") {
@@ -736,16 +766,15 @@ class OrderValidatorSpecification
     }
 
     "verify script of feeAsset" in {
-      forAll(orderV3WithFeeSettingsGenerator) {
-        case (order, orderFeeSettings) =>
-          def setFeeAssetScriptAndValidate(matcherFeeAssetScript: Option[RunScriptResult]): Result[Order] =
-            awaitResult { validateByBlockchain(orderFeeSettings)(None, None, matcherFeeAssetScript, None)(order) }
+      forAll(orderV3WithFeeSettingsGenerator) { case (order, orderFeeSettings) =>
+        def setFeeAssetScriptAndValidate(matcherFeeAssetScript: Option[RunScriptResult]): Result[Order] =
+          awaitResult { validateByBlockchain(orderFeeSettings)(None, None, matcherFeeAssetScript, None)(order) }
 
-          if (order.feeAsset != Waves) {
-            setFeeAssetScriptAndValidate(Some(RunScriptResult.ScriptError("Some error"))) should produce("AssetScriptReturnedError")
-            setFeeAssetScriptAndValidate(Some(RunScriptResult.Denied)) should produce("AssetScriptDeniedOrder")
-            setFeeAssetScriptAndValidate(None) shouldBe Symbol("right")
-          }
+        if (order.feeAsset != Waves) {
+          setFeeAssetScriptAndValidate(Some(RunScriptResult.ScriptError("Some error"))) should produce("AssetScriptReturnedError")
+          setFeeAssetScriptAndValidate(Some(RunScriptResult.Denied)) should produce("AssetScriptDeniedOrder")
+          setFeeAssetScriptAndValidate(None) shouldBe Symbol("right")
+        }
       }
     }
 
@@ -857,8 +886,10 @@ class OrderValidatorSpecification
 //    }
   }
 
-  private def blockchainTest(assetDescriptions: Asset => BriefAssetDescription = getDefaultAssetDescriptions,
-                             hasMatcherAccountScript: Boolean = false)(f: (Order => FutureResult[Order], AsyncBlockchain) => Any): Unit = {
+  private def blockchainTest(
+      assetDescriptions: Asset => BriefAssetDescription = getDefaultAssetDescriptions,
+      hasMatcherAccountScript: Boolean = false
+  )(f: (Order => FutureResult[Order], AsyncBlockchain) => Any): Unit = {
 
     val bc = stub[AsyncBlockchain]
     val tc = exchangeTransactionCreator(hasMatcherAccountScript, assetDescriptions(_).hasScript)
@@ -917,26 +948,29 @@ class OrderValidatorSpecification
     (bc.isFeatureActivated _).when(*).onCall(isActive andThen Future.successful)
   }
 
-  private def mkOrderValidator(bc: AsyncBlockchain,
-                               tc: ExchangeTransactionCreator,
-                               assetDescriptions: Asset => BriefAssetDescription = getDefaultAssetDescriptions): Order => FutureResult[Order] = {
-    order =>
-      OrderValidator.blockchainAware(
-        bc,
-        tc.createTransaction,
-        time,
-        DynamicSettings.symmetric(matcherFee),
-        matcherSettings.orderRestrictions.get(order.assetPair),
-        assetDescriptions,
-        rateCache,
-        hasMatcherAccountScript = false
-      )(order)
+  private def mkOrderValidator(
+      bc: AsyncBlockchain,
+      tc: ExchangeTransactionCreator,
+      assetDescriptions: Asset => BriefAssetDescription = getDefaultAssetDescriptions
+  ): Order => FutureResult[Order] = { order =>
+    OrderValidator.blockchainAware(
+      bc,
+      tc.createTransaction,
+      time,
+      DynamicSettings.symmetric(matcherFee),
+      matcherSettings.orderRestrictions.get(order.assetPair),
+      assetDescriptions,
+      rateCache,
+      hasMatcherAccountScript = false
+    )(order)
   }
 
   private def tradableBalance(p: Portfolio)(assetId: Asset): Long = assetId.fold(p.spendableBalance)(p.assets.getOrElse(_, 0L))
 
-  private def exchangeTransactionCreator(hasMatcherAccountScript: Boolean = false,
-                                         hasAssetScript: Asset => Boolean = getDefaultAssetDescriptions(_).hasScript) =
+  private def exchangeTransactionCreator(
+      hasMatcherAccountScript: Boolean = false,
+      hasAssetScript: Asset => Boolean = getDefaultAssetDescriptions(_).hasScript
+  ) =
     new ExchangeTransactionCreator(MatcherAccount, matcherSettings.exchangeTxBaseFee, hasMatcherAccountScript, hasAssetScript)
 
   private def asa[A](
@@ -946,8 +980,9 @@ class OrderValidatorSpecification
   )(f: OrderValidator.Result[AcceptedOrder] => A): A =
     f(OrderValidator.accountStateAware(tradableBalance(p), hasOrder, OrderBookAggregatedSnapshot.empty)(LimitOrder(o)))
 
-  private def validateMarketOrderByAccountStateAware(aggregatedSnapshot: OrderBookAggregatedSnapshot)(
-      b: Map[Asset, Long]): Order => Result[AcceptedOrder] = { order =>
+  private def validateMarketOrderByAccountStateAware(
+      aggregatedSnapshot: OrderBookAggregatedSnapshot
+  )(b: Map[Asset, Long]): Order => Result[AcceptedOrder] = { order =>
     OrderValidator.accountStateAware(
       tradableBalance = b.withDefaultValue(0L).apply,
       orderExists = false,
@@ -956,41 +991,47 @@ class OrderValidatorSpecification
   }
 
   private def msa(ba: Set[Address], o: Order): Order => Result[Order] = {
-    OrderValidator.matcherSettingsAware(o.matcherPublicKey,
-                                        ba,
-                                        matcherSettings,
-                                        getDefaultAssetDescriptions(_).decimals,
-                                        rateCache,
-                                        DynamicSettings.symmetric(matcherFee))
+    OrderValidator.matcherSettingsAware(
+      o.matcherPublicKey,
+      ba,
+      matcherSettings,
+      getDefaultAssetDescriptions(_).decimals,
+      rateCache,
+      DynamicSettings.symmetric(matcherFee)
+    )
   }
 
-  private def validateByMatcherSettings(orderFeeSettings: OrderFeeSettings,
-                                        blacklistedAssets: Set[IssuedAsset] = Set.empty[IssuedAsset],
-                                        allowedAssetPairs: Set[AssetPair] = Set.empty[AssetPair],
-                                        allowedOrderVersions: Set[Byte] = Set(1, 2, 3),
-                                        assetDecimals: Asset => Int = getDefaultAssetDescriptions(_).decimals,
-                                        rateCache: RateCache = rateCache): Order => Result[Order] = { order =>
+  private def validateByMatcherSettings(
+      orderFeeSettings: OrderFeeSettings,
+      blacklistedAssets: Set[IssuedAsset] = Set.empty[IssuedAsset],
+      allowedAssetPairs: Set[AssetPair] = Set.empty[AssetPair],
+      allowedOrderVersions: Set[Byte] = Set(1, 2, 3),
+      assetDecimals: Asset => Int = getDefaultAssetDescriptions(_).decimals,
+      rateCache: RateCache = rateCache
+  ): Order => Result[Order] = { order =>
     OrderValidator
       .matcherSettingsAware(
         MatcherAccount,
         Set.empty,
-        matcherSettings.copy(allowedAssetPairs = allowedAssetPairs,
-                             allowedOrderVersions = allowedOrderVersions,
-                             blacklistedAssets = blacklistedAssets),
+        matcherSettings
+          .copy(allowedAssetPairs = allowedAssetPairs, allowedOrderVersions = allowedOrderVersions, blacklistedAssets = blacklistedAssets),
         assetDecimals,
         rateCache,
         orderFeeSettings
       )(order)
   }
 
-  private def validateByBlockchain(orderFeeSettings: OrderFeeSettings,
-                                   orderRestrictions: Map[AssetPair, OrderRestrictionsSettings] = matcherSettings.orderRestrictions)(
+  private def validateByBlockchain(
+      orderFeeSettings: OrderFeeSettings,
+      orderRestrictions: Map[AssetPair, OrderRestrictionsSettings] = matcherSettings.orderRestrictions
+  )(
       amountAssetScript: Option[RunScriptResult] = None,
       priceAssetScript: Option[RunScriptResult] = None,
       matcherFeeAssetScript: Option[RunScriptResult] = None,
       matcherAccountScript: Option[RunScriptResult] = None,
       assetDescriptions: Asset => BriefAssetDescription = getDefaultAssetDescriptions,
-      rateCache: RateCache = rateCache)(order: Order): FutureResult[Order] = {
+      rateCache: RateCache = rateCache
+  )(order: Order): FutureResult[Order] = {
 
     val blockchain = stub[AsyncBlockchain]
 
@@ -1023,8 +1064,8 @@ class OrderValidatorSpecification
 
     val assetsDescriptions = {
       Set(order.assetPair.amountAsset -> amountAssetScript, order.assetPair.priceAsset -> priceAssetScript, order.feeAsset -> matcherFeeAssetScript)
-        .foldLeft(defaultAssetDescriptionsMap) {
-          case (descMap, (asset, maybeScript)) => descMap.updated(asset, descMap(asset).copy(hasScript = maybeScript.nonEmpty))
+        .foldLeft(defaultAssetDescriptionsMap) { case (descMap, (asset, maybeScript)) =>
+          descMap.updated(asset, descMap(asset).copy(hasScript = maybeScript.nonEmpty))
         }
     }
 
@@ -1067,7 +1108,7 @@ class OrderValidatorSpecification
     (bc.hasScript(_: IssuedAsset)).when(asset).returns(Future.successful(false))
 
   private def assignAssetDescription(bc: AsyncBlockchain, xs: (IssuedAsset, BriefAssetDescription)*): Unit =
-    xs.foreach {
-      case (asset, desc) => (bc.assetDescription _).when(asset).onCall((_: IssuedAsset) => Future.successful { Some(desc) })
+    xs.foreach { case (asset, desc) =>
+      (bc.assetDescription _).when(asset).onCall((_: IssuedAsset) => Future.successful { Some(desc) })
     }
 }

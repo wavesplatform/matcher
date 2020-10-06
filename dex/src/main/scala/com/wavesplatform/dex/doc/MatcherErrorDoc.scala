@@ -4,15 +4,12 @@ import com.wavesplatform.dex.error.{Class, Entity, MatcherError}
 import com.wavesplatform.dex.meta.{DescendantSamples, getSimpleName}
 import play.api.libs.json.Json
 
-import scala.annotation.nowarn
-
 object MatcherErrorDoc {
 
   object entitySamples extends DescendantSamples[Entity]
   object classSamples  extends DescendantSamples[Class]
   object errorSamples  extends DescendantSamples[MatcherError]
 
-  @nowarn
   def mkMarkdown: String = {
     val entities = entitySamples.run
       .map(x => x.code -> getSimpleName(x))

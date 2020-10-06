@@ -27,12 +27,14 @@ import com.wavesplatform.dex.model.{AssetPairBuilder, LevelAgg, OrderBookAggrega
 import com.wavesplatform.dex.settings.MatcherSettings
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
+import pureconfig.ConfigSource
 
 import scala.concurrent.duration.DurationInt
 
 class MatcherApiRouteV1Spec extends RouteSpec("/api/v1") with MatcherSpecBase with PathMockFactory with Eventually with WithDB {
 
-  private val settings = MatcherSettings.valueReader.read(ConfigFactory.load(), "waves.dex").copy(priceAssets = Seq(usd, Waves))
+  private val settings =
+    ConfigSource.fromConfig(ConfigFactory.load()).at("waves.dex").loadOrThrow[MatcherSettings].copy(priceAssets = Seq(usd, Waves))
 
   private implicit val efc: ErrorFormatterContext = {
     case `usd` => 2.some
@@ -43,7 +45,7 @@ class MatcherApiRouteV1Spec extends RouteSpec("/api/v1") with MatcherSpecBase wi
     bids = Seq(
       LevelAgg(43800.waves, 118),
       LevelAgg(52187.waves, 117),
-      LevelAgg(809.waves, 116),
+      LevelAgg(809.waves, 116)
     ),
     asks = Seq(
       LevelAgg(2134.waves, 119),
@@ -88,7 +90,7 @@ class MatcherApiRouteV1Spec extends RouteSpec("/api/v1") with MatcherSpecBase wi
 
     val orderBookHttpInfo =
       new OrderBookHttpInfo(
-        settings = settings.orderBookSnapshotHttpCache,
+        settings = settings.orderBookHttp,
         askAdapter = orderBookAskAdapter,
         time = time,
         assetDecimals = {
@@ -100,7 +102,8 @@ class MatcherApiRouteV1Spec extends RouteSpec("/api/v1") with MatcherSpecBase wi
     val route =
       MatcherApiRouteV1(
         assetPairBuilder = new AssetPairBuilder(
-          settings, {
+          settings,
+          {
             case `usd` => liftValueAsync(BriefAssetDescription("USD", 8, hasScript = false))
             case x     => liftErrorAsync[BriefAssetDescription](error.AssetNotFound(x))
           },

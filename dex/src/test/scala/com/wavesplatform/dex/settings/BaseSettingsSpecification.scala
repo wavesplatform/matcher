@@ -2,15 +2,15 @@ package com.wavesplatform.dex.settings
 
 import cats.syntax.either._
 import com.typesafe.config.{Config, ConfigFactory}
-import net.ceedubs.ficus.Ficus._
 import org.scalatest.flatspec.AnyFlatSpec
+import pureconfig.ConfigSource
 
 import scala.util.Try
 
 class BaseSettingsSpecification extends AnyFlatSpec {
 
   def getSettingByConfig(conf: Config): Either[String, MatcherSettings] =
-    Try(conf.as[MatcherSettings]("waves.dex")).toEither.leftMap(_.getMessage)
+    Try(ConfigSource.fromConfig(conf).at("waves.dex").loadOrThrow[MatcherSettings]).toEither.leftMap(_.getMessage)
 
   val correctOrderFeeStr: String =
     s"""
@@ -37,6 +37,11 @@ class BaseSettingsSpecification extends AnyFlatSpec {
     s"""
        |max-price-deviations {
        |  enable = yes
+       |  max-price-profit = 1000000
+       |  max-price-loss = 1000000
+       |  max-fee-deviation = 1000000
+       |
+       |  # TODO COMPAT
        |  profit = 1000000
        |  loss = 1000000
        |  fee = 1000000
@@ -66,12 +71,14 @@ class BaseSettingsSpecification extends AnyFlatSpec {
        |}
        """.stripMargin
 
-  def configWithSettings(orderFeeStr: String = correctOrderFeeStr,
-                         deviationsStr: String = correctDeviationsStr,
-                         allowedAssetPairsStr: String = correctAllowedAssetPairsStr,
-                         orderRestrictionsStr: String = correctOrderRestrictionsStr,
-                         matchingRulesStr: String = correctMatchingRulesStr,
-                         subscriptionsSettings: String = correctSubscriptionsSettingsStr): Config = {
+  def configWithSettings(
+      orderFeeStr: String = correctOrderFeeStr,
+      deviationsStr: String = correctDeviationsStr,
+      allowedAssetPairsStr: String = correctAllowedAssetPairsStr,
+      orderRestrictionsStr: String = correctOrderRestrictionsStr,
+      matchingRulesStr: String = correctMatchingRulesStr,
+      subscriptionsSettings: String = correctSubscriptionsSettingsStr
+  ): Config = {
     val configStr =
       s"""waves {
          |  directory = /waves
@@ -79,7 +86,7 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |    id = "matcher-1"
          |    account-storage {
          |      type = "in-mem"
-         |      in-mem.seed-in-base64 = "c3lrYWJsZXlhdA=="
+         |      in-mem.seed-in-base-64 = "c3lrYWJsZXlhdA=="
          |    }
          |    order-db {
          |      max-orders = 199

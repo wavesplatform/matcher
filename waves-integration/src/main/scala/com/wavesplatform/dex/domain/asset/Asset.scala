@@ -3,7 +3,6 @@ package com.wavesplatform.dex.domain.asset
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.utils.base58Length
-import net.ceedubs.ficus.readers.ValueReader
 import play.api.libs.json._
 
 sealed trait Asset extends Product with Serializable
@@ -38,10 +37,6 @@ object Asset {
     },
     tjs = Writes(asset => JsString(asset.toString))
   )
-
-  implicit val assetReader: ValueReader[Asset] = { (cfg, path) =>
-    AssetPair.extractAsset(cfg getString path).fold(ex => throw new Exception(ex.getMessage), identity)
-  }
 
   def fromString(x: String): Option[Asset] =
     if (x == WavesName) Some(Waves)

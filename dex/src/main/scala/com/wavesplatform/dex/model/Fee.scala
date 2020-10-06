@@ -33,10 +33,10 @@ object Fee {
         val (buy, sell) = Order.splitByType(s.order, c.order)
 
         val (buyAmt, sellAmt) = assetType match {
-          case AssetType.AMOUNT    => buy.getReceiveAmount _ -> sell.getSpendAmount _
-          case AssetType.PRICE     => buy.getSpendAmount _   -> sell.getReceiveAmount _
-          case AssetType.RECEIVING => buy.getReceiveAmount _ -> sell.getReceiveAmount _
-          case AssetType.SPENDING  => buy.getSpendAmount _   -> sell.getSpendAmount _
+          case AssetType.Amount    => buy.getReceiveAmount _ -> sell.getSpendAmount _
+          case AssetType.Price     => buy.getSpendAmount _   -> sell.getReceiveAmount _
+          case AssetType.Receiving => buy.getReceiveAmount _ -> sell.getReceiveAmount _
+          case AssetType.Spending  => buy.getSpendAmount _   -> sell.getSpendAmount _
         }
 
         def buySellFee(buyAmount: Long, buyPrice: Long, sellAmount: Long, sellPrice: Long): (Long, Long) =

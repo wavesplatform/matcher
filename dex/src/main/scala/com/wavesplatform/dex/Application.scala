@@ -54,8 +54,8 @@ import com.wavesplatform.dex.time.NTP
 import kamon.Kamon
 import kamon.influxdb.InfluxDBReporter
 import mouse.any.anySyntaxMouse
-import net.ceedubs.ficus.Ficus._
 import org.slf4j.LoggerFactory
+import pureconfig.ConfigSource
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -103,7 +103,7 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
     Future { blocking(time.close()); Done }
   }
 
-  private val db = openDB(settings.dataDir)
+  private val db = openDB(settings.dataDirectory)
   cs.addTask(CoordinatedShutdown.PhaseActorSystemTerminate, "DB") { () =>
     Future { blocking(db.close()); Done }
   }
@@ -116,7 +116,7 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
 
   private implicit val errorContext: ErrorFormatterContext = ErrorFormatterContext.fromOptional(assetsCache.get(_: Asset).map(_.decimals))
 
-  private val matcherQueue: MatcherQueue = settings.eventsQueue.tpe match {
+  private val matcherQueue: MatcherQueue = settings.eventsQueue.`type` match {
     case "local" =>
       log.info("Events will be stored locally")
       new LocalMatcherQueue(settings.eventsQueue.local, new LocalQueueStore(db), time)
@@ -134,7 +134,7 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
 
   private val orderBookAskAdapter = new OrderBookAskAdapter(orderBooks, settings.actorResponseTimeout)
   private val orderBookHttpInfo =
-    new OrderBookHttpInfo(settings.orderBookSnapshotHttpCache, orderBookAskAdapter, time, assetsCache.get(_).map(_.decimals))
+    new OrderBookHttpInfo(settings.orderBookHttp, orderBookAskAdapter, time, assetsCache.get(_).map(_.decimals))
 
   private val transactionCreator = new ExchangeTransactionCreator(
     matcherKeyPair,
@@ -179,7 +179,7 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
   )
 
   private val wsInternalBroadcastRef: typed.ActorRef[WsInternalBroadcastActor.Command] = actorSystem.spawn(
-    WsInternalBroadcastActor(settings.webSocketSettings.internalBroadcast),
+    WsInternalBroadcastActor(settings.webSockets.internalBroadcast),
     "ws-internal-broadcast"
   )
 
@@ -192,7 +192,7 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
   )
 
   private val historyRouterRef = settings.orderHistory.map { orderHistorySettings =>
-    actorSystem.actorOf(HistoryRouterActor.props(assetsCache.unsafeGetDecimals, settings.postgresConnection, orderHistorySettings), "history-router")
+    actorSystem.actorOf(HistoryRouterActor.props(assetsCache.unsafeGetDecimals, settings.postgres, orderHistorySettings), "history-router")
   }
 
   private val addressDirectoryRef =
@@ -214,7 +214,7 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
     storeEvent,
     started,
     spendableBalancesRef,
-    settings.addressActorSettings
+    settings.addressActor
   )
 
   private val spendableBalancesRef = actorSystem.actorOf(SpendableBalancesActor.props(wavesBlockchainAsyncClient, addressDirectoryRef))
@@ -223,7 +223,7 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
     def mkOrderBookProps(assetPair: AssetPair, matcherActor: ActorRef): Props = {
       matchingRulesCache.setCurrentMatchingRuleForNewOrderBook(assetPair, lastProcessedOffset, errorContext.unsafeAssetDecimals)
       OrderBookActor.props(
-        OrderBookActor.Settings(AggregatedOrderBookActor.Settings(settings.webSocketSettings.externalClientHandler.messagesInterval)),
+        OrderBookActor.Settings(AggregatedOrderBookActor.Settings(settings.webSockets.externalClientHandler.messagesInterval)),
         matcherActor,
         addressDirectoryRef,
         orderBookSnapshotStoreRef,
@@ -571,7 +571,7 @@ object Application {
 
     config.getConfig(scalaContextPath).toProperties.asScala.foreach { case (k, v) => System.setProperty(s"$scalaContextPath.$k", v) }
 
-    val settings = config.as[MatcherSettings]("waves.dex")(MatcherSettings.valueReader)
+    val settings = ConfigSource.fromConfig(config).at("waves.dex").loadOrThrow[MatcherSettings]
 
     // Initialize global var with actual address scheme
     AddressScheme.current = new AddressScheme { override val chainId: Byte = settings.addressSchemeCharacter.toByte }

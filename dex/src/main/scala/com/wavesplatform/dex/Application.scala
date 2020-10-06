@@ -23,7 +23,7 @@ import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor
 import com.wavesplatform.dex.actors.orderbook.{AggregatedOrderBookActor, OrderBookActor, OrderBookSnapshotStoreActor}
 import com.wavesplatform.dex.actors.tx.{BroadcastExchangeTransactionActor, CreateExchangeTransactionActor, WriteExchangeTransactionActor}
 import com.wavesplatform.dex.actors.{MatcherActor, OrderBookAskAdapter, RootActorSystem, SpendableBalancesActor}
-import com.wavesplatform.dex.api.http.headers.MatcherHttpServer
+import com.wavesplatform.dex.api.http.headers.{CustomMediaTypes, MatcherHttpServer}
 import com.wavesplatform.dex.api.http.routes.{MatcherApiRoute, MatcherApiRouteV1}
 import com.wavesplatform.dex.api.http.{CompositeHttpService, OrderBookHttpInfo}
 import com.wavesplatform.dex.api.routes.ApiRoute
@@ -353,6 +353,9 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       log.info(s"Binding REST and WebSocket API ${settings.restApi.address}:${settings.restApi.port} ...")
       http
         .newServerAt(settings.restApi.address, settings.restApi.port)
+        .adaptSettings { settings =>
+          settings.withParserSettings(settings.parserSettings.withCustomMediaTypes(CustomMediaTypes.`application/hocon`))
+        }
         .bind(combinedRoute)
         .map(_.addToCoordinatedShutdown(hardTerminationDeadline = 5.seconds))
     } map { serverBinding =>

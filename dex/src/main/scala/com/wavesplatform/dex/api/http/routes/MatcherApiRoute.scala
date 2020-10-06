@@ -2,8 +2,7 @@ package com.wavesplatform.dex.api.http.routes
 
 import akka.actor.{ActorRef, typed}
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
-import akka.http.scaladsl.model.headers.RawHeader
-import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
+import akka.http.scaladsl.model.{HttpEntity, HttpResponse, StatusCodes}
 import akka.http.scaladsl.server
 import akka.http.scaladsl.server._
 import akka.http.scaladsl.server.directives.FutureDirectives
@@ -19,7 +18,7 @@ import com.wavesplatform.dex.actors.address.AddressActor.OrderListType
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.api.http._
 import com.wavesplatform.dex.api.http.entities._
-import com.wavesplatform.dex.api.http.headers.`X-User-Public-Key`
+import com.wavesplatform.dex.api.http.headers.{CustomContentTypes, `X-User-Public-Key`}
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
 import com.wavesplatform.dex.api.ws.actors.WsExternalClientDirectoryActor
@@ -95,6 +94,9 @@ class MatcherApiRoute(
 
   private val timer      = Kamon.timer("matcher.api-requests")
   private val placeTimer = timer.withTag("action", "place")
+
+  private val excludedConfigKeys = Set("user", "pass", "seed", "private")
+  private val filteredConfig     = config.withoutKeys(excludedConfigKeys.contains)
 
   private def invalidJsonResponse(error: MatcherError): StandardRoute = complete { InvalidJsonResponse(error) }
   private val invalidUserPublicKey: StandardRoute                     = complete { SimpleErrorResponse(StatusCodes.Forbidden, error.UserPublicKeyIsNotValid) }
@@ -1046,17 +1048,8 @@ class MatcherApiRoute(
     response = classOf[HttpResponse]
   )
   def getConfig: Route = (path("config") & get & withAuth) {
-
-    respondWithHeader(RawHeader("Content-type", "application/hocon")) {
-
-      complete {
-        HttpResponse(entity = config.getObject("waves").toConfig
-          .withoutKeys(_.contains("user"))
-          .withoutKeys(_.contains("pass"))
-          .withoutKeys(_.contains("seed"))
-          .withoutKeys(_.contains("private"))
-          .rendered)
-      }
+    complete {
+      HttpEntity(filteredConfig.rendered).withContentType(CustomContentTypes.`application/hocon`)
     }
   }
 

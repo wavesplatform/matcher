@@ -2,9 +2,8 @@ package com.wavesplatform.dex.api.http.routes
 
 import akka.actor.{ActorRef, typed}
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
-import akka.http.scaladsl.model.HttpHeader.ParsingResult
 import akka.http.scaladsl.model.headers.RawHeader
-import akka.http.scaladsl.model.{HttpHeader, HttpResponse, StatusCodes}
+import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import akka.http.scaladsl.server
 import akka.http.scaladsl.server._
 import akka.http.scaladsl.server.directives.FutureDirectives
@@ -13,7 +12,7 @@ import akka.stream.Materializer
 import akka.util.Timeout
 import cats.syntax.option._
 import com.google.common.primitives.Longs
-import com.typesafe.config.{Config, ConfigValueType}
+import com.typesafe.config.Config
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.actors.MatcherActor._
 import com.wavesplatform.dex.actors.address.AddressActor.OrderListType
@@ -1046,9 +1045,9 @@ class MatcherApiRoute(
     tags = Array("debug"),
     response = classOf[HttpResponse]
   )
-  def getConfig: Route = (path("config") & get & withAuth)  {
+  def getConfig: Route = (path("config") & get & withAuth) {
 
-    respondWithHeader (RawHeader("Content-type", "application/hocon"))  {
+    respondWithHeader(RawHeader("Content-type", "application/hocon")) {
       complete {
 
         //
@@ -1058,10 +1057,10 @@ class MatcherApiRoute(
         //        }
 
         HttpResponse(entity = config.getObject("waves").toConfig
-          .filterKeys("user")
-          .filterKeys("pass")
-          .filterKeys("seed")
-          .filterKeys("private")
+          .filterKeys(_.contains("user"))
+          .filterKeys(_.contains("pass"))
+          .filterKeys(_.contains("seed"))
+          .filterKeys(_.contains("private"))
           .rendered)
       }
     }

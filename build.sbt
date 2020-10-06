@@ -8,7 +8,7 @@ Global / resolvers += Resolver.bintrayRepo("ethereum", "maven") // JNI LevelDB
 
 // Scalafix
 scalafixDependencies in ThisBuild ++= List(
-  "org.scalatest"          %% "autofix"                     % "3.1.0.0",
+  "org.scalatest" %% "autofix" % "3.1.0.0",
   "org.scala-lang.modules" %% "scala-collection-migrations" % "2.1.4"
 )
 addCompilerPlugin(scalafixSemanticdb)
@@ -195,7 +195,7 @@ fullCheckRaw := Def
     quickCheckRaw,
     Def.task {
       val wavesIntegrationDocker = (`waves-integration-it` / Docker / docker).value
-      val dexDocker              = (`dex-it` / Docker / docker).value
+      val dexDocker = (`dex-it` / Docker / docker).value
     },
     `waves-integration-it` / Test / test,
     `dex-it` / Test / test

@@ -14,18 +14,18 @@ import scala.concurrent.duration.FiniteDuration
 object GenesisConfigGenerator {
 
   private type AccountName = String
-  private type SeedText    = String
-  private type Share       = Long
+  private type SeedText = String
+  private type Share = Long
 
   case class DistributionItem(seedText: String, nonce: Int, amount: Share)
 
   case class Settings(
-      networkType: String,
-      initialBalance: Share,
-      baseTarget: Long,
-      averageBlockDelay: FiniteDuration,
-      timestamp: Option[Long],
-      distributions: Map[AccountName, DistributionItem]
+    networkType: String,
+    initialBalance: Share,
+    baseTarget: Long,
+    averageBlockDelay: FiniteDuration,
+    timestamp: Option[Long],
+    distributions: Map[AccountName, DistributionItem]
   ) {
 
     private[this] val distributionsSum = distributions.values.map(_.amount).sum
@@ -38,18 +38,18 @@ object GenesisConfigGenerator {
   }
 
   case class FullAddressInfo(
-      seedText: SeedText,
-      seed: ByteStr,
-      accountSeed: ByteStr,
-      accountPrivateKey: ByteStr,
-      accountPublicKey: ByteStr,
-      accountAddress: Address
+    seedText: SeedText,
+    seed: ByteStr,
+    accountSeed: ByteStr,
+    accountPrivateKey: ByteStr,
+    accountPublicKey: ByteStr,
+    accountAddress: Address
   )
 
   private def toFullAddressInfo(item: DistributionItem): FullAddressInfo = {
 
     val seedBytes = item.seedText.getBytes("UTF-8")
-    val acc       = PredefinedAccounts.generateNewAccount(seedBytes, item.nonce)
+    val acc = PredefinedAccounts.generateNewAccount(seedBytes, item.nonce)
 
     FullAddressInfo(
       seedText = item.seedText,
@@ -81,7 +81,7 @@ object GenesisConfigGenerator {
 
     val genesisBlock = {
 
-      val reference     = ByteStr(Array.fill(crypto.SignatureLength)(-1: Byte))
+      val reference = ByteStr(Array.fill(crypto.SignatureLength)(-1: Byte))
       val genesisSigner = KeyPair(ByteStr.empty)
 
       Block
@@ -127,4 +127,5 @@ object GenesisConfigGenerator {
          |}""".stripMargin
     )
   }
+
 }

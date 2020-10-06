@@ -67,19 +67,18 @@ case class Checker(superConnector: SuperConnector) {
 
     val asset: IssuedAsset = IssuedAsset(ByteStr(tx.id().bytes()))
     for {
-      _      <- nodeRest.broadcastTx(tx).leftMap(ex => s"Cannot broadcast issue transaction! $ex")
-      _      <- nodeRest.repeatRequest(nodeRest getTxInfo tx)(_.isRight)
+      _ <- nodeRest.broadcastTx(tx).leftMap(ex => s"Cannot broadcast issue transaction! $ex")
+      _ <- nodeRest.repeatRequest(nodeRest getTxInfo tx)(_.isRight)
       height <- nodeRest.waitForHeightArise()
-    } yield
-      (
-        AssetInfo(asset, name),
-        s"Issued ${denormalize(quantity)} $name, issue tx id = ${tx.id().toString}, height = ${height - 1}"
-      )
+    } yield (
+      AssetInfo(asset, name),
+      s"Issued ${denormalize(quantity)} $name, issue tx id = ${tx.id().toString}, height = ${height - 1}"
+    )
   }
 
   private def checkBalance: CheckLoggedResult[DetailedBalance] = {
 
-    val balance      = dexExtensionGrpc.matcherBalanceSync(env.matcherKeyPair)
+    val balance = dexExtensionGrpc.matcherBalanceSync(env.matcherKeyPair)
     val wavesBalance = denormalizeWavesBalance(balance.get(Waves).map(_._2) getOrElse 0)
 
     Either.cond(
@@ -92,40 +91,41 @@ case class Checker(superConnector: SuperConnector) {
   private def checkTestAsset(matcherBalance: DetailedBalance, assetName: String): CheckLoggedResult[AssetInfo] =
     matcherBalance
       .find(_._2._1.name == assetName)
-      .fold { issueAsset(assetName, testAssetDescription, mnogo) } {
+      .fold(issueAsset(assetName, testAssetDescription, mnogo)) {
         case (a, (d, b)) => (AssetInfo(a, d.name) -> s"Balance = ${denormalize(b)} ${d.name} (${a.toString})").asRight
       }
 
   private def mkMatcherOrder(assetPair: AssetPair, orderType: OrderType): Order = {
     val timestamp = System.currentTimeMillis
-    OrderV3(env.matcherKeyPair,
-            env.matcherKeyPair.publicKey,
-            assetPair,
-            orderType,
-            testAmount,
-            testPrice,
-            timestamp,
-            timestamp + 24.hours.toMillis,
-            matcherOrderFee,
-            Waves)
+    OrderV3(
+      env.matcherKeyPair,
+      env.matcherKeyPair.publicKey,
+      assetPair,
+      orderType,
+      testAmount,
+      testPrice,
+      timestamp,
+      timestamp + 24.hours.toMillis,
+      matcherOrderFee,
+      Waves
+    )
   }
 
   private def checkActiveOrders(firstAssetInfo: AssetInfo, secondAssetInfo: AssetInfo): CheckLoggedResult[AssetPairInfo] = {
     val assetPairInfo = getAssetPairInfo(firstAssetInfo, secondAssetInfo)
-    val assetPair     = assetPairInfo.assetPair
+    val assetPair = assetPairInfo.assetPair
     for {
-      activeOrders <- dexRest.getActiveOrdersByPair(env.matcherKeyPair, assetPair).map { _.map(j => (j \ "id").as[ByteStr]).toList }
-      _            <- activeOrders.traverse(id => dexRest.cancelOrder(id, assetPair, env.matcherKeyPair))
-      _            <- activeOrders.traverse(id => dexRest.waitForOrderStatus(id, assetPair, OrderStatus.Cancelled.name))
-    } yield {
+      activeOrders <- dexRest.getActiveOrdersByPair(env.matcherKeyPair, assetPair).map(_.map(j => (j \ "id").as[ByteStr]).toList)
+      _ <- activeOrders.traverse(id => dexRest.cancelOrder(id, assetPair, env.matcherKeyPair))
+      _ <- activeOrders.traverse(id => dexRest.waitForOrderStatus(id, assetPair, OrderStatus.Cancelled.name))
+    } yield
       if (activeOrders.isEmpty) (assetPairInfo, s"Matcher didn't have any active orders on a test asset pair ${assetPair.toString}")
       else (assetPairInfo, s"Matcher had active orders on a test asset pair ${assetPair.toString}: ${activeOrders.mkString(", ")} cancelled")
-    }
   }
 
   private def checkPlacement(assetPairInfo: AssetPairInfo): CheckLoggedResult[Order] = {
     val orderType = if (Random.nextBoolean()) BUY else SELL
-    val order     = mkMatcherOrder(assetPairInfo.assetPair, orderType)
+    val order = mkMatcherOrder(assetPairInfo.assetPair, orderType)
     for {
       _ <- dexRest.placeOrder(order)
       _ <- dexRest.waitForOrderStatus(order, OrderStatus.Accepted.name)
@@ -140,8 +140,8 @@ case class Checker(superConnector: SuperConnector) {
 
   private def checkExecution(assetPairInfo: AssetPairInfo): ErrorOr[String] = {
 
-    val counter     = mkMatcherOrder(assetPairInfo.assetPair, BUY)
-    val submitted   = mkMatcherOrder(assetPairInfo.assetPair, SELL)
+    val counter = mkMatcherOrder(assetPairInfo.assetPair, BUY)
+    val submitted = mkMatcherOrder(assetPairInfo.assetPair, SELL)
     val submittedId = submitted.id()
 
     def checkFillingAtDex(orderStatus: JsValue): ErrorOr[Boolean] = {
@@ -154,7 +154,7 @@ case class Checker(superConnector: SuperConnector) {
       (
         for {
           filledAmount <- (orderStatus \ "filledAmount").asOpt[Long]
-          filledFee    <- (orderStatus \ "filledFee").asOpt[Long]
+          filledFee <- (orderStatus \ "filledFee").asOpt[Long]
         } yield filledAmount == submitted.amount && filledFee == submitted.matcherFee
       ).toRight[String](s"Check of submitted order filling failed! Expected $expectedFilledStatus, but got ${orderStatus.toString}")
     }
@@ -168,12 +168,12 @@ case class Checker(superConnector: SuperConnector) {
       } yield txs
 
     for {
-      _               <- dexRest.placeOrder(counter)
-      counterStatus   <- dexRest.waitForOrderStatus(counter, OrderStatus.Accepted.name)
-      _               <- dexRest.placeOrder(submitted)
+      _ <- dexRest.placeOrder(counter)
+      counterStatus <- dexRest.waitForOrderStatus(counter, OrderStatus.Accepted.name)
+      _ <- dexRest.placeOrder(submitted)
       submittedStatus <- dexRest.waitForOrderStatus(submitted, OrderStatus.Filled.name)
-      _               <- checkFillingAtDex(submittedStatus)
-      txs             <- awaitSubmittedOrderAtNode
+      _ <- checkFillingAtDex(submittedStatus)
+      txs <- awaitSubmittedOrderAtNode
     } yield {
       val printOrder: Order => String = this.printOrder(assetPairInfo)(_)
       s"""\n
@@ -191,45 +191,45 @@ case class Checker(superConnector: SuperConnector) {
          """.stripMargin
     }
 
-  private def checkWsAccountUpdates(maybeSeed: Option[String]): ErrorOr[String] = {
-    authServiceRest.fold { lift(s"Account updates check wasn't performed, since Auth Service REST API uri wasn't provided") } { as =>
+  private def checkWsAccountUpdates(maybeSeed: Option[String]): ErrorOr[String] =
+    authServiceRest.fold(lift(s"Account updates check wasn't performed, since Auth Service REST API uri wasn't provided")) { as =>
       for {
-        creds    <- as.getAuthCredentials(maybeSeed)
+        creds <- as.getAuthCredentials(maybeSeed)
         snapshot <- dexWs.subscribeForAccountUpdates(creds)
       } yield s"""\n
-           |    Got snapshot for ${creds.keyPair.publicKey.toAddress} address, seed = ${creds.seed}${maybeSeed.fold(" (randomly generated)")(_ => "")}:
-           |    ${WsAddressChanges.wsAddressChangesFormat.writes(snapshot).toString}\n
+                 |    Got snapshot for ${creds.keyPair.publicKey.toAddress} address, seed = ${creds.seed}${maybeSeed.fold(" (randomly generated)")(_ =>
+        ""
+      )}:
+                 |    ${WsAddressChanges.wsAddressChangesFormat.writes(snapshot).toString}\n
          """.stripMargin
     }
-  }
 
   def checkState(version: String, maybeAccountSeed: Option[String]): ErrorOr[String] =
     for {
-      _                                  <- log[ErrorOr]("\nChecking:\n")
-      _                                  <- logCheck("1. DEX version") { checkVersion(version) }
-      (balance, balanceNotes)            <- logCheck("2. Matcher balance") { checkBalance }
-      (wuJIoInfo, firstAssetNotes)       <- logCheck("3. First test asset") { checkTestAsset(balance, firstTestAssetName) }
-      (mbIJIoInfo, secondAssetNotes)     <- logCheck("4. Second test asset") { checkTestAsset(balance, secondTestAssetName) }
-      (assetPairInfo, activeOrdersNotes) <- logCheck("5. Matcher active orders") { checkActiveOrders(wuJIoInfo, mbIJIoInfo) }
-      (order, placementNotes)            <- logCheck("6. Order placement") { checkPlacement(assetPairInfo) }
-      (_, cancellationNotes)             <- logCheck("7. Order cancellation") { checkCancellation(order) }
-      executionNotes                     <- logCheck("8. Execution") { checkExecution(assetPairInfo) }
-      orderBookWsStreamNotes             <- logCheck("9. Order book WS stream") { checkWsOrderBook(assetPairInfo) }
-      accountUpdatesWsStreamNotes        <- logCheck("10. Account updates WS stream") { checkWsAccountUpdates(maybeAccountSeed) }
-    } yield {
-      s"""
-           |Diagnostic notes:
-           |  Matcher balance           : $balanceNotes 
-           |  First asset               : $firstAssetNotes
-           |  Second asset              : $secondAssetNotes
-           |  Matcher active orders     : $activeOrdersNotes
-           |  Placement                 : $placementNotes
-           |  Cancellation              : $cancellationNotes
-           |  Execution                 : $executionNotes
-           |  Order book WS stream      : $orderBookWsStreamNotes
-           |  Account updates WS stream : $accountUpdatesWsStreamNotes
+      _ <- log[ErrorOr]("\nChecking:\n")
+      _ <- logCheck("1. DEX version")(checkVersion(version))
+      (balance, balanceNotes) <- logCheck("2. Matcher balance")(checkBalance)
+      (wuJIoInfo, firstAssetNotes) <- logCheck("3. First test asset")(checkTestAsset(balance, firstTestAssetName))
+      (mbIJIoInfo, secondAssetNotes) <- logCheck("4. Second test asset")(checkTestAsset(balance, secondTestAssetName))
+      (assetPairInfo, activeOrdersNotes) <- logCheck("5. Matcher active orders")(checkActiveOrders(wuJIoInfo, mbIJIoInfo))
+      (order, placementNotes) <- logCheck("6. Order placement")(checkPlacement(assetPairInfo))
+      (_, cancellationNotes) <- logCheck("7. Order cancellation")(checkCancellation(order))
+      executionNotes <- logCheck("8. Execution")(checkExecution(assetPairInfo))
+      orderBookWsStreamNotes <- logCheck("9. Order book WS stream")(checkWsOrderBook(assetPairInfo))
+      accountUpdatesWsStreamNotes <- logCheck("10. Account updates WS stream")(checkWsAccountUpdates(maybeAccountSeed))
+    } yield s"""
+               |Diagnostic notes:
+               |  Matcher balance           : $balanceNotes 
+               |  First asset               : $firstAssetNotes
+               |  Second asset              : $secondAssetNotes
+               |  Matcher active orders     : $activeOrdersNotes
+               |  Placement                 : $placementNotes
+               |  Cancellation              : $cancellationNotes
+               |  Execution                 : $executionNotes
+               |  Order book WS stream      : $orderBookWsStreamNotes
+               |  Account updates WS stream : $accountUpdatesWsStreamNotes
        """.stripMargin
-    }
+
 }
 
 object Checker {
@@ -237,26 +237,27 @@ object Checker {
   private case class AssetInfo(asset: Asset, name: String)
 
   private case class AssetPairInfo(amountAssetInfo: AssetInfo, priceAssetInfo: AssetInfo) {
-    val assetPair: AssetPair              = AssetPair(amountAssetInfo.asset, priceAssetInfo.asset)
+    val assetPair: AssetPair = AssetPair(amountAssetInfo.asset, priceAssetInfo.asset)
     val (amountAssetName, priceAssetName) = amountAssetInfo.name -> priceAssetInfo.name
-    val assetPairName                     = s"$amountAssetName-$priceAssetName"
+    val assetPairName = s"$amountAssetName-$priceAssetName"
   }
 
-  private val firstTestAssetName  = "IIIuJIo"
+  private val firstTestAssetName = "IIIuJIo"
   private val secondTestAssetName = "MbIJIo"
 
-  private val testAssetDescription  = "Asset for the Matcher checking purposes"
-  private val testAssetDecimals     = 8.toByte
+  private val testAssetDescription = "Asset for the Matcher checking purposes"
+  private val testAssetDecimals = 8.toByte
   private val testAmount, testPrice = 1.coin
-  private val mnogo                 = 100000000.coin
+  private val mnogo = 100000000.coin
 
   private val checkLeftIndent = 35
-  private val issueTxFee      = 1.waves
+  private val issueTxFee = 1.waves
   private val matcherOrderFee = 0.003.waves
 
   private val minMatcherValidBalance = 3.waves
 
-  private implicit class DoubleOps(private val value: Double) {
+  implicit private class DoubleOps(private val value: Double) {
     val coin, waves: Long = Normalization.normalizeAmountAndFee(value, 8)
   }
+
 }

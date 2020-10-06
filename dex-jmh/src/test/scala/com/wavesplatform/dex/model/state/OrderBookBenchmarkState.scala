@@ -12,10 +12,10 @@ trait OrderBookBenchmarkState extends OrderBookGen {
   def getMakerTakerFee(a: AcceptedOrder, b: LimitOrder): (Long, Long) = (a.matcherFee, b.matcherFee)
 
   def fixedSidesOrdersGen(
-      levelNumber: Int,
-      orderNumberInLevel: Int,
-      askPricesGen: Gen[Long],
-      bidPricesGen: Gen[Long]
+    levelNumber: Int,
+    orderNumberInLevel: Int,
+    askPricesGen: Gen[Long],
+    bidPricesGen: Gen[Long]
   ): Gen[(Seq[LimitOrder], Seq[LimitOrder])] =
     for {
       askOrders <- fixedSideOrdersGen(OrderType.SELL, levelNumber / 2, orderNumberInLevel, askPricesGen)
@@ -31,4 +31,5 @@ trait OrderBookBenchmarkState extends OrderBookGen {
         }
       )
     } yield orders.asScala.flatten.toSeq
+
 }

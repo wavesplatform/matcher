@@ -81,4 +81,5 @@ class MatcherScriptRunnerSpecification extends WavesExtSuiteBase {
       )
       .explicitGet()
       ._1
+
 }

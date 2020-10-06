@@ -1,7 +1,7 @@
 import com.typesafe.sbt.GitPlugin.autoImport.git
 import sbt.Keys.isSnapshot
-import sbt.{AutoPlugin, Def, PluginTrigger, Plugins, inTask, settingKey}
-import sbtdocker.DockerPlugin.autoImport.{ImageName, docker, imageNames}
+import sbt.{inTask, settingKey, AutoPlugin, Def, PluginTrigger, Plugins}
+import sbtdocker.DockerPlugin.autoImport.{docker, imageNames, ImageName}
 
 object ImageVersionPlugin extends AutoPlugin {
 
@@ -17,12 +17,12 @@ object ImageVersionPlugin extends AutoPlugin {
       imageTagMakeFunction := (gitTag => gitTag),
       imageNames := {
 
-        val latestImageName: ImageName         = ImageName(s"${nameOfImage.value}:latest")
-        val currentBranchName: String          = git.gitCurrentBranch.value
+        val latestImageName: ImageName = ImageName(s"${nameOfImage.value}:latest")
+        val currentBranchName: String = git.gitCurrentBranch.value
         val currentBranchNameLowerCase: String = currentBranchName.toLowerCase
-        val maybeGitTag: Option[String]        = git.gitDescribedVersion.value
-        val mkTag: String => String            = imageTagMakeFunction.value
-        val isRelease: Boolean                 = !isSnapshot.value && maybeGitTag.isDefined
+        val maybeGitTag: Option[String] = git.gitDescribedVersion.value
+        val mkTag: String => String = imageTagMakeFunction.value
+        val isRelease: Boolean = !isSnapshot.value && maybeGitTag.isDefined
 
         val mandatoryImageNames =
           if (currentBranchNameLowerCase.startsWith("dex-") || currentBranchNameLowerCase == "master")
@@ -34,9 +34,10 @@ object ImageVersionPlugin extends AutoPlugin {
       }
     )
   )
+
 }
 
 trait ImageVersionKeys {
-  val nameOfImage          = settingKey[String]("Name of the image")
+  val nameOfImage = settingKey[String]("Name of the image")
   val imageTagMakeFunction = settingKey[String => String]("Way to create image tag. Argument is the closest git tag")
 }

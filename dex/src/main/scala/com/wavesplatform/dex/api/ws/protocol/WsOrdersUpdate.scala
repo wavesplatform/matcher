@@ -17,6 +17,7 @@ case class WsOrdersUpdate(orders: NonEmptyList[WsFullOrder], timestamp: Long = S
     orders = other.orders ::: orders,
     timestamp = other.timestamp
   )
+
 }
 
 object WsOrdersUpdate {
@@ -28,14 +29,14 @@ object WsOrdersUpdate {
   )
 
   def from(x: OrderExecuted, ts: Long)(implicit efc: ErrorFormatterContext): WsOrdersUpdate = {
-    val ao1       = x.counterRemaining
+    val ao1 = x.counterRemaining
     val assetPair = ao1.order.assetPair
 
     val amountAssetDecimals = efc.unsafeAssetDecimals(assetPair.amountAsset)
-    val priceAssetDecimals  = efc.unsafeAssetDecimals(assetPair.priceAsset)
+    val priceAssetDecimals = efc.unsafeAssetDecimals(assetPair.priceAsset)
 
     def denormalizeAmount(value: Long): Double = Denormalization.denormalizeAmountAndFee(value, amountAssetDecimals).toDouble
-    def denormalizePrice(value: Long): Double  = Denormalization.denormalizePrice(value, amountAssetDecimals, priceAssetDecimals).toDouble
+    def denormalizePrice(value: Long): Double = Denormalization.denormalizePrice(value, amountAssetDecimals, priceAssetDecimals).toDouble
 
     def from(ao: AcceptedOrder): WsFullOrder =
       WsFullOrder.from(
@@ -66,4 +67,5 @@ object WsOrdersUpdate {
     (_, ts, orders) => WsOrdersUpdate(orders, ts),
     unlift(WsOrdersUpdate.wsUnapply)
   )
+
 }

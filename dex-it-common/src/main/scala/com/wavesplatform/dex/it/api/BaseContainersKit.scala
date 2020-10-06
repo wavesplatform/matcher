@@ -28,8 +28,9 @@ trait BaseContainersKit extends ScorexLogging {
 
   protected val moduleName: String
 
-  private val networkSeed   = Random.nextInt(0x100000) << 4 | 0x0A000000                                 // a random network in 10.x.x.x range
-  private val networkPrefix = s"${InetAddress.getByAddress(toByteArray(networkSeed)).getHostAddress}/28" // 10.x.x.x/28 network will accommodate up to 13 nodes
+  private val networkSeed = Random.nextInt(0x100000) << 4 | 0x0a000000 // a random network in 10.x.x.x range
+  private val networkPrefix =
+    s"${InetAddress.getByAddress(toByteArray(networkSeed)).getHostAddress}/28" // 10.x.x.x/28 network will accommodate up to 13 nodes
 
   protected val networkName = s"waves-${Random.nextInt(Int.MaxValue)}"
 
@@ -37,13 +38,14 @@ trait BaseContainersKit extends ScorexLogging {
     Network
       .builder()
       .createNetworkCmdModifier { cmd: CreateNetworkCmd =>
-        cmd.withIpam(new Ipam().withConfig(new Ipam.Config().withSubnet(networkPrefix).withIpRange(networkPrefix).withGateway(getIp(0xE))))
+        cmd.withIpam(new Ipam().withConfig(new Ipam.Config().withSubnet(networkPrefix).withIpRange(networkPrefix).withGateway(getIp(0xe))))
         cmd.withName(networkName)
       }
       .build()
 
-  protected def getIp(name: String): String         = getIp(getNumber(name))
-  protected def getIp(containerNumber: Int): String = InetAddress.getByAddress(toByteArray(containerNumber & 0xF | networkSeed)).getHostAddress
+  protected def getIp(name: String): String = getIp(getNumber(name))
+  protected def getIp(containerNumber: Int): String = InetAddress.getByAddress(toByteArray(containerNumber & 0xf | networkSeed)).getHostAddress
+
   protected def getNumber(name: String): Int = {
     val raw =
       name
@@ -63,11 +65,11 @@ trait BaseContainersKit extends ScorexLogging {
 
   protected def addKnownContainer(container: BaseContainer): Unit = knownContainers.updateAndGet(container :: _)
 
-  protected implicit val ec: ExecutionContext = ExecutionContext.fromExecutor {
+  implicit protected val ec: ExecutionContext = ExecutionContext.fromExecutor {
     Executors.newFixedThreadPool(10, new ThreadFactoryBuilder().setNameFormat(s"${getClass.getSimpleName}-%d").setDaemon(true).build)
   }
 
-  protected implicit val futureHttpBackend: LoggingSttpBackend[Future, Nothing] = new LoggingSttpBackend[Future, Nothing](
+  implicit protected val futureHttpBackend: LoggingSttpBackend[Future, Nothing] = new LoggingSttpBackend[Future, Nothing](
     AsyncHttpClientFutureBackend.usingConfig(
       new DefaultAsyncHttpClientConfig.Builder()
         .setMaxRequestRetry(0)
@@ -79,7 +81,7 @@ trait BaseContainersKit extends ScorexLogging {
     )
   )
 
-  protected implicit val tryHttpBackend: LoggingSttpBackend[Try, Nothing] = new LoggingSttpBackend[Try, Nothing](
+  implicit protected val tryHttpBackend: LoggingSttpBackend[Try, Nothing] = new LoggingSttpBackend[Try, Nothing](
     TryHttpURLConnectionBackend(customizeConnection = conn => {
       // For tests with a high latency
       conn.setConnectTimeout(30000)
@@ -99,14 +101,14 @@ trait BaseContainersKit extends ScorexLogging {
 
   /** A location for logs from containers on local machine */
   protected lazy val localLogsDir: Path = {
-    val runId: String = Option { System.getenv("RUN_ID") } getOrElse DateTimeFormatter.ofPattern("MM-dd--HH_mm_ss").format(LocalDateTime.now)
+    val runId: String = Option(System.getenv("RUN_ID")) getOrElse DateTimeFormatter.ofPattern("MM-dd--HH_mm_ss").format(LocalDateTime.now)
     def defaultDir =
       Paths.get(System.getProperty("user.dir"), moduleName, "target", "logs", runId, getClass.getSimpleName.replaceAll("""(\w)\w*\.""", "$1."))
 
-    Option { System.getProperty("waves.it.logging.dir") }
-      .map { Paths get _ }
-      .getOrElse { defaultDir }
-      .unsafeTap { Files.createDirectories(_) }
+    Option(System.getProperty("waves.it.logging.dir"))
+      .map(Paths get _)
+      .getOrElse(defaultDir)
+      .unsafeTap(Files.createDirectories(_))
   }
 
   protected def stopBaseContainers(): Unit = {
@@ -115,4 +117,5 @@ trait BaseContainersKit extends ScorexLogging {
     tryHttpBackend.close()
     knownContainers.getAndUpdate(_ => List.empty).foreach(_.stopWithoutRemove()) // Graceful shutdown to save logs
   }
+
 }

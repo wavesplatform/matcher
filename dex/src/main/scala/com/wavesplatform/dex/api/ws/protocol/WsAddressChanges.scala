@@ -8,12 +8,13 @@ import com.wavesplatform.dex.json
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
-case class WsAddressChanges(address: Address,
-                            balances: Map[Asset, WsBalances],
-                            orders: Seq[WsOrder],
-                            updateId: Long,
-                            timestamp: Long = System.currentTimeMillis)
-    extends WsServerMessage {
+case class WsAddressChanges(
+  address: Address,
+  balances: Map[Asset, WsBalances],
+  orders: Seq[WsOrder],
+  updateId: Long,
+  timestamp: Long = System.currentTimeMillis
+) extends WsServerMessage {
   override val tpe: String = WsAddressChanges.tpe
 }
 
@@ -40,4 +41,5 @@ object WsAddressChanges {
       case (tpe, ts, uid, addr, bs, os) => (tpe, ts, uid, addr, Option(bs).filter(_.nonEmpty), Option(os).filter(_.nonEmpty))
     }
   )
+
 }

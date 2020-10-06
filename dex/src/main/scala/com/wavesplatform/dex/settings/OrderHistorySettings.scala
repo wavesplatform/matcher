@@ -6,16 +6,16 @@ import com.wavesplatform.dex.settings.utils.{rules, validationOf}
 import pureconfig.generic.semiauto
 
 case class OrderHistorySettings(
-    ordersBatchLingerMs: Long = defaultBatchLingerMs,
-    ordersBatchEntries: Long = defaultBatchEntries,
-    eventsBatchLingerMs: Long = defaultBatchLingerMs,
-    eventsBatchEntries: Long = defaultBatchEntries
+  ordersBatchLingerMs: Long = defaultBatchLingerMs,
+  ordersBatchEntries: Long = defaultBatchEntries,
+  eventsBatchLingerMs: Long = defaultBatchLingerMs,
+  eventsBatchEntries: Long = defaultBatchEntries
 )
 
 object OrderHistorySettings {
 
   val defaultBatchLingerMs = 1000
-  val defaultBatchEntries  = 10000
+  val defaultBatchEntries = 10000
 
   implicit val orderHistoryConfigReader = semiauto
     .deriveReader[OrderHistorySettings]
@@ -25,4 +25,5 @@ object OrderHistorySettings {
       validationOf.field[OrderHistorySettings, "eventsBatchLingerMs"].mk(x => rules.gtEq0(x.eventsBatchLingerMs)),
       validationOf.field[OrderHistorySettings, "eventsBatchEntries"].mk(x => rules.gtEq0(x.eventsBatchEntries))
     )
+
 }

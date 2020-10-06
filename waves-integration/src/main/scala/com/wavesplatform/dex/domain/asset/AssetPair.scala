@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.domain.asset
 
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.dex.domain.bytes.{ByteStr, deser}
+import com.wavesplatform.dex.domain.bytes.{deser, ByteStr}
 import com.wavesplatform.dex.domain.validation.Validation
 import com.wavesplatform.dex.domain.validation.Validation.booleanOperators
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
@@ -14,16 +14,16 @@ import scala.util.{Failure, Success, Try}
       1. A price asset is chosen by a priority from priceAssets of /matcher/settings;
       2. If both assets are not present among priceAssets, they are sorted lexicographically: price asset bytes < amount asset bytes""")
 case class AssetPair(
-    @ApiModelProperty(
-      value = "Base58 encoded amount asset ID. Waves is used if field isn't specified",
-      dataType = "string",
-      example = "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS"
-    ) amountAsset: Asset,
-    @ApiModelProperty(
-      value = "Base58 encoded price asset ID. Waves is used if field isn't specified",
-      dataType = "string",
-      example = "DG2xFkPdDwKUoBkzGAhQtLpSGzfXLiCYPEzeKH2Ad24p"
-    ) priceAsset: Asset
+  @ApiModelProperty(
+    value = "Base58 encoded amount asset ID. Waves is used if field isn't specified",
+    dataType = "string",
+    example = "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS"
+  ) amountAsset: Asset,
+  @ApiModelProperty(
+    value = "Base58 encoded price asset ID. Waves is used if field isn't specified",
+    dataType = "string",
+    example = "DG2xFkPdDwKUoBkzGAhQtLpSGzfXLiCYPEzeKH2Ad24p"
+  ) priceAsset: Asset
 ) {
 
   @ApiModelProperty(hidden = true)
@@ -37,7 +37,7 @@ case class AssetPair(
   override def toString: String = key
 
   def isValid: Validation = (amountAsset != priceAsset) :| "Invalid AssetPair"
-  def bytes: Array[Byte]  = amountAsset.byteRepr ++ priceAsset.byteRepr
+  def bytes: Array[Byte] = amountAsset.byteRepr ++ priceAsset.byteRepr
 
   def reverse: AssetPair = AssetPair(priceAsset, amountAsset)
 
@@ -48,7 +48,7 @@ object AssetPair {
 
   def extractAsset(a: String): Try[Asset] = a match {
     case Asset.WavesName => Success(Waves)
-    case other           => ByteStr.decodeBase58(other).map(IssuedAsset)
+    case other => ByteStr.decodeBase58(other).map(IssuedAsset)
   }
 
   def extractAssetPair(s: String): Try[AssetPair] = s.split('-') match {
@@ -68,7 +68,7 @@ object AssetPair {
 
   def fromBytes(xs: Array[Byte]): (AssetPair, Int) = {
     val (amount, offset1) = deser.parseByteArrayOption(xs, 0, Asset.AssetIdLength)
-    val (price, offset2)  = deser.parseByteArrayOption(xs, offset1, Asset.AssetIdLength)
+    val (price, offset2) = deser.parseByteArrayOption(xs, offset1, Asset.AssetIdLength)
     (
       AssetPair(
         Asset.fromCompatId(amount.map(ByteStr(_))),
@@ -85,10 +85,11 @@ object AssetPair {
   val assetPairKeyAsStringFormat: Format[AssetPair] = Format(
     fjs = Reads {
       case JsString(x) => AssetPair.extractAssetPair(x).fold(e => JsError(e.getMessage), JsSuccess(_))
-      case x           => JsError(JsPath, s"Expected a string, but got ${x.toString().take(10)}...")
+      case x => JsError(JsPath, s"Expected a string, but got ${x.toString().take(10)}...")
     },
     tjs = Writes { x =>
       JsString(x.key)
     }
   )
+
 }

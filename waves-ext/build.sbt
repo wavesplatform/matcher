@@ -6,13 +6,15 @@ import WavesNodeArtifactsPlugin.autoImport.wavesNodeVersion
 import com.typesafe.sbt.SbtNativePackager.Universal
 import sbtdocker.DockerPlugin.autoImport._
 
-enablePlugins(RunApplicationSettings,
-              WavesNodeArtifactsPlugin,
-              ExtensionPackaging,
-              GitVersioning,
-              VersionSourcePlugin,
-              sbtdocker.DockerPlugin,
-              ImageVersionPlugin)
+enablePlugins(
+  RunApplicationSettings,
+  WavesNodeArtifactsPlugin,
+  ExtensionPackaging,
+  GitVersioning,
+  VersionSourcePlugin,
+  sbtdocker.DockerPlugin,
+  ImageVersionPlugin
+)
 
 V.scalaPackage := "com.wavesplatform.dex.grpc.integration"
 V.subProject := "ext"

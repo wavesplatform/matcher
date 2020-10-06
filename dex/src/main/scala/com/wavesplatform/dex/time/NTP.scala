@@ -15,19 +15,19 @@ import scala.concurrent.duration.DurationInt
 class NTP(ntpServer: String) extends Time with ScorexLogging with AutoCloseable {
 
   private val offsetPanicThreshold = 1000000L
-  private val ExpirationTimeout    = 60.seconds
-  private val RetryDelay           = 10.seconds
-  private val ResponseTimeout      = 10.seconds
+  private val ExpirationTimeout = 60.seconds
+  private val RetryDelay = 10.seconds
+  private val ResponseTimeout = 10.seconds
 
   private val duringShutdown = new AtomicBoolean(false)
 
-  private implicit val scheduler: SchedulerService = Scheduler.singleThread(
+  implicit private val scheduler: SchedulerService = Scheduler.singleThread(
     name = "time-impl",
     daemonic = false,
     executionModel = ExecutionModel.AlwaysAsyncExecution,
     reporter = {
       case _: RejectedExecutionException if duringShutdown.get() => // ignore
-      case e: Throwable                                          => log.error("An uncaught error", e)
+      case e: Throwable => log.error("An uncaught error", e)
     }
   )
 
@@ -35,6 +35,7 @@ class NTP(ntpServer: String) extends Time with ScorexLogging with AutoCloseable 
   client.setDefaultTimeout(ResponseTimeout.toMillis.toInt)
 
   @volatile private var offset = 0L
+
   private val updateTask: Task[Unit] = {
     def newOffsetTask: Task[Option[(InetAddress, java.lang.Long)]] = Task {
       try {
@@ -74,7 +75,7 @@ class NTP(ntpServer: String) extends Time with ScorexLogging with AutoCloseable 
 
   private val taskHandle = updateTask.runAsync {
     case Left(e) => log.error(s"Error executing task", e)
-    case _       =>
+    case _ =>
   }
 
   override def close(): Unit = if (duringShutdown.compareAndSet(false, true)) {
@@ -83,4 +84,5 @@ class NTP(ntpServer: String) extends Time with ScorexLogging with AutoCloseable 
     if (client.isOpen) client.close()
     scheduler.shutdown()
   }
+
 }

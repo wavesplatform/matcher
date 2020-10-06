@@ -6,12 +6,12 @@ import com.wavesplatform.dex.settings.utils.{rules, validationOf}
 import pureconfig.generic.semiauto
 
 case class OrderRestrictionsSettings(
-    stepAmount: Double = Default.stepAmount,
-    minAmount: Double = Default.minAmount,
-    maxAmount: Double = Default.maxAmount,
-    stepPrice: Double = Default.stepPrice,
-    minPrice: Double = Default.minPrice,
-    maxPrice: Double = Default.maxPrice
+  stepAmount: Double = Default.stepAmount,
+  minAmount: Double = Default.minAmount,
+  maxAmount: Double = Default.maxAmount,
+  stepPrice: Double = Default.stepPrice,
+  minPrice: Double = Default.minPrice,
+  maxPrice: Double = Default.maxPrice
 )
 
 object OrderRestrictionsSettings {
@@ -38,4 +38,5 @@ object OrderRestrictionsSettings {
       validationOf.field[OrderRestrictionsSettings, "maxAmount"].mk(x => rules.gtN(x.maxAmount, x.minAmount, "min-amount")),
       validationOf.field[OrderRestrictionsSettings, "maxPrice"].mk(x => rules.gtN(x.maxPrice, x.minPrice, "min-price"))
     )
+
 }

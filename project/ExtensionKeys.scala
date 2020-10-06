@@ -2,12 +2,15 @@ import sbt.Keys.Classpath
 import sbt._
 
 trait ExtensionKeys {
+
   val classpathOrdering = taskKey[Seq[(File, String)]](
     "The order of the classpath used at runtime for the bat/bash scripts."
   )
+
   val projectDependencyArtifacts = taskKey[Classpath](
     "The set of exported artifacts from our dependent projects."
   )
+
   val providedArtifacts = taskKey[Classpath](
     "The set of exported artifacts from our dependent projects."
   )

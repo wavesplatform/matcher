@@ -25,10 +25,10 @@ object OrderBookSideSnapshotCodecs {
 
   def decode(bb: ByteBuffer): OrderBookSideSnapshot = {
     val snapshotSize = bb.getInt
-    val r            = Map.newBuilder[Price, Seq[LimitOrder]]
+    val r = Map.newBuilder[Price, Seq[LimitOrder]]
     (1 to snapshotSize).foreach { _ =>
-      val price       = bb.getLong
-      val levelSize   = bb.getInt
+      val price = bb.getLong
+      val levelSize = bb.getInt
       val limitOrders = (1 to levelSize).map(_ => decodeLo(bb))
       r += price -> limitOrders
     }
@@ -61,14 +61,14 @@ object OrderBookSideSnapshotCodecs {
 
   def decodeLo(bb: ByteBuffer): LimitOrder = {
 
-    val header    = bb.get
-    val version   = if (header == 2) 2 else 1
+    val header = bb.get
+    val version = if (header == 2) 2 else 1
     val orderType = if (version == 1) header else bb.get
 
-    val amount       = bb.getLong
-    val fee          = bb.getLong
+    val amount = bb.getLong
+    val fee = bb.getLong
     val orderVersion = bb.get
-    val order        = Order.fromBytes(orderVersion, bb.getBytes)
+    val order = Order.fromBytes(orderVersion, bb.getBytes)
 
     val avgWeighedPriceNominator =
       if (version == 2) new BigInteger(bb.getBytes)
@@ -79,7 +79,8 @@ object OrderBookSideSnapshotCodecs {
 
     OrderType(orderType) match {
       case OrderType.SELL => SellLimitOrder(amount, fee, order, avgWeighedPriceNominator)
-      case OrderType.BUY  => BuyLimitOrder(amount, fee, order, avgWeighedPriceNominator)
+      case OrderType.BUY => BuyLimitOrder(amount, fee, order, avgWeighedPriceNominator)
     }
   }
+
 }

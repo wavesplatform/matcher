@@ -26,9 +26,12 @@ class SttpBackendOps[F[_]: CanWait: ThrowableMonadError, ErrorT: Reads](implicit
 
   def tryUnit(req: RequestT[Id, String, Nothing]): F[Either[ErrorT, Unit]] =
     httpBackend.send(req.mapResponse(_ => ()).tag("requestId", UUID.randomUUID)).flatMap(parseTryResponse[ErrorT, Unit])
+
 }
 
 object SttpBackendOps {
+
   def apply[F[_]: CanWait: ThrowableMonadError, ErrorT: Reads](implicit httpBackend: SttpBackend[F, Nothing]): SttpBackendOps[F, ErrorT] =
     new SttpBackendOps[F, ErrorT]
+
 }

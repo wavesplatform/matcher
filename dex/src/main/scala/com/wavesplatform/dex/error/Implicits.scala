@@ -23,40 +23,40 @@ object Implicits {
 
   // Here, because we doesn't want to leak this implicits outside the error package
 
-  implicit val byteShow   = cats.instances.byte.catsStdShowForByte
-  implicit val intShow    = cats.instances.int.catsStdShowForInt
-  implicit val longShow   = cats.instances.long.catsStdShowForLong
+  implicit val byteShow = cats.instances.byte.catsStdShowForByte
+  implicit val intShow = cats.instances.int.catsStdShowForInt
+  implicit val longShow = cats.instances.long.catsStdShowForLong
   implicit val stringShow = cats.instances.string.catsStdShowForString
 
-  implicit val doubleShow            = show[Double](d => formatValue(d))
-  implicit val byteStrShow           = show[ByteStr](_.toString)
-  implicit val assetShow             = show[Asset](_.toString)
-  implicit val issuedAssetShow       = show[IssuedAsset](_.toString)
-  implicit val wavesShow             = show[Waves.type](_ => "WAVES")
-  implicit val assetPairShow         = show[AssetPair](_.key)
-  implicit val publicKeyShow         = show[PublicKey](_.toString)
-  implicit val addressShow           = show[Address](_.stringRepr)
+  implicit val doubleShow = show[Double](d => formatValue(d))
+  implicit val byteStrShow = show[ByteStr](_.toString)
+  implicit val assetShow = show[Asset](_.toString)
+  implicit val issuedAssetShow = show[IssuedAsset](_.toString)
+  implicit val wavesShow = show[Waves.type](_ => "WAVES")
+  implicit val assetPairShow = show[AssetPair](_.key)
+  implicit val publicKeyShow = show[PublicKey](_.toString)
+  implicit val addressShow = show[Address](_.stringRepr)
   implicit val blockchainFeatureShow = show[BlockchainFeature](_.description)
-  implicit val amountShow            = show[Amount](amount => s"${formatValue(amount.volume)} ${assetShow show amount.asset}")
-  implicit val priceShow             = show[Price](input => formatValue(input.volume))
-  implicit val balanceShow           = show[List[Amount]] { _.map(amountShow.show).mkString(" and ") }
+  implicit val amountShow = show[Amount](amount => s"${formatValue(amount.volume)} ${assetShow show amount.asset}")
+  implicit val priceShow = show[Price](input => formatValue(input.volume))
+  implicit val balanceShow = show[List[Amount]](_.map(amountShow.show).mkString(" and "))
 
   implicit def traverseShow[F[_]: Traverse, T: Show]: Show[F[T]] = { traverse: F[T] =>
     s"${traverse.map(_.show).mkString_(", ")}"
   }
 
   implicit def listShow[T: Show]: Show[List[T]] = traverseShow[List, T]
-  implicit def setShow[T: Show]: Show[Set[T]]   = listShow[T].contramap[Set[T]](_.toList)
+  implicit def setShow[T: Show]: Show[Set[T]] = listShow[T].contramap[Set[T]](_.toList)
 
   implicit val stringWrites = Writes.StringWrites
 
-  implicit val doubleWrites            = stringWrites.contramap[Double](d => formatValue(d))
-  implicit val decimalWrites           = stringWrites.contramap[BigDecimal](formatValue)
-  implicit val addressWrites           = stringWrites.contramap[Address](_.stringRepr)
+  implicit val doubleWrites = stringWrites.contramap[Double](d => formatValue(d))
+  implicit val decimalWrites = stringWrites.contramap[BigDecimal](formatValue)
+  implicit val addressWrites = stringWrites.contramap[Address](_.stringRepr)
   implicit val blockchainFeatureWrites = stringWrites.contramap[BlockchainFeature](_.description)
 
   // Writes is invariant
-  implicit val wavesWrites       = Asset.assetFormat.contramap[Waves.type](x => x)
+  implicit val wavesWrites = Asset.assetFormat.contramap[Waves.type](x => x)
   implicit val issuedAssetWrites = Asset.assetFormat.contramap[IssuedAsset](x => x)
 
   // Tagged types can't catch this
@@ -77,19 +77,20 @@ object Implicits {
   implicit val priceWrites = decimalWrites.contramap[Price](_.volume)
 
   implicit def listWrites[T: Writes]: Writes[List[T]] = Writes.iterableWrites2[T, List[T]]
-  implicit def setWrites[T: Writes]: Writes[Set[T]]   = Writes.iterableWrites2[T, Set[T]]
+  implicit def setWrites[T: Writes]: Writes[Set[T]] = Writes.iterableWrites2[T, Set[T]]
 
   implicit class ErrorInterpolator(sc: StringContext) {
 
     class Args extends ProductArgs {
+
       def applyProduct[H <: HList, L <: HList](args: H)(
-          implicit
-          formatArgs: Mapper.Aux[FormatArg.type, H, L],
-          toList: ToList[L, Id[_]]
+        implicit
+        formatArgs: Mapper.Aux[FormatArg.type, H, L],
+        toList: ToList[L, Id[_]]
       ): MatcherErrorMessage = {
 
         val (nameArgs, strArgsFn, jsonArgsFn) =
-          toList { formatArgs(args) }
+          toList(formatArgs(args))
             .asInstanceOf[List[(String, String, JsValue)]]
             .unzip3
 
@@ -98,7 +99,7 @@ object Implicits {
         val (message, template, params) = parts.zipWithIndex.foldLeft(("", "", JsObject.empty)) {
           case ((m, t, p), (x, i)) =>
             val name = nameArgs(i)
-            val str  = strArgsFn(i)
+            val str = strArgsFn(i)
             val json = jsonArgsFn(i)
             (s"$m$x$str", s"$t$x{{$name}}", p + (name -> json))
         }
@@ -109,6 +110,7 @@ object Implicits {
           params
         )
       }
+
     }
 
     val e: Args = new Args
@@ -117,16 +119,21 @@ object Implicits {
   }
 
   object FormatArg extends Poly1 {
+
     implicit def mapAt[T: Show: Writes]: Case.Aux[(Symbol, T), (String, String, JsValue)] = at[(Symbol, T)] {
       case (name, arg) => (name.name, arg.show, implicitly[Writes[T]] writes arg)
     }
+
   }
 
   implicit class ThrowableOps(private val t: Throwable) extends AnyVal {
+
     def getWithStackTrace: String = {
       val sw = new StringWriter
       t.printStackTrace(new PrintWriter(sw))
       s"$t, ${sw.toString}"
     }
+
   }
+
 }

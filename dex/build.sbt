@@ -66,11 +66,11 @@ inTask(docker)(
     nameOfImage := "wavesplatform/matcher-server",
     dockerfile := new Dockerfile {
 
-      val (user, userId)   = ("waves-dex", "113")
+      val (user, userId) = ("waves-dex", "113")
       val (group, groupId) = ("waves-dex", "116")
 
       val runtimePath = s"/var/lib/$user"
-      val appPath     = s"/usr/share/$user"
+      val appPath = s"/usr/share/$user"
 
       val entryPointSh = s"$appPath/bin/start-matcher-server.sh"
 
@@ -84,9 +84,9 @@ inTask(docker)(
                 |ln -fs $runtimePath/log var/log/waves-dex""".stripMargin)
 
       Seq(
-        (Universal / stage).value                                                   -> s"$appPath/", // sources
+        (Universal / stage).value -> s"$appPath/", // sources
         (Compile / sourceDirectory).value / "container" / "start-matcher-server.sh" -> s"$appPath/bin/", // entry point
-        (Compile / sourceDirectory).value / "container" / "dex.conf"                -> s"$appPath/conf/" // base config
+        (Compile / sourceDirectory).value / "container" / "dex.conf" -> s"$appPath/conf/" // base config
       ) foreach { case (source, destination) => add(source = source, destination = destination, chown = s"$userId:$groupId") }
 
       user(s"$userId:$groupId")
@@ -135,8 +135,8 @@ inConfig(Debian)(
     maintainerScripts := maintainerScriptsFromDirectory(packageSource.value / "debian", Seq("preinst", "postinst", "postrm", "prerm")),
     linuxPackageMappings ++= {
       val upstartScript = {
-        val src    = packageSource.value / "upstart.conf"
-        val dest   = (target in Debian).value / "upstart" / s"${packageName.value}.conf"
+        val src = packageSource.value / "upstart.conf"
+        val dest = (target in Debian).value / "upstart" / s"${packageName.value}.conf"
         val result = TemplateWriter.generateScript(src.toURI.toURL, linuxScriptReplacements.value)
         IO.write(dest, result)
         dest
@@ -145,13 +145,13 @@ inConfig(Debian)(
       Seq(upstartScript -> s"/etc/init/${packageName.value}.conf").map(packageMapping(_).withConfig().withPerms("644"))
     },
     linuxScriptReplacements += "detect-loader" ->
-      """is_systemd() {
-        |    which systemctl >/dev/null 2>&1 && \
-        |    systemctl | grep -- -\.mount >/dev/null 2>&1
-        |}
-        |is_upstart() {
-        |    /sbin/init --version | grep upstart >/dev/null 2>&1
-        |}
-        |""".stripMargin
+    """is_systemd() {
+      |    which systemctl >/dev/null 2>&1 && \
+      |    systemctl | grep -- -\.mount >/dev/null 2>&1
+      |}
+      |is_upstart() {
+      |    /sbin/init --version | grep upstart >/dev/null 2>&1
+      |}
+      |""".stripMargin
   )
 )

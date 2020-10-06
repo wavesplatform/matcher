@@ -8,10 +8,11 @@ import scala.annotation.nowarn
 import scala.collection.immutable.{Queue, TreeMap}
 
 package object model {
-  type Level                 = Queue[LimitOrder]
+  type Level = Queue[LimitOrder]
   type OrderBookSideSnapshot = Map[Price, Seq[LimitOrder]]
 
   type Side = TreeMap[Price, Level]
+
   implicit class SideExt(val side: Side) extends AnyVal {
 
     /** Returns the best limit order in this side and the price of its level */
@@ -48,6 +49,7 @@ package object model {
     def put(price: Price, lo: LimitOrder): Side = side.updated(price, side.getOrElse(price, Queue.empty).enqueue(lo))
 
     def aggregated: Iterable[LevelAgg] = for { (p, l) <- side.view if l.nonEmpty } yield LevelAgg(l.map(_.amount).sum, p)
-    def bestLevel: Option[LevelAgg]    = aggregated.headOption
+    def bestLevel: Option[LevelAgg] = aggregated.headOption
   }
+
 }

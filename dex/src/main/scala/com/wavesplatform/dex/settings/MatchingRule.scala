@@ -7,15 +7,15 @@ import com.wavesplatform.dex.queue.QueueEventWithMeta
 /** Normalized representation of the matching rule */
 case class MatchingRule(startOffset: QueueEventWithMeta.Offset, tickSize: Long) {
 
-  def denormalize(assetPair: AssetPair, getAssetDecimals: Asset => Int): DenormalizedMatchingRule = {
+  def denormalize(assetPair: AssetPair, getAssetDecimals: Asset => Int): DenormalizedMatchingRule =
     DenormalizedMatchingRule(
       startOffset,
       Denormalization.denormalizePrice(tickSize, getAssetDecimals(assetPair.amountAsset), getAssetDecimals(assetPair.priceAsset))
     )
-  }
+
 }
 
 object MatchingRule {
-  val DefaultTickSize: Long     = 1
+  val DefaultTickSize: Long = 1
   val DefaultRule: MatchingRule = MatchingRule(0L, DefaultTickSize)
 }

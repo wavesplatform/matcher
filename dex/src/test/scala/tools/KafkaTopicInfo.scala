@@ -18,9 +18,9 @@ object KafkaTopicInfo extends App {
   implicit val system: ActorSystem = ActorSystem()
 
   val configFile = new File(args(0))
-  val topic      = args(1)
-  val from       = args(2).toLong
-  val max        = args(3).toInt
+  val topic = args(1)
+  val from = args(2).toLong
+  val max = args(3).toInt
 
   println(s"""configFile: ${configFile.getAbsolutePath}
              |topic: $topic
@@ -53,7 +53,7 @@ object KafkaTopicInfo extends App {
   )
 
   try {
-    val topicPartition  = new TopicPartition(topic, 0)
+    val topicPartition = new TopicPartition(topic, 0)
     val topicPartitions = java.util.Collections.singletonList(topicPartition)
     consumer.assign(topicPartitions)
 
@@ -70,8 +70,8 @@ object KafkaTopicInfo extends App {
     consumer.seek(topicPartition, from)
 
     val pollDuriation = java.time.Duration.ofNanos(1.seconds.toNanos)
-    val lastOffset    = from + max
-    var continue      = true
+    val lastOffset = from + max
+    var continue = true
     while (continue) {
       println(s"Reading from Kafka")
 
@@ -84,7 +84,5 @@ object KafkaTopicInfo extends App {
         if (x.offset() == lastOffset) continue = false
       }
     }
-  } finally {
-    consumer.close()
-  }
+  } finally consumer.close()
 }

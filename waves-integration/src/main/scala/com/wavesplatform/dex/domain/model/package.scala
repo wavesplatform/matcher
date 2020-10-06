@@ -2,7 +2,7 @@ package com.wavesplatform.dex.domain
 
 package object model {
 
-  type Price  = Long
+  type Price = Long
   type Amount = Long
 
   /** Converts amounts, prices and fees from denormalized values (decimal numbers) to normalized ones (longs) */
@@ -13,6 +13,7 @@ package object model {
 
     def normalizePrice(value: BigDecimal, amountAssetDecimals: Int, priceAssetDecimals: Int): Price =
       (value * BigDecimal(10).pow(8 + priceAssetDecimals - amountAssetDecimals)).toLong
+
   }
 
   /** Converts amounts, prices and fees from normalized values (longs) to denormalized ones (decimal numbers) */
@@ -26,4 +27,5 @@ package object model {
 
     def denormalizeWavesAmount(value: Amount): BigDecimal = denormalizeAmountAndFee(value, 8)
   }
+
 }

@@ -9,7 +9,7 @@ sealed trait Asset extends Product with Serializable
 
 object Asset {
 
-  val AssetIdLength: Int       = com.wavesplatform.dex.domain.crypto.DigestSize
+  val AssetIdLength: Int = com.wavesplatform.dex.domain.crypto.DigestSize
   val AssetIdStringLength: Int = base58Length(AssetIdLength)
 
   val WavesName = "WAVES"
@@ -19,7 +19,7 @@ object Asset {
   //     Also for better readability it should contain a class like IssuedAsset(stringHere)
   //  2. Used something else for any logic. E.g. trait Representation[T], where T <: String
   final case class IssuedAsset(id: ByteStr) extends Asset { override def toString: String = id.base58 }
-  final case object Waves                   extends Asset { override def toString: String = WavesName }
+  final case object Waves extends Asset { override def toString: String = WavesName }
 
   implicit val assetFormat: Format[Asset] = Format(
     fjs = Reads {
@@ -42,30 +42,31 @@ object Asset {
     if (x == WavesName) Some(Waves)
     else ByteStr.decodeBase58(x).fold(_ => None, xs => Some(IssuedAsset(xs)))
 
-  def fromCompatId(maybeBStr: Option[ByteStr]): Asset = {
+  def fromCompatId(maybeBStr: Option[ByteStr]): Asset =
     maybeBStr.fold[Asset](Waves)(IssuedAsset)
-  }
 
   implicit class AssetOps(private val ai: Asset) extends AnyVal {
 
     def byteRepr: Array[Byte] = ai match {
-      case Waves           => Array(0: Byte)
+      case Waves => Array(0: Byte)
       case IssuedAsset(id) => (1: Byte) +: id.arr
     }
 
     def compatId: Option[ByteStr] = ai match {
-      case Waves           => None
+      case Waves => None
       case IssuedAsset(id) => Some(id)
     }
 
     def maybeBase58Repr: Option[String] = ai match {
-      case Waves           => None
+      case Waves => None
       case IssuedAsset(id) => Some(id.base58)
     }
 
     def fold[A](onWaves: => A)(onAsset: IssuedAsset => A): A = ai match {
-      case Waves                  => onWaves
+      case Waves => onWaves
       case asset @ IssuedAsset(_) => onAsset(asset)
     }
+
   }
+
 }

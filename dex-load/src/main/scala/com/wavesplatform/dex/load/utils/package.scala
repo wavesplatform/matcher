@@ -30,23 +30,22 @@ package object utils {
       .load[Settings]
       .explicitGet()
 
-  val node             = new Node(settings.hosts.node)
-  val networkByte      = settings.chainId.charAt(0).toByte
-  val issuer           = PrivateKey.fromSeed(settings.richAccount, 0)
+  val node = new Node(settings.hosts.node)
+  val networkByte = settings.chainId.charAt(0).toByte
+  val issuer = PrivateKey.fromSeed(settings.richAccount, 0)
   implicit val backend = HttpURLConnectionBackend()
 
-  def getSignatureByPrivateKeyAndTimestamp(pk: PrivateKey, timestamp: Long): String = {
+  def getSignatureByPrivateKeyAndTimestamp(pk: PrivateKey, timestamp: Long): String =
     crypto
       .sign(com.wavesplatform.dex.domain.account.PrivateKey.apply(pk.bytes()), pk.publicKey().bytes() ++ Longs.toByteArray(timestamp))
       .base58
-  }
 
   def mkOrderHistoryHeaders(account: PrivateKey, timestamp: Long = System.currentTimeMillis): Map[String, String] = Map(
     "Timestamp" -> timestamp.toString,
     "Signature" -> getSignatureByPrivateKeyAndTimestamp(account, timestamp)
   )
 
-  def getOrderBook(account: PrivateKey, activeOnly: Boolean = true): JsValue = {
+  def getOrderBook(account: PrivateKey, activeOnly: Boolean = true): JsValue =
     Json
       .parse(
         sttp
@@ -56,7 +55,6 @@ package object utils {
           .body
           .explicitGet()
       )
-  }
 
   def waitForHeightArise(): Unit = {
     val toHeight = node.getHeight + 1
@@ -82,16 +80,15 @@ package object utils {
     tx.assetId()
   }
 
-  def mkOrder(acc: PrivateKey, orderType: OrderType, amount: Long, price: Long, pair: AssetPair): Order = {
+  def mkOrder(acc: PrivateKey, orderType: OrderType, amount: Long, price: Long, pair: AssetPair): Order =
     Order
       .builder(orderType, Amount.of(amount, pair.left()), Amount.of(price, pair.right()), PublicKey.as(settings.matcherPublicKey))
       .expiration(System.currentTimeMillis + 60 * 60 * 24 * 20 * 1000)
       .fee(settings.defaults.matcherFee)
       .version(3)
       .getSignedWith(acc)
-  }
 
-  def readAssetPairs(file: Option[File]): List[AssetPair] = {
+  def readAssetPairs(file: Option[File]): List[AssetPair] =
     if (Files.exists(file.get.toPath)) {
       val source = Source.fromFile(file.get)
       val pairs =
@@ -99,19 +96,18 @@ package object utils {
         else
           source
             .getLines()
-            .map(l => {
+            .map { l =>
               val splitted = l.split("-")
               new AssetPair(AssetId.as(splitted(0)), AssetId.as(splitted(1)))
-            })
+            }
             .toList
       source.close()
       pairs
     } else List.empty
-  }
 
   def savePairs(pairs: List[AssetPair]): List[AssetPair] = {
     val requestsFile = new File(settings.defaults.pairsFile)
-    val output       = new PrintWriter(requestsFile, "utf-8")
+    val output = new PrintWriter(requestsFile, "utf-8")
 
     try pairs.foreach(p => output.println(s"${p.left().toString}-${p.right().toString}"))
     finally output.close()
@@ -119,4 +115,5 @@ package object utils {
     println(s"\tDone. Pairs have been saved to: $requestsFile")
     pairs
   }
+
 }

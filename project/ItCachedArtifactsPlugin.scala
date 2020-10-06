@@ -19,17 +19,17 @@ object ItCachedArtifactsPlugin extends AutoPlugin {
     itArtifactsCacheDir := Paths.get(System.getProperty("user.home"), ".cache", "dex").toFile,
     downloadItArtifacts := {
 
-      val log      = streams.value.log
+      val log = streams.value.log
       val cacheDir = itArtifactsCacheDir.value; cacheDir.mkdirs()
 
       log.info(s"Count of artifacts required for IT: ${itArtifactDescriptions.value.size}. Checking artifacts cache...")
 
       itArtifactDescriptions.value.zipWithIndex.foreach {
         case (ArtifactDescription(downloadUrl, maybeArtifactName, maybeScript), idx) =>
-          val artifactIdx  = s"[${idx + 1}]"
-          val artifactUrl  = new URL(downloadUrl)
+          val artifactIdx = s"[${idx + 1}]"
+          val artifactUrl = new URL(downloadUrl)
           val artifactName = maybeArtifactName getOrElse artifactUrl.getPath.split('/').last
-          val cachedFile   = cacheDir / artifactName
+          val cachedFile = cacheDir / artifactName
 
           if (cachedFile.exists) log.info(s"$artifactIdx Artifact $artifactName found in the cache")
           else {
@@ -44,13 +44,14 @@ object ItCachedArtifactsPlugin extends AutoPlugin {
       log.info(s"IT artifacts have been prepared")
     }
   )
+
 }
 
 trait ItCachedArtifactsKeys {
 
   case class ArtifactDescription(downloadUrl: String, name: Option[String] = None, additionalScript: Option[String] = None)
 
-  val itArtifactsCacheDir    = settingKey[File]("Where cached artifacts are stored")
+  val itArtifactsCacheDir = settingKey[File]("Where cached artifacts are stored")
   val itArtifactDescriptions = settingKey[Seq[ArtifactDescription]]("Artifacts descriptions")
-  val downloadItArtifacts    = taskKey[Unit]("Downloads artifacts required for IT to the cache directory")
+  val downloadItArtifacts = taskKey[Unit]("Downloads artifacts required for IT to the cache directory")
 }

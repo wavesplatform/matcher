@@ -12,7 +12,7 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.grpc.integration.settings.WavesBlockchainClientSettings
 import com.wavesplatform.dex.model.OrderValidator.exchangeTransactionCreationFee
 import com.wavesplatform.dex.settings.utils.ConfigReaderOps.Implicits
-import com.wavesplatform.dex.settings.utils.{ConfigReaders, RawFailureReason, validationOf}
+import com.wavesplatform.dex.settings.utils.{validationOf, ConfigReaders, RawFailureReason}
 import pureconfig.ConfigReader
 import pureconfig.configurable.genericMapReader
 import pureconfig.error.{ExceptionThrown, FailureReason}
@@ -24,56 +24,56 @@ import scala.concurrent.duration.FiniteDuration
 import scala.util.matching.Regex
 
 case class MatcherSettings(
-    id: String,
-    addressSchemeCharacter: Char,
-    accountStorage: AccountStorage.Settings,
-    wavesBlockchainClient: WavesBlockchainClientSettings,
-    ntpServer: String,
-    restApi: RestAPISettings,
-    exchangeTxBaseFee: Long,
-    actorResponseTimeout: FiniteDuration,
-    dataDirectory: String,
-    snapshotsInterval: Int,
-    limitEventsDuringRecovery: Option[Int],
-    snapshotsLoadingTimeout: FiniteDuration,
-    startEventsProcessingTimeout: FiniteDuration,
-    orderBooksRecoveringTimeout: FiniteDuration,
-    priceAssets: Seq[Asset],
-    blacklistedAssets: Set[Asset.IssuedAsset],
-    blacklistedNames: Seq[Regex],
-    orderDb: OrderDB.Settings,
-    // this is not a Set[Address] because to parse an address, global AddressScheme must be initialized
-    blacklistedAddresses: Set[String],
-    orderBookHttp: OrderBookHttpInfo.Settings,
-    eventsQueue: EventsQueueSettings,
-    processConsumedTimeout: FiniteDuration,
-    orderFee: Map[Long, OrderFeeSettings],
-    maxPriceDeviations: DeviationsSettings,
-    orderRestrictions: Map[AssetPair, OrderRestrictionsSettings],
-    matchingRules: Map[AssetPair, NonEmptyList[DenormalizedMatchingRule]],
-    whiteListOnly: Boolean,
-    allowedAssetPairs: Set[AssetPair],
-    allowedOrderVersions: Set[Byte],
-    exchangeTransactionBroadcast: ExchangeTransactionBroadcastSettings,
-    postgres: PostgresConnection,
-    orderHistory: Option[OrderHistorySettings],
-    webSockets: WebSocketSettings,
-    addressActor: AddressActor.Settings
+  id: String,
+  addressSchemeCharacter: Char,
+  accountStorage: AccountStorage.Settings,
+  wavesBlockchainClient: WavesBlockchainClientSettings,
+  ntpServer: String,
+  restApi: RestAPISettings,
+  exchangeTxBaseFee: Long,
+  actorResponseTimeout: FiniteDuration,
+  dataDirectory: String,
+  snapshotsInterval: Int,
+  limitEventsDuringRecovery: Option[Int],
+  snapshotsLoadingTimeout: FiniteDuration,
+  startEventsProcessingTimeout: FiniteDuration,
+  orderBooksRecoveringTimeout: FiniteDuration,
+  priceAssets: Seq[Asset],
+  blacklistedAssets: Set[Asset.IssuedAsset],
+  blacklistedNames: Seq[Regex],
+  orderDb: OrderDB.Settings,
+  // this is not a Set[Address] because to parse an address, global AddressScheme must be initialized
+  blacklistedAddresses: Set[String],
+  orderBookHttp: OrderBookHttpInfo.Settings,
+  eventsQueue: EventsQueueSettings,
+  processConsumedTimeout: FiniteDuration,
+  orderFee: Map[Long, OrderFeeSettings],
+  maxPriceDeviations: DeviationsSettings,
+  orderRestrictions: Map[AssetPair, OrderRestrictionsSettings],
+  matchingRules: Map[AssetPair, NonEmptyList[DenormalizedMatchingRule]],
+  whiteListOnly: Boolean,
+  allowedAssetPairs: Set[AssetPair],
+  allowedOrderVersions: Set[Byte],
+  exchangeTransactionBroadcast: ExchangeTransactionBroadcastSettings,
+  postgres: PostgresConnection,
+  orderHistory: Option[OrderHistorySettings],
+  webSockets: WebSocketSettings,
+  addressActor: AddressActor.Settings
 ) {
 
   val recoverOrderHistory = !new File(dataDirectory).exists()
 
-  def mentionedAssets: Set[Asset] = {
+  def mentionedAssets: Set[Asset] =
     priceAssets.toSet ++
-      blacklistedAssets ++
-      orderRestrictions.keySet.flatMap(_.assets) ++
-      matchingRules.keySet.flatMap(_.assets) ++
-      allowedAssetPairs.flatMap(_.assets) ++
-      orderFee.values.toSet[OrderFeeSettings].flatMap {
-        case x: OrderFeeSettings.FixedSettings => Set(x.asset)
-        case _                                 => Set.empty[Asset]
-      }
-  }
+    blacklistedAssets ++
+    orderRestrictions.keySet.flatMap(_.assets) ++
+    matchingRules.keySet.flatMap(_.assets) ++
+    allowedAssetPairs.flatMap(_.assets) ++
+    orderFee.values.toSet[OrderFeeSettings].flatMap {
+      case x: OrderFeeSettings.FixedSettings => Set(x.asset)
+      case _ => Set.empty[Asset]
+    }
+
 }
 
 object MatcherSettings extends ConfigReaders {

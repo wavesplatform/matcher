@@ -58,9 +58,9 @@ class MatcherTickerTestSuite extends MatcherSuiteBase {
 //      SyncMatcherHttpApi.assertNotFoundAndMessage(dex1.api.place(mkOrder(node,usdWavesPair, OrderType.BUY, 1.waves, 200), ""))
     }
 
-    val bidPrice  = 200
+    val bidPrice = 200
     val bidAmount = 1.waves
-    val askPrice  = 400
+    val askPrice = 400
     val askAmount = bidAmount / 2
 
     "place bid order for first pair" in {
@@ -69,7 +69,7 @@ class MatcherTickerTestSuite extends MatcherSuiteBase {
 
       val r = dex1.api.orderBookStatus(btcUsdPair)
       r.lastTrade shouldBe None
-      r.bestBid should matchTo { Option(LevelAgg(2 * bidAmount, bidPrice)) }
+      r.bestBid should matchTo(Option(LevelAgg(2 * bidAmount, bidPrice)))
       r.bestAsk shouldBe None
     }
 
@@ -80,7 +80,7 @@ class MatcherTickerTestSuite extends MatcherSuiteBase {
       val r = dex1.api.orderBookStatus(btcWavesPair)
       r.lastTrade shouldBe None
       r.bestBid shouldBe None
-      r.bestAsk should matchTo { Option(LevelAgg(2 * askAmount, askPrice)) }
+      r.bestAsk should matchTo(Option(LevelAgg(2 * askAmount, askPrice)))
     }
 
     "place ask order for first pair" in {
@@ -89,31 +89,33 @@ class MatcherTickerTestSuite extends MatcherSuiteBase {
 
       val r = dex1.api.orderBookStatus(btcUsdPair)
       r.lastTrade shouldBe None
-      r.bestBid should matchTo { Option(LevelAgg(2 * bidAmount, bidPrice)) }
-      r.bestAsk should matchTo { Option(LevelAgg(2 * askAmount, askPrice)) }
+      r.bestBid should matchTo(Option(LevelAgg(2 * bidAmount, bidPrice)))
+      r.bestAsk should matchTo(Option(LevelAgg(2 * askAmount, askPrice)))
     }
 
     "match bid order for first pair" in {
       placeAndAwaitAtDex(mkOrder(bob, btcUsdPair, OrderType.SELL, askAmount, bidPrice), Status.Filled)
 
       val r1 = dex1.api.orderBookStatus(btcUsdPair)
-      r1.lastTrade should matchTo { Option(LastTrade(bidPrice, askAmount, OrderType.SELL)) }
-      r1.bestBid should matchTo { Option(LevelAgg(2 * bidAmount - askAmount, bidPrice)) }
-      r1.bestAsk should matchTo { Option(LevelAgg(2 * askAmount, askPrice)) }
+      r1.lastTrade should matchTo(Option(LastTrade(bidPrice, askAmount, OrderType.SELL)))
+      r1.bestBid should matchTo(Option(LevelAgg(2 * bidAmount - askAmount, bidPrice)))
+      r1.bestAsk should matchTo(Option(LevelAgg(2 * askAmount, askPrice)))
 
       placeAndAwaitAtDex(mkOrder(bob, btcUsdPair, OrderType.SELL, 3 * askAmount, bidPrice), Status.Filled)
 
       val r2 = dex1.api.orderBookStatus(btcUsdPair)
-      r2.lastTrade should matchTo { Option(LastTrade(bidPrice, 2 * askAmount, OrderType.SELL)) } // second BUY order (bidAmount = 2 * askAmount) filled
+      r2.lastTrade should matchTo {
+        Option(LastTrade(bidPrice, 2 * askAmount, OrderType.SELL))
+      } // second BUY order (bidAmount = 2 * askAmount) filled
       r2.bestBid shouldBe None
-      r2.bestAsk should matchTo { Option(LevelAgg(2 * askAmount, askPrice)) }
+      r2.bestAsk should matchTo(Option(LevelAgg(2 * askAmount, askPrice)))
     }
 
     "match ask order for first pair" in {
       placeAndAwaitAtDex(mkOrder(alice, btcUsdPair, OrderType.BUY, bidAmount, askPrice), Status.Filled)
 
       val r = dex1.api.orderBookStatus(btcUsdPair)
-      r.lastTrade should matchTo { Option(LastTrade(askPrice, askAmount, OrderType.BUY)) } // second SELL order filled
+      r.lastTrade should matchTo(Option(LastTrade(askPrice, askAmount, OrderType.BUY))) // second SELL order filled
       r.bestBid shouldBe None
       r.bestAsk shouldBe None
     }

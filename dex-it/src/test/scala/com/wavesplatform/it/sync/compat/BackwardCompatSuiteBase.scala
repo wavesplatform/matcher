@@ -11,13 +11,14 @@ import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.MatcherState
 
 /**
-  * Doesn't start DEX in beforeAll
-  */
+ * Doesn't start DEX in beforeAll
+ */
 trait BackwardCompatSuiteBase extends MatcherSuiteBase with MultipleVersions {
 
-  override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "WAVES" ]""".stripMargin)
+  override protected def dexInitialSuiteConfig: Config =
+    ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "WAVES" ]""".stripMargin)
 
-  protected val carol    = mkKeyPair("carol")
+  protected val carol = mkKeyPair("carol")
   protected val accounts = List(alice, bob)
 
   override protected def beforeAll(): Unit = {
@@ -48,7 +49,8 @@ trait BackwardCompatSuiteBase extends MatcherSuiteBase with MultipleVersions {
     accounts.foreach(dex2.api.waitForOrderHistory(_, activeOnly = Some(true))(_.isEmpty))
   }
 
-  protected def state(dexApi: DexApi[Id], orders: IndexedSeq[Order]): MatcherState = clean(matcherState(List(wavesUsdPair), orders, accounts, dexApi))
+  protected def state(dexApi: DexApi[Id], orders: IndexedSeq[Order]): MatcherState =
+    clean(matcherState(List(wavesUsdPair), orders, accounts, dexApi))
 
   private def clean(state: MatcherState): MatcherState = state.copy(
     offset = 0L, // doesn't matter in this test

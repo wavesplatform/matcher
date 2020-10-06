@@ -23,9 +23,9 @@ class OrderFeeSettingsCacheSpecification extends AnyWordSpecLike with Matchers w
 
       val settingsMap =
         Map(
-          -1L   -> DynamicSettings.symmetric(0.003.waves),
-          2L    -> DynamicSettings(0.001.waves, 0.005.waves),
-          15L   -> DynamicSettings(0.002.waves, 0.004.waves),
+          -1L -> DynamicSettings.symmetric(0.003.waves),
+          2L -> DynamicSettings(0.001.waves, 0.005.waves),
+          15L -> DynamicSettings(0.002.waves, 0.004.waves),
           1000L -> PercentSettings(AssetType.Amount, 0.005)
         )
 

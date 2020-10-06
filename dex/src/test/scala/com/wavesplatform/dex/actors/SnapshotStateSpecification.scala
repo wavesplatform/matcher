@@ -17,8 +17,8 @@ class SnapshotStateSpecification extends AnyPropSpecLike with DrivenPropertyChec
     )
 
     val g = for {
-      interval            <- Gen.choose(1, 1000L).label("interval")
-      currSnapshotOffset  <- Gen.choose(-1, 1000L).label("currSnapshotOffset")
+      interval <- Gen.choose(1, 1000L).label("interval")
+      currSnapshotOffset <- Gen.choose(-1, 1000L).label("currSnapshotOffset")
       lastProcessedOffset <- Gen.choose(-1, 1000L).label("lastProcessedOffset")
     } yield (currSnapshotOffset, lastProcessedOffset, interval)
 

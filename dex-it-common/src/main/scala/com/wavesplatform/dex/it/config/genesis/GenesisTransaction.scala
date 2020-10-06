@@ -11,10 +11,10 @@ case class GenesisTransaction(recipient: Address, amount: Long, timestamp: Long,
 
   val bytes: Coeval[Array[Byte]] = Coeval.evalOnce {
 
-    val typeBytes      = Array(typeId)
+    val typeBytes = Array(typeId)
     val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TimestampLength, 0)
-    val amountBytes    = Bytes.ensureCapacity(Longs.toByteArray(amount), AmountLength, 0)
-    val rcpBytes       = recipient.bytes.arr
+    val amountBytes = Bytes.ensureCapacity(Longs.toByteArray(amount), AmountLength, 0)
+    val rcpBytes = recipient.bytes.arr
     require(rcpBytes.length == Address.AddressLength)
 
     val res = Bytes.concat(typeBytes, timestampBytes, rcpBytes, amountBytes)
@@ -31,8 +31,8 @@ object GenesisTransaction {
   val typeId: Byte = 1
 
   private val TimestampLength, AmountLength = 8
-  private val TypeLength                    = 1
+  private val TypeLength = 1
 
   private val RECIPIENT_LENGTH = Address.AddressLength
-  private val BASE_LENGTH      = TimestampLength + RECIPIENT_LENGTH + AmountLength
+  private val BASE_LENGTH = TimestampLength + RECIPIENT_LENGTH + AmountLength
 }

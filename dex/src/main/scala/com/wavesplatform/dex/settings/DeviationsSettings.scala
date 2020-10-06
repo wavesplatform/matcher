@@ -8,6 +8,7 @@ import pureconfig.generic.semiauto
 case class DeviationsSettings(enable: Boolean, maxPriceProfit: Double, maxPriceLoss: Double, maxFeeDeviation: Double)
 
 object DeviationsSettings {
+
   implicit val deviationsConfigReader = semiauto
     .deriveReader[DeviationsSettings]
     .validatedField(
@@ -15,4 +16,5 @@ object DeviationsSettings {
       validationOf.field[DeviationsSettings, "maxPriceLoss"].mk(x => rules.gt0(x.maxPriceLoss)),
       validationOf.field[DeviationsSettings, "maxFeeDeviation"].mk(x => rules.gt0(x.maxFeeDeviation))
     )
+
 }

@@ -11,10 +11,10 @@ import play.api.libs.json.Json
 import scala.collection.mutable
 
 /**
-  * This actor waits for OrderExecuted event observed in both owners of orders and then creates an ExchangeTransaction
-  * and broadcasts it further.
-  * If both orders have the same owner, an ExchangeTransaction is created immediately.
-  */
+ * This actor waits for OrderExecuted event observed in both owners of orders and then creates an ExchangeTransaction
+ * and broadcasts it further.
+ * If both orders have the same owner, an ExchangeTransaction is created immediately.
+ */
 class CreateExchangeTransactionActor(createTransaction: CreateTransaction, recipients: List[ActorRef]) extends Actor with ScorexLogging {
 
   private val pendingEvents = mutable.Set.empty[OrderExecuted]
@@ -36,14 +36,15 @@ class CreateExchangeTransactionActor(createTransaction: CreateTransaction, recip
           case Left(ex) =>
             log.warn(
               s"""Can't create tx: $ex
-               |o1: (amount=${submitted.amount}, fee=${submitted.fee}): ${Json.prettyPrint(submitted.order.json())}
-               |o2: (amount=${counter.amount}, fee=${counter.fee}): ${Json.prettyPrint(counter.order.json())}""".stripMargin
+                 |o1: (amount=${submitted.amount}, fee=${submitted.fee}): ${Json.prettyPrint(submitted.order.json())}
+                 |o2: (amount=${counter.amount}, fee=${counter.fee}): ${Json.prettyPrint(counter.order.json())}""".stripMargin
             )
         }
 
         pendingEvents -= event
       } else pendingEvents += event
   }
+
 }
 
 object CreateExchangeTransactionActor {
@@ -53,4 +54,5 @@ object CreateExchangeTransactionActor {
 
   def props(createTransaction: CreateTransaction, recipients: List[ActorRef]): Props =
     Props(new CreateExchangeTransactionActor(createTransaction, recipients))
+
 }

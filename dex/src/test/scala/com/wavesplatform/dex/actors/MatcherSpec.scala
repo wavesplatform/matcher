@@ -27,4 +27,5 @@ trait MatcherSpecLike extends TestKitBase with Matchers with BeforeAndAfterAll w
     super.afterAll()
     shutdown(system)
   }
+
 }

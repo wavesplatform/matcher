@@ -57,7 +57,8 @@ trait HasKafka { self: BaseContainersKit with InformativeTestStart =>
       .withContainerNetwork(
         new ContainerNetwork()
           .withIpamConfig(new ContainerNetwork.Ipam().withIpv4Address(kafkaIp))
-          .withAliases(kafka.networkAliases.asJava))
+          .withAliases(kafka.networkAliases.asJava)
+      )
       .exec()
 
     waitForNetworkSettings(_.getNetworks.containsKey(network.getId))
@@ -72,4 +73,5 @@ trait HasKafka { self: BaseContainersKit with InformativeTestStart =>
       .zipWithIndex
       .find { case (ns, attempt) => pred(ns) || attempt == 10 }
       .fold(log.warn(s"Can't wait on ${kafka.containerId}"))(_ => ())
+
 }

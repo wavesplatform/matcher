@@ -19,13 +19,13 @@ import scala.jdk.CollectionConverters._
 @Warmup(iterations = 10)
 @Measurement(iterations = 10)
 class OrderBookAddBenchmark {
-  @Benchmark def add_0_plus_1250_test(st: Add_0_To_1250_State, bh: Blackhole): Unit       = bh.consume { st.run() }
-  @Benchmark def add_1250_plus_1250_test(st: Add_1250_To_1250_State, bh: Blackhole): Unit = bh.consume { st.run() }
+  @Benchmark def add_0_plus_1250_test(st: Add_0_To_1250_State, bh: Blackhole): Unit = bh.consume(st.run())
+  @Benchmark def add_1250_plus_1250_test(st: Add_1250_To_1250_State, bh: Blackhole): Unit = bh.consume(st.run())
 }
 
 object OrderBookAddBenchmark {
 
-  @State(Scope.Thread) class Add_0_To_1250_State    extends AddState(initOrderNumber = 0, orderNumberToAdd = 1250)
+  @State(Scope.Thread) class Add_0_To_1250_State extends AddState(initOrderNumber = 0, orderNumberToAdd = 1250)
   @State(Scope.Thread) class Add_1250_To_1250_State extends AddState(initOrderNumber = 1250, orderNumberToAdd = 1250)
 
   sealed abstract class AddState(initOrderNumber: Int, orderNumberToAdd: Int) extends OrderBookBenchmarkState {
@@ -55,5 +55,7 @@ object OrderBookAddBenchmark {
           }
         }
       } yield orders.asScala.toList
+
   }
+
 }

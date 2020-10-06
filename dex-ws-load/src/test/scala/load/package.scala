@@ -5,8 +5,8 @@ import io.gatling.http.Predef._
 
 import scala.concurrent.duration.DurationInt
 
-
 package object load {
+
   val checkPP = ws
     .checkTextMessage("checkPP")
     .matching(jsonPath("$.T").is("pp"))
@@ -39,4 +39,5 @@ package object load {
     .doIf("${pp.exists()}")(exec {
       ws("WS -- PP").sendText("""${pp}""").await(11 seconds)(checkPP)
     })
+
 }

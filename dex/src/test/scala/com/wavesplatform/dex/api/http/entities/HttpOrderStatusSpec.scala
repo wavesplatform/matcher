@@ -10,11 +10,11 @@ class HttpOrderStatusSpec extends AnyFreeSpec with Matchers with DiffMatcherWith
 
   "backward JSON compatibility and converting from OrderStatus" - {
     Map[OrderStatus, String](
-      OrderStatus.Accepted                 -> """{"status":"Accepted"}""",
-      OrderStatus.NotFound                 -> """{"status":"NotFound","message":"The limit order is not found"}""",
+      OrderStatus.Accepted -> """{"status":"Accepted"}""",
+      OrderStatus.NotFound -> """{"status":"NotFound","message":"The limit order is not found"}""",
       OrderStatus.PartiallyFilled(200, 10) -> """{"status":"PartiallyFilled","filledAmount":200,"filledFee":10}""",
-      OrderStatus.Filled(201, 11)          -> """{"status":"Filled","filledAmount":201,"filledFee":11}""",
-      OrderStatus.Cancelled(202, 12)       -> """{"status":"Cancelled","filledAmount":202,"filledFee":12}"""
+      OrderStatus.Filled(201, 11) -> """{"status":"Filled","filledAmount":201,"filledFee":11}""",
+      OrderStatus.Cancelled(202, 12) -> """{"status":"Cancelled","filledAmount":202,"filledFee":12}"""
     ).foreach {
       case (status, json) =>
         val apiStatus = HttpOrderStatus.from(status)

@@ -12,12 +12,12 @@ import pureconfig.generic.semiauto
 /** Denormalized representation of the matching rule passed from the application.conf */
 case class DenormalizedMatchingRule(startOffset: Long, tickSize: BigDecimal) {
 
-  def normalize(assetPair: AssetPair, assetDecimals: Asset => Int): MatchingRule = {
+  def normalize(assetPair: AssetPair, assetDecimals: Asset => Int): MatchingRule =
     MatchingRule(
       startOffset,
       Normalization.normalizePrice(tickSize, assetDecimals(assetPair.amountAsset), assetDecimals(assetPair.priceAsset))
     )
-  }
+
 }
 
 object DenormalizedMatchingRule extends ScorexLogging {
@@ -37,7 +37,10 @@ object DenormalizedMatchingRule extends ScorexLogging {
   }
 
   @annotation.tailrec
-  def skipOutdated(currOffset: QueueEventWithMeta.Offset, rules: NonEmptyList[DenormalizedMatchingRule]): NonEmptyList[DenormalizedMatchingRule] =
+  def skipOutdated(
+    currOffset: QueueEventWithMeta.Offset,
+    rules: NonEmptyList[DenormalizedMatchingRule]
+  ): NonEmptyList[DenormalizedMatchingRule] =
     if (currOffset > rules.head.startOffset)
       rules.tail match {
         case x :: xs =>
@@ -49,16 +52,17 @@ object DenormalizedMatchingRule extends ScorexLogging {
     else rules
 
   /**
-    * Returns denormalized (from application.conf) matching rules for the specified asset pair.
-    * Prepends default rule if matching rules list doesn't contain element with startOffset = 0
-    */
+   * Returns denormalized (from application.conf) matching rules for the specified asset pair.
+   * Prepends default rule if matching rules list doesn't contain element with startOffset = 0
+   */
   def getDenormalizedMatchingRules(
-      settings: MatcherSettings,
-      assetDecimals: Asset => Int,
-      assetPair: AssetPair
+    settings: MatcherSettings,
+    assetDecimals: Asset => Int,
+    assetPair: AssetPair
   ): NonEmptyList[DenormalizedMatchingRule] = {
     lazy val defaultRule = getDefaultRule(assetPair, assetDecimals)
-    val rules            = settings.matchingRules.getOrElse(assetPair, NonEmptyList.one(defaultRule))
+    val rules = settings.matchingRules.getOrElse(assetPair, NonEmptyList.one(defaultRule))
     if (rules.head.startOffset == 0) rules else defaultRule :: rules
   }
+
 }

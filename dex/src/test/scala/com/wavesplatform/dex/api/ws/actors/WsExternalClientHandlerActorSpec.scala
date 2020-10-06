@@ -35,10 +35,10 @@ class WsExternalClientHandlerActorSpec extends AnyFreeSpecLike with Matchers wit
 
   private val testKit = ActorTestKit()
 
-  private implicit val ec = testKit.system.executionContext
+  implicit private val ec = testKit.system.executionContext
 
-  private val issuedAsset   = IssuedAsset(ByteStr("issuedAsset".getBytes(StandardCharsets.UTF_8)))
-  private val assetPair     = AssetPair(issuedAsset, Waves)
+  private val issuedAsset = IssuedAsset(ByteStr("issuedAsset".getBytes(StandardCharsets.UTF_8)))
+  private val assetPair = AssetPair(issuedAsset, Waves)
   private val clientKeyPair = mkKeyPair("seed")
 
   private val subscriptionsSettings = SubscriptionsSettings.default
@@ -204,7 +204,7 @@ class WsExternalClientHandlerActorSpec extends AnyFreeSpecLike with Matchers wit
 
     "should close all subscriptions after connection closing" in test { t =>
       val jwtPayload = mkJwtSignedPayload(clientKeyPair)
-      val clientRef  = t.clientProbe.ref
+      val clientRef = t.clientProbe.ref
 
       t.wsHandlerRef ! ProcessClientMessage(WsOrderBookSubscribe(assetPair, 1))
       t.wsHandlerRef ! ProcessClientMessage(WsAddressSubscribe(clientKeyPair, WsAddressSubscribe.defaultAuthType, mkJwt(jwtPayload)))
@@ -236,7 +236,9 @@ class WsExternalClientHandlerActorSpec extends AnyFreeSpecLike with Matchers wit
         }
       }
 
-      assetPairs.foldLeft(assetPair) { case (newSubscription, oldSubscription) => checkEviction(newSubscription, oldSubscription); oldSubscription }
+      assetPairs.foldLeft(assetPair) { case (newSubscription, oldSubscription) =>
+        checkEviction(newSubscription, oldSubscription); oldSubscription
+      }
     }
 
     "should close old address subscriptions if total address subscriptions number has reached limit" in test { t =>
@@ -257,7 +259,9 @@ class WsExternalClientHandlerActorSpec extends AnyFreeSpecLike with Matchers wit
         }
       }
 
-      keyPairs.foldLeft(clientKeyPair) { case (newSubscription, oldSubscription) => checkEviction(newSubscription, oldSubscription); oldSubscription }
+      keyPairs.foldLeft(clientKeyPair) { case (newSubscription, oldSubscription) =>
+        checkEviction(newSubscription, oldSubscription); oldSubscription
+      }
     }
   }
 
@@ -276,19 +280,21 @@ class WsExternalClientHandlerActorSpec extends AnyFreeSpecLike with Matchers wit
     t.wsHandlerRef ! message
     t.clientProbe.receiveMessage() match {
       case actualError: WsError => actualError should matchTo(expectedError)
-      case x                    => fail(s"Unexpected message: $x")
+      case x => fail(s"Unexpected message: $x")
     }
   }
 
-  private case class TestInstances(clientProbe: TypedTestProbe[WsMessage],
-                                   matcherProbe: TestProbe,
-                                   addressProbe: TestProbe,
-                                   wsHandlerRef: ActorRef[WsExternalClientHandlerActor.Message],
-                                   connectionId: String)
+  private case class TestInstances(
+    clientProbe: TypedTestProbe[WsMessage],
+    matcherProbe: TestProbe,
+    addressProbe: TestProbe,
+    wsHandlerRef: ActorRef[WsExternalClientHandlerActor.Message],
+    connectionId: String
+  )
 
   private def test(f: TestInstances => Unit): Unit = {
 
-    val clientInbox  = TypedTestProbe[WsMessage]()(testKit.system)
+    val clientInbox = TypedTestProbe[WsMessage]()(testKit.system)
     val matcherProbe = TestProbe(UUID.randomUUID().toString)(testKit.system.toClassic)
     val addressProbe = TestProbe(UUID.randomUUID().toString)(testKit.system.toClassic)
 
@@ -328,4 +334,5 @@ class WsExternalClientHandlerActorSpec extends AnyFreeSpecLike with Matchers wit
     testKit.shutdownTestKit()
     super.afterAll()
   }
+
 }

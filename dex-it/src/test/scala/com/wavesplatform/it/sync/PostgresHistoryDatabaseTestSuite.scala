@@ -34,8 +34,8 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
     .loadOrThrow[PostgresConnection]
     .getQuillContextConfig
 
-  private val customDB: String       = "user_db"
-  private val customUser: String     = "user"
+  private val customDB: String = "user_db"
+  private val customUser: String = "user"
   private val customPassword: String = "user"
 
   private val postgresContainerName = "pgc"
@@ -90,7 +90,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
 
     def executeCreateTablesStatement(sqlConnection: Connection): Try[Unit] = Try {
 
-      val createTablesDDL       = getFileContentStr(orderHistoryDDLFileName)
+      val createTablesDDL = getFileContentStr(orderHistoryDDLFileName)
       val createTablesStatement = sqlConnection.prepareStatement(createTablesDDL)
 
       createTablesStatement.executeUpdate()
@@ -120,7 +120,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
 
   override def afterEach(): Unit = {
     super.afterEach()
-    Seq(alice, bob).foreach { dex1.api.cancelAll(_) }
+    Seq(alice, bob).foreach(dex1.api.cancelAll(_))
   }
 
   import ctx._
@@ -128,28 +128,28 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
   private def getEventsCount: Long = ctx.run(querySchema[EventRecord]("events", _.orderId -> "order_id").size)
 
   private case class OrderBriefInfo(
-      id: String,
-      tpe: Byte,
-      senderPublicKey: String,
-      side: Byte,
-      amountAsset: String,
-      priceAsset: String,
-      feeAsset: String,
-      amount: Double,
-      price: Double,
-      fee: Double,
-      closedAt: Option[LocalDateTime]
+    id: String,
+    tpe: Byte,
+    senderPublicKey: String,
+    side: Byte,
+    amountAsset: String,
+    priceAsset: String,
+    feeAsset: String,
+    amount: Double,
+    price: Double,
+    fee: Double,
+    closedAt: Option[LocalDateTime]
   )
 
   private case class EventBriefInfo(
-      orderId: String,
-      eventType: Byte,
-      filled: Double,
-      totalFilled: Double,
-      feeFilled: Double,
-      feeTotalFilled: Double,
-      status: Byte,
-      reason: EventReason = Events.NotTracked
+    orderId: String,
+    eventType: Byte,
+    filled: Double,
+    totalFilled: Double,
+    feeFilled: Double,
+    feeTotalFilled: Double,
+    status: Byte,
+    reason: EventReason = Events.NotTracked
   )
 
   private def getOrderInfoById(orderId: Order.Id): Option[OrderBriefInfo] =
@@ -157,17 +157,17 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
       .run(
         querySchema[OrderBriefInfo](
           "orders",
-          _.id              -> "id",
-          _.tpe             -> "type",
+          _.id -> "id",
+          _.tpe -> "type",
           _.senderPublicKey -> "sender_public_key",
-          _.side            -> "side",
-          _.amountAsset     -> "amount_asset_id",
-          _.priceAsset      -> "price_asset_id",
-          _.feeAsset        -> "fee_asset_id",
-          _.amount          -> "amount",
-          _.price           -> "price",
-          _.fee             -> "fee",
-          _.closedAt        -> "closed_at"
+          _.side -> "side",
+          _.amountAsset -> "amount_asset_id",
+          _.priceAsset -> "price_asset_id",
+          _.feeAsset -> "fee_asset_id",
+          _.amount -> "amount",
+          _.price -> "price",
+          _.fee -> "fee",
+          _.closedAt -> "closed_at"
         ).filter(_.id == lift(orderId.toString))
       )
       .headOption
@@ -177,14 +177,14 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
       .run(
         querySchema[EventRecord](
           "events",
-          _.eventType      -> "event_type",
-          _.filled         -> "filled",
-          _.totalFilled    -> "total_filled",
-          _.feeFilled      -> "fee_filled",
+          _.eventType -> "event_type",
+          _.filled -> "filled",
+          _.totalFilled -> "total_filled",
+          _.feeFilled -> "fee_filled",
           _.feeTotalFilled -> "fee_total_filled",
-          _.status         -> "status",
-          _.timestamp      -> "timestamp",
-          _.reason         -> "reason"
+          _.status -> "status",
+          _.timestamp -> "timestamp",
+          _.reason -> "reason"
         ).filter(_.orderId == lift(orderId.toString))
       )
       .sortWith { (l, r) =>
@@ -206,13 +206,13 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
       }
 
   private def cleanTables(): Unit = {
-    ctx.run { querySchema[OrderRecord]("orders").delete }
-    ctx.run { querySchema[EventRecord]("events").delete }
+    ctx.run(querySchema[OrderRecord]("orders").delete)
+    ctx.run(querySchema[EventRecord]("events").delete)
   }
 
   "Postgres order history should save correct filled status of closed orders" in {
 
-    val buyOrder  = mkOrder(bob, wavesBtcPair, BUY, 270477189L, 28259L)
+    val buyOrder = mkOrder(bob, wavesBtcPair, BUY, 270477189L, 28259L)
     val sellOrder = mkOrder(alice, wavesBtcPair, SELL, 274413799L, 28259L)
 
     placeAndAwaitAtDex(buyOrder)
@@ -228,7 +228,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
 
     getEventsInfoByOrderId(sellOrder.id()).last.status shouldBe statusPartiallyFilled
 
-    Seq(alice, bob).foreach { dex1.api.cancelAll(_) }
+    Seq(alice, bob).foreach(dex1.api.cancelAll(_))
     cleanTables()
   }
 
@@ -239,17 +239,17 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
       val cancelledOrder = mkOrderDP(alice, wavesUsdPair, BUY, 1.waves, 3.50)
 
       placeAndAwaitAtDex(cancelledOrder)
-      eventually { getOrderInfoById(cancelledOrder.id()).get.closedAt shouldBe None }
+      eventually(getOrderInfoById(cancelledOrder.id()).get.closedAt shouldBe None)
 
       cancelAndAwait(alice, cancelledOrder)
-      eventually { getOrderInfoById(cancelledOrder.id()).get.closedAt.nonEmpty shouldBe true }
+      eventually(getOrderInfoById(cancelledOrder.id()).get.closedAt.nonEmpty shouldBe true)
 
       cleanTables()
     }
 
     "execution" in {
 
-      val counter   = mkOrderDP(alice, wavesUsdPair, BUY, 1.waves, 3.50)
+      val counter = mkOrderDP(alice, wavesUsdPair, BUY, 1.waves, 3.50)
       val submitted = mkOrderDP(alice, wavesUsdPair, SELL, 1.waves, 3.50)
 
       placeAndAwaitAtDex(counter)
@@ -299,7 +299,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
   "Postgres order history should correctly save events: 1 big counter and 2 small submitted" in {
 
     def sellOrder: Order = mkOrderDP(bob, wctUsdPair, SELL, 100.wct, 0.35, matcherFee = 0.00000030.btc, feeAsset = btc)
-    val buyOrder         = mkOrderDP(alice, wctUsdPair, BUY, 300.wct, 0.35, matcherFee = 0.00001703.eth, feeAsset = eth)
+    val buyOrder = mkOrderDP(alice, wctUsdPair, BUY, 300.wct, 0.35, matcherFee = 0.00001703.eth, feeAsset = eth)
 
     dex1.api.place(buyOrder)
 
@@ -377,7 +377,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
   }
 
   "Postgres order history should correctly save events with Waves as amount and fee" in {
-    val buyOrder  = mkOrderDP(alice, wavesUsdPair, BUY, 300.waves, 0.35, matcherFee = 0.00370300.waves, feeAsset = Waves)
+    val buyOrder = mkOrderDP(alice, wavesUsdPair, BUY, 300.waves, 0.35, matcherFee = 0.00370300.waves, feeAsset = Waves)
     val sellOrder = mkOrderDP(bob, wavesUsdPair, SELL, 300.waves, 0.35, matcherFee = 0.30.usd, feeAsset = usd)
 
     dex1.api.place(buyOrder)
@@ -439,7 +439,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
   "Postgres order history should correctly save events: 1 small counter and 1 big submitted" in {
 
     val smallBuyOrder = mkOrderDP(alice, wctUsdPair, BUY, 300.wct, 0.35, 0.00001703.eth, feeAsset = eth)
-    val bigSellOrder  = mkOrderDP(bob, wctUsdPair, SELL, 900.wct, 0.35, 0.00000030.btc, feeAsset = btc)
+    val bigSellOrder = mkOrderDP(bob, wctUsdPair, SELL, 900.wct, 0.35, 0.00000030.btc, feeAsset = btc)
 
     dex1.api.place(smallBuyOrder)
     dex1.api.place(bigSellOrder)
@@ -612,7 +612,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
         }
       }
 
-      Seq(alice, bob).foreach { dex1.api.cancelAll(_) }
+      Seq(alice, bob).foreach(dex1.api.cancelAll(_))
     }
   }
 
@@ -623,15 +623,17 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
   }
 
   private val finalizeEventStatus = List(statusFilled, statusCancelled)
+
   private def finalizeEventTimestampOf(orderId: String): Option[LocalDateTime] =
     ctx
       .run(
         querySchema[EventRecord](
           "events",
           _.eventType -> "event_type",
-          _.status    -> "status"
+          _.status -> "status"
         ).filter(record => record.orderId == lift(orderId) && liftQuery(finalizeEventStatus).contains(record.status))
       )
       .map(_.timestamp)
       .headOption
+
 }

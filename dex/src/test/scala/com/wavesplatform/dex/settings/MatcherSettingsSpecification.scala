@@ -26,7 +26,7 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
 
   "MatcherSettings" should "read values" in {
 
-    val config   = configWithSettings()
+    val config = configWithSettings()
     val settings = ConfigSource.fromConfig(config).at("waves.dex").loadOrThrow[MatcherSettings]
 
     settings.id should be("matcher-1")
@@ -165,9 +165,9 @@ baz"""
      """.stripMargin
 
     def configStr(x: String): Config = configWithSettings(deviationsStr = x)
-    val settingsInvalidEnable        = getSettingByConfig(configStr(invalidEnable))
-    val settingsInvalidProfit        = getSettingByConfig(configStr(invalidProfit))
-    val settingsInvalidLossAndFee    = getSettingByConfig(configStr(invalidLossAndFee))
+    val settingsInvalidEnable = getSettingByConfig(configStr(invalidEnable))
+    val settingsInvalidProfit = getSettingByConfig(configStr(invalidProfit))
+    val settingsInvalidLossAndFee = getSettingByConfig(configStr(invalidLossAndFee))
 
     settingsInvalidEnable should produce("waves.dex.max-price-deviations.enable")
     settingsInvalidProfit should produce("waves.dex.max-price-deviations.max-price-profit")
@@ -364,11 +364,11 @@ baz"""
     getSettingByConfig(configStr(duplicates)).explicitGet().allowedAssetPairs.size shouldBe 2
 
     getSettingByConfig(configStr(nonEmptyCorrect)).explicitGet().allowedAssetPairs shouldBe
-      Set(
-        AssetPair.createAssetPair("WAVES", "BTC").get,
-        AssetPair.createAssetPair("WAVES", "ETH").get,
-        AssetPair.createAssetPair("8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS", "WAVES").get
-      )
+    Set(
+      AssetPair.createAssetPair("WAVES", "BTC").get,
+      AssetPair.createAssetPair("WAVES", "ETH").get,
+      AssetPair.createAssetPair("8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS", "WAVES").get
+    )
   }
 
   "Matching rules" should "be validated" in {
@@ -391,17 +391,17 @@ baz"""
 
     def incorrectRulesOrder(firstRuleOffset: Long, secondRuleOffset: Long): String =
       s"""matching-rules = {
-        |  "WAVES-8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS": [
-        |    {
-        |      start-offset = $firstRuleOffset
-        |      tick-size    = 0.002
-        |    },
-        |    {
-        |      start-offset = $secondRuleOffset
-        |      tick-size    = 0.001
-        |    }
-        |  ]
-        |}
+         |  "WAVES-8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS": [
+         |    {
+         |      start-offset = $firstRuleOffset
+         |      tick-size    = 0.002
+         |    },
+         |    {
+         |      start-offset = $secondRuleOffset
+         |      tick-size    = 0.001
+         |    }
+         |  ]
+         |}
       """.stripMargin
 
     withClue("default") {
@@ -411,12 +411,12 @@ baz"""
     withClue("nonempty correct") {
       getSettingByConfig(configStr(nonEmptyCorrect)).explicitGet().matchingRules shouldBe Map(
         AssetPair.fromString("WAVES-8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS").get ->
-          NonEmptyList[DenormalizedMatchingRule](
-            DenormalizedMatchingRule(100L, 0.002),
-            List(
-              DenormalizedMatchingRule(500L, 0.001)
-            )
+        NonEmptyList[DenormalizedMatchingRule](
+          DenormalizedMatchingRule(100L, 0.002),
+          List(
+            DenormalizedMatchingRule(500L, 0.001)
           )
+        )
       )
     }
 

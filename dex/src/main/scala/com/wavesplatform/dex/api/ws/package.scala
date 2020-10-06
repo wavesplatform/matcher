@@ -16,4 +16,5 @@ package object ws {
     },
     tjs = Writes(x => JsString(x.toString))
   )
+
 }

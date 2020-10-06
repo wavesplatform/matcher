@@ -72,12 +72,12 @@ class BaseSettingsSpecification extends AnyFlatSpec {
        """.stripMargin
 
   def configWithSettings(
-      orderFeeStr: String = correctOrderFeeStr,
-      deviationsStr: String = correctDeviationsStr,
-      allowedAssetPairsStr: String = correctAllowedAssetPairsStr,
-      orderRestrictionsStr: String = correctOrderRestrictionsStr,
-      matchingRulesStr: String = correctMatchingRulesStr,
-      subscriptionsSettings: String = correctSubscriptionsSettingsStr
+    orderFeeStr: String = correctOrderFeeStr,
+    deviationsStr: String = correctDeviationsStr,
+    allowedAssetPairsStr: String = correctAllowedAssetPairsStr,
+    orderRestrictionsStr: String = correctOrderRestrictionsStr,
+    matchingRulesStr: String = correctMatchingRulesStr,
+    subscriptionsSettings: String = correctSubscriptionsSettingsStr
   ): Config = {
     val configStr =
       s"""waves {
@@ -214,4 +214,5 @@ class BaseSettingsSpecification extends AnyFlatSpec {
 
     loadConfig(ConfigFactory.parseString(configStr))
   }
+
 }

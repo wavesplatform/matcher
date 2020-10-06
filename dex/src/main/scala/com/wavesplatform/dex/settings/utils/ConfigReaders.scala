@@ -9,7 +9,7 @@ trait ConfigReaders {
   val byteStr58ConfigReader = ConfigReader.fromStringTry(ByteStr.decodeBase58)
   val byteStr64ConfigReader = ConfigReader.fromStringTry(ByteStr.decodeBase64)
 
-  implicit val assetConfigReader       = ConfigReader.fromStringOpt(Asset.fromString)
+  implicit val assetConfigReader = ConfigReader.fromStringOpt(Asset.fromString)
   implicit val issuedAssetConfigReader = byteStr58ConfigReader.map(Asset.IssuedAsset)
 
   implicit val assetPairConfigReader = ConfigReader.fromString(assetPairKeyParser)

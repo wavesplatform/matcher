@@ -7,21 +7,21 @@ trait MatcherQueue {
   def startConsume(fromOffset: QueueEventWithMeta.Offset, process: Seq[QueueEventWithMeta] => Future[Unit]): Unit
 
   /**
-    * @return Depending on settings and result:
-    *         Future.successful(None)    if storing is disabled
-    *         Future.successful(Some(x)) if storing is enabled and it was successful
-    *         Future.failed(error)       if storing is enabled and it was failed
-    */
+   * @return Depending on settings and result:
+   *         Future.successful(None)    if storing is disabled
+   *         Future.successful(Some(x)) if storing is enabled and it was successful
+   *         Future.failed(error)       if storing is enabled and it was failed
+   */
   def storeEvent(payload: QueueEvent): Future[Option[QueueEventWithMeta]]
 
   /**
-    * @return -1 if topic is empty or even it doesn't exist
-    */
+   * @return -1 if topic is empty or even it doesn't exist
+   */
   def firstEventOffset: Future[QueueEventWithMeta.Offset]
 
   /**
-    * @return -1 if topic is empty or even it doesn't exist
-    */
+   * @return -1 if topic is empty or even it doesn't exist
+   */
   def lastEventOffset: Future[QueueEventWithMeta.Offset]
 
   def close(timeout: FiniteDuration): Future[Unit]
@@ -41,4 +41,5 @@ object MatcherQueue {
     override def storeEvent(event: QueueEvent): Future[Option[QueueEventWithMeta]] = stored
     override def close(timeout: FiniteDuration): Unit = {}
   }
+
 }

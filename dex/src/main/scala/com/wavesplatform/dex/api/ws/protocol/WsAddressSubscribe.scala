@@ -39,14 +39,15 @@ final case class WsAddressSubscribe(key: Address, authType: String, jwt: String)
       _ <- Either.cond(crypto.verify(payload.signature, ByteStr(payload.toSign), payload.publicKey), (), error.InvalidJwtPayloadSignature)
       _ <- Either.cond(payload.publicKey.toAddress == key, (), error.AddressAndPublicKeyAreIncompatible(key, payload.publicKey))
     } yield payload
+
 }
 
 object WsAddressSubscribe {
 
-  val tpe                = "aus"
-  val defaultAuthType    = "jwt"
+  val tpe = "aus"
+  val defaultAuthType = "jwt"
   val supportedAuthTypes = Set(defaultAuthType)
-  val leewayInSeconds    = 10
+  val leewayInSeconds = 10
 
   def wsUnapply(arg: WsAddressSubscribe): Option[(String, Address, String, String)] = (arg.tpe, arg.key, arg.authType, arg.jwt).some
 
@@ -60,13 +61,15 @@ object WsAddressSubscribe {
     unlift(WsAddressSubscribe.wsUnapply)
   )
 
-  case class JwtPayload(signature: ByteStr,
-                        publicKey: PublicKey,
-                        networkByte: String,
-                        clientId: String,
-                        firstTokenExpirationInSeconds: Long,
-                        activeTokenExpirationInSeconds: Long,
-                        scope: List[String]) {
+  case class JwtPayload(
+    signature: ByteStr,
+    publicKey: PublicKey,
+    networkByte: String,
+    clientId: String,
+    firstTokenExpirationInSeconds: Long,
+    activeTokenExpirationInSeconds: Long,
+    scope: List[String]
+  ) {
     def toSign: Array[Byte] = JwtPayload.toSignPrefix ++ s"$networkByte:$clientId:$firstTokenExpirationInSeconds".getBytes(StandardCharsets.UTF_8)
 
     def signed(privateKey: PrivateKey): JwtPayload = copy(signature = crypto.sign(privateKey, toSign))
@@ -84,11 +87,13 @@ object WsAddressSubscribe {
         (__ \ "exp").format[Long] and
         (__ \ "scope").format[List[String]]
     )(JwtPayload.apply, unlift(JwtPayload.unapply))
+
   }
 
   def toMatcherError(e: Throwable, address: Address): MatcherError = e match {
-    case _: JwtLengthException     => error.JwtBroken
+    case _: JwtLengthException => error.JwtBroken
     case _: JwtExpirationException => error.SubscriptionTokenExpired(address)
-    case _                         => error.JwtCommonError(e.getMessage)
+    case _ => error.JwtCommonError(e.getMessage)
   }
+
 }

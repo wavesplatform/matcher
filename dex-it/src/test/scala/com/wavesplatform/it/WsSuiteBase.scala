@@ -12,12 +12,12 @@ import scala.reflect.ClassTag
 
 trait WsSuiteBase extends MatcherSuiteBase with HasWebSockets {
 
-  protected implicit val wsErrorDiff: Diff[WsError] = Derived[Diff[WsError]].ignore[WsError, Long](_.timestamp)
+  implicit protected val wsErrorDiff: Diff[WsError] = Derived[Diff[WsError]].ignore[WsError, Long](_.timestamp)
 
-  protected implicit val wsCompleteOrderDiff: Diff[WsFullOrder] =
+  implicit protected val wsCompleteOrderDiff: Diff[WsFullOrder] =
     Derived[Diff[WsFullOrder]].ignore[WsFullOrder, Long](_.timestamp).ignore[WsFullOrder, Long](_.eventTimestamp)
 
-  final implicit class WsConnectionOps(val self: WsConnection) {
+  implicit final class WsConnectionOps(val self: WsConnection) {
 
     def receiveAtLeastN[T <: WsServerMessage: ClassTag](n: Int): List[T] = {
       val r = eventually {
@@ -35,11 +35,11 @@ trait WsSuiteBase extends MatcherSuiteBase with HasWebSockets {
           .collectMessages[WsServerMessage]
           .filter {
             case _: WsPingOrPong => true
-            case _: WsError      => true
-            case _               => false
+            case _: WsError => true
+            case _ => false
           }
           .partitionMap {
-            case x: WsError      => x.asLeft
+            case x: WsError => x.asLeft
             case x: WsPingOrPong => x.asRight
           }
 
@@ -59,5 +59,7 @@ trait WsSuiteBase extends MatcherSuiteBase with HasWebSockets {
       Thread.sleep(duration.toMillis)
       self.collectMessages[T].size shouldBe sizeBefore
     }
+
   }
+
 }

@@ -24,12 +24,13 @@ object KeyPair {
     def toAddress: Address = PublicKey.toAddress(kp)
   }
 
-  implicit def toPublicKey(kp: KeyPair): PublicKey   = kp.publicKey
+  implicit def toPublicKey(kp: KeyPair): PublicKey = kp.publicKey
   implicit def toPrivateKey(kp: KeyPair): PrivateKey = kp.privateKey
-  implicit def toAddress(keyPair: KeyPair): Address  = keyPair.toAddress
+  implicit def toAddress(keyPair: KeyPair): Address = keyPair.toAddress
 
   implicit val jsonFormat: Format[KeyPair] = Format(
     byteStrFormat.map(KeyPair(_)),
     Writes(v => Json.obj("seed" -> Base58.encode(v.seed), "publicKey" -> v.publicKey, "privateKey" -> v.privateKey))
   )
+
 }

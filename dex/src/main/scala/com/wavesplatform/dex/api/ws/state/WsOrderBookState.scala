@@ -16,11 +16,13 @@ import monocle.macros.GenLens
 import scala.annotation.nowarn
 import scala.collection.immutable.TreeMap
 
-case class WsOrderBookState(wsConnections: Map[ActorRef[WsOrderBookChanges], Long],
-                            changedAsks: Set[Price],
-                            changedBids: Set[Price],
-                            lastTrade: Option[LastTrade],
-                            changedTickSize: Option[Double]) {
+case class WsOrderBookState(
+  wsConnections: Map[ActorRef[WsOrderBookChanges], Long],
+  changedAsks: Set[Price],
+  changedBids: Set[Price],
+  lastTrade: Option[LastTrade],
+  changedTickSize: Option[Double]
+) {
 
   def addSubscription(x: ActorRef[WsOrderBookChanges]): WsOrderBookState = copy(wsConnections = wsConnections.updated(x, 0L))
 
@@ -45,30 +47,33 @@ case class WsOrderBookState(wsConnections: Map[ActorRef[WsOrderBookChanges], Lon
     side = x.side
   )
 
-  def flushed(assetPair: AssetPair,
-              amountDecimals: Int,
-              priceDecimals: Int,
-              asks: TreeMap[Price, Amount],
-              bids: TreeMap[Price, Amount],
-              timestamp: Long): WsOrderBookState = copy(
-    wsConnections = if (hasChanges) {
-      val changes =
-        protocol.WsOrderBookChanges(
-          assetPair = assetPair,
-          asks = denormalized(amountDecimals, priceDecimals, take(asks, changedAsks)),
-          bids = denormalized(amountDecimals, priceDecimals, take(bids, changedBids)),
-          lastTrade = lastTrade.map(lastTrade(amountDecimals, priceDecimals, _)),
-          updateId = 0L, // Will be changed below
-          timestamp = timestamp,
-          settings = if (changedTickSize.isDefined) WsOrderBookSettings(None, changedTickSize).some else None
-        )
-      wsConnections.map {
-        case (conn, updateId) =>
-          val newUpdateId = getNextUpdateId(updateId)
-          conn ! changes.copy(updateId = newUpdateId)
-          conn -> newUpdateId
-      }
-    } else wsConnections,
+  def flushed(
+    assetPair: AssetPair,
+    amountDecimals: Int,
+    priceDecimals: Int,
+    asks: TreeMap[Price, Amount],
+    bids: TreeMap[Price, Amount],
+    timestamp: Long
+  ): WsOrderBookState = copy(
+    wsConnections =
+      if (hasChanges) {
+        val changes =
+          protocol.WsOrderBookChanges(
+            assetPair = assetPair,
+            asks = denormalized(amountDecimals, priceDecimals, take(asks, changedAsks)),
+            bids = denormalized(amountDecimals, priceDecimals, take(bids, changedBids)),
+            lastTrade = lastTrade.map(lastTrade(amountDecimals, priceDecimals, _)),
+            updateId = 0L, // Will be changed below
+            timestamp = timestamp,
+            settings = if (changedTickSize.isDefined) WsOrderBookSettings(None, changedTickSize).some else None
+          )
+        wsConnections.map {
+          case (conn, updateId) =>
+            val newUpdateId = getNextUpdateId(updateId)
+            conn ! changes.copy(updateId = newUpdateId)
+            conn -> newUpdateId
+        }
+      } else wsConnections,
     changedAsks = Set.empty,
     changedBids = Set.empty,
     lastTrade = None,
@@ -87,22 +92,23 @@ case class WsOrderBookState(wsConnections: Map[ActorRef[WsOrderBookChanges], Lon
   }
 
   def accumulateChanges(lc: LevelAmounts, lt: Option[LastTrade], ts: Option[Double]): WsOrderBookState =
-    if (hasSubscriptions) {
+    if (hasSubscriptions)
       (
         changedAsksLens.modify(_ ++ lc.asks.keySet) andThen
-          changedBidsLens.modify(_ ++ lc.bids.keySet) andThen
-          lastTradeLens.modify { if (lt.isEmpty) _ else lt } andThen
-          changedTickSizeLens.modify { if (ts.isEmpty) _ else ts }
+        changedBidsLens.modify(_ ++ lc.bids.keySet) andThen
+        lastTradeLens.modify(if (lt.isEmpty) _ else lt) andThen
+        changedTickSizeLens.modify(if (ts.isEmpty) _ else ts)
       )(this)
-    } else this
+    else this
+
 }
 
 object WsOrderBookState {
   val empty = WsOrderBookState(Map.empty, Set.empty, Set.empty, None, None)
 
-  val genLens             = GenLens[WsOrderBookState]
-  val changedAsksLens     = genLens(_.changedAsks)
-  val changedBidsLens     = genLens(_.changedBids)
-  val lastTradeLens       = genLens(_.lastTrade)
+  val genLens = GenLens[WsOrderBookState]
+  val changedAsksLens = genLens(_.changedAsks)
+  val changedBidsLens = genLens(_.changedBids)
+  val lastTradeLens = genLens(_.lastTrade)
   val changedTickSizeLens = genLens(_.changedTickSize)
 }

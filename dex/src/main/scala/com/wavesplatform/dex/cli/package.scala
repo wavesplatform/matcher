@@ -10,7 +10,7 @@ package object cli {
 
   def lift[A](a: A): ErrorOr[A] = a.asRight
 
-  val success: ErrorOr[Unit] = lift { () }
+  val success: ErrorOr[Unit] = lift(())
 
   def log[F[_]: Applicative](log: String, indent: Option[Int] = None): F[Unit] = Applicative[F].pure {
     // It's fine
@@ -21,8 +21,9 @@ package object cli {
 
   def wrapByLogs[F[_]: Monad, A](begin: String, end: String = "Done\n", indent: Option[Int] = None)(f: => F[A]): F[A] =
     for {
-      _      <- log(begin, indent)
+      _ <- log(begin, indent)
       result <- f
-      _      <- log(end)
+      _ <- log(end)
     } yield result
+
 }

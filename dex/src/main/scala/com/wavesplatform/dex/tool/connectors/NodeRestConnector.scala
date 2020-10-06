@@ -14,7 +14,7 @@ import scala.concurrent.duration._
 
 case class NodeRestConnector(target: String, chainId: Byte) extends RestConnector {
 
-  override implicit val repeatRequestOptions: RepeatRequestOptions = {
+  implicit override val repeatRequestOptions: RepeatRequestOptions = {
     val blocksCount = 5
     (
       for {
@@ -33,18 +33,19 @@ case class NodeRestConnector(target: String, chainId: Byte) extends RestConnecto
     _.post(uri"$targetUri/transactions/broadcast").body(tx.toJson).contentType(MediaType.ApplicationJson)
   }
 
-  def getTxInfo(txId: String): ErrorOrJsonResponse    = mkResponse { _.get(uri"$targetUri/transactions/info/$txId") }
-  def getTxInfo(tx: JsValue): ErrorOrJsonResponse     = getTxInfo { (tx \ "id").as[String] }
+  def getTxInfo(txId: String): ErrorOrJsonResponse = mkResponse(_.get(uri"$targetUri/transactions/info/$txId"))
+  def getTxInfo(tx: JsValue): ErrorOrJsonResponse = getTxInfo((tx \ "id").as[String])
   def getTxInfo(tx: Transaction): ErrorOrJsonResponse = getTxInfo(tx.id.toString)
 
-  def getCurrentHeight: ErrorOr[Long] = mkResponse { _.get(uri"$targetUri/blocks/height") }.map(json => (json \ "height").as[Long])
+  def getCurrentHeight: ErrorOr[Long] = mkResponse(_.get(uri"$targetUri/blocks/height")).map(json => (json \ "height").as[Long])
 
   def getBlockHeadersAtHeightRange(from: Long, to: Long): ErrorOr[Seq[JsValue]] =
-    mkResponse { _.get(uri"$targetUri/blocks/headers/seq/$from/$to") }.map(_.as[Seq[JsValue]])
+    mkResponse(_.get(uri"$targetUri/blocks/headers/seq/$from/$to")).map(_.as[Seq[JsValue]])
 
   @tailrec
   final def waitForHeightArise(): ErrorOr[Long] = getCurrentHeight match {
-    case Right(origHeight) => repeatRequest(getCurrentHeight) { _.exists(_ > origHeight) }
-    case Left(_)           => waitForHeightArise()
+    case Right(origHeight) => repeatRequest(getCurrentHeight)(_.exists(_ > origHeight))
+    case Left(_) => waitForHeightArise()
   }
+
 }

@@ -6,7 +6,7 @@ import java.util.concurrent.ConcurrentHashMap
 import akka.actor.typed.Scheduler
 import akka.actor.typed.scaladsl.AskPattern._
 import akka.actor.typed.scaladsl.adapter._
-import akka.actor.{ActorRef, typed}
+import akka.actor.{typed, ActorRef}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import akka.http.scaladsl.server.{Directive0, Route}
@@ -41,24 +41,26 @@ import scala.util.{Failure, Success}
 
 @Path("/ws/v0")
 @Api()
-class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsInternalBroadcastActor.Command],
-                            externalClientDirectoryRef: typed.ActorRef[WsExternalClientDirectoryActor.Message],
-                            addressDirectory: ActorRef,
-                            matcher: ActorRef,
-                            time: Time,
-                            assetPairBuilder: AssetPairBuilder,
-                            override val apiKeyHash: Option[Array[Byte]],
-                            matcherSettings: MatcherSettings,
-                            matcherStatus: () => MatcherStatus,
-                            getRatesSnapshot: () => Map[Asset, Double])(implicit mat: Materializer)
+class MatcherWebSocketRoute(
+  wsInternalBroadcastRef: typed.ActorRef[WsInternalBroadcastActor.Command],
+  externalClientDirectoryRef: typed.ActorRef[WsExternalClientDirectoryActor.Message],
+  addressDirectory: ActorRef,
+  matcher: ActorRef,
+  time: Time,
+  assetPairBuilder: AssetPairBuilder,
+  override val apiKeyHash: Option[Array[Byte]],
+  matcherSettings: MatcherSettings,
+  matcherStatus: () => MatcherStatus,
+  getRatesSnapshot: () => Map[Asset, Double]
+)(implicit mat: Materializer)
     extends ApiRoute
     with AuthRoute
     with ScorexLogging {
 
   import mat.executionContext
 
-  private implicit val scheduler: Scheduler = mat.system.scheduler.toTyped
-  private implicit val timeout: Timeout     = Timeout(matcherSettings.actorResponseTimeout)
+  implicit private val scheduler: Scheduler = mat.system.scheduler.toTyped
+  implicit private val timeout: Timeout = Timeout(matcherSettings.actorResponseTimeout)
 
   private val wsHandlers = ConcurrentHashMap.newKeySet[CloseHandler]()
 
@@ -116,19 +118,21 @@ class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsInternalBro
 
     val clientId = UUID.randomUUID().toString
 
-    val client                    = mkSource(clientId)
+    val client = mkSource(clientId)
     val (clientRef, clientSource) = client.preMaterialize()
 
     val webSocketHandlerRef: typed.ActorRef[WsExternalClientHandlerActor.Message] =
       mat.system.spawn(
-        behavior = WsExternalClientHandlerActor(externalClientHandler,
-                                                time,
-                                                assetPairBuilder,
-                                                clientRef,
-                                                matcher,
-                                                addressDirectory,
-                                                clientId,
-                                                getRatesSnapshot),
+        behavior = WsExternalClientHandlerActor(
+          externalClientHandler,
+          time,
+          assetPairBuilder,
+          clientRef,
+          matcher,
+          addressDirectory,
+          clientId,
+          getRatesSnapshot
+        ),
         name = s"handler-$clientId"
       )
 
@@ -146,9 +150,13 @@ class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsInternalBro
         .named(s"server-$clientId")
 
     val serverSink: Sink[Message, NotUsed] =
-      mkServerSink[WsClientMessage, WsExternalClientHandlerActor.Command](clientId, closeHandler, externalClientHandler.healthCheck.pingInterval / 5) {
+      mkServerSink[WsClientMessage, WsExternalClientHandlerActor.Command](
+        clientId,
+        closeHandler,
+        externalClientHandler.healthCheck.pingInterval / 5
+      ) {
         case Right(x) => WsExternalClientHandlerActor.Command.ProcessClientMessage(x)
-        case Left(x)  => WsExternalClientHandlerActor.Command.ForwardToClient(x)
+        case Left(x) => WsExternalClientHandlerActor.Command.ForwardToClient(x)
       }.to(server)
 
     val flow: Flow[Message, TextMessage.Strict, NotUsed] = Flow.fromSinkAndSourceCoupled(serverSink, clientSource)
@@ -161,7 +169,7 @@ class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsInternalBro
 
     val clientId = UUID.randomUUID().toString
 
-    val client                    = mkSource(clientId)
+    val client = mkSource(clientId)
     val (clientRef, clientSource) = client.preMaterialize()
 
     val webSocketHandlerRef: typed.ActorRef[WsInternalClientHandlerActor.Message] =
@@ -187,7 +195,7 @@ class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsInternalBro
     val serverSink: Sink[Message, NotUsed] =
       mkServerSink[WsPingOrPong, WsInternalClientHandlerActor.Command](clientId, closeHandler, internalClientHandler.healthCheck.pingInterval / 5) {
         case Right(x) => WsInternalClientHandlerActor.Command.ProcessClientMessage(x)
-        case Left(x)  => WsInternalClientHandlerActor.Command.ForwardToClient(x)
+        case Left(x) => WsInternalClientHandlerActor.Command.ForwardToClient(x)
       }.to(server)
 
     val flow: Flow[Message, TextMessage.Strict, NotUsed] = Flow.fromSinkAndSourceCoupled(serverSink, clientSource)
@@ -209,7 +217,11 @@ class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsInternalBro
       .watchTermination()(handleTermination[WsServerMessage])
 
   // From client to server
-  private def mkServerSink[Raw: Reads, T](clientId: String, closeHandler: CloseHandler, strictTimeout: FiniteDuration)(f: Either[WsError, Raw] => T) =
+  private def mkServerSink[Raw: Reads, T](
+    clientId: String,
+    closeHandler: CloseHandler,
+    strictTimeout: FiniteDuration
+  )(f: Either[WsError, Raw] => T) =
     Flow[Message]
       .mapAsync[T](1) {
         case tm: TextMessage =>
@@ -222,7 +234,7 @@ class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsInternalBro
 
         case bm: BinaryMessage =>
           bm.dataStream.runWith(Sink.ignore)
-          Future.failed { new IllegalArgumentException("Binary messages are not supported") }
+          Future.failed(new IllegalArgumentException("Binary messages are not supported"))
       }
       .watchTermination() { (notUsed, future) =>
         closeHandler.closeOn(future)
@@ -243,18 +255,21 @@ class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsInternalBro
     val activeConnections = wsHandlers.asScala.filter(!_.closed.isCompleted)
     log.info(s"Closing ${activeConnections.size} connections")
     activeConnections.foreach(_.close())
-    Future.sequence { activeConnections.map(_.closed.future) }.map(_ => ())
+    Future.sequence(activeConnections.map(_.closed.future)).map(_ => ())
   }
 
   private def matcherStatusBarrier: Directive0 = matcherStatus() match {
-    case MatcherStatus.Working  => pass
+    case MatcherStatus.Working => pass
     case MatcherStatus.Starting => complete(error.MatcherIsStarting.toWsHttpResponse(StatusCodes.ServiceUnavailable))
     case MatcherStatus.Stopping => complete(error.MatcherIsStopping.toWsHttpResponse(StatusCodes.ServiceUnavailable))
   }
+
 }
 
 object MatcherWebSocketRoute {
+
   private[MatcherWebSocketRoute] class CloseHandler(val close: () => Unit, val closed: Promise[Done] = Promise[Done]()) {
     def closeOn(f: Future[Done]): Unit = closed.completeWith(f)
   }
+
 }

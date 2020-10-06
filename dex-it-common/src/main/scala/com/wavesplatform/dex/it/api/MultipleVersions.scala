@@ -6,6 +6,7 @@ import com.wavesplatform.dex.it.dex.HasDex
 import com.wavesplatform.dex.it.docker.{DexContainer, WavesNodeContainer}
 
 trait MultipleVersions extends HasDex with HasWavesNode { self: BaseContainersKit =>
+
   private lazy val dex2Image = Option(System.getenv("OTHER_DEX_IMAGE"))
     .getOrElse(throw new RuntimeException("Please specify the OTHER_DEX_IMAGE environment variable"))
 

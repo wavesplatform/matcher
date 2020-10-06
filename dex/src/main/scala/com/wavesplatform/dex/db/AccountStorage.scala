@@ -24,9 +24,10 @@ object AccountStorage {
   object Settings {
 
     case class InMem(seedInBase64: ByteStr) extends Settings
+
     object InMem extends ConfigReaders {
       implicit val byteStrConfigReader = byteStr64ConfigReader
-      implicit val inMemConfigReader   = semiauto.deriveReader[InMem]
+      implicit val inMemConfigReader = semiauto.deriveReader[InMem]
     }
 
     case class EncryptedFile(path: File, password: String) extends Settings
@@ -39,15 +40,15 @@ object AccountStorage {
     case Settings.EncryptedFile(file, password) =>
       if (file.isFile) {
         val encryptedSeedBytes = readFile(file)
-        val key                = Enigma.prepareDefaultKey(password)
-        val decryptedBytes     = Enigma.decrypt(key, encryptedSeedBytes)
+        val key = Enigma.prepareDefaultKey(password)
+        val decryptedBytes = Enigma.decrypt(key, encryptedSeedBytes)
         AccountStorage(KeyPair(decryptedBytes)).asRight
       } else s"A file '${file.getAbsolutePath}' doesn't exist".asLeft
   }
 
   def save(seed: ByteStr, to: EncryptedFile): Unit = {
     Files.createDirectories(to.path.getParentFile.toPath)
-    val key                = Enigma.prepareDefaultKey(to.password)
+    val key = Enigma.prepareDefaultKey(to.password)
     val encryptedSeedBytes = Enigma.encrypt(key, seed.arr)
     writeFile(to.path, encryptedSeedBytes)
   }
@@ -58,17 +59,14 @@ object AccountStorage {
     val reader = new FileInputStream(file)
     try {
       val buff = new Array[Byte](1024)
-      val r    = new ArrayBuffer[Byte]
+      val r = new ArrayBuffer[Byte]
       while (reader.available() > 0) {
         val read = reader.read(buff)
-        if (read > 0) {
+        if (read > 0)
           r.appendAll(buff.iterator.take(read))
-        }
       }
       r.toArray
-    } finally {
-      reader.close()
-    }
+    } finally reader.close()
   }
 
   def writeFile(file: File, bytes: Array[Byte]): Unit = {
@@ -76,4 +74,5 @@ object AccountStorage {
     try writer.write(bytes)
     finally writer.close()
   }
+
 }

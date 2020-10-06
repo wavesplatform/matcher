@@ -22,4 +22,5 @@ object WsInitial {
     (_, timestamp, connectionId) => WsInitial(connectionId, timestamp),
     unlift(WsInitial.wsUnapply)
   )
+
 }

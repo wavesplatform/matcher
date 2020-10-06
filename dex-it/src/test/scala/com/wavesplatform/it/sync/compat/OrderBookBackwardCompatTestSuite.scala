@@ -181,4 +181,5 @@ class OrderBookBackwardCompatTestSuite extends BackwardCompatSuiteBase with HasK
     super.afterAll()
     kafka.stop()
   }
+
 }

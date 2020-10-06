@@ -17,4 +17,5 @@ object SubscriptionsSettings {
       validationOf.field[SubscriptionsSettings, "maxOrderBookNumber"].mk(x => rules.gt0(x.maxOrderBookNumber)),
       validationOf.field[SubscriptionsSettings, "maxAddressNumber"].mk(x => rules.gt0(x.maxAddressNumber))
     )
+
 }

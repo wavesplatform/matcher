@@ -33,7 +33,7 @@ class MatcherWebSocketRouteSpec extends RouteSpec("/ws/v0") with MatcherSpecBase
 
   private val testKit = ActorTestKit()
 
-  private val apiKey       = "apiKey"
+  private val apiKey = "apiKey"
   private val apiKeyHeader = RawHeader(`X-Api-Key`.headerName, apiKey)
 
   private val settings = ConfigSource.fromConfig(ConfigFactory.load()).at("waves.dex").loadOrThrow[MatcherSettings].copy(priceAssets = Seq(Waves))
@@ -41,24 +41,22 @@ class MatcherWebSocketRouteSpec extends RouteSpec("/ws/v0") with MatcherSpecBase
   routePath("/connections") - {
     "connectionsRoute" - {
       "returns connections info" in test(
-        { route =>
+        route =>
           Get(routePath("/connections")).withHeaders(apiKeyHeader) ~> route ~> check {
             status shouldEqual StatusCodes.OK
             responseAs[HttpWebSocketConnections] should matchTo(HttpWebSocketConnections(0, Map.empty))
-          }
-        },
+          },
         apiKey
       )
     }
 
     "closeConnectionsRoute" - {
       "returns a closed connections info" in test(
-        { route =>
+        route =>
           Delete(routePath("/connections"), HttpWebSocketCloseFilter(100)).withHeaders(apiKeyHeader) ~> route ~> check {
             status shouldEqual StatusCodes.OK
             responseAs[HttpMessage] should matchTo(HttpMessage("In progress"))
-          }
-        },
+          },
         apiKey
       )
     }
@@ -66,7 +64,7 @@ class MatcherWebSocketRouteSpec extends RouteSpec("/ws/v0") with MatcherSpecBase
 
   @nowarn("msg=default")
   private def test[U](f: Route => U, apiKey: String = ""): U = {
-    val time                   = new TestTime
+    val time = new TestTime
     val vsInternalBroadcastRef = testKit.createTestProbe[WsInternalBroadcastActor.Command]()
     val route =
       new MatcherWebSocketRoute(
@@ -88,4 +86,5 @@ class MatcherWebSocketRouteSpec extends RouteSpec("/ws/v0") with MatcherSpecBase
 
     f(route.route)
   }
+
 }

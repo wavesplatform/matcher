@@ -13,17 +13,25 @@ import scala.concurrent.duration.{DurationInt, FiniteDuration}
 trait JwtUtils {
 
   def mkJwt(authServiceKeyPair: security.KeyPair, payload: JwtPayload): String = mkJwt(authServiceKeyPair, Json.toJsObject(payload))
+
   def mkJwt(authServiceKeyPrivateKey: security.PrivateKey, payload: JsObject): String =
     JwtJson.encode(payload, authServiceKeyPrivateKey, JwtAlgorithm.RS256)
+
   def mkJwt(authServiceKeyPair: security.KeyPair, payload: JsObject): String =
     JwtJson.encode(payload, authServiceKeyPair.getPrivate, JwtAlgorithm.RS256)
 
-  def mkJwtSignedPayload(clientKeyPair: KeyPair, networkByte: Byte = AddressScheme.current.chainId, lifetime: FiniteDuration = 1.hour): JwtPayload =
+  def mkJwtSignedPayload(
+    clientKeyPair: KeyPair,
+    networkByte: Byte = AddressScheme.current.chainId,
+    lifetime: FiniteDuration = 1.hour
+  ): JwtPayload =
     mkJwtNotSignedPayload(clientKeyPair, networkByte, lifetime).signed(clientKeyPair)
 
-  def mkJwtNotSignedPayload(clientPublicKey: PublicKey,
-                            networkByte: Byte = AddressScheme.current.chainId,
-                            lifetime: FiniteDuration = 1.hour): JwtPayload = {
+  def mkJwtNotSignedPayload(
+    clientPublicKey: PublicKey,
+    networkByte: Byte = AddressScheme.current.chainId,
+    lifetime: FiniteDuration = 1.hour
+  ): JwtPayload = {
     val exp = System.currentTimeMillis() / 1000 + lifetime.toSeconds
     JwtPayload(
       signature = ByteStr(Array.emptyByteArray),
@@ -35,6 +43,7 @@ trait JwtUtils {
       scope = List("general")
     )
   }
+
 }
 
 object JwtUtils extends JwtUtils

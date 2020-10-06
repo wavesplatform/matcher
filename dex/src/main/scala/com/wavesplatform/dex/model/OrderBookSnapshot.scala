@@ -7,6 +7,7 @@ import com.wavesplatform.dex.codecs.OrderBookSideSnapshotCodecs
 import scala.collection.mutable
 
 case class OrderBookSnapshot(bids: OrderBookSideSnapshot, asks: OrderBookSideSnapshot, lastTrade: Option[LastTrade])
+
 object OrderBookSnapshot {
 
   val empty: OrderBookSnapshot = OrderBookSnapshot(bids = Map.empty, asks = Map.empty, None)
@@ -32,4 +33,5 @@ object OrderBookSnapshot {
         case x => throw new RuntimeException(s"Can't deserialize Option as $x")
       }
     )
+
 }

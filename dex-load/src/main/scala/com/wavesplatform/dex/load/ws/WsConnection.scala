@@ -21,8 +21,8 @@ class WsConnection(uri: String, receive: WsServerMessage => Option[WsClientMessa
 
   import system.dispatcher
   private val testId: Int = ThreadLocalRandom.current().nextInt(10000)
-  private implicit val materializer = Materializer(system)
-  private val wsHandlerRef          = system.actorOf(TestWsHandlerActor.props(testId, keepAlive = true))
+  implicit private val materializer = Materializer(system)
+  private val wsHandlerRef = system.actorOf(TestWsHandlerActor.props(testId, keepAlive = true))
 
   log.info(s"Connecting to Matcher WS API: $uri")
 
@@ -32,7 +32,7 @@ class WsConnection(uri: String, receive: WsServerMessage => Option[WsClientMessa
   // To server
   private val source: Source[TextMessage.Strict, ActorRef] = {
     val completionMatcher: PartialFunction[Any, CompletionStrategy] = { case akka.actor.Status.Success(_) => CompletionStrategy.draining }
-    val failureMatcher: PartialFunction[Any, Throwable]             = { case Status.Failure(cause)        => cause }
+    val failureMatcher: PartialFunction[Any, Throwable] = { case Status.Failure(cause) => cause }
 
     Source
       .actorRef[WsClientMessage](completionMatcher, failureMatcher, 10, OverflowStrategy.fail)
@@ -50,16 +50,16 @@ class WsConnection(uri: String, receive: WsServerMessage => Option[WsClientMessa
         strictText <- tm.toStrict(1.second).map(_.getStrictText)
         clientMessage <- {
           log.trace(s"Got $strictText")
-          Try { Json.parse(strictText).as[WsServerMessage] } match {
+          Try(Json.parse(strictText).as[WsServerMessage]) match {
             case Failure(exception) => Future.failed(exception)
-            case Success(x)         => Future.successful { receive(x).foreach(wsHandlerRef ! _) }
+            case Success(x) => Future.successful(receive(x).foreach(wsHandlerRef ! _))
           }
         }
       } yield clientMessage
 
     case bm: BinaryMessage =>
       bm.dataStream.runWith(Sink.ignore)
-      Future.failed { new IllegalArgumentException("Binary messages are not supported") }
+      Future.failed(new IllegalArgumentException("Binary messages are not supported"))
   }
 
   private val flow: Flow[Message, TextMessage.Strict, Future[Done]] = Flow.fromSinkAndSourceCoupled(sink, source).watchTermination() {
@@ -76,8 +76,10 @@ class WsConnection(uri: String, receive: WsServerMessage => Option[WsClientMessa
   def send(message: WsClientMessage): Unit = wsHandlerRef ! TestWsHandlerActor.SendToServer(message)
 
   def isClosed: Boolean = closed.isCompleted
+
   def close(): Future[Done] = {
     if (!isClosed) wsHandlerRef ! TestWsHandlerActor.CloseConnection
     closed
   }
+
 }

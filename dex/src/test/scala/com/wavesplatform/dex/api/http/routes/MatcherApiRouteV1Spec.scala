@@ -15,7 +15,7 @@ import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor
 import com.wavesplatform.dex.api.RouteSpec
 import com.wavesplatform.dex.api.http.ApiMarshallers._
 import com.wavesplatform.dex.api.http.entities.{HttpOrderBook, HttpV1LevelAgg, HttpV1OrderBook}
-import com.wavesplatform.dex.api.http.{OrderBookHttpInfo, entities}
+import com.wavesplatform.dex.api.http.{entities, OrderBookHttpInfo}
 import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.db.WithDB
 import com.wavesplatform.dex.domain.asset.Asset.Waves
@@ -36,9 +36,9 @@ class MatcherApiRouteV1Spec extends RouteSpec("/api/v1") with MatcherSpecBase wi
   private val settings =
     ConfigSource.fromConfig(ConfigFactory.load()).at("waves.dex").loadOrThrow[MatcherSettings].copy(priceAssets = Seq(usd, Waves))
 
-  private implicit val efc: ErrorFormatterContext = {
+  implicit private val efc: ErrorFormatterContext = {
     case `usd` => 2.some
-    case _     => 8.some
+    case _ => 8.some
   }
 
   private val wavesUsdAggregatedSnapshot = OrderBookAggregatedSnapshot(
@@ -85,7 +85,7 @@ class MatcherApiRouteV1Spec extends RouteSpec("/api/v1") with MatcherSpecBase wi
       TestActor.KeepRunning
     }
 
-    val orderBooks          = new AtomicReference(Map(wavesUsdPair -> orderBookActor.ref.asRight[Unit]))
+    val orderBooks = new AtomicReference(Map(wavesUsdPair -> orderBookActor.ref.asRight[Unit]))
     val orderBookAskAdapter = new OrderBookAskAdapter(orderBooks, 5.seconds)
 
     val orderBookHttpInfo =
@@ -95,7 +95,7 @@ class MatcherApiRouteV1Spec extends RouteSpec("/api/v1") with MatcherSpecBase wi
         time = time,
         assetDecimals = {
           case a if a == `usd` || a == Waves => efc.assetDecimals(a)
-          case x                             => throw new IllegalArgumentException(s"No information about $x")
+          case x => throw new IllegalArgumentException(s"No information about $x")
         }
       )
 
@@ -105,7 +105,7 @@ class MatcherApiRouteV1Spec extends RouteSpec("/api/v1") with MatcherSpecBase wi
           settings,
           {
             case `usd` => liftValueAsync(BriefAssetDescription("USD", 8, hasScript = false))
-            case x     => liftErrorAsync[BriefAssetDescription](error.AssetNotFound(x))
+            case x => liftErrorAsync[BriefAssetDescription](error.AssetNotFound(x))
           },
           Set.empty
         ),
@@ -119,19 +119,17 @@ class MatcherApiRouteV1Spec extends RouteSpec("/api/v1") with MatcherSpecBase wi
 
   // getOrderBook
   routePath("/orderbook/{amountAsset}/{priceAsset}") - {
-    "returns an order book" in test(
-      { route =>
-        Get(routePath(s"/orderbook/WAVES/${usd.id}")) ~> route ~> check {
-          status shouldEqual StatusCodes.OK
-          responseAs[HttpV1OrderBook] should matchTo(
-            entities.HttpV1OrderBook(
-              timestamp = 0L,
-              bids = wavesUsdAggregatedSnapshot.bids.toList.map(HttpV1LevelAgg.fromLevelAgg(_, wavesUsdPair)),
-              asks = wavesUsdAggregatedSnapshot.asks.toList.map(HttpV1LevelAgg.fromLevelAgg(_, wavesUsdPair))
-            )
+    "returns an order book" in test { route =>
+      Get(routePath(s"/orderbook/WAVES/${usd.id}")) ~> route ~> check {
+        status shouldEqual StatusCodes.OK
+        responseAs[HttpV1OrderBook] should matchTo(
+          entities.HttpV1OrderBook(
+            timestamp = 0L,
+            bids = wavesUsdAggregatedSnapshot.bids.toList.map(HttpV1LevelAgg.fromLevelAgg(_, wavesUsdPair)),
+            asks = wavesUsdAggregatedSnapshot.asks.toList.map(HttpV1LevelAgg.fromLevelAgg(_, wavesUsdPair))
           )
-        }
+        )
       }
-    )
+    }
   }
 }

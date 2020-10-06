@@ -421,7 +421,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
         mkOrderDP(alice, wavesBtcPair, SELL, 1.waves, 0.00011119),
         mkOrderDP(alice, ethWavesPair, SELL, 1.eth, 195),
         mkOrderDP(bob, btcUsdPair, SELL, 1.btc, 8698.782732)
-      ) foreach placeAndAwaitAtDex(_)
+      ).foreach(placeAndAwaitAtDex(_))
 
       val wsc = mkDexWsConnection(dex1)
 

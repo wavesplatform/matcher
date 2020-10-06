@@ -17,13 +17,11 @@ import play.api.libs.json.{JsValue, Json}
 import pureconfig.ConfigSource
 import pureconfig.generic.auto._
 
-import scala.annotation.nowarn
 import scala.io.Source
 import scala.util.Random
 
 package object utils {
 
-  @nowarn
   val settings: Settings =
     ConfigSource
       .fromConfig(ConfigFactory.parseResources(scala.util.Properties.envOrElse("CONF", "devnet.conf")).getConfig("waves.dex.load"))

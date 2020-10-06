@@ -10,7 +10,7 @@ import org.testcontainers.utility.MountableFile
 object MountableFileOps {
 
   def fromContent(content: String): MountableFile = MountableFile.forHostPath {
-    Files.createTempFile("dex-it", "") unsafeTap Files.write(_, content getBytes StandardCharsets.UTF_8)
+    Files.createTempFile("dex-it", "").unsafeTap(Files.write(_, content getBytes StandardCharsets.UTF_8))
   }
 
 }

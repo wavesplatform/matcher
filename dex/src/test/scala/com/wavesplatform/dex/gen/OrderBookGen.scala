@@ -14,10 +14,11 @@ import org.scalacheck.Gen
 import scala.jdk.CollectionConverters._
 
 trait OrderBookGen {
-  val matcher = KeyPair(ByteStr("matcher".getBytes(StandardCharsets.UTF_8)))
 
-  val ts         = 1000L
-  val expiration = ts + 60000L
+  val matcher: KeyPair = KeyPair(ByteStr("matcher".getBytes(StandardCharsets.UTF_8)))
+
+  val ts: Long         = 1000L
+  val expiration: Long = ts + 60000L
 
   val clients   = (1 to 3).map(clientId => KeyPair(ByteStr(s"client-$clientId".getBytes(StandardCharsets.UTF_8))))
   val clientGen = Gen.oneOf(clients)
@@ -37,12 +38,15 @@ trait OrderBookGen {
         asks = askOrders.groupBy(_.order.price),
         bids = bidOrders.groupBy(_.order.price),
         lastTrade = None
-      ))
+      )
+    )
 
-  def flexibleSidesOrdersGen(maxLevelsInOrderBook: Int,
-                             maxOrdersInLevel: Int,
-                             askPricesGen: Gen[Long],
-                             bidPricesGen: Gen[Long]): Gen[(Seq[LimitOrder], Seq[LimitOrder])] =
+  def flexibleSidesOrdersGen(
+      maxLevelsInOrderBook: Int,
+      maxOrdersInLevel: Int,
+      askPricesGen: Gen[Long],
+      bidPricesGen: Gen[Long]
+  ): Gen[(Seq[LimitOrder], Seq[LimitOrder])] =
     for {
       (asksLevels, askOrders) <- flexibleSideOrdersGen(OrderType.SELL, maxLevelsInOrderBook, maxOrdersInLevel, askPricesGen)
       (_, bidOrders)          <- flexibleSideOrdersGen(OrderType.BUY, maxLevelsInOrderBook - asksLevels, maxOrdersInLevel, bidPricesGen)
@@ -52,9 +56,11 @@ trait OrderBookGen {
     for {
       levelNumber <- Gen.choose(0, maxLevels)
       prices      <- Gen.listOfN(levelNumber, pricesGen)
-      orders <- Gen.sequence(prices.map { price =>
-        Gen.resize(maxOrdersInLevel, Gen.nonEmptyListOf(limitOrderGen(orderGen(Gen.const(price), side))))
-      })
+      orders <- Gen.sequence(
+        prices.map { price =>
+          Gen.resize(maxOrdersInLevel, Gen.nonEmptyListOf(limitOrderGen(orderGen(Gen.const(price), side))))
+        }
+      )
     } yield (levelNumber, orders.asScala.flatten.toSeq)
 
   def limitOrderGen(orderGen: Gen[Order]): Gen[LimitOrder] =
@@ -85,7 +91,15 @@ trait OrderBookGen {
     */
   def orderGen(pricesGen: Gen[Long], side: OrderType): Gen[Order] =
     for {
-      owner    <- clientGen
+      owner <- clientGen
+      order <- orderGen(owner, pricesGen, side)
+    } yield order
+
+  /**
+    * @param pricesGen Should be multiplied by Order.PriceConstant
+    */
+  def orderGen(owner: KeyPair, pricesGen: Gen[Long], side: OrderType): Gen[Order] =
+    for {
       feeAsset <- assetGen
       price    <- pricesGen
       amount <- {
@@ -97,20 +111,19 @@ trait OrderBookGen {
       }
       matcherFee <- Gen.choose(0, 300000)
       version    <- if (feeAsset == Waves) Gen.choose[Byte](1, 3) else Gen.const(3: Byte)
-    } yield
-      Order(
-        sender = owner,
-        matcher = matcher,
-        pair = assetPair,
-        orderType = side,
-        amount = amount,
-        price = price,
-        timestamp = ts,
-        expiration = expiration,
-        matcherFee = matcherFee,
-        version = version,
-        feeAsset = feeAsset
-      )
+    } yield Order(
+      sender = owner,
+      matcher = matcher,
+      pair = assetPair,
+      orderType = side,
+      amount = amount,
+      price = price,
+      timestamp = ts,
+      expiration = expiration,
+      matcherFee = matcherFee,
+      version = version,
+      feeAsset = feeAsset
+    )
 
   def minAmount(price: Long): Long = math.max(1, Order.PriceConstant / price)
 }

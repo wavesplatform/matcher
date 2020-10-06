@@ -12,6 +12,7 @@ import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.error
+import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.queue.QueueEventWithMeta.{Offset => EventOffset}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
@@ -20,13 +21,15 @@ import scorex.utils._
 
 import scala.util.Failure
 
-class MatcherActor(settings: MatcherSettings,
-                   assetPairsDB: AssetPairsDB,
-                   recoveryCompletedWithEventNr: Either[String, Long] => Unit,
-                   orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
-                   orderBookActorProps: (AssetPair, ActorRef) => Props,
-                   assetDescription: Asset => Option[BriefAssetDescription])
-    extends Actor
+class MatcherActor(
+    settings: MatcherSettings,
+    assetPairsDB: AssetPairsDB,
+    recoveryCompletedWithEventNr: Either[String, Long] => Unit,
+    orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
+    orderBookActorProps: (AssetPair, ActorRef) => Props,
+    assetDescription: Asset => Option[BriefAssetDescription],
+    validateAssetPair: AssetPair => Either[MatcherError, AssetPair]
+) extends Actor
     with WorkingStash
     with ScorexLogging {
 
@@ -40,15 +43,23 @@ class MatcherActor(settings: MatcherSettings,
   private var snapshotsState = SnapshotsState.empty
 
   override val receive: Receive = {
-    val knownAssetPairs = assetPairsDB.all()
-    if (knownAssetPairs.isEmpty) {
+    val (errors, validAssetPairs) = assetPairsDB.all().partitionMap { assetPair =>
+      validateAssetPair(assetPair) match {
+        case Left(e)  => s"$assetPair: ${e.message.text}".asLeft
+        case Right(x) => x.asRight
+      }
+    }
+
+    if (errors.nonEmpty) log.warn(s"Invalid asset pairs:\n${errors.mkString("\n")}")
+
+    if (validAssetPairs.isEmpty) {
       log.info("Recovery completed!")
       recoveryCompletedWithEventNr(-1L asRight)
       working
     } else {
-      log.info(s"Recovery completed, waiting order books to restore: ${knownAssetPairs.mkString(", ")}")
-      knownAssetPairs.foreach(createOrderBook)
-      collectOrderBooks(knownAssetPairs.size, None, -1L, Map.empty)
+      log.info(s"Recovery completed, waiting order books to restore: ${validAssetPairs.mkString(", ")}")
+      validAssetPairs.foreach(createOrderBook)
+      collectOrderBooks(validAssetPairs.size, None, -1L, Map.empty)
     }
   }
 
@@ -60,9 +71,8 @@ class MatcherActor(settings: MatcherSettings,
       case _     => desc.fold("Unknown")(_.name)
     }
 
-  private def getAssetInfo(asset: Asset, desc: Option[BriefAssetDescription]): Option[AssetInfo] = {
+  private def getAssetInfo(asset: Asset, desc: Option[BriefAssetDescription]): Option[AssetInfo] =
     asset.fold(Option(8))(_ => desc.map(_.decimals)).map(AssetInfo)
-  }
 
   private def getAssetDesc(asset: Asset): Option[BriefAssetDescription] = asset.fold[Option[BriefAssetDescription]](None)(assetDescription)
 
@@ -85,7 +95,7 @@ class MatcherActor(settings: MatcherSettings,
     log.info(s"Creating order book for $pair")
     val orderBook = context.watch(context.actorOf(orderBookActorProps(pair, self), OrderBookActor.name(pair)))
     orderBooks.updateAndGet(_ + (pair -> Right(orderBook)))
-    tradedPairs += pair -> createMarketData(pair)
+    tradedPairs += pair               -> createMarketData(pair)
     orderBook
   }
 
@@ -112,22 +122,20 @@ class MatcherActor(settings: MatcherSettings,
     }
   }
 
-  private def createSnapshotFor(offset: QueueEventWithMeta.Offset): Unit = {
-    snapshotsState.requiredSnapshot(offset).foreach {
-      case (assetPair, updatedSnapshotState) =>
-        orderBook(assetPair) match {
-          case Some(Right(actorRef)) =>
-            log.info(
-              s"The $assetPair order book should do a snapshot, the current offset is $offset. The next snapshot candidate: ${updatedSnapshotState.nearestSnapshotOffset}"
-            )
-            actorRef ! SaveSnapshot(offset)
+  private def createSnapshotFor(offset: QueueEventWithMeta.Offset): Unit =
+    snapshotsState.requiredSnapshot(offset).foreach { case (assetPair, updatedSnapshotState) =>
+      orderBook(assetPair) match {
+        case Some(Right(actorRef)) =>
+          log.info(
+            s"The $assetPair order book should do a snapshot, the current offset is $offset. The next snapshot candidate: ${updatedSnapshotState.nearestSnapshotOffset}"
+          )
+          actorRef ! SaveSnapshot(offset)
 
-          case Some(Left(_)) => log.warn(s"Can't create a snapshot for $assetPair: the order book is down, ignoring it in the snapshot's rotation.")
-          case None          => log.warn(s"Can't create a snapshot for $assetPair: the order book has't yet started or was removed.")
-        }
-        snapshotsState = updatedSnapshotState
+        case Some(Left(_)) => log.warn(s"Can't create a snapshot for $assetPair: the order book is down, ignoring it in the snapshot's rotation.")
+        case None          => log.warn(s"Can't create a snapshot for $assetPair: the order book has't yet started or was removed.")
+      }
+      snapshotsState = updatedSnapshotState
     }
-  }
 
   private def working: Receive = {
 
@@ -196,10 +204,12 @@ class MatcherActor(settings: MatcherSettings,
     case ForceSaveSnapshots => context.children.foreach(_ ! SaveSnapshot(lastProcessedNr))
   }
 
-  private def collectOrderBooks(restOrderBooksNumber: Long,
-                                oldestEventNr: Option[Long],
-                                newestEventNr: Long,
-                                currentOffsets: Map[AssetPair, Option[EventOffset]]): Receive = {
+  private def collectOrderBooks(
+      restOrderBooksNumber: Long,
+      oldestEventNr: Option[Long],
+      newestEventNr: Long,
+      currentOffsets: Map[AssetPair, Option[EventOffset]]
+  ): Receive = {
     case OrderBookRecovered(assetPair, snapshotEventNr) =>
       val updatedRestOrderBooksNumber = restOrderBooksNumber - 1
 
@@ -229,9 +239,11 @@ class MatcherActor(settings: MatcherSettings,
     case x => stash(x)
   }
 
-  private def becomeWorking(oldestSnapshotOffset: Option[EventOffset],
-                            newestSnapshotOffset: EventOffset,
-                            currentOffsets: Map[AssetPair, Option[EventOffset]]): Unit = {
+  private def becomeWorking(
+      oldestSnapshotOffset: Option[EventOffset],
+      newestSnapshotOffset: EventOffset,
+      currentOffsets: Map[AssetPair, Option[EventOffset]]
+  ): Unit = {
     context.become(working)
 
     // Imagine we have no order books and start the DEX:
@@ -259,7 +271,8 @@ class MatcherActor(settings: MatcherSettings,
 
     log.info(
       s"All snapshots are loaded, oldestSnapshotOffset: $oldestSnapshotOffset, newestSnapshotOffset: $newestSnapshotOffset, " +
-        s"safeStartOffset: $safeStartOffset, safestStartOffset: $safestStartOffset, newestSnapshotOffset: $newestSnapshotOffset")
+        s"safeStartOffset: $safeStartOffset, safestStartOffset: $safestStartOffset, newestSnapshotOffset: $newestSnapshotOffset"
+    )
     log.trace(s"Expecting next snapshots at:\n${snapshotsState.nearestSnapshotOffsets.map { case (p, x) => s"$p -> $x" }.mkString("\n")}")
 
     unstashAll()
@@ -271,23 +284,25 @@ object MatcherActor {
 
   def name: String = "matcher"
 
-  def props(matcherSettings: MatcherSettings,
-            assetPairsDB: AssetPairsDB,
-            recoveryCompletedWithEventNr: Either[String, Long] => Unit,
-            orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
-            orderBookProps: (AssetPair, ActorRef) => Props,
-            assetDescription: Asset => Option[BriefAssetDescription]): Props = {
-    Props(
-      new MatcherActor(
-        matcherSettings,
-        assetPairsDB,
-        recoveryCompletedWithEventNr,
-        orderBooks,
-        orderBookProps,
-        assetDescription
-      )
+  def props(
+      matcherSettings: MatcherSettings,
+      assetPairsDB: AssetPairsDB,
+      recoveryCompletedWithEventNr: Either[String, Long] => Unit,
+      orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
+      orderBookProps: (AssetPair, ActorRef) => Props,
+      assetDescription: Asset => Option[BriefAssetDescription],
+      validateAssetPair: AssetPair => Either[MatcherError, AssetPair]
+  ): Props = Props(
+    new MatcherActor(
+      matcherSettings,
+      assetPairsDB,
+      recoveryCompletedWithEventNr,
+      orderBooks,
+      orderBookProps,
+      assetDescription,
+      validateAssetPair
     )
-  }
+  )
 
   private case class ShutdownStatus(initiated: Boolean, oldMessagesDeleted: Boolean, oldSnapshotsDeleted: Boolean, onComplete: () => Unit)
 
@@ -315,12 +330,14 @@ object MatcherActor {
 
   case class AssetInfo(decimals: Int)
 
-  case class MarketData(pair: AssetPair,
-                        amountAssetName: String,
-                        priceAssetName: String,
-                        created: Long,
-                        amountAssetInfo: Option[AssetInfo],
-                        priceAssetInfo: Option[AssetInfo])
+  case class MarketData(
+      pair: AssetPair,
+      amountAssetName: String,
+      priceAssetName: String,
+      created: Long,
+      amountAssetInfo: Option[AssetInfo],
+      priceAssetInfo: Option[AssetInfo]
+  )
 
   def compare(buffer1: Option[Array[Byte]], buffer2: Option[Array[Byte]]): Int = {
     if (buffer1.isEmpty && buffer2.isEmpty) 0

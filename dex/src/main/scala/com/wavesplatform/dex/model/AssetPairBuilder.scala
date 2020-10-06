@@ -7,6 +7,7 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.error
+import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model.AssetPairBuilder.AssetSide
@@ -15,9 +16,11 @@ import kamon.Kamon
 
 import scala.concurrent.ExecutionContext
 
-class AssetPairBuilder(settings: MatcherSettings,
-                       assetDescription: IssuedAsset => FutureResult[BriefAssetDescription],
-                       blacklistedAssets: Set[IssuedAsset])(implicit ec: ExecutionContext) {
+class AssetPairBuilder(
+    settings: MatcherSettings,
+    assetDescription: IssuedAsset => FutureResult[BriefAssetDescription],
+    blacklistedAssets: Set[IssuedAsset]
+)(implicit ec: ExecutionContext) {
 
   import com.wavesplatform.dex.model.OrderValidator._
 
@@ -35,7 +38,7 @@ class AssetPairBuilder(settings: MatcherSettings,
     case (Some(pi), Some(ai)) => pi < ai
   }
 
-  private def isBlacklistedByName(asset: IssuedAsset, desc: BriefAssetDescription): Boolean =
+  private def isBlacklistedByName(desc: BriefAssetDescription): Boolean =
     settings.blacklistedNames.exists(_.findFirstIn(desc.name).nonEmpty)
 
   def validateAssetId(asset: Asset): FutureResult[Asset] = validateAssetId(asset, AssetSide.Unknown)
@@ -43,7 +46,7 @@ class AssetPairBuilder(settings: MatcherSettings,
   private def validateAssetId(asset: Asset, side: AssetSide): FutureResult[Asset] = {
     asset.fold[FutureResult[Asset]] { liftValueAsync(Waves) } { asset =>
       assetDescription(asset) subflatMap { desc =>
-        if (blacklistedAssets.contains(asset) || isBlacklistedByName(asset, desc))
+        if (blacklistedAssets.contains(asset) || isBlacklistedByName(desc))
           Left(
             side match {
               case AssetSide.Unknown => error.AssetBlacklisted(asset)
@@ -56,6 +59,19 @@ class AssetPairBuilder(settings: MatcherSettings,
     }
   }
 
+  private def quickValidateAssetId(asset: Asset, side: AssetSide): Either[MatcherError, Asset] =
+    asset match {
+      case asset: IssuedAsset if blacklistedAssets.contains(asset) =>
+        Left(
+          side match {
+            case AssetSide.Unknown => error.AssetBlacklisted(asset)
+            case AssetSide.Amount  => error.AmountAssetBlacklisted(asset)
+            case AssetSide.Price   => error.PriceAssetBlacklisted(asset)
+          }
+        )
+      case _ => asset.asRight
+    }
+
   def validateAssetPair(pair: AssetPair): FutureResult[AssetPair] = validate.measure {
     if (settings.allowedAssetPairs contains pair) liftValueAsync(pair)
     else if (settings.whiteListOnly) liftErrorAsync(error.AssetPairIsDenied(pair))
@@ -65,6 +81,18 @@ class AssetPairBuilder(settings: MatcherSettings,
         _ <- successAsync.ensure { error.OrderAssetPairReversed(pair) }(_ => isCorrectlyOrdered(pair))
         _ <- validateAssetId(pair.priceAsset, AssetSide.Price)
         _ <- validateAssetId(pair.amountAsset, AssetSide.Amount)
+      } yield pair
+  }
+
+  def quickValidateAssetPair(pair: AssetPair): Either[MatcherError, AssetPair] = validate.measure {
+    if (settings.allowedAssetPairs contains pair) pair.asRight
+    else if (settings.whiteListOnly) error.AssetPairIsDenied(pair).asLeft
+    else
+      for {
+        _ <- Either.cond(pair.amountAsset != pair.priceAsset, (), error.AssetPairSameAssets(pair.amountAsset))
+        _ <- Either.cond(isCorrectlyOrdered(pair), (), error.OrderAssetPairReversed(pair))
+        _ <- quickValidateAssetId(pair.priceAsset, AssetSide.Price)
+        _ <- quickValidateAssetId(pair.amountAsset, AssetSide.Amount)
       } yield pair
   }
 

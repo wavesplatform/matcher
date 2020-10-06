@@ -14,7 +14,7 @@ object SubscriptionsSettings {
   implicit val subscriptionsConfigReader = semiauto
     .deriveReader[SubscriptionsSettings]
     .validatedField(
-      validationOf.field[SubscriptionsSettings, "maxOrderBookNumber"].mk(x => rules.gtN(x.maxOrderBookNumber, 0)),
-      validationOf.field[SubscriptionsSettings, "maxAddressNumber"].mk(x => rules.gtN(x.maxAddressNumber, 0))
+      validationOf.field[SubscriptionsSettings, "maxOrderBookNumber"].mk(x => rules.gt0(x.maxOrderBookNumber)),
+      validationOf.field[SubscriptionsSettings, "maxAddressNumber"].mk(x => rules.gt0(x.maxAddressNumber))
     )
 }

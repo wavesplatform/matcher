@@ -4,7 +4,7 @@ import cats.syntax.option._
 import com.softwaremill.sttp._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
-import com.wavesplatform.dex.api.http.entities.{HttpAssetInfo, HttpMarketStatus, HttpOrderBookHistoryItem, HttpV0LevelAgg}
+import com.wavesplatform.dex.api.http.entities.{HttpAssetInfo, HttpMarketStatus, HttpOrderBookHistoryItem, HttpV0LevelAgg, HttpV0OrderBook}
 import com.wavesplatform.dex.api.http.headers.MatcherHttpServer
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -44,14 +44,23 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
   override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(
     s"""waves.dex {
-       |  price-assets = [ "$UsdnId", "$BtcId", "$UsdId", "WAVES" ]
+       |  price-assets = [ "$UsdnId", "$BtcId", "$UsdId", "WAVES", $EthId ]
        |  order-db.max-orders = $maxOrders
        |}""".stripMargin
   )
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
-    broadcastAndAwait(issueAliceAssetTx, issueBob1Asset1Tx, issueBob2Asset2Tx, issueBobNotTradedAssetTx, IssueUsdTx, IssueBtcTx, IssueUsdnTx)
+    broadcastAndAwait(
+      issueAliceAssetTx,
+      issueBob1Asset1Tx,
+      issueBob2Asset2Tx,
+      issueBobNotTradedAssetTx,
+      IssueUsdTx,
+      IssueBtcTx,
+      IssueUsdnTx,
+      IssueEthTx
+    )
     dex1.start()
   }
 
@@ -202,7 +211,8 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
           val updatedMatcherBalance = wavesNode1.api.balance(matcher, Waves)
           updatedMatcherBalance should be(
-            matcherBalance - 2 * exTxFee + matcherFee + (matcherFee * 150.0 / 350.0).toLong + (matcherFee * 200.0 / 350.0).toLong + (matcherFee * 200.0 / 500.0).toLong)
+            matcherBalance - 2 * exTxFee + matcherFee + (matcherFee * 150.0 / 350.0).toLong + (matcherFee * 200.0 / 350.0).toLong + (matcherFee * 200.0 / 500.0).toLong
+          )
         }
 
         val updatedBobBalance = wavesNode1.api.balance(bob, Waves)
@@ -210,7 +220,8 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
         val updatedAliceBalance = wavesNode1.api.balance(alice, Waves)
         updatedAliceBalance should be(
-          aliceBalance - (matcherFee * 200.0 / 350.0).toLong - (matcherFee * 150.0 / 350.0).toLong - (matcherFee * 200.0 / 500.0).toLong - 1900 * 150)
+          aliceBalance - (matcherFee * 200.0 / 350.0).toLong - (matcherFee * 150.0 / 350.0).toLong - (matcherFee * 200.0 / 500.0).toLong - 1900 * 150
+        )
       }
 
       "order could be canceled and resubmitted again" in {
@@ -263,7 +274,8 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       "request order book for blacklisted pair" in {
         dex1.api.tryOrderBook(AssetPair(ForbiddenAsset, Waves)) should failWith(
           11534345,
-          MatcherError.Params(assetId = Some(ForbiddenAsset.toString))) // AssetNotFound
+          MatcherError.Params(assetId = Some(ForbiddenAsset.toString))
+        ) // AssetNotFound
       }
 
       "should consider UTX pool when checking the balance" in {
@@ -332,7 +344,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         ("pair", "amountDecimals", "priceDecimals"),
         (ap28._3, 2, 8),
         (ap34._3, 3, 4),
-        (ap08._3, 0, 8),
+        (ap08._3, 0, 8)
       )
 
     "issue assets" in broadcastAndAwait(ap28._1, ap28._2, ap34._1, ap34._2, ap08._1, ap08._2)
@@ -388,11 +400,10 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
     oldestSnapshotOffset should be <= currentOffset
 
     val snapshotOffsets = dex1.api.allSnapshotOffsets
-    snapshotOffsets.foreach {
-      case (assetPair, offset) =>
-        withClue(assetPair) {
-          offset should be <= currentOffset
-        }
+    snapshotOffsets.foreach { case (assetPair, offset) =>
+      withClue(assetPair) {
+        offset should be <= currentOffset
+      }
     }
   }
 
@@ -578,6 +589,45 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       sellOrderStatus.filledFee shouldBe 0.010909.usdn
 
       dex1.api.deleteRate(usdn)
+    }
+
+    "delete order books if their asset pair became invalid" in {
+
+      val sellOrder1 = mkOrderDP(alice, ethWavesPair, SELL, 1, 135)
+      placeAndAwaitAtDex(sellOrder1)
+
+      val ob = dex1.api.orderBook(ethWavesPair)
+      ob.asks should have size 1
+      ob.bids shouldBe empty
+
+      // Before: [ "$UsdnId", "$BtcId", "$UsdId", "WAVES", $EthId ]
+      dex1.restartWithNewSuiteConfig(
+        ConfigFactory
+          .parseString(s"""waves.dex.price-assets = [ "$UsdnId", "$BtcId", "$UsdId", $EthId, "WAVES"]""".stripMargin)
+          .withFallback(dexInitialSuiteConfig)
+      )
+
+      withClue("The old order book is not available") {
+        val e = intercept[RuntimeException](dex1.api.orderBook(ethWavesPair))
+        e.getMessage should fullyMatch regex ".*301.*" // Redirect
+      }
+
+      val wavesEthPair = AssetPair(Waves, eth)
+      dex1.api.orderStatus(wavesEthPair, sellOrder1.id()).status shouldBe Status.Accepted
+
+      dex1.api.orderBook(wavesEthPair) should matchTo(
+        HttpV0OrderBook(
+          timestamp = 0,
+          pair = wavesEthPair,
+          bids = List.empty,
+          asks = List.empty
+        )
+      )
+
+      dex1.api.deleteOrderBook(ethWavesPair)
+      dex1.api.waitForOrderStatus(wavesEthPair, sellOrder1.id(), Status.Cancelled)
+
+      placeAndAwaitAtDex(mkOrderDP(alice, wavesEthPair, SELL, 100, 1))
     }
   }
 }

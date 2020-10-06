@@ -49,13 +49,15 @@ class AssetPairBuilderSpec extends AnyFreeSpec with Matchers with MockFactory {
 
   private val blacklistedAssets = Set(Asset3)
 
-  private val priceAssets = ConfigFactory.parseString(s"""waves.dex {
-                                                         |  blacklisted-assets  = [${blacklistedAssets.map(_.id.toString).mkString(",")}]
-                                                         |  blacklisted-names   = ["name$$"]
-                                                         |  price-assets        = [${predefinedPriceAssets.map(_.id.toString).mkString(",")}]
-                                                         |  white-list-only     = no
-                                                         |  allowed-asset-pairs = [WAVES-${Asset3.id.toString}]
-                                                         |}""".stripMargin)
+  private val priceAssets = ConfigFactory.parseString(
+    s"""waves.dex {
+       |  blacklisted-assets  = [${blacklistedAssets.map(_.id.toString).mkString(",")}]
+       |  blacklisted-names   = ["name$$"]
+       |  price-assets        = [${predefinedPriceAssets.map(_.id.toString).mkString(",")}]
+       |  white-list-only     = no
+       |  allowed-asset-pairs = [WAVES-${Asset3.id.toString}]
+       |}""".stripMargin
+  )
 
   private val settings = ConfigSource.fromConfig(loadConfig(priceAssets)).at("waves.dex").loadOrThrow[MatcherSettings]
 

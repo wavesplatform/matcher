@@ -74,9 +74,7 @@ class OrderBookActorSpecification
     prepare: (OrderBookSnapshotDB, AssetPair) => Unit,
     matchingRules: NonEmptyList[DenormalizedMatchingRule] = NonEmptyList.one(DenormalizedMatchingRule(0, 0.00000001)),
     makerTakerFeeAtOffset: Long => (AcceptedOrder, LimitOrder) => (Long, Long) = _ => makerTakerPartialFee
-  )(
-    f: (AssetPair, TestActorRef[OrderBookActor with RestartableActor], TestProbe) => Unit
-  ): Unit = {
+  )(f: (AssetPair, TestActorRef[OrderBookActor with RestartableActor], TestProbe) => Unit): Unit = {
 
     md.clear()
 

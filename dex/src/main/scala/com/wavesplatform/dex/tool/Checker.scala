@@ -193,13 +193,12 @@ case class Checker(superConnector: SuperConnector) {
 
   private def checkWsAccountUpdates(maybeSeed: Option[String]): ErrorOr[String] =
     authServiceRest.fold(lift(s"Account updates check wasn't performed, since Auth Service REST API uri wasn't provided")) { as =>
+      val seedInfo = maybeSeed.fold(" (randomly generated)")(_ => "")
       for {
         creds <- as.getAuthCredentials(maybeSeed)
         snapshot <- dexWs.subscribeForAccountUpdates(creds)
       } yield s"""\n
-                 |    Got snapshot for ${creds.keyPair.publicKey.toAddress} address, seed = ${creds.seed}${maybeSeed.fold(" (randomly generated)")(_ =>
-        ""
-      )}:
+                 |    Got snapshot for ${creds.keyPair.publicKey.toAddress} address, seed = ${creds.seed}$seedInfo:
                  |    ${WsAddressChanges.wsAddressChangesFormat.writes(snapshot).toString}\n
          """.stripMargin
     }

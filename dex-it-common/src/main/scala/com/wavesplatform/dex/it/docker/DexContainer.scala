@@ -96,8 +96,7 @@ object DexContainer extends ScorexLogging {
     "DETAILED_LOG_PATH" -> s"$containerLogsPath/container-$containerName.detailed.log",
     "WAVES_DEX_CONFIGPATH" -> s"$baseContainerPath/$containerName.conf",
     "WAVES_DEX_DETAILED_LOG_PATH" -> s"$containerLogsPath/container-$containerName.detailed.log", // Backward compatibility for v2.0.3
-    "WAVES_DEX_OPTS" ->
-    List(
+    "WAVES_DEX_OPTS" -> List(
       "-J-Xmx1024M",
       s"-Djava.util.logging.config.file=$baseContainerPath/jul.properties",
       "-Dlogback.stdout.enabled=false",
@@ -111,8 +110,7 @@ object DexContainer extends ScorexLogging {
       s"-J-agentpath:/usr/local/YourKit-JavaProfiler-2019.8/bin/linux-x86-64/libyjpagent.so=port=10001,listen=all" +
       s",sampling,monitors,sessionname=prof-$containerName,snapshot_name_format={sessionname}," +
       s"dir=$containerLogsPath,logdir=$containerLogsPath,onexit=snapshot"
-    }
-      .mkString(" ", " ", " ")
+    }.mkString(" ", " ", " ")
   )
 
   /**

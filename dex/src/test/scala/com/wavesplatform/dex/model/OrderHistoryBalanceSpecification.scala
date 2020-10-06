@@ -927,9 +927,9 @@ private object OrderHistoryBalanceSpecification {
   implicit private class AddressActorExt(val ref: ActorRef) extends AnyVal {
 
     def orderIds(assetPair: Option[AssetPair], orderListType: OrderListType): Vector[Order.Id] =
-      askAddressActor[AddressActor.Reply.OrdersStatuses](ref, AddressActor.Query.GetOrdersStatuses(assetPair, orderListType)).xs.map(
-        _._1
-      ).toVector
+      askAddressActor[AddressActor.Reply.OrdersStatuses](ref, AddressActor.Query.GetOrdersStatuses(assetPair, orderListType))
+        .xs
+        .map(_._1).toVector
 
     def activeOrderIds: Vector[Order.Id] = orderIds(None, OrderListType.ActiveOnly)
 

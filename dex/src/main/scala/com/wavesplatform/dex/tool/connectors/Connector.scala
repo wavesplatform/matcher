@@ -15,8 +15,7 @@ trait Connector extends AutoCloseable {
   implicit val repeatRequestOptions: RepeatRequestOptions = RepeatRequestOptions.default
 
   final def repeatRequest[A](sendRequest: => ErrorOr[A])(test: ErrorOr[A] => Boolean)(implicit
-    repeatRequestOptions: RepeatRequestOptions =
-      repeatRequestOptions
+    repeatRequestOptions: RepeatRequestOptions = repeatRequestOptions
   ): ErrorOr[A] = {
 
     @tailrec

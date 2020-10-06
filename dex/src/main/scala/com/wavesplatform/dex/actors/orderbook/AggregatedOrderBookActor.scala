@@ -263,11 +263,10 @@ object AggregatedOrderBookActor {
     case (k, v) => k -> v.view.map(_.amount).sum
   }
 
-  @nowarn
   def sum(orig: TreeMap[Price, Amount], diff: Map[Price, Amount]): TreeMap[Price, Amount] =
     diff.foldLeft(orig) {
       case (r, (price, amount)) =>
-        val updatedAmount = r.getOrElse(price, 0L) + amount
+        @nowarn val updatedAmount = r.getOrElse(price, 0L) + amount
         if (updatedAmount == 0) r - price else r.updated(price, updatedAmount)
     }
 

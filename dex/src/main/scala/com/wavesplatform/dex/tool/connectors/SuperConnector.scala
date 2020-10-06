@@ -93,7 +93,7 @@ object SuperConnector {
       )
 
       mayBeAuthServiceRestApiUri = authServiceRestApi map prependScheme
-      mayBeAuthServiceConnector = mayBeAuthServiceRestApiUri map AuthServiceRestConnector(_, chainId)
+      mayBeAuthServiceConnector = mayBeAuthServiceRestApiUri.map(AuthServiceRestConnector(_, chainId))
       _ <- logProcessing("Setting up connection with Auth Service REST API")(success)
 
       env = Env(chainId, matcherSettings, matcherKeyPair)

@@ -80,13 +80,13 @@ case class WsOrderBookState(
     changedTickSize = None
   )
 
-  @nowarn
   def take(xs: TreeMap[Price, Amount], levels: Set[Price]): TreeMap[Price, Amount] = {
     // 1. Levels will be always smaller, than xs
     // 2. A level could gone from xs
     val r = TreeMap.newBuilder[Price, Amount](xs.ordering)
     levels.foreach { level =>
-      r += level -> xs.getOrElse(level, 0L)
+      @nowarn val v = xs.getOrElse(level, 0L)
+      r += level -> v
     }
     r.result()
   }

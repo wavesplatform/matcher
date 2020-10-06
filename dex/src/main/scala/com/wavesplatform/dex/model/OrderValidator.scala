@@ -181,7 +181,7 @@ object OrderValidator extends ScorexLogging {
       }
 
       def verifyAssetScript(assetId: Asset): FutureResult[Unit] = assetId.fold(successAsync) { assetId =>
-        liftAsync(exchangeTx) flatMap verifySmartToken(blockchain, assetId, _, assetDescriptions(_).hasScript)
+        liftAsync(exchangeTx).flatMap(verifySmartToken(blockchain, assetId, _, assetDescriptions(_).hasScript))
       }
 
       lazy val verifyMatcherFeeAssetScript: FutureResult[Unit] = {

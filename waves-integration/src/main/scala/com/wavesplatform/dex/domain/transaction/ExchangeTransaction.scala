@@ -117,7 +117,8 @@ object ExchangeTransaction {
   def parse(bytes: Array[Byte]): Try[ExchangeTransaction] =
     bytes.headOption
       .fold(Failure(new Exception("Empty array")): Try[ExchangeTransaction]) { b =>
-        val etp = if (b == 0) ExchangeTransactionV2 else ExchangeTransactionV1; etp parseBytes bytes flatMap validateExchangeParams(_).foldToTry
+        val etp = if (b == 0) ExchangeTransactionV2 else ExchangeTransactionV1
+        etp.parseBytes(bytes).flatMap(validateExchangeParams(_).foldToTry)
       }
 
   def validateExchangeParams(tx: ExchangeTransaction): Either[ValidationError, ExchangeTransaction] =

@@ -514,7 +514,7 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
                 .map {
                   _.toRight[MatcherError](error.AssetNotFound(asset))
                     .map { desc =>
-                      BriefAssetDescription(desc.name, desc.decimals, desc.hasScript) unsafeTap assetsCache.put(asset, _)
+                      BriefAssetDescription(desc.name, desc.decimals, desc.hasScript).unsafeTap(assetsCache.put(asset, _))
                     }
                 }
             }

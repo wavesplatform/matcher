@@ -16,7 +16,7 @@ import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionV2}
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.model.Events.ExchangeTransactionCreated
-import com.wavesplatform.dex.settings.{ExchangeTransactionBroadcastSettings, loadConfig}
+import com.wavesplatform.dex.settings.{loadConfig, ExchangeTransactionBroadcastSettings}
 import com.wavesplatform.dex.time.Time
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.BeforeAndAfterEach
@@ -170,7 +170,7 @@ class BroadcastExchangeTransactionActorSpecification
       }
 
       "failed to broadcast (retry)" in {
-        val firstProcessing  = new AtomicBoolean(false)
+        val firstProcessing = new AtomicBoolean(false)
         var triedToBroadcast = Seq.empty[ExchangeTransaction]
         val actor = defaultActor(
           time,
@@ -198,9 +198,11 @@ class BroadcastExchangeTransactionActorSpecification
     }
   }
 
-  private def defaultActor(time: Time,
-                           confirmed: Seq[ByteStr] => Future[Map[ByteStr, Boolean]],
-                           broadcast: ExchangeTransaction => Future[Boolean]): TestActorRef[BroadcastExchangeTransactionActor] = TestActorRef(
+  private def defaultActor(
+    time: Time,
+    confirmed: Seq[ByteStr] => Future[Map[ByteStr, Boolean]],
+    broadcast: ExchangeTransaction => Future[Boolean]
+  ): TestActorRef[BroadcastExchangeTransactionActor] = TestActorRef(
     new BroadcastExchangeTransactionActor(
       settings = ExchangeTransactionBroadcastSettings(
         broadcastUntilConfirmed = true,
@@ -249,4 +251,5 @@ class BroadcastExchangeTransactionActorSpecification
         .explicitGet()
     )
   }
+
 }

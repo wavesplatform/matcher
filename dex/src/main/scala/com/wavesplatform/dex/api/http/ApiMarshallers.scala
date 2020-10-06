@@ -24,7 +24,7 @@ trait ApiMarshallers {
       .forContentTypes(`application/json`)
       .mapWithCharset {
         case (ByteString.empty, _) => throw Unmarshaller.NoContentException
-        case (data, charset)       => data.decodeString(charset.nioCharset.name)
+        case (data, charset) => data.decodeString(charset.nioCharset.name)
       }
 
   private[this] lazy val jsonStringMarshaller = Marshaller.stringMarshaller(`application/json`)
@@ -37,13 +37,13 @@ trait ApiMarshallers {
 
       json.validate[A] match {
         case JsSuccess(value, _) => value
-        case JsError(errors)     => throw PlayJsonException(errors = errors.map { case (jp, errorsSeq) => jp -> errorsSeq.to(Seq) } to Seq)
+        case JsError(errors) => throw PlayJsonException(errors = errors.map { case (jp, errorsSeq) => jp -> errorsSeq.to(Seq) } to Seq)
       }
     }
 
   // preserve support for extracting plain strings from requests
   implicit val stringUnmarshaller: FromEntityUnmarshaller[String] = PredefinedFromEntityUnmarshallers.stringUnmarshaller
-  implicit val intUnmarshaller: FromEntityUnmarshaller[Int]       = stringUnmarshaller.map(_.toInt)
+  implicit val intUnmarshaller: FromEntityUnmarshaller[Int] = stringUnmarshaller.map(_.toInt)
 
   implicit def playJsonMarshaller[A](implicit writes: Writes[A], jsValueToString: JsValue => String = Json.stringify): ToEntityMarshaller[A] =
     Marshaller.oneOf(

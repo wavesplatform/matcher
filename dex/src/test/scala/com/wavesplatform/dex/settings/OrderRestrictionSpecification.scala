@@ -22,17 +22,17 @@ class OrderRestrictionSpecification extends BaseSettingsSpecification with Match
         |}
       """.stripMargin
     getSettingByConfig(configStr(emptyPairSettings)).explicitGet().orderRestrictions shouldBe
-      Map(
-        AssetPair.createAssetPair("WAVES", "BTC").get ->
-          OrderRestrictionsSettings(
-            stepAmount = OrderRestrictionsSettings.Default.stepAmount,
-            minAmount = OrderRestrictionsSettings.Default.minAmount,
-            maxAmount = OrderRestrictionsSettings.Default.maxAmount,
-            stepPrice = OrderRestrictionsSettings.Default.stepPrice,
-            minPrice = OrderRestrictionsSettings.Default.minPrice,
-            maxPrice = OrderRestrictionsSettings.Default.maxPrice
-          )
+    Map(
+      AssetPair.createAssetPair("WAVES", "BTC").get ->
+      OrderRestrictionsSettings(
+        stepAmount = OrderRestrictionsSettings.Default.stepAmount,
+        minAmount = OrderRestrictionsSettings.Default.minAmount,
+        maxAmount = OrderRestrictionsSettings.Default.maxAmount,
+        stepPrice = OrderRestrictionsSettings.Default.stepPrice,
+        minPrice = OrderRestrictionsSettings.Default.minPrice,
+        maxPrice = OrderRestrictionsSettings.Default.maxPrice
       )
+    )
   }
 
   "Incorrect values of settings" should "produce error" in {
@@ -55,15 +55,15 @@ class OrderRestrictionSpecification extends BaseSettingsSpecification with Match
     }
 
     val testMinMaxArray = Array(
-      "6"            -> "3",
-      "2"            -> "1",
-      "1.00001"      -> "1",
-      "1.0000001"    -> "1",
-      "1.000000001"  -> "1",
-      "1"            -> "0.9",
-      "1"            -> "0.99999",
-      "1"            -> "0.99999999999",
-      "1000000000"   -> "999999999",
+      "6" -> "3",
+      "2" -> "1",
+      "1.00001" -> "1",
+      "1.0000001" -> "1",
+      "1.000000001" -> "1",
+      "1" -> "0.9",
+      "1" -> "0.99999",
+      "1" -> "0.99999999999",
+      "1000000000" -> "999999999",
       "100000000000" -> "1"
     )
     withClue("min-amount > max-amount") {
@@ -176,26 +176,26 @@ class OrderRestrictionSpecification extends BaseSettingsSpecification with Match
       """.stripMargin
     withClue("nonempty correct") {
       getSettingByConfig(configStr(nonEmptyCorrect)).explicitGet().orderRestrictions shouldBe
-        Map(
-          AssetPair.createAssetPair("WAVES", "BTC").get ->
-            OrderRestrictionsSettings(
-              stepAmount = 0.001,
-              minAmount = 0.001,
-              maxAmount = 1000000,
-              stepPrice = OrderRestrictionsSettings.Default.stepPrice,
-              minPrice = OrderRestrictionsSettings.Default.minPrice,
-              maxPrice = OrderRestrictionsSettings.Default.maxPrice
-            ),
-          AssetPair.createAssetPair("ETH", "USD").get ->
-            OrderRestrictionsSettings(
-              stepAmount = 0.01,
-              minAmount = 0.05,
-              maxAmount = 20000,
-              stepPrice = 0.002,
-              minPrice = OrderRestrictionsSettings.Default.minPrice,
-              maxPrice = OrderRestrictionsSettings.Default.maxPrice
-            )
+      Map(
+        AssetPair.createAssetPair("WAVES", "BTC").get ->
+        OrderRestrictionsSettings(
+          stepAmount = 0.001,
+          minAmount = 0.001,
+          maxAmount = 1000000,
+          stepPrice = OrderRestrictionsSettings.Default.stepPrice,
+          minPrice = OrderRestrictionsSettings.Default.minPrice,
+          maxPrice = OrderRestrictionsSettings.Default.maxPrice
+        ),
+        AssetPair.createAssetPair("ETH", "USD").get ->
+        OrderRestrictionsSettings(
+          stepAmount = 0.01,
+          minAmount = 0.05,
+          maxAmount = 20000,
+          stepPrice = 0.002,
+          minPrice = OrderRestrictionsSettings.Default.minPrice,
+          maxPrice = OrderRestrictionsSettings.Default.maxPrice
         )
+      )
     }
 
     val oneFullPairSettings =
@@ -212,17 +212,17 @@ class OrderRestrictionSpecification extends BaseSettingsSpecification with Match
       """.stripMargin
     withClue("one full pair settings") {
       getSettingByConfig(configStr(oneFullPairSettings)).explicitGet().orderRestrictions shouldBe
-        Map(
-          AssetPair.createAssetPair("WAVES", "BTC").get ->
-            OrderRestrictionsSettings(
-              stepAmount = 0.001,
-              minAmount = 0.001,
-              maxAmount = 1000000,
-              stepPrice = 0.002,
-              minPrice = 0.003,
-              maxPrice = 500000
-            )
+      Map(
+        AssetPair.createAssetPair("WAVES", "BTC").get ->
+        OrderRestrictionsSettings(
+          stepAmount = 0.001,
+          minAmount = 0.001,
+          maxAmount = 1000000,
+          stepPrice = 0.002,
+          minPrice = 0.003,
+          maxPrice = 500000
         )
+      )
     }
 
     val someFullPairSettings =
@@ -255,35 +255,35 @@ class OrderRestrictionSpecification extends BaseSettingsSpecification with Match
       """.stripMargin
     withClue("some full pair settings") {
       getSettingByConfig(configStr(someFullPairSettings)).explicitGet().orderRestrictions shouldBe
-        Map(
-          AssetPair.createAssetPair("WAVES", "BTC").get ->
-            OrderRestrictionsSettings(
-              stepAmount = 0.001,
-              minAmount = 0.001,
-              maxAmount = 1000000,
-              stepPrice = 0.002,
-              minPrice = 0.003,
-              maxPrice = 500000
-            ),
-          AssetPair.createAssetPair("ETH", "WAVES").get ->
-            OrderRestrictionsSettings(
-              stepAmount = 0.0001,
-              minAmount = 0.01,
-              maxAmount = 2000,
-              stepPrice = 0.003,
-              minPrice = 0.004,
-              maxPrice = 10000
-            ),
-          AssetPair.createAssetPair("ETH", "USD").get ->
-            OrderRestrictionsSettings(
-              stepAmount = 0.1,
-              minAmount = 0.1,
-              maxAmount = 200,
-              stepPrice = 0.003,
-              minPrice = 0.004,
-              maxPrice = 15000
-            )
+      Map(
+        AssetPair.createAssetPair("WAVES", "BTC").get ->
+        OrderRestrictionsSettings(
+          stepAmount = 0.001,
+          minAmount = 0.001,
+          maxAmount = 1000000,
+          stepPrice = 0.002,
+          minPrice = 0.003,
+          maxPrice = 500000
+        ),
+        AssetPair.createAssetPair("ETH", "WAVES").get ->
+        OrderRestrictionsSettings(
+          stepAmount = 0.0001,
+          minAmount = 0.01,
+          maxAmount = 2000,
+          stepPrice = 0.003,
+          minPrice = 0.004,
+          maxPrice = 10000
+        ),
+        AssetPair.createAssetPair("ETH", "USD").get ->
+        OrderRestrictionsSettings(
+          stepAmount = 0.1,
+          minAmount = 0.1,
+          maxAmount = 200,
+          stepPrice = 0.003,
+          minPrice = 0.004,
+          maxPrice = 15000
         )
+      )
     }
 
     val setAndDefaultMix =
@@ -303,26 +303,26 @@ class OrderRestrictionSpecification extends BaseSettingsSpecification with Match
       """.stripMargin
     withClue("some full pair settings") {
       getSettingByConfig(configStr(setAndDefaultMix)).explicitGet().orderRestrictions shouldBe
-        Map(
-          AssetPair.createAssetPair("WAVES", "BTC").get ->
-            OrderRestrictionsSettings(
-              stepAmount = OrderRestrictionsSettings.Default.stepAmount,
-              minAmount = 0.001,
-              maxAmount = 1000000,
-              stepPrice = 0.002,
-              minPrice = 0.003,
-              maxPrice = OrderRestrictionsSettings.Default.maxPrice
-            ),
-          AssetPair.createAssetPair("ETH", "WAVES").get ->
-            OrderRestrictionsSettings(
-              stepAmount = 0.0001,
-              minAmount = OrderRestrictionsSettings.Default.minAmount,
-              maxAmount = 2000,
-              stepPrice = OrderRestrictionsSettings.Default.stepPrice,
-              minPrice = OrderRestrictionsSettings.Default.minPrice,
-              maxPrice = 10000
-            )
+      Map(
+        AssetPair.createAssetPair("WAVES", "BTC").get ->
+        OrderRestrictionsSettings(
+          stepAmount = OrderRestrictionsSettings.Default.stepAmount,
+          minAmount = 0.001,
+          maxAmount = 1000000,
+          stepPrice = 0.002,
+          minPrice = 0.003,
+          maxPrice = OrderRestrictionsSettings.Default.maxPrice
+        ),
+        AssetPair.createAssetPair("ETH", "WAVES").get ->
+        OrderRestrictionsSettings(
+          stepAmount = 0.0001,
+          minAmount = OrderRestrictionsSettings.Default.minAmount,
+          maxAmount = 2000,
+          stepPrice = OrderRestrictionsSettings.Default.stepPrice,
+          minPrice = OrderRestrictionsSettings.Default.minPrice,
+          maxPrice = 10000
         )
+      )
     }
   }
 }

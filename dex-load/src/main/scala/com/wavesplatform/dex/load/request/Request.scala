@@ -7,17 +7,20 @@ import com.wavesplatform.dex.load.request.RequestTag.RequestTag
 import com.wavesplatform.dex.load.request.RequestType.RequestType
 import com.wavesplatform.dex.load.utils.settings
 
-case class Request(httpType: RequestType,
-                   path: String,
-                   tag: RequestTag,
-                   jsonBody: String = null,
-                   headers: Map[String, String] = Map.empty,
-                   stringBody: String = "") {
+case class Request(
+  httpType: RequestType,
+  path: String,
+  tag: RequestTag,
+  jsonBody: String = null,
+  headers: Map[String, String] = Map.empty,
+  stringBody: String = ""
+) {
+
   val defaultHeaders = Map(
-    HttpHeaders.ACCEPT       -> "application/json",
-    HttpHeaders.CONNECTION   -> "close",
+    HttpHeaders.ACCEPT -> "application/json",
+    HttpHeaders.CONNECTION -> "close",
     HttpHeaders.CONTENT_TYPE -> "application/json",
-    HttpHeaders.HOST         -> settings.hosts.shooted
+    HttpHeaders.HOST -> settings.hosts.shooted
   )
 
   def mkGet(path: String, tag: RequestTag, additionalHeaders: Map[String, String] = Map.empty) = {
@@ -32,7 +35,7 @@ case class Request(httpType: RequestType,
 
     val headers = defaultHeaders ++ Map(
       HttpHeaders.CONTENT_LENGTH -> body.length.toString,
-      "X-API-Key"                -> settings.dexRestApiKey
+      "X-API-Key" -> settings.dexRestApiKey
     )
 
     val request = s"${RequestType.POST} $path HTTP/1.1\r\n${headers.map { case (k, v) => s"$k: $v" }.mkString("\r\n")}\r\n\r\n$body"
@@ -40,10 +43,10 @@ case class Request(httpType: RequestType,
     s"${request.length} $tag\r\n$request\r\n"
   }
 
-  def save(pw: PrintWriter): Unit = {
+  def save(pw: PrintWriter): Unit =
     pw.println(httpType match {
       case RequestType.POST => mkPost(jsonBody, path, tag, stringBody)
-      case RequestType.GET  => mkGet(path, tag, headers)
+      case RequestType.GET => mkGet(path, tag, headers)
     })
-  }
+
 }

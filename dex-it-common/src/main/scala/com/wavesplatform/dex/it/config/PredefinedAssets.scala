@@ -12,44 +12,46 @@ trait PredefinedAssets {
 
   val defaultAssetQuantity: Long = 999999999999L
 
-  val usdAssetName: String         = "USD-X"
+  val usdAssetName: String = "USD-X"
   val IssueUsdTx: IssueTransaction = mkIssue(alice, usdAssetName, defaultAssetQuantity, 2)
-  val UsdId: ByteStr               = toVanilla(IssueUsdTx.id())
-  val usd: IssuedAsset             = IssuedAsset(UsdId)
+  val UsdId: ByteStr = toVanilla(IssueUsdTx.id())
+  val usd: IssuedAsset = IssuedAsset(UsdId)
 
-  val usdnAssetName: String         = "USD-N"
+  val usdnAssetName: String = "USD-N"
   val IssueUsdnTx: IssueTransaction = mkIssue(alice, usdnAssetName, defaultAssetQuantity, 6)
-  val UsdnId: ByteStr               = toVanilla(IssueUsdnTx.id())
-  val usdn: IssuedAsset             = IssuedAsset(UsdnId)
+  val UsdnId: ByteStr = toVanilla(IssueUsdnTx.id())
+  val usdn: IssuedAsset = IssuedAsset(UsdnId)
 
-  val wctAssetName: String         = "WCT-X"
+  val wctAssetName: String = "WCT-X"
   val IssueWctTx: IssueTransaction = mkIssue(bob, wctAssetName, defaultAssetQuantity, 2)
-  val WctId: ByteStr               = toVanilla(IssueWctTx.id())
-  val wct: IssuedAsset             = IssuedAsset(WctId)
+  val WctId: ByteStr = toVanilla(IssueWctTx.id())
+  val wct: IssuedAsset = IssuedAsset(WctId)
 
-  val ethAssetName: String         = "ETH-X"
+  val ethAssetName: String = "ETH-X"
   val IssueEthTx: IssueTransaction = mkIssue(alice, ethAssetName, defaultAssetQuantity, 8)
-  val EthId: ByteStr               = toVanilla(IssueEthTx.id())
-  val eth: IssuedAsset             = IssuedAsset(EthId)
+  val EthId: ByteStr = toVanilla(IssueEthTx.id())
+  val eth: IssuedAsset = IssuedAsset(EthId)
 
-  val btcAssetName: String         = "BTC-X"
+  val btcAssetName: String = "BTC-X"
   val IssueBtcTx: IssueTransaction = mkIssue(bob, btcAssetName, defaultAssetQuantity, 8)
-  val BtcId: ByteStr               = toVanilla(IssueBtcTx.id())
-  val btc: IssuedAsset             = IssuedAsset(BtcId)
+  val BtcId: ByteStr = toVanilla(IssueBtcTx.id())
+  val btc: IssuedAsset = IssuedAsset(BtcId)
 
-  val wctUsdPair: AssetPair    = AssetPair(wct, usd)
-  val wctWavesPair: AssetPair  = AssetPair(wct, Waves)
-  val ethWavesPair: AssetPair  = AssetPair(eth, Waves)
-  val ethBtcPair: AssetPair    = AssetPair(eth, btc)
-  val wavesUsdPair: AssetPair  = AssetPair(Waves, usd)
-  val ethUsdPair: AssetPair    = AssetPair(eth, usd)
-  val wavesBtcPair: AssetPair  = AssetPair(Waves, btc)
-  val btcUsdPair: AssetPair    = AssetPair(btc, usd)
+  val wctUsdPair: AssetPair = AssetPair(wct, usd)
+  val wctWavesPair: AssetPair = AssetPair(wct, Waves)
+  val ethWavesPair: AssetPair = AssetPair(eth, Waves)
+  val ethBtcPair: AssetPair = AssetPair(eth, btc)
+  val wavesUsdPair: AssetPair = AssetPair(Waves, usd)
+  val ethUsdPair: AssetPair = AssetPair(eth, usd)
+  val wavesBtcPair: AssetPair = AssetPair(Waves, btc)
+  val btcUsdPair: AssetPair = AssetPair(btc, usd)
   val wavesUsdnPair: AssetPair = AssetPair(Waves, usdn)
-  val btcUsdnPair: AssetPair   = AssetPair(btc, usdn)
+  val btcUsdnPair: AssetPair = AssetPair(btc, usdn)
 
-  val ForbiddenAssetId: ByteStr   = ByteStr.decodeBase58("FdbnAsset").get
+  val ForbiddenAssetId: ByteStr = ByteStr.decodeBase58("FdbnAsset").get
   val ForbiddenAsset: IssuedAsset = IssuedAsset(ForbiddenAssetId)
 
-  implicit val assetDecimalsMap: Map[Asset, Int] = Map[Asset, Int](Waves -> 8, usd -> 2, usdn -> 6, wct -> 2, eth -> 8, btc -> 8).withDefaultValue(8)
+  implicit val assetDecimalsMap: Map[Asset, Int] =
+    Map[Asset, Int](Waves -> 8, usd -> 2, usdn -> 6, wct -> 2, eth -> 8, btc -> 8).withDefaultValue(8)
+
 }

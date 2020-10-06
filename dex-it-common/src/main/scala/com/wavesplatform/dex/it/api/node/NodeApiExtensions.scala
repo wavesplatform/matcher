@@ -13,4 +13,5 @@ trait NodeApiExtensions {
     txs.foreach(wavesNodeApi.broadcast)
     txs.foreach(wavesNodeApi.waitForTransaction)
   }
+
 }

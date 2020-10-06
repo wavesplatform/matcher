@@ -7,7 +7,7 @@ import mouse.any._
 
 object ConfigOps {
 
-  final implicit class ConfigOps(val config: Config) extends AnyVal {
+  implicit final class ConfigOps(val config: Config) extends AnyVal {
 
     def toProperties: Properties = new Properties() unsafeTap { properties =>
       config.entrySet().forEach { entry =>
@@ -27,5 +27,7 @@ object ConfigOps {
             .setFormatted(true)
             .setJson(false)
         )
+
   }
+
 }

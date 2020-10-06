@@ -16,21 +16,21 @@ case class AuthServiceRestConnector(target: String, chainId: Byte) extends RestC
     val jwtPayload = mkJwtSignedPayload(keyPair, networkByte = chainId)
     List(
       "grant_type" -> "password",
-      "username"   -> jwtPayload.publicKey.base58,
-      "password"   -> s"${jwtPayload.firstTokenExpirationInSeconds}:${jwtPayload.signature}",
-      "scope"      -> jwtPayload.scope.head,
-      "client_id"  -> jwtPayload.clientId
+      "username" -> jwtPayload.publicKey.base58,
+      "password" -> s"${jwtPayload.firstTokenExpirationInSeconds}:${jwtPayload.signature}",
+      "scope" -> jwtPayload.scope.head,
+      "client_id" -> jwtPayload.clientId
     ).map { case (k, v) => QuerySegment.KeyValue(k, v) }
   }
 
   def getAuthCredentials(maybeSeed: Option[String]): ErrorOr[AuthCredentials] = {
 
-    val seed          = maybeSeed getOrElse s"minion${ThreadLocalRandom.current.nextInt}"
-    val keyPair       = KeyPair(crypto secureHash (seed getBytes StandardCharsets.UTF_8))
+    val seed = maybeSeed getOrElse s"minion${ThreadLocalRandom.current.nextInt}"
+    val keyPair = KeyPair(crypto secureHash (seed getBytes StandardCharsets.UTF_8))
     val requestParams = mkAuthTokenRequestParams(keyPair)
-    val uri           = targetUri.copy(querySegments = requestParams)
+    val uri = targetUri.copy(querySegments = requestParams)
 
-    mkResponse { _.post(uri) }.map { j =>
+    mkResponse(_.post(uri)).map { j =>
       AuthCredentials(
         keyPair = keyPair,
         token = (j \ "access_token").as[String],
@@ -38,6 +38,7 @@ case class AuthServiceRestConnector(target: String, chainId: Byte) extends RestC
       )
     }
   }
+
 }
 
 object AuthServiceRestConnector {

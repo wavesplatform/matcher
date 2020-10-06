@@ -26,8 +26,8 @@ class WsConnection(uri: Uri, keepAlive: Boolean = true)(implicit system: ActorSy
   override protected lazy val log: LoggerFacade = LoggerFacade(LoggerFactory.getLogger(s"WsConnection[testId=$testId]"))
 
   log.info(s"""Connecting to Matcher WS API:
-            |         URI = $uri
-            |  Keep alive = $keepAlive""".stripMargin)
+              |         URI = $uri
+              |  Keep alive = $keepAlive""".stripMargin)
 
   import materializer.executionContext
 
@@ -39,7 +39,7 @@ class WsConnection(uri: Uri, keepAlive: Boolean = true)(implicit system: ActorSy
   // From test to server
   private val source: Source[TextMessage.Strict, ActorRef] = {
     val completionMatcher: PartialFunction[Any, CompletionStrategy] = { case akka.actor.Status.Success(_) => CompletionStrategy.draining }
-    val failureMatcher: PartialFunction[Any, Throwable]             = { case Status.Failure(cause)        => cause }
+    val failureMatcher: PartialFunction[Any, Throwable] = { case Status.Failure(cause) => cause }
 
     Source
       .actorRef[WsClientMessage](completionMatcher, failureMatcher, 10, OverflowStrategy.fail)
@@ -59,13 +59,13 @@ class WsConnection(uri: Uri, keepAlive: Boolean = true)(implicit system: ActorSy
         strictText <- tm.toStrict(1.second).map(_.getStrictText)
         clientMessage <- {
           log.debug(s"Got $strictText")
-          Try { Json.parse(strictText).as[WsServerMessage] } match {
+          Try(Json.parse(strictText).as[WsServerMessage]) match {
             case Failure(exception) => Future.failed(exception)
             case Success(x) =>
               messagesBuffer.add(x)
               if (keepAlive) x match {
                 case value: WsPingOrPong => wsHandlerRef ! value
-                case _                   =>
+                case _ =>
               }
               Future.successful(x)
           }
@@ -74,7 +74,7 @@ class WsConnection(uri: Uri, keepAlive: Boolean = true)(implicit system: ActorSy
 
     case bm: BinaryMessage =>
       bm.dataStream.runWith(Sink.ignore)
-      Future.failed { new IllegalArgumentException("Binary messages are not supported") }
+      Future.failed(new IllegalArgumentException("Binary messages are not supported"))
   }
 
   private val flow: Flow[Message, TextMessage.Strict, Future[Done]] = Flow.fromSinkAndSourceCoupled(sink, source).watchTermination() {
@@ -88,15 +88,15 @@ class WsConnection(uri: Uri, keepAlive: Boolean = true)(implicit system: ActorSy
 
   val (connectionResponse, closed) = Http().singleWebSocketRequest(WebSocketRequest(uri), flow)
 
-  val connectionOpenedTs: Long                   = System.currentTimeMillis
-  val connectionClosedTs: Future[Long]           = closed.map(_ => System.currentTimeMillis)
+  val connectionOpenedTs: Long = System.currentTimeMillis
+  val connectionClosedTs: Future[Long] = closed.map(_ => System.currentTimeMillis)
   val connectionLifetime: Future[FiniteDuration] = connectionClosedTs.map(cc => FiniteDuration(cc - connectionOpenedTs, MILLISECONDS))
 
   def messages: List[WsServerMessage] = messagesBuffer.iterator().asScala.toList
-  def clearMessages(): Unit           = messagesBuffer.clear()
+  def clearMessages(): Unit = messagesBuffer.clear()
 
   def send(message: WsClientMessage): Unit = wsHandlerRef ! TestWsHandlerActor.SendToServer(message)
 
-  def close(): Unit     = if (!isClosed) wsHandlerRef ! TestWsHandlerActor.CloseConnection
+  def close(): Unit = if (!isClosed) wsHandlerRef ! TestWsHandlerActor.CloseConnection
   def isClosed: Boolean = closed.isCompleted
 }

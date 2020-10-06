@@ -14,12 +14,14 @@ trait Connector extends AutoCloseable {
 
   implicit val repeatRequestOptions: RepeatRequestOptions = RepeatRequestOptions.default
 
-  final def repeatRequest[A](sendRequest: => ErrorOr[A])(test: ErrorOr[A] => Boolean)(implicit repeatRequestOptions: RepeatRequestOptions =
-                                                                                        repeatRequestOptions): ErrorOr[A] = {
+  final def repeatRequest[A](sendRequest: => ErrorOr[A])(test: ErrorOr[A] => Boolean)(implicit
+    repeatRequestOptions: RepeatRequestOptions = repeatRequestOptions
+  ): ErrorOr[A] = {
 
     @tailrec
-    def go(ro: RepeatRequestOptions, lastResponse: Option[ErrorOr[A]]): ErrorOr[A] = {
-      if (ro.attemptsLeft == 0) s"All attempts are out! ${lastResponse.fold("")(lr => s"Last response: ${lr.fold(identity, _.toString)}")}".asLeft
+    def go(ro: RepeatRequestOptions, lastResponse: Option[ErrorOr[A]]): ErrorOr[A] =
+      if (ro.attemptsLeft == 0)
+        s"All attempts are out! ${lastResponse.fold("")(lr => s"Last response: ${lr.fold(identity, _.toString)}")}".asLeft
       else {
         val response = sendRequest
         if (test(response)) response
@@ -28,20 +30,21 @@ trait Connector extends AutoCloseable {
           go(ro.decreaseAttempts, response.some)
         }
       }
-    }
 
     go(repeatRequestOptions, None)
   }
+
 }
 
 object Connector {
 
   final case class RepeatRequestOptions(attemptsLeft: Int, delay: FiniteDuration) {
     def decreaseAttempts: RepeatRequestOptions = copy(attemptsLeft = attemptsLeft - 1)
-    override def toString: String              = s"max attempts = $attemptsLeft, interval = $delay"
+    override def toString: String = s"max attempts = $attemptsLeft, interval = $delay"
   }
 
   object RepeatRequestOptions {
     val default: RepeatRequestOptions = RepeatRequestOptions(10, 1.second)
   }
+
 }

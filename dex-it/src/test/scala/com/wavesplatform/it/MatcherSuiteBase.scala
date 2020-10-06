@@ -59,7 +59,7 @@ trait MatcherSuiteBase
 
   override protected val moduleName: String = "dex-it"
 
-  override implicit def patienceConfig: PatienceConfig = super.patienceConfig.copy(timeout = 30.seconds, interval = 1.second)
+  implicit override def patienceConfig: PatienceConfig = super.patienceConfig.copy(timeout = 30.seconds, interval = 1.second)
 
   override protected def beforeAll(): Unit = {
     log.debug(s"Perform beforeAll")
@@ -88,4 +88,5 @@ trait MatcherSuiteBase
     }
     account
   }
+
 }

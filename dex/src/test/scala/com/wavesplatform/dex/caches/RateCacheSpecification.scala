@@ -12,8 +12,8 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 class RateCacheSpecification extends AnyWordSpecLike with Matchers with WithDB with MatcherSpecBase with PropertyChecks with NoShrink {
 
   private def test(f: RateCache => Unit): Unit = {
-    withClue("with DB") { f(RateCache(db)) }
-    withClue("in mem") { f(RateCache.inMem) }
+    withClue("with DB")(f(RateCache(db)))
+    withClue("in mem")(f(RateCache.inMem))
   }
 
   private val WavesRate: Map[Asset, Double] = Map(Waves -> 1d)
@@ -26,7 +26,7 @@ class RateCacheSpecification extends AnyWordSpecLike with Matchers with WithDB w
           .listOfN(
             100,
             for {
-              asset     <- arbitraryAssetGen
+              asset <- arbitraryAssetGen
               rateValue <- Gen.choose(1, 100).map(_.toDouble / 100)
             } yield asset -> rateValue
           )

@@ -13,7 +13,8 @@ import com.wavesplatform.dex.time.Time
 import scala.concurrent.{ExecutionContext, Future}
 
 class OrderBookHttpInfo(settings: OrderBookHttpInfo.Settings, askAdapter: OrderBookAskAdapter, time: Time, assetDecimals: Asset => Option[Int])(
-    implicit ec: ExecutionContext) {
+  implicit ec: ExecutionContext
+) {
 
   private val emptyMarketStatus = toHttpMarketStatusResponse(MarketStatus(None, None, None))
 
@@ -23,7 +24,7 @@ class OrderBookHttpInfo(settings: OrderBookHttpInfo.Settings, askAdapter: OrderB
       case Right(maybeMarketStatus) =>
         maybeMarketStatus match {
           case Some(ms) => toHttpMarketStatusResponse(ms)
-          case None     => emptyMarketStatus
+          case None => emptyMarketStatus
         }
     }
 
@@ -32,7 +33,7 @@ class OrderBookHttpInfo(settings: OrderBookHttpInfo.Settings, askAdapter: OrderB
   def getHttpView(assetPair: AssetPair, format: DecimalsFormat, depth: Option[Depth]): Future[HttpResponse] =
     askAdapter.getHttpView(assetPair, format, settings.nearestBigger(depth)).map {
       case Right(x) => x.getOrElse(getDefaultHttpView(assetPair, format))
-      case Left(e)  => toHttpResponse(OrderBookUnavailable(e))
+      case Left(e) => toHttpResponse(OrderBookUnavailable(e))
     }
 
   private def getDefaultHttpView(assetPair: AssetPair, format: DecimalsFormat): HttpResponse = {
@@ -47,15 +48,20 @@ class OrderBookHttpInfo(settings: OrderBookHttpInfo.Settings, askAdapter: OrderB
 
   private def assetPairDecimals(assetPair: AssetPair, format: DecimalsFormat): Option[(Depth, Depth)] = format match {
     case Denormalized => assetDecimals(assetPair.amountAsset).zip(assetDecimals(assetPair.priceAsset))
-    case _            => None
+    case _ => None
   }
+
 }
 
 object OrderBookHttpInfo {
+
   case class Settings(depthRanges: List[Int], defaultDepth: Option[Int]) {
+
     def nearestBigger(to: Option[Int]): Int =
       to.orElse(defaultDepth)
         .flatMap(desiredDepth => depthRanges.find(_ >= desiredDepth))
         .getOrElse(depthRanges.max)
+
   }
+
 }

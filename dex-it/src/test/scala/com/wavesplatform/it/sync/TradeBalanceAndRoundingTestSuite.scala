@@ -22,17 +22,17 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
   }
 
   "Alice and Bob trade WAVES-USD" - {
-    val price           = 238
-    val buyOrderAmount  = 425532L
+    val price = 238
+    val buyOrderAmount = 425532L
     val sellOrderAmount = 3100000000L
 
     val correctedSellAmount = correctAmount(sellOrderAmount, price)
 
     val adjustedAmount = receiveAmount(OrderType.BUY, buyOrderAmount, price)
-    val adjustedTotal  = receiveAmount(OrderType.SELL, buyOrderAmount, price)
+    val adjustedTotal = receiveAmount(OrderType.SELL, buyOrderAmount, price)
 
     var aliceWavesBalanceBefore = 0L
-    var bobWavesBalanceBefore   = 0L
+    var bobWavesBalanceBefore = 0L
 
     "prepare" in {
       log.debug(s"correctedSellAmount: $correctedSellAmount, adjustedAmount: $adjustedAmount, adjustedTotal: $adjustedTotal")
@@ -72,22 +72,24 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
 
     "check usd and waves balance after fill" in {
       val aliceWavesBalanceAfter = wavesNode1.api.balance(alice, Waves)
-      val aliceUsdBalance        = wavesNode1.api.balance(alice, usd)
+      val aliceUsdBalance = wavesNode1.api.balance(alice, usd)
 
       val bobWavesBalanceAfter = wavesNode1.api.balance(bob, Waves)
-      val bobUsdBalance        = wavesNode1.api.balance(bob, usd)
+      val bobUsdBalance = wavesNode1.api.balance(bob, usd)
 
       (aliceWavesBalanceAfter - aliceWavesBalanceBefore) should be(
-        adjustedAmount - (BigInt(matcherFee) * adjustedAmount / buyOrderAmount).bigInteger.longValue())
+        adjustedAmount - (BigInt(matcherFee) * adjustedAmount / buyOrderAmount).bigInteger.longValue()
+      )
 
       aliceUsdBalance - defaultAssetQuantity should be(-adjustedTotal)
       bobWavesBalanceAfter - bobWavesBalanceBefore should be(
-        -adjustedAmount - (BigInt(matcherFee) * adjustedAmount / sellOrderAmount).bigInteger.longValue())
+        -adjustedAmount - (BigInt(matcherFee) * adjustedAmount / sellOrderAmount).bigInteger.longValue()
+      )
       bobUsdBalance should be(adjustedTotal)
     }
 
     "check filled amount and tradable balance" in {
-      val bobOrder     = dex1.api.orderHistory(bob).head
+      val bobOrder = dex1.api.orderHistory(bob).head
       val filledAmount = dex1.api.orderStatus(bobOrder.assetPair, bobOrder.id).filledAmount.getOrElse(0L)
 
       filledAmount shouldBe adjustedAmount
@@ -118,8 +120,8 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
   }
 
   "Alice and Bob trade WAVES-USD check CELLING" - {
-    val price2           = 289
-    val buyOrderAmount2  = 0.07.waves
+    val price2 = 289
+    val buyOrderAmount2 = 0.07.waves
     val sellOrderAmount2 = 3.waves
 
     val correctedSellAmount2 = correctAmount(sellOrderAmount2, price2)
@@ -149,9 +151,9 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
 
   "Alice and Bob trade WCT-USD sell price less than buy price" - {
     "place wcd-usd order corrected by new price sell amount less then initial one" in {
-      val buyPrice   = 247700
-      val sellPrice  = 135600
-      val buyAmount  = 46978
+      val buyPrice = 247700
+      val sellPrice = 135600
+      val buyAmount = 46978
       val sellAmount = 56978
 
       val bobOrder = mkOrder(bob, wctUsdPair, SELL, sellAmount, sellPrice)
@@ -172,12 +174,12 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
 
   "Alice and Bob trade WCT-USD 1" - {
     val wctUsdSellAmount = 347
-    val wctUsdBuyAmount  = 146
-    val wctUsdPrice      = 12739213
+    val wctUsdBuyAmount = 146
+    val wctUsdPrice = 12739213
 
     "place wct-usd order" in {
-      val aliceUsdBalance   = wavesNode1.api.balance(alice, usd)
-      val bobUsdBalance     = wavesNode1.api.balance(bob, usd)
+      val aliceUsdBalance = wavesNode1.api.balance(alice, usd)
+      val bobUsdBalance = wavesNode1.api.balance(bob, usd)
       val bobWctInitBalance = wavesNode1.api.balance(bob, wct)
 
       val bobOrder = mkOrder(bob, wctUsdPair, SELL, wctUsdSellAmount, wctUsdPrice)
@@ -188,8 +190,8 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
 
       waitForOrderAtNode(aliceOrder)
 
-      val executedAmount         = correctAmount(wctUsdBuyAmount, wctUsdPrice) // 142
-      val bobReceiveUsdAmount    = receiveAmount(SELL, wctUsdBuyAmount, wctUsdPrice)
+      val executedAmount = correctAmount(wctUsdBuyAmount, wctUsdPrice) // 142
+      val bobReceiveUsdAmount = receiveAmount(SELL, wctUsdBuyAmount, wctUsdPrice)
       val expectedReservedBobWct = wctUsdSellAmount - executedAmount // 205 = 347 - 142
 
       eventually {
@@ -226,7 +228,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
 
   "get opened trading markets. Check WCT-USD" in {
     val openMarkets = dex1.api.allOrderBooks
-    val markets     = openMarkets.markets.last
+    val markets = openMarkets.markets.last
 
     markets.amountAssetName shouldBe wctAssetName
     markets.amountAssetInfo shouldBe Some(HttpAssetInfo(IssueWctTx.decimals()))
@@ -237,11 +239,11 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
 
   "Alice and Bob trade WCT-WAVES on not enough fee when place order" - {
     val wctWavesSellAmount = 2
-    val wctWavesPrice      = 11234560000000L
+    val wctWavesPrice = 11234560000000L
 
     "bob lease all waves exact half matcher fee" in {
       val leasingAmount = wavesNode1.api.balance(bob, Waves) - leasingFee - matcherFee / 2
-      val leaseTx       = mkLease(bob, matcher, leasingAmount)
+      val leaseTx = mkLease(bob, matcher, leasingAmount)
       broadcastAndAwait(leaseTx)
 
       val bobOrder = mkOrder(bob, wctWavesPair, SELL, wctWavesSellAmount, wctWavesPrice)
@@ -276,7 +278,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
 
   "submitted order is canceled during match" in {
 
-    Seq(alice, bob).foreach { dex1.api.cancelAll(_) }
+    Seq(alice, bob).foreach(dex1.api.cancelAll(_))
 
     val bobOrder = mkOrderDP(bob, wavesUsdPair, OrderType.SELL, 0.1.waves, 0.1)
     placeAndAwaitAtDex(bobOrder)
@@ -308,4 +310,5 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
   private def receiveAmount(ot: OrderType, matchAmount: Long, matchPrice: Long): Long =
     if (ot == BUY) correctAmount(matchAmount, matchPrice)
     else (BigInt(matchAmount) * matchPrice / Order.PriceConstant).bigInteger.longValueExact()
+
 }

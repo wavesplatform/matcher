@@ -31,8 +31,8 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
     val wct, usd: Long = Normalization.normalizeAmountAndFee(value, 2)
     val eth, btc: Long = Normalization.normalizeAmountAndFee(value, 8)
 
-    val price: Long         = Normalization.normalizePrice(value, 2, 2)
-    val wctUsdPrice: Long   = Normalization.normalizePrice(value, 2, 2)
+    val price: Long = Normalization.normalizePrice(value, 2, 2)
+    val wctUsdPrice: Long = Normalization.normalizePrice(value, 2, 2)
     val wavesUsdPrice: Long = Normalization.normalizePrice(value, 8, 2)
   }
 
@@ -48,13 +48,13 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
       ).foreach {
         case (version, feeAsset) =>
           s"version=$version, asset=$feeAsset" in {
-            val order   = mkOrder(alice, wctUsdPair, BUY, 1.wct, 1.price, matcherFee = matcherFee, feeAsset = feeAsset, version = version)
+            val order = mkOrder(alice, wctUsdPair, BUY, 1.wct, 1.price, matcherFee = matcherFee, feeAsset = feeAsset, version = version)
             val orderId = order.id()
             dex1.api.place(order)
             dex1.api.orderStatus(order).filledFee shouldBe None
 
             for {
-              activeOnly       <- List(true, false).map(Option(_))
+              activeOnly <- List(true, false).map(Option(_))
               orderBookHistory <- orderHistory(alice, wctUsdPair, activeOnly)
             } yield {
               val item = orderBookHistory.find(_.id == orderId).get
@@ -80,11 +80,11 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
     }
 
     "in filled orders of different versions" in {
-      val aliceOrder   = mkOrder(alice, wctUsdPair, BUY, 1.wct, 1.price, matcherFee = matcherFee, feeAsset = feeAsset)
+      val aliceOrder = mkOrder(alice, wctUsdPair, BUY, 1.wct, 1.price, matcherFee = matcherFee, feeAsset = feeAsset)
       val aliceOrderId = aliceOrder.id()
       dex1.api.place(aliceOrder)
 
-      val bobOrder   = mkOrder(bob, wctUsdPair, SELL, 1.wct, 1.price, matcherFee = matcherFee)
+      val bobOrder = mkOrder(bob, wctUsdPair, SELL, 1.wct, 1.price, matcherFee = matcherFee)
       val bobOrderId = bobOrder.id()
       dex1.api.place(bobOrder)
 
@@ -112,11 +112,11 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
     }
 
     "in partially filled and cancelled orders" in {
-      val aliceOrder   = mkOrder(alice, wctUsdPair, BUY, 2.wct, 1.price, matcherFee = matcherFee)
+      val aliceOrder = mkOrder(alice, wctUsdPair, BUY, 2.wct, 1.price, matcherFee = matcherFee)
       val aliceOrderId = aliceOrder.id()
       dex1.api.place(aliceOrder)
 
-      val bobOrder   = mkOrder(bob, wctUsdPair, SELL, 1.wct, 1.price, matcherFee = matcherFee)
+      val bobOrder = mkOrder(bob, wctUsdPair, SELL, 1.wct, 1.price, matcherFee = matcherFee)
       val bobOrderId = bobOrder.id()
       dex1.api.place(bobOrder)
 
@@ -126,7 +126,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
       dex1.api.orderStatus(bobOrder).filledFee shouldBe Some(matcherFee)
 
       for {
-        activeOnly       <- List(true, false).map(Option(_))
+        activeOnly <- List(true, false).map(Option(_))
         orderBookHistory <- orderHistory(alice, wctUsdPair, activeOnly)
       } yield {
         val item = orderBookHistory.find(_.id == aliceOrderId).get
@@ -159,11 +159,11 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
     }
 
     "in partially filled and cancelled orders of different versions" in {
-      val aliceOrder   = mkOrder(alice, wctUsdPair, BUY, 2.wct, 1.price, matcherFee = matcherFee, feeAsset = feeAsset)
+      val aliceOrder = mkOrder(alice, wctUsdPair, BUY, 2.wct, 1.price, matcherFee = matcherFee, feeAsset = feeAsset)
       val aliceOrderId = aliceOrder.id()
       dex1.api.place(aliceOrder)
 
-      val bobOrder   = mkOrder(bob, wctUsdPair, SELL, 1.wct, 1.price, matcherFee = matcherFee)
+      val bobOrder = mkOrder(bob, wctUsdPair, SELL, 1.wct, 1.price, matcherFee = matcherFee)
       val bobOrderId = bobOrder.id()
       dex1.api.place(bobOrder)
 
@@ -173,7 +173,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
       dex1.api.orderStatus(bobOrder).filledFee shouldBe Some(matcherFee)
 
       for {
-        activeOnly       <- List(true, false).map(Option(_))
+        activeOnly <- List(true, false).map(Option(_))
         orderBookHistory <- orderHistory(alice, wctUsdPair, activeOnly)
       } yield {
         val item = orderBookHistory.find(_.id == aliceOrderId).get
@@ -206,7 +206,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
     }
 
     "in partially filled orders with fractional filled amount" in {
-      val order   = mkOrder(alice, wctUsdPair, BUY, 9.wct, 1.price, matcherFee = matcherFee, feeAsset = feeAsset)
+      val order = mkOrder(alice, wctUsdPair, BUY, 9.wct, 1.price, matcherFee = matcherFee, feeAsset = feeAsset)
       val orderId = order.id()
       dex1.api.place(order)
 
@@ -226,7 +226,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
     }
 
     "should save right fee considering the fee rate" in {
-      val rate     = 0.33333333
+      val rate = 0.33333333
       val orderFee = (BigDecimal(rate) * matcherFee).setScale(0, CEILING).toLong
 
       val ethBalance = dex1.api.tradableBalance(alice, ethUsdPair)(eth)
@@ -235,7 +235,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
 
       dex1.api.upsertRate(feeAsset, rate)
 
-      val aliceOrder   = mkOrder(alice, ethUsdPair, BUY, 1.eth, 0.5.price, orderFee, feeAsset = feeAsset)
+      val aliceOrder = mkOrder(alice, ethUsdPair, BUY, 1.eth, 0.5.price, orderFee, feeAsset = feeAsset)
       val aliceOrderId = aliceOrder.id()
       dex1.api.place(aliceOrder)
 
@@ -246,7 +246,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
         item.feeAsset shouldBe feeAsset
       }
 
-      val bobOrder   = mkOrder(bob, ethUsdPair, SELL, 1.eth, 0.5.price, matcherFee, feeAsset = feeAsset)
+      val bobOrder = mkOrder(bob, ethUsdPair, SELL, 1.eth, 0.5.price, matcherFee, feeAsset = feeAsset)
       val bobOrderId = bobOrder.id()
       dex1.api.place(bobOrder)
 
@@ -271,20 +271,19 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
 
   "OrderHistory should" - {
     "correctly save average weighed price and total executed amount of price asset" in {
-      Seq(alice, bob).foreach { dex1.api.cancelAll(_) }
+      Seq(alice, bob).foreach(dex1.api.cancelAll(_))
 
-      def assertAvgWeighedPriceAndExecutedPriceAssets(keyPair: KeyPair, avgWeighedPricesAndPriceAssetAmounts: List[(Long, Long)]): Unit = {
+      def assertAvgWeighedPriceAndExecutedPriceAssets(keyPair: KeyPair, avgWeighedPricesAndPriceAssetAmounts: List[(Long, Long)]): Unit =
         dex1.api
           .orderHistoryByPair(keyPair, wavesUsdPair, Some(false))
           .map(item => item.avgWeighedPrice -> item.totalExecutedPriceAssets) should matchTo(avgWeighedPricesAndPriceAssetAmounts)
-      }
 
       // checking market and limit orders because
       // in case of market sell order avgWeighedPrice retrieved from orderDB,
       // in case of limit sell order - from active orders
       Seq(true, false) foreach { isMarketOrder =>
-        val mozart  = mkAccountWithBalance(100.waves -> Waves)
-        val salieri = mkAccountWithBalance(300.usd   -> usd, 10.waves -> Waves)
+        val mozart = mkAccountWithBalance(100.waves -> Waves)
+        val salieri = mkAccountWithBalance(300.usd -> usd, 10.waves -> Waves)
 
         Seq(
           30.waves -> 3.2,
@@ -294,10 +293,10 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
 
         placeAndAwaitAtNode(mkOrderDP(mozart, wavesUsdPair, SELL, 95.waves, 2.0), isMarketOrder = isMarketOrder)
 
-        assertAvgWeighedPriceAndExecutedPriceAssets(mozart, List(288L  -> 260.usd))
+        assertAvgWeighedPriceAndExecutedPriceAssets(mozart, List(288L -> 260.usd))
         assertAvgWeighedPriceAndExecutedPriceAssets(salieri, List(270L -> 135.usd, 290L -> 29.usd, 320L -> 96.usd))
 
-        Seq(alice, bob, mozart, salieri).foreach { dex1.api.cancelAll(_) }
+        Seq(alice, bob, mozart, salieri).foreach(dex1.api.cancelAll(_))
       }
     }
 
@@ -313,7 +312,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
       val order2 = mkOrderDP(carol, wavesUsdPair, OrderType.SELL, 2.waves, 3.0)
       dex1.api.place(order2)
 
-      val all        = List(order2.id(), order1.id())
+      val all = List(order2.id(), order1.id())
       val activeOnly = List(order2.id())
       val closedOnly = List(order1.id())
 
@@ -343,8 +342,8 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
         case (activeOnlyParam, closedOnlyParam, result) =>
           withClue(s"activeOnly=$activeOnlyParam, closedOnly=$closedOnlyParam, result=$result: ") {
             val expected = result match {
-              case OrderListType.All        => all
-              case OrderListType.Empty      => List.empty
+              case OrderListType.All => all
+              case OrderListType.Empty => List.empty
               case OrderListType.ActiveOnly => activeOnly
               case OrderListType.ClosedOnly => closedOnly
             }
@@ -364,4 +363,5 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
     dex1.api.orderHistoryByPair(account, pair, activeOnly),
     dex1.api.orderHistoryWithApiKey(account, activeOnly)
   )
+
 }

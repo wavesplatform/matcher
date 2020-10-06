@@ -8,7 +8,7 @@ import java.util.concurrent.{Executors, TimeoutException}
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.typesafe.config.Config
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.queue.KafkaMatcherQueue.{KafkaProducer, Settings, eventDeserializer}
+import com.wavesplatform.dex.queue.KafkaMatcherQueue.{eventDeserializer, KafkaProducer, Settings}
 import com.wavesplatform.dex.queue.MatcherQueue.{IgnoreProducer, Producer}
 import com.wavesplatform.dex.settings.toConfigOps
 import monix.eval.Task
@@ -21,26 +21,29 @@ import org.apache.kafka.common.errors.{WakeupException, TimeoutException => Kafk
 import org.apache.kafka.common.serialization._
 
 import scala.concurrent.duration.FiniteDuration
-import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
+import scala.concurrent.{blocking, ExecutionContext, Future, Promise}
 import scala.jdk.CollectionConverters._
 import scala.jdk.DurationConverters.ScalaDurationOps
 
 class KafkaMatcherQueue(settings: Settings) extends MatcherQueue with ScorexLogging {
+
   private val producerThreadPool =
     Executors.newFixedThreadPool(3, new ThreadFactoryBuilder().setDaemon(false).setNameFormat("queue-kafka-producer-%d").build())
+
   private val producerExecutionContext = ExecutionContext.fromExecutor(producerThreadPool)
 
   private val consumerThreadPool =
     Executors.newSingleThreadExecutor(new ThreadFactoryBuilder().setDaemon(false).setNameFormat("queue-kafka-consumer-%d").build())
+
   private val consumerExecutionContext = ExecutionContext.fromExecutor(consumerThreadPool)
 
   private val duringShutdown = new AtomicBoolean(false)
 
-  private val topicPartition                             = new TopicPartition(settings.topic, 0) // Only one partition
+  private val topicPartition = new TopicPartition(settings.topic, 0) // Only one partition
   private val topicPartitions: util.List[TopicPartition] = java.util.Collections.singletonList(topicPartition)
 
   private val consumerConfig = settings.consumer.client
-  private val consumer       = new KafkaConsumer[String, QueueEvent](consumerConfig.toProperties, new StringDeserializer, eventDeserializer)
+  private val consumer = new KafkaConsumer[String, QueueEvent](consumerConfig.toProperties, new StringDeserializer, eventDeserializer)
   consumer.assign(topicPartitions)
   private val pollDuration = java.time.Duration.ofMillis(settings.consumer.fetchMaxDuration.toMillis)
 
@@ -55,14 +58,12 @@ class KafkaMatcherQueue(settings: Settings) extends MatcherQueue with ScorexLogg
   }
 
   private val pollTask: Task[IndexedSeq[QueueEventWithMeta]] = Task {
-    try {
-      if (duringShutdown.get()) IndexedSeq.empty
-      else {
-        val records = consumer.poll(pollDuration)
-        records.asScala.map { record =>
-          QueueEventWithMeta(record.offset(), record.timestamp(), record.value())
-        }.toIndexedSeq
-      }
+    try if (duringShutdown.get()) IndexedSeq.empty
+    else {
+      val records = consumer.poll(pollDuration)
+      records.asScala.map { record =>
+        QueueEventWithMeta(record.offset(), record.timestamp(), record.value())
+      }.toIndexedSeq
     } catch {
       case e: WakeupException => if (duringShutdown.get()) IndexedSeq.empty else throw e
       case e: Throwable =>
@@ -87,7 +88,7 @@ class KafkaMatcherQueue(settings: Settings) extends MatcherQueue with ScorexLogg
           .filter(_.nonEmpty)
           .mapEvalF(process)
           .doOnError { e =>
-            Task { log.error("Consumer fails", e) }
+            Task(log.error("Consumer fails", e))
           }
       }
       .subscribe()(scheduler)
@@ -130,6 +131,7 @@ class KafkaMatcherQueue(settings: Settings) extends MatcherQueue with ScorexLogg
 
     stopProducer zip stopConsumer map (_ => ())
   }
+
 }
 
 object KafkaMatcherQueue {
@@ -139,47 +141,47 @@ object KafkaMatcherQueue {
 
   val eventDeserializer: Deserializer[QueueEvent] = new Deserializer[QueueEvent] {
     override def configure(configs: java.util.Map[String, _], isKey: Boolean): Unit = {}
-    override def deserialize(topic: String, data: Array[Byte]): QueueEvent          = QueueEvent.fromBytes(data)
-    override def close(): Unit                                                      = {}
+    override def deserialize(topic: String, data: Array[Byte]): QueueEvent = QueueEvent.fromBytes(data)
+    override def close(): Unit = {}
   }
 
   val eventSerializer: Serializer[QueueEvent] = new Serializer[QueueEvent] {
     override def configure(configs: java.util.Map[String, _], isKey: Boolean): Unit = {}
-    override def serialize(topic: String, data: QueueEvent): Array[Byte]            = QueueEvent.toBytes(data)
-    override def close(): Unit                                                      = {}
+    override def serialize(topic: String, data: QueueEvent): Array[Byte] = QueueEvent.toBytes(data)
+    override def close(): Unit = {}
   }
 
   private class KafkaProducer(topic: String, producerSettings: Properties)(implicit ec: ExecutionContext) extends Producer with ScorexLogging {
+
     private val producer =
       new org.apache.kafka.clients.producer.KafkaProducer[String, QueueEvent](producerSettings, new StringSerializer, eventSerializer)
 
     override def storeEvent(event: QueueEvent): Future[Option[QueueEventWithMeta]] = {
       log.trace(s"Storing $event")
       val p = Promise[QueueEventWithMeta]()
-      try {
-        producer.send(
-          new ProducerRecord[String, QueueEvent](topic, event),
-          new Callback {
-            override def onCompletion(metadata: RecordMetadata, exception: Exception): Unit = {
-              if (exception == null) {
-                log.debug(s"Stored $event, offset=${metadata.offset()}, timestamp=${metadata.timestamp()}")
-                p.success(
-                  QueueEventWithMeta(
-                    offset = metadata.offset(),
-                    timestamp = metadata.timestamp(),
-                    event = event
-                  ))
-              } else {
-                log.error(s"During storing $event", exception)
-                p.failure(exception match {
-                  case _: KafkaTimeoutException => new TimeoutException(s"Can't store message $event")
-                  case _                        => exception
-                })
-              }
+      try producer.send(
+        new ProducerRecord[String, QueueEvent](topic, event),
+        new Callback {
+          override def onCompletion(metadata: RecordMetadata, exception: Exception): Unit =
+            if (exception == null) {
+              log.debug(s"Stored $event, offset=${metadata.offset()}, timestamp=${metadata.timestamp()}")
+              p.success(
+                QueueEventWithMeta(
+                  offset = metadata.offset(),
+                  timestamp = metadata.timestamp(),
+                  event = event
+                )
+              )
+            } else {
+              log.error(s"During storing $event", exception)
+              p.failure(exception match {
+                case _: KafkaTimeoutException => new TimeoutException(s"Can't store message $event")
+                case _ => exception
+              })
             }
-          }
-        )
-      } catch {
+        }
+      )
+      catch {
         case e: Throwable =>
           log.error(s"Can't store message $event", e)
           p.failure(e)
@@ -188,8 +190,9 @@ object KafkaMatcherQueue {
       p.future.map(Some(_))
     }
 
-    override def close(timeout: FiniteDuration): Unit = {
+    override def close(timeout: FiniteDuration): Unit =
       producer.close(java.time.Duration.ofNanos(timeout.toNanos))
-    }
+
   }
+
 }

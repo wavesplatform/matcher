@@ -10,23 +10,24 @@ case class WsOrderBookSettings(restrictions: Option[OrderRestrictionsSettings], 
 object WsOrderBookSettings {
 
   private val amountField = "a"
-  private val priceField  = "p"
+  private val priceField = "p"
 
-  private implicit val doubleFormat: Format[Double] = doubleAsStringFormat
+  implicit private val doubleFormat: Format[Double] = doubleAsStringFormat
 
   implicit val orderRestrictionsSettingsFormat: Format[OrderRestrictionsSettings] = Format(
     fjs = Reads {
       case JsObject(restrictions) if restrictions.keySet == Set(amountField, priceField) =>
-        def getRestrictions(restricted: String): (Double, Double, Double) = Reads.Tuple3R[Double, Double, Double].reads(restrictions(restricted)).get
-        val (minAmount, stepAmount, maxAmount)                            = getRestrictions(amountField)
-        val (minPrice, stepPrice, maxPrice)                               = getRestrictions(priceField)
+        def getRestrictions(restricted: String): (Double, Double, Double) =
+          Reads.Tuple3R[Double, Double, Double].reads(restrictions(restricted)).get
+        val (minAmount, stepAmount, maxAmount) = getRestrictions(amountField)
+        val (minPrice, stepPrice, maxPrice) = getRestrictions(priceField)
         JsSuccess(OrderRestrictionsSettings(stepAmount, minAmount, maxAmount, stepPrice, minPrice, maxPrice))
       case x => JsError(JsPath, s"Cannot parse OrderRestrictionsSettings from ${x.getClass.getName}")
     },
     tjs = Writes { ors =>
       Json.obj(
         amountField -> Json.arr(ors.minAmount, ors.stepAmount, ors.maxAmount),
-        priceField  -> Json.arr(ors.minPrice, ors.stepPrice, ors.maxPrice)
+        priceField -> Json.arr(ors.minPrice, ors.stepPrice, ors.maxPrice)
       )
     }
   )
@@ -38,4 +39,5 @@ object WsOrderBookSettings {
     (restrictions, tickSize) => WsOrderBookSettings(restrictions, tickSize),
     unlift(WsOrderBookSettings.unapply)
   )
+
 }

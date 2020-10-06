@@ -16,10 +16,10 @@ class MatchingRulesSpecification extends BaseSettingsSpecification with Matchers
 
     def matchingRulesSettings(matchingRules: String): String =
       s"""matching-rules = {
-        |  "WAVES-8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS": [
-        |    $matchingRules
-        |  ]
-        |}
+         |  "WAVES-8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS": [
+         |    $matchingRules
+         |  ]
+         |}
       """.stripMargin
 
     def matchingRule(startOffset: Int): String =
@@ -87,12 +87,12 @@ class MatchingRulesSpecification extends BaseSettingsSpecification with Matchers
 
     getSettingByConfig(configStr(zeroStartOffsetRule)).explicitGet().matchingRules shouldBe Map(
       AssetPair.fromString("WAVES-8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS").get ->
-        NonEmptyList[DenormalizedMatchingRule](
-          DenormalizedMatchingRule(0, 0.002),
-          List(
-            DenormalizedMatchingRule(500L, 0.001)
-          )
+      NonEmptyList[DenormalizedMatchingRule](
+        DenormalizedMatchingRule(0, 0.002),
+        List(
+          DenormalizedMatchingRule(500L, 0.001)
         )
+      )
     )
   }
 
@@ -119,12 +119,12 @@ class MatchingRulesSpecification extends BaseSettingsSpecification with Matchers
     withClue("nonempty correct") {
       getSettingByConfig(configStr(nonEmptyCorrect)).explicitGet().matchingRules shouldBe Map(
         AssetPair.fromString("WAVES-8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS").get ->
-          NonEmptyList[DenormalizedMatchingRule](
-            DenormalizedMatchingRule(100L, 0.002),
-            List(
-              DenormalizedMatchingRule(500L, 0.001)
-            )
+        NonEmptyList[DenormalizedMatchingRule](
+          DenormalizedMatchingRule(100L, 0.002),
+          List(
+            DenormalizedMatchingRule(500L, 0.001)
           )
+        )
       )
     }
   }
@@ -176,10 +176,10 @@ class MatchingRulesSpecification extends BaseSettingsSpecification with Matchers
     ).foreach { tickSize =>
       getSettingByConfig(configStr(matchingRulesSettings(tickSize))).explicitGet().matchingRules shouldBe Map(
         AssetPair.fromString("WAVES-8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS").get ->
-          NonEmptyList[DenormalizedMatchingRule](
-            DenormalizedMatchingRule(100L, tickSize),
-            List()
-          )
+        NonEmptyList[DenormalizedMatchingRule](
+          DenormalizedMatchingRule(100L, tickSize),
+          List()
+        )
       )
     }
   }
@@ -192,6 +192,8 @@ class MatchingRulesSpecification extends BaseSettingsSpecification with Matchers
          |}
       """.stripMargin
 
-    getSettingByConfig(configStr(emptyTickSize)) should produce("waves.dex.matching-rules.WAVES-8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS.+\n.+Empty".r)
+    getSettingByConfig(configStr(emptyTickSize)) should produce(
+      "waves.dex.matching-rules.WAVES-8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS.+\n.+Empty".r
+    )
   }
 }

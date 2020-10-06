@@ -54,11 +54,14 @@ object NodeApi {
 
   implicit val functorK: FunctorK[NodeApi] = Derive.functorK[NodeApi]
 
-  def apply[F[_]](apiKey: String,
-                  host: => InetSocketAddress)(implicit M: MonadError[F, Throwable], W: CanWait[F], httpBackend: SttpBackend[F, Nothing]): NodeApi[F] =
+  def apply[F[_]](apiKey: String, host: => InetSocketAddress)(implicit
+    M: MonadError[F, Throwable],
+    W: CanWait[F],
+    httpBackend: SttpBackend[F, Nothing]
+  ): NodeApi[F] =
     new NodeApi[F] {
 
-      private val ops     = FOps[F]; import ops._
+      private val ops = FOps[F]; import ops._
       private val sttpOps = SttpBackendOps[F, ErrorResponse]; import sttpOps._
 
       def apiUri = s"http://${host.getAddress.getHostAddress}:${host.getPort}"
@@ -69,7 +72,8 @@ object NodeApi {
       override def tryAssetBalance(address: Address, asset: IssuedAsset): F[Either[ErrorResponse, AssetBalanceResponse]] =
         tryParseJson(sttp.get(uri"$apiUri/assets/balance/$address/${asset.toString}"))
 
-      override def tryBroadcast(tx: Transaction): F[Either[ErrorResponse, Unit]] = tryUnit(sttp.post(uri"$apiUri/transactions/broadcast").body(tx))
+      override def tryBroadcast(tx: Transaction): F[Either[ErrorResponse, Unit]] =
+        tryUnit(sttp.post(uri"$apiUri/transactions/broadcast").body(tx))
 
       override def tryTransactionInfo(id: Id): F[Either[ErrorResponse, Transaction]] =
         tryParseJson(sttp.get(uri"$apiUri/transactions/info/${id.toString}"))
@@ -92,7 +96,7 @@ object NodeApi {
         val hostName = toNode.getHostName
         repeatUntil(tryConnectedPeers, 1.second) {
           case Right(x) => x.peers.exists(p => p.address.contains(hostName))
-          case _        => false
+          case _ => false
         }.map(_ => ())
       }
 
@@ -101,7 +105,7 @@ object NodeApi {
       override def waitForActivationStatus(f: ActivationStatusResponse => Boolean): F[Unit] =
         repeatUntil(tryActivationStatus, RepeatRequestOptions(1.second, 180)) {
           case Right(x) => f(x)
-          case _        => false
+          case _ => false
         }.map(_ => ())
 
       override def waitForHeightArise(): F[Unit] =
@@ -110,7 +114,7 @@ object NodeApi {
             case Right(origHeight) =>
               repeatUntil(tryCurrentHeight, 1.second) {
                 case Right(x) => x > origHeight
-                case _        => false
+                case _ => false
               }.map(_ => ())
             case Left(_) => waitForHeightArise()
           }
@@ -118,22 +122,24 @@ object NodeApi {
       override def waitForHeight(height: Int): F[Unit] =
         repeatUntil(tryCurrentHeight, 1.second) {
           case Right(x) => x >= height
-          case _        => false
+          case _ => false
         }.map(_ => ())
 
       override def waitReady: F[Unit] = {
         // TODO hack, replace with socket's waitReady
         def request = M.handleErrorWith(tryCurrentHeight.map(_.isRight)) {
           case _: SocketException | _: JsResultException => M.pure(false)
-          case NonFatal(e)                               => M.raiseError(e)
+          case NonFatal(e) => M.raiseError(e)
         }
 
         // See DexApi
         repeatUntil(request, RepeatRequestOptions(1.second, 60 + 20))(_ == true).map(_ => ())
       }
+
     }
 
   private case class ConnectReq(host: String, port: Int)
+
   private object ConnectReq {
     implicit val connectFormat: Format[ConnectReq] = Json.format
   }

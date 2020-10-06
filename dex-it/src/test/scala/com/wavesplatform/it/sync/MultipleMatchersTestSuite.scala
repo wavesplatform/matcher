@@ -31,23 +31,23 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with
     ConfigFactory
       .parseString(
         """waves.dex {
-        |  price-assets = ["WAVES"]
-        |  snapshots-interval = 51
-        |}""".stripMargin
+          |  price-assets = ["WAVES"]
+          |  snapshots-interval = 51
+          |}""".stripMargin
       )
       .withFallback(jwtPublicKeyConfig)
 
   protected lazy val dex2: DexContainer = createDex("dex-2")
 
-  private val placesNumber  = 200
+  private val placesNumber = 200
   private val cancelsNumber = placesNumber / 10
 
   private val assetPairs = Seq(createAssetPair(eth, wct), ethWavesPair, wctWavesPair)
 
   private val aliceOrders = mkOrders(alice)
-  private val bobOrders   = mkOrders(bob)
-  private val orders      = aliceOrders ++ bobOrders
-  private val lastOrder   = orderGen(matcher, alice, assetPairs).sample.get
+  private val bobOrders = mkOrders(bob)
+  private val orders = aliceOrders ++ bobOrders
+  private val lastOrder = orderGen(matcher, alice, assetPairs).sample.get
 
   private var successfulCommandsNumber = 0
 
@@ -131,13 +131,13 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with
   "Place, fill and cancel a lot of orders" in {
 
     val alicePlaces = aliceOrders.map(MatcherCommand.Place(dex1.asyncApi, _))
-    val bobPlaces   = bobOrders.map(MatcherCommand.Place(dex2.asyncApi, _))
-    val places      = Random.shuffle(alicePlaces ++ bobPlaces)
+    val bobPlaces = bobOrders.map(MatcherCommand.Place(dex2.asyncApi, _))
+    val places = Random.shuffle(alicePlaces ++ bobPlaces)
 
     // .toSet to remove duplications
     val aliceCancels = (1 to cancelsNumber).map(_ => choose(aliceOrders)).toSet.map(MatcherCommand.Cancel(dex1.asyncApi, alice, _))
-    val bobCancels   = (1 to cancelsNumber).map(_ => choose(bobOrders)).toSet.map(MatcherCommand.Cancel(dex2.asyncApi, bob, _))
-    val cancels      = Random.shuffle(aliceCancels ++ bobCancels)
+    val bobCancels = (1 to cancelsNumber).map(_ => choose(bobOrders)).toSet.map(MatcherCommand.Cancel(dex2.asyncApi, bob, _))
+    val cancels = Random.shuffle(aliceCancels ++ bobCancels)
 
     successfulCommandsNumber = executeCommands(places ++ cancels)
     successfulCommandsNumber += executeCommands(List(MatcherCommand.Place(dex1.asyncApi, lastOrder)))
@@ -186,7 +186,7 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with
           orders.map { order =>
             dex1.asyncApi.tryCancel(owner, order).map {
               case Left(x) if x.error != 9437194 => throw new RuntimeException(s"Unexpected error: $x") // OrderCanceled
-              case _                             => ()
+              case _ => ()
             }
           }.toList
         }
@@ -209,9 +209,8 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with
     Await.result(toDexExplicitGetOps(dex1.asyncApi).orderHistory(bob, Some(true)), 5.seconds) shouldBe empty
   }
 
-  private def mkOrders(account: KeyPair, number: Int = placesNumber) = {
+  private def mkOrders(account: KeyPair, number: Int = placesNumber) =
     Gen.containerOfN[Vector, Order](number, orderGen(matcher, account, assetPairs)).sample.get
-  }
 
   private def state(dexApi: DexApi[Id]) = clean(matcherState(assetPairs, orders, Seq(alice), dexApi))
 
@@ -219,4 +218,5 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with
   private def clean(state: MatcherState): MatcherState = state.copy(
     snapshots = state.snapshots.map { case (k, _) => k -> 0L }
   )
+
 }

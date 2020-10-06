@@ -7,10 +7,10 @@ import java.util.concurrent.{ThreadLocalRandom, TimeoutException}
 
 import akka.Done
 import akka.actor.typed.scaladsl.adapter._
-import akka.actor.{ActorRef, ActorSystem, CoordinatedShutdown, Props, typed}
+import akka.actor.{typed, ActorRef, ActorSystem, CoordinatedShutdown, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Directives.respondWithHeader
-import akka.pattern.{CircuitBreaker, ask, gracefulStop}
+import akka.pattern.{ask, gracefulStop, CircuitBreaker}
 import akka.stream.Materializer
 import akka.util.Timeout
 import cats.data.EitherT
@@ -38,7 +38,7 @@ import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.utils.{EitherExt2, LoggerFacade, ScorexLogging}
-import com.wavesplatform.dex.effect.{FutureResult, liftValueAsync}
+import com.wavesplatform.dex.effect.{liftValueAsync, FutureResult}
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
 import com.wavesplatform.dex.grpc.integration.WavesBlockchainClientBuilder
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainAssetsWatchingClient
@@ -59,44 +59,45 @@ import pureconfig.ConfigSource
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{Future, Promise, blocking}
+import scala.concurrent.{blocking, Future, Promise}
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
 class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) extends ScorexLogging {
 
-  private val monixScheduler       = monix.execution.Scheduler.Implicits.global
+  private val monixScheduler = monix.execution.Scheduler.Implicits.global
   private val grpcExecutionContext = actorSystem.dispatchers.lookup("akka.actor.grpc-dispatcher")
 
   private val cs = CoordinatedShutdown(actorSystem)
 
-  private implicit val materializer = Materializer.matFromSystem(actorSystem)
+  implicit private val materializer = Materializer.matFromSystem(actorSystem)
   cs.addTask(CoordinatedShutdown.PhaseBeforeActorSystemTerminate, "Materializer") { () =>
     materializer.shutdown()
     Future.successful(Done)
   }
 
-  private val blacklistedAddresses  = settings.blacklistedAddresses.map(Address.fromString(_).explicitGet())
-  private val matchingRulesCache    = new MatchingRulesCache(settings)
+  private val blacklistedAddresses = settings.blacklistedAddresses.map(Address.fromString(_).explicitGet())
+  private val matchingRulesCache = new MatchingRulesCache(settings)
   private val orderFeeSettingsCache = new OrderFeeSettingsCache(settings.orderFee)
 
   private val maybeApiKeyHash: Option[Array[Byte]] = Option(settings.restApi.apiKeyHash) filter (_.nonEmpty) map Base58.decode
-  private val processConsumedTimeout               = new Timeout(settings.processConsumedTimeout * 2)
+  private val processConsumedTimeout = new Timeout(settings.processConsumedTimeout * 2)
+
   private val matcherKeyPair = AccountStorage.load(settings.accountStorage).map(_.keyPair).explicitGet().unsafeTap { x =>
     log.info(s"The DEX's public key: ${Base58.encode(x.publicKey.arr)}, account address: ${x.publicKey.toAddress.stringRepr}")
   }
 
-  private def matcherPublicKey: PublicKey   = matcherKeyPair
+  private def matcherPublicKey: PublicKey = matcherKeyPair
   @volatile private var lastProcessedOffset = -1L
 
   @volatile private var status: MatcherStatus = MatcherStatus.Starting
   cs.addJvmShutdownHook(setStatus(MatcherStatus.Stopping))
 
   @volatile private var hasMatcherAccountScript = false
-  private val orderBooks                        = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
-  private val snapshotsRestored                 = Promise[QueueEventWithMeta.Offset]() // Earliest offset among snapshots
+  private val orderBooks = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
+  private val snapshotsRestored = Promise[QueueEventWithMeta.Offset]() // Earliest offset among snapshots
 
-  private val wavesLifted: FutureResult[BriefAssetDescription] = liftValueAsync { BriefAssetDescription.wavesDescription }
+  private val wavesLifted: FutureResult[BriefAssetDescription] = liftValueAsync(BriefAssetDescription.wavesDescription)
 
   private val time = new NTP(settings.ntpServer)
   cs.addTask(CoordinatedShutdown.PhaseActorSystemTerminate, "NTP") { () =>
@@ -108,13 +109,13 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
     Future { blocking(db.close()); Done }
   }
 
-  private val assetPairsDB        = AssetPairsDB(db)
+  private val assetPairsDB = AssetPairsDB(db)
   private val orderBookSnapshotDB = OrderBookSnapshotDB(db)
-  private val orderDB             = OrderDB(settings.orderDb, db)
-  private val assetsCache         = AssetsStorage.cache { AssetsStorage.levelDB(db) }
-  private val rateCache           = RateCache(db)
+  private val orderDB = OrderDB(settings.orderDb, db)
+  private val assetsCache = AssetsStorage.cache(AssetsStorage.levelDB(db))
+  private val rateCache = RateCache(db)
 
-  private implicit val errorContext: ErrorFormatterContext = ErrorFormatterContext.fromOptional(assetsCache.get(_: Asset).map(_.decimals))
+  implicit private val errorContext: ErrorFormatterContext = ErrorFormatterContext.fromOptional(assetsCache.get(_: Asset).map(_.decimals))
 
   private val matcherQueue: MatcherQueue = settings.eventsQueue.`type` match {
     case "local" =>
@@ -133,6 +134,7 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
   }
 
   private val orderBookAskAdapter = new OrderBookAskAdapter(orderBooks, settings.actorResponseTimeout)
+
   private val orderBookHttpInfo =
     new OrderBookHttpInfo(settings.orderBookHttp, orderBookAskAdapter, time, assetsCache.get(_).map(_.decimals))
 
@@ -205,7 +207,9 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
     resetTimeout = settings.eventsQueue.circuitBreaker.resetTimeout
   )
 
-  private def storeEvent(payload: QueueEvent): Future[Option[QueueEventWithMeta]] = storeBreaker.withCircuitBreaker(matcherQueue.storeEvent(payload))
+  private def storeEvent(payload: QueueEvent): Future[Option[QueueEventWithMeta]] =
+    storeBreaker.withCircuitBreaker(matcherQueue.storeEvent(payload))
+
   private def mkAddressActorProps(address: Address, started: Boolean): Props = AddressActor.props(
     address,
     time,
@@ -244,7 +248,7 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
         assetPairsDB,
         {
           case Right(startOffset) => snapshotsRestored.success(startOffset)
-          case Left(msg)          => snapshotsRestored.failure(RecoveryError(msg))
+          case Left(msg) => snapshotsRestored.failure(RecoveryError(msg))
         },
         orderBooks,
         mkOrderBookProps,
@@ -282,7 +286,7 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
       matcherActorRef,
       addressDirectoryRef,
       matcherQueue.storeEvent,
-      p => Option { orderBooks.get() } flatMap (_ get p),
+      p => Option(orderBooks.get()) flatMap (_ get p),
       orderBookHttpInfo,
       getActualTickSize = assetPair => {
         matchingRulesCache.getDenormalizedRuleForNextOrder(assetPair, lastProcessedOffset, assetsCache.unsafeGetDecimals).tickSize
@@ -301,7 +305,7 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
           .sequence {
             settings.allowedOrderVersions.map(OrderValidator.checkOrderVersion(_, wavesBlockchainAsyncClient.isFeatureActivated).value)
           }
-          .map { _.collect { case Right(version) => version } }
+          .map(_.collect { case Right(version) => version })
       },
       () => orderFeeSettingsCache.getSettingsForOffset(lastProcessedOffset + 1),
       externalClientDirectoryRef
@@ -322,10 +326,11 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
     () => status,
     () => rateCache.getAllRates
   )
+
   cs.addTask(CoordinatedShutdown.PhaseBeforeServiceUnbind, "WebSockets")(() => wsApiRoute.gracefulShutdown().map(_ => Done))
 
   private val matcherApiRoutes: Seq[ApiRoute] = Seq(httpApiRouteV0, httpApiRouteV1, wsApiRoute)
-  private val matcherApiTypes: Set[Class[_]]  = matcherApiRoutes.map(_.getClass).toSet
+  private val matcherApiTypes: Set[Class[_]] = matcherApiRoutes.map(_.getClass).toSet
 
   private val startGuard = for {
     (_, http) <- {
@@ -402,7 +407,7 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
   }
 
   startGuard.onComplete {
-    case Success(_)                        => setStatus(MatcherStatus.Working)
+    case Success(_) => setStatus(MatcherStatus.Working)
     case Failure(e: ApplicationStopReason) => forceStopApplication(e)
     case Failure(e) =>
       log.error(s"Can't start matcher: ${e.getMessage}", e)
@@ -417,7 +422,7 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
 
     wavesBlockchainAsyncClient.realTimeBalanceBatchChanges
       .map(aggregateChangesByAddress)
-      .foreach { recipient ! SpendableBalancesActor.Command.UpdateStates(_) }(monixScheduler)
+      .foreach(recipient ! SpendableBalancesActor.Command.UpdateStates(_))(monixScheduler)
   }
 
   private def loadAllKnownAssets(): Future[Unit] =
@@ -437,7 +442,7 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
     if (xs.isEmpty) Future.unit
     else {
       val eventAssets = xs.flatMap(_.event.assets)
-      val loadAssets  = Future.traverse(eventAssets)(getAndCacheDescription(assetsCache, wavesBlockchainAsyncClient, _).value)
+      val loadAssets = Future.traverse(eventAssets)(getAndCacheDescription(assetsCache, wavesBlockchainAsyncClient, _).value)
 
       loadAssets.flatMap { _ =>
         val assetPairs: Set[AssetPair] = xs
@@ -492,7 +497,11 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
   private def getAndCacheDecimals(assetsCache: AssetsStorage, blockchain: AsyncBlockchain, asset: Asset): FutureResult[Int] =
     getAndCacheDescription(assetsCache, blockchain, asset).map(_.decimals)(catsStdInstancesForFuture)
 
-  private def getAndCacheDescription(assetsCache: AssetsStorage, blockchain: AsyncBlockchain, asset: Asset): FutureResult[BriefAssetDescription] =
+  private def getAndCacheDescription(
+    assetsCache: AssetsStorage,
+    blockchain: AsyncBlockchain,
+    asset: Asset
+  ): FutureResult[BriefAssetDescription] =
     asset match {
       case Waves => wavesLifted
       case asset: IssuedAsset =>
@@ -505,12 +514,13 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
                 .map {
                   _.toRight[MatcherError](error.AssetNotFound(asset))
                     .map { desc =>
-                      BriefAssetDescription(desc.name, desc.decimals, desc.hasScript) unsafeTap { assetsCache.put(asset, _) }
+                      BriefAssetDescription(desc.name, desc.decimals, desc.hasScript).unsafeTap(assetsCache.put(asset, _))
                     }
                 }
             }
         }
     }
+
 }
 
 object Application {
@@ -528,8 +538,8 @@ object Application {
     // http://www.eclipse.org/aspectj/doc/released/pdguide/trace.html
     System.setProperty("org.aspectj.tracing.factory", "default")
 
-    val configFile         = args.headOption
-    val (config, settings) = loadApplicationConfig { configFile.map(new File(_)) }
+    val configFile = args.headOption
+    val (config, settings) = loadApplicationConfig(configFile.map(new File(_)))
 
     // This option is used in logback.xml by default
     if (Option(System.getProperty("waves.dex.root-directory")).isEmpty)
@@ -567,7 +577,7 @@ object Application {
 
     import scala.jdk.CollectionConverters._
 
-    val config           = loadConfig(external map ConfigFactory.parseFile)
+    val config = loadConfig(external map ConfigFactory.parseFile)
     val scalaContextPath = "scala.concurrent.context"
 
     config.getConfig(scalaContextPath).toProperties.asScala.foreach { case (k, v) => System.setProperty(s"$scalaContextPath.$k", v) }
@@ -585,4 +595,5 @@ object Application {
 
     (config, settings)
   }
+
 }

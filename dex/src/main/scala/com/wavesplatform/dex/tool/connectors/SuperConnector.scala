@@ -10,31 +10,32 @@ import com.wavesplatform.dex.cli._
 import com.wavesplatform.dex.db.AccountStorage
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair}
 import com.wavesplatform.dex.error.Implicits.ThrowableOps
-import com.wavesplatform.dex.settings.{MatcherSettings, loadConfig}
+import com.wavesplatform.dex.settings.{loadConfig, MatcherSettings}
 import com.wavesplatform.dex.tool.connectors.SuperConnector.Env
 import pureconfig.ConfigSource
 
 import scala.util.Try
 
 case class SuperConnector private (
-    env: Env,
-    dexRest: DexRestConnector,
-    nodeRest: NodeRestConnector,
-    dexExtensionGrpc: DexExtensionGrpcConnector,
-    dexWs: DexWsConnector,
-    authServiceRest: Option[AuthServiceRestConnector]
+  env: Env,
+  dexRest: DexRestConnector,
+  nodeRest: NodeRestConnector,
+  dexExtensionGrpc: DexExtensionGrpcConnector,
+  dexWs: DexWsConnector,
+  authServiceRest: Option[AuthServiceRestConnector]
 ) extends AutoCloseable {
 
   def close(): Unit = {
-    Seq(dexRest, nodeRest, dexExtensionGrpc, dexWs).foreach { _.close() }
-    authServiceRest.foreach { _.close() }
+    Seq(dexRest, nodeRest, dexExtensionGrpc, dexWs).foreach(_.close())
+    authServiceRest.foreach(_.close())
   }
+
 }
 
 // noinspection ScalaStyle
 object SuperConnector {
 
-  private[tool] final case class Env(chainId: Byte, matcherSettings: MatcherSettings, matcherKeyPair: KeyPair)
+  final private[tool] case class Env(chainId: Byte, matcherSettings: MatcherSettings, matcherKeyPair: KeyPair)
 
   private val processLeftIndent = 110
 
@@ -50,7 +51,8 @@ object SuperConnector {
 
     def loadMatcherSettings(confPath: String): ErrorOr[MatcherSettings] =
       Try {
-        val matcherSettings = ConfigSource.fromConfig(loadConfig { parseFile(new File(dexConfigPath)) }).at("waves.dex").loadOrThrow[MatcherSettings]
+        val matcherSettings =
+          ConfigSource.fromConfig(loadConfig(parseFile(new File(dexConfigPath)))).at("waves.dex").loadOrThrow[MatcherSettings]
         AddressScheme.current = new AddressScheme { override val chainId: Byte = matcherSettings.addressSchemeCharacter.toByte }
         matcherSettings
       }.toEither.leftMap(ex => s"Cannot load matcher settings by path $confPath: ${ex.getWithStackTrace}")
@@ -59,12 +61,12 @@ object SuperConnector {
       AccountStorage.load(accountStorage).bimap(ex => s"Cannot load Matcher account! $ex", _.keyPair)
 
     for {
-      _               <- log("\nSetting up the Super Connector:\n")
-      matcherSettings <- logProcessing("Loading Matcher settings") { loadMatcherSettings(dexConfigPath) }
-      matcherKeyPair  <- logProcessing("Loading Matcher Key Pair") { loadMatcherKeyPair(matcherSettings.accountStorage) }
+      _ <- log("\nSetting up the Super Connector:\n")
+      matcherSettings <- logProcessing("Loading Matcher settings")(loadMatcherSettings(dexConfigPath))
+      matcherKeyPair <- logProcessing("Loading Matcher Key Pair")(loadMatcherKeyPair(matcherSettings.accountStorage))
 
       dexRestIpAndPort = s"${matcherSettings.restApi.address}:${matcherSettings.restApi.port}"
-      dexRestApiUri    = prependScheme(if (dexRestApi.isEmpty) dexRestIpAndPort else dexRestApi)
+      dexRestApiUri = prependScheme(if (dexRestApi.isEmpty) dexRestIpAndPort else dexRestApi)
       dexRestConnector = DexRestConnector(dexRestApiUri)
       _ <- logProcessing(s"Setting up connection with DEX REST API (${dexRestConnector.repeatRequestOptions})")(success)
 
@@ -86,12 +88,12 @@ object SuperConnector {
       (dexWsConnector, wsInitial) <- logProcessing("Setting up connection with DEX WS API")(
         for {
           wsConnector <- DexWsConnector.create(dexWsApiUri)
-          wsInitial   <- wsConnector.receiveInitialMessage
+          wsInitial <- wsConnector.receiveInitialMessage
         } yield wsConnector -> wsInitial
       )
 
       mayBeAuthServiceRestApiUri = authServiceRestApi map prependScheme
-      mayBeAuthServiceConnector  = mayBeAuthServiceRestApiUri map { AuthServiceRestConnector(_, chainId) }
+      mayBeAuthServiceConnector = mayBeAuthServiceRestApiUri.map(AuthServiceRestConnector(_, chainId))
       _ <- logProcessing("Setting up connection with Auth Service REST API")(success)
 
       env = Env(chainId, matcherSettings, matcherKeyPair)
@@ -116,9 +118,12 @@ object SuperConnector {
            |  Node REST API          : $nodeRestApiUri
            |  DEX extension gRPC API : $extensionGrpcApiUri
            |  DEX WS API             : $dexWsApiUri, connection ID = ${wsInitial.connectionId}
-           |  Auth Service REST API  : ${mayBeAuthServiceRestApiUri.getOrElse("Target wasn't provided, account updates check will not be performed!")}
+           |  Auth Service REST API  : ${mayBeAuthServiceRestApiUri.getOrElse(
+          "Target wasn't provided, account updates check will not be performed!"
+        )}
        """.stripMargin
       )
     } yield superConnector
   }
+
 }

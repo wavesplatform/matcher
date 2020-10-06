@@ -25,4 +25,5 @@ object ResponseParsers {
         case Failure(e) => Left(DeserializationError[JsError](string, JsError("Can't parse Config"), s"Can't parse Config: ${e.getMessage}"))
       }
     }
+
 }

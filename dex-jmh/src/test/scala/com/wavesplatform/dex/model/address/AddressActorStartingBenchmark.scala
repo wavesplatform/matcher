@@ -34,23 +34,23 @@ import scala.jdk.CollectionConverters._
 @Warmup(iterations = 10)
 @Measurement(iterations = 10)
 class AddressActorStartingBenchmark {
-  @Benchmark def eventsProcessingDuringStartTest(st: AddressState, bh: Blackhole): Unit = bh.consume { st.run() }
+  @Benchmark def eventsProcessingDuringStartTest(st: AddressState, bh: Blackhole): Unit = bh.consume(st.run())
 }
 
 object AddressActorStartingBenchmark {
 
   @State(Scope.Thread) class AddressState extends OrderBookGen {
 
-    val maxPrice: Long      = 1000L * Order.PriceConstant
-    val minPrice: Long      = 1L * Order.PriceConstant
+    val maxPrice: Long = 1000L * Order.PriceConstant
+    val minPrice: Long = 1L * Order.PriceConstant
     val priceGen: Gen[Long] = Gen.chooseNum(minPrice, maxPrice)
 
-    val owner: KeyPair             = clientGen.sample.get
+    val owner: KeyPair = clientGen.sample.get
     val counterOrderOwner: KeyPair = KeyPair(ByteStr("counter".getBytes(StandardCharsets.UTF_8)))
 
-    val askGen: Gen[Order]             = orderGen(owner, priceGen, OrderType.SELL)
-    val bidGen: Gen[Order]             = orderGen(owner, priceGen, OrderType.BUY)
-    val orderGen: Gen[Order]           = Gen.oneOf(askGen, bidGen)
+    val askGen: Gen[Order] = orderGen(owner, priceGen, OrderType.SELL)
+    val bidGen: Gen[Order] = orderGen(owner, priceGen, OrderType.BUY)
+    val orderGen: Gen[Order] = Gen.oneOf(askGen, bidGen)
     val limitOrderGen: Gen[LimitOrder] = orderGen.map(LimitOrder(_))
 
     val orderAddedGen: Gen[Seq[Events.Event]] = limitOrderGen.map { ao =>
@@ -66,7 +66,7 @@ object AddressActorStartingBenchmark {
     }
 
     val orderFilledEventuallyGen: Gen[Seq[Events.Event]] = limitOrderGen.map { ao =>
-      val firstExecutedEvent  = getOrderExecutedEvent(ao, getCounter(ao, ao.amount / 2))
+      val firstExecutedEvent = getOrderExecutedEvent(ao, getCounter(ao, ao.amount / 2))
       val secondExecutedEvent = getOrderExecutedEvent(firstExecutedEvent.submittedRemaining, getCounter(ao, ao.amount))
       Seq(getOrderAddedEvent(ao), firstExecutedEvent, secondExecutedEvent)
     }
@@ -77,7 +77,7 @@ object AddressActorStartingBenchmark {
 
     val orderPartiallyFilledAndThenCancelledGen: Gen[Seq[Events.Event]] = limitOrderGen.map { ao =>
       val firstExecutedEvent = getOrderExecutedEvent(ao, getCounter(ao, ao.amount / 2))
-      val cancelEvent        = getOrderCancelledEvent(firstExecutedEvent.submittedRemaining)
+      val cancelEvent = getOrderCancelledEvent(firstExecutedEvent.submittedRemaining)
       Seq(getOrderAddedEvent(ao), firstExecutedEvent, cancelEvent)
     }
 
@@ -103,7 +103,7 @@ object AddressActorStartingBenchmark {
             time = new TestTime(),
             orderDB = new TestOrderDB(10000),
             validate = (_, _) => Future.successful(().asRight),
-            store = event => Future.successful { Some(QueueEventWithMeta(0L, 0L, event)) },
+            store = event => Future.successful(Some(QueueEventWithMeta(0L, 0L, event))),
             started = true,
             spendableBalancesActor = ActorRef.noSender,
             settings = AddressActor.Settings.default
@@ -148,5 +148,7 @@ object AddressActorStartingBenchmark {
       counter.matcherFee,
       ao.matcherFee
     )
+
   }
+
 }

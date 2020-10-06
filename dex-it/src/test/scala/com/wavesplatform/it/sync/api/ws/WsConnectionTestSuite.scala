@@ -64,27 +64,29 @@ class WsConnectionTestSuite extends WsSuiteBase {
   }
 
   "getConnections returns the right statistics" in {
-    def expectClientAndOs(info: HttpWebSocketConnections,
-                          firefoxLinux: Int,
-                          unknownOs2: Int,
-                          androidUnknown: Int,
-                          unknownUnknown: Int,
-                          additional: (String, Int)*): Unit =
+    def expectClientAndOs(
+      info: HttpWebSocketConnections,
+      firefoxLinux: Int,
+      unknownOs2: Int,
+      androidUnknown: Int,
+      unknownUnknown: Int,
+      additional: (String, Int)*
+    ): Unit =
       info.clientAndOs should matchTo {
         Map
           .empty[String, Int]
           .appendIfNonZeroMany(
             Seq(
-              "Firefox, Linux 5.2"         -> firefoxLinux,
-              "Unknown Client, OS/2"       -> unknownOs2,
-              "Android 10, Unknown OS"     -> androidUnknown,
+              "Firefox, Linux 5.2" -> firefoxLinux,
+              "Unknown Client, OS/2" -> unknownOs2,
+              "Android 10, Unknown OS" -> androidUnknown,
               "Unknown Client, Unknown OS" -> unknownUnknown
             ) ++ additional: _*
           )
       }
 
     val firefoxLinuxWscs = mkDexWsConnections(1, os = "Linux 5.2".some, client = "Firefox".some)
-    val unknownOs2Wscs   = mkDexWsConnections(2, os = "OS/2".some)
+    val unknownOs2Wscs = mkDexWsConnections(2, os = "OS/2".some)
 
     val wscs = firefoxLinuxWscs ++
       unknownOs2Wscs ++
@@ -130,4 +132,5 @@ class WsConnectionTestSuite extends WsSuiteBase {
 
   private def mkDexWsConnections(n: Int, dex: DexContainer = dex1, os: Option[String] = None, client: Option[String] = None): Seq[WsConnection] =
     (1 to n).map(_ => mkDexWsConnection(dex, os = os, client = client))
+
 }

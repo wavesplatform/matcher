@@ -18,12 +18,12 @@ class HttpV1OrderBookSpec extends AnyFreeSpec with Matchers with DiffMatcherWith
                        |  "asks" : [ [ "1.19", "2134.00000000" ], [ "1.20", "747.00000000" ] ]
                        |}""".stripMargin
 
-  private val usd: Asset   = IssuedAsset("USDN".getBytes)
+  private val usd: Asset = IssuedAsset("USDN".getBytes)
   private val wavesUsdPair = AssetPair(Waves, usd)
 
-  private implicit val efc: ErrorFormatterContext = {
+  implicit private val efc: ErrorFormatterContext = {
     case `usd` => 2.some
-    case _     => 8.some
+    case _ => 8.some
   }
 
   private val bids = List(LevelAgg(4380000000000L, 118), LevelAgg(5218700000000L, 117), LevelAgg(80900000000L, 116))

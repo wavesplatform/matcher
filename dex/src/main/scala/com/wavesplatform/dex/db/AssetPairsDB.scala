@@ -14,7 +14,7 @@ object AssetPairsDB {
 
   def apply(db: DB): AssetPairsDB = new AssetPairsDB {
 
-    def add(pair: AssetPair): Unit    = db.readWrite(_.put(DbKeys.assetPair(pair), ()))
+    def add(pair: AssetPair): Unit = db.readWrite(_.put(DbKeys.assetPair(pair), ()))
     def remove(pair: AssetPair): Unit = db.readWrite(_.delete(DbKeys.assetPair(pair)))
 
     def all(): Set[AssetPair] = db.readOnly { ro =>
@@ -26,5 +26,7 @@ object AssetPairsDB {
 
       r.result()
     }
+
   }
+
 }

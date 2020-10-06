@@ -12,7 +12,7 @@ import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.it.api.node.{NodeApi, NodeApiExtensions}
 import com.wavesplatform.dex.it.dex.DexApi
 import com.wavesplatform.dex.it.docker.DexContainer
-import com.wavesplatform.it.{MatcherSuiteBase, api}
+import com.wavesplatform.it.{api, MatcherSuiteBase}
 import im.mak.waves.transactions.ExchangeTransaction
 import mouse.any._
 
@@ -22,18 +22,22 @@ import scala.collection.parallel.CollectionConverters._
 trait ApiExtensions extends NodeApiExtensions {
   this: MatcherSuiteBase =>
 
-  protected def placeAndAwaitAtDex(order: Order,
-                                   expectedStatus: HttpOrderStatus.Status = Status.Accepted,
-                                   dex: DexContainer = dex1,
-                                   isMarketOrder: Boolean = false): HttpOrderStatus = {
+  protected def placeAndAwaitAtDex(
+    order: Order,
+    expectedStatus: HttpOrderStatus.Status = Status.Accepted,
+    dex: DexContainer = dex1,
+    isMarketOrder: Boolean = false
+  ): HttpOrderStatus = {
     if (isMarketOrder) dex.api.placeMarket(order) else dex.api.place(order)
     dex.api.waitForOrderStatus(order, expectedStatus)
   }
 
-  protected def placeAndAwaitAtNode(order: Order,
-                                    dexApi: DexApi[Id] = dex1.api,
-                                    wavesNodeApi: NodeApi[Id] = wavesNode1.api,
-                                    isMarketOrder: Boolean = false): Seq[ExchangeTransaction] = {
+  protected def placeAndAwaitAtNode(
+    order: Order,
+    dexApi: DexApi[Id] = dex1.api,
+    wavesNodeApi: NodeApi[Id] = wavesNode1.api,
+    isMarketOrder: Boolean = false
+  ): Seq[ExchangeTransaction] = {
     if (isMarketOrder) dexApi.placeMarket(order) else dexApi.place(order)
     waitForOrderAtNode(order.id(), dexApi, wavesNodeApi)
   }
@@ -43,9 +47,11 @@ trait ApiExtensions extends NodeApiExtensions {
     dex1.api.waitForOrderStatus(order, expectedStatus)
   }
 
-  protected def waitForOrderAtNode(order: Order,
-                                   dexApi: DexApi[Id] = dex1.api,
-                                   wavesNodeApi: NodeApi[Id] = wavesNode1.api): Seq[ExchangeTransaction] =
+  protected def waitForOrderAtNode(
+    order: Order,
+    dexApi: DexApi[Id] = dex1.api,
+    wavesNodeApi: NodeApi[Id] = wavesNode1.api
+  ): Seq[ExchangeTransaction] =
     waitForOrderAtNode(order.id(), dexApi, wavesNodeApi)
 
   protected def waitForOrderAtNode(orderId: Order.Id, dexApi: DexApi[Id], wavesNodeApi: NodeApi[Id]): Seq[ExchangeTransaction] =
@@ -53,17 +59,19 @@ trait ApiExtensions extends NodeApiExtensions {
       _.foreach(tx => wavesNodeApi.waitForTransaction(tx.id()))
     }
 
-  protected def matcherState(assetPairs: Seq[AssetPair],
-                             orders: IndexedSeq[Order],
-                             accounts: Seq[KeyPair],
-                             dexApi: DexApi[Id] = dex1.api): MatcherState = {
+  protected def matcherState(
+    assetPairs: Seq[AssetPair],
+    orders: IndexedSeq[Order],
+    accounts: Seq[KeyPair],
+    dexApi: DexApi[Id] = dex1.api
+  ): MatcherState = {
 
-    val offset               = dexApi.currentOffset
-    val snapshots            = dexApi.allSnapshotOffsets
-    val orderBooks           = assetPairs.map(x => (x, (dexApi.orderBook(x), dexApi.orderBookStatus(x))))
-    val orderStatuses        = orders.map(x => x.idStr() -> dexApi.orderStatus(x))
-    val orderTransactionIds  = orders.map(x => x.idStr() -> dexApi.transactionsByOrder(x).map(_.id().toString).toSet)
-    val reservedBalances     = accounts.map(x => x -> dexApi.reservedBalance(x))
+    val offset = dexApi.currentOffset
+    val snapshots = dexApi.allSnapshotOffsets
+    val orderBooks = assetPairs.map(x => (x, (dexApi.orderBook(x), dexApi.orderBookStatus(x))))
+    val orderStatuses = orders.map(x => x.idStr() -> dexApi.orderStatus(x))
+    val orderTransactionIds = orders.map(x => x.idStr() -> dexApi.transactionsByOrder(x).map(_.id().toString).toSet)
+    val reservedBalances = accounts.map(x => x -> dexApi.reservedBalance(x))
     val accountsOrderHistory = accounts.flatMap(a => assetPairs.map(p => a -> p))
 
     val orderHistory = accountsOrderHistory.map {
@@ -103,12 +111,12 @@ trait ApiExtensions extends NodeApiExtensions {
     val transfers = balances.map {
       case (balance, asset) =>
         val sender = asset match {
-          case Waves           => alice
+          case Waves => alice
           case ia: IssuedAsset => if (wavesNode1.api.assetBalance(alice, ia).balance >= balance) alice else bob
         }
         mkTransfer(sender, account, balance, asset, 0.003.waves)
     }
-    transfers.par.foreach { broadcastAndAwait(_) }
+    transfers.par.foreach(broadcastAndAwait(_))
     eventually {
       balances.foreach {
         case (expectedBalance, asset) =>
@@ -116,7 +124,7 @@ trait ApiExtensions extends NodeApiExtensions {
           // val pair = if (asset == Waves) wavesUsdPair else if (asset.compatId > Waves.compatId) AssetPair(asset, Waves) else AssetPair(Waves, asset)
           // dex1.api.tradableBalance(account, pair).getOrElse(asset, 0L) shouldBe balance
           val actualBalance = asset match {
-            case Waves              => wavesNode1.api.wavesBalance(account).balance
+            case Waves => wavesNode1.api.wavesBalance(account).balance
             case asset: IssuedAsset => wavesNode1.api.assetBalance(account, asset).balance
           }
           actualBalance shouldBe expectedBalance
@@ -125,6 +133,6 @@ trait ApiExtensions extends NodeApiExtensions {
     account
   }
 
-  private implicit val assetPairOrd: Ordering[AssetPair] = Ordering.by[AssetPair, String](_.key)
-  private implicit val keyPairOrd: Ordering[KeyPair]     = Ordering.by[KeyPair, String](_.stringRepr)
+  implicit private val assetPairOrd: Ordering[AssetPair] = Ordering.by[AssetPair, String](_.key)
+  implicit private val keyPairOrd: Ordering[KeyPair] = Ordering.by[KeyPair, String](_.stringRepr)
 }

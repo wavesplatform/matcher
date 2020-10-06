@@ -11,9 +11,10 @@ object CommonSettings extends AutoPlugin {
   override def projectSettings: Seq[Def.Setting[_]] = Seq(
     packageSource := sourceDirectory.value / "package"
   )
+
 }
 
 trait CommonKeys {
-  val network       = SettingKey[NodeNetwork]("node-network", "The network for artifacts") // "network" is already defined
+  val network = SettingKey[NodeNetwork]("node-network", "The network for artifacts") // "network" is already defined
   val packageSource = settingKey[File]("Additional files for DEB")
 }

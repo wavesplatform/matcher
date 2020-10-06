@@ -6,18 +6,20 @@ import com.wavesplatform.dex.model.{LastTrade, LevelAgg}
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{Json, OFormat}
 
-case class HttpMarketStatus(@ApiModelProperty(dataType = "integer") lastPrice: Option[Long],
-                            @ApiModelProperty(dataType = "integer") lastAmount: Option[Long],
-                            @ApiModelProperty(
-                              value = "Side (sell or buy)",
-                              dataType = "string",
-                              example = "buy"
-                            )
-                            lastSide: Option[OrderType],
-                            @ApiModelProperty(dataType = "integer") bid: Option[Long],
-                            @ApiModelProperty(dataType = "integer") bidAmount: Option[Long],
-                            @ApiModelProperty(dataType = "integer") ask: Option[Long],
-                            @ApiModelProperty(dataType = "integer") askAmount: Option[Long]) {
+case class HttpMarketStatus(
+  @ApiModelProperty(dataType = "integer") lastPrice: Option[Long],
+  @ApiModelProperty(dataType = "integer") lastAmount: Option[Long],
+  @ApiModelProperty(
+    value = "Side (sell or buy)",
+    dataType = "string",
+    example = "buy"
+  )
+  lastSide: Option[OrderType],
+  @ApiModelProperty(dataType = "integer") bid: Option[Long],
+  @ApiModelProperty(dataType = "integer") bidAmount: Option[Long],
+  @ApiModelProperty(dataType = "integer") ask: Option[Long],
+  @ApiModelProperty(dataType = "integer") askAmount: Option[Long]
+) {
 
   @ApiModelProperty(hidden = true)
   val lastTrade: Option[LastTrade] =
@@ -40,6 +42,7 @@ case class HttpMarketStatus(@ApiModelProperty(dataType = "integer") lastPrice: O
       baa <- askAmount
       bap <- ask
     } yield LevelAgg(baa, bap)
+
 }
 
 object HttpMarketStatus {

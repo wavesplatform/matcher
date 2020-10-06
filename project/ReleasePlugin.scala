@@ -29,7 +29,7 @@ object ReleasePlugin extends AutoPlugin {
           .sequential(
             Compile / cleanAll,
             Compile / createDirectories,
-            Def.task { Command.process("packageAllForNetworks", (Compile / state).value) },
+            Def.task(Command.process("packageAllForNetworks", (Compile / state).value)),
             Compile / genDocs,
             Compile / writeReleaseNotes
           )
@@ -63,28 +63,29 @@ object ReleasePlugin extends AutoPlugin {
             .toTask(s" com.wavesplatform.dex.cli.WavesDexCli create-documentation --output-directory $outputDirectory")
         }.value,
         writeReleaseNotes := {
-          val runner           = git.runner.value
-          val log              = streams.value.log
-          val cwd              = (Compile / baseDirectory).value
-          val destDir          = (Compile / releaseDirectory).value
+          val runner = git.runner.value
+          val log = streams.value.log
+          val cwd = (Compile / baseDirectory).value
+          val destDir = (Compile / releaseDirectory).value
           val releaseNotesFile = destDir.resolve("release-notes.md").toFile
-          val artifactsFilter  = (Compile / artifactExtensions).value.foldLeft[FileFilter](NothingFilter)((r, x) => r || GlobFilter(s"*.$x"))
+          val artifactsFilter = (Compile / artifactExtensions).value.foldLeft[FileFilter](NothingFilter)((r, x) => r || GlobFilter(s"*.$x"))
 
           val tags = runner("tag", "--sort", "version:refname")(cwd, sbt.Logger.Null).replaceAll("\r", "").split("\n")
-          val (prevTag, lastTag) = if (tags.length <= 1) {
-            log.warn(s"Expected at least two tags, but there is ${tags.length}: ${tags.mkString(", ")}.")
-            (tags.headOption.getOrElse("HEAD"), "HEAD")
-          } else {
-            val lastTag = tags.last
-            val prevTag = tags(tags.length - 2)
+          val (prevTag, lastTag) =
+            if (tags.length <= 1) {
+              log.warn(s"Expected at least two tags, but there is ${tags.length}: ${tags.mkString(", ")}.")
+              (tags.headOption.getOrElse("HEAD"), "HEAD")
+            } else {
+              val lastTag = tags.last
+              val prevTag = tags(tags.length - 2)
 
-            val lastTagCommitId = runner("rev-parse", "--short", lastTag)(cwd, sbt.Logger.Null)
-            val lastCommitId    = runner("rev-parse", "--short", "HEAD")(cwd, sbt.Logger.Null)
-            if (lastTagCommitId != lastCommitId)
-              log.warn(s"Dirty release! The last tag ($lastTag) commit id is: $lastTagCommitId, last commit id is: $lastCommitId")
+              val lastTagCommitId = runner("rev-parse", "--short", lastTag)(cwd, sbt.Logger.Null)
+              val lastCommitId = runner("rev-parse", "--short", "HEAD")(cwd, sbt.Logger.Null)
+              if (lastTagCommitId != lastCommitId)
+                log.warn(s"Dirty release! The last tag ($lastTag) commit id is: $lastTagCommitId, last commit id is: $lastCommitId")
 
-            (prevTag, lastTag)
-          }
+              (prevTag, lastTag)
+            }
 
           log.info(s"Looking for commits between $prevTag and $lastTag")
           val changesContent =
@@ -115,15 +116,16 @@ object ReleasePlugin extends AutoPlugin {
                |""".stripMargin
 
           val content = s"""$changesContent
-                                  |
-                                  |$hashesContent""".stripMargin
+                           |
+                           |$hashesContent""".stripMargin
 
           log.info(s"Write release notes to $releaseNotesFile")
           IO.write(releaseNotesFile, content, StandardCharsets.UTF_8)
         },
         createDirectories := Files.createDirectories((Compile / releaseDirectory).value),
         cleanAll := List.empty
-      )) ++ Seq(
+      )
+    ) ++ Seq(
       commands += Command.command("packageAllForNetworks") { state =>
         NodeNetwork.All.foreach { x =>
           val updatedNetworkState = Project
@@ -136,17 +138,18 @@ object ReleasePlugin extends AutoPlugin {
         state
       }
     )
+
 }
 
 trait ReleasePluginKeys {
-  val releaseDirectory   = settingKey[Path]("Directory for release artifacts")
+  val releaseDirectory = settingKey[Path]("Directory for release artifacts")
   val artifactExtensions = settingKey[Seq[String]]("Used to search artifacts")
 
-  val release           = taskKey[Unit]("Packages artifacts and writes a documentation to the 'releaseDirectory'")
-  val cleanAll          = taskKey[Unit]("Cleans all projects")
-  val packageAll        = taskKey[Unit]("Packages all artifacts and moves them to 'releaseDirectory'")
+  val release = taskKey[Unit]("Packages artifacts and writes a documentation to the 'releaseDirectory'")
+  val cleanAll = taskKey[Unit]("Cleans all projects")
+  val packageAll = taskKey[Unit]("Packages all artifacts and moves them to 'releaseDirectory'")
   val createDirectories = taskKey[Unit]("Creates required directories")
-  val genDocs           = taskKey[Unit]("Generates the documentation")
+  val genDocs = taskKey[Unit]("Generates the documentation")
   val writeReleaseNotes = taskKey[Unit](s"""1. Collects commits between last two tags
                                            |2. Writes a draft of a release to the 'releaseDirectory'
                                            |3. Appends checksum of artifacts to release nodes""".stripMargin)

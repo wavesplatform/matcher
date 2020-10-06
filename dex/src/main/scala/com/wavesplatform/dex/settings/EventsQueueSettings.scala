@@ -6,10 +6,10 @@ import com.wavesplatform.dex.settings.EventsQueueSettings.CircuitBreakerSettings
 import scala.concurrent.duration.FiniteDuration
 
 case class EventsQueueSettings(
-    `type`: String,
-    local: LocalMatcherQueue.Settings,
-    kafka: KafkaMatcherQueue.Settings,
-    circuitBreaker: CircuitBreakerSettings
+  `type`: String,
+  local: LocalMatcherQueue.Settings,
+  kafka: KafkaMatcherQueue.Settings,
+  circuitBreaker: CircuitBreakerSettings
 )
 
 object EventsQueueSettings {

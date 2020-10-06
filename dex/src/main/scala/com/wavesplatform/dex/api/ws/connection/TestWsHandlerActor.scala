@@ -6,9 +6,9 @@ import com.wavesplatform.dex.domain.utils.{LoggerFacade, ScorexLogging}
 import org.slf4j.LoggerFactory
 
 /**
-  * Used as a proxy to the connection's source actor.
-  * Main goal is to respond with pongs to matcher's pings to keep connection alive
-  */
+ * Used as a proxy to the connection's source actor.
+ * Main goal is to respond with pongs to matcher's pings to keep connection alive
+ */
 class TestWsHandlerActor(testId: Int, keepAlive: Boolean) extends Actor with ScorexLogging {
 
   override protected lazy val log: LoggerFacade = LoggerFacade(LoggerFactory.getLogger(s"TestWsHandlerActor[testId=$testId]"))
@@ -30,8 +30,9 @@ class TestWsHandlerActor(testId: Int, keepAlive: Boolean) extends Actor with Sco
   }
 
   override val receive: Receive = {
-    case AssignSourceRef => context.become { awaitPings(sourceRef = sender()) }
+    case AssignSourceRef => context.become(awaitPings(sourceRef = sender()))
   }
+
 }
 
 object TestWsHandlerActor {

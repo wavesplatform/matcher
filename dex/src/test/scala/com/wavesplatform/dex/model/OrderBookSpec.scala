@@ -32,7 +32,7 @@ class OrderBookSpec
   implicit override val generatorDrivenConfig: PropertyCheckConfiguration = PropertyCheckConfiguration(minSuccessful = 1000)
 
   private val maxLevelsInOrderBook = 6
-  private val maxOrdersInLevel     = 2
+  private val maxOrdersInLevel = 2
 
   // TODO migrate to long ranges in 2.13
   private val askPricesMin = 1000L * Order.PriceConstant
@@ -54,14 +54,14 @@ class OrderBookSpec
 
   private val coinsInvariantPropGen = for {
     (askOrders, bidOrders) <- flexibleSidesOrdersGen(maxLevelsInOrderBook, maxOrdersInLevel, askPricesGen, bidPricesGen)
-    newOrder               <- newOrderGen
+    newOrder <- newOrderGen
   } yield (askOrders, bidOrders, newOrder)
 
   "add" - {
     // TODO Move to OrderExecuted property test
     "OrderExecuted: submitted.spent == counter.receive && counter.spent == submitted.receive" in forAll(coinsInvariantPropGen) {
       case (askOrders, bidOrders, newOrder) =>
-        val ob                                = mkOrderBook(askOrders, bidOrders)
+        val ob = mkOrderBook(askOrders, bidOrders)
         val OrderBookUpdates(_, events, _, _) = ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee))
         val clue =
           s"""Events:
@@ -73,10 +73,10 @@ ${formatEvents(events)}
             case evt: Events.OrderExecuted =>
               val price = evt.counter.price
 
-              val submittedSpent   = spentPortfolio(evt.submitted, evt.executedAmount, price)
+              val submittedSpent = spentPortfolio(evt.submitted, evt.executedAmount, price)
               val submittedReceive = receivePortfolio(evt.submitted, evt.executedAmount, price)
 
-              val counterSpent   = spentPortfolio(evt.counter, evt.executedAmount, price)
+              val counterSpent = spentPortfolio(evt.counter, evt.executedAmount, price)
               val counterReceive = receivePortfolio(evt.counter, evt.executedAmount, price)
 
               withClue(s"$evt: submitted.spent == counter.receive: ") {
@@ -94,9 +94,9 @@ ${formatEvents(events)}
 
     "coins invariant" in forAll(coinsInvariantPropGen) {
       case (askOrders, bidOrders, newOrder) =>
-        val ob             = mkOrderBook(askOrders, bidOrders)
+        val ob = mkOrderBook(askOrders, bidOrders)
         val balancesBefore = balancesBy(ob) |+| balancesBy(newOrder)
-        val coinsBefore    = Monoid.combineAll(balancesBefore.values)
+        val coinsBefore = Monoid.combineAll(balancesBefore.values)
 
         val OrderBookUpdates(updatedOb, events, _, _) = ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee))
 
@@ -104,27 +104,27 @@ ${formatEvents(events)}
           case (r, evt: Events.OrderExecuted) =>
             val price = evt.counter.price
 
-            val submittedSpent    = spentPortfolio(evt.submitted, evt.executedAmount, price)
-            val submittedReceive  = receivePortfolio(evt.submitted, evt.executedAmount, price)
+            val submittedSpent = spentPortfolio(evt.submitted, evt.executedAmount, price)
+            val submittedReceive = receivePortfolio(evt.submitted, evt.executedAmount, price)
             val submittedSpentFee = spentFee(evt.submitted, evt.executedAmount)
 
-            val counterSpent    = spentPortfolio(evt.counter, evt.executedAmount, price)
-            val counterReceive  = receivePortfolio(evt.counter, evt.executedAmount, price)
+            val counterSpent = spentPortfolio(evt.counter, evt.executedAmount, price)
+            val counterReceive = receivePortfolio(evt.counter, evt.executedAmount, price)
             val counterSpentFee = spentFee(evt.counter, evt.executedAmount)
 
             r |+|
-              Monoid.combineAll(Seq(
-                Map(evt.submitted.order.senderPublicKey -> submittedReceive),
-                Map(evt.counter.order.senderPublicKey   -> counterReceive),
-                Map((matcher: PublicKey)                -> submittedSpentFee),
-                Map((matcher: PublicKey)                -> counterSpentFee)
-              )) |-|
-              Monoid.combineAll(Seq(
-                Map(evt.submitted.order.senderPublicKey -> submittedSpent),
-                Map(evt.submitted.order.senderPublicKey -> submittedSpentFee),
-                Map(evt.counter.order.senderPublicKey   -> counterSpent),
-                Map(evt.counter.order.senderPublicKey   -> counterSpentFee),
-              ))
+            Monoid.combineAll(Seq(
+              Map(evt.submitted.order.senderPublicKey -> submittedReceive),
+              Map(evt.counter.order.senderPublicKey -> counterReceive),
+              Map((matcher: PublicKey) -> submittedSpentFee),
+              Map((matcher: PublicKey) -> counterSpentFee)
+            )) |-|
+            Monoid.combineAll(Seq(
+              Map(evt.submitted.order.senderPublicKey -> submittedSpent),
+              Map(evt.submitted.order.senderPublicKey -> submittedSpentFee),
+              Map(evt.counter.order.senderPublicKey -> counterSpent),
+              Map(evt.counter.order.senderPublicKey -> counterSpentFee)
+            ))
 
           case (r, _) => r
         }
@@ -160,7 +160,7 @@ ${diff.mkString("\n")}
 
     "order book invariant" in forAll(coinsInvariantPropGen) {
       case (askOrders, bidOrders, newOrder) =>
-        val ob                                        = mkOrderBook(askOrders, bidOrders)
+        val ob = mkOrderBook(askOrders, bidOrders)
         val OrderBookUpdates(updatedOb, events, _, _) = ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee))
 
         val clue =
@@ -189,14 +189,14 @@ ${formatEvents(events)}
 
     "result.levelChanges contains diff for updatedOrderBook.level" in forAll(coinsInvariantPropGen) {
       case (askOrders, bidOrders, newOrder) =>
-        val ob       = mkOrderBook(askOrders, bidOrders)
+        val ob = mkOrderBook(askOrders, bidOrders)
         val snapshot = ob.aggregatedSnapshot
 
         val OrderBookUpdates(updatedOb, events, levelChanges, _) =
           ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee))
         val updatedSnapshot = updatedOb.aggregatedSnapshot
 
-        val actualLevelChanges   = filterNonEmpty(levelChanges)
+        val actualLevelChanges = filterNonEmpty(levelChanges)
         val expectedLevelChanges = filterNonEmpty(toLevelAmounts(updatedSnapshot) |-| toLevelAmounts(snapshot))
 
         val clue =
@@ -265,7 +265,7 @@ $updatedSnapshot
 
     "no other order was removed" in test(removedGen) { (ob, orderIdToCancel, obAfter, _, _) =>
       val orderIdsBefore = orderIds(ob)
-      val orderIdsAfter  = orderIds(obAfter)
+      val orderIdsAfter = orderIds(obAfter)
       (orderIdsBefore - orderIdToCancel) should matchTo(orderIdsAfter)
     }
 
@@ -276,9 +276,9 @@ $updatedSnapshot
 
     "result.levelChanges contains diff for updatedOrderBook.level" in test(removedGen) { (obBefore, _, obAfter, events, levelChanges) =>
       val snapshotBefore = obBefore.aggregatedSnapshot
-      val snapshotAfter  = obAfter.aggregatedSnapshot
+      val snapshotAfter = obAfter.aggregatedSnapshot
 
-      val actualLevelChanges   = filterNonEmpty(levelChanges)
+      val actualLevelChanges = filterNonEmpty(levelChanges)
       val expectedLevelChanges = filterNonEmpty(toLevelAmounts(snapshotAfter) |-| toLevelAmounts(snapshotBefore))
 
       expectedLevelChanges should matchTo(actualLevelChanges)
@@ -292,7 +292,8 @@ $updatedSnapshot
         }
     }
 
-    def mkClue(orderIdToCancel: Order.Id, obBefore: OrderBook, obAfter: OrderBook, event: Option[Event], levelChanges: LevelAmounts): String = s"""
+    def mkClue(orderIdToCancel: Order.Id, obBefore: OrderBook, obAfter: OrderBook, event: Option[Event], levelChanges: LevelAmounts): String =
+      s"""
 Order id to cancel: $orderIdToCancel
 
 OrderBook before:
@@ -314,12 +315,12 @@ $levelChanges
   "cancelAll" - {
     "canceled all orders" in forAll(cancelAllPropGen) {
       case (askOrders, bidOrders) =>
-        val ob             = mkOrderBook(askOrders, bidOrders)
-        val obBefore       = format(ob)
+        val ob = mkOrderBook(askOrders, bidOrders)
+        val obBefore = format(ob)
         val orderIdsBefore = orderIds(ob)
 
         val OrderBookUpdates(obAfter, events, _, _) = ob.cancelAll(ts, Events.OrderCanceledReason.RequestExecuted)
-        val canceledOrders                          = events.collect { case evt: OrderCanceled => evt.acceptedOrder.order.id() }.toSet
+        val canceledOrders = events.collect { case evt: OrderCanceled => evt.acceptedOrder.order.id() }.toSet
         val clue =
           s"""
 OrderBook before:
@@ -350,7 +351,7 @@ ${canceledOrders.mkString("\n")}
         val ob = mkOrderBook(askOrders, bidOrders)
 
         val OrderBookUpdates(_, _, levelChanges, _) = ob.cancelAll(ts, Events.OrderCanceledReason.RequestExecuted)
-        val expectedLevelChanges                    = Group.inverse(toLevelAmounts(ob.aggregatedSnapshot))
+        val expectedLevelChanges = Group.inverse(toLevelAmounts(ob.aggregatedSnapshot))
 
         expectedLevelChanges should matchTo(levelChanges)
     }
@@ -362,7 +363,7 @@ ${canceledOrders.mkString("\n")}
     firstAskPrice should be > firstBidPrice
   }
 
-  private def orderIds(ob: OrderBook): Set[Order.Id]         = ob.allOrders.map(_.order.id()).toSet
+  private def orderIds(ob: OrderBook): Set[Order.Id] = ob.allOrders.map(_.order.id()).toSet
   private def hasOrder(ob: OrderBook, id: Order.Id): Boolean = ob.allOrders.exists(_.order.id() == id)
 
   private def balancesBy(ob: OrderBook): Map[PublicKey, Map[Asset, Long]] =
@@ -394,7 +395,7 @@ ${canceledOrders.mkString("\n")}
   private def filterNonEmpty(x: LevelAmounts): LevelAmounts =
     new LevelAmounts(
       asks = x.asks.filter(_._2 != 0),
-      bids = x.bids.filter(_._2 != 0),
+      bids = x.bids.filter(_._2 != 0)
     )
 
   private def formatSide(xs: Iterable[(Long, Level)]): String =
@@ -415,13 +416,13 @@ ${formatSide(x.bids)}"""
 
   private def format(x: Event): String = x match {
     case x: OrderExecuted => s"executed(a=${x.executedAmount}, c=${format(x.counter)}, s=${format(x.submitted)})"
-    case x: OrderAdded    => s"added(${format(x.order)})"
+    case x: OrderAdded => s"added(${format(x.order)})"
     case x: OrderCanceled => s"canceled(${x.reason}, ${format(x.acceptedOrder)})"
   }
 
   private def format(x: AcceptedOrder): String = {
     val name = x match {
-      case _: LimitOrder  => "limit"
+      case _: LimitOrder => "limit"
       case _: MarketOrder => "market"
     }
 

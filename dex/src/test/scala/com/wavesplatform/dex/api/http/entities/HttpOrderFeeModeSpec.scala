@@ -12,11 +12,11 @@ import play.api.libs.json.Json
 class HttpOrderFeeModeSpec extends AnyFreeSpec with Matchers with DiffMatcherWithImplicits {
 
   private val fixedModeJson: String = """{
-                                          |  "fixed" : {
-                                          |    "assetId" : "6suw3ZHbyk6jrM19n7Pvaih3zSPsAt3gKcY8AZPxQYQf",
-                                          |    "minFee" : 1
-                                          |  }
-                                          |}""".stripMargin
+                                        |  "fixed" : {
+                                        |    "assetId" : "6suw3ZHbyk6jrM19n7Pvaih3zSPsAt3gKcY8AZPxQYQf",
+                                        |    "minFee" : 1
+                                        |  }
+                                        |}""".stripMargin
 
   private val fixedMode: HttpOrderFeeMode = FeeModeFixed(IssuedAsset(Base58.decode("6suw3ZHbyk6jrM19n7Pvaih3zSPsAt3gKcY8AZPxQYQf")), 1)
 

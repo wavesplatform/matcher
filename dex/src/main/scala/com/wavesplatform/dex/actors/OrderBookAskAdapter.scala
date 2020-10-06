@@ -21,7 +21,8 @@ import scala.reflect.ClassTag
 
 // Will be removed after a migration to typed actors
 class OrderBookAskAdapter(orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]], askTimeout: FiniteDuration)(
-    implicit system: ActorSystem) {
+  implicit system: ActorSystem
+) {
   import system.dispatcher
 
   type Result[T] = Future[Either[MatcherError, Option[T]]]
@@ -47,4 +48,5 @@ class OrderBookAskAdapter(orderBooks: AtomicReference[Map[AssetPair, Either[Unit
           r.map(_.some.asRight)
       }
   }
+
 }

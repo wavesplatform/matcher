@@ -14,7 +14,7 @@ class WrappedDescendantHint[T](key: String = "type") extends CoproductHint[T] {
 
   override def from(cursor: ConfigCursor, options: Seq[String]): Result[CoproductHint.Action] =
     for {
-      objCur   <- cursor.asObjectCursor
+      objCur <- cursor.asObjectCursor
       valueCur <- objCur.atKey(key)
       valueStr <- valueCur.asString
       option <-
@@ -28,7 +28,8 @@ class WrappedDescendantHint[T](key: String = "type") extends CoproductHint[T] {
   // HACK: Probably this wont work. We don't care because don't use this functionality
   override def to(value: ConfigValue, name: String): ConfigValue = value match {
     case co: ConfigObject if co.containsKey(key) => throw CoproductHintException(CollidingKeys(key, co.get(key)))
-    case co: ConfigObject                        => Map(key -> fieldValue(name)).toConfig.withFallback(co.toConfig)
-    case _                                       => throw CoproductHintException(WrongType(value.valueType, Set(ConfigValueType.OBJECT)))
+    case co: ConfigObject => Map(key -> fieldValue(name)).toConfig.withFallback(co.toConfig)
+    case _ => throw CoproductHintException(WrongType(value.valueType, Set(ConfigValueType.OBJECT)))
   }
+
 }

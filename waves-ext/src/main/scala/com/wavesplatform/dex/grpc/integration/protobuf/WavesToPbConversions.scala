@@ -14,6 +14,7 @@ import com.wavesplatform.{account => va}
 object WavesToPbConversions {
 
   implicit class VanillaExchangeTransactionOps(tx: ve.ExchangeTransaction) {
+
     def toPB: SignedExchangeTransaction =
       SignedExchangeTransaction(
         transaction = Some(
@@ -36,13 +37,16 @@ object WavesToPbConversions {
         ),
         proofs = tx.proofs.proofs.map(_.toPB)
       )
+
   }
 
   implicit class VanillaAssetOps(self: Asset) {
+
     def toPB: ByteString = self match {
       case Asset.IssuedAsset(assetId) => assetId.toPB
-      case Asset.Waves                => ByteString.EMPTY
+      case Asset.Waves => ByteString.EMPTY
     }
+
   }
 
   implicit class VanillaAddressOps(self: Address) {
@@ -50,6 +54,7 @@ object WavesToPbConversions {
   }
 
   implicit class VanillaOrderOps(order: ve.Order) {
+
     def toPB: Order =
       Order(
         chainId = va.AddressScheme.current.chainId.toInt,
@@ -57,7 +62,7 @@ object WavesToPbConversions {
         matcherPublicKey = order.matcherPublicKey.toPB,
         assetPair = Some(AssetPair(order.assetPair.amountAsset.toPB, order.assetPair.priceAsset.toPB)),
         orderSide = order.orderType match {
-          case ve.OrderType.BUY  => Order.Side.BUY
+          case ve.OrderType.BUY => Order.Side.BUY
           case ve.OrderType.SELL => Order.Side.SELL
         },
         amount = order.amount,
@@ -68,9 +73,11 @@ object WavesToPbConversions {
         version = order.version,
         proofs = order.proofs.map(_.toPB)
       )
+
   }
 
   implicit class VanillaByteStrOps(val self: ByteStr) extends AnyVal {
     def toPB: ByteString = ByteString.copyFrom(self.arr)
   }
+
 }

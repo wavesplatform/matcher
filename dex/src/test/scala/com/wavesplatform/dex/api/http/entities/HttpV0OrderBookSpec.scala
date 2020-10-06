@@ -36,10 +36,10 @@ class HttpV0OrderBookSpec extends AnyFreeSpec with Matchers with DiffMatcherWith
                        |}""".stripMargin
 
   private val assetPair = AssetPair(Asset.fromString("LWbazpyvj625QB6EMC1vQoMkrvn2DdKjYbuuEw2T2UF").get, Waves)
-  private val bids      = List(LevelAgg(10000000000000L, 41), LevelAgg(2500000000000L, 40), LevelAgg(300000000000000L, 1))
-  private val asks      = List(LevelAgg(50000000000L, 50), LevelAgg(2500000000000L, 51))
+  private val bids = List(LevelAgg(10000000000000L, 41), LevelAgg(2500000000000L, 40), LevelAgg(300000000000000L, 1))
+  private val asks = List(LevelAgg(50000000000L, 50), LevelAgg(2500000000000L, 51))
 
-  private val orderBookV0     = HttpV0OrderBook(0, assetPair, bids.map(HttpV0LevelAgg.fromLevelAgg), asks.map(HttpV0LevelAgg.fromLevelAgg))
+  private val orderBookV0 = HttpV0OrderBook(0, assetPair, bids.map(HttpV0LevelAgg.fromLevelAgg), asks.map(HttpV0LevelAgg.fromLevelAgg))
   private val orderBookResult = HttpOrderBook(0, assetPair, bids, asks)
 
   "backward JSON compatibility" - {

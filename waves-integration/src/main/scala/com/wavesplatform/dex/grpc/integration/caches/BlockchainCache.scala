@@ -9,17 +9,21 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 /**
-  * Common logic for caching of the blockchain access results
-  *
-  * @param loader blockchain access function
-  * @param expiration living time of the each cache entry
-  * @param invalidationPredicate custom logic for value invalidation after it's loading to the cache
-  */
-abstract class BlockchainCache[K <: AnyRef, V <: AnyRef](loader: K => Future[V], expiration: Option[Duration], invalidationPredicate: V => Boolean)(
-    implicit ec: ExecutionContext)
-    extends ScorexLogging {
+ * Common logic for caching of the blockchain access results
+ *
+ * @param loader blockchain access function
+ * @param expiration living time of the each cache entry
+ * @param invalidationPredicate custom logic for value invalidation after it's loading to the cache
+ */
+abstract class BlockchainCache[K <: AnyRef, V <: AnyRef](
+  loader: K => Future[V],
+  expiration: Option[Duration],
+  invalidationPredicate: V => Boolean
+)(
+  implicit ec: ExecutionContext
+) extends ScorexLogging {
 
-  lazy private val cache: LoadingCache[K, Future[V]] = {
+  private lazy val cache: LoadingCache[K, Future[V]] = {
     val builder = CacheBuilder.newBuilder
     expiration
       .fold(builder)(builder.expireAfterWrite)
@@ -27,7 +31,9 @@ abstract class BlockchainCache[K <: AnyRef, V <: AnyRef](loader: K => Future[V],
         new CacheLoader[K, Future[V]] {
           override def load(key: K): Future[V] = loader(key) andThen {
             case Success(value) if invalidationPredicate(value) =>
-              cache.invalidate(key) // value may persist for a little longer than expected due to the fact that all the threads in the EC may be busy
+              cache.invalidate(
+                key
+              ) // value may persist for a little longer than expected due to the fact that all the threads in the EC may be busy
             case Failure(exception) => log.error(s"Error while value loading occurred: ", exception); cache.invalidate(key)
           }
         }

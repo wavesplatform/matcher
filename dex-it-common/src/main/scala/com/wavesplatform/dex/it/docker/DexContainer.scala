@@ -23,38 +23,41 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
 final case class DexContainer private (override val internalIp: String, underlying: GenericContainer)(
-    implicit
-    tryHttpBackend: LoggingSttpBackend[Try, Nothing],
-    futureHttpBackend: LoggingSttpBackend[Future, Nothing],
-    ec: ExecutionContext)
-    extends BaseContainer(DexContainer.baseContainerPath, underlying) {
+  implicit
+  tryHttpBackend: LoggingSttpBackend[Try, Nothing],
+  futureHttpBackend: LoggingSttpBackend[Future, Nothing],
+  ec: ExecutionContext
+) extends BaseContainer(DexContainer.baseContainerPath, underlying) {
 
   override protected val cachedRestApiAddress: CachedData[InetSocketAddress] = CachedData(getExternalAddress(DexContainer.restApiPort))
-  def restApiAddress: InetSocketAddress                                      = cachedRestApiAddress.get()
+  def restApiAddress: InetSocketAddress = cachedRestApiAddress.get()
 
-  override def api: DexApi[Id]          = fp.sync { DexApi[Try](apiKey, restApiAddress) }
+  override def api: DexApi[Id] = fp.sync(DexApi[Try](apiKey, restApiAddress))
   override def asyncApi: DexApi[Future] = DexApi[Future](apiKey, restApiAddress)
 }
 
 object DexContainer extends ScorexLogging {
 
   private val isProfilingEnabled: Boolean = Option(System.getenv("WAVES_DEX_PROFILING")).getOrElse("false").toBoolean
-  private val baseContainerPath: String   = "/usr/share/waves-dex"
-  private val containerLogsPath: String   = s"$baseContainerPath/logs"
+  private val baseContainerPath: String = "/usr/share/waves-dex"
+  private val containerLogsPath: String = s"$baseContainerPath/logs"
 
   private val restApiPort: Int = 6886 // application.conf waves.dex.rest-api.port
 
-  def apply(name: String,
-            networkName: String,
-            network: NetworkImpl,
-            internalIp: String,
-            runConfig: Config,
-            suiteInitialConfig: Config,
-            localLogsDir: Path,
-            image: String)(implicit
-                           tryHttpBackend: LoggingSttpBackend[Try, Nothing],
-                           futureHttpBackend: LoggingSttpBackend[Future, Nothing],
-                           ec: ExecutionContext): DexContainer = {
+  def apply(
+    name: String,
+    networkName: String,
+    network: NetworkImpl,
+    internalIp: String,
+    runConfig: Config,
+    suiteInitialConfig: Config,
+    localLogsDir: Path,
+    image: String
+  )(implicit
+    tryHttpBackend: LoggingSttpBackend[Try, Nothing],
+    futureHttpBackend: LoggingSttpBackend[Future, Nothing],
+    ec: ExecutionContext
+  ): DexContainer = {
 
     val underlying = GenericContainer(
       dockerImage = image,
@@ -89,32 +92,30 @@ object DexContainer extends ScorexLogging {
   }
 
   private def getEnv(containerName: String): Map[String, String] = Map(
-    "BRIEF_LOG_PATH"              -> s"$containerLogsPath/container-$containerName.log",
-    "DETAILED_LOG_PATH"           -> s"$containerLogsPath/container-$containerName.detailed.log",
-    "WAVES_DEX_CONFIGPATH"        -> s"$baseContainerPath/$containerName.conf",
+    "BRIEF_LOG_PATH" -> s"$containerLogsPath/container-$containerName.log",
+    "DETAILED_LOG_PATH" -> s"$containerLogsPath/container-$containerName.detailed.log",
+    "WAVES_DEX_CONFIGPATH" -> s"$baseContainerPath/$containerName.conf",
     "WAVES_DEX_DETAILED_LOG_PATH" -> s"$containerLogsPath/container-$containerName.detailed.log", // Backward compatibility for v2.0.3
-    "WAVES_DEX_OPTS" ->
-      List(
-        "-J-Xmx1024M",
-        s"-Djava.util.logging.config.file=$baseContainerPath/jul.properties",
-        "-Dlogback.stdout.enabled=false",
-        "-Dlogback.file.enabled=false",
-        s"-Dlogback.configurationFile=$baseContainerPath/doc/logback.xml",
-        s"-Dlogback.include.file=$baseContainerPath/doc/logback-container.xml",
-        s"-Dlogback.brief.fullPath=$containerLogsPath/container-$containerName.log",
-        s"-Dlogback.detailed.fullPath=$containerLogsPath/container-$containerName.detailed.log"
-      ).prependIf(isProfilingEnabled) {
-          // https://www.yourkit.com/docs/java/help/startup_options.jsp
-          s"-J-agentpath:/usr/local/YourKit-JavaProfiler-2019.8/bin/linux-x86-64/libyjpagent.so=port=10001,listen=all" +
-            s",sampling,monitors,sessionname=prof-$containerName,snapshot_name_format={sessionname}," +
-            s"dir=$containerLogsPath,logdir=$containerLogsPath,onexit=snapshot"
-        }
-        .mkString(" ", " ", " ")
+    "WAVES_DEX_OPTS" -> List(
+      "-J-Xmx1024M",
+      s"-Djava.util.logging.config.file=$baseContainerPath/jul.properties",
+      "-Dlogback.stdout.enabled=false",
+      "-Dlogback.file.enabled=false",
+      s"-Dlogback.configurationFile=$baseContainerPath/doc/logback.xml",
+      s"-Dlogback.include.file=$baseContainerPath/doc/logback-container.xml",
+      s"-Dlogback.brief.fullPath=$containerLogsPath/container-$containerName.log",
+      s"-Dlogback.detailed.fullPath=$containerLogsPath/container-$containerName.detailed.log"
+    ).prependIf(isProfilingEnabled) {
+      // https://www.yourkit.com/docs/java/help/startup_options.jsp
+      s"-J-agentpath:/usr/local/YourKit-JavaProfiler-2019.8/bin/linux-x86-64/libyjpagent.so=port=10001,listen=all" +
+      s",sampling,monitors,sessionname=prof-$containerName,snapshot_name_format={sessionname}," +
+      s"dir=$containerLogsPath,logdir=$containerLogsPath,onexit=snapshot"
+    }.mkString(" ", " ", " ")
   )
 
   /**
-    * @param resolve A relate to the base directory path of application
-    * @note Works only with /
-    */
+   * @param resolve A relate to the base directory path of application
+   * @note Works only with /
+   */
   def containerPath(resolve: String): String = s"$baseContainerPath/$resolve"
 }

@@ -12,12 +12,12 @@ import com.wavesplatform.dex.error
 import scala.concurrent.duration.FiniteDuration
 
 class BatchOrderCancelActor private (
-    orderIds: Set[Order.Id],
-    source: Command.Source,
-    processorActor: ActorRef,
-    clientActor: ActorRef,
-    timeout: FiniteDuration,
-    initResponse: Map[Order.Id, OrderCancelResult]
+  orderIds: Set[Order.Id],
+  source: Command.Source,
+  processorActor: ActorRef,
+  clientActor: ActorRef,
+  timeout: FiniteDuration,
+  initResponse: Map[Order.Id, OrderCancelResult]
 ) extends Actor
     with ScorexLogging {
 
@@ -31,7 +31,7 @@ class BatchOrderCancelActor private (
   private def state(restOrderIds: Set[Order.Id], response: Map[Order.Id, OrderCancelResult], timer: Cancellable): Receive = {
     case CancelResponse(id, x) =>
       val updatedRestOrderIds = restOrderIds - id
-      val updatedResponse     = response.updated(id, x)
+      val updatedResponse = response.updated(id, x)
 
       if (updatedRestOrderIds.isEmpty) stop(Event.BatchCancelCompleted(updatedResponse), timer)
       else context.become(state(restOrderIds - id, updatedResponse, timer))
@@ -48,15 +48,19 @@ class BatchOrderCancelActor private (
     clientActor ! response
     context.stop(self)
   }
+
 }
 
 object BatchOrderCancelActor {
-  def props(orderIds: Set[Order.Id],
-            source: Command.Source,
-            processorActor: ActorRef,
-            clientActor: ActorRef,
-            timeout: FiniteDuration,
-            initResponse: Map[Order.Id, OrderCancelResult] = Map.empty): Props = {
+
+  def props(
+    orderIds: Set[Order.Id],
+    source: Command.Source,
+    processorActor: ActorRef,
+    clientActor: ActorRef,
+    timeout: FiniteDuration,
+    initResponse: Map[Order.Id, OrderCancelResult] = Map.empty
+  ): Props = {
     require(orderIds.nonEmpty, "orderIds is empty")
     Props(new BatchOrderCancelActor(orderIds, source, processorActor, clientActor, timeout, initResponse))
   }
@@ -68,11 +72,13 @@ object BatchOrderCancelActor {
     def unapply(arg: Any): Option[(Order.Id, OrderCancelResult)] = helper.lift(arg)
 
     private val helper: PartialFunction[Any, (Order.Id, OrderCancelResult)] = {
-      case x @ Event.OrderCanceled(id)     => (id, Right(x))
-      case x @ error.OrderNotFound(id)     => (id, Left(x))
-      case x @ error.OrderCanceled(id)     => (id, Left(x))
-      case x @ error.OrderFull(id)         => (id, Left(x))
+      case x @ Event.OrderCanceled(id) => (id, Right(x))
+      case x @ error.OrderNotFound(id) => (id, Left(x))
+      case x @ error.OrderCanceled(id) => (id, Left(x))
+      case x @ error.OrderFull(id) => (id, Left(x))
       case x @ error.MarketOrderCancel(id) => (id, Left(x))
     }
+
   }
+
 }

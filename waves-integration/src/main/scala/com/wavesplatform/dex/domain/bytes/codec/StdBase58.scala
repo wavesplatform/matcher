@@ -9,10 +9,10 @@ object StdBase58 extends BaseXXEncDec {
   private val Alphabet: Array[Byte] = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz".getBytes(US_ASCII)
 
   private val DecodeTable: Array[Byte] = Array(
-    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, -1, -1, -1, -1, -1, -1, -1, 9, 10, 11, 12, 13, 14, 15, 16, -1, 17,
-    18, 19, 20, 21, -1, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, -1, -1, -1, -1, -1, -1, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, -1, 44, 45,
-    46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, -1, -1, -1, -1, -1, -1, -1, 9, 10, 11, 12, 13, 14, 15, 16,
+    -1, 17, 18, 19, 20, 21, -1, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, -1, -1, -1, -1, -1, -1, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43,
+    -1, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57
   )
 
   private def toBase58(c: Char): Byte = if (c < DecodeTable.length) DecodeTable(c) else -1
@@ -21,11 +21,11 @@ object StdBase58 extends BaseXXEncDec {
 
   def encode(bytes: Array[Byte]): String = {
 
-    val input     = util.Arrays.copyOf(bytes, bytes.length)
+    val input = util.Arrays.copyOf(bytes, bytes.length)
     val zeroCount = input.takeWhile(_ == 0).length
 
-    var in                  = zeroCount
-    var out                 = input.length * 2
+    var in = zeroCount
+    var out = input.length * 2
     val output: Array[Byte] = new Array[Byte](out)
 
     while (in < input.length) {
@@ -54,9 +54,9 @@ object StdBase58 extends BaseXXEncDec {
     }
 
     val zeroCount = input.takeWhile(_ == 0).length
-    var in        = zeroCount
-    var out       = input.length
-    val output    = new Array[Byte](out)
+    var in = zeroCount
+    var out = input.length
+    val output = new Array[Byte](out)
 
     while (in < input.length) {
       val mod = convert(input, in, 58, 256)
@@ -72,15 +72,16 @@ object StdBase58 extends BaseXXEncDec {
   private def convert(number: Array[Byte], offset: Int, from: Int, to: Int): Byte = {
 
     var rem = 0
-    var i   = offset
+    var i = offset
 
     while (i < number.length) {
       val digit = number(i) & 0xff
-      val tmp   = rem * from + digit
+      val tmp = rem * from + digit
       number(i) = (tmp / to).toByte
       rem = tmp % to
       i += 1
     }
     rem.toByte
   }
+
 }

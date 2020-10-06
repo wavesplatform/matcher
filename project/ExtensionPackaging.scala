@@ -11,15 +11,15 @@ import com.typesafe.sbt.packager.debian.DebianPlugin.autoImport.Debian
 import com.typesafe.sbt.packager.debian.JDebPackaging
 import com.typesafe.sbt.packager.linux.LinuxPackageMapping
 import com.typesafe.sbt.packager.linux.LinuxPlugin.autoImport.{defaultLinuxInstallLocation, linuxPackageMappings}
-import com.typesafe.sbt.packager.linux.LinuxPlugin.{Users, mapGenericMappingsToLinux}
+import com.typesafe.sbt.packager.linux.LinuxPlugin.{mapGenericMappingsToLinux, Users}
 import com.typesafe.sbt.packager.universal.UniversalDeployPlugin
 import org.apache.commons.compress.archivers.{ArchiveEntry, ArchiveStreamFactory}
 import sbt.Keys._
 import sbt._
 
 /**
-  * @note Specify "maintainer" to solve DEB warnings
-  */
+ * @note Specify "maintainer" to solve DEB warnings
+ */
 object ExtensionPackaging extends AutoPlugin {
 
   object autoImport extends ExtensionKeys
@@ -44,16 +44,17 @@ object ExtensionPackaging extends AutoPlugin {
         moduleId = projectID.value
       ),
       classpathOrdering ++= {
-        val jar              = """(.+)[-_]([\d\.]+.*)\.jar""".r
-        val baseDir          = (Compile / unmanagedBase).value
-        val appropriateFiles = List(s"waves_${wavesNodeVersion.value}_all.deb", s"waves-stagenet_${wavesNodeVersion.value}_all.deb").map(baseDir / _)
-        val debFile          = appropriateFiles.find(_.isFile).getOrElse(throw new RuntimeException("Can't find a deb file to check dependencies"))
+        val jar = """(.+)[-_]([\d\.]+.*)\.jar""".r
+        val baseDir = (Compile / unmanagedBase).value
+        val appropriateFiles =
+          List(s"waves_${wavesNodeVersion.value}_all.deb", s"waves-stagenet_${wavesNodeVersion.value}_all.deb").map(baseDir / _)
+        val debFile = appropriateFiles.find(_.isFile).getOrElse(throw new RuntimeException("Can't find a deb file to check dependencies"))
         val inDeb = filesInDeb(debFile)
           .filter(x => x.endsWith(".jar") && x.startsWith("./usr/share"))
           .map(_.split('/').last)
           .map {
             case jar(name, rev) => name -> rev
-            case x              => throw new RuntimeException(s"Can't parse JAR name: $x")
+            case x => throw new RuntimeException(s"Can't parse JAR name: $x")
           }
           .toMap
 
@@ -64,7 +65,7 @@ object ExtensionPackaging extends AutoPlugin {
       },
       Universal / mappings ++= classpathOrdering.value ++ {
         val baseConfigName = s"${name.value}-${network.value}.conf"
-        val localFile      = (Compile / baseDirectory).value / baseConfigName
+        val localFile = (Compile / baseDirectory).value / baseConfigName
         if (localFile.exists()) {
           val artifactPath = "doc/dex.conf.sample"
           Seq(localFile -> artifactPath)
@@ -81,9 +82,9 @@ object ExtensionPackaging extends AutoPlugin {
       ),
       Debian / maintainerScripts := maintainerScriptsAppend((Debian / maintainerScripts).value - Postinst)(
         Postinst ->
-          s"""#!/bin/sh
-             |set -e
-             |chown -R ${nodePackageName.value}:${nodePackageName.value} /usr/share/${nodePackageName.value}""".stripMargin
+        s"""#!/bin/sh
+           |set -e
+           |chown -R ${nodePackageName.value}:${nodePackageName.value} /usr/share/${nodePackageName.value}""".stripMargin
       )
     ) ++ nameFix ++ inScope(Global)(Seq(Global / name := (ThisProject / name).value) ++ nameFix)
 
@@ -104,12 +105,11 @@ object ExtensionPackaging extends AutoPlugin {
   private def makeRelativeClasspathNames(mappings: Seq[(File, String)]): Seq[String] =
     for {
       (_, name) <- mappings
-    } yield {
-      // Here we want the name relative to the lib/ folder...
-      // For now we just cheat...
-      if (name startsWith "lib/") name drop 4
-      else "../" + name
-    }
+    } yield
+    // Here we want the name relative to the lib/ folder...
+    // For now we just cheat...
+    if (name startsWith "lib/") name drop 4
+    else "../" + name
 
   def linkedProjectJar(jar: File, art: Artifact, moduleId: ModuleID): (File, String) = {
     val jarName = ExtensionPackaging.makeJarName(
@@ -123,22 +123,22 @@ object ExtensionPackaging extends AutoPlugin {
   }
 
   /**
-    * Constructs a jar name from components...(ModuleID/Artifact)
-    */
+   * Constructs a jar name from components...(ModuleID/Artifact)
+   */
   def makeJarName(org: String, name: String, revision: String, artifactName: String, artifactClassifier: Option[String]): String =
     org + "." +
-      name + "-" +
-      Option(artifactName.replace(name, "")).filterNot(_.isEmpty).map(_ + "-").getOrElse("") +
-      revision +
-      artifactClassifier.filterNot(_.isEmpty).map("-" + _).getOrElse("") +
-      ".jar"
+    name + "-" +
+    Option(artifactName.replace(name, "")).filterNot(_.isEmpty).map(_ + "-").getOrElse("") +
+    revision +
+    artifactClassifier.filterNot(_.isEmpty).map("-" + _).getOrElse("") +
+    ".jar"
 
   // Determines a nicer filename for an attributed jar file, using the
   // ivy metadata if available.
   private def getJarFullFilename(dep: Attributed[File]): String = {
     val filename: Option[String] = for {
       module <- dep.metadata
-      // sbt 0.13.x key
+        // sbt 0.13.x key
         .get(AttributeKey[ModuleID]("module-id"))
         // sbt 1.x key
         .orElse(dep.metadata.get(AttributeKey[ModuleID]("moduleID")))
@@ -147,10 +147,12 @@ object ExtensionPackaging extends AutoPlugin {
     filename.getOrElse(dep.data.getName)
   }
 
-  private def excludeProvidedArtifacts(runtimeClasspath: Classpath,
-                                       exclusions: Map[String, String]): (Map[File, String], Map[String, (String, String)]) = {
+  private def excludeProvidedArtifacts(
+    runtimeClasspath: Classpath,
+    exclusions: Map[String, String]
+  ): (Map[File, String], Map[String, (String, String)]) = {
     val initJarMapping = Map.empty[File, String]
-    val initConflicts  = Map.empty[String, (String, String)]
+    val initConflicts = Map.empty[String, (String, String)]
     runtimeClasspath.foldLeft((initJarMapping, initConflicts)) {
       case (r @ (jarMapping, conflicts), x) if x.data.isFile =>
         x.get(Keys.moduleID.key) match {
@@ -169,7 +171,7 @@ object ExtensionPackaging extends AutoPlugin {
   }
 
   private def filesInDeb(file: File): List[String] = {
-    val fs      = new BufferedInputStream(Files.newInputStream(file.toPath))
+    val fs = new BufferedInputStream(Files.newInputStream(file.toPath))
     val factory = new ArchiveStreamFactory()
 
     def entries: Iterator[ArchiveEntry] = {
@@ -185,4 +187,5 @@ object ExtensionPackaging extends AutoPlugin {
       .toList
     finally fs.close()
   }
+
 }

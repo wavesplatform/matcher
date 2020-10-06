@@ -15,20 +15,19 @@ import scala.jdk.CollectionConverters._
 
 trait HasDex { self: BaseContainersKit =>
   protected val defaultDexImage = "wavesplatform/dex-it:latest"
-  private val dexImage          = Option(System.getenv("DEX_IMAGE")).getOrElse(defaultDexImage)
+  private val dexImage = Option(System.getenv("DEX_IMAGE")).getOrElse(defaultDexImage)
 
-  protected implicit def toDexExplicitGetOps[F[_]: CanExtract: Functor](self: DexApi[F]): DexApiOps.ExplicitGetDexApiOps[F] = {
+  implicit protected def toDexExplicitGetOps[F[_]: CanExtract: Functor](self: DexApi[F]): DexApiOps.ExplicitGetDexApiOps[F] =
     new DexApiOps.ExplicitGetDexApiOps[F](self)
-  }
 
   protected def dexInitialSuiteConfig: Config = ConfigFactory.empty()
 
   protected lazy val dexRunConfig: Config = dexQueueConfig(ThreadLocalRandom.current.nextInt(0, Int.MaxValue))
 
-  protected def kafkaServer: Option[String] = Option { System.getenv("KAFKA_SERVER") }
+  protected def kafkaServer: Option[String] = Option(System.getenv("KAFKA_SERVER"))
 
-  protected def dexQueueConfig(queueId: Int): Config = {
-    kafkaServer.fold { ConfigFactory.empty() } { kafkaServer =>
+  protected def dexQueueConfig(queueId: Int): Config =
+    kafkaServer.fold(ConfigFactory.empty()) { kafkaServer =>
       ConfigFactory.parseString(s"""waves.dex.events-queue {
                                    |  type = kafka
                                    |  kafka {
@@ -37,12 +36,13 @@ trait HasDex { self: BaseContainersKit =>
                                    |  }
                                    |}""".stripMargin)
     }
-  }
 
-  protected def createDex(name: String,
-                          runConfig: Config = dexRunConfig,
-                          suiteInitialConfig: Config = dexInitialSuiteConfig,
-                          image: String = dexImage): DexContainer =
+  protected def createDex(
+    name: String,
+    runConfig: Config = dexRunConfig,
+    suiteInitialConfig: Config = dexInitialSuiteConfig,
+    image: String = dexImage
+  ): DexContainer =
     DexContainer(name, networkName, network, getIp(name), runConfig, suiteInitialConfig, localLogsDir, image) unsafeTap addKnownContainer
 
   lazy val dex1: DexContainer = createDex("dex-1")
@@ -52,21 +52,20 @@ trait HasDex { self: BaseContainersKit =>
     try {
       val newTopic = new NewTopic(name, 1, 1.toShort)
       adminClient.createTopics(java.util.Collections.singletonList(newTopic))
-    } finally {
-      adminClient.close()
-    }
+    } finally adminClient.close()
   }
 
   protected def mkKafkaAdminClient(kafkaServer: String): AdminClient = {
     val properties = new Properties()
     properties.putAll(
       Map(
-        "bootstrap.servers"  -> kafkaServer,
-        "key.deserializer"   -> "org.apache.kafka.common.serialization.StringDeserializer",
+        "bootstrap.servers" -> kafkaServer,
+        "key.deserializer" -> "org.apache.kafka.common.serialization.StringDeserializer",
         "value.deserializer" -> "org.apache.kafka.common.serialization.StringDeserializer"
       ).asJava
     )
 
     AdminClient.create(properties)
   }
+
 }

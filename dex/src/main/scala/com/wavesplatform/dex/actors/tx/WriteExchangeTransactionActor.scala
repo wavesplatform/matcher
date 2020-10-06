@@ -26,6 +26,7 @@ class WriteExchangeTransactionActor(db: DB) extends Actor with ScorexLogging {
       appendTxId(rw, tx.sellOrder.id(), tx.id())
     }
   }
+
 }
 
 object WriteExchangeTransactionActor {
@@ -35,9 +36,10 @@ object WriteExchangeTransactionActor {
   def props(db: DB): Props = Props(new WriteExchangeTransactionActor(db))
 
   def appendTxId(rw: RW, orderId: ByteStr, txId: ByteStr): Unit = {
-    val key       = DbKeys.orderTxIdsSeqNr(orderId)
+    val key = DbKeys.orderTxIdsSeqNr(orderId)
     val nextSeqNr = rw.get(key) + 1
     rw.put(key, nextSeqNr)
     rw.put(DbKeys.orderTxId(orderId, nextSeqNr), txId)
   }
+
 }

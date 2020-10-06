@@ -16,4 +16,5 @@ trait WorkingStash {
     stashedMessages.foreach { case (sender, message) => self.tell(message, sender) }
     stashedMessages = Queue.empty
   }
+
 }

@@ -23,4 +23,5 @@ object WsOrderBookSubscribe {
     (_, key, depth) => WsOrderBookSubscribe(key, depth),
     unlift(WsOrderBookSubscribe.wsUnapply)
   )
+
 }

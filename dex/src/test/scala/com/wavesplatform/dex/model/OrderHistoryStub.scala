@@ -16,30 +16,29 @@ import scala.concurrent.Future
 
 class OrderHistoryStub(system: ActorSystem, time: Time, maxActiveOrders: Int, maxFinalizedOrders: Int) {
 
-  private implicit val efc: ErrorFormatterContext = ErrorFormatterContext.from(_ => 8)
+  implicit private val efc: ErrorFormatterContext = ErrorFormatterContext.from(_ => 8)
 
-  private val refs   = mutable.AnyRefMap.empty[Address, ActorRef]
+  private val refs = mutable.AnyRefMap.empty[Address, ActorRef]
   private val orders = mutable.AnyRefMap.empty[ByteStr, Address]
 
   private val spendableBalances: (Address, Set[Asset]) => Future[Map[Asset, Long]] = (_, _) => Future.successful(Map.empty[Asset, Long])
-  private val allAssetsSpendableBalances: Address => Future[Map[Asset, Long]]      = _ => Future.successful(Map.empty[Asset, Long])
+  private val allAssetsSpendableBalances: Address => Future[Map[Asset, Long]] = _ => Future.successful(Map.empty[Asset, Long])
 
   private val spendableBalanceActor = system.actorOf(Props(new SpendableBalancesActor(spendableBalances, allAssetsSpendableBalances, addressDir)))
 
-  def createAddressActor(address: Address, started: Boolean): Props = {
+  def createAddressActor(address: Address, started: Boolean): Props =
     Props(
       new AddressActor(
         address,
         time,
         new TestOrderDB(maxFinalizedOrders),
         (_, _) => Future.successful(Right(())),
-        e => Future.successful { Some(QueueEventWithMeta(0, 0, e)) },
+        e => Future.successful(Some(QueueEventWithMeta(0, 0, e))),
         started,
         spendableBalanceActor,
         AddressActor.Settings.default.copy(maxActiveOrders = maxActiveOrders)
       )
     )
-  }
 
   private def actorFor(ao: AcceptedOrder): ActorRef =
     refs.getOrElseUpdate(
@@ -58,7 +57,7 @@ class OrderHistoryStub(system: ActorSystem, time: Time, maxActiveOrders: Int, ma
     )
   )
 
-  def ref(sender: Address): ActorRef  = refs(sender)
+  def ref(sender: Address): ActorRef = refs(sender)
   def ref(orderId: ByteStr): ActorRef = refs(orders(orderId))
 
   def process(event: Events.Event): Unit = event match {
@@ -68,7 +67,7 @@ class OrderHistoryStub(system: ActorSystem, time: Time, maxActiveOrders: Int, ma
 
     case ox: Events.OrderExecuted =>
       orders += ox.submitted.order.id() -> ox.submitted.order.sender
-      orders += ox.counter.order.id()   -> ox.counter.order.sender
+      orders += ox.counter.order.id() -> ox.counter.order.sender
       actorFor(ox.counter) ! ox
       actorFor(ox.submitted) ! ox
 

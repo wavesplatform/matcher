@@ -11,17 +11,19 @@ import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.model.{AcceptedOrder, OrderStatus}
 
-case class WsAddressState(address: Address,
-                          activeSubscription: Map[ActorRef[WsAddressChanges], Long],
-                          pendingSubscription: Set[ActorRef[WsAddressChanges]],
-                          changedSpendableAssets: Set[Asset],
-                          changedReservableAssets: Set[Asset],
-                          ordersChanges: Map[Order.Id, WsOrder]) { // TODO Probably use an ordered Map and pass it to WsAddressChanges
+case class WsAddressState(
+  address: Address,
+  activeSubscription: Map[ActorRef[WsAddressChanges], Long],
+  pendingSubscription: Set[ActorRef[WsAddressChanges]],
+  changedSpendableAssets: Set[Asset],
+  changedReservableAssets: Set[Asset],
+  ordersChanges: Map[Order.Id, WsOrder]
+) { // TODO Probably use an ordered Map and pass it to WsAddressChanges
 
   val hasActiveSubscriptions: Boolean = activeSubscription.nonEmpty
-  val hasChanges: Boolean             = getAllChangedAssets.nonEmpty || ordersChanges.nonEmpty
+  val hasChanges: Boolean = getAllChangedAssets.nonEmpty || ordersChanges.nonEmpty
 
-  def getAllChangedAssets: Set[Asset]  = changedSpendableAssets ++ changedReservableAssets
+  def getAllChangedAssets: Set[Asset] = changedSpendableAssets ++ changedReservableAssets
   def getAllOrderChanges: Seq[WsOrder] = ordersChanges.values.toSeq
 
   def addPendingSubscription(subscriber: ActorRef[WsAddressChanges]): WsAddressState =
@@ -36,7 +38,7 @@ case class WsAddressState(address: Address,
     else updated
   }
 
-  def putReservedAssets(diff: Set[Asset]): WsAddressState  = copy(changedReservableAssets = changedReservableAssets ++ diff)
+  def putReservedAssets(diff: Set[Asset]): WsAddressState = copy(changedReservableAssets = changedReservableAssets ++ diff)
   def putSpendableAssets(diff: Set[Asset]): WsAddressState = copy(changedSpendableAssets = changedSpendableAssets ++ diff)
 
   def putOrderUpdate(id: Order.Id, update: WsOrder): WsAddressState = copy(ordersChanges = ordersChanges + (id -> update))
@@ -81,15 +83,15 @@ case class WsAddressState(address: Address,
     }
   )
 
-  def cleanAllChanges(): WsAddressState     = copy(changedSpendableAssets = Set.empty, changedReservableAssets = Set.empty, ordersChanges = Map.empty)
-  def cleanOrderChanges(): WsAddressState   = copy(ordersChanges = Map.empty)
+  def cleanAllChanges(): WsAddressState = copy(changedSpendableAssets = Set.empty, changedReservableAssets = Set.empty, ordersChanges = Map.empty)
+  def cleanOrderChanges(): WsAddressState = copy(ordersChanges = Map.empty)
   def cleanBalanceChanges(): WsAddressState = copy(changedSpendableAssets = Set.empty, changedReservableAssets = Set.empty)
 }
 
 object WsAddressState {
 
   def empty(address: Address): WsAddressState = WsAddressState(address, Map.empty, Set.empty, Set.empty, Set.empty, Map.empty)
-  val numberMaxSafeInteger                    = 9007199254740991L
+  val numberMaxSafeInteger = 9007199254740991L
 
   def getNextUpdateId(currentUpdateId: Long): Long = if (currentUpdateId == numberMaxSafeInteger) 1 else currentUpdateId + 1
 }

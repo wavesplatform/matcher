@@ -12,7 +12,7 @@ class DenormalizedMatchingRulesSpecification extends AnyPropSpec with PropertyCh
   property("skipOutdated: rules.head.startOffset <= currentOffset < rules(1).startOffset") {
     val g = for {
       currOffset <- currOffsetGen
-      rules      <- rulesChainGen(5)
+      rules <- rulesChainGen(5)
     } yield (currOffset, rules)
 
     forAll(g) {
@@ -42,7 +42,7 @@ class DenormalizedMatchingRulesSpecification extends AnyPropSpec with PropertyCh
     else
       for {
         startOffset <- Gen.choose(prevRules.startOffset + 1, Long.MaxValue)
-        tickSize    <- Gen.choose(1, Double.MaxValue)
+        tickSize <- Gen.choose(1, Double.MaxValue)
       } yield Some(DenormalizedMatchingRule(startOffset, tickSize))
 
   private val firstRuleGen: Gen[DenormalizedMatchingRule] = Gen.choose(1, Double.MaxValue).map(DenormalizedMatchingRule(0L, _))
@@ -53,10 +53,11 @@ class DenormalizedMatchingRulesSpecification extends AnyPropSpec with PropertyCh
       else
         for {
           xs <- acc
-          x  <- nextRulesGen(xs.head)
-          r  <- x.fold(Gen.const(xs))(x => loop(rest - 1, Gen.const(x :: xs)))
+          x <- nextRulesGen(xs.head)
+          r <- x.fold(Gen.const(xs))(x => loop(rest - 1, Gen.const(x :: xs)))
         } yield r
 
     Gen.lzy(loop(maxNumber, firstRuleGen.map(NonEmptyList.one)).map(_.reverse))
   }
+
 }

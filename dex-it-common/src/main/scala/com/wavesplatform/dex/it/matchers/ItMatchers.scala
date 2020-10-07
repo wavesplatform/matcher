@@ -9,26 +9,25 @@ import scala.Ordered._
 
 trait ItMatchers {
 
-  def failWith(errorCode: Int): Matcher[Either[MatcherError, Any]]                      = new FailWith(errorCode)
+  def failWith(errorCode: Int): Matcher[Either[MatcherError, Any]] = new FailWith(errorCode)
   def failWith(errorCode: Int, messagePart: String): Matcher[Either[MatcherError, Any]] = new FailWith(errorCode, Some(messagePart))
 
-  def failWith(errorCode: Int, containsParams: MatcherError.Params): Matcher[Either[MatcherError, Any]] = {
+  def failWith(errorCode: Int, containsParams: MatcherError.Params): Matcher[Either[MatcherError, Any]] =
     new FailWith(errorCode, None, containsParams)
-  }
 
   def failWithBalanceNotEnough(required: Map[Asset, Long] = Map.empty, available: Map[Asset, Long] = Map.empty)(
-      implicit assetDecimalsMap: Map[Asset, Int]): Matcher[Either[MatcherError, Any]] = {
+    implicit assetDecimalsMap: Map[Asset, Int]
+  ): Matcher[Either[MatcherError, Any]] = {
 
-    def stringifyBalances(map: Map[Asset, Long]): String = {
+    def stringifyBalances(map: Map[Asset, Long]): String =
       map.toList
         .sortWith { (l, r) =>
           l._1.compatId < r._1.compatId
         }
         .map { case (a, b) => s"${Denormalization.denormalizeAmountAndFee(b, assetDecimalsMap(a))} ${a.toString}" }
         .mkString(" and ")
-    }
 
-    lazy val requiredStr  = stringifyBalances(required)
+    lazy val requiredStr = stringifyBalances(required)
     lazy val availableStr = stringifyBalances(available)
 
     val errorMsg =
@@ -37,4 +36,5 @@ trait ItMatchers {
 
     failWith(3147270, errorMsg)
   }
+
 }

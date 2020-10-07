@@ -52,51 +52,65 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
 
   def tryCancelAll(owner: KeyPair, timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, HttpSuccessfulBatchCancel]]
 
-  def tryCancelAllByPair(owner: KeyPair,
-                         assetPair: AssetPair,
-                         timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, HttpSuccessfulBatchCancel]]
+  def tryCancelAllByPair(
+    owner: KeyPair,
+    assetPair: AssetPair,
+    timestamp: Long = System.currentTimeMillis
+  ): F[Either[MatcherError, HttpSuccessfulBatchCancel]]
 
-  def tryCancelAllByIdsWithApiKey(owner: Address,
-                                  orderIds: Set[Order.Id],
-                                  xUserPublicKey: Option[PublicKey]): F[Either[MatcherError, HttpSuccessfulBatchCancel]]
+  def tryCancelAllByIdsWithApiKey(
+    owner: Address,
+    orderIds: Set[Order.Id],
+    xUserPublicKey: Option[PublicKey]
+  ): F[Either[MatcherError, HttpSuccessfulBatchCancel]]
 
   def tryOrderStatus(order: Order): F[Either[MatcherError, HttpOrderStatus]] = tryOrderStatus(order.assetPair, order.id())
   def tryOrderStatus(assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, HttpOrderStatus]]
 
-  def tryOrderStatusInfoByIdWithApiKey(owner: Address,
-                                       orderId: Order.Id,
-                                       xUserPublicKey: Option[PublicKey]): F[Either[MatcherError, HttpOrderBookHistoryItem]]
+  def tryOrderStatusInfoByIdWithApiKey(
+    owner: Address,
+    orderId: Order.Id,
+    xUserPublicKey: Option[PublicKey]
+  ): F[Either[MatcherError, HttpOrderBookHistoryItem]]
 
-  def tryOrderStatusInfoByIdWithSignature(owner: KeyPair,
-                                          orderId: Order.Id,
-                                          timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, HttpOrderBookHistoryItem]]
+  def tryOrderStatusInfoByIdWithSignature(
+    owner: KeyPair,
+    orderId: Order.Id,
+    timestamp: Long = System.currentTimeMillis
+  ): F[Either[MatcherError, HttpOrderBookHistoryItem]]
 
   def tryTransactionsByOrder(id: Order.Id): F[Either[MatcherError, List[ExchangeTransaction]]]
 
   /**
-    * param @activeOnly Server treats this parameter as false if it wasn't specified
-    */
-  def tryOrderHistory(owner: KeyPair,
-                      activeOnly: Option[Boolean] = None,
-                      closedOnly: Option[Boolean] = None,
-                      timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, List[HttpOrderBookHistoryItem]]]
+   * param @activeOnly Server treats this parameter as false if it wasn't specified
+   */
+  def tryOrderHistory(
+    owner: KeyPair,
+    activeOnly: Option[Boolean] = None,
+    closedOnly: Option[Boolean] = None,
+    timestamp: Long = System.currentTimeMillis
+  ): F[Either[MatcherError, List[HttpOrderBookHistoryItem]]]
 
   /**
-    * param @activeOnly Server treats this parameter as true if it wasn't specified
-    */
-  def tryOrderHistoryWithApiKey(owner: Address,
-                                activeOnly: Option[Boolean] = None,
-                                closedOnly: Option[Boolean] = None,
-                                xUserPublicKey: Option[PublicKey] = None): F[Either[MatcherError, List[HttpOrderBookHistoryItem]]]
+   * param @activeOnly Server treats this parameter as true if it wasn't specified
+   */
+  def tryOrderHistoryWithApiKey(
+    owner: Address,
+    activeOnly: Option[Boolean] = None,
+    closedOnly: Option[Boolean] = None,
+    xUserPublicKey: Option[PublicKey] = None
+  ): F[Either[MatcherError, List[HttpOrderBookHistoryItem]]]
 
   /**
-    * param @activeOnly Server treats this parameter as false if it wasn't specified
-    */
-  def tryOrderHistoryByPair(owner: KeyPair,
-                            assetPair: AssetPair,
-                            activeOnly: Option[Boolean] = None,
-                            closedOnly: Option[Boolean] = None,
-                            timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, List[HttpOrderBookHistoryItem]]]
+   * param @activeOnly Server treats this parameter as false if it wasn't specified
+   */
+  def tryOrderHistoryByPair(
+    owner: KeyPair,
+    assetPair: AssetPair,
+    activeOnly: Option[Boolean] = None,
+    closedOnly: Option[Boolean] = None,
+    timestamp: Long = System.currentTimeMillis
+  ): F[Either[MatcherError, List[HttpOrderBookHistoryItem]]]
 
   def tryAllOrderBooks: F[Either[MatcherError, HttpTradingMarkets]]
 
@@ -131,9 +145,12 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
   def waitForOrderPlacement(order: Order): F[HttpSuccessfulPlace]
 
   def waitForOrderHistory[A](owner: KeyPair, activeOnly: Option[Boolean])(
-      pred: List[HttpOrderBookHistoryItem] => Boolean): F[List[HttpOrderBookHistoryItem]]
+    pred: List[HttpOrderBookHistoryItem] => Boolean
+  ): F[List[HttpOrderBookHistoryItem]]
 
-  def waitForOrderStatus(order: Order, status: HttpOrderStatus.Status): F[HttpOrderStatus] = waitForOrderStatus(order.assetPair, order.id(), status)
+  def waitForOrderStatus(order: Order, status: HttpOrderStatus.Status): F[HttpOrderStatus] =
+    waitForOrderStatus(order.assetPair, order.id(), status)
+
   def waitForOrderStatus(assetPair: AssetPair, id: Order.Id, status: HttpOrderStatus.Status): F[HttpOrderStatus]
 
   def waitForTransactionsByOrder(order: Order, atLeast: Int): F[List[ExchangeTransaction]] = waitForTransactionsByOrder(order.id(), atLeast)
@@ -155,23 +172,26 @@ object DexApi {
   }
 
   private def cancelRequest(sender: KeyPair, orderId: String): HttpCancelOrder = {
-    val req       = HttpCancelOrder(sender, Some(ByteStr.decodeBase58(orderId).get), None, Array.emptyByteArray)
+    val req = HttpCancelOrder(sender, Some(ByteStr.decodeBase58(orderId).get), None, Array.emptyByteArray)
     val signature = crypto.sign(sender, req.toSign)
     req.copy(signature = signature)
   }
 
   private def batchCancelRequest(sender: KeyPair, timestamp: Long): HttpCancelOrder = {
-    val req       = HttpCancelOrder(sender, None, Some(timestamp), Array.emptyByteArray)
+    val req = HttpCancelOrder(sender, None, Some(timestamp), Array.emptyByteArray)
     val signature = crypto.sign(sender, req.toSign)
     req.copy(signature = signature)
   }
 
   // noinspection ScalaStyle
-  def apply[F[_]](apiKey: String,
-                  host: => InetSocketAddress)(implicit M: ThrowableMonadError[F], W: CanWait[F], httpBackend: SttpBackend[F, Nothing]): DexApi[F] =
+  def apply[F[_]](apiKey: String, host: => InetSocketAddress)(implicit
+    M: ThrowableMonadError[F],
+    W: CanWait[F],
+    httpBackend: SttpBackend[F, Nothing]
+  ): DexApi[F] =
     new DexApi[F] {
 
-      private val ops     = FOps[F]; import ops._
+      private val ops = FOps[F]; import ops._
       private val sttpOps = SttpBackendOps[F, MatcherError]; import sttpOps._
 
       def apiUri: String = {
@@ -180,7 +200,7 @@ object DexApi {
       }
 
       override val tryPublicKeyWithResponse = tryParseJsonWithResponse(sttp.get(uri"$apiUri/matcher"))
-      override val tryPublicKey             = tryPublicKeyWithResponse.map(_._2)
+      override val tryPublicKey = tryPublicKeyWithResponse.map(_._2)
 
       override def tryReservedBalance(of: KeyPair, timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, Map[Asset, Long]]] =
         tryParseJson {
@@ -196,13 +216,16 @@ object DexApi {
             .headers(apiKeyWithUserPublicKeyHeaders(xUserPublicKey))
         }
 
-      override def tryTradableBalance(of: KeyPair,
-                                      assetPair: AssetPair,
-                                      timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, Map[Asset, Long]]] =
+      override def tryTradableBalance(
+        of: KeyPair,
+        assetPair: AssetPair,
+        timestamp: Long = System.currentTimeMillis
+      ): F[Either[MatcherError, Map[Asset, Long]]] =
         tryParseJson {
           sttp
             .get(
-              uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/tradableBalance/${of.publicKey.toAddress.stringRepr}")
+              uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/tradableBalance/${of.publicKey.toAddress.stringRepr}"
+            )
             .headers(timestampAndSignatureHeaders(of, timestamp))
         }
 
@@ -237,9 +260,11 @@ object DexApi {
             .contentType("application/json", "UTF-8")
         }
 
-      override def tryCancelAllByPair(owner: KeyPair,
-                                      assetPair: AssetPair,
-                                      timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, HttpSuccessfulBatchCancel]] = tryParseJson {
+      override def tryCancelAllByPair(
+        owner: KeyPair,
+        assetPair: AssetPair,
+        timestamp: Long = System.currentTimeMillis
+      ): F[Either[MatcherError, HttpSuccessfulBatchCancel]] = tryParseJson {
         val body = Json.stringify(Json.toJson(batchCancelRequest(owner, timestamp)))
         sttp
           .post(uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/cancel")
@@ -247,9 +272,11 @@ object DexApi {
           .contentType("application/json", "UTF-8")
       }
 
-      override def tryCancelAllByIdsWithApiKey(owner: Address,
-                                               orderIds: Set[Order.Id],
-                                               xUserPublicKey: Option[PublicKey]): F[Either[MatcherError, HttpSuccessfulBatchCancel]] = tryParseJson {
+      override def tryCancelAllByIdsWithApiKey(
+        owner: Address,
+        orderIds: Set[Order.Id],
+        xUserPublicKey: Option[PublicKey]
+      ): F[Either[MatcherError, HttpSuccessfulBatchCancel]] = tryParseJson {
         sttp
           .post(uri"$apiUri/matcher/orders/$owner/cancel")
           .headers(apiKeyWithUserPublicKeyHeaders(xUserPublicKey))
@@ -265,18 +292,19 @@ object DexApi {
             .contentType("application/json", "UTF-8")
         }
 
-      override def tryOrderStatus(assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, HttpOrderStatus]] = {
+      override def tryOrderStatus(assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, HttpOrderStatus]] =
         tryParseJson {
           sttp
             .get(uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/$id")
             .readTimeout(3.minutes) // TODO find way to decrease timeout!
             .followRedirects(false)
         }
-      }
 
-      override def tryOrderStatusInfoByIdWithApiKey(owner: Address,
-                                                    orderId: Order.Id,
-                                                    xUserPublicKey: Option[PublicKey]): F[Either[MatcherError, HttpOrderBookHistoryItem]] =
+      override def tryOrderStatusInfoByIdWithApiKey(
+        owner: Address,
+        orderId: Order.Id,
+        xUserPublicKey: Option[PublicKey]
+      ): F[Either[MatcherError, HttpOrderBookHistoryItem]] =
         tryParseJson {
           sttp
             .get(uri"$apiUri/matcher/orders/$owner/${orderId.toString}")
@@ -284,44 +312,50 @@ object DexApi {
         }
 
       override def tryOrderStatusInfoByIdWithSignature(
-          owner: KeyPair,
-          orderId: Order.Id,
-          timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, HttpOrderBookHistoryItem]] =
+        owner: KeyPair,
+        orderId: Order.Id,
+        timestamp: Long = System.currentTimeMillis
+      ): F[Either[MatcherError, HttpOrderBookHistoryItem]] =
         tryParseJson {
           sttp
             .get(uri"$apiUri/matcher/orderbook/${owner.publicKey}/${orderId.toString}")
             .headers(timestampAndSignatureHeaders(owner, timestamp))
         }
 
-      override def tryTransactionsByOrder(id: Order.Id): F[Either[MatcherError, List[ExchangeTransaction]]] = {
+      override def tryTransactionsByOrder(id: Order.Id): F[Either[MatcherError, List[ExchangeTransaction]]] =
         tryParseJson(sttp.get(uri"$apiUri/matcher/transactions/$id"))
-      }
 
-      override def tryOrderHistory(owner: KeyPair,
-                                   activeOnly: Option[Boolean] = None,
-                                   closedOnly: Option[Boolean] = None,
-                                   timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, List[HttpOrderBookHistoryItem]]] =
+      override def tryOrderHistory(
+        owner: KeyPair,
+        activeOnly: Option[Boolean] = None,
+        closedOnly: Option[Boolean] = None,
+        timestamp: Long = System.currentTimeMillis
+      ): F[Either[MatcherError, List[HttpOrderBookHistoryItem]]] =
         tryParseJson {
           sttp
             .get(appendFilters(uri"$apiUri/matcher/orderbook/${Base58.encode(owner.publicKey)}", activeOnly, closedOnly))
             .headers(timestampAndSignatureHeaders(owner, timestamp))
         }
 
-      override def tryOrderHistoryWithApiKey(owner: Address,
-                                             activeOnly: Option[Boolean] = None,
-                                             closedOnly: Option[Boolean] = None,
-                                             xUserPublicKey: Option[PublicKey] = None): F[Either[MatcherError, List[HttpOrderBookHistoryItem]]] =
+      override def tryOrderHistoryWithApiKey(
+        owner: Address,
+        activeOnly: Option[Boolean] = None,
+        closedOnly: Option[Boolean] = None,
+        xUserPublicKey: Option[PublicKey] = None
+      ): F[Either[MatcherError, List[HttpOrderBookHistoryItem]]] =
         tryParseJson {
           sttp
             .get(appendFilters(uri"$apiUri/matcher/orders/${owner.stringRepr}", activeOnly, closedOnly))
             .headers(apiKeyWithUserPublicKeyHeaders(xUserPublicKey))
         }
 
-      override def tryOrderHistoryByPair(owner: KeyPair,
-                                         assetPair: AssetPair,
-                                         activeOnly: Option[Boolean] = None,
-                                         closedOnly: Option[Boolean] = None,
-                                         timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, List[HttpOrderBookHistoryItem]]] =
+      override def tryOrderHistoryByPair(
+        owner: KeyPair,
+        assetPair: AssetPair,
+        activeOnly: Option[Boolean] = None,
+        closedOnly: Option[Boolean] = None,
+        timestamp: Long = System.currentTimeMillis
+      ): F[Either[MatcherError, List[HttpOrderBookHistoryItem]]] =
         tryParseJson {
           sttp
             .get(
@@ -381,7 +415,7 @@ object DexApi {
 
         for {
           rawResp <- httpBackend.send(req)
-          resp    <- parseTryResponseEither[MatcherError, HttpMessage](rawResp)
+          resp <- parseTryResponseEither[MatcherError, HttpMessage](rawResp)
         } yield resp.map(rawResp.code -> _)
       }
 
@@ -426,7 +460,7 @@ object DexApi {
       override def waitReady: F[Unit] = {
         def request: F[Boolean] = M.handleErrorWith(tryAllOrderBooks.map(_.isRight)) {
           case _: SocketException | _: JsResultException => M.pure(false)
-          case NonFatal(e)                               => M.raiseError(e)
+          case NonFatal(e) => M.raiseError(e)
         }
 
         // Sometimes container start during 20 seconds! https://github.com/docker/for-mac/issues/1183
@@ -435,16 +469,17 @@ object DexApi {
 
       override def waitForOrder(assetPair: AssetPair, id: Order.Id)(pred: HttpOrderStatus => Boolean): F[HttpOrderStatus] =
         repeatUntil(tryOrderStatus(assetPair, id), RepeatRequestOptions(1.second, 60)) {
-          case Left(_)  => false
+          case Left(_) => false
           case Right(x) => pred(x)
         }.map(_.explicitGet())
 
       override def waitForOrderPlacement(order: Order): F[HttpSuccessfulPlace] = repeatUntil(tryPlace(order))(_.isRight).map(_.explicitGet())
 
       def waitForOrderHistory[A](owner: KeyPair, activeOnly: Option[Boolean])(
-          pred: List[HttpOrderBookHistoryItem] => Boolean): F[List[HttpOrderBookHistoryItem]] =
+        pred: List[HttpOrderBookHistoryItem] => Boolean
+      ): F[List[HttpOrderBookHistoryItem]] =
         repeatUntil[Either[MatcherError, List[HttpOrderBookHistoryItem]]](tryOrderHistory(owner, activeOnly), RepeatRequestOptions(1.second, 60)) {
-          case Left(_)  => false
+          case Left(_) => false
           case Right(x) => pred(x)
         }.map(_.explicitGet())
 
@@ -456,19 +491,19 @@ object DexApi {
 
       override def waitForTransactionsByOrder(id: Order.Id)(pred: List[ExchangeTransaction] => Boolean): F[List[ExchangeTransaction]] =
         repeatUntil[Either[MatcherError, List[ExchangeTransaction]]](tryTransactionsByOrder(id), RepeatRequestOptions(1.second, 60)) {
-          case Left(_)  => false
+          case Left(_) => false
           case Right(x) => pred(x)
         }.map(_.explicitGet())
 
       override def waitForCurrentOffset(pred: Long => Boolean): F[HttpOffset] =
         repeatUntil[Either[MatcherError, HttpOffset]](tryCurrentOffset, RepeatRequestOptions(1.second, 120)) {
-          case Left(_)  => false
+          case Left(_) => false
           case Right(x) => pred(x)
         }.map(_.explicitGet())
 
       override def waitForWsConnections(pred: HttpWebSocketConnections => Boolean): F[HttpWebSocketConnections] =
         repeatUntil[Either[MatcherError, HttpWebSocketConnections]](tryWsConnections, RepeatRequestOptions(1.second, 120)) {
-          case Left(_)  => false
+          case Left(_) => false
           case Right(x) => pred(x)
         }.map(_.explicitGet())
 
@@ -506,11 +541,12 @@ object DexApi {
         "Signature" -> Base58.encode(crypto.sign(owner, owner.publicKey ++ Longs.toByteArray(timestamp)))
       )
 
-      private val apiKeyHeaders: Map[String, String]                      = Map("X-API-Key"         -> apiKey)
+      private val apiKeyHeaders: Map[String, String] = Map("X-API-Key" -> apiKey)
       private def userPublicKeyHeaders(x: PublicKey): Map[String, String] = Map("X-User-Public-Key" -> x.base58)
 
-      private def apiKeyWithUserPublicKeyHeaders(xUserPublicKey: Option[PublicKey]): Map[String, String] = {
+      private def apiKeyWithUserPublicKeyHeaders(xUserPublicKey: Option[PublicKey]): Map[String, String] =
         apiKeyHeaders ++ xUserPublicKey.fold(Map.empty[String, String])(userPublicKeyHeaders)
-      }
+
     }
+
 }

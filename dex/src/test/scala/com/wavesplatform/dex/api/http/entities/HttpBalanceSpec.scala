@@ -19,7 +19,7 @@ class HttpBalanceSpec extends AnyFreeSpec with Matchers with DiffMatcherWithImpl
 
   private val balance =
     Map(
-      Waves       -> 100L,
+      Waves -> 100L,
       issuedAsset -> 300L
     )
 

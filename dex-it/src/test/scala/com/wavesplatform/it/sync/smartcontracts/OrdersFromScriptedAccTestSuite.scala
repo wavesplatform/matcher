@@ -27,8 +27,8 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
        |}""".stripMargin
   )
 
-  private val aliceAssetTx   = mkIssue(alice, "AliceCoin", someAssetAmount, 0)
-  private val aliceAsset     = IssuedAsset(aliceAssetTx.id())
+  private val aliceAssetTx = mkIssue(alice, "AliceCoin", someAssetAmount, 0)
+  private val aliceAsset = IssuedAsset(aliceAssetTx.id())
   private val aliceWavesPair = AssetPair(aliceAsset, Waves)
 
   private def updateBobScript(binaryCodeInBase64: String): Unit =
@@ -41,14 +41,18 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
 
   "issue asset and run test" - {
     "trading is deprecated" in {
-      dex1.api.tryPlace(mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 1)) should failWith(
+      dex1.api.tryPlace(
+        mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 1)
+      ) should failWith(
         2097923, // AccountFeatureUnsupported
         "An account's feature isn't yet supported"
       )
     }
 
     "can't place an OrderV2 before the activation" in {
-      dex1.api.tryPlace(mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2)) should failWith(
+      dex1.api.tryPlace(
+        mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2)
+      ) should failWith(
         2099459, // OrderVersionUnsupported
         "The order of version 2 isn't yet supported"
       )
@@ -61,7 +65,9 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
       // true && (height > 0)
       updateBobScript("AgMGCQAAZgAAAAIFAAAABmhlaWdodAAAAAAAAAAAAAeEODpj")
       Thread.sleep(3000) // TODO Sometimes fail without this awaiting, probably issue in the cache
-      dex1.api.tryPlace(mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2)) should failWith(
+      dex1.api.tryPlace(
+        mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2)
+      ) should failWith(
         3147520, // AccountScriptReturnedError
         "An access to the blockchain.height is denied on DEX"
       )
@@ -105,7 +111,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
        */
       "prepare" in updateBobScript(
         "AAIDAAAAAAAAAAIIAQAAAAAAAAAAAAAAAQAAAAJ0eAEAAAAGdmVyaWZ5AAAAAAQAAAAHJG1hdGNoMAUAAAACdHgDCQAAAQAAAAIFAAAABy" +
-          "RtYXRjaDACAAAABU9yZGVyBAAAAAFvBQAAAAckbWF0Y2gwCQAAZgAAAAIIBQAAAAFvAAAABmFtb3VudAAAAAAAAAAD6AboNesg"
+        "RtYXRjaDACAAAABU9yZGVyBAAAAAFvBQAAAAckbWF0Y2gwCQAAZgAAAAIIBQAAAAFvAAAABmFtb3VudAAAAAAAAAAD6AboNesg"
       )
 
       "accept correct order" in {
@@ -115,7 +121,9 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
       }
 
       "reject incorrect order" in {
-        dex1.api.tryPlace(mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2)) should failWith(
+        dex1.api.tryPlace(
+          mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2)
+        ) should failWith(
           3147522 // AccountScriptDeniedOrder
         )
       }

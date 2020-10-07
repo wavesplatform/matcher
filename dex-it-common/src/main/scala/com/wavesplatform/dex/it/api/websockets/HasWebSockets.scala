@@ -26,7 +26,7 @@ import scala.concurrent.duration._
 trait HasWebSockets extends BeforeAndAfterAll with BeforeAndAfterEach with HasJwt with WsConnectionOps with WsMessageOps {
   _: Suite with Eventually with Matchers with DiffMatcherWithImplicits with PredefinedAssets =>
 
-  implicit protected val system: ActorSystem        = ActorSystem()
+  implicit protected val system: ActorSystem = ActorSystem()
   implicit protected val materializer: Materializer = Materializer.matFromSystem(system)
   implicit protected val efc: ErrorFormatterContext = ErrorFormatterContext.from(assetDecimalsMap)
 
@@ -43,11 +43,13 @@ trait HasWebSockets extends BeforeAndAfterAll with BeforeAndAfterEach with HasJw
 
   protected def addConnection(connection: WsConnection): Unit = knownWsConnections.add(connection)
 
-  protected def mkWsAddressConnection(client: KeyPair,
-                                      dex: DexContainer,
-                                      keepAlive: Boolean = true,
-                                      subscriptionLifetime: FiniteDuration = 1.hour): WsConnection = {
-    val jwt        = mkJwt(client, lifetime = subscriptionLifetime)
+  protected def mkWsAddressConnection(
+    client: KeyPair,
+    dex: DexContainer,
+    keepAlive: Boolean = true,
+    subscriptionLifetime: FiniteDuration = 1.hour
+  ): WsConnection = {
+    val jwt = mkJwt(client, lifetime = subscriptionLifetime)
     val connection = mkDexWsConnection(dex, keepAlive = keepAlive)
     connection.send(WsAddressSubscribe(client.toAddress, WsAddressSubscribe.defaultAuthType, jwt))
     connection
@@ -68,35 +70,36 @@ trait HasWebSockets extends BeforeAndAfterAll with BeforeAndAfterEach with HasJw
   protected def mkWsInternalConnection(dex: DexContainer, keepAlive: Boolean = true): WsConnection =
     mkWsConnection(getWsInternalStreamUri(dex), keepAlive)
 
-  protected def mkDexWsConnection(dex: DexContainer,
-                                  os: Option[String] = None,
-                                  client: Option[String] = None,
-                                  keepAlive: Boolean = true): WsConnection = {
+  protected def mkDexWsConnection(
+    dex: DexContainer,
+    os: Option[String] = None,
+    client: Option[String] = None,
+    keepAlive: Boolean = true
+  ): WsConnection = {
     val query: Map[String, String] = Map
       .empty[String, String]
       .appendIfDefinedMany(
-        "a_os"     -> os,
+        "a_os" -> os,
         "a_client" -> client
       )
 
     mkWsConnection(getWsStreamUri(dex, query), keepAlive)
   }
 
-  protected def mkWsConnection(uri: Uri, keepAlive: Boolean = true): WsConnection = {
+  protected def mkWsConnection(uri: Uri, keepAlive: Boolean = true): WsConnection =
     new WsConnection(uri, keepAlive) unsafeTap { wsc =>
       addConnection(wsc)
-      eventually { wsc.collectMessages[WsInitial] should have size 1 }
+      eventually(wsc.collectMessages[WsInitial] should have size 1)
       wsc.clearMessages()
     }
-  }
 
   protected def assertChanges(c: WsConnection, squash: Boolean = true)(expBs: Map[Asset, WsBalances]*)(expOs: WsOrder*): Unit = {
     eventually {
       if (squash) {
         c.balanceChanges.size should be <= expBs.size
-        c.balanceChanges.squashed should matchTo { expBs.toList.squashed }
+        c.balanceChanges.squashed should matchTo(expBs.toList.squashed)
         c.orderChanges.size should be <= expOs.size
-        c.orderChanges.squashed should matchTo { expOs.toList.squashed }
+        c.orderChanges.squashed should matchTo(expOs.toList.squashed)
       } else {
         c.balanceChanges should matchTo(expBs)
         c.orderChanges should matchTo(expOs)
@@ -148,7 +151,7 @@ trait HasWebSockets extends BeforeAndAfterAll with BeforeAndAfterEach with HasJw
   )
 
   protected def cleanupWebSockets(): Unit = if (!knownWsConnections.isEmpty) {
-    knownWsConnections.forEach { _.close() }
+    knownWsConnections.forEach(_.close())
     knownWsConnections.clear()
   }
 
@@ -162,4 +165,5 @@ trait HasWebSockets extends BeforeAndAfterAll with BeforeAndAfterEach with HasJw
     cleanupWebSockets()
     materializer.shutdown()
   }
+
 }

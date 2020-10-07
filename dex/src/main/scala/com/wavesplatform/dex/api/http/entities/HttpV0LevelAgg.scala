@@ -8,5 +8,5 @@ case class HttpV0LevelAgg(@ApiModelProperty(example = "83187648950") amount: Lon
 
 object HttpV0LevelAgg {
   implicit val httpV0LevelAggReads: Reads[HttpV0LevelAgg] = Json.reads
-  def fromLevelAgg(la: LevelAgg): HttpV0LevelAgg          = HttpV0LevelAgg(la.amount, la.price)
+  def fromLevelAgg(la: LevelAgg): HttpV0LevelAgg = HttpV0LevelAgg(la.amount, la.price)
 }

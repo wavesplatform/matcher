@@ -13,14 +13,15 @@ import monix.reactive.Observable
 import scala.concurrent.{ExecutionContext, Future}
 
 class WavesBlockchainAssetsWatchingClient(
-    settings: WavesBlockchainClientSettings,
-    underlying: WavesBlockchainClient[Future],
-    assetsStorage: AssetsStorage
+  settings: WavesBlockchainClientSettings,
+  underlying: WavesBlockchainClient[Future],
+  assetsStorage: AssetsStorage
 )(implicit grpcExecutionContext: ExecutionContext)
     extends WavesBlockchainCachingClient(underlying, settings.defaultCachesExpiration) {
 
   // Do not use
-  override def realTimeBalanceChanges: Observable[WavesBlockchainClient.BalanceChanges] = realTimeBalanceBatchChanges.flatMap(Observable.fromIterable)
+  override def realTimeBalanceChanges: Observable[WavesBlockchainClient.BalanceChanges] =
+    realTimeBalanceBatchChanges.flatMap(Observable.fromIterable)
 
   // TODO Refactor to fit this method
   def realTimeBalanceBatchChanges: Observable[List[WavesBlockchainClient.BalanceChanges]] =
@@ -37,7 +38,7 @@ class WavesBlockchainAssetsWatchingClient(
   override def allAssetsSpendableBalance(address: Address): Future[Map[Asset, Long]] =
     for {
       xs <- underlying.allAssetsSpendableBalance(address)
-      _  <- saveAssetsDescription(xs.keysIterator)
+      _ <- saveAssetsDescription(xs.keysIterator)
     } yield xs
 
   private def saveAssetsDescription(assets: Iterator[Asset]) =
@@ -49,7 +50,8 @@ class WavesBlockchainAssetsWatchingClient(
       case None =>
         assetDescription(asset).map {
           case Some(x) => assetsStorage.put(asset, x)
-          case None    => log.warn(s"Can't find the '$asset' asset in the blockchain")
+          case None => log.warn(s"Can't find the '$asset' asset in the blockchain")
         }
     }
+
 }

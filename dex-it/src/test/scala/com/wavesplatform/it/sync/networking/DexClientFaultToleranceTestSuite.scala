@@ -17,12 +17,11 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProx
 
   private val wavesNodeProxy: ContainerProxy = mkToxiProxy(WavesNodeContainer.wavesNodeNetAlias, WavesNodeContainer.dexGrpcExtensionPort)
 
-  override protected def dexInitialSuiteConfig: Config = {
+  override protected def dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(s"""waves.dex {
                                  |  price-assets = [ "$UsdId", "WAVES" ]
                                  |  waves-blockchain-client.grpc.target = "$toxiProxyHostName:${getInnerToxiProxyPort(wavesNodeProxy)}"
                                  |}""".stripMargin)
-  }
 
   lazy val wavesNode2: WavesNodeContainer = createWavesNode("waves-2")
 
@@ -65,7 +64,7 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProx
     // in these cases some delays after disconnections are required
 
     val aliceBuyOrder = mkOrder(alice, wavesUsdPair, OrderType.BUY, 1.waves, 300)
-    val bobBuyOrder   = mkOrder(bob, wavesUsdPair, OrderType.BUY, 1.waves, 300)
+    val bobBuyOrder = mkOrder(bob, wavesUsdPair, OrderType.BUY, 1.waves, 300)
 
     lazy val alice2BobTransferTx = mkTransfer(alice, bob, amount = wavesNode2.api.balance(alice, usd), asset = usd)
     lazy val bob2AliceTransferTx = mkTransfer(bob, alice, amount = wavesNode1.api.balance(bob, usd), asset = usd)
@@ -131,11 +130,12 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProx
 
     dex1.api.waitForOrderPlacement(order)
     dex1.api.waitForOrderStatus(order, Status.Accepted)
-    dex1.api.tradableBalance(mkKeyPair("random"), wavesUsdPair) should matchTo { Map.empty[Asset, Long] }
+    dex1.api.tradableBalance(mkKeyPair("random"), wavesUsdPair) should matchTo(Map.empty[Asset, Long])
   }
 
   private def usdBalancesShouldBe(wavesNodeApi: NodeApi[Id], expectedAliceBalance: Long, expectedBobBalance: Long): Unit = {
     withClue("alice:")(wavesNodeApi.balance(alice, usd) shouldBe expectedAliceBalance)
     withClue("bob:")(wavesNodeApi.balance(bob, usd) shouldBe expectedBobBalance)
   }
+
 }

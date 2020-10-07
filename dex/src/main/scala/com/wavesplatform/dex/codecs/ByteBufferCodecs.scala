@@ -13,9 +13,8 @@ object ByteBufferCodecs {
 
     def getBytes: Array[Byte] = {
       val len = b.getInt
-      if (b.limit() < len || len < 0) {
+      if (b.limit() < len || len < 0)
         throw new Exception(s"Invalid array size ($len)")
-      }
       val bytes = new Array[Byte](len)
       b.get(bytes)
       bytes
@@ -38,9 +37,9 @@ object ByteBufferCodecs {
 
     def putFinalOrderStatus(orderInfoVersion: Byte, st: OrderStatus): ByteBuffer = {
       val tpe: Byte = st match {
-        case _: OrderStatus.Filled    => 0
+        case _: OrderStatus.Filled => 0
         case _: OrderStatus.Cancelled => 1
-        case x                        => throw new IllegalArgumentException(s"Can't encode order status $x")
+        case x => throw new IllegalArgumentException(s"Can't encode order status $x")
       }
       val r = b.put(tpe).putLong(st.filledAmount)
       if (orderInfoVersion <= 1) r else r.putLong(st.filledFee)
@@ -61,7 +60,7 @@ object ByteBufferCodecs {
     }
 
     def putAcceptedOrderType(x: AcceptedOrderType): ByteBuffer = x match {
-      case AcceptedOrderType.Limit  => b.put(0: Byte)
+      case AcceptedOrderType.Limit => b.put(0: Byte)
       case AcceptedOrderType.Market => b.put(1: Byte)
     }
 
@@ -70,5 +69,7 @@ object ByteBufferCodecs {
       case 1 => AcceptedOrderType.Market
       case x => throw new IllegalArgumentException(s"Can't parse accepted order type: $x")
     }
+
   }
+
 }

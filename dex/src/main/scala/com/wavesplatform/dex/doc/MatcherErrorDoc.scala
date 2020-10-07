@@ -1,18 +1,15 @@
 package com.wavesplatform.dex.doc
 
 import com.wavesplatform.dex.error.{Class, Entity, MatcherError}
-import com.wavesplatform.dex.meta.{DescendantSamples, getSimpleName}
+import com.wavesplatform.dex.meta.{getSimpleName, DescendantSamples}
 import play.api.libs.json.Json
-
-import scala.annotation.nowarn
 
 object MatcherErrorDoc {
 
   object entitySamples extends DescendantSamples[Entity]
-  object classSamples  extends DescendantSamples[Class]
-  object errorSamples  extends DescendantSamples[MatcherError]
+  object classSamples extends DescendantSamples[Class]
+  object errorSamples extends DescendantSamples[MatcherError]
 
-  @nowarn
   def mkMarkdown: String = {
     val entities = entitySamples.run
       .map(x => x.code -> getSimpleName(x))
@@ -21,13 +18,13 @@ object MatcherErrorDoc {
       .map(x => x.code -> getSimpleName(x))
 
     val entitiesMap = entities.toMap
-    val classesMap  = classes.toMap
+    val classesMap = classes.toMap
     val errors = errorSamples.run
       .sortBy(_.code)
       .map { x =>
-        val name      = getSimpleName(x)
-        val objCode   = getObjectCode(x.code)
-        val partCode  = getPartCode(x.code)
+        val name = getSimpleName(x)
+        val objCode = getObjectCode(x.code)
+        val partCode = getPartCode(x.code)
         val classCode = getClassCode(x.code)
         (x, objCode, partCode, classCode, name)
       }
@@ -64,8 +61,8 @@ object MatcherErrorDoc {
     val errorsTable = errors.zipWithIndex
       .map {
         case ((x, objCode, partCode, classCode, name), i) =>
-          val obj   = entitiesMap(objCode)
-          val part  = entitiesMap(partCode)
+          val obj = entitiesMap(objCode)
+          val part = entitiesMap(partCode)
           val klass = classesMap(classCode)
           s"| ${i + 1} | ${x.code} | $obj | $part | $klass | [$name](#error-$name) |"
       }
@@ -95,9 +92,9 @@ object MatcherErrorDoc {
         /$detailedErrors""".stripMargin('/')
   }
 
-  private def getObjectCode(errorCode: Int): Int = (errorCode >> 20) & 0x7FF
-  private def getPartCode(errorCode: Int): Int   = (errorCode >> 8) & 0xFFF
-  private def getClassCode(errorCode: Int): Int  = errorCode & 0xFF
+  private def getObjectCode(errorCode: Int): Int = (errorCode >> 20) & 0x7ff
+  private def getPartCode(errorCode: Int): Int = (errorCode >> 8) & 0xfff
+  private def getClassCode(errorCode: Int): Int = errorCode & 0xff
 
   private def toMarkdownTable(xs: Seq[(Int, String)]): String =
     xs.sortBy(_._1)

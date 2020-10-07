@@ -13,9 +13,11 @@ import scala.concurrent.{ExecutionContext, Future}
 
 object WavesBlockchainClientBuilder extends ScorexLogging {
 
-  def async(wavesBlockchainClientSettings: WavesBlockchainClientSettings,
-            monixScheduler: Scheduler,
-            grpcExecutionContext: ExecutionContext): WavesBlockchainClient[Future] = {
+  def async(
+    wavesBlockchainClientSettings: WavesBlockchainClientSettings,
+    monixScheduler: Scheduler,
+    grpcExecutionContext: ExecutionContext
+  ): WavesBlockchainClient[Future] = {
 
     log.info(s"Building gRPC client for server: ${wavesBlockchainClientSettings.grpc.target}")
 
@@ -35,4 +37,5 @@ object WavesBlockchainClientBuilder extends ScorexLogging {
       wavesBlockchainClientSettings.defaultCachesExpiration
     )(grpcExecutionContext)
   }
+
 }

@@ -39,7 +39,8 @@ class OrderV3TestSuite extends MatcherSuiteBase {
 
   private def allowedOrderVersion(versions: Int*): Config =
     ConfigFactory.parseString(s"""waves.dex {
-         |  price-assets = [ "$UsdId", "WAVES" ]
-         |  allowed-order-versions = [${versions.mkString(", ")}]
-         |}""".stripMargin)
+                                 |  price-assets = [ "$UsdId", "WAVES" ]
+                                 |  allowed-order-versions = [${versions.mkString(", ")}]
+                                 |}""".stripMargin)
+
 }

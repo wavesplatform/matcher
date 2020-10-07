@@ -4,6 +4,8 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.ThreadLocalRandom
 
 import cats.instances.FutureInstances
+import com.softwaremill.diffx.{Derived, Diff}
+import com.wavesplatform.dex.api.http.entities.HttpV0OrderBook
 import com.wavesplatform.dex.asset.DoubleOps
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset
@@ -53,9 +55,11 @@ trait MatcherSuiteBase
 
   GenesisConfig.setupAddressScheme()
 
+  implicit val httpV0OrderBookDiff: Diff[HttpV0OrderBook] = Derived[Diff[HttpV0OrderBook]].ignore[HttpV0OrderBook, Long](_.timestamp)
+
   override protected val moduleName: String = "dex-it"
 
-  override implicit def patienceConfig: PatienceConfig = super.patienceConfig.copy(timeout = 30.seconds, interval = 1.second)
+  implicit override def patienceConfig: PatienceConfig = super.patienceConfig.copy(timeout = 30.seconds, interval = 1.second)
 
   override protected def beforeAll(): Unit = {
     log.debug(s"Perform beforeAll")
@@ -75,14 +79,14 @@ trait MatcherSuiteBase
   def createAccountWithBalance(balances: (Long, Asset)*): KeyPair = {
     val account = KeyPair(ByteStr(s"account-test-${ThreadLocalRandom.current().nextInt()}".getBytes(StandardCharsets.UTF_8)))
 
-    balances.foreach {
-      case (balance, asset) =>
-        assert(
-          wavesNode1.api.balance(alice, asset) >= balance,
-          s"Alice doesn't have enough balance in ${asset.toString} to make a transfer"
-        )
-        broadcastAndAwait(mkTransfer(alice, account.toAddress, balance, asset))
+    balances.foreach { case (balance, asset) =>
+      assert(
+        wavesNode1.api.balance(alice, asset) >= balance,
+        s"Alice doesn't have enough balance in ${asset.toString} to make a transfer"
+      )
+      broadcastAndAwait(mkTransfer(alice, account.toAddress, balance, asset))
     }
     account
   }
+
 }

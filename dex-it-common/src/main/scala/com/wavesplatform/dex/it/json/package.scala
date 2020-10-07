@@ -60,11 +60,12 @@ package object json {
           val assetPair = (
             assetPairStrArr match {
               case Array(amtAssetStr, prcAssetStr) => AssetPair.createAssetPair(amtAssetStr, prcAssetStr)
-              case _                               => throw new Exception(s"$assetPairStr (incorrect assets count, expected 2 but got ${assetPairStrArr.size})")
+              case _ => throw new Exception(s"$assetPairStr (incorrect assets count, expected 2 but got ${assetPairStrArr.size})")
             }
           ).fold(ex => throw new Exception(s"$assetPairStr (${ex.getMessage})"), identity)
           assetPair -> offset
       }
     }
   }
+
 }

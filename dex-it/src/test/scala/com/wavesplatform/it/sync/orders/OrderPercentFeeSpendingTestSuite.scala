@@ -4,25 +4,26 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.settings.AssetType._
-import com.wavesplatform.dex.settings.FeeMode.PERCENT
 
 class OrderPercentFeeSpendingTestSuite extends OrderFeeBaseTestSuite {
 
-  val version   = 3.toByte
-  val assetType = SPENDING
+  val version = 3.toByte
+  val assetType = Spending
 
-  override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""
-                                                                                      |waves.dex {
-                                                                                      |  allowed-order-versions = [1, 2, 3]
-                                                                                      |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
-                                                                                      |  order-fee.-1 {
-                                                                                      |    mode = $PERCENT
-                                                                                      |    $PERCENT {
-                                                                                      |      asset-type = $assetType
-                                                                                      |      min-fee = $percentFee
-                                                                                      |    }
-                                                                                      |  }
-                                                                                      |}""".stripMargin)
+  override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(
+    s"""
+       |waves.dex {
+       |  allowed-order-versions = [1, 2, 3]
+       |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
+       |  order-fee.-1 {
+       |    mode = percent
+       |    percent {
+       |      asset-type = spending
+       |      min-fee = $percentFee
+       |    }
+       |  }
+       |}""".stripMargin
+  )
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
@@ -32,11 +33,21 @@ class OrderPercentFeeSpendingTestSuite extends OrderFeeBaseTestSuite {
 
   s"V$version orders (fee asset type: $assetType) & fees processing" - {
     s"users should pay correct fee when fee asset-type = $assetType and order fully filled " in {
-      val accountBuyer  = mkAccountWithBalance(fullyAmountUsd + minimalFee        -> IssuedAsset(UsdId))
+      val accountBuyer = mkAccountWithBalance(fullyAmountUsd + minimalFee -> IssuedAsset(UsdId))
       val accountSeller = mkAccountWithBalance(fullyAmountWaves + minimalFeeWaves -> Waves)
 
       placeAndAwaitAtDex(
-        mkOrder(accountBuyer, wavesUsdPair, BUY, fullyAmountWaves, price, matcherFee = minimalFee, version = version, feeAsset = IssuedAsset(UsdId)))
+        mkOrder(
+          accountBuyer,
+          wavesUsdPair,
+          BUY,
+          fullyAmountWaves,
+          price,
+          matcherFee = minimalFee,
+          version = version,
+          feeAsset = IssuedAsset(UsdId)
+        )
+      )
       placeAndAwaitAtNode(mkOrder(accountSeller, wavesUsdPair, SELL, fullyAmountWaves, price, matcherFee = minimalFeeWaves, version = version))
 
       wavesNode1.api.balance(accountBuyer, Waves) should be(fullyAmountWaves)
@@ -51,11 +62,21 @@ class OrderPercentFeeSpendingTestSuite extends OrderFeeBaseTestSuite {
     }
 
     s"users should pay correct fee when fee asset-type = $assetType and order partially filled" in {
-      val accountBuyer  = mkAccountWithBalance(fullyAmountUsd + minimalFee            -> IssuedAsset(UsdId))
+      val accountBuyer = mkAccountWithBalance(fullyAmountUsd + minimalFee -> IssuedAsset(UsdId))
       val accountSeller = mkAccountWithBalance(partiallyAmountWaves + minimalFeeWaves -> Waves)
 
       placeAndAwaitAtDex(
-        mkOrder(accountBuyer, wavesUsdPair, BUY, fullyAmountWaves, price, matcherFee = minimalFee, version = version, feeAsset = IssuedAsset(UsdId)))
+        mkOrder(
+          accountBuyer,
+          wavesUsdPair,
+          BUY,
+          fullyAmountWaves,
+          price,
+          matcherFee = minimalFee,
+          version = version,
+          feeAsset = IssuedAsset(UsdId)
+        )
+      )
       placeAndAwaitAtNode(mkOrder(accountSeller, wavesUsdPair, SELL, partiallyAmountWaves, price, matcherFee = minimalFeeWaves, version = version))
 
       wavesNode1.api.balance(accountBuyer, Waves) shouldBe partiallyAmountWaves
@@ -73,11 +94,21 @@ class OrderPercentFeeSpendingTestSuite extends OrderFeeBaseTestSuite {
     }
 
     s"order should be processed if amount less then fee when fee asset-type = $assetType" in {
-      val accountBuyer  = mkAccountWithBalance(fullyAmountUsd + minimalFee        -> IssuedAsset(UsdId))
+      val accountBuyer = mkAccountWithBalance(fullyAmountUsd + minimalFee -> IssuedAsset(UsdId))
       val accountSeller = mkAccountWithBalance(fullyAmountWaves + tooHighFeeWaves -> Waves)
 
       placeAndAwaitAtDex(
-        mkOrder(accountBuyer, wavesUsdPair, BUY, fullyAmountWaves, price, matcherFee = minimalFee, version = version, feeAsset = IssuedAsset(UsdId)))
+        mkOrder(
+          accountBuyer,
+          wavesUsdPair,
+          BUY,
+          fullyAmountWaves,
+          price,
+          matcherFee = minimalFee,
+          version = version,
+          feeAsset = IssuedAsset(UsdId)
+        )
+      )
       placeAndAwaitAtNode(mkOrder(accountSeller, wavesUsdPair, SELL, fullyAmountWaves, price, matcherFee = tooHighFeeWaves, version = version))
 
       wavesNode1.api.balance(accountBuyer, Waves) should be(fullyAmountWaves)
@@ -103,8 +134,11 @@ class OrderPercentFeeSpendingTestSuite extends OrderFeeBaseTestSuite {
             tooLowFee,
             version = version,
             feeAsset = IssuedAsset(UsdId)
-          )) should failWith(9441542, // FeeNotEnough
-                             s"Required 2.52 ${UsdId.toString} as fee for this order, but given 2.51 ${UsdId.toString}")
+          )
+        ) should failWith(
+        9441542, // FeeNotEnough
+        s"Required 2.52 ${UsdId.toString} as fee for this order, but given 2.51 ${UsdId.toString}"
+      )
     }
 
     s"sell order should be rejected if fee less then minimum possible fee when fee asset-type = $assetType" in {
@@ -118,8 +152,11 @@ class OrderPercentFeeSpendingTestSuite extends OrderFeeBaseTestSuite {
             price,
             tooLowFeeWaves,
             version = version
-          )) should failWith(9441542, // FeeNotEnough
-                             "Required 2.1 WAVES as fee for this order, but given 2.09 WAVES")
+          )
+        ) should failWith(
+        9441542, // FeeNotEnough
+        "Required 2.1 WAVES as fee for this order, but given 2.09 WAVES"
+      )
     }
   }
 }

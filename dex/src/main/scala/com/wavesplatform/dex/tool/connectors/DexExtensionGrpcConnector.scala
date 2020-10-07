@@ -29,17 +29,17 @@ case class DexExtensionGrpcConnector private (target: String, grpcAsyncClient: W
   private def sync[A](f: Awaitable[A]): A = Await.result(f, requestTimeout)
 
   private def getDetailedBalance(asset: Asset, balance: Long): Future[(Asset, (BriefAssetDescription, Long))] = asset match {
-    case Waves           => Future.successful(asset -> (BriefAssetDescription.wavesDescription -> balance))
+    case Waves => Future.successful(asset -> (BriefAssetDescription.wavesDescription -> balance))
     case ia: IssuedAsset => grpcAsyncClient.assetDescription(ia).map(maybeDesc => ia -> (maybeDesc.get -> balance))
   }
 
   def matcherBalanceAsync(address: Address): Future[DetailedBalance] =
     for {
-      balances                <- grpcAsyncClient.allAssetsSpendableBalance(address)
+      balances <- grpcAsyncClient.allAssetsSpendableBalance(address)
       balancesWithDescription <- balances.toList.traverse { case (a, b) => getDetailedBalance(a, b) }
     } yield balancesWithDescription.toMap
 
-  def matcherBalanceSync(address: Address): DetailedBalance = sync { matcherBalanceAsync(address) }
+  def matcherBalanceSync(address: Address): DetailedBalance = sync(matcherBalanceAsync(address))
 
   override def close(): Unit = Await.result(grpcAsyncClient.close(), 3.seconds)
 }
@@ -53,9 +53,10 @@ object DexExtensionGrpcConnector {
   def create(target: String): ErrorOr[DexExtensionGrpcConnector] =
     Try {
       LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME).asInstanceOf[Logger].setLevel(Level.OFF)
-      val grpcSettings   = GrpcClientSettings(target, 5, 5, true, 2.seconds, 5.seconds, 1.minute, ChannelOptionsSettings(5.seconds))
+      val grpcSettings = GrpcClientSettings(target, 5, 5, true, 2.seconds, 5.seconds, 1.minute, ChannelOptionsSettings(5.seconds))
       val clientSettings = WavesBlockchainClientSettings(grpcSettings, 100.milliseconds, 100)
       WavesBlockchainClientBuilder.async(clientSettings, monixScheduler, executionContext)
     }.toEither
       .bimap(ex => s"Cannot establish gRPC connection to DEX Extension! $ex", client => DexExtensionGrpcConnector(target, client))
+
 }

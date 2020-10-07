@@ -118,10 +118,10 @@ class MakerTakerFeeTestSuite extends MatcherSuiteBase with TableDrivenPropertyCh
   "DEX should correctly charge different fees when settings changes" in {
 
     val offsetInitial = dex1.api.currentOffset
-    val offset0       = offsetInitial + 1
-    val offset1       = offset0 + 1
-    val offset2       = offset1 + 1
-    val offset3       = offset2 + 1
+    val offset0 = offsetInitial + 1
+    val offset1 = offset0 + 1
+    val offset2 = offset1 + 1
+    val offset3 = offset2 + 1
 
     dex1.restartWithNewSuiteConfig(
       ConfigFactory.parseString(
@@ -183,12 +183,14 @@ class MakerTakerFeeTestSuite extends MatcherSuiteBase with TableDrivenPropertyCh
       dex1.api.cancelAll(taker)
     }
 
-    withClue("maker - DynamicSettings(0.001.waves, 0.005.waves), taker (market, 25% filled) - DynamicSettings(0.002.waves, 0.004.waves), fee in ETH") {
+    withClue(
+      "maker - DynamicSettings(0.001.waves, 0.005.waves), taker (market, 25% filled) - DynamicSettings(0.002.waves, 0.004.waves), fee in ETH"
+    ) {
 
       dex1.api.currentOffset shouldBe offset1
 
       val makerOrder = mkOrderDP(maker, wavesUsdPair, SELL, 10.waves, 3.00, 0.00002838.eth, eth) // 0.005.waves = 0.00002838.eth
-      val takerOrder = mkOrderDP(taker, wavesUsdPair, BUY, 40.waves, 3.00, 0.00002271.eth, eth)  // 0.004.waves = 0.00002271.eth
+      val takerOrder = mkOrderDP(taker, wavesUsdPair, BUY, 40.waves, 3.00, 0.00002271.eth, eth) // 0.004.waves = 0.00002271.eth
 
       placeAndAwaitAtDex(makerOrder)
       dex1.api.currentOffset shouldBe offset2

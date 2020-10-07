@@ -16,36 +16,40 @@ import scala.collection.immutable.Queue
 import scala.concurrent.duration.FiniteDuration
 
 /**
-  * Controls a single WebSocket connection for order updates stream
-  * Handles user messages (pongs) add schedules timeouts (pongs, max connection lifetime)
-  */
+ * Controls a single WebSocket connection for order updates stream
+ * Handles user messages (pongs) add schedules timeouts (pongs, max connection lifetime)
+ */
 object WsInternalClientHandlerActor {
 
   sealed trait Message extends Product with Serializable
 
   sealed trait Command extends Message
+
   object Command {
-    case class ProcessClientMessage(wsMessage: WsPingOrPong)     extends Command
+    case class ProcessClientMessage(wsMessage: WsPingOrPong) extends Command
     case class ForwardToClient(wsServerMessage: WsServerMessage) extends Command
-    case class CloseConnection(reason: MatcherError)             extends Command
+    case class CloseConnection(reason: MatcherError) extends Command
 
     private[WsInternalClientHandlerActor] case object SendPing extends Command
   }
 
   sealed trait Event extends Message
+
   object Event {
     case class Completed(completionStatus: Either[Throwable, Unit]) extends Event
   }
 
   final case class Settings(healthCheck: WsHealthCheckSettings)
 
-  def apply(settings: Settings,
-            time: Time,
-            assetPairBuilder: AssetPairBuilder,
-            clientRef: ActorRef[WsServerMessage],
-            matcherRef: classic.ActorRef,
-            addressRef: classic.ActorRef,
-            connectionId: String): Behavior[Message] =
+  def apply(
+    settings: Settings,
+    time: Time,
+    assetPairBuilder: AssetPairBuilder,
+    clientRef: ActorRef[WsServerMessage],
+    matcherRef: classic.ActorRef,
+    addressRef: classic.ActorRef,
+    connectionId: String
+  ): Behavior[Message] =
     Behaviors.setup[Message] { context =>
       context.setLoggerName(s"WsInternalHandlerActor[c=${clientRef.path.name}]")
 
@@ -58,25 +62,27 @@ object WsInternalClientHandlerActor {
       def schedulePongTimeout(): Cancellable = scheduleOnce(settings.healthCheck.pongTimeout, Command.CloseConnection(WsConnectionPongTimeout))
 
       def sendPingAndScheduleNextOne(): (WsPingOrPong, Cancellable) = {
-        val ping     = WsPingOrPong(matcherTime)
+        val ping = WsPingOrPong(matcherTime)
         val nextPing = scheduleOnce(settings.healthCheck.pingInterval, Command.SendPing)
         clientRef ! ping
         ping -> nextPing
       }
 
       def cancelSchedules(nextPing: Cancellable, pongTimeout: Cancellable): Unit =
-        List(nextPing, pongTimeout, firstPing).foreach { _.cancel() }
+        List(nextPing, pongTimeout, firstPing).foreach(_.cancel())
 
-      def awaitPong(maybeExpectedPong: Option[WsPingOrPong],
-                    pongTimeout: Cancellable,
-                    nextPing: Cancellable,
-                    orderBookSubscriptions: Queue[AssetPair],
-                    addressSubscriptions: Queue[(Address, Cancellable)]): Behavior[Message] = {
+      def awaitPong(
+        maybeExpectedPong: Option[WsPingOrPong],
+        pongTimeout: Cancellable,
+        nextPing: Cancellable,
+        orderBookSubscriptions: Queue[AssetPair],
+        addressSubscriptions: Queue[(Address, Cancellable)]
+      ): Behavior[Message] =
         Behaviors
           .receiveMessage[Message] {
             case Command.SendPing =>
               val (expectedPong, newNextPing) = sendPingAndScheduleNextOne()
-              val updatedPongTimeout          = if (pongTimeout.isCancelled) schedulePongTimeout() else pongTimeout
+              val updatedPongTimeout = if (pongTimeout.isCancelled) schedulePongTimeout() else pongTimeout
               awaitPong(expectedPong.some, updatedPongTimeout, newNextPing, orderBookSubscriptions, addressSubscriptions)
 
             case Command.ForwardToClient(wsMessage) =>
@@ -108,14 +114,13 @@ object WsInternalClientHandlerActor {
 
             case Event.Completed(status) =>
               status match {
-                case Left(e)  => context.log.debug("Got failure Completed. Stopping...", e)
+                case Left(e) => context.log.debug("Got failure Completed. Stopping...", e)
                 case Right(_) => context.log.debug("Got successful Completed. Stopping...")
               }
 
               cancelSchedules(nextPing, pongTimeout)
               Behaviors.stopped
           }
-      }
 
       // send the initial message with the connection ID for further debugging
       clientRef ! WsInitial(connectionId, matcherTime)
@@ -128,4 +133,5 @@ object WsInternalClientHandlerActor {
         addressSubscriptions = Queue.empty
       )
     }
+
 }

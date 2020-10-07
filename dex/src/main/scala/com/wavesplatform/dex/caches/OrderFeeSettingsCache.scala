@@ -11,11 +11,11 @@ class OrderFeeSettingsCache(orderFeeSettingsMap: Map[Long, OrderFeeSettings]) {
     TreeMap.empty[Long, OrderFeeSettings] ++ orderFeeSettingsMap
   }
 
-  def getSettingsForOffset(offset: Long): OrderFeeSettings = {
+  def getSettingsForOffset(offset: Long): OrderFeeSettings =
     allOrderFeeSettings
       .takeWhile { case (o, _) => o <= offset }
       .lastOption
       .map(_._2)
       .getOrElse(throw new IllegalStateException(s"Order fee settings are not set for offset $offset"))
-  }
+
 }

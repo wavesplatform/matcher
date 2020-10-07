@@ -11,10 +11,10 @@ import com.wavesplatform.dex.model.Events.OrderCancelFailed
 import scala.collection.mutable
 
 class AddressDirectoryActor(
-    orderDB: OrderDB,
-    mkAddressActorProps: (Address, Boolean) => Props,
-    historyRouterRef: Option[ActorRef],
-    var started: Boolean = false
+  orderDB: OrderDB,
+  mkAddressActorProps: (Address, Boolean) => Props,
+  historyRouterRef: Option[ActorRef],
+  var started: Boolean = false
 ) extends Actor
     with ScorexLogging {
 
@@ -32,7 +32,7 @@ class AddressDirectoryActor(
 
   private def forward(address: Address, msg: Any): Unit = (children get address, msg) match {
     case (None, _: AddressActor.Message.BalanceChanged) =>
-    case _                                              => children.getOrElseUpdate(address, createAddressActor(address)) forward msg
+    case _ => children.getOrElseUpdate(address, createAddressActor(address)) forward msg
   }
 
   override def receive: Receive = {
@@ -53,7 +53,7 @@ class AddressDirectoryActor(
     case e: OrderCancelFailed =>
       orderDB.get(e.id) match {
         case Some(order) => forward(order.sender.toAddress, e)
-        case None        => log.warn(s"The order '${e.id}' not found")
+        case None => log.warn(s"The order '${e.id}' not found")
       }
 
     case StartWork =>
@@ -62,10 +62,11 @@ class AddressDirectoryActor(
 
     case Terminated(child) =>
       val addressString = child.path.name
-      val address       = Address.fromString(addressString).explicitGet()
+      val address = Address.fromString(addressString).explicitGet()
       children.remove(address)
       log.warn(s"Address handler for $addressString terminated")
   }
+
 }
 
 object AddressDirectoryActor {

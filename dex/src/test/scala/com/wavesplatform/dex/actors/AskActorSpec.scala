@@ -10,14 +10,9 @@ import org.scalatest.matchers.should.Matchers
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, Future, TimeoutException}
 
-class AskActorSpec
-    extends AnyFreeSpec
-    with Matchers
-    with SystemTime
-    with MatcherSpecLike
-    with DiffMatcherWithImplicits {
+class AskActorSpec extends AnyFreeSpec with Matchers with SystemTime with MatcherSpecLike with DiffMatcherWithImplicits {
 
-  private val defaultTimeout  = 5.seconds
+  private val defaultTimeout = 5.seconds
   private val defaultResponse = "foo"
 
   "AskActor" - {
@@ -39,7 +34,7 @@ class AskActorSpec
 
   private def test(f: (ActorRef, Future[String]) => Unit): Unit = {
     val (ref, future) = AskActor.mk[String](100.millis)
-    val p             = TestProbe()
+    val p = TestProbe()
     p.watch(ref)
 
     f(ref, future)

@@ -8,7 +8,7 @@ import com.wavesplatform.dex.domain.utils.ScorexLogging
 
 trait ApiRoute extends Directives with ApiMarshallers with ScorexLogging {
 
-  protected implicit val matcherResponseTrm: ToResponseMarshaller[MatcherResponse] = MatcherResponse.toResponseMarshaller
+  implicit protected val matcherResponseTrm: ToResponseMarshaller[MatcherResponse] = MatcherResponse.toResponseMarshaller
 
   def route: Route
 }

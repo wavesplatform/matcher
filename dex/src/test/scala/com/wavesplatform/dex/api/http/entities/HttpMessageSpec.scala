@@ -7,7 +7,7 @@ import play.api.libs.json.Json
 
 class HttpMessageSpec extends AnyFreeSpec with Matchers with DiffMatcherWithImplicits {
 
-  private val json    = """{"message":"test text"}"""
+  private val json = """{"message":"test text"}"""
   private val message = HttpMessage("test text")
 
   "backward JSON compatibility" - {

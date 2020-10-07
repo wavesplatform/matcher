@@ -16,7 +16,7 @@ object WavesBlockchainClient {
 
   final case class BalanceChanges(address: Address, asset: Asset, balance: Long)
 
-  type SpendableBalance        = Map[Asset, Long]
+  type SpendableBalance = Map[Asset, Long]
   type SpendableBalanceChanges = Map[Address, SpendableBalance]
 }
 

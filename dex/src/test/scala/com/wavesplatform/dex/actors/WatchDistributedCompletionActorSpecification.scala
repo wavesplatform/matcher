@@ -31,8 +31,8 @@ class WatchDistributedCompletionActorSpecification
 
       val dyingTestGen = for {
         workingNumber <- Gen.choose(0, 5)
-        dyingNumber   <- Gen.choose(if (workingNumber == 0) 1 else 0, 5)
-        dieDelays     <- Gen.listOfN(dyingNumber, Gen.choose(0.millis, 50.millis))
+        dyingNumber <- Gen.choose(if (workingNumber == 0) 1 else 0, 5)
+        dieDelays <- Gen.listOfN(dyingNumber, Gen.choose(0.millis, 50.millis))
       } yield {
         val working = (1 to workingNumber).map(_ => system.actorOf(Props(new PongActor)))
         val dying = (1 to dyingNumber).zip(dieDelays).map {
@@ -66,9 +66,11 @@ class WatchDistributedCompletionActorSpecification
     TestKit.shutdownActorSystem(system)
     super.afterAll()
   }
+
 }
 
 object WatchDistributedCompletionActorSpecification {
+
   def watcher(workers: Set[ActorRef], timeout: FiniteDuration = 1.minute)(implicit system: ActorSystem): TestProbe = {
     val p = TestProbe()
     system.actorOf(Props(new WatchDistributedCompletionActor(workers, p.ref, Symbol("ping"), Symbol("pong"), timeout)))
@@ -80,17 +82,21 @@ object WatchDistributedCompletionActorSpecification {
   }
 
   class PongActor extends Actor {
+
     override def receive: Receive = {
       case Symbol("ping") => sender() ! Symbol("pong")
     }
+
   }
 
   class PongAndDieActor extends Actor {
+
     override def receive: Receive = {
       case Symbol("ping") =>
         sender() ! Symbol("pong")
         context.stop(self)
     }
+
   }
 
   class DyingActor(delay: FiniteDuration) extends Actor {
@@ -101,4 +107,5 @@ object WatchDistributedCompletionActorSpecification {
 
     override def receive: Receive = Actor.ignoringBehavior
   }
+
 }

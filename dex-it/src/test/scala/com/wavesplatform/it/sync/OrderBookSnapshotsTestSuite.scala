@@ -3,7 +3,7 @@ package com.wavesplatform.it.sync
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus
 import com.wavesplatform.dex.domain.order.Order
-import com.wavesplatform.it.{MatcherSuiteBase, orderGen}
+import com.wavesplatform.it.{orderGen, MatcherSuiteBase}
 import org.scalacheck.Gen
 
 class OrderBookSnapshotsTestSuite extends MatcherSuiteBase {
@@ -11,21 +11,23 @@ class OrderBookSnapshotsTestSuite extends MatcherSuiteBase {
 
   override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(
     s"""waves.dex {
-      |  price-assets = ["$UsdId", "WAVES"]
-      |  snapshots-interval = $interval
-      |}""".stripMargin
+       |  price-assets = ["$UsdId", "WAVES"]
+       |  snapshots-interval = $interval
+       |}""".stripMargin
   )
 
   private val assetPair1 = ethUsdPair
   private val assetPair2 = ethWavesPair
 
   private val ordersPack1Size = 11
+
   private val ordersPack1 = Gen
     .containerOfN[Vector, Order](ordersPack1Size - 1, orderGen(matcher, alice, List(assetPair1)))
     .sample
     .get :+ orderGen(matcher, alice, List(assetPair2)).sample.get
 
   private val ordersPack2Size = interval.toInt
+
   private val ordersPack2 = Gen
     .containerOfN[Vector, Order](ordersPack2Size, orderGen(matcher, alice, List(assetPair2)))
     .sample

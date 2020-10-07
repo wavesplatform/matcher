@@ -10,7 +10,7 @@ import com.wavesplatform.dex.db.AssetsStorage
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.order.Order
-import com.wavesplatform.dex.effect.{FutureResult, liftFutureAsync, liftValueAsync}
+import com.wavesplatform.dex.effect.{liftFutureAsync, liftValueAsync, FutureResult}
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.OrderValidator.AsyncBlockchain
@@ -20,20 +20,21 @@ import com.wavesplatform.dex.time.Time
 import scala.concurrent.{ExecutionContext, Future}
 
 object ValidationStages {
+
   def mkFirst(
-      settings: MatcherSettings,
-      matcherPublicKey: PublicKey,
-      orderFeeSettingsCache: OrderFeeSettingsCache,
-      matchingRulesCache: MatchingRulesCache,
-      rateCache: RateCache,
-      assetsCache: AssetsStorage,
-      blockchain: AsyncBlockchain,
-      transactionCreator: ExchangeTransactionCreator,
-      time: Time,
-      orderBookAskAdapter: OrderBookAskAdapter,
-      lastProcessedOffset: => Long,
-      blacklistedAddresses: Set[Address],
-      hasMatcherAccountScript: Boolean
+    settings: MatcherSettings,
+    matcherPublicKey: PublicKey,
+    orderFeeSettingsCache: OrderFeeSettingsCache,
+    matchingRulesCache: MatchingRulesCache,
+    rateCache: RateCache,
+    assetsCache: AssetsStorage,
+    blockchain: AsyncBlockchain,
+    transactionCreator: ExchangeTransactionCreator,
+    time: Time,
+    orderBookAskAdapter: OrderBookAskAdapter,
+    lastProcessedOffset: => Long,
+    blacklistedAddresses: Set[Address],
+    hasMatcherAccountScript: Boolean
   )(o: Order)(implicit efc: ErrorFormatterContext, ec: ExecutionContext): FutureResult[Order] = {
     import OrderValidator._
 
@@ -50,7 +51,8 @@ object ValidationStages {
         _ <- matcherSettingsAware(matcherPublicKey, blacklistedAddresses, settings, orderAssetsDecimals, rateCache, actualOrderFeeSettings)(o)
         _ <- timeAware(time)(o)
         _ <- tickSizeAware(actualTickSize)(o)
-        _ <- if (settings.deviation.enabled) marketAware(actualOrderFeeSettings, settings.deviation, marketStatus)(o) else success
+        _ <-
+          if (settings.maxPriceDeviations.enable) marketAware(actualOrderFeeSettings, settings.maxPriceDeviations, marketStatus)(o) else success
       } yield o
     }
 
@@ -69,24 +71,24 @@ object ValidationStages {
 
     for {
       marketStatus <- {
-        if (settings.deviation.enabled) EitherT(orderBookAskAdapter.getMarketStatus(o.assetPair))
+        if (settings.maxPriceDeviations.enable) EitherT(orderBookAskAdapter.getMarketStatus(o.assetPair))
         else liftValueAsync(Option.empty[OrderBookActor.MarketStatus])
       }
-      _ <- liftAsync { syncValidation(marketStatus, assetsCache.unsafeGetDecimals) }
+      _ <- liftAsync(syncValidation(marketStatus, assetsCache.unsafeGetDecimals))
       _ <- asyncValidation(assetsCache.unsafeGet)
     } yield o
   }
 
   def mkSecond(
-      blockchain: AsyncBlockchain,
-      orderBookAskAdapter: OrderBookAskAdapter
+    blockchain: AsyncBlockchain,
+    orderBookAskAdapter: OrderBookAskAdapter
   )(ao: AcceptedOrder, tradableBalance: Map[Asset, Long])(implicit
-      efc: ErrorFormatterContext,
-      ec: ExecutionContext
+    efc: ErrorFormatterContext,
+    ec: ExecutionContext
   ): Future[Either[MatcherError, Unit]] = {
     for {
       hasOrderInBlockchain <- liftFutureAsync(blockchain.forgedOrder(ao.id))
-      orderBookCache       <- EitherT(orderBookAskAdapter.getAggregatedSnapshot(ao.order.assetPair))
+      orderBookCache <- EitherT(orderBookAskAdapter.getAggregatedSnapshot(ao.order.assetPair))
       _ <- EitherT.fromEither {
         OrderValidator
           .accountStateAware(
@@ -97,4 +99,5 @@ object ValidationStages {
       }
     } yield ()
   }.value
+
 }

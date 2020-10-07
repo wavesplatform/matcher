@@ -59,7 +59,7 @@ class AggregatedOrderBookActorSpec
   private val pair = AssetPair(IssuedAsset(ByteStr("issued".getBytes(StandardCharsets.UTF_8))), Waves)
 
   private val maxLevelsInOrderBook = 6
-  private val maxOrdersInLevel     = 2
+  private val maxOrdersInLevel = 2
 
   // TODO migrate to long ranges in 2.13
   private val askPricesMin = 1000L * Order.PriceConstant
@@ -144,8 +144,8 @@ class AggregatedOrderBookActorSpec
 
     "apply" - {
       "should init with provided order book" in forAll(orderBookGen) { orderBook =>
-        val ref      = mk(orderBook)
-        val actual   = HttpV0OrderBook.fromHttpResponse { get[HttpResponse](ref)(Query.GetHttpView(MatcherModel.Normalized, 10, _)) }
+        val ref = mk(orderBook)
+        val actual = HttpV0OrderBook.fromHttpResponse(get[HttpResponse](ref)(Query.GetHttpView(MatcherModel.Normalized, 10, _)))
         val expected = orderBookResultFrom(orderBook)
         actual.copy(timestamp = 0L) should matchTo(expected)
       }
@@ -154,7 +154,7 @@ class AggregatedOrderBookActorSpec
     "should return an updated" - {
       "market status after update" - {
         "once" in {
-          val ref       = mk(OrderBook.empty)
+          val ref = mk(OrderBook.empty)
           val lastTrade = LastTrade(500L, 10L, OrderType.BUY)
 
           ref ! Command.ApplyChanges(
@@ -177,7 +177,7 @@ class AggregatedOrderBookActorSpec
         }
 
         "multiple times" in {
-          val ref       = mk(OrderBook.empty)
+          val ref = mk(OrderBook.empty)
           val lastTrade = LastTrade(500L, 10L, OrderType.BUY)
 
           ref ! Command.ApplyChanges(
@@ -221,8 +221,8 @@ class AggregatedOrderBookActorSpec
           val ref = mk(OrderBook.empty)
           ref ! Command.ApplyChanges(
             levelChanges = LevelAmounts(
-              asks = Map(2100L -> 1L, 2000L  -> 99L),
-              bids = Map(999L  -> 30L, 1000L -> 50L)
+              asks = Map(2100L -> 1L, 2000L -> 99L),
+              bids = Map(999L -> 30L, 1000L -> 50L)
             ),
             lastTrade = Some(LastTrade(500L, 10L, OrderType.BUY)),
             tickSize = None,
@@ -293,8 +293,8 @@ class AggregatedOrderBookActorSpec
           val ref = mk(OrderBook.empty)
           ref ! Command.ApplyChanges(
             levelChanges = LevelAmounts(
-              asks = Map(2100L -> 1L, 2000L  -> 99L),
-              bids = Map(999L  -> 30L, 1000L -> 50L)
+              asks = Map(2100L -> 1L, 2000L -> 99L),
+              bids = Map(999L -> 30L, 1000L -> 50L)
             ),
             lastTrade = Some(LastTrade(500L, 10L, OrderType.BUY)),
             tickSize = None,
@@ -376,7 +376,7 @@ class AggregatedOrderBookActorSpec
           snapshot.asks shouldBe empty
           snapshot.bids shouldBe empty
           snapshot.lastTrade shouldBe None
-          snapshot.settings should matchTo { Option(WsOrderBookSettings(maybeRestrictions, Some(tickSize))) }
+          snapshot.settings should matchTo(Option(WsOrderBookSettings(maybeRestrictions, Some(tickSize))))
         }
 
         def mkAoba(maybeRestrictions: Option[OrderRestrictionsSettings], tickSize: Double): ActorRef[Message] =
@@ -384,15 +384,15 @@ class AggregatedOrderBookActorSpec
 
         withClue("Empty restrictions and default tick size") {
           val defaultTickSize = DenormalizedMatchingRule.DefaultTickSize.toDouble
-          val aoba            = mkAoba(None, defaultTickSize)
+          val aoba = mkAoba(None, defaultTickSize)
           aoba ! Command.AddWsSubscription(wsEventsProbe.ref)
           checkOrderBookSettingsInSnapshot(None, defaultTickSize)
         }
 
         withClue("Non-default restrictions and tick size, tick size changed") {
           val restrictions = Some(OrderRestrictionsSettings(0.1, 0.2, 10, 0.3, 0.15, 100))
-          val tickSize     = 0.25
-          val aoba         = mkAoba(restrictions, tickSize)
+          val tickSize = 0.25
+          val aoba = mkAoba(restrictions, tickSize)
 
           aoba ! Command.AddWsSubscription(wsEventsProbe.ref)
           checkOrderBookSettingsInSnapshot(restrictions, tickSize)
@@ -404,7 +404,7 @@ class AggregatedOrderBookActorSpec
           changes.asks shouldBe empty
           changes.bids shouldBe empty
           changes.lastTrade shouldBe None
-          changes.settings should matchTo { Option(WsOrderBookSettings(None, Some(0.30))) }
+          changes.settings should matchTo(Option(WsOrderBookSettings(None, Some(0.30))))
         }
       }
     }
@@ -430,9 +430,11 @@ class AggregatedOrderBookActorSpec
       case (price, level) => LevelAgg(amount = level.map(_.amount).sum, price = price)
     }.toList
 
-  private def mk(ob: OrderBook,
-                 restrictions: Option[OrderRestrictionsSettings] = None,
-                 tickSize: Double = DenormalizedMatchingRule.DefaultTickSize.toDouble): ActorRef[Message] = system.spawn(
+  private def mk(
+    ob: OrderBook,
+    restrictions: Option[OrderRestrictionsSettings] = None,
+    tickSize: Double = DenormalizedMatchingRule.DefaultTickSize.toDouble
+  ): ActorRef[Message] = system.spawn(
     AggregatedOrderBookActor(
       AggregatedOrderBookActor.Settings(100.millis),
       pair,

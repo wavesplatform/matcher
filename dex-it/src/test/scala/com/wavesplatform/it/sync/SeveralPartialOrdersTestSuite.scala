@@ -18,8 +18,8 @@ class SeveralPartialOrdersTestSuite extends MatcherSuiteBase {
   }
 
   "Alice and Bob trade WAVES-USD" - {
-    val price           = 238
-    val buyOrderAmount  = 425532L
+    val price = 238
+    val buyOrderAmount = 425532L
     val sellOrderAmount = 840340L
 
     "place usd-waves order" in {

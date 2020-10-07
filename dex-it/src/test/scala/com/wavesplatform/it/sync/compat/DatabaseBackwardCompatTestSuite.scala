@@ -51,4 +51,5 @@ class DatabaseBackwardCompatTestSuite extends BackwardCompatSuiteBase {
 
     dex2.start()
   }
+
 }

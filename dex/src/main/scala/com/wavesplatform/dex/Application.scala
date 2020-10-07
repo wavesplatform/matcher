@@ -1,4 +1,4 @@
-package com.wavesplatform.dex
+ackage com.wavesplatform.dex
 
 import java.io.File
 import java.security.Security

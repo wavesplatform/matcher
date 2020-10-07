@@ -9,7 +9,7 @@ import cats.catsInstancesForId
 import cats.syntax.flatMap._
 import cats.syntax.option._
 import com.wavesplatform.dex._
-import com.wavesplatform.dex.app.{MatcherStateCheckingFailedError, forceStopApplication}
+import com.wavesplatform.dex.app.{forceStopApplication, MatcherStateCheckingFailedError}
 import com.wavesplatform.dex.db.AccountStorage
 import com.wavesplatform.dex.doc.MatcherErrorDoc
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair}
@@ -22,6 +22,7 @@ import scopt.{OParser, RenderingMode}
 import scala.util.{Failure, Success, Try}
 
 object WavesDexCli extends ScoptImplicits {
+
   // todo commands:
   // get account by seed [and nonce]
   def main(rawArgs: Array[String]): Unit = {
@@ -143,8 +144,8 @@ object WavesDexCli extends ScoptImplicits {
           command match {
             case Command.GenerateAccountSeed =>
               val seedPromptText = s"Enter the${if (args.accountNonce.isEmpty) " seed of DEX's account" else " base seed"}: "
-              val rawSeed        = readSeedFromFromStdIn(seedPromptText, args.seedFormat)
-              val accountSeed    = KeyPair(args.accountNonce.fold(rawSeed)(AccountStorage.getAccountSeed(rawSeed, _)))
+              val rawSeed = readSeedFromFromStdIn(seedPromptText, args.seedFormat)
+              val accountSeed = KeyPair(args.accountNonce.fold(rawSeed)(AccountStorage.getAccountSeed(rawSeed, _)))
 
               println(s"""Do not share this information with others!
                          |
@@ -172,9 +173,9 @@ object WavesDexCli extends ScoptImplicits {
               }
 
               val seedPromptText = s"Enter the${if (args.accountNonce.isEmpty) " seed of DEX's account" else " base seed"}: "
-              val rawSeed        = readSeedFromFromStdIn(seedPromptText, args.seedFormat)
-              val password       = readSecretFromStdIn("Enter the password for file: ")
-              val accountSeed    = args.accountNonce.fold(rawSeed)(AccountStorage.getAccountSeed(rawSeed, _))
+              val rawSeed = readSeedFromFromStdIn(seedPromptText, args.seedFormat)
+              val password = readSecretFromStdIn("Enter the password for file: ")
+              val accountSeed = args.accountNonce.fold(rawSeed)(AccountStorage.getAccountSeed(rawSeed, _))
 
               AccountStorage.save(
                 accountSeed,
@@ -200,7 +201,7 @@ object WavesDexCli extends ScoptImplicits {
 
             case Command.CreateDocumentation =>
               val outputBasePath = args.outputDirectory.toPath
-              val errorsFile     = outputBasePath.resolve("errors.md").toFile
+              val errorsFile = outputBasePath.resolve("errors.md").toFile
 
               Files.createDirectories(outputBasePath)
 
@@ -209,7 +210,7 @@ object WavesDexCli extends ScoptImplicits {
               try {
                 errors.write(MatcherErrorDoc.mkMarkdown)
                 println(s"Saved errors documentation to $errorsFile")
-              } finally { errors.close() }
+              } finally errors.close()
 
             case Command.CreateApiKey =>
               val hashedApiKey = Base58.encode(domain.crypto.secureHash(args.apiKey))
@@ -224,22 +225,22 @@ object WavesDexCli extends ScoptImplicits {
                 for {
                   _ <- cli.log(
                     s"""
-                      |Passed arguments:
-                      |  DEX REST API          : ${args.dexRestApi}
-                      |  Waves Node REST API   : ${args.nodeRestApi}
-                      |  Expected DEX version  : ${args.version}
-                      |  DEX config path       : ${args.dexConfigPath}
-                      |  Auth Service REST API : ${args.authServiceRestApi.getOrElse("")}
-                      |  Account seed          : ${args.accountSeed.getOrElse("")}
+                       |Passed arguments:
+                       |  DEX REST API          : ${args.dexRestApi}
+                       |  Waves Node REST API   : ${args.nodeRestApi}
+                       |  Expected DEX version  : ${args.version}
+                       |  DEX config path       : ${args.dexConfigPath}
+                       |  Auth Service REST API : ${args.authServiceRestApi.getOrElse("")}
+                       |  Account seed          : ${args.accountSeed.getOrElse("")}
                    """.stripMargin
                   )
                   superConnector <- SuperConnector.create(args.dexConfigPath, args.dexRestApi, args.nodeRestApi, args.authServiceRestApi)
-                  checkResult    <- Checker(superConnector).checkState(args.version, args.accountSeed)
-                  _              <- cli.lift { superConnector.close() }
+                  checkResult <- Checker(superConnector).checkState(args.version, args.accountSeed)
+                  _ <- cli.lift(superConnector.close())
                 } yield checkResult
               ) match {
                 case Right(diagnosticNotes) => println(s"$diagnosticNotes\nCongratulations! All checks passed!")
-                case Left(error)            => println(error); forceStopApplication(MatcherStateCheckingFailedError)
+                case Left(error) => println(error); forceStopApplication(MatcherStateCheckingFailedError)
               }
           }
           println("Done")
@@ -247,7 +248,7 @@ object WavesDexCli extends ScoptImplicits {
     }
   }
 
-  private sealed trait Command {
+  sealed private trait Command {
     def name: String
   }
 
@@ -272,36 +273,42 @@ object WavesDexCli extends ScoptImplicits {
     case object CheckServer extends Command {
       override def name: String = "check-server"
     }
+
   }
 
-  private sealed trait SeedFormat
+  sealed private trait SeedFormat
+
   private object SeedFormat {
 
     case object RawString extends SeedFormat
-    case object Base64    extends SeedFormat
-    case object Base58    extends SeedFormat
+    case object Base64 extends SeedFormat
+    case object Base58 extends SeedFormat
 
     implicit val seedFormatRead: scopt.Read[SeedFormat] = scopt.Read.reads {
       case "raw-string" => RawString
-      case "base64"     => Base64
-      case "base58"     => Base58
-      case x            => throw new IllegalArgumentException(s"Expected 'raw-string', 'base64' or 'base58', but got '$x'")
+      case "base64" => Base64
+      case "base58" => Base58
+      case x => throw new IllegalArgumentException(s"Expected 'raw-string', 'base64' or 'base58', but got '$x'")
     }
+
   }
 
   private val defaultFile = new File(".")
-  private case class Args(addressSchemeByte: Option[Char] = None,
-                          seedFormat: SeedFormat = SeedFormat.RawString,
-                          accountNonce: Option[Int] = None,
-                          command: Option[Command] = None,
-                          outputDirectory: File = defaultFile,
-                          apiKey: String = "",
-                          dexRestApi: String = "",
-                          nodeRestApi: String = "",
-                          version: String = "",
-                          dexConfigPath: String = "",
-                          authServiceRestApi: Option[String] = None,
-                          accountSeed: Option[String] = None)
+
+  private case class Args(
+    addressSchemeByte: Option[Char] = None,
+    seedFormat: SeedFormat = SeedFormat.RawString,
+    accountNonce: Option[Int] = None,
+    command: Option[Command] = None,
+    outputDirectory: File = defaultFile,
+    apiKey: String = "",
+    dexRestApi: String = "",
+    nodeRestApi: String = "",
+    version: String = "",
+    dexConfigPath: String = "",
+    authServiceRestApi: Option[String] = None,
+    accountSeed: Option[String] = None
+  )
 
   // noinspection ScalaStyle
   @scala.annotation.tailrec
@@ -310,9 +317,10 @@ object WavesDexCli extends ScoptImplicits {
     format match {
       case SeedFormat.RawString => rawSeed.getBytes(StandardCharsets.UTF_8)
       case SeedFormat.Base64 =>
-        Try { Base64.getDecoder.decode(rawSeed) } match {
+        Try(Base64.getDecoder.decode(rawSeed)) match {
           case Success(r) => r
-          case Failure(e) => System.err.println(s"Can't parse the seed in the base64 format, try again, ${e}"); readSeedFromFromStdIn(prompt, format)
+          case Failure(e) =>
+            System.err.println(s"Can't parse the seed in the base64 format, try again, $e"); readSeedFromFromStdIn(prompt, format)
         }
       case SeedFormat.Base58 =>
         Base58.tryDecodeWithLimit(rawSeed) match {
@@ -337,4 +345,5 @@ object WavesDexCli extends ScoptImplicits {
       readSecretFromStdIn(prompt)
     } else r
   }
+
 }

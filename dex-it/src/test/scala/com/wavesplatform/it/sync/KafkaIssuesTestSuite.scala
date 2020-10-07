@@ -23,10 +23,10 @@ import scala.concurrent.duration.DurationInt
 class KafkaIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka {
 
   private val requestTimeout = 15.seconds
-  private val maxFailures    = 5
+  private val maxFailures = 5
 
   // Hacks, see DEX-794
-  private val deliveryTimeout         = requestTimeout + 1.second
+  private val deliveryTimeout = requestTimeout + 1.second
   private val waitAfterNetworkChanges = deliveryTimeout
 
   override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex {
@@ -46,7 +46,7 @@ class KafkaIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka 
   }
 }""")
 
-  private val topicName                    = s"test-${ThreadLocalRandom.current.nextInt(0, Int.MaxValue)}"
+  private val topicName = s"test-${ThreadLocalRandom.current.nextInt(0, Int.MaxValue)}"
   override protected lazy val dexRunConfig = dexKafkaConfig(topicName).withFallback(jwtPublicKeyConfig)
 
   override protected def beforeAll(): Unit = {
@@ -85,18 +85,18 @@ class KafkaIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka 
   "Matcher should free reserved balances if order wasn't placed into the queue" in {
 
     val initialWavesBalance: Double = denormalizeWavesAmount(wavesNode1.api.balance(alice, Waves)).toDouble
-    val initialUsdBalance: Double   = denormalizeAmountAndFee(wavesNode1.api.balance(alice, usd), 2).toDouble
+    val initialUsdBalance: Double = denormalizeAmountAndFee(wavesNode1.api.balance(alice, usd), 2).toDouble
 
     val wsac = mkWsAddressConnection(alice, dex1)
 
-    assertChanges(wsac, squash = false) { Map(Waves -> WsBalances(initialWavesBalance, 0), usd -> WsBalances(initialUsdBalance, 0)) }()
+    assertChanges(wsac, squash = false)(Map(Waves -> WsBalances(initialWavesBalance, 0), usd -> WsBalances(initialUsdBalance, 0)))()
 
     val sellOrder = mkOrderDP(alice, wavesUsdPair, SELL, 10.waves, 3.0)
     placeAndAwaitAtDex(sellOrder)
 
     dex1.api.reservedBalance(alice) should matchTo(Map[Asset, Long](Waves -> 10.003.waves))
 
-    assertChanges(wsac) { Map(Waves -> WsBalances(initialWavesBalance - 10.003, 10.003)) } {
+    assertChanges(wsac)(Map(Waves -> WsBalances(initialWavesBalance - 10.003, 10.003))) {
       WsOrder.fromDomain(LimitOrder(sellOrder))
     }
 
@@ -128,7 +128,7 @@ class KafkaIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka 
     dex1.api.orderHistory(alice, Some(true)) should have size 0
     dex1.api.reservedBalance(alice) shouldBe empty
 
-    assertChanges(wsac, squash = false) { Map(Waves -> WsBalances(initialWavesBalance, 0)) } {
+    assertChanges(wsac, squash = false)(Map(Waves -> WsBalances(initialWavesBalance, 0))) {
       WsOrder(id = sellOrder.id(), status = OrderStatus.Cancelled.name)
     }
 
@@ -138,7 +138,7 @@ class KafkaIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka 
     dex1.api.orderHistory(alice, Some(true)) should have size 1
     dex1.api.reservedBalance(alice) should matchTo(Map[Asset, Long](Waves -> 30.003.waves))
 
-    assertChanges(wsac, squash = false) { Map(Waves -> WsBalances(initialWavesBalance - 30.003, 30.003)) } {
+    assertChanges(wsac, squash = false)(Map(Waves -> WsBalances(initialWavesBalance - 30.003, 30.003))) {
       WsOrder.fromDomain(LimitOrder(bigSellOrder))
     }
 
@@ -187,15 +187,15 @@ class KafkaIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka 
       } catch {
         case _: Throwable =>
           dex1.getState().getExitCodeLong shouldBe 12 // RecoveryError.code
-      }                                               // Add finally (above) if you write a new test
+      } // Add finally (above) if you write a new test
     }
   }
 
   private def clearTopic(topicName: String): Unit = {
     val kafkaClient = mkKafkaAdminClient(s"$kafkaIp:9092")
     try {
-      val resource         = new ConfigResource(ConfigResource.Type.TOPIC, topicName)
-      val retentionEntry   = new ConfigEntry(TopicConfig.RETENTION_MS_CONFIG, "100") // Small retention to clear topic
+      val resource = new ConfigResource(ConfigResource.Type.TOPIC, topicName)
+      val retentionEntry = new ConfigEntry(TopicConfig.RETENTION_MS_CONFIG, "100") // Small retention to clear topic
       val alterRetentionOp = new AlterConfigOp(retentionEntry, AlterConfigOp.OpType.SET)
 
       val updateConfig = new java.util.HashMap[ConfigResource, java.util.Collection[AlterConfigOp]]()
@@ -220,4 +220,5 @@ class KafkaIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka 
       dex1.api.allSnapshotOffsets(wavesUsdPair) shouldBe (offsetBefore + 20) // 10 orders * 2 (place and cancel)
     }
   }
+
 }

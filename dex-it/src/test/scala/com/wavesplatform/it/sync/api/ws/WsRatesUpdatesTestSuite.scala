@@ -9,7 +9,8 @@ import com.wavesplatform.it.WsSuiteBase
 
 class WsRatesUpdatesTestSuite extends WsSuiteBase {
 
-  override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$BtcId", "$UsdId", "WAVES" ]""")
+  override protected val dexInitialSuiteConfig: Config =
+    ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$BtcId", "$UsdId", "WAVES" ]""")
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
@@ -19,18 +20,17 @@ class WsRatesUpdatesTestSuite extends WsSuiteBase {
 
   "Matcher should send rates snapshot after subscription and rates updates" in {
 
-    def assertRatesUpdates(wsc: WsConnection)(expectedRatesUpdates: List[(Map[Asset, Double], Long)]): Unit = {
+    def assertRatesUpdates(wsc: WsConnection)(expectedRatesUpdates: List[(Map[Asset, Double], Long)]): Unit =
       wsc
         .receiveAtLeastN[WsRatesUpdates](expectedRatesUpdates.size)
         .map(r => r.rates -> r.updateId) should matchTo(expectedRatesUpdates)
-    }
 
     dex1.api.upsertRate(btc, 0.00041863)
 
     val wsc1 = mkWsRatesUpdatesConnection(dex1)
 
     withClue("Rates snapshot") {
-      assertRatesUpdates(wsc1) { List((Map(Waves -> 1, btc -> 0.00041863), 0)) }
+      assertRatesUpdates(wsc1)(List((Map(Waves -> 1, btc -> 0.00041863), 0)))
       wsc1.clearMessages()
     }
 
@@ -44,16 +44,16 @@ class WsRatesUpdatesTestSuite extends WsSuiteBase {
       assertRatesUpdates(wsc1) {
         List(
           Map[Asset, Double](btc -> 0.00041864) -> 1L,
-          Map[Asset, Double](usd -> 2.76)       -> 2L
+          Map[Asset, Double](usd -> 2.76) -> 2L
         )
       }
       assertRatesUpdates(wsc2) {
         List(
           Map[Asset, Double](Waves -> 1, btc -> 0.00041864) -> 0L,
-          Map[Asset, Double](usd   -> 2.76) -> 1L
+          Map[Asset, Double](usd -> 2.76) -> 1L
         )
       }
-      Seq(wsc1, wsc2).foreach { _.clearMessages() }
+      Seq(wsc1, wsc2).foreach(_.clearMessages())
     }
 
     Seq(btc, usd).foreach(dex1.api.deleteRate)
@@ -71,18 +71,18 @@ class WsRatesUpdatesTestSuite extends WsSuiteBase {
           Map[Asset, Double](usd -> -1) -> 3L
         )
       }
-      Seq(wsc1, wsc2).foreach { _.clearMessages() }
+      Seq(wsc1, wsc2).foreach(_.clearMessages())
     }
 
     withClue("Rates snapshot after deleting") {
       dex1.api.upsertRate(btc, 0.0099)
       val wsc = mkWsRatesUpdatesConnection(dex1)
-      assertRatesUpdates(wsc) { List(Map[Asset, Double](Waves -> 1, btc -> 0.0099) -> 0) }
+      assertRatesUpdates(wsc)(List(Map[Asset, Double](Waves -> 1, btc -> 0.0099) -> 0))
       wsc.close()
       dex1.api.deleteRate(btc)
     }
 
-    Seq(wsc1, wsc2).foreach { _.close() }
+    Seq(wsc1, wsc2).foreach(_.close())
   }
 
   "Few subscription won't make effect" in {

@@ -18,12 +18,11 @@ trait HasToxiProxy { self: BaseContainersKit =>
       cmd withIpv4Address getIp(13)
     }
 
-  protected def getInnerToxiProxyPort(proxy: ContainerProxy): Int = {
+  protected def getInnerToxiProxyPort(proxy: ContainerProxy): Int =
     container.getContainerInfo.getNetworkSettings.getPorts.getBindings.asScala
       .find { case (_, bindings) => bindings.head.getHostPortSpec == proxy.getProxyPort.toString }
       .map(_._1.getPort)
       .getOrElse(throw new IllegalStateException(s"There is no inner port for proxied one: ${proxy.getProxyPort}"))
-  }
 
   protected def mkToxiProxy(hostname: String, port: Int): ToxiproxyContainer.ContainerProxy = container.getProxy(hostname, port)
 

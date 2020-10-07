@@ -19,4 +19,5 @@ object CanWait {
     Thread.sleep(duration.toMillis)
     Success(())
   }
+
 }

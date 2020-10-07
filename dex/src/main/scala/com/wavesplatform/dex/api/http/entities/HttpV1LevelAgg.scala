@@ -8,14 +8,16 @@ import com.wavesplatform.dex.model.LevelAgg
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{Format, JsArray, _}
 
-case class HttpV1LevelAgg(@ApiModelProperty(
-                            dataType = "string",
-                            example = "831.87648950"
-                          ) amount: Double,
-                          @ApiModelProperty(
-                            dataType = "string",
-                            example = "0.00012079"
-                          ) price: Double)
+case class HttpV1LevelAgg(
+  @ApiModelProperty(
+    dataType = "string",
+    example = "831.87648950"
+  ) amount: Double,
+  @ApiModelProperty(
+    dataType = "string",
+    example = "0.00012079"
+  ) price: Double
+)
 
 object HttpV1LevelAgg {
 
@@ -23,7 +25,7 @@ object HttpV1LevelAgg {
 
   implicit val httpV1LevelAggReads: Reads[HttpV1LevelAgg] = Reads {
     case JsArray(value) if value.lengthCompare(2) == 0 => JsSuccess(HttpV1LevelAgg(value(1).as[Double], value(0).as[Double]))
-    case x                                             => JsError(s"Cannot parse $x as ApiV1LevelAgg")
+    case x => JsError(s"Cannot parse $x as ApiV1LevelAgg")
   }
 
   def fromLevelAgg(la: LevelAgg, assetPair: AssetPair)(implicit efc: ErrorFormatterContext): HttpV1LevelAgg = {
@@ -36,4 +38,5 @@ object HttpV1LevelAgg {
       Denormalization.denormalizePrice(la.price, amountAssetDecimals, priceAssetDecimals).toDouble
     )
   }
+
 }

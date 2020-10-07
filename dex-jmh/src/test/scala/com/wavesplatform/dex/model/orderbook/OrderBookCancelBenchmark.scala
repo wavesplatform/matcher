@@ -20,13 +20,13 @@ import scala.util.Random
 @Measurement(iterations = 10)
 class OrderBookCancelBenchmark {
 //  @Benchmark def cancel_2500_to_1250_test(st: Cancel_2500_To_1250_State, bh: Blackhole): Unit = bh.consume { st.run() }
-  @Benchmark def cancel_1250_to_0_test(st: Cancel_1250_To_0_State, bh: Blackhole): Unit = bh.consume { st.run() }
+  @Benchmark def cancel_1250_to_0_test(st: Cancel_1250_To_0_State, bh: Blackhole): Unit = bh.consume(st.run())
 }
 
 object OrderBookCancelBenchmark {
 
   @State(Scope.Thread) class Cancel_2500_To_1250_State extends CancelState(initOrderNumber = 2500, orderNumberAfterCancel = 1250)
-  @State(Scope.Thread) class Cancel_1250_To_0_State    extends CancelState(initOrderNumber = 1250, orderNumberAfterCancel = 0)
+  @State(Scope.Thread) class Cancel_1250_To_0_State extends CancelState(initOrderNumber = 1250, orderNumberAfterCancel = 0)
 
   sealed abstract class CancelState(initOrderNumber: Int, orderNumberAfterCancel: Int) extends OrderBookBenchmarkState {
     private val askPricesMin = 1000L * Order.PriceConstant
@@ -43,6 +43,7 @@ object OrderBookCancelBenchmark {
     ).map(Function.tupled(mkOrderBook))
 
     val orderBook: OrderBook = orderBookGen.sample.get
+
     val orders: Seq[Order.Id] = {
       val xs = orderBook.allOrders.map(_.order.id()).toVector
       new Random(ThreadLocalRandom.current()).shuffle(xs).take(initOrderNumber - orderNumberAfterCancel)

@@ -16,14 +16,14 @@ class OrderDBSpec extends AnyFreeSpec with Matchers with WithDB with MatcherSpec
   private def finalizedOrderInfoGen(o: Order): Gen[(Order, OrderInfo[OrderStatus.Final])] =
     for {
       filledAmount <- Gen.choose(0, o.amount)
-      filledFee    <- Gen.choose(0, o.matcherFee)
-      status       <- Gen.oneOf(OrderStatus.Filled(o.amount, o.matcherFee), OrderStatus.Cancelled(filledAmount, filledFee))
+      filledFee <- Gen.choose(0, o.matcherFee)
+      status <- Gen.oneOf(OrderStatus.Filled(o.amount, o.matcherFee), OrderStatus.Cancelled(filledAmount, filledFee))
     } yield o -> o.toInfo(status)
 
   private def finalizedOrderSeqGen(orderCount: Int): Gen[(KeyPair, AssetPair, Seq[(Order, OrderInfo[OrderStatus.Final])])] =
     for {
-      sender    <- accountGen
-      pair      <- distinctPairGen
+      sender <- accountGen
+      pair <- distinctPairGen
       orderList <- Gen.listOfN(orderCount, orderGenerator(sender, pair).flatMap(o => finalizedOrderInfoGen(o)))
     } yield (sender, pair, orderList)
 
@@ -54,17 +54,17 @@ class OrderDBSpec extends AnyFreeSpec with Matchers with WithDB with MatcherSpec
     }
 
     "does not overwrite finalized info" in test { odb =>
-      val dualFinalizedOrderInfoGen: Gen[(Order, OrderInfo[OrderStatus.Final], OrderInfo[OrderStatus.Final])] = for {
-        (o, _)       <- orderGenerator
-        filledAmount <- Gen.choose(0, o.amount)
-        filledFee    <- Gen.choose(0, o.matcherFee)
-        s1           <- Gen.oneOf(OrderStatus.Filled(o.amount, o.matcherFee), OrderStatus.Cancelled(filledAmount, filledFee))
-        s2           <- Gen.oneOf(OrderStatus.Filled(o.amount, o.matcherFee), OrderStatus.Cancelled(filledAmount, filledFee))
-      } yield
-        (
+      val dualFinalizedOrderInfoGen: Gen[(Order, OrderInfo[OrderStatus.Final], OrderInfo[OrderStatus.Final])] =
+        for {
+          (o, _) <- orderGenerator
+          filledAmount <- Gen.choose(0, o.amount)
+          filledFee <- Gen.choose(0, o.matcherFee)
+          s1 <- Gen.oneOf(OrderStatus.Filled(o.amount, o.matcherFee), OrderStatus.Cancelled(filledAmount, filledFee))
+          s2 <- Gen.oneOf(OrderStatus.Filled(o.amount, o.matcherFee), OrderStatus.Cancelled(filledAmount, filledFee))
+        } yield (
           o,
           OrderInfo.v2(o.orderType, o.amount, o.price, o.matcherFee, o.feeAsset, o.timestamp, s1, o.assetPair),
-          OrderInfo.v2(o.orderType, o.amount, o.price, o.matcherFee, o.feeAsset, o.timestamp, s2, o.assetPair),
+          OrderInfo.v2(o.orderType, o.amount, o.price, o.matcherFee, o.feeAsset, o.timestamp, s2, o.assetPair)
         )
 
       forAll(dualFinalizedOrderInfoGen) {
@@ -91,7 +91,7 @@ class OrderDBSpec extends AnyFreeSpec with Matchers with WithDB with MatcherSpec
 
     "does not load more orders than limit" in {
       val settings = matcherSettings.orderDb.copy(maxOrders = 30)
-      val odb      = OrderDB(settings, db)
+      val odb = OrderDB(settings, db)
       val paramGen = finalizedOrderSeqGen(40)
 
       forAll(paramGen) {
@@ -109,8 +109,12 @@ class OrderDBSpec extends AnyFreeSpec with Matchers with WithDB with MatcherSpec
 }
 
 object OrderDBSpec {
-  private implicit class OrderExt(val o: Order) extends AnyVal {
+
+  implicit private class OrderExt(val o: Order) extends AnyVal {
+
     def toInfo[A <: OrderStatus](status: A) =
       OrderInfo.v2[A](o.orderType, o.amount, o.price, o.matcherFee, o.feeAsset, o.timestamp, status, o.assetPair)
+
   }
+
 }

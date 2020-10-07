@@ -54,10 +54,10 @@ object ItTestPlugin extends AutoPlugin {
           ) ++ (Test / javaOptions).value
         },
         testGrouping := {
-          val javaHomeValue     = (test / javaHome).value
+          val javaHomeValue = (test / javaHome).value
           val logDirectoryValue = (Test / logDirectory).value
-          val envVarsValue      = (Test / envVars).value
-          val javaOptionsValue  = (Test / javaOptions).value
+          val envVarsValue = (Test / envVars).value
+          val javaOptionsValue = (Test / javaOptions).value
 
           (Test / definedTests).value.map { suite =>
             Group(
@@ -74,11 +74,14 @@ object ItTestPlugin extends AutoPlugin {
                   ) ++ javaOptionsValue,
                   connectInput = false,
                   envVars = envVarsValue
-                ))
+                )
+              )
             )
           }
         }
-      ))
+      )
+    )
+
 }
 
 trait ItKeys {

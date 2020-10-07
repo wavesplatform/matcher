@@ -3,6 +3,7 @@ package com.wavesplatform.dex.it.dex
 import cats.Functor
 import cats.syntax.functor._
 import com.softwaremill.sttp.StatusCode
+import com.typesafe.config.Config
 import com.wavesplatform.dex.api.http.entities._
 import com.wavesplatform.dex.domain.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -113,6 +114,7 @@ object DexApiOps {
     def saveSnapshots: F[Unit] = explicitGet(self.trySaveSnapshots)
 
     def settings: F[HttpMatcherPublicSettings] = explicitGet(self.trySettings)
+    def config: F[Config] = explicitGet(self.tryConfig)
 
     def wsConnections: F[HttpWebSocketConnections] = explicitGet(self.tryWsConnections)
     def closeWsConnections(oldestNumber: Int): F[HttpMessage] = explicitGet(self.tryCloseWsConnections(oldestNumber))

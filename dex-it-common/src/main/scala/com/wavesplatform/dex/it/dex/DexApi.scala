@@ -10,6 +10,7 @@ import com.google.common.primitives.Longs
 import com.softwaremill.sttp.Uri.QueryFragment
 import com.softwaremill.sttp.playJson._
 import com.softwaremill.sttp.{SttpBackend, MonadError => _, _}
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities._
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
 import com.wavesplatform.dex.domain.account.{Address, KeyPair, PublicKey}
@@ -24,7 +25,7 @@ import com.wavesplatform.dex.it.api.HasWaitReady
 import com.wavesplatform.dex.it.api.responses.dex._
 import com.wavesplatform.dex.it.fp.{CanWait, FOps, RepeatRequestOptions, ThrowableMonadError}
 import com.wavesplatform.dex.it.json._
-import com.wavesplatform.dex.it.sttp.ResponseParsers.asLong
+import com.wavesplatform.dex.it.sttp.ResponseParsers.{asConfig, asLong}
 import com.wavesplatform.dex.it.sttp.SttpBackendOps
 import im.mak.waves.transactions.ExchangeTransaction
 import play.api.libs.json.{JsResultException, Json}
@@ -133,6 +134,7 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
   def trySaveSnapshots: F[Either[MatcherError, Unit]]
 
   def trySettings: F[Either[MatcherError, HttpMatcherPublicSettings]]
+  def tryConfig: F[Either[MatcherError, Config]]
 
   def tryWsConnections: F[Either[MatcherError, HttpWebSocketConnections]]
   def tryCloseWsConnections(oldestNumber: Int): F[Either[MatcherError, HttpMessage]]
@@ -511,6 +513,13 @@ object DexApi {
         sttp
           .get(uri"$apiUri/matcher/settings")
           .headers(apiKeyHeaders)
+      }
+
+      override def tryConfig: F[Either[MatcherError, Config]] = tryParse {
+        sttp
+          .get(uri"$apiUri/matcher/debug/config")
+          .headers(apiKeyHeaders)
+          .response(asConfig)
       }
 
       override def tryWsConnections: F[Either[MatcherError, HttpWebSocketConnections]] = tryParseJson {

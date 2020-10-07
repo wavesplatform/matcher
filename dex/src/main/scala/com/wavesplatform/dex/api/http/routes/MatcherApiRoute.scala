@@ -2,7 +2,7 @@ package com.wavesplatform.dex.api.http.routes
 
 import akka.actor.{typed, ActorRef}
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
-import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.model.{HttpEntity, HttpResponse, StatusCodes}
 import akka.http.scaladsl.server
 import akka.http.scaladsl.server._
 import akka.http.scaladsl.server.directives.FutureDirectives
@@ -11,13 +11,14 @@ import akka.stream.Materializer
 import akka.util.Timeout
 import cats.syntax.option._
 import com.google.common.primitives.Longs
+import com.typesafe.config.Config
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.actors.MatcherActor._
 import com.wavesplatform.dex.actors.address.AddressActor.OrderListType
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.api.http._
 import com.wavesplatform.dex.api.http.entities._
-import com.wavesplatform.dex.api.http.headers.`X-User-Public-Key`
+import com.wavesplatform.dex.api.http.headers.{`X-User-Public-Key`, CustomContentTypes}
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
 import com.wavesplatform.dex.api.ws.actors.WsExternalClientDirectoryActor
@@ -43,6 +44,7 @@ import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.MatcherQueue.StoreEvent
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
+import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
 import com.wavesplatform.dex.settings.{MatcherSettings, OrderFeeSettings}
 import io.swagger.annotations._
 import javax.ws.rs.Path
@@ -58,6 +60,7 @@ import scala.util.Success
 class MatcherApiRoute(
   assetPairBuilder: AssetPairBuilder,
   matcherPublicKey: PublicKey,
+  config: Config,
   matcher: ActorRef,
   addressActor: ActorRef,
   storeEvent: StoreEvent,
@@ -92,6 +95,9 @@ class MatcherApiRoute(
   private val timer = Kamon.timer("matcher.api-requests")
   private val placeTimer = timer.withTag("action", "place")
 
+  private val excludedConfigKeys = Set("user", "pass", "seed", "private", "java", "sun", "api")
+  private val filteredConfig = config.withoutKeys(excludedConfigKeys)
+
   private def invalidJsonResponse(error: MatcherError): StandardRoute = complete(InvalidJsonResponse(error))
   private val invalidUserPublicKey: StandardRoute = complete(SimpleErrorResponse(StatusCodes.Forbidden, error.UserPublicKeyIsNotValid))
 
@@ -123,7 +129,7 @@ class MatcherApiRoute(
   private val transactionsRoutes: Route = pathPrefix("transactions")(protect(getTransactionsByOrder))
 
   private val debugRoutes: Route = pathPrefix("debug") {
-    getCurrentOffset ~ getLastOffset ~ getOldestSnapshotOffset ~ getAllSnapshotOffsets ~ protect(saveSnapshots)
+    getConfig ~ getCurrentOffset ~ getLastOffset ~ getOldestSnapshotOffset ~ getAllSnapshotOffsets ~ protect(saveSnapshots)
   }
 
   private val orderBookRoutes: Route = pathPrefix("orderbook") {
@@ -1032,6 +1038,20 @@ class MatcherApiRoute(
   )
   def getTransactionsByOrder: Route = (path(ByteStrPM) & get) { orderId =>
     complete(Json.toJson(orderDb.transactionsByOrder(orderId)))
+  }
+
+  @Path("/debug/config")
+  @ApiOperation(
+    value = "Returns current matcher's configuration",
+    httpMethod = "GET",
+    authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
+    tags = Array("debug"),
+    response = classOf[HttpResponse]
+  )
+  def getConfig: Route = (path("config") & get & withAuth) {
+    complete {
+      HttpEntity(filteredConfig.rendered).withContentType(CustomContentTypes.`application/hocon`)
+    }
   }
 
   @Path("/debug/currentOffset")

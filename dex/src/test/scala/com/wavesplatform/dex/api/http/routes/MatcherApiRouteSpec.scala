@@ -26,7 +26,7 @@ import com.wavesplatform.dex.actors.tx.WriteExchangeTransactionActor
 import com.wavesplatform.dex.api.RouteSpec
 import com.wavesplatform.dex.api.http.ApiMarshallers._
 import com.wavesplatform.dex.api.http.entities._
-import com.wavesplatform.dex.api.http.headers.`X-Api-Key`
+import com.wavesplatform.dex.api.http.headers.{`X-Api-Key`, CustomContentTypes}
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
 import com.wavesplatform.dex.api.http.{entities, OrderBookHttpInfo}
 import com.wavesplatform.dex.api.ws.actors.WsExternalClientDirectoryActor
@@ -230,6 +230,24 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         Get(routePath("/debug/lastOffset")).withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldEqual StatusCodes.OK
           responseAs[HttpOffset] should matchTo(0L)
+        },
+      apiKey
+    )
+  }
+
+  // getConfig
+  routePath("/debug/config") - {
+    "X-Api-Key is required" in test { route =>
+      Get(routePath("/debug/config")) ~> route ~> check {
+        status shouldEqual StatusCodes.Forbidden
+      }
+    }
+
+    "returns application/hocon as content-type" in test(
+      route =>
+        Get(routePath("/debug/config")).withHeaders(apiKeyHeader) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          contentType shouldEqual CustomContentTypes.`application/hocon`
         },
       apiKey
     )
@@ -1269,6 +1287,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
           Set.empty
         ),
         matcherPublicKey = matcherKeyPair.publicKey,
+        config = ConfigFactory.load().atKey("waves.dex"),
         matcher = matcherActor.ref,
         addressActor = addressActor.ref,
         storeEvent = {

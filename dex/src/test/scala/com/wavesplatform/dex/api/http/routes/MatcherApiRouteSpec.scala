@@ -26,9 +26,9 @@ import com.wavesplatform.dex.actors.tx.WriteExchangeTransactionActor
 import com.wavesplatform.dex.api.RouteSpec
 import com.wavesplatform.dex.api.http.ApiMarshallers._
 import com.wavesplatform.dex.api.http.entities._
-import com.wavesplatform.dex.api.http.headers.{`X-Api-Key`, CustomContentTypes}
+import com.wavesplatform.dex.api.http.headers.{CustomContentTypes, `X-Api-Key`}
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
-import com.wavesplatform.dex.api.http.{entities, OrderBookHttpInfo}
+import com.wavesplatform.dex.api.http.{OrderBookHttpInfo, entities}
 import com.wavesplatform.dex.api.ws.actors.WsExternalClientDirectoryActor
 import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.caches.RateCache
@@ -57,6 +57,7 @@ import com.wavesplatform.dex.settings.{MatcherSettings, OrderRestrictionsSetting
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 import play.api.libs.json.{JsArray, JsString, Json, JsonFacade => _}
+import pureconfig.ConfigSource
 
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
@@ -122,13 +123,14 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
   private val amountAssetDesc = BriefAssetDescription("AmountAsset", 8, hasScript = false)
   private val priceAssetDesc = BriefAssetDescription("PriceAsset", 8, hasScript = false)
 
-  private val settings =
-    MatcherSettings.valueReader
-      .read(ConfigFactory.load(), "waves.dex")
-      .copy(
-        priceAssets = Seq(badOrder.assetPair.priceAsset, okOrder.assetPair.priceAsset, priceAsset, Waves),
-        orderRestrictions = Map(smartWavesPair -> orderRestrictions)
-      )
+  private val settings = ConfigSource
+    .fromConfig(ConfigFactory.load())
+    .at("waves.dex")
+    .loadOrThrow[MatcherSettings]
+    .copy(
+      priceAssets = Seq(badOrder.assetPair.priceAsset, okOrder.assetPair.priceAsset, priceAsset, Waves),
+      orderRestrictions = Map(smartWavesPair -> orderRestrictions)
+    )
 
   implicit private val httpMarketDataWithMetaDiff: Diff[HttpMarketDataWithMeta] =
     Derived[Diff[HttpMarketDataWithMeta]].ignore[HttpMarketDataWithMeta, Long](_.created)
@@ -233,6 +235,24 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     )
   }
 
+  // getConfig
+  routePath("/debug/config") - {
+    "X-Api-Key is required" in test { route =>
+      Get(routePath("/debug/config")) ~> route ~> check {
+        status shouldEqual StatusCodes.Forbidden
+      }
+    }
+
+    "returns application/hocon as content-type" in test(
+      route =>
+        Get(routePath("/debug/config")).withHeaders(apiKeyHeader) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          contentType shouldEqual CustomContentTypes.`application/hocon`
+        },
+      apiKey
+    )
+  }
+
   // getOldestSnapshotOffset
   routePath("/debug/oldestSnapshotOffset") - {
     "returns the oldest snapshot offset among all order books" in test(
@@ -268,24 +288,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       route =>
         Post(routePath("/debug/saveSnapshots")).withHeaders(apiKeyHeader) ~> route ~> check {
           responseAs[HttpMessage] should matchTo(HttpMessage("Saving started"))
-        },
-      apiKey
-    )
-  }
-
-  // getConfig
-  routePath("/debug/config") - {
-    "X-Api-Key is required" in test { route =>
-      Get(routePath("/debug/config")) ~> route ~> check {
-        status shouldEqual StatusCodes.Forbidden
-      }
-    }
-
-    "returns application/hocon as content-type" in test(
-      route =>
-        Get(routePath("/debug/config")).withHeaders(apiKeyHeader) ~> route ~> check {
-          status shouldEqual StatusCodes.OK
-          contentType shouldEqual CustomContentTypes.`application/hocon`
         },
       apiKey
     )
@@ -1261,7 +1263,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
 
     val orderBookHttpInfo =
       new OrderBookHttpInfo(
-        settings = settings.orderBookSnapshotHttpCache,
+        settings = settings.orderBookHttp,
         askAdapter = orderBookAskAdapter,
         time = time,
         assetDecimals =
@@ -1285,7 +1287,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
           Set.empty
         ),
         matcherPublicKey = matcherKeyPair.publicKey,
-        config = ConfigFactory.load(),
+        config = ConfigFactory.load().atKey("waves.dex"),
         matcher = matcherActor.ref,
         addressActor = addressActor.ref,
         storeEvent = {

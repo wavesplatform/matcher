@@ -95,7 +95,7 @@ class MatcherApiRoute(
   private val timer = Kamon.timer("matcher.api-requests")
   private val placeTimer = timer.withTag("action", "place")
 
-  private val excludedConfigKeys = Set("user", "pass", "seed", "private")
+  private val excludedConfigKeys = Set("user", "pass", "seed", "private", "java", "sun", "api")
   private val filteredConfig = config.withoutKeys(excludedConfigKeys)
 
   private def invalidJsonResponse(error: MatcherError): StandardRoute = complete(InvalidJsonResponse(error))

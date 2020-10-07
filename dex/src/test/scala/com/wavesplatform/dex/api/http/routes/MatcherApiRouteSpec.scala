@@ -281,7 +281,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       }
     }
 
-    "returns correct application/hocon as content-type" in test(
+    "returns application/hocon as content-type" in test(
       route =>
         Get(routePath("/debug/config")).withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldEqual StatusCodes.OK

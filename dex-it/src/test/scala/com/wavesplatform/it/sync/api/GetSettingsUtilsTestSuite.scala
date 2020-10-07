@@ -2,6 +2,7 @@ package com.wavesplatform.it.sync.api
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
 
 class GetSettingsUtilsTestSuite extends MatcherSuiteBase {
 
@@ -21,6 +22,6 @@ class GetSettingsUtilsTestSuite extends MatcherSuiteBase {
   }
 
   "GET matcher/debug/config should return config without restricted key-parts (e.g. seed)" in {
-    dex1.api.config.toString should not contain "seed"
+    dex1.api.config.rendered should not contain "seed"
   }
 }

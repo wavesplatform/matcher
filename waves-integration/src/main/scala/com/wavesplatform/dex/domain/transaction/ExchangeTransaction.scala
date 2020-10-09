@@ -134,22 +134,27 @@ object ExchangeTransaction {
     fee: Long,
     timestamp: Long
   ): Either[ValidationError, Unit] =
-    Seq(
-      (fee <= 0) -> InsufficientFee(),
-      (amount <= 0) -> NonPositiveAmount(amount, "assets"),
-      (amount > Order.MaxAmount) -> GenericError("amount too large"),
-      (price <= 0) -> GenericError("price should be > 0"),
-      (price > Order.MaxAmount) -> GenericError("price too large"),
-      (sellMatcherFee > Order.MaxAmount) -> GenericError("sellMatcherFee too large"),
-      (buyMatcherFee > Order.MaxAmount) -> GenericError("buyMatcherFee too large"),
-      (fee > Order.MaxAmount) -> GenericError("fee too large"),
-      (buyOrder.orderType != OrderType.BUY) -> GenericError("buyOrder should has OrderType.BUY"),
-      (sellOrder.orderType != OrderType.SELL) -> GenericError("sellOrder should has OrderType.SELL"),
-      (buyOrder.matcherPublicKey != sellOrder.matcherPublicKey) -> GenericError("buyOrder.matcher should be the same as sellOrder.matcher"),
-      (buyOrder.assetPair != sellOrder.assetPair) -> GenericError("Both orders should have same AssetPair"),
-      (!buyOrder.isValid(timestamp)) -> OrderValidationError(buyOrder, buyOrder.isValid(timestamp).messages()),
-      (!sellOrder.isValid(timestamp)) -> OrderValidationError(sellOrder, sellOrder.isValid(timestamp).labels.mkString("\n")),
-      (!(price <= buyOrder.price && price >= sellOrder.price)) -> GenericError("priceIsValid")
-    ).foldLeft(().asRight[ValidationError]) { case (result, (hasError, error)) => result.ensure(error)(_ => !hasError) }
+    for {
+      _ <- Either.cond(fee > 0, (), InsufficientFee())
+      _ <- Either.cond(amount > 0, (), NonPositiveAmount(amount, "assets"))
+      _ <- Either.cond(amount <= Order.MaxAmount, (), GenericError("amount too large"))
+      _ <- Either.cond(price > 0, (), GenericError("price should be > 0"))
+      _ <- Either.cond(price <= Order.MaxAmount, (), GenericError("price too large"))
+      _ <- Either.cond(sellMatcherFee <= Order.MaxAmount, (), GenericError("sellMatcherFee too large"))
+      _ <- Either.cond(buyMatcherFee <= Order.MaxAmount, (), GenericError("buyMatcherFee too large"))
+      _ <- Either.cond(fee <= Order.MaxAmount, (), GenericError("fee too large"))
+      _ <- Either.cond(buyOrder.orderType == OrderType.BUY, (), GenericError("buyOrder should has OrderType.BUY"))
+      _ <- Either.cond(sellOrder.orderType == OrderType.SELL, (), GenericError("sellOrder should has OrderType.SELL"))
+      _ <- Either.cond(
+        buyOrder.matcherPublicKey == sellOrder.matcherPublicKey,
+        (),
+        GenericError("buyOrder.matcher should be the same as sellOrder.matcher")
+      )
+      _ <- Either.cond(buyOrder.assetPair == sellOrder.assetPair, (), GenericError("Both orders should have same AssetPair"))
+      _ <- Either.cond(buyOrder.isValid(timestamp), (), OrderValidationError(buyOrder, buyOrder.isValid(timestamp).messages()))
+      _ <- Either.cond(sellOrder.isValid(timestamp), (), OrderValidationError(sellOrder, sellOrder.isValid(timestamp).labels.mkString("\n")))
+      _ <- Either.cond(price <= buyOrder.price && price >= sellOrder.price, (), GenericError("priceIsValid"))
+
+    } yield ()
 
 }

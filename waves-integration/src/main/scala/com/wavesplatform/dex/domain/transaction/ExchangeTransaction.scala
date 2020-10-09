@@ -133,7 +133,8 @@ object ExchangeTransaction {
     sellMatcherFee: Long,
     fee: Long,
     timestamp: Long
-  ): Either[ValidationError, Unit] =
+  ): Either[ValidationError, Unit] = {
+
     Seq(
       (fee <= 0) -> InsufficientFee(),
       (amount <= 0) -> NonPositiveAmount(amount, "assets"),
@@ -150,6 +151,8 @@ object ExchangeTransaction {
       (!buyOrder.isValid(timestamp)) -> OrderValidationError(buyOrder, buyOrder.isValid(timestamp).messages()),
       (!sellOrder.isValid(timestamp)) -> OrderValidationError(sellOrder, sellOrder.isValid(timestamp).labels.mkString("\n")),
       (!(price <= buyOrder.price && price >= sellOrder.price)) -> GenericError("priceIsValid")
-    ).foldLeft(().asRight[ValidationError]) { case (result, (hasError, error)) => result.ensure(error)(_ => !hasError) }
+    ) foreach  { case (hasError, validationError) => if (hasError) return Right(validationError) }
 
+    Right(())
+  }
 }

@@ -1287,11 +1287,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
           Set.empty
         ),
         matcherPublicKey = matcherKeyPair.publicKey,
-<<<<<<< HEAD
-        config = ConfigFactory.load(),
-=======
         config = ConfigFactory.load().atKey("waves.dex"),
->>>>>>> 0e8cd14f1d35f4611080aa0ce9b6a7f5adbda09a
         matcher = matcherActor.ref,
         addressActor = addressActor.ref,
         storeEvent = {

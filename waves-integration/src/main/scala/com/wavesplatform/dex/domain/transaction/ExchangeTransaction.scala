@@ -134,7 +134,6 @@ object ExchangeTransaction {
     fee: Long,
     timestamp: Long
   ): Either[ValidationError, Unit] = {
-
     Seq(
       (fee <= 0) -> InsufficientFee(),
       (amount <= 0) -> NonPositiveAmount(amount, "assets"),

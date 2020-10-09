@@ -143,8 +143,7 @@ object ExchangeTransaction {
       _ <- Either.cond(sellMatcherFee <= Order.MaxAmount, (), GenericError("sellMatcherFee too large"))
       _ <- Either.cond(buyMatcherFee <= Order.MaxAmount, (), GenericError("buyMatcherFee too large"))
       _ <- Either.cond(fee <= Order.MaxAmount, (), GenericError("fee too large"))
-      _ <- Either.cond(buyOrder.orderType == OrderType.BUY, (), GenericError("price too large"))
-      _ <- Either.cond(price <= Order.MaxAmount, (), GenericError("buyOrder should has OrderType.BUY"))
+      _ <- Either.cond(buyOrder.orderType == OrderType.BUY, (), GenericError("buyOrder should has OrderType.BUY"))
       _ <- Either.cond(sellOrder.orderType == OrderType.SELL, (), GenericError("sellOrder should has OrderType.SELL"))
       _ <- Either.cond(
         buyOrder.matcherPublicKey == sellOrder.matcherPublicKey,

@@ -135,7 +135,7 @@ object ExchangeTransaction {
     timestamp: Long
   ): Either[ValidationError, Unit] =
     for {
-      _ <- Either.cond(fee <= 0, (), InsufficientFee())
+      _ <- Either.cond(fee > 0, (), InsufficientFee())
       _ <- Either.cond(amount > 0, (), NonPositiveAmount(amount, "assets"))
       _ <- Either.cond(amount <= Order.MaxAmount, (), GenericError("amount too large"))
       _ <- Either.cond(price > 0, (), GenericError("price should be > 0"))

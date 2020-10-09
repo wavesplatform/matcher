@@ -58,29 +58,29 @@ import scala.util.Success
 @Path("/matcher")
 @Api()
 class MatcherApiRoute(
-                       assetPairBuilder: AssetPairBuilder,
-                       matcherPublicKey: PublicKey,
-                       config: Config,
-                       matcher: ActorRef,
-                       addressActor: ActorRef,
-                       storeEvent: StoreEvent,
-                       orderBook: AssetPair => Option[Either[Unit, ActorRef]],
-                       orderBookHttpInfo: OrderBookHttpInfo,
-                       getActualTickSize: AssetPair => BigDecimal,
-                       orderValidator: Order => FutureResult[Order],
-                       matcherSettings: MatcherSettings,
-                       override val matcherStatus: () => MatcherStatus,
-                       orderDb: OrderDB,
-                       currentOffset: () => QueueEventWithMeta.Offset,
-                       lastOffset: () => Future[QueueEventWithMeta.Offset],
-                       matcherAccountFee: Long,
-                       override val apiKeyHash: Option[Array[Byte]],
-                       rateCache: RateCache,
-                       validatedAllowedOrderVersions: () => Future[Set[Byte]],
-                       getActualOrderFeeSettings: () => OrderFeeSettings,
-                       externalClientDirectoryRef: typed.ActorRef[WsExternalClientDirectoryActor.Message]
-                     )(implicit mat: Materializer)
-  extends ApiRoute
+  assetPairBuilder: AssetPairBuilder,
+  matcherPublicKey: PublicKey,
+  config: Config,
+  matcher: ActorRef,
+  addressActor: ActorRef,
+  storeEvent: StoreEvent,
+  orderBook: AssetPair => Option[Either[Unit, ActorRef]],
+  orderBookHttpInfo: OrderBookHttpInfo,
+  getActualTickSize: AssetPair => BigDecimal,
+  orderValidator: Order => FutureResult[Order],
+  matcherSettings: MatcherSettings,
+  override val matcherStatus: () => MatcherStatus,
+  orderDb: OrderDB,
+  currentOffset: () => QueueEventWithMeta.Offset,
+  lastOffset: () => Future[QueueEventWithMeta.Offset],
+  matcherAccountFee: Long,
+  override val apiKeyHash: Option[Array[Byte]],
+  rateCache: RateCache,
+  validatedAllowedOrderVersions: () => Future[Set[Byte]],
+  getActualOrderFeeSettings: () => OrderFeeSettings,
+  externalClientDirectoryRef: typed.ActorRef[WsExternalClientDirectoryActor.Message]
+)(implicit mat: Materializer)
+    extends ApiRoute
     with AuthRoute
     with HasStatusBarrier
     with ScorexLogging {
@@ -135,8 +135,8 @@ class MatcherApiRoute(
   private val orderBookRoutes: Route = pathPrefix("orderbook") {
     protect {
       orderBookInfo ~ getOrderStatusInfoByIdWithSignature ~ getOrderBook ~ marketStatus ~ placeLimitOrder ~
-        placeMarketOrder ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~ tradableBalance ~
-        orderStatus ~ historyDelete ~ cancel ~ cancelAll ~ orderbooks ~ orderBookDelete
+      placeMarketOrder ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~ tradableBalance ~
+      orderStatus ~ historyDelete ~ cancel ~ cancelAll ~ orderbooks ~ orderBookDelete
     }
   }
 
@@ -159,11 +159,11 @@ class MatcherApiRoute(
   }
 
   private def withAssetPair(
-                             p: AssetPair,
-                             redirectToInverse: Boolean = false,
-                             suffix: String = "",
-                             formatError: MatcherError => ToResponseMarshallable = InfoNotFound.apply
-                           ): Directive1[AssetPair] =
+    p: AssetPair,
+    redirectToInverse: Boolean = false,
+    suffix: String = "",
+    formatError: MatcherError => ToResponseMarshallable = InfoNotFound.apply
+  ): Directive1[AssetPair] =
     FutureDirectives.onSuccess(assetPairBuilder.validateAssetPair(p).value) flatMap {
       case Right(_) => provide(p)
       case Left(e) if redirectToInverse =>

@@ -15,15 +15,15 @@ import im.mak.waves.transactions.common.Id
 
 object NodeApiOps {
 
-  final implicit class ExplicitGetNodeApiOps[F[_]: Functor](val self: NodeApi[F])(implicit E: CanExtract[F]) {
+  implicit final class ExplicitGetNodeApiOps[F[_]: Functor](val self: NodeApi[F])(implicit E: CanExtract[F]) {
 
     import E.{extract => explicitGet}
 
-    def wavesBalance(address: Address): F[WavesBalanceResponse]                     = explicitGet(self.tryWavesBalance(address))
+    def wavesBalance(address: Address): F[WavesBalanceResponse] = explicitGet(self.tryWavesBalance(address))
     def assetBalance(address: Address, asset: IssuedAsset): F[AssetBalanceResponse] = explicitGet(self.tryAssetBalance(address, asset))
 
     def balance(address: Address, asset: Asset): F[Long] = asset match {
-      case Waves          => wavesBalance(address).map(_.balance)
+      case Waves => wavesBalance(address).map(_.balance)
       case x: IssuedAsset => assetBalance(address, x).map(_.balance)
     }
 
@@ -43,6 +43,7 @@ object NodeApiOps {
     def currentHeight: F[Int] = explicitGet(self.tryCurrentHeight)
 
     def activationStatus: F[ActivationStatusResponse] = explicitGet(self.tryActivationStatus)
-    def config: F[Config]                             = explicitGet(self.tryConfig)
+    def config: F[Config] = explicitGet(self.tryConfig)
   }
+
 }

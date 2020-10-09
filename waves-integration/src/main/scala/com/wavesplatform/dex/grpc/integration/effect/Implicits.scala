@@ -5,7 +5,9 @@ import io.netty.util.concurrent.{Future => NettyFuture}
 import scala.concurrent.{CancellationException, Future, Promise}
 
 object Implicits {
-  final implicit class NettyFutureOps[T](val self: NettyFuture[T]) extends AnyVal {
+
+  implicit final class NettyFutureOps[T](val self: NettyFuture[T]) extends AnyVal {
+
     def asScala: Future[T] = {
       val r = Promise[T]()
       self.addListener { (future: NettyFuture[T]) =>
@@ -15,5 +17,7 @@ object Implicits {
       }
       r.future
     }
+
   }
+
 }

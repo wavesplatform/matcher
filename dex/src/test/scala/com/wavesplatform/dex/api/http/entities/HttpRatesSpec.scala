@@ -19,7 +19,7 @@ class HttpRatesSpec extends AnyFreeSpec with Matchers with DiffMatcherWithImplic
 
   private val rates =
     Map(
-      Waves       -> 1d,
+      Waves -> 1d,
       issuedAsset -> 3d
     )
 

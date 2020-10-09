@@ -23,7 +23,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
   private val IssueResults(issueAliceAssetTx, aliceAssetId, aliceAsset) = mkIssueExtended(alice, "AliceCoin", someAssetAmount, 0)
 
   private val predefAssetPair = wavesUsdPair
-  private val aliceWavesPair  = AssetPair(aliceAsset, Waves)
+  private val aliceWavesPair = AssetPair(aliceAsset, Waves)
 
   private val sc1 = Scripts.alwaysTrue
 
@@ -54,15 +54,15 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
    */
   private val sc3 = Scripts.renderScriptTemplate(
     "AgQAAAAFdXNkSWQBAAAAB3t1c2RJZH0EAAAADGFsaWNlQXNzZXRJZAEAAAAOe2FsaWNlQXNzZXRJZH0EAAAAByRtYXRja" +
-      "DAFAAAAAnR4AwkAAAEAAAACBQAAAAckbWF0Y2gwAgAAAAVPcmRlcgQAAAABdAUAAAAHJG1hdGNoMAQAAAACaWQJAAAAAAAAAggFAAAAAXQAAAAC" +
-      "aWQBAAAAAAQAAAAQYXNzZXRQYWlyMUFtb3VudAkBAAAACWlzRGVmaW5lZAAAAAEICAUAAAABdAAAAAlhc3NldFBhaXIAAAALYW1vdW50QXNzZXQ" +
-      "EAAAAD2Fzc2V0UGFpcjFQcmljZQkAAAAAAAACCAgFAAAAAXQAAAAJYXNzZXRQYWlyAAAACnByaWNlQXNzZXQFAAAABXVzZElkBAAAABBhc3NldF" +
-      "BhaXIyQW1vdW50CQAAAAAAAAIICAUAAAABdAAAAAlhc3NldFBhaXIAAAALYW1vdW50QXNzZXQFAAAADGFsaWNlQXNzZXRJZAQAAAAPYXNzZXRQY" +
-      "WlyMlByaWNlCQEAAAAJaXNEZWZpbmVkAAAAAQgIBQAAAAF0AAAACWFzc2V0UGFpcgAAAApwcmljZUFzc2V0AwMJAQAAAAEhAAAAAQUAAAAQYXNz" +
-      "ZXRQYWlyMUFtb3VudAUAAAAPYXNzZXRQYWlyMVByaWNlBwYDBQAAABBhc3NldFBhaXIyQW1vdW50CQEAAAABIQAAAAEFAAAAD2Fzc2V0UGFpcjJ" +
-      "QcmljZQcDCQAAAQAAAAIFAAAAByRtYXRjaDACAAAAFFNldFNjcmlwdFRyYW5zYWN0aW9uBAAAAAFzBQAAAAckbWF0Y2gwBgQAAAAFb3RoZXIFAA" +
-      "AAByRtYXRjaDAJAQAAAAV0aHJvdwAAAABoNJIT",
-    "{usdId}"        -> UsdId,
+    "DAFAAAAAnR4AwkAAAEAAAACBQAAAAckbWF0Y2gwAgAAAAVPcmRlcgQAAAABdAUAAAAHJG1hdGNoMAQAAAACaWQJAAAAAAAAAggFAAAAAXQAAAAC" +
+    "aWQBAAAAAAQAAAAQYXNzZXRQYWlyMUFtb3VudAkBAAAACWlzRGVmaW5lZAAAAAEICAUAAAABdAAAAAlhc3NldFBhaXIAAAALYW1vdW50QXNzZXQ" +
+    "EAAAAD2Fzc2V0UGFpcjFQcmljZQkAAAAAAAACCAgFAAAAAXQAAAAJYXNzZXRQYWlyAAAACnByaWNlQXNzZXQFAAAABXVzZElkBAAAABBhc3NldF" +
+    "BhaXIyQW1vdW50CQAAAAAAAAIICAUAAAABdAAAAAlhc3NldFBhaXIAAAALYW1vdW50QXNzZXQFAAAADGFsaWNlQXNzZXRJZAQAAAAPYXNzZXRQY" +
+    "WlyMlByaWNlCQEAAAAJaXNEZWZpbmVkAAAAAQgIBQAAAAF0AAAACWFzc2V0UGFpcgAAAApwcmljZUFzc2V0AwMJAQAAAAEhAAAAAQUAAAAQYXNz" +
+    "ZXRQYWlyMUFtb3VudAUAAAAPYXNzZXRQYWlyMVByaWNlBwYDBQAAABBhc3NldFBhaXIyQW1vdW50CQEAAAABIQAAAAEFAAAAD2Fzc2V0UGFpcjJ" +
+    "QcmljZQcDCQAAAQAAAAIFAAAAByRtYXRjaDACAAAAFFNldFNjcmlwdFRyYW5zYWN0aW9uBAAAAAFzBQAAAAckbWF0Y2gwBgQAAAAFb3RoZXIFAA" +
+    "AAByRtYXRjaDAJAQAAAAV0aHJvdwAAAABoNJIT",
+    "{usdId}" -> UsdId,
     "{aliceAssetId}" -> aliceAssetId
   )
 
@@ -88,18 +88,18 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
    */
   private val sc4 = Scripts.renderScriptTemplate(
     "AgQAAAAOYWxpY2VQdWJsaWNLZXkBAAAAEHthbGljZVB1YmxpY0tleX0EAAAAEG1hdGNoZXJQdWJsaWNLZXkBAAAAEnttY" +
-      "XRjaGVyUHVibGljS2V5fQQAAAAHJG1hdGNoMAUAAAACdHgDCQAAAQAAAAIFAAAAByRtYXRjaDACAAAABU9yZGVyBAAAAAF0BQAAAAckbWF0Y2gw" +
-      "BAAAAAJpZAkAAAAAAAACCAUAAAABdAAAAAJpZAEAAAAABAAAAA9zZW5kZXJQdWJsaWNLZXkJAAAAAAAAAggFAAAAAXQAAAAPc2VuZGVyUHVibGl" +
-      "jS2V5BQAAAA5hbGljZVB1YmxpY0tleQQAAAASaXNNYXRjaGVyUHVibGljS2V5CQAAAAAAAAIIBQAAAAF0AAAAEG1hdGNoZXJQdWJsaWNLZXkFAA" +
-      "AAEG1hdGNoZXJQdWJsaWNLZXkEAAAACXRpbWVzdGFtcAkAAGYAAAACCAUAAAABdAAAAAl0aW1lc3RhbXAAAAAAAAAAAAAEAAAABXByaWNlCQAAZ" +
-      "gAAAAIIBQAAAAF0AAAABXByaWNlAAAAAAAAAAAABAAAAAZhbW91bnQJAABmAAAAAggFAAAAAXQAAAAGYW1vdW50AAAAAAAAAAAABAAAAApleHBp" +
-      "cmF0aW9uCQAAZgAAAAIIBQAAAAF0AAAACmV4cGlyYXRpb24AAAAAAAAAAAAEAAAACm1hdGNoZXJGZWUJAABmAAAAAggFAAAAAXQAAAAKbWF0Y2h" +
-      "lckZlZQAAAAAAAAAAAAQAAAAJYm9keUJ5dGVzCQAAAAAAAAIIBQAAAAF0AAAACWJvZHlCeXRlcwEAAAAAAwMDAwMDAwMDAwkBAAAAASEAAAABBQ" +
-      "AAAAJpZAUAAAAPc2VuZGVyUHVibGljS2V5BwUAAAASaXNNYXRjaGVyUHVibGljS2V5BwUAAAAJdGltZXN0YW1wBwUAAAAFcHJpY2UHBQAAAAZhb" +
-      "W91bnQHBQAAAApleHBpcmF0aW9uBwUAAAAKbWF0Y2hlckZlZQcFAAAACmV4cGlyYXRpb24HBQAAAAptYXRjaGVyRmVlBwkBAAAAASEAAAABBQAA" +
-      "AAlib2R5Qnl0ZXMHAwkAAAEAAAACBQAAAAckbWF0Y2gwAgAAABRTZXRTY3JpcHRUcmFuc2FjdGlvbgQAAAABcwUAAAAHJG1hdGNoMAYJAQAAAAV" +
-      "0aHJvdwAAAAAIj5yk",
-    "{alicePublicKey}"   -> alice.publicKey,
+    "XRjaGVyUHVibGljS2V5fQQAAAAHJG1hdGNoMAUAAAACdHgDCQAAAQAAAAIFAAAAByRtYXRjaDACAAAABU9yZGVyBAAAAAF0BQAAAAckbWF0Y2gw" +
+    "BAAAAAJpZAkAAAAAAAACCAUAAAABdAAAAAJpZAEAAAAABAAAAA9zZW5kZXJQdWJsaWNLZXkJAAAAAAAAAggFAAAAAXQAAAAPc2VuZGVyUHVibGl" +
+    "jS2V5BQAAAA5hbGljZVB1YmxpY0tleQQAAAASaXNNYXRjaGVyUHVibGljS2V5CQAAAAAAAAIIBQAAAAF0AAAAEG1hdGNoZXJQdWJsaWNLZXkFAA" +
+    "AAEG1hdGNoZXJQdWJsaWNLZXkEAAAACXRpbWVzdGFtcAkAAGYAAAACCAUAAAABdAAAAAl0aW1lc3RhbXAAAAAAAAAAAAAEAAAABXByaWNlCQAAZ" +
+    "gAAAAIIBQAAAAF0AAAABXByaWNlAAAAAAAAAAAABAAAAAZhbW91bnQJAABmAAAAAggFAAAAAXQAAAAGYW1vdW50AAAAAAAAAAAABAAAAApleHBp" +
+    "cmF0aW9uCQAAZgAAAAIIBQAAAAF0AAAACmV4cGlyYXRpb24AAAAAAAAAAAAEAAAACm1hdGNoZXJGZWUJAABmAAAAAggFAAAAAXQAAAAKbWF0Y2h" +
+    "lckZlZQAAAAAAAAAAAAQAAAAJYm9keUJ5dGVzCQAAAAAAAAIIBQAAAAF0AAAACWJvZHlCeXRlcwEAAAAAAwMDAwMDAwMDAwkBAAAAASEAAAABBQ" +
+    "AAAAJpZAUAAAAPc2VuZGVyUHVibGljS2V5BwUAAAASaXNNYXRjaGVyUHVibGljS2V5BwUAAAAJdGltZXN0YW1wBwUAAAAFcHJpY2UHBQAAAAZhb" +
+    "W91bnQHBQAAAApleHBpcmF0aW9uBwUAAAAKbWF0Y2hlckZlZQcFAAAACmV4cGlyYXRpb24HBQAAAAptYXRjaGVyRmVlBwkBAAAAASEAAAABBQAA" +
+    "AAlib2R5Qnl0ZXMHAwkAAAEAAAACBQAAAAckbWF0Y2gwAgAAABRTZXRTY3JpcHRUcmFuc2FjdGlvbgQAAAABcwUAAAAHJG1hdGNoMAYJAQAAAAV" +
+    "0aHJvdwAAAAAIj5yk",
+    "{alicePublicKey}" -> alice.publicKey,
     "{matcherPublicKey}" -> matcher.publicKey
   )
 
@@ -113,9 +113,9 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
    */
   private val sc5 = Scripts.renderScriptTemplate(
     "AgQAAAAOYWxpY2VQdWJsaWNLZXkBAAAAEHthbGljZVB1YmxpY0tleX0EAAAAByRtYXRjaDAFAAAAAnR4AwkAAAEAAAACB" +
-      "QAAAAckbWF0Y2gwAgAAAAVPcmRlcgQAAAABdAUAAAAHJG1hdGNoMAkAAfQAAAADCAUAAAABdAAAAAlib2R5Qnl0ZXMJAAGRAAAAAggFAAAAAXQA" +
-      "AAAGcHJvb2ZzAAAAAAAAAAAABQAAAA5hbGljZVB1YmxpY0tleQMJAAABAAAAAgUAAAAHJG1hdGNoMAIAAAAUU2V0U2NyaXB0VHJhbnNhY3Rpb24" +
-      "EAAAAAXMFAAAAByRtYXRjaDAGCQEAAAAFdGhyb3cAAAAAnM6WrQ==",
+    "QAAAAckbWF0Y2gwAgAAAAVPcmRlcgQAAAABdAUAAAAHJG1hdGNoMAkAAfQAAAADCAUAAAABdAAAAAlib2R5Qnl0ZXMJAAGRAAAAAggFAAAAAXQA" +
+    "AAAGcHJvb2ZzAAAAAAAAAAAABQAAAA5hbGljZVB1YmxpY0tleQMJAAABAAAAAgUAAAAHJG1hdGNoMAIAAAAUU2V0U2NyaXB0VHJhbnNhY3Rpb24" +
+    "EAAAAAXMFAAAAByRtYXRjaDAGCQEAAAAFdGhyb3cAAAAAnM6WrQ==",
     "{alicePublicKey}" -> alice.publicKey
   )
 
@@ -135,16 +135,16 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
    */
   private val sc6 = Scripts.renderScriptTemplate(
     "AgQAAAAOYWxpY2VQdWJsaWNLZXkBAAAAEHthbGljZVB1YmxpY0tleX0EAAAADGJvYlB1YmxpY0tleQEAAAAOe2JvYlB1Y" +
-      "mxpY0tleX0EAAAAEG1hdGNoZXJQdWJsaWNLZXkBAAAAEnttYXRjaGVyUHVibGljS2V5fQQAAAAHJG1hdGNoMAUAAAACdHgDCQAAAQAAAAIFAAAA" +
-      "ByRtYXRjaDACAAAABU9yZGVyBAAAAAF0BQAAAAckbWF0Y2gwBAAAAAVhbGljZQMJAAH0AAAAAwgFAAAAAXQAAAAJYm9keUJ5dGVzCQABkQAAAAI" +
-      "IBQAAAAF0AAAABnByb29mcwAAAAAAAAAAAAUAAAAOYWxpY2VQdWJsaWNLZXkAAAAAAAAAAAEAAAAAAAAAAAAEAAAAA2JvYgMJAAH0AAAAAwgFAA" +
-      "AAAXQAAAAJYm9keUJ5dGVzCQABkQAAAAIIBQAAAAF0AAAABnByb29mcwAAAAAAAAAAAQUAAAAMYm9iUHVibGljS2V5AAAAAAAAAAABAAAAAAAAA" +
-      "AAABAAAAAdtYXRjaGVyAwkAAfQAAAADCAUAAAABdAAAAAlib2R5Qnl0ZXMJAAGRAAAAAggFAAAAAXQAAAAGcHJvb2ZzAAAAAAAAAAACBQAAABBt" +
-      "YXRjaGVyUHVibGljS2V5AAAAAAAAAAABAAAAAAAAAAAACQAAZwAAAAIJAABkAAAAAgkAAGQAAAACBQAAAAVhbGljZQUAAAADYm9iBQAAAAdtYXR" +
-      "jaGVyAAAAAAAAAAACAwkAAAEAAAACBQAAAAckbWF0Y2gwAgAAABRTZXRTY3JpcHRUcmFuc2FjdGlvbgQAAAABcwUAAAAHJG1hdGNoMAYJAQAAAA" +
-      "V0aHJvdwAAAABu4D+b",
-    "{alicePublicKey}"   -> alice.publicKey,
-    "{bobPublicKey}"     -> bob.publicKey,
+    "mxpY0tleX0EAAAAEG1hdGNoZXJQdWJsaWNLZXkBAAAAEnttYXRjaGVyUHVibGljS2V5fQQAAAAHJG1hdGNoMAUAAAACdHgDCQAAAQAAAAIFAAAA" +
+    "ByRtYXRjaDACAAAABU9yZGVyBAAAAAF0BQAAAAckbWF0Y2gwBAAAAAVhbGljZQMJAAH0AAAAAwgFAAAAAXQAAAAJYm9keUJ5dGVzCQABkQAAAAI" +
+    "IBQAAAAF0AAAABnByb29mcwAAAAAAAAAAAAUAAAAOYWxpY2VQdWJsaWNLZXkAAAAAAAAAAAEAAAAAAAAAAAAEAAAAA2JvYgMJAAH0AAAAAwgFAA" +
+    "AAAXQAAAAJYm9keUJ5dGVzCQABkQAAAAIIBQAAAAF0AAAABnByb29mcwAAAAAAAAAAAQUAAAAMYm9iUHVibGljS2V5AAAAAAAAAAABAAAAAAAAA" +
+    "AAABAAAAAdtYXRjaGVyAwkAAfQAAAADCAUAAAABdAAAAAlib2R5Qnl0ZXMJAAGRAAAAAggFAAAAAXQAAAAGcHJvb2ZzAAAAAAAAAAACBQAAABBt" +
+    "YXRjaGVyUHVibGljS2V5AAAAAAAAAAABAAAAAAAAAAAACQAAZwAAAAIJAABkAAAAAgkAAGQAAAACBQAAAAVhbGljZQUAAAADYm9iBQAAAAdtYXR" +
+    "jaGVyAAAAAAAAAAACAwkAAAEAAAACBQAAAAckbWF0Y2gwAgAAABRTZXRTY3JpcHRUcmFuc2FjdGlvbgQAAAABcwUAAAAHJG1hdGNoMAYJAQAAAA" +
+    "V0aHJvdwAAAABu4D+b",
+    "{alicePublicKey}" -> alice.publicKey,
+    "{bobPublicKey}" -> bob.publicKey,
     "{matcherPublicKey}" -> matcher.publicKey
   )
 
@@ -162,12 +162,12 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
    */
   private val sc7 = Scripts.renderScriptTemplate(
     "AgQAAAAFd2N0SWQBAAAAB3t3Y3RJZH0EAAAAByRtYXRjaDAFAAAAAnR4AwkAAAEAAAACBQAAAAckbWF0Y2gwAgAAAAVPc" +
-      "mRlcgQAAAABdAUAAAAHJG1hdGNoMAQAAAACaWQJAAAAAAAAAggFAAAAAXQAAAACaWQBAAAAAAQAAAAPYXNzZXRQYWlyQW1vdW50AwkBAAAACWlz" +
-      "RGVmaW5lZAAAAAEICAUAAAABdAAAAAlhc3NldFBhaXIAAAALYW1vdW50QXNzZXQJAAAAAAAAAgkBAAAAB2V4dHJhY3QAAAABCAgFAAAAAXQAAAA" +
-      "JYXNzZXRQYWlyAAAAC2Ftb3VudEFzc2V0BQAAAAV3Y3RJZAcEAAAADmFzc2V0UGFpclByaWNlCQEAAAAJaXNEZWZpbmVkAAAAAQgIBQAAAAF0AA" +
-      "AACWFzc2V0UGFpcgAAAApwcmljZUFzc2V0AwUAAAAPYXNzZXRQYWlyQW1vdW50CQEAAAABIQAAAAEFAAAADmFzc2V0UGFpclByaWNlBwMJAAABA" +
-      "AAAAgUAAAAHJG1hdGNoMAIAAAAUU2V0U2NyaXB0VHJhbnNhY3Rpb24EAAAAAXMFAAAAByRtYXRjaDAGBAAAAAVvdGhlcgUAAAAHJG1hdGNoMAkB" +
-      "AAAABXRocm93AAAAAPKBXCk=",
+    "mRlcgQAAAABdAUAAAAHJG1hdGNoMAQAAAACaWQJAAAAAAAAAggFAAAAAXQAAAACaWQBAAAAAAQAAAAPYXNzZXRQYWlyQW1vdW50AwkBAAAACWlz" +
+    "RGVmaW5lZAAAAAEICAUAAAABdAAAAAlhc3NldFBhaXIAAAALYW1vdW50QXNzZXQJAAAAAAAAAgkBAAAAB2V4dHJhY3QAAAABCAgFAAAAAXQAAAA" +
+    "JYXNzZXRQYWlyAAAAC2Ftb3VudEFzc2V0BQAAAAV3Y3RJZAcEAAAADmFzc2V0UGFpclByaWNlCQEAAAAJaXNEZWZpbmVkAAAAAQgIBQAAAAF0AA" +
+    "AACWFzc2V0UGFpcgAAAApwcmljZUFzc2V0AwUAAAAPYXNzZXRQYWlyQW1vdW50CQEAAAABIQAAAAEFAAAADmFzc2V0UGFpclByaWNlBwMJAAABA" +
+    "AAAAgUAAAAHJG1hdGNoMAIAAAAUU2V0U2NyaXB0VHJhbnNhY3Rpb24EAAAAAXMFAAAAByRtYXRjaDAGBAAAAAVvdGhlcgUAAAAHJG1hdGNoMAkB" +
+    "AAAABXRocm93AAAAAPKBXCk=",
     "{wctId}" -> WctId
   )
 
@@ -181,9 +181,9 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
    */
   private val sc8 = Scripts.renderScriptTemplate(
     "AgQAAAAQbWF0Y2hlclB1YmxpY0tleQEAAAASe21hdGNoZXJQdWJsaWNLZXl9BAAAAAckbWF0Y2gwBQAAAAJ0eAMJAAABA" +
-      "AAAAgUAAAAHJG1hdGNoMAIAAAAFT3JkZXIEAAAAAXQFAAAAByRtYXRjaDAJAAH0AAAAAwgFAAAAAXQAAAAJYm9keUJ5dGVzCQABkQAAAAIIBQAA" +
-      "AAF0AAAABnByb29mcwAAAAAAAAAAAAUAAAAQbWF0Y2hlclB1YmxpY0tleQMJAAABAAAAAgUAAAAHJG1hdGNoMAIAAAAUU2V0U2NyaXB0VHJhbnN" +
-      "hY3Rpb24EAAAAAXMFAAAAByRtYXRjaDAGCQEAAAAFdGhyb3cAAAAAWX4f/Q==",
+    "AAAAgUAAAAHJG1hdGNoMAIAAAAFT3JkZXIEAAAAAXQFAAAAByRtYXRjaDAJAAH0AAAAAwgFAAAAAXQAAAAJYm9keUJ5dGVzCQABkQAAAAIIBQAA" +
+    "AAF0AAAABnByb29mcwAAAAAAAAAAAAUAAAAQbWF0Y2hlclB1YmxpY0tleQMJAAABAAAAAgUAAAAHJG1hdGNoMAIAAAAUU2V0U2NyaXB0VHJhbnN" +
+    "hY3Rpb24EAAAAAXMFAAAAByRtYXRjaDAGCQEAAAAFdGhyb3cAAAAAWX4f/Q==",
     "{matcherPublicKey}" -> matcher.publicKey
   )
 
@@ -196,8 +196,8 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
    */
   private val sc9 = Scripts.fromBase64(
     "AgQAAAAHJG1hdGNoMAUAAAACdHgDCQAAAQAAAAIFAAAAByRtYXRjaDACAAAABU9yZGVyBAAAAAF0BQAAAAckbWF0Y2gwCQAAZgAAAAIA" +
-      "AAAAAAAAAAAFAAAABmhlaWdodAMJAAABAAAAAgUAAAAHJG1hdGNoMAIAAAAUU2V0U2NyaXB0VHJhbnNhY3Rpb24EAAAAAXMFAAAAByRtYXRjaDA" +
-      "GCQEAAAAFdGhyb3cAAAAAnVjIGw=="
+    "AAAAAAAAAAAFAAAABmhlaWdodAMJAAABAAAAAgUAAAAHJG1hdGNoMAIAAAAUU2V0U2NyaXB0VHJhbnNhY3Rpb24EAAAAAXMFAAAAByRtYXRjaDA" +
+    "GCQEAAAAFdGhyb3cAAAAAnVjIGw=="
   )
 
   override protected def beforeAll(): Unit = {
@@ -248,7 +248,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
             )
 
           val sigAlice = ByteStr(crypto.sign(alice, unsigned.bodyBytes()))
-          val sigBob   = ByteStr(crypto.sign(bob, unsigned.bodyBytes()))
+          val sigBob = ByteStr(crypto.sign(bob, unsigned.bodyBytes()))
 
           val signed = unsigned.copy(proofs = Proofs(Seq(sigAlice, sigBob)))
           placeAndAwaitAtDex(signed)
@@ -272,7 +272,8 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
 
           setAliceScript(sc)
 
-          val bobOrd1 = mkOrder(bob, predefAssetPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, matcherFee = smartMatcherFee, version = 2)
+          val bobOrd1 =
+            mkOrder(bob, predefAssetPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, matcherFee = smartMatcherFee, version = 2)
           dex1.api.place(bobOrd1)
 
           val bobOrd2 = mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, matcherFee = smartMatcherFee, version = 2)
@@ -315,7 +316,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
               )
 
             val sigAlice = ByteStr(crypto.sign(alice, unsigned.bodyBytes()))
-            val sigMat   = ByteStr(crypto.sign(matcher.privateKey, unsigned.bodyBytes()))
+            val sigMat = ByteStr(crypto.sign(matcher.privateKey, unsigned.bodyBytes()))
             placeAndAwaitAtDex(unsigned.copy(proofs = Proofs(Seq(sigAlice, ByteStr.empty, sigMat))))
           }
 
@@ -346,13 +347,17 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
           setAliceScript(sc)
 
           dex1.api
-            .tryPlace(mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)) should failWith(
+            .tryPlace(
+              mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
+            ) should failWith(
             3147522, // AccountScriptDeniedOrder
             MatcherError.Params(address = Some(alice.toAddress.stringRepr))
           )
 
           dex1.api
-            .tryPlace(mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)) should failWith(
+            .tryPlace(
+              mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
+            ) should failWith(
             3147522, // AccountScriptDeniedOrder
             MatcherError.Params(address = Some(alice.toAddress.stringRepr))
           )
@@ -360,7 +365,9 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
 
         "9" in {
           setAliceScript(sc9)
-          dex1.api.tryPlace(mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)) should failWith(
+          dex1.api.tryPlace(
+            mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
+          ) should failWith(
             3147520, // AccountScriptReturnedError
             "An access to the blockchain.height is denied on DEX"
           )
@@ -391,12 +398,12 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
           dex1.api.waitForOrderStatus(bobOrd2, Status.Filled)
 
           val aliceOrd1Txs = dex1.api.waitForTransactionsByOrder(aliceOrd1, 1)
-          val r1           = wavesNode1.api.tryBroadcast(aliceOrd1Txs.head)
+          val r1 = wavesNode1.api.tryBroadcast(aliceOrd1Txs.head)
           r1 shouldBe Symbol("left")
           r1.swap.explicitGet().error shouldBe 307 // node's ApiError TransactionNotAllowedByAccountScript.Id
 
           val aliceOrd2Txs = dex1.api.waitForTransactionsByOrder(aliceOrd2, 1)
-          val r2           = wavesNode1.api.tryBroadcast(aliceOrd2Txs.head)
+          val r2 = wavesNode1.api.tryBroadcast(aliceOrd2Txs.head)
           r2 shouldBe Symbol("left")
           r2.swap.explicitGet().error shouldBe 307 // node's ApiError TransactionNotAllowedByAccountScript.Id
 
@@ -411,5 +418,6 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
 
   private def setAliceScript(binaryCode: ByteStr): Unit =
     broadcastAndAwait(mkSetAccountScript(alice, Some(binaryCode), fee = setScriptFee + smartFee))
+
   private def resetAliceAccountScript(): Unit = broadcastAndAwait(mkResetAccountScript(alice, fee = setScriptFee + smartFee))
 }

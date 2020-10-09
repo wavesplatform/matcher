@@ -14,7 +14,8 @@ import com.wavesplatform.protobuf.{Amount => PbAmount}
 object DexToPbConversions {
 
   implicit class VanillaExchangeTransactionOps(tx: VExchangeTransaction) {
-    def toPB: SignedExchangeTransaction = {
+
+    def toPB: SignedExchangeTransaction =
       SignedExchangeTransaction(
         transaction = Some(
           ExchangeTransaction(
@@ -36,7 +37,7 @@ object DexToPbConversions {
         ),
         proofs = tx.proofs.proofs.map(_.toPB)
       )
-    }
+
   }
 
   implicit class VanillaAssetOps(self: VAsset) {
@@ -48,14 +49,15 @@ object DexToPbConversions {
   }
 
   implicit class VanillaOrderOps(order: VOrder) {
-    def toPB: PbOrder = {
+
+    def toPB: PbOrder =
       PbOrder(
         chainId = VAddressScheme.current.chainId.toInt,
         senderPublicKey = order.senderPublicKey.toPB,
         matcherPublicKey = order.matcherPublicKey.toPB,
         assetPair = Some(PbAssetPair(order.assetPair.amountAsset.toPB, order.assetPair.priceAsset.toPB)),
         orderSide = order.orderType match {
-          case VOrderType.BUY  => PbOrder.Side.BUY
+          case VOrderType.BUY => PbOrder.Side.BUY
           case VOrderType.SELL => PbOrder.Side.SELL
         },
         amount = order.amount,
@@ -66,10 +68,11 @@ object DexToPbConversions {
         version = order.version,
         proofs = order.proofs.map(_.toPB)
       )
-    }
+
   }
 
   implicit class VanillaByteStrOps(val self: VByteStr) extends AnyVal {
     def toPB: PbByteString = PbByteString.copyFrom(self.arr)
   }
+
 }

@@ -13,8 +13,8 @@ import com.wavesplatform.dex.model.{OrderInfo, OrderStatus}
 import org.iq80.leveldb.DB
 
 /**
-  * Contains only finalized orders
-  */
+ * Contains only finalized orders
+ */
 trait OrderDB {
   def containsInfo(id: Order.Id): Boolean
   def status(id: Order.Id): OrderStatus.Final
@@ -38,16 +38,15 @@ object OrderDB {
 
     override def saveOrder(o: Order): Unit = db.readWrite { rw =>
       val k = DbKeys.order(o.id())
-      if (!rw.has(k)) {
+      if (!rw.has(k))
         rw.put(k, Some(o))
-      }
     }
 
     override def get(id: Order.Id): Option[Order] = db.readOnly(_.get(DbKeys.order(id)))
 
     override def saveOrderInfo(id: Order.Id, sender: Address, oi: FinalOrderInfo): Unit = {
       val orderInfoKey = DbKeys.orderInfo(id)
-      if (!db.has(orderInfoKey)) {
+      if (!db.has(orderInfoKey))
         db.readWrite { rw =>
           val newCommonSeqNr = rw.inc(DbKeys.finalizedCommonSeqNr(sender))
           rw.put(DbKeys.finalizedCommon(sender, newCommonSeqNr), Some(id))
@@ -61,7 +60,6 @@ object OrderDB {
 
           rw.put(orderInfoKey, Some(oi))
         }
-      }
     }
 
     override def getFinalizedOrders(owner: Address, maybePair: Option[AssetPair]): Seq[(Order.Id, OrderInfo[OrderStatus])] =
@@ -75,8 +73,8 @@ object OrderDB {
 
         (for {
           offset <- 0 until math.min(seqNr, settings.maxOrders)
-          id     <- db.get(key(seqNr - offset))
-          oi     <- db.get(DbKeys.orderInfo(id))
+          id <- db.get(key(seqNr - offset))
+          oi <- db.get(DbKeys.orderInfo(id))
         } yield id -> oi).sorted
       }
 
@@ -89,6 +87,7 @@ object OrderDB {
         tx <- ro.get(DbKeys.exchangeTransaction(txId))
       } yield tx
     }
+
   }
 
   implicit def orderInfoOrdering[S <: OrderStatus]: Ordering[(ByteStr, OrderInfo[S])] = Ordering.by { case (id, oi) => (-oi.timestamp, id) }

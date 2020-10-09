@@ -17,10 +17,11 @@ class AskActor[T](p: Promise[T], timeout: FiniteDuration)(implicit ct: ClassTag[
       context.stop(self)
       x match {
         case x: T if x.getClass == ct.runtimeClass => p.trySuccess(x)
-        case e: Status.Failure                     => p.tryFailure(e.cause)
-        case _                                     => p.tryFailure(new IllegalArgumentException(s"Expected ${ct.runtimeClass.getName}, but got $x"))
+        case e: Status.Failure => p.tryFailure(e.cause)
+        case _ => p.tryFailure(new IllegalArgumentException(s"Expected ${ct.runtimeClass.getName}, but got $x"))
       }
   }
+
 }
 
 object AskActor {
@@ -28,9 +29,11 @@ object AskActor {
   private val timeoutMessage = Status.Failure(TimedOut)
 
   def props[T](p: Promise[T], timeout: FiniteDuration)(implicit ct: ClassTag[T]) = Props(new AskActor(p, timeout))
+
   def mk[T](timeout: FiniteDuration)(implicit ct: ClassTag[T], system: ActorSystem): (ActorRef, Future[T]) = {
-    val p   = Promise[T]()
+    val p = Promise[T]()
     val ref = system.actorOf(props(p, timeout))
     (ref, p.future)
   }
+
 }

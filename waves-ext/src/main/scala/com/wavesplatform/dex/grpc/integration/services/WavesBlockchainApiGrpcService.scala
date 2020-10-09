@@ -51,7 +51,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
     metadata.put(descKey, "Shutting down")
     val shutdownError = new StatusRuntimeException(Status.UNAVAILABLE, metadata) // Because it should try to connect to other DEX Extension
 
-    realTimeBalanceChangesSubscribers.forEach { _.onError(shutdownError) }
+    realTimeBalanceChangesSubscribers.forEach(_.onError(shutdownError))
     realTimeBalanceChangesSubscribers.clear()
   }
 
@@ -60,8 +60,8 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
       .map {
         case (address, asset) =>
           val newAssetBalance = spendableBalance(address, asset)
-          val addressBalance  = allSpendableBalances.getOrDefault(address, Map.empty)
-          val needUpdate      = !addressBalance.get(asset).contains(newAssetBalance)
+          val addressBalance = allSpendableBalances.getOrDefault(address, Map.empty)
+          val needUpdate = !addressBalance.get(asset).contains(newAssetBalance)
 
           if (needUpdate) {
             allSpendableBalances.put(address, addressBalance + (asset -> newAssetBalance))
@@ -86,7 +86,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
         case None =>
           context.utx.transactionById(txId.toVanilla) match {
             case Some(_) => TransactionStatus(txId, TransactionStatus.Status.UNCONFIRMED)
-            case None    => TransactionStatus(txId, TransactionStatus.Status.NOT_EXISTS)
+            case None => TransactionStatus(txId, TransactionStatus.Status.NOT_EXISTS)
           }
       }
     }
@@ -96,7 +96,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
   override def broadcast(request: BroadcastRequest): Future[BroadcastResponse] = Future {
     request.transaction
       .fold[Either[ValidationError, SignedExchangeTransaction]](GenericError("The signed transaction must be specified").asLeft)(_.asRight)
-      .flatMap { _.toVanilla }
+      .flatMap(_.toVanilla)
       .flatMap { tx =>
         if (context.blockchain.containsTransaction(tx)) Right(BroadcastResponse(isValid = true))
         else context.broadcastTransaction(tx).resultE.map(BroadcastResponse(_)).leftFlatMap(_ => BroadcastResponse().asRight)
@@ -149,7 +149,8 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
             script = info.script,
             isAssetScript = true,
             scriptContainerAddress = Coproduct[Environment.Tthis](Environment.AssetId(asset.byteRepr))
-          )._2)
+          )._2
+        )
     }
     RunScriptResponse(r)
   }
@@ -204,7 +205,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
     if (!realTimeBalanceChanges().isCompleted) {
       responseObserver match {
         case x: ServerCallStreamObserver[_] => x.setOnCancelHandler(() => realTimeBalanceChangesSubscribers remove x)
-        case x                              => log.warn(s"Can't register cancel handler for $x")
+        case x => log.warn(s"Can't register cancel handler for $x")
       }
       realTimeBalanceChangesSubscribers.add(responseObserver)
     }
@@ -213,9 +214,9 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
     import RunScriptResponse.Result
     try raw match {
       case Left(execError) => Result.ScriptError(execError)
-      case Right(FALSE)    => Result.Denied(Empty())
-      case Right(TRUE)     => Result.Empty
-      case Right(x)        => Result.UnexpectedResult(x.toString)
+      case Right(FALSE) => Result.Denied(Empty())
+      case Right(TRUE) => Result.Empty
+      case Right(x) => Result.UnexpectedResult(x.toString)
     } catch {
       case NonFatal(e) =>
         log.trace(error.formatStackTrace(e))
@@ -225,14 +226,13 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
 
   override def allAssetsSpendableBalance(request: AddressRequest): Future[AllAssetsSpendableBalanceResponse] = {
     for {
-      address       <- Task.fromTry(Try(request.address.toVanillaAddress))
+      address <- Task.fromTry(Try(request.address.toVanillaAddress))
       assetBalances <- context.accountsApi.portfolio(address).toListL
-    } yield
-      AllAssetsSpendableBalanceResponse(
-        (Waves :: assetBalances.map(_._1))
-          .map(a => AllAssetsSpendableBalanceResponse.Record(a.toPB, spendableBalance(address, a)))
-          .filterNot(_.balance == 0L)
-      )
+    } yield AllAssetsSpendableBalanceResponse(
+      (Waves :: assetBalances.map(_._1))
+        .map(a => AllAssetsSpendableBalanceResponse.Record(a.toPB, spendableBalance(address, a)))
+        .filterNot(_.balance == 0L)
+    )
   }.runToFuture
 
   override def getNodeAddress(request: Empty): Future[NodeAddressResponse] = Future {
@@ -247,4 +247,5 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
     metadata.put(descKey, description)
     throw new StatusRuntimeException(Status.INVALID_ARGUMENT, metadata)
   }
+
 }

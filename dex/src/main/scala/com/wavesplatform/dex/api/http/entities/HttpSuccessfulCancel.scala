@@ -20,5 +20,5 @@ class HttpSuccessfulCancel {
 
 object HttpSuccessfulCancel {
   val success: Boolean = true
-  val status: String   = "OrderCanceled"
+  val status: String = "OrderCanceled"
 }

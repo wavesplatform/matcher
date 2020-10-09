@@ -11,4 +11,5 @@ inConfig(Jmh)(
     // rewire tasks, so that 'jmh:run' automatically invokes 'jmh:compile' (otherwise a clean 'jmh:run' would fail)
     compile := compile.dependsOn(Test / compile).value,
     run := run.dependsOn(compile).evaluated
-  ))
+  )
+)

@@ -16,7 +16,7 @@ inTask(docker)(
     imageTagMakeFunction := (gitTag => s"${wavesNodeVersion.value}_$gitTag"),
     dockerfile := new Dockerfile {
 
-      val basePath     = "/opt/waves"
+      val basePath = "/opt/waves"
       val entryPointSh = s"$basePath/start-matcher-node-it.sh"
 
       from("wavesplatform/matcher-node:latest")

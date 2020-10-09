@@ -12,11 +12,11 @@ import play.api.libs.json.Json
 class HttpOrderFeeModeSpec extends AnyFreeSpec with Matchers with DiffMatcherWithImplicits {
 
   private val fixedModeJson: String = """{
-                                          |  "fixed" : {
-                                          |    "assetId" : "6suw3ZHbyk6jrM19n7Pvaih3zSPsAt3gKcY8AZPxQYQf",
-                                          |    "minFee" : 1
-                                          |  }
-                                          |}""".stripMargin
+                                        |  "fixed" : {
+                                        |    "assetId" : "6suw3ZHbyk6jrM19n7Pvaih3zSPsAt3gKcY8AZPxQYQf",
+                                        |    "minFee" : 1
+                                        |  }
+                                        |}""".stripMargin
 
   private val fixedMode: HttpOrderFeeMode = FeeModeFixed(IssuedAsset(Base58.decode("6suw3ZHbyk6jrM19n7Pvaih3zSPsAt3gKcY8AZPxQYQf")), 1)
 
@@ -36,7 +36,7 @@ class HttpOrderFeeModeSpec extends AnyFreeSpec with Matchers with DiffMatcherWit
                                           |  }
                                           |}""".stripMargin
 
-  private val percentMode: HttpOrderFeeMode = FeeModePercent(AssetType.PRICE, 0.14)
+  private val percentMode: HttpOrderFeeMode = FeeModePercent(AssetType.Price, 0.14)
 
   private val dynamicMode: HttpOrderFeeMode = FeeModeDynamic(600000, Map(Waves -> 1))
 

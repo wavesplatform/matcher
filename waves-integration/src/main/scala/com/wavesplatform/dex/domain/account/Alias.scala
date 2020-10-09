@@ -1,13 +1,13 @@
 package com.wavesplatform.dex.domain.account
 
-import com.wavesplatform.dex.domain.bytes.{ByteStr, deser}
+import com.wavesplatform.dex.domain.bytes.{deser, ByteStr}
 import com.wavesplatform.dex.domain.error.ValidationError
 import com.wavesplatform.dex.domain.error.ValidationError.GenericError
 
 sealed trait Alias extends AddressOrAlias {
 
   lazy val stringRepr: String = Alias.Prefix + chainId.toChar + ":" + name
-  lazy val bytes: ByteStr     = ByteStr(Alias.AddressVersion +: chainId +: deser.serializeArray(name.getBytes("UTF-8")))
+  lazy val bytes: ByteStr = ByteStr(Alias.AddressVersion +: chainId +: deser.serializeArray(name.getBytes("UTF-8")))
 
   val name: String
   val chainId: Byte
@@ -18,33 +18,31 @@ object Alias {
   val Prefix: String = "alias:"
 
   val AddressVersion: Byte = 2
-  val MinLength            = 4
-  val MaxLength            = 30
+  val MinLength = 4
+  val MaxLength = 30
 
   val AliasAlphabet = "-.0123456789@_abcdefghijklmnopqrstuvwxyz"
 
-  def create(name: String): Either[ValidationError, Alias] = {
+  def create(name: String): Either[ValidationError, Alias] =
     createWithChainId(name, currentChainId)
-  }
 
   def fromString(str: String): Either[ValidationError, Alias] = {
     val aliasPatternInfo = "Alias string pattern is 'alias:<chain-id>:<address-alias>"
 
-    if (!str.startsWith(Prefix)) {
+    if (!str.startsWith(Prefix))
       Left(GenericError(aliasPatternInfo))
-    } else {
+    else {
       val charSemicolonAlias = str.drop(Prefix.length)
-      val chainId            = charSemicolonAlias(0).toByte
-      val name               = charSemicolonAlias.drop(2)
-      if (charSemicolonAlias(1) != ':') {
+      val chainId = charSemicolonAlias(0).toByte
+      val name = charSemicolonAlias.drop(2)
+      if (charSemicolonAlias(1) != ':')
         Left(GenericError(aliasPatternInfo))
-      } else {
+      else
         createWithChainId(name, chainId)
-      }
     }
   }
 
-  def fromBytes(bytes: Array[Byte]): Either[ValidationError, Alias] = {
+  def fromBytes(bytes: Array[Byte]): Either[ValidationError, Alias] =
     bytes match {
       case Array(`AddressVersion`, chainId, _, _, rest @ _*) =>
         createWithChainId(new String(rest.toArray, "UTF-8"), chainId)
@@ -52,9 +50,9 @@ object Alias {
       case _ =>
         Left(GenericError("Bad alias bytes"))
     }
-  }
 
   @inline private[this] def currentChainId: Byte = AddressScheme.current.chainId
+
   private[this] def isValidAliasChar(c: Char): Boolean =
     ('0' <= c && c <= '9') || ('a' <= c && c <= 'z') || c == '_' || c == '@' || c == '-' || c == '.'
 
@@ -70,4 +68,5 @@ object Alias {
     else
       Right(AliasImpl(if (chainId == 0) currentChainId else chainId, name))
   }
+
 }

@@ -27,4 +27,5 @@ class FailWith(expectedErrorCode: Int, expectedMessagePart: Option[String] = Non
       "got expected error",
       IndexedSeq(expectedErrorCode, expectedMessagePart, expectedParams, r)
     )
+
 }

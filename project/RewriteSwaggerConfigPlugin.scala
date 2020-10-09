@@ -13,18 +13,19 @@ import scala.collection.JavaConverters._
 // See https://github.com/swagger-api/swagger-ui/issues/5710
 object RewriteSwaggerConfigPlugin extends AutoPlugin {
   override val trigger = PluginTrigger.NoTrigger
+
   override def projectSettings: Seq[Def.Setting[_]] =
     inConfig(Compile)(
       Seq(
         resourceGenerators += Def.task {
-          val jarName       = s"swagger-ui-${Version.swaggerUi}.jar"
+          val jarName = s"swagger-ui-${Version.swaggerUi}.jar"
           val indexHtmlPath = s"META-INF/resources/webjars/swagger-ui/${Version.swaggerUi}/index.html"
-          val outputFile    = resourceManaged.value / indexHtmlPath
+          val outputFile = resourceManaged.value / indexHtmlPath
 
           val html = (Compile / dependencyClasspath).value
             .find(_.data.getName == jarName)
             .flatMap(jar => fileContentFromJar(jar.data, indexHtmlPath))
-            .map { new String(_, StandardCharsets.UTF_8) }
+            .map(new String(_, StandardCharsets.UTF_8))
 
           val resource = s"$jarName:$indexHtmlPath"
           html match {
@@ -63,12 +64,13 @@ window.ui = ui;
 
           Seq(outputFile)
         }.taskValue
-      ))
+      )
+    )
 
   private def fileContentFromJar(jar: File, fileName: String): Option[Array[Byte]] = {
-    val fs      = new BufferedInputStream(Files.newInputStream(jar.toPath))
+    val fs = new BufferedInputStream(Files.newInputStream(jar.toPath))
     val factory = new ArchiveStreamFactory()
-    val ais     = factory.createArchiveInputStream(fs)
+    val ais = factory.createArchiveInputStream(fs)
 
     try Iterator
       .continually(ais.getNextEntry)
@@ -81,4 +83,5 @@ window.ui = ui;
         out.toByteArray
       } finally fs.close()
   }
+
 }

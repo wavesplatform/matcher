@@ -20,19 +20,19 @@ class WsCollectChangesClient(apiUri: String, address: String, aus: String, obs: 
   private val log = LoggerFactory.getLogger(s"WsApiClient[$address]")
 
   private val emptyWsAddresState: WsAddressChanges = WsAddressChanges(Address.fromString(address).explicitGet(), Map.empty, Seq.empty, 0L)
-  @volatile private var accountUpdates             = emptyWsAddresState
-  private val orderBookUpdates                     = mutable.AnyRefMap.empty[AssetPair, WsOrderBookChanges]
-  @volatile private var gotPings                   = 0
+  @volatile private var accountUpdates = emptyWsAddresState
+  private val orderBookUpdates = mutable.AnyRefMap.empty[AssetPair, WsOrderBookChanges]
+  @volatile private var gotPings = 0
 
   private val receive: Function[WsServerMessage, Option[WsClientMessage]] = {
-    case x: WsPingOrPong        => gotPings += 1; x.some
-    case x: WsInitial           => log.info(s"Connection id: ${x.connectionId}"); none
-    case x: WsError             => log.error(s"Got error: $x"); throw new RuntimeException(s"Got $x")
+    case x: WsPingOrPong => gotPings += 1; x.some
+    case x: WsInitial => log.info(s"Connection id: ${x.connectionId}"); none
+    case x: WsError => log.error(s"Got error: $x"); throw new RuntimeException(s"Got $x")
     case diff: WsAddressChanges => accountUpdates = merge(accountUpdates, diff); none
     case diff: WsOrderBookChanges =>
       val updatedOb = orderBookUpdates.get(diff.assetPair) match {
         case Some(origOb) => merge(origOb, diff)
-        case None         => diff
+        case None => diff
       }
       orderBookUpdates.put(diff.assetPair, updatedOb)
       none
@@ -79,7 +79,7 @@ class WsCollectChangesClient(apiUri: String, address: String, aus: String, obs: 
     timestamp = diff.timestamp
   )
 
-  private var client            = none[WsConnection]
+  private var client = none[WsConnection]
   private val subscribeMessages = Json.parse(aus).as[WsAddressSubscribe] :: obs.map(Json.parse(_).as[WsOrderBookSubscribe]).toList
 
   def run(): Future[Unit] = {
@@ -87,14 +87,14 @@ class WsCollectChangesClient(apiUri: String, address: String, aus: String, obs: 
     val newClient = new WsConnection(apiUri, receive)
     client = newClient.some
     newClient.connectionResponse.map {
-      case _: ValidUpgrade           => subscribeMessages.foreach(newClient.send)
+      case _: ValidUpgrade => subscribeMessages.foreach(newClient.send)
       case x: InvalidUpgradeResponse => throw new RuntimeException(s"Can't connect to WebSockets on $apiUri: ${x.response.status} ${x.cause}")
     }
   }
 
-  def collectedAddressState: WsAddressChanges                 = accountUpdates
+  def collectedAddressState: WsAddressChanges = accountUpdates
   def collectedOrderBooks: Map[AssetPair, WsOrderBookChanges] = orderBookUpdates.toMap
-  def pingsNumber: Int                                        = gotPings
+  def pingsNumber: Int = gotPings
 
   def close(): Future[Unit] =
     client
@@ -104,4 +104,5 @@ class WsCollectChangesClient(apiUri: String, address: String, aus: String, obs: 
           accountUpdates = emptyWsAddresState
           orderBookUpdates.clear()
       }
+
 }

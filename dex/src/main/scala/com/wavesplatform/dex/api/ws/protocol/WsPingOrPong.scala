@@ -21,4 +21,5 @@ object WsPingOrPong {
     (_, ts) => WsPingOrPong(ts),
     unlift(WsPingOrPong.wsUnapply)
   )
+
 }

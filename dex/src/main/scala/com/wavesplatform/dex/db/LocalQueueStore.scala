@@ -11,12 +11,12 @@ import org.iq80.leveldb.{DB, ReadOptions}
 
 class LocalQueueStore(db: DB) {
 
-  private val newestIdx        = new AtomicLong(db.get(lqNewestIdx))
-  private val inMemQueue       = new ConcurrentLinkedQueue[QueueEventWithMeta]
+  private val newestIdx = new AtomicLong(db.get(lqNewestIdx))
+  private val inMemQueue = new ConcurrentLinkedQueue[QueueEventWithMeta]
   private var startInMemOffset = Option.empty[QueueEventWithMeta.Offset]
 
   def enqueue(event: QueueEvent, timestamp: Long): QueueEventWithMeta.Offset = {
-    val offset   = newestIdx.incrementAndGet()
+    val offset = newestIdx.incrementAndGet()
     val eventKey = lpqElement(offset)
 
     val x = QueueEventWithMeta(offset, timestamp, event)
@@ -30,11 +30,11 @@ class LocalQueueStore(db: DB) {
     offset
   }
 
-  def getFrom(offset: QueueEventWithMeta.Offset, maxElements: Int): Vector[QueueEventWithMeta] = {
-    if (startInMemOffset.exists(_ <= offset)) {
+  def getFrom(offset: QueueEventWithMeta.Offset, maxElements: Int): Vector[QueueEventWithMeta] =
+    if (startInMemOffset.exists(_ <= offset))
       if (inMemQueue.isEmpty) Vector.empty
       else {
-        val xs    = Vector.newBuilder[QueueEventWithMeta]
+        val xs = Vector.newBuilder[QueueEventWithMeta]
         var added = 0
 
         while (!inMemQueue.isEmpty && added < maxElements) Option(inMemQueue.poll()).foreach { x =>
@@ -44,13 +44,12 @@ class LocalQueueStore(db: DB) {
 
         xs.result()
       }
-    } else
+    else
       new ReadOnlyDB(db, new ReadOptions())
         .read(LqElementKeyName, LqElementPrefixBytes, lpqElement(math.max(offset, 0)).keyBytes, Int.MaxValue) { e =>
           val offset = Longs.fromByteArray(e.getKey.slice(Shorts.BYTES, Shorts.BYTES + Longs.BYTES))
           lpqElement(offset).parse(e.getValue).getOrElse(throw new RuntimeException(s"Can't find a queue event at $offset"))
         }
-  }
 
   def oldestOffset: Option[QueueEventWithMeta.Offset] =
     new ReadOnlyDB(db, new ReadOptions())
@@ -60,7 +59,7 @@ class LocalQueueStore(db: DB) {
       .headOption
 
   def newestOffset: Option[QueueEventWithMeta.Offset] = {
-    val idx      = newestIdx.get()
+    val idx = newestIdx.get()
     val eventKey = lpqElement(idx)
     eventKey.parse(db.get(eventKey.keyBytes)).map(_.offset)
   }

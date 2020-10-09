@@ -8,25 +8,20 @@ object Base58 extends BaseXXEncDec {
 
   override val defaultDecodeLimit: Int = 192
 
-  override def encode(array: Array[Byte]): String = {
+  override def encode(array: Array[Byte]): String =
     if (useSlowBase58) StdBase58.encode(array)
-    else {
-      try {
-        FastBase58.encode(array)
-      } catch {
+    else
+      try FastBase58.encode(array)
+      catch {
         case NonFatal(_) => StdBase58.encode(array)
       }
-    }
-  }
 
-  override def decode(str: String): Array[Byte] = {
+  override def decode(str: String): Array[Byte] =
     if (useSlowBase58) StdBase58.decode(str)
-    else {
-      try {
-        FastBase58.decode(str)
-      } catch {
+    else
+      try FastBase58.decode(str)
+      catch {
         case NonFatal(_) => StdBase58.decode(str)
       }
-    }
-  }
+
 }

@@ -29,7 +29,7 @@ trait HasJwt extends JwtUtils {
 
   protected def mkJwt(payload: JwtPayload): String = mkJwt(authServiceKeyPair, Json.toJsObject(payload))
 
-  protected def mkJwt(clientKeyPair: KeyPair, lifetime: FiniteDuration = 1.hour): String = {
+  protected def mkJwt(clientKeyPair: KeyPair, lifetime: FiniteDuration = 1.hour): String =
     mkJwt(mkJwtSignedPayload(clientKeyPair, lifetime = lifetime))
-  }
+
 }

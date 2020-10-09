@@ -12,10 +12,10 @@ import play.api.libs.json.Json
 
 class OrderJsonSpec extends WavesIntegrationSuiteBase with Matchers {
 
-  private val usd: IssuedAsset        = IssuedAsset("USDN".getBytes)
+  private val usd: IssuedAsset = IssuedAsset("USDN".getBytes)
   private val wavesUsdPair: AssetPair = AssetPair(Waves, usd)
 
-  private val senderKeyPair  = KeyPair("sender".getBytes)
+  private val senderKeyPair = KeyPair("sender".getBytes)
   private val matcherKeyPair = KeyPair("matcher".getBytes)
 
   private val order: Order =
@@ -34,24 +34,24 @@ class OrderJsonSpec extends WavesIntegrationSuiteBase with Matchers {
 
   def getOrderJson(feeAssetRepresentation: Option[String]): String =
     s"""{
-      |  "version" : 3,
-      |  "id" : "HCXVwUaETvHySqRyJSZ2NbnLeqTYP2FBkbwecXmMdbM6",
-      |  "sender" : "3N7YhNxYuoa59oCCMPuQRqSx6KM61FkGjYa",
-      |  "senderPublicKey" : "226pFho3kqHiCoiQVAUq5MVFkg3KzGLc2zLNsbH8GmE7",
-      |  "matcherPublicKey" : "J6ghck2hA2GNJTHGSLSeuCjKuLDGz8i83NfCMFVoWhvf",
-      |  "assetPair" : {
-      |    "amountAsset" : "WAVES",
-      |    "priceAsset" : "3BVv85"
-      |  },
-      |  "orderType" : "sell",
-      |  "amount" : 123456789,
-      |  "price" : 119,
-      |  "timestamp" : 1578074613225,
-      |  "expiration" : 1578077613225,
-      |  "matcherFee" : 300000,${feeAssetRepresentation.fold("")(str => s"""\n"matcherFeeAssetId" : $str,""")}
-      |  "signature" : "7dsUd1bQZFWCEKyYqkPxd5AE7x88QUK6xJH86KcqtE2LHURxN92QEJRfojHkgezez6fppDGvTCUcr4ZmrPRKmTZ",
-      |  "proofs" : [ "7dsUd1bQZFWCEKyYqkPxd5AE7x88QUK6xJH86KcqtE2LHURxN92QEJRfojHkgezez6fppDGvTCUcr4ZmrPRKmTZ" ]
-      |}""".stripMargin
+       |  "version" : 3,
+       |  "id" : "HCXVwUaETvHySqRyJSZ2NbnLeqTYP2FBkbwecXmMdbM6",
+       |  "sender" : "3N7YhNxYuoa59oCCMPuQRqSx6KM61FkGjYa",
+       |  "senderPublicKey" : "226pFho3kqHiCoiQVAUq5MVFkg3KzGLc2zLNsbH8GmE7",
+       |  "matcherPublicKey" : "J6ghck2hA2GNJTHGSLSeuCjKuLDGz8i83NfCMFVoWhvf",
+       |  "assetPair" : {
+       |    "amountAsset" : "WAVES",
+       |    "priceAsset" : "3BVv85"
+       |  },
+       |  "orderType" : "sell",
+       |  "amount" : 123456789,
+       |  "price" : 119,
+       |  "timestamp" : 1578074613225,
+       |  "expiration" : 1578077613225,
+       |  "matcherFee" : 300000,${feeAssetRepresentation.fold("")(str => s"""\n"matcherFeeAssetId" : $str,""")}
+       |  "signature" : "7dsUd1bQZFWCEKyYqkPxd5AE7x88QUK6xJH86KcqtE2LHURxN92QEJRfojHkgezez6fppDGvTCUcr4ZmrPRKmTZ",
+       |  "proofs" : [ "7dsUd1bQZFWCEKyYqkPxd5AE7x88QUK6xJH86KcqtE2LHURxN92QEJRfojHkgezez6fppDGvTCUcr4ZmrPRKmTZ" ]
+       |}""".stripMargin
 
   "Domain OrderV3" should {
 

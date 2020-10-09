@@ -36,7 +36,7 @@ waves.dex {
   account-storage {
    
     type = "not-specified" # "in-mem" or "encrypted-file"
-    in-mem.seed-in-base64 = ""
+    in-mem.seed-in-base-64 = ""
     
     encrypted-file.password = "password-for-file"
   }

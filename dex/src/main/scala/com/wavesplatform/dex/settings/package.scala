@@ -24,4 +24,5 @@ package object settings {
       .withFallback(ConfigFactory.defaultReference())
       .resolve()
   }
+
 }

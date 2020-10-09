@@ -7,7 +7,7 @@ import scala.io.Source
 
 object RequestDeleter {
 
-  def delRequests(file: File, deletedCount: Int): Unit = {
+  def delRequests(file: File, deletedCount: Int): Unit =
     if (Files.exists(file.toPath)) {
       val source = Source.fromFile(file)
       val outputFile = s"requests-after-drop-${System.currentTimeMillis}.txt"
@@ -20,7 +20,7 @@ object RequestDeleter {
       try {
         source
           .getLines()
-          .map(line => {
+          .map { line =>
             if (r < deletedCount)
               i = i + 1
             if (line.isEmpty || line.indexOf("{") == 0) {
@@ -31,11 +31,11 @@ object RequestDeleter {
               }
             }
             line
-          })
+          }
           .drop(i)
           .foreach(line => output.print(s"$line\r\n"))
         println(s"$deletedCount of $r requests have been dropped from ${file.getAbsolutePath}, and saved to $outputFile")
       } finally output.close()
     }
-  }
+
 }

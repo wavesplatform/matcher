@@ -10,22 +10,33 @@ import mouse.any._
 
 trait HasWavesNode { self: BaseContainersKit =>
   protected val defaultNodeImage = "wavesplatform/waves-integration-it:latest"
-  private val nodeImage          = Option(System.getenv("NODE_IMAGE")).getOrElse(defaultNodeImage)
+  private val nodeImage = Option(System.getenv("NODE_IMAGE")).getOrElse(defaultNodeImage)
 
-  protected implicit def toNodeExplicitGetOps[F[_]: Functor: CanExtract](self: NodeApi[F]): NodeApiOps.ExplicitGetNodeApiOps[F] = {
+  implicit protected def toNodeExplicitGetOps[F[_]: Functor: CanExtract](self: NodeApi[F]): NodeApiOps.ExplicitGetNodeApiOps[F] =
     new NodeApiOps.ExplicitGetNodeApiOps[F](self)
-  }
 
   protected def wavesNodeInitialSuiteConfig: Config = ConfigFactory.empty()
 
   protected lazy val wavesNodeRunConfig: Config = GenesisConfig.config
 
-  protected def createWavesNode(name: String,
-                                runConfig: Config = wavesNodeRunConfig,
-                                suiteInitialConfig: Config = wavesNodeInitialSuiteConfig,
-                                image: String = nodeImage,
-                                netAlias: Option[String] = Some(WavesNodeContainer.wavesNodeNetAlias)): WavesNodeContainer =
-    WavesNodeContainer(name, networkName, network, getIp(name), runConfig, suiteInitialConfig, localLogsDir, image, netAlias) unsafeTap addKnownContainer
+  protected def createWavesNode(
+    name: String,
+    runConfig: Config = wavesNodeRunConfig,
+    suiteInitialConfig: Config = wavesNodeInitialSuiteConfig,
+    image: String = nodeImage,
+    netAlias: Option[String] = Some(WavesNodeContainer.wavesNodeNetAlias)
+  ): WavesNodeContainer =
+    WavesNodeContainer(
+      name,
+      networkName,
+      network,
+      getIp(name),
+      runConfig,
+      suiteInitialConfig,
+      localLogsDir,
+      image,
+      netAlias
+    ) unsafeTap addKnownContainer
 
   lazy val wavesNode1: WavesNodeContainer = createWavesNode("waves-1")
 }

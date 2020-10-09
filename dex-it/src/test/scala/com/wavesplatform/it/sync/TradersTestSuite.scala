@@ -13,14 +13,13 @@ import com.wavesplatform.it.MatcherSuiteBase
 
 class TradersTestSuite extends MatcherSuiteBase {
 
-  override protected val dexInitialSuiteConfig: Config = {
+  override protected val dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(
       s"""waves.dex {
          |  price-assets = [ "$UsdId", "WAVES", "$WctId" ]
          |  grpc.integration.caches.default-expiration = 1ms
          |}""".stripMargin
     )
-  }
 
   val orderVersions: Seq[Byte] = Seq(1, 2, 3)
 
@@ -47,7 +46,7 @@ class TradersTestSuite extends MatcherSuiteBase {
 
       val trickyBobWavesPairWB58 = AssetPair(
         amountAsset = wct,
-        priceAsset = IssuedAsset { ByteStr.decodeBase58(Asset.WavesName).get }
+        priceAsset = IssuedAsset(ByteStr.decodeBase58(Asset.WavesName).get)
       )
 
       trickyBobWavesPairWB58.key shouldBe AssetPair(wct, Waves).key
@@ -56,7 +55,7 @@ class TradersTestSuite extends MatcherSuiteBase {
       dex1.api.tryPlace(trickyBobOrderWB58) should failWith(9440512) // OrderInvalidSignature
 
       val trickyBobWavesPairWS = AssetPair(
-        amountAsset = IssuedAsset { ByteStr(Asset.WavesName.getBytes) },
+        amountAsset = IssuedAsset(ByteStr(Asset.WavesName.getBytes)),
         priceAsset = wct
       )
 
@@ -96,8 +95,8 @@ class TradersTestSuite extends MatcherSuiteBase {
         "moved assets, insufficient assets" in {
 
           for (orderV <- orderVersions) {
-            val orderAmount              = 4000
-            val transferAmount           = IssueWctTx.quantity() - orderAmount
+            val orderAmount = 4000
+            val transferAmount = IssueWctTx.quantity() - orderAmount
             val oldestOrder, newestOrder = bobPlacesSellWctOrder(orderAmount, orderV)
 
             // Transfer all coins except required for one order
@@ -123,12 +122,12 @@ class TradersTestSuite extends MatcherSuiteBase {
 
         "leased waves, insufficient fee" in {
           for (orderV <- orderVersions) {
-            val bobBalance               = wavesNode1.api.balance(bob, Waves)
+            val bobBalance = wavesNode1.api.balance(bob, Waves)
             val oldestOrder, newestOrder = bobPlacesSellWctOrder(1000, orderV)
 
             // Lease all waves except required for one order
             val leaseAmount = bobBalance - matcherFee - leasingFee
-            val lease       = mkLease(bob, alice, leaseAmount, leasingFee)
+            val lease = mkLease(bob, alice, leaseAmount, leasingFee)
 
             wavesNode1.api.broadcast(lease)
 
@@ -151,12 +150,12 @@ class TradersTestSuite extends MatcherSuiteBase {
 
         "moved waves, insufficient fee" in {
           for (orderV <- orderVersions) {
-            val bobBalance               = wavesNode1.api.balance(bob, Waves)
+            val bobBalance = wavesNode1.api.balance(bob, Waves)
             val oldestOrder, newestOrder = bobPlacesSellWctOrder(1000, orderV)
 
             // Transfer all waves except required for one order
             val transferAmount = bobBalance - matcherFee - minFee
-            val transferTx     = mkTransfer(bob, alice, transferAmount, Waves, minFee)
+            val transferTx = mkTransfer(bob, alice, transferAmount, Waves, minFee)
 
             wavesNode1.api.broadcast(transferTx)
 
@@ -181,12 +180,12 @@ class TradersTestSuite extends MatcherSuiteBase {
       "order with waves" - {
         "leased waves, insufficient fee for one ExchangeTransaction" in {
           // Amount of waves in order is smaller than fee
-          val bobBalance               = wavesNode1.api.balance(bob, Waves)
+          val bobBalance = wavesNode1.api.balance(bob, Waves)
           val oldestOrder, newestOrder = bobPlacesBuyWaveOrder(wctWavesPair, 1, 10.waves * Order.PriceConstant)
 
           // Lease all waves except required for one order
           val leaseAmount = bobBalance - matcherFee - 10.waves - leasingFee // TODO ???
-          val lease       = mkLease(bob, alice, leaseAmount, leasingFee)
+          val lease = mkLease(bob, alice, leaseAmount, leasingFee)
           wavesNode1.api.broadcast(lease)
 
           withClue(s"The newest order '${newestOrder.idStr()}' is Cancelled") {
@@ -206,11 +205,11 @@ class TradersTestSuite extends MatcherSuiteBase {
 
         "leased waves, insufficient waves" in {
           val bobBalance = wavesNode1.api.balance(bob, Waves)
-          val price      = 1.waves
-          val order      = bobPlacesBuyWaveOrder(wctWavesPair, 1, price * Order.PriceConstant)
+          val price = 1.waves
+          val order = bobPlacesBuyWaveOrder(wctWavesPair, 1, price * Order.PriceConstant)
 
           val leaseAmount = bobBalance - matcherFee - price / 2
-          val lease       = mkLease(bob, alice, leaseAmount, leasingFee)
+          val lease = mkLease(bob, alice, leaseAmount, leasingFee)
 
           wavesNode1.api.broadcast(lease)
 
@@ -227,8 +226,8 @@ class TradersTestSuite extends MatcherSuiteBase {
         "moved waves, insufficient fee" in {
           // Amount of waves in order is smaller than fee
           val bobBalance = wavesNode1.api.balance(bob, Waves)
-          val price      = matcherFee / 2
-          val order      = bobPlacesBuyWaveOrder(wctWavesPair, 1, price * Order.PriceConstant)
+          val price = matcherFee / 2
+          val order = bobPlacesBuyWaveOrder(wctWavesPair, 1, price * Order.PriceConstant)
 
           val transferAmount = bobBalance - matcherFee - price
           wavesNode1.api.broadcast(mkTransfer(bob, alice, transferAmount, Waves, matcherFee)) // TODO fee
@@ -247,7 +246,7 @@ class TradersTestSuite extends MatcherSuiteBase {
           val bobAssetQuantity = 10000
 
           val newFeeAssetTx = mkIssue(bob, "FeeCoin", bobAssetQuantity, 2, issueFee)
-          val newFeeAsset   = IssuedAsset(newFeeAssetTx.id())
+          val newFeeAsset = IssuedAsset(newFeeAssetTx.id())
 
           broadcastAndAwait(newFeeAssetTx)
           dex1.api.upsertRate(newFeeAsset, 2)
@@ -285,9 +284,9 @@ class TradersTestSuite extends MatcherSuiteBase {
 
       placeAndAwaitAtDex(mkOrderDP(alice, wavesUsdPair, BUY, 100.waves, 3.00))
 
-      wavesNode1.api.broadcast { mkTransfer(bob, alice, wavesNode1.api.balance(bob, Waves) - matcherFee, Waves) }
+      wavesNode1.api.broadcast(mkTransfer(bob, alice, wavesNode1.api.balance(bob, Waves) - matcherFee, Waves))
 
-      dex1.api.tryPlace { mkOrderDP(bob, wavesUsdPair, SELL, 100.waves, 3.00) } should failWith(3147270) // BalanceNotEnough
+      dex1.api.tryPlace(mkOrderDP(bob, wavesUsdPair, SELL, 100.waves, 3.00)) should failWith(3147270) // BalanceNotEnough
     }
   }
 }

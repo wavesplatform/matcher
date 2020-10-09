@@ -41,10 +41,10 @@ class AddressActorSpecification
     with DiffMatcherWithImplicits
     with MatcherSpecBase {
 
-  private implicit val typedSystem                = system.toTyped
-  private implicit val efc: ErrorFormatterContext = ErrorFormatterContext.from(_ => 8)
+  implicit private val typedSystem = system.toTyped
+  implicit private val efc: ErrorFormatterContext = ErrorFormatterContext.from(_ => 8)
 
-  private val assetId     = ByteStr("asset".getBytes("utf-8"))
+  private val assetId = ByteStr("asset".getBytes("utf-8"))
   override val matcherFee = 30000L
 
   private val sellTokenOrder1 = OrderV1(
@@ -141,7 +141,7 @@ class AddressActorSpecification
       ref ! GetTradableBalance(Set(Waves))
       expectMsgPF(hint = "Balance") {
         case r: Balance => r should matchTo(Balance(Map(Waves -> 0L)))
-        case _          =>
+        case _ =>
       }
     }
 
@@ -225,20 +225,20 @@ class AddressActorSpecification
   }
 
   /**
-    * (updatedPortfolio: Portfolio, sendBalanceChanged: Boolean) => Unit
-    */
+   * (updatedPortfolio: Portfolio, sendBalanceChanged: Boolean) => Unit
+   */
   private def test(f: (ActorRef, TestProbe, AcceptedOrder => Unit, Portfolio => Unit) => Unit): Unit = {
 
-    val eventsProbe      = TestProbe()
+    val eventsProbe = TestProbe()
     val currentPortfolio = new AtomicReference[Portfolio]()
-    val address          = addr("test")
+    val address = addr("test")
 
     def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] = Future.successful {
       (currentPortfolio.get().assets ++ Map(Waves -> currentPortfolio.get().balance).view.filterKeys(assets.contains)).toMap
     }
 
     def allAssetsSpendableBalance: Address => Future[Map[Asset, Long]] = { _ =>
-      Future.successful { (currentPortfolio.get().assets ++ Map(Waves -> currentPortfolio.get().balance)).toMap }
+      Future.successful((currentPortfolio.get().assets ++ Map(Waves -> currentPortfolio.get().balance)).toMap)
     }
 
     lazy val spendableBalancesActor =
@@ -248,7 +248,7 @@ class AddressActorSpecification
         )
       )
 
-    def createAddressActor(address: Address, started: Boolean): Props = {
+    def createAddressActor(address: Address, started: Boolean): Props =
       Props(
         new AddressActor(
           address,
@@ -257,13 +257,12 @@ class AddressActorSpecification
           (_, _) => Future.successful(Right(())),
           event => {
             eventsProbe.ref ! event
-            Future.successful { Some(QueueEventWithMeta(0L, 0L, event)) }
+            Future.successful(Some(QueueEventWithMeta(0L, 0L, event)))
           },
           started,
           spendableBalancesActor
         )
       )
-    }
 
     lazy val addressDir = system.actorOf(Props(new AddressDirectoryActor(EmptyOrderDB, createAddressActor, None, started = true)))
 
@@ -303,11 +302,12 @@ class AddressActorSpecification
     Portfolio(b.getOrElse(Waves, 0L), LeaseBalance.empty, b.collect { case (id @ IssuedAsset(_), v) => id -> v })
   }
 
-  private def addr(seed: String): Address       = privateKey(seed).toAddress
+  private def addr(seed: String): Address = privateKey(seed).toAddress
   private def privateKey(seed: String): KeyPair = KeyPair(seed.getBytes("utf-8"))
 
   override protected def afterAll(): Unit = {
     TestKit.shutdownActorSystem(system)
     super.afterAll()
   }
+
 }

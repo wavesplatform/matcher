@@ -18,12 +18,12 @@ object PublicKey extends TaggedType[ByteStr] {
 
   val empty: PublicKey = apply(ByteStr.empty)
 
-  def apply(publicKey: ByteStr): PublicKey     = interner.intern(publicKey @@ this)
+  def apply(publicKey: ByteStr): PublicKey = interner.intern(publicKey @@ this)
   def apply(publicKey: Array[Byte]): PublicKey = apply(ByteStr(publicKey))
 
   def fromBase58String(base58: String): Either[InvalidAddress, PublicKey] =
     (for {
-      _     <- Either.cond(base58.length <= KeyStringLength, (), "Bad public key string length")
+      _ <- Either.cond(base58.length <= KeyStringLength, (), "Bad public key string length")
       bytes <- Base58.tryDecodeWithLimit(base58).toEither.left.map(ex => s"Unable to decode base58: ${ex.getMessage}")
     } yield PublicKey(bytes)).left.map(err => InvalidAddress(s"Invalid sender: $err"))
 
@@ -39,4 +39,5 @@ object PublicKey extends TaggedType[ByteStr] {
     byteStrFormat.map(this.apply),
     Writes(pk => byteStrFormat.writes(pk))
   )
+
 }

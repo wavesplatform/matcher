@@ -10,8 +10,9 @@ trait HasStatusBarrier { this: ApiRoute =>
   def matcherStatus: () => MatcherStatus
 
   def matcherStatusBarrier: Directive0 = matcherStatus() match {
-    case MatcherStatus.Working  => pass
+    case MatcherStatus.Working => pass
     case MatcherStatus.Starting => complete(DuringStart)
     case MatcherStatus.Stopping => complete(DuringShutdown)
   }
+
 }

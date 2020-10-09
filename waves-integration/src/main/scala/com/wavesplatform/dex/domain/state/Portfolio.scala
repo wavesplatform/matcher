@@ -12,9 +12,10 @@ case class Portfolio(balance: Long, lease: LeaseBalance, assets: Map[IssuedAsset
   lazy val spendableBalance: Long = balance - lease.out
 
   def balanceOf(assetId: Asset): Long = assetId match {
-    case Waves                  => balance
+    case Waves => balance
     case asset @ IssuedAsset(_) => assets.getOrElse(asset, 0L)
   }
+
 }
 
 object Portfolio {
@@ -25,11 +26,13 @@ object Portfolio {
 
   implicit val monoid: Monoid[Portfolio] = new Monoid[Portfolio] {
     override val empty: Portfolio = Portfolio.empty
+
     override def combine(older: Portfolio, newer: Portfolio): Portfolio = Portfolio(
       balance = safeSum(older.balance, newer.balance),
       lease = Monoid.combine(older.lease, newer.lease),
       assets = Monoid.combine(older.assets, newer.assets)
     )
+
   }
 
   implicit class PortfolioExt(self: Portfolio) {
@@ -43,9 +46,11 @@ object Portfolio {
       val a2 = that.assetIds
 
       val intersection = a1 & a2
-      val sureChanged  = (a1 | a2) -- intersection
+      val sureChanged = (a1 | a2) -- intersection
 
       intersection.filter(x => spendableBalanceOf(x) != that.spendableBalanceOf(x)) ++ sureChanged
     }
+
   }
+
 }

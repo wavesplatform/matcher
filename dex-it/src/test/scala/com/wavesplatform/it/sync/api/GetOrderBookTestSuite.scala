@@ -24,7 +24,7 @@ class GetOrderBookTestSuite extends MatcherSuiteBase {
     )
 
   // DEX-642
-  private implicit val orderBookResponseDiff: Diff[HttpV0OrderBook] = Derived[Diff[HttpV0OrderBook]].ignore(_.timestamp)
+  implicit private val orderBookResponseDiff: Diff[HttpV0OrderBook] = Derived[Diff[HttpV0OrderBook]].ignore(_.timestamp)
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
@@ -65,7 +65,7 @@ class GetOrderBookTestSuite extends MatcherSuiteBase {
 
   "query parameters should not be lost during redirect to well-ordered pair" in {
 
-    val depth               = 10
+    val depth = 10
     val ethWavesOrdersCount = 20
 
     (1 to ethWavesOrdersCount) foreach { i =>

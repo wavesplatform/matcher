@@ -29,23 +29,22 @@ object DexTestConfig {
     if (AssetPairBuilder.assetIdOrdering.compare(asset1.compatId, asset2.compatId) > 0) AssetPair(asset1, asset2)
     else AssetPair(asset2, asset1)
 
-  def issueAssetPair(issuer: KeyPair, amountAssetDecimals: Byte, priceAssetDecimals: Byte): (IssueTransaction, IssueTransaction, AssetPair) = {
+  def issueAssetPair(issuer: KeyPair, amountAssetDecimals: Byte, priceAssetDecimals: Byte): (IssueTransaction, IssueTransaction, AssetPair) =
     issueAssetPair(issuer, issuer, amountAssetDecimals, priceAssetDecimals)
-  }
 
   @scala.annotation.tailrec
-  def issueAssetPair(amountAssetIssuer: KeyPair,
-                     priceAssetIssuer: KeyPair,
-                     amountAssetDecimals: Byte,
-                     priceAssetDecimals: Byte): (IssueTransaction, IssueTransaction, AssetPair) = {
+  def issueAssetPair(
+    amountAssetIssuer: KeyPair,
+    priceAssetIssuer: KeyPair,
+    amountAssetDecimals: Byte,
+    priceAssetDecimals: Byte
+  ): (IssueTransaction, IssueTransaction, AssetPair) = {
 
-    val IssueResults(issueAmountAssetTx, amountAssetId, amountAsset) = {
+    val IssueResults(issueAmountAssetTx, amountAssetId, amountAsset) =
       mkIssueExtended(amountAssetIssuer, Random.nextString(4), someAssetAmount, amountAssetDecimals, issueFee)
-    }
 
-    val IssueResults(issuePriceAssetTx, priceAssetId, priceAsset) = {
+    val IssueResults(issuePriceAssetTx, priceAssetId, priceAsset) =
       mkIssueExtended(priceAssetIssuer, Random.nextString(4), someAssetAmount, priceAssetDecimals, issueFee)
-    }
 
     if (MatcherActor.compare(Some(priceAssetId.arr), Some(amountAssetId.arr)) < 0)
       (issueAmountAssetTx, issuePriceAssetTx, AssetPair(amountAsset, priceAsset))
@@ -56,10 +55,12 @@ object DexTestConfig {
   def assetPairIssuePriceAsset(issuer: KeyPair, amountAsset: Asset, priceAssetDecimals: Byte): (IssueTransaction, AssetPair) = {
 
     val issuePriceAssetTx = mkIssue(issuer, Random.nextString(4), someAssetAmount, priceAssetDecimals, issueFee)
-    val priceAssetId      = toVanilla(issuePriceAssetTx.id())
-    val priceAsset        = IssuedAsset(priceAssetId)
+    val priceAssetId = toVanilla(issuePriceAssetTx.id())
+    val priceAsset = IssuedAsset(priceAssetId)
 
-    if (MatcherActor.compare(Some(priceAssetId.arr), amountAsset.compatId.map(_.arr)) < 0) (issuePriceAssetTx, AssetPair(amountAsset, priceAsset))
+    if (MatcherActor.compare(Some(priceAssetId.arr), amountAsset.compatId.map(_.arr)) < 0)
+      (issuePriceAssetTx, AssetPair(amountAsset, priceAsset))
     else assetPairIssuePriceAsset(issuer, amountAsset, priceAssetDecimals)
   }
+
 }

@@ -22,11 +22,11 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
 final case class WavesNodeContainer(override val internalIp: String, underlying: GenericContainer)(
-    implicit
-    tryHttpBackend: LoggingSttpBackend[Try, Nothing],
-    futureHttpBackend: LoggingSttpBackend[Future, Nothing],
-    ec: ExecutionContext)
-    extends BaseContainer(WavesNodeContainer.baseContainerPath, underlying) {
+  implicit
+  tryHttpBackend: LoggingSttpBackend[Try, Nothing],
+  futureHttpBackend: LoggingSttpBackend[Future, Nothing],
+  ec: ExecutionContext
+) extends BaseContainer(WavesNodeContainer.baseContainerPath, underlying) {
 
   override protected val cachedRestApiAddress: CachedData[InetSocketAddress] = CachedData(getExternalAddress(WavesNodeContainer.restApiPort))
 
@@ -38,7 +38,7 @@ final case class WavesNodeContainer(override val internalIp: String, underlying:
 
   def grpcApiTarget: String = s"${grpcApiAddress.getHostName}:${grpcApiAddress.getPort}"
 
-  override def api: NodeApi[Id]          = fp.sync { NodeApi[Try](apiKey, cachedRestApiAddress.get()) }
+  override def api: NodeApi[Id] = fp.sync(NodeApi[Try](apiKey, cachedRestApiAddress.get()))
   override def asyncApi: NodeApi[Future] = NodeApi[Future](apiKey, cachedRestApiAddress.get())
 
   override def invalidateCaches(): Unit = {
@@ -46,6 +46,7 @@ final case class WavesNodeContainer(override val internalIp: String, underlying:
     cachedNetworkAddress.invalidate()
     cachedGrpcApiAddress.invalidate()
   }
+
 }
 
 object WavesNodeContainer extends ScorexLogging {
@@ -53,24 +54,27 @@ object WavesNodeContainer extends ScorexLogging {
   private val baseContainerPath: String = "/opt/waves"
   private val containerLogsPath: String = s"$baseContainerPath/logs"
 
-  private val restApiPort: Int  = 6869 // application.conf waves.rest-api.port
-  private val networkPort: Int  = 6863 // application.conf waves.network.port
+  private val restApiPort: Int = 6869 // application.conf waves.rest-api.port
+  private val networkPort: Int = 6863 // application.conf waves.network.port
   val dexGrpcExtensionPort: Int = 6887 // application.conf waves.dex.grpc.integration.port
 
   val wavesNodeNetAlias: String = "waves.nodes"
 
-  def apply(name: String,
-            networkName: String,
-            network: NetworkImpl,
-            internalIp: String,
-            runConfig: Config,
-            suiteInitialConfig: Config,
-            localLogsDir: Path,
-            image: String,
-            netAlias: Option[String] = Some(wavesNodeNetAlias))(implicit
-                                                                tryHttpBackend: LoggingSttpBackend[Try, Nothing],
-                                                                futureHttpBackend: LoggingSttpBackend[Future, Nothing],
-                                                                ec: ExecutionContext): WavesNodeContainer = {
+  def apply(
+    name: String,
+    networkName: String,
+    network: NetworkImpl,
+    internalIp: String,
+    runConfig: Config,
+    suiteInitialConfig: Config,
+    localLogsDir: Path,
+    image: String,
+    netAlias: Option[String] = Some(wavesNodeNetAlias)
+  )(implicit
+    tryHttpBackend: LoggingSttpBackend[Try, Nothing],
+    futureHttpBackend: LoggingSttpBackend[Future, Nothing],
+    ec: ExecutionContext
+  ): WavesNodeContainer = {
 
     val underlying = GenericContainer(
       dockerImage = image,
@@ -79,7 +83,7 @@ object WavesNodeContainer extends ScorexLogging {
       waitStrategy = ignoreWaitStrategy
     ).configure { c =>
       c.withNetwork(network)
-      netAlias.foreach { c.withNetworkAliases(_) }
+      netAlias.foreach(c.withNetworkAliases(_))
       c.withFileSystemBind(localLogsDir.toString, containerLogsPath, BindMode.READ_WRITE)
       c.withCreateContainerCmdModifier {
         _.withName(s"$networkName-$name") // network.getName returns random id
@@ -106,10 +110,10 @@ object WavesNodeContainer extends ScorexLogging {
   }
 
   private def getEnv(containerName: String, ip: String): Map[String, String] = Map(
-    "BRIEF_LOG_PATH"               -> s"$containerLogsPath/container-$containerName.log",
-    "DETAILED_LOG_PATH"            -> "/dev/null",
+    "BRIEF_LOG_PATH" -> s"$containerLogsPath/container-$containerName.log",
+    "DETAILED_LOG_PATH" -> "/dev/null",
     "WAVES_NODE_DETAILED_LOG_PATH" -> "/dev/null", // Backward compatibility for v1.1.10+v2.0.3
-    "WAVES_NODE_CONFIGPATH"        -> s"$baseContainerPath/$containerName.conf",
+    "WAVES_NODE_CONFIGPATH" -> s"$baseContainerPath/$containerName.conf",
     "WAVES_OPTS" -> List(
       "-Xmx1024M",
       s"-Djava.util.logging.config.file=$baseContainerPath/jul.properties",
@@ -118,4 +122,5 @@ object WavesNodeContainer extends ScorexLogging {
       s"-Dwaves.network.declared-address=$ip:6883"
     ).mkString(" ", " ", " ")
   )
+
 }

@@ -18,15 +18,15 @@ trait AuthRoute { this: ApiRoute =>
 
     def correctResponse(statusCode: StatusCode, matcherError: MatcherError): ToResponseMarshallable = this match {
       case _: MatcherWebSocketRoute => matcherError.toWsHttpResponse(statusCode)
-      case _                        => SimpleErrorResponse(statusCode, matcherError)
+      case _ => SimpleErrorResponse(statusCode, matcherError)
     }
-    apiKeyHash.fold[Directive0] { complete(SimpleErrorResponse(StatusCodes.InternalServerError, ApiKeyIsNotProvided)) } { hashFromSettings =>
+    apiKeyHash.fold[Directive0](complete(SimpleErrorResponse(StatusCodes.InternalServerError, ApiKeyIsNotProvided))) { hashFromSettings =>
       optionalHeaderValueByType(`X-Api-Key`).flatMap {
         case Some(key) if java.util.Arrays.equals(crypto secureHash key.value, hashFromSettings) => pass
         case _ =>
           optionalHeaderValueByType(api_key).flatMap {
             case Some(key) if java.util.Arrays.equals(crypto secureHash key.value, hashFromSettings) => pass
-            case _                                                                                   => complete { correctResponse(StatusCodes.Forbidden, ApiKeyIsNotValid) }
+            case _ => complete(correctResponse(StatusCodes.Forbidden, ApiKeyIsNotValid))
           }
       }
     }
@@ -37,8 +37,9 @@ trait AuthRoute { this: ApiRoute =>
       case None => provide(None)
       case Some(rawPublicKey) =>
         PublicKey.fromBase58String(rawPublicKey.value) match {
-          case Left(_)  => complete(SimpleErrorResponse(StatusCodes.BadRequest, UserPublicKeyIsNotValid))
+          case Left(_) => complete(SimpleErrorResponse(StatusCodes.BadRequest, UserPublicKeyIsNotValid))
           case Right(x) => provide[Option[PublicKey]](Some(PublicKey(x)))
         }
     }
+
 }

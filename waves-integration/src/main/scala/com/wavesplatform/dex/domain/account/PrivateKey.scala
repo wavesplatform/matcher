@@ -6,7 +6,7 @@ import supertagged._
 
 object PrivateKey extends TaggedType[ByteStr] {
 
-  def apply(privateKey: ByteStr): PrivateKey     = privateKey @@ PrivateKey
+  def apply(privateKey: ByteStr): PrivateKey = privateKey @@ PrivateKey
   def apply(privateKey: Array[Byte]): PrivateKey = apply(ByteStr(privateKey))
 
   def unapply(arg: Array[Byte]): Option[PrivateKey] = Some(apply(arg))
@@ -15,4 +15,5 @@ object PrivateKey extends TaggedType[ByteStr] {
     ByteStr.byteStrFormat.map(this.apply),
     Writes(pk => ByteStr.byteStrFormat.writes(pk))
   )
+
 }

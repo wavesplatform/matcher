@@ -13,31 +13,31 @@ import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.config.DexTestConfig._
 
 /**
-  * BUY orders price:  (1 - p) * best bid <= price <= (1 + l) * best ask
-  * SELL orders price: (1 - l) * best bid <= price <= (1 + p) * best ask
-  *
-  * where:
-  *
-  *   p = max price deviation profit / 100
-  *   l = max price deviation loss / 100
-  *   best bid = highest price of buy
-  *   best ask = lowest price of sell
-  *
-  * BUY orders fee:  fee >= fs * (1 - fd) * best ask * amount
-  * SELL orders fee: fee >= fs * (1 - fd) * best bid * amount
-  *
-  * where:
-  *
-  *   fs = fee in percents from order-fee settings (order-fee.percent.min-fee) / 100
-  *   fd = max fee deviation / 100
-  *   best bid = highest price of buy
-  *   best ask = lowest price of sell
-  */
+ * BUY orders price:  (1 - p) * best bid <= price <= (1 + l) * best ask
+ * SELL orders price: (1 - l) * best bid <= price <= (1 + p) * best ask
+ *
+ * where:
+ *
+ *   p = max price deviation profit / 100
+ *   l = max price deviation loss / 100
+ *   best bid = highest price of buy
+ *   best ask = lowest price of sell
+ *
+ * BUY orders fee:  fee >= fs * (1 - fd) * best ask * amount
+ * SELL orders fee: fee >= fs * (1 - fd) * best bid * amount
+ *
+ * where:
+ *
+ *   fs = fee in percents from order-fee settings (order-fee.percent.min-fee) / 100
+ *   fd = max fee deviation / 100
+ *   best bid = highest price of buy
+ *   best ask = lowest price of sell
+ */
 class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
   val deviationProfit = 70
-  val deviationLoss   = 60
-  val deviationFee    = 40
+  val deviationLoss = 60
+  val deviationFee = 40
 
   val IssueResults(scriptAssetTx, _, scriptAsset) =
     mkIssueExtended(alice, "asset1", defaultAssetQuantity, fee = smartIssueFee, script = Some(Scripts.alwaysTrue))
@@ -54,9 +54,14 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
        |  allowed-order-versions = [1, 2, 3]
        |  max-price-deviations {
        |    enable = yes
-       |    profit = $deviationProfit
-       |    loss = $deviationLoss
-       |    fee = $deviationFee
+       |    max-price-profit = $deviationProfit
+       |    max-price-loss = $deviationLoss
+       |    max-fee-deviation = $deviationFee
+       |
+       |    # TODO COMPAT
+       |    profit = $${waves.dex.max-price-deviations.max-price-profit}
+       |    loss = $${waves.dex.max-price-deviations.max-price-loss}
+       |    fee = $${waves.dex.max-price-deviations.max-fee-deviation}
        |  }
        |  order-fee.-1 {
        |    mode = "percent"
@@ -87,27 +92,27 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
     val lowerBound = orderType match {
       case SELL => 100 - deviationLoss
-      case BUY  => 100 - deviationProfit
+      case BUY => 100 - deviationProfit
     }
 
     val upperBound = orderType match {
       case SELL => 100 + deviationProfit
-      case BUY  => 100 + deviationLoss
+      case BUY => 100 + deviationLoss
     }
 
     s"The $orderType order's price $price is out of deviation bounds. It should meet the following matcher's requirements: " +
-      s"$lowerBound% of best bid price <= order price <= $upperBound% of best ask price"
+    s"$lowerBound% of best bid price <= order price <= $upperBound% of best ask price"
   }
 
   def feeIsOutOfDeviationBounds(fee: String, feeAssetId: String, orderType: OrderType): String = {
 
     val marketType = orderType match {
       case SELL => "bid"
-      case BUY  => "ask"
+      case BUY => "ask"
     }
 
     s"The $orderType order's matcher fee $fee $feeAssetId is out of deviation bounds. " +
-      s"It should meet the following matcher's requirements: matcher fee >= ${100 - deviationFee}% of fee which should be paid in case of matching with best $marketType"
+    s"It should meet the following matcher's requirements: matcher fee >= ${100 - deviationFee}% of fee which should be paid in case of matching with best $marketType"
   }
 
   "buy orders price is" - {
@@ -132,14 +137,14 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
         waitForOrderAtNode(bestAskOrder)
 
         dex1.api.reservedBalance(alice) should matchTo(Map(assetPair.amountAsset -> 100000000000L, feeAsset -> 2 * matcherFee))
-        dex1.api.reservedBalance(bob) should matchTo(Map(assetPair.priceAsset    -> 691500000L))
+        dex1.api.reservedBalance(bob) should matchTo(Map(assetPair.priceAsset -> 691500000L))
 
         cancelAll(alice, bob)
       }
 
       s"$wavesUsdPair" in {
 
-        val feeAsset     = wavesUsdPair.priceAsset
+        val feeAsset = wavesUsdPair.priceAsset
         val bestAskOrder = mkOrder(bob, wavesUsdPair, SELL, 2000.waves, 500, 4 * 300, feeAsset)
         val bestBidOrder = mkOrder(alice, wavesUsdPair, BUY, 2000.waves, 300, 2 * 300, feeAsset)
 
@@ -154,7 +159,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
         waitForOrderAtNode(bestAskOrder)
 
-        dex1.api.reservedBalance(bob) should matchTo(Map(wavesUsdPair.amountAsset  -> 100000000000L, feeAsset -> 600L))
+        dex1.api.reservedBalance(bob) should matchTo(Map(wavesUsdPair.amountAsset -> 100000000000L, feeAsset -> 600L))
         dex1.api.reservedBalance(alice) should matchTo(Map(wavesUsdPair.priceAsset -> 691500L))
 
         cancelAll(alice, bob)
@@ -244,11 +249,11 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
       for (assetPair <- Seq(wavesBtcPair, ethWavesPair, scriptAssetsPair)) s"$assetPair" in {
 
-        val feeAsset     = assetPair.priceAsset
+        val feeAsset = assetPair.priceAsset
         val bestAskOrder = mkOrder(alice, assetPair, SELL, 2000.waves, 500000, 4 * matcherFee, feeAsset)
         val bestBidOrder = mkOrder(bob, assetPair, BUY, 2000.waves, 300000, 2 * matcherFee, feeAsset)
 
-        Seq(bestAskOrder, bestBidOrder).foreach { placeAndAwaitAtDex(_) }
+        Seq(bestAskOrder, bestBidOrder).foreach(placeAndAwaitAtDex(_))
 
         dex1.api.orderBook(assetPair).asks should matchTo(List(HttpV0LevelAgg(2000.waves, 500000)))
         dex1.api.orderBook(assetPair).bids should matchTo(List(HttpV0LevelAgg(2000.waves, 300000)))
@@ -259,7 +264,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
         waitForOrderAtNode(bestBidOrder)
 
         dex1.api.reservedBalance(alice) should matchTo(Map(assetPair.amountAsset -> 300000000000L, feeAsset -> 7 * matcherFee))
-        dex1.api.reservedBalance(bob) should matchTo(Map(assetPair.priceAsset    -> 300300000L))
+        dex1.api.reservedBalance(bob) should matchTo(Map(assetPair.priceAsset -> 300300000L))
 
         cancelAll(alice, bob)
       }
@@ -304,7 +309,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
       "-- too high" - {
         for (assetPair <- Seq(wavesBtcPair, ethWavesPair, scriptAssetsPair)) s"$assetPair" in {
 
-          val feeAsset     = assetPair.priceAsset
+          val feeAsset = assetPair.priceAsset
           val bestAskOrder = mkOrder(alice, assetPair, SELL, 1000.waves, 500000, 2 * matcherFee, feeAsset)
 
           placeAndAwaitAtDex(bestAskOrder)
@@ -324,7 +329,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
         s"$wavesUsdPair" in {
 
-          val feeAsset     = wavesUsdPair.priceAsset
+          val feeAsset = wavesUsdPair.priceAsset
           val bestAskOrder = mkOrder(alice, wavesUsdPair, SELL, 1000.waves, 500, 2 * 300, feeAsset)
 
           placeAndAwaitAtDex(bestAskOrder)
@@ -442,6 +447,6 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
     }
   }
 
-  private def cancelAll(xs: KeyPair*): Unit         = xs.foreach(dex1.api.cancelAll(_))
+  private def cancelAll(xs: KeyPair*): Unit = xs.foreach(dex1.api.cancelAll(_))
   private def waitForOrdersAtNode(xs: Order*): Unit = xs.foreach(waitForOrderAtNode(_))
 }

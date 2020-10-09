@@ -12,7 +12,7 @@ import scala.concurrent.duration._
 
 class MatcherMassOrdersTestSuite extends MatcherSuiteBase {
 
-  private val maxActiveOrders    = 20
+  private val maxActiveOrders = 20
   private val maxFinalizedOrders = 10
 
   override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(
@@ -36,10 +36,10 @@ class MatcherMassOrdersTestSuite extends MatcherSuiteBase {
   }
 
   // timeToLive to generate different orders
-  private val aliceOrderFill     = mkOrder(alice, ethWavesPair, OrderType.SELL, 3, Order.PriceConstant, ttl = 1.day)
-  private val alicePartialOrder  = mkOrder(alice, ethWavesPair, OrderType.SELL, 3, Order.PriceConstant, ttl = 2.days)
+  private val aliceOrderFill = mkOrder(alice, ethWavesPair, OrderType.SELL, 3, Order.PriceConstant, ttl = 1.day)
+  private val alicePartialOrder = mkOrder(alice, ethWavesPair, OrderType.SELL, 3, Order.PriceConstant, ttl = 2.days)
   private val aliceOrderToCancel = mkOrder(alice, ethWavesPair, OrderType.SELL, 3, Order.PriceConstant, ttl = 3.days)
-  private val aliceActiveOrder   = mkOrder(alice, ethWavesPair, OrderType.SELL, 3, Order.PriceConstant + 100000000)
+  private val aliceActiveOrder = mkOrder(alice, ethWavesPair, OrderType.SELL, 3, Order.PriceConstant + 100000000)
 
   "Create orders with statuses FILL, PARTIAL, CANCELLED, ACTIVE" - {
     "Place initial orders" in {
@@ -128,13 +128,13 @@ class MatcherMassOrdersTestSuite extends MatcherSuiteBase {
 
     "check order history orders count after fill" in {
       val aliceAllActiveOrders = dex1.api.orderHistory(alice, activeOnly = Some(true))
-      val aliceAllOrders       = dex1.api.orderHistory(alice)
-      val expectedAllOrders    = maxFinalizedOrders + aliceAllActiveOrders.size
+      val aliceAllOrders = dex1.api.orderHistory(alice)
+      val expectedAllOrders = maxFinalizedOrders + aliceAllActiveOrders.size
       aliceAllOrders.size shouldBe expectedAllOrders
 
       val alicePairActiveOrders = dex1.api.orderHistoryByPair(alice, wavesUsdPair, activeOnly = Some(true))
-      val alicePairOrders       = dex1.api.orderHistoryByPair(alice, wavesUsdPair)
-      val expectedPairOrders    = maxFinalizedOrders + alicePairActiveOrders.size
+      val alicePairOrders = dex1.api.orderHistoryByPair(alice, wavesUsdPair)
+      val expectedPairOrders = maxFinalizedOrders + alicePairActiveOrders.size
       alicePairOrders.size shouldBe expectedPairOrders
     }
   }
@@ -145,4 +145,5 @@ class MatcherMassOrdersTestSuite extends MatcherSuiteBase {
       dex1.api.place(order)
       order.id()
     }.toList
+
 }

@@ -2,7 +2,7 @@ package com.wavesplatform.dex.it
 
 import cats.arrow.FunctionK
 import cats.tagless.FunctorK
-import cats.{Id, MonadError, ~>}
+import cats.{~>, Id, MonadError}
 
 import scala.util.Try
 

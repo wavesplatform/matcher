@@ -8,7 +8,9 @@ import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import scala.concurrent.{ExecutionContext, Future}
 
 class AssetDescriptionsCache(loader: IssuedAsset => Future[Option[BriefAssetDescription]], expiration: Duration)(
-    implicit executionContext: ExecutionContext)
-    extends BlockchainCache[IssuedAsset, Option[BriefAssetDescription]](loader,
-                                                                        Some(expiration),
-                                                                        invalidationPredicate = BlockchainCache.noCustomInvalidationLogic)
+  implicit executionContext: ExecutionContext
+) extends BlockchainCache[IssuedAsset, Option[BriefAssetDescription]](
+      loader,
+      Some(expiration),
+      invalidationPredicate = BlockchainCache.noCustomInvalidationLogic
+    )

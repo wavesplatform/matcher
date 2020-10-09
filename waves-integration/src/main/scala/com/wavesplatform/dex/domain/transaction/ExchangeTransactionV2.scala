@@ -15,19 +15,20 @@ import monix.eval.Coeval
 import scala.util.Try
 
 @ApiModel(value = "ExchangeTransaction")
-case class ExchangeTransactionV2(@ApiModelProperty(name = "order1", dataType = "com.wavesplatform.dex.domain.order.OrderV3") buyOrder: Order,
-                                 @ApiModelProperty(name = "order2", dataType = "com.wavesplatform.dex.domain.order.OrderV3") sellOrder: Order,
-                                 @ApiModelProperty() amount: Long,
-                                 @ApiModelProperty() price: Long,
-                                 @ApiModelProperty() buyMatcherFee: Long,
-                                 @ApiModelProperty() sellMatcherFee: Long,
-                                 @ApiModelProperty() fee: Long,
-                                 @ApiModelProperty() timestamp: Long,
-                                 @ApiModelProperty(
-                                   value = "Exchange Transaction proofs as Base58 encoded signatures list",
-                                   dataType = "List[string]",
-                                 ) proofs: Proofs)
-    extends ExchangeTransaction {
+case class ExchangeTransactionV2(
+  @ApiModelProperty(name = "order1", dataType = "com.wavesplatform.dex.domain.order.OrderV3") buyOrder: Order,
+  @ApiModelProperty(name = "order2", dataType = "com.wavesplatform.dex.domain.order.OrderV3") sellOrder: Order,
+  @ApiModelProperty() amount: Long,
+  @ApiModelProperty() price: Long,
+  @ApiModelProperty() buyMatcherFee: Long,
+  @ApiModelProperty() sellMatcherFee: Long,
+  @ApiModelProperty() fee: Long,
+  @ApiModelProperty() timestamp: Long,
+  @ApiModelProperty(
+    value = "Exchange Transaction proofs as Base58 encoded signatures list",
+    dataType = "List[string]"
+  ) proofs: Proofs
+) extends ExchangeTransaction {
 
   import ExchangeTransactionV2._
 
@@ -38,44 +39,48 @@ case class ExchangeTransactionV2(@ApiModelProperty(name = "order1", dataType = "
   override val bodyBytes: Coeval[Array[Byte]] =
     Coeval.evalOnce(
       Array(0: Byte, ExchangeTransaction.typeId, version) ++
-        Ints.toByteArray(buyOrder.bytes().length) ++ orderMark(buyOrder.version) ++ buyOrder.bytes() ++
-        Ints.toByteArray(sellOrder.bytes().length) ++ orderMark(sellOrder.version) ++ sellOrder.bytes() ++
-        Longs.toByteArray(price) ++ Longs.toByteArray(amount) ++
-        Longs.toByteArray(buyMatcherFee) ++ Longs.toByteArray(sellMatcherFee) ++ Longs.toByteArray(fee) ++
-        Longs.toByteArray(timestamp)
+      Ints.toByteArray(buyOrder.bytes().length) ++ orderMark(buyOrder.version) ++ buyOrder.bytes() ++
+      Ints.toByteArray(sellOrder.bytes().length) ++ orderMark(sellOrder.version) ++ sellOrder.bytes() ++
+      Longs.toByteArray(price) ++ Longs.toByteArray(amount) ++
+      Longs.toByteArray(buyMatcherFee) ++ Longs.toByteArray(sellMatcherFee) ++ Longs.toByteArray(fee) ++
+      Longs.toByteArray(timestamp)
     )
 
   @ApiModelProperty(hidden = true)
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(bodyBytes() ++ proofs.bytes())
+
 }
 
 object ExchangeTransactionV2 extends ExchangeTransactionParser[ExchangeTransactionV2] {
 
   private def orderMark(version: Byte): Array[Byte] = if (version == 1) Array(1: Byte) else Array()
 
-  def create(matcher: PrivateKey,
-             buyOrder: Order,
-             sellOrder: Order,
-             amount: Long,
-             price: Long,
-             buyMatcherFee: Long,
-             sellMatcherFee: Long,
-             fee: Long,
-             timestamp: Long): Either[ValidationError, ExchangeTransactionV2] = {
+  def create(
+    matcher: PrivateKey,
+    buyOrder: Order,
+    sellOrder: Order,
+    amount: Long,
+    price: Long,
+    buyMatcherFee: Long,
+    sellMatcherFee: Long,
+    fee: Long,
+    timestamp: Long
+  ): Either[ValidationError, ExchangeTransactionV2] =
     create(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, Proofs.empty).map { unverified =>
       unverified.copy(proofs = Proofs(List(ByteStr(crypto.sign(matcher, unverified.bodyBytes())))))
     }
-  }
 
-  def create(buyOrder: Order,
-             sellOrder: Order,
-             amount: Long,
-             price: Long,
-             buyMatcherFee: Long,
-             sellMatcherFee: Long,
-             fee: Long,
-             timestamp: Long,
-             proofs: Proofs): Either[ValidationError, ExchangeTransactionV2] = {
+  def create(
+    buyOrder: Order,
+    sellOrder: Order,
+    amount: Long,
+    price: Long,
+    buyMatcherFee: Long,
+    sellMatcherFee: Long,
+    fee: Long,
+    timestamp: Long,
+    proofs: Proofs
+  ): Either[ValidationError, ExchangeTransactionV2] =
     validateExchangeParams(
       buyOrder,
       sellOrder,
@@ -88,7 +93,6 @@ object ExchangeTransactionV2 extends ExchangeTransactionParser[ExchangeTransacti
     ).map { _ =>
       ExchangeTransactionV2(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, proofs)
     }
-  }
 
   override protected def parseHeader(bytes: Array[Byte]): Try[Int] = Try {
 
@@ -103,19 +107,19 @@ object ExchangeTransactionV2 extends ExchangeTransactionParser[ExchangeTransacti
     3
   }
 
-  override def statefulParse: Stateful[ExchangeTransactionV2] = {
+  override def statefulParse: Stateful[ExchangeTransactionV2] =
     for {
-      _              <- read[Int]
-      buyOrder       <- Order.statefulParse
-      _              <- read[Int]
-      sellOrder      <- Order.statefulParse
-      price          <- read[Long]
-      amount         <- read[Long]
-      buyMatcherFee  <- read[Long]
+      _ <- read[Int]
+      buyOrder <- Order.statefulParse
+      _ <- read[Int]
+      sellOrder <- Order.statefulParse
+      price <- read[Long]
+      amount <- read[Long]
+      buyMatcherFee <- read[Long]
       sellMatcherFee <- read[Long]
-      fee            <- read[Long]
-      timestamp      <- read[Long]
-      proofs         <- read[Proofs]
+      fee <- read[Long]
+      timestamp <- read[Long]
+      proofs <- read[Proofs]
     } yield ExchangeTransactionV2(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, proofs)
-  }
+
 }

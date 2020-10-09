@@ -1,0 +1,4 @@
+-J-server
+-J-Xss256m
+-J-XX:MetaspaceSize=256m
+-J-XX:MaxMetaspaceExpansion=0

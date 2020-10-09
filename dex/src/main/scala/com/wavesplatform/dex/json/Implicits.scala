@@ -5,7 +5,9 @@ import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
 object Implicits {
-  final implicit class JsPathOps(val self: JsPath) extends AnyVal {
+
+  implicit final class JsPathOps(val self: JsPath) extends AnyVal {
+
     def formatMayBeEmpty[T](implicit f: Format[T], mayBeEmpty: MayBeEmpty[T]): OFormat[T] =
       self
         .formatNullable[T]
@@ -13,5 +15,7 @@ object Implicits {
           _.fold(mayBeEmpty.empty)(identity),
           Option(_).filterNot(mayBeEmpty.isEmpty)
         )
+
   }
+
 }

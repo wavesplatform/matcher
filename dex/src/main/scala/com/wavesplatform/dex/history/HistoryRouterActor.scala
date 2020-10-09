@@ -24,20 +24,20 @@ object HistoryRouterActor {
 
   def toLocalDateTime(timestamp: Long): LocalDateTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(timestamp), ZoneOffset.UTC)
 
-  val eventTrade, buySide, limitOrderType    = 0: Byte
+  val eventTrade, buySide, limitOrderType = 0: Byte
   val eventCancel, sellSide, marketOrderType = 1: Byte
 
   val statusPartiallyFilled: Byte = 1
-  val statusFilled: Byte          = 2
-  val statusCancelled: Byte       = 3
+  val statusFilled: Byte = 2
+  val statusCancelled: Byte = 3
 
   sealed trait HistoryMsg extends Product with Serializable
 
   sealed trait HistoryInsertMsg extends HistoryMsg {
 
     type R <: Record // mapping between domain objects and database rows
-    type DenormalizePrice        = (Long, AssetPair) => BigDecimal // how to convert price to the human-readable format
-    type DenormalizeAmountAndFee = (Long, Asset) => BigDecimal     // how to convert amount and fee fee to the human-readable format
+    type DenormalizePrice = (Long, AssetPair) => BigDecimal // how to convert price to the human-readable format
+    type DenormalizeAmountAndFee = (Long, Asset) => BigDecimal // how to convert amount and fee fee to the human-readable format
 
     protected def createRecords(denormalizeAmountAndFee: DenormalizeAmountAndFee, denormalizePrice: DenormalizePrice): Set[R]
   }
@@ -70,13 +70,14 @@ object HistoryRouterActor {
           )
         )
       }
+
     }
 
     final case class SaveEvent(event: Event) extends HistoryInsertMsg {
 
       override type R = EventRecord
 
-      override def createRecords(denormalizeAmountAndFee: DenormalizeAmountAndFee, denormalizePrice: DenormalizePrice): Set[R] = {
+      override def createRecords(denormalizeAmountAndFee: DenormalizeAmountAndFee, denormalizePrice: DenormalizePrice): Set[R] =
         this.event match {
           case _: OrderAdded => Set.empty[EventRecord]
 
@@ -119,8 +120,9 @@ object HistoryRouterActor {
               )
             )
         }
-      }
+
     }
+
   }
 
   sealed trait HistoryUpdateMsg extends HistoryMsg
@@ -145,28 +147,28 @@ class HistoryRouterActor(assetDecimals: Asset => Int, postgresConnection: Postgr
   private def denormalizePrice(value: Long, pair: AssetPair): BigDecimal =
     Denormalization.denormalizePrice(value, assetDecimals(pair.amountAsset), assetDecimals(pair.priceAsset))
 
-  override def connectionConfig: Config = postgresConnection.getConfig
+  override def connectionConfig: Config = postgresConnection.getQuillContextConfig
 
   private val ordersHistory: ActorRef = context.actorOf(
     Props(
       new HistoryMessagesBatchSenderActor[HistoryMsg] {
 
-        val batchLinger: Long  = orderHistorySettings.ordersBatchLingerMs
+        val batchLinger: Long = orderHistorySettings.ordersBatchLingerMs
         val batchEntries: Long = orderHistorySettings.ordersBatchEntries
 
         def toRecord(saveOrder: SaveOrder): OrderRecord = saveOrder.createRecords(denormalizeAmountAndFee, denormalizePrice).head
 
         override def createAndSendBatch(batchBuffer: Iterable[HistoryMsg]): Unit = {
 
-          val (updates, newOrders) = batchBuffer.foldLeft { (List.empty[UpdateOrder], Map.empty[String, OrderRecord]) } {
+          val (updates, newOrders) = batchBuffer.foldLeft((List.empty[UpdateOrder], Map.empty[String, OrderRecord])) {
             case ((updates, newOrders), msg) =>
               msg match {
-                case _: SaveEvent        => updates -> newOrders // Impossible here
+                case _: SaveEvent => updates -> newOrders // Impossible here
                 case newOrder: SaveOrder => updates -> newOrders.updated(newOrder.acceptedOrder.id.base58, toRecord(newOrder))
                 case update @ UpdateOrder(updatedOrderId, closedAt) =>
                   newOrders.get(updatedOrderId) match {
-                    case None        => (update :: updates) -> newOrders
-                    case Some(order) => updates             -> newOrders.updated(updatedOrderId, order.copy(closedAt = closedAt))
+                    case None => (update :: updates) -> newOrders
+                    case Some(order) => updates -> newOrders.updated(updatedOrderId, order.copy(closedAt = closedAt))
                   }
               }
           }
@@ -175,21 +177,21 @@ class HistoryRouterActor(assetDecimals: Asset => Int, postgresConnection: Postgr
             liftQuery(newOrders.values) foreach { orderRecord =>
               querySchema[OrderRecord](
                 "orders",
-                _.id              -> "id",
-                _.tpe             -> "type",
-                _.senderAddress   -> "sender_address",
+                _.id -> "id",
+                _.tpe -> "type",
+                _.senderAddress -> "sender_address",
                 _.senderPublicKey -> "sender_public_key",
-                _.amountAssetId   -> "amount_asset_id",
-                _.priceAssetId    -> "price_asset_id",
-                _.feeAssetId      -> "fee_asset_id",
-                _.side            -> "side",
-                _.price           -> "price",
-                _.amount          -> "amount",
-                _.timestamp       -> "timestamp",
-                _.expiration      -> "expiration",
-                _.fee             -> "fee",
-                _.created         -> "created",
-                _.closedAt        -> "closed_at"
+                _.amountAssetId -> "amount_asset_id",
+                _.priceAssetId -> "price_asset_id",
+                _.feeAssetId -> "fee_asset_id",
+                _.side -> "side",
+                _.price -> "price",
+                _.amount -> "amount",
+                _.timestamp -> "timestamp",
+                _.expiration -> "expiration",
+                _.fee -> "fee",
+                _.created -> "created",
+                _.closedAt -> "closed_at"
               ).insert(orderRecord).onConflictIgnore
             }
           }
@@ -204,6 +206,7 @@ class HistoryRouterActor(assetDecimals: Asset => Int, postgresConnection: Postgr
             }
           }
         }
+
       }
     ),
     name = "orders-history"
@@ -213,7 +216,7 @@ class HistoryRouterActor(assetDecimals: Asset => Int, postgresConnection: Postgr
     Props(
       new HistoryMessagesBatchSenderActor[SaveEvent] {
 
-        val batchLinger: Long  = orderHistorySettings.eventsBatchLingerMs
+        val batchLinger: Long = orderHistorySettings.eventsBatchLingerMs
         val batchEntries: Long = orderHistorySettings.eventsBatchEntries
 
         def createAndSendBatch(batchBuffer: Iterable[SaveEvent]): Unit =
@@ -221,19 +224,20 @@ class HistoryRouterActor(assetDecimals: Asset => Int, postgresConnection: Postgr
             liftQuery(batchBuffer flatMap { _.createRecords(denormalizeAmountAndFee, denormalizePrice) }) foreach { eventRecord =>
               querySchema[EventRecord](
                 "events",
-                _.orderId        -> "order_id",
-                _.eventType      -> "event_type",
-                _.timestamp      -> "timestamp",
-                _.price          -> "price",
-                _.filled         -> "filled",
-                _.totalFilled    -> "total_filled",
-                _.feeFilled      -> "fee_filled",
+                _.orderId -> "order_id",
+                _.eventType -> "event_type",
+                _.timestamp -> "timestamp",
+                _.price -> "price",
+                _.filled -> "filled",
+                _.totalFilled -> "total_filled",
+                _.feeFilled -> "fee_filled",
                 _.feeTotalFilled -> "fee_total_filled",
-                _.status         -> "status",
-                _.reason         -> "reason"
+                _.status -> "status",
+                _.reason -> "reason"
               ).insert(eventRecord).onConflictIgnore
             }
           }
+
       }
     ),
     name = "events-history"
@@ -257,4 +261,5 @@ class HistoryRouterActor(assetDecimals: Asset => Int, postgresConnection: Postgr
     case newOrder: SaveOrder => ordersHistory forward newOrder
     case newEvent: SaveEvent => eventsHistory forward newEvent; updateOrderClosedAtTimestamp(newEvent.event)
   }
+
 }

@@ -13,7 +13,7 @@ import org.scalatest.{BeforeAndAfterEach, Suite}
 
 trait WithDB extends BeforeAndAfterEach { this: Suite =>
 
-  private val path                  = Files.createTempDirectory("lvl").toAbsolutePath
+  private val path = Files.createTempDirectory("lvl").toAbsolutePath
   private var currentDBInstance: DB = _
 
   def db: DB = currentDBInstance
@@ -29,18 +29,16 @@ trait WithDB extends BeforeAndAfterEach { this: Suite =>
     try {
       super.afterEach()
       db.close()
-    } finally {
-      TestHelpers.deleteRecursively(path)
-    }
+    } finally TestHelpers.deleteRecursively(path)
 
   protected def tempDb(f: DB => Any): Any = {
     val path = Files.createTempDirectory("lvl-temp").toAbsolutePath
-    val db   = LevelDBFactory.factory.open(path.toFile, new Options().createIfMissing(true))
-    try {
-      f(db)
-    } finally {
+    val db = LevelDBFactory.factory.open(path.toFile, new Options().createIfMissing(true))
+    try f(db)
+    finally {
       db.close()
       TestHelpers.deleteRecursively(path)
     }
   }
+
 }

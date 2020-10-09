@@ -9,7 +9,7 @@ case class WsRatesUpdatesSubscribe(id: String = "ru") extends WsClientMessage {
 
 object WsRatesUpdatesSubscribe {
 
-  val tpe         = "rus"
+  val tpe = "rus"
   val subscribeId = "ru"
 
   implicit val wsRatesUpdatesSubscribeFormat: Format[WsRatesUpdatesSubscribe] = (
@@ -20,8 +20,8 @@ object WsRatesUpdatesSubscribe {
     unlift(s => Option(tpe -> s.id))
   )
 
-  def validateId(wsRatesUpdatesSubscribe: WsRatesUpdatesSubscribe): JsResult[WsRatesUpdatesSubscribe] = {
+  def validateId(wsRatesUpdatesSubscribe: WsRatesUpdatesSubscribe): JsResult[WsRatesUpdatesSubscribe] =
     if (wsRatesUpdatesSubscribe.id == subscribeId) JsSuccess(wsRatesUpdatesSubscribe)
     else JsError(JsPath \ "S", s"Unexpected subscribe id, got: ${wsRatesUpdatesSubscribe.id}, but expected $subscribeId")
-  }
+
 }

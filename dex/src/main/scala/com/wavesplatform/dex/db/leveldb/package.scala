@@ -13,12 +13,11 @@ package object leveldb extends ScorexLogging {
 
     log.debug(s"Open DB at $path")
 
-    val file    = new File(path)
+    val file = new File(path)
     val options = new Options().createIfMissing(true).paranoidChecks(true)
 
-    if (recreate) {
+    if (recreate)
       LevelDBFactory.factory.destroy(file, options)
-    }
 
     file.getAbsoluteFile.getParentFile.mkdirs()
     LevelDBFactory.factory.open(file, options)
@@ -35,13 +34,13 @@ package object leveldb extends ScorexLogging {
     }
 
     /**
-      * @note Runs operations in batch, so keep in mind, that previous changes don't appear lately in f
-      */
+     * @note Runs operations in batch, so keep in mind, that previous changes don't appear lately in f
+     */
     def readWrite[A](f: RW => A): A = {
-      val snapshot    = db.getSnapshot
+      val snapshot = db.getSnapshot
       val readOptions = new ReadOptions().snapshot(snapshot)
-      val batch       = db.createWriteBatch()
-      val rw          = new RW(db, readOptions, batch)
+      val batch = db.createWriteBatch()
+      val rw = new RW(db, readOptions, batch)
       try {
         val r = f(rw)
         db.write(batch)
@@ -52,7 +51,7 @@ package object leveldb extends ScorexLogging {
       }
     }
 
-    def get[A](key: Key[A]): A    = key.parse(db.get(key.keyBytes))
+    def get[A](key: Key[A]): A = key.parse(db.get(key.keyBytes))
     def has(key: Key[_]): Boolean = db.get(key.keyBytes) != null
 
     def iterateOver(prefix: Short)(f: DBEntry => Unit): Unit = iterateOver(Shorts.toByteArray(prefix))(f)
@@ -64,5 +63,7 @@ package object leveldb extends ScorexLogging {
         while (iterator.hasNext && iterator.peekNext().getKey.startsWith(prefix)) f(iterator.next())
       } finally iterator.close()
     }
+
   }
+
 }

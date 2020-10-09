@@ -42,7 +42,7 @@ class HttpSuccessfulPlaceSpec extends AnyFreeSpec with Matchers with DiffMatcher
     matcherPublicKey = PublicKey(Base58.decode("G67KDhqHdjNNb2tnHRgNbDppQEM9ySXdiBip577n2Xoj")),
     assetPair = AssetPair(
       amountAsset = IssuedAsset(ByteStr.decodeBase58("6RQYnag6kTXaoGi3yPmX9JMpPya8WQntSohisKKCMGr").get),
-      priceAsset = IssuedAsset(ByteStr.decodeBase58("8pBLJDEwWgrxxHHnVLYbjhUySKy1qteiZGqK8dJeHUA").get),
+      priceAsset = IssuedAsset(ByteStr.decodeBase58("8pBLJDEwWgrxxHHnVLYbjhUySKy1qteiZGqK8dJeHUA").get)
     ),
     orderType = OrderType.BUY,
     amount = 7235959396154477L,

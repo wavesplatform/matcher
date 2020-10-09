@@ -13,18 +13,18 @@ import im.mak.waves.transactions.{ExchangeTransaction => JExchangeTransaction}
 trait ToWavesJConversions {
 
   implicit def toVanilla(x: AssetId): ByteStr = ByteStr(x.bytes())
-  implicit def toVanilla(x: Id): ByteStr      = ByteStr(x.bytes())
+  implicit def toVanilla(x: Id): ByteStr = ByteStr(x.bytes())
 
   implicit def toWavesJ(x: ByteStr): Id = Id.as(x.arr)
 
-  implicit def toWavesJ(x: KeyPair): JPrivateKey  = JPrivateKey.as(x.privateKey.arr)
+  implicit def toWavesJ(x: KeyPair): JPrivateKey = JPrivateKey.as(x.privateKey.arr)
   implicit def toWavesJ(x: PublicKey): JPublicKey = JPublicKey.as(x.arr)
 
   implicit def toWavesJ(x: Address): JAddress = JAddress.as(x.bytes.arr)
 
   implicit def toWavesJ(x: Asset): AssetId = x match {
     case Asset.IssuedAsset(id) => AssetId.as(id.arr)
-    case Asset.Waves           => AssetId.WAVES
+    case Asset.Waves => AssetId.WAVES
   }
 
   implicit def toWavesJ(x: OrderType): JOrderType = if (x == OrderType.BUY) JOrderType.BUY else JOrderType.SELL
@@ -63,6 +63,7 @@ trait ToWavesJConversions {
         resultTx.setProof(idx, JProof.as(proof.arr))
     }
   }
+
 }
 
 object Implicits extends ToWavesJConversions

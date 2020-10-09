@@ -13,12 +13,13 @@ import com.wavesplatform.dex.grpc.integration.services.AssetDescriptionResponse.
 object PbToDexConversions {
 
   implicit class PbByteStringOps(val self: PbByteString) extends AnyVal {
-    def toVanilla: VByteStr        = VByteStr(self.toByteArray)
-    def toVanillaAsset: VAsset     = if (self.isEmpty) VAsset.Waves else VAsset.IssuedAsset(self.toVanilla)
+    def toVanilla: VByteStr = VByteStr(self.toByteArray)
+    def toVanillaAsset: VAsset = if (self.isEmpty) VAsset.Waves else VAsset.IssuedAsset(self.toVanilla)
     def toVanillaAddress: VAddress = VAddress.fromBytes(self.toByteArray).explicitGet()
   }
 
   implicit class PbMaybeDescriptionOps(val self: MaybeDescription) extends AnyVal {
+
     def toVanilla: Option[BriefAssetDescription] = self match {
       case MaybeDescription.Empty => None
       case MaybeDescription.Description(value) =>
@@ -30,5 +31,7 @@ object PbToDexConversions {
           )
         )
     }
+
   }
+
 }

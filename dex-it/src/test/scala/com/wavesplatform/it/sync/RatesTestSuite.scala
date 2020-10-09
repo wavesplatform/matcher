@@ -21,7 +21,7 @@ class RatesTestSuite extends MatcherSuiteBase {
 
   val defaultRateMap: HttpRates = Map(Waves -> 1d)
 
-  val wctRate        = 0.2
+  val wctRate = 0.2
   val wctRateUpdated = 0.5
 
   val wctStr: String = WctId.toString

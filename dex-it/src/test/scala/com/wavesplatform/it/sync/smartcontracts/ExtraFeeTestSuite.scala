@@ -14,23 +14,23 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
   override protected def dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(
       s"""waves.dex.order-fee.-1 {
-       |  mode = dynamic
-       |  dynamic {
-       |    base-maker-fee = $tradeFee
-       |    base-taker-fee = $tradeFee
-       |  }
-       |}
+         |  mode = dynamic
+         |  dynamic {
+         |    base-maker-fee = $tradeFee
+         |    base-taker-fee = $tradeFee
+         |  }
+         |}
        """.stripMargin
     )
 
-  private val trueScript  = Option(Scripts.alwaysTrue)
+  private val trueScript = Option(Scripts.alwaysTrue)
   private val falseScript = Option(Scripts.alwaysFalse)
-  private val amount      = 1L
-  private val price       = 100000000L
+  private val amount = 1L
+  private val price = 100000000L
 
-  private val IssueResults(asset0Tx, _, asset0)     = mkIssueExtended(alice, "Asset0", defaultAssetQuantity, 0, smartIssueFee)
-  private val IssueResults(asset1Tx, _, asset1)     = mkIssueExtended(alice, "SmartAsset1", defaultAssetQuantity, 0, smartIssueFee, trueScript)
-  private val IssueResults(asset2Tx, _, asset2)     = mkIssueExtended(bob, "SmartAsset2", defaultAssetQuantity, 0, smartIssueFee, trueScript)
+  private val IssueResults(asset0Tx, _, asset0) = mkIssueExtended(alice, "Asset0", defaultAssetQuantity, 0, smartIssueFee)
+  private val IssueResults(asset1Tx, _, asset1) = mkIssueExtended(alice, "SmartAsset1", defaultAssetQuantity, 0, smartIssueFee, trueScript)
+  private val IssueResults(asset2Tx, _, asset2) = mkIssueExtended(bob, "SmartAsset2", defaultAssetQuantity, 0, smartIssueFee, trueScript)
   private val IssueResults(feeAssetTx, _, feeAsset) = mkIssueExtended(bob, "FeeSmartAsset", defaultAssetQuantity, 8, smartIssueFee, trueScript)
 
   private val IssueResults(assetWith2DecTx, assetWith2DecId, assetWith2Dec) =
@@ -59,16 +59,17 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
       "then fee should be 0.003 + 0.004 (for Smart Asset only, not Smart Account)" in {
         val oneSmartPair = createAssetPair(asset0, asset1)
 
-        val aliceInitBalance   = wavesNode1.api.balance(alice, Waves)
-        val bobInitBalance     = wavesNode1.api.balance(bob, Waves)
+        val aliceInitBalance = wavesNode1.api.balance(alice, Waves)
+        val bobInitBalance = wavesNode1.api.balance(bob, Waves)
         val matcherInitBalance = wavesNode1.api.balance(matcher, Waves)
 
         val expectedFee = tradeFee + smartFee // 1 x "smart asset"
-        val invalidFee  = expectedFee - 1
+        val invalidFee = expectedFee - 1
 
         dex1.api.tryPlace(mkOrder(alice, oneSmartPair, SELL, amount, price, invalidFee, version = 2)) should failWith(
           9441542, // FeeNotEnough
-          "Required 0.007 WAVES as fee for this order, but given 0.00699999 WAVES")
+          "Required 0.007 WAVES as fee for this order, but given 0.00699999 WAVES"
+        )
 
         placeAndAwaitAtDex(mkOrder(alice, oneSmartPair, SELL, amount, price, expectedFee, version = 2))
 
@@ -96,12 +97,12 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
 
           val bothSmartPair = createAssetPair(asset1, asset2)
 
-          val aliceInitBalance   = wavesNode1.api.balance(alice, Waves)
-          val bobInitBalance     = wavesNode1.api.balance(bob, Waves)
+          val aliceInitBalance = wavesNode1.api.balance(alice, Waves)
+          val bobInitBalance = wavesNode1.api.balance(bob, Waves)
           val matcherInitBalance = wavesNode1.api.balance(matcher, Waves)
 
           val expectedFee = tradeFee + 2 * smartFee + smartFee // 2 x "smart asset" and 1 x "matcher script"
-          val invalidFee  = expectedFee - 1
+          val invalidFee = expectedFee - 1
 
           dex1.api.tryPlace(mkOrder(alice, bothSmartPair, SELL, amount, price, invalidFee, version = 2)) should failWith(
             9441542, // FeeNotEnough
@@ -129,9 +130,9 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
     "with non-waves asset fee with one Smart Account and one Smart Asset" in {
       val oneSmartPair = createAssetPair(asset0, asset1)
 
-      val bobInitBalance     = wavesNode1.api.balance(bob, feeAsset)
+      val bobInitBalance = wavesNode1.api.balance(bob, feeAsset)
       val matcherInitBalance = wavesNode1.api.balance(matcher, feeAsset)
-      val feeAssetRate       = 0.0005
+      val feeAssetRate = 0.0005
 
       dex1.api.upsertRate(feeAsset, feeAssetRate)
       dex1.api.upsertRate(btc, feeAssetRate)
@@ -141,7 +142,7 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
         // TODO This will be fixed in NODE 1.2.8+, see NODE-2183
         // val expectedWavesFee = tradeFee + smartFee + smartFee // 1 x "smart asset" and 1 x "matcher script"
         val expectedWavesFee = tradeFee + smartFee + smartFee + smartFee // 1 x "smart asset" and 1 x "matcher script" and 1 x "scripted fee"
-        val expectedFee      = 550L                                      // 1 x "smart asset" and 1 x "matcher script"
+        val expectedFee = 550L // 1 x "smart asset" and 1 x "matcher script"
 
         placeAndAwaitAtDex(mkOrder(bob, oneSmartPair, SELL, amount, price, expectedFee, version = 3, feeAsset = feeAsset))
 
@@ -164,8 +165,8 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
 
         val asset2WithDecWavesPair = createAssetPair(assetWith2Dec, Waves)
 
-        val bobWavesBalance   = wavesNode1.api.balance(bob, Waves)
-        val bobAssetBalance   = wavesNode1.api.balance(bob, assetWith2Dec)
+        val bobWavesBalance = wavesNode1.api.balance(bob, Waves)
+        val bobAssetBalance = wavesNode1.api.balance(bob, assetWith2Dec)
         val aliceWavesBalance = wavesNode1.api.balance(alice, Waves)
         val aliceAssetBalance = wavesNode1.api.balance(alice, assetWith2Dec)
 
@@ -216,6 +217,7 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
 
     dex1.api.tryPlace(mkOrder(bob, oneSmartPair, SELL, amount, price, 550, version = 3, feeAsset = falseFeeAsset)) should failWith(
       11536130, // AssetScriptDeniedOrder
-      s"The asset's script of $falseFeeAssetId rejected the order")
+      s"The asset's script of $falseFeeAssetId rejected the order"
+    )
   }
 }

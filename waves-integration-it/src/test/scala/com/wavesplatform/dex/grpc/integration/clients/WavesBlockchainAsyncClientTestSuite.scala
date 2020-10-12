@@ -179,7 +179,7 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
       "if the transaction is in the blockchain" in {
         val exchangeTx = mkExchangeTx
 
-        broadcastAndAwait(exchangeTx)
+        broadcastAndAwait(exchangeTx.toWavesJ())
         wait(client.broadcastTx(exchangeTx)) shouldBe true
       }
     }
@@ -257,7 +257,7 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
       }
 
       withClue("run script") {
-        val pair = AssetPair.createAssetPair(toVanilla(issueTx.id()).toString, "WAVES").get
+        val pair = AssetPair.createAssetPair(issueTx.id().toString, "WAVES").get
         val exchangeTx = mkDomainExchange(bob, alice, pair, 1L, 2 * Order.PriceConstant, matcherFee = 1.waves, matcher = matcher)
 
         wait(client.runScript(IssuedAsset(issueTx.id()), exchangeTx)) shouldBe RunScriptResult.Allowed

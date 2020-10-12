@@ -5,6 +5,7 @@ import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
+import com.wavesplatform.dex.it.config.GenesisConfig
 import im.mak.waves.transactions.account.{Address => JAddress, PrivateKey => JPrivateKey, PublicKey => JPublicKey}
 import im.mak.waves.transactions.common.{Amount, AssetId, Id, Proof => JProof}
 import im.mak.waves.transactions.exchange.{Order => JOrder, OrderType => JOrderType}
@@ -31,7 +32,7 @@ trait ToWavesJConversions {
 
   implicit class OrderOps(val self: Order) {
 
-    def toWavesJ(chainId: Byte): JOrder = {
+    def toWavesJ(chainId: Byte = GenesisConfig.chainId): JOrder = {
       val unsignedOrder =
         JOrder
           .builder(
@@ -58,7 +59,7 @@ trait ToWavesJConversions {
 
   implicit class ExchangeTransactionOps(val self: ExchangeTransaction) {
 
-    def toWavesJ(chainId: Byte): JExchangeTransaction = {
+    def toWavesJ(chainId: Byte = GenesisConfig.chainId): JExchangeTransaction = {
       val unsignedTx =
         JExchangeTransaction
           .builder(

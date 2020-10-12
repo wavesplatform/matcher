@@ -191,7 +191,7 @@ trait MkWavesEntities {
   }
 
   def mkSetAccountScript(accountOwner: KeyPair, script: ByteStr, chainId: Byte = GenesisConfig.chainId): SetScriptTransaction =
-    mkSetAccountMayBeScript(accountOwner, Some(script), chainId)
+    mkSetAccountMayBeScript(accountOwner, Some(script), chainId = chainId)
 
   def mkResetAccountScript(
     accountOwner: KeyPair,

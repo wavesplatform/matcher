@@ -278,7 +278,7 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
       }
 
       withClue("set script") {
-        val setScriptTx = mkSetAccountScript(receiver, trueScript)
+        val setScriptTx = mkSetAccountMayBeScript(receiver, trueScript)
         broadcastAndAwait(setScriptTx)
 
         wait(client.hasScript(receiver)) shouldBe true

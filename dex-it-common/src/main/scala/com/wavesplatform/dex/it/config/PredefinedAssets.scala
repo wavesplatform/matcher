@@ -14,27 +14,27 @@ trait PredefinedAssets {
 
   val usdAssetName: String = "USD-X"
   val IssueUsdTx: IssueTransaction = mkIssue(alice, usdAssetName, defaultAssetQuantity, 2)
-  val UsdId: ByteStr = toVanilla(IssueUsdTx.id())
+  val UsdId: ByteStr = IssueUsdTx.id()
   val usd: IssuedAsset = IssuedAsset(UsdId)
 
   val usdnAssetName: String = "USD-N"
   val IssueUsdnTx: IssueTransaction = mkIssue(alice, usdnAssetName, defaultAssetQuantity, 6)
-  val UsdnId: ByteStr = toVanilla(IssueUsdnTx.id())
+  val UsdnId: ByteStr = IssueUsdnTx.id()
   val usdn: IssuedAsset = IssuedAsset(UsdnId)
 
   val wctAssetName: String = "WCT-X"
   val IssueWctTx: IssueTransaction = mkIssue(bob, wctAssetName, defaultAssetQuantity, 2)
-  val WctId: ByteStr = toVanilla(IssueWctTx.id())
+  val WctId: ByteStr = IssueWctTx.id()
   val wct: IssuedAsset = IssuedAsset(WctId)
 
   val ethAssetName: String = "ETH-X"
   val IssueEthTx: IssueTransaction = mkIssue(alice, ethAssetName, defaultAssetQuantity, 8)
-  val EthId: ByteStr = toVanilla(IssueEthTx.id())
+  val EthId: ByteStr = IssueEthTx.id()
   val eth: IssuedAsset = IssuedAsset(EthId)
 
   val btcAssetName: String = "BTC-X"
   val IssueBtcTx: IssueTransaction = mkIssue(bob, btcAssetName, defaultAssetQuantity, 8)
-  val BtcId: ByteStr = toVanilla(IssueBtcTx.id())
+  val BtcId: ByteStr = IssueBtcTx.id()
   val btc: IssuedAsset = IssuedAsset(BtcId)
 
   val wctUsdPair: AssetPair = AssetPair(wct, usd)

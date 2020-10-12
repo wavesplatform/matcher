@@ -8,7 +8,7 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import com.wavesplatform.dex.it.test.Scripts
-import com.wavesplatform.dex.it.waves.MkWavesEntities
+import com.wavesplatform.dex.it.waves.{MkWavesEntities, ToWavesJConversions}
 import com.wavesplatform.it.MatcherSuiteBase
 import im.mak.waves.transactions.IssueTransaction
 
@@ -138,17 +138,15 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
   }
 }
 
-object OrdersFromScriptedAssetTestSuite {
+object OrdersFromScriptedAssetTestSuite extends ToWavesJConversions {
 
-  import MkWavesEntities.mkIssue
   import com.wavesplatform.dex.it.config.PredefinedAccounts.matcher
-  import com.wavesplatform.dex.it.waves.Implicits.toVanilla
   import com.wavesplatform.dex.waves.WavesFeeConstants.smartIssueFee
 
   private def mkAllow(id: Int): IssueTransaction =
-    mkIssue(matcher, s"AllowAsset-$id", Int.MaxValue / 3, 0, smartIssueFee, Some(Scripts.alwaysTrue))
+    MkWavesEntities.mkIssue(matcher, s"AllowAsset-$id", Int.MaxValue / 3, 0, smartIssueFee, Some(Scripts.alwaysTrue))
 
-  private val issueUnscriptedAssetTx = mkIssue(matcher, "UnscriptedAsset", Int.MaxValue / 3, 0)
+  private val issueUnscriptedAssetTx = MkWavesEntities.mkIssue(matcher, "UnscriptedAsset", Int.MaxValue / 3, 0)
   private val unscriptedAsset = IssuedAsset(issueUnscriptedAssetTx.id())
 
   private val issueAllowAssetTx = mkAllow(0)
@@ -160,7 +158,7 @@ object OrdersFromScriptedAssetTestSuite {
   private val issueAllowAsset3Tx = mkAllow(2)
   private val allowAsset3 = IssuedAsset(issueAllowAsset3Tx.id())
 
-  private val issueDenyAssetTx = mkIssue(matcher, "DenyAsset", Int.MaxValue / 3, 0, smartIssueFee, Some(Scripts.alwaysFalse))
+  private val issueDenyAssetTx = MkWavesEntities.mkIssue(matcher, "DenyAsset", Int.MaxValue / 3, 0, smartIssueFee, Some(Scripts.alwaysFalse))
   private val denyAsset = IssuedAsset(issueDenyAssetTx.id())
 
   /*

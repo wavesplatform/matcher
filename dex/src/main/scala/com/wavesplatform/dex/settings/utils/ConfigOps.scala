@@ -2,7 +2,6 @@ package com.wavesplatform.dex.settings.utils
 
 import java.util.Properties
 
-import cats.data.Validated
 import com.typesafe.config.{Config, ConfigObject, ConfigRenderOptions}
 import mouse.any._
 

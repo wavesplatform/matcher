@@ -72,6 +72,44 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with
     dex1.connectToNetwork()
   }
 
+  "Place, fill and cancel a lot of orders" in {
+
+    val alicePlaces = aliceOrders.map(MatcherCommand.Place(dex1.asyncApi, _))
+    val bobPlaces = bobOrders.map(MatcherCommand.Place(dex2.asyncApi, _))
+    val places = Random.shuffle(alicePlaces ++ bobPlaces)
+
+    // .toSet to remove duplications
+    val aliceCancels = (1 to cancelsNumber).map(_ => choose(aliceOrders)).toSet.map(MatcherCommand.Cancel(dex1.asyncApi, alice, _))
+    val bobCancels = (1 to cancelsNumber).map(_ => choose(bobOrders)).toSet.map(MatcherCommand.Cancel(dex2.asyncApi, bob, _))
+    val cancels = Random.shuffle(aliceCancels ++ bobCancels)
+
+    successfulCommandsNumber = executeCommands(places ++ cancels)
+    successfulCommandsNumber += executeCommands(List(MatcherCommand.Place(dex1.asyncApi, lastOrder)))
+    log.info(s"Successful commands: $successfulCommandsNumber")
+  }
+
+  "Wait until all requests are processed" in {
+    try {
+      val offset1 = dex1.api.waitForCurrentOffset(_ == successfulCommandsNumber - 1) // Index starts from 0
+      dex2.api.waitForCurrentOffset(_ == offset1)
+
+      withClue("Last command processed") {
+        List(dex1.asyncApi, dex2.asyncApi).foreach(_.waitForOrder(lastOrder)(_.status != Status.NotFound))
+      }
+    } catch {
+      case NonFatal(e) =>
+        log.info(s"Last offsets: node1=${dex1.api.lastOffset}, node2=${dex2.api.lastOffset}")
+        throw e
+    }
+  }
+
+  "States on both matcher should be equal" in {
+    val state1 = state(dex1.api)
+    val state2 = state(dex2.api)
+
+    state1 should matchTo(state2)
+  }
+
   "WS Order book state should be the same on two matchers" in {
     val acc = mkAccountWithBalance(100.eth -> eth, 100.waves -> Waves)
 
@@ -126,44 +164,6 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with
 
     wsau1.close()
     wsau2.close()
-  }
-
-  "Place, fill and cancel a lot of orders" in {
-
-    val alicePlaces = aliceOrders.map(MatcherCommand.Place(dex1.asyncApi, _))
-    val bobPlaces = bobOrders.map(MatcherCommand.Place(dex2.asyncApi, _))
-    val places = Random.shuffle(alicePlaces ++ bobPlaces)
-
-    // .toSet to remove duplications
-    val aliceCancels = (1 to cancelsNumber).map(_ => choose(aliceOrders)).toSet.map(MatcherCommand.Cancel(dex1.asyncApi, alice, _))
-    val bobCancels = (1 to cancelsNumber).map(_ => choose(bobOrders)).toSet.map(MatcherCommand.Cancel(dex2.asyncApi, bob, _))
-    val cancels = Random.shuffle(aliceCancels ++ bobCancels)
-
-    successfulCommandsNumber = executeCommands(places ++ cancels)
-    successfulCommandsNumber += executeCommands(List(MatcherCommand.Place(dex1.asyncApi, lastOrder)))
-    log.info(s"Successful commands: $successfulCommandsNumber")
-  }
-
-  "Wait until all requests are processed" in {
-    try {
-      val offset1 = dex1.api.waitForCurrentOffset(_ == successfulCommandsNumber - 1) // Index starts from 0
-      dex2.api.waitForCurrentOffset(_ == offset1)
-
-      withClue("Last command processed") {
-        List(dex1.asyncApi, dex2.asyncApi).foreach(_.waitForOrder(lastOrder)(_.status != Status.NotFound))
-      }
-    } catch {
-      case NonFatal(e) =>
-        log.info(s"Last offsets: node1=${dex1.api.lastOffset}, node2=${dex2.api.lastOffset}")
-        throw e
-    }
-  }
-
-  "States on both matcher should be equal" in {
-    val state1 = state(dex1.api)
-    val state2 = state(dex2.api)
-
-    state1 should matchTo(state2)
   }
 
   "Batch cancel and single cancels simultaneously" in {

@@ -32,7 +32,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
   private val aliceWavesPair = AssetPair(aliceAsset, Waves)
 
   private def updateBobScript(binaryCodeInBase64: String): Unit =
-    broadcastAndAwait(mkSetAccountScript(bob, Some(Scripts.fromBase64(binaryCodeInBase64)), fee = setScriptFee + smartFee))
+    broadcastAndAwait(mkSetAccountMayBeScript(bob, Some(Scripts.fromBase64(binaryCodeInBase64)), fee = setScriptFee + smartFee))
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()

@@ -49,7 +49,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
        |  price-assets = [ "$UsdId", "$BtcId", "WAVES", "$EthId", "$WctId" ]
        |  ${getPostgresConnectionCfgString(postgresContainerName, postgresContainerPort)}
        |  order-db.max-orders = $maxOrders
-       |  order-history.enabled = yes
+       |  order-history.enable = yes
        |}
     """.stripMargin
   )

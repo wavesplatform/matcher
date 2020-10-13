@@ -58,6 +58,13 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
        |    loss = $deviationLoss
        |    fee = $deviationFee
        |  }
+       |  # FORWARD COMPAT
+       |  max-price-deviations {
+       |    enable = yes
+       |    max-price-profit = $deviationProfit
+       |    max-price-loss = $deviationLoss
+       |    max-fee-deviation = $deviationFee
+       |  }
        |  order-fee.-1 {
        |    mode = "percent"
        |    percent {

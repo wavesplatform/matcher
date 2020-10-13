@@ -49,6 +49,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
        |  ${getPostgresConnectionCfgString(postgresContainerName, postgresContainerPort)}
        |  order-db.max-orders = $maxOrders
        |  order-history.enabled = yes
+       |  order-history.enable = yes
        |}
     """.stripMargin
   )

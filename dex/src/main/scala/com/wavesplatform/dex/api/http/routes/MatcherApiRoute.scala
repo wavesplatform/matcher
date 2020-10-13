@@ -1046,6 +1046,7 @@ class MatcherApiRoute(
     httpMethod = "GET",
     authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
     tags = Array("debug"),
+    produces = "application/hocon",
     response = classOf[HttpResponse]
   )
   def getConfig: Route = (path("config") & get & withAuth) {

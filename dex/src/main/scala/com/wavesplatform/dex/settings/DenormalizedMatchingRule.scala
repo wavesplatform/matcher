@@ -4,7 +4,7 @@ import cats.data.NonEmptyList
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.model.Normalization
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.queue.QueueEventWithMeta
+import com.wavesplatform.dex.queue.ValidatedCommandWithMeta
 import com.wavesplatform.dex.settings.utils.ConfigReaderOps.Implicits
 import com.wavesplatform.dex.settings.utils.{rules, validationOf}
 import pureconfig.generic.semiauto
@@ -38,7 +38,7 @@ object DenormalizedMatchingRule extends ScorexLogging {
 
   @annotation.tailrec
   def skipOutdated(
-    currOffset: QueueEventWithMeta.Offset,
+    currOffset: ValidatedCommandWithMeta.Offset,
     rules: NonEmptyList[DenormalizedMatchingRule]
   ): NonEmptyList[DenormalizedMatchingRule] =
     if (currOffset > rules.head.startOffset)

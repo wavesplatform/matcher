@@ -8,8 +8,8 @@ import scala.concurrent.duration.Deadline
 import scala.concurrent.{ExecutionContext, Future}
 
 class RepeatableRequests(queue: MatcherQueue, deadline: Deadline)(implicit ec: ExecutionContext) extends ScorexLogging {
-  def firstOffset: Future[QueueEventWithMeta.Offset] = getOffset("first", deadline, queue.firstEventOffset)
-  def lastOffset: Future[QueueEventWithMeta.Offset] = getOffset("last", deadline, queue.lastEventOffset)
+  def firstOffset: Future[ValidatedCommandWithMeta.Offset] = getOffset("first", deadline, queue.firstOffset)
+  def lastOffset: Future[ValidatedCommandWithMeta.Offset] = getOffset("last", deadline, queue.lastOffset)
 
   private def getOffset[T](which: String, deadline: Deadline, get: => Future[T]): Future[T] = get.recoverWith {
     case e: TimeoutException =>

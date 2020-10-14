@@ -104,7 +104,7 @@ case class OrderBookStopped(assetPair: AssetPair)
     )
 
 case object CanNotPersistEvent
-    extends MatcherError(commonEntity, producer, broken, e"Can not persist event, please retry later or contact with the administrator")
+    extends MatcherError(commonEntity, producer, broken, e"Can not persist command, please retry later or contact with the administrator")
 
 case object CancelRequestIsIncomplete extends MatcherError(request, commonEntity, unexpected, e"Either timestamp or orderId must be specified")
 

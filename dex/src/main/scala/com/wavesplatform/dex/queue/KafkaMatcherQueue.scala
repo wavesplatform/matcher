@@ -8,7 +8,7 @@ import java.util.concurrent.{Executors, TimeoutException}
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.typesafe.config.Config
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.queue.KafkaMatcherQueue.{eventDeserializer, KafkaProducer, Settings}
+import com.wavesplatform.dex.queue.KafkaMatcherQueue.{validatedCommandDeserializer, KafkaProducer, Settings}
 import com.wavesplatform.dex.queue.MatcherQueue.{IgnoreProducer, Producer}
 import com.wavesplatform.dex.settings.toConfigOps
 import monix.eval.Task
@@ -43,7 +43,10 @@ class KafkaMatcherQueue(settings: Settings) extends MatcherQueue with ScorexLogg
   private val topicPartitions: util.List[TopicPartition] = java.util.Collections.singletonList(topicPartition)
 
   private val consumerConfig = settings.consumer.client
-  private val consumer = new KafkaConsumer[String, QueueEvent](consumerConfig.toProperties, new StringDeserializer, eventDeserializer)
+
+  private val consumer =
+    new KafkaConsumer[String, ValidatedCommand](consumerConfig.toProperties, new StringDeserializer, validatedCommandDeserializer)
+
   consumer.assign(topicPartitions)
   private val pollDuration = java.time.Duration.ofMillis(settings.consumer.fetchMaxDuration.toMillis)
 
@@ -57,12 +60,12 @@ class KafkaMatcherQueue(settings: Settings) extends MatcherQueue with ScorexLogg
     r
   }
 
-  private val pollTask: Task[IndexedSeq[QueueEventWithMeta]] = Task {
+  private val pollTask: Task[IndexedSeq[ValidatedCommandWithMeta]] = Task {
     try if (duringShutdown.get()) IndexedSeq.empty
     else {
       val records = consumer.poll(pollDuration)
       records.asScala.map { record =>
-        QueueEventWithMeta(record.offset(), record.timestamp(), record.value())
+        ValidatedCommandWithMeta(record.offset(), record.timestamp(), record.value())
       }.toIndexedSeq
     } catch {
       case e: WakeupException => if (duringShutdown.get()) IndexedSeq.empty else throw e
@@ -72,7 +75,7 @@ class KafkaMatcherQueue(settings: Settings) extends MatcherQueue with ScorexLogg
     }
   }
 
-  override def startConsume(fromOffset: QueueEventWithMeta.Offset, process: Seq[QueueEventWithMeta] => Future[Unit]): Unit = {
+  override def startConsume(fromOffset: ValidatedCommandWithMeta.Offset, process: Seq[ValidatedCommandWithMeta] => Future[Unit]): Unit = {
     val scheduler = Scheduler(consumerExecutionContext, executionModel = ExecutionModel.AlwaysAsyncExecution)
     consumerTask.cancel()
     consumerTask = Observable
@@ -94,15 +97,15 @@ class KafkaMatcherQueue(settings: Settings) extends MatcherQueue with ScorexLogg
       .subscribe()(scheduler)
   }
 
-  override def storeEvent(event: QueueEvent): Future[Option[QueueEventWithMeta]] = producer.storeEvent(event)
+  override def store(command: ValidatedCommand): Future[Option[ValidatedCommandWithMeta]] = producer.store(command)
 
-  override def firstEventOffset: Future[QueueEventWithMeta.Offset] =
+  override def firstOffset: Future[ValidatedCommandWithMeta.Offset] =
     safeOffsetRequest(consumer.beginningOffsets(topicPartitions).get(topicPartition) - 1L)
 
-  override def lastEventOffset: Future[QueueEventWithMeta.Offset] =
+  override def lastOffset: Future[ValidatedCommandWithMeta.Offset] =
     safeOffsetRequest(consumer.endOffsets(topicPartitions).get(topicPartition) - 1L)
 
-  private def safeOffsetRequest(f: => QueueEventWithMeta.Offset): Future[QueueEventWithMeta.Offset] = {
+  private def safeOffsetRequest(f: => ValidatedCommandWithMeta.Offset): Future[ValidatedCommandWithMeta.Offset] = {
     implicit val context = consumerExecutionContext
     Future(consumer.listTopics())
       .flatMap { topics =>
@@ -139,43 +142,47 @@ object KafkaMatcherQueue {
   case class ConsumerSettings(fetchMaxDuration: FiniteDuration, maxBufferSize: Int, client: Config)
   case class ProducerSettings(enable: Boolean, client: Config)
 
-  val eventDeserializer: Deserializer[QueueEvent] = new Deserializer[QueueEvent] {
+  val validatedCommandDeserializer: Deserializer[ValidatedCommand] = new Deserializer[ValidatedCommand] {
     override def configure(configs: java.util.Map[String, _], isKey: Boolean): Unit = {}
-    override def deserialize(topic: String, data: Array[Byte]): QueueEvent = QueueEvent.fromBytes(data)
+    override def deserialize(topic: String, data: Array[Byte]): ValidatedCommand = ValidatedCommand.fromBytes(data)
     override def close(): Unit = {}
   }
 
-  val eventSerializer: Serializer[QueueEvent] = new Serializer[QueueEvent] {
+  val validatedCommandSerializer: Serializer[ValidatedCommand] = new Serializer[ValidatedCommand] {
     override def configure(configs: java.util.Map[String, _], isKey: Boolean): Unit = {}
-    override def serialize(topic: String, data: QueueEvent): Array[Byte] = QueueEvent.toBytes(data)
+    override def serialize(topic: String, data: ValidatedCommand): Array[Byte] = ValidatedCommand.toBytes(data)
     override def close(): Unit = {}
   }
 
   private class KafkaProducer(topic: String, producerSettings: Properties)(implicit ec: ExecutionContext) extends Producer with ScorexLogging {
 
     private val producer =
-      new org.apache.kafka.clients.producer.KafkaProducer[String, QueueEvent](producerSettings, new StringSerializer, eventSerializer)
+      new org.apache.kafka.clients.producer.KafkaProducer[String, ValidatedCommand](
+        producerSettings,
+        new StringSerializer,
+        validatedCommandSerializer
+      )
 
-    override def storeEvent(event: QueueEvent): Future[Option[QueueEventWithMeta]] = {
-      log.trace(s"Storing $event")
-      val p = Promise[QueueEventWithMeta]()
+    override def store(command: ValidatedCommand): Future[Option[ValidatedCommandWithMeta]] = {
+      log.trace(s"Storing $command")
+      val p = Promise[ValidatedCommandWithMeta]()
       try producer.send(
-        new ProducerRecord[String, QueueEvent](topic, event),
+        new ProducerRecord[String, ValidatedCommand](topic, command),
         new Callback {
           override def onCompletion(metadata: RecordMetadata, exception: Exception): Unit =
             if (exception == null) {
-              log.debug(s"Stored $event, offset=${metadata.offset()}, timestamp=${metadata.timestamp()}")
+              log.debug(s"Stored $command, offset=${metadata.offset()}, timestamp=${metadata.timestamp()}")
               p.success(
-                QueueEventWithMeta(
+                ValidatedCommandWithMeta(
                   offset = metadata.offset(),
                   timestamp = metadata.timestamp(),
-                  event = event
+                  command = command
                 )
               )
             } else {
-              log.error(s"During storing $event", exception)
+              log.error(s"During storing $command", exception)
               p.failure(exception match {
-                case _: KafkaTimeoutException => new TimeoutException(s"Can't store message $event")
+                case _: KafkaTimeoutException => new TimeoutException(s"Can't store message $command")
                 case _ => exception
               })
             }
@@ -183,7 +190,7 @@ object KafkaMatcherQueue {
       )
       catch {
         case e: Throwable =>
-          log.error(s"Can't store message $event", e)
+          log.error(s"Can't store message $command", e)
           p.failure(e)
       }
 

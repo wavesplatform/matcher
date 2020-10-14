@@ -19,7 +19,7 @@ import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.meta.getSimpleName
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderAddedReason, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model.{Events, LimitOrder, MarketOrder}
-import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
+import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.propspec.AnyPropSpecLike
 
@@ -490,9 +490,9 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
           time = time,
           orderDB = new TestOrderDB(100),
           (_, _) => Future.successful(Right(())),
-          store = event => {
-            testProbe.ref ! event
-            Future.successful(Some(QueueEventWithMeta(0L, System.currentTimeMillis, event)))
+          store = command => {
+            testProbe.ref ! command
+            Future.successful(Some(ValidatedCommandWithMeta(0L, System.currentTimeMillis, command)))
           },
           started,
           spendableBalancesActor
@@ -581,7 +581,7 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
       val expectedFeeAssetReserve = reserves(marketOrder.feeAsset)
 
       placeMarketOrder(tp, addressDir, marketOrder)
-      tp.expectMsg(QueueEvent.PlacedMarket(marketOrder))
+      tp.expectMsg(ValidatedCommand.PlaceMarketOrder(marketOrder))
 
       withClue {
         s"Place market $orderType order, fee in ${feeAsset.toStringSRT(orderType)} asset, " +
@@ -695,7 +695,7 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
         val marketOrder = MarketOrder(order, balance)
 
         placeMarketOrder(tp, addressDir, marketOrder)
-        tp.expectMsgType[QueueEvent.PlacedMarket]
+        tp.expectMsgType[ValidatedCommand.PlaceMarketOrder]
 
         val orderExecutedEvent = executeMarketOrder(addressDir, marketOrder, LimitOrder(counter))
 

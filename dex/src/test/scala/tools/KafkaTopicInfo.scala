@@ -4,8 +4,8 @@ import java.io.File
 
 import akka.actor.ActorSystem
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.dex.queue.KafkaMatcherQueue.eventDeserializer
-import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
+import com.wavesplatform.dex.queue.KafkaMatcherQueue.validatedCommandDeserializer
+import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import com.wavesplatform.dex.settings.toConfigOps
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.common.TopicPartition
@@ -46,10 +46,10 @@ object KafkaTopicInfo extends App {
         .getConfig("waves.dex.events-queue.kafka")
     }
 
-  val consumer = new KafkaConsumer[String, QueueEvent](
+  val consumer = new KafkaConsumer[String, ValidatedCommand](
     config.getConfig("waves.dex.events-queue.kafka.consumer.client").toProperties,
     new StringDeserializer,
-    eventDeserializer
+    validatedCommandDeserializer
   )
 
   try {
@@ -77,7 +77,7 @@ object KafkaTopicInfo extends App {
 
       val xs = consumer.poll(pollDuriation).asScala.toVector
       xs.foreach { msg =>
-        println(QueueEventWithMeta(msg.offset(), msg.timestamp(), msg.value()))
+        println(ValidatedCommandWithMeta(msg.offset(), msg.timestamp(), msg.value()))
       }
 
       xs.lastOption.foreach { x =>

@@ -7,7 +7,7 @@ import cats.syntax.apply.catsSyntaxTuple2Semigroupal
 import com.wavesplatform.dex.db.leveldb.{DBExt, Key}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.model.OrderBookSnapshot
-import com.wavesplatform.dex.queue.QueueEventWithMeta.Offset
+import com.wavesplatform.dex.queue.ValidatedCommandWithMeta.Offset
 import org.iq80.leveldb.DB
 
 trait OrderBookSnapshotDB {

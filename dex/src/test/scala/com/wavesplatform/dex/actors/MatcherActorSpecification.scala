@@ -20,7 +20,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.{Events, OrderBookSnapshot}
-import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
+import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatchingRule}
 import com.wavesplatform.dex.time.SystemTime
 import org.scalamock.scalatest.PathMockFactory
@@ -334,7 +334,7 @@ class MatcherActorSpecification
         )
 
         val probe = TestProbe()
-        probe.send(actor, QueueEventWithMeta(10L, 0L, QueueEvent.OrderBookDeleted(pair)))
+        probe.send(actor, ValidatedCommandWithMeta(10L, 0L, ValidatedCommand.DeleteOrderBook(pair)))
 
         withClue("Removed from snapshots rotation") {
           eventually {
@@ -403,7 +403,7 @@ class MatcherActorSpecification
       private var nr = -1L
 
       override def receive: Receive = {
-        case x: QueueEventWithMeta if x.offset > nr => nr = x.offset
+        case x: ValidatedCommandWithMeta if x.offset > nr => nr = x.offset
         case SaveSnapshot(globalNr) =>
           val event = OrderBookSnapshotUpdateCompleted(assetPair, Some(globalNr))
           context.system.scheduler.scheduleOnce(200.millis) {
@@ -460,7 +460,7 @@ class MatcherActorSpecification
     pairs.foreach { case (pair, offset) => obsdb.update(pair, offset, Some(OrderBookSnapshot.empty)) }
   }
 
-  private def doNothingOnRecovery(x: Either[String, QueueEventWithMeta.Offset]): Unit = {}
+  private def doNothingOnRecovery(x: Either[String, ValidatedCommandWithMeta.Offset]): Unit = {}
 
   private def emptyOrderBookRefs = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
   private def randomAssetId: Asset = IssuedAsset(ByteStr(randomBytes()))
@@ -492,7 +492,7 @@ object MatcherActorSpecification {
   private class DeletingActor(owner: ActorRef, assetPair: AssetPair, startOffset: Option[Long] = None)
       extends RecoveringActor(owner, assetPair, startOffset) {
     override def receive: Receive = handleDelete orElse super.receive
-    private def handleDelete: Receive = { case QueueEventWithMeta(_, _, _: QueueEvent.OrderBookDeleted) => context.stop(self) }
+    private def handleDelete: Receive = { case ValidatedCommandWithMeta(_, _, _: ValidatedCommand.DeleteOrderBook) => context.stop(self) }
   }
 
   private def emptySnapshotStoreActor(implicit actorSystem: ActorSystem): ActorRef = {

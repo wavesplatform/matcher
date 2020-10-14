@@ -23,7 +23,7 @@ import com.wavesplatform.dex.domain.state.{LeaseBalance, Portfolio}
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderAddedReason}
 import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder, MarketOrder}
-import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
+import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
@@ -91,28 +91,28 @@ class AddressActorSpecification
 
   "AddressActorSpecification" should {
     "cancel orders" when {
-      "asset balance changed" in test { (_, eventsProbe, addOrder, updatePortfolio) =>
+      "asset balance changed" in test { (_, commandsProbe, addOrder, updatePortfolio) =>
         val initPortfolio = sellToken1Portfolio
 
         updatePortfolio(initPortfolio)
         addOrder(LimitOrder(sellTokenOrder1))
 
         updatePortfolio(initPortfolio.copy(assets = Map.empty))
-        eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder1.assetPair, sellTokenOrder1.id(), Source.BalanceTracking))
+        commandsProbe.expectMsg(ValidatedCommand.CancelOrder(sellTokenOrder1.assetPair, sellTokenOrder1.id(), Source.BalanceTracking))
       }
 
       "waves balance changed" when {
         "there are waves for fee" in wavesBalanceTest(restWaves = matcherFee)
         "there are no waves at all" in wavesBalanceTest(restWaves = 0L)
 
-        def wavesBalanceTest(restWaves: Long): Unit = test { (_, eventsProbe, addOrder, updatePortfolio) =>
+        def wavesBalanceTest(restWaves: Long): Unit = test { (_, commandsProbe, addOrder, updatePortfolio) =>
           val initPortfolio = sellWavesPortfolio
           updatePortfolio(initPortfolio)
 
           addOrder(LimitOrder(sellWavesOrder))
 
           updatePortfolio(initPortfolio.copy(balance = restWaves))
-          eventsProbe.expectMsg(QueueEvent.Canceled(sellWavesOrder.assetPair, sellWavesOrder.id(), Source.BalanceTracking))
+          commandsProbe.expectMsg(ValidatedCommand.CancelOrder(sellWavesOrder.assetPair, sellWavesOrder.id(), Source.BalanceTracking))
         }
       }
 
@@ -120,19 +120,19 @@ class AddressActorSpecification
         "there are waves for fee" in leaseTest(_ => matcherFee)
         "there are no waves at all" in leaseTest(_.spendableBalance)
 
-        def leaseTest(leasedWaves: Portfolio => Long): Unit = test { (_, eventsProbe, addOrder, updatePortfolio) =>
+        def leaseTest(leasedWaves: Portfolio => Long): Unit = test { (_, commandsProbe, addOrder, updatePortfolio) =>
           val initPortfolio = sellWavesPortfolio
           updatePortfolio(initPortfolio)
 
           addOrder(LimitOrder(sellWavesOrder))
 
           updatePortfolio(initPortfolio.copy(lease = LeaseBalance(0, leasedWaves(initPortfolio))))
-          eventsProbe.expectMsg(QueueEvent.Canceled(sellWavesOrder.assetPair, sellWavesOrder.id(), Source.BalanceTracking))
+          commandsProbe.expectMsg(ValidatedCommand.CancelOrder(sellWavesOrder.assetPair, sellWavesOrder.id(), Source.BalanceTracking))
         }
       }
     }
 
-    "return reservable balance without excess assets" in test { (ref, eventsProbe, addOrder, updatePortfolio) =>
+    "return reservable balance without excess assets" in test { (ref, _, addOrder, updatePortfolio) =>
       val initPortfolio = sellToken1Portfolio
       updatePortfolio(initPortfolio)
 
@@ -145,7 +145,7 @@ class AddressActorSpecification
       }
     }
 
-    "track canceled orders and don't cancel more on same BalanceUpdated message" in test { (_, eventsProbe, addOrder, updatePortfolio) =>
+    "track canceled orders and don't cancel more on same BalanceUpdated message" in test { (_, commandsProbe, addOrder, updatePortfolio) =>
       val initPortfolio = Monoid.combine(sellToken1Portfolio, sellToken2Portfolio)
       updatePortfolio(initPortfolio)
 
@@ -153,13 +153,13 @@ class AddressActorSpecification
       addOrder(LimitOrder(sellTokenOrder2))
 
       updatePortfolio(sellToken1Portfolio)
-      eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder2.assetPair, sellTokenOrder2.id(), Source.BalanceTracking))
+      commandsProbe.expectMsg(ValidatedCommand.CancelOrder(sellTokenOrder2.assetPair, sellTokenOrder2.id(), Source.BalanceTracking))
 
       updatePortfolio(sellToken1Portfolio) // same event
-      eventsProbe.expectNoMessage()
+      commandsProbe.expectNoMessage()
     }
 
-    "cancel multiple orders" in test { (_, eventsProbe, addOrder, updatePortfolio) =>
+    "cancel multiple orders" in test { (_, commandsProbe, addOrder, updatePortfolio) =>
       val initPortfolio = Monoid.combineAll(Seq(sellToken1Portfolio, sellToken2Portfolio, sellWavesPortfolio))
       updatePortfolio(initPortfolio)
 
@@ -167,22 +167,22 @@ class AddressActorSpecification
       addOrder(LimitOrder(sellTokenOrder2))
 
       updatePortfolio(sellWavesPortfolio)
-      eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder1.assetPair, sellTokenOrder1.id(), Source.BalanceTracking))
-      eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder2.assetPair, sellTokenOrder2.id(), Source.BalanceTracking))
+      commandsProbe.expectMsg(ValidatedCommand.CancelOrder(sellTokenOrder1.assetPair, sellTokenOrder1.id(), Source.BalanceTracking))
+      commandsProbe.expectMsg(ValidatedCommand.CancelOrder(sellTokenOrder2.assetPair, sellTokenOrder2.id(), Source.BalanceTracking))
     }
 
-    "cancel only orders, those aren't fit" in test { (_, eventsProbe, addOrder, updatePortfolio) =>
+    "cancel only orders, those aren't fit" in test { (_, commandsProbe, addOrder, updatePortfolio) =>
       val initPortfolio = Monoid.combineAll(Seq(sellToken1Portfolio, sellToken2Portfolio, sellWavesPortfolio))
       updatePortfolio(initPortfolio)
 
       Seq(sellTokenOrder1, sellWavesOrder, sellTokenOrder2).foreach(o => addOrder(LimitOrder(o)))
 
       updatePortfolio(sellWavesPortfolio)
-      eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder1.assetPair, sellTokenOrder1.id(), Source.BalanceTracking))
-      eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder2.assetPair, sellTokenOrder2.id(), Source.BalanceTracking))
+      commandsProbe.expectMsg(ValidatedCommand.CancelOrder(sellTokenOrder1.assetPair, sellTokenOrder1.id(), Source.BalanceTracking))
+      commandsProbe.expectMsg(ValidatedCommand.CancelOrder(sellTokenOrder2.assetPair, sellTokenOrder2.id(), Source.BalanceTracking))
     }
 
-    "cancel expired orders" in test { (ref, eventsProbe, addOrder, updatePortfolio) =>
+    "cancel expired orders" in test { (_, commandsProbe, addOrder, updatePortfolio) =>
       val initPortfolio = sellToken1Portfolio
       updatePortfolio(initPortfolio)
 
@@ -201,7 +201,7 @@ class AddressActorSpecification
       )
       addOrder(lo)
 
-      eventsProbe.expectMsg(QueueEvent.Canceled(lo.order.assetPair, lo.id, Source.Expiration))
+      commandsProbe.expectMsg(ValidatedCommand.CancelOrder(lo.order.assetPair, lo.id, Source.Expiration))
     }
 
     "should not send a message multiple times" in test { (ref, _, addOrder, updatePortfolio) =>
@@ -229,7 +229,7 @@ class AddressActorSpecification
    */
   private def test(f: (ActorRef, TestProbe, AcceptedOrder => Unit, Portfolio => Unit) => Unit): Unit = {
 
-    val eventsProbe = TestProbe()
+    val commandsProbe = TestProbe()
     val currentPortfolio = new AtomicReference[Portfolio]()
     val address = addr("test")
 
@@ -255,9 +255,9 @@ class AddressActorSpecification
           time,
           EmptyOrderDB,
           (_, _) => Future.successful(Right(())),
-          event => {
-            eventsProbe.ref ! event
-            Future.successful(Some(QueueEventWithMeta(0L, 0L, event)))
+          command => {
+            commandsProbe.ref ! command
+            Future.successful(Some(ValidatedCommandWithMeta(0L, 0L, command)))
           },
           started,
           spendableBalancesActor
@@ -270,15 +270,15 @@ class AddressActorSpecification
       addressDir ! AddressDirectoryActor.Envelope(address, AddressActor.Command.PlaceOrder(ao.order, ao.isMarket))
       ao match {
         case lo: LimitOrder =>
-          eventsProbe.expectMsg(QueueEvent.Placed(lo))
+          commandsProbe.expectMsg(ValidatedCommand.PlaceOrder(lo))
           addressDir ! OrderAdded(lo, OrderAddedReason.RequestExecuted, System.currentTimeMillis)
-        case mo: MarketOrder => eventsProbe.expectMsg(QueueEvent.PlacedMarket(mo))
+        case mo: MarketOrder => commandsProbe.expectMsg(ValidatedCommand.PlaceMarketOrder(mo))
       }
     }
 
     f(
       addressDir,
-      eventsProbe,
+      commandsProbe,
       addOrder,
       updatedPortfolio => {
         val prevPortfolio = Option(currentPortfolio.getAndSet(updatedPortfolio)).getOrElse(Portfolio.empty)

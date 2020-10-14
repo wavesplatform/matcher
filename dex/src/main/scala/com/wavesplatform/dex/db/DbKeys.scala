@@ -14,7 +14,7 @@ import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.OrderInfo.FinalOrderInfo
 import com.wavesplatform.dex.model.{OrderBookSnapshot, OrderInfo}
-import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
+import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 
 import scala.collection.mutable
 
@@ -73,12 +73,12 @@ object DbKeys {
   val LqElementPrefixBytes: Array[Byte] = Shorts.toByteArray(LqElementPrefix)
   val LqElementKeyName: String = "lq-element"
 
-  def lpqElement(idx: Long): Key[Option[QueueEventWithMeta]] =
+  def lpqElement(idx: Long): Key[Option[ValidatedCommandWithMeta]] =
     Key.opt(
       LqElementKeyName,
       bytes(LqElementPrefix, Longs.toByteArray(idx)),
-      xs => QueueEventWithMeta(idx, Longs.fromByteArray(xs.take(8)), QueueEvent.fromBytes(xs.drop(8))),
-      QueueEventWithMeta.toBytes(_).drop(8)
+      xs => ValidatedCommandWithMeta(idx, Longs.fromByteArray(xs.take(8)), ValidatedCommand.fromBytes(xs.drop(8))),
+      ValidatedCommandWithMeta.toBytes(_).drop(8)
     )
 
   val ratePrefix: Short = 22

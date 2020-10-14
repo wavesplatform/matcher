@@ -406,9 +406,7 @@ class OrderValidatorSpecification
           )
 
           priceValidationWithNoBounds(sellOrder) shouldBe Symbol("right")
-          lowSellOrderPrices.foreach(price =>
-            priceValidationWithLowerBound(sellOrder.updatePrice(price.btc)) should produce("DeviantOrderPrice")
-          )
+          lowSellOrderPrices.foreach(price => priceValidationWithLowerBound(sellOrder.updatePrice(price.btc)) should produce("DeviantOrderPrice"))
 
           (midSellOrderPrices ++ highSellOrderPrices).foreach(price =>
             priceValidationWithLowerBound(sellOrder.updatePrice(price.btc)) shouldBe Symbol("right")
@@ -420,17 +418,13 @@ class OrderValidatorSpecification
 
         withClue("order price has only upper bound if there are no bids") {
           priceValidationWithNoBounds(buyOrder) shouldBe Symbol("right")
-          highBuyOrderPrices.foreach(price =>
-            priceValidationWithUpperBound(buyOrder.updatePrice(price.btc)) should produce("DeviantOrderPrice")
-          )
+          highBuyOrderPrices.foreach(price => priceValidationWithUpperBound(buyOrder.updatePrice(price.btc)) should produce("DeviantOrderPrice"))
           (lowBuyOrderPrices ++ midBuyOrderPrices).foreach(price =>
             priceValidationWithUpperBound(buyOrder.updatePrice(price.btc)) shouldBe Symbol("right")
           )
 
           priceValidationWithNoBounds(sellOrder) shouldBe Symbol("right")
-          highSellOrderPrices.foreach(price =>
-            priceValidationWithUpperBound(sellOrder.updatePrice(price.btc)) should produce("DeviantOrderPrice")
-          )
+          highSellOrderPrices.foreach(price => priceValidationWithUpperBound(sellOrder.updatePrice(price.btc)) should produce("DeviantOrderPrice"))
           (lowSellOrderPrices ++ midSellOrderPrices).foreach(price =>
             priceValidationWithUpperBound(sellOrder.updatePrice(price.btc)) shouldBe Symbol("right")
           )

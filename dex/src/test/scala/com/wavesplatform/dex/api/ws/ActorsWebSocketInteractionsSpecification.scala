@@ -21,7 +21,7 @@ import com.wavesplatform.dex.error.{ErrorFormatterContext, WavesNodeConnectionBr
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderAddedReason, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder, MarketOrder, _}
-import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
+import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import com.wavesplatform.dex.settings.OrderFeeSettings.DynamicSettings
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
@@ -56,7 +56,7 @@ class ActorsWebSocketInteractionsSpecification
     ) => Unit
   ): Unit = {
 
-    val eventsProbe: TestProbe = TestProbe()
+    val commandsProbe: TestProbe = TestProbe()
     val wsEventsProbe: TypedTestProbe[WsMessage] = testKit.createTestProbe[WsMessage]()
 
     val currentPortfolio = new AtomicReference[Portfolio](Portfolio.empty)
@@ -86,9 +86,9 @@ class ActorsWebSocketInteractionsSpecification
           time,
           EmptyOrderDB,
           (_, _) => Future.successful(Right(())),
-          event => {
-            eventsProbe.ref ! event
-            Future.successful(Some(QueueEventWithMeta(0L, 0L, event)))
+          command => {
+            commandsProbe.ref ! command
+            Future.successful(Some(ValidatedCommandWithMeta(0L, 0L, command)))
           },
           started,
           spendableBalancesActor
@@ -99,7 +99,9 @@ class ActorsWebSocketInteractionsSpecification
 
     def placeOrder(ao: AcceptedOrder): Unit = {
       addressDir ! AddressDirectoryActor.Envelope(address, AddressActor.Command.PlaceOrder(ao.order, ao.isMarket))
-      eventsProbe.expectMsg(ao match { case lo: LimitOrder => QueueEvent.Placed(lo); case mo: MarketOrder => QueueEvent.PlacedMarket(mo) })
+      commandsProbe.expectMsg(ao match {
+        case lo: LimitOrder => ValidatedCommand.PlaceOrder(lo); case mo: MarketOrder => ValidatedCommand.PlaceMarketOrder(mo)
+      })
       addressDir ! OrderAdded(ao, OrderAddedReason.RequestExecuted, System.currentTimeMillis)
     }
 
@@ -109,7 +111,7 @@ class ActorsWebSocketInteractionsSpecification
           if (unmatchable) AddressActor.Command.Source.Request // Not important in this test suite
           else AddressActor.Command.Source.Request
         addressDir ! AddressDirectoryActor.Envelope(address, AddressActor.Command.CancelOrder(ao.id, source))
-        eventsProbe.expectMsg(QueueEvent.Canceled(ao.order.assetPair, ao.id, source))
+        commandsProbe.expectMsg(ValidatedCommand.CancelOrder(ao.order.assetPair, ao.id, source))
       }
 
       val reason = if (unmatchable) Events.OrderCanceledReason.BecameUnmatchable else Events.OrderCanceledReason.RequestExecuted
@@ -147,7 +149,7 @@ class ActorsWebSocketInteractionsSpecification
 
     f(
       addressDir,
-      eventsProbe,
+      commandsProbe,
       wsEventsProbe,
       address,
       () => subscribe(),
@@ -488,7 +490,7 @@ class ActorsWebSocketInteractionsSpecification
           ad ! OrderAdded(counter, OrderAddedReason.RequestExecuted, now)
 
           ad ! AddressDirectoryActor.Envelope(address, AddressActor.Command.PlaceOrder(submitted.order, submitted.isMarket))
-          ep.expectMsg(QueueEvent.Placed(submitted))
+          ep.expectMsg(ValidatedCommand.PlaceOrder(submitted))
 
           ad ! OrderAdded(submitted, OrderAddedReason.RequestExecuted, now)
           val oe = OrderExecuted(submitted, counter, System.currentTimeMillis, submitted.matcherFee, counter.matcherFee)
@@ -518,7 +520,7 @@ class ActorsWebSocketInteractionsSpecification
         ad ! OrderAdded(counter, OrderAddedReason.RequestExecuted, now)
 
         ad ! AddressDirectoryActor.Envelope(address, AddressActor.Command.PlaceOrder(submitted.order, submitted.isMarket))
-        ep.expectMsg(QueueEvent.Placed(submitted))
+        ep.expectMsg(ValidatedCommand.PlaceOrder(submitted))
 
         ad ! OrderAdded(submitted, OrderAddedReason.RequestExecuted, now)
         val oe = OrderExecuted(submitted, counter, System.currentTimeMillis, submitted.matcherFee, counter.matcherFee)

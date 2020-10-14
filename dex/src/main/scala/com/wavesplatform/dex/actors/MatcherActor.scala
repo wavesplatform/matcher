@@ -14,8 +14,8 @@ import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
-import com.wavesplatform.dex.queue.QueueEventWithMeta.{Offset => EventOffset}
-import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
+import com.wavesplatform.dex.queue.ValidatedCommandWithMeta.{Offset => EventOffset}
+import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import com.wavesplatform.dex.settings.MatcherSettings
 import scorex.utils._
 
@@ -122,7 +122,7 @@ class MatcherActor(
     }
   }
 
-  private def createSnapshotFor(offset: QueueEventWithMeta.Offset): Unit =
+  private def createSnapshotFor(offset: ValidatedCommandWithMeta.Offset): Unit =
     snapshotsState.requiredSnapshot(offset).foreach { case (assetPair, updatedSnapshotState) =>
       orderBook(assetPair) match {
         case Some(Right(actorRef)) =>
@@ -142,11 +142,11 @@ class MatcherActor(
     case GetMarkets => sender() ! tradedPairs.values.toSeq
     case GetSnapshotOffsets => sender() ! SnapshotOffsetsResponse(snapshotsState.snapshotOffsets)
 
-    case request: QueueEventWithMeta =>
-      request.event match {
-        case QueueEvent.OrderBookDeleted(assetPair) =>
+    case request: ValidatedCommandWithMeta =>
+      request.command match {
+        case ValidatedCommand.DeleteOrderBook(assetPair) =>
           // autoCreate = false for case, when multiple OrderBookDeleted(A1-A2) events happen one after another
-          runFor(request.event.assetPair, autoCreate = false) { (sender, ref) =>
+          runFor(request.command.assetPair, autoCreate = false) { (sender, ref) =>
             ref.tell(request, sender)
             orderBooks.getAndUpdate(_.filterNot(_._2.exists(_ == ref)))
             snapshotsState = snapshotsState.without(assetPair)
@@ -154,7 +154,7 @@ class MatcherActor(
             assetPairsDB.remove(assetPair)
           }
 
-        case _ => runFor(request.event.assetPair)((sender, orderBook) => orderBook.tell(request, sender))
+        case _ => runFor(request.command.assetPair)((sender, orderBook) => orderBook.tell(request, sender))
       }
       lastProcessedNr = math.max(request.offset, lastProcessedNr)
       createSnapshotFor(lastProcessedNr)

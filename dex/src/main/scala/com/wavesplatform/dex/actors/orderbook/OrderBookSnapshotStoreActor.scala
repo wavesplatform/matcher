@@ -5,7 +5,7 @@ import com.wavesplatform.dex.actors.orderbook.OrderBookSnapshotStoreActor._
 import com.wavesplatform.dex.db.OrderBookSnapshotDB
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.model.OrderBookSnapshot
-import com.wavesplatform.dex.queue.QueueEventWithMeta.Offset
+import com.wavesplatform.dex.queue.ValidatedCommandWithMeta.Offset
 
 class OrderBookSnapshotStoreActor(db: OrderBookSnapshotDB) extends Actor {
 

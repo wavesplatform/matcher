@@ -6,6 +6,7 @@ import com.wavesplatform.dex.settings.utils.{rules, validationOf}
 import pureconfig.generic.semiauto
 
 case class OrderHistorySettings(
+  enable: Boolean = false,
   ordersBatchLingerMs: Long = defaultBatchLingerMs,
   ordersBatchEntries: Long = defaultBatchEntries,
   eventsBatchLingerMs: Long = defaultBatchLingerMs,

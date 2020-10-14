@@ -4,7 +4,8 @@ import com.wavesplatform.dex.actors.MatcherActor
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
-import com.wavesplatform.dex.it.waves.Implicits.toVanilla
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.it.waves.Implicits._
 import com.wavesplatform.dex.it.waves.MkWavesEntities._
 import com.wavesplatform.dex.model.AssetPairBuilder
 import com.wavesplatform.dex.waves.WavesFeeConstants._
@@ -55,7 +56,7 @@ object DexTestConfig {
   def assetPairIssuePriceAsset(issuer: KeyPair, amountAsset: Asset, priceAssetDecimals: Byte): (IssueTransaction, AssetPair) = {
 
     val issuePriceAssetTx = mkIssue(issuer, Random.nextString(4), someAssetAmount, priceAssetDecimals, issueFee)
-    val priceAssetId = toVanilla(issuePriceAssetTx.id())
+    val priceAssetId: ByteStr = issuePriceAssetTx.id()
     val priceAsset = IssuedAsset(priceAssetId)
 
     if (MatcherActor.compare(Some(priceAssetId.arr), amountAsset.compatId.map(_.arr)) < 0)

@@ -56,7 +56,7 @@ case class MatcherSettings(
   allowedOrderVersions: Set[Byte],
   exchangeTransactionBroadcast: ExchangeTransactionBroadcastSettings,
   postgres: PostgresConnection,
-  orderHistory: Option[OrderHistorySettings],
+  orderHistory: OrderHistorySettings,
   webSockets: WebSocketSettings,
   addressActor: AddressActor.Settings
 ) {

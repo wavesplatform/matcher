@@ -49,7 +49,7 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
       mkTransfer(bob, alice, defaultAssetQuantity / 2, asset2, 0.005.waves),
       mkTransfer(bob, alice, 5, assetWith2Dec, 0.005.waves)
     )
-    broadcastAndAwait(mkSetAccountScript(alice, trueScript))
+    broadcastAndAwait(mkSetAccountMayBeScript(alice, trueScript))
 
     dex1.start()
   }
@@ -91,7 +91,7 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
     "with one Smart Account, two Smart Assets and scripted Matcher" - {
       "then fee should be 0.003 + (0.004 * 2) + 0.004 (for Smart Assets and Matcher Script)" - {
         "and total fee should be divided proportionally with partial filling" in {
-          broadcastAndAwait(mkSetAccountScript(matcher, trueScript))
+          broadcastAndAwait(mkSetAccountMayBeScript(matcher, trueScript))
 
           dex1.restart() // matcher caches knowledge about it's script during start
 

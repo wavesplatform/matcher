@@ -417,7 +417,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
   }
 
   private def setAliceScript(binaryCode: ByteStr): Unit =
-    broadcastAndAwait(mkSetAccountScript(alice, Some(binaryCode), fee = setScriptFee + smartFee))
+    broadcastAndAwait(mkSetAccountMayBeScript(alice, Some(binaryCode), fee = setScriptFee + smartFee))
 
   private def resetAliceAccountScript(): Unit = broadcastAndAwait(mkResetAccountScript(alice, fee = setScriptFee + smartFee))
 }

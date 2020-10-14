@@ -4,16 +4,15 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.account.AddressScheme
 
 object GenesisConfig {
-
   val generatorConfig: Config = ConfigFactory.parseResources("genesis.conf")
   val config: Config = GenesisConfigGenerator.generate(generatorConfig)
 
-  private val requiredChainId = config.getString("waves.blockchain.custom.address-scheme-character").head.toByte
+  val chainId = config.getString("waves.blockchain.custom.address-scheme-character").head.toByte
 
   def setupAddressScheme(): Unit =
-    if (AddressScheme.current.chainId != requiredChainId)
+    if (AddressScheme.current.chainId != chainId)
       AddressScheme.current = new AddressScheme {
-        override val chainId: Byte = requiredChainId
+        override val chainId: Byte = GenesisConfig.chainId
       }
 
   setupAddressScheme()

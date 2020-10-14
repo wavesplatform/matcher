@@ -10,7 +10,7 @@ import com.google.common.primitives.Longs
 import com.softwaremill.sttp.Uri.QueryFragment
 import com.softwaremill.sttp.playJson._
 import com.softwaremill.sttp.{SttpBackend, MonadError => _, _}
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.Config
 import com.wavesplatform.dex.api.http.entities._
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
 import com.wavesplatform.dex.domain.account.{Address, KeyPair, PublicKey}

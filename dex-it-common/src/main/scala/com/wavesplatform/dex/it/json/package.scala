@@ -1,17 +1,14 @@
 package com.wavesplatform.dex.it
 
-import com.wavesplatform.dex.domain.account.AddressScheme
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
-import im.mak.waves.transactions.{ExchangeTransaction, Transaction, WavesConfig}
+import im.mak.waves.transactions.{ExchangeTransaction, Transaction}
 import play.api.libs.json._
 
 import scala.util.{Failure, Success, Try}
 
 package object json {
-
-  WavesConfig.chainId(AddressScheme.current.chainId)
 
   implicit val transactionFormat: Format[Transaction] = Format[Transaction](
     Reads { json =>

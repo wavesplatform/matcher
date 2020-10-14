@@ -88,7 +88,8 @@ class AddressActor(
     case event: OrderExecuted =>
       log.debug(s"OrderExecuted(${event.submittedRemaining.id}, ${event.counterRemaining.id}), amount=${event.executedAmount}")
       List(event.submittedRemaining, event.counterRemaining).filter(_.order.sender.toAddress == owner).foreach(refreshOrderState(_, event))
-      if (started) context.system.eventStream.publish(CreateExchangeTransactionActor.OrderExecutedObserved(owner, event))
+      // if (started) - otherwise DatabaseBackwardCompatTestSuite fails
+      context.system.eventStream.publish(CreateExchangeTransactionActor.OrderExecutedObserved(owner, event))
 
     case event @ OrderCanceled(ao, reason, ts) =>
       val id = ao.id

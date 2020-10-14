@@ -16,6 +16,7 @@ import akka.util.Timeout
 import cats.data.EitherT
 import cats.instances.future.catsStdInstancesForFuture
 import cats.syntax.functor._
+import cats.syntax.option._
 import ch.qos.logback.classic.LoggerContext
 import com.typesafe.config._
 import com.wavesplatform.dex.actors.ActorSystemOps.ImplicitOps
@@ -193,9 +194,12 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     "order-book-snapshot-store"
   )
 
-  private val historyRouterRef = settings.orderHistory.map { orderHistorySettings =>
-    actorSystem.actorOf(HistoryRouterActor.props(assetsCache.unsafeGetDecimals, settings.postgres, orderHistorySettings), "history-router")
-  }
+  private val historyRouterRef =
+    if (settings.orderHistory.enable) actorSystem.actorOf(
+      HistoryRouterActor.props(assetsCache.unsafeGetDecimals, settings.postgres, settings.orderHistory),
+      "history-router"
+    ).some
+    else none
 
   private val addressDirectoryRef =
     actorSystem.actorOf(AddressDirectoryActor.props(orderDB, mkAddressActorProps, historyRouterRef), AddressDirectoryActor.name)

@@ -4,7 +4,7 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.ThreadLocalRandom
 
 import cats.syntax.option._
-import com.wavesplatform.dex.domain.account.{Address, AddressScheme, KeyPair, PublicKey}
+import com.wavesplatform.dex.domain.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -13,6 +13,7 @@ import com.wavesplatform.dex.domain.model.Normalization
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionV2}
 import com.wavesplatform.dex.domain.utils.EitherExt2
+import com.wavesplatform.dex.it.config.GenesisConfig
 import com.wavesplatform.dex.it.config.PredefinedAccounts.matcher
 import com.wavesplatform.dex.it.waves.Implicits._
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
@@ -104,25 +105,30 @@ trait MkWavesEntities {
     asset: Asset,
     feeAmount: Long = minFee,
     feeAsset: Asset = Waves,
-    timestamp: Long = System.currentTimeMillis
+    timestamp: Long = System.currentTimeMillis,
+    chainId: Byte = GenesisConfig.chainId
   ): TransferTransaction =
-    TransferTransaction.builder(recipient, Amount.of(amount, asset)).fee(Amount.of(feeAmount, feeAsset)).timestamp(timestamp).getSignedWith(
-      sender
-    )
+    TransferTransaction
+      .builder(recipient, Amount.of(amount, asset))
+      .chainId(chainId)
+      .fee(Amount.of(feeAmount, feeAsset))
+      .timestamp(timestamp)
+      .getSignedWith(sender)
 
   def mkMassTransfer(
     sender: KeyPair,
     asset: Asset,
     transfers: List[Transfer],
     fee: Long = massTransferDefaultFee,
-    timestamp: Long = System.currentTimeMillis
+    timestamp: Long = System.currentTimeMillis,
+    chainId: Byte = GenesisConfig.chainId
   ): MassTransferTransaction =
     MassTransferTransaction
       .builder(transfers.asJava)
+      .chainId(chainId)
       .assetId(asset)
       .fee(fee)
       .timestamp(timestamp)
-      .chainId(AddressScheme.current.chainId)
       .getSignedWith(sender)
 
   def mkLease(
@@ -130,17 +136,19 @@ trait MkWavesEntities {
     recipient: Address,
     amount: Long,
     fee: Long = leasingFee,
-    timestamp: Long = System.currentTimeMillis
+    timestamp: Long = System.currentTimeMillis,
+    chainId: Byte = GenesisConfig.chainId
   ): LeaseTransaction =
-    LeaseTransaction.builder(recipient, amount).fee(fee).timestamp(timestamp).getSignedWith(sender)
+    LeaseTransaction.builder(recipient, amount).chainId(chainId).fee(fee).timestamp(timestamp).getSignedWith(sender)
 
   def mkLeaseCancel(
     sender: KeyPair,
     leaseId: ByteStr,
     fee: Long = leasingFee,
-    timestamp: Long = System.currentTimeMillis
+    timestamp: Long = System.currentTimeMillis,
+    chainId: Byte = GenesisConfig.chainId
   ): LeaseCancelTransaction =
-    LeaseCancelTransaction.builder(leaseId).chainId(AddressScheme.current.chainId).fee(fee).timestamp(timestamp).getSignedWith(sender)
+    LeaseCancelTransaction.builder(leaseId).chainId(chainId).fee(fee).timestamp(timestamp).getSignedWith(sender)
 
   def mkIssue(
     issuer: KeyPair,
@@ -150,12 +158,13 @@ trait MkWavesEntities {
     fee: Long = issueFee,
     script: Option[ByteStr] = None,
     reissuable: Boolean = false,
-    timestamp: Long = System.currentTimeMillis
+    timestamp: Long = System.currentTimeMillis,
+    chainId: Byte = GenesisConfig.chainId
   ): IssueTransaction =
     IssueTransaction
       .builder(name, quantity, decimals)
+      .chainId(chainId)
       .description(s"$name asset")
-      .chainId(AddressScheme.current.chainId)
       .isReissuable(reissuable)
       .script(script2Base64String(script))
       .fee(fee)
@@ -170,31 +179,37 @@ trait MkWavesEntities {
     fee: Long = issueFee,
     script: Option[ByteStr] = None,
     reissuable: Boolean = false,
-    timestamp: Long = System.currentTimeMillis
+    timestamp: Long = System.currentTimeMillis,
+    chainId: Byte = GenesisConfig.chainId
   ): IssueResults = {
 
-    val tx: IssueTransaction = mkIssue(issuer, name, quantity, decimals, fee, script, reissuable, timestamp)
+    val tx: IssueTransaction = mkIssue(issuer, name, quantity, decimals, fee, script, reissuable, timestamp, chainId)
     val assetId: ByteStr = tx.assetId()
     val issuedAsset: IssuedAsset = IssuedAsset(assetId)
 
     IssueResults(tx, assetId, issuedAsset)
   }
 
-  def mkSetAccountScript(accountOwner: KeyPair, script: ByteStr): SetScriptTransaction =
-    mkSetAccountScript(accountOwner, Some(script))
+  def mkSetAccountScript(accountOwner: KeyPair, script: ByteStr, chainId: Byte = GenesisConfig.chainId): SetScriptTransaction =
+    mkSetAccountMayBeScript(accountOwner, Some(script), chainId = chainId)
 
-  def mkResetAccountScript(accountOwner: KeyPair, fee: Long = setScriptFee, timestamp: Long = System.currentTimeMillis): SetScriptTransaction =
-    mkSetAccountScript(accountOwner, None, fee, timestamp)
+  def mkResetAccountScript(
+    accountOwner: KeyPair,
+    fee: Long = setScriptFee,
+    timestamp: Long = System.currentTimeMillis,
+    chainId: Byte = GenesisConfig.chainId
+  ): SetScriptTransaction = mkSetAccountMayBeScript(accountOwner, None, fee, timestamp, chainId)
 
-  def mkSetAccountScript(
+  def mkSetAccountMayBeScript(
     accountOwner: KeyPair,
     script: Option[ByteStr],
     fee: Long = setScriptFee,
-    timestamp: Long = System.currentTimeMillis
+    timestamp: Long = System.currentTimeMillis,
+    chainId: Byte = GenesisConfig.chainId
   ): SetScriptTransaction =
     SetScriptTransaction
       .builder(script2Base64String(script))
-      .chainId(AddressScheme.current.chainId)
+      .chainId(chainId)
       .fee(fee)
       .timestamp(timestamp)
       .getSignedWith(accountOwner)
@@ -204,11 +219,12 @@ trait MkWavesEntities {
     asset: IssuedAsset,
     script: ByteStr,
     fee: Long = setAssetScriptFee,
-    timestamp: Long = System.currentTimeMillis
+    timestamp: Long = System.currentTimeMillis,
+    chainId: Byte = GenesisConfig.chainId
   ): SetAssetScriptTransaction =
     SetAssetScriptTransaction
       .builder(asset, script2Base64String(script.some))
-      .chainId(AddressScheme.current.chainId)
+      .chainId(chainId)
       .fee(fee)
       .timestamp(timestamp)
       .getSignedWith(assetOwner)
@@ -221,9 +237,10 @@ trait MkWavesEntities {
     price: Long,
     matcherFee: Long = matcherFee,
     timestamp: Long = System.currentTimeMillis,
-    matcher: KeyPair
+    matcher: KeyPair,
+    chainId: Byte = GenesisConfig.chainId
   ): JExchangeTransaction =
-    toWavesJ(mkDomainExchange(buyOrderOwner, sellOrderOwner, pair, amount, price, matcherFee, timestamp = timestamp, matcher = matcher))
+    mkDomainExchange(buyOrderOwner, sellOrderOwner, pair, amount, price, matcherFee, timestamp = timestamp, matcher = matcher).toWavesJ(chainId)
 
   def mkDomainExchange(
     buyOrderOwner: KeyPair,
@@ -254,10 +271,17 @@ trait MkWavesEntities {
       .explicitGet()
   }
 
-  def mkBurn(sender: KeyPair, asset: Asset, amount: Long, fee: Long = burnFee, timestamp: Long = System.currentTimeMillis): BurnTransaction =
+  def mkBurn(
+    sender: KeyPair,
+    asset: Asset,
+    amount: Long,
+    fee: Long = burnFee,
+    timestamp: Long = System.currentTimeMillis,
+    chainId: Byte = GenesisConfig.chainId
+  ): BurnTransaction =
     BurnTransaction
       .builder(Amount.of(amount, asset))
-      .chainId(AddressScheme.current.chainId)
+      .chainId(chainId)
       .fee(fee)
       .timestamp(timestamp)
       .version(2)

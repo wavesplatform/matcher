@@ -14,7 +14,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.model.Denormalization
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.error.ErrorFormatterContext
-import com.wavesplatform.dex.model.{LimitOrder, MarketOrder}
+import com.wavesplatform.dex.model.{LimitOrder, MarketOrder, OrderBook}
 import com.wavesplatform.dex.settings.OrderRestrictionsSettings
 import org.scalacheck.Gen
 import org.scalatest.freespec.AnyFreeSpec
@@ -129,22 +129,22 @@ class WsMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDrivenProp
 
   private val wsOrderBookChangesGen: Gen[WsOrderBookChanges] = for {
     assetPair <- assetPairGen
-    asks <- wsSide(askPricesGen)
-    bids <- wsSide(bidPricesGen)
+    asks <- wsSide(askPricesGen, OrderBook.asksDenormalizedOrdering)
+    bids <- wsSide(bidPricesGen, OrderBook.bidsDenormalizedOrdering)
     lastTrade <- Gen.oneOf[Option[WsLastTrade]](None, lastTradeGen.map(Option(_)))
     updateId <- Gen.choose(0L, Long.MaxValue)
     ts <- Gen.choose(0L, Long.MaxValue)
     orderBookSettings <- Gen.option(orderBookSettingsGen)
   } yield protocol.WsOrderBookChanges(assetPair, asks, bids, lastTrade, updateId, orderBookSettings, ts)
 
-  private def wsSide(pricesGen: Gen[Long]): Gen[WsSide] = {
+  private def wsSide(pricesGen: Gen[Long], ordering: Ordering[Double]): Gen[WsSide] = {
     val itemGen = Gen.zip(pricesGen, amountGen)
     Gen.listOf(itemGen).map { xs =>
       TreeMap(xs.map {
         case (price, amount) =>
           Denormalization.denormalizePrice(price, amountDecimals, priceDecimals).toDouble ->
             Denormalization.denormalizeAmountAndFee(amount, amountDecimals).toDouble
-      }: _*)
+      }: _*)(ordering)
     }
   }
 

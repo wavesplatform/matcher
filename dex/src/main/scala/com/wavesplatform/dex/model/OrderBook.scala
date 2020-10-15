@@ -214,8 +214,11 @@ object OrderBook {
   // Showing owner for old orders. Should be deleted in Order.MaxLiveTime
   private def formatLo(lo: LimitOrder): String = s"""{"id":"${lo.order.id()}","owner":"${lo.order.senderPublicKey.toAddress.stringRepr}"}"""
 
-  val bidsOrdering: Ordering[Long] = (x: Long, y: Long) => -Ordering.Long.compare(x, y)
-  val asksOrdering: Ordering[Long] = (x: Long, y: Long) => Ordering.Long.compare(x, y)
+  val asksOrdering: Ordering[Long] = Ordering.Long
+  val asksDenormalizedOrdering: Ordering[Double] = Ordering.Double.TotalOrdering
+
+  val bidsOrdering: Ordering[Long] = asksOrdering.reverse
+  val bidsDenormalizedOrdering: Ordering[Double] = asksDenormalizedOrdering.reverse
 
   val empty: OrderBook = new OrderBook(TreeMap.empty(bidsOrdering), TreeMap.empty(asksOrdering), None, HashMap.empty)
 

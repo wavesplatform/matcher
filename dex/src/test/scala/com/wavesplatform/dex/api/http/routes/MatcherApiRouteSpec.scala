@@ -51,7 +51,7 @@ import com.wavesplatform.dex.gen.issuedAssetIdGen
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.MatcherModel.Denormalized
 import com.wavesplatform.dex.model.{LimitOrder, OrderInfo, OrderStatus, _}
-import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
+import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import com.wavesplatform.dex.settings.OrderFeeSettings.DynamicSettings
 import com.wavesplatform.dex.settings.{MatcherSettings, OrderRestrictionsSettings}
 import org.scalamock.scalatest.PathMockFactory
@@ -677,8 +677,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
                 Left(
                   HttpError(
                     error = 25601,
-                    message = "Can not persist event, please retry later or contact with the administrator",
-                    template = "Can not persist event, please retry later or contact with the administrator",
+                    message = "Can not persist command, please retry later or contact with the administrator",
+                    template = "Can not persist command, please retry later or contact with the administrator",
                     status = "OrderCancelRejected"
                   )
                 )
@@ -736,8 +736,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
               Left(
                 HttpError(
                   error = 25601,
-                  message = "Can not persist event, please retry later or contact with the administrator",
-                  template = "Can not persist event, please retry later or contact with the administrator",
+                  message = "Can not persist command, please retry later or contact with the administrator",
+                  template = "Can not persist command, please retry later or contact with the administrator",
                   status = "OrderCancelRejected"
                 )
               )
@@ -1290,9 +1290,9 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         config = ConfigFactory.load().atKey("waves.dex"),
         matcher = matcherActor.ref,
         addressActor = addressActor.ref,
-        storeEvent = {
-          case QueueEvent.OrderBookDeleted(pair) if pair == okOrder.assetPair =>
-            Future.successful(QueueEventWithMeta(1L, System.currentTimeMillis, QueueEvent.OrderBookDeleted(pair)).some)
+        storeCommand = {
+          case ValidatedCommand.DeleteOrderBook(pair) if pair == okOrder.assetPair =>
+            Future.successful(ValidatedCommandWithMeta(1L, System.currentTimeMillis, ValidatedCommand.DeleteOrderBook(pair)).some)
           case _ => Future.failed(new NotImplementedError("Storing is not implemented"))
         },
         orderBook = {

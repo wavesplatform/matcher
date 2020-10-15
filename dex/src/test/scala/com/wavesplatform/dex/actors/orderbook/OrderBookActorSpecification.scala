@@ -26,8 +26,8 @@ import com.wavesplatform.dex.fixtures.RestartableActor.RestartActor
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderAddedReason, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model.OrderBook.OrderBookUpdates
 import com.wavesplatform.dex.model._
-import com.wavesplatform.dex.queue.QueueEvent
-import com.wavesplatform.dex.queue.QueueEvent.Canceled
+import com.wavesplatform.dex.queue.ValidatedCommand
+import com.wavesplatform.dex.queue.ValidatedCommand.CancelOrder
 import com.wavesplatform.dex.settings.OrderFeeSettings.DynamicSettings
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatchingRule}
 import com.wavesplatform.dex.time.SystemTime
@@ -323,7 +323,7 @@ class OrderBookActorSpecification
       orderBook ! wrapLimitOrder(1, buyOrder)
       tp.expectMsgType[OrderAdded]
 
-      orderBook ! wrapEvent(2, Canceled(buyOrder.assetPair, buyOrder.id(), Source.Request))
+      orderBook ! wrapCommand(2, CancelOrder(buyOrder.assetPair, buyOrder.id(), Source.Request))
       tp.expectMsgType[OrderCanceled]
     }
 
@@ -412,9 +412,9 @@ class OrderBookActorSpecification
         bids.last.price shouldBe 0.0000040 * Order.PriceConstant
       }
 
-      orderBook ! wrapEvent(
+      orderBook ! wrapCommand(
         2,
-        Canceled(buyOrder1.assetPair, buyOrder1.id(), Source.Request)
+        CancelOrder(buyOrder1.assetPair, buyOrder1.id(), Source.Request)
       ) // order book is looking for the price level of buyOrder1 correctly (41 but not 40)
       tp.expectMsgType[OrderCanceled]
 
@@ -710,7 +710,7 @@ class OrderBookActorSpecification
       orderBook ! wrapLimitOrder(order)
       tp.expectMsgType[OrderAdded]
 
-      orderBook ! wrapEvent(QueueEvent.OrderBookDeleted(wctWavesPair))
+      orderBook ! wrapCommand(ValidatedCommand.DeleteOrderBook(wctWavesPair))
       tp.expectMsgType[OrderCanceled].reason shouldBe Events.OrderCanceledReason.OrderBookDeleted
     }
   }

@@ -96,7 +96,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
   @volatile private var hasMatcherAccountScript = false
   private val orderBooks = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
-  private val snapshotsRestored = Promise[QueueEventWithMeta.Offset]() // Earliest offset among snapshots
+  private val snapshotsRestored = Promise[ValidatedCommandWithMeta.Offset]() // Earliest offset among snapshots
 
   private val wavesLifted: FutureResult[BriefAssetDescription] = liftValueAsync(BriefAssetDescription.wavesDescription)
 
@@ -120,11 +120,11 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
   private val matcherQueue: MatcherQueue = settings.eventsQueue.`type` match {
     case "local" =>
-      log.info("Events will be stored locally")
+      log.info("Commands will be stored locally")
       new LocalMatcherQueue(settings.eventsQueue.local, new LocalQueueStore(db), time)
 
     case "kafka" =>
-      log.info("Events will be stored in Kafka")
+      log.info("Commands will be stored in Kafka")
       new KafkaMatcherQueue(settings.eventsQueue.kafka)
 
     case x => throw new IllegalArgumentException(s"Unknown queue type: $x")
@@ -211,15 +211,15 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     resetTimeout = settings.eventsQueue.circuitBreaker.resetTimeout
   )
 
-  private def storeEvent(payload: QueueEvent): Future[Option[QueueEventWithMeta]] =
-    storeBreaker.withCircuitBreaker(matcherQueue.storeEvent(payload))
+  private def storeCommand(payload: ValidatedCommand): Future[Option[ValidatedCommandWithMeta]] =
+    storeBreaker.withCircuitBreaker(matcherQueue.store(payload))
 
   private def mkAddressActorProps(address: Address, started: Boolean): Props = AddressActor.props(
     address,
     time,
     orderDB,
     ValidationStages.mkSecond(wavesBlockchainAsyncClient, orderBookAskAdapter),
-    storeEvent,
+    storeCommand,
     started,
     spendableBalancesRef,
     settings.addressActor
@@ -290,7 +290,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       config,
       matcherActorRef,
       addressDirectoryRef,
-      matcherQueue.storeEvent,
+      matcherQueue.store,
       p => Option(orderBooks.get()) flatMap (_ get p),
       orderBookHttpInfo,
       getActualTickSize = assetPair => {
@@ -301,7 +301,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       () => status,
       orderDB,
       () => lastProcessedOffset,
-      () => matcherQueue.lastEventOffset,
+      () => matcherQueue.lastOffset,
       ExchangeTransactionCreator.getAdditionalFeeForScript(hasMatcherAccountScript),
       maybeApiKeyHash,
       rateCache,
@@ -446,19 +446,19 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
         }
     }
 
-  private def consumeMessages(xs: Iterable[QueueEventWithMeta]): Future[Unit] =
+  private def consumeMessages(xs: Iterable[ValidatedCommandWithMeta]): Future[Unit] =
     if (xs.isEmpty) Future.unit
     else {
-      val eventAssets = xs.flatMap(_.event.assets)
+      val eventAssets = xs.flatMap(_.command.assets)
       val loadAssets = Future.traverse(eventAssets)(getAndCacheDescription(assetsCache, wavesBlockchainAsyncClient, _).value)
 
       loadAssets.flatMap { _ =>
         val assetPairs: Set[AssetPair] = xs
-          .map { eventWithMeta =>
-            log.debug(s"Consumed $eventWithMeta")
-            matcherActorRef ! eventWithMeta
-            lastProcessedOffset = eventWithMeta.offset
-            eventWithMeta.event.assetPair
+          .map { validatedCommandWithMeta =>
+            log.debug(s"Consumed $validatedCommandWithMeta")
+            matcherActorRef ! validatedCommandWithMeta
+            lastProcessedOffset = validatedCommandWithMeta.offset
+            validatedCommandWithMeta.command.assetPair
           }
           .to(Set)
 
@@ -481,14 +481,14 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     log.info(s"Status now is $newStatus")
   }
 
-  private def waitSnapshotsRestored(wait: FiniteDuration): Future[QueueEventWithMeta.Offset] = Future.firstCompletedOf(
+  private def waitSnapshotsRestored(wait: FiniteDuration): Future[ValidatedCommandWithMeta.Offset] = Future.firstCompletedOf(
     List(
       snapshotsRestored.future,
       actorSystem.timeout(wait).recover { case _ => throw RecoveryError(s"Timeout of $wait for waiting snapshots to restore is out") }
     )
   )
 
-  private def waitOffsetReached(lastQueueOffset: QueueEventWithMeta.Offset, deadline: Deadline): Future[Unit] = {
+  private def waitOffsetReached(lastQueueOffset: ValidatedCommandWithMeta.Offset, deadline: Deadline): Future[Unit] = {
     def loop(p: Promise[Unit]): Unit = {
       log.trace(s"offsets: $lastProcessedOffset >= $lastQueueOffset, deadline: ${deadline.isOverdue()}")
       if (lastProcessedOffset >= lastQueueOffset) p.success(())

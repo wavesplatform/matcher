@@ -32,7 +32,7 @@ import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.dex.time.Time
 import io.swagger.annotations._
 import javax.ws.rs.Path
-import play.api.libs.json.{Json, Reads}
+import play.api.libs.json.{JsError, JsSuccess, Json, Reads}
 
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{Future, Promise}
@@ -227,9 +227,16 @@ class MatcherWebSocketRoute(
         case tm: TextMessage =>
           tm.toStrict(strictTimeout)
             .map { message =>
-              Json.parse(message.getStrictText).as[Raw].asRight[WsError]
+              Json.parse(message.getStrictText).validate[Raw] match {
+                case JsSuccess(x, _) => x.asRight
+                case JsError(xs) =>
+                  val errors = xs.map {
+                    case (path, errors) => s"$path (${errors.map(_.message).mkString("\"", ", ", "\"")})"
+                  }.toList
+                  WsError.from(error.InvalidJson(errors), time.getTimestamp()).asLeft
+              }
             }
-            .recover { case _ => WsError.from(InvalidJson(Nil), time.getTimestamp()).asLeft[Raw] }
+            .recover { case e => WsError.from(InvalidJson(List(e.getMessage)), time.getTimestamp()).asLeft[Raw] }
             .map(f)
 
         case bm: BinaryMessage =>

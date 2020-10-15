@@ -21,7 +21,7 @@ import scala.util.{Failure, Success, Try}
 
 class WsConnection(uri: Uri, keepAlive: Boolean = true)(implicit system: ActorSystem, materializer: Materializer) extends ScorexLogging {
 
-  private val testId: Int = ThreadLocalRandom.current().nextInt(10000)
+  val testId: Int = ThreadLocalRandom.current().nextInt(10000)
 
   override protected lazy val log: LoggerFacade = LoggerFacade(LoggerFactory.getLogger(s"WsConnection[testId=$testId]"))
 

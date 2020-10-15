@@ -42,8 +42,8 @@ import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
 import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model._
-import com.wavesplatform.dex.queue.MatcherQueue.StoreEvent
-import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
+import com.wavesplatform.dex.queue.MatcherQueue.StoreValidatedCommand
+import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
 import com.wavesplatform.dex.settings.{MatcherSettings, OrderFeeSettings}
 import io.swagger.annotations._
@@ -63,7 +63,7 @@ class MatcherApiRoute(
   config: Config,
   matcher: ActorRef,
   addressActor: ActorRef,
-  storeEvent: StoreEvent,
+  storeCommand: StoreValidatedCommand,
   orderBook: AssetPair => Option[Either[Unit, ActorRef]],
   orderBookHttpInfo: OrderBookHttpInfo,
   getActualTickSize: AssetPair => BigDecimal,
@@ -71,8 +71,8 @@ class MatcherApiRoute(
   matcherSettings: MatcherSettings,
   override val matcherStatus: () => MatcherStatus,
   orderDb: OrderDB,
-  currentOffset: () => QueueEventWithMeta.Offset,
-  lastOffset: () => Future[QueueEventWithMeta.Offset],
+  currentOffset: () => ValidatedCommandWithMeta.Offset,
+  lastOffset: () => Future[ValidatedCommandWithMeta.Offset],
   matcherAccountFee: Long,
   override val apiKeyHash: Option[Array[Byte]],
   rateCache: RateCache,
@@ -1009,7 +1009,7 @@ class MatcherApiRoute(
     orderBook(pair) match {
       case Some(Right(_)) =>
         complete(
-          storeEvent(QueueEvent.OrderBookDeleted(pair))
+          storeCommand(ValidatedCommand.DeleteOrderBook(pair))
             .map {
               case None => NotImplemented(error.FeatureDisabled)
               case _ => SimpleResponse(StatusCodes.Accepted, "Deleting order book")

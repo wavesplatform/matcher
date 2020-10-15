@@ -3,14 +3,14 @@ package com.wavesplatform.dex.api.http
 import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.json.{assetDoubleMapFormat, assetMapFormat, assetPairMapFormat}
-import com.wavesplatform.dex.queue.QueueEventWithMeta
+import com.wavesplatform.dex.queue.ValidatedCommandWithMeta
 import play.api.libs.json.{Format, JsValue, Writes}
 
 package object entities {
 
   type HttpMatcherPublicKey = PublicKey
   type HttpRates = Map[Asset, Double]
-  type HttpOffset = QueueEventWithMeta.Offset
+  type HttpOffset = ValidatedCommandWithMeta.Offset
   type HttpSnapshotOffsets = Map[AssetPair, HttpOffset]
   type HttpBalance = Map[Asset, Long]
 

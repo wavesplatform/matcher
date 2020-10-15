@@ -14,7 +14,7 @@ import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
-import com.wavesplatform.dex.queue.QueueEventWithMeta
+import com.wavesplatform.dex.queue.ValidatedCommandWithMeta
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
@@ -67,7 +67,7 @@ class SpendableBalancesActorSpecification
         time,
         EmptyOrderDB,
         (_, _) => Future.successful(Right(())),
-        event => { testProbe.ref ! event; Future.successful(Some(QueueEventWithMeta(0L, 0, event))) },
+        command => { testProbe.ref ! command; Future.successful(Some(ValidatedCommandWithMeta(0L, 0, command))) },
         started,
         sba
       )

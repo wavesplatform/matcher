@@ -17,7 +17,7 @@ import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.gen.OrderBookGen
 import com.wavesplatform.dex.model.address.AddressActorStartingBenchmark.AddressState
 import com.wavesplatform.dex.model.{AcceptedOrder, Events, LimitOrder}
-import com.wavesplatform.dex.queue.QueueEventWithMeta
+import com.wavesplatform.dex.queue.ValidatedCommandWithMeta
 import com.wavesplatform.dex.time.TestTime
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
@@ -103,7 +103,7 @@ object AddressActorStartingBenchmark {
             time = new TestTime(),
             orderDB = new TestOrderDB(10000),
             validate = (_, _) => Future.successful(().asRight),
-            store = event => Future.successful(Some(QueueEventWithMeta(0L, 0L, event))),
+            store = command => Future.successful(Some(ValidatedCommandWithMeta(0L, 0L, command))),
             started = true,
             spendableBalancesActor = ActorRef.noSender,
             settings = AddressActor.Settings.default

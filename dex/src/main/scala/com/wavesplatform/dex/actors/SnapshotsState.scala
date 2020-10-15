@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.actors
 
 import com.wavesplatform.dex.domain.asset.AssetPair
-import com.wavesplatform.dex.queue.QueueEventWithMeta.{Offset => EventOffset}
+import com.wavesplatform.dex.queue.ValidatedCommandWithMeta.{Offset => EventOffset}
 
 import scala.collection.immutable.SortedSet
 

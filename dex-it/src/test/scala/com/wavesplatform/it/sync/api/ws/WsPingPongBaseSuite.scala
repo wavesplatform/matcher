@@ -93,11 +93,13 @@ abstract class WsPingPongBaseSuite extends WsSuiteBase {
 
         Seq(wsac1 -> connection1Lifetime, wsac2 -> connection2Lifetime).foreach {
           case (conn, connLifetime) =>
-            val (errors, pings) = conn.receiveAtLeastNErrorsAndPings(1, 2)
-            connLifetime should (be >= expectedConnectionsLifetime and be <= expectedConnectionsLifetime + delta)
-            pings.size should (be >= 2 and be <= 3)
-            errors should matchTo(List(pongTimeoutError))
-            conn.isClosed shouldBe true
+            withClue(s"testId=${conn.testId}") {
+              val (errors, pings) = conn.receiveAtLeastNErrorsAndPings(1, 2)
+              connLifetime should (be >= expectedConnectionsLifetime and be <= expectedConnectionsLifetime + delta)
+              pings.size should (be >= 2 and be <= 3)
+              errors should matchTo(List(pongTimeoutError))
+              conn.isClosed shouldBe true
+            }
         }
       }
     }
@@ -131,12 +133,13 @@ abstract class WsPingPongBaseSuite extends WsSuiteBase {
 
       pings.size should (be >= 3 and be <= 4)
 
-      errors should matchTo {
-        List(
-          WsError(0L, expectedError.code, expectedError.message.text),
-          pongTimeoutError
-        )
-      }
+      errors.size should be(2)
+      val List(actualInvalidJsonError, actualPongTimeoutError) = errors
+
+      actualInvalidJsonError.code should be(expectedError.code)
+      actualInvalidJsonError.message should include regex "broken"
+
+      actualPongTimeoutError should matchTo(pongTimeoutError)
 
       wsc.isClosed shouldBe true
     }

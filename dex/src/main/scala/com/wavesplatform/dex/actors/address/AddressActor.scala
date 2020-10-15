@@ -32,8 +32,8 @@ import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.Spen
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCancelFailed, OrderCanceled, OrderCanceledReason, OrderExecuted, Event => OrderEvent}
 import com.wavesplatform.dex.model._
-import com.wavesplatform.dex.queue.MatcherQueue.StoreEvent
-import com.wavesplatform.dex.queue.QueueEvent
+import com.wavesplatform.dex.queue.MatcherQueue.StoreValidatedCommand
+import com.wavesplatform.dex.queue.ValidatedCommand
 import com.wavesplatform.dex.time.Time
 import org.slf4j.LoggerFactory
 
@@ -48,7 +48,7 @@ class AddressActor(
   time: Time,
   orderDB: OrderDB,
   validate: (AcceptedOrder, Map[Asset, Long]) => Future[Either[MatcherError, Unit]],
-  store: StoreEvent,
+  store: StoreValidatedCommand,
   var started: Boolean,
   spendableBalancesActor: ActorRef,
   settings: AddressActor.Settings = AddressActor.Settings.default
@@ -263,7 +263,7 @@ class AddressActor(
       pendingCommands.remove(orderId).foreach { command =>
         command.client ! reason
         queueEvent match {
-          case QueueEvent.Placed(_) | QueueEvent.PlacedMarket(_) =>
+          case ValidatedCommand.PlaceOrder(_) | ValidatedCommand.PlaceMarketOrder(_) =>
             activeOrders.remove(orderId).foreach { ao =>
               openVolume = openVolume |-| ao.reservableBalance
               if (wsAddressState.hasActiveSubscriptions) {
@@ -515,26 +515,26 @@ class AddressActor(
       scheduleNextDiffSending()
     }
 
-    storeEvent(ao.id)(
+    storeCommand(ao.id)(
       ao match {
-        case ao: LimitOrder => QueueEvent.Placed(ao)
-        case ao: MarketOrder => QueueEvent.PlacedMarket(ao)
+        case ao: LimitOrder => ValidatedCommand.PlaceOrder(ao)
+        case ao: MarketOrder => ValidatedCommand.PlaceMarketOrder(ao)
       }
     )
   }
 
-  private def cancel(o: Order, source: Command.Source): Unit = storeEvent(o.id())(QueueEvent.Canceled(o.assetPair, o.id(), source))
+  private def cancel(o: Order, source: Command.Source): Unit = storeCommand(o.id())(ValidatedCommand.CancelOrder(o.assetPair, o.id(), source))
 
-  private def storeEvent(orderId: Order.Id)(event: QueueEvent): Unit =
-    store(event)
+  private def storeCommand(orderId: Order.Id)(command: ValidatedCommand): Unit =
+    store(command)
       .transform {
         case Success(None) => Success(Some(error.FeatureDisabled))
         case Success(_) => Success(None)
         case Failure(e) =>
-          val prefix = s"Store failed for $orderId, $event"
+          val prefix = s"Store failed for $orderId, $command"
           log.warn(
             e match {
-              case _: TimeoutException => s"$prefix: timeout during storing $event for $orderId"
+              case _: TimeoutException => s"$prefix: timeout during storing $command for $orderId"
               case _: CircuitBreakerOpenException => s"$prefix: fail fast due to circuit breaker"
               case _ => prefix
             },
@@ -543,8 +543,8 @@ class AddressActor(
           Success(Some(error.CanNotPersistEvent))
       }
       .onComplete {
-        case Success(Some(error)) => self ! Event.StoreFailed(orderId, error, event)
-        case Success(None) => self ! Event.StoreSucceeded(orderId, event); log.trace(s"$event saved")
+        case Success(Some(error)) => self ! Event.StoreFailed(orderId, error, command)
+        case Success(None) => self ! Event.StoreSucceeded(orderId, command); log.trace(s"$command saved")
         case _ => throw new IllegalStateException("Impossibru")
       }
 
@@ -576,7 +576,7 @@ object AddressActor {
     time: Time,
     orderDB: OrderDB,
     validate: (AcceptedOrder, Map[Asset, Long]) => Future[Either[MatcherError, Unit]],
-    store: StoreEvent,
+    store: StoreValidatedCommand,
     started: Boolean,
     spendableBalancesActor: ActorRef,
     settings: AddressActor.Settings = AddressActor.Settings.default
@@ -676,8 +676,8 @@ object AddressActor {
       override def orderId: Order.Id = acceptedOrder.id
     }
 
-    case class StoreFailed(orderId: Order.Id, reason: MatcherError, queueEvent: QueueEvent) extends Event
-    case class StoreSucceeded(orderId: Order.Id, queueEvent: QueueEvent) extends Event
+    case class StoreFailed(orderId: Order.Id, reason: MatcherError, command: ValidatedCommand) extends Event
+    case class StoreSucceeded(orderId: Order.Id, command: ValidatedCommand) extends Event
     // Now it doesn't matter whether an order executed or just added
     case class OrderAccepted(order: Order) extends Event
     case class OrderCanceled(orderId: Order.Id) extends Event

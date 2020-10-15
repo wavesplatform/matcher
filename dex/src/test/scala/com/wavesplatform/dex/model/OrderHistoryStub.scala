@@ -8,7 +8,7 @@ import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.error.ErrorFormatterContext
-import com.wavesplatform.dex.queue.QueueEventWithMeta
+import com.wavesplatform.dex.queue.ValidatedCommandWithMeta
 import com.wavesplatform.dex.time.Time
 
 import scala.collection.mutable
@@ -33,7 +33,7 @@ class OrderHistoryStub(system: ActorSystem, time: Time, maxActiveOrders: Int, ma
         time,
         new TestOrderDB(maxFinalizedOrders),
         (_, _) => Future.successful(Right(())),
-        e => Future.successful(Some(QueueEventWithMeta(0, 0, e))),
+        e => Future.successful(Some(ValidatedCommandWithMeta(0L, 0, e))),
         started,
         spendableBalanceActor,
         AddressActor.Settings.default.copy(maxActiveOrders = maxActiveOrders)

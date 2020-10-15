@@ -24,7 +24,7 @@ import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.Events.{OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model.OrderValidator.Result
 import com.wavesplatform.dex.model.{BuyLimitOrder, LimitOrder, OrderValidator, SellLimitOrder, _}
-import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
+import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import com.wavesplatform.dex.settings.OrderFeeSettings._
 import com.wavesplatform.dex.settings.{loadConfig, AssetType, MatcherSettings, OrderFeeSettings}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
@@ -79,12 +79,16 @@ trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with Doub
   private val seqNr: AtomicLong = new AtomicLong(-1)
 
   protected def toNormalized(value: Long): Long = value * Order.PriceConstant
-  protected def wrapEvent(n: Long, event: QueueEvent): QueueEventWithMeta = QueueEventWithMeta(n, System.currentTimeMillis(), event)
-  protected def wrapEvent(event: QueueEvent): QueueEventWithMeta = QueueEventWithMeta(seqNr.incrementAndGet(), System.currentTimeMillis(), event)
 
-  protected def wrapLimitOrder(x: Order): QueueEventWithMeta = wrapLimitOrder(seqNr.incrementAndGet(), x)
-  protected def wrapLimitOrder(n: Long, x: Order): QueueEventWithMeta = wrapEvent(n, QueueEvent.Placed(LimitOrder(x)))
-  protected def wrapMarketOrder(mo: MarketOrder): QueueEventWithMeta = wrapEvent(QueueEvent.PlacedMarket(mo))
+  protected def wrapCommand(n: Long, command: ValidatedCommand): ValidatedCommandWithMeta =
+    ValidatedCommandWithMeta(n, System.currentTimeMillis(), command)
+
+  protected def wrapCommand(command: ValidatedCommand): ValidatedCommandWithMeta =
+    ValidatedCommandWithMeta(seqNr.incrementAndGet(), System.currentTimeMillis(), command)
+
+  protected def wrapLimitOrder(x: Order): ValidatedCommandWithMeta = wrapLimitOrder(seqNr.incrementAndGet(), x)
+  protected def wrapLimitOrder(n: Long, x: Order): ValidatedCommandWithMeta = wrapCommand(n, ValidatedCommand.PlaceOrder(LimitOrder(x)))
+  protected def wrapMarketOrder(mo: MarketOrder): ValidatedCommandWithMeta = wrapCommand(ValidatedCommand.PlaceMarketOrder(mo))
 
   protected def awaitResult[A](result: FutureResult[A]): Result[A] = Await.result(result.value, Duration.Inf)
   protected def awaitResult[A](result: Future[A]): A = Await.result(result, Duration.Inf)

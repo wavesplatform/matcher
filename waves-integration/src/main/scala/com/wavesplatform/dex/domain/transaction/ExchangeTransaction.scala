@@ -1,6 +1,5 @@
 package com.wavesplatform.dex.domain.transaction
 
-import cats.syntax.either._
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves

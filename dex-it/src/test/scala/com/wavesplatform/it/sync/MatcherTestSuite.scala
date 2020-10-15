@@ -73,7 +73,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
   "Check cross ordering between Alice and Bob" - {
     "/matcher should respond with the matcher's public key" in {
-      dex1.api.publicKey shouldBe matcher.publicKey
+      dex1.newApi.publicKey shouldBe matcher.publicKey
     }
 
     "/matcher should contain a header with HTTP server" in {

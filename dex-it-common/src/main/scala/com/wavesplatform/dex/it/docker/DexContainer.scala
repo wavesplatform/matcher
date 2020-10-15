@@ -6,12 +6,13 @@ import java.nio.file.{Path, Paths}
 import cats.Id
 import cats.instances.future.catsStdInstancesForFuture
 import cats.instances.try_._
+import cats.tagless.implicits._
 import com.dimafeng.testcontainers.GenericContainer
 import com.typesafe.config.Config
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.it.cache.CachedData
 import com.wavesplatform.dex.it.collections.Implicits.ListOps
-import com.wavesplatform.dex.it.dex.DexApi
+import com.wavesplatform.dex.it.dex.{AsyncEnrichedDexNewApi, DexApi, DexNewApi}
 import com.wavesplatform.dex.it.fp
 import com.wavesplatform.dex.it.resources.getRawContentFromResource
 import com.wavesplatform.dex.it.sttp.LoggingSttpBackend
@@ -34,6 +35,10 @@ final case class DexContainer private (override val internalIp: String, underlyi
 
   override def api: DexApi[Id] = fp.sync(DexApi[Try](apiKey, restApiAddress))
   override def asyncApi: DexApi[Future] = DexApi[Future](apiKey, restApiAddress)
+
+  def newAsyncEnrichedApi: AsyncEnrichedDexNewApi = new AsyncEnrichedDexNewApi(apiKey, restApiAddress)
+  def newAsyncApi: DexNewApi[Future] = newAsyncEnrichedApi.mapK(DexNewApi.toAsyncUnsafe)
+  def newApi: DexNewApi[Id] = newAsyncEnrichedApi.mapK(DexNewApi.toSyncUnsafe)
 }
 
 object DexContainer extends ScorexLogging {

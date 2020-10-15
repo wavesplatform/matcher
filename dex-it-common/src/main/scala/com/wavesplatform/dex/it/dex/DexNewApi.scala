@@ -122,6 +122,31 @@ trait DexNewApi[F[_]] {
 
   def wsConnections: F[HttpWebSocketConnections]
   def closeWsConnections(oldestNumber: Int): F[HttpMessage]
+
+  // TODO move
+
+  def waitForOrder(order: Order)(pred: HttpOrderStatus => Boolean): F[HttpOrderStatus] = waitForOrder(order.assetPair, order.id())(pred)
+  def waitForOrder(assetPair: AssetPair, id: Order.Id)(pred: HttpOrderStatus => Boolean): F[HttpOrderStatus]
+
+  def waitForOrderPlacement(order: Order): F[HttpSuccessfulPlace]
+
+  def waitForOrderHistory[A](owner: KeyPair, activeOnly: Option[Boolean])(
+    pred: List[HttpOrderBookHistoryItem] => Boolean
+  ): F[List[HttpOrderBookHistoryItem]]
+
+  def waitForOrderStatus(order: Order, status: HttpOrderStatus.Status): F[HttpOrderStatus] =
+    waitForOrderStatus(order.assetPair, order.id(), status)
+
+  def waitForOrderStatus(assetPair: AssetPair, id: Order.Id, status: HttpOrderStatus.Status): F[HttpOrderStatus]
+
+  def waitForTransactionsByOrder(order: Order, atLeast: Int): F[List[ExchangeTransaction]] = waitForTransactionsByOrder(order.id(), atLeast)
+  def waitForTransactionsByOrder(id: Order.Id, atLeast: Int): F[List[ExchangeTransaction]]
+
+  def waitForTransactionsByOrder(id: Order.Id)(pred: List[ExchangeTransaction] => Boolean): F[List[ExchangeTransaction]]
+
+  def waitForCurrentOffset(pred: Long => Boolean): F[HttpOffset]
+
+  def waitForWsConnections(pred: HttpWebSocketConnections => Boolean): F[HttpWebSocketConnections]
 }
 
 object DexNewApi {

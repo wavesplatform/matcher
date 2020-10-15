@@ -11,10 +11,10 @@ pipeline {
         string(name: 'NEW_BRANCH_OR_TAG', defaultValue: 'origin/master', description: 'Dex branch')
     }
     environment {
-          dexPrevImage = DEX_PREVIOUS_IMAGE
-          dexNewImage = DEX_NEW_IMAGE
-          nodePrevImage = NODE_PREVIOUS_IMAGE
-          nodeNewImage = NODE_NEW_IMAGE
+          dexPrevImage = "${DEX_PREVIOUS_IMAGE}"
+          dexNewImage = "${DEX_NEW_IMAGE}"
+          nodePrevImage = "${NODE_PREVIOUS_IMAGE}"
+          nodeNewImage = "${NODE_NEW_IMAGE}"
           PREVIOUS_BRANCH_OR_TAG = "${PREVIOUS_BRANCH_OR_TAG}"
           NEW_BRANCH_OR_TAG = "${NEW_BRANCH_OR_TAG}"
     }

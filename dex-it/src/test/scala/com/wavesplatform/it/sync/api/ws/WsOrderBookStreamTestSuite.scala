@@ -463,7 +463,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
 
       markup("Multiple orders")
       val orders = (1 to 50).map { i =>
-        mkOrderDP(carol, wavesBtcPair, BUY, 1.waves + i, 0.00012)
+        mkOrderDP(carol, wavesBtcPair, BUY, 1.waves + i, 0.00012 + i / 100000.0d)
       }
 
       Await.result(Future.traverse(orders)(dex1.asyncApi.place), 1.minute)

@@ -10,7 +10,7 @@ import com.wavesplatform.dex.api.ws.state.WsOrderBookState._
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.model.Denormalization.{denormalizeAmountAndFee, denormalizePrice}
 import com.wavesplatform.dex.domain.model.{Amount, Price}
-import com.wavesplatform.dex.model.{LastTrade, LevelAmounts}
+import com.wavesplatform.dex.model.{LastTrade, LevelAmounts, OrderBook}
 import monocle.macros.GenLens
 
 import scala.annotation.nowarn
@@ -36,10 +36,10 @@ case class WsOrderBookState(
 
   def hasChanges: Boolean = changedAsks.nonEmpty || changedBids.nonEmpty || lastTrade.nonEmpty || changedTickSize.nonEmpty
 
-  def denormalized(amountDecimals: Int, priceDecimals: Int, xs: TreeMap[Price, Amount]): TreeMap[Double, Double] = xs.map {
+  def denormalized(amountDecimals: Int, priceDecimals: Int, xs: TreeMap[Price, Amount], ordering: Ordering[Double]): TreeMap[Double, Double] = xs.map {
     case (price, amount) =>
       denormalizePrice(price, amountDecimals, priceDecimals).toDouble -> denormalizeAmountAndFee(amount, amountDecimals).toDouble
-  }
+  }(ordering)
 
   def lastTrade(amountDecimals: Int, priceDecimals: Int, x: LastTrade): WsLastTrade = WsLastTrade(
     price = denormalizePrice(x.price, amountDecimals, priceDecimals).toDouble,
@@ -60,8 +60,8 @@ case class WsOrderBookState(
         val changes =
           protocol.WsOrderBookChanges(
             assetPair = assetPair,
-            asks = denormalized(amountDecimals, priceDecimals, take(asks, changedAsks)),
-            bids = denormalized(amountDecimals, priceDecimals, take(bids, changedBids)),
+            asks = denormalized(amountDecimals, priceDecimals, take(asks, changedAsks), OrderBook.asksDenormalizedOrdering),
+            bids = denormalized(amountDecimals, priceDecimals, take(bids, changedBids), OrderBook.bidsDenormalizedOrdering),
             lastTrade = lastTrade.map(lastTrade(amountDecimals, priceDecimals, _)),
             updateId = 0L, // Will be changed below
             timestamp = timestamp,

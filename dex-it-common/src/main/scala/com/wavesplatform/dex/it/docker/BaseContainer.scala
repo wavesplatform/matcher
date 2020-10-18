@@ -31,8 +31,8 @@ abstract class BaseContainer(protected val baseContainerPath: String, private va
 
   protected val cachedRestApiAddress: CachedData[InetSocketAddress]
 
-  def api: HasWaitReady[Id]
-  def asyncApi: HasWaitReady[Future]
+  def waitReady: HasWaitReady[Id]
+  def asyncWaitReady: HasWaitReady[Future]
 
   protected def getExternalAddress(internalPort: Int): InetSocketAddress = {
 
@@ -151,13 +151,13 @@ abstract class BaseContainer(protected val baseContainerPath: String, private va
       )
       .exec()
 
-    api.waitReady
+    waitReady.waitReady
   }
 
   override def start(): Unit = {
     Option(underlying.containerId).fold(super.start())(_ => sendStartCmd())
     invalidateCaches()
-    api.waitReady
+    waitReady.waitReady
   }
 
   def restart(): Unit = {

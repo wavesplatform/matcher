@@ -193,7 +193,7 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with
         .map(_ => ())
 
     def batchCancels(owner: KeyPair, assetPairs: Iterable[AssetPair]): Future[List[HttpSuccessfulBatchCancel]] = Future.sequence {
-      assetPairs.map(toDexExplicitGetOps(dex2.asyncApi).cancelAllByPair(owner, _, System.currentTimeMillis)).toList
+      assetPairs.map(toDexApiWaitOps(dex2.asyncApi).cancelAllByPair(owner, _, System.currentTimeMillis)).toList
     }
 
     Await.result(
@@ -205,8 +205,8 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with
     )
 
     // TODO implement .waitFor[Seq[OrderbookHistory]]
-    Await.result(toDexExplicitGetOps(dex1.asyncApi).orderHistory(alice, Some(true)), 5.seconds) shouldBe empty
-    Await.result(toDexExplicitGetOps(dex1.asyncApi).orderHistory(bob, Some(true)), 5.seconds) shouldBe empty
+    Await.result(toDexApiWaitOps(dex1.asyncApi).orderHistory(alice, Some(true)), 5.seconds) shouldBe empty
+    Await.result(toDexApiWaitOps(dex1.asyncApi).orderHistory(bob, Some(true)), 5.seconds) shouldBe empty
   }
 
   private def mkOrders(account: KeyPair, number: Int = placesNumber) =

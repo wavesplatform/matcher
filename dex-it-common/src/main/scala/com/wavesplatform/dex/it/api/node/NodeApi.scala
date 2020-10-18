@@ -13,7 +13,7 @@ import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.it.api.HasWaitReady
 import com.wavesplatform.dex.it.api.responses.node._
-import com.wavesplatform.dex.it.fp.{CanWait, FOps, RepeatRequestOptions}
+import com.wavesplatform.dex.it.fp.{CanRepeat, FOps, RepeatRequestOptions}
 import com.wavesplatform.dex.it.json.transactionFormat
 import com.wavesplatform.dex.it.sttp.ResponseParsers.asConfig
 import com.wavesplatform.dex.it.sttp.SttpBackendOps
@@ -55,9 +55,9 @@ object NodeApi {
   implicit val functorK: FunctorK[NodeApi] = Derive.functorK[NodeApi]
 
   def apply[F[_]](apiKey: String, host: => InetSocketAddress)(implicit
-    M: MonadError[F, Throwable],
-    W: CanWait[F],
-    httpBackend: SttpBackend[F, Nothing]
+                                                              M: MonadError[F, Throwable],
+                                                              W: CanRepeat[F],
+                                                              httpBackend: SttpBackend[F, Nothing]
   ): NodeApi[F] =
     new NodeApi[F] {
 
@@ -94,36 +94,40 @@ object NodeApi {
 
       override def waitForConnectedPeer(toNode: InetSocketAddress): F[Unit] = {
         val hostName = toNode.getHostName
-        repeatUntil(tryConnectedPeers, 1.second) {
-          case Right(x) => x.peers.exists(p => p.address.contains(hostName))
-          case _ => false
-        }.map(_ => ())
+//        repeatUntil(tryConnectedPeers, 1.second) {
+//          case Right(x) => x.peers.exists(p => p.address.contains(hostName))
+//          case _ => false
+//        }.map(_ => ())
+        ???
       }
 
-      override def waitForTransaction(id: Id): F[Unit] = repeatUntil(tryTransactionInfo(id))(_.isRight).map(_ => ())
+      override def waitForTransaction(id: Id): F[Unit] = ??? // repeatUntil(tryTransactionInfo(id))(_.isRight).map(_ => ())
 
       override def waitForActivationStatus(f: ActivationStatusResponse => Boolean): F[Unit] =
-        repeatUntil(tryActivationStatus, RepeatRequestOptions(1.second, 180)) {
-          case Right(x) => f(x)
-          case _ => false
-        }.map(_ => ())
+//        repeatUntil(tryActivationStatus, RepeatRequestOptions(1.second, 180)) {
+//          case Right(x) => f(x)
+//          case _ => false
+//        }.map(_ => ())
+        ???
 
       override def waitForHeightArise(): F[Unit] =
         tryCurrentHeight
           .flatMap {
             case Right(origHeight) =>
-              repeatUntil(tryCurrentHeight, 1.second) {
-                case Right(x) => x > origHeight
-                case _ => false
-              }.map(_ => ())
+//              repeatUntil(tryCurrentHeight, 1.second) {
+//                case Right(x) => x > origHeight
+//                case _ => false
+//              }.map(_ => ())
+              ???
             case Left(_) => waitForHeightArise()
           }
 
       override def waitForHeight(height: Int): F[Unit] =
-        repeatUntil(tryCurrentHeight, 1.second) {
-          case Right(x) => x >= height
-          case _ => false
-        }.map(_ => ())
+//        repeatUntil(tryCurrentHeight, 1.second) {
+//          case Right(x) => x >= height
+//          case _ => false
+//        }.map(_ => ())
+        ???
 
       override def waitReady: F[Unit] = {
         // TODO hack, replace with socket's waitReady
@@ -133,7 +137,8 @@ object NodeApi {
         }
 
         // See DexApi
-        repeatUntil(request, RepeatRequestOptions(1.second, 60 + 20))(_ == true).map(_ => ())
+        // repeatUntil(request, RepeatRequestOptions(1.second, 60 + 20))(_ == true).map(_ => ())
+        ???
       }
 
     }

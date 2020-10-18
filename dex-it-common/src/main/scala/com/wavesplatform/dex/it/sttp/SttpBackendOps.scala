@@ -6,10 +6,10 @@ import cats.syntax.flatMap._
 import cats.syntax.functor._
 import com.softwaremill.sttp.playJson.asJson
 import com.softwaremill.sttp.{DeserializationError, Id, RequestT, Response, SttpBackend}
-import com.wavesplatform.dex.it.fp.{CanWait, FOps, ThrowableMonadError}
+import com.wavesplatform.dex.it.fp.{CanRepeat, FOps, ThrowableMonadError}
 import play.api.libs.json.{JsError, Reads}
 
-class SttpBackendOps[F[_]: CanWait: ThrowableMonadError, ErrorT: Reads](implicit httpBackend: SttpBackend[F, Nothing]) {
+class SttpBackendOps[F[_]: CanRepeat: ThrowableMonadError, ErrorT: Reads](implicit httpBackend: SttpBackend[F, Nothing]) {
 
   private val ops = FOps[F]; import ops._
 
@@ -31,7 +31,7 @@ class SttpBackendOps[F[_]: CanWait: ThrowableMonadError, ErrorT: Reads](implicit
 
 object SttpBackendOps {
 
-  def apply[F[_]: CanWait: ThrowableMonadError, ErrorT: Reads](implicit httpBackend: SttpBackend[F, Nothing]): SttpBackendOps[F, ErrorT] =
+  def apply[F[_]: CanRepeat: ThrowableMonadError, ErrorT: Reads](implicit httpBackend: SttpBackend[F, Nothing]): SttpBackendOps[F, ErrorT] =
     new SttpBackendOps[F, ErrorT]
 
 }

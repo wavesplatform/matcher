@@ -23,9 +23,9 @@ package object it {
 
   private def executeCommand(x: MatcherCommand, ignoreErrors: Boolean): Future[Int] =
     try x match {
-      case MatcherCommand.Place(api, order) => api.tryPlace(order).map(_.fold(_ => 0, _ => 1))
-      case MatcherCommand.Cancel(api, owner, order) =>
-        api.tryCancel(owner, order).map(_.fold(_ => 0, _ => 1))
+      case MatcherCommand.Place(dex, order) => dex.tryAsyncApi.place(order).map(_.fold(_ => 0, _ => 1))
+      case MatcherCommand.Cancel(dex, owner, order) =>
+        dex.tryAsyncApi.cancel(owner, order).map(_.fold(_ => 0, _ => 1))
     } catch {
       case NonFatal(e) =>
         if (ignoreErrors) Future.successful(0)

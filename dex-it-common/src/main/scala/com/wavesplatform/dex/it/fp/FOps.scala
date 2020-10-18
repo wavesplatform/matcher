@@ -16,31 +16,11 @@ case class RepeatRequestOptions(delayBetweenRequests: FiniteDuration, maxAttempt
   def decreaseAttempts: RepeatRequestOptions = copy(maxAttempts = maxAttempts - 1)
 }
 
-class FOps[F[_]](implicit M: ThrowableMonadError[F], W: CanWait[F]) {
+object RepeatRequestOptions {
+  val default = RepeatRequestOptions(1.second, 60)
+}
 
-  def repeatUntil[T](f: => F[T], options: RepeatRequestOptions = RepeatRequestOptions(1.second, 30))(stopCond: T => Boolean): F[T] =
-    f.flatMap { firstResp =>
-      (firstResp, options).tailRecM[F, (T, RepeatRequestOptions)] {
-        case (resp, currOptions) =>
-          if (stopCond(resp)) M.pure((resp, currOptions).asRight)
-          else if (currOptions.maxAttempts <= 0) M.raiseError(new RuntimeException(s"All attempts are out! The last response is: $resp"))
-          else W.wait(options.delayBetweenRequests).productR(f).map(x => (x, currOptions.decreaseAttempts).asLeft)
-      }
-    }
-      .map(_._1)
-
-  def repeatUntil[T](f: => F[T], delay: FiniteDuration)(pred: T => Boolean): F[T] =
-    f.flatMap {
-      _.tailRecM[F, T] { x =>
-        if (pred(x)) M.pure(x.asRight)
-        else W.wait(delay).productR(f).map(_.asLeft)
-      }
-    }
-
-  def repeatUntilResponse[T](f: => F[Response[Either[DeserializationError[JsError], T]]], delay: FiniteDuration)(
-    pred: Response[Either[DeserializationError[JsError], T]] => Boolean
-  ): F[T] =
-    repeatUntil(f, delay)(pred).flatMap(parseResponse)
+class FOps[F[_]](implicit M: ThrowableMonadError[F], W: CanRepeat[F]) {
 
   def parseResponse[T](resp: Response[Either[DeserializationError[JsError], T]]): F[T] =
     resp.rawErrorBody match {
@@ -80,5 +60,5 @@ class FOps[F[_]](implicit M: ThrowableMonadError[F], W: CanWait[F]) {
 }
 
 object FOps {
-  def apply[F[_]: CanWait: ThrowableMonadError]: FOps[F] = new FOps[F]
+  def apply[F[_]: CanRepeat: ThrowableMonadError]: FOps[F] = new FOps[F]
 }

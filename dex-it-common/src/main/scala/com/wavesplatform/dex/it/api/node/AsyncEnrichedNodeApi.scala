@@ -3,8 +3,8 @@ package com.wavesplatform.dex.it.api.node
 import java.net.InetSocketAddress
 import java.util.UUID
 
+import com.softwaremill.sttp._
 import com.softwaremill.sttp.playJson._
-import com.softwaremill.sttp.{Request, SttpBackend, MonadError => _, _}
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.it.api.node.AsyncEnrichedNodeApi._
@@ -19,11 +19,11 @@ import scala.concurrent.{ExecutionContext, Future}
 class AsyncEnrichedNodeApi(apiKey: String, host: => InetSocketAddress)(implicit ec: ExecutionContext, httpBackend: SttpBackend[Future, Nothing])
     extends NodeApi[AsyncEnriched] {
 
-  override def wavesBalance(address: Address): AsyncEnriched[WavesBalanceResponse] = mk {
+  override def wavesBalanceOrig(address: Address): AsyncEnriched[WavesBalanceResponse] = mk {
     sttp.get(uri"$apiUri/addresses/balance/$address")
   }
 
-  override def assetBalance(address: Address, asset: Asset.IssuedAsset): AsyncEnriched[AssetBalanceResponse] = mk {
+  override def assetBalanceOrig(address: Address, asset: Asset.IssuedAsset): AsyncEnriched[AssetBalanceResponse] = mk {
     sttp.get(uri"$apiUri/assets/balance/$address/$asset")
   }
 
@@ -35,7 +35,7 @@ class AsyncEnrichedNodeApi(apiKey: String, host: => InetSocketAddress)(implicit 
     sttp.get(uri"$apiUri/transactions/info/$id")
   }
 
-  override def currentHeight: AsyncEnriched[HeightResponse] = mk {
+  override def currentHeightOrig: AsyncEnriched[HeightResponse] = mk {
     sttp.get(uri"$apiUri/blocks/height")
   }
 

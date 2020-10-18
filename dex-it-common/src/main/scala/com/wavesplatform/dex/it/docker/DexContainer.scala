@@ -4,6 +4,7 @@ import java.net.InetSocketAddress
 import java.nio.file.{Path, Paths}
 
 import cats.Id
+import cats.tagless.FunctorK
 import com.dimafeng.testcontainers.GenericContainer
 import com.typesafe.config.Config
 import com.wavesplatform.dex.domain.utils.ScorexLogging
@@ -30,17 +31,16 @@ final case class DexContainer private (override val internalIp: String, underlyi
   override protected val cachedRestApiAddress: CachedData[InetSocketAddress] = CachedData(getExternalAddress(DexContainer.restApiPort))
   def restApiAddress: InetSocketAddress = cachedRestApiAddress.get()
 
-  //override def api: DexApi[Id] = fp.sync(DexApi[Try](apiKey, restApiAddress))
-  //override def asyncApi: DexApi[Future] = DexApi[Future](apiKey, restApiAddress)
-
   def asyncRawApi: AsyncEnrichedDexApi = new AsyncEnrichedDexApi(apiKey, restApiAddress)
 
-  def api: DexApi[Id] = asyncRawApi.mapK(toSyncUnsafe)
-  def tryApi: DexApi[SyncTry] = asyncRawApi.mapK(toSyncTry)
-  def rawApi: DexApi[SyncRaw] = asyncRawApi.mapK(toSyncRaw)
+  private val apiFunctorK: FunctorK[DexApi] = FunctorK[DexApi] // IntelliJ FIX
 
-  def asyncApi: DexApi[Future] = asyncRawApi.mapK(toAsyncUnsafe)
-  def asyncTryApi: DexApi[AsyncTry] = asyncRawApi.mapK(toAsyncTry)
+  def api: DexApi[Id] = apiFunctorK.mapK(asyncRawApi)(toSyncUnsafe)
+  def tryApi: DexApi[SyncTry] = apiFunctorK.mapK(asyncRawApi)(toSyncTry)
+  def rawApi: DexApi[SyncRaw] = apiFunctorK.mapK(asyncRawApi)(toSyncRaw)
+
+  def asyncApi: DexApi[Future] = apiFunctorK.mapK(asyncRawApi)(toAsyncUnsafe)
+  def asyncTryApi: DexApi[AsyncTry] = apiFunctorK.mapK(asyncRawApi)(toAsyncTry)
 
   override def waitReady: HasWaitReady[Id] = ???
   override def asyncWaitReady: HasWaitReady[Future] = ???

@@ -5,6 +5,9 @@ import java.net.InetSocketAddress
 import cats.syntax.flatMap._
 import cats.syntax.functor._
 import cats.{FlatMap, Functor}
+import com.wavesplatform.dex.domain.account.Address
+import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.it.api.responses.node.ActivationStatusResponse
 import com.wavesplatform.dex.it.fp.{CanRepeat, RepeatRequestOptions}
 import im.mak.waves.transactions.Transaction
@@ -16,12 +19,22 @@ object NodeApiWaitOps {
 
   implicit final class Implicit[F[_]: Functor: FlatMap](val self: NodeApi[F])(implicit R: CanRepeat[F]) {
 
-    def waitForHeight(height: Int): F[Int] =
-      R.repeatUntil(self.currentHeight)(_.height >= height).map(_.height)
+    // TODO
+    def balance(address: Address, asset: Asset): F[Long] = asset match {
+      case asset: IssuedAsset => self.assetBalance(address, asset)
+      case Asset.Waves => self.wavesBalance(address)
+    }
 
-    def waitForHeightArise(): F[Unit] = for {
-      curr <- self.currentHeight
-      r <- waitForHeight(curr.height + 1)
+    def wavesBalance(address: Address): F[Long] = self.wavesBalanceOrig(address).map(_.balance)
+    def assetBalance(address: Address, asset: IssuedAsset): F[Long] = self.assetBalanceOrig(address, asset).map(_.balance)
+
+    def currentHeight: F[Int] = self.currentHeightOrig.map(_.height)
+
+    def waitForHeight(height: Int): F[Int] = R.repeatUntil(currentHeight)(_ >= height)
+
+    def waitForHeightArise(): F[Int] = for {
+      curr <- currentHeight
+      r <- waitForHeight(curr + 1)
     } yield r
 
     def waitForConnectedPeer(toNode: InetSocketAddress): F[Unit] = {

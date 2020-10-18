@@ -44,11 +44,10 @@ class RoundingIssuesTestSuite extends MatcherSuiteBase {
     val tx = waitForOrderAtNode(counter)
     dex1.api.cancel(alice, counter)
 
-    val exchangeTx =
-      wavesNode1.api.transactionInfo(tx.head.id()).getOrElse(throw new RuntimeException(s"Can't find tx with id = '${tx.head.id()}'")) match {
-        case r: ExchangeTransaction => r
-        case x => throw new RuntimeException(s"Expected ExchangeTransaction, but got $x")
-      }
+    val exchangeTx = wavesNode1.api.transactionInfo(tx.head.id()) match {
+      case r: ExchangeTransaction => r
+      case x => throw new RuntimeException(s"Expected ExchangeTransaction, but got $x")
+    }
 
     exchangeTx.price() shouldBe counter.price
     exchangeTx.amount() shouldBe filledAmount

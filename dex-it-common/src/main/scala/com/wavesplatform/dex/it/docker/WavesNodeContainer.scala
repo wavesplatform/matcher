@@ -4,15 +4,13 @@ import java.net.InetSocketAddress
 import java.nio.file.{Path, Paths}
 
 import cats.Id
-import cats.instances.future.catsStdInstancesForFuture
-import cats.instances.try_._
+import cats.tagless.FunctorK
 import com.dimafeng.testcontainers.GenericContainer
 import com.typesafe.config.Config
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.it.api.HasWaitReady
-import com.wavesplatform.dex.it.api.node.NodeApi
+import com.wavesplatform.dex.it.api.node.{AsyncEnrichedNodeApi, NodeApi}
+import com.wavesplatform.dex.it.api.{toAsyncTry, toAsyncUnsafe, toSyncRaw, toSyncTry, toSyncUnsafe, AsyncTry, HasWaitReady, SyncRaw, SyncTry}
 import com.wavesplatform.dex.it.cache.CachedData
-import com.wavesplatform.dex.it.fp
 import com.wavesplatform.dex.it.resources.getRawContentFromResource
 import com.wavesplatform.dex.it.sttp.LoggingSttpBackend
 import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
@@ -39,8 +37,16 @@ final case class WavesNodeContainer(override val internalIp: String, underlying:
 
   def grpcApiTarget: String = s"${grpcApiAddress.getHostName}:${grpcApiAddress.getPort}"
 
-  def api: NodeApi[Id] = fp.sync(NodeApi[Try](apiKey, cachedRestApiAddress.get()))
-  def asyncApi: NodeApi[Future] = NodeApi[Future](apiKey, cachedRestApiAddress.get())
+  def asyncRawApi: AsyncEnrichedNodeApi = new AsyncEnrichedNodeApi(apiKey, cachedRestApiAddress.get())
+
+  private val apiFunctorK: FunctorK[NodeApi] = FunctorK[NodeApi] // IntelliJ FIX
+
+  def api: NodeApi[Id] = apiFunctorK.mapK(asyncRawApi)(toSyncUnsafe)
+  def tryApi: NodeApi[SyncTry] = apiFunctorK.mapK(asyncRawApi)(toSyncTry)
+  def rawApi: NodeApi[SyncRaw] = apiFunctorK.mapK(asyncRawApi)(toSyncRaw)
+
+  def asyncApi: NodeApi[Future] = apiFunctorK.mapK(asyncRawApi)(toAsyncUnsafe)
+  def asyncTryApi: NodeApi[AsyncTry] = apiFunctorK.mapK(asyncRawApi)(toAsyncTry)
 
   override def waitReady: HasWaitReady[Id] = ???
   override def asyncWaitReady: HasWaitReady[Future] = ???

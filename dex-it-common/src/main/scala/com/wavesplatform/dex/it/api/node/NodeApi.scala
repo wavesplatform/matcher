@@ -1,39 +1,26 @@
 package com.wavesplatform.dex.it.api.node
 
-import java.net.{InetSocketAddress, SocketException}
+import java.net.InetSocketAddress
 
-import cats.MonadError
-import cats.syntax.flatMap._
-import cats.syntax.functor._
-import cats.tagless.{Derive, FunctorK}
-import com.softwaremill.sttp.playJson._
-import com.softwaremill.sttp.{SttpBackend, MonadError => _, _}
-import com.typesafe.config.Config
+import cats.tagless.{autoFunctorK, finalAlg}
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
-import com.wavesplatform.dex.it.api.HasWaitReady
 import com.wavesplatform.dex.it.api.responses.node._
-import com.wavesplatform.dex.it.fp.{CanRepeat, FOps, RepeatRequestOptions}
-import com.wavesplatform.dex.it.json.transactionFormat
-import com.wavesplatform.dex.it.sttp.ResponseParsers.asConfig
-import com.wavesplatform.dex.it.sttp.SttpBackendOps
 import im.mak.waves.transactions.Transaction
 import im.mak.waves.transactions.common.Id
-import play.api.libs.json.{Format, JsResultException, Json}
-
-import scala.concurrent.duration.DurationInt
-import scala.util.control.NonFatal
 
 // TODO ErrorResponse
+@finalAlg
+@autoFunctorK
 trait NodeApi[F[_]] {
 
-  def wavesBalance(address: Address): F[WavesBalanceResponse]
-  def assetBalance(address: Address, asset: IssuedAsset): F[AssetBalanceResponse]
+  def wavesBalanceOrig(address: Address): F[WavesBalanceResponse]
+  def assetBalanceOrig(address: Address, asset: IssuedAsset): F[AssetBalanceResponse]
 
   def broadcast(tx: Transaction): F[Unit]
   def transactionInfo(id: Id): F[Transaction]
 
-  def currentHeight: F[HeightResponse]
+  def currentHeightOrig: F[HeightResponse]
 
   def activationStatus: F[ActivationStatusResponse]
 //  def config: F[Config]

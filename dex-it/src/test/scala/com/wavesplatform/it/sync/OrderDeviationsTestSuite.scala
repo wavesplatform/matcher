@@ -175,7 +175,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
           dex1.api.orderBook(assetPair).bids shouldBe List(HttpV0LevelAgg(1000.waves, 300000))
           dex1.api.reservedBalance(bob)(assetPair.priceAsset) shouldBe 300600000L
 
-          dex1.api.tryPlace(mkOrder(bob, assetPair, BUY, 1000.waves, 89999, matcherFee, feeAsset = assetPair.priceAsset)) should failWith(
+          dex1.tryApi.place(mkOrder(bob, assetPair, BUY, 1000.waves, 89999, matcherFee, feeAsset = assetPair.priceAsset)) should failWith(
             9441295, // DeviantOrderPrice
             orderIsOutOfDeviationBounds("0.00089999", BUY)
           )
@@ -196,7 +196,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
           dex1.api.reservedBalance(bob)(wavesUsdPair.priceAsset) shouldBe 300600L
 
-          dex1.api.tryPlace(mkOrder(bob, wavesUsdPair, BUY, 1000.waves, 89, matcherFee, feeAsset = wavesUsdPair.priceAsset)) should failWith(
+          dex1.tryApi.place(mkOrder(bob, wavesUsdPair, BUY, 1000.waves, 89, matcherFee, feeAsset = wavesUsdPair.priceAsset)) should failWith(
             9441295, // DeviantOrderPrice
             orderIsOutOfDeviationBounds("0.89", BUY)
           )
@@ -214,8 +214,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
           dex1.api.orderBook(assetPair).asks shouldBe List(HttpV0LevelAgg(1000.waves, 500000))
 
-          dex1.api
-            .tryPlace(mkOrder(bob, assetPair, BUY, 1000.waves, 800001, 3 * matcherFee, feeAsset = assetPair.priceAsset)) should failWith(
+          dex1.tryApi.place(mkOrder(bob, assetPair, BUY, 1000.waves, 800001, 3 * matcherFee, feeAsset = assetPair.priceAsset)) should failWith(
             9441295, // DeviantOrderPrice
             orderIsOutOfDeviationBounds("0.00800001", BUY)
           )
@@ -231,7 +230,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
           dex1.api.orderBook(wavesUsdPair).asks shouldBe List(HttpV0LevelAgg(1000.waves, 500))
 
-          dex1.api.tryPlace(mkOrder(alice, wavesUsdPair, BUY, 1000.waves, 801, 3 * 300, feeAsset = wavesUsdPair.priceAsset)) should failWith(
+          dex1.tryApi.place(mkOrder(alice, wavesUsdPair, BUY, 1000.waves, 801, 3 * 300, feeAsset = wavesUsdPair.priceAsset)) should failWith(
             9441295, // DeviantOrderPrice
             orderIsOutOfDeviationBounds("8.01", BUY)
           )
@@ -279,7 +278,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
           dex1.api.orderBook(assetPair).bids shouldBe List(HttpV0LevelAgg(1000.waves, 300000))
 
-          dex1.api.tryPlace(mkOrder(alice, assetPair, SELL, 1000.waves, 119999, matcherFee, feeAsset = assetPair.priceAsset)) should failWith(
+          dex1.tryApi.place(mkOrder(alice, assetPair, SELL, 1000.waves, 119999, matcherFee, feeAsset = assetPair.priceAsset)) should failWith(
             9441295, // DeviantOrderPrice
             orderIsOutOfDeviationBounds("0.00119999", SELL)
           )
@@ -295,7 +294,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
           dex1.api.orderBook(wavesUsdPair).bids shouldBe List(HttpV0LevelAgg(1000.waves, 300))
 
-          dex1.api.tryPlace(mkOrder(alice, wavesUsdPair, SELL, 1000.waves, 119, 300, feeAsset = wavesUsdPair.priceAsset)) should failWith(
+          dex1.tryApi.place(mkOrder(alice, wavesUsdPair, SELL, 1000.waves, 119, 300, feeAsset = wavesUsdPair.priceAsset)) should failWith(
             9441295, // DeviantOrderPrice
             orderIsOutOfDeviationBounds("1.19", SELL)
           )
@@ -316,8 +315,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
           dex1.api.orderBook(assetPair).asks should matchTo(List(HttpV0LevelAgg(1000.waves, 500000)))
 
-          dex1.api
-            .tryPlace(mkOrder(alice, assetPair, SELL, 1000.waves, 850001, 3 * matcherFee, feeAsset)) should failWith(
+          dex1.tryApi.place(mkOrder(alice, assetPair, SELL, 1000.waves, 850001, 3 * matcherFee, feeAsset)) should failWith(
             9441295, // DeviantOrderPrice
             orderIsOutOfDeviationBounds("0.00850001", SELL)
           )
@@ -336,7 +334,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
           dex1.api.orderBook(wavesUsdPair).asks shouldBe List(HttpV0LevelAgg(1000.waves, 500))
 
-          dex1.api.tryPlace(mkOrder(alice, wavesUsdPair, SELL, 1000.waves, 851, 3 * 300, feeAsset)) should failWith(
+          dex1.tryApi.place(mkOrder(alice, wavesUsdPair, SELL, 1000.waves, 851, 3 * 300, feeAsset)) should failWith(
             9441295, // DeviantOrderPrice
             orderIsOutOfDeviationBounds("8.51", SELL)
           )
@@ -399,7 +397,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
         dex1.api.orderBook(assetPair).asks shouldBe List(HttpV0LevelAgg(1000.waves, 600000))
 
-        dex1.api.tryPlace(mkOrder(bob, assetPair, BUY, 1000.waves, 300000, 359999, feeAsset = assetPair.priceAsset)) should failWith(
+        dex1.tryApi.place(mkOrder(bob, assetPair, BUY, 1000.waves, 300000, 359999, feeAsset = assetPair.priceAsset)) should failWith(
           9441551, // DeviantOrderMatcherFee
           feeIsOutOfDeviationBounds("0.00359999", assetPair.priceAssetStr, BUY)
         )
@@ -411,7 +409,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
         dex1.api.orderBook(assetPair).bids shouldBe List(HttpV0LevelAgg(1000.waves, 1200000))
 
-        dex1.api.tryPlace(mkOrder(alice, assetPair, SELL, 1000.waves, 600000, 719999, feeAsset = assetPair.priceAsset)) should failWith(
+        dex1.tryApi.place(mkOrder(alice, assetPair, SELL, 1000.waves, 600000, 719999, feeAsset = assetPair.priceAsset)) should failWith(
           9441551, // DeviantOrderMatcherFee
           feeIsOutOfDeviationBounds("0.00719999", assetPair.priceAssetStr, SELL)
         )
@@ -425,7 +423,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
         dex1.api.orderBook(wavesUsdPair).asks shouldBe List(HttpV0LevelAgg(1000.waves, 600))
 
-        dex1.api.tryPlace(mkOrder(alice, wavesUsdPair, BUY, 1000.waves, 300, 359, feeAsset = wavesUsdPair.priceAsset)) should failWith(
+        dex1.tryApi.place(mkOrder(alice, wavesUsdPair, BUY, 1000.waves, 300, 359, feeAsset = wavesUsdPair.priceAsset)) should failWith(
           9441551, // DeviantOrderMatcherFee
           feeIsOutOfDeviationBounds("3.59", wavesUsdPair.priceAssetStr, BUY)
         )
@@ -437,7 +435,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
         dex1.api.orderBook(wavesUsdPair).bids shouldBe List(HttpV0LevelAgg(1000.waves, 1200))
 
-        dex1.api.tryPlace(mkOrder(bob, wavesUsdPair, SELL, 1000.waves, 600, 719, feeAsset = wavesUsdPair.priceAsset)) should failWith(
+        dex1.tryApi.place(mkOrder(bob, wavesUsdPair, SELL, 1000.waves, 600, 719, feeAsset = wavesUsdPair.priceAsset)) should failWith(
           9441551, // DeviantOrderMatcherFee
           feeIsOutOfDeviationBounds("7.19", wavesUsdPair.priceAssetStr, SELL)
         )

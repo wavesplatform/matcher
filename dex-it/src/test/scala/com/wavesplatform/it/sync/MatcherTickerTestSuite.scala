@@ -27,7 +27,7 @@ class MatcherTickerTestSuite extends MatcherSuiteBase {
 
   "matcher ticker validation" - {
     "get tickers for unavailable asset should produce error" in {
-      dex1.api.tryOrderBookStatus(wctUsdPair) should failWith(11534345, MatcherError.Params(assetId = Some(WctId.toString)))
+      dex1.tryApi.orderBookStatus(wctUsdPair) should failWith(11534345, MatcherError.Params(assetId = Some(WctId.toString)))
     }
 
     "status of empty orderbook" in {
@@ -44,10 +44,10 @@ class MatcherTickerTestSuite extends MatcherSuiteBase {
       val usdWavesPair = AssetPair(usd, Waves)
 
       intercept[RuntimeException] {
-        dex1.api.tryOrderBook(usdWavesPair)
+        dex1.tryApi.orderBook(usdWavesPair)
       }
 
-      dex1.api.tryOrderBook(wavesUsdPair) shouldBe Symbol("right")
+      dex1.tryApi.orderBook(wavesUsdPair) shouldBe Symbol("right")
 //      assert(
 //        node
 //          .matcherGet(s"/matcher/orderbook/${usdWavesPair.amountAssetStr}/${usdWavesPair.priceAssetStr}/status", statusCode = 301)

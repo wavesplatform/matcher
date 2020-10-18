@@ -74,7 +74,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
 
     "is not enough" in {
       upsertRates(btc -> btcRate, eth -> ethRate)
-      dex1.api.tryPlace(
+      dex1.tryApi.place(
         mkOrder(
           owner = bob,
           pair = wavesBtcPair,
@@ -90,7 +90,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
       ) // TODO
 
       // TODO
-      val r = dex1.api.tryPlace(
+      val r = dex1.tryApi.place(
         mkOrder(
           owner = bob,
           pair = wavesBtcPair,
@@ -175,7 +175,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
     val order = mkBobOrder
 
     "only waves supported" in {
-      dex1.api.tryPlace(order) should failWith(
+      dex1.tryApi.place(order) should failWith(
         9441540, // UnexpectedFeeAsset
         s"Required one of the following fee asset: WAVES. But given $BtcId"
       )
@@ -183,7 +183,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
 
     "not only waves supported" in {
       upsertRates(eth -> 0.1)
-      dex1.api.tryPlace(order) should failWith(
+      dex1.tryApi.place(order) should failWith(
         9441540, // UnexpectedFeeAsset
         s"Required one of the following fee asset: $EthId, WAVES. But given $BtcId"
       )
@@ -273,7 +273,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
 
       val newBtcRate = btcRate * 2
 
-      dex1.api.upsertRate(btc, newBtcRate)._1 shouldBe StatusCodes.Ok
+      dex1.rawApi.upsertRate(btc, newBtcRate).code shouldBe StatusCodes.Ok
       dex1.api.reservedBalance(bob)(btc) shouldBe 50150L
       dex1.api.place(mkAliceOrder)
 
@@ -469,7 +469,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
 
   "fee in pairs with different decimals count" in {
     upsertRates(usd -> 5d)
-    dex1.api.tryPlace(mkOrder(bob, wavesUsdPair, OrderType.SELL, 1.waves, 300, matcherFee = 1L, feeAsset = usd)) should failWith(
+    dex1.tryApi.place(mkOrder(bob, wavesUsdPair, OrderType.SELL, 1.waves, 300, matcherFee = 1L, feeAsset = usd)) should failWith(
       9441542, // FeeNotEnough
       s"Required 0.02 $UsdId as fee for this order, but given 0.01 $UsdId"
     )

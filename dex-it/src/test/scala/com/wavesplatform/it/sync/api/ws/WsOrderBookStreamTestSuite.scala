@@ -401,7 +401,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
       val wscs = List(wsc1, wsc2, wsc3)
       wscs.foreach(_.receiveAtLeastN[WsOrderBookChanges](1))
 
-      dex1.api.tryDeleteOrderBook(assetPair)
+      dex1.tryApi.deleteOrderBook(assetPair)
 
       val expectedMessage = WsError(
         timestamp = 0L, // ignored

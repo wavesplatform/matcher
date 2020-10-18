@@ -89,8 +89,8 @@ class OrderFixedFeeTestSuite extends OrderFeeBaseTestSuite {
 
       "should reject orders if orders' matcherFeeAsset not equal to specified in config" in {
         val pair = AssetPair(aliceAsset, Waves)
-        dex1.api.tryPlace(mkOrder(alice, pair, OrderType.BUY, 1, priceFixed)) shouldBe Symbol("left")
-        dex1.api.tryPlace(mkOrder(bob, pair, OrderType.SELL, 1, priceFixed)) shouldBe Symbol("left")
+        dex1.tryApi.place(mkOrder(alice, pair, OrderType.BUY, 1, priceFixed)) shouldBe Symbol("left")
+        dex1.tryApi.place(mkOrder(bob, pair, OrderType.SELL, 1, priceFixed)) shouldBe Symbol("left")
       }
 
       "should reject orders if orders' matcherFee less than specified minFee in config" in {
@@ -98,14 +98,14 @@ class OrderFixedFeeTestSuite extends OrderFeeBaseTestSuite {
         val pair = AssetPair(aliceAsset, Waves)
         val insufficientMatcherFee = minMatcherFee - 1
 
-        dex1.api.tryPlace(
+        dex1.tryApi.place(
           mkOrder(alice, pair, OrderType.BUY, amount, priceFixed, matcherFee = insufficientMatcherFee, feeAsset = aliceAsset)
         ) should failWith(
           9441542, // FeeNotEnough
           s"Required $minMatcherFee ${aliceAsset.toString}"
         )
 
-        dex1.api.tryPlace(
+        dex1.tryApi.place(
           mkOrder(bob, pair, OrderType.SELL, amount, priceFixed, matcherFee = insufficientMatcherFee, feeAsset = aliceAsset)
         ) should failWith(
           9441542, // FeeNotEnough

@@ -3,6 +3,7 @@ package com.wavesplatform.dex.it.dex
 import java.util.Properties
 import java.util.concurrent.ThreadLocalRandom
 
+import cats.Functor
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.it.api.BaseContainersKit
 import com.wavesplatform.dex.it.docker.DexContainer
@@ -16,7 +17,7 @@ trait HasDex { self: BaseContainersKit =>
   protected val defaultDexImage = "wavesplatform/dex-it:latest"
   private val dexImage = Option(System.getenv("DEX_IMAGE")).getOrElse(defaultDexImage)
 
-  implicit protected def toDexApiWaitOps[F[_]: CanRepeat](self: DexApi[F]): DexApiWaitOps.Implicit[F] =
+  implicit protected def toDexApiWaitOps[F[_]: Functor: CanRepeat](self: DexApi[F]): DexApiWaitOps.Implicit[F] =
     new DexApiWaitOps.Implicit[F](self)
 
   protected def dexInitialSuiteConfig: Config = ConfigFactory.empty()

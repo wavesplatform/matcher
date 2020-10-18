@@ -139,7 +139,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
         val order = mkBobOrder
         placeAndAwaitAtDex(order)
 
-        dex1.api.tryCancelWithApiKey(order.id(), Some(alice.publicKey)) should failWith(9437193) // OrderNotFound
+        dex1.tryApi.cancelWithApiKey(order.id(), Some(alice.publicKey)) should failWith(9437193) // OrderNotFound
         dex1.api.cancelWithApiKey(order)
         dex1.api.waitForOrderStatus(order, Status.Cancelled)
       }
@@ -151,7 +151,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       val order = mkOrder(bob, wavesUsdPair, OrderType.SELL, 100.waves, 800)
       placeAndAwaitAtDex(order)
       cancelAndAwait(bob, order)
-      dex1.api.tryCancel(bob, order) should failWith(9437194) // OrderCanceled
+      dex1.tryApi.cancel(bob, order) should failWith(9437194) // OrderCanceled
     }
 
     "when order is fully filled" in {
@@ -160,14 +160,14 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       placeAndAwaitAtDex(order)
       placeAndAwaitAtNode(mkOrder(alice, wavesUsdPair, OrderType.BUY, 100.waves, 500))
 
-      dex1.api.tryCancel(bob, order) should failWith(9437191, s"The order ${order.id()} is filled")
+      dex1.tryApi.cancel(bob, order) should failWith(9437191, s"The order ${order.id()} is filled")
     }
 
     "when request sender is not the sender of and order" in {
       val order = mkBobOrder
       placeAndAwaitAtDex(order)
 
-      val r = dex1.api.tryCancel(matcher, order)
+      val r = dex1.tryApi.cancel(matcher, order)
       r shouldBe Symbol("left")
       r.swap.explicitGet().error shouldBe 9437193 // OrderNotFound
 

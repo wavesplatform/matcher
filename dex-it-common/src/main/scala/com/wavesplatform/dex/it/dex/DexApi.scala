@@ -24,7 +24,7 @@ trait DexApi[F[_]] {
   def publicKey: F[HttpMatcherPublicKey]
 
   def reservedBalance(of: KeyPair, timestamp: Long = System.currentTimeMillis): F[HttpBalance]
-  def reservedBalanceWithApiKey(of: KeyPair, xUserPublicKey: Option[PublicKey]): F[HttpBalance]
+  def reservedBalanceWithApiKey(of: KeyPair, xUserPublicKey: Option[PublicKey] = None): F[HttpBalance]
 
   def tradableBalance(of: KeyPair, assetPair: AssetPair, timestamp: Long = System.currentTimeMillis): F[HttpBalance]
 
@@ -33,6 +33,10 @@ trait DexApi[F[_]] {
 
   def cancel(owner: KeyPair, order: Order): F[HttpSuccessfulSingleCancel] = cancel(owner, order.assetPair, order.id())
   def cancel(owner: KeyPair, assetPair: AssetPair, id: Order.Id): F[HttpSuccessfulSingleCancel]
+
+  def cancelWithApiKey(order: Order, xUserPublicKey: Option[PublicKey] = None): F[HttpSuccessfulSingleCancel] =
+    cancelWithApiKey(order.id(), xUserPublicKey)
+
   def cancelWithApiKey(id: Order.Id, xUserPublicKey: Option[PublicKey]): F[HttpSuccessfulSingleCancel]
 
   def cancelAll(owner: KeyPair, timestamp: Long = System.currentTimeMillis): F[HttpSuccessfulBatchCancel]
@@ -46,7 +50,7 @@ trait DexApi[F[_]] {
   def cancelAllByIdsWithApiKey(
     owner: Address,
     orderIds: Set[Order.Id],
-    xUserPublicKey: Option[PublicKey]
+    xUserPublicKey: Option[PublicKey] = None
   ): F[HttpSuccessfulBatchCancel]
 
   def orderStatus(order: Order): F[HttpOrderStatus] = orderStatus(order.assetPair, order.id())
@@ -60,8 +64,15 @@ trait DexApi[F[_]] {
 
   def orderStatusInfoByIdWithSignature(
     owner: KeyPair,
-    orderId: Order.Id,
+    order: Order,
     timestamp: Long = System.currentTimeMillis
+  ): F[HttpOrderBookHistoryItem] =
+    orderStatusInfoByIdWithSignature(owner, order.id(), timestamp)
+
+  def orderStatusInfoByIdWithSignature(
+    owner: KeyPair,
+    orderId: Order.Id,
+    timestamp: Long
   ): F[HttpOrderBookHistoryItem]
 
   def transactionsByOrder(order: Order): F[List[ExchangeTransaction]] = transactionsByOrder(order.id())
@@ -160,6 +171,7 @@ object DexApi {
 
   type SyncTry[T] = Either[MatcherError, T]
   type SyncUnsafe[T] = T
+  type SyncRaw[_] = Response[String]
 
   implicit val toAsyncHttpResponse: AsyncEnriched ~> AsyncHttpResponse = λ[AsyncEnriched ~> AsyncHttpResponse](_.map(_.response))
   implicit val toAsyncTry: AsyncEnriched ~> AsyncTry = λ[AsyncEnriched ~> AsyncTry](_.map(_.tryGet))
@@ -173,6 +185,10 @@ object DexApi {
 
   implicit val toSyncUnsafe: AsyncEnriched ~> SyncUnsafe = λ[AsyncEnriched ~> SyncUnsafe] { x =>
     Await.result(x.map(parseUnsafe), syncTimeout)
+  }
+
+  implicit val toSyncRaw: AsyncEnriched ~> SyncRaw = λ[AsyncEnriched ~> SyncRaw] { x =>
+    Await.result(x, syncTimeout).response
   }
 
   def parseUnsafe[T](enriched: EnrichedResponse[T]): T = enriched.tryGet match {

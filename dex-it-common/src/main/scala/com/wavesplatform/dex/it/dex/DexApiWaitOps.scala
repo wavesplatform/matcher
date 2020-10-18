@@ -1,5 +1,7 @@
 package com.wavesplatform.dex.it.dex
 
+import cats.Functor
+import cats.syntax.functor._
 import com.wavesplatform.dex.api.http.entities._
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -12,13 +14,21 @@ import scala.concurrent.duration.DurationInt
 object DexApiWaitOps {
 
   // TODO rename to syntax as in cats
-  implicit final class Implicit[F[_]](val self: DexApi[F])(implicit R: CanRepeat[F]) {
+  implicit final class Implicit[F[_]: Functor](val self: DexApi[F])(implicit R: CanRepeat[F]) {
+
+    // TODO move
+    def tradingPairInfo(assetPair: AssetPair): F[Option[HttpMarketDataWithMeta]] = self.allOrderBooks.map {
+      _.markets.find(marketData => marketData.amountAsset == assetPair.amountAsset && marketData.priceAsset == assetPair.priceAsset)
+    }
 
     def waitForOrderStatus(order: Order, status: HttpOrderStatus.Status): F[HttpOrderStatus] =
       waitForOrderStatus(order.assetPair, order.id(), status)
 
     def waitForOrderStatus(assetPair: AssetPair, id: Order.Id, status: HttpOrderStatus.Status): F[HttpOrderStatus] =
       waitForOrder(assetPair, id)(_.status == status)
+
+    def waitForOrder(order: Order)(pred: HttpOrderStatus => Boolean): F[HttpOrderStatus] =
+      waitForOrder(order.assetPair, order.id())(pred)
 
     def waitForOrder(assetPair: AssetPair, id: Order.Id)(pred: HttpOrderStatus => Boolean): F[HttpOrderStatus] =
       R.repeatUntil(self.orderStatus(assetPair, id), RepeatRequestOptions.default)(pred)

@@ -45,7 +45,7 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
   "can't place if the script returns FALSE" in {
     val pair = AssetPair(unscriptedAsset, denyAsset)
     val order = mkOrder(matcher, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, matcherFee = smartTradeFee, version = 2)
-    dex1.api.tryPlace(order) should failWith(
+    dex1.tryApi.place(order) should failWith(
       11536130, // AssetScriptDeniedOrder
       MatcherError.Params(assetId = Some(denyAsset.id.toString))
     )
@@ -105,7 +105,7 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     dex1.api.waitForOrderStatus(counter, Status.PartiallyFilled)
 
     val txs = dex1.api.waitForTransactionsByOrder(submitted, 1)
-    val r = wavesNode1.api.tryBroadcast(txs.head)
+    val r = wavesNode1.tryApi.broadcast(txs.head)
     r shouldBe Symbol("left")
     r.swap.explicitGet().error shouldBe 308 // node's ApiError TransactionNotAllowedByAssetScript.Id
   }
@@ -132,7 +132,7 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     dex1.api.waitForOrderStatus(counter, Status.PartiallyFilled)
 
     val txs = dex1.api.waitForTransactionsByOrder(submitted, 1)
-    val r = wavesNode1.api.tryBroadcast(txs.head)
+    val r = wavesNode1.tryApi.broadcast(txs.head)
     r shouldBe Symbol("left")
     r.swap.explicitGet().error shouldBe 308 // node's ApiError TransactionNotAllowedByAssetScript.Id
   }

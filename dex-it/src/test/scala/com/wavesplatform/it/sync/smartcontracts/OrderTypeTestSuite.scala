@@ -46,7 +46,7 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
         val aliceOrd1 = mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
         placeAndAwaitAtDex(aliceOrd1)
 
-        dex1.api.tryPlace(
+        dex1.tryApi.place(
           mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
         ) should failWith(
           3147522, // AccountScriptDeniedOrder
@@ -72,7 +72,7 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
           "yRtYXRjaDAGCQEAAAAFdGhyb3cAAAAAYWVPjA=="
         )
 
-        dex1.api.tryPlace(
+        dex1.tryApi.place(
           mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
         ) should failWith(
           3147522, // AccountScriptDeniedOrder
@@ -135,7 +135,7 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
         waitForOrderAtNode(bobOrd1)
 
         val txs = dex1.api.waitForTransactionsByOrder(bobOrd2, 1)
-        val r = wavesNode1.api.tryBroadcast(txs.head)
+        val r = wavesNode1.tryApi.broadcast(txs.head)
         r shouldBe Symbol("left")
         r.swap.explicitGet().error shouldBe 307 // node's ApiError TransactionNotAllowedByAccountScript.Id
       }

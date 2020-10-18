@@ -41,7 +41,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
 
   "issue asset and run test" - {
     "trading is deprecated" in {
-      dex1.api.tryPlace(
+      dex1.tryApi.place(
         mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 1)
       ) should failWith(
         2097923, // AccountFeatureUnsupported
@@ -50,7 +50,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
     }
 
     "can't place an OrderV2 before the activation" in {
-      dex1.api.tryPlace(
+      dex1.tryApi.place(
         mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2)
       ) should failWith(
         2099459, // OrderVersionUnsupported
@@ -65,7 +65,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
       // true && (height > 0)
       updateBobScript("AgMGCQAAZgAAAAIFAAAABmhlaWdodAAAAAAAAAAAAAeEODpj")
       Thread.sleep(3000) // TODO Sometimes fail without this awaiting, probably issue in the cache
-      dex1.api.tryPlace(
+      dex1.tryApi.place(
         mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2)
       ) should failWith(
         3147520, // AccountScriptReturnedError
@@ -121,7 +121,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
       }
 
       "reject incorrect order" in {
-        dex1.api.tryPlace(
+        dex1.tryApi.place(
           mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2)
         ) should failWith(
           3147522 // AccountScriptDeniedOrder

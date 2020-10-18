@@ -99,7 +99,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
   override def cancelAllByIdsWithApiKey(
     owner: Address,
     orderIds: Set[Id],
-    xUserPublicKey: Option[PublicKey]
+    xUserPublicKey: Option[PublicKey] = None
   ): AsyncEnriched[HttpSuccessfulBatchCancel] = mk {
     sttp
       .post(uri"$apiUri/matcher/orders/$owner/cancel")

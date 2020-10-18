@@ -14,7 +14,7 @@ import com.wavesplatform.dex.it.api.HasWaitReady
 import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import com.wavesplatform.dex.it.cache.CachedData
 import com.wavesplatform.dex.it.collections.Implicits.ListOps
-import com.wavesplatform.dex.it.dex.DexApi.{AsyncTry, SyncTry}
+import com.wavesplatform.dex.it.dex.DexApi.{AsyncTry, SyncRaw, SyncTry}
 import com.wavesplatform.dex.it.dex.{AsyncEnrichedDexApi, DexApi}
 import com.wavesplatform.dex.it.resources.getRawContentFromResource
 import com.wavesplatform.dex.it.sttp.LoggingSttpBackend
@@ -38,12 +38,14 @@ final case class DexContainer private (override val internalIp: String, underlyi
   //override def api: DexApi[Id] = fp.sync(DexApi[Try](apiKey, restApiAddress))
   //override def asyncApi: DexApi[Future] = DexApi[Future](apiKey, restApiAddress)
 
-  def asyncEnrichedApi: AsyncEnrichedDexApi = new AsyncEnrichedDexApi(apiKey, restApiAddress)
+  def asyncRawApi: AsyncEnrichedDexApi = new AsyncEnrichedDexApi(apiKey, restApiAddress)
 
-  def api: DexApi[Id] = asyncEnrichedApi.mapK(DexApi.toSyncUnsafe)
-  def tryApi: DexApi[SyncTry] = asyncEnrichedApi.mapK(DexApi.toSyncTry)
-  def asyncApi: DexApi[Future] = asyncEnrichedApi.mapK(DexApi.toAsyncUnsafe)
-  def tryAsyncApi: DexApi[AsyncTry] = asyncEnrichedApi.mapK(DexApi.toAsyncTry)
+  def api: DexApi[Id] = asyncRawApi.mapK(DexApi.toSyncUnsafe)
+  def tryApi: DexApi[SyncTry] = asyncRawApi.mapK(DexApi.toSyncTry)
+  def rawApi: DexApi[SyncRaw] = asyncRawApi.mapK(DexApi.toSyncRaw)
+
+  def asyncApi: DexApi[Future] = asyncRawApi.mapK(DexApi.toAsyncUnsafe)
+  def asyncTryApi: DexApi[AsyncTry] = asyncRawApi.mapK(DexApi.toAsyncTry)
 
   override def waitReady: HasWaitReady[Id] = ???
   override def asyncWaitReady: HasWaitReady[Future] = ???

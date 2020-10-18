@@ -1,22 +1,12 @@
 package com.wavesplatform.dex.it.dex
 
-import cats._
-import cats.implicits._
 import cats.tagless._
-import com.softwaremill.sttp.Response
 import com.typesafe.config.Config
 import com.wavesplatform.dex.api.http.entities._
 import com.wavesplatform.dex.domain.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.Order
-import com.wavesplatform.dex.it.api.EnrichedResponse
-import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import im.mak.waves.transactions.ExchangeTransaction
-import play.api.libs.json.Json
-
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration.DurationInt
-import scala.concurrent.{Await, Future}
 
 @finalAlg
 @autoFunctorK
@@ -134,66 +124,4 @@ trait DexApi[F[_]] {
 
   def wsConnections: F[HttpWebSocketConnections]
   def closeWsConnections(oldestNumber: Int): F[HttpMessage]
-
-  // TODO move
-
-//  def waitForOrder(order: Order)(pred: HttpOrderStatus => Boolean): F[HttpOrderStatus] = waitForOrder(order.assetPair, order.id())(pred)
-//  def waitForOrder(assetPair: AssetPair, id: Order.Id)(pred: HttpOrderStatus => Boolean): F[HttpOrderStatus]
-//
-//  def waitForOrderPlacement(order: Order): F[HttpSuccessfulPlace]
-//
-//  def waitForOrderHistory[A](owner: KeyPair, activeOnly: Option[Boolean])(
-//    pred: List[HttpOrderBookHistoryItem] => Boolean
-//  ): F[List[HttpOrderBookHistoryItem]]
-//
-//  def waitForOrderStatus(order: Order, status: HttpOrderStatus.Status): F[HttpOrderStatus] =
-//    waitForOrderStatus(order.assetPair, order.id(), status)
-//
-//  def waitForOrderStatus(assetPair: AssetPair, id: Order.Id, status: HttpOrderStatus.Status): F[HttpOrderStatus]
-//
-//  def waitForTransactionsByOrder(order: Order, atLeast: Int): F[List[ExchangeTransaction]] = waitForTransactionsByOrder(order.id(), atLeast)
-//  def waitForTransactionsByOrder(id: Order.Id, atLeast: Int): F[List[ExchangeTransaction]]
-//
-//  def waitForTransactionsByOrder(id: Order.Id)(pred: List[ExchangeTransaction] => Boolean): F[List[ExchangeTransaction]]
-//
-//  def waitForCurrentOffset(pred: Long => Boolean): F[HttpOffset]
-//
-//  def waitForWsConnections(pred: HttpWebSocketConnections => Boolean): F[HttpWebSocketConnections]
-}
-
-object DexApi {
-
-  type AsyncEnriched[T] = Future[EnrichedResponse[T]]
-
-  type AsyncHttpResponse[_] = Future[Response[String]]
-  type AsyncTry[T] = Future[Either[MatcherError, T]]
-  type AsyncUnsafe[T] = Future[T]
-
-  type SyncTry[T] = Either[MatcherError, T]
-  type SyncUnsafe[T] = T
-  type SyncRaw[_] = Response[String]
-
-  implicit val toAsyncHttpResponse: AsyncEnriched ~> AsyncHttpResponse = λ[AsyncEnriched ~> AsyncHttpResponse](_.map(_.response))
-  implicit val toAsyncTry: AsyncEnriched ~> AsyncTry = λ[AsyncEnriched ~> AsyncTry](_.map(_.tryGet))
-  implicit val toAsyncUnsafe: AsyncEnriched ~> AsyncUnsafe = λ[AsyncEnriched ~> AsyncUnsafe](_.map(parseUnsafe))
-
-  val syncTimeout = 10.minutes
-
-  implicit val toSyncTry: AsyncEnriched ~> SyncTry = λ[AsyncEnriched ~> SyncTry] { x =>
-    Await.result(x.map(_.tryGet), syncTimeout)
-  }
-
-  implicit val toSyncUnsafe: AsyncEnriched ~> SyncUnsafe = λ[AsyncEnriched ~> SyncUnsafe] { x =>
-    Await.result(x.map(parseUnsafe), syncTimeout)
-  }
-
-  implicit val toSyncRaw: AsyncEnriched ~> SyncRaw = λ[AsyncEnriched ~> SyncRaw] { x =>
-    Await.result(x, syncTimeout).response
-  }
-
-  def parseUnsafe[T](enriched: EnrichedResponse[T]): T = enriched.tryGet match {
-    case Left(e) => throw new RuntimeException(s"An unexpected MatcherError: $e")
-    case Right(x) => x
-  }
-
 }

@@ -17,8 +17,7 @@ import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.Order.Id
-import com.wavesplatform.dex.it.api.EnrichedResponse
-import com.wavesplatform.dex.it.dex.DexApi.AsyncEnriched
+import com.wavesplatform.dex.it.api._
 import com.wavesplatform.dex.it.json._
 import im.mak.waves.transactions.ExchangeTransaction
 import play.api.libs.json.{Json, Reads}

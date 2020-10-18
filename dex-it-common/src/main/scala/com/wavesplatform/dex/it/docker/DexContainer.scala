@@ -4,17 +4,12 @@ import java.net.InetSocketAddress
 import java.nio.file.{Path, Paths}
 
 import cats.Id
-import cats.instances.future.catsStdInstancesForFuture
-import cats.instances.try_._
-import cats.tagless.implicits._
 import com.dimafeng.testcontainers.GenericContainer
 import com.typesafe.config.Config
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.it.api.HasWaitReady
-import com.wavesplatform.dex.it.api.responses.dex.MatcherError
+import com.wavesplatform.dex.it.api._
 import com.wavesplatform.dex.it.cache.CachedData
 import com.wavesplatform.dex.it.collections.Implicits.ListOps
-import com.wavesplatform.dex.it.dex.DexApi.{AsyncTry, SyncRaw, SyncTry}
 import com.wavesplatform.dex.it.dex.{AsyncEnrichedDexApi, DexApi}
 import com.wavesplatform.dex.it.resources.getRawContentFromResource
 import com.wavesplatform.dex.it.sttp.LoggingSttpBackend
@@ -40,12 +35,12 @@ final case class DexContainer private (override val internalIp: String, underlyi
 
   def asyncRawApi: AsyncEnrichedDexApi = new AsyncEnrichedDexApi(apiKey, restApiAddress)
 
-  def api: DexApi[Id] = asyncRawApi.mapK(DexApi.toSyncUnsafe)
-  def tryApi: DexApi[SyncTry] = asyncRawApi.mapK(DexApi.toSyncTry)
-  def rawApi: DexApi[SyncRaw] = asyncRawApi.mapK(DexApi.toSyncRaw)
+  def api: DexApi[Id] = asyncRawApi.mapK(toSyncUnsafe)
+  def tryApi: DexApi[SyncTry] = asyncRawApi.mapK(toSyncTry)
+  def rawApi: DexApi[SyncRaw] = asyncRawApi.mapK(toSyncRaw)
 
-  def asyncApi: DexApi[Future] = asyncRawApi.mapK(DexApi.toAsyncUnsafe)
-  def asyncTryApi: DexApi[AsyncTry] = asyncRawApi.mapK(DexApi.toAsyncTry)
+  def asyncApi: DexApi[Future] = asyncRawApi.mapK(toAsyncUnsafe)
+  def asyncTryApi: DexApi[AsyncTry] = asyncRawApi.mapK(toAsyncTry)
 
   override def waitReady: HasWaitReady[Id] = ???
   override def asyncWaitReady: HasWaitReady[Future] = ???

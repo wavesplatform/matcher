@@ -11,7 +11,9 @@ sealed trait EnrichedResponse[T] {
 }
 
 object EnrichedResponse {
+
   case class AsJson[T](response: Response[String])(implicit val reads: Reads[T]) extends EnrichedResponse[T] {
+
     override def tryGet: Either[MatcherError, T] = response.body match {
       case Left(e) =>
         Json.parse(e)
@@ -24,9 +26,24 @@ object EnrichedResponse {
           .fold(throw new RuntimeException(s"The server returned success, but can't parse response: $x"))(identity)
           .asRight
     }
+
   }
 
   case class AsHocon[T](response: Response[String]) extends EnrichedResponse[T] {
     override def tryGet: Either[MatcherError, T] = ???
   }
+
+  case class Ignore(response: Response[String]) extends EnrichedResponse[Unit] {
+
+    override def tryGet: Either[MatcherError, Unit] = response.body match {
+      case Left(e) =>
+        Json.parse(e)
+          .asOpt[MatcherError]
+          .fold(throw new RuntimeException(s"The server returned error, but can't parse response as MatcherError: $e"))(identity)
+          .asLeft
+      case _ => ().asRight
+    }
+
+  }
+
 }

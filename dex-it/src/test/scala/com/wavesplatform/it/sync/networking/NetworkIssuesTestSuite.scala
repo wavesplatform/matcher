@@ -8,6 +8,7 @@ import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.SELL
 import com.wavesplatform.dex.effect.FutureOps.Implicits
 import com.wavesplatform.dex.it.api.HasToxiProxy
+import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import com.wavesplatform.dex.it.docker.WavesNodeContainer
 import com.wavesplatform.it.WsSuiteBase
 import com.wavesplatform.it.tags.NetworkTests
@@ -15,7 +16,7 @@ import eu.rekawek.toxiproxy.model.ToxicDirection
 import org.testcontainers.containers.ToxiproxyContainer.ContainerProxy
 
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.{blocking, Await, Future}
+import scala.concurrent.{Await, Future, blocking}
 
 @NetworkTests
 class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
@@ -80,7 +81,12 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
 
       dex1.connectToNetwork()
 
-      dex1.tryApi.place(mkOrder(acc, wavesUsdPair, SELL, 50.waves, 1.usd)) should failWith(3147270)
+      val o = mkOrder(acc, wavesUsdPair, SELL, 50.waves, 1.usd)
+
+      dex1.tryApi.place(o) match {
+        case Left(MatcherError(x,_,_,_)) => x should be equals 3147270
+        case _ => dex1.api.waitForOrderStatus(o, Status.Cancelled)
+      }
     }
 
     "user doesn't have a balances snapshot (got by ws connection)" in {
@@ -93,7 +99,12 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
 
       dex1.connectToNetwork()
 
-      dex1.tryApi.place(mkOrder(acc, wavesUsdPair, SELL, 50.waves, 1.usd)) should failWith(3147270)
+      val o = mkOrder(acc, wavesUsdPair, SELL, 50.waves, 1.usd)
+
+      dex1.tryApi.place(o) match {
+        case Left(MatcherError(x,_,_,_)) => x should be equals 3147270
+        case _ => dex1.api.waitForOrderStatus(o, Status.Cancelled)
+      }
     }
   }
 

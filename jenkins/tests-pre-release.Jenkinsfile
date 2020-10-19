@@ -10,8 +10,8 @@ pipeline {
         string(name: 'PREVIOUS_BRANCH_OR_TAG', defaultValue: 'origin/master', description: 'Dex branch')
         string(name: 'NEW_BRANCH_OR_TAG', defaultValue: 'origin/master', description: 'Dex branch')
 
-        gitParameter branchFilter: '**', defaultValue: 'origin/master', name: 'PREVIOUS_BRANCH_OR_TAG1', type: 'PT_BRANCH_TAG', useRepository: 'https://github.com/wavesplatform/matcher.git'
-        gitParameter branchFilter: '**', defaultValue: 'origin/master', name: 'NEW_BRANCH_OR_TAG1', type: 'PT_BRANCH_TAG', useRepository: 'https://github.com/wavesplatform/matcher.git'
+        gitParameter branchFilter: '**', defaultValue: 'origin/master', name: 'PREVIOUS_BRANCH_OR_TAG1', type: 'PT_BRANCH_TAG', useRepository: 'Dex'
+        gitParameter branchFilter: '**', defaultValue: 'origin/master', name: 'NEW_BRANCH_OR_TAG1', type: 'PT_BRANCH_TAG', useRepository: 'Dex'
 
     }
     environment {

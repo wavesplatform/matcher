@@ -7,8 +7,6 @@ pipeline {
         string(name: 'DEX_PREVIOUS_IMAGE', defaultValue: 'dex-it:2.2.2', description: 'Matcher image on the Mainnet')
         string(name: 'NODE_NEW_IMAGE', defaultValue: 'waves-integration-it:master', description: 'Version of the node used by the new matcher')
         string(name: 'DEX_NEW_IMAGE', defaultValue: 'dex-it:master', description: 'New version of the matcher')
-        string(name: 'PREVIOUS_BRANCH_OR_TAG', defaultValue: 'origin/master', description: 'Dex branch or tag deployed on mainnet')
-        string(name: 'NEW_BRANCH_OR_TAG', defaultValue: 'origin/master', description: 'Dex branch of release candidate')
     }
     environment {
           dexPrevImage = "${REGISTRY}/waves/dex/${DEX_PREVIOUS_IMAGE}"

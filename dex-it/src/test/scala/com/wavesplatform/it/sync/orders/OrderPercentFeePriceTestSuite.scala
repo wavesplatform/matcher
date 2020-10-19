@@ -153,7 +153,7 @@ class OrderPercentFeePriceTestSuite extends OrderFeeBaseTestSuite {
     }
 
     s"buy order should be rejected user will get tokens for pay fee after order executed when fee asset-type = $assetType" in {
-      dex1.api.tryPlace(
+      dex1.tryApi.place(
         mkOrder(
           mkAccountWithBalance(fullyAmountUsd -> usd),
           wavesUsdPair,
@@ -168,8 +168,8 @@ class OrderPercentFeePriceTestSuite extends OrderFeeBaseTestSuite {
     }
 
     s"buy order should be rejected if fee less then minimum possible fee when fee asset-type = $assetType" in {
-      dex1.api
-        .tryPlace(
+      dex1.tryApi
+        .place(
           mkOrder(
             mkAccountWithBalance(fullyAmountUsd + minimalFee -> IssuedAsset(UsdId)),
             wavesUsdPair,
@@ -184,8 +184,8 @@ class OrderPercentFeePriceTestSuite extends OrderFeeBaseTestSuite {
     }
 
     s"sell order should be rejected if fee less then minimum possible fee when fee asset-type = $assetType" in {
-      dex1.api
-        .tryPlace(
+      dex1.tryApi
+        .place(
           mkOrder(
             mkAccountWithBalance(fullyAmountWaves -> Waves, minimalFee -> IssuedAsset(UsdId)),
             wavesUsdPair,

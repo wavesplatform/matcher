@@ -52,7 +52,7 @@ class TradersTestSuite extends MatcherSuiteBase {
       trickyBobWavesPairWB58.key shouldBe AssetPair(wct, Waves).key
 
       val trickyBobOrderWB58 = mkOrder(bob, trickyBobWavesPairWB58, OrderType.BUY, 1, 10.waves * Order.PriceConstant)
-      dex1.api.tryPlace(trickyBobOrderWB58) should failWith(9440512) // OrderInvalidSignature
+      dex1.tryApi.place(trickyBobOrderWB58) should failWith(9440512) // OrderInvalidSignature
 
       val trickyBobWavesPairWS = AssetPair(
         amountAsset = IssuedAsset(ByteStr(Asset.WavesName.getBytes)),
@@ -60,7 +60,7 @@ class TradersTestSuite extends MatcherSuiteBase {
       )
 
       val trickyBobOrderWS = mkOrder(bob, trickyBobWavesPairWS, OrderType.BUY, 100000, 10000000)
-      dex1.api.tryPlace(trickyBobOrderWS) should failWith(
+      dex1.tryApi.place(trickyBobOrderWS) should failWith(
         11534345, // AssetNotFound
         MatcherError.Params(assetId = Some(trickyBobWavesPairWS.amountAssetStr))
       )
@@ -286,7 +286,7 @@ class TradersTestSuite extends MatcherSuiteBase {
 
       wavesNode1.api.broadcast(mkTransfer(bob, alice, wavesNode1.api.balance(bob, Waves) - matcherFee, Waves))
 
-      dex1.api.tryPlace(mkOrderDP(bob, wavesUsdPair, SELL, 100.waves, 3.00)) should failWith(3147270) // BalanceNotEnough
+      dex1.tryApi.place(mkOrderDP(bob, wavesUsdPair, SELL, 100.waves, 3.00)) should failWith(3147270) // BalanceNotEnough
     }
   }
 }

@@ -1,4 +1,4 @@
-package com.wavesplatform.dex.it.dex
+package com.wavesplatform.dex.it.api.dex
 
 import java.util.Properties
 import java.util.concurrent.ThreadLocalRandom
@@ -7,7 +7,7 @@ import cats.Functor
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.it.api.BaseContainersKit
 import com.wavesplatform.dex.it.docker.DexContainer
-import com.wavesplatform.dex.it.fp.CanExtract
+import com.wavesplatform.dex.it.fp.CanRepeat
 import mouse.any._
 import org.apache.kafka.clients.admin.{AdminClient, NewTopic}
 
@@ -17,8 +17,8 @@ trait HasDex { self: BaseContainersKit =>
   protected val defaultDexImage = "wavesplatform/dex-it:latest"
   private val dexImage = Option(System.getenv("DEX_IMAGE")).getOrElse(defaultDexImage)
 
-  implicit protected def toDexExplicitGetOps[F[_]: CanExtract: Functor](self: DexApi[F]): DexApiOps.ExplicitGetDexApiOps[F] =
-    new DexApiOps.ExplicitGetDexApiOps[F](self)
+  implicit protected def toDexApiSyntax[F[_]: Functor: CanRepeat](self: DexApi[F]): DexApiSyntax.Ops[F] =
+    new DexApiSyntax.Ops[F](self)
 
   protected def dexInitialSuiteConfig: Config = ConfigFactory.empty()
 

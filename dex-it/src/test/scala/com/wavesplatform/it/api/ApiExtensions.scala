@@ -6,13 +6,12 @@ import cats.Id
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.api.http.entities.{HttpOrderBookHistoryItem, HttpOrderStatus}
 import com.wavesplatform.dex.domain.account.KeyPair
-import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.it.api.dex.DexApi
 import com.wavesplatform.dex.it.api.node.{NodeApi, NodeApiExtensions}
-import com.wavesplatform.dex.it.dex.DexApi
 import com.wavesplatform.dex.it.docker.DexContainer
-import com.wavesplatform.it.{api, MatcherSuiteBase}
+import com.wavesplatform.it.{MatcherSuiteBase, api}
 import im.mak.waves.transactions.ExchangeTransaction
 import mouse.any._
 
@@ -110,24 +109,13 @@ trait ApiExtensions extends NodeApiExtensions {
     val account = mkKeyPair(s"account-test-${ThreadLocalRandom.current().nextInt}")
     val transfers = balances.map {
       case (balance, asset) =>
-        val sender = asset match {
-          case Waves => alice
-          case ia: IssuedAsset => if (wavesNode1.api.assetBalance(alice, ia).balance >= balance) alice else bob
-        }
+        val sender = if (wavesNode1.api.balance(alice, asset) >= balance) alice else bob
         mkTransfer(sender, account, balance, asset, 0.003.waves)
     }
     transfers.par.foreach(broadcastAndAwait(_))
     eventually {
       balances.foreach {
-        case (expectedBalance, asset) =>
-          // Sadly, this won't work because of price assets, we need a better API to make this simpler.
-          // val pair = if (asset == Waves) wavesUsdPair else if (asset.compatId > Waves.compatId) AssetPair(asset, Waves) else AssetPair(Waves, asset)
-          // dex1.api.tradableBalance(account, pair).getOrElse(asset, 0L) shouldBe balance
-          val actualBalance = asset match {
-            case Waves => wavesNode1.api.wavesBalance(account).balance
-            case asset: IssuedAsset => wavesNode1.api.assetBalance(account, asset).balance
-          }
-          actualBalance shouldBe expectedBalance
+        case (expectedBalance, asset) => wavesNode1.api.balance(account, asset) shouldBe expectedBalance
       }
     }
     account

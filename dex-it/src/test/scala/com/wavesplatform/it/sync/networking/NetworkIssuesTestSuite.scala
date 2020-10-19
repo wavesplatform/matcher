@@ -80,7 +80,7 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
 
       dex1.connectToNetwork()
 
-      dex1.api.tryPlace(mkOrder(acc, wavesUsdPair, SELL, 50.waves, 1.usd)) should failWith(3147270)
+      dex1.tryApi.place(mkOrder(acc, wavesUsdPair, SELL, 50.waves, 1.usd)) should failWith(3147270)
     }
 
     "user doesn't have a balances snapshot (got by ws connection)" in {
@@ -93,7 +93,7 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
 
       dex1.connectToNetwork()
 
-      dex1.api.tryPlace(mkOrder(acc, wavesUsdPair, SELL, 50.waves, 1.usd)) should failWith(3147270)
+      dex1.tryApi.place(mkOrder(acc, wavesUsdPair, SELL, 50.waves, 1.usd)) should failWith(3147270)
     }
   }
 

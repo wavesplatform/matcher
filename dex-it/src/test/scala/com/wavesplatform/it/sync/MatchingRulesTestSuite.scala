@@ -256,14 +256,14 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
   }
 
   "Placing order on level 0" in {
-    dex1.api.tryPlace(mkOrder(bob, wctUsdPair, BUY, amount * 100000000L, 1, matcherFee)) should failWith(
+    dex1.tryApi.place(mkOrder(bob, wctUsdPair, BUY, amount * 100000000L, 1, matcherFee)) should failWith(
       9441286, // OrderInvalidPriceLevel
       "The buy order's price 0.00000001 does not meet matcher's requirements: price >= 12 (actual tick size). Orders can not be placed into level with price 0"
     )
   }
 
   "Placing order on level 0 with virgin orderbook" in {
-    dex1.api.tryPlace(mkOrder(bob, wctWavesPair, BUY, amount * 100000000L, 1 * 1000000L, matcherFee)) should failWith(
+    dex1.tryApi.place(mkOrder(bob, wctWavesPair, BUY, amount * 100000000L, 1 * 1000000L, matcherFee)) should failWith(
       9441286, // OrderInvalidPriceLevel
       "The buy order's price 0.00000001 does not meet matcher's requirements: price >= 12 (actual tick size). Orders can not be placed into level with price 0"
     )

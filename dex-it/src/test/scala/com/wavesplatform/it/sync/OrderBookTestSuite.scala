@@ -65,7 +65,7 @@ class OrderBookTestSuite extends MatcherSuiteBase {
     aliceRBForBothPairs = reservedBalancesOf(alice)
     bobRBForBothPairs = reservedBalancesOf(bob)
 
-    dex1.api.tryDeleteOrderBook(wctUsdPair) shouldBe Symbol("right")
+    dex1.tryApi.deleteOrderBook(wctUsdPair) shouldBe Symbol("right")
   }
 
   "When delete order book" - {
@@ -111,7 +111,7 @@ class OrderBookTestSuite extends MatcherSuiteBase {
     }
 
     "matcher can start after multiple delete events" in {
-      def deleteWctWaves(): Future[Either[MatcherError, HttpMessage]] = dex1.asyncApi.tryDeleteOrderBook(wctWavesPair)
+      def deleteWctWaves(): Future[Either[MatcherError, HttpMessage]] = dex1.asyncTryApi.deleteOrderBook(wctWavesPair)
       val deleteMultipleTimes = deleteWctWaves()
         .zip(deleteWctWaves())
         .map(_ => ())

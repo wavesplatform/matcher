@@ -358,7 +358,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
         1.waves -> 3.usd
       )
 
-      dex1.api.tryPlaceMarket(mkOrder(bob, wavesUsdPair, BUY, 3.waves, 2.usd, fixedFee)) should failWith(
+      dex1.tryApi.placeMarket(mkOrder(bob, wavesUsdPair, BUY, 3.waves, 2.usd, fixedFee)) should failWith(
         19927055,
         tooLowPrice("buy", "2")
       )
@@ -370,7 +370,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
 
       placeOrders(bob, wavesUsdPair, BUY)(amount -> price)
 
-      dex1.api.tryPlaceMarket(mkOrder(alice, wavesUsdPair, SELL, amount, marketPrice, fixedFee)) should failWith(
+      dex1.tryApi.placeMarket(mkOrder(alice, wavesUsdPair, SELL, amount, marketPrice, fixedFee)) should failWith(
         19927055,
         tooHighPrice("sell", "0.5")
       )
@@ -385,7 +385,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
 
       placeOrders(alice, wavesUsdPair, SELL)(amount -> price)
 
-      dex1.api.tryPlaceMarket(mkOrder(account, wavesUsdPair, BUY, amount, price, fixedFee)) should failWithBalanceNotEnough(
+      dex1.tryApi.placeMarket(mkOrder(account, wavesUsdPair, BUY, amount, price, fixedFee)) should failWithBalanceNotEnough(
         required = Map(Waves -> fixedFee, usd -> 0.01.usd)
       )
     }
@@ -405,7 +405,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
 
       placeAndAwaitAtDex(mkOrder(bob, wavesUsdPair, SELL, amount, price, fixedFee, feeAsset = btc, version = 3))
 
-      dex1.api.tryPlaceMarket(mkOrder(account, wavesUsdPair, BUY, amount, price, fixedFee, feeAsset = btc)) should failWithBalanceNotEnough(
+      dex1.tryApi.placeMarket(mkOrder(account, wavesUsdPair, BUY, amount, price, fixedFee, feeAsset = btc)) should failWithBalanceNotEnough(
         required = Map(btc -> fixedFee, usd -> 0.01.usd)
       )
     }
@@ -426,7 +426,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
     dex1.api.reservedBalance(carol) should matchTo(Map[Asset, Long](Waves -> 10.waves))
     wavesNode1.api.balance(carol, Waves) shouldBe 10.waves
 
-    dex1.api.tryPlaceMarket(order2) should failWithBalanceNotEnough()
+    dex1.tryApi.placeMarket(order2) should failWithBalanceNotEnough()
   }
 
   "Market order should be executed even if sender balance isn't enough to cover order value" in {

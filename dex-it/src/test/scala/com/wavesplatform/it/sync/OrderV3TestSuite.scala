@@ -20,7 +20,7 @@ class OrderV3TestSuite extends MatcherSuiteBase {
 
     "try to place not allowed orderV3" in {
       val orderV3 = mkOrder(alice, wavesUsdPair, OrderType.BUY, 3, price, version = 3)
-      dex1.api.tryPlace(orderV3) should failWith(9439746, "The orders of version 3 are denied by matcher") // OrderVersionDenied
+      dex1.tryApi.place(orderV3) should failWith(9439746, "The orders of version 3 are denied by matcher") // OrderVersionDenied
     }
 
     "matching orderV1 and orderV3" in {

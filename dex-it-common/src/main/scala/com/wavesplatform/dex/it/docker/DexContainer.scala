@@ -3,16 +3,16 @@ package com.wavesplatform.dex.it.docker
 import java.net.InetSocketAddress
 import java.nio.file.{Path, Paths}
 
-import cats.Id
-import cats.instances.future.catsStdInstancesForFuture
-import cats.instances.try_._
+import cats.tagless.FunctorK
 import com.dimafeng.testcontainers.GenericContainer
+import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.Config
 import com.wavesplatform.dex.domain.utils.ScorexLogging
+import com.wavesplatform.dex.it.api._
+import com.wavesplatform.dex.it.api.dex.{AsyncEnrichedDexApi, DexApi}
+import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import com.wavesplatform.dex.it.cache.CachedData
 import com.wavesplatform.dex.it.collections.Implicits.ListOps
-import com.wavesplatform.dex.it.dex.DexApi
-import com.wavesplatform.dex.it.fp
 import com.wavesplatform.dex.it.resources.getRawContentFromResource
 import com.wavesplatform.dex.it.sttp.LoggingSttpBackend
 import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
@@ -32,8 +32,35 @@ final case class DexContainer private (override val internalIp: String, underlyi
   override protected val cachedRestApiAddress: CachedData[InetSocketAddress] = CachedData(getExternalAddress(DexContainer.restApiPort))
   def restApiAddress: InetSocketAddress = cachedRestApiAddress.get()
 
-  override def api: DexApi[Id] = fp.sync(DexApi[Try](apiKey, restApiAddress))
-  override def asyncApi: DexApi[Future] = DexApi[Future](apiKey, restApiAddress)
+  private val apiFunctorK: FunctorK[DexApi] = FunctorK[DexApi] // IntelliJ FIX
+
+  val tf = new Transformations[MatcherError]
+  import tf._
+
+  def api: DexApi[SyncUnsafe] = apiFunctorK.mapK(asyncRawApi)(toSyncUnsafe)
+  def tryApi: DexApi[SyncTry] = apiFunctorK.mapK(asyncRawApi)(toSyncTry)
+  def httpApi: DexApi[SyncHttp] = apiFunctorK.mapK(asyncRawApi)(toSyncHttp)
+  def rawApi: DexApi[SyncRaw] = apiFunctorK.mapK(asyncRawApi)(toSyncRaw)
+
+  def asyncApi: DexApi[AsyncUnsafe] = apiFunctorK.mapK(asyncRawApi)(toAsyncUnsafe)
+  def asyncTryApi: DexApi[AsyncTry] = apiFunctorK.mapK(asyncRawApi)(toAsyncTry)
+  def asyncRawApi: AsyncEnrichedDexApi = new AsyncEnrichedDexApi(apiKey, restApiAddress)
+
+  override def waitReady(): Unit = {
+    val r = Iterator
+      .continually {
+        Thread.sleep(1000)
+        try httpApi.allOrderBooks.code == StatusCodes.Ok
+        catch {
+          case _: Throwable => false
+        }
+      }
+      .take(60)
+      .find(_ == true)
+
+    if (!r.contains(true)) throw new RuntimeException(s"${underlying.containerId} is not ready, all attempts are out")
+  }
+
 }
 
 object DexContainer extends ScorexLogging {

@@ -42,12 +42,12 @@ class MakerTakerFeeTestSuite extends MatcherSuiteBase with TableDrivenPropertyCh
   "DEX with static non-default DynamicSettings" - {
 
     "should reject orders with insufficient fee" in {
-      dex1.api.tryPlace(mkOrderDP(maker, wavesUsdPair, SELL, 1.waves, 3.00, 0.00499999.waves)) should failWith(
+      dex1.tryApi.place(mkOrderDP(maker, wavesUsdPair, SELL, 1.waves, 3.00, 0.00499999.waves)) should failWith(
         9441542, // FeeNotEnough
         s"Required 0.005 WAVES as fee for this order, but given 0.00499999 WAVES"
       )
 
-      dex1.api.tryPlace(mkOrderDP(maker, wavesUsdPair, SELL, 1.waves, 3.00, 0.00002837.eth, eth)) should failWith(
+      dex1.tryApi.place(mkOrderDP(maker, wavesUsdPair, SELL, 1.waves, 3.00, 0.00002837.eth, eth)) should failWith(
         9441542, // FeeNotEnough
         s"Required 0.00002838 $EthId as fee for this order, but given 0.00002837 $EthId"
       )

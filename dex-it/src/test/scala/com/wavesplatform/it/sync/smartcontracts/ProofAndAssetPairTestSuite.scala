@@ -346,18 +346,16 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
         for ((sc, i) <- Seq(sc2, sc7, sc8).zip(Seq(2, 7, 8))) s"$i" in {
           setAliceScript(sc)
 
-          dex1.api
-            .tryPlace(
-              mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
-            ) should failWith(
+          dex1.tryApi.place(
+            mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
+          ) should failWith(
             3147522, // AccountScriptDeniedOrder
             MatcherError.Params(address = Some(alice.toAddress.stringRepr))
           )
 
-          dex1.api
-            .tryPlace(
-              mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
-            ) should failWith(
+          dex1.tryApi.place(
+            mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
+          ) should failWith(
             3147522, // AccountScriptDeniedOrder
             MatcherError.Params(address = Some(alice.toAddress.stringRepr))
           )
@@ -365,7 +363,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
 
         "9" in {
           setAliceScript(sc9)
-          dex1.api.tryPlace(
+          dex1.tryApi.place(
             mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
           ) should failWith(
             3147520, // AccountScriptReturnedError
@@ -398,12 +396,12 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
           dex1.api.waitForOrderStatus(bobOrd2, Status.Filled)
 
           val aliceOrd1Txs = dex1.api.waitForTransactionsByOrder(aliceOrd1, 1)
-          val r1 = wavesNode1.api.tryBroadcast(aliceOrd1Txs.head)
+          val r1 = wavesNode1.tryApi.broadcast(aliceOrd1Txs.head)
           r1 shouldBe Symbol("left")
           r1.swap.explicitGet().error shouldBe 307 // node's ApiError TransactionNotAllowedByAccountScript.Id
 
           val aliceOrd2Txs = dex1.api.waitForTransactionsByOrder(aliceOrd2, 1)
-          val r2 = wavesNode1.api.tryBroadcast(aliceOrd2Txs.head)
+          val r2 = wavesNode1.tryApi.broadcast(aliceOrd2Txs.head)
           r2 shouldBe Symbol("left")
           r2.swap.explicitGet().error shouldBe 307 // node's ApiError TransactionNotAllowedByAccountScript.Id
 

@@ -116,12 +116,12 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProx
 
     wavesNode1.disconnectFromNetwork()
 
-    dex1.api.tryPlace(order) should failWith(
+    dex1.tryApi.place(order) should failWith(
       105906177,
       "Waves Node is unavailable, please retry later or contact with the administrator"
     )
 
-    dex1.api.tryTradableBalance(mkKeyPair("random"), wavesUsdPair) should failWith(
+    dex1.tryApi.tradableBalance(mkKeyPair("random"), wavesUsdPair) should failWith(
       105906177,
       "Waves Node is unavailable, please retry later or contact with the administrator"
     )

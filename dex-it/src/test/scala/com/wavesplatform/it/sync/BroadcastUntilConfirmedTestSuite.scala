@@ -27,7 +27,7 @@ class BroadcastUntilConfirmedTestSuite extends MatcherSuiteBase {
     wavesNode1.disconnectFromNetwork()
 
     markup("Place orders, those should match")
-    eventually(dex1.api.tryPlace(aliceOrder) shouldBe Symbol("right"))
+    eventually(dex1.tryApi.place(aliceOrder) shouldBe Symbol("right"))
 
     dex1.api.place(bobOrder)
     dex1.api.waitForOrderStatus(aliceOrder, Status.Filled)

@@ -25,7 +25,7 @@ class DisableProducerTestSuite extends MatcherSuiteBase {
     }
 
     "place an order and wait some time" in {
-      def test(order: Order): Unit = dex1.api.tryPlace(order) should failWith(528) // FeatureDisabled
+      def test(order: Order): Unit = dex1.tryApi.place(order) should failWith(528) // FeatureDisabled
 
       List(
         mkOrder(alice, ethWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant),

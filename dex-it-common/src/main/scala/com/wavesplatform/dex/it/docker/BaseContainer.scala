@@ -4,7 +4,6 @@ import java.net.InetSocketAddress
 import java.nio.charset.StandardCharsets
 import java.nio.file._
 
-import cats.Id
 import com.dimafeng.testcontainers.GenericContainer
 import com.github.dockerjava.api.async.ResultCallback
 import com.github.dockerjava.api.command.InspectContainerResponse
@@ -12,12 +11,10 @@ import com.github.dockerjava.api.exception.{NotFoundException, NotModifiedExcept
 import com.github.dockerjava.api.model.{ContainerNetwork, ExposedPort, Frame, Ports}
 import com.typesafe.config.Config
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.it.api.HasWaitReady
 import com.wavesplatform.dex.it.cache.CachedData
 import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
 import org.testcontainers.images.builder.Transferable
 
-import scala.concurrent.Future
 import scala.jdk.CollectionConverters._
 import scala.util.control.NonFatal
 
@@ -31,8 +28,7 @@ abstract class BaseContainer(protected val baseContainerPath: String, private va
 
   protected val cachedRestApiAddress: CachedData[InetSocketAddress]
 
-  def api: HasWaitReady[Id]
-  def asyncApi: HasWaitReady[Future]
+  def waitReady(): Unit
 
   protected def getExternalAddress(internalPort: Int): InetSocketAddress = {
 
@@ -151,13 +147,13 @@ abstract class BaseContainer(protected val baseContainerPath: String, private va
       )
       .exec()
 
-    api.waitReady
+    waitReady()
   }
 
   override def start(): Unit = {
     Option(underlying.containerId).fold(super.start())(_ => sendStartCmd())
     invalidateCaches()
-    api.waitReady
+    waitReady()
   }
 
   def restart(): Unit = {

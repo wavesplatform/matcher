@@ -123,8 +123,8 @@ class OrderPercentFeeSpendingTestSuite extends OrderFeeBaseTestSuite {
     }
 
     s"buy order should be rejected if fee less then minimum possible fee when fee asset-type = $assetType" in {
-      dex1.api
-        .tryPlace(
+      dex1.tryApi
+        .place(
           mkOrder(
             mkAccountWithBalance(fullyAmountUsd + minimalFee -> IssuedAsset(UsdId)),
             wavesUsdPair,
@@ -142,8 +142,8 @@ class OrderPercentFeeSpendingTestSuite extends OrderFeeBaseTestSuite {
     }
 
     s"sell order should be rejected if fee less then minimum possible fee when fee asset-type = $assetType" in {
-      dex1.api
-        .tryPlace(
+      dex1.tryApi
+        .place(
           mkOrder(
             mkAccountWithBalance(fullyAmountWaves + tooHighFeeWaves -> Waves),
             wavesUsdPair,

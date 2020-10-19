@@ -110,7 +110,7 @@ class CorrectStatusAfterPlaceTestSuite extends MatcherSuiteBase {
   private def request(order: Order): Future[(Order.Id, HttpOrderStatus.Status, Boolean)] =
     for {
       // TODO happens rarely, try to remove after migration to new akka-http
-      sent <- dex1.asyncApi.tryPlace(order).map(_ => true).recover { case x => log.error("Some error with order placement occurred:", x); false }
+      sent <- dex1.asyncTryApi.place(order).map(_ => true).recover { case x => log.error("Some error with order placement occurred:", x); false }
       status <- dex1.asyncApi.orderStatus(order)
     } yield (order.id(), status.status, sent)
 

@@ -29,8 +29,8 @@ class MatcherRecoveryTestSuite extends MatcherSuiteBase {
   "Place, fill and cancel a lot of orders" in {
     val cancels = (1 to cancelsNumber).map(_ => choose(orders))
 
-    val placeCommands = Random.shuffle(orders.map(MatcherCommand.Place(dex1.asyncApi, _)))
-    val cancelCommands = cancels.map(MatcherCommand.Cancel(dex1.asyncApi, alice, _))
+    val placeCommands = Random.shuffle(orders.map(MatcherCommand.Place(dex1, _)))
+    val cancelCommands = cancels.map(MatcherCommand.Cancel(dex1, alice, _))
 
     successfulCommandsNumber += executeCommands(placeCommands)
     successfulCommandsNumber += executeCommands(cancelCommands)

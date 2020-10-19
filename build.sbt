@@ -119,6 +119,7 @@ inScope(Global)(
       "-Ywarn-unused:-implicits",
       "-Ywarn-macros:after", // https://github.com/scala/bug/issues/11099
       "-Xlint",
+      "-Ymacro-annotations",
       "-opt:l:inline",
       "-opt-inline-from:**",
       "-Yrangepos", // required for scalafix

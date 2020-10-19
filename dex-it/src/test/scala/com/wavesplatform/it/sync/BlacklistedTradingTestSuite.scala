@@ -106,16 +106,16 @@ class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
   }
 
   private def testOrderPlacementDenied(order: Order, address: Address): Unit =
-    dex1.api.tryPlace(order) should failWith(3145733, MatcherError.Params(address = Some(address.stringRepr)))
+    dex1.tryApi.place(order) should failWith(3145733, MatcherError.Params(address = Some(address.stringRepr)))
 
   private def testOrderPlacementDenied(order: Order, blacklistedAsset: Asset): Unit =
-    failedDueAssetBlacklist(dex1.api.tryPlace(order), order.assetPair, blacklistedAsset)
+    failedDueAssetBlacklist(dex1.tryApi.place(order), order.assetPair, blacklistedAsset)
 
   private def testOrderStatusDenied(order: Order, blacklistedAsset: Asset): Unit =
-    failedDueAssetBlacklist(dex1.api.tryOrderStatus(order), order.assetPair, blacklistedAsset)
+    failedDueAssetBlacklist(dex1.tryApi.orderStatus(order), order.assetPair, blacklistedAsset)
 
   private def testOrderBookDenied(assetPair: AssetPair, blacklistedAsset: Asset): Unit =
-    failedDueAssetBlacklist(dex1.api.tryOrderBook(assetPair), assetPair, blacklistedAsset)
+    failedDueAssetBlacklist(dex1.tryApi.orderBook(assetPair), assetPair, blacklistedAsset)
 
   private def failedDueAssetBlacklist(r: Either[MatcherError, Any], assetPair: AssetPair, blacklistedAsset: Asset) =
     r should failWith(expectedErrorCode(assetPair, blacklistedAsset), MatcherError.Params(assetId = Some(blacklistedAsset.toString)))

@@ -10,7 +10,7 @@ class V2OrderPercentFeeAmountTestSuite extends OrderPercentFeeAmountTestSuite(2.
 
 class V3OrderPercentFeeAmountTestSuite extends OrderPercentFeeAmountTestSuite(3.toByte) {
   s"buy order should be rejected is fee Asset not equal WAVES when fee asset-type = $assetType" in {
-    dex1.api.tryPlace(
+    dex1.tryApi.place(
       mkOrder(
         mkAccountWithBalance(fullyAmountUsd + minimalFeeWaves -> usd, minimalFeeWaves -> Waves),
         wavesUsdPair,
@@ -24,7 +24,7 @@ class V3OrderPercentFeeAmountTestSuite extends OrderPercentFeeAmountTestSuite(3.
   }
 
   s"sell order should be rejected is fee Asset not equal WAVES when fee asset-type = $assetType" in {
-    dex1.api.tryPlace(
+    dex1.tryApi.place(
       mkOrder(
         mkAccountWithBalance(minimalFeeWaves -> usd, fullyAmountWaves -> Waves),
         wavesUsdPair,
@@ -122,7 +122,7 @@ abstract class OrderPercentFeeAmountTestSuite(version: Byte) extends OrderFeeBas
     }
 
     s"buy order should be rejected user will get tokens for pay fee after order executed when fee asset-type = $assetType" in {
-      dex1.api.tryPlace(
+      dex1.tryApi.place(
         mkOrder(
           createAccountWithBalance(fullyAmountUsd -> usd),
           wavesUsdPair,
@@ -136,7 +136,7 @@ abstract class OrderPercentFeeAmountTestSuite(version: Byte) extends OrderFeeBas
     }
 
     s"buy order should be rejected if fee less then minimum possible fee when fee asset-type = $assetType" in {
-      dex1.api.tryPlace(
+      dex1.tryApi.place(
         mkOrder(
           mkAccountWithBalance(fullyAmountUsd -> usd, minimalFeeWaves -> Waves),
           wavesUsdPair,
@@ -153,7 +153,7 @@ abstract class OrderPercentFeeAmountTestSuite(version: Byte) extends OrderFeeBas
     }
 
     s"sell order should be rejected if fee less then minimum possible fee when fee asset-type = $assetType" in {
-      dex1.api.tryPlace(
+      dex1.tryApi.place(
         mkOrder(
           mkAccountWithBalance(fullyAmountWaves + minimalFeeWaves -> Waves),
           wavesUsdPair,

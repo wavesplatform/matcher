@@ -247,6 +247,7 @@ object Dependencies {
     lazy val dexIt: Seq[ModuleID] = integrationTestKit ++ Seq(parCollections)
 
     lazy val dexItCommon: Seq[ModuleID] = Seq(
+      kindProjector,
       sttpModule("core"),
       sttpModule("play-json"),
       sttpModule("async-http-client-backend-future"),

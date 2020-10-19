@@ -4,7 +4,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
 
-class GetSettingsUtilsTestSuite extends MatcherSuiteBase {
+class MatcherConfigTestSuite extends MatcherSuiteBase {
 
   override protected val dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(

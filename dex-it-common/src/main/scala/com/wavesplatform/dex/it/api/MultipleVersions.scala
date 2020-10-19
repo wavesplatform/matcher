@@ -1,8 +1,8 @@
 package com.wavesplatform.dex.it.api
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.it.api.dex.HasDex
 import com.wavesplatform.dex.it.api.node.HasWavesNode
-import com.wavesplatform.dex.it.dex.HasDex
 import com.wavesplatform.dex.it.docker.{DexContainer, WavesNodeContainer}
 
 trait MultipleVersions extends HasDex with HasWavesNode { self: BaseContainersKit =>

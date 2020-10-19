@@ -5,14 +5,10 @@ pipeline {
     parameters {
         string(name: 'NODE_PREVIOUS_IMAGE', defaultValue: 'waves-integration-it:1.2.12_2.2.2', description: 'Current node image used by matcher on the Mainnet')
         string(name: 'DEX_PREVIOUS_IMAGE', defaultValue: 'dex-it:2.2.2', description: 'Matcher image on the Mainnet')
-        string(name: 'NODE_NEW_IMAGE', defaultValue: 'waves-integration-it:master', description: 'Version used by the new matcher')
+        string(name: 'NODE_NEW_IMAGE', defaultValue: 'waves-integration-it:master', description: 'Version of the node used by the new matcher')
         string(name: 'DEX_NEW_IMAGE', defaultValue: 'dex-it:master', description: 'New version of the matcher')
-        string(name: 'PREVIOUS_BRANCH_OR_TAG', defaultValue: 'origin/master', description: 'Dex branch')
-        string(name: 'NEW_BRANCH_OR_TAG', defaultValue: 'origin/master', description: 'Dex branch')
-
-        gitParameter branchFilter: '**', defaultValue: 'origin/master', name: 'PREVIOUS_BRANCH_OR_TAG1', type: 'PT_BRANCH_TAG', useRepository: 'Dex'
-        gitParameter branchFilter: '**', defaultValue: 'origin/master', name: 'NEW_BRANCH_OR_TAG1', type: 'PT_BRANCH_TAG', useRepository: 'Dex'
-
+        string(name: 'PREVIOUS_BRANCH_OR_TAG', defaultValue: 'origin/master', description: 'Dex branch or tag deployed on mainnet')
+        string(name: 'NEW_BRANCH_OR_TAG', defaultValue: 'origin/master', description: 'Dex branch of release candidate')
     }
     environment {
           dexPrevImage = "${REGISTRY}/waves/dex/${DEX_PREVIOUS_IMAGE}"
@@ -27,7 +23,7 @@ pipeline {
             steps {
                 build job: 'Waves.Exchange/Matcher/Matcher Server - OS - Test - Kafka', propagate: false, wait: false, parameters: [
                   [$class: 'GitParameterValue', name: 'BRANCH', value: "${env.NEW_BRANCH_OR_TAG}"],
-                  [$class: 'StringParameterValue', name: 'LABEL', value: "- PRE RELEASE (${env.NEW_BRANCH_OR_TAG})"]
+                  [$class: 'StringParameterValue', name: 'LABEL', value: "- PRE RELEASE"]
                 ]
             }
         }
@@ -37,7 +33,7 @@ pipeline {
                   [$class: 'StringParameterValue', name: 'BRANCH', value: "${env.PREVIOUS_BRANCH_OR_TAG}"],
                   [$class: 'StringParameterValue', name: 'OTHER_DEX_IMAGE', value: dexNewImage],
                   [$class: 'StringParameterValue', name: 'OTHER_NODE_IMAGE', value: nodeNewImage],
-                  [$class: 'StringParameterValue', name: 'LABEL', value: "- PRE RELEASE (${env.PREVIOUS_BRANCH_OR_TAG})"]
+                  [$class: 'StringParameterValue', name: 'LABEL', value: "- PRE RELEASE"]
                 ]
             }
         }
@@ -47,7 +43,7 @@ pipeline {
                   [$class: 'StringParameterValue', name: 'DEX_IMAGE', value: dexNewImage],
                   [$class: 'StringParameterValue', name: 'NODE_IMAGE', value: nodeNewImage],
                   [$class: 'StringParameterValue', name: 'BRANCH', value: "${env.PREVIOUS_BRANCH_OR_TAG}"],
-                  [$class: 'StringParameterValue', name: 'LABEL', value: "- PRE RELEASE (${env.PREVIOUS_BRANCH_OR_TAG})"]
+                  [$class: 'StringParameterValue', name: 'LABEL', value: "- PRE RELEASE"]
                 ]
             }
         }

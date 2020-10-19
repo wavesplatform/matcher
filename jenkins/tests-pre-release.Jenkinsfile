@@ -13,8 +13,8 @@ pipeline {
           dexNewImage = "${REGISTRY}/waves/dex/${DEX_NEW_IMAGE}"
           nodePrevImage = "${REGISTRY}/waves/dex/${NODE_PREVIOUS_IMAGE}"
           nodeNewImage = "${REGISTRY}/waves/dex/${NODE_NEW_IMAGE}"
-          PREVIOUS_BRANCH_OR_TAG = "${PREVIOUS_BRANCH_OR_TAG}"
-          NEW_BRANCH_OR_TAG = "${NEW_BRANCH_OR_TAG}"
+          PREVIOUS_BRANCH_OR_TAG = PREVIOUS_BRANCH_OR_TAG.replace("Dex", "origin")
+          NEW_BRANCH_OR_TAG = NEW_BRANCH_OR_TAG.replace("Dex", "origin")
     }
     stages {
         stage ('Trigger job: Test - Kafka') {

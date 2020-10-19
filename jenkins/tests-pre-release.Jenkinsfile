@@ -3,18 +3,22 @@ pipeline {
         label 'buildagent-matcher'
     }
     parameters {
-        string(name: 'NODE_PREVIOUS_IMAGE', defaultValue: 'registry.wvservices.com/waves/dex/waves-integration-it:1.2.12_2.2.2', description: 'Current node image used by matcher on the Mainnet')
-        string(name: 'DEX_PREVIOUS_IMAGE', defaultValue: 'registry.wvservices.com/waves/dex/dex-it:2.2.2', description: 'Matcher image on the Mainnet')
-        string(name: 'NODE_NEW_IMAGE', defaultValue: 'registry.wvservices.com/waves/dex/waves-integration-it:master', description: 'Version used by the new matcher')
-        string(name: 'DEX_NEW_IMAGE', defaultValue: 'registry.wvservices.com/waves/dex/dex-it:master', description: 'New version of the matcher')
+        string(name: 'NODE_PREVIOUS_IMAGE', defaultValue: 'waves-integration-it:1.2.12_2.2.2', description: 'Current node image used by matcher on the Mainnet')
+        string(name: 'DEX_PREVIOUS_IMAGE', defaultValue: 'dex-it:2.2.2', description: 'Matcher image on the Mainnet')
+        string(name: 'NODE_NEW_IMAGE', defaultValue: 'waves-integration-it:master', description: 'Version used by the new matcher')
+        string(name: 'DEX_NEW_IMAGE', defaultValue: 'dex-it:master', description: 'New version of the matcher')
         string(name: 'PREVIOUS_BRANCH_OR_TAG', defaultValue: 'origin/master', description: 'Dex branch')
         string(name: 'NEW_BRANCH_OR_TAG', defaultValue: 'origin/master', description: 'Dex branch')
+
+        gitParameter branchFilter: '**', defaultValue: 'origin/master', name: 'PREVIOUS_BRANCH_OR_TAG1', type: 'PT_BRANCH_TAG', useRepository: 'https://github.com/wavesplatform/matcher.git'
+        gitParameter branchFilter: '**', defaultValue: 'origin/master', name: 'NEW_BRANCH_OR_TAG1', type: 'PT_BRANCH_TAG', useRepository: 'https://github.com/wavesplatform/matcher.git'
+
     }
     environment {
-          dexPrevImage = "${DEX_PREVIOUS_IMAGE}"
-          dexNewImage = "${DEX_NEW_IMAGE}"
-          nodePrevImage = "${NODE_PREVIOUS_IMAGE}"
-          nodeNewImage = "${NODE_NEW_IMAGE}"
+          dexPrevImage = "${REGISTRY}/waves/dex/${DEX_PREVIOUS_IMAGE}"
+          dexNewImage = "${REGISTRY}/waves/dex/${DEX_NEW_IMAGE}"
+          nodePrevImage = "${REGISTRY}/waves/dex/${NODE_PREVIOUS_IMAGE}"
+          nodeNewImage = "${REGISTRY}/waves/dex/${NODE_NEW_IMAGE}"
           PREVIOUS_BRANCH_OR_TAG = "${PREVIOUS_BRANCH_OR_TAG}"
           NEW_BRANCH_OR_TAG = "${NEW_BRANCH_OR_TAG}"
     }

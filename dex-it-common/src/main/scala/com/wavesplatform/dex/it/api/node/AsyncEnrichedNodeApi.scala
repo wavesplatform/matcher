@@ -28,7 +28,7 @@ class AsyncEnrichedNodeApi(apiKey: String, host: => InetSocketAddress)(implicit 
   }
 
   override def broadcast(tx: Transaction): AsyncEnriched[Unit] = mkIgnore {
-    sttp.post(uri"$apiUri/transactions/broadcast").body(tx.toJson)
+    sttp.post(uri"$apiUri/transactions/broadcast").body(tx.toJson).contentType("application/json")
   }
 
   override def transactionInfo(id: Id): AsyncEnriched[Transaction] = mk {
@@ -44,7 +44,10 @@ class AsyncEnrichedNodeApi(apiKey: String, host: => InetSocketAddress)(implicit 
   }
 
   override def connect(toNode: InetSocketAddress): AsyncEnriched[Unit] = mkIgnore {
-    sttp.post(uri"$apiUri/peers/connect").body(ConnectReq(toNode.getHostName, toNode.getPort)).header("X-API-Key", apiKey)
+    sttp
+      .post(uri"$apiUri/peers/connect")
+      .body(ConnectReq(toNode.getHostName, toNode.getPort))
+      .header("X-API-Key", apiKey)
   }
 
   override def connectedPeers: AsyncEnriched[ConnectedPeersResponse] = mk {

@@ -125,3 +125,5 @@ trait DexApi[F[_]] {
   def wsConnections: F[HttpWebSocketConnections]
   def closeWsConnections(oldestNumber: Int): F[HttpMessage]
 }
+
+object DexApi {} // Without this line we have java.lang.NoClassDefFoundError: com/wavesplatform/dex/it/dex/DexApi$

@@ -613,8 +613,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       )
 
       withClue("The old order book is not available") {
-        val e = intercept[RuntimeException](dex1.api.orderBook(ethWavesPair))
-        e.getMessage should fullyMatch regex ".*301.*" // Redirect
+        dex1.rawApi.orderBook(ethWavesPair).code shouldBe StatusCodes.MovedPermanently
       }
 
       val wavesEthPair = AssetPair(Waves, eth)

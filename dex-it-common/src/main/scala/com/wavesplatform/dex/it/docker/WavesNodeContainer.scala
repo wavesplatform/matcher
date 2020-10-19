@@ -9,13 +9,14 @@ import com.dimafeng.testcontainers.GenericContainer
 import com.typesafe.config.Config
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.it.api.node.{AsyncEnrichedNodeApi, NodeApi}
-import com.wavesplatform.dex.it.api.{toAsyncTry, toAsyncUnsafe, toSyncRaw, toSyncTry, toSyncUnsafe, AsyncTry, HasWaitReady, SyncRaw, SyncTry}
+import com.wavesplatform.dex.it.api.{toAsyncTry, toAsyncUnsafe, toSyncRaw, toSyncTry, toSyncUnsafe, AsyncTry, SyncRaw, SyncTry}
 import com.wavesplatform.dex.it.cache.CachedData
 import com.wavesplatform.dex.it.resources.getRawContentFromResource
 import com.wavesplatform.dex.it.sttp.LoggingSttpBackend
 import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
 import org.testcontainers.containers.BindMode
 import org.testcontainers.containers.Network.NetworkImpl
+import sttp.model.StatusCode
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
@@ -48,8 +49,20 @@ final case class WavesNodeContainer(override val internalIp: String, underlying:
   def asyncApi: NodeApi[Future] = apiFunctorK.mapK(asyncRawApi)(toAsyncUnsafe)
   def asyncTryApi: NodeApi[AsyncTry] = apiFunctorK.mapK(asyncRawApi)(toAsyncTry)
 
-  override def waitReady: HasWaitReady[Id] = ???
-  override def asyncWaitReady: HasWaitReady[Future] = ???
+  override def waitReady(): Unit = {
+    val r = Iterator
+      .continually {
+        Thread.sleep(1000)
+        try rawApi.currentHeightOrig.code == StatusCode.Ok.code
+        catch {
+          case _: Throwable => false
+        }
+      }
+      .take(60)
+      .find(_ == true)
+
+    if (!r.contains(true)) throw new RuntimeException(s"${underlying.containerId} is not ready, all attempts are out")
+  }
 
   override def invalidateCaches(): Unit = {
     super.invalidateCaches()

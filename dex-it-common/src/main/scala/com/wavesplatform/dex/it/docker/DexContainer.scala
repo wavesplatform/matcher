@@ -6,6 +6,7 @@ import java.nio.file.{Path, Paths}
 import cats.Id
 import cats.tagless.FunctorK
 import com.dimafeng.testcontainers.GenericContainer
+import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.Config
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.it.api._
@@ -42,8 +43,21 @@ final case class DexContainer private (override val internalIp: String, underlyi
   def asyncApi: DexApi[Future] = apiFunctorK.mapK(asyncRawApi)(toAsyncUnsafe)
   def asyncTryApi: DexApi[AsyncTry] = apiFunctorK.mapK(asyncRawApi)(toAsyncTry)
 
-  override def waitReady: HasWaitReady[Id] = ???
-  override def asyncWaitReady: HasWaitReady[Future] = ???
+  override def waitReady(): Unit = {
+    val r = Iterator
+      .continually {
+        Thread.sleep(1000)
+        try rawApi.allOrderBooks.code == StatusCodes.Ok
+        catch {
+          case _: Throwable => false
+        }
+      }
+      .take(60)
+      .find(_ == true)
+
+    if (!r.contains(true)) throw new RuntimeException(s"${underlying.containerId} is not ready, all attempts are out")
+  }
+
 }
 
 object DexContainer extends ScorexLogging {

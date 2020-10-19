@@ -9,7 +9,6 @@ import com.wavesplatform.dex.it.api.responses.node._
 import im.mak.waves.transactions.Transaction
 import im.mak.waves.transactions.common.Id
 
-// TODO ErrorResponse
 @finalAlg
 @autoFunctorK
 trait NodeApi[F[_]] {

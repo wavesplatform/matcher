@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync
 
+import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset.Waves
@@ -25,37 +26,19 @@ class MatcherTickerTestSuite extends MatcherSuiteBase {
     priceAsset = Waves
   )
 
+  private val usdWavesPair = AssetPair(usd, Waves)
+
   "matcher ticker validation" - {
     "get tickers for unavailable asset should produce error" in {
       dex1.tryApi.orderBookStatus(wctUsdPair) should failWith(11534345, MatcherError.Params(assetId = Some(WctId.toString)))
     }
 
     "status of empty orderbook" in {
-//    TODO: add error message after fix of https://wavesplatform.atlassian.net/browse/NODE-1151
-//      SyncMatcherHttpApi.assertNotFoundAndMessage(dex1.api.orderBookStatus(wavesUsdPair), s"")
+      dex1.api.orderBookInfo(wavesUsdPair).matchingRules.tickSize shouldBe 0.01
     }
 
     "error of non-existed order" in {
-      //TODO: add error message after fix of https://wavesplatform.atlassian.net/browse/NODE-1151
-//      SyncMatcherHttpApi.assertNotFoundAndMessage(node.orderStatus(IssueUsdTx.id().toString, wavesUsdPair), s"")
-    }
-
-    "try to work with incorrect pair" in {
-      val usdWavesPair = AssetPair(usd, Waves)
-
-      intercept[RuntimeException] {
-        dex1.tryApi.orderBook(usdWavesPair)
-      }
-
-      dex1.tryApi.orderBook(wavesUsdPair) shouldBe Symbol("right")
-//      assert(
-//        node
-//          .matcherGet(s"/matcher/orderbook/${usdWavesPair.amountAssetStr}/${usdWavesPair.priceAssetStr}/status", statusCode = 301)
-//          .getHeader("Location")
-//          .contains(s"WAVES/${usdWavesPair.amountAssetStr}"))
-
-      //TODO: add error message after fix of https://wavesplatform.atlassian.net/browse/NODE-1151
-//      SyncMatcherHttpApi.assertNotFoundAndMessage(dex1.api.place(mkOrder(node,usdWavesPair, OrderType.BUY, 1.waves, 200), ""))
+      dex1.httpApi.orderBookInfo(usdWavesPair).code shouldBe StatusCodes.MovedPermanently
     }
 
     val bidPrice = 200

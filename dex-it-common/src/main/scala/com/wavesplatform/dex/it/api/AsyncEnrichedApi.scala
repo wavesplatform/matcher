@@ -4,22 +4,32 @@ import java.net.InetSocketAddress
 import java.util.UUID
 
 import com.softwaremill.sttp.{Request, SttpBackend}
+import com.typesafe.config.Config
 import play.api.libs.json.Reads
 
 import scala.concurrent.{ExecutionContext, Future}
 
-abstract class AsyncEnrichedApi(host: => InetSocketAddress)(implicit ec: ExecutionContext, httpBackend: SttpBackend[Future, Nothing]) {
+abstract class AsyncEnrichedApi[ErrorT: Reads](host: => InetSocketAddress)(implicit
+  ec: ExecutionContext,
+  httpBackend: SttpBackend[Future, Nothing]
+) {
 
-  def mk[T: Reads](req: Request[String, Nothing]): AsyncEnriched[T] =
-    httpBackend.send[String](req.tag("requestId", UUID.randomUUID)).map {
-      EnrichedResponse.AsJson[T](_)
-    }
+  type R[EntityT] = Future[EnrichedResponse[ErrorT, EntityT]]
 
-  def mkHocon[T](req: Request[String, Nothing]): AsyncEnriched[T] =
-    httpBackend.send[String](req.tag("requestId", UUID.randomUUID)).map(EnrichedResponse.AsHocon[T])
+  def mk[EntityT: Reads](req: Request[String, Nothing]): R[EntityT] =
+    httpBackend
+      .send[String](req.tag("requestId", UUID.randomUUID))
+      .map(EnrichedResponse(_, new EnrichedResponse.AsJson[ErrorT, EntityT]))
 
-  def mkIgnore(req: Request[String, Nothing]): AsyncEnriched[Unit] =
-    httpBackend.send[String](req.tag("requestId", UUID.randomUUID)).map(EnrichedResponse.Ignore)
+  def mkHocon[EntityT](req: Request[String, Nothing]): R[Config] =
+    httpBackend
+      .send[String](req.tag("requestId", UUID.randomUUID))
+      .map(EnrichedResponse(_, new EnrichedResponse.AsHocon[ErrorT]))
+
+  def mkIgnore(req: Request[String, Nothing]): R[Unit] =
+    httpBackend
+      .send[String](req.tag("requestId", UUID.randomUUID))
+      .map(EnrichedResponse(_, new EnrichedResponse.Ignore[ErrorT]))
 
   def apiUri: String = {
     val savedHost = host

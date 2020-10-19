@@ -77,7 +77,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
     }
 
     "/matcher should contain a header with HTTP server" in {
-      dex1.rawApi.publicKey.header(MatcherHttpServer.name) shouldBe "matcher-1".some
+      dex1.httpApi.publicKey.header(MatcherHttpServer.name) shouldBe "matcher-1".some
     }
 
     "sell order could be placed correctly" - {
@@ -613,7 +613,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       )
 
       withClue("The old order book is not available") {
-        dex1.rawApi.orderBook(ethWavesPair).code shouldBe StatusCodes.MovedPermanently
+        dex1.httpApi.orderBook(ethWavesPair).code shouldBe StatusCodes.MovedPermanently
       }
 
       val wavesEthPair = AssetPair(Waves, eth)

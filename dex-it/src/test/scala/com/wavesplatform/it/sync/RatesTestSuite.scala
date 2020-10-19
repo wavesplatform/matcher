@@ -50,14 +50,14 @@ class RatesTestSuite extends MatcherSuiteBase {
 
     // add rate for wct
     val addWctRate = dex1.rawApi.upsertRate(wct, wctRate)
-    addWctRate.code shouldBe StatusCodes.Created
-    addWctRate.unsafeBody shouldBe s"The rate $wctRate for the asset $wctStr added"
+    addWctRate.response.code shouldBe StatusCodes.Created
+    addWctRate.unsafeGet.message shouldBe s"The rate $wctRate for the asset $wctStr added"
     dex1.api.rates shouldBe defaultRateMap + (wct -> wctRate)
 
     // update rate for wct
     val updateWctRate = dex1.rawApi.upsertRate(wct, wctRateUpdated)
-    updateWctRate.code shouldBe StatusCodes.Ok
-    updateWctRate.unsafeBody shouldBe s"The rate for the asset $wctStr updated, old value = $wctRate, new value = $wctRateUpdated"
+    updateWctRate.response.code shouldBe StatusCodes.Ok
+    updateWctRate.unsafeGet.message shouldBe s"The rate for the asset $wctStr updated, old value = $wctRate, new value = $wctRateUpdated"
     dex1.api.rates shouldBe defaultRateMap + (wct -> wctRateUpdated)
 
     // update rate for Waves is not allowed
@@ -82,14 +82,14 @@ class RatesTestSuite extends MatcherSuiteBase {
 
   "Changing rates affects order validation" in {
     // set rate for btc
-    dex1.rawApi.upsertRate(btc, 1).code shouldBe StatusCodes.Created
+    dex1.httpApi.upsertRate(btc, 1).code shouldBe StatusCodes.Created
 
     // place order with admissible fee (according to btc rate = 1)
     val order1 = newOrder
     placeAndAwaitAtDex(order1)
 
     // slightly increase rate for btc
-    dex1.rawApi.upsertRate(btc, 1.1).code shouldBe StatusCodes.Ok
+    dex1.httpApi.upsertRate(btc, 1.1).code shouldBe StatusCodes.Ok
 
     // the same order now is rejected
     dex1.tryApi.place(newOrder) should failWith(
@@ -98,7 +98,7 @@ class RatesTestSuite extends MatcherSuiteBase {
     )
 
     // return previous rate for btc
-    dex1.rawApi.upsertRate(btc, 1).code shouldBe StatusCodes.Ok
+    dex1.httpApi.upsertRate(btc, 1).code shouldBe StatusCodes.Ok
 
     placeAndAwaitAtDex(newOrder)
 
@@ -107,7 +107,7 @@ class RatesTestSuite extends MatcherSuiteBase {
 
   "Rates are restored from the DB after matcher's restart" in {
     // add high rate for btc
-    dex1.rawApi.upsertRate(btc, 1.1).code shouldBe StatusCodes.Created
+    dex1.httpApi.upsertRate(btc, 1.1).code shouldBe StatusCodes.Created
 
     // order with low fee should be rejected
     dex1.tryApi.place(newOrder) should failWith(

@@ -3,7 +3,6 @@ package com.wavesplatform.dex.it.docker
 import java.net.InetSocketAddress
 import java.nio.file.{Path, Paths}
 
-import cats.Id
 import cats.tagless.FunctorK
 import com.dimafeng.testcontainers.GenericContainer
 import com.softwaremill.sttp.StatusCodes
@@ -11,6 +10,7 @@ import com.typesafe.config.Config
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.it.api._
 import com.wavesplatform.dex.it.api.dex.{AsyncEnrichedDexApi, DexApi}
+import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import com.wavesplatform.dex.it.cache.CachedData
 import com.wavesplatform.dex.it.collections.Implicits.ListOps
 import com.wavesplatform.dex.it.resources.getRawContentFromResource
@@ -32,22 +32,25 @@ final case class DexContainer private (override val internalIp: String, underlyi
   override protected val cachedRestApiAddress: CachedData[InetSocketAddress] = CachedData(getExternalAddress(DexContainer.restApiPort))
   def restApiAddress: InetSocketAddress = cachedRestApiAddress.get()
 
-  def asyncRawApi: AsyncEnrichedDexApi = new AsyncEnrichedDexApi(apiKey, restApiAddress)
-
   private val apiFunctorK: FunctorK[DexApi] = FunctorK[DexApi] // IntelliJ FIX
 
-  def api: DexApi[Id] = apiFunctorK.mapK(asyncRawApi)(toSyncUnsafe)
+  val tf = new Transformations[MatcherError]
+  import tf._
+
+  def api: DexApi[SyncUnsafe] = apiFunctorK.mapK(asyncRawApi)(toSyncUnsafe)
   def tryApi: DexApi[SyncTry] = apiFunctorK.mapK(asyncRawApi)(toSyncTry)
+  def httpApi: DexApi[SyncHttp] = apiFunctorK.mapK(asyncRawApi)(toSyncHttp)
   def rawApi: DexApi[SyncRaw] = apiFunctorK.mapK(asyncRawApi)(toSyncRaw)
 
-  def asyncApi: DexApi[Future] = apiFunctorK.mapK(asyncRawApi)(toAsyncUnsafe)
+  def asyncApi: DexApi[AsyncUnsafe] = apiFunctorK.mapK(asyncRawApi)(toAsyncUnsafe)
   def asyncTryApi: DexApi[AsyncTry] = apiFunctorK.mapK(asyncRawApi)(toAsyncTry)
+  def asyncRawApi: AsyncEnrichedDexApi = new AsyncEnrichedDexApi(apiKey, restApiAddress)
 
   override def waitReady(): Unit = {
     val r = Iterator
       .continually {
         Thread.sleep(1000)
-        try rawApi.allOrderBooks.code == StatusCodes.Ok
+        try httpApi.allOrderBooks.code == StatusCodes.Ok
         catch {
           case _: Throwable => false
         }

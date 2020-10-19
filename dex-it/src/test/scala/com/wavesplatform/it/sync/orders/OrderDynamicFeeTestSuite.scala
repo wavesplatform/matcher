@@ -273,7 +273,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
 
       val newBtcRate = btcRate * 2
 
-      dex1.rawApi.upsertRate(btc, newBtcRate).code shouldBe StatusCodes.Ok
+      dex1.httpApi.upsertRate(btc, newBtcRate).code shouldBe StatusCodes.Ok
       dex1.api.reservedBalance(bob)(btc) shouldBe 50150L
       dex1.api.place(mkAliceOrder)
 

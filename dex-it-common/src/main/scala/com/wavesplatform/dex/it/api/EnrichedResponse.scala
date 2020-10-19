@@ -2,49 +2,57 @@ package com.wavesplatform.dex.it.api
 
 import cats.implicits.catsSyntaxEitherId
 import com.softwaremill.sttp.Response
-import com.wavesplatform.dex.it.api.responses.dex.MatcherError
+import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.it.api.EnrichedResponse.As
 import play.api.libs.json.{Json, Reads}
 
-// TODO ErrorT
-sealed trait EnrichedResponse[T] {
-  def response: Response[String]
-  def tryGet: Either[MatcherError, T]
+case class EnrichedResponse[ErrorT, EntityT](response: Response[String], as: As[ErrorT, EntityT]) {
+  def tryGet: Either[ErrorT, EntityT] = as.tryGet(response)
+
+  def unsafeGet: EntityT = tryGet match {
+    case Left(e) => throw new RuntimeException(s"An unexpected error: $e")
+    case Right(x) => x
+  }
+
 }
 
 object EnrichedResponse {
 
-  case class AsJson[T](response: Response[String])(implicit val reads: Reads[T]) extends EnrichedResponse[T] {
+  sealed trait As[ErrorT, EntityT] {
+    def tryGet(response: Response[String]): Either[ErrorT, EntityT]
+  }
 
-    override def tryGet: Either[MatcherError, T] = response.body match {
-      case Left(e) =>
-        Json.parse(e)
-          .asOpt[MatcherError]
-          .fold(throw new RuntimeException(s"The server returned error, but can't parse response as MatcherError: $e"))(identity)
-          .asLeft
-      case Right(x) =>
-        Json.parse(x)
-          .asOpt(reads)
-          .fold(throw new RuntimeException(s"The server returned success, but can't parse response: $x"))(identity)
-          .asRight
+  class AsJson[ErrorT: Reads, EntityT: Reads] extends As[ErrorT, EntityT] {
+
+    override def tryGet(response: Response[String]): Either[ErrorT, EntityT] = parseWithError(response) { x =>
+      Json.parse(x)
+        .asOpt[EntityT]
+        .fold(throw new RuntimeException(s"The server returned success, but can't parse response: $x"))(identity)
+        .asRight[ErrorT]
     }
 
   }
 
-  case class AsHocon[T](response: Response[String]) extends EnrichedResponse[T] {
-    override def tryGet: Either[MatcherError, T] = ???
-  }
+  class AsHocon[ErrorT: Reads] extends As[ErrorT, Config] {
 
-  case class Ignore(response: Response[String]) extends EnrichedResponse[Unit] {
-
-    override def tryGet: Either[MatcherError, Unit] = response.body match {
-      case Left(e) =>
-        Json.parse(e)
-          .asOpt[MatcherError]
-          .fold(throw new RuntimeException(s"The server returned error, but can't parse response as MatcherError: $e"))(identity)
-          .asLeft
-      case _ => ().asRight
+    override def tryGet(response: Response[String]): Either[ErrorT, Config] = parseWithError(response) { x =>
+      ConfigFactory.parseString(x).asRight
     }
 
   }
+
+  class Ignore[ErrorT: Reads] extends As[ErrorT, Unit] {
+    override def tryGet(response: Response[String]): Either[ErrorT, Unit] = parseWithError(response)(_ => ().asRight)
+  }
+
+  def parseWithError[ErrorT: Reads, EntityT](response: Response[String])(f: String => Either[ErrorT, EntityT]): Either[ErrorT, EntityT] =
+    response.body match {
+      case Right(x) => f(x)
+      case Left(e) =>
+        Json.parse(e)
+          .asOpt[ErrorT]
+          .fold(throw new RuntimeException(s"The server returned error, but can't parse response as error: $e"))(identity)
+          .asLeft
+    }
 
 }

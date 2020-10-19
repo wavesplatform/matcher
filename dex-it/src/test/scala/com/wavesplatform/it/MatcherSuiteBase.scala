@@ -12,9 +12,9 @@ import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.it.api.BaseContainersKit
+import com.wavesplatform.dex.it.api.dex.HasDex
 import com.wavesplatform.dex.it.api.node.HasWavesNode
 import com.wavesplatform.dex.it.config.{GenesisConfig, PredefinedAccounts, PredefinedAssets}
-import com.wavesplatform.dex.it.dex.HasDex
 import com.wavesplatform.dex.it.matchers.ItMatchers
 import com.wavesplatform.dex.it.test.InformativeTestStart
 import com.wavesplatform.dex.it.waves.{MkWavesEntities, ToWavesJConversions}

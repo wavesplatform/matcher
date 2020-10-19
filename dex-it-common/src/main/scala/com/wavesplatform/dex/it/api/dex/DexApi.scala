@@ -1,4 +1,4 @@
-package com.wavesplatform.dex.it.dex
+package com.wavesplatform.dex.it.api.dex
 
 import cats.tagless._
 import com.typesafe.config.Config

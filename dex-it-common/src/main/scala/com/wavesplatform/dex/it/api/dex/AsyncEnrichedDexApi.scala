@@ -1,4 +1,4 @@
-package com.wavesplatform.dex.it.dex
+package com.wavesplatform.dex.it.api.dex
 
 import java.net.InetSocketAddress
 import java.util.UUID
@@ -20,13 +20,14 @@ import com.wavesplatform.dex.domain.order.Order.Id
 import com.wavesplatform.dex.it.api._
 import com.wavesplatform.dex.it.json._
 import im.mak.waves.transactions.ExchangeTransaction
-import play.api.libs.json.{Json, Reads}
+import play.api.libs.json.Json
 
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, Future}
 
 class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit ec: ExecutionContext, httpBackend: SttpBackend[Future, Nothing])
-    extends DexApi[AsyncEnriched] {
+    extends AsyncEnrichedApi(host)
+    with DexApi[AsyncEnriched] {
 
   override val publicKey: AsyncEnriched[HttpMatcherPublicKey] = mk(sttp.get(uri"$apiUri/matcher"))
 
@@ -288,19 +289,6 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .contentType("application/json", "UTF-8")
       .headers(apiKeyHeaders)
   }
-
-  def apiUri: String = {
-    val savedHost = host
-    s"http://${savedHost.getAddress.getHostAddress}:${savedHost.getPort}"
-  }
-
-  def mk[T: Reads](req: Request[String, Nothing]): AsyncEnriched[T] =
-    httpBackend.send[String](req.tag("requestId", UUID.randomUUID)).map {
-      EnrichedResponse.AsJson[T](_)
-    }
-
-  def mkHocon[T](req: Request[String, Nothing]): AsyncEnriched[T] =
-    httpBackend.send[String](req.tag("requestId", UUID.randomUUID)).map(EnrichedResponse.AsHocon[T])
 
   def cancelRequest(sender: KeyPair, orderId: String): HttpCancelOrder = {
     val req = HttpCancelOrder(sender, Some(ByteStr.decodeBase58(orderId).get), None, Array.emptyByteArray)

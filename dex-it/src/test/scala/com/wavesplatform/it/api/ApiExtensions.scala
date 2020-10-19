@@ -4,13 +4,12 @@ import java.util.concurrent.ThreadLocalRandom
 
 import cats.Id
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
-import com.wavesplatform.dex.api.http.entities.{HttpOrderBookHistoryItem, HttpOrderStatus, HttpSuccessfulPlace}
+import com.wavesplatform.dex.api.http.entities.{HttpOrderBookHistoryItem, HttpOrderStatus}
 import com.wavesplatform.dex.domain.account.KeyPair
-import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.it.api.dex.DexApi
 import com.wavesplatform.dex.it.api.node.{NodeApi, NodeApiExtensions}
-import com.wavesplatform.dex.it.dex.DexApi
 import com.wavesplatform.dex.it.docker.DexContainer
 import com.wavesplatform.it.{MatcherSuiteBase, api}
 import im.mak.waves.transactions.ExchangeTransaction
@@ -18,7 +17,6 @@ import mouse.any._
 
 import scala.collection.immutable.TreeMap
 import scala.collection.parallel.CollectionConverters._
-import scala.concurrent.duration.DurationInt
 
 trait ApiExtensions extends NodeApiExtensions {
   this: MatcherSuiteBase =>

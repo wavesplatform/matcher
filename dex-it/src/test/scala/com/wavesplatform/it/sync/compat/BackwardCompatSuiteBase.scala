@@ -6,7 +6,7 @@ import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.it.api.MultipleVersions
-import com.wavesplatform.dex.it.dex.DexApi
+import com.wavesplatform.dex.it.api.dex.DexApi
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.MatcherState
 

@@ -5,6 +5,7 @@ import com.softwaremill.sttp.Response
 import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import play.api.libs.json.{Json, Reads}
 
+// TODO ErrorT
 sealed trait EnrichedResponse[T] {
   def response: Response[String]
   def tryGet: Either[MatcherError, T]

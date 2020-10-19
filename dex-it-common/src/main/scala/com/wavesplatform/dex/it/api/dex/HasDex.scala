@@ -1,4 +1,4 @@
-package com.wavesplatform.dex.it.dex
+package com.wavesplatform.dex.it.api.dex
 
 import java.util.Properties
 import java.util.concurrent.ThreadLocalRandom

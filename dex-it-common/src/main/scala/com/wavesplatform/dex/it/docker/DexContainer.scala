@@ -10,9 +10,9 @@ import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.Config
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.it.api._
+import com.wavesplatform.dex.it.api.dex.{AsyncEnrichedDexApi, DexApi}
 import com.wavesplatform.dex.it.cache.CachedData
 import com.wavesplatform.dex.it.collections.Implicits.ListOps
-import com.wavesplatform.dex.it.dex.{AsyncEnrichedDexApi, DexApi}
 import com.wavesplatform.dex.it.resources.getRawContentFromResource
 import com.wavesplatform.dex.it.sttp.LoggingSttpBackend
 import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps

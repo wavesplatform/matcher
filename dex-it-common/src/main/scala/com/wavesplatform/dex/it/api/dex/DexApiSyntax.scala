@@ -11,12 +11,10 @@ import im.mak.waves.transactions.ExchangeTransaction
 
 import scala.concurrent.duration.DurationInt
 
-object DexApiWaitOps {
+object DexApiSyntax {
 
-  // TODO rename to syntax as in cats
-  implicit final class Implicit[F[_]: Functor](val self: DexApi[F])(implicit R: CanRepeat[F]) {
+  implicit final class Ops[F[_]: Functor](val self: DexApi[F])(implicit R: CanRepeat[F]) {
 
-    // TODO move
     def tradingPairInfo(assetPair: AssetPair): F[Option[HttpMarketDataWithMeta]] = self.allOrderBooks.map {
       _.markets.find(marketData => marketData.amountAsset == assetPair.amountAsset && marketData.priceAsset == assetPair.priceAsset)
     }

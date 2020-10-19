@@ -15,11 +15,10 @@ import im.mak.waves.transactions.common.Id
 
 import scala.concurrent.duration.DurationInt
 
-object NodeApiWaitOps {
+object NodeApiSyntax {
 
-  implicit final class Implicit[F[_]: Functor: FlatMap](val self: NodeApi[F])(implicit R: CanRepeat[F]) {
+  implicit final class Ops[F[_]: Functor: FlatMap](val self: NodeApi[F])(implicit R: CanRepeat[F]) {
 
-    // TODO
     def balance(address: Address, asset: Asset): F[Long] = asset match {
       case asset: IssuedAsset => self.assetBalance(address, asset)
       case Asset.Waves => self.wavesBalance(address)

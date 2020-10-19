@@ -12,8 +12,8 @@ trait HasWavesNode { self: BaseContainersKit =>
   protected val defaultNodeImage = "wavesplatform/waves-integration-it:latest"
   private val nodeImage = Option(System.getenv("NODE_IMAGE")).getOrElse(defaultNodeImage)
 
-  implicit protected def toNodeWaitOps[F[_]: Functor: FlatMap: CanRepeat](self: NodeApi[F]): NodeApiWaitOps.Implicit[F] =
-    new NodeApiWaitOps.Implicit[F](self)
+  implicit protected def toNodeApiSyntax[F[_]: Functor: FlatMap: CanRepeat](self: NodeApi[F]): NodeApiSyntax.Ops[F] =
+    new NodeApiSyntax.Ops[F](self)
 
   protected def wavesNodeInitialSuiteConfig: Config = ConfigFactory.empty()
 

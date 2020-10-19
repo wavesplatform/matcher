@@ -17,8 +17,8 @@ trait HasDex { self: BaseContainersKit =>
   protected val defaultDexImage = "wavesplatform/dex-it:latest"
   private val dexImage = Option(System.getenv("DEX_IMAGE")).getOrElse(defaultDexImage)
 
-  implicit protected def toDexApiWaitOps[F[_]: Functor: CanRepeat](self: DexApi[F]): DexApiWaitOps.Implicit[F] =
-    new DexApiWaitOps.Implicit[F](self)
+  implicit protected def toDexApiSyntax[F[_]: Functor: CanRepeat](self: DexApi[F]): DexApiSyntax.Ops[F] =
+    new DexApiSyntax.Ops[F](self)
 
   protected def dexInitialSuiteConfig: Config = ConfigFactory.empty()
 

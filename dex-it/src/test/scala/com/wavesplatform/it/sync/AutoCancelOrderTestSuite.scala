@@ -9,7 +9,7 @@ import com.wavesplatform.dex.effect.FutureOps.Implicits
 import com.wavesplatform.dex.it.docker.DexContainer
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.tags.DexItExternalKafkaRequired
-import com.wavesplatform.wavesj.Transfer
+import im.mak.waves.transactions.mass.Transfer
 
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, Future}
@@ -23,7 +23,8 @@ class AutoCancelOrderTestSuite extends MatcherSuiteBase {
        |}""".stripMargin
   )
 
-  override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "$BtcId", "WAVES" ]""")
+  override protected def dexInitialSuiteConfig: Config =
+    ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "$BtcId", "WAVES" ]""")
 
   protected lazy val dex2: DexContainer = createDex("dex-2")
 
@@ -53,7 +54,7 @@ class AutoCancelOrderTestSuite extends MatcherSuiteBase {
       knownAccounts = knownAccounts ++ accounts
 
       val oneOrderAmount = 10000
-      val orderPrice     = 3000000000000L
+      val orderPrice = 3000000000000L
 
       broadcastAndAwait(mkMassTransfer(alice, Waves, accounts.map(x => new Transfer(x.toAddress, issueFee + matcherFee)).toList))
 
@@ -64,8 +65,8 @@ class AutoCancelOrderTestSuite extends MatcherSuiteBase {
 
       val sells = accountsAndAssets.map {
         case (account, asset) =>
-          val issuedAsset = IssuedAsset(asset.getId)
-          val assetPair   = AssetPair(issuedAsset, Waves)
+          val issuedAsset = IssuedAsset(asset.id())
+          val assetPair = AssetPair(issuedAsset, Waves)
           eventually {
             dex1.api.tradableBalance(account, assetPair).getOrElse(issuedAsset, 0L) shouldBe oneOrderAmount
           }
@@ -75,13 +76,13 @@ class AutoCancelOrderTestSuite extends MatcherSuiteBase {
       sells.foreach(placeAndAwaitAtDex(_))
 
       val submittedOrdersNumber = 10
-      val buyOrders = for {
-        (_, asset) <- accountsAndAssets
-        i          <- 1 to submittedOrdersNumber
-      } yield
-        mkOrder(
+      val buyOrders =
+        for {
+          (_, asset) <- accountsAndAssets
+          i <- 1 to submittedOrdersNumber
+        } yield mkOrder(
           alice,
-          AssetPair(IssuedAsset(asset.getId), Waves),
+          AssetPair(IssuedAsset(asset.id()), Waves),
           OrderType.BUY,
           amount = oneOrderAmount / submittedOrdersNumber,
           price = orderPrice,
@@ -89,10 +90,8 @@ class AutoCancelOrderTestSuite extends MatcherSuiteBase {
         )
 
       Await.ready(
-        {
-          Future.traverse(buyOrders.groupBy(_.assetPair).values) { orders =>
-            Future.inSeries(orders)(dex2.asyncApi.place(_))
-          }
+        Future.traverse(buyOrders.groupBy(_.assetPair).values) { orders =>
+          Future.inSeries(orders)(dex2.asyncApi.place(_))
         },
         5.minutes
       )

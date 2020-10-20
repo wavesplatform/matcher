@@ -20,6 +20,7 @@ import com.wavesplatform.dex.grpc.integration.services.WavesBlockchainApiGrpcSer
 import com.wavesplatform.dex.grpc.integration.smart.MatcherScriptRunner
 import com.wavesplatform.events.UtxEvent.{TxAdded, TxRemoved}
 import com.wavesplatform.events._
+import com.wavesplatform.events.protobuf.StateUpdate
 import com.wavesplatform.extensions.{Context => ExtensionContext}
 import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.lang.v1.compiler.Terms

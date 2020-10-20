@@ -21,7 +21,7 @@ import com.wavesplatform.dex.error.{ErrorFormatterContext, WavesNodeConnectionBr
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderAddedReason, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder, MarketOrder, _}
-import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
+import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import com.wavesplatform.dex.settings.OrderFeeSettings.DynamicSettings
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
@@ -39,68 +39,69 @@ class ActorsWebSocketInteractionsSpecification
 
   private val testKit = ActorTestKit()
 
-  private implicit val efc: ErrorFormatterContext = ErrorFormatterContext.from(asset => getDefaultAssetDescriptions(asset).decimals)
+  implicit private val efc: ErrorFormatterContext = ErrorFormatterContext.from(asset => getDefaultAssetDescriptions(asset).decimals)
 
   private def webSocketTest(
-      f: (
-          ActorRef, // address directory
-          TestProbe, // test probe
-          TypedTestProbe[WsMessage], // ws test probe
-          KeyPair, // owner's key pair
-          () => Unit, // subscribe
-          AcceptedOrder => Unit, // place order
-          (AcceptedOrder, Boolean) => Unit, // cancel
-          (AcceptedOrder, LimitOrder) => OrderExecuted, // execute
-          Map[Asset, Long] => Unit, // update spendable balances
-          (Map[Asset, WsBalances], Seq[WsOrder], Long) => Unit // expect balances diff, orders diff and update id by web socket
-      ) => Unit
+    f: (
+      ActorRef, // address directory
+      TestProbe, // test probe
+      TypedTestProbe[WsMessage], // ws test probe
+      KeyPair, // owner's key pair
+      () => Unit, // subscribe
+      AcceptedOrder => Unit, // place order
+      (AcceptedOrder, Boolean) => Unit, // cancel
+      (AcceptedOrder, LimitOrder) => OrderExecuted, // execute
+      Map[Asset, Long] => Unit, // update spendable balances
+      (Map[Asset, WsBalances], Seq[WsOrder], Long) => Unit // expect balances diff, orders diff and update id by web socket
+    ) => Unit
   ): Unit = {
 
-    val eventsProbe: TestProbe                   = TestProbe()
+    val commandsProbe: TestProbe = TestProbe()
     val wsEventsProbe: TypedTestProbe[WsMessage] = testKit.createTestProbe[WsMessage]()
 
     val currentPortfolio = new AtomicReference[Portfolio](Portfolio.empty)
-    val address          = KeyPair("test".getBytes)
+    val address = KeyPair("test".getBytes)
 
-    def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] = {
-      Future.successful { (currentPortfolio.get().assets ++ Map(Waves -> currentPortfolio.get().balance).view.filterKeys(assets)).toMap }
-    }
+    def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] =
+      Future.successful((currentPortfolio.get().assets ++ Map(Waves -> currentPortfolio.get().balance).view.filterKeys(assets)).toMap)
 
     def allAssetsSpendableBalance: Address => Future[Map[Asset, Long]] = { a =>
       if (a == address.toAddress) Future.successful {
         (currentPortfolio.get().assets ++ Map(Waves -> currentPortfolio.get().balance)).filter(_._2 > 0).toMap
-      } else Future.failed(WavesNodeConnectionLostException("Node unavailable", new IllegalStateException))
+      }
+      else Future.failed(WavesNodeConnectionLostException("Node unavailable", new IllegalStateException))
     }
 
-    lazy val addressDir = system.actorOf(Props(new AddressDirectoryActor(EmptyOrderDB, createAddressActor, None)))
+    lazy val addressDir = system.actorOf(Props(new AddressDirectoryActor(EmptyOrderDB, createAddressActor, None, started = true)))
 
     lazy val spendableBalancesActor =
       system.actorOf(
         Props(new SpendableBalancesActor(spendableBalances, allAssetsSpendableBalance, addressDir))
       )
 
-    def createAddressActor(address: Address, enableSchedules: Boolean): Props = {
+    def createAddressActor(address: Address, started: Boolean): Props =
       Props(
         new AddressActor(
           address,
           time,
           EmptyOrderDB,
           (_, _) => Future.successful(Right(())),
-          event => {
-            eventsProbe.ref ! event
-            Future.successful { Some(QueueEventWithMeta(0L, 0L, event)) }
+          command => {
+            commandsProbe.ref ! command
+            Future.successful(Some(ValidatedCommandWithMeta(0L, 0L, command)))
           },
-          enableSchedules,
+          started,
           spendableBalancesActor
         )
       )
-    }
 
     def subscribe(): Unit = addressDir ! AddressDirectoryActor.Envelope(address, AddressActor.WsCommand.AddWsSubscription(wsEventsProbe.ref))
 
     def placeOrder(ao: AcceptedOrder): Unit = {
       addressDir ! AddressDirectoryActor.Envelope(address, AddressActor.Command.PlaceOrder(ao.order, ao.isMarket))
-      eventsProbe.expectMsg(ao match { case lo: LimitOrder => QueueEvent.Placed(lo); case mo: MarketOrder => QueueEvent.PlacedMarket(mo) })
+      commandsProbe.expectMsg(ao match {
+        case lo: LimitOrder => ValidatedCommand.PlaceOrder(lo); case mo: MarketOrder => ValidatedCommand.PlaceMarketOrder(mo)
+      })
       addressDir ! OrderAdded(ao, OrderAddedReason.RequestExecuted, System.currentTimeMillis)
     }
 
@@ -110,7 +111,7 @@ class ActorsWebSocketInteractionsSpecification
           if (unmatchable) AddressActor.Command.Source.Request // Not important in this test suite
           else AddressActor.Command.Source.Request
         addressDir ! AddressDirectoryActor.Envelope(address, AddressActor.Command.CancelOrder(ao.id, source))
-        eventsProbe.expectMsg(QueueEvent.Canceled(ao.order.assetPair, ao.id, source))
+        commandsProbe.expectMsg(ValidatedCommand.CancelOrder(ao.order.assetPair, ao.id, source))
       }
 
       val reason = if (unmatchable) Events.OrderCanceledReason.BecameUnmatchable else Events.OrderCanceledReason.RequestExecuted
@@ -119,7 +120,7 @@ class ActorsWebSocketInteractionsSpecification
 
     def executeOrder(s: AcceptedOrder, c: LimitOrder): OrderExecuted = {
       val (counterExecutedFee, submittedExecutedFee) = Fee.getMakerTakerFee(DynamicSettings.symmetric(0.003.waves))(s, c)
-      val oe                                         = OrderExecuted(s, c, System.currentTimeMillis, counterExecutedFee, submittedExecutedFee)
+      val oe = OrderExecuted(s, c, System.currentTimeMillis, counterExecutedFee, submittedExecutedFee)
       addressDir ! oe
       oe
     }
@@ -127,7 +128,7 @@ class ActorsWebSocketInteractionsSpecification
     def updateBalances(changes: Map[Asset, Long]): Unit = {
 
       val updatedPortfolio = Portfolio(changes.getOrElse(Waves, 0), LeaseBalance.empty, changes.collect { case (a: IssuedAsset, b) => a -> b })
-      val prevPortfolio    = Option(currentPortfolio getAndSet updatedPortfolio).getOrElse(Portfolio.empty)
+      val prevPortfolio = Option(currentPortfolio getAndSet updatedPortfolio).getOrElse(Portfolio.empty)
 
       val spendableBalanceChanges: Map[Asset, Long] =
         prevPortfolio
@@ -148,7 +149,7 @@ class ActorsWebSocketInteractionsSpecification
 
     f(
       addressDir,
-      eventsProbe,
+      commandsProbe,
       wsEventsProbe,
       address,
       () => subscribe(),
@@ -208,14 +209,14 @@ class ActorsWebSocketInteractionsSpecification
             expectWsBalancesAndOrders(
               Map(
                 Waves -> WsBalances(100, 0),
-                usd   -> WsBalances(300, 0)
+                usd -> WsBalances(300, 0)
               ),
               Seq.empty,
               0
             )
           }
 
-          val buyOrder  = LimitOrder(createOrder(wavesUsdPair, BUY, 10.waves, 3.0, sender = address))
+          val buyOrder = LimitOrder(createOrder(wavesUsdPair, BUY, 10.waves, 3.0, sender = address))
           val sellOrder = LimitOrder(createOrder(wavesUsdPair, SELL, 5.waves, 3.0))
 
           withClue("Sender places order BUY 10 Waves\n") {
@@ -244,7 +245,7 @@ class ActorsWebSocketInteractionsSpecification
               // The tradable balance will be changed to 270 USD and 99.997 WAVES when the exchange transaction comes to UTX
               // The half of order is still available
               Map(
-                usd   -> WsBalances(285, 15),
+                usd -> WsBalances(285, 15),
                 Waves -> WsBalances(99.9985, 0.0015)
               ),
               Seq(
@@ -265,7 +266,7 @@ class ActorsWebSocketInteractionsSpecification
 
             expectWsBalancesAndOrders(
               Map(
-                usd   -> WsBalances(270, 15),
+                usd -> WsBalances(270, 15),
                 Waves -> WsBalances(104.997, 0.0015)
               ),
               Seq.empty,
@@ -277,7 +278,7 @@ class ActorsWebSocketInteractionsSpecification
             cancel(oe.counterRemaining, false)
             expectWsBalancesAndOrders(
               Map(
-                usd   -> WsBalances(285, 0),
+                usd -> WsBalances(285, 0),
                 Waves -> WsBalances(104.9985, 0)
               ),
               Seq(
@@ -293,9 +294,10 @@ class ActorsWebSocketInteractionsSpecification
 
       "sender places market order in nonempty order book, fee in ETH" in webSocketTest {
         (_, _, _, address, subscribeAddress, placeOrder, cancel, executeOrder, updateBalances, expectWsBalancesAndOrders) =>
-          def matchOrders(submittedMarket: MarketOrder, counterAmount: Long): MarketOrder = {
-            executeOrder(submittedMarket, LimitOrder(createOrder(wavesUsdPair, SELL, counterAmount, 3.0))).submittedMarketRemaining(submittedMarket)
-          }
+          def matchOrders(submittedMarket: MarketOrder, counterAmount: Long): MarketOrder =
+            executeOrder(submittedMarket, LimitOrder(createOrder(wavesUsdPair, SELL, counterAmount, 3.0))).submittedMarketRemaining(
+              submittedMarket
+            )
 
           val tradableBalance = Map(Waves -> 100.waves, usd -> 300.usd, eth -> 3.eth)
           updateBalances(tradableBalance)
@@ -416,7 +418,7 @@ class ActorsWebSocketInteractionsSpecification
         subscribe(webSubscription)
         expectWsBalance(webSubscription, Map(Waves -> WsBalances(100, 0), usd -> WsBalances(300, 0), eth -> WsBalances(2, 0)), 0)
 
-        updateBalances { Map(Waves -> 100.waves, usd -> 300.usd, eth -> 5.eth) }
+        updateBalances(Map(Waves -> 100.waves, usd -> 300.usd, eth -> 5.eth))
         expectWsBalance(webSubscription, Map(eth -> WsBalances(5, 0)), 1)
 
         subscribe(mobileSubscription)
@@ -425,7 +427,7 @@ class ActorsWebSocketInteractionsSpecification
         val order = LimitOrder(createOrder(wavesUsdPair, BUY, 1.waves, 3.0, sender = address))
 
         placeOrder(order)
-        expectWsBalance(webSubscription, Map(usd    -> WsBalances(297, 3), Waves -> WsBalances(99.997, 0.003)), 2)
+        expectWsBalance(webSubscription, Map(usd -> WsBalances(297, 3), Waves -> WsBalances(99.997, 0.003)), 2)
         expectWsBalance(mobileSubscription, Map(usd -> WsBalances(297, 3), Waves -> WsBalances(99.997, 0.003)), 1)
 
         subscribe(desktopSubscription)
@@ -433,20 +435,20 @@ class ActorsWebSocketInteractionsSpecification
 
         cancel(order, true)
 
-        expectWsBalance(webSubscription, Map(usd     -> WsBalances(300, 0), Waves -> WsBalances(100, 0)), 3)
-        expectWsBalance(mobileSubscription, Map(usd  -> WsBalances(300, 0), Waves -> WsBalances(100, 0)), 2)
+        expectWsBalance(webSubscription, Map(usd -> WsBalances(300, 0), Waves -> WsBalances(100, 0)), 3)
+        expectWsBalance(mobileSubscription, Map(usd -> WsBalances(300, 0), Waves -> WsBalances(100, 0)), 2)
         expectWsBalance(desktopSubscription, Map(usd -> WsBalances(300, 0), Waves -> WsBalances(100, 0)), 1)
       }
 
       "so far unsubscribed address made some actions and then subscribes" in webSocketTest {
         (_, _, _, address, subscribeAddress, placeOrder, _, _, updateBalances, expectWsBalancesAndOrders) =>
-          updateBalances { Map(Waves -> 100.waves, usd -> 300.usd, eth -> 2.eth) }
+          updateBalances(Map(Waves -> 100.waves, usd -> 300.usd, eth -> 2.eth))
           val lo = LimitOrder(createOrder(wavesUsdPair, BUY, 1.waves, 3.0, sender = address))
 
           placeOrder(lo)
 
-          updateBalances { Map(Waves -> 100.waves, usd -> 300.usd, eth -> 5.eth) }
-          updateBalances { Map(Waves -> 115.waves, usd -> 300.usd, eth -> 5.eth) }
+          updateBalances(Map(Waves -> 100.waves, usd -> 300.usd, eth -> 5.eth))
+          updateBalances(Map(Waves -> 115.waves, usd -> 300.usd, eth -> 5.eth))
 
           subscribeAddress()
           expectWsBalancesAndOrders(
@@ -458,7 +460,7 @@ class ActorsWebSocketInteractionsSpecification
 
       "spendable balance is equal to reserved" in webSocketTest {
         (_, _, _, address, subscribeAddress, placeOrder, _, _, updateBalances, expectWsBalancesAndOrders) =>
-          updateBalances { Map(Waves -> 100.waves, btc -> 1.btc) }
+          updateBalances(Map(Waves -> 100.waves, btc -> 1.btc))
           val lo = LimitOrder(createOrder(btcUsdPair, SELL, 1.btc, 8776.0, sender = address))
           placeOrder(lo)
 
@@ -472,9 +474,9 @@ class ActorsWebSocketInteractionsSpecification
 
       "order executes right after it was placed" in webSocketTest {
         (ad, ep, _, address, subscribeAddress, _, _, _, updateBalances, expectWsBalancesAndOrders) =>
-          updateBalances { Map(Waves -> 100.waves, btc -> 1.btc) }
+          updateBalances(Map(Waves -> 100.waves, btc -> 1.btc))
 
-          val counter   = LimitOrder(createOrder(wavesUsdPair, BUY, 5.waves, 3.0))
+          val counter = LimitOrder(createOrder(wavesUsdPair, BUY, 5.waves, 3.0))
           val submitted = LimitOrder(createOrder(wavesUsdPair, SELL, 5.waves, 3.0, sender = address))
 
           subscribeAddress()
@@ -488,7 +490,7 @@ class ActorsWebSocketInteractionsSpecification
           ad ! OrderAdded(counter, OrderAddedReason.RequestExecuted, now)
 
           ad ! AddressDirectoryActor.Envelope(address, AddressActor.Command.PlaceOrder(submitted.order, submitted.isMarket))
-          ep.expectMsg(QueueEvent.Placed(submitted))
+          ep.expectMsg(ValidatedCommand.PlaceOrder(submitted))
 
           ad ! OrderAdded(submitted, OrderAddedReason.RequestExecuted, now)
           val oe = OrderExecuted(submitted, counter, System.currentTimeMillis, submitted.matcherFee, counter.matcherFee)
@@ -502,9 +504,9 @@ class ActorsWebSocketInteractionsSpecification
       }
 
       "trade with itself" in webSocketTest { (ad, ep, _, address, subscribeAddress, _, _, _, updateBalances, expectWsBalancesAndOrders) =>
-        updateBalances { Map(Waves -> 100.waves, btc -> 1.btc) }
+        updateBalances(Map(Waves -> 100.waves, btc -> 1.btc))
 
-        val counter   = LimitOrder(createOrder(wavesUsdPair, BUY, 5.waves, 3.0, sender = address))
+        val counter = LimitOrder(createOrder(wavesUsdPair, BUY, 5.waves, 3.0, sender = address))
         val submitted = LimitOrder(createOrder(wavesUsdPair, SELL, 5.waves, 3.0, sender = address))
 
         subscribeAddress()
@@ -518,7 +520,7 @@ class ActorsWebSocketInteractionsSpecification
         ad ! OrderAdded(counter, OrderAddedReason.RequestExecuted, now)
 
         ad ! AddressDirectoryActor.Envelope(address, AddressActor.Command.PlaceOrder(submitted.order, submitted.isMarket))
-        ep.expectMsg(QueueEvent.Placed(submitted))
+        ep.expectMsg(ValidatedCommand.PlaceOrder(submitted))
 
         ad ! OrderAdded(submitted, OrderAddedReason.RequestExecuted, now)
         val oe = OrderExecuted(submitted, counter, System.currentTimeMillis, submitted.matcherFee, counter.matcherFee)
@@ -538,7 +540,7 @@ class ActorsWebSocketInteractionsSpecification
             oe.submittedMarketRemaining(submittedMarket) -> oe.counterRemaining
           }
 
-          updateBalances { Map(Waves -> 100.waves, usd -> 70.usd) }
+          updateBalances(Map(Waves -> 100.waves, usd -> 70.usd))
 
           val counter1 = LimitOrder(createOrder(wavesUsdPair, BUY, 5.waves, 3.0, sender = address))
           val counter2 = LimitOrder(createOrder(wavesUsdPair, BUY, 5.waves, 3.1, sender = address))
@@ -566,7 +568,7 @@ class ActorsWebSocketInteractionsSpecification
           expectWsBalancesAndOrders(
             Map(
               // executed = 5, reserved_diff = -15 = -5 * 3, reserved = 31.5 = 46.5 - 15, tradable = 38.5 = 70 - 31.5
-              usd   -> WsBalances(38.5, 31.5),
+              usd -> WsBalances(38.5, 31.5),
               Waves -> WsBalances(99.994, 0.006) // 0.006 is a commission for counter2 + counter3, 99.994 = 100 - 0.006
             ),
             Seq(
@@ -586,7 +588,7 @@ class ActorsWebSocketInteractionsSpecification
           expectWsBalancesAndOrders(
             Map(
               // executed = 5, reserved_diff = -15.5 = -5 * 3.1, reserved = 16.5 = 31.5 - 15.5, tradable = 54 = 70 - 16
-              usd   -> WsBalances(54, 16),
+              usd -> WsBalances(54, 16),
               Waves -> WsBalances(99.997, 0.003)
             ),
             Seq(
@@ -606,7 +608,7 @@ class ActorsWebSocketInteractionsSpecification
           expectWsBalancesAndOrders(
             Map(
               // executed = 2 = 12 - 5 - 5, reserved_diff = -6.4 = -2 * 3.2, reserved = 9.6 = 16 - 6.4, tradable = 60.4 = 70 - 9.6
-              usd   -> WsBalances(60.4, 9.6),
+              usd -> WsBalances(60.4, 9.6),
               Waves -> WsBalances(99.9982, 0.0018) // executed_fee = 0.0012 = 0.003 * 2 / 5
             ),
             Seq(
@@ -641,11 +643,10 @@ class ActorsWebSocketInteractionsSpecification
 
       "market order executes (address is sender of market)" in webSocketTest {
         (_, _, _, address, subscribeAddress, placeOrder, _, executeOrder, updateBalances, expectWsBalancesAndOrders) =>
-          def matchOrders(submittedMarket: MarketOrder, counter: LimitOrder): MarketOrder = {
+          def matchOrders(submittedMarket: MarketOrder, counter: LimitOrder): MarketOrder =
             executeOrder(submittedMarket, counter).submittedMarketRemaining(submittedMarket)
-          }
 
-          updateBalances { Map(Waves -> 100.waves, usd -> 70.usd) }
+          updateBalances(Map(Waves -> 100.waves, usd -> 70.usd))
 
           val counter1 = LimitOrder(createOrder(wavesUsdPair, BUY, 5.waves, 3.0))
           val counter2 = LimitOrder(createOrder(wavesUsdPair, BUY, 5.waves, 3.1))
@@ -750,7 +751,16 @@ class ActorsWebSocketInteractionsSpecification
 
         expectWsBalancesAndOrders(
           Map(usd -> WsBalances(5, 5), Waves -> WsBalances(9.9985, 0.0015)),
-          Seq(WsOrder(id = bo.id, status = OrderStatus.PartiallyFilled.name, filledAmount = 5.0, filledFee = 0.0015, avgWeighedPrice = 1.0, totalExecutedPriceAssets = 5.0)),
+          Seq(
+            WsOrder(
+              id = bo.id,
+              status = OrderStatus.PartiallyFilled.name,
+              filledAmount = 5.0,
+              filledFee = 0.0015,
+              avgWeighedPrice = 1.0,
+              totalExecutedPriceAssets = 5.0
+            )
+          ),
           2
         )
 
@@ -780,4 +790,5 @@ class ActorsWebSocketInteractionsSpecification
     super.afterAll()
     system.terminate()
   }
+
 }

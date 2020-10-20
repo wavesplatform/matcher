@@ -6,6 +6,8 @@ import scala.io.Source
 import scala.util.Try
 
 package object resources {
+
   def getRawContentFromResource(fileName: String): String =
-    Try(Source fromResource fileName).getOrElse { throw new FileNotFoundException(s"Resource '$fileName'") }.mkString
+    Try(Source fromResource fileName).getOrElse(throw new FileNotFoundException(s"Resource '$fileName'")).mkString
+
 }

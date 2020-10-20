@@ -26,8 +26,8 @@ object GatlingFeeder {
       .replace("-----END PRIVATE KEY-----", "")
       .replaceAll("\\n", "")
 
-    val kf         = KeyFactory.getInstance("RSA")
-    val ksPkcs8    = new PKCS8EncodedKeySpec(Base64.getDecoder.decode(privateKeyContent))
+    val kf = KeyFactory.getInstance("RSA")
+    val ksPkcs8 = new PKCS8EncodedKeySpec(Base64.getDecoder.decode(privateKeyContent))
     val privateKey = kf.generatePrivate(ksPkcs8)
 
     privateKey
@@ -46,11 +46,11 @@ object GatlingFeeder {
     ).signed(a.privateKey)
   }
 
-  private def mkAusString(accountKeyPair: KeyPair, authKp: security.PrivateKey): String = {
+  private def mkAusString(accountKeyPair: KeyPair, authKp: security.PrivateKey): String =
     s"""{"T":"aus","S":"${accountKeyPair.toAddress.toString}","t":"jwt","j":"${JwtUtils.mkJwt(
       authKp,
-      Json.toJsObject(mkJwtSignedPayload(accountKeyPair)))}"}"""
-  }
+      Json.toJsObject(mkJwtSignedPayload(accountKeyPair))
+    )}"}"""
 
   private def mkObsStrings(pairsFile: File, numberPerClient: Int): String = {
     val source = Source.fromFile(pairsFile)
@@ -61,18 +61,20 @@ object GatlingFeeder {
     } finally source.close()
   }
 
-  def mkFile(accountsNumber: Int,
-             seedPrefix: String,
-             authKp: security.PrivateKey,
-             pairsFile: File,
-             orderBookNumberPerAccount: Int,
-             feederFile: File): Unit = {
+  def mkFile(
+    accountsNumber: Int,
+    seedPrefix: String,
+    authKp: security.PrivateKey,
+    pairsFile: File,
+    orderBookNumberPerAccount: Int,
+    feederFile: File
+  ): Unit = {
     val output = new PrintWriter(feederFile, "utf-8")
     try {
       output.print("a;m")
-      (0 until orderBookNumberPerAccount).foreach(i => {
+      (0 until orderBookNumberPerAccount).foreach { i =>
         output.print(s";o$i")
-      })
+      }
       output.println()
       (0 until accountsNumber).foreach { i =>
         val kp = KeyPair.fromSeed(Base58.encode(s"$seedPrefix$i".getBytes)).explicitGet()
@@ -81,4 +83,5 @@ object GatlingFeeder {
     } finally output.close()
     println(s"Results have been saved to $feederFile")
   }
+
 }

@@ -40,13 +40,14 @@ object HttpOrderBook {
 
       AssetPair(readAssetId("amountAsset"), readAssetId("priceAsset"))
     }
+
   }
 
   private def formatValue(value: BigDecimal, decimals: Int): String = new java.text.DecimalFormat(s"0.${"0" * decimals}").format(value)
 
-  private def denormalizeAndSerializeSide(side: Seq[LevelAgg], amountAssetDecimals: Int, priceAssetDecimals: Int, jg: JsonGenerator): Unit = {
+  private def denormalizeAndSerializeSide(side: Seq[LevelAgg], amountAssetDecimals: Int, priceAssetDecimals: Int, jg: JsonGenerator): Unit =
     side.foreach { levelAgg =>
-      val denormalizedPrice  = Denormalization.denormalizePrice(levelAgg.price, amountAssetDecimals, priceAssetDecimals)
+      val denormalizedPrice = Denormalization.denormalizePrice(levelAgg.price, amountAssetDecimals, priceAssetDecimals)
       val denormalizedAmount = Denormalization.denormalizeAmountAndFee(levelAgg.amount, amountAssetDecimals)
 
       jg.writeStartArray(2)
@@ -54,11 +55,11 @@ object HttpOrderBook {
       jg.writeString(formatValue(denormalizedAmount, amountAssetDecimals))
       jg.writeEndArray()
     }
-  }
 
   def toJson(x: HttpOrderBook): String = serialize(x)
 
   class Serializer extends StdSerializer[HttpOrderBook](classOf[HttpOrderBook]) {
+
     override def serialize(x: HttpOrderBook, j: JsonGenerator, serializerProvider: SerializerProvider): Unit = {
       j.writeStartObject()
       j.writeNumberField("timestamp", x.timestamp)
@@ -92,5 +93,7 @@ object HttpOrderBook {
 
       j.writeEndObject()
     }
+
   }
+
 }

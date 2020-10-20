@@ -18,10 +18,12 @@ import scala.util.Try
 class DEXExtension(context: ExtensionContext) extends Extension with ScorexLogging {
 
   @volatile
-  private var server: Server                            = _
+  private var server: Server = _
+
   private var apiService: WavesBlockchainApiGrpcService = _
 
   implicit val chosenCase: NameMapper = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
+
   implicit private val apiScheduler: Scheduler = Scheduler(
     ec = context.actorSystem.dispatchers.lookup("akka.actor.waves-dex-grpc-scheduler"),
     executionModel = ExecutionModel.AlwaysAsyncExecution
@@ -30,7 +32,7 @@ class DEXExtension(context: ExtensionContext) extends Extension with ScorexLoggi
   override def start(): Unit = {
 
     val host: String = context.settings.config.as[String]("waves.dex.grpc.integration.host")
-    val port: Int    = context.settings.config.as[Int]("waves.dex.grpc.integration.port")
+    val port: Int = context.settings.config.as[Int]("waves.dex.grpc.integration.port")
 
     val ignoredExchangeTxSenderPublicKey: Option[String] = Try {
       context.settings.config.as[String]("waves.dex.utx.ignore-exchange-sender-pk-in-pessimistic-portfolio")
@@ -55,4 +57,5 @@ class DEXExtension(context: ExtensionContext) extends Extension with ScorexLoggi
     if (server != null) server.shutdownNow()
     Future.successful(())
   }
+
 }

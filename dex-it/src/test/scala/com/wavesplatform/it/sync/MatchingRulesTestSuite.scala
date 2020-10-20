@@ -77,17 +77,14 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
     dex1.start()
   }
 
-  def priceAssetBalance(owner: KeyPair, assetPair: AssetPair): Long = {
+  def priceAssetBalance(owner: KeyPair, assetPair: AssetPair): Long =
     assetBalance(owner, assetPair.priceAsset)
-  }
 
-  def amountAssetBalance(owner: KeyPair, assetPair: AssetPair): Long = {
+  def amountAssetBalance(owner: KeyPair, assetPair: AssetPair): Long =
     assetBalance(owner, assetPair.amountAsset)
-  }
 
-  def assetBalance(owner: KeyPair, asset: Asset): Long = {
+  def assetBalance(owner: KeyPair, asset: Asset): Long =
     wavesNode1.api.balance(owner, asset)
-  }
 
   val (amount, price) = (1000L, PriceConstant)
 
@@ -171,11 +168,11 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
 
   // offset is 18, after test - 22
   "Matching on the same price level" in {
-    val bobUsdBalance     = wavesNode1.api.balance(bob, usd)
-    val bobWctBalance     = wavesNode1.api.balance(bob, wct)
-    val aliceUsdBalance   = wavesNode1.api.balance(alice, usd)
-    val aliceWctBalance   = wavesNode1.api.balance(alice, wct)
-    val bobWavesBalance   = wavesNode1.api.balance(bob, Waves)
+    val bobUsdBalance = wavesNode1.api.balance(bob, usd)
+    val bobWctBalance = wavesNode1.api.balance(bob, wct)
+    val aliceUsdBalance = wavesNode1.api.balance(alice, usd)
+    val aliceWctBalance = wavesNode1.api.balance(alice, wct)
+    val bobWavesBalance = wavesNode1.api.balance(bob, Waves)
     val aliceWavesBalance = wavesNode1.api.balance(alice, Waves)
 
     val sellOrder = mkOrder(bob, wctUsdPair, SELL, amount, 4 * price, matcherFee)
@@ -207,11 +204,11 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
 
   // offset is 22, after test - 25
   "Matching with old orders after tick size enabled" in {
-    val bobUsdBalance     = wavesNode1.api.balance(bob, usd)
-    val bobWctBalance     = wavesNode1.api.balance(bob, wct)
-    val aliceUsdBalance   = wavesNode1.api.balance(alice, usd)
-    val aliceWctBalance   = wavesNode1.api.balance(alice, wct)
-    val bobWavesBalance   = wavesNode1.api.balance(bob, Waves)
+    val bobUsdBalance = wavesNode1.api.balance(bob, usd)
+    val bobWctBalance = wavesNode1.api.balance(bob, wct)
+    val aliceUsdBalance = wavesNode1.api.balance(alice, usd)
+    val aliceWctBalance = wavesNode1.api.balance(alice, wct)
+    val bobWavesBalance = wavesNode1.api.balance(bob, Waves)
     val aliceWavesBalance = wavesNode1.api.balance(alice, Waves)
 
     val sellOrder = mkOrder(bob, wctUsdPair, SELL, amount, 15 * price, matcherFee)
@@ -259,14 +256,14 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
   }
 
   "Placing order on level 0" in {
-    dex1.api.tryPlace(mkOrder(bob, wctUsdPair, BUY, amount * 100000000L, 1, matcherFee)) should failWith(
+    dex1.tryApi.place(mkOrder(bob, wctUsdPair, BUY, amount * 100000000L, 1, matcherFee)) should failWith(
       9441286, // OrderInvalidPriceLevel
       "The buy order's price 0.00000001 does not meet matcher's requirements: price >= 12 (actual tick size). Orders can not be placed into level with price 0"
     )
   }
 
   "Placing order on level 0 with virgin orderbook" in {
-    dex1.api.tryPlace(mkOrder(bob, wctWavesPair, BUY, amount * 100000000L, 1 * 1000000L, matcherFee)) should failWith(
+    dex1.tryApi.place(mkOrder(bob, wctWavesPair, BUY, amount * 100000000L, 1 * 1000000L, matcherFee)) should failWith(
       9441286, // OrderInvalidPriceLevel
       "The buy order's price 0.00000001 does not meet matcher's requirements: price >= 12 (actual tick size). Orders can not be placed into level with price 0"
     )
@@ -278,11 +275,11 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
         case (pair: AssetPair, amount: Long, price: Long) =>
           withClue(pair) {
             val aliceAmountBalance = assetBalance(alice, pair.amountAsset)
-            val bobAmountBalance   = assetBalance(bob, pair.amountAsset)
-            val alicePriceBalance  = assetBalance(alice, pair.priceAsset)
-            val bobPriceBalance    = assetBalance(bob, pair.priceAsset)
-            val aliceWavesBalance  = assetBalance(alice, Waves)
-            val bobWavesBalance    = assetBalance(bob, Waves)
+            val bobAmountBalance = assetBalance(bob, pair.amountAsset)
+            val alicePriceBalance = assetBalance(alice, pair.priceAsset)
+            val bobPriceBalance = assetBalance(bob, pair.priceAsset)
+            val aliceWavesBalance = assetBalance(alice, Waves)
+            val bobWavesBalance = assetBalance(bob, Waves)
 
             val bestAskOrderId = mkOrder(alice, pair, SELL, amount, 17 * price, matcherFee)
             dex1.api.place(bestAskOrderId)

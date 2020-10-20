@@ -33,8 +33,8 @@ object WavesNodeArtifactsPlugin extends AutoPlugin {
       filesToRemove
     },
     downloadWavesNodeArtifacts := {
-      val version      = wavesNodeVersion.value
-      val targetDir    = unmanagedBase.value
+      val version = wavesNodeVersion.value
+      val targetDir = unmanagedBase.value
       implicit val log = streams.value.log
 
       val unmanagedJarsToDownload = artifactNames(version).filterNot(x => (targetDir / x).isFile)
@@ -57,8 +57,8 @@ object WavesNodeArtifactsPlugin extends AutoPlugin {
             releasesContent =>
               log.info(s"Looking for Waves Node $version...")
               getFilesDownloadUrls(releasesContent.bodyAsString, version, artifactsToDownload).map { rawUrl =>
-                val url        = new URL(rawUrl)
-                val fileName   = url.getPath.split('/').last
+                val url = new URL(rawUrl)
+                val fileName = url.getPath.split('/').last
                 val cachedFile = cacheDir / fileName
                 val targetFile = targetDir / fileName
 
@@ -84,7 +84,9 @@ object WavesNodeArtifactsPlugin extends AutoPlugin {
     s"waves-stagenet_${version}_all.deb"
   )
 
-  private def getFilesDownloadUrls(rawJson: String, version: String, fileNamesToDownload: List[String])(implicit log: ManagedLogger): List[String] =
+  private def getFilesDownloadUrls(rawJson: String, version: String, fileNamesToDownload: List[String])(implicit
+    log: ManagedLogger
+  ): List[String] =
     Parser.parseFromString(rawJson).get match {
       case JArray(jReleases) =>
         jReleases
@@ -92,7 +94,7 @@ object WavesNodeArtifactsPlugin extends AutoPlugin {
             case JObject(jRelease) if jRelease.contains(JField("tag_name", JString(s"v$version"))) =>
               jRelease.find(_.field == "assets") match {
                 case Some(JField(_, JArray(jAssets))) => fileNamesToDownload.flatMap(findAssetUrl(jAssets, _))
-                case x                                => throw new RuntimeException(s"Can't find assets in: $x")
+                case x => throw new RuntimeException(s"Can't find assets in: $x")
               }
           }
           .getOrElse {
@@ -111,18 +113,19 @@ object WavesNodeArtifactsPlugin extends AutoPlugin {
             .getOrElse(throw new RuntimeException(s"Can't find browser_download_url in $jAsset"))
             .value match {
             case JString(x) => x
-            case x          => throw new RuntimeException(s"Can't parse url: $x")
+            case x => throw new RuntimeException(s"Can't parse url: $x")
           }
       }
     if (r.isEmpty) log.warn(s"Can't find $name")
     r
   }
+
 }
 
 trait WavesNodeArtifactsKeys {
   // Useful for CI
-  val wavesArtifactsCacheDir     = settingKey[File]("Where cached artifacts are stored")
-  val wavesNodeVersion           = settingKey[String]("Waves Node version without 'v'")
-  val cleanupWavesNodeArtifacts  = taskKey[Seq[File]]("Removes stale artifacts")
+  val wavesArtifactsCacheDir = settingKey[File]("Where cached artifacts are stored")
+  val wavesNodeVersion = settingKey[String]("Waves Node version without 'v'")
+  val cleanupWavesNodeArtifacts = taskKey[Seq[File]]("Removes stale artifacts")
   val downloadWavesNodeArtifacts = taskKey[Unit]("Downloads Waves Node artifacts to unmanagedBase")
 }

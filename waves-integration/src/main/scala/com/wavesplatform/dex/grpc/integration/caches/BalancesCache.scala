@@ -12,10 +12,10 @@ class BalancesCache(loader: (Address, Asset) => Future[Long])(implicit execution
       invalidationPredicate = BlockchainCache.noCustomInvalidationLogic
     ) {
 
-  def batchPut(batch: Map[Address, Map[Asset, Long]]): Unit = {
+  def batchPut(batch: Map[Address, Map[Asset, Long]]): Unit =
     batch.foreach {
       case (address, changedBalances) =>
-        changedBalances.foreach { case (asset, balance) => put(address -> asset, Future.successful { BigInt(balance) }) }
+        changedBalances.foreach { case (asset, balance) => put(address -> asset, Future.successful(BigInt(balance))) }
     }
-  }
+
 }

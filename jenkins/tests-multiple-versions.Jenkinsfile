@@ -9,6 +9,7 @@ pipeline {
     }
     parameters {
         string(name: 'SBT_THREAD_NUMBER', defaultValue: '6', description: '')
+        string(name: 'LABEL', defaultValue: '', description: '')
     }
     environment {
         SBT_HOME = tool name: 'sbt-1.2.6', type: 'org.jvnet.hudson.plugins.SbtPluginBuilder$SbtInstallation'
@@ -24,7 +25,8 @@ pipeline {
         stage('Cleanup') {
             steps {
                 script {
-                    currentBuild.displayName = "${params.BRANCH}"
+                    currentBuild.displayName = "${params.BRANCH}${params.LABEL}"
+                    currentBuild.description = "<a href='${REGISTRY}/waves/dex/${OTHER_DEX_IMAGE}'>Dex image</a> <br/> <a href='${REGISTRY}/waves/dex/${OTHER_NODE_IMAGE}'>Node image</a>"
                 }
                 sh 'git fetch --tags'
                 sh 'docker rmi `docker images --format "{{.Repository}}:{{.Tag}}" | grep "wavesplatform"` || true'

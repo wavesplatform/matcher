@@ -8,15 +8,15 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import com.wavesplatform.dex.it.test.Scripts
-import com.wavesplatform.dex.it.waves.MkWavesEntities
+import com.wavesplatform.dex.it.waves.{MkWavesEntities, ToWavesJConversions}
 import com.wavesplatform.it.MatcherSuiteBase
 import im.mak.waves.transactions.IssueTransaction
 
 /**
-  * Rules:
-  * 1. If the script fails during placing, the matcher must reject an order
-  * 2. If the script fails during execution, the matcher must cancel both orders (submitted and counter)
-  */
+ * Rules:
+ * 1. If the script fails during placing, the matcher must reject an order
+ * 2. If the script fails during execution, the matcher must cancel both orders (submitted and counter)
+ */
 class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
 
   import OrdersFromScriptedAssetTestSuite._
@@ -36,16 +36,16 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
   }
 
   "can place if the script returns TRUE" in {
-    val pair    = AssetPair(unscriptedAsset, allowAsset)
+    val pair = AssetPair(unscriptedAsset, allowAsset)
     val counter = mkOrder(matcher, pair, OrderType.SELL, 100000, 2 * Order.PriceConstant, version = 2, matcherFee = smartTradeFee)
     placeAndAwaitAtDex(counter)
     dex1.api.cancel(matcher, counter)
   }
 
   "can't place if the script returns FALSE" in {
-    val pair  = AssetPair(unscriptedAsset, denyAsset)
+    val pair = AssetPair(unscriptedAsset, denyAsset)
     val order = mkOrder(matcher, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, matcherFee = smartTradeFee, version = 2)
-    dex1.api.tryPlace(order) should failWith(
+    dex1.tryApi.place(order) should failWith(
       11536130, // AssetScriptDeniedOrder
       MatcherError.Params(assetId = Some(denyAsset.id.toString))
     )
@@ -58,7 +58,10 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     placeAndAwaitAtDex(mkOrder(matcher, pair, OrderType.SELL, 100000, 2 * Order.PriceConstant, version = 2, matcherFee = smartTradeFee))
 
     info("place a submitted order")
-    placeAndAwaitAtDex(mkOrder(matcher, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 2, matcherFee = smartTradeFee), Status.Filled)
+    placeAndAwaitAtDex(
+      mkOrder(matcher, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 2, matcherFee = smartTradeFee),
+      Status.Filled
+    )
   }
 
   "can execute against scripted, if both scripts returns TRUE" in {
@@ -82,7 +85,7 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
 
   "can't execute against unscripted, if the script returns FALSE" in {
     info("place a counter order")
-    val pair    = AssetPair(allowAsset2, unscriptedAsset)
+    val pair = AssetPair(allowAsset2, unscriptedAsset)
     val counter = mkOrder(matcher, pair, OrderType.SELL, 100001, 2 * Order.PriceConstant, version = 2, matcherFee = smartTradeFee)
     placeAndAwaitAtDex(counter)
 
@@ -102,14 +105,14 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     dex1.api.waitForOrderStatus(counter, Status.PartiallyFilled)
 
     val txs = dex1.api.waitForTransactionsByOrder(submitted, 1)
-    val r   = wavesNode1.api.tryBroadcast(txs.head)
+    val r = wavesNode1.tryApi.broadcast(txs.head)
     r shouldBe Symbol("left")
     r.swap.explicitGet().error shouldBe 308 // node's ApiError TransactionNotAllowedByAssetScript.Id
   }
 
   "can't execute against scripted, if one script returns FALSE" in {
     info("place a counter order")
-    val pair    = AssetPair(allowAsset3, allowAsset)
+    val pair = AssetPair(allowAsset3, allowAsset)
     val counter = mkOrder(matcher, pair, OrderType.SELL, 100001, 2 * Order.PriceConstant, version = 2, matcherFee = twoSmartTradeFee)
     placeAndAwaitAtDex(counter)
 
@@ -129,36 +132,34 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     dex1.api.waitForOrderStatus(counter, Status.PartiallyFilled)
 
     val txs = dex1.api.waitForTransactionsByOrder(submitted, 1)
-    val r   = wavesNode1.api.tryBroadcast(txs.head)
+    val r = wavesNode1.tryApi.broadcast(txs.head)
     r shouldBe Symbol("left")
     r.swap.explicitGet().error shouldBe 308 // node's ApiError TransactionNotAllowedByAssetScript.Id
   }
 }
 
-object OrdersFromScriptedAssetTestSuite {
+object OrdersFromScriptedAssetTestSuite extends ToWavesJConversions {
 
-  import MkWavesEntities.mkIssue
   import com.wavesplatform.dex.it.config.PredefinedAccounts.matcher
-  import com.wavesplatform.dex.it.waves.Implicits.toVanilla
   import com.wavesplatform.dex.waves.WavesFeeConstants.smartIssueFee
 
   private def mkAllow(id: Int): IssueTransaction =
-    mkIssue(matcher, s"AllowAsset-$id", Int.MaxValue / 3, 0, smartIssueFee, Some(Scripts.alwaysTrue))
+    MkWavesEntities.mkIssue(matcher, s"AllowAsset-$id", Int.MaxValue / 3, 0, smartIssueFee, Some(Scripts.alwaysTrue))
 
-  private val issueUnscriptedAssetTx = mkIssue(matcher, "UnscriptedAsset", Int.MaxValue / 3, 0)
-  private val unscriptedAsset        = IssuedAsset(issueUnscriptedAssetTx.id())
+  private val issueUnscriptedAssetTx = MkWavesEntities.mkIssue(matcher, "UnscriptedAsset", Int.MaxValue / 3, 0)
+  private val unscriptedAsset = IssuedAsset(issueUnscriptedAssetTx.id())
 
   private val issueAllowAssetTx = mkAllow(0)
-  private val allowAsset        = IssuedAsset(issueAllowAssetTx.id())
+  private val allowAsset = IssuedAsset(issueAllowAssetTx.id())
 
   private val issueAllowAsset2Tx = mkAllow(1)
-  private val allowAsset2        = IssuedAsset(issueAllowAsset2Tx.id())
+  private val allowAsset2 = IssuedAsset(issueAllowAsset2Tx.id())
 
   private val issueAllowAsset3Tx = mkAllow(2)
-  private val allowAsset3        = IssuedAsset(issueAllowAsset3Tx.id())
+  private val allowAsset3 = IssuedAsset(issueAllowAsset3Tx.id())
 
-  private val issueDenyAssetTx = mkIssue(matcher, "DenyAsset", Int.MaxValue / 3, 0, smartIssueFee, Some(Scripts.alwaysFalse))
-  private val denyAsset        = IssuedAsset(issueDenyAssetTx.id())
+  private val issueDenyAssetTx = MkWavesEntities.mkIssue(matcher, "DenyAsset", Int.MaxValue / 3, 0, smartIssueFee, Some(Scripts.alwaysFalse))
+  private val denyAsset = IssuedAsset(issueDenyAssetTx.id())
 
   /*
   {-# STDLIB_VERSION 2 #-}
@@ -169,6 +170,7 @@ object OrdersFromScriptedAssetTestSuite {
    */
   private val DenyBigAmountScript = Scripts.fromBase64(
     "AgQAAAAHJG1hdGNoMAUAAAACdHgDCQAAAQAAAAIFAAAAByRtYXRjaDACAAAAE0V4Y2hhbmdlVHJhbnNhY3Rpb24EAAAAAnR4BQAAAAckbWF0Y2gwCQA" +
-      "AZwAAAAIAAAAAAAABhqAICAUAAAACdHgAAAAJc2VsbE9yZGVyAAAABmFtb3VudAQAAAAFb3RoZXIFAAAAByRtYXRjaDAGTQhceA=="
+    "AZwAAAAIAAAAAAAABhqAICAUAAAACdHgAAAAJc2VsbE9yZGVyAAAABmFtb3VudAQAAAAFb3RoZXIFAAAAByRtYXRjaDAGTQhceA=="
   )
+
 }

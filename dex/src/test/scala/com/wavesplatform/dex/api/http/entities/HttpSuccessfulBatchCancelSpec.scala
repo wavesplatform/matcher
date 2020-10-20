@@ -17,8 +17,8 @@ class HttpSuccessfulBatchCancelSpec extends AnyFreeSpec with Matchers with DiffM
       |    "status" : "OrderCanceled"
       |  }, {
       |    "error" : 25601,
-      |    "message" : "Can not persist event, please retry later or contact with the administrator",
-      |    "template" : "Can not persist event, please retry later or contact with the administrator",
+      |    "message" : "Can not persist command, please retry later or contact with the administrator",
+      |    "template" : "Can not persist command, please retry later or contact with the administrator",
       |    "status" : "OrderCancelRejected",
       |    "success" : false
       |  } ] ],
@@ -32,8 +32,8 @@ class HttpSuccessfulBatchCancelSpec extends AnyFreeSpec with Matchers with DiffM
       Left(
         HttpError(
           error = 25601,
-          message = "Can not persist event, please retry later or contact with the administrator",
-          template = "Can not persist event, please retry later or contact with the administrator",
+          message = "Can not persist command, please retry later or contact with the administrator",
+          template = "Can not persist command, please retry later or contact with the administrator",
           status = "OrderCancelRejected"
         )
       )

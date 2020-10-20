@@ -14,21 +14,21 @@ trait HasPostgresJdbcContext {
   protected lazy val ctx: PostgresJdbcContext[SnakeCase.type] = new PostgresJdbcContext(SnakeCase, connectionConfig)
 
   @unused
-  protected implicit val encodeEventReason = MappedEncoding[EventReason, Byte] {
-    case Events.NotTracked                              => 0
-    case Events.OrderAddedReason.RequestExecuted        => 1
-    case Events.OrderAddedReason.OrderBookRecovered     => 2
-    case Events.OrderExecutedReason                     => 3
-    case Events.OrderCanceledReason.RequestExecuted     => 4
-    case Events.OrderCanceledReason.OrderBookDeleted    => 5
-    case Events.OrderCanceledReason.Expired             => 6
-    case Events.OrderCanceledReason.BecameUnmatchable   => 7
-    case Events.OrderCanceledReason.BecameInvalid       => 8
+  implicit protected val encodeEventReason = MappedEncoding[EventReason, Byte] {
+    case Events.NotTracked => 0
+    case Events.OrderAddedReason.RequestExecuted => 1
+    case Events.OrderAddedReason.OrderBookRecovered => 2
+    case Events.OrderExecutedReason => 3
+    case Events.OrderCanceledReason.RequestExecuted => 4
+    case Events.OrderCanceledReason.OrderBookDeleted => 5
+    case Events.OrderCanceledReason.Expired => 6
+    case Events.OrderCanceledReason.BecameUnmatchable => 7
+    case Events.OrderCanceledReason.BecameInvalid => 8
     case Events.OrderCanceledReason.InsufficientBalance => 9
   }
 
   @unused
-  protected implicit val decodeEventReason = MappedEncoding[Byte, EventReason] {
+  implicit protected val decodeEventReason = MappedEncoding[Byte, EventReason] {
     case 0 => Events.NotTracked
     case 1 => Events.OrderAddedReason.RequestExecuted
     case 2 => Events.OrderAddedReason.OrderBookRecovered
@@ -40,4 +40,5 @@ trait HasPostgresJdbcContext {
     case 8 => Events.OrderCanceledReason.BecameInvalid
     case 9 => Events.OrderCanceledReason.InsufficientBalance
   }
+
 }

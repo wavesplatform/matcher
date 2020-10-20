@@ -25,7 +25,7 @@ class DatabaseBackwardCompatTestSuite extends BackwardCompatSuiteBase {
     orders.groupBy(_.assetPair).valuesIterator.foreach { orders =>
       dex2.api.waitForOrder(orders.last)(_.status != Status.NotFound)
     }
-    Thread.sleep(10.seconds.toMillis) // An additional time to wait the concurrent processing
+    Thread.sleep(2.minutes.toMillis) // An additional time to wait the concurrent processing
     val state2 = state(dex2.api, orders)
 
     dex2.stopWithoutRemove()
@@ -34,7 +34,7 @@ class DatabaseBackwardCompatTestSuite extends BackwardCompatSuiteBase {
     orders.groupBy(_.assetPair).valuesIterator.foreach { orders =>
       dex1.api.waitForOrder(orders.last)(_.status != Status.NotFound)
     }
-    Thread.sleep(10.seconds.toMillis) // An additional time to wait the concurrent processing
+    Thread.sleep(2.minutes.toMillis) // An additional time to wait the concurrent processing
     val state1 = state(dex1.api, orders)
     state1 should matchTo(state2)
   }
@@ -51,4 +51,5 @@ class DatabaseBackwardCompatTestSuite extends BackwardCompatSuiteBase {
 
     dex2.start()
   }
+
 }

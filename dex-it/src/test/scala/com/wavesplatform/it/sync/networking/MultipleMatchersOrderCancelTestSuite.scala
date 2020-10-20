@@ -11,7 +11,8 @@ import com.wavesplatform.it.tags.DexItExternalKafkaRequired
 @DexItExternalKafkaRequired
 class MultipleMatchersOrderCancelTestSuite extends MatcherSuiteBase {
 
-  override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "WAVES" ]""".stripMargin)
+  override protected def dexInitialSuiteConfig: Config =
+    ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "WAVES" ]""".stripMargin)
 
   protected lazy val dex2: DexContainer = createDex("dex-2")
 
@@ -23,25 +24,25 @@ class MultipleMatchersOrderCancelTestSuite extends MatcherSuiteBase {
   }
 
   /**
-    *  Assumptions:
-    *    1. DEX-1 is a master, DEX-2 is a slave;
-    *    2. Latency in direction Kafka -> DEX-1 is too high and is ok in direction Kafka -> DEX-2, or master DEX is much more busy than slave one;
-    *    3. DEX-1 and DEX-2 are connected to the same Node.
-    *
-    *  In this case orders on DEX-1 might be cancelled due to balance changing on Node (which were caused by exchange transactions from DEX-2)
-    */
+   *  Assumptions:
+   *    1. DEX-1 is a master, DEX-2 is a slave;
+   *    2. Latency in direction Kafka -> DEX-1 is too high and is ok in direction Kafka -> DEX-2, or master DEX is much more busy than slave one;
+   *    3. DEX-1 and DEX-2 are connected to the same Node.
+   *
+   *  In this case orders on DEX-1 might be cancelled due to balance changing on Node (which were caused by exchange transactions from DEX-2)
+   */
   "Tricky case when DEX-1 is slower than DEX-2 and it leads to order cancelling on DEX-1" in {
 
     val acc1 = mkAccountWithBalance(15.015.waves -> Waves)
-    val acc2 = mkAccountWithBalance(0.015.waves  -> Waves, 15.usd -> usd)
-    val acc3 = mkAccountWithBalance(1.waves      -> Waves, 10.eth -> eth) // Account for fake orders
+    val acc2 = mkAccountWithBalance(0.015.waves -> Waves, 15.usd -> usd)
+    val acc3 = mkAccountWithBalance(1.waves -> Waves, 10.eth -> eth) // Account for fake orders
 
     val ts = System.currentTimeMillis()
     val sellOrders = (1 to 5).map { amt =>
       mkOrderDP(acc1, wavesUsdPair, OrderType.SELL, amt.waves, amt, ts = ts + amt) // To cancel latest first
     }
 
-    sellOrders.foreach { placeAndAwaitAtDex(_) }
+    sellOrders.foreach(placeAndAwaitAtDex(_))
 
     // if DEX-1 will work with local queue, it won't receive buy orders placements and
     // will cancel remained orders due to balance changes

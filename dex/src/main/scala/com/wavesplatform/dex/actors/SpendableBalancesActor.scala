@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.actors
 
-import akka.actor.{Actor, ActorRef, Status}
+import akka.actor.{Actor, ActorRef, Props, Status}
 import cats.syntax.either._
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.domain.account.Address
@@ -8,20 +8,22 @@ import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.error.{MatcherError, WavesNodeConnectionBroken}
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
+import com.wavesplatform.dex.model.OrderValidator.AsyncBlockchain
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
-class SpendableBalancesActor(spendableBalances: (Address, Set[Asset]) => Future[Map[Asset, Long]],
-                             allAssetsSpendableBalances: Address => Future[Map[Asset, Long]],
-                             addressDirectory: ActorRef)
-    extends Actor
+class SpendableBalancesActor(
+  spendableBalances: (Address, Set[Asset]) => Future[Map[Asset, Long]],
+  allAssetsSpendableBalances: Address => Future[Map[Asset, Long]],
+  addressDirectory: ActorRef
+) extends Actor
     with ScorexLogging {
 
   import context.dispatcher
 
   type AddressState = Map[Asset, Long]
-  type State        = Map[Address, AddressState]
+  type State = Map[Address, AddressState]
 
   /** Keeps states of all addresses by all available assets */
   var fullState: State = Map.empty
@@ -32,7 +34,7 @@ class SpendableBalancesActor(spendableBalances: (Address, Set[Asset]) => Future[
   def receive: Receive = {
 
     case SpendableBalancesActor.Query.GetState(address, assets) =>
-      val maybeAddressState   = fullState.get(address).orElse(incompleteStateChanges get address).getOrElse(Map.empty)
+      val maybeAddressState = fullState.get(address).orElse(incompleteStateChanges get address).getOrElse(Map.empty)
       val assetsMaybeBalances = assets.map(asset => asset -> maybeAddressState.get(asset)).toMap
 
       val (knownAssets, unknownAssets) = assetsMaybeBalances.partition { case (_, balance) => balance.isDefined }
@@ -90,8 +92,8 @@ class SpendableBalancesActor(spendableBalances: (Address, Set[Asset]) => Future[
     case SpendableBalancesActor.Command.UpdateStates(changes) =>
       changes.foreach {
         case (address, stateUpdate) =>
-          val addressFullState  = fullState.get(address)
-          val knownBalance      = addressFullState orElse incompleteStateChanges.get(address) getOrElse Map.empty
+          val addressFullState = fullState.get(address)
+          val knownBalance = addressFullState orElse incompleteStateChanges.get(address) getOrElse Map.empty
           val (clean, forAudit) = if (knownBalance.isEmpty) (stateUpdate, stateUpdate) else getCleanAndForAuditChanges(stateUpdate, knownBalance)
 
           if (addressFullState.isDefined) {
@@ -104,35 +106,47 @@ class SpendableBalancesActor(spendableBalances: (Address, Set[Asset]) => Future[
   }
 
   /**
-    * Splits balance state update into clean (unknown so far) changes and
-    * changes for audit (decreasing compared to known balance, they can lead to orders cancelling)
-    */
+   * Splits balance state update into clean (unknown so far) changes and
+   * changes for audit (decreasing compared to known balance, they can lead to orders cancelling)
+   */
   private def getCleanAndForAuditChanges(stateUpdate: AddressState, knownBalance: AddressState): (AddressState, AddressState) =
-    stateUpdate.foldLeft { (Map.empty[Asset, Long], Map.empty[Asset, Long]) } {
+    stateUpdate.foldLeft((Map.empty[Asset, Long], Map.empty[Asset, Long])) {
       case ((ac, dc), balanceChanges @ (asset, update)) =>
-        knownBalance.get(asset).fold { (ac + balanceChanges, dc + balanceChanges) } { existedBalance =>
+        knownBalance.get(asset).fold((ac + balanceChanges, dc + balanceChanges)) { existedBalance =>
           if (update == existedBalance) (ac, dc) else (ac + balanceChanges, if (update < existedBalance) dc + balanceChanges else dc)
         }
     }
+
 }
 
 object SpendableBalancesActor {
 
+  def props(blockchain: AsyncBlockchain, addressDirectoryRef: ActorRef): Props = Props(
+    new SpendableBalancesActor(
+      blockchain.spendableBalances,
+      blockchain.allAssetsSpendableBalance,
+      addressDirectoryRef
+    )
+  )
+
   trait Command
+
   object Command {
-    final case class SetState(address: Address, state: Map[Asset, Long])   extends Command
+    final case class SetState(address: Address, state: Map[Asset, Long]) extends Command
     final case class UpdateStates(changes: Map[Address, Map[Asset, Long]]) extends Command
   }
 
   trait Query
+
   object Query {
     final case class GetState(address: Address, assets: Set[Asset]) extends Query
-    final case class GetSnapshot(address: Address)                  extends Query
+    final case class GetSnapshot(address: Address) extends Query
   }
 
   trait Reply
+
   object Reply {
-    final case class GetState(state: Map[Asset, Long])                          extends Reply
+    final case class GetState(state: Map[Asset, Long]) extends Reply
     final case class GetSnapshot(state: Either[MatcherError, Map[Asset, Long]]) extends Reply
   }
 

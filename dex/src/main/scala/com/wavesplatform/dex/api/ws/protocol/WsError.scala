@@ -29,4 +29,5 @@ object WsError {
     (_, timestamp, code, message) => WsError(timestamp, code, message),
     unlift(WsError.wsUnapply)
   )
+
 }

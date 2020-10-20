@@ -26,9 +26,9 @@ class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
     val (dec2, dec8) = (1000L, 1000000000L)
 
     Then("Place some orders")
-    val usdOrder  = mkOrder(alice, wavesUsdPair, BUY, dec8, dec2)
-    val wctOrder  = mkOrder(alice, wctWavesPair, BUY, dec2, dec8)
-    val ethOrder  = mkOrder(alice, ethWavesPair, SELL, dec8, dec8)
+    val usdOrder = mkOrder(alice, wavesUsdPair, BUY, dec8, dec2)
+    val wctOrder = mkOrder(alice, wctWavesPair, BUY, dec2, dec8)
+    val ethOrder = mkOrder(alice, ethWavesPair, SELL, dec8, dec8)
     val btcOrder1 = mkOrder(bob, wavesBtcPair, SELL, dec8, dec8)
     List(usdOrder, wctOrder, ethOrder, btcOrder1).foreach(dex1.api.place)
     dex1.api.waitForOrderStatus(btcOrder1, Status.Accepted)
@@ -99,23 +99,23 @@ class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
     And("new orders can be placed")
     val newWctOrder = mkOrder(alice, wctWavesPair, BUY, dec2, dec8)
     val newEthOrder = mkOrder(alice, ethWavesPair, SELL, dec8, dec8)
-    val btcOrder3   = mkOrder(bob, wavesBtcPair, SELL, dec8, dec8)
-    val newOrders   = List(newWctOrder, newEthOrder, btcOrder3)
+    val btcOrder3 = mkOrder(bob, wavesBtcPair, SELL, dec8, dec8)
+    val newOrders = List(newWctOrder, newEthOrder, btcOrder3)
     newOrders.foreach(dex1.api.place)
     newOrders.foreach(dex1.api.waitForOrderStatus(_, Status.Accepted))
   }
 
   private def testOrderPlacementDenied(order: Order, address: Address): Unit =
-    dex1.api.tryPlace(order) should failWith(3145733, MatcherError.Params(address = Some(address.stringRepr)))
+    dex1.tryApi.place(order) should failWith(3145733, MatcherError.Params(address = Some(address.stringRepr)))
 
   private def testOrderPlacementDenied(order: Order, blacklistedAsset: Asset): Unit =
-    failedDueAssetBlacklist(dex1.api.tryPlace(order), order.assetPair, blacklistedAsset)
+    failedDueAssetBlacklist(dex1.tryApi.place(order), order.assetPair, blacklistedAsset)
 
   private def testOrderStatusDenied(order: Order, blacklistedAsset: Asset): Unit =
-    failedDueAssetBlacklist(dex1.api.tryOrderStatus(order), order.assetPair, blacklistedAsset)
+    failedDueAssetBlacklist(dex1.tryApi.orderStatus(order), order.assetPair, blacklistedAsset)
 
   private def testOrderBookDenied(assetPair: AssetPair, blacklistedAsset: Asset): Unit =
-    failedDueAssetBlacklist(dex1.api.tryOrderBook(assetPair), assetPair, blacklistedAsset)
+    failedDueAssetBlacklist(dex1.tryApi.orderBook(assetPair), assetPair, blacklistedAsset)
 
   private def failedDueAssetBlacklist(r: Either[MatcherError, Any], assetPair: AssetPair, blacklistedAsset: Asset) =
     r should failWith(expectedErrorCode(assetPair, blacklistedAsset), MatcherError.Params(assetId = Some(blacklistedAsset.toString)))
@@ -124,10 +124,12 @@ class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
     if (blacklistedAsset == assetPair.amountAsset) 11538181 // AmountAssetBlacklisted
     else 11538437 // PriceAssetBlacklisted
 
-  private def configWithBlacklisted(assets: Array[Asset] = Array.empty,
-                                    names: Array[String] = Array.empty,
-                                    addresses: Array[KeyPair] = Array.empty,
-                                    allowedAssetPairs: Array[String] = Array.empty): Config = {
+  private def configWithBlacklisted(
+    assets: Array[Asset] = Array.empty,
+    names: Array[String] = Array.empty,
+    addresses: Array[KeyPair] = Array.empty,
+    allowedAssetPairs: Array[String] = Array.empty
+  ): Config = {
     def toStr(array: Array[String]): String = if (array.length == 0) "" else array.mkString("\"", "\", \"", "\"")
     parseString(s"""
                    |waves.dex {
@@ -140,4 +142,5 @@ class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
                    |}
     """.stripMargin)
   }
+
 }

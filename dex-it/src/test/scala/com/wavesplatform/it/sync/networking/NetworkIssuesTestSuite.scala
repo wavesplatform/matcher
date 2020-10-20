@@ -8,6 +8,7 @@ import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.SELL
 import com.wavesplatform.dex.effect.FutureOps.Implicits
 import com.wavesplatform.dex.it.api.HasToxiProxy
+import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import com.wavesplatform.dex.it.docker.WavesNodeContainer
 import com.wavesplatform.it.WsSuiteBase
 import com.wavesplatform.it.tags.NetworkTests
@@ -56,9 +57,7 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
           Future(blocking(wavesNode1.reconnectToNetwork(500, 500)))
         }
         orderBook <- dex1.asyncApi.orderBook(wavesUsdPair)
-      } yield {
-        orderBook.asks should have size 100
-      },
+      } yield orderBook.asks should have size 100,
       2.minute
     )
 
@@ -72,7 +71,7 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
       val acc = mkAccountWithBalance(100.waves -> Waves)
       val wsc = mkWsAddressConnection(acc, dex1)
 
-      eventually { wsc.addressStateChanges should have size 1 }
+      eventually(wsc.addressStateChanges should have size 1)
 
       wsc.close()
       dex1.disconnectFromNetwork()
@@ -82,7 +81,12 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
 
       dex1.connectToNetwork()
 
-      dex1.api.tryPlace(mkOrder(acc, wavesUsdPair, SELL, 50.waves, 1.usd)) should failWith(3147270)
+      val o = mkOrder(acc, wavesUsdPair, SELL, 50.waves, 1.usd)
+
+      dex1.tryApi.place(o) match {
+        case Left(MatcherError(x,_,_,_)) => x should be equals 3147270
+        case _ => dex1.api.waitForOrderStatus(o, Status.Cancelled)
+      }
     }
 
     "user doesn't have a balances snapshot (got by ws connection)" in {
@@ -95,7 +99,12 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
 
       dex1.connectToNetwork()
 
-      dex1.api.tryPlace(mkOrder(acc, wavesUsdPair, SELL, 50.waves, 1.usd)) should failWith(3147270)
+      val o = mkOrder(acc, wavesUsdPair, SELL, 50.waves, 1.usd)
+
+      dex1.tryApi.place(o) match {
+        case Left(MatcherError(x,_,_,_)) => x should be equals 3147270
+        case _ => dex1.api.waitForOrderStatus(o, Status.Cancelled)
+      }
     }
   }
 
@@ -145,9 +154,9 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
   "DEXClient should connect to another node from pool if linked node had lost the connection to network " in {
 
     val conf = ConfigFactory.parseString(s"""waves.dex {
-                                 |  price-assets = [ "$UsdId", "WAVES" ]
-                                 |  waves-blockchain-client.grpc.target = "${WavesNodeContainer.wavesNodeNetAlias}:${WavesNodeContainer.dexGrpcExtensionPort}"
-                                 |}""".stripMargin)
+                                            |  price-assets = [ "$UsdId", "WAVES" ]
+                                            |  waves-blockchain-client.grpc.target = "${WavesNodeContainer.wavesNodeNetAlias}:${WavesNodeContainer.dexGrpcExtensionPort}"
+                                            |}""".stripMargin)
 
     dex1.restartWithNewSuiteConfig(conf)
 
@@ -183,18 +192,18 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
     dex1.api.cancelAll(bob)
   }
 
-  private def makeAndMatchOrders(): Unit = {
+  private def makeAndMatchOrders(): Unit =
     for (i <- 1 to 5) {
       val o1 = mkOrder(alice, wavesUsdPair, OrderType.BUY, 1.waves, i * 300)
       val o2 = mkOrder(bob, wavesUsdPair, OrderType.SELL, 1.waves, i * 300)
       dex1.api.place(o1)
       dex1.api.place(o2)
     }
-  }
 
   private def matchingShouldBeSuccess(): Unit = {
     val ob = dex1.api.orderBook(wavesUsdPair)
     ob.bids should be(empty)
     ob.asks should be(empty)
   }
+
 }

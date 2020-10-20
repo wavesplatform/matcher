@@ -15,14 +15,15 @@ import play.api.libs.json._
 
 import scala.collection.immutable.TreeMap
 
-case class WsOrderBookChanges(assetPair: AssetPair,
-                              asks: WsSide,
-                              bids: WsSide,
-                              lastTrade: Option[WsLastTrade],
-                              updateId: Long,
-                              settings: Option[WsOrderBookSettings],
-                              timestamp: Long = System.currentTimeMillis)
-    extends WsServerMessage {
+case class WsOrderBookChanges(
+  assetPair: AssetPair,
+  asks: WsSide,
+  bids: WsSide,
+  lastTrade: Option[WsLastTrade],
+  updateId: Long,
+  settings: Option[WsOrderBookSettings],
+  timestamp: Long = System.currentTimeMillis
+) extends WsServerMessage {
   override val tpe: String = WsOrderBookChanges.tpe
 }
 
@@ -58,7 +59,8 @@ object WsOrderBookChanges {
       (__ \ "t").formatNullable[WsLastTrade] and
       (__ \ "s").formatNullable[WsOrderBookSettings]
   )(
-    (_, assetPair, timestamp, uid, asks, bids, lastTrade, settings) => WsOrderBookChanges(assetPair, asks, bids, lastTrade, uid, settings, timestamp),
+    (_, assetPair, timestamp, uid, asks, bids, lastTrade, settings) =>
+      WsOrderBookChanges(assetPair, asks, bids, lastTrade, uid, settings, timestamp),
     unlift(WsOrderBookChanges.wsUnapply)
   )
 
@@ -76,7 +78,7 @@ object WsOrderBookChanges {
           case (JsSuccess(r, _), (pair, i)) =>
             for {
               (price, amount) <- pair.validate(priceAmountFormat)
-              _               <- if (r.contains(price)) JsError(JsPath \ i \ 0, s"Side contains price $price twice") else JsSuccess(())
+              _ <- if (r.contains(price)) JsError(JsPath \ i \ 0, s"Side contains price $price twice") else JsSuccess(())
             } yield r.updated(price, amount)
 
           case (_, (_, i)) => JsError(JsPath \ i, "Can't read as price+amount pair")
@@ -90,18 +92,20 @@ object WsOrderBookChanges {
 
   private def sideMayBeEmpty(ordering: Ordering[Double]): MayBeEmpty[WsSide] = new MayBeEmpty[WsSide] {
     override def isEmpty(x: WsSide): Boolean = x.isEmpty
-    override def empty: WsSide               = TreeMap.empty(ordering)
+    override def empty: WsSide = TreeMap.empty(ordering)
   }
 
-  def from(assetPair: AssetPair,
-           amountDecimals: Int,
-           priceDecimals: Int,
-           asks: Iterable[LevelAgg],
-           bids: Iterable[LevelAgg],
-           lt: Option[LastTrade],
-           updateId: Long,
-           restrictions: Option[OrderRestrictionsSettings],
-           tickSize: Double): WsOrderBookChanges =
+  def from(
+    assetPair: AssetPair,
+    amountDecimals: Int,
+    priceDecimals: Int,
+    asks: Iterable[LevelAgg],
+    bids: Iterable[LevelAgg],
+    lt: Option[LastTrade],
+    updateId: Long,
+    restrictions: Option[OrderRestrictionsSettings],
+    tickSize: Double
+  ): WsOrderBookChanges =
     WsOrderBookChanges(
       assetPair = assetPair,
       asks = side(amountDecimals, priceDecimals, asks, asksOrdering),
@@ -121,7 +125,8 @@ object WsOrderBookChanges {
     TreeMap(
       xs.map { x =>
         denormalizePrice(x.price, amountDecimals, priceDecimals).toDouble ->
-          denormalizeAmountAndFee(x.amount, amountDecimals).toDouble
+        denormalizeAmountAndFee(x.amount, amountDecimals).toDouble
       }.toSeq: _*
     )(ordering)
+
 }

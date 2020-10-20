@@ -9,8 +9,8 @@ import com.wavesplatform.dex.api.ws.protocol.WsOrdersUpdate
 import scala.concurrent.duration.FiniteDuration
 
 /**
-  * Contains subscriptions for internal stream and broadcast messages.
-  */
+ * Contains subscriptions for internal stream and broadcast messages.
+ */
 object WsInternalBroadcastActor {
 
   sealed trait Message extends Product with Serializable
@@ -19,7 +19,7 @@ object WsInternalBroadcastActor {
 
   object Command {
     case class Subscribe(clientRef: ActorRef[WsInternalClientHandlerActor.Message]) extends Command
-    case class Collect(update: WsOrdersUpdate)                                      extends Command
+    case class Collect(update: WsOrdersUpdate) extends Command
 
     private[WsInternalBroadcastActor] case object SendWsUpdates extends Command
   }
@@ -72,7 +72,7 @@ object WsInternalBroadcastActor {
 
     def updateSubscriptions(f: Subscriptions => Subscriptions): State = {
       val updated = f(subscriptions)
-      val s       = copy(subscriptions = updated)
+      val s = copy(subscriptions = updated)
       if (updated.isEmpty) {
         schedule.cancel()
         s.withoutUpdates
@@ -97,5 +97,7 @@ object WsInternalBroadcastActor {
             .foldLeft(x) { case (updates, orig) => orig.append(updates) }
             .some
         )
+
   }
+
 }

@@ -6,8 +6,9 @@ package object error {
 
   def formatStackTrace(e: Throwable): String = {
     val stringWriter = new StringWriter()
-    e.printStackTrace { new PrintWriter(stringWriter) }
+    e.printStackTrace(new PrintWriter(stringWriter))
     stringWriter.flush()
     stringWriter.getBuffer.toString
   }
+
 }

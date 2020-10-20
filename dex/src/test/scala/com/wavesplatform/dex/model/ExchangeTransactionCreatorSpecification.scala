@@ -29,17 +29,18 @@ class ExchangeTransactionCreatorSpecification
     with NoShrink
     with TableDrivenPropertyChecks {
 
-  private def getExchangeTransactionCreator(hasMatcherScript: Boolean = false,
-                                            hasAssetScripts: Asset => Boolean = _ => false): ExchangeTransactionCreator = {
+  private def getExchangeTransactionCreator(
+    hasMatcherScript: Boolean = false,
+    hasAssetScripts: Asset => Boolean = _ => false
+  ): ExchangeTransactionCreator =
     new ExchangeTransactionCreator(MatcherAccount, matcherSettings.exchangeTxBaseFee, hasMatcherScript, hasAssetScripts)
-  }
 
   "ExchangeTransactionCreator" should {
     "create an ExchangeTransactionV2" when {
       (List(1, 2, 3) ++ List(1, 2, 3)).combinations(2).foreach {
         case List(counterVersion, submittedVersion) =>
           s"counterVersion=$counterVersion, submittedVersion=$submittedVersion" in {
-            val counter   = buy(wavesBtcPair, 100000, 0.0008, matcherFee = Some(2000L), version = counterVersion.toByte)
+            val counter = buy(wavesBtcPair, 100000, 0.0008, matcherFee = Some(2000L), version = counterVersion.toByte)
             val submitted = sell(wavesBtcPair, 100000, 0.0007, matcherFee = Some(1000L), version = submittedVersion.toByte)
 
             val tc = getExchangeTransactionCreator()
@@ -59,8 +60,8 @@ class ExchangeTransactionCreatorSpecification
       "orders are matched partially" in {
         val preconditions = for { ((_, buyOrder), (senderSell, sellOrder)) <- orderV3MirrorPairGenerator } yield {
           val sellOrderWithUpdatedAmount = sellOrder.updateAmount(sellOrder.amount / 2)
-          val newSignature               = crypto.sign(senderSell, sellOrderWithUpdatedAmount.bodyBytes())
-          val correctedSellOrder         = sellOrderWithUpdatedAmount.updateProofs(Proofs(Seq(ByteStr(newSignature))))
+          val newSignature = crypto.sign(senderSell, sellOrderWithUpdatedAmount.bodyBytes())
+          val correctedSellOrder = sellOrderWithUpdatedAmount.updateProofs(Proofs(Seq(ByteStr(newSignature))))
 
           (buyOrder, correctedSellOrder)
         }

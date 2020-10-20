@@ -8,7 +8,7 @@ Global / resolvers += Resolver.bintrayRepo("ethereum", "maven") // JNI LevelDB
 
 // Scalafix
 scalafixDependencies in ThisBuild ++= List(
-  "org.scalatest"          %% "autofix"                     % "3.1.0.0",
+  "org.scalatest" %% "autofix" % "3.1.0.0",
   "org.scala-lang.modules" %% "scala-collection-migrations" % "2.1.4"
 )
 addCompilerPlugin(scalafixSemanticdb)
@@ -119,10 +119,13 @@ inScope(Global)(
       "-Ywarn-unused:-implicits",
       "-Ywarn-macros:after", // https://github.com/scala/bug/issues/11099
       "-Xlint",
+      "-Ymacro-annotations",
       "-opt:l:inline",
       "-opt-inline-from:**",
       "-Yrangepos", // required for scalafix
-      "-P:semanticdb:synthetics:on"
+      "-P:semanticdb:synthetics:on",
+      // Excluding -byname-implicit is required for Scala 2.13 due to https://github.com/scala/bug/issues/12072
+      "-Xlint:_,-byname-implicit" // Fixes pureconfig.generic.semiauto.deriveReader
     ),
     crossPaths := false,
     scalafmtOnCompile := false,
@@ -193,7 +196,7 @@ fullCheckRaw := Def
     quickCheckRaw,
     Def.task {
       val wavesIntegrationDocker = (`waves-integration-it` / Docker / docker).value
-      val dexDocker              = (`dex-it` / Docker / docker).value
+      val dexDocker = (`dex-it` / Docker / docker).value
     },
     `waves-integration-it` / Test / test,
     `dex-it` / Test / test

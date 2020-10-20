@@ -15,10 +15,10 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
   override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "WAVES" ]""")
 
   private val issueAliceAssetTx = mkIssue(alice, "AliceCoinOrders", someAssetAmount, decimals = 0)
-  private val aliceAsset        = IssuedAsset(issueAliceAssetTx.id())
+  private val aliceAsset = IssuedAsset(issueAliceAssetTx.id())
 
   private val predefAssetPair = wavesUsdPair
-  private val aliceWavesPair  = AssetPair(aliceAsset, Waves)
+  private val aliceWavesPair = AssetPair(aliceAsset, Waves)
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
@@ -46,7 +46,9 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
         val aliceOrd1 = mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
         placeAndAwaitAtDex(aliceOrd1)
 
-        dex1.api.tryPlace(mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)) should failWith(
+        dex1.tryApi.place(
+          mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
+        ) should failWith(
           3147522, // AccountScriptDeniedOrder
           MatcherError.Params(address = Some(alice.toAddress.stringRepr))
         )
@@ -66,11 +68,13 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
          */
         setAliceScriptText(
           "AgQAAAAHJG1hdGNoMAUAAAACdHgDCQAAAQAAAAIFAAAAByRtYXRjaDACAAAABU9yZGVyBAAAAAFvBQAAAAckbWF0Y2gwCQAAAAAAAAII" +
-            "BQAAAAFvAAAACW9yZGVyVHlwZQUAAAAEU2VsbAMJAAABAAAAAgUAAAAHJG1hdGNoMAIAAAAUU2V0U2NyaXB0VHJhbnNhY3Rpb24EAAAAAXMFAAAAB" +
-            "yRtYXRjaDAGCQEAAAAFdGhyb3cAAAAAYWVPjA=="
+          "BQAAAAFvAAAACW9yZGVyVHlwZQUAAAAEU2VsbAMJAAABAAAAAgUAAAAHJG1hdGNoMAIAAAAUU2V0U2NyaXB0VHJhbnNhY3Rpb24EAAAAAXMFAAAAB" +
+          "yRtYXRjaDAGCQEAAAAFdGhyb3cAAAAAYWVPjA=="
         )
 
-        dex1.api.tryPlace(mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)) should failWith(
+        dex1.tryApi.place(
+          mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
+        ) should failWith(
           3147522, // AccountScriptDeniedOrder
           MatcherError.Params(address = Some(alice.toAddress.stringRepr))
         )
@@ -93,8 +97,8 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
          */
         setAliceScriptText(
           "AgQAAAAHJG1hdGNoMAUAAAACdHgDCQAAAQAAAAIFAAAAByRtYXRjaDACAAAABU9yZGVyBAAAAAFvBQAAAAckbWF0Y2gwAwkAAAAAAAACCAUAAAABb" +
-            "wAAAAlvcmRlclR5cGUFAAAAA0J1eQYJAAAAAAAAAggFAAAAAW8AAAAJb3JkZXJUeXBlBQAAAARTZWxsAwkAAAEAAAACBQAAAAckbWF0Y2gwAgAA" +
-            "ABRTZXRTY3JpcHRUcmFuc2FjdGlvbgQAAAABcwUAAAAHJG1hdGNoMAYJAQAAAAV0aHJvdwAAAAAeB1+u"
+          "wAAAAlvcmRlclR5cGUFAAAAA0J1eQYJAAAAAAAAAggFAAAAAW8AAAAJb3JkZXJUeXBlBQAAAARTZWxsAwkAAAEAAAACBQAAAAckbWF0Y2gwAgAA" +
+          "ABRTZXRTY3JpcHRUcmFuc2FjdGlvbgQAAAABcwUAAAAHJG1hdGNoMAYJAQAAAAV0aHJvdwAAAAAeB1+u"
         )
 
         val aliceOrd1 = mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
@@ -131,7 +135,7 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
         waitForOrderAtNode(bobOrd1)
 
         val txs = dex1.api.waitForTransactionsByOrder(bobOrd2, 1)
-        val r   = wavesNode1.api.tryBroadcast(txs.head)
+        val r = wavesNode1.tryApi.broadcast(txs.head)
         r shouldBe Symbol("left")
         r.swap.explicitGet().error shouldBe 307 // node's ApiError TransactionNotAllowedByAccountScript.Id
       }
@@ -140,5 +144,6 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
 
   private def setAliceScriptText(binaryCodeInBase64: String): Unit =
     broadcastAndAwait(mkSetAccountScript(alice, Scripts.fromBase64(binaryCodeInBase64)))
+
   private def resetAliceAccountScript(): Unit = broadcastAndAwait(mkResetAccountScript(alice, fee = setScriptFee + smartFee))
 }

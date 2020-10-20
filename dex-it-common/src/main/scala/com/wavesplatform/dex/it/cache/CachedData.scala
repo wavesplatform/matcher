@@ -4,8 +4,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 
 class CachedData[T <: AnyRef](getData: => T) {
 
-  private val lock  = new ReentrantReadWriteLock()
-  private val read  = lock.readLock()
+  private val lock = new ReentrantReadWriteLock()
+  private val read = lock.readLock()
   private val write = lock.writeLock()
 
   private var cached = Option.empty[T]
@@ -27,6 +27,7 @@ class CachedData[T <: AnyRef](getData: => T) {
       write.lock()
       cached = None
     } finally write.unlock()
+
 }
 
 object CachedData {

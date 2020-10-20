@@ -8,10 +8,11 @@ trait RestartableActor extends Actor {
   override def unhandled(message: Any): Unit = {
     message match {
       case RestartActor => throw RestartActorException
-      case _            =>
+      case _ =>
     }
     super.unhandled(message)
   }
+
 }
 
 object RestartableActor {

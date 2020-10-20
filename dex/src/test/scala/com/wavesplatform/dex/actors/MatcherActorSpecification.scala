@@ -6,6 +6,7 @@ import akka.actor.typed.scaladsl.adapter._
 import akka.actor.{Actor, ActorRef, ActorSystem, Kill, Props, Terminated}
 import akka.testkit.{ImplicitSender, TestActor, TestActorRef, TestProbe}
 import cats.data.NonEmptyList
+import cats.implicits.catsSyntaxEitherId
 import com.wavesplatform.dex.MatcherSpecBase
 import com.wavesplatform.dex.actors.MatcherActor.{ForceStartOrderBook, GetMarkets, MarketData, SaveSnapshot}
 import com.wavesplatform.dex.actors.MatcherActorSpecification.{DeletingActor, FailAtStartActor, NothingDoActor, RecoveringActor, _}
@@ -19,7 +20,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.{Events, OrderBookSnapshot}
-import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
+import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatchingRule}
 import com.wavesplatform.dex.time.SystemTime
 import org.scalamock.scalatest.PathMockFactory
@@ -39,33 +40,31 @@ class MatcherActorSpecification
     with Eventually
     with SystemTime {
 
-  private def assetDescription(assetId: Asset): Option[BriefAssetDescription] = {
+  private def assetDescription(assetId: Asset): Option[BriefAssetDescription] =
     Some(BriefAssetDescription(name = "Unknown", decimals = 8, hasScript = false))
-  }
 
   "MatcherActor" should {
     "return all open markets" in {
       val actor = defaultActor()
       val probe = TestProbe()
 
-      val pair  = AssetPair(randomAssetId, randomAssetId)
+      val pair = AssetPair(randomAssetId, randomAssetId)
       val order = buy(pair, 2000L, 1)
 
       probe.send(actor, wrapLimitOrder(order))
       probe.send(actor, GetMarkets)
 
-      probe.expectMsgPF() {
-        case s @ Seq(MarketData(_, "Unknown", "Unknown", _, _, _)) =>
-          s.size shouldBe 1
+      probe.expectMsgPF() { case s @ Seq(MarketData(_, "Unknown", "Unknown", _, _, _)) =>
+        s.size shouldBe 1
       }
     }
 
     "successfully route the first place to the new order book" in {
       val addressActor = TestProbe()
-      val actor        = defaultActor(addressActor = addressActor.ref)
-      val probe        = TestProbe()
+      val actor = defaultActor(addressActor = addressActor.ref)
+      val probe = TestProbe()
 
-      val pair  = AssetPair(randomAssetId, randomAssetId)
+      val pair = AssetPair(randomAssetId, randomAssetId)
       val order = buy(pair, 2000L, 1)
 
       probe.send(actor, wrapLimitOrder(order))
@@ -75,7 +74,7 @@ class MatcherActorSpecification
     "mark an order book as failed" when {
       "it crashes at start" in {
         val pair = AssetPair(randomAssetId, randomAssetId)
-        val ob   = emptyOrderBookRefs
+        val ob = emptyOrderBookRefs
         val actor = TestActorRef(
           new MatcherActor(
             matcherSettings,
@@ -83,27 +82,28 @@ class MatcherActorSpecification
             doNothingOnRecovery,
             ob,
             (_, _) => Props(new FailAtStartActor),
-            assetDescription
+            assetDescription,
+            _.asRight
           )
         )
 
         val probe = TestProbe()
         probe.send(actor, wrapLimitOrder(buy(pair, 2000L, 1)))
-        eventually { ob.get()(pair) shouldBe Symbol("left") }
+        eventually(ob.get()(pair) shouldBe Symbol("left"))
         probe.expectNoMessage()
       }
 
       "it crashes during the work" in {
-        val ob    = emptyOrderBookRefs
+        val ob = emptyOrderBookRefs
         val actor = defaultActor(ob)
         val probe = TestProbe()
 
         val a1, a2, a3 = randomAssetId
 
-        val pair1  = AssetPair(a1, a2)
+        val pair1 = AssetPair(a1, a2)
         val order1 = buy(pair1, 2000L, 1)
 
-        val pair2  = AssetPair(a2, a3)
+        val pair2 = AssetPair(a2, a3)
         val order2 = buy(pair2, 2000L, 1)
 
         probe.send(actor, wrapLimitOrder(order1))
@@ -125,7 +125,7 @@ class MatcherActorSpecification
     }
 
     "continue the work when recovery is successful" in {
-      val ob      = emptyOrderBookRefs
+      val ob = emptyOrderBookRefs
       var working = false
 
       val actor = system.actorOf(
@@ -136,7 +136,8 @@ class MatcherActorSpecification
             startResult => working = startResult.isRight,
             ob,
             (_, _) => Props(new FailAtStartActor()),
-            assetDescription
+            assetDescription,
+            _.asRight
           )
         )
       )
@@ -150,10 +151,10 @@ class MatcherActorSpecification
 
     "stop the work" when {
       "an order book as failed during recovery" in {
-        val apdb    = mkAssetPairsDB
-        val obsdb   = mkOrderBookSnapshotDB
-        val pair    = AssetPair(randomAssetId, randomAssetId)
-        val ob      = emptyOrderBookRefs
+        val apdb = mkAssetPairsDB
+        val obsdb = mkOrderBookSnapshotDB
+        val pair = AssetPair(randomAssetId, randomAssetId)
+        val ob = emptyOrderBookRefs
         var stopped = false
 
         matcherHadOrderBooksBefore(apdb, obsdb, pair -> 1)
@@ -167,20 +168,22 @@ class MatcherActorSpecification
                 startResult => stopped = startResult.isLeft,
                 ob,
                 (_, _) => Props(new FailAtStartActor),
-                assetDescription
+                assetDescription,
+                _.asRight
               )
             )
-          ))
+          )
+        )
 
         probe.expectTerminated(actor)
         stopped shouldBe true
       }
 
       "received Shutdown during start" in {
-        val apdb    = mkAssetPairsDB
-        val obsdb   = mkOrderBookSnapshotDB
-        val pair    = AssetPair(randomAssetId, randomAssetId)
-        val ob      = emptyOrderBookRefs
+        val apdb = mkAssetPairsDB
+        val obsdb = mkOrderBookSnapshotDB
+        val pair = AssetPair(randomAssetId, randomAssetId)
+        val ob = emptyOrderBookRefs
         var stopped = false
 
         matcherHadOrderBooksBefore(apdb, obsdb, pair -> 1)
@@ -194,7 +197,8 @@ class MatcherActorSpecification
                 startResult => stopped = startResult.isLeft,
                 ob,
                 (_, _) => Props(new NothingDoActor),
-                assetDescription
+                assetDescription,
+                _.asRight
               )
             )
           )
@@ -223,7 +227,7 @@ class MatcherActorSpecification
 
         "later" in snapshotTest(pair23) { (matcherActor, probes) =>
           val eventSender = TestProbe()
-          val probe       = probes.head
+          val probe = probes.head
           sendBuyOrders(eventSender, matcherActor, pair23, 0 to 10)
           probe.expectMsg(OrderBookSnapshotUpdateCompleted(pair23, Some(9)))
 
@@ -232,7 +236,7 @@ class MatcherActorSpecification
         }
 
         "multiple order books" in snapshotTest(pair23, pair45) { (matcherActor, probes) =>
-          val eventSender            = TestProbe()
+          val eventSender = TestProbe()
           val List(probe23, probe45) = probes
           sendBuyOrders(eventSender, matcherActor, pair23, 0 to 1)
           sendBuyOrders(eventSender, matcherActor, pair45, 2 to 3)
@@ -252,7 +256,7 @@ class MatcherActorSpecification
 
       "received a lot of messages and skipped the middle offset" in snapshotTest(pair23) { (matcherActor, probes) =>
         val eventSender = TestProbe()
-        val probe       = probes.head
+        val probe = probes.head
         sendBuyOrders(eventSender, matcherActor, pair23, 0 to 30)
         probe.expectMsg(OrderBookSnapshotUpdateCompleted(pair23, Some(9)))
 
@@ -267,13 +271,13 @@ class MatcherActorSpecification
 
     "create an order book" when {
       "place order - new order book" in {
-        val apdb  = mkAssetPairsDB
+        val apdb = mkAssetPairsDB
         val obsdb = mkOrderBookSnapshotDB
         val pair1 = AssetPair(randomAssetId, randomAssetId)
         val pair2 = AssetPair(randomAssetId, randomAssetId)
 
         matcherHadOrderBooksBefore(apdb, obsdb, pair1 -> 9)
-        val ob    = emptyOrderBookRefs
+        val ob = emptyOrderBookRefs
         val actor = defaultActor(ob, apdb = apdb, snapshotStoreActor = system.actorOf(OrderBookSnapshotStoreActor.props(obsdb)))
 
         val probe = TestProbe()
@@ -289,7 +293,7 @@ class MatcherActorSpecification
 
       "force request" in {
         val pair = AssetPair(randomAssetId, randomAssetId)
-        val ob   = emptyOrderBookRefs
+        val ob = emptyOrderBookRefs
 
         val probe = TestProbe()
         val actor = system.actorOf(
@@ -300,7 +304,8 @@ class MatcherActorSpecification
               _ => {},
               ob,
               (pair, matcherActor) => Props(new RecoveringActor(matcherActor, pair)),
-              assetDescription
+              assetDescription,
+              _.asRight
             )
           )
         )
@@ -310,9 +315,9 @@ class MatcherActorSpecification
       }
 
       "after delete" in {
-        val apdb  = mkAssetPairsDB
+        val apdb = mkAssetPairsDB
         val obsdb = OrderBookSnapshotDB.inMem
-        val pair  = AssetPair(randomAssetId, randomAssetId)
+        val pair = AssetPair(randomAssetId, randomAssetId)
 
         matcherHadOrderBooksBefore(apdb, obsdb, pair -> 9L)
         val ob = emptyOrderBookRefs
@@ -323,18 +328,19 @@ class MatcherActorSpecification
             doNothingOnRecovery,
             ob,
             (assetPair, matcher) => Props(new DeletingActor(matcher, assetPair, Some(9L))),
-            assetDescription
+            assetDescription,
+            _.asRight
           )
         )
 
         val probe = TestProbe()
-        probe.send(actor, QueueEventWithMeta(10L, 0L, QueueEvent.OrderBookDeleted(pair)))
+        probe.send(actor, ValidatedCommandWithMeta(10L, 0L, ValidatedCommand.DeleteOrderBook(pair)))
 
         withClue("Removed from snapshots rotation") {
           eventually {
             probe.send(actor, GetMarkets)
-            probe.expectMsgPF() {
-              case xs @ Seq() => xs.size shouldBe 0 // To ignore annoying warnings
+            probe.expectMsgPF() { case xs @ Seq() =>
+              xs.size shouldBe 0 // To ignore annoying warnings
             }
 
             probe.send(actor, MatcherActor.GetSnapshotOffsets)
@@ -348,8 +354,8 @@ class MatcherActorSpecification
 
           eventually {
             probe.send(actor, GetMarkets)
-            probe.expectMsgPF() {
-              case Seq(x: MarketData) => x.pair shouldBe pair
+            probe.expectMsgPF() { case Seq(x: MarketData) =>
+              x.pair shouldBe pair
             }
 
             probe.send(actor, MatcherActor.GetSnapshotOffsets)
@@ -368,8 +374,8 @@ class MatcherActorSpecification
   }
 
   /**
-    * @param f (MatcherActor, TestProbe) => Any
-    */
+   * @param f (MatcherActor, TestProbe) => Any
+   */
   private def snapshotTest(assetPairs: AssetPair*)(f: (ActorRef, List[TestProbe]) => Any): Any = {
     val r = assetPairs.map(fakeOrderBookActor).toList
     val actor = TestActorRef(
@@ -383,7 +389,8 @@ class MatcherActorSpecification
           if (idx < 0) throw new RuntimeException(s"Can't find $assetPair in $assetPairs")
           r(idx)._1
         },
-        assetDescription
+        assetDescription,
+        _.asRight
       )
     )
 
@@ -396,7 +403,7 @@ class MatcherActorSpecification
       private var nr = -1L
 
       override def receive: Receive = {
-        case x: QueueEventWithMeta if x.offset > nr => nr = x.offset
+        case x: ValidatedCommandWithMeta if x.offset > nr => nr = x.offset
         case SaveSnapshot(globalNr) =>
           val event = OrderBookSnapshotUpdateCompleted(assetPair, Some(globalNr))
           context.system.scheduler.scheduleOnce(200.millis) {
@@ -410,10 +417,12 @@ class MatcherActorSpecification
     (props, probe)
   }
 
-  private def defaultActor(ob: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]] = emptyOrderBookRefs,
-                           apdb: AssetPairsDB = mkAssetPairsDB,
-                           addressActor: ActorRef = TestProbe().ref,
-                           snapshotStoreActor: ActorRef = emptySnapshotStoreActor): TestActorRef[MatcherActor] = {
+  private def defaultActor(
+    ob: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]] = emptyOrderBookRefs,
+    apdb: AssetPairsDB = mkAssetPairsDB,
+    addressActor: ActorRef = TestProbe().ref,
+    snapshotStoreActor: ActorRef = emptySnapshotStoreActor
+  ): TestActorRef[MatcherActor] = {
     implicit val efc: ErrorFormatterContext = ErrorFormatterContext.from(_ => 8)
 
     TestActorRef(
@@ -436,13 +445,14 @@ class MatcherActorSpecification
             _ => MatchingRule.DefaultRule,
             _ => makerTakerPartialFee,
             None
-        ),
-        assetDescription
+          ),
+        assetDescription,
+        _.asRight
       )
     )
   }
 
-  private def mkAssetPairsDB: AssetPairsDB               = AssetPairsDB(db)
+  private def mkAssetPairsDB: AssetPairsDB = AssetPairsDB(db)
   private def mkOrderBookSnapshotDB: OrderBookSnapshotDB = OrderBookSnapshotDB(db)
 
   private def matcherHadOrderBooksBefore(apdb: AssetPairsDB, obsdb: OrderBookSnapshotDB, pairs: (AssetPair, Long)*): Unit = {
@@ -450,33 +460,39 @@ class MatcherActorSpecification
     pairs.foreach { case (pair, offset) => obsdb.update(pair, offset, Some(OrderBookSnapshot.empty)) }
   }
 
-  private def doNothingOnRecovery(x: Either[String, (ActorRef, QueueEventWithMeta.Offset)]): Unit = {}
+  private def doNothingOnRecovery(x: Either[String, ValidatedCommandWithMeta.Offset]): Unit = {}
 
-  private def emptyOrderBookRefs   = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
+  private def emptyOrderBookRefs = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
   private def randomAssetId: Asset = IssuedAsset(ByteStr(randomBytes()))
 }
 
 object MatcherActorSpecification {
   private class NothingDoActor extends Actor { override def receive: Receive = Actor.ignoringBehavior }
+
   private class RecoveringActor(owner: ActorRef, assetPair: AssetPair, startOffset: Option[Long] = None) extends Actor {
     context.system.scheduler.scheduleOnce(50.millis, owner, OrderBookRecovered(assetPair, startOffset)) // emulates recovering
     override def receive: Receive = {
       case ForceStartOrderBook(p) if p == assetPair => sender() ! MatcherActor.OrderBookCreated(assetPair)
-      case _                                        =>
+      case _ =>
     }
+
   }
+
   private class FailAtStartActor extends Actor {
     override def receive: Receive = Actor.emptyBehavior
+
     override def preStart(): Unit = {
       super.preStart()
       Thread.sleep(50)
       throw new RuntimeException("I don't want to work today")
     }
+
   }
+
   private class DeletingActor(owner: ActorRef, assetPair: AssetPair, startOffset: Option[Long] = None)
       extends RecoveringActor(owner, assetPair, startOffset) {
-    override def receive: Receive     = handleDelete orElse super.receive
-    private def handleDelete: Receive = { case QueueEventWithMeta(_, _, _: QueueEvent.OrderBookDeleted) => context.stop(self) }
+    override def receive: Receive = handleDelete orElse super.receive
+    private def handleDelete: Receive = { case ValidatedCommandWithMeta(_, _, _: ValidatedCommand.DeleteOrderBook) => context.stop(self) }
   }
 
   private def emptySnapshotStoreActor(implicit actorSystem: ActorSystem): ActorRef = {
@@ -489,4 +505,5 @@ object MatcherActorSpecification {
     }
     p.ref
   }
+
 }

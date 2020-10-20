@@ -10,9 +10,7 @@ class ConnectionsAndStreamsTest extends Simulation {
   val scn = scenario("ConnectionsAndStreamsTest")
     .feed(feeder)
     .exec(connect)
-
     .exec(ws("WS -- AU").sendText("""${m}"""))
-
     .exec(ws("WS -- OB").sendText("""${o0}"""))
     .exec(ws("WS -- OB").sendText("""${o1}"""))
     .exec(ws("WS -- OB").sendText("""${o2}"""))
@@ -23,11 +21,9 @@ class ConnectionsAndStreamsTest extends Simulation {
     .exec(ws("WS -- OB").sendText("""${o7}"""))
     .exec(ws("WS -- OB").sendText("""${o8}"""))
     .exec(ws("WS -- OB").sendText("""${o9}"""))
-
     .repeat(System.getProperty("rt").toInt) {
       pingPong
     }
-
     .exec(close)
 
   setUp(

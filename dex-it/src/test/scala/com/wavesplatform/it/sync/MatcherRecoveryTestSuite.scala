@@ -10,28 +10,27 @@ import scala.util.Random
 
 class MatcherRecoveryTestSuite extends MatcherSuiteBase {
 
-  override protected def dexInitialSuiteConfig: Config = {
+  override protected def dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(
       s"""waves.dex {
-       |  snapshots-interval = 51
-       |  price-assets = [ "$UsdId", "WAVES" ]
-       |}""".stripMargin
+         |  snapshots-interval = 51
+         |  price-assets = [ "$UsdId", "WAVES" ]
+         |}""".stripMargin
     )
-  }
 
-  private val placesNumber  = 200
+  private val placesNumber = 200
   private val cancelsNumber = placesNumber / 10
 
   private val assetPairs = List(ethUsdPair, wavesUsdPair, ethWavesPair)
-  private val orders     = Gen.containerOfN[Vector, Order](placesNumber, orderGen(matcher, alice, assetPairs)).sample.get
+  private val orders = Gen.containerOfN[Vector, Order](placesNumber, orderGen(matcher, alice, assetPairs)).sample.get
 
   private var successfulCommandsNumber = 0
 
   "Place, fill and cancel a lot of orders" in {
     val cancels = (1 to cancelsNumber).map(_ => choose(orders))
 
-    val placeCommands  = Random.shuffle(orders.map(MatcherCommand.Place(dex1.asyncApi, _)))
-    val cancelCommands = cancels.map(MatcherCommand.Cancel(dex1.asyncApi, alice, _))
+    val placeCommands = Random.shuffle(orders.map(MatcherCommand.Place(dex1, _)))
+    val cancelCommands = cancels.map(MatcherCommand.Cancel(dex1, alice, _))
 
     successfulCommandsNumber += executeCommands(placeCommands)
     successfulCommandsNumber += executeCommands(cancelCommands)
@@ -45,9 +44,9 @@ class MatcherRecoveryTestSuite extends MatcherSuiteBase {
 
   "Store the current state" in {
     stateBefore = state
-    withClue("common offset") { stateBefore.offset should be > 0L }
+    withClue("common offset")(stateBefore.offset should be > 0L)
     stateBefore.snapshots.foreach {
-      case (assetPair, snapshotOffset) => withClue(assetPair) { snapshotOffset should be > 0L }
+      case (assetPair, snapshotOffset) => withClue(assetPair)(snapshotOffset should be > 0L)
     }
   }
 
@@ -69,4 +68,5 @@ class MatcherRecoveryTestSuite extends MatcherSuiteBase {
     broadcastAndAwait(IssueEthTx, IssueUsdTx)
     dex1.start()
   }
+
 }

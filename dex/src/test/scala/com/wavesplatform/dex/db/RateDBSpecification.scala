@@ -8,7 +8,7 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class RateDBSpecification extends AnyWordSpecLike with Matchers with WithDB with MatcherSpecBase with PropertyChecks with NoShrink {
 
-  private def test(f: RateDB => Unit): Unit = f { RateDB(db) }
+  private def test(f: RateDB => Unit): Unit = f(RateDB(db))
 
   "RateDB" should {
     "add, get and delete rates" in test { rdb =>
@@ -17,7 +17,7 @@ class RateDBSpecification extends AnyWordSpecLike with Matchers with WithDB with
           .listOfN(
             100,
             for {
-              asset     <- arbitraryAssetGen
+              asset <- arbitraryAssetGen
               rateValue <- Gen.choose(1, 100).map(_.toDouble / 100)
             } yield asset -> rateValue
           )

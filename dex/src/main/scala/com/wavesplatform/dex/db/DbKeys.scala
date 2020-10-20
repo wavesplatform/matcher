@@ -14,7 +14,7 @@ import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.OrderInfo.FinalOrderInfo
 import com.wavesplatform.dex.model.{OrderBookSnapshot, OrderInfo}
-import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
+import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 
 import scala.collection.mutable
 
@@ -41,7 +41,7 @@ object DbKeys {
   // openVolumeSeqNr = 7
   // openVolumeAsset = 8
 
-  def orderTxIdsSeqNr(orderId: ByteStr): Key[Int]           = bytesSeqNr("matcher-order-tx-ids-seq-nr", 9, orderId.arr)
+  def orderTxIdsSeqNr(orderId: ByteStr): Key[Int] = bytesSeqNr("matcher-order-tx-ids-seq-nr", 9, orderId.arr)
   def orderTxId(orderId: ByteStr, seqNr: Int): Key[ByteStr] = Key("matcher-order-tx-id", hBytes(10, seqNr, orderId.arr), ByteStr(_), _.arr)
 
   def exchangeTransaction(txId: ByteStr): Key[Option[ExchangeTransaction]] =
@@ -69,19 +69,20 @@ object DbKeys {
   val lqOldestIdx: Key[Long] = longKey("lq-oldest-idx", 19: Short, default = -1)
   val lqNewestIdx: Key[Long] = longKey("lq-newest-idx", 20: Short, default = -1)
 
-  val LqElementPrefix: Short            = 21
+  val LqElementPrefix: Short = 21
   val LqElementPrefixBytes: Array[Byte] = Shorts.toByteArray(LqElementPrefix)
-  val LqElementKeyName: String          = "lq-element"
+  val LqElementKeyName: String = "lq-element"
 
-  def lpqElement(idx: Long): Key[Option[QueueEventWithMeta]] =
+  def lpqElement(idx: Long): Key[Option[ValidatedCommandWithMeta]] =
     Key.opt(
       LqElementKeyName,
       bytes(LqElementPrefix, Longs.toByteArray(idx)),
-      xs => QueueEventWithMeta(idx, Longs.fromByteArray(xs.take(8)), QueueEvent.fromBytes(xs.drop(8))),
-      QueueEventWithMeta.toBytes(_).drop(8)
+      xs => ValidatedCommandWithMeta(idx, Longs.fromByteArray(xs.take(8)), ValidatedCommand.fromBytes(xs.drop(8))),
+      ValidatedCommandWithMeta.toBytes(_).drop(8)
     )
 
   val ratePrefix: Short = 22
+
   def rate(asset: IssuedAsset): Key[Double] = {
     import java.lang.Double._
     Key(
@@ -93,14 +94,17 @@ object DbKeys {
   }
 
   val AssetPairsPrefix: Short = 23
+
   def assetPair(pair: AssetPair): Key[Unit] =
     Key("matcher-asset-pair", bytes(AssetPairsPrefix, pair.bytes), _ => (), _ => Array.emptyByteArray)
 
   val OrderBookSnapshotOffsetPrefix: Short = 24
+
   def orderBookSnapshotOffset(pair: AssetPair): Key[Option[Long]] =
     Key.opt("matcher-ob-snapshot-offset", bytes(OrderBookSnapshotOffsetPrefix, pair.bytes), Longs.fromByteArray, Longs.toByteArray)
 
   val OrderBookSnapshotPrefix: Short = 25
+
   def orderBookSnapshot(pair: AssetPair): Key[Option[OrderBookSnapshot]] =
     Key.opt(
       "matcher-ob-snapshot",
@@ -114,16 +118,17 @@ object DbKeys {
     )
 
   val AssetPrefix: Short = 26
+
   def asset(x: IssuedAsset): Key[Option[BriefAssetDescription]] =
     Key.opt(
       "matcher-asset",
       bytes(AssetPrefix, x.id.arr),
       bytes => {
-        val bb         = ByteBuffer.wrap(bytes)
+        val bb = ByteBuffer.wrap(bytes)
         val nameLength = bb.getInt
-        val name       = new Array[Byte](nameLength)
+        val name = new Array[Byte](nameLength)
         bb.get(name)
-        val decimals  = bb.getInt
+        val decimals = bb.getInt
         val hasScript = bb.get == 1
 
         BriefAssetDescription(new String(name, StandardCharsets.UTF_8), decimals, hasScript)
@@ -133,4 +138,5 @@ object DbKeys {
         Ints.toByteArray(nameBytes.length) ++ nameBytes ++ Ints.toByteArray(x.decimals) ++ Array[Byte](if (x.hasScript) 1 else 0)
       }
     )
+
 }

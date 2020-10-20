@@ -10,20 +10,22 @@ import com.wavesplatform.dex.error
 import scala.collection.immutable.{HashMap, TreeMap}
 
 /**
-  * Contains subscriptions for internal stream and broadcast messages.
-  */
+ * Contains subscriptions for internal stream and broadcast messages.
+ */
 object WsExternalClientDirectoryActor {
 
   sealed trait Message extends Product with Serializable
 
   sealed trait Command extends Message
+
   object Command {
     case class Subscribe(clientRef: ActorRef[WsExternalClientHandlerActor.Message], os: String, client: String) extends Command
-    case class CloseOldest(number: Int)                                                                         extends Command
-    case class BroadcastRatesUpdates(newRates: Map[Asset, Double])                                              extends Command
+    case class CloseOldest(number: Int) extends Command
+    case class BroadcastRatesUpdates(newRates: Map[Asset, Double]) extends Command
   }
 
   sealed trait Query extends Message
+
   object Query {
     case class GetActiveNumber(client: ActorRef[HttpWebSocketConnections]) extends Query
   }
@@ -66,7 +68,7 @@ object WsExternalClientDirectoryActor {
     }
 
   private type TargetActor = ActorRef[WsExternalClientHandlerActor.Message]
-  private type Index       = Int
+  private type Index = Int
 
   private case class State(currentIndex: Index, all: Map[TargetActor, ConnectionInfo], infoMap: Map[String, Int]) {
 
@@ -99,7 +101,7 @@ object WsExternalClientDirectoryActor {
       val updatedInfoMap = infoDiff.foldLeft(infoMap) {
         case (r, (k, v)) =>
           r.get(k) match {
-            case None        => r
+            case None => r
             case Some(origV) => r.updated(k, math.max(0, origV - v))
           }
       }
@@ -107,9 +109,11 @@ object WsExternalClientDirectoryActor {
       val oldestActors = oldest.map(_._1)
       (copy(all = all -- oldestActors, infoMap = updatedInfoMap), oldestActors)
     }
+
   }
 
   private case class ConnectionInfo(index: Index, os: String, client: String) {
     val clientAndOs = s"$client, $os"
   }
+
 }

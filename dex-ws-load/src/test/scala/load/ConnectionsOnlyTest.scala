@@ -9,11 +9,9 @@ class ConnectionsOnlyTest extends Simulation {
   val scn = scenario("ConnectionsOnlyTest")
     .feed(feeder)
     .exec(connect)
-
     .repeat(System.getProperty("rt").toInt) {
       pingPong
     }
-
     .exec(close)
 
   setUp(

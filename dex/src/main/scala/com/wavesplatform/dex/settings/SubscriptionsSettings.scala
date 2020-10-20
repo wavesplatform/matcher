@@ -1,22 +1,21 @@
 package com.wavesplatform.dex.settings
 
-import cats.syntax.apply._
-import com.wavesplatform.dex.settings.utils.ConfigSettingsValidator
-import com.wavesplatform.dex.settings.utils.ConfigSettingsValidator._
-import net.ceedubs.ficus.Ficus._
-import net.ceedubs.ficus.readers.ValueReader
+import com.wavesplatform.dex.settings.SubscriptionsSettings.default
+import com.wavesplatform.dex.settings.utils.ConfigReaderOps.Implicits
+import com.wavesplatform.dex.settings.utils.{rules, validationOf}
+import pureconfig.generic.semiauto
 
-final case class SubscriptionsSettings(maxOrderBookNumber: Int, maxAddressNumber: Int)
+final case class SubscriptionsSettings(maxOrderBookNumber: Int = default.maxOrderBookNumber, maxAddressNumber: Int = default.maxAddressNumber)
 
 object SubscriptionsSettings {
 
-  val default: SubscriptionsSettings = SubscriptionsSettings(10, 10)
+  val default = SubscriptionsSettings(10, 10)
 
-  implicit val subscriptionSettingsReader: ValueReader[SubscriptionsSettings] = { (cfg, path) =>
-    val cfgValidator = ConfigSettingsValidator(cfg)
-    (
-      cfgValidator.validateByPredicate[Int](s"$path.max-order-book-number")(_ > 1, "max order book number should be > 1"),
-      cfgValidator.validateByPredicate[Int](s"$path.max-address-number")(_ > 1, "max address number should be > 1"),
-    ) mapN SubscriptionsSettings.apply getValueOrThrowErrors
-  }
+  implicit val subscriptionsConfigReader = semiauto
+    .deriveReader[SubscriptionsSettings]
+    .validatedField(
+      validationOf.field[SubscriptionsSettings, "maxOrderBookNumber"].mk(x => rules.gt0(x.maxOrderBookNumber)),
+      validationOf.field[SubscriptionsSettings, "maxAddressNumber"].mk(x => rules.gt0(x.maxAddressNumber))
+    )
+
 }

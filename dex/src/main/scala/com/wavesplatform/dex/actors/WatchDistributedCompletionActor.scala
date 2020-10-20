@@ -5,12 +5,13 @@ import com.wavesplatform.dex.domain.utils.ScorexLogging
 
 import scala.concurrent.duration.FiniteDuration
 
-class WatchDistributedCompletionActor(workers: Set[ActorRef],
-                                      completionReceiver: ActorRef,
-                                      startWorkCommand: Any,
-                                      workCompleted: Any,
-                                      timeout: FiniteDuration)
-    extends Actor
+class WatchDistributedCompletionActor(
+  workers: Set[ActorRef],
+  completionReceiver: ActorRef,
+  startWorkCommand: Any,
+  workCompleted: Any,
+  timeout: FiniteDuration
+) extends Actor
     with ScorexLogging {
 
   import context.dispatcher
@@ -46,9 +47,12 @@ class WatchDistributedCompletionActor(workers: Set[ActorRef],
     completionReceiver ! workCompleted
     context.stop(self)
   }
+
 }
 
 object WatchDistributedCompletionActor {
+
   def props(workers: Set[ActorRef], completionReceiver: ActorRef, startWorkCommand: Any, workCompleted: Any, timeout: FiniteDuration): Props =
     Props(new WatchDistributedCompletionActor(workers, completionReceiver, startWorkCommand, workCompleted, timeout))
+
 }

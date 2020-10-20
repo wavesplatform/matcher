@@ -26,8 +26,8 @@ import com.wavesplatform.dex.fixtures.RestartableActor.RestartActor
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderAddedReason, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model.OrderBook.OrderBookUpdates
 import com.wavesplatform.dex.model._
-import com.wavesplatform.dex.queue.QueueEvent
-import com.wavesplatform.dex.queue.QueueEvent.Canceled
+import com.wavesplatform.dex.queue.ValidatedCommand
+import com.wavesplatform.dex.queue.ValidatedCommand.CancelOrder
 import com.wavesplatform.dex.settings.OrderFeeSettings.DynamicSettings
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatchingRule}
 import com.wavesplatform.dex.time.SystemTime
@@ -63,21 +63,23 @@ class OrderBookActorSpecification
       f(pair, actor, probe)
     }
 
-  private def obcTestWithMatchingRules(matchingRules: NonEmptyList[DenormalizedMatchingRule])(f: (AssetPair, ActorRef, TestProbe) => Unit): Unit =
+  private def obcTestWithMatchingRules(matchingRules: NonEmptyList[DenormalizedMatchingRule])(f: (AssetPair, ActorRef, TestProbe) => Unit)
+    : Unit =
     obcTestWithPrepare((_, _) => (), matchingRules) { (pair, actor, probe) =>
       probe.expectMsg(OrderBookRecovered(pair, None))
       f(pair, actor, probe)
     }
 
-  private def obcTestWithPrepare(prepare: (OrderBookSnapshotDB, AssetPair) => Unit,
-                                 matchingRules: NonEmptyList[DenormalizedMatchingRule] = NonEmptyList.one(DenormalizedMatchingRule(0, 0.00000001)),
-                                 makerTakerFeeAtOffset: Long => (AcceptedOrder, LimitOrder) => (Long, Long) = _ => makerTakerPartialFee)(
-      f: (AssetPair, TestActorRef[OrderBookActor with RestartableActor], TestProbe) => Unit): Unit = {
+  private def obcTestWithPrepare(
+    prepare: (OrderBookSnapshotDB, AssetPair) => Unit,
+    matchingRules: NonEmptyList[DenormalizedMatchingRule] = NonEmptyList.one(DenormalizedMatchingRule(0, 0.00000001)),
+    makerTakerFeeAtOffset: Long => (AcceptedOrder, LimitOrder) => (Long, Long) = _ => makerTakerPartialFee
+  )(f: (AssetPair, TestActorRef[OrderBookActor with RestartableActor], TestProbe) => Unit): Unit = {
 
     md.clear()
 
-    val tp    = TestProbe()
-    val pair  = AssetPair(wctAsset, Waves)
+    val tp = TestProbe()
+    val pair = AssetPair(wctAsset, Waves)
     val obsdb = OrderBookSnapshotDB.inMem
 
     prepare(obsdb, pair)
@@ -98,7 +100,8 @@ class OrderBookActorSpecification
         raw => MatchingRule(raw.startOffset, (raw.tickSize * BigDecimal(10).pow(8)).toLongExact),
         makerTakerFeeAtOffset,
         None
-      ) with RestartableActor)
+      ) with RestartableActor
+    )
 
     f(pair, orderBookActor, tp)
     system.stop(orderBookActor)
@@ -122,14 +125,12 @@ class OrderBookActorSpecification
       tp.expectMsg(OrderBookRecovered(pair, Some(50)))
     }
 
-    "recovery - notify address actor about orders" in obcTestWithPrepare(
-      { (obsdb, p) =>
-        val ord                                  = buy(p, 10 * Order.PriceConstant, 100)
-        val ob                                   = OrderBook.empty
-        val OrderBookUpdates(updatedOb, _, _, _) = ob.add(LimitOrder(ord), ord.timestamp, makerTakerPartialFee)
-        obsdb.update(p, 50L, Some(updatedOb.snapshot))
-      }
-    ) { (pair, _, tp) =>
+    "recovery - notify address actor about orders" in obcTestWithPrepare { (obsdb, p) =>
+      val ord = buy(p, 10 * Order.PriceConstant, 100)
+      val ob = OrderBook.empty
+      val OrderBookUpdates(updatedOb, _, _, _) = ob.add(LimitOrder(ord), ord.timestamp, makerTakerPartialFee)
+      obsdb.update(p, 50L, Some(updatedOb.snapshot))
+    } { (pair, _, tp) =>
       tp.expectMsgType[OrderAdded]
       tp.expectMsg(OrderBookRecovered(pair, Some(50)))
     }
@@ -166,12 +167,16 @@ class OrderBookActorSpecification
 
       actor ! RestartActor
       tp.expectMsgType[OrderAdded] should matchTo(
-        OrderAdded(SellLimitOrder(
+        OrderAdded(
+          SellLimitOrder(
             ord2.amount - ord1.amount,
             ord2.matcherFee - AcceptedOrder.partialFee(ord2.matcherFee, ord2.amount, ord1.amount),
             ord2,
             (BigInt(10) * Order.PriceConstant * 100 * Order.PriceConstant).bigInteger
-          ), OrderAddedReason.OrderBookRecovered, ord2.timestamp)
+          ),
+          OrderAddedReason.OrderBookRecovered,
+          ord2.timestamp
+        )
       )
       tp.expectMsgType[OrderBookRecovered]
     }
@@ -192,12 +197,16 @@ class OrderBookActorSpecification
 
       val restAmount = ord1.amount + ord2.amount - ord3.amount
       tp.expectMsg(
-        OrderAdded(BuyLimitOrder(
+        OrderAdded(
+          BuyLimitOrder(
             restAmount,
             ord2.matcherFee - AcceptedOrder.partialFee(ord2.matcherFee, ord2.amount, ord2.amount - restAmount),
             ord2,
             (BigInt(2) * Order.PriceConstant * 100 * Order.PriceConstant).bigInteger
-          ), OrderAddedReason.OrderBookRecovered, ord2.timestamp)
+          ),
+          OrderAddedReason.OrderBookRecovered,
+          ord2.timestamp
+        )
       )
       tp.expectMsgType[OrderBookRecovered]
     }
@@ -220,19 +229,23 @@ class OrderBookActorSpecification
 
       val restAmount = ord1.amount + ord2.amount + ord3.amount - ord4.amount
       tp.expectMsg(
-        OrderAdded(SellLimitOrder(
+        OrderAdded(
+          SellLimitOrder(
             restAmount,
             ord2.matcherFee - AcceptedOrder.partialFee(ord2.matcherFee, ord2.amount, ord2.amount - restAmount),
             ord2,
             (BigInt(4) * Order.PriceConstant * 100 * Order.PriceConstant).bigInteger
-          ), OrderAddedReason.OrderBookRecovered, ord2.timestamp)
+          ),
+          OrderAddedReason.OrderBookRecovered,
+          ord2.timestamp
+        )
       )
       tp.expectMsgType[OrderBookRecovered]
     }
 
     "place orders and restart without waiting for response" in obcTest { (pair, orderBook, tp) =>
       val ord1 = sell(pair, 10 * Order.PriceConstant, 100)
-      val ts   = System.currentTimeMillis()
+      val ts = System.currentTimeMillis()
 
       (1 to 100) foreach { i =>
         orderBook ! wrapLimitOrder(ord1.updateTimestamp(ts + i))
@@ -310,7 +323,7 @@ class OrderBookActorSpecification
       orderBook ! wrapLimitOrder(1, buyOrder)
       tp.expectMsgType[OrderAdded]
 
-      orderBook ! wrapEvent(2, Canceled(buyOrder.assetPair, buyOrder.id(), Source.Request))
+      orderBook ! wrapCommand(2, CancelOrder(buyOrder.assetPair, buyOrder.id(), Source.Request))
       tp.expectMsgType[OrderCanceled]
     }
 
@@ -399,7 +412,10 @@ class OrderBookActorSpecification
         bids.last.price shouldBe 0.0000040 * Order.PriceConstant
       }
 
-      orderBook ! wrapEvent(2, Canceled(buyOrder1.assetPair, buyOrder1.id(), Source.Request)) // order book is looking for the price level of buyOrder1 correctly (41 but not 40)
+      orderBook ! wrapCommand(
+        2,
+        CancelOrder(buyOrder1.assetPair, buyOrder1.id(), Source.Request)
+      ) // order book is looking for the price level of buyOrder1 correctly (41 but not 40)
       tp.expectMsgType[OrderCanceled]
 
       eventually {
@@ -443,14 +459,14 @@ class OrderBookActorSpecification
 
       def bigMarketOrderTest(marketOrderType: OrderType, feeAsset: Asset): Unit = obcTest { (wctWavesPair, orderBook, tp) =>
         val counterOrder1Amount = toNormalized(12) // will be executed fully
-        val counterOrder2Amount = toNormalized(5)  // will be executed fully
-        val counterOrder3Amount = toNormalized(3)  // will be executed partially
+        val counterOrder2Amount = toNormalized(5) // will be executed fully
+        val counterOrder3Amount = toNormalized(3) // will be executed partially
 
         val marketOrderAmount = toNormalized(18)
 
         val (counterOrder1, counterOrder2, counterOrder3, marketOrder) = marketOrderType match {
           case OrderType.BUY =>
-            val buyOrder       = buy(wctWavesPair, amount = marketOrderAmount, price = 110, matcherFee = smallFee, version = 3, feeAsset = feeAsset)
+            val buyOrder = buy(wctWavesPair, amount = marketOrderAmount, price = 110, matcherFee = smallFee, version = 3, feeAsset = feeAsset)
             val marketBuyOrder = MarketOrder(buyOrder, availableForSpending = getSpentAmountWithFee(buyOrder))
             (
               sell(wctWavesPair, amount = counterOrder1Amount, price = 105),
@@ -459,7 +475,7 @@ class OrderBookActorSpecification
               marketBuyOrder
             )
           case OrderType.SELL =>
-            val sellOrder       = sell(wctWavesPair, amount = marketOrderAmount, price = 95, matcherFee = smallFee, version = 3, feeAsset = feeAsset)
+            val sellOrder = sell(wctWavesPair, amount = marketOrderAmount, price = 95, matcherFee = smallFee, version = 3, feeAsset = feeAsset)
             val marketSellOrder = MarketOrder(sellOrder, availableForSpending = getSpentAmountWithFee(sellOrder))
             (
               buy(wctWavesPair, amount = counterOrder1Amount, price = 110),
@@ -481,13 +497,13 @@ class OrderBookActorSpecification
         oe1.counter shouldBe LimitOrder(counterOrder1)
         oe1.executedAmount shouldBe counterOrder1.amount
 
-        val oe2                   = tp.expectMsgType[OrderExecuted]
+        val oe2 = tp.expectMsgType[OrderExecuted]
         val marketOrderRemaining1 = oe1.submittedMarketRemaining(marketOrder)
         oe2.submitted shouldBe marketOrderRemaining1
         oe2.counter shouldBe LimitOrder(counterOrder2)
         oe2.executedAmount shouldBe counterOrder2.amount
 
-        val oe3                   = tp.expectMsgType[OrderExecuted]
+        val oe3 = tp.expectMsgType[OrderExecuted]
         val marketOrderRemaining2 = oe2.submittedMarketRemaining(marketOrderRemaining1)
         oe3.submitted shouldBe marketOrderRemaining2
         oe3.counter shouldBe LimitOrder(counterOrder3)
@@ -502,31 +518,31 @@ class OrderBookActorSpecification
         }
       }
 
-      bigMarketOrderTest(OrderType.SELL, feeAsset = Waves)    // fee in received asset
+      bigMarketOrderTest(OrderType.SELL, feeAsset = Waves) // fee in received asset
       bigMarketOrderTest(OrderType.SELL, feeAsset = ethAsset) // fee in third asset
       bigMarketOrderTest(OrderType.SELL, feeAsset = wctAsset) // fee in spent asset
 
       bigMarketOrderTest(OrderType.BUY, feeAsset = wctAsset) // fee in received asset
       bigMarketOrderTest(OrderType.BUY, feeAsset = ethAsset) // fee in third asset
-      bigMarketOrderTest(OrderType.BUY, feeAsset = Waves)    // fee in spent asset
+      bigMarketOrderTest(OrderType.BUY, feeAsset = Waves) // fee in spent asset
     }
 
     "cancel market orders because of the stop conditions (no counter orders or partially filled)" in {
 
       def noCountersOrPartiallyFilledTest(marketOrderType: OrderType, feeAsset: Asset): Unit = obcTest { (wctWavesPair, orderBook, tp) =>
-        val marketOrderAmount  = toNormalized(10)
+        val marketOrderAmount = toNormalized(10)
         val counterOrderAmount = toNormalized(4)
 
         val (counterOrder, marketOrder) = marketOrderType match {
           case OrderType.SELL =>
-            val sellOrder       = sell(wctWavesPair, amount = marketOrderAmount, price = 90, matcherFee = smallFee, version = 3, feeAsset = feeAsset)
+            val sellOrder = sell(wctWavesPair, amount = marketOrderAmount, price = 90, matcherFee = smallFee, version = 3, feeAsset = feeAsset)
             val marketSellOrder = MarketOrder(sellOrder, availableForSpending = getSpentAmountWithFee(sellOrder))
             (
               buy(wctWavesPair, amount = counterOrderAmount, price = 100, matcherFee = smallFee, version = 3),
               marketSellOrder
             )
           case OrderType.BUY =>
-            val buyOrder       = buy(wctWavesPair, amount = marketOrderAmount, price = 100, matcherFee = smallFee, version = 3, feeAsset = feeAsset)
+            val buyOrder = buy(wctWavesPair, amount = marketOrderAmount, price = 100, matcherFee = smallFee, version = 3, feeAsset = feeAsset)
             val marketBuyOrder = MarketOrder(buyOrder, availableForSpending = getSpentAmountWithFee(buyOrder))
             (
               sell(wctWavesPair, amount = counterOrderAmount, price = 90, matcherFee = smallFee, version = 3),
@@ -572,20 +588,20 @@ class OrderBookActorSpecification
         }
       }
 
-      noCountersOrPartiallyFilledTest(marketOrderType = OrderType.SELL, feeAsset = Waves)    // fee in received asset
+      noCountersOrPartiallyFilledTest(marketOrderType = OrderType.SELL, feeAsset = Waves) // fee in received asset
       noCountersOrPartiallyFilledTest(marketOrderType = OrderType.SELL, feeAsset = ethAsset) // fee in third asset
       noCountersOrPartiallyFilledTest(marketOrderType = OrderType.SELL, feeAsset = wctAsset) // fee in spent asset
 
       noCountersOrPartiallyFilledTest(marketOrderType = OrderType.BUY, feeAsset = wctAsset) // fee in received asset
       noCountersOrPartiallyFilledTest(marketOrderType = OrderType.BUY, feeAsset = ethAsset) // fee in third asset
-      noCountersOrPartiallyFilledTest(marketOrderType = OrderType.BUY, feeAsset = Waves)    // fee in spent asset
+      noCountersOrPartiallyFilledTest(marketOrderType = OrderType.BUY, feeAsset = Waves) // fee in spent asset
     }
 
     "cancel market orders because of the stop conditions (available balance for spending is exhausted)" in {
 
       def afsIsNotEnoughTest(marketOrderType: OrderType, feeAsset: Asset, isFeeConsideredInExecutionAmount: Boolean): Unit =
         obcTest { (wctWavesPair, orderBook, tp) =>
-          val moAmount             = toNormalized(4)
+          val moAmount = toNormalized(4)
           val availableForSpending = moAmount / 2
 
           val (counterOrder, marketOrder) = marketOrderType match {
@@ -618,12 +634,15 @@ class OrderBookActorSpecification
           oe.counter shouldBe LimitOrder(counterOrder)
 
           (marketOrderType, isFeeConsideredInExecutionAmount) match {
-            case (OrderType.SELL, true)  => oe.executedAmount + oe.submittedExecutedFee shouldBe marketOrder.availableForSpending
+            case (OrderType.SELL, true) => oe.executedAmount + oe.submittedExecutedFee shouldBe marketOrder.availableForSpending
             case (OrderType.SELL, false) => oe.executedAmount shouldBe marketOrder.availableForSpending
 
             case (OrderType.BUY, true) =>
               oe.executedAmountOfPriceAsset + oe.submittedExecutedFee should be <= marketOrder.availableForSpending
-              MatcherModel.getCost(oe.executedAmount + 1, marketOrder.price) + oe.submittedExecutedFee should be > marketOrder.availableForSpending
+              MatcherModel.getCost(
+                oe.executedAmount + 1,
+                marketOrder.price
+              ) + oe.submittedExecutedFee should be > marketOrder.availableForSpending
 
             case (OrderType.BUY, false) =>
               oe.executedAmountOfPriceAsset should be <= marketOrder.availableForSpending
@@ -644,13 +663,13 @@ class OrderBookActorSpecification
           }
         }
 
-      afsIsNotEnoughTest(marketOrderType = OrderType.SELL, feeAsset = Waves, isFeeConsideredInExecutionAmount = false)    // fee in received asset
+      afsIsNotEnoughTest(marketOrderType = OrderType.SELL, feeAsset = Waves, isFeeConsideredInExecutionAmount = false) // fee in received asset
       afsIsNotEnoughTest(marketOrderType = OrderType.SELL, feeAsset = ethAsset, isFeeConsideredInExecutionAmount = false) // fee in third asset
-      afsIsNotEnoughTest(marketOrderType = OrderType.SELL, feeAsset = wctAsset, isFeeConsideredInExecutionAmount = true)  // fee in spent asset
+      afsIsNotEnoughTest(marketOrderType = OrderType.SELL, feeAsset = wctAsset, isFeeConsideredInExecutionAmount = true) // fee in spent asset
 
       afsIsNotEnoughTest(marketOrderType = OrderType.BUY, feeAsset = wctAsset, isFeeConsideredInExecutionAmount = false) // fee in received asset
       afsIsNotEnoughTest(marketOrderType = OrderType.BUY, feeAsset = ethAsset, isFeeConsideredInExecutionAmount = false) // fee in third asset
-      afsIsNotEnoughTest(marketOrderType = OrderType.BUY, feeAsset = Waves, isFeeConsideredInExecutionAmount = true)     // fee in spent asset
+      afsIsNotEnoughTest(marketOrderType = OrderType.BUY, feeAsset = Waves, isFeeConsideredInExecutionAmount = true) // fee in spent asset
     }
 
     "cancel a submitted order if it couldn't be matched by a price of a counter order" in obcTest { (wctWavesPair, orderBook, tp) =>
@@ -691,14 +710,17 @@ class OrderBookActorSpecification
       orderBook ! wrapLimitOrder(order)
       tp.expectMsgType[OrderAdded]
 
-      orderBook ! wrapEvent(QueueEvent.OrderBookDeleted(wctWavesPair))
+      orderBook ! wrapCommand(ValidatedCommand.DeleteOrderBook(wctWavesPair))
       tp.expectMsgType[OrderCanceled].reason shouldBe Events.OrderCanceledReason.OrderBookDeleted
     }
   }
 
   private def getAggregatedSnapshot(orderBookRef: ActorRef): OrderBookAggregatedSnapshot = {
-    val pair       = wavesUsdPair // hack
+    val pair = wavesUsdPair // hack
     val askAdapter = new OrderBookAskAdapter(new AtomicReference(Map(pair -> Right(orderBookRef))), 5.seconds)
-    Await.result(askAdapter.getAggregatedSnapshot(pair), 1.second).toOption.flatten.getOrElse(throw new IllegalStateException("Can't get snapshot"))
+    Await.result(askAdapter.getAggregatedSnapshot(pair), 1.second).toOption.flatten.getOrElse(throw new IllegalStateException(
+      "Can't get snapshot"
+    ))
   }
+
 }

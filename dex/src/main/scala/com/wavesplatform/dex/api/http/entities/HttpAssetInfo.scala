@@ -8,5 +8,5 @@ case class HttpAssetInfo(@ApiModelProperty(example = "8") decimals: Int)
 
 object HttpAssetInfo {
   implicit val httpAssetInfoFormat: Format[HttpAssetInfo] = Json.format[HttpAssetInfo]
-  def fromAssetInfo(ai: AssetInfo): HttpAssetInfo         = HttpAssetInfo(ai.decimals)
+  def fromAssetInfo(ai: AssetInfo): HttpAssetInfo = HttpAssetInfo(ai.decimals)
 }

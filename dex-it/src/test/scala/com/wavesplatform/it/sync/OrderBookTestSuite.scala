@@ -18,6 +18,7 @@ class OrderBookTestSuite extends MatcherSuiteBase {
   override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "WAVES" ]""")
 
   private case class ReservedBalances(wct: Long, usd: Long, waves: Long)
+
   private def reservedBalancesOf(pk: KeyPair): ReservedBalances = {
     val reservedBalances = dex1.api.reservedBalance(pk)
     ReservedBalances(
@@ -27,18 +28,18 @@ class OrderBookTestSuite extends MatcherSuiteBase {
     )
   }
 
-  private val (amount, price)         = (1000L, PriceConstant)
-  private val buyOrder                = mkOrder(alice, wctUsdPair, BUY, 2 * amount, price)
-  private val anotherBuyOrder         = mkOrder(alice, wctUsdPair, BUY, amount, price)
-  private val sellOrder               = mkOrder(bob, wctUsdPair, SELL, amount, 2 * price)
-  private val buyOrderForAnotherPair  = mkOrder(alice, wctWavesPair, BUY, amount, price)
+  private val (amount, price) = (1000L, PriceConstant)
+  private val buyOrder = mkOrder(alice, wctUsdPair, BUY, 2 * amount, price)
+  private val anotherBuyOrder = mkOrder(alice, wctUsdPair, BUY, amount, price)
+  private val sellOrder = mkOrder(bob, wctUsdPair, SELL, amount, 2 * price)
+  private val buyOrderForAnotherPair = mkOrder(alice, wctWavesPair, BUY, amount, price)
   private val sellOrderForAnotherPair = mkOrder(bob, wctWavesPair, SELL, amount, 2 * price)
 
   private var aliceRBForOnePair = ReservedBalances(0, 0, 0)
-  private var bobRBForOnePair   = ReservedBalances(0, 0, 0)
+  private var bobRBForOnePair = ReservedBalances(0, 0, 0)
 
   private var aliceRBForBothPairs = ReservedBalances(0, 0, 0)
-  private var bobRBForBothPairs   = ReservedBalances(0, 0, 0)
+  private var bobRBForBothPairs = ReservedBalances(0, 0, 0)
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
@@ -64,7 +65,7 @@ class OrderBookTestSuite extends MatcherSuiteBase {
     aliceRBForBothPairs = reservedBalancesOf(alice)
     bobRBForBothPairs = reservedBalancesOf(bob)
 
-    dex1.api.tryDeleteOrderBook(wctUsdPair) shouldBe Symbol("right")
+    dex1.tryApi.deleteOrderBook(wctUsdPair) shouldBe Symbol("right")
   }
 
   "When delete order book" - {
@@ -110,7 +111,7 @@ class OrderBookTestSuite extends MatcherSuiteBase {
     }
 
     "matcher can start after multiple delete events" in {
-      def deleteWctWaves(): Future[Either[MatcherError, HttpMessage]] = dex1.asyncApi.tryDeleteOrderBook(wctWavesPair)
+      def deleteWctWaves(): Future[Either[MatcherError, HttpMessage]] = dex1.asyncTryApi.deleteOrderBook(wctWavesPair)
       val deleteMultipleTimes = deleteWctWaves()
         .zip(deleteWctWaves())
         .map(_ => ())

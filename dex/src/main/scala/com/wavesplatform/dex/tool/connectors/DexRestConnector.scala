@@ -21,7 +21,7 @@ case class DexRestConnector(target: String) extends RestConnector {
 
   private def mkCancelRequest(orderId: Order.Id, owner: KeyPair): HttpCancelOrder = {
     val cancelRequest = HttpCancelOrder(owner, orderId.some, None, Array.emptyByteArray)
-    val signature     = crypto.sign(owner, cancelRequest.toSign)
+    val signature = crypto.sign(owner, cancelRequest.toSign)
     cancelRequest.copy(signature = signature)
   }
 
@@ -49,10 +49,10 @@ case class DexRestConnector(target: String) extends RestConnector {
     _.get(uri"$apiUri/orderbook/${assetPair.amountAsset}/${assetPair.priceAsset}/$orderId")
   }
 
-  def getTxsByOrderId(id: Order.Id): ErrorOr[Seq[JsValue]] = mkResponse { _.get(uri"$apiUri/transactions/$id") } map { _.as[Seq[JsValue]] }
+  def getTxsByOrderId(id: Order.Id): ErrorOr[Seq[JsValue]] = mkResponse(_.get(uri"$apiUri/transactions/$id")) map { _.as[Seq[JsValue]] }
 
   def waitForOrderStatus(orderId: Order.Id, assetPair: AssetPair, expectedStatusName: String): ErrorOrJsonResponse =
-    repeatRequest { getOrderStatus(orderId, assetPair) } {
+    repeatRequest(getOrderStatus(orderId, assetPair)) {
       _.map(json => (json \ "status").get.asOpt[String] contains expectedStatusName).getOrElse(false)
     }
 
@@ -63,8 +63,8 @@ case class DexRestConnector(target: String) extends RestConnector {
     val uri =
       uri"$apiUri/orderbook/${assetPair.amountAsset}/${assetPair.priceAsset}/publicKey/${keyPair.publicKey.toString}"
         .copy(querySegments = List(QuerySegment.KeyValue("activeOnly", "true")))
-    mkResponse { _.get(uri).headers(timestampAndSignatureHeaders(keyPair, System.currentTimeMillis)) }.map(_.as[Seq[JsValue]])
+    mkResponse(_.get(uri).headers(timestampAndSignatureHeaders(keyPair, System.currentTimeMillis))).map(_.as[Seq[JsValue]])
   }
 
-  def getMatcherSettings: ErrorOr[JsValue] = mkResponse { _.get(uri"$apiUri/settings") }
+  def getMatcherSettings: ErrorOr[JsValue] = mkResponse(_.get(uri"$apiUri/settings"))
 }

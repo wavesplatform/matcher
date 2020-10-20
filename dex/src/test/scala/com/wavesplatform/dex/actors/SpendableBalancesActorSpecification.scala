@@ -14,7 +14,7 @@ import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
-import com.wavesplatform.dex.queue.QueueEventWithMeta
+import com.wavesplatform.dex.queue.ValidatedCommandWithMeta
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
@@ -37,11 +37,11 @@ class SpendableBalancesActorSpecification
   val testProbe: TestProbe = TestProbe()
 
   val alice: Address = KeyPair("alice".getBytes).toAddress
-  val bob: Address   = KeyPair("bob".getBytes).toAddress
+  val bob: Address = KeyPair("bob".getBytes).toAddress
 
   val balancesFromNode: Map[Address, Map[Asset, Long]] = Map(
     alice -> Map(Waves -> 100.waves, usd -> 50.usd, btc -> 2.btc),
-    bob   -> Map(Waves -> 300.waves, eth -> 5.eth)
+    bob -> Map(Waves -> 300.waves, eth -> 5.eth)
   )
 
   val spendableBalancesGrpcCalls = new ConcurrentHashMap[Address, Int](Map(alice -> 0, bob -> 0).asJava)
@@ -57,22 +57,21 @@ class SpendableBalancesActorSpecification
     }
   }
 
-  lazy val ad: ActorRef  = system.actorOf(Props(new AddressDirectoryActor(EmptyOrderDB, createAddressActor, None)))
+  lazy val ad: ActorRef = system.actorOf(Props(new AddressDirectoryActor(EmptyOrderDB, createAddressActor, None, started = true)))
   lazy val sba: ActorRef = system.actorOf(Props(new SpendableBalancesActor(spendableBalances, allAssetsSpendableBalances, ad)))
 
-  def createAddressActor(address: Address, enableSchedules: Boolean): Props = {
+  def createAddressActor(address: Address, started: Boolean): Props =
     Props(
       new AddressActor(
         address,
         time,
         EmptyOrderDB,
         (_, _) => Future.successful(Right(())),
-        event => { testProbe.ref ! event; Future.successful { Some(QueueEventWithMeta(0L, 0, event)) } },
-        enableSchedules,
+        command => { testProbe.ref ! command; Future.successful(Some(ValidatedCommandWithMeta(0L, 0, command))) },
+        started,
         sba
       )
     )
-  }
 
   "SpendableBalancesActor" should {
 
@@ -110,8 +109,9 @@ class SpendableBalancesActorSpecification
 
       val spendableBalances: (Address, Set[Asset]) => Future[Map[Asset, Long]] = { (address, assets) =>
         if (address == alice)
-          Future.successful { Map(Waves -> 100.waves, usd -> 500.usd).withDefaultValue(0L).view.filterKeys(assets).toMap } else
-          Future.failed[Map[Asset, Long]] { WavesNodeConnectionLostException("ain't my bitch", new Exception()) }
+          Future.successful(Map(Waves -> 100.waves, usd -> 500.usd).withDefaultValue(0L).view.filterKeys(assets).toMap)
+        else
+          Future.failed[Map[Asset, Long]](WavesNodeConnectionLostException("ain't my bitch", new Exception()))
       }
 
       val sba: ActorRef = system.actorOf(Props(new SpendableBalancesActor(spendableBalances, allAssetsSpendableBalances, ad)))
@@ -124,8 +124,8 @@ class SpendableBalancesActorSpecification
 
       def await[T](awaitable: Future[T]): T = Await.result(awaitable, 5.second)
 
-      await { askSpendableBalance(alice, Set(Waves, usd)) } should matchTo { Map(Waves -> 100.waves, usd -> 500.usd) }
-      a[WavesNodeConnectionLostException] should be thrownBy await { askSpendableBalance(bob, Set(Waves, usd)) }
+      await(askSpendableBalance(alice, Set(Waves, usd))) should matchTo(Map(Waves -> 100.waves, usd -> 500.usd))
+      a[WavesNodeConnectionLostException] should be thrownBy await(askSpendableBalance(bob, Set(Waves, usd)))
     }
 
     "correctly creates balance changes events" in {
@@ -143,7 +143,7 @@ class SpendableBalancesActorSpecification
       val sba: ActorRef = system.actorOf(Props(new SpendableBalancesActor(spendableBalances, allAssetsSpendableBalances, testProbe.ref)))
 
       def updateAndExpectBalanceChanges(update: (Asset, Long)*)(changedAssets: Set[Asset], decreasingChanges: Map[Asset, Long]): Unit = {
-        sba ! SpendableBalancesActor.Command.UpdateStates { Map(alice -> update.toMap) }
+        sba ! SpendableBalancesActor.Command.UpdateStates(Map(alice -> update.toMap))
         val envelope = testProbe.expectMsgType[AddressDirectoryActor.Envelope]
         envelope.address should matchTo(alice)
         envelope.cmd.asInstanceOf[AddressActor.Message.BalanceChanged] should matchTo {

@@ -14,7 +14,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.model.Denormalization
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.error.ErrorFormatterContext
-import com.wavesplatform.dex.model.{LimitOrder, MarketOrder}
+import com.wavesplatform.dex.model.{LimitOrder, MarketOrder, OrderBook}
 import com.wavesplatform.dex.settings.OrderRestrictionsSettings
 import org.scalacheck.Gen
 import org.scalatest.freespec.AnyFreeSpec
@@ -26,28 +26,29 @@ import scala.collection.immutable.TreeMap
 
 class WsMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDrivenPropertyChecks with Matchers with MatcherSpecBase {
 
-  private implicit val efc: ErrorFormatterContext = ErrorFormatterContext.from(_ => 8)
+  implicit private val efc: ErrorFormatterContext = ErrorFormatterContext.from(_ => 8)
 
   private val wsBalancesGen = for {
     tradable <- maxWavesAmountGen
     reserved <- maxWavesAmountGen
-    div      <- Gen.choose(1, 100000000L)
+    div <- Gen.choose(1, 100000000L)
   } yield WsBalances(tradable.toDouble / div, reserved.toDouble / div)
 
   private val wsOrderGen = for {
-    (order, _)    <- orderGenerator
-    isMarket      <- Gen.oneOf(true, false)
-    isNew         <- Gen.oneOf(true, false)
-    filledPercent <- Gen.choose(0D, 1D)
+    (order, _) <- orderGenerator
+    isMarket <- Gen.oneOf(true, false)
+    isNew <- Gen.oneOf(true, false)
+    filledPercent <- Gen.choose(0d, 1d)
   } yield {
 
     lazy val partialAmount: Long = (order.amount * filledPercent).toLong
-    lazy val partialFee: Long    = (order.matcherFee * filledPercent).toLong
+    lazy val partialFee: Long = (order.matcherFee * filledPercent).toLong
 
     val ao = (isNew, isMarket) match {
-      case (true, true)   => MarketOrder(order, _ => Long.MaxValue)
-      case (true, false)  => LimitOrder(order)
-      case (false, true)  => MarketOrder(order, _ => Long.MaxValue).partial(partialAmount, partialFee, Long.MaxValue, BigInteger.valueOf(order.price))
+      case (true, true) => MarketOrder(order, _ => Long.MaxValue)
+      case (true, false) => LimitOrder(order)
+      case (false, true) =>
+        MarketOrder(order, _ => Long.MaxValue).partial(partialAmount, partialFee, Long.MaxValue, BigInteger.valueOf(order.price))
       case (false, false) => LimitOrder(order).partial(partialAmount, partialFee, BigInteger.valueOf(order.price))
     }
 
@@ -69,14 +70,14 @@ class WsMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDrivenProp
   }
 
   private val wsAddressChangesGen = for {
-    account        <- Gen.alphaNumStr.map(x => KeyPair(ByteStr(x.getBytes(StandardCharsets.UTF_8))))
+    account <- Gen.alphaNumStr.map(x => KeyPair(ByteStr(x.getBytes(StandardCharsets.UTF_8))))
     balanceChanges <- Gen.choose(0, 5)
-    orderChanges   <- Gen.const(5 - balanceChanges)
-    assets         <- Gen.listOfN(balanceChanges, assetGen)
-    balances       <- Gen.listOfN(balanceChanges, wsBalancesGen)
-    orders         <- Gen.listOfN(orderChanges, wsOrderGen)
-    updateId       <- Gen.choose(0L, Long.MaxValue)
-    ts             <- Gen.choose(0L, Long.MaxValue)
+    orderChanges <- Gen.const(5 - balanceChanges)
+    assets <- Gen.listOfN(balanceChanges, assetGen)
+    balances <- Gen.listOfN(balanceChanges, wsBalancesGen)
+    orders <- Gen.listOfN(orderChanges, wsOrderGen)
+    updateId <- Gen.choose(0L, Long.MaxValue)
+    ts <- Gen.choose(0L, Long.MaxValue)
   } yield WsAddressChanges(account.toAddress, (assets zip balances).toMap, orders, updateId, ts)
 
   private val askPricesMin = 1000L * Order.PriceConstant
@@ -90,68 +91,69 @@ class WsMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDrivenProp
   private val amountGen = Gen.choose(1L, 2000L)
 
   private val amountDecimals = 8
-  private val priceDecimals  = 2
+  private val priceDecimals = 2
 
   private val orderBookSettingsGen: Gen[WsOrderBookSettings] = {
 
-    def getDenormalizedValueInRange(min: Long, max: Long): Gen[Double] = Gen.choose(min, max).map { BigDecimal(_) / Order.PriceConstant toDouble }
+    def getDenormalizedValueInRange(min: Long, max: Long): Gen[Double] =
+      Gen.choose(min, max).map(BigDecimal(_) / Order.PriceConstant toDouble)
 
     val restrictionsGen =
       for {
         stepAmount <- getDenormalizedValueInRange(1, 10)
-        minAmount  <- getDenormalizedValueInRange(1, 10)
-        maxAmount  <- getDenormalizedValueInRange(1 * Order.PriceConstant, 10 * Order.PriceConstant)
-        stepPrice  <- getDenormalizedValueInRange(1, 10)
-        minPrice   <- getDenormalizedValueInRange(1, 10)
-        maxPrice   <- getDenormalizedValueInRange(1 * Order.PriceConstant, 10 * Order.PriceConstant)
+        minAmount <- getDenormalizedValueInRange(1, 10)
+        maxAmount <- getDenormalizedValueInRange(1 * Order.PriceConstant, 10 * Order.PriceConstant)
+        stepPrice <- getDenormalizedValueInRange(1, 10)
+        minPrice <- getDenormalizedValueInRange(1, 10)
+        maxPrice <- getDenormalizedValueInRange(1 * Order.PriceConstant, 10 * Order.PriceConstant)
       } yield OrderRestrictionsSettings(stepAmount, minAmount, maxAmount, stepPrice, minPrice, maxPrice)
 
     val tickSizeGen = getDenormalizedValueInRange(10, 50)
 
     for {
       restrictions <- Gen.option(restrictionsGen)
-      tickSize     <- Gen.option(tickSizeGen)
+      tickSize <- Gen.option(tickSizeGen)
     } yield WsOrderBookSettings(restrictions, tickSize)
   }
 
-  private val lastTradeGen: Gen[WsLastTrade] = for {
-    price     <- Gen.chooseNum(1, Long.MaxValue)
-    amount    <- Gen.chooseNum(1, Long.MaxValue)
-    orderType <- orderTypeGenerator
-  } yield
-    WsLastTrade(
+  private val lastTradeGen: Gen[WsLastTrade] =
+    for {
+      price <- Gen.chooseNum(1, Long.MaxValue)
+      amount <- Gen.chooseNum(1, Long.MaxValue)
+      orderType <- orderTypeGenerator
+    } yield WsLastTrade(
       price = Denormalization.denormalizePrice(price, 8, 2).toDouble,
       amount = Denormalization.denormalizeAmountAndFee(amount, 8).toDouble,
       orderType
     )
 
   private val wsOrderBookChangesGen: Gen[WsOrderBookChanges] = for {
-    assetPair         <- assetPairGen
-    asks              <- wsSide(askPricesGen)
-    bids              <- wsSide(bidPricesGen)
-    lastTrade         <- Gen.oneOf[Option[WsLastTrade]](None, lastTradeGen.map(Option(_)))
-    updateId          <- Gen.choose(0L, Long.MaxValue)
-    ts                <- Gen.choose(0L, Long.MaxValue)
+    assetPair <- assetPairGen
+    asks <- wsSide(askPricesGen, OrderBook.asksDenormalizedOrdering)
+    bids <- wsSide(bidPricesGen, OrderBook.bidsDenormalizedOrdering)
+    lastTrade <- Gen.oneOf[Option[WsLastTrade]](None, lastTradeGen.map(Option(_)))
+    updateId <- Gen.choose(0L, Long.MaxValue)
+    ts <- Gen.choose(0L, Long.MaxValue)
     orderBookSettings <- Gen.option(orderBookSettingsGen)
   } yield protocol.WsOrderBookChanges(assetPair, asks, bids, lastTrade, updateId, orderBookSettings, ts)
 
-  private def wsSide(pricesGen: Gen[Long]): Gen[WsSide] = {
+  private def wsSide(pricesGen: Gen[Long], ordering: Ordering[Double]): Gen[WsSide] = {
     val itemGen = Gen.zip(pricesGen, amountGen)
     Gen.listOf(itemGen).map { xs =>
       TreeMap(xs.map {
         case (price, amount) =>
           Denormalization.denormalizePrice(price, amountDecimals, priceDecimals).toDouble ->
             Denormalization.denormalizeAmountAndFee(amount, amountDecimals).toDouble
-      }: _*)
+      }: _*)(ordering)
     }
   }
 
   private val wsRatesUpdateGen: Gen[WsRatesUpdates] = for {
-    timestamp  <- Gen.choose(0L, Long.MaxValue)
-    updateId   <- Gen.choose(0L, Long.MaxValue)
+    timestamp <- Gen.choose(0L, Long.MaxValue)
+    updateId <- Gen.choose(0L, Long.MaxValue)
     ratesCount <- Gen.choose(1, 5)
-    assets     <- Gen.listOfN(ratesCount, assetGen)
-    rates      <- Gen.listOfN(ratesCount, Gen.frequency((4, Gen.choose(0.05D, 100500D)), (1, Gen.const(-1D))))
+    assets <- Gen.listOfN(ratesCount, assetGen)
+    rates <- Gen.listOfN(ratesCount, Gen.frequency((4, Gen.choose(0.05d, 100500d)), (1, Gen.const(-1d))))
   } yield WsRatesUpdates(assets.zip(rates).toMap, updateId, timestamp)
 
   private def serdeTest[T <: Product with Serializable: Diff](gen: Gen[T])(implicit format: Format[T]): Unit = forAll(gen) { original =>

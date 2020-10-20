@@ -4,7 +4,6 @@ import java.net.InetSocketAddress
 import java.nio.charset.StandardCharsets
 import java.nio.file._
 
-import cats.Id
 import com.dimafeng.testcontainers.GenericContainer
 import com.github.dockerjava.api.async.ResultCallback
 import com.github.dockerjava.api.command.InspectContainerResponse
@@ -12,12 +11,10 @@ import com.github.dockerjava.api.exception.{NotFoundException, NotModifiedExcept
 import com.github.dockerjava.api.model.{ContainerNetwork, ExposedPort, Frame, Ports}
 import com.typesafe.config.Config
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.it.api.HasWaitReady
 import com.wavesplatform.dex.it.cache.CachedData
 import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
 import org.testcontainers.images.builder.Transferable
 
-import scala.concurrent.Future
 import scala.jdk.CollectionConverters._
 import scala.util.control.NonFatal
 
@@ -31,8 +28,7 @@ abstract class BaseContainer(protected val baseContainerPath: String, private va
 
   protected val cachedRestApiAddress: CachedData[InetSocketAddress]
 
-  def api: HasWaitReady[Id]
-  def asyncApi: HasWaitReady[Future]
+  def waitReady(): Unit
 
   protected def getExternalAddress(internalPort: Int): InetSocketAddress = {
 
@@ -68,39 +64,36 @@ abstract class BaseContainer(protected val baseContainerPath: String, private va
 
   def replaceSuiteConfig(newSuiteConfig: Config): Unit = underlying.configure { c =>
     val containerPath = Paths.get(baseContainerPath, "suite.conf").toString
-    val content       = newSuiteConfig.rendered
+    val content = newSuiteConfig.rendered
     log.trace(s"$prefix Write to '$containerPath':\n$content")
     c.copyFileToContainer(Transferable.of(content.getBytes(StandardCharsets.UTF_8)), containerPath)
   }
 
   def getState(): InspectContainerResponse#ContainerState = dockerClient.inspectContainerCmd(underlying.containerId).exec().getState
 
-  def printDebugMessage(text: String): Unit = {
-    try {
-      if (Option(underlying.containerId).exists(dockerClient.inspectContainerCmd(_).exec().getState.getRunning)) {
+  def printDebugMessage(text: String): Unit =
+    try if (Option(underlying.containerId).exists(dockerClient.inspectContainerCmd(_).exec().getState.getRunning)) {
 
-        val escaped = text.replace('\'', '\"')
+      val escaped = text.replace('\'', '\"')
 
-        val execCmd =
-          dockerClient
-            .execCreateCmd(underlying.containerId)
-            .withCmd(
-              "/bin/sh",
-              "-c",
-              s"""/bin/echo '$escaped' >> $$BRIEF_LOG_PATH; /bin/echo '$escaped' >> $$DETAILED_LOG_PATH"""
-            )
+      val execCmd =
+        dockerClient
+          .execCreateCmd(underlying.containerId)
+          .withCmd(
+            "/bin/sh",
+            "-c",
+            s"""/bin/echo '$escaped' >> $$BRIEF_LOG_PATH; /bin/echo '$escaped' >> $$DETAILED_LOG_PATH"""
+          )
 
-        val execCmdId = execCmd.exec().getId
+      val execCmdId = execCmd.exec().getId
 
-        try dockerClient.execStartCmd(execCmdId).exec(new ResultCallback.Adapter[Frame])
-        catch {
-          case NonFatal(_) => /* ignore */
-        } finally execCmd.close()
-      }
+      try dockerClient.execStartCmd(execCmdId).exec(new ResultCallback.Adapter[Frame])
+      catch {
+        case NonFatal(_) => /* ignore */
+      } finally execCmd.close()
     } catch {
       case _: NotFoundException =>
     }
-  }
 
   def stopWithoutRemove(): Unit = {
     printState()
@@ -118,7 +111,7 @@ abstract class BaseContainer(protected val baseContainerPath: String, private va
         .fold(log.warn(s"Can't stop ${underlying.containerId}"))(_ => ())
     } catch {
       case e: NotModifiedException => log.warn(s"$prefix Can't stop", e)
-      case e: Throwable            => throw e
+      case e: Throwable => throw e
     }
   }
 
@@ -150,16 +143,17 @@ abstract class BaseContainer(protected val baseContainerPath: String, private va
       .withContainerNetwork(
         new ContainerNetwork()
           .withIpamConfig(new ContainerNetwork.Ipam().withIpv4Address(internalIp))
-          .withAliases(underlying.networkAliases.asJava))
+          .withAliases(underlying.networkAliases.asJava)
+      )
       .exec()
 
-    api.waitReady
+    waitReady()
   }
 
   override def start(): Unit = {
-    Option(underlying.containerId).fold { super.start() }(_ => sendStartCmd())
+    Option(underlying.containerId).fold(super.start())(_ => sendStartCmd())
     invalidateCaches()
-    api.waitReady
+    waitReady()
   }
 
   def restart(): Unit = {
@@ -171,4 +165,5 @@ abstract class BaseContainer(protected val baseContainerPath: String, private va
     replaceSuiteConfig(newSuiteConfig)
     restart()
   }
+
 }

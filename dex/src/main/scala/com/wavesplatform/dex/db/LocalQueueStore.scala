@@ -6,20 +6,20 @@ import java.util.concurrent.atomic.AtomicLong
 import com.google.common.primitives.{Longs, Shorts}
 import com.wavesplatform.dex.db.DbKeys._
 import com.wavesplatform.dex.db.leveldb.{DBExt, ReadOnlyDB}
-import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
+import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import org.iq80.leveldb.{DB, ReadOptions}
 
 class LocalQueueStore(db: DB) {
 
-  private val newestIdx        = new AtomicLong(db.get(lqNewestIdx))
-  private val inMemQueue       = new ConcurrentLinkedQueue[QueueEventWithMeta]
-  private var startInMemOffset = Option.empty[QueueEventWithMeta.Offset]
+  private val newestIdx = new AtomicLong(db.get(lqNewestIdx))
+  private val inMemQueue = new ConcurrentLinkedQueue[ValidatedCommandWithMeta]
+  private var startInMemOffset = Option.empty[ValidatedCommandWithMeta.Offset]
 
-  def enqueue(event: QueueEvent, timestamp: Long): QueueEventWithMeta.Offset = {
-    val offset   = newestIdx.incrementAndGet()
+  def enqueue(command: ValidatedCommand, timestamp: Long): ValidatedCommandWithMeta.Offset = {
+    val offset = newestIdx.incrementAndGet()
     val eventKey = lpqElement(offset)
 
-    val x = QueueEventWithMeta(offset, timestamp, event)
+    val x = ValidatedCommandWithMeta(offset, timestamp, command)
     db.readWrite { rw =>
       rw.put(eventKey, Some(x))
       rw.put(lqNewestIdx, offset)
@@ -30,11 +30,11 @@ class LocalQueueStore(db: DB) {
     offset
   }
 
-  def getFrom(offset: QueueEventWithMeta.Offset, maxElements: Int): Vector[QueueEventWithMeta] = {
-    if (startInMemOffset.exists(_ <= offset)) {
+  def getFrom(offset: ValidatedCommandWithMeta.Offset, maxElements: Int): Vector[ValidatedCommandWithMeta] =
+    if (startInMemOffset.exists(_ <= offset))
       if (inMemQueue.isEmpty) Vector.empty
       else {
-        val xs    = Vector.newBuilder[QueueEventWithMeta]
+        val xs = Vector.newBuilder[ValidatedCommandWithMeta]
         var added = 0
 
         while (!inMemQueue.isEmpty && added < maxElements) Option(inMemQueue.poll()).foreach { x =>
@@ -44,28 +44,27 @@ class LocalQueueStore(db: DB) {
 
         xs.result()
       }
-    } else
+    else
       new ReadOnlyDB(db, new ReadOptions())
         .read(LqElementKeyName, LqElementPrefixBytes, lpqElement(math.max(offset, 0)).keyBytes, Int.MaxValue) { e =>
           val offset = Longs.fromByteArray(e.getKey.slice(Shorts.BYTES, Shorts.BYTES + Longs.BYTES))
           lpqElement(offset).parse(e.getValue).getOrElse(throw new RuntimeException(s"Can't find a queue event at $offset"))
         }
-  }
 
-  def oldestOffset: Option[QueueEventWithMeta.Offset] =
+  def oldestOffset: Option[ValidatedCommandWithMeta.Offset] =
     new ReadOnlyDB(db, new ReadOptions())
       .read(LqElementKeyName, LqElementPrefixBytes, lpqElement(0).keyBytes, 1) { e =>
         Longs.fromByteArray(e.getKey.slice(Shorts.BYTES, Shorts.BYTES + Longs.BYTES))
       }
       .headOption
 
-  def newestOffset: Option[QueueEventWithMeta.Offset] = {
-    val idx      = newestIdx.get()
+  def newestOffset: Option[ValidatedCommandWithMeta.Offset] = {
+    val idx = newestIdx.get()
     val eventKey = lpqElement(idx)
     eventKey.parse(db.get(eventKey.keyBytes)).map(_.offset)
   }
 
-  def dropUntil(offset: QueueEventWithMeta.Offset): Unit = db.readWrite { rw =>
+  def dropUntil(offset: ValidatedCommandWithMeta.Offset): Unit = db.readWrite { rw =>
     val oldestIdx = math.max(db.get(lqOldestIdx), 0)
     (oldestIdx until offset).foreach { offset =>
       rw.delete(lpqElement(offset))

@@ -20,7 +20,7 @@ object RateDB {
 
   def apply(db: DB): RateDB = new RateDB {
 
-    def upsertRate(asset: IssuedAsset, value: Double): Unit = db.readWrite { _.put(DbKeys.rate(asset), value) }
+    def upsertRate(asset: IssuedAsset, value: Double): Unit = db.readWrite(_.put(DbKeys.rate(asset), value))
 
     def getAllRates: Map[IssuedAsset, Double] = {
 
@@ -35,6 +35,7 @@ object RateDB {
       ratesListBuffer.toMap
     }
 
-    def deleteRate(asset: IssuedAsset): Unit = db.readWrite { _.delete(DbKeys.rate(asset)) }
+    def deleteRate(asset: IssuedAsset): Unit = db.readWrite(_.delete(DbKeys.rate(asset)))
   }
+
 }

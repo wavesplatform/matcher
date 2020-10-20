@@ -10,4 +10,5 @@ object RunApplicationSettings extends AutoPlugin {
       run / fork := true
     )
   )
+
 }

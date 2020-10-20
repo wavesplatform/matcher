@@ -23,10 +23,10 @@ class OrderFeeSettingsCacheSpecification extends AnyWordSpecLike with Matchers w
 
       val settingsMap =
         Map(
-          -1L   -> DynamicSettings.symmetric(0.003.waves),
-          2L    -> DynamicSettings(0.001.waves, 0.005.waves),
-          15L   -> DynamicSettings(0.002.waves, 0.004.waves),
-          1000L -> PercentSettings(AssetType.AMOUNT, 0.005)
+          -1L -> DynamicSettings.symmetric(0.003.waves),
+          2L -> DynamicSettings(0.001.waves, 0.005.waves),
+          15L -> DynamicSettings(0.002.waves, 0.004.waves),
+          1000L -> PercentSettings(AssetType.Amount, 0.005)
         )
 
       val ofsc = new OrderFeeSettingsCache(settingsMap)
@@ -40,7 +40,7 @@ class OrderFeeSettingsCacheSpecification extends AnyWordSpecLike with Matchers w
       check(offset = 0L, current = DynamicSettings(0.003.waves, 0.003.waves), actual = DynamicSettings(0.003.waves, 0.003.waves))
       check(offset = 17L, current = DynamicSettings(0.002.waves, 0.004.waves), actual = DynamicSettings(0.002.waves, 0.004.waves))
       check(offset = 100L, current = DynamicSettings(0.002.waves, 0.004.waves), actual = DynamicSettings(0.002.waves, 0.004.waves))
-      check(offset = 999L, current = DynamicSettings(0.002.waves, 0.004.waves), actual = PercentSettings(AssetType.AMOUNT, 0.005))
+      check(offset = 999L, current = DynamicSettings(0.002.waves, 0.004.waves), actual = PercentSettings(AssetType.Amount, 0.005))
     }
   }
 }

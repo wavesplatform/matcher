@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.domain.account
 
-import com.wavesplatform.dex.domain.bytes.{ByteStr, deser}
+import com.wavesplatform.dex.domain.bytes.{deser, ByteStr}
 import com.wavesplatform.dex.domain.error.ValidationError
 import com.wavesplatform.dex.domain.error.ValidationError._
 
@@ -13,7 +13,7 @@ trait AddressOrAlias {
 
   override def equals(obj: Any): Boolean = obj match {
     case a: AddressOrAlias => bytes == a.bytes
-    case _                 => false
+    case _ => false
   }
 
   override def hashCode(): Int = java.util.Arrays.hashCode(bytes.arr)
@@ -23,7 +23,7 @@ object AddressOrAlias {
 
   def fromBytes(bytes: Array[Byte], position: Int): Either[ValidationError, (AddressOrAlias, Int)] = bytes(position) match {
     case Address.AddressVersion =>
-      val addressEnd   = position + Address.AddressLength
+      val addressEnd = position + Address.AddressLength
       val addressBytes = bytes.slice(position, addressEnd)
       Address.fromBytes(addressBytes).map((_, addressEnd))
     case Alias.AddressVersion =>
@@ -32,8 +32,8 @@ object AddressOrAlias {
     case _ => Left(InvalidAddress("Unknown address/alias version"))
   }
 
-  def fromString(s: String): Either[ValidationError, AddressOrAlias] = {
+  def fromString(s: String): Either[ValidationError, AddressOrAlias] =
     if (s.startsWith(Alias.Prefix)) Alias.fromString(s)
     else Address.fromString(s)
-  }
+
 }

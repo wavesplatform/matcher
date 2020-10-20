@@ -26,6 +26,7 @@ trait InformativeTestStart extends Suite { self: BaseContainersKit =>
 
   protected def writeGlobalLog(x: String): Unit = {
     log.debug(x)
-    knownContainers.get().foreach { _.printDebugMessage(x) }
+    knownContainers.get().foreach(_.printDebugMessage(x))
   }
+
 }

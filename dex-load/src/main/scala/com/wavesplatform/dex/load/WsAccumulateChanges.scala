@@ -15,8 +15,8 @@ object WsAccumulateChanges {
       val fields = accountLine.split(';')
 
       val addr = fields(0)
-      val aus  = fields(1)
-      val obs  = fields.drop(2).toSeq
+      val aus = fields(1)
+      val obs = fields.drop(2).toSeq
 
       new WsCollectChangesClient(apiUri, addr, aus, obs)
     }
@@ -25,7 +25,7 @@ object WsAccumulateChanges {
     val source = Source.fromFile(feederFile)
     try {
       val lines = source.getLines()
-      val r     = lines.take(accountsNumber).toArray
+      val r = lines.take(accountsNumber).toArray
       lines.foreach { line =>
         // 30%
         if (Random.nextDouble() < 0.3) r.update(Random.nextInt(accountsNumber), line)
@@ -33,4 +33,5 @@ object WsAccumulateChanges {
       r.toSeq
     } finally source.close()
   }
+
 }

@@ -10,26 +10,29 @@ import com.wavesplatform.dex.model.Events.OrderCancelFailed
 
 import scala.collection.mutable
 
-class AddressDirectoryActor(orderDB: OrderDB, addressActorProps: (Address, Boolean) => Props, historyRouter: Option[ActorRef])
-    extends Actor
+class AddressDirectoryActor(
+  orderDB: OrderDB,
+  mkAddressActorProps: (Address, Boolean) => Props,
+  historyRouterRef: Option[ActorRef],
+  var started: Boolean = false
+) extends Actor
     with ScorexLogging {
 
   import AddressDirectoryActor._
   import context._
 
-  private var startSchedules: Boolean = false
-  private[this] val children          = mutable.AnyRefMap.empty[Address, ActorRef]
+  private[this] val children = mutable.AnyRefMap.empty[Address, ActorRef]
 
   override def supervisorStrategy: SupervisorStrategy = SupervisorStrategy.stoppingStrategy
 
   private def createAddressActor(address: Address): ActorRef = {
     log.debug(s"Creating address actor for $address")
-    watch(actorOf(addressActorProps(address, startSchedules), address.toString))
+    watch(actorOf(mkAddressActorProps(address, started), address.toString))
   }
 
   private def forward(address: Address, msg: Any): Unit = (children get address, msg) match {
     case (None, _: AddressActor.Message.BalanceChanged) =>
-    case _                                              => children.getOrElseUpdate(address, createAddressActor(address)) forward msg
+    case _ => children.getOrElseUpdate(address, createAddressActor(address)) forward msg
   }
 
   override def receive: Receive = {
@@ -37,39 +40,47 @@ class AddressDirectoryActor(orderDB: OrderDB, addressActorProps: (Address, Boole
 
     case e @ Events.OrderAdded(lo, _, timestamp) =>
       forward(lo.order.sender, e)
-      historyRouter foreach { _ ! HistoryInsertMsg.SaveOrder(lo, timestamp) }
+      historyRouterRef foreach { _ ! HistoryInsertMsg.SaveOrder(lo, timestamp) }
 
     case e: Events.OrderExecuted =>
-      import e.{counter, submitted}
-      forward(submitted.order.sender, e)
-      if (counter.order.sender != submitted.order.sender) forward(counter.order.sender, e)
-      historyRouter foreach { _ ! HistoryInsertMsg.SaveEvent(e) }
+      Set(e.counter.order, e.submitted.order).map(_.sender).foreach(forward(_, e))
+      historyRouterRef foreach { _ ! HistoryInsertMsg.SaveEvent(e) }
 
     case e: Events.OrderCanceled =>
       forward(e.acceptedOrder.order.sender, e)
-      historyRouter foreach { _ ! HistoryInsertMsg.SaveEvent(e) }
+      historyRouterRef foreach { _ ! HistoryInsertMsg.SaveEvent(e) }
 
     case e: OrderCancelFailed =>
       orderDB.get(e.id) match {
         case Some(order) => forward(order.sender.toAddress, e)
-        case None        => log.warn(s"The order '${e.id}' not found")
+        case None => log.warn(s"The order '${e.id}' not found")
       }
 
-    case StartSchedules =>
-      if (!startSchedules) {
-        startSchedules = true
-        context.children.foreach(_ ! StartSchedules)
-      }
+    case StartWork =>
+      started = true
+      context.children.foreach(_ ! StartWork)
 
     case Terminated(child) =>
       val addressString = child.path.name
-      val address       = Address.fromString(addressString).explicitGet()
+      val address = Address.fromString(addressString).explicitGet()
       children.remove(address)
       log.warn(s"Address handler for $addressString terminated")
   }
+
 }
 
 object AddressDirectoryActor {
+  val name = "addresses"
+
+  def props(orderDB: OrderDB, mkAddressActorProps: (Address, Boolean) => Props, historyRouterRef: Option[ActorRef]): Props = Props(
+    new AddressDirectoryActor(
+      orderDB,
+      mkAddressActorProps,
+      historyRouterRef,
+      false
+    )
+  )
+
   case class Envelope(address: Address, cmd: AddressActor.Message)
-  case object StartSchedules
+  case object StartWork
 }

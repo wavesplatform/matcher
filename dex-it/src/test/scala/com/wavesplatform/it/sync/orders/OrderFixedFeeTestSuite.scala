@@ -11,9 +11,10 @@ import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 
 class OrderFixedFeeTestSuite extends OrderFeeBaseTestSuite {
   private val minMatcherFee = 200000L
-  private val priceFixed    = 100000000L
+  private val priceFixed = 100000000L
 
   private val IssueResults(issueAliceAssetTx, _, aliceAsset) = mkIssueExtended(alice, "AliceCoin", quantity = 9999999999999L, decimals = 0)
+
   private val IssueResults(issueAliceScriptedAssetTx, _, aliceScriptedAsset) =
     mkIssueExtended(alice, "AliceSmartAsset", quantity = 9999999999999L, decimals = 0, fee = smartIssueFee, script = Some(Scripts.alwaysTrue))
 
@@ -26,15 +27,15 @@ class OrderFixedFeeTestSuite extends OrderFeeBaseTestSuite {
     "when has some asset as fixed fee in config and orders placed" - {
       "should accept orders if orders' matcherFeeAsset equal to specified in config" - {
         List(
-          "regular asset"  -> aliceAsset,
+          "regular asset" -> aliceAsset,
           "scripted asset" -> aliceScriptedAsset
         ).foreach {
           case (title, asset) =>
             s"$title" in {
-              val pair        = AssetPair(asset, Waves)
+              val pair = AssetPair(asset, Waves)
               val orderAmount = 1
 
-              dex1.restartWithNewSuiteConfig { configWithOrderFeeFixed(asset) }
+              dex1.restartWithNewSuiteConfig(configWithOrderFeeFixed(asset))
               broadcastAndAwait(mkTransfer(alice, bob, wavesNode1.api.balance(alice, asset) / 2, asset, feeAmount = minFee + smartFee))
 
               val aliceAssetBalanceBefore = wavesNode1.api.balance(alice, asset)
@@ -72,29 +73,41 @@ class OrderFixedFeeTestSuite extends OrderFeeBaseTestSuite {
       }
 
       "should accept orders if sender received amount > than fee amount" in {
-        dex1.restartWithNewSuiteConfig { configWithOrderFeeFixed(aliceAsset) }
+        dex1.restartWithNewSuiteConfig(configWithOrderFeeFixed(aliceAsset))
         broadcastAndAwait(mkTransfer(bob, alice, minMatcherFee, aliceAsset))
         val pair = AssetPair(aliceAsset, Waves)
-        placeAndAwaitAtDex(mkOrder(bob, pair, OrderType.BUY, amount = minMatcherFee, priceFixed, matcherFee = minMatcherFee, feeAsset = aliceAsset))
+        placeAndAwaitAtDex(mkOrder(
+          bob,
+          pair,
+          OrderType.BUY,
+          amount = minMatcherFee,
+          priceFixed,
+          matcherFee = minMatcherFee,
+          feeAsset = aliceAsset
+        ))
       }
 
       "should reject orders if orders' matcherFeeAsset not equal to specified in config" in {
         val pair = AssetPair(aliceAsset, Waves)
-        dex1.api.tryPlace(mkOrder(alice, pair, OrderType.BUY, 1, priceFixed)) shouldBe Symbol("left")
-        dex1.api.tryPlace(mkOrder(bob, pair, OrderType.SELL, 1, priceFixed)) shouldBe Symbol("left")
+        dex1.tryApi.place(mkOrder(alice, pair, OrderType.BUY, 1, priceFixed)) shouldBe Symbol("left")
+        dex1.tryApi.place(mkOrder(bob, pair, OrderType.SELL, 1, priceFixed)) shouldBe Symbol("left")
       }
 
       "should reject orders if orders' matcherFee less than specified minFee in config" in {
-        val amount                 = 1
-        val pair                   = AssetPair(aliceAsset, Waves)
+        val amount = 1
+        val pair = AssetPair(aliceAsset, Waves)
         val insufficientMatcherFee = minMatcherFee - 1
 
-        dex1.api.tryPlace(mkOrder(alice, pair, OrderType.BUY, amount, priceFixed, matcherFee = insufficientMatcherFee, feeAsset = aliceAsset)) should failWith(
+        dex1.tryApi.place(
+          mkOrder(alice, pair, OrderType.BUY, amount, priceFixed, matcherFee = insufficientMatcherFee, feeAsset = aliceAsset)
+        ) should failWith(
           9441542, // FeeNotEnough
           s"Required $minMatcherFee ${aliceAsset.toString}"
         )
 
-        dex1.api.tryPlace(mkOrder(bob, pair, OrderType.SELL, amount, priceFixed, matcherFee = insufficientMatcherFee, feeAsset = aliceAsset)) should failWith(
+        dex1.tryApi.place(
+          mkOrder(bob, pair, OrderType.SELL, amount, priceFixed, matcherFee = insufficientMatcherFee, feeAsset = aliceAsset)
+        ) should failWith(
           9441542, // FeeNotEnough
           s"Required $minMatcherFee ${aliceAsset.toString}"
         )
@@ -102,7 +115,7 @@ class OrderFixedFeeTestSuite extends OrderFeeBaseTestSuite {
     }
   }
 
-  private def configWithOrderFeeFixed(matcherFeeAsset: Asset): Config = {
+  private def configWithOrderFeeFixed(matcherFeeAsset: Asset): Config =
     parseString(s"""waves.dex {
                    | allowed-order-versions = [1, 2, 3]
                    |  order-fee.-1 {
@@ -113,5 +126,5 @@ class OrderFixedFeeTestSuite extends OrderFeeBaseTestSuite {
                    |   }
                    |  }
                    |}""".stripMargin)
-  }
+
 }

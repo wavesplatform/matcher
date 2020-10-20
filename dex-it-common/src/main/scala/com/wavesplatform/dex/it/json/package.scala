@@ -1,17 +1,14 @@
 package com.wavesplatform.dex.it
 
-import com.wavesplatform.dex.domain.account.AddressScheme
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
-import im.mak.waves.transactions.{ExchangeTransaction, Transaction, WavesConfig}
+import im.mak.waves.transactions.{ExchangeTransaction, Transaction}
 import play.api.libs.json._
 
 import scala.util.{Failure, Success, Try}
 
 package object json {
-
-  WavesConfig.chainId(AddressScheme.current.chainId)
 
   implicit val transactionFormat: Format[Transaction] = Format[Transaction](
     Reads { json =>
@@ -60,11 +57,12 @@ package object json {
           val assetPair = (
             assetPairStrArr match {
               case Array(amtAssetStr, prcAssetStr) => AssetPair.createAssetPair(amtAssetStr, prcAssetStr)
-              case _                               => throw new Exception(s"$assetPairStr (incorrect assets count, expected 2 but got ${assetPairStrArr.size})")
+              case _ => throw new Exception(s"$assetPairStr (incorrect assets count, expected 2 but got ${assetPairStrArr.size})")
             }
           ).fold(ex => throw new Exception(s"$assetPairStr (${ex.getMessage})"), identity)
           assetPair -> offset
       }
     }
   }
+
 }

@@ -7,7 +7,7 @@ import cats.syntax.apply.catsSyntaxTuple2Semigroupal
 import com.wavesplatform.dex.db.leveldb.{DBExt, Key}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.model.OrderBookSnapshot
-import com.wavesplatform.dex.queue.QueueEventWithMeta.Offset
+import com.wavesplatform.dex.queue.ValidatedCommandWithMeta.Offset
 import org.iq80.leveldb.DB
 
 trait OrderBookSnapshotDB {
@@ -17,7 +17,9 @@ trait OrderBookSnapshotDB {
 }
 
 object OrderBookSnapshotDB {
+
   def apply(db: DB): OrderBookSnapshotDB = new OrderBookSnapshotDB {
+
     override def get(assetPair: AssetPair): Option[(Offset, OrderBookSnapshot)] = db.readOnly { ro =>
       val (obOffsetKey, obKey) = keys(assetPair)
       (ro.get(obOffsetKey), ro.get(obKey)).tupled
@@ -37,6 +39,7 @@ object OrderBookSnapshotDB {
 
     private def keys(assetPair: AssetPair): (Key[Option[Offset]], Key[Option[OrderBookSnapshot]]) =
       (DbKeys.orderBookSnapshotOffset(assetPair), DbKeys.orderBookSnapshot(assetPair))
+
   }
 
   def inMem: OrderBookSnapshotDB = new OrderBookSnapshotDB {
@@ -49,4 +52,5 @@ object OrderBookSnapshotDB {
 
     override def delete(assetPair: AssetPair): Unit = snapshots.remove(assetPair)
   }
+
 }

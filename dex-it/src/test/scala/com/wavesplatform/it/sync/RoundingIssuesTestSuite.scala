@@ -11,7 +11,8 @@ import im.mak.waves.transactions.ExchangeTransaction
 
 class RoundingIssuesTestSuite extends MatcherSuiteBase {
 
-  override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "$BtcId", "WAVES" ]""")
+  override protected def dexInitialSuiteConfig: Config =
+    ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "$BtcId", "WAVES" ]""")
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
@@ -21,7 +22,7 @@ class RoundingIssuesTestSuite extends MatcherSuiteBase {
 
   "should correctly fill an order with small amount" in {
     val aliceBalanceBefore = wavesNode1.api.balance(alice, Waves)
-    val bobBalanceBefore   = wavesNode1.api.balance(bob, Waves)
+    val bobBalanceBefore = wavesNode1.api.balance(bob, Waves)
 
     val counter = mkOrder(alice, wavesUsdPair, OrderType.BUY, 3100000000L, 238)
     dex1.api.place(counter)
@@ -29,7 +30,7 @@ class RoundingIssuesTestSuite extends MatcherSuiteBase {
     val submitted = mkOrder(bob, wavesUsdPair, OrderType.SELL, 425532L, 235)
     dex1.api.place(submitted)
 
-    val filledAmount             = 420169L
+    val filledAmount = 420169L
     val totalExecutedPriceAssets = 1L // = 420169 * 238 / 10^8
 
     dex1.api.waitForOrder(submitted)(_ == HttpOrderStatus(Status.Filled, filledAmount.some, 296219L.some))
@@ -43,11 +44,10 @@ class RoundingIssuesTestSuite extends MatcherSuiteBase {
     val tx = waitForOrderAtNode(counter)
     dex1.api.cancel(alice, counter)
 
-    val exchangeTx =
-      wavesNode1.api.transactionInfo(tx.head.id()).getOrElse(throw new RuntimeException(s"Can't find tx with id = '${tx.head.id()}'")) match {
-        case r: ExchangeTransaction => r
-        case x                      => throw new RuntimeException(s"Expected ExchangeTransaction, but got $x")
-      }
+    val exchangeTx = wavesNode1.api.transactionInfo(tx.head.id()) match {
+      case r: ExchangeTransaction => r
+      case x => throw new RuntimeException(s"Expected ExchangeTransaction, but got $x")
+    }
 
     exchangeTx.price() shouldBe counter.price
     exchangeTx.amount() shouldBe filledAmount
@@ -55,7 +55,7 @@ class RoundingIssuesTestSuite extends MatcherSuiteBase {
     exchangeTx.sellMatcherFee() shouldBe 296219L
 
     val aliceBalanceAfter = wavesNode1.api.balance(alice, Waves)
-    val bobBalanceAfter   = wavesNode1.api.balance(bob, Waves)
+    val bobBalanceAfter = wavesNode1.api.balance(bob, Waves)
 
     (aliceBalanceAfter - aliceBalanceBefore) shouldBe (-40L + 420169L)
     (bobBalanceAfter - bobBalanceBefore) shouldBe (-296219L - 420169L)

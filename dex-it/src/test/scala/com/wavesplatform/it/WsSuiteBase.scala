@@ -3,6 +3,7 @@ package com.wavesplatform.it
 import cats.syntax.either._
 import com.softwaremill.diffx.{Derived, Diff}
 import com.wavesplatform.dex.api.ws.connection.WsConnection
+import com.wavesplatform.dex.api.ws.connection.WsConnection.WsRawMessage
 import com.wavesplatform.dex.api.ws.entities.WsFullOrder
 import com.wavesplatform.dex.api.ws.protocol.{WsError, WsPingOrPong, WsServerMessage}
 import com.wavesplatform.dex.it.api.websockets.HasWebSockets
@@ -12,16 +13,26 @@ import scala.reflect.ClassTag
 
 trait WsSuiteBase extends MatcherSuiteBase with HasWebSockets {
 
-  protected implicit val wsErrorDiff: Diff[WsError] = Derived[Diff[WsError]].ignore[WsError, Long](_.timestamp)
+  implicit protected val wsErrorDiff: Diff[WsError] = Derived[Diff[WsError]].ignore[WsError, Long](_.timestamp)
 
-  protected implicit val wsCompleteOrderDiff: Diff[WsFullOrder] =
+  implicit protected val wsCompleteOrderDiff: Diff[WsFullOrder] =
     Derived[Diff[WsFullOrder]].ignore[WsFullOrder, Long](_.timestamp).ignore[WsFullOrder, Long](_.eventTimestamp)
 
-  final implicit class WsConnectionOps(val self: WsConnection) {
+  implicit final class WsConnectionOps(val self: WsConnection) {
 
     def receiveAtLeastN[T <: WsServerMessage: ClassTag](n: Int): List[T] = {
       val r = eventually {
         val xs = self.collectMessages[T]
+        xs.size should be >= n
+        xs
+      }
+      Thread.sleep(200) // Waiting for additional messages
+      r
+    }
+
+    def receiveAtLeastNRaw(n: Int): List[WsRawMessage] = {
+      val r = eventually {
+        val xs = self.rawMessages
         xs.size should be >= n
         xs
       }
@@ -35,11 +46,11 @@ trait WsSuiteBase extends MatcherSuiteBase with HasWebSockets {
           .collectMessages[WsServerMessage]
           .filter {
             case _: WsPingOrPong => true
-            case _: WsError      => true
-            case _               => false
+            case _: WsError => true
+            case _ => false
           }
           .partitionMap {
-            case x: WsError      => x.asLeft
+            case x: WsError => x.asLeft
             case x: WsPingOrPong => x.asRight
           }
 
@@ -59,5 +70,7 @@ trait WsSuiteBase extends MatcherSuiteBase with HasWebSockets {
       Thread.sleep(duration.toMillis)
       self.collectMessages[T].size shouldBe sizeBefore
     }
+
   }
+
 }

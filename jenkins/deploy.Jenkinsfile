@@ -29,6 +29,9 @@ pipeline {
         stage('Checkout') {
             steps {
                 cleanWs()
+                script {
+                    currentBuild.displayName = "${params.BRANCH_DEX}"
+                }
                 dir('matcher') {
                     checkout scm: [$class: 'GitSCM', userRemoteConfigs: [[url: 'https://github.com/wavesplatform/matcher.git', credentialsId: null]], extensions: [[$class: 'CloneOption', noTags: false, reference: '', shallow: false]], branches: [[name: "${BRANCH_DEX}"]]], poll: false
                 }

@@ -4,8 +4,8 @@ import java.io.File
 
 import akka.actor.ActorSystem
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.dex.queue.KafkaMatcherQueue.eventDeserializer
-import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
+import com.wavesplatform.dex.queue.KafkaMatcherQueue.validatedCommandDeserializer
+import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import com.wavesplatform.dex.settings.toConfigOps
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.common.TopicPartition
@@ -18,9 +18,9 @@ object KafkaTopicInfo extends App {
   implicit val system: ActorSystem = ActorSystem()
 
   val configFile = new File(args(0))
-  val topic      = args(1)
-  val from       = args(2).toLong
-  val max        = args(3).toInt
+  val topic = args(1)
+  val from = args(2).toLong
+  val max = args(3).toInt
 
   println(s"""configFile: ${configFile.getAbsolutePath}
              |topic: $topic
@@ -46,14 +46,14 @@ object KafkaTopicInfo extends App {
         .getConfig("waves.dex.events-queue.kafka")
     }
 
-  val consumer = new KafkaConsumer[String, QueueEvent](
+  val consumer = new KafkaConsumer[String, ValidatedCommand](
     config.getConfig("waves.dex.events-queue.kafka.consumer.client").toProperties,
     new StringDeserializer,
-    eventDeserializer
+    validatedCommandDeserializer
   )
 
   try {
-    val topicPartition  = new TopicPartition(topic, 0)
+    val topicPartition = new TopicPartition(topic, 0)
     val topicPartitions = java.util.Collections.singletonList(topicPartition)
     consumer.assign(topicPartitions)
 
@@ -70,21 +70,19 @@ object KafkaTopicInfo extends App {
     consumer.seek(topicPartition, from)
 
     val pollDuriation = java.time.Duration.ofNanos(1.seconds.toNanos)
-    val lastOffset    = from + max
-    var continue      = true
+    val lastOffset = from + max
+    var continue = true
     while (continue) {
       println(s"Reading from Kafka")
 
       val xs = consumer.poll(pollDuriation).asScala.toVector
       xs.foreach { msg =>
-        println(QueueEventWithMeta(msg.offset(), msg.timestamp(), msg.value()))
+        println(ValidatedCommandWithMeta(msg.offset(), msg.timestamp(), msg.value()))
       }
 
       xs.lastOption.foreach { x =>
         if (x.offset() == lastOffset) continue = false
       }
     }
-  } finally {
-    consumer.close()
-  }
+  } finally consumer.close()
 }

@@ -13,6 +13,7 @@ import com.wavesplatform.dex.api.http.entities._
 import com.wavesplatform.dex.api.http.headers.`X-Api-Key`
 import com.wavesplatform.dex.api.ws.actors.{WsExternalClientDirectoryActor, WsInternalBroadcastActor}
 import com.wavesplatform.dex.api.ws.routes.MatcherWebSocketRoute
+import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.effect._
@@ -23,6 +24,7 @@ import com.wavesplatform.dex.time.TestTime
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 import play.api.libs.json.{JsonFacade => _}
+import pureconfig.ConfigSource
 
 import scala.annotation.nowarn
 import scala.util.Random
@@ -31,35 +33,30 @@ class MatcherWebSocketRouteSpec extends RouteSpec("/ws/v0") with MatcherSpecBase
 
   private val testKit = ActorTestKit()
 
-  private val apiKey       = "apiKey"
+  private val apiKey = "apiKey"
   private val apiKeyHeader = RawHeader(`X-Api-Key`.headerName, apiKey)
 
-  private val settings =
-    MatcherSettings.valueReader
-      .read(ConfigFactory.load(), "waves.dex")
-      .copy(priceAssets = Seq(Waves))
+  private val settings = ConfigSource.fromConfig(ConfigFactory.load()).at("waves.dex").loadOrThrow[MatcherSettings].copy(priceAssets = Seq(Waves))
 
   routePath("/connections") - {
     "connectionsRoute" - {
       "returns connections info" in test(
-        { route =>
+        route =>
           Get(routePath("/connections")).withHeaders(apiKeyHeader) ~> route ~> check {
             status shouldEqual StatusCodes.OK
             responseAs[HttpWebSocketConnections] should matchTo(HttpWebSocketConnections(0, Map.empty))
-          }
-        },
+          },
         apiKey
       )
     }
 
     "closeConnectionsRoute" - {
       "returns a closed connections info" in test(
-        { route =>
+        route =>
           Delete(routePath("/connections"), HttpWebSocketCloseFilter(100)).withHeaders(apiKeyHeader) ~> route ~> check {
             status shouldEqual StatusCodes.OK
             responseAs[HttpMessage] should matchTo(HttpMessage("In progress"))
-          }
-        },
+          },
         apiKey
       )
     }
@@ -67,7 +64,7 @@ class MatcherWebSocketRouteSpec extends RouteSpec("/ws/v0") with MatcherSpecBase
 
   @nowarn("msg=default")
   private def test[U](f: Route => U, apiKey: String = ""): U = {
-    val time                   = new TestTime
+    val time = new TestTime
     val vsInternalBroadcastRef = testKit.createTestProbe[WsInternalBroadcastActor.Command]()
     val route =
       new MatcherWebSocketRoute(
@@ -83,10 +80,11 @@ class MatcherWebSocketRouteSpec extends RouteSpec("/ws/v0") with MatcherSpecBase
         ),
         apiKeyHash = Some(crypto secureHash apiKey),
         matcherSettings = settings,
-        matcherStatus = () => Matcher.Status.Working,
+        matcherStatus = () => MatcherStatus.Working,
         () => rateCache.getAllRates
       )
 
     f(route.route)
   }
+
 }

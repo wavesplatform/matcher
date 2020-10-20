@@ -6,11 +6,11 @@ import scala.concurrent.{ExecutionContext, Future}
 
 package object metrics {
 
-  final implicit class TimerExt(private val timer: Timer) extends AnyVal {
+  implicit final class TimerExt(private val timer: Timer) extends AnyVal {
 
     def measureWithFilter[T](f: => T)(filter: T => Boolean): T = {
       val startedTimer = timer.start()
-      val result       = f
+      val result = f
       if (filter(result)) startedTimer.stop()
       result
     }
@@ -19,9 +19,11 @@ package object metrics {
 
     def measureFuture[T](f: => Future[T])(implicit ec: ExecutionContext): Future[T] = {
       val startedTimer = timer.start()
-      val future       = f
+      val future = f
       future.onComplete(_ => startedTimer.stop())
       future
     }
+
   }
+
 }

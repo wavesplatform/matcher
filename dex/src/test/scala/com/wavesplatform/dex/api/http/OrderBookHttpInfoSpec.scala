@@ -33,14 +33,14 @@ class OrderBookHttpInfoSpec extends AnyFreeSpec with Matchers with SystemTime wi
       "should return the nearest depth cache" - {
         // Two levels: one is aggregated and one is not
 
-        val aggOrderBookRef   = system.actorOf(Props(new FakeOrderBookActor(pair)))
-        val askAdapter        = new OrderBookAskAdapter(new AtomicReference(Map(pair -> Right(aggOrderBookRef))), 5.seconds)
+        val aggOrderBookRef = system.actorOf(Props(new FakeOrderBookActor(pair)))
+        val askAdapter = new OrderBookAskAdapter(new AtomicReference(Map(pair -> Right(aggOrderBookRef))), 5.seconds)
         val orderBookHttpInfo = new OrderBookHttpInfo(OrderBookHttpInfo.Settings(List(3, 9), None), askAdapter, time, _ => Some(8))
         def get(depth: Option[Int]): HttpV0OrderBook =
           HttpV0OrderBook.fromHttpResponse(Await.result(orderBookHttpInfo.getHttpView(pair, MatcherModel.Normalized, depth), 5.seconds))
 
         val middlePrice = 1000L
-        val now         = time.getTimestamp()
+        val now = time.getTimestamp()
 
         (1 to 10).foreach { i =>
           aggOrderBookRef ! AggregatedOrderBookActor.Command.ApplyChanges(
@@ -60,10 +60,10 @@ class OrderBookHttpInfoSpec extends AnyFreeSpec with Matchers with SystemTime wi
         }
 
         Seq(
-          0  -> 3,
-          1  -> 3,
-          3  -> 3,
-          5  -> 9,
+          0 -> 3,
+          1 -> 3,
+          3 -> 3,
+          5 -> 9,
           10 -> 9
         ).foreach {
           case (depth, expectedSize) =>
@@ -89,7 +89,8 @@ class OrderBookHttpInfoSpec extends AnyFreeSpec with Matchers with SystemTime wi
             (Some(0), 1),
             (Some(1), 1),
             (Some(5), 1)
-          )) { (arg, expected) =>
+          )
+        ) { (arg, expected) =>
           settings.nearestBigger(arg) shouldBe expected
         }
       }
@@ -106,7 +107,8 @@ class OrderBookHttpInfoSpec extends AnyFreeSpec with Matchers with SystemTime wi
             (Some(7), 7),
             (Some(9), 9),
             (Some(100), 9)
-          )) { (arg, expected) =>
+          )
+        ) { (arg, expected) =>
           settings.nearestBigger(arg) shouldBe expected
         }
       }
@@ -123,7 +125,8 @@ class OrderBookHttpInfoSpec extends AnyFreeSpec with Matchers with SystemTime wi
             (Some(7), 7),
             (Some(9), 9),
             (Some(100), 9)
-          )) { (arg, expected) =>
+          )
+        ) { (arg, expected) =>
           settings.nearestBigger(arg) shouldBe expected
         }
       }
@@ -134,7 +137,9 @@ class OrderBookHttpInfoSpec extends AnyFreeSpec with Matchers with SystemTime wi
 }
 
 object OrderBookHttpInfoSpec {
+
   private class FakeOrderBookActor(pair: AssetPair) extends Actor {
+
     private val aggOrderBookRef = context.spawn(
       AggregatedOrderBookActor(
         AggregatedOrderBookActor.Settings(100.millis),
@@ -152,5 +157,7 @@ object OrderBookHttpInfoSpec {
     override def receive: Receive = {
       case x: AggregatedOrderBookActor.Message => aggOrderBookRef ! x
     }
+
   }
+
 }

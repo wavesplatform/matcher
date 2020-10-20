@@ -8,12 +8,12 @@ import scala.reflect.ClassTag
 
 trait WsConnectionOps {
 
-  final implicit class Ops(self: WsConnection) {
+  implicit final class Ops(self: WsConnection) {
     def collectMessages[T <: WsServerMessage: ClassTag]: List[T] = self.messages.collect { case x: T => x }
-    def pings: List[WsPingOrPong]                                = collectMessages[WsPingOrPong]
-    def addressStateChanges: List[WsAddressChanges]              = collectMessages[WsAddressChanges]
-    def balanceChanges: List[Map[Asset, WsBalances]]             = addressStateChanges.map(_.balances).filter(_.nonEmpty)
-    def orderChanges: List[WsOrder]                              = addressStateChanges.flatMap(_.orders)
+    def pings: List[WsPingOrPong] = collectMessages[WsPingOrPong]
+    def addressStateChanges: List[WsAddressChanges] = collectMessages[WsAddressChanges]
+    def balanceChanges: List[Map[Asset, WsBalances]] = addressStateChanges.map(_.balances).filter(_.nonEmpty)
+    def orderChanges: List[WsOrder] = addressStateChanges.flatMap(_.orders)
   }
 
 }

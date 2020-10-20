@@ -3,6 +3,7 @@ package com.wavesplatform.it
 import cats.syntax.either._
 import com.softwaremill.diffx.{Derived, Diff}
 import com.wavesplatform.dex.api.ws.connection.WsConnection
+import com.wavesplatform.dex.api.ws.connection.WsConnection.WsRawMessage
 import com.wavesplatform.dex.api.ws.entities.WsFullOrder
 import com.wavesplatform.dex.api.ws.protocol.{WsError, WsPingOrPong, WsServerMessage}
 import com.wavesplatform.dex.it.api.websockets.HasWebSockets
@@ -22,6 +23,16 @@ trait WsSuiteBase extends MatcherSuiteBase with HasWebSockets {
     def receiveAtLeastN[T <: WsServerMessage: ClassTag](n: Int): List[T] = {
       val r = eventually {
         val xs = self.collectMessages[T]
+        xs.size should be >= n
+        xs
+      }
+      Thread.sleep(200) // Waiting for additional messages
+      r
+    }
+
+    def receiveAtLeastNRaw(n: Int): List[WsRawMessage] = {
+      val r = eventually {
+        val xs = self.rawMessages
         xs.size should be >= n
         xs
       }

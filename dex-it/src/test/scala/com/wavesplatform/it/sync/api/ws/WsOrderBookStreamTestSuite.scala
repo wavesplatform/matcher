@@ -241,7 +241,6 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
       wsc4.close()
 
       buffer4.size should (be >= 1 and be <= 2)
-      // TODO this test won't check ordering :(
       buffer4.squashed.values.head should matchTo(
         protocol.WsOrderBookChanges(
           assetPair = wavesBtcPair,

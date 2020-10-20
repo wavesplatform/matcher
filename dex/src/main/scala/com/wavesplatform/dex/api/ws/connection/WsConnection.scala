@@ -9,6 +9,7 @@ import akka.http.scaladsl.model.Uri
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage, WebSocketRequest}
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.stream.{CompletionStrategy, Materializer, OverflowStrategy}
+import com.wavesplatform.dex.api.ws.connection.WsConnection.WsRawMessage
 import com.wavesplatform.dex.api.ws.protocol.{WsClientMessage, WsMessage, WsPingOrPong, WsServerMessage}
 import com.wavesplatform.dex.domain.utils.{LoggerFacade, ScorexLogging}
 import org.slf4j.LoggerFactory
@@ -50,6 +51,7 @@ class WsConnection(uri: Uri, keepAlive: Boolean = true)(implicit system: ActorSy
       }
   }
 
+  private val rawMessagesBuffer: ConcurrentLinkedQueue[WsRawMessage] = new ConcurrentLinkedQueue[WsRawMessage]()
   private val messagesBuffer: ConcurrentLinkedQueue[WsServerMessage] = new ConcurrentLinkedQueue[WsServerMessage]()
 
   // From server to test
@@ -59,6 +61,7 @@ class WsConnection(uri: Uri, keepAlive: Boolean = true)(implicit system: ActorSy
         strictText <- tm.toStrict(1.second).map(_.getStrictText)
         clientMessage <- {
           log.debug(s"Got $strictText")
+          rawMessagesBuffer.add(WsRawMessage(strictText, System.currentTimeMillis()))
           Try(Json.parse(strictText).as[WsServerMessage]) match {
             case Failure(exception) => Future.failed(exception)
             case Success(x) =>
@@ -92,11 +95,20 @@ class WsConnection(uri: Uri, keepAlive: Boolean = true)(implicit system: ActorSy
   val connectionClosedTs: Future[Long] = closed.map(_ => System.currentTimeMillis)
   val connectionLifetime: Future[FiniteDuration] = connectionClosedTs.map(cc => FiniteDuration(cc - connectionOpenedTs, MILLISECONDS))
 
+  def rawMessages: List[WsRawMessage] = rawMessagesBuffer.iterator().asScala.toList
   def messages: List[WsServerMessage] = messagesBuffer.iterator().asScala.toList
-  def clearMessages(): Unit = messagesBuffer.clear()
+
+  def clearMessages(): Unit = {
+    rawMessagesBuffer.clear()
+    messagesBuffer.clear()
+  }
 
   def send(message: WsClientMessage): Unit = wsHandlerRef ! TestWsHandlerActor.SendToServer(message)
 
   def close(): Unit = if (!isClosed) wsHandlerRef ! TestWsHandlerActor.CloseConnection
   def isClosed: Boolean = closed.isCompleted
+}
+
+object WsConnection {
+  case class WsRawMessage(body: String, ts: Long)
 }

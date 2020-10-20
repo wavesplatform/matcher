@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.it.api.websockets
 
+import com.wavesplatform.dex.api.ws.connection.WsConnection.WsRawMessage
 import com.wavesplatform.dex.api.ws.entities.{WsBalances, WsFullOrder, WsOrder}
 import com.wavesplatform.dex.api.ws.protocol.{WsOrderBookChanges, WsOrdersUpdate}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -49,6 +50,17 @@ trait WsMessageOps {
             settings = orig.settings.orElse(x.settings)
           )
         )
+    }
+
+  }
+
+  implicit class WsOrderBookRawChangesListOps(self: List[WsRawMessage]) {
+
+    def squashed[T](parse: PartialFunction[WsRawMessage, T])(z: T)(combine: (T, T) => T): T = {
+      val liftedParse = parse.lift
+      self.foldLeft(z) {
+        case (r, x) => liftedParse(x).foldLeft(r)(combine)
+      }
     }
 
   }

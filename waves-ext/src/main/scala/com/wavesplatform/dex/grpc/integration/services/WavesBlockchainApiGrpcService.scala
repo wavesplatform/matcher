@@ -71,12 +71,6 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, ignoredExchangeTx
     realTimeBalanceChangesSubscribers.clear()
   }
 
-  private def getAddressesChangedAssets(transactionStateUpdates: Seq[StateUpdate]): AddressesAssetsChanges = {
-    transactionStateUpdates.foldLeft(Map.empty[Address, Set[Asset]]) {
-      case (result, stateUpdate) => result |+| stateUpdate.balances.groupBy(_._1).view.mapValues(_.map(_._2).toSet).toMap
-    }
-  }
-
   private def getAddressesChangedAssets(diff: Diff): AddressesAssetsChanges = diff.portfolios.view.mapValues(_.assetIds).toMap
 
   private val pessimisticPortfolios                                                 = new PessimisticPortfolios(context.blockchain.transactionMeta(_).isEmpty)
@@ -85,7 +79,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, ignoredExchangeTx
   private val isRollback                                                            = new AtomicBoolean(false)
   private val storingChangesDuringRollback: AtomicReference[AddressesAssetsChanges] = new AtomicReference(Map.empty)
 
-  private val blockchainBalanceUpdates: Observable[AddressesAssetsChanges] = context.blockchainUpdated.map {
+  private val blockchainBalanceUpdates: Observable[AddressesAssetsChanges] = Observable.empty /*context.blockchainUpdated.map {
     case BlockAppended(_, newHeight, _, _, _, transactionStateUpdates) =>
       val changes = getAddressesChangedAssets(transactionStateUpdates)
       if (isRollback.get()) {
@@ -104,6 +98,12 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, ignoredExchangeTx
     case MicroBlockRollbackCompleted(_, _)                       => emptyAddressAssetsChanges
     case RollbackCompleted(_, _)                                 => isRollback.set(true); emptyAddressAssetsChanges
   }
+
+  private def getAddressesChangedAssets(transactionStateUpdates: Seq[StateUpdate]): AddressesAssetsChanges = {
+    transactionStateUpdates.foldLeft(Map.empty[Address, Set[Asset]]) {
+      case (result, stateUpdate) => result |+| stateUpdate.balances.groupBy(_._1).view.mapValues(_.map(_._2).toSet).toMap
+    }
+  }*/
 
   private val utxBalanceUpdates: Observable[AddressesAssetsChanges] = context.utxEvents.map {
     case TxAdded(tx, diff) =>

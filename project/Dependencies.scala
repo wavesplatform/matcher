@@ -262,9 +262,7 @@ object Dependencies {
 
     lazy val dexTestCommon: Seq[ModuleID] = Seq(diffx, scalaTest, scalaCheck, scalaTestPlusCheck, allureScalaTest)
 
-    lazy val wavesExt: Seq[ModuleID] = Seq(
-      grpcNetty
-    )
+    lazy val wavesExt: Seq[ModuleID] = Seq.empty
 
     lazy val wavesGrpc: Seq[ModuleID] = Seq(wavesProtobufSchemas, grpcScalaPb) ++ silencer
 

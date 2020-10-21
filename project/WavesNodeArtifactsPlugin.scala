@@ -1,7 +1,9 @@
-import java.io.File
+import java.io.{File => _, FileFilter => _}
+import java.nio.charset.StandardCharsets
 import java.nio.file.Paths
 
 import gigahorse.Request
+import org.apache.commons.io.FileUtils
 import sbt.Keys.{streams, unmanagedBase}
 import sbt._
 import sbt.internal.util.ManagedLogger
@@ -22,53 +24,71 @@ object WavesNodeArtifactsPlugin extends AutoPlugin {
 
   override def projectSettings: Seq[Def.Setting[_]] = Seq(
     wavesArtifactsCacheDir := Paths.get(System.getProperty("user.home"), ".cache", "dex").toFile,
-    cleanupWavesNodeArtifacts := {
-      val version = wavesNodeVersion.value
-      val filesToRemove = IO.listFiles(unmanagedBase.value).filter { x =>
-        val name = x.getName
-        name.startsWith("waves") && !name.contains(version)
-      }
-
-      filesToRemove.foreach(_.delete())
-      filesToRemove
+    isOldWavesVersion := {
+      val versionFile = unmanagedBase.value / "version"
+      !(versionFile.isFile && IO.read(versionFile, StandardCharsets.UTF_8).trim() == wavesNodeVersion.value)
     },
-    downloadWavesNodeArtifacts := {
-      val version = wavesNodeVersion.value
-      val targetDir = unmanagedBase.value
-      implicit val log = streams.value.log
-
-      val cacheDir = wavesArtifactsCacheDir.value
-      val (preCachedXs, toCacheXs) = cacheInfo(artifactNames(version), cacheDir)
-      val cachedXs =
-        if (toCacheXs.isEmpty) {
-          log.info("All required artifacts have been downloaded")
-          preCachedXs
-        } else {
-          log.info("Opening the releases page...")
-          val request = Request("https://api.github.com/repos/wavesplatform/Waves/releases").withHeaders("User-Agent" -> "SBT")
-          val cached = Http.http.run(request).map { releasesContent =>
-            log.info(s"Looking for $version version...")
-            getFilesDownloadUrls(releasesContent.bodyAsString, version, toCacheXs).map { rawUrl =>
-              val url = new URL(rawUrl)
-              val fileName = url.getPath.split('/').last
-              val cachedFile = cacheDir / fileName
-
-              log.info(s"Downloading $url to $cachedFile...")
-              Using.urlInputStream(url)(IO.transfer(_, cachedFile))
-
-              cachedFile
-            }
+    cleanupWavesNodeArtifacts := {
+      if (isOldWavesVersion.value) {
+        val filesToRemove = IO.listFiles(
+          unmanagedBase.value,
+          new FileFilter {
+            override def accept(pathname: File): Boolean = pathname.getName != ".gitignore"
           }
-          val cachedXs = Await.result(cached, 10.minutes)
-          preCachedXs ::: cachedXs
+        )
+
+        filesToRemove.foreach { x =>
+          if (x.isDirectory) FileUtils.deleteDirectory(x)
+          else x.delete()
         }
 
-      val toTargetXs = toTarget(cachedXs, targetDir)
-      if (toTargetXs.isEmpty) log.info("All required artifacts copied")
-      else toTargetXs.foreach { x =>
-        val targetFile = targetDir / x.getName
-        log.info(s"Copying $x to $targetFile")
-        IO.copyFile(x, targetFile)
+        filesToRemove
+      } else List.empty
+    },
+    downloadWavesNodeArtifacts := {
+      implicit val log = streams.value.log
+
+      if (isOldWavesVersion.value) {
+        val version = wavesNodeVersion.value
+        val targetDir = unmanagedBase.value
+
+        val cacheDir = wavesArtifactsCacheDir.value
+        val (preCachedXs, toCacheXs) = cacheInfo(artifactNames(version), cacheDir)
+        val cachedXs =
+          if (toCacheXs.isEmpty) {
+            log.info("All required artifacts have been downloaded")
+            preCachedXs
+          } else {
+            log.info("Opening the releases page...")
+            val request = Request("https://api.github.com/repos/wavesplatform/Waves/releases").withHeaders("User-Agent" -> "SBT")
+            val cached = Http.http.run(request).map { releasesContent =>
+              log.info(s"Looking for $version version...")
+              getFilesDownloadUrls(releasesContent.bodyAsString, version, toCacheXs).map { rawUrl =>
+                val url = new URL(rawUrl)
+                val fileName = url.getPath.split('/').last
+                val cachedFile = cacheDir / fileName
+
+                log.info(s"Downloading $url to $cachedFile...")
+                Using.urlInputStream(url)(IO.transfer(_, cachedFile))
+
+                cachedFile
+              }
+            }
+            val cachedXs = Await.result(cached, 10.minutes)
+            preCachedXs ::: cachedXs
+          }
+
+        val toTargetXs = toTarget(cachedXs, targetDir)
+        if (toTargetXs.isEmpty) log.info("All required artifacts copied")
+        else toTargetXs.foreach { x =>
+          val targetFile = targetDir / x.getName
+          log.info(s"Copying $x to $targetFile")
+          IO.copyFile(x, targetFile)
+        }
+
+        // Additional steps
+        val versionFile = unmanagedBase.value / "version"
+        IO.write(versionFile, version, StandardCharsets.UTF_8, append = false)
       }
     },
     downloadWavesNodeArtifacts := downloadWavesNodeArtifacts.dependsOn(cleanupWavesNodeArtifacts).value
@@ -78,6 +98,7 @@ object WavesNodeArtifactsPlugin extends AutoPlugin {
   private def artifactNames(version: String): List[List[String]] = List(
     List(s"waves-all-$version.jar"),
     List(s"waves_${version}_all.deb", s"waves-stagenet_${version}_all.deb"),
+    List(s"blockchain-updates-$version.tgz", s"blockchain-updates-stagenet_$version.tgz"),
     List(s"blockchain-updates_${version}_all.deb", s"blockchain-updates-stagenet_${version}_all.deb")
   )
 
@@ -144,4 +165,5 @@ trait WavesNodeArtifactsKeys {
   val wavesNodeVersion = settingKey[String]("Waves Node version without 'v'")
   val cleanupWavesNodeArtifacts = taskKey[Seq[File]]("Removes stale artifacts")
   val downloadWavesNodeArtifacts = taskKey[Unit]("Downloads Waves Node artifacts to unmanagedBase")
+  val isOldWavesVersion = taskKey[Boolean]("Returns true if there are outdated artifacts")
 }

@@ -37,65 +37,71 @@ object WavesNodeArtifactsPlugin extends AutoPlugin {
       val targetDir = unmanagedBase.value
       implicit val log = streams.value.log
 
-      val unmanagedJarsToDownload = artifactNames(version).filterNot(x => (targetDir / x).isFile)
-      if (unmanagedJarsToDownload.isEmpty) log.info("Waves Node artifacts have been downloaded")
-      else {
-        val cacheDir = wavesArtifactsCacheDir.value
-        cacheDir.mkdirs()
-
-        val (cachedArtifacts, artifactsToDownload) = unmanagedJarsToDownload.partition(x => (cacheDir / x).isFile)
-        cachedArtifacts.foreach { x =>
-          IO.copyFile(cacheDir / x, targetDir / x)
-        }
-
-        if (artifactsToDownload.isEmpty) log.info("Waves Node artifacts have been cached")
-        else {
-          log.info(s"Artifacts to download: ${artifactsToDownload.mkString(", ")}")
-          log.info("Opening releases page...")
+      val cacheDir = wavesArtifactsCacheDir.value
+      val (preCachedXs, toCacheXs) = cacheInfo(artifactNames(version), cacheDir)
+      val cachedXs =
+        if (toCacheXs.isEmpty) {
+          log.info("All required artifacts have been downloaded")
+          preCachedXs
+        } else {
+          log.info("Opening the releases page...")
           val request = Request("https://api.github.com/repos/wavesplatform/Waves/releases").withHeaders("User-Agent" -> "SBT")
-          val r = Http.http.run(request).map {
-            releasesContent =>
-              log.info(s"Looking for Waves Node $version...")
-              getFilesDownloadUrls(releasesContent.bodyAsString, version, artifactsToDownload).map { rawUrl =>
-                val url = new URL(rawUrl)
-                val fileName = url.getPath.split('/').last
-                val cachedFile = cacheDir / fileName
-                val targetFile = targetDir / fileName
+          val cached = Http.http.run(request).map { releasesContent =>
+            log.info(s"Looking for $version version...")
+            getFilesDownloadUrls(releasesContent.bodyAsString, version, toCacheXs).map { rawUrl =>
+              val url = new URL(rawUrl)
+              val fileName = url.getPath.split('/').last
+              val cachedFile = cacheDir / fileName
 
-                log.info(s"Downloading $url to $cachedFile...")
-                Using.urlInputStream(url)(IO.transfer(_, cachedFile))
+              log.info(s"Downloading $url to $cachedFile...")
+              Using.urlInputStream(url)(IO.transfer(_, cachedFile))
 
-                log.info(s"Copying $cachedFile to $targetFile")
-                IO.copyFile(cachedFile, targetFile)
-
-                targetFile
-              }
+              cachedFile
+            }
           }
-          Await.result(r, 10.minutes) // Result to fail with an exception if there is an error
+          val cachedXs = Await.result(cached, 10.minutes)
+          preCachedXs ::: cachedXs
         }
+
+      val toTargetXs = toTarget(cachedXs, targetDir)
+      if (toTargetXs.isEmpty) log.info("All required artifacts copied")
+      else toTargetXs.foreach { x =>
+        val targetFile = targetDir / x.getName
+        log.info(s"Copying $x to $targetFile")
+        IO.copyFile(x, targetFile)
       }
     },
     downloadWavesNodeArtifacts := downloadWavesNodeArtifacts.dependsOn(cleanupWavesNodeArtifacts).value
   )
 
-  private def artifactNames(version: String): List[String] = List(
-    s"waves-all-$version.jar",
-    s"waves_${version}_all.deb",
-    s"waves-stagenet_${version}_all.deb"
+  // List[Alternatives]
+  private def artifactNames(version: String): List[List[String]] = List(
+    List(s"waves-all-$version.jar"),
+    List(s"waves_${version}_all.deb", s"waves-stagenet_${version}_all.deb"),
+    List(s"blockchain-updates_${version}_all.deb", s"blockchain-updates-stagenet_${version}_all.deb")
   )
 
-  private def getFilesDownloadUrls(rawJson: String, version: String, fileNamesToDownload: List[String])(implicit
+  private def getFilesDownloadUrls(rawJson: String, version: String, fileNamesToDownload: List[List[String]])(implicit
     log: ManagedLogger
   ): List[String] =
     Parser.parseFromString(rawJson).get match {
       case JArray(jReleases) =>
         jReleases
           .collectFirst {
-            case JObject(jRelease) if jRelease.contains(JField("tag_name", JString(s"v$version"))) =>
-              jRelease.find(_.field == "assets") match {
-                case Some(JField(_, JArray(jAssets))) => fileNamesToDownload.flatMap(findAssetUrl(jAssets, _))
-                case x => throw new RuntimeException(s"Can't find assets in: $x")
-              }
+            case JObject(jRelease) if jRelease.contains(JField("tag_name", JString(s"v$version"))) => jRelease
+          }
+          .map { jRelease =>
+            jRelease.find(_.field == "assets") match {
+              case Some(JField(_, JArray(jAssets))) => jAssets
+              case x => throw new RuntimeException(s"Can't find assets in: $x")
+            }
+          }
+          .map { jAssets =>
+            fileNamesToDownload.flatMap { xs =>
+              val r = xs.flatMap(findAssetUrl(jAssets, _))
+              if (r.isEmpty) log.err(s"At least one artifact should be released: ${xs.mkString(", ")}")
+              r.headOption
+            }
           }
           .getOrElse {
             log.warn(s"Can't find version: $version (tag_name=v$version)")
@@ -104,21 +110,31 @@ object WavesNodeArtifactsPlugin extends AutoPlugin {
       case x => throw new RuntimeException(s"Can't parse releases as array: $x")
     }
 
-  private def findAssetUrl(jAssets: Array[JValue], name: String)(implicit log: ManagedLogger): Option[String] = {
-    val r = jAssets
-      .collectFirst {
-        case JObject(jAsset) if jAsset.contains(JField("name", JString(name))) =>
-          jAsset
-            .find(_.field == "browser_download_url")
-            .getOrElse(throw new RuntimeException(s"Can't find browser_download_url in $jAsset"))
-            .value match {
-            case JString(x) => x
-            case x => throw new RuntimeException(s"Can't parse url: $x")
-          }
-      }
-    if (r.isEmpty) log.warn(s"Can't find $name")
-    r
+  private def findAssetUrl(jAssets: Array[JValue], name: String)(implicit log: ManagedLogger): Option[String] =
+    jAssets.collectFirst {
+      case JObject(jAsset) if jAsset.contains(JField("name", JString(name))) =>
+        jAsset
+          .find(_.field == "browser_download_url")
+          .getOrElse(throw new RuntimeException(s"Can't find browser_download_url in ${jAsset.mkString("Array(", ", ", ")")}"))
+          .value match {
+          case JString(x) => x
+          case x => throw new RuntimeException(s"Can't parse url: $x")
+        }
+    }
+
+  /**
+   * @return (cached, toCache)
+   */
+  private def cacheInfo(alternatives: List[List[String]], cacheDir: File): (List[File], List[List[String]]) = {
+    val (cachedArtifacts, toCache) = alternatives.partition(xs => xs.exists(x => (cacheDir / x).isFile))
+    val cached = cachedArtifacts.map { xs =>
+      xs.map(cacheDir / _).find(_.isFile).getOrElse(throw new RuntimeException("Imposibru!"))
+    }
+    (cached, toCache)
   }
+
+  private def toTarget(cached: List[File], targetDir: File): List[File] =
+    cached.filterNot(x => (targetDir / x.getName).isFile)
 
 }
 

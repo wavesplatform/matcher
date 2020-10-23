@@ -54,9 +54,11 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
   // TODO rename to balanceChangesObserver after release 2.1.2
   private val realTimeBalanceChangesObserver = new RealTimeBalanceChangesObserver
 
+  private val empty: Empty = Empty()
+
   // TODO rename to requestBalanceChanges after release 2.1.2
   /** Performs new gRPC call for receiving of the spendable balance changes real-time stream */
-  private def requestRealTimeBalanceChanges(): Unit = blockchainService.getRealTimeBalanceChanges(Empty(), realTimeBalanceChangesObserver)
+  private def requestRealTimeBalanceChanges(): Unit = blockchainService.getRealTimeBalanceChanges(empty, realTimeBalanceChangesObserver)
 
   private def parse(input: RunScriptResponse): RunScriptResult = input.result match {
     case Result.WrongInput(message) => throw new IllegalArgumentException(message)
@@ -138,10 +140,12 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
   }
 
   override def getNodeAddress: Future[InetAddress] = handlingErrors {
-    blockchainService.getNodeAddress(Empty()) map { r =>
+    blockchainService.getNodeAddress(empty) map { r =>
       InetAddress.getByName(r.address)
     }
   }
+
+  override def currentHeight: Future[Int] = blockchainService.getCurrentHeight(empty).map(_.height)
 
   // TODO rename to BalanceChangesObserver after release 2.1.2
   final private class RealTimeBalanceChangesObserver extends ClientResponseObserver[Empty, BalanceChangesFlattenResponse] with AutoCloseable {
@@ -153,7 +157,7 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
 
     override def onNext(value: BalanceChangesFlattenResponse): Unit = {
       if (isConnectionEstablished.compareAndSet(false, true))
-        blockchainService.getNodeAddress(Empty()) foreach { response =>
+        blockchainService.getNodeAddress(empty) foreach { response =>
           log.info(s"gRPC connection restored! DEX server now is connected to Node with an address: ${response.address}")
         }
 

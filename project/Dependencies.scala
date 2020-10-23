@@ -279,7 +279,7 @@ object Dependencies {
       mouse,
       grpcNetty,
       wavesProtobufSchemas
-    ) ++ testKit
+    ) ++ testKit ++ silencer
 
     lazy val wavesIntegrationIt: Seq[ModuleID] = Seq(
       julToSlf4j

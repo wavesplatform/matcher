@@ -39,6 +39,8 @@ service WavesBlockchainApi {
     rpc AllAssetsSpendableBalance (AddressRequest) returns (AllAssetsSpendableBalanceResponse);
 
     rpc GetNodeAddress (google.protobuf.Empty) returns (NodeAddressResponse);
+
+    rpc GetCurrentHeight (google.protobuf.Empty) returns (CurrentHeightResponse);
 }
 
 // Common requests
@@ -194,6 +196,10 @@ message AllAssetsSpendableBalanceResponse {
 
 message NodeAddressResponse {
     string address = 1;
+}
+
+message CurrentHeightResponse {
+    int32 height = 1;
 }
 
 // Other entities

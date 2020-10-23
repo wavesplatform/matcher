@@ -1,6 +1,7 @@
 package com.wavesplatform.dex.grpc.integration.clients
 
 import java.net.InetAddress
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger, AtomicReference}
 
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
@@ -10,6 +11,9 @@ import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.Updates
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
+import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions._
+import com.wavesplatform.events.protobuf.BlockchainUpdated.Rollback.RollbackType
+import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
 import monix.reactive.Observable
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -50,17 +54,80 @@ trait WavesBlockchainClient {
 class DefaultWavesBlockchainClient(
   meClient: MatcherExtensionClient[Future],
   bClient: BlockchainUpdatesClient
-)(implicit ec: ExecutionContext) extends WavesBlockchainClient {
+)(implicit ec: ExecutionContext)
+    extends WavesBlockchainClient {
 
-  override def updates: Observable[Updates] = {
+  type Balances = Map[Address, Map[Asset, Long]]
+
+  private val currentMaxHeight = new AtomicInteger(0)
+  private val isRollback = new AtomicBoolean(false)
+
+  private val emptyBalances: Balances = Map.empty
+  private val knownBalances: AtomicReference[Balances] = new AtomicReference(emptyBalances)
+  private val storingChangesDuringRollback: AtomicReference[Balances] = new AtomicReference(emptyBalances)
+
+  override lazy val updates: Observable[Updates] = {
+    val bStream = Observable.fromFuture(meClient.currentHeight).flatMap { start =>
+      currentMaxHeight.set(start) // TODO think about algo
+      val safeStream = bClient.blockchainEvents(start).onErrorRecoverWith {
+        case _ => bClient.blockchainEvents(currentMaxHeight.get())
+      }
+
+      safeStream.map { event =>
+        event.update match {
+          case Update.Empty => emptyBalances // Nothing to do
+          case Update.Append(updates) =>
+            val changes = updates.stateUpdate.fold(emptyBalances) { stateUpdate =>
+              // TODO Test performance
+              stateUpdate.balances.foldLeft(emptyBalances) {
+                case (r, x) =>
+                  x.amount.fold(r) { assetAmount =>
+                    val address = x.address.toVanillaAddress
+                    val updated = r
+                      .getOrElse(address, Map.empty)
+                      .updated(assetAmount.assetId.toVanillaAsset, assetAmount.amount)
+                    r.updated(address, updated)
+                  }
+              }
+            }
+
+            val newHeight = event.height
+            if (isRollback.get()) {
+              val accumulatedUpdates = storingChangesDuringRollback.updateAndGet(upsert(_, changes))
+              if (newHeight < currentMaxHeight.get) emptyBalances
+              else {
+                isRollback.set(false)
+                storingChangesDuringRollback.set(Map.empty)
+                knownBalances.updateAndGet(upsert(_, accumulatedUpdates))
+                accumulatedUpdates
+              }
+            } else {
+              currentMaxHeight.set(newHeight)
+              knownBalances.updateAndGet(upsert(_, changes))
+              changes
+            }
+
+          case Update.Rollback(value) =>
+            // TODO We need to invalidate balances for some (address, asset)
+            value.`type` match {
+              case RollbackType.BLOCK => isRollback.set(true); emptyBalances
+              case RollbackType.MICROBLOCK => emptyBalances // TODO ???
+              case RollbackType.Unrecognized(_) => emptyBalances // TODO ???
+            }
+        }
+      }
+    }
+
     val meStream = meClient.realTimeBalanceChanges.map(x => Map(x.address -> Map(x.asset -> x.balance)))
-    val bStream = bClient.blockchainUpdates
+
     Observable(bStream, meStream).merge.map(Updates)
   }
 
+  // TODO knownBalances
   override def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] =
     meClient.spendableBalances(address, assets)
 
+  // TODO knownBalances
   override def allAssetsSpendableBalance(address: Address): Future[Map[Asset, Long]] =
     meClient.allAssetsSpendableBalance(address)
 
@@ -97,4 +164,11 @@ class DefaultWavesBlockchainClient(
     meClient.getNodeAddress
 
   override def close(): Future[Unit] = meClient.close().zip(bClient.close()).map(_ => ())
+
+  private def upsert(orig: Balances, update: Balances): Balances =
+    update.foldLeft(orig) { case (r, (address, balances)) =>
+      val orig = r.getOrElse(address, Map.empty)
+      r.updated(address, orig ++ balances)
+    }
+
 }

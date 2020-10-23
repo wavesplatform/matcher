@@ -44,6 +44,7 @@ trait MatcherExtensionClient[F[_]] {
   def forgedOrder(orderId: ByteStr): F[Boolean]
 
   def getNodeAddress: F[InetAddress]
+  def currentHeight: F[Int]
 
   def close(): F[Unit]
 }

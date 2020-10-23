@@ -47,6 +47,7 @@ class MatcherExtensionCachingClient(underlying: MatcherExtensionClient[Future], 
   override def forgedOrder(orderId: ByteStr): Future[Boolean] = underlying.forgedOrder(orderId)
 
   override def getNodeAddress: Future[InetAddress] = underlying.getNodeAddress
+  override def currentHeight: Future[Int] = underlying.currentHeight
 
   override def close(): Future[Unit] = underlying.close()
 }

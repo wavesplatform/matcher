@@ -12,7 +12,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.BalanceChanges
+import com.wavesplatform.dex.grpc.integration.clients.MatcherExtensionClient.BalanceChanges
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.effect.Implicits.NettyFutureOps
 import com.wavesplatform.dex.grpc.integration.exceptions.{UnexpectedConnectionException, WavesNodeConnectionLostException}
@@ -33,9 +33,9 @@ import scala.concurrent.{ExecutionContext, Future}
  * @param eventLoopGroup Here, because this class takes ownership
  * @param monixScheduler Is not an implicit, because it is ExecutionContext too
  */
-class WavesBlockchainGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: ManagedChannel, monixScheduler: Scheduler)(
+class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: ManagedChannel, monixScheduler: Scheduler)(
   implicit grpcExecutionContext: ExecutionContext
-) extends WavesBlockchainClient[Future]
+) extends MatcherExtensionClient[Future]
     with ScorexLogging {
 
   private def gRPCErrorsHandler(exception: Throwable): Throwable = exception match {
@@ -68,7 +68,7 @@ class WavesBlockchainGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: Ma
   }
 
   // TODO rename to spendableBalanceChanges after release 2.1.2
-  override lazy val realTimeBalanceChanges: Observable[WavesBlockchainClient.BalanceChanges] = {
+  override lazy val realTimeBalanceChanges: Observable[MatcherExtensionClient.BalanceChanges] = {
     requestRealTimeBalanceChanges()
     realTimeSpendableBalanceChangesSubject
   }

@@ -41,9 +41,9 @@ import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.utils.{EitherExt2, LoggerFacade, ScorexLogging}
 import com.wavesplatform.dex.effect.{liftValueAsync, FutureResult}
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
-import com.wavesplatform.dex.grpc.integration.WavesBlockchainClientBuilder
-import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainAssetsWatchingClient
-import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.BalanceChanges
+import com.wavesplatform.dex.grpc.integration.WavesClientBuilder
+import com.wavesplatform.dex.grpc.integration.clients.MatcherExtensionAssetsWatchingClient
+import com.wavesplatform.dex.grpc.integration.clients.MatcherExtensionClient.BalanceChanges
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.history.HistoryRouterActor
 import com.wavesplatform.dex.logs.SystemInformationReporter
@@ -146,9 +146,9 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     assetsCache.unsafeGetHasScript
   )
 
-  private val wavesBlockchainAsyncClient = new WavesBlockchainAssetsWatchingClient(
+  private val wavesBlockchainAsyncClient = new MatcherExtensionAssetsWatchingClient(
     settings = settings.wavesBlockchainClient,
-    underlying = WavesBlockchainClientBuilder.async(
+    underlying = WavesClientBuilder.asyncMatcherExtension(
       settings.wavesBlockchainClient,
       monixScheduler = monixScheduler,
       grpcExecutionContext = grpcExecutionContext

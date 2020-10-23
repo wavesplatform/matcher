@@ -9,8 +9,8 @@ import com.wavesplatform.dex.cli.ErrorOr
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.dex.grpc.integration.WavesBlockchainClientBuilder
-import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient
+import com.wavesplatform.dex.grpc.integration.WavesClientBuilder
+import com.wavesplatform.dex.grpc.integration.clients.MatcherExtensionClient
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.settings.GrpcClientSettings.ChannelOptionsSettings
 import com.wavesplatform.dex.grpc.integration.settings.{GrpcClientSettings, WavesBlockchainClientSettings}
@@ -22,7 +22,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Awaitable, Future}
 import scala.util.Try
 
-case class DexExtensionGrpcConnector private (target: String, grpcAsyncClient: WavesBlockchainClient[Future]) extends Connector {
+case class DexExtensionGrpcConnector private (target: String, grpcAsyncClient: MatcherExtensionClient[Future]) extends Connector {
 
   import DexExtensionGrpcConnector._
 
@@ -55,7 +55,7 @@ object DexExtensionGrpcConnector {
       LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME).asInstanceOf[Logger].setLevel(Level.OFF)
       val grpcSettings = GrpcClientSettings(target, 5, 5, true, 2.seconds, 5.seconds, 1.minute, ChannelOptionsSettings(5.seconds))
       val clientSettings = WavesBlockchainClientSettings(grpcSettings, 100.milliseconds, 100)
-      WavesBlockchainClientBuilder.async(clientSettings, monixScheduler, executionContext)
+      WavesClientBuilder.asyncMatcherExtension(clientSettings, monixScheduler, executionContext)
     }.toEither
       .bimap(ex => s"Cannot establish gRPC connection to DEX Extension! $ex", client => DexExtensionGrpcConnector(target, client))
 

@@ -11,10 +11,10 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionV2}
 import com.wavesplatform.dex.domain.utils.EitherExt2
-import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.BalanceChanges
+import com.wavesplatform.dex.grpc.integration.clients.MatcherExtensionClient.BalanceChanges
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.settings.{GrpcClientSettings, WavesBlockchainClientSettings}
-import com.wavesplatform.dex.grpc.integration.{IntegrationSuiteBase, WavesBlockchainClientBuilder}
+import com.wavesplatform.dex.grpc.integration.{IntegrationSuiteBase, WavesClientBuilder}
 import com.wavesplatform.dex.it.test.Scripts
 import monix.execution.Ack.Continue
 import monix.execution.{Ack, Scheduler}
@@ -42,7 +42,7 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
   implicit private val monixScheduler: Scheduler = Scheduler(runNow)
 
   private lazy val client =
-    WavesBlockchainClientBuilder.async(
+    WavesClientBuilder.asyncMatcherExtension(
       WavesBlockchainClientSettings(
         grpc = GrpcClientSettings(
           target = wavesNode1.grpcApiTarget,

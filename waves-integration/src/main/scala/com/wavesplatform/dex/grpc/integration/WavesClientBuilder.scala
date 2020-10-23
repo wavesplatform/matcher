@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.grpc.integration
 
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.grpc.integration.clients.{WavesBlockchainCachingClient, WavesBlockchainClient, WavesBlockchainGrpcAsyncClient}
+import com.wavesplatform.dex.grpc.integration.clients.{MatcherExtensionCachingClient, MatcherExtensionClient, MatcherExtensionGrpcAsyncClient}
 import com.wavesplatform.dex.grpc.integration.settings.WavesBlockchainClientSettings
 import io.grpc.ManagedChannel
 import io.grpc.internal.DnsNameResolverProvider
@@ -11,15 +11,15 @@ import monix.execution.Scheduler
 
 import scala.concurrent.{ExecutionContext, Future}
 
-object WavesBlockchainClientBuilder extends ScorexLogging {
+object WavesClientBuilder extends ScorexLogging {
 
-  def async(
+  def asyncMatcherExtension(
     wavesBlockchainClientSettings: WavesBlockchainClientSettings,
     monixScheduler: Scheduler,
     grpcExecutionContext: ExecutionContext
-  ): WavesBlockchainClient[Future] = {
+  ): MatcherExtensionClient[Future] = {
 
-    log.info(s"Building gRPC client for server: ${wavesBlockchainClientSettings.grpc.target}")
+    log.info(s"Building Matcher Extension gRPC client for server: ${wavesBlockchainClientSettings.grpc.target}")
 
     val eventLoopGroup = new NioEventLoopGroup
 
@@ -32,8 +32,8 @@ object WavesBlockchainClientBuilder extends ScorexLogging {
         .usePlaintext()
         .build
 
-    new WavesBlockchainCachingClient(
-      new WavesBlockchainGrpcAsyncClient(eventLoopGroup, channel, monixScheduler)(grpcExecutionContext),
+    new MatcherExtensionCachingClient(
+      new MatcherExtensionGrpcAsyncClient(eventLoopGroup, channel, monixScheduler)(grpcExecutionContext),
       wavesBlockchainClientSettings.defaultCachesExpiration
     )(grpcExecutionContext)
   }

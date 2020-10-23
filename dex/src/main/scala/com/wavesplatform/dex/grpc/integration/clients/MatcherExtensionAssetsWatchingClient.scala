@@ -12,19 +12,19 @@ import monix.reactive.Observable
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class WavesBlockchainAssetsWatchingClient(
-  settings: WavesBlockchainClientSettings,
-  underlying: WavesBlockchainClient[Future],
-  assetsStorage: AssetsStorage
+class MatcherExtensionAssetsWatchingClient(
+                                            settings: WavesBlockchainClientSettings,
+                                            underlying: MatcherExtensionClient[Future],
+                                            assetsStorage: AssetsStorage
 )(implicit grpcExecutionContext: ExecutionContext)
-    extends WavesBlockchainCachingClient(underlying, settings.defaultCachesExpiration) {
+    extends MatcherExtensionCachingClient(underlying, settings.defaultCachesExpiration) {
 
   // Do not use
-  override def realTimeBalanceChanges: Observable[WavesBlockchainClient.BalanceChanges] =
+  override def realTimeBalanceChanges: Observable[MatcherExtensionClient.BalanceChanges] =
     realTimeBalanceBatchChanges.flatMap(Observable.fromIterable)
 
   // TODO Refactor to fit this method
-  def realTimeBalanceBatchChanges: Observable[List[WavesBlockchainClient.BalanceChanges]] =
+  def realTimeBalanceBatchChanges: Observable[List[MatcherExtensionClient.BalanceChanges]] =
     underlying.realTimeBalanceChanges
       .bufferIntrospective(settings.balanceStreamBufferSize)
       .mapEval { xs =>

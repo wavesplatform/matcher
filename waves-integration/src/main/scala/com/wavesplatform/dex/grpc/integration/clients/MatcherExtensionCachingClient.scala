@@ -16,9 +16,9 @@ import monix.reactive.Observable
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
 
-class WavesBlockchainCachingClient(underlying: WavesBlockchainClient[Future], defaultCacheExpiration: FiniteDuration)(
+class MatcherExtensionCachingClient(underlying: MatcherExtensionClient[Future], defaultCacheExpiration: FiniteDuration)(
   implicit grpcExecutionContext: ExecutionContext
-) extends WavesBlockchainClient[Future]
+) extends MatcherExtensionClient[Future]
     with ScorexLogging {
 
   private val cacheExpiration: Duration = Duration.ofMillis(defaultCacheExpiration.toMillis)
@@ -27,7 +27,7 @@ class WavesBlockchainCachingClient(underlying: WavesBlockchainClient[Future], de
     new FeaturesCache(underlying.isFeatureActivated, invalidationPredicate = !_) // we don't keep knowledge about unactivated features
   private val assetDescriptionsCache = new AssetDescriptionsCache(underlying.assetDescription, cacheExpiration)
 
-  override def realTimeBalanceChanges: Observable[WavesBlockchainClient.BalanceChanges] = underlying.realTimeBalanceChanges
+  override def realTimeBalanceChanges: Observable[MatcherExtensionClient.BalanceChanges] = underlying.realTimeBalanceChanges
   override def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] = underlying.spendableBalances(address, assets)
   override def allAssetsSpendableBalance(address: Address): Future[Map[Asset, Long]] = underlying.allAssetsSpendableBalance(address)
 

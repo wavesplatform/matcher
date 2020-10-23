@@ -37,7 +37,7 @@ object Dependencies {
     val kamonCore = "2.1.6"
     val kamonInfluxDb = "2.1.6"
 
-    val wavesProtobufSchemas = "1.2.6"
+    val wavesProtobufSchemas = "1.2.8"
     val wavesJ = "1.0.1"
 
     val postgresql = "42.2.16"
@@ -277,7 +277,8 @@ object Dependencies {
       monixReactive,
       betterMonadicFor,
       mouse,
-      grpcNetty
+      grpcNetty,
+      wavesProtobufSchemas
     ) ++ testKit
 
     lazy val wavesIntegrationIt: Seq[ModuleID] = Seq(

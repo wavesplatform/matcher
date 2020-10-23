@@ -28,7 +28,7 @@ import com.wavesplatform.dex.domain.utils.{LoggerFacade, ScorexLogging}
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError, UnexpectedError, WavesNodeConnectionBroken}
 import com.wavesplatform.dex.fp.MapImplicits.group
-import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.SpendableBalance
+import com.wavesplatform.dex.grpc.integration.clients.MatcherExtensionClient.SpendableBalance
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCancelFailed, OrderCanceled, OrderCanceledReason, OrderExecuted, Event => OrderEvent}
 import com.wavesplatform.dex.model._

@@ -87,6 +87,21 @@ object WavesNodeArtifactsPlugin extends AutoPlugin {
         }
 
         // Additional steps
+        // Unpacking grpc-server extension JARs to have all required dependencies, including grpc ones
+        val grpcServerArchive = targetDir.listFiles(new FileFilter {
+          override def accept(pathname: File): Boolean = pathname.name.matches("grpc-server.+\\.tgz")
+        }).headOption.getOrElse(throw new RuntimeException("Can'f find a grpc-server archive"))
+
+        MatcherIOUtils.decompressTgz(grpcServerArchive, targetDir)
+        val grpcServerDir = targetDir / grpcServerArchive.name.replace(".tgz", "")
+        IO.move(
+          (grpcServerDir / "lib").listFiles().map { orig =>
+            orig -> targetDir / orig.name
+          }
+        )
+        FileUtils.deleteDirectory(grpcServerDir)
+
+        // Write version file to prevent rewrites on each compilation
         val versionFile = unmanagedBase.value / "version"
         IO.write(versionFile, version, StandardCharsets.UTF_8, append = false)
       }
@@ -94,12 +109,14 @@ object WavesNodeArtifactsPlugin extends AutoPlugin {
     downloadWavesNodeArtifacts := downloadWavesNodeArtifacts.dependsOn(cleanupWavesNodeArtifacts).value
   )
 
+  private val networkSuffixes = List("", "-stagenet")
+
   // List[Alternatives]
   private def artifactNames(version: String): List[List[String]] = List(
     List(s"waves-all-$version.jar"),
-    List(s"waves_${version}_all.deb", s"waves-stagenet_${version}_all.deb"),
-    List(s"blockchain-updates-$version.tgz", s"blockchain-updates-stagenet_$version.tgz"),
-    List(s"blockchain-updates_${version}_all.deb", s"blockchain-updates-stagenet_${version}_all.deb")
+    networkSuffixes.map(x => s"waves_$x${version}_all.deb"),
+    networkSuffixes.map(x => s"grpc-server$x-$version.tgz"),
+    networkSuffixes.map(x => s"grpc-server${x}_${version}_all.deb")
   )
 
   private def getFilesDownloadUrls(rawJson: String, version: String, fileNamesToDownload: List[List[String]])(implicit

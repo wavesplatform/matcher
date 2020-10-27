@@ -85,10 +85,15 @@ class RatesTestSuite extends MatcherSuiteBase {
     dex1.httpApi.upsertRate(btc, 1).code shouldBe StatusCodes.Created
 
     // place order with admissible fee (according to btc rate = 1)
-    val order1 = newOrder
-    placeAndAwaitAtDex(order1)
+    placeAndAwaitAtDex(newOrder)
 
     // slightly increase rate for btc
+    dex1.httpApi.upsertRate(btc, 1.2).code shouldBe StatusCodes.Ok
+
+    // the same order is passed, because we choose the minimal rate between 1 and 1.1
+    placeAndAwaitAtDex(newOrder)
+
+    // now a new order doesn't matches both rates
     dex1.httpApi.upsertRate(btc, 1.1).code shouldBe StatusCodes.Ok
 
     // the same order now is rejected

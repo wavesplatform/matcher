@@ -1,14 +1,11 @@
 package com.wavesplatform.dex.caches
 
-import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicReference
 
 import com.wavesplatform.dex.db.RateDB
 import com.wavesplatform.dex.domain.asset.Asset
-import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.Asset.Waves
 import org.iq80.leveldb.DB
-
-import scala.collection.concurrent.TrieMap
-import scala.jdk.CollectionConverters._
 
 trait RateCache {
 
@@ -26,51 +23,65 @@ trait RateCache {
 
 object RateCache {
 
-  private val WavesRate = Option(1d)
+  private val WavesRate = 1d
+  private val WavesRateOpt = Option(WavesRate)
 
-  def apply(db: DB): RateCache = new RateCache {
+  /**
+   * 1. Stores two values for each asset
+   * 2. In getRate returns the least rate
+   * 3. In other methods returns the latest rate
+   */
+  def apply(rateDB: RateDB): RateCache = new RateCache {
 
-    private val rateDB = RateDB(db)
-    private val rateMap = new ConcurrentHashMap[IssuedAsset, Double](rateDB.getAllRates.asJava)
+    private val xs: AtomicReference[RateCacheMaps] =
+      new AtomicReference(RateCacheMaps(rateDB.getAllRates.toMap[Asset, Double].updated(Waves, WavesRate)))
 
     def upsertRate(asset: Asset, value: Double): Option[Double] =
-      asset.fold(WavesRate) { issuedAsset =>
-        rateDB.upsertRate(issuedAsset, value)
-        Option(rateMap.put(issuedAsset, value))
+      asset.fold(WavesRateOpt) { asset =>
+        rateDB.upsertRate(asset, value)
+        xs.getAndUpdate(_.upsert(asset, value)).latest.get(asset)
       }
 
-    def getRate(asset: Asset): Option[Double] = asset.fold(WavesRate)(asset => Option(rateMap get asset))
+    /**
+     * @return The least rate, because a client could not update the rate in time, which leads to rejection
+     */
+    def getRate(asset: Asset): Option[Double] = asset.fold(WavesRateOpt)(xs.get.least)
 
-    def getAllRates: Map[Asset, Double] =
-      rateMap.asScala.toMap.map { case (issuedAsset, value) => Asset.fromCompatId(issuedAsset.compatId) -> value } + (Waves -> 1d)
+    def getAllRates: Map[Asset, Double] = xs.get.latest
 
-    def deleteRate(asset: Asset): Option[Double] = asset.fold(WavesRate) { issuedAsset =>
-      rateDB.deleteRate(issuedAsset)
-      Option(rateMap.remove(issuedAsset))
+    def deleteRate(asset: Asset): Option[Double] = asset.fold(WavesRateOpt) { asset =>
+      rateDB.deleteRate(asset)
+      xs.getAndUpdate(_.delete(asset)).latest.get(asset)
     }
 
   }
 
-  def inMem: RateCache = new RateCache {
+  def apply(db: DB): RateCache = RateCache(RateDB(db))
 
-    private val rates: TrieMap[Asset, Double] = TrieMap(Waves -> 1d)
+  def inMem: RateCache = apply(RateDB.inMem)
 
-    def upsertRate(asset: Asset, value: Double): Option[Double] =
-      asset.fold(WavesRate) { issuedAsset =>
-        val previousValue = rates.get(issuedAsset)
-        rates += (asset -> value)
-        previousValue
-      }
+  private case class RateCacheMaps(latest: Map[Asset, Double], lastTwo: Map[Asset, DropOldestFixedBuffer2]) {
 
-    def getRate(asset: Asset): Option[Double] = rates.get(asset)
-    def getAllRates: Map[Asset, Double] = rates.toMap
+    def upsert(asset: Asset, value: Double): RateCacheMaps = {
+      val orig = lastTwo.get(asset)
+      val updated = orig.fold(DropOldestFixedBuffer2(value))(_.append(value))
+      RateCacheMaps(
+        latest = latest.updated(asset, value),
+        lastTwo = lastTwo.updated(asset, updated)
+      )
+    }
 
-    def deleteRate(asset: Asset): Option[Double] =
-      asset.fold(Option(1d)) { issuedAsset =>
-        val previousValue = rates.get(issuedAsset)
-        rates -= issuedAsset
-        previousValue
-      }
+    def delete(asset: Asset): RateCacheMaps = RateCacheMaps(latest - asset, lastTwo - asset)
+    def least(asset: Asset): Option[Double] = lastTwo.get(asset).map(_.min)
+
+  }
+
+  private object RateCacheMaps {
+
+    def apply(init: Map[Asset, Double]): RateCacheMaps = RateCacheMaps(
+      latest = init,
+      lastTwo = init.map { case (k, v) => k -> DropOldestFixedBuffer2(v) }
+    )
 
   }
 

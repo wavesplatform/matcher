@@ -84,18 +84,18 @@ inTask(docker)(
     dockerfile := {
       val log = streams.value.log
 
-      val blockchainUpdatesDir = unmanagedBase.value
+      val grpcServerDir = unmanagedBase.value
         .listFiles(new FilenameFilter {
-          override def accept(dir: File, name: String): Boolean = name.startsWith("blockchain-updates") && name.endsWith(".tgz")
+          override def accept(dir: File, name: String): Boolean = name.startsWith("grpc-server") && name.endsWith(".tgz")
         })
         .headOption match {
-        case None => throw new RuntimeException("Can't find the blockchain-updates archive")
-        case Some(blockchainUpdatesArchive) =>
+        case None => throw new RuntimeException("Can't find the grcp-server archive")
+        case Some(grpcServerArchive) =>
           val targetDir = target.value / ".."
-          val r = targetDir / blockchainUpdatesArchive.getName.replace(".tgz", "")
+          val r = targetDir / grpcServerArchive.getName.replace(".tgz", "")
           if (!r.isDirectory) {
-            log.info(s"Decompressing $blockchainUpdatesArchive to $targetDir")
-            MatcherIOUtils.decompressTgz(blockchainUpdatesArchive, targetDir)
+            log.info(s"Decompressing $grpcServerArchive to $targetDir")
+            MatcherIOUtils.decompressTgz(grpcServerArchive, targetDir)
           }
           r
       }
@@ -104,7 +104,7 @@ inTask(docker)(
         from(s"wavesplatform/wavesnode:${wavesNodeVersion.value}")
         user("143:143") // waves:waves
         add(
-          sources = Seq((Universal / stage).value / "lib", blockchainUpdatesDir / "lib"),
+          sources = Seq((Universal / stage).value / "lib", grpcServerDir / "lib"),
           destination = "/usr/share/waves/lib/plugins/",
           chown = "143:143"
         )

@@ -11,6 +11,7 @@ import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.caches.{AssetDescriptionsCache, FeaturesCache}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
+import com.wavesplatform.dex.grpc.integration.services.UtxEvent
 import monix.reactive.Observable
 
 import scala.concurrent.duration.FiniteDuration
@@ -27,7 +28,8 @@ class MatcherExtensionCachingClient(underlying: MatcherExtensionClient[Future], 
     new FeaturesCache(underlying.isFeatureActivated, invalidationPredicate = !_) // we don't keep knowledge about unactivated features
   private val assetDescriptionsCache = new AssetDescriptionsCache(underlying.assetDescription, cacheExpiration)
 
-  override def realTimeBalanceChanges: Observable[MatcherExtensionClient.BalanceChanges] = underlying.realTimeBalanceChanges
+  override def utxChanges: Observable[UtxEvent] = underlying.utxChanges
+
   override def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] = underlying.spendableBalances(address, assets)
   override def allAssetsSpendableBalance(address: Address): Future[Map[Asset, Long]] = underlying.allAssetsSpendableBalance(address)
 

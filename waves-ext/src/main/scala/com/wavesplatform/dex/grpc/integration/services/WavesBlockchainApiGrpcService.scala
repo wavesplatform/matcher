@@ -2,24 +2,20 @@ package com.wavesplatform.dex.grpc.integration.services
 
 import java.net.InetAddress
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger, AtomicReference}
 
-import cats.instances.map._
-import cats.instances.set._
-import cats.kernel.Monoid
+import cats.implicits.catsSyntaxOptionId
 import cats.syntax.either._
-import cats.syntax.monoid._
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.Address
+import com.wavesplatform.api.grpc._
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.dex.collections.Implicits._
 import com.wavesplatform.dex.grpc.integration._
 import com.wavesplatform.dex.grpc.integration.protobuf.EitherVEExt
 import com.wavesplatform.dex.grpc.integration.protobuf.PbToWavesConversions._
 import com.wavesplatform.dex.grpc.integration.protobuf.WavesToPbConversions._
-import com.wavesplatform.dex.grpc.integration.services.WavesBlockchainApiGrpcService.PessimisticPortfolios
 import com.wavesplatform.dex.grpc.integration.smart.MatcherScriptRunner
 import com.wavesplatform.events.UtxEvent.{TxAdded, TxRemoved}
-import com.wavesplatform.events._
 import com.wavesplatform.events.protobuf.StateUpdate
 import com.wavesplatform.extensions.{Context => ExtensionContext}
 import com.wavesplatform.features.BlockchainFeatureStatus
@@ -27,128 +23,196 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.{ExecutionError, ValidationError}
+import com.wavesplatform.protobuf.Amount
+import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.state.{Diff, Portfolio}
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.smart.script.ScriptRunner
-import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.stub.{ServerCallStreamObserver, StreamObserver}
 import io.grpc.{Metadata, Status, StatusRuntimeException}
-import monix.eval.{Coeval, Task}
-import monix.execution.{CancelableFuture, Scheduler}
-import monix.reactive.Observable
+import monix.eval.Task
+import monix.execution.Scheduler
 import shapeless.Coproduct
 
-import scala.collection.concurrent.TrieMap
 import scala.concurrent.Future
+import scala.jdk.CollectionConverters._
 import scala.util.Try
 import scala.util.control.NonFatal
 
+// TODO send all utx on connect?
 class WavesBlockchainApiGrpcService(context: ExtensionContext, ignoredExchangeTxSenderPublicKey: Option[String])(implicit sc: Scheduler)
     extends WavesBlockchainApiGrpc.WavesBlockchainApi
     with ScorexLogging {
 
-  private type AddressesAssetsChanges = Map[Address, Set[Asset]]
-
   private val descKey = Metadata.Key.of("desc", Metadata.ASCII_STRING_MARSHALLER)
 
-  private val emptyAddressAssetsChanges = Map.empty[Address, Set[Asset]]
-  private val allSpendableBalances      = new ConcurrentHashMap[Address, Map[Asset, Long]]()
+  private val utxState = new ConcurrentHashMap[ByteStr, UtxTransaction]()
 
-  // TODO rename to balanceChangesSubscribers after release 2.1.2
-  private val realTimeBalanceChangesSubscribers = ConcurrentHashMap.newKeySet[StreamObserver[BalanceChangesFlattenResponse]](2)
+//  private val emptyAddressAssetsChanges = Map.empty[Address, Set[Asset]]
+//  private val allSpendableBalances = new ConcurrentHashMap[Address, Map[Asset, Long]]()
+
+  private val utxChangesSubscribers = ConcurrentHashMap.newKeySet[StreamObserver[UtxEvent]](2)
 
   private val cleanupTask: Task[Unit] = Task {
     log.info("Closing balance changes stream...")
 
     // https://github.com/grpc/grpc/blob/master/doc/statuscodes.md
-    val metadata      = new Metadata(); metadata.put(descKey, "Shutting down")
+    val metadata = new Metadata(); metadata.put(descKey, "Shutting down")
     val shutdownError = new StatusRuntimeException(Status.UNAVAILABLE, metadata) // Because it should try to connect to other DEX Extension
 
-    realTimeBalanceChangesSubscribers.forEach(_.onError(shutdownError))
-    realTimeBalanceChangesSubscribers.clear()
+    utxChangesSubscribers.forEach(_.onError(shutdownError))
+    utxChangesSubscribers.clear()
   }
 
-  private def getAddressesChangedAssets(diff: Diff): AddressesAssetsChanges = diff.portfolios.view.mapValues(_.assetIds).toMap
+  // private def getAddressesChangedAssets(diff: Diff): AddressesAssetsChanges = diff.portfolios.view.mapValues(_.assetIds).toMap
 
-  private val pessimisticPortfolios                                                 = new PessimisticPortfolios(context.blockchain.transactionMeta(_).isEmpty)
-  private val txAddressesAssetsChanges                                              = new ConcurrentHashMap[Transaction, AddressesAssetsChanges]()
-  private val currentMaxHeight                                                      = new AtomicInteger(context.blockchain.height)
-  private val isRollback                                                            = new AtomicBoolean(false)
-  private val storingChangesDuringRollback: AtomicReference[AddressesAssetsChanges] = new AtomicReference(Map.empty)
+//  private val pessimisticPortfolios = new PessimisticPortfolios(context.blockchain.transactionMeta(_).isEmpty)
+  // private val txAddressesAssetsChanges = new ConcurrentHashMap[Transaction, AddressesAssetsChanges]()
 
-  private val blockchainBalanceUpdates: Observable[AddressesAssetsChanges] = Observable.empty /*context.blockchainUpdated.map {
-    case BlockAppended(_, newHeight, _, _, _, transactionStateUpdates) =>
-      val changes = getAddressesChangedAssets(transactionStateUpdates)
-      if (isRollback.get()) {
-        storingChangesDuringRollback.updateAndGet(_ |+| changes)
-        if (newHeight != currentMaxHeight.get) emptyAddressAssetsChanges
-        else {
-          isRollback.set(false)
-          storingChangesDuringRollback.getAndSet(Map.empty)
-        }
-      } else {
-        currentMaxHeight.set(newHeight)
-        changes
+  private val pbWaves = Waves.toPB
+
+  case class PortfolioUpdates(
+    balanceUpdates: List[StateUpdate.BalanceUpdate],
+    leasingUpdates: List[StateUpdate.LeasingUpdate]
+  )
+
+  private def unpack(init: PortfolioUpdates, address: Address, portfolio: Portfolio): PortfolioUpdates = {
+    val pbAddress = address.toPB
+
+    val balanceUpdates = portfolio.assets
+      .foldLeft(init.balanceUpdates) {
+        case (r, (asset, v)) =>
+          if (v == 0) r
+          else StateUpdate.BalanceUpdate(
+            address = address.toPB,
+            amount = Amount(asset.toPB, v).some
+          ) :: r
       }
+      .prependIf(portfolio.balance != 0)(StateUpdate.BalanceUpdate(pbAddress, Amount(pbWaves, portfolio.balance).some))
 
-    case MicroBlockAppended(_, _, _, _, transactionStateUpdates) => getAddressesChangedAssets(transactionStateUpdates)
-    case MicroBlockRollbackCompleted(_, _)                       => emptyAddressAssetsChanges
-    case RollbackCompleted(_, _)                                 => isRollback.set(true); emptyAddressAssetsChanges
-  }
-
-  private def getAddressesChangedAssets(transactionStateUpdates: Seq[StateUpdate]): AddressesAssetsChanges = {
-    transactionStateUpdates.foldLeft(Map.empty[Address, Set[Asset]]) {
-      case (result, stateUpdate) => result |+| stateUpdate.balances.groupBy(_._1).view.mapValues(_.map(_._2).toSet).toMap
+    val lease = portfolio.lease
+    val leasingUpdates = init.leasingUpdates.prependIf(lease.in != 0 || lease.out != 0) {
+      StateUpdate.LeasingUpdate(
+        address = pbAddress,
+        in = portfolio.lease.in,
+        out = portfolio.lease.out
+      )
     }
-  }*/
 
-  private val utxBalanceUpdates: Observable[AddressesAssetsChanges] = context.utxEvents.map {
-    case TxAdded(tx, diff) =>
-      tx match {
-        case et: ExchangeTransaction if ignoredExchangeTxSenderPublicKey.contains(et.sender.toString) => emptyAddressAssetsChanges
-        case otherTx =>
-          val changes = getAddressesChangedAssets(diff)
-          pessimisticPortfolios.add(otherTx, diff)
-          txAddressesAssetsChanges.putIfAbsent(otherTx, changes)
-          changes
-      }
-    case TxRemoved(tx, _) =>
-      pessimisticPortfolios.remove(tx)
-      Option(txAddressesAssetsChanges remove tx).getOrElse(Map.empty)
+    PortfolioUpdates(balanceUpdates, leasingUpdates)
   }
 
-  private val realTimeBalanceChanges: Coeval[CancelableFuture[Unit]] = Coeval.evalOnce {
-    Observable(blockchainBalanceUpdates, utxBalanceUpdates).merge
-      .map {
-        _.flatMap {
-          case (address, assets) =>
-            val addressBalance       = allSpendableBalances.getOrDefault(address, Map.empty)
-            val pessimisticPortfolio = pessimisticPortfolios.getAggregated(address)
-            assets.map { asset =>
-              val newAssetBalance = spendableBalance(address, pessimisticPortfolio, asset)
-              val needUpdate      = !addressBalance.get(asset).contains(newAssetBalance)
-              if (needUpdate) {
-                allSpendableBalances.put(address, addressBalance + (asset -> newAssetBalance))
-                Some(BalanceChangesFlattenResponse(address.toPB, asset.toPB, newAssetBalance))
-              } else Option.empty[BalanceChangesFlattenResponse]
+  private def toPbDiff(vanilla: Diff): TransactionDiff = {
+    val portfolioUpdates = vanilla.portfolios.foldLeft(PortfolioUpdates(Nil, Nil)) {
+      case (r, (address, portfolio)) => unpack(r, address, portfolio)
+    }
+
+    TransactionDiff(
+      stateUpdate = StateUpdate(
+        balances = portfolioUpdates.balanceUpdates,
+        leases = portfolioUpdates.leasingUpdates,
+        dataEntries = vanilla.accountData.view.flatMap {
+          case (address, dataEntries) =>
+            dataEntries.data.values.map { dataEntry =>
+              StateUpdate.DataEntryUpdate(
+                address = address.toPB,
+                dataEntry = PBTransactions.toPBDataEntry(dataEntry).some
+              )
             }
-        }.collect { case Some(response) => response }
-      }
-      .doOnSubscriptionCancel(cleanupTask)
-      .doOnComplete(cleanupTask)
-      .doOnError(e => Task { log.error(s"Error in real time balance changes stream occurred!", e) })
-      .foreach { batch =>
-        if (batch.nonEmpty) {
-          realTimeBalanceChangesSubscribers.forEach { subscriber =>
-            try batch.foreach(subscriber.onNext)
+        }.toList,
+        assets = Nil // vanilla. // TODO
+      ).some
+    )
+  }
+
+  // TODO duplication
+  private def getSimpleName(x: Any): String = x.getClass.getName.replaceAll(".*?(\\w+)\\$?$", "$1")
+
+  // TODO close
+  private val utxBalanceUpdates = context.utxEvents
+    .doOnSubscriptionCancel(cleanupTask)
+    .doOnComplete(cleanupTask)
+    .doOnError(e => Task(log.error(s"Error in real time balance changes stream occurred!", e)))
+    .foreach {
+      case TxAdded(tx, diff) =>
+        val utxTransaction = UtxTransaction(
+          transaction = tx.toPB.some,
+          diff = toPbDiff(diff).some
+        )
+
+        utxState.put(
+          tx.id(),
+          utxTransaction
+        )
+
+        val event = UtxEvent(UtxEvent.Added(List(utxTransaction)).some)
+        utxChangesSubscribers.forEach { subscriber =>
+          try subscriber.onNext(event)
+          catch { case e: Throwable => log.warn(s"Can't send balance changes to $subscriber", e) }
+        }
+//      tx match {
+//        case et: ExchangeTransaction if ignoredExchangeTxSenderPublicKey.contains(et.sender.toString) => emptyAddressAssetsChanges
+//        case otherTx =>
+//          val changes = getAddressesChangedAssets(diff)
+//          pessimisticPortfolios.add(otherTx, diff)
+//          txAddressesAssetsChanges.putIfAbsent(otherTx, changes)
+//          changes
+//      }
+
+      case TxRemoved(tx, reason) =>
+        Option(utxState.remove(tx.id())).foreach { utxTransaction =>
+          val gReason = reason.map { x =>
+            UtxEvent.Removed.Item.Reason(
+              name = getSimpleName(x),
+              message = x.toString
+            )
+          }
+
+          val event = UtxEvent(
+            removed = UtxEvent.Removed(List(UtxEvent.Removed.Item(utxTransaction.some, gReason))).some
+          )
+
+          utxChangesSubscribers.forEach { subscriber =>
+            try subscriber.onNext(event)
             catch { case e: Throwable => log.warn(s"Can't send balance changes to $subscriber", e) }
           }
         }
-      }
-  }
+
+//      pessimisticPortfolios.remove(tx)
+//      Option(txAddressesAssetsChanges remove tx).getOrElse(Map.empty)
+    }
+
+//  private val utxChanges: Coeval[CancelableFuture[Unit]] = Coeval.evalOnce {
+//    utxBalanceUpdates
+//      .map {
+//        _.flatMap {
+//          case (address, assets) =>
+//            val addressBalance = allSpendableBalances.getOrDefault(address, Map.empty)
+//            val pessimisticPortfolio = pessimisticPortfolios.getAggregated(address)
+//            assets.map { asset =>
+//              val newAssetBalance = spendableBalance(address, pessimisticPortfolio, asset)
+//              val needUpdate = !addressBalance.get(asset).contains(newAssetBalance)
+//              if (needUpdate) {
+//                allSpendableBalances.put(address, addressBalance + (asset -> newAssetBalance))
+//                Some(BalanceChangesFlattenResponse(address.toPB, asset.toPB, newAssetBalance))
+//              } else Option.empty[BalanceChangesFlattenResponse]
+//            }
+//        }.collect { case Some(response) => response }
+//      }
+//      .doOnSubscriptionCancel(cleanupTask)
+//      .doOnComplete(cleanupTask)
+//      .doOnError(e => Task(log.error(s"Error in real time balance changes stream occurred!", e)))
+//      .foreach { batch =>
+//        if (batch.nonEmpty)
+//          utxChangesSubscribers.forEach { subscriber =>
+//            try batch.foreach(subscriber.onNext)
+//            catch { case e: Throwable => log.warn(s"Can't send balance changes to $subscriber", e) }
+//          }
+//      }
+//  }
 
   override def getStatuses(request: TransactionsByIdRequest): Future[TransactionsStatusesResponse] = Future {
     val statuses = request.transactionIds.map { txId =>
@@ -271,15 +335,17 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, ignoredExchangeTx
     ForgedOrderResponse(isForged = seen)
   }
 
-  // TODO rename to getBalanceChanges after release 2.1.2
-  override def getRealTimeBalanceChanges(request: Empty, responseObserver: StreamObserver[BalanceChangesFlattenResponse]): Unit =
-    if (!realTimeBalanceChanges().isCompleted) {
+  override def getUtxChanges(request: Empty, responseObserver: StreamObserver[UtxEvent]): Unit =
+    if (!utxBalanceUpdates.isCompleted) {
       responseObserver match {
-        case x: ServerCallStreamObserver[_] => x.setOnCancelHandler(() => realTimeBalanceChangesSubscribers remove x)
+        case x: ServerCallStreamObserver[_] => x.setOnCancelHandler(() => utxChangesSubscribers remove x)
         case x => log.warn(s"Can't register cancel handler for $x")
       }
-      realTimeBalanceChangesSubscribers.add(responseObserver)
+      utxChangesSubscribers.add(responseObserver)
+      responseObserver.onNext(UtxEvent(added = UtxEvent.Added(utxState.values().asScala.toSeq).some))
     }
+
+  override def getCurrentHeight(request: Empty): Future[CurrentHeightResponse] = Future(CurrentHeightResponse(context.blockchain.height))
 
   private def parseScriptResult(raw: => Either[ExecutionError, Terms.EVALUATED]): RunScriptResponse.Result = {
     import RunScriptResponse.Result
@@ -310,14 +376,17 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, ignoredExchangeTx
     NodeAddressResponse(InetAddress.getLocalHost.getHostAddress)
   }
 
-  private def spendableBalance(address: Address, asset: Asset): Long =
-    spendableBalance(address, pessimisticPortfolios.getAggregated(address), asset)
+  private def spendableBalance(address: Address, asset: Asset): Long = 0L
+    // spendableBalance(address, pessimisticPortfolios.getAggregated(address), asset)
 
   private def spendableBalance(address: Address, pessimisticAddressPortfolio: Portfolio, asset: Asset): Long = {
-    val stateBalance       = context.blockchain.balance(address, asset)
-    val leasedBalance      = asset.fold(context.blockchain.leaseBalance(address).out)(_ => 0L)
+    val stateBalance = context.blockchain.balance(address, asset)
+    val leasedBalance = asset.fold(context.blockchain.leaseBalance(address).out)(_ => 0L)
     val pessimisticBalance = pessimisticAddressPortfolio.spendableBalanceOf(asset)
-    math.max(0L, stateBalance - leasedBalance + pessimisticBalance) // The negative spendable balance could happen if there are multiple transactions in UTX those spend more than available
+    math.max(
+      0L,
+      stateBalance - leasedBalance + pessimisticBalance
+    ) // The negative spendable balance could happen if there are multiple transactions in UTX those spend more than available
   }
 
   private def throwInvalidArgument(description: String): Nothing = {
@@ -330,17 +399,18 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, ignoredExchangeTx
 
 object WavesBlockchainApiGrpcService {
 
-  private class PessimisticPortfolios(isTxKnown: ByteStr => Boolean) {
+//  private class PessimisticPortfolios(isTxKnown: ByteStr => Boolean) {
+//
+//    private type Portfolios = Map[Address, Portfolio]
+//    private val txsPessimisticPortfolios = TrieMap[Transaction, Portfolios]()
+//
+//    def add(tx: Transaction, diff: Diff): Unit = txsPessimisticPortfolios.putIfAbsent(tx, diff.portfolios.view.mapValues(_.pessimistic).toMap)
+//    def remove(tx: Transaction): Unit = txsPessimisticPortfolios.remove(tx)
+//
+//    def getAggregated(address: Address): Portfolio =
+//      // take only txs which weren't forged. Appending of a micro block occurs before removing a tx from UTX
+//      Monoid.combineAll(txsPessimisticPortfolios.view.filterKeys(tx => isTxKnown(tx.id())).values).getOrElse(address, Portfolio.empty)
+//
+//  }
 
-    private type Portfolios = Map[Address, Portfolio]
-    private val txsPessimisticPortfolios = TrieMap[Transaction, Portfolios]()
-
-    def add(tx: Transaction, diff: Diff): Unit = txsPessimisticPortfolios.putIfAbsent(tx, diff.portfolios.view.mapValues(_.pessimistic).toMap)
-    def remove(tx: Transaction): Unit          = txsPessimisticPortfolios.remove(tx)
-
-    def getAggregated(address: Address): Portfolio = {
-      // take only txs which weren't forged. Appending of a micro block occurs before removing a tx from UTX
-      Monoid.combineAll(txsPessimisticPortfolios.view.filterKeys(tx => isTxKnown(tx.id())).values).getOrElse(address, Portfolio.empty)
-    }
-  }
 }

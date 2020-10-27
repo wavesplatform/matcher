@@ -6,13 +6,13 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
+import com.wavesplatform.api.grpc.TransactionsByIdRequest
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.grpc.integration.clients.MatcherExtensionClient.BalanceChanges
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.effect.Implicits.NettyFutureOps
 import com.wavesplatform.dex.grpc.integration.exceptions.{UnexpectedConnectionException, WavesNodeConnectionLostException}
@@ -48,17 +48,14 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
   private val shuttingDown = new AtomicBoolean(false)
   private val blockchainService = WavesBlockchainApiGrpc.stub(channel)
 
-  // TODO rename to spendableBalanceChangesSubject after release 2.1.2
-  private val realTimeSpendableBalanceChangesSubject = ConcurrentSubject.publish[BalanceChanges](monixScheduler)
-
-  // TODO rename to balanceChangesObserver after release 2.1.2
-  private val realTimeBalanceChangesObserver = new RealTimeBalanceChangesObserver
+  private val utxEventsSubject = ConcurrentSubject.publish[UtxEvent](monixScheduler)
+  private val utxEventsSubjectObserver = new UtxEventsObserver
 
   private val empty: Empty = Empty()
 
   // TODO rename to requestBalanceChanges after release 2.1.2
   /** Performs new gRPC call for receiving of the spendable balance changes real-time stream */
-  private def requestRealTimeBalanceChanges(): Unit = blockchainService.getRealTimeBalanceChanges(empty, realTimeBalanceChangesObserver)
+  private def requestUtxEvents(): Unit = blockchainService.getUtxEvents(empty, utxEventsSubjectObserver)
 
   private def parse(input: RunScriptResponse): RunScriptResult = input.result match {
     case Result.WrongInput(message) => throw new IllegalArgumentException(message)
@@ -69,10 +66,9 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
     case _: Result.Denied => RunScriptResult.Denied
   }
 
-  // TODO rename to spendableBalanceChanges after release 2.1.2
-  override lazy val realTimeBalanceChanges: Observable[MatcherExtensionClient.BalanceChanges] = {
-    requestRealTimeBalanceChanges()
-    realTimeSpendableBalanceChangesSubject
+  override lazy val utxChanges: Observable[UtxEvent] = {
+    requestUtxEvents()
+    utxEventsSubject
   }
 
   override def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] = handlingErrors {
@@ -148,27 +144,27 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
   override def currentHeight: Future[Int] = blockchainService.getCurrentHeight(empty).map(_.height)
 
   // TODO rename to BalanceChangesObserver after release 2.1.2
-  final private class RealTimeBalanceChangesObserver extends ClientResponseObserver[Empty, BalanceChangesFlattenResponse] with AutoCloseable {
+  final private class UtxEventsObserver extends ClientResponseObserver[Empty, UtxEvent] with AutoCloseable {
 
     private val isConnectionEstablished: AtomicBoolean = new AtomicBoolean(true)
     private var requestStream: ClientCallStreamObserver[Empty] = _
 
     override def onCompleted(): Unit = log.info("Balance changes stream completed!")
 
-    override def onNext(value: BalanceChangesFlattenResponse): Unit = {
+    override def onNext(value: UtxEvent): Unit = {
+      // TODO
       if (isConnectionEstablished.compareAndSet(false, true))
         blockchainService.getNodeAddress(empty) foreach { response =>
           log.info(s"gRPC connection restored! DEX server now is connected to Node with an address: ${response.address}")
         }
 
-      val vanillaBalanceChanges = BalanceChanges(value.address.toVanillaAddress, value.asset.toVanillaAsset, value.balance)
-      realTimeSpendableBalanceChangesSubject.onNext(vanillaBalanceChanges)
+      utxEventsSubject.onNext(value)
     }
 
     override def onError(e: Throwable): Unit = if (!shuttingDown.get()) {
       if (isConnectionEstablished.compareAndSet(true, false)) log.error("Connection with Node lost!", e)
       channel.resetConnectBackoff()
-      requestRealTimeBalanceChanges()
+      requestUtxEvents()
     }
 
     override def close(): Unit = if (requestStream != null) requestStream.cancel("Shutting down", new StatusRuntimeException(Status.CANCELLED))

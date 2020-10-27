@@ -8,22 +8,13 @@ import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
-import com.wavesplatform.dex.grpc.integration.clients.MatcherExtensionClient.BalanceChanges
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
+import com.wavesplatform.dex.grpc.integration.services.UtxEvent
 import monix.reactive.Observable
-
-object MatcherExtensionClient {
-
-  final case class BalanceChanges(address: Address, asset: Asset, balance: Long)
-
-  type SpendableBalance = Map[Asset, Long]
-  type SpendableBalanceChanges = Map[Address, SpendableBalance]
-}
 
 trait MatcherExtensionClient[F[_]] {
 
-  // TODO rename to spendableBalanceChanges after release 2.1.2
-  def realTimeBalanceChanges: Observable[BalanceChanges]
+  def utxChanges: Observable[UtxEvent]
 
   def spendableBalances(address: Address, assets: Set[Asset]): F[Map[Asset, Long]]
   def allAssetsSpendableBalance(address: Address): F[Map[Asset, Long]]

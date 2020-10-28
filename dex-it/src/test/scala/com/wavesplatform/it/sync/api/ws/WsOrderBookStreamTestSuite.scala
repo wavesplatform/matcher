@@ -85,7 +85,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
     def placeOrdersAsync(t: OrderType): Unit = {
       val orders = (1 until 50).map(_ => mkOrderDP(alice, wavesUsdPair, t, 1.usd, Random.between(10000, 10000000)))
       executeCommands(Random.shuffle(orders.map(MatcherCommand.Place(dex1, _))))
-      orders.foreach(eventually(dex1.api.waitForOrderStatus(_, Status.Accepted)))
+      orders.foreach(o => eventually(dex1.api.waitForOrderStatus(o, Status.Accepted)))
     }
 
     "send prices in bids with right order" in {

@@ -1,21 +1,31 @@
 package com.wavesplatform.dex.grpc.integration.clients
 
 import java.net.InetAddress
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger, AtomicReference}
 
+import cats.Group
+import cats.instances.long._
+import cats.instances.map.catsKernelStdMonoidForMap
+import cats.syntax.group._
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
-import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
+import com.wavesplatform.dex.grpc.integration.clients.DefaultWavesBlockchainClient.PessimisticPortfolios
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.Updates
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions._
+import com.wavesplatform.dex.grpc.integration.services.UtxEvent.Type
+import com.wavesplatform.dex.grpc.integration.services.UtxTransaction
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Rollback.RollbackType
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
+import com.wavesplatform.events.protobuf.StateUpdate
 import monix.reactive.Observable
 
+import scala.collection.concurrent.TrieMap
 import scala.concurrent.{ExecutionContext, Future}
 
 object WavesBlockchainClient {
@@ -58,6 +68,7 @@ class DefaultWavesBlockchainClient(
     extends WavesBlockchainClient {
 
   type Balances = Map[Address, Map[Asset, Long]]
+  type Leases = Map[Address, Long]
 
   private val currentMaxHeight = new AtomicInteger(0)
   private val isRollback = new AtomicBoolean(false)
@@ -65,6 +76,26 @@ class DefaultWavesBlockchainClient(
   private val emptyBalances: Balances = Map.empty
   private val knownBalances: AtomicReference[Balances] = new AtomicReference(emptyBalances)
   private val storingChangesDuringRollback: AtomicReference[Balances] = new AtomicReference(emptyBalances)
+
+  private val pessimisticPortfolios = new PessimisticPortfolios
+
+  private def balanceUpdates(stateUpdate: StateUpdate): Balances =
+    stateUpdate.balances.foldLeft(emptyBalances) {
+      case (r, x) =>
+        x.amount.fold(r) { assetAmount =>
+          val address = x.address.toVanillaAddress
+          val updated = r
+            .getOrElse(address, Map.empty)
+            .updated(assetAmount.assetId.toVanillaAsset, assetAmount.amount)
+          r.updated(address, updated)
+        }
+    }
+
+  private def leaseUpdates(stateUpdate: StateUpdate): Leases =
+    stateUpdate.leases.foldLeft[Leases](Map.empty) { case (r, x) =>
+      if (x.out <= 0) r
+      else r.updated(x.address.toVanillaAddress, x.out)
+    }
 
   override lazy val updates: Observable[Updates] = {
     val bStream = Observable.fromFuture(meClient.currentHeight).flatMap { start =>
@@ -77,20 +108,10 @@ class DefaultWavesBlockchainClient(
         event.update match {
           case Update.Empty => emptyBalances // Nothing to do
           case Update.Append(updates) =>
-            val changes = updates.stateUpdate.fold(emptyBalances) { stateUpdate =>
-              // TODO Test performance
-              stateUpdate.balances.foldLeft(emptyBalances) {
-                case (r, x) =>
-                  x.amount.fold(r) { assetAmount =>
-                    val address = x.address.toVanillaAddress
-                    val updated = r
-                      .getOrElse(address, Map.empty)
-                      .updated(assetAmount.assetId.toVanillaAsset, assetAmount.amount)
-                    r.updated(address, updated)
-                  }
-              }
-            }
+            // TODO Test performance
+            updates.body.microBlock.get.microBlock.get
 
+            val changes = updates.stateUpdate.fold(emptyBalances)(balanceUpdates)
             val newHeight = event.height
             if (isRollback.get()) {
               val accumulatedUpdates = storingChangesDuringRollback.updateAndGet(upsert(_, changes))
@@ -118,7 +139,13 @@ class DefaultWavesBlockchainClient(
       }
     }
 
-    val meStream = meClient.realTimeBalanceChanges.map(x => Map(x.address -> Map(x.asset -> x.balance)))
+    val meStream = meClient.utxEvents.map { event =>
+      event.`type` match {
+        case Type.Switch(event) => event.transaction.map()
+        case Type.Update(event) =>
+        case Type.Empty =>
+      }
+    }
 
     Observable(bStream, meStream).merge.map(Updates)
   }
@@ -170,5 +197,57 @@ class DefaultWavesBlockchainClient(
       val orig = r.getOrElse(address, Map.empty)
       r.updated(address, orig ++ balances)
     }
+
+}
+
+object DefaultWavesBlockchainClient {
+
+  private class PessimisticPortfolios {
+
+    private type Portfolios = Map[Address, Map[Asset, Long]]
+
+    private val portfolios = new ConcurrentHashMap[Address, Map[Asset, Long]]()
+    private val txs = TrieMap.empty[UtxTransaction, Portfolios] // TODO Use ID
+
+    def add(tx: UtxTransaction): Unit = tx.diff.flatMap(_.stateUpdate).foreach { diff =>
+      // Balances
+      val p1: Portfolios = diff.balances.groupBy(_.address).map {
+        case (address, updates) =>
+          val balances = updates.view
+            .flatMap(_.amount)
+            .collect {
+              case x if x.amount < 0 => x.assetId.toVanillaAsset -> x.amount // pessimistic
+            }
+            .toMap
+          address.toVanillaAddress -> balances
+      }
+
+      // Leasing
+      val finalP: Portfolios = diff.leases.foldLeft(p1) {
+        case (r, x) =>
+          if (x.out <= 0) r // pessimistic
+          else {
+            val address = x.address.toVanillaAddress
+            val orig = r.getOrElse(address, Map.empty)
+            val updated = orig.updated(Waves, orig.getOrElse(Waves, 0L) - x.out)
+            r.updated(address, updated)
+          }
+      }
+
+      if (txs.putIfAbsent(tx, finalP).isEmpty)
+        finalP.foreach {
+          case (address, balances) => portfolios.compute(address, (_, orig) => orig |+| balances)
+        }
+    }
+
+    def remove(tx: UtxTransaction): Unit = txs.remove(tx).foreach { p =>
+      p.foreach {
+        case (address, balances) => portfolios.compute(address, (_, orig) => orig |-| balances)
+      }
+    }
+
+    def getAggregated(address: Address): Map[Asset, Long] = portfolios.get(address)
+
+  }
 
 }

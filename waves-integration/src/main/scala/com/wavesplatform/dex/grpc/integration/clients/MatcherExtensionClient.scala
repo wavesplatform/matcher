@@ -14,7 +14,7 @@ import monix.reactive.Observable
 
 trait MatcherExtensionClient[F[_]] {
 
-  def utxChanges: Observable[UtxEvent]
+  def utxEvents: Observable[UtxEvent]
 
   def spendableBalances(address: Address, assets: Set[Asset]): F[Map[Asset, Long]]
   def allAssetsSpendableBalance(address: Address): F[Map[Asset, Long]]

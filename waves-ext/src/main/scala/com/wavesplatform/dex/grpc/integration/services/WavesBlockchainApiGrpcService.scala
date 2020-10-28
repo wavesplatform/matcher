@@ -148,7 +148,14 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, ignoredExchangeTx
           utxTransaction
         )
 
-        val event = UtxEvent(UtxEvent.Added(List(utxTransaction)).some)
+        val event = UtxEvent(
+          UtxEvent.Type.Update(
+            UtxEvent.Update(
+              added = List(UtxEvent.Update.Added(utxTransaction.some))
+            )
+          )
+        )
+
         utxChangesSubscribers.forEach { subscriber =>
           try subscriber.onNext(event)
           catch { case e: Throwable => log.warn(s"Can't send balance changes to $subscriber", e) }
@@ -165,14 +172,18 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, ignoredExchangeTx
       case TxRemoved(tx, reason) =>
         Option(utxState.remove(tx.id())).foreach { utxTransaction =>
           val gReason = reason.map { x =>
-            UtxEvent.Removed.Item.Reason(
+            UtxEvent.Update.Removed.Reason(
               name = getSimpleName(x),
               message = x.toString
             )
           }
 
           val event = UtxEvent(
-            removed = UtxEvent.Removed(List(UtxEvent.Removed.Item(utxTransaction.some, gReason))).some
+            UtxEvent.Type.Update(
+              UtxEvent.Update(
+                removed = List(UtxEvent.Update.Removed(utxTransaction.some, gReason))
+              )
+            )
           )
 
           utxChangesSubscribers.forEach { subscriber =>
@@ -335,14 +346,22 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, ignoredExchangeTx
     ForgedOrderResponse(isForged = seen)
   }
 
-  override def getUtxChanges(request: Empty, responseObserver: StreamObserver[UtxEvent]): Unit =
+  override def getUtxEvents(request: Empty, responseObserver: StreamObserver[UtxEvent]): Unit =
     if (!utxBalanceUpdates.isCompleted) {
       responseObserver match {
         case x: ServerCallStreamObserver[_] => x.setOnCancelHandler(() => utxChangesSubscribers remove x)
         case x => log.warn(s"Can't register cancel handler for $x")
       }
+
       utxChangesSubscribers.add(responseObserver)
-      responseObserver.onNext(UtxEvent(added = UtxEvent.Added(utxState.values().asScala.toSeq).some))
+      val event = UtxEvent(
+        UtxEvent.Type.Switch(
+          UtxEvent.Switch(
+            utxState.values().asScala.toSeq
+          )
+        )
+      )
+      responseObserver.onNext(event)
     }
 
   override def getCurrentHeight(request: Empty): Future[CurrentHeightResponse] = Future(CurrentHeightResponse(context.blockchain.height))
@@ -377,7 +396,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, ignoredExchangeTx
   }
 
   private def spendableBalance(address: Address, asset: Asset): Long = 0L
-    // spendableBalance(address, pessimisticPortfolios.getAggregated(address), asset)
+  // spendableBalance(address, pessimisticPortfolios.getAggregated(address), asset)
 
   private def spendableBalance(address: Address, pessimisticAddressPortfolio: Portfolio, asset: Asset): Long = {
     val stateBalance = context.blockchain.balance(address, asset)
@@ -399,18 +418,6 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, ignoredExchangeTx
 
 object WavesBlockchainApiGrpcService {
 
-//  private class PessimisticPortfolios(isTxKnown: ByteStr => Boolean) {
-//
-//    private type Portfolios = Map[Address, Portfolio]
-//    private val txsPessimisticPortfolios = TrieMap[Transaction, Portfolios]()
-//
-//    def add(tx: Transaction, diff: Diff): Unit = txsPessimisticPortfolios.putIfAbsent(tx, diff.portfolios.view.mapValues(_.pessimistic).toMap)
-//    def remove(tx: Transaction): Unit = txsPessimisticPortfolios.remove(tx)
-//
-//    def getAggregated(address: Address): Portfolio =
-//      // take only txs which weren't forged. Appending of a micro block occurs before removing a tx from UTX
-//      Monoid.combineAll(txsPessimisticPortfolios.view.filterKeys(tx => isTxKnown(tx.id())).values).getOrElse(address, Portfolio.empty)
-//
-//  }
+
 
 }

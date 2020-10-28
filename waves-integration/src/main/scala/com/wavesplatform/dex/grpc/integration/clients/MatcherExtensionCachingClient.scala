@@ -28,7 +28,7 @@ class MatcherExtensionCachingClient(underlying: MatcherExtensionClient[Future], 
     new FeaturesCache(underlying.isFeatureActivated, invalidationPredicate = !_) // we don't keep knowledge about unactivated features
   private val assetDescriptionsCache = new AssetDescriptionsCache(underlying.assetDescription, cacheExpiration)
 
-  override def utxChanges: Observable[UtxEvent] = underlying.utxChanges
+  override def utxEvents: Observable[UtxEvent] = underlying.utxEvents
 
   override def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] = underlying.spendableBalances(address, assets)
   override def allAssetsSpendableBalance(address: Address): Future[Map[Asset, Long]] = underlying.allAssetsSpendableBalance(address)

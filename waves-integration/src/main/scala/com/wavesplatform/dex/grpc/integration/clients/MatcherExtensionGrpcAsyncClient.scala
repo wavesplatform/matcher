@@ -66,7 +66,7 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
     case _: Result.Denied => RunScriptResult.Denied
   }
 
-  override lazy val utxChanges: Observable[UtxEvent] = {
+  override lazy val utxEvents: Observable[UtxEvent] = {
     requestUtxEvents()
     utxEventsSubject
   }

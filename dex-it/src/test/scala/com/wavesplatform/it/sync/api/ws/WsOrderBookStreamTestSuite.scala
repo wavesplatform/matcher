@@ -20,6 +20,7 @@ import com.wavesplatform.it.WsSuiteBase
 import scala.collection.immutable.TreeMap
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, Future}
+import play.api.libs.json._
 
 class WsOrderBookStreamTestSuite extends WsSuiteBase {
 
@@ -76,6 +77,40 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
   }
 
   "Order book stream should" - {
+    "send prices in asks with right order" in {
+      val wsc = mkDexWsConnection(dex1)
+      wsc.send(WsOrderBookSubscribe(wavesUsdPair, 1))
+
+      (1 until 50).foreach(i => placeAndAwaitAtDex(mkOrderDP(alice, wavesUsdPair, BUY, 1.usd, i * 10000)))
+
+      wsc.receiveAtLeastNRaw(20).map(m =>
+        (Json.parse(m.body) \ "b").asOpt[List[List[String]]] match {
+          case Some(b) => b.flatMap(_.head).map(_.toDouble)
+          case None => List.empty
+        }
+      ).filter(_.nonEmpty).filter(_.size > 1).filter(l => l == l.sorted) should have size 0
+
+      dex1.api.cancelAll(alice)
+      wsc.close()
+    }
+
+    "send prices in bids with right order" in {
+      val wsc = mkDexWsConnection(dex1)
+      wsc.send(WsOrderBookSubscribe(wavesUsdPair, 1))
+
+      (1 until 50).foreach(i => placeAndAwaitAtDex(mkOrderDP(alice, wavesUsdPair, SELL, 1.usd, i * 10000)))
+
+      wsc.receiveAtLeastNRaw(20).map(m =>
+        (Json.parse(m.body) \ "b").asOpt[List[List[String]]] match {
+          case Some(b) => b.flatMap(_.head).map(_.toDouble)
+          case None => List.empty
+        }
+      ).filter(_.nonEmpty).filter(_.size > 1).filter(l => l == l.sorted(Ordering[Double].reverse)) should have size 0
+
+      dex1.api.cancelAll(alice)
+      wsc.close()
+    }
+
     "correctly handle rejections" in {
       val invalidAssetPair = AssetPair(Waves, eth)
 

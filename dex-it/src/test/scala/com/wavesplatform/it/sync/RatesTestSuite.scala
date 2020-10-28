@@ -93,7 +93,7 @@ class RatesTestSuite extends MatcherSuiteBase {
     // the same order is passed, because we choose the minimal rate between 1 and 1.1
     placeAndAwaitAtDex(newOrder)
 
-    // now a new order doesn't matches both rates
+    // now a new order doesn't match both rates
     dex1.httpApi.upsertRate(btc, 1.1).code shouldBe StatusCodes.Ok
 
     // the same order now is rejected

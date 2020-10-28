@@ -8,16 +8,14 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class DropOldestFixedBuffer2Spec extends AnyFreeSpecLike with Matchers with PropertyChecks with NoShrink {
   private val doubleGen = Arbitrary.arbDouble.arbitrary
-  private val testGen = Gen.zip(doubleGen, Gen.listOf(Arbitrary.arbDouble.arbitrary))
+  private val testGen = Gen.zip(doubleGen, Gen.listOf(doubleGen))
 
   "DropOldestFixedBuffer2" - {
     "min" - {
       "selects the minimal value between two last" in forAll(testGen) { case (init, xs) =>
         val buff = xs.foldLeft(DropOldestFixedBuffer2(init))(_.append(_))
-
         val lastTwo = (init :: xs).takeRight(2)
-        val expectedMin = if (lastTwo.isEmpty) init else lastTwo.min
-        buff.min shouldBe expectedMin
+        buff.min shouldBe lastTwo.min
       }
     }
   }

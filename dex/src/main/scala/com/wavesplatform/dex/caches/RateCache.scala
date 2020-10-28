@@ -27,9 +27,9 @@ object RateCache {
   private val WavesRateOpt = Option(WavesRate)
 
   /**
-   * 1. Stores two values for each asset
-   * 2. In getRate returns the least rate
-   * 3. In other methods returns the latest rate
+   * 1. Stores internally two values for each asset
+   * 2. getRate returns the least rate
+   * 3. other methods return the latest rate
    */
   def apply(rateDB: RateDB): RateCache = new RateCache {
 

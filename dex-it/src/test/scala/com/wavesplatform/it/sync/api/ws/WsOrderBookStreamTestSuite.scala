@@ -3,6 +3,7 @@ package com.wavesplatform.it.sync.api.ws
 import cats.syntax.option._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus
+import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.api.ws.connection.WsConnection
 import com.wavesplatform.dex.api.ws.entities.{WsLastTrade, WsOrderBookSettings}
 import com.wavesplatform.dex.api.ws.protocol
@@ -15,12 +16,15 @@ import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.error.SubscriptionsLimitReached
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, OrderRestrictionsSettings}
-import com.wavesplatform.it.WsSuiteBase
+import com.wavesplatform.it.api.MatcherCommand
+import com.wavesplatform.it.{executeCommands, WsSuiteBase}
 
 import scala.collection.immutable.TreeMap
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, Future}
 import play.api.libs.json._
+
+import scala.util.Random
 
 class WsOrderBookStreamTestSuite extends WsSuiteBase {
 
@@ -77,13 +81,20 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
   }
 
   "Order book stream should" - {
-    "send prices in asks with right order" in {
+
+    def placeOrdersAsync(t: OrderType): Unit = {
+      val orders = (1 until 50).map(_ => mkOrderDP(alice, wavesUsdPair, t, 1.usd, Random.between(10000, 10000000)))
+      executeCommands(Random.shuffle(orders.map(MatcherCommand.Place(dex1, _))))
+      eventually(orders.foreach(dex1.api.waitForOrderStatus(_, Status.Accepted)))
+    }
+
+    "send prices in bids with right order" in {
       val wsc = mkDexWsConnection(dex1)
       wsc.send(WsOrderBookSubscribe(wavesUsdPair, 1))
 
-      (1 until 50).foreach(i => placeAndAwaitAtDex(mkOrderDP(alice, wavesUsdPair, BUY, 1.usd, i * 10000)))
+      placeOrdersAsync(BUY)
 
-      wsc.receiveAtLeastNRaw(20).map(m =>
+      wsc.receiveAtLeastNRaw(1).map(m =>
         (Json.parse(m.body) \ "b").asOpt[List[List[String]]] match {
           case Some(b) => b.flatMap(_.head).map(_.toDouble)
           case None => List.empty
@@ -94,14 +105,14 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
       wsc.close()
     }
 
-    "send prices in bids with right order" in {
+    "send prices in asks with right order" in {
       val wsc = mkDexWsConnection(dex1)
       wsc.send(WsOrderBookSubscribe(wavesUsdPair, 1))
 
-      (1 until 50).foreach(i => placeAndAwaitAtDex(mkOrderDP(alice, wavesUsdPair, SELL, 1.usd, i * 10000)))
+      placeOrdersAsync(SELL)
 
-      wsc.receiveAtLeastNRaw(20).map(m =>
-        (Json.parse(m.body) \ "b").asOpt[List[List[String]]] match {
+      wsc.receiveAtLeastNRaw(1).map(m =>
+        (Json.parse(m.body) \ "a").asOpt[List[List[String]]] match {
           case Some(b) => b.flatMap(_.head).map(_.toDouble)
           case None => List.empty
         }

@@ -185,7 +185,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
       upsertRates(eth -> 0.1)
       dex1.tryApi.place(order) should failWith(
         9441540, // UnexpectedFeeAsset
-        s"Required one of the following fee asset: $EthId, WAVES. But given $BtcId"
+        s"But given $BtcId"
       )
       dex1.api.deleteRate(eth)
     }

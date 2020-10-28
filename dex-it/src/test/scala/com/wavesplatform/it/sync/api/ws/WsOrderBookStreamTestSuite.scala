@@ -88,7 +88,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
           case Some(b) => b.flatMap(_.head).map(_.toDouble)
           case None => List.empty
         }
-      ).filter(_.nonEmpty).filter(_.size > 1).filter(l => l == l.sorted) should have size 0
+      ).filter(_.size > 1).filter(l => l == l.sorted) should have size 0
 
       dex1.api.cancelAll(alice)
       wsc.close()
@@ -105,7 +105,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
           case Some(b) => b.flatMap(_.head).map(_.toDouble)
           case None => List.empty
         }
-      ).filter(_.nonEmpty).filter(_.size > 1).filter(l => l == l.sorted(Ordering[Double].reverse)) should have size 0
+      ).filter(_.size > 1).filter(l => l == l.sorted(Ordering[Double].reverse)) should have size 0
 
       dex1.api.cancelAll(alice)
       wsc.close()

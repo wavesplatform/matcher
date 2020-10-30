@@ -1,32 +1,25 @@
 package com.wavesplatform.dex.grpc.integration.clients.state
 
-import cats.instances.long._
-import cats.syntax.group._
 import com.wavesplatform.dex.domain.account.Address
-import com.wavesplatform.dex.domain.asset.Asset
-import com.wavesplatform.dex.fp.MapImplicits.group
-import com.wavesplatform.dex.grpc.integration.clients.state.BlockchainState.ChangedAddresses
 
-case class BlockchainState(
-  height: Int,
-  changedAddresses: List[ChangedAddresses],
-  regularBalances: Map[Address, Map[Asset, Long]],
-  outLeases: Map[Address, Long],
-  utxExpenses: Map[Address, Map[Asset, Long]]
-) {
+import scala.collection.immutable.Queue
 
-
-
-  def networkBalanceOf(address: Address): Map[Asset, Long] =
-    (regularBalances.getOrElse(address, Map.empty) |-|
-      outLeases.get(address).fold(Map.empty[Asset, Long])(x => Map(Asset.Waves -> x)) |-|
-      utxExpenses.getOrElse(address, Map.empty))
-      .filter(_._2 > 0)
-
+sealed trait BlockchainState extends Product with Serializable {
+  def blockInfo: BlockInfo
 }
 
 object BlockchainState {
 
-  case class ChangedAddresses(height: Int, addresses: Set[Address])
+  case class Normal(data: BlockchainData) extends BlockchainState {
+    override def blockInfo: BlockInfo = data.blockInfo
+  }
+
+  case class TransientRollback(commonBlockInfo: BlockInfo, orig: BlockchainData, accumulated: BlockchainData) extends BlockchainState {
+    override def blockInfo: BlockInfo = commonBlockInfo
+  }
+
+  case class TransientResolving(orig: BlockchainData, waitInfoFor: Set[Address], stash: Queue[BlockchainEvent]) extends BlockchainState {
+    override def blockInfo: BlockInfo = orig.blockInfo
+  }
 
 }

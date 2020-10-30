@@ -22,8 +22,13 @@ import com.wavesplatform.dex.grpc.integration.services.UtxEvent.Type
 import com.wavesplatform.dex.grpc.integration.services.UtxTransaction
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Rollback.RollbackType
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
-import com.wavesplatform.events.protobuf.StateUpdate
+import com.wavesplatform.events.protobuf.{BlockchainUpdated, StateUpdate}
 import monix.reactive.Observable
+import DefaultWavesBlockchainClient._
+import cats.syntax.option._
+import com.wavesplatform.dex.grpc.integration.clients.state.BlockchainData.ChangedAddresses
+import com.wavesplatform.dex.grpc.integration.clients.state.{BlockInfo, BlockchainData, BlockchainEvent, BlockchainState, StateTransitions}
+import monix.reactive.subjects.ConcurrentSubject
 
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.{ExecutionContext, Future}
@@ -79,6 +84,9 @@ class DefaultWavesBlockchainClient(
 
   private val pessimisticPortfolios = new PessimisticPortfolios
 
+  private val dataUpdates = ConcurrentSubject.publish[BlockchainEvent]
+
+  // TODO replace with deepReplace ?
   private def balanceUpdates(stateUpdate: StateUpdate): Balances =
     stateUpdate.balances.foldLeft(emptyBalances) {
       case (r, x) =>
@@ -98,44 +106,50 @@ class DefaultWavesBlockchainClient(
     }
 
   override lazy val updates: Observable[Updates] = {
-    val bStream = Observable.fromFuture(meClient.currentHeight).flatMap { start =>
-      currentMaxHeight.set(start) // TODO think about algo
+    val bState = Observable.fromFuture(meClient.currentBlockInfo).flatMap { startBlockInfo =>
+      val start = startBlockInfo.height - MaxRollbackHeight - 1
+      currentMaxHeight.set(start)
       val safeStream = bClient.blockchainEvents(start).onErrorRecoverWith {
         case _ => bClient.blockchainEvents(currentMaxHeight.get())
       }
 
-      safeStream.map { event =>
-        event.update match {
-          case Update.Empty => emptyBalances // Nothing to do
-          case Update.Append(updates) =>
-            // TODO Test performance
-            updates.body.microBlock.get.microBlock.get
+      val eventsStream = safeStream
+        .map { event =>
+          val blockInfo = BlockInfo(event.height, event.id.toVanilla)
+          event.update match {
+            case Update.Empty => none // Nothing to do
+            case Update.Append(updates) =>
+              val regularBalanceChanges = updates.stateUpdate.fold(emptyBalances)(balanceUpdates)
+              val outLeasesChanges = updates.stateUpdate.fold(Map.empty[Address, Long])(leaseUpdates)
 
-            val changes = updates.stateUpdate.fold(emptyBalances)(balanceUpdates)
-            val newHeight = event.height
-            if (isRollback.get()) {
-              val accumulatedUpdates = storingChangesDuringRollback.updateAndGet(upsert(_, changes))
-              if (newHeight < currentMaxHeight.get) emptyBalances
-              else {
-                isRollback.set(false)
-                storingChangesDuringRollback.set(Map.empty)
-                knownBalances.updateAndGet(upsert(_, accumulatedUpdates))
-                accumulatedUpdates
+              BlockchainEvent.Append(BlockchainData(
+                blockInfo = blockInfo,
+                changedAddresses = ChangedAddresses(blockInfo.height, regularBalanceChanges.keySet ++ outLeasesChanges.keySet) :: Nil,
+                regularBalances = regularBalanceChanges,
+                outLeases = outLeasesChanges
+              )).some
+
+            case Update.Rollback(value) =>
+              value.`type` match {
+                case RollbackType.BLOCK => BlockchainEvent.Rollback(blockInfo).some
+                case RollbackType.MICROBLOCK => none // TODO ???
+                case RollbackType.Unrecognized(_) => none // TODO ???
               }
-            } else {
-              currentMaxHeight.set(newHeight)
-              knownBalances.updateAndGet(upsert(_, changes))
-              changes
-            }
-
-          case Update.Rollback(value) =>
-            // TODO We need to invalidate balances for some (address, asset)
-            value.`type` match {
-              case RollbackType.BLOCK => isRollback.set(true); emptyBalances
-              case RollbackType.MICROBLOCK => emptyBalances // TODO ???
-              case RollbackType.Unrecognized(_) => emptyBalances // TODO ???
-            }
+          }
         }
+        .collect { case Some(x) => x }
+
+      val init = BlockchainState.Normal(
+        BlockchainData(
+          blockInfo = startBlockInfo,
+          changedAddresses = List.empty,
+          regularBalances = Map.empty,
+          outLeases = Map.empty
+        )
+      )
+
+      Observable(eventsStream, dataUpdates).merge.scan[BlockchainState](init) { (r, event) =>
+        StateTransitions(r, event)
       }
     }
 
@@ -147,7 +161,7 @@ class DefaultWavesBlockchainClient(
       }
     }
 
-    Observable(bStream, meStream).merge.map(Updates)
+    Observable(bState, meStream).merge.map(Updates)
   }
 
   // TODO knownBalances
@@ -201,6 +215,8 @@ class DefaultWavesBlockchainClient(
 }
 
 object DefaultWavesBlockchainClient {
+
+  val MaxRollbackHeight = 100
 
   private class PessimisticPortfolios {
 

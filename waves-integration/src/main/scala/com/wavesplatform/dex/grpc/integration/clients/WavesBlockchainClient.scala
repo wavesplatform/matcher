@@ -14,7 +14,6 @@ import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
-import com.wavesplatform.dex.grpc.integration.clients.DefaultWavesBlockchainClient.PessimisticPortfolios
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.Updates
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions._
@@ -27,7 +26,9 @@ import monix.reactive.Observable
 import DefaultWavesBlockchainClient._
 import cats.syntax.option._
 import com.wavesplatform.dex.grpc.integration.clients.state.BlockchainData.ChangedAddresses
-import com.wavesplatform.dex.grpc.integration.clients.state.{BlockInfo, BlockchainData, BlockchainEvent, BlockchainState, StateTransitions}
+import com.wavesplatform.dex.grpc.integration.clients.state.{BlockInfo, BlockchainData, BlockchainEvent, BlockchainState}
+import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
+import monix.execution.Scheduler
 import monix.reactive.subjects.ConcurrentSubject
 
 import scala.collection.concurrent.TrieMap
@@ -35,6 +36,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 object WavesBlockchainClient {
 
+  type BalanceChanges = Map[Address, Map[Asset, Long]]
   case class Updates(updatedBalances: Map[Address, Map[Asset, Long]])
 
 }
@@ -69,7 +71,7 @@ trait WavesBlockchainClient {
 class DefaultWavesBlockchainClient(
   meClient: MatcherExtensionClient[Future],
   bClient: BlockchainUpdatesClient
-)(implicit ec: ExecutionContext)
+)(implicit ec: ExecutionContext, monixScheduler: Scheduler)
     extends WavesBlockchainClient {
 
   type Balances = Map[Address, Map[Asset, Long]]
@@ -82,7 +84,7 @@ class DefaultWavesBlockchainClient(
   private val knownBalances: AtomicReference[Balances] = new AtomicReference(emptyBalances)
   private val storingChangesDuringRollback: AtomicReference[Balances] = new AtomicReference(emptyBalances)
 
-  private val pessimisticPortfolios = new PessimisticPortfolios
+//  private val pessimisticPortfolios = new PessimisticPortfolios
 
   private val dataUpdates = ConcurrentSubject.publish[BlockchainEvent]
 
@@ -106,62 +108,89 @@ class DefaultWavesBlockchainClient(
     }
 
   override lazy val updates: Observable[Updates] = {
-    val bState = Observable.fromFuture(meClient.currentBlockInfo).flatMap { startBlockInfo =>
-      val start = startBlockInfo.height - MaxRollbackHeight - 1
-      currentMaxHeight.set(start)
-      val safeStream = bClient.blockchainEvents(start).onErrorRecoverWith {
-        case _ => bClient.blockchainEvents(currentMaxHeight.get())
-      }
+    val bBalances = ConcurrentSubject.publish[BlockchainEvent.DataUpdate]
 
-      val eventsStream = safeStream
-        .map { event =>
-          val blockInfo = BlockInfo(event.height, event.id.toVanilla)
-          event.update match {
-            case Update.Empty => none // Nothing to do
-            case Update.Append(updates) =>
-              val regularBalanceChanges = updates.stateUpdate.fold(emptyBalances)(balanceUpdates)
-              val outLeasesChanges = updates.stateUpdate.fold(Map.empty[Address, Long])(leaseUpdates)
-
-              BlockchainEvent.Append(BlockchainData(
-                blockInfo = blockInfo,
-                changedAddresses = ChangedAddresses(blockInfo.height, regularBalanceChanges.keySet ++ outLeasesChanges.keySet) :: Nil,
-                regularBalances = regularBalanceChanges,
-                outLeases = outLeasesChanges
-              )).some
-
-            case Update.Rollback(value) =>
-              value.`type` match {
-                case RollbackType.BLOCK => BlockchainEvent.Rollback(blockInfo).some
-                case RollbackType.MICROBLOCK => none // TODO ???
-                case RollbackType.Unrecognized(_) => none // TODO ???
-              }
-          }
-        }
-        .collect { case Some(x) => x }
-
-      val init = BlockchainState.Normal(
-        BlockchainData(
-          blockInfo = startBlockInfo,
-          changedAddresses = List.empty,
-          regularBalances = Map.empty,
-          outLeases = Map.empty
-        )
-      )
-
-      Observable(eventsStream, dataUpdates).merge.scan[BlockchainState](init) { (r, event) =>
-        StateTransitions(r, event)
-      }
+    bClient.blockchainEvents(0).map { x =>
+      println(s"===> $x")
     }
 
-    val meStream = meClient.utxEvents.map { event =>
+//    Observable.fromFuture(meClient.currentBlockInfo).foreach { startBlockInfo =>
+//      val start = startBlockInfo.height - MaxRollbackHeight - 1
+//      currentMaxHeight.set(start)
+//      val safeStream = bClient.blockchainEvents(start).onErrorRecoverWith {
+//        case _ => bClient.blockchainEvents(currentMaxHeight.get())
+//      }
+//
+//      /**
+//        * Cases:
+//        * 1. Downloading blocks: Append+
+//        * 2. Appending on a network's height: Append, AppendMicro+, RollbackMicro?, Append
+//        * 2. Rollback: Rollback, Append+
+//        */
+//
+//      val eventsStream = safeStream
+//        .map { event =>
+//          val blockInfo = BlockInfo(event.height, event.id.toVanilla)
+//          event.update match {
+//            case Update.Empty => none // Nothing to do
+//            case Update.Append(updates) =>
+//              val regularBalanceChanges = updates.stateUpdate.fold(emptyBalances)(balanceUpdates)
+//              val outLeasesChanges = updates.stateUpdate.fold(Map.empty[Address, Long])(leaseUpdates)
+//              val data = BlockchainData(
+//                blockInfo = blockInfo,
+//                changedAddresses = ChangedAddresses(blockInfo.height, regularBalanceChanges.keySet ++ outLeasesChanges.keySet) :: Nil,
+//                regularBalances = regularBalanceChanges,
+//                outLeases = outLeasesChanges
+//              )
+//
+//              updates.body match {
+//                case Body.Empty => none // ???
+//                case _: Body.Block => BlockchainEvent.Append(data).some
+//                case _: Body.MicroBlock => BlockchainEvent.AppendMicro(data).some
+//              }
+//
+//            case Update.Rollback(value) =>
+//              value.`type` match {
+//                case RollbackType.BLOCK => BlockchainEvent.Rollback(blockInfo).some
+//                case RollbackType.MICROBLOCK => BlockchainEvent.Rollback(blockInfo).some // TODO ???
+//                case RollbackType.Unrecognized(_) => none // TODO ???
+//              }
+//          }
+//        }
+//        .collect { case Some(x) => x }
+//
+//      val init = StateTransitions.Update(
+//        newState = BlockchainState.Normal(
+//          data = BlockchainData(
+//            blockInfo = startBlockInfo,
+//            changedAddresses = List.empty,
+//            regularBalances = Map.empty,
+//            outLeases = Map.empty
+//          ),
+//          liquidBlocks = List.empty
+//        ),
+//        pushNext = none,
+//        request = Set.empty
+//      )
+//
+//      Observable(eventsStream, dataUpdates).merge
+//        .scan(init)((r, event) => StateTransitions(r.newState, event))
+//        .foreach { update =>
+//          update.pushNext.foreach(bBalances.onNext)
+//          if (update.request.nonEmpty) {} // TODO
+//        }
+//    }
+
+    /*val meStream = meClient.utxEvents.map { event =>
       event.`type` match {
         case Type.Switch(event) => event.transaction.map()
         case Type.Update(event) =>
         case Type.Empty =>
       }
-    }
+    }*/
 
-    Observable(bState, meStream).merge.map(Updates)
+    // Observable(bState, meStream).merge.map(Updates)
+    Observable.empty
   }
 
   // TODO knownBalances
@@ -218,52 +247,52 @@ object DefaultWavesBlockchainClient {
 
   val MaxRollbackHeight = 100
 
-  private class PessimisticPortfolios {
-
-    private type Portfolios = Map[Address, Map[Asset, Long]]
-
-    private val portfolios = new ConcurrentHashMap[Address, Map[Asset, Long]]()
-    private val txs = TrieMap.empty[UtxTransaction, Portfolios] // TODO Use ID
-
-    def add(tx: UtxTransaction): Unit = tx.diff.flatMap(_.stateUpdate).foreach { diff =>
-      // Balances
-      val p1: Portfolios = diff.balances.groupBy(_.address).map {
-        case (address, updates) =>
-          val balances = updates.view
-            .flatMap(_.amount)
-            .collect {
-              case x if x.amount < 0 => x.assetId.toVanillaAsset -> x.amount // pessimistic
-            }
-            .toMap
-          address.toVanillaAddress -> balances
-      }
-
-      // Leasing
-      val finalP: Portfolios = diff.leases.foldLeft(p1) {
-        case (r, x) =>
-          if (x.out <= 0) r // pessimistic
-          else {
-            val address = x.address.toVanillaAddress
-            val orig = r.getOrElse(address, Map.empty)
-            val updated = orig.updated(Waves, orig.getOrElse(Waves, 0L) - x.out)
-            r.updated(address, updated)
-          }
-      }
-
-      if (txs.putIfAbsent(tx, finalP).isEmpty)
-        finalP.foreach {
-          case (address, balances) => portfolios.compute(address, (_, orig) => orig |+| balances)
-        }
-    }
-
-    def remove(tx: UtxTransaction): Unit = txs.remove(tx).foreach { p =>
-      p.foreach {
-        case (address, balances) => portfolios.compute(address, (_, orig) => orig |-| balances)
-      }
-    }
-
-    def getAggregated(address: Address): Map[Asset, Long] = portfolios.get(address)
-
-  }
+//  private class PessimisticPortfolios {
+//
+//    private type Portfolios = Map[Address, Map[Asset, Long]]
+//
+//    private val portfolios = new ConcurrentHashMap[Address, Map[Asset, Long]]()
+//    private val txs = TrieMap.empty[UtxTransaction, Portfolios] // TODO Use ID
+//
+//    def add(tx: UtxTransaction): Unit = tx.diff.flatMap(_.stateUpdate).foreach { diff =>
+//      // Balances
+//      val p1: Portfolios = diff.balances.groupBy(_.address).map {
+//        case (address, updates) =>
+//          val balances = updates.view
+//            .flatMap(_.amount)
+//            .collect {
+//              case x if x.amount < 0 => x.assetId.toVanillaAsset -> x.amount // pessimistic
+//            }
+//            .toMap
+//          address.toVanillaAddress -> balances
+//      }
+//
+//      // Leasing
+//      val finalP: Portfolios = diff.leases.foldLeft(p1) {
+//        case (r, x) =>
+//          if (x.out <= 0) r // pessimistic
+//          else {
+//            val address = x.address.toVanillaAddress
+//            val orig = r.getOrElse(address, Map.empty)
+//            val updated = orig.updated(Waves, orig.getOrElse(Waves, 0L) - x.out)
+//            r.updated(address, updated)
+//          }
+//      }
+//
+//      if (txs.putIfAbsent(tx, finalP).isEmpty)
+//        finalP.foreach {
+//          case (address, balances) => portfolios.compute(address, (_, orig) => orig |+| balances)
+//        }
+//    }
+//
+//    def remove(tx: UtxTransaction): Unit = txs.remove(tx).foreach { p =>
+//      p.foreach {
+//        case (address, balances) => portfolios.compute(address, (_, orig) => orig |-| balances)
+//      }
+//    }
+//
+//    def getAggregated(address: Address): Map[Asset, Long] = portfolios.get(address)
+//
+//  }
 
 }

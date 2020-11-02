@@ -43,7 +43,7 @@ import com.wavesplatform.dex.effect.{liftValueAsync, FutureResult}
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
 import com.wavesplatform.dex.grpc.integration.WavesClientBuilder
 import com.wavesplatform.dex.grpc.integration.clients.MatcherExtensionAssetsWatchingClient
-import com.wavesplatform.dex.grpc.integration.clients.MatcherExtensionClient.BalanceChanges
+import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.BalanceChanges
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.history.HistoryRouterActor
 import com.wavesplatform.dex.logs.SystemInformationReporter
@@ -424,13 +424,13 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
   private def watchBalanceChanges(recipient: ActorRef): Unit = {
 
-    def aggregateChangesByAddress(xs: List[BalanceChanges]): Map[Address, Map[Asset, Long]] = xs.foldLeft(Map.empty[Address, Map[Asset, Long]]) {
-      case (result, bc) => result.updated(bc.address, result.getOrElse(bc.address, Map.empty) + (bc.asset -> bc.balance))
-    }
-
-    wavesBlockchainAsyncClient.realTimeBalanceBatchChanges
-      .map(aggregateChangesByAddress)
-      .foreach(recipient ! SpendableBalancesActor.Command.UpdateStates(_))(monixScheduler)
+//    def aggregateChangesByAddress(xs: List[BalanceChanges]): Map[Address, Map[Asset, Long]] = xs.foldLeft(Map.empty[Address, Map[Asset, Long]]) {
+//      case (result, bc) => result.updated(bc.address, result.getOrElse(bc.address, Map.empty) + (bc.asset -> bc.balance))
+//    }
+//
+//    wavesBlockchainAsyncClient.realTimeBalanceBatchChanges
+//      .map(aggregateChangesByAddress)
+//      .foreach(recipient ! SpendableBalancesActor.Command.UpdateStates(_))(monixScheduler)
   }
 
   private def loadAllKnownAssets(): Future[Unit] =

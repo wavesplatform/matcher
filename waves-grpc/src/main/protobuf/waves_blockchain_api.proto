@@ -38,7 +38,7 @@ service WavesBlockchainApi {
 
     rpc GetNodeAddress (google.protobuf.Empty) returns (NodeAddressResponse);
 
-    rpc GetCurrentHeight (google.protobuf.Empty) returns (CurrentHeightResponse);
+    rpc GetCurrentBlockInfo (google.protobuf.Empty) returns (CurrentBlockInfoResponse);
 }
 
 // Common requests
@@ -180,8 +180,9 @@ message NodeAddressResponse {
     string address = 1;
 }
 
-message CurrentHeightResponse {
+message CurrentBlockInfoResponse {
     int32 height = 1;
+    bytes block_id = 2;
 }
 
 message UtxStateResponse {

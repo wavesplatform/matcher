@@ -7,6 +7,7 @@ import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.fp.MapImplicits.group
 import com.wavesplatform.dex.grpc.integration.clients.state.BlockchainData.ChangedAddresses
+import com.wavesplatform.dex.grpc.integration.clients.state.BlockchainEvent.DataUpdate
 
 case class BlockchainData(
   blockInfo: BlockInfo,
@@ -30,6 +31,12 @@ case class BlockchainData(
     changedAddresses = changes.changedAddresses ::: changedAddresses,
     regularBalances = regularBalances.deepReplace(changes.regularBalances),
     outLeases = outLeases ++ changes.outLeases
+  )
+
+  // TODO
+  def changes: DataUpdate = DataUpdate(
+    regularBalances = regularBalances,
+    outLeases = outLeases
   )
 
 }

@@ -134,8 +134,6 @@ abstract class BaseContainer(protected val baseContainerPath: String, private va
   }
 
   def connectToNetwork(): Unit = {
-    invalidateCaches()
-
     dockerClient
       .connectToNetworkCmd()
       .withContainerId(underlying.containerId)
@@ -147,11 +145,33 @@ abstract class BaseContainer(protected val baseContainerPath: String, private va
       )
       .exec()
 
+    Iterator
+      .continually {
+        Thread.sleep(1000)
+        dockerClient.inspectContainerCmd(underlying.containerId).exec().getNetworkSettings
+      }
+      .zipWithIndex
+      .find { case (ns, attempt) =>
+        ns.getNetworks.asScala.exists(_._2.getNetworkID == underlying.network.getId) || attempt == 20
+      }
+      .fold(log.warn(s"Can't start ${underlying.containerId}"))(_ => ())
+
+    invalidateCaches()
     waitReady()
   }
 
   override def start(): Unit = {
     Option(underlying.containerId).fold(super.start())(_ => sendStartCmd())
+
+    Iterator
+      .continually {
+        Thread.sleep(1000)
+        dockerClient.inspectContainerCmd(underlying.containerId).exec().getState
+      }
+      .zipWithIndex
+      .find { case (state, attempt) => state.getRunning || attempt == 20 }
+      .fold(log.warn(s"Can't start ${underlying.containerId}"))(_ => ())
+
     invalidateCaches()
     waitReady()
   }

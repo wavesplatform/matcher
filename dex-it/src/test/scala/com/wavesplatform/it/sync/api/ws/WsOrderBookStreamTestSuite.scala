@@ -476,7 +476,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
 
       wsc.receiveAtLeastNRaw(1).map(m =>
         (Json.parse(m.body) \ "b").asOpt[List[List[String]]] match {
-          case Some(b) => println(s"!!!!!!!!!!!! ${b}"); b.flatMap(_.head).map(_.toDouble)
+          case Some(b) => b.flatMap(_.head).map(_.toDouble)
           case None => List.empty
         }
       ).filter(l => l == l.sorted && l.size > 1) should have size 0

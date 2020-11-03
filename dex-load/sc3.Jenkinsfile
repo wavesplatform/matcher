@@ -9,7 +9,7 @@ pipeline {
     parameters {
         string(name: 'SBT_THREAD_NUMBER', defaultValue: '6', description: '')
         string(name: 'SEED', defaultValue: 'test-seed', description: 'Seed prefix of generated accounts')
-        string(name: 'AN', defaultValue: '60', description: 'Count of generated accounts')
+        string(name: 'AN', defaultValue: '6000', description: 'Count of generated accounts')
         string(name: 'AS', defaultValue: 'D', description: 'Chain ID')
     }
     environment {

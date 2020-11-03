@@ -13,7 +13,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.grpc.integration.clients.state.BlockInfo
+import com.wavesplatform.dex.grpc.integration.clients.state.BlockRef
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.effect.Implicits.NettyFutureOps
 import com.wavesplatform.dex.grpc.integration.exceptions.{UnexpectedConnectionException, WavesNodeConnectionLostException}
@@ -143,8 +143,8 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
   }
 
 
-  override def currentBlockInfo: Future[BlockInfo] = blockchainService.getCurrentBlockInfo(empty).map { x =>
-    BlockInfo(x.height, x.blockId.toVanilla)
+  override def currentBlockInfo: Future[BlockRef] = blockchainService.getCurrentBlockInfo(empty).map { x =>
+    BlockRef(x.height, x.blockId.toVanilla)
   }
 
   // TODO rename to BalanceChangesObserver after release 2.1.2

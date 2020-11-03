@@ -10,7 +10,7 @@ import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.caches.{AssetDescriptionsCache, FeaturesCache}
-import com.wavesplatform.dex.grpc.integration.clients.state.BlockInfo
+import com.wavesplatform.dex.grpc.integration.clients.state.BlockRef
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.services.UtxEvent
 import monix.reactive.Observable
@@ -50,7 +50,7 @@ class MatcherExtensionCachingClient(underlying: MatcherExtensionClient[Future], 
   override def forgedOrder(orderId: ByteStr): Future[Boolean] = underlying.forgedOrder(orderId)
 
   override def getNodeAddress: Future[InetAddress] = underlying.getNodeAddress
-  override def currentBlockInfo: Future[BlockInfo] = underlying.currentBlockInfo
+  override def currentBlockInfo: Future[BlockRef] = underlying.currentBlockInfo
 
   override def close(): Future[Unit] = underlying.close()
 }

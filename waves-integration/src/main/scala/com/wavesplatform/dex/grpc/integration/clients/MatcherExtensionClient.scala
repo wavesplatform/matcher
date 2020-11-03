@@ -8,7 +8,7 @@ import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
-import com.wavesplatform.dex.grpc.integration.clients.state.BlockInfo
+import com.wavesplatform.dex.grpc.integration.clients.state.BlockRef
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.services.UtxEvent
 import monix.reactive.Observable
@@ -36,7 +36,7 @@ trait MatcherExtensionClient[F[_]] {
   def forgedOrder(orderId: ByteStr): F[Boolean]
 
   def getNodeAddress: F[InetAddress]
-  def currentBlockInfo: F[BlockInfo]
+  def currentBlockInfo: F[BlockRef]
 
   def close(): F[Unit]
 }

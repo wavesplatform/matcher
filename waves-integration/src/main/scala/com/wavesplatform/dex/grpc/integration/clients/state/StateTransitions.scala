@@ -2,6 +2,7 @@ package com.wavesplatform.dex.grpc.integration.clients.state
 
 import cats.kernel.Semigroup
 import cats.syntax.option._
+import cats.instances.map._
 import cats.syntax.semigroup._
 import com.wavesplatform.dex.collection.ListOps.Ops
 import com.wavesplatform.dex.collection.MapOps.Ops2
@@ -70,17 +71,13 @@ object StateTransitions {
               else {
                 // + liquid
                 val changedOnPreviousFork =
-                  previousFork.blocksFrom(origState.commonBlockInfo).foldLeft(Set.empty[Address]) {
-                    case (r, x) => r ++ x.changedAddresses
-                  } ++
-                  origState.orig.latestLiquidBlock.flatMap(_.latestBlock).fold(Set.empty[Address])(_.changedAddresses)
+                  previousFork.blocksFrom(origState.commonBlockInfo).combinedBlockchainBalance |+|
+                  origState.orig.latestLiquidBlock.changes
 
-                val changedOnNewFork =
-                  updatedFork.blocksFrom(origState.commonBlockInfo).foldLeft(Set.empty[Address]) {
-                    case (r, x) => r ++ x.changedAddresses
-                  }
+                val changedOnNewFork = updatedFork.blocksFrom(origState.commonBlockInfo).combinedBlockchainBalance
 
                 val toInvalidate = changedOnPreviousFork -- changedOnNewFork
+
                 val toPush = changedOnNewFork.foldLeft(DataUpdate(Map.empty, Map.empty)) { case (r, address) =>
                   if (toInvalidate.contains(address)) r
                   else {

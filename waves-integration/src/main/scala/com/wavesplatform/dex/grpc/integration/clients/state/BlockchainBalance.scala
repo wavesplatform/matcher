@@ -5,7 +5,17 @@ import com.wavesplatform.dex.collection.MapOps.Ops2
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 
-case class BlockchainBalance(regular: Map[Address, Map[Asset, Long]], outLeases: Map[Address, Long])
+case class BlockchainBalance(regular: Map[Address, Map[Asset, Long]], outLeases: Map[Address, Long]) {
+
+  def addressIndexes: Map[Address, AddressChangesIndex] = (regular.keySet ++ outLeases.keySet).view
+    .map { address =>
+      val rx = regular.getOrElse(address, Map.empty).keySet
+      val hasOutLeases = outLeases.contains(address)
+      (address, AddressChangesIndex(rx, hasOutLeases))
+    }
+    .toMap
+
+}
 
 object BlockchainBalance {
 

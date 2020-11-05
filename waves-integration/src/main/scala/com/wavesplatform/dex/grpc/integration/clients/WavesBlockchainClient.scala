@@ -26,7 +26,7 @@ import monix.reactive.Observable
 import DefaultWavesBlockchainClient._
 import cats.syntax.option._
 import com.wavesplatform.dex.grpc.integration.clients.state.WavesFork.BlockChanges
-import com.wavesplatform.dex.grpc.integration.clients.state.{BlockRef, WavesFork, BlockchainEvent, BlockchainState}
+import com.wavesplatform.dex.grpc.integration.clients.state.{BlockRef, WavesFork, BlockchainEvent, BlockchainStatus}
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import monix.execution.Scheduler
 import monix.reactive.subjects.ConcurrentSubject
@@ -160,8 +160,8 @@ class DefaultWavesBlockchainClient(
         .collect { case Some(x) => x }
 
       val init = StateTransitions.Update(
-        newState = BlockchainState.Normal(
-          history = BlockchainData(
+        newState = BlockchainStatus.Normal(
+          mainFork = BlockchainData(
             blockInfo = startBlockInfo,
             blocks = List.empty,
             regularBalances = Map.empty,

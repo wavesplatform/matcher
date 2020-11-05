@@ -9,7 +9,8 @@ import com.wavesplatform.dex.collection.MapOps.Ops2
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.grpc.integration.clients.state.BlockchainEvent._
-import com.wavesplatform.dex.grpc.integration.clients.state.BlockchainState._
+import com.wavesplatform.dex.grpc.integration.clients.state.BlockchainStatus._
+import com.wavesplatform.dex.grpc.integration.clients.state.WavesFork.DropResult
 
 import scala.collection.immutable.Queue
 
@@ -24,7 +25,8 @@ object StateTransitions {
 
   case class RequestAddressData(address: Address, assets: Set[Asset])
 
-  case class Update(newState: BlockchainState, pushNext: Option[BlockchainBalance], request: List[RequestAddressData])
+  // TODO replace with interface with methods?
+  case class Update(newState: BlockchainStatus, pushNext: Option[BlockchainBalance], request: List[RequestAddressData])
 
   object Update {
 
@@ -40,76 +42,68 @@ object StateTransitions {
 
   }
 
-  def apply(origState: BlockchainState, event: BlockchainEvent): Update = origState match {
+  def apply(origState: BlockchainStatus, event: BlockchainEvent): Update = origState match {
     case origState: Normal =>
       event match {
-        case AppendBlock(block) => Update(origState.withBlock(block), block.changes.some, List.empty)
-        case AppendMicroBlock(microBlock) => Update(origState.withMicroBlock(microBlock), microBlock.changes.some, List.empty)
-        case RollbackTo(commonBlockInfo) => Update(rollback(origState, commonBlockInfo), none, List.empty)
-        case RollbackMicroBlocks(commonBlockInfo) =>
-          Update(
-            newState = TransientRollbackMicro(
-              commonBlockInfo = commonBlockInfo,
-              orig = origState,
-              liquidBlocks = List.empty
-            ),
-            pushNext = none,
-            request = List.empty
-          )
-        case _ => Update(origState, none, List.empty) // Won't happen
+        case AppendBlock(block) => Update(origState.mainFork.withBlock(block), block.changes.some, List.empty)
+        case AppendMicroBlock(microBlock) => Update(origState.mainFork.withMicroBlock(microBlock), microBlock.changes.some, List.empty)
+        case RollbackTo(commonBlockRef) =>
+          origState.mainFork.dropAfter(commonBlockRef) match {
+            case DropResult.Succeeded(newFork) =>
+              TransientRollback(
+                commonBlockRef = commonBlockRef,
+                mainFork = origState.mainFork,
+                newFork = newFork
+              )
+            case DropResult.DroppedAll => Update(Init, none, List.empty) // TODO Request all
+            case DropResult.UnknownLiquidBlockRef(knownFork) => Update(Normal(knownFork), none, List.empty) // TODO Request from height, Transient somewhat to check block id?
+          }
+        case _ => Update(origState, none, List.empty) // Won't happen TODO process?
       }
 
     case origState: TransientRollback =>
       event match {
         case AppendBlock(block) =>
-          val updatedFork = origState.fork.withBlock(block)
-          val previousFork = origState.orig.history
-          (previousFork.latestBlock, block) match {
-            case (Some(previousForkLatestBlock), newForkLatestBlock) =>
-              if (newForkLatestBlock.blockInfo.height < previousForkLatestBlock.blockInfo.height)
-                Update(origState.copy(fork = updatedFork), none, List.empty)
+          val updatedNewFork = origState.newFork.withBlock(block)
+          val previousFork = origState.mainFork
+          if (updatedNewFork.history.head.ref.height < previousFork.history.head.ref.height)
+            Update(origState.copy(newFork = updatedNewFork), none, List.empty)
+          else {
+            val changedOnPreviousFork =
+              previousFork.blocksFrom(origState.commonBlockRef).combinedBlockchainBalance |+|
+              origState.mainFork.latestLiquidBlock.changes
+
+            val changedOnNewFork = updatedNewFork.blocksFrom(origState.commonBlockRef).combinedBlockchainBalance
+
+            val toInvalidate = changedOnPreviousFork -- changedOnNewFork
+
+            val toPush = changedOnNewFork.foldLeft(DataUpdate(Map.empty, Map.empty)) { case (r, address) =>
+              if (toInvalidate.contains(address)) r
               else {
-                // + liquid
-                val changedOnPreviousFork =
-                  previousFork.blocksFrom(origState.commonBlockInfo).combinedBlockchainBalance |+|
-                  origState.orig.latestLiquidBlock.changes
-
-                val changedOnNewFork = updatedFork.blocksFrom(origState.commonBlockInfo).combinedBlockchainBalance
-
-                val toInvalidate = changedOnPreviousFork -- changedOnNewFork
-
-                val toPush = changedOnNewFork.foldLeft(DataUpdate(Map.empty, Map.empty)) { case (r, address) =>
-                  if (toInvalidate.contains(address)) r
-                  else {
-                    updatedFork.regularBalances.get(address) match {
-                      case Some(updatedBalances) =>
-                      case None =>
-                    }
-                    if (origState.orig.history.regularBalances.get(address)) {}
-                  }
+                updatedNewFork.regularBalances.get(address) match {
+                  case Some(updatedBalances) =>
+                  case None =>
                 }
-
-                Update(
-                  newState = TransientResolving(
-                    // Note, this state contains not coherent data, because we waiting an information for some addresses
-                    orig = updatedFork.copy(
-                      regularBalances = origState.orig.history.regularBalances.deepReplace(updatedFork.regularBalances),
-                      outLeases = origState.orig.history.outLeases ++ updatedFork.outLeases
-                    ),
-                    waitInfoFor = toInvalidate,
-                    stash = Queue.empty
-                  ),
-                  pushNext = none, // ???
-                  request = toInvalidate
-                )
+                if (origState.mainFork.mainFork.regularBalances.get(address)) {}
               }
+            }
 
-            case _ => Update(origState, none, Set.empty) // Won't happen
+            Update(
+              newState = TransientResolving(
+                // Note, this state contains not coherent data, because we waiting an information for some addresses
+                mainFork = updatedNewFork.copy(
+                  regularBalances = origState.mainFork.mainFork.regularBalances.deepReplace(updatedNewFork.regularBalances),
+                  outLeases = origState.mainFork.mainFork.outLeases ++ updatedNewFork.outLeases
+                ),
+                waitInfoFor = toInvalidate,
+                stash = Queue.empty
+              ),
+              pushNext = none, // ???
+              request = toInvalidate
+            )
           }
 
-        // case AppendMicro() => ???
-        case RollbackTo(commonBlockInfo) => Update(rollback(Normal(origState.orig, List.empty), commonBlockInfo), none, Set.empty) // ???
-        case _ => Update(origState, none, Set.empty) // Won't happen
+         case _ => Update(origState, none, Set.empty) // Won't happen
       }
 
     case origState: TransientResolving =>
@@ -117,13 +111,13 @@ object StateTransitions {
         case BalanceUpdates(regularBalances, outLeases) =>
           val init = Update(
             newState = Normal(
-              origState.orig.copy(
-                regularBalances = origState.orig.regularBalances.deepReplace(regularBalances),
-                outLeases = origState.orig.outLeases ++ outLeases
+              origState.mainFork.copy(
+                regularBalances = origState.mainFork.regularBalances.deepReplace(regularBalances),
+                outLeases = origState.mainFork.outLeases ++ outLeases
               ),
               liquidBlocks = List.empty
             ),
-            pushNext = origState.orig.changes.some,
+            pushNext = origState.mainFork.changes.some,
             request = Set.empty
           )
 
@@ -135,17 +129,11 @@ object StateTransitions {
       }
   }
 
-  def rollback(orig: Normal, commonBlockInfo: BlockRef): BlockchainState = {
-    val commonBlocks = orig.history.history.dropWhile(commonBlockInfo.height < _.blockInfo.height)
+  def rollback(mainFork: WavesFork, commonBlockRef: BlockRef): Option[BlockchainStatus] = mainFork.dropAfter(commonBlockRef).map { newFork =>
     TransientRollback(
-      commonBlockInfo = commonBlockInfo,
-      orig = orig,
-      fork = HistoricalData(
-        history = commonBlocks,
-        regularBalances = Map.empty, // will be updated after fork resolving
-        outLeases = Map.empty // will be updated after fork resolving
-      )
+      commonBlockRef = commonBlockInfo,
+      mainFork = mainFork,
+      newFork = newFork
     )
-  }
 
 }

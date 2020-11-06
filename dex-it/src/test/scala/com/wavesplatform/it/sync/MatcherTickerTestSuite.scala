@@ -29,17 +29,7 @@ class MatcherTickerTestSuite extends MatcherSuiteBase {
   private val usdWavesPair = AssetPair(usd, Waves)
 
   "matcher ticker validation" - {
-    "get tickers for unavailable asset should produce error" in {
-      dex1.tryApi.orderBookStatus(wctUsdPair) should failWith(11534345, MatcherError.Params(assetId = Some(WctId.toString)))
-    }
 
-    "status of empty orderbook" in {
-      dex1.api.orderBookInfo(wavesUsdPair).matchingRules.tickSize shouldBe 0.01
-    }
-
-    "error of non-existed order" in {
-      dex1.httpApi.orderBookInfo(usdWavesPair).code shouldBe StatusCodes.MovedPermanently
-    }
 
     val bidPrice = 200
     val bidAmount = 1.waves

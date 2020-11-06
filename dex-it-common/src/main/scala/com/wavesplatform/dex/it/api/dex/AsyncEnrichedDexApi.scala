@@ -199,6 +199,12 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .followRedirects(true)
   }
 
+  override def orderBookInfo(amount: String, price: String): R[HttpOrderBookInfo] = mk {
+    sttp
+      .get(uri"$apiUri/matcher/orderbook/$amount/$price}/info")
+      .followRedirects(false)
+  }
+
   override def orderBookInfo(assetPair: AssetPair): R[HttpOrderBookInfo] = mk {
     sttp
       .get(uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/info")

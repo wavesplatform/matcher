@@ -11,14 +11,14 @@ import com.wavesplatform.events.protobuf.BlockchainUpdated
 import io.grpc.stub.{ClientCallStreamObserver, ClientResponseObserver}
 import io.grpc.{ManagedChannel, Status, StatusRuntimeException}
 import io.netty.channel.EventLoopGroup
-import monix.execution.Scheduler
+import monix.execution.{Cancelable, Scheduler}
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 
 import scala.concurrent.{ExecutionContext, Future}
 
 trait BlockchainUpdatesClient {
-  def blockchainEvents(fromHeight: Int): Observable[BlockchainUpdated]
+  def blockchainEvents(fromHeight: Int): (Observable[BlockchainUpdated], Cancelable)
   def close(): Future[Unit]
 }
 
@@ -29,10 +29,11 @@ class DefaultBlockchainUpdatesClient(eventLoopGroup: EventLoopGroup, channel: Ma
   private val shuttingDown = new AtomicBoolean(false)
   private val grpcService = BlockchainUpdatesApiGrpc.stub(channel) // TODO move this dependency to constructor?
 
-  override def blockchainEvents(fromHeight: Int): Observable[BlockchainUpdated] = {
+  override def blockchainEvents(fromHeight: Int): (Observable[BlockchainUpdated], Cancelable) = {
     val r = ConcurrentSubject.publish[BlockchainUpdated](monixScheduler)
-    grpcService.subscribe(new SubscribeRequest(fromHeight), new EventsObserver(r))
-    r
+    val o = new EventsObserver(r)
+    grpcService.subscribe(new SubscribeRequest(fromHeight), o)
+    (r, () => o.close())
   }
 
   override def close(): Future[Unit] = {
@@ -58,6 +59,7 @@ class DefaultBlockchainUpdatesClient(eventLoopGroup: EventLoopGroup, channel: Ma
     override def onError(e: Throwable): Unit = if (!shuttingDown.get()) subject.onError(e)
 
     override def close(): Unit = if (requestStream != null) requestStream.cancel("Shutting down", new StatusRuntimeException(Status.CANCELLED))
+
     override def onCompleted(): Unit = log.info("Balance changes stream completed!")
   }
 

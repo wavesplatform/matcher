@@ -1,37 +1,35 @@
 package com.wavesplatform.dex.grpc.integration.clients.state
 
-import cats.Monoid
-import cats.instances.map._
-import cats.instances.set._
-import cats.syntax.semigroup._
-import com.wavesplatform.dex.domain.account.Address
-import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.meta.getSimpleName
 
 import scala.collection.immutable.Queue
 
-sealed trait BlockchainStatus extends Product with Serializable
+sealed trait BlockchainStatus extends Product with Serializable {
+  def name: String = getSimpleName(getClass)
+}
 
 object BlockchainStatus {
-  case object Init extends BlockchainStatus
-  case class Normal(mainFork: WavesFork) extends BlockchainStatus
-  case class TransientRollback(commonBlockRef: BlockRef, mainFork: WavesFork, newFork: WavesFork, diffIndex: DiffIndex) extends BlockchainStatus
-  // TODO collect diff between forks?
-  case class TransientResolving(mainFork: WavesFork, waitInfoFor: Set[Address], stash: Queue[BlockchainEvent]) extends BlockchainStatus
 
-  case class DiffIndex(regular: Map[Address, Set[Asset]], outLeases: Set[Address])
+  case class Normal(mainFork: WavesFork, currentHeightHint: Int) extends BlockchainStatus {
+    override def toString: String = s"Normal(${mainFork.history.headOption.map(_.ref)})"
+  }
 
-  object DiffIndex {
+  /**
+   * @param newFork Required to be non-empty
+   */
+  case class TransientRollback(
+    newFork: WavesFork,
+    newForkChanges: BlockchainBalance, // from a common block
+    previousForkHeight: Int,
+    previousForkDiffIndex: DiffIndex // from a common block
+  ) extends BlockchainStatus {
+    require(newFork.history.nonEmpty, "newFork must not be empty!")
 
-    implicit val diffIndexMonoid: Monoid[DiffIndex] = new Monoid[DiffIndex] {
-      override val empty = DiffIndex(Map.empty, Set.empty)
+    override def toString: String = s"TransientRollback(n=${newFork.history.headOption.map(_.ref)}, h=$previousForkHeight)"
+  }
 
-      override def combine(x: DiffIndex, y: DiffIndex): DiffIndex = DiffIndex(
-        regular = x.regular |+| y.regular,
-        outLeases = x.outLeases |+| y.outLeases
-      )
-
-    }
-
+  case class TransientResolving(mainFork: WavesFork, stash: Queue[BlockchainEvent], currentHeightHint: Int) extends BlockchainStatus {
+    override def toString: String = s"TransientResolving(${mainFork.history.headOption.map(_.ref)}, l=${stash.lastOption})"
   }
 
 }

@@ -7,13 +7,13 @@ import com.wavesplatform.dex.domain.asset.Asset
 
 case class BlockchainBalance(regular: Map[Address, Map[Asset, Long]], outLeases: Map[Address, Long]) {
 
-  def addressIndexes: Map[Address, AddressChangesIndex] = (regular.keySet ++ outLeases.keySet).view
-    .map { address =>
-      val rx = regular.getOrElse(address, Map.empty).keySet
-      val hasOutLeases = outLeases.contains(address)
-      (address, AddressChangesIndex(rx, hasOutLeases))
-    }
-    .toMap
+  // TODO
+  def diffIndex: DiffIndex = DiffIndex(
+    regular = regular.view.mapValues(_.keySet).toMap,
+    outLeases = outLeases.keySet
+  )
+
+  def isEmpty: Boolean = regular.isEmpty && outLeases.isEmpty
 
 }
 

@@ -1,9 +1,8 @@
 package com.wavesplatform.dex.grpc.integration.clients.state
 
 import com.wavesplatform.dex.domain.bytes.ByteStr
-import com.wavesplatform.dex.grpc.integration.clients.state.BlockchainStatus.DiffIndex
 
-case class BaseBlock(ref: BlockRef, reference: ByteStr, changes: BlockchainBalance, tpe: BaseBlock.Type) {
+case class WavesBlock(ref: BlockRef, reference: ByteStr, changes: BlockchainBalance, tpe: WavesBlock.Type) {
 
   def diffIndex: DiffIndex = DiffIndex(
     regular = changes.regular.view.mapValues(_.keySet).toMap,
@@ -12,8 +11,8 @@ case class BaseBlock(ref: BlockRef, reference: ByteStr, changes: BlockchainBalan
 
 }
 
-object BaseBlock {
-  sealed trait Type
+object WavesBlock {
+  sealed trait Type extends Product with Serializable
 
   object Type {
     case object Block extends Type

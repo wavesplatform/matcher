@@ -29,7 +29,7 @@ object StatusTransitions extends ScorexLogging {
                 StatusUpdate(
                   TransientRollback(
                     newFork = WavesFork(List.empty),
-                    newForkChanges = Monoid.empty,
+                    newForkChanges = Monoid.empty[BlockchainBalance],
                     previousForkHeight = origStatus.currentHeightHint,
                     previousForkDiffIndex = origStatus.mainFork.diffIndex
                   ),
@@ -54,7 +54,7 @@ object StatusTransitions extends ScorexLogging {
               StatusUpdate(
                 newStatus = TransientRollback(
                   newFork = commonFork,
-                  newForkChanges = Monoid.empty,
+                  newForkChanges = Monoid.empty[BlockchainBalance],
                   previousForkHeight = commonBlockRef.height,
                   previousForkDiffIndex = droppedDiff
                 )
@@ -75,7 +75,7 @@ object StatusTransitions extends ScorexLogging {
                 StatusUpdate(
                   TransientRollback(
                     newFork = WavesFork(List.empty),
-                    newForkChanges = Monoid.empty,
+                    newForkChanges = Monoid.empty[BlockchainBalance],
                     previousForkHeight = origStatus.previousForkHeight,
                     previousForkDiffIndex = origStatus.previousForkDiffIndex
                   ),

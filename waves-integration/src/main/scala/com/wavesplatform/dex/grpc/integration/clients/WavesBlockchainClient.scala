@@ -1,40 +1,33 @@
 package com.wavesplatform.dex.grpc.integration.clients
 
 import java.net.InetAddress
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger, AtomicReference}
+import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
 
-import cats.{Group, Monoid}
-import cats.instances.long._
-import cats.instances.map.catsKernelStdMonoidForMap
+import cats.Monoid
 import cats.syntax.group._
+import cats.syntax.option._
+import com.wavesplatform.dex.collection.MapOps.Ops
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
+import com.wavesplatform.dex.grpc.integration.clients.DefaultWavesBlockchainClient._
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.Updates
+import com.wavesplatform.dex.grpc.integration.clients.state.StatusUpdate.HeightUpdate
+import com.wavesplatform.dex.grpc.integration.clients.state._
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions._
-import com.wavesplatform.dex.grpc.integration.services.UtxEvent.Type
-import com.wavesplatform.dex.grpc.integration.services.UtxTransaction
+import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Rollback.RollbackType
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
 import com.wavesplatform.events.protobuf.{BlockchainUpdated, StateUpdate}
-import monix.reactive.Observable
-import DefaultWavesBlockchainClient._
-import cats.syntax.option._
-import com.wavesplatform.dex.collection.MapOps.{Ops, Ops2}
-import com.wavesplatform.dex.grpc.integration.clients.state.StatusUpdate.HeightUpdate
-import com.wavesplatform.dex.grpc.integration.clients.state.WavesFork.BlockChanges
-import com.wavesplatform.dex.grpc.integration.clients.state.{BlockRef, BlockchainBalance, BlockchainEvent, BlockchainStatus, StatusTransitions, StatusUpdate, WavesBlock, WavesFork}
-import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import monix.execution.{Cancelable, Scheduler}
+import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 
-import scala.collection.concurrent.TrieMap
-import scala.concurrent.{blocking, ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future}
 
 object WavesBlockchainClient {
 
@@ -82,8 +75,7 @@ class DefaultWavesBlockchainClient(
   private val currentMaxHeight = new AtomicInteger(0)
 
   private val emptyBalances: Balances = Map.empty
-  private val knownBalances: AtomicReference[BlockchainBalance] = new AtomicReference(emptyBalances)
-  private val storingChangesDuringRollback: AtomicReference[Balances] = new AtomicReference(emptyBalances)
+  private val knownBalances: AtomicReference[BlockchainBalance] = new AtomicReference(Monoid.empty[BlockchainBalance])
 
 //  private val pessimisticPortfolios = new PessimisticPortfolios
 
@@ -108,14 +100,49 @@ class DefaultWavesBlockchainClient(
       else r.updated(x.address.toVanillaAddress, x.out)
     }
 
-  override lazy val updates: Observable[Updates] = {
-    val bBalances = ConcurrentSubject.publish[BlockchainEvent.DataReceived]
+  /**
+   * Cases:
+   * 1. Downloading blocks: Append+
+   * 2. Appending on a network's height: AppendMicro*, RollbackMicro?, Append
+   * 2. Rollback: Rollback, Append+
+   */
+  private def mkEventsStream(orig: Observable[BlockchainUpdated]): Observable[BlockchainEvent] = orig
+    .map { event =>
+      val blockRef = BlockRef(event.height, event.id.toVanilla)
+      event.update match {
+        case Update.Empty => none // Nothing to do
+        case Update.Append(updates) =>
+          val regularBalanceChanges = updates.stateUpdate.fold(emptyBalances)(balanceUpdates)
+          val outLeasesChanges = updates.stateUpdate.fold(Map.empty[Address, Long])(leaseUpdates)
 
-    bClient.blockchainEvents(0).map { x =>
-      println(s"===> $x")
+          val blockInfo = updates.body match {
+            case Body.Empty => none // Log
+            case Body.Block(block) => (WavesBlock.Type.Block, block.block.get.header.get.reference.toVanilla).some
+            case Body.MicroBlock(block) => (WavesBlock.Type.MicroBlock, block.microBlock.get.microBlock.get.reference.toVanilla).some
+          }
+
+          blockInfo.map { case (tpe, reference) =>
+            val block = WavesBlock(
+              ref = blockRef,
+              reference = reference,
+              changes = BlockchainBalance(regularBalanceChanges, outLeasesChanges),
+              tpe = tpe
+            )
+
+            BlockchainEvent.Appended(block)
+          }
+
+        case Update.Rollback(value) =>
+          value.`type` match {
+            case RollbackType.BLOCK | RollbackType.MICROBLOCK => BlockchainEvent.RolledBackTo(blockRef).some
+            case RollbackType.Unrecognized(_) => none // TODO ???
+          }
+      }
     }
+    .collect { case Some(x) => x }
 
-    Observable.fromFuture(meClient.currentBlockInfo).foreach { startBlockInfo =>
+  override lazy val updates: Observable[Updates] = {
+    val bBalances = Observable.fromFuture(meClient.currentBlockInfo).flatMap { startBlockInfo =>
       val start = math.max(startBlockInfo.height - MaxRollbackHeight - 1, 0)
       currentMaxHeight.set(start)
 
@@ -131,51 +158,9 @@ class DefaultWavesBlockchainClient(
         }
       }
 
-      /**
-       * Cases:
-       * 1. Downloading blocks: Append+
-       * 2. Appending on a network's height: AppendMicro*, RollbackMicro?, Append
-       * 2. Rollback: Rollback, Append+
-       */
-
-      val eventsStream = safeStream
-        .map { event =>
-          val blockRef = BlockRef(event.height, event.id.toVanilla)
-          event.update match {
-            case Update.Empty => none // Nothing to do
-            case Update.Append(updates) =>
-              val regularBalanceChanges = updates.stateUpdate.fold(emptyBalances)(balanceUpdates)
-              val outLeasesChanges = updates.stateUpdate.fold(Map.empty[Address, Long])(leaseUpdates)
-
-              val blockInfo = updates.body match {
-                case Body.Empty => none // Log
-                case Body.Block(block) => (WavesBlock.Type.Block, block.block.get.header.get.reference.toVanilla).some
-                case Body.MicroBlock(block) => (WavesBlock.Type.MicroBlock, block.microBlock.get.microBlock.get.reference.toVanilla).some
-              }
-
-              blockInfo.map { case (tpe, reference) =>
-                val block = WavesBlock(
-                  ref = blockRef,
-                  reference = reference,
-                  changes = BlockchainBalance(regularBalanceChanges, outLeasesChanges),
-                  tpe = tpe
-                )
-
-                BlockchainEvent.Appended(block)
-              }
-
-            case Update.Rollback(value) =>
-              value.`type` match {
-                case RollbackType.BLOCK | RollbackType.MICROBLOCK => BlockchainEvent.RolledBackTo(blockRef).some
-                case RollbackType.Unrecognized(_) => none // TODO ???
-              }
-          }
-        }
-        .collect { case Some(x) => x }
-
       // TODO cache addresses
       val init: BlockchainStatus = BlockchainStatus.Normal(WavesFork(List.empty), start)
-      Observable(eventsStream, dataUpdates).merge
+      Observable(mkEventsStream(safeStream), dataUpdates).merge
         .mapAccumulate(init) { (origStatus, event) =>
           val x = StatusTransitions(origStatus, event)
           val updatedBalances = x.updatedHeight match {
@@ -197,8 +182,10 @@ class DefaultWavesBlockchainClient(
                     .deepCombine(updatedRegular)(_ ++ _)
                 ) { case (regular, (address, leaseOut)) =>
                   regular.get(address) match {
-                    case Some(x) => x.updated(Waves, math.max(0L, x.getOrElse(Waves, 0L) - leaseOut))
-                    case None => regular // hmm... we doesn't know it balance, but know lease!
+                    case Some(assets) =>
+                      val updatedAssets = assets.updated(Waves, math.max(0L, assets.getOrElse(Waves, 0L) - leaseOut))
+                      regular.updated(address, updatedAssets)
+                    case None => regular // TODO hmm... we doesn't know it balance, but know lease!
                   }
                 }
               }
@@ -222,7 +209,7 @@ class DefaultWavesBlockchainClient(
     }*/
 
     // Observable(bState, meStream).merge.map(Updates)
-    Observable.empty
+    bBalances.map(Updates)
   }
 
   // TODO knownBalances

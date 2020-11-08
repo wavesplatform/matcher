@@ -46,10 +46,10 @@ object Dependencies {
     val sttp = "1.7.2"
     val sttpClient = "2.2.7"
 
-    val testContainers = "0.38.1"
-    val testContainersPostgres = "1.14.3"
-    val testContainersKafka = "1.14.3"
-    val testContainersToxiProxy = "1.14.3"
+    val testContainers = "0.38.6"
+    val testContainersPostgres = "1.15.0"
+    val testContainersKafka = "1.15.0"
+    val testContainersToxiProxy = "1.15.0"
 
     val jackson = "2.10.0"
     val playJson = "2.9.0"

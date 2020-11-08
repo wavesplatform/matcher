@@ -7,8 +7,8 @@ import com.wavesplatform.dex.grpc.integration.clients.state.StatusUpdate.HeightU
 // TODO replace with interface with methods?
 case class StatusUpdate(
   newStatus: BlockchainStatus,
-  updatedBalances: BlockchainBalance = Monoid.empty,
-  requestBalances: DiffIndex = Monoid.empty,
+  updatedBalances: BlockchainBalance = Monoid.empty[BlockchainBalance],
+  requestBalances: DiffIndex = Monoid.empty[DiffIndex],
   updatedHeight: HeightUpdate = HeightUpdate.NotChanged
 )
 

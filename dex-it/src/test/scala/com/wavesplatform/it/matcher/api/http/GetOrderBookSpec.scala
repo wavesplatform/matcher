@@ -46,8 +46,10 @@ class GetOrderBookSpec extends MatcherSuiteBase with TableDrivenPropertyChecks w
     }
 
     "should return correct number of asks and bids" in {
+      val ask = mkOrder(alice, wavesUsdPair, SELL, 10.waves, 5.usd)
+
       placeAndAwaitAtDex(mkOrder(alice, wavesUsdPair, BUY, 1.waves, 1.usd))
-      placeAndAwaitAtDex(mkOrder(alice, wavesUsdPair, SELL, 10.waves, 5.usd))
+      placeAndAwaitAtDex(ask)
       placeAndAwaitAtDex(mkOrder(alice, wavesUsdPair, BUY, 3.waves, 4.usd))
 
       val r = validate200Json(dex1.rawApi.getOrderBook(wavesUsdPair))
@@ -55,6 +57,10 @@ class GetOrderBookSpec extends MatcherSuiteBase with TableDrivenPropertyChecks w
       r.pair should be (wavesUsdPair)
       r.asks should have size 1
       r.bids should have size 2
+
+      cancelAndAwait(alice, ask)
+
+      validate200Json(dex1.rawApi.getOrderBook(wavesUsdPair)).asks should have size 0
     }
 
     "should return exception when price is not a correct base58 string" in {

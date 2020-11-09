@@ -203,20 +203,22 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
 
   override def getOrderBook(assetPair: AssetPair, depth: Int): R[HttpV0OrderBook] = getOrderBook(assetPair, depth.toString)
 
-  override def orderBookInfo(amountAsset: String, priceAsset: String): R[HttpOrderBookInfo] = mk {
+  override def getOrderBookInfo(amountAsset: String, priceAsset: String): R[HttpOrderBookInfo] = mk {
     sttp
       .get(uri"$apiUri/matcher/orderbook/$amountAsset/$priceAsset}/info")
       .followRedirects(false)
   }
 
-  override def orderBookInfo(assetPair: AssetPair): R[HttpOrderBookInfo] = orderBookInfo(assetPair.amountAssetStr, assetPair.priceAssetStr)
+  override def getOrderBookInfo(assetPair: AssetPair): R[HttpOrderBookInfo] = getOrderBookInfo(assetPair.amountAssetStr, assetPair.priceAssetStr)
 
-  override def orderBookStatus(assetPair: AssetPair): R[HttpMarketStatus] = mk {
+  override def getOrderBookStatus(amountAsset: String, priceAsset: String): R[HttpOrderBookStatus] = mk {
     sttp
-      .get(uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/status")
+      .get(uri"$apiUri/matcher/orderbook/$amountAsset/$priceAsset/status")
       .followRedirects(false)
       .headers(apiKeyHeaders)
   }
+
+  override def getOrderBookStatus(assetPair: AssetPair): R[HttpOrderBookStatus] = getOrderBookStatus(assetPair.amountAssetStr, assetPair.priceAssetStr)
 
   override def deleteOrderBook(assetPair: AssetPair): R[HttpMessage] = mk {
     sttp

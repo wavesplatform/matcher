@@ -4,7 +4,7 @@ import cats.syntax.option._
 import com.softwaremill.sttp._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
-import com.wavesplatform.dex.api.http.entities.{HttpAssetInfo, HttpMarketStatus, HttpOrderBookHistoryItem, HttpV0LevelAgg, HttpV0OrderBook}
+import com.wavesplatform.dex.api.http.entities.{HttpAssetInfo, HttpOrderBookStatus, HttpOrderBookHistoryItem, HttpV0LevelAgg, HttpV0OrderBook}
 import com.wavesplatform.dex.api.http.headers.MatcherHttpServer
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -309,7 +309,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
           dex1.api.place(mkOrder(bob, bob2WavesPair, SELL, askAmount, ask))
 
-          val resp1 = dex1.api.orderBookStatus(bob2WavesPair)
+          val resp1 = dex1.api.getOrderBookStatus(bob2WavesPair)
           resp1.lastTrade shouldBe None
           resp1.bestBid shouldBe None
           resp1.bestAsk should matchTo {
@@ -318,7 +318,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
           dex1.api.place(mkOrder(alice, bob2WavesPair, BUY, bidAmount, bid))
 
-          val resp2 = dex1.api.orderBookStatus(bob2WavesPair)
+          val resp2 = dex1.api.getOrderBookStatus(bob2WavesPair)
           resp2.lastTrade should matchTo {
             Option(LastTrade(ask, askAmount, OrderType.BUY))
           }
@@ -329,8 +329,8 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         }
 
         "is returned even there is no such order book" in {
-          val r = dex1.api.orderBookStatus(bobNotTradedWavesPair)
-          r should matchTo(HttpMarketStatus(None, None, None, None, None, None, None))
+          val r = dex1.api.getOrderBookStatus(bobNotTradedWavesPair)
+          r should matchTo(HttpOrderBookStatus(None, None, None, None, None, None, None))
         }
       }
     }
@@ -550,7 +550,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
     "not create OrderExecuted event with executed amount = 0 and the last trade should not have amount = 0" in {
 
-      val btcUsdnPairLastTrade = dex1.api.orderBookStatus(btcUsdnPair).lastTrade
+      val btcUsdnPairLastTrade = dex1.api.getOrderBookStatus(btcUsdnPair).lastTrade
       val carol = mkAccountWithBalance(26L -> usdn, 1.waves -> Waves)
 
       val sellOrder = mkOrder(bob, btcUsdnPair, SELL, 345506L, 9337000000L) // 1594779890545
@@ -566,7 +566,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       ob.asks shouldBe List(HttpV0LevelAgg(345506L, 9337000000L))
       ob.bids shouldBe empty
 
-      dex1.api.orderBookStatus(btcUsdnPair).lastTrade should matchTo(btcUsdnPairLastTrade)
+      dex1.api.getOrderBookStatus(btcUsdnPair).lastTrade should matchTo(btcUsdnPairLastTrade)
 
       Seq(bob, carol).foreach { owner =>
         dex1.api.cancelAll(owner)

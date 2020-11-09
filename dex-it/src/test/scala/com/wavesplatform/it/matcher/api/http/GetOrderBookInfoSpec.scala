@@ -9,7 +9,7 @@ import org.scalatest.prop.TableDrivenPropertyChecks
 
 class GetOrderBookInfoSpec extends MatcherSuiteBase with TableDrivenPropertyChecks with RawHttpChecks {
 
-  private val negativeCases = Table(
+  private val negativeAssets = Table(
     ("Amount", "Price", "Http status", "Error code", "Message"),
     ("incorrect", "WAVES", 404, 11534345, "The asset incorrect not found"),
     ("WAVES", "incorrect", 404, 9440771, "The WAVES-incorrect asset pair should be reversed")
@@ -30,21 +30,21 @@ class GetOrderBookInfoSpec extends MatcherSuiteBase with TableDrivenPropertyChec
   "GET /matcher/orderbook/{amountAsset}/{priceAsset}/info " - {
 
     "should return exception when amount is not a correct base58 string" in { // TODO: ? Create task for change it to matcherError?
-      validate404Exception(dex1.rawApi.orderBookInfo("null", "WAVES"))
+      validate404Exception(dex1.rawApi.getOrderBookInfo("null", "WAVES"))
     }
 
     "should return exception when price is not a correct base58 string" in {
-      validate404Exception(dex1.rawApi.orderBookInfo("WAVES", "null"))
-    }
-
-    forAll(negativeCases) { (a: String, p: String, c: Int, e: Int, m: String) =>
-      s"for $a/$p should return (HTTP-$c; [$e: $m]) " in {
-        validateMatcherError(dex1.rawApi.orderBookInfo(AssetPair.createAssetPair(a, p).get), c, e, m)
-      }
+      validate404Exception(dex1.rawApi.getOrderBookInfo("WAVES", "null"))
     }
 
     "should return correct data" in {
-      validate200Json(dex1.rawApi.orderBookInfo(wavesUsdPair)).matchingRules should be(HttpMatchingRules(0.01))
+      validate200Json(dex1.rawApi.getOrderBookInfo(wavesUsdPair)).matchingRules should be(HttpMatchingRules(0.01))
+    }
+
+    forAll(negativeAssets) { (a: String, p: String, c: Int, e: Int, m: String) =>
+      s"for $a/$p should return (HTTP-$c; [$e: $m]) " in {
+        validateMatcherError(dex1.rawApi.getOrderBookInfo(AssetPair.createAssetPair(a, p).get), c, e, m)
+      }
     }
   }
 }

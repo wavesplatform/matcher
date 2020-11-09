@@ -106,9 +106,11 @@ trait DexApi[F[_]] {
   def getOrderBook(assetPair: AssetPair, depth: String): F[HttpV0OrderBook]
   def getOrderBook(assetPair: AssetPair, depth: Int): F[HttpV0OrderBook]
 
-  def orderBookInfo(assetPair: AssetPair): F[HttpOrderBookInfo]
-  def orderBookInfo(amountAsset: String, priceAsset: String): F[HttpOrderBookInfo]
-  def orderBookStatus(assetPair: AssetPair): F[HttpMarketStatus]
+  def getOrderBookInfo(assetPair: AssetPair): F[HttpOrderBookInfo]
+  def getOrderBookInfo(amountAsset: String, priceAsset: String): F[HttpOrderBookInfo]
+
+  def getOrderBookStatus(amountAsset: String, priceAsset: String): F[HttpOrderBookStatus]
+  def getOrderBookStatus(assetPair: AssetPair): F[HttpOrderBookStatus]
 
   def deleteOrderBook(assetPair: AssetPair): F[HttpMessage]
 

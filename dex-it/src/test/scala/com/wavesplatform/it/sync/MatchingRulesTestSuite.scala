@@ -94,7 +94,7 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
 
     Seq(wctUsdPair -> 0.00000001, wavesBtcPair -> 0.00000001, wavesUsdPair -> 0.01).foreach {
       case (pair, defaultTs) =>
-        dex1.api.orderBookInfo(pair).matchingRules.tickSize shouldBe defaultTs
+        dex1.api.getOrderBookInfo(pair).matchingRules.tickSize shouldBe defaultTs
 
         val order = mkOrder(bob, pair, SELL, amount, price, matcherFee)
         placeAndAwaitAtDex(order)

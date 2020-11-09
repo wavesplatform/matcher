@@ -72,7 +72,7 @@ class GetOrderBookStatusSpec extends MatcherSuiteBase with TableDrivenPropertyCh
         status.askAmount.get should be(1.waves)
         status.bid.get should be(1.1.usd)
         status.bidAmount.get should be(10.waves)
-
+      }
 //        //TODO: will be fixed in the morning, want to sleep ))
 //        status.lastPrice.get should be(LastTrade(1.waves, 1.9.usd, BUY))
 //        status.bestBid.get should be(LevelAgg(1.waves, 1.1.usd))

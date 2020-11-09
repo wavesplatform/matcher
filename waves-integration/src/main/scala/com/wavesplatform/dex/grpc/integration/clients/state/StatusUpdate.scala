@@ -10,7 +10,9 @@ case class StatusUpdate(
   updatedBalances: BlockchainBalance = Monoid.empty[BlockchainBalance],
   requestBalances: DiffIndex = Monoid.empty[DiffIndex],
   updatedHeight: HeightUpdate = HeightUpdate.NotChanged
-)
+) {
+  override def toString: String = s"StatusUpdate($newStatus, ub=$updatedBalances, rb=$requestBalances, h=$updatedHeight)"
+}
 
 object StatusUpdate {
 

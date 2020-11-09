@@ -13,6 +13,7 @@ import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.clients.DefaultWavesBlockchainClient._
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.Updates
 import com.wavesplatform.dex.grpc.integration.clients.state.StatusUpdate.HeightUpdate
@@ -80,7 +81,8 @@ class DefaultWavesBlockchainClient(
   meClient: MatcherExtensionClient[Future],
   bClient: BlockchainUpdatesClient
 )(implicit ec: ExecutionContext, monixScheduler: Scheduler)
-    extends WavesBlockchainClient {
+    extends WavesBlockchainClient
+    with ScorexLogging {
 
   type Balances = Map[Address, Map[Asset, Long]]
   type Leases = Map[Address, Long]
@@ -95,11 +97,13 @@ class DefaultWavesBlockchainClient(
   private val dataUpdates = ConcurrentSubject.publish[BlockchainEvent]
 
   // TODO replace with deepReplace ?
-  private def balanceUpdates(stateUpdate: StateUpdate): Balances =
-    stateUpdate.balances.foldLeft(emptyBalances) {
+  private def balanceUpdates(stateUpdate: Iterable[StateUpdate]): Balances =
+    stateUpdate.flatMap(_.balances).foldLeft(emptyBalances) {
       case (r, x) =>
+        // TODO what if absent? All assets has gone?
         x.amount.fold(r) { assetAmount =>
           val address = x.address.toVanillaAddress
+          log.info(s"balanceUpdates: $address: ${assetAmount.assetId.toVanillaAsset} -> ${assetAmount.amount}, r: $r")
           val updated = r
             .getOrElse(address, Map.empty)
             .updated(assetAmount.assetId.toVanillaAsset, assetAmount.amount)
@@ -107,8 +111,8 @@ class DefaultWavesBlockchainClient(
         }
     }
 
-  private def leaseUpdates(stateUpdate: StateUpdate): Leases =
-    stateUpdate.leases.foldLeft[Leases](Map.empty) { case (r, x) =>
+  private def leaseUpdates(stateUpdate: Iterable[StateUpdate]): Leases =
+    stateUpdate.flatMap(_.leases).foldLeft[Leases](Map.empty) { case (r, x) =>
       if (x.out <= 0) r
       else r.updated(x.address.toVanillaAddress, x.out)
     }
@@ -125,8 +129,9 @@ class DefaultWavesBlockchainClient(
       event.update match {
         case Update.Empty => none // Nothing to do
         case Update.Append(updates) =>
-          val regularBalanceChanges = updates.stateUpdate.fold(emptyBalances)(balanceUpdates)
-          val outLeasesChanges = updates.stateUpdate.fold(Map.empty[Address, Long])(leaseUpdates)
+          log.info(s"mkEventsStream.stateUpdate: ${updates.stateUpdate}")
+          val regularBalanceChanges = balanceUpdates(updates.stateUpdate).deepReplace(balanceUpdates(updates.transactionStateUpdates))
+          val outLeasesChanges = leaseUpdates(updates.stateUpdate).deepCombine(leaseUpdates(updates.transactionStateUpdates))((_, x) => x)
 
           val blockInfo = updates.body match {
             case Body.Empty => none // Log
@@ -154,9 +159,10 @@ class DefaultWavesBlockchainClient(
     }
     .collect { case Some(x) => x }
 
-  override lazy val updates: Observable[Updates] = {
+  // TODO lazy
+  override val updates: Observable[Updates] = {
     val bBalances = Observable.fromFuture(meClient.currentBlockInfo).flatMap { startBlockInfo =>
-      val start = math.max(startBlockInfo.height - MaxRollbackHeight - 1, 0)
+      val start = math.max(startBlockInfo.height - MaxRollbackHeight - 1, 1)
       currentMaxHeight.set(start)
 
       @volatile var safeStreamCancelable = Cancelable.empty
@@ -178,6 +184,7 @@ class DefaultWavesBlockchainClient(
           val x = StatusTransitions(origStatus, event)
           val updatedBalances = x.updatedHeight match {
             case HeightUpdate.Updated(newHeight) =>
+              log.info(s"Got HeightUpdate.Updated $x")
               currentMaxHeight.set(newHeight)
               if (!x.requestBalances.isEmpty) {} // TODO
               if (x.updatedBalances.isEmpty) emptyBalances

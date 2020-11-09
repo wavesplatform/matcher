@@ -10,14 +10,14 @@ object ListOps {
      * @return (pxs, where p(x) == true, rest xs), pxs is reversed
      */
     def splitOnCondReversed(p: T => Boolean): (List[T], List[T]) = {
-      @tailrec def loop(accLeft: List[T]): (List[T], List[T]) = self match {
+      @tailrec def loop(rest: List[T], accLeft: List[T]): (List[T], List[T]) = rest match {
         case Nil => (accLeft, Nil)
         case x :: xs =>
-          if (p(x)) loop(x :: accLeft)
-          else (accLeft, xs)
+          if (p(x)) loop(xs, x :: accLeft)
+          else (accLeft, rest)
       }
 
-      loop(List.empty)
+      loop(self, List.empty)
     }
 
     def splitOnCond(p: T => Boolean): (List[T], List[T]) = {

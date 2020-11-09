@@ -26,7 +26,7 @@ object MatcherIOUtils {
           val path = dest / name
 
           if (entry.isDirectory) path.mkdirs()
-          else if (!path.isFile) IOUtils.copy(tarIn, new FileOutputStream(path))
+          else if (!path.isFile) IOUtils.copy(tarIn, new FileOutputStream(path)) // isFile to check existence
         }
     } finally tarIn.close()
   }

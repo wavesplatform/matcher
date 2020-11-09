@@ -78,9 +78,13 @@ object SuperConnector {
       _ <- logProcessing(s"Setting up connection with Node REST API (${nodeRestConnector.repeatRequestOptions})")(success)
 
       extensionGrpcApiUri = matcherSettings.wavesBlockchainClient.grpc.target
+      blockchainUpdatesExtensionGrpcApiUri = matcherSettings.wavesBlockchainClient.blockchainUpdatesGrpc.target
 
       dexExtensionGrpcConnector <- logProcessing("Setting up connection with DEX Extension gRPC API") {
-        DexExtensionGrpcConnector.create(extensionGrpcApiUri)
+        DexExtensionGrpcConnector.create(
+          extensionGrpcApiUri,
+          blockchainUpdatesExtensionGrpcApiUri
+        )
       }
 
       dexWsApiUri = s"${if (dexRestApiUri startsWith "http://") "ws://" else "wss://"}$dexRestIpAndPort/ws/v0"
@@ -117,6 +121,7 @@ object SuperConnector {
            |  DEX REST API           : $dexRestApiUri
            |  Node REST API          : $nodeRestApiUri
            |  DEX extension gRPC API : $extensionGrpcApiUri
+           |  Blockchain Updates extension gRPC API : $blockchainUpdatesExtensionGrpcApiUri
            |  DEX WS API             : $dexWsApiUri, connection ID = ${wsInitial.connectionId}
            |  Auth Service REST API  : ${mayBeAuthServiceRestApiUri.getOrElse(
           "Target wasn't provided, account updates check will not be performed!"

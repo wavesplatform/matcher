@@ -79,7 +79,7 @@ object StatusTransitions extends ScorexLogging {
                     previousForkHeight = origStatus.previousForkHeight,
                     previousForkDiffIndex = origStatus.previousForkDiffIndex
                   ),
-                  updatedHeight = HeightUpdate.RestartRequired(math.max(0, origStatus.previousForkHeight - 1))
+                  updatedHeight = HeightUpdate.RestartRequired(math.max(1, origStatus.previousForkHeight - 1)) // TODO duplication of max
                 )
 
               case Right(updatedNewFork) =>

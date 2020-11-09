@@ -33,6 +33,7 @@ class DefaultBlockchainUpdatesClient(eventLoopGroup: EventLoopGroup, channel: Ma
     val r = ConcurrentSubject.publish[BlockchainUpdated](monixScheduler)
     val o = new EventsObserver(r)
     grpcService.subscribe(new SubscribeRequest(fromHeight), o)
+    log.debug(s"Subscribed on blockchain events from $fromHeight")
     (r, () => o.close())
   }
 
@@ -53,12 +54,20 @@ class DefaultBlockchainUpdatesClient(eventLoopGroup: EventLoopGroup, channel: Ma
 
     override def beforeStart(requestStream: ClientCallStreamObserver[Empty]): Unit = this.requestStream = requestStream
 
-    override def onNext(value: SubscribeEvent): Unit =
+    override def onNext(value: SubscribeEvent): Unit = {
+      log.trace(s"Got $value")
       value.update.foreach(subject.onNext)
+    }
 
-    override def onError(e: Throwable): Unit = if (!shuttingDown.get()) subject.onError(e)
+    override def onError(e: Throwable): Unit = {
+      log.error("Got an error", e)
+      if (!shuttingDown.get()) subject.onError(e)
+    }
 
-    override def close(): Unit = if (requestStream != null) requestStream.cancel("Shutting down", new StatusRuntimeException(Status.CANCELLED))
+    override def close(): Unit = {
+      log.info("Closed")
+      if (requestStream != null) requestStream.cancel("Shutting down", new StatusRuntimeException(Status.CANCELLED))
+    }
 
     override def onCompleted(): Unit = log.info("Balance changes stream completed!")
   }

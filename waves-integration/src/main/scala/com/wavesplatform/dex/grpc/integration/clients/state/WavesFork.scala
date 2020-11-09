@@ -50,8 +50,10 @@ case class WavesFork(history: List[WavesBlock]) {
     (WavesFork(commonHistory), droppedHistory.foldMap(_.diffIndex))
   }
 
-  private def canAppend(prev: WavesBlock, newBlock: WavesBlock): Boolean =
-    (prev.ref.height + 1) == newBlock.ref.height && prev.ref.id == newBlock.reference
+  private def canAppend(prev: WavesBlock, newBlock: WavesBlock): Boolean = {
+    val expectedHeight = if (newBlock.tpe == WavesBlock.Type.Block) prev.ref.height + 1 else prev.ref.height
+    expectedHeight == newBlock.ref.height && prev.ref.id == newBlock.reference
+  }
 
   private def mkHardenedBlock(blocks: NonEmptyList[WavesBlock]): WavesBlock = blocks.reduce(WavesFork.blockSemigroup)
 }

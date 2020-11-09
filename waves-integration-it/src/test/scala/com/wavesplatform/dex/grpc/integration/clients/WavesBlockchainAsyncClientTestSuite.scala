@@ -1,9 +1,12 @@
 package com.wavesplatform.dex.grpc.integration.clients
 
 import java.nio.charset.StandardCharsets
+import java.time.temporal.ChronoUnit
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicReference
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder
+import com.wavesplatform.dex.collection.MapOps.Ops2
 import com.wavesplatform.dex.domain.account.{Address, KeyPair}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -11,41 +14,48 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionV2}
 import com.wavesplatform.dex.domain.utils.EitherExt2
-import com.wavesplatform.dex.grpc.integration.clients.MatcherExtensionClient.BalanceChanges
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.settings.{GrpcClientSettings, WavesBlockchainClientSettings}
 import com.wavesplatform.dex.grpc.integration.{IntegrationSuiteBase, WavesClientBuilder}
 import com.wavesplatform.dex.it.test.Scripts
-import monix.execution.Ack.Continue
-import monix.execution.{Ack, Scheduler}
-import monix.reactive.Observer
-import org.scalatest.Assertion
+import monix.execution.Scheduler
+import org.scalatest.{durations, Assertion, CancelAfterFailure}
 
 import scala.concurrent.duration.{Duration, DurationInt}
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.Random
 
-class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
+class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase with CancelAfterFailure {
 
   private val runNow = new ExecutionContext {
     override def execute(runnable: Runnable): Unit = runnable.run()
     override def reportFailure(cause: Throwable): Unit = throw cause
   }
 
-  private val grpcExecutor = Executors.newSingleThreadExecutor {
+  private val grpcExecutor = Executors.newCachedThreadPool(
     new ThreadFactoryBuilder()
       .setDaemon(true)
       .setNameFormat("grpc-%d")
       .build()
-  }
+  )
 
-  implicit private val monixScheduler: Scheduler = Scheduler(runNow)
+  implicit private val monixScheduler: Scheduler = monix.execution.Scheduler.cached("monix", 1, 5) // .Implicits.global
 
   private lazy val client =
-    WavesClientBuilder.asyncMatcherExtension(
+    WavesClientBuilder.async(
       WavesBlockchainClientSettings(
         grpc = GrpcClientSettings(
-          target = wavesNode1.grpcApiTarget,
+          target = wavesNode1.matcherExtApiTarget,
+          maxHedgedAttempts = 5,
+          maxRetryAttempts = 5,
+          keepAliveWithoutCalls = true,
+          keepAliveTime = 2.seconds,
+          keepAliveTimeout = 5.seconds,
+          idleTimeout = 1.minute,
+          channelOptions = GrpcClientSettings.ChannelOptionsSettings(connectTimeout = 5.seconds)
+        ),
+        blockchainUpdatesGrpc = GrpcClientSettings(
+          target = wavesNode1.blockchainUpdatesExtApiTarget,
           maxHedgedAttempts = 5,
           maxRetryAttempts = 5,
           keepAliveWithoutCalls = true,
@@ -66,25 +76,14 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
     interval = 1.second
   )
 
-  @volatile private var balanceChanges = Map.empty[Address, Map[Asset, Long]]
-
-  private val eventsObserver: Observer[BalanceChanges] = new Observer[BalanceChanges] {
-    override def onError(ex: Throwable): Unit = ()
-    override def onComplete(): Unit = ()
-
-    override def onNext(elem: BalanceChanges): Future[Ack] = {
-      balanceChanges += elem.address -> (balanceChanges.getOrElse(elem.address, Map.empty) + (elem.asset -> elem.balance))
-      Continue
-    }
-
-  }
+  private val balanceChanges = new AtomicReference(Map.empty[Address, Map[Asset, Long]])
 
   private val trueScript = Option(Scripts.alwaysTrue)
 
-  private def assertBalanceChanges(expectedBalanceChanges: Map[Address, Map[Asset, Long]]): Assertion = eventually {
+  private def assertBalanceChanges(expectedBalanceChanges: Map[Address, Map[Asset, Long]]): Unit = eventually {
     // Remove pairs (address, asset) those expectedBalanceChanges has not
     val actual = simplify(
-      balanceChanges.view
+      balanceChanges.get.view
         .filterKeys(expectedBalanceChanges.keys.toSet)
         .map {
           case (address, balance) => address -> balance.view.filterKeys(expectedBalanceChanges(address).contains).toMap
@@ -92,7 +91,9 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
         .toMap
     )
     val expected = simplify(expectedBalanceChanges)
-    actual should matchTo(expected)
+    withClue(s"actual=$actual vs expected=$expected\n") {
+      actual should matchTo(expected)
+    }
   }
 
   private def simplify(xs: Map[Address, Map[Asset, Long]]): String =
@@ -116,7 +117,10 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
   override def beforeAll(): Unit = {
     super.beforeAll()
     broadcastAndAwait(IssueUsdTx)
-    client.realTimeBalanceChanges.subscribe(eventsObserver)
+    client.updates.foreach { update =>
+      log.info(s"Got $update")
+      balanceChanges.updateAndGet(_.deepReplace(update.updatedBalances))
+    }
   }
 
   "DEX client should receive balance changes via gRPC" in {
@@ -125,8 +129,8 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
     val issueAssetTx = mkIssue(alice, "name", someAssetAmount, 2)
     val issuedAsset = IssuedAsset(issueAssetTx.id())
 
-    balanceChanges = Map.empty[Address, Map[Asset, Long]]
-    broadcastAndAwait(issueAssetTx)
+    balanceChanges.set(Map.empty)
+    broadcastAndAwait(issueAssetTx, mkTransfer(alice, bob, 1235689L, Waves))
 
     assertBalanceChanges {
       Map(
@@ -137,7 +141,7 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
       )
     }
 
-    balanceChanges = Map.empty[Address, Map[Asset, Long]]
+    balanceChanges.set(Map.empty)
     broadcastAndAwait(mkTransfer(alice, bob, someAssetAmount, issuedAsset))
 
     assertBalanceChanges {
@@ -340,8 +344,8 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
 
   override protected def afterAll(): Unit = {
     super.afterAll()
-    Await.ready(client.close(), Duration.Inf)
-    grpcExecutor.shutdown()
+    Await.ready(client.close(), 10.seconds)
+    grpcExecutor.shutdownNow()
   }
 
   private def wait[T](f: => Future[T]): T = Await.result(f, 10.seconds)

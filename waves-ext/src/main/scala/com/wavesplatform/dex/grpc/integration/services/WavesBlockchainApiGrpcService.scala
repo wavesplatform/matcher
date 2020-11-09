@@ -364,7 +364,14 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, ignoredExchangeTx
       responseObserver.onNext(event)
     }
 
-  override def getCurrentHeight(request: Empty): Future[CurrentHeightResponse] = Future(CurrentHeightResponse(context.blockchain.height))
+  override def getCurrentBlockInfo(request: Empty): Future[CurrentBlockInfoResponse] = Future {
+    // ByteStr.empty is a genesis block
+    val id = context.blockchain.lastBlockId.getOrElse(ByteStr.empty)
+    CurrentBlockInfoResponse(
+      height = context.blockchain.heightOf(id).getOrElse(0),
+      blockId = id.toPB
+    )
+  }
 
   private def parseScriptResult(raw: => Either[ExecutionError, Terms.EVALUATED]): RunScriptResponse.Result = {
     import RunScriptResponse.Result
@@ -416,8 +423,4 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, ignoredExchangeTx
 
 }
 
-object WavesBlockchainApiGrpcService {
-
-
-
-}
+object WavesBlockchainApiGrpcService {}

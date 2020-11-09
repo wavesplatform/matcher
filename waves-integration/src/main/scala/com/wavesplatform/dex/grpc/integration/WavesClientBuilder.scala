@@ -13,18 +13,28 @@ import scala.concurrent.ExecutionContext
 
 object WavesClientBuilder extends ScorexLogging {
 
-  def asyncMatcherExtension(
+  def async(
     wavesBlockchainClientSettings: WavesBlockchainClientSettings,
     monixScheduler: Scheduler,
     grpcExecutionContext: ExecutionContext
   ): WavesBlockchainClient = {
 
-    log.info(s"Building Matcher Extension gRPC client for server: ${wavesBlockchainClientSettings.grpc.target}")
 
     val eventLoopGroup = new NioEventLoopGroup
 
-    val channel: ManagedChannel =
+    log.info(s"Building Matcher Extension gRPC client for server: ${wavesBlockchainClientSettings.grpc.target}")
+    val matcherExtensionChannel: ManagedChannel =
       wavesBlockchainClientSettings.grpc.toNettyChannelBuilder
+        .nameResolverFactory(new DnsNameResolverProvider)
+        .executor((command: Runnable) => grpcExecutionContext.execute(command))
+        .eventLoopGroup(eventLoopGroup)
+        .channelType(classOf[NioSocketChannel])
+        .usePlaintext()
+        .build
+
+    log.info(s"Building Blockchain Updates Extension gRPC client for server: ${wavesBlockchainClientSettings.blockchainUpdatesGrpc.target}")
+    val blockchainUpdatesChannel: ManagedChannel =
+      wavesBlockchainClientSettings.blockchainUpdatesGrpc.toNettyChannelBuilder
         .nameResolverFactory(new DnsNameResolverProvider)
         .executor((command: Runnable) => grpcExecutionContext.execute(command))
         .eventLoopGroup(eventLoopGroup)
@@ -34,10 +44,10 @@ object WavesClientBuilder extends ScorexLogging {
 
     new DefaultWavesBlockchainClient(
       meClient = new MatcherExtensionCachingClient(
-        new MatcherExtensionGrpcAsyncClient(eventLoopGroup, channel, monixScheduler)(grpcExecutionContext),
+        new MatcherExtensionGrpcAsyncClient(eventLoopGroup, matcherExtensionChannel, monixScheduler)(grpcExecutionContext),
         wavesBlockchainClientSettings.defaultCachesExpiration
       )(grpcExecutionContext),
-      bClient = new DefaultBlockchainUpdatesClient(eventLoopGroup, channel, monixScheduler)(grpcExecutionContext)
+      bClient = new DefaultBlockchainUpdatesClient(eventLoopGroup, blockchainUpdatesChannel, monixScheduler)(grpcExecutionContext)
     )(grpcExecutionContext, monixScheduler)
   }
 

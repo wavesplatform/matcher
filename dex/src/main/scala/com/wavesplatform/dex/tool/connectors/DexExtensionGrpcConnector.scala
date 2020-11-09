@@ -50,12 +50,13 @@ object DexExtensionGrpcConnector {
 
   type DetailedBalance = Map[Asset, (BriefAssetDescription, Long)]
 
-  def create(target: String): ErrorOr[DexExtensionGrpcConnector] =
+  def create(target: String, blockchainUpdatesTarget: String): ErrorOr[DexExtensionGrpcConnector] =
     Try {
       LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME).asInstanceOf[Logger].setLevel(Level.OFF)
       val grpcSettings = GrpcClientSettings(target, 5, 5, true, 2.seconds, 5.seconds, 1.minute, ChannelOptionsSettings(5.seconds))
-      val clientSettings = WavesBlockchainClientSettings(grpcSettings, 100.milliseconds, 100)
-      WavesClientBuilder.asyncMatcherExtension(clientSettings, monixScheduler, executionContext)
+      val blockchainUpdatesGrpcSettings = GrpcClientSettings(blockchainUpdatesTarget, 5, 5, true, 2.seconds, 5.seconds, 1.minute, ChannelOptionsSettings(5.seconds))
+      val clientSettings = WavesBlockchainClientSettings(grpcSettings, blockchainUpdatesGrpcSettings, 100.milliseconds, 100)
+      WavesClientBuilder.async(clientSettings, monixScheduler, executionContext)
     }.toEither
       .bimap(ex => s"Cannot establish gRPC connection to DEX Extension! $ex", client => DexExtensionGrpcConnector(target, client))
 

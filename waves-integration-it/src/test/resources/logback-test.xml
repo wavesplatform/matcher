@@ -27,6 +27,9 @@
     <logger name="io.netty" level="INFO"/>
     <logger name="io.grpc.netty" level="WARN"/>
     <logger name="io.swagger" level="OFF"/>
+    <logger name="com.github.dockerjava" level="WARN"/>
+    <logger name="org.testcontainers" level="WARN"/>
+    <logger name="com.wavesplatform" level="TRACE"/>
 
     <root level="TRACE">
         <appender-ref ref="${waves.it.logging.appender:-STDOUT}"/>

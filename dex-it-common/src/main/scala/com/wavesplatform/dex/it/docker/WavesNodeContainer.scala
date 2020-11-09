@@ -31,12 +31,15 @@ final case class WavesNodeContainer(override val internalIp: String, underlying:
   override protected val cachedRestApiAddress: CachedData[InetSocketAddress] = CachedData(getExternalAddress(WavesNodeContainer.restApiPort))
 
   private val cachedNetworkAddress = CachedData(getInternalAddress(WavesNodeContainer.networkPort))
-  private val cachedGrpcApiAddress = CachedData(getExternalAddress(WavesNodeContainer.dexGrpcExtensionPort))
+  private val cachedMatcherExtGrpcApiAddress = CachedData(getExternalAddress(WavesNodeContainer.matcherGrpcExtensionPort))
+  private val cachedBlockchainUpdatesExtGrpcApiAddress = CachedData(getExternalAddress(WavesNodeContainer.blockchainUpdatesGrpcExtensionPort))
 
   def networkAddress: InetSocketAddress = cachedNetworkAddress.get()
-  def grpcApiAddress: InetSocketAddress = cachedGrpcApiAddress.get()
+  def matcherExtGrpcApiAddress: InetSocketAddress = cachedMatcherExtGrpcApiAddress.get()
+  def blockchainUpdatesExtGrpcApiAddress: InetSocketAddress = cachedBlockchainUpdatesExtGrpcApiAddress.get()
 
-  def grpcApiTarget: String = s"${grpcApiAddress.getHostName}:${grpcApiAddress.getPort}"
+  def matcherExtApiTarget: String = s"${matcherExtGrpcApiAddress.getHostName}:${matcherExtGrpcApiAddress.getPort}"
+  def blockchainUpdatesExtApiTarget: String = s"${blockchainUpdatesExtGrpcApiAddress.getHostName}:${blockchainUpdatesExtGrpcApiAddress.getPort}"
 
   private val apiFunctorK: FunctorK[NodeApi] = FunctorK[NodeApi] // IntelliJ FIX
 
@@ -70,7 +73,7 @@ final case class WavesNodeContainer(override val internalIp: String, underlying:
   override def invalidateCaches(): Unit = {
     super.invalidateCaches()
     cachedNetworkAddress.invalidate()
-    cachedGrpcApiAddress.invalidate()
+    cachedMatcherExtGrpcApiAddress.invalidate()
   }
 
 }
@@ -82,7 +85,8 @@ object WavesNodeContainer extends ScorexLogging {
 
   private val restApiPort: Int = 6869 // application.conf waves.rest-api.port
   private val networkPort: Int = 6863 // application.conf waves.network.port
-  val dexGrpcExtensionPort: Int = 6887 // application.conf waves.dex.grpc.integration.port
+  val matcherGrpcExtensionPort: Int = 6887 // application.conf waves.dex.grpc.integration.port
+  val blockchainUpdatesGrpcExtensionPort: Int = 6881 // application.conf waves.dex.blockchain-updates-grpc.integration.port
 
   val wavesNodeNetAlias: String = "waves.nodes"
 
@@ -104,7 +108,7 @@ object WavesNodeContainer extends ScorexLogging {
 
     val underlying = GenericContainer(
       dockerImage = image,
-      exposedPorts = List(restApiPort, networkPort, dexGrpcExtensionPort),
+      exposedPorts = List(restApiPort, networkPort, matcherGrpcExtensionPort),
       env = getEnv(name, internalIp),
       waitStrategy = ignoreWaitStrategy
     ).configure { c =>

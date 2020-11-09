@@ -91,7 +91,7 @@ inTask(docker)(
         .headOption match {
         case None => throw new RuntimeException("Can't find the grcp-server archive")
         case Some(grpcServerArchive) =>
-          val targetDir = target.value / ".."
+          val targetDir = (Compile / compile / target).value
           val r = targetDir / grpcServerArchive.getName.replace(".tgz", "")
           if (!r.isDirectory) {
             log.info(s"Decompressing $grpcServerArchive to $targetDir")
@@ -108,7 +108,7 @@ inTask(docker)(
           destination = "/usr/share/waves/lib/plugins/",
           chown = "143:143"
         )
-        expose(6887, 6871) // DEX Extension, Stagenet REST API
+        expose(6887, 6881, 6871) // DEX Extension, Blockchain Updates Extension, Stagenet REST API
       }
     },
     buildOptions := BuildOptions(removeIntermediateContainers = BuildOptions.Remove.OnSuccess)

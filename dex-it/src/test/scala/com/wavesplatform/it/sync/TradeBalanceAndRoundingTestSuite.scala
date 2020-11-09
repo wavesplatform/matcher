@@ -59,7 +59,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
     }
 
     "get opened trading markets. USD price-asset" in {
-      val openMarkets = dex1.api.allOrderBooks
+      val openMarkets = dex1.api.getOrderBooks
       openMarkets.markets.size shouldBe 1
       val markets = openMarkets.markets.head
 
@@ -227,7 +227,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
   }
 
   "get opened trading markets. Check WCT-USD" in {
-    val openMarkets = dex1.api.allOrderBooks
+    val openMarkets = dex1.api.getOrderBooks
     val markets = openMarkets.markets.last
 
     markets.amountAssetName shouldBe wctAssetName

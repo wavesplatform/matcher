@@ -485,7 +485,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
     val bobOrder = mkOrder(bob, wavesUsdPair, OrderType.SELL, 1.waves, 300, matcherFee = 1L, feeAsset = usd)
     dex1.api.place(bobOrder)
 
-    dex1.api.orderBook(wavesUsdPair).asks shouldBe List(HttpV0LevelAgg(1.waves, 300))
+    dex1.api.getOrderBook(wavesUsdPair).asks shouldBe List(HttpV0LevelAgg(1.waves, 300))
     dex1.api.reservedBalance(bob) shouldBe Map(usd -> 1L, Waves -> 1.waves)
     dex1.api.cancel(bob, bobOrder)
 
@@ -498,7 +498,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
     val aliceOrderId = mkOrder(alice, wavesUsdPair, OrderType.BUY, 1.waves, 300, matcherFee = 1L, feeAsset = usd)
     dex1.api.place(aliceOrderId)
 
-    dex1.api.orderBook(wavesUsdPair).bids shouldBe List(HttpV0LevelAgg(1.waves, 300))
+    dex1.api.getOrderBook(wavesUsdPair).bids shouldBe List(HttpV0LevelAgg(1.waves, 300))
     dex1.api.reservedBalance(alice) shouldBe Map(usd -> 301)
 
     dex1.api.place(mkOrder(bob, wavesUsdPair, OrderType.SELL, 1.waves, 300, 1L, feeAsset = usd))

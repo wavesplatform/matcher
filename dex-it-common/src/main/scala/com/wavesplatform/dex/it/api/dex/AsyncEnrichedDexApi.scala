@@ -185,31 +185,31 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .headers(timestampAndSignatureHeaders(owner, timestamp))
   }
 
-  override def allOrderBooks: R[HttpTradingMarkets] = mk(sttp.get(uri"$apiUri/matcher/orderbook"))
+  override def getOrderBooks: R[HttpTradingMarkets] = mk(sttp.get(uri"$apiUri/matcher/orderbook"))
 
-  override def orderBook(assetPair: AssetPair): R[HttpV0OrderBook] = mk {
+  override def getOrderBook(amountAsset: String, priceAsset: String): R[HttpV0OrderBook] = mk {
     sttp
-      .get(uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}")
+      .get(uri"$apiUri/matcher/orderbook/$amountAsset/$priceAsset")
       .followRedirects(false)
   }
 
-  override def orderBook(assetPair: AssetPair, depth: Int): R[HttpV0OrderBook] = mk {
+  override def getOrderBook(assetPair: AssetPair): R[HttpV0OrderBook] = getOrderBook(assetPair.amountAssetStr, assetPair.priceAssetStr)
+
+  override def getOrderBook(assetPair: AssetPair, depth: String): R[HttpV0OrderBook] = mk {
     sttp
       .get(uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}?depth=$depth")
       .followRedirects(true)
   }
 
-  override def orderBookInfo(amount: String, price: String): R[HttpOrderBookInfo] = mk {
+  override def getOrderBook(assetPair: AssetPair, depth: Int): R[HttpV0OrderBook] = getOrderBook(assetPair, depth.toString)
+
+  override def orderBookInfo(amountAsset: String, priceAsset: String): R[HttpOrderBookInfo] = mk {
     sttp
-      .get(uri"$apiUri/matcher/orderbook/$amount/$price}/info")
+      .get(uri"$apiUri/matcher/orderbook/$amountAsset/$priceAsset}/info")
       .followRedirects(false)
   }
 
-  override def orderBookInfo(assetPair: AssetPair): R[HttpOrderBookInfo] = mk {
-    sttp
-      .get(uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/info")
-      .followRedirects(false)
-  }
+  override def orderBookInfo(assetPair: AssetPair): R[HttpOrderBookInfo] = orderBookInfo(assetPair.amountAssetStr, assetPair.priceAssetStr)
 
   override def orderBookStatus(assetPair: AssetPair): R[HttpMarketStatus] = mk {
     sttp

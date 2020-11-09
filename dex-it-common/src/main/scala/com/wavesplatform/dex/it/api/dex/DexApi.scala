@@ -99,13 +99,15 @@ trait DexApi[F[_]] {
     timestamp: Long = System.currentTimeMillis
   ): F[List[HttpOrderBookHistoryItem]]
 
-  def allOrderBooks: F[HttpTradingMarkets]
+  def getOrderBooks: F[HttpTradingMarkets]
 
-  def orderBook(assetPair: AssetPair): F[HttpV0OrderBook]
-  def orderBook(assetPair: AssetPair, depth: Int): F[HttpV0OrderBook]
+  def getOrderBook(amountAsset: String, priceAsset: String): F[HttpV0OrderBook]
+  def getOrderBook(assetPair: AssetPair): F[HttpV0OrderBook]
+  def getOrderBook(assetPair: AssetPair, depth: String): F[HttpV0OrderBook]
+  def getOrderBook(assetPair: AssetPair, depth: Int): F[HttpV0OrderBook]
 
   def orderBookInfo(assetPair: AssetPair): F[HttpOrderBookInfo]
-  def orderBookInfo(amount: String, price: String): F[HttpOrderBookInfo]
+  def orderBookInfo(amountAsset: String, priceAsset: String): F[HttpOrderBookInfo]
   def orderBookStatus(assetPair: AssetPair): F[HttpMarketStatus]
 
   def deleteOrderBook(assetPair: AssetPair): F[HttpMessage]

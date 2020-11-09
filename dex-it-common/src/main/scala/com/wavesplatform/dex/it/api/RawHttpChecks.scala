@@ -15,14 +15,16 @@ trait RawHttpChecks extends Matchers {
   protected def validate301Redirect[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT]): Unit =
     r.response.code should be(StatusCodes.MovedPermanently)
 
-  protected def validateMatcherError[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT], c: Int, e: Int, m: String): Unit = {
-    r.response.code should be(c)
+  protected def validateMatcherError[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT], code: Int, error: Int, message: String): Unit = {
+    r.response.code should be(code)
     r.response.headers should contain("Content-Type", "application/json")
     r.response.body should be leftSideValue
 
+
+
     val b = Json.parse(r.response.body.left.get)
-    (b \ "message").as[String] should be(m)
-    (b \ "error").as[Int] should be(e)
+    (b \ "message").as[String] should be(message)
+    (b \ "error").as[Int] should be(error)
   }
 
   protected def validate404Exception[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT]): Unit = {

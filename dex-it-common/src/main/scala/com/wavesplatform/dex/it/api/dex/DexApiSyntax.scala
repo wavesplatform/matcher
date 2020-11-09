@@ -15,7 +15,7 @@ object DexApiSyntax {
 
   implicit final class Ops[F[_]: Functor](val self: DexApi[F])(implicit R: CanRepeat[F]) {
 
-    def tradingPairInfo(assetPair: AssetPair): F[Option[HttpMarketDataWithMeta]] = self.allOrderBooks.map {
+    def tradingPairInfo(assetPair: AssetPair): F[Option[HttpMarketDataWithMeta]] = self.getOrderBooks.map {
       _.markets.find(marketData => marketData.amountAsset == assetPair.amountAsset && marketData.priceAsset == assetPair.priceAsset)
     }
 

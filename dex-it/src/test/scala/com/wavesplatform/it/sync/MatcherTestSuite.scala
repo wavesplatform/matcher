@@ -88,7 +88,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         dex1.api.waitForOrderStatus(order1, Status.Accepted)
 
         // Alice check that order is correct
-        val orders = dex1.api.orderBook(aliceWavesPair)
+        val orders = dex1.api.getOrderBook(aliceWavesPair)
         orders.asks.head.amount shouldBe aliceSellAmount
         orders.asks.head.price shouldBe 2000.waves
       }
@@ -105,7 +105,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       }
 
       "get opened trading markets" in {
-        val orderBooks = dex1.api.allOrderBooks
+        val orderBooks = dex1.api.getOrderBooks
         orderBooks.markets.size shouldBe 1
         val markets = orderBooks.markets.head
 
@@ -152,7 +152,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         }
 
         // Alice checks that part of her order still in the order book
-        val orders = dex1.api.orderBook(aliceWavesPair)
+        val orders = dex1.api.getOrderBook(aliceWavesPair)
         orders.asks.head.amount shouldBe 300
         orders.asks.head.price shouldBe 2000.waves
 
@@ -189,7 +189,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         placeAndAwaitAtDex(order3)
 
         // Bob checks that the order in the order book
-        val orders = dex1.api.orderBook(aliceWavesPair)
+        val orders = dex1.api.getOrderBook(aliceWavesPair)
         orders.asks should contain(HttpV0LevelAgg(150, 1900.waves))
       }
 
@@ -231,7 +231,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         dex1.api.cancel(alice, order1).status shouldBe "OrderCanceled"
 
         // Alice checks that the order book is empty
-        val orders1 = dex1.api.orderBook(aliceWavesPair)
+        val orders1 = dex1.api.getOrderBook(aliceWavesPair)
         orders1.asks.size should be(0)
         orders1.bids.size should be(0)
 
@@ -239,7 +239,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         dex1.api.place(mkOrder(alice, aliceWavesPair, SELL, 100, 2000.waves)).status shouldBe "OrderAccepted"
 
         // Alice checks that the order is in the order book
-        val orders2 = dex1.api.orderBook(aliceWavesPair)
+        val orders2 = dex1.api.getOrderBook(aliceWavesPair)
         orders2.asks should contain(HttpV0LevelAgg(100, 2000.waves))
       }
 
@@ -253,7 +253,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         placeAndAwaitAtDex(order5, Status.PartiallyFilled)
 
         // Check that remaining part of the order is in the order book
-        val orders = dex1.api.orderBook(aliceWavesPair)
+        val orders = dex1.api.getOrderBook(aliceWavesPair)
         orders.bids should contain(HttpV0LevelAgg(30, 2000.waves))
 
         // Check balances
@@ -274,7 +274,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       }
 
       "request order book for blacklisted pair" in {
-        dex1.tryApi.orderBook(AssetPair(ForbiddenAsset, Waves)) should failWith(
+        dex1.tryApi.getOrderBook(AssetPair(ForbiddenAsset, Waves)) should failWith(
           11534345,
           MatcherError.Params(assetId = Some(ForbiddenAsset.toString))
         ) // AssetNotFound
@@ -561,7 +561,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       dex1.api.placeMarket(buyOrder)
       dex1.api.waitForOrderStatus(buyOrder, Status.Filled)
 
-      val ob = dex1.api.orderBook(btcUsdnPair)
+      val ob = dex1.api.getOrderBook(btcUsdnPair)
 
       ob.asks shouldBe List(HttpV0LevelAgg(345506L, 9337000000L))
       ob.bids shouldBe empty
@@ -601,7 +601,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       val sellOrder1 = mkOrderDP(alice, ethWavesPair, SELL, 1, 135)
       placeAndAwaitAtDex(sellOrder1)
 
-      val ob = dex1.api.orderBook(ethWavesPair)
+      val ob = dex1.api.getOrderBook(ethWavesPair)
       ob.asks should have size 1
       ob.bids shouldBe empty
 
@@ -613,13 +613,13 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       )
 
       withClue("The old order book is not available") {
-        dex1.httpApi.orderBook(ethWavesPair).code shouldBe StatusCodes.MovedPermanently
+        dex1.httpApi.getOrderBook(ethWavesPair).code shouldBe StatusCodes.MovedPermanently
       }
 
       val wavesEthPair = AssetPair(Waves, eth)
       dex1.api.orderStatus(wavesEthPair, sellOrder1.id()).status shouldBe Status.Accepted
 
-      dex1.api.orderBook(wavesEthPair) should matchTo(
+      dex1.api.getOrderBook(wavesEthPair) should matchTo(
         HttpV0OrderBook(
           timestamp = 0,
           pair = wavesEthPair,

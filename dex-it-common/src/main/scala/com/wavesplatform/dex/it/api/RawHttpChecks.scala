@@ -20,8 +20,6 @@ trait RawHttpChecks extends Matchers {
     r.response.headers should contain("Content-Type", "application/json")
     r.response.body should be leftSideValue
 
-
-
     val b = Json.parse(r.response.body.left.get)
     (b \ "message").as[String] should be(message)
     (b \ "error").as[Int] should be(error)

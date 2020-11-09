@@ -6,7 +6,7 @@ import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
 import cats.Monoid
 import cats.syntax.group._
 import cats.syntax.option._
-import com.wavesplatform.dex.collection.MapOps.Ops
+import com.wavesplatform.dex.collection.MapOps.{Ops, Ops2}
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
@@ -33,6 +33,19 @@ object WavesBlockchainClient {
 
   type BalanceChanges = Map[Address, Map[Asset, Long]]
   case class Updates(updatedBalances: Map[Address, Map[Asset, Long]])
+
+  object Updates {
+
+    implicit val updatesMonoid: Monoid[Updates] = new Monoid[Updates] {
+      override val empty: Updates = Updates(Map.empty)
+
+      override def combine(x: Updates, y: Updates): Updates = Updates(
+        x.updatedBalances.deepReplace(y.updatedBalances)
+      )
+
+    }
+
+  }
 
 }
 
@@ -209,7 +222,7 @@ class DefaultWavesBlockchainClient(
     }*/
 
     // Observable(bState, meStream).merge.map(Updates)
-    bBalances.map(Updates)
+    bBalances.map(Updates(_))
   }
 
   // TODO knownBalances

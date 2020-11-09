@@ -7,10 +7,10 @@ import java.util.concurrent.{ThreadLocalRandom, TimeoutException}
 
 import akka.Done
 import akka.actor.typed.scaladsl.adapter._
-import akka.actor.{typed, ActorRef, ActorSystem, CoordinatedShutdown, Props}
+import akka.actor.{ActorRef, ActorSystem, CoordinatedShutdown, Props, typed}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Directives.respondWithHeader
-import akka.pattern.{ask, gracefulStop, CircuitBreaker}
+import akka.pattern.{CircuitBreaker, ask, gracefulStop}
 import akka.stream.Materializer
 import akka.util.Timeout
 import cats.data.EitherT
@@ -39,15 +39,13 @@ import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.utils.{EitherExt2, LoggerFacade, ScorexLogging}
-import com.wavesplatform.dex.effect.{liftValueAsync, FutureResult}
+import com.wavesplatform.dex.effect.{FutureResult, liftValueAsync}
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
 import com.wavesplatform.dex.grpc.integration.WavesClientBuilder
-import com.wavesplatform.dex.grpc.integration.clients.MatcherExtensionAssetsWatchingClient
-import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.BalanceChanges
+import com.wavesplatform.dex.grpc.integration.clients.{MatcherExtensionAssetsWatchingClient, WavesBlockchainClient}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.history.HistoryRouterActor
 import com.wavesplatform.dex.logs.SystemInformationReporter
-import com.wavesplatform.dex.model.OrderValidator.AsyncBlockchain
 import com.wavesplatform.dex.model.{AssetPairBuilder, ExchangeTransactionCreator, Fee, OrderValidator, ValidationStages}
 import com.wavesplatform.dex.queue._
 import com.wavesplatform.dex.settings.MatcherSettings
@@ -60,7 +58,7 @@ import pureconfig.ConfigSource
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{blocking, Future, Promise}
+import scala.concurrent.{Future, Promise, blocking}
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
@@ -502,12 +500,12 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     p.future
   }
 
-  private def getAndCacheDecimals(assetsCache: AssetsStorage, blockchain: AsyncBlockchain, asset: Asset): FutureResult[Int] =
+  private def getAndCacheDecimals(assetsCache: AssetsStorage, blockchain: WavesBlockchainClient, asset: Asset): FutureResult[Int] =
     getAndCacheDescription(assetsCache, blockchain, asset).map(_.decimals)(catsStdInstancesForFuture)
 
   private def getAndCacheDescription(
     assetsCache: AssetsStorage,
-    blockchain: AsyncBlockchain,
+    blockchain: WavesBlockchainClient,
     asset: Asset
   ): FutureResult[BriefAssetDescription] =
     asset match {

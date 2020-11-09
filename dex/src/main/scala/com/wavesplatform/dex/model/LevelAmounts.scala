@@ -5,6 +5,7 @@ import cats.instances.long.catsKernelStdGroupForLong
 import cats.syntax.group._
 import com.wavesplatform.dex.domain.model.{Amount, Price}
 import com.wavesplatform.dex.domain.order.OrderType
+import com.wavesplatform.dex.fp.MapImplicits.group
 import com.wavesplatform.dex.model.Events.OrderExecuted
 import com.wavesplatform.dex.model.LevelAmounts.mkDiff
 

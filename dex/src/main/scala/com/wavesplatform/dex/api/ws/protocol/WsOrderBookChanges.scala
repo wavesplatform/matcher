@@ -6,6 +6,7 @@ import com.wavesplatform.dex.api.ws.entities.{WsLastTrade, WsOrderBookSettings}
 import com.wavesplatform.dex.api.ws.protocol.WsOrderBookChanges.WsSide
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.model.Denormalization._
+import com.wavesplatform.dex.fp.MayBeEmpty
 import com.wavesplatform.dex.json.Implicits.JsPathOps
 import com.wavesplatform.dex.model.{LastTrade, LevelAgg}
 import com.wavesplatform.dex.settings.OrderRestrictionsSettings

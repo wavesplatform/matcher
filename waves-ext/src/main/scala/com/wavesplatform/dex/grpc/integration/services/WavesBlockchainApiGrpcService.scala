@@ -390,7 +390,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, ignoredExchangeTx
   override def allAssetsSpendableBalance(request: AddressRequest): Future[AllAssetsSpendableBalanceResponse] = {
     for {
       address <- Task.fromTry(Try(request.address.toVanillaAddress))
-      assetBalances <- context.accountsApi.portfolio(address).toListL
+      assetBalances <- context.accountsApi.portfolio(address).toListL // TODO optimize
     } yield AllAssetsSpendableBalanceResponse(
       (Waves :: assetBalances.map(_._1))
         .map(a => AllAssetsSpendableBalanceResponse.Record(a.toPB, spendableBalance(address, a)))
@@ -402,7 +402,15 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, ignoredExchangeTx
     NodeAddressResponse(InetAddress.getLocalHost.getHostAddress)
   }
 
-  private def spendableBalance(address: Address, asset: Asset): Long = 0L
+  private def spendableBalance(address: Address, asset: Asset): Long = {
+    val stateBalance = context.blockchain.balance(address, asset)
+    val leasedBalance = asset.fold(context.blockchain.leaseBalance(address).out)(_ => 0L)
+    math.max(
+      0L,
+      stateBalance - leasedBalance // + pessimisticBalance TODO
+    ) // The negative spendable balance could happen if there are multiple transactions in UTX those spend more than available
+  }
+
   // spendableBalance(address, pessimisticPortfolios.getAggregated(address), asset)
 
   private def spendableBalance(address: Address, pessimisticAddressPortfolio: Portfolio, asset: Asset): Long = {

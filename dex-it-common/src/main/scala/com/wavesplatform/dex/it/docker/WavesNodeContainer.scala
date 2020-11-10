@@ -46,6 +46,8 @@ final case class WavesNodeContainer(override val internalIp: String, underlying:
   val tf = new Transformations[ErrorResponse]
   import tf._
 
+  // See DexContainer about apis
+
   def api: NodeApi[SyncUnsafe] = apiFunctorK.mapK(asyncRawApi)(toSyncUnsafe)
   def tryApi: NodeApi[SyncTry] = apiFunctorK.mapK(asyncRawApi)(toSyncTry)
   def httpApi: NodeApi[SyncHttp] = apiFunctorK.mapK(asyncRawApi)(toSyncHttp)

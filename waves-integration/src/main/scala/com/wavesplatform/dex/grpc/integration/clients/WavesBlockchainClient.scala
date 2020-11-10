@@ -103,10 +103,10 @@ class DefaultWavesBlockchainClient(
         // TODO what if absent? All assets has gone?
         x.amount.fold(r) { assetAmount =>
           val address = x.address.toVanillaAddress
-          log.info(s"balanceUpdates: $address: ${assetAmount.assetId.toVanillaAsset} -> ${assetAmount.amount}, r: $r")
           val updated = r
             .getOrElse(address, Map.empty)
             .updated(assetAmount.assetId.toVanillaAsset, assetAmount.amount)
+          log.info(s"balanceUpdates: $address: ${assetAmount.assetId.toVanillaAsset} -> ${assetAmount.amount}, updated: $updated")
           r.updated(address, updated)
         }
     }
@@ -132,6 +132,7 @@ class DefaultWavesBlockchainClient(
           log.info(s"mkEventsStream.stateUpdate: ${updates.stateUpdate}")
           val regularBalanceChanges = balanceUpdates(updates.stateUpdate).deepReplace(balanceUpdates(updates.transactionStateUpdates))
           val outLeasesChanges = leaseUpdates(updates.stateUpdate).deepCombine(leaseUpdates(updates.transactionStateUpdates))((_, x) => x)
+          log.info(s"mkEventsStream.regularBalanceChanges: $regularBalanceChanges")
 
           val blockInfo = updates.body match {
             case Body.Empty => none // Log
@@ -183,37 +184,15 @@ class DefaultWavesBlockchainClient(
         .mapAccumulate(init) { (origStatus, event) =>
           val x = StatusTransitions(origStatus, event)
           val updatedBalances = x.updatedHeight match {
-            case HeightUpdate.Updated(newHeight) =>
-              log.info(s"Got HeightUpdate.Updated $x")
-              currentMaxHeight.set(newHeight)
-              if (!x.requestBalances.isEmpty) {} // TODO
-              if (x.updatedBalances.isEmpty) emptyBalances
-              else {
-                val changedKeys = x.updatedBalances.diffIndex.outLeases ++ x.updatedBalances.diffIndex.regular.keySet
-
-                val updated = knownBalances.updateAndGet(_ |+| x.updatedBalances)
-                val updatedRegular = updated.regular.view.filterKeys(changedKeys.contains)
-                val updatedLeaseOut = updated.outLeases.view.filterKeys(changedKeys.contains)
-
-                // TODO push next
-                updatedLeaseOut.foldLeft(
-                  Map
-                    .empty[Address, Map[Asset, Long]]
-                    .deepCombine(updatedRegular)(_ ++ _)
-                ) { case (regular, (address, leaseOut)) =>
-                  regular.get(address) match {
-                    case Some(assets) =>
-                      val updatedAssets = assets.updated(Waves, math.max(0L, assets.getOrElse(Waves, 0L) - leaseOut))
-                      regular.updated(address, updatedAssets)
-                    case None => regular // TODO hmm... we doesn't know it balance, but know lease!
-                  }
-                }
-              }
             case HeightUpdate.RestartRequired(atHeight) =>
               currentMaxHeight.set(atHeight)
               safeStreamCancelable.cancel()
               emptyBalances
-            case _ => emptyBalances
+            case HeightUpdate.Updated(newHeight) =>
+              currentMaxHeight.set(newHeight)
+              updateAll(x)
+            case _ =>
+              updateAll(x)
           }
           (x.newStatus, updatedBalances)
         }
@@ -230,6 +209,42 @@ class DefaultWavesBlockchainClient(
 
     // Observable(bState, meStream).merge.map(Updates)
     bBalances.map(Updates(_))
+  }
+
+  private def updateAll(x: StatusUpdate): Map[Address, Map[Asset, Long]] = {
+    if (!x.requestBalances.isEmpty)
+      log.warn(s"Request balances: ${x.requestBalances}") // TODO
+    if (x.updatedBalances.isEmpty) emptyBalances
+    else {
+      val updated = knownBalances.updateAndGet(_ |+| x.updatedBalances)
+
+      val addressesWithChangedWaves = x.updatedBalances.regular.foldLeft(List.empty[Address]) {
+        case (r, (address, assets)) =>
+          if (assets.contains(Waves)) address :: r
+          else r
+      }
+
+      val changedOutLeasesAddresses = x.updatedBalances.outLeases.keySet
+      val origLeases = addressesWithChangedWaves.view
+        .filterNot(changedOutLeasesAddresses.contains)
+        .map(address => address -> updated.outLeases.getOrElse(address, 0L))
+        .toMap
+
+      val combined = (origLeases ++ x.updatedBalances.outLeases).foldLeft(x.updatedBalances.regular) {
+        case (r, (address, updatedOutLease)) =>
+          val origAddressBalance = r.get(address)
+          val origWavesBalance = origAddressBalance.flatMap(_.get(Waves))
+            .orElse(updated.regular.get(address).flatMap(_.get(Waves)))
+            .getOrElse(0L)
+
+          val wavesBalance = math.max(0L, origWavesBalance - updatedOutLease)
+          r.updated(address, origAddressBalance.getOrElse(Map.empty).updated(Waves, wavesBalance))
+      }
+
+      log.info(s"Got HeightUpdate.Updated $x\nCombined: $combined")
+
+      combined
+    }
   }
 
   // TODO knownBalances

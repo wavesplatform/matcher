@@ -1,11 +1,8 @@
 package com.wavesplatform.it.matcher.api.http
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.api.http.entities.HttpMatchingRules
-import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.it.api.RawHttpChecks
-import com.wavesplatform.dex.model.OrderStatus.Cancelled
 import com.wavesplatform.it.MatcherSuiteBase
 import org.scalatest.prop.TableDrivenPropertyChecks
 
@@ -19,8 +16,7 @@ class GetOrderBooksSpec extends MatcherSuiteBase with TableDrivenPropertyChecks 
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
-    broadcastAndAwait(IssueBtcTx)
-    broadcastAndAwait(IssueUsdTx)
+    broadcastAndAwait(IssueBtcTx, IssueUsdTx)
     dex1.start()
   }
 

@@ -9,12 +9,6 @@ import org.scalatest.prop.TableDrivenPropertyChecks
 
 class GetOrderBookInfoSpec extends MatcherSuiteBase with TableDrivenPropertyChecks with RawHttpChecks {
 
-  private val negativeAssets = Table(
-    ("Amount", "Price", "Http status", "Error code", "Message"),
-    ("incorrect", "WAVES", 404, 11534345, "The asset incorrect not found"),
-    ("WAVES", "incorrect", 404, 9440771, "The WAVES-incorrect asset pair should be reversed")
-  )
-
   override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(
     s"""waves.dex {
        |  price-assets = [ "$UsdId", "WAVES" ]
@@ -41,7 +35,11 @@ class GetOrderBookInfoSpec extends MatcherSuiteBase with TableDrivenPropertyChec
       validate200Json(dex1.rawApi.getOrderBookInfo(wavesUsdPair)).matchingRules should be(HttpMatchingRules(0.01))
     }
 
-    forAll(negativeAssets) { (a: String, p: String, c: Int, e: Int, m: String) =>
+    forAll(Table(
+      ("Amount", "Price", "Http status", "Error code", "Message"),
+      ("incorrect", "WAVES", 404, 11534345, "The asset incorrect not found"),
+      ("WAVES", "incorrect", 404, 9440771, "The WAVES-incorrect asset pair should be reversed")
+    )) { (a: String, p: String, c: Int, e: Int, m: String) =>
       s"for $a/$p should return (HTTP-$c; [$e: $m]) " in {
         validateMatcherError(dex1.rawApi.getOrderBookInfo(AssetPair.createAssetPair(a, p).get), c, e, m)
       }

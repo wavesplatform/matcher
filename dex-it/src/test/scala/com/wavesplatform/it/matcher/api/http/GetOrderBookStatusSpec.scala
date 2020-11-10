@@ -1,12 +1,11 @@
 package com.wavesplatform.it.matcher.api.http
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.api.http.entities.{HttpOrderBookStatus, HttpOrderStatus}
+import com.wavesplatform.dex.api.http.entities.HttpOrderBookStatus
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.it.api.RawHttpChecks
 import com.wavesplatform.dex.model.{LastTrade, LevelAgg}
-import com.wavesplatform.dex.model.OrderStatus.Filled
 import com.wavesplatform.it.MatcherSuiteBase
 import org.scalatest.prop.TableDrivenPropertyChecks
 
@@ -18,16 +17,9 @@ class GetOrderBookStatusSpec extends MatcherSuiteBase with TableDrivenPropertyCh
        |}""".stripMargin
   )
 
-  private val negativeAssets = Table(
-    ("Amount", "Price", "Http status", "Error code", "Message"),
-    ("incorrect", "WAVES", 404, 11534345, "The asset incorrect not found"),
-    ("WAVES", "incorrect", 404, 9440771, "The WAVES-incorrect asset pair should be reversed")
-  )
-
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
-    broadcastAndAwait(IssueBtcTx)
-    broadcastAndAwait(IssueUsdTx)
+    broadcastAndAwait(IssueBtcTx, IssueUsdTx)
     dex1.start()
   }
 
@@ -68,28 +60,40 @@ class GetOrderBookStatusSpec extends MatcherSuiteBase with TableDrivenPropertyCh
       withClue("- trade (best sell order partially filled)") {
         placeAndAwaitAtNode(mkOrder(alice, wavesUsdPair, BUY, 1.waves, 2.usd))
         val status = validate200Json(dex1.rawApi.getOrderBookStatus(wavesUsdPair))
-        status.ask.get should be(1.9.usd)
-        status.askAmount.get should be(1.waves)
-        status.bid.get should be(1.1.usd)
-        status.bidAmount.get should be(10.waves)
+
+        status should matchTo(HttpOrderBookStatus(
+          Some(1.9.usd),
+          Some(1.waves),
+          Some(BUY),
+          Some(1.1.usd),
+          Some(10.waves),
+          Some(1.9.usd),
+          Some(1.waves)
+        ))
+
+        status.lastTrade.get should be(LastTrade(1.9.usd, 1.waves, BUY))
+        status.bestBid.get should be(LevelAgg(10.waves, 1.1.usd))
+        status.bestAsk.get should be(LevelAgg(1.waves, 1.9.usd))
       }
-//        //TODO: will be fixed in the morning, want to sleep ))
-//        status.lastPrice.get should be(LastTrade(1.waves, 1.9.usd, BUY))
-//        status.bestBid.get should be(LevelAgg(1.waves, 1.1.usd))
-//        status.bestAsk.get should be(LevelAgg(1.waves, 1.9.usd))
-//      }
-//
-//      withClue("- trade (best sell order fully filled)") {
-//        placeAndAwaitAtNode(mkOrder(alice, wavesUsdPair, BUY, 1.waves, 2.usd))
-//        val status = validate200Json(dex1.rawApi.getOrderBookStatus(wavesUsdPair))
-//        status.ask.get should be(1.9.usd)
-//        status.askAmount.get should be(1.waves)
-//        status.bid.get should be(1.1.usd)
-//        status.bidAmount.get should be(1.waves)
-//        status.lastPrice.get should be(LastTrade(1.9.usd, 1.waves, BUY))
-//        status.bestBid.get should be(LevelAgg(1.waves, 1.1.usd))
-//        status.bestAsk.get should be(LevelAgg(1.waves, 1.9.usd))
-//      }
+
+      withClue("- trade (best sell order fully filled)") {
+        placeAndAwaitAtNode(mkOrder(alice, wavesUsdPair, BUY, 1.waves, 2.usd))
+        val status = validate200Json(dex1.rawApi.getOrderBookStatus(wavesUsdPair))
+
+        status should matchTo(HttpOrderBookStatus(
+          Some(1.9.usd),
+          Some(1.waves),
+          Some(BUY),
+          Some(1.1.usd),
+          Some(10.waves),
+          Some(2.usd),
+          Some(4.waves)
+        ))
+
+        status.lastTrade.get should be(LastTrade(1.9.usd, 1.waves, BUY))
+        status.bestBid.get should be(LevelAgg(10.waves, 1.1.usd))
+        status.bestAsk.get should be(LevelAgg(4.waves, 2.usd))
+      }
     }
 
     "should return exception when amount is not a correct base58 string" in { // TODO: ? Create task for change it to matcherError?
@@ -100,7 +104,11 @@ class GetOrderBookStatusSpec extends MatcherSuiteBase with TableDrivenPropertyCh
       validate404Exception(dex1.rawApi.getOrderBookStatus("WAVES", "null"))
     }
 
-    forAll(negativeAssets) { (a: String, p: String, c: Int, e: Int, m: String) =>
+    forAll(Table(
+      ("Amount", "Price", "Http status", "Error code", "Message"),
+      ("incorrect", "WAVES", 404, 11534345, "The asset incorrect not found"),
+      ("WAVES", "incorrect", 404, 9440771, "The WAVES-incorrect asset pair should be reversed")
+    )) { (a: String, p: String, c: Int, e: Int, m: String) =>
       s"for $a/$p should return (HTTP-$c; [$e: $m]) " in {
         validateMatcherError(dex1.rawApi.getOrderBookStatus(AssetPair.createAssetPair(a, p).get), c, e, m)
       }

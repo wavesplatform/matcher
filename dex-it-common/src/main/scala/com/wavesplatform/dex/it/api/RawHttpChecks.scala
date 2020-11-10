@@ -1,8 +1,8 @@
 package com.wavesplatform.dex.it.api
 
 import com.softwaremill.sttp.StatusCodes
+import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import org.scalatest.matchers.should.Matchers
-import play.api.libs.json.Json
 
 trait RawHttpChecks extends Matchers {
 
@@ -20,9 +20,10 @@ trait RawHttpChecks extends Matchers {
     r.response.headers should contain("Content-Type", "application/json")
     r.response.body should be leftSideValue
 
-    val b = Json.parse(r.response.body.left.get)
-    (b \ "message").as[String] should be(message)
-    (b \ "error").as[Int] should be(error)
+    r.tryGet match {
+      case Left(MatcherError(e, m, _, _)) => e should be(error); m should be(message);
+      case _ => assert(false, s"Unexpected response $r")
+    }
   }
 
   protected def validate404Exception[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT]): Unit = {

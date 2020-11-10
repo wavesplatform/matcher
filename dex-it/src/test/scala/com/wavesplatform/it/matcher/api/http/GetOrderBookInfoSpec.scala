@@ -31,8 +31,12 @@ class GetOrderBookInfoSpec extends MatcherSuiteBase with TableDrivenPropertyChec
       validate404Exception(dex1.rawApi.getOrderBookInfo("WAVES", "null"))
     }
 
-    "should return correct data" in {
+    "should return correct matching rules" in {
       validate200Json(dex1.rawApi.getOrderBookInfo(wavesUsdPair)).matchingRules should be(HttpMatchingRules(0.01))
+    }
+
+    "should return correct restrictions" in {
+      // TODO: add restrictions to config; write test to check
     }
 
     forAll(Table(

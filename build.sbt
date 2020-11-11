@@ -182,7 +182,7 @@ Compile / cleanAll := {
 lazy val quickCheckRaw = taskKey[Unit]("Build a project and run unit tests")
 quickCheckRaw := Def
   .sequential(
-    root / Test / compile,
+    compile.all(ScopeFilter(inProjects(allProjects: _*), inConfigurations(Compile, Test))), // root / compile doesn't work
     `waves-ext` / Test / test,
     `waves-integration` / Test / test,
     dex / Test / test,

@@ -27,11 +27,6 @@ import scala.util.Random
 
 class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase with CancelAfterFailure {
 
-  private val runNow = new ExecutionContext {
-    override def execute(runnable: Runnable): Unit = runnable.run()
-    override def reportFailure(cause: Throwable): Unit = throw cause
-  }
-
   private val grpcExecutor = Executors.newCachedThreadPool(
     new ThreadFactoryBuilder()
       .setDaemon(true)

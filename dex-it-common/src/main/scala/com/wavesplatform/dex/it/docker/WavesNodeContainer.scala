@@ -110,7 +110,7 @@ object WavesNodeContainer extends ScorexLogging {
 
     val underlying = GenericContainer(
       dockerImage = image,
-      exposedPorts = List(restApiPort, networkPort, matcherGrpcExtensionPort),
+      exposedPorts = List(restApiPort, networkPort, matcherGrpcExtensionPort, blockchainUpdatesGrpcExtensionPort),
       env = getEnv(name, internalIp),
       waitStrategy = ignoreWaitStrategy
     ).configure { c =>

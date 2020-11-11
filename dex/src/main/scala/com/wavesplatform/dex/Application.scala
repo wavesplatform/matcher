@@ -7,10 +7,10 @@ import java.util.concurrent.{ThreadLocalRandom, TimeoutException}
 
 import akka.Done
 import akka.actor.typed.scaladsl.adapter._
-import akka.actor.{ActorRef, ActorSystem, CoordinatedShutdown, Props, typed}
+import akka.actor.{typed, ActorRef, ActorSystem, CoordinatedShutdown, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Directives.respondWithHeader
-import akka.pattern.{CircuitBreaker, ask, gracefulStop}
+import akka.pattern.{ask, gracefulStop, CircuitBreaker}
 import akka.stream.Materializer
 import akka.util.Timeout
 import cats.data.EitherT
@@ -39,7 +39,7 @@ import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.utils.{EitherExt2, LoggerFacade, ScorexLogging}
-import com.wavesplatform.dex.effect.{FutureResult, liftValueAsync}
+import com.wavesplatform.dex.effect.{liftValueAsync, FutureResult}
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
 import com.wavesplatform.dex.grpc.integration.WavesClientBuilder
 import com.wavesplatform.dex.grpc.integration.clients.{MatcherExtensionAssetsWatchingClient, WavesBlockchainClient}
@@ -58,7 +58,7 @@ import pureconfig.ConfigSource
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{Future, Promise, blocking}
+import scala.concurrent.{blocking, Future, Promise}
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
@@ -420,16 +420,9 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       forceStopApplication(StartingMatcherError)
   }
 
-  private def watchBalanceChanges(recipient: ActorRef): Unit = {
-
-//    def aggregateChangesByAddress(xs: List[BalanceChanges]): Map[Address, Map[Asset, Long]] = xs.foldLeft(Map.empty[Address, Map[Asset, Long]]) {
-//      case (result, bc) => result.updated(bc.address, result.getOrElse(bc.address, Map.empty) + (bc.asset -> bc.balance))
-//    }
-//
-//    wavesBlockchainAsyncClient.realTimeBalanceBatchChanges
-//      .map(aggregateChangesByAddress)
-//      .foreach(recipient ! SpendableBalancesActor.Command.UpdateStates(_))(monixScheduler)
-  }
+  private def watchBalanceChanges(recipient: ActorRef): Unit =
+    wavesBlockchainAsyncClient.updates
+      .foreach(updates => recipient ! SpendableBalancesActor.Command.UpdateStates(updates.updatedBalances))(monixScheduler)
 
   private def loadAllKnownAssets(): Future[Unit] =
     Future(blocking(assetPairsDB.all()).flatMap(_.assets) ++ settings.mentionedAssets).flatMap { assetsToLoad =>

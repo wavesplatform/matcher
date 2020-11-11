@@ -280,6 +280,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         ) // AssetNotFound
       }
 
+      // TODO this is not about UTX Pool, because waitForOrderAtNode waits for a transaction to be mined
       "should consider UTX pool when checking the balance" in {
         wavesNode1.api.balance(alice, bobAsset1) shouldBe 0
         wavesNode1.api.balance(matcher, bobAsset1) shouldBe 0
@@ -295,7 +296,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         placeAndAwaitAtDex(order7, Status.Filled)
 
         waitForOrderAtNode(order7)
-        // Bob tries to do the same operation, but at now he has no assets
+        // Bob tries to do the same operation, but at now he have no assets
         dex1.tryApi.place(mkBobOrder) should failWith(3147270) // BalanceNotEnough
       }
 

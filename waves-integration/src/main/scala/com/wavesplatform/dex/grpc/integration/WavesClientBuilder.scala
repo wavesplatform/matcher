@@ -19,7 +19,6 @@ object WavesClientBuilder extends ScorexLogging {
     grpcExecutionContext: ExecutionContext
   ): WavesBlockchainClient = {
 
-
     val eventLoopGroup = new NioEventLoopGroup
 
     log.info(s"Building Matcher Extension gRPC client for server: ${wavesBlockchainClientSettings.grpc.target}")

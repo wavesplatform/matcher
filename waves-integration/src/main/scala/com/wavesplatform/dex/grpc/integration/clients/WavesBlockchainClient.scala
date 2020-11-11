@@ -1,20 +1,17 @@
 package com.wavesplatform.dex.grpc.integration.clients
 
 import java.net.InetAddress
-import java.util
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import cats.Monoid
+import cats.instances.list._
+import cats.instances.long._
+import cats.instances.set._
 import cats.syntax.foldable._
 import cats.syntax.group._
-import cats.instances.long._
-import cats.instances.list._
-import cats.instances.set._
-import com.wavesplatform.dex.fp.MapImplicits.group
 import cats.syntax.option._
-import com.google.protobuf.{ByteString, CodedOutputStream}
+import com.google.protobuf.ByteString
 import com.wavesplatform.dex.collection.MapOps.{Ops, Ops2}
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
@@ -23,6 +20,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
+import com.wavesplatform.dex.fp.MapImplicits.group
 import com.wavesplatform.dex.grpc.integration.clients.DefaultWavesBlockchainClient._
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.Updates
 import com.wavesplatform.dex.grpc.integration.clients.state.StatusUpdate.HeightUpdate
@@ -37,12 +35,9 @@ import com.wavesplatform.events.protobuf.{BlockchainUpdated, StateUpdate}
 import monix.execution.{Cancelable, Scheduler}
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
-import scalapb.GeneratedMessage
 
-import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.control.NonFatal
 
 object WavesBlockchainClient {
 
@@ -345,12 +340,6 @@ class DefaultWavesBlockchainClient(
 
   override def close(): Future[Unit] = meClient.close().zip(bClient.close()).map(_ => ())
 
-  private def upsert(orig: Balances, update: Balances): Balances =
-    update.foldLeft(orig) { case (r, (address, balances)) =>
-      val orig = r.getOrElse(address, Map.empty)
-      r.updated(address, orig ++ balances)
-    }
-
 }
 
 object DefaultWavesBlockchainClient {
@@ -375,7 +364,7 @@ object DefaultWavesBlockchainClient {
 
     def replaceWith(setTxs: Set[UtxTransaction]): Set[Address] = write {
       val setTxMap = setTxs.map(tx => tx.id -> tx).toMap
-      val oldTxIds = txs.keySet -- setTxMap.keySet
+      val oldTxIds = txs.keySet.toSet -- setTxMap.keySet
       val newTxIds = setTxMap.keySet -- txs.keySet
 
       val newTxsPortfolios = newTxIds.toList.map(id => id -> getPessimisticPortfolio(setTxMap(id))) // TODO apply
@@ -468,27 +457,6 @@ object DefaultWavesBlockchainClient {
 
         finalP
       }
-
-  }
-
-  // https://github.com/wavesplatform/Waves/blob/d7ffb13e2c4fa5b9460cb21dc83e0ebdbff655ec/node/src/main/scala/com/wavesplatform/transaction/serialization/impl/PBTransactionSerializer.scala
-  private object PBUtils {
-
-    def encodeDeterministic(msg: GeneratedMessage): Array[Byte] = {
-      val outArray = new Array[Byte](msg.serializedSize)
-      val outputStream = CodedOutputStream.newInstance(outArray)
-
-      outputStream.useDeterministicSerialization() // Adds this
-      msg.writeTo(outputStream)
-
-      try outputStream.checkNoSpaceLeft()
-      catch {
-        case NonFatal(e) =>
-          throw new RuntimeException(s"Error serializing PB message: $msg (bytes = ${ByteStr(msg.toByteArray)})", e)
-      }
-
-      outArray
-    }
 
   }
 

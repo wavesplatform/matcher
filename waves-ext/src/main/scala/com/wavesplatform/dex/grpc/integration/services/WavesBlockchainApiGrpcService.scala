@@ -52,9 +52,6 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, ignoredExchangeTx
 
   private val utxState = new ConcurrentHashMap[ByteStr, UtxTransaction]()
 
-//  private val emptyAddressAssetsChanges = Map.empty[Address, Set[Asset]]
-//  private val allSpendableBalances = new ConcurrentHashMap[Address, Map[Asset, Long]]()
-
   private val utxChangesSubscribers = ConcurrentHashMap.newKeySet[StreamObserver[UtxEvent]](2)
 
   private val cleanupTask: Task[Unit] = Task {
@@ -67,11 +64,6 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, ignoredExchangeTx
     utxChangesSubscribers.forEach(_.onError(shutdownError))
     utxChangesSubscribers.clear()
   }
-
-  // private def getAddressesChangedAssets(diff: Diff): AddressesAssetsChanges = diff.portfolios.view.mapValues(_.assetIds).toMap
-
-//  private val pessimisticPortfolios = new PessimisticPortfolios(context.blockchain.transactionMeta(_).isEmpty)
-  // private val txAddressesAssetsChanges = new ConcurrentHashMap[Transaction, AddressesAssetsChanges]()
 
   private val pbWaves = Waves.toPB
 
@@ -160,14 +152,6 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, ignoredExchangeTx
           try subscriber.onNext(event)
           catch { case e: Throwable => log.warn(s"Can't send balance changes to $subscriber", e) }
         }
-//      tx match {
-//        case et: ExchangeTransaction if ignoredExchangeTxSenderPublicKey.contains(et.sender.toString) => emptyAddressAssetsChanges
-//        case otherTx =>
-//          val changes = getAddressesChangedAssets(diff)
-//          pessimisticPortfolios.add(otherTx, diff)
-//          txAddressesAssetsChanges.putIfAbsent(otherTx, changes)
-//          changes
-//      }
 
       case evt @ TxRemoved(tx, reason) =>
         Option(utxState.remove(tx.id())) match {
@@ -194,39 +178,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, ignoredExchangeTx
               catch { case e: Throwable => log.warn(s"Can't send balance changes to $subscriber", e) }
             }
         }
-
-//      pessimisticPortfolios.remove(tx)
-//      Option(txAddressesAssetsChanges remove tx).getOrElse(Map.empty)
     }
-
-//  private val utxChanges: Coeval[CancelableFuture[Unit]] = Coeval.evalOnce {
-//    utxBalanceUpdates
-//      .map {
-//        _.flatMap {
-//          case (address, assets) =>
-//            val addressBalance = allSpendableBalances.getOrDefault(address, Map.empty)
-//            val pessimisticPortfolio = pessimisticPortfolios.getAggregated(address)
-//            assets.map { asset =>
-//              val newAssetBalance = spendableBalance(address, pessimisticPortfolio, asset)
-//              val needUpdate = !addressBalance.get(asset).contains(newAssetBalance)
-//              if (needUpdate) {
-//                allSpendableBalances.put(address, addressBalance + (asset -> newAssetBalance))
-//                Some(BalanceChangesFlattenResponse(address.toPB, asset.toPB, newAssetBalance))
-//              } else Option.empty[BalanceChangesFlattenResponse]
-//            }
-//        }.collect { case Some(response) => response }
-//      }
-//      .doOnSubscriptionCancel(cleanupTask)
-//      .doOnComplete(cleanupTask)
-//      .doOnError(e => Task(log.error(s"Error in real time balance changes stream occurred!", e)))
-//      .foreach { batch =>
-//        if (batch.nonEmpty)
-//          utxChangesSubscribers.forEach { subscriber =>
-//            try batch.foreach(subscriber.onNext)
-//            catch { case e: Throwable => log.warn(s"Can't send balance changes to $subscriber", e) }
-//          }
-//      }
-//  }
 
   override def getStatuses(request: TransactionsByIdRequest): Future[TransactionsStatusesResponse] = Future {
     val statuses = request.transactionIds.map { txId =>
@@ -412,18 +364,6 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, ignoredExchangeTx
     math.max(
       0L,
       stateBalance - leasedBalance // + pessimisticBalance TODO
-    ) // The negative spendable balance could happen if there are multiple transactions in UTX those spend more than available
-  }
-
-  // spendableBalance(address, pessimisticPortfolios.getAggregated(address), asset)
-
-  private def spendableBalance(address: Address, pessimisticAddressPortfolio: Portfolio, asset: Asset): Long = {
-    val stateBalance = context.blockchain.balance(address, asset)
-    val leasedBalance = asset.fold(context.blockchain.leaseBalance(address).out)(_ => 0L)
-    val pessimisticBalance = pessimisticAddressPortfolio.spendableBalanceOf(asset)
-    math.max(
-      0L,
-      stateBalance - leasedBalance + pessimisticBalance
     ) // The negative spendable balance could happen if there are multiple transactions in UTX those spend more than available
   }
 

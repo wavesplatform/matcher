@@ -25,7 +25,7 @@ trait RawHttpChecks extends Matchers {
 
     r.tryGet match {
       case Left(MatcherError(e, m, _, _)) => e should be(error); m should be(message);
-      case _ => assert(false, s"Unexpected response $r")
+      case _ => fail(s"Unexpected response $r")
     }
   }
 

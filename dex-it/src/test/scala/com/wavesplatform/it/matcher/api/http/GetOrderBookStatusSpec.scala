@@ -96,6 +96,10 @@ class GetOrderBookStatusSpec extends MatcherSuiteBase with TableDrivenPropertyCh
       }
     }
 
+    "should return empty json for not traded order book" in {
+      validate200Json(dex1.rawApi.getOrderBookStatus(wavesBtcPair)) should matchTo(HttpOrderBookStatus(None, None, None, None, None, None, None))
+    }
+
     "should return exception when amount is not a correct base58 string" in { // TODO: ? Create task for change it to matcherError?
       validate404Exception(dex1.rawApi.getOrderBookStatus("null", "WAVES"))
     }

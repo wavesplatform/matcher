@@ -221,7 +221,7 @@ message UtxEvent {
     }
 
     message Switch {
-        repeated UtxTransaction transaction = 1;
+        repeated UtxTransaction transactions = 1;
     }
 
     message Update {
@@ -245,8 +245,9 @@ message UtxEvent {
 }
 
 message UtxTransaction {
-    SignedTransaction transaction = 1;
-    TransactionDiff diff = 2;
+    bytes id = 1;
+    SignedTransaction transaction = 2;
+    TransactionDiff diff = 3;
 }
 
 message TransactionDiff {

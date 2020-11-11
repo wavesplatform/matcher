@@ -313,9 +313,7 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase with Canc
       mkTransfer(bob, carol, 1.btc, btc)
     )
 
-    // TODO Pessimistic portfolio
-    // wavesNode1.api.broadcast(mkTransfer(carol, bob, 1.waves, Waves))
-    broadcastAndAwait(mkTransfer(carol, bob, 1.waves, Waves))
+    wavesNode1.api.broadcast(mkTransfer(carol, bob, 1.waves, Waves))
 
     wait(client allAssetsSpendableBalance carol) should matchTo(
       Map[Asset, Long](

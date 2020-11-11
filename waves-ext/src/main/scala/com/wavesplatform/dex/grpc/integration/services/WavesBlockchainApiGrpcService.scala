@@ -35,6 +35,7 @@ import io.grpc.stub.{ServerCallStreamObserver, StreamObserver}
 import io.grpc.{Metadata, Status, StatusRuntimeException}
 import monix.eval.Task
 import monix.execution.Scheduler
+import scalapb.json4s.JsonFormat
 import shapeless.Coproduct
 
 import scala.concurrent.Future
@@ -137,16 +138,15 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, ignoredExchangeTx
     .doOnComplete(cleanupTask)
     .doOnError(e => Task(log.error(s"Error in real time balance changes stream occurred!", e)))
     .foreach {
-      case TxAdded(tx, diff) =>
+      case evt @ TxAdded(tx, diff) =>
         val utxTransaction = UtxTransaction(
+          id = tx.id().toPB,
           transaction = tx.toPB.some,
           diff = toPbDiff(diff).some
         )
 
-        utxState.put(
-          tx.id(),
-          utxTransaction
-        )
+        utxState.put(tx.id(), utxTransaction)
+        log.info(s"added: id=${tx.id()}, ${JsonFormat.toJsonString(utxTransaction)}, $evt")
 
         val event = UtxEvent(
           UtxEvent.Type.Update(
@@ -169,27 +169,30 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, ignoredExchangeTx
 //          changes
 //      }
 
-      case TxRemoved(tx, reason) =>
-        Option(utxState.remove(tx.id())).foreach { utxTransaction =>
-          val gReason = reason.map { x =>
-            UtxEvent.Update.Removed.Reason(
-              name = getSimpleName(x),
-              message = x.toString
-            )
-          }
+      case evt @ TxRemoved(tx, reason) =>
+        Option(utxState.remove(tx.id())) match {
+          case None => log.info(s"$evt - can't find")
+          case Some(utxTransaction) =>
+            log.info(s"removed: id=${tx.id()}, $evt")
+            val gReason = reason.map { x =>
+              UtxEvent.Update.Removed.Reason(
+                name = getSimpleName(x),
+                message = x.toString
+              )
+            }
 
-          val event = UtxEvent(
-            UtxEvent.Type.Update(
-              UtxEvent.Update(
-                removed = List(UtxEvent.Update.Removed(utxTransaction.some, gReason))
+            val event = UtxEvent(
+              UtxEvent.Type.Update(
+                UtxEvent.Update(
+                  removed = List(UtxEvent.Update.Removed(utxTransaction.some, gReason))
+                )
               )
             )
-          )
 
-          utxChangesSubscribers.forEach { subscriber =>
-            try subscriber.onNext(event)
-            catch { case e: Throwable => log.warn(s"Can't send balance changes to $subscriber", e) }
-          }
+            utxChangesSubscribers.forEach { subscriber =>
+              try subscriber.onNext(event)
+              catch { case e: Throwable => log.warn(s"Can't send balance changes to $subscriber", e) }
+            }
         }
 
 //      pessimisticPortfolios.remove(tx)
@@ -353,6 +356,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, ignoredExchangeTx
         case x => log.warn(s"Can't register cancel handler for $x")
       }
 
+      log.info("Add new observer")
       utxChangesSubscribers.add(responseObserver)
       val event = UtxEvent(
         UtxEvent.Type.Switch(

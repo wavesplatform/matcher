@@ -1,11 +1,20 @@
 package com.wavesplatform.dex.grpc.integration.clients
 
 import java.net.InetAddress
+import java.util
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
+import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import cats.Monoid
+import cats.syntax.foldable._
 import cats.syntax.group._
+import cats.instances.long._
+import cats.instances.list._
+import cats.instances.set._
+import com.wavesplatform.dex.fp.MapImplicits.group
 import cats.syntax.option._
+import com.google.protobuf.{ByteString, CodedOutputStream}
 import com.wavesplatform.dex.collection.MapOps.{Ops, Ops2}
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
@@ -20,6 +29,7 @@ import com.wavesplatform.dex.grpc.integration.clients.state.StatusUpdate.HeightU
 import com.wavesplatform.dex.grpc.integration.clients.state._
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions._
+import com.wavesplatform.dex.grpc.integration.services.{UtxEvent, UtxTransaction}
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Rollback.RollbackType
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
@@ -27,8 +37,12 @@ import com.wavesplatform.events.protobuf.{BlockchainUpdated, StateUpdate}
 import monix.execution.{Cancelable, Scheduler}
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
+import scalapb.GeneratedMessage
 
+import scala.collection.concurrent.TrieMap
+import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.control.NonFatal
 
 object WavesBlockchainClient {
 
@@ -92,7 +106,7 @@ class DefaultWavesBlockchainClient(
   private val emptyBalances: Balances = Map.empty
   private val knownBalances: AtomicReference[BlockchainBalance] = new AtomicReference(Monoid.empty[BlockchainBalance])
 
-//  private val pessimisticPortfolios = new PessimisticPortfolios
+  private val pessimisticPortfolios = new PessimisticPortfolios
 
   private val dataUpdates = ConcurrentSubject.publish[BlockchainEvent]
 
@@ -190,70 +204,112 @@ class DefaultWavesBlockchainClient(
               emptyBalances
             case HeightUpdate.Updated(newHeight) =>
               currentMaxHeight.set(newHeight)
-              updateAll(x)
+              runSideEffects(x)
+              collectBalanceChanges(x)
             case _ =>
-              updateAll(x)
+              runSideEffects(x)
+              collectBalanceChanges(x)
           }
           (x.newStatus, updatedBalances)
         }
         .filter(_.nonEmpty)
     }
 
-    /*val meStream = meClient.utxEvents.map { event =>
+    val meStream = meClient.utxEvents.map { event =>
       event.`type` match {
-        case Type.Switch(event) => event.transaction.map()
-        case Type.Update(event) =>
-        case Type.Empty =>
+        case UtxEvent.Type.Switch(event) =>
+          pessimisticPortfolios.replaceWith(event.transactions.toSet).map { changedAddress =>
+            changedAddress -> combineBalances(
+              regular = Map.empty,
+              outLease = none,
+              pessimistic = pessimisticPortfolios.getAggregated(changedAddress),
+              updatedRegular = knownBalances.get.regular.getOrElse(changedAddress, Map.empty),
+              updatedOutLease = knownBalances.get.outLeases.get(changedAddress),
+              updatedPessimistic = pessimisticPortfolios.getAggregated(changedAddress)
+            )
+          }.toMap
+        // TODO
+        case UtxEvent.Type.Update(event) =>
+          pessimisticPortfolios
+            .addAndRemove(
+              addTxs = event.added.flatMap(_.transaction),
+              removeTxs = event.removed.flatMap(_.transaction)
+            )
+            .map { changedAddress =>
+              changedAddress -> combineBalances(
+                regular = Map.empty,
+                outLease = none,
+                pessimistic = pessimisticPortfolios.getAggregated(changedAddress),
+                updatedRegular = knownBalances.get.regular.getOrElse(changedAddress, Map.empty),
+                updatedOutLease = knownBalances.get.outLeases.get(changedAddress),
+                updatedPessimistic = pessimisticPortfolios.getAggregated(changedAddress)
+              )
+            }.toMap
+        case _ => Map.empty[Address, Map[Asset, Long]]
       }
-    }*/
+    }
 
-    // Observable(bState, meStream).merge.map(Updates)
-    bBalances.map(Updates(_))
+    Observable(bBalances, meStream).merge.map(Updates(_))
   }
 
-  private def updateAll(x: StatusUpdate): Map[Address, Map[Asset, Long]] = {
+  private def runSideEffects(x: StatusUpdate): Unit =
     if (!x.requestBalances.isEmpty)
       log.warn(s"Request balances: ${x.requestBalances}") // TODO
+
+  private def combineBalances(
+    regular: Map[Asset, Long],
+    outLease: Option[Long],
+    pessimistic: Map[Asset, Long],
+    updatedRegular: Map[Asset, Long],
+    updatedOutLease: Option[Long],
+    updatedPessimistic: Map[Asset, Long]
+  ): Map[Asset, Long] = {
+    val changedAssets = regular.keySet ++ pessimistic.keySet ++ outLease.map(_ => Waves)
+    changedAssets.map { asset =>
+      val assetRegular = regular.get(asset).orElse(updatedRegular.get(asset)).getOrElse(0L)
+      val assetLeaseOut = outLease.orElse(updatedOutLease).getOrElse(0L)
+      val assetPessimistic = pessimistic.get(asset).orElse(updatedPessimistic.get(asset)).getOrElse(0L)
+      asset -> math.max(0L, assetRegular - assetLeaseOut + assetPessimistic) // pessimistic is negative
+    }.toMap
+  }
+
+  // TODO combine three Map[Asset, Long] for each address
+  private def collectBalanceChanges(x: StatusUpdate): Map[Address, Map[Asset, Long]] =
     if (x.updatedBalances.isEmpty) emptyBalances
     else {
       val updated = knownBalances.updateAndGet(_ |+| x.updatedBalances)
-
-      val addressesWithChangedWaves = x.updatedBalances.regular.foldLeft(List.empty[Address]) {
-        case (r, (address, assets)) =>
-          if (assets.contains(Waves)) address :: r
-          else r
-      }
-
-      val changedOutLeasesAddresses = x.updatedBalances.outLeases.keySet
-      val origLeases = addressesWithChangedWaves.view
-        .filterNot(changedOutLeasesAddresses.contains)
-        .map(address => address -> updated.outLeases.getOrElse(address, 0L))
+      val changedAddresses = x.updatedBalances.regular.keySet ++ x.updatedBalances.outLeases.keySet
+      val combined = changedAddresses
+        .map { address =>
+          address -> combineBalances(
+            regular = x.updatedBalances.regular.getOrElse(address, Map.empty),
+            outLease = x.updatedBalances.outLeases.get(address),
+            pessimistic = Map.empty,
+            updatedRegular = updated.regular.getOrElse(address, Map.empty),
+            updatedOutLease = updated.outLeases.get(address),
+            updatedPessimistic = pessimisticPortfolios.getAggregated(address)
+          )
+        }
         .toMap
-
-      val combined = (origLeases ++ x.updatedBalances.outLeases).foldLeft(x.updatedBalances.regular) {
-        case (r, (address, updatedOutLease)) =>
-          val origAddressBalance = r.get(address)
-          val origWavesBalance = origAddressBalance.flatMap(_.get(Waves))
-            .orElse(updated.regular.get(address).flatMap(_.get(Waves)))
-            .getOrElse(0L)
-
-          val wavesBalance = math.max(0L, origWavesBalance - updatedOutLease)
-          r.updated(address, origAddressBalance.getOrElse(Map.empty).updated(Waves, wavesBalance))
-      }
 
       log.info(s"Got HeightUpdate.Updated $x\nCombined: $combined")
 
       combined
     }
-  }
 
   // TODO knownBalances
   override def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] =
-    meClient.spendableBalances(address, assets)
+    meClient.spendableBalances(address, assets).map(_ |+| pessimisticPortfolios.getAggregated(address).collect {
+      case p @ (asset, v) if assets.contains(asset) => p
+    })
 
   // TODO knownBalances
   override def allAssetsSpendableBalance(address: Address): Future[Map[Asset, Long]] =
-    meClient.allAssetsSpendableBalance(address)
+    meClient.allAssetsSpendableBalance(address).map { xs =>
+      xs |+| pessimisticPortfolios.getAggregated(address).collect {
+        case p @ (asset, v) if xs.keySet.contains(asset) => p
+      }
+    }
 
   // TODO get all and track in bClient
   override def isFeatureActivated(id: Short): Future[Boolean] =
@@ -301,52 +357,139 @@ object DefaultWavesBlockchainClient {
 
   val MaxRollbackHeight = 100
 
-//  private class PessimisticPortfolios {
-//
-//    private type Portfolios = Map[Address, Map[Asset, Long]]
-//
-//    private val portfolios = new ConcurrentHashMap[Address, Map[Asset, Long]]()
-//    private val txs = TrieMap.empty[UtxTransaction, Portfolios] // TODO Use ID
-//
-//    def add(tx: UtxTransaction): Unit = tx.diff.flatMap(_.stateUpdate).foreach { diff =>
-//      // Balances
-//      val p1: Portfolios = diff.balances.groupBy(_.address).map {
-//        case (address, updates) =>
-//          val balances = updates.view
-//            .flatMap(_.amount)
-//            .collect {
-//              case x if x.amount < 0 => x.assetId.toVanillaAsset -> x.amount // pessimistic
-//            }
-//            .toMap
-//          address.toVanillaAddress -> balances
-//      }
-//
-//      // Leasing
-//      val finalP: Portfolios = diff.leases.foldLeft(p1) {
-//        case (r, x) =>
-//          if (x.out <= 0) r // pessimistic
-//          else {
-//            val address = x.address.toVanillaAddress
-//            val orig = r.getOrElse(address, Map.empty)
-//            val updated = orig.updated(Waves, orig.getOrElse(Waves, 0L) - x.out)
-//            r.updated(address, updated)
-//          }
-//      }
-//
-//      if (txs.putIfAbsent(tx, finalP).isEmpty)
-//        finalP.foreach {
-//          case (address, balances) => portfolios.compute(address, (_, orig) => orig |+| balances)
-//        }
-//    }
-//
-//    def remove(tx: UtxTransaction): Unit = txs.remove(tx).foreach { p =>
-//      p.foreach {
-//        case (address, balances) => portfolios.compute(address, (_, orig) => orig |-| balances)
-//      }
-//    }
-//
-//    def getAggregated(address: Address): Map[Asset, Long] = portfolios.get(address)
-//
-//  }
+  private class PessimisticPortfolios extends ScorexLogging {
+
+    private val reentrantLock = new ReentrantReadWriteLock()
+
+    private def read[T](f: => T): T =
+      try { reentrantLock.readLock().lock(); f }
+      finally reentrantLock.readLock().unlock()
+
+    private def write[T](f: => T): T =
+      try { reentrantLock.writeLock().lock(); f }
+      finally reentrantLock.writeLock().unlock()
+
+    // Longs are negative in both maps, see getPessimisticPortfolio
+    private val portfolios = new mutable.AnyRefMap[Address, Map[Asset, Long]]()
+    private val txs = new mutable.AnyRefMap[ByteString, Map[Address, Map[Asset, Long]]] // TODO id <------------
+
+    def replaceWith(setTxs: Set[UtxTransaction]): Set[Address] = write {
+      val setTxMap = setTxs.map(tx => tx.id -> tx).toMap
+      val oldTxIds = txs.keySet -- setTxMap.keySet
+      val newTxIds = setTxMap.keySet -- txs.keySet
+
+      val newTxsPortfolios = newTxIds.toList.map(id => id -> getPessimisticPortfolio(setTxMap(id))) // TODO apply
+      newTxsPortfolios.foreach(Function.tupled(txs.put))
+
+      val addPortfolios = newTxsPortfolios.foldMap(_._2)
+      val subtractPortfolios = oldTxIds.toList.foldMap(txs.remove(_).getOrElse(Map.empty))
+      val diff = addPortfolios |-| subtractPortfolios
+      diff.foreach { case (address, diff) =>
+        portfolios.updateWith(address) { prev =>
+          (prev.getOrElse(Map.empty) |+| diff)
+            .filter(_._2 < 0) // TODO: guess it is not possible, but...
+            .some
+        }
+      }
+      log.info(s"replaceWith ids=${setTxMap.keySet.map(_.toVanilla)}, diff=$diff, txs=$setTxs")
+      diff.keySet
+    }
+
+    // TODO
+    def addAndRemove(addTxs: Seq[UtxTransaction], removeTxs: Seq[UtxTransaction]): Set[Address] = write {
+      log.info(s"addTxs: ${addTxs.map(_.id.toVanilla)}, removeTxs: ${removeTxs.map(_.id.toVanilla)}")
+      addTxs.toList.foldMapK[Set, Address](addUnsafe) |+|
+      removeTxs.toList.foldMapK[Set, Address](removeUnsafe)
+    }
+
+    private def addUnsafe(tx: UtxTransaction): Set[Address] = {
+      val id = tx.id
+      if (txs.contains(id)) {
+        log.info(s"addUnsafe: already has ${id.toVanilla}")
+        Set.empty
+      } else {
+        val finalP = getPessimisticPortfolio(tx)
+        log.info(s"addUnsafe: id=${id.toVanilla}, diff=$finalP, tx=$tx")
+        // TODO we calculate and check only in the and?
+        if (txs.put(id, finalP).isEmpty) {
+          finalP.foreach {
+            case (address, p) => portfolios.updateWith(address)(prev => (prev.getOrElse(Map.empty) |+| p).some)
+          }
+          finalP.keySet
+        } else Set.empty
+      }
+    }
+
+    private def removeUnsafe(tx: UtxTransaction): Set[Address] =
+      txs.remove(tx.id) match {
+        case None =>
+          log.info(s"removeUnsafe: wasn't id=${tx.id.toVanilla}, tx=$tx")
+          Set.empty[Address]
+        case Some(p) =>
+          log.info(s"removeUnsafe: id=${tx.id.toVanilla}, diff=$p, tx=$tx")
+          p.foreach {
+            case (address, p) =>
+              portfolios.updateWith(address) { prev =>
+                prev.map(_ |-| p) // TODO cleanup. sometimes?
+              }
+          }
+          p.keySet
+      }
+
+    def getAggregated(address: Address): Map[Asset, Long] = read(portfolios.getOrElse(address, Map.empty))
+
+    // Utility
+
+    def getPessimisticPortfolio(tx: UtxTransaction): Map[Address, Map[Asset, Long]] = tx.diff.flatMap(_.stateUpdate)
+      .fold(Map.empty[Address, Map[Asset, Long]]) { diff =>
+        // Balances
+        val p1 = diff.balances.groupBy(_.address).map {
+          case (address, updates) =>
+            val balances = updates.view
+              .flatMap(_.amount)
+              .collect {
+                case x if x.amount < 0 => x.assetId.toVanillaAsset -> x.amount // pessimistic
+              }
+              .toMap
+            address.toVanillaAddress -> balances
+        }
+
+        // Leasing
+        val finalP = diff.leases.foldLeft(p1) {
+          case (r, x) =>
+            if (x.out <= 0) r // pessimistic
+            else {
+              val address = x.address.toVanillaAddress
+              val orig = r.getOrElse(address, Map.empty)
+              val updated = orig.updated(Waves, orig.getOrElse(Waves, 0L) - x.out)
+              r.updated(address, updated)
+            }
+        }
+
+        finalP
+      }
+
+  }
+
+  // https://github.com/wavesplatform/Waves/blob/d7ffb13e2c4fa5b9460cb21dc83e0ebdbff655ec/node/src/main/scala/com/wavesplatform/transaction/serialization/impl/PBTransactionSerializer.scala
+  private object PBUtils {
+
+    def encodeDeterministic(msg: GeneratedMessage): Array[Byte] = {
+      val outArray = new Array[Byte](msg.serializedSize)
+      val outputStream = CodedOutputStream.newInstance(outArray)
+
+      outputStream.useDeterministicSerialization() // Adds this
+      msg.writeTo(outputStream)
+
+      try outputStream.checkNoSpaceLeft()
+      catch {
+        case NonFatal(e) =>
+          throw new RuntimeException(s"Error serializing PB message: $msg (bytes = ${ByteStr(msg.toByteArray)})", e)
+      }
+
+      outArray
+    }
+
+  }
 
 }

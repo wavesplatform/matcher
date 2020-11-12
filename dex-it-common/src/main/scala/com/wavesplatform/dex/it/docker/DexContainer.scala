@@ -70,6 +70,7 @@ final case class DexContainer private (override val internalIp: String, underlyi
     if (!r.contains(true)) throw new RuntimeException(s"${underlying.containerId} is not ready, all attempts are out")
   }
 
+  override def printDebugMessage(text: String): Unit = api.print(text)
 }
 
 object DexContainer extends ScorexLogging {

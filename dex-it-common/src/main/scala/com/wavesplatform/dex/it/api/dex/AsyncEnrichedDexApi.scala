@@ -277,6 +277,14 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .headers(apiKeyHeaders)
   }
 
+  override def print(message: String): R[Unit] = mkIgnore {
+    sttp
+      .post(uri"$apiUri/matcher/debug/print")
+      .headers(apiKeyHeaders)
+      .body(Json.stringify(Json.toJson(HttpMessage(message))))
+      .contentType("application/json", "UTF-8")
+  }
+
   override def wsConnections: R[HttpWebSocketConnections] = mk {
     sttp
       .get(uri"$apiUri/ws/v0/connections")

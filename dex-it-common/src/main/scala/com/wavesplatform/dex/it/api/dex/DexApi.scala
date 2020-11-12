@@ -122,6 +122,8 @@ trait DexApi[F[_]] {
   def settings: F[HttpMatcherPublicSettings]
   def config: F[Config]
 
+  def print(message: String): F[Unit]
+
   def wsConnections: F[HttpWebSocketConnections]
   def closeWsConnections(oldestNumber: Int): F[HttpMessage]
 }

@@ -1,7 +1,6 @@
 package com.wavesplatform.dex.grpc.integration.clients.state
 
 import cats.kernel.Monoid
-import cats.syntax.option._
 import cats.syntax.semigroup._
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.clients.state.BlockchainEvent._

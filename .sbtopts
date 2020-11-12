@@ -2,3 +2,4 @@
 -J-Xss256m
 -J-XX:MetaspaceSize=256m
 -J-XX:MaxMetaspaceExpansion=0
+-XX:+UseG1GC

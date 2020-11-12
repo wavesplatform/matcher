@@ -90,7 +90,7 @@ class TradersTestSuite extends MatcherSuiteBase {
     }
 
     "owner moves assets/waves to another account and order become an invalid" - {
-      // Could not work sometimes because of NODE-546
+      // Could not work sometimes because of NODE-746
       "order with assets" - {
         "moved assets, insufficient assets" in {
 
@@ -108,7 +108,7 @@ class TradersTestSuite extends MatcherSuiteBase {
             }
 
             withClue(s"The oldest order of version $orderV '${oldestOrder.idStr()}' is still active\n") {
-              dex1.api.orderStatus(oldestOrder).status shouldBe Status.Accepted
+              dex1.api.orderStatus(oldestOrder).status shouldBe Status.Accepted // <----
             }
 
             withClue("Cleanup\n") {
@@ -123,7 +123,7 @@ class TradersTestSuite extends MatcherSuiteBase {
         "leased waves, insufficient fee" in {
           for (orderV <- orderVersions) {
             val bobBalance = wavesNode1.api.balance(bob, Waves)
-            val oldestOrder, newestOrder = bobPlacesSellWctOrder(1000, orderV)
+            val oldestOrder, newestOrder = bobPlacesSellWctOrder(1000, orderV) // wct/usd
 
             // Lease all waves except required for one order
             val leaseAmount = bobBalance - matcherFee - leasingFee
@@ -136,7 +136,7 @@ class TradersTestSuite extends MatcherSuiteBase {
             }
 
             withClue(s"The oldest order of version $orderV '${oldestOrder.idStr()}' is still active") {
-              dex1.api.orderStatus(oldestOrder).status shouldBe Status.Accepted
+              dex1.api.orderStatus(oldestOrder).status shouldBe Status.Accepted // <--
             }
 
             withClue("Cleanup") {
@@ -144,6 +144,12 @@ class TradersTestSuite extends MatcherSuiteBase {
               dex1.api.cancelAll(bob)
               dex1.api.waitForOrderStatus(oldestOrder, Status.Cancelled)
               broadcastAndAwait(mkLeaseCancel(bob, lease.id()))
+
+              eventually {
+                val b = dex1.api.tradableBalance(bob, wctWavesPair)
+                b.getOrElse(wct, 0L) should be > 0L // sell
+                b.getOrElse(Waves, 0L) should be > 0L // fee
+              }
             }
           }
         }
@@ -285,6 +291,7 @@ class TradersTestSuite extends MatcherSuiteBase {
       placeAndAwaitAtDex(mkOrderDP(alice, wavesUsdPair, BUY, 100.waves, 3.00))
 
       wavesNode1.api.broadcast(mkTransfer(bob, alice, wavesNode1.api.balance(bob, Waves) - matcherFee, Waves))
+      //wavesNode1.api. // wait for unconfirmed
 
       dex1.tryApi.place(mkOrderDP(bob, wavesUsdPair, SELL, 100.waves, 3.00)) should failWith(3147270) // BalanceNotEnough
     }

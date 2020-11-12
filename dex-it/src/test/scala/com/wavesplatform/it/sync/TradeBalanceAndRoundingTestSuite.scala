@@ -97,7 +97,6 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
 
     "check reserved balance" in {
       val reservedFee = BigInt(matcherFee) - (BigInt(matcherFee) * adjustedAmount / sellOrderAmount)
-      log.debug(s"reservedFee: $reservedFee")
       val expectedBobReservedBalance = correctedSellAmount - adjustedAmount + reservedFee
       dex1.api.reservedBalance(bob)(Waves) shouldBe expectedBobReservedBalance
 

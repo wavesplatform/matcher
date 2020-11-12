@@ -20,6 +20,7 @@ trait NodeApi[F[_]] {
   def transactionInfo(id: Id): F[Transaction]
 
   def currentHeightOrig: F[HeightResponse]
+  def unconfirmedInfo(id: Id): F[Transaction]
 
   def activationStatus: F[ActivationStatusResponse]
 
@@ -27,6 +28,8 @@ trait NodeApi[F[_]] {
   def connectedPeers: F[ConnectedPeersResponse]
 
   def rollback(toHeight: Int, returnTransactionsToUtx: Boolean): F[Unit]
+
+  def print(message: String): F[Unit]
 }
 
 object NodeApi {} // ClassNotFound NodeApi$ without this line

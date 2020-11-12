@@ -71,29 +71,7 @@ abstract class BaseContainer(protected val baseContainerPath: String, private va
 
   def getState(): InspectContainerResponse#ContainerState = dockerClient.inspectContainerCmd(underlying.containerId).exec().getState
 
-  def printDebugMessage(text: String): Unit =
-    try if (Option(underlying.containerId).exists(dockerClient.inspectContainerCmd(_).exec().getState.getRunning)) {
-
-      val escaped = text.replace('\'', '\"')
-
-      val execCmd =
-        dockerClient
-          .execCreateCmd(underlying.containerId)
-          .withCmd(
-            "/bin/sh",
-            "-c",
-            s"""/bin/echo '$escaped' >> $$BRIEF_LOG_PATH; /bin/echo '$escaped' >> $$DETAILED_LOG_PATH"""
-          )
-
-      val execCmdId = execCmd.exec().getId
-
-      try dockerClient.execStartCmd(execCmdId).exec(new ResultCallback.Adapter[Frame])
-      catch {
-        case NonFatal(_) => /* ignore */
-      } finally execCmd.close()
-    } catch {
-      case _: NotFoundException =>
-    }
+  def printDebugMessage(text: String): Unit
 
   def stopWithoutRemove(): Unit = {
     printState()

@@ -78,6 +78,7 @@ final case class WavesNodeContainer(override val internalIp: String, underlying:
     cachedMatcherExtGrpcApiAddress.invalidate()
   }
 
+  override def printDebugMessage(text: String): Unit = api.print(text)
 }
 
 object WavesNodeContainer extends ScorexLogging {

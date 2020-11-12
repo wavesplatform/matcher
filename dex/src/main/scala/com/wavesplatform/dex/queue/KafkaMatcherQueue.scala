@@ -7,9 +7,11 @@ import java.util.concurrent.{Executors, TimeoutException}
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.typesafe.config.Config
+import com.wavesplatform.dex.app.{forceStopApplication, KafkaMessageDeserializationError, MatcherStateCheckingFailedError}
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.queue.KafkaMatcherQueue.{validatedCommandDeserializer, KafkaProducer, Settings}
 import com.wavesplatform.dex.queue.MatcherQueue.{IgnoreProducer, Producer}
+import com.wavesplatform.dex.queue.ValidatedCommand.Empty
 import com.wavesplatform.dex.settings.toConfigOps
 import monix.eval.Task
 import monix.execution.{Cancelable, ExecutionModel, Scheduler}
@@ -144,7 +146,13 @@ object KafkaMatcherQueue {
 
   val validatedCommandDeserializer: Deserializer[ValidatedCommand] = new Deserializer[ValidatedCommand] {
     override def configure(configs: java.util.Map[String, _], isKey: Boolean): Unit = {}
-    override def deserialize(topic: String, data: Array[Byte]): ValidatedCommand = ValidatedCommand.fromBytes(data)
+
+    override def deserialize(topic: String, data: Array[Byte]): ValidatedCommand =
+      try ValidatedCommand.fromBytes(data)
+      catch {
+        case e: Throwable => forceStopApplication(KafkaMessageDeserializationError(e.getMessage)); Empty()
+      }
+
     override def close(): Unit = {}
   }
 

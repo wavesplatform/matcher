@@ -7,12 +7,17 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.crypto.DigestSize
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.model.{LimitOrder, MarketOrder}
+import org.apache.kafka.common.errors.SerializationException
 
 sealed trait ValidatedCommand extends Product with Serializable {
   def assetPair: AssetPair
 }
 
 object ValidatedCommand {
+
+  case class Empty() extends ValidatedCommand {
+    override def assetPair: AssetPair = null
+  }
 
   case class PlaceOrder(limitOrder: LimitOrder) extends ValidatedCommand {
     override def assetPair: AssetPair = limitOrder.order.assetPair
@@ -55,7 +60,7 @@ object ValidatedCommand {
     case 3 => DeleteOrderBook(AssetPair.fromBytes(xs.tail)._1)
     case 4 =>
       val afs = Longs.fromByteArray(xs.slice(1, 9)); PlaceMarketOrder(MarketOrder(Order.fromBytes(xs(9), xs.slice(10, Int.MaxValue)), afs))
-    case x => throw new IllegalArgumentException(s"Unknown command type: $x")
+    case x => throw new SerializationException(s"Unknown command type: $x; command: ${xs.toString}")
   }
 
   // Pre-allocated

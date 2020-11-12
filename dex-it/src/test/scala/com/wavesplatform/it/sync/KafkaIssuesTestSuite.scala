@@ -1,6 +1,6 @@
 package com.wavesplatform.it.sync
 
-import java.util.Collections
+import java.util.{Collections, Properties}
 import java.util.concurrent.ThreadLocalRandom
 
 import cats.implicits.catsSyntaxOptionId
@@ -17,6 +17,8 @@ import com.wavesplatform.dex.model.{LimitOrder, OrderStatus}
 import com.wavesplatform.it.WsSuiteBase
 import org.apache.kafka.clients.admin.{AlterConfigOp, ConfigEntry}
 import org.apache.kafka.common.config.{ConfigResource, TopicConfig}
+import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
+import org.apache.kafka.common.serialization.StringSerializer
 
 import scala.concurrent.duration.DurationInt
 
@@ -189,6 +191,18 @@ class KafkaIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka 
           dex1.getState().getExitCodeLong shouldBe 12 // RecoveryError.code
       } // Add finally (above) if you write a new test
     }
+  }
+
+  "Matcher should stop working when got unexpected kafka message" in {
+    val kafkaProducerProps: Properties = {
+      val props = new Properties()
+      props.put("bootstrap.servers", s"$kafkaIp:9092")
+      props.put("key.serializer", classOf[StringSerializer].getName)
+      props.put("value.serializer", classOf[StringSerializer].getName)
+      props
+    }
+    new KafkaProducer[String, String](kafkaProducerProps).send(new ProducerRecord[String, String](topicName, "incorrect_key", "incorrect_value"))
+    dex1.getState().getExitCodeLong shouldBe 21
   }
 
   private def clearTopic(topicName: String): Unit = {

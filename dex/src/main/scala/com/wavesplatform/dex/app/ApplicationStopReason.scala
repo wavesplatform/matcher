@@ -23,3 +23,7 @@ case object NotSynchronizedNodeError extends ApplicationStopReason(18) {
 case object MatcherStateCheckingFailedError extends ApplicationStopReason(20) {
   override val getMessage: String = "Matcher checking failed, see log"
 }
+
+case class KafkaMessageDeserializationError(error: String) extends ApplicationStopReason(21) {
+  override val getMessage: String = s"$error"
+}

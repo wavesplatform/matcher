@@ -1,6 +1,7 @@
 package com.wavesplatform.it.matcher.api.http
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.it.api.RawHttpChecks
 import com.wavesplatform.it.MatcherSuiteBase
@@ -34,9 +35,10 @@ class GetOrderBooksSpec extends MatcherSuiteBase with TableDrivenPropertyChecks 
       placeAndAwaitAtDex(mkOrder(alice, wavesUsdPair, BUY, 1.waves, 1.usd))
       placeAndAwaitAtDex(mkOrder(alice, wavesBtcPair, SELL, 1.btc, 1.waves))
 
-      val markets = validate200Json(dex1.rawApi.getOrderBooks).markets
+      val markets = validate200Json(dex1.rawApi.getOrderBooks).markets.map(x =>  AssetPair(x.amountAsset, x.priceAsset))
       markets should have size 2
-      markets.map(x => s"${x.amountAsset}-${x.priceAsset}") should contain allOf (wavesBtcPair.key, wavesUsdPair.key)
+      markets should contain (wavesBtcPair)
+      markets should contain (wavesUsdPair)
     }
   }
 }

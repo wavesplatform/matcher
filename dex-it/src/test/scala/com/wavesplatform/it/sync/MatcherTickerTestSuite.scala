@@ -1,12 +1,10 @@
 package com.wavesplatform.it.sync
 
-import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.OrderType
-import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import com.wavesplatform.dex.model.{LastTrade, LevelAgg}
 import com.wavesplatform.it.MatcherSuiteBase
 
@@ -25,8 +23,6 @@ class MatcherTickerTestSuite extends MatcherSuiteBase {
     amountAsset = btc,
     priceAsset = Waves
   )
-
-  private val usdWavesPair = AssetPair(usd, Waves)
 
   "matcher ticker validation" - {
 

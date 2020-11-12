@@ -32,10 +32,6 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
   private val IssueResults(issueBob1Asset1Tx, _, bobAsset1) = mkIssueExtended(bob, "Bob-1-X", someAssetAmount, 5)
   private val bob1WavesPair = AssetPair(bobAsset1, Waves)
 
-  private val IssueResults(issueBob2Asset2Tx, _, bobAsset2) = mkIssueExtended(bob, "Bob-2-X", someAssetAmount, 0)
-
-  private val IssueResults(issueBobNotTradedAssetTx, _, bobNotTradedAsset) = mkIssueExtended(bob, "Bob-Not-Traded", someAssetAmount, 0)
-
   private val order1 = mkOrder(alice, aliceWavesPair, SELL, aliceSellAmount, 2000.waves, ttl = 10.minutes) // TTL?
 
   private val maxOrders = 99
@@ -52,8 +48,6 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
     broadcastAndAwait(
       issueAliceAssetTx,
       issueBob1Asset1Tx,
-      issueBob2Asset2Tx,
-      issueBobNotTradedAssetTx,
       IssueUsdTx,
       IssueBtcTx,
       IssueUsdnTx,

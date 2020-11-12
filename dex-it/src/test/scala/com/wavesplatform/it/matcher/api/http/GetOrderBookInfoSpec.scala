@@ -9,28 +9,34 @@ import org.scalatest.prop.TableDrivenPropertyChecks
 
 class GetOrderBookInfoSpec extends MatcherSuiteBase with TableDrivenPropertyChecks with RawHttpChecks {
 
-  val minAmount = 0.1
-  val maxAmount = 100000000
-  val stepAmount = 0.1
-  val minPrice = 0.0001
-  val maxPrice = 1000
-  val stepPrice = 0.001
-
-  override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(
-    s"""waves.dex {
-       |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
-       |    order-restrictions = {
-       |   "WAVES-$UsdId": {
-       |     min-amount  = $minAmount
-       |     max-amount  = $maxAmount
-       |     step-amount = $stepAmount
-       |     min-price   = $minPrice
-       |     max-price   = $maxPrice
-       |     step-price  = $stepPrice
-       |   }
-       | }
-       |}""".stripMargin
+  val expectedOrderRestrictions = HttpOrderRestrictions(
+    0.1,
+    0.1,
+    100000000,
+    0.001,
+    0.0001,
+    1000
   )
+
+  override protected def dexInitialSuiteConfig: Config = {
+    import expectedOrderRestrictions._
+
+    ConfigFactory.parseString(
+      s"""waves.dex {
+         |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
+         |    order-restrictions = {
+         |   "WAVES-$UsdId": {
+         |     min-amount  = $minAmount
+         |     max-amount  = $maxAmount
+         |     step-amount = $stepAmount
+         |     min-price   = $minPrice
+         |     max-price   = $maxPrice
+         |     step-price  = $stepPrice
+         |   }
+         | }
+         |}""".stripMargin
+    )
+  }
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
@@ -53,18 +59,11 @@ class GetOrderBookInfoSpec extends MatcherSuiteBase with TableDrivenPropertyChec
     }
 
     "should return correct restrictions when it is in config" in {
-      validate200Json(dex1.rawApi.getOrderBookInfo(wavesUsdPair)).restrictions.get should be(HttpOrderRestrictions(
-        stepAmount,
-        minAmount,
-        maxAmount,
-        stepPrice,
-        minPrice,
-        maxPrice
-      ))
+      validate200Json(dex1.rawApi.getOrderBookInfo(wavesUsdPair)).restrictions.get should be(expectedOrderRestrictions)
     }
 
     "shouldn't return the restrictions object if it isn't in config" in {
-      validate200Json(dex1.rawApi.getOrderBookInfo(wavesBtcPair)).restrictions should be (empty)
+      validate200Json(dex1.rawApi.getOrderBookInfo(wavesBtcPair)).restrictions should be(empty)
     }
 
     forAll(Table(

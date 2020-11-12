@@ -94,7 +94,7 @@ class RoundingIssuesTestSuite extends MatcherSuiteBase {
     dex1.api.waitForOrder(counter2)(_ == HttpOrderStatus(Status.PartiallyFilled, filledAmount = Some(2857143L), filledFee = Some(8571L)))
 
     withClue("orderBook check") {
-      val ob = dex1.api.orderBook(wavesUsdPair)
+      val ob = dex1.api.getOrderBook(wavesUsdPair)
       ob.bids shouldBe empty
       ob.asks shouldBe List(HttpV0LevelAgg(97142857L, 70L)) // = 100000000 - 2857143
     }

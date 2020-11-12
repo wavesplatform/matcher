@@ -48,14 +48,14 @@ class SeveralPartialOrdersTestSuite extends MatcherSuiteBase {
       }
 
       // Previously cancelled order should not affect new orders
-      val orderBook1 = dex1.api.orderBook(wavesUsdPair)
+      val orderBook1 = dex1.api.getOrderBook(wavesUsdPair)
       orderBook1.asks shouldBe empty
       orderBook1.bids shouldBe empty
 
       val bobOrder2 = mkOrder(bob, wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
       placeAndAwaitAtDex(bobOrder2)
 
-      val orderBook2 = dex1.api.orderBook(wavesUsdPair)
+      val orderBook2 = dex1.api.getOrderBook(wavesUsdPair)
       orderBook2.asks shouldBe List(HttpV0LevelAgg(bobOrder2.amount, bobOrder2.price))
       orderBook2.bids shouldBe empty
 
@@ -88,14 +88,14 @@ class SeveralPartialOrdersTestSuite extends MatcherSuiteBase {
       }
 
       // Previously cancelled order should not affect new orders
-      val orderBook1 = dex1.api.orderBook(wavesUsdPair)
+      val orderBook1 = dex1.api.getOrderBook(wavesUsdPair)
       orderBook1.asks shouldBe empty
       orderBook1.bids shouldBe empty
 
       val bobOrder2 = mkOrder(bob, wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
       placeAndAwaitAtDex(bobOrder2)
 
-      val orderBook2 = dex1.api.orderBook(wavesUsdPair)
+      val orderBook2 = dex1.api.getOrderBook(wavesUsdPair)
       orderBook2.asks shouldBe List(HttpV0LevelAgg(bobOrder2.amount, bobOrder2.price))
       orderBook2.bids shouldBe empty
     }

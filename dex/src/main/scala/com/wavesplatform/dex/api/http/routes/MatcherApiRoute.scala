@@ -134,9 +134,9 @@ class MatcherApiRoute(
 
   private val orderBookRoutes: Route = pathPrefix("orderbook") {
     protect {
-      orderBookInfo ~ getOrderStatusInfoByIdWithSignature ~ getOrderBook ~ marketStatus ~ placeLimitOrder ~
+      getOrderBookInfo ~ getOrderStatusInfoByIdWithSignature ~ getOrderBook ~ getOrderBookStatus ~ placeLimitOrder ~
       placeMarketOrder ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~ tradableBalance ~
-      orderStatus ~ historyDelete ~ cancel ~ cancelAll ~ orderbooks ~ orderBookDelete
+      orderStatus ~ historyDelete ~ cancel ~ cancelAll ~ getOrderBooks ~ orderBookDelete
     }
   }
 
@@ -381,7 +381,7 @@ class MatcherApiRoute(
     notes = "Get current market data such as last trade, best bid and ask",
     httpMethod = "GET",
     tags = Array("markets"),
-    response = classOf[HttpMarketStatus]
+    response = classOf[HttpOrderBookStatus]
   )
   @ApiImplicitParams(
     Array(
@@ -389,7 +389,7 @@ class MatcherApiRoute(
       new ApiImplicitParam(name = "priceAsset", value = "Price Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path")
     )
   )
-  def marketStatus: Route = (path(AssetPairPM / "status") & get) { p =>
+  def getOrderBookStatus: Route = (path(AssetPairPM / "status") & get) { p =>
     withAssetPair(p, redirectToInverse = true, suffix = "/status") { pair =>
       complete(orderBookHttpInfo.getMarketStatus(pair))
     }
@@ -408,13 +408,13 @@ class MatcherApiRoute(
       new ApiImplicitParam(name = "priceAsset", value = "Price Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path")
     )
   )
-  def orderBookInfo: Route = (path(AssetPairPM / "info") & get) { p =>
+  def getOrderBookInfo: Route = (path(AssetPairPM / "info") & get) { p =>
     withAssetPair(p, redirectToInverse = true, suffix = "/info") { pair =>
-      complete(SimpleResponse(orderBookInfo(pair)))
+      complete(SimpleResponse(getOrderBookInfo(pair)))
     }
   }
 
-  private def orderBookInfo(pair: AssetPair) = HttpOrderBookInfo(
+  private def getOrderBookInfo(pair: AssetPair) = HttpOrderBookInfo(
     restrictions = matcherSettings.orderRestrictions.get(pair).map(HttpOrderRestrictions.fromSettings),
     matchingRules = HttpMatchingRules(tickSize = getActualTickSize(pair).toDouble)
   )
@@ -473,14 +473,14 @@ class MatcherApiRoute(
     tags = Array("markets"),
     response = classOf[HttpTradingMarkets]
   )
-  def orderbooks: Route = (pathEndOrSingleSlash & get) {
+  def getOrderBooks: Route = (pathEndOrSingleSlash & get) {
     complete(
       (matcher ? GetMarkets).mapTo[Seq[MarketData]].map { markets =>
         SimpleResponse(
           HttpTradingMarkets(
             matcherPublicKey,
             markets.map { md =>
-              val meta = orderBookInfo(md.pair)
+              val meta = getOrderBookInfo(md.pair)
               HttpMarketDataWithMeta(
                 md.pair.amountAsset,
                 md.amountAssetName,

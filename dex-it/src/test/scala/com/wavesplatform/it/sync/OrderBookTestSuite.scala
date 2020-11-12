@@ -77,13 +77,13 @@ class OrderBookTestSuite extends MatcherSuiteBase {
 
     "the order book was deleted" in {
       withClue("orderBook") {
-        val orderBook = dex1.api.orderBook(wctUsdPair)
+        val orderBook = dex1.api.getOrderBook(wctUsdPair)
         orderBook.bids shouldBe empty
         orderBook.asks shouldBe empty
       }
 
       withClue("tradingMarkets") {
-        val tradingPairs = dex1.api.allOrderBooks.markets.map(x => s"${x.amountAsset}-${x.priceAsset}")
+        val tradingPairs = dex1.api.getOrderBooks.markets.map(x => s"${x.amountAsset}-${x.priceAsset}")
         tradingPairs shouldNot contain(wctUsdPair.key)
       }
 
@@ -105,7 +105,7 @@ class OrderBookTestSuite extends MatcherSuiteBase {
       dex1.api.orderStatus(sellOrderForAnotherPair).status shouldBe Status.Accepted
       dex1.api.place(mkOrder(alice, wctWavesPair, BUY, amount, price))
 
-      val orderBook = dex1.api.orderBook(wctWavesPair)
+      val orderBook = dex1.api.getOrderBook(wctWavesPair)
       orderBook.bids shouldNot be(empty)
       orderBook.asks shouldNot be(empty)
     }

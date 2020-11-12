@@ -7,7 +7,7 @@ import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import play.api.libs.json.{JsBoolean, JsString, Json}
 
-class HttpMarketStatusSpec extends AnyFreeSpec with Matchers with DiffMatcherWithImplicits {
+class HttpOrderBookStatusSpec extends AnyFreeSpec with Matchers with DiffMatcherWithImplicits {
 
   private val json =
     """{
@@ -23,7 +23,7 @@ class HttpMarketStatusSpec extends AnyFreeSpec with Matchers with DiffMatcherWit
       |}""".stripMargin
 
   private val marketStatus =
-    HttpMarketStatus(
+    HttpOrderBookStatus(
       lastPrice = 1000L.some,
       lastAmount = 2000L.some,
       lastSide = OrderType.SELL.some,
@@ -35,7 +35,7 @@ class HttpMarketStatusSpec extends AnyFreeSpec with Matchers with DiffMatcherWit
 
   "backward JSON compatibility" - {
     "deserialization" in {
-      Json.parse(json).as[HttpMarketStatus] should matchTo(marketStatus)
+      Json.parse(json).as[HttpOrderBookStatus] should matchTo(marketStatus)
     }
 
     "serialization" in {

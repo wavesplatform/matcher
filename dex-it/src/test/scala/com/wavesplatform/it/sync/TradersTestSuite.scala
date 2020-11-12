@@ -68,7 +68,7 @@ class TradersTestSuite extends MatcherSuiteBase {
       val correctBobOrder = mkOrder(bob, wctWavesPair, OrderType.BUY, 1, 10.waves * Order.PriceConstant)
       placeAndAwaitAtDex(correctBobOrder)
 
-      val markets = dex1.api.allOrderBooks.markets.map(x => s"${x.amountAsset}-${x.priceAsset}").toSet
+      val markets = dex1.api.getOrderBooks.markets.map(x => s"${x.amountAsset}-${x.priceAsset}").toSet
 
       withClue("hasTrickyBobWavesPairWB58Market\n") {
         markets.contains(trickyBobWavesPairWB58.key) shouldBe true
@@ -83,7 +83,7 @@ class TradersTestSuite extends MatcherSuiteBase {
       }
 
       withClue("Cleanup") {
-        dex1.api.orderBook(wctWavesPair).bids shouldNot be(empty)
+        dex1.api.getOrderBook(wctWavesPair).bids shouldNot be(empty)
         dex1.api.cancelAll(bob)
         dex1.api.waitForOrderStatus(correctBobOrder, Status.Cancelled)
       }

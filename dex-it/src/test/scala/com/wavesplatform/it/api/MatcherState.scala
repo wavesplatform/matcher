@@ -7,7 +7,7 @@ import com.wavesplatform.dex.domain.asset.AssetPair
 case class MatcherState(
   offset: HttpOffset,
   snapshots: HttpSnapshotOffsets,
-  orderBooks: Map[AssetPair, (HttpV0OrderBook, HttpMarketStatus)],
+  orderBooks: Map[AssetPair, (HttpV0OrderBook, HttpOrderBookStatus)],
   orderStatuses: Map[String, HttpOrderStatus],
   orderTransactionIds: Map[String, Set[String]],
   reservedBalances: Map[KeyPair, HttpBalance],

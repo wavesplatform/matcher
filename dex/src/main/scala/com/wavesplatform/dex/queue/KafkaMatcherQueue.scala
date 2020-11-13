@@ -1,13 +1,13 @@
 package com.wavesplatform.dex.queue
 
 import java.util
-import java.util.Properties
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.{Executors, TimeoutException}
+import java.util.{Base64, Properties}
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.typesafe.config.Config
-import com.wavesplatform.dex.app.{KafkaMessageDeserializationError, forceStopApplication}
+import com.wavesplatform.dex.app.{QueueMessageDeserializationError, forceStopApplication}
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.queue.KafkaMatcherQueue.{KafkaProducer, Settings, validatedCommandDeserializer}
 import com.wavesplatform.dex.queue.MatcherQueue.{IgnoreProducer, Producer}
@@ -18,7 +18,7 @@ import monix.reactive.Observable
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.{Callback, ProducerRecord, RecordMetadata}
 import org.apache.kafka.common.TopicPartition
-import org.apache.kafka.common.errors.{WakeupException, TimeoutException => KafkaTimeoutException}
+import org.apache.kafka.common.errors.{SerializationException, WakeupException, TimeoutException => KafkaTimeoutException}
 import org.apache.kafka.common.serialization._
 
 import scala.concurrent.duration.FiniteDuration
@@ -70,6 +70,7 @@ class KafkaMatcherQueue(settings: Settings) extends MatcherQueue with ScorexLogg
       }.toIndexedSeq
     } catch {
       case e: WakeupException => if (duringShutdown.get()) IndexedSeq.empty else throw e
+      case e: SerializationException => throw e
       case e: Throwable =>
         log.error(s"Can't consume", e)
         IndexedSeq.empty
@@ -91,8 +92,9 @@ class KafkaMatcherQueue(settings: Settings) extends MatcherQueue with ScorexLogg
           .bufferIntrospective(settings.consumer.maxBufferSize)
           .filter(_.nonEmpty)
           .mapEvalF(process)
-          .doOnError { e =>
-            Task(log.error("Consumer fails", e))
+          .doOnError {
+            case _: SerializationException => Task(forceStopApplication(QueueMessageDeserializationError))
+            case e => Task(log.error("Consumer fails", e))
           }
       }
       .subscribe()(scheduler)
@@ -150,8 +152,7 @@ object KafkaMatcherQueue extends ScorexLogging {
       try ValidatedCommand.fromBytes(data)
       catch {
         case e: Throwable =>
-          log.error(s"Deserialization exception: $e")
-          forceStopApplication(KafkaMessageDeserializationError(e.getMessage))
+          log.error(s"Can't deserialize bytes: ${Base64.getEncoder.encodeToString(data)}")
           throw e
       }
 

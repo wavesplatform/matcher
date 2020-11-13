@@ -379,7 +379,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
     deadline = settings.startEventsProcessingTimeout.fromNow
     (firstQueueOffset, lastOffsetQueue) <- {
-      log.info("Gettings queue offsets ...")
+      log.info("Getting queue offsets ...")
       val requests = new RepeatableRequests(matcherQueue, deadline)
       requests.firstOffset zip requests.lastOffset
     }

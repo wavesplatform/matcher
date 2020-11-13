@@ -1,28 +1,29 @@
 package com.wavesplatform.it.sync
 
-import java.util.{Collections, Properties}
 import java.util.concurrent.ThreadLocalRandom
+import java.util.{Collections, Properties}
 
 import cats.implicits.catsSyntaxOptionId
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.api.ws.entities.{WsBalances, WsOrder}
+import com.wavesplatform.dex.app.QueueMessageDeserializationError
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.model.Denormalization._
 import com.wavesplatform.dex.domain.order.OrderType.SELL
 import com.wavesplatform.dex.it.api.HasKafka
-import com.wavesplatform.dex.it.api.websockets.HasWebSockets
 import com.wavesplatform.dex.model.{LimitOrder, OrderStatus}
 import com.wavesplatform.it.WsSuiteBase
 import org.apache.kafka.clients.admin.{AlterConfigOp, ConfigEntry}
+import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord, RecordMetadata}
 import org.apache.kafka.common.config.{ConfigResource, TopicConfig}
-import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 import org.apache.kafka.common.serialization.StringSerializer
 
 import scala.concurrent.duration.DurationInt
+import scala.concurrent.{Await, Promise}
 
-class KafkaIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka {
+class KafkaIssuesTestSuite extends WsSuiteBase with HasKafka {
 
   private val requestTimeout = 15.seconds
   private val maxFailures = 5
@@ -56,6 +57,7 @@ class KafkaIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka 
     kafka.start()
 
     broadcastAndAwait(IssueUsdTx)
+    createKafkaTopic(topicName, Some(kafka.bootstrapServers))
     dex1.start()
   }
 
@@ -196,13 +198,27 @@ class KafkaIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka 
   "Matcher should stop working when got unexpected kafka message" in {
     val kafkaProducerProps: Properties = {
       val props = new Properties()
-      props.put("bootstrap.servers", s"$kafkaIp:9092")
-      props.put("key.serializer", classOf[StringSerializer].getName)
-      props.put("value.serializer", classOf[StringSerializer].getName)
+      props.put("bootstrap.servers", kafka.bootstrapServers)
+      val stringSerializerName = classOf[StringSerializer].getName
+      props.put("key.serializer", stringSerializerName)
+      props.put("value.serializer", stringSerializerName)
       props
     }
-    new KafkaProducer[String, String](kafkaProducerProps).send(new ProducerRecord[String, String](topicName, "incorrect_key", "incorrect_value"))
-    dex1.getState().getExitCodeLong shouldBe 21
+    val sendResult = Promise[Unit]()
+    val producer = new KafkaProducer[String, String](kafkaProducerProps)
+    producer.send(
+      new ProducerRecord(topicName, "incorrect_key", "incorrect_value"),
+      (_: RecordMetadata, exception: Exception) =>
+        Option(exception) match {
+          case Some(e) => sendResult.failure(e)
+          case None => sendResult.success(())
+        }
+    )
+    Await.result(sendResult.future, 10.seconds)
+    producer.close()
+    eventually {
+      dex1.getState().getExitCodeLong shouldBe QueueMessageDeserializationError.code
+    }
   }
 
   private def clearTopic(topicName: String): Unit = {

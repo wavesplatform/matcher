@@ -7,11 +7,10 @@ import java.util.concurrent.{Executors, TimeoutException}
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.typesafe.config.Config
-import com.wavesplatform.dex.app.{forceStopApplication, KafkaMessageDeserializationError, MatcherStateCheckingFailedError}
+import com.wavesplatform.dex.app.{KafkaMessageDeserializationError, forceStopApplication}
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.queue.KafkaMatcherQueue.{validatedCommandDeserializer, KafkaProducer, Settings}
+import com.wavesplatform.dex.queue.KafkaMatcherQueue.{KafkaProducer, Settings, validatedCommandDeserializer}
 import com.wavesplatform.dex.queue.MatcherQueue.{IgnoreProducer, Producer}
-import com.wavesplatform.dex.queue.ValidatedCommand.Empty
 import com.wavesplatform.dex.settings.toConfigOps
 import monix.eval.Task
 import monix.execution.{Cancelable, ExecutionModel, Scheduler}
@@ -23,7 +22,7 @@ import org.apache.kafka.common.errors.{WakeupException, TimeoutException => Kafk
 import org.apache.kafka.common.serialization._
 
 import scala.concurrent.duration.FiniteDuration
-import scala.concurrent.{blocking, ExecutionContext, Future, Promise}
+import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
 import scala.jdk.CollectionConverters._
 import scala.jdk.DurationConverters.ScalaDurationOps
 
@@ -139,7 +138,7 @@ class KafkaMatcherQueue(settings: Settings) extends MatcherQueue with ScorexLogg
 
 }
 
-object KafkaMatcherQueue {
+object KafkaMatcherQueue extends ScorexLogging {
   case class Settings(topic: String, consumer: ConsumerSettings, producer: ProducerSettings)
   case class ConsumerSettings(fetchMaxDuration: FiniteDuration, maxBufferSize: Int, client: Config)
   case class ProducerSettings(enable: Boolean, client: Config)
@@ -150,7 +149,10 @@ object KafkaMatcherQueue {
     override def deserialize(topic: String, data: Array[Byte]): ValidatedCommand =
       try ValidatedCommand.fromBytes(data)
       catch {
-        case e: Throwable => forceStopApplication(KafkaMessageDeserializationError(e.getMessage)); Empty()
+        case e: Throwable =>
+          log.error(s"Deserialization exception: $e")
+          forceStopApplication(KafkaMessageDeserializationError(e.getMessage))
+          throw e
       }
 
     override def close(): Unit = {}

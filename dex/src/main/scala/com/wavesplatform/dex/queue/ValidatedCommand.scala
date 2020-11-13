@@ -15,10 +15,6 @@ sealed trait ValidatedCommand extends Product with Serializable {
 
 object ValidatedCommand {
 
-  case class Empty() extends ValidatedCommand {
-    override def assetPair: AssetPair = null
-  }
-
   case class PlaceOrder(limitOrder: LimitOrder) extends ValidatedCommand {
     override def assetPair: AssetPair = limitOrder.order.assetPair
   }

@@ -18,9 +18,9 @@ trait NodeApi[F[_]] {
 
   def broadcast(tx: Transaction): F[Unit]
   def transactionInfo(id: Id): F[Transaction]
+  def unconfirmedTransactionInfo(id: Id): F[Transaction]
 
   def currentHeightOrig: F[HeightResponse]
-  def unconfirmedInfo(id: Id): F[Transaction]
 
   def activationStatus: F[ActivationStatusResponse]
 

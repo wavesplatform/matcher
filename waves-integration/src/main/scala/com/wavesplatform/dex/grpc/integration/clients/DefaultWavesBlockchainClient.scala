@@ -91,7 +91,7 @@ class DefaultWavesBlockchainClient(
 
           // To not count transactions in UTX
           // TODO another place?
-          pessimisticPortfolios.addAndRemove(
+          if (updates.transactionIds.nonEmpty) pessimisticPortfolios.addAndRemove(
             addTxs = List.empty,
             removeTxs = updates.transactionIds
           )

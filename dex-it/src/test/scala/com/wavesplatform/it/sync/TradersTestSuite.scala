@@ -136,7 +136,7 @@ class TradersTestSuite extends MatcherSuiteBase {
             }
 
             withClue(s"The oldest order of version $orderV '${oldestOrder.idStr()}' is still active") {
-              dex1.api.orderStatus(oldestOrder).status shouldBe Status.Accepted // <--
+              dex1.api.orderStatus(oldestOrder).status shouldBe Status.Accepted
             }
 
             withClue("Cleanup") {
@@ -288,12 +288,20 @@ class TradersTestSuite extends MatcherSuiteBase {
 
       dex1.restart() // after restart DEX doesn't have cached Bob's balance
 
+      // HACK: Monix waits and don't send the first event through the observable
+      wavesNode1.api.broadcast(mkTransfer(alice, mkKeyPair("carol"), 100.waves, Waves))
       placeAndAwaitAtDex(mkOrderDP(alice, wavesUsdPair, BUY, 100.waves, 3.00))
 
-      wavesNode1.api.broadcast(mkTransfer(bob, alice, wavesNode1.api.balance(bob, Waves) - matcherFee, Waves))
-      //wavesNode1.api. // wait for unconfirmed
+      val tx = mkTransfer(bob, alice, wavesNode1.api.balance(bob, Waves) - matcherFee, Waves)
+      val txId = tx.id()
+      wavesNode1.api.broadcast(tx)
+      eventually {
+        wavesNode1.tryApi.unconfirmedTransactionInfo(txId).isRight shouldBe true
+      }
 
-      dex1.tryApi.place(mkOrderDP(bob, wavesUsdPair, SELL, 100.waves, 3.00)) should failWith(3147270) // BalanceNotEnough
+      val order = mkOrderDP(bob, wavesUsdPair, SELL, 100.waves, 3.00)
+      log.info(s"Trying to place ${order.idStr()} during $txId")
+      dex1.tryApi.place(order) should failWith(3147270) // BalanceNotEnough
     }
   }
 }

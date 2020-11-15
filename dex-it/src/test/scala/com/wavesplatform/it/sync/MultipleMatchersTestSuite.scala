@@ -68,7 +68,7 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with
     val acc = mkAccountWithBalance(10.waves -> Waves)
     dex1.disconnectFromNetwork()
     broadcastAndAwait(mkTransfer(acc, alice.toAddress, 4.waves, Waves, 0.05.waves))
-    dex2.api.tradableBalance(acc, ethWavesPair)(Waves) shouldBe 5.95.waves
+    dex2.api.getTradableBalance(acc, ethWavesPair)(Waves) shouldBe 5.95.waves
     dex1.connectToNetwork()
   }
 

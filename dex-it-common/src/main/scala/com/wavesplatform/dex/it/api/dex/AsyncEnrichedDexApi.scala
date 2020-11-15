@@ -32,19 +32,19 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
 
   override val publicKey: R[HttpMatcherPublicKey] = mk(sttp.get(uri"$apiUri/matcher"))
 
-  override def reservedBalance(of: KeyPair, timestamp: Long): R[HttpBalance] = mk {
+  override def getReservedBalance(of: KeyPair, timestamp: Long): R[HttpBalance] = mk {
     sttp
       .get(uri"$apiUri/matcher/balance/reserved/${Base58.encode(of.publicKey)}")
       .headers(timestampAndSignatureHeaders(of, timestamp))
   }
 
-  override def reservedBalanceWithApiKey(of: KeyPair, xUserPublicKey: Option[PublicKey]): R[HttpBalance] = mk {
+  override def getReservedBalanceWithApiKey(of: KeyPair, xUserPublicKey: Option[PublicKey]): R[HttpBalance] = mk {
     sttp
       .get(uri"$apiUri/matcher/balance/reserved/${Base58.encode(of.publicKey)}")
       .headers(apiKeyWithUserPublicKeyHeaders(xUserPublicKey))
   }
 
-  override def tradableBalance(of: KeyPair, assetPair: AssetPair, timestamp: Long): R[HttpBalance] = mk {
+  override def getTradableBalance(of: KeyPair, assetPair: AssetPair, timestamp: Long): R[HttpBalance] = mk {
     sttp
       .get(
         uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/tradableBalance/${of.publicKey.toAddress.stringRepr}"

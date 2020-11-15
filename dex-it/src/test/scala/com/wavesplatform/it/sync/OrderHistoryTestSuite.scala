@@ -229,7 +229,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
       val rate = 0.33333333
       val orderFee = (BigDecimal(rate) * matcherFee).setScale(0, CEILING).toLong
 
-      val ethBalance = dex1.api.tradableBalance(alice, ethUsdPair)(eth)
+      val ethBalance = dex1.api.getTradableBalance(alice, ethUsdPair)(eth)
 
       broadcastAndAwait(mkTransfer(alice, bob, ethBalance - orderFee, eth))
 

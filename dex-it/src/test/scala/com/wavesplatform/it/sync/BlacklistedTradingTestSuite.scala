@@ -75,8 +75,8 @@ class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
     dex1.api.getOrderBooks.markets.size shouldBe 4
 
     And("balances are still reserved")
-    dex1.api.reservedBalance(alice).size shouldBe 3
-    dex1.api.reservedBalance(bob).size shouldBe 1
+    dex1.api.getReservedBalance(alice).size shouldBe 3
+    dex1.api.getReservedBalance(bob).size shouldBe 1
 
     And("orders for other assets are still available")
     dex1.api.orderStatus(usdOrder).status shouldBe Status.Accepted

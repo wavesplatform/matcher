@@ -1,4 +1,4 @@
-package com.wavesplatform.it.sync
+package com.wavesplatform.it.sync.kafka.issues
 
 import java.util.Properties
 import java.util.concurrent.ThreadLocalRandom
@@ -12,7 +12,7 @@ import org.apache.kafka.common.serialization.StringSerializer
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, Promise}
 
-class MatcherForceStopTestSuite extends MatcherSuiteBase with HasKafka {
+class DeserializationIssuesTestSuite extends MatcherSuiteBase with HasKafka {
 
   private val topicName = s"test-${ThreadLocalRandom.current.nextInt(0, Int.MaxValue)}"
   override protected lazy val dexRunConfig = dexKafkaConfig(topicName)

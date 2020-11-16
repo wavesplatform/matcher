@@ -73,7 +73,8 @@ class SpendableBalancesActorSpecification
       )
     )
 
-  "SpendableBalancesActor" should {
+  // TODO?
+  "SpendableBalancesActor" ignore {
 
     "handle state queries without excess gRPC calls" in {
 

@@ -38,6 +38,7 @@ final case class WavesNodeContainer(override val internalIp: String, underlying:
   def matcherExtGrpcApiAddress: InetSocketAddress = cachedMatcherExtGrpcApiAddress.get()
   def blockchainUpdatesExtGrpcApiAddress: InetSocketAddress = cachedBlockchainUpdatesExtGrpcApiAddress.get()
 
+  // This won't help after reconnect to the network, need to recreate clients
   def matcherExtApiTarget: String = s"${matcherExtGrpcApiAddress.getHostName}:${matcherExtGrpcApiAddress.getPort}"
   def blockchainUpdatesExtApiTarget: String = s"${blockchainUpdatesExtGrpcApiAddress.getHostName}:${blockchainUpdatesExtGrpcApiAddress.getPort}"
 
@@ -76,9 +77,10 @@ final case class WavesNodeContainer(override val internalIp: String, underlying:
     super.invalidateCaches()
     cachedNetworkAddress.invalidate()
     cachedMatcherExtGrpcApiAddress.invalidate()
+    cachedBlockchainUpdatesExtGrpcApiAddress.invalidate()
   }
 
-  override def printDebugMessage(text: String): Unit = api.print(text)
+  override def printDebugMessage(text: String): Unit = rawApi.print(text)
 }
 
 object WavesNodeContainer extends ScorexLogging {

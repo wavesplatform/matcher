@@ -31,6 +31,7 @@ import monix.execution.{Cancelable, Scheduler}
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 
+import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
 
 class DefaultWavesBlockchainClient(
@@ -178,7 +179,7 @@ class DefaultWavesBlockchainClient(
           pessimisticPortfolios
             .addAndRemove(
               addTxs = event.added.flatMap(_.transaction),
-              removeTxs = event.removed.flatMap(_.transaction).map(_.id)
+              removeTxs = Seq.empty //event.removed.flatMap(_.transaction).map(_.id) // Because we remove them during adding a [micro]block
             )
             .map { changedAddress =>
               log.info(s"combineBalances for $changedAddress")
@@ -195,7 +196,21 @@ class DefaultWavesBlockchainClient(
       }
     }
 
-    Observable(bBalances, meStream).merge.map(Updates(_))
+    val bx = mutable.Map.empty[Address, Map[Asset, Long]]
+    Observable(bBalances, meStream).merge
+      .map { updated =>
+        updated.filter { case (address, updatedBalance) =>
+          val prev = bx.getOrElse(address, Map.empty).filter { case (k, _) => updatedBalance.contains(k) }
+          val same = prev == updatedBalance
+          if (same) log.info(s"Previous balance for $address remains $prev")
+          else {
+            bx.update(address, prev ++ updatedBalance)
+            log.info(s"Changed previous balance for $address from $prev to $updatedBalance")
+          }
+          !same
+        }
+      }
+      .map(Updates(_))
   }
 
   private def runSideEffects(x: StatusUpdate): Unit =
@@ -215,8 +230,10 @@ class DefaultWavesBlockchainClient(
       val assetRegular = regular.get(asset).orElse(updatedRegular.get(asset)).getOrElse(0L)
       val assetOutLease = outLease.orElse(updatedOutLease).getOrElse(0L)
       val assetPessimistic = pessimistic.get(asset).orElse(updatedPessimistic.get(asset)).getOrElse(0L)
-      log.info(s"combineBalances: $asset: r=$assetRegular, ol=$assetOutLease, p=$assetPessimistic")
-      asset -> math.max(0L, assetRegular - assetOutLease + assetPessimistic) // pessimistic is negative
+      // TODO solve overflow?
+      val r = math.max(0L, assetRegular - assetOutLease + assetPessimistic) // pessimistic is negative
+      log.info(s"combineBalances: $asset: r=$r, reg=$assetRegular, ol=$assetOutLease, p=$assetPessimistic")
+      asset -> r
     }.toMap
   }
 

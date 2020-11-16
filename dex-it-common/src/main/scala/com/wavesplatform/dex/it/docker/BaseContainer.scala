@@ -104,16 +104,33 @@ abstract class BaseContainer(protected val baseContainerPath: String, private va
 
   def invalidateCaches(): Unit = cachedRestApiAddress.invalidate()
 
-  def reconnectToNetwork(delay: Long = 0, duration: Long = 100): Unit = {
-    Thread.sleep(delay)
-    disconnectFromNetwork()
-    Thread.sleep(duration)
-    connectToNetwork()
+  // This method is buggy on macOS, because it seems the REST API port is unreachable after this!
+  def reconnectToNetwork(delay: Long = 0, duration: Long = 100): Unit =
+    try {
+      Thread.sleep(delay)
+      disconnectFromNetwork()
+      Thread.sleep(duration)
+      connectToNetwork()
+    } catch {
+      case e: Throwable =>
+        logPortsInfo(s"Can't reconnect the '$containerId' container to the network: $containerInfo\n")
+        throw e
+    }
+
+  private def logPortsInfo(prefix: String): Unit = {
+    val str = dockerClient
+      .inspectContainerCmd(underlying.containerId)
+      .exec()
+      .getNetworkSettings
+      .getPorts
+      .toPrimitive
+      .asScala
+      .map { case (n, xs) => s"""  $n: ${xs.asScala.map(_.asScala.mkString(", ")).mkString("; ")}""" }
+      .mkString("\n")
+    log.info(s"${prefix}Ports info:\n$str")
   }
 
   def connectToNetwork(): Unit = {
-    invalidateCaches()
-
     dockerClient
       .connectToNetworkCmd()
       .withContainerId(underlying.containerId)
@@ -125,6 +142,7 @@ abstract class BaseContainer(protected val baseContainerPath: String, private va
       )
       .exec()
 
+    invalidateCaches()
     waitReady()
   }
 

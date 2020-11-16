@@ -357,7 +357,7 @@ class AddressActor(
     denormalizeAmountAndFee(balanceSource.getOrElse(asset, 0L), decimals).toDouble
 
   private def mkWsBalances(spendableBalances: Map[Asset, Long]): Map[Asset, WsBalances] = {
-    val tradableBalance = spendableBalances |-| openVolume.view.filterKeys(spendableBalances.keySet).toMap
+    val tradableBalance = (spendableBalances |-| openVolume.view.filterKeys(spendableBalances.keySet).toMap).filter(_._2 >= 0)
     spendableBalances.keySet
       .flatMap { asset =>
         efc.assetDecimals(asset) match {

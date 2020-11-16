@@ -8,17 +8,11 @@ pipeline {
         string(name: 'NODE_NEW_IMAGE', defaultValue: 'waves-integration-it:master', description: 'Version of the node used by the new matcher')
         string(name: 'DEX_NEW_IMAGE', defaultValue: 'dex-it:master', description: 'New version of the matcher')
     }
-    environment {
-          dexPrevImage = "${REGISTRY}/waves/dex/${DEX_PREVIOUS_IMAGE}"
-          dexNewImage = "${REGISTRY}/waves/dex/${DEX_NEW_IMAGE}"
-          nodePrevImage = "${REGISTRY}/waves/dex/${NODE_PREVIOUS_IMAGE}"
-          nodeNewImage = "${REGISTRY}/waves/dex/${NODE_NEW_IMAGE}"
-    }
     stages {
         stage ('Trigger job: Test - Kafka') {
             steps {
                 build job: 'Waves.Exchange/Matcher/Matcher Server - OS - Test - Kafka', propagate: false, wait: false, parameters: [
-                  [$class: 'GitParameterValue', name: 'BRANCH', value: "${env.NEW_BRANCH_OR_TAG}"],
+                  [$class: 'GitParameterValue', name: 'BRANCH', value: "${NEW_BRANCH_OR_TAG}"],
                   [$class: 'StringParameterValue', name: 'LABEL', value: "- PRE RELEASE"]
                 ]
             }
@@ -26,9 +20,9 @@ pipeline {
         stage ('Trigger job: Test - Multiple Versions') {
             steps {
                 build job: 'Waves.Exchange/Matcher/Matcher Server - OS - Test - Multiple Versions', propagate: false, wait: false, parameters: [
-                  [$class: 'StringParameterValue', name: 'BRANCH', value: "${env.PREVIOUS_BRANCH_OR_TAG}"],
-                  [$class: 'StringParameterValue', name: 'OTHER_DEX_IMAGE', value: dexNewImage],
-                  [$class: 'StringParameterValue', name: 'OTHER_NODE_IMAGE', value: nodeNewImage],
+                  [$class: 'StringParameterValue', name: 'BRANCH', value: "${PREVIOUS_BRANCH_OR_TAG}"],
+                  [$class: 'StringParameterValue', name: 'OTHER_DEX_IMAGE', value: "${params.REGISTRY}/waves/dex/${params.DEX_NEW_IMAGE}"],
+                  [$class: 'StringParameterValue', name: 'OTHER_NODE_IMAGE', value: "${params.REGISTRY}/waves/dex/${params.DEX_NEW_IMAGE}"],
                   [$class: 'StringParameterValue', name: 'LABEL', value: "- PRE RELEASE"]
                 ]
             }
@@ -36,9 +30,9 @@ pipeline {
         stage ('Trigger job: Test - Version') {
             steps {
                 build job: 'Waves.Exchange/Matcher/Matcher Server - OS - Test - Version', propagate: false, wait: false, parameters: [
-                  [$class: 'StringParameterValue', name: 'DEX_IMAGE', value: dexNewImage],
-                  [$class: 'StringParameterValue', name: 'NODE_IMAGE', value: nodeNewImage],
-                  [$class: 'StringParameterValue', name: 'BRANCH', value: "${env.PREVIOUS_BRANCH_OR_TAG}"],
+                  [$class: 'StringParameterValue', name: 'DEX_IMAGE', value: "${params.REGISTRY}/waves/dex/${params.DEX_NEW_IMAGE}"],
+                  [$class: 'StringParameterValue', name: 'NODE_IMAGE', value: "${params.REGISTRY}/waves/dex/${params.NODE_NEW_IMAGE}"],
+                  [$class: 'StringParameterValue', name: 'BRANCH', value: "${PREVIOUS_BRANCH_OR_TAG}"],
                   [$class: 'StringParameterValue', name: 'LABEL', value: "- PRE RELEASE"]
                 ]
             }

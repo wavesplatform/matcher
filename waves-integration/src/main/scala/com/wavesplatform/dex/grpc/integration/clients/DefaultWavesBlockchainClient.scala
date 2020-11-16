@@ -175,7 +175,7 @@ class DefaultWavesBlockchainClient(
             )
           }.toMap
         // TODO
-        case UtxEvent.Type.Update(event) =>
+        case UtxEvent.Type.Update(event) if event.added.nonEmpty =>
           pessimisticPortfolios
             .addAndRemove(
               addTxs = event.added.flatMap(_.transaction),
@@ -197,6 +197,7 @@ class DefaultWavesBlockchainClient(
     }
 
     val bx = mutable.Map.empty[Address, Map[Asset, Long]]
+    // TODO modifications of knownBalances and pessimisticPortfolio should not be concurrent // <-----------------
     Observable(bBalances, meStream).merge
       .map { updated =>
         updated.filter { case (address, updatedBalance) =>

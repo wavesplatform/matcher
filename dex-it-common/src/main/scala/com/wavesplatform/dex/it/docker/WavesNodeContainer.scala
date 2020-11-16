@@ -80,7 +80,7 @@ final case class WavesNodeContainer(override val internalIp: String, underlying:
     cachedBlockchainUpdatesExtGrpcApiAddress.invalidate()
   }
 
-  override def printDebugMessage(text: String): Unit = rawApi.print(text)
+  override def printDebugMessage(text: String): Unit = asyncRawApi.print(text)
 }
 
 object WavesNodeContainer extends ScorexLogging {

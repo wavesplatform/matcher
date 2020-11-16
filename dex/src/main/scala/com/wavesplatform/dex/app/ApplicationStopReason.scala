@@ -2,10 +2,11 @@ package com.wavesplatform.dex.app
 
 import scala.util.control.NoStackTrace
 
+// e.g. https://www.freebsd.org/cgi/man.cgi?query=sysexits&apropos=0&sektion=0&manpath=FreeBSD%204.3-RELEASE&format=html
 sealed abstract class ApplicationStopReason(val code: Int) extends RuntimeException with NoStackTrace
 
 case object StartingMatcherError extends ApplicationStopReason(10) {
-  override val getMessage: String = "Can't start matcher, see log"
+  override val getMessage: String = "Can't start matcher, see the log"
 }
 
 case class RecoveryError(detailed: String) extends ApplicationStopReason(12) {
@@ -21,5 +22,9 @@ case object NotSynchronizedNodeError extends ApplicationStopReason(18) {
 }
 
 case object MatcherStateCheckingFailedError extends ApplicationStopReason(20) {
-  override val getMessage: String = "Matcher checking failed, see log"
+  override val getMessage: String = "Matcher checking failed, see the log"
+}
+
+case object QueueMessageDeserializationError extends ApplicationStopReason(74) {
+  override val getMessage: String = "Can't deserialize queue message, see the log"
 }

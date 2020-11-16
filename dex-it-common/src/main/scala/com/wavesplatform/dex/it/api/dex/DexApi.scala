@@ -13,7 +13,9 @@ import im.mak.waves.transactions.ExchangeTransaction
 trait DexApi[F[_]] {
   def publicKey: F[HttpMatcherPublicKey]
 
+  def getReservedBalance(publicKey: String, timestamp: Long, signature: String): F[HttpBalance]
   def getReservedBalance(of: KeyPair, timestamp: Long = System.currentTimeMillis): F[HttpBalance]
+  def getReservedBalance(publicKey: String, headers: Map[String, String]): F[HttpBalance]
   def getReservedBalanceWithApiKey(of: KeyPair, xUserPublicKey: Option[PublicKey] = None): F[HttpBalance]
 
   def getTradableBalance(of: KeyPair, assetPair: AssetPair, timestamp: Long = System.currentTimeMillis): F[HttpBalance]

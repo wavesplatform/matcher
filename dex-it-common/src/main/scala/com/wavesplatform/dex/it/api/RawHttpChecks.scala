@@ -18,6 +18,9 @@ trait RawHttpChecks extends Matchers {
   protected def validate301Redirect[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT]): Unit =
     r.response.code should be(StatusCodes.MovedPermanently)
 
+  protected def validateAuthorizationError[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT]): Unit =
+    validateMatcherError(r, StatusCodes.Forbidden, 106954752, "Provided API key is not correct")
+
   protected def validateMatcherError[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT], code: Int, error: Int, message: String): Unit = {
     r.response.code should be(code)
     assertResponseContainHeaders(r, "Content-Type" -> "application/json")

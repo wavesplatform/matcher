@@ -209,8 +209,7 @@ class NetworkAndQueueIssuesTestSuite extends WsSuiteBase with HasWebSockets with
     val offsetBefore = dex1.api.lastOffset
 
     val orders = (1 to 10).map(i => mkOrderDP(alice, wavesUsdPair, SELL, 10.waves, 3.0, ttl = i.days))
-    orders.foreach(dex1.api.place)
-    orders.foreach(dex1.api.waitForOrderStatus(_, Status.Accepted))
+    orders.foreach(placeAndAwaitAtDex(_))
 
     orders.foreach(dex1.api.cancel(alice, _))
     dex1.api.waitForOrderHistory(alice, true.some)(_.isEmpty)

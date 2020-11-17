@@ -13,22 +13,27 @@ import com.wavesplatform.dex.it.docker.WavesNodeContainer
 import com.wavesplatform.it.WsSuiteBase
 import com.wavesplatform.it.tags.NetworkTests
 import eu.rekawek.toxiproxy.model.ToxicDirection
-import org.testcontainers.containers.ToxiproxyContainer.ContainerProxy
 
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.{Await, Future, blocking}
+import scala.concurrent.{blocking, Await, Future}
 
 @NetworkTests
 class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
 
-  private val wavesNodeProxy: ContainerProxy = mkToxiProxy(WavesNodeContainer.wavesNodeNetAlias, WavesNodeContainer.matcherGrpcExtensionPort)
+  private val matcherExtensionProxy = mkToxiProxy(WavesNodeContainer.wavesNodeNetAlias, WavesNodeContainer.matcherGrpcExtensionPort)
+
+  private val blockchainUpdatesExtensionProxy =
+    mkToxiProxy(WavesNodeContainer.wavesNodeNetAlias, WavesNodeContainer.blockchainUpdatesGrpcExtensionPort)
 
   override protected def dexInitialSuiteConfig: Config =
     ConfigFactory
       .parseString(
         s"""waves.dex {
            |  price-assets = [ "$UsdId", "WAVES" ]
-           |  waves-blockchain-client.grpc.target = "$toxiProxyHostName:${getInnerToxiProxyPort(wavesNodeProxy)}"
+           |  waves-blockchain-client {
+           |    grpc.target = "$toxiProxyHostName:${getInnerToxiProxyPort(matcherExtensionProxy)}"
+           |    blockchain-updates-grpc.target = "$toxiProxyHostName:${getInnerToxiProxyPort(blockchainUpdatesExtensionProxy)}"
+           |  }
            |}""".stripMargin
       )
       .withFallback(jwtPublicKeyConfig)
@@ -42,7 +47,7 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
   }
 
   override protected def afterEach(): Unit = {
-    wavesNodeProxy.toxics().getAll.forEach(_.remove())
+    matcherExtensionProxy.toxics().getAll.forEach(_.remove())
     clearOrderBook()
   }
 
@@ -84,7 +89,7 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
       val o = mkOrder(acc, wavesUsdPair, SELL, 50.waves, 1.usd)
 
       dex1.tryApi.place(o) match {
-        case Left(MatcherError(x,_,_,_)) => x should be equals 3147270
+        case Left(MatcherError(x, _, _, _)) => x shouldBe 3147270
         case _ => dex1.api.waitForOrderStatus(o, Status.Cancelled)
       }
     }
@@ -102,7 +107,7 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
       val o = mkOrder(acc, wavesUsdPair, SELL, 50.waves, 1.usd)
 
       dex1.tryApi.place(o) match {
-        case Left(MatcherError(x,_,_,_)) => x should be equals 3147270
+        case Left(MatcherError(x, _, _, _)) => x shouldBe 3147270
         case _ => dex1.api.waitForOrderStatus(o, Status.Cancelled)
       }
     }
@@ -110,20 +115,20 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
 
   "DEXClient should works correctly despite of latency: " - {
     "high latency (from node to dex)" in {
-      wavesNodeProxy.toxics().latency("latency", ToxicDirection.DOWNSTREAM, 4500)
+      matcherExtensionProxy.toxics().latency("latency", ToxicDirection.DOWNSTREAM, 4500)
       makeAndMatchOrders()
       matchingShouldBeSuccess()
     }
 
     "high latency (from dex to node)" in {
-      wavesNodeProxy.toxics().latency("latency", ToxicDirection.UPSTREAM, 4500)
+      matcherExtensionProxy.toxics().latency("latency", ToxicDirection.UPSTREAM, 4500)
       makeAndMatchOrders()
       matchingShouldBeSuccess()
     }
 
     "high latency (both directions)" in {
-      wavesNodeProxy.toxics().latency("latencyD", ToxicDirection.DOWNSTREAM, 4500)
-      wavesNodeProxy.toxics().latency("latencyU", ToxicDirection.UPSTREAM, 4500)
+      matcherExtensionProxy.toxics().latency("latencyD", ToxicDirection.DOWNSTREAM, 4500)
+      matcherExtensionProxy.toxics().latency("latencyU", ToxicDirection.UPSTREAM, 4500)
       makeAndMatchOrders()
       matchingShouldBeSuccess()
     }
@@ -132,20 +137,20 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
   "DEXClient should works correctly despite of slow network: " - {
 
     "16 kbps from node to dex" in {
-      wavesNodeProxy.toxics().bandwidth("bandwidth", ToxicDirection.DOWNSTREAM, 16)
+      matcherExtensionProxy.toxics().bandwidth("bandwidth", ToxicDirection.DOWNSTREAM, 16)
       makeAndMatchOrders()
       matchingShouldBeSuccess()
     }
 
     "16 kbps from dex to node" in {
-      wavesNodeProxy.toxics().bandwidth("bandwidth", ToxicDirection.UPSTREAM, 16)
+      matcherExtensionProxy.toxics().bandwidth("bandwidth", ToxicDirection.UPSTREAM, 16)
       makeAndMatchOrders()
       matchingShouldBeSuccess()
     }
 
     "16 kbps in both directions" in {
-      wavesNodeProxy.toxics().bandwidth("bandwidthD", ToxicDirection.DOWNSTREAM, 16)
-      wavesNodeProxy.toxics().bandwidth("bandwidthU", ToxicDirection.UPSTREAM, 16)
+      matcherExtensionProxy.toxics().bandwidth("bandwidthD", ToxicDirection.DOWNSTREAM, 16)
+      matcherExtensionProxy.toxics().bandwidth("bandwidthU", ToxicDirection.UPSTREAM, 16)
       makeAndMatchOrders()
       matchingShouldBeSuccess()
     }
@@ -153,10 +158,15 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
 
   "DEXClient should connect to another node from pool if linked node had lost the connection to network " in {
 
-    val conf = ConfigFactory.parseString(s"""waves.dex {
-                                            |  price-assets = [ "$UsdId", "WAVES" ]
-                                            |  waves-blockchain-client.grpc.target = "${WavesNodeContainer.wavesNodeNetAlias}:${WavesNodeContainer.matcherGrpcExtensionPort}"
-                                            |}""".stripMargin)
+    val conf = ConfigFactory.parseString(
+      s"""waves.dex {
+         |  price-assets = [ "$UsdId", "WAVES" ]
+         |  waves-blockchain-client { 
+         |    grpc.target = "${WavesNodeContainer.wavesNodeNetAlias}:${WavesNodeContainer.matcherGrpcExtensionPort}"
+         |    blockchain-updates-grpc.target = "${WavesNodeContainer.wavesNodeNetAlias}:${WavesNodeContainer.blockchainUpdatesGrpcExtensionPort}"
+         |  }
+         |}""".stripMargin
+    )
 
     dex1.restartWithNewSuiteConfig(conf)
 

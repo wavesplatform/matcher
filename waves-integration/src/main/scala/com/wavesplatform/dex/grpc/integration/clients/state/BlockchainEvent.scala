@@ -13,6 +13,10 @@ object BlockchainEvent {
     override def toString: String = s"RolledBackTo(${commonBlockRef.height}, ${commonBlockRef.id})"
   }
 
+  case class SyncFailed(dropFrom: Int) extends BlockchainEvent {
+    override def toString: String = s"SyncFailed($dropFrom)"
+  }
+
   case class DataReceived(updates: BlockchainBalance) extends BlockchainEvent {
     override def toString: String = "DataReceived"
   }

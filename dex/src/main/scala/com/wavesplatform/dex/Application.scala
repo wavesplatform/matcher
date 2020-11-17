@@ -7,10 +7,10 @@ import java.util.concurrent.{ThreadLocalRandom, TimeoutException}
 
 import akka.Done
 import akka.actor.typed.scaladsl.adapter._
-import akka.actor.{typed, ActorRef, ActorSystem, CoordinatedShutdown, Props}
+import akka.actor.{ActorRef, ActorSystem, CoordinatedShutdown, Props, typed}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Directives.respondWithHeader
-import akka.pattern.{ask, gracefulStop, CircuitBreaker}
+import akka.pattern.{CircuitBreaker, ask, gracefulStop}
 import akka.stream.Materializer
 import akka.util.Timeout
 import cats.data.EitherT
@@ -39,7 +39,7 @@ import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.utils.{EitherExt2, LoggerFacade, ScorexLogging}
-import com.wavesplatform.dex.effect.{liftValueAsync, FutureResult}
+import com.wavesplatform.dex.effect.{FutureResult, liftValueAsync}
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
 import com.wavesplatform.dex.grpc.integration.WavesClientBuilder
 import com.wavesplatform.dex.grpc.integration.clients.{MatcherExtensionAssetsWatchingClient, WavesBlockchainClient}
@@ -52,19 +52,20 @@ import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.dex.time.NTP
 import kamon.Kamon
 import kamon.influxdb.InfluxDBReporter
+import monix.execution.ExecutionModel
 import mouse.any.anySyntaxMouse
 import org.slf4j.LoggerFactory
 import pureconfig.ConfigSource
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{blocking, Future, Promise}
+import scala.concurrent.{Future, Promise, blocking}
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
 class Application(settings: MatcherSettings, config: Config)(implicit val actorSystem: ActorSystem) extends ScorexLogging {
 
-  private val monixScheduler = monix.execution.Scheduler.Implicits.global
+  private val monixScheduler = monix.execution.Scheduler.Implicits.global.withExecutionModel(ExecutionModel.AlwaysAsyncExecution)
   private val grpcExecutionContext = actorSystem.dispatchers.lookup("akka.actor.grpc-dispatcher")
 
   private val cs = CoordinatedShutdown(actorSystem)

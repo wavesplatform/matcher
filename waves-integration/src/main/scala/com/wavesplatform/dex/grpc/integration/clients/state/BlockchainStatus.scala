@@ -5,7 +5,7 @@ import com.wavesplatform.dex.meta.getSimpleName
 import scala.collection.immutable.Queue
 
 sealed trait BlockchainStatus extends Product with Serializable {
-  def name: String = getSimpleName(getClass)
+  def name: String = getSimpleName(this)
 }
 
 object BlockchainStatus {
@@ -28,6 +28,7 @@ object BlockchainStatus {
     override def toString: String = s"TransientRollback(n=${newFork.history.headOption.map(_.ref)}, h=$previousForkHeight)"
   }
 
+  // TODO do we need currentHeightHint
   case class TransientResolving(mainFork: WavesFork, stash: Queue[BlockchainEvent], currentHeightHint: Int) extends BlockchainStatus {
     override def toString: String = s"TransientResolving(${mainFork.history.headOption.map(_.ref)}, l=${stash.lastOption})"
   }

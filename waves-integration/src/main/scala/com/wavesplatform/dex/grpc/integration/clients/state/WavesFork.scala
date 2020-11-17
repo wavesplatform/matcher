@@ -50,6 +50,13 @@ case class WavesFork(history: List[WavesBlock]) {
     (WavesFork(commonHistory), droppedHistory.foldMap(_.diffIndex))
   }
 
+  def dropFrom(height: Int): (WavesFork, DiffIndex) = {
+    val (droppedHistory, commonHistory) = history.splitOnCondReversed(_.ref.height >= height)
+    (WavesFork(commonHistory), droppedHistory.foldMap(_.diffIndex))
+  }
+
+  def dropAll: (WavesFork, DiffIndex) = (WavesFork(Nil), history.foldMap(_.diffIndex))
+
   private def canAppend(prev: WavesBlock, newBlock: WavesBlock): Boolean = {
     val expectedHeight = if (newBlock.tpe == WavesBlock.Type.Block) prev.ref.height + 1 else prev.ref.height
     expectedHeight == newBlock.ref.height && prev.ref.id == newBlock.reference

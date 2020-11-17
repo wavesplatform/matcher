@@ -18,6 +18,10 @@ import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions._
 import com.wavesplatform.dex.grpc.integration.services.UtxTransaction
 
 import scala.collection.mutable
+import java.util
+import mouse.any._
+
+import cats.syntax.either._
 
 private[clients] class PessimisticPortfolios extends ScorexLogging {
 
@@ -33,10 +37,14 @@ private[clients] class PessimisticPortfolios extends ScorexLogging {
 
   // Longs are negative in both maps, see getPessimisticPortfolio
   private val portfolios = new mutable.AnyRefMap[Address, Map[Asset, Long]]()
-  private val txs = new mutable.AnyRefMap[ByteString, Map[Address, Map[Asset, Long]]] // TODO id <------------
+  private val txs = new mutable.AnyRefMap[ByteString, Map[Address, Map[Asset, Long]]]
 
-  def replaceWith(setTxs: Set[UtxTransaction]): Set[Address] = write {
-    val setTxMap = setTxs.map(tx => tx.id -> tx).toMap
+  // TODO decorate?
+  private val MaxForgedTransactions = 10000
+  private val forgedTxsCache: mutable.Queue[ByteString] = new mutable.Queue[ByteString](MaxForgedTransactions)
+
+  def replaceWith(setTxs: Seq[UtxTransaction]): Set[Address] = write {
+    val setTxMap = setTxs.collect { case tx if !forgedTxsCache.contains(tx.id) => tx.id -> tx }.toMap
     val oldTxIds = txs.keySet.toSet -- setTxMap.keySet
     val newTxIds = setTxMap.keySet -- txs.keySet
 
@@ -57,11 +65,22 @@ private[clients] class PessimisticPortfolios extends ScorexLogging {
     diff.keySet
   }
 
-  // TODO
-  def addAndRemove(addTxs: Seq[UtxTransaction], removeTxs: Seq[ByteString]): Set[Address] = write {
-    log.info(s"addTxs: ${addTxs.map(_.id.toVanilla)}, removeTxs: ${removeTxs.map(_.toVanilla)}")
-    addTxs.toList.foldMapK[Set, Address](addUnsafe) |+|
-    removeTxs.toList.foldMapK[Set, Address](removeUnsafe)
+  def processForged(txIds: Seq[ByteString]): Set[Address] = write {
+    log.info(s"processForged: ${txIds.map(_.toVanilla)}")
+    txIds.toList.foldMapK[Set, Address] { txId =>
+      removeUnsafe(txId).unsafeTap { affected =>
+        if (affected.isEmpty) {
+          if (forgedTxsCache.size == MaxForgedTransactions) forgedTxsCache.removeLast()
+          forgedTxsCache.addOne(txId)
+        }
+      }
+    }
+  }
+
+  def addPending(txs: Seq[UtxTransaction]): Set[Address] = write {
+    val filtered = txs.filter(tx => !forgedTxsCache.contains(tx.id))
+    log.info(s"addPending: ${filtered.map(_.id.toVanilla).mkString(", ")}; notFiltered=${txs.map(_.id.toVanilla)}")
+    filtered.toList.foldMapK[Set, Address](addUnsafe)
   }
 
   private def addUnsafe(tx: UtxTransaction): Set[Address] = {
@@ -78,7 +97,7 @@ private[clients] class PessimisticPortfolios extends ScorexLogging {
       // TODO we calculate and check only in the and?
       if (txs.put(id, finalP).isEmpty) {
         finalP.foreach {
-          case (address, p) => portfolios.updateWith(address)(prev => (prev.getOrElse(Map.empty) |+| p).some)
+          case (address, p) => portfolios.updateWith(address)(_.foldLeft(p)(_ |+| _).some)
         }
         finalP.keySet
       } else Set.empty
@@ -95,7 +114,9 @@ private[clients] class PessimisticPortfolios extends ScorexLogging {
         p.foreach {
           case (address, p) =>
             portfolios.updateWith(address) { prev =>
-              prev.map(_ |-| p) // TODO cleanup. sometimes?
+              val r = prev.map(_ |-| p) // TODO cleanup. sometimes?
+              log.info(s"removeUnsafe of $address: $prev -> $r")
+              r
             }
         }
         p.keySet

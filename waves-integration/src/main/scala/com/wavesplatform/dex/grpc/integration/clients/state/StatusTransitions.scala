@@ -5,7 +5,7 @@ import cats.syntax.semigroup._
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.clients.state.BlockchainEvent._
 import com.wavesplatform.dex.grpc.integration.clients.state.BlockchainStatus._
-import com.wavesplatform.dex.grpc.integration.clients.state.StatusUpdate.HeightUpdate
+import com.wavesplatform.dex.grpc.integration.clients.state.StatusUpdate.LastBlockHeight
 
 import scala.collection.immutable.Queue
 
@@ -25,39 +25,51 @@ object StatusTransitions extends ScorexLogging {
             origStatus.mainFork.withBlock(block) match {
               case Left(e) =>
                 log.error(s"Forcibly rollback, because of error: $e")
+                val previousBlock = origStatus.mainFork.history.tail.headOption
+                val (newFork, _) = previousBlock match {
+                  case Some(previousBlock) => origStatus.mainFork.dropAfter(previousBlock.ref)
+                  case None => origStatus.mainFork.dropAll
+                }
+
                 StatusUpdate(
-                  TransientRollback(
-                    newFork = WavesFork(List.empty),
+                  newStatus = TransientRollback(
+                    newFork = newFork,
                     newForkChanges = Monoid.empty[BlockchainBalance],
                     previousForkHeight = origStatus.currentHeightHint,
                     previousForkDiffIndex = origStatus.mainFork.diffIndex
                   ),
-                  updatedHeight = HeightUpdate.RestartRequired(math.max(0, origStatus.currentHeightHint - 1))
+                  updatedLastBlockHeight = LastBlockHeight.RestartRequired(math.max(0, origStatus.currentHeightHint - 1))
                 )
               case Right(updatedFork) =>
                 StatusUpdate(
                   newStatus = Normal(updatedFork, block.ref.height),
                   updatedBalances = block.changes,
-                  updatedHeight = if (block.tpe == WavesBlock.Type.Block) HeightUpdate.Updated(block.ref.height) else HeightUpdate.NotChanged
+                  updatedLastBlockHeight =
+                    if (block.tpe == WavesBlock.Type.Block) LastBlockHeight.Updated(block.ref.height) else LastBlockHeight.NotChanged
                 )
             }
 
           case RolledBackTo(commonBlockRef) =>
             val (commonFork, droppedDiff) = origStatus.mainFork.dropAfter(commonBlockRef)
-            if (commonFork.history.isEmpty)
-              StatusUpdate(
-                newStatus = TransientResolving(commonFork, Queue.empty, commonBlockRef.height),
-                requestBalances = droppedDiff
+            StatusUpdate(
+              newStatus = TransientRollback(
+                newFork = commonFork,
+                newForkChanges = Monoid.empty[BlockchainBalance],
+                previousForkHeight = origStatus.currentHeightHint,
+                previousForkDiffIndex = droppedDiff
               )
-            else
-              StatusUpdate(
-                newStatus = TransientRollback(
-                  newFork = commonFork,
-                  newForkChanges = Monoid.empty[BlockchainBalance],
-                  previousForkHeight = commonBlockRef.height,
-                  previousForkDiffIndex = droppedDiff
-                )
+            )
+
+          case SyncFailed(height) =>
+            val (commonFork, droppedDiff) = origStatus.mainFork.dropFrom(height)
+            StatusUpdate(
+              newStatus = TransientRollback(
+                newFork = commonFork,
+                newForkChanges = Monoid.empty[BlockchainBalance],
+                previousForkHeight = origStatus.currentHeightHint,
+                previousForkDiffIndex = droppedDiff
               )
+            )
 
           case _ =>
             // Won't happen
@@ -78,7 +90,8 @@ object StatusTransitions extends ScorexLogging {
                     previousForkHeight = origStatus.previousForkHeight,
                     previousForkDiffIndex = origStatus.previousForkDiffIndex
                   ),
-                  updatedHeight = HeightUpdate.RestartRequired(math.max(1, origStatus.previousForkHeight - 1)) // TODO duplication of max
+                  updatedLastBlockHeight =
+                    LastBlockHeight.RestartRequired(math.max(1, origStatus.previousForkHeight - 1)) // TODO duplication of max
                 )
 
               case Right(updatedNewFork) =>
@@ -93,16 +106,39 @@ object StatusTransitions extends ScorexLogging {
                   )
                 else
                   StatusUpdate(
-                    newStatus = TransientResolving(
+                    newStatus = TransientResolving( // We don't a height, because a micro block comes after all blocks
                       mainFork = updatedNewFork,
                       stash = Queue.empty,
                       currentHeightHint = block.ref.height
                     ),
                     updatedBalances = newForkChanges,
                     requestBalances = origStatus.previousForkDiffIndex.without(newForkChanges.diffIndex),
-                    updatedHeight = if (block.tpe == WavesBlock.Type.Block) HeightUpdate.Updated(block.ref.height) else HeightUpdate.NotChanged
+                    updatedLastBlockHeight =
+                      if (block.tpe == WavesBlock.Type.Block) LastBlockHeight.Updated(block.ref.height) else LastBlockHeight.NotChanged
                   )
             }
+
+          case RolledBackTo(commonBlockRef) =>
+            val (commonFork, droppedDiff) = origStatus.newFork.dropAfter(commonBlockRef)
+            StatusUpdate(
+              newStatus = TransientRollback(
+                newFork = commonFork,
+                newForkChanges = Monoid.empty[BlockchainBalance],
+                previousForkHeight = origStatus.previousForkHeight,
+                previousForkDiffIndex = origStatus.previousForkDiffIndex |+| droppedDiff
+              )
+            )
+
+          case SyncFailed(height) =>
+            val (commonFork, droppedDiff) = origStatus.newFork.dropFrom(height)
+            StatusUpdate(
+              newStatus = TransientRollback(
+                newFork = commonFork,
+                newForkChanges = Monoid.empty[BlockchainBalance],
+                previousForkHeight = origStatus.previousForkHeight,
+                previousForkDiffIndex = origStatus.previousForkDiffIndex |+| droppedDiff
+              )
+            )
 
           case _ =>
             // Won't happen
@@ -112,7 +148,9 @@ object StatusTransitions extends ScorexLogging {
 
       case origStatus: TransientResolving =>
         event match {
+          // TODO We can stuck if waiting for DataReceiving in stash!!!!
           case DataReceived(updates) =>
+            // TODO optimize. Probably we don't need to request all data. E.g. we hadn't this address in last 100 blocks and we got its balance 101 block before
             val init = StatusUpdate(
               newStatus = Normal(origStatus.mainFork, origStatus.currentHeightHint),
               updatedBalances = updates

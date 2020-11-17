@@ -13,7 +13,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.grpc.integration.clients.state.BlockRef
+import com.wavesplatform.dex.grpc.integration.clients.state.{BlockRef, BlockchainBalance, DiffIndex}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.effect.Implicits.NettyFutureOps
 import com.wavesplatform.dex.grpc.integration.exceptions.{UnexpectedConnectionException, WavesNodeConnectionLostException}
@@ -86,6 +86,26 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
       .map(response => response.balances.map(record => record.assetId.toVanillaAsset -> record.balance).toMap)
   }
 
+  override def getBalances(index: DiffIndex): Future[BlockchainBalance] = handlingErrors {
+    val request = GetBalancesRequest(
+      regular = index.regular.map { case (address, assets) =>
+        GetBalancesRequest.RegularPair(
+          address = address.toPB,
+          assets = assets.map(_.toPB).toSeq
+        )
+      }.toSeq,
+      outLeaseAddresses = index.outLeases.map(_.toPB).toSeq
+    )
+    blockchainService.getBalances(request).map { response =>
+      BlockchainBalance(
+        regular = response.regular
+          .map(pair => pair.address.toVanillaAddress -> pair.amount.map(x => x.assetId.toVanillaAsset -> x.amount).toMap)
+          .toMap,
+        outLeases = response.outLeases.map(x => x.address.toVanillaAddress -> x.amount).toMap
+      )
+    }
+  }
+
   override def isFeatureActivated(id: Short): Future[Boolean] = handlingErrors {
     blockchainService.isFeatureActivated(IsFeatureActivatedRequest(id)).map(_.isActivated)
   }
@@ -141,7 +161,6 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
       InetAddress.getByName(r.address)
     }
   }
-
 
   override def currentBlockInfo: Future[BlockRef] = blockchainService.getCurrentBlockInfo(empty).map { x =>
     BlockRef(x.height, x.blockId.toVanilla)

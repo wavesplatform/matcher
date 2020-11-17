@@ -138,7 +138,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, ignoredExchangeTx
         )
 
         utxState.put(tx.id(), utxTransaction)
-        log.info(s"added: id=${tx.id()}, ${JsonFormat.toJsonString(utxTransaction)}, $evt")
+        log.info(s"UtxAdded: id=${tx.id()}, ${JsonFormat.toJsonString(utxTransaction)}, $evt")
 
         val event = UtxEvent(
           UtxEvent.Type.Update(
@@ -157,7 +157,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, ignoredExchangeTx
         Option(utxState.remove(tx.id())) match {
           case None => log.info(s"$evt - can't find")
           case Some(utxTransaction) =>
-            log.info(s"removed: id=${tx.id()}, $evt")
+            log.info(s"UtxRemoved: id=${tx.id()}, $evt")
             val gReason = reason.map { x =>
               UtxEvent.Update.Removed.Reason(
                 name = getSimpleName(x),
@@ -294,6 +294,34 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, ignoredExchangeTx
         .filter(_.balance > 0)
 
     SpendableAssetsBalancesResponse(assetsBalances)
+  }
+
+  // TODO optimize
+  override def getBalances(request: GetBalancesRequest): Future[GetBalancesResponse] = Future {
+    val regular = request.regular
+      .map { regular =>
+        val address = regular.address.toVanillaAddress
+        GetBalancesResponse.RegularPair(
+          address = regular.address,
+          amount = regular.assets
+            .map { asset =>
+              val balance = asset.toVanillaAsset match {
+                case Waves => context.accountsApi.balance(address)
+                case asset: IssuedAsset => context.accountsApi.assetBalance(address, asset)
+              }
+              Amount(asset, balance)
+            }
+        )
+      }
+
+    val outLeases = request.outLeaseAddresses.map { address =>
+      GetBalancesResponse.OutLeasePair(
+        address = address,
+        amount = context.blockchain.leaseBalance(address.toVanillaAddress).out
+      )
+    }
+
+    GetBalancesResponse(regular, outLeases)
   }
 
   override def forgedOrder(request: ForgedOrderRequest): Future[ForgedOrderResponse] = Future {

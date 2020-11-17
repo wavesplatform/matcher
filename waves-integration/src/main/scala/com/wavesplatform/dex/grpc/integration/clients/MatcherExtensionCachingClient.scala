@@ -10,7 +10,7 @@ import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.caches.{AssetDescriptionsCache, FeaturesCache}
-import com.wavesplatform.dex.grpc.integration.clients.state.BlockRef
+import com.wavesplatform.dex.grpc.integration.clients.state.{BlockRef, BlockchainBalance, DiffIndex}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.services.UtxEvent
 import monix.reactive.Observable
@@ -33,6 +33,7 @@ class MatcherExtensionCachingClient(underlying: MatcherExtensionClient[Future], 
 
   override def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] = underlying.spendableBalances(address, assets)
   override def allAssetsSpendableBalance(address: Address): Future[Map[Asset, Long]] = underlying.allAssetsSpendableBalance(address)
+  override def getBalances(index: DiffIndex): Future[BlockchainBalance] = underlying.getBalances(index)
 
   override def isFeatureActivated(id: Short): Future[Boolean] = featuresCache.get(id) map Boolean2boolean
 

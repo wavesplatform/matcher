@@ -39,6 +39,8 @@ service WavesBlockchainApi {
     rpc GetNodeAddress (google.protobuf.Empty) returns (NodeAddressResponse);
 
     rpc GetCurrentBlockInfo (google.protobuf.Empty) returns (CurrentBlockInfoResponse);
+
+    rpc GetBalances (GetBalancesRequest) returns (GetBalancesResponse);
 }
 
 // Common requests
@@ -187,6 +189,32 @@ message CurrentBlockInfoResponse {
 
 message UtxStateResponse {
     repeated UtxTransaction transactions = 1;
+}
+
+message GetBalancesRequest {
+    // regular: Map[Address, Set[Asset]], outLeases: Set[Address]
+    repeated RegularPair regular = 1;
+    repeated bytes outLeaseAddresses = 2;
+
+    message RegularPair {
+        bytes address = 1;
+        repeated bytes assets = 2;
+    }
+}
+
+message GetBalancesResponse {
+    repeated RegularPair regular = 1;
+    repeated OutLeasePair outLeases = 2;
+
+    message RegularPair {
+        bytes address = 1;
+        repeated waves.Amount amount = 2;
+    }
+
+    message OutLeasePair {
+        bytes address = 1;
+        int64 amount = 2;
+    }
 }
 
 // Other entities

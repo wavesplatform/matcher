@@ -50,13 +50,16 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .headers(apiKeyWithUserPublicKeyHeaders(xUserPublicKey))
   }
 
-  override def getTradableBalance(of: KeyPair, assetPair: AssetPair, timestamp: Long): R[HttpBalance] = mk {
+  override def getTradableBalance(address: String, amountAsset: String, priceAsset: String): R[HttpBalance] = mk {
     sttp
       .get(
-        uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/tradableBalance/${of.publicKey.toAddress.stringRepr}"
+        uri"$apiUri/matcher/orderbook/$amountAsset/$priceAsset/tradableBalance/$address"
       )
-      .headers(timestampAndSignatureHeaders(of, timestamp))
+      .followRedirects(false)
   }
+
+  override def getTradableBalance(of: KeyPair, assetPair: AssetPair): R[HttpBalance] =
+    getTradableBalance(of.publicKey.toAddress.stringRepr, assetPair.amountAssetStr, assetPair.priceAssetStr)
 
   override def place(order: Order): R[HttpSuccessfulPlace] = mk {
     sttp

@@ -151,7 +151,7 @@ class DefaultWavesBlockchainClient(
             log.warn(s"Got an error, subscribing from $height", e)
             val failedEvent = Observable((BlockchainEvent.SyncFailed(height): BlockchainEvent, Seq.empty[ByteString]))
             // TODO wait until connection restored
-            Observable(failedEvent, mkBlockchainEventsStream(height, cancelRef)).concat.delayExecution(100.millis)
+            Observable(failedEvent, mkBlockchainEventsStream(height, cancelRef)).concat
           }
       }
   }

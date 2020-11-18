@@ -104,18 +104,28 @@ object StatusTransitions extends ScorexLogging {
                     )
                     // updatedHeight = updatedHeight // We don't notify about updates until we get the same height
                   )
-                else
-                  StatusUpdate(
-                    newStatus = TransientResolving( // We don't a height, because a micro block comes after all blocks
+                else {
+                  // We don't a height, because a micro block comes after all blocks
+                  val requestBalances = origStatus.previousForkDiffIndex.without(newForkChanges.diffIndex)
+                  val newStatus =
+                    if (requestBalances.isEmpty) Normal(
+                      mainFork = updatedNewFork,
+                      currentHeightHint = block.ref.height
+                    )
+                    else TransientResolving(
                       mainFork = updatedNewFork,
                       stash = Queue.empty,
                       currentHeightHint = block.ref.height
-                    ),
+                    )
+                  StatusUpdate(
+                    newStatus = newStatus,
                     updatedBalances = newForkChanges,
-                    requestBalances = origStatus.previousForkDiffIndex.without(newForkChanges.diffIndex),
+                    requestBalances = requestBalances,
+                    // TODO Do we really need this?
                     updatedLastBlockHeight =
                       if (block.tpe == WavesBlock.Type.Block) LastBlockHeight.Updated(block.ref.height) else LastBlockHeight.NotChanged
                   )
+                }
             }
 
           case RolledBackTo(commonBlockRef) =>

@@ -34,7 +34,9 @@ import monix.reactive.subjects.ConcurrentSubject
 import mouse.any._
 
 import scala.collection.mutable
+import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success}
 
 class DefaultWavesBlockchainClient(
   meClient: MatcherExtensionClient[Future],
@@ -47,6 +49,7 @@ class DefaultWavesBlockchainClient(
   type Leases = Map[Address, Long]
 
   private val lastBlockHeight = new AtomicInteger(0)
+  @volatile private var isClosing = false
 
   private val emptyBalances: Balances = Map.empty
   private val knownBalances: AtomicReference[BlockchainBalance] = new AtomicReference(Monoid.empty[BlockchainBalance])
@@ -142,10 +145,14 @@ class DefaultWavesBlockchainClient(
       .collect { case Some(x) => x }
       .onErrorRecoverWith {
         case e =>
-          val height = Option(lastBlockHeight.get()).map(x => math.max(1, x - 1)).getOrElse(fromHeight)
-          log.warn(s"Got an error, subscribing from $height", e)
-          val failedEvent = Observable((BlockchainEvent.SyncFailed(height): BlockchainEvent, Seq.empty[ByteString]))
-          Observable(failedEvent, mkBlockchainEventsStream(height, cancelRef)).concat
+          if (isClosing) Observable.empty
+          else {
+            val height = Option(lastBlockHeight.get()).map(x => math.max(1, x - 1)).getOrElse(fromHeight)
+            log.warn(s"Got an error, subscribing from $height", e)
+            val failedEvent = Observable((BlockchainEvent.SyncFailed(height): BlockchainEvent, Seq.empty[ByteString]))
+            // TODO wait until connection restored
+            Observable(failedEvent, mkBlockchainEventsStream(height, cancelRef)).concat.delayExecution(100.millis)
+          }
       }
   }
 
@@ -170,7 +177,7 @@ class DefaultWavesBlockchainClient(
             case LastBlockHeight.Updated(to) => to.some
             case _ => none
           }
-          runSideEffects(x)
+          requestBalances(x.requestBalances)
           val r =
             if (x.updatedBalances.isEmpty && forgedTxIds.isEmpty) none[CommonUpdate]
             else CommonUpdate.Forged(
@@ -270,12 +277,17 @@ class DefaultWavesBlockchainClient(
       .map(Updates(_))
   }
 
-  private def runSideEffects(x: StatusUpdate): Unit =
-    if (!x.requestBalances.isEmpty) {
-      log.info(s"Request balances: ${x.requestBalances}")
-      meClient.getBalances(x.requestBalances).foreach { r =>
-        log.info(s"Got balances response: $r")
-        dataUpdates.onNext(BlockchainEvent.DataReceived(r))
+  // TODO use a smarter approach
+  private def requestBalances(x: DiffIndex): Unit =
+    if (!x.isEmpty) {
+      log.info(s"Request balances: $x")
+      meClient.getBalances(x).onComplete {
+        case Success(r) =>
+          log.info(s"Got balances response: $r")
+          dataUpdates.onNext(BlockchainEvent.DataReceived(r))
+        case Failure(e) =>
+          log.warn("Got an error during requesting balances", e)
+          requestBalances(x)
       }
     }
 
@@ -361,7 +373,10 @@ class DefaultWavesBlockchainClient(
   override def getNodeAddress: Future[InetAddress] =
     meClient.getNodeAddress
 
-  override def close(): Future[Unit] = meClient.close().zip(bClient.close()).map(_ => ())
+  override def close(): Future[Unit] = {
+    isClosing = true
+    meClient.close().zip(bClient.close()).map(_ => ())
+  }
 
 }
 

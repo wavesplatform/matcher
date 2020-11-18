@@ -1,7 +1,6 @@
 package com.wavesplatform.dex.grpc.integration.clients
 
 import java.nio.charset.StandardCharsets
-import java.time.temporal.ChronoUnit
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicReference
 
@@ -19,9 +18,9 @@ import com.wavesplatform.dex.grpc.integration.settings.{GrpcClientSettings, Wave
 import com.wavesplatform.dex.grpc.integration.{IntegrationSuiteBase, WavesClientBuilder}
 import com.wavesplatform.dex.it.test.Scripts
 import monix.execution.Scheduler
-import org.scalatest.{durations, Assertion, CancelAfterFailure}
+import org.scalatest.CancelAfterFailure
 
-import scala.concurrent.duration.{Duration, DurationInt}
+import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.Random
 
@@ -294,8 +293,7 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase with Canc
   }
 
   "spendableBalances" in {
-    val issuedAsset = randomIssuedAsset
-    wait(client.spendableBalances(bob, Set(Waves, issuedAsset))) should matchTo(Map[Asset, Long](Waves -> 494994798999996L))
+    wait(client.spendableBalances(bob, Set(Waves, randomIssuedAsset))) should matchTo(Map[Asset, Long](Waves -> 494994798999996L))
   }
 
   "allAssetsSpendableBalance" in {
@@ -338,8 +336,8 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase with Canc
   // TODO check that the functions returns new data after the state is changed?
 
   override protected def afterAll(): Unit = {
-    super.afterAll()
     Await.ready(client.close(), 10.seconds)
+    super.afterAll()
     grpcExecutor.shutdownNow()
   }
 

@@ -5,6 +5,9 @@ import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
 
 import cats.Monoid
 import cats.instances.long._
+import cats.instances.queue._
+import cats.instances.set._
+import cats.syntax.foldable._
 import cats.syntax.group._
 import cats.syntax.option._
 import com.google.protobuf.ByteString
@@ -20,6 +23,7 @@ import com.wavesplatform.dex.fp.MapImplicits.group
 import com.wavesplatform.dex.grpc.integration.clients.DefaultWavesBlockchainClient._
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.Updates
 import com.wavesplatform.dex.grpc.integration.clients.state.StatusUpdate.LastBlockHeight
+import com.wavesplatform.dex.grpc.integration.clients.state.WavesNodeEvent.WavesNodeUtxEvent
 import com.wavesplatform.dex.grpc.integration.clients.state._
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions._
@@ -31,10 +35,9 @@ import com.wavesplatform.events.protobuf.{BlockchainUpdated, StateUpdate}
 import monix.execution.{Cancelable, Scheduler}
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
-import mouse.any._
 
+import scala.collection.immutable.Queue
 import scala.collection.mutable
-import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
@@ -56,7 +59,7 @@ class DefaultWavesBlockchainClient(
 
   private val pessimisticPortfolios = new PessimisticPortfolios
 
-  private val dataUpdates = ConcurrentSubject.publish[BlockchainEvent]
+  private val dataUpdates = ConcurrentSubject.publish[WavesNodeEvent]
 
   // TODO replace with deepReplace ?
   private def balanceUpdates(stateUpdate: Iterable[StateUpdate]): Balances =
@@ -93,7 +96,7 @@ class DefaultWavesBlockchainClient(
    * 2. Appending on a network's height: AppendMicro*, RollbackMicro?, Append
    * 2. Rollback: Rollback, Append+
    */
-  private def toEvent(event: BlockchainUpdated): Option[BlockchainEvent] = {
+  private def toEvent(event: BlockchainUpdated): Option[WavesNodeEvent] = {
     val blockRef = BlockRef(event.height, event.id.toVanilla)
     event.update match {
       case Update.Empty => none // Nothing to do
@@ -117,31 +120,28 @@ class DefaultWavesBlockchainClient(
             tpe = tpe
           )
 
-          BlockchainEvent.Appended(block)
+          WavesNodeEvent.Appended(block, updates.transactionIds)
         }
 
       case Update.Rollback(value) =>
         value.`type` match {
-          case RollbackType.BLOCK | RollbackType.MICROBLOCK => BlockchainEvent.RolledBackTo(blockRef).some
+          case RollbackType.BLOCK | RollbackType.MICROBLOCK => WavesNodeEvent.RolledBackTo(blockRef).some
           case RollbackType.Unrecognized(_) => none // TODO ???
         }
     }
   }
 
-  private def mkBlockchainEventsStream(fromHeight: Int, cancelRef: AtomicReference[Cancelable]): Observable[(BlockchainEvent, Seq[ByteString])] = {
+  private def toEvent(event: UtxEvent): Option[WavesNodeEvent] = event.`type` match {
+    case UtxEvent.Type.Switch(event) => WavesNodeEvent.UtxSwitched(event.transactions).some
+    case UtxEvent.Type.Update(event) if event.added.nonEmpty => WavesNodeEvent.UtxAdded(event.added.flatMap(_.transaction)).some
+    case _ => none
+  }
+
+  private def mkBlockchainEventsStream(fromHeight: Int, cancelRef: AtomicReference[Cancelable]): Observable[WavesNodeEvent] = {
     val (s, c) = bClient.blockchainEvents(fromHeight)
     cancelRef.set(c)
     s
-      .map { x =>
-        toEvent(x).map { r =>
-          val txIds = x.update match {
-            case Update.Empty => Seq.empty
-            case Update.Append(block) => block.transactionIds
-            case _: Update.Rollback => Seq.empty
-          }
-          (r, txIds)
-        }
-      }
+      .map(toEvent)
       .collect { case Some(x) => x }
       .onErrorRecoverWith {
         case e =>
@@ -149,7 +149,7 @@ class DefaultWavesBlockchainClient(
           else {
             val height = Option(lastBlockHeight.get()).map(x => math.max(1, x - 1)).getOrElse(fromHeight)
             log.warn(s"Got an error, subscribing from $height", e)
-            val failedEvent = Observable((BlockchainEvent.SyncFailed(height): BlockchainEvent, Seq.empty[ByteString]))
+            val failedEvent = Observable[WavesNodeEvent](WavesNodeEvent.SyncFailed(height))
             // TODO wait until connection restored
             Observable(failedEvent, mkBlockchainEventsStream(height, cancelRef)).concat
           }
@@ -157,112 +157,49 @@ class DefaultWavesBlockchainClient(
   }
 
   // TODO lazy
-  override val updates: Observable[Updates] = {
-    val bBalances = Observable.fromFuture(meClient.currentBlockInfo).flatMap { startBlockInfo =>
-      val startHeight = math.max(startBlockInfo.height - MaxRollbackHeight - 1, 1)
+  override val updates: Observable[Updates] = Observable.fromFuture(meClient.currentBlockInfo).flatMap { startBlockInfo =>
+    val startHeight = math.max(startBlockInfo.height - MaxRollbackHeight - 1, 1)
 
-      // TODO Wait until both connections restored!
-      val safeStreamCancelable = new AtomicReference(Cancelable.empty)
-      val init: BlockchainStatus = BlockchainStatus.Normal(WavesFork(List.empty), startHeight)
-      Observable(
-        dataUpdates.map((_, Seq.empty[ByteString])),
-        mkBlockchainEventsStream(startHeight, safeStreamCancelable)
-      ).merge
-        .mapAccumulate(init) { case (origStatus, (event, forgedTxIds)) =>
-          val x = StatusTransitions(origStatus, event)
-          val newLastBlockRef = x.updatedLastBlockHeight match {
-            case LastBlockHeight.RestartRequired(at) =>
-              safeStreamCancelable.get().cancel()
-              at.some
-            case LastBlockHeight.Updated(to) => to.some
-            case _ => none
-          }
-          requestBalances(x.requestBalances)
-          val r =
-            if (x.updatedBalances.isEmpty && forgedTxIds.isEmpty) none[CommonUpdate]
-            else CommonUpdate.Forged(
-              txIds = forgedTxIds,
-              knownBalanceUpdated = x.updatedBalances,
-              updatedLastBlockHeight = newLastBlockRef
-            ).some
-          (x.newStatus, r)
-        }
-        .collect { case Some(x) => x }
-    }
-
-    val meStream = meClient.utxEvents.map { event =>
-      event.`type` match {
-        case UtxEvent.Type.Switch(event) => CommonUpdate.UtxReplaced(event.transactions).some
-        case UtxEvent.Type.Update(event) if event.added.nonEmpty => CommonUpdate.UtxAdded(event.added.flatMap(_.transaction)).some
-        case _ => none
-      }
-    }.collect { case Some(x) => x }
-
+    // TODO Wait until both connections restored!
+    val safeStreamCancelable = new AtomicReference(Cancelable.empty)
     val finalBalance = mutable.Map.empty[Address, Map[Asset, Long]]
-    Observable(meStream, bBalances).merge
-      .map { update =>
-        // TODO: These changes probably have to be atomic!
-        val updated = update match {
-          case CommonUpdate.Forged(txIds, knownBalanceUpdated, newHeight) =>
-            log.info(
-              s"\n---- Forged(txIds=${txIds.map(_.toVanilla).mkString(", ")}, h=${newHeight.fold("s")(_.toString)}, b=$knownBalanceUpdated) ----"
-            )
-            newHeight.foreach(lastBlockHeight.set)
-            val chAddrs = pessimisticPortfolios.processForged(txIds)
-            val updated = knownBalances.updateAndGet(_ |+| knownBalanceUpdated)
-            val changedAddresses = knownBalanceUpdated.regular.keySet ++ knownBalanceUpdated.outLeases.keySet ++ chAddrs
-            val combined = changedAddresses
-              .map { address =>
-                log.info(s"Forged.combineBalances for $address")
-                address -> combineBalances(
-                  regular = knownBalanceUpdated.regular.getOrElse(address, Map.empty),
-                  outLease = knownBalanceUpdated.outLeases.get(address),
-                  pessimistic = Map.empty,
-                  updatedRegular = updated.regular.getOrElse(address, Map.empty),
-                  updatedOutLease = updated.outLeases.get(address),
-                  updatedPessimistic = pessimisticPortfolios.getAggregated(address)
-                )
-              }
-              .toMap
-
-            log.info(s"Combined: $combined\n---- End Forged ----")
-            combined
-
-          case CommonUpdate.UtxAdded(txs) =>
-            log.info(s"\n---- UtxAdded(${txs.map(_.id.toVanilla).mkString(", ")}) ----")
-            pessimisticPortfolios
-              .addPending(txs) // Because we remove them during adding a [micro]block
-              .map { changedAddress =>
-                log.info(s"UtxAdded.combineBalances for $changedAddress")
-                changedAddress -> combineBalances(
-                  regular = Map.empty,
-                  outLease = none,
-                  pessimistic = pessimisticPortfolios.getAggregated(changedAddress), // TODO probably some assets weren't changed
-                  updatedRegular = knownBalances.get.regular.getOrElse(changedAddress, Map.empty),
-                  updatedOutLease = knownBalances.get.outLeases.get(changedAddress),
-                  updatedPessimistic = pessimisticPortfolios.getAggregated(changedAddress)
-                )
-              }.toMap.unsafeTap { _ =>
-                log.info("\n----End UtxAdded----")
-              }
-
-          case CommonUpdate.UtxReplaced(newTxs) =>
-            log.info(s"\n---- UtxReplaced(${newTxs.map(_.id.toVanilla).mkString(", ")}) ----")
-            pessimisticPortfolios.replaceWith(newTxs).map { changedAddress =>
-              log.info(s"UtxReplaced.combineBalances for $changedAddress")
-              changedAddress -> combineBalances(
-                regular = Map.empty,
-                outLease = none,
-                pessimistic = pessimisticPortfolios.getAggregated(changedAddress),
-                updatedRegular = knownBalances.get.regular.getOrElse(changedAddress, Map.empty),
-                updatedOutLease = knownBalances.get.outLeases.get(changedAddress),
-                updatedPessimistic = pessimisticPortfolios.getAggregated(changedAddress)
-              )
-            }.toMap.unsafeTap { _ =>
-              log.info("\n----End UtxReplaced----")
-            }
+    val init: BlockchainStatus = BlockchainStatus.Normal(WavesFork(List.empty), startHeight)
+    Observable(
+      dataUpdates,
+      meClient.utxEvents.map(toEvent).collect { case Some(x) => x },
+      mkBlockchainEventsStream(startHeight, safeStreamCancelable)
+    ).merge
+      .mapAccumulate(init) { case (origStatus, event) =>
+        val x = StatusTransitions(origStatus, event)
+        x.updatedLastBlockHeight match {
+          case LastBlockHeight.Updated(to) => lastBlockHeight.set(to)
+          case LastBlockHeight.RestartRequired(at) =>
+            // TODO Or a better we need to wrap observable to make it restartable
+            lastBlockHeight.set(at)
+            safeStreamCancelable.get().cancel()
+          case _ =>
         }
-
+        requestBalances(x.requestBalances)
+        val updatedKnownBalances = knownBalances.updateAndGet(_ |+| x.updatedBalances)
+        val changedAddresses =
+          updatedKnownBalances.regular.keySet ++ updatedKnownBalances.outLeases.keySet ++ processUtxEvents(x.processUtxEvents)
+        val updatedFinalBalances = changedAddresses
+          .map { address =>
+            log.info(s"Forged.combineBalances for $address")
+            address -> combineBalances(
+              regular = x.updatedBalances.regular.getOrElse(address, Map.empty),
+              outLease = x.updatedBalances.outLeases.get(address),
+              pessimistic = Map.empty,
+              updatedRegular = updatedKnownBalances.regular.getOrElse(address, Map.empty),
+              updatedOutLease = updatedKnownBalances.outLeases.get(address),
+              updatedPessimistic = pessimisticPortfolios.getAggregated(address)
+            )
+          }
+          .toMap
+        (x.newStatus, updatedFinalBalances)
+      }
+      .filter(_.nonEmpty)
+      .map { updated => // TODO do on a previous step
         updated.filter { case (address, updatedBalance) =>
           val prev = finalBalance.getOrElse(address, Map.empty).filter { case (k, _) => updatedBalance.contains(k) }
           val same = prev == updatedBalance
@@ -277,6 +214,15 @@ class DefaultWavesBlockchainClient(
       .map(Updates(_))
   }
 
+  private def processUtxEvents(queue: Queue[WavesNodeUtxEvent]): Set[Address] = queue.foldMap(processUtxEvent)
+
+  // TODO probably some assets weren't changed
+  private def processUtxEvent(event: WavesNodeUtxEvent): Set[Address] = event match {
+    case WavesNodeUtxEvent.Added(txs) => pessimisticPortfolios.addPending(txs) // Because we remove them during adding a [micro]block
+    case WavesNodeUtxEvent.Forged(txIds) => pessimisticPortfolios.processForged(txIds)
+    case WavesNodeUtxEvent.Switched(newTxs) => pessimisticPortfolios.replaceWith(newTxs)
+  }
+
   // TODO use a smarter approach
   private def requestBalances(x: DiffIndex): Unit =
     if (!x.isEmpty) {
@@ -284,7 +230,7 @@ class DefaultWavesBlockchainClient(
       meClient.getBalances(x).onComplete {
         case Success(r) =>
           log.info(s"Got balances response: $r")
-          dataUpdates.onNext(BlockchainEvent.DataReceived(r))
+          dataUpdates.onNext(WavesNodeEvent.DataReceived(r))
         case Failure(e) =>
           log.warn("Got an error during requesting balances", e)
           requestBalances(x)

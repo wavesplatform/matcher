@@ -3,7 +3,7 @@ package com.wavesplatform.dex.grpc.integration.clients.state
 import cats.kernel.Monoid
 import cats.syntax.semigroup._
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.grpc.integration.clients.state.BlockchainEvent._
+import com.wavesplatform.dex.grpc.integration.clients.state.WavesNodeEvent._
 import com.wavesplatform.dex.grpc.integration.clients.state.BlockchainStatus._
 import com.wavesplatform.dex.grpc.integration.clients.state.StatusUpdate.LastBlockHeight
 
@@ -17,11 +17,12 @@ import scala.collection.immutable.Queue
 
 object StatusTransitions extends ScorexLogging {
 
-  def apply(origStatus: BlockchainStatus, event: BlockchainEvent): StatusUpdate = {
+  def apply(origStatus: BlockchainStatus, event: WavesNodeEvent): StatusUpdate = {
     val r = origStatus match {
       case origStatus: Normal =>
         event match {
-          case Appended(block) =>
+          case Appended(block, forgedTxIds) =>
+            val utxEventsStash = Queue(WavesNodeUtxEvent.Forged(forgedTxIds))
             origStatus.mainFork.withBlock(block) match {
               case Left(e) =>
                 log.error(s"Forcibly rollback, because of error: $e")
@@ -36,7 +37,8 @@ object StatusTransitions extends ScorexLogging {
                     newFork = newFork,
                     newForkChanges = Monoid.empty[BlockchainBalance],
                     previousForkHeight = origStatus.currentHeightHint,
-                    previousForkDiffIndex = origStatus.mainFork.diffIndex
+                    previousForkDiffIndex = origStatus.mainFork.diffIndex,
+                    utxEventsStash = utxEventsStash
                   ),
                   updatedLastBlockHeight = LastBlockHeight.RestartRequired(math.max(0, origStatus.currentHeightHint - 1))
                 )
@@ -45,9 +47,22 @@ object StatusTransitions extends ScorexLogging {
                   newStatus = Normal(updatedFork, block.ref.height),
                   updatedBalances = block.changes,
                   updatedLastBlockHeight =
-                    if (block.tpe == WavesBlock.Type.Block) LastBlockHeight.Updated(block.ref.height) else LastBlockHeight.NotChanged
+                    if (block.tpe == WavesBlock.Type.Block) LastBlockHeight.Updated(block.ref.height) else LastBlockHeight.NotChanged,
+                  processUtxEvents = utxEventsStash
                 )
             }
+
+          case UtxAdded(txs) =>
+            StatusUpdate(
+              newStatus = origStatus,
+              processUtxEvents = Queue(WavesNodeUtxEvent.Added(txs))
+            )
+
+          case UtxSwitched(newTxs) =>
+            StatusUpdate(
+              newStatus = origStatus,
+              processUtxEvents = Queue(WavesNodeUtxEvent.Switched(newTxs))
+            )
 
           case RolledBackTo(commonBlockRef) =>
             val (commonFork, droppedDiff) = origStatus.mainFork.dropAfter(commonBlockRef)
@@ -56,7 +71,8 @@ object StatusTransitions extends ScorexLogging {
                 newFork = commonFork,
                 newForkChanges = Monoid.empty[BlockchainBalance],
                 previousForkHeight = origStatus.currentHeightHint,
-                previousForkDiffIndex = droppedDiff
+                previousForkDiffIndex = droppedDiff,
+                utxEventsStash = Queue.empty
               )
             )
 
@@ -67,7 +83,8 @@ object StatusTransitions extends ScorexLogging {
                 newFork = commonFork,
                 newForkChanges = Monoid.empty[BlockchainBalance],
                 previousForkHeight = origStatus.currentHeightHint,
-                previousForkDiffIndex = droppedDiff
+                previousForkDiffIndex = droppedDiff,
+                utxEventsStash = Queue.empty
               )
             )
 
@@ -79,7 +96,8 @@ object StatusTransitions extends ScorexLogging {
 
       case origStatus: TransientRollback =>
         event match {
-          case Appended(block) =>
+          case Appended(block, forgedTxIds) =>
+            val updatedUtxEventsStash = origStatus.utxEventsStash.enqueue(WavesNodeUtxEvent.Forged(forgedTxIds))
             origStatus.newFork.withBlock(block) match {
               case Left(e) =>
                 log.error(s"Forcibly rollback, because of error: $e")
@@ -88,7 +106,8 @@ object StatusTransitions extends ScorexLogging {
                     newFork = WavesFork(List.empty),
                     newForkChanges = Monoid.empty[BlockchainBalance],
                     previousForkHeight = origStatus.previousForkHeight,
-                    previousForkDiffIndex = origStatus.previousForkDiffIndex
+                    previousForkDiffIndex = origStatus.previousForkDiffIndex,
+                    utxEventsStash = updatedUtxEventsStash
                   ),
                   updatedLastBlockHeight =
                     LastBlockHeight.RestartRequired(math.max(1, origStatus.previousForkHeight - 1)) // TODO duplication of max
@@ -100,33 +119,42 @@ object StatusTransitions extends ScorexLogging {
                   StatusUpdate(
                     newStatus = origStatus.copy(
                       newFork = updatedNewFork,
-                      newForkChanges = newForkChanges
+                      newForkChanges = newForkChanges,
+                      utxEventsStash = updatedUtxEventsStash
                     )
                     // updatedHeight = updatedHeight // We don't notify about updates until we get the same height
                   )
                 else {
                   // We don't a height, because a micro block comes after all blocks
                   val requestBalances = origStatus.previousForkDiffIndex.without(newForkChanges.diffIndex)
-                  val newStatus =
+                  val (newStatus, updatedProcessUtxEvents) =
                     if (requestBalances.isEmpty) Normal(
                       mainFork = updatedNewFork,
                       currentHeightHint = block.ref.height
-                    )
+                    ) -> Queue.empty
                     else TransientResolving(
                       mainFork = updatedNewFork,
                       stash = Queue.empty,
-                      currentHeightHint = block.ref.height
-                    )
+                      currentHeightHint = block.ref.height,
+                      utxEventsStash = updatedUtxEventsStash
+                    ) -> updatedUtxEventsStash
                   StatusUpdate(
                     newStatus = newStatus,
                     updatedBalances = newForkChanges,
                     requestBalances = requestBalances,
                     // TODO Do we really need this?
                     updatedLastBlockHeight =
-                      if (block.tpe == WavesBlock.Type.Block) LastBlockHeight.Updated(block.ref.height) else LastBlockHeight.NotChanged
+                      if (block.tpe == WavesBlock.Type.Block) LastBlockHeight.Updated(block.ref.height) else LastBlockHeight.NotChanged,
+                    processUtxEvents = updatedProcessUtxEvents
                   )
                 }
             }
+
+          case UtxAdded(txs) =>
+            StatusUpdate(newStatus = origStatus.copy(utxEventsStash = origStatus.utxEventsStash.enqueue(WavesNodeUtxEvent.Added(txs))))
+
+          case UtxSwitched(newTxs) =>
+            StatusUpdate(newStatus = origStatus.copy(utxEventsStash = origStatus.utxEventsStash.enqueue(WavesNodeUtxEvent.Switched(newTxs))))
 
           case RolledBackTo(commonBlockRef) =>
             val (commonFork, droppedDiff) = origStatus.newFork.dropAfter(commonBlockRef)
@@ -135,7 +163,8 @@ object StatusTransitions extends ScorexLogging {
                 newFork = commonFork,
                 newForkChanges = Monoid.empty[BlockchainBalance],
                 previousForkHeight = origStatus.previousForkHeight,
-                previousForkDiffIndex = origStatus.previousForkDiffIndex |+| droppedDiff
+                previousForkDiffIndex = origStatus.previousForkDiffIndex |+| droppedDiff,
+                utxEventsStash = origStatus.utxEventsStash
               )
             )
 
@@ -146,7 +175,8 @@ object StatusTransitions extends ScorexLogging {
                 newFork = commonFork,
                 newForkChanges = Monoid.empty[BlockchainBalance],
                 previousForkHeight = origStatus.previousForkHeight,
-                previousForkDiffIndex = origStatus.previousForkDiffIndex |+| droppedDiff
+                previousForkDiffIndex = origStatus.previousForkDiffIndex |+| droppedDiff,
+                utxEventsStash = origStatus.utxEventsStash
               )
             )
 
@@ -163,7 +193,8 @@ object StatusTransitions extends ScorexLogging {
             // TODO optimize. Probably we don't need to request all data. E.g. we hadn't this address in last 100 blocks and we got its balance 101 block before
             val init = StatusUpdate(
               newStatus = Normal(origStatus.mainFork, origStatus.currentHeightHint),
-              updatedBalances = updates
+              updatedBalances = updates,
+              processUtxEvents = origStatus.utxEventsStash
             )
 
             origStatus.stash.foldLeft(init) {

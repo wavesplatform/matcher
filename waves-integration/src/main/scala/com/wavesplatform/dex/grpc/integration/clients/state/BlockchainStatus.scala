@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.grpc.integration.clients.state
 
+import com.wavesplatform.dex.grpc.integration.clients.state.WavesNodeEvent.WavesNodeUtxEvent
 import com.wavesplatform.dex.meta.getSimpleName
 
 import scala.collection.immutable.Queue
@@ -21,16 +22,27 @@ object BlockchainStatus {
     newFork: WavesFork,
     newForkChanges: BlockchainBalance, // from a common block
     previousForkHeight: Int,
-    previousForkDiffIndex: DiffIndex // from a common block
+    previousForkDiffIndex: DiffIndex, // from a common block
+    utxEventsStash: Queue[WavesNodeUtxEvent]
   ) extends BlockchainStatus {
     require(newFork.history.nonEmpty, "newFork must not be empty!")
 
-    override def toString: String = s"TransientRollback(n=${newFork.history.headOption.map(_.ref)}, h=$previousForkHeight)"
+    override def toString: String =
+      s"TransientRollback(n=${newFork.history.headOption.map(_.ref)}, h=$previousForkHeight, utx=${utxEventsStash.size})"
+
   }
 
   // TODO do we need currentHeightHint
-  case class TransientResolving(mainFork: WavesFork, stash: Queue[BlockchainEvent], currentHeightHint: Int) extends BlockchainStatus {
-    override def toString: String = s"TransientResolving(${mainFork.history.headOption.map(_.ref)}, l=${stash.lastOption})"
+  case class TransientResolving(
+    mainFork: WavesFork,
+    stash: Queue[WavesNodeEvent],
+    currentHeightHint: Int,
+    utxEventsStash: Queue[WavesNodeUtxEvent]
+  ) extends BlockchainStatus {
+
+    override def toString: String =
+      s"TransientResolving(${mainFork.history.headOption.map(_.ref)}, l=${stash.lastOption}, utx=${utxEventsStash.size})"
+
   }
 
 }

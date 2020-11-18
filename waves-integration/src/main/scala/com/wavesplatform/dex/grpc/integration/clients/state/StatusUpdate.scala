@@ -3,15 +3,19 @@ package com.wavesplatform.dex.grpc.integration.clients.state
 import cats.syntax.semigroup._
 import cats.{Monoid, Semigroup}
 import com.wavesplatform.dex.grpc.integration.clients.state.StatusUpdate.LastBlockHeight
+import com.wavesplatform.dex.grpc.integration.clients.state.WavesNodeEvent.WavesNodeUtxEvent
+
+import scala.collection.immutable.Queue
 
 // TODO replace with interface with methods?
 case class StatusUpdate(
   newStatus: BlockchainStatus,
   updatedBalances: BlockchainBalance = Monoid.empty[BlockchainBalance],
   requestBalances: DiffIndex = Monoid.empty[DiffIndex],
-  updatedLastBlockHeight: LastBlockHeight = LastBlockHeight.NotChanged
+  updatedLastBlockHeight: LastBlockHeight = LastBlockHeight.NotChanged,
+  processUtxEvents: Queue[WavesNodeUtxEvent] = Queue.empty
 ) {
-  override def toString: String = s"StatusUpdate($newStatus, ub=$updatedBalances, rb=$requestBalances, lbh=$updatedLastBlockHeight)"
+  override def toString: String = s"StatusUpdate($newStatus, ub=$updatedBalances, rb=$requestBalances, lbh=$updatedLastBlockHeight, utx=${processUtxEvents.size})"
 }
 
 object StatusUpdate {
@@ -21,7 +25,8 @@ object StatusUpdate {
       newStatus = y.newStatus,
       updatedBalances = x.updatedBalances |+| y.updatedBalances,
       requestBalances = x.requestBalances |+| y.requestBalances,
-      updatedLastBlockHeight = y.updatedLastBlockHeight |+| x.updatedLastBlockHeight
+      updatedLastBlockHeight = y.updatedLastBlockHeight |+| x.updatedLastBlockHeight,
+      processUtxEvents = x.processUtxEvents.enqueueAll(y.processUtxEvents)
     )
   }
 

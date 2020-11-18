@@ -13,10 +13,13 @@ import im.mak.waves.transactions.ExchangeTransaction
 trait DexApi[F[_]] {
   def publicKey: F[HttpMatcherPublicKey]
 
-  def reservedBalance(of: KeyPair, timestamp: Long = System.currentTimeMillis): F[HttpBalance]
-  def reservedBalanceWithApiKey(of: KeyPair, xUserPublicKey: Option[PublicKey] = None): F[HttpBalance]
+  def getReservedBalance(publicKey: String, timestamp: Long, signature: String): F[HttpBalance]
+  def getReservedBalance(of: KeyPair, timestamp: Long = System.currentTimeMillis): F[HttpBalance]
+  def getReservedBalance(publicKey: String, headers: Map[String, String]): F[HttpBalance]
+  def getReservedBalanceWithApiKey(of: KeyPair, xUserPublicKey: Option[PublicKey] = None): F[HttpBalance]
 
-  def tradableBalance(of: KeyPair, assetPair: AssetPair, timestamp: Long = System.currentTimeMillis): F[HttpBalance]
+  def getTradableBalance(address: String, amountAsset: String, priceAsset: String): F[HttpBalance]
+  def getTradableBalance(of: KeyPair, assetPair: AssetPair): F[HttpBalance]
 
   def place(order: Order): F[HttpSuccessfulPlace]
   def placeMarket(order: Order): F[HttpSuccessfulPlace]

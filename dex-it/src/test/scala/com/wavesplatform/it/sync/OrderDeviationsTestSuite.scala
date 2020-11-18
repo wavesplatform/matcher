@@ -136,8 +136,8 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
         waitForOrderAtNode(bestAskOrder)
 
-        dex1.api.reservedBalance(alice) should matchTo(Map(assetPair.amountAsset -> 100000000000L, feeAsset -> 2 * matcherFee))
-        dex1.api.reservedBalance(bob) should matchTo(Map(assetPair.priceAsset -> 691500000L))
+        dex1.api.getReservedBalance(alice) should matchTo(Map(assetPair.amountAsset -> 100000000000L, feeAsset -> 2 * matcherFee))
+        dex1.api.getReservedBalance(bob) should matchTo(Map(assetPair.priceAsset -> 691500000L))
 
         cancelAll(alice, bob)
       }
@@ -159,8 +159,8 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
         waitForOrderAtNode(bestAskOrder)
 
-        dex1.api.reservedBalance(bob) should matchTo(Map(wavesUsdPair.amountAsset -> 100000000000L, feeAsset -> 600L))
-        dex1.api.reservedBalance(alice) should matchTo(Map(wavesUsdPair.priceAsset -> 691500L))
+        dex1.api.getReservedBalance(bob) should matchTo(Map(wavesUsdPair.amountAsset -> 100000000000L, feeAsset -> 600L))
+        dex1.api.getReservedBalance(alice) should matchTo(Map(wavesUsdPair.priceAsset -> 691500L))
 
         cancelAll(alice, bob)
       }
@@ -173,18 +173,18 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
           placeAndAwaitAtDex(bestBidOrder)
 
           dex1.api.getOrderBook(assetPair).bids shouldBe List(HttpV0LevelAgg(1000.waves, 300000))
-          dex1.api.reservedBalance(bob)(assetPair.priceAsset) shouldBe 300600000L
+          dex1.api.getReservedBalance(bob)(assetPair.priceAsset) shouldBe 300600000L
 
           dex1.tryApi.place(mkOrder(bob, assetPair, BUY, 1000.waves, 89999, matcherFee, feeAsset = assetPair.priceAsset)) should failWith(
             9441295, // DeviantOrderPrice
             orderIsOutOfDeviationBounds("0.00089999", BUY)
           )
 
-          dex1.api.reservedBalance(bob) shouldBe Map(assetPair.priceAsset -> 300600000L)
+          dex1.api.getReservedBalance(bob) shouldBe Map(assetPair.priceAsset -> 300600000L)
 
           dex1.api.cancel(bob, bestBidOrder)
 
-          dex1.api.reservedBalance(bob) shouldBe empty
+          dex1.api.getReservedBalance(bob) shouldBe empty
           cancelAll(alice)
         }
 
@@ -194,14 +194,14 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
           dex1.api.getOrderBook(wavesUsdPair).bids shouldBe List(HttpV0LevelAgg(1000.waves, 300))
 
-          dex1.api.reservedBalance(bob)(wavesUsdPair.priceAsset) shouldBe 300600L
+          dex1.api.getReservedBalance(bob)(wavesUsdPair.priceAsset) shouldBe 300600L
 
           dex1.tryApi.place(mkOrder(bob, wavesUsdPair, BUY, 1000.waves, 89, matcherFee, feeAsset = wavesUsdPair.priceAsset)) should failWith(
             9441295, // DeviantOrderPrice
             orderIsOutOfDeviationBounds("0.89", BUY)
           )
 
-          dex1.api.reservedBalance(bob) shouldBe Map(wavesUsdPair.priceAsset -> 300600L)
+          dex1.api.getReservedBalance(bob) shouldBe Map(wavesUsdPair.priceAsset -> 300600L)
 
           cancelAll(alice, bob)
         }
@@ -219,7 +219,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
             orderIsOutOfDeviationBounds("0.00800001", BUY)
           )
 
-          dex1.api.reservedBalance(bob) shouldBe empty
+          dex1.api.getReservedBalance(bob) shouldBe empty
 
           cancelAll(alice, bob)
         }
@@ -235,7 +235,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
             orderIsOutOfDeviationBounds("8.01", BUY)
           )
 
-          dex1.api.reservedBalance(alice) shouldBe empty
+          dex1.api.getReservedBalance(alice) shouldBe empty
 
           cancelAll(alice, bob)
         }
@@ -262,8 +262,8 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
         waitForOrderAtNode(bestBidOrder)
 
-        dex1.api.reservedBalance(alice) should matchTo(Map(assetPair.amountAsset -> 300000000000L, feeAsset -> 7 * matcherFee))
-        dex1.api.reservedBalance(bob) should matchTo(Map(assetPair.priceAsset -> 300300000L))
+        dex1.api.getReservedBalance(alice) should matchTo(Map(assetPair.amountAsset -> 300000000000L, feeAsset -> 7 * matcherFee))
+        dex1.api.getReservedBalance(bob) should matchTo(Map(assetPair.priceAsset -> 300300000L))
 
         cancelAll(alice, bob)
       }
@@ -283,7 +283,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
             orderIsOutOfDeviationBounds("0.00119999", SELL)
           )
 
-          dex1.api.reservedBalance(alice) shouldBe empty
+          dex1.api.getReservedBalance(alice) shouldBe empty
 
           cancelAll(bob)
         }
@@ -299,7 +299,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
             orderIsOutOfDeviationBounds("1.19", SELL)
           )
 
-          dex1.api.reservedBalance(alice) shouldBe empty
+          dex1.api.getReservedBalance(alice) shouldBe empty
 
           cancelAll(bob, bob)
         }
@@ -320,7 +320,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
             orderIsOutOfDeviationBounds("0.00850001", SELL)
           )
 
-          dex1.api.reservedBalance(alice) should matchTo(Map(assetPair.amountAsset -> 1000.waves, feeAsset -> 2 * matcherFee))
+          dex1.api.getReservedBalance(alice) should matchTo(Map(assetPair.amountAsset -> 1000.waves, feeAsset -> 2 * matcherFee))
 
           cancelAll(alice, bob)
         }
@@ -339,7 +339,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
             orderIsOutOfDeviationBounds("8.51", SELL)
           )
 
-          dex1.api.reservedBalance(alice) shouldBe Map(wavesUsdPair.amountAsset -> 1000.waves, feeAsset -> 2 * 300)
+          dex1.api.getReservedBalance(alice) shouldBe Map(wavesUsdPair.amountAsset -> 1000.waves, feeAsset -> 2 * 300)
 
           cancelAll(alice, bob)
         }

@@ -72,12 +72,12 @@ class RoundingIssuesTestSuite extends MatcherSuiteBase {
     dex1.api.waitForOrder(submitted)(_ == HttpOrderStatus(Status.Filled, filledAmount = Some(filledAmount), filledFee = Some(299999L)))
     dex1.api.waitForOrder(counter)(_ == HttpOrderStatus(Status.PartiallyFilled, filledAmount = Some(filledAmount), filledFee = Some(72559L)))
 
-    withClue("Alice's reserved balance before cancel")(dex1.api.reservedBalance(alice) shouldBe empty)
+    withClue("Alice's reserved balance before cancel")(dex1.api.getReservedBalance(alice) shouldBe empty)
 
     waitForOrderAtNode(counter)
     dex1.api.cancel(bob, counter)
 
-    withClue("Bob's reserved balance after cancel")(dex1.api.reservedBalance(bob) shouldBe empty)
+    withClue("Bob's reserved balance after cancel")(dex1.api.getReservedBalance(bob) shouldBe empty)
   }
 
   "should correctly fill 2 counter orders" in {

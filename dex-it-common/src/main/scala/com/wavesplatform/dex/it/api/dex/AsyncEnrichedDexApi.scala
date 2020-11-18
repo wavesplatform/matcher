@@ -32,25 +32,34 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
 
   override val publicKey: R[HttpMatcherPublicKey] = mk(sttp.get(uri"$apiUri/matcher"))
 
-  override def reservedBalance(of: KeyPair, timestamp: Long): R[HttpBalance] = mk {
+  override def getReservedBalance(publicKey: String, timestamp: Long, signature: String): R[HttpBalance] =
+    getReservedBalance(publicKey, Map("timestamp" -> timestamp.toString, "signature" -> signature))
+
+  override def getReservedBalance(of: KeyPair, timestamp: Long): R[HttpBalance] =
+    getReservedBalance(Base58.encode(of.publicKey), timestampAndSignatureHeaders(of, timestamp))
+
+  override def getReservedBalance(publicKey: String, headers: Map[String, String]): R[HttpBalance] = mk {
     sttp
-      .get(uri"$apiUri/matcher/balance/reserved/${Base58.encode(of.publicKey)}")
-      .headers(timestampAndSignatureHeaders(of, timestamp))
+      .get(uri"$apiUri/matcher/balance/reserved/$publicKey")
+      .headers(headers)
   }
 
-  override def reservedBalanceWithApiKey(of: KeyPair, xUserPublicKey: Option[PublicKey]): R[HttpBalance] = mk {
+  override def getReservedBalanceWithApiKey(of: KeyPair, xUserPublicKey: Option[PublicKey]): R[HttpBalance] = mk {
     sttp
       .get(uri"$apiUri/matcher/balance/reserved/${Base58.encode(of.publicKey)}")
       .headers(apiKeyWithUserPublicKeyHeaders(xUserPublicKey))
   }
 
-  override def tradableBalance(of: KeyPair, assetPair: AssetPair, timestamp: Long): R[HttpBalance] = mk {
+  override def getTradableBalance(address: String, amountAsset: String, priceAsset: String): R[HttpBalance] = mk {
     sttp
       .get(
-        uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/tradableBalance/${of.publicKey.toAddress.stringRepr}"
+        uri"$apiUri/matcher/orderbook/$amountAsset/$priceAsset/tradableBalance/$address"
       )
-      .headers(timestampAndSignatureHeaders(of, timestamp))
+      .followRedirects(false)
   }
+
+  override def getTradableBalance(of: KeyPair, assetPair: AssetPair): R[HttpBalance] =
+    getTradableBalance(of.publicKey.toAddress.stringRepr, assetPair.amountAssetStr, assetPair.priceAssetStr)
 
   override def place(order: Order): R[HttpSuccessfulPlace] = mk {
     sttp
@@ -218,7 +227,8 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .headers(apiKeyHeaders)
   }
 
-  override def getOrderBookStatus(assetPair: AssetPair): R[HttpOrderBookStatus] = getOrderBookStatus(assetPair.amountAssetStr, assetPair.priceAssetStr)
+  override def getOrderBookStatus(assetPair: AssetPair): R[HttpOrderBookStatus] =
+    getOrderBookStatus(assetPair.amountAssetStr, assetPair.priceAssetStr)
 
   override def deleteOrderBook(assetPair: AssetPair): R[HttpMessage] = mk {
     sttp

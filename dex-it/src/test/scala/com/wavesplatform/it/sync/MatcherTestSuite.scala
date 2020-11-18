@@ -109,13 +109,13 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       }
 
       "frozen amount should be listed via matcherBalance REST endpoint" in {
-        dex1.api.reservedBalance(alice) shouldBe Map(Waves -> matcherFee, aliceAsset -> aliceSellAmount)
-        dex1.api.reservedBalance(bob) shouldBe empty
+        dex1.api.getReservedBalance(alice) shouldBe Map(Waves -> matcherFee, aliceAsset -> aliceSellAmount)
+        dex1.api.getReservedBalance(bob) shouldBe empty
       }
 
       "frozen amount should be listed via matcherBalance REST endpoint with Api Key" in {
-        dex1.api.reservedBalanceWithApiKey(alice) shouldBe Map(Waves -> matcherFee, aliceAsset -> aliceSellAmount)
-        dex1.api.reservedBalanceWithApiKey(bob) shouldBe empty
+        dex1.api.getReservedBalanceWithApiKey(alice) shouldBe Map(Waves -> matcherFee, aliceAsset -> aliceSellAmount)
+        dex1.api.getReservedBalanceWithApiKey(bob) shouldBe empty
       }
 
       "and should be listed by trader's publiс key via REST" in {
@@ -371,8 +371,8 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
     "reject proxy requests if X-User-Public-Key doesn't match query param and process them correctly otherwise " - {
 
       "/matcher/balance/reserved/{publicKey}" in {
-        dex1.tryApi.reservedBalanceWithApiKey(alice, Some(bob.publicKey)) should failWith(3148801, "Provided user public key is not correct")
-        dex1.tryApi.reservedBalanceWithApiKey(alice, Some(alice.publicKey)) shouldBe Symbol("right")
+        dex1.tryApi.getReservedBalanceWithApiKey(alice, Some(bob.publicKey)) should failWith(3148801, "Provided user public key is not correct")
+        dex1.tryApi.getReservedBalanceWithApiKey(alice, Some(alice.publicKey)) shouldBe Symbol("right")
       }
 
       "/matcher/orders/{address}/cancel" in {

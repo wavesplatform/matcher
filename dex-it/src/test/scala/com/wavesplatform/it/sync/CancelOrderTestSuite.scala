@@ -233,7 +233,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       val trader = createAccountWithBalance(traderTotalBalance -> Waves)
 
       eventually {
-        dex1.api.tradableBalance(trader, wavesUsdPair).getOrElse(Waves, 0L) shouldBe traderTotalBalance
+        dex1.api.getTradableBalance(trader, wavesUsdPair).getOrElse(Waves, 0L) shouldBe traderTotalBalance
       }
 
       knownAccounts = trader :: knownAccounts
@@ -268,7 +268,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
           val issuedAsset = IssuedAsset(asset.id())
           val assetPair = AssetPair(issuedAsset, Waves)
           eventually {
-            dex1.api.tradableBalance(account, assetPair).getOrElse(issuedAsset, 0L) shouldBe oneOrderAmount
+            dex1.api.getTradableBalance(account, assetPair).getOrElse(issuedAsset, 0L) shouldBe oneOrderAmount
           }
           mkOrder(account, assetPair, OrderType.SELL, oneOrderAmount, orderPrice)
       }
@@ -312,7 +312,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
 
     accounts.foreach { account =>
       eventually {
-        dex1.api.tradableBalance(account, wavesUsdPair).getOrElse(Waves, 0L) shouldBe 1000.waves
+        dex1.api.getTradableBalance(account, wavesUsdPair).getOrElse(Waves, 0L) shouldBe 1000.waves
       }
     }
 

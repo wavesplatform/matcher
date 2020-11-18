@@ -245,8 +245,8 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       placeAndAwaitAtDex(counterOrder)
       placeAndAwaitAtNode(submittedOrder)
 
-      dex1.api.orderStatus(counterOrder).status shouldBe Status.PartiallyFilled
-      dex1.api.orderStatus(submittedOrder).status shouldBe Status.Filled
+      dex1.api.getOrderStatus(counterOrder).status shouldBe Status.PartiallyFilled
+      dex1.api.getOrderStatus(submittedOrder).status shouldBe Status.Filled
     }
 
     "wrong cancel when match on all coins" in {

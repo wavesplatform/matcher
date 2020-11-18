@@ -118,9 +118,9 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .contentType("application/json", "UTF-8")
   }
 
-  override def orderStatus(assetPair: AssetPair, id: Id): R[HttpOrderStatus] = mk {
+  override def getOrderStatus(amountAsset: String, priceAsset: String, id: String): R[HttpOrderStatus] = mk {
     sttp
-      .get(uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/$id")
+      .get(uri"$apiUri/matcher/orderbook/$amountAsset/$priceAsset/$id")
       .readTimeout(3.minutes) // TODO find way to decrease timeout!
       .followRedirects(false)
   }

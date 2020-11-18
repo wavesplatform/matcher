@@ -29,7 +29,7 @@ object DexApiSyntax {
       waitForOrder(order.assetPair, order.id())(pred)
 
     def waitForOrder(assetPair: AssetPair, id: Order.Id)(pred: HttpOrderStatus => Boolean): F[HttpOrderStatus] =
-      R.repeatUntil(self.orderStatus(assetPair, id), RepeatRequestOptions.default)(pred)
+      R.repeatUntil(self.getOrderStatus(assetPair, id), RepeatRequestOptions.default)(pred)
 
     def waitForOrderPlacement(order: Order): F[HttpSuccessfulPlace] = R.repeatUntil(self.place(order))(_.success)
 

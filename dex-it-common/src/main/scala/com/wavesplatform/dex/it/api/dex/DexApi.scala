@@ -46,8 +46,9 @@ trait DexApi[F[_]] {
     xUserPublicKey: Option[PublicKey] = None
   ): F[HttpSuccessfulBatchCancel]
 
-  def orderStatus(order: Order): F[HttpOrderStatus] = orderStatus(order.assetPair, order.id())
-  def orderStatus(assetPair: AssetPair, id: Order.Id): F[HttpOrderStatus]
+  def getOrderStatus(order: Order): F[HttpOrderStatus] = getOrderStatus(order.assetPair, order.id())
+  def getOrderStatus(assetPair: AssetPair, id: Order.Id): F[HttpOrderStatus] = getOrderStatus(assetPair.amountAssetStr, assetPair.priceAssetStr, id.toString)
+  def getOrderStatus(amountAsset: String, priceAsset: String, id: String): F[HttpOrderStatus]
 
   def orderStatusInfoByIdWithApiKey(
     owner: Address,

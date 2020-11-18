@@ -346,7 +346,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
     orders.foreach(dex1.api.place)
     orders.foreach { order =>
-      val status = dex1.api.orderStatus(order).status
+      val status = dex1.api.getOrderStatus(order).status
       withClue(order.idStr())(status should not be Status.NotFound)
     }
   }
@@ -574,7 +574,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       }
 
       val wavesEthPair = AssetPair(Waves, eth)
-      dex1.api.orderStatus(wavesEthPair, sellOrder1.id()).status shouldBe Status.Accepted
+      dex1.api.getOrderStatus(wavesEthPair, sellOrder1.id()).status shouldBe Status.Accepted
 
       dex1.api.getOrderBook(wavesEthPair) should matchTo(
         HttpV0OrderBook(

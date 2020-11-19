@@ -150,7 +150,7 @@ class DefaultWavesBlockchainClient(
             val height = Option(lastBlockHeight.get()).map(x => math.max(1, x - 1)).getOrElse(fromHeight)
             log.warn(s"Got an error, subscribing from $height", e)
             val failedEvent = Observable[WavesNodeEvent](WavesNodeEvent.SyncFailed(height))
-            // TODO wait until connection restored
+            // TODO wait until connection restored, otherwise we get a ton of logs
             Observable(failedEvent, mkBlockchainEventsStream(height, cancelRef)).concat
           }
       }

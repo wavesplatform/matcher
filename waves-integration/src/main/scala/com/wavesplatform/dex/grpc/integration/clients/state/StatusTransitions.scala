@@ -131,13 +131,13 @@ object StatusTransitions extends ScorexLogging {
                     if (requestBalances.isEmpty) Normal(
                       mainFork = updatedNewFork,
                       currentHeightHint = block.ref.height
-                    ) -> Queue.empty
+                    ) -> updatedUtxEventsStash
                     else TransientResolving(
                       mainFork = updatedNewFork,
                       stash = Queue.empty,
                       currentHeightHint = block.ref.height,
                       utxEventsStash = updatedUtxEventsStash
-                    ) -> updatedUtxEventsStash
+                    ) -> Queue.empty
                   StatusUpdate(
                     newStatus = newStatus,
                     updatedBalances = newForkChanges,

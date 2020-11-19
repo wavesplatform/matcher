@@ -66,7 +66,7 @@ private[clients] class PessimisticPortfolios extends ScorexLogging {
     log.info(s"processForged: ${txIds.map(_.toVanilla)}")
     txIds.toList.foldMapK[Set, Address] { txId =>
       removeUnsafe(txId).unsafeTap { affected =>
-        if (affected.isEmpty) {
+        if (affected.isEmpty) { // We haven't seen this tx
           if (forgedTxsCache.size == MaxForgedTransactions) forgedTxsCache.removeLast()
           forgedTxsCache.addOne(txId)
         }

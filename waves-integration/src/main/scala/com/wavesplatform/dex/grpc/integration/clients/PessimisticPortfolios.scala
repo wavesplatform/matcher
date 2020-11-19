@@ -16,12 +16,9 @@ import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.fp.MapImplicits.group
 import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions._
 import com.wavesplatform.dex.grpc.integration.services.UtxTransaction
-
-import scala.collection.mutable
-import java.util
 import mouse.any._
 
-import cats.syntax.either._
+import scala.collection.mutable
 
 private[clients] class PessimisticPortfolios extends ScorexLogging {
 
@@ -76,6 +73,9 @@ private[clients] class PessimisticPortfolios extends ScorexLogging {
       }
     }
   }
+
+  // TODO
+  def removeFailed(): Set[Address] = ???
 
   def addPending(txs: Seq[UtxTransaction]): Set[Address] = write {
     val filtered = txs.filter(tx => !forgedTxsCache.contains(tx.id))

@@ -3,6 +3,7 @@ package com.wavesplatform.it.sync
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.api.ws.entities.{WsBalances, WsOrder}
+import com.wavesplatform.dex.api.ws.protocol.WsPingOrPong
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.OrderType.SELL
@@ -54,13 +55,13 @@ class BouncingBalancesTestSuite extends WsSuiteBase {
         }
       }
 
-      val heightInitial        = wavesNode1.api.currentHeight
-      val heightIssue          = heightInitial + 1
-      val heightFirstTransfer  = heightIssue + 1
+      val heightInitial = wavesNode1.api.currentHeight
+      val heightIssue = heightInitial + 1
+      val heightFirstTransfer = heightIssue + 1
       val heightSecondTransfer = heightFirstTransfer + 1
 
       val IssueResults(issueDoggyCoinTx, _, doggyCoin) = mkIssueExtended(alice, "doggyCoin", 1000000.asset8)
-      val doggyUsdPair                                 = AssetPair(doggyCoin, usd)
+      val doggyUsdPair = AssetPair(doggyCoin, usd)
 
       implicit val efc: ErrorFormatterContext = ErrorFormatterContext.from(assetDecimalsMap + (doggyCoin -> 8))
 
@@ -90,7 +91,7 @@ class BouncingBalancesTestSuite extends WsSuiteBase {
       placeAndAwaitAtDex(bobOrder)
 
       assertChanges(wsc)(
-        Map(Waves     -> WsBalances(4949949.997, 0.003)),
+        Map(Waves -> WsBalances(4949949.997, 0.003)),
         Map(doggyCoin -> WsBalances(0, 1000000))
       )(WsOrder.fromDomain(LimitOrder(bobOrder)))
       wsc.clearMessages()
@@ -104,7 +105,10 @@ class BouncingBalancesTestSuite extends WsSuiteBase {
         wavesNode1.api.waitForHeight(heightSecondTransfer)
         dex1.api.orderStatus(bobOrder).status shouldBe Status.Accepted
 
-        wsc.messages shouldBe empty
+        wsc.messages.filter {
+          case _: WsPingOrPong => false
+          case _ => true
+        } shouldBe empty
       }
     }
   }

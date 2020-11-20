@@ -5,10 +5,9 @@ import java.nio.charset.StandardCharsets
 import java.nio.file._
 
 import com.dimafeng.testcontainers.GenericContainer
-import com.github.dockerjava.api.async.ResultCallback
 import com.github.dockerjava.api.command.InspectContainerResponse
-import com.github.dockerjava.api.exception.{NotFoundException, NotModifiedException}
-import com.github.dockerjava.api.model.{ContainerNetwork, ExposedPort, Frame, Ports}
+import com.github.dockerjava.api.exception.NotModifiedException
+import com.github.dockerjava.api.model.{ContainerNetwork, ExposedPort, Ports}
 import com.typesafe.config.Config
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.it.cache.CachedData
@@ -16,7 +15,6 @@ import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
 import org.testcontainers.images.builder.Transferable
 
 import scala.jdk.CollectionConverters._
-import scala.util.control.NonFatal
 
 abstract class BaseContainer(protected val baseContainerPath: String, private val underlying: GenericContainer)
     extends GenericContainer(underlying)

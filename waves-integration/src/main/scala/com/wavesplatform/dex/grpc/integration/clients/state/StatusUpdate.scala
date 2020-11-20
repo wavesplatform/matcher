@@ -35,7 +35,7 @@ object StatusUpdate {
   object LastBlockHeight {
     case object NotChanged extends LastBlockHeight
     case class Updated(to: Int) extends LastBlockHeight
-    case class RestartRequired(at: Int) extends LastBlockHeight // TODO Make restart in one place
+    case class RestartRequired(from: Int) extends LastBlockHeight
 
     implicit val heightUpdateSemigroup: Semigroup[LastBlockHeight] = {
       case (NotChanged, y) => y

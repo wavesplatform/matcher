@@ -40,7 +40,7 @@ object StatusTransitions extends ScorexLogging {
                     previousForkDiffIndex = origStatus.mainFork.diffIndex,
                     utxEventsStash = utxEventsStash
                   ),
-                  updatedLastBlockHeight = LastBlockHeight.RestartRequired(math.max(0, origStatus.currentHeightHint - 1))
+                  updatedLastBlockHeight = LastBlockHeight.RestartRequired(math.max(1, origStatus.currentHeightHint - 1))
                 )
               case Right(updatedFork) =>
                 StatusUpdate(

@@ -1,5 +1,7 @@
 package com.wavesplatform.it.sync
 
+import java.util.concurrent.ThreadLocalRandom
+
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
@@ -10,6 +12,8 @@ import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import com.wavesplatform.it.MatcherSuiteBase
+
+import scala.concurrent.duration._
 
 class TradersTestSuite extends MatcherSuiteBase {
 
@@ -30,7 +34,15 @@ class TradersTestSuite extends MatcherSuiteBase {
   }
 
   private def bobPlacesSellWctOrder(bobCoinAmount: Int, orderVersion: Byte): Order = {
-    val r = mkOrder(bob, wctUsdPair, OrderType.SELL, bobCoinAmount, 1 * Order.PriceConstant, version = orderVersion)
+    val r = mkOrder(
+      bob,
+      wctUsdPair,
+      OrderType.SELL,
+      bobCoinAmount,
+      1 * Order.PriceConstant,
+      version = orderVersion,
+      ttl = ThreadLocalRandom.current.nextLong(1.hour.toMillis, 2.hours.toMillis).millis
+    )
     placeAndAwaitAtDex(r)
     r
   }
@@ -108,7 +120,7 @@ class TradersTestSuite extends MatcherSuiteBase {
             }
 
             withClue(s"The oldest order of version $orderV '${oldestOrder.idStr()}' is still active\n") {
-              dex1.api.orderStatus(oldestOrder).status shouldBe Status.Accepted // <----
+              dex1.api.orderStatus(oldestOrder).status shouldBe Status.Accepted
             }
 
             withClue("Cleanup\n") {

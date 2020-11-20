@@ -85,11 +85,11 @@ class DefaultWavesBlockchainClient(
             log.info(s"Forged.combineBalances for $address")
             address -> combineBalances(
               updatedRegular = x.updatedBalances.regular.getOrElse(address, Map.empty),
-              updatedOutLease = x.updatedBalances.outLeases.get(address),
+              updatedOutLease = x.updatedBalances.outLeases.get(address).fold(Map.empty[Asset, Long])(x => Map(Waves -> x)),
               // TODO: not all assets changed
               updatedPessimistic = if (updatedPessimistic.contains(address)) pessimisticPortfolios.getAggregated(address) else Map.empty,
               finalRegular = finalKnownBalances.regular.getOrElse(address, Map.empty),
-              finalOutLease = finalKnownBalances.outLeases.get(address),
+              finalOutLease = finalKnownBalances.outLeases.get(address).fold(Map.empty[Asset, Long])(x => Map(Waves -> x)),
               finalPessimistic = pessimisticPortfolios.getAggregated(address)
             )
           }
@@ -137,16 +137,16 @@ class DefaultWavesBlockchainClient(
 
   private def combineBalances(
     updatedRegular: Map[Asset, Long],
-    updatedOutLease: Option[Long],
+    updatedOutLease: Map[Asset, Long],
     updatedPessimistic: Map[Asset, Long],
     finalRegular: Map[Asset, Long],
-    finalOutLease: Option[Long],
+    finalOutLease: Map[Asset, Long],
     finalPessimistic: Map[Asset, Long]
   ): Map[Asset, Long] = {
-    val changedAssets = updatedRegular.keySet ++ updatedPessimistic.keySet ++ updatedOutLease.map(_ => Waves)
+    val changedAssets = updatedRegular.keySet ++ updatedPessimistic.keySet ++ updatedOutLease.keySet
     changedAssets.map { asset =>
       val assetRegular = updatedRegular.get(asset).orElse(finalRegular.get(asset)).getOrElse(0L)
-      val assetOutLease = updatedOutLease.orElse(finalOutLease).getOrElse(0L)
+      val assetOutLease = updatedOutLease.get(asset).orElse(finalOutLease.get(asset)).getOrElse(0L)
       val assetPessimistic = updatedPessimistic.get(asset).orElse(finalPessimistic.get(asset)).getOrElse(0L)
       // TODO solve overflow?
       val r = math.max(0L, assetRegular - assetOutLease + assetPessimistic) // pessimistic is negative
@@ -158,13 +158,13 @@ class DefaultWavesBlockchainClient(
   override def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] = {
     val known = knownBalances.get
     val regular = known.regular.getOrElse(address, Map.empty).filter { case (k, _) => assets.contains(k) }
-    val outLease = if (assets.contains(Waves)) known.outLeases.get(address) else none
     val blockchainBalance = combineBalances(
       updatedRegular = regular,
-      updatedOutLease = outLease,
+      updatedOutLease = Map.empty,
       updatedPessimistic = Map.empty,
-      finalRegular = regular,
-      finalOutLease = outLease,
+      finalRegular = Map.empty,
+      // Will be used only if Waves in assets, see combineBalances
+      finalOutLease = known.outLeases.get(address).fold(Map.empty[Asset, Long])(x => Map(Waves -> x)),
       finalPessimistic = Map.empty
     )
 

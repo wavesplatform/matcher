@@ -1,9 +1,9 @@
-package com.wavesplatform.dex.grpc.integration.clients.state
+package com.wavesplatform.dex.grpc.integration.clients.status
 
 import cats.syntax.semigroup._
 import cats.{Monoid, Semigroup}
-import com.wavesplatform.dex.grpc.integration.clients.state.StatusUpdate.LastBlockHeight
-import com.wavesplatform.dex.grpc.integration.clients.state.WavesNodeEvent.WavesNodeUtxEvent
+import com.wavesplatform.dex.grpc.integration.clients.status.StatusUpdate.LastBlockHeight
+import com.wavesplatform.dex.grpc.integration.clients.status.WavesNodeEvent.WavesNodeUtxEvent
 
 import scala.collection.immutable.Queue
 

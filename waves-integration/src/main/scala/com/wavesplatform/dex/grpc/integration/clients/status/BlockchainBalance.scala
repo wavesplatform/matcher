@@ -1,13 +1,12 @@
-package com.wavesplatform.dex.grpc.integration.clients.state
+package com.wavesplatform.dex.grpc.integration.clients.status
 
 import cats.Monoid
-import com.wavesplatform.dex.collection.MapOps.Ops2
+import com.wavesplatform.dex.collection.MapOps.Ops2D
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 
 case class BlockchainBalance(regular: Map[Address, Map[Asset, Long]], outLeases: Map[Address, Long]) {
 
-  // TODO
   def diffIndex: DiffIndex = DiffIndex(
     regular = regular.view.mapValues(_.keySet).toMap,
     outLeases = outLeases.keySet

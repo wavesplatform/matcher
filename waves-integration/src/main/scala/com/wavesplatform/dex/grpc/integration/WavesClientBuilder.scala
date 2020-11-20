@@ -2,6 +2,8 @@ package com.wavesplatform.dex.grpc.integration
 
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.clients._
+import com.wavesplatform.dex.grpc.integration.clients.blockchainupdates.DefaultBlockchainUpdatesClient
+import com.wavesplatform.dex.grpc.integration.clients.matcherext.{MatcherExtensionCachingClient, MatcherExtensionGrpcAsyncClient}
 import com.wavesplatform.dex.grpc.integration.settings.WavesBlockchainClientSettings
 import io.grpc.ManagedChannel
 import io.grpc.internal.DnsNameResolverProvider
@@ -41,7 +43,7 @@ object WavesClientBuilder extends ScorexLogging {
         .usePlaintext()
         .build
 
-    new DefaultWavesBlockchainClient(
+    new CombinedWavesBlockchainClient(
       meClient = new MatcherExtensionCachingClient(
         new MatcherExtensionGrpcAsyncClient(eventLoopGroup, matcherExtensionChannel, monixScheduler)(grpcExecutionContext),
         wavesBlockchainClientSettings.defaultCachesExpiration

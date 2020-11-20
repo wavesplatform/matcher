@@ -1,4 +1,4 @@
-package com.wavesplatform.dex.grpc.integration.clients.state
+package com.wavesplatform.dex.grpc.integration.clients.status
 
 import cats.Monoid
 import cats.instances.map._

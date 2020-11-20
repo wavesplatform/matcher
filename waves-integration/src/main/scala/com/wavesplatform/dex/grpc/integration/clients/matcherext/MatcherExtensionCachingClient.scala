@@ -1,4 +1,4 @@
-package com.wavesplatform.dex.grpc.integration.clients
+package com.wavesplatform.dex.grpc.integration.clients.matcherext
 
 import java.net.InetAddress
 import java.time.Duration
@@ -10,17 +10,17 @@ import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.caches.{AssetDescriptionsCache, FeaturesCache}
-import com.wavesplatform.dex.grpc.integration.clients.state.{BlockRef, BlockchainBalance, DiffIndex}
+import com.wavesplatform.dex.grpc.integration.clients.RunScriptResult
+import com.wavesplatform.dex.grpc.integration.clients.status.{BlockRef, BlockchainBalance, DiffIndex, WavesNodeEvent}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
-import com.wavesplatform.dex.grpc.integration.services.UtxEvent
 import monix.reactive.Observable
 
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
 
-class MatcherExtensionCachingClient(underlying: MatcherExtensionClient[Future], defaultCacheExpiration: FiniteDuration)(
+class MatcherExtensionCachingClient(underlying: MatcherExtensionClient, defaultCacheExpiration: FiniteDuration)(
   implicit grpcExecutionContext: ExecutionContext
-) extends MatcherExtensionClient[Future]
+) extends MatcherExtensionClient
     with ScorexLogging {
 
   private val cacheExpiration: Duration = Duration.ofMillis(defaultCacheExpiration.toMillis)
@@ -29,7 +29,7 @@ class MatcherExtensionCachingClient(underlying: MatcherExtensionClient[Future], 
     new FeaturesCache(underlying.isFeatureActivated, invalidationPredicate = !_) // we don't keep knowledge about unactivated features
   private val assetDescriptionsCache = new AssetDescriptionsCache(underlying.assetDescription, cacheExpiration)
 
-  override def utxEvents: Observable[UtxEvent] = underlying.utxEvents
+  override def utxEvents: Observable[WavesNodeEvent] = underlying.utxEvents
 
   override def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] = underlying.spendableBalances(address, assets)
   override def allAssetsSpendableBalance(address: Address): Future[Map[Asset, Long]] = underlying.allAssetsSpendableBalance(address)

@@ -1,9 +1,11 @@
-package com.wavesplatform.dex.grpc.integration.clients
+package com.wavesplatform.dex.grpc.integration.clients.matcherext
 
 import java.net.InetAddress
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
+import cats.implicits.catsSyntaxOptionId
+import cats.syntax.option._
 import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.api.grpc.TransactionsByIdRequest
@@ -13,7 +15,8 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.grpc.integration.clients.state.{BlockRef, BlockchainBalance, DiffIndex}
+import com.wavesplatform.dex.grpc.integration.clients.RunScriptResult
+import com.wavesplatform.dex.grpc.integration.clients.status.{BlockRef, BlockchainBalance, DiffIndex, WavesNodeEvent}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.effect.Implicits.NettyFutureOps
 import com.wavesplatform.dex.grpc.integration.exceptions.{UnexpectedConnectionException, WavesNodeConnectionLostException}
@@ -36,7 +39,7 @@ import scala.concurrent.{ExecutionContext, Future}
  */
 class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: ManagedChannel, monixScheduler: Scheduler)(
   implicit grpcExecutionContext: ExecutionContext
-) extends MatcherExtensionClient[Future]
+) extends MatcherExtensionClient
     with ScorexLogging {
 
   private def gRPCErrorsHandler(exception: Throwable): Throwable = exception match {
@@ -49,7 +52,7 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
   private val shuttingDown = new AtomicBoolean(false)
   private val blockchainService = WavesBlockchainApiGrpc.stub(channel)
 
-  private val utxEventsSubject = ConcurrentSubject.publish[UtxEvent](monixScheduler)
+  private val utxEventsSubject = ConcurrentSubject.publish[WavesNodeEvent](monixScheduler)
   private val utxEventsSubjectObserver = new UtxEventsObserver
 
   private val empty: Empty = Empty()
@@ -67,7 +70,7 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
     case _: Result.Denied => RunScriptResult.Denied
   }
 
-  override lazy val utxEvents: Observable[UtxEvent] = {
+  override lazy val utxEvents: Observable[WavesNodeEvent] = {
     requestUtxEvents()
     utxEventsSubject
   }
@@ -174,6 +177,12 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
 
     override def onCompleted(): Unit = log.info("Balance changes stream completed!")
 
+    private def toEvent(event: UtxEvent): Option[WavesNodeEvent] = event.`type` match {
+      case UtxEvent.Type.Switch(event) => WavesNodeEvent.UtxSwitched(event.transactions).some
+      case UtxEvent.Type.Update(event) if event.added.nonEmpty => WavesNodeEvent.UtxAdded(event.added.flatMap(_.transaction)).some
+      case _ => none
+    }
+
     override def onNext(value: UtxEvent): Unit = {
       // TODO
       if (isConnectionEstablished.compareAndSet(false, true))
@@ -181,7 +190,10 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
           log.info(s"gRPC connection restored! DEX server now is connected to Node with an address: ${response.address}")
         }
 
-      utxEventsSubject.onNext(value)
+      toEvent(value) match {
+        case Some(value) => utxEventsSubject.onNext(value)
+        case None => log.warn(s"Can't convert to event: $value")
+      }
     }
 
     override def onError(e: Throwable): Unit = if (!shuttingDown.get()) {

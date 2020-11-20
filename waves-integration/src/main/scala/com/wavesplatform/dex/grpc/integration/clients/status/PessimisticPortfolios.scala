@@ -1,4 +1,4 @@
-package com.wavesplatform.dex.grpc.integration.clients
+package com.wavesplatform.dex.grpc.integration.clients.status
 
 import java.util.concurrent.locks.ReentrantReadWriteLock
 

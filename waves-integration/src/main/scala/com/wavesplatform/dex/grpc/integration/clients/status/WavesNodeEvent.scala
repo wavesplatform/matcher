@@ -1,4 +1,4 @@
-package com.wavesplatform.dex.grpc.integration.clients.state
+package com.wavesplatform.dex.grpc.integration.clients.status
 
 import com.google.protobuf.ByteString
 import com.wavesplatform.dex.grpc.integration.services.UtxTransaction

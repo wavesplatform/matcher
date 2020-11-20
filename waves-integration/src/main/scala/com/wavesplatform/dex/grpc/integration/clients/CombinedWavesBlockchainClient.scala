@@ -9,7 +9,6 @@ import cats.instances.queue._
 import cats.instances.set._
 import cats.syntax.foldable._
 import cats.syntax.group._
-import cats.syntax.option._
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
@@ -18,13 +17,14 @@ import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.fp.MapImplicits.group
-import com.wavesplatform.dex.grpc.integration.clients.DefaultWavesBlockchainClient._
+import com.wavesplatform.dex.grpc.integration.clients.CombinedWavesBlockchainClient._
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.Updates
-import com.wavesplatform.dex.grpc.integration.clients.state.StatusUpdate.LastBlockHeight
-import com.wavesplatform.dex.grpc.integration.clients.state.WavesNodeEvent.WavesNodeUtxEvent
-import com.wavesplatform.dex.grpc.integration.clients.state._
+import com.wavesplatform.dex.grpc.integration.clients.blockchainupdates.BlockchainUpdatesClient
+import com.wavesplatform.dex.grpc.integration.clients.matcherext.MatcherExtensionClient
+import com.wavesplatform.dex.grpc.integration.clients.status.StatusUpdate.LastBlockHeight
+import com.wavesplatform.dex.grpc.integration.clients.status.WavesNodeEvent.WavesNodeUtxEvent
+import com.wavesplatform.dex.grpc.integration.clients.status._
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
-import com.wavesplatform.dex.grpc.integration.services.UtxEvent
 import monix.execution.Scheduler
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
@@ -34,8 +34,8 @@ import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
-class DefaultWavesBlockchainClient(
-  meClient: MatcherExtensionClient[Future],
+class CombinedWavesBlockchainClient(
+  meClient: MatcherExtensionClient,
   bClient: BlockchainUpdatesClient
 )(implicit ec: ExecutionContext, monixScheduler: Scheduler)
     extends WavesBlockchainClient
@@ -50,12 +50,6 @@ class DefaultWavesBlockchainClient(
 
   private val dataUpdates = ConcurrentSubject.publish[WavesNodeEvent]
 
-  private def toEvent(event: UtxEvent): Option[WavesNodeEvent] = event.`type` match {
-    case UtxEvent.Type.Switch(event) => WavesNodeEvent.UtxSwitched(event.transactions).some
-    case UtxEvent.Type.Update(event) if event.added.nonEmpty => WavesNodeEvent.UtxAdded(event.added.flatMap(_.transaction)).some
-    case _ => none
-  }
-
   // TODO lazy
   override val updates: Observable[Updates] = Observable.fromFuture(meClient.currentBlockInfo).flatMap { startBlockInfo =>
     val startHeight = math.max(startBlockInfo.height - MaxRollbackHeight - 1, 1)
@@ -64,11 +58,8 @@ class DefaultWavesBlockchainClient(
     val finalBalance = mutable.Map.empty[Address, Map[Asset, Long]]
     val init: BlockchainStatus = BlockchainStatus.Normal(WavesFork(List.empty), startHeight)
     val (blockchainEvents, control) = bClient.blockchainEvents(startHeight)
-    Observable(
-      dataUpdates,
-      meClient.utxEvents.map(toEvent).collect { case Some(x) => x },
-      blockchainEvents
-    ).merge
+    Observable(dataUpdates, meClient.utxEvents, blockchainEvents)
+      .merge
       .mapAccumulate(init) { case (origStatus, event) =>
         val x = StatusTransitions(origStatus, event)
         x.updatedLastBlockHeight match {
@@ -217,13 +208,12 @@ class DefaultWavesBlockchainClient(
   override def getNodeAddress: Future[InetAddress] =
     meClient.getNodeAddress
 
-  override def close(): Future[Unit] = {
+  override def close(): Future[Unit] =
     meClient.close().zip(bClient.close()).map(_ => ())
-  }
 
 }
 
-object DefaultWavesBlockchainClient {
+object CombinedWavesBlockchainClient {
 
   val MaxRollbackHeight = 100
 

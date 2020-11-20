@@ -44,9 +44,6 @@ class DefaultWavesBlockchainClient(
   type Balances = Map[Address, Map[Asset, Long]]
   type Leases = Map[Address, Long]
 
-  @volatile private var isClosing = false
-
-  private val emptyBalances: Balances = Map.empty
   private val knownBalances: AtomicReference[BlockchainBalance] = new AtomicReference(Monoid.empty[BlockchainBalance])
 
   private val pessimisticPortfolios = new PessimisticPortfolios
@@ -221,7 +218,6 @@ class DefaultWavesBlockchainClient(
     meClient.getNodeAddress
 
   override def close(): Future[Unit] = {
-    isClosing = true
     meClient.close().zip(bClient.close()).map(_ => ())
   }
 

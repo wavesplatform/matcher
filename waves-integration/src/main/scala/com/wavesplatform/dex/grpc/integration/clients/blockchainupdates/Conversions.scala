@@ -16,8 +16,6 @@ object Conversions {
   type Balances = Map[Address, Map[Asset, Long]]
   type Leases = Map[Address, Long]
 
-  private val emptyBalances: Balances = Map.empty
-
   /**
    * Cases:
    * 1. Downloading blocks: Append+
@@ -58,7 +56,7 @@ object Conversions {
   }
 
   def combineBalanceUpdates(stateUpdate: View[StateUpdate]): Balances =
-    stateUpdate.flatMap(_.balances).foldLeft(emptyBalances) {
+    stateUpdate.flatMap(_.balances).foldLeft[Balances](Map.empty) {
       case (r, x) =>
         x.amount.fold(r) { assetAmount =>
           val address = x.address.toVanillaAddress

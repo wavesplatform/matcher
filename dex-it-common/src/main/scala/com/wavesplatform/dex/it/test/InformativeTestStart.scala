@@ -1,36 +1,41 @@
 package com.wavesplatform.dex.it.test
 
 import java.time.{LocalDateTime, ZoneId}
-import java.util.concurrent.atomic.AtomicBoolean
 
 import com.wavesplatform.dex.it.api.BaseContainersKit
 import mouse.any._
-import org.scalatest.{Args, CancelAfterFailure, Status, Suite}
+import org.scalatest._
 
 import scala.util.{Failure, Success}
 
-trait InformativeTestStart extends Suite { self: BaseContainersKit =>
+trait InformativeTestStart extends TestSuite { self: BaseContainersKit =>
 
-  private val isFailed = new AtomicBoolean(false)
+  @volatile private var preventLogs = false
 
   override protected def runTest(testName: String, args: Args): Status = {
-
-    def print(text: String): Unit = writeGlobalLog(s"---------- [${LocalDateTime.now(ZoneId.of("UTC"))}] $text ----------")
-
-    print(s"STARTED: $testName")
-
-    super.runTest(testName, args) unsafeTap {
+    if (shouldWrite(success = true)) print(s"STARTED: $testName")
+    super.runTest(testName, args).unsafeTap {
       _.whenCompleted {
-        case Success(r) => if (!isFailed.get) print(s"${if (r) "SUCCEEDED" else "FAILED"}: $testName")
-        case Failure(e) =>
-          val shouldWrite = this match {
-            case _: CancelAfterFailure => isFailed.compareAndSet(false, true)
-            case _ => true
-          }
-          if (shouldWrite) print(s"FAILED WITH ${e.getClass.getSimpleName}: $testName")
+        case Success(success) => if (shouldWrite(success)) print(s"${if (success) "SUCCEEDED" else "FAILED"}: $testName")
+        case Failure(e) => if (shouldWrite(success = false)) print(s"FAILED WITH ${e.getClass.getSimpleName}: $testName")
       }
     }
   }
+
+  // Single quotes to emphasize the text in IDE
+  private def print(text: String): Unit = writeGlobalLog(s"'---------- [${LocalDateTime.now(ZoneId.of("UTC"))}] $text ----------'")
+
+  private def shouldWrite(success: Boolean): Boolean =
+    this match {
+      case _: CancelAfterFailure | _: NoStackTraceCancelAfterFailure =>
+        if (preventLogs) false
+        else if (success) true
+        else {
+          preventLogs = true
+          true
+        }
+      case _ => true
+    }
 
   protected def writeGlobalLog(x: String): Unit = {
     log.debug(x)

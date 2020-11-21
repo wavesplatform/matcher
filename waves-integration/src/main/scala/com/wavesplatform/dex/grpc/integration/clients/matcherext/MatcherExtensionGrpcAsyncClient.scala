@@ -179,8 +179,12 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
 
     private def toEvent(event: UtxEvent): Option[WavesNodeEvent] = event.`type` match {
       case UtxEvent.Type.Switch(event) => WavesNodeEvent.UtxSwitched(event.transactions).some
-      case UtxEvent.Type.Update(event) if event.added.nonEmpty => WavesNodeEvent.UtxAdded(event.added.flatMap(_.transaction)).some
-      case _ => none
+      case UtxEvent.Type.Update(event) =>
+        if (event.added.isEmpty) none
+        else WavesNodeEvent.UtxAdded(event.added.flatMap(_.transaction)).some
+      case _ =>
+        log.warn(s"Can't convert to event: $event")
+        none
     }
 
     override def onNext(value: UtxEvent): Unit = {
@@ -190,10 +194,7 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
           log.info(s"gRPC connection restored! DEX server now is connected to Node with an address: ${response.address}")
         }
 
-      toEvent(value) match {
-        case Some(value) => utxEventsSubject.onNext(value)
-        case None => log.warn(s"Can't convert to event: $value")
-      }
+      toEvent(value).foreach(utxEventsSubject.onNext)
     }
 
     override def onError(e: Throwable): Unit = if (!shuttingDown.get()) {

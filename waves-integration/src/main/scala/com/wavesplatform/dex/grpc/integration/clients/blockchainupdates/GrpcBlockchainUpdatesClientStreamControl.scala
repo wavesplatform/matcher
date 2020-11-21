@@ -22,6 +22,7 @@ class GrpcBlockchainUpdatesClientStreamControl(
 
   def startFrom(height: Int): Unit = {
     require(height >= 1, "We can not get blocks on height <= 0")
+    log.info(s"Starting from $height")
     checkpointHeight = height - 1
     grpcObserver = subscribe(subject, height, doOnError)
   }
@@ -39,12 +40,14 @@ class GrpcBlockchainUpdatesClientStreamControl(
     subject.onComplete()
   }
 
+  // Happens only during disconnects or other gRPC issues
   private def doOnError(e: Throwable): Unit = {
     log.warn(s"Got an error in blockchain events", e)
     val fromHeight = math.max(1, checkpointHeight - 1)
+    // TODO probably we need something like backpressure to no process invalid preloaded blocks after SyncFailed
+    subject.onNext(WavesNodeEvent.SyncFailed(fromHeight))
     scheduler.scheduleOnce(100.millis) { // TODO to config
-      subject.onNext(WavesNodeEvent.SyncFailed(fromHeight))
-      startFrom(fromHeight) // Because already stopped
+      startFrom(fromHeight) // Not stopping grpcObserver, because it is already stopped
     }
   }
 

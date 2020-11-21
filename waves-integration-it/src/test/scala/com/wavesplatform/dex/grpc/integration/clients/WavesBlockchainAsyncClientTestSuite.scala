@@ -16,15 +16,14 @@ import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.settings.{GrpcClientSettings, WavesBlockchainClientSettings}
 import com.wavesplatform.dex.grpc.integration.{IntegrationSuiteBase, WavesClientBuilder}
-import com.wavesplatform.dex.it.test.Scripts
+import com.wavesplatform.dex.it.test.{NoStackTraceCancelAfterFailure, Scripts}
 import monix.execution.Scheduler
-import org.scalatest.CancelAfterFailure
 
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.Random
 
-class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase with CancelAfterFailure {
+class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase with NoStackTraceCancelAfterFailure {
 
   private val grpcExecutor = Executors.newCachedThreadPool(
     new ThreadFactoryBuilder()
@@ -170,15 +169,19 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase with Canc
       "if the transaction passed the validation and was added to the UTX pool" in {
         val exchangeTx = mkExchangeTx
 
-        wait(client.broadcastTx(exchangeTx)) shouldBe true
-        wavesNode1.api.waitForTransaction(exchangeTx.id())
+        withClue(exchangeTx.id().base58) {
+          wait(client.broadcastTx(exchangeTx)) shouldBe true
+          wavesNode1.api.waitForTransaction(exchangeTx.id())
+        }
       }
 
       "if the transaction is in the blockchain" in {
         val exchangeTx = mkExchangeTx
 
-        broadcastAndAwait(exchangeTx.toWavesJ())
-        wait(client.broadcastTx(exchangeTx)) shouldBe true
+        withClue(exchangeTx.id().base58) {
+          broadcastAndAwait(exchangeTx.toWavesJ())
+          wait(client.broadcastTx(exchangeTx)) shouldBe true
+        }
       }
     }
 
@@ -251,7 +254,9 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase with Canc
       withClue("issue scripted asset") {
         broadcastAndAwait(issueTx)
 
-        wait(client.hasScript(IssuedAsset(issueTx.id()))) shouldBe true
+        eventually {
+          wait(client.hasScript(IssuedAsset(issueTx.id()))) shouldBe true
+        }
       }
 
       withClue("run script") {
@@ -279,7 +284,9 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase with Canc
         val setScriptTx = mkSetAccountMayBeScript(receiver, trueScript)
         broadcastAndAwait(setScriptTx)
 
-        wait(client.hasScript(receiver)) shouldBe true
+        eventually {
+          wait(client.hasScript(receiver)) shouldBe true
+        }
       }
 
       withClue("run script") {
@@ -308,13 +315,15 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase with Canc
 
     wavesNode1.api.broadcast(mkTransfer(carol, bob, 1.waves, Waves))
 
-    wait(client allAssetsSpendableBalance carol) should matchTo(
-      Map[Asset, Long](
-        Waves -> (10.waves - 1.waves - minFee),
-        usd -> 1.usd,
-        btc -> 1.btc
+    eventually {
+      wait(client allAssetsSpendableBalance carol) should matchTo(
+        Map[Asset, Long](
+          Waves -> (10.waves - 1.waves - minFee),
+          usd -> 1.usd,
+          btc -> 1.btc
+        )
       )
-    )
+    }
   }
 
   "forgedOrder" - {
@@ -326,10 +335,13 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase with Canc
       val pair = AssetPair.createAssetPair(UsdId.toString, "WAVES").get
       val exchangeTx = mkExchange(bob, alice, pair, 1L, 2 * Order.PriceConstant, matcher = matcher)
 
-      broadcastAndAwait(exchangeTx)
-
-      wait(client.forgedOrder(exchangeTx.buyOrder().id())) shouldBe true
-      wait(client.forgedOrder(exchangeTx.sellOrder().id())) shouldBe true
+      withClue(exchangeTx.id().base58) {
+        broadcastAndAwait(exchangeTx)
+        eventually {
+          wait(client.forgedOrder(exchangeTx.buyOrder().id())) shouldBe true
+          wait(client.forgedOrder(exchangeTx.sellOrder().id())) shouldBe true
+        }
+      }
     }
   }
 

@@ -21,8 +21,6 @@ class GetOrderStatusInfoByIdWithSignature extends MatcherSuiteBase with TableDri
        |}""".stripMargin
   )
 
-  val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd)
-
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
     broadcastAndAwait(IssueBtcTx, IssueUsdTx)
@@ -123,6 +121,7 @@ class GetOrderStatusInfoByIdWithSignature extends MatcherSuiteBase with TableDri
     }
 
     "should return error when the order doesn't exist" in {
+      val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd)
       validateMatcherError(
         dex1.rawApi.getOrderStatusInfoByIdWithSignature(alice, order),
         StatusCodes.NotFound,
@@ -139,6 +138,7 @@ class GetOrderStatusInfoByIdWithSignature extends MatcherSuiteBase with TableDri
     }
 
     "should return error exception when the orderId is not correct base58 string" in {
+      val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd)
       placeAndAwaitAtDex(order)
       val ts = System.currentTimeMillis
       val sign = Base58.encode(crypto.sign(alice, alice.publicKey ++ Longs.toByteArray(ts)))
@@ -147,6 +147,8 @@ class GetOrderStatusInfoByIdWithSignature extends MatcherSuiteBase with TableDri
     }
 
     "should return error if publicKey parameter has the different value of used in signature" in {
+      val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd)
+      placeAndAwaitAtDex(order)
       val ts = System.currentTimeMillis
       val sign = Base58.encode(crypto.sign(alice, alice.publicKey ++ Longs.toByteArray(ts)))
 
@@ -154,13 +156,43 @@ class GetOrderStatusInfoByIdWithSignature extends MatcherSuiteBase with TableDri
     }
 
     "should return error if timestamp header has the different value of used in signature" in {
+      val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd)
+      placeAndAwaitAtDex(order)
       val ts = System.currentTimeMillis
       val sign = Base58.encode(crypto.sign(alice, alice.publicKey ++ Longs.toByteArray(ts)))
 
       validateIncorrectSignature(dex1.rawApi.getOrderStatusInfoByIdWithSignature(Base58.encode(alice.publicKey), order.idStr(), ts + 1000, sign))
     }
 
+    // There is an incorrect error (Asset not found), we should discuss about it
+    "should return error timestamp header doesn't exist" ignore {
+      val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd)
+      placeAndAwaitAtDex(order)
+      val ts = System.currentTimeMillis
+      val sign = Base58.encode(crypto.sign(alice, alice.publicKey ++ Longs.toByteArray(ts)))
+
+      validateIncorrectSignature(dex1.rawApi.getOrderStatusInfoByIdWithSignature(
+        Base58.encode(alice.publicKey),
+        order.idStr(),
+        Map("Signature" -> sign)
+      ))
+    }
+
+    // There is an incorrect error (Asset not found), we should discuss about it
+    "should return error signature header doesn't exist" ignore {
+      val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd)
+      placeAndAwaitAtDex(order)
+
+      validateIncorrectSignature(dex1.rawApi.getOrderStatusInfoByIdWithSignature(
+        Base58.encode(alice.publicKey),
+        order.idStr(),
+        Map("Timestamp" -> System.currentTimeMillis.toString)
+      ))
+    }
+
     "should return error with incorrect signature" in {
+      val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd)
+      placeAndAwaitAtDex(order)
       validateIncorrectSignature(dex1.rawApi.getOrderStatusInfoByIdWithSignature(
         Base58.encode(alice.publicKey),
         order.idStr(),

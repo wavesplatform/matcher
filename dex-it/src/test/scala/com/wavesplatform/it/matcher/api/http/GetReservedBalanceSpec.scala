@@ -1,13 +1,12 @@
 package com.wavesplatform.it.matcher.api.http
 
 import com.google.common.primitives.Longs
-import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
-import com.wavesplatform.dex.it.api.{EnrichedResponse, RawHttpChecks}
+import com.wavesplatform.dex.it.api.RawHttpChecks
 import com.wavesplatform.it.MatcherSuiteBase
 import org.scalatest.prop.TableDrivenPropertyChecks
 
@@ -25,9 +24,6 @@ class GetReservedBalanceSpec extends MatcherSuiteBase with TableDrivenPropertyCh
     broadcastAndAwait(IssueUsdTx, IssueBtcTx)
     dex1.start()
   }
-
-  def validateIncorrectSignature[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT]) =
-    validateMatcherError(r, StatusCodes.BadRequest, 1051904, "The request has an invalid signature")
 
   "GET /matcher/balance/reserved/{publicKey}" - {
     "should return empty object if account doesn't have opened orders" in {

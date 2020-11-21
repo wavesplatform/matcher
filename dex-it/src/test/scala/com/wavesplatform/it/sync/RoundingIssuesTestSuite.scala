@@ -38,7 +38,7 @@ class RoundingIssuesTestSuite extends MatcherSuiteBase {
 
     Seq(alice -> counter, bob -> submitted).foreach {
       case (owner, ao) =>
-        dex1.api.orderStatusInfoByIdWithSignature(owner, ao).totalExecutedPriceAssets shouldBe totalExecutedPriceAssets
+        dex1.api.getOrderStatusInfoByIdWithSignature(owner, ao).totalExecutedPriceAssets shouldBe totalExecutedPriceAssets
     }
 
     val tx = waitForOrderAtNode(counter)

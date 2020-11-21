@@ -47,23 +47,30 @@ trait DexApi[F[_]] {
   ): F[HttpSuccessfulBatchCancel]
 
   def getOrderStatus(order: Order): F[HttpOrderStatus] = getOrderStatus(order.assetPair, order.id())
-  def getOrderStatus(assetPair: AssetPair, id: Order.Id): F[HttpOrderStatus] = getOrderStatus(assetPair.amountAssetStr, assetPair.priceAssetStr, id.toString)
+
+  def getOrderStatus(assetPair: AssetPair, id: Order.Id): F[HttpOrderStatus] =
+    getOrderStatus(assetPair.amountAssetStr, assetPair.priceAssetStr, id.toString)
+
   def getOrderStatus(amountAsset: String, priceAsset: String, id: String): F[HttpOrderStatus]
 
-  def orderStatusInfoByIdWithApiKey(
+  def getOrderStatusInfoByIdWithApiKey(
     owner: Address,
     orderId: Order.Id,
     xUserPublicKey: Option[PublicKey]
   ): F[HttpOrderBookHistoryItem]
 
-  def orderStatusInfoByIdWithSignature(
+  def getOrderStatusInfoByIdWithSignature(publicKey: String, orderId: String, timestamp: Long, signature: String): F[HttpOrderBookHistoryItem]
+
+  def getOrderStatusInfoByIdWithSignature(publicKey: String, orderId: String, headers: Map[String, String]): F[HttpOrderBookHistoryItem]
+
+  def getOrderStatusInfoByIdWithSignature(
     owner: KeyPair,
     order: Order,
     timestamp: Long = System.currentTimeMillis
   ): F[HttpOrderBookHistoryItem] =
-    orderStatusInfoByIdWithSignature(owner, order.id(), timestamp)
+    getOrderStatusInfoByIdWithSignature(owner, order.id(), timestamp)
 
-  def orderStatusInfoByIdWithSignature(
+  def getOrderStatusInfoByIdWithSignature(
     owner: KeyPair,
     orderId: Order.Id,
     timestamp: Long

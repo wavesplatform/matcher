@@ -125,6 +125,16 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .followRedirects(false)
   }
 
+  override def getOrderStatusInfoById(
+    address: String,
+    orderId: String,
+    headers: Map[String, String] = Map.empty
+  ): R[HttpOrderBookHistoryItem] = mk {
+    sttp
+      .get(uri"$apiUri/matcher/orders/$address/$orderId")
+      .headers(headers)
+  }
+
   override def getOrderStatusInfoByIdWithApiKey(
     owner: Address,
     orderId: Id,
@@ -151,7 +161,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
     getOrderStatusInfoByIdWithSignature(publicKey, orderId, Map("timestamp" -> timestamp.toString, "signature" -> signature))
 
   override def getOrderStatusInfoByIdWithSignature(owner: KeyPair, orderId: Id, timestamp: Long): R[HttpOrderBookHistoryItem] =
-    getOrderStatusInfoByIdWithSignature(owner.publicKey.toString, orderId.toString, timestampAndSignatureHeaders(owner, timestamp))
+    getOrderStatusInfoByIdWithSignature(Base58.encode(owner.publicKey), orderId.toString, timestampAndSignatureHeaders(owner, timestamp))
 
   override def transactionsByOrder(id: Id): R[List[ExchangeTransaction]] = mk {
     sttp.get(uri"$apiUri/matcher/transactions/$id")

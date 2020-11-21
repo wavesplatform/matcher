@@ -53,6 +53,12 @@ trait DexApi[F[_]] {
 
   def getOrderStatus(amountAsset: String, priceAsset: String, id: String): F[HttpOrderStatus]
 
+  def getOrderStatusInfoById(
+    address: String,
+    orderId: String,
+    headers: Map[String, String] = Map.empty
+  ): F[HttpOrderBookHistoryItem]
+
   def getOrderStatusInfoByIdWithApiKey(
     owner: Address,
     orderId: Order.Id,

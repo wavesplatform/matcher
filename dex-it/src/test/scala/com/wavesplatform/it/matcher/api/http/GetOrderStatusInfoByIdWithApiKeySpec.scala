@@ -3,10 +3,13 @@ package com.wavesplatform.it.matcher.api.http
 import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderBookHistoryItem
-import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
+import com.wavesplatform.dex.domain.account.KeyPair.toAddress
+import com.wavesplatform.dex.domain.bytes.codec.Base58
+import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.it.api.RawHttpChecks
-import com.wavesplatform.dex.model.AcceptedOrderType
+import com.wavesplatform.dex.it.docker.apiKey
+import com.wavesplatform.dex.model.{AcceptedOrderType, OrderStatus}
 import com.wavesplatform.it.MatcherSuiteBase
 import org.scalatest.prop.TableDrivenPropertyChecks
 
@@ -28,70 +31,55 @@ class GetOrderStatusInfoByIdWithApiKeySpec extends MatcherSuiteBase with TableDr
 
   "GET /matcher/orders/{address}/{orderId} " - {
 
+    def httpOrderInfo(o: Order, s: OrderStatus, f: Long = 0.003.waves, awp: Long = 0, tepa: Long = 0): HttpOrderBookHistoryItem =
+      HttpOrderBookHistoryItem(
+        o.id(),
+        o.orderType,
+        AcceptedOrderType.Limit,
+        o.amount,
+        s.filledAmount,
+        o.price,
+        f,
+        s.filledFee,
+        o.feeAsset,
+        o.timestamp,
+        s.name,
+        o.assetPair,
+        awp,
+        o.version,
+        tepa
+      )
+
     "should return correct status of the order" in {
       val o = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd)
       placeAndAwaitAtDex(o)
 
       withClue(" - accepted") {
-        validate200Json(dex1.rawApi.getOrderStatusInfoByIdWithApiKey(alice, o.id(), Some(alice.publicKey))) should be(HttpOrderBookHistoryItem(
-          o.id(),
-          BUY,
-          AcceptedOrderType.Limit,
-          10.waves,
-          0,
-          2.usd,
-          0.003.waves,
-          0,
-          o.feeAsset,
-          o.timestamp,
-          Status.Accepted.name,
-          wavesUsdPair,
-          0,
-          o.version,
-          0
+        validate200Json(dex1.rawApi.getOrderStatusInfoByIdWithApiKey(alice, o.id(), Some(alice.publicKey))) should be(httpOrderInfo(
+          o,
+          OrderStatus.Accepted
         ))
       }
 
       withClue(" - partially filled") {
         placeAndAwaitAtNode(mkOrder(alice, wavesUsdPair, SELL, 5.waves, 2.usd))
 
-        validate200Json(dex1.rawApi.getOrderStatusInfoByIdWithApiKey(alice, o.id(), Some(alice.publicKey))) should be(HttpOrderBookHistoryItem(
-          o.id(),
-          BUY,
-          AcceptedOrderType.Limit,
-          10.waves,
-          5.waves,
-          2.usd,
-          0.003.waves,
-          0.0015.waves,
-          o.feeAsset,
-          o.timestamp,
-          Status.PartiallyFilled.name,
-          wavesUsdPair,
-          2.usd,
-          o.version,
-          10.usd
+        validate200Json(dex1.rawApi.getOrderStatusInfoByIdWithApiKey(alice, o.id(), Some(alice.publicKey))) should be(httpOrderInfo(
+          o,
+          OrderStatus.PartiallyFilled(5.waves, 0.0015.waves),
+          awp = 2.usd,
+          tepa = 10.usd
         ))
       }
 
       withClue(" - filled") {
         placeAndAwaitAtNode(mkOrder(alice, wavesUsdPair, SELL, 5.waves, 2.usd))
-        validate200Json(dex1.rawApi.getOrderStatusInfoByIdWithApiKey(alice, o.id(), Some(alice.publicKey))) should be(HttpOrderBookHistoryItem(
-          o.id(),
-          BUY,
-          AcceptedOrderType.Limit,
-          10.waves,
-          10.waves,
-          2.usd,
-          0.003.waves,
-          0.003.waves,
-          o.feeAsset,
-          o.timestamp,
-          Status.Filled.name,
-          wavesUsdPair,
-          2.usd,
-          o.version,
-          20.usd
+
+        validate200Json(dex1.rawApi.getOrderStatusInfoByIdWithApiKey(alice, o.id(), Some(alice.publicKey))) should be(httpOrderInfo(
+          o,
+          OrderStatus.Filled(10.waves, 0.003.waves),
+          awp = 2.usd,
+          tepa = 20.usd
         ))
       }
 
@@ -99,24 +87,20 @@ class GetOrderStatusInfoByIdWithApiKeySpec extends MatcherSuiteBase with TableDr
         val o = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd)
         placeAndAwaitAtDex(o)
         cancelAndAwait(alice, o)
-        validate200Json(dex1.rawApi.getOrderStatusInfoByIdWithApiKey(alice, o.id(), Some(alice.publicKey))) should be(HttpOrderBookHistoryItem(
-          o.id(),
-          BUY,
-          AcceptedOrderType.Limit,
-          10.waves,
-          0,
-          2.usd,
-          0.003.waves,
-          0,
-          o.feeAsset,
-          o.timestamp,
-          Status.Cancelled.name,
-          wavesUsdPair,
-          0,
-          o.version,
-          0
+
+        validate200Json(dex1.rawApi.getOrderStatusInfoByIdWithApiKey(alice, o.id(), Some(alice.publicKey))) should be(httpOrderInfo(
+          o,
+          OrderStatus.Cancelled(0, 0)
         ))
       }
+    }
+
+    "should return an error when without headers" in {
+      val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd)
+      placeAndAwaitAtDex(order)
+      validateAuthorizationError(
+        dex1.rawApi.getOrderStatusInfoById(alice.toAddress.stringRepr, order.idStr())
+      )
     }
 
     "should return an error when the public key header is not of order owner" in {
@@ -130,6 +114,19 @@ class GetOrderStatusInfoByIdWithApiKeySpec extends MatcherSuiteBase with TableDr
       )
     }
 
+    "should return an error when the public api-key header is not correct" in {
+      val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd)
+      placeAndAwaitAtDex(order)
+
+      validateAuthorizationError(
+        dex1.rawApi.getOrderStatusInfoById(
+          alice.toAddress.stringRepr,
+          order.idStr(),
+          Map("X-User-Public-Key" -> Base58.encode(alice.publicKey), "X-API-Key" -> "incorrect")
+        )
+      )
+    }
+
     "should return an error when the order doesn't exist" in {
       val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd)
       validateMatcherError(
@@ -140,6 +137,30 @@ class GetOrderStatusInfoByIdWithApiKeySpec extends MatcherSuiteBase with TableDr
       )
     }
 
-  }
+    "should return error when address is not a correct base58 string" in {
+      val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd)
+      validateMatcherError(
+        dex1.rawApi.getOrderStatusInfoById(
+          "null",
+          order.idStr(),
+          Map("X-User-Public-Key" -> Base58.encode(alice.publicKey), "X-API-Key" -> apiKey)
+        ),
+        StatusCodes.BadRequest,
+        4194304,
+        "Provided address in not correct, reason: Unable to decode base58: requirement failed: Wrong char 'l' in Base58 string 'null'"
+      )
+    }
 
+    //TODO: change after DEX-980
+    "should return error when orderId is not a correct base58 string" in {
+      validate404Exception(
+        dex1.rawApi.getOrderStatusInfoById(
+          alice.toAddress.stringRepr,
+          "null",
+          Map("X-User-Public-Key" -> Base58.encode(alice.publicKey), "X-API-Key" -> apiKey)
+        )
+      )
+    }
+
+  }
 }

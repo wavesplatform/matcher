@@ -45,7 +45,7 @@ object DexApiSyntax {
       waitForTransactionsByOrder(id)(_.lengthCompare(atLeast) >= 0)
 
     def waitForTransactionsByOrder(id: Order.Id)(pred: List[ExchangeTransaction] => Boolean): F[List[ExchangeTransaction]] =
-      R.repeatUntil(self.transactionsByOrder(id), RepeatRequestOptions.default)(pred)
+      R.repeatUntil(self.getTransactionsByOrder(id), RepeatRequestOptions.default)(pred)
 
     def waitForCurrentOffset(pred: Long => Boolean): F[HttpOffset] =
       R.repeatUntil(self.currentOffset, RepeatRequestOptions(1.second, 120))(pred)

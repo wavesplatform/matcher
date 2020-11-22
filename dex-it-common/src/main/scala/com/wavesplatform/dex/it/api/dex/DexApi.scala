@@ -82,8 +82,11 @@ trait DexApi[F[_]] {
     timestamp: Long
   ): F[HttpOrderBookHistoryItem]
 
-  def transactionsByOrder(order: Order): F[List[ExchangeTransaction]] = transactionsByOrder(order.id())
-  def transactionsByOrder(id: Order.Id): F[List[ExchangeTransaction]]
+  def getTransactionsByOrder(orderId: String): F[List[ExchangeTransaction]] = getTransactionsByOrder(orderId)
+
+  def getTransactionsByOrder(order: Order): F[List[ExchangeTransaction]] = getTransactionsByOrder(order.id())
+
+  def getTransactionsByOrder(id: Order.Id): F[List[ExchangeTransaction]]
 
   /**
    * param @activeOnly Server treats this parameter as false if it wasn't specified

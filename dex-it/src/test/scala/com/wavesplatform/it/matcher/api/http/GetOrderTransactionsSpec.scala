@@ -1,6 +1,7 @@
 package com.wavesplatform.it.matcher.api.http
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.it.api.RawHttpChecks
 import com.wavesplatform.it.MatcherSuiteBase
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -22,8 +23,47 @@ class GetOrderTransactionsSpec extends MatcherSuiteBase with TableDrivenProperty
 
   "GET /matcher/balance/reserved/{publicKey}" - {
 
-    "test " in {
-      // TODO
+    "should return empty list when order doesn't exists " in {
+      validate200Json(dex1.rawApi.getTransactionsByOrder(mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd))) should be(empty)
+    }
+
+    "should return empty list when order doesn't have transactions" in {
+      val o = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd)
+      placeAndAwaitAtDex(o)
+      validate200Json(dex1.rawApi.getTransactionsByOrder(o)) should be(empty)
+
+      dex1.api.cancelAll(alice)
+    }
+
+    "should return one transaction when order partially filled with another one" in {
+      val o = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd)
+      placeAndAwaitAtDex(o)
+      placeAndAwaitAtNode(mkOrder(bob, wavesUsdPair, SELL, 5.waves, 2.usd))
+
+      val r = validate200Json(dex1.rawApi.getTransactionsByOrder(o))
+
+      r should have size 1
+      r.head.orders() should have size 2
+      r.head.orders().get(0).id().toString should be(o.idStr())
+      dex1.api.cancelAll(alice)
+      dex1.api.cancelAll(bob)
+    }
+
+    "should return 2 transactions when order filled by another 2 orders" in {
+      val o = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd)
+      placeAndAwaitAtDex(o)
+      placeAndAwaitAtNode(mkOrder(bob, wavesUsdPair, SELL, 5.waves, 2.usd))
+      placeAndAwaitAtNode(mkOrder(bob, wavesUsdPair, SELL, 5.waves, 2.usd))
+
+      val r = validate200Json(dex1.rawApi.getTransactionsByOrder(o))
+
+      r should have size 2
+      r.foreach(_.orders().get(0).id().toString should be(o.idStr()))
+    }
+
+    //TODO: change after DEX-980
+    "should return error when orderId is not a correct base58 string" in {
+      validate404Exception(dex1.rawApi.getTransactionsByOrder("null"))
     }
   }
 

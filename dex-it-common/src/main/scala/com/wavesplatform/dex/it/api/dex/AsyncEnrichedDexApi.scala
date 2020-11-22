@@ -163,9 +163,11 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
   override def getOrderStatusInfoByIdWithSignature(owner: KeyPair, orderId: Id, timestamp: Long): R[HttpOrderBookHistoryItem] =
     getOrderStatusInfoByIdWithSignature(Base58.encode(owner.publicKey), orderId.toString, timestampAndSignatureHeaders(owner, timestamp))
 
-  override def transactionsByOrder(id: Id): R[List[ExchangeTransaction]] = mk {
-    sttp.get(uri"$apiUri/matcher/transactions/$id")
+  override def getTransactionsByOrder(orderId: String): R[List[ExchangeTransaction]] = mk {
+    sttp.get(uri"$apiUri/matcher/transactions/$orderId")
   }
+
+  override def getTransactionsByOrder(id: Id): R[List[ExchangeTransaction]] = getTransactionsByOrder(id.toString)
 
   /**
    * param @activeOnly Server treats this parameter as false if it wasn't specified

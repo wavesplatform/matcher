@@ -119,6 +119,7 @@ trait DexApi[F[_]] {
 
   def upsertRate(assetId: String, rate: Double, headers: Map[String, String] = Map.empty): F[HttpMessage]
   def upsertRate(asset: Asset, rate: Double): F[HttpMessage]
+  def deleteRate(assetId: String, headers: Map[String, String] = Map.empty): F[HttpMessage]
   def deleteRate(asset: Asset): F[HttpMessage]
   def getRates: F[HttpRates]
 

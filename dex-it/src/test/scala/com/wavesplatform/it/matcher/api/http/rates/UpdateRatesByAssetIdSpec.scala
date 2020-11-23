@@ -24,9 +24,9 @@ class UpdateRatesByAssetIdSpec extends MatcherSuiteBase with RawHttpChecks {
     dex1.start()
   }
 
-  "GET /matcher/settings/rates " - {
+  "PUT /matcher/settings/rates/{assetId} " - {
 
-    "should return 201 when user update the rate " in {
+    "should return OK when user update the rate " in {
 
       withClue(" - asset doesn't have a rate") {
         validate201Json(dex1.rawApi.upsertRate(usd, 0.01)).message should be(s"The rate 0.01 for the asset $UsdId added")

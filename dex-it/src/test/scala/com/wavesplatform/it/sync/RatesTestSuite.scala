@@ -40,7 +40,7 @@ class RatesTestSuite extends MatcherSuiteBase {
 
   "Rates can be handled via REST" in {
     // default rates
-    dex1.api.rates shouldBe defaultRateMap
+    dex1.api.getRates shouldBe defaultRateMap
 
     // add rate for unexisted asset
     dex1.tryApi.upsertRate(IssuedAsset(ByteStr.decodeBase58("unexistedAsset").get), 0.2) should failWith(
@@ -52,21 +52,21 @@ class RatesTestSuite extends MatcherSuiteBase {
     val addWctRate = dex1.rawApi.upsertRate(wct, wctRate)
     addWctRate.response.code shouldBe StatusCodes.Created
     addWctRate.unsafeGet.message shouldBe s"The rate $wctRate for the asset $wctStr added"
-    dex1.api.rates shouldBe defaultRateMap + (wct -> wctRate)
+    dex1.api.getRates shouldBe defaultRateMap + (wct -> wctRate)
 
     // update rate for wct
     val updateWctRate = dex1.rawApi.upsertRate(wct, wctRateUpdated)
     updateWctRate.response.code shouldBe StatusCodes.Ok
     updateWctRate.unsafeGet.message shouldBe s"The rate for the asset $wctStr updated, old value = $wctRate, new value = $wctRateUpdated"
-    dex1.api.rates shouldBe defaultRateMap + (wct -> wctRateUpdated)
+    dex1.api.getRates shouldBe defaultRateMap + (wct -> wctRateUpdated)
 
     // update rate for Waves is not allowed
     dex1.tryApi.upsertRate(Waves, wctRateUpdated) should failWith(20971531, "The rate for WAVES cannot be changed")
-    dex1.api.rates shouldBe defaultRateMap + (wct -> wctRateUpdated)
+    dex1.api.getRates shouldBe defaultRateMap + (wct -> wctRateUpdated)
 
     // delete rate for wct
     dex1.api.deleteRate(wct).message shouldBe s"The rate for the asset $wctStr deleted, old value = $wctRateUpdated"
-    dex1.api.rates shouldBe defaultRateMap
+    dex1.api.getRates shouldBe defaultRateMap
 
     // delete unexisted rate
     dex1.tryApi.deleteRate(wct) should failWith(20971529, MatcherError.Params(assetId = Some(wctStr)))
@@ -74,10 +74,10 @@ class RatesTestSuite extends MatcherSuiteBase {
 
   "Rates should not be changed by incorrect values" in {
     dex1.tryApi.upsertRate(Waves, 0) should failWith(20971535, "Asset rate should be positive")
-    dex1.api.rates shouldBe defaultRateMap
+    dex1.api.getRates shouldBe defaultRateMap
 
     dex1.tryApi.upsertRate(Waves, -0.1) should failWith(20971535, "Asset rate should be positive")
-    dex1.api.rates shouldBe defaultRateMap
+    dex1.api.getRates shouldBe defaultRateMap
   }
 
   "Changing rates affects order validation" in {

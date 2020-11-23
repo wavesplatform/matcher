@@ -237,14 +237,16 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .headers(apiKeyHeaders)
   }
 
-  override def upsertRate(asset: Asset, rate: Double): R[HttpMessage] = mk {
+  override def upsertRate(assetId: String, rate: Double, headers: Map[String, String]): R[HttpMessage] = mk {
     sttp
-      .put(uri"$apiUri/matcher/settings/rates/${asset.toString}")
+      .put(uri"$apiUri/matcher/settings/rates/$assetId")
       .body(Json.stringify(Json.toJson(rate)))
       .contentType("application/json", "UTF-8")
-      .headers(apiKeyHeaders)
+      .headers(headers)
       .tag("requestId", UUID.randomUUID)
   }
+
+  override def upsertRate(asset: Asset, rate: Double): R[HttpMessage] = upsertRate(asset.toString, rate, apiKeyHeaders)
 
   override def deleteRate(asset: Asset): R[HttpMessage] = mk {
     sttp
@@ -253,7 +255,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .headers(apiKeyHeaders)
   }
 
-  override def rates: R[HttpRates] = mk {
+  override def getRates: R[HttpRates] = mk {
     sttp.get(uri"$apiUri/matcher/settings/rates").headers(apiKeyHeaders)
   }
 

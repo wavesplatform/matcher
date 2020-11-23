@@ -9,8 +9,15 @@ trait RawHttpChecks extends Matchers {
   private def assertResponseContainHeaders[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT], expected: (String, String)*): Unit =
     expected.foreach(r.response.headers should contain(_))
 
+
   protected def validate200Json[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT]): EntityT = {
     r.response.code should be(StatusCodes.Ok)
+    assertResponseContainHeaders(r, "Content-Type" -> "application/json")
+    r.unsafeGet
+  }
+
+  protected def validate201Json[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT]): EntityT = {
+    r.response.code should be(StatusCodes.Created)
     assertResponseContainHeaders(r, "Content-Type" -> "application/json")
     r.unsafeGet
   }

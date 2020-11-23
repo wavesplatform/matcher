@@ -36,8 +36,6 @@ service WavesBlockchainApi {
 
     rpc AllAssetsSpendableBalance (AddressRequest) returns (AllAssetsSpendableBalanceResponse);
 
-    rpc GetNodeAddress (google.protobuf.Empty) returns (NodeAddressResponse);
-
     rpc GetCurrentBlockInfo (google.protobuf.Empty) returns (CurrentBlockInfoResponse);
 
     rpc GetBalances (GetBalancesRequest) returns (GetBalancesResponse);
@@ -176,10 +174,6 @@ message AllAssetsSpendableBalanceResponse {
         int64 balance = 2;
     }
     repeated Record balances = 1;
-}
-
-message NodeAddressResponse {
-    string address = 1;
 }
 
 message CurrentBlockInfoResponse {

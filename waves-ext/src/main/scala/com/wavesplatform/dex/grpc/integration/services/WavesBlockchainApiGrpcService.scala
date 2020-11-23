@@ -1,6 +1,5 @@
 package com.wavesplatform.dex.grpc.integration.services
 
-import java.net.InetAddress
 import java.util.concurrent.ConcurrentHashMap
 
 import cats.implicits.catsSyntaxOptionId
@@ -381,10 +380,6 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, ignoredExchangeTx
         .filterNot(_.balance == 0L)
     )
   }.runToFuture
-
-  override def getNodeAddress(request: Empty): Future[NodeAddressResponse] = Future {
-    NodeAddressResponse(InetAddress.getLocalHost.getHostAddress)
-  }
 
   private def spendableBalance(address: Address, asset: Asset): Long = {
     val stateBalance = context.blockchain.balance(address, asset)

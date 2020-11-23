@@ -1,6 +1,5 @@
 package com.wavesplatform.dex.grpc.integration.clients.matcherext
 
-import java.net.InetAddress
 import java.time.Duration
 
 import com.wavesplatform.dex.domain.account.Address
@@ -50,7 +49,6 @@ class MatcherExtensionCachingClient(underlying: MatcherExtensionClient, defaultC
 
   override def forgedOrder(orderId: ByteStr): Future[Boolean] = underlying.forgedOrder(orderId)
 
-  override def getNodeAddress: Future[InetAddress] = underlying.getNodeAddress
   override def currentBlockInfo: Future[BlockRef] = underlying.currentBlockInfo
 
   override def close(): Future[Unit] = underlying.close()

@@ -205,9 +205,6 @@ class CombinedWavesBlockchainClient(
   override def forgedOrder(orderId: ByteStr): Future[Boolean] =
     meClient.forgedOrder(orderId)
 
-  override def getNodeAddress: Future[InetAddress] =
-    meClient.getNodeAddress
-
   override def close(): Future[Unit] =
     meClient.close().zip(bClient.close()).map(_ => ())
 

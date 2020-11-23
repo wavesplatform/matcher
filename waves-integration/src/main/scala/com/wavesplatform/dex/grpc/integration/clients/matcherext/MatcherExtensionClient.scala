@@ -1,7 +1,5 @@
 package com.wavesplatform.dex.grpc.integration.clients.matcherext
 
-import java.net.InetAddress
-
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
@@ -38,7 +36,6 @@ trait MatcherExtensionClient {
 
   def forgedOrder(orderId: ByteStr): Future[Boolean]
 
-  def getNodeAddress: Future[InetAddress]
   def currentBlockInfo: Future[BlockRef]
 
   def close(): Future[Unit]

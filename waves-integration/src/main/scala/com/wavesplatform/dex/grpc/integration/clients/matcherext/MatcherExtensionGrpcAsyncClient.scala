@@ -1,12 +1,11 @@
 package com.wavesplatform.dex.grpc.integration.clients.matcherext
 
-import java.net.InetAddress
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 import cats.implicits.catsSyntaxOptionId
 import cats.syntax.option._
-import com.google.protobuf.ByteString
+import com.google.protobuf.UnsafeByteOperations
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.api.grpc.TransactionsByIdRequest
 import com.wavesplatform.dex.domain.account.Address
@@ -23,15 +22,16 @@ import com.wavesplatform.dex.grpc.integration.exceptions.{UnexpectedConnectionEx
 import com.wavesplatform.dex.grpc.integration.protobuf.DexToPbConversions._
 import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions._
 import com.wavesplatform.dex.grpc.integration.services.RunScriptResponse.Result
+import com.wavesplatform.dex.grpc.integration.services.WavesBlockchainApiGrpc._
 import com.wavesplatform.dex.grpc.integration.services._
-import io.grpc.stub.{ClientCallStreamObserver, ClientResponseObserver}
-import io.grpc.{ManagedChannel, Status, StatusRuntimeException}
+import io.grpc._
+import io.grpc.stub.{ClientCallStreamObserver, ClientCalls, ClientResponseObserver, StreamObserver}
 import io.netty.channel.EventLoopGroup
 import monix.execution.Scheduler
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future, Promise}
 
 /**
  * @param eventLoopGroup Here, because this class takes ownership
@@ -50,16 +50,14 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
   private def handlingErrors[A](f: => Future[A]): Future[A] = f.transform(identity, gRPCErrorsHandler)
 
   private val shuttingDown = new AtomicBoolean(false)
-  private val blockchainService = WavesBlockchainApiGrpc.stub(channel)
-
   private val utxEventsSubject = ConcurrentSubject.publish[WavesNodeEvent](monixScheduler)
-  private val utxEventsSubjectObserver = new UtxEventsObserver
 
   private val empty: Empty = Empty()
 
-  // TODO rename to requestBalanceChanges after release 2.1.2
-  /** Performs new gRPC call for receiving of the spendable balance changes real-time stream */
-  private def requestUtxEvents(): Unit = blockchainService.getUtxEvents(empty, utxEventsSubjectObserver)
+  private def requestUtxEvents(): Unit = {
+    val call = channel.newCall(METHOD_GET_UTX_EVENTS, CallOptions.DEFAULT)
+    ClientCalls.asyncServerStreamingCall(call, empty, new UtxEventsObserver(call))
+  }
 
   private def parse(input: RunScriptResponse): RunScriptResult = input.result match {
     case Result.WrongInput(message) => throw new IllegalArgumentException(message)
@@ -76,16 +74,14 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
   }
 
   override def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] = handlingErrors {
-    blockchainService
-      .spendableAssetsBalances {
-        SpendableAssetsBalancesRequest(address = address.toPB, assets.map(a => SpendableAssetsBalancesRequest.Record(a.toPB)).toSeq)
-      }
-      .map(response => response.balances.map(record => record.assetId.toVanillaAsset -> record.balance).toMap)
+    asyncUnaryCall(
+      METHOD_SPENDABLE_ASSETS_BALANCES,
+      SpendableAssetsBalancesRequest(address = address.toPB, assets.map(a => SpendableAssetsBalancesRequest.Record(a.toPB)).toSeq)
+    ).map(response => response.balances.map(record => record.assetId.toVanillaAsset -> record.balance).toMap)
   }
 
   override def allAssetsSpendableBalance(address: Address): Future[Map[Asset, Long]] = handlingErrors {
-    blockchainService
-      .allAssetsSpendableBalance(AddressRequest(address.toPB))
+    asyncUnaryCall(METHOD_ALL_ASSETS_SPENDABLE_BALANCE, AddressRequest(address.toPB))
       .map(response => response.balances.map(record => record.assetId.toVanillaAsset -> record.balance).toMap)
   }
 
@@ -99,56 +95,57 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
       }.toSeq,
       outLeaseAddresses = index.outLeases.map(_.toPB).toSeq
     )
-    blockchainService.getBalances(request).map { response =>
-      BlockchainBalance(
-        regular = response.regular
-          .map(pair => pair.address.toVanillaAddress -> pair.amount.map(x => x.assetId.toVanillaAsset -> x.amount).toMap)
-          .toMap,
-        outLeases = response.outLeases.map(x => x.address.toVanillaAddress -> x.amount).toMap
-      )
-    }
+
+    asyncUnaryCall(WavesBlockchainApiGrpc.METHOD_GET_BALANCES, request)
+      .map { response =>
+        BlockchainBalance(
+          regular = response.regular
+            .map(pair => pair.address.toVanillaAddress -> pair.amount.map(x => x.assetId.toVanillaAsset -> x.amount).toMap)
+            .toMap,
+          outLeases = response.outLeases.map(x => x.address.toVanillaAddress -> x.amount).toMap
+        )
+      }
   }
 
   override def isFeatureActivated(id: Short): Future[Boolean] = handlingErrors {
-    blockchainService.isFeatureActivated(IsFeatureActivatedRequest(id)).map(_.isActivated)
+    asyncUnaryCall(METHOD_IS_FEATURE_ACTIVATED, IsFeatureActivatedRequest(id)).map(_.isActivated)
   }
 
   override def assetDescription(asset: Asset.IssuedAsset): Future[Option[BriefAssetDescription]] = handlingErrors {
-    blockchainService.assetDescription(AssetIdRequest(asset.toPB)).map(_.maybeDescription.toVanilla)
+    asyncUnaryCall(METHOD_ASSET_DESCRIPTION, AssetIdRequest(asset.toPB)).map(_.maybeDescription.toVanilla)
   }
 
   override def hasScript(asset: Asset.IssuedAsset): Future[Boolean] = handlingErrors {
-    blockchainService.hasAssetScript(AssetIdRequest(assetId = asset.toPB)).map(_.has)
+    asyncUnaryCall(METHOD_HAS_ASSET_SCRIPT, AssetIdRequest(asset.toPB)).map(_.has)
   }
 
   override def runScript(asset: Asset.IssuedAsset, input: transaction.ExchangeTransaction): Future[RunScriptResult] = handlingErrors {
-    blockchainService
-      .runAssetScript(RunAssetScriptRequest(assetId = asset.toPB, transaction = Some(input.toPB)))
-      .map(parse)
+    asyncUnaryCall(METHOD_RUN_ASSET_SCRIPT, RunAssetScriptRequest(assetId = asset.toPB, transaction = Some(input.toPB))).map(parse)
   }
 
   override def hasScript(address: Address): Future[Boolean] = handlingErrors {
-    blockchainService.hasAddressScript(HasAddressScriptRequest(address = address.toPB)).map(_.has)
+    asyncUnaryCall(METHOD_HAS_ADDRESS_SCRIPT, HasAddressScriptRequest(address.toPB)).map(_.has)
   }
 
   override def runScript(address: Address, input: Order): Future[RunScriptResult] = handlingErrors {
-    blockchainService
-      .runAddressScript(RunAddressScriptRequest(address = address.toPB, order = Some(input.toPB)))
-      .map(parse)
+    asyncUnaryCall(METHOD_RUN_ADDRESS_SCRIPT, RunAddressScriptRequest(address = address.toPB, order = Some(input.toPB))).map(parse)
   }
 
-  override def wereForged(txIds: Seq[ByteStr]): Future[Map[ByteStr, Boolean]] =
-    handlingErrors {
-      blockchainService
-        .getStatuses(TransactionsByIdRequest(txIds.map(id => ByteString copyFrom id.arr)))
-        .map(_.transactionsStatutes.map(txStatus => txStatus.id.toVanilla -> txStatus.status.isConfirmed).toMap)
-    } recover { case _ => txIds.map(_ -> false).toMap }
+  override def wereForged(txIds: Seq[ByteStr]): Future[Map[ByteStr, Boolean]] = handlingErrors {
+    asyncUnaryCall(METHOD_GET_STATUSES, TransactionsByIdRequest(txIds.map(id => UnsafeByteOperations.unsafeWrap(id.arr))))
+      .map(_.transactionsStatutes.map(txStatus => txStatus.id.toVanilla -> txStatus.status.isConfirmed).toMap)
+  }.recover { case _ => txIds.map(_ -> false).toMap }
 
-  override def broadcastTx(tx: transaction.ExchangeTransaction): Future[Boolean] =
-    handlingErrors(blockchainService.broadcast(BroadcastRequest(transaction = Some(tx.toPB))).map(_.isValid)) recover { case _ => false }
+  override def broadcastTx(tx: transaction.ExchangeTransaction): Future[Boolean] = handlingErrors {
+    asyncUnaryCall(METHOD_BROADCAST, BroadcastRequest(transaction = Some(tx.toPB))).map(_.isValid)
+  }.recover { case _ => false }
 
   override def forgedOrder(orderId: ByteStr): Future[Boolean] = handlingErrors {
-    blockchainService.forgedOrder(ForgedOrderRequest(orderId.toPB)).map(_.isForged)
+    asyncUnaryCall(METHOD_FORGED_ORDER, ForgedOrderRequest(orderId.toPB)).map(_.isForged)
+  }
+
+  override def currentBlockInfo: Future[BlockRef] = handlingErrors {
+    asyncUnaryCall(METHOD_GET_CURRENT_BLOCK_INFO, empty).map(x => BlockRef(x.height, x.blockId.toVanilla))
   }
 
   override def close(): Future[Unit] = {
@@ -159,23 +156,25 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
     eventLoopGroup.shutdownGracefully(0, 500, TimeUnit.MILLISECONDS).asScala.map(_ => ())
   }
 
-  override def getNodeAddress: Future[InetAddress] = handlingErrors {
-    blockchainService.getNodeAddress(empty) map { r =>
-      InetAddress.getByName(r.address)
-    }
-  }
+  final private class UtxEventsObserver(call: ClientCall[Empty, UtxEvent]) extends ClientResponseObserver[Empty, UtxEvent] with AutoCloseable {
 
-  override def currentBlockInfo: Future[BlockRef] = blockchainService.getCurrentBlockInfo(empty).map { x =>
-    BlockRef(x.height, x.blockId.toVanilla)
-  }
-
-  // TODO rename to BalanceChangesObserver after release 2.1.2
-  final private class UtxEventsObserver extends ClientResponseObserver[Empty, UtxEvent] with AutoCloseable {
-
-    private val isConnectionEstablished: AtomicBoolean = new AtomicBoolean(true)
     private var requestStream: ClientCallStreamObserver[Empty] = _
 
-    override def onCompleted(): Unit = log.info("Balance changes stream completed!")
+    override def beforeStart(requestStream: ClientCallStreamObserver[Empty]): Unit = {
+      this.requestStream = requestStream
+      requestStream.setOnReadyHandler(() => log.info(s"Getting utx events from ${call.getAttributes.get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR)}"))
+    }
+
+    override def onNext(value: UtxEvent): Unit = toEvent(value).foreach(utxEventsSubject.onNext)
+
+    override def onError(e: Throwable): Unit = if (!shuttingDown.get()) {
+      channel.resetConnectBackoff()
+      requestUtxEvents()
+    }
+
+    override def onCompleted(): Unit = log.info(s"Utx events stream completed")
+
+    override def close(): Unit = if (requestStream != null) requestStream.cancel("Shutting down", new StatusRuntimeException(Status.CANCELLED))
 
     private def toEvent(event: UtxEvent): Option[WavesNodeEvent] = event.`type` match {
       case UtxEvent.Type.Switch(event) => WavesNodeEvent.UtxSwitched(event.transactions).some
@@ -187,25 +186,28 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
         none
     }
 
-    override def onNext(value: UtxEvent): Unit = {
-      // TODO
-      if (isConnectionEstablished.compareAndSet(false, true))
-        blockchainService.getNodeAddress(empty) foreach { response =>
-          log.info(s"gRPC connection restored! DEX server now is connected to Node with an address: ${response.address}")
+  }
+
+  private def asyncUnaryCall[RequestT, ResponseT](
+    methodDescriptor: MethodDescriptor[RequestT, ResponseT],
+    arg: RequestT
+  ): Future[ResponseT] = {
+    // TODO better CallOptions
+    val call = channel.newCall(methodDescriptor, CallOptions.DEFAULT)
+    val p = Promise[ResponseT]()
+    ClientCalls.asyncUnaryCall(
+      call,
+      arg,
+      new StreamObserver[ResponseT] {
+        override def onNext(value: ResponseT): Unit = p.trySuccess(value)
+        override def onError(t: Throwable): Unit = p.tryFailure(t)
+        override def onCompleted(): Unit = {
+          val methodName = methodDescriptor.getFullMethodName.split('/').lastOption.getOrElse(methodDescriptor.getFullMethodName)
+          log.trace(s"$methodName to ${call.getAttributes.get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR)}")
         }
-
-      toEvent(value).foreach(utxEventsSubject.onNext)
-    }
-
-    override def onError(e: Throwable): Unit = if (!shuttingDown.get()) {
-      if (isConnectionEstablished.compareAndSet(true, false)) log.error("Connection with Node lost!", e)
-      channel.resetConnectBackoff()
-      requestUtxEvents()
-    }
-
-    override def close(): Unit = if (requestStream != null) requestStream.cancel("Shutting down", new StatusRuntimeException(Status.CANCELLED))
-
-    override def beforeStart(requestStream: ClientCallStreamObserver[Empty]): Unit = this.requestStream = requestStream
+      }
+    )
+    p.future
   }
 
 }

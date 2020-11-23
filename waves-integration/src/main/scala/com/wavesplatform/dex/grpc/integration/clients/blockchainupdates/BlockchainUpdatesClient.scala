@@ -7,7 +7,8 @@ import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.clients.status._
 import com.wavesplatform.dex.grpc.integration.effect.Implicits.NettyFutureOps
 import com.wavesplatform.events.api.grpc.protobuf.{BlockchainUpdatesApiGrpc, SubscribeRequest}
-import io.grpc.ManagedChannel
+import io.grpc.stub.ClientCalls
+import io.grpc.{CallOptions, ManagedChannel}
 import io.netty.channel.EventLoopGroup
 import monix.execution.Scheduler
 import monix.reactive.Observable
@@ -25,7 +26,6 @@ class DefaultBlockchainUpdatesClient(eventLoopGroup: EventLoopGroup, channel: Ma
 ) extends BlockchainUpdatesClient
     with ScorexLogging {
   @volatile private var isClosing = false
-  private val grpcService = BlockchainUpdatesApiGrpc.stub(channel) // TODO move this dependency to constructor?
 
   override def blockchainEvents(fromHeight: Int): (Observable[WavesNodeEvent], BlockchainUpdatesStreamControl) = {
     // From the docs: the grammar must still be respected: (onNext)* (onComplete | onError)
@@ -37,8 +37,10 @@ class DefaultBlockchainUpdatesClient(eventLoopGroup: EventLoopGroup, channel: Ma
         if (isClosing) none
         else {
           log.debug(s"Subscribed on blockchain events from $fromHeight")
-          val r = new GrpcEventsObserver(subject, Conversions.toEvent, isClosing, onError)
-          grpcService.subscribe(new SubscribeRequest(fromHeight), r)
+          val call = channel.newCall(BlockchainUpdatesApiGrpc.METHOD_SUBSCRIBE, CallOptions.DEFAULT)
+          val r = new GrpcBlockchainEventsObserver(subject, Conversions.toEvent, isClosing, call, onError)
+
+          ClientCalls.asyncServerStreamingCall(call, new SubscribeRequest(fromHeight), r)
           r.some
         }
       }

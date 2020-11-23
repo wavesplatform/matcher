@@ -31,7 +31,7 @@ class GetOrderStatusInfoByIdWithApiKeySpec extends MatcherSuiteBase with TableDr
 
   "GET /matcher/orders/{address}/{orderId} " - {
 
-    def httpOrderInfo(o: Order, s: OrderStatus, f: Long = 0.003.waves, awp: Long = 0, tepa: Long = 0): HttpOrderBookHistoryItem =
+    def httpOrderInfo(o: Order, s: OrderStatus, f: Long = 0.003.waves, avgWeighedPrice: Long = 0, totalExecutedPriceAssets: Long = 0): HttpOrderBookHistoryItem =
       HttpOrderBookHistoryItem(
         o.id(),
         o.orderType,
@@ -45,9 +45,9 @@ class GetOrderStatusInfoByIdWithApiKeySpec extends MatcherSuiteBase with TableDr
         o.timestamp,
         s.name,
         o.assetPair,
-        awp,
+        avgWeighedPrice,
         o.version,
-        tepa
+        totalExecutedPriceAssets
       )
 
     "should return correct status of the order" in {
@@ -55,7 +55,7 @@ class GetOrderStatusInfoByIdWithApiKeySpec extends MatcherSuiteBase with TableDr
       placeAndAwaitAtDex(o)
 
       withClue(" - accepted") {
-        validate200Json(dex1.rawApi.getOrderStatusInfoByIdWithApiKey(alice, o.id(), Some(alice.publicKey))) should be(httpOrderInfo(
+        validate200Json(dex1.rawApi.getOrderStatusInfoByIdWithApiKey(alice, o.id(), Some(alice.publicKey))) should matchTo(httpOrderInfo(
           o,
           OrderStatus.Accepted
         ))
@@ -64,22 +64,22 @@ class GetOrderStatusInfoByIdWithApiKeySpec extends MatcherSuiteBase with TableDr
       withClue(" - partially filled") {
         placeAndAwaitAtNode(mkOrder(alice, wavesUsdPair, SELL, 5.waves, 2.usd))
 
-        validate200Json(dex1.rawApi.getOrderStatusInfoByIdWithApiKey(alice, o.id(), Some(alice.publicKey))) should be(httpOrderInfo(
+        validate200Json(dex1.rawApi.getOrderStatusInfoByIdWithApiKey(alice, o.id(), Some(alice.publicKey))) should matchTo(httpOrderInfo(
           o,
           OrderStatus.PartiallyFilled(5.waves, 0.0015.waves),
-          awp = 2.usd,
-          tepa = 10.usd
+          avgWeighedPrice = 2.usd,
+          totalExecutedPriceAssets = 10.usd
         ))
       }
 
       withClue(" - filled") {
         placeAndAwaitAtNode(mkOrder(alice, wavesUsdPair, SELL, 5.waves, 2.usd))
 
-        validate200Json(dex1.rawApi.getOrderStatusInfoByIdWithApiKey(alice, o.id(), Some(alice.publicKey))) should be(httpOrderInfo(
+        validate200Json(dex1.rawApi.getOrderStatusInfoByIdWithApiKey(alice, o.id(), Some(alice.publicKey))) should matchTo(httpOrderInfo(
           o,
           OrderStatus.Filled(10.waves, 0.003.waves),
-          awp = 2.usd,
-          tepa = 20.usd
+          avgWeighedPrice = 2.usd,
+          totalExecutedPriceAssets = 20.usd
         ))
       }
 
@@ -88,7 +88,7 @@ class GetOrderStatusInfoByIdWithApiKeySpec extends MatcherSuiteBase with TableDr
         placeAndAwaitAtDex(o)
         cancelAndAwait(alice, o)
 
-        validate200Json(dex1.rawApi.getOrderStatusInfoByIdWithApiKey(alice, o.id(), Some(alice.publicKey))) should be(httpOrderInfo(
+        validate200Json(dex1.rawApi.getOrderStatusInfoByIdWithApiKey(alice, o.id(), Some(alice.publicKey))) should matchTo(httpOrderInfo(
           o,
           OrderStatus.Cancelled(0, 0)
         ))
@@ -137,7 +137,7 @@ class GetOrderStatusInfoByIdWithApiKeySpec extends MatcherSuiteBase with TableDr
       )
     }
 
-    "should return error when address is not a correct base58 string" in {
+    "should return an error when address is not a correct base58 string" in {
       val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd)
       validateMatcherError(
         dex1.rawApi.getOrderStatusInfoById(
@@ -152,7 +152,7 @@ class GetOrderStatusInfoByIdWithApiKeySpec extends MatcherSuiteBase with TableDr
     }
 
     //TODO: change after DEX-980
-    "should return error when orderId is not a correct base58 string" in {
+    "should return an error when orderId is not a correct base58 string" in {
       validate404Exception(
         dex1.rawApi.getOrderStatusInfoById(
           alice.toAddress.stringRepr,

@@ -57,25 +57,25 @@ class GetReservedBalanceSpec extends MatcherSuiteBase with TableDrivenPropertyCh
     }
 
     //TODO: change after DEX-978
-    "should return error if publicKey is not correct base58 string" in {
+    "should return an error if publicKey is not correct base58 string" in {
       validate404Exception(dex1.rawApi.getReservedBalance("null", System.currentTimeMillis, "sign"))
     }
 
-    "should return error if publicKey parameter has the different value of used in signature" in {
+    "should return an error if publicKey parameter has the different value of used in signature" in {
       val ts = System.currentTimeMillis
       val sign = Base58.encode(crypto.sign(alice, alice.publicKey ++ Longs.toByteArray(ts)))
 
       validateIncorrectSignature(dex1.rawApi.getReservedBalance(Base58.encode(bob.publicKey), ts, sign))
     }
 
-    "should return error if timestamp header has the different value of used in signature" in {
+    "should return an error if timestamp header has the different value of used in signature" in {
       val ts = System.currentTimeMillis
       val sign = Base58.encode(crypto.sign(alice, alice.publicKey ++ Longs.toByteArray(ts)))
 
       validateIncorrectSignature(dex1.rawApi.getReservedBalance(Base58.encode(alice.publicKey), ts + 1000, sign))
     }
 
-    "should return error with incorrect signature" in {
+    "should return an error with incorrect signature" in {
       validateIncorrectSignature(dex1.rawApi.getReservedBalance(Base58.encode(alice.publicKey), System.currentTimeMillis, "incorrect"))
     }
   }

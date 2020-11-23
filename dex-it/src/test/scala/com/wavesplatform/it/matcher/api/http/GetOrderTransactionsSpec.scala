@@ -62,7 +62,7 @@ class GetOrderTransactionsSpec extends MatcherSuiteBase with TableDrivenProperty
     }
 
     //TODO: change after DEX-980
-    "should return error when orderId is not a correct base58 string" in {
+    "should return an error when orderId is not a correct base58 string" in {
       validate404Exception(dex1.rawApi.getTransactionsByOrder("null"))
     }
   }

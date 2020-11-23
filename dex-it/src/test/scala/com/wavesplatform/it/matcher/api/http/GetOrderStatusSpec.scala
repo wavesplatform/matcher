@@ -3,9 +3,12 @@ package com.wavesplatform.it.matcher.api.http
 import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
+import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
+import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.it.api.RawHttpChecks
 import com.wavesplatform.it.MatcherSuiteBase
+import im.mak.waves.transactions.IssueTransaction
 import org.scalatest.prop.TableDrivenPropertyChecks
 
 class GetOrderStatusSpec extends MatcherSuiteBase with TableDrivenPropertyChecks with RawHttpChecks {
@@ -58,16 +61,16 @@ class GetOrderStatusSpec extends MatcherSuiteBase with TableDrivenPropertyChecks
     }
 
     //TODO: change after DEX-969
-    "should return error exception when the amount asset is not correct base58 string" in {
+    "should return an error exception when the amount asset is not correct base58 string" in {
       validate404Exception(dex1.rawApi.getOrderStatus("null", UsdId.toString, order.idStr()))
     }
 
     //TODO: change after DEX-969
-    "should return error exception when the price asset is not correct base58 string" in {
+    "should return an error exception when the price asset is not correct base58 string" in {
       validate404Exception(dex1.rawApi.getOrderStatus("WAVES", "null", order.idStr()))
     }
 
-    "should return error when amount asset doesn't exist" in {
+    "should return an error when amount asset doesn't exist" in {
       val incorrectAsset = "3Q6ndEq2z5UJwF4SF24ySRj9guPoFWaSeXP"
 
       validateMatcherError(
@@ -78,15 +81,18 @@ class GetOrderStatusSpec extends MatcherSuiteBase with TableDrivenPropertyChecks
       )
     }
 
-    //TODO:  DEX-981 | incorrect error, because of asset 3Q6ndEq2z5UJwF4SF24ySRj9guPoFWaSeXP doesn't exist
-    "should return error when price asset doesn't exist" in {
-      val incorrectAsset = "3Q6ndEq2z5UJwF4SF24ySRj9guPoFWaSeXP"
-      validateMatcherError(
-        dex1.rawApi.getOrderStatus("WAVES", incorrectAsset, order.idStr()),
-        StatusCodes.NotFound,
-        9440771,
-        s"The WAVES-$incorrectAsset asset pair should be reversed"
-      )
+    "should redirect if price asset in base58 less than amount asset" in {
+
+      def mkAsset(): IssueTransaction = {
+        val tx = mkIssue(alice, "name", someAssetAmount, 2)
+        if (tx.id().toString < "WAVES") tx
+        else mkAsset()
+      }
+
+      val issuedAsset = mkAsset()
+      broadcastAndAwait(issuedAsset)
+
+      validate301Redirect(dex1.rawApi.getOrderStatus("WAVES", issuedAsset.assetId().toString, order.idStr()))
     }
   }
 }

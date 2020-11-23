@@ -34,7 +34,7 @@ class GetOrderStatusInfoByIdWithSignature extends MatcherSuiteBase with TableDri
       placeAndAwaitAtDex(o)
 
       withClue(" - accepted") {
-        validate200Json(dex1.rawApi.getOrderStatusInfoByIdWithSignature(alice, o)) should be(HttpOrderBookHistoryItem(
+        validate200Json(dex1.rawApi.getOrderStatusInfoByIdWithSignature(alice, o)) should matchTo(HttpOrderBookHistoryItem(
           o.id(),
           BUY,
           AcceptedOrderType.Limit,
@@ -56,7 +56,7 @@ class GetOrderStatusInfoByIdWithSignature extends MatcherSuiteBase with TableDri
       withClue(" - partially filled") {
         placeAndAwaitAtNode(mkOrder(alice, wavesUsdPair, SELL, 5.waves, 2.usd))
 
-        validate200Json(dex1.rawApi.getOrderStatusInfoByIdWithSignature(alice, o)) should be(HttpOrderBookHistoryItem(
+        validate200Json(dex1.rawApi.getOrderStatusInfoByIdWithSignature(alice, o)) should matchTo(HttpOrderBookHistoryItem(
           o.id(),
           BUY,
           AcceptedOrderType.Limit,
@@ -77,7 +77,7 @@ class GetOrderStatusInfoByIdWithSignature extends MatcherSuiteBase with TableDri
 
       withClue(" - filled") {
         placeAndAwaitAtNode(mkOrder(alice, wavesUsdPair, SELL, 5.waves, 2.usd))
-        validate200Json(dex1.rawApi.getOrderStatusInfoByIdWithSignature(alice, o)) should be(HttpOrderBookHistoryItem(
+        validate200Json(dex1.rawApi.getOrderStatusInfoByIdWithSignature(alice, o)) should matchTo(HttpOrderBookHistoryItem(
           o.id(),
           BUY,
           AcceptedOrderType.Limit,
@@ -100,7 +100,7 @@ class GetOrderStatusInfoByIdWithSignature extends MatcherSuiteBase with TableDri
         val o = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd)
         placeAndAwaitAtDex(o)
         cancelAndAwait(alice, o)
-        validate200Json(dex1.rawApi.getOrderStatusInfoByIdWithSignature(alice, o)) should be(HttpOrderBookHistoryItem(
+        validate200Json(dex1.rawApi.getOrderStatusInfoByIdWithSignature(alice, o)) should matchTo(HttpOrderBookHistoryItem(
           o.id(),
           BUY,
           AcceptedOrderType.Limit,
@@ -120,7 +120,7 @@ class GetOrderStatusInfoByIdWithSignature extends MatcherSuiteBase with TableDri
       }
     }
 
-    "should return error when the order doesn't exist" in {
+    "should return an error when the order doesn't exist" in {
       val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd)
       validateMatcherError(
         dex1.rawApi.getOrderStatusInfoByIdWithSignature(alice, order),
@@ -130,14 +130,14 @@ class GetOrderStatusInfoByIdWithSignature extends MatcherSuiteBase with TableDri
       )
     }
 
-    "should return error exception when the publicKey is not correct base58 string" in {
+    "should return an error exception when the publicKey is not correct base58 string" in {
       val ts = System.currentTimeMillis
       val sign = Base58.encode(crypto.sign(alice, alice.publicKey ++ Longs.toByteArray(ts)))
 
       validate404Exception(dex1.rawApi.getOrderStatusInfoByIdWithSignature("null", "null", ts, sign))
     }
 
-    "should return error exception when the orderId is not correct base58 string" in {
+    "should return an error exception when the orderId is not correct base58 string" in {
       val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd)
       placeAndAwaitAtDex(order)
       val ts = System.currentTimeMillis
@@ -146,7 +146,7 @@ class GetOrderStatusInfoByIdWithSignature extends MatcherSuiteBase with TableDri
       validate404Exception(dex1.rawApi.getOrderStatusInfoByIdWithSignature(Base58.encode(alice.publicKey), "null", ts, sign))
     }
 
-    "should return error if publicKey parameter has the different value of used in signature" in {
+    "should return an error if publicKey parameter has the different value of used in signature" in {
       val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd)
       placeAndAwaitAtDex(order)
       val ts = System.currentTimeMillis
@@ -155,7 +155,7 @@ class GetOrderStatusInfoByIdWithSignature extends MatcherSuiteBase with TableDri
       validateIncorrectSignature(dex1.rawApi.getOrderStatusInfoByIdWithSignature(Base58.encode(bob.publicKey), order.idStr(), ts, sign))
     }
 
-    "should return error if timestamp header has the different value of used in signature" in {
+    "should return an error if timestamp header has the different value of used in signature" in {
       val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd)
       placeAndAwaitAtDex(order)
       val ts = System.currentTimeMillis
@@ -164,8 +164,8 @@ class GetOrderStatusInfoByIdWithSignature extends MatcherSuiteBase with TableDri
       validateIncorrectSignature(dex1.rawApi.getOrderStatusInfoByIdWithSignature(Base58.encode(alice.publicKey), order.idStr(), ts + 1000, sign))
     }
 
-    // There is an incorrect error (Asset not found), we should discuss about it
-    "should return error timestamp header doesn't exist" ignore {
+    // DEX-982
+    "should return an error timestamp header doesn't exist" ignore {
       val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd)
       placeAndAwaitAtDex(order)
       val ts = System.currentTimeMillis
@@ -178,8 +178,8 @@ class GetOrderStatusInfoByIdWithSignature extends MatcherSuiteBase with TableDri
       ))
     }
 
-    // There is an incorrect error (Asset not found), we should discuss about it
-    "should return error signature header doesn't exist" ignore {
+    // DEX-982
+    "should return an error signature header doesn't exist" ignore {
       val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd)
       placeAndAwaitAtDex(order)
 
@@ -190,7 +190,7 @@ class GetOrderStatusInfoByIdWithSignature extends MatcherSuiteBase with TableDri
       ))
     }
 
-    "should return error with incorrect signature" in {
+    "should return an error with incorrect signature" in {
       val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd)
       placeAndAwaitAtDex(order)
       validateIncorrectSignature(dex1.rawApi.getOrderStatusInfoByIdWithSignature(

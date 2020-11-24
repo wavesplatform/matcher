@@ -1,5 +1,39 @@
 package com.wavesplatform.it.matcher.api.http.debug
 
-class GetMatcherConfigSpec {
+import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.it.api.RawHttpChecks
+import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
+
+class GetMatcherConfigSpec extends MatcherSuiteBase with RawHttpChecks {
+
+  override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(
+    s"""waves.dex {
+       |  price-assets = [ "$BtcId", "$UsdId", "WAVES" ]
+       |}""".stripMargin
+  )
+
+  override protected def beforeAll(): Unit = {
+    wavesNode1.start()
+    broadcastAndAwait(IssueBtcTx, IssueUsdTx)
+    dex1.start()
+  }
+
+  "GET /matcher/debug/config " - {
+
+    "should return correct config" in {
+      val config = validate200Hocon(dex1.rawApi.getMatcherConfig).rendered
+
+      Set("user", "pass", "seed", "private", "java", "sun", "api").foreach(config should not contain _)
+    }
+
+    "should return correct error with incorrect x-api-key header" in {
+      validateAuthorizationError(dex1.rawApi.getMatcherConfig(Map("X-API_KEY" -> "incorrect")))
+    }
+
+    "should return correct error without x-api-key header" in {
+      validateAuthorizationError(dex1.rawApi.getMatcherConfig(Map.empty))
+    }
+  }
 
 }

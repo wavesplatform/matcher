@@ -144,8 +144,11 @@ trait DexApi[F[_]] {
   def allSnapshotOffsets: F[HttpSnapshotOffsets]
   def saveSnapshots: F[HttpMessage]
 
-  def settings: F[HttpMatcherPublicSettings]
-  def config: F[Config]
+  def getMatcherSettings: F[HttpMatcherPublicSettings]
+  def getMatcherConfig: F[Config]
+  def getMatcherConfig(headers: Map[String, String]): F[Config]
+
+  def getMatcherPublicKey: F[String]
 
   def wsConnections: F[HttpWebSocketConnections]
   def closeWsConnections(oldestNumber: Int): F[HttpMessage]

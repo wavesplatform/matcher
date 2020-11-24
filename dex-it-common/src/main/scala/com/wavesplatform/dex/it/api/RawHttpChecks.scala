@@ -9,11 +9,15 @@ trait RawHttpChecks extends Matchers {
   private def assertResponseContainHeaders[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT], expected: (String, String)*): Unit =
     expected.foreach(r.response.headers should contain(_))
 
-  protected def validate200Json[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT]): EntityT = {
+  private def validate200[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT], contentType: String): EntityT = {
     r.response.code should be(StatusCodes.Ok)
-    assertResponseContainHeaders(r, "Content-Type" -> "application/json")
+    assertResponseContainHeaders(r, "Content-Type" -> contentType)
     r.unsafeGet
   }
+
+  protected def validate200Hocon[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT]): EntityT = validate200(r, "application/hocon")
+
+  protected def validate200Json[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT]): EntityT = validate200(r, "application/json")
 
   def validateIncorrectSignature[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT]) =
     validateMatcherError(r, StatusCodes.BadRequest, 1051904, "The request has an invalid signature")

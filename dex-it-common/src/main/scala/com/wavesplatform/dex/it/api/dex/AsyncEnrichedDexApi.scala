@@ -307,16 +307,23 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
     sttp.post(uri"$apiUri/matcher/debug/saveSnapshots").headers(apiKeyHeaders)
   }
 
-  override def settings: R[HttpMatcherPublicSettings] = mk {
+  override def getMatcherSettings: R[HttpMatcherPublicSettings] = mk {
     sttp
       .get(uri"$apiUri/matcher/settings")
       .headers(apiKeyHeaders)
   }
 
-  override def config: R[Config] = mkHocon {
+  override def getMatcherConfig(headers: Map[String, String]): R[Config] = mkHocon {
     sttp
       .get(uri"$apiUri/matcher/debug/config")
-      .headers(apiKeyHeaders)
+      .headers(headers)
+  }
+
+  override def getMatcherConfig: R[Config] = getMatcherConfig(apiKeyHeaders)
+
+  override def getMatcherPublicKey: R[String] = mk {
+    sttp
+      .get(uri"$apiUri/matcher")
   }
 
   override def wsConnections: R[HttpWebSocketConnections] = mk {

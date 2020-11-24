@@ -118,14 +118,24 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .contentType("application/json", "UTF-8")
   }
 
-  override def orderStatus(assetPair: AssetPair, id: Id): R[HttpOrderStatus] = mk {
+  override def getOrderStatus(amountAsset: String, priceAsset: String, id: String): R[HttpOrderStatus] = mk {
     sttp
-      .get(uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/$id")
+      .get(uri"$apiUri/matcher/orderbook/$amountAsset/$priceAsset/$id")
       .readTimeout(3.minutes) // TODO find way to decrease timeout!
       .followRedirects(false)
   }
 
-  override def orderStatusInfoByIdWithApiKey(
+  override def getOrderStatusInfoById(
+    address: String,
+    orderId: String,
+    headers: Map[String, String] = Map.empty
+  ): R[HttpOrderBookHistoryItem] = mk {
+    sttp
+      .get(uri"$apiUri/matcher/orders/$address/$orderId")
+      .headers(headers)
+  }
+
+  override def getOrderStatusInfoByIdWithApiKey(
     owner: Address,
     orderId: Id,
     xUserPublicKey: Option[PublicKey]
@@ -135,15 +145,29 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .headers(apiKeyWithUserPublicKeyHeaders(xUserPublicKey))
   }
 
-  override def orderStatusInfoByIdWithSignature(owner: KeyPair, orderId: Id, timestamp: Long): R[HttpOrderBookHistoryItem] = mk {
-    sttp
-      .get(uri"$apiUri/matcher/orderbook/${owner.publicKey}/${orderId.toString}")
-      .headers(timestampAndSignatureHeaders(owner, timestamp))
+  override def getOrderStatusInfoByIdWithSignature(publicKey: String, orderId: String, headers: Map[String, String]): R[HttpOrderBookHistoryItem] =
+    mk {
+      sttp
+        .get(uri"$apiUri/matcher/orderbook/$publicKey/$orderId")
+        .headers(headers)
+    }
+
+  override def getOrderStatusInfoByIdWithSignature(
+    publicKey: String,
+    orderId: String,
+    timestamp: Long,
+    signature: String
+  ): R[HttpOrderBookHistoryItem] =
+    getOrderStatusInfoByIdWithSignature(publicKey, orderId, Map("timestamp" -> timestamp.toString, "signature" -> signature))
+
+  override def getOrderStatusInfoByIdWithSignature(owner: KeyPair, orderId: Id, timestamp: Long): R[HttpOrderBookHistoryItem] =
+    getOrderStatusInfoByIdWithSignature(Base58.encode(owner.publicKey), orderId.toString, timestampAndSignatureHeaders(owner, timestamp))
+
+  override def getTransactionsByOrder(orderId: String): R[List[ExchangeTransaction]] = mk {
+    sttp.get(uri"$apiUri/matcher/transactions/$orderId")
   }
 
-  override def transactionsByOrder(id: Id): R[List[ExchangeTransaction]] = mk {
-    sttp.get(uri"$apiUri/matcher/transactions/$id")
-  }
+  override def getTransactionsByOrder(id: Id): R[List[ExchangeTransaction]] = getTransactionsByOrder(id.toString)
 
   /**
    * param @activeOnly Server treats this parameter as false if it wasn't specified

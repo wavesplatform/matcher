@@ -101,8 +101,8 @@ class OrderBookTestSuite extends MatcherSuiteBase {
     }
 
     "it should not affect other pairs and their orders" in {
-      dex1.api.orderStatus(buyOrderForAnotherPair).status shouldBe Status.Accepted
-      dex1.api.orderStatus(sellOrderForAnotherPair).status shouldBe Status.Accepted
+      dex1.api.getOrderStatus(buyOrderForAnotherPair).status shouldBe Status.Accepted
+      dex1.api.getOrderStatus(sellOrderForAnotherPair).status shouldBe Status.Accepted
       dex1.api.place(mkOrder(alice, wctWavesPair, BUY, amount, price))
 
       val orderBook = dex1.api.getOrderBook(wctWavesPair)

@@ -1,13 +1,12 @@
 package com.wavesplatform.it.matcher.api.http
 
 import com.google.common.primitives.Longs
-import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
-import com.wavesplatform.dex.it.api.{EnrichedResponse, RawHttpChecks}
+import com.wavesplatform.dex.it.api.RawHttpChecks
 import com.wavesplatform.it.MatcherSuiteBase
 import org.scalatest.prop.TableDrivenPropertyChecks
 
@@ -25,9 +24,6 @@ class GetReservedBalanceSpec extends MatcherSuiteBase with TableDrivenPropertyCh
     broadcastAndAwait(IssueUsdTx, IssueBtcTx)
     dex1.start()
   }
-
-  def validateIncorrectSignature[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT]) =
-    validateMatcherError(r, StatusCodes.BadRequest, 1051904, "The request has an invalid signature")
 
   "GET /matcher/balance/reserved/{publicKey}" - {
     "should return empty object if account doesn't have opened orders" in {
@@ -61,25 +57,25 @@ class GetReservedBalanceSpec extends MatcherSuiteBase with TableDrivenPropertyCh
     }
 
     //TODO: change after DEX-978
-    "should return error if publicKey is not correct base58 string" in {
+    "should return an error if publicKey is not correct base58 string" in {
       validate404Exception(dex1.rawApi.getReservedBalance("null", System.currentTimeMillis, "sign"))
     }
 
-    "should return error if publicKey parameter has the different value of used in signature" in {
+    "should return an error if publicKey parameter has the different value of used in signature" in {
       val ts = System.currentTimeMillis
       val sign = Base58.encode(crypto.sign(alice, alice.publicKey ++ Longs.toByteArray(ts)))
 
       validateIncorrectSignature(dex1.rawApi.getReservedBalance(Base58.encode(bob.publicKey), ts, sign))
     }
 
-    "should return error if timestamp header has the different value of used in signature" in {
+    "should return an error if timestamp header has the different value of used in signature" in {
       val ts = System.currentTimeMillis
       val sign = Base58.encode(crypto.sign(alice, alice.publicKey ++ Longs.toByteArray(ts)))
 
       validateIncorrectSignature(dex1.rawApi.getReservedBalance(Base58.encode(alice.publicKey), ts + 1000, sign))
     }
 
-    "should return error with incorrect signature" in {
+    "should return an error with incorrect signature" in {
       validateIncorrectSignature(dex1.rawApi.getReservedBalance(Base58.encode(alice.publicKey), System.currentTimeMillis, "incorrect"))
     }
   }

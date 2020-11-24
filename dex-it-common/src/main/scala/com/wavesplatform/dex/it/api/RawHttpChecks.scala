@@ -21,6 +21,9 @@ trait RawHttpChecks extends Matchers {
     assertResponseContainHeaders(r, "Content-Type" -> "application/json")
     r.unsafeGet
   }
+  
+  def validateIncorrectSignature[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT]) =
+    validateMatcherError(r, StatusCodes.BadRequest, 1051904, "The request has an invalid signature")
 
   protected def validate301Redirect[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT]): Unit =
     r.response.code should be(StatusCodes.MovedPermanently)

@@ -90,7 +90,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
 
     "check filled amount and tradable balance" in {
       val bobOrder = dex1.api.orderHistory(bob).head
-      val filledAmount = dex1.api.orderStatus(bobOrder.assetPair, bobOrder.id).filledAmount.getOrElse(0L)
+      val filledAmount = dex1.api.getOrderStatus(bobOrder.assetPair, bobOrder.id).filledAmount.getOrElse(0L)
 
       filledAmount shouldBe adjustedAmount
     }

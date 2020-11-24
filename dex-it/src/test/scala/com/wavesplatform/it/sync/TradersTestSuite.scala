@@ -108,7 +108,7 @@ class TradersTestSuite extends MatcherSuiteBase {
             }
 
             withClue(s"The oldest order of version $orderV '${oldestOrder.idStr()}' is still active\n") {
-              dex1.api.orderStatus(oldestOrder).status shouldBe Status.Accepted
+              dex1.api.getOrderStatus(oldestOrder).status shouldBe Status.Accepted
             }
 
             withClue("Cleanup\n") {
@@ -136,7 +136,7 @@ class TradersTestSuite extends MatcherSuiteBase {
             }
 
             withClue(s"The oldest order of version $orderV '${oldestOrder.idStr()}' is still active") {
-              dex1.api.orderStatus(oldestOrder).status shouldBe Status.Accepted
+              dex1.api.getOrderStatus(oldestOrder).status shouldBe Status.Accepted
             }
 
             withClue("Cleanup") {
@@ -164,7 +164,7 @@ class TradersTestSuite extends MatcherSuiteBase {
             }
 
             withClue(s"The oldest order of version $orderV '${oldestOrder.idStr()}' is still active") {
-              dex1.api.orderStatus(oldestOrder).status shouldBe Status.Accepted
+              dex1.api.getOrderStatus(oldestOrder).status shouldBe Status.Accepted
             }
 
             withClue("Cleanup") {
@@ -192,7 +192,7 @@ class TradersTestSuite extends MatcherSuiteBase {
             dex1.api.waitForOrderStatus(newestOrder, Status.Cancelled)
           }
           withClue(s"The oldest order '${oldestOrder.idStr()}' is still active") {
-            dex1.api.orderStatus(oldestOrder).status shouldBe Status.Accepted
+            dex1.api.getOrderStatus(oldestOrder).status shouldBe Status.Accepted
           }
 
           withClue("Cleanup") {

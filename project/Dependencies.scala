@@ -175,7 +175,8 @@ object Dependencies {
     scalaTestPlusCheck,
     scalaMock,
     javaLevelDb,
-    allureScalaTest
+    allureScalaTest,
+    diffx
   ) map (_ % Test)
 
   private val integrationTestKit: Seq[ModuleID] = Seq(wavesJ, logback % Test) ++ testKit

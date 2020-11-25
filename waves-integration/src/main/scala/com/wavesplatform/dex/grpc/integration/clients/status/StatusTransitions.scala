@@ -6,6 +6,7 @@ import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.clients.status.WavesNodeEvent._
 import com.wavesplatform.dex.grpc.integration.clients.status.BlockchainStatus._
 import com.wavesplatform.dex.grpc.integration.clients.status.StatusUpdate.LastBlockHeight
+import com.wavesplatform.dex.grpc.integration.clients.status.WavesNodeEvent.RolledBack.To
 
 import scala.collection.immutable.Queue
 
@@ -22,7 +23,7 @@ object StatusTransitions extends ScorexLogging {
       case origStatus: Normal =>
         event match {
           case Appended(block, forgedTxIds) =>
-            val utxEventsStash = Queue(WavesNodeUtxEvent.Forged(forgedTxIds))
+            val utxEventsStash = if (forgedTxIds.isEmpty) Queue.empty else Queue(WavesNodeUtxEvent.Forged(forgedTxIds))
             origStatus.mainFork.withBlock(block) match {
               case Left(e) =>
                 log.error(s"Forcibly rollback, because of error: $e")
@@ -64,20 +65,11 @@ object StatusTransitions extends ScorexLogging {
               processUtxEvents = Queue(WavesNodeUtxEvent.Switched(newTxs))
             )
 
-          case RolledBackTo(commonBlockRef) =>
-            val (commonFork, droppedDiff) = origStatus.mainFork.dropAfter(commonBlockRef)
-            StatusUpdate(
-              newStatus = TransientRollback(
-                newFork = commonFork,
-                newForkChanges = Monoid.empty[BlockchainBalance],
-                previousForkHeight = origStatus.currentHeightHint,
-                previousForkDiffIndex = droppedDiff,
-                utxEventsStash = Queue.empty
-              )
-            )
-
-          case SyncFailed(height) =>
-            val (commonFork, droppedDiff) = origStatus.mainFork.dropFrom(height)
+          case RolledBack(to) =>
+            val (commonFork, droppedDiff) = to match {
+              case To.CommonBlockRef(ref) => origStatus.mainFork.dropAfter(ref)
+              case To.Height(h) => origStatus.mainFork.dropAfter(h)
+            }
             StatusUpdate(
               newStatus = TransientRollback(
                 newFork = commonFork,
@@ -97,7 +89,8 @@ object StatusTransitions extends ScorexLogging {
       case origStatus: TransientRollback =>
         event match {
           case Appended(block, forgedTxIds) =>
-            val updatedUtxEventsStash = origStatus.utxEventsStash.enqueue(WavesNodeUtxEvent.Forged(forgedTxIds))
+            val updatedUtxEventsStash =
+              if (forgedTxIds.isEmpty) Queue.empty else origStatus.utxEventsStash.enqueue(WavesNodeUtxEvent.Forged(forgedTxIds))
             origStatus.newFork.withBlock(block) match {
               case Left(e) =>
                 log.error(s"Forcibly rollback, because of error: $e")
@@ -156,20 +149,11 @@ object StatusTransitions extends ScorexLogging {
           case UtxSwitched(newTxs) =>
             StatusUpdate(newStatus = origStatus.copy(utxEventsStash = origStatus.utxEventsStash.enqueue(WavesNodeUtxEvent.Switched(newTxs))))
 
-          case RolledBackTo(commonBlockRef) =>
-            val (commonFork, droppedDiff) = origStatus.newFork.dropAfter(commonBlockRef)
-            StatusUpdate(
-              newStatus = TransientRollback(
-                newFork = commonFork,
-                newForkChanges = Monoid.empty[BlockchainBalance],
-                previousForkHeight = origStatus.previousForkHeight,
-                previousForkDiffIndex = origStatus.previousForkDiffIndex |+| droppedDiff,
-                utxEventsStash = origStatus.utxEventsStash
-              )
-            )
-
-          case SyncFailed(height) =>
-            val (commonFork, droppedDiff) = origStatus.newFork.dropFrom(height)
+          case RolledBack(to) =>
+            val (commonFork, droppedDiff) = to match {
+              case To.CommonBlockRef(ref) => origStatus.newFork.dropAfter(ref)
+              case To.Height(h) => origStatus.newFork.dropAfter(h)
+            }
             StatusUpdate(
               newStatus = TransientRollback(
                 newFork = commonFork,

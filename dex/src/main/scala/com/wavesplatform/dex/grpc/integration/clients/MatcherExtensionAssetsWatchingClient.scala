@@ -1,7 +1,5 @@
 package com.wavesplatform.dex.grpc.integration.clients
 
-import java.net.InetAddress
-
 import cats.Monoid
 import cats.instances.future._
 import cats.syntax.apply._

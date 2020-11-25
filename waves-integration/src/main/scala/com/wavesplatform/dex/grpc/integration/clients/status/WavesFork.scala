@@ -50,8 +50,8 @@ case class WavesFork(history: List[WavesBlock]) {
     (WavesFork(commonHistory), droppedHistory.foldMap(_.diffIndex))
   }
 
-  def dropFrom(height: Int): (WavesFork, DiffIndex) = {
-    val (droppedHistory, commonHistory) = history.splitOnCondReversed(_.ref.height >= height)
+  def dropAfter(height: Int): (WavesFork, DiffIndex) = {
+    val (droppedHistory, commonHistory) = history.splitOnCondReversed(_.ref.height > height)
     (WavesFork(commonHistory), droppedHistory.foldMap(_.diffIndex))
   }
 

@@ -53,9 +53,9 @@ class OrderJsonSpec extends WavesIntegrationSuiteBase with Matchers {
        |  "proofs" : [ "7dsUd1bQZFWCEKyYqkPxd5AE7x88QUK6xJH86KcqtE2LHURxN92QEJRfojHkgezez6fppDGvTCUcr4ZmrPRKmTZ" ]
        |}""".stripMargin
 
-  "Domain OrderV3" should {
+  "Domain OrderV3 should" - {
 
-    "be deserialized from JSON" when {
+    "be deserialized from JSON when" - {
 
       "matcherFeeAssetId passed as null" in {
         Json.parse(getOrderJson("null".some)).as[Order] updateProofs order.proofs shouldBe order

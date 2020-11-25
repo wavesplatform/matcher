@@ -15,9 +15,6 @@ object BlockchainStatus {
     override def toString: String = s"Normal(${mainFork.history.headOption.map(_.ref)})"
   }
 
-  /**
-   * @param newFork Required to be non-empty
-   */
   case class TransientRollback(
     newFork: WavesFork,
     newForkChanges: BlockchainBalance, // from a common block
@@ -25,7 +22,7 @@ object BlockchainStatus {
     previousForkDiffIndex: DiffIndex, // from a common block TODO should really be from the common block
     utxEventsStash: Queue[WavesNodeUtxEvent]
   ) extends BlockchainStatus {
-    require(newFork.history.nonEmpty, "newFork must not be empty!")
+    // require(newFork.history.nonEmpty, "newFork must not be empty!") // It looks like we don't need such requirement
 
     override def toString: String =
       s"TransientRollback(n=${newFork.history.headOption.map(_.ref)}, h=$previousForkHeight, utx=${utxEventsStash.size})"

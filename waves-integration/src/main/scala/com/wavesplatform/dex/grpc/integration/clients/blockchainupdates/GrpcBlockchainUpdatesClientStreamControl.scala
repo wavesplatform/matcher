@@ -44,9 +44,9 @@ class GrpcBlockchainUpdatesClientStreamControl(
   private def doOnError(e: Throwable): Unit = {
     // TODO probably we need something like backpressure to no process invalid preloaded blocks after SyncFailed
     log.warn(s"Got an error in blockchain events", e)
-    val fromHeight = math.max(1, checkpointHeight - 1)
+    val fromHeight = math.max(1, checkpointHeight) // was: checkpointHeight - 1
     // It needs to be before the delay to obtain the UTX stream connection before blocks
-    subject.onNext(WavesNodeEvent.SyncFailed(fromHeight))
+    subject.onNext(WavesNodeEvent.RolledBack(WavesNodeEvent.RolledBack.To.Height(fromHeight)))
     // TODO need to stop?
     scheduler.scheduleOnce(50.millis) { // TODO to config
       // TODO

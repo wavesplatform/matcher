@@ -13,12 +13,21 @@ object WavesNodeEvent {
   }
 
   // Could also happen on appending of a key block
-  case class RolledBackTo(commonBlockRef: BlockRef) extends WavesNodeEvent {
-    override def toString: String = s"RolledBackTo(${commonBlockRef.height}, ${commonBlockRef.id})"
-  }
+  case class RolledBack(to: RolledBack.To) extends WavesNodeEvent
 
-  case class SyncFailed(dropFrom: Int) extends WavesNodeEvent {
-    override def toString: String = s"SyncFailed($dropFrom)"
+  object RolledBack {
+    sealed trait To extends Product with Serializable
+
+    object To {
+
+      case class CommonBlockRef(ref: BlockRef) extends To {
+        override def toString: String = s"CommonBlockRef(${ref.height}, ${ref.id})"
+      }
+
+      case class Height(h: Int) extends To
+
+    }
+
   }
 
   case class DataReceived(updates: BlockchainBalance) extends WavesNodeEvent {
@@ -34,6 +43,7 @@ object WavesNodeEvent {
   }
 
   sealed trait WavesNodeUtxEvent extends Product with Serializable
+
   object WavesNodeUtxEvent {
     case class Added(txs: Seq[UtxTransaction]) extends WavesNodeUtxEvent
     case class Forged(txIds: Seq[ByteString]) extends WavesNodeUtxEvent

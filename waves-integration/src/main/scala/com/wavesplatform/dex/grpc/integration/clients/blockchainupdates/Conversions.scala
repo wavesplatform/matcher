@@ -49,7 +49,8 @@ object Conversions {
 
       case Update.Rollback(value) =>
         value.`type` match {
-          case RollbackType.BLOCK | RollbackType.MICROBLOCK => WavesNodeEvent.RolledBackTo(blockRef).some
+          case RollbackType.BLOCK | RollbackType.MICROBLOCK =>
+            WavesNodeEvent.RolledBack(WavesNodeEvent.RolledBack.To.CommonBlockRef(blockRef)).some
           case _: RollbackType.Unrecognized => none
         }
     }

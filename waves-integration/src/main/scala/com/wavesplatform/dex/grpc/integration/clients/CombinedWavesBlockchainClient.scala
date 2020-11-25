@@ -1,6 +1,5 @@
 package com.wavesplatform.dex.grpc.integration.clients
 
-import java.net.InetAddress
 import java.util.concurrent.atomic.AtomicReference
 
 import cats.Monoid

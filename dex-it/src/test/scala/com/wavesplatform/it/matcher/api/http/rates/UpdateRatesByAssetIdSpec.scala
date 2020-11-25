@@ -44,7 +44,7 @@ class UpdateRatesByAssetIdSpec extends MatcherSuiteBase with RawHttpChecks {
       validateMatcherError(dex1.rawApi.upsertRate(btc, 0), StatusCodes.BadRequest, 20971535, "Asset rate should be positive")
     }
 
-    //TODO: DEX-985UpdateRatesByAssetIdSpec
+    //TODO: DEX-985
     "should return error if  the rate value more than Double.max" ignore {
       validateMatcherError(dex1.rawApi.upsertRate(btc, "2.79769311348623157E308"), StatusCodes.BadRequest, -1, "Error")
     }

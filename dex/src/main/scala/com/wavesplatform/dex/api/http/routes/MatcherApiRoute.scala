@@ -135,13 +135,13 @@ class MatcherApiRoute(
   private val orderBookRoutes: Route = pathPrefix("orderbook") {
     protect {
       getOrderBookInfo ~ getOrderStatusInfoByIdWithSignature ~ getOrderBook ~ getOrderBookStatus ~ placeLimitOrder ~
-      placeMarketOrder ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~ tradableBalance ~
-      orderStatus ~ historyDelete ~ cancel ~ cancelAll ~ getOrderBooks ~ orderBookDelete
+      placeMarketOrder ~ getOrderHistoryByAssetPairAndPublicKey ~ getOrderHistoryByPublicKey ~ tradableBalance ~
+      orderStatus ~ deleteOrderHistory ~ cancel ~ cancelAll ~ getOrderBooks ~ orderBookDelete
     }
   }
 
   private val ordersRoutes: Route = pathPrefix("orders") {
-    protect(getAllOrderHistory ~ getOrderStatusInfoByIdWithApiKey ~ cancelAllById ~ forceCancelOrder)
+    protect(getOrderHistoryByApiKey ~ getOrderStatusInfoByIdWithApiKey ~ cancelAllById ~ forceCancelOrder)
   }
 
   override lazy val route: Route = pathPrefix("matcher") {
@@ -679,7 +679,7 @@ class MatcherApiRoute(
       )
     )
   )
-  def historyDelete: Route = path(AssetPairPM / "delete") { _ =>
+  def deleteOrderHistory: Route = path(AssetPairPM / "delete") { _ =>
     post {
       entity(as[HttpCancelOrder]) { req =>
         complete {
@@ -737,7 +737,7 @@ class MatcherApiRoute(
       )
     )
   )
-  def getAssetPairAndPublicKeyOrderHistory: Route = (path(AssetPairPM / "publicKey" / PublicKeyPM) & get) { (p, publicKey) =>
+  def getOrderHistoryByAssetPairAndPublicKey: Route = (path(AssetPairPM / "publicKey" / PublicKeyPM) & get) { (p, publicKey) =>
     withAssetPair(p, redirectToInverse = true, s"/publicKey/$publicKey") { pair =>
       parameters("activeOnly".as[Boolean].?, "closedOnly".as[Boolean].?) { (activeOnly, closedOnly) =>
         signedGet(publicKey) {
@@ -784,7 +784,7 @@ class MatcherApiRoute(
       )
     )
   )
-  def getPublicKeyOrderHistory: Route = (path(PublicKeyPM) & get) { publicKey =>
+  def getOrderHistoryByPublicKey: Route = (path(PublicKeyPM) & get) { publicKey =>
     parameters("activeOnly".as[Boolean].?, "closedOnly".as[Boolean].?) { (activeOnly, closedOnly) =>
       signedGet(publicKey) {
         loadOrders(publicKey, None, getOrderListType(activeOnly, closedOnly, OrderListType.All))
@@ -822,7 +822,7 @@ class MatcherApiRoute(
       )
     )
   )
-  def getAllOrderHistory: Route = (path(AddressPM) & get & withAuth & withUserPublicKeyOpt) { (addressOrError, userPublicKey) =>
+  def getOrderHistoryByApiKey: Route = (path(AddressPM) & get & withAuth & withUserPublicKeyOpt) { (addressOrError, userPublicKey) =>
     withCorrectAddress(addressOrError) { address =>
       userPublicKey match {
         case Some(upk) if upk.toAddress != address => invalidUserPublicKey

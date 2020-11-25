@@ -31,7 +31,10 @@ import monix.execution.Scheduler
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 
+import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, Future, Promise}
+
+// TODO refactor this package, hard to read
 
 /**
  * @param eventLoopGroup Here, because this class takes ownership
@@ -55,7 +58,8 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
   private val empty: Empty = Empty()
 
   private def requestUtxEvents(): Unit = {
-    val call = channel.newCall(METHOD_GET_UTX_EVENTS, CallOptions.DEFAULT)
+    // https://github.com/grpc/grpc/blob/master/doc/wait-for-ready.md
+    val call = channel.newCall(METHOD_GET_UTX_EVENTS, CallOptions.DEFAULT.withWaitForReady()) // TODO withDeadline
     ClientCalls.asyncServerStreamingCall(call, empty, new UtxEventsObserver(call))
   }
 
@@ -152,8 +156,8 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
     shuttingDown.set(true)
     channel.shutdown()
     channel.awaitTermination(500, TimeUnit.MILLISECONDS)
-    // See NettyChannelBuilder.eventLoopGroup
-    eventLoopGroup.shutdownGracefully(0, 500, TimeUnit.MILLISECONDS).asScala.map(_ => ())
+    if (eventLoopGroup.isShuttingDown) Future.successful(())
+    else eventLoopGroup.shutdownGracefully(0, 500, TimeUnit.MILLISECONDS).asScala.map(_ => ())
   }
 
   final private class UtxEventsObserver(call: ClientCall[Empty, UtxEvent]) extends ClientResponseObserver[Empty, UtxEvent] with AutoCloseable {
@@ -168,8 +172,9 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
     override def onNext(value: UtxEvent): Unit = toEvent(value).foreach(utxEventsSubject.onNext)
 
     override def onError(e: Throwable): Unit = if (!shuttingDown.get()) {
-      channel.resetConnectBackoff()
-      requestUtxEvents()
+      log.warn(s"Got an error in utx events", e)
+      // channel.resetConnectBackoff()
+      monixScheduler.scheduleOnce(50.millis)(requestUtxEvents())
     }
 
     override def onCompleted(): Unit = log.info(s"Utx events stream completed")

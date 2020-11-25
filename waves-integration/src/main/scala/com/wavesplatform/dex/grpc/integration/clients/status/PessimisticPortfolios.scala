@@ -38,8 +38,10 @@ private[clients] class PessimisticPortfolios extends ScorexLogging {
 
   // TODO decorate?
   private val MaxForgedTransactions = 10000
-  private val forgedTxsCache: mutable.Queue[ByteString] = new mutable.Queue[ByteString](MaxForgedTransactions)
+  private val forgedTxsCache: mutable.Queue[ByteString] = new mutable.Queue[ByteString](MaxForgedTransactions) // TODO better data structure
 
+  // TODO what we need to remove from forgedTxCache?
+  // TODO if setTxs == txs?
   def replaceWith(setTxs: Seq[UtxTransaction]): Set[Address] = write {
     val setTxMap = setTxs.collect { case tx if !forgedTxsCache.contains(tx.id) => tx.id -> tx }.toMap
     val oldTxIds = txs.keySet.toSet -- setTxMap.keySet
@@ -62,6 +64,7 @@ private[clients] class PessimisticPortfolios extends ScorexLogging {
     diff.keySet
   }
 
+  // TODO also remove from cache
   def processForged(txIds: Seq[ByteString]): Set[Address] = write {
     log.info(s"processForged: ${txIds.map(_.toVanilla)}")
     txIds.toList.foldMapK[Set, Address] { txId =>
@@ -69,7 +72,7 @@ private[clients] class PessimisticPortfolios extends ScorexLogging {
         if (affected.isEmpty) { // We haven't seen this tx
           if (forgedTxsCache.size == MaxForgedTransactions) forgedTxsCache.removeLast()
           forgedTxsCache.addOne(txId)
-        }
+        } // else forgedTxsCache.removeFirst(_ == txId) OR in addPending
       }
     }
   }

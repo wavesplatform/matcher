@@ -37,7 +37,7 @@ class DefaultBlockchainUpdatesClient(eventLoopGroup: EventLoopGroup, channel: Ma
         if (isClosing) none
         else {
           log.debug(s"Subscribed on blockchain events from $fromHeight")
-          val call = channel.newCall(BlockchainUpdatesApiGrpc.METHOD_SUBSCRIBE, CallOptions.DEFAULT)
+          val call = channel.newCall(BlockchainUpdatesApiGrpc.METHOD_SUBSCRIBE, CallOptions.DEFAULT.withWaitForReady())
           val r = new GrpcBlockchainEventsObserver(subject, Conversions.toEvent, isClosing, call, onError)
 
           ClientCalls.asyncServerStreamingCall(call, new SubscribeRequest(fromHeight), r)
@@ -53,9 +53,9 @@ class DefaultBlockchainUpdatesClient(eventLoopGroup: EventLoopGroup, channel: Ma
     isClosing = true
     channel.shutdown()
     channel.awaitTermination(500, TimeUnit.MILLISECONDS)
-    // See NettyChannelBuilder.eventLoopGroup
-    // TODO can we have one loop group for both clients?
-    eventLoopGroup.shutdownGracefully(0, 500, TimeUnit.MILLISECONDS).asScala.map(_ => ())
+    // TODO remove duplication
+    if (eventLoopGroup.isShuttingDown) Future.successful(())
+    else eventLoopGroup.shutdownGracefully(0, 500, TimeUnit.MILLISECONDS).asScala.map(_ => ())
   }
 
 }

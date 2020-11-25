@@ -126,7 +126,7 @@ object StatusTransitions extends ScorexLogging {
                   )
                 else {
                   // We don't a height, because a micro block comes after all blocks
-                  val requestBalances = origStatus.previousForkDiffIndex.without(newForkChanges.diffIndex)
+                  val requestBalances = origStatus.previousForkDiffIndex.without(newForkChanges.diffIndex) // TODO
                   val (newStatus, updatedProcessUtxEvents) =
                     if (requestBalances.isEmpty) Normal(
                       mainFork = updatedNewFork,
@@ -188,7 +188,9 @@ object StatusTransitions extends ScorexLogging {
 
       case origStatus: TransientResolving =>
         event match {
-          // TODO We can stuck if waiting for DataReceiving in stash!!!!
+          // TODO We can stuck if waiting for DataReceiving in stash, because we don't send a request !!!!
+          // OR not, because we are creating a new stash
+          // Also we need a some protection from stuck!
           case DataReceived(updates) =>
             // TODO optimize. Probably we don't need to request all data. E.g. we hadn't this address in last 100 blocks and we got its balance 101 block before
             val init = StatusUpdate(

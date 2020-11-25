@@ -22,7 +22,7 @@ object BlockchainStatus {
     newFork: WavesFork,
     newForkChanges: BlockchainBalance, // from a common block
     previousForkHeight: Int,
-    previousForkDiffIndex: DiffIndex, // from a common block
+    previousForkDiffIndex: DiffIndex, // from a common block TODO should really be from the common block
     utxEventsStash: Queue[WavesNodeUtxEvent]
   ) extends BlockchainStatus {
     require(newFork.history.nonEmpty, "newFork must not be empty!")

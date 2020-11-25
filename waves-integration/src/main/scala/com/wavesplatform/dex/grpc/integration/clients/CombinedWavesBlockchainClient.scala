@@ -54,7 +54,7 @@ class CombinedWavesBlockchainClient(
   override val updates: Observable[Updates] = Observable.fromFuture(meClient.currentBlockInfo).flatMap { startBlockInfo =>
     val startHeight = math.max(startBlockInfo.height - MaxRollbackHeight - 1, 1)
 
-    // TODO Wait until both connections restored!
+    // TODO Wait until both connections restored, because one node could be behind another!
     val finalBalance = mutable.Map.empty[Address, Map[Asset, Long]]
     val init: BlockchainStatus = BlockchainStatus.Normal(WavesFork(List.empty), startHeight)
     val (blockchainEvents, control) = bClient.blockchainEvents(startHeight)

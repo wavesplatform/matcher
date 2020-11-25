@@ -14,24 +14,24 @@ class DeleteRatesSpec extends MatcherSuiteBase with RawHttpChecks {
 
   override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(
     s"""waves.dex {
-       |  price-assets = [ "$BtcId", "$UsdId", "WAVES" ]
+       |  price-assets = [ "$UsdId", "WAVES" ]
        |}""".stripMargin
   )
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
-    broadcastAndAwait(IssueBtcTx, IssueUsdTx)
+    broadcastAndAwait(IssueUsdTx)
     dex1.start()
   }
 
-  "DELETE /matcher/settings/rates/{assetId} " - {
+  "DELETE /matcher/settings/rates/{assetId}" - {
 
     "should delete rate by asset id" in {
       validate201Json(dex1.rawApi.upsertRate(usd, 0.01)).message should be(s"The rate 0.01 for the asset $UsdId added")
       validate200Json(dex1.rawApi.deleteRate(usd)).message should be(s"The rate for the asset $UsdId deleted, old value = 0.01")
     }
 
-    "should return error for unexisted asset" in {
+    "should return error when rate was not specified" in {
       validateMatcherError(dex1.rawApi.deleteRate(usd), StatusCodes.NotFound, 20971529, s"The rate for the asset $UsdId was not specified")
     }
 

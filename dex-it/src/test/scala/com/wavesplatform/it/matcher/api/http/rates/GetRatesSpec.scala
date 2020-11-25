@@ -12,17 +12,17 @@ class GetRatesSpec extends MatcherSuiteBase with RawHttpChecks {
 
   override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(
     s"""waves.dex {
-       |  price-assets = [ "$BtcId", "$UsdId", "WAVES" ]
+       |  price-assets = [ "$UsdId", "WAVES" ]
        |}""".stripMargin
   )
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
-    broadcastAndAwait(IssueBtcTx, IssueUsdTx)
+    broadcastAndAwait(IssueUsdTx)
     dex1.start()
   }
 
-  "GET /matcher/settings/rates " - {
+  "GET /matcher/settings/rates" - {
 
     "should return default value when rates were not set up" in {
       validate200Json(dex1.rawApi.getRates) should be(defaultRates)

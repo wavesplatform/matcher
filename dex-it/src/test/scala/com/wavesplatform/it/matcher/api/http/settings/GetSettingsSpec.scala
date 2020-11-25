@@ -14,11 +14,11 @@ class GetSettingsSpec extends MatcherSuiteBase with RawHttpChecks {
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
-    broadcastAndAwait(IssueBtcTx, IssueUsdTx)
+    broadcastAndAwait(IssueUsdTx)
     dex1.start()
   }
 
-  "GET /matcher/settings " - {
+  "GET /matcher/settings" - {
 
     "should return correct settings" in {
       val settings = validate200Json(dex1.rawApi.getMatcherSettings)

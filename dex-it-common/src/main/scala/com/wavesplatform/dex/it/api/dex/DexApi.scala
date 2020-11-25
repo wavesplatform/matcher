@@ -132,6 +132,7 @@ trait DexApi[F[_]] {
   def getOrderBookStatus(amountAsset: String, priceAsset: String): F[HttpOrderBookStatus]
   def getOrderBookStatus(assetPair: AssetPair): F[HttpOrderBookStatus]
 
+  def deleteOrderBook(amountAsset: String, priceAsset: String, headers: Map[String, String]): F[HttpMessage]
   def deleteOrderBook(assetPair: AssetPair): F[HttpMessage]
 
   def upsertRate(asset: Asset, rate: Double): F[HttpMessage]

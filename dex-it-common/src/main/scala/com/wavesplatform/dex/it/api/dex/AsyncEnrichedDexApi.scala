@@ -254,12 +254,15 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
   override def getOrderBookStatus(assetPair: AssetPair): R[HttpOrderBookStatus] =
     getOrderBookStatus(assetPair.amountAssetStr, assetPair.priceAssetStr)
 
-  override def deleteOrderBook(assetPair: AssetPair): R[HttpMessage] = mk {
+  override def deleteOrderBook(amountAsset: String, priceAsset: String, headers: Map[String, String]): R[HttpMessage] = mk {
     sttp
-      .delete(uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}")
+      .delete(uri"$apiUri/matcher/orderbook/$amountAsset/$priceAsset")
       .followRedirects(false)
-      .headers(apiKeyHeaders)
+      .headers(headers)
   }
+
+  override def deleteOrderBook(assetPair: AssetPair): R[HttpMessage] =
+    deleteOrderBook(assetPair.amountAssetStr, assetPair.priceAssetStr, apiKeyHeaders)
 
   override def upsertRate(asset: Asset, rate: Double): R[HttpMessage] = mk {
     sttp

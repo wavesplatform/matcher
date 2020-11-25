@@ -61,16 +61,16 @@ class GetTradableBalanceSpec extends MatcherSuiteBase with TableDrivenPropertyCh
     }
 
     //TODO: change after DEX-980
-    "should return error exception when the amount asset is not correct base58 string" in {
+    "should return an error exception when the amount asset is not correct base58 string" in {
       validate404Exception(dex1.rawApi.getTradableBalance(alice.toAddress.stringRepr, "null", UsdId.toString))
     }
 
     //TODO: change after DEX-980
-    "should return error exception when the price asset is not correct base58 string" in {
+    "should return an error exception when the price asset is not correct base58 string" in {
       validate404Exception(dex1.rawApi.getTradableBalance(alice.toAddress.stringRepr, "WAVES", "null"))
     }
 
-    "should return error when amount asset doesn't exist" in {
+    "should return an error when amount asset doesn't exist" in {
       val incorrectAsset = "3Q6ndEq2z5UJwF4SF24ySRj9guPoFWaSeXP"
       validateMatcherError(
         dex1.rawApi.getTradableBalance(alice.toAddress.stringRepr, incorrectAsset, "WAVES"),
@@ -81,7 +81,7 @@ class GetTradableBalanceSpec extends MatcherSuiteBase with TableDrivenPropertyCh
     }
 
     //TODO:  DEX-981 | incorrect error, because of asset 3Q6ndEq2z5UJwF4SF24ySRj9guPoFWaSeXP doesn't exist
-    "should return error when price asset doesn't exist" in {
+    "should return an error when price asset doesn't exist" in {
       val incorrectAsset = "3Q6ndEq2z5UJwF4SF24ySRj9guPoFWaSeXP"
       validateMatcherError(
         dex1.rawApi.getTradableBalance(alice.toAddress.stringRepr, "WAVES", incorrectAsset),
@@ -95,7 +95,7 @@ class GetTradableBalanceSpec extends MatcherSuiteBase with TableDrivenPropertyCh
       validate301Redirect(dex1.rawApi.getTradableBalance(alice.toAddress.stringRepr, UsdId.toString, "WAVES"))
     }
 
-    "should return error if address has a bad checksum" in {
+    "should return an error if address has a bad checksum" in {
       validateMatcherError(
         dex1.rawApi.getTradableBalance("3Q6ndEq2z5UJwFaSF24ySRj9guPoFWaSeXX", "WAVES", UsdId.toString),
         StatusCodes.BadRequest,
@@ -104,7 +104,7 @@ class GetTradableBalanceSpec extends MatcherSuiteBase with TableDrivenPropertyCh
       )
     }
 
-    "should return error if address has an incorrect length" in {
+    "should return an error if address has an incorrect length" in {
       validateMatcherError(
         dex1.rawApi.getTradableBalance("AAAAA", "WAVES", UsdId.toString),
         StatusCodes.BadRequest,
@@ -113,7 +113,7 @@ class GetTradableBalanceSpec extends MatcherSuiteBase with TableDrivenPropertyCh
       )
     }
 
-    "should return error if address is not correct base58 string" in {
+    "should return an error if address is not correct base58 string" in {
       validateMatcherError(
         dex1.rawApi.getTradableBalance("null", "WAVES", UsdId.toString),
         StatusCodes.BadRequest,

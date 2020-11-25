@@ -46,30 +46,47 @@ trait DexApi[F[_]] {
     xUserPublicKey: Option[PublicKey] = None
   ): F[HttpSuccessfulBatchCancel]
 
-  def orderStatus(order: Order): F[HttpOrderStatus] = orderStatus(order.assetPair, order.id())
-  def orderStatus(assetPair: AssetPair, id: Order.Id): F[HttpOrderStatus]
+  def getOrderStatus(order: Order): F[HttpOrderStatus] = getOrderStatus(order.assetPair, order.id())
 
-  def orderStatusInfoByIdWithApiKey(
+  def getOrderStatus(assetPair: AssetPair, id: Order.Id): F[HttpOrderStatus] =
+    getOrderStatus(assetPair.amountAssetStr, assetPair.priceAssetStr, id.toString)
+
+  def getOrderStatus(amountAsset: String, priceAsset: String, id: String): F[HttpOrderStatus]
+
+  def getOrderStatusInfoById(
+    address: String,
+    orderId: String,
+    headers: Map[String, String] = Map.empty
+  ): F[HttpOrderBookHistoryItem]
+
+  def getOrderStatusInfoByIdWithApiKey(
     owner: Address,
     orderId: Order.Id,
     xUserPublicKey: Option[PublicKey]
   ): F[HttpOrderBookHistoryItem]
 
-  def orderStatusInfoByIdWithSignature(
+  def getOrderStatusInfoByIdWithSignature(publicKey: String, orderId: String, timestamp: Long, signature: String): F[HttpOrderBookHistoryItem]
+
+  def getOrderStatusInfoByIdWithSignature(publicKey: String, orderId: String, headers: Map[String, String]): F[HttpOrderBookHistoryItem]
+
+  def getOrderStatusInfoByIdWithSignature(
     owner: KeyPair,
     order: Order,
     timestamp: Long = System.currentTimeMillis
   ): F[HttpOrderBookHistoryItem] =
-    orderStatusInfoByIdWithSignature(owner, order.id(), timestamp)
+    getOrderStatusInfoByIdWithSignature(owner, order.id(), timestamp)
 
-  def orderStatusInfoByIdWithSignature(
+  def getOrderStatusInfoByIdWithSignature(
     owner: KeyPair,
     orderId: Order.Id,
     timestamp: Long
   ): F[HttpOrderBookHistoryItem]
 
-  def transactionsByOrder(order: Order): F[List[ExchangeTransaction]] = transactionsByOrder(order.id())
-  def transactionsByOrder(id: Order.Id): F[List[ExchangeTransaction]]
+  def getTransactionsByOrder(orderId: String): F[List[ExchangeTransaction]] = getTransactionsByOrder(orderId)
+
+  def getTransactionsByOrder(order: Order): F[List[ExchangeTransaction]] = getTransactionsByOrder(order.id())
+
+  def getTransactionsByOrder(id: Order.Id): F[List[ExchangeTransaction]]
 
   /**
    * param @activeOnly Server treats this parameter as false if it wasn't specified

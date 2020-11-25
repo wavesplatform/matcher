@@ -126,7 +126,7 @@ class MatcherApiRoute(
   private val ratesRoutes: Route = pathPrefix("rates")(getRates ~ protect(upsertRate ~ deleteRate))
   private val settingsRoutes: Route = pathPrefix("settings")(getSettings ~ ratesRoutes)
   private val balanceRoutes: Route = pathPrefix("balance")(protect(reservedBalance))
-  private val transactionsRoutes: Route = pathPrefix("transactions")(protect(getTransactionsByOrder))
+  private val transactionsRoutes: Route = pathPrefix("transactions")(protect(getOrderTransactions))
 
   private val debugRoutes: Route = pathPrefix("debug") {
     getConfig ~ getCurrentOffset ~ getLastOffset ~ getOldestSnapshotOffset ~ getAllSnapshotOffsets ~ protect(saveSnapshots)
@@ -1036,7 +1036,7 @@ class MatcherApiRoute(
       new ApiImplicitParam(name = "orderId", value = "Order ID", dataType = "string", paramType = "path")
     )
   )
-  def getTransactionsByOrder: Route = (path(ByteStrPM) & get) { orderId =>
+  def getOrderTransactions: Route = (path(ByteStrPM) & get) { orderId =>
     complete(Json.toJson(orderDb.transactionsByOrder(orderId)))
   }
 

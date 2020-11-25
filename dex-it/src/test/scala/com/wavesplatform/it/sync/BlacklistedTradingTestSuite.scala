@@ -52,10 +52,10 @@ class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
     testOrderPlacementDenied(mkOrder(bob, wavesBtcPair, SELL, dec8, dec8), bob)
 
     And("orders of blacklisted address are still available")
-    dex1.api.orderStatus(btcOrder1).status shouldBe Status.Accepted
+    dex1.api.getOrderStatus(btcOrder1).status shouldBe Status.Accepted
 
     And("orders for other assets are still available")
-    dex1.api.orderStatus(usdOrder).status shouldBe Status.Accepted
+    dex1.api.getOrderStatus(usdOrder).status shouldBe Status.Accepted
 
     And("OrderBook for blacklisted assets is not available")
     testOrderBookDenied(wctWavesPair, IssuedAsset(WctId))
@@ -79,7 +79,7 @@ class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
     dex1.api.getReservedBalance(bob).size shouldBe 1
 
     And("orders for other assets are still available")
-    dex1.api.orderStatus(usdOrder).status shouldBe Status.Accepted
+    dex1.api.getOrderStatus(usdOrder).status shouldBe Status.Accepted
 
     And("order can be placed on allowed pair with blacklisted asset")
     val btcOrder2 = mkOrder(alice, wavesBtcPair, SELL, dec8, dec8)
@@ -93,8 +93,8 @@ class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
     dex1.api.getOrderBook(ethWavesPair).asks.size shouldBe 1
 
     And("order statuses are available again")
-    dex1.api.orderStatus(wctOrder).status shouldBe Status.Accepted
-    dex1.api.orderStatus(ethOrder).status shouldBe Status.Accepted
+    dex1.api.getOrderStatus(wctOrder).status shouldBe Status.Accepted
+    dex1.api.getOrderStatus(ethOrder).status shouldBe Status.Accepted
 
     And("new orders can be placed")
     val newWctOrder = mkOrder(alice, wctWavesPair, BUY, dec2, dec8)
@@ -112,7 +112,7 @@ class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
     failedDueAssetBlacklist(dex1.tryApi.place(order), order.assetPair, blacklistedAsset)
 
   private def testOrderStatusDenied(order: Order, blacklistedAsset: Asset): Unit =
-    failedDueAssetBlacklist(dex1.tryApi.orderStatus(order), order.assetPair, blacklistedAsset)
+    failedDueAssetBlacklist(dex1.tryApi.getOrderStatus(order), order.assetPair, blacklistedAsset)
 
   private def testOrderBookDenied(assetPair: AssetPair, blacklistedAsset: Asset): Unit =
     failedDueAssetBlacklist(dex1.tryApi.getOrderBook(assetPair), assetPair, blacklistedAsset)

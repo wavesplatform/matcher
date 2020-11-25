@@ -219,7 +219,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
     placeAndAwaitAtNode(sellOrder)
 
     // buy counter order is not executed completely, but has filled status
-    dex1.api.orderStatus(buyOrder) should matchTo(HttpOrderStatus(Status.Filled, 270476663L.some, 299999L.some))
+    dex1.api.getOrderStatus(buyOrder) should matchTo(HttpOrderStatus(Status.Filled, 270476663L.some, 299999L.some))
 
     val buyOrderEvents = getEventsInfoByOrderId(buyOrder.id())
 
@@ -271,7 +271,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
 
       // Because we have to wait more than 30 seconds
       eventually(timeout = Timeout(90.seconds), interval = Interval(1.second)) {
-        dex1.api.orderStatus(order).status shouldBe Status.Cancelled
+        dex1.api.getOrderStatus(order).status shouldBe Status.Cancelled
       }
 
       eventually {

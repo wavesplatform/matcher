@@ -346,7 +346,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
     orders.foreach(dex1.api.place)
     orders.foreach { order =>
-      val status = dex1.api.orderStatus(order).status
+      val status = dex1.api.getOrderStatus(order).status
       withClue(order.idStr())(status should not be Status.NotFound)
     }
   }
@@ -415,19 +415,19 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
         placeAndAwaitAtDex(order)
 
-        dex1.tryApi.orderStatusInfoByIdWithApiKey(
+        dex1.tryApi.getOrderStatusInfoByIdWithApiKey(
           owner = bob,
           orderId = order.id(),
           xUserPublicKey = Some(alice.publicKey)
         ) should failWith(3148801, "Provided user public key is not correct")
 
-        dex1.tryApi.orderStatusInfoByIdWithApiKey(
+        dex1.tryApi.getOrderStatusInfoByIdWithApiKey(
           owner = bob,
           orderId = notPlacedOrder.id(),
           xUserPublicKey = Some(bob.publicKey)
         ) should failWith(notFoundError.code, notFoundError.message.text)
 
-        dex1.tryApi.orderStatusInfoByIdWithApiKey(
+        dex1.tryApi.getOrderStatusInfoByIdWithApiKey(
           owner = bob,
           orderId = order.id(),
           xUserPublicKey = Some(bob.publicKey)
@@ -465,7 +465,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
       placeAndAwaitAtDex(order)
 
-      dex1.tryApi.orderStatusInfoByIdWithSignature(alice, order) shouldBe Right(
+      dex1.tryApi.getOrderStatusInfoByIdWithSignature(alice, order) shouldBe Right(
         HttpOrderBookHistoryItem(
           id = order.id(),
           `type` = SELL,
@@ -485,7 +485,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         )
       )
 
-      dex1.tryApi.orderStatusInfoByIdWithSignature(alice, notPlacedOrder) should failWith(notFoundError.code, notFoundError.message.text)
+      dex1.tryApi.getOrderStatusInfoByIdWithSignature(alice, notPlacedOrder) should failWith(notFoundError.code, notFoundError.message.text)
     }
 
     "correctly calculate average weighed price when submitted becomes counter" in {
@@ -498,7 +498,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       placeAndAwaitAtDex(sellOrder, Status.PartiallyFilled)
       placeAndAwaitAtNode(buyOrder2)
 
-      dex1.tryApi.orderStatusInfoByIdWithSignature(bob, sellOrder).map(_.avgWeighedPrice) shouldBe Right(9351722813L)
+      dex1.tryApi.getOrderStatusInfoByIdWithSignature(bob, sellOrder).map(_.avgWeighedPrice) shouldBe Right(9351722813L)
 
       Seq(alice, bob).foreach { owner =>
         dex1.api.cancelAll(owner)
@@ -544,8 +544,8 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       placeAndAwaitAtDex(sellOrder)
       placeAndAwaitAtNode(buyOrder)
 
-      val sellOrderStatus = dex1.api.orderStatusInfoByIdWithSignature(carol, sellOrder)
-      val buyOrderStatus = dex1.api.orderStatusInfoByIdWithSignature(alice, buyOrder)
+      val sellOrderStatus = dex1.api.getOrderStatusInfoByIdWithSignature(carol, sellOrder)
+      val buyOrderStatus = dex1.api.getOrderStatusInfoByIdWithSignature(alice, buyOrder)
 
       Seq(sellOrderStatus, buyOrderStatus).foreach(_.totalExecutedPriceAssets shouldBe 12.2.usdn)
       sellOrderStatus.filledFee shouldBe 0.010909.usdn
@@ -574,7 +574,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       }
 
       val wavesEthPair = AssetPair(Waves, eth)
-      dex1.api.orderStatus(wavesEthPair, sellOrder1.id()).status shouldBe Status.Accepted
+      dex1.api.getOrderStatus(wavesEthPair, sellOrder1.id()).status shouldBe Status.Accepted
 
       dex1.api.getOrderBook(wavesEthPair) should matchTo(
         HttpV0OrderBook(

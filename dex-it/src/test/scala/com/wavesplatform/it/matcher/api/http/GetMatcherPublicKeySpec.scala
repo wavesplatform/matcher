@@ -10,7 +10,7 @@ class GetMatcherPublicKeySpec extends MatcherSuiteBase with RawHttpChecks {
     dex1.start()
   }
 
-  "GET /matcher " - {
+  "GET /matcher" - {
     "should return correct public key of matcher" in {
       validate200Json(dex1.rawApi.getMatcherPublicKey) should be(matcher.publicKey)
     }

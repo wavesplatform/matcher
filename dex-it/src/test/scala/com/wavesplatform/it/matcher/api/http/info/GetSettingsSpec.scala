@@ -1,4 +1,4 @@
-package com.wavesplatform.it.matcher.api.http.settings
+package com.wavesplatform.it.matcher.api.http.info
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.it.api.RawHttpChecks

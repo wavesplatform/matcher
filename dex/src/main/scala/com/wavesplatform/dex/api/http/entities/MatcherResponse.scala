@@ -85,7 +85,7 @@ case class OrderCancelRejected(error: MatcherError) extends MatcherResponse(C.Ba
 case object InvalidSignature extends MatcherResponse(C.BadRequest, error.RequestInvalidSignature)
 case class NotImplemented(error: MatcherError) extends MatcherResponse(C.NotImplemented, error)
 case class CanNotPersist(error: MatcherError) extends MatcherResponse(C.ServiceUnavailable, error)
-case class OrderBookUnavailable(error: MatcherError) extends MatcherResponse(C.ServiceUnavailable, error)
+case class OrderBookUnavailable(error: MatcherError) extends MatcherResponse(C.BadRequest, error)
 case object DuringStart extends MatcherResponse(C.ServiceUnavailable, error.MatcherIsStarting)
 case object DuringShutdown extends MatcherResponse(C.ServiceUnavailable, error.MatcherIsStopping)
 case object TimedOut extends MatcherResponse(C.InternalServerError, error.RequestTimeout)

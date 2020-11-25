@@ -84,7 +84,7 @@ case class OrderBookBroken(theAssetPair: AssetPair)
       orderBook,
       commonEntity,
       broken,
-      e"The order book for ${Symbol("assetPair") -> theAssetPair} is unavailable, please contact with the administrator"
+      e"The order book for ${Symbol("assetPair") -> theAssetPair} has been deleted or does not exist"
     )
 
 case class OrderBookUnexpectedState(assetPair: AssetPair)

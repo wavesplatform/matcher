@@ -149,7 +149,7 @@ class MatcherApiRoute(
   }
 
   private def unavailableOrderBookBarrier(p: AssetPair): Directive0 = orderBook(p) match {
-    case Some(x) => if (x.isRight) pass else complete(OrderBookUnavailable(error.OrderBookBroken(p)))
+    case Some(x) => if (x.isRight) pass else complete(OrderBookUnavailable(error.OrderBookNotFound(p)))
     case None => forceCheckOrderBook(p)
   }
 

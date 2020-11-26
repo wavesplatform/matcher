@@ -1,11 +1,13 @@
 package com.wavesplatform.it.matcher.api.http.history
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.api.http.entities.HttpOrderBookHistoryItem
 import com.wavesplatform.dex.domain.account.KeyPair.toAddress
 import com.wavesplatform.dex.domain.order.OrderType.BUY
 import com.wavesplatform.dex.it.api.RawHttpChecks
+import com.wavesplatform.dex.model.OrderStatus
 import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.matcher.api.http.http.toHttpOrderBookHistoryItem
+import org.scalatest.matchers.must.Matchers.contain
 
 class GetOrderHistoryByApiKeySpec extends MatcherSuiteBase with RawHttpChecks {
 
@@ -29,12 +31,15 @@ class GetOrderHistoryByApiKeySpec extends MatcherSuiteBase with RawHttpChecks {
         mkOrder(alice, wavesUsdPair, BUY, 10.waves, 1.usd),
         mkOrder(alice, wavesUsdPair, BUY, 11.waves, 2.usd),
         mkOrder(alice, wavesUsdPair, BUY, 12.waves, 3.usd)
-      )
-      orders.foreach(placeAndAwaitAtDex(_))
-      HttpOrderBookHistoryItem()
+      ).map { order =>
+        placeAndAwaitAtDex(order)
+        toHttpOrderBookHistoryItem(order, OrderStatus.Accepted)
+      }
 
-      validate200Json(dex1.rawApi.getOrderHistoryByApiKey(toAddress(alice).stringRepr)).head.
+      val history = validate200Json(dex1.rawApi.getOrderHistoryByApiKey(toAddress(alice).stringRepr))
 
+      history should have size orders.length
+      orders.foreach(history should contain(_))
     }
 
   }

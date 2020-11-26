@@ -12,7 +12,7 @@ import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.test.matchers.ProduceError.produce
-import org.scalacheck.{Arbitrary, Gen, Shrink}
+import org.scalacheck.{Gen, Shrink}
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
 import scala.util.matching.Regex
@@ -170,9 +170,8 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
       }
 
       "block +" - {
+        val init = WavesFork(List(block1))
         "expected" - {
-          val init = WavesFork(List(block1))
-
           "block" in { init.withBlock(block2) should matchTo(WavesFork(List(block2, block1)).asRight[String]) }
 
           "micro block" in {
@@ -186,8 +185,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
         }
 
         "unexpected" - {
-          def test(message: Regex, updateNext: WavesBlock => WavesBlock): Unit =
-            WavesFork(List(block1)).withBlock(updateNext(block2)) should produce(message)
+          def test(message: Regex, updateNext: WavesBlock => WavesBlock): Unit = init.withBlock(updateNext(block2)) should produce(message)
 
           "block" - {
             "unexpected reference" in test("(?s)^The new block.+must reference.+".r, _.copy(reference = ByteStr.empty))
@@ -221,125 +219,130 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
       }
 
       "block, micro block +" - {
+        val microBlock1 = WavesBlock(
+          ref = BlockRef(height = 1, id = ByteStr(Array[Byte](98, 0, 1))),
+          reference = block1.ref.id,
+          changes = BlockchainBalance(
+            regular = Map(bob -> Map(usd -> 7), alice -> Map(usd -> 24)),
+            outLeases = Map.empty
+          ),
+          tpe = WavesBlock.Type.MicroBlock
+        )
+
+        val init = WavesFork(List(microBlock1, block1))
+
         "expected" - {
-          val microBlock1 = WavesBlock(
-            ref = BlockRef(height = 1, id = ByteStr(Array[Byte](98, 0, 1))),
-            reference = block1.ref.id,
-            changes = BlockchainBalance(
-              regular = Map(bob -> Map(usd -> 7), alice -> Map(usd -> 24)),
-              outLeases = Map.empty
-            ),
-            tpe = WavesBlock.Type.MicroBlock
-          )
+          "block referenced to the" - {
+            "micro block" in {
+              val newBlock = WavesBlock(
+                ref = BlockRef(height = 2, id = ByteStr(Array[Byte](98, 1))),
+                reference = microBlock1.ref.id,
+                changes = BlockchainBalance(
+                  regular = Map(alice -> Map(Waves -> 9), bob -> Map(usd -> 2L)),
+                  outLeases = Map(alice -> 1L)
+                ),
+                tpe = WavesBlock.Type.Block
+              )
 
-          val init = WavesFork(List(microBlock1, block1))
+              val hardenedBlock = block1.copy(
+                ref = microBlock1.ref,
+                reference = block1.reference,
+                changes = block1.changes |+| microBlock1.changes,
+                tpe = WavesBlock.Type.Block
+              )
 
-//          "block" in {
-//            val newBlock = WavesBlock(
-//              ref = BlockRef(height = 2, id = ByteStr(Array[Byte](98, 1))),
-//              reference = microBlock1.ref.id,
-//              changes = BlockchainBalance(
-//                regular = Map(alice -> Map(Waves -> 9), bob -> Map(usd -> 2L)),
-//                outLeases = Map(alice -> 1L)
-//              ),
-//              tpe = WavesBlock.Type.Block
-//            )
-//
-//            val hardenedBlock = block1.copy(
-//              ref = microBlock1.ref,
-//              reference = block1.reference,
-//              changes = block1.changes |+| microBlock1.changes,
-//              tpe = WavesBlock.Type.Block
-//            )
-//
-//            init.withBlock(newBlock) should matchTo(WavesFork(List(newBlock, hardenedBlock)).asRight[String])
-//          }
+              init.withBlock(newBlock) should matchTo(WavesFork(List(newBlock, hardenedBlock)).asRight[String])
+            }
 
-//          "block referenced to a block" in {
-//            val newBlock = WavesBlock(
-//              ref = BlockRef(height = 2, id = ByteStr(Array[Byte](98, 1))),
-//              reference = block1.ref.id,
-//              changes = BlockchainBalance( // TODO changes here is not essential
-//                regular = Map(alice -> Map(Waves -> 9), bob -> Map(usd -> 2L)),
-//                outLeases = Map(alice -> 1L)
-//              ),
-//              tpe = WavesBlock.Type.Block
-//            )
-//
-//            init.withBlock(newBlock) should matchTo(WavesFork(List(newBlock, block1)).asRight[String])
-//          }
-//
-//          "block referenced to a previous micro block" in {
-//
-//          }
+            "block" in {
+              val newBlock = WavesBlock(
+                ref = BlockRef(height = 2, id = ByteStr(Array[Byte](98, 1))),
+                reference = block1.ref.id,
+                changes = BlockchainBalance( // TODO changes here are not essential
+                  regular = Map(alice -> Map(Waves -> 9), bob -> Map(usd -> 2L)),
+                  outLeases = Map(alice -> 1L)
+                ),
+                tpe = WavesBlock.Type.Block
+              )
 
-//          "micro block" in {
-//            val microBlock1 = block2.copy(
-//              ref = BlockRef(height = 1, id = block2.ref.id),
-//              tpe = WavesBlock.Type.MicroBlock
-//            )
-//
-//            init.withBlock(microBlock1) should matchTo(WavesFork(List(microBlock1, block1)).asRight[String])
-//          }
+              init.withBlock(newBlock) should matchTo(WavesFork(List(newBlock, block1)).asRight[String])
+            }
+          }
+
+          "micro block" in {
+            val microBlock2 = block2.copy(
+              ref = BlockRef(height = 1, id = ByteStr(Array[Byte](98, 0, 2))),
+              reference = microBlock1.ref.id,
+              tpe = WavesBlock.Type.MicroBlock
+            )
+
+            init.withBlock(microBlock2) should matchTo(WavesFork(List(microBlock2, microBlock1, block1)).asRight[String])
+          }
         }
 
-//        "unexpected" - {
-//          def test(updateNext: WavesBlock => WavesBlock): Unit =
-//            WavesFork(List(block1)).withBlock(updateNext(block2)) should produce("(?s)^A new.+block.+must continue the chain.+".r)
-//
-//          "block" - {
-//            "unexpected reference" in test(_.copy(reference = ByteStr.empty))
-//
-//            "unexpected height" - {
-//              def heightTest(h: Int): Unit = test(x => x.copy(ref = x.ref.copy(height = h)))
-//              "1" in heightTest(1)
-//              "3" in heightTest(3)
-//            }
-//          }
-//
-//          "micro block" - {
-//            "unexpected reference" in test(_.copy(
-//              tpe = WavesBlock.Type.MicroBlock,
-//              reference = ByteStr.empty
-//            ))
-//
-//            "unexpected height" - {
-//              def heightTest(h: Int): Unit = test(x => x.copy(tpe = WavesBlock.Type.MicroBlock, ref = x.ref.copy(height = h)))
-//              "1" in heightTest(0)
-//              "3" in heightTest(2)
-//            }
-//          }
-//        }
+        "unexpected" - {
+          def test(message: Regex, updateNext: WavesBlock => WavesBlock): Unit =
+            init.withBlock(updateNext(block2)) should produce(message)
+
+          "block" - {
+            "unexpected reference" in test("(?s)^The new block.+must reference.+".r, _.copy(reference = ByteStr.empty))
+
+            "unexpected height" - {
+              def heightTest(h: Int): Unit = test("(?s)^The new block.+must be after.+".r, x => x.copy(ref = x.ref.copy(height = h)))
+              "1" in heightTest(1)
+              "3" in heightTest(3)
+            }
+          }
+
+          "micro block" - {
+            "unexpected reference" in test(
+              "(?s)^The new micro block.+must reference.+".r,
+              _.copy(
+                tpe = WavesBlock.Type.MicroBlock,
+                reference = ByteStr.empty
+              )
+            )
+
+            "unexpected height" - {
+              def heightTest(h: Int): Unit = test(
+                "(?s)^The new micro block.+must reference.+".r,
+                x => x.copy(tpe = WavesBlock.Type.MicroBlock, ref = x.ref.copy(height = h))
+              )
+              "1" in heightTest(0)
+              "3" in heightTest(2)
+            }
+          }
+        }
       }
 
       "block, micro block, micro block +" - {
+        val microBlock1 = WavesBlock(
+          ref = BlockRef(height = 1, id = ByteStr(Array[Byte](98, 0, 1))),
+          reference = block1.ref.id,
+          changes = BlockchainBalance(
+            regular = Map(bob -> Map(usd -> 7), alice -> Map(usd -> 24)),
+            outLeases = Map.empty
+          ),
+          tpe = WavesBlock.Type.MicroBlock
+        )
+
+        val microBlock2 = WavesBlock(
+          ref = BlockRef(height = 1, id = ByteStr(Array[Byte](98, 0, 2))),
+          reference = microBlock1.ref.id,
+          changes = BlockchainBalance(
+            regular = Map(bob -> Map(usd -> 3), alice -> Map(usd -> 11)),
+            outLeases = Map.empty
+          ),
+          tpe = WavesBlock.Type.MicroBlock
+        )
+
+        val init = WavesFork(List(microBlock2, microBlock1, block1))
+
         "expected" - {
-          val microBlock1 = WavesBlock(
-            ref = BlockRef(height = 1, id = ByteStr(Array[Byte](98, 0, 1))),
-            reference = block1.ref.id,
-            changes = BlockchainBalance(
-              regular = Map(bob -> Map(usd -> 7), alice -> Map(usd -> 24)),
-              outLeases = Map.empty
-            ),
-            tpe = WavesBlock.Type.MicroBlock
-          )
-
-          val microBlock2 = WavesBlock(
-            ref = BlockRef(height = 1, id = ByteStr(Array[Byte](98, 0, 2))),
-            reference = microBlock1.ref.id,
-            changes = BlockchainBalance(
-              regular = Map(bob -> Map(usd -> 3), alice -> Map(usd -> 11)),
-              outLeases = Map.empty
-            ),
-            tpe = WavesBlock.Type.MicroBlock
-          )
-
-          val init = WavesFork(List(microBlock2, microBlock1, block1))
-
-          "block" in {
+          "block referenced to the previous micro block" in {
             val newBlock = WavesBlock(
               ref = BlockRef(height = 2, id = ByteStr(Array[Byte](98, 2))),
-              reference = microBlock2.ref.id,
+              reference = microBlock1.ref.id,
               changes = BlockchainBalance(
                 regular = Map(alice -> Map(Waves -> 9), bob -> Map(usd -> 2L)),
                 outLeases = Map(alice -> 1L)
@@ -348,60 +351,62 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
             )
 
             val hardenedBlock = block1.copy(
-              ref = microBlock2.ref,
+              ref = microBlock1.ref,
               reference = block1.reference,
-              changes = block1.changes |+| microBlock1.changes |+| microBlock2.changes,
+              changes = block1.changes |+| microBlock1.changes,
               tpe = WavesBlock.Type.Block
             )
 
             init.withBlock(newBlock) should matchTo(WavesFork(List(newBlock, hardenedBlock)).asRight[String])
           }
-
-//          "block referenced to a block" in {
-//            init.withBlock(newBlock) should matchTo(WavesFork(List(newBlock, hardenedBlock)).asRight[String])
-//          }
-          //
-          //          "block referenced to a previous micro block" in {
-          //
-          //          }
-
-          //          "micro block" in {
-          //            val microBlock1 = block2.copy(
-          //              ref = BlockRef(height = 1, id = block2.ref.id),
-          //              tpe = WavesBlock.Type.MicroBlock
-          //            )
-          //
-          //            init.withBlock(microBlock1) should matchTo(WavesFork(List(microBlock1, block1)).asRight[String])
-          //          }
         }
 
-        //        "unexpected" - {
-        //          def test(updateNext: WavesBlock => WavesBlock): Unit =
-        //            WavesFork(List(block1)).withBlock(updateNext(block2)) should produce("(?s)^A new.+block.+must continue the chain.+".r)
-        //
-        //          "block" - {
-        //            "unexpected reference" in test(_.copy(reference = ByteStr.empty))
-        //
-        //            "unexpected height" - {
-        //              def heightTest(h: Int): Unit = test(x => x.copy(ref = x.ref.copy(height = h)))
-        //              "1" in heightTest(1)
-        //              "3" in heightTest(3)
-        //            }
-        //          }
-        //
-        //          "micro block" - {
-        //            "unexpected reference" in test(_.copy(
-        //              tpe = WavesBlock.Type.MicroBlock,
-        //              reference = ByteStr.empty
-        //            ))
-        //
-        //            "unexpected height" - {
-        //              def heightTest(h: Int): Unit = test(x => x.copy(tpe = WavesBlock.Type.MicroBlock, ref = x.ref.copy(height = h)))
-        //              "1" in heightTest(0)
-        //              "3" in heightTest(2)
-        //            }
-        //          }
-        //        }
+        "unexpected" - {
+          def test(updateNext: WavesBlock => WavesBlock): Unit =
+            WavesFork(List(block1)).withBlock(updateNext(block2)) should produce("(?s)^A new.+block.+must continue the chain.+".r)
+
+          "micro block referenced to the previous micro block" - {
+            "unexpected reference" in {
+              val microBlock3 = WavesBlock(
+                ref = BlockRef(height = 1, id = ByteStr(Array[Byte](98, 0, 3))),
+                reference = microBlock1.ref.id,
+                changes = BlockchainBalance(
+                  regular = Map(bob -> Map(usd -> 3), alice -> Map(usd -> 11)),
+                  outLeases = Map.empty
+                ),
+                tpe = WavesBlock.Type.MicroBlock
+              )
+
+              init.withBlock(microBlock3) should produce("(?s)^The new micro block.+must reference the last block.+".r)
+            }
+          }
+        }
+      }
+
+      "block, block, micro block + block referenced to the previous one" in {
+        val microBlock = WavesBlock(
+          ref = BlockRef(height = 2, id = ByteStr(Array[Byte](98, 0, 1))),
+          reference = block2.ref.id,
+          changes = BlockchainBalance(
+            regular = Map(bob -> Map(usd -> 7), alice -> Map(usd -> 24)),
+            outLeases = Map.empty
+          ),
+          tpe = WavesBlock.Type.MicroBlock
+        )
+
+        val init = WavesFork(List(microBlock, block2, block1))
+
+        val newBlock = WavesBlock(
+          ref = BlockRef(height = 3, id = ByteStr(Array[Byte](98, 1, 0))),
+          reference = block1.ref.id,
+          changes = BlockchainBalance(
+            regular = Map(bob -> Map(usd -> 35)),
+            outLeases = Map.empty
+          ),
+          tpe = WavesBlock.Type.Block
+        )
+
+        init.withBlock(newBlock) should produce("(?s)^The new block.+must reference.+the one of.+".r)
       }
     }
   }

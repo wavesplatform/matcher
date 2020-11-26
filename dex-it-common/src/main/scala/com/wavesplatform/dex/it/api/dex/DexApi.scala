@@ -132,6 +132,7 @@ trait DexApi[F[_]] {
   def getOrderBookStatus(amountAsset: String, priceAsset: String): F[HttpOrderBookStatus]
   def getOrderBookStatus(assetPair: AssetPair): F[HttpOrderBookStatus]
 
+  def deleteOrderBook(amountAsset: String, priceAsset: String, headers: Map[String, String]): F[HttpMessage]
   def deleteOrderBook(assetPair: AssetPair): F[HttpMessage]
 
   def upsertRate(assetId: String, rate: Double, headers: Map[String, String] = Map.empty): F[HttpMessage]
@@ -149,8 +150,11 @@ trait DexApi[F[_]] {
   def allSnapshotOffsets: F[HttpSnapshotOffsets]
   def saveSnapshots: F[HttpMessage]
 
-  def settings: F[HttpMatcherPublicSettings]
-  def config: F[Config]
+  def getMatcherSettings: F[HttpMatcherPublicSettings]
+  def getMatcherConfig: F[Config]
+  def getMatcherConfig(headers: Map[String, String]): F[Config]
+
+  def getMatcherPublicKey: F[String]
 
   def wsConnections: F[HttpWebSocketConnections]
   def closeWsConnections(oldestNumber: Int): F[HttpMessage]

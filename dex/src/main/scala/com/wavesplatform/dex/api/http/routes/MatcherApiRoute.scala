@@ -129,14 +129,14 @@ class MatcherApiRoute(
   private val transactionsRoutes: Route = pathPrefix("transactions")(protect(getOrderTransactions))
 
   private val debugRoutes: Route = pathPrefix("debug") {
-    getConfig ~ getCurrentOffset ~ getLastOffset ~ getOldestSnapshotOffset ~ getAllSnapshotOffsets ~ protect(saveSnapshots)
+    getMatcherConfig ~ getCurrentOffset ~ getLastOffset ~ getOldestSnapshotOffset ~ getAllSnapshotOffsets ~ protect(saveSnapshots)
   }
 
   private val orderBookRoutes: Route = pathPrefix("orderbook") {
     protect {
       getOrderBookInfo ~ getOrderStatusInfoByIdWithSignature ~ getOrderBook ~ getOrderBookStatus ~ placeLimitOrder ~
       placeMarketOrder ~ getOrderHistoryByAssetPairAndPublicKey ~ getOrderHistoryByPublicKey ~ tradableBalance ~
-      orderStatus ~ deleteOrderHistory ~ cancel ~ cancelAll ~ getOrderBooks ~ orderBookDelete
+      orderStatus ~ deleteOrderHistory ~ cancel ~ cancelAll ~ getOrderBooks ~ deleteOrderBook
     }
   }
 
@@ -1005,7 +1005,7 @@ class MatcherApiRoute(
       new ApiImplicitParam(name = "priceAsset", value = "Price Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path")
     )
   )
-  def orderBookDelete: Route = (path(AssetPairPM) & delete & withAuth) { pair =>
+  def deleteOrderBook: Route = (path(AssetPairPM) & delete & withAuth) { pair =>
     orderBook(pair) match {
       case Some(Right(_)) =>
         complete(
@@ -1049,7 +1049,7 @@ class MatcherApiRoute(
     produces = "application/hocon",
     response = classOf[HttpResponse]
   )
-  def getConfig: Route = (path("config") & get & withAuth) {
+  def getMatcherConfig: Route = (path("config") & get & withAuth) {
     complete {
       HttpEntity(filteredConfig.rendered).withContentType(CustomContentTypes.`application/hocon`)
     }

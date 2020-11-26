@@ -254,13 +254,6 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
   override def getOrderBookStatus(assetPair: AssetPair): R[HttpOrderBookStatus] =
     getOrderBookStatus(assetPair.amountAssetStr, assetPair.priceAssetStr)
 
-  override def deleteOrderBook(assetPair: AssetPair): R[HttpMessage] = mk {
-    sttp
-      .delete(uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}")
-      .followRedirects(false)
-      .headers(apiKeyHeaders)
-  }
-
   override def upsertRate(assetId: String, rate: Double, headers: Map[String, String]): R[HttpMessage] = mk {
     sttp
       .put(uri"$apiUri/matcher/settings/rates/$assetId")
@@ -278,7 +271,6 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .headers(apiKeyHeaders)
       .tag("requestId", UUID.randomUUID)
   }
-
 
   override def upsertRate(asset: Asset, rate: Double): R[HttpMessage] = upsertRate(asset.toString, rate, apiKeyHeaders)
 
@@ -299,6 +291,16 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
     sttp
       .get(uri"$apiUri/matcher/orders/$address")
       .headers(apiKeyHeaders)
+  }
+
+  override def deleteOrderBook(assetPair: AssetPair): R[HttpMessage] =
+    deleteOrderBook(assetPair.amountAssetStr, assetPair.priceAssetStr, apiKeyHeaders)
+
+  override def deleteOrderBook(amountAsset: String, priceAsset: String, headers: Map[String, String]): R[HttpMessage] = mk {
+    sttp
+      .delete(uri"$apiUri/matcher/orderbook/$amountAsset/$priceAsset")
+      .followRedirects(false)
+      .headers(headers)
   }
 
   override def currentOffset: R[HttpOffset] = mk {
@@ -327,16 +329,23 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
     sttp.post(uri"$apiUri/matcher/debug/saveSnapshots").headers(apiKeyHeaders)
   }
 
-  override def settings: R[HttpMatcherPublicSettings] = mk {
+  override def getMatcherSettings: R[HttpMatcherPublicSettings] = mk {
     sttp
       .get(uri"$apiUri/matcher/settings")
       .headers(apiKeyHeaders)
   }
 
-  override def config: R[Config] = mkHocon {
+  override def getMatcherConfig(headers: Map[String, String]): R[Config] = mkHocon {
     sttp
       .get(uri"$apiUri/matcher/debug/config")
-      .headers(apiKeyHeaders)
+      .headers(headers)
+  }
+
+  override def getMatcherConfig: R[Config] = getMatcherConfig(apiKeyHeaders)
+
+  override def getMatcherPublicKey: R[String] = mk {
+    sttp
+      .get(uri"$apiUri/matcher")
   }
 
   override def wsConnections: R[HttpWebSocketConnections] = mk {

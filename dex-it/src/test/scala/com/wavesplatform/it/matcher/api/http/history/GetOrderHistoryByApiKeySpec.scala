@@ -7,7 +7,6 @@ import com.wavesplatform.dex.it.api.RawHttpChecks
 import com.wavesplatform.dex.model.OrderStatus
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.matcher.api.http.http.toHttpOrderBookHistoryItem
-import org.scalatest.matchers.must.Matchers.contain
 
 class GetOrderHistoryByApiKeySpec extends MatcherSuiteBase with RawHttpChecks {
 

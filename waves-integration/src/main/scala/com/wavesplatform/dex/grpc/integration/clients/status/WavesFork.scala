@@ -14,29 +14,34 @@ import scala.annotation.tailrec
 /**
  * @param history Contains micro blocks
  */
-case class WavesFork(history: List[WavesBlock]) { // TODO cut to last N blocks is required!
+case class WavesFork(history: List[WavesBlock]) { // TODO cut to last N blocks is required to reduce amount of stored blocks!
 
-  def withBlock(block: WavesBlock): Either[String, WavesFork] =
+  /**
+   * @return (droppedMicroBlocks, updatedFork)
+   */
+  def withBlock(block: WavesBlock): Either[String, (List[WavesBlock], WavesFork)] =
     if (block.tpe == WavesBlock.Type.Block) withFullBlock(block)
-    else withMicroBlock(block)
+    else withMicroBlock(block).map((List.empty, _))
 
   /**
    * @return Guarantees WavesFork is not empty
    */
-  private def withFullBlock(block: WavesBlock): Either[String, WavesFork] = history match {
-    case Nil => WavesFork(block :: history).asRight
+  private def withFullBlock(block: WavesBlock): Either[String, (List[WavesBlock], WavesFork)] = history match {
+    case Nil => (List.empty, WavesFork(block :: history)).asRight
     case prev :: _ =>
       if (block.ref.height == prev.ref.height + 1)
         dropPreviousFork(block, history).map {
           case (droppedBlocks, historyAfterCut) =>
             val (microBlocks, blocksHistory) = historyAfterCut.splitOnCondReversed(_.tpe == WavesBlock.Type.MicroBlock)
-            if (microBlocks.isEmpty) WavesFork(block :: blocksHistory)
-            else blocksHistory match {
-              case Nil => throw new RuntimeException("Imposibru")
-              case keyBlock :: restBlocks =>
-                val liquidBlock = NonEmptyList(keyBlock, microBlocks) // Have the direct order
-                WavesFork(block :: mkHardenedBlock(liquidBlock) :: restBlocks)
-            }
+            val updatedFork =
+              if (microBlocks.isEmpty) WavesFork(block :: blocksHistory)
+              else blocksHistory match {
+                case Nil => throw new RuntimeException("Imposibru")
+                case keyBlock :: restBlocks =>
+                  val liquidBlock = NonEmptyList(keyBlock, microBlocks) // Have the direct order
+                  WavesFork(block :: mkHardenedBlock(liquidBlock) :: restBlocks)
+              }
+            (droppedBlocks, updatedFork)
         }
       else s"The new block ${block.ref} (reference=${block.reference}) must be after ${prev.ref}".asLeft
   }

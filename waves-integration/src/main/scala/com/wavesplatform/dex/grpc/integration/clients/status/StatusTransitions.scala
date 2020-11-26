@@ -43,7 +43,7 @@ object StatusTransitions extends ScorexLogging {
                   ),
                   updatedLastBlockHeight = LastBlockHeight.RestartRequired(math.max(1, origStatus.currentHeightHint - 1))
                 )
-              case Right(updatedFork) =>
+              case Right((dropped, updatedFork)) =>
                 StatusUpdate(
                   newStatus = Normal(updatedFork, block.ref.height),
                   updatedBalances = block.changes,
@@ -106,7 +106,7 @@ object StatusTransitions extends ScorexLogging {
                     LastBlockHeight.RestartRequired(math.max(1, origStatus.previousForkHeight - 1)) // TODO duplication of max
                 )
 
-              case Right(updatedNewFork) =>
+              case Right((dropped, updatedNewFork)) =>
                 val newForkChanges = origStatus.newForkChanges |+| block.changes
                 if (block.tpe == WavesBlock.Type.Block)
                   StatusUpdate(

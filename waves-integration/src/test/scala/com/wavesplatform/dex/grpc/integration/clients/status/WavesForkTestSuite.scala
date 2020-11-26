@@ -47,6 +47,8 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
     tpe = WavesBlock.Type.Block
   )
 
+  private val emptyChain = List.empty[WavesBlock]
+
   private def chainGen(blocksNumber: Range, microBlocksNumber: Range): Gen[List[WavesBlock]] = for {
     blocksNumber <- Gen.choose(blocksNumber.head, blocksNumber.last)
     microBlocksNumber <- if (blocksNumber == 0) Gen.const(0) else Gen.choose(microBlocksNumber.head, microBlocksNumber.last)
@@ -92,7 +94,6 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
   "WavesFork" - {
     "dropPreviousFork" - {
       "empty" in {
-        val emptyChain = List.empty[WavesBlock]
         WavesFork.dropPreviousFork(block1, emptyChain) should matchTo((emptyChain, emptyChain).asRight[String])
       }
 
@@ -161,7 +162,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
       "empty +" - {
         val init = WavesFork(List.empty)
 
-        "block" in { init.withBlock(block1) should matchTo(WavesFork(List(block1)).asRight[String]) }
+        "block" in { init.withBlock(block1) should matchTo((emptyChain, WavesFork(List(block1))).asRight[String]) }
 
         "micro block" in {
           val microBlock = block1.copy(tpe = WavesBlock.Type.MicroBlock)
@@ -172,7 +173,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
       "block +" - {
         val init = WavesFork(List(block1))
         "expected" - {
-          "block" in { init.withBlock(block2) should matchTo(WavesFork(List(block2, block1)).asRight[String]) }
+          "block" in { init.withBlock(block2) should matchTo((emptyChain, WavesFork(List(block2, block1))).asRight[String]) }
 
           "micro block" in {
             val microBlock = block2.copy(
@@ -180,7 +181,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
               tpe = WavesBlock.Type.MicroBlock
             )
 
-            init.withBlock(microBlock) should matchTo(WavesFork(List(microBlock, block1)).asRight[String])
+            init.withBlock(microBlock) should matchTo((emptyChain, WavesFork(List(microBlock, block1))).asRight[String])
           }
         }
 
@@ -251,7 +252,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
                 tpe = WavesBlock.Type.Block
               )
 
-              init.withBlock(newBlock) should matchTo(WavesFork(List(newBlock, hardenedBlock)).asRight[String])
+              init.withBlock(newBlock) should matchTo((emptyChain, WavesFork(List(newBlock, hardenedBlock))).asRight[String])
             }
 
             "block" in {
@@ -265,7 +266,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
                 tpe = WavesBlock.Type.Block
               )
 
-              init.withBlock(newBlock) should matchTo(WavesFork(List(newBlock, block1)).asRight[String])
+              init.withBlock(newBlock) should matchTo((List(microBlock1), WavesFork(List(newBlock, block1))).asRight[String])
             }
           }
 
@@ -276,7 +277,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
               tpe = WavesBlock.Type.MicroBlock
             )
 
-            init.withBlock(microBlock2) should matchTo(WavesFork(List(microBlock2, microBlock1, block1)).asRight[String])
+            init.withBlock(microBlock2) should matchTo((emptyChain, WavesFork(List(microBlock2, microBlock1, block1))).asRight[String])
           }
         }
 
@@ -357,14 +358,11 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
               tpe = WavesBlock.Type.Block
             )
 
-            init.withBlock(newBlock) should matchTo(WavesFork(List(newBlock, hardenedBlock)).asRight[String])
+            init.withBlock(newBlock) should matchTo((List(microBlock2), WavesFork(List(newBlock, hardenedBlock))).asRight[String])
           }
         }
 
         "unexpected" - {
-          def test(updateNext: WavesBlock => WavesBlock): Unit =
-            WavesFork(List(block1)).withBlock(updateNext(block2)) should produce("(?s)^A new.+block.+must continue the chain.+".r)
-
           "micro block referenced to the previous micro block" - {
             "unexpected reference" in {
               val microBlock3 = WavesBlock(

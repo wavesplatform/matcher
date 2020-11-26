@@ -83,7 +83,7 @@ case class OrderBookNotFound(theAssetPair: AssetPair)
   extends MatcherError(
     orderBook,
     commonEntity,
-    broken,
+    notFound,
     e"The order book for ${Symbol("assetPair") -> theAssetPair} has been deleted or does not exist"
   )
 

@@ -18,16 +18,20 @@ trait RawHttpChecks extends Matchers {
   protected def validate200Hocon[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT]): EntityT =
     validateResponse(r, StatusCodes.Ok, "application/hocon")
 
-  protected def validate200Json[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT]): EntityT = validateResponse(r, StatusCodes.Ok, "application/json")
+  protected def validate200Json[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT]): EntityT =
+    validateResponse(r, StatusCodes.Ok, "application/json")
+
+  protected def validate201Json[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT]): EntityT =
+    validateResponse(r, StatusCodes.Created, "application/json")
 
   protected def validate202Json[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT]): EntityT =
     validateResponse(r, StatusCodes.Accepted, "application/json")
 
-  protected def validateIncorrectSignature[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT]) =
-    validateMatcherError(r, StatusCodes.BadRequest, 1051904, "The request has an invalid signature")
-
   protected def validate301Redirect[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT]): Unit =
     r.response.code should be(StatusCodes.MovedPermanently)
+
+  protected def validateIncorrectSignature[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT]) =
+    validateMatcherError(r, StatusCodes.BadRequest, 1051904, "The request has an invalid signature")
 
   protected def validateAuthorizationError[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT]): Unit =
     validateMatcherError(r, StatusCodes.Forbidden, 106954752, "Provided API key is not correct")

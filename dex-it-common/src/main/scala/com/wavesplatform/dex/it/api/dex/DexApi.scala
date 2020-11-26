@@ -135,9 +135,12 @@ trait DexApi[F[_]] {
   def deleteOrderBook(amountAsset: String, priceAsset: String, headers: Map[String, String]): F[HttpMessage]
   def deleteOrderBook(assetPair: AssetPair): F[HttpMessage]
 
+  def upsertRate(assetId: String, rate: Double, headers: Map[String, String] = Map.empty): F[HttpMessage]
   def upsertRate(asset: Asset, rate: Double): F[HttpMessage]
+  def upsertRate(asset: Asset, rate: String): F[HttpMessage]
+  def deleteRate(assetId: String, headers: Map[String, String] = Map.empty): F[HttpMessage]
   def deleteRate(asset: Asset): F[HttpMessage]
-  def rates: F[HttpRates]
+  def getRates: F[HttpRates]
 
   def currentOffset: F[HttpOffset]
   def lastOffset: F[HttpOffset]

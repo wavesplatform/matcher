@@ -295,6 +295,12 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
     sttp.get(uri"$apiUri/matcher/settings/rates").headers(apiKeyHeaders)
   }
 
+  override def getOrderHistoryByApiKey(address: String): R[Array[HttpOrderBookHistoryItem]] = mk {
+    sttp
+      .get(uri"$apiUri/matcher/orders/$address")
+      .headers(apiKeyHeaders)
+  }
+
   override def currentOffset: R[HttpOffset] = mk {
     sttp
       .get(uri"$apiUri/matcher/debug/currentOffset")

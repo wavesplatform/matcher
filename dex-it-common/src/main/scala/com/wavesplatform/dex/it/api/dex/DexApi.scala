@@ -141,6 +141,8 @@ trait DexApi[F[_]] {
   def deleteRate(asset: Asset): F[HttpMessage]
   def getRates: F[HttpRates]
 
+  def getOrderHistoryByApiKey(address: String): F[Array[HttpOrderBookHistoryItem]]
+
   def currentOffset: F[HttpOffset]
   def lastOffset: F[HttpOffset]
   def oldestSnapshotOffset: F[HttpOffset]

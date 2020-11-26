@@ -115,7 +115,7 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProx
     usdBalancesShouldBe(wavesNode1.api, defaultAssetQuantity, 0)
 
     markup("Now DEX receives balances stream from the node 1 and cancels Bob's order")
-    dex1.api.waitForOrderStatus(bobBuyOrder, Status.Cancelled)
+    dex1.api.waitForOrderStatus(bobBuyOrder, Status.Cancelled) // TODO
   }
 
   "DEXClient should correctly handle gRPC errors" in {

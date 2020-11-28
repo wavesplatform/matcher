@@ -6,5 +6,5 @@ import scala.annotation.nowarn
 
 @nowarn
 trait NoShrink {
-  implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
+  implicit def noShrink[A]: Shrink[A] = Shrink.withLazyList(_ => LazyList.empty)
 }

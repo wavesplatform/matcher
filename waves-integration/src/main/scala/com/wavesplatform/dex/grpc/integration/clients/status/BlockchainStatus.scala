@@ -11,34 +11,23 @@ sealed trait BlockchainStatus extends Product with Serializable {
 
 object BlockchainStatus {
 
-  case class Normal(mainFork: WavesFork, currentHeightHint: Int) extends BlockchainStatus {
-    override def toString: String = s"Normal(${mainFork.history.headOption.map(_.ref)})"
+  case class Normal(main: WavesBranch) extends BlockchainStatus {
+    override def toString: String = s"Normal(${main.history.headOption.map(_.ref)})"
   }
 
-  case class TransientRollback(
-    newFork: WavesFork,
-    newForkChanges: BlockchainBalance, // from a common block
-    previousForkHeight: Int,
-    previousForkDiffIndex: DiffIndex, // from a common block TODO should really be from the common block
-    utxEventsStash: Queue[WavesNodeUtxEvent]
-  ) extends BlockchainStatus {
-    // require(newFork.history.nonEmpty, "newFork must not be empty!") // It looks like we don't need such requirement
-
-    override def toString: String =
-      s"TransientRollback(n=${newFork.history.headOption.map(_.ref)}, h=$previousForkHeight, utx=${utxEventsStash.size})"
-
+  case class TransientRollback(fork: WavesFork, utxEventsStash: Queue[WavesNodeUtxEvent]) extends BlockchainStatus {
+    override def toString: String = s"TransientRollback(f=$fork, utx=${utxEventsStash.size})"
   }
 
-  // TODO do we need currentHeightHint
   case class TransientResolving(
-    mainFork: WavesFork,
+    main: WavesBranch,
+    stashChanges: BlockchainBalance,
     stash: Queue[WavesNodeEvent],
-    currentHeightHint: Int,
     utxEventsStash: Queue[WavesNodeUtxEvent]
   ) extends BlockchainStatus {
 
     override def toString: String =
-      s"TransientResolving(${mainFork.history.headOption.map(_.ref)}, l=${stash.lastOption}, utx=${utxEventsStash.size})"
+      s"TransientResolving(${main.history.headOption.map(_.ref)}, l=${stash.lastOption}, utx=${utxEventsStash.size})"
 
   }
 

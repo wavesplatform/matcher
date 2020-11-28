@@ -12,6 +12,14 @@ case class BlockchainBalance(regular: Map[Address, Map[Asset, Long]], outLeases:
     outLeases = outLeases.keySet
   )
 
+  def filter(by: DiffIndex): BlockchainBalance = BlockchainBalance(
+    regular = regular.view
+      .map { case (address, assets) => address -> by.regular.get(address).fold(Map.empty[Asset, Long])(assets.view.filterKeys(_).toMap) }
+      .filterNot(_._2.isEmpty)
+      .toMap,
+    outLeases = outLeases.filter { case (address, _) => by.outLeases.contains(address) }
+  )
+
   def isEmpty: Boolean = regular.isEmpty && outLeases.isEmpty
 
   override def toString: String = s"BlockchainBalance(r=$regular, ol=$outLeases)"

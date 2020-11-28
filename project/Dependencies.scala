@@ -11,8 +11,8 @@ object Dependencies {
     val akkaHttp = "10.2.0"
 
     val scalaTest = "3.2.2"
-    val scalaCheck = "1.14.3"
-    val scalaTestPlusCheck = "3.2.2.0"
+    val scalaCheck = "1.15.0"
+    val scalaTestPlusCheck = "3.2.3.0"
     val scalaMock = "4.4.0"
     val diffx = "0.3.29"
 
@@ -96,7 +96,7 @@ object Dependencies {
   private val akkaHttp = akkaModule("akka-http", Version.akkaHttp)
   private val scalaTest = "org.scalatest" %% "scalatest" % Version.scalaTest
   private val scalaCheck = "org.scalacheck" %% "scalacheck" % Version.scalaCheck
-  private val scalaTestPlusCheck = "org.scalatestplus" %% "scalacheck-1-14" % Version.scalaTestPlusCheck
+  private val scalaTestPlusCheck = "org.scalatestplus" %% "scalacheck-1-15" % Version.scalaTestPlusCheck
   private val scalaMock = "org.scalamock" %% "scalamock" % Version.scalaMock
   private val diffx = "com.softwaremill.diffx" %% "diffx-scalatest" % Version.diffx
   private val catsCore = catsModule("core")

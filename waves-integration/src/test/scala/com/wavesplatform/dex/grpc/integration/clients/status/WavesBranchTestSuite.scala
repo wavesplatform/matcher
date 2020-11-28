@@ -17,10 +17,10 @@ import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
 import scala.util.matching.Regex
 
-class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrivenPropertyChecks {
+class WavesBranchTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrivenPropertyChecks {
 
   // NoShrink
-  implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
+  implicit def noShrink[A]: Shrink[A] = Shrink.withLazyList(_ => LazyList.empty)
 
   private val alice = KeyPair(ByteStr("alice".getBytes(StandardCharsets.UTF_8))).toAddress
   private val bob = KeyPair(ByteStr("bob".getBytes(StandardCharsets.UTF_8))).toAddress
@@ -34,7 +34,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
       regular = Map(alice -> Map(Waves -> 10, usd -> 2L)),
       outLeases = Map(bob -> 23L)
     ),
-    tpe = WavesBlock.Type.Block
+    tpe = WavesBlock.Type.FullBlock
   )
 
   private val block2 = WavesBlock(
@@ -44,7 +44,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
       regular = Map(bob -> Map(usd -> 35)),
       outLeases = Map.empty
     ),
-    tpe = WavesBlock.Type.Block
+    tpe = WavesBlock.Type.FullBlock
   )
 
   private val emptyChain = List.empty[WavesBlock]
@@ -57,7 +57,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
       ref = BlockRef(0, ByteStr(Array[Byte](0))),
       reference = ByteStr.empty,
       changes = Monoid.empty[BlockchainBalance],
-      tpe = WavesBlock.Type.Block
+      tpe = WavesBlock.Type.FullBlock
     )
 
     val blocks = Iterator
@@ -94,7 +94,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
   "WavesFork" - {
     "dropPreviousFork" - {
       "empty" in {
-        WavesFork.dropPreviousFork(block1, emptyChain) should matchTo((emptyChain, emptyChain).asRight[String])
+        WavesBranch.dropPreviousFork(block1, emptyChain) should matchTo((emptyChain, emptyChain).asRight[String])
       }
 
       "positive" - {
@@ -110,13 +110,13 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
               ref = BlockRef(referencedBlock.ref.height + 1, ByteStr(Array[Byte](-3))),
               reference = referencedBlock.ref.id,
               changes = Monoid.empty[BlockchainBalance],
-              tpe = WavesBlock.Type.Block
+              tpe = WavesBlock.Type.FullBlock
             ),
             chain
           )
 
         def test(f: (WavesBlock, List[WavesBlock], List[WavesBlock]) => Any): Unit = forAll(testGen) { case (newBlock, chain) =>
-          WavesFork.dropPreviousFork(newBlock, chain) match {
+          WavesBranch.dropPreviousFork(newBlock, chain) match {
             case Left(e) => fail(e)
             case Right((dropped, restChain)) => f(newBlock, dropped, restChain)
           }
@@ -147,22 +147,33 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
               ref = BlockRef(chain.head.ref.height + 1, ByteStr(Array(-3))),
               reference = ByteStr(Array(-2)),
               changes = Monoid.empty[BlockchainBalance],
-              tpe = WavesBlock.Type.Block
+              tpe = WavesBlock.Type.FullBlock
             ),
             chain
           )
 
         "returns an error if referenced an unknown block" in forAll(testGen) { case (newBlock, chain) =>
-          WavesFork.dropPreviousFork(newBlock, chain) should produce("(?s)^The new block.+ must reference.+$".r)
+          WavesBranch.dropPreviousFork(newBlock, chain) should produce("(?s)^The new block.+ must reference.+$".r)
         }
       }
     }
 
+    // Terminology:
+    // * block - full block or micro block
+    // Properties:
+    // 1. If we have no blocks and receive a full block, this block is added in the front of the current fork
+    // 2. If we have no blocks and receive a micro block, we restart from the current height
+    // 3. If we have no micro blocks and receive a full block that is referenced to the last known block, this block is added in the front of the current fork
+    // 4. If we have micro blocks and receive a full block that is referenced to the last known full block or its micro blocks
+    //    1. The last block and its micro blocks are replaced by a hardened block in the fork
+    //    2. See 3
+    // 5. If we receive an irrelevant block, we drop the last full block and its micro blocks [and restart the stream from the last block's height]
+
     "withBlock" - {
       "empty +" - {
-        val init = WavesFork(List.empty)
+        val init = WavesBranch(List.empty, 0)
 
-        "block" in { init.withBlock(block1) should matchTo((emptyChain, WavesFork(List(block1))).asRight[String]) }
+        "block" in { init.withBlock(block1) should matchTo((emptyChain, WavesBranch(List(block1), 1)).asRight[String]) }
 
         "micro block" in {
           val microBlock = block1.copy(tpe = WavesBlock.Type.MicroBlock)
@@ -171,9 +182,9 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
       }
 
       "block +" - {
-        val init = WavesFork(List(block1))
+        val init = WavesBranch(List(block1), 1)
         "expected" - {
-          "block" in { init.withBlock(block2) should matchTo((emptyChain, WavesFork(List(block2, block1))).asRight[String]) }
+          "block" in { init.withBlock(block2) should matchTo((emptyChain, WavesBranch(List(block2, block1), 2)).asRight[String]) }
 
           "micro block" in {
             val microBlock = block2.copy(
@@ -181,7 +192,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
               tpe = WavesBlock.Type.MicroBlock
             )
 
-            init.withBlock(microBlock) should matchTo((emptyChain, WavesFork(List(microBlock, block1))).asRight[String])
+            init.withBlock(microBlock) should matchTo((emptyChain, WavesBranch(List(microBlock, block1), 1)).asRight[String])
           }
         }
 
@@ -230,7 +241,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
           tpe = WavesBlock.Type.MicroBlock
         )
 
-        val init = WavesFork(List(microBlock1, block1))
+        val init = WavesBranch(List(microBlock1, block1), 1)
 
         "expected" - {
           "block referenced to the" - {
@@ -242,17 +253,17 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
                   regular = Map(alice -> Map(Waves -> 9), bob -> Map(usd -> 2L)),
                   outLeases = Map(alice -> 1L)
                 ),
-                tpe = WavesBlock.Type.Block
+                tpe = WavesBlock.Type.FullBlock
               )
 
               val hardenedBlock = block1.copy(
                 ref = microBlock1.ref,
                 reference = block1.reference,
                 changes = block1.changes |+| microBlock1.changes,
-                tpe = WavesBlock.Type.Block
+                tpe = WavesBlock.Type.FullBlock
               )
 
-              init.withBlock(newBlock) should matchTo((emptyChain, WavesFork(List(newBlock, hardenedBlock))).asRight[String])
+              init.withBlock(newBlock) should matchTo((emptyChain, WavesBranch(List(newBlock, hardenedBlock), 2)).asRight[String])
             }
 
             "block" in {
@@ -263,10 +274,10 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
                   regular = Map(alice -> Map(Waves -> 9), bob -> Map(usd -> 2L)),
                   outLeases = Map(alice -> 1L)
                 ),
-                tpe = WavesBlock.Type.Block
+                tpe = WavesBlock.Type.FullBlock
               )
 
-              init.withBlock(newBlock) should matchTo((List(microBlock1), WavesFork(List(newBlock, block1))).asRight[String])
+              init.withBlock(newBlock) should matchTo((List(microBlock1), WavesBranch(List(newBlock, block1), 2)).asRight[String])
             }
           }
 
@@ -277,7 +288,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
               tpe = WavesBlock.Type.MicroBlock
             )
 
-            init.withBlock(microBlock2) should matchTo((emptyChain, WavesFork(List(microBlock2, microBlock1, block1))).asRight[String])
+            init.withBlock(microBlock2) should matchTo((emptyChain, WavesBranch(List(microBlock2, microBlock1, block1), 1)).asRight[String])
           }
         }
 
@@ -337,7 +348,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
           tpe = WavesBlock.Type.MicroBlock
         )
 
-        val init = WavesFork(List(microBlock2, microBlock1, block1))
+        val init = WavesBranch(List(microBlock2, microBlock1, block1), 1)
 
         "expected" - {
           "block referenced to the previous micro block" in {
@@ -348,17 +359,17 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
                 regular = Map(alice -> Map(Waves -> 9), bob -> Map(usd -> 2L)),
                 outLeases = Map(alice -> 1L)
               ),
-              tpe = WavesBlock.Type.Block
+              tpe = WavesBlock.Type.FullBlock
             )
 
             val hardenedBlock = block1.copy(
               ref = microBlock1.ref,
               reference = block1.reference,
               changes = block1.changes |+| microBlock1.changes,
-              tpe = WavesBlock.Type.Block
+              tpe = WavesBlock.Type.FullBlock
             )
 
-            init.withBlock(newBlock) should matchTo((List(microBlock2), WavesFork(List(newBlock, hardenedBlock))).asRight[String])
+            init.withBlock(newBlock) should matchTo((List(microBlock2), WavesBranch(List(newBlock, hardenedBlock), 2)).asRight[String])
           }
         }
 
@@ -392,7 +403,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
           tpe = WavesBlock.Type.MicroBlock
         )
 
-        val init = WavesFork(List(microBlock, block2, block1))
+        val init = WavesBranch(List(microBlock, block2, block1), 2)
 
         val newBlock = WavesBlock(
           ref = BlockRef(height = 3, id = ByteStr(Array[Byte](98, 1, 0))),
@@ -401,7 +412,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
             regular = Map(bob -> Map(usd -> 35)),
             outLeases = Map.empty
           ),
-          tpe = WavesBlock.Type.Block
+          tpe = WavesBlock.Type.FullBlock
         )
 
         init.withBlock(newBlock) should produce("(?s)^The new block.+must reference.+the one of.+".r)

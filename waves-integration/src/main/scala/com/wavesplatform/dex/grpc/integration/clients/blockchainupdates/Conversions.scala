@@ -32,7 +32,7 @@ object Conversions {
 
         val blockInfo = updates.body match {
           case Body.Empty => none
-          case Body.Block(block) => (WavesBlock.Type.Block, block.block.get.header.get.reference.toVanilla).some
+          case Body.Block(block) => (WavesBlock.Type.FullBlock, block.block.get.header.get.reference.toVanilla).some
           case Body.MicroBlock(block) => (WavesBlock.Type.MicroBlock, block.microBlock.get.microBlock.get.reference.toVanilla).some
         }
 

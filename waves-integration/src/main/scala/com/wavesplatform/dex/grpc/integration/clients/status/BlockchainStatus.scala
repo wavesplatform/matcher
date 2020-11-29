@@ -27,7 +27,7 @@ object BlockchainStatus {
   ) extends BlockchainStatus {
 
     override def toString: String =
-      s"TransientResolving(${main.history.headOption.map(_.ref)}, l=${stash.lastOption}, utx=${utxEventsStash.size})"
+      s"TransientResolving(${main.history.headOption.map(_.ref)}, l=${stash.lastOption})"
 
   }
 

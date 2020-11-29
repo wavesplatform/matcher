@@ -13,6 +13,7 @@ object WavesNodeEvent {
   }
 
   // Could also happen on appending of a key block
+  // It is expected, that we get Appended after RolledBack
   case class RolledBack(to: RolledBack.To) extends WavesNodeEvent
 
   object RolledBack {

@@ -7,12 +7,12 @@ import cats.syntax.either._
 import cats.syntax.foldable._
 import cats.syntax.semigroup._
 import com.wavesplatform.dex.collection.ListOps.Ops
-import com.wavesplatform.dex.grpc.integration.clients.status.WavesBranch.dropPreviousFork
+import com.wavesplatform.dex.grpc.integration.clients.status.WavesBranch.dropLiquidBlock
 
 import scala.annotation.tailrec
 
 /**
- * TODO Rename class or a history field to reflect that there are not all blocks
+ * TODO WavesChain? or history -> chain?
  * TODO constructor with auto height when passed non empty list
  * @param history Contains micro blocks
  */
@@ -27,31 +27,25 @@ case class WavesBranch(history: List[WavesBlock], height: Int) { // TODO cut to 
   /**
    * @return (droppedMicroBlocks, updatedFork)
    */
-  def withBlock(block: WavesBlock): Either[String, (List[WavesBlock], WavesBranch)] =
+  def withBlock(block: WavesBlock): Either[String, WavesBranch] =
     if (block.tpe == WavesBlock.Type.FullBlock) withFullBlock(block)
-    else withMicroBlock(block).map((List.empty, _))
+    else withMicroBlock(block)
 
   /**
-   * @return Guarantees WavesFork is not empty
+   * It is expected, that block references the last block in the history
+   * @return (droppedBlocks, ) Guarantees WavesFork is not empty
    */
-  private def withFullBlock(block: WavesBlock): Either[String, (List[WavesBlock], WavesBranch)] = history match {
-    case Nil => (List.empty, WavesBranch(block :: history, block.ref.height)).asRight
+  private def withFullBlock(block: WavesBlock): Either[String, WavesBranch] = history match {
+    case Nil => WavesBranch(block :: history, block.ref.height).asRight
     case prev :: _ =>
-      if (block.ref.height == prev.ref.height + 1)
-        dropPreviousFork(block, history).map {
-          case (droppedBlocks, historyAfterCut) =>
-            val (microBlocks, blocksHistory) = historyAfterCut.splitOnCondReversed(_.tpe == WavesBlock.Type.MicroBlock)
-            val updatedFork =
-              if (microBlocks.isEmpty) WavesBranch(block :: blocksHistory, block.ref.height)
-              else blocksHistory match {
-                case Nil => throw new RuntimeException("Imposibru")
-                case keyBlock :: restBlocks =>
-                  val liquidBlock = NonEmptyList(keyBlock, microBlocks) // Have the direct order
-                  WavesBranch(block :: mkHardenedBlock(liquidBlock) :: restBlocks, block.ref.height)
-              }
-            (droppedBlocks, updatedFork)
+      if (block.ref.height == prev.ref.height + 1 && block.reference == prev.ref.id) {
+        val (liquidBlock, restHistory) = dropLiquidBlock(block, history)
+        val newHistory = liquidBlock match {
+          case Nil => block :: restHistory
+          case x :: xs => block :: mkHardenedBlock(NonEmptyList(x, xs)) :: restHistory
         }
-      else s"The new block ${block.ref} (reference=${block.reference}) must be after ${prev.ref}".asLeft
+        WavesBranch(newHistory, block.ref.height).asRight
+      } else s"The new block ${block.ref} (reference=${block.reference}) must be after ${prev.ref}".asLeft
   }
 
   private def withMicroBlock(microBlock: WavesBlock): Either[String, WavesBranch] = history match {
@@ -74,13 +68,13 @@ case class WavesBranch(history: List[WavesBlock], height: Int) { // TODO cut to 
    * @return (new branch, dropped blocks), where dropped blocks are ordered from oldest to newest
    */
   def dropAfter(ref: BlockRef): (WavesBranch, List[WavesBlock]) = {
-    val (droppedHistory, commonHistory) = history.splitOnCondReversed(x => !(x.ref.height == ref.height && x.ref.id == ref.id))
-    (WavesBranch(commonHistory, droppedHistory.headOption.fold(height)(x => math.max(0, x.ref.height - 1))), droppedHistory)
+    val (droppedBlocks, commonHistory) = history.splitOnCondReversed(x => !(x.ref.height == ref.height && x.ref.id == ref.id))
+    (WavesBranch(commonHistory, ref.height), droppedBlocks)
   }
 
   def dropAfter(height: Int): (WavesBranch, List[WavesBlock]) = {
-    val (droppedHistory, commonHistory) = history.splitOnCondReversed(_.ref.height > height)
-    (WavesBranch(commonHistory, height), droppedHistory)
+    val (droppedBlocks, commonHistory) = history.splitOnCondReversed(_.ref.height > height)
+    (WavesBranch(commonHistory, height), droppedBlocks)
   }
 
   def dropAll: (WavesBranch, List[WavesBlock]) = (WavesBranch(Nil, history.lastOption.fold(height)(x => math.max(0, x.ref.height - 1))), history)
@@ -104,29 +98,23 @@ object WavesBranch {
 
   }
 
-  // TODO better name
   /**
-   * @return (droppedBlocks, restHistory)
+   * @return (liquidBlock, restHistory)
    */
-  def dropPreviousFork(newKeyBlock: WavesBlock, history: List[WavesBlock]): Either[String, (List[WavesBlock], List[WavesBlock])] = {
-    require(newKeyBlock.tpe == WavesBlock.Type.FullBlock, s"Expected $newKeyBlock to be a block, not a micro block!")
-    dropPreviousFork(newKeyBlock, dropped = List.empty, restHistory = history)
-  }
+  def dropLiquidBlock(newFullBlock: WavesBlock, history: List[WavesBlock]): (List[WavesBlock], List[WavesBlock]) =
+    dropLiquidBlock(newFullBlock, liquidBlock = List.empty, restHistory = history)
 
   @tailrec
-  private def dropPreviousFork(
-    newKeyBlock: WavesBlock,
-    dropped: List[WavesBlock],
+  private def dropLiquidBlock(
+    newFullBlock: WavesBlock,
+    liquidBlock: List[WavesBlock],
     restHistory: List[WavesBlock]
-  ): Either[String, (List[WavesBlock], List[WavesBlock])] = restHistory match {
-    case Nil => (dropped, restHistory).asRight
+  ): (List[WavesBlock], List[WavesBlock]) = restHistory match {
+    case Nil => (liquidBlock, restHistory)
     case x :: tailRestHistory =>
-      if (newKeyBlock.reference == x.ref.id) (dropped, restHistory).asRight
-      else if (x.tpe == WavesBlock.Type.MicroBlock) dropPreviousFork(newKeyBlock, x :: dropped, tailRestHistory)
-      else {
-        val droppedRefs = dropped.map(_.ref).mkString(", ")
-        s"The new block ${newKeyBlock.ref} must reference (${newKeyBlock.reference}) the one of the previous micro blocks ($droppedRefs) or the previous key block (${x.ref})".asLeft
-      }
+      if (x.tpe == WavesBlock.Type.MicroBlock) dropLiquidBlock(newFullBlock, x :: liquidBlock, tailRestHistory)
+      else if (liquidBlock.nonEmpty) (x :: liquidBlock, tailRestHistory) // We have a liquid block, x is a key block
+      else (liquidBlock, restHistory) // No liquid block, x is a full block
   }
 
 }

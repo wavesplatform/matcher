@@ -2,6 +2,7 @@ package com.wavesplatform.dex.grpc.integration.clients.status
 
 import java.nio.charset.StandardCharsets
 
+import cats.Monoid
 import cats.syntax.semigroup._
 import com.google.protobuf.UnsafeByteOperations
 import com.wavesplatform.dex.WavesIntegrationSuiteBase
@@ -71,67 +72,6 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
                 utxEventsStash = Queue.empty
               ),
               updatedLastBlockHeight = StatusUpdate.LastBlockHeight.RestartRequired(2)
-            ))
-          }
-
-          "because of a rolling back a micro block" in {
-            val block1 = WavesBlock(
-              ref = BlockRef(height = 1, id = ByteStr(Array[Byte](98, 0, 0))),
-              reference = ByteStr.empty,
-              changes = updatedBalances1,
-              tpe = WavesBlock.Type.FullBlock
-            )
-
-            val microBlock1 = WavesBlock(
-              ref = BlockRef(height = 1, id = ByteStr(Array[Byte](98, 0, 1))),
-              reference = block1.ref.id,
-              changes = BlockchainBalance(
-                regular = Map(bob -> Map(usd -> 7), alice -> Map(usd -> 24)),
-                outLeases = Map.empty
-              ),
-              tpe = WavesBlock.Type.MicroBlock
-            )
-
-            val microBlock2 = WavesBlock(
-              ref = BlockRef(height = 1, id = ByteStr(Array[Byte](98, 0, 2))),
-              reference = microBlock1.ref.id,
-              changes = BlockchainBalance(
-                regular = Map(bob -> Map(usd -> 3), alice -> Map(usd -> 11)),
-                outLeases = Map.empty
-              ),
-              tpe = WavesBlock.Type.MicroBlock
-            )
-
-            val block2 = WavesBlock(
-              ref = BlockRef(height = 2, id = ByteStr(Array[Byte](98, 1, 0))),
-              reference = microBlock1.ref.id,
-              changes = BlockchainBalance(
-                regular = Map(bob -> Map(usd -> 12), alice -> Map(usd -> 41)),
-                outLeases = Map.empty
-              ),
-              tpe = WavesBlock.Type.FullBlock
-            )
-
-            val init = Normal(WavesBranch(List(microBlock2, microBlock1, block1), block1.ref.height))
-            val event = Appended(block = block2, forgedTxIds = Seq.empty)
-
-            val hardenedBlock1 = block1.copy(
-              ref = microBlock1.ref,
-              reference = block1.reference,
-              changes = block1.changes |+| microBlock1.changes,
-              tpe = WavesBlock.Type.FullBlock
-            )
-
-            StatusTransitions(init, event) should matchTo(StatusUpdate(
-              newStatus = TransientRollback(
-                fork = WavesFork(
-                  origBranch = init.main,
-                  forkBranch = WavesBranch(List(block2, hardenedBlock1), block2.ref.height),
-                  connected = true // because hardenedBlock1.ref == microBlock1.ref
-                ),
-                utxEventsStash = Queue.empty
-              ),
-              updatedLastBlockHeight = StatusUpdate.LastBlockHeight.NotChanged
             ))
           }
         }
@@ -356,28 +296,105 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
         }
       }
 
-      "[RolledBack] -> TransientRollback, where [RolledBack] is" ignore {
-        "Height" ignore {}
-        "CommonBlockRef" ignore {}
+      "[RolledBack] -> TransientRollback, where [RolledBack] is" - {
+        def test(rolledBackTo: RolledBack.To): Unit =
+          StatusTransitions(init, RolledBack(rolledBackTo)) should matchTo(StatusUpdate(
+            newStatus = TransientRollback(
+              fork = WavesFork(
+                origBranch = WavesBranch(List(block2A, block1), block2A.ref.height),
+                forkBranch = WavesBranch(List(block1), block1.ref.height),
+                connected = true
+              ),
+              utxEventsStash = Queue.empty
+            )
+          ))
+
+        "Height" in test(RolledBack.To.Height(1))
+        "CommonBlockRef" in test(RolledBack.To.CommonBlockRef(block1.ref))
       }
 
-      "DataReceived -> TransientRollback" ignore {}
+      "DataReceived -> TransientRollback" in { // ignored
+        StatusTransitions(init, DataReceived(Monoid.empty[BlockchainBalance])) should matchTo(StatusUpdate(init))
+      }
     }
 
-    "TransientResolving +" ignore {
-      "Appended -> TransientResolving" ignore {}
+    "TransientResolving +" - {
+      val block = WavesBlock(
+        ref = BlockRef(height = 1, id = ByteStr(Array[Byte](98, 0))),
+        reference = ByteStr.empty,
+        changes = updatedBalances1,
+        tpe = WavesBlock.Type.FullBlock
+      )
 
-      "[UtxEvent] -> TransientResolving, where [UtxEvent] is" ignore {
-        "UtxAdded" ignore {}
-        "UtxAdded" ignore {}
+      val microBlock = WavesBlock(
+        ref = BlockRef(height = 1, id = ByteStr(Array[Byte](98, 1))),
+        reference = block.ref.id,
+        changes = BlockchainBalance(
+          regular = Map(carol -> Map(Waves -> 10)),
+          outLeases = Map.empty
+        ),
+        tpe = WavesBlock.Type.MicroBlock
+      )
+
+      val init = TransientResolving(
+        main = WavesBranch(List(microBlock, block), microBlock.ref.height),
+        stashChanges = BlockchainBalance(
+          regular = Map(carol -> Map(Waves -> 10)),
+          outLeases = Map.empty
+        ),
+        utxEventsStash = Queue.empty,
+        stash = Queue.empty
+      )
+
+      def stashedTest(event: WavesNodeEvent): Unit =
+        StatusTransitions(init, event) should matchTo(StatusUpdate(
+          newStatus = init.copy(
+            stash = init.stash.enqueue(event)
+          )
+        ))
+
+      "Appended -> TransientResolving" in {
+        val microBlock2 = WavesBlock(
+          ref = BlockRef(height = 1, id = ByteStr(Array[Byte](98, 2))),
+          reference = microBlock.ref.id,
+          changes = BlockchainBalance(
+            regular = Map(bob -> Map(usd -> 1)),
+            outLeases = Map(carol -> 10)
+          ),
+          tpe = WavesBlock.Type.MicroBlock
+        )
+
+        stashedTest(Appended(block = microBlock2, forgedTxIds = Seq.empty))
       }
 
-      "[RolledBack] -> TransientResolving, where [RolledBack] is" ignore {
-        "Height" ignore {}
-        "CommonBlockRef" ignore {}
+      "[UtxEvent] -> TransientResolving, where [UtxEvent] is" - {
+        "UtxAdded" in stashedTest(UtxAdded(Seq.empty))
+        "UtxSwitched" in stashedTest(UtxSwitched(Seq.empty))
       }
 
-      "DataReceived -> Normal" ignore {}
+      "[RolledBack] -> TransientResolving, where [RolledBack] is" - {
+        "Height" in stashedTest(RolledBack(RolledBack.To.Height(1)))
+        "CommonBlockRef" in stashedTest(RolledBack(RolledBack.To.CommonBlockRef(block.ref)))
+      }
+
+      // TODO more tests
+      "DataReceived -> Normal" in {
+        val event = DataReceived(BlockchainBalance(
+          regular = Map(alice -> Map(Waves -> 1)),
+          outLeases = Map.empty
+        ))
+        StatusTransitions(init, event) should matchTo(StatusUpdate(
+          newStatus = Normal(init.main),
+          updatedBalances = BlockchainBalance( // stashChanges + event
+            regular = Map(
+              alice -> Map(Waves -> 1),
+              carol -> Map(Waves -> 10)
+            ),
+            outLeases = Map.empty
+          ),
+          updatedLastBlockHeight = LastBlockHeight.Updated(init.main.height)
+        ))
+      }
     }
   }
 

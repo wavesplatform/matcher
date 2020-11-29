@@ -28,30 +28,19 @@ object StatusTransitions extends ScorexLogging {
                 log.error(s"Forcibly rollback, because of error: $e")
                 val fork = WavesFork.mkRolledBackByOne(origStatus.main)
                 StatusUpdate(
-                  newStatus = TransientRollback(
-                    fork = fork,
-                    utxEventsStash = Queue.empty
-                  ),
+                  newStatus = TransientRollback(fork, Queue.empty),
                   updatedLastBlockHeight = LastBlockHeight.RestartRequired(fork.height + 1)
                 )
 
-              case Right((dropped, updatedFork)) =>
-                val utxEventsStash = if (forgedTxIds.isEmpty) Queue.empty else Queue(WavesNodeUtxEvent.Forged(forgedTxIds))
-                if (dropped.isEmpty)
-                  StatusUpdate(
-                    newStatus = Normal(updatedFork),
-                    updatedBalances = block.changes,
-                    updatedLastBlockHeight =
-                      if (block.tpe == WavesBlock.Type.FullBlock) LastBlockHeight.Updated(updatedFork.height) else LastBlockHeight.NotChanged,
-                    processUtxEvents = utxEventsStash
-                  )
-                else // Some micro blocks were dropped. With a high probability dropped transactions will be in a new micro block, so we'll wait for it
-                  StatusUpdate(
-                    newStatus = TransientRollback(
-                      fork = WavesFork.mkFromForkBranch(origStatus.main, updatedFork), // Probably some heuristics will be good
-                      utxEventsStash = utxEventsStash
-                    )
-                  )
+              case Right(updatedFork) =>
+                StatusUpdate(
+                  newStatus = Normal(updatedFork),
+                  updatedBalances = block.changes,
+                  updatedLastBlockHeight =
+                    if (block.tpe == WavesBlock.Type.FullBlock) LastBlockHeight.Updated(updatedFork.height)
+                    else LastBlockHeight.NotChanged,
+                  processUtxEvents = if (forgedTxIds.isEmpty) Queue.empty else Queue(WavesNodeUtxEvent.Forged(forgedTxIds))
+                )
             }
 
           case UtxAdded(txs) =>
@@ -66,7 +55,7 @@ object StatusTransitions extends ScorexLogging {
               processUtxEvents = Queue(WavesNodeUtxEvent.Switched(newTxs))
             )
 
-          case RolledBack(to) =>
+          case RolledBack(to) => // This could be during appending a new key block too
             StatusUpdate(
               newStatus = TransientRollback(
                 fork = to match {
@@ -159,7 +148,7 @@ object StatusTransitions extends ScorexLogging {
             // TODO optimize. Probably we don't need to request all data. E.g. we hadn't this address in last 100 blocks and we got its balance 101 block before
             val init = StatusUpdate(
               newStatus = Normal(origStatus.main),
-              updatedBalances = updates,
+              updatedBalances = origStatus.stashChanges |+| updates,
               processUtxEvents = origStatus.utxEventsStash,
               updatedLastBlockHeight = LastBlockHeight.Updated(origStatus.main.height)
             )

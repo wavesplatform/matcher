@@ -2,12 +2,13 @@ package com.wavesplatform.dex.collection
 
 import scala.annotation.tailrec
 
+// TODO tests
 object ListOps {
 
   implicit final class Ops[T](val self: List[T]) extends AnyVal {
 
     /**
-     * @return (pxs, where p(x) == true, rest xs), pxs is reversed
+     * @return (pxs, rest xs), where: pxs is reversed and for each x in pxs p(x) == true
      */
     def splitOnCondReversed(p: T => Boolean): (List[T], List[T]) = {
       @tailrec def loop(rest: List[T], accLeft: List[T]): (List[T], List[T]) = rest match {

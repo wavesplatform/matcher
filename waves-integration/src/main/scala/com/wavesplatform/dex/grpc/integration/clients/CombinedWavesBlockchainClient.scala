@@ -24,6 +24,7 @@ import com.wavesplatform.dex.grpc.integration.clients.status.StatusUpdate.LastBl
 import com.wavesplatform.dex.grpc.integration.clients.status.WavesNodeEvent.WavesNodeUtxEvent
 import com.wavesplatform.dex.grpc.integration.clients.status._
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
+import monix.eval.Task
 import monix.execution.Scheduler
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
@@ -99,6 +100,7 @@ class CombinedWavesBlockchainClient(
           !same
         }
       }
+      .doOnError { e => Task(log.error("Got an error in the combined stream", e)) }
       .map(Updates(_))
   }
 

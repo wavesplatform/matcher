@@ -35,7 +35,7 @@ case class WavesFork private[status] (origBranch: WavesBranch, forkBranch: Waves
   def withBlock(block: WavesBlock): Status =
     forkBranch.withBlock(block) match {
       case Left(e) => Status.Failed(withoutLastLiquid, e)
-      case Right((_, updatedForkBranch)) =>
+      case Right(updatedForkBranch) =>
         // TODO if we are restoring the origBranch in forkBranch, hold NotResolved until we get all micro blocks
         if (block.tpe == WavesBlock.Type.FullBlock) Status.NotResolved(copy(forkBranch = updatedForkBranch))
         else {
@@ -84,8 +84,8 @@ object WavesFork {
   def mkRolledBackByOne(origBranch: WavesBranch): WavesFork =
     mkFromCommonBranch(origBranch, origBranch.withoutLastLiquid) // Or better use WavesFork.withoutLastLiquid
 
-  def mkFromForkBranch(origBranch: WavesBranch, forkBranch: WavesBranch): WavesFork =
-    WavesFork(origBranch, forkBranch, forkBranch.history.lastOption.exists(x => origBranch.history.exists(_.ref == x.ref)))
+//  def mkFromForkBranch(origBranch: WavesBranch, forkBranch: WavesBranch): WavesFork =
+//    WavesFork(origBranch, forkBranch, forkBranch.history.lastOption.exists(x => origBranch.history.exists(_.ref == x.ref)))
 
   private def mkFromCommonBranch(origBranch: WavesBranch, commonBranch: WavesBranch): WavesFork =
     WavesFork(origBranch, commonBranch.copy(history = commonBranch.history.headOption.toList), !commonBranch.isEmpty)

@@ -65,7 +65,7 @@ case class WavesFork private[status] (origBranch: WavesBranch, forkBranch: Waves
   def withoutLast: WavesFork = mkFromUpdatedForkBranch(forkBranch.withoutLast)
 
   def rollBackTo(height: Int): WavesFork = mkFromUpdatedForkBranch(forkBranch.dropAfter(height)._1)
-  def rollBackTo(ref: BlockRef): WavesFork = mkFromUpdatedForkBranch(forkBranch.dropAfter(ref)._1)
+  def rollBackTo(ref: BlockRef): WavesFork = mkFromUpdatedForkBranchRef(forkBranch.dropAfter(ref)._1, ref)
 
   // Valid only when we remove blocks
   private def mkFromUpdatedForkBranch(updatedForkBranch: WavesBranch): WavesFork =
@@ -73,9 +73,21 @@ case class WavesFork private[status] (origBranch: WavesBranch, forkBranch: Waves
     // * we take one from the origBranch to preserve connected
     // * or disconnect them if origBranch doesn't contain a common ancestor
     if (connected && updatedForkBranch.isEmpty)
-      origBranch.dropAfter(forkBranchLastBlock.ref)._2.headOption match {
+      origBranch.history.find(x => x.tpe == WavesBlock.Type.FullBlock && x.ref.height == updatedForkBranch.height) match {
         case None => copy(forkBranch = updatedForkBranch, connected = false)
         case Some(newCommonBlock) => copy(forkBranch = WavesBranch(List(newCommonBlock), newCommonBlock.ref.height))
+      }
+    else copy(forkBranch = updatedForkBranch)
+
+  // Valid only when we remove blocks
+  private def mkFromUpdatedForkBranchRef(updatedForkBranch: WavesBranch, commonBlockRef: BlockRef): WavesFork =
+    // If there is no blocks in withoutLastLiquid
+    // * we take one from the origBranch to preserve connected
+    // * or disconnect them if origBranch doesn't contain a common ancestor
+    if (connected && updatedForkBranch.isEmpty)
+      origBranch.history.find(_.ref == commonBlockRef) match {
+        case None => copy(forkBranch = updatedForkBranch, connected = false)
+        case Some(newCommonBlock) => copy(forkBranch = WavesBranch(List(newCommonBlock), commonBlockRef.height))
       }
     else copy(forkBranch = updatedForkBranch)
 

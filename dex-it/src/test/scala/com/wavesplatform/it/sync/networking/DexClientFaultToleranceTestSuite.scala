@@ -95,6 +95,7 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProx
     usdBalancesShouldBe(wavesNode2.api, expectedAliceBalance = 0, expectedBobBalance = defaultAssetQuantity)
 
     markup("Now DEX receives balances stream from the node 2 and cancels Alice's order")
+
     dex1.api.waitForOrderStatus(aliceBuyOrder, Status.Cancelled)
 
     markup("Bob places order that requires some amount of USD, DEX receives balances stream from the node 2")

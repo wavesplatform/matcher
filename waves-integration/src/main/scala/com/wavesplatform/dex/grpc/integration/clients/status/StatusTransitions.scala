@@ -19,6 +19,7 @@ import scala.collection.immutable.Queue
 object StatusTransitions extends ScorexLogging {
 
   def apply(origStatus: BlockchainStatus, event: WavesNodeEvent): StatusUpdate = {
+    log.info(s"${origStatus.name} + $event")
     val r = origStatus match {
       case origStatus: Normal =>
         event match {
@@ -110,14 +111,15 @@ object StatusTransitions extends ScorexLogging {
                 )
 
               case Status.Failed(updatedFork, reason) =>
-                log.error(s"Forcibly rollback, because of error: $reason")
-                StatusUpdate(
-                  newStatus = TransientRollback(
-                    fork = updatedFork,
-                    utxEventsStash = origStatus.utxEventsStash // TODO ??? hm we just dropped a transaction from the last block?
-                  ),
-                  updatedLastBlockHeight = LastBlockHeight.RestartRequired(updatedFork.height + 1)
-                )
+//                log.error(s"Forcibly rollback, because of error: $reason")
+//                StatusUpdate(
+//                  newStatus = TransientRollback(
+//                    fork = updatedFork,
+//                    utxEventsStash = origStatus.utxEventsStash // TODO ??? hm we just dropped a transaction from the last block?
+//                  ),
+//                  updatedLastBlockHeight = LastBlockHeight.RestartRequired(updatedFork.height + 1)
+//                )
+                StatusUpdate(newStatus = origStatus) // TODO Until BlockchainUpdatesStreamControl.askNext
             }
 
           case UtxAdded(txs) =>
@@ -131,7 +133,7 @@ object StatusTransitions extends ScorexLogging {
               case To.CommonBlockRef(ref) => origStatus.fork.rollBackTo(ref)
               case To.Height(h) => origStatus.fork.rollBackTo(h)
             }
-            StatusUpdate(newStatus = origStatus.copy(fork = fork))
+            StatusUpdate(newStatus = origStatus.copy(fork = fork)) // TODO not only update a fork ?
 
           case _ =>
             // Won't happen

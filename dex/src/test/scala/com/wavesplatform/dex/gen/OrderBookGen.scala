@@ -57,12 +57,12 @@ trait OrderBookGen {
     for {
       levelNumber <- Gen.choose(0, maxLevels)
       prices <- Gen.listOfN(levelNumber, pricesGen)
-      orders <- Gen.sequence(
+      orders <- Gen.sequence[List[List[LimitOrder]], List[LimitOrder]](
         prices.map { price =>
           Gen.resize(maxOrdersInLevel, Gen.nonEmptyListOf(limitOrderGen(orderGen(Gen.const(price), side))))
         }
       )
-    } yield (levelNumber, orders.asScala.flatten.toSeq)
+    } yield (levelNumber, orders.flatten)
 
   def limitOrderGen(orderGen: Gen[Order]): Gen[LimitOrder] =
     for {

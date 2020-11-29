@@ -6,10 +6,12 @@ import cats.syntax.semigroup._
 import com.google.protobuf.UnsafeByteOperations
 import com.wavesplatform.dex.WavesIntegrationSuiteBase
 import com.wavesplatform.dex.domain.account.KeyPair
+import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
-import com.wavesplatform.dex.grpc.integration.clients.status.BlockchainStatus.{Normal, TransientRollback}
+import com.wavesplatform.dex.grpc.integration.clients.status.BlockchainStatus.{Normal, TransientResolving, TransientRollback}
+import com.wavesplatform.dex.grpc.integration.clients.status.StatusUpdate.LastBlockHeight
 import com.wavesplatform.dex.grpc.integration.clients.status.WavesNodeEvent.{Appended, DataReceived, RolledBack, UtxAdded, UtxSwitched, WavesNodeUtxEvent}
 import com.wavesplatform.dex.grpc.integration.services.UtxTransaction
 
@@ -282,12 +284,54 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
             ))
           }
 
-          "because of a new keyblock referenced" ignore {} // ???
+          "because the resolving process haven't yet completed" in {
+            val init = TransientRollback(
+              fork = WavesFork(
+                origBranch = WavesBranch(List(block2A, block1), block2A.ref.height),
+                forkBranch = WavesBranch(List(block1), block1.ref.height),
+                connected = true
+              ),
+              utxEventsStash = Queue.empty
+            )
 
-          "because of the required height was not reached" ignore {}
+            val event = Appended(block = block2B, forgedTxIds = Seq.empty)
+
+            StatusTransitions(init, event) should matchTo(StatusUpdate(
+              newStatus = TransientRollback(
+                fork = WavesFork(init.fork.origBranch, WavesBranch(List(block2B, block1), block2B.ref.height), connected = true),
+                utxEventsStash = Queue.empty
+              )
+            ))
+          }
         }
 
-        "TransientResolving" ignore {}
+        "TransientResolving" in {
+          val microBlock = WavesBlock(
+            ref = BlockRef(height = 2, id = ByteStr(Array[Byte](98, 1, 1))),
+            reference = block2B.ref.id,
+            changes = BlockchainBalance(
+              regular = Map(alice -> Map(usd -> 8)),
+              outLeases = Map(bob -> 10)
+            ),
+            tpe = WavesBlock.Type.MicroBlock
+          )
+
+          val event = Appended(block = microBlock, forgedTxIds = Seq.empty)
+
+          StatusTransitions(init, event) should matchTo(StatusUpdate(
+            newStatus = TransientResolving(
+              main = WavesBranch(List(microBlock, block2B, block1), 2),
+              stashChanges = BlockchainBalance( // block2B + microBlock
+                regular = Map(alice -> Map(usd -> 8), bob -> Map(usd -> 12)),
+                outLeases = Map(bob -> 10)
+              ),
+              stash = Queue.empty,
+              utxEventsStash = Queue.empty
+            ),
+            requestBalances = DiffIndex(regular = Map(carol -> Set(Waves: Asset)), outLeases = Set.empty),
+            updatedLastBlockHeight = LastBlockHeight.NotChanged
+          ))
+        }
       }
 
       "[UtxEvent] -> TransientRollback, where [UtxEvent] is" ignore {

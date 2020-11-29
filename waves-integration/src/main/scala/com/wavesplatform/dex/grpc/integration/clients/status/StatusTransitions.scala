@@ -160,7 +160,8 @@ object StatusTransitions extends ScorexLogging {
             val init = StatusUpdate(
               newStatus = Normal(origStatus.main),
               updatedBalances = updates,
-              processUtxEvents = origStatus.utxEventsStash
+              processUtxEvents = origStatus.utxEventsStash,
+              updatedLastBlockHeight = LastBlockHeight.Updated(origStatus.main.height)
             )
 
             origStatus.stash.foldLeft(init) {

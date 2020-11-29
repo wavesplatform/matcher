@@ -81,13 +81,13 @@ class AggregatedOrderBookActorSpec
   private def ordersGen(maxOrdersNumber: Int): Gen[List[AcceptedOrder]] =
     for {
       orderSides <- Gen.resize(maxOrdersNumber, Gen.listOf(orderSideGen))
-      orders <- Gen.sequence {
+      orders <- Gen.sequence[List[AcceptedOrder], AcceptedOrder] {
         orderSides.map { side =>
           val orderGen = if (side == OrderType.SELL) askGen else bidGen
-          Gen.oneOf(limitOrderGen(orderGen), marketOrderGen(orderGen))
+          Gen.oneOf[AcceptedOrder](limitOrderGen(orderGen), marketOrderGen(orderGen))
         }
       }
-    } yield orders.asScala.toList
+    } yield orders
 
   "AggregatedOrderBookActor" - {
     "properties" - {

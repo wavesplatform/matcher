@@ -59,9 +59,14 @@ case class WavesBranch(history: List[WavesBlock], height: Int) { // TODO cut to 
 
   def diffIndex: DiffIndex = history.foldMap(_.diffIndex)
 
-  def withoutLastLiquid: WavesBranch = {
-    val withoutMicroBlocks = history.dropWhile(_.tpe == WavesBlock.Type.MicroBlock)
-    WavesBranch(if (withoutMicroBlocks.isEmpty) Nil else withoutMicroBlocks.tail, math.max(0, height - 1))
+  def withoutLast: WavesBranch = {
+    val updatedHistory =
+      if (history.isEmpty) Nil
+      else if (history.headOption.exists(_.tpe == WavesBlock.Type.MicroBlock))
+        // Remove a liquid block. tail is safe, because we can't append a micro block without a block in the history
+        history.dropWhile(_.tpe == WavesBlock.Type.MicroBlock).tail
+      else history.tail // Remove a full block
+    WavesBranch(updatedHistory, math.max(0, height - 1))
   }
 
   /**

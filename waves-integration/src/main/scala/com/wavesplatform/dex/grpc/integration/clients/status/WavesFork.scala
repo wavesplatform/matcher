@@ -34,7 +34,7 @@ case class WavesFork private[status] (origBranch: WavesBranch, forkBranch: Waves
 
   def withBlock(block: WavesBlock): Status =
     forkBranch.withBlock(block) match {
-      case Left(e) => Status.Failed(withoutLastLiquid, e)
+      case Left(e) => Status.Failed(withoutLast, e)
       case Right(updatedForkBranch) =>
         // TODO if we are restoring the origBranch in forkBranch, hold NotResolved until we get all micro blocks
         if (block.tpe == WavesBlock.Type.FullBlock) Status.NotResolved(copy(forkBranch = updatedForkBranch))
@@ -43,7 +43,11 @@ case class WavesFork private[status] (origBranch: WavesBranch, forkBranch: Waves
             if (connected) {
               // It's okay to use forkBranchLastBlock here, because a micro block added to the forkBranch without other changes
               val (commonBranch, droppedBlocks) = origBranch.dropAfter(forkBranchLastBlock.ref)
-              (droppedBlocks, updatedForkBranch.history.init, updatedForkBranch.copy(history = updatedForkBranch.history ::: commonBranch.history.tail))
+              (
+                droppedBlocks,
+                updatedForkBranch.history.init,
+                updatedForkBranch.copy(history = updatedForkBranch.history ::: commonBranch.history.tail)
+              )
             } else (origBranch.history, updatedForkBranch.history, updatedForkBranch) // MicroBlock && !connected
 
           val origForkDiffIndex = origDroppedBlocks.foldMap(_.diffIndex)
@@ -60,7 +64,7 @@ case class WavesFork private[status] (origBranch: WavesBranch, forkBranch: Waves
         }
     }
 
-  def withoutLastLiquid: WavesFork = mkFromUpdatedForkBranch(forkBranch.withoutLastLiquid, forkBranch.height - 1)
+  def withoutLast: WavesFork = mkFromUpdatedForkBranch(forkBranch.withoutLast, forkBranch.height - 1)
 
   def rollBackTo(height: Int): WavesFork = mkFromUpdatedForkBranch(forkBranch.dropAfter(height)._1, height)
   def rollBackTo(ref: BlockRef): WavesFork = mkFromUpdatedForkBranch(forkBranch.dropAfter(ref)._1, height)
@@ -82,7 +86,7 @@ object WavesFork {
   def mk(origBranch: WavesBranch, commonHeight: Int): WavesFork = mkFromCommonBranch(origBranch, origBranch.dropAfter(commonHeight)._1)
 
   def mkRolledBackByOne(origBranch: WavesBranch): WavesFork =
-    mkFromCommonBranch(origBranch, origBranch.withoutLastLiquid) // Or better use WavesFork.withoutLastLiquid
+    mkFromCommonBranch(origBranch, origBranch.withoutLast) // Or better use WavesFork.withoutLast
 
 //  def mkFromForkBranch(origBranch: WavesBranch, forkBranch: WavesBranch): WavesFork =
 //    WavesFork(origBranch, forkBranch, forkBranch.history.lastOption.exists(x => origBranch.history.exists(_.ref == x.ref)))

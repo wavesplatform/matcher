@@ -48,13 +48,13 @@ object OrderBookAddBenchmark {
     def ordersGen(orderNumber: Int): Gen[List[AcceptedOrder]] =
       for {
         orderSides <- Gen.listOfN(orderNumber, orderSideGen)
-        orders <- Gen.sequence {
+        orders <- Gen.sequence[List[AcceptedOrder], AcceptedOrder] {
           orderSides.map { side =>
             val orderGen = if (side == OrderType.SELL) askGen else bidGen
             Gen.oneOf(limitOrderGen(orderGen), marketOrderGen(orderGen))
           }
         }
-      } yield orders.asScala.toList
+      } yield orders
 
   }
 

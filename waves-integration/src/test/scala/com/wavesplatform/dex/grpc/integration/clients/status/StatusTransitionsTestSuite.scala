@@ -334,9 +334,26 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
         }
       }
 
-      "[UtxEvent] -> TransientRollback, where [UtxEvent] is" ignore {
-        "UtxAdded" ignore {}
-        "UtxAdded" ignore {}
+      "[UtxEvent] -> TransientRollback, where [UtxEvent] is" - {
+        "UtxAdded" in {
+          val txs = Seq(UtxTransaction(id = UnsafeByteOperations.unsafeWrap(Array[Byte](5, 6, 7))))
+          val event = UtxAdded(txs)
+          StatusTransitions(init, event) should matchTo(StatusUpdate(
+            newStatus = init.copy(
+              utxEventsStash = Queue(WavesNodeUtxEvent.Added(txs))
+            )
+          ))
+        }
+
+        "UtxSwitched" in {
+          val txs = Seq(UtxTransaction(id = UnsafeByteOperations.unsafeWrap(Array[Byte](5, 6, 7))))
+          val event = UtxSwitched(txs)
+          StatusTransitions(init, event) should matchTo(StatusUpdate(
+            newStatus = init.copy(
+              utxEventsStash = Queue(WavesNodeUtxEvent.Switched(txs))
+            )
+          ))
+        }
       }
 
       "[RolledBack] -> TransientRollback, where [RolledBack] is" ignore {

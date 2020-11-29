@@ -126,12 +126,12 @@ object AddressActorStartingBenchmark {
     def ordersGen(orderNumber: Int): Gen[List[AcceptedOrder]] =
       for {
         orderSides <- Gen.listOfN(orderNumber, orderSideGen)
-        orders <- Gen.sequence {
+        orders <- Gen.sequence[List[LimitOrder], LimitOrder] {
           orderSides.map { side =>
             (if (side == OrderType.SELL) askGen else bidGen).map(LimitOrder.apply)
           }
         }
-      } yield orders.asScala.toList
+      } yield orders
 
     def getOrderAddedEvent(ao: AcceptedOrder): Events.OrderAdded =
       Events.OrderAdded(ao, Events.OrderAddedReason.RequestExecuted, System.currentTimeMillis())

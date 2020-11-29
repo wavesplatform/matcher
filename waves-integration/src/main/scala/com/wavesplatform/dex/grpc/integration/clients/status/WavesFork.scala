@@ -62,19 +62,22 @@ case class WavesFork private[status] (origBranch: WavesBranch, forkBranch: Waves
         }
     }
 
-  def withoutLast: WavesFork = mkFromUpdatedForkBranch(forkBranch.withoutLast, forkBranch.height - 1)
+  def withoutLast: WavesFork = mkFromUpdatedForkBranch(forkBranch.withoutLast)
 
-  def rollBackTo(height: Int): WavesFork = mkFromUpdatedForkBranch(forkBranch.dropAfter(height)._1, height)
-  def rollBackTo(ref: BlockRef): WavesFork = mkFromUpdatedForkBranch(forkBranch.dropAfter(ref)._1, height)
+  def rollBackTo(height: Int): WavesFork = mkFromUpdatedForkBranch(forkBranch.dropAfter(height)._1)
+  def rollBackTo(ref: BlockRef): WavesFork = mkFromUpdatedForkBranch(forkBranch.dropAfter(ref)._1)
 
-  private def mkFromUpdatedForkBranch(updatedForkBranch: WavesBranch, newHeight: Int): WavesFork =
+  // Valid only when we remove blocks
+  private def mkFromUpdatedForkBranch(updatedForkBranch: WavesBranch): WavesFork =
     // If there is no blocks in withoutLastLiquid
     // * we take one from the origBranch to preserve connected
     // * or disconnect them if origBranch doesn't contain a common ancestor
-    if (updatedForkBranch.isEmpty) {
-      val newCommonBlock = if (connected) origBranch.dropAfter(forkBranchLastBlock.ref)._2.headOption else None
-      copy(forkBranch = WavesBranch(newCommonBlock.toList, newHeight), connected = newCommonBlock.nonEmpty)
-    } else copy(forkBranch = updatedForkBranch)
+    if (connected && updatedForkBranch.isEmpty)
+      origBranch.dropAfter(forkBranchLastBlock.ref)._2.headOption match {
+        case None => copy(forkBranch = updatedForkBranch, connected = false)
+        case Some(newCommonBlock) => copy(forkBranch = WavesBranch(List(newCommonBlock), newCommonBlock.ref.height))
+      }
+    else copy(forkBranch = updatedForkBranch)
 
 }
 

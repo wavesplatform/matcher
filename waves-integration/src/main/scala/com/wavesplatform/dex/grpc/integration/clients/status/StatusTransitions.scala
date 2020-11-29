@@ -79,7 +79,7 @@ object StatusTransitions extends ScorexLogging {
               if (forgedTxIds.isEmpty) Queue.empty
               else origStatus.utxEventsStash.enqueue(WavesNodeUtxEvent.Forged(forgedTxIds))
 
-            origStatus.fork.withBlock(block) match { // TODO should return not only an error, but a dropped blocks and...?
+            origStatus.fork.withBlock(block) match {
               case Status.Resolved(activeBranch, newChanges, lostDiffIndex) =>
                 if (lostDiffIndex.isEmpty)
                   StatusUpdate(

@@ -345,6 +345,19 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase with NoSt
     }
   }
 
+  "is able to work after a rollback" in {
+    val height = wavesNode1.api.currentHeight
+    wavesNode1.api.waitForHeight(height + 2)
+
+    val aliceBalanceBefore = wavesNode1.api.balance(alice, Waves)
+    wavesNode1.api.rollback(height, returnTransactionsToUtx = false)
+
+    wavesNode1.api.broadcast(mkTransfer(alice, bob, 1.waves, Waves))
+    eventually {
+      wavesNode1.api.balance(alice, Waves) shouldBe (aliceBalanceBefore - 1.waves - minFee)
+    }
+  }
+
   // TODO check that the functions returns new data after the state is changed?
 
   override protected def afterAll(): Unit = {

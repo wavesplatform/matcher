@@ -9,8 +9,6 @@ import com.wavesplatform.dex.grpc.integration.clients.status.WavesFork.Status
 
 // TODO test
 // TODO this class is too slow for his purposes
-// invariant:
-//  if forkBranch is not empty, forkBranch.last contains in
 case class WavesFork private[status] (origBranch: WavesBranch, forkBranch: WavesBranch, connected: Boolean) {
 
   // TODO move to tests in the end

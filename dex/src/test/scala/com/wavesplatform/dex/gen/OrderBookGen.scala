@@ -11,8 +11,6 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.model.{AcceptedOrder, BuyLimitOrder, BuyMarketOrder, LimitOrder, MarketOrder, OrderBook, OrderBookSnapshot, SellLimitOrder, SellMarketOrder}
 import org.scalacheck.Gen
 
-import scala.jdk.CollectionConverters._
-
 trait OrderBookGen {
 
   val matcher: KeyPair = KeyPair(ByteStr("matcher".getBytes(StandardCharsets.UTF_8)))

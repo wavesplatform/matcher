@@ -215,15 +215,14 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
             val event = Appended(block = newBlock, forgedTxIds = Seq.empty)
 
             // See StatusTransitions
-//            StatusTransitions(init, event) should matchTo(StatusUpdate(
-//              newStatus = TransientRollback(
-//                // TODO test with more than 1 block
-//                fork = WavesFork(init.fork.origBranch, WavesBranch(List(block1), block1.ref.height), connected = true),
-//                utxEventsStash = Queue.empty
-//              ),
-//              updatedLastBlockHeight = StatusUpdate.LastBlockHeight.RestartRequired(2)
-//            ))
-            StatusTransitions(init, event) should matchTo(StatusUpdate(newStatus = init))
+            StatusTransitions(init, event) should matchTo(StatusUpdate(
+              newStatus = TransientRollback(
+                // TODO test with more than 1 block
+                fork = WavesFork(init.fork.origBranch, WavesBranch(List(block1), block1.ref.height), connected = true),
+                utxEventsStash = Queue.empty
+              ),
+              updatedLastBlockHeight = StatusUpdate.LastBlockHeight.RestartRequired(2)
+            ))
           }
 
           "because the resolving process haven't yet completed" in {

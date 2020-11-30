@@ -32,12 +32,15 @@ class GrpcBlockchainEventsObserver(
   }
 
   override def onNext(value: SubscribeEvent): Unit = value.update.flatMap(toEvent) match {
-    case Some(value) => if (awaitNext.compareAndSet(true, false)) subject.onNext(value) else buffer.add(value)
     case None => log.warn(s"Can't convert to event: $value")
+    case Some(value) =>
+      buffer.add(value)
+      tryPublish()
   }
 
-  // TODO Probably there is a concurrency issue
-  def requestNext(): Unit = if (!awaitNext.get) Option(buffer.poll()) match {
+  def requestNext(): Unit = if (awaitNext.compareAndSet(false, true)) tryPublish()
+
+  private def tryPublish(): Unit = if (awaitNext.compareAndSet(true, false)) Option(buffer.poll()) match {
     case Some(x) => subject.onNext(x)
     case None => awaitNext.set(true)
   }

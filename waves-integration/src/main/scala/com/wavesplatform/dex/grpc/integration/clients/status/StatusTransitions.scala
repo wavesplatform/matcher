@@ -111,16 +111,14 @@ object StatusTransitions extends ScorexLogging {
                 )
 
               case Status.Failed(updatedFork, reason) =>
-//                log.error(s"Forcibly rollback, because of error: $reason")
-//                StatusUpdate(
-//                  newStatus = TransientRollback(
-//                    fork = updatedFork,
-//                    utxEventsStash = origStatus.utxEventsStash // TODO ??? hm we just dropped a transaction from the last block?
-//                  ),
-//                  updatedLastBlockHeight = LastBlockHeight.RestartRequired(updatedFork.height + 1)
-//                )
-                log.warn(s"Can't append a block: $reason")
-                StatusUpdate(newStatus = origStatus) // TODO Until BlockchainUpdatesStreamControl.askNext
+                log.error(s"Forcibly rollback, because of error: $reason")
+                StatusUpdate(
+                  newStatus = TransientRollback(
+                    fork = updatedFork,
+                    utxEventsStash = origStatus.utxEventsStash // TODO ??? hm we just dropped a transaction from the last block?
+                  ),
+                  updatedLastBlockHeight = LastBlockHeight.RestartRequired(updatedFork.height + 1)
+                )
             }
 
           case UtxAdded(txs) =>

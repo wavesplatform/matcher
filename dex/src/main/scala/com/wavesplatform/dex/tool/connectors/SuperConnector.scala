@@ -120,7 +120,7 @@ object SuperConnector {
            |  Matcher address        : ${matcherKeyPair.publicKey.toAddress}
            |  DEX REST API           : $dexRestApiUri
            |  Node REST API          : $nodeRestApiUri
-           |  DEX extension gRPC API : $extensionGrpcApiUri
+           |  Matcher extension gRPC API            : $extensionGrpcApiUri
            |  Blockchain Updates extension gRPC API : $blockchainUpdatesExtensionGrpcApiUri
            |  DEX WS API             : $dexWsApiUri, connection ID = ${wsInitial.connectionId}
            |  Auth Service REST API  : ${mayBeAuthServiceRestApiUri.getOrElse(

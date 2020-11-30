@@ -32,25 +32,34 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
 
   override val publicKey: R[HttpMatcherPublicKey] = mk(sttp.get(uri"$apiUri/matcher"))
 
-  override def reservedBalance(of: KeyPair, timestamp: Long): R[HttpBalance] = mk {
+  override def getReservedBalance(publicKey: String, timestamp: Long, signature: String): R[HttpBalance] =
+    getReservedBalance(publicKey, Map("timestamp" -> timestamp.toString, "signature" -> signature))
+
+  override def getReservedBalance(of: KeyPair, timestamp: Long): R[HttpBalance] =
+    getReservedBalance(Base58.encode(of.publicKey), timestampAndSignatureHeaders(of, timestamp))
+
+  override def getReservedBalance(publicKey: String, headers: Map[String, String]): R[HttpBalance] = mk {
     sttp
-      .get(uri"$apiUri/matcher/balance/reserved/${Base58.encode(of.publicKey)}")
-      .headers(timestampAndSignatureHeaders(of, timestamp))
+      .get(uri"$apiUri/matcher/balance/reserved/$publicKey")
+      .headers(headers)
   }
 
-  override def reservedBalanceWithApiKey(of: KeyPair, xUserPublicKey: Option[PublicKey]): R[HttpBalance] = mk {
+  override def getReservedBalanceWithApiKey(of: KeyPair, xUserPublicKey: Option[PublicKey]): R[HttpBalance] = mk {
     sttp
       .get(uri"$apiUri/matcher/balance/reserved/${Base58.encode(of.publicKey)}")
       .headers(apiKeyWithUserPublicKeyHeaders(xUserPublicKey))
   }
 
-  override def tradableBalance(of: KeyPair, assetPair: AssetPair, timestamp: Long): R[HttpBalance] = mk {
+  override def getTradableBalance(address: String, amountAsset: String, priceAsset: String): R[HttpBalance] = mk {
     sttp
       .get(
-        uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/tradableBalance/${of.publicKey.toAddress.stringRepr}"
+        uri"$apiUri/matcher/orderbook/$amountAsset/$priceAsset/tradableBalance/$address"
       )
-      .headers(timestampAndSignatureHeaders(of, timestamp))
+      .followRedirects(false)
   }
+
+  override def getTradableBalance(of: KeyPair, assetPair: AssetPair): R[HttpBalance] =
+    getTradableBalance(of.publicKey.toAddress.stringRepr, assetPair.amountAssetStr, assetPair.priceAssetStr)
 
   override def place(order: Order): R[HttpSuccessfulPlace] = mk {
     sttp
@@ -109,14 +118,24 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .contentType("application/json", "UTF-8")
   }
 
-  override def orderStatus(assetPair: AssetPair, id: Id): R[HttpOrderStatus] = mk {
+  override def getOrderStatus(amountAsset: String, priceAsset: String, id: String): R[HttpOrderStatus] = mk {
     sttp
-      .get(uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/$id")
+      .get(uri"$apiUri/matcher/orderbook/$amountAsset/$priceAsset/$id")
       .readTimeout(3.minutes) // TODO find way to decrease timeout!
       .followRedirects(false)
   }
 
-  override def orderStatusInfoByIdWithApiKey(
+  override def getOrderStatusInfoById(
+    address: String,
+    orderId: String,
+    headers: Map[String, String] = Map.empty
+  ): R[HttpOrderBookHistoryItem] = mk {
+    sttp
+      .get(uri"$apiUri/matcher/orders/$address/$orderId")
+      .headers(headers)
+  }
+
+  override def getOrderStatusInfoByIdWithApiKey(
     owner: Address,
     orderId: Id,
     xUserPublicKey: Option[PublicKey]
@@ -126,15 +145,29 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .headers(apiKeyWithUserPublicKeyHeaders(xUserPublicKey))
   }
 
-  override def orderStatusInfoByIdWithSignature(owner: KeyPair, orderId: Id, timestamp: Long): R[HttpOrderBookHistoryItem] = mk {
-    sttp
-      .get(uri"$apiUri/matcher/orderbook/${owner.publicKey}/${orderId.toString}")
-      .headers(timestampAndSignatureHeaders(owner, timestamp))
+  override def getOrderStatusInfoByIdWithSignature(publicKey: String, orderId: String, headers: Map[String, String]): R[HttpOrderBookHistoryItem] =
+    mk {
+      sttp
+        .get(uri"$apiUri/matcher/orderbook/$publicKey/$orderId")
+        .headers(headers)
+    }
+
+  override def getOrderStatusInfoByIdWithSignature(
+    publicKey: String,
+    orderId: String,
+    timestamp: Long,
+    signature: String
+  ): R[HttpOrderBookHistoryItem] =
+    getOrderStatusInfoByIdWithSignature(publicKey, orderId, Map("timestamp" -> timestamp.toString, "signature" -> signature))
+
+  override def getOrderStatusInfoByIdWithSignature(owner: KeyPair, orderId: Id, timestamp: Long): R[HttpOrderBookHistoryItem] =
+    getOrderStatusInfoByIdWithSignature(Base58.encode(owner.publicKey), orderId.toString, timestampAndSignatureHeaders(owner, timestamp))
+
+  override def getTransactionsByOrder(orderId: String): R[List[ExchangeTransaction]] = mk {
+    sttp.get(uri"$apiUri/matcher/transactions/$orderId")
   }
 
-  override def transactionsByOrder(id: Id): R[List[ExchangeTransaction]] = mk {
-    sttp.get(uri"$apiUri/matcher/transactions/$id")
-  }
+  override def getTransactionsByOrder(id: Id): R[List[ExchangeTransaction]] = getTransactionsByOrder(id.toString)
 
   /**
    * param @activeOnly Server treats this parameter as false if it wasn't specified
@@ -185,41 +218,52 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .headers(timestampAndSignatureHeaders(owner, timestamp))
   }
 
-  override def allOrderBooks: R[HttpTradingMarkets] = mk(sttp.get(uri"$apiUri/matcher/orderbook"))
+  override def getOrderBooks: R[HttpTradingMarkets] = mk(sttp.get(uri"$apiUri/matcher/orderbook"))
 
-  override def orderBook(assetPair: AssetPair): R[HttpV0OrderBook] = mk {
+  override def getOrderBook(amountAsset: String, priceAsset: String): R[HttpV0OrderBook] = mk {
     sttp
-      .get(uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}")
+      .get(uri"$apiUri/matcher/orderbook/$amountAsset/$priceAsset")
       .followRedirects(false)
   }
 
-  override def orderBook(assetPair: AssetPair, depth: Int): R[HttpV0OrderBook] = mk {
+  override def getOrderBook(assetPair: AssetPair): R[HttpV0OrderBook] = getOrderBook(assetPair.amountAssetStr, assetPair.priceAssetStr)
+
+  override def getOrderBook(assetPair: AssetPair, depth: String): R[HttpV0OrderBook] = mk {
     sttp
       .get(uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}?depth=$depth")
       .followRedirects(true)
   }
 
-  override def orderBookInfo(assetPair: AssetPair): R[HttpOrderBookInfo] = mk {
+  override def getOrderBook(assetPair: AssetPair, depth: Int): R[HttpV0OrderBook] = getOrderBook(assetPair, depth.toString)
+
+  override def getOrderBookInfo(amountAsset: String, priceAsset: String): R[HttpOrderBookInfo] = mk {
     sttp
-      .get(uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/info")
+      .get(uri"$apiUri/matcher/orderbook/$amountAsset/$priceAsset/info")
       .followRedirects(false)
   }
 
-  override def orderBookStatus(assetPair: AssetPair): R[HttpMarketStatus] = mk {
-    sttp
-      .get(uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/status")
-      .followRedirects(false)
-      .headers(apiKeyHeaders)
-  }
+  override def getOrderBookInfo(assetPair: AssetPair): R[HttpOrderBookInfo] = getOrderBookInfo(assetPair.amountAssetStr, assetPair.priceAssetStr)
 
-  override def deleteOrderBook(assetPair: AssetPair): R[HttpMessage] = mk {
+  override def getOrderBookStatus(amountAsset: String, priceAsset: String): R[HttpOrderBookStatus] = mk {
     sttp
-      .delete(uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}")
+      .get(uri"$apiUri/matcher/orderbook/$amountAsset/$priceAsset/status")
       .followRedirects(false)
       .headers(apiKeyHeaders)
   }
 
-  override def upsertRate(asset: Asset, rate: Double): R[HttpMessage] = mk {
+  override def getOrderBookStatus(assetPair: AssetPair): R[HttpOrderBookStatus] =
+    getOrderBookStatus(assetPair.amountAssetStr, assetPair.priceAssetStr)
+
+  override def upsertRate(assetId: String, rate: Double, headers: Map[String, String]): R[HttpMessage] = mk {
+    sttp
+      .put(uri"$apiUri/matcher/settings/rates/$assetId")
+      .body(Json.stringify(Json.toJson(rate)))
+      .contentType("application/json", "UTF-8")
+      .headers(headers)
+      .tag("requestId", UUID.randomUUID)
+  }
+
+  override def upsertRate(asset: Asset, rate: String): R[HttpMessage] = mk {
     sttp
       .put(uri"$apiUri/matcher/settings/rates/${asset.toString}")
       .body(Json.stringify(Json.toJson(rate)))
@@ -228,15 +272,29 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .tag("requestId", UUID.randomUUID)
   }
 
-  override def deleteRate(asset: Asset): R[HttpMessage] = mk {
+  override def upsertRate(asset: Asset, rate: Double): R[HttpMessage] = upsertRate(asset.toString, rate, apiKeyHeaders)
+
+  override def deleteRate(assetId: String, headers: Map[String, String]): R[HttpMessage] = mk {
     sttp
-      .delete(uri"$apiUri/matcher/settings/rates/${asset.toString}")
+      .delete(uri"$apiUri/matcher/settings/rates/$assetId")
       .contentType("application/json", "UTF-8")
-      .headers(apiKeyHeaders)
+      .headers(headers)
   }
 
-  override def rates: R[HttpRates] = mk {
+  override def deleteRate(asset: Asset): R[HttpMessage] = deleteRate(asset.toString, apiKeyHeaders)
+
+  override def getRates: R[HttpRates] = mk {
     sttp.get(uri"$apiUri/matcher/settings/rates").headers(apiKeyHeaders)
+  }
+
+  override def deleteOrderBook(assetPair: AssetPair): R[HttpMessage] =
+    deleteOrderBook(assetPair.amountAssetStr, assetPair.priceAssetStr, apiKeyHeaders)
+
+  override def deleteOrderBook(amountAsset: String, priceAsset: String, headers: Map[String, String]): R[HttpMessage] = mk {
+    sttp
+      .delete(uri"$apiUri/matcher/orderbook/$amountAsset/$priceAsset")
+      .followRedirects(false)
+      .headers(headers)
   }
 
   override def currentOffset: R[HttpOffset] = mk {
@@ -265,16 +323,23 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
     sttp.post(uri"$apiUri/matcher/debug/saveSnapshots").headers(apiKeyHeaders)
   }
 
-  override def settings: R[HttpMatcherPublicSettings] = mk {
+  override def getMatcherSettings: R[HttpMatcherPublicSettings] = mk {
     sttp
       .get(uri"$apiUri/matcher/settings")
       .headers(apiKeyHeaders)
   }
 
-  override def config: R[Config] = mkHocon {
+  override def getMatcherConfig(headers: Map[String, String]): R[Config] = mkHocon {
     sttp
       .get(uri"$apiUri/matcher/debug/config")
-      .headers(apiKeyHeaders)
+      .headers(headers)
+  }
+
+  override def getMatcherConfig: R[Config] = getMatcherConfig(apiKeyHeaders)
+
+  override def getMatcherPublicKey: R[String] = mk {
+    sttp
+      .get(uri"$apiUri/matcher")
   }
 
   override def print(message: String): R[Unit] = mkIgnore {

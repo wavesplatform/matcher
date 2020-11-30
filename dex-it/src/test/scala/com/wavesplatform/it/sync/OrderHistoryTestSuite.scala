@@ -51,7 +51,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
             val order = mkOrder(alice, wctUsdPair, BUY, 1.wct, 1.price, matcherFee = matcherFee, feeAsset = feeAsset, version = version)
             val orderId = order.id()
             dex1.api.place(order)
-            dex1.api.orderStatus(order).filledFee shouldBe None
+            dex1.api.getOrderStatus(order).filledFee shouldBe None
 
             for {
               activeOnly <- List(true, false).map(Option(_))
@@ -90,7 +90,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
 
       waitForOrderAtNode(aliceOrder)
 
-      List(bobOrder, aliceOrder).foreach(order => dex1.api.orderStatus(order).filledFee shouldBe Some(matcherFee))
+      List(bobOrder, aliceOrder).foreach(order => dex1.api.getOrderStatus(order).filledFee shouldBe Some(matcherFee))
 
       orderHistory(alice, wctUsdPair, activeOnly = Some(false)).foreach { orderBookHistory =>
         val item = orderBookHistory.find(_.id == aliceOrderId).get
@@ -122,8 +122,8 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
 
       waitForOrderAtNode(aliceOrder)
 
-      dex1.api.orderStatus(aliceOrder).filledFee shouldBe Some(matcherFee / 2)
-      dex1.api.orderStatus(bobOrder).filledFee shouldBe Some(matcherFee)
+      dex1.api.getOrderStatus(aliceOrder).filledFee shouldBe Some(matcherFee / 2)
+      dex1.api.getOrderStatus(bobOrder).filledFee shouldBe Some(matcherFee)
 
       for {
         activeOnly <- List(true, false).map(Option(_))
@@ -143,8 +143,8 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
       }
 
       dex1.api.cancel(alice, aliceOrder)
-      dex1.api.orderStatus(aliceOrder).filledFee shouldBe Some(matcherFee / 2)
-      dex1.api.orderStatus(bobOrder).filledFee shouldBe Some(matcherFee)
+      dex1.api.getOrderStatus(aliceOrder).filledFee shouldBe Some(matcherFee / 2)
+      dex1.api.getOrderStatus(bobOrder).filledFee shouldBe Some(matcherFee)
 
       orderHistory(alice, wctUsdPair, activeOnly = Some(false)).foreach { orderBookHistory =>
         val item = orderBookHistory.find(_.id == aliceOrderId).get
@@ -169,8 +169,8 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
 
       waitForOrderAtNode(aliceOrder)
 
-      dex1.api.orderStatus(aliceOrder).filledFee shouldBe Some(matcherFee / 2)
-      dex1.api.orderStatus(bobOrder).filledFee shouldBe Some(matcherFee)
+      dex1.api.getOrderStatus(aliceOrder).filledFee shouldBe Some(matcherFee / 2)
+      dex1.api.getOrderStatus(bobOrder).filledFee shouldBe Some(matcherFee)
 
       for {
         activeOnly <- List(true, false).map(Option(_))
@@ -190,8 +190,8 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
       }
 
       dex1.api.cancel(alice, aliceOrder)
-      dex1.api.orderStatus(aliceOrder).filledFee shouldBe Some(matcherFee / 2)
-      dex1.api.orderStatus(bobOrder).filledFee shouldBe Some(matcherFee)
+      dex1.api.getOrderStatus(aliceOrder).filledFee shouldBe Some(matcherFee / 2)
+      dex1.api.getOrderStatus(bobOrder).filledFee shouldBe Some(matcherFee)
 
       orderHistory(alice, wctUsdPair, activeOnly = Some(false)).foreach { orderBookHistory =>
         val item = orderBookHistory.find(_.id == aliceOrderId).get
@@ -213,7 +213,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
       dex1.api.place(mkOrder(bob, wctUsdPair, SELL, 1.wct, 1.price, matcherFee = matcherFee))
 
       waitForOrderAtNode(order)
-      dex1.api.orderStatus(order).filledFee shouldBe Some(33333)
+      dex1.api.getOrderStatus(order).filledFee shouldBe Some(33333)
 
       orderHistory(alice, wctUsdPair, activeOnly = Some(false)).foreach { orderBookHistory =>
         val item = orderBookHistory.find(_.id == orderId).get
@@ -229,7 +229,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
       val rate = 0.33333333
       val orderFee = (BigDecimal(rate) * matcherFee).setScale(0, CEILING).toLong
 
-      val ethBalance = dex1.api.tradableBalance(alice, ethUsdPair)(eth)
+      val ethBalance = dex1.api.getTradableBalance(alice, ethUsdPair)(eth)
 
       broadcastAndAwait(mkTransfer(alice, bob, ethBalance - orderFee, eth))
 
@@ -251,7 +251,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
       dex1.api.place(bobOrder)
 
       waitForOrderAtNode(aliceOrder)
-      dex1.api.orderStatus(aliceOrder).filledFee shouldBe Some(orderFee)
+      dex1.api.getOrderStatus(aliceOrder).filledFee shouldBe Some(orderFee)
 
       orderHistory(alice, ethUsdPair, activeOnly = Some(false)).foreach { orderBookHistory =>
         val item = orderBookHistory.find(_.id == aliceOrderId).get

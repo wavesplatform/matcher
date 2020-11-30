@@ -61,7 +61,7 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
         _ <- Future.inSeries(orders)(dex1.asyncApi.place(_).recover { case _ => () }).zip {
           Future(blocking(wavesNode1.reconnectToNetwork(500, 500)))
         }
-        orderBook <- dex1.asyncApi.orderBook(wavesUsdPair)
+        orderBook <- dex1.asyncApi.getOrderBook(wavesUsdPair)
       } yield orderBook.asks should have size 100,
       2.minute
     )
@@ -211,7 +211,7 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
     }
 
   private def matchingShouldBeSuccess(): Unit = {
-    val ob = dex1.api.orderBook(wavesUsdPair)
+    val ob = dex1.api.getOrderBook(wavesUsdPair)
     ob.bids should be(empty)
     ob.asks should be(empty)
   }

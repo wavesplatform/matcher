@@ -287,7 +287,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
           waitForOrderAtNode(bobOrd1).head.fee().value() shouldBe 300000
           waitForOrderAtNode(bobOrd2).head.fee().value() shouldBe 300000
 
-          dex1.api.reservedBalance(bob) shouldBe empty
+          dex1.api.getReservedBalance(bob) shouldBe empty
         }
       }
 
@@ -334,7 +334,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
           waitForOrderAtNode(bobOrd1).head.fee().value() shouldBe 300000
           waitForOrderAtNode(bobOrd2).head.fee().value() shouldBe 300000
 
-          dex1.api.reservedBalance(bob) shouldBe empty
+          dex1.api.getReservedBalance(bob) shouldBe empty
         }
 
         resetAliceAccountScript()
@@ -406,7 +406,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
           r2.swap.explicitGet().error shouldBe 307 // node's ApiError TransactionNotAllowedByAccountScript.Id
 
           dex1.api.orderHistoryWithApiKey(alice, activeOnly = Some(true)).length shouldBe 0
-          dex1.api.reservedBalance(bob) shouldBe empty
+          dex1.api.getReservedBalance(bob) shouldBe empty
 
           resetAliceAccountScript()
         }

@@ -614,14 +614,51 @@ class OrderValidatorSpecification
         val validateByRate: Order => Result[Order] = validateByMatcherSettings(DynamicSettings.symmetric(0.003.waves), rateCache = rateCache)
         val order: Order = createOrder(wavesUsdPair, BUY, 1.waves, 3.00, 0.01.usd, feeAsset = usd)
 
+        withClue("USD rate = 3.34, fee should be >= 0.02 usd\n") {
+          rateCache.upsertRate(usd, 3.34)
+          validateByRate(order) should produce("FeeNotEnough")
+        }
+      }
+
+      "matcherFee is too small according to two latest rates of fee asset" in {
+        val rateCache: RateCache = RateCache.inMem
+        val validateByRate: Order => Result[Order] = validateByMatcherSettings(DynamicSettings.symmetric(0.003.waves), rateCache = rateCache)
+        val order: Order = createOrder(wavesUsdPair, BUY, 1.waves, 3.00, 0.01.usd, feeAsset = usd)
+
+        def feeNotEnoughChecks(): Unit = List(5d, 4d, 10d).foreach { rate =>
+          withClue(s"USD rate = $rate\n") {
+            rateCache.upsertRate(usd, rate)
+            validateByRate(order) should produce("FeeNotEnough")
+          }
+        }
+
+        feeNotEnoughChecks()
+        List(3d, 2d, 4d).foreach(rateCache.upsertRate(usd, _)) // Making the rate appropriate to the order
+        feeNotEnoughChecks()
+      }
+
+      "matcherFee is enough according to rate of fee asset" in {
+
+        val rateCache: RateCache = RateCache.inMem
+        val validateByRate: Order => Result[Order] = validateByMatcherSettings(DynamicSettings.symmetric(0.003.waves), rateCache = rateCache)
+        val order: Order = createOrder(wavesUsdPair, BUY, 1.waves, 3.00, 0.01.usd, feeAsset = usd)
+
         withClue("USD rate = 3.33, fee should be >= 0.01 usd\n") {
           rateCache.upsertRate(usd, 3.33)
           validateByRate(order) shouldBe Symbol("right")
         }
+      }
 
-        withClue("USD rate = 3.34, fee should be >= 0.02 usd\n") {
-          rateCache.upsertRate(usd, 3.34)
-          validateByRate(order) should produce("FeeNotEnough")
+      "matcherFee is enough according to two latest rates of fee asset" in {
+        val rateCache: RateCache = RateCache.inMem
+        val validateByRate: Order => Result[Order] = validateByMatcherSettings(DynamicSettings.symmetric(0.003.waves), rateCache = rateCache)
+        val order: Order = createOrder(wavesUsdPair, BUY, 1.waves, 3.00, 0.01.usd, feeAsset = usd)
+
+        List(3d, 3.33d, 10d, 3.2d).foreach { rate =>
+          withClue(s"USD rate = $rate\n") {
+            rateCache.upsertRate(usd, rate)
+            validateByRate(order) shouldBe Symbol("right")
+          }
         }
       }
 

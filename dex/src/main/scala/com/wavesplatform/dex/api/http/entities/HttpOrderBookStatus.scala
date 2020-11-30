@@ -6,7 +6,7 @@ import com.wavesplatform.dex.model.{LastTrade, LevelAgg}
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{Json, OFormat}
 
-case class HttpMarketStatus(
+case class HttpOrderBookStatus(
   @ApiModelProperty(dataType = "integer") lastPrice: Option[Long],
   @ApiModelProperty(dataType = "integer") lastAmount: Option[Long],
   @ApiModelProperty(
@@ -45,10 +45,10 @@ case class HttpMarketStatus(
 
 }
 
-object HttpMarketStatus {
+object HttpOrderBookStatus {
 
-  def fromMarketStatus(ms: MarketStatus): HttpMarketStatus =
-    HttpMarketStatus(
+  def fromMarketStatus(ms: MarketStatus): HttpOrderBookStatus =
+    HttpOrderBookStatus(
       lastPrice = ms.lastTrade.map(_.price),
       lastAmount = ms.lastTrade.map(_.amount),
       lastSide = ms.lastTrade.map(_.side),
@@ -58,5 +58,5 @@ object HttpMarketStatus {
       askAmount = ms.bestAsk.map(_.amount)
     )
 
-  implicit val httpMarketStatusFormat: OFormat[HttpMarketStatus] = Json.format[HttpMarketStatus]
+  implicit val httpMarketStatusFormat: OFormat[HttpOrderBookStatus] = Json.format[HttpOrderBookStatus]
 }

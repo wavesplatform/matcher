@@ -73,7 +73,7 @@ class SpendableBalancesActorSpecification
       )
     )
 
-  // TODO?
+  // DEX-989
   "SpendableBalancesActor" ignore {
 
     "handle state queries without excess gRPC calls" in {

@@ -80,7 +80,7 @@ class TradersTestSuite extends MatcherSuiteBase {
       val correctBobOrder = mkOrder(bob, wctWavesPair, OrderType.BUY, 1, 10.waves * Order.PriceConstant)
       placeAndAwaitAtDex(correctBobOrder)
 
-      val markets = dex1.api.allOrderBooks.markets.map(x => s"${x.amountAsset}-${x.priceAsset}").toSet
+      val markets = dex1.api.getOrderBooks.markets.map(x => s"${x.amountAsset}-${x.priceAsset}").toSet
 
       withClue("hasTrickyBobWavesPairWB58Market\n") {
         markets.contains(trickyBobWavesPairWB58.key) shouldBe true
@@ -95,7 +95,7 @@ class TradersTestSuite extends MatcherSuiteBase {
       }
 
       withClue("Cleanup") {
-        dex1.api.orderBook(wctWavesPair).bids shouldNot be(empty)
+        dex1.api.getOrderBook(wctWavesPair).bids shouldNot be(empty)
         dex1.api.cancelAll(bob)
         dex1.api.waitForOrderStatus(correctBobOrder, Status.Cancelled)
       }
@@ -120,7 +120,7 @@ class TradersTestSuite extends MatcherSuiteBase {
             }
 
             withClue(s"The oldest order of version $orderV '${oldestOrder.idStr()}' is still active\n") {
-              dex1.api.orderStatus(oldestOrder).status shouldBe Status.Accepted
+              dex1.api.getOrderStatus(oldestOrder).status shouldBe Status.Accepted
             }
 
             withClue("Cleanup\n") {
@@ -148,7 +148,7 @@ class TradersTestSuite extends MatcherSuiteBase {
             }
 
             withClue(s"The oldest order of version $orderV '${oldestOrder.idStr()}' is still active") {
-              dex1.api.orderStatus(oldestOrder).status shouldBe Status.Accepted
+              dex1.api.getOrderStatus(oldestOrder).status shouldBe Status.Accepted
             }
 
             withClue("Cleanup") {
@@ -158,7 +158,7 @@ class TradersTestSuite extends MatcherSuiteBase {
               broadcastAndAwait(mkLeaseCancel(bob, lease.id()))
 
               eventually {
-                val b = dex1.api.tradableBalance(bob, wctWavesPair)
+                val b = dex1.api.getTradableBalance(bob, wctWavesPair)
                 b.getOrElse(wct, 0L) should be > 0L // sell
                 b.getOrElse(Waves, 0L) should be > 0L // fee
               }
@@ -182,7 +182,7 @@ class TradersTestSuite extends MatcherSuiteBase {
             }
 
             withClue(s"The oldest order of version $orderV '${oldestOrder.idStr()}' is still active") {
-              dex1.api.orderStatus(oldestOrder).status shouldBe Status.Accepted
+              dex1.api.getOrderStatus(oldestOrder).status shouldBe Status.Accepted
             }
 
             withClue("Cleanup") {
@@ -210,7 +210,7 @@ class TradersTestSuite extends MatcherSuiteBase {
             dex1.api.waitForOrderStatus(newestOrder, Status.Cancelled)
           }
           withClue(s"The oldest order '${oldestOrder.idStr()}' is still active") {
-            dex1.api.orderStatus(oldestOrder).status shouldBe Status.Accepted
+            dex1.api.getOrderStatus(oldestOrder).status shouldBe Status.Accepted
           }
 
           withClue("Cleanup") {
@@ -272,7 +272,7 @@ class TradersTestSuite extends MatcherSuiteBase {
           val bobOrder = mkOrder(bob, wctUsdPair, SELL, 400L, 2 * 100000000L, matcherFee = 1, feeAsset = newFeeAsset)
 
           dex1.api.place(bobOrder)
-          dex1.api.reservedBalance(bob) shouldBe Map(wct -> 400, newFeeAsset -> 1)
+          dex1.api.getReservedBalance(bob) shouldBe Map(wct -> 400, newFeeAsset -> 1)
 
           broadcastAndAwait(mkTransfer(bob, alice, bobAssetQuantity, newFeeAsset, matcherFee))
           val currHeight = wavesNode1.api.currentHeight

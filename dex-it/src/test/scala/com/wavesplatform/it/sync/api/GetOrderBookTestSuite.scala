@@ -33,14 +33,14 @@ class GetOrderBookTestSuite extends MatcherSuiteBase {
   }
 
   def checkDepth(forTheseDepths: Array[Int] = Array(), thisDepthWillBePicked: Int): Unit = {
-    val orderBook: HttpV0OrderBook = dex1.api.orderBook(wavesUsdPair, thisDepthWillBePicked)
+    val orderBook: HttpV0OrderBook = dex1.api.getOrderBook(wavesUsdPair, thisDepthWillBePicked)
 
     if (thisDepthWillBePicked < ordersCount) {
       orderBook.asks.size shouldBe thisDepthWillBePicked
       orderBook.bids.size shouldBe thisDepthWillBePicked
     }
 
-    forTheseDepths.foreach(depth => dex1.api.orderBook(wavesUsdPair, depth) should matchTo(orderBook))
+    forTheseDepths.foreach(depth => dex1.api.getOrderBook(wavesUsdPair, depth) should matchTo(orderBook))
   }
 
   "response order book should contain right count of bids and asks" in {
@@ -57,9 +57,9 @@ class GetOrderBookTestSuite extends MatcherSuiteBase {
     checkDepth(forTheseDepths = Array(102, 103, 999, 9999), thisDepthWillBePicked = 1000)
 
     withClue("check default depth value") {
-      val defaultOrderBook = dex1.api.orderBook(wavesUsdPair)
-      defaultOrderBook should matchTo(dex1.api.orderBook(wavesUsdPair, 100))
-      Array(44, 45, 60, 98, 99).foreach(depth => dex1.api.orderBook(wavesUsdPair, depth) should matchTo(defaultOrderBook))
+      val defaultOrderBook = dex1.api.getOrderBook(wavesUsdPair)
+      defaultOrderBook should matchTo(dex1.api.getOrderBook(wavesUsdPair, 100))
+      Array(44, 45, 60, 98, 99).foreach(depth => dex1.api.getOrderBook(wavesUsdPair, depth) should matchTo(defaultOrderBook))
     }
   }
 
@@ -73,7 +73,7 @@ class GetOrderBookTestSuite extends MatcherSuiteBase {
       dex1.api.place(mkOrder(alice, ethWavesPair, SELL, 1.waves, (i + ethWavesOrdersCount + 1) * 100))
     }
 
-    val orderBook = dex1.api.orderBook(AssetPair(Waves, eth), depth)
+    val orderBook = dex1.api.getOrderBook(AssetPair(Waves, eth), depth)
     orderBook.asks should have size depth
     orderBook.bids should have size depth
   }

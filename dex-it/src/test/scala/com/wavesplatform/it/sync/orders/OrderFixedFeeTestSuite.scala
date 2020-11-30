@@ -47,11 +47,11 @@ class OrderFixedFeeTestSuite extends OrderFeeBaseTestSuite {
               val aliceOrder = mkOrder(alice, pair, OrderType.BUY, orderAmount, priceFixed, matcherFee = minMatcherFee, feeAsset = asset)
               placeAndAwaitAtDex(aliceOrder)
 
-              val reservedBalance1 = dex1.api.reservedBalance(alice)
+              val reservedBalance1 = dex1.api.getReservedBalance(alice)
               reservedBalance1(Waves) shouldBe orderAmount * priceFixed / 100000000
               reservedBalance1(asset) shouldBe minMatcherFee
 
-              val tradableBalance1 = dex1.api.tradableBalance(alice, pair)
+              val tradableBalance1 = dex1.api.getTradableBalance(alice, pair)
               tradableBalance1(Waves) shouldBe aliceWavesBalanceBefore - (orderAmount * priceFixed / 100000000)
               tradableBalance1(asset) shouldBe aliceAssetBalanceBefore - minMatcherFee
 

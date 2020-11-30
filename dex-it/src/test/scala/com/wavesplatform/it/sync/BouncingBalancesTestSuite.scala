@@ -96,14 +96,14 @@ class BouncingBalancesTestSuite extends WsSuiteBase {
       )(WsOrder.fromDomain(LimitOrder(bobOrder)))
       wsc.clearMessages()
 
-      dex1.api.orderStatus(bobOrder).status shouldBe Status.Accepted
+      dex1.api.getOrderStatus(bobOrder).status shouldBe Status.Accepted
 
       withClue(s"After rollback order should not be cancelled and balances should not be decreased\n") {
         wavesNode1.api.rollback(heightInitial, returnTransactionsToUtx = false)
         wavesNode1.api.currentHeight shouldBe heightInitial
 
         wavesNode1.api.waitForHeight(heightSecondTransfer)
-        dex1.api.orderStatus(bobOrder).status shouldBe Status.Accepted
+        dex1.api.getOrderStatus(bobOrder).status shouldBe Status.Accepted
 
         wsc.messages.filter {
           case _: WsPingOrPong => false

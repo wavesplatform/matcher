@@ -5,6 +5,7 @@ import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import org.iq80.leveldb.DB
 
+import scala.collection.concurrent.TrieMap
 import scala.collection.mutable.ListBuffer
 
 trait RateDB {
@@ -36,6 +37,13 @@ object RateDB {
     }
 
     def deleteRate(asset: IssuedAsset): Unit = db.readWrite(_.delete(DbKeys.rate(asset)))
+  }
+
+  def inMem: RateDB = new RateDB {
+    private val rates = TrieMap.empty[IssuedAsset, Double]
+    override def upsertRate(asset: IssuedAsset, value: Double): Unit = rates += asset -> value
+    override def getAllRates: Map[IssuedAsset, Double] = rates.toMap
+    override def deleteRate(asset: IssuedAsset): Unit = rates -= asset
   }
 
 }

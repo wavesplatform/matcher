@@ -74,7 +74,7 @@ trait ApiExtensions extends NodeApiExtensions {
     val accountsOrderHistory = accounts.flatMap(a => assetPairs.map(p => a -> p))
 
     val orderHistory = accountsOrderHistory.map {
-      case (account, pair) => (account, pair, dexApi.orderHistoryByPair(account, pair))
+      case (account, pair) => (account, pair, dexApi.getOrderHistoryByAssetPairAndPublicKey(account, pair))
     }
 
     val orderHistoryMap = orderHistory

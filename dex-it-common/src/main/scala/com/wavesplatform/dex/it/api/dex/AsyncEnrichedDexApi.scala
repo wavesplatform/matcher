@@ -172,7 +172,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
   /**
    * param @activeOnly Server treats this parameter as false if it wasn't specified
    */
-  override def orderHistory(
+  override def getOrderHistoryByPublicKey(
     owner: KeyPair,
     activeOnly: Option[Boolean],
     closedOnly: Option[Boolean],
@@ -181,6 +181,23 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
     sttp
       .get(appendFilters(uri"$apiUri/matcher/orderbook/${Base58.encode(owner.publicKey)}", activeOnly, closedOnly))
       .headers(timestampAndSignatureHeaders(owner, timestamp))
+  }
+
+  override def getOrderHistoryByApiKey(address: String): R[List[HttpOrderBookHistoryItem]] = mk {
+    sttp
+      .get(uri"$apiUri/matcher/orders/$address")
+      .headers(apiKeyHeaders)
+  }
+
+  override def getOrderHistoryByApiKey(
+    address: String,
+    activeOnly: Boolean,
+    closedOnly: Boolean,
+    headers: Map[String, String]
+  ): R[List[HttpOrderBookHistoryItem]] = mk {
+    sttp
+      .get(uri"$apiUri/matcher/orders/$address?activeOnly=$activeOnly&closedOnly=$closedOnly")
+      .headers(headers)
   }
 
   /**
@@ -200,7 +217,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
   /**
    * param @activeOnly Server treats this parameter as false if it wasn't specified
    */
-  override def orderHistoryByPair(
+  override def getOrderHistoryByAssetPairAndPublicKey(
     owner: KeyPair,
     assetPair: AssetPair,
     activeOnly: Option[Boolean],
@@ -285,12 +302,6 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
 
   override def getRates: R[HttpRates] = mk {
     sttp.get(uri"$apiUri/matcher/settings/rates").headers(apiKeyHeaders)
-  }
-
-  override def getOrderHistoryByApiKey(address: String): R[Array[HttpOrderBookHistoryItem]] = mk {
-    sttp
-      .get(uri"$apiUri/matcher/orders/$address")
-      .headers(apiKeyHeaders)
   }
 
   override def deleteOrderBook(assetPair: AssetPair): R[HttpMessage] =

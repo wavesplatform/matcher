@@ -50,7 +50,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       dex1.api.cancel(bob, order)
       dex1.api.waitForOrderStatus(order, Status.Cancelled)
 
-      dex1.api.orderHistoryByPair(bob, wavesUsdPair).collectFirst {
+      dex1.api.getOrderHistoryByAssetPairAndPublicKey(bob, wavesUsdPair).collectFirst {
         case o if o.id == order.id() => o.status shouldEqual Status.Cancelled.name
       }
 
@@ -113,9 +113,9 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
         dex1.api.cancelWithApiKey(order)
         dex1.api.waitForOrderStatus(order, Status.Cancelled)
 
-        dex1.api.orderHistory(bob).find(_.id == order.id()).get.status shouldBe Status.Cancelled.name
+        dex1.api.getOrderHistoryByPublicKey(bob).find(_.id == order.id()).get.status shouldBe Status.Cancelled.name
 
-        dex1.api.orderHistoryByPair(bob, wavesUsdPair).find(_.id == order.id()).get.status shouldBe Status.Cancelled.name
+        dex1.api.getOrderHistoryByAssetPairAndPublicKey(bob, wavesUsdPair).find(_.id == order.id()).get.status shouldBe Status.Cancelled.name
 
         eventually {
           val orderBook = dex1.api.getOrderBook(wavesUsdPair)
@@ -130,9 +130,9 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
         dex1.api.cancelWithApiKey(order, Some(order.senderPublicKey))
         dex1.api.waitForOrderStatus(order, Status.Cancelled)
 
-        dex1.api.orderHistory(bob).find(_.id == order.id()).get.status shouldBe Status.Cancelled.name
+        dex1.api.getOrderHistoryByPublicKey(bob).find(_.id == order.id()).get.status shouldBe Status.Cancelled.name
 
-        dex1.api.orderHistoryByPair(bob, wavesUsdPair).find(_.id == order.id()).get.status shouldBe Status.Cancelled.name
+        dex1.api.getOrderHistoryByAssetPairAndPublicKey(bob, wavesUsdPair).find(_.id == order.id()).get.status shouldBe Status.Cancelled.name
       }
 
       "and with an invalid X-User-Public-Key" in {
@@ -332,7 +332,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
           Future.inSeries(pairs)(Function.tupled(place(_, _, ordersPerAccount))).map(_.flatten)
         }
         _ <- Future.traverse(accounts) { account =>
-          dex1.asyncApi.orderHistoryByPair(account, wavesUsdPair).map { orders =>
+          dex1.asyncApi.getOrderHistoryByAssetPairAndPublicKey(account, wavesUsdPair).map { orders =>
             withClue(s"account $account: ") {
               orders.size shouldBe ordersPerAccount
             }

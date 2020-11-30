@@ -88,10 +88,19 @@ trait DexApi[F[_]] {
 
   def getTransactionsByOrder(id: Order.Id): F[List[ExchangeTransaction]]
 
+
+  def getOrderHistoryByApiKey(address: String): F[List[HttpOrderBookHistoryItem]]
+  def getOrderHistoryByApiKey(
+                               address: String,
+                               activeOnly:Boolean,
+                               closedOnly: Boolean,
+                               headers: Map[String, String]
+                             ): F[List[HttpOrderBookHistoryItem]]
+
   /**
    * param @activeOnly Server treats this parameter as false if it wasn't specified
    */
-  def orderHistory(
+  def getOrderHistoryByPublicKey(
     owner: KeyPair,
     activeOnly: Option[Boolean] = None,
     closedOnly: Option[Boolean] = None,
@@ -111,7 +120,7 @@ trait DexApi[F[_]] {
   /**
    * param @activeOnly Server treats this parameter as false if it wasn't specified
    */
-  def orderHistoryByPair(
+  def getOrderHistoryByAssetPairAndPublicKey(
     owner: KeyPair,
     assetPair: AssetPair,
     activeOnly: Option[Boolean] = None,
@@ -141,8 +150,6 @@ trait DexApi[F[_]] {
   def deleteRate(assetId: String, headers: Map[String, String] = Map.empty): F[HttpMessage]
   def deleteRate(asset: Asset): F[HttpMessage]
   def getRates: F[HttpRates]
-
-  def getOrderHistoryByApiKey(address: String): F[Array[HttpOrderBookHistoryItem]]
 
   def currentOffset: F[HttpOffset]
   def lastOffset: F[HttpOffset]

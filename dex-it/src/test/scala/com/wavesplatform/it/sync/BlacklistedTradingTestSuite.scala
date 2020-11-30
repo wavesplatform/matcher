@@ -63,11 +63,11 @@ class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
     dex1.api.getOrderBook(wavesBtcPair).asks.size shouldBe 1
 
     And("OrderHistory returns info about all orders")
-    val aliceOrderHistory = dex1.api.orderHistory(alice, activeOnly = Some(true))
+    val aliceOrderHistory = dex1.api.getOrderHistoryByPublicKey(alice, activeOnly = Some(true))
     aliceOrderHistory.size shouldBe 3
     aliceOrderHistory.foreach(_.status shouldBe Status.Accepted.name)
 
-    val bobOrderHistory = dex1.api.orderHistory(bob, activeOnly = Some(true))
+    val bobOrderHistory = dex1.api.getOrderHistoryByPublicKey(bob, activeOnly = Some(true))
     bobOrderHistory.size shouldBe 1
     bobOrderHistory.head.status shouldBe Status.Accepted.name
 

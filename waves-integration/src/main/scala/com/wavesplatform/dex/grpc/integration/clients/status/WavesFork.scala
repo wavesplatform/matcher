@@ -9,6 +9,7 @@ import com.wavesplatform.dex.grpc.integration.clients.status.WavesFork.Status
 
 // TODO test
 // TODO this class is too slow for his purposes
+// TODO can be connected if forkBranch rolled back behind origBranch and restored the same branch
 case class WavesFork private[status] (origBranch: WavesBranch, forkBranch: WavesBranch, connected: Boolean) {
 
   // TODO move to tests in the end
@@ -35,7 +36,8 @@ case class WavesFork private[status] (origBranch: WavesBranch, forkBranch: Waves
       case Left(e) => Status.Failed(withoutLast, e)
       case Right(updatedForkBranch) =>
         // TODO if we are restoring the origBranch in forkBranch, hold NotResolved until we get all micro blocks
-        if (block.tpe == WavesBlock.Type.FullBlock) Status.NotResolved(copy(forkBranch = updatedForkBranch))
+        // Compare heights to solve a situation when there no transactions in the network since some height
+        if (block.tpe == WavesBlock.Type.FullBlock && block.ref.height < origBranch.height) Status.NotResolved(copy(forkBranch = updatedForkBranch))
         else {
           val (origDroppedBlocks, updatedForkDroppedBlocks, activeBranch) =
             if (connected) {

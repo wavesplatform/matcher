@@ -119,6 +119,7 @@ object StatusTransitions extends ScorexLogging {
 //                  ),
 //                  updatedLastBlockHeight = LastBlockHeight.RestartRequired(updatedFork.height + 1)
 //                )
+                log.warn(s"Can't append a block: $reason")
                 StatusUpdate(newStatus = origStatus) // TODO Until BlockchainUpdatesStreamControl.askNext
             }
 

@@ -227,9 +227,19 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
           }
 
           "because the resolving process haven't yet completed" in {
+            val block3 = WavesBlock(
+              ref = BlockRef(height = 3, id = ByteStr(Array[Byte](98, 2, 0))),
+              reference = block2A.ref.id,
+              changes = BlockchainBalance(
+                regular = Map(carol -> Map(Waves -> 11)),
+                outLeases = Map.empty
+              ),
+              tpe = WavesBlock.Type.FullBlock
+            )
+
             val init = TransientRollback(
               fork = WavesFork(
-                origBranch = WavesBranch(List(block2A, block1), block2A.ref.height),
+                origBranch = WavesBranch(List(block3, block2A, block1), block3.ref.height),
                 forkBranch = WavesBranch(List(block1), block1.ref.height),
                 connected = true
               ),

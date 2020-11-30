@@ -8,13 +8,15 @@ sealed trait WavesNodeEvent extends Product with Serializable
 
 object WavesNodeEvent {
 
-  case class Appended(block: WavesBlock, forgedTxIds: Seq[ByteString]) extends WavesNodeEvent {
+  sealed trait BlockchainUpdates
+
+  case class Appended(block: WavesBlock, forgedTxIds: Seq[ByteString]) extends WavesNodeEvent with BlockchainUpdates {
     override def toString: String = s"Appended(${block.tpe}, h=${block.ref.height}, ${block.ref.id}, ftx=${txIdsToString(forgedTxIds)})"
   }
 
   // Could also happen on appending of a key block
   // It is expected, that we get Appended after RolledBack
-  case class RolledBack(to: RolledBack.To) extends WavesNodeEvent
+  case class RolledBack(to: RolledBack.To) extends WavesNodeEvent with BlockchainUpdates
 
   object RolledBack {
     sealed trait To extends Product with Serializable

@@ -9,6 +9,8 @@ case class WavesBlock(ref: BlockRef, reference: ByteStr, changes: BlockchainBala
     outLeases = changes.outLeases.keySet
   )
 
+  override def toString: String = s"WavesBlock(id=${ref.id.base58.take(5)}, h=${ref.height}, tpe=$tpe)"
+
 }
 
 object WavesBlock {

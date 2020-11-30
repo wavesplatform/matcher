@@ -85,6 +85,8 @@ case class WavesBranch(history: List[WavesBlock], height: Int) { // TODO cut to 
   def dropAll: (WavesBranch, List[WavesBlock]) = (WavesBranch(Nil, history.lastOption.fold(height)(x => math.max(0, x.ref.height - 1))), history)
 
   private def mkHardenedBlock(blocks: NonEmptyList[WavesBlock]): WavesBlock = blocks.reduce(WavesBranch.blockSemigroup)
+
+  override def toString: String = s"WavesBranch(his=${history.map(_.ref)}, h=$height)"
 }
 
 object WavesBranch {

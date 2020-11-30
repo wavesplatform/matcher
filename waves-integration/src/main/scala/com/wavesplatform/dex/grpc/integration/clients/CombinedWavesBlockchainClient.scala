@@ -21,7 +21,7 @@ import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.Upda
 import com.wavesplatform.dex.grpc.integration.clients.blockchainupdates.BlockchainUpdatesClient
 import com.wavesplatform.dex.grpc.integration.clients.matcherext.MatcherExtensionClient
 import com.wavesplatform.dex.grpc.integration.clients.status.StatusUpdate.LastBlockHeight
-import com.wavesplatform.dex.grpc.integration.clients.status.WavesNodeEvent.WavesNodeUtxEvent
+import com.wavesplatform.dex.grpc.integration.clients.status.WavesNodeEvent.{BlockchainUpdates, WavesNodeUtxEvent}
 import com.wavesplatform.dex.grpc.integration.clients.status._
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import monix.eval.Task
@@ -65,6 +65,10 @@ class CombinedWavesBlockchainClient(
         x.updatedLastBlockHeight match {
           case LastBlockHeight.Updated(to) => control.checkpoint(to)
           case LastBlockHeight.RestartRequired(from) => control.restartFrom(from)
+          case _ =>
+        }
+        event match {
+          case _: BlockchainUpdates => control.requestNext()
           case _ =>
         }
         requestBalances(x.requestBalances)

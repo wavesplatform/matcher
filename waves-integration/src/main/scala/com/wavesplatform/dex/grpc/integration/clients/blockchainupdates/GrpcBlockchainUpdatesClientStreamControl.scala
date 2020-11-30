@@ -2,8 +2,6 @@ package com.wavesplatform.dex.grpc.integration.clients.blockchainupdates
 
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.clients.status.WavesNodeEvent
-import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
-import io.grpc.stub.StreamObserver
 import monix.execution.Scheduler
 import monix.reactive.Observer
 
@@ -11,18 +9,17 @@ import scala.concurrent.duration.DurationInt
 
 class GrpcBlockchainUpdatesClientStreamControl(
   subject: Observer[WavesNodeEvent],
-  subscribe: (Observer[WavesNodeEvent], Int, Throwable => Unit) => Option[StreamObserver[SubscribeEvent]]
+  subscribe: (Observer[WavesNodeEvent], Int, Throwable => Unit) => Option[GrpcBlockchainEventsObserver]
 )(implicit scheduler: Scheduler)
     extends BlockchainUpdatesStreamControl
     with ScorexLogging {
-  @volatile private var grpcObserver: Option[StreamObserver[SubscribeEvent]] = None
+  @volatile private var grpcObserver: Option[GrpcBlockchainEventsObserver] = None
 
   // Note, it is not processed height! A less value could be emitted to control
   @volatile private var checkpointHeight = 1
 
   def startFrom(height: Int): Unit = {
     require(height >= 1, "We can not get blocks on height <= 0")
-    log.info(s"Starting from $height")
     checkpointHeight = height - 1
     grpcObserver = subscribe(subject, height, doOnError)
   }
@@ -31,6 +28,8 @@ class GrpcBlockchainUpdatesClientStreamControl(
     stopGrpcObserver()
     startFrom(height)
   }
+
+  override def requestNext(): Unit = grpcObserver.foreach(_.requestNext())
 
   override def checkpoint(height: Int): Unit = checkpointHeight = height
 

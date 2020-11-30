@@ -31,6 +31,7 @@ case class WavesFork private[status] (origBranch: WavesBranch, forkBranch: Waves
 
   def height: Int = forkBranch.height
 
+  // TODO if we have e.g. 10 blocks and did rollback for 2, we don't need to request balances. Check this case
   def withBlock(block: WavesBlock): Status =
     forkBranch.withBlock(block) match {
       case Left(e) => Status.Failed(withoutLast, e)
@@ -93,6 +94,7 @@ case class WavesFork private[status] (origBranch: WavesBranch, forkBranch: Waves
       }
     else copy(forkBranch = updatedForkBranch)
 
+  override def toString: String = s"WavesFork(o=$origBranch, f=$forkBranch, connected=$connected)"
 }
 
 object WavesFork {

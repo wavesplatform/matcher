@@ -1,5 +1,8 @@
 package com.wavesplatform.dex.grpc.integration.clients.blockchainupdates
 
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.atomic.AtomicBoolean
+
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.clients.status.WavesNodeEvent
@@ -20,6 +23,8 @@ class GrpcBlockchainEventsObserver(
     with ScorexLogging {
 
   private var requestStream: ClientCallStreamObserver[Empty] = _
+  private val awaitNext = new AtomicBoolean(true)
+  private val buffer = new ConcurrentLinkedQueue[WavesNodeEvent]()
 
   override def beforeStart(requestStream: ClientCallStreamObserver[Empty]): Unit = {
     this.requestStream = requestStream
@@ -27,8 +32,14 @@ class GrpcBlockchainEventsObserver(
   }
 
   override def onNext(value: SubscribeEvent): Unit = value.update.flatMap(toEvent) match {
-    case Some(value) => subject.onNext(value)
+    case Some(value) => if (awaitNext.compareAndSet(true, false)) subject.onNext(value) else buffer.add(value)
     case None => log.warn(s"Can't convert to event: $value")
+  }
+
+  // TODO Probably there is a concurrency issue
+  def requestNext(): Unit = if (!awaitNext.get) Option(buffer.poll()) match {
+    case Some(x) => subject.onNext(x)
+    case None => awaitNext.set(true)
   }
 
   override def onError(e: Throwable): Unit = if (!isClosing) doOnError(e)

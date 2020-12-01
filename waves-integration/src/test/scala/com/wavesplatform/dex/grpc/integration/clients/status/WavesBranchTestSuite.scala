@@ -20,7 +20,7 @@ import scala.util.matching.Regex
 class WavesBranchTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrivenPropertyChecks {
 
   // NoShrink
-  implicit def noShrink[A]: Shrink[A] = Shrink.withLazyList(_ => LazyList.empty)
+  implicit def noShrink[A]: Shrink[A] = Shrink.withLazyList(_ => LazyList.empty) // TODO DEX-994
 
   private val alice = KeyPair(ByteStr("alice".getBytes(StandardCharsets.UTF_8))).toAddress
   private val bob = KeyPair(ByteStr("bob".getBytes(StandardCharsets.UTF_8))).toAddress

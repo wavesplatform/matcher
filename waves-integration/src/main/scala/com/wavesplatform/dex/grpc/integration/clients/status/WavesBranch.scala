@@ -12,28 +12,25 @@ import com.wavesplatform.dex.grpc.integration.clients.status.WavesBranch.dropLiq
 import scala.annotation.tailrec
 
 /**
- * TODO WavesChain? or history -> chain?
- * TODO constructor with auto height when passed non empty list
+ * TODO DEX-1008 WavesChain? or history -> chain?
+ * TODO DEX-1008 A constructor with auto height when passed non empty list
+ * TODO DEX-1008 Cut to last N blocks is required to reduce amount of stored blocks!
+ *
  * @param history Contains micro blocks
  */
-case class WavesBranch(history: List[WavesBlock], height: Int) { // TODO cut to last N blocks is required to reduce amount of stored blocks!
+case class WavesBranch(history: List[WavesBlock], height: Int) {
 
   require(history.headOption.map(_.ref.height).forall(_ == height), "height corresponds last block")
 
   def isEmpty: Boolean = history.isEmpty
 
-  // TODO remove withBlock, because its type creases a possibility that some blocks can be dropped during a micro block appending
-
-  /**
-   * @return (droppedMicroBlocks, updatedFork)
-   */
   def withBlock(block: WavesBlock): Either[String, WavesBranch] =
     if (block.tpe == WavesBlock.Type.FullBlock) withFullBlock(block)
     else withMicroBlock(block)
 
   /**
    * It is expected, that block references the last block in the history
-   * @return (droppedBlocks, ) Guarantees WavesFork is not empty
+   * @return Guarantees WavesFork is not empty
    */
   private def withFullBlock(block: WavesBlock): Either[String, WavesBranch] = history match {
     case Nil => WavesBranch(block :: history, block.ref.height).asRight
@@ -91,6 +88,7 @@ case class WavesBranch(history: List[WavesBlock], height: Int) { // TODO cut to 
 
 object WavesBranch {
 
+  // DEX-1002
   private[WavesBranch] val blockSemigroup = new Semigroup[WavesBlock] {
 
     override def combine(x: WavesBlock, y: WavesBlock): WavesBlock = {

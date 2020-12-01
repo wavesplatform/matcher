@@ -10,12 +10,6 @@ import com.wavesplatform.dex.grpc.integration.clients.status.WavesNodeEvent._
 
 import scala.collection.immutable.Queue
 
-/**
- * The extension guarantees:
- * 1. During initialization: events will be sent after initial blocks
- * 2. Events has causal ordering
- */
-
 object StatusTransitions extends ScorexLogging {
 
   def apply(origStatus: BlockchainStatus, event: WavesNodeEvent): StatusUpdate = {
@@ -56,7 +50,7 @@ object StatusTransitions extends ScorexLogging {
               processUtxEvents = Queue(WavesNodeUtxEvent.Switched(newTxs))
             )
 
-          case RolledBack(to) => // This could be during appending a new key block too
+          case RolledBack(to) => // This could happen during an appending of a new key block too
             StatusUpdate(
               newStatus = TransientRollback(
                 fork = to match {
@@ -115,7 +109,7 @@ object StatusTransitions extends ScorexLogging {
                 StatusUpdate(
                   newStatus = TransientRollback(
                     fork = updatedFork,
-                    utxEventsStash = origStatus.utxEventsStash // TODO ??? hm we just dropped a transaction from the last block?
+                    utxEventsStash = origStatus.utxEventsStash // TODO DEX-1004 Hm we just dropped a transaction from the last block?
                   ),
                   updatedLastBlockHeight = LastBlockHeight.RestartRequired(updatedFork.height + 1)
                 )
@@ -132,7 +126,7 @@ object StatusTransitions extends ScorexLogging {
               case To.CommonBlockRef(ref) => origStatus.fork.rollBackTo(ref)
               case To.Height(h) => origStatus.fork.rollBackTo(h)
             }
-            StatusUpdate(newStatus = origStatus.copy(fork = fork)) // TODO not only update a fork ?
+            StatusUpdate(newStatus = origStatus.copy(fork = fork)) // TODO DEX-1004 Not only update a fork ?
 
           case _ =>
             // Won't happen
@@ -142,11 +136,8 @@ object StatusTransitions extends ScorexLogging {
 
       case origStatus: TransientResolving =>
         event match {
-          // TODO We can stuck if waiting for DataReceiving in stash, because we don't send a request !!!!
-          // OR not, because we are creating a new stash
-          // Also we need a some protection from stuck!
+          // TODO DEX-1005
           case DataReceived(updates) =>
-            // TODO optimize. Probably we don't need to request all data. E.g. we hadn't this address in last 100 blocks and we got its balance 101 block before
             val init = StatusUpdate(
               newStatus = Normal(origStatus.main),
               updatedBalances = origStatus.stashChanges |+| updates,
@@ -162,7 +153,7 @@ object StatusTransitions extends ScorexLogging {
         }
     }
 
-    log.info(s"${origStatus.name} + $event = $r")
+    log.info(s"Result: $r")
     r
   }
 

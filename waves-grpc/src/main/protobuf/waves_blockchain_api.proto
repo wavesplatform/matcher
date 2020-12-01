@@ -186,8 +186,10 @@ message UtxStateResponse {
 }
 
 message GetBalancesRequest {
-    // regular: Map[Address, Set[Asset]], outLeases: Set[Address]
+    // regular: Map[Address, Set[Asset]]
     repeated RegularPair regular = 1;
+
+    // outLeases: Set[Address]
     repeated bytes outLeaseAddresses = 2;
 
     message RegularPair {

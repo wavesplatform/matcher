@@ -15,6 +15,7 @@ import scala.concurrent.ExecutionContext
 
 object WavesClientBuilder extends ScorexLogging {
 
+  // TODO DEX-998
   def async(
     wavesBlockchainClientSettings: WavesBlockchainClientSettings,
     monixScheduler: Scheduler,
@@ -48,7 +49,8 @@ object WavesClientBuilder extends ScorexLogging {
         new MatcherExtensionGrpcAsyncClient(eventLoopGroup, matcherExtensionChannel, monixScheduler)(grpcExecutionContext),
         wavesBlockchainClientSettings.defaultCachesExpiration
       )(grpcExecutionContext),
-      bClient = new DefaultBlockchainUpdatesClient(eventLoopGroup, blockchainUpdatesChannel, monixScheduler)(grpcExecutionContext)
+      bClient = new DefaultBlockchainUpdatesClient(eventLoopGroup, blockchainUpdatesChannel, monixScheduler)(grpcExecutionContext),
+      ignoredExchangeTxSenderPublicKey = None // TODO DEX-995
     )(grpcExecutionContext, monixScheduler)
   }
 

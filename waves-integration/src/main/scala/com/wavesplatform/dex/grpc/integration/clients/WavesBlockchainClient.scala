@@ -13,6 +13,7 @@ import monix.reactive.Observable
 
 import scala.concurrent.Future
 
+// TODO DEX-998
 trait WavesBlockchainClient {
   def updates: Observable[WavesBlockchainClient.Updates]
 

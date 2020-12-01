@@ -17,6 +17,11 @@ import monix.reactive.subjects.ConcurrentSubject
 import scala.concurrent.{ExecutionContext, Future}
 
 trait BlockchainUpdatesClient {
+  /**
+   * The extension guarantees:
+   * 1. During initialization: events will be sent after initial blocks
+   * 2. Events has causal ordering
+   */
   def blockchainEvents(fromHeight: Int): (Observable[WavesNodeEvent], BlockchainUpdatesStreamControl)
   def close(): Future[Unit]
 }
@@ -29,7 +34,7 @@ class DefaultBlockchainUpdatesClient(eventLoopGroup: EventLoopGroup, channel: Ma
 
   override def blockchainEvents(fromHeight: Int): (Observable[WavesNodeEvent], BlockchainUpdatesStreamControl) = {
     // From the docs: the grammar must still be respected: (onNext)* (onComplete | onError)
-    // That is why we don't propagate errors to r
+    // On error we just restart the stream, so r receives updates from a new stream. That is why we don't propagate errors to r
     val subject = ConcurrentSubject.publish[WavesNodeEvent](monixScheduler)
     val control = new GrpcBlockchainUpdatesClientStreamControl(
       subject,
@@ -37,7 +42,7 @@ class DefaultBlockchainUpdatesClient(eventLoopGroup: EventLoopGroup, channel: Ma
         if (isClosing) none
         else {
           log.debug(s"Subscribed on blockchain events from $fromHeight")
-          val call = channel.newCall(BlockchainUpdatesApiGrpc.METHOD_SUBSCRIBE, CallOptions.DEFAULT.withWaitForReady())
+          val call = channel.newCall(BlockchainUpdatesApiGrpc.METHOD_SUBSCRIBE, CallOptions.DEFAULT.withWaitForReady()) // TODO DEX-1001
           val r = new GrpcBlockchainEventsObserver(subject, Conversions.toEvent, isClosing, call, onError)
 
           ClientCalls.asyncServerStreamingCall(call, new SubscribeRequest(fromHeight), r)
@@ -53,7 +58,7 @@ class DefaultBlockchainUpdatesClient(eventLoopGroup: EventLoopGroup, channel: Ma
     isClosing = true
     channel.shutdown()
     channel.awaitTermination(500, TimeUnit.MILLISECONDS)
-    // TODO remove duplication
+    // TODO DEX-998
     if (eventLoopGroup.isShuttingDown) Future.successful(())
     else eventLoopGroup.shutdownGracefully(0, 500, TimeUnit.MILLISECONDS).asScala.map(_ => ())
   }

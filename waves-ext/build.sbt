@@ -21,7 +21,6 @@ enablePlugins(
 V.scalaPackage := "com.wavesplatform.dex.grpc.integration"
 V.subProject := "ext"
 
-resolvers += "dnvriend" at "https://dl.bintray.com/dnvriend/maven" // TODO try to remove
 libraryDependencies ++= Dependencies.Module.wavesExt
 
 val packageSettings = Seq(

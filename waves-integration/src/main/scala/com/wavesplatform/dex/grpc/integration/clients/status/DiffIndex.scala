@@ -7,9 +7,9 @@ import cats.syntax.semigroup._
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 
-// TODO tests, or just for regular.view.map.filterNot.toMap
 case class DiffIndex(regular: Map[Address, Set[Asset]], outLeases: Set[Address]) {
 
+  // TODO DEX-1003, also probably create a common implementation for intersect too
   def without(that: DiffIndex): DiffIndex = DiffIndex(
     regular = regular.view
       .map { case (address, assets) => address -> that.regular.get(address).fold(assets)(assets.--) }
@@ -32,6 +32,7 @@ case class DiffIndex(regular: Map[Address, Set[Asset]], outLeases: Set[Address])
 
 object DiffIndex {
 
+  // TODO DEX-1002
   implicit val diffIndexMonoid: Monoid[DiffIndex] = new Monoid[DiffIndex] {
     override val empty = DiffIndex(Map.empty, Set.empty)
 

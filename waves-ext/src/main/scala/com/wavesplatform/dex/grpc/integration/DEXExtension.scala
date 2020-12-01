@@ -34,12 +34,13 @@ class DEXExtension(context: ExtensionContext) extends Extension with ScorexLoggi
     val host: String = context.settings.config.as[String]("waves.dex.grpc.integration.host")
     val port: Int = context.settings.config.as[Int]("waves.dex.grpc.integration.port")
 
+    // TODO DEX-995
     val ignoredExchangeTxSenderPublicKey: Option[String] = Try {
       context.settings.config.as[String]("waves.dex.utx.ignore-exchange-sender-pk-in-pessimistic-portfolio")
     }.toOption
 
     val bindAddress = new InetSocketAddress(host, port)
-    apiService = new WavesBlockchainApiGrpcService(context, ignoredExchangeTxSenderPublicKey)
+    apiService = new WavesBlockchainApiGrpcService(context)
 
     server = NettyServerBuilder
       .forAddress(bindAddress)

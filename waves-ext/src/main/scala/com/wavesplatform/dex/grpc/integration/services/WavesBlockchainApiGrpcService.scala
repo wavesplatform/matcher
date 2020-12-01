@@ -8,14 +8,12 @@ import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.grpc._
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.dex.collections.Implicits._
 import com.wavesplatform.dex.grpc.integration._
 import com.wavesplatform.dex.grpc.integration.protobuf.EitherVEExt
 import com.wavesplatform.dex.grpc.integration.protobuf.PbToWavesConversions._
 import com.wavesplatform.dex.grpc.integration.protobuf.WavesToPbConversions._
 import com.wavesplatform.dex.grpc.integration.smart.MatcherScriptRunner
 import com.wavesplatform.events.UtxEvent.{TxAdded, TxRemoved}
-import com.wavesplatform.events.protobuf.StateUpdate
 import com.wavesplatform.extensions.{Context => ExtensionContext}
 import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.lang.v1.compiler.Terms
@@ -23,8 +21,6 @@ import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.{ExecutionError, ValidationError}
 import com.wavesplatform.protobuf.Amount
-import com.wavesplatform.protobuf.transaction.PBTransactions
-import com.wavesplatform.state.{Diff, Portfolio}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -34,7 +30,6 @@ import io.grpc.stub.{ServerCallStreamObserver, StreamObserver}
 import io.grpc.{Metadata, Status, StatusRuntimeException}
 import monix.eval.Task
 import monix.execution.Scheduler
-import scalapb.json4s.JsonFormat
 import shapeless.Coproduct
 
 import scala.concurrent.Future
@@ -42,8 +37,7 @@ import scala.jdk.CollectionConverters._
 import scala.util.Try
 import scala.util.control.NonFatal
 
-// TODO send all utx on connect?
-class WavesBlockchainApiGrpcService(context: ExtensionContext, ignoredExchangeTxSenderPublicKey: Option[String])(implicit sc: Scheduler)
+class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Scheduler)
     extends WavesBlockchainApiGrpc.WavesBlockchainApi
     with ScorexLogging {
 
@@ -57,87 +51,30 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, ignoredExchangeTx
     log.info("Closing balance changes stream...")
 
     // https://github.com/grpc/grpc/blob/master/doc/statuscodes.md
-    val metadata = new Metadata(); metadata.put(descKey, "Shutting down")
+    val metadata = new Metadata()
+    metadata.put(descKey, "Shutting down")
     val shutdownError = new StatusRuntimeException(Status.UNAVAILABLE, metadata) // Because it should try to connect to other DEX Extension
 
     utxChangesSubscribers.forEach(_.onError(shutdownError))
     utxChangesSubscribers.clear()
   }
 
-  private val pbWaves = Waves.toPB
-
-  case class PortfolioUpdates(
-    balanceUpdates: List[StateUpdate.BalanceUpdate],
-    leasingUpdates: List[StateUpdate.LeasingUpdate]
-  )
-
-  private def unpack(init: PortfolioUpdates, address: Address, portfolio: Portfolio): PortfolioUpdates = {
-    val pbAddress = address.toPB
-
-    val balanceUpdates = portfolio.assets
-      .foldLeft(init.balanceUpdates) {
-        case (r, (asset, v)) =>
-          if (v == 0) r
-          else StateUpdate.BalanceUpdate(
-            address = address.toPB,
-            amount = Amount(asset.toPB, v).some
-          ) :: r
-      }
-      .prependIf(portfolio.balance != 0)(StateUpdate.BalanceUpdate(pbAddress, Amount(pbWaves, portfolio.balance).some))
-
-    val lease = portfolio.lease
-    val leasingUpdates = init.leasingUpdates.prependIf(lease.in != 0 || lease.out != 0) {
-      StateUpdate.LeasingUpdate(
-        address = pbAddress,
-        in = portfolio.lease.in,
-        out = portfolio.lease.out
-      )
-    }
-
-    PortfolioUpdates(balanceUpdates, leasingUpdates)
-  }
-
-  private def toPbDiff(vanilla: Diff): TransactionDiff = {
-    val portfolioUpdates = vanilla.portfolios.foldLeft(PortfolioUpdates(Nil, Nil)) {
-      case (r, (address, portfolio)) => unpack(r, address, portfolio)
-    }
-
-    TransactionDiff(
-      stateUpdate = StateUpdate(
-        balances = portfolioUpdates.balanceUpdates,
-        leases = portfolioUpdates.leasingUpdates,
-        dataEntries = vanilla.accountData.view.flatMap {
-          case (address, dataEntries) =>
-            dataEntries.data.values.map { dataEntry =>
-              StateUpdate.DataEntryUpdate(
-                address = address.toPB,
-                dataEntry = PBTransactions.toPBDataEntry(dataEntry).some
-              )
-            }
-        }.toList,
-        assets = Nil // vanilla. // TODO
-      ).some
-    )
-  }
-
-  // TODO duplication
+  // TODO DEX-994
   private def getSimpleName(x: Any): String = x.getClass.getName.replaceAll(".*?(\\w+)\\$?$", "$1")
 
-  // TODO close
   private val utxBalanceUpdates = context.utxEvents
     .doOnSubscriptionCancel(cleanupTask)
     .doOnComplete(cleanupTask)
-    .doOnError(e => Task(log.error(s"Error in real time balance changes stream occurred!", e)))
+    .doOnError(e => Task(log.error("Error in real time balance changes stream occurred!", e)))
     .foreach {
-      case evt @ TxAdded(tx, diff) =>
+      case TxAdded(tx, diff) =>
         val utxTransaction = UtxTransaction(
           id = tx.id().toPB,
           transaction = tx.toPB.some,
-          diff = toPbDiff(diff).some
+          diff = diff.toPB.some
         )
 
         utxState.put(tx.id(), utxTransaction)
-        log.info(s"UtxAdded: id=${tx.id()}, ${JsonFormat.toJsonString(utxTransaction)}, $evt")
 
         val event = UtxEvent(
           UtxEvent.Type.Update(
@@ -152,11 +89,10 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, ignoredExchangeTx
           catch { case e: Throwable => log.warn(s"Can't send balance changes to $subscriber", e) }
         }
 
-      case evt @ TxRemoved(tx, reason) =>
+      case TxRemoved(tx, reason) =>
         Option(utxState.remove(tx.id())) match {
-          case None => log.info(s"$evt - can't find")
+          case None => log.debug(s"Can't find removed ${tx.id()} with reason: $reason")
           case Some(utxTransaction) =>
-            log.info(s"UtxRemoved: id=${tx.id()}, $evt")
             val gReason = reason.map { x =>
               UtxEvent.Update.Removed.Reason(
                 name = getSimpleName(x),
@@ -182,7 +118,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, ignoredExchangeTx
   override def getStatuses(request: TransactionsByIdRequest): Future[TransactionsStatusesResponse] = Future {
     val statuses = request.transactionIds.map { txId =>
       context.blockchain.transactionInfo(txId.toVanilla).map(_._1) match {
-        case Some(height) => TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, height) // TODO
+        case Some(height) => TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, height)
         case None =>
           context.utx.transactionById(txId.toVanilla) match {
             case Some(_) => TransactionStatus(txId, TransactionStatus.Status.UNCONFIRMED)
@@ -295,7 +231,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, ignoredExchangeTx
     SpendableAssetsBalancesResponse(assetsBalances)
   }
 
-  // TODO optimize
+  // TODO DEX-997 optimize
   override def getBalances(request: GetBalancesRequest): Future[GetBalancesResponse] = Future {
     val regular = request.regular
       .map { regular =>
@@ -335,7 +271,6 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, ignoredExchangeTx
         case x => log.warn(s"Can't register cancel handler for $x")
       }
 
-      log.info("Add new observer")
       utxChangesSubscribers.add(responseObserver)
       val event = UtxEvent(
         UtxEvent.Type.Switch(
@@ -373,10 +308,10 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, ignoredExchangeTx
   override def allAssetsSpendableBalance(request: AddressRequest): Future[AllAssetsSpendableBalanceResponse] = {
     for {
       address <- Task.fromTry(Try(request.address.toVanillaAddress))
-      assetBalances <- context.accountsApi.portfolio(address).toListL // TODO optimize
+      assetBalances <- context.accountsApi.portfolio(address).toListL // TODO DEX-997 optimize
     } yield AllAssetsSpendableBalanceResponse(
       (Waves :: assetBalances.map(_._1))
-        .map(a => AllAssetsSpendableBalanceResponse.Record(a.toPB, spendableBalance(address, a)))
+        .map(a => AllAssetsSpendableBalanceResponse.Record(a.toPB, spendableBalance(address, a))) // TODO DEX-997 do not use spendableBalance
         .filterNot(_.balance == 0L)
     )
   }.runToFuture
@@ -384,10 +319,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, ignoredExchangeTx
   private def spendableBalance(address: Address, asset: Asset): Long = {
     val stateBalance = context.blockchain.balance(address, asset)
     val leasedBalance = asset.fold(context.blockchain.leaseBalance(address).out)(_ => 0L)
-    math.max(
-      0L,
-      stateBalance - leasedBalance // + pessimisticBalance TODO
-    ) // The negative spendable balance could happen if there are multiple transactions in UTX those spend more than available
+    stateBalance - leasedBalance
   }
 
   private def throwInvalidArgument(description: String): Nothing = {
@@ -397,5 +329,3 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, ignoredExchangeTx
   }
 
 }
-
-object WavesBlockchainApiGrpcService {}

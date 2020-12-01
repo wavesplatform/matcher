@@ -4,6 +4,7 @@ import cats.Group
 import cats.instances.map.catsKernelStdMonoidForMap
 import cats.kernel.Semigroup
 
+// TODO DEX-994 This package
 object MapImplicits {
 
   implicit def group[K, V](implicit vGroup: Group[V]): Group[Map[K, V]] = new Group[Map[K, V]] {

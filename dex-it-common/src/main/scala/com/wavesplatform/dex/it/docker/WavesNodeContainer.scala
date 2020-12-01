@@ -155,7 +155,7 @@ object WavesNodeContainer extends ScorexLogging {
       s"-Dlogback.configurationFile=$baseContainerPath/logback-container.xml",
       s"-Dlogback.brief.fullPath=$containerLogsPath/container-$containerName.log",
       s"-Dwaves.network.declared-address=$ip:6883",
-      "-Dmonix.environment.batchSize=1" // TODO Prod node setting?
+      "-Dmonix.environment.batchSize=1" // TODO DEX-993 Prod node setting?
     ).mkString(" ", " ", " ")
   )
 

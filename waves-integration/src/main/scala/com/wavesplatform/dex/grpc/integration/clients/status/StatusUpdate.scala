@@ -7,6 +7,7 @@ import com.wavesplatform.dex.grpc.integration.clients.status.WavesNodeEvent.Wave
 
 import scala.collection.immutable.Queue
 
+// TODO DEX-1004
 case class StatusUpdate(
   newStatus: BlockchainStatus,
   updatedBalances: BlockchainBalance = Monoid.empty[BlockchainBalance],

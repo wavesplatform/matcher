@@ -32,7 +32,7 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase with NoSt
       .build()
   )
 
-  implicit private val monixScheduler: Scheduler = monix.execution.Scheduler.cached("monix", 1, 5) // .Implicits.global
+  implicit private val monixScheduler: Scheduler = monix.execution.Scheduler.cached("monix", 1, 5)
 
   private lazy val client =
     WavesClientBuilder.async(

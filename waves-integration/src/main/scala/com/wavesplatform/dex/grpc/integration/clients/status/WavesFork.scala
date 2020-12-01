@@ -7,12 +7,12 @@ import cats.syntax.foldable._
 import cats.syntax.semigroup._
 import com.wavesplatform.dex.grpc.integration.clients.status.WavesFork.Status
 
-// TODO test
-// TODO this class is too slow for his purposes
-// TODO can be connected if forkBranch rolled back behind origBranch and restored the same branch
+// TODO DEX-1009 Unit test
+// TODO DEX-1010 Can be connected again if forkBranch rolled back behind origBranch and restored the same branch
+// TODO DEX-1011 This class is too slow for his purposes
 case class WavesFork private[status] (origBranch: WavesBranch, forkBranch: WavesBranch, connected: Boolean) {
 
-  // TODO move to tests in the end
+  // TODO DEX-1009 Move to tests in the end
 
   require(!origBranch.isEmpty, "empty origBranch")
 
@@ -27,18 +27,19 @@ case class WavesFork private[status] (origBranch: WavesBranch, forkBranch: Waves
     "origBranch, forkBranch and connected invariant"
   )
 
-  // TODO An additional invariant: forkBranch should contain only one common block!
+  // TODO DEX-1009 An additional invariant: forkBranch should contain only one common block!
 
   def height: Int = forkBranch.height
 
-  // TODO if we have e.g. 10 blocks and did rollback for 2, we don't need to request balances. Check this case
+  // TODO DEX-1010 if we have e.g. 10 blocks and did rollback for 2, we don't need to request balances. Check this case
   def withBlock(block: WavesBlock): Status =
     forkBranch.withBlock(block) match {
       case Left(e) => Status.Failed(withoutLast, e)
       case Right(updatedForkBranch) =>
-        // TODO if we are restoring the origBranch in forkBranch, hold NotResolved until we get all micro blocks
+        // TODO DEX-1010 if we are restoring the origBranch in forkBranch, hold NotResolved until we get all micro blocks
         // Compare heights to solve a situation when there no transactions in the network since some height
-        if (block.tpe == WavesBlock.Type.FullBlock && block.ref.height < origBranch.height) Status.NotResolved(copy(forkBranch = updatedForkBranch))
+        if (block.tpe == WavesBlock.Type.FullBlock && block.ref.height < origBranch.height)
+          Status.NotResolved(copy(forkBranch = updatedForkBranch))
         else {
           val (origDroppedBlocks, updatedForkDroppedBlocks, activeBranch) =
             if (connected) {
@@ -49,7 +50,7 @@ case class WavesFork private[status] (origBranch: WavesBranch, forkBranch: Waves
                 updatedForkBranch.history.init,
                 updatedForkBranch.copy(history = updatedForkBranch.history ::: commonBranch.history.tail)
               )
-            } else (origBranch.history, updatedForkBranch.history, updatedForkBranch) // MicroBlock && !connected
+            } else (origBranch.history, updatedForkBranch.history, updatedForkBranch)
 
           val origForkDiffIndex = origDroppedBlocks.foldMap(_.diffIndex)
           val (updatedForkAllChanges, updatedForkDiffIndex) = updatedForkDroppedBlocks
@@ -59,7 +60,7 @@ case class WavesFork private[status] (origBranch: WavesBranch, forkBranch: Waves
 
           Status.Resolved(
             activeBranch = activeBranch,
-            newChanges = updatedForkAllChanges, // TODO Probably we can filter out this, but it is done on next layer. Should we do?
+            newChanges = updatedForkAllChanges, // TODO DEX-1011 Probably we can filter out this, but it is done on next layer. Should we do?
             lostDiffIndex = origForkDiffIndex.without(updatedForkDiffIndex)
           )
         }
@@ -70,6 +71,7 @@ case class WavesFork private[status] (origBranch: WavesBranch, forkBranch: Waves
   def rollBackTo(height: Int): WavesFork = mkFromUpdatedForkBranch(forkBranch.dropAfter(height)._1)
   def rollBackTo(ref: BlockRef): WavesFork = mkFromUpdatedForkBranchRef(forkBranch.dropAfter(ref)._1, ref)
 
+  // TODO DEX-1009
   // Valid only when we remove blocks
   private def mkFromUpdatedForkBranch(updatedForkBranch: WavesBranch): WavesFork =
     // If there is no blocks in withoutLastLiquid
@@ -82,6 +84,7 @@ case class WavesFork private[status] (origBranch: WavesBranch, forkBranch: Waves
       }
     else copy(forkBranch = updatedForkBranch)
 
+  // TODO DEX-1009
   // Valid only when we remove blocks
   private def mkFromUpdatedForkBranchRef(updatedForkBranch: WavesBranch, commonBlockRef: BlockRef): WavesFork =
     // If there is no blocks in withoutLastLiquid
@@ -104,9 +107,6 @@ object WavesFork {
 
   def mkRolledBackByOne(origBranch: WavesBranch): WavesFork =
     mkFromCommonBranch(origBranch, origBranch.withoutLast) // Or better use WavesFork.withoutLast
-
-//  def mkFromForkBranch(origBranch: WavesBranch, forkBranch: WavesBranch): WavesFork =
-//    WavesFork(origBranch, forkBranch, forkBranch.history.lastOption.exists(x => origBranch.history.exists(_.ref == x.ref)))
 
   private def mkFromCommonBranch(origBranch: WavesBranch, commonBranch: WavesBranch): WavesFork =
     WavesFork(origBranch, commonBranch.copy(history = commonBranch.history.headOption.toList), !commonBranch.isEmpty)

@@ -5,8 +5,6 @@ import com.wavesplatform.dex.gen.OrderBookGen
 import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder}
 import org.scalacheck.Gen
 
-import scala.jdk.CollectionConverters._
-
 trait OrderBookBenchmarkState extends OrderBookGen {
 
   def getMakerTakerFee(a: AcceptedOrder, b: LimitOrder): (Long, Long) = (a.matcherFee, b.matcherFee)

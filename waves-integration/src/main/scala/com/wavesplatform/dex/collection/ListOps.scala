@@ -2,7 +2,7 @@ package com.wavesplatform.dex.collection
 
 import scala.annotation.tailrec
 
-// TODO tests
+// TODO DEX-994, tests
 object ListOps {
 
   implicit final class Ops[T](val self: List[T]) extends AnyVal {

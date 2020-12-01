@@ -1,19 +1,26 @@
 package com.wavesplatform.dex.grpc.integration.protobuf
 
+import cats.syntax.option._
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.dex.collections.Implicits.ListOps
 import com.wavesplatform.dex.grpc.integration.services._
+import com.wavesplatform.events.protobuf.StateUpdate
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.order.{AssetPair, Order}
-import com.wavesplatform.protobuf.transaction.ExchangeTransactionData
+import com.wavesplatform.protobuf.transaction.{ExchangeTransactionData, PBTransactions}
+import com.wavesplatform.state.{Diff, Portfolio}
 import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.{exchange => ve}
 import com.wavesplatform.{account => va}
 
 object WavesToPbConversions {
 
-  implicit class VanillaExchangeTransactionOps(tx: ve.ExchangeTransaction) {
+  val pbWaves = Waves.toPB
+
+  implicit final class VanillaExchangeTransactionOps(val tx: ve.ExchangeTransaction) extends AnyVal {
 
     def toPB: SignedExchangeTransaction =
       SignedExchangeTransaction(
@@ -40,7 +47,7 @@ object WavesToPbConversions {
 
   }
 
-  implicit class VanillaAssetOps(self: Asset) {
+  implicit final class VanillaAssetOps(val self: Asset) extends AnyVal {
 
     def toPB: ByteString = self match {
       case Asset.IssuedAsset(assetId) => assetId.toPB
@@ -49,11 +56,11 @@ object WavesToPbConversions {
 
   }
 
-  implicit class VanillaAddressOps(self: Address) {
+  implicit final class VanillaAddressOps(val self: Address) extends AnyVal {
     def toPB: ByteString = ByteStr(self.bytes).toPB
   }
 
-  implicit class VanillaOrderOps(order: ve.Order) {
+  implicit final class VanillaOrderOps(val order: ve.Order) extends AnyVal {
 
     def toPB: Order =
       Order(
@@ -76,8 +83,66 @@ object WavesToPbConversions {
 
   }
 
-  implicit class VanillaByteStrOps(val self: ByteStr) extends AnyVal {
+  implicit final class VanillaDiffOps(val self: Diff) extends AnyVal {
+
+    def toPB: TransactionDiff = {
+      val portfolioUpdates = self.portfolios.foldLeft(PortfolioUpdates(Nil, Nil)) {
+        case (r, (address, portfolio)) => append(r, address, portfolio)
+      }
+
+      TransactionDiff(
+        stateUpdate = StateUpdate(
+          balances = portfolioUpdates.balanceUpdates,
+          leases = portfolioUpdates.leasingUpdates,
+          dataEntries = self.accountData.view.flatMap {
+            case (address, dataEntries) =>
+              dataEntries.data.values.map { dataEntry =>
+                StateUpdate.DataEntryUpdate(
+                  address = address.toPB,
+                  dataEntry = PBTransactions.toPBDataEntry(dataEntry).some
+                )
+              }
+          }.toList,
+          assets = Nil // Haven't support yet
+        ).some
+      )
+    }
+
+    private def append(init: PortfolioUpdates, address: Address, portfolio: Portfolio): PortfolioUpdates = {
+      val pbAddress = address.toPB
+
+      val balanceUpdates = portfolio.assets
+        .foldLeft(init.balanceUpdates) {
+          case (r, (asset, v)) =>
+            if (v == 0) r
+            else StateUpdate.BalanceUpdate(
+              address = address.toPB,
+              amount = Amount(asset.toPB, v).some
+            ) :: r
+        }
+        .prependIf(portfolio.balance != 0)(StateUpdate.BalanceUpdate(pbAddress, Amount(pbWaves, portfolio.balance).some))
+
+      val lease = portfolio.lease
+      val leasingUpdates = init.leasingUpdates.prependIf(lease.in != 0 || lease.out != 0) {
+        StateUpdate.LeasingUpdate(
+          address = pbAddress,
+          in = portfolio.lease.in,
+          out = portfolio.lease.out
+        )
+      }
+
+      PortfolioUpdates(balanceUpdates, leasingUpdates)
+    }
+
+  }
+
+  implicit final class VanillaByteStrOps(val self: ByteStr) extends AnyVal {
     def toPB: ByteString = ByteString.copyFrom(self.arr)
   }
+
+  private case class PortfolioUpdates(
+    balanceUpdates: List[StateUpdate.BalanceUpdate],
+    leasingUpdates: List[StateUpdate.LeasingUpdate]
+  )
 
 }

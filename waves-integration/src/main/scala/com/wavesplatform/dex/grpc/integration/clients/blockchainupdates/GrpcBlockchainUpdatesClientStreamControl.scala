@@ -7,6 +7,7 @@ import monix.reactive.Observer
 
 import scala.concurrent.duration.DurationInt
 
+// TODO DEX-999
 class GrpcBlockchainUpdatesClientStreamControl(
   subject: Observer[WavesNodeEvent],
   subscribe: (Observer[WavesNodeEvent], Int, Throwable => Unit) => Option[GrpcBlockchainEventsObserver]
@@ -41,17 +42,12 @@ class GrpcBlockchainUpdatesClientStreamControl(
 
   // Happens only during disconnects or other gRPC issues
   private def doOnError(e: Throwable): Unit = {
-    // TODO probably we need something like backpressure to no process invalid preloaded blocks after SyncFailed
     log.warn(s"Got an error in blockchain events", e)
     val requestHeight = checkpointHeight
     val rollBackHeight = math.max(0, checkpointHeight - 1)
     // It needs to be before the delay to obtain the UTX stream connection before blocks
     subject.onNext(WavesNodeEvent.RolledBack(WavesNodeEvent.RolledBack.To.Height(rollBackHeight)))
-    // TODO need to stop?
-    scheduler.scheduleOnce(50.millis) { // TODO to config
-      // TODO
-      // 1. prepend SyncFailed only if started
-      // 2. we need not only wait for a connection, but for same height too!
+    scheduler.scheduleOnce(50.millis) { // TODO DEX-1000
       startFrom(requestHeight) // Not stopping grpcObserver, because it is already stopped
     }
   }

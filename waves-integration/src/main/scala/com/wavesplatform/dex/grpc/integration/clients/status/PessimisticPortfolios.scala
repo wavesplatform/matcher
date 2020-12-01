@@ -12,6 +12,7 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
+import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.fp.MapImplicits.group
 import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions._
@@ -20,7 +21,8 @@ import mouse.any._
 
 import scala.collection.mutable
 
-private[clients] class PessimisticPortfolios extends ScorexLogging {
+// TODO DEX-995
+private[clients] class PessimisticPortfolios(ignoredExchangeTxSenderPublicKey: Option[ByteStr]) extends ScorexLogging {
 
   private val reentrantLock = new ReentrantReadWriteLock()
 
@@ -36,18 +38,22 @@ private[clients] class PessimisticPortfolios extends ScorexLogging {
   private val portfolios = new mutable.AnyRefMap[Address, Map[Asset, Long]]()
   private val txs = new mutable.AnyRefMap[ByteString, Map[Address, Map[Asset, Long]]]
 
-  // TODO decorate?
+  // TODO DEX-995 Extract a class (e.g. decorator) with a cache functionality
   private val MaxForgedTransactions = 10000
-  private val forgedTxsCache: mutable.Queue[ByteString] = new mutable.Queue[ByteString](MaxForgedTransactions) // TODO better data structure
 
-  // TODO what we need to remove from forgedTxCache?
-  // TODO if setTxs == txs?
+  // TODO DEX-995 better data structure (or two!)
+  private val forgedTxsCache: mutable.Queue[ByteString] = new mutable.Queue[ByteString](MaxForgedTransactions)
+
+  // TODO DEX-995 Cleanup for forgedTxCache?
+  // TODO DEX-995 An optimimization for case when setTxs == txs
+  // TODO DEX-1013
   def replaceWith(setTxs: Seq[UtxTransaction]): Set[Address] = write {
     val setTxMap = setTxs.collect { case tx if !forgedTxsCache.contains(tx.id) => tx.id -> tx }.toMap
     val oldTxIds = txs.keySet.toSet -- setTxMap.keySet
     val newTxIds = setTxMap.keySet -- txs.keySet
 
-    val newTxsPortfolios = newTxIds.toList.map(id => id -> getPessimisticPortfolio(setTxMap(id))) // TODO apply
+    // TODO DEX-995 Is it safe to use setTxMap.apply?
+    val newTxsPortfolios = newTxIds.toList.map(id => id -> getPessimisticPortfolio(setTxMap(id)))
     newTxsPortfolios.foreach(Function.tupled(txs.put))
 
     val addPortfolios = newTxsPortfolios.foldMap(_._2)
@@ -56,7 +62,7 @@ private[clients] class PessimisticPortfolios extends ScorexLogging {
     diff.foreach { case (address, diff) =>
       portfolios.updateWith(address) { prev =>
         (prev.getOrElse(Map.empty) |+| diff)
-          .filter(_._2 < 0) // TODO: guess it is not possible, but...
+          .filter(_._2 < 0) // TODO DEX-995: guess it is not possible, but...
           .some
       }
     }
@@ -64,7 +70,8 @@ private[clients] class PessimisticPortfolios extends ScorexLogging {
     diff.keySet
   }
 
-  // TODO also remove from cache
+  // TODO DEX-995 Also remove from the cache
+  // TODO DEX-1013
   def processForged(txIds: Seq[ByteString]): Set[Address] = write {
     log.info(s"processForged: ${txIds.map(_.toVanilla)}")
     txIds.toList.foldMapK[Set, Address] { txId =>
@@ -77,9 +84,11 @@ private[clients] class PessimisticPortfolios extends ScorexLogging {
     }
   }
 
-  // TODO
+  // TODO DEX-995
+  // TODO DEX-1013
   def removeFailed(): Set[Address] = ???
 
+  // TODO DEX-1013
   def addPending(txs: Seq[UtxTransaction]): Set[Address] = write {
     val filtered = txs.filter(tx => !forgedTxsCache.contains(tx.id))
     log.info(s"addPending: ${filtered.map(_.id.toVanilla).mkString(", ")}; notFiltered=${txs.map(_.id.toVanilla)}")
@@ -91,19 +100,20 @@ private[clients] class PessimisticPortfolios extends ScorexLogging {
     if (txs.contains(id)) {
       log.info(s"addUnsafe: already has ${id.toVanilla}")
       Set.empty
-    } else if (tx.transaction.flatMap(_.transaction).fold(false)(_.data.isExchange)) {
-      log.info(s"addUnsafe: ignoring because it is an exchange tx ${id.toVanilla}")
-      Set.empty
-    } else {
-      val finalP = getPessimisticPortfolio(tx)
-      log.info(s"addUnsafe: id=${id.toVanilla}, diff=$finalP, tx=$tx")
-      // TODO we calculate and check only in the and?
-      if (txs.put(id, finalP).isEmpty) {
-        finalP.foreach {
-          case (address, p) => portfolios.updateWith(address)(_.foldLeft(p)(_ |+| _).some)
-        }
-        finalP.keySet
-      } else Set.empty
+    } else tx.transaction.flatMap(_.transaction) match {
+      case Some(tx) if tx.data.isExchange && ignoredExchangeTxSenderPublicKey.contains(tx.senderPublicKey.toVanilla) =>
+        log.info(s"addUnsafe: ignoring because it is an exchange tx ${id.toVanilla}")
+        Set.empty
+      case _ =>
+        val finalP = getPessimisticPortfolio(tx)
+        log.info(s"addUnsafe: id=${id.toVanilla}, diff=$finalP, tx=$tx")
+        // TODO we calculate and check only in the and?
+        if (txs.put(id, finalP).isEmpty) {
+          finalP.foreach {
+            case (address, p) => portfolios.updateWith(address)(_.foldLeft(p)(_ |+| _).some)
+          }
+          finalP.keySet
+        } else Set.empty
     }
   }
 
@@ -117,7 +127,7 @@ private[clients] class PessimisticPortfolios extends ScorexLogging {
         p.foreach {
           case (address, p) =>
             portfolios.updateWith(address) { prev =>
-              val r = prev.map(_ |-| p) // TODO cleanup. sometimes?
+              val r = prev.map(_ |-| p) // TODO DEX-995 We need a cleanup
               log.info(s"removeUnsafe of $address: $prev -> $r")
               r
             }
@@ -129,6 +139,7 @@ private[clients] class PessimisticPortfolios extends ScorexLogging {
 
   // Utility
 
+  // TODO DEX-995 Could we do it faster?
   def getPessimisticPortfolio(tx: UtxTransaction): Map[Address, Map[Asset, Long]] = tx.diff.flatMap(_.stateUpdate)
     .fold(Map.empty[Address, Map[Asset, Long]]) { diff =>
       // Balances
@@ -137,7 +148,7 @@ private[clients] class PessimisticPortfolios extends ScorexLogging {
           val balances = updates.view
             .flatMap(_.amount)
             .collect {
-              case x if x.amount < 0 => x.assetId.toVanillaAsset -> x.amount // pessimistic
+              case x if x.amount < 0 => x.assetId.toVanillaAsset -> x.amount // Count only pessimistic
             }
             .toMap
           address.toVanillaAddress -> balances
@@ -146,7 +157,7 @@ private[clients] class PessimisticPortfolios extends ScorexLogging {
       // Leasing
       val finalP = diff.leases.foldLeft(p1) {
         case (r, x) =>
-          if (x.out <= 0) r // pessimistic
+          if (x.out <= 0) r // Ignore an invalid values
           else {
             val address = x.address.toVanillaAddress
             val orig = r.getOrElse(address, Map.empty)

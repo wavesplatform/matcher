@@ -8,7 +8,6 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.concurrent.{Await, Future}
 
-// TODO remove some lines from ScalaTest stack trace
 class Transformations[ErrorT](syncTimeout: FiniteDuration = 10.minutes) {
 
   type AsyncRaw[EntityT] = Future[EnrichedResponse[ErrorT, EntityT]]

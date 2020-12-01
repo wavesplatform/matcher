@@ -34,8 +34,6 @@ import monix.reactive.subjects.ConcurrentSubject
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
-// TODO refactor this package, hard to read
-
 /**
  * @param eventLoopGroup Here, because this class takes ownership
  * @param monixScheduler Is not an implicit, because it is ExecutionContext too
@@ -59,7 +57,7 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
 
   private def requestUtxEvents(): Unit = {
     // https://github.com/grpc/grpc/blob/master/doc/wait-for-ready.md
-    val call = channel.newCall(METHOD_GET_UTX_EVENTS, CallOptions.DEFAULT.withWaitForReady()) // TODO withDeadline
+    val call = channel.newCall(METHOD_GET_UTX_EVENTS, CallOptions.DEFAULT.withWaitForReady()) // TODO DEX-1001
     ClientCalls.asyncServerStreamingCall(call, empty, new UtxEventsObserver(call))
   }
 
@@ -156,6 +154,8 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
     shuttingDown.set(true)
     channel.shutdown()
     channel.awaitTermination(500, TimeUnit.MILLISECONDS)
+
+    // TODO DEX-998
     if (eventLoopGroup.isShuttingDown) Future.successful(())
     else eventLoopGroup.shutdownGracefully(0, 500, TimeUnit.MILLISECONDS).asScala.map(_ => ())
   }
@@ -174,7 +174,7 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
     override def onError(e: Throwable): Unit = if (!shuttingDown.get()) {
       log.warn(s"Got an error in utx events", e)
       // channel.resetConnectBackoff()
-      monixScheduler.scheduleOnce(50.millis)(requestUtxEvents())
+      monixScheduler.scheduleOnce(50.millis)(requestUtxEvents()) // TODO DEX-1000
     }
 
     override def onCompleted(): Unit = log.info(s"Utx events stream completed")
@@ -197,7 +197,7 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
     methodDescriptor: MethodDescriptor[RequestT, ResponseT],
     arg: RequestT
   ): Future[ResponseT] = {
-    // TODO better CallOptions
+    // TODO DEX-1001
     val call = channel.newCall(methodDescriptor, CallOptions.DEFAULT)
     val p = Promise[ResponseT]()
     ClientCalls.asyncUnaryCall(

@@ -27,6 +27,7 @@ case class BlockchainBalance(regular: Map[Address, Map[Asset, Long]], outLeases:
 
 object BlockchainBalance {
 
+  // TODO DEX-1002
   implicit val blockchainBalanceMonoid = new Monoid[BlockchainBalance] {
     override val empty: BlockchainBalance = BlockchainBalance(Map.empty, Map.empty)
 

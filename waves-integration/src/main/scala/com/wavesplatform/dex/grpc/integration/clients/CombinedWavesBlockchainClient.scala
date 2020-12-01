@@ -36,7 +36,8 @@ import scala.util.{Failure, Success}
 
 class CombinedWavesBlockchainClient(
   meClient: MatcherExtensionClient,
-  bClient: BlockchainUpdatesClient
+  bClient: BlockchainUpdatesClient,
+  ignoredExchangeTxSenderPublicKey: Option[ByteStr]
 )(implicit ec: ExecutionContext, monixScheduler: Scheduler)
     extends WavesBlockchainClient
     with ScorexLogging {
@@ -46,15 +47,14 @@ class CombinedWavesBlockchainClient(
 
   private val knownBalances: AtomicReference[BlockchainBalance] = new AtomicReference(Monoid.empty[BlockchainBalance])
 
-  private val pessimisticPortfolios = new PessimisticPortfolios
+  private val pessimisticPortfolios = new PessimisticPortfolios(ignoredExchangeTxSenderPublicKey)
 
   private val dataUpdates = ConcurrentSubject.publish[WavesNodeEvent]
 
-  // TODO lazy
   override val updates: Observable[Updates] = Observable.fromFuture(meClient.currentBlockInfo).flatMap { startBlockInfo =>
     val startHeight = math.max(startBlockInfo.height - MaxRollbackHeight - 1, 1)
 
-    // TODO Wait until both connections restored, because one node could be behind another!
+    // TODO DEX-1000 Wait until both connections are restored, because one node could be behind another!
     val finalBalance = mutable.Map.empty[Address, Map[Asset, Long]]
     val init: BlockchainStatus = BlockchainStatus.Normal(WavesBranch(List.empty, startHeight))
     val (blockchainEvents, control) = bClient.blockchainEvents(startHeight)
@@ -77,11 +77,10 @@ class CombinedWavesBlockchainClient(
         val changedAddresses = finalKnownBalances.regular.keySet ++ finalKnownBalances.outLeases.keySet ++ updatedPessimistic
         val updatedFinalBalances = changedAddresses
           .map { address =>
-            log.info(s"Forged.combineBalances for $address")
             address -> combineBalances(
               updatedRegular = x.updatedBalances.regular.getOrElse(address, Map.empty),
               updatedOutLease = x.updatedBalances.outLeases.get(address).fold(Map.empty[Asset, Long])(x => Map(Waves -> x)),
-              // TODO: not all assets changed
+              // TODO DEX-1013
               updatedPessimistic = if (updatedPessimistic.contains(address)) pessimisticPortfolios.getAggregated(address) else Map.empty,
               finalRegular = finalKnownBalances.regular.getOrElse(address, Map.empty),
               finalOutLease = finalKnownBalances.outLeases.get(address).fold(Map.empty[Asset, Long])(x => Map(Waves -> x)),
@@ -92,39 +91,32 @@ class CombinedWavesBlockchainClient(
         (x.newStatus, updatedFinalBalances)
       }
       .filter(_.nonEmpty)
-      .map { updated => // TODO do on a previous step
-        updated.filter { case (address, updatedBalance) =>
+      .map { updated => // TODO DEX-1014
+      updated.filter { case (address, updatedBalance) =>
           val prev = finalBalance.getOrElse(address, Map.empty).filter { case (k, _) => updatedBalance.contains(k) }
           val same = prev == updatedBalance
-          if (same) log.info(s"Previous balance for $address remains $prev")
-          else {
-            finalBalance.update(address, prev ++ updatedBalance)
-            log.info(s"Changed previous balance for $address from $prev to $updatedBalance")
-          }
+          if (!same) finalBalance.update(address, prev ++ updatedBalance)
           !same
         }
       }
-      .doOnError { e => Task(log.error("Got an error in the combined stream", e)) }
+      .doOnError(e => Task(log.error("Got an error in the combined stream", e)))
       .map(Updates(_))
   }
 
   private def processUtxEvents(queue: Queue[WavesNodeUtxEvent]): Set[Address] = queue.foldMap(processUtxEvent)
 
-  // TODO probably some assets weren't changed
+  // TODO DEX-1013
   private def processUtxEvent(event: WavesNodeUtxEvent): Set[Address] = event match {
-    case WavesNodeUtxEvent.Added(txs) => pessimisticPortfolios.addPending(txs) // Because we remove them during adding a [micro]block
+    case WavesNodeUtxEvent.Added(txs) => pessimisticPortfolios.addPending(txs) // Because we remove them during adding a full/micro block
     case WavesNodeUtxEvent.Forged(txIds) => pessimisticPortfolios.processForged(txIds)
     case WavesNodeUtxEvent.Switched(newTxs) => pessimisticPortfolios.replaceWith(newTxs)
   }
 
-  // TODO use a smarter approach
+  // TODO DEX-1015
   private def requestBalances(x: DiffIndex): Unit =
     if (!x.isEmpty) {
-      log.info(s"Request balances: $x")
       meClient.getBalances(x).onComplete {
-        case Success(r) =>
-          log.info(s"Got balances response: $r")
-          dataUpdates.onNext(WavesNodeEvent.DataReceived(r))
+        case Success(r) => dataUpdates.onNext(WavesNodeEvent.DataReceived(r))
         case Failure(e) =>
           log.warn("Got an error during requesting balances", e)
           requestBalances(x)
@@ -146,7 +138,6 @@ class CombinedWavesBlockchainClient(
       val assetPessimistic = updatedPessimistic.get(asset).orElse(finalPessimistic.get(asset)).getOrElse(0L)
       // TODO solve overflow?
       val r = math.max(0L, assetRegular - assetOutLease + assetPessimistic) // pessimistic is negative
-      log.info(s"combineBalances: $asset: r=$r, reg=$assetRegular, ol=$assetOutLease, p=$assetPessimistic")
       asset -> r
     }.toMap
   }
@@ -173,7 +164,6 @@ class CombinedWavesBlockchainClient(
     }
   }
 
-  // TODO knownBalances
   override def allAssetsSpendableBalance(address: Address): Future[Map[Asset, Long]] =
     meClient.allAssetsSpendableBalance(address).map { xs =>
       xs |+| pessimisticPortfolios.getAggregated(address).collect {
@@ -181,15 +171,15 @@ class CombinedWavesBlockchainClient(
       }
     }
 
-  // TODO get all and track in bClient
+  // TODO DEX-1012
   override def isFeatureActivated(id: Short): Future[Boolean] =
     meClient.isFeatureActivated(id)
 
-  // TODO track?
+  // TODO DEX-353
   override def assetDescription(asset: IssuedAsset): Future[Option[BriefAssetDescription]] =
     meClient.assetDescription(asset)
 
-  // TODO track?
+  // TODO DEX-353
   override def hasScript(asset: IssuedAsset): Future[Boolean] = meClient.hasScript(asset)
 
   override def runScript(asset: IssuedAsset, input: ExchangeTransaction): Future[RunScriptResult] =

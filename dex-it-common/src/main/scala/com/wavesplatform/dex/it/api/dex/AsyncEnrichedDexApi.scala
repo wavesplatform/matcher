@@ -184,7 +184,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
 
   override def getOrderHistoryByPublicKey(publicKey: String, timestamp: Long, signature: String): R[List[HttpOrderBookHistoryItem]] = mk {
     sttp
-      .get(uri"$apiUri/matcher/orders/$publicKey")
+      .get(uri"$apiUri/matcher/orderbook/$publicKey")
       .headers(Map("timestamp" -> timestamp.toString, "signature" -> signature))
   }
 
@@ -196,7 +196,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
 
   override def getOrderHistoryByPublicKey(owner: KeyPair): R[List[HttpOrderBookHistoryItem]] = mk {
     sttp
-      .get(uri"$apiUri/matcher/orders/${Base58.encode(owner.publicKey)}")
+      .get(uri"$apiUri/matcher/orderbook/${Base58.encode(owner.publicKey)}")
       .headers(timestampAndSignatureHeaders(owner, System.currentTimeMillis()))
   }
 

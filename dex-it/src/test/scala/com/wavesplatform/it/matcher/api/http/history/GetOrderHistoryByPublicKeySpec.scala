@@ -1,7 +1,6 @@
 package com.wavesplatform.it.matcher.api.http.history
 
 import com.google.common.primitives.Longs
-import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
@@ -66,11 +65,12 @@ class GetOrderHistoryByPublicKeySpec extends MatcherSuiteBase with RawHttpChecks
       }
     }
 
+    //TODO: change after DEX-980
     "should return an error if public key is not a correct base58 string" in {
       val ts = System.currentTimeMillis
       val sign = Base58.encode(crypto.sign(alice, alice.publicKey ++ Longs.toByteArray(ts)))
 
-      validateMatcherError(dex1.rawApi.getOrderHistoryByPublicKey("null", ts, sign), StatusCodes.Forbidden, 106954752, "Provided API key is not correct")
+      validate404Exception(dex1.rawApi.getOrderHistoryByPublicKey("null", ts, sign))
     }
 
     "should return an error if public key parameter has the different value of used in signature" in {

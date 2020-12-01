@@ -136,7 +136,7 @@ class MatcherApiRoute(
     protect {
       getOrderBookInfo ~ getOrderStatusInfoByIdWithSignature ~ getOrderBook ~ getOrderBookStatus ~ placeLimitOrder ~
       placeMarketOrder ~ getOrderHistoryByAssetPairAndPublicKey ~ getOrderHistoryByPublicKey ~ tradableBalance ~
-      orderStatus ~ deleteOrderHistory ~ cancel ~ cancelAll ~ getOrderBooks ~ deleteOrderBook
+      orderStatus ~ deleteHistory ~ cancel ~ cancelAll ~ getOrderBooks ~ deleteOrderBook
     }
   }
 
@@ -679,7 +679,7 @@ class MatcherApiRoute(
       )
     )
   )
-  def deleteOrderHistory: Route = path(AssetPairPM / "delete") { _ =>
+  def deleteHistory: Route = path(AssetPairPM / "delete") { _ =>
     post {
       entity(as[HttpCancelOrder]) { req =>
         complete {

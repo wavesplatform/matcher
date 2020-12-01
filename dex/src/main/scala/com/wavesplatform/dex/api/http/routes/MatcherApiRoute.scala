@@ -664,7 +664,7 @@ class MatcherApiRoute(
     produces = "application/json",
     consumes = "application/json",
     tags = Array("history"),
-    response = classOf[HttpMessage]
+    response = classOf[HttpSuccessfulDelete]
   )
   @ApiImplicitParams(
     Array(

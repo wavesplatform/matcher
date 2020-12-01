@@ -8,8 +8,7 @@ import play.api.libs.json.{Json, OFormat}
 @ApiModel(
   description = "Successful deletion message. Can be HttpSuccessfulDeleteHistory",
   subTypes = Array(
-    classOf[HttpSuccessfulSingleCancel],
-    classOf[HttpSuccessfulBatchCancel]
+    classOf[HttpSuccessfulDeleteHistory]
   )
 )
 class HttpSuccessfulDelete {

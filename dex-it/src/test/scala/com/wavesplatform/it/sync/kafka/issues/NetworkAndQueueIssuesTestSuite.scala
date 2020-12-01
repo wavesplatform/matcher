@@ -63,7 +63,7 @@ class NetworkAndQueueIssuesTestSuite extends WsSuiteBase with HasWebSockets with
     disconnectKafkaFromNetwork()
     Thread.sleep(waitAfterNetworkChanges.toMillis)
 
-    val offsetBefore = dex1.api.currentOffset
+    val offsetBefore = dex1.api.getCurrentOffset
 
     (1 to maxFailures).foreach { i =>
       dex1.tryApi.place(mkOrderDP(alice, wavesUsdPair, SELL, i.waves, 3.0)) shouldBe Symbol("left")
@@ -74,7 +74,7 @@ class NetworkAndQueueIssuesTestSuite extends WsSuiteBase with HasWebSockets with
     Thread.sleep(waitAfterNetworkChanges.toMillis)
 
     withClue("Messages weren't saved to the queue") {
-      dex1.api.currentOffset shouldBe offsetBefore
+      dex1.api.getCurrentOffset shouldBe offsetBefore
     }
 
     dex1.tryApi.place(mkOrderDP(alice, wavesUsdPair, SELL, 1.waves, 3.0)) shouldBe Symbol("right")
@@ -206,7 +206,7 @@ class NetworkAndQueueIssuesTestSuite extends WsSuiteBase with HasWebSockets with
   }
 
   private def fillQueueAndSaveSnapshots(): Unit = {
-    val offsetBefore = dex1.api.lastOffset
+    val offsetBefore = dex1.api.getLastOffset
 
     val orders = (1 to 10).map(i => mkOrderDP(alice, wavesUsdPair, SELL, 10.waves, 3.0, ttl = i.days))
     orders.foreach(placeAndAwaitAtDex(_))
@@ -216,7 +216,7 @@ class NetworkAndQueueIssuesTestSuite extends WsSuiteBase with HasWebSockets with
 
     dex1.api.saveSnapshots
     eventually {
-      dex1.api.allSnapshotOffsets(wavesUsdPair) shouldBe (offsetBefore + 20) // 10 orders * 2 (place and cancel)
+      dex1.api.getAllSnapshotOffsets(wavesUsdPair) shouldBe (offsetBefore + 20) // 10 orders * 2 (place and cancel)
     }
   }
 

@@ -34,15 +34,15 @@ class DisableProducerTestSuite extends MatcherSuiteBase {
 
       Thread.sleep(5000)
 
-      dex1.api.currentOffset should be(-1)
-      dex1.api.lastOffset should be(-1)
+      dex1.api.getCurrentOffset should be(-1)
+      dex1.api.getLastOffset should be(-1)
     }
 
     "Commands aren't written to queue after restart" in {
       dex1.restart()
 
-      dex1.api.currentOffset should be(-1)
-      dex1.api.lastOffset should be(-1)
+      dex1.api.getCurrentOffset should be(-1)
+      dex1.api.getLastOffset should be(-1)
     }
   }
 }

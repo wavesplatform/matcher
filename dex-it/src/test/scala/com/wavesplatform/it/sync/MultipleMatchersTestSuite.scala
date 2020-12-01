@@ -98,7 +98,7 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with
       }
     } catch {
       case NonFatal(e) =>
-        log.info(s"Last offsets: node1=${dex1.api.lastOffset}, node2=${dex2.api.lastOffset}")
+        log.info(s"Last offsets: node1=${dex1.api.getLastOffset}, node2=${dex2.api.getLastOffset}")
         throw e
     }
   }

@@ -5,10 +5,9 @@ import java.nio.charset.StandardCharsets
 import java.nio.file._
 
 import com.dimafeng.testcontainers.GenericContainer
-import com.github.dockerjava.api.async.ResultCallback
 import com.github.dockerjava.api.command.InspectContainerResponse
-import com.github.dockerjava.api.exception.{NotFoundException, NotModifiedException}
-import com.github.dockerjava.api.model.{ContainerNetwork, ExposedPort, Frame, Ports}
+import com.github.dockerjava.api.exception.NotModifiedException
+import com.github.dockerjava.api.model.{ContainerNetwork, ExposedPort, Ports}
 import com.typesafe.config.Config
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.it.cache.CachedData
@@ -16,7 +15,6 @@ import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
 import org.testcontainers.images.builder.Transferable
 
 import scala.jdk.CollectionConverters._
-import scala.util.control.NonFatal
 
 abstract class BaseContainer(protected val baseContainerPath: String, private val underlying: GenericContainer)
     extends GenericContainer(underlying)
@@ -71,29 +69,7 @@ abstract class BaseContainer(protected val baseContainerPath: String, private va
 
   def getState(): InspectContainerResponse#ContainerState = dockerClient.inspectContainerCmd(underlying.containerId).exec().getState
 
-  def printDebugMessage(text: String): Unit =
-    try if (Option(underlying.containerId).exists(dockerClient.inspectContainerCmd(_).exec().getState.getRunning)) {
-
-      val escaped = text.replace('\'', '\"')
-
-      val execCmd =
-        dockerClient
-          .execCreateCmd(underlying.containerId)
-          .withCmd(
-            "/bin/sh",
-            "-c",
-            s"""/bin/echo '$escaped' >> $$BRIEF_LOG_PATH; /bin/echo '$escaped' >> $$DETAILED_LOG_PATH"""
-          )
-
-      val execCmdId = execCmd.exec().getId
-
-      try dockerClient.execStartCmd(execCmdId).exec(new ResultCallback.Adapter[Frame])
-      catch {
-        case NonFatal(_) => /* ignore */
-      } finally execCmd.close()
-    } catch {
-      case _: NotFoundException =>
-    }
+  def printDebugMessage(text: String): Unit
 
   def stopWithoutRemove(): Unit = {
     printState()
@@ -126,11 +102,30 @@ abstract class BaseContainer(protected val baseContainerPath: String, private va
 
   def invalidateCaches(): Unit = cachedRestApiAddress.invalidate()
 
-  def reconnectToNetwork(delay: Long = 0, duration: Long = 100): Unit = {
-    Thread.sleep(delay)
-    disconnectFromNetwork()
-    Thread.sleep(duration)
-    connectToNetwork()
+  // This method is buggy on macOS, because it seems the REST API port is unreachable after this!
+  def reconnectToNetwork(delay: Long = 0, duration: Long = 100): Unit =
+    try {
+      Thread.sleep(delay)
+      disconnectFromNetwork()
+      Thread.sleep(duration)
+      connectToNetwork()
+    } catch {
+      case e: Throwable =>
+        logPortsInfo(s"Can't reconnect the '$containerId' container to the network: $containerInfo\n")
+        throw e
+    }
+
+  private def logPortsInfo(prefix: String): Unit = {
+    val str = dockerClient
+      .inspectContainerCmd(underlying.containerId)
+      .exec()
+      .getNetworkSettings
+      .getPorts
+      .toPrimitive
+      .asScala
+      .map { case (n, xs) => s"""  $n: ${xs.asScala.map(_.asScala.mkString(", ")).mkString("; ")}""" }
+      .mkString("\n")
+    log.info(s"${prefix}Ports info:\n$str")
   }
 
   def connectToNetwork(): Unit = {

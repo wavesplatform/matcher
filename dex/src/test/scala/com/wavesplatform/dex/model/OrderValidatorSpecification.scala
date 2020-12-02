@@ -19,9 +19,9 @@ import com.wavesplatform.dex.domain.state.{LeaseBalance, Portfolio}
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.error.ErrorFormatterContext
-import com.wavesplatform.dex.grpc.integration.clients.RunScriptResult
+import com.wavesplatform.dex.grpc.integration.clients.{RunScriptResult, WavesBlockchainClient}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
-import com.wavesplatform.dex.model.OrderValidator.{AsyncBlockchain, Result}
+import com.wavesplatform.dex.model.OrderValidator.Result
 import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, FixedSettings, PercentSettings}
 import com.wavesplatform.dex.settings.{AssetType, DeviationsSettings, OrderFeeSettings, OrderRestrictionsSettings}
 import com.wavesplatform.dex.test.matchers.ProduceError.produce
@@ -925,9 +925,9 @@ class OrderValidatorSpecification
   private def blockchainTest(
     assetDescriptions: Asset => BriefAssetDescription = getDefaultAssetDescriptions,
     hasMatcherAccountScript: Boolean = false
-  )(f: (Order => FutureResult[Order], AsyncBlockchain) => Any): Unit = {
+  )(f: (Order => FutureResult[Order], WavesBlockchainClient) => Any): Unit = {
 
-    val bc = stub[AsyncBlockchain]
+    val bc = stub[WavesBlockchainClient]
     val tc = exchangeTransactionCreator(hasMatcherAccountScript, assetDescriptions(_).hasScript)
     val ov = mkOrderValidator(bc, tc, assetDescriptions)
 
@@ -936,7 +936,7 @@ class OrderValidatorSpecification
 
   private def validateOrderProofsTest(proofs: Seq[ByteStr]): Unit = {
 
-    val bc = stub[AsyncBlockchain]
+    val bc = stub[WavesBlockchainClient]
     val pk = KeyPair(randomBytes())
 
     activate(bc, _ == BlockchainFeatures.SmartAccountTrading.id)
@@ -981,11 +981,11 @@ class OrderValidatorSpecification
       version = version
     )
 
-  private def activate(bc: AsyncBlockchain, isActive: Function[Short, Boolean]): Unit =
+  private def activate(bc: WavesBlockchainClient, isActive: Function[Short, Boolean]): Unit =
     (bc.isFeatureActivated _).when(*).onCall(isActive andThen Future.successful)
 
   private def mkOrderValidator(
-    bc: AsyncBlockchain,
+    bc: WavesBlockchainClient,
     tc: ExchangeTransactionCreator,
     assetDescriptions: Asset => BriefAssetDescription = getDefaultAssetDescriptions
   ): Order => FutureResult[Order] = { order =>
@@ -1068,7 +1068,7 @@ class OrderValidatorSpecification
     rateCache: RateCache = rateCache
   )(order: Order): FutureResult[Order] = {
 
-    val blockchain = stub[AsyncBlockchain]
+    val blockchain = stub[WavesBlockchainClient]
 
     activate(
       blockchain,
@@ -1120,32 +1120,32 @@ class OrderValidatorSpecification
       )(order)
   }
 
-  private def assignScript(bc: AsyncBlockchain, address: Address, result: RunScriptResult): Unit = {
+  private def assignScript(bc: WavesBlockchainClient, address: Address, result: RunScriptResult): Unit = {
     (bc.hasScript(_: Address)).when(address).returns(Future.successful(true))
     (bc.runScript(_: Address, _: Order)).when(address, *).onCall((_, _) => Future.successful(result))
   }
 
-  private def assignScript(bc: AsyncBlockchain, address: Address, result: Option[RunScriptResult]): Unit = result match {
+  private def assignScript(bc: WavesBlockchainClient, address: Address, result: Option[RunScriptResult]): Unit = result match {
     case None => (bc.hasScript(_: Address)).when(address).returns(Future.successful(false))
     case Some(r) =>
       (bc.hasScript(_: Address)).when(address).returns(Future.successful(true))
       (bc.runScript(_: Address, _: Order)).when(address, *).onCall((_, _) => Future.successful(r))
   }
 
-  private def assignScript(bc: AsyncBlockchain, asset: IssuedAsset, result: Option[RunScriptResult]): Unit = result match {
+  private def assignScript(bc: WavesBlockchainClient, asset: IssuedAsset, result: Option[RunScriptResult]): Unit = result match {
     case None => (bc.hasScript(_: IssuedAsset)).when(asset).returns(Future.successful(false))
     case Some(r) =>
       (bc.hasScript(_: IssuedAsset)).when(asset).returns(Future.successful(true))
       (bc.runScript(_: IssuedAsset, _: ExchangeTransaction)).when(asset, *).onCall((_, _) => Future.successful(r))
   }
 
-  private def assignNoScript(bc: AsyncBlockchain, address: Address): Unit =
+  private def assignNoScript(bc: WavesBlockchainClient, address: Address): Unit =
     (bc.hasScript(_: Address)).when(address).returns(Future.successful(false))
 
-  private def assignNoScript(bc: AsyncBlockchain, asset: IssuedAsset): Unit =
+  private def assignNoScript(bc: WavesBlockchainClient, asset: IssuedAsset): Unit =
     (bc.hasScript(_: IssuedAsset)).when(asset).returns(Future.successful(false))
 
-  private def assignAssetDescription(bc: AsyncBlockchain, xs: (IssuedAsset, BriefAssetDescription)*): Unit =
+  private def assignAssetDescription(bc: WavesBlockchainClient, xs: (IssuedAsset, BriefAssetDescription)*): Unit =
     xs.foreach { case (asset, desc) =>
       (bc.assetDescription _).when(asset).onCall((_: IssuedAsset) => Future.successful(Some(desc)))
     }

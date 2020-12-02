@@ -1,6 +1,5 @@
-package com.wavesplatform.dex.grpc.integration.clients
+package com.wavesplatform.dex.grpc.integration.clients.matcherext
 
-import java.net.InetAddress
 import java.time.Duration
 
 import com.wavesplatform.dex.domain.account.Address
@@ -10,15 +9,17 @@ import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.caches.{AssetDescriptionsCache, FeaturesCache}
+import com.wavesplatform.dex.grpc.integration.clients.RunScriptResult
+import com.wavesplatform.dex.grpc.integration.clients.status.{BlockRef, BlockchainBalance, DiffIndex, WavesNodeEvent}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import monix.reactive.Observable
 
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
 
-class WavesBlockchainCachingClient(underlying: WavesBlockchainClient[Future], defaultCacheExpiration: FiniteDuration)(
+class MatcherExtensionCachingClient(underlying: MatcherExtensionClient, defaultCacheExpiration: FiniteDuration)(
   implicit grpcExecutionContext: ExecutionContext
-) extends WavesBlockchainClient[Future]
+) extends MatcherExtensionClient
     with ScorexLogging {
 
   private val cacheExpiration: Duration = Duration.ofMillis(defaultCacheExpiration.toMillis)
@@ -27,9 +28,11 @@ class WavesBlockchainCachingClient(underlying: WavesBlockchainClient[Future], de
     new FeaturesCache(underlying.isFeatureActivated, invalidationPredicate = !_) // we don't keep knowledge about unactivated features
   private val assetDescriptionsCache = new AssetDescriptionsCache(underlying.assetDescription, cacheExpiration)
 
-  override def realTimeBalanceChanges: Observable[WavesBlockchainClient.BalanceChanges] = underlying.realTimeBalanceChanges
+  override def utxEvents: Observable[WavesNodeEvent] = underlying.utxEvents
+
   override def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] = underlying.spendableBalances(address, assets)
   override def allAssetsSpendableBalance(address: Address): Future[Map[Asset, Long]] = underlying.allAssetsSpendableBalance(address)
+  override def getBalances(index: DiffIndex): Future[BlockchainBalance] = underlying.getBalances(index)
 
   override def isFeatureActivated(id: Short): Future[Boolean] = featuresCache.get(id) map Boolean2boolean
 
@@ -46,7 +49,7 @@ class WavesBlockchainCachingClient(underlying: WavesBlockchainClient[Future], de
 
   override def forgedOrder(orderId: ByteStr): Future[Boolean] = underlying.forgedOrder(orderId)
 
-  override def getNodeAddress: Future[InetAddress] = underlying.getNodeAddress
+  override def currentBlockInfo: Future[BlockRef] = underlying.currentBlockInfo
 
   override def close(): Future[Unit] = underlying.close()
 }

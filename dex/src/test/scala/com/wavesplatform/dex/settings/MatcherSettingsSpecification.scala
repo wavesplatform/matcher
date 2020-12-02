@@ -53,6 +53,18 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
             connectTimeout = 99.seconds
           )
         ),
+        blockchainUpdatesGrpc = GrpcClientSettings(
+          target = "127.1.2.10:7444",
+          maxHedgedAttempts = 10,
+          maxRetryAttempts = 14,
+          keepAliveWithoutCalls = true,
+          keepAliveTime = 9.seconds,
+          keepAliveTimeout = 12.seconds,
+          idleTimeout = 21.seconds,
+          channelOptions = GrpcClientSettings.ChannelOptionsSettings(
+            connectTimeout = 100.seconds
+          )
+        ),
         defaultCachesExpiration = 101.millis,
         balanceStreamBufferSize = 100
       )

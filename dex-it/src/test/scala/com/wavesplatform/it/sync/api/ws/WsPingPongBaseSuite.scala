@@ -126,14 +126,16 @@ abstract class WsPingPongBaseSuite extends WsSuiteBase {
 
       val connectionLifetime = Await.result(wsc.connectionLifetime, pingInterval + pongTimeout + delta)
       val expectedConnectionsLifetime = pingInterval * 2 + pongTimeout
-      val (errors, pings) = wsc.receiveAtLeastNErrorsAndPings(1, 3)
-      val expectedError = InvalidJson(Nil)
-
       connectionLifetime should (be >= expectedConnectionsLifetime and be <= expectedConnectionsLifetime + delta)
 
-      pings.size should (be >= 3 and be <= 4)
+      val errors = eventually {
+        val (errors, pings) = wsc.receiveAtLeastNErrorsAndPings(1, 3)
+        pings.size should (be >= 3 and be <= 4)
+        errors.size should be(2)
+        errors
+      }
 
-      errors.size should be(2)
+      val expectedError = InvalidJson(Nil)
       val List(actualInvalidJsonError, actualPongTimeoutError) = errors
 
       actualInvalidJsonError.code should be(expectedError.code)

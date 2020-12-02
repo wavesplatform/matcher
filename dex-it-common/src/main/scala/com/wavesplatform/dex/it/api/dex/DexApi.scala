@@ -195,6 +195,8 @@ trait DexApi[F[_]] {
 
   def getMatcherPublicKey: F[String]
 
+  def print(message: String): F[Unit]
+
   def wsConnections: F[HttpWebSocketConnections]
   def closeWsConnections(oldestNumber: Int): F[HttpMessage]
 }

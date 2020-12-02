@@ -1,4 +1,4 @@
-import java.io.BufferedInputStream
+import java.io.{BufferedInputStream, FilenameFilter}
 import java.nio.file.Files
 
 import CommonSettings.autoImport.network
@@ -46,10 +46,10 @@ object ExtensionPackaging extends AutoPlugin {
       classpathOrdering ++= {
         val jar = """(.+)[-_]([\d\.]+.*)\.jar""".r
         val baseDir = (Compile / unmanagedBase).value
-        val appropriateFiles =
-          List(s"waves_${wavesNodeVersion.value}_all.deb", s"waves-stagenet_${wavesNodeVersion.value}_all.deb").map(baseDir / _)
-        val debFile = appropriateFiles.find(_.isFile).getOrElse(throw new RuntimeException("Can't find a deb file to check dependencies"))
-        val inDeb = filesInDeb(debFile)
+        val appropriateFiles = baseDir.listFiles(new FilenameFilter {
+          override def accept(dir: File, name: String): Boolean = name.endsWith(".deb")
+        })
+        val inDeb = appropriateFiles.flatMap(filesInDeb)
           .filter(x => x.endsWith(".jar") && x.startsWith("./usr/share"))
           .map(_.split('/').last)
           .map {

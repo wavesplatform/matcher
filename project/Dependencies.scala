@@ -11,8 +11,8 @@ object Dependencies {
     val akkaHttp = "10.2.0"
 
     val scalaTest = "3.2.2"
-    val scalaCheck = "1.14.3"
-    val scalaTestPlusCheck = "3.2.2.0"
+    val scalaCheck = "1.15.0"
+    val scalaTestPlusCheck = "3.2.3.0"
     val scalaMock = "4.4.0"
     val diffx = "0.3.29"
 
@@ -37,7 +37,7 @@ object Dependencies {
     val kamonCore = "2.1.6"
     val kamonInfluxDb = "2.1.6"
 
-    val wavesProtobufSchemas = "1.2.6"
+    val wavesProtobufSchemas = "1.2.8"
     val wavesJ = "1.0.1"
 
     val postgresql = "42.2.16"
@@ -96,7 +96,7 @@ object Dependencies {
   private val akkaHttp = akkaModule("akka-http", Version.akkaHttp)
   private val scalaTest = "org.scalatest" %% "scalatest" % Version.scalaTest
   private val scalaCheck = "org.scalacheck" %% "scalacheck" % Version.scalaCheck
-  private val scalaTestPlusCheck = "org.scalatestplus" %% "scalacheck-1-14" % Version.scalaTestPlusCheck
+  private val scalaTestPlusCheck = "org.scalatestplus" %% "scalacheck-1-15" % Version.scalaTestPlusCheck
   private val scalaMock = "org.scalamock" %% "scalamock" % Version.scalaMock
   private val diffx = "com.softwaremill.diffx" %% "diffx-scalatest" % Version.diffx
   private val catsCore = catsModule("core")
@@ -175,7 +175,8 @@ object Dependencies {
     scalaTestPlusCheck,
     scalaMock,
     javaLevelDb,
-    allureScalaTest
+    allureScalaTest,
+    diffx
   ) map (_ % Test)
 
   private val integrationTestKit: Seq[ModuleID] = Seq(wavesJ, logback % Test) ++ testKit
@@ -262,9 +263,7 @@ object Dependencies {
 
     lazy val dexTestCommon: Seq[ModuleID] = Seq(diffx, scalaTest, scalaCheck, scalaTestPlusCheck, allureScalaTest)
 
-    lazy val wavesExt: Seq[ModuleID] = Seq(
-      grpcNetty
-    )
+    lazy val wavesExt: Seq[ModuleID] = Seq.empty
 
     lazy val wavesGrpc: Seq[ModuleID] = Seq(wavesProtobufSchemas, grpcScalaPb) ++ silencer
 
@@ -279,8 +278,9 @@ object Dependencies {
       monixReactive,
       betterMonadicFor,
       mouse,
-      grpcNetty
-    ) ++ testKit
+      grpcNetty,
+      wavesProtobufSchemas
+    ) ++ testKit ++ silencer
 
     lazy val wavesIntegrationIt: Seq[ModuleID] = Seq(
       julToSlf4j

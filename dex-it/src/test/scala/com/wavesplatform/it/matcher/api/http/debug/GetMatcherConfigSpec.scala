@@ -1,9 +1,8 @@
 package com.wavesplatform.it.matcher.api.http.debug
 
-import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.it.api.RawHttpChecks
-import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
+import com.wavesplatform.it.MatcherSuiteBase
 
 class GetMatcherConfigSpec extends MatcherSuiteBase with RawHttpChecks {
 

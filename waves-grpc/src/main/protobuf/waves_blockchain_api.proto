@@ -3,14 +3,16 @@ syntax = "proto3";
 package waves.dex.grpc.integration;
 option java_package = "com.wavesplatform.dex.grpc.integration.services";
 
-import "waves/transaction.proto";
-import "waves/order.proto";
-import "waves/amount.proto";
 import "google/protobuf/empty.proto";
+import "waves/amount.proto";
+import "waves/order.proto";
+import "waves/transaction.proto";
+import "waves/events/events.proto";
+import "waves/node/grpc/transactions_api.proto";
 
 service WavesBlockchainApi {
 
-    rpc GetStatuses (TransactionsByIdRequest) returns (TransactionsStatusesResponse);
+    rpc GetStatuses (waves.node.grpc.TransactionsByIdRequest) returns (TransactionsStatusesResponse);
 
     rpc Broadcast (BroadcastRequest) returns (BroadcastResponse);
 
@@ -30,22 +32,16 @@ service WavesBlockchainApi {
 
     rpc ForgedOrder (ForgedOrderRequest) returns (ForgedOrderResponse);
 
-    // TODO after release 2.1.2:
-    // 1. Add GetBalanceChanges with the same functionality
-    // 2. Use it in a new version
-    // 3. Remove GetRealTimeBalanceChanges in a next version
-    rpc GetRealTimeBalanceChanges (google.protobuf.Empty) returns (stream BalanceChangesFlattenResponse);
+    rpc GetUtxEvents (google.protobuf.Empty) returns (stream UtxEvent);
 
     rpc AllAssetsSpendableBalance (AddressRequest) returns (AllAssetsSpendableBalanceResponse);
 
-    rpc GetNodeAddress (google.protobuf.Empty) returns (NodeAddressResponse);
+    rpc GetCurrentBlockInfo (google.protobuf.Empty) returns (CurrentBlockInfoResponse);
+
+    rpc GetBalances (GetBalancesRequest) returns (GetBalancesResponse);
 }
 
 // Common requests
-
-message TransactionsByIdRequest {
-    repeated bytes transaction_ids = 1;
-}
 
 message AssetIdRequest {
     bytes asset_id = 1;
@@ -74,20 +70,8 @@ message RunScriptResponse {
 
 // Specific requests and responses
 
-message TransactionStatus {
-    enum Status {
-        NOT_EXISTS = 0;
-        UNCONFIRMED = 1;
-        CONFIRMED = 2;
-    }
-
-    bytes id = 1;
-    Status status = 2;
-    int64 height = 3;
-}
-
 message TransactionsStatusesResponse {
-    repeated TransactionStatus transactions_statutes = 1;
+    repeated waves.node.grpc.TransactionStatus transactions_statutes = 1;
 }
 
 message BroadcastRequest {
@@ -192,8 +176,41 @@ message AllAssetsSpendableBalanceResponse {
     repeated Record balances = 1;
 }
 
-message NodeAddressResponse {
-    string address = 1;
+message CurrentBlockInfoResponse {
+    int32 height = 1;
+    bytes block_id = 2;
+}
+
+message UtxStateResponse {
+    repeated UtxTransaction transactions = 1;
+}
+
+message GetBalancesRequest {
+    // regular: Map[Address, Set[Asset]]
+    repeated RegularPair regular = 1;
+
+    // outLeases: Set[Address]
+    repeated bytes outLeaseAddresses = 2;
+
+    message RegularPair {
+        bytes address = 1;
+        repeated bytes assets = 2;
+    }
+}
+
+message GetBalancesResponse {
+    repeated RegularPair regular = 1;
+    repeated OutLeasePair outLeases = 2;
+
+    message RegularPair {
+        bytes address = 1;
+        repeated waves.Amount amount = 2;
+    }
+
+    message OutLeasePair {
+        bytes address = 1;
+        int64 amount = 2;
+    }
 }
 
 // Other entities
@@ -218,5 +235,52 @@ message ExchangeTransaction {
     // compatibility with wavesplatform/protobuf-schemas
     oneof data {
         waves.ExchangeTransactionData exchange = 107;
+    }
+}
+
+message UtxEvent {
+    oneof type {
+        Switch switch = 1;
+        Update update = 2;
+    }
+
+    message Switch {
+        repeated UtxTransaction transactions = 1;
+    }
+
+    message Update {
+        repeated Added added = 1;
+        repeated Removed removed = 2;
+
+        message Added {
+            UtxTransaction transaction = 1;
+        }
+
+        message Removed {
+            UtxTransaction transaction = 1;
+            Reason reason = 2;
+
+            message Reason {
+                string name = 1;
+                string message = 2;
+            }
+        }
+    }
+}
+
+message UtxTransaction {
+    bytes id = 1;
+    SignedTransaction transaction = 2;
+    TransactionDiff diff = 3;
+}
+
+message TransactionDiff {
+    waves.events.StateUpdate state_update = 1;
+    repeated OrderFill order_fills = 2;
+
+    message OrderFill {
+        bytes order_id = 1;
+        int64 volume = 2;
+        int64 fee = 3;
     }
 }

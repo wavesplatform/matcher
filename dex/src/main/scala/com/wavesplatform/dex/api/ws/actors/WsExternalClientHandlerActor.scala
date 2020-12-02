@@ -302,7 +302,7 @@ object WsExternalClientHandlerActor {
             case command: Command.CloseConnection =>
               context.log.trace("Got CloseConnection: {}", command.reason.message.text)
               clientRef ! WsError.from(command.reason, matcherTime)
-              clientRef ! WsServerMessage.Complete
+              context.scheduleOnce(100.millis, clientRef, WsServerMessage.Complete) // Otherwise a connection is closed too quickly
               cancelSchedules(nextPing, pongTimeout)
               Behaviors.same // Will receive Completed when WsServerMessage.Complete will be delivered
 

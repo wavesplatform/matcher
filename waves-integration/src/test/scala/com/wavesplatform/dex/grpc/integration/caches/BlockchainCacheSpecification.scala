@@ -6,12 +6,11 @@ import java.util.concurrent.{ConcurrentHashMap, ExecutorService, Executors}
 import com.wavesplatform.dex.WavesIntegrationSuiteBase
 import mouse.any.anySyntaxMouse
 import org.scalatest.BeforeAndAfterAll
-import org.scalatest.matchers.should.Matchers
 
 import scala.concurrent._
 import scala.jdk.CollectionConverters._
 
-class BlockchainCacheSpecification extends WavesIntegrationSuiteBase with Matchers with BeforeAndAfterAll {
+class BlockchainCacheSpecification extends WavesIntegrationSuiteBase with BeforeAndAfterAll {
 
   private val executor: ExecutorService = Executors.newCachedThreadPool
   implicit private val blockingContext: ExecutionContextExecutor = ExecutionContext.fromExecutor(executor)
@@ -33,7 +32,7 @@ class BlockchainCacheSpecification extends WavesIntegrationSuiteBase with Matche
 
   private val andThenAwaitTimeout = 300
 
-  "BlockchainCache" should {
+  "BlockchainCache should" - {
 
     "not keep failed futures" in {
 

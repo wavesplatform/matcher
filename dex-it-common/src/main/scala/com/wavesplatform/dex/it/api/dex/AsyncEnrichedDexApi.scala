@@ -408,8 +408,15 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
   override def getMatcherConfig: R[Config] = getMatcherConfig(apiKeyHeaders)
 
   override def getMatcherPublicKey: R[String] = mk {
+    sttp.get(uri"$apiUri/matcher")
+  }
+
+  override def print(message: String): R[Unit] = mkIgnore {
     sttp
-      .get(uri"$apiUri/matcher")
+      .post(uri"$apiUri/matcher/debug/print")
+      .headers(apiKeyHeaders)
+      .body(Json.stringify(Json.toJson(HttpMessage(message))))
+      .contentType("application/json", "UTF-8")
   }
 
   override def wsConnections: R[HttpWebSocketConnections] = mk {

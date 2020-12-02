@@ -3,8 +3,8 @@ package com.wavesplatform.dex.actors.address
 import java.time.{Instant, Duration => JDuration}
 
 import akka.actor.typed.scaladsl.adapter._
-import akka.actor.{typed, Actor, ActorRef, Cancellable, Props, Status}
-import akka.pattern.{ask, pipe, CircuitBreakerOpenException}
+import akka.actor.{Actor, ActorRef, Cancellable, Props, Status, typed}
+import akka.pattern.{CircuitBreakerOpenException, ask, pipe}
 import akka.{actor => classic}
 import cats.instances.long.catsKernelStdGroupForLong
 import cats.kernel.Group
@@ -28,7 +28,6 @@ import com.wavesplatform.dex.domain.utils.{LoggerFacade, ScorexLogging}
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError, UnexpectedError, WavesNodeConnectionBroken}
 import com.wavesplatform.dex.fp.MapImplicits.group
-import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.SpendableBalance
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCancelFailed, OrderCanceled, OrderCanceledReason, OrderExecuted, Event => OrderEvent}
 import com.wavesplatform.dex.model._
@@ -358,7 +357,7 @@ class AddressActor(
     denormalizeAmountAndFee(balanceSource.getOrElse(asset, 0L), decimals).toDouble
 
   private def mkWsBalances(spendableBalances: Map[Asset, Long]): Map[Asset, WsBalances] = {
-    val tradableBalance = spendableBalances |-| openVolume.view.filterKeys(spendableBalances.keySet).toMap
+    val tradableBalance = (spendableBalances |-| openVolume.view.filterKeys(spendableBalances.keySet).toMap).filter(_._2 >= 0)
     spendableBalances.keySet
       .flatMap { asset =>
         efc.assetDecimals(asset) match {
@@ -598,8 +597,8 @@ object AddressActor {
    * @return None if ∀ (asset, v) ∈ r, v < 0
    *         else Some(r)
    */
-  private def trySubtract(from: SpendableBalance, xs: SpendableBalance): Either[(Long, Asset), SpendableBalance] =
-    xs.foldLeft[Either[(Long, Asset), SpendableBalance]](Right(from)) {
+  private def trySubtract(from: Map[Asset, Long], xs: Map[Asset, Long]): Either[(Long, Asset), Map[Asset, Long]] =
+    xs.foldLeft[Either[(Long, Asset), Map[Asset, Long]]](Right(from)) {
       case (r @ Left(_), _) => r
       case (curr, (_, 0)) => curr
       case (Right(curr), (assetId, amount)) =>

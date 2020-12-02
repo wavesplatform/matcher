@@ -129,7 +129,7 @@ class MatcherApiRoute(
   private val transactionsRoutes: Route = pathPrefix("transactions")(protect(getOrderTransactions))
 
   private val debugRoutes: Route = pathPrefix("debug") {
-    getMatcherConfig ~ getCurrentOffset ~ getLastOffset ~ getOldestSnapshotOffset ~ getAllSnapshotOffsets ~ protect(saveSnapshots)
+    getMatcherConfig ~ getCurrentOffset ~ getLastOffset ~ getOldestSnapshotOffset ~ getAllSnapshotOffsets ~ protect(saveSnapshots) ~ print
   }
 
   private val orderBookRoutes: Route = pathPrefix("orderbook") {
@@ -1123,6 +1123,16 @@ class MatcherApiRoute(
     complete {
       matcher ! ForceSaveSnapshots
       SimpleResponse(StatusCodes.OK, "Saving started")
+    }
+  }
+
+  // Hidden
+  def print: Route = (path("print") & post & withAuth) {
+    entity(as[HttpMessage]) { x =>
+      log.warn(x.message)
+      complete {
+        SimpleResponse(StatusCodes.OK, "Message logged")
+      }
     }
   }
 

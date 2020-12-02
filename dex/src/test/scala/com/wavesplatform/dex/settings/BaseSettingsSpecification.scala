@@ -111,6 +111,18 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |          connect-timeout = 99s
          |        }
          |      }
+         |      blockchain-updates-grpc {
+         |        target = "127.1.2.10:7444"
+         |        max-hedged-attempts = 10
+         |        max-retry-attempts = 14
+         |        keep-alive-without-calls = true
+         |        keep-alive-time = 9s
+         |        keep-alive-timeout = 12s
+         |        idle-timeout = 21s
+         |        channel-options {
+         |          connect-timeout = 100s
+         |        }
+         |      }
          |      default-caches-expiration = 101ms,
          |      balance-stream-buffer-size = 100
          |    }

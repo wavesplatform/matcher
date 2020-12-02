@@ -5,8 +5,6 @@ import com.wavesplatform.dex.gen.OrderBookGen
 import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder}
 import org.scalacheck.Gen
 
-import scala.jdk.CollectionConverters._
-
 trait OrderBookBenchmarkState extends OrderBookGen {
 
   def getMakerTakerFee(a: AcceptedOrder, b: LimitOrder): (Long, Long) = (a.matcherFee, b.matcherFee)
@@ -25,11 +23,11 @@ trait OrderBookBenchmarkState extends OrderBookGen {
   def fixedSideOrdersGen(side: OrderType, levels: Int, ordersInLevel: Int, pricesGen: Gen[Long]): Gen[Seq[LimitOrder]] =
     for {
       prices <- Gen.listOfN(levels, pricesGen)
-      orders <- Gen.sequence(
+      orders <- Gen.sequence[List[List[LimitOrder]], List[LimitOrder]](
         prices.map { price =>
           Gen.listOfN(ordersInLevel, limitOrderGen(orderGen(Gen.const(price), side)))
         }
       )
-    } yield orders.asScala.flatten.toSeq
+    } yield orders.flatten
 
 }

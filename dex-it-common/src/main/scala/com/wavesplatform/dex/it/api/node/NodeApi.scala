@@ -18,6 +18,7 @@ trait NodeApi[F[_]] {
 
   def broadcast(tx: Transaction): F[Unit]
   def transactionInfo(id: Id): F[Transaction]
+  def unconfirmedTransactionInfo(id: Id): F[Transaction]
 
   def currentHeightOrig: F[HeightResponse]
 
@@ -25,6 +26,10 @@ trait NodeApi[F[_]] {
 
   def connect(toNode: InetSocketAddress): F[Unit]
   def connectedPeers: F[ConnectedPeersResponse]
+
+  def rollback(toHeight: Int, returnTransactionsToUtx: Boolean): F[Unit]
+
+  def print(message: String): F[Unit]
 }
 
 object NodeApi {} // ClassNotFound NodeApi$ without this line

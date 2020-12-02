@@ -174,10 +174,19 @@ trait DexApi[F[_]] {
   def deleteRate(asset: Asset): F[HttpMessage]
   def getRates: F[HttpRates]
 
-  def currentOffset: F[HttpOffset]
-  def lastOffset: F[HttpOffset]
-  def oldestSnapshotOffset: F[HttpOffset]
-  def allSnapshotOffsets: F[HttpSnapshotOffsets]
+  def getCurrentOffset: F[HttpOffset]
+  def getCurrentOffset(headers: Map[String, String]): F[HttpOffset]
+
+  def getLastOffset: F[HttpOffset]
+  def getLastOffset(headers: Map[String, String]): F[HttpOffset]
+
+  def getOldestSnapshotOffset: F[HttpOffset]
+  def getOldestSnapshotOffset(headers: Map[String, String]): F[HttpOffset]
+
+  def getAllSnapshotOffsets(headers: Map[String, String]): F[HttpSnapshotOffsets]
+  def getAllSnapshotOffsets: F[HttpSnapshotOffsets]
+
+  def saveSnapshots(headers: Map[String, String]): F[HttpMessage]
   def saveSnapshots: F[HttpMessage]
 
   def getMatcherSettings: F[HttpMatcherPublicSettings]

@@ -88,7 +88,7 @@ class OrderBookTestSuite extends MatcherSuiteBase {
       }
 
       withClue("getAllSnapshotOffsets") {
-        dex1.api.allSnapshotOffsets.keySet shouldNot contain(wctUsdPair.key)
+        dex1.api.getAllSnapshotOffsets.keySet shouldNot contain(wctUsdPair.key)
       }
     }
 

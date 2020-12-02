@@ -352,13 +352,13 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
   }
 
   "Debug information was updated" in {
-    val currentOffset = dex1.api.currentOffset
+    val currentOffset = dex1.api.getCurrentOffset
     currentOffset should be > 0L
 
-    val oldestSnapshotOffset = dex1.api.oldestSnapshotOffset
+    val oldestSnapshotOffset = dex1.api.getOldestSnapshotOffset
     oldestSnapshotOffset should be <= currentOffset
 
-    val snapshotOffsets = dex1.api.allSnapshotOffsets
+    val snapshotOffsets = dex1.api.getAllSnapshotOffsets
     snapshotOffsets.foreach { case (assetPair, offset) =>
       withClue(assetPair) {
         offset should be <= currentOffset

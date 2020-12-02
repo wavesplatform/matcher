@@ -357,31 +357,41 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .headers(headers)
   }
 
-  override def currentOffset: R[HttpOffset] = mk {
+  override def getCurrentOffset(headers: Map[String, String]): R[HttpOffset] = mk {
     sttp
       .get(uri"$apiUri/matcher/debug/currentOffset")
-      .headers(apiKeyHeaders)
+      .headers(headers)
   }
 
-  override def lastOffset: R[HttpOffset] = mk {
+  override def getCurrentOffset: R[HttpOffset] = getCurrentOffset(apiKeyHeaders)
+
+  override def getLastOffset(headers: Map[String, String]): R[HttpOffset] = mk {
     sttp
       .get(uri"$apiUri/matcher/debug/lastOffset")
-      .headers(apiKeyHeaders)
+      .headers(headers)
   }
 
-  override def oldestSnapshotOffset: R[HttpOffset] = mk {
+  override def getLastOffset: R[HttpOffset] = getLastOffset(apiKeyHeaders)
+
+  override def getOldestSnapshotOffset(headers: Map[String, String]): R[HttpOffset] = mk {
     sttp
       .get(uri"$apiUri/matcher/debug/oldestSnapshotOffset")
-      .headers(apiKeyHeaders)
+      .headers(headers)
   }
 
-  override def allSnapshotOffsets: R[HttpSnapshotOffsets] = mk {
-    sttp.get(uri"$apiUri/matcher/debug/allSnapshotOffsets").headers(apiKeyHeaders)
+  override def getOldestSnapshotOffset: R[HttpOffset] = getOldestSnapshotOffset(apiKeyHeaders)
+
+  override def getAllSnapshotOffsets(headers: Map[String, String]): R[HttpSnapshotOffsets] = mk {
+    sttp.get(uri"$apiUri/matcher/debug/allSnapshotOffsets").headers(headers)
   }
 
-  override def saveSnapshots: R[HttpMessage] = mk {
-    sttp.post(uri"$apiUri/matcher/debug/saveSnapshots").headers(apiKeyHeaders)
+  override def getAllSnapshotOffsets: R[HttpSnapshotOffsets] = getAllSnapshotOffsets(apiKeyHeaders)
+
+  override def saveSnapshots(headers: Map[String, String]): R[HttpMessage] = mk {
+    sttp.post(uri"$apiUri/matcher/debug/saveSnapshots").headers(headers)
   }
+
+  override def saveSnapshots: R[HttpMessage] = saveSnapshots(apiKeyHeaders)
 
   override def getMatcherSettings: R[HttpMatcherPublicSettings] = mk {
     sttp

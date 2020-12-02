@@ -48,7 +48,7 @@ object DexApiSyntax {
       R.repeatUntil(self.getTransactionsByOrder(id), RepeatRequestOptions.default)(pred)
 
     def waitForCurrentOffset(pred: Long => Boolean): F[HttpOffset] =
-      R.repeatUntil(self.currentOffset, RepeatRequestOptions(1.second, 120))(pred)
+      R.repeatUntil(self.getCurrentOffset, RepeatRequestOptions(1.second, 120))(pred)
 
     def waitForWsConnections(pred: HttpWebSocketConnections => Boolean): F[HttpWebSocketConnections] =
       R.repeatUntil(self.wsConnections, RepeatRequestOptions(1.second, 120))(pred)

@@ -115,7 +115,7 @@ class NetworkAndQueueIssuesTestSuite extends WsSuiteBase with HasWebSockets with
       Map(Waves -> WsBalances(initialWavesBalance - 10.003, 10.003))
     )()
 
-    val oh = dex1.api.orderHistory(alice, Some(true))
+    val oh = dex1.api.getOrderHistoryByPublicKey(alice, Some(true))
     oh should have size 1
     oh.head.id shouldBe sellOrder.id()
 
@@ -125,7 +125,7 @@ class NetworkAndQueueIssuesTestSuite extends WsSuiteBase with HasWebSockets with
     dex1.tryApi.cancel(alice, sellOrder) shouldBe Symbol("right")
     dex1.api.waitForOrderStatus(sellOrder, Status.Cancelled)
 
-    dex1.api.orderHistory(alice, Some(true)) should have size 0
+    dex1.api.getOrderHistoryByPublicKey(alice, Some(true)) should have size 0
     dex1.api.getReservedBalance(alice) shouldBe empty
 
     assertChanges(wsac, squash = false)(Map(Waves -> WsBalances(initialWavesBalance, 0))) {
@@ -135,7 +135,7 @@ class NetworkAndQueueIssuesTestSuite extends WsSuiteBase with HasWebSockets with
     dex1.tryApi.place(bigSellOrder) shouldBe Symbol("right")
     dex1.api.waitForOrderStatus(bigSellOrder, Status.Accepted)
 
-    dex1.api.orderHistory(alice, Some(true)) should have size 1
+    dex1.api.getOrderHistoryByPublicKey(alice, Some(true)) should have size 1
     dex1.api.getReservedBalance(alice) should matchTo(Map[Asset, Long](Waves -> 30.003.waves))
 
     assertChanges(wsac, squash = false)(Map(Waves -> WsBalances(initialWavesBalance - 30.003, 30.003))) {

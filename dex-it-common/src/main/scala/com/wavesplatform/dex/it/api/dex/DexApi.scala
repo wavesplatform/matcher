@@ -88,10 +88,34 @@ trait DexApi[F[_]] {
 
   def getTransactionsByOrder(id: Order.Id): F[List[ExchangeTransaction]]
 
+  def deleteHistory(owner: KeyPair, assetPair: AssetPair, orderId: String): F[HttpSuccessfulDeleteHistory]
+
+  def getOrderHistoryByApiKey(publicKey: String, timestamp: Long, signature: String): F[List[HttpOrderBookHistoryItem]]
+
+  def getOrderHistoryByApiKey(address: String): F[List[HttpOrderBookHistoryItem]]
+
+  def getOrderHistoryByApiKey(
+    address: String,
+    activeOnly: Boolean,
+    closedOnly: Boolean,
+    headers: Map[String, String]
+  ): F[List[HttpOrderBookHistoryItem]]
+
+  def getOrderHistoryByPublicKey(owner: KeyPair): F[List[HttpOrderBookHistoryItem]]
+
   /**
    * param @activeOnly Server treats this parameter as false if it wasn't specified
    */
-  def orderHistory(
+  def getOrderHistoryByPublicKey(
+    publicKey: String,
+    timestamp: Long,
+    signature: String
+  ): F[List[HttpOrderBookHistoryItem]]
+
+  /**
+   * param @activeOnly Server treats this parameter as false if it wasn't specified
+   */
+  def getOrderHistoryByPublicKey(
     owner: KeyPair,
     activeOnly: Option[Boolean] = None,
     closedOnly: Option[Boolean] = None,
@@ -108,10 +132,18 @@ trait DexApi[F[_]] {
     xUserPublicKey: Option[PublicKey] = None
   ): F[List[HttpOrderBookHistoryItem]]
 
+  def getOrderHistoryByAssetPairAndPublicKey(
+    publicKey: String,
+    amountAsset: String,
+    priceAsset: String,
+    timestamp: Long,
+    signature: String
+  ): F[List[HttpOrderBookHistoryItem]]
+
   /**
    * param @activeOnly Server treats this parameter as false if it wasn't specified
    */
-  def orderHistoryByPair(
+  def getOrderHistoryByAssetPairAndPublicKey(
     owner: KeyPair,
     assetPair: AssetPair,
     activeOnly: Option[Boolean] = None,

@@ -11,6 +11,7 @@ import com.wavesplatform.dex.it.api.RawHttpChecks
 import com.wavesplatform.dex.it.docker.apiKey
 import com.wavesplatform.dex.model.{AcceptedOrderType, OrderStatus}
 import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.matcher.api.http.http.toHttpOrderBookHistoryItem
 import org.scalatest.prop.TableDrivenPropertyChecks
 
 class GetOrderStatusInfoByIdWithApiKeySpec extends MatcherSuiteBase with TableDrivenPropertyChecks with RawHttpChecks {
@@ -31,56 +32,43 @@ class GetOrderStatusInfoByIdWithApiKeySpec extends MatcherSuiteBase with TableDr
 
   "GET /matcher/orders/{address}/{orderId} " - {
 
-    def httpOrderInfo(o: Order, s: OrderStatus, f: Long = 0.003.waves, avgWeighedPrice: Long = 0, totalExecutedPriceAssets: Long = 0): HttpOrderBookHistoryItem =
-      HttpOrderBookHistoryItem(
-        o.id(),
-        o.orderType,
-        AcceptedOrderType.Limit,
-        o.amount,
-        s.filledAmount,
-        o.price,
-        f,
-        s.filledFee,
-        o.feeAsset,
-        o.timestamp,
-        s.name,
-        o.assetPair,
-        avgWeighedPrice,
-        o.version,
-        totalExecutedPriceAssets
-      )
-
     "should return correct status of the order" in {
       val o = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd)
       placeAndAwaitAtDex(o)
 
       withClue(" - accepted") {
-        validate200Json(dex1.rawApi.getOrderStatusInfoByIdWithApiKey(alice, o.id(), Some(alice.publicKey))) should matchTo(httpOrderInfo(
-          o,
-          OrderStatus.Accepted
-        ))
+        validate200Json(dex1.rawApi.getOrderStatusInfoByIdWithApiKey(alice, o.id(), Some(alice.publicKey))) should matchTo(
+          toHttpOrderBookHistoryItem(
+            o,
+            OrderStatus.Accepted
+          )
+        )
       }
 
       withClue(" - partially filled") {
         placeAndAwaitAtNode(mkOrder(alice, wavesUsdPair, SELL, 5.waves, 2.usd))
 
-        validate200Json(dex1.rawApi.getOrderStatusInfoByIdWithApiKey(alice, o.id(), Some(alice.publicKey))) should matchTo(httpOrderInfo(
-          o,
-          OrderStatus.PartiallyFilled(5.waves, 0.0015.waves),
-          avgWeighedPrice = 2.usd,
-          totalExecutedPriceAssets = 10.usd
-        ))
+        validate200Json(dex1.rawApi.getOrderStatusInfoByIdWithApiKey(alice, o.id(), Some(alice.publicKey))) should matchTo(
+          toHttpOrderBookHistoryItem(
+            o,
+            OrderStatus.PartiallyFilled(5.waves, 0.0015.waves),
+            avgWeighedPrice = 2.usd,
+            totalExecutedPriceAssets = 10.usd
+          )
+        )
       }
 
       withClue(" - filled") {
         placeAndAwaitAtNode(mkOrder(alice, wavesUsdPair, SELL, 5.waves, 2.usd))
 
-        validate200Json(dex1.rawApi.getOrderStatusInfoByIdWithApiKey(alice, o.id(), Some(alice.publicKey))) should matchTo(httpOrderInfo(
-          o,
-          OrderStatus.Filled(10.waves, 0.003.waves),
-          avgWeighedPrice = 2.usd,
-          totalExecutedPriceAssets = 20.usd
-        ))
+        validate200Json(dex1.rawApi.getOrderStatusInfoByIdWithApiKey(alice, o.id(), Some(alice.publicKey))) should matchTo(
+          toHttpOrderBookHistoryItem(
+            o,
+            OrderStatus.Filled(10.waves, 0.003.waves),
+            avgWeighedPrice = 2.usd,
+            totalExecutedPriceAssets = 20.usd
+          )
+        )
       }
 
       withClue(" - cancelled") {
@@ -88,10 +76,12 @@ class GetOrderStatusInfoByIdWithApiKeySpec extends MatcherSuiteBase with TableDr
         placeAndAwaitAtDex(o)
         cancelAndAwait(alice, o)
 
-        validate200Json(dex1.rawApi.getOrderStatusInfoByIdWithApiKey(alice, o.id(), Some(alice.publicKey))) should matchTo(httpOrderInfo(
-          o,
-          OrderStatus.Cancelled(0, 0)
-        ))
+        validate200Json(dex1.rawApi.getOrderStatusInfoByIdWithApiKey(alice, o.id(), Some(alice.publicKey))) should matchTo(
+          toHttpOrderBookHistoryItem(
+            o,
+            OrderStatus.Cancelled(0, 0)
+          )
+        )
       }
     }
 

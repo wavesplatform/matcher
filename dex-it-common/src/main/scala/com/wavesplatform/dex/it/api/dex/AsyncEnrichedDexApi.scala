@@ -169,10 +169,41 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
 
   override def getTransactionsByOrder(id: Id): R[List[ExchangeTransaction]] = getTransactionsByOrder(id.toString)
 
+  override def deleteHistory(
+    owner: KeyPair,
+    assetPair: AssetPair,
+    orderId: String
+  ): R[HttpSuccessfulDeleteHistory] = mk {
+    sttp
+      .post(uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/delete")
+      .followRedirects(false)
+      .body(Json.stringify(Json.toJson(cancelRequest(owner, orderId))))
+      .contentType("application/json", "UTF-8")
+
+  }
+
+  override def getOrderHistoryByPublicKey(publicKey: String, timestamp: Long, signature: String): R[List[HttpOrderBookHistoryItem]] = mk {
+    sttp
+      .get(uri"$apiUri/matcher/orderbook/$publicKey")
+      .headers(Map("timestamp" -> timestamp.toString, "signature" -> signature))
+  }
+
+  override def getOrderHistoryByApiKey(publicKey: String, timestamp: Long, signature: String): R[List[HttpOrderBookHistoryItem]] = mk {
+    sttp
+      .get(uri"$apiUri/matcher/orders/$publicKey")
+      .headers(Map("timestamp" -> timestamp.toString, "signature" -> signature))
+  }
+
+  override def getOrderHistoryByPublicKey(owner: KeyPair): R[List[HttpOrderBookHistoryItem]] = mk {
+    sttp
+      .get(uri"$apiUri/matcher/orderbook/${Base58.encode(owner.publicKey)}")
+      .headers(timestampAndSignatureHeaders(owner, System.currentTimeMillis()))
+  }
+
   /**
    * param @activeOnly Server treats this parameter as false if it wasn't specified
    */
-  override def orderHistory(
+  override def getOrderHistoryByPublicKey(
     owner: KeyPair,
     activeOnly: Option[Boolean],
     closedOnly: Option[Boolean],
@@ -181,6 +212,23 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
     sttp
       .get(appendFilters(uri"$apiUri/matcher/orderbook/${Base58.encode(owner.publicKey)}", activeOnly, closedOnly))
       .headers(timestampAndSignatureHeaders(owner, timestamp))
+  }
+
+  override def getOrderHistoryByApiKey(address: String): R[List[HttpOrderBookHistoryItem]] = mk {
+    sttp
+      .get(uri"$apiUri/matcher/orders/$address")
+      .headers(apiKeyHeaders)
+  }
+
+  override def getOrderHistoryByApiKey(
+    address: String,
+    activeOnly: Boolean,
+    closedOnly: Boolean,
+    headers: Map[String, String]
+  ): R[List[HttpOrderBookHistoryItem]] = mk {
+    sttp
+      .get(uri"$apiUri/matcher/orders/$address?activeOnly=$activeOnly&closedOnly=$closedOnly")
+      .headers(headers)
   }
 
   /**
@@ -197,10 +245,22 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .headers(apiKeyWithUserPublicKeyHeaders(xUserPublicKey))
   }
 
+  def getOrderHistoryByAssetPairAndPublicKey(
+    publicKey: String,
+    amountAsset: String,
+    priceAsset: String,
+    timestamp: Long,
+    signature: String
+  ): R[List[HttpOrderBookHistoryItem]] = mk {
+    sttp
+      .get(uri"$apiUri/matcher/orderbook/$amountAsset/$priceAsset/publicKey/$publicKey")
+      .headers(Map("timestamp" -> timestamp.toString, "signature" -> signature))
+  }
+
   /**
    * param @activeOnly Server treats this parameter as false if it wasn't specified
    */
-  override def orderHistoryByPair(
+  override def getOrderHistoryByAssetPairAndPublicKey(
     owner: KeyPair,
     assetPair: AssetPair,
     activeOnly: Option[Boolean],

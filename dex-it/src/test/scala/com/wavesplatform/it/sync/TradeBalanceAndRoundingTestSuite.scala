@@ -89,7 +89,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
     }
 
     "check filled amount and tradable balance" in {
-      val bobOrder = dex1.api.orderHistory(bob).head
+      val bobOrder = dex1.api.getOrderHistoryByPublicKey(bob).head
       val filledAmount = dex1.api.getOrderStatus(bobOrder.assetPair, bobOrder.id).filledAmount.getOrElse(0L)
 
       filledAmount shouldBe adjustedAmount
@@ -105,7 +105,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
     }
 
     "check waves-usd tradable balance" in {
-      val orderHistory = dex1.api.orderHistory(bob)
+      val orderHistory = dex1.api.getOrderHistoryByPublicKey(bob)
       orderHistory.size should be(1)
 
       val expectedBobTradableBalance = bobWavesBalanceBefore - (correctedSellAmount + matcherFee)
@@ -207,7 +207,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
       val expectedReservedWaves = matcherFee - AcceptedOrder.partialFee(matcherFee, wctUsdSellAmount, executedAmount)
       dex1.api.getReservedBalance(bob)(Waves) shouldBe expectedReservedWaves
 
-      dex1.api.cancel(bob, wctUsdPair, dex1.api.orderHistory(bob).head.id)
+      dex1.api.cancel(bob, wctUsdPair, dex1.api.getOrderHistoryByPublicKey(bob).head.id)
     }
 
     "reserved balance is empty after the total execution" in {

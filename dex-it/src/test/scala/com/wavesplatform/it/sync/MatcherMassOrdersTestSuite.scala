@@ -62,13 +62,13 @@ class MatcherMassOrdersTestSuite extends MatcherSuiteBase {
     "Mass orders creation with random lifetime. Active orders still in list" in {
       val activeAliceOrders1 = 2
 
-      dex1.api.orderHistory(alice, activeOnly = Some(false)).length shouldBe 4
-      dex1.api.orderHistory(alice, activeOnly = Some(true)).length shouldBe activeAliceOrders1
+      dex1.api.getOrderHistoryByPublicKey(alice, activeOnly = Some(false)).length shouldBe 4
+      dex1.api.getOrderHistoryByPublicKey(alice, activeOnly = Some(true)).length shouldBe activeAliceOrders1
 
-      dex1.api.orderHistory(bob, activeOnly = Some(false)).length shouldBe 2
-      dex1.api.orderHistory(bob, activeOnly = Some(true)).length shouldBe 0
+      dex1.api.getOrderHistoryByPublicKey(bob, activeOnly = Some(false)).length shouldBe 2
+      dex1.api.getOrderHistoryByPublicKey(bob, activeOnly = Some(true)).length shouldBe 0
 
-      val orderIds = dex1.api.orderHistory(alice).map(_.id)
+      val orderIds = dex1.api.getOrderHistoryByPublicKey(alice).map(_.id)
 
       orderIds should contain(aliceActiveOrder.id())
 
@@ -81,40 +81,40 @@ class MatcherMassOrdersTestSuite extends MatcherSuiteBase {
       dex1.api.waitForOrderStatus(alicePartialOrder, Status.PartiallyFilled)
 
       withClue("no flag") {
-        val orderIdsAfterMatching1 = dex1.api.orderHistory(alice).map(_.id)
+        val orderIdsAfterMatching1 = dex1.api.getOrderHistoryByPublicKey(alice).map(_.id)
         orderIdsAfterMatching1 should contain(aliceActiveOrder.id())
         orderIdsAfterMatching1 should contain(alicePartialOrder.id())
       }
 
       withClue("activeOnly=false") {
-        val orderIdsAfterMatching2 = dex1.api.orderHistory(alice, activeOnly = Some(false)).map(_.id)
+        val orderIdsAfterMatching2 = dex1.api.getOrderHistoryByPublicKey(alice, activeOnly = Some(false)).map(_.id)
         orderIdsAfterMatching2 should contain(aliceActiveOrder.id())
         orderIdsAfterMatching2 should contain(alicePartialOrder.id())
       }
 
       withClue("activeOnly=true") {
-        val orderIdsAfterMatching3 = dex1.api.orderHistory(alice, activeOnly = Some(true)).map(_.id)
+        val orderIdsAfterMatching3 = dex1.api.getOrderHistoryByPublicKey(alice, activeOnly = Some(true)).map(_.id)
         orderIdsAfterMatching3 should contain(aliceActiveOrder.id())
         orderIdsAfterMatching3 should contain(alicePartialOrder.id())
       }
 
       // All orders are finalized
-      dex1.api.orderHistory(bob).map(_.id).take(maxFinalizedOrders) should matchTo(bobsOrderIds.take(maxFinalizedOrders))
-      dex1.api.orderHistoryByPair(bob, wavesUsdPair).map(_.id).take(maxFinalizedOrders) should matchTo(bobsOrderIds.take(maxFinalizedOrders))
+      dex1.api.getOrderHistoryByPublicKey(bob).map(_.id).take(maxFinalizedOrders) should matchTo(bobsOrderIds.take(maxFinalizedOrders))
+      dex1.api.getOrderHistoryByAssetPairAndPublicKey(bob, wavesUsdPair).map(_.id).take(maxFinalizedOrders) should matchTo(bobsOrderIds.take(maxFinalizedOrders))
     }
 
     "Filled and Cancelled orders should be after Partial And Accepted" in {
       val lastIdxOfActiveOrder =
-        dex1.api.orderHistory(alice).lastIndexWhere(o => o.status == Status.Accepted.name || o.status == Status.PartiallyFilled.name)
+        dex1.api.getOrderHistoryByPublicKey(alice).lastIndexWhere(o => o.status == Status.Accepted.name || o.status == Status.PartiallyFilled.name)
       val firstIdxOfClosedOrder =
-        dex1.api.orderHistory(alice).indexWhere(o => o.status == Status.Filled.name || o.status == Status.Cancelled.name)
+        dex1.api.getOrderHistoryByPublicKey(alice).indexWhere(o => o.status == Status.Filled.name || o.status == Status.Cancelled.name)
       lastIdxOfActiveOrder should be < firstIdxOfClosedOrder
     }
 
     "Accepted and PartiallyFilled orders should be sorted by timestamp." in {
       val activeAndPartialOrders =
         dex1.api
-          .orderHistory(alice)
+          .getOrderHistoryByPublicKey(alice)
           .filter(o => o.status == Status.Accepted.name || o.status == Status.PartiallyFilled.name)
           .map(_.timestamp)
       activeAndPartialOrders.reverse shouldBe sorted
@@ -122,18 +122,18 @@ class MatcherMassOrdersTestSuite extends MatcherSuiteBase {
 
     "Filled and Cancelled orders should be sorted by timestamp." in {
       val filledAndCancelledOrders =
-        dex1.api.orderHistory(alice).filter(o => o.status === Status.Filled.name || o.status == Status.Cancelled.name).map(_.timestamp)
+        dex1.api.getOrderHistoryByPublicKey(alice).filter(o => o.status === Status.Filled.name || o.status == Status.Cancelled.name).map(_.timestamp)
       filledAndCancelledOrders.reverse shouldBe sorted
     }
 
     "check order history orders count after fill" in {
-      val aliceAllActiveOrders = dex1.api.orderHistory(alice, activeOnly = Some(true))
-      val aliceAllOrders = dex1.api.orderHistory(alice)
+      val aliceAllActiveOrders = dex1.api.getOrderHistoryByPublicKey(alice, activeOnly = Some(true))
+      val aliceAllOrders = dex1.api.getOrderHistoryByPublicKey(alice)
       val expectedAllOrders = maxFinalizedOrders + aliceAllActiveOrders.size
       aliceAllOrders.size shouldBe expectedAllOrders
 
-      val alicePairActiveOrders = dex1.api.orderHistoryByPair(alice, wavesUsdPair, activeOnly = Some(true))
-      val alicePairOrders = dex1.api.orderHistoryByPair(alice, wavesUsdPair)
+      val alicePairActiveOrders = dex1.api.getOrderHistoryByAssetPairAndPublicKey(alice, wavesUsdPair, activeOnly = Some(true))
+      val alicePairOrders = dex1.api.getOrderHistoryByAssetPairAndPublicKey(alice, wavesUsdPair)
       val expectedPairOrders = maxFinalizedOrders + alicePairActiveOrders.size
       alicePairOrders.size shouldBe expectedPairOrders
     }

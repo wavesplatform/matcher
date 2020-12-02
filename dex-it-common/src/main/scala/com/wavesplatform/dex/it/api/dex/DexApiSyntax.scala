@@ -36,7 +36,7 @@ object DexApiSyntax {
     def waitForOrderHistory[A](owner: KeyPair, activeOnly: Option[Boolean])(
       pred: List[HttpOrderBookHistoryItem] => Boolean
     ): F[List[HttpOrderBookHistoryItem]] =
-      R.repeatUntil(self.orderHistory(owner, activeOnly), RepeatRequestOptions.default)(pred)
+      R.repeatUntil(self.getOrderHistoryByPublicKey(owner, activeOnly), RepeatRequestOptions.default)(pred)
 
     def waitForTransactionsByOrder(order: Order, atLeast: Int): F[List[ExchangeTransaction]] =
       waitForTransactionsByOrder(order.id(), atLeast)

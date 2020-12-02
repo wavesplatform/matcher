@@ -23,13 +23,13 @@ class MatcherRestartTestSuite extends MatcherSuiteBase {
       orders.asks.head.price shouldBe 2.waves * Order.PriceConstant
 
       // Sell order should be in the dex1.api.orderBook
-      dex1.api.orderHistory(alice).head.status shouldBe Status.Accepted.name
+      dex1.api.getOrderHistoryByPublicKey(alice).head.status shouldBe Status.Accepted.name
 
       // Reboot matcher's node
       dex1.restart()
 
       dex1.api.waitForOrderStatus(aliceOrder, Status.Accepted)
-      dex1.api.orderHistory(alice).head.status shouldBe Status.Accepted.name
+      dex1.api.getOrderHistoryByPublicKey(alice).head.status shouldBe Status.Accepted.name
 
       val orders1 = dex1.api.getOrderBook(ethWavesPair)
       orders1.asks.head.amount shouldBe 500
@@ -49,7 +49,7 @@ class MatcherRestartTestSuite extends MatcherSuiteBase {
       orders3.asks.head.amount shouldBe 500
 
       dex1.api.waitForOrderStatus(aliceOrder, Status.Cancelled)
-      dex1.api.orderHistory(alice).head.status shouldBe Status.Accepted.name
+      dex1.api.getOrderHistoryByPublicKey(alice).head.status shouldBe Status.Accepted.name
     }
   }
 }

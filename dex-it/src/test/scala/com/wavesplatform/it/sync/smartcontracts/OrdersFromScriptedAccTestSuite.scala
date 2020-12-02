@@ -136,7 +136,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
 
       // Alice checks that the order in order book
       dex1.api.waitForOrderStatus(aliceOrder, Status.Filled)
-      dex1.api.orderHistory(alice).head.status shouldBe Status.Filled.name
+      dex1.api.getOrderHistoryByPublicKey(alice).head.status shouldBe Status.Filled.name
     }
   }
 }

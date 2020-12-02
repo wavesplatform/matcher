@@ -128,8 +128,8 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
         orders.head.orderType shouldBe AcceptedOrderType.Market
       }
 
-      validateHistory("by pair", dex1.api.orderHistoryByPair(account2, wavesUsdPair))
-      validateHistory("full", dex1.api.orderHistory(account2))
+      validateHistory("by pair", dex1.api.getOrderHistoryByAssetPairAndPublicKey(account2, wavesUsdPair))
+      validateHistory("full", dex1.api.getOrderHistoryByPublicKey(account2))
       validateHistory("admin", dex1.api.orderHistoryWithApiKey(account2, activeOnly = Some(false)))
 
       Seq(account1, account2).foreach(dex1.api.cancelAll(_))

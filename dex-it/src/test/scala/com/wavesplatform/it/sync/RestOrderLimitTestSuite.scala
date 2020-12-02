@@ -23,21 +23,21 @@ class RestOrderLimitTestSuite extends MatcherSuiteBase {
   )
 
   private def activeOrders: List[Order.Id] = {
-    val activeOrders = dex1.api.orderHistory(alice, activeOnly = Some(true)).map(_.id)
+    val activeOrders = dex1.api.getOrderHistoryByPublicKey(alice, activeOnly = Some(true)).map(_.id)
     dex1.api.orderHistoryWithApiKey(alice, activeOnly = Some(true)).map(_.id) should matchTo(activeOrders)
     activeOrders
   }
 
   private def allOrders: List[Order.Id] = {
-    val allOrders = dex1.api.orderHistory(alice).map(_.id)
+    val allOrders = dex1.api.getOrderHistoryByPublicKey(alice).map(_.id)
     dex1.api.orderHistoryWithApiKey(alice, activeOnly = Some(false)).map(_.id) should matchTo(allOrders)
     allOrders
   }
 
   private def activeOrdersBy(pair: AssetPair, n: KeyPair = alice): List[Order.Id] =
-    dex1.api.orderHistoryByPair(n, pair, activeOnly = Some(true)).map(_.id)
+    dex1.api.getOrderHistoryByAssetPairAndPublicKey(n, pair, activeOnly = Some(true)).map(_.id)
 
-  private def allOrdersBy(pair: AssetPair, n: KeyPair = alice): List[Order.Id] = dex1.api.orderHistoryByPair(n, pair).map(_.id)
+  private def allOrdersBy(pair: AssetPair, n: KeyPair = alice): List[Order.Id] = dex1.api.getOrderHistoryByAssetPairAndPublicKey(n, pair).map(_.id)
 
   markup("""Test suite checks only Alice's OrderHistory.
            |Bob places orders only for matching Alice's orders.""".stripMargin)

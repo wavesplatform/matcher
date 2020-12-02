@@ -275,7 +275,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
 
       def assertAvgWeighedPriceAndExecutedPriceAssets(keyPair: KeyPair, avgWeighedPricesAndPriceAssetAmounts: List[(Long, Long)]): Unit =
         dex1.api
-          .orderHistoryByPair(keyPair, wavesUsdPair, Some(false))
+          .getOrderHistoryByAssetPairAndPublicKey(keyPair, wavesUsdPair, Some(false))
           .map(item => item.avgWeighedPrice -> item.totalExecutedPriceAssets) should matchTo(avgWeighedPricesAndPriceAssetAmounts)
 
       // checking market and limit orders because
@@ -318,10 +318,10 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
 
       withClue("default: ") {
         // MatcherApiRoute.getAssetPairAndPublicKeyOrderHistory
-        dex1.api.orderHistoryByPair(carol, wavesUsdPair).map(_.id) should matchTo(all)
+        dex1.api.getOrderHistoryByAssetPairAndPublicKey(carol, wavesUsdPair).map(_.id) should matchTo(all)
 
         // MatcherApiRoute.getPublicKeyOrderHistory
-        dex1.api.orderHistory(carol).map(_.id) should matchTo(all)
+        dex1.api.getOrderHistoryByPublicKey(carol).map(_.id) should matchTo(all)
 
         // MatcherApiRoute.getAllOrderHistory
         dex1.api.orderHistoryWithApiKey(carol).map(_.id) should matchTo(activeOnly)
@@ -348,8 +348,8 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
               case OrderListType.ClosedOnly => closedOnly
             }
 
-            dex1.api.orderHistoryByPair(carol, wavesUsdPair, activeOnlyParam, closedOnlyParam).map(_.id) should matchTo(expected)
-            dex1.api.orderHistory(carol, activeOnlyParam, closedOnlyParam).map(_.id) should matchTo(expected)
+            dex1.api.getOrderHistoryByAssetPairAndPublicKey(carol, wavesUsdPair, activeOnlyParam, closedOnlyParam).map(_.id) should matchTo(expected)
+            dex1.api.getOrderHistoryByPublicKey(carol, activeOnlyParam, closedOnlyParam).map(_.id) should matchTo(expected)
             dex1.api.orderHistoryWithApiKey(carol, activeOnlyParam, closedOnlyParam).map(_.id) should matchTo(expected)
           }
       }
@@ -359,8 +359,8 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
   }
 
   private def orderHistory(account: KeyPair, pair: AssetPair, activeOnly: Option[Boolean]): List[List[HttpOrderBookHistoryItem]] = List(
-    dex1.api.orderHistory(account, activeOnly),
-    dex1.api.orderHistoryByPair(account, pair, activeOnly),
+    dex1.api.getOrderHistoryByPublicKey(account, activeOnly),
+    dex1.api.getOrderHistoryByAssetPairAndPublicKey(account, pair, activeOnly),
     dex1.api.orderHistoryWithApiKey(account, activeOnly)
   )
 

@@ -88,10 +88,34 @@ trait DexApi[F[_]] {
 
   def getTransactionsByOrder(id: Order.Id): F[List[ExchangeTransaction]]
 
+  def deleteHistory(owner: KeyPair, assetPair: AssetPair, orderId: String): F[HttpSuccessfulDeleteHistory]
+
+  def getOrderHistoryByApiKey(publicKey: String, timestamp: Long, signature: String): F[List[HttpOrderBookHistoryItem]]
+
+  def getOrderHistoryByApiKey(address: String): F[List[HttpOrderBookHistoryItem]]
+
+  def getOrderHistoryByApiKey(
+    address: String,
+    activeOnly: Boolean,
+    closedOnly: Boolean,
+    headers: Map[String, String]
+  ): F[List[HttpOrderBookHistoryItem]]
+
+  def getOrderHistoryByPublicKey(owner: KeyPair): F[List[HttpOrderBookHistoryItem]]
+
   /**
    * param @activeOnly Server treats this parameter as false if it wasn't specified
    */
-  def orderHistory(
+  def getOrderHistoryByPublicKey(
+    publicKey: String,
+    timestamp: Long,
+    signature: String
+  ): F[List[HttpOrderBookHistoryItem]]
+
+  /**
+   * param @activeOnly Server treats this parameter as false if it wasn't specified
+   */
+  def getOrderHistoryByPublicKey(
     owner: KeyPair,
     activeOnly: Option[Boolean] = None,
     closedOnly: Option[Boolean] = None,
@@ -108,10 +132,18 @@ trait DexApi[F[_]] {
     xUserPublicKey: Option[PublicKey] = None
   ): F[List[HttpOrderBookHistoryItem]]
 
+  def getOrderHistoryByAssetPairAndPublicKey(
+    publicKey: String,
+    amountAsset: String,
+    priceAsset: String,
+    timestamp: Long,
+    signature: String
+  ): F[List[HttpOrderBookHistoryItem]]
+
   /**
    * param @activeOnly Server treats this parameter as false if it wasn't specified
    */
-  def orderHistoryByPair(
+  def getOrderHistoryByAssetPairAndPublicKey(
     owner: KeyPair,
     assetPair: AssetPair,
     activeOnly: Option[Boolean] = None,
@@ -142,10 +174,19 @@ trait DexApi[F[_]] {
   def deleteRate(asset: Asset): F[HttpMessage]
   def getRates: F[HttpRates]
 
-  def currentOffset: F[HttpOffset]
-  def lastOffset: F[HttpOffset]
-  def oldestSnapshotOffset: F[HttpOffset]
-  def allSnapshotOffsets: F[HttpSnapshotOffsets]
+  def getCurrentOffset: F[HttpOffset]
+  def getCurrentOffset(headers: Map[String, String]): F[HttpOffset]
+
+  def getLastOffset: F[HttpOffset]
+  def getLastOffset(headers: Map[String, String]): F[HttpOffset]
+
+  def getOldestSnapshotOffset: F[HttpOffset]
+  def getOldestSnapshotOffset(headers: Map[String, String]): F[HttpOffset]
+
+  def getAllSnapshotOffsets(headers: Map[String, String]): F[HttpSnapshotOffsets]
+  def getAllSnapshotOffsets: F[HttpSnapshotOffsets]
+
+  def saveSnapshots(headers: Map[String, String]): F[HttpMessage]
   def saveSnapshots: F[HttpMessage]
 
   def getMatcherSettings: F[HttpMatcherPublicSettings]

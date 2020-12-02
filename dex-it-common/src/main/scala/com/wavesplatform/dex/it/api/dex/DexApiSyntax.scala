@@ -36,7 +36,7 @@ object DexApiSyntax {
     def waitForOrderHistory[A](owner: KeyPair, activeOnly: Option[Boolean])(
       pred: List[HttpOrderBookHistoryItem] => Boolean
     ): F[List[HttpOrderBookHistoryItem]] =
-      R.repeatUntil(self.orderHistory(owner, activeOnly), RepeatRequestOptions.default)(pred)
+      R.repeatUntil(self.getOrderHistoryByPublicKey(owner, activeOnly), RepeatRequestOptions.default)(pred)
 
     def waitForTransactionsByOrder(order: Order, atLeast: Int): F[List[ExchangeTransaction]] =
       waitForTransactionsByOrder(order.id(), atLeast)
@@ -48,7 +48,7 @@ object DexApiSyntax {
       R.repeatUntil(self.getTransactionsByOrder(id), RepeatRequestOptions.default)(pred)
 
     def waitForCurrentOffset(pred: Long => Boolean): F[HttpOffset] =
-      R.repeatUntil(self.currentOffset, RepeatRequestOptions(1.second, 120))(pred)
+      R.repeatUntil(self.getCurrentOffset, RepeatRequestOptions(1.second, 120))(pred)
 
     def waitForWsConnections(pred: HttpWebSocketConnections => Boolean): F[HttpWebSocketConnections] =
       R.repeatUntil(self.wsConnections, RepeatRequestOptions(1.second, 120))(pred)

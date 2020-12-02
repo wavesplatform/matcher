@@ -98,7 +98,7 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with
       }
     } catch {
       case NonFatal(e) =>
-        log.info(s"Last offsets: node1=${dex1.api.lastOffset}, node2=${dex2.api.lastOffset}")
+        log.info(s"Last offsets: node1=${dex1.api.getLastOffset}, node2=${dex2.api.getLastOffset}")
         throw e
     }
   }
@@ -204,8 +204,8 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with
       3.minutes
     )
 
-    Await.result(dex1.asyncApi.orderHistory(alice, Some(true)), 5.seconds) shouldBe empty
-    Await.result(dex1.asyncApi.orderHistory(bob, Some(true)), 5.seconds) shouldBe empty
+    Await.result(dex1.asyncApi.getOrderHistoryByPublicKey(alice, Some(true)), 5.seconds) shouldBe empty
+    Await.result(dex1.asyncApi.getOrderHistoryByPublicKey(bob, Some(true)), 5.seconds) shouldBe empty
   }
 
   private def mkOrders(account: KeyPair, number: Int = placesNumber) =

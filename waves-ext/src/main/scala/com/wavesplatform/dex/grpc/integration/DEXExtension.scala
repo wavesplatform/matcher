@@ -13,7 +13,6 @@ import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.NameMapper
 
 import scala.concurrent.Future
-import scala.util.Try
 
 class DEXExtension(context: ExtensionContext) extends Extension with ScorexLogging {
 

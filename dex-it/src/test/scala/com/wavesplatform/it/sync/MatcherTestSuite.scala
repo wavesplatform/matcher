@@ -91,8 +91,8 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
           orders.head.orderType shouldBe AcceptedOrderType.Limit
         }
 
-        validateHistory("by pair", dex1.api.orderHistoryByPair(alice, aliceWavesPair))
-        validateHistory("full", dex1.api.orderHistory(alice))
+        validateHistory("by pair", dex1.api.getOrderHistoryByAssetPairAndPublicKey(alice, aliceWavesPair))
+        validateHistory("full", dex1.api.getOrderHistoryByPublicKey(alice))
         validateHistory("admin", dex1.api.orderHistoryWithApiKey(alice, activeOnly = Some(false)))
       }
 
@@ -119,7 +119,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       }
 
       "and should be listed by trader's publiс key via REST" in {
-        dex1.api.orderHistory(alice).map(_.id) should contain(order1.id())
+        dex1.api.getOrderHistoryByPublicKey(alice).map(_.id) should contain(order1.id())
       }
 
       "and should match with buy order" in {
@@ -134,8 +134,8 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         dex1.api.waitForOrderStatus(order1, Status.PartiallyFilled)
         dex1.api.waitForOrderStatus(order2, Status.Filled)
 
-        dex1.api.orderHistoryByPair(bob, aliceWavesPair).map(_.id) should contain(order2.id())
-        dex1.api.orderHistory(bob).map(_.id) should contain(order2.id())
+        dex1.api.getOrderHistoryByAssetPairAndPublicKey(bob, aliceWavesPair).map(_.id) should contain(order2.id())
+        dex1.api.getOrderHistoryByPublicKey(bob).map(_.id) should contain(order2.id())
 
         waitForOrderAtNode(order2)
         eventually {
@@ -165,9 +165,9 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       }
 
       "request activeOnly orders" in {
-        val aliceOrders = dex1.api.orderHistory(alice, activeOnly = Some(true))
+        val aliceOrders = dex1.api.getOrderHistoryByPublicKey(alice, activeOnly = Some(true))
         aliceOrders.map(_.id) shouldBe Seq(order1.id())
-        val bobOrders = dex1.api.orderHistory(bob, activeOnly = Some(true))
+        val bobOrders = dex1.api.getOrderHistoryByPublicKey(bob, activeOnly = Some(true))
         bobOrders.map(_.id) shouldBe empty
       }
 
@@ -353,13 +353,13 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
   }
 
   "Debug information was updated" in {
-    val currentOffset = dex1.api.currentOffset
+    val currentOffset = dex1.api.getCurrentOffset
     currentOffset should be > 0L
 
-    val oldestSnapshotOffset = dex1.api.oldestSnapshotOffset
+    val oldestSnapshotOffset = dex1.api.getOldestSnapshotOffset
     oldestSnapshotOffset should be <= currentOffset
 
-    val snapshotOffsets = dex1.api.allSnapshotOffsets
+    val snapshotOffsets = dex1.api.getAllSnapshotOffsets
     snapshotOffsets.foreach { case (assetPair, offset) =>
       withClue(assetPair) {
         offset should be <= currentOffset

@@ -65,8 +65,8 @@ trait ApiExtensions extends NodeApiExtensions {
     dexApi: DexApi[Id] = dex1.api
   ): MatcherState = {
 
-    val offset = dexApi.currentOffset
-    val snapshots = dexApi.allSnapshotOffsets
+    val offset = dexApi.getCurrentOffset
+    val snapshots = dexApi.getAllSnapshotOffsets
     val orderBooks = assetPairs.map(x => (x, (dexApi.getOrderBook(x), dexApi.getOrderBookStatus(x))))
     val orderStatuses = orders.map(x => x.idStr() -> dexApi.getOrderStatus(x))
     val orderTransactionIds = orders.map(x => x.idStr() -> dexApi.getTransactionsByOrder(x).map(_.id().toString).toSet)
@@ -74,7 +74,7 @@ trait ApiExtensions extends NodeApiExtensions {
     val accountsOrderHistory = accounts.flatMap(a => assetPairs.map(p => a -> p))
 
     val orderHistory = accountsOrderHistory.map {
-      case (account, pair) => (account, pair, dexApi.orderHistoryByPair(account, pair))
+      case (account, pair) => (account, pair, dexApi.getOrderHistoryByAssetPairAndPublicKey(account, pair))
     }
 
     val orderHistoryMap = orderHistory

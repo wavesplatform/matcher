@@ -128,16 +128,16 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
         placeAndAwaitAtDex(bestAskOrder)
         placeAndAwaitAtDex(bestBidOrder)
 
-        dex1.api.orderBook(assetPair).asks should matchTo(List(HttpV0LevelAgg(2000.waves, 500000)))
-        dex1.api.orderBook(assetPair).bids should matchTo(List(HttpV0LevelAgg(2000.waves, 300000)))
+        dex1.api.getOrderBook(assetPair).asks should matchTo(List(HttpV0LevelAgg(2000.waves, 500000)))
+        dex1.api.getOrderBook(assetPair).bids should matchTo(List(HttpV0LevelAgg(2000.waves, 300000)))
 
         placeAndAwaitAtDex(mkOrder(bob, assetPair, BUY, 1000.waves, 90000, 3 * matcherFee, feeAsset), Status.Accepted)
         placeAndAwaitAtDex(mkOrder(bob, assetPair, BUY, 1000.waves, 800000, 3 * matcherFee, feeAsset), Status.Filled)
 
         waitForOrderAtNode(bestAskOrder)
 
-        dex1.api.reservedBalance(alice) should matchTo(Map(assetPair.amountAsset -> 100000000000L, feeAsset -> 2 * matcherFee))
-        dex1.api.reservedBalance(bob) should matchTo(Map(assetPair.priceAsset -> 691500000L))
+        dex1.api.getReservedBalance(alice) should matchTo(Map(assetPair.amountAsset -> 100000000000L, feeAsset -> 2 * matcherFee))
+        dex1.api.getReservedBalance(bob) should matchTo(Map(assetPair.priceAsset -> 691500000L))
 
         cancelAll(alice, bob)
       }
@@ -151,16 +151,16 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
         placeAndAwaitAtDex(bestAskOrder, Status.Accepted)
         placeAndAwaitAtDex(bestBidOrder, Status.Accepted)
 
-        dex1.api.orderBook(wavesUsdPair).asks should matchTo(List(HttpV0LevelAgg(2000.waves, 500)))
-        dex1.api.orderBook(wavesUsdPair).bids should matchTo(List(HttpV0LevelAgg(2000.waves, 300)))
+        dex1.api.getOrderBook(wavesUsdPair).asks should matchTo(List(HttpV0LevelAgg(2000.waves, 500)))
+        dex1.api.getOrderBook(wavesUsdPair).bids should matchTo(List(HttpV0LevelAgg(2000.waves, 300)))
 
         placeAndAwaitAtDex(mkOrder(alice, wavesUsdPair, BUY, 1000.waves, 90, 3 * 300, feeAsset), Status.Accepted)
         placeAndAwaitAtDex(mkOrder(alice, wavesUsdPair, BUY, 1000.waves, 800, 3 * 300, feeAsset), Status.Filled)
 
         waitForOrderAtNode(bestAskOrder)
 
-        dex1.api.reservedBalance(bob) should matchTo(Map(wavesUsdPair.amountAsset -> 100000000000L, feeAsset -> 600L))
-        dex1.api.reservedBalance(alice) should matchTo(Map(wavesUsdPair.priceAsset -> 691500L))
+        dex1.api.getReservedBalance(bob) should matchTo(Map(wavesUsdPair.amountAsset -> 100000000000L, feeAsset -> 600L))
+        dex1.api.getReservedBalance(alice) should matchTo(Map(wavesUsdPair.priceAsset -> 691500L))
 
         cancelAll(alice, bob)
       }
@@ -172,19 +172,19 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
           val bestBidOrder = mkOrder(bob, assetPair, BUY, 1000.waves, 300000, 2 * matcherFee, feeAsset = assetPair.priceAsset)
           placeAndAwaitAtDex(bestBidOrder)
 
-          dex1.api.orderBook(assetPair).bids shouldBe List(HttpV0LevelAgg(1000.waves, 300000))
-          dex1.api.reservedBalance(bob)(assetPair.priceAsset) shouldBe 300600000L
+          dex1.api.getOrderBook(assetPair).bids shouldBe List(HttpV0LevelAgg(1000.waves, 300000))
+          dex1.api.getReservedBalance(bob)(assetPair.priceAsset) shouldBe 300600000L
 
           dex1.tryApi.place(mkOrder(bob, assetPair, BUY, 1000.waves, 89999, matcherFee, feeAsset = assetPair.priceAsset)) should failWith(
             9441295, // DeviantOrderPrice
             orderIsOutOfDeviationBounds("0.00089999", BUY)
           )
 
-          dex1.api.reservedBalance(bob) shouldBe Map(assetPair.priceAsset -> 300600000L)
+          dex1.api.getReservedBalance(bob) shouldBe Map(assetPair.priceAsset -> 300600000L)
 
           dex1.api.cancel(bob, bestBidOrder)
 
-          dex1.api.reservedBalance(bob) shouldBe empty
+          dex1.api.getReservedBalance(bob) shouldBe empty
           cancelAll(alice)
         }
 
@@ -192,16 +192,16 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
           val bestBidOrder = mkOrder(bob, wavesUsdPair, BUY, 1000.waves, 300, 2 * 300, feeAsset = wavesUsdPair.priceAsset)
           placeAndAwaitAtDex(bestBidOrder)
 
-          dex1.api.orderBook(wavesUsdPair).bids shouldBe List(HttpV0LevelAgg(1000.waves, 300))
+          dex1.api.getOrderBook(wavesUsdPair).bids shouldBe List(HttpV0LevelAgg(1000.waves, 300))
 
-          dex1.api.reservedBalance(bob)(wavesUsdPair.priceAsset) shouldBe 300600L
+          dex1.api.getReservedBalance(bob)(wavesUsdPair.priceAsset) shouldBe 300600L
 
           dex1.tryApi.place(mkOrder(bob, wavesUsdPair, BUY, 1000.waves, 89, matcherFee, feeAsset = wavesUsdPair.priceAsset)) should failWith(
             9441295, // DeviantOrderPrice
             orderIsOutOfDeviationBounds("0.89", BUY)
           )
 
-          dex1.api.reservedBalance(bob) shouldBe Map(wavesUsdPair.priceAsset -> 300600L)
+          dex1.api.getReservedBalance(bob) shouldBe Map(wavesUsdPair.priceAsset -> 300600L)
 
           cancelAll(alice, bob)
         }
@@ -212,14 +212,14 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
           val bestAskOrder = mkOrder(alice, assetPair, SELL, 1000.waves, 500000, 4 * matcherFee, feeAsset = assetPair.priceAsset)
           placeAndAwaitAtDex(bestAskOrder)
 
-          dex1.api.orderBook(assetPair).asks shouldBe List(HttpV0LevelAgg(1000.waves, 500000))
+          dex1.api.getOrderBook(assetPair).asks shouldBe List(HttpV0LevelAgg(1000.waves, 500000))
 
           dex1.tryApi.place(mkOrder(bob, assetPair, BUY, 1000.waves, 800001, 3 * matcherFee, feeAsset = assetPair.priceAsset)) should failWith(
             9441295, // DeviantOrderPrice
             orderIsOutOfDeviationBounds("0.00800001", BUY)
           )
 
-          dex1.api.reservedBalance(bob) shouldBe empty
+          dex1.api.getReservedBalance(bob) shouldBe empty
 
           cancelAll(alice, bob)
         }
@@ -228,14 +228,14 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
           val bestAskOrder = mkOrder(bob, wavesUsdPair, SELL, 1000.waves, 500, 4 * 300, feeAsset = wavesUsdPair.priceAsset)
           placeAndAwaitAtDex(bestAskOrder)
 
-          dex1.api.orderBook(wavesUsdPair).asks shouldBe List(HttpV0LevelAgg(1000.waves, 500))
+          dex1.api.getOrderBook(wavesUsdPair).asks shouldBe List(HttpV0LevelAgg(1000.waves, 500))
 
           dex1.tryApi.place(mkOrder(alice, wavesUsdPair, BUY, 1000.waves, 801, 3 * 300, feeAsset = wavesUsdPair.priceAsset)) should failWith(
             9441295, // DeviantOrderPrice
             orderIsOutOfDeviationBounds("8.01", BUY)
           )
 
-          dex1.api.reservedBalance(alice) shouldBe empty
+          dex1.api.getReservedBalance(alice) shouldBe empty
 
           cancelAll(alice, bob)
         }
@@ -254,16 +254,16 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
         Seq(bestAskOrder, bestBidOrder).foreach(placeAndAwaitAtDex(_))
 
-        dex1.api.orderBook(assetPair).asks should matchTo(List(HttpV0LevelAgg(2000.waves, 500000)))
-        dex1.api.orderBook(assetPair).bids should matchTo(List(HttpV0LevelAgg(2000.waves, 300000)))
+        dex1.api.getOrderBook(assetPair).asks should matchTo(List(HttpV0LevelAgg(2000.waves, 500000)))
+        dex1.api.getOrderBook(assetPair).bids should matchTo(List(HttpV0LevelAgg(2000.waves, 300000)))
 
         placeAndAwaitAtDex(mkOrder(alice, assetPair, SELL, 1000.waves, 850000, 3 * matcherFee, feeAsset), Status.Accepted)
         placeAndAwaitAtDex(mkOrder(alice, assetPair, SELL, 1000.waves, 120000, 3 * matcherFee, feeAsset), Status.Filled)
 
         waitForOrderAtNode(bestBidOrder)
 
-        dex1.api.reservedBalance(alice) should matchTo(Map(assetPair.amountAsset -> 300000000000L, feeAsset -> 7 * matcherFee))
-        dex1.api.reservedBalance(bob) should matchTo(Map(assetPair.priceAsset -> 300300000L))
+        dex1.api.getReservedBalance(alice) should matchTo(Map(assetPair.amountAsset -> 300000000000L, feeAsset -> 7 * matcherFee))
+        dex1.api.getReservedBalance(bob) should matchTo(Map(assetPair.priceAsset -> 300300000L))
 
         cancelAll(alice, bob)
       }
@@ -276,14 +276,14 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
           val bestBidOrder = mkOrder(bob, assetPair, BUY, 1000.waves, 300000, matcherFee, feeAsset = assetPair.priceAsset)
           placeAndAwaitAtDex(bestBidOrder)
 
-          dex1.api.orderBook(assetPair).bids shouldBe List(HttpV0LevelAgg(1000.waves, 300000))
+          dex1.api.getOrderBook(assetPair).bids shouldBe List(HttpV0LevelAgg(1000.waves, 300000))
 
           dex1.tryApi.place(mkOrder(alice, assetPair, SELL, 1000.waves, 119999, matcherFee, feeAsset = assetPair.priceAsset)) should failWith(
             9441295, // DeviantOrderPrice
             orderIsOutOfDeviationBounds("0.00119999", SELL)
           )
 
-          dex1.api.reservedBalance(alice) shouldBe empty
+          dex1.api.getReservedBalance(alice) shouldBe empty
 
           cancelAll(bob)
         }
@@ -292,14 +292,14 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
           val bestBidOrder = mkOrder(bob, wavesUsdPair, BUY, 1000.waves, 300, 300, feeAsset = wavesUsdPair.priceAsset)
           placeAndAwaitAtDex(bestBidOrder)
 
-          dex1.api.orderBook(wavesUsdPair).bids shouldBe List(HttpV0LevelAgg(1000.waves, 300))
+          dex1.api.getOrderBook(wavesUsdPair).bids shouldBe List(HttpV0LevelAgg(1000.waves, 300))
 
           dex1.tryApi.place(mkOrder(alice, wavesUsdPair, SELL, 1000.waves, 119, 300, feeAsset = wavesUsdPair.priceAsset)) should failWith(
             9441295, // DeviantOrderPrice
             orderIsOutOfDeviationBounds("1.19", SELL)
           )
 
-          dex1.api.reservedBalance(alice) shouldBe empty
+          dex1.api.getReservedBalance(alice) shouldBe empty
 
           cancelAll(bob, bob)
         }
@@ -313,14 +313,14 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
           placeAndAwaitAtDex(bestAskOrder)
 
-          dex1.api.orderBook(assetPair).asks should matchTo(List(HttpV0LevelAgg(1000.waves, 500000)))
+          dex1.api.getOrderBook(assetPair).asks should matchTo(List(HttpV0LevelAgg(1000.waves, 500000)))
 
           dex1.tryApi.place(mkOrder(alice, assetPair, SELL, 1000.waves, 850001, 3 * matcherFee, feeAsset)) should failWith(
             9441295, // DeviantOrderPrice
             orderIsOutOfDeviationBounds("0.00850001", SELL)
           )
 
-          dex1.api.reservedBalance(alice) should matchTo(Map(assetPair.amountAsset -> 1000.waves, feeAsset -> 2 * matcherFee))
+          dex1.api.getReservedBalance(alice) should matchTo(Map(assetPair.amountAsset -> 1000.waves, feeAsset -> 2 * matcherFee))
 
           cancelAll(alice, bob)
         }
@@ -332,14 +332,14 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
           placeAndAwaitAtDex(bestAskOrder)
 
-          dex1.api.orderBook(wavesUsdPair).asks shouldBe List(HttpV0LevelAgg(1000.waves, 500))
+          dex1.api.getOrderBook(wavesUsdPair).asks shouldBe List(HttpV0LevelAgg(1000.waves, 500))
 
           dex1.tryApi.place(mkOrder(alice, wavesUsdPair, SELL, 1000.waves, 851, 3 * 300, feeAsset)) should failWith(
             9441295, // DeviantOrderPrice
             orderIsOutOfDeviationBounds("8.51", SELL)
           )
 
-          dex1.api.reservedBalance(alice) shouldBe Map(wavesUsdPair.amountAsset -> 1000.waves, feeAsset -> 2 * 300)
+          dex1.api.getReservedBalance(alice) shouldBe Map(wavesUsdPair.amountAsset -> 1000.waves, feeAsset -> 2 * 300)
 
           cancelAll(alice, bob)
         }
@@ -353,14 +353,14 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
         val aliceOrder1 = mkOrder(alice, assetPair, SELL, 1000.waves, 600000, 2 * matcherFee, feeAsset = assetPair.priceAsset)
         placeAndAwaitAtDex(aliceOrder1)
 
-        dex1.api.orderBook(assetPair).asks shouldBe List(HttpV0LevelAgg(1000.waves, 600000))
+        dex1.api.getOrderBook(assetPair).asks shouldBe List(HttpV0LevelAgg(1000.waves, 600000))
 
         val bobOrder1 = mkOrder(bob, assetPair, BUY, 1000.waves, 800000, 3 * matcherFee, feeAsset = assetPair.priceAsset)
         placeAndAwaitAtDex(bobOrder1, Status.Filled)
 
         val aliceOrder2 = mkOrder(alice, assetPair, BUY, 1000.waves, 700000, 3 * matcherFee, feeAsset = assetPair.priceAsset)
         placeAndAwaitAtDex(aliceOrder2)
-        dex1.api.orderBook(assetPair).bids shouldBe List(HttpV0LevelAgg(1000.waves, 700000))
+        dex1.api.getOrderBook(assetPair).bids shouldBe List(HttpV0LevelAgg(1000.waves, 700000))
 
         val bobOrder2 = mkOrder(bob, assetPair, SELL, 1000.waves, 600000, 2 * matcherFee, feeAsset = assetPair.priceAsset)
         placeAndAwaitAtDex(bobOrder2, Status.Filled)
@@ -373,14 +373,14 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
         val bobOrder1 = mkOrder(bob, wavesUsdPair, SELL, 1000.waves, 600, 600, feeAsset = wavesUsdPair.priceAsset)
         placeAndAwaitAtDex(bobOrder1)
 
-        dex1.api.orderBook(wavesUsdPair).asks shouldBe List(HttpV0LevelAgg(1000.waves, 600))
+        dex1.api.getOrderBook(wavesUsdPair).asks shouldBe List(HttpV0LevelAgg(1000.waves, 600))
 
         val aliceOrder1 = mkOrder(alice, wavesUsdPair, BUY, 1000.waves, 800, 3 * 300, feeAsset = wavesUsdPair.priceAsset)
         placeAndAwaitAtDex(aliceOrder1, Status.Filled)
 
         val aliceOrder2 = mkOrder(alice, wavesUsdPair, BUY, 1000.waves, 700, 3 * 300, feeAsset = wavesUsdPair.priceAsset)
         placeAndAwaitAtDex(aliceOrder2)
-        dex1.api.orderBook(wavesUsdPair).bids shouldBe List(HttpV0LevelAgg(1000.waves, 700))
+        dex1.api.getOrderBook(wavesUsdPair).bids shouldBe List(HttpV0LevelAgg(1000.waves, 700))
 
         val bobOrder2 = mkOrder(bob, wavesUsdPair, SELL, 1000.waves, 600, 2 * 300, feeAsset = wavesUsdPair.priceAsset)
         placeAndAwaitAtDex(bobOrder2, Status.Filled)
@@ -395,7 +395,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
         val bestAskOrder = mkOrder(alice, assetPair, SELL, 1000.waves, 600000, 2 * matcherFee, feeAsset = assetPair.priceAsset)
         placeAndAwaitAtDex(bestAskOrder)
 
-        dex1.api.orderBook(assetPair).asks shouldBe List(HttpV0LevelAgg(1000.waves, 600000))
+        dex1.api.getOrderBook(assetPair).asks shouldBe List(HttpV0LevelAgg(1000.waves, 600000))
 
         dex1.tryApi.place(mkOrder(bob, assetPair, BUY, 1000.waves, 300000, 359999, feeAsset = assetPair.priceAsset)) should failWith(
           9441551, // DeviantOrderMatcherFee
@@ -407,7 +407,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
         val bestBidOrder = mkOrder(bob, assetPair, BUY, 1000.waves, 1200000, 4 * matcherFee, feeAsset = assetPair.priceAsset)
         placeAndAwaitAtDex(bestBidOrder)
 
-        dex1.api.orderBook(assetPair).bids shouldBe List(HttpV0LevelAgg(1000.waves, 1200000))
+        dex1.api.getOrderBook(assetPair).bids shouldBe List(HttpV0LevelAgg(1000.waves, 1200000))
 
         dex1.tryApi.place(mkOrder(alice, assetPair, SELL, 1000.waves, 600000, 719999, feeAsset = assetPair.priceAsset)) should failWith(
           9441551, // DeviantOrderMatcherFee
@@ -421,7 +421,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
         val bestAskOrder = mkOrder(bob, wavesUsdPair, SELL, 1000.waves, 600, 2 * 300, feeAsset = wavesUsdPair.priceAsset)
         placeAndAwaitAtDex(bestAskOrder)
 
-        dex1.api.orderBook(wavesUsdPair).asks shouldBe List(HttpV0LevelAgg(1000.waves, 600))
+        dex1.api.getOrderBook(wavesUsdPair).asks shouldBe List(HttpV0LevelAgg(1000.waves, 600))
 
         dex1.tryApi.place(mkOrder(alice, wavesUsdPair, BUY, 1000.waves, 300, 359, feeAsset = wavesUsdPair.priceAsset)) should failWith(
           9441551, // DeviantOrderMatcherFee
@@ -433,7 +433,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
         val bestBidOrder = mkOrder(alice, wavesUsdPair, BUY, 1000.waves, 1200, 4 * 300, feeAsset = wavesUsdPair.priceAsset)
         placeAndAwaitAtDex(bestBidOrder)
 
-        dex1.api.orderBook(wavesUsdPair).bids shouldBe List(HttpV0LevelAgg(1000.waves, 1200))
+        dex1.api.getOrderBook(wavesUsdPair).bids shouldBe List(HttpV0LevelAgg(1000.waves, 1200))
 
         dex1.tryApi.place(mkOrder(bob, wavesUsdPair, SELL, 1000.waves, 600, 719, feeAsset = wavesUsdPair.priceAsset)) should failWith(
           9441551, // DeviantOrderMatcherFee

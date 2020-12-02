@@ -41,19 +41,18 @@ import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.utils.{EitherExt2, LoggerFacade, ScorexLogging}
 import com.wavesplatform.dex.effect.{liftValueAsync, FutureResult}
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
-import com.wavesplatform.dex.grpc.integration.WavesBlockchainClientBuilder
-import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainAssetsWatchingClient
-import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.BalanceChanges
+import com.wavesplatform.dex.grpc.integration.WavesClientBuilder
+import com.wavesplatform.dex.grpc.integration.clients.{MatcherExtensionAssetsWatchingClient, WavesBlockchainClient}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.history.HistoryRouterActor
 import com.wavesplatform.dex.logs.SystemInformationReporter
-import com.wavesplatform.dex.model.OrderValidator.AsyncBlockchain
 import com.wavesplatform.dex.model.{AssetPairBuilder, ExchangeTransactionCreator, Fee, OrderValidator, ValidationStages}
 import com.wavesplatform.dex.queue._
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.dex.time.NTP
 import kamon.Kamon
 import kamon.influxdb.InfluxDBReporter
+import monix.execution.ExecutionModel
 import mouse.any.anySyntaxMouse
 import org.slf4j.LoggerFactory
 import pureconfig.ConfigSource
@@ -66,7 +65,7 @@ import scala.util.{Failure, Success}
 
 class Application(settings: MatcherSettings, config: Config)(implicit val actorSystem: ActorSystem) extends ScorexLogging {
 
-  private val monixScheduler = monix.execution.Scheduler.Implicits.global
+  private val monixScheduler = monix.execution.Scheduler.Implicits.global.withExecutionModel(ExecutionModel.AlwaysAsyncExecution)
   private val grpcExecutionContext = actorSystem.dispatchers.lookup("akka.actor.grpc-dispatcher")
 
   private val cs = CoordinatedShutdown(actorSystem)
@@ -146,9 +145,9 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     assetsCache.unsafeGetHasScript
   )
 
-  private val wavesBlockchainAsyncClient = new WavesBlockchainAssetsWatchingClient(
+  private val wavesBlockchainAsyncClient = new MatcherExtensionAssetsWatchingClient(
     settings = settings.wavesBlockchainClient,
-    underlying = WavesBlockchainClientBuilder.async(
+    underlying = WavesClientBuilder.async(
       settings.wavesBlockchainClient,
       monixScheduler = monixScheduler,
       grpcExecutionContext = grpcExecutionContext
@@ -379,7 +378,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
     deadline = settings.startEventsProcessingTimeout.fromNow
     (firstQueueOffset, lastOffsetQueue) <- {
-      log.info("Gettings queue offsets ...")
+      log.info("Getting queue offsets ...")
       val requests = new RepeatableRequests(matcherQueue, deadline)
       requests.firstOffset zip requests.lastOffset
     }
@@ -403,11 +402,8 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       log.info(s"Last queue offset is $lastOffsetQueue")
       waitOffsetReached(lastOffsetQueue, deadline)
     }
-
-    connectedNodeAddress <- wavesBlockchainAsyncClient.getNodeAddress
   } yield {
     log.info("Last offset has been reached, notify addresses")
-    log.info(s"DEX server is connected to Node with an address: ${connectedNodeAddress.getHostAddress}")
     addressDirectoryRef ! AddressDirectoryActor.StartWork
 
     log.info("Start watching balances")
@@ -422,16 +418,9 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       forceStopApplication(StartingMatcherError)
   }
 
-  private def watchBalanceChanges(recipient: ActorRef): Unit = {
-
-    def aggregateChangesByAddress(xs: List[BalanceChanges]): Map[Address, Map[Asset, Long]] = xs.foldLeft(Map.empty[Address, Map[Asset, Long]]) {
-      case (result, bc) => result.updated(bc.address, result.getOrElse(bc.address, Map.empty) + (bc.asset -> bc.balance))
-    }
-
-    wavesBlockchainAsyncClient.realTimeBalanceBatchChanges
-      .map(aggregateChangesByAddress)
-      .foreach(recipient ! SpendableBalancesActor.Command.UpdateStates(_))(monixScheduler)
-  }
+  private def watchBalanceChanges(recipient: ActorRef): Unit =
+    wavesBlockchainAsyncClient.updates
+      .foreach(updates => recipient ! SpendableBalancesActor.Command.UpdateStates(updates.updatedBalances))(monixScheduler)
 
   private def loadAllKnownAssets(): Future[Unit] =
     Future(blocking(assetPairsDB.all()).flatMap(_.assets) ++ settings.mentionedAssets).flatMap { assetsToLoad =>
@@ -502,12 +491,12 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     p.future
   }
 
-  private def getAndCacheDecimals(assetsCache: AssetsStorage, blockchain: AsyncBlockchain, asset: Asset): FutureResult[Int] =
+  private def getAndCacheDecimals(assetsCache: AssetsStorage, blockchain: WavesBlockchainClient, asset: Asset): FutureResult[Int] =
     getAndCacheDescription(assetsCache, blockchain, asset).map(_.decimals)(catsStdInstancesForFuture)
 
   private def getAndCacheDescription(
     assetsCache: AssetsStorage,
-    blockchain: AsyncBlockchain,
+    blockchain: WavesBlockchainClient,
     asset: Asset
   ): FutureResult[BriefAssetDescription] =
     asset match {

@@ -4,12 +4,14 @@ import java.net.InetSocketAddress
 
 import com.softwaremill.sttp._
 import com.softwaremill.sttp.playJson._
+import com.wavesplatform.dex.api.http.entities.HttpMessage
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.it.api.responses.node._
 import com.wavesplatform.dex.it.api.{AsyncEnrichedApi, EnrichedResponse}
 import im.mak.waves.transactions.Transaction
 import im.mak.waves.transactions.common.Id
+import play.api.libs.json.Json
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -31,6 +33,10 @@ class AsyncEnrichedNodeApi(apiKey: String, host: => InetSocketAddress)(implicit 
 
   override def transactionInfo(id: Id): R[Transaction] = mk {
     sttp.get(uri"$apiUri/transactions/info/$id")
+  }
+
+  override def unconfirmedTransactionInfo(id: Id): R[Transaction] = mk {
+    sttp.get(uri"$apiUri/transactions/unconfirmed/info/$id")
   }
 
   override def currentHeightOrig: R[HeightResponse] = mk {
@@ -56,6 +62,13 @@ class AsyncEnrichedNodeApi(apiKey: String, host: => InetSocketAddress)(implicit 
     sttp
       .post(uri"$apiUri/debug/rollback")
       .body(RollbackReq(toHeight, returnTransactionsToUtx))
+      .header("X-API-Key", apiKey)
+  }
+
+  override def print(message: String): R[Unit] = mkIgnore {
+    sttp
+      .post(uri"$apiUri/debug/print")
+      .body(Json.toJson(HttpMessage(message)))
       .header("X-API-Key", apiKey)
   }
 

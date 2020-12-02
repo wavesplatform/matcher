@@ -13,10 +13,13 @@ import im.mak.waves.transactions.ExchangeTransaction
 trait DexApi[F[_]] {
   def publicKey: F[HttpMatcherPublicKey]
 
-  def reservedBalance(of: KeyPair, timestamp: Long = System.currentTimeMillis): F[HttpBalance]
-  def reservedBalanceWithApiKey(of: KeyPair, xUserPublicKey: Option[PublicKey] = None): F[HttpBalance]
+  def getReservedBalance(publicKey: String, timestamp: Long, signature: String): F[HttpBalance]
+  def getReservedBalance(of: KeyPair, timestamp: Long = System.currentTimeMillis): F[HttpBalance]
+  def getReservedBalance(publicKey: String, headers: Map[String, String]): F[HttpBalance]
+  def getReservedBalanceWithApiKey(of: KeyPair, xUserPublicKey: Option[PublicKey] = None): F[HttpBalance]
 
-  def tradableBalance(of: KeyPair, assetPair: AssetPair, timestamp: Long = System.currentTimeMillis): F[HttpBalance]
+  def getTradableBalance(address: String, amountAsset: String, priceAsset: String): F[HttpBalance]
+  def getTradableBalance(of: KeyPair, assetPair: AssetPair): F[HttpBalance]
 
   def place(order: Order): F[HttpSuccessfulPlace]
   def placeMarket(order: Order): F[HttpSuccessfulPlace]
@@ -43,30 +46,47 @@ trait DexApi[F[_]] {
     xUserPublicKey: Option[PublicKey] = None
   ): F[HttpSuccessfulBatchCancel]
 
-  def orderStatus(order: Order): F[HttpOrderStatus] = orderStatus(order.assetPair, order.id())
-  def orderStatus(assetPair: AssetPair, id: Order.Id): F[HttpOrderStatus]
+  def getOrderStatus(order: Order): F[HttpOrderStatus] = getOrderStatus(order.assetPair, order.id())
 
-  def orderStatusInfoByIdWithApiKey(
+  def getOrderStatus(assetPair: AssetPair, id: Order.Id): F[HttpOrderStatus] =
+    getOrderStatus(assetPair.amountAssetStr, assetPair.priceAssetStr, id.toString)
+
+  def getOrderStatus(amountAsset: String, priceAsset: String, id: String): F[HttpOrderStatus]
+
+  def getOrderStatusInfoById(
+    address: String,
+    orderId: String,
+    headers: Map[String, String] = Map.empty
+  ): F[HttpOrderBookHistoryItem]
+
+  def getOrderStatusInfoByIdWithApiKey(
     owner: Address,
     orderId: Order.Id,
     xUserPublicKey: Option[PublicKey]
   ): F[HttpOrderBookHistoryItem]
 
-  def orderStatusInfoByIdWithSignature(
+  def getOrderStatusInfoByIdWithSignature(publicKey: String, orderId: String, timestamp: Long, signature: String): F[HttpOrderBookHistoryItem]
+
+  def getOrderStatusInfoByIdWithSignature(publicKey: String, orderId: String, headers: Map[String, String]): F[HttpOrderBookHistoryItem]
+
+  def getOrderStatusInfoByIdWithSignature(
     owner: KeyPair,
     order: Order,
     timestamp: Long = System.currentTimeMillis
   ): F[HttpOrderBookHistoryItem] =
-    orderStatusInfoByIdWithSignature(owner, order.id(), timestamp)
+    getOrderStatusInfoByIdWithSignature(owner, order.id(), timestamp)
 
-  def orderStatusInfoByIdWithSignature(
+  def getOrderStatusInfoByIdWithSignature(
     owner: KeyPair,
     orderId: Order.Id,
     timestamp: Long
   ): F[HttpOrderBookHistoryItem]
 
-  def transactionsByOrder(order: Order): F[List[ExchangeTransaction]] = transactionsByOrder(order.id())
-  def transactionsByOrder(id: Order.Id): F[List[ExchangeTransaction]]
+  def getTransactionsByOrder(orderId: String): F[List[ExchangeTransaction]] = getTransactionsByOrder(orderId)
+
+  def getTransactionsByOrder(order: Order): F[List[ExchangeTransaction]] = getTransactionsByOrder(order.id())
+
+  def getTransactionsByOrder(id: Order.Id): F[List[ExchangeTransaction]]
 
   /**
    * param @activeOnly Server treats this parameter as false if it wasn't specified
@@ -99,19 +119,28 @@ trait DexApi[F[_]] {
     timestamp: Long = System.currentTimeMillis
   ): F[List[HttpOrderBookHistoryItem]]
 
-  def allOrderBooks: F[HttpTradingMarkets]
+  def getOrderBooks: F[HttpTradingMarkets]
 
-  def orderBook(assetPair: AssetPair): F[HttpV0OrderBook]
-  def orderBook(assetPair: AssetPair, depth: Int): F[HttpV0OrderBook]
+  def getOrderBook(amountAsset: String, priceAsset: String): F[HttpV0OrderBook]
+  def getOrderBook(assetPair: AssetPair): F[HttpV0OrderBook]
+  def getOrderBook(assetPair: AssetPair, depth: String): F[HttpV0OrderBook]
+  def getOrderBook(assetPair: AssetPair, depth: Int): F[HttpV0OrderBook]
 
-  def orderBookInfo(assetPair: AssetPair): F[HttpOrderBookInfo]
-  def orderBookStatus(assetPair: AssetPair): F[HttpMarketStatus]
+  def getOrderBookInfo(assetPair: AssetPair): F[HttpOrderBookInfo]
+  def getOrderBookInfo(amountAsset: String, priceAsset: String): F[HttpOrderBookInfo]
 
+  def getOrderBookStatus(amountAsset: String, priceAsset: String): F[HttpOrderBookStatus]
+  def getOrderBookStatus(assetPair: AssetPair): F[HttpOrderBookStatus]
+
+  def deleteOrderBook(amountAsset: String, priceAsset: String, headers: Map[String, String]): F[HttpMessage]
   def deleteOrderBook(assetPair: AssetPair): F[HttpMessage]
 
+  def upsertRate(assetId: String, rate: Double, headers: Map[String, String] = Map.empty): F[HttpMessage]
   def upsertRate(asset: Asset, rate: Double): F[HttpMessage]
+  def upsertRate(asset: Asset, rate: String): F[HttpMessage]
+  def deleteRate(assetId: String, headers: Map[String, String] = Map.empty): F[HttpMessage]
   def deleteRate(asset: Asset): F[HttpMessage]
-  def rates: F[HttpRates]
+  def getRates: F[HttpRates]
 
   def currentOffset: F[HttpOffset]
   def lastOffset: F[HttpOffset]
@@ -119,8 +148,13 @@ trait DexApi[F[_]] {
   def allSnapshotOffsets: F[HttpSnapshotOffsets]
   def saveSnapshots: F[HttpMessage]
 
-  def settings: F[HttpMatcherPublicSettings]
-  def config: F[Config]
+  def getMatcherSettings: F[HttpMatcherPublicSettings]
+  def getMatcherConfig: F[Config]
+  def getMatcherConfig(headers: Map[String, String]): F[Config]
+
+  def getMatcherPublicKey: F[String]
+
+  def print(message: String): F[Unit]
 
   def wsConnections: F[HttpWebSocketConnections]
   def closeWsConnections(oldestNumber: Int): F[HttpMessage]

@@ -315,14 +315,14 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     "returns an order book status" in test { route =>
       Get(routePath(s"/orderbook/$smartAssetId/WAVES/status")) ~> route ~> check {
         status shouldEqual StatusCodes.OK
-        responseAs[HttpMarketStatus] should matchTo(HttpMarketStatus fromMarketStatus smartWavesMarketStatus)
+        responseAs[HttpOrderBookStatus] should matchTo(HttpOrderBookStatus fromMarketStatus smartWavesMarketStatus)
       }
     }
 
     "returns OK even there is no such order book" in test { route =>
       Get(routePath(s"/orderbook/$unknownAssetId/WAVES/status")) ~> route ~> check {
         status shouldEqual StatusCodes.OK
-        responseAs[HttpMarketStatus] should matchTo(HttpMarketStatus(None, None, None, None, None, None, None))
+        responseAs[HttpOrderBookStatus] should matchTo(HttpOrderBookStatus(None, None, None, None, None, None, None))
       }
     }
   }

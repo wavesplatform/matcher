@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
-    <property name="pattern" value="%date{ISO8601,UTC} %-5level [%.25thread] %logger{26} - %msg%n%ex"/>
+    <property name="pattern" value="%date{HH:mm:ss.SSS,UTC} %-5level [%.10thread] %logger{26} - %msg%n%rEx"/>
 
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <target>System.out</target>

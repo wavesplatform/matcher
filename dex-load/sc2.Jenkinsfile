@@ -7,16 +7,15 @@ pipeline {
         timeout(time: 45, unit: 'MINUTES')
     }
     parameters {
-        string(name: 'SBT_THREAD_NUMBER', defaultValue: '6', description: '')
         string(name: 'SEED', defaultValue: 'test-seed', description: 'Seed prefix of generated accounts')
-        string(name: 'AN', defaultValue: '60', description: 'Count of generated accounts')
-        string(name: 'RC', defaultValue: '10000', description: 'Count of requests')
+        string(name: 'AN', defaultValue: '6000', description: 'Count of generated accounts')
+        string(name: 'RC', defaultValue: '250000', description: 'Count of requests')
         string(name: 'RT', defaultValue: '6', description: 'Generation type')
         string(name: 'AS', defaultValue: 'D', description: 'Chain ID')
     }
     environment {
         SBT_HOME = tool name: 'sbt-1.2.6', type: 'org.jvnet.hudson.plugins.SbtPluginBuilder$SbtInstallation'
-        SBT_THREAD_NUMBER = "${SBT_THREAD_NUMBER}"
+        SBT_THREAD_NUMBER = "6"
         SBT_OPTS = '-Xmx10g -XX:ReservedCodeCacheSize=128m -XX:+CMSClassUnloadingEnabled'
         PATH = "${env.SBT_HOME}/bin:${env.PATH}"
         SEED = "${SEED}"

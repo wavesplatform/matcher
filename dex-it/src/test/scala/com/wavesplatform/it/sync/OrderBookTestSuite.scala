@@ -20,7 +20,7 @@ class OrderBookTestSuite extends MatcherSuiteBase {
   private case class ReservedBalances(wct: Long, usd: Long, waves: Long)
 
   private def reservedBalancesOf(pk: KeyPair): ReservedBalances = {
-    val reservedBalances = dex1.api.reservedBalance(pk)
+    val reservedBalances = dex1.api.getReservedBalance(pk)
     ReservedBalances(
       reservedBalances.getOrElse(wct, 0),
       reservedBalances.getOrElse(usd, 0),
@@ -77,13 +77,13 @@ class OrderBookTestSuite extends MatcherSuiteBase {
 
     "the order book was deleted" in {
       withClue("orderBook") {
-        val orderBook = dex1.api.orderBook(wctUsdPair)
+        val orderBook = dex1.api.getOrderBook(wctUsdPair)
         orderBook.bids shouldBe empty
         orderBook.asks shouldBe empty
       }
 
       withClue("tradingMarkets") {
-        val tradingPairs = dex1.api.allOrderBooks.markets.map(x => s"${x.amountAsset}-${x.priceAsset}")
+        val tradingPairs = dex1.api.getOrderBooks.markets.map(x => s"${x.amountAsset}-${x.priceAsset}")
         tradingPairs shouldNot contain(wctUsdPair.key)
       }
 
@@ -101,11 +101,11 @@ class OrderBookTestSuite extends MatcherSuiteBase {
     }
 
     "it should not affect other pairs and their orders" in {
-      dex1.api.orderStatus(buyOrderForAnotherPair).status shouldBe Status.Accepted
-      dex1.api.orderStatus(sellOrderForAnotherPair).status shouldBe Status.Accepted
+      dex1.api.getOrderStatus(buyOrderForAnotherPair).status shouldBe Status.Accepted
+      dex1.api.getOrderStatus(sellOrderForAnotherPair).status shouldBe Status.Accepted
       dex1.api.place(mkOrder(alice, wctWavesPair, BUY, amount, price))
 
-      val orderBook = dex1.api.orderBook(wctWavesPair)
+      val orderBook = dex1.api.getOrderBook(wctWavesPair)
       orderBook.bids shouldNot be(empty)
       orderBook.asks shouldNot be(empty)
     }

@@ -3,6 +3,7 @@ package com.wavesplatform.it.sync.api.ws
 import cats.syntax.option._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus
+import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.api.ws.connection.WsConnection
 import com.wavesplatform.dex.api.ws.entities.{WsLastTrade, WsOrderBookSettings}
 import com.wavesplatform.dex.api.ws.protocol
@@ -15,11 +16,15 @@ import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.error.SubscriptionsLimitReached
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, OrderRestrictionsSettings}
-import com.wavesplatform.it.WsSuiteBase
+import com.wavesplatform.it.api.MatcherCommand
+import com.wavesplatform.it.{executeCommands, WsSuiteBase}
 
 import scala.collection.immutable.TreeMap
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, Future}
+import play.api.libs.json._
+
+import scala.util.Random
 
 class WsOrderBookStreamTestSuite extends WsSuiteBase {
 
@@ -76,6 +81,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
   }
 
   "Order book stream should" - {
+
     "correctly handle rejections" in {
       val invalidAssetPair = AssetPair(Waves, eth)
 
@@ -435,6 +441,8 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
           WsError.from(SubscriptionsLimitReached(3, wavesBtcPair.toString), 0L)
         )
       }
+
+      dex1.api.cancelAll(alice)
     }
 
     "be opened even if there is no such order book" in {
@@ -452,6 +460,46 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
 
       placeAndAwaitAtDex(mkOrderDP(alice, bchUsdPair, SELL, 10.asset8, 231.0))
       wsc.receiveAtLeastN[WsOrderBookChanges](1).head.asks should matchTo(TreeMap(231.0 -> 10.0))
+    }
+
+    def placeOrdersAsync(t: OrderType): Unit = {
+      val orders = (1 until 50).map(_ => mkOrderDP(alice, wavesUsdPair, t, 1.usd, Random.between(10000, 10000000)))
+      executeCommands(Random.shuffle(orders.map(MatcherCommand.Place(dex1, _))))
+      orders.foreach(o => eventually(dex1.api.waitForOrderStatus(o, Status.Accepted)))
+    }
+
+    "send prices in bids with right order" in {
+      val wsc = mkDexWsConnection(dex1)
+      wsc.send(WsOrderBookSubscribe(wavesUsdPair, 1))
+
+      placeOrdersAsync(BUY)
+
+      wsc.receiveAtLeastNRaw(1).map(m =>
+        (Json.parse(m.body) \ "b").asOpt[List[List[String]]] match {
+          case Some(b) => b.flatMap(_.head).map(_.toDouble)
+          case None => List.empty
+        }
+      ).filter(l => l == l.sorted && l.size > 1) should have size 0
+
+      dex1.api.cancelAll(alice)
+      wsc.close()
+    }
+
+    "send prices in asks with right order" in {
+      val wsc = mkDexWsConnection(dex1)
+      wsc.send(WsOrderBookSubscribe(wavesUsdPair, 1))
+
+      placeOrdersAsync(SELL)
+
+      wsc.receiveAtLeastNRaw(1).map(m =>
+        (Json.parse(m.body) \ "a").asOpt[List[List[String]]] match {
+          case Some(b) => b.flatMap(_.head).map(_.toDouble)
+          case None => List.empty
+        }
+      ).filter(l => l == l.sorted(Ordering[Double].reverse) && l.size > 1) should have size 0
+
+      dex1.api.cancelAll(alice)
+      wsc.close()
     }
   }
 

@@ -48,12 +48,6 @@ class OrderRestrictionsTestSuite extends MatcherSuiteBase {
 //    )
   }
 
-  "order info returns information event there is no such order book" in {
-    dex1.api.orderBookInfo(ethBtcPair).restrictions shouldBe empty
-    dex1.api.orderBookInfo(wavesBtcPair).restrictions shouldBe empty
-    dex1.api.orderBookInfo(wctUsdPair).restrictions shouldNot be(empty)
-  }
-
   "low amount" in {
     dex1.tryApi.place(mkOrder(alice, wctUsdPair, BUY, 1, 100000000, matcherFee)) should failWith(
       9441026, // OrderInvalidAmount
@@ -105,26 +99,5 @@ class OrderRestrictionsTestSuite extends MatcherSuiteBase {
 
   "valid order" in {
     placeAndAwaitAtDex(mkOrder(alice, wctUsdPair, BUY, 100000000, 100000, matcherFee))
-  }
-
-  "order restrictions endpoints" in {
-    dex1.api.orderBookInfo(wctUsdPair).restrictions.get.minAmount shouldBe 0.1
-    dex1.api.orderBookInfo(wctUsdPair).restrictions.get.maxAmount shouldBe 100000000
-    dex1.api.orderBookInfo(wctUsdPair).restrictions.get.stepAmount shouldBe 0.1
-    dex1.api.orderBookInfo(wctUsdPair).restrictions.get.minPrice shouldBe 0.0001
-    dex1.api.orderBookInfo(wctUsdPair).restrictions.get.maxPrice shouldBe 1000
-    dex1.api.orderBookInfo(wctUsdPair).restrictions.get.stepPrice shouldBe 0.001
-
-    dex1.api.tradingPairInfo(wctUsdPair).get.restrictions.get.minAmount shouldBe 0.1
-    dex1.api.tradingPairInfo(wctUsdPair).get.restrictions.get.maxAmount shouldBe 100000000
-    dex1.api.tradingPairInfo(wctUsdPair).get.restrictions.get.stepAmount shouldBe 0.1
-    dex1.api.tradingPairInfo(wctUsdPair).get.restrictions.get.minPrice shouldBe 0.0001
-    dex1.api.tradingPairInfo(wctUsdPair).get.restrictions.get.maxPrice shouldBe 1000
-    dex1.api.tradingPairInfo(wctUsdPair).get.restrictions.get.stepPrice shouldBe 0.001
-
-    dex1.api.orderBookInfo(wavesBtcPair).restrictions shouldBe empty
-
-    dex1.api.place(mkOrder(bob, wavesBtcPair, BUY, 100000000, 100000, matcherFee))
-    dex1.api.tradingPairInfo(wavesBtcPair).get.restrictions shouldBe empty
   }
 }

@@ -10,10 +10,10 @@ import com.wavesplatform.dex.db.AssetsStorage
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.order.Order
-import com.wavesplatform.dex.effect.{liftFutureAsync, liftValueAsync, FutureResult}
+import com.wavesplatform.dex.effect.{FutureResult, liftFutureAsync, liftValueAsync}
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
+import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
-import com.wavesplatform.dex.model.OrderValidator.AsyncBlockchain
 import com.wavesplatform.dex.settings.{MatcherSettings, OrderFeeSettings}
 import com.wavesplatform.dex.time.Time
 
@@ -28,7 +28,7 @@ object ValidationStages {
     matchingRulesCache: MatchingRulesCache,
     rateCache: RateCache,
     assetsCache: AssetsStorage,
-    blockchain: AsyncBlockchain,
+    blockchain: WavesBlockchainClient,
     transactionCreator: ExchangeTransactionCreator,
     time: Time,
     orderBookAskAdapter: OrderBookAskAdapter,
@@ -80,7 +80,7 @@ object ValidationStages {
   }
 
   def mkSecond(
-    blockchain: AsyncBlockchain,
+    blockchain: WavesBlockchainClient,
     orderBookAskAdapter: OrderBookAskAdapter
   )(ao: AcceptedOrder, tradableBalance: Map[Asset, Long])(implicit
     efc: ErrorFormatterContext,

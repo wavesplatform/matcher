@@ -40,7 +40,6 @@ import scala.math.BigDecimal.RoundingMode
 object OrderValidator extends ScorexLogging {
 
   type Result[T] = Either[MatcherError, T]
-  type AsyncBlockchain = WavesBlockchainClient[Future]
 
   private val timer = Kamon.timer("matcher.validation").withTag("type", "blockchain")
 
@@ -62,7 +61,7 @@ object OrderValidator extends ScorexLogging {
       )
   }
 
-  private def verifyOrderByAccountScript(blockchain: AsyncBlockchain, address: Address, order: Order)(implicit
+  private def verifyOrderByAccountScript(blockchain: WavesBlockchainClient, address: Address, order: Order)(implicit
     ec: ExecutionContext
   ): FutureResult[Unit] = {
 
@@ -87,7 +86,7 @@ object OrderValidator extends ScorexLogging {
     liftFutureAsync(blockchain.hasScript(address)).ifM(verifyAddressScript, verifySignature(order))
   }
 
-  private def verifySmartToken(blockchain: AsyncBlockchain, asset: IssuedAsset, tx: ExchangeTransaction, hasAssetScript: Asset => Boolean)(
+  private def verifySmartToken(blockchain: WavesBlockchainClient, asset: IssuedAsset, tx: ExchangeTransaction, hasAssetScript: Asset => Boolean)(
     implicit ec: ExecutionContext
   ): FutureResult[Unit] = {
 
@@ -156,7 +155,7 @@ object OrderValidator extends ScorexLogging {
   }
 
   def blockchainAware(
-    blockchain: AsyncBlockchain,
+    blockchain: WavesBlockchainClient,
     transactionCreator: ExchangeTransactionCreator.CreateTransaction,
     time: Time,
     orderFeeSettings: OrderFeeSettings,

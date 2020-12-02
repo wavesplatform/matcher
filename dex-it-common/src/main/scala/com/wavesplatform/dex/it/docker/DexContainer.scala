@@ -37,6 +37,15 @@ final case class DexContainer private (override val internalIp: String, underlyi
   val tf = new Transformations[MatcherError]
   import tf._
 
+  /*
+  Which api to use? Consider a lesser power principle:
+  1. Least power: api - we can get an entity, httpApi - we can get an HTTP response only
+  2. Moderate power: tryApi - we can get either an entity or a domain error (MatcherError). But we need to write more code
+  3. The most powerful: rawApi - we can get all information, including HTTP response. This method is more powerful, but requires more code
+
+  Use async* only if you want to do parallel requests.
+   */
+
   def api: DexApi[SyncUnsafe] = apiFunctorK.mapK(asyncRawApi)(toSyncUnsafe)
   def tryApi: DexApi[SyncTry] = apiFunctorK.mapK(asyncRawApi)(toSyncTry)
   def httpApi: DexApi[SyncHttp] = apiFunctorK.mapK(asyncRawApi)(toSyncHttp)
@@ -50,7 +59,7 @@ final case class DexContainer private (override val internalIp: String, underlyi
     val r = Iterator
       .continually {
         Thread.sleep(1000)
-        try httpApi.allOrderBooks.code == StatusCodes.Ok
+        try httpApi.getOrderBooks.code == StatusCodes.Ok
         catch {
           case _: Throwable => false
         }
@@ -61,6 +70,7 @@ final case class DexContainer private (override val internalIp: String, underlyi
     if (!r.contains(true)) throw new RuntimeException(s"${underlying.containerId} is not ready, all attempts are out")
   }
 
+  override def printDebugMessage(text: String): Unit = asyncRawApi.print(text)
 }
 
 object DexContainer extends ScorexLogging {

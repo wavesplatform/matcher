@@ -9,10 +9,10 @@ trait HasToxiProxy { self: BaseContainersKit =>
 
   protected val toxiProxyHostName = s"$networkName-toxiproxy"
 
-  private val container: ToxiproxyContainer = new ToxiproxyContainer()
+  private val container: ToxiproxyContainer = new ToxiproxyContainer("shopify/toxiproxy:2.1.0")
     .withNetwork(network)
     .withNetworkAliases(toxiProxyHostName)
-    .withExposedPorts(8666)
+    .withExposedPorts(8666, 8667) // Two ports for two extensions: blockchain updates and ours
     .withCreateContainerCmdModifier { cmd =>
       cmd withName toxiProxyHostName
       cmd withIpv4Address getIp(13)

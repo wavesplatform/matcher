@@ -52,15 +52,15 @@ class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
     testOrderPlacementDenied(mkOrder(bob, wavesBtcPair, SELL, dec8, dec8), bob)
 
     And("orders of blacklisted address are still available")
-    dex1.api.orderStatus(btcOrder1).status shouldBe Status.Accepted
+    dex1.api.getOrderStatus(btcOrder1).status shouldBe Status.Accepted
 
     And("orders for other assets are still available")
-    dex1.api.orderStatus(usdOrder).status shouldBe Status.Accepted
+    dex1.api.getOrderStatus(usdOrder).status shouldBe Status.Accepted
 
     And("OrderBook for blacklisted assets is not available")
     testOrderBookDenied(wctWavesPair, IssuedAsset(WctId))
     testOrderBookDenied(ethWavesPair, IssuedAsset(EthId))
-    dex1.api.orderBook(wavesBtcPair).asks.size shouldBe 1
+    dex1.api.getOrderBook(wavesBtcPair).asks.size shouldBe 1
 
     And("OrderHistory returns info about all orders")
     val aliceOrderHistory = dex1.api.orderHistory(alice, activeOnly = Some(true))
@@ -72,14 +72,14 @@ class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
     bobOrderHistory.head.status shouldBe Status.Accepted.name
 
     And("Trading markets have info about all asset pairs")
-    dex1.api.allOrderBooks.markets.size shouldBe 4
+    dex1.api.getOrderBooks.markets.size shouldBe 4
 
     And("balances are still reserved")
-    dex1.api.reservedBalance(alice).size shouldBe 3
-    dex1.api.reservedBalance(bob).size shouldBe 1
+    dex1.api.getReservedBalance(alice).size shouldBe 3
+    dex1.api.getReservedBalance(bob).size shouldBe 1
 
     And("orders for other assets are still available")
-    dex1.api.orderStatus(usdOrder).status shouldBe Status.Accepted
+    dex1.api.getOrderStatus(usdOrder).status shouldBe Status.Accepted
 
     And("order can be placed on allowed pair with blacklisted asset")
     val btcOrder2 = mkOrder(alice, wavesBtcPair, SELL, dec8, dec8)
@@ -89,12 +89,12 @@ class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
     dex1.restartWithNewSuiteConfig(configWithBlacklisted())
 
     Then("OrderBook for blacklisted assets is available again")
-    dex1.api.orderBook(wctWavesPair).bids.size shouldBe 1
-    dex1.api.orderBook(ethWavesPair).asks.size shouldBe 1
+    dex1.api.getOrderBook(wctWavesPair).bids.size shouldBe 1
+    dex1.api.getOrderBook(ethWavesPair).asks.size shouldBe 1
 
     And("order statuses are available again")
-    dex1.api.orderStatus(wctOrder).status shouldBe Status.Accepted
-    dex1.api.orderStatus(ethOrder).status shouldBe Status.Accepted
+    dex1.api.getOrderStatus(wctOrder).status shouldBe Status.Accepted
+    dex1.api.getOrderStatus(ethOrder).status shouldBe Status.Accepted
 
     And("new orders can be placed")
     val newWctOrder = mkOrder(alice, wctWavesPair, BUY, dec2, dec8)
@@ -112,10 +112,10 @@ class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
     failedDueAssetBlacklist(dex1.tryApi.place(order), order.assetPair, blacklistedAsset)
 
   private def testOrderStatusDenied(order: Order, blacklistedAsset: Asset): Unit =
-    failedDueAssetBlacklist(dex1.tryApi.orderStatus(order), order.assetPair, blacklistedAsset)
+    failedDueAssetBlacklist(dex1.tryApi.getOrderStatus(order), order.assetPair, blacklistedAsset)
 
   private def testOrderBookDenied(assetPair: AssetPair, blacklistedAsset: Asset): Unit =
-    failedDueAssetBlacklist(dex1.tryApi.orderBook(assetPair), assetPair, blacklistedAsset)
+    failedDueAssetBlacklist(dex1.tryApi.getOrderBook(assetPair), assetPair, blacklistedAsset)
 
   private def failedDueAssetBlacklist(r: Either[MatcherError, Any], assetPair: AssetPair, blacklistedAsset: Asset) =
     r should failWith(expectedErrorCode(assetPair, blacklistedAsset), MatcherError.Params(assetId = Some(blacklistedAsset.toString)))

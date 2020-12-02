@@ -1,5 +1,7 @@
 description := "Node integration extension for the Waves DEX"
 
+import java.io.FilenameFilter
+
 import ImageVersionPlugin.autoImport.{imageTagMakeFunction, nameOfImage}
 import VersionSourcePlugin.V
 import WavesNodeArtifactsPlugin.autoImport.wavesNodeVersion
@@ -19,7 +21,6 @@ enablePlugins(
 V.scalaPackage := "com.wavesplatform.dex.grpc.integration"
 V.subProject := "ext"
 
-resolvers += "dnvriend" at "https://dl.bintray.com/dnvriend/maven"
 libraryDependencies ++= Dependencies.Module.wavesExt
 
 val packageSettings = Seq(
@@ -79,15 +80,35 @@ inTask(docker)(
   Seq(
     nameOfImage := "wavesplatform/matcher-node",
     imageTagMakeFunction := (gitTag => s"${wavesNodeVersion.value}_$gitTag"),
-    dockerfile := new Dockerfile {
-      from(s"wavesplatform/wavesnode:${wavesNodeVersion.value}")
-      user("143:143") // waves:waves
-      add(
-        sources = Seq((Universal / stage).value / "lib"), // sources
-        destination = "/usr/share/waves/lib/plugins/",
-        chown = "143:143"
-      )
-      expose(6887, 6871) // DEX Extension, Stagenet REST API
+    dockerfile := {
+      val log = streams.value.log
+
+      val grpcServerDir = unmanagedBase.value
+        .listFiles(new FilenameFilter {
+          override def accept(dir: File, name: String): Boolean = name.startsWith("grpc-server") && name.endsWith(".tgz")
+        })
+        .headOption match {
+        case None => throw new RuntimeException("Can't find the grcp-server archive")
+        case Some(grpcServerArchive) =>
+          val targetDir = (Compile / compile / target).value
+          val r = targetDir / grpcServerArchive.getName.replace(".tgz", "")
+          if (!r.isDirectory) {
+            log.info(s"Decompressing $grpcServerArchive to $targetDir")
+            MatcherIOUtils.decompressTgz(grpcServerArchive, targetDir)
+          }
+          r
+      }
+
+      new Dockerfile {
+        from(s"wavesplatform/wavesnode:${wavesNodeVersion.value}")
+        user("143:143") // waves:waves
+        add(
+          sources = Seq((Universal / stage).value / "lib", grpcServerDir / "lib"),
+          destination = "/usr/share/waves/lib/plugins/",
+          chown = "143:143"
+        )
+        expose(6887, 6881, 6871) // DEX Extension, Blockchain Updates Extension, Stagenet REST API
+      }
     },
     buildOptions := BuildOptions(removeIntermediateContainers = BuildOptions.Remove.OnSuccess)
   )

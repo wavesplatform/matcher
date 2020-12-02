@@ -1,8 +1,9 @@
 # IDE/Editor files
-.idea
-.ensime
+.idea/
+.ensime/
 .ensime_cache/
-.metals
+.metals/
+.bsp/
 
 # scala build folders and files
 target

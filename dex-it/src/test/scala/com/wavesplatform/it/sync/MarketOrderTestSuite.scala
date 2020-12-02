@@ -174,7 +174,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
       dex1.api.placeMarket(marketOrder)
       dex1.api.waitForOrderStatus(marketOrder, Status.Filled)
 
-      val orderBook = dex1.api.orderBook(wavesUsdPair)
+      val orderBook = dex1.api.getOrderBook(wavesUsdPair)
       orderBook.bids should be(empty)
       orderBook.asks shouldNot be(empty)
 
@@ -200,7 +200,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
       dex1.api.placeMarket(marketOrder)
       dex1.api.waitForOrderStatus(marketOrder, Status.Filled)
 
-      val orderBook = dex1.api.orderBook(wavesUsdPair)
+      val orderBook = dex1.api.getOrderBook(wavesUsdPair)
       orderBook.bids shouldNot be(empty)
       orderBook.asks should be(empty)
 
@@ -228,7 +228,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
       dex1.api.placeMarket(marketOrder)
       dex1.api.waitForOrderStatus(marketOrder, Status.Filled).filledAmount shouldBe Some(ordersAmount)
 
-      val orderBook = dex1.api.orderBook(wavesUsdPair)
+      val orderBook = dex1.api.getOrderBook(wavesUsdPair)
       orderBook.bids should be(empty)
       orderBook.asks should be(empty)
 
@@ -262,7 +262,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
       dex1.api.placeMarket(marketOrder)
       dex1.api.waitForOrderStatus(marketOrder, Status.Filled).filledAmount shouldBe Some(ordersAmount)
 
-      val orderBook = dex1.api.orderBook(wavesUsdPair)
+      val orderBook = dex1.api.getOrderBook(wavesUsdPair)
       orderBook.bids should be(empty)
       orderBook.asks should be(empty)
 
@@ -294,7 +294,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
       dex1.api.placeMarket(marketOrder)
       dex1.api.waitForOrderStatus(marketOrder, Status.Filled)
 
-      val orderBook = dex1.api.orderBook(wavesUsdPair)
+      val orderBook = dex1.api.getOrderBook(wavesUsdPair)
       orderBook.bids should be(empty)
       orderBook.asks should be(empty)
 
@@ -324,7 +324,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
       dex1.api.placeMarket(marketOrder)
       dex1.api.waitForOrderStatus(marketOrder, Status.Filled).filledAmount shouldBe Some(marketOrderAmount)
 
-      val orderBook = dex1.api.orderBook(wavesUsdPair)
+      val orderBook = dex1.api.getOrderBook(wavesUsdPair)
       orderBook.asks should have size 1
       orderBook.bids should be(empty)
 
@@ -344,7 +344,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
     "should be accepted if there is no way to fill it completely (sum of all orders in order book < amount of market order" in {
       placeOrders(bob, wavesUsdPair, SELL)(100.waves -> price)
 
-      val total = dex1.api.orderBook(wavesUsdPair).bids.map(_.amount).sum
+      val total = dex1.api.getOrderBook(wavesUsdPair).bids.map(_.amount).sum
       val marketOrder = mkOrder(alice, wavesUsdPair, BUY, total + 1000.waves, price, fixedFee)
 
       dex1.api.placeMarket(marketOrder)
@@ -423,7 +423,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
     val order2 = mkOrderDP(carol, wavesUsdPair, SELL, 9.997.waves, 3.0, ttl = 2.days)
 
     dex1.api.place(order1)
-    dex1.api.reservedBalance(carol) should matchTo(Map[Asset, Long](Waves -> 10.waves))
+    dex1.api.getReservedBalance(carol) should matchTo(Map[Asset, Long](Waves -> 10.waves))
     wavesNode1.api.balance(carol, Waves) shouldBe 10.waves
 
     dex1.tryApi.placeMarket(order2) should failWithBalanceNotEnough()

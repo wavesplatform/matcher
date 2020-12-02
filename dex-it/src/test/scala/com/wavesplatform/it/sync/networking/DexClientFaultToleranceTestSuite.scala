@@ -10,18 +10,25 @@ import com.wavesplatform.dex.it.api.node.NodeApi
 import com.wavesplatform.dex.it.docker.WavesNodeContainer
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.tags.NetworkTests
-import org.testcontainers.containers.ToxiproxyContainer.ContainerProxy
 
 @NetworkTests
 class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProxy {
 
-  private val wavesNodeProxy: ContainerProxy = mkToxiProxy(WavesNodeContainer.wavesNodeNetAlias, WavesNodeContainer.dexGrpcExtensionPort)
+  private val wavesNodeProxy = mkToxiProxy(WavesNodeContainer.wavesNodeNetAlias, WavesNodeContainer.matcherGrpcExtensionPort)
+
+  private val blockchainUpdatesExtensionProxy =
+    mkToxiProxy(WavesNodeContainer.wavesNodeNetAlias, WavesNodeContainer.blockchainUpdatesGrpcExtensionPort)
 
   override protected def dexInitialSuiteConfig: Config =
-    ConfigFactory.parseString(s"""waves.dex {
-                                 |  price-assets = [ "$UsdId", "WAVES" ]
-                                 |  waves-blockchain-client.grpc.target = "$toxiProxyHostName:${getInnerToxiProxyPort(wavesNodeProxy)}"
-                                 |}""".stripMargin)
+    ConfigFactory.parseString(
+      s"""waves.dex {
+         |  price-assets = [ "$UsdId", "WAVES" ]
+         |  waves-blockchain-client { 
+         |    grpc.target = "$toxiProxyHostName:${getInnerToxiProxyPort(wavesNodeProxy)}"
+         |    blockchain-updates-grpc.target = "$toxiProxyHostName:${getInnerToxiProxyPort(blockchainUpdatesExtensionProxy)}"
+         |  }
+         |}""".stripMargin
+    )
 
   lazy val wavesNode2: WavesNodeContainer = createWavesNode("waves-2")
 
@@ -121,7 +128,7 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProx
       "Waves Node is unavailable, please retry later or contact with the administrator"
     )
 
-    dex1.tryApi.tradableBalance(mkKeyPair("random"), wavesUsdPair) should failWith(
+    dex1.tryApi.getTradableBalance(mkKeyPair("random"), wavesUsdPair) should failWith(
       105906177,
       "Waves Node is unavailable, please retry later or contact with the administrator"
     )
@@ -130,7 +137,7 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProx
 
     dex1.api.waitForOrderPlacement(order)
     dex1.api.waitForOrderStatus(order, Status.Accepted)
-    dex1.api.tradableBalance(mkKeyPair("random"), wavesUsdPair) should matchTo(Map.empty[Asset, Long])
+    dex1.api.getTradableBalance(mkKeyPair("random"), wavesUsdPair) should matchTo(Map.empty[Asset, Long])
   }
 
   private def usdBalancesShouldBe(wavesNodeApi: NodeApi[Id], expectedAliceBalance: Long, expectedBobBalance: Long): Unit = {

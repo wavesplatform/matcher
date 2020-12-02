@@ -5,7 +5,7 @@ import com.wavesplatform.dex.actors.OrderBookAskAdapter
 import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.Depth
 import com.wavesplatform.dex.actors.orderbook.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.api.http.entities.MatcherResponse.toHttpResponse
-import com.wavesplatform.dex.api.http.entities.{HttpMarketStatus, HttpOrderBook, OrderBookUnavailable, SimpleResponse}
+import com.wavesplatform.dex.api.http.entities.{HttpOrderBookStatus, HttpOrderBook, OrderBookUnavailable, SimpleResponse}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.model.MatcherModel.{DecimalsFormat, Denormalized}
 import com.wavesplatform.dex.time.Time
@@ -28,7 +28,7 @@ class OrderBookHttpInfo(settings: OrderBookHttpInfo.Settings, askAdapter: OrderB
         }
     }
 
-  private def toHttpMarketStatusResponse(ms: MarketStatus): HttpResponse = toHttpResponse(SimpleResponse(HttpMarketStatus fromMarketStatus ms))
+  private def toHttpMarketStatusResponse(ms: MarketStatus): HttpResponse = toHttpResponse(SimpleResponse(HttpOrderBookStatus fromMarketStatus ms))
 
   def getHttpView(assetPair: AssetPair, format: DecimalsFormat, depth: Option[Depth]): Future[HttpResponse] =
     askAdapter.getHttpView(assetPair, format, settings.nearestBigger(depth)).map {

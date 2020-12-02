@@ -44,8 +44,8 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
       // Alice wants to sell USD for Waves
       val bobOrder1 = mkOrder(bob, wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
       placeAndAwaitAtDex(bobOrder1)
-      dex1.api.reservedBalance(bob)(Waves) shouldBe sellOrderAmount + matcherFee
-      dex1.api.tradableBalance(bob, wavesUsdPair)(Waves) shouldBe bobWavesBalanceBefore - (sellOrderAmount + matcherFee)
+      dex1.api.getReservedBalance(bob)(Waves) shouldBe sellOrderAmount + matcherFee
+      dex1.api.getTradableBalance(bob, wavesUsdPair)(Waves) shouldBe bobWavesBalanceBefore - (sellOrderAmount + matcherFee)
 
       val aliceOrder = mkOrder(alice, wavesUsdPair, OrderType.BUY, buyOrderAmount, price)
       dex1.api.place(aliceOrder)
@@ -59,7 +59,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
     }
 
     "get opened trading markets. USD price-asset" in {
-      val openMarkets = dex1.api.allOrderBooks
+      val openMarkets = dex1.api.getOrderBooks
       openMarkets.markets.size shouldBe 1
       val markets = openMarkets.markets.head
 
@@ -90,18 +90,17 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
 
     "check filled amount and tradable balance" in {
       val bobOrder = dex1.api.orderHistory(bob).head
-      val filledAmount = dex1.api.orderStatus(bobOrder.assetPair, bobOrder.id).filledAmount.getOrElse(0L)
+      val filledAmount = dex1.api.getOrderStatus(bobOrder.assetPair, bobOrder.id).filledAmount.getOrElse(0L)
 
       filledAmount shouldBe adjustedAmount
     }
 
     "check reserved balance" in {
       val reservedFee = BigInt(matcherFee) - (BigInt(matcherFee) * adjustedAmount / sellOrderAmount)
-      log.debug(s"reservedFee: $reservedFee")
       val expectedBobReservedBalance = correctedSellAmount - adjustedAmount + reservedFee
-      dex1.api.reservedBalance(bob)(Waves) shouldBe expectedBobReservedBalance
+      dex1.api.getReservedBalance(bob)(Waves) shouldBe expectedBobReservedBalance
 
-      dex1.api.reservedBalance(alice) shouldBe empty
+      dex1.api.getReservedBalance(alice) shouldBe empty
     }
 
     "check waves-usd tradable balance" in {
@@ -109,13 +108,13 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
       orderHistory.size should be(1)
 
       val expectedBobTradableBalance = bobWavesBalanceBefore - (correctedSellAmount + matcherFee)
-      dex1.api.tradableBalance(bob, wavesUsdPair)(Waves) shouldBe expectedBobTradableBalance
-      dex1.api.tradableBalance(alice, wavesUsdPair)(Waves) shouldBe wavesNode1.api.balance(alice, Waves)
+      dex1.api.getTradableBalance(bob, wavesUsdPair)(Waves) shouldBe expectedBobTradableBalance
+      dex1.api.getTradableBalance(alice, wavesUsdPair)(Waves) shouldBe wavesNode1.api.balance(alice, Waves)
 
       val order = orderHistory.head
       dex1.api.cancel(bob, order.assetPair, order.id)
       dex1.api.waitForOrderStatus(order.assetPair, order.id, Status.Cancelled)
-      dex1.api.tradableBalance(bob, order.assetPair)(Waves) shouldBe wavesNode1.api.balance(bob, Waves)
+      dex1.api.getTradableBalance(bob, order.assetPair)(Waves) shouldBe wavesNode1.api.balance(bob, Waves)
     }
   }
 
@@ -129,12 +128,12 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
     "place usd-waves order" in {
       // Alice wants to sell USD for Waves
       val bobWavesBalanceBefore = wavesNode1.api.balance(bob, Waves)
-      dex1.api.tradableBalance(bob, wavesUsdPair)(Waves)
+      dex1.api.getTradableBalance(bob, wavesUsdPair)(Waves)
       val bobOrder1 = mkOrder(bob, wavesUsdPair, OrderType.SELL, sellOrderAmount2, price2)
       placeAndAwaitAtDex(bobOrder1)
 
-      dex1.api.reservedBalance(bob)(Waves) shouldBe correctedSellAmount2 + matcherFee
-      dex1.api.tradableBalance(bob, wavesUsdPair)(Waves) shouldBe bobWavesBalanceBefore - (correctedSellAmount2 + matcherFee)
+      dex1.api.getReservedBalance(bob)(Waves) shouldBe correctedSellAmount2 + matcherFee
+      dex1.api.getTradableBalance(bob, wavesUsdPair)(Waves) shouldBe bobWavesBalanceBefore - (correctedSellAmount2 + matcherFee)
 
       val aliceOrder = mkOrder(alice, wavesUsdPair, OrderType.BUY, buyOrderAmount2, price2)
       placeAndAwaitAtDex(aliceOrder, Status.Filled)
@@ -167,8 +166,8 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
 
       dex1.api.waitForOrderStatus(bobOrder, Status.Cancelled)
 
-      dex1.api.reservedBalance(bob) shouldBe empty
-      dex1.api.reservedBalance(alice) shouldBe empty
+      dex1.api.getReservedBalance(bob) shouldBe empty
+      dex1.api.getReservedBalance(alice) shouldBe empty
     }
   }
 
@@ -195,17 +194,17 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
       val expectedReservedBobWct = wctUsdSellAmount - executedAmount // 205 = 347 - 142
 
       eventually {
-        dex1.api.reservedBalance(bob)(wct) shouldBe expectedReservedBobWct
+        dex1.api.getReservedBalance(bob)(wct) shouldBe expectedReservedBobWct
         // 999999999652 = 999999999999 - 142 - 205
-        dex1.api.tradableBalance(bob, wctUsdPair)(wct) shouldBe bobWctInitBalance - executedAmount - expectedReservedBobWct
-        dex1.api.tradableBalance(bob, wctUsdPair)(usd) shouldBe bobUsdBalance + bobReceiveUsdAmount
+        dex1.api.getTradableBalance(bob, wctUsdPair)(wct) shouldBe bobWctInitBalance - executedAmount - expectedReservedBobWct
+        dex1.api.getTradableBalance(bob, wctUsdPair)(usd) shouldBe bobUsdBalance + bobReceiveUsdAmount
       }
 
-      dex1.api.reservedBalance(alice) shouldBe empty
-      dex1.api.tradableBalance(alice, wctUsdPair)(usd) shouldBe aliceUsdBalance - bobReceiveUsdAmount
+      dex1.api.getReservedBalance(alice) shouldBe empty
+      dex1.api.getTradableBalance(alice, wctUsdPair)(usd) shouldBe aliceUsdBalance - bobReceiveUsdAmount
 
       val expectedReservedWaves = matcherFee - AcceptedOrder.partialFee(matcherFee, wctUsdSellAmount, executedAmount)
-      dex1.api.reservedBalance(bob)(Waves) shouldBe expectedReservedWaves
+      dex1.api.getReservedBalance(bob)(Waves) shouldBe expectedReservedWaves
 
       dex1.api.cancel(bob, wctUsdPair, dex1.api.orderHistory(bob).head.id)
     }
@@ -220,14 +219,14 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
 
       waitForOrderAtNode(bobOrder)
       eventually {
-        dex1.api.reservedBalance(alice) shouldBe empty
-        dex1.api.reservedBalance(bob) shouldBe empty
+        dex1.api.getReservedBalance(alice) shouldBe empty
+        dex1.api.getReservedBalance(bob) shouldBe empty
       }
     }
   }
 
   "get opened trading markets. Check WCT-USD" in {
-    val openMarkets = dex1.api.allOrderBooks
+    val openMarkets = dex1.api.getOrderBooks
     val markets = openMarkets.markets.last
 
     markets.amountAssetName shouldBe wctAssetName
@@ -270,7 +269,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
 
       waitForOrderAtNode(submitted)
       eventually {
-        dex1.api.reservedBalance(bob) shouldBe empty
+        dex1.api.getReservedBalance(bob) shouldBe empty
       }
       dex1.api.cancel(alice, counter2)
     }
@@ -288,7 +287,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
     dex1.api.waitForOrder(aliceOrder)(_ == HttpOrderStatus(Status.Cancelled, filledAmount = Some(0), filledFee = Some(0)))
 
     withClue("Alice's reserved balance:") {
-      dex1.api.reservedBalance(alice) shouldBe empty
+      dex1.api.getReservedBalance(alice) shouldBe empty
     }
 
     val aliceOrders = dex1.api.orderHistoryWithApiKey(alice, activeOnly = Some(false))

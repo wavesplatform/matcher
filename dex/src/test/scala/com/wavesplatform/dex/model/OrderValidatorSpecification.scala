@@ -19,9 +19,9 @@ import com.wavesplatform.dex.domain.state.{LeaseBalance, Portfolio}
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.error.ErrorFormatterContext
-import com.wavesplatform.dex.grpc.integration.clients.RunScriptResult
+import com.wavesplatform.dex.grpc.integration.clients.{RunScriptResult, WavesBlockchainClient}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
-import com.wavesplatform.dex.model.OrderValidator.{AsyncBlockchain, Result}
+import com.wavesplatform.dex.model.OrderValidator.Result
 import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, FixedSettings, PercentSettings}
 import com.wavesplatform.dex.settings.{AssetType, DeviationsSettings, OrderFeeSettings, OrderRestrictionsSettings}
 import com.wavesplatform.dex.test.matchers.ProduceError.produce
@@ -614,14 +614,51 @@ class OrderValidatorSpecification
         val validateByRate: Order => Result[Order] = validateByMatcherSettings(DynamicSettings.symmetric(0.003.waves), rateCache = rateCache)
         val order: Order = createOrder(wavesUsdPair, BUY, 1.waves, 3.00, 0.01.usd, feeAsset = usd)
 
+        withClue("USD rate = 3.34, fee should be >= 0.02 usd\n") {
+          rateCache.upsertRate(usd, 3.34)
+          validateByRate(order) should produce("FeeNotEnough")
+        }
+      }
+
+      "matcherFee is too small according to two latest rates of fee asset" in {
+        val rateCache: RateCache = RateCache.inMem
+        val validateByRate: Order => Result[Order] = validateByMatcherSettings(DynamicSettings.symmetric(0.003.waves), rateCache = rateCache)
+        val order: Order = createOrder(wavesUsdPair, BUY, 1.waves, 3.00, 0.01.usd, feeAsset = usd)
+
+        def feeNotEnoughChecks(): Unit = List(5d, 4d, 10d).foreach { rate =>
+          withClue(s"USD rate = $rate\n") {
+            rateCache.upsertRate(usd, rate)
+            validateByRate(order) should produce("FeeNotEnough")
+          }
+        }
+
+        feeNotEnoughChecks()
+        List(3d, 2d, 4d).foreach(rateCache.upsertRate(usd, _)) // Making the rate appropriate to the order
+        feeNotEnoughChecks()
+      }
+
+      "matcherFee is enough according to rate of fee asset" in {
+
+        val rateCache: RateCache = RateCache.inMem
+        val validateByRate: Order => Result[Order] = validateByMatcherSettings(DynamicSettings.symmetric(0.003.waves), rateCache = rateCache)
+        val order: Order = createOrder(wavesUsdPair, BUY, 1.waves, 3.00, 0.01.usd, feeAsset = usd)
+
         withClue("USD rate = 3.33, fee should be >= 0.01 usd\n") {
           rateCache.upsertRate(usd, 3.33)
           validateByRate(order) shouldBe Symbol("right")
         }
+      }
 
-        withClue("USD rate = 3.34, fee should be >= 0.02 usd\n") {
-          rateCache.upsertRate(usd, 3.34)
-          validateByRate(order) should produce("FeeNotEnough")
+      "matcherFee is enough according to two latest rates of fee asset" in {
+        val rateCache: RateCache = RateCache.inMem
+        val validateByRate: Order => Result[Order] = validateByMatcherSettings(DynamicSettings.symmetric(0.003.waves), rateCache = rateCache)
+        val order: Order = createOrder(wavesUsdPair, BUY, 1.waves, 3.00, 0.01.usd, feeAsset = usd)
+
+        List(3d, 3.33d, 10d, 3.2d).foreach { rate =>
+          withClue(s"USD rate = $rate\n") {
+            rateCache.upsertRate(usd, rate)
+            validateByRate(order) shouldBe Symbol("right")
+          }
         }
       }
 
@@ -888,9 +925,9 @@ class OrderValidatorSpecification
   private def blockchainTest(
     assetDescriptions: Asset => BriefAssetDescription = getDefaultAssetDescriptions,
     hasMatcherAccountScript: Boolean = false
-  )(f: (Order => FutureResult[Order], AsyncBlockchain) => Any): Unit = {
+  )(f: (Order => FutureResult[Order], WavesBlockchainClient) => Any): Unit = {
 
-    val bc = stub[AsyncBlockchain]
+    val bc = stub[WavesBlockchainClient]
     val tc = exchangeTransactionCreator(hasMatcherAccountScript, assetDescriptions(_).hasScript)
     val ov = mkOrderValidator(bc, tc, assetDescriptions)
 
@@ -899,7 +936,7 @@ class OrderValidatorSpecification
 
   private def validateOrderProofsTest(proofs: Seq[ByteStr]): Unit = {
 
-    val bc = stub[AsyncBlockchain]
+    val bc = stub[WavesBlockchainClient]
     val pk = KeyPair(randomBytes())
 
     activate(bc, _ == BlockchainFeatures.SmartAccountTrading.id)
@@ -944,11 +981,11 @@ class OrderValidatorSpecification
       version = version
     )
 
-  private def activate(bc: AsyncBlockchain, isActive: Function[Short, Boolean]): Unit =
+  private def activate(bc: WavesBlockchainClient, isActive: Function[Short, Boolean]): Unit =
     (bc.isFeatureActivated _).when(*).onCall(isActive andThen Future.successful)
 
   private def mkOrderValidator(
-    bc: AsyncBlockchain,
+    bc: WavesBlockchainClient,
     tc: ExchangeTransactionCreator,
     assetDescriptions: Asset => BriefAssetDescription = getDefaultAssetDescriptions
   ): Order => FutureResult[Order] = { order =>
@@ -1031,7 +1068,7 @@ class OrderValidatorSpecification
     rateCache: RateCache = rateCache
   )(order: Order): FutureResult[Order] = {
 
-    val blockchain = stub[AsyncBlockchain]
+    val blockchain = stub[WavesBlockchainClient]
 
     activate(
       blockchain,
@@ -1083,32 +1120,32 @@ class OrderValidatorSpecification
       )(order)
   }
 
-  private def assignScript(bc: AsyncBlockchain, address: Address, result: RunScriptResult): Unit = {
+  private def assignScript(bc: WavesBlockchainClient, address: Address, result: RunScriptResult): Unit = {
     (bc.hasScript(_: Address)).when(address).returns(Future.successful(true))
     (bc.runScript(_: Address, _: Order)).when(address, *).onCall((_, _) => Future.successful(result))
   }
 
-  private def assignScript(bc: AsyncBlockchain, address: Address, result: Option[RunScriptResult]): Unit = result match {
+  private def assignScript(bc: WavesBlockchainClient, address: Address, result: Option[RunScriptResult]): Unit = result match {
     case None => (bc.hasScript(_: Address)).when(address).returns(Future.successful(false))
     case Some(r) =>
       (bc.hasScript(_: Address)).when(address).returns(Future.successful(true))
       (bc.runScript(_: Address, _: Order)).when(address, *).onCall((_, _) => Future.successful(r))
   }
 
-  private def assignScript(bc: AsyncBlockchain, asset: IssuedAsset, result: Option[RunScriptResult]): Unit = result match {
+  private def assignScript(bc: WavesBlockchainClient, asset: IssuedAsset, result: Option[RunScriptResult]): Unit = result match {
     case None => (bc.hasScript(_: IssuedAsset)).when(asset).returns(Future.successful(false))
     case Some(r) =>
       (bc.hasScript(_: IssuedAsset)).when(asset).returns(Future.successful(true))
       (bc.runScript(_: IssuedAsset, _: ExchangeTransaction)).when(asset, *).onCall((_, _) => Future.successful(r))
   }
 
-  private def assignNoScript(bc: AsyncBlockchain, address: Address): Unit =
+  private def assignNoScript(bc: WavesBlockchainClient, address: Address): Unit =
     (bc.hasScript(_: Address)).when(address).returns(Future.successful(false))
 
-  private def assignNoScript(bc: AsyncBlockchain, asset: IssuedAsset): Unit =
+  private def assignNoScript(bc: WavesBlockchainClient, asset: IssuedAsset): Unit =
     (bc.hasScript(_: IssuedAsset)).when(asset).returns(Future.successful(false))
 
-  private def assignAssetDescription(bc: AsyncBlockchain, xs: (IssuedAsset, BriefAssetDescription)*): Unit =
+  private def assignAssetDescription(bc: WavesBlockchainClient, xs: (IssuedAsset, BriefAssetDescription)*): Unit =
     xs.foreach { case (asset, desc) =>
       (bc.assetDescription _).when(asset).onCall((_: IssuedAsset) => Future.successful(Some(desc)))
     }

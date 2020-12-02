@@ -42,7 +42,7 @@ class AutoCancelOrderTestSuite extends MatcherSuiteBase {
 
     knownAccounts.foreach(dex1.api.cancelAll(_))
     eventually {
-      val orderBook = dex1.api.orderBook(wavesUsdPair)
+      val orderBook = dex1.api.getOrderBook(wavesUsdPair)
       orderBook.bids shouldBe empty
       orderBook.asks shouldBe empty
     }
@@ -68,7 +68,7 @@ class AutoCancelOrderTestSuite extends MatcherSuiteBase {
           val issuedAsset = IssuedAsset(asset.id())
           val assetPair = AssetPair(issuedAsset, Waves)
           eventually {
-            dex1.api.tradableBalance(account, assetPair).getOrElse(issuedAsset, 0L) shouldBe oneOrderAmount
+            dex1.api.getTradableBalance(account, assetPair).getOrElse(issuedAsset, 0L) shouldBe oneOrderAmount
           }
           mkOrder(account, assetPair, OrderType.SELL, oneOrderAmount, orderPrice)
       }

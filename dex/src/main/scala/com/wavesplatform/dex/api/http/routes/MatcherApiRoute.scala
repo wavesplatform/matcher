@@ -126,17 +126,17 @@ class MatcherApiRoute(
   private val ratesRoutes: Route = pathPrefix("rates")(getRates ~ protect(upsertRate ~ deleteRate))
   private val settingsRoutes: Route = pathPrefix("settings")(getSettings ~ ratesRoutes)
   private val balanceRoutes: Route = pathPrefix("balance")(protect(reservedBalance))
-  private val transactionsRoutes: Route = pathPrefix("transactions")(protect(getTransactionsByOrder))
+  private val transactionsRoutes: Route = pathPrefix("transactions")(protect(getOrderTransactions))
 
   private val debugRoutes: Route = pathPrefix("debug") {
-    getConfig ~ getCurrentOffset ~ getLastOffset ~ getOldestSnapshotOffset ~ getAllSnapshotOffsets ~ protect(saveSnapshots)
+    getMatcherConfig ~ getCurrentOffset ~ getLastOffset ~ getOldestSnapshotOffset ~ getAllSnapshotOffsets ~ protect(saveSnapshots) ~ print
   }
 
   private val orderBookRoutes: Route = pathPrefix("orderbook") {
     protect {
-      orderBookInfo ~ getOrderStatusInfoByIdWithSignature ~ getOrderBook ~ marketStatus ~ placeLimitOrder ~
+      getOrderBookInfo ~ getOrderStatusInfoByIdWithSignature ~ getOrderBook ~ getOrderBookStatus ~ placeLimitOrder ~
       placeMarketOrder ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~ tradableBalance ~
-      orderStatus ~ historyDelete ~ cancel ~ cancelAll ~ orderbooks ~ orderBookDelete
+      orderStatus ~ historyDelete ~ cancel ~ cancelAll ~ getOrderBooks ~ deleteOrderBook
     }
   }
 
@@ -381,7 +381,7 @@ class MatcherApiRoute(
     notes = "Get current market data such as last trade, best bid and ask",
     httpMethod = "GET",
     tags = Array("markets"),
-    response = classOf[HttpMarketStatus]
+    response = classOf[HttpOrderBookStatus]
   )
   @ApiImplicitParams(
     Array(
@@ -389,7 +389,7 @@ class MatcherApiRoute(
       new ApiImplicitParam(name = "priceAsset", value = "Price Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path")
     )
   )
-  def marketStatus: Route = (path(AssetPairPM / "status") & get) { p =>
+  def getOrderBookStatus: Route = (path(AssetPairPM / "status") & get) { p =>
     withAssetPair(p, redirectToInverse = true, suffix = "/status") { pair =>
       complete(orderBookHttpInfo.getMarketStatus(pair))
     }
@@ -408,13 +408,13 @@ class MatcherApiRoute(
       new ApiImplicitParam(name = "priceAsset", value = "Price Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path")
     )
   )
-  def orderBookInfo: Route = (path(AssetPairPM / "info") & get) { p =>
+  def getOrderBookInfo: Route = (path(AssetPairPM / "info") & get) { p =>
     withAssetPair(p, redirectToInverse = true, suffix = "/info") { pair =>
-      complete(SimpleResponse(orderBookInfo(pair)))
+      complete(SimpleResponse(getOrderBookInfo(pair)))
     }
   }
 
-  private def orderBookInfo(pair: AssetPair) = HttpOrderBookInfo(
+  private def getOrderBookInfo(pair: AssetPair) = HttpOrderBookInfo(
     restrictions = matcherSettings.orderRestrictions.get(pair).map(HttpOrderRestrictions.fromSettings),
     matchingRules = HttpMatchingRules(tickSize = getActualTickSize(pair).toDouble)
   )
@@ -473,14 +473,14 @@ class MatcherApiRoute(
     tags = Array("markets"),
     response = classOf[HttpTradingMarkets]
   )
-  def orderbooks: Route = (pathEndOrSingleSlash & get) {
+  def getOrderBooks: Route = (pathEndOrSingleSlash & get) {
     complete(
       (matcher ? GetMarkets).mapTo[Seq[MarketData]].map { markets =>
         SimpleResponse(
           HttpTradingMarkets(
             matcherPublicKey,
             markets.map { md =>
-              val meta = orderBookInfo(md.pair)
+              val meta = getOrderBookInfo(md.pair)
               HttpMarketDataWithMeta(
                 md.pair.amountAsset,
                 md.amountAssetName,
@@ -1005,7 +1005,7 @@ class MatcherApiRoute(
       new ApiImplicitParam(name = "priceAsset", value = "Price Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path")
     )
   )
-  def orderBookDelete: Route = (path(AssetPairPM) & delete & withAuth) { pair =>
+  def deleteOrderBook: Route = (path(AssetPairPM) & delete & withAuth) { pair =>
     orderBook(pair) match {
       case Some(Right(_)) =>
         complete(
@@ -1036,7 +1036,7 @@ class MatcherApiRoute(
       new ApiImplicitParam(name = "orderId", value = "Order ID", dataType = "string", paramType = "path")
     )
   )
-  def getTransactionsByOrder: Route = (path(ByteStrPM) & get) { orderId =>
+  def getOrderTransactions: Route = (path(ByteStrPM) & get) { orderId =>
     complete(Json.toJson(orderDb.transactionsByOrder(orderId)))
   }
 
@@ -1049,7 +1049,7 @@ class MatcherApiRoute(
     produces = "application/hocon",
     response = classOf[HttpResponse]
   )
-  def getConfig: Route = (path("config") & get & withAuth) {
+  def getMatcherConfig: Route = (path("config") & get & withAuth) {
     complete {
       HttpEntity(filteredConfig.rendered).withContentType(CustomContentTypes.`application/hocon`)
     }
@@ -1123,6 +1123,16 @@ class MatcherApiRoute(
     complete {
       matcher ! ForceSaveSnapshots
       SimpleResponse(StatusCodes.OK, "Saving started")
+    }
+  }
+
+  // Hidden
+  def print: Route = (path("print") & post & withAuth) {
+    entity(as[HttpMessage]) { x =>
+      log.warn(x.message)
+      complete {
+        SimpleResponse(StatusCodes.OK, "Message logged")
+      }
     }
   }
 

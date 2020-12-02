@@ -1,12 +1,10 @@
 package com.wavesplatform.it.sync
 
-import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.OrderType
-import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import com.wavesplatform.dex.model.{LastTrade, LevelAgg}
 import com.wavesplatform.it.MatcherSuiteBase
 
@@ -26,20 +24,8 @@ class MatcherTickerTestSuite extends MatcherSuiteBase {
     priceAsset = Waves
   )
 
-  private val usdWavesPair = AssetPair(usd, Waves)
-
   "matcher ticker validation" - {
-    "get tickers for unavailable asset should produce error" in {
-      dex1.tryApi.orderBookStatus(wctUsdPair) should failWith(11534345, MatcherError.Params(assetId = Some(WctId.toString)))
-    }
 
-    "status of empty orderbook" in {
-      dex1.api.orderBookInfo(wavesUsdPair).matchingRules.tickSize shouldBe 0.01
-    }
-
-    "error of non-existed order" in {
-      dex1.httpApi.orderBookInfo(usdWavesPair).code shouldBe StatusCodes.MovedPermanently
-    }
 
     val bidPrice = 200
     val bidAmount = 1.waves
@@ -50,7 +36,7 @@ class MatcherTickerTestSuite extends MatcherSuiteBase {
       dex1.api.place(mkOrder(alice, btcUsdPair, OrderType.BUY, bidAmount, bidPrice))
       placeAndAwaitAtDex(mkOrder(alice, btcUsdPair, OrderType.BUY, bidAmount, bidPrice))
 
-      val r = dex1.api.orderBookStatus(btcUsdPair)
+      val r = dex1.api.getOrderBookStatus(btcUsdPair)
       r.lastTrade shouldBe None
       r.bestBid should matchTo(Option(LevelAgg(2 * bidAmount, bidPrice)))
       r.bestAsk shouldBe None
@@ -60,7 +46,7 @@ class MatcherTickerTestSuite extends MatcherSuiteBase {
       dex1.api.place(mkOrder(bob, btcWavesPair, OrderType.SELL, askAmount, askPrice))
       placeAndAwaitAtDex(mkOrder(bob, btcWavesPair, OrderType.SELL, askAmount, askPrice))
 
-      val r = dex1.api.orderBookStatus(btcWavesPair)
+      val r = dex1.api.getOrderBookStatus(btcWavesPair)
       r.lastTrade shouldBe None
       r.bestBid shouldBe None
       r.bestAsk should matchTo(Option(LevelAgg(2 * askAmount, askPrice)))
@@ -70,7 +56,7 @@ class MatcherTickerTestSuite extends MatcherSuiteBase {
       dex1.api.place(mkOrder(bob, btcUsdPair, OrderType.SELL, askAmount, askPrice))
       placeAndAwaitAtDex(mkOrder(bob, btcUsdPair, OrderType.SELL, askAmount, askPrice))
 
-      val r = dex1.api.orderBookStatus(btcUsdPair)
+      val r = dex1.api.getOrderBookStatus(btcUsdPair)
       r.lastTrade shouldBe None
       r.bestBid should matchTo(Option(LevelAgg(2 * bidAmount, bidPrice)))
       r.bestAsk should matchTo(Option(LevelAgg(2 * askAmount, askPrice)))
@@ -79,14 +65,14 @@ class MatcherTickerTestSuite extends MatcherSuiteBase {
     "match bid order for first pair" in {
       placeAndAwaitAtDex(mkOrder(bob, btcUsdPair, OrderType.SELL, askAmount, bidPrice), Status.Filled)
 
-      val r1 = dex1.api.orderBookStatus(btcUsdPair)
+      val r1 = dex1.api.getOrderBookStatus(btcUsdPair)
       r1.lastTrade should matchTo(Option(LastTrade(bidPrice, askAmount, OrderType.SELL)))
       r1.bestBid should matchTo(Option(LevelAgg(2 * bidAmount - askAmount, bidPrice)))
       r1.bestAsk should matchTo(Option(LevelAgg(2 * askAmount, askPrice)))
 
       placeAndAwaitAtDex(mkOrder(bob, btcUsdPair, OrderType.SELL, 3 * askAmount, bidPrice), Status.Filled)
 
-      val r2 = dex1.api.orderBookStatus(btcUsdPair)
+      val r2 = dex1.api.getOrderBookStatus(btcUsdPair)
       r2.lastTrade should matchTo {
         Option(LastTrade(bidPrice, 2 * askAmount, OrderType.SELL))
       } // second BUY order (bidAmount = 2 * askAmount) filled
@@ -97,7 +83,7 @@ class MatcherTickerTestSuite extends MatcherSuiteBase {
     "match ask order for first pair" in {
       placeAndAwaitAtDex(mkOrder(alice, btcUsdPair, OrderType.BUY, bidAmount, askPrice), Status.Filled)
 
-      val r = dex1.api.orderBookStatus(btcUsdPair)
+      val r = dex1.api.getOrderBookStatus(btcUsdPair)
       r.lastTrade should matchTo(Option(LastTrade(askPrice, askAmount, OrderType.BUY))) // second SELL order filled
       r.bestBid shouldBe None
       r.bestAsk shouldBe None

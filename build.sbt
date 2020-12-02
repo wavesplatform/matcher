@@ -176,13 +176,13 @@ def allProjects: List[ProjectReference] = ReflectUtilities.allVals[Project](this
 Compile / cleanAll := {
   val xs = allProjects
   streams.value.log.info(s"Cleaning ${xs.mkString(", ")}")
-  clean.all(ScopeFilter(inProjects(allProjects: _*), inConfigurations(Compile, Test))).value
+  clean.all(ScopeFilter(inProjects(allProjects: _*), inConfigurations(Compile, Test))).value.head
 }
 
 lazy val quickCheckRaw = taskKey[Unit]("Build a project and run unit tests")
 quickCheckRaw := Def
   .sequential(
-    root / Test / compile,
+    compile.all(ScopeFilter(inProjects(allProjects: _*), inConfigurations(Compile, Test))), // root / compile doesn't work
     `waves-ext` / Test / test,
     `waves-integration` / Test / test,
     dex / Test / test,

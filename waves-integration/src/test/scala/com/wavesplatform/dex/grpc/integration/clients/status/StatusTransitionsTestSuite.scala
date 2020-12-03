@@ -52,7 +52,8 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
           StatusTransitions(init, event) should matchTo(StatusUpdate(
             newStatus = Normal(WavesBranch(List(newBlock), 1)),
             updatedBalances = updatedBalances1,
-            updatedLastBlockHeight = StatusUpdate.LastBlockHeight.Updated(1)
+            updatedLastBlockHeight = StatusUpdate.LastBlockHeight.Updated(1),
+            requestNextBlockchainEvent = true
           ))
         }
 
@@ -123,7 +124,8 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
             fork = WavesFork(init.main, WavesBranch(List(block1), block1.ref.height), connected = true),
             utxEventsStash = Queue.empty
           ),
-          updatedLastBlockHeight = StatusUpdate.LastBlockHeight.NotChanged
+          updatedLastBlockHeight = StatusUpdate.LastBlockHeight.NotChanged,
+          requestNextBlockchainEvent = true
         ))
 
         "Height" in test(RolledBack.To.Height(1))
@@ -136,7 +138,10 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
           regular = Map.empty,
           outLeases = Map(alice -> 999L)
         ))
-        StatusTransitions(init, event) should matchTo(StatusUpdate(init)) // Ignoring
+        StatusTransitions(init, event) should matchTo(StatusUpdate(
+          newStatus = init, // Ignoring
+          requestNextBlockchainEvent = true
+        ))
       }
     }
 
@@ -196,7 +201,8 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
               main = WavesBranch(List(microBlock, block2B, block1), 2)
             ),
             updatedBalances = block2B.changes |+| microBlock.changes,
-            updatedLastBlockHeight = StatusUpdate.LastBlockHeight.Updated(2)
+            updatedLastBlockHeight = StatusUpdate.LastBlockHeight.Updated(2),
+            requestNextBlockchainEvent = true
           ))
         }
 
@@ -251,7 +257,8 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
               newStatus = TransientRollback(
                 fork = WavesFork(init.fork.origBranch, WavesBranch(List(block2B, block1), block2B.ref.height), connected = true),
                 utxEventsStash = Queue.empty
-              )
+              ),
+              requestNextBlockchainEvent = true
             ))
           }
         }
@@ -276,7 +283,6 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
                 regular = Map(alice -> Map(usd -> 8), bob -> Map(usd -> 12)),
                 outLeases = Map(bob -> 10)
               ),
-              stash = Queue.empty,
               utxEventsStash = Queue.empty
             ),
             requestBalances = DiffIndex(regular = Map(carol -> Set(Waves: Asset)), outLeases = Set.empty),
@@ -317,15 +323,19 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
                 connected = true
               ),
               utxEventsStash = Queue.empty
-            )
+            ),
+            requestNextBlockchainEvent = true
           ))
 
         "Height" in test(RolledBack.To.Height(1))
         "CommonBlockRef" in test(RolledBack.To.CommonBlockRef(block1.ref))
       }
 
-      "DataReceived -> TransientRollback" in { // ignored
-        StatusTransitions(init, DataReceived(Monoid.empty[BlockchainBalance])) should matchTo(StatusUpdate(init))
+      "DataReceived -> TransientRollback" in {
+        StatusTransitions(init, DataReceived(Monoid.empty[BlockchainBalance])) should matchTo(StatusUpdate(
+          newStatus = init, // ignored
+          requestNextBlockchainEvent = true
+        ))
       }
     }
 
@@ -353,15 +363,13 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
           regular = Map(carol -> Map(Waves -> 10)),
           outLeases = Map.empty
         ),
-        utxEventsStash = Queue.empty,
-        stash = Queue.empty
+        utxEventsStash = Queue.empty
       )
 
-      def stashedTest(event: WavesNodeEvent): Unit =
+      def stashedTest(event: WavesNodeEvent, requestNextBlockchainEvent: Boolean = false): Unit =
         StatusTransitions(init, event) should matchTo(StatusUpdate(
-          newStatus = init.copy(
-            stash = init.stash.enqueue(event)
-          )
+          newStatus = init,
+          requestNextBlockchainEvent = requestNextBlockchainEvent
         ))
 
       "Appended -> TransientResolving" in {
@@ -375,7 +383,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
           tpe = WavesBlock.Type.MicroBlock
         )
 
-        stashedTest(Appended(block = microBlock2, forgedTxIds = Seq.empty))
+        stashedTest(Appended(block = microBlock2, forgedTxIds = Seq.empty), requestNextBlockchainEvent = true)
       }
 
       "[UtxEvent] -> TransientResolving, where [UtxEvent] is" - {
@@ -384,8 +392,8 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
       }
 
       "[RolledBack] -> TransientResolving, where [RolledBack] is" - {
-        "Height" in stashedTest(RolledBack(RolledBack.To.Height(1)))
-        "CommonBlockRef" in stashedTest(RolledBack(RolledBack.To.CommonBlockRef(block.ref)))
+        "Height" in stashedTest(RolledBack(RolledBack.To.Height(1)), requestNextBlockchainEvent = true)
+        "CommonBlockRef" in stashedTest(RolledBack(RolledBack.To.CommonBlockRef(block.ref)), requestNextBlockchainEvent = true)
       }
 
       // TODO more tests
@@ -403,7 +411,8 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
             ),
             outLeases = Map.empty
           ),
-          updatedLastBlockHeight = LastBlockHeight.Updated(init.main.height)
+          updatedLastBlockHeight = LastBlockHeight.Updated(init.main.height),
+          requestNextBlockchainEvent = true
         ))
       }
     }

@@ -22,12 +22,11 @@ object BlockchainStatus {
   case class TransientResolving(
     main: WavesBranch,
     stashChanges: BlockchainBalance,
-    stash: Queue[WavesNodeEvent],
     utxEventsStash: Queue[WavesNodeUtxEvent]
   ) extends BlockchainStatus {
 
     override def toString: String =
-      s"TransientResolving(${main.history.headOption.map(_.ref)}, l=${stash.lastOption})"
+      s"TransientResolving(${main.history.headOption.map(_.ref)}, u=${utxEventsStash.length})"
 
   }
 

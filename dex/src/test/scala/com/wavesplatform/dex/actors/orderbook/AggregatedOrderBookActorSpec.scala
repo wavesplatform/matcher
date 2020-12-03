@@ -79,7 +79,8 @@ class AggregatedOrderBookActorSpec
 
   private def ordersGen(maxOrdersNumber: Int): Gen[List[AcceptedOrder]] =
     for {
-      orderSides <- Gen.resize(maxOrdersNumber, Gen.listOf(orderSideGen))
+      ordersNumber <- Gen.chooseNum(0, maxOrdersNumber)
+      orderSides <- Gen.listOfN(ordersNumber, orderSideGen)
       orders <- Gen.sequence[List[AcceptedOrder], AcceptedOrder] {
         orderSides.map { side =>
           val orderGen = if (side == OrderType.SELL) askGen else bidGen

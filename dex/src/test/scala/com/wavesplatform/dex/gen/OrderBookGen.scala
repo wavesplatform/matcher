@@ -57,7 +57,9 @@ trait OrderBookGen {
       prices <- Gen.listOfN(levelNumber, pricesGen)
       orders <- Gen.sequence[List[List[LimitOrder]], List[LimitOrder]](
         prices.map { price =>
-          Gen.resize(maxOrdersInLevel, Gen.nonEmptyListOf(limitOrderGen(orderGen(Gen.const(price), side))))
+          Gen.chooseNum(1, maxOrdersInLevel).flatMap { size =>
+            Gen.listOfN(size, limitOrderGen(orderGen(Gen.const(price), side)))
+          }
         }
       )
     } yield (levelNumber, orders.flatten)

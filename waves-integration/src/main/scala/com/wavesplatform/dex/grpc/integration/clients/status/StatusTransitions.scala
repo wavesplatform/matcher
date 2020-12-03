@@ -34,7 +34,8 @@ object StatusTransitions extends ScorexLogging {
                   updatedLastBlockHeight =
                     if (block.tpe == WavesBlock.Type.FullBlock) LastBlockHeight.Updated(updatedFork.height)
                     else LastBlockHeight.NotChanged,
-                  processUtxEvents = if (forgedTxIds.isEmpty) Queue.empty else Queue(WavesNodeUtxEvent.Forged(forgedTxIds))
+                  processUtxEvents = if (forgedTxIds.isEmpty) Queue.empty else Queue(WavesNodeUtxEvent.Forged(forgedTxIds)),
+                  requestNextBlockchainEvent = true
                 )
             }
 
@@ -58,13 +59,14 @@ object StatusTransitions extends ScorexLogging {
                   case To.Height(h) => WavesFork.mk(origStatus.main, h)
                 },
                 utxEventsStash = Queue.empty
-              )
+              ),
+              requestNextBlockchainEvent = true
             )
 
           case _ =>
             // Won't happen
             log.error("Unexpected transition, ignore")
-            StatusUpdate(origStatus)
+            StatusUpdate(origStatus, requestNextBlockchainEvent = true)
         }
 
       case origStatus: TransientRollback =>
@@ -81,19 +83,20 @@ object StatusTransitions extends ScorexLogging {
                     newStatus = Normal(activeBranch),
                     updatedBalances = newChanges,
                     updatedLastBlockHeight = LastBlockHeight.Updated(activeBranch.height),
-                    processUtxEvents = updatedUtxEventsStash
+                    processUtxEvents = updatedUtxEventsStash,
+                    requestNextBlockchainEvent = true
                   )
                 else
                   StatusUpdate(
                     newStatus = TransientResolving(
                       main = activeBranch,
                       stashChanges = newChanges,
-                      stash = Queue.empty,
                       utxEventsStash = updatedUtxEventsStash
                     ),
                     requestBalances = lostDiffIndex,
                     updatedLastBlockHeight = LastBlockHeight.NotChanged,
-                    processUtxEvents = Queue.empty
+                    processUtxEvents = Queue.empty,
+                    // requestNextBlockchainEvent = true // Because we are waiting for DataReceived
                   )
 
               case Status.NotResolved(updatedFork) =>
@@ -101,7 +104,8 @@ object StatusTransitions extends ScorexLogging {
                   newStatus = TransientRollback(
                     fork = updatedFork,
                     utxEventsStash = updatedUtxEventsStash
-                  )
+                  ),
+                  requestNextBlockchainEvent = true
                 )
 
               case Status.Failed(updatedFork, reason) =>
@@ -126,30 +130,38 @@ object StatusTransitions extends ScorexLogging {
               case To.CommonBlockRef(ref) => origStatus.fork.rollBackTo(ref)
               case To.Height(h) => origStatus.fork.rollBackTo(h)
             }
-            StatusUpdate(newStatus = origStatus.copy(fork = fork)) // TODO DEX-1004 Not only update a fork ?
+            StatusUpdate(
+              newStatus = origStatus.copy(fork = fork), // TODO DEX-1004 Not only update a fork ?
+              requestNextBlockchainEvent = true
+            )
 
           case _ =>
             // Won't happen
             log.error("Unexpected transition, ignore")
-            StatusUpdate(origStatus)
+            StatusUpdate(origStatus, requestNextBlockchainEvent = true)
         }
 
       case origStatus: TransientResolving =>
         event match {
-          // TODO DEX-1005
           case DataReceived(updates) =>
-            val init = StatusUpdate(
+            StatusUpdate(
               newStatus = Normal(origStatus.main),
               updatedBalances = origStatus.stashChanges |+| updates,
               processUtxEvents = origStatus.utxEventsStash,
-              updatedLastBlockHeight = LastBlockHeight.Updated(origStatus.main.height)
+              updatedLastBlockHeight = LastBlockHeight.Updated(origStatus.main.height),
+              requestNextBlockchainEvent = true
             )
 
-            origStatus.stash.foldLeft(init) {
-              case (r, x) => r |+| apply(r.newStatus, x)
-            }
-
-          case _ => StatusUpdate(origStatus.copy(stash = origStatus.stash.enqueue(event)))
+          case _ =>
+            // Won't happen
+            log.error("Unexpected transition, ignore")
+            StatusUpdate(
+              newStatus = origStatus,
+              requestNextBlockchainEvent = event match {
+                case _: UtxAdded | _: UtxSwitched => false
+                case _ => true // If this really happen, we eventually fail to append a new block
+              }
+            )
         }
     }
 

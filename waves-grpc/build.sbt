@@ -7,6 +7,7 @@ libraryDependencies ++= Dependencies.Module.wavesGrpc
 // When scalac compiles a generated class, it warns about a deprecated field.
 scalacOptions += "-P:silencer:pathFilters=FileOptions"
 
+// Use protocGenerate to generate it manually
 inConfig(Compile)(
   Seq(
     PB.deleteTargetDirectory := false,

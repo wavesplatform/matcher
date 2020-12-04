@@ -1,0 +1,9 @@
+graph LR
+  W[Waves Node]
+  MBUs[Blockchain Updates server]
+  MBUc[Blockchain Updates client]
+  MEs[Matcher Extension server]
+  MEc[Matcher Extension client]
+  MBUs -->|Blockchain Events| MBUc
+  MEs -->|UTX Events| MEc
+  MEc -->|Balances| MEs

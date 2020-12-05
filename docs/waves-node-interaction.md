@@ -4,13 +4,26 @@ It requires two installed extensions on the Waves Node:
 * `Blockchain Updates` provides a stream of blockchain events: a block appended, a chain rolled back, etc.;
 * `Matcher Extension` provides other required functionality: getting balances, a stream of UTX events, etc.
 
+The clients of these extensions coupled. This means when one of them stops, another stops too.
+
 ![Matcher-Node interaction](./images/wni-ext.svg)
 
-The clients of these extensions coupled. This means when one of them stops, another stops too.
+## Streams
+
+We have different event streams: 
+* Blockchain;
+* Utx;
+* DataReceived.
+
+To have an easier processing and reasoning benefits we merge them into a one.
+
+![Mering streams](./images/wni-streams.svg)
 
 ## State machine
 
 There is a state machine that describes how Matcher works with Blockchain and UTX events.
+See `StatusTransitions` class for implementation details.
+
 Matcher will not request the next blockchain event until process the previous.
 
 ![State machine](./images/wni-state-machine.svg)
@@ -46,4 +59,17 @@ In this state we are waiting for `DataReceived`. We can switch to the `Normal` s
 
 ## Forks
 
-To resolve forks we use `WavesFork` class.
+To resolve forks we use `WavesFork` class. Note, in Waves blockchain the maximum rollback size is 100 blocks.
+The last measurement showed 6-8 rollbacks with 1-2 height on MainNet during the day.
+
+![Forks](./images/wni-forks.svg)
+
+After resolving a fork, we look which addresses affected on the original, but not on the new main branch and
+request their balances.
+
+## Branches
+
+Are represented by `WavesBranch` class. It has a limited number of blocks to preserve the memory and 
+because we can't roll back more than 100 blocks.
+
+![Branch](./images/wni-branch.svg)

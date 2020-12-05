@@ -13,6 +13,7 @@ digraph NodeBranch {
   Betc [label="...", style="filled", color="#F4ACB7"]
   B901 [label=<B<sub>901</sub>>, style="filled", color="#F4ACB7"]
   B900 [label=<B<sub>900</sub>>, style="filled", color="#F4ACB7"]
+  B899 [label="dropped", style="dashed"]
 
-  MB2 -> MB1 -> B1000 -> B999 -> B998 -> Betc -> B901 -> B900
+  MB2 -> MB1 -> B1000 -> B999 -> B998 -> Betc -> B901 -> B900 -> B899
 }

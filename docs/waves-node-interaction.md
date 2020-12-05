@@ -13,7 +13,7 @@ The clients of these extensions coupled. This means when one of them stops, anot
 We have different event streams: 
 * Blockchain;
 * Utx;
-* DataReceived.
+* DataReceived is a synthetic stream of manually requested balances. See `TransientResolving` below.
 
 To have an easier processing and reasoning benefits we merge them into a one.
 
@@ -60,9 +60,39 @@ In this state we are waiting for `DataReceived`. We can switch to the `Normal` s
 ## Forks
 
 To resolve forks we use `WavesFork` class. Note, in Waves blockchain the maximum rollback size is 100 blocks.
-The last measurement showed 6-8 rollbacks with 1-2 height on MainNet during the day.
+The last measurement showed 6-8 rollbacks with 1-2 height on MainNet during the day. 
+So it should not be a big issue for us.
 
-![Forks](./images/wni-forks.svg)
+![Not resolved fork](./images/wni-not-resolved-fork.svg)
+
+The fork resolves when we:
+* receive the last known micro block if we are on the same branch (e.g. rolled back after a disconnect);
+* receive a micro block if we are on a different branch.
+
+The second case is more interesting. Why did we wait for a micro block? 
+
+At first, a Node can't switch to a branch with a lesser number of blocks (from a Node's team):
+```
+A branch with one block: score_1 = X / baseTarget_0
+A branch with two blocks: score_2 = X / bt_1 + X / bt_2 = X (bt_1 + bt_2) / (bt_1 * bt_2)
+
+score_1 > score_2  ==>
+X / bt_0 > X (bt_1 + bt_2) / (bt_1 * bt_2) ==>
+1 / bt_0 > (bt_1 + bt_2) / (bt_1 * bt_2) ==>
+bt_0 < (bt_1 * bt_2) / (bt_1 + bt_2)
+
+baseTarget is calculated based on gap between previous blocks, so bt_0 have to be bt_1. Then:
+
+bt_0 * (bt_0 + bt_2) < bt_0 * bt_2
+bt_0 ^ 2 < 0 
+
+This could not happen.
+```
+
+So, if we wait for the height of the previous branch, we wait the latest block.
+Waiting a micro block saves us from a balance flickering.
+
+![Resolved fork](./images/wni-resolved-fork.svg)
 
 After resolving a fork, we look which addresses affected on the original, but not on the new main branch and
 request their balances.

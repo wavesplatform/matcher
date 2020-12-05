@@ -64,7 +64,7 @@
 <g id="node10" class="node">
 <title>cU1</title>
 <polygon fill="#c3e991" stroke="#c3e991" points="610,-158 556,-158 556,-122 610,-122 610,-158"/>
-<text text-anchor="middle" x="583" y="-136.3" font-family="Times,serif" font-size="14.00">cU1</text>
+<text text-anchor="middle" x="583" y="-136.3" font-family="Times,serif" font-size="14.00">U1</text>
 </g>
 <!-- B3&#45;&gt;cU1 -->
 <g id="edge15" class="edge">
@@ -148,7 +148,7 @@
 <g id="node11" class="node">
 <title>cD1</title>
 <polygon fill="#cb904d" stroke="#cb904d" points="700,-158 646,-158 646,-122 700,-122 700,-158"/>
-<text text-anchor="middle" x="673" y="-136.3" font-family="Times,serif" font-size="14.00">cD1</text>
+<text text-anchor="middle" x="673" y="-136.3" font-family="Times,serif" font-size="14.00">D1</text>
 </g>
 <!-- cU1&#45;&gt;cD1 -->
 <g id="edge7" class="edge">
@@ -160,7 +160,7 @@
 <g id="node12" class="node">
 <title>cB1</title>
 <polygon fill="#dfcc74" stroke="#dfcc74" points="790,-158 736,-158 736,-122 790,-122 790,-158"/>
-<text text-anchor="middle" x="763" y="-136.3" font-family="Times,serif" font-size="14.00">cB1</text>
+<text text-anchor="middle" x="763" y="-136.3" font-family="Times,serif" font-size="14.00">B1</text>
 </g>
 <!-- cD1&#45;&gt;cB1 -->
 <g id="edge8" class="edge">
@@ -172,7 +172,7 @@
 <g id="node13" class="node">
 <title>cU2</title>
 <polygon fill="#c3e991" stroke="#c3e991" points="880,-158 826,-158 826,-122 880,-122 880,-158"/>
-<text text-anchor="middle" x="853" y="-136.3" font-family="Times,serif" font-size="14.00">cU2</text>
+<text text-anchor="middle" x="853" y="-136.3" font-family="Times,serif" font-size="14.00">U2</text>
 </g>
 <!-- cB1&#45;&gt;cU2 -->
 <g id="edge9" class="edge">
@@ -184,7 +184,7 @@
 <g id="node14" class="node">
 <title>cB2</title>
 <polygon fill="#dfcc74" stroke="#dfcc74" points="970,-158 916,-158 916,-122 970,-122 970,-158"/>
-<text text-anchor="middle" x="943" y="-136.3" font-family="Times,serif" font-size="14.00">cB2</text>
+<text text-anchor="middle" x="943" y="-136.3" font-family="Times,serif" font-size="14.00">B2</text>
 </g>
 <!-- cU2&#45;&gt;cB2 -->
 <g id="edge10" class="edge">
@@ -196,7 +196,7 @@
 <g id="node15" class="node">
 <title>cD2</title>
 <polygon fill="#cb904d" stroke="#cb904d" points="1060,-158 1006,-158 1006,-122 1060,-122 1060,-158"/>
-<text text-anchor="middle" x="1033" y="-136.3" font-family="Times,serif" font-size="14.00">cD2</text>
+<text text-anchor="middle" x="1033" y="-136.3" font-family="Times,serif" font-size="14.00">D2</text>
 </g>
 <!-- cB2&#45;&gt;cD2 -->
 <g id="edge11" class="edge">
@@ -208,7 +208,7 @@
 <g id="node16" class="node">
 <title>cB3</title>
 <polygon fill="#dfcc74" stroke="#dfcc74" points="1150,-158 1096,-158 1096,-122 1150,-122 1150,-158"/>
-<text text-anchor="middle" x="1123" y="-136.3" font-family="Times,serif" font-size="14.00">cB3</text>
+<text text-anchor="middle" x="1123" y="-136.3" font-family="Times,serif" font-size="14.00">B3</text>
 </g>
 <!-- cD2&#45;&gt;cB3 -->
 <g id="edge12" class="edge">
@@ -220,7 +220,7 @@
 <g id="node17" class="node">
 <title>cU3</title>
 <polygon fill="#c3e991" stroke="#c3e991" points="1240,-158 1186,-158 1186,-122 1240,-122 1240,-158"/>
-<text text-anchor="middle" x="1213" y="-136.3" font-family="Times,serif" font-size="14.00">cU3</text>
+<text text-anchor="middle" x="1213" y="-136.3" font-family="Times,serif" font-size="14.00">U3</text>
 </g>
 <!-- cB3&#45;&gt;cU3 -->
 <g id="edge13" class="edge">
@@ -232,7 +232,7 @@
 <g id="node18" class="node">
 <title>cD3</title>
 <polygon fill="#cb904d" stroke="#cb904d" points="1330,-158 1276,-158 1276,-122 1330,-122 1330,-158"/>
-<text text-anchor="middle" x="1303" y="-136.3" font-family="Times,serif" font-size="14.00">cD3</text>
+<text text-anchor="middle" x="1303" y="-136.3" font-family="Times,serif" font-size="14.00">D3</text>
 </g>
 <!-- cU3&#45;&gt;cD3 -->
 <g id="edge14" class="edge">

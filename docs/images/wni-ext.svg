@@ -1,1 +1,78 @@
-<svg id="mermaid-1607161551722" width="598.75" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" height="302" viewBox="0 0 598.75 302"><style>#mermaid-1607161551722{font-family:"trebuchet ms",verdana,arial;font-size:16px;fill:#333;}#mermaid-1607161551722 .error-icon{fill:#552222;}#mermaid-1607161551722 .error-text{fill:#552222;stroke:#552222;}#mermaid-1607161551722 .edge-thickness-normal{stroke-width:2px;}#mermaid-1607161551722 .edge-thickness-thick{stroke-width:3.5px;}#mermaid-1607161551722 .edge-pattern-solid{stroke-dasharray:0;}#mermaid-1607161551722 .edge-pattern-dashed{stroke-dasharray:3;}#mermaid-1607161551722 .edge-pattern-dotted{stroke-dasharray:2;}#mermaid-1607161551722 .marker{fill:#333333;}#mermaid-1607161551722 .marker.cross{stroke:#333333;}#mermaid-1607161551722 svg{font-family:"trebuchet ms",verdana,arial;font-size:16px;}#mermaid-1607161551722 .label{font-family:"trebuchet ms",verdana,arial;color:#333;}#mermaid-1607161551722 .label text{fill:#333;}#mermaid-1607161551722 .node rect,#mermaid-1607161551722 .node circle,#mermaid-1607161551722 .node ellipse,#mermaid-1607161551722 .node polygon,#mermaid-1607161551722 .node path{fill:#ECECFF;stroke:#9370DB;stroke-width:1px;}#mermaid-1607161551722 .node .label{text-align:center;}#mermaid-1607161551722 .node.clickable{cursor:pointer;}#mermaid-1607161551722 .arrowheadPath{fill:#333333;}#mermaid-1607161551722 .edgePath .path{stroke:#333333;stroke-width:1.5px;}#mermaid-1607161551722 .flowchart-link{stroke:#333333;fill:none;}#mermaid-1607161551722 .edgeLabel{background-color:#e8e8e8;text-align:center;}#mermaid-1607161551722 .edgeLabel rect{opacity:0.5;background-color:#e8e8e8;fill:#e8e8e8;}#mermaid-1607161551722 .cluster rect{fill:#ffffde;stroke:#aaaa33;stroke-width:1px;}#mermaid-1607161551722 .cluster text{fill:#333;}#mermaid-1607161551722 div.mermaidTooltip{position:absolute;text-align:center;max-width:200px;padding:2px;font-family:"trebuchet ms",verdana,arial;font-size:12px;background:hsl(80,100%,96.2745098039%);border:1px solid #aaaa33;border-radius:2px;pointer-events:none;z-index:100;}#mermaid-1607161551722:root{--mermaid-font-family:"trebuchet ms",verdana,arial;}#mermaid-1607161551722 flowchart-v2{fill:apa;}</style><g transform="translate(0, 2)"><marker id="flowchart-pointEnd" class="marker flowchart" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"></path></marker><marker id="flowchart-pointStart" class="marker flowchart" viewBox="0 0 10 10" refX="0" refY="5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto"><path d="M 0 5 L 10 10 L 10 0 z" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"></path></marker><marker id="flowchart-circleEnd" class="marker flowchart" viewBox="0 0 10 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"></circle></marker><marker id="flowchart-circleStart" class="marker flowchart" viewBox="0 0 10 10" refX="-1" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"></circle></marker><marker id="flowchart-crossEnd" class="marker cross flowchart" viewBox="0 0 11 11" refX="12" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" style="stroke-width: 2; stroke-dasharray: 1, 0;"></path></marker><marker id="flowchart-crossStart" class="marker cross flowchart" viewBox="0 0 11 11" refX="-1" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" style="stroke-width: 2; stroke-dasharray: 1, 0;"></path></marker><g class="root"><g class="clusters"><g class="cluster" id="subGraph1"><rect rx="0" ry="0" x="8" y="209" width="562" height="83"></rect><g class="cluster-label" transform="translate(243.5, 207)"><foreignObject width="91" height="18"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">Waves Node</span></div></foreignObject></g></g><g class="cluster" id="Matcher"><rect rx="0" ry="0" x="11" y="8" width="557.5" height="83"></rect><g class="cluster-label" transform="translate(261.25, 6)"><foreignObject width="57" height="18"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">Matcher</span></div></foreignObject></g></g></g><g class="edgePaths"><path d="M146,234L146,229.83333333333334C146,225.66666666666666,146,217.33333333333334,146,209C146,200.66666666666666,146,192.33333333333334,146,182.5C146,172.66666666666666,146,161.33333333333334,146,150C146,138.66666666666666,146,127.33333333333333,146,117.5C146,107.66666666666667,146,99.33333333333333,146,91C146,82.66666666666667,146,74.33333333333333,146,70.16666666666667L146,66" id="L-MBUs-MBUc" class=" edge-thickness-normal edge-pattern-dotted flowchart-link LS-MBUs LE-MBUc" marker-end="url(#flowchart-pointEnd)"></path><path d="M445.85843373493975,66L453.8403614457831,70.16666666666667C461.82228915662654,74.33333333333333,477.78614457831327,82.66666666666667,485.76807228915663,91C493.75,99.33333333333333,493.75,107.66666666666667,493.75,117.5C493.75,127.33333333333333,493.75,138.66666666666666,493.75,150C493.75,161.33333333333334,493.75,172.66666666666666,493.75,182.5C493.75,192.33333333333334,493.75,200.66666666666666,485.76807228915663,209C477.78614457831327,217.33333333333334,461.82228915662654,225.66666666666666,453.8403614457832,229.83333333333334L445.85843373493975,234" id="L-MEc-MEs" class=" edge-thickness-normal edge-pattern-solid flowchart-link LS-MEc LE-MEs"></path><path d="M382.64156626506025,234L374.6596385542169,229.83333333333334C366.67771084337346,225.66666666666666,350.71385542168673,217.33333333333334,342.73192771084337,209C334.75,200.66666666666666,334.75,192.33333333333334,334.75,182.5C334.75,172.66666666666666,334.75,161.33333333333334,334.75,150C334.75,138.66666666666666,334.75,127.33333333333333,334.75,117.5C334.75,107.66666666666667,334.75,99.33333333333333,342.73192771084337,91C350.71385542168673,82.66666666666667,366.67771084337346,74.33333333333333,374.6596385542169,70.16666666666667L382.64156626506025,66" id="L-MEs-MEc" class=" edge-thickness-normal edge-pattern-dotted flowchart-link LS-MEs LE-MEc" marker-end="url(#flowchart-pointEnd)"></path></g><g class="edgeLabels"><g class="edgeLabel" transform="translate(146, 150)"><g class="label" transform="translate(-65, -9)"><foreignObject width="130" height="18"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel">Blockchain events</span></div></foreignObject></g></g><g class="edgeLabel" transform="translate(493.75, 150)"><g class="label" transform="translate(-97, -9)"><foreignObject width="194" height="18"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel">Balances request/response</span></div></foreignObject></g></g><g class="edgeLabel" transform="translate(334.75, 150)"><g class="label" transform="translate(-42, -9)"><foreignObject width="84" height="18"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="edgeLabel">UTX events</span></div></foreignObject></g></g></g><g class="nodes"><g class="node undefined" id="MBUs" transform="translate(146, 250.5)"><rect class="basic label-container" rx="0" ry="0" x="-103" y="-16.5" width="206" height="33"></rect><g class="label" transform="translate(-95.5, -9)"><foreignObject width="191" height="18"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">Blockchain Updates server</span></div></foreignObject></g></g><g class="node undefined" id="MEs" transform="translate(414.25, 250.5)"><rect class="basic label-container" rx="0" ry="0" x="-97.5" y="-16.5" width="195" height="33"></rect><g class="label" transform="translate(-90, -9)"><foreignObject width="180" height="18"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">Matcher Extension server</span></div></foreignObject></g></g><g class="node undefined" id="MBUc" transform="translate(146, 49.5)"><rect class="basic label-container" rx="0" ry="0" x="-100" y="-16.5" width="200" height="33"></rect><g class="label" transform="translate(-92.5, -9)"><foreignObject width="185" height="18"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">Blockchain Updates client</span></div></foreignObject></g></g><g class="node undefined" id="MEc" transform="translate(414.25, 49.5)"><rect class="basic label-container" rx="0" ry="0" x="-94.5" y="-16.5" width="189" height="33"></rect><g class="label" transform="translate(-87, -9)"><foreignObject width="174" height="18"><div xmlns="http://www.w3.org/1999/xhtml" style="display: inline-block; white-space: nowrap;"><span class="nodeLabel">Matcher Extension client</span></div></foreignObject></g></g></g></g></g></svg>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+ "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<!-- Generated by graphviz version 2.44.0 ()
+ -->
+<!-- Title: MatcherNodeInteraction Pages: 1 -->
+<svg width="422pt" height="271pt"
+ viewBox="0.00 0.00 422.00 271.00" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 267)">
+<title>MatcherNodeInteraction</title>
+<polygon fill="white" stroke="transparent" points="-4,4 -4,-267 418,-267 418,4 -4,4"/>
+<text text-anchor="middle" x="207" y="-7.8" font-family="Times,serif" font-size="14.00">Matcher&#45;Node interaction</text>
+<g id="clust1" class="cluster">
+<title>cluster_0</title>
+<polygon fill="#56e39f" stroke="#56e39f" points="8,-180 8,-255 406,-255 406,-180 8,-180"/>
+<text text-anchor="middle" x="207" y="-239.8" font-family="Times,serif" font-size="14.00">Node</text>
+</g>
+<g id="clust2" class="cluster">
+<title>cluster_1</title>
+<polygon fill="#59c9a5" stroke="#59c9a5" points="8,-31 8,-106 406,-106 406,-31 8,-31"/>
+<text text-anchor="middle" x="207" y="-90.8" font-family="Times,serif" font-size="14.00">Matcher</text>
+</g>
+<!-- MBUs -->
+<g id="node1" class="node">
+<title>MBUs</title>
+<polygon fill="none" stroke="black" points="200.5,-224 15.5,-224 15.5,-188 200.5,-188 200.5,-224"/>
+<text text-anchor="middle" x="108" y="-202.3" font-family="Times,serif" font-size="14.00">Blockchain Updates server</text>
+</g>
+<!-- MEs -->
+<g id="node2" class="node">
+<title>MEs</title>
+<polygon fill="none" stroke="black" points="397.5,-224 218.5,-224 218.5,-188 397.5,-188 397.5,-224"/>
+<text text-anchor="middle" x="308" y="-202.3" font-family="Times,serif" font-size="14.00">Matcher Extension server</text>
+</g>
+<!-- MBUs&#45;&gt;MEs -->
+<!-- MBUc -->
+<g id="node3" class="node">
+<title>MBUc</title>
+<polygon fill="none" stroke="black" points="200.5,-75 15.5,-75 15.5,-39 200.5,-39 200.5,-75"/>
+<text text-anchor="middle" x="108" y="-53.3" font-family="Times,serif" font-size="14.00">Blockchain Updates client</text>
+</g>
+<!-- MBUs&#45;&gt;MBUc -->
+<g id="edge3" class="edge">
+<title>MBUs&#45;&gt;MBUc</title>
+<path fill="none" stroke="black" stroke-dasharray="5,2" d="M108,-187.73C108,-187.73 108,-80.42 108,-80.42"/>
+<polygon fill="black" stroke="black" points="109.75,-80.42 108,-75.42 106.25,-80.42 109.75,-80.42"/>
+<text text-anchor="middle" x="97.05" y="-141.76" font-family="Times,serif" font-size="11.00">Blockchain events</text>
+</g>
+<!-- MEc -->
+<g id="node4" class="node">
+<title>MEc</title>
+<polygon fill="none" stroke="black" points="397.5,-75 218.5,-75 218.5,-39 397.5,-39 397.5,-75"/>
+<text text-anchor="middle" x="308" y="-53.3" font-family="Times,serif" font-size="14.00">Matcher Extension client</text>
+</g>
+<!-- MEs&#45;&gt;MEc -->
+<g id="edge4" class="edge">
+<title>MEs:sw&#45;&gt;MEc:nw</title>
+<path fill="none" stroke="black" stroke-dasharray="5,2" d="M263.25,-188C263.25,-188 263.25,-80 263.25,-80"/>
+<polygon fill="black" stroke="black" points="265,-80 263.25,-75 261.5,-80 265,-80"/>
+<text text-anchor="middle" x="266.6" y="-120.08" font-family="Times,serif" font-size="11.00">UTX events</text>
+</g>
+<!-- MBUc&#45;&gt;MEc -->
+<!-- MEc&#45;&gt;MEs -->
+<g id="edge5" class="edge">
+<title>MEc:ne&#45;&gt;MEs:se</title>
+<path fill="none" stroke="black" d="M308,-75C308,-75 308,-183 308,-183"/>
+<polygon fill="black" stroke="black" points="306.25,-183 308,-188 309.75,-183 306.25,-183"/>
+<text text-anchor="middle" x="314.05" y="-160.94" font-family="Times,serif" font-size="11.00">Data request</text>
+</g>
+<!-- MEc&#45;&gt;MEs -->
+<g id="edge6" class="edge">
+<title>MEc:ne&#45;&gt;MEs:se</title>
+<path fill="none" stroke="black" d="M352.75,-80C352.75,-80 352.75,-188 352.75,-188"/>
+<polygon fill="black" stroke="black" points="354.5,-80 352.75,-75 351,-80 354.5,-80"/>
+<text text-anchor="middle" x="361.75" y="-146.23" font-family="Times,serif" font-size="11.00">Data response</text>
+</g>
+</g>
+</svg>

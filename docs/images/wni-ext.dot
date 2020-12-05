@@ -1,0 +1,40 @@
+// @formatter:off
+digraph MatcherNodeInteraction {
+  graph [label = "Matcher-Node interaction", newrank = "true", splines = "ortho"]
+  node [shape = "box"]
+  edge [fontsize = 11, arrowsize = 0.5]
+
+  MBUs [label = "Blockchain Updates server"]
+  MEs [label = "Matcher Extension server"]
+
+  MBUc [label = "Blockchain Updates client"]
+  MEc [label = "Matcher Extension client"]
+
+  subgraph cluster_0 {
+    edge [style = "invis"]
+
+    MBUs -> MEs
+
+    label = "Node"
+    style = "filled"
+    color = "#56E39F"
+  }
+
+  subgraph cluster_1 {
+    edge [style = "invis"]
+
+    MBUc -> MEc
+
+    label = "Matcher"
+    style = "filled"
+    color = "#59C9A5"
+  }
+
+  MBUs -> MBUc [headlabel = "Blockchain events", minlen = 3, labeldistance = 7, labelangle = 9, style = "dashed", bgcolor = "red"]
+  MEs:sw -> MEc:nw [headlabel = "UTX events", minlen = 3, labeldistance = 4.8, labelangle = -4, style = "dashed"]
+  MEc:ne -> MEs:se [headlabel = "Data request", labeldistance = 2.5, labelangle = 14]
+  MEc:ne -> MEs:se [headlabel = "Data response", labeldistance = 4, labelangle = 13, dir = "back"]
+
+  {rank = same; MEs MBUs}
+  {rank = same; MEc MBUc}
+}

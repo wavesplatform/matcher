@@ -1,6 +1,6 @@
 // @formatter:off
 digraph NodeBranch {
-  graph [label="Branch", newrank="true", rankdir=LR, compound=true]
+  graph [label="Branch", newrank="true", rankdir=RL, compound=true]
   node [shape="circle"]
   edge [fontsize=11, arrowsize=0.5]
 

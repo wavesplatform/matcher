@@ -1,3 +1,9 @@
 #!/usr/bin/env sh
-CURR_DIR="$( cd "$( dirname "$0" )" && pwd )"
-docker run --rm --volume ${CURR_DIR}:/docs minlag/mermaid-cli:8.8.0 mmdc -i /docs/images/wni-ext.mmd -o /docs/images/wni-ext.svg
+IMAGES_DIR="$( cd "$( dirname "$0" )" && pwd )/images"
+# Can't run a loop or other script using entrypoint: a rights issue
+cd ${IMAGES_DIR}
+for f in *.mmd
+do
+  echo "Converting $f..."
+  docker run --rm --volume ${IMAGES_DIR}:/data minlag/mermaid-cli:8.8.0 -i "$f" -o $(echo $f | sed s/mmd/svg/)
+done

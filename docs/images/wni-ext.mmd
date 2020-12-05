@@ -1,9 +1,12 @@
-graph LR
-  W[Waves Node]
-  MBUs[Blockchain Updates server]
-  MBUc[Blockchain Updates client]
-  MEs[Matcher Extension server]
-  MEc[Matcher Extension client]
-  MBUs -->|Blockchain Events| MBUc
-  MEs -->|UTX Events| MEc
-  MEc -->|Balances| MEs
+flowchart BT
+  subgraph Matcher
+    MBUc[Blockchain Updates client]
+    MEc[Matcher Extension client]
+  end
+  subgraph Waves Node
+    MBUs[Blockchain Updates server]
+    MEs[Matcher Extension server]
+  end
+  MBUs -..->|Blockchain events| MBUc
+  MEc ---|Balances request/response| MEs
+  MEs -..->|UTX events| MEc

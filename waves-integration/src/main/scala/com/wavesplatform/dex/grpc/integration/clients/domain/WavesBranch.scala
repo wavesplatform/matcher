@@ -1,4 +1,4 @@
-package com.wavesplatform.dex.grpc.integration.clients.status
+package com.wavesplatform.dex.grpc.integration.clients.domain
 
 import cats.Semigroup
 import cats.data.NonEmptyList
@@ -7,7 +7,7 @@ import cats.syntax.either._
 import cats.syntax.foldable._
 import cats.syntax.semigroup._
 import com.wavesplatform.dex.collection.ListOps.Ops
-import com.wavesplatform.dex.grpc.integration.clients.status.WavesBranch.dropLiquidBlock
+import com.wavesplatform.dex.grpc.integration.clients.domain.WavesBranch.dropLiquidBlock
 
 import scala.annotation.tailrec
 

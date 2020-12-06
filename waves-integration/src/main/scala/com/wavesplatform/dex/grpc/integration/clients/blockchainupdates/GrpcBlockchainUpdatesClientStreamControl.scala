@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.grpc.integration.clients.blockchainupdates
 
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.grpc.integration.clients.status.WavesNodeEvent
+import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeEvent
 import monix.execution.Scheduler
 import monix.reactive.Observer
 

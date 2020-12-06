@@ -1,6 +1,6 @@
-package com.wavesplatform.dex.grpc.integration.clients.status
+package com.wavesplatform.dex.grpc.integration.clients.domain
 
-import com.wavesplatform.dex.grpc.integration.clients.status.WavesNodeEvent.WavesNodeUtxEvent
+import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeEvent.WavesNodeUtxEvent
 import com.wavesplatform.dex.meta.getSimpleName
 
 import scala.collection.immutable.Queue

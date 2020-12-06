@@ -5,7 +5,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.grpc.integration.clients.status.WavesNodeEvent
+import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeEvent
 import com.wavesplatform.events.api.grpc.protobuf.{SubscribeEvent, SubscribeRequest}
 import com.wavesplatform.events.protobuf.BlockchainUpdated
 import io.grpc.stub.{ClientCallStreamObserver, ClientResponseObserver}

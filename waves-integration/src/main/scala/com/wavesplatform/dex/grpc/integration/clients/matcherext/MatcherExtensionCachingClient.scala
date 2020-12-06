@@ -10,7 +10,7 @@ import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.caches.{AssetDescriptionsCache, FeaturesCache}
 import com.wavesplatform.dex.grpc.integration.clients.RunScriptResult
-import com.wavesplatform.dex.grpc.integration.clients.status.{BlockRef, BlockchainBalance, DiffIndex, WavesNodeEvent}
+import com.wavesplatform.dex.grpc.integration.clients.domain.{BlockRef, BlockchainBalance, DiffIndex, WavesNodeEvent}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import monix.reactive.Observable
 

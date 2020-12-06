@@ -1,12 +1,12 @@
-package com.wavesplatform.dex.grpc.integration.clients.status
+package com.wavesplatform.dex.grpc.integration.clients.domain
 
 import cats.syntax.semigroup._
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.grpc.integration.clients.status.BlockchainStatus._
-import com.wavesplatform.dex.grpc.integration.clients.status.StatusUpdate.LastBlockHeight
-import com.wavesplatform.dex.grpc.integration.clients.status.WavesFork.Status
-import com.wavesplatform.dex.grpc.integration.clients.status.WavesNodeEvent.RolledBack.To
-import com.wavesplatform.dex.grpc.integration.clients.status.WavesNodeEvent._
+import com.wavesplatform.dex.grpc.integration.clients.domain.BlockchainStatus._
+import com.wavesplatform.dex.grpc.integration.clients.domain.StatusUpdate.LastBlockHeight
+import com.wavesplatform.dex.grpc.integration.clients.domain.WavesFork.Status
+import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeEvent.RolledBack.To
+import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeEvent._
 
 import scala.collection.immutable.Queue
 

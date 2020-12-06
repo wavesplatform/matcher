@@ -1,4 +1,4 @@
-package com.wavesplatform.dex.grpc.integration.clients.status
+package com.wavesplatform.dex.grpc.integration.clients.domain
 
 import java.nio.charset.StandardCharsets
 
@@ -11,9 +11,9 @@ import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
-import com.wavesplatform.dex.grpc.integration.clients.status.BlockchainStatus.{Normal, TransientResolving, TransientRollback}
-import com.wavesplatform.dex.grpc.integration.clients.status.StatusUpdate.LastBlockHeight
-import com.wavesplatform.dex.grpc.integration.clients.status.WavesNodeEvent.{Appended, DataReceived, RolledBack, UtxAdded, UtxSwitched, WavesNodeUtxEvent}
+import com.wavesplatform.dex.grpc.integration.clients.domain.BlockchainStatus.{Normal, TransientResolving, TransientRollback}
+import com.wavesplatform.dex.grpc.integration.clients.domain.StatusUpdate.LastBlockHeight
+import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeEvent.{Appended, DataReceived, RolledBack, UtxAdded, UtxSwitched, WavesNodeUtxEvent}
 import com.wavesplatform.dex.grpc.integration.services.UtxTransaction
 
 import scala.collection.immutable.Queue

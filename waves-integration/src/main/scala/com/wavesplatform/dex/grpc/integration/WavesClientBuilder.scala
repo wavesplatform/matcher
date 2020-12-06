@@ -49,8 +49,7 @@ object WavesClientBuilder extends ScorexLogging {
         new MatcherExtensionGrpcAsyncClient(eventLoopGroup, matcherExtensionChannel, monixScheduler)(grpcExecutionContext),
         wavesBlockchainClientSettings.defaultCachesExpiration
       )(grpcExecutionContext),
-      bClient = new DefaultBlockchainUpdatesClient(eventLoopGroup, blockchainUpdatesChannel, monixScheduler)(grpcExecutionContext),
-      ignoredExchangeTxSenderPublicKey = None // TODO DEX-995
+      bClient = new DefaultBlockchainUpdatesClient(eventLoopGroup, blockchainUpdatesChannel, monixScheduler)(grpcExecutionContext)
     )(grpcExecutionContext, monixScheduler)
   }
 

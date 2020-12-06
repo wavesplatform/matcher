@@ -1,4 +1,4 @@
-package com.wavesplatform.dex.grpc.integration.clients.status
+package com.wavesplatform.dex.grpc.integration.clients.domain
 
 import com.wavesplatform.dex.domain.bytes.ByteStr
 

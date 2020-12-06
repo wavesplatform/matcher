@@ -3,7 +3,7 @@ package com.wavesplatform.dex.grpc.integration.clients.blockchainupdates
 import cats.syntax.option._
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
-import com.wavesplatform.dex.grpc.integration.clients.status.{BlockRef, BlockchainBalance, WavesBlock, WavesNodeEvent}
+import com.wavesplatform.dex.grpc.integration.clients.domain.{BlockRef, BlockchainBalance, WavesBlock, WavesNodeEvent}
 import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions._
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Rollback.RollbackType

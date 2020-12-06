@@ -1,4 +1,4 @@
-package com.wavesplatform.dex.grpc.integration.clients.status
+package com.wavesplatform.dex.grpc.integration.clients.domain
 
 import cats.Monoid
 import com.wavesplatform.dex.collection.MapOps.Ops2D

@@ -1,5 +1,14 @@
 # How Matcher interacts with the Waves Node
 
+  * [Streams](#streams)
+  * [State machine](#state-machine)
+     * [Statuses](#statuses)
+        * [Normal](#normal)
+        * [TransientRollback](#transientrollback)
+        * [TransientResolving](#transientresolving)
+  * [Forks](#forks)
+  * [Branches](#branches)
+
 It requires two installed extensions on the Waves Node:
 * `Blockchain Updates` provides a stream of blockchain events: a block appended, a chain rolled back, etc.;
 * `Matcher Extension` provides other required functionality: getting balances, a stream of UTX events, etc.

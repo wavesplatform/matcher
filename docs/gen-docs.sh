@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 IMAGES_DIR="$( cd "$( dirname "$0" )" && pwd )/images"
 # Can't run a loop or other script using entrypoint: a rights issue
+# Also see https://dreampuf.github.io for an online graphviz editor
 cd ${IMAGES_DIR}
 for f in *.dot
 do

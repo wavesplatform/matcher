@@ -97,6 +97,12 @@ Waiting a micro block saves us from a balance flickering.
 After resolving a fork, we look which addresses affected on the original, but not on the new main branch and
 request their balances.
 
+![Branches diff](./images/wni-branches-diff.svg)
+
+Where `changesDiff` is addresses and assets which we have to request from the Node.
+
+Most time `changes1` will be equal to `changes2`, so we don't see any difference.  
+
 ## Branches
 
 Are represented by `WavesBranch` class. It has a limited number of blocks to preserve the memory and 

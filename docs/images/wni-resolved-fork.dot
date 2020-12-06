@@ -1,0 +1,48 @@
+// @formatter:off
+digraph NodeResolvedFork {
+  graph [label="Resolved fork", newrank="true", rankdir=RL, compound=true, splines="ortho"]
+  node [shape="box"]
+  edge [fontsize=11, arrowsize=0.5]
+
+  subgraph cluster_0 {
+    MB2 [label=<&micro;B<sub>2</sub>>, style="filled", color="#FFE5D9"]
+    MB1 [label=<&micro;B<sub>1</sub>>, style="filled", color="#FFE5D9"]
+
+    AH1 [label="actual height", shape="none", fontsize=10]
+
+    B1000 [label=<B<sub>1000</sub>>, style="filled", color="#F4ACB7"]
+    B999 [label=<B<sub>999</sub>>, style="filled", color="#F4ACB7"]
+    B998 [label=<B<sub>998</sub>>, style="filled", color="#F4ACB7"]
+    Betc [label="...", style="filled", color="#F4ACB7"]
+    B901 [label=<B<sub>901</sub>>, style="filled", color="#F4ACB7"]
+    B900 [label=<B<sub>900</sub>>, style="filled", color="#F4ACB7"]
+
+    MB2 -> MB1 -> AH1 -> B1000 -> B999 -> B998 -> Betc -> B901 -> B900
+
+    label="Original branch"
+  }
+
+  subgraph cluster_1 {
+    MB2_ [style="invisible"]
+    MB1_ [label=<&micro;B<sub>1</sub>>, style="filled", color="#9D8189", fontcolor="#FFFFFF"]
+
+    AH1_ [label="actual height", shape="none", fontsize=10]
+
+    B1000_ [label=<B<sub>1000</sub>'>, style="filled", color="#9D8189", fontcolor="#FFFFFF"]
+    B999_ [label=<B<sub>999</sub>'>, style="filled", color="#9D8189", fontcolor="#FFFFFF"]
+    Betc_ [label="...", style="filled", color="#9D8189", fontcolor="#FFFFFF"]
+    B902_ [label=<B<sub>902</sub>'>, style="filled", color="#9D8189", fontcolor="#FFFFFF"]
+
+    MB1_ -> AH1_ -> B1000_ -> B999_ -> Betc_ -> B902_
+
+    label="New main branch"
+  }
+
+  B902_:w -> B901:s
+  AH1:s -> AH1_:n [dir="none", style="dashed"]
+
+  {rank="same"; Betc B902_}
+  {rank="same"; MB1 MB1_}
+  {rank="same"; AH1 AH1_}
+  {rank="same"; MB2 MB2_}
+}

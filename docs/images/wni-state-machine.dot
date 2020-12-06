@@ -1,0 +1,20 @@
+// @formatter:off
+digraph WniStateMachine {
+  graph [label="State Machine"]
+  edge [fontsize=11, arrowsize=0.5]
+
+  N:n -> N:n [label="Appended ok"]
+  N:w -> N:w [label="Utx*"]
+  N:e -> TRB:n [headlabel="RolledBack", labeldistance=5, labelangle=-4]
+  N:e -> TRB:ne [headlabel="Appended invalid", minlen=3, labeldistance=8, labelangle=8]
+  TRB:nw -> N:se [headlabel=<Appended ok<sup>1</sup>>, headtooltip="Same addresses and assets affected", labeldistance=4, labelangle=-43, fontcolor="#FF66B3"]
+  TRB:w -> TRB:w [headlabel="Utx*", labeldistance=2, labelangle=-90]
+  TRB:e -> TRB:e [label="Appended ok"]
+  TRB:se -> TRB:se [label="RolledBack"]
+  TRB -> TRS [headlabel="Appended ok", labeldistance=5, labelangle=-35]
+  TRS -> N [headlabel="DataReceived", minlen=5, labeldistance=9, labelangle=31]
+
+  N [label="Normal", style="filled", color="#084B83", fontcolor="#F0F6F6"]
+  TRB [label="TransientRollback", style="filled", color="#42BFDD", fontcolor="#084B83"]
+  TRS [label="TransientResolving", style="filled", color="#BBE6E4", fontcolor="#084B83"]
+}

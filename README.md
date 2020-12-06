@@ -7,6 +7,45 @@ The latest release for each network can be found in the [Releases section](https
 
 For further information please refer the official [documentation](https://docs.wavesplatform.com).
 
+   * [How to Build and Test](#how-to-build-and-test)
+      * [1. Setup the environment](#1-setup-the-environment)
+         * [1.1. Installing Java](#11-installing-java)
+         * [1.2. Installing SBT](#12-installing-sbt)
+      * [2. Obtaining Source Codes](#2-obtaining-source-codes)
+      * [3. Compilation and unit tests](#3-compilation-and-unit-tests)
+      * [4. Running Matcher integration tests (optional)](#4-running-matcher-integration-tests-optional)
+         * [SBT](#sbt)
+         * [IntelliJ IDEA](#intellij-idea)
+      * [5. Building packages](#5-building-packages)
+         * [Mainnet](#mainnet)
+         * [Testnet](#testnet)
+      * [6. Installing and running](#6-installing-and-running)
+         * [6.1. Node installation](#61-node-installation)
+         * [6.2. Matcher extension installation and configuration](#62-matcher-extension-installation-and-configuration)
+            * [a. Installation through DEB](#a--installation-through-deb)
+            * [b. Installation through ZIP](#b--installation-through-zip)
+            * [Configration of Matcher extension](#-configration-of-matcher-extension)
+         * [6.3. Matcher server installation and configuration](#63-matcher-server-installation-and-configuration)
+            * [a. Installation through DEB](#a--installation-through-deb-1)
+            * [b. Installation through ZIP](#b--installation-through-zip-1)
+            * [Configuration of Matcher server](#-configuration-of-matcher-server)
+      * [7. Running an extension project locally during development](#7-running-an-extension-project-locally-during-development)
+         * [SBT](#sbt-1)
+         * [IntelliJ IDEA](#intellij-idea-1)
+   * [CLI](#cli)
+      * [1. Generating account storage](#1-generating-account-storage)
+      * [2. Generating API key](#2-generating-api-key)
+   * [Known issues](#known-issues)
+      * [Common](#common)
+      * [IntelliJ IDEA](#intellij-idea-2)
+   * [Production recommendations](#production-recommendations)
+      * [Kafka's queue](#kafkas-queue)
+   * [Benchmarks](#benchmarks)
+   * [Documentation](#documentation)
+   * [Contributor notes](#contributor-notes)
+      * [Branches](#branches)
+      * [Publishing a new release](#publishing-a-new-release)
+
 # How to Build and Test
 
 The Matcher as Node can be built and installed wherever java can run. We ship following artifacts:
@@ -264,7 +303,7 @@ sbt "dex/run /path/to/configuration"
 
 All files will be stored in `_local/runtime/mainnet`, including logs in the `log/` directory.
 
-## 8. CLI
+# CLI
 
 We have CLI tools accompanying to Matcher server. Run `waves-dex-cli` to see a full documentation. The CLI functionality includes:
 
@@ -279,7 +318,7 @@ If you want to run CLI from SBT, use the following template:
 dex/runMain com.wavesplatform.dex.cli.WavesDexCli here-your-arguments
 ```
 
-### 8.1. Generating account storage
+## 1. Generating account storage
 
 Example:
 
@@ -297,7 +336,7 @@ here:
 After running this command you will see where your `account.dat` was saved and which settings do you have to add to the Matcher server configuration (`/usr/share/waves-dex/conf/main.conf`).
 Note, the shown settings contain a placeholder for your raw password, insert a real password to your configuration! 
 
-### 8.2. Generating API key
+## 2. Generating API key
 
 Example:
 
@@ -314,9 +353,9 @@ Don't forget to update your settings:
 waves.dex.rest-api.api-key-hash = "7L6GpLHhA5KyJTAVc8WFHwEcyTY8fC8rRbyMCiFnM4i"
 ```
 
-## 9. Known issues
+# Known issues
 
-### Common
+## Common
 
 1. The compilation may fail on master with strange errors like:
 
@@ -338,7 +377,7 @@ waves.dex.rest-api.api-key-hash = "7L6GpLHhA5KyJTAVc8WFHwEcyTY8fC8rRbyMCiFnM4i"
       find /Users/vsuharnikov/.sbt/1.0/staging/f431ce12d422de688eee/waves -type d -name target | xargs -I{} rm -rf {}
       ```
 
-### IntelliJ IDEA
+## IntelliJ IDEA
 
 1. Worksheets may not work: https://youtrack.jetbrains.com/issue/SCL-6726 . Also make sure:
    
@@ -366,9 +405,9 @@ waves.dex.rest-api.api-key-hash = "7L6GpLHhA5KyJTAVc8WFHwEcyTY8fC8rRbyMCiFnM4i"
 
 6. If you want to run integration tests with Kafka, run the command in sbt before: ```set `dex-it`/Test/envVars := Map("KAFKA_SERVER" -> "kafka-host:9092")```
 
-## 10. Production recommendations
+# Production recommendations
 
-### Kafka's queue
+## Kafka's queue
 
 If all of these points are true:
 
@@ -393,7 +432,7 @@ Note, it is not recommended to change this options if you aren't face the issue.
     sudo sysctl -p
     ```
 
-## 11. Benchmarks
+# Benchmarks
 
 We use [sbt-jmh](https://github.com/ktoso/sbt-jmh). For more information, please read its documentation.
 
@@ -414,9 +453,13 @@ To run with a benchmark (for example, [async-profiler](https://github.com/jvm-pr
 
 JFR files could be read with [jmc](https://adoptopenjdk.net/jmc.html).
 
-## 12. Contributor notes
+# Documentation
 
-### Branches
+Some internal docs could be found in the [docs](./docs) directory.
+
+# Contributor notes
+
+## Branches
 
 * `master` is a developers' branch;
 * `DEX-XXX` is a feature or a bug fix branch;
@@ -427,7 +470,7 @@ A new release is tagged to the commit in a `master` branch. If there is a bug:
 2. The fix is committed to this branch;
 2. When all fixes are done, a new tag is created; 
 
-### Publishing a new release
+## Publishing a new release
 
 1. Building artifacts:
 

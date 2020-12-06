@@ -1,0 +1,59 @@
+// @formatter:off
+digraph MatcherNodeStreams {
+  graph [label="Node streams", newrank="true", rankdir=LR, compound=true]
+  node [shape="box"]
+  edge [fontsize=11, arrowsize=0.5]
+
+  subgraph cluster_0 {
+    B1 -> B2 -> B3
+
+    label = "Blockchain events"
+    style = "filled"
+    color = "#DFCC74"
+  }
+
+  subgraph cluster_1 {
+    U1 -> U2 [minlen=2]
+    U2 -> U3 [minlen=3]
+
+    label = "Utx events"
+    style = "filled"
+    color = "#C3E991"
+  }
+
+  subgraph cluster_2 {
+    D1 -> D2 [minlen=3]
+    D2 -> D3
+
+    label = "Data events"
+    style = "filled"
+    color = "#CB904D"
+  }
+
+  subgraph cluster_3 {
+    label = "Combined events"
+    style = "filled"
+    color = "#51A3A3"
+
+    cU1 -> cD1 -> cB1 -> cU2 -> cB2 -> cD2 -> cB3 -> cU3 -> cD3
+
+    cB1 [label="B1", style="filled", color="#DFCC74"]
+    cB2 [label="B2", style="filled", color="#DFCC74"]
+    cB3 [label="B3", style="filled", color="#DFCC74"]
+
+    cU1 [label="U1", style="filled", color="#C3E991"]
+    cU2 [label="U2", style="filled", color="#C3E991"]
+    cU3 [label="U3", style="filled", color="#C3E991"]
+
+    cD1 [label="D1", style="filled", color="#CB904D"]
+    cD2 [label="D2", style="filled", color="#CB904D"]
+    cD3 [label="D3", style="filled", color="#CB904D"]
+  }
+
+  B3 -> cU1 [ltail=cluster_0, lhead=cluster_3]
+  U3 -> cU1 [ltail=cluster_1, lhead=cluster_3]
+  D3 -> cU1 [ltail=cluster_2, lhead=cluster_3]
+
+  {rank = same; B1 U2}
+  {rank = same; B3 D3}
+}

@@ -1,0 +1,19 @@
+// @formatter:off
+digraph NodeBranch {
+  graph [label="Branch", newrank="true", rankdir=RL, compound=true]
+  node [shape="circle"]
+  edge [fontsize=11, arrowsize=0.5]
+
+  MB2 [label=<&micro;B<sub>2</sub>>, style="filled", color="#FFE5D9"]
+  MB1 [label=<&micro;B<sub>1</sub>>, style="filled", color="#FFE5D9"]
+
+  B1000 [label=<B<sub>1000</sub>>, style="filled", color="#F4ACB7"]
+  B999 [label=<B<sub>999</sub>>, style="filled", color="#F4ACB7"]
+  B998 [label=<B<sub>998</sub>>, style="filled", color="#F4ACB7"]
+  Betc [label="...", style="filled", color="#F4ACB7"]
+  B901 [label=<B<sub>901</sub>>, style="filled", color="#F4ACB7"]
+  B900 [label=<B<sub>900</sub>>, style="filled", color="#F4ACB7"]
+  B899 [label="dropped", style="dashed"]
+
+  MB2 -> MB1 -> B1000 -> B999 -> B998 -> Betc -> B901 -> B900 -> B899
+}

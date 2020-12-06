@@ -11,6 +11,9 @@ target
 *.jar
 !third-party/yourkit/yjp-controller-api-redist.jar
 
+# other dependencies
+.node_modules
+
 # vim
 *.*~
 

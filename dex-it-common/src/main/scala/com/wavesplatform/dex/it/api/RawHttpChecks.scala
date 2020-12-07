@@ -56,6 +56,15 @@ trait RawHttpChecks extends Matchers {
     }
   }
 
+  protected def validateMatcherError[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT], code: Int, error: MatcherError): Unit = {
+    validateError(r, code)
+
+    r.tryGet match {
+      case Left(MatcherError(e, m, s, _)) => e should be(error.error); m.contains(error.message) should be(true); s should be(error.status)
+      case _ => fail(s"Unexpected response $r")
+    }
+  }
+
   protected def validateMatcherError[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT], code: Int, error: Int, message: String): Unit = {
     validateError(r, code)
 

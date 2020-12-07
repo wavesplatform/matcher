@@ -47,7 +47,7 @@ class CancelOrderSpec extends MatcherSuiteBase with RawHttpChecks {
       validateMatcherError(dex1.rawApi.cancelOrder(alice, o), StatusCodes.BadRequest, 9437194, s"The order ${o.idStr()} is canceled")
     }
 
-    //TODO: maybe there is should be 404 ?
+    //TODO: DEX-1024
     "should return error when order doesn't exist" in {
       val o = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 1.usd)
       validateMatcherError(dex1.rawApi.cancelOrder(alice, o), StatusCodes.BadRequest, 9437193, s"The order ${o.idStr()} not found")

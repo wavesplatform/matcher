@@ -1,31 +1,13 @@
 package com.wavesplatform.it.matcher.api.http.place
 
 import com.softwaremill.sttp.StatusCodes
-import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpSuccessfulPlace
-import com.wavesplatform.dex.domain.account
-import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.OrderType.BUY
-import com.wavesplatform.dex.it.api.RawHttpChecks
-import com.wavesplatform.it.MatcherSuiteBase
-import org.scalatest.prop.TableDrivenPropertyChecks
+import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import play.api.libs.json.Json
 
-import scala.concurrent.duration.Duration
-
-class PlaceLimitOrderSpec extends MatcherSuiteBase with TableDrivenPropertyChecks with RawHttpChecks {
-
-  override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(
-    s"""waves.dex {
-       |  price-assets = [ "$UsdId", "WAVES" ]
-       |}""".stripMargin
-  )
-
-  override protected def beforeAll(): Unit = {
-    wavesNode1.start()
-    broadcastAndAwait(IssueUsdTx)
-    dex1.start()
-  }
+class PlaceLimitOrderSpec extends PlaceOrderBaseSpec {
 
   "POST /matcher/orderbook" - {
 
@@ -44,10 +26,11 @@ class PlaceLimitOrderSpec extends MatcherSuiteBase with TableDrivenPropertyCheck
       )
     }
 
-    forAll(orderCases) { (n: Int, a: Long, p: Long, f: Long, fa: Asset, t: Long, d: Duration, v: Byte, pk: account.PublicKey, c: Int, e: Int, m: String) =>
-      s"For row $n should return (HTTP-$c; [$e: $m]) " in {
-        validateMatcherErrorContainText(dex1.rawApi.place(mkOrder(alice, wavesUsdPair, BUY, a, p, f, fa, t, d, v, pk)), c, e, m)
+    forAll(orderCases) { (n: Int, order: Order, code: Int, error: MatcherError) =>
+      s"Case $n: For order [$order] should return error [$error]" in {
+        validateMatcherError(dex1.rawApi.place(order), code, error)
       }
     }
+
   }
 }

@@ -48,31 +48,29 @@ class CancelOrdersByAddressAndIdsSpec extends MatcherSuiteBase with RawHttpCheck
         o.idStr()
       }
 
-      val r = validate200Json(dex1.rawApi.cancelAllByAddressAndIds(toAddress(alice).stringRepr, ids))
+      val r = validate200Json(dex1.rawApi.cancelAllByAddressAndIds(alice.toAddress.stringRepr, ids))
 
       r.success should be(true)
       r.status should be("BatchCancelCompleted")
       r.message.head should have size orders.size
 
       r.message.foreach(m => {
-        m.foreach(i => {
-          i match {
-            case util.Right(HttpSuccessfulSingleCancel(_,success,status)) => success should be (true); status should be ("OrderCanceled")
-            case _ => fail(s"Unexpected response $r")
-          }
-        })
+        m.foreach {
+          case util.Right(HttpSuccessfulSingleCancel(_, success, status)) => success should be(true); status should be("OrderCanceled")
+          case _ => fail(s"Unexpected response $r")
+        }
       })
 
       orders.foreach(dex1.api.waitForOrderStatus(_, Status.Cancelled))
     }
 
     "should return OK if there is nothing to cancel" in {
-      validate200Json(dex1.rawApi.cancelAllByAddressAndIds(toAddress(alice).stringRepr, Set.empty))
+      validate200Json(dex1.rawApi.cancelAllByAddressAndIds(alice.toAddress.stringRepr, Set.empty))
     }
 
     "should return an error when one of ids is not a correct base58 string" in {
       validateMatcherError(
-        dex1.rawApi.cancelAllByAddressAndIds(toAddress(alice).stringRepr, placeAndGetIds() + "null"),
+        dex1.rawApi.cancelAllByAddressAndIds(alice.toAddress.stringRepr, placeAndGetIds() + "null"),
         StatusCodes.BadRequest,
         1048577,
         "The provided JSON contains invalid fields: (3). Check the documentation"
@@ -90,13 +88,13 @@ class CancelOrdersByAddressAndIdsSpec extends MatcherSuiteBase with RawHttpCheck
 
     "should return an error when without headers" in {
       validateAuthorizationError(
-        dex1.rawApi.cancelAllByAddressAndIds(toAddress(alice).stringRepr, placeAndGetIds(), Map.empty)
+        dex1.rawApi.cancelAllByAddressAndIds(alice.toAddress.stringRepr, placeAndGetIds(), Map.empty)
       )
     }
 
     "should return an error when the public api-key header is not correct" in {
       validateAuthorizationError(
-        dex1.rawApi.cancelAllByAddressAndIds(toAddress(alice).stringRepr, placeAndGetIds(), Map("X-API-Key" -> "incorrect"))
+        dex1.rawApi.cancelAllByAddressAndIds(alice.toAddress.stringRepr, placeAndGetIds(), Map("X-API-Key" -> "incorrect"))
       )
     }
   }

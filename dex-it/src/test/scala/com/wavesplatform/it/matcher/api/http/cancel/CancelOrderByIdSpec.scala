@@ -59,14 +59,39 @@ class CancelOrderByIdSpec extends MatcherSuiteBase with RawHttpChecks {
       validate404Exception(dex1.rawApi.cancelOrderById("null", Map("X-API-KEY" -> apiKey)))
     }
 
-    "should return an error when without headers" in {
+    "should return an error without headers" in {
       val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 1.usd)
       placeAndAwaitAtDex(order)
 
       validateAuthorizationError(dex1.rawApi.cancelOrderById(order.idStr(), Map.empty[String, String]))
     }
 
-    "should return an error when the public api-key header is not correct" in {
+    "should return an error when the public-key header is not a correct base58 string" in {
+      val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 1.usd)
+      placeAndAwaitAtDex(order)
+
+      validateMatcherError(
+        dex1.rawApi.cancelOrderById(order.idStr(), Map("X-API-Key" -> apiKey, "X-User-Public-Key" -> "null")),
+        StatusCodes.BadRequest,
+        3148801,
+        "Provided user public key is not correct"
+      )
+    }
+
+    //TODO: maybe there is should be 404?
+    "should return an error when the public-key header is not from order owner" in {
+      val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 1.usd)
+      placeAndAwaitAtDex(order)
+
+      validateMatcherError(
+        dex1.rawApi.cancelOrderById(order.idStr(), Map("X-API-Key" -> apiKey, "X-User-Public-Key" -> bob.publicKey.stringRepr)),
+        StatusCodes.BadRequest,
+        9437193,
+        s"The order ${order.idStr()} not found"
+      )
+    }
+
+    "should return an error when the api-key header is not correct" in {
       val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 1.usd)
       placeAndAwaitAtDex(order)
 

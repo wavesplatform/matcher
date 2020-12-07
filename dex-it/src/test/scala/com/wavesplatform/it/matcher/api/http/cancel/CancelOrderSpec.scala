@@ -24,7 +24,7 @@ class CancelOrderSpec extends MatcherSuiteBase with RawHttpChecks {
     dex1.start()
   }
 
-  "POST /matcher/orderbook/cancel" - {
+  "POST /matcher/orderbook/{amountAsset}/{priceAsset}/cancel" - {
     "should cancel order" in {
 
       val o = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 1.usd)

@@ -11,8 +11,7 @@ import com.wavesplatform.dex.grpc.integration.services.UtxTransaction
 
 private[clients] class SynchronizedPessimisticPortfolios() extends ScorexLogging {
 
-  private val storage = new PessimisticStorage
-  private val orig = new LookAheadPessimisticPortfolios(new DefaultPessimisticPortfolios(storage), 10000) // TODO setting
+  private val orig = new LookAheadPessimisticPortfolios(new DefaultPessimisticPortfolios(), 10000) // TODO setting
 
   private val reentrantLock = new ReentrantReadWriteLock()
 

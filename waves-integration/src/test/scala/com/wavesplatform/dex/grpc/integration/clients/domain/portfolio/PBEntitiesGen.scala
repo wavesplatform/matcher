@@ -3,6 +3,8 @@ package com.wavesplatform.dex.grpc.integration.clients.domain.portfolio
 import cats.syntax.option._
 import com.google.protobuf.{ByteString, UnsafeByteOperations}
 import com.wavesplatform.dex.domain.account.{Address, KeyPair}
+import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.grpc.integration.protobuf.DexToPbConversions._
 import com.wavesplatform.dex.grpc.integration.services.{TransactionDiff, UtxTransaction}
@@ -16,6 +18,8 @@ trait PBEntitiesGen {
 
   val accountGen: Gen[KeyPair] = Gen.containerOfN[Array, Byte](20, Arbitrary.arbByte.arbitrary).map(xs => KeyPair(ByteStr(xs)))
   val addressGen: Gen[Address] = accountGen.map(_.toAddress)
+
+  val issuedAssetGen: Gen[Asset] = Gen.containerOfN[Array, Byte](32, Arbitrary.arbByte.arbitrary).map(IssuedAsset(_))
 
   // Const
 
@@ -47,7 +51,7 @@ trait PBEntitiesGen {
   val pbIssuedAssetGen = pbByteString32Gen
   val pbAssetGen = Gen.oneOf(pbIssuedAssetGen, Gen.const(pbWaves))
 
-  val pbTxId = pbByteString32Gen
+  val pbTxIdGen = pbByteString32Gen
 
   val pbEmptyBalanceUpdateGen: Gen[StateUpdate.BalanceUpdate] = pbAddressGen.map { address =>
     StateUpdate.BalanceUpdate(
@@ -89,7 +93,7 @@ trait PBEntitiesGen {
     .suchThat(_.groupBy(_.address).forall(_._2.lengthCompare(1) == 0)) // Because an address affected only once in a transaction
 
   val pbUtxTransactionGen: Gen[UtxTransaction] = for {
-    id <- pbTxId
+    id <- pbTxIdGen
     balanceUpdates <- pbBalanceUpdateListGen
     leasingUpdates <- pbLeasingUpdateListGen
   } yield mkUtxTransaction(id, balanceUpdates, leasingUpdates)

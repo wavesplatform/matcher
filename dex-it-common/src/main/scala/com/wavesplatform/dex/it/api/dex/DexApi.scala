@@ -5,8 +5,10 @@ import com.typesafe.config.Config
 import com.wavesplatform.dex.api.http.entities._
 import com.wavesplatform.dex.domain.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import im.mak.waves.transactions.ExchangeTransaction
+import play.api.libs.json.JsObject
 
 @finalAlg
 @autoFunctorK
@@ -22,16 +24,23 @@ trait DexApi[F[_]] {
   def getTradableBalance(of: KeyPair, assetPair: AssetPair): F[HttpBalance]
 
   def place(order: Order): F[HttpSuccessfulPlace]
+  def place(order: JsObject): F[HttpSuccessfulPlace]
+
+  def placeMarket(order: JsObject): F[HttpSuccessfulPlace]
   def placeMarket(order: Order): F[HttpSuccessfulPlace]
 
-  def cancel(owner: KeyPair, order: Order): F[HttpSuccessfulSingleCancel] = cancel(owner, order.assetPair, order.id())
-  def cancel(owner: KeyPair, assetPair: AssetPair, id: Order.Id): F[HttpSuccessfulSingleCancel]
+  def cancelOrder(owner: KeyPair, amountAsset: String, priceAsset: String, orderId: String, timestamp: Long, signature: ByteStr): F[HttpSuccessfulSingleCancel]
+  def cancelOrder(owner: KeyPair, order: Order): F[HttpSuccessfulSingleCancel] = cancelOrder(owner, order.assetPair, order.id())
+  def cancelOrder(owner: KeyPair, assetPair: AssetPair, id: Order.Id): F[HttpSuccessfulSingleCancel]
 
-  def cancelWithApiKey(order: Order, xUserPublicKey: Option[PublicKey] = None): F[HttpSuccessfulSingleCancel] =
-    cancelWithApiKey(order.id(), xUserPublicKey)
+  def cancelOrderById(id: String, headers: Map[String, String]): F[HttpSuccessfulSingleCancel]
 
-  def cancelWithApiKey(id: Order.Id, xUserPublicKey: Option[PublicKey]): F[HttpSuccessfulSingleCancel]
+  def cancelOrderById(order: Order, xUserPublicKey: Option[PublicKey] = None): F[HttpSuccessfulSingleCancel] =
+    cancelOrderById(order.id(), xUserPublicKey)
 
+  def cancelOrderById(id: Order.Id, xUserPublicKey: Option[PublicKey]): F[HttpSuccessfulSingleCancel]
+
+  def cancelAll(sender: KeyPair, timestamp: Long, signature: ByteStr): F[HttpSuccessfulBatchCancel]
   def cancelAll(owner: KeyPair, timestamp: Long = System.currentTimeMillis): F[HttpSuccessfulBatchCancel]
 
   def cancelAllByPair(
@@ -40,7 +49,11 @@ trait DexApi[F[_]] {
     timestamp: Long = System.currentTimeMillis
   ): F[HttpSuccessfulBatchCancel]
 
-  def cancelAllByIdsWithApiKey(
+  def cancelAllByAddressAndIds(address: String, ids: Set[String]): F[HttpSuccessfulBatchCancel]
+
+  def cancelAllByAddressAndIds(address: String, ids: Set[String], headers: Map[String, String]): F[HttpSuccessfulBatchCancel]
+
+  def cancelAllByApiKeyAndIds(
     owner: Address,
     orderIds: Set[Order.Id],
     xUserPublicKey: Option[PublicKey] = None

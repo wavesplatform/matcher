@@ -15,6 +15,12 @@ trait RawHttpChecks extends Matchers {
     r.unsafeGet
   }
 
+  private def validateError[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT], code: Int): Unit = {
+    r.response.code should be(code)
+    validateResponseContainHeaders(r, "Content-Type" -> "application/json")
+    r.response.body should be leftSideValue
+  }
+
   protected def validate200Hocon[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT]): EntityT =
     validateResponse(r, StatusCodes.Ok, "application/hocon")
 
@@ -36,10 +42,22 @@ trait RawHttpChecks extends Matchers {
   protected def validateAuthorizationError[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT]): Unit =
     validateMatcherError(r, StatusCodes.Forbidden, 106954752, "Provided API key is not correct")
 
+  protected def validateMatcherErrorContainText[ErrorT, EntityT](
+    r: EnrichedResponse[ErrorT, EntityT],
+    code: Int,
+    error: Int,
+    message: String
+  ): Unit = {
+    validateError(r, code)
+
+    r.tryGet match {
+      case Left(MatcherError(e, m, _, _)) => e should be(error); m.contains(message) should be(true);
+      case _ => fail(s"Unexpected response $r")
+    }
+  }
+
   protected def validateMatcherError[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT], code: Int, error: Int, message: String): Unit = {
-    r.response.code should be(code)
-    validateResponseContainHeaders(r, "Content-Type" -> "application/json")
-    r.response.body should be leftSideValue
+    validateError(r, code)
 
     r.tryGet match {
       case Left(MatcherError(e, m, _, _)) => e should be(error); m should be(message);

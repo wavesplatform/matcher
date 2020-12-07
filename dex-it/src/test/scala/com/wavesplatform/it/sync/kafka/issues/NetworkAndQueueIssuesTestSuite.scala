@@ -103,7 +103,7 @@ class NetworkAndQueueIssuesTestSuite extends WsSuiteBase with HasWebSockets with
     disconnectKafkaFromNetwork()
     Thread.sleep(waitAfterNetworkChanges.toMillis)
 
-    dex1.tryApi.cancel(alice, sellOrder) shouldBe Symbol("left")
+    dex1.tryApi.cancelOrder(alice, sellOrder) shouldBe Symbol("left")
 
     val bigSellOrder = mkOrderDP(alice, wavesUsdPair, SELL, 30.waves, 3.0)
     dex1.tryApi.place(bigSellOrder) shouldBe Symbol("left")
@@ -122,7 +122,7 @@ class NetworkAndQueueIssuesTestSuite extends WsSuiteBase with HasWebSockets with
     connectKafkaToNetwork()
     Thread.sleep(waitAfterNetworkChanges.toMillis)
 
-    dex1.tryApi.cancel(alice, sellOrder) shouldBe Symbol("right")
+    dex1.tryApi.cancelOrder(alice, sellOrder) shouldBe Symbol("right")
     dex1.api.waitForOrderStatus(sellOrder, Status.Cancelled)
 
     dex1.api.getOrderHistoryByPublicKey(alice, Some(true)) should have size 0
@@ -211,7 +211,7 @@ class NetworkAndQueueIssuesTestSuite extends WsSuiteBase with HasWebSockets with
     val orders = (1 to 10).map(i => mkOrderDP(alice, wavesUsdPair, SELL, 10.waves, 3.0, ttl = i.days))
     orders.foreach(placeAndAwaitAtDex(_))
 
-    orders.foreach(dex1.api.cancel(alice, _))
+    orders.foreach(dex1.api.cancelOrder(alice, _))
     dex1.api.waitForOrderHistory(alice, true.some)(_.isEmpty)
 
     dex1.api.saveSnapshots

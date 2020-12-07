@@ -63,7 +63,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
               item.feeAsset shouldBe feeAsset
             }
 
-            dex1.api.cancel(alice, order)
+            dex1.api.cancelOrder(alice, order)
 
             orderHistory(alice, wctUsdPair, activeOnly = Some(false)).foreach { orderBookHistory =>
               val item = orderBookHistory.find(_.id == orderId).get
@@ -142,7 +142,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
         item.feeAsset shouldBe Waves
       }
 
-      dex1.api.cancel(alice, aliceOrder)
+      dex1.api.cancelOrder(alice, aliceOrder)
       dex1.api.getOrderStatus(aliceOrder).filledFee shouldBe Some(matcherFee / 2)
       dex1.api.getOrderStatus(bobOrder).filledFee shouldBe Some(matcherFee)
 
@@ -189,7 +189,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
         item.feeAsset shouldBe Waves
       }
 
-      dex1.api.cancel(alice, aliceOrder)
+      dex1.api.cancelOrder(alice, aliceOrder)
       dex1.api.getOrderStatus(aliceOrder).filledFee shouldBe Some(matcherFee / 2)
       dex1.api.getOrderStatus(bobOrder).filledFee shouldBe Some(matcherFee)
 
@@ -222,7 +222,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
         item.feeAsset shouldBe feeAsset
       }
 
-      dex1.api.cancel(alice, order)
+      dex1.api.cancelOrder(alice, order)
     }
 
     "should save right fee considering the fee rate" in {

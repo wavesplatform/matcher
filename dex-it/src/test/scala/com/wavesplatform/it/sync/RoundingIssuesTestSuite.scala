@@ -42,7 +42,7 @@ class RoundingIssuesTestSuite extends MatcherSuiteBase {
     }
 
     val tx = waitForOrderAtNode(counter)
-    dex1.api.cancel(alice, counter)
+    dex1.api.cancelOrder(alice, counter)
 
     val exchangeTx = wavesNode1.api.transactionInfo(tx.head.id()) match {
       case r: ExchangeTransaction => r
@@ -75,7 +75,7 @@ class RoundingIssuesTestSuite extends MatcherSuiteBase {
     withClue("Alice's reserved balance before cancel")(dex1.api.getReservedBalance(alice) shouldBe empty)
 
     waitForOrderAtNode(counter)
-    dex1.api.cancel(bob, counter)
+    dex1.api.cancelOrder(bob, counter)
 
     withClue("Bob's reserved balance after cancel")(dex1.api.getReservedBalance(bob) shouldBe empty)
   }

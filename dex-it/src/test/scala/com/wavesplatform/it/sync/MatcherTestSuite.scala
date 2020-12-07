@@ -220,7 +220,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
       "order could be canceled and resubmitted again" in {
         // Alice cancels the very first order (100 left)
-        dex1.api.cancel(alice, order1).status shouldBe "OrderCanceled"
+        dex1.api.cancelOrder(alice, order1).status shouldBe "OrderCanceled"
 
         // Alice checks that the order book is empty
         val orders1 = dex1.api.getOrderBook(aliceWavesPair)
@@ -387,11 +387,11 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
         Seq(o1, o2).foreach(dex1.api.place)
 
-        dex1.tryApi.cancelAllByIdsWithApiKey(bob, orderIds, Some(alice.publicKey)) should failWith(
+        dex1.tryApi.cancelAllByApiKeyAndIds(bob, orderIds, Some(alice.publicKey)) should failWith(
           3148801,
           "Provided user public key is not correct"
         )
-        dex1.tryApi.cancelAllByIdsWithApiKey(bob, orderIds, Some(bob.publicKey)) shouldBe Symbol("right")
+        dex1.tryApi.cancelAllByApiKeyAndIds(bob, orderIds, Some(bob.publicKey)) shouldBe Symbol("right")
       }
 
       "/matcher/orders/{address}" in {

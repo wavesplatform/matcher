@@ -42,7 +42,7 @@ trait ApiExtensions extends NodeApiExtensions {
   }
 
   protected def cancelAndAwait(owner: KeyPair, order: Order, expectedStatus: HttpOrderStatus.Status = Status.Cancelled): HttpOrderStatus = {
-    dex1.api.cancel(owner, order)
+    dex1.api.cancelOrder(owner, order)
     dex1.api.waitForOrderStatus(order, expectedStatus)
   }
 

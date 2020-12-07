@@ -182,7 +182,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
           dex1.api.getReservedBalance(bob) shouldBe Map(assetPair.priceAsset -> 300600000L)
 
-          dex1.api.cancel(bob, bestBidOrder)
+          dex1.api.cancelOrder(bob, bestBidOrder)
 
           dex1.api.getReservedBalance(bob) shouldBe empty
           cancelAll(alice)
@@ -402,7 +402,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
           feeIsOutOfDeviationBounds("0.00359999", assetPair.priceAssetStr, BUY)
         )
 
-        dex1.api.cancel(alice, bestAskOrder)
+        dex1.api.cancelOrder(alice, bestAskOrder)
 
         val bestBidOrder = mkOrder(bob, assetPair, BUY, 1000.waves, 1200000, 4 * matcherFee, feeAsset = assetPair.priceAsset)
         placeAndAwaitAtDex(bestBidOrder)
@@ -428,7 +428,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
           feeIsOutOfDeviationBounds("3.59", wavesUsdPair.priceAssetStr, BUY)
         )
 
-        dex1.api.cancel(bob, bestAskOrder)
+        dex1.api.cancelOrder(bob, bestAskOrder)
 
         val bestBidOrder = mkOrder(alice, wavesUsdPair, BUY, 1000.waves, 1200, 4 * 300, feeAsset = wavesUsdPair.priceAsset)
         placeAndAwaitAtDex(bestBidOrder)

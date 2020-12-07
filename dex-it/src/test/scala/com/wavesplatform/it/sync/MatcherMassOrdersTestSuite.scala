@@ -46,7 +46,7 @@ class MatcherMassOrdersTestSuite extends MatcherSuiteBase {
       // Alice places sell orders
       List(aliceOrderFill, alicePartialOrder, aliceOrderToCancel, aliceActiveOrder).foreach(dex1.api.place)
 
-      dex1.api.cancel(alice, aliceOrderToCancel) // TODO: remove this line in DEX-160
+      dex1.api.cancelOrder(alice, aliceOrderToCancel) // TODO: remove this line in DEX-160
       dex1.api.waitForOrderStatus(aliceOrderToCancel, Status.Cancelled)
 
       // Bob orders should partially fill one Alice order and fill another

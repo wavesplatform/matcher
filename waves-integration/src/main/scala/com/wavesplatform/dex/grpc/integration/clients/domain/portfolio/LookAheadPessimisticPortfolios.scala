@@ -3,7 +3,6 @@ package com.wavesplatform.dex.grpc.integration.clients.domain.portfolio
 import com.google.protobuf.ByteString
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
-import com.wavesplatform.dex.grpc.integration.services.UtxTransaction
 
 import scala.collection.mutable
 import scala.util.chaining._
@@ -19,12 +18,12 @@ class LookAheadPessimisticPortfolios(orig: PessimisticPortfolios, maxForgedTrans
   override def getAggregated(address: Address): Map[Asset, Long] = orig.getAggregated(address)
 
   // DEX-1004
-  override def replaceWith(setTxs: Seq[UtxTransaction]): Set[Address] = {
+  override def replaceWith(setTxs: Seq[PessimisticTransaction]): Set[Address] = {
     val filteredSetTxs = setTxs.filterNot(remove) // Without unknown
     orig.replaceWith(filteredSetTxs)
   }
 
-  override def addPending(txs: Seq[UtxTransaction]): Set[Address] = {
+  override def addPending(txs: Seq[PessimisticTransaction]): Set[Address] = {
     val filteredTxs = txs.filterNot(remove)
     orig.addPending(filteredTxs)
   }
@@ -32,12 +31,11 @@ class LookAheadPessimisticPortfolios(orig: PessimisticPortfolios, maxForgedTrans
   /**
    * @return (affected addresses, unknown transactions)
    */
-  override def processForged(txIds: Seq[ByteString]): (Set[Address], List[ByteString]) = {
+  override def processForged(txIds: Seq[ByteString]): (Set[Address], List[ByteString]) =
     // We don't filter, because a transaction can't be forged twice
     orig.processForged(txIds).tap { case (_, unknownTxIds) =>
       unknownTxIds.foreach(put)
     }
-  }
 
   override def removeFailed(txIds: Seq[ByteString]): Set[Address] = orig.removeFailed(txIds)
 
@@ -48,7 +46,7 @@ class LookAheadPessimisticPortfolios(orig: PessimisticPortfolios, maxForgedTrans
     }
   }
 
-  private def remove(tx: UtxTransaction): Boolean = remove(tx.id)
+  private def remove(tx: PessimisticTransaction): Boolean = remove(tx.txId)
 
   private def remove(id: ByteString): Boolean = forgedTxs.remove(id).tap { had =>
     if (had) forgedTxsEvictionQueue.removeFirst(_ == id)

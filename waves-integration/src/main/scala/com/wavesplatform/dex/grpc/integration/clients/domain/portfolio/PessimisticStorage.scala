@@ -6,6 +6,7 @@ import com.wavesplatform.dex.domain.asset.Asset
 
 import scala.collection.mutable
 
+// TODO move to DefaultPessimisticPortfolios?
 private[portfolio] class PessimisticStorage {
   // Longs are negative in both maps, see getPessimisticPortfolio
   val portfolios = new mutable.AnyRefMap[Address, Map[Asset, Long]]()

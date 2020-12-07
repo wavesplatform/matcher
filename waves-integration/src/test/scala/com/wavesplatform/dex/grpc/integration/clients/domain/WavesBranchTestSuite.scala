@@ -6,7 +6,7 @@ import cats.Monoid
 import cats.syntax.either._
 import cats.syntax.option._
 import cats.syntax.semigroup._
-import com.wavesplatform.dex.WavesIntegrationSuiteBase
+import com.wavesplatform.dex.{NoShrink, WavesIntegrationSuiteBase}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -17,10 +17,7 @@ import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
 import scala.util.matching.Regex
 
-class WavesBranchTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrivenPropertyChecks {
-
-  // NoShrink
-  implicit def noShrink[A]: Shrink[A] = Shrink.withLazyList(_ => LazyList.empty) // TODO DEX-994
+class WavesBranchTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrivenPropertyChecks with NoShrink {
 
   private val alice = KeyPair(ByteStr("alice".getBytes(StandardCharsets.UTF_8))).toAddress
   private val bob = KeyPair(ByteStr("bob".getBytes(StandardCharsets.UTF_8))).toAddress

@@ -6,9 +6,10 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.utils.ScorexLogging
+import com.wavesplatform.dex.grpc.integration.clients.domain.portfolio.Implicits._
 import com.wavesplatform.dex.grpc.integration.services.UtxTransaction
 
-private[clients] class SynchronizedPessimisticPortfolios() extends PessimisticPortfolios with ScorexLogging {
+private[clients] class SynchronizedPessimisticPortfolios() extends ScorexLogging {
 
   private val storage = new PessimisticStorage
   private val orig = new LookAheadPessimisticPortfolios(new DefaultPessimisticPortfolios(storage), 10000) // TODO setting
@@ -25,7 +26,7 @@ private[clients] class SynchronizedPessimisticPortfolios() extends PessimisticPo
 
   // TODO DEX-1013
   def replaceWith(setTxs: Seq[UtxTransaction]): Set[Address] = write {
-    orig.replaceWith(setTxs)
+    orig.replaceWith(setTxs.map(x => PessimisticTransaction(x.id, x.pessimisticPortfolio)))
   }
 
   // TODO DEX-1013
@@ -43,7 +44,7 @@ private[clients] class SynchronizedPessimisticPortfolios() extends PessimisticPo
 
   // TODO DEX-1013
   def addPending(txs: Seq[UtxTransaction]): Set[Address] = write {
-    orig.addPending(txs)
+    orig.addPending(txs.map(x => PessimisticTransaction(x.id, x.pessimisticPortfolio)))
   }
 
   def getAggregated(address: Address): Map[Asset, Long] = read(orig.getAggregated(address))

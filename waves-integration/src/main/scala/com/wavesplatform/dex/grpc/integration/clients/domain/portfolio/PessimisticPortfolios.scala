@@ -3,13 +3,12 @@ package com.wavesplatform.dex.grpc.integration.clients.domain.portfolio
 import com.google.protobuf.ByteString
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
-import com.wavesplatform.dex.grpc.integration.services.UtxTransaction
 
 trait PessimisticPortfolios {
   def getAggregated(address: Address): Map[Asset, Long]
 
-  def replaceWith(setTxs: Seq[UtxTransaction]): Set[Address]
-  def addPending(txs: Seq[UtxTransaction]): Set[Address]
+  def replaceWith(setTxs: Seq[PessimisticTransaction]): Set[Address]
+  def addPending(txs: Seq[PessimisticTransaction]): Set[Address]
 
   /**
    * @return (affected addresses, unknown transactions)

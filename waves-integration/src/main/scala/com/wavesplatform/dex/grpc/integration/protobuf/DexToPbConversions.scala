@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.grpc.integration.protobuf
 
-import com.google.protobuf.{ByteString => PbByteString}
+import com.google.protobuf.{UnsafeByteOperations, ByteString => PbByteString}
 import com.wavesplatform.dex.domain.account.{Address => VAddress, AddressScheme => VAddressScheme}
 import com.wavesplatform.dex.domain.asset.{Asset => VAsset}
 import com.wavesplatform.dex.domain.bytes.{ByteStr => VByteStr}
@@ -72,7 +72,7 @@ object DexToPbConversions {
   }
 
   implicit class VanillaByteStrOps(val self: VByteStr) extends AnyVal {
-    def toPB: PbByteString = PbByteString.copyFrom(self.arr)
+    def toPB: PbByteString = UnsafeByteOperations.unsafeWrap(self) // PbByteString.copyFrom(self.arr)
   }
 
 }

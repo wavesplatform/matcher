@@ -10,13 +10,11 @@ import cats.syntax.option._
 import com.google.protobuf.ByteString
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
-import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.fp.MapImplicits.cleaningGroup
-import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions._
 
 import scala.collection.mutable
 
-class DefaultPessimisticPortfolios() extends PessimisticPortfolios with ScorexLogging {
+class DefaultPessimisticPortfolios() extends PessimisticPortfolios {
   // Longs are negative in both maps, see getPessimisticPortfolio
   private val portfolios = new mutable.AnyRefMap[Address, Map[Asset, Long]]()
   private val txs = new mutable.AnyRefMap[ByteString, Map[Address, Map[Asset, Long]]]
@@ -56,37 +54,29 @@ class DefaultPessimisticPortfolios() extends PessimisticPortfolios with ScorexLo
             .some
         }
       }
-      log.info(s"replaceWith ids=${setTxMap.keySet.map(_.toVanilla)}, diff=$diff, txs=$setTxs")
       diff.keySet
     }
   }
 
-  override def addPending(txs: Seq[PessimisticTransaction]): Set[Address] = {
-    log.info(s"addPending: ${txs.map(_.txId.toVanilla).mkString(", ")}")
+  override def addPending(txs: Seq[PessimisticTransaction]): Set[Address] =
     txs.toList.foldMapK[Set, Address](addUnsafe)
-  }
 
   /**
    * @return (affected addresses, unknown transactions)
    */
-  override def processForged(txIds: Seq[ByteString]): (Set[Address], List[ByteString]) = {
-    log.info(s"processForged: ${txIds.map(_.toVanilla)}")
+  override def processForged(txIds: Seq[ByteString]): (Set[Address], List[ByteString]) =
     txIds.toList.foldMap { txId =>
       val (known, affected) = removeUnsafe(txId)
       (affected, if (known) Nil else List(txId))
     }
-  }
 
   override def removeFailed(txIds: Seq[ByteString]): Set[Address] = ???
 
   private def addUnsafe(tx: PessimisticTransaction): Set[Address] = {
     val id = tx.txId
-    if (txs.contains(id)) {
-      log.info(s"addUnsafe: already has ${id.toVanilla}")
-      Set.empty
-    } else {
+    if (txs.contains(id)) Set.empty
+    else {
       val finalP = tx.pessimisticPortfolio
-      log.info(s"addUnsafe: id=${id.toVanilla}, diff=$finalP, tx=$tx")
       // TODO we calculate and check only in the and?
       if (txs.put(id, finalP).isEmpty) {
         finalP.foreach {
@@ -103,17 +93,12 @@ class DefaultPessimisticPortfolios() extends PessimisticPortfolios with ScorexLo
   private def removeUnsafe(txId: ByteString): (Boolean, Set[Address]) = {
     val tx = txs.remove(txId)
     val affectedAddresses = tx match {
-      case None =>
-        log.info(s"removeUnsafe: wasn't id=${txId.toVanilla}")
-        Set.empty[Address]
+      case None => Set.empty[Address]
       case Some(p) =>
-        log.info(s"removeUnsafe: id=${txId.toVanilla}, diff=$p")
         p.foreach {
           case (address, p) =>
             portfolios.updateWith(address) { prev =>
-              val r = prev.map(xs => (xs |-| p).filter(_._2 < 0)).filter(_.nonEmpty)
-              log.info(s"removeUnsafe of $address: $prev -> $r")
-              r
+              prev.map(xs => (xs |-| p).filter(_._2 < 0)).filter(_.nonEmpty)
             }
         }
         p.keySet

@@ -5,13 +5,13 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 import com.google.protobuf.ByteString
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
-import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.clients.domain.portfolio.Implicits._
+import com.wavesplatform.dex.grpc.integration.clients.domain.portfolio.SynchronizedPessimisticPortfolios.Settings
 import com.wavesplatform.dex.grpc.integration.services.UtxTransaction
 
-private[clients] class SynchronizedPessimisticPortfolios() extends ScorexLogging {
+class SynchronizedPessimisticPortfolios(settings: Settings) {
 
-  private val orig = new LookAheadPessimisticPortfolios(new DefaultPessimisticPortfolios(), 10000) // TODO setting
+  private val orig = new LookAheadPessimisticPortfolios(new DefaultPessimisticPortfolios(), settings.maxForgedTransactions)
 
   private val reentrantLock = new ReentrantReadWriteLock()
 
@@ -48,4 +48,8 @@ private[clients] class SynchronizedPessimisticPortfolios() extends ScorexLogging
 
   def getAggregated(address: Address): Map[Asset, Long] = read(orig.getAggregated(address))
 
+}
+
+object SynchronizedPessimisticPortfolios {
+  case class Settings(maxForgedTransactions: Int)
 }

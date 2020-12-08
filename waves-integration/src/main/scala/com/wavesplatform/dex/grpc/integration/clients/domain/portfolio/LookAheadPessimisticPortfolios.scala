@@ -19,12 +19,13 @@ class LookAheadPessimisticPortfolios(orig: PessimisticPortfolios, maxForgedTrans
 
   // DEX-1004
   override def replaceWith(setTxs: Seq[PessimisticTransaction]): Set[Address] = {
-    val filteredSetTxs = setTxs.filterNot(remove) // Without unknown
-    orig.replaceWith(filteredSetTxs)
+    forgedTxs.clear()
+    forgedTxsEvictionQueue.clear()
+    orig.replaceWith(setTxs)
   }
 
   override def addPending(txs: Seq[PessimisticTransaction]): Set[Address] = {
-    val filteredTxs = txs.filterNot(remove)
+    val filteredTxs = txs.filterNot(remove) // Without unknown
     orig.addPending(filteredTxs)
   }
 

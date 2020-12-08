@@ -47,7 +47,7 @@ class CombinedWavesBlockchainClient(
 
   private val knownBalances: AtomicReference[BlockchainBalance] = new AtomicReference(Monoid.empty[BlockchainBalance])
 
-  private val pessimisticPortfolios = new SynchronizedPessimisticPortfolios()
+  private val pessimisticPortfolios = new SynchronizedPessimisticPortfolios(SynchronizedPessimisticPortfolios.Settings(10000)) // TODO
 
   private val dataUpdates = ConcurrentSubject.publish[WavesNodeEvent]
 

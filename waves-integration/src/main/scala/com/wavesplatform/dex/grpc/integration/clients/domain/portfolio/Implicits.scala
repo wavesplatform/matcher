@@ -12,7 +12,7 @@ object Implicits {
   // Probably we need to move ByteString -> Address conversion further
   implicit final class UtxTransactionOps(val self: UtxTransaction) extends AnyVal {
 
-    // TODO DEX-995 Could we do it faster? TODO test
+    // TODO DEX-1023 Could we do it faster?
     def pessimisticPortfolio: AddressAssets = self.diff.flatMap(_.stateUpdate)
       .fold(Map.empty[Address, Map[Asset, Long]]) { diff =>
         // Balances

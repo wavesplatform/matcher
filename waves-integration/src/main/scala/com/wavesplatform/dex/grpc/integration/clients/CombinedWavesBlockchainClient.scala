@@ -105,7 +105,8 @@ class CombinedWavesBlockchainClient(
 
   // TODO DEX-1013
   private def processUtxEvent(event: WavesNodeUtxEvent): Set[Address] = event match {
-    case WavesNodeUtxEvent.Added(txs) => pessimisticPortfolios.addPending(txs) // Because we remove them during adding a full/micro block
+    case WavesNodeUtxEvent.Updated(newTxs, failedTxs) =>
+      pessimisticPortfolios.addPending(newTxs) |+| pessimisticPortfolios.removeFailed(failedTxs.map(_.id))
     case WavesNodeUtxEvent.Forged(txIds) => pessimisticPortfolios.processForged(txIds)._1
     case WavesNodeUtxEvent.Switched(newTxs) => pessimisticPortfolios.replaceWith(newTxs)
   }

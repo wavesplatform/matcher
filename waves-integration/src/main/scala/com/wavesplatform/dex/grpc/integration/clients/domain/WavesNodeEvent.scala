@@ -37,8 +37,8 @@ object WavesNodeEvent {
     override def toString: String = "DataReceived"
   }
 
-  case class UtxAdded(txs: Seq[UtxTransaction]) extends WavesNodeEvent {
-    override def toString: String = s"UtxAdded(${txsToString(txs)})"
+  case class UtxUpdated(addedTxs: Seq[UtxTransaction], failedTxs: Seq[UtxTransaction]) extends WavesNodeEvent {
+    override def toString: String = s"UtxUpdated(a=${txsToString(addedTxs)}, f=${txsToString(failedTxs)})"
   }
 
   case class UtxSwitched(newTxs: Seq[UtxTransaction]) extends WavesNodeEvent {
@@ -48,7 +48,7 @@ object WavesNodeEvent {
   sealed trait WavesNodeUtxEvent extends Product with Serializable
 
   object WavesNodeUtxEvent {
-    case class Added(txs: Seq[UtxTransaction]) extends WavesNodeUtxEvent
+    case class Updated(newTxs: Seq[UtxTransaction], failedTxs: Seq[UtxTransaction]) extends WavesNodeUtxEvent
     case class Forged(txIds: Seq[ByteString]) extends WavesNodeUtxEvent
     case class Switched(newTxs: Seq[UtxTransaction]) extends WavesNodeUtxEvent
   }

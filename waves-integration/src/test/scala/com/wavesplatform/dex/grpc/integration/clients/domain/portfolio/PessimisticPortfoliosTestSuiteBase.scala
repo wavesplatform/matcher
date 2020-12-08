@@ -82,9 +82,26 @@ abstract class PessimisticPortfoliosTestSuiteBase
       }
     }
 
-    // TODO DEX-1021
-    // TODO DEX-1013 Test results
-    "removeFailed" ignore {}
+    "removeFailed" - {
+      val testGen = for {
+        initialTxs <- Gen.listOf(pessimisticTransactionGen)
+        failedTxIds <- Gen.listOf(Gen.oneOf(mkPBTxId :: initialTxs.map(_.txId))) // + random tx id
+      } yield (initialTxs, failedTxIds)
+
+      // TODO DEX-1013 Test results
+      "the new state combined with failed txs changes should be equal to the previous state" in forAll(testGen) {
+        case (initialTxs, failedTxIds) =>
+          val pp = mkPessimisticPortfolios(initialTxs)
+
+          val initialTxsMap = initialTxs.map(x => x.txId -> x).toMap
+          val forgedTxsChanges = failedTxIds.distinct.foldMap(id => initialTxsMap.get(id).fold(Map.empty: AddressAssets)(_.pessimisticPortfolio))
+          val before = getState(pp)
+
+          pp.removeFailed(failedTxIds)
+
+          combine(getState(pp), forgedTxsChanges) should matchTo(before)
+      }
+    }
   }
 
   def collectChanges(txs: List[PessimisticTransaction]): AddressAssets = combine(txs.map(_.pessimisticPortfolio): _*)

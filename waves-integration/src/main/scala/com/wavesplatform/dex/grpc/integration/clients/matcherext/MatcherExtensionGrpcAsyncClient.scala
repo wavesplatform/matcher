@@ -184,8 +184,17 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
     private def toEvent(event: UtxEvent): Option[WavesNodeEvent] = event.`type` match {
       case UtxEvent.Type.Switch(event) => WavesNodeEvent.UtxSwitched(event.transactions).some
       case UtxEvent.Type.Update(event) =>
-        if (event.added.isEmpty) none
-        else WavesNodeEvent.UtxAdded(event.added.flatMap(_.transaction)).some
+        val failedTxs = event.removed.flatMap { tx =>
+          tx.reason match {
+            case None => none // Because we remove them during adding a full/micro block
+            case Some(reason) =>
+              tx.transaction.tapEach { tx =>
+                log.info(s"${tx.id.toVanilla} failed: ${reason.name}, ${reason.message}")
+              }
+          }
+        }
+        if (event.added.isEmpty && failedTxs.isEmpty) none
+        else WavesNodeEvent.UtxUpdated(event.added.flatMap(_.transaction), failedTxs).some
       case _ =>
         log.warn(s"Can't convert to event: $event")
         none

@@ -89,6 +89,7 @@ object Dependencies {
   private def kamonModule(module: String, version: String): ModuleID = "io.kamon" %% s"kamon-$module" % version
   private def jwtModule(module: String): ModuleID = "com.pauldijou" %% s"jwt-$module" % Version.jwt
 
+  private val alleyCatsCore = "org.typelevel" %% "alleycats-core" % Version.cats
   private val parCollections = "org.scala-lang.modules" %% "scala-parallel-collections" % Version.parCollections
   private val akkaActor = akkaModule("akka-actor", Version.akka)
   private val akkaActorTyped = akkaModule("akka-actor-typed", Version.akka)
@@ -200,6 +201,7 @@ object Dependencies {
       catsModule("kernel"),
       catsModule("macros"),
       catsCore,
+      alleyCatsCore,
       shapeless,
       kamonCore,
       typesafeConfig,
@@ -253,6 +255,7 @@ object Dependencies {
       sttpModule("play-json"),
       sttpModule("async-http-client-backend-future"),
       catsCore,
+      alleyCatsCore,
       catsTaglessMacros,
       typesafeConfig,
       mouse,
@@ -274,6 +277,7 @@ object Dependencies {
       playJson,
       scorexCrypto,
       catsCore,
+      alleyCatsCore,
       supertagged,
       monixReactive,
       betterMonadicFor,

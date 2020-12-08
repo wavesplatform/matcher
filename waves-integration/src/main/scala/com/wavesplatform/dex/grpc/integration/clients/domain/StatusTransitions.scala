@@ -39,10 +39,10 @@ object StatusTransitions extends ScorexLogging {
                 )
             }
 
-          case UtxAdded(txs) =>
+          case UtxUpdated(newTxs, failedTxs) =>
             StatusUpdate(
               newStatus = origStatus,
-              processUtxEvents = Queue(WavesNodeUtxEvent.Added(txs))
+              processUtxEvents = Queue(WavesNodeUtxEvent.Updated(newTxs, failedTxs))
             )
 
           case UtxSwitched(newTxs) =>
@@ -95,7 +95,7 @@ object StatusTransitions extends ScorexLogging {
                     ),
                     requestBalances = lostDiffIndex,
                     updatedLastBlockHeight = LastBlockHeight.NotChanged,
-                    processUtxEvents = Queue.empty,
+                    processUtxEvents = Queue.empty
                     // requestNextBlockchainEvent = true // Because we are waiting for DataReceived
                   )
 
@@ -119,8 +119,9 @@ object StatusTransitions extends ScorexLogging {
                 )
             }
 
-          case UtxAdded(txs) =>
-            StatusUpdate(newStatus = origStatus.copy(utxEventsStash = origStatus.utxEventsStash.enqueue(WavesNodeUtxEvent.Added(txs))))
+          case UtxUpdated(newTxs, failedTxs) =>
+            StatusUpdate(newStatus =
+              origStatus.copy(utxEventsStash = origStatus.utxEventsStash.enqueue(WavesNodeUtxEvent.Updated(newTxs, failedTxs))))
 
           case UtxSwitched(newTxs) =>
             StatusUpdate(newStatus = origStatus.copy(utxEventsStash = origStatus.utxEventsStash.enqueue(WavesNodeUtxEvent.Switched(newTxs))))
@@ -158,7 +159,7 @@ object StatusTransitions extends ScorexLogging {
             StatusUpdate(
               newStatus = origStatus,
               requestNextBlockchainEvent = event match {
-                case _: UtxAdded | _: UtxSwitched => false
+                case _: UtxUpdated | _: UtxSwitched => false
                 case _ => true // If this really happen, we eventually fail to append a new block
               }
             )

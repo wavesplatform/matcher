@@ -45,11 +45,12 @@ object WavesClientBuilder extends ScorexLogging {
         .build
 
     new CombinedWavesBlockchainClient(
+      wavesBlockchainClientSettings.combinedClientSettings,
       meClient = new MatcherExtensionCachingClient(
         new MatcherExtensionGrpcAsyncClient(eventLoopGroup, matcherExtensionChannel, monixScheduler)(grpcExecutionContext),
         wavesBlockchainClientSettings.defaultCachesExpiration
       )(grpcExecutionContext),
-      bClient = new DefaultBlockchainUpdatesClient(eventLoopGroup, blockchainUpdatesChannel, monixScheduler)(grpcExecutionContext)
+      bClient = new DefaultBlockchainUpdatesClient(eventLoopGroup, blockchainUpdatesChannel, monixScheduler)(grpcExecutionContext),
     )(grpcExecutionContext, monixScheduler)
   }
 

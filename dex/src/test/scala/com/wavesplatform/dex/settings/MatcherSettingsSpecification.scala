@@ -10,6 +10,8 @@ import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.utils.EitherExt2
+import com.wavesplatform.dex.grpc.integration.clients.CombinedWavesBlockchainClient
+import com.wavesplatform.dex.grpc.integration.clients.domain.portfolio.SynchronizedPessimisticPortfolios
 import com.wavesplatform.dex.grpc.integration.settings.{GrpcClientSettings, WavesBlockchainClientSettings}
 import com.wavesplatform.dex.model.Implicits.AssetPairOps
 import com.wavesplatform.dex.queue.LocalMatcherQueue
@@ -66,7 +68,10 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
           )
         ),
         defaultCachesExpiration = 101.millis,
-        balanceStreamBufferSize = 100
+        balanceStreamBufferSize = 100,
+        combinedClientSettings = CombinedWavesBlockchainClient.Settings(
+          pessimisticPortfolios = SynchronizedPessimisticPortfolios.Settings(400)
+        )
       )
     )
 

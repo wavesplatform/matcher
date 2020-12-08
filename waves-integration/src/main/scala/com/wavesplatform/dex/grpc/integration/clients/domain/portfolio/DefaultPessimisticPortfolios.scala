@@ -77,13 +77,9 @@ class DefaultPessimisticPortfolios() extends PessimisticPortfolios {
     if (txs.contains(id)) Set.empty
     else {
       val finalP = tx.pessimisticPortfolio
-      // TODO we calculate and check only in the and?
-      if (txs.put(id, finalP).isEmpty) {
-        finalP.foreach {
-          case (address, p) => portfolios.updateWith(address)(_.foldLeft(p)(_ |+| _).some)
-        }
-        finalP.keySet
-      } else Set.empty
+      txs.put(id, finalP)
+      finalP.foreach { case (address, p) => portfolios.updateWith(address)(_.foldLeft(p)(_ |+| _).some) }
+      finalP.keySet
     }
   }
 

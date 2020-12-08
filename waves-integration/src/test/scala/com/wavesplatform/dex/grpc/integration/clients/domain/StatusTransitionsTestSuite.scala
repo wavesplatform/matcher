@@ -13,7 +13,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.grpc.integration.clients.domain.BlockchainStatus.{Normal, TransientResolving, TransientRollback}
 import com.wavesplatform.dex.grpc.integration.clients.domain.StatusUpdate.LastBlockHeight
-import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeEvent.{Appended, DataReceived, RolledBack, UtxAdded, UtxSwitched, WavesNodeUtxEvent}
+import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeEvent.{Appended, DataReceived, RolledBack, UtxUpdated, UtxSwitched, WavesNodeUtxEvent}
 import com.wavesplatform.dex.grpc.integration.services.UtxTransaction
 
 import scala.collection.immutable.Queue
@@ -48,7 +48,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
           )
 
           val init = Normal(WavesBranch(List.empty, 0))
-          val event = Appended(block = newBlock, forgedTxIds = Seq.empty)
+          val event = Appended(block = newBlock, forgedTxIds = Nil)
           StatusTransitions(init, event) should matchTo(StatusUpdate(
             newStatus = Normal(WavesBranch(List(newBlock), 1)),
             updatedBalances = updatedBalances1,
@@ -66,7 +66,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
               tpe = WavesBlock.Type.FullBlock
             )
             val init = Normal(WavesBranch(List(block1), block1.ref.height))
-            val event = Appended(block = block1, forgedTxIds = Seq.empty)
+            val event = Appended(block = block1, forgedTxIds = Nil)
             StatusTransitions(init, event) should matchTo(StatusUpdate(
               newStatus = TransientRollback(
                 fork = WavesFork(init.main, WavesBranch(List.empty, 1), connected = false),
@@ -79,13 +79,13 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
       }
 
       "[UtxEvent] -> Normal, where [UtxEvent] is" - {
-        "UtxAdded" in {
+        "UtxUpdated" in {
           val init = Normal(WavesBranch(List.empty, 0))
-          val txs = Seq(UtxTransaction(id = UnsafeByteOperations.unsafeWrap(Array[Byte](5, 6, 7))))
-          val event = UtxAdded(txs)
+          val newTxs = Seq(UtxTransaction(id = UnsafeByteOperations.unsafeWrap(Array[Byte](5, 6, 7))))
+          val event = UtxUpdated(newTxs, Nil)
           StatusTransitions(init, event) should matchTo(StatusUpdate(
             newStatus = init,
-            processUtxEvents = Queue(WavesNodeUtxEvent.Added(txs)),
+            processUtxEvents = Queue(WavesNodeUtxEvent.Updated(newTxs, Nil)),
             updatedLastBlockHeight = StatusUpdate.LastBlockHeight.NotChanged
           ))
         }
@@ -194,7 +194,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
             tpe = WavesBlock.Type.MicroBlock
           )
 
-          val event = Appended(block = microBlock, forgedTxIds = Seq.empty)
+          val event = Appended(block = microBlock, forgedTxIds = Nil)
 
           StatusTransitions(init, event) should matchTo(StatusUpdate(
             newStatus = Normal(
@@ -218,7 +218,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
               tpe = WavesBlock.Type.FullBlock
             )
 
-            val event = Appended(block = newBlock, forgedTxIds = Seq.empty)
+            val event = Appended(block = newBlock, forgedTxIds = Nil)
 
             // See StatusTransitions
             StatusTransitions(init, event) should matchTo(StatusUpdate(
@@ -251,7 +251,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
               utxEventsStash = Queue.empty
             )
 
-            val event = Appended(block = block2B, forgedTxIds = Seq.empty)
+            val event = Appended(block = block2B, forgedTxIds = Nil)
 
             StatusTransitions(init, event) should matchTo(StatusUpdate(
               newStatus = TransientRollback(
@@ -274,7 +274,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
             tpe = WavesBlock.Type.MicroBlock
           )
 
-          val event = Appended(block = microBlock, forgedTxIds = Seq.empty)
+          val event = Appended(block = microBlock, forgedTxIds = Nil)
 
           StatusTransitions(init, event) should matchTo(StatusUpdate(
             newStatus = TransientResolving(
@@ -292,12 +292,12 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
       }
 
       "[UtxEvent] -> TransientRollback, where [UtxEvent] is" - {
-        "UtxAdded" in {
-          val txs = Seq(UtxTransaction(id = UnsafeByteOperations.unsafeWrap(Array[Byte](5, 6, 7))))
-          val event = UtxAdded(txs)
+        "UtxUpdated" in {
+          val newTxs = Seq(UtxTransaction(id = UnsafeByteOperations.unsafeWrap(Array[Byte](5, 6, 7))))
+          val event = UtxUpdated(newTxs, Nil)
           StatusTransitions(init, event) should matchTo(StatusUpdate(
             newStatus = init.copy(
-              utxEventsStash = Queue(WavesNodeUtxEvent.Added(txs))
+              utxEventsStash = Queue(WavesNodeUtxEvent.Updated(newTxs, Nil))
             )
           ))
         }
@@ -383,12 +383,12 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
           tpe = WavesBlock.Type.MicroBlock
         )
 
-        stashedTest(Appended(block = microBlock2, forgedTxIds = Seq.empty), requestNextBlockchainEvent = true)
+        stashedTest(Appended(block = microBlock2, forgedTxIds = Nil), requestNextBlockchainEvent = true)
       }
 
       "[UtxEvent] -> TransientResolving, where [UtxEvent] is" - {
-        "UtxAdded" in stashedTest(UtxAdded(Seq.empty))
-        "UtxSwitched" in stashedTest(UtxSwitched(Seq.empty))
+        "UtxUpdated" in stashedTest(UtxUpdated(Nil, Nil))
+        "UtxSwitched" in stashedTest(UtxSwitched(Nil))
       }
 
       "[RolledBack] -> TransientResolving, where [RolledBack] is" - {

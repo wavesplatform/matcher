@@ -24,21 +24,19 @@ class LookAheadPessimisticPortfolios(orig: PessimisticPortfolios, maxForgedTrans
     orig.replaceWith(setTxs)
   }
 
-  override def addPending(txs: Seq[PessimisticTransaction]): Set[Address] = {
-    val filteredTxs = txs.filterNot(remove) // Without unknown
-    orig.addPending(filteredTxs)
-  }
+  override def addPending(txs: Iterable[PessimisticTransaction]): Set[Address] =
+    orig.addPending(txs.filterNot(remove)) // Without unknown
 
   /**
    * @return (affected addresses, unknown transactions)
    */
-  override def processForged(txIds: Seq[ByteString]): (Set[Address], List[ByteString]) =
+  override def processForged(txIds: Iterable[ByteString]): (Set[Address], List[ByteString]) =
     // We don't filter, because a transaction can't be forged twice
     orig.processForged(txIds).tap { case (_, unknownTxIds) =>
       unknownTxIds.foreach(put)
     }
 
-  override def removeFailed(txIds: Seq[ByteString]): Set[Address] =
+  override def removeFailed(txIds: Iterable[ByteString]): Set[Address] =
     // txIds.foreach(remove) // a transaction can't be forged and failed both. Also we update caches in replaceWith, DEX-1004
     orig.removeFailed(txIds)
 

@@ -1,9 +1,10 @@
 package com.wavesplatform.dex.grpc.integration.clients.domain.portfolio
 
+import alleycats.std.iterable._
 import cats.instances.list._
 import cats.instances.long._
-import cats.instances.set._
 import cats.instances.tuple._
+import cats.kernel.Semigroup
 import cats.syntax.foldable._
 import cats.syntax.group._
 import cats.syntax.option._
@@ -13,6 +14,7 @@ import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.fp.MapImplicits.cleaningGroup
 
 import scala.collection.mutable
+import scala.util.chaining._
 
 class DefaultPessimisticPortfolios() extends PessimisticPortfolios {
   // Longs are negative in both maps, see getPessimisticPortfolio
@@ -58,48 +60,36 @@ class DefaultPessimisticPortfolios() extends PessimisticPortfolios {
     }
   }
 
-  override def addPending(txs: Seq[PessimisticTransaction]): Set[Address] =
-    txs.toList.foldMapK[Set, Address](addUnsafe)
+  override def addPending(addTxs: Iterable[PessimisticTransaction]): Set[Address] = {
+    val pessimisticChanges = addTxs
+      .filterNot(addTxs => txs.contains(addTxs.txId))
+      .foldMap[AddressAssets](tx => tx.pessimisticPortfolio.tap(txs.put(tx.txId, _)))
+
+    pessimisticChanges.foreach { case (address, p) => portfolios.updateWith(address)(_.foldLeft(p)(Semigroup.combine).some) }
+    pessimisticChanges.keySet
+  }
 
   /**
    * @return (affected addresses, unknown transactions)
    */
-  override def processForged(txIds: Seq[ByteString]): (Set[Address], List[ByteString]) =
-    txIds.toList.foldMap { txId =>
-      val (known, affected) = removeUnsafe(txId)
-      (affected, if (known) Nil else List(txId))
+  override def processForged(txIds: Iterable[ByteString]): (Set[Address], List[ByteString]) = {
+    val (pessimisticChangesToRevert, unknownTxIds) = txIds.foldMap[(AddressAssets, List[ByteString])] { txId =>
+      txs.remove(txId).fold[(AddressAssets, List[ByteString])]((Map.empty, List(txId)))((_, Nil))
     }
-
-  override def removeFailed(txIds: Seq[ByteString]): Set[Address] = ???
-
-  private def addUnsafe(tx: PessimisticTransaction): Set[Address] = {
-    val id = tx.txId
-    if (txs.contains(id)) Set.empty
-    else {
-      val finalP = tx.pessimisticPortfolio
-      txs.put(id, finalP)
-      finalP.foreach { case (address, p) => portfolios.updateWith(address)(_.foldLeft(p)(_ |+| _).some) }
-      finalP.keySet
-    }
+    revert(pessimisticChangesToRevert)
+    (pessimisticChangesToRevert.keySet, unknownTxIds)
   }
 
-  /**
-   * @return (known?, affected addresses)
-   */
-  private def removeUnsafe(txId: ByteString): (Boolean, Set[Address]) = {
-    val tx = txs.remove(txId)
-    val affectedAddresses = tx match {
-      case None => Set.empty[Address]
-      case Some(p) =>
-        p.foreach {
-          case (address, p) =>
-            portfolios.updateWith(address) { prev =>
-              prev.map(xs => (xs |-| p).filter(_._2 < 0)).filter(_.nonEmpty)
-            }
-        }
-        p.keySet
+  override def removeFailed(txIds: Iterable[ByteString]): Set[Address] = {
+    val pessimisticChangesToRevert = txIds.foldMap[AddressAssets](txs.remove(_).getOrElse(Map.empty))
+    revert(pessimisticChangesToRevert)
+    pessimisticChangesToRevert.keySet
+  }
+
+  private def revert(toRevert: AddressAssets): Unit = toRevert.foreach { case (address, toRevert) =>
+    portfolios.updateWith(address) { prev =>
+      prev.map(xs => (xs |-| toRevert).filter(_._2 < 0)).filter(_.nonEmpty)
     }
-    (tx.isDefined, affectedAddresses)
   }
 
 }

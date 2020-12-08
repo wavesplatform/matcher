@@ -123,8 +123,9 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |          connect-timeout = 100s
          |        }
          |      }
-         |      default-caches-expiration = 101ms,
+         |      default-caches-expiration = 101ms
          |      balance-stream-buffer-size = 100
+         |      combined-client-settings.pessimistic-portfolios.max-forged-transactions = 400
          |    }
          |    exchange-tx-base-fee = 300000
          |    actor-response-timeout = 11s

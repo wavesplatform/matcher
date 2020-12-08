@@ -19,10 +19,11 @@ import com.wavesplatform.dex.fp.MapImplicits.group
 import com.wavesplatform.dex.grpc.integration.clients.CombinedWavesBlockchainClient._
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.Updates
 import com.wavesplatform.dex.grpc.integration.clients.blockchainupdates.BlockchainUpdatesClient
+import com.wavesplatform.dex.grpc.integration.clients.domain.StatusUpdate.LastBlockHeight
+import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeEvent.WavesNodeUtxEvent
+import com.wavesplatform.dex.grpc.integration.clients.domain._
+import com.wavesplatform.dex.grpc.integration.clients.domain.portfolio.SynchronizedPessimisticPortfolios
 import com.wavesplatform.dex.grpc.integration.clients.matcherext.MatcherExtensionClient
-import com.wavesplatform.dex.grpc.integration.clients.status.StatusUpdate.LastBlockHeight
-import com.wavesplatform.dex.grpc.integration.clients.status.WavesNodeEvent.WavesNodeUtxEvent
-import com.wavesplatform.dex.grpc.integration.clients.status._
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import monix.eval.Task
 import monix.execution.Scheduler
@@ -35,9 +36,9 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 class CombinedWavesBlockchainClient(
+  settings: Settings,
   meClient: MatcherExtensionClient,
-  bClient: BlockchainUpdatesClient,
-  ignoredExchangeTxSenderPublicKey: Option[ByteStr]
+  bClient: BlockchainUpdatesClient
 )(implicit ec: ExecutionContext, monixScheduler: Scheduler)
     extends WavesBlockchainClient
     with ScorexLogging {
@@ -47,7 +48,7 @@ class CombinedWavesBlockchainClient(
 
   private val knownBalances: AtomicReference[BlockchainBalance] = new AtomicReference(Monoid.empty[BlockchainBalance])
 
-  private val pessimisticPortfolios = new PessimisticPortfolios(ignoredExchangeTxSenderPublicKey)
+  private val pessimisticPortfolios = new SynchronizedPessimisticPortfolios(settings.pessimisticPortfolios)
 
   private val dataUpdates = ConcurrentSubject.publish[WavesNodeEvent]
 
@@ -89,7 +90,7 @@ class CombinedWavesBlockchainClient(
       }
       .filter(_.nonEmpty)
       .map { updated => // TODO DEX-1014
-      updated.filter { case (address, updatedBalance) =>
+        updated.filter { case (address, updatedBalance) =>
           val prev = finalBalance.getOrElse(address, Map.empty).filter { case (k, _) => updatedBalance.contains(k) }
           val same = prev == updatedBalance
           if (!same) finalBalance.update(address, prev ++ updatedBalance)
@@ -105,20 +106,19 @@ class CombinedWavesBlockchainClient(
   // TODO DEX-1013
   private def processUtxEvent(event: WavesNodeUtxEvent): Set[Address] = event match {
     case WavesNodeUtxEvent.Added(txs) => pessimisticPortfolios.addPending(txs) // Because we remove them during adding a full/micro block
-    case WavesNodeUtxEvent.Forged(txIds) => pessimisticPortfolios.processForged(txIds)
+    case WavesNodeUtxEvent.Forged(txIds) => pessimisticPortfolios.processForged(txIds)._1
     case WavesNodeUtxEvent.Switched(newTxs) => pessimisticPortfolios.replaceWith(newTxs)
   }
 
   // TODO DEX-1015
   private def requestBalances(x: DiffIndex): Unit =
-    if (!x.isEmpty) {
+    if (!x.isEmpty)
       meClient.getBalances(x).onComplete {
         case Success(r) => dataUpdates.onNext(WavesNodeEvent.DataReceived(r))
         case Failure(e) =>
           log.warn("Got an error during requesting balances", e)
           requestBalances(x)
       }
-    }
 
   private def combineBalances(
     updatedRegular: Map[Asset, Long],
@@ -205,5 +205,7 @@ class CombinedWavesBlockchainClient(
 object CombinedWavesBlockchainClient {
 
   val MaxRollbackHeight = 100
+
+  case class Settings(pessimisticPortfolios: SynchronizedPessimisticPortfolios.Settings)
 
 }

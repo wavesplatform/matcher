@@ -1,10 +1,13 @@
 package com.wavesplatform.dex.grpc.integration.settings
 
+import com.wavesplatform.dex.grpc.integration.clients.CombinedWavesBlockchainClient
+
 import scala.concurrent.duration.FiniteDuration
 
 case class WavesBlockchainClientSettings(
   grpc: GrpcClientSettings,
   blockchainUpdatesGrpc: GrpcClientSettings,
   defaultCachesExpiration: FiniteDuration,
-  balanceStreamBufferSize: Int
+  balanceStreamBufferSize: Int,
+  combinedClientSettings: CombinedWavesBlockchainClient.Settings
 )

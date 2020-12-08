@@ -1,8 +1,8 @@
-package com.wavesplatform.dex.grpc.integration.clients.status
+package com.wavesplatform.dex.grpc.integration.clients.domain
 
 import cats.Monoid
-import com.wavesplatform.dex.grpc.integration.clients.status.StatusUpdate.LastBlockHeight
-import com.wavesplatform.dex.grpc.integration.clients.status.WavesNodeEvent.WavesNodeUtxEvent
+import com.wavesplatform.dex.grpc.integration.clients.domain.StatusUpdate.LastBlockHeight
+import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeEvent.WavesNodeUtxEvent
 
 import scala.collection.immutable.Queue
 

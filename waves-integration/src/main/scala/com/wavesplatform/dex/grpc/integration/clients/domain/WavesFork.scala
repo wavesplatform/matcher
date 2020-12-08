@@ -1,16 +1,16 @@
-package com.wavesplatform.dex.grpc.integration.clients.status
+package com.wavesplatform.dex.grpc.integration.clients.domain
 
 import cats.Monoid
 import cats.instances.list._
 import cats.instances.tuple._
 import cats.syntax.foldable._
 import cats.syntax.semigroup._
-import com.wavesplatform.dex.grpc.integration.clients.status.WavesFork.Status
+import com.wavesplatform.dex.grpc.integration.clients.domain.WavesFork.Status
 
 // TODO DEX-1009 Unit test
 // TODO DEX-1010 Can be connected again if forkBranch rolled back behind origBranch and restored the same branch
 // TODO DEX-1011 This class is too slow for his purposes
-case class WavesFork private[status] (origBranch: WavesBranch, forkBranch: WavesBranch, connected: Boolean) {
+case class WavesFork private[domain](origBranch: WavesBranch, forkBranch: WavesBranch, connected: Boolean) {
 
   // TODO DEX-1009 Move to tests in the end
 

@@ -11,7 +11,7 @@ sealed trait BlockchainStatus extends Product with Serializable {
 
 object BlockchainStatus {
 
-  case class Normal(main: WavesBranch) extends BlockchainStatus {
+  case class Normal(main: WavesChain) extends BlockchainStatus {
     override def toString: String = s"Normal(${main.history.headOption.map(_.ref)})"
   }
 
@@ -20,9 +20,9 @@ object BlockchainStatus {
   }
 
   case class TransientResolving(
-    main: WavesBranch,
-    stashChanges: BlockchainBalance,
-    utxEventsStash: Queue[WavesNodeUtxEvent]
+                                 main: WavesChain,
+                                 stashChanges: BlockchainBalance,
+                                 utxEventsStash: Queue[WavesNodeUtxEvent]
   ) extends BlockchainStatus {
 
     override def toString: String =

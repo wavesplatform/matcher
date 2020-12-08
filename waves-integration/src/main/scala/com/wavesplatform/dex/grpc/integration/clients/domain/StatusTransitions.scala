@@ -77,19 +77,19 @@ object StatusTransitions extends ScorexLogging {
               else origStatus.utxEventsStash.enqueue(WavesNodeUtxEvent.Forged(forgedTxIds))
 
             origStatus.fork.withBlock(block) match {
-              case Status.Resolved(activeBranch, newChanges, lostDiffIndex) =>
+              case Status.Resolved(activeChain, newChanges, lostDiffIndex) =>
                 if (lostDiffIndex.isEmpty)
                   StatusUpdate(
-                    newStatus = Normal(activeBranch),
+                    newStatus = Normal(activeChain),
                     updatedBalances = newChanges,
-                    updatedLastBlockHeight = LastBlockHeight.Updated(activeBranch.height),
+                    updatedLastBlockHeight = LastBlockHeight.Updated(activeChain.height),
                     processUtxEvents = updatedUtxEventsStash,
                     requestNextBlockchainEvent = true
                   )
                 else
                   StatusUpdate(
                     newStatus = TransientResolving(
-                      main = activeBranch,
+                      main = activeChain,
                       stashChanges = newChanges,
                       utxEventsStash = updatedUtxEventsStash
                     ),

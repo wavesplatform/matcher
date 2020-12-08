@@ -7,7 +7,7 @@
         * [TransientRollback](#transientrollback)
         * [TransientResolving](#transientresolving)
   * [Forks](#forks)
-  * [Branches](#branches)
+  * [Chains](#chains)
 
 It requires two installed extensions on the Waves Node:
 * `Blockchain Updates` provides a stream of blockchain events: a block appended, a chain rolled back, etc.;
@@ -38,7 +38,7 @@ Matcher will not request the next blockchain event until process the previous.
 ![State machine](./images/wni-state-machine.svg)
 
 Where:
-* `Utx*` is `UtxAdded` and `UtxSwitched`;
+* `Utx*` is `UtxUpdated` and `UtxSwitched`;
 * `Appended ok` is `Appended` with a valid block;
 * `Appended invalid` is `Appended` with an invalid block.
 
@@ -75,15 +75,15 @@ So it should not be a big issue for us.
 ![Not resolved fork](./images/wni-not-resolved-fork.svg)
 
 The fork resolves when we:
-* receive the last known micro block if we are on the same branch (e.g. rolled back after a disconnect);
-* receive a micro block if we are on a different branch.
+* receive the last known micro block if we are on the same chain (e.g. rolled back after a disconnect);
+* receive a micro block if we are on a different chain.
 
 The second case is more interesting. Why did we wait for a micro block? 
 
-At first, a Node can't switch to a branch with a lesser number of blocks (from a Node's team):
+At first, a Node can't switch to a chain with a lesser number of blocks (from a Node's team):
 ```
-A branch with one block: score_1 = X / baseTarget_0
-A branch with two blocks: score_2 = X / bt_1 + X / bt_2 = X (bt_1 + bt_2) / (bt_1 * bt_2)
+A chain with one block: score_1 = X / baseTarget_0
+A chain with two blocks: score_2 = X / bt_1 + X / bt_2 = X (bt_1 + bt_2) / (bt_1 * bt_2)
 
 score_1 > score_2  ==>
 X / bt_0 > X (bt_1 + bt_2) / (bt_1 * bt_2) ==>
@@ -98,23 +98,23 @@ bt_0 ^ 2 < 0
 This could not happen.
 ```
 
-So, if we wait for the height of the previous branch, we wait the latest block.
+So, if we wait for the height of the previous chain, we wait the latest block.
 Waiting a micro block saves us from a balance flickering.
 
 ![Resolved fork](./images/wni-resolved-fork.svg)
 
-After resolving a fork, we look which addresses affected on the original, but not on the new main branch and
+After resolving a fork, we look which addresses affected on the original, but not on the new main chain and
 request their balances.
 
-![Branches diff](./images/wni-branches-diff.svg)
+![Chains diff](./images/wni-chains-diff.svg)
 
 Where `changesDiff` is addresses and assets which we have to request from the Node.
 
 Most time `changes1` will be equal to `changes2`, so we don't see any difference.  
 
-## Branches
+## Chains
 
-Are represented by `WavesBranch` class. It has a limited number of blocks to preserve the memory and 
+Are represented by `WavesChain` class. It has a limited number of blocks to preserve the memory and 
 because we can't roll back more than 100 blocks.
 
-![Branch](./images/wni-branch.svg)
+![Chain](./images/wni-chain.svg)

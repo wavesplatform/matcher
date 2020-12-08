@@ -57,7 +57,7 @@ class CombinedWavesBlockchainClient(
 
     // TODO DEX-1000 Wait until both connections are restored, because one node could be behind another!
     val finalBalance = mutable.Map.empty[Address, Map[Asset, Long]]
-    val init: BlockchainStatus = BlockchainStatus.Normal(WavesBranch(List.empty, startHeight))
+    val init: BlockchainStatus = BlockchainStatus.Normal(WavesChain(List.empty, startHeight))
     val (blockchainEvents, control) = bClient.blockchainEvents(startHeight)
     Observable(dataUpdates, meClient.utxEvents, blockchainEvents)
       .merge

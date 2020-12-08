@@ -16,5 +16,6 @@ trait PessimisticPortfolios {
    */
   def processForged(txIds: Iterable[ByteString]): (Set[Address], List[ByteString])
 
+  // Similar to processForged, but we ignore unknown transactions
   def removeFailed(txIds: Iterable[ByteString]): Set[Address]
 }

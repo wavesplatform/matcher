@@ -53,7 +53,7 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
           MatcherError.Params(address = Some(alice.toAddress.stringRepr))
         )
 
-        dex1.api.cancel(alice, aliceOrd1).status shouldBe "OrderCanceled"
+        dex1.api.cancelOrder(alice, aliceOrd1).status shouldBe "OrderCanceled"
         resetAliceAccountScript()
       }
 
@@ -82,7 +82,7 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
         val aliceOrd2 = mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
         placeAndAwaitAtDex(aliceOrd2)
 
-        dex1.api.cancel(alice, aliceOrd2).status shouldBe "OrderCanceled"
+        dex1.api.cancelOrder(alice, aliceOrd2).status shouldBe "OrderCanceled"
         resetAliceAccountScript()
       }
 
@@ -107,8 +107,8 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
         val aliceOrd2 = mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
         placeAndAwaitAtDex(aliceOrd2)
 
-        dex1.api.cancel(alice, aliceOrd1).status shouldBe "OrderCanceled"
-        dex1.api.cancel(alice, aliceOrd2).status shouldBe "OrderCanceled"
+        dex1.api.cancelOrder(alice, aliceOrd1).status shouldBe "OrderCanceled"
+        dex1.api.cancelOrder(alice, aliceOrd2).status shouldBe "OrderCanceled"
         resetAliceAccountScript()
       }
 

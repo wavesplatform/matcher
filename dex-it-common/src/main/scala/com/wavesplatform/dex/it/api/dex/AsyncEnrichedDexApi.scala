@@ -2,7 +2,6 @@ package com.wavesplatform.dex.it.api.dex
 
 import java.net.InetSocketAddress
 import java.util.UUID
-
 import com.google.common.primitives.Longs
 import com.softwaremill.sttp.Uri.QueryFragment
 import com.softwaremill.sttp._
@@ -21,7 +20,7 @@ import com.wavesplatform.dex.it.api._
 import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import com.wavesplatform.dex.it.json._
 import im.mak.waves.transactions.ExchangeTransaction
-import play.api.libs.json.Json
+import play.api.libs.json.{JsObject, Json}
 
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, Future}
@@ -69,11 +68,43 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .body(order)
   }
 
+  override def place(order: JsObject): R[HttpSuccessfulPlace] = mk {
+    sttp
+      .post(uri"$apiUri/matcher/orderbook")
+      .readTimeout(3.minutes) // TODO find a way to decrease the timeout!
+      .followRedirects(false) // TODO move ?
+      .body(order)
+  }
+
+  override def placeMarket(order: JsObject): R[HttpSuccessfulPlace] = mk {
+    sttp
+      .post(uri"$apiUri/matcher/orderbook/market")
+      .readTimeout(3.minutes) // TODO find a way to decrease the timeout!
+      .followRedirects(false) // TODO move ?
+      .body(order)
+  }
+
   override def placeMarket(order: Order): R[HttpSuccessfulPlace] = mk {
     sttp.post(uri"$apiUri/matcher/orderbook/market").body(order)
   }
 
-  override def cancel(owner: KeyPair, assetPair: AssetPair, id: Id): R[HttpSuccessfulSingleCancel] = mk {
+  override def cancelOrder(
+    owner: KeyPair,
+    amountAsset: String,
+    priceAsset: String,
+    orderId: String,
+    timestamp: Long,
+    signature: ByteStr
+  ): R[HttpSuccessfulSingleCancel] = mk {
+    sttp
+      .post(uri"$apiUri/matcher/orderbook/$amountAsset/$priceAsset/cancel")
+      .readTimeout(3.minutes) // TODO find a way to decrease the timeout!
+      .followRedirects(false)
+      .body(Json.stringify(Json.toJson(cancelRequest(owner, orderId).copy(signature = signature))))
+      .contentType("application/json", "UTF-8")
+  }
+
+  override def cancelOrder(owner: KeyPair, assetPair: AssetPair, id: Id): R[HttpSuccessfulSingleCancel] = mk {
     val body = Json.stringify(Json.toJson(cancelRequest(owner, id.toString)))
     sttp
       .post(uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/cancel")
@@ -83,10 +114,25 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .contentType("application/json", "UTF-8")
   }
 
-  override def cancelWithApiKey(id: Id, xUserPublicKey: Option[PublicKey]): R[HttpSuccessfulSingleCancel] = mk {
+
+  override def cancelOrderById(id: String, headers: Map[String, String]): R[HttpSuccessfulSingleCancel] = mk {
+    sttp
+      .post(uri"$apiUri/matcher/orders/cancel/$id")
+      .headers(headers)
+      .contentType("application/json", "UTF-8")
+  }
+
+  override def cancelOrderById(id: Id, xUserPublicKey: Option[PublicKey]): R[HttpSuccessfulSingleCancel] = mk {
     sttp
       .post(uri"$apiUri/matcher/orders/cancel/${id.toString}")
       .headers(apiKeyWithUserPublicKeyHeaders(xUserPublicKey))
+      .contentType("application/json", "UTF-8")
+  }
+
+  override def cancelAll(sender: KeyPair, timestamp: Long, signature: ByteStr): R[HttpSuccessfulBatchCancel] = mk {
+    sttp
+      .post(uri"$apiUri/matcher/orderbook/cancel")
+      .body(Json.stringify(Json.toJson(batchCancelRequest(sender, timestamp).copy(signature = signature))))
       .contentType("application/json", "UTF-8")
   }
 
@@ -106,7 +152,33 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .contentType("application/json", "UTF-8")
   }
 
-  override def cancelAllByIdsWithApiKey(
+  def cancelAllByAddressAndIds(
+    address: String,
+    ids: Set[String],
+    headers: Map[String, String]
+  ): R[HttpSuccessfulBatchCancel] = mk {
+    sttp
+      .post(uri"$apiUri/matcher/orders/$address/cancel")
+      .headers(headers)
+      .body(Json.stringify(Json.toJson(ids)))
+      .contentType("application/json", "UTF-8")
+  }
+
+  def cancelAllByAddressAndIds(address: String, ids: Set[String]): R[HttpSuccessfulBatchCancel] =
+    cancelAllByAddressAndIds(address, ids, apiKeyHeaders)
+
+  def cancelAllByApiKeyAndIds(owner: Address, orderIds: Set[Order.Id], headers: Map[String, String]): R[HttpSuccessfulBatchCancel] = mk {
+    sttp
+      .post(uri"$apiUri/matcher/orders/$owner/cancel")
+      .headers(headers)
+      .body(Json.stringify(Json.toJson(orderIds)))
+      .contentType("application/json", "UTF-8")
+  }
+
+  def cancelAllByApiKeyAndIds(owner: Address, orderIds: Set[Order.Id]): R[HttpSuccessfulBatchCancel] =
+    cancelAllByApiKeyAndIds(owner, orderIds, apiKeyHeaders)
+
+  override def cancelAllByApiKeyAndIds(
     owner: Address,
     orderIds: Set[Id],
     xUserPublicKey: Option[PublicKey] = None

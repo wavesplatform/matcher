@@ -219,10 +219,10 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
           val aliceOrd2 = mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
           placeAndAwaitAtDex(aliceOrd2)
 
-          dex1.api.cancel(alice, aliceOrd1)
+          dex1.api.cancelOrder(alice, aliceOrd1)
           dex1.api.waitForOrderStatus(aliceOrd1, Status.Cancelled)
 
-          dex1.api.cancel(alice, aliceOrd2).status shouldBe "OrderCanceled"
+          dex1.api.cancelOrder(alice, aliceOrd2).status shouldBe "OrderCanceled"
           dex1.api.waitForOrderStatus(aliceOrd2, Status.Cancelled)
         }
       }
@@ -253,7 +253,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
           val signed = unsigned.copy(proofs = Proofs(Seq(sigAlice, sigBob)))
           placeAndAwaitAtDex(signed)
 
-          dex1.api.cancel(alice, signed)
+          dex1.api.cancelOrder(alice, signed)
           dex1.api.waitForOrderStatus(signed, Status.Cancelled)
         }
 

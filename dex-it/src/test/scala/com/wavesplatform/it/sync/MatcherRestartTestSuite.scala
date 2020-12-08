@@ -42,7 +42,7 @@ class MatcherRestartTestSuite extends MatcherSuiteBase {
         orders2.asks.head.price shouldBe 2.waves * Order.PriceConstant
       }
 
-      val cancel = dex1.api.cancel(alice, aliceOrder)
+      val cancel = dex1.api.cancelOrder(alice, aliceOrder)
       cancel.status should be("OrderCanceled") // TODO
 
       val orders3 = dex1.api.getOrderBook(ethWavesPair)

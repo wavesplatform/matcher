@@ -59,7 +59,7 @@ class SeveralPartialOrdersTestSuite extends MatcherSuiteBase {
       orderBook2.asks shouldBe List(HttpV0LevelAgg(bobOrder2.amount, bobOrder2.price))
       orderBook2.bids shouldBe empty
 
-      dex1.api.cancel(bob, bobOrder2)
+      dex1.api.cancelOrder(bob, bobOrder2)
       dex1.api.waitForOrderStatus(bobOrder2, Status.Cancelled)
 
       dex1.api.getReservedBalance(bob) shouldBe empty

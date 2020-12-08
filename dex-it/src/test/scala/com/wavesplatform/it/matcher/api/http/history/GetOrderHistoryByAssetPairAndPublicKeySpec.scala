@@ -8,7 +8,7 @@ import com.wavesplatform.dex.domain.order.OrderType.BUY
 import com.wavesplatform.dex.it.api.RawHttpChecks
 import com.wavesplatform.dex.model.OrderStatus
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.it.matcher.api.http.http.toHttpOrderBookHistoryItem
+import com.wavesplatform.it.matcher.api.http.toHttpOrderBookHistoryItem
 
 class GetOrderHistoryByAssetPairAndPublicKeySpec extends MatcherSuiteBase with RawHttpChecks {
 

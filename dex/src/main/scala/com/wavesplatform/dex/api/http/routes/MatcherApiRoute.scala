@@ -141,7 +141,7 @@ class MatcherApiRoute(
   }
 
   private val ordersRoutes: Route = pathPrefix("orders") {
-    protect(getOrderHistoryByApiKey ~ getOrderStatusInfoByIdWithApiKey ~ cancelAllById ~ forceCancelOrder)
+    protect(getOrderHistoryByApiKey ~ getOrderStatusInfoByIdWithApiKey ~ cancelAllByApiKeyAndIds ~ cancelByApi)
   }
 
   override lazy val route: Route = pathPrefix("matcher") {
@@ -610,7 +610,7 @@ class MatcherApiRoute(
       )
     )
   )
-  def cancelAllById: Route = (path(AddressPM / "cancel") & post & withAuth & withUserPublicKeyOpt) { (addressOrError, userPublicKey) =>
+  def cancelAllByApiKeyAndIds: Route = (path(AddressPM / "cancel") & post & withAuth & withUserPublicKeyOpt) { (addressOrError, userPublicKey) =>
     withCorrectAddress(addressOrError) { address =>
       userPublicKey match {
         case Some(upk) if upk.toAddress != address => invalidUserPublicKey
@@ -646,7 +646,7 @@ class MatcherApiRoute(
       )
     )
   )
-  def forceCancelOrder: Route = (path("cancel" / ByteStrPM) & post & withAuth & withUserPublicKeyOpt) { (orderId, userPublicKey) =>
+  def cancelByApi: Route = (path("cancel" / ByteStrPM) & post & withAuth & withUserPublicKeyOpt) { (orderId, userPublicKey) =>
     def reject: StandardRoute = complete(OrderCancelRejected(error.OrderNotFound(orderId)))
     (orderDb.get(orderId), userPublicKey) match {
       case (None, _) => reject

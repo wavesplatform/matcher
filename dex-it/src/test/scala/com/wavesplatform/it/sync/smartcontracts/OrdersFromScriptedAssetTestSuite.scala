@@ -39,7 +39,7 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     val pair = AssetPair(unscriptedAsset, allowAsset)
     val counter = mkOrder(matcher, pair, OrderType.SELL, 100000, 2 * Order.PriceConstant, version = 2, matcherFee = smartTradeFee)
     placeAndAwaitAtDex(counter)
-    dex1.api.cancel(matcher, counter)
+    dex1.api.cancelOrder(matcher, counter)
   }
 
   "can't place if the script returns FALSE" in {

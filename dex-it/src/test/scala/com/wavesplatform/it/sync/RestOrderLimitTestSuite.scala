@@ -74,8 +74,8 @@ class RestOrderLimitTestSuite extends MatcherSuiteBase {
       mkOrder(bob, bobPair, SELL, 1, 3.waves, ts = now + 12) // part fill partial2
     ).foreach(dex1.api.place)
 
-    dex1.api.cancel(alice, cancelled1)
-    dex1.api.cancel(alice, cancelled2)
+    dex1.api.cancelOrder(alice, cancelled1)
+    dex1.api.cancelOrder(alice, cancelled2)
     dex1.api.waitForOrderStatus(cancelled2, Status.Cancelled)
 
     val activeOrdersAllFive = List(partial2, active2, partial1, active1, active0).map(_.id())

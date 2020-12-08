@@ -315,7 +315,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
     dex1.api.waitForOrderStatus(buyOrder, Status.PartiallyFilled)
     dex1.api.waitForOrderStatus(sellOrder2, Status.Filled)
 
-    dex1.api.cancel(alice, buyOrder)
+    dex1.api.cancelOrder(alice, buyOrder)
 
     withClue("checking info for 2 small submitted orders\n") {
       Set(sellOrder1, sellOrder2).foreach { order =>

@@ -366,7 +366,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
       val wsc2 = mkWsOrderBookConnection(wavesBtcPair, dex1)
       assertUpdateId(wsc2, 0)
 
-      dex1.api.cancel(carol, order)
+      dex1.api.cancelOrder(carol, order)
       assertUpdateId(wsc1, 2)
       assertUpdateId(wsc2, 1)
     }

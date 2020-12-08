@@ -184,7 +184,7 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with
       Future
         .sequence {
           orders.map { order =>
-            dex1.asyncTryApi.cancel(owner, order).map {
+            dex1.asyncTryApi.cancelOrder(owner, order).map {
               case Left(x) if x.error != 9437194 => throw new RuntimeException(s"Unexpected error: $x") // OrderCanceled
               case _ => ()
             }

@@ -1,4 +1,4 @@
-package com.wavesplatform.it.matcher.api.http
+package com.wavesplatform.it.matcher.api
 
 import com.wavesplatform.dex.api.http.entities.HttpOrderBookHistoryItem
 import com.wavesplatform.dex.asset.DoubleOps.NumericOps

@@ -12,8 +12,8 @@ import scala.util.chaining._
  */
 class LookAheadPessimisticPortfolios(orig: PessimisticPortfolios, maxForgedTransactions: Int) extends PessimisticPortfolios {
 
-  private val forgedTxsEvictionQueue: mutable.Queue[ByteString] = new mutable.Queue[ByteString](maxForgedTransactions)
-  private val forgedTxs: mutable.Set[ByteString] = new mutable.HashSet[ByteString]
+  private val forgedTxsEvictionQueue = new mutable.Queue[ByteString](maxForgedTransactions)
+  private val forgedTxs = new mutable.HashSet[ByteString]
 
   override def getAggregated(address: Address): Map[Asset, Long] = orig.getAggregated(address)
 
@@ -38,11 +38,13 @@ class LookAheadPessimisticPortfolios(orig: PessimisticPortfolios, maxForgedTrans
       unknownTxIds.foreach(put)
     }
 
-  override def removeFailed(txIds: Seq[ByteString]): Set[Address] = orig.removeFailed(txIds)
+  override def removeFailed(txIds: Seq[ByteString]): Set[Address] =
+    // txIds.foreach(remove) // a transaction can't be forged and failed both. Also we update caches in replaceWith, DEX-1004
+    orig.removeFailed(txIds)
 
   private def put(txId: ByteString): Unit = forgedTxs.add(txId).tap { added =>
     if (added) {
-      if (forgedTxsEvictionQueue.size == maxForgedTransactions) forgedTxsEvictionQueue.removeLast()
+      if (forgedTxsEvictionQueue.size == maxForgedTransactions) forgedTxsEvictionQueue.removeLastOption().foreach(forgedTxs.remove)
       forgedTxsEvictionQueue.enqueue(txId)
     }
   }

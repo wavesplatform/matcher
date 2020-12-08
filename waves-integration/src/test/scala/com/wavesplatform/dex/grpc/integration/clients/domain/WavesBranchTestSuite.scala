@@ -6,13 +6,13 @@ import cats.Monoid
 import cats.syntax.either._
 import cats.syntax.option._
 import cats.syntax.semigroup._
-import com.wavesplatform.dex.{NoShrink, WavesIntegrationSuiteBase}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.test.matchers.ProduceError.produce
-import org.scalacheck.{Gen, Shrink}
+import com.wavesplatform.dex.{NoShrink, WavesIntegrationSuiteBase}
+import org.scalacheck.Gen
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
 import scala.util.matching.Regex

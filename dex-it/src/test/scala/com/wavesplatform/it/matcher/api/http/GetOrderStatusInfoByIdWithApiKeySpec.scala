@@ -2,14 +2,12 @@ package com.wavesplatform.it.matcher.api.http
 
 import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.api.http.entities.HttpOrderBookHistoryItem
 import com.wavesplatform.dex.domain.account.KeyPair.toAddress
 import com.wavesplatform.dex.domain.bytes.codec.Base58
-import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.it.api.RawHttpChecks
 import com.wavesplatform.dex.it.docker.apiKey
-import com.wavesplatform.dex.model.{AcceptedOrderType, OrderStatus}
+import com.wavesplatform.dex.model.OrderStatus
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.matcher.api.http.http.toHttpOrderBookHistoryItem
 import org.scalatest.prop.TableDrivenPropertyChecks

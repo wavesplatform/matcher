@@ -2,15 +2,14 @@ package com.wavesplatform.dex.grpc.integration.clients.domain
 
 import cats.Semigroup
 import cats.data.NonEmptyList
-import cats.instances.queue._
+import cats.instances.vector._
 import cats.syntax.either._
 import cats.syntax.foldable._
 import cats.syntax.semigroup._
-import com.wavesplatform.dex.collection.QueueOps.Ops
+import com.wavesplatform.dex.collection.VectorOps.Ops
 import com.wavesplatform.dex.grpc.integration.clients.domain.WavesChain.dropLiquidBlock
 
 import scala.annotation.tailrec
-import scala.collection.immutable.Queue
 
 /**
  * TODO DEX-1008 A constructor with auto height when passed non empty list
@@ -19,7 +18,7 @@ import scala.collection.immutable.Queue
  * @param history Contains micro blocks
  * @param blocksCapacity How many full blocks we can append
  */
-case class WavesChain(history: Queue[WavesBlock], height: Int, blocksCapacity: Int) {
+case class WavesChain(history: Vector[WavesBlock], height: Int, blocksCapacity: Int) {
   require(history.headOption.map(_.ref.height).forall(_ == height), "height corresponds last block")
   require(blocksCapacity >= 0, "blocksCapacity >= 0")
 
@@ -29,7 +28,6 @@ case class WavesChain(history: Queue[WavesBlock], height: Int, blocksCapacity: I
 
   def last: Option[WavesBlock] = history.headOption
 
-  // TODO dropping!
   def withBlock(block: WavesBlock): Either[String, WavesChain] =
     if (block.tpe == WavesBlock.Type.FullBlock) withFullBlock(block)
     else withMicroBlock(block)
@@ -47,7 +45,8 @@ case class WavesChain(history: Queue[WavesBlock], height: Int, blocksCapacity: I
           case Nil => restHistory.prepended(block)
           case x :: xs => restHistory.prepended(mkHardenedBlock(NonEmptyList(x, xs))).prepended(block)
         }
-        WavesChain(newHistory, block.ref.height, blocksCapacity = blocksCapacity - 1).asRight
+        if (blocksCapacity == 0) WavesChain(newHistory.dropRight(1), block.ref.height, blocksCapacity = 0).asRight
+        else WavesChain(newHistory, block.ref.height, blocksCapacity = blocksCapacity - 1).asRight
       } else s"The new block ${block.ref} (reference=${block.reference}) must be after ${prev.ref}".asLeft
   }
 
@@ -126,15 +125,15 @@ object WavesChain {
   /**
    * @return (liquidBlock, restHistory)
    */
-  def dropLiquidBlock(newFullBlock: WavesBlock, history: Queue[WavesBlock]): (List[WavesBlock], Queue[WavesBlock]) =
+  def dropLiquidBlock(newFullBlock: WavesBlock, history: Vector[WavesBlock]): (List[WavesBlock], Vector[WavesBlock]) =
     dropLiquidBlock(newFullBlock, liquidBlock = List.empty, restHistory = history)
 
   @tailrec
   private def dropLiquidBlock(
     newFullBlock: WavesBlock,
     liquidBlock: List[WavesBlock],
-    restHistory: Queue[WavesBlock]
-  ): (List[WavesBlock], Queue[WavesBlock]) = restHistory.headOption match {
+    restHistory: Vector[WavesBlock]
+  ): (List[WavesBlock], Vector[WavesBlock]) = restHistory.headOption match {
     case None => (liquidBlock, restHistory)
     case Some(x) =>
       if (x.tpe == WavesBlock.Type.MicroBlock) dropLiquidBlock(newFullBlock, x :: liquidBlock, restHistory.tail)

@@ -13,7 +13,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.grpc.integration.clients.domain.BlockchainStatus.{Normal, TransientResolving, TransientRollback}
 import com.wavesplatform.dex.grpc.integration.clients.domain.StatusUpdate.LastBlockHeight
-import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeEvent.{Appended, DataReceived, RolledBack, UtxUpdated, UtxSwitched, WavesNodeUtxEvent}
+import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeEvent.{Appended, DataReceived, RolledBack, UtxSwitched, UtxUpdated, WavesNodeUtxEvent}
 import com.wavesplatform.dex.grpc.integration.services.UtxTransaction
 
 import scala.collection.immutable.Queue
@@ -47,10 +47,10 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
             tpe = WavesBlock.Type.FullBlock
           )
 
-          val init = Normal(WavesChain(List.empty, 0, 100))
+          val init = Normal(WavesChain(Queue.empty, 0, 100))
           val event = Appended(block = newBlock, forgedTxIds = Nil)
           StatusTransitions(init, event) should matchTo(StatusUpdate(
-            newStatus = Normal(WavesChain(List(newBlock), 1, 99)),
+            newStatus = Normal(WavesChain(Queue(newBlock), 1, 99)),
             updatedBalances = updatedBalances1,
             updatedLastBlockHeight = StatusUpdate.LastBlockHeight.Updated(1),
             requestNextBlockchainEvent = true
@@ -65,11 +65,11 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
               changes = updatedBalances1,
               tpe = WavesBlock.Type.FullBlock
             )
-            val init = Normal(WavesChain(List(block1), block1.ref.height, 99))
+            val init = Normal(WavesChain(Queue(block1), block1.ref.height, 99))
             val event = Appended(block = block1, forgedTxIds = Nil)
             StatusTransitions(init, event) should matchTo(StatusUpdate(
               newStatus = TransientRollback(
-                fork = WavesFork(init.main, WavesChain(List.empty, 1, 100)),
+                fork = WavesFork(init.main, WavesChain(Queue.empty, 1, 100)),
                 utxEventsStash = Queue.empty
               ),
               updatedLastBlockHeight = StatusUpdate.LastBlockHeight.RestartRequired(2)
@@ -80,7 +80,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
 
       "[UtxEvent] -> Normal, where [UtxEvent] is" - {
         "UtxUpdated" in {
-          val init = Normal(WavesChain(List.empty, 0, 100))
+          val init = Normal(WavesChain(Queue.empty, 0, 100))
           val newTxs = Seq(UtxTransaction(id = UnsafeByteOperations.unsafeWrap(Array[Byte](5, 6, 7))))
           val event = UtxUpdated(newTxs, Nil)
           StatusTransitions(init, event) should matchTo(StatusUpdate(
@@ -91,7 +91,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
         }
 
         "UtxSwitched" in {
-          val init = Normal(WavesChain(List.empty, 0, 100))
+          val init = Normal(WavesChain(Queue.empty, 0, 100))
           val txs = Seq(UtxTransaction(id = UnsafeByteOperations.unsafeWrap(Array[Byte](5, 6, 7))))
           val event = UtxSwitched(txs)
           StatusTransitions(init, event) should matchTo(StatusUpdate(
@@ -117,11 +117,11 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
           tpe = WavesBlock.Type.FullBlock
         )
 
-        val init = Normal(WavesChain(List(block2, block1), 2, 98))
+        val init = Normal(WavesChain(Queue(block2, block1), 2, 98))
 
         def test(to: RolledBack.To): Unit = StatusTransitions(init, RolledBack(to)) should matchTo(StatusUpdate(
           newStatus = TransientRollback(
-            fork = WavesFork(init.main, WavesChain(List(block1), block1.ref.height, 99)),
+            fork = WavesFork(init.main, WavesChain(Queue(block1), block1.ref.height, 99)),
             utxEventsStash = Queue.empty
           ),
           updatedLastBlockHeight = StatusUpdate.LastBlockHeight.NotChanged,
@@ -133,7 +133,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
       }
 
       "DataReceived -> Normal" in {
-        val init = Normal(WavesChain(List.empty, 0, 100))
+        val init = Normal(WavesChain(Queue.empty, 0, 100))
         val event = DataReceived(BlockchainBalance(
           regular = Map.empty,
           outLeases = Map(alice -> 999L)
@@ -175,8 +175,8 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
 
       val init = TransientRollback(
         fork = WavesFork(
-          origChain = WavesChain(List(block2A, block1), block2A.ref.height, 98),
-          forkChain = WavesChain(List(block2B, block1), block2B.ref.height, 98)
+          origChain = WavesChain(Queue(block2A, block1), block2A.ref.height, 98),
+          forkChain = WavesChain(Queue(block2B, block1), block2B.ref.height, 98)
         ),
         utxEventsStash = Queue.empty
       )
@@ -197,7 +197,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
 
           StatusTransitions(init, event) should matchTo(StatusUpdate(
             newStatus = Normal(
-              main = WavesChain(List(microBlock, block2B, block1), 2, 98)
+              main = WavesChain(Queue(microBlock, block2B, block1), 2, 98)
             ),
             updatedBalances = block2B.changes |+| microBlock.changes,
             updatedLastBlockHeight = StatusUpdate.LastBlockHeight.Updated(2),
@@ -223,7 +223,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
             StatusTransitions(init, event) should matchTo(StatusUpdate(
               newStatus = TransientRollback(
                 // TODO test with more than 1 block
-                fork = WavesFork(init.fork.origChain, WavesChain(List(block1), block1.ref.height, 99)),
+                fork = WavesFork(init.fork.origChain, WavesChain(Queue(block1), block1.ref.height, 99)),
                 utxEventsStash = Queue.empty
               ),
               updatedLastBlockHeight = StatusUpdate.LastBlockHeight.RestartRequired(2)
@@ -243,8 +243,8 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
 
             val init = TransientRollback(
               fork = WavesFork(
-                origChain = WavesChain(List(block3, block2A, block1), block3.ref.height, 97),
-                forkChain = WavesChain(List(block1), block1.ref.height, 99)
+                origChain = WavesChain(Queue(block3, block2A, block1), block3.ref.height, 97),
+                forkChain = WavesChain(Queue(block1), block1.ref.height, 99)
               ),
               utxEventsStash = Queue.empty
             )
@@ -253,7 +253,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
 
             StatusTransitions(init, event) should matchTo(StatusUpdate(
               newStatus = TransientRollback(
-                fork = WavesFork(init.fork.origChain, WavesChain(List(block2B, block1), block2B.ref.height, 98)),
+                fork = WavesFork(init.fork.origChain, WavesChain(Queue(block2B, block1), block2B.ref.height, 98)),
                 utxEventsStash = Queue.empty
               ),
               requestNextBlockchainEvent = true
@@ -276,7 +276,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
 
           StatusTransitions(init, event) should matchTo(StatusUpdate(
             newStatus = TransientResolving(
-              main = WavesChain(List(microBlock, block2B, block1), 2, 98),
+              main = WavesChain(Queue(microBlock, block2B, block1), 2, 98),
               stashChanges = BlockchainBalance( // block2B + microBlock
                 regular = Map(alice -> Map(usd -> 8), bob -> Map(usd -> 12)),
                 outLeases = Map(bob -> 10)
@@ -316,8 +316,8 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
           StatusTransitions(init, RolledBack(rolledBackTo)) should matchTo(StatusUpdate(
             newStatus = TransientRollback(
               fork = WavesFork(
-                origChain = WavesChain(List(block2A, block1), block2A.ref.height, 98),
-                forkChain = WavesChain(List(block1), block1.ref.height, 99)
+                origChain = WavesChain(Queue(block2A, block1), block2A.ref.height, 98),
+                forkChain = WavesChain(Queue(block1), block1.ref.height, 99)
               ),
               utxEventsStash = Queue.empty
             ),
@@ -355,7 +355,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
       )
 
       val init = TransientResolving(
-        main = WavesChain(List(microBlock, block), microBlock.ref.height, 99),
+        main = WavesChain(Queue(microBlock, block), microBlock.ref.height, 99),
         stashChanges = BlockchainBalance(
           regular = Map(carol -> Map(Waves -> 10)),
           outLeases = Map.empty

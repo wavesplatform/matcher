@@ -2,14 +2,15 @@ package com.wavesplatform.dex.grpc.integration.clients.domain
 
 import cats.Semigroup
 import cats.data.NonEmptyList
-import cats.instances.list._
+import cats.instances.queue._
 import cats.syntax.either._
 import cats.syntax.foldable._
 import cats.syntax.semigroup._
-import com.wavesplatform.dex.collection.ListOps.Ops
+import com.wavesplatform.dex.collection.QueueOps.Ops
 import com.wavesplatform.dex.grpc.integration.clients.domain.WavesChain.dropLiquidBlock
 
 import scala.annotation.tailrec
+import scala.collection.immutable.Queue
 
 /**
  * TODO DEX-1008 A constructor with auto height when passed non empty list
@@ -18,10 +19,11 @@ import scala.annotation.tailrec
  * @param history Contains micro blocks
  * @param blocksCapacity How many full blocks we can append
  */
-case class WavesChain(history: List[WavesBlock], height: Int, blocksCapacity: Int) {
-
+case class WavesChain(history: Queue[WavesBlock], height: Int, blocksCapacity: Int) {
   require(history.headOption.map(_.ref.height).forall(_ == height), "height corresponds last block")
-  // require(blocksCapacity >= 0, "blocksCapacity >= 0")
+  require(blocksCapacity >= 0, "blocksCapacity >= 0")
+
+  // We prepend block, because it is easier to use dropWhile
 
   def isEmpty: Boolean = history.isEmpty
 
@@ -36,24 +38,24 @@ case class WavesChain(history: List[WavesBlock], height: Int, blocksCapacity: In
    * It is expected, that block references the last block in the history
    * @return Guarantees WavesFork is not empty
    */
-  private def withFullBlock(block: WavesBlock): Either[String, WavesChain] = history match {
-    case Nil => WavesChain(block :: history, block.ref.height, blocksCapacity = blocksCapacity - 1).asRight
-    case prev :: _ =>
+  private def withFullBlock(block: WavesBlock): Either[String, WavesChain] = history.headOption match {
+    case None => WavesChain(history.prepended(block), block.ref.height, blocksCapacity = blocksCapacity - 1).asRight
+    case Some(prev) =>
       if (block.ref.height == prev.ref.height + 1 && block.reference == prev.ref.id) {
         val (liquidBlock, restHistory) = dropLiquidBlock(block, history)
         val newHistory = liquidBlock match {
-          case Nil => block :: restHistory
-          case x :: xs => block :: mkHardenedBlock(NonEmptyList(x, xs)) :: restHistory
+          case Nil => restHistory.prepended(block)
+          case x :: xs => restHistory.prepended(mkHardenedBlock(NonEmptyList(x, xs))).prepended(block)
         }
         WavesChain(newHistory, block.ref.height, blocksCapacity = blocksCapacity - 1).asRight
       } else s"The new block ${block.ref} (reference=${block.reference}) must be after ${prev.ref}".asLeft
   }
 
-  private def withMicroBlock(microBlock: WavesBlock): Either[String, WavesChain] = history match {
-    case Nil => s"Can't attach a micro block $microBlock to empty chain".asLeft
-    case prev :: _ =>
+  private def withMicroBlock(microBlock: WavesBlock): Either[String, WavesChain] = history.headOption match {
+    case None => s"Can't attach a micro block $microBlock to empty chain".asLeft
+    case Some(prev) =>
       if (microBlock.ref.height == prev.ref.height && microBlock.reference == prev.ref.id)
-        WavesChain(microBlock :: history, microBlock.ref.height, blocksCapacity = blocksCapacity).asRight
+        WavesChain(history.prepended(microBlock), microBlock.ref.height, blocksCapacity = blocksCapacity).asRight
       else
         s"The new micro block ${microBlock.ref} (reference=${microBlock.reference}) must reference the last block ${prev.ref}".asLeft
   }
@@ -64,7 +66,7 @@ case class WavesChain(history: List[WavesBlock], height: Int, blocksCapacity: In
   def withoutLastLiquidOrFull: WavesChain = {
     val heightCorrection = if (history.isEmpty) 0 else 1
     val updatedHistory =
-      if (history.isEmpty) Nil
+      if (history.isEmpty) history
       else if (history.headOption.exists(_.tpe == WavesBlock.Type.MicroBlock))
         // Remove a liquid block. tail is safe, because we can't append a micro block without a block in the history
         history.dropWhile(_.tpe == WavesBlock.Type.MicroBlock).tail
@@ -99,16 +101,6 @@ case class WavesChain(history: List[WavesBlock], height: Int, blocksCapacity: In
     (WavesChain(commonHistory, height, blocksCapacity = blocksCapacity + droppedFullBlocksNumber), droppedBlocks)
   }
 
-  def dropAll: (WavesChain, List[WavesBlock]) = (
-    // TODO DEX-1032
-    WavesChain(
-      Nil,
-      history.lastOption.fold(height)(x => math.max(0, x.ref.height - 1)),
-      blocksCapacity = blocksCapacity + history.count(_.tpe == WavesBlock.Type.FullBlock)
-    ),
-    history
-  )
-
   private def mkHardenedBlock(blocks: NonEmptyList[WavesBlock]): WavesBlock = blocks.reduce(WavesChain.blockSemigroup)
 
   override def toString: String = s"WavesChain(his=${history.map(_.ref)}, h=$height)"
@@ -134,19 +126,20 @@ object WavesChain {
   /**
    * @return (liquidBlock, restHistory)
    */
-  def dropLiquidBlock(newFullBlock: WavesBlock, history: List[WavesBlock]): (List[WavesBlock], List[WavesBlock]) =
+  def dropLiquidBlock(newFullBlock: WavesBlock, history: Queue[WavesBlock]): (List[WavesBlock], Queue[WavesBlock]) =
     dropLiquidBlock(newFullBlock, liquidBlock = List.empty, restHistory = history)
 
   @tailrec
   private def dropLiquidBlock(
     newFullBlock: WavesBlock,
     liquidBlock: List[WavesBlock],
-    restHistory: List[WavesBlock]
-  ): (List[WavesBlock], List[WavesBlock]) = restHistory match {
-    case Nil => (liquidBlock, restHistory)
-    case x :: tailRestHistory =>
-      if (x.tpe == WavesBlock.Type.MicroBlock) dropLiquidBlock(newFullBlock, x :: liquidBlock, tailRestHistory)
-      else if (liquidBlock.nonEmpty) (x :: liquidBlock, tailRestHistory) // We have a liquid block, x is a key block
+    restHistory: Queue[WavesBlock]
+  ): (List[WavesBlock], Queue[WavesBlock]) = restHistory.headOption match {
+    case None => (liquidBlock, restHistory)
+    case Some(x) =>
+      if (x.tpe == WavesBlock.Type.MicroBlock) dropLiquidBlock(newFullBlock, x :: liquidBlock, restHistory.tail)
+      // TODO isEmpty
+      else if (liquidBlock.nonEmpty) (x :: liquidBlock, restHistory.tail) // We have a liquid block, x is a key block
       else (liquidBlock, restHistory) // No liquid block, x is a full block
   }
 

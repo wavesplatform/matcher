@@ -13,7 +13,6 @@ import scala.annotation.tailrec
 
 /**
  * TODO DEX-1008 A constructor with auto height when passed non empty list
- * TODO DEX-1008 Cut to last N blocks is required to reduce amount of stored blocks!
  *
  * @param history Contains micro blocks
  * @param blocksCapacity How many full blocks we can append

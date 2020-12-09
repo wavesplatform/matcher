@@ -54,8 +54,8 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
 
       "positive" - {
         def testGen(blocksNumber: Range, microBlocksNumber: Range): Gen[(WavesBlock, Vector[WavesBlock])] =
-          chainGen(blocksNumber, microBlocksNumber).map { chain =>
-            val headBlock = chain.headOption
+          historyGen(blocksNumber, microBlocksNumber).map { history =>
+            val headBlock = history.headOption
             (
               WavesBlock(
                 ref = BlockRef(headBlock.fold(1)(_.ref.height + 1), ByteStr(Array[Byte](-7))),
@@ -63,30 +63,30 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
                 changes = Monoid.empty[BlockchainBalance],
                 tpe = WavesBlock.Type.FullBlock
               ),
-              chain
+              history
             )
           }
 
         "liquid block is not empty" - {
-          "the last liquid block's part is referenced by a new block" in forAll(testGen(1 to 3, 1 to 3)) { case (newBlock, chain) =>
-            val (liquidBlock, _) = WavesChain.dropLiquidBlock(newBlock, chain)
+          "the last liquid block's part is referenced by a new block" in forAll(testGen(1 to 3, 1 to 3)) { case (newBlock, history) =>
+            val (liquidBlock, _) = WavesChain.dropLiquidBlock(newBlock, history)
             liquidBlock.last.ref.id shouldBe newBlock.reference
           }
 
-          "the rest history should not contain a referenced block" in forAll(testGen(1 to 3, 1 to 3)) { case (newBlock, chain) =>
-            val (_, restHistory) = WavesChain.dropLiquidBlock(newBlock, chain)
+          "the rest history should not contain a referenced block" in forAll(testGen(1 to 3, 1 to 3)) { case (newBlock, history) =>
+            val (_, restHistory) = WavesChain.dropLiquidBlock(newBlock, history)
             restHistory.find(_.ref.id == newBlock.reference) shouldBe empty
           }
         }
 
         "liquid block is empty" - {
-          "when there are no micro blocks" in forAll(testGen(1 to 3, 0 to 0)) { case (newBlock, chain) =>
-            val (liquidBlock, _) = WavesChain.dropLiquidBlock(newBlock, chain)
+          "when there are no micro blocks" in forAll(testGen(1 to 3, 0 to 0)) { case (newBlock, history) =>
+            val (liquidBlock, _) = WavesChain.dropLiquidBlock(newBlock, history)
             liquidBlock shouldBe empty
           }
 
-          "the head block in the rest history is referenced by a new one" in forAll(testGen(1 to 3, 0 to 0)) { case (newBlock, chain) =>
-            val (_, restHistory) = WavesChain.dropLiquidBlock(newBlock, chain)
+          "the head block in the rest history is referenced by a new one" in forAll(testGen(1 to 3, 0 to 0)) { case (newBlock, history) =>
+            val (_, restHistory) = WavesChain.dropLiquidBlock(newBlock, history)
             restHistory.head.ref.id shouldBe newBlock.reference
           }
         }
@@ -95,7 +95,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
 
     "dropDifference" - {
       val testGen = for {
-        commonBlocks <- Gen.const(mkChain(1, 0)) // chainGen(0 to 2, 0 to 2)
+        commonBlocks <- historyGen(0 to 2, 0 to 2)
         (maxBlocksNumber, startHeight) = commonBlocks.headOption match {
           case Some(lastBlock) =>
             if (lastBlock.tpe == WavesBlock.Type.FullBlock) (2, lastBlock.ref.height + 1)
@@ -103,15 +103,15 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
           case _ => (2, 0)
         }
 
-        detachedChain1 <- chainGen(0 to maxBlocksNumber, 0 to 2, startHeight)
-        detachedChain2 <- chainGen(0 to maxBlocksNumber, 0 to 2, startHeight)
+        detachedHistory1 <- historyGen(0 to maxBlocksNumber, 0 to 2, startHeight to startHeight)
+        detachedHistory2 <- historyGen(0 to maxBlocksNumber, 0 to 2, startHeight to startHeight)
       } yield {
-        val chain1 = detachedChain1.appendedAll(commonBlocks)
-        val chain2 = detachedChain2.appendedAll(commonBlocks)
+        val history1 = detachedHistory1.appendedAll(commonBlocks)
+        val history2 = detachedHistory2.appendedAll(commonBlocks)
         (
           commonBlocks,
-          WavesChain(chain1, chain1.headOption.fold(0)(_.ref.height), 100),
-          WavesChain(chain2, chain2.headOption.fold(0)(_.ref.height), 100)
+          WavesChain(history1, history1.headOption.fold(0)(_.ref.height), 100),
+          WavesChain(history2, history2.headOption.fold(0)(_.ref.height), 100)
         )
       }
 
@@ -140,6 +140,73 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
     // 5. If we receive an irrelevant block, we drop the last full block and its micro blocks [and restart the stream from the last block's height]
 
     "withBlock" - {
+      "properties" - {
+        val testGen: Gen[(WavesChain, WavesBlock)] =
+          Gen.oneOf(
+            historyGen(0 to 2, 0 to 2, 0 to 2).map { history =>
+              val newBlock = mkNextFullBlock(if (history.isEmpty) defaultInitBlock else history.head)
+              (WavesChain(history, history.headOption.fold(0)(_.ref.height), 100), newBlock)
+            },
+            historyGen(1 to 2, 0 to 2, 0 to 2).map { history =>
+              val newBlock = mkNextMicroBlock(history.head)
+              (WavesChain(history, history.headOption.fold(0)(_.ref.height), 100), newBlock)
+            }
+          )
+
+        def test(f: (WavesChain, WavesChain, WavesBlock) => Any): Any = forAll(testGen) { case (chain, newBlock) =>
+          chain.withBlock(newBlock) match {
+            case Left(e) => fail(e)
+            case Right(updatedChain) => f(chain, updatedChain, newBlock)
+          }
+        }
+
+        "a new block is the last block in the chain after appending" in test { (_, updatedChain, newBlock) =>
+          updatedChain.last should matchTo(newBlock.some)
+        }
+
+        "the height increased if we append a full block" in test { (chain, updatedChain, newBlock) =>
+          val expectedHeight = chain.height + (if (newBlock.tpe == WavesBlock.Type.FullBlock) 1 else 0)
+          updatedChain.height shouldBe expectedHeight
+        }
+
+        "the capacity decreased if we append a full block" in test { (chain, updatedChain, newBlock) =>
+          val expectedCapacity = chain.blocksCapacity - (if (newBlock.tpe == WavesBlock.Type.FullBlock) 1 else 0)
+          updatedChain.blocksCapacity shouldBe expectedCapacity
+        }
+
+        "the length preserved if we append a block and the capacity exhausted" in {
+          val testGen = for {
+            history <- historyGen(1 to 2, 0 to 0, 0 to 2)
+          } yield {
+            val chain = WavesChain(history, history.head.ref.height, 0)
+            (chain, mkNextFullBlock(history.head))
+          }
+
+          forAll(testGen) { case (chain, newBlock) =>
+            chain.withBlock(newBlock) match {
+              case Left(e) => fail(e)
+              case Right(updatedChain) => updatedChain.history.length shouldBe chain.history.length
+            }
+          }
+        }
+
+        "the length increased if we append a micro block even the capacity exhausted" in {
+          val testGen = for {
+            history <- historyGen(1 to 2, 0 to 2, 0 to 2)
+          } yield {
+            val chain = WavesChain(history, history.head.ref.height, 0)
+            (chain, mkNextMicroBlock(history.head))
+          }
+
+          forAll(testGen) { case (chain, newBlock) =>
+            chain.withBlock(newBlock) match {
+              case Left(e) => fail(e)
+              case Right(updatedChain) => updatedChain.history.length shouldBe (chain.history.length + 1)
+            }
+          }
+        }
+      }
+
       "empty +" - {
         val init = WavesChain(emptyChain, 0, 100)
 
@@ -379,45 +446,76 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
         init.withBlock(newBlock) should produce("(?s)^The new block.+must be after.+".r)
       }
     }
+
+    "withoutLast" - {
+      def testGen(maxMicroBlocks: Range = 0 to 2): Gen[WavesChain] = for {
+        history <- historyGen(1 to 2, maxMicroBlocks, 0 to 2)
+        capacity <- Gen.choose(0, 2)
+      } yield WavesChain(history, history.head.ref.height, capacity)
+
+      "the last block disappears" in forAll(testGen()) { chain =>
+        val (updatedChain, _) = chain.withoutLast
+        updatedChain.history should not contain chain.last.get
+      }
+
+      "the capacity increases if the last block is a full block" in forAll(testGen(0 to 0)) { chain =>
+        val (updatedChain, _) = chain.withoutLast
+        updatedChain.blocksCapacity shouldBe chain.blocksCapacity + 1
+      }
+
+      "the capacity remains if the last block is a micro block" in forAll(testGen(1 to 2)) { chain =>
+        val (updatedChain, _) = chain.withoutLast
+        updatedChain.blocksCapacity shouldBe chain.blocksCapacity
+      }
+    }
   }
 
-  private def chainGen(blocksNumber: Range, microBlocksNumber: Range, startHeight: Int = 0): Gen[Vector[WavesBlock]] = for {
+  private lazy val defaultInitBlock = WavesBlock(
+    ref = BlockRef(0, ByteStr(Array[Byte](0))),
+    reference = ByteStr.empty,
+    changes = Monoid.empty[BlockchainBalance],
+    tpe = WavesBlock.Type.FullBlock
+  )
+
+  private def historyGen(blocksNumber: Range, microBlocksNumber: Range, startHeightRange: Range = 0 to 2): Gen[Vector[WavesBlock]] =
+    for {
+      startHeight <- Gen.choose(startHeightRange.head, startHeightRange.last)
+      r <- historyGen(
+        blocksNumber,
+        microBlocksNumber,
+        initBlock = defaultInitBlock.copy(
+          ref = BlockRef(
+            height = startHeight,
+            id = ByteStr(Array.fill[Byte](startHeight)(1))
+          )
+        )
+      )
+    } yield r
+
+  private def historyGen(blocksNumber: Range, microBlocksNumber: Range, initBlock: WavesBlock): Gen[Vector[WavesBlock]] = for {
     blocksNumber <- Gen.choose(blocksNumber.head, blocksNumber.last)
     microBlocksNumber <- if (blocksNumber == 0) Gen.const(0) else Gen.choose(microBlocksNumber.head, microBlocksNumber.last)
-  } yield mkChain(blocksNumber, microBlocksNumber, startHeight)
+  } yield historyGen(blocksNumber, microBlocksNumber, initBlock)
 
-  private def mkChain(blocksNumber: Int, microBlocksNumber: Int, startHeight: Int = 0): Vector[WavesBlock] =
+  private def historyGen(blocksNumber: Int, microBlocksNumber: Int, initBlock: WavesBlock): Vector[WavesBlock] =
     if (blocksNumber <= 0) Vector.empty
     else {
-      val initBlock = WavesBlock(
-        ref = BlockRef(startHeight, ByteStr(Array[Byte](0))),
-        reference = ByteStr.empty,
-        changes = Monoid.empty[BlockchainBalance],
-        tpe = WavesBlock.Type.FullBlock
-      )
-
-      val blocks = Iterator
-        .unfold(initBlock) { prev =>
-          val next = prev.copy(
-            ref = BlockRef(prev.ref.height + 1, ByteStr(prev.ref.id.arr.prepended(1))),
-            reference = prev.ref.id
-          )
-          (next, next).some
-        }
+      val blocks = {
+        Iterator(initBlock) ++ Iterator
+          .unfold(initBlock) { prev =>
+            val next = mkNextFullBlock(prev)
+            (next, next).some
+          }
+      }
         .take(blocksNumber)
-        .toVector
-        .prepended(initBlock) // 1, 2, 3
+        .toVector // 1, 2, 3
 
       val microBlocks = blocks.lastOption match {
         case None => Vector.empty[WavesBlock]
         case Some(lastBlock) =>
           Iterator
             .unfold(lastBlock) { prev =>
-              val next = prev.copy(
-                ref = prev.ref.copy(id = ByteStr(prev.ref.id.arr.prepended(2))), // height remains
-                reference = prev.ref.id,
-                tpe = WavesBlock.Type.MicroBlock
-              )
+              val next = mkNextMicroBlock(prev)
               (next, next).some
             }
             .take(microBlocksNumber)
@@ -426,5 +524,17 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
 
       blocks.appendedAll(microBlocks).reverse // 5, 4, 3, 2, 1
     }
+
+  private def mkNextFullBlock(prevBlock: WavesBlock): WavesBlock = prevBlock.copy(
+    ref = BlockRef(prevBlock.ref.height + 1, ByteStr(prevBlock.ref.id.arr.prepended(1))),
+    reference = prevBlock.ref.id,
+    tpe = WavesBlock.Type.FullBlock
+  )
+
+  private def mkNextMicroBlock(prevBlock: WavesBlock): WavesBlock = prevBlock.copy(
+    ref = prevBlock.ref.copy(id = ByteStr(prevBlock.ref.id.arr.prepended(2))), // height remains
+    reference = prevBlock.ref.id,
+    tpe = WavesBlock.Type.MicroBlock
+  )
 
 }

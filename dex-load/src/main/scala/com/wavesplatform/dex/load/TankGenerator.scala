@@ -10,9 +10,10 @@ import com.wavesplatform.dex.domain.account.{Address, PrivateKey, PublicKey}
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.load.request._
 import com.wavesplatform.dex.load.utils._
+import com.wavesplatform.protobuf.transaction.Recipient
 import im.mak.waves.transactions.{MassTransferTransaction, TransferTransaction}
 import im.mak.waves.transactions.account.{PrivateKey => JPrivateKey, PublicKey => JPublicKey}
-import im.mak.waves.transactions.common.{Amount, AssetId}
+import im.mak.waves.transactions.common.{Amount, AssetId, Base58String, Recipient}
 import im.mak.waves.transactions.exchange.{AssetPair, Order, OrderType}
 import im.mak.waves.transactions.mass.Transfer
 import org.apache.http.HttpResponse
@@ -338,7 +339,7 @@ object TankGenerator {
 
     val assets = mkAssets(10)
     val initialValue = 100000000000L
-    val assetOwners = accounts.map(_.address() -> assets(new Random().nextInt(assets.length)))
+    val assetOwners = accounts.map(_ -> assets(new Random().nextInt(assets.length)))
     val allRecipients = assetOwners.map(_._1).toSet
 
     def mkMassTransfer(transfers: List[Transfer], asset: AssetId): MassTransferTransaction =
@@ -350,21 +351,23 @@ object TankGenerator {
         .getSignedWith(issuer)
 
     def mkTransfer(recipient: JPrivateKey, amount: Amount): TransferTransaction = TransferTransaction
-      .builder(recipient, amount)
+      .builder(recipient.address(), amount)
       .fee(settings.defaults.massTransferFee)
       .getSignedWith(issuer)
 
+
+
     assetOwners.map { case (assetOwner, asset) =>
       try {
-        node.broadcast(mkTransfer(assetOwner, Amount.of(initialValue, AssetId.as(asset))))
-        node.broadcast(mkTransfer(assetOwner, Amount.of(initialValue)))
+        node.broadcast(new im.mak.waves.transactions.TransferTransaction(issuer.publicKey(),assetOwner.address(), Amount.of(initialValue, AssetId.as(asset)), Base58String.empty))
+        node.broadcast(new im.mak.waves.transactions.TransferTransaction(issuer.publicKey(),assetOwner.address(), Amount.of(initialValue), Base58String.empty))
       } catch { case e: Exception => println(e) }
     }
 
     waitForHeightArise()
 
     val massTransfers = assetOwners.map { case (assetOwner, asset) =>
-      mkMassTransfer((allRecipients - assetOwner).map(recipient => Transfer.to(recipient, 1000000L)).toList, AssetId.as(asset))
+      mkMassTransfer((allRecipients - assetOwner).map(recipient => Transfer.to(recipient.address(), 1000000L)).toList, AssetId.as(asset))
     }
 
     Random
@@ -442,13 +445,13 @@ object TankGenerator {
     )
   }
 
-  private def mkAllTypesWithMassTransfers(accounts: List[JPrivateKey], requestsCount: Int): List[Request] = {
+  private def mkAllTypesWithMassTransfers(accounts: List[JPrivateKey], requestsCount: Int, pairsFile: Option[File]): List[Request] = {
 
-    val requests = mkAllTypes(accounts.slice(0, 5899), requestsCount)
-    val step1And3 = requests.slice(0, 36059)
-    val step2 = requests.slice(36060, 36060 + 162000)
+    val requests = mkAllTypes(accounts.slice(0, 5899).toList, requestsCount, pairsFile)
+    val step1And3 = requests.slice(0, 36059).toList
+    val step2 = requests.slice(36060, 36060 + 162000).toList
 
-    step1And3 + step2 + mkMassTransfers(accounts.slice(5900, 5999), 18000)
+    step1And3 ++ step2 ++ mkMassTransfers(accounts.slice(5900, 5999).toList, 18000)
   }
 
   private def svRequests(requests: List[Request], outputFile: File): Unit = {
@@ -477,7 +480,7 @@ object TankGenerator {
         case 4 => mkOrderHistory(accounts, requestsCount, pairsFile)
         case 5 => mkBalances(accounts, requestsCount, pairsFile)
         case 6 => mkAllTypes(accounts, requestsCount, pairsFile)
-        case 7 => mkAllTypesWithMassTransfers(accounts, requestsCount)
+        case 7 => mkAllTypesWithMassTransfers(accounts, requestsCount, pairsFile)
         case _ => println("Wrong number of task "); List.empty
       }
       svRequests(requests, outputFile)

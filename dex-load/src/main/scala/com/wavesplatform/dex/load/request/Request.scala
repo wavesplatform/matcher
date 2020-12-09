@@ -13,19 +13,21 @@ case class Request(
   tag: RequestTag,
   jsonBody: String = null,
   headers: Map[String, String] = Map.empty,
-  stringBody: String = ""
+  stringBody: String = "",
+  host: String = settings.hosts.shooted
 ) {
 
   val defaultHeaders = Map(
     HttpHeaders.ACCEPT -> "application/json",
     HttpHeaders.CONNECTION -> "close",
-    HttpHeaders.CONTENT_TYPE -> "application/json",
-    HttpHeaders.HOST -> settings.hosts.shooted
+    HttpHeaders.CONTENT_TYPE -> "application/json"
   )
 
-  def mkGet(path: String, tag: RequestTag, additionalHeaders: Map[String, String] = Map.empty) = {
+  def mkGet(path: String, tag: RequestTag, additionalHeaders: Map[String, String] = Map.empty): String = {
     val request =
-      s"${RequestType.GET} $path HTTP/1.1\r\n${(defaultHeaders ++ additionalHeaders).map { case (k, v) => s"$k: $v" }.mkString("\r\n")}\r\n\r\n"
+      s"${RequestType.GET} $path HTTP/1.1\r\n${(defaultHeaders ++ additionalHeaders ++ Map(HttpHeaders.HOST -> host)).map { case (k, v) =>
+        s"$k: $v"
+      }.mkString("\r\n")}\r\n\r\n"
 
     s"${request.length} $tag\r\n$request\r\n"
   }
@@ -35,7 +37,8 @@ case class Request(
 
     val headers = defaultHeaders ++ Map(
       HttpHeaders.CONTENT_LENGTH -> body.length.toString,
-      "X-API-Key" -> settings.dexRestApiKey
+      "X-API-Key" -> settings.dexRestApiKey,
+      HttpHeaders.HOST -> host
     )
 
     val request = s"${RequestType.POST} $path HTTP/1.1\r\n${headers.map { case (k, v) => s"$k: $v" }.mkString("\r\n")}\r\n\r\n$body"

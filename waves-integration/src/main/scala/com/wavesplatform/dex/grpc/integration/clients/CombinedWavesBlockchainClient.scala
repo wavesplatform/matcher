@@ -53,11 +53,11 @@ class CombinedWavesBlockchainClient(
   private val dataUpdates = ConcurrentSubject.publish[WavesNodeEvent]
 
   override val updates: Observable[Updates] = Observable.fromFuture(meClient.currentBlockInfo).flatMap { startBlockInfo =>
-    val startHeight = math.max(startBlockInfo.height - MaxRollbackHeight - 1, 1)
+    val startHeight = math.max(startBlockInfo.height - MaxBlockNumberInChain, 1)
 
     // TODO DEX-1000 Wait until both connections are restored, because one node could be behind another!
     val finalBalance = mutable.Map.empty[Address, Map[Asset, Long]]
-    val init: BlockchainStatus = BlockchainStatus.Normal(WavesChain(List.empty, startHeight))
+    val init: BlockchainStatus = BlockchainStatus.Normal(WavesChain(List.empty, startHeight, MaxBlockNumberInChain))
     val (blockchainEvents, control) = bClient.blockchainEvents(startHeight)
     Observable(dataUpdates, meClient.utxEvents, blockchainEvents)
       .merge
@@ -205,7 +205,7 @@ class CombinedWavesBlockchainClient(
 
 object CombinedWavesBlockchainClient {
 
-  val MaxRollbackHeight = 100
+  val MaxBlockNumberInChain = 101 // MaxRollBackHeight is 100
 
   case class Settings(pessimisticPortfolios: SynchronizedPessimisticPortfolios.Settings)
 

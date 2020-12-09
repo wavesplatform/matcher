@@ -46,48 +46,6 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
 
   private val emptyChain = List.empty[WavesBlock]
 
-  private def chainGen(blocksNumber: Range, microBlocksNumber: Range): Gen[List[WavesBlock]] = for {
-    blocksNumber <- Gen.choose(blocksNumber.head, blocksNumber.last)
-    microBlocksNumber <- if (blocksNumber == 0) Gen.const(0) else Gen.choose(microBlocksNumber.head, microBlocksNumber.last)
-  } yield {
-    val initBlock = WavesBlock(
-      ref = BlockRef(0, ByteStr(Array[Byte](0))),
-      reference = ByteStr.empty,
-      changes = Monoid.empty[BlockchainBalance],
-      tpe = WavesBlock.Type.FullBlock
-    )
-
-    val blocks = Iterator
-      .unfold(initBlock) { prev =>
-        val next = prev.copy(
-          ref = BlockRef(prev.ref.height + 1, ByteStr(prev.ref.id.arr.prepended(1))),
-          reference = prev.ref.id
-        )
-        (next, next).some
-      }
-      .take(blocksNumber)
-      .toList
-      .reverse // 3, 2, 1
-
-    val microBlocks = blocks match {
-      case Nil => List.empty[WavesBlock]
-      case lastBlock :: _ =>
-        Iterator
-          .unfold(lastBlock) { prev =>
-            val next = prev.copy(
-              ref = prev.ref.copy(id = ByteStr(prev.ref.id.arr.prepended(2))), // height remains
-              reference = prev.ref.id,
-              tpe = WavesBlock.Type.MicroBlock
-            )
-            (next, next).some
-          }
-          .take(microBlocksNumber)
-          .toList // 4, 5
-    }
-
-    blocks.reverse_:::(microBlocks) // 5, 4, 3, 2, 1
-  }
-
   "WavesChain" - {
     "dropLiquidBlock" - {
       "empty" in {
@@ -135,6 +93,41 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
       }
     }
 
+    "dropDifference" - {
+      val testGen = for {
+        commonBlocks <- Gen.const(mkChain(1, 0)) // chainGen(0 to 2, 0 to 2)
+        (maxBlocksNumber, startHeight) = commonBlocks.headOption match {
+          case Some(lastBlock) =>
+            if (lastBlock.tpe == WavesBlock.Type.FullBlock) (2, lastBlock.ref.height + 1)
+            else (0, lastBlock.ref.height)
+          case _ => (2, 0)
+        }
+
+        detachedChain1 <- chainGen(0 to maxBlocksNumber, 0 to 2, startHeight)
+        detachedChain2 <- chainGen(0 to maxBlocksNumber, 0 to 2, startHeight)
+      } yield {
+        val chain1 = detachedChain1 ::: commonBlocks
+        val chain2 = detachedChain2 ::: commonBlocks
+        (
+          commonBlocks,
+          WavesChain(chain1, chain1.headOption.fold(0)(_.ref.height), 100),
+          WavesChain(chain2, chain2.headOption.fold(0)(_.ref.height), 100)
+        )
+      }
+
+      "there is no common block between dropped" in forAll(testGen) { case (commonBlocks, chain1, chain2) =>
+        val (dropped1, dropped2) = WavesChain.dropDifference(chain1, chain2)
+        commonBlocks.foreach { commonBlock =>
+          withClue("dropped1: ") {
+            dropped1 should not contain commonBlock
+          }
+          withClue("dropped2: ") {
+            dropped2 should not contain commonBlock
+          }
+        }
+      }
+    }
+
     // Terminology:
     // * block - full block or micro block
     // Properties:
@@ -148,9 +141,9 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
 
     "withBlock" - {
       "empty +" - {
-        val init = WavesChain(List.empty, 0)
+        val init = WavesChain(List.empty, 0, 100)
 
-        "block" in { init.withBlock(block1) should matchTo(WavesChain(List(block1), 1).asRight[String]) }
+        "block" in { init.withBlock(block1) should matchTo(WavesChain(List(block1), 1, 99).asRight[String]) }
 
         "micro block" in {
           val microBlock = block1.copy(tpe = WavesBlock.Type.MicroBlock)
@@ -159,9 +152,9 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
       }
 
       "block +" - {
-        val init = WavesChain(List(block1), 1)
+        val init = WavesChain(List(block1), 1, 99)
         "expected" - {
-          "block" in { init.withBlock(block2) should matchTo(WavesChain(List(block2, block1), 2).asRight[String]) }
+          "block" in { init.withBlock(block2) should matchTo(WavesChain(List(block2, block1), 2, 98).asRight[String]) }
 
           "micro block" in {
             val microBlock = block2.copy(
@@ -169,7 +162,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
               tpe = WavesBlock.Type.MicroBlock
             )
 
-            init.withBlock(microBlock) should matchTo(WavesChain(List(microBlock, block1), 1).asRight[String])
+            init.withBlock(microBlock) should matchTo(WavesChain(List(microBlock, block1), 1, 99).asRight[String])
           }
         }
 
@@ -218,7 +211,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
           tpe = WavesBlock.Type.MicroBlock
         )
 
-        val init = WavesChain(List(microBlock1, block1), 1)
+        val init = WavesChain(List(microBlock1, block1), 1, 99)
 
         "expected" - {
           "block referenced to the" - {
@@ -240,7 +233,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
                 tpe = WavesBlock.Type.FullBlock
               )
 
-              init.withBlock(newBlock) should matchTo(WavesChain(List(newBlock, hardenedBlock), 2).asRight[String])
+              init.withBlock(newBlock) should matchTo(WavesChain(List(newBlock, hardenedBlock), 2, 98).asRight[String])
             }
           }
 
@@ -251,7 +244,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
               tpe = WavesBlock.Type.MicroBlock
             )
 
-            init.withBlock(microBlock2) should matchTo(WavesChain(List(microBlock2, microBlock1, block1), 1).asRight[String])
+            init.withBlock(microBlock2) should matchTo(WavesChain(List(microBlock2, microBlock1, block1), 1, 99).asRight[String])
           }
         }
 
@@ -325,7 +318,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
           tpe = WavesBlock.Type.MicroBlock
         )
 
-        val init = WavesChain(List(microBlock2, microBlock1, block1), 1)
+        val init = WavesChain(List(microBlock2, microBlock1, block1), 1, 99)
 
         "unexpected" - {
           "block referenced to the previous micro block" in {
@@ -371,7 +364,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
           tpe = WavesBlock.Type.MicroBlock
         )
 
-        val init = WavesChain(List(microBlock, block2, block1), 2)
+        val init = WavesChain(List(microBlock, block2, block1), 2, 98)
 
         val newBlock = WavesBlock(
           ref = BlockRef(height = 3, id = ByteStr(Array[Byte](98, 1, 0))),
@@ -387,4 +380,52 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
       }
     }
   }
+
+  private def chainGen(blocksNumber: Range, microBlocksNumber: Range, startHeight: Int = 0): Gen[List[WavesBlock]] = for {
+    blocksNumber <- Gen.choose(blocksNumber.head, blocksNumber.last)
+    microBlocksNumber <- if (blocksNumber == 0) Gen.const(0) else Gen.choose(microBlocksNumber.head, microBlocksNumber.last)
+  } yield mkChain(blocksNumber, microBlocksNumber, startHeight)
+
+  private def mkChain(blocksNumber: Int, microBlocksNumber: Int, startHeight: Int = 0): List[WavesBlock] =
+    if (blocksNumber <= 0) Nil
+    else {
+      val initBlock = WavesBlock(
+        ref = BlockRef(startHeight, ByteStr(Array[Byte](0))),
+        reference = ByteStr.empty,
+        changes = Monoid.empty[BlockchainBalance],
+        tpe = WavesBlock.Type.FullBlock
+      )
+
+      val blocks = {
+        initBlock :: Iterator
+          .unfold(initBlock) { prev =>
+            val next = prev.copy(
+              ref = BlockRef(prev.ref.height + 1, ByteStr(prev.ref.id.arr.prepended(1))),
+              reference = prev.ref.id
+            )
+            (next, next).some
+          }
+          .take(blocksNumber)
+          .toList
+      }.reverse // 3, 2, 1
+
+      val microBlocks = blocks match {
+        case Nil => List.empty[WavesBlock]
+        case lastBlock :: _ =>
+          Iterator
+            .unfold(lastBlock) { prev =>
+              val next = prev.copy(
+                ref = prev.ref.copy(id = ByteStr(prev.ref.id.arr.prepended(2))), // height remains
+                reference = prev.ref.id,
+                tpe = WavesBlock.Type.MicroBlock
+              )
+              (next, next).some
+            }
+            .take(microBlocksNumber)
+            .toList // 4, 5
+      }
+
+      blocks.reverse_:::(microBlocks) // 5, 4, 3, 2, 1
+    }
+
 }

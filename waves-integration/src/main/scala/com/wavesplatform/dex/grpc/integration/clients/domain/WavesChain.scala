@@ -12,8 +12,6 @@ import com.wavesplatform.dex.grpc.integration.clients.domain.WavesChain.dropLiqu
 import scala.annotation.tailrec
 
 /**
- * TODO DEX-1008 A constructor with auto height when passed non empty list
- *
  * @param history Contains micro blocks
  * @param blocksCapacity How many full blocks we can append
  */
@@ -60,7 +58,6 @@ case class WavesChain(history: Vector[WavesBlock], height: Int, blocksCapacity: 
 
   def diffIndex: DiffIndex = history.foldMap(_.diffIndex)
 
-  // TODO tests
   def withoutLastLiquidOrFull: WavesChain = {
     val heightCorrection = if (history.isEmpty) 0 else 1
     val updatedHistory =
@@ -72,7 +69,6 @@ case class WavesChain(history: Vector[WavesBlock], height: Int, blocksCapacity: 
     WavesChain(updatedHistory, height - heightCorrection, blocksCapacity = blocksCapacity + heightCorrection)
   }
 
-  // TODO tests
   def withoutLast: (WavesChain, Option[WavesBlock]) =
     if (isEmpty) (this, None)
     else {
@@ -120,6 +116,12 @@ object WavesChain {
     }
 
   }
+
+  /**
+   * If history is empty, the height is supposed to be 0
+   */
+  def apply(history: Vector[WavesBlock], blocksCapacity: Int): WavesChain =
+    WavesChain(history, history.headOption.fold(0)(_.ref.height), blocksCapacity)
 
   /**
    * @return (liquidBlock, restHistory)

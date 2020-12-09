@@ -110,8 +110,8 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
         val history2 = detachedHistory2.appendedAll(commonBlocks)
         (
           commonBlocks,
-          WavesChain(history1, history1.headOption.fold(0)(_.ref.height), 100),
-          WavesChain(history2, history2.headOption.fold(0)(_.ref.height), 100)
+          WavesChain(history1, 100),
+          WavesChain(history2, 100)
         )
       }
 
@@ -128,28 +128,15 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
       }
     }
 
-    // Terminology:
-    // * block - full block or micro block
-    // Properties:
-    // 1. If we have no blocks and receive a full block, this block is added in the front of the current fork
-    // 2. If we have no blocks and receive a micro block, we restart from the current height
-    // 3. If we have no micro blocks and receive a full block that is referenced to the last known block, this block is added in the front of the current fork
-    // 4. If we have micro blocks and receive a full block that is referenced to the last known full block or its micro blocks
-    //    1. The last block and its micro blocks are replaced by a hardened block in the fork
-    //    2. See 3
-    // 5. If we receive an irrelevant block, we drop the last full block and its micro blocks [and restart the stream from the last block's height]
-
     "withBlock" - {
       "properties" - {
         val testGen: Gen[(WavesChain, WavesBlock)] =
           Gen.oneOf(
             historyGen(0 to 2, 0 to 2, 0 to 2).map { history =>
-              val newBlock = mkNextFullBlock(if (history.isEmpty) defaultInitBlock else history.head)
-              (WavesChain(history, history.headOption.fold(0)(_.ref.height), 100), newBlock)
+              (WavesChain(history, 100), mkNextFullBlock(if (history.isEmpty) defaultInitBlock else history.head))
             },
             historyGen(1 to 2, 0 to 2, 0 to 2).map { history =>
-              val newBlock = mkNextMicroBlock(history.head)
-              (WavesChain(history, history.headOption.fold(0)(_.ref.height), 100), newBlock)
+              (WavesChain(history, 100), mkNextMicroBlock(history.head))
             }
           )
 
@@ -177,10 +164,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
         "the length preserved if we append a block and the capacity exhausted" in {
           val testGen = for {
             history <- historyGen(1 to 2, 0 to 0, 0 to 2)
-          } yield {
-            val chain = WavesChain(history, history.head.ref.height, 0)
-            (chain, mkNextFullBlock(history.head))
-          }
+          } yield (WavesChain(history, 0), mkNextFullBlock(history.head))
 
           forAll(testGen) { case (chain, newBlock) =>
             chain.withBlock(newBlock) match {
@@ -193,10 +177,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
         "the length increased if we append a micro block even the capacity exhausted" in {
           val testGen = for {
             history <- historyGen(1 to 2, 0 to 2, 0 to 2)
-          } yield {
-            val chain = WavesChain(history, history.head.ref.height, 0)
-            (chain, mkNextMicroBlock(history.head))
-          }
+          } yield (WavesChain(history, 0), mkNextMicroBlock(history.head))
 
           forAll(testGen) { case (chain, newBlock) =>
             chain.withBlock(newBlock) match {
@@ -208,9 +189,9 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
       }
 
       "empty +" - {
-        val init = WavesChain(emptyChain, 0, 100)
+        val init = WavesChain(emptyChain, 100)
 
-        "block" in { init.withBlock(block1) should matchTo(WavesChain(Vector(block1), 1, 99).asRight[String]) }
+        "block" in { init.withBlock(block1) should matchTo(WavesChain(Vector(block1), 99).asRight[String]) }
 
         "micro block" in {
           val microBlock = block1.copy(tpe = WavesBlock.Type.MicroBlock)
@@ -219,9 +200,9 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
       }
 
       "block +" - {
-        val init = WavesChain(Vector(block1), 1, 99)
+        val init = WavesChain(Vector(block1), 99)
         "expected" - {
-          "block" in { init.withBlock(block2) should matchTo(WavesChain(Vector(block2, block1), 2, 98).asRight[String]) }
+          "block" in { init.withBlock(block2) should matchTo(WavesChain(Vector(block2, block1), 98).asRight[String]) }
 
           "micro block" in {
             val microBlock = block2.copy(
@@ -229,7 +210,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
               tpe = WavesBlock.Type.MicroBlock
             )
 
-            init.withBlock(microBlock) should matchTo(WavesChain(Vector(microBlock, block1), 1, 99).asRight[String])
+            init.withBlock(microBlock) should matchTo(WavesChain(Vector(microBlock, block1), 99).asRight[String])
           }
         }
 
@@ -278,7 +259,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
           tpe = WavesBlock.Type.MicroBlock
         )
 
-        val init = WavesChain(Vector(microBlock1, block1), 1, 99)
+        val init = WavesChain(Vector(microBlock1, block1), 99)
 
         "expected" - {
           "block referenced to the" - {
@@ -300,7 +281,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
                 tpe = WavesBlock.Type.FullBlock
               )
 
-              init.withBlock(newBlock) should matchTo(WavesChain(Vector(newBlock, hardenedBlock), 2, 98).asRight[String])
+              init.withBlock(newBlock) should matchTo(WavesChain(Vector(newBlock, hardenedBlock), 98).asRight[String])
             }
           }
 
@@ -311,7 +292,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
               tpe = WavesBlock.Type.MicroBlock
             )
 
-            init.withBlock(microBlock2) should matchTo(WavesChain(Vector(microBlock2, microBlock1, block1), 1, 99).asRight[String])
+            init.withBlock(microBlock2) should matchTo(WavesChain(Vector(microBlock2, microBlock1, block1), 99).asRight[String])
           }
         }
 
@@ -385,7 +366,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
           tpe = WavesBlock.Type.MicroBlock
         )
 
-        val init = WavesChain(Vector(microBlock2, microBlock1, block1), 1, 99)
+        val init = WavesChain(Vector(microBlock2, microBlock1, block1), 99)
 
         "unexpected" - {
           "block referenced to the previous micro block" in {
@@ -431,7 +412,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
           tpe = WavesBlock.Type.MicroBlock
         )
 
-        val init = WavesChain(Vector(microBlock, block2, block1), 2, 98)
+        val init = WavesChain(Vector(microBlock, block2, block1), 98)
 
         val newBlock = WavesBlock(
           ref = BlockRef(height = 3, id = ByteStr(Array[Byte](98, 1, 0))),
@@ -447,11 +428,33 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
       }
     }
 
+    "withoutLastLiquidOrFull" - {
+      val testGen: Gen[WavesChain] = for {
+        history <- historyGen(1 to 2, 0 to 2, 0 to 2)
+        capacity <- Gen.choose(0, 2)
+      } yield WavesChain(history, capacity)
+
+      "the last block disappears" in forAll(testGen) { chain =>
+        val updatedChain = chain.withoutLastLiquidOrFull
+        updatedChain.history should not contain chain.last.get
+      }
+
+      "micro blocks disappear" in forAll(testGen) { chain =>
+        val updatedChain = chain.withoutLastLiquidOrFull
+        updatedChain.history.find(_.tpe == WavesBlock.Type.MicroBlock) shouldBe empty
+      }
+
+      "the capacity increases" in forAll(testGen) { chain =>
+        val updatedChain = chain.withoutLastLiquidOrFull
+        updatedChain.blocksCapacity shouldBe chain.blocksCapacity + 1
+      }
+    }
+
     "withoutLast" - {
       def testGen(maxMicroBlocks: Range = 0 to 2): Gen[WavesChain] = for {
         history <- historyGen(1 to 2, maxMicroBlocks, 0 to 2)
         capacity <- Gen.choose(0, 2)
-      } yield WavesChain(history, history.head.ref.height, capacity)
+      } yield WavesChain(history, capacity)
 
       "the last block disappears" in forAll(testGen()) { chain =>
         val (updatedChain, _) = chain.withoutLast

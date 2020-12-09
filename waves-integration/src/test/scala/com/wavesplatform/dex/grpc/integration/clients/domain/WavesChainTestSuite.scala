@@ -428,23 +428,204 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
       }
     }
 
+    "dropAfter(ref)" - {
+      val testGen = for {
+        history <- historyGen(1 to 3, 0 to 2, 0 to 2)
+        refToDrop <- Gen.oneOf(history.map(_.ref))
+        capacity <- Gen.choose(0, 2)
+      } yield (WavesChain(history, capacity), refToDrop)
+
+      "the block with a specified ref" - {
+        "remains" in forAll(testGen) { case (chain, ref) =>
+          val (updatedChain, _) = chain.dropAfter(ref)
+          updatedChain.history.map(_.ref) should contain(ref)
+        }
+
+        "should not be among dropped" in forAll(testGen) { case (chain, ref) =>
+          val (_, dropped) = chain.dropAfter(ref)
+          dropped.map(_.ref) should not contain ref
+        }
+      }
+
+      "dropped blocks" - {
+        "were in the original chain" in forAll(testGen) { case (chain, ref) =>
+          val (_, dropped) = chain.dropAfter(ref)
+          dropped.foreach { b =>
+            withClue(s"${b.ref}: ") {
+              chain.history.map(_.ref) should contain(b.ref)
+            }
+          }
+        }
+
+        "don't present in the updated chain" in forAll(testGen) { case (chain, ref) =>
+          val (updatedChain, dropped) = chain.dropAfter(ref)
+          dropped.foreach { b =>
+            withClue(s"${b.ref}: ") {
+              updatedChain.history.map(_.ref) should not contain b.ref
+            }
+          }
+        }
+
+        "are reverse ordered" in forAll(testGen) { case (chain, ref) =>
+          val (_, dropped) = chain.dropAfter(ref)
+          val droppedRefs = dropped.map(_.ref)
+          val expectedRefs = chain.history.take(droppedRefs.length).map(_.ref).reverse
+
+          droppedRefs should contain theSameElementsInOrderAs expectedRefs
+        }
+      }
+
+      "the chain remains if the we drop after the last block" in {
+        val testGen = for {
+          history <- historyGen(1 to 3, 0 to 2, 0 to 2)
+          capacity <- Gen.choose(0, 2)
+        } yield WavesChain(history, capacity)
+
+        forAll(testGen) { chain =>
+          val (updatedChain, _) = chain.dropAfter(chain.last.get.ref)
+          updatedChain should matchTo(chain)
+        }
+      }
+
+      "the height of update chain is equal to specified" in {
+        val testGen = for {
+          history <- historyGen(1 to 3, 0 to 2, 0 to 2)
+          refToDrop <- Gen.oneOf(history.map(_.ref))
+          capacity <- Gen.choose(0, 2)
+        } yield (WavesChain(history, capacity), refToDrop)
+
+        forAll(testGen) { case (chain, ref) =>
+          val (updatedChain, _) = chain.dropAfter(ref)
+          updatedChain.height shouldBe ref.height
+        }
+      }
+
+      "the capacity increased by a number of dropped full blocks" in {
+        val testGen = for {
+          history <- historyGen(1 to 3, 0 to 2, 0 to 2)
+          refToDrop <- Gen.oneOf(history.map(_.ref))
+          capacity <- Gen.choose(0, 2)
+        } yield (WavesChain(history, capacity), refToDrop)
+
+        forAll(testGen) { case (chain, ref) =>
+          val (updatedChain, dropped) = chain.dropAfter(ref)
+          updatedChain.blocksCapacity shouldBe chain.blocksCapacity + dropped.count(_.tpe == WavesBlock.Type.FullBlock)
+        }
+      }
+    }
+
+    "dropAfter(height)" - {
+      val testGen = for {
+        history <- historyGen(1 to 3, 0 to 2, 0 to 2)
+        refToDrop <- Gen.oneOf(history.map(_.ref))
+        capacity <- Gen.choose(0, 2)
+      } yield (WavesChain(history, capacity), refToDrop.height)
+
+      "the block with a specified height or less" - {
+        "remains" in forAll(testGen) { case (chain, height) =>
+          val (updatedChain, _) = chain.dropAfter(height)
+          updatedChain.history.map(_.ref.height).max shouldBe height
+        }
+
+        "should not be among dropped" in forAll(testGen) { case (chain, height) =>
+          val (_, dropped) = chain.dropAfter(height)
+          dropped.map(_.ref.height).minOption.getOrElse(height) shouldBe >=(height)
+        }
+      }
+
+      "dropped blocks" - {
+        "were in the original chain" in forAll(testGen) { case (chain, height) =>
+          val (_, dropped) = chain.dropAfter(height)
+          dropped.foreach { b =>
+            withClue(s"${b.ref}: ") {
+              chain.history.map(_.ref) should contain(b.ref)
+            }
+          }
+        }
+
+        "don't present in the updated chain" in forAll(testGen) { case (chain, height) =>
+          val (updatedChain, dropped) = chain.dropAfter(height)
+          dropped.foreach { b =>
+            withClue(s"${b.ref}: ") {
+              updatedChain.history.map(_.ref.height) should not contain b.ref
+            }
+          }
+        }
+
+        "are with a higher heights the the specified" in forAll(testGen) { case (chain, height) =>
+          val (_, dropped) = chain.dropAfter(height)
+          dropped.foreach { b =>
+            withClue(s"${b.ref}: ") {
+              b.ref.height should be > height
+            }
+          }
+        }
+
+        "are reverse ordered" in forAll(testGen) { case (chain, height) =>
+          val (_, dropped) = chain.dropAfter(height)
+          val droppedRefs = dropped.map(_.ref)
+          val expectedRefs = chain.history.take(droppedRefs.length).map(_.ref).reverse
+
+          droppedRefs should contain theSameElementsInOrderAs expectedRefs
+        }
+      }
+
+      "the chain remains if the we drop after the last block" in {
+        val testGen = for {
+          history <- historyGen(1 to 3, 0 to 2, 0 to 2)
+          capacity <- Gen.choose(0, 2)
+        } yield WavesChain(history, capacity)
+
+        forAll(testGen) { chain =>
+          val (updatedChain, _) = chain.dropAfter(chain.last.get.ref.height)
+          updatedChain should matchTo(chain)
+        }
+      }
+
+      "the height of update chain is equal to specified" in {
+        val testGen = for {
+          history <- historyGen(1 to 3, 0 to 2, 0 to 2)
+          refToDrop <- Gen.oneOf(history.map(_.ref))
+          capacity <- Gen.choose(0, 2)
+        } yield (WavesChain(history, capacity), refToDrop.height)
+
+        forAll(testGen) { case (chain, height) =>
+          val (updatedChain, _) = chain.dropAfter(height)
+          updatedChain.height shouldBe height
+        }
+      }
+
+      "the capacity increased by a number of dropped full blocks" in {
+        val testGen = for {
+          history <- historyGen(1 to 3, 0 to 2, 0 to 2)
+          refToDrop <- Gen.oneOf(history.map(_.ref))
+          capacity <- Gen.choose(0, 2)
+        } yield (WavesChain(history, capacity), refToDrop.height)
+
+        forAll(testGen) { case (chain, height) =>
+          val (updatedChain, dropped) = chain.dropAfter(height)
+          updatedChain.blocksCapacity shouldBe chain.blocksCapacity + dropped.count(_.tpe == WavesBlock.Type.FullBlock)
+        }
+      }
+    }
+
     "withoutLastLiquidOrFull" - {
-      val testGen: Gen[WavesChain] = for {
-        history <- historyGen(1 to 2, 0 to 2, 0 to 2)
+      def testGen(maxMicroBlocks: Range = 0 to 2): Gen[WavesChain] = for {
+        history <- historyGen(1 to 2, maxMicroBlocks, 0 to 2)
         capacity <- Gen.choose(0, 2)
       } yield WavesChain(history, capacity)
 
-      "the last block disappears" in forAll(testGen) { chain =>
+      "the last block disappears" in forAll(testGen()) { chain =>
         val updatedChain = chain.withoutLastLiquidOrFull
         updatedChain.history should not contain chain.last.get
       }
 
-      "micro blocks disappear" in forAll(testGen) { chain =>
+      "micro blocks disappear" in forAll(testGen(1 to 2)) { chain =>
         val updatedChain = chain.withoutLastLiquidOrFull
         updatedChain.history.find(_.tpe == WavesBlock.Type.MicroBlock) shouldBe empty
       }
 
-      "the capacity increases" in forAll(testGen) { chain =>
+      "the capacity increases" in forAll(testGen()) { chain =>
         val updatedChain = chain.withoutLastLiquidOrFull
         updatedChain.blocksCapacity shouldBe chain.blocksCapacity + 1
       }
@@ -459,6 +640,11 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
       "the last block disappears" in forAll(testGen()) { chain =>
         val (updatedChain, _) = chain.withoutLast
         updatedChain.history should not contain chain.last.get
+      }
+
+      "drops the last block" in forAll(testGen()) { chain =>
+        val (_, droppedBlock) = chain.withoutLast
+        droppedBlock should matchTo(chain.last)
       }
 
       "the capacity increases if the last block is a full block" in forAll(testGen(0 to 0)) { chain =>

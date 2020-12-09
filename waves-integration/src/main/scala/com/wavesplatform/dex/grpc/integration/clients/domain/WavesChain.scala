@@ -77,7 +77,6 @@ case class WavesChain(history: Vector[WavesBlock], height: Int, blocksCapacity: 
       (WavesChain(history.tail, height - heightCorrection, blocksCapacity = blocksCapacity + heightCorrection), droppedBlock)
     }
 
-  // TODO tests
   /**
    * @return (new chain, dropped blocks), where dropped blocks are ordered from oldest to newest
    */
@@ -88,6 +87,9 @@ case class WavesChain(history: Vector[WavesBlock], height: Int, blocksCapacity: 
     (WavesChain(commonHistory, ref.height, blocksCapacity = blocksCapacity + droppedFullBlocksNumber), droppedBlocks)
   }
 
+  /**
+   * @return (new chain, dropped blocks), where dropped blocks are ordered from oldest to newest
+   */
   def dropAfter(height: Int): (WavesChain, List[WavesBlock]) = {
     // TODO DEX-1032
     val (droppedBlocks, commonHistory) = history.splitOnCondReversed(_.ref.height > height)

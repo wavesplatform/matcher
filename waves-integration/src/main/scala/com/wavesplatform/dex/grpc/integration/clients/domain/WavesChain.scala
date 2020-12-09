@@ -140,9 +140,8 @@ object WavesChain {
     case None => (liquidBlock, restHistory)
     case Some(x) =>
       if (x.tpe == WavesBlock.Type.MicroBlock) dropLiquidBlock(newFullBlock, x :: liquidBlock, restHistory.tail)
-      // TODO isEmpty
-      else if (liquidBlock.nonEmpty) (x :: liquidBlock, restHistory.tail) // We have a liquid block, x is a key block
-      else (liquidBlock, restHistory) // No liquid block, x is a full block
+      else if (liquidBlock.isEmpty) (liquidBlock, restHistory) // No liquid block, x is a full block
+      else (x :: liquidBlock, restHistory.tail) // We have a liquid block, x is a key block
   }
 
   /**

@@ -359,8 +359,8 @@ object TankGenerator {
 
     assetOwners.map { case (assetOwner, asset) =>
       try {
-        node.broadcast(new im.mak.waves.transactions.TransferTransaction(issuer.publicKey(),assetOwner.address(), Amount.of(initialValue, AssetId.as(asset)), Base58String.empty))
-        node.broadcast(new im.mak.waves.transactions.TransferTransaction(issuer.publicKey(),assetOwner.address(), Amount.of(initialValue), Base58String.empty))
+        node.broadcast(new im.mak.waves.transactions.TransferTransaction(issuer.publicKey(),assetOwner.address(), Amount.of(initialValue, AssetId.as(asset)), null))
+        node.broadcast(new im.mak.waves.transactions.TransferTransaction(issuer.publicKey(),assetOwner.address(), Amount.of(initialValue), null))
       } catch { case e: Exception => println(e) }
     }
 
@@ -373,7 +373,7 @@ object TankGenerator {
     Random
       .shuffle(
         List
-          .fill(requestCount / 100)(massTransfers)
+          .fill(requestCount / 100 + 1)(massTransfers)
           .flatten
       ).map { mt =>
         Request(
@@ -451,7 +451,9 @@ object TankGenerator {
     val step1And3 = requests.slice(0, 36059).toList
     val step2 = requests.slice(36060, 36060 + 162000).toList
 
-    step1And3 ++ step2 ++ mkMassTransfers(accounts.slice(5900, 5999).toList, 18000)
+    val mt = mkMassTransfers(accounts.slice(5900, 6000).toList, 18000)
+
+    step1And3 ++ step2 ++ mt
   }
 
   private def svRequests(requests: List[Request], outputFile: File): Unit = {

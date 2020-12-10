@@ -3,7 +3,7 @@ def deployNode (host) {
          sshagent (credentials: ['buildagent-matcher']) {
              sh "ssh -o StrictHostKeyChecking=no -l buildagent-matcher ${host} hostname"
 
-             sh "scp ./waves/node/target/waves-devnet*all*.deb buildagent-matcher@${host}:/home/buildagent-matcher"
+             sh "scp ./waves/node/target/*devnet*all*.deb buildagent-matcher@${host}:/home/buildagent-matcher"
              sh "scp ./matcher/dex-load/src/main/resources/reinstallNode.sh buildagent-matcher@${host}:/home/buildagent-matcher"
              sh "ssh -q buildagent-matcher@${host} sudo sh reinstallNode.sh"
          }

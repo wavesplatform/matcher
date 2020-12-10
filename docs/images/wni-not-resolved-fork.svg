@@ -13,12 +13,12 @@
 <g id="clust1" class="cluster">
 <title>cluster_0</title>
 <polygon fill="none" stroke="black" points="8,-114 8,-189 708,-189 708,-114 8,-114"/>
-<text text-anchor="middle" x="358" y="-173.8" font-family="Times,serif" font-size="14.00">Original branch</text>
+<text text-anchor="middle" x="358" y="-173.8" font-family="Times,serif" font-size="14.00">Original chain</text>
 </g>
 <g id="clust2" class="cluster">
 <title>cluster_1</title>
 <polygon fill="none" stroke="black" points="188,-31 188,-106 708,-106 708,-31 188,-31"/>
-<text text-anchor="middle" x="448" y="-90.8" font-family="Times,serif" font-size="14.00">New main branch</text>
+<text text-anchor="middle" x="448" y="-90.8" font-family="Times,serif" font-size="14.00">New main chain</text>
 </g>
 <!-- MB2 -->
 <g id="node1" class="node">

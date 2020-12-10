@@ -19,7 +19,7 @@ digraph NodeResolvedFork {
 
     MB2 -> MB1 -> AH1 -> B1000 -> B999 -> B998 -> Betc -> B901 -> B900
 
-    label="Original branch"
+    label="Original chain"
   }
 
   subgraph cluster_1 {
@@ -35,7 +35,7 @@ digraph NodeResolvedFork {
 
     MB1_ -> AH1_ -> B1000_ -> B999_ -> Betc_ -> B902_
 
-    label="New main branch"
+    label="New main chain"
   }
 
   B902_:w -> B901:s

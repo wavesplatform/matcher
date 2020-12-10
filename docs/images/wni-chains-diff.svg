@@ -42,9 +42,9 @@
     <text xml:space="preserve"
           style="font-size: 18.75346375px; font-style: normal; font-weight: normal; text-align: center; line-height: 125%; letter-spacing: 0px; word-spacing: 0px; text-anchor: middle; fill: rgb(229, 170, 82); fill-opacity: 1; stroke: none; font-family: Arial;"
           x="240" y="82" id="labelA" sodipodi:linespacing="125%" inkscape:label="#text3051-9"
-          visibility="visible">Original branch</text>
+          visibility="visible">Original chain</text>
     <text xml:space="preserve"
           style="font-size: 18.32133102px; font-style: normal; font-weight: normal; text-align: center; line-height: 125%; letter-spacing: 0px; word-spacing: 0px; text-anchor: middle; fill: rgb(150, 209, 150); fill-opacity: 1; stroke: none; font-family: Arial;"
           x="470" y="82" id="labelB" sodipodi:linespacing="125%" inkscape:label="#text3051-2"
-          visibility="visible">New main branch</text>
+          visibility="visible">New main chain</text>
 </svg>

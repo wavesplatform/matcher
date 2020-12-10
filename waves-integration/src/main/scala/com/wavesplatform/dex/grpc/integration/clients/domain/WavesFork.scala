@@ -8,113 +8,63 @@ import cats.syntax.semigroup._
 import com.wavesplatform.dex.grpc.integration.clients.domain.WavesFork.Status
 
 // TODO DEX-1009 Unit test
-// TODO DEX-1010 Can be connected again if forkBranch rolled back behind origBranch and restored the same branch
+// TODO DEX-1010 Can be connected again if forkChain rolled back behind origChain and restored the same chain
 // TODO DEX-1011 This class is too slow for his purposes
-case class WavesFork private[domain](origBranch: WavesBranch, forkBranch: WavesBranch, connected: Boolean) {
+case class WavesFork private[domain] (origChain: WavesChain, forkChain: WavesChain) {
 
   // TODO DEX-1009 Move to tests in the end
 
-  require(!origBranch.isEmpty, "empty origBranch")
+  require(!origChain.isEmpty, "empty origChain")
 
-  private lazy val forkBranchLastBlock = forkBranch.history.last // Use only if connected!
-  private lazy val origBranchLastBlock = origBranch.history.last
+  // TODO DEX-1009 An additional invariant: forkChain should contain only one common block!
 
-  require(
-    // if connected, the original branch contains a last block from the fork
-    connected && origBranch.history.exists(_.ref == forkBranchLastBlock.ref) ||
-    // if not, fork happened before the oldest stored block in the original branch
-    !connected && forkBranch.history.lastOption.fold(forkBranch.height)(_.ref.height) <= origBranchLastBlock.ref.height,
-    "origBranch, forkBranch and connected invariant"
-  )
-
-  // TODO DEX-1009 An additional invariant: forkBranch should contain only one common block!
-
-  def height: Int = forkBranch.height
+  def height: Int = forkChain.height
 
   // TODO DEX-1010 if we have e.g. 10 blocks and did rollback for 2, we don't need to request balances. Check this case
-  def withBlock(block: WavesBlock): Status =
-    forkBranch.withBlock(block) match {
-      case Left(e) => Status.Failed(withoutLast, e)
-      case Right(updatedForkBranch) =>
-        // TODO DEX-1010 if we are restoring the origBranch in forkBranch, hold NotResolved until we get all micro blocks
-        // Compare heights to solve a situation when there no transactions in the network since some height
-        if (block.tpe == WavesBlock.Type.FullBlock && block.ref.height < origBranch.height)
-          Status.NotResolved(copy(forkBranch = updatedForkBranch))
-        else {
-          val (origDroppedBlocks, updatedForkDroppedBlocks, activeBranch) =
-            if (connected) {
-              // It's okay to use forkBranchLastBlock here, because a micro block added to the forkBranch without other changes
-              val (commonBranch, droppedBlocks) = origBranch.dropAfter(forkBranchLastBlock.ref)
-              (
-                droppedBlocks,
-                updatedForkBranch.history.init,
-                updatedForkBranch.copy(history = updatedForkBranch.history ::: commonBranch.history.tail)
-              )
-            } else (origBranch.history, updatedForkBranch.history, updatedForkBranch)
+  def withBlock(block: WavesBlock): Status = forkChain.withBlock(block) match {
+    case Left(e) => Status.Failed(withoutLast, e)
+    case Right(updatedForkChain) =>
+      // TODO DEX-1010 if we are restoring the origChain in forkChain, hold NotResolved until we get all micro blocks
+      // Compare heights to solve a situation when there no transactions in the network since some height
+      if (block.tpe == WavesBlock.Type.FullBlock && block.ref.height < origChain.height)
+        Status.NotResolved(copy(forkChain = updatedForkChain))
+      else {
+        val (origDropped, forkDropped) = WavesChain.dropDifference(origChain, updatedForkChain)
 
-          val origForkDiffIndex = origDroppedBlocks.foldMap(_.diffIndex)
-          val (updatedForkAllChanges, updatedForkDiffIndex) = updatedForkDroppedBlocks
-            .foldLeft(Monoid.empty[(BlockchainBalance, DiffIndex)]) {
-              case (r, block) => (block.changes, block.diffIndex) |+| r
-            }
+        val origForkDiffIndex = origDropped.foldMap(_.diffIndex)
+        val (updatedForkAllChanges, updatedForkDiffIndex) = forkDropped
+          .foldLeft(Monoid.empty[(BlockchainBalance, DiffIndex)]) { // foldMap
+            case (r, block) => r.|+|((block.changes, block.diffIndex))
+          }
 
-          Status.Resolved(
-            activeBranch = activeBranch,
-            newChanges = updatedForkAllChanges, // TODO DEX-1011 Probably we can filter out this, but it is done on next layer. Should we do?
-            lostDiffIndex = origForkDiffIndex.without(updatedForkDiffIndex)
-          )
-        }
-    }
-
-  def withoutLast: WavesFork = mkFromUpdatedForkBranch(forkBranch.withoutLast)
-
-  def rollBackTo(height: Int): WavesFork = mkFromUpdatedForkBranch(forkBranch.dropAfter(height)._1)
-  def rollBackTo(ref: BlockRef): WavesFork = mkFromUpdatedForkBranchRef(forkBranch.dropAfter(ref)._1, ref)
-
-  // TODO DEX-1009
-  // Valid only when we remove blocks
-  private def mkFromUpdatedForkBranch(updatedForkBranch: WavesBranch): WavesFork =
-    // If there is no blocks in withoutLastLiquid
-    // * we take one from the origBranch to preserve connected
-    // * or disconnect them if origBranch doesn't contain a common ancestor
-    if (connected && updatedForkBranch.isEmpty)
-      origBranch.history.find(x => x.tpe == WavesBlock.Type.FullBlock && x.ref.height == updatedForkBranch.height) match {
-        case None => copy(forkBranch = updatedForkBranch, connected = false)
-        case Some(newCommonBlock) => copy(forkBranch = WavesBranch(List(newCommonBlock), newCommonBlock.ref.height))
+        Status.Resolved(
+          activeChain = updatedForkChain,
+          newChanges = updatedForkAllChanges, // TODO DEX-1011 Probably we can filter out this, but it is done on next layer. Should we do?
+          lostDiffIndex = origForkDiffIndex.without(updatedForkDiffIndex)
+        )
       }
-    else copy(forkBranch = updatedForkBranch)
+  }
 
-  // TODO DEX-1009
-  // Valid only when we remove blocks
-  private def mkFromUpdatedForkBranchRef(updatedForkBranch: WavesBranch, commonBlockRef: BlockRef): WavesFork =
-    // If there is no blocks in withoutLastLiquid
-    // * we take one from the origBranch to preserve connected
-    // * or disconnect them if origBranch doesn't contain a common ancestor
-    if (connected && updatedForkBranch.isEmpty)
-      origBranch.history.find(_.ref == commonBlockRef) match {
-        case None => copy(forkBranch = updatedForkBranch, connected = false)
-        case Some(newCommonBlock) => copy(forkBranch = WavesBranch(List(newCommonBlock), commonBlockRef.height))
-      }
-    else copy(forkBranch = updatedForkBranch)
+  def withoutLast: WavesFork = copy(forkChain = forkChain.withoutLastLiquidOrFull)
 
-  override def toString: String = s"WavesFork(o=$origBranch, f=$forkBranch, connected=$connected)"
+  def rollBackTo(height: Int): WavesFork = copy(forkChain = forkChain.dropAfter(height)._1)
+  def rollBackTo(ref: BlockRef): WavesFork = copy(forkChain = forkChain.dropAfter(ref)._1)
+
+  override def toString: String = s"WavesFork(o=$origChain, f=$forkChain)"
 }
 
 object WavesFork {
 
-  def mk(origBranch: WavesBranch, commonBlockRef: BlockRef): WavesFork = mkFromCommonBranch(origBranch, origBranch.dropAfter(commonBlockRef)._1)
-  def mk(origBranch: WavesBranch, commonHeight: Int): WavesFork = mkFromCommonBranch(origBranch, origBranch.dropAfter(commonHeight)._1)
+  def mk(origChain: WavesChain, commonBlockRef: BlockRef): WavesFork = WavesFork(origChain, origChain.dropAfter(commonBlockRef)._1)
+  def mk(origChain: WavesChain, commonHeight: Int): WavesFork = WavesFork(origChain, origChain.dropAfter(commonHeight)._1)
 
-  def mkRolledBackByOne(origBranch: WavesBranch): WavesFork =
-    mkFromCommonBranch(origBranch, origBranch.withoutLast) // Or better use WavesFork.withoutLast
-
-  private def mkFromCommonBranch(origBranch: WavesBranch, commonBranch: WavesBranch): WavesFork =
-    WavesFork(origBranch, commonBranch.copy(history = commonBranch.history.headOption.toList), !commonBranch.isEmpty)
+  def mkRolledBackByOne(origChain: WavesChain): WavesFork =
+    WavesFork(origChain, origChain.withoutLastLiquidOrFull) // Or better use WavesFork.withoutLast
 
   sealed trait Status extends Product with Serializable
 
   object Status {
-    case class Resolved(activeBranch: WavesBranch, newChanges: BlockchainBalance, lostDiffIndex: DiffIndex) extends Status
+    case class Resolved(activeChain: WavesChain, newChanges: BlockchainBalance, lostDiffIndex: DiffIndex) extends Status
     case class NotResolved(updatedFork: WavesFork) extends Status
     case class Failed(updatedFork: WavesFork, reason: String) extends Status
   }

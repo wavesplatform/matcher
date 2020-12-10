@@ -447,11 +447,11 @@ object TankGenerator {
 
   private def mkAllTypesWithMassTransfers(accounts: List[JPrivateKey], requestsCount: Int, pairsFile: Option[File]): List[Request] = {
 
-    val requests = mkAllTypes(accounts.slice(0, 5899).toList, requestsCount, pairsFile)
+    val requests = mkAllTypes(accounts.slice(0, 5899), requestsCount, pairsFile)
     val step1And3 = requests.slice(0, 36059).toList
-    val step2 = requests.slice(36060, 36060 + 162000).toList
+    val step2 = requests.slice(36060, 36060 + 162000)
 
-    val mt = mkMassTransfers(accounts.slice(5900, 6000).toList, 18000)
+    val mt = mkMassTransfers(accounts.slice(5900, 6000), 18000)
 
     step1And3 ++ step2 ++ mt
   }

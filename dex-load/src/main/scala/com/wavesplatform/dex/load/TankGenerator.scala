@@ -350,13 +350,6 @@ object TankGenerator {
         .version(1)
         .getSignedWith(issuer)
 
-    def mkTransfer(recipient: JPrivateKey, amount: Amount): TransferTransaction = TransferTransaction
-      .builder(recipient.address(), amount)
-      .fee(settings.defaults.massTransferFee)
-      .getSignedWith(issuer)
-
-
-
     assetOwners.map { case (assetOwner, asset) =>
       try {
         node.broadcast(new im.mak.waves.transactions.TransferTransaction(issuer.publicKey(),assetOwner.address(), Amount.of(initialValue, AssetId.as(asset)), null))

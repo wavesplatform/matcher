@@ -299,7 +299,7 @@ object WavesDexLoadCli extends ScoptImplicits {
   private val defaultAuthFile = new File("authkey.txt")
 
   private case class Args(
-    addressSchemeByte: Char = 'T',
+    addressSchemeByte: Char = 'D',
     command: Option[Command] = None,
     authServicesPrivateKeyFile: File = defaultAuthFile,
     feederFile: File = defaultFeederFile,

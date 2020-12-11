@@ -3,8 +3,6 @@ package com.wavesplatform.dex.grpc.integration.clients.matcherext
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
-import cats.implicits.catsSyntaxOptionId
-import cats.syntax.option._
 import com.google.protobuf.UnsafeByteOperations
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.api.grpc.TransactionsByIdRequest
@@ -15,7 +13,7 @@ import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.clients.RunScriptResult
-import com.wavesplatform.dex.grpc.integration.clients.domain.{BlockRef, BlockchainBalance, DiffIndex, WavesNodeEvent}
+import com.wavesplatform.dex.grpc.integration.clients.domain.{BlockRef, BlockchainBalance, DiffIndex}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.effect.Implicits.NettyFutureOps
 import com.wavesplatform.dex.grpc.integration.exceptions.{UnexpectedConnectionException, WavesNodeConnectionLostException}
@@ -25,13 +23,10 @@ import com.wavesplatform.dex.grpc.integration.services.RunScriptResponse.Result
 import com.wavesplatform.dex.grpc.integration.services.WavesBlockchainApiGrpc._
 import com.wavesplatform.dex.grpc.integration.services._
 import io.grpc._
-import io.grpc.stub.{ClientCallStreamObserver, ClientCalls, ClientResponseObserver, StreamObserver}
+import io.grpc.stub.{ClientCalls, StreamObserver}
 import io.netty.channel.EventLoopGroup
 import monix.execution.Scheduler
-import monix.reactive.Observable
-import monix.reactive.subjects.ConcurrentSubject
 
-import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
 /**
@@ -51,15 +46,8 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
   private def handlingErrors[A](f: => Future[A]): Future[A] = f.transform(identity, gRPCErrorsHandler)
 
   private val shuttingDown = new AtomicBoolean(false)
-  private val utxEventsSubject = ConcurrentSubject.publish[WavesNodeEvent](monixScheduler)
 
   private val empty: Empty = Empty()
-
-  private def requestUtxEvents(): Unit = {
-    // https://github.com/grpc/grpc/blob/master/doc/wait-for-ready.md
-    val call = channel.newCall(METHOD_GET_UTX_EVENTS, CallOptions.DEFAULT.withWaitForReady()) // TODO DEX-1001
-    ClientCalls.asyncServerStreamingCall(call, empty, new UtxEventsObserver(call))
-  }
 
   private def parse(input: RunScriptResponse): RunScriptResult = input.result match {
     case Result.WrongInput(message) => throw new IllegalArgumentException(message)
@@ -70,10 +58,7 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
     case _: Result.Denied => RunScriptResult.Denied
   }
 
-  override lazy val utxEvents: Observable[WavesNodeEvent] = {
-    requestUtxEvents()
-    utxEventsSubject
-  }
+  override val utxEvents: UtxEventsControlledStream = new UtxEventsControlledStream(channel)(monixScheduler)
 
   override def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] = handlingErrors {
     asyncUnaryCall(
@@ -152,54 +137,13 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
 
   override def close(): Future[Unit] = {
     shuttingDown.set(true)
+    utxEvents.close()
     channel.shutdown()
     channel.awaitTermination(500, TimeUnit.MILLISECONDS)
 
     // TODO DEX-998
     if (eventLoopGroup.isShuttingDown) Future.successful(())
     else eventLoopGroup.shutdownGracefully(0, 500, TimeUnit.MILLISECONDS).asScala.map(_ => ())
-  }
-
-  final private class UtxEventsObserver(call: ClientCall[Empty, UtxEvent]) extends ClientResponseObserver[Empty, UtxEvent] with AutoCloseable {
-
-    private var requestStream: ClientCallStreamObserver[Empty] = _
-
-    override def beforeStart(requestStream: ClientCallStreamObserver[Empty]): Unit = {
-      this.requestStream = requestStream
-      requestStream.setOnReadyHandler(() => log.info(s"Getting utx events from ${call.getAttributes.get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR)}"))
-    }
-
-    override def onNext(value: UtxEvent): Unit = toEvent(value).foreach(utxEventsSubject.onNext)
-
-    override def onError(e: Throwable): Unit = if (!shuttingDown.get()) {
-      log.warn(s"Got an error in utx events", e)
-      // channel.resetConnectBackoff()
-      monixScheduler.scheduleOnce(50.millis)(requestUtxEvents()) // TODO DEX-1000
-    }
-
-    override def onCompleted(): Unit = log.info(s"Utx events stream completed")
-
-    override def close(): Unit = if (requestStream != null) requestStream.cancel("Shutting down", new StatusRuntimeException(Status.CANCELLED))
-
-    private def toEvent(event: UtxEvent): Option[WavesNodeEvent] = event.`type` match {
-      case UtxEvent.Type.Switch(event) => WavesNodeEvent.UtxSwitched(event.transactions).some
-      case UtxEvent.Type.Update(event) =>
-        val failedTxs = event.removed.flatMap { tx =>
-          tx.reason match {
-            case None => none // Because we remove them during adding a full/micro block
-            case Some(reason) =>
-              tx.transaction.tapEach { tx =>
-                log.info(s"${tx.id.toVanilla} failed: ${reason.name}, ${reason.message}")
-              }
-          }
-        }
-        if (event.added.isEmpty && failedTxs.isEmpty) none
-        else WavesNodeEvent.UtxUpdated(event.added.flatMap(_.transaction), failedTxs).some
-      case _ =>
-        log.warn(s"Can't convert to event: $event")
-        none
-    }
-
   }
 
   private def asyncUnaryCall[RequestT, ResponseT](

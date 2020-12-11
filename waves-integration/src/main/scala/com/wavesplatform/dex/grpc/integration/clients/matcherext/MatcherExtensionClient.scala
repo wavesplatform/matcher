@@ -7,15 +7,14 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.grpc.integration.clients.RunScriptResult
-import com.wavesplatform.dex.grpc.integration.clients.domain.{BlockRef, BlockchainBalance, DiffIndex, WavesNodeEvent}
+import com.wavesplatform.dex.grpc.integration.clients.domain.{BlockRef, BlockchainBalance, DiffIndex}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
-import monix.reactive.Observable
 
 import scala.concurrent.Future
 
 trait MatcherExtensionClient {
 
-  def utxEvents: Observable[WavesNodeEvent]
+  val utxEvents: UtxEventsControlledStream
 
   def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]]
   def allAssetsSpendableBalance(address: Address): Future[Map[Asset, Long]]

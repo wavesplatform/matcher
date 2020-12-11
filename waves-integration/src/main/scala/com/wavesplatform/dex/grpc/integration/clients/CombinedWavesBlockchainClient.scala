@@ -58,17 +58,20 @@ class CombinedWavesBlockchainClient(
     // TODO DEX-1000 Wait until both connections are restored, because one node could be behind another!
     val finalBalance = mutable.Map.empty[Address, Map[Asset, Long]]
     val init: BlockchainStatus = BlockchainStatus.Normal(WavesChain(Vector.empty, startHeight, MaxBlockNumberInChain))
-    val (blockchainEvents, control) = bClient.blockchainEvents(startHeight)
-    Observable(dataUpdates, meClient.utxEvents, blockchainEvents)
+
+    val combinedStream = new CombinedStream(bClient.blockchainEvents, meClient.utxEvents)
+    combinedStream.startFrom(startHeight)
+
+    Observable(dataUpdates, combinedStream.stream)
       .merge
       .mapAccumulate(init) { case (origStatus, event) =>
         val x = StatusTransitions(origStatus, event)
         x.updatedLastBlockHeight match {
-          case LastBlockHeight.Updated(to) => control.checkpoint(to)
-          case LastBlockHeight.RestartRequired(from) => control.restartFrom(from)
+          case LastBlockHeight.Updated(to) => combinedStream.updateHeightHint(to)
+          case LastBlockHeight.RestartRequired(from) => combinedStream.restartFrom(from)
           case _ =>
         }
-        if (x.requestNextBlockchainEvent) control.requestNext()
+        if (x.requestNextBlockchainEvent) bClient.blockchainEvents.requestNext()
         requestBalances(x.requestBalances)
         val finalKnownBalances = knownBalances.updateAndGet(_ |+| x.updatedBalances)
         val updatedPessimistic = processUtxEvents(x.processUtxEvents)

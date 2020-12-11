@@ -10,9 +10,8 @@ import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.caches.{AssetDescriptionsCache, FeaturesCache}
 import com.wavesplatform.dex.grpc.integration.clients.RunScriptResult
-import com.wavesplatform.dex.grpc.integration.clients.domain.{BlockRef, BlockchainBalance, DiffIndex, WavesNodeEvent}
+import com.wavesplatform.dex.grpc.integration.clients.domain.{BlockRef, BlockchainBalance, DiffIndex}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
-import monix.reactive.Observable
 
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
@@ -28,7 +27,7 @@ class MatcherExtensionCachingClient(underlying: MatcherExtensionClient, defaultC
     new FeaturesCache(underlying.isFeatureActivated, invalidationPredicate = !_) // we don't keep knowledge about unactivated features
   private val assetDescriptionsCache = new AssetDescriptionsCache(underlying.assetDescription, cacheExpiration)
 
-  override def utxEvents: Observable[WavesNodeEvent] = underlying.utxEvents
+  override val utxEvents = underlying.utxEvents
 
   override def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] = underlying.spendableBalances(address, assets)
   override def allAssetsSpendableBalance(address: Address): Future[Map[Asset, Long]] = underlying.allAssetsSpendableBalance(address)

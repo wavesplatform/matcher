@@ -11,7 +11,7 @@ import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.grpc.integration.WavesClientBuilder
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient
-import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedWavesBlockchainClient
+import com.wavesplatform.dex.grpc.integration.clients.combined.{CombinedStream, CombinedWavesBlockchainClient}
 import com.wavesplatform.dex.grpc.integration.clients.domain.portfolio.SynchronizedPessimisticPortfolios
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.settings.GrpcClientSettings.ChannelOptionsSettings
@@ -63,7 +63,7 @@ object DexExtensionGrpcConnector {
         blockchainUpdatesGrpcSettings,
         100.milliseconds,
         100,
-        CombinedWavesBlockchainClient.Settings(100, SynchronizedPessimisticPortfolios.Settings(100))
+        CombinedWavesBlockchainClient.Settings(100, CombinedStream.Settings(1.second), SynchronizedPessimisticPortfolios.Settings(100))
       )
       WavesClientBuilder.async(clientSettings, monixScheduler, executionContext)
     }.toEither

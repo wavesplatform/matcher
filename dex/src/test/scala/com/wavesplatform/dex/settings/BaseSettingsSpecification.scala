@@ -127,6 +127,7 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |      balance-stream-buffer-size = 100
          |      combined-client-settings {
          |        max-rollback-height = 90
+         |        combined-stream.restart-delay = 199ms
          |        pessimistic-portfolios.max-forged-transactions = 400
          |      }
          |    }

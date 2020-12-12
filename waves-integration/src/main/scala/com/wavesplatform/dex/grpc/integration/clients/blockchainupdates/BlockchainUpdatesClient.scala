@@ -26,10 +26,7 @@ class DefaultBlockchainUpdatesClient(eventLoopGroup: EventLoopGroup, channel: Ma
 ) extends BlockchainUpdatesClient
     with ScorexLogging {
 
-  // TODO move docs
-  // From the docs: the grammar must still be respected: (onNext)* (onComplete | onError)
-  // On error we just restart the stream, so r receives updates from a new stream. That is why we don't propagate errors to r
-  override val blockchainEvents: BlockchainUpdatesControlledStream = new BlockchainUpdatesControlledStream(channel)(monixScheduler)
+  override val blockchainEvents = new GrpcBlockchainUpdatesControlledStream(channel)(monixScheduler)
 
   override def close(): Future[Unit] = {
     blockchainEvents.close()

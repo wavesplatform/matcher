@@ -58,7 +58,7 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
     case _: Result.Denied => RunScriptResult.Denied
   }
 
-  override val utxEvents: UtxEventsControlledStream = new UtxEventsControlledStream(channel)(monixScheduler)
+  override val utxEvents = new GrpcUtxEventsControlledStream(channel)(monixScheduler)
 
   override def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] = handlingErrors {
     asyncUnaryCall(

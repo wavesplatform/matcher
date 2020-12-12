@@ -59,7 +59,7 @@ class CombinedWavesBlockchainClient(
     val finalBalance = mutable.Map.empty[Address, Map[Asset, Long]]
     val init: BlockchainStatus = BlockchainStatus.Normal(WavesChain(Vector.empty, startHeight, settings.maxRollbackHeight + 1))
 
-    val combinedStream = new CombinedStream(bClient.blockchainEvents, meClient.utxEvents)
+    val combinedStream = new CombinedStream(settings.combinedStream, bClient.blockchainEvents, meClient.utxEvents)
     combinedStream.startFrom(startHeight)
 
     Observable(dataUpdates, combinedStream.stream)
@@ -208,6 +208,10 @@ class CombinedWavesBlockchainClient(
 
 object CombinedWavesBlockchainClient {
 
-  case class Settings(maxRollbackHeight: Int, pessimisticPortfolios: SynchronizedPessimisticPortfolios.Settings)
+  case class Settings(
+    maxRollbackHeight: Int,
+    combinedStream: CombinedStream.Settings,
+    pessimisticPortfolios: SynchronizedPessimisticPortfolios.Settings
+  )
 
 }

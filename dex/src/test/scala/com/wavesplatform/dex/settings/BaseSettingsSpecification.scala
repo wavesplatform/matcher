@@ -125,7 +125,11 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |      }
          |      default-caches-expiration = 101ms
          |      balance-stream-buffer-size = 100
-         |      combined-client-settings.pessimistic-portfolios.max-forged-transactions = 400
+         |      combined-client-settings {
+         |        max-rollback-height = 90
+         |        combined-stream.restart-delay = 199ms
+         |        pessimistic-portfolios.max-forged-transactions = 400
+         |      }
          |    }
          |    exchange-tx-base-fee = 300000
          |    actor-response-timeout = 11s

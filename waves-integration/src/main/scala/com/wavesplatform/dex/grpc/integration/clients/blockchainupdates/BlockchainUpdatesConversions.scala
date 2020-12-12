@@ -12,7 +12,7 @@ import com.wavesplatform.events.protobuf.{BlockchainUpdated, StateUpdate}
 
 import scala.collection.View
 
-object Conversions {
+object BlockchainUpdatesConversions {
   type Balances = Map[Address, Map[Asset, Long]]
   type Leases = Map[Address, Long]
 

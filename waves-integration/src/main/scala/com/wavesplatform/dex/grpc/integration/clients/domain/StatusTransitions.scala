@@ -128,8 +128,8 @@ object StatusTransitions extends ScorexLogging {
 
           case RolledBack(to) =>
             val fork = to match {
-              case To.CommonBlockRef(ref) => origStatus.fork.rollBackTo(ref)
-              case To.Height(h) => origStatus.fork.rollBackTo(h)
+              case To.CommonBlockRef(ref) => origStatus.fork.rollbackTo(ref)
+              case To.Height(h) => origStatus.fork.rollbackTo(h)
             }
             StatusUpdate(
               newStatus = origStatus.copy(fork = fork), // TODO DEX-1004 Not only update a fork ?

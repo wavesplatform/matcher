@@ -13,6 +13,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionV2}
 import com.wavesplatform.dex.domain.utils.EitherExt2
+import com.wavesplatform.dex.grpc.integration.clients.combined.{CombinedStream, CombinedWavesBlockchainClient}
 import com.wavesplatform.dex.grpc.integration.clients.domain.portfolio.SynchronizedPessimisticPortfolios
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.settings.{GrpcClientSettings, WavesBlockchainClientSettings}
@@ -61,7 +62,9 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase with NoSt
         defaultCachesExpiration = 100.milliseconds,
         balanceStreamBufferSize = 100,
         combinedClientSettings = CombinedWavesBlockchainClient.Settings(
-          SynchronizedPessimisticPortfolios.Settings(100)
+          maxRollbackHeight = 100,
+          combinedStream = CombinedStream.Settings(1.second),
+          pessimisticPortfolios = SynchronizedPessimisticPortfolios.Settings(100)
         )
       ),
       monixScheduler,

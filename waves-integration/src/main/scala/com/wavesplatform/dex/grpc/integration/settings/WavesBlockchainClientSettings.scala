@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.grpc.integration.settings
 
-import com.wavesplatform.dex.grpc.integration.clients.CombinedWavesBlockchainClient
+import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedWavesBlockchainClient
 
 import scala.concurrent.duration.FiniteDuration
 

@@ -47,8 +47,8 @@ case class WavesFork private[domain] (origChain: WavesChain, forkChain: WavesCha
 
   def withoutLast: WavesFork = copy(forkChain = forkChain.withoutLastLiquidOrFull)
 
-  def rollBackTo(height: Int): WavesFork = copy(forkChain = forkChain.dropAfter(height)._1)
-  def rollBackTo(ref: BlockRef): WavesFork = copy(forkChain = forkChain.dropAfter(ref)._1)
+  def rollbackTo(height: Int): WavesFork = copy(forkChain = forkChain.dropAfter(height)._1)
+  def rollbackTo(ref: BlockRef): WavesFork = copy(forkChain = forkChain.dropAfter(ref)._1)
 
   override def toString: String = s"WavesFork(o=$origChain, f=$forkChain)"
 }

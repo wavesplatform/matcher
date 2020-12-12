@@ -1,6 +1,7 @@
-package com.wavesplatform.dex.grpc.integration.clients
+package com.wavesplatform.dex.grpc.integration.clients.combined
 
 import com.wavesplatform.dex.domain.utils.ScorexLogging
+import com.wavesplatform.dex.grpc.integration.clients.ControlledStream
 import com.wavesplatform.dex.grpc.integration.clients.blockchainupdates.{BlockchainUpdatesControlledStream, BlockchainUpdatesConversions}
 import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeEvent
 import com.wavesplatform.dex.grpc.integration.clients.matcherext.{UtxEventConversions, UtxEventsControlledStream}
@@ -100,8 +101,8 @@ class CombinedStream(blockchainUpdates: BlockchainUpdatesControlledStream, utxEv
 
   private def recover(): Unit = {
     recoverOnlyBlockchainUpdates = false
-    val rollBackHeight = math.max(1, heightHint - 1)
-    internalStream.onNext(WavesNodeEvent.RolledBack(WavesNodeEvent.RolledBack.To.Height(rollBackHeight)))
+    val rollbackHeight = math.max(1, heightHint - 1)
+    internalStream.onNext(WavesNodeEvent.RolledBack(WavesNodeEvent.RolledBack.To.Height(rollbackHeight)))
     scheduler.scheduleOnce(1.second) {
       blockchainUpdates.startFrom(heightHint)
     }

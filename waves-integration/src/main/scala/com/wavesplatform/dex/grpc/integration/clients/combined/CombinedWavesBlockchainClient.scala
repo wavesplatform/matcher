@@ -1,4 +1,4 @@
-package com.wavesplatform.dex.grpc.integration.clients
+package com.wavesplatform.dex.grpc.integration.clients.combined
 
 import java.util.concurrent.atomic.AtomicReference
 
@@ -16,14 +16,15 @@ import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.fp.MapImplicits.group
-import com.wavesplatform.dex.grpc.integration.clients.CombinedWavesBlockchainClient._
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.Updates
 import com.wavesplatform.dex.grpc.integration.clients.blockchainupdates.BlockchainUpdatesClient
+import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedWavesBlockchainClient._
 import com.wavesplatform.dex.grpc.integration.clients.domain.StatusUpdate.LastBlockHeight
 import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeEvent.WavesNodeUtxEvent
 import com.wavesplatform.dex.grpc.integration.clients.domain._
 import com.wavesplatform.dex.grpc.integration.clients.domain.portfolio.SynchronizedPessimisticPortfolios
 import com.wavesplatform.dex.grpc.integration.clients.matcherext.MatcherExtensionClient
+import com.wavesplatform.dex.grpc.integration.clients.{RunScriptResult, WavesBlockchainClient}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import monix.eval.Task
 import monix.execution.Scheduler
@@ -53,11 +54,10 @@ class CombinedWavesBlockchainClient(
   private val dataUpdates = ConcurrentSubject.publish[WavesNodeEvent]
 
   override val updates: Observable[Updates] = Observable.fromFuture(meClient.currentBlockInfo).flatMap { startBlockInfo =>
-    val startHeight = math.max(startBlockInfo.height - MaxBlockNumberInChain, 1)
+    val startHeight = math.max(startBlockInfo.height - settings.maxRollbackHeight - 1, 1)
 
-    // TODO DEX-1000 Wait until both connections are restored, because one node could be behind another!
     val finalBalance = mutable.Map.empty[Address, Map[Asset, Long]]
-    val init: BlockchainStatus = BlockchainStatus.Normal(WavesChain(Vector.empty, startHeight, MaxBlockNumberInChain))
+    val init: BlockchainStatus = BlockchainStatus.Normal(WavesChain(Vector.empty, startHeight, settings.maxRollbackHeight + 1))
 
     val combinedStream = new CombinedStream(bClient.blockchainEvents, meClient.utxEvents)
     combinedStream.startFrom(startHeight)
@@ -208,8 +208,6 @@ class CombinedWavesBlockchainClient(
 
 object CombinedWavesBlockchainClient {
 
-  val MaxBlockNumberInChain = 101 // MaxRollBackHeight is 100
-
-  case class Settings(pessimisticPortfolios: SynchronizedPessimisticPortfolios.Settings)
+  case class Settings(maxRollbackHeight: Int, pessimisticPortfolios: SynchronizedPessimisticPortfolios.Settings)
 
 }

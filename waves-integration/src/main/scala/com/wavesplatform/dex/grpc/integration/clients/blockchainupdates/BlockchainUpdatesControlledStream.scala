@@ -7,18 +7,16 @@ import com.wavesplatform.dex.grpc.integration.clients.ControlledStream.SystemEve
 import com.wavesplatform.dex.grpc.observers.IntegrationObserver
 import com.wavesplatform.events.api.grpc.protobuf.{BlockchainUpdatesApiGrpc, SubscribeEvent, SubscribeRequest}
 import io.grpc.stub.ClientCalls
-import io.grpc.{CallOptions, Grpc, ManagedChannel}
+import io.grpc.{CallOptions, ClientCall, Grpc, ManagedChannel}
 import monix.execution.Scheduler
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
-
-import scala.util.chaining._
 
 // TODO DEX-999
 class BlockchainUpdatesControlledStream(channel: ManagedChannel)(implicit scheduler: Scheduler)
     extends ControlledStream[SubscribeEvent]
     with ScorexLogging {
-  @volatile private var grpcObserver: Option[IntegrationObserver[SubscribeEvent]] = None
+  @volatile private var grpcObserver: Option[BlockchainUpdatesObserver] = None
 
   private val internalStream = ConcurrentSubject.publish[SubscribeEvent]
   override val stream: Observable[SubscribeEvent] = internalStream
@@ -30,18 +28,8 @@ class BlockchainUpdatesControlledStream(channel: ManagedChannel)(implicit schedu
     require(height >= 1, "We can not get blocks on height <= 0")
 
     val call = channel.newCall(BlockchainUpdatesApiGrpc.METHOD_SUBSCRIBE, CallOptions.DEFAULT.withWaitForReady()) // TODO DEX-1001
-    val observer = new IntegrationObserver[SubscribeEvent](
-      internalStream,
-      { () =>
-        log.info(s"Getting blockchain events from ${call.getAttributes.get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR)} starting from $height")
-        internalSystemStream.onNext(ControlledStream.SystemEvent.BecameReady)
-      },
-      { e =>
-        log.warn(s"Got an error in blockchain events", e)
-        internalSystemStream.onNext(ControlledStream.SystemEvent.Stopped)
-      }
-    ).tap(x => grpcObserver = x.some)
-
+    val observer = new BlockchainUpdatesObserver(call, height)
+    grpcObserver = observer.some
     ClientCalls.asyncServerStreamingCall(call, new SubscribeRequest(height), observer)
   }
 
@@ -61,8 +49,24 @@ class BlockchainUpdatesControlledStream(channel: ManagedChannel)(implicit schedu
   }
 
   private def stopGrpcObserver(): Unit = {
-    grpcObserver.foreach(_.onCompleted())
+    grpcObserver.foreach(_.close())
     grpcObserver = None
+  }
+
+  private class BlockchainUpdatesObserver(call: ClientCall[SubscribeRequest, SubscribeEvent], startHeight: Int)
+      extends IntegrationObserver[SubscribeRequest, SubscribeEvent](internalStream) {
+
+    override def onReady(): Unit = {
+      log.info(s"Getting blockchain events from ${call.getAttributes.get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR)} starting from $startHeight")
+      internalSystemStream.onNext(ControlledStream.SystemEvent.BecameReady)
+    }
+
+    override def onError(e: Throwable): Unit = if (!isClosed) {
+      log.warn(s"Got an error in blockchain events", e)
+      internalSystemStream.onNext(ControlledStream.SystemEvent.Stopped)
+    }
+
+    override def onCompleted(): Unit = log.error("Unexpected onCompleted")
   }
 
 }

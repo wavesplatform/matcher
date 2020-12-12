@@ -15,7 +15,15 @@ object ControlledStream {
 
   object SystemEvent {
     case object BecameReady extends SystemEvent
+
+    /**
+     * Manually or by an error
+     */
     case object Stopped extends SystemEvent
+
+    /**
+     * During shutdown
+     */
     case object Closed extends SystemEvent
   }
 

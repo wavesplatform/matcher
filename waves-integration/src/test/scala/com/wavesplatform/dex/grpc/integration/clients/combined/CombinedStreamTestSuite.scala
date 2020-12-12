@@ -11,6 +11,7 @@ import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import monix.execution.{ExecutionModel, Scheduler}
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
+import org.scalatest.exceptions.TestFailedException
 
 import scala.concurrent.duration.DurationInt
 import scala.util.chaining._
@@ -19,7 +20,7 @@ class CombinedStreamTestSuite extends WavesIntegrationSuiteBase {
 
   implicit private val runNow = Scheduler(
     ec = scala.concurrent.ExecutionContext.Implicits.global,
-    executionModel = ExecutionModel.BatchedExecution(100)
+    executionModel = ExecutionModel.AlwaysAsyncExecution
   )
 
   "CombinedStream" - {
@@ -138,7 +139,7 @@ class CombinedStreamTestSuite extends WavesIntegrationSuiteBase {
           "recovery started" in {
             val t = mkStarted()
             t.utxEvents.systemStream.onNext(SystemEvent.Stopped)
-            t.utxEvents.systemStream.lastUnsafe shouldBe SystemEvent.BecameReady.some
+            logged(t.utxEvents.systemStream)(_.last shouldBe SystemEvent.BecameReady)
             logged(t.blockchainUpdates.systemStream)(_.last shouldBe SystemEvent.BecameReady)
           }
         }
@@ -164,7 +165,7 @@ class CombinedStreamTestSuite extends WavesIntegrationSuiteBase {
     val blockchainUpdates = new BlockchainUpdatesControlledStreamMock
     val utxEvents = new UtxEventsControlledStreamMock
     val cs = new CombinedStream(
-      CombinedStream.Settings(restartDelay = 0.millis),
+      CombinedStream.Settings(restartDelay = 10.millis),
       blockchainUpdates = blockchainUpdates,
       utxEvents = utxEvents
     )
@@ -172,14 +173,18 @@ class CombinedStreamTestSuite extends WavesIntegrationSuiteBase {
   }
 
   private def mkStarted(): TestClasses = mk().tap { t =>
-    t.utxEvents.systemStream.onNext(SystemEvent.BecameReady)
     t.blockchainUpdates.systemStream.onNext(SystemEvent.BecameReady)
+    // TODO DEX-1035 to solve this (and flash sequence of events like Ready -> Stop) we need much more sophisticated algorithm
+    Thread.sleep(50)
   }
 
   private def logged[T](subject: Observable[T])(f: List[T] => Unit): Unit = {
-    val xs = subject.toListLUnsafe
+    val xs = subject.takeByTimespan(100.millis).toListL.runSyncUnsafe()
     withClue(s"$xs: ") {
-      f(xs)
+      try f(xs)
+      catch {
+        case e: Throwable => throw new TestFailedException("", e, 3)
+      }
     }
   }
 
@@ -210,12 +215,6 @@ object CombinedStreamTestSuite {
     override def start(): Unit = systemStream.onNext(SystemEvent.BecameReady)
     override def stop(): Unit = systemStream.onNext(SystemEvent.Stopped)
     override def close(): Unit = systemStream.onNext(SystemEvent.Closed)
-  }
-
-  implicit final class ObservableTestOps[T](val self: Observable[T]) extends AnyVal {
-    def toListLUnsafe(implicit scheduler: Scheduler): List[T] = self.takeByTimespan(100.millis).toListL.runSyncUnsafe()
-    def firstUnsafe(implicit scheduler: Scheduler): Option[T] = toListLUnsafe.headOption
-    def lastUnsafe(implicit scheduler: Scheduler): Option[T] = toListLUnsafe.lastOption
   }
 
 }

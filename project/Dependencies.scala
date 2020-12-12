@@ -16,11 +16,11 @@ object Dependencies {
     val scalaMock = "4.4.0"
     val diffx = "0.3.29"
 
-    val cats = "2.1.1"
-    val catsTaglessMacros = "0.11"
-    val kindProjector = "0.9.10"
+    val cats = "2.3.0"
+    val catsTaglessMacros = "0.12"
+    val kindProjector = "0.11.2"
     val betterMonadicFor = "0.3.1"
-    val mouse = "0.25"
+    val mouse = "0.26.2"
     val shapeless = "2.3.3"
     val monocle = "2.1.0"
 
@@ -63,7 +63,7 @@ object Dependencies {
 
     val scorexCrypto = "2.1.9"
 
-    val monix = "3.2.2"
+    val monix = "3.3.0"
 
     val supertagged = "1.5"
 

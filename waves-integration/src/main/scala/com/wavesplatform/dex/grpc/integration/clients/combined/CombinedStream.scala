@@ -2,7 +2,6 @@ package com.wavesplatform.dex.grpc.integration.clients.combined
 
 import java.util.concurrent.atomic.AtomicBoolean
 
-import cats.syntax.either._
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.clients.ControlledStream
 import com.wavesplatform.dex.grpc.integration.clients.blockchainupdates.{BlockchainUpdatesControlledStream, BlockchainUpdatesConversions}
@@ -35,41 +34,39 @@ class CombinedStream(
   private val internalStream = ConcurrentSubject.publish[WavesNodeEvent]
   val stream: Observable[WavesNodeEvent] = internalStream
 
-  Observable(
-    utxEvents.systemStream.map(_.asLeft[ControlledStream.SystemEvent]),
-    blockchainUpdates.systemStream.map(_.asRight[ControlledStream.SystemEvent])
-  ).merge.foreach {
-    case Left(evt) =>
-      evt match {
-        case ControlledStream.SystemEvent.BecameReady =>
-          utxEventsStopped.set(false)
+  private val runWithDelay: (() => Unit) => Unit =
+    if (settings.restartDelay.length == 0) { f => f() }
+    else f => scheduler.scheduleOnce(settings.restartDelay)(f())
 
-        case ControlledStream.SystemEvent.Stopped =>
-          if (utxEventsStopped.compareAndSet(false, true))
-            if (blockchainUpdatesStopped.get) recover()
-            else blockchainUpdates.stop()
+  utxEvents.systemStream.foreach {
+    case ControlledStream.SystemEvent.BecameReady =>
+      utxEventsStopped.compareAndSet(true, false)
 
-        case ControlledStream.SystemEvent.Closed =>
-          if (utxEventsClosed.compareAndSet(false, true))
-            if (blockchainUpdatesClosed.get) finish()
-            else blockchainUpdates.close()
-      }
-    case Right(evt) =>
-      evt match {
-        case ControlledStream.SystemEvent.BecameReady =>
-          if (blockchainUpdatesStopped.compareAndSet(true, false) && utxEventsStopped.get)
-            utxEvents.start()
+    case ControlledStream.SystemEvent.Stopped =>
+      if (utxEventsStopped.compareAndSet(false, true))
+        if (blockchainUpdatesStopped.get) recover()
+        else blockchainUpdates.stop()
 
-        case ControlledStream.SystemEvent.Stopped =>
-          if (blockchainUpdatesStopped.compareAndSet(false, true))
-            if (utxEventsStopped.get || recoverOnlyBlockchainUpdates) recover()
-            else utxEvents.stop()
+    case ControlledStream.SystemEvent.Closed =>
+      if (utxEventsClosed.compareAndSet(false, true))
+        if (blockchainUpdatesClosed.get) finish()
+        else blockchainUpdates.close()
+  }
 
-        case ControlledStream.SystemEvent.Closed =>
-          if (blockchainUpdatesClosed.compareAndSet(false, true))
-            if (utxEventsClosed.get) finish()
-            else utxEvents.close()
-      }
+  blockchainUpdates.systemStream.foreach {
+    case ControlledStream.SystemEvent.BecameReady =>
+      if (blockchainUpdatesStopped.compareAndSet(true, false) && utxEventsStopped.get)
+        utxEvents.start()
+
+    case ControlledStream.SystemEvent.Stopped =>
+      if (blockchainUpdatesStopped.compareAndSet(false, true))
+        if (utxEventsStopped.get || recoverOnlyBlockchainUpdates) recover()
+        else utxEvents.stop()
+
+    case ControlledStream.SystemEvent.Closed =>
+      if (blockchainUpdatesClosed.compareAndSet(false, true))
+        if (utxEventsClosed.get) finish()
+        else utxEvents.close()
   }
 
   blockchainUpdates.stream.foreach { evt =>
@@ -109,8 +106,7 @@ class CombinedStream(
     recoverOnlyBlockchainUpdates = true
 
     // Self-healed above
-    if (settings.restartDelay.length == 0) blockchainUpdates.stop()
-    else scheduler.scheduleOnce(settings.restartDelay)(blockchainUpdates.stop())
+    runWithDelay(() => blockchainUpdates.stop())
   }
 
   private def recover(): Unit = {
@@ -121,9 +117,7 @@ class CombinedStream(
     val restartHeight = heightHint
 
     internalStream.onNext(WavesNodeEvent.RolledBack(WavesNodeEvent.RolledBack.To.Height(rollbackHeight)))
-
-    if (settings.restartDelay.length == 0) blockchainUpdates.startFrom(restartHeight)
-    else scheduler.scheduleOnce(settings.restartDelay)(blockchainUpdates.startFrom(restartHeight))
+    runWithDelay(() => blockchainUpdates.startFrom(restartHeight))
   }
 
   private def finish(): Unit = internalStream.onComplete()

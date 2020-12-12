@@ -16,6 +16,8 @@ class CombinedStream(blockchainUpdates: BlockchainUpdatesControlledStream, utxEv
   // Note, it is not a processed height! A less value could be emitted to control
   @volatile private var heightHint = 1
 
+  @volatile private var recoverOnlyBlockchainUpdates = false
+
   @volatile private var blockchainUpdatesStopped = false
   @volatile private var utxEventsStopped = false
 
@@ -29,7 +31,7 @@ class CombinedStream(blockchainUpdates: BlockchainUpdatesControlledStream, utxEv
     case ControlledStream.SystemEvent.BecameReady => utxEvents.start()
 
     case ControlledStream.SystemEvent.Stopped =>
-      if (utxEventsStopped) recover()
+      if (utxEventsStopped || recoverOnlyBlockchainUpdates) recover()
       else {
         blockchainUpdatesStopped = true
         utxEvents.stop()
@@ -88,12 +90,16 @@ class CombinedStream(blockchainUpdates: BlockchainUpdatesControlledStream, utxEv
   }
 
   def restartFrom(height: Int): Unit = {
-    // TODO do not restart UTX
     heightHint = height
+    /* No need to restart UTX, because:
+      1. All streams operate normally
+      2. We force a roll back during recover(), so UTX events will be stashed */
+    recoverOnlyBlockchainUpdates = true
     scheduler.scheduleOnce(1.second)(blockchainUpdates.stop()) // Self-healed above
   }
 
   private def recover(): Unit = {
+    recoverOnlyBlockchainUpdates = false
     val rollBackHeight = math.max(1, heightHint - 1)
     internalStream.onNext(WavesNodeEvent.RolledBack(WavesNodeEvent.RolledBack.To.Height(rollBackHeight)))
     scheduler.scheduleOnce(1.second) {

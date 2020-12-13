@@ -172,6 +172,7 @@ object TankGenerator {
     val pairs: List[AssetPair] = if (Files.notExists(pairsFile.get.toPath)) mkAssetPairs(assets) else readAssetPairs(pairsFile)
     if (!distributed) distributeAssets(accounts, assets)
 
+    printl(s"Pairs: ${pairs.mkString("\n")}")
     pairs
   }
 
@@ -352,8 +353,13 @@ object TankGenerator {
 
     assetOwners.map { case (assetOwner, asset) =>
       try {
-        node.broadcast(new im.mak.waves.transactions.TransferTransaction(issuer.publicKey(),assetOwner.address(), Amount.of(initialValue, AssetId.as(asset)), null))
-        node.broadcast(new im.mak.waves.transactions.TransferTransaction(issuer.publicKey(),assetOwner.address(), Amount.of(initialValue), null))
+        node.broadcast(new im.mak.waves.transactions.TransferTransaction(
+          issuer.publicKey(),
+          assetOwner.address(),
+          Amount.of(initialValue, AssetId.as(asset)),
+          null
+        ))
+        node.broadcast(new im.mak.waves.transactions.TransferTransaction(issuer.publicKey(), assetOwner.address(), Amount.of(initialValue), null))
       } catch { case e: Exception => println(e) }
     }
 
@@ -439,14 +445,17 @@ object TankGenerator {
   }
 
   private def mkAllTypesWithMassTransfers(accounts: List[JPrivateKey], requestsCount: Int, pairsFile: Option[File]): List[Request] = {
+    val massTransfersAccounts = accounts.slice(accounts.size - 100, accounts.size)
+    val step1And3RequestsCount = requestsCount / 100 * 16
+    val step2MatcherRequestsCount = requestsCount - step1And3RequestsCount
+    val massTransfersRequestsCount = step2MatcherRequestsCount / 10
 
-    val requests = mkAllTypes(accounts.slice(0, 5899), requestsCount, pairsFile)
-    val step1And3 = requests.slice(0, 36059).toList
-    val step2 = requests.slice(36060, 36060 + 162000)
+    val requests = mkAllTypes(accounts.slice(0, accounts.size - massTransfersAccounts.size), requestsCount, pairsFile)
+    val step1And3 = requests.slice(0, step1And3RequestsCount).toList
+    val step2 = requests.slice(step1And3RequestsCount, step1And3RequestsCount + step2MatcherRequestsCount)
+    val massTransfers = mkMassTransfers(massTransfersAccounts, massTransfersRequestsCount)
 
-    val mt = mkMassTransfers(accounts.slice(5900, 6000), 18000)
-
-    step1And3 ++ step2 ++ mt
+    Random.shuffle(step1And3 ++ step2 ++ massTransfers)
   }
 
   private def svRequests(requests: List[Request], outputFile: File): Unit = {

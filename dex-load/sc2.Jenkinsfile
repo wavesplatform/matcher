@@ -9,7 +9,7 @@ pipeline {
     parameters {
         string(name: 'SEED', defaultValue: 'test-seed', description: 'Seed prefix of generated accounts')
         string(name: 'AN', defaultValue: '6000', description: 'Count of generated accounts')
-        string(name: 'RC', defaultValue: '250000', description: 'Count of requests')
+        string(name: 'RC', defaultValue: '216060', description: 'Count of requests')
         string(name: 'RT', defaultValue: '6', description: 'Generation type')
         string(name: 'AS', defaultValue: 'D', description: 'Chain ID')
     }

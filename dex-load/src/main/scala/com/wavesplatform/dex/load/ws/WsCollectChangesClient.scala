@@ -19,8 +19,8 @@ class WsCollectChangesClient(apiUri: String, address: String, aus: String, obs: 
 
   private val log = LoggerFactory.getLogger(s"WsApiClient[$address]")
 
-  private val emptyWsAddresState: WsAddressChanges = WsAddressChanges(Address.fromString(address).explicitGet(), Map.empty, Seq.empty, 0L)
-  @volatile private var accountUpdates = emptyWsAddresState
+  private val emptyWsAddressState: WsAddressChanges = WsAddressChanges(Address.fromString(address).explicitGet(), Map.empty, Seq.empty, 0L)
+  @volatile private var accountUpdates = emptyWsAddressState
   private val orderBookUpdates = mutable.AnyRefMap.empty[AssetPair, WsOrderBookChanges]
   @volatile private var gotPings = 0
 
@@ -28,7 +28,7 @@ class WsCollectChangesClient(apiUri: String, address: String, aus: String, obs: 
     case x: WsPingOrPong => gotPings += 1; x.some
     case x: WsInitial => log.info(s"Connection id: ${x.connectionId}"); none
     case x: WsError => log.error(s"Got error: $x"); throw new RuntimeException(s"Got $x")
-    case diff: WsAddressChanges => accountUpdates = merge(accountUpdates, diff); none
+    case diff: WsAddressChanges => validate(accountUpdates, diff); accountUpdates = merge(accountUpdates, diff); none
     case diff: WsOrderBookChanges =>
       val updatedOb = orderBookUpdates.get(diff.assetPair) match {
         case Some(origOb) => merge(origOb, diff)
@@ -36,6 +36,12 @@ class WsCollectChangesClient(apiUri: String, address: String, aus: String, obs: 
       }
       orderBookUpdates.put(diff.assetPair, updatedOb)
       none
+  }
+
+  private def validate(orig: WsAddressChanges, diff: WsAddressChanges) = diff.balances.foreach { b =>
+    if (orig.balances(b._1).tradable > b._2.tradable)
+      println(s"${orig.address} orig: ${orig.balances(b._1).tradable} diff: ${b._2.tradable}")
+    else println(s"validation for ${orig.address} is OK")
   }
 
   private def merge(orig: WsAddressChanges, diff: WsAddressChanges): WsAddressChanges = WsAddressChanges(
@@ -101,7 +107,7 @@ class WsCollectChangesClient(apiUri: String, address: String, aus: String, obs: 
       .fold(Future.successful(()))(_.close().map(_ => ()))
       .andThen {
         case _ =>
-          accountUpdates = emptyWsAddresState
+          accountUpdates = emptyWsAddressState
           orderBookUpdates.clear()
       }
 

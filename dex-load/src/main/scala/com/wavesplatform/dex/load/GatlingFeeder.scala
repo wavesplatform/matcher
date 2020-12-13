@@ -52,14 +52,16 @@ object GatlingFeeder {
       Json.toJsObject(mkJwtSignedPayload(accountKeyPair))
     )}"}"""
 
-  private def mkObsStrings(pairsFile: File, numberPerClient: Int): String = {
-    val source = Source.fromFile(pairsFile)
+  private def mkObsStrings(pairsFile: File, numberPerClient: Int): String =
     try {
+      val source = Source.fromFile(pairsFile)
       val pairs = Random.shuffle(source.getLines().toVector)
+      source.close()
       require(numberPerClient <= pairs.size, "numberPerClient > available asset pairs in file")
       pairs.take(numberPerClient).map(x => s"""{"T":"obs","S":"$x","d":100}""").mkString(";")
-    } finally source.close()
-  }
+    } catch {
+      case _ => ""
+    }
 
   def mkFile(
     accountsNumber: Int,

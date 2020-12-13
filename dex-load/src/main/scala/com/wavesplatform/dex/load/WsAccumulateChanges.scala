@@ -10,8 +10,12 @@ import scala.util.Random
 
 object WsAccumulateChanges {
 
-  def createClients(apiUri: String, feederFile: File, accountsNumber: Int)(implicit system: ActorSystem): Seq[WsCollectChangesClient] =
-    readRandomAccountLines(feederFile, accountsNumber).map { accountLine =>
+  def createClients(apiUri: String, feederFile: File, accountsNumber: Int, wsCheckType: Int)(implicit
+    system: ActorSystem
+  ): Seq[WsCollectChangesClient] = {
+    val accountLines = if (wsCheckType == 1) readLastAccountLines(feederFile, accountsNumber) else readRandomAccountLines(feederFile, accountsNumber)
+
+    accountLines.map { accountLine =>
       val fields = accountLine.split(';')
 
       val addr = fields(0)
@@ -20,6 +24,13 @@ object WsAccumulateChanges {
 
       new WsCollectChangesClient(apiUri, addr, aus, obs)
     }
+  }
+
+  private def readLastAccountLines(feederFile: File, accountsNumber: Int): Seq[String] = {
+    val source = Source.fromFile(feederFile)
+    try source.getLines().toList.reverse.take(accountsNumber)
+    finally source.close()
+  }
 
   private def readRandomAccountLines(feederFile: File, accountsNumber: Int): Seq[String] = {
     val source = Source.fromFile(feederFile)

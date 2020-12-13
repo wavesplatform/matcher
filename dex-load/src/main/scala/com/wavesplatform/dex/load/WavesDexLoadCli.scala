@@ -97,7 +97,11 @@ object WavesDexLoadCli extends ScoptImplicits {
             opt[FiniteDuration]("ws-response-wait-time")
               .abbr("wrwt")
               .text("The time to wait data on second stage")
-              .action((x, s) => s.copy(wsResponseWaitTime = x))
+              .action((x, s) => s.copy(wsResponseWaitTime = x)),
+            opt[Int]("ws-check-type")
+              .abbr("wct")
+              .text("Type of checking data with ws")
+              .action((x, s) => s.copy(wsCheckType = x))
           ),
         cmd(Command.CreateRequests.name)
           .action((_, s) => s.copy(command = Command.CreateRequests.some))
@@ -186,11 +190,12 @@ object WavesDexLoadCli extends ScoptImplicits {
                      |  Feeder file             : ${args.feederFile.getAbsolutePath}
                      |  Accounts number         : ${args.accountsNumber}
                      |  Collect time            : ${args.collectTime}
-                     |  WebSocket response time : ${args.wsResponseWaitTime}\n""".stripMargin
+                     |  WebSocket response time : ${args.wsResponseWaitTime}
+                     |  WebSocket check type    : ${args.wsCheckType}\n""".stripMargin
                 )
 
                 val clients: Seq[WsCollectChangesClient] = cli.wrapByLogs[Id, Seq[WsCollectChangesClient]]("Creating clients.. ") {
-                  WsAccumulateChanges.createClients(args.dexWsApi, args.feederFile, args.accountsNumber)
+                  WsAccumulateChanges.createClients(args.dexWsApi, args.feederFile, args.accountsNumber, args.wsCheckType)
                 }
 
                 val r =
@@ -312,7 +317,8 @@ object WavesDexLoadCli extends ScoptImplicits {
     requestsFile: File = new File(s"requests-${System.currentTimeMillis}.txt"),
     dexRestApi: String = "",
     collectTime: FiniteDuration = 5.seconds,
-    wsResponseWaitTime: FiniteDuration = 5.seconds
+    wsResponseWaitTime: FiniteDuration = 5.seconds,
+    wsCheckType: Int = 1
   ) {
     def dexWsApi: String = s"${prependScheme(dexRestApi)}/ws/v0"
   }

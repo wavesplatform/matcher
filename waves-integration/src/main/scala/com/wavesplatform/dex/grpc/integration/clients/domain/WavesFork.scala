@@ -8,7 +8,6 @@ import cats.syntax.semigroup._
 import com.wavesplatform.dex.grpc.integration.clients.domain.WavesFork.Status
 
 // TODO DEX-1009 Unit test
-// TODO DEX-1010 Can be connected again if forkChain rolled back behind origChain and restored the same chain
 // TODO DEX-1011 This class is too slow for his purposes
 case class WavesFork private[domain] (origChain: WavesChain, forkChain: WavesChain) {
 
@@ -26,7 +25,7 @@ case class WavesFork private[domain] (origChain: WavesChain, forkChain: WavesCha
     case Right(updatedForkChain) =>
       // TODO DEX-1010 if we are restoring the origChain in forkChain, hold NotResolved until we get all micro blocks
       // Compare heights to solve a situation when there no transactions in the network since some height
-      if (block.tpe == WavesBlock.Type.FullBlock && block.ref.height < origChain.height)
+      if (block.tpe == WavesBlock.Type.FullBlock || block.ref.height < origChain.height)
         Status.NotResolved(copy(forkChain = updatedForkChain))
       else {
         val (origDropped, forkDropped) = WavesChain.dropDifference(origChain, updatedForkChain)

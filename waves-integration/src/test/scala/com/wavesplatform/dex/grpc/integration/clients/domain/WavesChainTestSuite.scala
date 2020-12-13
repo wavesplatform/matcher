@@ -94,36 +94,126 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
     }
 
     "dropDifference" - {
-      val testGen = for {
-        commonBlocks <- historyGen(0 to 2, 0 to 2)
-        (maxBlocksNumber, startHeight) = commonBlocks.headOption match {
-          case Some(lastBlock) =>
-            if (lastBlock.tpe == WavesBlock.Type.FullBlock) (2, lastBlock.ref.height + 1)
-            else (0, lastBlock.ref.height)
-          case _ => (2, 0)
+      def tests(testGen: Gen[(Vector[WavesBlock], WavesChain, WavesChain)]): Unit = {
+        "there is no common block between dropped" in forAll(testGen) { case (commonBlocks, chain1, chain2) =>
+          val (dropped1, dropped2) = WavesChain.dropDifference(chain1, chain2)
+          commonBlocks.foreach { commonBlock =>
+            withClue("dropped1: ") {
+              dropped1 should not contain commonBlock
+            }
+            withClue("dropped2: ") {
+              dropped2 should not contain commonBlock
+            }
+          }
         }
 
-        detachedHistory1 <- historyGen(0 to maxBlocksNumber, 0 to 2, startHeight to startHeight)
-        detachedHistory2 <- historyGen(0 to maxBlocksNumber, 0 to 2, startHeight to startHeight)
-      } yield {
-        val history1 = detachedHistory1.appendedAll(commonBlocks)
-        val history2 = detachedHistory2.appendedAll(commonBlocks)
-        (
-          commonBlocks,
-          WavesChain(history1, 100),
-          WavesChain(history2, 100)
-        )
+        "dropped1" - {
+          "present in chain1" in forAll(testGen) { case (_, chain1, chain2) =>
+            val (dropped1, dropped2) = WavesChain.dropDifference(chain1, chain2)
+            dropped1.foreach { b1 =>
+              withClue(s"b1=$b1, dropped1: $dropped1, dropped2: $dropped2: ") {
+                chain1.has(b1.ref) shouldBe true
+              }
+            }
+          }
+
+          "doesn't present in chain2" in forAll(testGen) { case (_, chain1, chain2) =>
+            val (dropped1, dropped2) = WavesChain.dropDifference(chain1, chain2)
+            dropped1.foreach { b1 =>
+              withClue(s"b1=$b1, dropped1: $dropped1, dropped2: $dropped2: ") {
+                chain2.has(b1.ref) shouldBe false
+              }
+            }
+          }
+        }
+
+        "dropped2" - {
+          "present in chain2" in forAll(testGen) { case (_, chain1, chain2) =>
+            val (dropped1, dropped2) = WavesChain.dropDifference(chain1, chain2)
+            dropped2.foreach { b2 =>
+              withClue(s"b2=$b2, dropped1: $dropped1, dropped2: $dropped2: ") {
+                chain2.has(b2.ref) shouldBe true
+              }
+            }
+          }
+
+          "doesn't present in chain1" in forAll(testGen) { case (_, chain1, chain2) =>
+            val (dropped1, dropped2) = WavesChain.dropDifference(chain1, chain2)
+            dropped2.foreach { b2 =>
+              withClue(s"b2=$b2, dropped1: $dropped1, dropped2: $dropped2: ") {
+                chain1.has(b2.ref) shouldBe false
+              }
+            }
+          }
+        }
       }
 
-      "there is no common block between dropped" in forAll(testGen) { case (commonBlocks, chain1, chain2) =>
-        val (dropped1, dropped2) = WavesChain.dropDifference(chain1, chain2)
-        commonBlocks.foreach { commonBlock =>
-          withClue("dropped1: ") {
-            dropped1 should not contain commonBlock
+      "on a fork" - {
+        val testGen = for {
+          commonBlocks <- historyGen(0 to 2, 0 to 2)
+          (maxBlocksNumber, startHeight) = commonBlocks.headOption match {
+            case Some(lastBlock) =>
+              if (lastBlock.tpe == WavesBlock.Type.FullBlock) (2, lastBlock.ref.height + 1)
+              else (0, lastBlock.ref.height)
+            case _ => (2, 0)
           }
-          withClue("dropped2: ") {
-            dropped2 should not contain commonBlock
+
+          detachedHistory1 <- historyGen(0 to maxBlocksNumber, 0 to 2, startHeight to startHeight)
+          detachedHistory2 <- historyGen(0 to maxBlocksNumber, 0 to 2, startHeight to startHeight)
+        } yield {
+          val history1 = detachedHistory1.appendedAll(commonBlocks)
+          val history2 = detachedHistory2.appendedAll(commonBlocks)
+          (
+            commonBlocks,
+            WavesChain(history1, 100),
+            WavesChain(history2, 100)
+          )
+        }
+
+        tests(testGen)
+      }
+
+      "on the same chain" - {
+        val testGen = for {
+          fullHistory <- historyGen(1 to 3, 0 to 2)
+          partialHistory <- Gen.choose(1, fullHistory.length).map(fullHistory.drop)
+          lessBlockChain <- Gen.oneOf(1, 2)
+        } yield {
+          val (history1, history2) = if (lessBlockChain == 1) (partialHistory, fullHistory) else (fullHistory, partialHistory)
+          (
+            partialHistory,
+            WavesChain(history1, 100),
+            WavesChain(history2, 100)
+          )
+        }
+
+        tests(testGen)
+      }
+
+      "on totally different chains" - {
+        val testGen = for {
+          history1 <- historyGen(1 to 3, 0 to 2).map { xs =>
+            xs.map { x =>
+              x.copy(
+                ref = x.ref.copy(id = ByteStr(120 +: x.ref.id.arr)),
+                reference = ByteStr(120 +: x.reference.arr)
+              )
+            }
           }
+          history2 <- historyGen(1 to 3, 0 to 2).map { xs =>
+            xs.map { x =>
+              x.copy(
+                ref = x.ref.copy(id = ByteStr(121 +: x.ref.id.arr)),
+                reference = ByteStr(121 +: x.reference.arr)
+              )
+            }
+          }
+        } yield (WavesChain(history1, 100), WavesChain(history2, 100))
+
+        "dropped all" in forAll(testGen) { case (chain1, chain2) =>
+          val (dropped1, dropped2) = WavesChain.dropDifference(chain1, chain2)
+          dropped1 should matchTo(chain1.history.reverse.toList)
+          dropped2 should matchTo(chain2.history.reverse.toList)
         }
       }
     }

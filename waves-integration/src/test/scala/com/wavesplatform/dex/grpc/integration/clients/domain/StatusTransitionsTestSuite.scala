@@ -164,7 +164,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
       )
 
       val block2B = WavesBlock(
-        ref = BlockRef(height = 2, id = ByteStr(Array[Byte](98, 1, 0))),
+        ref = BlockRef(height = 2, id = ByteStr(Array[Byte](98, 1, 1, 0))),
         reference = block1.ref.id,
         changes = BlockchainBalance(
           regular = Map(bob -> Map(usd -> 12), alice -> Map(usd -> 41)),
@@ -184,7 +184,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
       "Appended ->" - {
         "Normal" in {
           val microBlock = WavesBlock(
-            ref = BlockRef(height = 2, id = ByteStr(Array[Byte](98, 1, 1))),
+            ref = BlockRef(height = 2, id = ByteStr(Array[Byte](98, 1, 1, 1))),
             reference = block2B.ref.id,
             changes = BlockchainBalance(
               regular = Map(alice -> Map(usd -> 8), carol -> Map(Waves -> 4)),

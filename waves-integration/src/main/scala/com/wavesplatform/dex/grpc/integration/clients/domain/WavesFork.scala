@@ -25,8 +25,11 @@ case class WavesFork private[domain] (origChain: WavesChain, forkChain: WavesCha
     case Right(updatedForkChain) =>
       // TODO DEX-1010 if we are restoring the origChain in forkChain, hold NotResolved until we get all micro blocks
       // Compare heights to solve a situation when there no transactions in the network since some height
-      if (block.tpe == WavesBlock.Type.FullBlock || block.ref.height < origChain.height)
-        Status.NotResolved(copy(forkChain = updatedForkChain))
+      if (
+        block.ref.height < origChain.height
+        || block.tpe == WavesBlock.Type.FullBlock
+        || block.tpe == WavesBlock.Type.MicroBlock && origChain.has(block.ref) // On the same chain
+      ) Status.NotResolved(copy(forkChain = updatedForkChain))
       else {
         val (origDropped, forkDropped) = WavesChain.dropDifference(origChain, updatedForkChain)
 

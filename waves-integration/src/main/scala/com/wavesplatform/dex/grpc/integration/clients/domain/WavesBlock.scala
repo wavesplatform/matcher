@@ -17,8 +17,15 @@ object WavesBlock {
   sealed trait Type extends Product with Serializable
 
   object Type {
-    case object FullBlock extends Type
-    case object MicroBlock extends Type
+
+    case object FullBlock extends Type {
+      override val toString = "f"
+    }
+
+    case object MicroBlock extends Type {
+      override val toString = "m"
+    }
+
   }
 
 }

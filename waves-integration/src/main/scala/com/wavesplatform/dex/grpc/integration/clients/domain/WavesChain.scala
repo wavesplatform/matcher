@@ -25,6 +25,8 @@ case class WavesChain(history: Vector[WavesBlock], height: Int, blocksCapacity: 
 
   def last: Option[WavesBlock] = history.headOption
 
+  def has(ref: BlockRef): Boolean = history.exists(_.ref == ref)
+
   def withBlock(block: WavesBlock): Either[String, WavesChain] =
     if (block.tpe == WavesBlock.Type.FullBlock) withFullBlock(block)
     else withMicroBlock(block)
@@ -99,7 +101,7 @@ case class WavesChain(history: Vector[WavesBlock], height: Int, blocksCapacity: 
 
   private def mkHardenedBlock(blocks: NonEmptyList[WavesBlock]): WavesBlock = blocks.reduce(WavesChain.blockSemigroup)
 
-  override def toString: String = s"WavesChain(his=${history.map(_.ref)}, h=$height)"
+  override def toString: String = s"WavesChain(his=${history.map(x => s"${x.tpe}-${x.ref}")}, h=$height)"
 }
 
 object WavesChain {
@@ -149,29 +151,81 @@ object WavesChain {
    *         full block h=1, full block h=2, micro block 1, micro block 2
    */
   def dropDifference(chain1: WavesChain, chain2: WavesChain): (List[WavesBlock], List[WavesBlock]) =
-    dropDifference(chain1, List.empty, chain2, List.empty)
+    dropDifference(
+      chain1 = chain1,
+      acc1 = List.empty,
+      chain1RestMicroBlockNumber = chain1.history.view.takeWhile(_.tpe == WavesBlock.Type.MicroBlock).size,
+      chain2 = chain2,
+      acc2 = List.empty,
+      chain2RestMicroBlockNumber = chain2.history.view.takeWhile(_.tpe == WavesBlock.Type.MicroBlock).size
+    )
 
   @tailrec
   private def dropDifference(
     chain1: WavesChain,
     acc1: List[WavesBlock],
+    chain1RestMicroBlockNumber: Int,
     chain2: WavesChain,
-    acc2: List[WavesBlock]
+    acc2: List[WavesBlock],
+    chain2RestMicroBlockNumber: Int
   ): (List[WavesBlock], List[WavesBlock]) =
     (chain1.last, chain2.last) match {
       case (Some(block1), Some(block2)) =>
         if (block1.ref == block2.ref) (acc1, acc2)
-        else if (block1.ref.height > block2.ref.height) {
+        else if (chain1RestMicroBlockNumber > chain2RestMicroBlockNumber) {
           val (updatedChain1, droppedBlock1) = chain1.withoutLast
-          dropDifference(updatedChain1, droppedBlock1.fold(acc1)(_ :: acc1), chain2, acc2)
+          dropDifference(
+            updatedChain1,
+            droppedBlock1.fold(acc1)(_ :: acc1),
+            chain1RestMicroBlockNumber - 1,
+            chain2,
+            acc2,
+            chain2RestMicroBlockNumber
+          )
+        } else if (chain1RestMicroBlockNumber < chain2RestMicroBlockNumber) {
+          val (updatedChain2, droppedBlock2) = chain2.withoutLast
+          dropDifference(
+            chain1,
+            acc1,
+            chain1RestMicroBlockNumber,
+            updatedChain2,
+            droppedBlock2.fold(acc2)(_ :: acc2),
+            chain2RestMicroBlockNumber - 1
+          )
+        } else if (block1.ref.height > block2.ref.height) {
+          val (updatedChain1, droppedBlock1) = chain1.withoutLast
+          dropDifference(
+            updatedChain1,
+            droppedBlock1.fold(acc1)(_ :: acc1),
+            chain1RestMicroBlockNumber - droppedBlock1.filter(_.tpe == WavesBlock.Type.MicroBlock).fold(0)(_ => 1),
+            chain2,
+            acc2,
+            chain2RestMicroBlockNumber
+          )
         } else if (block1.ref.height < block2.ref.height) {
           val (updatedChain2, droppedBlock2) = chain2.withoutLast
-          dropDifference(chain1, acc1, updatedChain2, droppedBlock2.fold(acc2)(_ :: acc2))
+          dropDifference(
+            chain1,
+            acc1,
+            chain1RestMicroBlockNumber,
+            updatedChain2,
+            droppedBlock2.fold(acc2)(_ :: acc2),
+            chain2RestMicroBlockNumber - droppedBlock2.filter(_.tpe == WavesBlock.Type.MicroBlock).fold(0)(_ => 1)
+          )
         } else {
           val (updatedChain1, droppedBlock1) = chain1.withoutLast
           val (updatedChain2, droppedBlock2) = chain2.withoutLast
-          dropDifference(updatedChain1, droppedBlock1.fold(acc1)(_ :: acc1), updatedChain2, droppedBlock2.fold(acc2)(_ :: acc2))
+          dropDifference(
+            updatedChain1,
+            droppedBlock1.fold(acc1)(_ :: acc1),
+            chain1RestMicroBlockNumber - droppedBlock1.filter(_.tpe == WavesBlock.Type.MicroBlock).fold(0)(_ => 1),
+            updatedChain2,
+            droppedBlock2.fold(acc2)(_ :: acc2),
+            chain2RestMicroBlockNumber - droppedBlock2.filter(_.tpe == WavesBlock.Type.MicroBlock).fold(0)(_ => 1)
+          )
         }
+      case (Some(_), None) => (chain1.history.reverse.toList ::: acc1, acc2)
+      case (None, Some(_)) => (acc1, chain2.history.reverse.toList ::: acc2)
       case _ => (acc1, acc2)
     }
 

@@ -3,20 +3,13 @@ package com.wavesplatform.dex.grpc.integration.clients.domain
 import java.nio.charset.StandardCharsets
 
 import cats.Monoid
-import cats.syntax.either._
-import cats.syntax.option._
-import cats.syntax.semigroup._
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.grpc.integration.clients.domain.WavesFork.Status
-import com.wavesplatform.dex.test.matchers.ProduceError.produce
 import com.wavesplatform.dex.{NoShrink, WavesIntegrationSuiteBase}
-import org.scalacheck.Gen
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
-
-import scala.util.matching.Regex
 
 class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrivenPropertyChecks with NoShrink {
 
@@ -85,21 +78,21 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
       }
 
       "NotResolved - the height is still less than on the previous chain" - {
-        "full block" in {
+        "a full block" in {
           val fork = WavesFork(
-            WavesChain(Vector(block3, block2, block1), 97),
+            WavesChain(Vector(block2, block1), 98),
             WavesChain(Vector(block1), 99)
           )
 
           val expectedUpdatedFork = WavesFork(
-            WavesChain(Vector(block3, block2, block1), 97),
+            WavesChain(Vector(block2, block1), 98),
             WavesChain(Vector(block2, block1), 98)
           )
 
           fork.withBlock(block2) should matchTo(Status.NotResolved(expectedUpdatedFork): Status)
         }
 
-        "micro block" in {
+        "a micro block with a lesser key block height than in the original chain" in {
           val fork = WavesFork(
             WavesChain(Vector(block3, block2, block1), 97),
             WavesChain(Vector(block2, block1), 98)
@@ -122,32 +115,91 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
 
           fork.withBlock(microBlock) should matchTo(Status.NotResolved(expectedUpdatedFork): Status)
         }
+
+        "an existed micro block on the same chain" in {
+          val microBlock1 = WavesBlock(
+            ref = BlockRef(height = 1, id = ByteStr(Array[Byte](98, 2))),
+            reference = block1.ref.id,
+            changes = BlockchainBalance(
+              regular = Map(alice -> Map(usd -> 69)),
+              outLeases = Map(bob -> 2L)
+            ),
+            tpe = WavesBlock.Type.MicroBlock
+          )
+
+          val fork = WavesFork(
+            WavesChain(Vector(microBlock1, block1), 99),
+            WavesChain(Vector(block1), 99)
+          )
+
+          val expectedUpdatedFork = WavesFork(
+            WavesChain(Vector(microBlock1, block1), 99),
+            WavesChain(Vector(microBlock1, block1), 99)
+          )
+
+          fork.withBlock(microBlock1) should matchTo(Status.NotResolved(expectedUpdatedFork): Status)
+        }
       }
 
-      "Resolved on micro block" in {
-        val fork = WavesFork(
-          WavesChain(Vector(block2, block1), 98),
-          WavesChain(Vector(block2, block1), 98)
-        )
+      "Resolved on a micro block" - {
+        "after the key block" in {
+          val fork = WavesFork(
+            WavesChain(Vector(block2, block1), 98),
+            WavesChain(Vector(block2, block1), 98)
+          )
 
-        val microBlock = WavesBlock(
-          ref = BlockRef(height = 2, id = ByteStr(Array[Byte](98, 1, 1))),
-          reference = block2.ref.id,
-          changes = BlockchainBalance(
-            regular = Map(bob -> Map(usd -> 31)),
-            outLeases = Map(bob -> 10L)
-          ),
-          tpe = WavesBlock.Type.MicroBlock
-        )
+          val microBlock = WavesBlock(
+            ref = BlockRef(height = 2, id = ByteStr(Array[Byte](98, 1, 1))),
+            reference = block2.ref.id,
+            changes = BlockchainBalance(
+              regular = Map(bob -> Map(usd -> 31)),
+              outLeases = Map(bob -> 10L)
+            ),
+            tpe = WavesBlock.Type.MicroBlock
+          )
 
-        fork.withBlock(microBlock) should matchTo(Status.Resolved(
-          activeChain = WavesChain(Vector(microBlock, block2, block1), 98),
-          newChanges = BlockchainBalance(
-            regular = Map(bob -> Map(usd -> 31)),
-            outLeases = Map(bob -> 10L)
-          ),
-          lostDiffIndex = Monoid.empty[DiffIndex]
-        ): Status)
+          fork.withBlock(microBlock) should matchTo(Status.Resolved(
+            activeChain = WavesChain(Vector(microBlock, block2, block1), 98),
+            newChanges = BlockchainBalance(
+              regular = Map(bob -> Map(usd -> 31)),
+              outLeases = Map(bob -> 10L)
+            ),
+            lostDiffIndex = Monoid.empty[DiffIndex]
+          ): Status)
+        }
+
+        "unknown" in {
+          val microBlock1 = WavesBlock(
+            ref = BlockRef(height = 1, id = ByteStr(Array[Byte](98, 2))),
+            reference = block1.ref.id,
+            changes = BlockchainBalance(
+              regular = Map(alice -> Map(usd -> 69)),
+              outLeases = Map(bob -> 2L)
+            ),
+            tpe = WavesBlock.Type.MicroBlock
+          )
+
+          val microBlock2 = WavesBlock(
+            ref = BlockRef(height = 1, id = ByteStr(Array[Byte](98, 3))),
+            reference = microBlock1.ref.id,
+            changes = BlockchainBalance(
+              regular = Map(bob -> Map(Waves -> 11)),
+              outLeases = Map(alice -> 9L)
+            ),
+            tpe = WavesBlock.Type.MicroBlock
+          )
+
+          val fork = WavesFork(
+            WavesChain(Vector(microBlock1, block1), 99),
+            WavesChain(Vector(microBlock1, block1), 99)
+          )
+
+          fork.withBlock(microBlock2) should matchTo(Status.Resolved(
+            activeChain = WavesChain(Vector(microBlock2, microBlock1, block1), 99),
+            newChanges = microBlock2.changes,
+            lostDiffIndex = Monoid.empty[DiffIndex]
+          ): Status)
+        }
       }
     }
     // "withoutLast" - {} // No need, delegates to WavesChain

@@ -19,12 +19,10 @@ case class WavesFork private[domain] (origChain: WavesChain, forkChain: WavesCha
 
   def height: Int = forkChain.height
 
-  // TODO DEX-1010 if we have e.g. 10 blocks and did rollback for 2, we don't need to request balances. Check this case
   def withBlock(block: WavesBlock): Status = forkChain.withBlock(block) match {
     case Left(e) => Status.Failed(withoutLast, e)
     case Right(updatedForkChain) =>
-      // TODO DEX-1010 if we are restoring the origChain in forkChain, hold NotResolved until we get all micro blocks
-      // Compare heights to solve a situation when there no transactions in the network since some height
+      // Compare heights to solve a situation when there are no transactions in the network since some height
       if (
         block.ref.height < origChain.height
         || block.tpe == WavesBlock.Type.FullBlock

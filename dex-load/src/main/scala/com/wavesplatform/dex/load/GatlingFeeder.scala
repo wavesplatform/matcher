@@ -60,7 +60,7 @@ object GatlingFeeder {
       require(numberPerClient <= pairs.size, "numberPerClient > available asset pairs in file")
       pairs.take(numberPerClient).map(x => s"""{"T":"obs","S":"$x","d":100}""").mkString(";")
     } catch {
-      case _ => ""
+      case _: Throwable => ""
     }
 
   def mkFile(

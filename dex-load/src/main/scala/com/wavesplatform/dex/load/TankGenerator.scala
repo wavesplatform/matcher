@@ -172,7 +172,7 @@ object TankGenerator {
     val pairs: List[AssetPair] = if (Files.notExists(pairsFile.get.toPath)) mkAssetPairs(assets) else readAssetPairs(pairsFile)
     if (!distributed) distributeAssets(accounts, assets)
 
-    printl(s"Pairs: ${pairs.mkString("\n")}")
+    println(s"Pairs: ${pairs.mkString("\n")}")
     pairs
   }
 

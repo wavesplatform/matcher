@@ -379,8 +379,7 @@ object TankGenerator {
           RequestType.POST,
           s"/transactions/broadcast",
           RequestTag.MASS_TRANSFER,
-          jsonBody = mt.toJson,
-          host = new URI(settings.hosts.node).getHost
+          jsonBody = mt.toJson
         )
       }
   }

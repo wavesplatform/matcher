@@ -36,7 +36,7 @@ class GrpcUtxEventsControlledStream(channel: ManagedChannel)(implicit scheduler:
     ClientCalls.asyncServerStreamingCall(call, empty, observer)
   }
 
-  override def stop(): Unit = {
+  override def stop(): Unit = if (grpcObserver.nonEmpty) {
     log.info("Stopping utx events stream")
     stopGrpcObserver()
     internalSystemStream.onNext(ControlledStream.SystemEvent.Stopped)
@@ -44,9 +44,10 @@ class GrpcUtxEventsControlledStream(channel: ManagedChannel)(implicit scheduler:
 
   override def close(): Unit = {
     log.info("Closing utx events stream")
+    stopGrpcObserver()
     internalStream.onComplete()
     internalSystemStream.onNext(ControlledStream.SystemEvent.Closed)
-    stopGrpcObserver()
+    internalSystemStream.onComplete()
   }
 
   private def stopGrpcObserver(): Unit = {

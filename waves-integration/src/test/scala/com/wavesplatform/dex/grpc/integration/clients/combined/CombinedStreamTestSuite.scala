@@ -4,6 +4,7 @@ import cats.syntax.option._
 import com.wavesplatform.dex.WavesIntegrationSuiteBase
 import com.wavesplatform.dex.grpc.integration.clients.ControlledStream.SystemEvent
 import com.wavesplatform.dex.grpc.integration.clients.blockchainupdates.BlockchainUpdatesControlledStream
+import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedStream.Status
 import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedStreamTestSuite._
 import com.wavesplatform.dex.grpc.integration.clients.matcherext.UtxEventsControlledStream
 import com.wavesplatform.dex.grpc.integration.services.UtxEvent
@@ -13,6 +14,7 @@ import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 import org.scalatest.exceptions.TestFailedException
 
+import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
 import scala.util.chaining._
 
@@ -68,11 +70,11 @@ class CombinedStreamTestSuite extends WavesIntegrationSuiteBase {
         logged(t.blockchainUpdates.systemStream)(_.tail.head shouldBe SystemEvent.Stopped)
       }
 
-      "doesn't stop utxEvents" in {
+      "stops utxEvents" in {
         val t = mk()
         t.cs.startFrom(10)
         t.cs.restartFrom(5)
-        logged(t.utxEvents.systemStream)(_.tail shouldBe empty)
+        logged(t.utxEvents.systemStream)(_.tail.head shouldBe SystemEvent.Stopped)
       }
 
       "affects the recovery height" in {
@@ -85,10 +87,10 @@ class CombinedStreamTestSuite extends WavesIntegrationSuiteBase {
 
     "events" - {
       "blockchainUpdates" - {
-        "BecameReady - triggers start of utxEvents" in {
+        "BecameReady - don't trigger utxEvents" in {
           val t = mk()
           t.blockchainUpdates.systemStream.onNext(SystemEvent.BecameReady)
-          logged(t.utxEvents.systemStream)(_.head shouldBe SystemEvent.BecameReady)
+          logged(t.utxEvents.systemStream)(_.lastOption shouldBe empty)
         }
 
         "Stopped" - {
@@ -110,23 +112,23 @@ class CombinedStreamTestSuite extends WavesIntegrationSuiteBase {
         "Closed" - {
           "closes utxEvents" in {
             val t = mkStarted()
-            t.blockchainUpdates.systemStream.onNext(SystemEvent.Closed)
+            t.blockchainUpdates.close()
             logged(t.utxEvents.systemStream)(_.last shouldBe SystemEvent.Closed)
           }
 
           "no recovery" in {
             val t = mkStarted()
-            t.blockchainUpdates.systemStream.onNext(SystemEvent.Closed)
-            logged(t.blockchainUpdates.systemStream)(_.last shouldBe SystemEvent.Closed)
+            t.blockchainUpdates.close()
+            Await.result(t.cs.lastStatus, 5.seconds) should matchTo[Status](Status.Closing(blockchainUpdates = true, utxEvents = true))
           }
         }
       }
 
       "utxEvents" - {
-        "BecameReady - don't trigger blockchainUpdates" in {
+        "BecameReady - triggers start of blockchainUpdates" in {
           val t = mk()
           t.utxEvents.systemStream.onNext(SystemEvent.BecameReady)
-          logged(t.blockchainUpdates.systemStream)(_.lastOption shouldBe empty)
+          logged(t.blockchainUpdates.systemStream)(_.head shouldBe SystemEvent.BecameReady)
         }
 
         "Stopped" - {
@@ -147,14 +149,14 @@ class CombinedStreamTestSuite extends WavesIntegrationSuiteBase {
         "Closed" - {
           "closes blockchainUpdates" in {
             val t = mkStarted()
-            t.utxEvents.systemStream.onNext(SystemEvent.Closed)
+            t.utxEvents.close()
             logged(t.blockchainUpdates.systemStream)(_.last shouldBe SystemEvent.Closed)
           }
 
           "no recovery" in {
             val t = mkStarted()
-            t.utxEvents.systemStream.onNext(SystemEvent.Closed)
-            logged(t.utxEvents.systemStream)(_.last shouldBe SystemEvent.Closed)
+            t.utxEvents.close()
+            Await.result(t.cs.lastStatus, 5.seconds) should matchTo[Status](Status.Closing(blockchainUpdates = true, utxEvents = true))
           }
         }
       }
@@ -172,11 +174,7 @@ class CombinedStreamTestSuite extends WavesIntegrationSuiteBase {
     new TestClasses(cs, blockchainUpdates, utxEvents)
   }
 
-  private def mkStarted(): TestClasses = mk().tap { t =>
-    t.blockchainUpdates.systemStream.onNext(SystemEvent.BecameReady)
-    // TODO DEX-1035 to solve this (and flash sequence of events like Ready -> Stop) we need much more sophisticated algorithm
-    Thread.sleep(50)
-  }
+  private def mkStarted(): TestClasses = mk().tap(_.utxEvents.systemStream.onNext(SystemEvent.BecameReady))
 
   private def logged[T](subject: Observable[T])(f: List[T] => Unit): Unit = {
     val xs = subject.takeByTimespan(100.millis).toListL.runSyncUnsafe()
@@ -205,7 +203,12 @@ object CombinedStreamTestSuite {
     override def startFrom(height: Int): Unit = systemStream.onNext(SystemEvent.BecameReady)
     override def requestNext(): Unit = {}
     override def stop(): Unit = systemStream.onNext(SystemEvent.Stopped)
-    override def close(): Unit = systemStream.onNext(SystemEvent.Closed)
+
+    override def close(): Unit = {
+      systemStream.onNext(SystemEvent.Closed)
+      systemStream.onComplete()
+    }
+
   }
 
   class UtxEventsControlledStreamMock(implicit scheduler: Scheduler) extends UtxEventsControlledStream {
@@ -214,7 +217,12 @@ object CombinedStreamTestSuite {
 
     override def start(): Unit = systemStream.onNext(SystemEvent.BecameReady)
     override def stop(): Unit = systemStream.onNext(SystemEvent.Stopped)
-    override def close(): Unit = systemStream.onNext(SystemEvent.Closed)
+
+    override def close(): Unit = {
+      systemStream.onNext(SystemEvent.Closed)
+      systemStream.onComplete()
+    }
+
   }
 
 }

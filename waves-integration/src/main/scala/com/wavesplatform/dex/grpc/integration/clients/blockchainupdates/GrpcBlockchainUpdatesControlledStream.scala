@@ -39,7 +39,7 @@ class GrpcBlockchainUpdatesControlledStream(channel: ManagedChannel)(implicit sc
 
   override def requestNext(): Unit = grpcObserver.foreach(_.requestNext())
 
-  override def stop(): Unit = {
+  override def stop(): Unit = if (grpcObserver.nonEmpty) {
     log.info("Stopping balance updates stream")
     stopGrpcObserver()
     internalSystemStream.onNext(ControlledStream.SystemEvent.Stopped)
@@ -50,6 +50,7 @@ class GrpcBlockchainUpdatesControlledStream(channel: ManagedChannel)(implicit sc
     stopGrpcObserver()
     internalStream.onComplete()
     internalSystemStream.onNext(ControlledStream.SystemEvent.Closed)
+    internalSystemStream.onComplete()
   }
 
   private def stopGrpcObserver(): Unit = {

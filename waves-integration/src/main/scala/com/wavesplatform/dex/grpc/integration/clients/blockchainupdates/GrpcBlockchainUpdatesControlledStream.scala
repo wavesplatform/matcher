@@ -30,6 +30,7 @@ class GrpcBlockchainUpdatesControlledStream(channel: ManagedChannel)(implicit sc
 
   override def startFrom(height: Int): Unit = {
     require(height >= 1, "We can not get blocks on height <= 0")
+    log.info("Connecting to Blockchain events stream")
 
     val call = channel.newCall(BlockchainUpdatesApiGrpc.METHOD_SUBSCRIBE, CallOptions.DEFAULT.withWaitForReady()) // TODO DEX-1001
     val observer = new BlockchainUpdatesObserver(call, height)
@@ -62,7 +63,7 @@ class GrpcBlockchainUpdatesControlledStream(channel: ManagedChannel)(implicit sc
       extends IntegrationObserver[SubscribeRequest, SubscribeEvent](internalStream) {
 
     override def onReady(): Unit = {
-      log.info(s"Getting blockchain events from ${call.getAttributes.get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR)} starting from $startHeight")
+      log.info(s"Getting blockchain events from ${Option(call.getAttributes.get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR)).getOrElse("unknown")} starting from $startHeight")
       internalSystemStream.onNext(ControlledStream.SystemEvent.BecameReady)
     }
 

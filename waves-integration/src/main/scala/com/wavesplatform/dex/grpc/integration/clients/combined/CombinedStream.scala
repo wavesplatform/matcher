@@ -13,6 +13,7 @@ import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 
 import scala.concurrent.duration.FiniteDuration
+import scala.util.Failure
 import scala.util.chaining._
 
 /**
@@ -46,28 +47,37 @@ class CombinedStream(
       case (orig, Left(evt)) => utxEventsTransitions(orig, evt).tap(updated => log.info(s"utx: $orig + $evt -> $updated"))
       case (orig, Right(evt)) => blockchainEventsTransitions(orig, evt).tap(updated => log.info(s"bu: $orig + $evt -> $updated"))
     }
-    .runAsyncLogErr
+    .runAsyncLogErr(log)
 
-  blockchainUpdates.stream.foreach { evt =>
-    evt.update.flatMap(BlockchainUpdatesConversions.toEvent) match {
-      case Some(x) => internalStream.onNext(x)
-      case None =>
-        log.warn(s"Can't convert $evt to a domain event, asking next")
-        blockchainUpdates.requestNext()
+  blockchainUpdates.stream
+    .foreach { evt =>
+      evt.update.flatMap(BlockchainUpdatesConversions.toEvent) match {
+        case Some(x) => internalStream.onNext(x)
+        case None =>
+          log.error(s"Can't convert $evt to a domain event, asking next")
+          blockchainUpdates.requestNext()
+      }
     }
-  }
+    .onComplete {
+      case Failure(e) => log.error("blockchainUpdates failed", e)
+      case _ => log.info("blockchainUpdates completed")
+    }
 
-  utxEvents.stream.foreach { evt =>
-    UtxEventConversions.toEvent(evt) match {
-      case Some(x) => internalStream.onNext(x)
-      case None =>
-        log.warn(s"Can't convert $evt to a domain event")
-        blockchainUpdates.requestNext()
+  utxEvents.stream
+    .foreach { evt =>
+      UtxEventConversions.toEvent(evt) match {
+        case Some(x) => internalStream.onNext(x)
+        case None => log.error(s"Can't convert $evt to a domain event")
+      }
     }
-  }
+    .onComplete {
+      case Failure(e) => log.error("utxEvents failed", e)
+      case _ => log.info("utxEvents completed")
+    }
 
   // TODO DEX-1034
   def startFrom(height: Int): Unit = {
+    log.info(s"Starting from $height")
     updateHeightHint(height)
     utxEvents.start()
   }
@@ -238,7 +248,10 @@ class CombinedStream(
     runWithDelay(() => utxEvents.start())
   }
 
-  private def finish(): Unit = internalStream.onComplete()
+  private def finish(): Unit = {
+    log.info("Finished")
+    internalStream.onComplete()
+  }
 
 }
 

@@ -22,11 +22,11 @@ class GrpcBlockchainUpdatesControlledStream(channel: ManagedChannel)(implicit sc
     with ScorexLogging {
   @volatile private var grpcObserver: Option[BlockchainUpdatesObserver] = None
 
-  private val internalStream = ConcurrentSubject.publish[SubscribeEvent]
-  override val stream: Observable[SubscribeEvent] = internalStream.publish // See GrpcUtxEventsControlledStream
+  private val internalStream = ConcurrentSubject.replayLimited[SubscribeEvent](10)
+  override val stream: Observable[SubscribeEvent] = internalStream // .publish // See GrpcUtxEventsControlledStream
 
-  private val internalSystemStream = ConcurrentSubject.publish[SystemEvent]
-  override val systemStream: Observable[SystemEvent] = internalSystemStream.publish
+  private val internalSystemStream = ConcurrentSubject.replayLimited[SystemEvent](10)
+  override val systemStream: Observable[SystemEvent] = internalSystemStream // .publish
 
   override def startFrom(height: Int): Unit = {
     require(height >= 1, "We can not get blocks on height <= 0")

@@ -71,7 +71,7 @@ class CombinedStream(
     blockchainUpdates.systemStream.map(_.asRight[SystemEvent])
   ).merge[Either[SystemEvent, SystemEvent]](implicitly, OverflowStrategy.Unbounded)
     .map { x =>
-      println(s"==> lastStatus: $x")
+      log.info(s"==> lastStatus: $x")
       x
     }
     .foldLeft[Status](Status.Starting()) {

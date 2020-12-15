@@ -9,7 +9,7 @@ import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeEvent
 import com.wavesplatform.dex.grpc.integration.clients.matcherext.{UtxEventConversions, UtxEventsControlledStream}
 import com.wavesplatform.dex.meta.getSimpleName
 import monix.eval.Task
-import monix.execution.{ExecutionModel, Scheduler}
+import monix.execution.Scheduler
 import monix.reactive.subjects.ConcurrentSubject
 import monix.reactive.{Observable, OverflowStrategy}
 
@@ -70,19 +70,9 @@ class CombinedStream(
     utxEvents.systemStream.map(_.asLeft[SystemEvent]),
     blockchainUpdates.systemStream.map(_.asRight[SystemEvent])
   ).merge[Either[SystemEvent, SystemEvent]](implicitly, OverflowStrategy.Unbounded)
-    .map { x =>
-      log.info(s"==> lastStatus: $x")
-      x
-    }
     .foldLeft[Status](Status.Starting()) {
       case (orig, Left(evt)) => utxEventsTransitions(orig, evt).tap(updated => log.info(s"utx: $orig + $evt -> $updated"))
       case (orig, Right(evt)) => blockchainEventsTransitions(orig, evt).tap(updated => log.info(s"bu: $orig + $evt -> $updated"))
-    }
-    .doOnStart { x =>
-      Task(log.info(s"==> lastStatus started with $x"))
-    }
-    .doOnSubscribe {
-      Task(log.info(s"==> lastStatus is subscribed by someone"))
     }
     .doOnComplete {
       Task(log.info(s"lastStatus completed"))
@@ -90,7 +80,8 @@ class CombinedStream(
     .doOnError { e =>
       Task(log.error(s"lastStatus failed", e))
     }
-    .subscribe()(scheduler.withExecutionModel(ExecutionModel.AlwaysAsyncExecution))
+    .lastL
+    .runToFuture
 
   // TODO DEX-1034
   def startFrom(height: Int): Unit = {

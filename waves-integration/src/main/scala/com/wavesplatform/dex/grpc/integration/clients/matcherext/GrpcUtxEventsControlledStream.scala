@@ -34,6 +34,7 @@ class GrpcUtxEventsControlledStream(channel: ManagedChannel)(implicit scheduler:
     val call = channel.newCall(WavesBlockchainApiGrpc.METHOD_GET_UTX_EVENTS, CallOptions.DEFAULT.withWaitForReady()) // TODO DEX-1001
     val observer = new UtxEventObserver(call)
     grpcObserver = observer.some
+    internalSystemStream.onNext(ControlledStream.SystemEvent.BecameReady) // TODO
     ClientCalls.asyncServerStreamingCall(call, empty, observer)
   }
 
@@ -59,7 +60,7 @@ class GrpcUtxEventsControlledStream(channel: ManagedChannel)(implicit scheduler:
   private class UtxEventObserver(call: ClientCall[Empty, UtxEvent]) extends ClosingObserver[Empty, UtxEvent] {
 
     override def onReady(): Unit = {
-      internalSystemStream.onNext(ControlledStream.SystemEvent.BecameReady)
+      // internalSystemStream.onNext(ControlledStream.SystemEvent.BecameReady)
       val address = Option(call.getAttributes.get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR)).fold("unknown")(_.toString)
       log.info(s"Getting utx events from $address")
     }

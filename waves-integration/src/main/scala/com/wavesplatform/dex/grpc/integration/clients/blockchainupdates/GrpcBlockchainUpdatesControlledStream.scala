@@ -36,6 +36,7 @@ class GrpcBlockchainUpdatesControlledStream(channel: ManagedChannel)(implicit sc
     val call = channel.newCall(BlockchainUpdatesApiGrpc.METHOD_SUBSCRIBE, CallOptions.DEFAULT.withWaitForReady()) // TODO DEX-1001
     val observer = new BlockchainUpdatesObserver(call, height)
     grpcObserver = observer.some
+    internalSystemStream.onNext(ControlledStream.SystemEvent.BecameReady) // TODO
     ClientCalls.asyncServerStreamingCall(call, new SubscribeRequest(height), observer)
   }
 
@@ -64,7 +65,7 @@ class GrpcBlockchainUpdatesControlledStream(channel: ManagedChannel)(implicit sc
       extends IntegrationObserver[SubscribeRequest, SubscribeEvent](internalStream) {
 
     override def onReady(): Unit = {
-      internalSystemStream.onNext(ControlledStream.SystemEvent.BecameReady)
+      // internalSystemStream.onNext(ControlledStream.SystemEvent.BecameReady)
       val address = Option(call.getAttributes.get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR)).fold("unknown")(_.toString)
       log.info(s"Getting blockchain events from $address starting from $startHeight")
     }

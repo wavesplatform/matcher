@@ -349,6 +349,7 @@ object TankGenerator {
         .assetId(asset)
         .fee(settings.defaults.massTransferFee + (transfers.size + 1) * settings.defaults.massTransferMultiplier)
         .version(1)
+        .timestamp(System.currentTimeMillis() + Random.nextLong(100000))
         .getSignedWith(issuer)
 
     assetOwners.map { case (assetOwner, asset) =>
@@ -377,11 +378,7 @@ object TankGenerator {
     }
 
     Random
-      .shuffle(
-        List
-          .fill(requestCount / 100 + 1)(massTransfers)
-          .flatten
-      ).map { mt =>
+      .shuffle(massTransfers).map { mt =>
         Request(
           RequestType.POST,
           s"/transactions/broadcast",

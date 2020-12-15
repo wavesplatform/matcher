@@ -4,7 +4,6 @@ import cats.syntax.option._
 import com.wavesplatform.dex.WavesIntegrationSuiteBase
 import com.wavesplatform.dex.grpc.integration.clients.ControlledStream.SystemEvent
 import com.wavesplatform.dex.grpc.integration.clients.blockchainupdates.BlockchainUpdatesControlledStream
-import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedStream.Status
 import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedStreamTestSuite._
 import com.wavesplatform.dex.grpc.integration.clients.matcherext.UtxEventsControlledStream
 import com.wavesplatform.dex.grpc.integration.services.UtxEvent
@@ -14,7 +13,6 @@ import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 import org.scalatest.exceptions.TestFailedException
 
-import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
 import scala.util.chaining._
 
@@ -116,11 +114,11 @@ class CombinedStreamTestSuite extends WavesIntegrationSuiteBase {
             logged(t.utxEvents.systemStream)(_.last shouldBe SystemEvent.Closed)
           }
 
-          "no recovery" in {
-            val t = mkStarted()
-            t.blockchainUpdates.close()
-            Await.result(t.cs.lastStatus, 5.seconds) should matchTo[Status](Status.Closing(blockchainUpdates = true, utxEvents = true))
-          }
+//          "no recovery" in {
+//            val t = mkStarted()
+//            t.blockchainUpdates.close()
+//            Await.result(t.cs.lastStatus, 5.seconds) should matchTo[Status](Status.Closing(blockchainUpdates = true, utxEvents = true))
+//          }
         }
       }
 
@@ -153,11 +151,11 @@ class CombinedStreamTestSuite extends WavesIntegrationSuiteBase {
             logged(t.blockchainUpdates.systemStream)(_.last shouldBe SystemEvent.Closed)
           }
 
-          "no recovery" in {
-            val t = mkStarted()
-            t.utxEvents.close()
-            Await.result(t.cs.lastStatus, 5.seconds) should matchTo[Status](Status.Closing(blockchainUpdates = true, utxEvents = true))
-          }
+//          "no recovery" in {
+//            val t = mkStarted()
+//            t.utxEvents.close()
+//            Await.result(t.cs.lastStatus, 5.seconds) should matchTo[Status](Status.Closing(blockchainUpdates = true, utxEvents = true))
+//          }
         }
       }
     }

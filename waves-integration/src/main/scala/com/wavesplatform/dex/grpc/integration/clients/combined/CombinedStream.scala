@@ -78,11 +78,17 @@ class CombinedStream(
       case (orig, Left(evt)) => utxEventsTransitions(orig, evt).tap(updated => log.info(s"utx: $orig + $evt -> $updated"))
       case (orig, Right(evt)) => blockchainEventsTransitions(orig, evt).tap(updated => log.info(s"bu: $orig + $evt -> $updated"))
     }
+    .doOnStart { x =>
+      Task(log.info(s"==> lastStatus started with $x"))
+    }
+    .doOnSubscribe {
+      Task(log.info(s"==> lastStatus is subscribed by someone"))
+    }
     .doOnComplete {
       Task(log.info(s"lastStatus completed"))
     }
     .doOnError { e =>
-      Task(log.info(s"lastStatus completed with $e"))
+      Task(log.error(s"lastStatus failed", e))
     }
     .subscribe()(scheduler.withExecutionModel(ExecutionModel.AlwaysAsyncExecution))
 

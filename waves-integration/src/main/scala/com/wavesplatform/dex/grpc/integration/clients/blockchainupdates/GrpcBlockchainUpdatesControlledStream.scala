@@ -64,10 +64,9 @@ class GrpcBlockchainUpdatesControlledStream(channel: ManagedChannel)(implicit sc
       extends IntegrationObserver[SubscribeRequest, SubscribeEvent](internalStream) {
 
     override def onReady(): Unit = {
-      log.info(
-        s"Getting blockchain events from ${Option(call.getAttributes.get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR)).getOrElse("unknown")} starting from $startHeight"
-      )
       internalSystemStream.onNext(ControlledStream.SystemEvent.BecameReady)
+      val address = Option(call.getAttributes.get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR)).fold("unknown")(_.toString)
+      log.info(s"Getting blockchain events from $address starting from $startHeight")
     }
 
     override def onError(e: Throwable): Unit = if (!isClosed) {

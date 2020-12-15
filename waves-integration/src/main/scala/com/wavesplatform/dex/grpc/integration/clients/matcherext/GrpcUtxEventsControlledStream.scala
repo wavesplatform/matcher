@@ -59,8 +59,9 @@ class GrpcUtxEventsControlledStream(channel: ManagedChannel)(implicit scheduler:
   private class UtxEventObserver(call: ClientCall[Empty, UtxEvent]) extends ClosingObserver[Empty, UtxEvent] {
 
     override def onReady(): Unit = {
-      log.info(s"Getting utx events from ${Option(call.getAttributes.get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR)).getOrElse("unknown")}")
       internalSystemStream.onNext(ControlledStream.SystemEvent.BecameReady)
+      val address = Option(call.getAttributes.get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR)).fold("unknown")(_.toString)
+      log.info(s"Getting utx events from $address")
     }
 
     override def onNext(value: UtxEvent): Unit = internalStream.onNext(value)

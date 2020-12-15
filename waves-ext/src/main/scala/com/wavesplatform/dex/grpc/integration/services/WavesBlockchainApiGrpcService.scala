@@ -271,22 +271,24 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
   }
 
   override def getUtxEvents(request: Empty, responseObserver: StreamObserver[UtxEvent]): Unit =
-    if (!utxBalanceUpdates.isCompleted) {
-      responseObserver match {
-        case x: ServerCallStreamObserver[_] => x.setOnCancelHandler(() => utxChangesSubscribers remove x)
-        case x => log.warn(s"Can't register cancel handler for $x")
-      }
+    if (!utxBalanceUpdates.isCompleted) responseObserver match {
+      case x: ServerCallStreamObserver[_] =>
+        x.setOnReadyHandler { () =>
+          // We have such order of calls, because we have to guarantee non-concurrent calls to onNext
+          // See StreamObserver for more details
+          initialEvents.onNext(responseObserver -> UtxEvent(
+            UtxEvent.Type.Switch(
+              UtxEvent.Switch(
+                utxState.values.toSeq
+              )
+            )
+          ))
+          utxChangesSubscribers.add(responseObserver)
 
-      // We have such order of calls, because we have to guarantee non-concurrent calls to onNext
-      // See StreamObserver for more details
-      utxChangesSubscribers.add(responseObserver)
-      initialEvents.onNext(responseObserver -> UtxEvent(
-        UtxEvent.Type.Switch(
-          UtxEvent.Switch(
-            utxState.values.toSeq
-          )
-        )
-      ))
+          log.info("Registered a new utx events observer")
+        }
+        x.setOnCancelHandler(() => utxChangesSubscribers remove x)
+      case x => log.warn(s"Can't register cancel handler for $x")
     }
 
   override def getCurrentBlockInfo(request: Empty): Future[CurrentBlockInfoResponse] = Future {

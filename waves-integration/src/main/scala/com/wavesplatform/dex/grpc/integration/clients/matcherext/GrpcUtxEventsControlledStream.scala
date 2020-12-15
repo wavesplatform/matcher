@@ -22,10 +22,11 @@ class GrpcUtxEventsControlledStream(channel: ManagedChannel)(implicit scheduler:
   @volatile private var grpcObserver: Option[UtxEventObserver] = None
 
   private val internalStream = ConcurrentSubject.publish[UtxEvent]
-  override val stream: Observable[UtxEvent] = internalStream
+  // HACK: Monix skips the first few messages! So we have to turn it into a hot
+  override val stream: Observable[UtxEvent] = internalStream.publish
 
   private val internalSystemStream = ConcurrentSubject.publish[SystemEvent]
-  override val systemStream: Observable[ControlledStream.SystemEvent] = internalSystemStream
+  override val systemStream: Observable[ControlledStream.SystemEvent] = internalSystemStream.publish
 
   private val empty: Empty = Empty()
 
@@ -34,7 +35,6 @@ class GrpcUtxEventsControlledStream(channel: ManagedChannel)(implicit scheduler:
     val call = channel.newCall(WavesBlockchainApiGrpc.METHOD_GET_UTX_EVENTS, CallOptions.DEFAULT.withWaitForReady()) // TODO DEX-1001
     val observer = new UtxEventObserver(call)
     grpcObserver = observer.some
-    internalSystemStream.onNext(ControlledStream.SystemEvent.BecameReady) // TODO
     ClientCalls.asyncServerStreamingCall(call, empty, observer)
   }
 
@@ -60,7 +60,7 @@ class GrpcUtxEventsControlledStream(channel: ManagedChannel)(implicit scheduler:
   private class UtxEventObserver(call: ClientCall[Empty, UtxEvent]) extends ClosingObserver[Empty, UtxEvent] {
 
     override def onReady(): Unit = {
-      // internalSystemStream.onNext(ControlledStream.SystemEvent.BecameReady)
+      internalSystemStream.onNext(ControlledStream.SystemEvent.BecameReady)
       val address = Option(call.getAttributes.get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR)).fold("unknown")(_.toString)
       log.info(s"Getting utx events from $address")
     }

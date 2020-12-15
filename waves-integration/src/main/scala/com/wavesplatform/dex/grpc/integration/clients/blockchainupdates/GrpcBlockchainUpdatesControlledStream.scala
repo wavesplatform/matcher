@@ -22,12 +22,11 @@ class GrpcBlockchainUpdatesControlledStream(channel: ManagedChannel)(implicit sc
     with ScorexLogging {
   @volatile private var grpcObserver: Option[BlockchainUpdatesObserver] = None
 
-  // https://github.com/monix/monix/issues/1019#issuecomment-529700466
   private val internalStream = ConcurrentSubject.publish[SubscribeEvent]
-  override val stream: Observable[SubscribeEvent] = internalStream
+  override val stream: Observable[SubscribeEvent] = internalStream.publish // See GrpcUtxEventsControlledStream
 
   private val internalSystemStream = ConcurrentSubject.publish[SystemEvent]
-  override val systemStream: Observable[SystemEvent] = internalSystemStream
+  override val systemStream: Observable[SystemEvent] = internalSystemStream.publish
 
   override def startFrom(height: Int): Unit = {
     require(height >= 1, "We can not get blocks on height <= 0")
@@ -36,7 +35,6 @@ class GrpcBlockchainUpdatesControlledStream(channel: ManagedChannel)(implicit sc
     val call = channel.newCall(BlockchainUpdatesApiGrpc.METHOD_SUBSCRIBE, CallOptions.DEFAULT.withWaitForReady()) // TODO DEX-1001
     val observer = new BlockchainUpdatesObserver(call, height)
     grpcObserver = observer.some
-    internalSystemStream.onNext(ControlledStream.SystemEvent.BecameReady) // TODO
     ClientCalls.asyncServerStreamingCall(call, new SubscribeRequest(height), observer)
   }
 
@@ -65,7 +63,7 @@ class GrpcBlockchainUpdatesControlledStream(channel: ManagedChannel)(implicit sc
       extends IntegrationObserver[SubscribeRequest, SubscribeEvent](internalStream) {
 
     override def onReady(): Unit = {
-      // internalSystemStream.onNext(ControlledStream.SystemEvent.BecameReady)
+      internalSystemStream.onNext(ControlledStream.SystemEvent.BecameReady)
       val address = Option(call.getAttributes.get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR)).fold("unknown")(_.toString)
       log.info(s"Getting blockchain events from $address starting from $startHeight")
     }

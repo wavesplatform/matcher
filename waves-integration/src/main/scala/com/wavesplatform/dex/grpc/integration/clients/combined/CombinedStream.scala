@@ -9,8 +9,8 @@ import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeEvent
 import com.wavesplatform.dex.grpc.integration.clients.matcherext.{UtxEventConversions, UtxEventsControlledStream}
 import com.wavesplatform.dex.meta.getSimpleName
 import monix.execution.Scheduler
-import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
+import monix.reactive.{Observable, OverflowStrategy}
 
 import scala.concurrent.duration.FiniteDuration
 import scala.util.Failure
@@ -39,16 +39,6 @@ class CombinedStream(
     if (settings.restartDelay.length == 0) { f => f() }
     else f => scheduler.scheduleOnce(settings.restartDelay)(f())
 
-  val lastStatus = Observable(
-    utxEvents.systemStream.map(_.asLeft[SystemEvent]),
-    blockchainUpdates.systemStream.map(_.asRight[SystemEvent])
-  ).merge
-    .foldLeftL[Status](Status.Starting()) {
-      case (orig, Left(evt)) => utxEventsTransitions(orig, evt).tap(updated => log.info(s"utx: $orig + $evt -> $updated"))
-      case (orig, Right(evt)) => blockchainEventsTransitions(orig, evt).tap(updated => log.info(s"bu: $orig + $evt -> $updated"))
-    }
-    .runAsyncLogErr(log)
-
   blockchainUpdates.stream
     .foreach { evt =>
       evt.update.flatMap(BlockchainUpdatesConversions.toEvent) match {
@@ -73,6 +63,19 @@ class CombinedStream(
     .onComplete {
       case Failure(e) => log.error("utxEvents failed", e)
       case _ => log.info("utxEvents completed")
+    }
+
+  val lastStatus = Observable(
+    utxEvents.systemStream.map(_.asLeft[SystemEvent]),
+    blockchainUpdates.systemStream.map(_.asRight[SystemEvent])
+  ).merge[Either[SystemEvent, SystemEvent]](implicitly, OverflowStrategy.Unbounded)
+    .foldLeftL[Status](Status.Starting()) {
+      case (orig, Left(evt)) => utxEventsTransitions(orig, evt).tap(updated => log.info(s"utx: $orig + $evt -> $updated"))
+      case (orig, Right(evt)) => blockchainEventsTransitions(orig, evt).tap(updated => log.info(s"bu: $orig + $evt -> $updated"))
+    }
+    .runAsyncLogErr(log)
+    .andThen {
+      case x => log.info(s"lastStatus completed with $x")
     }
 
   // TODO DEX-1034

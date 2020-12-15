@@ -4,7 +4,6 @@ import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.api.http.entities.HttpSuccessfulSingleCancel
-import com.wavesplatform.dex.domain.account.KeyPair.toAddress
 import com.wavesplatform.dex.domain.order.OrderType.BUY
 import com.wavesplatform.dex.it.api.RawHttpChecks
 import com.wavesplatform.it.MatcherSuiteBase

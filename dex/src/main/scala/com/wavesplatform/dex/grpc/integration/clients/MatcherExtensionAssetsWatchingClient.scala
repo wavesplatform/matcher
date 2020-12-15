@@ -1,6 +1,5 @@
 package com.wavesplatform.dex.grpc.integration.clients
 
-import cats.Monoid
 import cats.instances.future._
 import cats.syntax.apply._
 import com.wavesplatform.dex.db.AssetsStorage
@@ -19,7 +18,7 @@ import monix.reactive.Observable
 import scala.concurrent.{ExecutionContext, Future}
 
 class MatcherExtensionAssetsWatchingClient(
-  settings: WavesBlockchainClientSettings,
+  settings: WavesBlockchainClientSettings, // TODO remove
   underlying: WavesBlockchainClient,
   assetsStorage: AssetsStorage
 )(implicit grpcExecutionContext: ExecutionContext)
@@ -27,21 +26,19 @@ class MatcherExtensionAssetsWatchingClient(
     with ScorexLogging {
 
   override def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] =
-    saveAssetsDescription(assets.iterator) *> underlying.spendableBalances(address, assets)
+    saveAssetsDescription(assets) *> underlying.spendableBalances(address, assets)
 
   override def allAssetsSpendableBalance(address: Address): Future[Map[Asset, Long]] =
     for {
       xs <- underlying.allAssetsSpendableBalance(address)
-      _ <- saveAssetsDescription(xs.keysIterator)
+      _ <- saveAssetsDescription(xs.keySet)
     } yield xs
 
   override def updates: Observable[WavesBlockchainClient.Updates] = underlying
     .updates
-    .bufferIntrospective(settings.balanceStreamBufferSize)
     .mapEval { xs =>
-      val r = Monoid.combineAll(xs)
-      val assets = r.updatedBalances.valuesIterator.flatMap(_.keysIterator)
-      Task.fromFuture(saveAssetsDescription(assets)).map(_ => r)
+      val assets = xs.updatedBalances.valuesIterator.flatMap(_.keysIterator).toSet
+      Task.fromFuture(saveAssetsDescription(assets)).map(_ => xs)
     }
 
   override def isFeatureActivated(id: Short): Future[Boolean] = underlying.isFeatureActivated(id)
@@ -64,8 +61,8 @@ class MatcherExtensionAssetsWatchingClient(
 
   override def close(): Future[Unit] = underlying.close()
 
-  private def saveAssetsDescription(assets: Iterator[Asset]): Future[Unit] =
-    Future.traverse(assets.collect { case asset: IssuedAsset if !assetsStorage.contains(asset) => asset }.toSet)(saveAssetDescription).map(_ => ())
+  private def saveAssetsDescription(assets: Set[Asset]): Future[Unit] =
+    Future.traverse(assets.iterator.collect { case asset: IssuedAsset if !assetsStorage.contains(asset) => asset })(saveAssetDescription).map(_ => ())
 
   private def saveAssetDescription(asset: IssuedAsset): Future[Unit] =
     assetsStorage.get(asset) match {

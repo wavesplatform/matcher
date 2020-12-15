@@ -63,7 +63,7 @@ object Dependencies {
 
     val scorexCrypto = "2.1.9"
 
-    val monix = "3.2.2"
+    val monix = "3.3.0"
 
     val supertagged = "1.5"
 

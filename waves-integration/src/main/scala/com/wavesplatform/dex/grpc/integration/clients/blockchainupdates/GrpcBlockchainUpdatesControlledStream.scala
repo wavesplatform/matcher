@@ -22,6 +22,7 @@ class GrpcBlockchainUpdatesControlledStream(channel: ManagedChannel)(implicit sc
     with ScorexLogging {
   @volatile private var grpcObserver: Option[BlockchainUpdatesObserver] = None
 
+  // https://github.com/monix/monix/issues/1019#issuecomment-529700466
   private val internalStream = ConcurrentSubject.publish[SubscribeEvent]
   override val stream: Observable[SubscribeEvent] = internalStream
 
@@ -63,7 +64,9 @@ class GrpcBlockchainUpdatesControlledStream(channel: ManagedChannel)(implicit sc
       extends IntegrationObserver[SubscribeRequest, SubscribeEvent](internalStream) {
 
     override def onReady(): Unit = {
-      log.info(s"Getting blockchain events from ${Option(call.getAttributes.get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR)).getOrElse("unknown")} starting from $startHeight")
+      log.info(
+        s"Getting blockchain events from ${Option(call.getAttributes.get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR)).getOrElse("unknown")} starting from $startHeight"
+      )
       internalSystemStream.onNext(ControlledStream.SystemEvent.BecameReady)
     }
 

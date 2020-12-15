@@ -11,7 +11,7 @@ import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.load.request._
 import com.wavesplatform.dex.load.utils._
 import com.wavesplatform.protobuf.transaction.Recipient
-import im.mak.waves.transactions.{MassTransferTransaction, TransferTransaction}
+import im.mak.waves.transactions.{MassTransferTransaction, TransactionOrOrder, TransferTransaction}
 import im.mak.waves.transactions.account.{PrivateKey => JPrivateKey, PublicKey => JPublicKey}
 import im.mak.waves.transactions.common.{Amount, AssetId, Base58String, Recipient}
 import im.mak.waves.transactions.exchange.{AssetPair, Order, OrderType}
@@ -353,13 +353,20 @@ object TankGenerator {
 
     assetOwners.map { case (assetOwner, asset) =>
       try {
-        node.broadcast(new im.mak.waves.transactions.TransferTransaction(
-          issuer.publicKey(),
-          assetOwner.address(),
-          Amount.of(initialValue, AssetId.as(asset)),
-          null
-        ))
-        node.broadcast(new im.mak.waves.transactions.TransferTransaction(issuer.publicKey(), assetOwner.address(), Amount.of(initialValue), null))
+        node.broadcast(
+          TransferTransaction
+            .builder(assetOwner.address(), Amount.of(initialValue, AssetId.as(asset)))
+            .timestamp(System.currentTimeMillis() + Random.nextLong(100000))
+            .version(1)
+            .getSignedWith(issuer)
+        )
+        node.broadcast(
+          TransferTransaction
+            .builder(assetOwner.address(), Amount.of(initialValue))
+            .timestamp(System.currentTimeMillis() + Random.nextLong(100000))
+            .version(1)
+            .getSignedWith(issuer)
+        )
       } catch { case e: Exception => println(e) }
     }
 

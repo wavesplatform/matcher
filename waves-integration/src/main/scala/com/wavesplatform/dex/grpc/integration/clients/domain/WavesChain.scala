@@ -115,7 +115,8 @@ object WavesChain {
         ref = y.ref,
         reference = x.reference,
         changes = x.changes |+| y.changes,
-        tpe = x.tpe
+        tpe = x.tpe,
+        forgedTxIds = x.forgedTxIds.union(y.forgedTxIds)
       )
     }
 

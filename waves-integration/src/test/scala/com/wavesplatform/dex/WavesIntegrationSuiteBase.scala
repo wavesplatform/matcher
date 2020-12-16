@@ -1,6 +1,6 @@
 package com.wavesplatform.dex
 
-import com.google.protobuf.ByteString
+import com.google.protobuf.{ByteString, UnsafeByteOperations}
 import com.softwaremill.diffx.{ConsoleColorConfig, Derived, Diff, DiffResultDifferent, DiffResultValue, FieldPath, Identical}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.grpc.integration.services.UtxTransaction
@@ -34,6 +34,11 @@ trait WavesIntegrationSuiteBase extends AnyFreeSpecLike with Matchers with Allur
         MatchResult(matches = false, s"Matching error:\n$diff\nleft: $left", "")
       case _ => MatchResult(matches = true, "", "")
     }
+  }
+
+  protected def mkTxId(n: Int): ByteString = {
+    require(n <= 127) // or we need complex implementation
+    UnsafeByteOperations.unsafeWrap(new Array[Byte](n))
   }
 
 }

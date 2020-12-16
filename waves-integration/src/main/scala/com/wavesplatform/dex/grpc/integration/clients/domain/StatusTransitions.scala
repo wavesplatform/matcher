@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.grpc.integration.clients.domain
 
+import cats.kernel.Monoid
 import cats.syntax.semigroup._
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.clients.domain.BlockchainStatus._
@@ -7,8 +8,7 @@ import com.wavesplatform.dex.grpc.integration.clients.domain.StatusUpdate.LastBl
 import com.wavesplatform.dex.grpc.integration.clients.domain.WavesFork.Status
 import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeEvent.RolledBack.To
 import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeEvent._
-
-import scala.collection.immutable.Queue
+import com.wavesplatform.dex.meta.getSimpleName
 
 object StatusTransitions extends ScorexLogging {
 
@@ -17,13 +17,13 @@ object StatusTransitions extends ScorexLogging {
     val r = origStatus match {
       case origStatus: Normal =>
         event match {
-          case Appended(block, forgedTxIds) =>
+          case Appended(block) =>
             origStatus.main.withBlock(block) match {
               case Left(e) =>
                 log.error(s"Forcibly rollback, because of error: $e")
                 val fork = WavesFork.mkRolledBackByOne(origStatus.main)
                 StatusUpdate(
-                  newStatus = TransientRollback(fork, Queue.empty),
+                  newStatus = TransientRollback(fork, Monoid.empty[UtxUpdate]),
                   updatedLastBlockHeight = LastBlockHeight.RestartRequired(fork.height + 1)
                 )
 
@@ -34,7 +34,7 @@ object StatusTransitions extends ScorexLogging {
                   updatedLastBlockHeight =
                     if (block.tpe == WavesBlock.Type.FullBlock) LastBlockHeight.Updated(updatedFork.height)
                     else LastBlockHeight.NotChanged,
-                  processUtxEvents = if (forgedTxIds.isEmpty) Queue.empty else Queue(WavesNodeUtxEvent.Forged(forgedTxIds)),
+                  utxUpdate = UtxUpdate(forgedTxIds = block.forgedTxIds),
                   requestNextBlockchainEvent = true
                 )
             }
@@ -42,13 +42,14 @@ object StatusTransitions extends ScorexLogging {
           case UtxUpdated(newTxs, failedTxs) =>
             StatusUpdate(
               newStatus = origStatus,
-              processUtxEvents = Queue(WavesNodeUtxEvent.Updated(newTxs, failedTxs))
+              utxUpdate = UtxUpdate(unconfirmedTxs = newTxs, failedTxIds = failedTxs.map(_.id).toSet)
             )
 
           case UtxSwitched(newTxs) =>
+            // Normally won't happen
             StatusUpdate(
               newStatus = origStatus,
-              processUtxEvents = Queue(WavesNodeUtxEvent.Switched(newTxs))
+              utxUpdate = UtxUpdate(unconfirmedTxs = newTxs, resetCaches = true)
             )
 
           case RolledBack(to) => // This could happen during an appending of a new key block too
@@ -58,7 +59,7 @@ object StatusTransitions extends ScorexLogging {
                   case To.CommonBlockRef(ref) => WavesFork.mk(origStatus.main, ref)
                   case To.Height(h) => WavesFork.mk(origStatus.main, h)
                 },
-                utxEventsStash = Queue.empty
+                utxUpdate = Monoid.empty[UtxUpdate]
               ),
               requestNextBlockchainEvent = true
             )
@@ -71,31 +72,31 @@ object StatusTransitions extends ScorexLogging {
 
       case origStatus: TransientRollback =>
         event match {
-          case Appended(block, forgedTxIds) =>
-            val updatedUtxEventsStash =
-              if (forgedTxIds.isEmpty) Queue.empty
-              else origStatus.utxEventsStash.enqueue(WavesNodeUtxEvent.Forged(forgedTxIds))
-
+          case Appended(block) =>
             origStatus.fork.withBlock(block) match {
-              case Status.Resolved(activeChain, newChanges, lostDiffIndex) =>
-                if (lostDiffIndex.isEmpty)
+              case resolved: Status.Resolved =>
+                val finalUtxUpdate = origStatus.utxUpdate |+| UtxUpdate(
+                  forgedTxIds = resolved.forgedTxIds,
+                  failedTxIds = resolved.lostTxIds
+                )
+
+                if (resolved.lostDiffIndex.isEmpty)
                   StatusUpdate(
-                    newStatus = Normal(activeChain),
-                    updatedBalances = newChanges,
-                    updatedLastBlockHeight = LastBlockHeight.Updated(activeChain.height),
-                    processUtxEvents = updatedUtxEventsStash,
+                    newStatus = Normal(resolved.activeChain),
+                    updatedBalances = resolved.newChanges,
+                    updatedLastBlockHeight = LastBlockHeight.Updated(resolved.activeChain.height),
+                    utxUpdate = finalUtxUpdate,
                     requestNextBlockchainEvent = true
                   )
                 else
                   StatusUpdate(
                     newStatus = TransientResolving(
-                      main = activeChain,
-                      stashChanges = newChanges,
-                      utxEventsStash = updatedUtxEventsStash
+                      main = resolved.activeChain,
+                      stashChanges = resolved.newChanges,
+                      utxUpdate = finalUtxUpdate
                     ),
-                    requestBalances = lostDiffIndex,
-                    updatedLastBlockHeight = LastBlockHeight.NotChanged,
-                    processUtxEvents = Queue.empty
+                    requestBalances = resolved.lostDiffIndex,
+                    updatedLastBlockHeight = LastBlockHeight.NotChanged
                     // requestNextBlockchainEvent = true // Because we are waiting for DataReceived
                   )
 
@@ -103,7 +104,7 @@ object StatusTransitions extends ScorexLogging {
                 StatusUpdate(
                   newStatus = TransientRollback(
                     fork = updatedFork,
-                    utxEventsStash = updatedUtxEventsStash
+                    utxUpdate = origStatus.utxUpdate
                   ),
                   requestNextBlockchainEvent = true
                 )
@@ -113,18 +114,28 @@ object StatusTransitions extends ScorexLogging {
                 StatusUpdate(
                   newStatus = TransientRollback(
                     fork = updatedFork,
-                    utxEventsStash = origStatus.utxEventsStash // TODO DEX-1004 Hm we just dropped a transaction from the last block?
+                    utxUpdate = origStatus.utxUpdate
                   ),
                   updatedLastBlockHeight = LastBlockHeight.RestartRequired(updatedFork.height + 1)
                 )
             }
 
           case UtxUpdated(newTxs, failedTxs) =>
-            StatusUpdate(newStatus =
-              origStatus.copy(utxEventsStash = origStatus.utxEventsStash.enqueue(WavesNodeUtxEvent.Updated(newTxs, failedTxs))))
+            StatusUpdate(
+              newStatus = origStatus.copy(
+                utxUpdate = origStatus.utxUpdate |+| UtxUpdate(
+                  unconfirmedTxs = newTxs,
+                  failedTxIds = failedTxs.map(_.id).toSet
+                )
+              )
+            )
 
           case UtxSwitched(newTxs) =>
-            StatusUpdate(newStatus = origStatus.copy(utxEventsStash = origStatus.utxEventsStash.enqueue(WavesNodeUtxEvent.Switched(newTxs))))
+            StatusUpdate(
+              newStatus = origStatus.copy(
+                utxUpdate = UtxUpdate(unconfirmedTxs = newTxs, resetCaches = true) // Forget a previous
+              )
+            )
 
           case RolledBack(to) =>
             val fork = to match {
@@ -132,7 +143,7 @@ object StatusTransitions extends ScorexLogging {
               case To.Height(h) => origStatus.fork.rollbackTo(h)
             }
             StatusUpdate(
-              newStatus = origStatus.copy(fork = fork), // TODO DEX-1004 Not only update a fork ?
+              newStatus = origStatus.copy(fork = fork),
               requestNextBlockchainEvent = true
             )
 
@@ -148,20 +159,35 @@ object StatusTransitions extends ScorexLogging {
             StatusUpdate(
               newStatus = Normal(origStatus.main),
               updatedBalances = origStatus.stashChanges |+| updates,
-              processUtxEvents = origStatus.utxEventsStash,
+              utxUpdate = origStatus.utxUpdate,
               updatedLastBlockHeight = LastBlockHeight.Updated(origStatus.main.height),
               requestNextBlockchainEvent = true
             )
 
+          case UtxUpdated(newTxs, failedTxs) =>
+            StatusUpdate(
+              newStatus = origStatus.copy(
+                utxUpdate = origStatus.utxUpdate |+| UtxUpdate(
+                  unconfirmedTxs = newTxs,
+                  failedTxIds = failedTxs.map(_.id).toSet
+                )
+              )
+            )
+
+          case UtxSwitched(newTxs) =>
+            log.error("Unexpected UTxSwitched, reset utxUpdate")
+            StatusUpdate(
+              newStatus = origStatus.copy(
+                utxUpdate = UtxUpdate(unconfirmedTxs = newTxs, resetCaches = true) // Forget a previous
+              )
+            )
+
           case _ =>
             // Won't happen
-            log.error("Unexpected transition, ignore")
+            log.error(s"Unexpected ${getSimpleName(event)}, ignore")
             StatusUpdate(
               newStatus = origStatus,
-              requestNextBlockchainEvent = event match {
-                case _: UtxUpdated | _: UtxSwitched => false
-                case _ => true // If this really happen, we eventually fail to append a new block
-              }
+              requestNextBlockchainEvent = true // If this really happen, we eventually fail to append a new block
             )
         }
     }

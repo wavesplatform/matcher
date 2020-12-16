@@ -4,9 +4,7 @@ import java.util.concurrent.atomic.AtomicReference
 
 import cats.Monoid
 import cats.instances.long._
-import cats.instances.queue._
 import cats.instances.set._
-import cats.syntax.foldable._
 import cats.syntax.group._
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
@@ -20,7 +18,6 @@ import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.Upda
 import com.wavesplatform.dex.grpc.integration.clients.blockchainupdates.BlockchainUpdatesClient
 import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedWavesBlockchainClient._
 import com.wavesplatform.dex.grpc.integration.clients.domain.StatusUpdate.LastBlockHeight
-import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeEvent.WavesNodeUtxEvent
 import com.wavesplatform.dex.grpc.integration.clients.domain._
 import com.wavesplatform.dex.grpc.integration.clients.domain.portfolio.SynchronizedPessimisticPortfolios
 import com.wavesplatform.dex.grpc.integration.clients.matcherext.MatcherExtensionClient
@@ -31,11 +28,10 @@ import monix.execution.Scheduler
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 
-import scala.collection.immutable.Queue
 import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Success}
 import scala.util.chaining._
+import scala.util.{Failure, Success}
 
 class CombinedWavesBlockchainClient(
   settings: Settings,
@@ -75,7 +71,7 @@ class CombinedWavesBlockchainClient(
           if (x.requestNextBlockchainEvent) bClient.blockchainEvents.requestNext()
           requestBalances(x.requestBalances)
           val finalKnownBalances = knownBalances.updateAndGet(_ |+| x.updatedBalances)
-          val updatedPessimistic = processUtxEvents(x.processUtxEvents)
+          val updatedPessimistic = processUtxEvents(x.utxUpdate)
           val changedAddresses = finalKnownBalances.regular.keySet ++ finalKnownBalances.outLeases.keySet ++ updatedPessimistic
           val updatedFinalBalances = changedAddresses
             .map { address =>
@@ -106,15 +102,13 @@ class CombinedWavesBlockchainClient(
     }
     .doOnError(e => Task(log.error("Got an error in the combined stream", e)))
 
-  private def processUtxEvents(queue: Queue[WavesNodeUtxEvent]): Set[Address] = queue.foldMap(processUtxEvent)
-
   // TODO DEX-1013
-  private def processUtxEvent(event: WavesNodeUtxEvent): Set[Address] = event match {
-    case WavesNodeUtxEvent.Updated(newTxs, failedTxs) =>
-      pessimisticPortfolios.addPending(newTxs) |+| pessimisticPortfolios.removeFailed(failedTxs.map(_.id))
-    case WavesNodeUtxEvent.Forged(txIds) => pessimisticPortfolios.processForged(txIds)._1
-    case WavesNodeUtxEvent.Switched(newTxs) => pessimisticPortfolios.replaceWith(newTxs)
-  }
+  private def processUtxEvents(utxUpdate: UtxUpdate): Set[Address] =
+    if (utxUpdate.resetCaches) pessimisticPortfolios.replaceWith(utxUpdate.unconfirmedTxs)
+    else
+      pessimisticPortfolios.addPending(utxUpdate.unconfirmedTxs) |+|
+      pessimisticPortfolios.processForged(utxUpdate.forgedTxIds)._1 |+|
+      pessimisticPortfolios.removeFailed(utxUpdate.failedTxIds)
 
   // TODO DEX-1015
   private def requestBalances(x: DiffIndex): Unit =

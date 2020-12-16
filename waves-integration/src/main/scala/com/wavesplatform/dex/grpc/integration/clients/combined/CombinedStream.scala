@@ -9,9 +9,9 @@ import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeEvent
 import com.wavesplatform.dex.grpc.integration.clients.matcherext.{UtxEventConversions, UtxEventsControlledStream}
 import com.wavesplatform.dex.meta.getSimpleName
 import monix.eval.Task
-import monix.execution.Scheduler
+import monix.execution.{Ack, Scheduler}
+import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
-import monix.reactive.{Observable, OverflowStrategy}
 
 import scala.concurrent.duration.FiniteDuration
 import scala.util.Failure
@@ -80,15 +80,25 @@ class CombinedStream(
 
   utxEvents.systemStream
     .map(_.asLeft[SystemEvent])
-    .doOnComplete(Task(log.info(s"utxEvents completed")))
-    .doOnError(e => Task(log.error(s"utxEvents failed", e)))
-    .subscribe(mergedEvents)
+    .subscribe(
+      { x =>
+        mergedEvents.onNext(x)
+        Ack.Continue
+      },
+      e => log.error(s"utxEvents failed", e), // Won't happen
+      () => log.info(s"utxEvents completed") // We do this manually in finish()
+    )
 
   blockchainUpdates.systemStream
     .map(_.asRight[SystemEvent])
-    .doOnComplete(Task(log.info(s"utxEvents completed")))
-    .doOnError(e => Task(log.error(s"utxEvents failed", e)))
-    .subscribe(mergedEvents)
+    .subscribe(
+      { x =>
+        mergedEvents.onNext(x)
+        Ack.Continue
+      },
+      e => log.error(s"bu failed", e), // Won't happen
+      () => log.info(s"bu completed") // We do this manually in finish()
+    )
 
   // TODO DEX-1034
   def startFrom(height: Int): Unit = {
@@ -111,7 +121,7 @@ class CombinedStream(
 
   private def utxEventsTransitions(origStatus: Status, event: SystemEvent): Status = {
     def ignore(): Status = {
-      log.error(s"Unexpected transition $origStatus + $event, ignore")
+      log.error(s"utx: Unexpected transition $origStatus + $event, ignore")
       origStatus
     }
 
@@ -187,7 +197,7 @@ class CombinedStream(
 
   private def blockchainEventsTransitions(origStatus: Status, event: SystemEvent): Status = {
     def ignore(): Status = {
-      log.error(s"Unexpected transition $origStatus + $event, ignore")
+      log.error(s"bu: Unexpected transition $origStatus + $event, ignore")
       origStatus
     }
 

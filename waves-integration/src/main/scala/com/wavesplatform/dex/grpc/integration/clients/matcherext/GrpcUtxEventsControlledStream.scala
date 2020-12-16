@@ -1,5 +1,7 @@
 package com.wavesplatform.dex.grpc.integration.clients.matcherext
 
+import java.util.concurrent.atomic.AtomicBoolean
+
 import cats.syntax.option._
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.dex.domain.utils.ScorexLogging
@@ -58,13 +60,22 @@ class GrpcUtxEventsControlledStream(channel: ManagedChannel)(implicit scheduler:
 
   private class UtxEventObserver(call: ClientCall[Empty, UtxEvent]) extends ClosingObserver[Empty, UtxEvent] {
 
+    private val ready = new AtomicBoolean(false)
+
     override def onReady(): Unit = {
-      internalSystemStream.onNext(SystemEvent.BecameReady)
       val address = Option(call.getAttributes.get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR)).fold("unknown")(_.toString)
       log.info(s"Getting utx events from $address")
     }
 
-    override def onNext(value: UtxEvent): Unit = internalStream.onNext(value)
+    override def onNext(value: UtxEvent): Unit = {
+      internalStream.onNext(value)
+
+      // To guarantee UtxSwitch before readiness and thus before resolving a temporary rollback (StatusTransitions)
+      if (ready.compareAndSet(false, true)) {
+        if (!value.`type`.isSwitch) log.error(s"Expected UtxSwitch, received: ${value.`type`}")
+        internalSystemStream.onNext(SystemEvent.BecameReady)
+      }
+    }
 
     override def onError(e: Throwable): Unit = if (!isClosed) {
       log.warn(s"Got an error in utx events", e)

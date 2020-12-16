@@ -379,7 +379,7 @@ object TankGenerator {
       }
 
     Random
-      .shuffle(massTransfers.flatten).map { mt =>
+      .shuffle(massTransfers.flatten.toList).map { mt =>
         Request(
           RequestType.POST,
           s"/transactions/broadcast",

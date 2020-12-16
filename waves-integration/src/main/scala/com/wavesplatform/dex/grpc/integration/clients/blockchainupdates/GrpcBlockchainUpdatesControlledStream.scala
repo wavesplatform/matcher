@@ -2,7 +2,6 @@ package com.wavesplatform.dex.grpc.integration.clients.blockchainupdates
 
 import cats.syntax.option._
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.grpc.integration.clients.ControlledStream
 import com.wavesplatform.dex.grpc.integration.clients.ControlledStream.SystemEvent
 import com.wavesplatform.dex.grpc.observers.IntegrationObserver
 import com.wavesplatform.events.api.grpc.protobuf.{BlockchainUpdatesApiGrpc, SubscribeEvent, SubscribeRequest}
@@ -22,10 +21,10 @@ class GrpcBlockchainUpdatesControlledStream(channel: ManagedChannel)(implicit sc
     with ScorexLogging {
   @volatile private var grpcObserver: Option[BlockchainUpdatesObserver] = None
 
-  private val internalStream = ConcurrentSubject.replayLimited[SubscribeEvent](10)
+  private val internalStream = ConcurrentSubject.publish[SubscribeEvent] // .replayLimited[SubscribeEvent](10)
   override val stream: Observable[SubscribeEvent] = internalStream // .publish // See GrpcUtxEventsControlledStream
 
-  private val internalSystemStream = ConcurrentSubject.replayLimited[SystemEvent](10)
+  private val internalSystemStream = ConcurrentSubject.publish[SystemEvent] // .replayLimited[SystemEvent](10)
   override val systemStream: Observable[SystemEvent] = internalSystemStream // .publish
 
   override def startFrom(height: Int): Unit = {
@@ -43,14 +42,14 @@ class GrpcBlockchainUpdatesControlledStream(channel: ManagedChannel)(implicit sc
   override def stop(): Unit = if (grpcObserver.nonEmpty) {
     log.info("Stopping balance updates stream")
     stopGrpcObserver()
-    internalSystemStream.onNext(ControlledStream.SystemEvent.Stopped)
+    internalSystemStream.onNext(SystemEvent.Stopped)
   }
 
   override def close(): Unit = {
     log.info("Closing balance updates stream")
     stopGrpcObserver()
     internalStream.onComplete()
-    internalSystemStream.onNext(ControlledStream.SystemEvent.Closed)
+    internalSystemStream.onNext(SystemEvent.Closed)
     internalSystemStream.onComplete()
   }
 
@@ -63,14 +62,14 @@ class GrpcBlockchainUpdatesControlledStream(channel: ManagedChannel)(implicit sc
       extends IntegrationObserver[SubscribeRequest, SubscribeEvent](internalStream) {
 
     override def onReady(): Unit = {
-      internalSystemStream.onNext(ControlledStream.SystemEvent.BecameReady)
+      internalSystemStream.onNext(SystemEvent.BecameReady)
       val address = Option(call.getAttributes.get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR)).fold("unknown")(_.toString)
       log.info(s"Getting blockchain events from $address starting from $startHeight")
     }
 
     override def onError(e: Throwable): Unit = if (!isClosed) {
       log.warn(s"Got an error in blockchain events", e)
-      internalSystemStream.onNext(ControlledStream.SystemEvent.Stopped)
+      internalSystemStream.onNext(SystemEvent.Stopped)
     }
 
     override def onCompleted(): Unit = log.error("Unexpected onCompleted")

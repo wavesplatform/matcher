@@ -66,22 +66,29 @@ class CombinedStream(
       case _ => log.info("utxEvents completed")
     }
 
-  val lastStatus = Observable(
-    utxEvents.systemStream.map(_.asLeft[SystemEvent]),
-    blockchainUpdates.systemStream.map(_.asRight[SystemEvent])
-  ).merge[Either[SystemEvent, SystemEvent]](implicitly, OverflowStrategy.Unbounded)
+  private val mergedEvents = ConcurrentSubject.publish[Either[SystemEvent, SystemEvent]]
+
+  val lastStatus = mergedEvents
     .foldLeft[Status](Status.Starting()) {
       case (orig, Left(evt)) => utxEventsTransitions(orig, evt).tap(updated => log.info(s"utx: $orig + $evt -> $updated"))
       case (orig, Right(evt)) => blockchainEventsTransitions(orig, evt).tap(updated => log.info(s"bu: $orig + $evt -> $updated"))
     }
-    .doOnComplete {
-      Task(log.info(s"lastStatus completed"))
-    }
-    .doOnError { e =>
-      Task(log.error(s"lastStatus failed", e))
-    }
+    .doOnComplete(Task(log.info(s"lastStatus completed")))
+    .doOnError(e => Task(log.error(s"lastStatus failed", e)))
     .lastL
     .runToFuture
+
+  utxEvents.systemStream
+    .map(_.asLeft[SystemEvent])
+    .doOnComplete(Task(log.info(s"utxEvents completed")))
+    .doOnError(e => Task(log.error(s"utxEvents failed", e)))
+    .subscribe(mergedEvents)
+
+  blockchainUpdates.systemStream
+    .map(_.asRight[SystemEvent])
+    .doOnComplete(Task(log.info(s"utxEvents completed")))
+    .doOnError(e => Task(log.error(s"utxEvents failed", e)))
+    .subscribe(mergedEvents)
 
   // TODO DEX-1034
   def startFrom(height: Int): Unit = {
@@ -259,6 +266,7 @@ class CombinedStream(
   private def finish(): Unit = {
     log.info("Finished")
     internalStream.onComplete()
+    mergedEvents.onComplete()
   }
 
 }

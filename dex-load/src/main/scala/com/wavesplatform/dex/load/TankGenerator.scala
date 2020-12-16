@@ -373,12 +373,13 @@ object TankGenerator {
 
     waitForHeightArise()
 
-    val massTransfers = assetOwners.map { case (assetOwner, asset) =>
-      mkMassTransfer((allRecipients - assetOwner).map(recipient => Transfer.to(recipient.address(), 1000000L)).toList, AssetId.as(asset))
-    }
+    val massTransfers =
+      for (_ <- 0 to requestCount / 100) yield assetOwners.map { case (assetOwner, asset) =>
+        mkMassTransfer((allRecipients - assetOwner).map(recipient => Transfer.to(recipient.address(), 1000000L)).toList, AssetId.as(asset))
+      }
 
     Random
-      .shuffle(massTransfers).map { mt =>
+      .shuffle(massTransfers.flatten).map { mt =>
         Request(
           RequestType.POST,
           s"/transactions/broadcast",

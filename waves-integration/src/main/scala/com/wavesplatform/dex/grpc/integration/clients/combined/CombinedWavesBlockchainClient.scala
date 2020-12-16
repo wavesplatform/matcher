@@ -35,6 +35,7 @@ import scala.collection.immutable.Queue
 import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
+import scala.util.chaining._
 
 class CombinedWavesBlockchainClient(
   settings: Settings,
@@ -53,56 +54,57 @@ class CombinedWavesBlockchainClient(
 
   private val dataUpdates = ConcurrentSubject.publish[WavesNodeEvent]
 
-  override val updates: Observable[Updates] = Observable.fromFuture(meClient.currentBlockInfo).flatMap { startBlockInfo =>
-    val startHeight = math.max(startBlockInfo.height - settings.maxRollbackHeight - 1, 1)
+  override val updates: Observable[Updates] = Observable.fromFuture(meClient.currentBlockInfo)
+    .flatMap { startBlockInfo =>
+      log.info(s"Current block: $startBlockInfo")
+      val startHeight = math.max(startBlockInfo.height - settings.maxRollbackHeight - 1, 1)
 
-    val finalBalance = mutable.Map.empty[Address, Map[Asset, Long]]
-    val init: BlockchainStatus = BlockchainStatus.Normal(WavesChain(Vector.empty, startHeight, settings.maxRollbackHeight + 1))
+      val finalBalance = mutable.Map.empty[Address, Map[Asset, Long]]
+      val init: BlockchainStatus = BlockchainStatus.Normal(WavesChain(Vector.empty, startHeight, settings.maxRollbackHeight + 1))
 
-    val combinedStream = new CombinedStream(settings.combinedStream, bClient.blockchainEvents, meClient.utxEvents)
-    combinedStream.startFrom(startHeight)
-
-    Observable(dataUpdates, combinedStream.stream)
-      .merge
-      .mapAccumulate(init) { case (origStatus, event) =>
-        val x = StatusTransitions(origStatus, event)
-        x.updatedLastBlockHeight match {
-          case LastBlockHeight.Updated(to) => combinedStream.updateHeightHint(to)
-          case LastBlockHeight.RestartRequired(from) => combinedStream.restartFrom(from)
-          case _ =>
-        }
-        if (x.requestNextBlockchainEvent) bClient.blockchainEvents.requestNext()
-        requestBalances(x.requestBalances)
-        val finalKnownBalances = knownBalances.updateAndGet(_ |+| x.updatedBalances)
-        val updatedPessimistic = processUtxEvents(x.processUtxEvents)
-        val changedAddresses = finalKnownBalances.regular.keySet ++ finalKnownBalances.outLeases.keySet ++ updatedPessimistic
-        val updatedFinalBalances = changedAddresses
-          .map { address =>
-            address -> combineBalances(
-              updatedRegular = x.updatedBalances.regular.getOrElse(address, Map.empty),
-              updatedOutLease = x.updatedBalances.outLeases.get(address).fold(Map.empty[Asset, Long])(x => Map(Waves -> x)),
-              // TODO DEX-1013
-              updatedPessimistic = if (updatedPessimistic.contains(address)) pessimisticPortfolios.getAggregated(address) else Map.empty,
-              finalRegular = finalKnownBalances.regular.getOrElse(address, Map.empty),
-              finalOutLease = finalKnownBalances.outLeases.get(address).fold(Map.empty[Asset, Long])(x => Map(Waves -> x)),
-              finalPessimistic = pessimisticPortfolios.getAggregated(address)
-            )
+      val combinedStream = new CombinedStream(settings.combinedStream, bClient.blockchainEvents, meClient.utxEvents)
+      Observable(dataUpdates, combinedStream.stream)
+        .merge
+        .mapAccumulate(init) { case (origStatus, event) =>
+          val x = StatusTransitions(origStatus, event)
+          x.updatedLastBlockHeight match {
+            case LastBlockHeight.Updated(to) => combinedStream.updateHeightHint(to)
+            case LastBlockHeight.RestartRequired(from) => combinedStream.restartFrom(from)
+            case _ =>
           }
-          .toMap
-        (x.newStatus, updatedFinalBalances)
-      }
-      .filter(_.nonEmpty)
-      .map { updated => // TODO DEX-1014
-        updated.filter { case (address, updatedBalance) =>
-          val prev = finalBalance.getOrElse(address, Map.empty).filter { case (k, _) => updatedBalance.contains(k) }
-          val same = prev == updatedBalance
-          if (!same) finalBalance.update(address, prev ++ updatedBalance)
-          !same
+          if (x.requestNextBlockchainEvent) bClient.blockchainEvents.requestNext()
+          requestBalances(x.requestBalances)
+          val finalKnownBalances = knownBalances.updateAndGet(_ |+| x.updatedBalances)
+          val updatedPessimistic = processUtxEvents(x.processUtxEvents)
+          val changedAddresses = finalKnownBalances.regular.keySet ++ finalKnownBalances.outLeases.keySet ++ updatedPessimistic
+          val updatedFinalBalances = changedAddresses
+            .map { address =>
+              address -> combineBalances(
+                updatedRegular = x.updatedBalances.regular.getOrElse(address, Map.empty),
+                updatedOutLease = x.updatedBalances.outLeases.get(address).fold(Map.empty[Asset, Long])(x => Map(Waves -> x)),
+                // TODO DEX-1013
+                updatedPessimistic = if (updatedPessimistic.contains(address)) pessimisticPortfolios.getAggregated(address) else Map.empty,
+                finalRegular = finalKnownBalances.regular.getOrElse(address, Map.empty),
+                finalOutLease = finalKnownBalances.outLeases.get(address).fold(Map.empty[Asset, Long])(x => Map(Waves -> x)),
+                finalPessimistic = pessimisticPortfolios.getAggregated(address)
+              )
+            }
+            .toMap
+          (x.newStatus, updatedFinalBalances)
         }
-      }
-      .doOnError(e => Task(log.error("Got an error in the combined stream", e)))
-      .map(Updates(_))
-  }
+        .filter(_.nonEmpty)
+        .map { updated => // TODO DEX-1014
+          updated.filter { case (address, updatedBalance) =>
+            val prev = finalBalance.getOrElse(address, Map.empty).filter { case (k, _) => updatedBalance.contains(k) }
+            val same = prev == updatedBalance
+            if (!same) finalBalance.update(address, prev ++ updatedBalance)
+            !same
+          }
+        }
+        .map(Updates(_))
+        .tap(_ => combinedStream.startFrom(startHeight))
+    }
+    .doOnError(e => Task(log.error("Got an error in the combined stream", e)))
 
   private def processUtxEvents(queue: Queue[WavesNodeUtxEvent]): Set[Address] = queue.foldMap(processUtxEvent)
 

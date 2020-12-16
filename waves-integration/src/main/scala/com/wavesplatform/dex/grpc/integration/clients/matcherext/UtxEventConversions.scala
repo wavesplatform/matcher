@@ -20,7 +20,7 @@ object UtxEventConversions extends ScorexLogging {
             }
         }
       }
-      if (event.added.isEmpty && failedTxs.isEmpty) none
+      if (event.added.isEmpty && event.removed.isEmpty) none
       else WavesNodeEvent.UtxUpdated(event.added.flatMap(_.transaction), failedTxs).some
     case _ => none
   }

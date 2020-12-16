@@ -21,22 +21,24 @@ class GrpcUtxEventsControlledStream(channel: ManagedChannel)(implicit scheduler:
     with ScorexLogging {
   @volatile private var grpcObserver: Option[UtxEventObserver] = None
 
-  private val internalStream = ConcurrentSubject.publish[UtxEvent]
-  override val stream: Observable[UtxEvent] = internalStream
+  private val internalStream = ConcurrentSubject.replayLimited[UtxEvent](10)
+  // HACK: Monix skips the first few messages! So we have to turn it into a hot
+  override val stream: Observable[UtxEvent] = internalStream // .publish
 
-  private val internalSystemStream = ConcurrentSubject.publish[SystemEvent]
-  override val systemStream: Observable[ControlledStream.SystemEvent] = internalSystemStream
+  private val internalSystemStream = ConcurrentSubject.replayLimited[SystemEvent](10)
+  override val systemStream: Observable[ControlledStream.SystemEvent] = internalSystemStream // .publish
 
   private val empty: Empty = Empty()
 
   override def start(): Unit = {
+    log.info("Connecting to UTX stream")
     val call = channel.newCall(WavesBlockchainApiGrpc.METHOD_GET_UTX_EVENTS, CallOptions.DEFAULT.withWaitForReady()) // TODO DEX-1001
     val observer = new UtxEventObserver(call)
     grpcObserver = observer.some
     ClientCalls.asyncServerStreamingCall(call, empty, observer)
   }
 
-  override def stop(): Unit = {
+  override def stop(): Unit = if (grpcObserver.nonEmpty) {
     log.info("Stopping utx events stream")
     stopGrpcObserver()
     internalSystemStream.onNext(ControlledStream.SystemEvent.Stopped)
@@ -44,9 +46,10 @@ class GrpcUtxEventsControlledStream(channel: ManagedChannel)(implicit scheduler:
 
   override def close(): Unit = {
     log.info("Closing utx events stream")
+    stopGrpcObserver()
     internalStream.onComplete()
     internalSystemStream.onNext(ControlledStream.SystemEvent.Closed)
-    stopGrpcObserver()
+    internalSystemStream.onComplete()
   }
 
   private def stopGrpcObserver(): Unit = {
@@ -57,8 +60,9 @@ class GrpcUtxEventsControlledStream(channel: ManagedChannel)(implicit scheduler:
   private class UtxEventObserver(call: ClientCall[Empty, UtxEvent]) extends ClosingObserver[Empty, UtxEvent] {
 
     override def onReady(): Unit = {
-      log.info(s"Getting utx events from ${call.getAttributes.get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR)}")
       internalSystemStream.onNext(ControlledStream.SystemEvent.BecameReady)
+      val address = Option(call.getAttributes.get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR)).fold("unknown")(_.toString)
+      log.info(s"Getting utx events from $address")
     }
 
     override def onNext(value: UtxEvent): Unit = internalStream.onNext(value)

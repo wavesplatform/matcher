@@ -1,18 +1,28 @@
 package com.wavesplatform.dex.grpc.integration.clients.combined
 
-import java.util.concurrent.atomic.AtomicBoolean
-
+import cats.syntax.either._
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.grpc.integration.clients.ControlledStream
+import com.wavesplatform.dex.grpc.integration.clients.ControlledStream.SystemEvent
 import com.wavesplatform.dex.grpc.integration.clients.blockchainupdates.{BlockchainUpdatesControlledStream, BlockchainUpdatesConversions}
+import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedStream.Status
 import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeEvent
 import com.wavesplatform.dex.grpc.integration.clients.matcherext.{UtxEventConversions, UtxEventsControlledStream}
+import com.wavesplatform.dex.meta.getSimpleName
+import monix.eval.Task
 import monix.execution.Scheduler
-import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
+import monix.reactive.{Observable, OverflowStrategy}
 
 import scala.concurrent.duration.FiniteDuration
+import scala.util.Failure
+import scala.util.chaining._
 
+/**
+ * During reconnects we need to:
+ * 1. Notify that the connection failed and switch the system to the TransientRollback state
+ * 2. Recover the UTX stream, so UTX events will be stashed
+ * 3. Recover the blockchain updates stream
+ */
 class CombinedStream(
   settings: CombinedStream.Settings,
   blockchainUpdates: BlockchainUpdatesControlledStream,
@@ -23,14 +33,6 @@ class CombinedStream(
   // Note, it is not a processed height! A less value could be emitted to control
   @volatile private var heightHint = 1
 
-  @volatile private var recoverOnlyBlockchainUpdates = false
-
-  private val blockchainUpdatesStopped = new AtomicBoolean(true)
-  private val utxEventsStopped = new AtomicBoolean(true)
-
-  private val blockchainUpdatesClosed = new AtomicBoolean(false)
-  private val utxEventsClosed = new AtomicBoolean(false)
-
   private val internalStream = ConcurrentSubject.publish[WavesNodeEvent]
   val stream: Observable[WavesNodeEvent] = internalStream
 
@@ -38,59 +40,54 @@ class CombinedStream(
     if (settings.restartDelay.length == 0) { f => f() }
     else f => scheduler.scheduleOnce(settings.restartDelay)(f())
 
-  utxEvents.systemStream.foreach {
-    case ControlledStream.SystemEvent.BecameReady =>
-      utxEventsStopped.compareAndSet(true, false)
-
-    case ControlledStream.SystemEvent.Stopped =>
-      if (utxEventsStopped.compareAndSet(false, true))
-        if (blockchainUpdatesStopped.get) recover()
-        else blockchainUpdates.stop()
-
-    case ControlledStream.SystemEvent.Closed =>
-      if (utxEventsClosed.compareAndSet(false, true))
-        if (blockchainUpdatesClosed.get) finish()
-        else blockchainUpdates.close()
-  }
-
-  blockchainUpdates.systemStream.foreach {
-    case ControlledStream.SystemEvent.BecameReady =>
-      if (blockchainUpdatesStopped.compareAndSet(true, false) && utxEventsStopped.get)
-        utxEvents.start()
-
-    case ControlledStream.SystemEvent.Stopped =>
-      if (blockchainUpdatesStopped.compareAndSet(false, true))
-        if (utxEventsStopped.get || recoverOnlyBlockchainUpdates) recover()
-        else utxEvents.stop()
-
-    case ControlledStream.SystemEvent.Closed =>
-      if (blockchainUpdatesClosed.compareAndSet(false, true))
-        if (utxEventsClosed.get) finish()
-        else utxEvents.close()
-  }
-
-  blockchainUpdates.stream.foreach { evt =>
-    evt.update.flatMap(BlockchainUpdatesConversions.toEvent) match {
-      case Some(x) => internalStream.onNext(x)
-      case None =>
-        log.warn(s"Can't convert $evt to a domain event, asking next")
-        blockchainUpdates.requestNext()
+  blockchainUpdates.stream
+    .foreach { evt =>
+      evt.update.flatMap(BlockchainUpdatesConversions.toEvent) match {
+        case Some(x) => internalStream.onNext(x)
+        case None =>
+          log.error(s"Can't convert $evt to a domain event, asking next")
+          blockchainUpdates.requestNext()
+      }
     }
-  }
-
-  utxEvents.stream.foreach { evt =>
-    UtxEventConversions.toEvent(evt) match {
-      case Some(x) => internalStream.onNext(x)
-      case None =>
-        log.warn(s"Can't convert $evt to a domain event")
-        blockchainUpdates.requestNext()
+    .onComplete {
+      case Failure(e) => log.error("blockchainUpdates failed", e)
+      case _ => log.info("blockchainUpdates completed")
     }
-  }
+
+  utxEvents.stream
+    .foreach { evt =>
+      UtxEventConversions.toEvent(evt) match {
+        case Some(x) => internalStream.onNext(x)
+        case None => log.error(s"Can't convert $evt to a domain event")
+      }
+    }
+    .onComplete {
+      case Failure(e) => log.error("utxEvents failed", e)
+      case _ => log.info("utxEvents completed")
+    }
+
+  val lastStatus = Observable(
+    utxEvents.systemStream.map(_.asLeft[SystemEvent]),
+    blockchainUpdates.systemStream.map(_.asRight[SystemEvent])
+  ).merge[Either[SystemEvent, SystemEvent]](implicitly, OverflowStrategy.Unbounded)
+    .foldLeft[Status](Status.Starting()) {
+      case (orig, Left(evt)) => utxEventsTransitions(orig, evt).tap(updated => log.info(s"utx: $orig + $evt -> $updated"))
+      case (orig, Right(evt)) => blockchainEventsTransitions(orig, evt).tap(updated => log.info(s"bu: $orig + $evt -> $updated"))
+    }
+    .doOnComplete {
+      Task(log.info(s"lastStatus completed"))
+    }
+    .doOnError { e =>
+      Task(log.error(s"lastStatus failed", e))
+    }
+    .lastL
+    .runToFuture
 
   // TODO DEX-1034
   def startFrom(height: Int): Unit = {
+    log.info(s"Starting from $height")
     updateHeightHint(height)
-    blockchainUpdates.startFrom(height)
+    utxEvents.start()
   }
 
   def updateHeightHint(height: Int): Unit =
@@ -100,30 +97,191 @@ class CombinedStream(
 
   def restartFrom(height: Int): Unit = {
     updateHeightHint(height)
-    /* No need to restart UTX, because:
-      1. All streams operate normally
-      2. We force a roll back during recover(), so UTX events will be stashed */
-    recoverOnlyBlockchainUpdates = true
 
     // Self-healed above
     runWithDelay(() => blockchainUpdates.stop())
   }
 
-  private def recover(): Unit = {
-    recoverOnlyBlockchainUpdates = false
+  private def utxEventsTransitions(origStatus: Status, event: SystemEvent): Status = {
+    def ignore(): Status = {
+      log.error(s"Unexpected transition $origStatus + $event, ignore")
+      origStatus
+    }
 
-    // Note, heightHint remains
-    val rollbackHeight = math.max(1, heightHint - 1)
-    val restartHeight = heightHint
+    origStatus match {
+      case origStatus: Status.Starting =>
+        event match {
+          case SystemEvent.BecameReady =>
+            if (origStatus.utxEvents) ignore()
+            else if (origStatus.oneDone) Status.Working
+            else {
+              blockchainUpdates.startFrom(heightHint)
+              origStatus.copy(utxEvents = true)
+            }
 
-    internalStream.onNext(WavesNodeEvent.RolledBack(WavesNodeEvent.RolledBack.To.Height(rollbackHeight)))
-    runWithDelay(() => blockchainUpdates.startFrom(restartHeight))
+          case SystemEvent.Stopped =>
+            // Stopping, because we doesn't know, it is an issue of a server, or just this connection.
+            // In the second case, blockchainUpdates will be closed by itself.
+            // So we are expecting blockchainUpdates will be stopped by itself or our request.
+            blockchainUpdates.stop()
+            Status.Stopping(utxEvents = true)
+
+          case SystemEvent.Closed =>
+            blockchainUpdates.close()
+            Status.Closing(utxEvents = true)
+        }
+
+      case origStatus: Status.Stopping =>
+        event match {
+          case SystemEvent.BecameReady => ignore()
+
+          case SystemEvent.Stopped =>
+            if (origStatus.utxEvents) ignore()
+            else if (origStatus.oneDone) {
+              recover()
+              Status.Starting()
+            } else {
+              blockchainUpdates.stop()
+              origStatus.copy(utxEvents = true)
+            }
+
+          case SystemEvent.Closed =>
+            blockchainUpdates.close()
+            Status.Closing(utxEvents = true)
+        }
+
+      case Status.Working =>
+        event match {
+          case SystemEvent.BecameReady => ignore()
+
+          case SystemEvent.Stopped =>
+            // See Starting + Stopped
+            blockchainUpdates.stop()
+            Status.Stopping(utxEvents = true)
+
+          case SystemEvent.Closed =>
+            blockchainUpdates.close()
+            Status.Closing(utxEvents = true)
+        }
+
+      case origStatus: Status.Closing =>
+        event match {
+          case SystemEvent.Closed =>
+            if (origStatus.utxEvents) ignore()
+            else {
+              if (origStatus.oneDone) finish()
+              origStatus.copy(utxEvents = true)
+            }
+
+          case _ => ignore()
+        }
+    }
   }
 
-  private def finish(): Unit = internalStream.onComplete()
+  private def blockchainEventsTransitions(origStatus: Status, event: SystemEvent): Status = {
+    def ignore(): Status = {
+      log.error(s"Unexpected transition $origStatus + $event, ignore")
+      origStatus
+    }
+
+    origStatus match {
+      case origStatus: Status.Starting =>
+        event match {
+          case SystemEvent.BecameReady =>
+            if (origStatus.blockchainUpdates) ignore()
+            else if (origStatus.oneDone) Status.Working
+            else origStatus.copy(blockchainUpdates = true)
+
+          case SystemEvent.Stopped =>
+            // See utxEventsTransitions: Starting + Stopped
+            utxEvents.stop()
+            Status.Stopping(blockchainUpdates = true)
+
+          case SystemEvent.Closed =>
+            utxEvents.close()
+            Status.Closing(blockchainUpdates = true)
+        }
+
+      case origStatus: Status.Stopping =>
+        event match {
+          case SystemEvent.BecameReady => ignore()
+
+          case SystemEvent.Stopped =>
+            if (origStatus.blockchainUpdates) ignore()
+            else if (origStatus.oneDone) {
+              recover()
+              Status.Starting()
+            } else {
+              utxEvents.stop()
+              origStatus.copy(blockchainUpdates = true)
+            }
+
+          case SystemEvent.Closed =>
+            utxEvents.close()
+            Status.Closing(blockchainUpdates = true)
+        }
+
+      case Status.Working =>
+        event match {
+          case SystemEvent.BecameReady => ignore()
+
+          case SystemEvent.Stopped =>
+            // See utxEventsTransitions: Starting + Stopped
+            utxEvents.stop()
+            Status.Stopping(blockchainUpdates = true)
+
+          case SystemEvent.Closed =>
+            utxEvents.close()
+            Status.Closing(blockchainUpdates = true)
+        }
+
+      case origStatus: Status.Closing =>
+        event match {
+          case SystemEvent.Closed =>
+            if (origStatus.blockchainUpdates) ignore()
+            else {
+              if (origStatus.oneDone) finish()
+              origStatus.copy(blockchainUpdates = true)
+            }
+
+          case _ => ignore()
+        }
+    }
+  }
+
+  private def recover(): Unit = {
+    // Note, heightHint remains
+    val rollbackHeight = math.max(1, heightHint - 1)
+    internalStream.onNext(WavesNodeEvent.RolledBack(WavesNodeEvent.RolledBack.To.Height(rollbackHeight)))
+    runWithDelay(() => utxEvents.start())
+  }
+
+  private def finish(): Unit = {
+    log.info("Finished")
+    internalStream.onComplete()
+  }
 
 }
 
 object CombinedStream {
   case class Settings(restartDelay: FiniteDuration)
+
+  trait Status extends Product with Serializable
+
+  object Status {
+
+    sealed trait HasStreams {
+      def blockchainUpdates: Boolean
+      def utxEvents: Boolean
+
+      def oneDone: Boolean = blockchainUpdates || utxEvents
+      override def toString: String = s"${getSimpleName(this)}(b=$blockchainUpdates, u=$utxEvents)"
+    }
+
+    case class Starting(blockchainUpdates: Boolean = false, utxEvents: Boolean = false) extends Status with HasStreams
+    case class Stopping(blockchainUpdates: Boolean = false, utxEvents: Boolean = false) extends Status with HasStreams
+    case class Closing(blockchainUpdates: Boolean = false, utxEvents: Boolean = false) extends Status with HasStreams
+    case object Working extends Status
+  }
+
 }

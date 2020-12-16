@@ -30,10 +30,12 @@ import io.grpc.stub.{ServerCallStreamObserver, StreamObserver}
 import io.grpc.{Metadata, Status, StatusRuntimeException}
 import monix.eval.Task
 import monix.execution.Scheduler
+import monix.reactive.Observable
+import monix.reactive.subjects.ConcurrentSubject
 import shapeless.Coproduct
 
+import scala.collection.concurrent.TrieMap
 import scala.concurrent.Future
-import scala.jdk.CollectionConverters._
 import scala.util.Try
 import scala.util.control.NonFatal
 
@@ -43,9 +45,11 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
 
   private val descKey = Metadata.Key.of("desc", Metadata.ASCII_STRING_MARSHALLER)
 
-  private val utxState = new ConcurrentHashMap[ByteStr, UtxTransaction]()
+  private val utxState = new TrieMap[ByteStr, UtxTransaction]()
 
   private val utxChangesSubscribers = ConcurrentHashMap.newKeySet[StreamObserver[UtxEvent]](2)
+
+  private val initialEvents = ConcurrentSubject.publish[(StreamObserver[UtxEvent], UtxEvent)]
 
   private val cleanupTask: Task[Unit] = Task {
     log.info("Closing balance changes stream...")
@@ -55,62 +59,64 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
     metadata.put(descKey, "Shutting down")
     val shutdownError = new StatusRuntimeException(Status.UNAVAILABLE, metadata) // Because it should try to connect to other DEX Extension
 
-    utxChangesSubscribers.forEach(_.onError(shutdownError))
+    withUtxChangesSubscribers("send onError", _.onError(shutdownError))
     utxChangesSubscribers.clear()
   }
 
   // TODO DEX-994
   private def getSimpleName(x: Any): String = x.getClass.getName.replaceAll(".*?(\\w+)\\$?$", "$1")
 
-  private val utxBalanceUpdates = context.utxEvents
+  private val utxBalanceUpdates = Observable(
+    initialEvents.map(_.asLeft[com.wavesplatform.events.UtxEvent]),
+    context.utxEvents.map(_.asRight[(StreamObserver[UtxEvent], UtxEvent)])
+  ).merge
     .doOnSubscriptionCancel(cleanupTask)
     .doOnComplete(cleanupTask)
     .doOnError(e => Task(log.error("Error in real time balance changes stream occurred!", e)))
     .foreach {
-      case TxAdded(tx, diff) =>
-        val utxTransaction = UtxTransaction(
-          id = tx.id().toPB,
-          transaction = tx.toPB.some,
-          diff = diff.toPB.some
-        )
+      case Left((observer, evt)) => observer.onNext(evt) // See getUtxEvents
 
-        utxState.put(tx.id(), utxTransaction)
-
-        val event = UtxEvent(
-          UtxEvent.Type.Update(
-            UtxEvent.Update(
-              added = List(UtxEvent.Update.Added(utxTransaction.some))
+      case Right(evt) =>
+        evt match {
+          case TxAdded(tx, diff) =>
+            val utxTransaction = UtxTransaction(
+              id = tx.id().toPB,
+              transaction = tx.toPB.some,
+              diff = diff.toPB.some
             )
-          )
-        )
 
-        utxChangesSubscribers.forEach { subscriber =>
-          try subscriber.onNext(event)
-          catch { case e: Throwable => log.warn(s"Can't send balance changes to $subscriber", e) }
-        }
-
-      case TxRemoved(tx, reason) =>
-        Option(utxState.remove(tx.id())) match {
-          case None => log.debug(s"Can't find removed ${tx.id()} with reason: $reason")
-          case Some(utxTransaction) =>
-            val gReason = reason.map { x =>
-              UtxEvent.Update.Removed.Reason(
-                name = getSimpleName(x),
-                message = x.toString
-              )
-            }
+            utxState.put(tx.id(), utxTransaction)
 
             val event = UtxEvent(
               UtxEvent.Type.Update(
                 UtxEvent.Update(
-                  removed = List(UtxEvent.Update.Removed(utxTransaction.some, gReason))
+                  added = List(UtxEvent.Update.Added(utxTransaction.some))
                 )
               )
             )
 
-            utxChangesSubscribers.forEach { subscriber =>
-              try subscriber.onNext(event)
-              catch { case e: Throwable => log.warn(s"Can't send balance changes to $subscriber", e) }
+            withUtxChangesSubscribers("send next", _.onNext(event))
+
+          case TxRemoved(tx, reason) =>
+            utxState.remove(tx.id()) match {
+              case None => log.debug(s"Can't find removed ${tx.id()} with reason: $reason")
+              case utxTransaction =>
+                val gReason = reason.map { x =>
+                  UtxEvent.Update.Removed.Reason(
+                    name = getSimpleName(x),
+                    message = x.toString
+                  )
+                }
+
+                val event = UtxEvent(
+                  UtxEvent.Type.Update(
+                    UtxEvent.Update(
+                      removed = List(UtxEvent.Update.Removed(utxTransaction, gReason))
+                    )
+                  )
+                )
+
+                withUtxChangesSubscribers("send next", _.onNext(event))
             }
         }
     }
@@ -265,21 +271,24 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
   }
 
   override def getUtxEvents(request: Empty, responseObserver: StreamObserver[UtxEvent]): Unit =
-    if (!utxBalanceUpdates.isCompleted) {
-      responseObserver match {
-        case x: ServerCallStreamObserver[_] => x.setOnCancelHandler(() => utxChangesSubscribers remove x)
-        case x => log.warn(s"Can't register cancel handler for $x")
-      }
+    if (!utxBalanceUpdates.isCompleted) responseObserver match {
+      case x: ServerCallStreamObserver[_] =>
+        x.setOnReadyHandler { () =>
+          // We have such order of calls, because we have to guarantee non-concurrent calls to onNext
+          // See StreamObserver for more details
+          initialEvents.onNext(responseObserver -> UtxEvent(
+            UtxEvent.Type.Switch(
+              UtxEvent.Switch(
+                utxState.values.toSeq
+              )
+            )
+          ))
+          utxChangesSubscribers.add(responseObserver)
 
-      utxChangesSubscribers.add(responseObserver)
-      val event = UtxEvent(
-        UtxEvent.Type.Switch(
-          UtxEvent.Switch(
-            utxState.values().asScala.toSeq
-          )
-        )
-      )
-      responseObserver.onNext(event)
+          log.info("Registered a new utx events observer")
+        }
+        x.setOnCancelHandler(() => utxChangesSubscribers remove x)
+      case x => log.warn(s"Can't register cancel handler for $x")
     }
 
   override def getCurrentBlockInfo(request: Empty): Future[CurrentBlockInfoResponse] = Future {
@@ -327,5 +336,11 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
     metadata.put(descKey, description)
     throw new StatusRuntimeException(Status.INVALID_ARGUMENT, metadata)
   }
+
+  private def withUtxChangesSubscribers(label: String, f: StreamObserver[UtxEvent] => Unit): Unit =
+    utxChangesSubscribers.forEach { subscriber =>
+      try f(subscriber)
+      catch { case e: Throwable => log.warn(s"$subscriber: can't $label", e) }
+    }
 
 }

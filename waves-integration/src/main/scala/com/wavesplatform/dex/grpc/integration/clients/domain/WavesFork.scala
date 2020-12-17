@@ -1,10 +1,12 @@
 package com.wavesplatform.dex.grpc.integration.clients.domain
 
 import cats.Monoid
+import cats.instances.set._
 import cats.instances.list._
 import cats.instances.tuple._
 import cats.syntax.foldable._
 import cats.syntax.semigroup._
+import com.google.protobuf.ByteString
 import com.wavesplatform.dex.grpc.integration.clients.domain.WavesFork.Status
 
 // TODO DEX-1009 Unit test
@@ -31,16 +33,18 @@ case class WavesFork private[domain] (origChain: WavesChain, forkChain: WavesCha
       else {
         val (origDropped, forkDropped) = WavesChain.dropDifference(origChain, updatedForkChain)
 
+        val origTxIds = origDropped.foldMap(_.forgedTxIds)
+        val forkTxIds = forkDropped.foldMap(_.forgedTxIds)
+
         val origForkDiffIndex = origDropped.foldMap(_.diffIndex)
-        val (updatedForkAllChanges, updatedForkDiffIndex) = forkDropped
-          .foldLeft(Monoid.empty[(BlockchainBalance, DiffIndex)]) { // foldMap
-            case (r, block) => r.|+|((block.changes, block.diffIndex))
-          }
+        val (updatedForkAllChanges, updatedForkDiffIndex) = forkDropped.foldMap(block => (block.changes, block.diffIndex))
 
         Status.Resolved(
           activeChain = updatedForkChain,
           newChanges = updatedForkAllChanges, // TODO DEX-1011 Probably we can filter out this, but it is done on next layer. Should we do?
-          lostDiffIndex = origForkDiffIndex.without(updatedForkDiffIndex)
+          lostDiffIndex = origForkDiffIndex.without(updatedForkDiffIndex),
+          lostTxIds = origTxIds -- forkTxIds,
+          forgedTxIds = forkTxIds -- origTxIds
         )
       }
   }
@@ -64,7 +68,15 @@ object WavesFork {
   sealed trait Status extends Product with Serializable
 
   object Status {
-    case class Resolved(activeChain: WavesChain, newChanges: BlockchainBalance, lostDiffIndex: DiffIndex) extends Status
+
+    case class Resolved(
+      activeChain: WavesChain,
+      newChanges: BlockchainBalance,
+      lostDiffIndex: DiffIndex,
+      lostTxIds: Set[ByteString], // Will be used in the future
+      forgedTxIds: Set[ByteString]
+    ) extends Status
+
     case class NotResolved(updatedFork: WavesFork) extends Status
     case class Failed(updatedFork: WavesFork, reason: String) extends Status
   }

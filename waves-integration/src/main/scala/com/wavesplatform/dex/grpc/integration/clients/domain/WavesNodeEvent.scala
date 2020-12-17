@@ -10,8 +10,8 @@ object WavesNodeEvent {
 
   sealed trait BlockchainUpdates
 
-  case class Appended(block: WavesBlock, forgedTxIds: Seq[ByteString]) extends WavesNodeEvent with BlockchainUpdates {
-    override def toString: String = s"Appended(${block.tpe}, h=${block.ref.height}, ${block.ref.id}, ftx=${txIdsToString(forgedTxIds)})"
+  case class Appended(block: WavesBlock) extends WavesNodeEvent with BlockchainUpdates {
+    override def toString: String = s"Appended(${block.tpe}, h=${block.ref.height}, ${block.ref.id})"
   }
 
   // Could also happen on appending of a key block
@@ -49,7 +49,7 @@ object WavesNodeEvent {
 
   object WavesNodeUtxEvent {
     case class Updated(newTxs: Seq[UtxTransaction], failedTxs: Seq[UtxTransaction]) extends WavesNodeUtxEvent
-    case class Forged(txIds: Seq[ByteString]) extends WavesNodeUtxEvent
+    case class Forged(txIds: Set[ByteString]) extends WavesNodeUtxEvent
     case class Switched(newTxs: Seq[UtxTransaction]) extends WavesNodeUtxEvent
   }
 
@@ -60,6 +60,5 @@ object WavesNodeEvent {
   }
 
   private def txsToString(txs: Seq[UtxTransaction]): String = txs.map(_.id.toBase58).mkString(", ")
-  private def txIdsToString(txs: Seq[ByteString]): String = txs.map(_.toBase58).mkString(", ")
 
 }

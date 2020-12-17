@@ -104,8 +104,8 @@ class CombinedStreamTestSuite extends WavesIntegrationSuiteBase {
             val t = mkStarted()
             t.blockchainUpdates.systemStream.onNext(SystemEvent.Stopped)
 
-            logged(t.blockchainUpdates.systemStream)(_.last shouldBe SystemEvent.BecameReady)
             logged(t.utxEvents.systemStream)(_.last shouldBe SystemEvent.BecameReady)
+            logged(t.blockchainUpdates.systemStream)(_.last shouldBe SystemEvent.BecameReady)
           }
         }
 
@@ -177,7 +177,7 @@ class CombinedStreamTestSuite extends WavesIntegrationSuiteBase {
   private def mkStarted(): TestClasses = mk().tap(_.utxEvents.systemStream.onNext(SystemEvent.BecameReady))
 
   private def logged[T](subject: Observable[T])(f: List[T] => Unit): Unit = {
-    val xs = subject.takeByTimespan(100.millis).toListL.runSyncUnsafe()
+    val xs = subject.takeByTimespan(200.millis).toListL.runSyncUnsafe()
     withClue(s"$xs: ") {
       try f(xs)
       catch {

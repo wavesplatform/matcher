@@ -32,12 +32,12 @@ class SynchronizedPessimisticPortfolios(settings: Settings) {
   /**
    * @return (affected addresses, unknown transactions)
    */
-  def processForged(txIds: Seq[ByteString]): (Set[Address], List[ByteString]) = write {
+  def processForged(txIds: Set[ByteString]): (Set[Address], List[ByteString]) = write {
     orig.processForged(txIds)
   }
 
   // TODO DEX-1013
-  def removeFailed(txIds: Seq[ByteString]): Set[Address] = write {
+  def removeFailed(txIds: Set[ByteString]): Set[Address] = write {
     orig.removeFailed(txIds)
   }
 

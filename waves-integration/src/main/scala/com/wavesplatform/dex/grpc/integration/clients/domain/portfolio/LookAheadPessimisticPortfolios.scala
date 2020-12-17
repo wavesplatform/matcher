@@ -17,7 +17,6 @@ class LookAheadPessimisticPortfolios(orig: PessimisticPortfolios, maxForgedTrans
 
   override def getAggregated(address: Address): Map[Asset, Long] = orig.getAggregated(address)
 
-  // DEX-1004
   override def replaceWith(setTxs: Seq[PessimisticTransaction]): Set[Address] = {
     forgedTxs.clear()
     forgedTxsEvictionQueue.clear()
@@ -37,7 +36,7 @@ class LookAheadPessimisticPortfolios(orig: PessimisticPortfolios, maxForgedTrans
     }
 
   override def removeFailed(txIds: Iterable[ByteString]): Set[Address] =
-    // txIds.foreach(remove) // a transaction can't be forged and failed both. Also we update caches in replaceWith, DEX-1004
+    // txIds.foreach(remove) // a transaction can't be forged and failed both.
     orig.removeFailed(txIds)
 
   private def put(txId: ByteString): Unit = forgedTxs.add(txId).tap { added =>

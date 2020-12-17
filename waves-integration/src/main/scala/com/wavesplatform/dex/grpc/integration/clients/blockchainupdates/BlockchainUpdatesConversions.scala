@@ -41,10 +41,11 @@ object BlockchainUpdatesConversions {
             ref = blockRef,
             reference = reference,
             changes = BlockchainBalance(regularBalanceChanges, outLeasesChanges),
-            tpe = tpe
+            tpe = tpe,
+            forgedTxIds = updates.transactionIds.toSet
           )
 
-          WavesNodeEvent.Appended(block, updates.transactionIds)
+          WavesNodeEvent.Appended(block)
         }
 
       case Update.Rollback(value) =>

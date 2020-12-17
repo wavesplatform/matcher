@@ -22,12 +22,12 @@ class GrpcUtxEventsControlledStream(channel: ManagedChannel)(implicit scheduler:
     with ScorexLogging {
   @volatile private var grpcObserver: Option[UtxEventObserver] = None
 
-  private val internalStream = ConcurrentSubject.publish[UtxEvent] // .replayLimited[UtxEvent](10)
+  private val internalStream = ConcurrentSubject.publish[UtxEvent]
   // HACK: Monix skips the first few messages! So we have to turn it into a hot
-  override val stream: Observable[UtxEvent] = internalStream // .publish
+  override val stream: Observable[UtxEvent] = internalStream
 
-  private val internalSystemStream = ConcurrentSubject.publish[SystemEvent] // .replayLimited[SystemEvent](10)
-  override val systemStream: Observable[SystemEvent] = internalSystemStream // .publish
+  private val internalSystemStream = ConcurrentSubject.publish[SystemEvent]
+  override val systemStream: Observable[SystemEvent] = internalSystemStream
 
   private val empty: Empty = Empty()
 

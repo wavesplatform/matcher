@@ -102,20 +102,14 @@ object StatusTransitions extends ScorexLogging {
 
               case Status.NotResolved(updatedFork) =>
                 StatusUpdate(
-                  newStatus = TransientRollback(
-                    fork = updatedFork,
-                    utxUpdate = origStatus.utxUpdate
-                  ),
+                  newStatus = origStatus.copy(fork = updatedFork),
                   requestNextBlockchainEvent = true
                 )
 
               case Status.Failed(updatedFork, reason) =>
                 log.error(s"Forcibly rollback, because of error: $reason")
                 StatusUpdate(
-                  newStatus = TransientRollback(
-                    fork = updatedFork,
-                    utxUpdate = origStatus.utxUpdate
-                  ),
+                  origStatus.copy(fork = updatedFork),
                   updatedLastBlockHeight = LastBlockHeight.RestartRequired(updatedFork.height + 1)
                 )
             }
@@ -133,7 +127,7 @@ object StatusTransitions extends ScorexLogging {
           case UtxSwitched(newTxs) =>
             StatusUpdate(
               newStatus = origStatus.copy(
-                utxUpdate = UtxUpdate(unconfirmedTxs = newTxs, resetCaches = true) // Forget a previous
+                utxUpdate = UtxUpdate(unconfirmedTxs = newTxs, resetCaches = true) // Forget the previous
               )
             )
 
@@ -178,7 +172,7 @@ object StatusTransitions extends ScorexLogging {
             log.error("Unexpected UTxSwitched, reset utxUpdate")
             StatusUpdate(
               newStatus = origStatus.copy(
-                utxUpdate = UtxUpdate(unconfirmedTxs = newTxs, resetCaches = true) // Forget a previous
+                utxUpdate = UtxUpdate(unconfirmedTxs = newTxs, resetCaches = true) // Forget the previous
               )
             )
 

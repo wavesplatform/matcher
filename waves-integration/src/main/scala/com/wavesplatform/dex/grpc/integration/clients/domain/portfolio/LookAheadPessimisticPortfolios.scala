@@ -17,7 +17,6 @@ class LookAheadPessimisticPortfolios(orig: PessimisticPortfolios, maxForgedTrans
 
   override def getAggregated(address: Address): Map[Asset, Long] = orig.getAggregated(address)
 
-  // DEX-1004
   override def replaceWith(setTxs: Seq[PessimisticTransaction]): Set[Address] = {
     forgedTxs.clear()
     forgedTxsEvictionQueue.clear()

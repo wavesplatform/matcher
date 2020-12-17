@@ -40,12 +40,24 @@ abstract class PessimisticPortfoliosTestSuiteBase
 
     "replaceWith" - {
       // TODO DEX-1013 Test results
-      "whatever a state, the new state should be equal to arguments" in forAll(
-        pessimisticPortfoliosGen,
-        Gen.listOf(pessimisticTransactionGen)
-      ) { (pp, arg) =>
-        pp.replaceWith(arg)
-        getState(pp) should matchTo(collectChanges(arg))
+      "whatever a state, the new state should be equal to arguments" - {
+        val testGen = Gen.zip(pessimisticPortfoliosGen, Gen.listOf(pessimisticTransactionGen))
+
+        "in general" in forAll(testGen) { case (pp, arg) =>
+          pp.replaceWith(arg)
+          getState(pp) should matchTo(collectChanges(arg))
+        }
+
+        "for each address" in forAll(testGen) { case (pp, arg) =>
+          pp.replaceWith(arg)
+
+          val expectedState = arg.foldMap(_.pessimisticPortfolio)
+          expectedState.foreach { case (address, expectedPP) =>
+            withClue(s"$address: ") {
+              pp.getAggregated(address) should matchTo(expectedPP)
+            }
+          }
+        }
       }
     }
 

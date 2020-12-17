@@ -36,7 +36,7 @@ class LookAheadPessimisticPortfolios(orig: PessimisticPortfolios, maxForgedTrans
     }
 
   override def removeFailed(txIds: Iterable[ByteString]): Set[Address] =
-    // txIds.foreach(remove) // a transaction can't be forged and failed both. Also we update caches in replaceWith, DEX-1004
+    // txIds.foreach(remove) // a transaction can't be forged and failed both.
     orig.removeFailed(txIds)
 
   private def put(txId: ByteString): Unit = forgedTxs.add(txId).tap { added =>

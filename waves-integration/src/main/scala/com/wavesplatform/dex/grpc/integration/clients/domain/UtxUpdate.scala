@@ -18,7 +18,7 @@ object UtxUpdate {
   implicit val utxUpdateMonoid: Monoid[UtxUpdate] = new Monoid[UtxUpdate] {
     override val empty: UtxUpdate = UtxUpdate()
 
-    // TODO resetCaches optimization: only unconfirmedTxs
+    // TODO DEX-1002 resetCaches optimization: only unconfirmedTxs
     override def combine(x: UtxUpdate, y: UtxUpdate): UtxUpdate = UtxUpdate(
       unconfirmedTxs = removeDone(x.unconfirmedTxs, y) ++ removeDone(y.unconfirmedTxs, x),
       forgedTxIds = x.forgedTxIds.union(y.forgedTxIds),

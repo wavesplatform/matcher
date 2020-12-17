@@ -452,7 +452,7 @@ object TankGenerator {
     val massTransfersAccounts = accounts.slice(accounts.size - 100, accounts.size)
     val step1And3RequestsCount = requestsCount / 100 * 16
     val step2MatcherRequestsCount = requestsCount - step1And3RequestsCount
-    val massTransfersRequestsCount = step2MatcherRequestsCount / 10
+    val massTransfersRequestsCount = step2MatcherRequestsCount / 15
 
     val requests = mkAllTypes(accounts.slice(0, accounts.size - massTransfersAccounts.size), requestsCount, pairsFile)
     val step1And3 = requests.slice(0, step1And3RequestsCount).toList

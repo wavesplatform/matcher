@@ -22,7 +22,7 @@ import com.typesafe.config._
 import com.wavesplatform.dex.actors.ActorSystemOps.ImplicitOps
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.actors.orderbook.{AggregatedOrderBookActor, OrderBookActor, OrderBookSnapshotStoreActor}
-import com.wavesplatform.dex.actors.tx.{BroadcastExchangeTransactionActor, CreateExchangeTransactionActor, WriteExchangeTransactionActor}
+import com.wavesplatform.dex.actors.tx.{BroadcastExchangeTransactionActor, WriteExchangeTransactionActor}
 import com.wavesplatform.dex.actors.{MatcherActor, OrderBookAskAdapter, OrderEventsCoordinatorActor, RootActorSystem, SpendableBalancesActor}
 import com.wavesplatform.dex.api.http.headers.{CustomMediaTypes, MatcherHttpServer}
 import com.wavesplatform.dex.api.http.routes.{MatcherApiRoute, MatcherApiRouteV1}
@@ -175,11 +175,6 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     "exchange-transaction-broadcast"
   )
 
-  actorSystem.actorOf(
-    CreateExchangeTransactionActor.props(transactionCreator.createTransaction, List(txWriterRef, wavesNetTxBroadcasterRef)),
-    CreateExchangeTransactionActor.name
-  )
-
   private val wsInternalBroadcastRef: typed.ActorRef[WsInternalBroadcastActor.Command] = actorSystem.spawn(
     WsInternalBroadcastActor(settings.webSockets.internalBroadcast),
     "ws-internal-broadcast"
@@ -226,7 +221,16 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
   private val spendableBalancesRef = actorSystem.actorOf(SpendableBalancesActor.props(wavesBlockchainAsyncClient, addressDirectoryRef))
 
-  private val orderEventsCoordinatorRef = actorSystem.spawn(OrderEventsCoordinatorActor.apply(addressDirectoryRef, spendableBalancesRef), "events-coordinator")
+  private val orderEventsCoordinatorRef = actorSystem.spawn(
+    behavior = OrderEventsCoordinatorActor.apply(
+      addressDirectoryRef = addressDirectoryRef,
+      spendableBalancesRef = spendableBalancesRef,
+      txWriterRef = txWriterRef,
+      broadcastRef = wavesNetTxBroadcasterRef,
+      createTransaction = transactionCreator.createTransaction
+    ),
+    name = "events-coordinator"
+  )
 
   private val matcherActorRef: ActorRef = {
     def mkOrderBookProps(assetPair: AssetPair, matcherActor: ActorRef): Props = {

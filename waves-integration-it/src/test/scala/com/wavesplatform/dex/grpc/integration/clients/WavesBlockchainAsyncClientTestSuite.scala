@@ -335,7 +335,7 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase with NoSt
 
   "forgedOrder" - {
     "no such order" in {
-      wait(client.forgedOrder(randomByteStr(32))) shouldBe false
+      wait(client.isOrderForged(randomByteStr(32))) shouldBe false
     }
 
     "the order was in a forged ExchangeTransaction" in {
@@ -345,8 +345,8 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase with NoSt
       withClue(exchangeTx.id().base58) {
         broadcastAndAwait(exchangeTx)
         eventually {
-          wait(client.forgedOrder(exchangeTx.buyOrder().id())) shouldBe true
-          wait(client.forgedOrder(exchangeTx.sellOrder().id())) shouldBe true
+          wait(client.isOrderForged(exchangeTx.buyOrder().id())) shouldBe true
+          wait(client.isOrderForged(exchangeTx.sellOrder().id())) shouldBe true
         }
       }
     }

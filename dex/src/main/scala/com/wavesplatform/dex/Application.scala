@@ -227,7 +227,8 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       spendableBalancesRef = spendableBalancesRef,
       txWriterRef = txWriterRef,
       broadcastRef = wavesNetTxBroadcasterRef,
-      createTransaction = transactionCreator.createTransaction
+      createTransaction = transactionCreator.createTransaction,
+      isTransactionForged = txId => wavesBlockchainAsyncClient.wereForged(List(txId)).map(_.getOrElse(txId, false))
     ),
     name = "events-coordinator"
   )

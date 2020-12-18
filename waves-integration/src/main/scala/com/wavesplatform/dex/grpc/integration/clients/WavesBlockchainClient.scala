@@ -34,7 +34,7 @@ trait WavesBlockchainClient {
   def wereForged(txIds: Seq[ByteStr]): Future[Map[ByteStr, Boolean]]
   def broadcastTx(tx: ExchangeTransaction): Future[Boolean]
 
-  def forgedOrder(orderId: ByteStr): Future[Boolean]
+  def isOrderForged(orderId: ByteStr): Future[Boolean]
 
   def close(): Future[Unit]
 }

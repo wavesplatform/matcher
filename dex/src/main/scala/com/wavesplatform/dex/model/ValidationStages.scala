@@ -87,7 +87,7 @@ object ValidationStages {
     ec: ExecutionContext
   ): Future[Either[MatcherError, Unit]] = {
     for {
-      hasOrderInBlockchain <- liftFutureAsync(blockchain.forgedOrder(ao.id))
+      hasOrderInBlockchain <- liftFutureAsync(blockchain.isOrderForged(ao.id))
       orderBookCache <- EitherT(orderBookAskAdapter.getAggregatedSnapshot(ao.order.assetPair))
       _ <- EitherT.fromEither {
         OrderValidator

@@ -203,7 +203,7 @@ class CombinedWavesBlockchainClient(
   override def broadcastTx(tx: ExchangeTransaction): Future[Boolean] =
     meClient.broadcastTx(tx)
 
-  override def forgedOrder(orderId: ByteStr): Future[Boolean] =
+  override def isOrderForged(orderId: ByteStr): Future[Boolean] =
     meClient.forgedOrder(orderId)
 
   override def close(): Future[Unit] =

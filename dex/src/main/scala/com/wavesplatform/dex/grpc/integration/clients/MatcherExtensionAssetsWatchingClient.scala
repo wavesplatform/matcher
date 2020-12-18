@@ -57,7 +57,7 @@ class MatcherExtensionAssetsWatchingClient(
 
   override def broadcastTx(tx: ExchangeTransaction): Future[Boolean] = underlying.broadcastTx(tx)
 
-  override def forgedOrder(orderId: ByteStr): Future[Boolean] = underlying.forgedOrder(orderId)
+  override def isOrderForged(orderId: ByteStr): Future[Boolean] = underlying.isOrderForged(orderId)
 
   override def close(): Future[Unit] = underlying.close()
 

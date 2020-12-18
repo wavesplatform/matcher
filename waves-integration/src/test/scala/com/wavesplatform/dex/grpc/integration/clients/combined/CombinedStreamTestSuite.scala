@@ -12,13 +12,14 @@ import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import monix.execution.{ExecutionModel, Scheduler}
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
+import org.scalatest.concurrent.Eventually
 import org.scalatest.exceptions.TestFailedException
 
 import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
 import scala.util.chaining._
 
-class CombinedStreamTestSuite extends WavesIntegrationSuiteBase {
+class CombinedStreamTestSuite extends WavesIntegrationSuiteBase with Eventually {
 
   implicit private val runNow = Scheduler(
     ec = scala.concurrent.ExecutionContext.Implicits.global,
@@ -105,7 +106,9 @@ class CombinedStreamTestSuite extends WavesIntegrationSuiteBase {
             t.blockchainUpdates.systemStream.onNext(SystemEvent.Stopped)
 
             logged(t.utxEvents.systemStream)(_.last shouldBe SystemEvent.BecameReady)
-            logged(t.blockchainUpdates.systemStream)(_.last shouldBe SystemEvent.BecameReady)
+            eventually { // It takes some time
+              logged(t.blockchainUpdates.systemStream)(_.last shouldBe SystemEvent.BecameReady)
+            }
           }
         }
 

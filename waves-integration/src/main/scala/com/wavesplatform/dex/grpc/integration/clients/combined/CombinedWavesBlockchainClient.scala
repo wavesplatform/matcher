@@ -32,6 +32,7 @@ import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.chaining._
 import scala.util.{Failure, Success}
+import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions._
 
 class CombinedWavesBlockchainClient(
   settings: Settings,
@@ -86,18 +87,26 @@ class CombinedWavesBlockchainClient(
               )
             }
             .toMap
-          (x.newStatus, updatedFinalBalances)
+          (
+            x.newStatus,
+            Updates(
+              updatedFinalBalances,
+              forgedTxIds = x.utxUpdate.forgedTxIds.map(_.toVanilla),
+              failedTxIds = x.utxUpdate.failedTxIds.map(_.toVanilla)
+            )
+          )
         }
-        .filter(_.nonEmpty)
+        .filterNot(_.isEmpty)
         .map { updated => // TODO DEX-1014
-          updated.filter { case (address, updatedBalance) =>
-            val prev = finalBalance.getOrElse(address, Map.empty).filter { case (k, _) => updatedBalance.contains(k) }
-            val same = prev == updatedBalance
-            if (!same) finalBalance.update(address, prev ++ updatedBalance)
-            !same
-          }
+          updated.copy(
+            updatedBalances = updated.updatedBalances.filter { case (address, updatedBalance) =>
+              val prev = finalBalance.getOrElse(address, Map.empty).filter { case (k, _) => updatedBalance.contains(k) }
+              val same = prev == updatedBalance
+              if (!same) finalBalance.update(address, prev ++ updatedBalance)
+              !same
+            }
+          )
         }
-        .map(Updates(_))
         .tap(_ => combinedStream.startFrom(startHeight))
     }
     .doOnError(e => Task(log.error("Got an error in the combined stream", e)))

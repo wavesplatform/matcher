@@ -42,15 +42,25 @@ trait WavesBlockchainClient {
 object WavesBlockchainClient {
 
   type BalanceChanges = Map[Address, Map[Asset, Long]]
-  case class Updates(updatedBalances: Map[Address, Map[Asset, Long]])
+
+  // TODO move outside
+  case class Updates(
+    updatedBalances: Map[Address, Map[Asset, Long]],
+    forgedTxIds: Set[ExchangeTransaction.Id], // TODO Actually, this is not only exchange transactions now
+    failedTxIds: Set[ExchangeTransaction.Id]
+  ) {
+    def isEmpty: Boolean = updatedBalances.isEmpty && forgedTxIds.isEmpty && failedTxIds.isEmpty
+  }
 
   object Updates {
 
     implicit val updatesMonoid: Monoid[Updates] = new Monoid[Updates] {
-      override val empty: Updates = Updates(Map.empty)
+      override val empty: Updates = Updates(Map.empty, Set.empty, Set.empty)
 
       override def combine(x: Updates, y: Updates): Updates = Updates(
-        x.updatedBalances.deepReplace(y.updatedBalances)
+        updatedBalances = x.updatedBalances.deepReplace(y.updatedBalances),
+        forgedTxIds = x.forgedTxIds.union(y.forgedTxIds),
+        failedTxIds = x.failedTxIds.union(y.failedTxIds)
       )
 
     }

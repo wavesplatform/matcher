@@ -111,6 +111,8 @@ trait ExchangeTransaction extends ByteAndJsonSerializable with Proven {
 
 object ExchangeTransaction {
 
+  type Id = ByteStr
+
   val typeId: Byte = 7
 
   def parse(bytes: Array[Byte]): Try[ExchangeTransaction] =

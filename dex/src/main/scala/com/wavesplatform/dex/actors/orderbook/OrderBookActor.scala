@@ -10,7 +10,7 @@ import cats.syntax.option._
 import com.wavesplatform.dex.actors.MatcherActor.{ForceStartOrderBook, OrderBookCreated, SaveSnapshot}
 import com.wavesplatform.dex.actors.address.AddressActor
 import com.wavesplatform.dex.actors.orderbook.OrderBookActor._
-import com.wavesplatform.dex.actors.{orderbook, MatcherActor, WorkingStash}
+import com.wavesplatform.dex.actors.{MatcherActor, OrderEventsCoordinatorActor, WorkingStash, orderbook}
 import com.wavesplatform.dex.api.ws.actors.WsInternalBroadcastActor
 import com.wavesplatform.dex.api.ws.protocol.WsOrdersUpdate
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -32,7 +32,7 @@ import scala.concurrent.ExecutionContext
 class OrderBookActor(
   settings: Settings,
   owner: classic.ActorRef,
-  addressActor: classic.ActorRef,
+  eventsCoordinatorRef: typed.ActorRef[OrderEventsCoordinatorActor.Message],
   snapshotStore: classic.ActorRef,
   wsInternalHandlerDirectoryRef: typed.ActorRef[WsInternalBroadcastActor.Command],
   assetPair: AssetPair,
@@ -175,7 +175,7 @@ class OrderBookActor(
   private def processEvents(timestamp: Long, events: IterableOnce[Event]): Unit =
     events.iterator.foreach { event =>
       logEvent(event)
-      addressActor ! event
+      eventsCoordinatorRef ! OrderEventsCoordinatorActor.Command.Process(event)
 
       val changes = event match {
         case event: Events.OrderExecuted => WsOrdersUpdate.from(event, timestamp).some
@@ -204,7 +204,9 @@ class OrderBookActor(
         processEvents(cancelEvent.timestamp, List(cancelEvent))
       case _ =>
         log.warn(s"Error applying $command: order not found")
-        addressActor ! OrderCancelFailed(cancelCommand.orderId, error.OrderNotFound(cancelCommand.orderId))
+        eventsCoordinatorRef ! OrderEventsCoordinatorActor.Command.ProcessError(
+          OrderCancelFailed(cancelCommand.orderId, error.OrderNotFound(cancelCommand.orderId))
+        )
     }
   }
 
@@ -256,7 +258,7 @@ object OrderBookActor {
   def props(
     settings: Settings,
     parent: classic.ActorRef,
-    addressActor: classic.ActorRef,
+    eventsCoordinatorRef: typed.ActorRef[OrderEventsCoordinatorActor.Message],
     snapshotStore: classic.ActorRef,
     wsInternalHandlerDirectoryRef: typed.ActorRef[WsInternalBroadcastActor.Command],
     assetPair: AssetPair,
@@ -271,7 +273,7 @@ object OrderBookActor {
       new OrderBookActor(
         settings,
         parent,
-        addressActor,
+        eventsCoordinatorRef,
         snapshotStore,
         wsInternalHandlerDirectoryRef,
         assetPair,

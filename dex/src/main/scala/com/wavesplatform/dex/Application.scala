@@ -169,7 +169,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       .props(
         settings.exchangeTransactionBroadcast,
         time,
-        wavesBlockchainAsyncClient.wereForged,
+        wavesBlockchainAsyncClient.areKnown,
         wavesBlockchainAsyncClient.broadcastTx
       ),
     "exchange-transaction-broadcast"
@@ -228,7 +228,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       txWriterRef = txWriterRef,
       broadcastRef = wavesNetTxBroadcasterRef,
       createTransaction = transactionCreator.createTransaction,
-      isTransactionForged = txId => wavesBlockchainAsyncClient.wereForged(List(txId)).map(_.getOrElse(txId, false))
+      isTransactionKnown = txId => wavesBlockchainAsyncClient.areKnown(List(txId)).map(_.getOrElse(txId, false))
     ),
     name = "events-coordinator"
   )

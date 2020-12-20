@@ -8,7 +8,9 @@ import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
+import com.wavesplatform.dex.grpc.integration.clients.domain.TransactionWithChanges
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
+import com.wavesplatform.events.protobuf.StateUpdate
 import monix.reactive.Observable
 
 import scala.concurrent.Future
@@ -31,7 +33,10 @@ trait WavesBlockchainClient {
   def hasScript(address: Address): Future[Boolean]
   def runScript(address: Address, input: Order): Future[RunScriptResult]
 
-  def wereForged(txIds: Seq[ByteStr]): Future[Map[ByteStr, Boolean]]
+  /**
+   * Forged or unconfirmed
+   */
+  def areKnown(txIds: Seq[ByteStr]): Future[Map[ByteStr, Boolean]]
   def broadcastTx(tx: ExchangeTransaction): Future[Boolean]
 
   def isOrderForged(orderId: ByteStr): Future[Boolean]
@@ -46,21 +51,21 @@ object WavesBlockchainClient {
   // TODO move outside
   case class Updates(
     updatedBalances: Map[Address, Map[Asset, Long]],
-    forgedTxIds: Set[ExchangeTransaction.Id], // TODO Actually, this is not only exchange transactions now
-    failedTxIds: Set[ExchangeTransaction.Id]
+    appearedTxs: Map[ExchangeTransaction.Id, TransactionWithChanges],
+    failedTxs: Map[ExchangeTransaction.Id, TransactionWithChanges]
   ) {
-    def isEmpty: Boolean = updatedBalances.isEmpty && forgedTxIds.isEmpty && failedTxIds.isEmpty
+    def isEmpty: Boolean = updatedBalances.isEmpty && appearedTxs.isEmpty
   }
 
   object Updates {
 
     implicit val updatesMonoid: Monoid[Updates] = new Monoid[Updates] {
-      override val empty: Updates = Updates(Map.empty, Set.empty, Set.empty)
+      override val empty: Updates = Updates(Map.empty, Map.empty, Map.empty)
 
       override def combine(x: Updates, y: Updates): Updates = Updates(
         updatedBalances = x.updatedBalances.deepReplace(y.updatedBalances),
-        forgedTxIds = x.forgedTxIds.union(y.forgedTxIds),
-        failedTxIds = x.failedTxIds.union(y.failedTxIds)
+        appearedTxs = x.appearedTxs ++ y.appearedTxs,
+        failedTxs = x.failedTxs ++ y.failedTxs
       )
 
     }

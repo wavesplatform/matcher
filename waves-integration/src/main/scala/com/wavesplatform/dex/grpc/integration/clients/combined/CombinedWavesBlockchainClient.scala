@@ -6,7 +6,8 @@ import cats.Monoid
 import cats.instances.long._
 import cats.instances.set._
 import cats.syntax.group._
-import com.wavesplatform.dex.domain.account.Address
+import com.google.protobuf.ByteString
+import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -21,6 +22,7 @@ import com.wavesplatform.dex.grpc.integration.clients.domain.StatusUpdate.LastBl
 import com.wavesplatform.dex.grpc.integration.clients.domain._
 import com.wavesplatform.dex.grpc.integration.clients.domain.portfolio.SynchronizedPessimisticPortfolios
 import com.wavesplatform.dex.grpc.integration.clients.matcherext.MatcherExtensionClient
+import com.wavesplatform.dex.grpc.integration.protobuf.DexToPbConversions._
 import com.wavesplatform.dex.grpc.integration.clients.{RunScriptResult, WavesBlockchainClient}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import monix.eval.Task
@@ -33,9 +35,12 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.chaining._
 import scala.util.{Failure, Success}
 import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions._
+import com.wavesplatform.dex.grpc.integration.services.UtxTransaction
+import com.wavesplatform.protobuf.transaction.SignedTransaction
 
 class CombinedWavesBlockchainClient(
   settings: Settings,
+  matcherPublicKey: PublicKey, // * @param matcherPublicKey Used to ignore transactions other than Matcher's ones in Updates
   meClient: MatcherExtensionClient,
   bClient: BlockchainUpdatesClient
 )(implicit ec: ExecutionContext, monixScheduler: Scheduler)
@@ -44,6 +49,8 @@ class CombinedWavesBlockchainClient(
 
   type Balances = Map[Address, Map[Asset, Long]]
   type Leases = Map[Address, Long]
+
+  private val pbMatcherPublicKey = matcherPublicKey.toPB
 
   private val knownBalances: AtomicReference[BlockchainBalance] = new AtomicReference(Monoid.empty[BlockchainBalance])
 
@@ -91,8 +98,15 @@ class CombinedWavesBlockchainClient(
             x.newStatus,
             Updates(
               updatedFinalBalances,
-              forgedTxIds = x.utxUpdate.forgedTxIds.map(_.toVanilla),
-              failedTxIds = x.utxUpdate.failedTxIds.map(_.toVanilla)
+              appearedTxs = ({
+                x.utxUpdate.forgedTxs.view.collect { case (id, x) if isExchangeTransactionFromMatcher(x.tx) => id.toVanilla -> x.changes }
+              } ++ {
+                for {
+                  tx <- x.utxUpdate.unconfirmedTxs.view if isExchangeTransactionFromMatcher(tx)
+                  update <- tx.diff.flatMap(_.stateUpdate)
+                } yield tx.id.toVanilla -> update
+              }).toMap,
+              failedTxs = x.utxUpdate.failedTxs.collect { case (id, tx) if isExchangeTransactionFromMatcher(tx) => id.toVanilla }.toSet
             )
           )
         }
@@ -101,9 +115,9 @@ class CombinedWavesBlockchainClient(
           updated.copy(
             updatedBalances = updated.updatedBalances.filter { case (address, updatedBalance) =>
               val prev = finalBalance.getOrElse(address, Map.empty).filter { case (k, _) => updatedBalance.contains(k) }
-              val same = prev == updatedBalance
-              if (!same) finalBalance.update(address, prev ++ updatedBalance)
-              !same
+              val different = prev != updatedBalance
+              if (different) finalBalance.update(address, prev ++ updatedBalance)
+              different
             }
           )
         }
@@ -116,8 +130,8 @@ class CombinedWavesBlockchainClient(
     if (utxUpdate.resetCaches) pessimisticPortfolios.replaceWith(utxUpdate.unconfirmedTxs)
     else
       pessimisticPortfolios.addPending(utxUpdate.unconfirmedTxs) |+|
-      pessimisticPortfolios.processForged(utxUpdate.forgedTxIds)._1 |+|
-      pessimisticPortfolios.removeFailed(utxUpdate.failedTxIds)
+      pessimisticPortfolios.processForged(utxUpdate.forgedTxs.keySet)._1 |+|
+      pessimisticPortfolios.removeFailed(utxUpdate.failedTxs.keySet) // TODO Not only exchange transactions
 
   // TODO DEX-1015
   private def requestBalances(x: DiffIndex): Unit =
@@ -147,6 +161,13 @@ class CombinedWavesBlockchainClient(
       asset -> r
     }.toMap
   }
+
+  private def isExchangeTransactionFromMatcher(tx: SignedTransaction): Boolean =
+    tx.transaction.exists { tx =>
+      tx.data.isExchange && ByteString.unsignedLexicographicalComparator().compare(tx.senderPublicKey, pbMatcherPublicKey) == 0
+    }
+
+  private def isExchangeTransactionFromMatcher(tx: UtxTransaction): Boolean = tx.transaction.exists(isExchangeTransactionFromMatcher)
 
   override def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] = {
     val known = knownBalances.get
@@ -197,8 +218,8 @@ class CombinedWavesBlockchainClient(
   override def runScript(address: Address, input: Order): Future[RunScriptResult] =
     meClient.runScript(address, input)
 
-  override def wereForged(txIds: Seq[ByteStr]): Future[Map[ByteStr, Boolean]] =
-    meClient.wereForged(txIds)
+  override def areKnown(txIds: Seq[ByteStr]): Future[Map[ByteStr, Boolean]] =
+    meClient.areKnown(txIds)
 
   override def broadcastTx(tx: ExchangeTransaction): Future[Boolean] =
     meClient.broadcastTx(tx)

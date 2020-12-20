@@ -6,11 +6,11 @@ import com.wavesplatform.dex.grpc.integration.services.UtxTransaction
 
 case class UtxUpdate(
   unconfirmedTxs: Seq[UtxTransaction] = Nil,
-  forgedTxIds: Set[ByteString] = Set.empty,
-  failedTxIds: Set[ByteString] = Set.empty,
+  forgedTxs: Map[ByteString, TransactionWithChanges] = Map.empty,
+  failedTxs: Map[ByteString, UtxTransaction] = Map.empty,
   resetCaches: Boolean = false
 ) {
-  override def toString: String = s"UtxUpdate(u=${unconfirmedTxs.size}, fgtx=${forgedTxIds.size}, fltx=${failedTxIds.size}, r=$resetCaches)"
+  override def toString: String = s"UtxUpdate(u=${unconfirmedTxs.size}, fgtx=${forgedTxs.size}, fltx=${failedTxs.size}, r=$resetCaches)"
 }
 
 object UtxUpdate {
@@ -21,15 +21,15 @@ object UtxUpdate {
     // TODO DEX-1002 resetCaches optimization: only unconfirmedTxs
     override def combine(x: UtxUpdate, y: UtxUpdate): UtxUpdate = UtxUpdate(
       unconfirmedTxs = removeDone(x.unconfirmedTxs, y) ++ removeDone(y.unconfirmedTxs, x),
-      forgedTxIds = x.forgedTxIds.union(y.forgedTxIds),
-      failedTxIds = x.failedTxIds.union(y.failedTxIds),
+      forgedTxs = x.forgedTxs ++ y.forgedTxs,
+      failedTxs = x.failedTxs ++ y.failedTxs,
       resetCaches = x.resetCaches || y.resetCaches
     )
 
     private def removeDone(
       unconfirmedTxs: Seq[UtxTransaction],
       by: UtxUpdate
-    ): Seq[UtxTransaction] = unconfirmedTxs.filterNot(tx => by.forgedTxIds.contains(tx.id) || by.failedTxIds.contains(tx.id))
+    ): Seq[UtxTransaction] = unconfirmedTxs.filterNot(tx => by.forgedTxs.contains(tx.id) || by.failedTxs.contains(tx.id))
 
   }
 

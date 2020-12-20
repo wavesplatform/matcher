@@ -45,7 +45,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
             reference = ByteStr.empty,
             changes = updatedBalances1,
             tpe = WavesBlock.Type.FullBlock,
-            forgedTxIds = Set(mkTxId(1))
+            forgedTxs = Set(mkTxId(1))
           )
 
           val init = Normal(WavesChain(Vector.empty, 100))
@@ -54,7 +54,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
             newStatus = Normal(WavesChain(Vector(newBlock), 99)),
             updatedBalances = updatedBalances1,
             updatedLastBlockHeight = StatusUpdate.LastBlockHeight.Updated(1),
-            utxUpdate = UtxUpdate(forgedTxIds = newBlock.forgedTxIds),
+            utxUpdate = UtxUpdate(forgedTxs = newBlock.forgedTxs),
             requestNextBlockchainEvent = true
           ))
         }
@@ -66,7 +66,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
               reference = ByteStr.empty,
               changes = updatedBalances1,
               tpe = WavesBlock.Type.FullBlock,
-              forgedTxIds = Set(mkTxId(1))
+              forgedTxs = Set(mkTxId(1))
             )
             val init = Normal(WavesChain(Vector(block1), 99))
             val event = Appended(block1)
@@ -111,7 +111,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
           reference = ByteStr.empty,
           changes = updatedBalances1,
           tpe = WavesBlock.Type.FullBlock,
-          forgedTxIds = Set(mkTxId(1))
+          forgedTxs = Set(mkTxId(1))
         )
 
         val block2 = WavesBlock(
@@ -119,7 +119,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
           reference = block1.ref.id,
           changes = updatedBalances2,
           tpe = WavesBlock.Type.FullBlock,
-          forgedTxIds = Set(mkTxId(2))
+          forgedTxs = Set(mkTxId(2))
         )
 
         val init = Normal(WavesChain(Vector(block2, block1), 98))
@@ -156,7 +156,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
         reference = ByteStr.empty,
         changes = updatedBalances1,
         tpe = WavesBlock.Type.FullBlock,
-        forgedTxIds = Set(mkTxId(1))
+        forgedTxs = Set(mkTxId(1))
       )
 
       val block2A = WavesBlock(
@@ -167,7 +167,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
           outLeases = Map.empty
         ),
         tpe = WavesBlock.Type.FullBlock,
-        forgedTxIds = Set(mkTxId(2))
+        forgedTxs = Set(mkTxId(2))
       )
 
       val block2B = WavesBlock(
@@ -178,7 +178,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
           outLeases = Map.empty
         ),
         tpe = WavesBlock.Type.FullBlock,
-        forgedTxIds = Set(mkTxId(3))
+        forgedTxs = Set(mkTxId(3))
       )
 
       val init = TransientRollback(
@@ -186,7 +186,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
           origChain = WavesChain(Vector(block2A, block1), 98),
           forkChain = WavesChain(Vector(block2B, block1), 98)
         ),
-        utxUpdate = UtxUpdate(failedTxIds = Set(mkTxId(30)))
+        utxUpdate = UtxUpdate(failedTxs = Set(mkTxId(30)))
       )
 
       "Appended ->" - {
@@ -199,7 +199,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
               outLeases = Map(bob -> 10)
             ),
             tpe = WavesBlock.Type.MicroBlock,
-            forgedTxIds = Set(mkTxId(10))
+            forgedTxs = Set(mkTxId(10))
           )
 
           val event = Appended(microBlock)
@@ -211,8 +211,8 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
             updatedBalances = block2B.changes |+| microBlock.changes,
             updatedLastBlockHeight = StatusUpdate.LastBlockHeight.Updated(2),
             utxUpdate = init.utxUpdate |+| UtxUpdate(
-              forgedTxIds = block2B.forgedTxIds.union(microBlock.forgedTxIds),
-              failedTxIds = block2A.forgedTxIds // It doesn't affect now
+              forgedTxs = block2B.forgedTxs.union(microBlock.forgedTxs),
+              failedTxs = block2A.forgedTxs // It doesn't affect now
             ),
             requestNextBlockchainEvent = true
           ))
@@ -228,7 +228,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
                 outLeases = Map(bob -> 10)
               ),
               tpe = WavesBlock.Type.FullBlock,
-              forgedTxIds = Set(mkTxId(10))
+              forgedTxs = Set(mkTxId(10))
             )
 
             val event = Appended(newBlock)
@@ -253,7 +253,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
                 outLeases = Map.empty
               ),
               tpe = WavesBlock.Type.FullBlock,
-              forgedTxIds = Set(mkTxId(10))
+              forgedTxs = Set(mkTxId(10))
             )
 
             val init = TransientRollback(
@@ -261,7 +261,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
                 origChain = WavesChain(Vector(block3, block2A, block1), 97),
                 forkChain = WavesChain(Vector(block1), 99)
               ),
-              utxUpdate = UtxUpdate(forgedTxIds = Set(mkTxId(1)))
+              utxUpdate = UtxUpdate(forgedTxs = Set(mkTxId(1)))
             )
 
             val event = Appended(block2B)
@@ -285,7 +285,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
               outLeases = Map(bob -> 10)
             ),
             tpe = WavesBlock.Type.MicroBlock,
-            forgedTxIds = Set(mkTxId(10))
+            forgedTxs = Set(mkTxId(10))
           )
 
           val event = Appended(microBlock)
@@ -298,8 +298,8 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
                 outLeases = Map(bob -> 10)
               ),
               utxUpdate = init.utxUpdate |+| UtxUpdate(
-                forgedTxIds = block2B.forgedTxIds.union(microBlock.forgedTxIds),
-                failedTxIds = block2A.forgedTxIds // Doesn't affect
+                forgedTxs = block2B.forgedTxs.union(microBlock.forgedTxs),
+                failedTxs = block2A.forgedTxs // Doesn't affect
               )
             ),
             requestBalances = DiffIndex(regular = Map(carol -> Set(Waves: Asset)), outLeases = Set.empty),
@@ -364,7 +364,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
         reference = ByteStr.empty,
         changes = updatedBalances1,
         tpe = WavesBlock.Type.FullBlock,
-        forgedTxIds = Set(mkTxId(1))
+        forgedTxs = Set(mkTxId(1))
       )
 
       val microBlock = WavesBlock(
@@ -375,7 +375,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
           outLeases = Map.empty
         ),
         tpe = WavesBlock.Type.MicroBlock,
-        forgedTxIds = Set(mkTxId(2))
+        forgedTxs = Set(mkTxId(2))
       )
 
       val init = TransientResolving(
@@ -384,7 +384,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
           regular = Map(carol -> Map(Waves -> 10)),
           outLeases = Map.empty
         ),
-        utxUpdate = UtxUpdate(failedTxIds = Set(mkTxId(30)))
+        utxUpdate = UtxUpdate(failedTxs = Set(mkTxId(30)))
       )
 
       def stashedTest(event: WavesNodeEvent, requestNextBlockchainEvent: Boolean): Unit =
@@ -402,7 +402,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
             outLeases = Map(carol -> 10)
           ),
           tpe = WavesBlock.Type.MicroBlock,
-          forgedTxIds = Set(mkTxId(10))
+          forgedTxs = Set(mkTxId(10))
         )
 
         stashedTest(Appended(microBlock2), requestNextBlockchainEvent = true)
@@ -419,7 +419,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
             newStatus = init.copy(
               utxUpdate = init.utxUpdate |+| UtxUpdate(
                 unconfirmedTxs = event.addedTxs,
-                failedTxIds = event.failedTxs.headOption.map(_.id).toSet
+                failedTxs = event.failedTxs.headOption.map(_.id).toSet
               )
             ),
           ))

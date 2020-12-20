@@ -118,9 +118,9 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
     asyncUnaryCall(METHOD_RUN_ADDRESS_SCRIPT, RunAddressScriptRequest(address = address.toPB, order = Some(input.toPB))).map(parse)
   }
 
-  override def wereForged(txIds: Seq[ByteStr]): Future[Map[ByteStr, Boolean]] = handlingErrors {
+  override def areKnown(txIds: Seq[ByteStr]): Future[Map[ByteStr, Boolean]] = handlingErrors {
     asyncUnaryCall(METHOD_GET_STATUSES, TransactionsByIdRequest(txIds.map(id => UnsafeByteOperations.unsafeWrap(id.arr))))
-      .map(_.transactionsStatutes.map(txStatus => txStatus.id.toVanilla -> txStatus.status.isConfirmed).toMap)
+      .map(_.transactionsStatutes.map(txStatus => txStatus.id.toVanilla -> !txStatus.status.isNotExists).toMap)
   }.recover { case _ => txIds.map(_ -> false).toMap }
 
   override def broadcastTx(tx: transaction.ExchangeTransaction): Future[Boolean] = handlingErrors {

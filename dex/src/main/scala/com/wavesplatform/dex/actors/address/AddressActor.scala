@@ -3,8 +3,8 @@ package com.wavesplatform.dex.actors.address
 import java.time.{Instant, Duration => JDuration}
 
 import akka.actor.typed.scaladsl.adapter._
-import akka.actor.{Actor, ActorRef, Cancellable, Props, Status, typed}
-import akka.pattern.{CircuitBreakerOpenException, ask, pipe}
+import akka.actor.{typed, Actor, ActorRef, Cancellable, Props, Status}
+import akka.pattern.{ask, pipe, CircuitBreakerOpenException}
 import akka.{actor => classic}
 import cats.instances.long.catsKernelStdGroupForLong
 import cats.kernel.Group
@@ -83,6 +83,7 @@ class AddressActor(
         command.client ! Event.OrderAccepted(order.order)
       }
 
+    // TODO remove
     case event: OrderExecuted =>
       log.debug(s"OrderExecuted(${event.submittedRemaining.id}, ${event.counterRemaining.id}), amount=${event.executedAmount}")
       List(event.submittedRemaining, event.counterRemaining).filter(_.order.sender.toAddress == owner).foreach(refreshOrderState(_, event))
@@ -95,6 +96,36 @@ class AddressActor(
       if (started) pendingCommands.remove(id).foreach { pc =>
         log.trace(s"Confirming cancellation for $id")
         pc.client ! Event.OrderCanceled(id)
+      }
+
+    case msg @ Command.ApplyBatch(event, balanceUpdate) =>
+      // Event update
+      log.debug(s"OrderExecuted(${event.submittedRemaining.id}, ${event.counterRemaining.id}), amount=${event.executedAmount}")
+      List(event.submittedRemaining, event.counterRemaining).filter(_.order.sender.toAddress == owner).foreach(refreshOrderState(_, event))
+
+      // TODO refactor
+      // Balance update
+      if (wsAddressState.hasActiveSubscriptions) {
+        wsAddressState = wsAddressState.putSpendableAssets(balanceUpdate.keySet)
+        scheduleNextDiffSending()
+      }
+
+      // changesForAudit
+      if (started) {
+        val toCancel = getOrdersToCancel(balanceUpdate).filterNot(ao => isCancelling(ao.order.id()))
+        if (toCancel.isEmpty) log.trace(s"Got $msg, nothing to cancel")
+        else {
+          val cancelledText = toCancel.map(x => s"${x.insufficientAmount} ${x.assetId} for ${x.order.idStr()}").mkString(", ")
+          log.debug(s"Got $msg, canceling ${toCancel.size} of ${activeOrders.size}: doesn't have $cancelledText")
+          toCancel.foreach { x =>
+            val id = x.order.id()
+            pendingCommands.put(
+              id,
+              PendingCommand(Command.CancelOrder(id, Command.Source.BalanceTracking), ignoreRef)
+            ) // To prevent orders being cancelled twice
+            cancel(x.order, Command.Source.BalanceTracking)
+          }
+        }
       }
 
     case command @ OrderCancelFailed(id, reason) =>
@@ -207,6 +238,7 @@ class AddressActor(
           }
       }
 
+    // TODO remove
     case msg: Message.BalanceChanged =>
       if (wsAddressState.hasActiveSubscriptions) {
         wsAddressState = wsAddressState.putSpendableAssets(msg.changedAssets)
@@ -632,6 +664,8 @@ object AddressActor {
   sealed trait OneOrderCommand extends Command
 
   object Command {
+
+    case class ApplyBatch(events: Queue[Events.Event], balanceUpdate: Map[Asset, Long]) extends Command
 
     case class PlaceOrder(order: Order, isMarket: Boolean) extends OneOrderCommand {
 

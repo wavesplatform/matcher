@@ -92,11 +92,19 @@ trait PBEntitiesGen {
     .listOf(pbLeasingUpdateGen())
     .suchThat(_.groupBy(_.address).forall(_._2.lengthCompare(1) == 0)) // Because an address affected only once in a transaction
 
-  val pbUtxTransactionGen: Gen[UtxTransaction] = for {
-    id <- pbTxIdGen
+  val pbStateUpdateGen: Gen[StateUpdate] = for {
     balanceUpdates <- pbBalanceUpdateListGen
     leasingUpdates <- pbLeasingUpdateListGen
-  } yield mkUtxTransaction(id, balanceUpdates, leasingUpdates)
+  } yield StateUpdate(balances = balanceUpdates, leases = leasingUpdates)
+
+  val pbUtxTransactionGen: Gen[UtxTransaction] =
+    for {
+      id <- pbTxIdGen
+      update <- pbStateUpdateGen
+    } yield UtxTransaction(
+      id = id,
+      diff = TransactionDiff(stateUpdate = update.some).some
+    )
 
   def mkPBByteStringGen(len: Int): Gen[ByteString] =
     Gen.containerOfN[Array, Byte](len, Arbitrary.arbByte.arbitrary).map(UnsafeByteOperations.unsafeWrap)

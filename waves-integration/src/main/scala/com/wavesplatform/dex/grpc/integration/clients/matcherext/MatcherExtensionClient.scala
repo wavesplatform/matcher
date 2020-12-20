@@ -30,7 +30,7 @@ trait MatcherExtensionClient {
   def hasScript(address: Address): Future[Boolean]
   def runScript(address: Address, input: Order): Future[RunScriptResult]
 
-  def wereForged(txIds: Seq[ByteStr]): Future[Map[ByteStr, Boolean]]
+  def areKnown(txIds: Seq[ByteStr]): Future[Map[ByteStr, Boolean]]
   def broadcastTx(tx: ExchangeTransaction): Future[Boolean]
 
   def forgedOrder(orderId: ByteStr): Future[Boolean]

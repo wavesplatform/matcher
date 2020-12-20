@@ -4,14 +4,20 @@ import akka.actor.typed.Behavior
 import akka.actor.typed.scaladsl.Behaviors
 import akka.{actor => classic}
 import cats.syntax.option._
+import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
+import com.wavesplatform.dex.domain.account.Address
+import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
+import com.wavesplatform.dex.fp.MapImplicits.MapOps
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.Updates
+import com.wavesplatform.dex.grpc.integration.clients.domain.portfolio.AddressAssets
 import com.wavesplatform.dex.model.Events
 import com.wavesplatform.dex.model.Events.ExchangeTransactionCreated
 import com.wavesplatform.dex.model.ExchangeTransactionCreator.CreateTransaction
 import play.api.libs.json.Json
 
+import scala.collection.immutable.Queue
 import scala.concurrent.Future
 import scala.util.{Success, Try}
 
@@ -31,7 +37,7 @@ object OrderEventsCoordinatorActor {
   sealed trait Event extends Message
 
   object Event {
-    case class TxChecked(tx: ExchangeTransaction, isForged: Try[Boolean]) extends Event
+    case class TxChecked(tx: ExchangeTransaction, isKnown: Try[Boolean]) extends Event
   }
 
   def apply(
@@ -40,7 +46,7 @@ object OrderEventsCoordinatorActor {
     txWriterRef: classic.ActorRef,
     broadcastRef: classic.ActorRef,
     createTransaction: CreateTransaction,
-    isTransactionForged: ExchangeTransaction.Id => Future[Boolean]
+    isTransactionKnown: ExchangeTransaction.Id => Future[Boolean]
   ): Behavior[Message] = Behaviors.setup { _ =>
     def default(state: State): Behavior[Message] =
       Behaviors.receive[Message] { (context, message) =>
@@ -57,8 +63,8 @@ object OrderEventsCoordinatorActor {
                     context.log.info(s"Created transaction: $tx")
                     val txCreated = ExchangeTransactionCreated(tx)
                     txWriterRef ! txCreated
-                    context.pipeToSelf(isTransactionForged(tx.id()))(Event.TxChecked(tx, _))
-                    default(state.addPending(tx.id(), event, tx.buyOrder.id(), tx.sellOrder.id()))
+                    context.pipeToSelf(isTransactionKnown(tx.id()))(Event.TxChecked(tx, _))
+                    default(state.withExecuted(tx.id(), event, addressDirectoryRef))
 
                   case Left(ex) =>
                     import event._
@@ -72,112 +78,169 @@ object OrderEventsCoordinatorActor {
                 }
 
               case event: Events.OrderCanceled =>
-                default(state.addPending(event, addressDirectoryRef))
+                default(state.withPendingCancel(event, addressDirectoryRef))
             }
 
           case Command.ProcessError(event) =>
-            addressDirectoryRef ! event
+            addressDirectoryRef ! event // We don't add this to pending, because this event is only for notification for HTTP API
             Behaviors.same
 
           case Command.ApplyUpdates(updates) =>
-            spendableBalancesRef ! SpendableBalancesActor.Command.UpdateStates(updates.updatedBalances) // TODO: AddressActor should receive Balance AND OrderExecuted
-            if (updates.failedTxIds.nonEmpty || updates.forgedTxIds.nonEmpty) {
-              val failedTxsStr = if (updates.failedTxIds.isEmpty) "" else updates.failedTxIds.mkString("Failed: ", ", ", ". ")
-              val forgedTxsStr = if (updates.forgedTxIds.isEmpty) "" else updates.forgedTxIds.mkString("Forged: ", ", ", "")
-              context.log.info(s"$failedTxsStr$forgedTxsStr")
-            }
-            default(state.finishTxs(updates.failedTxIds.union(updates.forgedTxIds), addressDirectoryRef))
+            // addressDirectory ! AddressDirectoryActor.Envelope(address, AddressActor.Message.BalanceChanged(stateUpdate.keySet, stateUpdate))
+            val txAddresses = (updates.appearedTxs.values ++ updates.failedTxs.values).map()
+            updates.updatedBalances.view.filterKeys()
+            val (updatedState, restChanges) = state.withBalanceUpdates(updates.updatedBalances)
 
-          case Event.TxChecked(tx, isForged) =>
-            if (state.has(tx.id()))
-              isForged match {
-                case Success(false) =>
-                  broadcastRef ! ExchangeTransactionCreated(tx)
-                  Behaviors.same
-                case _ => default(state.finishTxs(Set(tx.id()), addressDirectoryRef)) // log error?
-              }
-            else Behaviors.same // Seems we got it in ApplyUpdates
+            if (restChanges.nonEmpty) spendableBalancesRef ! SpendableBalancesActor.Command.UpdateStates(restChanges)
+            // updates.failedTxs // TODO
+            default(updatedState.withKnownOnNodeTxs(updates.appearedTxs.keySet, addressDirectoryRef))
+
+          case Event.TxChecked(tx, isKnown) =>
+            val txId = tx.id()
+            isKnown match {
+              case Success(false) =>
+                broadcastRef ! ExchangeTransactionCreated(tx) // TODO handle invalid
+                Behaviors.same
+              case _ =>
+                // log error?
+                default(
+                  List(
+                    tx.buyOrder.senderPublicKey.toAddress,
+                    tx.sellOrder.senderPublicKey.toAddress
+                  ).foldLeft(state) { case (r, address) => r.withKnownOnNodeTx(address, txId, Map.empty, addressDirectoryRef) }
+                )
+            }
         }
       }
 
-    default(State(Map.empty, Map.empty))
+    default(State(Map.empty))
   }
 
-  private case class State(pendingTxs: Map[ExchangeTransaction.Id, PendingTx], pendingOrders: Map[Order.Id, PendingOrder]) {
+  private case class State(addresses: Map[Address, PendingAddress]) {
 
-    def has(txId: ExchangeTransaction.Id): Boolean = pendingTxs.contains(txId)
-
-    def addPending(txId: ExchangeTransaction.Id, event: Events.OrderExecuted, order1Id: Order.Id, order2Id: Order.Id): State =
-      State(
-        pendingTxs = pendingTxs.updated(txId, PendingTx(txId, event, Set(order1Id, order2Id))),
-        pendingOrders = pendingOrders
-          .updated(order1Id, addPendingTx(txId, order1Id))
-          .updated(order2Id, addPendingTx(txId, order2Id))
-      )
-
-    private def addPendingTx(txId: ExchangeTransaction.Id, order1Id: Order.Id): PendingOrder =
-      pendingOrders.get(order1Id) match {
-        case Some(x) => x.copy(pendingTxs = x.pendingTxs + txId)
-        case None => PendingOrder(order1Id, Set(txId), pendingCancel = none)
+    def withBalanceUpdates(updates: AddressAssets): (State, AddressAssets) =
+      updates.foldLeft((this, Map.empty: AddressAssets)) {
+        case ((state, rest), x @ (address, updates)) =>
+          state.addresses.get(address) match {
+            case None => (state, rest + x)
+            case Some(x) =>
+              (
+                state.copy(state.addresses.updated(address, x.withUpdatedBalances(updates))),
+                rest
+              )
+          }
       }
 
-    def addPending(event: Events.OrderCanceled, addressDirectoryRef: classic.ActorRef): State = {
-      val orderId = event.acceptedOrder.id
-      pendingOrders.get(orderId) match {
-        case Some(x) => State(pendingTxs, pendingOrders.updated(orderId, x.withCancel(event)))
+    def withExecuted(txId: ExchangeTransaction.Id, event: Events.OrderExecuted, addressDirectoryRef: classic.ActorRef): State = {
+      lazy val defaultPendingAddress = PendingAddress(
+        pendingTxs = Map[ExchangeTransaction.Id, PendingTransactionType](txId -> PendingTransactionType.KnownOnMatcher),
+        stashedBalance = Map.empty,
+        events = Queue(event)
+      )
+
+      State(
+        List(
+          event.counter.order.senderPublicKey.toAddress,
+          event.submitted.order.senderPublicKey.toAddress
+        ).foldLeft(addresses) { case (addresses, address) =>
+          val pendingAddress = addresses.get(address).fold(defaultPendingAddress)(_.withKnownOnMatcher(txId, event))
+          if (pendingAddress.isResolved) {
+            addressDirectoryRef ! AddressDirectoryActor.Envelope(
+              address,
+              AddressActor.Command.ApplyBatch(pendingAddress.events, pendingAddress.stashedBalance)
+            )
+            addresses - address
+          } else addresses.updated(address, pendingAddress)
+        }
+      )
+    }
+
+    def withPendingCancel(event: Events.OrderCanceled, addressDirectoryRef: classic.ActorRef): State = {
+      val address = event.acceptedOrder.order.senderPublicKey.toAddress
+      addresses.get(address) match {
+        case Some(x) => State(addresses.updated(address, x.withEvent(event)))
         case _ =>
           addressDirectoryRef ! event
           this
       }
     }
 
-    def finishTxs(txIds: Set[ExchangeTransaction.Id], addressDirectoryRef: classic.ActorRef): State = {
-      val r = txIds.foldLeft((pendingTxs, pendingOrders)) {
-        case (r @ (pendingTxs, pendingOrders), txId) =>
-          pendingTxs.get(txId) match {
-            case None => r
-            case Some(pendingTx) =>
-              addressDirectoryRef ! pendingTx.event
-              val updatedPendingOrders = pendingTx.orderIds.foldLeft(pendingOrders) { case (r, orderId) =>
-                applyTx(r, txId, orderId, addressDirectoryRef)
-              }
-              (pendingTxs - txId, updatedPendingOrders)
-          }
-      }
-      Function.tupled(State)(r)
-    }
-
-    private def applyTx(
-      pendingOrders: Map[Order.Id, PendingOrder],
+    def withKnownOnNodeTx(
+      trader: Address,
       txId: ExchangeTransaction.Id,
-      orderId: Order.Id,
+      balanceUpdates: Map[Asset, Long],
       addressDirectoryRef: classic.ActorRef
-    ): Map[Order.Id, PendingOrder] =
-      pendingOrders.get(orderId) match {
-        case Some(pendingOrder) =>
-          pendingOrder.applyTx(txId) match {
-            case Some(x) => pendingOrders.updated(orderId, x)
-            case _ =>
-              pendingOrder.pendingCancel.foreach(addressDirectoryRef ! _)
-              pendingOrders - orderId
-          }
+    ): State =
+      State(addresses.get(trader) match {
+        case Some(pendingAddress) =>
+          val updatedPendingAddress = pendingAddress.withKnownOnNode(txId, balanceUpdates)
+          if (updatedPendingAddress.isResolved) {
+            addressDirectoryRef ! AddressDirectoryActor.Envelope(
+              trader,
+              AddressActor.Command.ApplyBatch(updatedPendingAddress.events, updatedPendingAddress.stashedBalance)
+            )
+            addresses - trader
+          } else addresses.updated(trader, updatedPendingAddress)
 
-        case _ => pendingOrders
-      }
+        case None =>
+          addressDirectoryRef ! AddressDirectoryActor.Envelope(
+            trader,
+            AddressActor.Message.BalanceChanged(balanceUpdates.keySet, balanceUpdates) // TODO
+          )
+          addresses
+      })
 
   }
 
-  private case class PendingTx(id: ExchangeTransaction.Id, event: Events.OrderExecuted, orderIds: Set[Order.Id])
+  private case class PendingAddress(
+    pendingTxs: Map[ExchangeTransaction.Id, PendingTransactionType],
+    stashedBalance: Map[Asset, Long],
+    events: Queue[Events.Event]
+  ) {
+    def isResolved: Boolean = pendingTxs.isEmpty
 
-  private case class PendingOrder(id: Order.Id, pendingTxs: Set[ExchangeTransaction.Id], pendingCancel: Option[Events.OrderCanceled]) {
+    def withUpdatedBalances(xs: Map[Asset, Long]): PendingAddress = copy(stashedBalance = stashedBalance ++ xs)
 
-    def applyTx(id: ExchangeTransaction.Id): Option[PendingOrder] = {
-      val updatedPendingTxs = pendingTxs - id
-      if (updatedPendingTxs.isEmpty) none
-      else copy(pendingTxs = updatedPendingTxs).some
-    }
+    def withKnownOnNode(txId: ExchangeTransaction.Id, balanceUpdates: Map[Asset, Long]): PendingAddress =
+      pendingTxs.get(txId) match {
+        case Some(PendingTransactionType.KnownOnNode) => this
+        case Some(PendingTransactionType.KnownOnMatcher) =>
+          copy(
+            pendingTxs = pendingTxs - txId,
+            stashedBalance = stashedBalance ++ balanceUpdates
+          )
+        case _ =>
+          copy(
+            pendingTxs = pendingTxs.updated(txId, PendingTransactionType.KnownOnNode),
+            stashedBalance = stashedBalance ++ balanceUpdates
+          )
+      }
 
-    def withCancel(event: Events.OrderCanceled): PendingOrder = if (pendingCancel.isEmpty) copy(pendingCancel = event.some) else this
+    def withKnownOnMatcher(txId: ExchangeTransaction.Id, event: Events.OrderExecuted): PendingAddress =
+      pendingTxs.get(txId) match {
+        case Some(PendingTransactionType.KnownOnMatcher) => this
+        case Some(PendingTransactionType.KnownOnNode) =>
+          copy(
+            pendingTxs = pendingTxs - txId,
+            events = events.enqueue(event)
+          )
+        case _ =>
+          copy(
+            pendingTxs = pendingTxs.updated(txId, PendingTransactionType.KnownOnMatcher),
+            events = events.enqueue(event)
+          )
+      }
+
+    def withEvent(event: Events.Event): PendingAddress = copy(events = events.enqueue(event))
+  }
+
+  sealed private trait PendingTransactionType
+
+  private object PendingTransactionType {
+    case object KnownOnMatcher extends PendingTransactionType
+
+    // Will be known soon on Matcher. Another case is impossible, because we check a transaction first
+    case object KnownOnNode extends PendingTransactionType
   }
 
 }

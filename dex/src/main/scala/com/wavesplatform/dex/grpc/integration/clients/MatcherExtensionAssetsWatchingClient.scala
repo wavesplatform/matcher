@@ -53,7 +53,7 @@ class MatcherExtensionAssetsWatchingClient(
 
   override def runScript(address: Address, input: Order): Future[RunScriptResult] = underlying.runScript(address, input)
 
-  override def wereForged(txIds: Seq[ByteStr]): Future[Map[ByteStr, Boolean]] = underlying.wereForged(txIds)
+  override def areKnown(txIds: Seq[ByteStr]): Future[Map[ByteStr, Boolean]] = underlying.areKnown(txIds)
 
   override def broadcastTx(tx: ExchangeTransaction): Future[Boolean] = underlying.broadcastTx(tx)
 

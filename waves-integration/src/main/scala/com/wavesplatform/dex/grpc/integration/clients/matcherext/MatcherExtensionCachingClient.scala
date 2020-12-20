@@ -43,7 +43,7 @@ class MatcherExtensionCachingClient(underlying: MatcherExtensionClient, defaultC
   override def hasScript(address: Address): Future[Boolean] = underlying.hasScript(address)
   override def runScript(address: Address, input: Order): Future[RunScriptResult] = underlying.runScript(address, input)
 
-  override def wereForged(txIds: Seq[ByteStr]): Future[Map[ByteStr, Boolean]] = underlying.wereForged(txIds)
+  override def areKnown(txIds: Seq[ByteStr]): Future[Map[ByteStr, Boolean]] = underlying.areKnown(txIds)
   override def broadcastTx(tx: ExchangeTransaction): Future[Boolean] = underlying.broadcastTx(tx)
 
   override def forgedOrder(orderId: ByteStr): Future[Boolean] = underlying.forgedOrder(orderId)

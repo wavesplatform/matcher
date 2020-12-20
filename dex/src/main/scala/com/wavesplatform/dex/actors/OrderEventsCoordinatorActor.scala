@@ -87,30 +87,34 @@ object OrderEventsCoordinatorActor extends ScorexLogging {
           case Command.ApplyUpdates(updates) =>
             context.log.info(s"Got ApplyUpdates($updates)")
             // ISSUE HERE! A tx appeared in UTX then in FORGED! <------
-            val (updatedState, restBalances) = (updates.appearedTxs ++ updates.failedTxs).foldLeft((state, updates.updatedBalances)) {
-              case (r @ (state, restBalances), (txId, tx)) =>
-                tx.tx.transaction match {
-                  case Some(body) if body.data.isExchange =>
-                    val traderAddresses = tx.tx.transaction.flatMap(_.data.exchange).to(Seq).flatMap { data =>
-                      data.orders.map(_.senderPublicKey.toVanillaPublicKey.toAddress)
-                    }
+            val (updatedState, restBalances) = (updates.appearedTxs ++ updates.failedTxs)
+              .filterNot { case (txId, _) => state.cache.has(txId) }
+              .foldLeft((state, updates.updatedBalances)) {
+                case (r @ (state, restBalances), (txId, tx)) =>
+                  tx.tx.transaction match {
+                    case Some(body) if body.data.isExchange =>
+                      val traderAddresses = tx.tx.transaction.flatMap(_.data.exchange).to(Seq).flatMap { data =>
+                        data.orders.map(_.senderPublicKey.toVanillaPublicKey.toAddress)
+                      }
 
-                    val updatedState = traderAddresses.foldLeft(state) { case (state, address) =>
-                      state.withKnownOnNodeTx(address, txId, restBalances.getOrElse(address, Map.empty), addressDirectoryRef)
-                    }
+                      val updatedState = traderAddresses.foldLeft(state) { case (state, address) =>
+                        state.withKnownOnNodeTx(address, txId, restBalances.getOrElse(address, Map.empty), addressDirectoryRef)
+                      }
 
-                    (updatedState, restBalances -- traderAddresses)
+                      (updatedState, restBalances -- traderAddresses)
 
-                  case _ => r
-                }
-            }
+                    case _ => r
+                  }
+              }
 
             default(updatedState.withBalanceUpdates(restBalances, addressDirectoryRef))
 
           case Event.TxChecked(tx, isKnown) =>
             val txId = tx.id()
-            context.log.info(s"Got TxChecked($tx, $isKnown)")
-            isKnown match {
+            val inCache = state.cache.has(txId)
+            context.log.info(s"Got TxChecked($tx, $isKnown), inCache: $inCache")
+            if (inCache) Behaviors.same
+            else isKnown match {
               case Success(false) =>
                 broadcastRef ! ExchangeTransactionCreated(tx) // TODO handle invalid
                 Behaviors.same
@@ -126,10 +130,19 @@ object OrderEventsCoordinatorActor extends ScorexLogging {
         }
       }
 
-    default(State(Map.empty))
+    default(State(Map.empty, TxsCache(Set.empty, Vector.empty)))
   }
 
-  private case class State(addresses: Map[Address, PendingAddress]) {
+  private case class TxsCache(ids: Set[ExchangeTransaction.Id], queue: Vector[ExchangeTransaction.Id], capacity: Int = 10000) {
+    def has(id: ExchangeTransaction.Id): Boolean = ids.contains(id)
+
+    def append(id: ExchangeTransaction.Id): TxsCache =
+      if (capacity == 0) copy(ids - queue.head + id, queue.tail :+ id)
+      else copy(ids + id, queue :+ id, capacity - 1)
+
+  }
+
+  private case class State(addresses: Map[Address, PendingAddress], cache: TxsCache) {
 
     def withBalanceUpdates(updates: AddressAssets, addressDirectoryRef: classic.ActorRef): State =
       State(
@@ -145,7 +158,8 @@ object OrderEventsCoordinatorActor extends ScorexLogging {
                 )
                 addresses
             }
-        }
+        },
+        cache
       )
 
     def withExecuted(txId: ExchangeTransaction.Id, event: Events.OrderExecuted, addressDirectoryRef: classic.ActorRef): State = {
@@ -169,14 +183,15 @@ object OrderEventsCoordinatorActor extends ScorexLogging {
             )
             addresses - address
           } else addresses.updated(address, pendingAddress)
-        }
+        },
+        cache
       )
     }
 
     def withPendingCancel(event: Events.OrderCanceled, addressDirectoryRef: classic.ActorRef): State = {
       val address = event.acceptedOrder.order.senderPublicKey.toAddress
       addresses.get(address) match {
-        case Some(x) => State(addresses.updated(address, x.withEvent(event)))
+        case Some(x) => State(addresses.updated(address, x.withEvent(event)), cache)
         case _ =>
           addressDirectoryRef ! event
           this
@@ -188,8 +203,8 @@ object OrderEventsCoordinatorActor extends ScorexLogging {
       txId: ExchangeTransaction.Id,
       balanceUpdates: Map[Asset, Long],
       addressDirectoryRef: classic.ActorRef
-    ): State =
-      State(addresses.get(address) match {
+    ): State = State(
+      addresses.get(address) match {
         case Some(pendingAddress) =>
           val updatedPendingAddress = pendingAddress.withKnownOnNode(txId, balanceUpdates)
           log.info(s"==> State.withKnownOnNodeTx: $txId, $address, isResolved: ${updatedPendingAddress.isResolved}, $updatedPendingAddress")
@@ -208,7 +223,9 @@ object OrderEventsCoordinatorActor extends ScorexLogging {
             AddressActor.Message.BalanceChanged(balanceUpdates.keySet, balanceUpdates) // TODO
           )
           addresses
-      })
+      },
+      cache.append(txId)
+    )
 
   }
 

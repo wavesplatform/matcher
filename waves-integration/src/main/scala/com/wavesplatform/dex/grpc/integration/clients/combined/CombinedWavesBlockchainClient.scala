@@ -99,14 +99,19 @@ class CombinedWavesBlockchainClient(
             Updates(
               updatedFinalBalances,
               appearedTxs = ({
-                x.utxUpdate.forgedTxs.view.collect { case (id, x) if isExchangeTransactionFromMatcher(x.tx) => id.toVanilla -> x.changes }
+                x.utxUpdate.forgedTxs.view.collect { case (id, x) if isExchangeTransactionFromMatcher(x.tx) => id.toVanilla -> x }
               } ++ {
                 for {
                   tx <- x.utxUpdate.unconfirmedTxs.view if isExchangeTransactionFromMatcher(tx)
-                  update <- tx.diff.flatMap(_.stateUpdate)
-                } yield tx.id.toVanilla -> update
+                  signedTx <- tx.transaction
+                  changes <- tx.diff.flatMap(_.stateUpdate)
+                } yield tx.id.toVanilla -> TransactionWithChanges(signedTx, changes)
               }).toMap,
-              failedTxs = x.utxUpdate.failedTxs.collect { case (id, tx) if isExchangeTransactionFromMatcher(tx) => id.toVanilla }.toSet
+              failedTxs = (for {
+                tx <- x.utxUpdate.failedTxs.values if isExchangeTransactionFromMatcher(tx)
+                signedTx <- tx.transaction
+                changes <- tx.diff.flatMap(_.stateUpdate)
+              } yield tx.id.toVanilla -> TransactionWithChanges(signedTx, changes)).toMap
             )
           )
         }

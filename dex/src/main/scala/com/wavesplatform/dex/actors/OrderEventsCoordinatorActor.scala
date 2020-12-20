@@ -3,15 +3,13 @@ package com.wavesplatform.dex.actors
 import akka.actor.typed.Behavior
 import akka.actor.typed.scaladsl.Behaviors
 import akka.{actor => classic}
-import cats.syntax.option._
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
-import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
-import com.wavesplatform.dex.fp.MapImplicits.MapOps
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.Updates
 import com.wavesplatform.dex.grpc.integration.clients.domain.portfolio.AddressAssets
+import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions._
 import com.wavesplatform.dex.model.Events
 import com.wavesplatform.dex.model.Events.ExchangeTransactionCreated
 import com.wavesplatform.dex.model.ExchangeTransactionCreator.CreateTransaction
@@ -86,14 +84,25 @@ object OrderEventsCoordinatorActor {
             Behaviors.same
 
           case Command.ApplyUpdates(updates) =>
-            // addressDirectory ! AddressDirectoryActor.Envelope(address, AddressActor.Message.BalanceChanged(stateUpdate.keySet, stateUpdate))
-            val txAddresses = (updates.appearedTxs.values ++ updates.failedTxs.values).map()
-            updates.updatedBalances.view.filterKeys()
-            val (updatedState, restChanges) = state.withBalanceUpdates(updates.updatedBalances)
+            val (updatedState, restBalances) = (updates.appearedTxs ++ updates.failedTxs).foldLeft((state, updates.updatedBalances)) {
+              case (r @ (state, restBalances), (txId, tx)) =>
+                tx.tx.transaction match {
+                  case Some(body) if body.data.isExchange =>
+                    val traderAddresses = tx.tx.transaction.flatMap(_.data.exchange).to(Seq).flatMap { data =>
+                      data.orders.map(_.senderPublicKey.toVanillaPublicKey.toAddress)
+                    }
 
-            if (restChanges.nonEmpty) spendableBalancesRef ! SpendableBalancesActor.Command.UpdateStates(restChanges)
-            // updates.failedTxs // TODO
-            default(updatedState.withKnownOnNodeTxs(updates.appearedTxs.keySet, addressDirectoryRef))
+                    val updatedState = traderAddresses.foldLeft(state) { case (state, address) =>
+                      state.withKnownOnNodeTx(address, txId, restBalances.getOrElse(address, Map.empty), addressDirectoryRef)
+                    }
+
+                    (updatedState, restBalances -- traderAddresses)
+
+                  case _ => r
+                }
+            }
+
+            default(updatedState.withBalanceUpdates(restBalances, addressDirectoryRef))
 
           case Event.TxChecked(tx, isKnown) =>
             val txId = tx.id()
@@ -118,18 +127,22 @@ object OrderEventsCoordinatorActor {
 
   private case class State(addresses: Map[Address, PendingAddress]) {
 
-    def withBalanceUpdates(updates: AddressAssets): (State, AddressAssets) =
-      updates.foldLeft((this, Map.empty: AddressAssets)) {
-        case ((state, rest), x @ (address, updates)) =>
-          state.addresses.get(address) match {
-            case None => (state, rest + x)
-            case Some(x) =>
-              (
-                state.copy(state.addresses.updated(address, x.withUpdatedBalances(updates))),
-                rest
-              )
-          }
-      }
+    def withBalanceUpdates(updates: AddressAssets, addressDirectoryRef: classic.ActorRef): State =
+      State(
+        updates.foldLeft(addresses) {
+          case (addresses, (address, updates)) =>
+            addresses.get(address) match {
+              case Some(x) => addresses.updated(address, x.withUpdatedBalances(updates))
+              case None =>
+                // TODO
+                addressDirectoryRef ! AddressDirectoryActor.Envelope(
+                  address,
+                  AddressActor.Message.BalanceChanged(updates.keySet, updates)
+                )
+                addresses
+            }
+        }
+      )
 
     def withExecuted(txId: ExchangeTransaction.Id, event: Events.OrderExecuted, addressDirectoryRef: classic.ActorRef): State = {
       lazy val defaultPendingAddress = PendingAddress(

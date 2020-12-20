@@ -36,7 +36,7 @@ class AddressDirectoryActor(
   }
 
   override def receive: Receive = {
-    case Envelope(address, cmd) => forward(address, cmd)
+    case Envelope(address, msg) => forward(address, msg)
 
     case e @ Events.OrderAdded(lo, _, timestamp) =>
       forward(lo.order.sender, e)

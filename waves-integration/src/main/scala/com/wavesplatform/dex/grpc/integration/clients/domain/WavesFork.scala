@@ -5,7 +5,6 @@ import cats.instances.tuple._
 import cats.syntax.foldable._
 import com.google.protobuf.ByteString
 import com.wavesplatform.dex.grpc.integration.clients.domain.WavesFork.Status
-import com.wavesplatform.events.protobuf.StateUpdate
 
 // TODO DEX-1009 Unit test
 // TODO DEX-1011 This class is too slow for his purposes
@@ -31,8 +30,8 @@ case class WavesFork private[domain] (origChain: WavesChain, forkChain: WavesCha
       else {
         val (origDropped, forkDropped) = WavesChain.dropDifference(origChain, updatedForkChain)
 
-        val origTxs = origDropped.foldLeft(Map.empty[ByteString, StateUpdate])(_ ++ _.forgedTxs)
-        val forkTxs = forkDropped.foldLeft(Map.empty[ByteString, StateUpdate])(_ ++ _.forgedTxs)
+        val origTxs = origDropped.foldLeft(Map.empty[ByteString, TransactionWithChanges])(_ ++ _.forgedTxs)
+        val forkTxs = forkDropped.foldLeft(Map.empty[ByteString, TransactionWithChanges])(_ ++ _.forgedTxs)
 
         val origForkDiffIndex = origDropped.foldMap(_.diffIndex)
         val (updatedForkAllChanges, updatedForkDiffIndex) = forkDropped.foldMap(block => (block.changes, block.diffIndex))
@@ -42,7 +41,7 @@ case class WavesFork private[domain] (origChain: WavesChain, forkChain: WavesCha
           newChanges = updatedForkAllChanges, // TODO DEX-1011 Probably we can filter out this, but it is done on next layer. Should we do?
           lostDiffIndex = origForkDiffIndex.without(updatedForkDiffIndex),
           lostTxIds = origTxs -- forkTxs.keys,
-          forgedTxIds = forkTxs -- origTxs.keys
+          forgedTxs = forkTxs -- origTxs.keys
         )
       }
   }
@@ -71,8 +70,8 @@ object WavesFork {
       activeChain: WavesChain,
       newChanges: BlockchainBalance,
       lostDiffIndex: DiffIndex,
-      lostTxIds: Map[ByteString, StateUpdate], // Will be used in the future
-      forgedTxIds: Map[ByteString, StateUpdate]
+      lostTxIds: Map[ByteString, TransactionWithChanges], // Will be used in the future
+      forgedTxs: Map[ByteString, TransactionWithChanges]
     ) extends Status
 
     case class NotResolved(updatedFork: WavesFork) extends Status

@@ -10,7 +10,6 @@ import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.grpc.integration.clients.domain.TransactionWithChanges
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
-import com.wavesplatform.events.protobuf.StateUpdate
 import monix.reactive.Observable
 
 import scala.concurrent.Future

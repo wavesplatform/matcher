@@ -7,6 +7,7 @@ import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.Updates
 import com.wavesplatform.dex.grpc.integration.clients.domain.portfolio.AddressAssets
 import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions._
@@ -20,7 +21,7 @@ import scala.concurrent.Future
 import scala.util.{Success, Try}
 
 // TODO tests
-object OrderEventsCoordinatorActor {
+object OrderEventsCoordinatorActor extends ScorexLogging {
 
   sealed trait Message extends Product with Serializable
 
@@ -84,6 +85,8 @@ object OrderEventsCoordinatorActor {
             Behaviors.same
 
           case Command.ApplyUpdates(updates) =>
+            context.log.info(s"Got ApplyUpdates($updates)")
+            // ISSUE HERE! A tx appeared in UTX then in FORGED! <------
             val (updatedState, restBalances) = (updates.appearedTxs ++ updates.failedTxs).foldLeft((state, updates.updatedBalances)) {
               case (r @ (state, restBalances), (txId, tx)) =>
                 tx.tx.transaction match {
@@ -106,6 +109,7 @@ object OrderEventsCoordinatorActor {
 
           case Event.TxChecked(tx, isKnown) =>
             val txId = tx.id()
+            context.log.info(s"Got TxChecked($tx, $isKnown)")
             isKnown match {
               case Success(false) =>
                 broadcastRef ! ExchangeTransactionCreated(tx) // TODO handle invalid
@@ -157,6 +161,7 @@ object OrderEventsCoordinatorActor {
           event.submitted.order.senderPublicKey.toAddress
         ).foldLeft(addresses) { case (addresses, address) =>
           val pendingAddress = addresses.get(address).fold(defaultPendingAddress)(_.withKnownOnMatcher(txId, event))
+          log.info(s"==> State.withExecuted: $txId, $address, isResolved: ${pendingAddress.isResolved}, $pendingAddress")
           if (pendingAddress.isResolved) {
             addressDirectoryRef ! AddressDirectoryActor.Envelope(
               address,
@@ -179,25 +184,27 @@ object OrderEventsCoordinatorActor {
     }
 
     def withKnownOnNodeTx(
-      trader: Address,
+      address: Address,
       txId: ExchangeTransaction.Id,
       balanceUpdates: Map[Asset, Long],
       addressDirectoryRef: classic.ActorRef
     ): State =
-      State(addresses.get(trader) match {
+      State(addresses.get(address) match {
         case Some(pendingAddress) =>
           val updatedPendingAddress = pendingAddress.withKnownOnNode(txId, balanceUpdates)
+          log.info(s"==> State.withKnownOnNodeTx: $txId, $address, isResolved: ${updatedPendingAddress.isResolved}, $updatedPendingAddress")
           if (updatedPendingAddress.isResolved) {
             addressDirectoryRef ! AddressDirectoryActor.Envelope(
-              trader,
+              address,
               AddressActor.Command.ApplyBatch(updatedPendingAddress.events, updatedPendingAddress.stashedBalance)
             )
-            addresses - trader
-          } else addresses.updated(trader, updatedPendingAddress)
+            addresses - address
+          } else addresses.updated(address, updatedPendingAddress)
 
         case None =>
+          log.info(s"==> State.withKnownOnNodeTx: $txId, $address, send only balances")
           addressDirectoryRef ! AddressDirectoryActor.Envelope(
-            trader,
+            address,
             AddressActor.Message.BalanceChanged(balanceUpdates.keySet, balanceUpdates) // TODO
           )
           addresses

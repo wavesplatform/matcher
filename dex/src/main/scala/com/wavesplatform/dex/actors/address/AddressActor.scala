@@ -98,7 +98,8 @@ class AddressActor(
         pc.client ! Event.OrderCanceled(id)
       }
 
-    case Command.ApplyBatch(events, balanceUpdate) =>
+    case msg @ Command.ApplyBatch(events, balanceUpdate) =>
+      log.info(s"Got $msg")
       // TODO a bit silly, but should work
       events.foreach(eventsProcessing(_))
       if (started) working(Message.BalanceChanged(balanceUpdate.keySet, balanceUpdate)) // TODO

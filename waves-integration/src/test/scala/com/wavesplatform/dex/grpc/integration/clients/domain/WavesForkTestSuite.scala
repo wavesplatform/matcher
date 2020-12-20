@@ -173,7 +173,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
             ),
             lostDiffIndex = Monoid.empty[DiffIndex],
             lostTxIds = Set.empty,
-            forgedTxIds = microBlock.forgedTxs
+            forgedTxs = microBlock.forgedTxs
           ): Status)
         }
 
@@ -210,7 +210,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
             newChanges = microBlock2.changes,
             lostDiffIndex = Monoid.empty[DiffIndex],
             lostTxIds = Set.empty,
-            forgedTxIds = microBlock2.forgedTxs
+            forgedTxs = microBlock2.forgedTxs
           ): Status)
         }
       }

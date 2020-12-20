@@ -149,6 +149,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     settings = settings.wavesBlockchainClient,
     underlying = WavesClientBuilder.async(
       settings.wavesBlockchainClient,
+      matcherPublicKey,
       monixScheduler = monixScheduler,
       grpcExecutionContext = grpcExecutionContext
     ),

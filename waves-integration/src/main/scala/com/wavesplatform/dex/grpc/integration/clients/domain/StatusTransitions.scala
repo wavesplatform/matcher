@@ -76,7 +76,7 @@ object StatusTransitions extends ScorexLogging {
             origStatus.fork.withBlock(block) match {
               case resolved: Status.Resolved =>
                 val finalUtxUpdate = origStatus.utxUpdate |+| UtxUpdate(
-                  forgedTxs = resolved.forgedTxIds,
+                  forgedTxs = resolved.forgedTxs,
                   failedTxs = Map.empty // resolved.lostTxIds
                 )
 

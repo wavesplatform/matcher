@@ -178,7 +178,7 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase with NoSt
         val exchangeTx = mkExchangeTx
 
         withClue(exchangeTx.id().base58) {
-          wait(client.broadcastTx(exchangeTx)) shouldBe true
+          wait(client.broadcastTx(exchangeTx)) shouldBe BroadcastResult.Added
           wavesNode1.api.waitForTransaction(exchangeTx.id())
         }
       }
@@ -188,7 +188,7 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase with NoSt
 
         withClue(exchangeTx.id().base58) {
           broadcastAndAwait(exchangeTx.toWavesJ())
-          wait(client.broadcastTx(exchangeTx)) shouldBe true
+          wait(client.broadcastTx(exchangeTx)) shouldBe a[BroadcastResult.Failed]
         }
       }
     }
@@ -219,7 +219,7 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase with NoSt
           )
           .explicitGet()
 
-      wait(client.broadcastTx(exchangeTx)) shouldBe false
+      wait(client.broadcastTx(exchangeTx)) shouldBe a[BroadcastResult.Failed]
     }
   }
 

@@ -105,13 +105,13 @@ class CombinedWavesBlockchainClient(
                   tx <- x.utxUpdate.unconfirmedTxs.view if isExchangeTransactionFromMatcher(tx)
                   signedTx <- tx.transaction
                   changes <- tx.diff.flatMap(_.stateUpdate)
-                } yield tx.id.toVanilla -> TransactionWithChanges(signedTx, changes)
+                } yield tx.id.toVanilla -> TransactionWithChanges(tx.id, signedTx, changes)
               }).toMap,
               failedTxs = (for {
                 tx <- x.utxUpdate.failedTxs.values if isExchangeTransactionFromMatcher(tx)
                 signedTx <- tx.transaction
                 changes <- tx.diff.flatMap(_.stateUpdate)
-              } yield tx.id.toVanilla -> TransactionWithChanges(signedTx, changes)).toMap
+              } yield tx.id.toVanilla -> TransactionWithChanges(tx.id, signedTx, changes)).toMap
             )
           )
         }

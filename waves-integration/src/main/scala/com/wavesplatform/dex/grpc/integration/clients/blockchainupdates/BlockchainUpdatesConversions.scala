@@ -51,7 +51,7 @@ object BlockchainUpdatesConversions {
               .zip(updates.transactionStateUpdates)
               .zip(transactionBodies)
               .map {
-                case ((id, update), tx) => id -> TransactionWithChanges(tx, update)
+                case ((id, update), tx) => id -> TransactionWithChanges(id, tx, update)
               }
               .toMap
           )

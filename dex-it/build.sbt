@@ -6,6 +6,11 @@ description := "DEX integration tests"
 
 libraryDependencies ++= Dependencies.Module.dexIt
 
+Test / scalacOptions ++= List(
+  "-P:silencer:globalFilters=^magnolia: using fallback derivation.*$", // https://github.com/softwaremill/diffx#customization
+  "-P:silencer:globalFilters=^.*is never used.*$"
+)
+
 // Additional files required for dex-it image
 itArtifactDescriptions := {
 

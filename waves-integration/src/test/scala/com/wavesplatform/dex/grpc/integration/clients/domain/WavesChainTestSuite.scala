@@ -64,7 +64,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
                 reference = headBlock.fold(ByteStr(Array[Byte](-8)))(_.ref.id),
                 changes = Monoid.empty[BlockchainBalance],
                 tpe = WavesBlock.Type.FullBlock,
-                forgedTxs = Map.empty // TODO
+                forgedTxs = Map.empty
               ),
               history
             )

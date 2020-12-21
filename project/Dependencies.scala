@@ -178,7 +178,7 @@ object Dependencies {
     javaLevelDb,
     allureScalaTest,
     diffx
-  ) map (_ % Test)
+  ).map(_ % Test)  ++ silencer
 
   private val integrationTestKit: Seq[ModuleID] = Seq(wavesJ, logback % Test) ++ testKit
 
@@ -243,7 +243,7 @@ object Dependencies {
       sttpClient,
       wavesJ,
       betterMonadicFor
-    ) ++ pureConfig ++ enumeratum ++ testKit ++ quill ++ monocle ++ silencer
+    ) ++ pureConfig ++ enumeratum ++ testKit ++ quill ++ monocle
 
     lazy val dexLoad: Seq[ModuleID] = Seq(diffx) ++ pureConfig
 

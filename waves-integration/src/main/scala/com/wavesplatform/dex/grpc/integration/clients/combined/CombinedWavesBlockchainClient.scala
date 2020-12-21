@@ -40,7 +40,7 @@ import com.wavesplatform.protobuf.transaction.SignedTransaction
 
 class CombinedWavesBlockchainClient(
   settings: Settings,
-  matcherPublicKey: PublicKey, // * @param matcherPublicKey Used to ignore transactions other than Matcher's ones in Updates
+  matcherPublicKey: PublicKey,
   meClient: MatcherExtensionClient,
   bClient: BlockchainUpdatesClient
 )(implicit ec: ExecutionContext, monixScheduler: Scheduler)

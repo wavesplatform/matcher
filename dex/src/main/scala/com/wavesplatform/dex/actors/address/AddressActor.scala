@@ -83,7 +83,6 @@ class AddressActor(
         command.client ! Event.OrderAccepted(order.order)
       }
 
-    // TODO remove
     case event: OrderExecuted =>
       log.debug(s"OrderExecuted(${event.submittedRemaining.id}, ${event.counterRemaining.id}), amount=${event.executedAmount}")
       List(event.submittedRemaining, event.counterRemaining).filter(_.order.sender.toAddress == owner).foreach(refreshOrderState(_, event))
@@ -214,7 +213,6 @@ class AddressActor(
           }
       }
 
-    // TODO remove
     case msg: Message.BalanceChanged =>
       if (wsAddressState.hasActiveSubscriptions) {
         wsAddressState = wsAddressState.putSpendableAssets(msg.changedAssets)

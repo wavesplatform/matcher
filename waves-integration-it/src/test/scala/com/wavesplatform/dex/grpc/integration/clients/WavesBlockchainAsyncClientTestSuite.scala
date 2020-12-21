@@ -6,7 +6,7 @@ import java.util.concurrent.atomic.AtomicReference
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.wavesplatform.dex.collection.MapOps.Ops2D
-import com.wavesplatform.dex.domain.account.{Address, KeyPair}
+import com.wavesplatform.dex.domain.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -38,7 +38,7 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase with NoSt
 
   private lazy val client =
     WavesClientBuilder.async(
-      WavesBlockchainClientSettings(
+      wavesBlockchainClientSettings= WavesBlockchainClientSettings(
         grpc = GrpcClientSettings(
           target = wavesNode1.matcherExtApiTarget,
           maxHedgedAttempts = 5,
@@ -67,8 +67,9 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase with NoSt
           pessimisticPortfolios = SynchronizedPessimisticPortfolios.Settings(100)
         )
       ),
-      monixScheduler,
-      ExecutionContext.fromExecutor(grpcExecutor)
+      matcherPublicKey = PublicKey(Array.emptyByteArray), // Doesn't matter here
+      monixScheduler = monixScheduler,
+      grpcExecutionContext = ExecutionContext.fromExecutor(grpcExecutor)
     )
 
   implicit override def patienceConfig: PatienceConfig = super.patienceConfig.copy(

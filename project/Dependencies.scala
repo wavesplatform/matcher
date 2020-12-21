@@ -243,7 +243,7 @@ object Dependencies {
       sttpClient,
       wavesJ,
       betterMonadicFor
-    ) ++ pureConfig ++ enumeratum ++ testKit ++ quill ++ monocle
+    ) ++ pureConfig ++ enumeratum ++ testKit ++ quill ++ monocle ++ silencer
 
     lazy val dexLoad: Seq[ModuleID] = Seq(diffx) ++ pureConfig
 

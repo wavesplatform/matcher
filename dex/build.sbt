@@ -18,6 +18,8 @@ enablePlugins(
   ImageVersionPlugin
 )
 
+Test / scalacOptions += "-P:silencer:globalFilters=^magnolia: using fallback derivation.*$" // https://github.com/softwaremill/diffx#customization
+
 V.scalaPackage := "com.wavesplatform.dex"
 V.subProject := "dex"
 

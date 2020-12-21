@@ -125,8 +125,7 @@ inScope(Global)(
       "-Yrangepos", // required for scalafix
       "-P:semanticdb:synthetics:on",
       // Excluding -byname-implicit is required for Scala 2.13 due to https://github.com/scala/bug/issues/12072
-      "-Xlint:_,-byname-implicit", // Fixes pureconfig.generic.semiauto.deriveReader
-      "-P:silencer:globalFilters=^magnolia: using fallback derivation.*$" // https://github.com/softwaremill/diffx#customization
+      "-Xlint:_,-byname-implicit" // Fixes pureconfig.generic.semiauto.deriveReader
     ),
     crossPaths := false,
     scalafmtOnCompile := false,

@@ -86,7 +86,6 @@ object OrderEventsCoordinatorActor extends ScorexLogging {
 
           case Command.ApplyUpdates(updates) =>
             context.log.info(s"Got ApplyUpdates($updates)")
-            // ISSUE HERE! A tx appeared in UTX then in FORGED! <------
             val (updatedState, restBalances) = (updates.appearedTxs ++ updates.failedTxs)
               .filterNot { case (txId, _) => state.cache.has(txId) }
               .foldLeft((state, updates.updatedBalances)) {

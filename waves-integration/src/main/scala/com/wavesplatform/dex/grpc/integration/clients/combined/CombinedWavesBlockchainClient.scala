@@ -136,7 +136,7 @@ class CombinedWavesBlockchainClient(
     else
       pessimisticPortfolios.addPending(utxUpdate.unconfirmedTxs) |+|
       pessimisticPortfolios.processForged(utxUpdate.forgedTxs.keySet)._1 |+|
-      pessimisticPortfolios.removeFailed(utxUpdate.failedTxs.keySet) // TODO Not only exchange transactions
+      pessimisticPortfolios.removeFailed(utxUpdate.failedTxs.keySet)
 
   // TODO DEX-1015
   private def requestBalances(x: DiffIndex): Unit =

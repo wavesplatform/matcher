@@ -22,6 +22,7 @@ class WsCollectChangesClient(apiUri: String, address: String, aus: String, obs: 
   private val emptyWsAddressState: WsAddressChanges = WsAddressChanges(Address.fromString(address).explicitGet(), Map.empty, Seq.empty, 0L)
   @volatile private var accountUpdates = emptyWsAddressState
   private val orderBookUpdates = mutable.AnyRefMap.empty[AssetPair, WsOrderBookChanges]
+  val addressUpdateLeaps = scala.collection.mutable.ArrayBuffer.empty[String]
   @volatile private var gotPings = 0
 
   private val receive: Function[WsServerMessage, Option[WsClientMessage]] = {
@@ -40,8 +41,7 @@ class WsCollectChangesClient(apiUri: String, address: String, aus: String, obs: 
 
   private def validate(orig: WsAddressChanges, diff: WsAddressChanges) = diff.balances.foreach { b =>
     if (orig.balances(b._1).tradable > b._2.tradable)
-      println(s"${orig.address} orig: ${orig.balances(b._1).tradable} diff: ${b._2.tradable}")
-    else println(s"validation for ${orig.address} is OK")
+      addressUpdateLeaps += s"${orig.address} orig: ${orig.balances(b._1).tradable} diff: ${b._2.tradable}"
   }
 
   private def merge(orig: WsAddressChanges, diff: WsAddressChanges): WsAddressChanges = WsAddressChanges(

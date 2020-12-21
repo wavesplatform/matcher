@@ -183,6 +183,109 @@ object WavesDexLoadCli extends ScoptImplicits {
               case Command.Check =>
                 implicit val system = ActorSystem()
 
+                def checkLeaps() = {
+                  val clients: Seq[WsCollectChangesClient] =
+                    WsAccumulateChanges.createClients(args.dexWsApi, args.feederFile, args.accountsNumber, args.wsCheckType)
+
+                  val withLeaps =
+                    try {
+                      Future.traverse(clients)(_.run())
+                      Await.result(GlobalTimer.instance.sleep(args.collectTime), Duration.Inf)
+
+                      clients.filter(_.addressUpdateLeaps.size != 0)
+                    } finally {
+                      clients.foreach(_.close())
+                      system.terminate()
+                      GlobalTimer.instance.stop()
+                    }
+
+                  if (withLeaps.size > 0) {
+                    println("Balance leaps:")
+                    withLeaps.foreach(println(_))
+                    sys.exit(1)
+                  } else
+                    println("Congratulations! All checks passed!")
+                }
+
+                def checkChanges() = {
+                  val clients: Seq[WsCollectChangesClient] = cli.wrapByLogs[Id, Seq[WsCollectChangesClient]]("Creating clients.. ") {
+                    WsAccumulateChanges.createClients(args.dexWsApi, args.feederFile, args.accountsNumber, args.wsCheckType)
+                  }
+
+                  val r =
+                    try {
+                      val checks = for {
+                        _ <- cli.wrapByLogs("Stage 1. Running clients... ")(Future.traverse(clients)(_.run()))
+                        _ <- cli.wrapByLogs(s"Stage 1. Waiting ${args.collectTime}... ")(GlobalTimer.instance.sleep(args.collectTime))
+                        watchedAddresses <- cli.wrapByLogs("Stage 1. Getting collected addresses... ") {
+                          Future.successful(getOrThrow(checkUniq(clients.map(_.collectedAddressState).groupBy(_.address))))
+                        }
+                        watchedOrderBooks <- cli.wrapByLogs("Stage 1. Getting collected order books... ") {
+                          Future.successful(getOrThrow(checkUniq(switch(clients.map(_.collectedOrderBooks)))))
+                        }
+                        _ <- cli.wrapByLogs("Stage 1. Checking amount of pings... ") {
+                          Future.successful(println(clients.map(_.pingsNumber).mkString(", ")))
+                        }
+                        _ <- cli.wrapByLogs("Stage 1. Stopping clients... ")(Future.traverse(clients)(_.close()))
+
+                        _ <- cli.wrapByLogs("Stage 2. Running new clients... ")(Future.traverse(clients)(_.run()))
+                        _ <- cli.wrapByLogs(s"Stage 2. Waiting ${args.wsResponseWaitTime}... ") {
+                          GlobalTimer.instance.sleep(args.wsResponseWaitTime)
+                        }
+                        finalAddresses <- cli.wrapByLogs("Stage 2. Getting final addresses... ") {
+                          Future.successful {
+                            getOrThrow(checkUniq(clients.map(_.collectedAddressState).groupBy(_.address)))
+                          }
+                        }
+                        finalOrderBooks <- cli.wrapByLogs("Stage 2. Getting final order books... ") {
+                          Future.successful {
+                            getOrThrow(checkUniq(switch(clients.map(_.collectedOrderBooks))))
+                          }
+                        }
+
+                        _ <- cli.wrapByLogs("Stage 2. Stopping clients... ")(Future.traverse(clients)(_.close()))
+
+                        _ <- cli.wrapByLogs("Stage 3. Comparing collected and final addresses... ") {
+                          Future {
+                            val addressesCompareResult = compare(watchedAddresses, finalAddresses)
+                            if (!addressesCompareResult.isIdentical) {
+                              println(s"Found issues:\n${addressesCompareResult.show}")
+                              throw new IllegalStateException("Found issues")
+                            }
+                          }
+                        }
+
+                        _ <- cli.wrapByLogs("Stage 3. Comparing collected and final order books... ") {
+                          Future {
+                            val orderBooksCompareResult = compare(watchedOrderBooks, finalOrderBooks)
+                            if (!orderBooksCompareResult.isIdentical) {
+                              println(s"Found issues:\n${orderBooksCompareResult.show}")
+                              throw new IllegalStateException("Found issues")
+                            }
+                          }
+                        }
+                      } yield ()
+
+                      val r = checks
+                        .map(_ => "Congratulations! All checks passed!".asRight[String])
+                        .recover { case x => x.getWithStackTrace.asLeft[String] }
+
+                      Await.result(r, Duration.Inf)
+                    } finally {
+                      clients.foreach(_.close())
+                      system.terminate()
+                      GlobalTimer.instance.stop()
+                    }
+
+                  r match {
+                    case Right(diagnosticNotes) => println(diagnosticNotes)
+                    case Left(error) =>
+                      println(error)
+                      sys.exit(1)
+                  }
+
+                }
+
                 cli.log[Id](
                   s"""Arguments:
                      |  DEX REST API            : ${args.dexRestApi}
@@ -194,80 +297,9 @@ object WavesDexLoadCli extends ScoptImplicits {
                      |  WebSocket check type    : ${args.wsCheckType}\n""".stripMargin
                 )
 
-                val clients: Seq[WsCollectChangesClient] = cli.wrapByLogs[Id, Seq[WsCollectChangesClient]]("Creating clients.. ") {
-                  WsAccumulateChanges.createClients(args.dexWsApi, args.feederFile, args.accountsNumber, args.wsCheckType)
-                }
-
-                val r =
-                  try {
-                    val checks = for {
-                      _ <- cli.wrapByLogs("Stage 1. Running clients... ")(Future.traverse(clients)(_.run()))
-                      _ <- cli.wrapByLogs(s"Stage 1. Waiting ${args.collectTime}... ")(GlobalTimer.instance.sleep(args.collectTime))
-                      watchedAddresses <- cli.wrapByLogs("Stage 1. Getting collected addresses... ") {
-                        Future.successful(getOrThrow(checkUniq(clients.map(_.collectedAddressState).groupBy(_.address))))
-                      }
-                      watchedOrderBooks <- cli.wrapByLogs("Stage 1. Getting collected order books... ") {
-                        Future.successful(getOrThrow(checkUniq(switch(clients.map(_.collectedOrderBooks)))))
-                      }
-                      _ <- cli.wrapByLogs("Stage 1. Checking amount of pings... ") {
-                        Future.successful(println(clients.map(_.pingsNumber).mkString(", ")))
-                      }
-                      _ <- cli.wrapByLogs("Stage 1. Stopping clients... ")(Future.traverse(clients)(_.close()))
-
-                      _ <- cli.wrapByLogs("Stage 2. Running new clients... ")(Future.traverse(clients)(_.run()))
-                      _ <- cli.wrapByLogs(s"Stage 2. Waiting ${args.wsResponseWaitTime}... ") {
-                        GlobalTimer.instance.sleep(args.wsResponseWaitTime)
-                      }
-                      finalAddresses <- cli.wrapByLogs("Stage 2. Getting final addresses... ") {
-                        Future.successful {
-                          getOrThrow(checkUniq(clients.map(_.collectedAddressState).groupBy(_.address)))
-                        }
-                      }
-                      finalOrderBooks <- cli.wrapByLogs("Stage 2. Getting final order books... ") {
-                        Future.successful {
-                          getOrThrow(checkUniq(switch(clients.map(_.collectedOrderBooks))))
-                        }
-                      }
-
-                      _ <- cli.wrapByLogs("Stage 2. Stopping clients... ")(Future.traverse(clients)(_.close()))
-
-                      _ <- cli.wrapByLogs("Stage 3. Comparing collected and final addresses... ") {
-                        Future {
-                          val addressesCompareResult = compare(watchedAddresses, finalAddresses)
-                          if (!addressesCompareResult.isIdentical) {
-                            println(s"Found issues:\n${addressesCompareResult.show}")
-                            throw new IllegalStateException("Found issues")
-                          }
-                        }
-                      }
-
-                      _ <- cli.wrapByLogs("Stage 3. Comparing collected and final order books... ") {
-                        Future {
-                          val orderBooksCompareResult = compare(watchedOrderBooks, finalOrderBooks)
-                          if (!orderBooksCompareResult.isIdentical) {
-                            println(s"Found issues:\n${orderBooksCompareResult.show}")
-                            throw new IllegalStateException("Found issues")
-                          }
-                        }
-                      }
-                    } yield ()
-
-                    val r = checks
-                      .map(_ => "Congratulations! All checks passed!".asRight[String])
-                      .recover { case x => x.getWithStackTrace.asLeft[String] }
-
-                    Await.result(r, Duration.Inf)
-                  } finally {
-                    clients.foreach(_.close())
-                    system.terminate()
-                    GlobalTimer.instance.stop()
-                  }
-
-                r match {
-                  case Right(diagnosticNotes) => println(diagnosticNotes)
-                  case Left(error) =>
-                    println(error)
-                    sys.exit(1)
+                args.wsCheckType match {
+                  case 1 => checkLeaps()
+                  case 2 => checkChanges()
                 }
             }
             println("Done")

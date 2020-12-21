@@ -418,7 +418,8 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       waitOffsetReached(lastOffsetQueue, deadline)
     }
   } yield {
-    log.info("Last offset has been reached, notify addresses")
+    log.info("Last offset has been reached, switching to a normal mode")
+    orderEventsCoordinatorRef ! OrderEventsCoordinatorActor.Command.Start
     addressDirectoryRef ! AddressDirectoryActor.StartWork
   }
 

@@ -221,10 +221,11 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
     // buy counter order is not executed completely, but has filled status
     dex1.api.getOrderStatus(buyOrder) should matchTo(HttpOrderStatus(Status.Filled, 270476663L.some, 299999L.some))
 
-    val buyOrderEvents = getEventsInfoByOrderId(buyOrder.id())
-
-    buyOrderEvents should have size 1
-    buyOrderEvents.head.status shouldBe statusFilled
+    eventually {
+      val buyOrderEvents = getEventsInfoByOrderId(buyOrder.id())
+      buyOrderEvents should have size 1
+      buyOrderEvents.head.status shouldBe statusFilled
+    }
 
     getEventsInfoByOrderId(sellOrder.id()).last.status shouldBe statusPartiallyFilled
 

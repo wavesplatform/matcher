@@ -23,7 +23,7 @@ import com.wavesplatform.dex.grpc.integration.clients.domain._
 import com.wavesplatform.dex.grpc.integration.clients.domain.portfolio.SynchronizedPessimisticPortfolios
 import com.wavesplatform.dex.grpc.integration.clients.matcherext.MatcherExtensionClient
 import com.wavesplatform.dex.grpc.integration.protobuf.DexToPbConversions._
-import com.wavesplatform.dex.grpc.integration.clients.{RunScriptResult, WavesBlockchainClient}
+import com.wavesplatform.dex.grpc.integration.clients.{BroadcastResult, RunScriptResult, WavesBlockchainClient}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import monix.eval.Task
 import monix.execution.Scheduler
@@ -226,8 +226,7 @@ class CombinedWavesBlockchainClient(
   override def areKnown(txIds: Seq[ByteStr]): Future[Map[ByteStr, Boolean]] =
     meClient.areKnown(txIds)
 
-  override def broadcastTx(tx: ExchangeTransaction): Future[Boolean] =
-    meClient.broadcastTx(tx)
+  override def broadcastTx(tx: ExchangeTransaction): Future[BroadcastResult] = meClient.broadcastTx(tx)
 
   override def isOrderForged(orderId: ByteStr): Future[Boolean] =
     meClient.forgedOrder(orderId)

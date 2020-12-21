@@ -55,14 +55,16 @@ class MatcherExtensionAssetsWatchingClient(
 
   override def areKnown(txIds: Seq[ByteStr]): Future[Map[ByteStr, Boolean]] = underlying.areKnown(txIds)
 
-  override def broadcastTx(tx: ExchangeTransaction): Future[Boolean] = underlying.broadcastTx(tx)
+  override def broadcastTx(tx: ExchangeTransaction): Future[BroadcastResult] = underlying.broadcastTx(tx)
 
   override def isOrderForged(orderId: ByteStr): Future[Boolean] = underlying.isOrderForged(orderId)
 
   override def close(): Future[Unit] = underlying.close()
 
   private def saveAssetsDescription(assets: Set[Asset]): Future[Unit] =
-    Future.traverse(assets.iterator.collect { case asset: IssuedAsset if !assetsStorage.contains(asset) => asset })(saveAssetDescription).map(_ => ())
+    Future.traverse(assets.iterator.collect { case asset: IssuedAsset if !assetsStorage.contains(asset) => asset })(saveAssetDescription).map(
+      _ => ()
+    )
 
   private def saveAssetDescription(asset: IssuedAsset): Future[Unit] =
     assetsStorage.get(asset) match {

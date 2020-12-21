@@ -4,6 +4,7 @@ import akka.actor.typed.Behavior
 import akka.actor.typed.scaladsl.Behaviors
 import akka.{actor => classic}
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
+import com.wavesplatform.dex.actors.tx.BroadcastExchangeTransactionActor
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
@@ -28,9 +29,13 @@ object OrderEventsCoordinatorActor extends ScorexLogging {
   sealed trait Command extends Message
 
   object Command {
+    case object Start extends Command
+
     case class Process(event: Events.Event) extends Command
     case class ProcessError(event: Events.OrderCancelFailed) extends Command
     case class ApplyUpdates(updates: Updates) extends Command
+
+    // case class ApplyObserved(tx: ExchangeTransaction) extends Command // TODO Better name or combined with ApplyUpdates
   }
 
   sealed trait Event extends Message
@@ -72,7 +77,7 @@ object OrderEventsCoordinatorActor extends ScorexLogging {
                          |o1: (amount=${submitted.amount}, fee=${submitted.fee}): ${Json.prettyPrint(submitted.order.json())}
                          |o2: (amount=${counter.amount}, fee=${counter.fee}): ${Json.prettyPrint(counter.order.json())}""".stripMargin
                     )
-                    addressDirectoryRef ! event
+                    addressDirectoryRef ! event // TODO should we remove Observed on NODE? <----
                     Behaviors.same
                 }
 
@@ -115,7 +120,7 @@ object OrderEventsCoordinatorActor extends ScorexLogging {
             if (inCache) Behaviors.same
             else isKnown match {
               case Success(false) =>
-                broadcastRef ! ExchangeTransactionCreated(tx) // TODO handle invalid
+                broadcastRef ! BroadcastExchangeTransactionActor.Broadcast(context.self, tx)
                 Behaviors.same
               case _ =>
                 // log error?
@@ -126,10 +131,43 @@ object OrderEventsCoordinatorActor extends ScorexLogging {
                   ).foldLeft(state) { case (r, address) => r.withKnownOnNodeTx(address, txId, Map.empty, addressDirectoryRef) }
                 )
             }
+
+          case Command.Start =>
+            context.log.error("Unexpected Command.Start")
+            Behaviors.same
         }
       }
 
-    default(State(Map.empty, TxsCache(Set.empty, Vector.empty)))
+    val ignoring: Behavior[Message] = Behaviors.receiveMessage[Message] {
+      case Command.Process(event) =>
+        addressDirectoryRef ! event
+        event match {
+          case event: Events.OrderExecuted =>
+            createTransaction(event).foreach { tx =>
+              val txCreated = ExchangeTransactionCreated(tx)
+              txWriterRef ! txCreated
+              broadcastRef ! txCreated
+            }
+
+          case _ =>
+        }
+        Behaviors.same
+
+      case Command.ProcessError(event) =>
+        addressDirectoryRef ! event
+        Behaviors.same
+
+      case Command.ApplyUpdates(updates) =>
+        updates.updatedBalances.foreach { case (address, updates) =>
+          addressDirectoryRef ! AddressDirectoryActor.Envelope(address, AddressActor.Message.BalanceChanged(updates.keySet, updates))
+        }
+        Behaviors.same
+
+      case Command.Start => default(State(Map.empty, TxsCache(Set.empty, Vector.empty)))
+      case _: Event.TxChecked => Behaviors.same
+    }
+
+    ignoring
   }
 
   private case class TxsCache(ids: Set[ExchangeTransaction.Id], queue: Vector[ExchangeTransaction.Id], capacity: Int = 10000) {

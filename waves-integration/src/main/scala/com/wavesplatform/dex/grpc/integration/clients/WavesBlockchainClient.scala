@@ -36,7 +36,7 @@ trait WavesBlockchainClient {
    * Forged or unconfirmed
    */
   def areKnown(txIds: Seq[ByteStr]): Future[Map[ByteStr, Boolean]]
-  def broadcastTx(tx: ExchangeTransaction): Future[Boolean]
+  def broadcastTx(tx: ExchangeTransaction): Future[BroadcastResult]
 
   def isOrderForged(orderId: ByteStr): Future[Boolean]
 

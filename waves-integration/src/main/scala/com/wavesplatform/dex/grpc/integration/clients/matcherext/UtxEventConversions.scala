@@ -26,7 +26,9 @@ object UtxEventConversions extends ScorexLogging {
 
         if (addedTxs.isEmpty && failedTxs.isEmpty) none
         else WavesNodeEvent.UtxUpdated(addedTxs, failedTxs).some
-      case _ => none
+      case _ =>
+        log.error(s"Can't convert $event to a domain event")
+        none
     }
 
 }

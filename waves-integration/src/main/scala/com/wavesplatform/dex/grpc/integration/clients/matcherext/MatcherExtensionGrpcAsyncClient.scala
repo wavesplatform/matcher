@@ -12,14 +12,13 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.grpc.integration.clients.RunScriptResult
+import com.wavesplatform.dex.grpc.integration.clients.{BroadcastResult, RunScriptResult}
 import com.wavesplatform.dex.grpc.integration.clients.domain.{BlockRef, BlockchainBalance, DiffIndex}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.effect.Implicits.NettyFutureOps
 import com.wavesplatform.dex.grpc.integration.exceptions.{UnexpectedConnectionException, WavesNodeConnectionLostException}
 import com.wavesplatform.dex.grpc.integration.protobuf.DexToPbConversions._
 import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions._
-import com.wavesplatform.dex.grpc.integration.services.RunScriptResponse.Result
 import com.wavesplatform.dex.grpc.integration.services.WavesBlockchainApiGrpc._
 import com.wavesplatform.dex.grpc.integration.services._
 import io.grpc._
@@ -49,13 +48,16 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
 
   private val empty: Empty = Empty()
 
-  private def parse(input: RunScriptResponse): RunScriptResult = input.result match {
-    case Result.WrongInput(message) => throw new IllegalArgumentException(message)
-    case Result.Empty => RunScriptResult.Allowed
-    case Result.ScriptError(message) => RunScriptResult.ScriptError(message)
-    case Result.UnexpectedResult(obj) => RunScriptResult.UnexpectedResult(obj)
-    case Result.Exception(value) => RunScriptResult.Exception(value.name, value.message)
-    case _: Result.Denied => RunScriptResult.Denied
+  private def parse(input: RunScriptResponse): RunScriptResult = {
+    import RunScriptResponse.Result
+    input.result match {
+      case Result.WrongInput(message) => throw new IllegalArgumentException(message)
+      case Result.Empty => RunScriptResult.Allowed
+      case Result.ScriptError(message) => RunScriptResult.ScriptError(message)
+      case Result.UnexpectedResult(obj) => RunScriptResult.UnexpectedResult(obj)
+      case Result.Exception(value) => RunScriptResult.Exception(value.name, value.message)
+      case _: Result.Denied => RunScriptResult.Denied
+    }
   }
 
   override val utxEvents = new GrpcUtxEventsControlledStream(channel)(monixScheduler)
@@ -123,9 +125,16 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
       .map(_.transactionsStatutes.map(txStatus => txStatus.id.toVanilla -> !txStatus.status.isNotExists).toMap)
   }.recover { case _ => txIds.map(_ -> false).toMap }
 
-  override def broadcastTx(tx: transaction.ExchangeTransaction): Future[Boolean] = handlingErrors {
-    asyncUnaryCall(METHOD_BROADCAST, BroadcastRequest(transaction = Some(tx.toPB))).map(_.isValid)
-  }.recover { case _ => false }
+  override def broadcastTx(tx: transaction.ExchangeTransaction): Future[BroadcastResult] = handlingErrors {
+    asyncUnaryCall(METHOD_BROADCAST, BroadcastRequest(transaction = Some(tx.toPB))).map { response =>
+      import BroadcastResponse.Result
+      response.result match {
+        case Result.Empty => BroadcastResult.Failed("Unexpected response on client: Result.Empty")
+        case Result.Added(x) => if (x) BroadcastResult.Added else BroadcastResult.NotAdded
+        case Result.Failed(message) => BroadcastResult.Failed(message)
+      }
+    }
+  }.recover { case e => BroadcastResult.Failed(s"Failed on client: ${Option(e.getMessage).getOrElse(e.getClass.getName)}") }
 
   override def forgedOrder(orderId: ByteStr): Future[Boolean] = handlingErrors {
     asyncUnaryCall(METHOD_FORGED_ORDER, ForgedOrderRequest(orderId.toPB)).map(_.isForged)

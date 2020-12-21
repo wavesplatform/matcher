@@ -9,8 +9,8 @@ import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.caches.{AssetDescriptionsCache, FeaturesCache}
-import com.wavesplatform.dex.grpc.integration.clients.RunScriptResult
 import com.wavesplatform.dex.grpc.integration.clients.domain.{BlockRef, BlockchainBalance, DiffIndex}
+import com.wavesplatform.dex.grpc.integration.clients.{BroadcastResult, RunScriptResult}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 
 import scala.concurrent.duration.FiniteDuration
@@ -44,7 +44,7 @@ class MatcherExtensionCachingClient(underlying: MatcherExtensionClient, defaultC
   override def runScript(address: Address, input: Order): Future[RunScriptResult] = underlying.runScript(address, input)
 
   override def areKnown(txIds: Seq[ByteStr]): Future[Map[ByteStr, Boolean]] = underlying.areKnown(txIds)
-  override def broadcastTx(tx: ExchangeTransaction): Future[Boolean] = underlying.broadcastTx(tx)
+  override def broadcastTx(tx: ExchangeTransaction): Future[BroadcastResult] = underlying.broadcastTx(tx)
 
   override def forgedOrder(orderId: ByteStr): Future[Boolean] = underlying.forgedOrder(orderId)
 

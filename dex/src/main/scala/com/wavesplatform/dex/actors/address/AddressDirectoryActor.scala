@@ -32,23 +32,28 @@ class AddressDirectoryActor(
 
   private def forward(address: Address, msg: Any): Unit = (children get address, msg) match {
     case (None, _: AddressActor.Message.BalanceChanged) =>
-    case _ => children.getOrElseUpdate(address, createAddressActor(address)) forward msg
+    case _ =>
+      msg match {
+        case msg: AddressActor.Command.ApplyBatch => msg.events.foreach(sendEventToHistoryRouter)
+        case _ =>
+      }
+      children.getOrElseUpdate(address, createAddressActor(address)) forward msg
   }
 
   override def receive: Receive = {
-    case Envelope(address, msg) => forward(address, msg)
+    case Envelope(address, message) => forward(address, message)
 
-    case e @ Events.OrderAdded(lo, _, timestamp) =>
-      forward(lo.order.sender, e)
-      historyRouterRef foreach { _ ! HistoryInsertMsg.SaveOrder(lo, timestamp) }
+    case e: Events.OrderAdded =>
+      forward(e.order.order.sender, e)
+      sendEventToHistoryRouter(e)
 
     case e: Events.OrderExecuted =>
       Set(e.counter.order, e.submitted.order).map(_.sender).foreach(forward(_, e))
-      historyRouterRef foreach { _ ! HistoryInsertMsg.SaveEvent(e) }
+      sendEventToHistoryRouter(e)
 
     case e: Events.OrderCanceled =>
       forward(e.acceptedOrder.order.sender, e)
-      historyRouterRef foreach { _ ! HistoryInsertMsg.SaveEvent(e) }
+      sendEventToHistoryRouter(e)
 
     case e: OrderCancelFailed =>
       orderDB.get(e.id) match {
@@ -67,6 +72,16 @@ class AddressDirectoryActor(
       log.warn(s"Address handler for $addressString terminated")
   }
 
+  private def sendEventToHistoryRouter(event: Events.Event): Unit = historyRouterRef.foreach { historyRouterRef =>
+    val msg = event match {
+      case Events.OrderAdded(lo, _, timestamp) => HistoryInsertMsg.SaveOrder(lo, timestamp)
+      case e: Events.OrderExecuted => HistoryInsertMsg.SaveEvent(e)
+      case e: Events.OrderCanceled => HistoryInsertMsg.SaveEvent(e)
+    }
+
+    historyRouterRef ! msg
+  }
+
 }
 
 object AddressDirectoryActor {
@@ -81,6 +96,6 @@ object AddressDirectoryActor {
     )
   )
 
-  case class Envelope(address: Address, cmd: AddressActor.Message)
+  case class Envelope(address: Address, message: AddressActor.Message)
   case object StartWork
 }

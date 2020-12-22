@@ -72,6 +72,8 @@ class AddressActor(
   private var wsAddressState = WsAddressState.empty(owner)
   private var wsSendSchedule: Cancellable = Cancellable.alreadyCancelled
 
+  private val spendableBalances = MutableMap.empty[Asset, Long]
+
   // if (started) because we haven't pendingCommands during the start
   private val eventsProcessing: Receive = {
     case event: OrderAdded =>
@@ -99,7 +101,8 @@ class AddressActor(
 
     case msg @ Command.ApplyBatch(events, balanceUpdate) =>
       log.info(s"Got $msg")
-      // TODO a bit silly, but should work
+      // TODO This code is not optimal, but it should work.
+      // E.g. We need folding
       events.foreach(eventsProcessing(_))
       if (started) working(Message.BalanceChanged(balanceUpdate.keySet, balanceUpdate)) // TODO
 
@@ -214,6 +217,7 @@ class AddressActor(
       }
 
     case msg: Message.BalanceChanged =>
+      msg.changesForAudit.foreach(Function.tupled(spendableBalances.update))
       if (wsAddressState.hasActiveSubscriptions) {
         wsAddressState = wsAddressState.putSpendableAssets(msg.changedAssets)
         scheduleNextDiffSending()
@@ -299,7 +303,7 @@ class AddressActor(
 
     case WsCommand.AddWsSubscription(client) =>
       log.trace(s"[c=${client.path.name}] Added WebSocket subscription")
-      spendableBalancesActor ! SpendableBalancesActor.Query.GetSnapshot(owner)
+      spendableBalancesActor ! SpendableBalancesActor.Query.GetSnapshot(owner) // TODO not all assets are required
       wsAddressState = wsAddressState.addPendingSubscription(client)
       context.watch(client)
 
@@ -311,9 +315,14 @@ class AddressActor(
     // Received a snapshot for pending connections
     case SpendableBalancesActor.Reply.GetSnapshot(allAssetsSpendableBalance) =>
       allAssetsSpendableBalance match {
-        case Right(spendableBalance) =>
+        case Right(snapshotSpendableBalance) =>
+          snapshotSpendableBalance.view
+            .filterKeys(asset => !spendableBalances.contains(asset))
+            .foreach(Function.tupled(spendableBalances.update)) // TODO do this once
+
           wsAddressState.sendSnapshot(
-            balances = mkWsBalances(spendableBalance),
+            // spendableBalances contains the latest balances
+            balances = mkWsBalances(spendableBalances.view.filter(_._2 > 0).to(Map)), // TODO
             orders = activeOrders.values.map(WsOrder.fromDomain(_)).to(Seq)
           )
           wsAddressState = wsAddressState.flushPendingSubscriptions()
@@ -325,19 +334,24 @@ class AddressActor(
     // It is time to send updates to clients. This block of code asks balances
     case WsCommand.PrepareDiffForWsSubscribers =>
       if (wsAddressState.hasActiveSubscriptions && wsAddressState.hasChanges) {
-        spendableBalancesActor ! SpendableBalancesActor.Query.GetState(owner, wsAddressState.getAllChangedAssets)
-        // We asked balances for current changedAssets and clean it here,
-        // because there are could be new changes between sent Query.GetState and received Reply.GetState.
-        wsAddressState = wsAddressState.cleanBalanceChanges()
+        wsAddressState = wsAddressState
+          .sendDiffs(
+            balances = mkWsBalances(spendableBalances.view.filterKeys(wsAddressState.getAllChangedAssets.contains).to(Map)),
+            orders = wsAddressState.getAllOrderChanges
+          )
+          .cleanOrderChanges()
+          .cleanBalanceChanges()
+
+        wsAddressState = wsAddressState.cleanOrderChanges()
       }
       wsSendSchedule = Cancellable.alreadyCancelled
 
     // It is time to send updates to clients. This block of code sends balances
-    case SpendableBalancesActor.Reply.GetState(spendableBalances) =>
+    case SpendableBalancesActor.Reply.GetState(getStateSpendableBalances) =>
       wsAddressState =
         if (wsAddressState.hasActiveSubscriptions)
           wsAddressState.sendDiffs(
-            balances = mkWsBalances(spendableBalances),
+            balances = mkWsBalances(getStateSpendableBalances ++ spendableBalances.view.filterKeys(getStateSpendableBalances.contains)),
             orders = wsAddressState.getAllOrderChanges
           )
         else if (wsAddressState.pendingSubscription.isEmpty)

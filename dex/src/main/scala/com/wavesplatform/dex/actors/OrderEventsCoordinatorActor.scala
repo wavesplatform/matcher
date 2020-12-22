@@ -97,7 +97,8 @@ object OrderEventsCoordinatorActor extends ScorexLogging {
                 case (r @ (state, restBalances), (txId, tx)) =>
                   tx.tx.transaction match {
                     case Some(body) if body.data.isExchange =>
-                      val traderAddresses = tx.tx.transaction.flatMap(_.data.exchange).to(Seq).flatMap { data =>
+                      // Because is could be one trader
+                      val traderAddresses = tx.tx.transaction.flatMap(_.data.exchange).to(Set).flatMap { data =>
                         data.orders.map(_.senderPublicKey.toVanillaPublicKey.toAddress)
                       }
 
@@ -125,7 +126,7 @@ object OrderEventsCoordinatorActor extends ScorexLogging {
               case _ =>
                 // log error?
                 default(
-                  List(
+                  Set( // Because is could be one trader
                     tx.buyOrder.senderPublicKey.toAddress,
                     tx.sellOrder.senderPublicKey.toAddress
                   ).foldLeft(state) { case (r, address) => r.withKnownOnNodeTx(address, txId, Map.empty, addressDirectoryRef) }
@@ -207,7 +208,7 @@ object OrderEventsCoordinatorActor extends ScorexLogging {
       )
 
       State(
-        List(
+        Set( // Because is could be one trader
           event.counter.order.senderPublicKey.toAddress,
           event.submitted.order.senderPublicKey.toAddress
         ).foldLeft(addresses) { case (addresses, address) =>

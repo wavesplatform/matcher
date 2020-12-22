@@ -31,7 +31,7 @@ class BroadcastExchangeTransactionActor(
     case Broadcast(clientRef, tx) =>
       broadcast(tx).onComplete { result =>
         val sendResponse = result match {
-          case Success(BroadcastResult.NotAdded) => false // Will be received
+          case Success(BroadcastResult.NotAdded) => false // Was/Will be received
           case Success(BroadcastResult.Added) => false // Will be received
           case Success(BroadcastResult.Failed(message)) =>
             log.warn(s"Can't broadcast ${tx.id()}: $message")

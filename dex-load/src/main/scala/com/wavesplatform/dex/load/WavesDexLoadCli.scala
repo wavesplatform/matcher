@@ -98,7 +98,7 @@ object WavesDexLoadCli extends ScoptImplicits {
               .abbr("wrwt")
               .text("The time to wait data on second stage")
               .action((x, s) => s.copy(wsResponseWaitTime = x)),
-            opt[Int]("ws-check-type")
+            opt[WsCheckType]("ws-check-type")
               .abbr("wct")
               .text("Type of checking data with ws")
               .action((x, s) => s.copy(wsCheckType = x))
@@ -168,7 +168,7 @@ object WavesDexLoadCli extends ScoptImplicits {
                   s"""Arguments:
                      |  Requests type                     : ${args.requestsType}
                      |  Requests count                    : ${args.requestsCount}
-                     |  Pairs file                        : ${args.pairsFile}
+                     |  Pairs file                        : ${args.pairsFile.get}
                      |  Seed prefix                       : ${args.seedPrefix}
                      |  Output file                       : ${args.requestsFile.getAbsoluteFile}
                      |  Count of accounts                 : ${args.accountsNumber}\n""".stripMargin
@@ -217,7 +217,7 @@ object WavesDexLoadCli extends ScoptImplicits {
                   val withLeaps =
                     try {
                       Future.traverse(clients)(_.run())
-                      Await.result(Thread.sleep(args.collectTime.toMillis), Duration.Inf)
+                      Thread.sleep(args.collectTime.toMillis)
 
                       clients.filter(_.addressUpdateLeaps.size != 0)
                     } finally {
@@ -391,7 +391,7 @@ object WavesDexLoadCli extends ScoptImplicits {
     dexRestApi: String = "",
     collectTime: FiniteDuration = 5.seconds,
     wsResponseWaitTime: FiniteDuration = 5.seconds,
-    wsCheckType: WsCheckType = "updates"
+    wsCheckType: WsCheckType = CheckUpdates
   ) {
     def dexWsApi: String = s"${prependScheme(dexRestApi)}/ws/v0"
   }

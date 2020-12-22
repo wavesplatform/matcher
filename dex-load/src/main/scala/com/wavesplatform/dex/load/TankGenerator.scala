@@ -123,7 +123,7 @@ object TankGenerator {
       .map(account => new Transfer(account.address(), settings.defaults.wavesPerAccount))
       .grouped(100)
       .foreach { group =>
-        try node.broadcast(mkMassTransfer(group, Waves, System.currentTimeMillis() + Random.nextLong(100000)))
+        try node.broadcast(mkMassTransfer(group, AssetId.as("WAVES"), System.currentTimeMillis() + Random.nextLong(100000)))
         catch { case e: Exception => println(e) }
       }
     println(s" Done")
@@ -373,7 +373,7 @@ object TankGenerator {
     )
 
     Random
-      .shuffle(massTransfers.flatten.toList).map { mt =>
+      .shuffle(massTransfers.toList).map { mt =>
         Request(
           RequestType.POST,
           s"/transactions/broadcast",

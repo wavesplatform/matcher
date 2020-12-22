@@ -39,9 +39,11 @@ class WsCollectChangesClient(apiUri: String, address: String, aus: String, obs: 
       none
   }
 
+  def getAddress: String = address
+
   private def collectLeaps(orig: WsAddressChanges, diff: WsAddressChanges) = diff.balances.filter(_._1.toString != "WAVES").foreach { b =>
     if (orig.balances(b._1).tradable > b._2.tradable)
-      addressUpdateLeaps += s"${orig.address} orig: ${orig.balances(b._1).tradable} diff: ${b._2.tradable}"
+      addressUpdateLeaps += s"orig: ${orig.balances(b._1).tradable} diff: ${b._2.tradable}"
   }
 
   private def merge(orig: WsAddressChanges, diff: WsAddressChanges): WsAddressChanges = WsAddressChanges(

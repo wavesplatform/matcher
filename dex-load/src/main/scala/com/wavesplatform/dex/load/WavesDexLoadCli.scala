@@ -191,7 +191,7 @@ object WavesDexLoadCli extends ScoptImplicits {
                   s"""Arguments:
                      |  Count of accounts                 : ${args.accountsNumber}
                      |  Seed prefix                       : ${args.seedPrefix}
-                     |  Pairs file                        : ${args.pairsFile}
+                     |  Pairs file                        : ${args.pairsFile.get}
                      |  Count of order books per account  : ${args.orderBookNumberPerAccount}
                      |  Auth key file                     : ${args.authServicesPrivateKeyFile}\n""".stripMargin
                 )
@@ -217,7 +217,7 @@ object WavesDexLoadCli extends ScoptImplicits {
                   val withLeaps =
                     try {
                       Future.traverse(clients)(_.run())
-                      Thread.sleep(args.collectTime.toMillis)
+                      Thread.sleep(args.wsResponseWaitTime.toMillis)
 
                       clients.filter(_.addressUpdateLeaps.size != 0)
                     } finally {
@@ -228,7 +228,12 @@ object WavesDexLoadCli extends ScoptImplicits {
 
                   if (withLeaps.size > 0) {
                     println("Balance leaps:")
-                    withLeaps.foreach(println(_))
+                    println(s"Count of addresses with leaps: ${withLeaps.size}")
+                    println(s"Leaps: ${withLeaps.size}")
+                    withLeaps.foreach { c =>
+                      println(c.getAddress)
+                      c.addressUpdateLeaps.foreach(println(_))
+                    }
                     sys.exit(1)
                   } else
                     println("Congratulations! All checks passed!")

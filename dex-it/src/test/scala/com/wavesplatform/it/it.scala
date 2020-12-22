@@ -25,7 +25,10 @@ package object it {
     try x match {
       case MatcherCommand.Place(dex, order) => dex.asyncTryApi.place(order).map(_.fold(_ => 0, _ => 1))
       case MatcherCommand.Cancel(dex, owner, order) =>
-        dex.asyncTryApi.cancelOrder(owner, order).map(_.fold(_ => 0, _ => 1))
+        dex.asyncTryApi.cancelOrder(owner, order).map(_.fold(
+          e => if (e.error == 9437193) 1 else 0, // OrderNotFound in the order book, but the request is saved
+          _ => 1
+        ))
     } catch {
       case NonFatal(e) =>
         if (ignoreErrors) Future.successful(0)

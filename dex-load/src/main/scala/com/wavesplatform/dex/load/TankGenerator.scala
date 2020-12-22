@@ -114,7 +114,7 @@ object TankGenerator {
         .map(account => new Transfer(account.address(), minimumNeededAssetBalance))
         .grouped(100)
         .zipWithIndex
-        .foreach { (group, index) =>
+        .foreach { case (group, index) =>
           try node.broadcast(mkMassTransfer(transfers = group, asset = AssetId.as(asset), ts = now + index))
           catch { case e: Exception => println(e) }
         }
@@ -126,7 +126,7 @@ object TankGenerator {
       .map(account => new Transfer(account.address(), settings.defaults.wavesPerAccount))
       .grouped(100)
       .zipWithIndex
-      .foreach { (group, index) =>
+      .foreach { case (group, index) =>
         try node.broadcast(mkMassTransfer(transfers = group, asset = AssetId.as("WAVES"), ts = now + index))
         catch { case e: Exception => println(e) }
       }

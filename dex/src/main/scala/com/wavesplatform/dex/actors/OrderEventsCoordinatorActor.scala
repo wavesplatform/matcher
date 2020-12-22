@@ -46,7 +46,6 @@ object OrderEventsCoordinatorActor extends ScorexLogging {
 
   def apply(
     addressDirectoryRef: classic.ActorRef,
-    spendableBalancesRef: classic.ActorRef,
     txWriterRef: classic.ActorRef,
     broadcastRef: classic.ActorRef,
     createTransaction: CreateTransaction,

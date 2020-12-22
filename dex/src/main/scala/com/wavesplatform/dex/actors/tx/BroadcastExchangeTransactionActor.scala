@@ -45,7 +45,7 @@ class BroadcastExchangeTransactionActor(
         if (sendResponse) clientRef ! OrderEventsCoordinatorActor.Event.TxChecked(tx, result.map(_ => true)) // TODO HACK
       }
 
-    case ExchangeTransactionCreated(tx) => broadcast(tx)
+    case ExchangeTransactionCreated(tx) => broadcast(tx) // TODO remove
     case CheckAndSend => // ignore
   }
 
@@ -87,7 +87,36 @@ class BroadcastExchangeTransactionActor(
           self ! StashTransactionsToCheck(broadcastedTxs)
         }
 
-    case ExchangeTransactionCreated(tx) =>
+    case Broadcast(clientRef, tx) =>
+      val r = for {
+        confirmed <- confirmed(List(tx.id())).map(_.getOrElse(tx.id(), false))
+        _ <-
+          if (confirmed) Future.unit
+          else broadcast(tx).andThen { result =>
+            val sendResponse = result match {
+              case Success(BroadcastResult.NotAdded) => false // Was/Will be received
+              case Success(BroadcastResult.Added) => false // Will be received
+              case Success(BroadcastResult.Failed(message)) =>
+                log.warn(s"Can't broadcast ${tx.id()}: $message")
+                true
+              case Failure(e) =>
+                log.warn(s"Can't broadcast ${tx.id()}", e)
+                true
+            }
+
+            log.info(s"==> broadcast: ${tx.id()}: $result")
+            if (sendResponse) clientRef ! OrderEventsCoordinatorActor.Event.TxChecked(tx, result.map(_ => true)) // TODO HACK
+          }
+      } yield confirmed
+
+      r.onComplete {
+        case Success(confirmed) => if (!confirmed) self ! EnqueueToNextCheck(tx)
+        case Failure(e) =>
+          log.warn(s"Can't confirm or broadcast ${tx.id()}", e)
+          self ! EnqueueToCheck(tx)
+      }
+
+    case ExchangeTransactionCreated(tx) => // TODO remove
       val r = for {
         confirmed <- confirmed(List(tx.id())).map(_.getOrElse(tx.id(), false))
         _ <- if (confirmed) Future.unit else broadcast(tx)

@@ -256,7 +256,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
       placeAndAwaitAtDex(counter)
       placeAndAwaitAtNode(submitted)
 
-      val filledEventTimestamp = expectFinalization(submitted.idStr())
+      val filledEventTimestamp = eventually(expectFinalization(submitted.idStr()))
       eventually {
         Seq(counter, submitted).foreach { order =>
           getOrderInfoById(order.id()).get.closedAt should matchTo(filledEventTimestamp)

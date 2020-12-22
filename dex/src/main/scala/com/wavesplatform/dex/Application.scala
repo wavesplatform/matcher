@@ -225,7 +225,6 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   private val orderEventsCoordinatorRef = actorSystem.spawn(
     behavior = OrderEventsCoordinatorActor.apply(
       addressDirectoryRef = addressDirectoryRef,
-      spendableBalancesRef = spendableBalancesRef,
       txWriterRef = txWriterRef,
       broadcastRef = wavesNetTxBroadcasterRef,
       createTransaction = transactionCreator.createTransaction,

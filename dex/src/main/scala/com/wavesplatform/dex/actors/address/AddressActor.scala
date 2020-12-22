@@ -240,7 +240,7 @@ class AddressActor(
       }
 
     case Query.GetReservedBalance => sender() ! Reply.Balance(openVolume.filter(_._2 > 0))
-    case Query.GetTradableBalance(forAssets) => getTradableBalance(forAssets).map(Reply.Balance).pipeTo(sender())
+    case Query.GetTradableBalance(forAssets) => getTradableBalance(forAssets).map(Reply.Balance).pipeTo(sender()) // TODO from local
 
     case Query.GetOrderStatus(orderId) =>
       sender() ! Reply.GetOrderStatus(activeOrders.get(orderId).fold[OrderStatus](orderDB.status(orderId))(_.status))

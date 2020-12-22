@@ -729,8 +729,13 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
           wavesNode1.api.balance(alice, eth) shouldBe (aliceEthBalance + 90)
           wavesNode1.api.balance(bob, eth) shouldBe (bobEthBalance - 110)
 
-          dex1.api.getReservedBalance(alice) shouldBe empty
-          dex1.api.getReservedBalance(bob) shouldBe empty
+          eventually {
+            dex1.api.getReservedBalance(alice) shouldBe empty
+          }
+
+          eventually {
+            dex1.api.getReservedBalance(bob) shouldBe empty
+          }
         }
 
         withClue("place buy order with amount less than fee") {

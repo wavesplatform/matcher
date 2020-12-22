@@ -106,13 +106,16 @@ object TankGenerator {
   ): Unit = {
     println("Distributing... ")
 
+    val now = System.currentTimeMillis()
+
     assets.foreach { asset =>
       println(s"\t -- $asset")
       accounts
         .map(account => new Transfer(account.address(), minimumNeededAssetBalance))
         .grouped(100)
-        .foreach { group =>
-          try node.broadcast(mkMassTransfer(group, AssetId.as(asset), System.currentTimeMillis() + Random.nextLong(100000)))
+        .zipWithIndex
+        .foreach { (group, index) =>
+          try node.broadcast(mkMassTransfer(transfers = group, asset = AssetId.as(asset), ts = now + index))
           catch { case e: Exception => println(e) }
         }
     }
@@ -122,8 +125,9 @@ object TankGenerator {
     accounts
       .map(account => new Transfer(account.address(), settings.defaults.wavesPerAccount))
       .grouped(100)
-      .foreach { group =>
-        try node.broadcast(mkMassTransfer(group, AssetId.as("WAVES"), System.currentTimeMillis() + Random.nextLong(100000)))
+      .zipWithIndex
+      .foreach { (group, index) =>
+        try node.broadcast(mkMassTransfer(transfers = group, asset = AssetId.as("WAVES"), ts = now + index))
         catch { case e: Exception => println(e) }
       }
     println(s" Done")
@@ -363,14 +367,15 @@ object TankGenerator {
     waitForHeightArise()
 
     val now = System.currentTimeMillis()
-    val massTransfers =  for {
-      i <- 0 to requestCount / 100
-      (assetOwner, asset) <- assetOwners
-    } yield mkMassTransfer(
-      transfers = (allRecipients - assetOwner).map(recipient => Transfer.to(recipient.address(), 1000000L)).toList,
-      asset = AssetId.as(asset),
-      ts = now + i
-    )
+    val massTransfers =
+      for {
+        i <- 0 to requestCount / 100
+        (assetOwner, asset) <- assetOwners
+      } yield mkMassTransfer(
+        transfers = (allRecipients - assetOwner).map(recipient => Transfer.to(recipient.address(), 1000000L)).toList,
+        asset = AssetId.as(asset),
+        ts = now + i
+      )
 
     Random
       .shuffle(massTransfers.toList).map { mt =>

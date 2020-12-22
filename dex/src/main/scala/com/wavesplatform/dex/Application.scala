@@ -21,9 +21,10 @@ import ch.qos.logback.classic.LoggerContext
 import com.typesafe.config._
 import com.wavesplatform.dex.actors.ActorSystemOps.ImplicitOps
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
+import com.wavesplatform.dex.actors.events.OrderEventsCoordinatorActor
 import com.wavesplatform.dex.actors.orderbook.{AggregatedOrderBookActor, OrderBookActor, OrderBookSnapshotStoreActor}
 import com.wavesplatform.dex.actors.tx.{BroadcastExchangeTransactionActor, WriteExchangeTransactionActor}
-import com.wavesplatform.dex.actors.{MatcherActor, OrderBookAskAdapter, OrderEventsCoordinatorActor, RootActorSystem, SpendableBalancesActor}
+import com.wavesplatform.dex.actors.{MatcherActor, OrderBookAskAdapter, RootActorSystem, SpendableBalancesActor}
 import com.wavesplatform.dex.api.http.headers.{CustomMediaTypes, MatcherHttpServer}
 import com.wavesplatform.dex.api.http.routes.{MatcherApiRoute, MatcherApiRouteV1}
 import com.wavesplatform.dex.api.http.{CompositeHttpService, OrderBookHttpInfo}

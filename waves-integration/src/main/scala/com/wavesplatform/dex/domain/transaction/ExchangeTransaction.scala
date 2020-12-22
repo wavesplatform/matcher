@@ -30,6 +30,9 @@ trait ExchangeTransaction extends ByteAndJsonSerializable with Proven {
   def timestamp: Long
   def version: Byte
 
+  // Set, because is could be one trader
+  def traders: Set[Address] = Set(buyOrder.senderPublicKey.toAddress, sellOrder.senderPublicKey.toAddress)
+
   @ApiModelProperty(
     value = "Transaction ID",
     dataType = "string",

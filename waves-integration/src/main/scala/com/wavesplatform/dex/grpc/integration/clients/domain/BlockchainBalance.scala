@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.grpc.integration.clients.domain
 
 import cats.Monoid
-import com.wavesplatform.dex.collection.MapOps.Ops2D
+import com.wavesplatform.dex.collections.MapOps.Ops2D
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 

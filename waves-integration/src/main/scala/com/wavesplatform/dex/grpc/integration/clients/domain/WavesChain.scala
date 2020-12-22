@@ -6,7 +6,7 @@ import cats.instances.vector._
 import cats.syntax.either._
 import cats.syntax.foldable._
 import cats.syntax.semigroup._
-import com.wavesplatform.dex.collection.VectorOps.Ops
+import com.wavesplatform.dex.collections.VectorOps.Ops
 import com.wavesplatform.dex.grpc.integration.clients.domain.WavesChain.dropLiquidBlock
 
 import scala.annotation.tailrec

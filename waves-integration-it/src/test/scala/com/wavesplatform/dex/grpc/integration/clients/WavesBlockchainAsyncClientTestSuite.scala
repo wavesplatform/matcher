@@ -5,7 +5,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicReference
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder
-import com.wavesplatform.dex.collection.MapOps.Ops2D
+import com.wavesplatform.dex.collections.MapOps.Ops2D
 import com.wavesplatform.dex.domain.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}

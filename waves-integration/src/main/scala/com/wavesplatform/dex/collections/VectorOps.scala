@@ -1,4 +1,4 @@
-package com.wavesplatform.dex.collection
+package com.wavesplatform.dex.collections
 
 import scala.annotation.tailrec
 

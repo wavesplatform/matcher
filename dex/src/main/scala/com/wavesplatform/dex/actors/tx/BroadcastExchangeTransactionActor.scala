@@ -3,7 +3,7 @@ package com.wavesplatform.dex.actors.tx
 import akka.actor.{Actor, Props}
 import cats.instances.future.catsStdInstancesForFuture
 import cats.syntax.functor._
-import com.wavesplatform.dex.actors.OrderEventsCoordinatorActor
+import com.wavesplatform.dex.actors.events.OrderEventsCoordinatorActor
 import com.wavesplatform.dex.actors.tx.BroadcastExchangeTransactionActor._
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction

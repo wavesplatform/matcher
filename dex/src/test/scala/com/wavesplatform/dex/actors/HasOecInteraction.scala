@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.actors
 
 import akka.testkit.TestProbe
-import com.wavesplatform.dex.actors.OrderEventsCoordinatorActor.Command.Process
+import com.wavesplatform.dex.actors.events.OrderEventsCoordinatorActor.Command.Process
 import com.wavesplatform.dex.model.Events
 import org.scalatest.Suite
 

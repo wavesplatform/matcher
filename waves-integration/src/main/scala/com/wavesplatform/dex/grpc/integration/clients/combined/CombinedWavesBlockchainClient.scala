@@ -79,7 +79,7 @@ class CombinedWavesBlockchainClient(
           if (x.requestNextBlockchainEvent) bClient.blockchainEvents.requestNext()
           requestBalances(x.requestBalances)
           val finalKnownBalances = knownBalances.updateAndGet(_ |+| x.updatedBalances)
-          val updatedPessimistic = processUtxEvents(x.utxUpdate)
+          val updatedPessimistic = processUtxEvents(x.utxUpdate) // TODO do we need to filter out known transactions (WavesChain)?
           val changedAddresses = finalKnownBalances.regular.keySet ++ finalKnownBalances.outLeases.keySet ++ updatedPessimistic
           val updatedFinalBalances = changedAddresses
             .map { address =>

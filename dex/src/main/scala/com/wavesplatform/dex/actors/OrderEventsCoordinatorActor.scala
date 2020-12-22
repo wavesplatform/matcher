@@ -90,26 +90,27 @@ object OrderEventsCoordinatorActor extends ScorexLogging {
 
           case Command.ApplyUpdates(updates) =>
             context.log.info(s"Got ApplyUpdates($updates)")
-            val (updatedState, restBalances) = (updates.appearedTxs ++ updates.failedTxs)
-              .filterNot { case (txId, _) => state.cache.has(txId) }
-              .foldLeft((state, updates.updatedBalances)) {
-                case (r @ (state, restBalances), (txId, tx)) =>
-                  tx.tx.transaction match {
-                    case Some(body) if body.data.isExchange =>
-                      // Because is could be one trader
-                      val traderAddresses = tx.tx.transaction.flatMap(_.data.exchange).to(Set).flatMap { data =>
-                        data.orders.map(_.senderPublicKey.toVanillaPublicKey.toAddress)
-                      }
+            val (updatedState, restBalances) =
+              (updates.appearedTxs ++ updates.failedTxs) // All transactions are exchange and from this matcher's account
+                .filterNot { case (txId, _) => state.cache.has(txId) }
+                .foldLeft((state, updates.updatedBalances)) {
+                  case (r @ (state, restBalances), (txId, tx)) =>
+                    tx.tx.transaction match {
+                      case Some(body) if body.data.isExchange =>
+                        // Because is could be one trader
+                        val traderAddresses = tx.tx.transaction.flatMap(_.data.exchange).to(Set).flatMap { data =>
+                          data.orders.map(_.senderPublicKey.toVanillaPublicKey.toAddress)
+                        }
 
-                      val updatedState = traderAddresses.foldLeft(state) { case (state, address) =>
-                        state.withKnownOnNodeTx(address, txId, restBalances.getOrElse(address, Map.empty), addressDirectoryRef)
-                      }
+                        val updatedState = traderAddresses.foldLeft(state) { case (state, address) =>
+                          state.withKnownOnNodeTx(address, txId, restBalances.getOrElse(address, Map.empty), addressDirectoryRef)
+                        }
 
-                      (updatedState, restBalances -- traderAddresses)
+                        (updatedState, restBalances -- traderAddresses)
 
-                    case _ => r
-                  }
-              }
+                      case _ => r
+                    }
+                }
 
             default(updatedState.withBalanceUpdates(restBalances, addressDirectoryRef))
 

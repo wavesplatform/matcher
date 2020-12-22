@@ -4,7 +4,6 @@ import java.io.File
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.util.concurrent.Executors
-
 import akka.actor.ActorSystem
 import cats.instances.future._
 import cats.syntax.either._
@@ -18,6 +17,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.error.Implicits.ThrowableOps
 import com.wavesplatform.dex.it.time.GlobalTimer
 import com.wavesplatform.dex.it.time.GlobalTimer.TimerOpsImplicits
+import com.wavesplatform.dex.load.WavesDexLoadCli.WsCheckType.{CheckLeaps, CheckUpdates}
 import com.wavesplatform.dex.load.ws.WsCollectChangesClient
 import com.wavesplatform.dex.{cli, Version}
 import scopt.{OParser, RenderingMode}
@@ -161,16 +161,43 @@ object WavesDexLoadCli extends ScoptImplicits {
             AddressScheme.current = new AddressScheme {
               override val chainId: Byte = args.addressSchemeByte.toByte
             }
+
             command match {
               case Command.CreateRequests =>
+                cli.log[Id](
+                  s"""Arguments:
+                     |  Requests type                     : ${args.requestsType}
+                     |  Requests count                    : ${args.requestsCount}
+                     |  Pairs file                        : ${args.pairsFile}
+                     |  Seed prefix                       : ${args.seedPrefix}
+                     |  Output file                       : ${args.requestsFile.getAbsoluteFile}
+                     |  Count of accounts                 : ${args.accountsNumber}\n""".stripMargin
+                )
+
                 TankGenerator
                   .mkRequests(args.seedPrefix, args.pairsFile, args.requestsFile, args.requestsCount, args.requestsType, args.accountsNumber)
 
               case Command.DeleteRequests =>
+                cli.log[Id](
+                  s"""Arguments:
+                     |  Requests file                     : ${args.requestsFile.getAbsolutePath}
+                     |  Requests count                    : ${args.requestsCount}\n""".stripMargin
+                )
+
                 RequestDeleter.delRequests(args.requestsFile, args.requestsCount)
 
               case Command.CreateFeederFile =>
+                cli.log[Id](
+                  s"""Arguments:
+                     |  Count of accounts                 : ${args.accountsNumber}
+                     |  Seed prefix                       : ${args.seedPrefix}
+                     |  Pairs file                        : ${args.pairsFile}
+                     |  Count of order books per account  : ${args.orderBookNumberPerAccount}
+                     |  Auth key file                     : ${args.authServicesPrivateKeyFile}\n""".stripMargin
+                )
+
                 val authPrivateKey = new String(Files.readAllBytes(args.authServicesPrivateKeyFile.toPath), StandardCharsets.UTF_8)
+
                 GatlingFeeder.mkFile(
                   accountsNumber = args.accountsNumber,
                   seedPrefix = args.seedPrefix,
@@ -190,7 +217,7 @@ object WavesDexLoadCli extends ScoptImplicits {
                   val withLeaps =
                     try {
                       Future.traverse(clients)(_.run())
-                      Await.result(GlobalTimer.instance.sleep(args.collectTime), Duration.Inf)
+                      Await.result(Thread.sleep(args.collectTime.toMillis), Duration.Inf)
 
                       clients.filter(_.addressUpdateLeaps.size != 0)
                     } finally {
@@ -207,7 +234,7 @@ object WavesDexLoadCli extends ScoptImplicits {
                     println("Congratulations! All checks passed!")
                 }
 
-                def checkChanges() = {
+                def checkUpdates() = {
                   val clients: Seq[WsCollectChangesClient] = cli.wrapByLogs[Id, Seq[WsCollectChangesClient]]("Creating clients.. ") {
                     WsAccumulateChanges.createClients(args.dexWsApi, args.feederFile, args.accountsNumber, args.wsCheckType)
                   }
@@ -298,8 +325,8 @@ object WavesDexLoadCli extends ScoptImplicits {
                 )
 
                 args.wsCheckType match {
-                  case 1 => checkLeaps()
-                  case 2 => checkChanges()
+                  case CheckLeaps => checkLeaps()
+                  case CheckUpdates => checkUpdates()
                 }
             }
             println("Done")
@@ -332,6 +359,20 @@ object WavesDexLoadCli extends ScoptImplicits {
 
   }
 
+  sealed trait WsCheckType
+
+  object WsCheckType {
+    case object CheckLeaps extends WsCheckType
+    case object CheckUpdates extends WsCheckType
+
+    implicit val wsCheckTypeRead: scopt.Read[WsCheckType] = scopt.Read.reads {
+      case "leaps" => CheckLeaps
+      case "updates" => CheckUpdates
+      case x => throw new IllegalArgumentException(s"Expected 'leaps', 'updates', but got '$x'")
+    }
+
+  }
+
   private val defaultFeederFile = new File("feeder.csv")
   private val defaultAuthFile = new File("authkey.txt")
 
@@ -350,7 +391,7 @@ object WavesDexLoadCli extends ScoptImplicits {
     dexRestApi: String = "",
     collectTime: FiniteDuration = 5.seconds,
     wsResponseWaitTime: FiniteDuration = 5.seconds,
-    wsCheckType: Int = 1
+    wsCheckType: WsCheckType = "updates"
   ) {
     def dexWsApi: String = s"${prependScheme(dexRestApi)}/ws/v0"
   }

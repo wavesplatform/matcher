@@ -90,6 +90,15 @@ object TankGenerator {
     savePairs(randomAssetPairs)
   }
 
+  private def mkMassTransfer(transfers: List[Transfer], asset: AssetId, ts: Long): MassTransferTransaction =
+    MassTransferTransaction
+      .builder(transfers.asJava)
+      .assetId(asset)
+      .fee(settings.defaults.massTransferFee + (transfers.size + 1) * settings.defaults.massTransferMultiplier)
+      .version(1)
+      .timestamp(ts)
+      .getSignedWith(issuer)
+
   private def distributeAssets(
     accounts: List[JPrivateKey],
     assets: List[String],
@@ -97,28 +106,18 @@ object TankGenerator {
   ): Unit = {
     println("Distributing... ")
 
-    def massTransferFee(group: List[Transfer]): Long =
-      settings.defaults.massTransferFee + (group.size + 1) * settings.defaults.massTransferMultiplier
-
-    def mkMassTransfer(transfers: List[Transfer], asset: AssetId): MassTransferTransaction =
-      MassTransferTransaction
-        .builder(transfers.asJava)
-        .assetId(asset)
-        .fee(massTransferFee(transfers))
-        .version(1)
-        .getSignedWith(issuer)
-
     assets.foreach { asset =>
       println(s"\t -- $asset")
       accounts
         .map(account => new Transfer(account.address(), minimumNeededAssetBalance))
         .grouped(100)
         .foreach { group =>
-          try node.broadcast(mkMassTransfer(group, AssetId.as(asset)))
+          try node.broadcast(mkMassTransfer(group, AssetId.as(asset), System.currentTimeMillis() + Random.nextLong(100000)))
           catch { case e: Exception => println(e) }
         }
     }
 
+    try node.broadcast(mkMassTransfer(group, AssetId.as(asset), System.currentTimeMillis() + Random.nextLong(100000)))
     println(s"\t -- WAVES")
 
     accounts
@@ -343,15 +342,6 @@ object TankGenerator {
     val assetOwners = accounts.map(_ -> assets(new Random().nextInt(assets.length)))
     val allRecipients = assetOwners.map(_._1).toSet
 
-    def mkMassTransfer(transfers: List[Transfer], asset: AssetId): MassTransferTransaction =
-      MassTransferTransaction
-        .builder(transfers.asJava)
-        .assetId(asset)
-        .fee(settings.defaults.massTransferFee + (transfers.size + 1) * settings.defaults.massTransferMultiplier)
-        .version(1)
-        .timestamp(System.currentTimeMillis() + Random.nextLong(100000))
-        .getSignedWith(issuer)
-
     assetOwners.map { case (assetOwner, asset) =>
       try {
         node.broadcast(
@@ -373,10 +363,15 @@ object TankGenerator {
 
     waitForHeightArise()
 
-    val massTransfers =
-      for (_ <- 0 to requestCount / 100) yield assetOwners.map { case (assetOwner, asset) =>
-        mkMassTransfer((allRecipients - assetOwner).map(recipient => Transfer.to(recipient.address(), 1000000L)).toList, AssetId.as(asset))
-      }
+    val now = System.currentTimeMillis()
+    val massTransfers =  for {
+      i <- 0 to requestCount / 100
+      (assetOwner, asset) <- assetOwners
+    } yield mkMassTransfer(
+      transfers = (allRecipients - assetOwner).map(recipient => Transfer.to(recipient.address(), 1000000L)).toList,
+      asset = AssetId.as(asset),
+      ts = now + i
+    )
 
     Random
       .shuffle(massTransfers.flatten.toList).map { mt =>

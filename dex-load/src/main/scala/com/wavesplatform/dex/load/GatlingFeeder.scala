@@ -5,7 +5,6 @@ import java.security
 import java.security.KeyFactory
 import java.security.spec.PKCS8EncodedKeySpec
 import java.util.Base64
-
 import com.wavesplatform.dex.api.ws.protocol.WsAddressSubscribe.JwtPayload
 import com.wavesplatform.dex.auth.JwtUtils
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair}
@@ -16,7 +15,7 @@ import play.api.libs.json.Json
 
 import scala.concurrent.duration._
 import scala.io.Source
-import scala.util.Random
+import scala.util.{Random, Using}
 
 object GatlingFeeder {
 
@@ -53,15 +52,11 @@ object GatlingFeeder {
     )}"}"""
 
   private def mkObsStrings(pairsFile: File, numberPerClient: Int): String =
-    try {
-      val source = Source.fromFile(pairsFile)
+    Using(Source.fromFile(pairsFile)) { source =>
       val pairs = Random.shuffle(source.getLines().toVector)
-      source.close()
       require(numberPerClient <= pairs.size, "numberPerClient > available asset pairs in file")
       pairs.take(numberPerClient).map(x => s"""{"T":"obs","S":"$x","d":100}""").mkString(";")
-    } catch {
-      case _: Throwable => ""
-    }
+    }.get
 
   def mkFile(
     accountsNumber: Int,

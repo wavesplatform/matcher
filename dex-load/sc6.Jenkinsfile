@@ -66,7 +66,7 @@ pipeline {
                  }
                  stage("Web Socket Check Leaps") {
                     steps {
-                        sh 'sbt "dex-load/check -dra=http://${AIM}:6886 -an=100 -ct=15.seconds -wrwt=8.minutes -wct=1"'
+                        sh 'sbt "dex-load/check -dra=http://${AIM}:6886 -an=100 -ct=15.seconds -wrwt=8.minutes -wct=leaps"'
                     }
                  }
             }

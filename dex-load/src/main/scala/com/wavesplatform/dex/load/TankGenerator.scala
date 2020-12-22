@@ -117,14 +117,13 @@ object TankGenerator {
         }
     }
 
-    try node.broadcast(mkMassTransfer(group, AssetId.as(asset), System.currentTimeMillis() + Random.nextLong(100000)))
     println(s"\t -- WAVES")
 
     accounts
       .map(account => new Transfer(account.address(), settings.defaults.wavesPerAccount))
       .grouped(100)
       .foreach { group =>
-        try node.broadcast(mkMassTransfer(group, AssetId.WAVES))
+        try node.broadcast(mkMassTransfer(group, Waves, System.currentTimeMillis() + Random.nextLong(100000)))
         catch { case e: Exception => println(e) }
       }
     println(s" Done")

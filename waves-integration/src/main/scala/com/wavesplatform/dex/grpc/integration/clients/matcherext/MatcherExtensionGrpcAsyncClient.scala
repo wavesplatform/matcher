@@ -69,8 +69,8 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
     ).map(response => response.balances.map(record => record.assetId.toVanillaAsset -> record.balance).toMap)
   }
 
-  override def allAssetsSpendableBalance(address: Address): Future[Map[Asset, Long]] = handlingErrors {
-    asyncUnaryCall(METHOD_ALL_ASSETS_SPENDABLE_BALANCE, AddressRequest(address.toPB))
+  override def allAssetsSpendableBalance(address: Address, excludeAssets: Set[Asset]): Future[Map[Asset, Long]] = handlingErrors {
+    asyncUnaryCall(METHOD_ALL_ASSETS_SPENDABLE_BALANCE, AddressRequest(address.toPB, excludeAssetIds = excludeAssets.map(_.toPB).toSeq))
       .map(response => response.balances.map(record => record.assetId.toVanillaAsset -> record.balance).toMap)
   }
 

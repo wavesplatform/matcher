@@ -237,9 +237,8 @@ class AddressActorSpecification
       (currentPortfolio.get().assets ++ Map(Waves -> currentPortfolio.get().balance).view.filterKeys(assets.contains)).toMap
     }
 
-    def allAssetsSpendableBalance: Address => Future[Map[Asset, Long]] = { _ =>
+    def allAssetsSpendableBalance(address: Address, excludeAssets: Set[Asset]): Future[Map[Asset, Long]] =
       Future.successful((currentPortfolio.get().assets ++ Map(Waves -> currentPortfolio.get().balance)).toMap)
-    }
 
     lazy val spendableBalancesActor =
       system.actorOf(

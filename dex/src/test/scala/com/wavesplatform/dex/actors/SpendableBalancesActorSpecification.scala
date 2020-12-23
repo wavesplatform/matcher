@@ -46,13 +46,13 @@ class SpendableBalancesActorSpecification
 
   val spendableBalancesGrpcCalls = new ConcurrentHashMap[Address, Int](Map(alice -> 0, bob -> 0).asJava)
 
-  def allAssetsSpendableBalances(address: Address): Future[Map[Asset, Long]] = Future.successful {
+  def allAssetsSpendableBalances(address: Address, excludeAssetIds: Set[Asset]): Future[Map[Asset, Long]] = Future.successful {
     balancesFromNode.getOrElse(address, Map.empty)
   }
 
   def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] = {
     spendableBalancesGrpcCalls.computeIfPresent(address, (_, pv) => pv + 1)
-    allAssetsSpendableBalances(address).map { stateFromNode =>
+    allAssetsSpendableBalances(address, Set.empty).map { stateFromNode =>
       assets.map(a => a -> stateFromNode.getOrElse(a, 0L)).toMap
     }
   }
@@ -137,7 +137,7 @@ class SpendableBalancesActorSpecification
         if (address == alice) aliceBalance.view.filterKeys(assets).toMap else Map.empty
       }
 
-      def allAssetsSpendableBalances(address: Address): Future[Map[Asset, Long]] = Future.successful {
+      def allAssetsSpendableBalances(address: Address, excludeAssets: Set[Asset]): Future[Map[Asset, Long]] = Future.successful {
         if (address == alice) aliceBalance else Map.empty
       }
 
@@ -171,7 +171,7 @@ class SpendableBalancesActorSpecification
       }
 
       withClue("Receiving snapshot") {
-        sba.tell(SpendableBalancesActor.Query.GetSnapshot(alice), testProbe.ref)
+        sba.tell(SpendableBalancesActor.Query.GetSnapshot(alice, Set.empty), testProbe.ref)
         testProbe.expectMsgType[SpendableBalancesActor.Reply.GetSnapshot].state.getOrElse(Map.empty) should matchTo {
           Map(Waves -> 23.waves, usd -> 8.usd)
         }

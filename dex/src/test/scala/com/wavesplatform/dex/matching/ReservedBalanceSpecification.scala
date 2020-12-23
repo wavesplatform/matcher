@@ -95,7 +95,7 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
   )
 
   private val spendableBalances: (Address, Set[Asset]) => Future[Map[Asset, Long]] = (_, _) => Future.successful(Map.empty[Asset, Long])
-  private val allAssetsSpendableBalances: Address => Future[Map[Asset, Long]] = _ => Future.successful(Map.empty[Asset, Long])
+  private val allAssetsSpendableBalances: (Address, Set[Asset]) => Future[Map[Asset, Long]] = (_, _) => Future.successful(Map.empty[Asset, Long])
 
   private val spendableBalancesActor =
     system.actorOf(Props(new SpendableBalancesActor(spendableBalances, allAssetsSpendableBalances, addressDir)))

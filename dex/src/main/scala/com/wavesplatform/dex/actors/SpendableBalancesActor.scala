@@ -15,7 +15,7 @@ import scala.util.{Failure, Success}
 
 class SpendableBalancesActor(
   spendableBalances: (Address, Set[Asset]) => Future[Map[Asset, Long]],
-  allAssetsSpendableBalances: Address => Future[Map[Asset, Long]],
+  allAssetsSpendableBalances: (Address, Set[Asset]) => Future[Map[Asset, Long]], // Set[Asset] to ignore
   addressDirectory: ActorRef
 ) extends Actor
     with ScorexLogging {
@@ -34,9 +34,9 @@ class SpendableBalancesActor(
           s ! Status.Failure(WavesNodeConnectionLostException("Could not receive spendable balance from Waves Node", ex))
       }
 
-    case SpendableBalancesActor.Query.GetSnapshot(address) =>
+    case SpendableBalancesActor.Query.GetSnapshot(address, ignoreAssets) =>
       val s = sender()
-      allAssetsSpendableBalances(address).onComplete {
+      allAssetsSpendableBalances(address, ignoreAssets).onComplete {
         case Success(balance) => s ! SpendableBalancesActor.Reply.GetSnapshot(balance.asRight)
         case Failure(ex) =>
           log.error("Could not receive address spendable balance snapshot from Waves Node", ex)
@@ -86,7 +86,7 @@ object SpendableBalancesActor {
 
   object Query {
     final case class GetState(address: Address, assets: Set[Asset]) extends Query
-    final case class GetSnapshot(address: Address) extends Query
+    final case class GetSnapshot(address: Address, knownAssets: Set[Asset]) extends Query
   }
 
   trait Reply

@@ -324,7 +324,7 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase with NoSt
     wavesNode1.api.broadcast(mkTransfer(carol, bob, 1.waves, Waves))
 
     eventually {
-      wait(client allAssetsSpendableBalance carol) should matchTo(
+      wait(client.allAssetsSpendableBalance(carol, Set.empty)) should matchTo(
         Map[Asset, Long](
           Waves -> (10.waves - 1.waves - minFee),
           usd -> 1.usd,

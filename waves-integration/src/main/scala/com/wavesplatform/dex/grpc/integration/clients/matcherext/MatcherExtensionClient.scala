@@ -17,7 +17,7 @@ trait MatcherExtensionClient {
   val utxEvents: UtxEventsControlledStream
 
   def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]]
-  def allAssetsSpendableBalance(address: Address): Future[Map[Asset, Long]]
+  def allAssetsSpendableBalance(address: Address, excludeAssets: Set[Asset]): Future[Map[Asset, Long]]
   def getBalances(index: DiffIndex): Future[BlockchainBalance]
 
   def isFeatureActivated(id: Short): Future[Boolean]

@@ -195,8 +195,8 @@ class CombinedWavesBlockchainClient(
     }
   }
 
-  override def allAssetsSpendableBalance(address: Address): Future[Map[Asset, Long]] =
-    meClient.allAssetsSpendableBalance(address).map { xs =>
+  override def allAssetsSpendableBalance(address: Address, excludeAssets: Set[Asset]): Future[Map[Asset, Long]] =
+    meClient.allAssetsSpendableBalance(address, excludeAssets).map { xs =>
       xs |+| pessimisticPortfolios.getAggregated(address).collect {
         case p @ (asset, _) if xs.keySet.contains(asset) => p
       }

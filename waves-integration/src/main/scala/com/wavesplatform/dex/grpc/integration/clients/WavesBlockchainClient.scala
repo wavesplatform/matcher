@@ -18,7 +18,7 @@ trait WavesBlockchainClient {
 
   def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]]
 
-  def allAssetsSpendableBalance(address: Address): Future[Map[Asset, Long]]
+  def allAssetsSpendableBalance(address: Address, excludeAssets: Set[Asset]): Future[Map[Asset, Long]]
 
   def isFeatureActivated(id: Short): Future[Boolean]
 

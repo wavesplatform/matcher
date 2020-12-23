@@ -22,7 +22,7 @@ class OrderHistoryStub(system: ActorSystem, time: Time, maxActiveOrders: Int, ma
   private val orders = mutable.AnyRefMap.empty[ByteStr, Address]
 
   private val spendableBalances: (Address, Set[Asset]) => Future[Map[Asset, Long]] = (_, _) => Future.successful(Map.empty[Asset, Long])
-  private val allAssetsSpendableBalances: Address => Future[Map[Asset, Long]] = _ => Future.successful(Map.empty[Asset, Long])
+  private val allAssetsSpendableBalances: (Address, Set[Asset]) => Future[Map[Asset, Long]] = (_, _) => Future.successful(Map.empty[Asset, Long])
 
   private val spendableBalanceActor = system.actorOf(Props(new SpendableBalancesActor(spendableBalances, allAssetsSpendableBalances, addressDir)))
 

@@ -326,11 +326,15 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
     for {
       address <- Task.fromTry(Try(request.address.toVanillaAddress))
       assetBalances <- context.accountsApi.portfolio(address).toListL // TODO DEX-997 optimize
-    } yield AllAssetsSpendableBalanceResponse(
-      (Waves :: assetBalances.map(_._1))
-        .map(a => AllAssetsSpendableBalanceResponse.Record(a.toPB, spendableBalance(address, a))) // TODO DEX-997 do not use spendableBalance
-        .filterNot(_.balance == 0L)
-    )
+    } yield {
+      val excludeAssets = request.excludeAssetIds.view.map(_.toVanillaAsset).toSet
+      AllAssetsSpendableBalanceResponse(
+        (Waves :: assetBalances.map(_._1))
+          .filterNot(excludeAssets.contains)
+          .map(a => AllAssetsSpendableBalanceResponse.Record(a.toPB, spendableBalance(address, a))) // TODO DEX-997 do not use spendableBalance
+          .filterNot(_.balance == 0L)
+      )
+    }
   }.runToFuture
 
   private def spendableBalance(address: Address, asset: Asset): Long = {

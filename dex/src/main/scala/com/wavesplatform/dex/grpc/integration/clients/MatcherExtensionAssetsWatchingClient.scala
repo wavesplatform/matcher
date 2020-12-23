@@ -29,9 +29,9 @@ class MatcherExtensionAssetsWatchingClient(
   override def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] =
     saveAssetsDescription(assets) *> underlying.spendableBalances(address, assets)
 
-  override def allAssetsSpendableBalance(address: Address): Future[Map[Asset, Long]] =
+  override def allAssetsSpendableBalance(address: Address, excludeAssets: Set[Asset]): Future[Map[Asset, Long]] =
     for {
-      xs <- underlying.allAssetsSpendableBalance(address)
+      xs <- underlying.allAssetsSpendableBalance(address, excludeAssets)
       _ <- saveAssetsDescription(xs.keySet)
     } yield xs
 

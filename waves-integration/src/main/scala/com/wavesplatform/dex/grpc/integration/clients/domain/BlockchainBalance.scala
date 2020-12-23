@@ -22,7 +22,7 @@ case class BlockchainBalance(regular: Map[Address, Map[Asset, Long]], outLeases:
 
   def isEmpty: Boolean = regular.isEmpty && outLeases.isEmpty
 
-  override def toString: String = s"BlockchainBalance(r=$regular, ol=$outLeases)"
+  override def toString: String = s"BlockchainBalance(r={${regular.keys.mkString(", ")}}, ol={${outLeases.keys.mkString(", ")}})"
 }
 
 object BlockchainBalance {

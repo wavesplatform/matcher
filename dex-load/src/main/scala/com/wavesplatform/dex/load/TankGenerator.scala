@@ -6,12 +6,14 @@ import java.nio.file.Files
 import java.util.concurrent.{ExecutorService, Executors}
 import com.softwaremill.sttp.{MonadError => _}
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
-import com.wavesplatform.dex.domain.account.{Address, PrivateKey, PublicKey}
+import com.wavesplatform.dex.domain.account.{Address, AddressScheme, KeyPair, PrivateKey, PublicKey}
+import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
+import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.load.request._
 import com.wavesplatform.dex.load.utils._
 import com.wavesplatform.protobuf.transaction.Recipient
-import im.mak.waves.transactions.{MassTransferTransaction, TransactionOrOrder, TransferTransaction}
+import im.mak.waves.transactions.{MassTransferTransaction, TransactionOrOrder, TransferTransaction, WavesConfig}
 import im.mak.waves.transactions.account.{PrivateKey => JPrivateKey, PublicKey => JPublicKey}
 import im.mak.waves.transactions.common.{Amount, AssetId, Base58String, Recipient}
 import im.mak.waves.transactions.exchange.{AssetPair, Order, OrderType}
@@ -57,7 +59,9 @@ object TankGenerator {
 
   private def mkAccounts(seedPrefix: String, count: Int): List[JPrivateKey] = {
     print(s"Generating $count accounts (prefix: $seedPrefix)... ")
-    val accounts = (1 to count).map(i => JPrivateKey.fromSeed(s"$seedPrefix$i", 0)).toList
+    WavesConfig.chainId(AddressScheme.current.chainId)
+    val accounts =
+      (1 to count).map(i => JPrivateKey.as(KeyPair.fromSeed(Base58.encode(s"$seedPrefix$i".getBytes)).explicitGet().privateKey.arr)).toList
     println("Done")
     accounts
   }

@@ -1,18 +1,17 @@
 package com.wavesplatform.dex.load
 
-import java.io.{File, PrintWriter}
-import java.security
-import java.security.KeyFactory
-import java.security.spec.PKCS8EncodedKeySpec
-import java.util.Base64
 import com.wavesplatform.dex.api.ws.protocol.WsAddressSubscribe.JwtPayload
 import com.wavesplatform.dex.auth.JwtUtils
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
-import com.wavesplatform.dex.domain.bytes.codec.Base58
-import com.wavesplatform.dex.domain.utils.EitherExt2
 import play.api.libs.json.Json
 
+import java.io.{File, PrintWriter}
+import java.nio.charset.StandardCharsets
+import java.security
+import java.security.KeyFactory
+import java.security.spec.PKCS8EncodedKeySpec
+import java.util.Base64
 import scala.concurrent.duration._
 import scala.io.Source
 import scala.util.{Random, Using}
@@ -74,7 +73,7 @@ object GatlingFeeder {
       }
       output.println()
       (0 until accountsNumber).foreach { i =>
-        val kp = KeyPair.fromSeed(Base58.encode(s"$seedPrefix$i".getBytes)).explicitGet()
+        val kp = KeyPair(ByteStr(s"$seedPrefix$i".getBytes(StandardCharsets.UTF_8)))
         output.println(s"""${kp.toAddress};${mkAusString(kp, authKp)};${mkObsStrings(pairsFile, orderBookNumberPerAccount)}""")
       }
     } finally output.close()

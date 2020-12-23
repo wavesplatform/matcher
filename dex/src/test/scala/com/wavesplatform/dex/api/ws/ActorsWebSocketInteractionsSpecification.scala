@@ -530,7 +530,7 @@ class ActorsWebSocketInteractionsSpecification
         ad ! oe
 
         expectWsBalancesAndOrders(
-          Map(Waves -> WsBalances(100, 0), btc -> WsBalances(1, 0)),
+          Map(Waves -> WsBalances(100, 0)),
           Seq(WsOrder.fromDomain(oe.counterRemaining), WsOrder.fromDomain(oe.submittedRemaining)),
           1
         )

@@ -21,6 +21,8 @@ enablePlugins(
 V.scalaPackage := "com.wavesplatform.dex"
 V.subProject := "dex"
 
+Test / scalacOptions += "-P:silencer:globalFilters=^magnolia: using fallback derivation.*$" // https://github.com/softwaremill/diffx#customization
+
 resolvers += "dnvriend" at "https://dl.bintray.com/dnvriend/maven"
 libraryDependencies ++= Dependencies.Module.dex
 

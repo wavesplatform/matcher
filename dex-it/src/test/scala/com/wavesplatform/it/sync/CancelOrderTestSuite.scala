@@ -5,6 +5,7 @@ import java.util.concurrent.ThreadLocalRandom
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.account.KeyPair
+import com.wavesplatform.dex.domain.account.KeyPair.toAddress
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
@@ -252,6 +253,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
     "wrong cancel when match on all coins" in {
       val accounts = (1 to 30).map(_ => createAccountWithBalance(issueFee -> Waves))
       knownAccounts = knownAccounts ++ accounts
+      log.info(s"accounts:\n${accounts.map(_.toAddress.stringRepr).sorted.mkString("\n")}")
 
       val oneOrderAmount = 10000
       val orderPrice = 3000000000000L

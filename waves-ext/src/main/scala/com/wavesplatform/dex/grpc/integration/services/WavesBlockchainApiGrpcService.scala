@@ -140,8 +140,9 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
       .fold[Either[ValidationError, SignedExchangeTransaction]](GenericError("The signed transaction must be specified").asLeft)(_.asRight)
       .flatMap(_.toVanilla)
       .flatMap { tx =>
-        if (context.blockchain.containsTransaction(tx)) Right(BroadcastResponse(isValid = true))
-        else context.broadcastTransaction(tx).resultE.map(BroadcastResponse(_)).leftFlatMap(_ => BroadcastResponse().asRight)
+        context.broadcastTransaction(tx).resultE
+          .map(isNew => BroadcastResponse(BroadcastResponse.Result.Added(isNew)))
+          .leftFlatMap(e => BroadcastResponse(BroadcastResponse.Result.Failed(e.toString)).asRight)
       }
       .explicitGetErr()
   }
@@ -276,18 +277,25 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
         x.setOnReadyHandler { () =>
           // We have such order of calls, because we have to guarantee non-concurrent calls to onNext
           // See StreamObserver for more details
-          initialEvents.onNext(responseObserver -> UtxEvent(
-            UtxEvent.Type.Switch(
-              UtxEvent.Switch(
-                utxState.values.toSeq
+          // Yeah, we can receive onReady multiple times!
+          if (!utxChangesSubscribers.contains(responseObserver)) {
+            initialEvents.onNext(responseObserver -> UtxEvent(
+              UtxEvent.Type.Switch(
+                UtxEvent.Switch(
+                  utxState.values.toSeq
+                )
               )
-            )
-          ))
-          utxChangesSubscribers.add(responseObserver)
-
-          log.info("Registered a new utx events observer")
+            ))
+            utxChangesSubscribers.add(responseObserver)
+            log.info(s"Registered a new utx events observer: ${x.hashCode()}")
+          }
         }
-        x.setOnCancelHandler(() => utxChangesSubscribers remove x)
+
+        x.setOnCancelHandler { () =>
+          utxChangesSubscribers.remove(x)
+          log.info(s"Removed an utx events observer: ${x.hashCode()}")
+        }
+
       case x => log.warn(s"Can't register cancel handler for $x")
     }
 

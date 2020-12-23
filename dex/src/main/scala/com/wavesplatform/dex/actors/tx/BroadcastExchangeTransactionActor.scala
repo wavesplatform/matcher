@@ -3,10 +3,12 @@ package com.wavesplatform.dex.actors.tx
 import akka.actor.{Actor, Props}
 import cats.instances.future.catsStdInstancesForFuture
 import cats.syntax.functor._
+import com.wavesplatform.dex.actors.events.OrderEventsCoordinatorActor
 import com.wavesplatform.dex.actors.tx.BroadcastExchangeTransactionActor._
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
+import com.wavesplatform.dex.grpc.integration.clients.BroadcastResult
 import com.wavesplatform.dex.model.Events.ExchangeTransactionCreated
 import com.wavesplatform.dex.settings.ExchangeTransactionBroadcastSettings
 import com.wavesplatform.dex.time.Time
@@ -15,18 +17,35 @@ import scala.concurrent.Future
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
+// TODO DEX-1043
 class BroadcastExchangeTransactionActor(
   settings: ExchangeTransactionBroadcastSettings,
   time: Time,
   confirmed: Seq[ByteStr] => Future[Map[ByteStr, Boolean]],
-  broadcast: ExchangeTransaction => Future[Boolean]
+  broadcast: ExchangeTransaction => Future[BroadcastResult]
 ) extends Actor
     with ScorexLogging {
 
   import context.dispatcher
 
   private val default: Receive = {
-    case ExchangeTransactionCreated(tx) => broadcast(tx)
+    case Broadcast(clientRef, tx) =>
+      broadcast(tx).onComplete { result =>
+        val sendResponse = result match {
+          case Success(BroadcastResult.NotAdded) => false // Was/Will be received
+          case Success(BroadcastResult.Added) => false // Will be received
+          case Success(BroadcastResult.Failed(message)) =>
+            log.warn(s"Can't broadcast ${tx.id()}: $message")
+            true
+          case Failure(e) =>
+            log.warn(s"Can't broadcast ${tx.id()}", e)
+            true
+        }
+
+        if (sendResponse) clientRef ! OrderEventsCoordinatorActor.Event.TxChecked(tx, result.map(_ => true)) // TODO DEX-1043 HACK
+      }
+
+    case ExchangeTransactionCreated(tx) => broadcast(tx) // TODO DEX-1043 remove
     case CheckAndSend => // ignore
   }
 
@@ -44,7 +63,14 @@ class BroadcastExchangeTransactionActor(
             .sequence(ready.map(tx => broadcast(tx).tupleLeft(tx)))
             .map(_.toMap)
             .map { isTxBroadcasted =>
-              val (validTxs, invalidTxs) = ready.partition(isTxBroadcasted)
+              // TODO DEX-1043 Refactor
+              val (validTxs, invalidTxs) = ready.partition { x =>
+                isTxBroadcasted(x) match {
+                  case BroadcastResult.Added => true
+                  case BroadcastResult.NotAdded => false
+                  case _: BroadcastResult.Failed => false
+                }
+              }
 
               log.debug(s"Stats: ${confirmed.size} confirmed, ${ready.size} sent, ${validTxs.size} successful")
               if (expired.nonEmpty) log.warn(s"${expired.size} failed to send: ${format(expired)}; became invalid: ${format(invalidTxs)}")
@@ -61,7 +87,35 @@ class BroadcastExchangeTransactionActor(
           self ! StashTransactionsToCheck(broadcastedTxs)
         }
 
-    case ExchangeTransactionCreated(tx) =>
+    case Broadcast(clientRef, tx) =>
+      val r = for {
+        confirmed <- confirmed(List(tx.id())).map(_.getOrElse(tx.id(), false))
+        _ <-
+          if (confirmed) Future.unit
+          else broadcast(tx).andThen { result =>
+            val sendResponse = result match {
+              case Success(BroadcastResult.NotAdded) => false // Was/Will be received
+              case Success(BroadcastResult.Added) => false // Will be received
+              case Success(BroadcastResult.Failed(message)) =>
+                log.warn(s"Can't broadcast ${tx.id()}: $message")
+                true
+              case Failure(e) =>
+                log.warn(s"Can't broadcast ${tx.id()}", e)
+                true
+            }
+
+            if (sendResponse) clientRef ! OrderEventsCoordinatorActor.Event.TxChecked(tx, result.map(_ => true)) // TODO DEX-1043 HACK
+          }
+      } yield confirmed
+
+      r.onComplete {
+        case Success(confirmed) => if (!confirmed) self ! EnqueueToNextCheck(tx)
+        case Failure(e) =>
+          log.warn(s"Can't confirm or broadcast ${tx.id()}", e)
+          self ! EnqueueToCheck(tx)
+      }
+
+    case ExchangeTransactionCreated(tx) => // TODO DEX-1043 remove
       val r = for {
         confirmed <- confirmed(List(tx.id())).map(_.getOrElse(tx.id(), false))
         _ <- if (confirmed) Future.unit else broadcast(tx)
@@ -92,6 +146,8 @@ class BroadcastExchangeTransactionActor(
 
 object BroadcastExchangeTransactionActor {
 
+  case class Broadcast(clientRef: akka.actor.typed.ActorRef[OrderEventsCoordinatorActor.Message], tx: ExchangeTransaction)
+
   final case object CheckAndSend
 
   final private case class EnqueueToNextCheck(tx: ExchangeTransaction)
@@ -102,7 +158,7 @@ object BroadcastExchangeTransactionActor {
     settings: ExchangeTransactionBroadcastSettings,
     time: Time,
     isConfirmed: Seq[ByteStr] => Future[Map[ByteStr, Boolean]],
-    broadcast: ExchangeTransaction => Future[Boolean]
+    broadcast: ExchangeTransaction => Future[BroadcastResult]
   ): Props =
     Props(new BroadcastExchangeTransactionActor(settings, time, isConfirmed, broadcast))
 

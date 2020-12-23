@@ -15,8 +15,9 @@ import com.wavesplatform.dex.domain.crypto.Proofs
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionV2}
 import com.wavesplatform.dex.domain.utils.EitherExt2
+import com.wavesplatform.dex.grpc.integration.clients.BroadcastResult
 import com.wavesplatform.dex.model.Events.ExchangeTransactionCreated
-import com.wavesplatform.dex.settings.{loadConfig, ExchangeTransactionBroadcastSettings}
+import com.wavesplatform.dex.settings.{ExchangeTransactionBroadcastSettings, loadConfig}
 import com.wavesplatform.dex.time.Time
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.BeforeAndAfterEach
@@ -52,7 +53,7 @@ class BroadcastExchangeTransactionActorSpecification
         confirmed = _ => getConfirmation(false),
         broadcast = tx => {
           broadcasted = List(tx)
-          Future.successful(true)
+          Future.successful(BroadcastResult.Added)
         }
       )
 
@@ -70,7 +71,7 @@ class BroadcastExchangeTransactionActorSpecification
         confirmed = _ => getConfirmation(false),
         broadcast = tx => {
           broadcasted = List(tx)
-          Future.successful(true)
+          Future.successful(BroadcastResult.Added)
         }
       )
 
@@ -94,7 +95,7 @@ class BroadcastExchangeTransactionActorSpecification
           confirmed = _ => getConfirmation(true),
           broadcast = tx => {
             broadcasted = List(tx)
-            Future.successful(true)
+            Future.successful(BroadcastResult.Added)
           }
         )
 
@@ -117,7 +118,7 @@ class BroadcastExchangeTransactionActorSpecification
           confirmed = _ => getConfirmation(true),
           broadcast = tx => {
             broadcasted = List(tx)
-            Future.successful(true)
+            Future.successful(BroadcastResult.Added)
           }
         )
 
@@ -146,7 +147,7 @@ class BroadcastExchangeTransactionActorSpecification
           },
           broadcast = _ => {
             firstProcessed.compareAndSet(false, true)
-            Future.successful(true)
+            Future.successful(BroadcastResult.Added)
           }
         )
 
@@ -201,7 +202,7 @@ class BroadcastExchangeTransactionActorSpecification
   private def defaultActor(
     time: Time,
     confirmed: Seq[ByteStr] => Future[Map[ByteStr, Boolean]],
-    broadcast: ExchangeTransaction => Future[Boolean]
+    broadcast: ExchangeTransaction => Future[BroadcastResult]
   ): TestActorRef[BroadcastExchangeTransactionActor] = TestActorRef(
     new BroadcastExchangeTransactionActor(
       settings = ExchangeTransactionBroadcastSettings(

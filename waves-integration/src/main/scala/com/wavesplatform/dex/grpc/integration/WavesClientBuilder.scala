@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.grpc.integration
 
+import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.clients._
 import com.wavesplatform.dex.grpc.integration.clients.blockchainupdates.DefaultBlockchainUpdatesClient
@@ -19,6 +20,7 @@ object WavesClientBuilder extends ScorexLogging {
   // TODO DEX-998
   def async(
     wavesBlockchainClientSettings: WavesBlockchainClientSettings,
+    matcherPublicKey: PublicKey,
     monixScheduler: Scheduler,
     grpcExecutionContext: ExecutionContext
   ): WavesBlockchainClient = {
@@ -47,11 +49,12 @@ object WavesClientBuilder extends ScorexLogging {
 
     new CombinedWavesBlockchainClient(
       wavesBlockchainClientSettings.combinedClientSettings,
+      matcherPublicKey,
       meClient = new MatcherExtensionCachingClient(
         new MatcherExtensionGrpcAsyncClient(eventLoopGroup, matcherExtensionChannel, monixScheduler)(grpcExecutionContext),
         wavesBlockchainClientSettings.defaultCachesExpiration
       )(grpcExecutionContext),
-      bClient = new DefaultBlockchainUpdatesClient(eventLoopGroup, blockchainUpdatesChannel, monixScheduler)(grpcExecutionContext),
+      bClient = new DefaultBlockchainUpdatesClient(eventLoopGroup, blockchainUpdatesChannel, monixScheduler)(grpcExecutionContext)
     )(grpcExecutionContext, monixScheduler)
   }
 

@@ -147,7 +147,7 @@ class SpendableBalancesActorSpecification
         sba ! SpendableBalancesActor.Command.UpdateStates(Map(alice -> update.toMap))
         val envelope = testProbe.expectMsgType[AddressDirectoryActor.Envelope]
         envelope.address should matchTo(alice)
-        envelope.cmd.asInstanceOf[AddressActor.Message.BalanceChanged] should matchTo {
+        envelope.message.asInstanceOf[AddressActor.Message.BalanceChanged] should matchTo {
           AddressActor.Message.BalanceChanged(changedAssets, decreasingChanges)
         }
       }

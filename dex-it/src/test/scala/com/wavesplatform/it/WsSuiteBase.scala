@@ -13,13 +13,13 @@ import scala.reflect.ClassTag
 
 trait WsSuiteBase extends MatcherSuiteBase with HasWebSockets {
 
-  implicit protected val wsErrorDiff: Diff[WsError] = Derived[Diff[WsError]].ignore[WsError, Long](_.timestamp)
+  implicit protected val wsErrorDiff: Derived[Diff[WsError]] = Derived(Diff.gen[WsError].value.ignore[WsError, Long](_.timestamp))
 
-  implicit protected val wsAddressChangesDiff: Diff[WsAddressChanges] =
-    Derived[Diff[WsAddressChanges]].ignore[WsAddressChanges, Long](_.timestamp)
+  implicit protected val wsAddressChangesDiff: Derived[Diff[WsAddressChanges]] =
+    Derived(Diff.gen[WsAddressChanges].value.ignore[WsAddressChanges, Long](_.timestamp))
 
   implicit protected val wsCompleteOrderDiff: Diff[WsFullOrder] =
-    Derived[Diff[WsFullOrder]].ignore[WsFullOrder, Long](_.timestamp).ignore[WsFullOrder, Long](_.eventTimestamp)
+    Derived(Diff.gen[WsFullOrder].value.ignore[WsFullOrder, Long](_.timestamp).ignore[WsFullOrder, Long](_.eventTimestamp))
 
   implicit final class WsConnectionOps(val self: WsConnection) {
 

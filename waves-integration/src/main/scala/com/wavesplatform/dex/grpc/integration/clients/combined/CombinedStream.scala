@@ -56,10 +56,7 @@ class CombinedStream(
 
   utxEvents.stream
     .foreach { evt =>
-      UtxEventConversions.toEvent(evt) match {
-        case Some(x) => internalStream.onNext(x)
-        case None => log.error(s"Can't convert $evt to a domain event")
-      }
+      UtxEventConversions.toEvent(evt).foreach(internalStream.onNext)
     }
     .onComplete {
       case Failure(e) => log.error("utxEvents failed", e)

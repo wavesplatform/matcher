@@ -3,7 +3,7 @@ package com.wavesplatform.dex.grpc.integration.clients.blockchainupdates
 import cats.syntax.option._
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
-import com.wavesplatform.dex.grpc.integration.clients.domain.{BlockRef, BlockchainBalance, WavesBlock, WavesNodeEvent}
+import com.wavesplatform.dex.grpc.integration.clients.domain._
 import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions._
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Rollback.RollbackType
@@ -30,19 +30,30 @@ object BlockchainUpdatesConversions {
         val regularBalanceChanges = combineBalanceUpdates(updates.stateUpdate.view ++ updates.transactionStateUpdates)
         val outLeasesChanges = combineLeaseUpdates(updates.stateUpdate.view ++ updates.transactionStateUpdates)
 
+        // block.transactions, updates.transactionIds, updates.transactionStateUpdates have the same order
         val blockInfo = updates.body match {
           case Body.Empty => none
-          case Body.Block(block) => (WavesBlock.Type.FullBlock, block.block.get.header.get.reference.toVanilla).some
-          case Body.MicroBlock(block) => (WavesBlock.Type.MicroBlock, block.microBlock.get.microBlock.get.reference.toVanilla).some
+          case Body.Block(block) =>
+            val x = block.block.get
+            (WavesBlock.Type.FullBlock, x.header.get.reference.toVanilla, x.transactions).some
+          case Body.MicroBlock(block) =>
+            val x = block.microBlock.get.microBlock.get
+            (WavesBlock.Type.MicroBlock, x.reference.toVanilla, x.transactions).some
         }
 
-        blockInfo.map { case (tpe, reference) =>
+        blockInfo.map { case (tpe, reference, transactionBodies) =>
           val block = WavesBlock(
             ref = blockRef,
             reference = reference,
             changes = BlockchainBalance(regularBalanceChanges, outLeasesChanges),
             tpe = tpe,
-            forgedTxIds = updates.transactionIds.toSet
+            forgedTxs = updates.transactionIds.view
+              .zip(updates.transactionStateUpdates)
+              .zip(transactionBodies)
+              .map {
+                case ((id, update), tx) => id -> TransactionWithChanges(id, tx, update)
+              }
+              .toMap
           )
 
           WavesNodeEvent.Appended(block)

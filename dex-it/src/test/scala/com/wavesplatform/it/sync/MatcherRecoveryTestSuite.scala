@@ -34,6 +34,7 @@ class MatcherRecoveryTestSuite extends MatcherSuiteBase {
 
     successfulCommandsNumber += executeCommands(placeCommands)
     successfulCommandsNumber += executeCommands(cancelCommands)
+    log.info(s"successfulCommandsNumber: $successfulCommandsNumber")
   }
 
   "Wait until all requests are processed - 1" in {

@@ -6,7 +6,7 @@ import cats.syntax.either._
 import cats.syntax.traverse._
 import ch.qos.logback.classic.{Level, Logger}
 import com.wavesplatform.dex.cli.ErrorOr
-import com.wavesplatform.dex.domain.account.Address
+import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.grpc.integration.WavesClientBuilder
@@ -52,7 +52,7 @@ object DexExtensionGrpcConnector {
 
   type DetailedBalance = Map[Asset, (BriefAssetDescription, Long)]
 
-  def create(target: String, blockchainUpdatesTarget: String): ErrorOr[DexExtensionGrpcConnector] =
+  def create(matcherPublicKey: PublicKey, target: String, blockchainUpdatesTarget: String): ErrorOr[DexExtensionGrpcConnector] =
     Try {
       LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME).asInstanceOf[Logger].setLevel(Level.OFF)
       val grpcSettings = GrpcClientSettings(target, 5, 5, true, 2.seconds, 5.seconds, 1.minute, ChannelOptionsSettings(5.seconds))
@@ -65,7 +65,7 @@ object DexExtensionGrpcConnector {
         100,
         CombinedWavesBlockchainClient.Settings(100, CombinedStream.Settings(1.second), SynchronizedPessimisticPortfolios.Settings(100))
       )
-      WavesClientBuilder.async(clientSettings, monixScheduler, executionContext)
+      WavesClientBuilder.async(clientSettings, matcherPublicKey, monixScheduler, executionContext)
     }.toEither
       .bimap(ex => s"Cannot establish gRPC connection to DEX Extension! $ex", client => DexExtensionGrpcConnector(target, client))
 

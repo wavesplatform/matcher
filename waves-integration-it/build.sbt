@@ -8,6 +8,8 @@ description := "Integration tests of the Waves blockchain client"
 
 libraryDependencies ++= Dependencies.Module.wavesIntegrationIt
 
+Test / scalacOptions += "-P:silencer:globalFilters=^magnolia: using fallback derivation.*$" // https://github.com/softwaremill/diffx#customization
+
 docker := docker.dependsOn(LocalProject("waves-ext") / docker).value
 
 inTask(docker)(

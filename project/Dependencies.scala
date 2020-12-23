@@ -14,7 +14,7 @@ object Dependencies {
     val scalaCheck = "1.15.0"
     val scalaTestPlusCheck = "3.2.3.0"
     val scalaMock = "4.4.0"
-    val diffx = "0.3.29"
+    val diffx = "0.3.29" // Can't update to 0.3.30, we have an issue with child traits of AcceptedOrder
 
     val cats = "2.1.1"
     val catsTaglessMacros = "0.11"
@@ -178,7 +178,7 @@ object Dependencies {
     javaLevelDb,
     allureScalaTest,
     diffx
-  ) map (_ % Test)
+  ).map(_ % Test)  ++ silencer
 
   private val integrationTestKit: Seq[ModuleID] = Seq(wavesJ, logback % Test) ++ testKit
 

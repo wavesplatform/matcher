@@ -6,7 +6,6 @@ import cats.Monoid
 import cats.syntax.either._
 import cats.syntax.option._
 import cats.syntax.semigroup._
-import com.google.protobuf.{ByteString, UnsafeByteOperations}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -33,7 +32,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
       outLeases = Map(bob -> 23L)
     ),
     tpe = WavesBlock.Type.FullBlock,
-    forgedTxIds = Set(mkTxId(1))
+    forgedTxs = mkTransactionWithChangesMap(1)
   )
 
   private val block2 = WavesBlock(
@@ -44,7 +43,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
       outLeases = Map.empty
     ),
     tpe = WavesBlock.Type.FullBlock,
-    forgedTxIds = Set(mkTxId(2))
+    forgedTxs = mkTransactionWithChangesMap(2)
   )
 
   private val emptyChain = Vector.empty[WavesBlock]
@@ -65,7 +64,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
                 reference = headBlock.fold(ByteStr(Array[Byte](-8)))(_.ref.id),
                 changes = Monoid.empty[BlockchainBalance],
                 tpe = WavesBlock.Type.FullBlock,
-                forgedTxIds = Set.empty // TODO
+                forgedTxs = Map.empty
               ),
               history
             )
@@ -351,7 +350,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
             outLeases = Map.empty
           ),
           tpe = WavesBlock.Type.MicroBlock,
-          forgedTxIds = Set(mkTxId(1))
+          forgedTxs = mkTransactionWithChangesMap(5)
         )
 
         val init = WavesChain(Vector(microBlock1, block1), 99)
@@ -367,14 +366,15 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
                   outLeases = Map(alice -> 1L)
                 ),
                 tpe = WavesBlock.Type.FullBlock,
-                forgedTxIds = Set(mkTxId(10))
+                forgedTxs = mkTransactionWithChangesMap(10)
               )
 
               val hardenedBlock = block1.copy(
                 ref = microBlock1.ref,
                 reference = block1.reference,
                 changes = block1.changes |+| microBlock1.changes,
-                tpe = WavesBlock.Type.FullBlock
+                tpe = WavesBlock.Type.FullBlock,
+                forgedTxs = block1.forgedTxs ++ microBlock1.forgedTxs
               )
 
               init.withBlock(newBlock) should matchTo(WavesChain(Vector(newBlock, hardenedBlock), 98).asRight[String])
@@ -414,7 +414,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
                   outLeases = Map(alice -> 1L)
                 ),
                 tpe = WavesBlock.Type.FullBlock,
-                forgedTxIds = Set(mkTxId(10))
+                forgedTxs = mkTransactionWithChangesMap(10)
               )
 
               init.withBlock(newBlock) should produce("(?s)^The new block.+must be after.+".r)
@@ -451,7 +451,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
             outLeases = Map.empty
           ),
           tpe = WavesBlock.Type.MicroBlock,
-          forgedTxIds = Set(mkTxId(1))
+          forgedTxs = mkTransactionWithChangesMap(1)
         )
 
         val microBlock2 = WavesBlock(
@@ -462,7 +462,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
             outLeases = Map.empty
           ),
           tpe = WavesBlock.Type.MicroBlock,
-          forgedTxIds = Set(mkTxId(2))
+          forgedTxs = mkTransactionWithChangesMap(2)
         )
 
         val init = WavesChain(Vector(microBlock2, microBlock1, block1), 99)
@@ -477,7 +477,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
                 outLeases = Map(alice -> 1L)
               ),
               tpe = WavesBlock.Type.FullBlock,
-              forgedTxIds = Set(mkTxId(10))
+              forgedTxs = mkTransactionWithChangesMap(10)
             )
 
             init.withBlock(newBlock) should produce("(?s)^The new block.+must be after.+".r)
@@ -493,7 +493,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
                   outLeases = Map.empty
                 ),
                 tpe = WavesBlock.Type.MicroBlock,
-                forgedTxIds = Set(mkTxId(10))
+                forgedTxs = mkTransactionWithChangesMap(10)
               )
 
               init.withBlock(microBlock3) should produce("(?s)^The new micro block.+must reference the last block.+".r)
@@ -511,7 +511,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
             outLeases = Map.empty
           ),
           tpe = WavesBlock.Type.MicroBlock,
-          forgedTxIds = Set(mkTxId(1))
+          forgedTxs = mkTransactionWithChangesMap(5)
         )
 
         val init = WavesChain(Vector(microBlock, block2, block1), 98)
@@ -524,7 +524,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
             outLeases = Map.empty
           ),
           tpe = WavesBlock.Type.FullBlock,
-          forgedTxIds = Set(mkTxId(2))
+          forgedTxs = mkTransactionWithChangesMap(2)
         )
 
         init.withBlock(newBlock) should produce("(?s)^The new block.+must be after.+".r)
@@ -767,7 +767,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
     reference = ByteStr.empty,
     changes = Monoid.empty[BlockchainBalance],
     tpe = WavesBlock.Type.FullBlock,
-    forgedTxIds = Set.empty
+    forgedTxs = Map.empty
   )
 
   private def historyGen(blocksNumber: Range, microBlocksNumber: Range, startHeightRange: Range = 0 to 2): Gen[Vector[WavesBlock]] =

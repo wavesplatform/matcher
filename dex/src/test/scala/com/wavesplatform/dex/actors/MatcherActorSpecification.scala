@@ -34,6 +34,7 @@ class MatcherActorSpecification
     extends MatcherSpec("MatcherActor")
     with MatcherSpecBase
     with WithDB
+    with HasOecInteraction
     with BeforeAndAfterEach
     with PathMockFactory
     with ImplicitSender
@@ -68,7 +69,7 @@ class MatcherActorSpecification
       val order = buy(pair, 2000L, 1)
 
       probe.send(actor, wrapLimitOrder(order))
-      addressActor.expectMsgType[Events.OrderAdded]
+      addressActor.expectOecProcess[Events.OrderAdded]
     }
 
     "mark an order book as failed" when {

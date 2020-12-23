@@ -30,7 +30,7 @@ class BroadcastUntilConfirmedTestSuite extends MatcherSuiteBase {
     eventually(dex1.tryApi.place(aliceOrder) shouldBe Symbol("right"))
 
     dex1.api.place(bobOrder)
-    dex1.api.waitForOrderStatus(aliceOrder, Status.Filled)
+    // dex1.api.waitForOrderStatus(aliceOrder, Status.Filled) // Because now we are waiting for a transaction in UTX/Blockchain
 
     markup("Wait for a transaction")
     val exchangeTxId = dex1.api.waitForTransactionsByOrder(aliceOrder, 1).head.id()

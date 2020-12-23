@@ -1,4 +1,4 @@
-package com.wavesplatform.dex.collection
+package com.wavesplatform.dex.collections
 
 // TODO DEX-994
 object MapOps {

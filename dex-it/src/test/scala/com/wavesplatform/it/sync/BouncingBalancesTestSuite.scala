@@ -2,16 +2,19 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
+import com.wavesplatform.dex.api.ws.connection.WsConnection
 import com.wavesplatform.dex.api.ws.entities.{WsBalances, WsOrder}
-import com.wavesplatform.dex.api.ws.protocol.WsPingOrPong
+import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsPingOrPong}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
-import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.SELL
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.it.docker.WavesNodeContainer
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.model.LimitOrder
 import com.wavesplatform.it.WsSuiteBase
+import org.scalatest.Assertion
 
 class BouncingBalancesTestSuite extends WsSuiteBase {
 
@@ -22,9 +25,15 @@ class BouncingBalancesTestSuite extends WsSuiteBase {
 
   override def wavesNodeInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.miner.enable = false""".stripMargin)
 
-  private val minerNodeSuiteConfig: Config = ConfigFactory.parseString("waves.miner.enable = true")
+  private val minerNodeSuiteConfig: Config = ConfigFactory.parseString("""waves.miner {
+  enable = true
+  micro-block-interval = 1s
+  min-micro-block-age = 1s
+}""")
 
   lazy val wavesMinerNode: WavesNodeContainer = createWavesNode("waves-2", suiteInitialConfig = minerNodeSuiteConfig, netAlias = None)
+
+  private val IssueResults(issueDoggyCoinTx, _, doggyCoin) = mkIssueExtended(alice, "doggyCoin", 1000000.asset8)
 
   override protected def beforeAll(): Unit = {
     wavesMinerNode.start()
@@ -38,11 +47,11 @@ class BouncingBalancesTestSuite extends WsSuiteBase {
     wavesNode1.api.waitForTransaction(IssueUsdTx)
 
     dex1.start()
+    log.info(s"\naddresses:\n alice=${alice.toAddress}\n bob=${bob.toAddress}\n\nassets:\n usd=$usd\n doggy=$doggyCoin")
   }
 
-  "Balance should not bounce when" - {
-    "rollback is completed" in {
-
+  "Balance should not bounce" - {
+    "when a rollback is completed" in {
       val wsc = mkWsAddressConnection(bob, dex1)
 
       withClue("Bob has only Waves on balance\n") {
@@ -60,7 +69,6 @@ class BouncingBalancesTestSuite extends WsSuiteBase {
       val heightFirstTransfer = heightIssue + 1
       val heightSecondTransfer = heightFirstTransfer + 1
 
-      val IssueResults(issueDoggyCoinTx, _, doggyCoin) = mkIssueExtended(alice, "doggyCoin", 1000000.asset8)
       val doggyUsdPair = AssetPair(doggyCoin, usd)
 
       implicit val efc: ErrorFormatterContext = ErrorFormatterContext.from(assetDecimalsMap + (doggyCoin -> 8))
@@ -91,7 +99,7 @@ class BouncingBalancesTestSuite extends WsSuiteBase {
       placeAndAwaitAtDex(bobOrder)
 
       assertChanges(wsc)(
-        Map(Waves -> WsBalances(4949949.997, 0.003)),
+        Map(Waves -> WsBalances(4949949.997, 0.003)), // Fee for order
         Map(doggyCoin -> WsBalances(0, 1000000))
       )(WsOrder.fromDomain(LimitOrder(bobOrder)))
       wsc.clearMessages()
@@ -110,6 +118,53 @@ class BouncingBalancesTestSuite extends WsSuiteBase {
           case _ => true
         } shouldBe empty
       }
+
+      wsc.close()
+    }
+
+    "multiple orders test" in {
+      val aliceWsc = mkWsAddressConnection(alice, dex1)
+      val bobWsc = mkWsAddressConnection(bob, dex1)
+
+      val now = System.currentTimeMillis()
+      val counterOrders = (1 to 25).map(i => mkOrderDP(alice, wavesUsdPair, OrderType.BUY, 1.waves, 10, ts = now + i))
+      val submittedOrders = (1 to 50).map(i => mkOrderDP(bob, wavesUsdPair, OrderType.SELL, 0.5.waves, 10, ts = now + i))
+
+      counterOrders.foreach(dex1.api.place)
+      submittedOrders.foreach(dex1.api.place)
+
+      counterOrders.foreach(dex1.api.waitForOrderStatus(_, Status.Filled))
+      submittedOrders.foreach(dex1.api.waitForOrderStatus(_, Status.Filled))
+
+      def checkOrdering(label: String, xs: List[Double])(cmp: (Double, Double) => Assertion): Unit = {
+        val elementsStr = xs.zipWithIndex.map { case (x, i) => s"$i: $x" }.mkString(", ")
+        withClue(s"$label ($elementsStr):\n") {
+          xs.zip(xs.tail).zipWithIndex.foreach {
+            case ((b1, b2), i) => withClue(s"$i: ")(cmp(b1, b2))
+          }
+        }
+      }
+
+      val aliceUsdChanges = collectTradableBalanceChanges(aliceWsc, usd)
+      checkOrdering("alice usd", aliceUsdChanges)(_ shouldBe >=(_))
+
+      // probably we need to zip with aliceUsdChanges and check
+      //  val aliceWavesChanges = collectTradableBalanceChanges(aliceWsc, Waves)
+      //  checkOrdering("alice Waves", aliceWavesChanges)(_ shouldBe <=(_))
+
+      //  val bobUsdChanges = collectTradableBalanceChanges(bobWsc, usd)
+      //  checkOrdering("bob usd", bobUsdChanges)(_ shouldBe <=(_))
+
+      val bobWavesChanges = collectTradableBalanceChanges(bobWsc, Waves)
+      checkOrdering("bob Waves", bobWavesChanges)(_ shouldBe >=(_))
+
+      aliceWsc.close()
+      bobWsc.close()
     }
   }
+
+  private def collectTradableBalanceChanges(wsc: WsConnection, asset: Asset): List[Double] = wsc.messages.collect {
+    case x: WsAddressChanges if x.balances.contains(asset) => x.balances(asset).tradable
+  }
+
 }

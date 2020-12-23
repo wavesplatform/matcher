@@ -3,7 +3,11 @@ package com.wavesplatform.dex
 import com.google.protobuf.{ByteString, UnsafeByteOperations}
 import com.softwaremill.diffx.{ConsoleColorConfig, Derived, Diff, DiffResultDifferent, DiffResultValue, FieldPath, Identical}
 import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.bytes.codec.Base58
+import com.wavesplatform.dex.grpc.integration.clients.domain.TransactionWithChanges
 import com.wavesplatform.dex.grpc.integration.services.UtxTransaction
+import com.wavesplatform.events.protobuf.StateUpdate
+import com.wavesplatform.protobuf.transaction.SignedTransaction
 import io.qameta.allure.scalatest.AllureScalatestContext
 import org.scalatest.enablers.Emptiness
 import org.scalatest.freespec.AnyFreeSpecLike
@@ -18,10 +22,15 @@ trait WavesIntegrationSuiteBase extends AnyFreeSpecLike with Matchers with Allur
   implicit val optionEmptiness: Emptiness[Option[Any]] = (thing: Option[Any]) => thing.isEmpty
 
   // diffx
+  val byteStringDiff: Diff[ByteString] = Diff[String].contramap[ByteString](xs => Base58.encode(xs.toByteArray))
 
-  implicit val derivedByteStrDiff: Derived[Diff[ByteStr]] = Derived(getDiff[ByteStr](_.toString == _.toString)) // TODO duplication
-  implicit val derivedByteStringDiff: Derived[Diff[ByteString]] = Derived(getDiff[ByteString](_.toString == _.toString))
-  implicit val derivedUtxTransactionDiff: Derived[Diff[UtxTransaction]] = Derived(getDiff[UtxTransaction](_.id == _.id))
+  implicit val derivedByteStrDiff: Derived[Diff[ByteStr]] = Derived(Diff[String].contramap[ByteStr](_.toString)) // TODO duplication
+  implicit val derivedByteStringDiff: Derived[Diff[ByteString]] = Derived(byteStringDiff)
+  implicit val derivedUtxTransactionDiff: Derived[Diff[UtxTransaction]] = Derived(byteStringDiff.contramap[UtxTransaction](_.id))
+
+  // Fixes "Class too large" compiler issue
+  implicit val derivedSignedTransactionDiff: Derived[Diff[TransactionWithChanges]] =
+    Derived(byteStringDiff.contramap[TransactionWithChanges](_.txId))
 
   def getDiff[T](comparison: (T, T) => Boolean): Diff[T] = { (left: T, right: T, _: List[FieldPath]) =>
     if (comparison(left, right)) Identical(left) else DiffResultValue(left, right)
@@ -35,6 +44,22 @@ trait WavesIntegrationSuiteBase extends AnyFreeSpecLike with Matchers with Allur
       case _ => MatchResult(matches = true, "", "")
     }
   }
+
+  protected def mkTransactionWithChangesMap(id: Int): Map[ByteString, TransactionWithChanges] = {
+    val txId = mkTxId(id)
+    Map(txId -> mkTransactionWithChanges(txId))
+  }
+
+  protected def mkUtxTransactionMap(id: Int): Map[ByteString, UtxTransaction] = {
+    val txId = mkTxId(id)
+    Map(txId -> UtxTransaction(txId))
+  }
+
+  protected def mkTransactionWithChanges(txId: ByteString): TransactionWithChanges = TransactionWithChanges(
+    txId = txId,
+    tx = SignedTransaction(),
+    changes = StateUpdate()
+  )
 
   protected def mkTxId(n: Int): ByteString = {
     require(n <= 127) // or we need complex implementation

@@ -34,7 +34,7 @@ object StatusTransitions extends ScorexLogging {
                   updatedLastBlockHeight =
                     if (block.tpe == WavesBlock.Type.FullBlock) LastBlockHeight.Updated(updatedFork.height)
                     else LastBlockHeight.NotChanged,
-                  utxUpdate = UtxUpdate(forgedTxIds = block.forgedTxIds),
+                  utxUpdate = UtxUpdate(forgedTxs = block.forgedTxs),
                   requestNextBlockchainEvent = true
                 )
             }
@@ -42,7 +42,7 @@ object StatusTransitions extends ScorexLogging {
           case UtxUpdated(newTxs, failedTxs) =>
             StatusUpdate(
               newStatus = origStatus,
-              utxUpdate = UtxUpdate(unconfirmedTxs = newTxs, failedTxIds = failedTxs.map(_.id).toSet)
+              utxUpdate = UtxUpdate(unconfirmedTxs = newTxs, failedTxs = failedTxs.view.map(x => x.id -> x).toMap)
             )
 
           case UtxSwitched(newTxs) =>
@@ -76,8 +76,8 @@ object StatusTransitions extends ScorexLogging {
             origStatus.fork.withBlock(block) match {
               case resolved: Status.Resolved =>
                 val finalUtxUpdate = origStatus.utxUpdate |+| UtxUpdate(
-                  forgedTxIds = resolved.forgedTxIds,
-                  failedTxIds = resolved.lostTxIds
+                  forgedTxs = resolved.forgedTxs,
+                  failedTxs = Map.empty // resolved.lostTxIds
                 )
 
                 if (resolved.lostDiffIndex.isEmpty)
@@ -119,7 +119,7 @@ object StatusTransitions extends ScorexLogging {
               newStatus = origStatus.copy(
                 utxUpdate = origStatus.utxUpdate |+| UtxUpdate(
                   unconfirmedTxs = newTxs,
-                  failedTxIds = failedTxs.map(_.id).toSet
+                  failedTxs = failedTxs.view.map(x => x.id -> x).toMap
                 )
               )
             )
@@ -163,7 +163,7 @@ object StatusTransitions extends ScorexLogging {
               newStatus = origStatus.copy(
                 utxUpdate = origStatus.utxUpdate |+| UtxUpdate(
                   unconfirmedTxs = newTxs,
-                  failedTxIds = failedTxs.map(_.id).toSet
+                  failedTxs = failedTxs.view.map(x => x.id -> x).toMap
                 )
               )
             )

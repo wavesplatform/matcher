@@ -3,8 +3,8 @@ package com.wavesplatform.dex.actors.address
 import java.time.{Instant, Duration => JDuration}
 
 import akka.actor.typed.scaladsl.adapter._
-import akka.actor.{Actor, ActorRef, Cancellable, Props, Status, typed}
-import akka.pattern.{CircuitBreakerOpenException, ask, pipe}
+import akka.actor.{typed, Actor, ActorRef, Cancellable, Props, Status}
+import akka.pattern.{ask, pipe, CircuitBreakerOpenException}
 import akka.{actor => classic}
 import cats.instances.long.catsKernelStdGroupForLong
 import cats.kernel.Group
@@ -13,7 +13,6 @@ import cats.syntax.group.{catsSyntaxGroup, catsSyntaxSemigroup}
 import com.wavesplatform.dex.actors.SpendableBalancesActor
 import com.wavesplatform.dex.actors.address.AddressActor.Settings.default
 import com.wavesplatform.dex.actors.address.AddressActor._
-import com.wavesplatform.dex.actors.tx.CreateExchangeTransactionActor
 import com.wavesplatform.dex.api.http.entities.MatcherResponse
 import com.wavesplatform.dex.api.ws.entities.{WsBalances, WsOrder}
 import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsError, WsServerMessage}
@@ -73,6 +72,8 @@ class AddressActor(
   private var wsAddressState = WsAddressState.empty(owner)
   private var wsSendSchedule: Cancellable = Cancellable.alreadyCancelled
 
+  private val spendableBalances = MutableMap.empty[Asset, Long]
+
   // if (started) because we haven't pendingCommands during the start
   private val eventsProcessing: Receive = {
     case event: OrderAdded =>
@@ -87,8 +88,6 @@ class AddressActor(
     case event: OrderExecuted =>
       log.debug(s"OrderExecuted(${event.submittedRemaining.id}, ${event.counterRemaining.id}), amount=${event.executedAmount}")
       List(event.submittedRemaining, event.counterRemaining).filter(_.order.sender.toAddress == owner).foreach(refreshOrderState(_, event))
-      // if (started) - otherwise DatabaseBackwardCompatTestSuite fails
-      context.system.eventStream.publish(CreateExchangeTransactionActor.OrderExecutedObserved(owner, event))
 
     case event @ OrderCanceled(ao, reason, ts) =>
       val id = ao.id
@@ -99,6 +98,13 @@ class AddressActor(
         log.trace(s"Confirming cancellation for $id")
         pc.client ! Event.OrderCanceled(id)
       }
+
+    case msg @ Command.ApplyBatch(events, balanceUpdate) =>
+      log.info(s"Got $msg")
+      // TODO DEX-1040 This code is not optimal, but it should work.
+      // e.g. We need folding
+      events.foreach(eventsProcessing(_))
+      if (started) working(Message.BalanceChanged(balanceUpdate.keySet, balanceUpdate))
 
     case command @ OrderCancelFailed(id, reason) =>
       if (started) pendingCommands.remove(id) match {
@@ -211,6 +217,7 @@ class AddressActor(
       }
 
     case msg: Message.BalanceChanged =>
+      msg.changesForAudit.foreach(Function.tupled(spendableBalances.update))
       if (wsAddressState.hasActiveSubscriptions) {
         wsAddressState = wsAddressState.putSpendableAssets(msg.changedAssets)
         scheduleNextDiffSending()
@@ -233,7 +240,7 @@ class AddressActor(
       }
 
     case Query.GetReservedBalance => sender() ! Reply.Balance(openVolume.filter(_._2 > 0))
-    case Query.GetTradableBalance(forAssets) => getTradableBalance(forAssets).map(Reply.Balance).pipeTo(sender())
+    case Query.GetTradableBalance(forAssets) => getTradableBalance(forAssets).map(Reply.Balance).pipeTo(sender()) // TODO DEX-1039
 
     case Query.GetOrderStatus(orderId) =>
       sender() ! Reply.GetOrderStatus(activeOrders.get(orderId).fold[OrderStatus](orderDB.status(orderId))(_.status))
@@ -296,7 +303,7 @@ class AddressActor(
 
     case WsCommand.AddWsSubscription(client) =>
       log.trace(s"[c=${client.path.name}] Added WebSocket subscription")
-      spendableBalancesActor ! SpendableBalancesActor.Query.GetSnapshot(owner)
+      spendableBalancesActor ! SpendableBalancesActor.Query.GetSnapshot(owner) // TODO DEX-1039 not all assets are required
       wsAddressState = wsAddressState.addPendingSubscription(client)
       context.watch(client)
 
@@ -308,9 +315,14 @@ class AddressActor(
     // Received a snapshot for pending connections
     case SpendableBalancesActor.Reply.GetSnapshot(allAssetsSpendableBalance) =>
       allAssetsSpendableBalance match {
-        case Right(spendableBalance) =>
+        case Right(snapshotSpendableBalance) =>
+          snapshotSpendableBalance.view
+            .filterKeys(asset => !spendableBalances.contains(asset))
+            .foreach(Function.tupled(spendableBalances.update)) // TODO DEX-1039 Do this once
+
           wsAddressState.sendSnapshot(
-            balances = mkWsBalances(spendableBalance),
+            // spendableBalances contains the latest balances
+            balances = mkWsBalances(spendableBalances.view.filter(_._2 > 0).to(Map)), // TODO DEX-1039
             orders = activeOrders.values.map(WsOrder.fromDomain(_)).to(Seq)
           )
           wsAddressState = wsAddressState.flushPendingSubscriptions()
@@ -322,19 +334,24 @@ class AddressActor(
     // It is time to send updates to clients. This block of code asks balances
     case WsCommand.PrepareDiffForWsSubscribers =>
       if (wsAddressState.hasActiveSubscriptions && wsAddressState.hasChanges) {
-        spendableBalancesActor ! SpendableBalancesActor.Query.GetState(owner, wsAddressState.getAllChangedAssets)
-        // We asked balances for current changedAssets and clean it here,
-        // because there are could be new changes between sent Query.GetState and received Reply.GetState.
-        wsAddressState = wsAddressState.cleanBalanceChanges()
+        wsAddressState = wsAddressState
+          .sendDiffs(
+            balances = mkWsBalances(spendableBalances.view.filterKeys(wsAddressState.getAllChangedAssets.contains).to(Map)),
+            orders = wsAddressState.getAllOrderChanges
+          )
+          .cleanOrderChanges()
+          .cleanBalanceChanges()
+
+        wsAddressState = wsAddressState.cleanOrderChanges()
       }
       wsSendSchedule = Cancellable.alreadyCancelled
 
     // It is time to send updates to clients. This block of code sends balances
-    case SpendableBalancesActor.Reply.GetState(spendableBalances) =>
+    case SpendableBalancesActor.Reply.GetState(getStateSpendableBalances) =>
       wsAddressState =
         if (wsAddressState.hasActiveSubscriptions)
           wsAddressState.sendDiffs(
-            balances = mkWsBalances(spendableBalances),
+            balances = mkWsBalances(getStateSpendableBalances ++ spendableBalances.view.filterKeys(getStateSpendableBalances.contains)),
             orders = wsAddressState.getAllOrderChanges
           )
         else if (wsAddressState.pendingSubscription.isEmpty)
@@ -407,6 +424,7 @@ class AddressActor(
     }
   }
 
+  // TODO DEX-1039
   private def getTradableBalance(forAssets: Set[Asset])(implicit group: Group[Map[Asset, Long]]): Future[Map[Asset, Long]] =
     spendableBalancesActor
       .ask(SpendableBalancesActor.Query.GetState(owner, forAssets))(5.seconds, self) // TODO replace ask pattern by better solution
@@ -635,6 +653,8 @@ object AddressActor {
   sealed trait OneOrderCommand extends Command
 
   object Command {
+
+    case class ApplyBatch(events: Queue[Events.Event], balanceUpdate: Map[Asset, Long]) extends Command
 
     case class PlaceOrder(order: Order, isMarket: Boolean) extends OneOrderCommand {
 

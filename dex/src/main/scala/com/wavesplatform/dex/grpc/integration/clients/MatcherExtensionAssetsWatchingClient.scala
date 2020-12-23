@@ -10,6 +10,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
+import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeUpdates
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.settings.WavesBlockchainClientSettings
 import monix.eval.Task
@@ -34,7 +35,7 @@ class MatcherExtensionAssetsWatchingClient(
       _ <- saveAssetsDescription(xs.keySet)
     } yield xs
 
-  override def updates: Observable[WavesBlockchainClient.Updates] = underlying
+  override def updates: Observable[WavesNodeUpdates] = underlying
     .updates
     .mapEval { xs =>
       val assets = xs.updatedBalances.valuesIterator.flatMap(_.keysIterator).toSet
@@ -53,16 +54,18 @@ class MatcherExtensionAssetsWatchingClient(
 
   override def runScript(address: Address, input: Order): Future[RunScriptResult] = underlying.runScript(address, input)
 
-  override def wereForged(txIds: Seq[ByteStr]): Future[Map[ByteStr, Boolean]] = underlying.wereForged(txIds)
+  override def areKnown(txIds: Seq[ByteStr]): Future[Map[ByteStr, Boolean]] = underlying.areKnown(txIds)
 
-  override def broadcastTx(tx: ExchangeTransaction): Future[Boolean] = underlying.broadcastTx(tx)
+  override def broadcastTx(tx: ExchangeTransaction): Future[BroadcastResult] = underlying.broadcastTx(tx)
 
-  override def forgedOrder(orderId: ByteStr): Future[Boolean] = underlying.forgedOrder(orderId)
+  override def isOrderForged(orderId: ByteStr): Future[Boolean] = underlying.isOrderForged(orderId)
 
   override def close(): Future[Unit] = underlying.close()
 
   private def saveAssetsDescription(assets: Set[Asset]): Future[Unit] =
-    Future.traverse(assets.iterator.collect { case asset: IssuedAsset if !assetsStorage.contains(asset) => asset })(saveAssetDescription).map(_ => ())
+    Future.traverse(assets.iterator.collect { case asset: IssuedAsset if !assetsStorage.contains(asset) => asset })(saveAssetDescription).map(
+      _ => ()
+    )
 
   private def saveAssetDescription(asset: IssuedAsset): Future[Unit] =
     assetsStorage.get(asset) match {

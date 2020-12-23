@@ -21,8 +21,9 @@ import ch.qos.logback.classic.LoggerContext
 import com.typesafe.config._
 import com.wavesplatform.dex.actors.ActorSystemOps.ImplicitOps
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
+import com.wavesplatform.dex.actors.events.OrderEventsCoordinatorActor
 import com.wavesplatform.dex.actors.orderbook.{AggregatedOrderBookActor, OrderBookActor, OrderBookSnapshotStoreActor}
-import com.wavesplatform.dex.actors.tx.{BroadcastExchangeTransactionActor, CreateExchangeTransactionActor, WriteExchangeTransactionActor}
+import com.wavesplatform.dex.actors.tx.{BroadcastExchangeTransactionActor, WriteExchangeTransactionActor}
 import com.wavesplatform.dex.actors.{MatcherActor, OrderBookAskAdapter, RootActorSystem, SpendableBalancesActor}
 import com.wavesplatform.dex.api.http.headers.{CustomMediaTypes, MatcherHttpServer}
 import com.wavesplatform.dex.api.http.routes.{MatcherApiRoute, MatcherApiRouteV1}
@@ -149,6 +150,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     settings = settings.wavesBlockchainClient,
     underlying = WavesClientBuilder.async(
       settings.wavesBlockchainClient,
+      matcherPublicKey,
       monixScheduler = monixScheduler,
       grpcExecutionContext = grpcExecutionContext
     ),
@@ -169,15 +171,10 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       .props(
         settings.exchangeTransactionBroadcast,
         time,
-        wavesBlockchainAsyncClient.wereForged,
+        wavesBlockchainAsyncClient.areKnown,
         wavesBlockchainAsyncClient.broadcastTx
       ),
     "exchange-transaction-broadcast"
-  )
-
-  actorSystem.actorOf(
-    CreateExchangeTransactionActor.props(transactionCreator.createTransaction, List(txWriterRef, wavesNetTxBroadcasterRef)),
-    CreateExchangeTransactionActor.name
   )
 
   private val wsInternalBroadcastRef: typed.ActorRef[WsInternalBroadcastActor.Command] = actorSystem.spawn(
@@ -226,13 +223,24 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
   private val spendableBalancesRef = actorSystem.actorOf(SpendableBalancesActor.props(wavesBlockchainAsyncClient, addressDirectoryRef))
 
+  private val orderEventsCoordinatorRef = actorSystem.spawn(
+    behavior = OrderEventsCoordinatorActor.apply(
+      addressDirectoryRef = addressDirectoryRef,
+      txWriterRef = txWriterRef,
+      broadcastRef = wavesNetTxBroadcasterRef,
+      createTransaction = transactionCreator.createTransaction,
+      isTransactionKnown = txId => wavesBlockchainAsyncClient.areKnown(List(txId)).map(_.getOrElse(txId, false))
+    ),
+    name = "events-coordinator"
+  )
+
   private val matcherActorRef: ActorRef = {
     def mkOrderBookProps(assetPair: AssetPair, matcherActor: ActorRef): Props = {
       matchingRulesCache.setCurrentMatchingRuleForNewOrderBook(assetPair, lastProcessedOffset, errorContext.unsafeAssetDecimals)
       OrderBookActor.props(
         OrderBookActor.Settings(AggregatedOrderBookActor.Settings(settings.webSockets.externalClientHandler.messagesInterval)),
         matcherActor,
-        addressDirectoryRef,
+        orderEventsCoordinatorRef,
         orderBookSnapshotStoreRef,
         wsInternalBroadcastRef,
         assetPair,
@@ -352,6 +360,13 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       )
     }
 
+    _ = {
+      log.info("Start watching Node updates")
+      wavesBlockchainAsyncClient.updates.foreach { updates =>
+        orderEventsCoordinatorRef ! OrderEventsCoordinatorActor.Command.ApplyUpdates(updates)
+      }(monixScheduler)
+    }
+
     _ <- {
       log.info(s"Preparing HTTP service (Matcher's ID = ${settings.id}) ...")
       // Indirectly initializes matcherActor, so it must be after loadAllKnownAssets
@@ -403,11 +418,9 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       waitOffsetReached(lastOffsetQueue, deadline)
     }
   } yield {
-    log.info("Last offset has been reached, notify addresses")
+    log.info("Last offset has been reached, switching to a normal mode")
+    orderEventsCoordinatorRef ! OrderEventsCoordinatorActor.Command.Start
     addressDirectoryRef ! AddressDirectoryActor.StartWork
-
-    log.info("Start watching balances")
-    watchBalanceChanges(spendableBalancesRef)
   }
 
   startGuard.onComplete {
@@ -417,10 +430,6 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       log.error(s"Can't start matcher: ${e.getMessage}", e)
       forceStopApplication(StartingMatcherError)
   }
-
-  private def watchBalanceChanges(recipient: ActorRef): Unit =
-    wavesBlockchainAsyncClient.updates
-      .foreach(updates => recipient ! SpendableBalancesActor.Command.UpdateStates(updates.updatedBalances))(monixScheduler)
 
   private def loadAllKnownAssets(): Future[Unit] =
     Future(blocking(assetPairsDB.all()).flatMap(_.assets) ++ settings.mentionedAssets).flatMap { assetsToLoad =>

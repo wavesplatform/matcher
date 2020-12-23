@@ -4,6 +4,7 @@ import java.math.{BigDecimal, BigInteger, RoundingMode}
 
 import cats.instances.long.catsKernelStdGroupForLong
 import cats.syntax.group._
+import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.model.Price
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
@@ -452,6 +453,9 @@ object Events {
       case lo: LimitOrder => submittedLimitRemaining(lo)
       case mo: MarketOrder => submittedMarketRemaining(mo)
     }
+
+    // Set, because is could be one trader
+    def traders: Set[Address] = Set(counter.order.senderPublicKey.toAddress, submitted.order.senderPublicKey.toAddress)
 
     override def reason: EventReason = OrderExecutedReason
   }

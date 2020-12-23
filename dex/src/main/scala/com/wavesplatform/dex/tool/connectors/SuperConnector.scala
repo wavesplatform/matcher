@@ -82,6 +82,7 @@ object SuperConnector {
 
       dexExtensionGrpcConnector <- logProcessing("Setting up connection with DEX Extension gRPC API") {
         DexExtensionGrpcConnector.create(
+          matcherKeyPair.publicKey,
           extensionGrpcApiUri,
           blockchainUpdatesExtensionGrpcApiUri
         )

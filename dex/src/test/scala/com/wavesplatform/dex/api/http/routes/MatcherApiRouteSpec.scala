@@ -132,8 +132,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       orderRestrictions = Map(smartWavesPair -> orderRestrictions)
     )
 
-  implicit private val httpMarketDataWithMetaDiff: Diff[HttpMarketDataWithMeta] =
-    Derived[Diff[HttpMarketDataWithMeta]].ignore[HttpMarketDataWithMeta, Long](_.created)
+  implicit private val httpMarketDataWithMetaDiff: Derived[Diff[HttpMarketDataWithMeta]] =
+    Derived(Diff.gen[HttpMarketDataWithMeta].value.ignore[HttpMarketDataWithMeta, Long](_.created))
 
   private def mkHistoryItem(order: Order, status: String): HttpOrderBookHistoryItem =
     HttpOrderBookHistoryItem(

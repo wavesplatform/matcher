@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.grpc.integration.clients
 
-sealed trait RunScriptResult
+sealed trait RunScriptResult extends Product with Serializable
 
 object RunScriptResult {
   case class ScriptError(message: String) extends RunScriptResult

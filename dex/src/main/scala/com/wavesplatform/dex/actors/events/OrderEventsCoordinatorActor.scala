@@ -17,7 +17,7 @@ import com.wavesplatform.dex.model.ExchangeTransactionCreator.CreateTransaction
 import play.api.libs.json.Json
 
 import scala.concurrent.Future
-import scala.util.{Success, Try}
+import scala.util.{Failure, Success, Try}
 
 // TODO DEX-1042
 object OrderEventsCoordinatorActor {
@@ -106,7 +106,9 @@ object OrderEventsCoordinatorActor {
             Behaviors.same
 
           case Command.ApplyUpdates(updates) =>
-            context.log.info(s"Got ApplyUpdates($updates)")
+            context.log.info(
+              s"Got ApplyUpdates(failedTxs=${updates.failedTxs.keys.mkString(", ")}, appearedTxs=${updates.appearedTxs.keys.mkString(", ")})"
+            )
 
             // All transactions are exchange and from this matcher's account
             val (updatedState1, balancesAfterTxs) = (updates.appearedTxs ++ updates.failedTxs)
@@ -131,14 +133,18 @@ object OrderEventsCoordinatorActor {
           case Event.TxChecked(tx, isKnown) =>
             val txId = tx.id()
             val inCache = state.knownOnNodeCache.contains(txId)
-            context.log.info(s"Got TxChecked($tx, $isKnown), inCache: $inCache")
+
+            isKnown match {
+              case Success(x) => context.log.info(s"Got TxChecked(${tx.id()}, isKnown=$x), inCache: $inCache")
+              case Failure(e) => context.log.warn(s"Failed to check ${tx.id()} status", e)
+            }
+
             if (inCache) Behaviors.same
             else isKnown match {
               case Success(false) =>
                 broadcastRef ! BroadcastExchangeTransactionActor.Broadcast(context.self, tx)
                 Behaviors.same
               case _ =>
-                // log error?
                 val (updated, restBalances, resolved) = state.withKnownOnNodeTx(tx.traders, txId, Map.empty)
                 sendResolved(resolved)
                 sendBalances(restBalances) // Actually, they should be empty, but anyway

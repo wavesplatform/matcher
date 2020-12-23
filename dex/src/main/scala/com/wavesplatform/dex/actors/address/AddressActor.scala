@@ -63,7 +63,7 @@ class AddressActor(
   private val pendingCommands = MutableMap.empty[Order.Id, PendingCommand]
 
   private val activeOrders = MutableMap.empty[Order.Id, AcceptedOrder]
-  private var openVolume = Map.empty[Asset, Long]
+  @volatile private var openVolume = Map.empty[Asset, Long]
   private val expiration = MutableMap.empty[Order.Id, Cancellable]
 
   // Saves from cases when a client does multiple requests with the same order
@@ -72,6 +72,7 @@ class AddressActor(
   private var wsAddressState = WsAddressState.empty(owner)
   private var wsSendSchedule: Cancellable = Cancellable.alreadyCancelled
 
+  private var allAssetsKnown = false
   private val spendableBalances = MutableMap.empty[Asset, Long]
 
   // if (started) because we haven't pendingCommands during the start
@@ -240,7 +241,7 @@ class AddressActor(
       }
 
     case Query.GetReservedBalance => sender() ! Reply.Balance(openVolume.filter(_._2 > 0))
-    case Query.GetTradableBalance(forAssets) => getTradableBalance(forAssets).map(Reply.Balance).pipeTo(sender()) // TODO DEX-1039
+    case Query.GetTradableBalance(forAssets) => getTradableBalance(forAssets).map(Reply.Balance).pipeTo(sender()) // TODO DEX-1016
 
     case Query.GetOrderStatus(orderId) =>
       sender() ! Reply.GetOrderStatus(activeOrders.get(orderId).fold[OrderStatus](orderDB.status(orderId))(_.status))
@@ -303,9 +304,13 @@ class AddressActor(
 
     case WsCommand.AddWsSubscription(client) =>
       log.trace(s"[c=${client.path.name}] Added WebSocket subscription")
-      spendableBalancesActor ! SpendableBalancesActor.Query.GetSnapshot(owner) // TODO DEX-1039 not all assets are required
       wsAddressState = wsAddressState.addPendingSubscription(client)
-      context.watch(client)
+      if (allAssetsKnown) sendWsSnapshotAndFlushPendingSubscriptions()
+      else {
+        // to(Set) because we need an immutable set
+        spendableBalancesActor ! SpendableBalancesActor.Query.GetSnapshot(owner, spendableBalances.keys.to(Set))
+        context.watch(client)
+      }
 
     case WsCommand.RemoveWsSubscription(client) =>
       log.trace(s"[c=${client.path.name}] Removed WebSocket subscription")
@@ -316,16 +321,13 @@ class AddressActor(
     case SpendableBalancesActor.Reply.GetSnapshot(allAssetsSpendableBalance) =>
       allAssetsSpendableBalance match {
         case Right(snapshotSpendableBalance) =>
+          allAssetsKnown = true
           snapshotSpendableBalance.view
             .filterKeys(asset => !spendableBalances.contains(asset))
-            .foreach(Function.tupled(spendableBalances.update)) // TODO DEX-1039 Do this once
+            .foreach(Function.tupled(spendableBalances.update))
 
-          wsAddressState.sendSnapshot(
-            // spendableBalances contains the latest balances
-            balances = mkWsBalances(spendableBalances.view.filter(_._2 > 0).to(Map)), // TODO DEX-1039
-            orders = activeOrders.values.map(WsOrder.fromDomain(_)).to(Seq)
-          )
-          wsAddressState = wsAddressState.flushPendingSubscriptions()
+          sendWsSnapshotAndFlushPendingSubscriptions()
+
         case Left(matcherError) =>
           wsAddressState.pendingSubscription.foreach(_.unsafeUpcast[WsServerMessage] ! WsError.from(matcherError, time.correctedTime()))
           wsAddressState = wsAddressState.copy(pendingSubscription = Set.empty)
@@ -424,12 +426,18 @@ class AddressActor(
     }
   }
 
-  // TODO DEX-1039
-  private def getTradableBalance(forAssets: Set[Asset])(implicit group: Group[Map[Asset, Long]]): Future[Map[Asset, Long]] =
-    spendableBalancesActor
-      .ask(SpendableBalancesActor.Query.GetState(owner, forAssets))(5.seconds, self) // TODO replace ask pattern by better solution
-      .mapTo[SpendableBalancesActor.Reply.GetState]
-      .map(xs => (xs.state |-| openVolume.view.filterKeys(forAssets).toMap).filter(_._2 > 0).withDefaultValue(0L))
+  private def getTradableBalance(forAssets: Set[Asset])(implicit group: Group[Map[Asset, Long]]): Future[Map[Asset, Long]] = {
+    val (known, unknown) = forAssets.partition(spendableBalances.contains)
+    val knownBalance = spendableBalances.view.filterKeys(known.contains).toMap
+
+    val askUnknown =
+      if (allAssetsKnown || unknown.isEmpty) Future.successful(SpendableBalancesActor.Reply.GetState(Map.empty))
+      else spendableBalancesActor
+        .ask(SpendableBalancesActor.Query.GetState(owner, unknown))(5.seconds, self) // TODO replace ask pattern by better solution
+        .mapTo[SpendableBalancesActor.Reply.GetState]
+
+    askUnknown.map(xs => (xs.state ++ knownBalance |-| openVolume.view.filterKeys(forAssets).toMap).filter(_._2 > 0).withDefaultValue(0L))
+  }
 
   private def scheduleExpiration(order: Order): Unit = if (!expiration.contains(order.id())) {
     val timeToExpiration = (order.expiration - time.correctedTime()).max(0L)
@@ -490,6 +498,18 @@ class AddressActor(
 
       scheduleNextDiffSending()
     }
+  }
+
+  /**
+   * Use only if allAssetsKnown == true!
+   */
+  private def sendWsSnapshotAndFlushPendingSubscriptions(): Unit = {
+    wsAddressState.sendSnapshot(
+      // spendableBalances contains the latest balances
+      balances = mkWsBalances(spendableBalances.view.filter(_._2 > 0).to(Map)),
+      orders = activeOrders.values.map(WsOrder.fromDomain(_)).to(Seq)
+    )
+    wsAddressState = wsAddressState.flushPendingSubscriptions()
   }
 
   private def getOrdersToCancel(actualBalance: Map[Asset, Long]): Queue[InsufficientBalanceOrder] = {

@@ -30,7 +30,7 @@ class MatcherExtensionCachingClient(underlying: MatcherExtensionClient, defaultC
   override val utxEvents = underlying.utxEvents
 
   override def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] = underlying.spendableBalances(address, assets)
-  override def allAssetsSpendableBalance(address: Address): Future[Map[Asset, Long]] = underlying.allAssetsSpendableBalance(address)
+  override def allAssetsSpendableBalance(address: Address, excludeAssets: Set[Asset]): Future[Map[Asset, Long]] = underlying.allAssetsSpendableBalance(address, excludeAssets)
   override def getBalances(index: DiffIndex): Future[BlockchainBalance] = underlying.getBalances(index)
 
   override def isFeatureActivated(id: Short): Future[Boolean] = featuresCache.get(id) map Boolean2boolean

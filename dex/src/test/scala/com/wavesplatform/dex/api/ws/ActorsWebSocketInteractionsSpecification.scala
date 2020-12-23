@@ -65,12 +65,11 @@ class ActorsWebSocketInteractionsSpecification
     def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] =
       Future.successful((currentPortfolio.get().assets ++ Map(Waves -> currentPortfolio.get().balance).view.filterKeys(assets)).toMap)
 
-    def allAssetsSpendableBalance: Address => Future[Map[Asset, Long]] = { a =>
+    def allAssetsSpendableBalance(a: Address, excludeAssets: Set[Asset]): Future[Map[Asset, Long]] =
       if (a == address.toAddress) Future.successful {
         (currentPortfolio.get().assets ++ Map(Waves -> currentPortfolio.get().balance)).filter(_._2 > 0).toMap
       }
       else Future.failed(WavesNodeConnectionLostException("Node unavailable", new IllegalStateException))
-    }
 
     lazy val addressDir = system.actorOf(Props(new AddressDirectoryActor(EmptyOrderDB, createAddressActor, None, started = true)))
 
@@ -402,44 +401,45 @@ class ActorsWebSocketInteractionsSpecification
       }
 
       // DEX-989
-      "there are few subscriptions from single address" ignore webSocketTest { (ad, _, _, address, _, placeOrder, cancel, _, updateBalances, _) =>
-        val tradableBalance = Map(Waves -> 100.waves, usd -> 300.usd, eth -> 2.eth)
-        updateBalances(tradableBalance)
+      "there are few subscriptions from single address" ignore webSocketTest {
+        (ad, _, _, address, _, placeOrder, cancel, _, updateBalances, _) =>
+          val tradableBalance = Map(Waves -> 100.waves, usd -> 300.usd, eth -> 2.eth)
+          updateBalances(tradableBalance)
 
-        def subscribe(tp: TypedTestProbe[WsMessage]): Unit =
-          ad ! AddressDirectoryActor.Envelope(address, AddressActor.WsCommand.AddWsSubscription(tp.ref))
+          def subscribe(tp: TypedTestProbe[WsMessage]): Unit =
+            ad ! AddressDirectoryActor.Envelope(address, AddressActor.WsCommand.AddWsSubscription(tp.ref))
 
-        def expectWsBalance(tp: TypedTestProbe[WsMessage], expected: Map[Asset, WsBalances], expectedUpdateId: Long): Unit = {
-          val wsAddressChanges = tp.expectMessageType[WsAddressChanges]
-          wsAddressChanges.balances should matchTo(expected)
-          wsAddressChanges.updateId should matchTo(expectedUpdateId)
-        }
+          def expectWsBalance(tp: TypedTestProbe[WsMessage], expected: Map[Asset, WsBalances], expectedUpdateId: Long): Unit = {
+            val wsAddressChanges = tp.expectMessageType[WsAddressChanges]
+            wsAddressChanges.balances should matchTo(expected)
+            wsAddressChanges.updateId should matchTo(expectedUpdateId)
+          }
 
-        val webSubscription, mobileSubscription, desktopSubscription = testKit.createTestProbe[WsMessage]()
+          val webSubscription, mobileSubscription, desktopSubscription = testKit.createTestProbe[WsMessage]()
 
-        subscribe(webSubscription)
-        expectWsBalance(webSubscription, Map(Waves -> WsBalances(100, 0), usd -> WsBalances(300, 0), eth -> WsBalances(2, 0)), 0)
+          subscribe(webSubscription)
+          expectWsBalance(webSubscription, Map(Waves -> WsBalances(100, 0), usd -> WsBalances(300, 0), eth -> WsBalances(2, 0)), 0)
 
-        updateBalances(Map(Waves -> 100.waves, usd -> 300.usd, eth -> 5.eth))
-        expectWsBalance(webSubscription, Map(eth -> WsBalances(5, 0)), 1)
+          updateBalances(Map(Waves -> 100.waves, usd -> 300.usd, eth -> 5.eth))
+          expectWsBalance(webSubscription, Map(eth -> WsBalances(5, 0)), 1)
 
-        subscribe(mobileSubscription)
-        expectWsBalance(mobileSubscription, Map(Waves -> WsBalances(100, 0), usd -> WsBalances(300, 0), eth -> WsBalances(5, 0)), 0)
+          subscribe(mobileSubscription)
+          expectWsBalance(mobileSubscription, Map(Waves -> WsBalances(100, 0), usd -> WsBalances(300, 0), eth -> WsBalances(5, 0)), 0)
 
-        val order = LimitOrder(createOrder(wavesUsdPair, BUY, 1.waves, 3.0, sender = address))
+          val order = LimitOrder(createOrder(wavesUsdPair, BUY, 1.waves, 3.0, sender = address))
 
-        placeOrder(order)
-        expectWsBalance(webSubscription, Map(usd -> WsBalances(297, 3), Waves -> WsBalances(99.997, 0.003)), 2)
-        expectWsBalance(mobileSubscription, Map(usd -> WsBalances(297, 3), Waves -> WsBalances(99.997, 0.003)), 1)
+          placeOrder(order)
+          expectWsBalance(webSubscription, Map(usd -> WsBalances(297, 3), Waves -> WsBalances(99.997, 0.003)), 2)
+          expectWsBalance(mobileSubscription, Map(usd -> WsBalances(297, 3), Waves -> WsBalances(99.997, 0.003)), 1)
 
-        subscribe(desktopSubscription)
-        expectWsBalance(desktopSubscription, Map(Waves -> WsBalances(99.997, 0.003), usd -> WsBalances(297, 3), eth -> WsBalances(5, 0)), 0)
+          subscribe(desktopSubscription)
+          expectWsBalance(desktopSubscription, Map(Waves -> WsBalances(99.997, 0.003), usd -> WsBalances(297, 3), eth -> WsBalances(5, 0)), 0)
 
-        cancel(order, true)
+          cancel(order, true)
 
-        expectWsBalance(webSubscription, Map(usd -> WsBalances(300, 0), Waves -> WsBalances(100, 0)), 3)
-        expectWsBalance(mobileSubscription, Map(usd -> WsBalances(300, 0), Waves -> WsBalances(100, 0)), 2)
-        expectWsBalance(desktopSubscription, Map(usd -> WsBalances(300, 0), Waves -> WsBalances(100, 0)), 1)
+          expectWsBalance(webSubscription, Map(usd -> WsBalances(300, 0), Waves -> WsBalances(100, 0)), 3)
+          expectWsBalance(mobileSubscription, Map(usd -> WsBalances(300, 0), Waves -> WsBalances(100, 0)), 2)
+          expectWsBalance(desktopSubscription, Map(usd -> WsBalances(300, 0), Waves -> WsBalances(100, 0)), 1)
       }
 
       "so far unsubscribed address made some actions and then subscribes" in webSocketTest {

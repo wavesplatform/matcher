@@ -17,6 +17,7 @@ import scala.concurrent.Future
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
+// TODO DEX-1043
 class BroadcastExchangeTransactionActor(
   settings: ExchangeTransactionBroadcastSettings,
   time: Time,
@@ -41,11 +42,10 @@ class BroadcastExchangeTransactionActor(
             true
         }
 
-        log.info(s"==> broadcast: ${tx.id()}: $result")
-        if (sendResponse) clientRef ! OrderEventsCoordinatorActor.Event.TxChecked(tx, result.map(_ => true)) // TODO HACK
+        if (sendResponse) clientRef ! OrderEventsCoordinatorActor.Event.TxChecked(tx, result.map(_ => true)) // TODO DEX-1043 HACK
       }
 
-    case ExchangeTransactionCreated(tx) => broadcast(tx) // TODO remove
+    case ExchangeTransactionCreated(tx) => broadcast(tx) // TODO DEX-1043 remove
     case CheckAndSend => // ignore
   }
 
@@ -63,7 +63,7 @@ class BroadcastExchangeTransactionActor(
             .sequence(ready.map(tx => broadcast(tx).tupleLeft(tx)))
             .map(_.toMap)
             .map { isTxBroadcasted =>
-              // TODO Refactor
+              // TODO DEX-1043 Refactor
               val (validTxs, invalidTxs) = ready.partition { x =>
                 isTxBroadcasted(x) match {
                   case BroadcastResult.Added => true
@@ -104,8 +104,7 @@ class BroadcastExchangeTransactionActor(
                 true
             }
 
-            log.info(s"==> broadcast: ${tx.id()}: $result")
-            if (sendResponse) clientRef ! OrderEventsCoordinatorActor.Event.TxChecked(tx, result.map(_ => true)) // TODO HACK
+            if (sendResponse) clientRef ! OrderEventsCoordinatorActor.Event.TxChecked(tx, result.map(_ => true)) // TODO DEX-1043 HACK
           }
       } yield confirmed
 
@@ -116,7 +115,7 @@ class BroadcastExchangeTransactionActor(
           self ! EnqueueToCheck(tx)
       }
 
-    case ExchangeTransactionCreated(tx) => // TODO remove
+    case ExchangeTransactionCreated(tx) => // TODO DEX-1043 remove
       val r = for {
         confirmed <- confirmed(List(tx.id())).map(_.getOrElse(tx.id(), false))
         _ <- if (confirmed) Future.unit else broadcast(tx)

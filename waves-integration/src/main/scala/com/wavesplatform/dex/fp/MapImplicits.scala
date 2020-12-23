@@ -40,10 +40,6 @@ object MapImplicits {
   }
 
   implicit final class MapOps[K, V](val self: Map[K, V]) extends AnyVal {
-    def appendIf(cond: Boolean, k: => K, v: => V): Map[K, V] = if (cond) self.updated(k, v) else self
-    def removeIf(cond: Boolean, k: => K): Map[K, V] = if (cond) self - k else self
-    def appendOrRemoveIf(appendIf: Boolean, k: => K, v: => V): Map[K, V] = if (appendIf) self.updated(k, v) else self - k
-
     def appendIfDefined(k: K, v: Option[V]): Map[K, V] = v.fold(self)(self.updated(k, _))
     def appendIfDefinedMany(kv: (K, Option[V])*): Map[K, V] = kv.foldLeft(self) { case (r, (k, v)) => r.appendIfDefined(k, v) }
   }

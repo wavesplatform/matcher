@@ -15,7 +15,6 @@ import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.fp.MapImplicits.group
-import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.Updates
 import com.wavesplatform.dex.grpc.integration.clients.blockchainupdates.BlockchainUpdatesClient
 import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedWavesBlockchainClient._
 import com.wavesplatform.dex.grpc.integration.clients.domain.StatusUpdate.LastBlockHeight
@@ -58,7 +57,7 @@ class CombinedWavesBlockchainClient(
 
   private val dataUpdates = ConcurrentSubject.publish[WavesNodeEvent]
 
-  override val updates: Observable[Updates] = Observable.fromFuture(meClient.currentBlockInfo)
+  override val updates: Observable[WavesNodeUpdates] = Observable.fromFuture(meClient.currentBlockInfo)
     .flatMap { startBlockInfo =>
       log.info(s"Current block: $startBlockInfo")
       val startHeight = math.max(startBlockInfo.height - settings.maxRollbackHeight - 1, 1)
@@ -79,7 +78,7 @@ class CombinedWavesBlockchainClient(
           if (x.requestNextBlockchainEvent) bClient.blockchainEvents.requestNext()
           requestBalances(x.requestBalances)
           val finalKnownBalances = knownBalances.updateAndGet(_ |+| x.updatedBalances)
-          val updatedPessimistic = processUtxEvents(x.utxUpdate) // TODO do we need to filter out known transactions (WavesChain)?
+          val updatedPessimistic = processUtxEvents(x.utxUpdate) // TODO DEX-1045 Do we need to filter out known transactions (WavesChain)?
           val changedAddresses = finalKnownBalances.regular.keySet ++ finalKnownBalances.outLeases.keySet ++ updatedPessimistic
           val updatedFinalBalances = changedAddresses
             .map { address =>
@@ -96,7 +95,7 @@ class CombinedWavesBlockchainClient(
             .toMap
           (
             x.newStatus,
-            Updates(
+            WavesNodeUpdates(
               updatedFinalBalances,
               appearedTxs = ({
                 x.utxUpdate.forgedTxs.view.collect { case (id, x) if isExchangeTransactionFromMatcher(x.tx) => id.toVanilla -> x }

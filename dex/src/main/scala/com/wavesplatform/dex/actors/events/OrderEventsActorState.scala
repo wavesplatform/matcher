@@ -9,13 +9,14 @@ import com.wavesplatform.dex.model.Events
 
 import scala.collection.immutable.Queue
 
+// TODO DEX-1041
 case class OrderEventsActorState(addresses: Map[Address, PendingAddress], knownOnNodeCache: FifoSet[ExchangeTransaction.Id]) {
 
   /**
    * @return (updated, passUpdates), passUpdates can be sent to recipients
    */
   def withBalanceUpdates(updates: AddressAssets): (OrderEventsActorState, AddressAssets) = {
-    // TODO probably, we need fold on addresses, because updates.size >> addresses.size
+    // TODO DEX-1041 probably, we need fold on addresses, because updates.size >> addresses.size
     val (updatedAddresses, passUpdates) = updates.foldLeft((addresses, Map.empty: AddressAssets)) {
       case ((addresses, passUpdates), item @ (address, updates)) =>
         addresses.get(address) match {

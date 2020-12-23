@@ -11,14 +11,12 @@ import cats.syntax.option._
 import com.google.protobuf.ByteString
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
-import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.fp.MapImplicits.cleaningGroup
 
 import scala.collection.mutable
 import scala.util.chaining._
-import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions._
 
-class DefaultPessimisticPortfolios() extends PessimisticPortfolios with ScorexLogging {
+class DefaultPessimisticPortfolios() extends PessimisticPortfolios {
   // Longs are negative in both maps, see getPessimisticPortfolio
   private val portfolios = new mutable.AnyRefMap[Address, Map[Asset, Long]]()
   private val txs = new mutable.AnyRefMap[ByteString, Map[Address, Map[Asset, Long]]]
@@ -39,12 +37,6 @@ class DefaultPessimisticPortfolios() extends PessimisticPortfolios with ScorexLo
     val putTxIds = setTxIds -- origTxIds
     val removeTxIds = origTxIds -- setTxIds
 
-    log.info(s"""replaceWith:
-origTxIds:   ${origTxIds.toSeq.map(_.toVanilla.base58).sorted.mkString(", ")}
-putTxIds:    ${putTxIds.toSeq.map(_.toVanilla.base58).sorted.mkString(", ")}
-removeTxIds: ${removeTxIds.toSeq.map(_.toVanilla.base58).sorted.mkString(", ")}
-""")
-
     if (removeTxIds.isEmpty && putTxIds.isEmpty) Set.empty
     else {
       // It is safe to use setTxMap.apply here, because putTxIds contains elements only from setTxIds
@@ -57,7 +49,6 @@ removeTxIds: ${removeTxIds.toSeq.map(_.toVanilla.base58).sorted.mkString(", ")}
       val subtractPortfolios = removeTxIds.toList.foldMap(txs.remove(_).getOrElse(Map.empty))
 
       val diff = addPortfolios |-| subtractPortfolios
-      log.info(s"portfolio diff:\n${diff.mkString("\n")}")
       diff.foreach { case (address, diff) =>
         portfolios.updateWith(address) { prev =>
           (prev.getOrElse(Map.empty) |+| diff)

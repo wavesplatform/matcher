@@ -1,14 +1,12 @@
 package com.wavesplatform.dex.grpc.integration.clients
 
-import cats.Monoid
-import com.wavesplatform.dex.collections.MapOps.Ops2D
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
-import com.wavesplatform.dex.grpc.integration.clients.domain.TransactionWithChanges
+import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeUpdates
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import monix.reactive.Observable
 
@@ -16,7 +14,7 @@ import scala.concurrent.Future
 
 // TODO DEX-998
 trait WavesBlockchainClient {
-  def updates: Observable[WavesBlockchainClient.Updates]
+  def updates: Observable[WavesNodeUpdates]
 
   def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]]
 
@@ -41,34 +39,4 @@ trait WavesBlockchainClient {
   def isOrderForged(orderId: ByteStr): Future[Boolean]
 
   def close(): Future[Unit]
-}
-
-object WavesBlockchainClient {
-
-  type BalanceChanges = Map[Address, Map[Asset, Long]]
-
-  // TODO move outside
-  case class Updates(
-    updatedBalances: Map[Address, Map[Asset, Long]],
-    appearedTxs: Map[ExchangeTransaction.Id, TransactionWithChanges],
-    failedTxs: Map[ExchangeTransaction.Id, TransactionWithChanges]
-  ) {
-    def isEmpty: Boolean = updatedBalances.isEmpty && appearedTxs.isEmpty
-  }
-
-  object Updates {
-
-    implicit val updatesMonoid: Monoid[Updates] = new Monoid[Updates] {
-      override val empty: Updates = Updates(Map.empty, Map.empty, Map.empty)
-
-      override def combine(x: Updates, y: Updates): Updates = Updates(
-        updatedBalances = x.updatedBalances.deepReplace(y.updatedBalances),
-        appearedTxs = x.appearedTxs ++ y.appearedTxs,
-        failedTxs = x.failedTxs ++ y.failedTxs
-      )
-
-    }
-
-  }
-
 }

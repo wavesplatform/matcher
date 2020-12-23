@@ -5,6 +5,7 @@ sealed trait FifoSet[T] {
   def append(x: T): FifoSet[T]
 }
 
+// DEX-1044
 private case class LimitedFifoSet[T] private (elements: Set[T], queue: Vector[T], capacity: Int) extends FifoSet[T] {
   def contains(id: T): Boolean = elements.contains(id)
 

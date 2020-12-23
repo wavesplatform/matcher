@@ -101,10 +101,10 @@ class AddressActor(
 
     case msg @ Command.ApplyBatch(events, balanceUpdate) =>
       log.info(s"Got $msg")
-      // TODO This code is not optimal, but it should work.
-      // E.g. We need folding
+      // TODO DEX-1040 This code is not optimal, but it should work.
+      // e.g. We need folding
       events.foreach(eventsProcessing(_))
-      if (started) working(Message.BalanceChanged(balanceUpdate.keySet, balanceUpdate)) // TODO
+      if (started) working(Message.BalanceChanged(balanceUpdate.keySet, balanceUpdate))
 
     case command @ OrderCancelFailed(id, reason) =>
       if (started) pendingCommands.remove(id) match {
@@ -240,7 +240,7 @@ class AddressActor(
       }
 
     case Query.GetReservedBalance => sender() ! Reply.Balance(openVolume.filter(_._2 > 0))
-    case Query.GetTradableBalance(forAssets) => getTradableBalance(forAssets).map(Reply.Balance).pipeTo(sender()) // TODO from local
+    case Query.GetTradableBalance(forAssets) => getTradableBalance(forAssets).map(Reply.Balance).pipeTo(sender()) // TODO DEX-1039
 
     case Query.GetOrderStatus(orderId) =>
       sender() ! Reply.GetOrderStatus(activeOrders.get(orderId).fold[OrderStatus](orderDB.status(orderId))(_.status))
@@ -303,7 +303,7 @@ class AddressActor(
 
     case WsCommand.AddWsSubscription(client) =>
       log.trace(s"[c=${client.path.name}] Added WebSocket subscription")
-      spendableBalancesActor ! SpendableBalancesActor.Query.GetSnapshot(owner) // TODO not all assets are required
+      spendableBalancesActor ! SpendableBalancesActor.Query.GetSnapshot(owner) // TODO DEX-1039 not all assets are required
       wsAddressState = wsAddressState.addPendingSubscription(client)
       context.watch(client)
 
@@ -318,11 +318,11 @@ class AddressActor(
         case Right(snapshotSpendableBalance) =>
           snapshotSpendableBalance.view
             .filterKeys(asset => !spendableBalances.contains(asset))
-            .foreach(Function.tupled(spendableBalances.update)) // TODO do this once
+            .foreach(Function.tupled(spendableBalances.update)) // TODO DEX-1039 Do this once
 
           wsAddressState.sendSnapshot(
             // spendableBalances contains the latest balances
-            balances = mkWsBalances(spendableBalances.view.filter(_._2 > 0).to(Map)), // TODO
+            balances = mkWsBalances(spendableBalances.view.filter(_._2 > 0).to(Map)), // TODO DEX-1039
             orders = activeOrders.values.map(WsOrder.fromDomain(_)).to(Seq)
           )
           wsAddressState = wsAddressState.flushPendingSubscriptions()
@@ -424,6 +424,7 @@ class AddressActor(
     }
   }
 
+  // TODO DEX-1039
   private def getTradableBalance(forAssets: Set[Asset])(implicit group: Group[Map[Asset, Long]]): Future[Map[Asset, Long]] =
     spendableBalancesActor
       .ask(SpendableBalancesActor.Query.GetState(owner, forAssets))(5.seconds, self) // TODO replace ask pattern by better solution

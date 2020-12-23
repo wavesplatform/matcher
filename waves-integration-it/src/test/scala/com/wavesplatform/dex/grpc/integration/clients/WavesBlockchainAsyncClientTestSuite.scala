@@ -38,7 +38,7 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase with NoSt
 
   private lazy val client =
     WavesClientBuilder.async(
-      wavesBlockchainClientSettings= WavesBlockchainClientSettings(
+      wavesBlockchainClientSettings = WavesBlockchainClientSettings(
         grpc = GrpcClientSettings(
           target = wavesNode1.matcherExtApiTarget,
           maxHedgedAttempts = 5,

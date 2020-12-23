@@ -8,7 +8,7 @@ import com.wavesplatform.dex.actors.tx.BroadcastExchangeTransactionActor
 import com.wavesplatform.dex.collections.FifoSet
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
-import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.Updates
+import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeUpdates
 import com.wavesplatform.dex.grpc.integration.clients.domain.portfolio.AddressAssets
 import com.wavesplatform.dex.grpc.integration.ops.SignedTransactionOps.Implicits
 import com.wavesplatform.dex.model.Events
@@ -19,7 +19,7 @@ import play.api.libs.json.Json
 import scala.concurrent.Future
 import scala.util.{Success, Try}
 
-// TODO tests
+// TODO DEX-1042
 object OrderEventsCoordinatorActor {
 
   sealed trait Message extends Product with Serializable
@@ -31,7 +31,7 @@ object OrderEventsCoordinatorActor {
 
     case class Process(event: Events.Event) extends Command
     case class ProcessError(event: Events.OrderCancelFailed) extends Command
-    case class ApplyUpdates(updates: Updates) extends Command
+    case class ApplyUpdates(updates: WavesNodeUpdates) extends Command
   }
 
   sealed trait Event extends Message
@@ -54,7 +54,6 @@ object OrderEventsCoordinatorActor {
       )
     }
 
-    // TODO
     def sendBalances(balances: AddressAssets): Unit = balances.foreach { case (address, balances) =>
       addressDirectoryRef ! AddressDirectoryActor.Envelope(
         address,
@@ -80,18 +79,19 @@ object OrderEventsCoordinatorActor {
                     context.pipeToSelf(isTransactionKnown(tx.id()))(Event.TxChecked(tx, _))
 
                     val (updatedState, resolved) = state.withExecuted(tx.id(), event)
-                    sendResolved(resolved) // TODO pipeToSelf is needed if resolved?
+                    sendResolved(resolved) // TODO DEX-1042 pipeToSelf is needed if resolved?
 
                     holdUntilAppearOnNode(updatedState)
 
                   case Left(ex) =>
+                    // We just pass an event without touching a state, because this transaction neither created, nor appeared on Node
                     import event._
                     context.log.warn(
                       s"""Can't create tx: $ex
                          |o1: (amount=${submitted.amount}, fee=${submitted.fee}): ${Json.prettyPrint(submitted.order.json())}
                          |o2: (amount=${counter.amount}, fee=${counter.fee}): ${Json.prettyPrint(counter.order.json())}""".stripMargin
                     )
-                    addressDirectoryRef ! event // TODO should we remove Observed on NODE? <----
+                    addressDirectoryRef ! event
                     Behaviors.same
                 }
 
@@ -176,7 +176,7 @@ object OrderEventsCoordinatorActor {
         }
         Behaviors.same
 
-      case Command.Start => holdUntilAppearOnNode(OrderEventsActorState(Map.empty, FifoSet.limited(10000)))
+      case Command.Start => holdUntilAppearOnNode(OrderEventsActorState(Map.empty, FifoSet.limited(10000))) // TODO DEX-1042 settings
       case _: Event.TxChecked => Behaviors.same
     }
 

@@ -6,6 +6,7 @@ import com.wavesplatform.dex.model.Events
 
 import scala.collection.immutable.Queue
 
+// TODO DEX-1041
 case class PendingAddress(
   pendingTxs: Map[ExchangeTransaction.Id, PendingTransactionType],
   stashedBalance: Map[Asset, Long],

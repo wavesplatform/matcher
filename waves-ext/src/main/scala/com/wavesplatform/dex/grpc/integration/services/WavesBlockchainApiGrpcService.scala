@@ -140,8 +140,6 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
       .fold[Either[ValidationError, SignedExchangeTransaction]](GenericError("The signed transaction must be specified").asLeft)(_.asRight)
       .flatMap(_.toVanilla)
       .flatMap { tx =>
-        // context.broadcastTransaction(tx) returns isNew
-        // TODO Better protocol with error messages
         context.broadcastTransaction(tx).resultE
           .map(isNew => BroadcastResponse(BroadcastResponse.Result.Added(isNew)))
           .leftFlatMap(e => BroadcastResponse(BroadcastResponse.Result.Failed(e.toString)).asRight)

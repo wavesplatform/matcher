@@ -10,6 +10,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
+import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeUpdates
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.settings.WavesBlockchainClientSettings
 import monix.eval.Task
@@ -34,7 +35,7 @@ class MatcherExtensionAssetsWatchingClient(
       _ <- saveAssetsDescription(xs.keySet)
     } yield xs
 
-  override def updates: Observable[WavesBlockchainClient.Updates] = underlying
+  override def updates: Observable[WavesNodeUpdates] = underlying
     .updates
     .mapEval { xs =>
       val assets = xs.updatedBalances.valuesIterator.flatMap(_.keysIterator).toSet

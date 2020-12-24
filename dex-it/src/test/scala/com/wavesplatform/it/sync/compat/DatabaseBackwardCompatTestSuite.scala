@@ -2,13 +2,14 @@ package com.wavesplatform.it.sync.compat
 
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.order.Order
-import com.wavesplatform.dex.it.docker.DexContainer
-import com.wavesplatform.it.orderGen
+import com.wavesplatform.it.api.MatcherCommand
 import com.wavesplatform.it.tags.DexMultipleVersions
+import com.wavesplatform.it.{executePlaces, orderGen}
 import org.scalacheck.Gen
 import org.testcontainers.containers.BindMode
 
 import scala.concurrent.duration.DurationInt
+import scala.util.Random
 
 @DexMultipleVersions
 class DatabaseBackwardCompatTestSuite extends BackwardCompatSuiteBase {
@@ -19,8 +20,17 @@ class DatabaseBackwardCompatTestSuite extends BackwardCompatSuiteBase {
       orderGen(matcher, bob, assetPairs)
     )
 
-    val orders = Gen.containerOfN[Vector, Order](200, twoAccountsOrdersGen).sample.get
-    orders.foreach(dex2.api.place)
+    // To ignore not important errors
+    val placeCommands = Random.shuffle(
+      Gen
+        .containerOfN[Vector, Order](200, twoAccountsOrdersGen).sample
+        .get
+        .map(MatcherCommand.Place(dex2, _))
+    )
+    val orders = executePlaces(placeCommands)
+    withClue("orders.size: ") {
+      orders.size shouldBe >(0)
+    }
 
     orders.groupBy(_.assetPair).valuesIterator.foreach { orders =>
       dex2.api.waitForOrder(orders.last)(_.status != Status.NotFound)
@@ -42,7 +52,7 @@ class DatabaseBackwardCompatTestSuite extends BackwardCompatSuiteBase {
   override protected def beforeAll(): Unit = {
     super.beforeAll()
 
-    val containerDataDir = DexContainer.containerPath("data")
+    val containerDataDir = "/opt/waves-dex/data"
     List(dex1, dex2).foreach {
       _.underlying.configure {
         _.withFileSystemBind(localLogsDir.resolve("db").toString, containerDataDir, BindMode.READ_WRITE)

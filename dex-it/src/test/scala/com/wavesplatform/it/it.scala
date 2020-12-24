@@ -21,6 +21,15 @@ package object it {
   def executeCommands(xs: Seq[MatcherCommand], ignoreErrors: Boolean = true, timeout: FiniteDuration = 3.minutes): Int =
     Await.result(Future.sequence(xs.map(executeCommand(_, ignoreErrors))), timeout).sum
 
+  def executePlaces(xs: Seq[MatcherCommand.Place], ignoreErrors: Boolean = true, timeout: FiniteDuration = 3.minutes): Vector[Order] = {
+    def execute(c: MatcherCommand.Place): Future[Seq[Order]] =
+      executeCommand(c, ignoreErrors).map {
+        case 0 => Nil
+        case _ => List(c.order)
+      }
+    Await.result(Future.sequence(xs.map(execute)), timeout).flatten.toVector
+  }
+
   private def executeCommand(x: MatcherCommand, ignoreErrors: Boolean): Future[Int] =
     try x match {
       case MatcherCommand.Place(dex, order) => dex.asyncTryApi.place(order).map(_.fold(_ => 0, _ => 1))

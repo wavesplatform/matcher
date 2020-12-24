@@ -39,7 +39,12 @@ trait InformativeTestStart extends TestSuite { self: BaseContainersKit =>
 
   protected def writeGlobalLog(x: String): Unit = {
     log.debug(x)
-    knownContainers.get().foreach(_.printDebugMessage(x))
+    knownContainers.get().foreach { container =>
+      try container.printDebugMessage(x)
+      catch {
+        case e: Throwable => log.warn(s"Can't write message to ${container.containerId}", e)
+      }
+    }
   }
 
 }

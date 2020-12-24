@@ -73,7 +73,8 @@ object GatlingFeeder {
       }
       output.println()
       (0 until accountsNumber).foreach { i =>
-        val kp = KeyPair(ByteStr(s"$seedPrefix$i".getBytes(StandardCharsets.UTF_8)))
+        val seedBytes = s"$seedPrefix$i".getBytes(StandardCharsets.UTF_8)
+        val kp = KeyPair(ByteStr(seedBytes))
         output.println(s"""${kp.toAddress};${mkAusString(kp, authKp)};${mkObsStrings(pairsFile, orderBookNumberPerAccount)}""")
       }
     } finally output.close()

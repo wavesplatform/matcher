@@ -7,6 +7,7 @@ import java.util.concurrent.{ExecutorService, Executors}
 import com.softwaremill.sttp.{MonadError => _}
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
 import com.wavesplatform.dex.domain.account.{Address, AddressScheme, KeyPair, PrivateKey, PublicKey}
+import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.utils.EitherExt2
@@ -31,6 +32,8 @@ import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters._
 import scala.util.Random
 import org.apache.http.client.protocol.HttpClientContext
+
+import java.nio.charset.StandardCharsets
 
 object TankGenerator {
 
@@ -60,10 +63,13 @@ object TankGenerator {
   private def mkAccounts(seedPrefix: String, count: Int): List[JPrivateKey] = {
     print(s"Generating $count accounts (prefix: $seedPrefix)... ")
     WavesConfig.chainId(AddressScheme.current.chainId)
-    val accounts =
-      (1 to count).map(i => JPrivateKey.as(KeyPair.fromSeed(Base58.encode(s"$seedPrefix$i".getBytes)).explicitGet().privateKey.arr)).toList
+
+    val accounts = (0 until count).map { i =>
+      val seedBytes = s"$seedPrefix$i".getBytes(StandardCharsets.UTF_8)
+      JPrivateKey.as(KeyPair(ByteStr(seedBytes)).privateKey.arr)
+    }
     println("Done")
-    accounts
+    accounts.toList
   }
 
   private def mkAssets(count: Int = settings.assets.count): List[String] = {

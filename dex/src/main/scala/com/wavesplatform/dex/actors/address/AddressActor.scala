@@ -106,6 +106,7 @@ class AddressActor(
       // e.g. We need folding
       events.foreach(eventsProcessing(_))
       if (started) working(Message.BalanceChanged(balanceUpdate.keySet, balanceUpdate))
+      log.info("ApplyBatch applied")
 
     case command @ OrderCancelFailed(id, reason) =>
       if (started) pendingCommands.remove(id) match {

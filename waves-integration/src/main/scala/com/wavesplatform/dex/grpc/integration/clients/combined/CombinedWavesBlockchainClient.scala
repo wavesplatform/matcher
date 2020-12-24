@@ -93,6 +93,19 @@ class CombinedWavesBlockchainClient(
               )
             }
             .toMap
+
+          // // Not useful for UTX, because it doesn't consider the current state of orders
+          // // Will be useful, when blockchain updates send order fills.
+          // val fillsDebugInfo = x.utxUpdate.unconfirmedTxs.flatMap { tx =>
+          //   val fills = tx.diff.toList.flatMap(_.orderFills).map { fill =>
+          //     s"${fill.orderId.toVanilla} -> v:${fill.volume} + f:${fill.fee}"
+          //   }
+          //   if (fills.isEmpty) Nil
+          //   else List(s"${tx.id.toVanilla}: ${fills.mkString(", ")}")
+          // }
+          //
+          // if (fillsDebugInfo.nonEmpty) log.info(s"Detected fills:\n${fillsDebugInfo.mkString("\n")}")
+
           (
             x.newStatus,
             WavesNodeUpdates(

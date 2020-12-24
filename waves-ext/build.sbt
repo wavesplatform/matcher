@@ -71,11 +71,6 @@ inConfig(Linux)(
   )
 )
 
-Debian / debianPackageConflicts := Seq(
-  "grpc-server",
-  "waves-node-grpc-server" // TODO NODE-1999
-)
-
 inTask(docker)(
   Seq(
     nameOfImage := "wavesplatform/matcher-node",

@@ -70,13 +70,19 @@ case class OrderEventsActorState(addresses: Map[Address, PendingAddress], knownO
     if (knownOnNodeCache.contains(txId)) (this, balanceUpdates, Map.empty)
     else {
       val (updatedAddresses, restUpdates, resolved) = traders.foldLeft((addresses, balanceUpdates, Map.empty[Address, PendingAddress])) {
-        case (r @ (addresses, restUpdates, resolved), address) =>
+        case ((addresses, restUpdates, resolved), address) =>
           addresses.get(address) match {
-            case None => r
             case Some(pendingAddress) =>
               val x = pendingAddress.withKnownOnNode(txId, restUpdates.getOrElse(address, Map.empty))
               if (x.isResolved) (addresses - address, restUpdates - address, resolved.updated(address, x))
               else (addresses.updated(address, x), restUpdates - address, resolved)
+            case None =>
+              val x = PendingAddress(
+                pendingTxs = Map[ExchangeTransaction.Id, PendingTransactionType](txId -> PendingTransactionType.KnownOnNode),
+                stashedBalance = restUpdates.getOrElse(address, Map.empty),
+                events = Queue.empty
+              )
+              (addresses.updated(address, x), restUpdates - address, resolved)
           }
       }
 

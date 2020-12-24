@@ -21,6 +21,7 @@ import com.wavesplatform.dex.it.waves.{MkWavesEntities, ToWavesJConversions}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.waves.WavesFeeConstants
 import com.wavesplatform.it.api.ApiExtensions
+import im.mak.waves.transactions.ExchangeTransaction
 import io.qameta.allure.scalatest.AllureScalatestContext
 import org.scalatest.concurrent.Eventually
 import org.scalatest.freespec.AnyFreeSpec
@@ -55,7 +56,8 @@ trait MatcherSuiteBase
 
   GenesisConfig.setupAddressScheme()
 
-  implicit val httpV0OrderBookDiff: Diff[HttpV0OrderBook] = Derived[Diff[HttpV0OrderBook]].ignore[HttpV0OrderBook, Long](_.timestamp)
+  implicit val httpV0OrderBookDiff: Derived[Diff[HttpV0OrderBook]] = Derived(Diff.gen[HttpV0OrderBook].ignore[HttpV0OrderBook, Long](_.timestamp))
+  implicit val exchangeTransactionDiff: Derived[Diff[ExchangeTransaction]] = Derived(Diff[String].contramap[ExchangeTransaction](_.id().base58))
 
   override protected val moduleName: String = "dex-it"
 
@@ -76,16 +78,21 @@ trait MatcherSuiteBase
     super.afterAll()
   }
 
-  def createAccountWithBalance(balances: (Long, Asset)*): KeyPair = {
-    val account = KeyPair(ByteStr(s"account-test-${ThreadLocalRandom.current().nextInt()}".getBytes(StandardCharsets.UTF_8)))
+  def createAccountWithBalance(balances: (Long, Asset)*): KeyPair = createAccountWithBalance(0, balances: _*)
 
-    balances.foreach { case (balance, asset) =>
+  def createAccountWithBalance(index: Int, balances: (Long, Asset)*): KeyPair = {
+    val account = KeyPair(ByteStr(s"account-test-$index-${ThreadLocalRandom.current().nextInt()}".getBytes(StandardCharsets.UTF_8)))
+
+    val txIds = balances.map { case (balance, asset) =>
       assert(
         wavesNode1.api.balance(alice, asset) >= balance,
         s"Alice doesn't have enough balance in ${asset.toString} to make a transfer"
       )
-      broadcastAndAwait(mkTransfer(alice, account.toAddress, balance, asset))
+      val tx = mkTransfer(alice, account.toAddress, balance, asset)
+      wavesNode1.api.broadcast(tx)
+      tx.id()
     }
+    txIds.foreach(wavesNode1.api.waitForTransaction)
     account
   }
 

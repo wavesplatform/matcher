@@ -105,6 +105,8 @@ object WavesToPbConversions {
           }.toList,
           assets = Nil // Haven't support yet
         ).some
+        // Not useful for UTX transactions. Could be useful in the future
+        // orderFills = self.orderFills.map { case (orderId, x) => TransactionDiff.OrderFill(orderId.toPB, volume = x.volume, fee = x.fee) }.toSeq
       )
     }
 

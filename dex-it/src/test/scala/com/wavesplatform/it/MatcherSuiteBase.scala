@@ -76,16 +76,21 @@ trait MatcherSuiteBase
     super.afterAll()
   }
 
-  def createAccountWithBalance(balances: (Long, Asset)*): KeyPair = {
-    val account = KeyPair(ByteStr(s"account-test-${ThreadLocalRandom.current().nextInt()}".getBytes(StandardCharsets.UTF_8)))
+  def createAccountWithBalance(balances: (Long, Asset)*): KeyPair = createAccountWithBalance(0, balances: _*)
 
-    balances.foreach { case (balance, asset) =>
+  def createAccountWithBalance(index: Int, balances: (Long, Asset)*): KeyPair = {
+    val account = KeyPair(ByteStr(s"account-test-$index-${ThreadLocalRandom.current().nextInt()}".getBytes(StandardCharsets.UTF_8)))
+
+    val txIds = balances.map { case (balance, asset) =>
       assert(
         wavesNode1.api.balance(alice, asset) >= balance,
         s"Alice doesn't have enough balance in ${asset.toString} to make a transfer"
       )
-      broadcastAndAwait(mkTransfer(alice, account.toAddress, balance, asset))
+      val tx = mkTransfer(alice, account.toAddress, balance, asset)
+      wavesNode1.api.broadcast(tx)
+      tx.id()
     }
+    txIds.foreach(wavesNode1.api.waitForTransaction)
     account
   }
 

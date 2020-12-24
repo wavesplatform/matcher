@@ -50,7 +50,7 @@ class AutoCancelOrderTestSuite extends MatcherSuiteBase {
 
   "Auto cancel" - {
     "wrong cancel when match orders on all coins" in {
-      val accounts = (1 to 5).map(_ => createAccountWithBalance(issueFee -> Waves))
+      val accounts = (1 to 5).map(i => createAccountWithBalance(i, issueFee -> Waves))
       knownAccounts = knownAccounts ++ accounts
 
       val oneOrderAmount = 10000
@@ -63,14 +63,15 @@ class AutoCancelOrderTestSuite extends MatcherSuiteBase {
       }.toMap
       broadcastAndAwait(accountsAndAssets.values.toSeq: _*)
 
-      val sells = accountsAndAssets.map {
-        case (account, asset) =>
+      val now = System.currentTimeMillis()
+      val sells = accountsAndAssets.zipWithIndex.map {
+        case ((account, asset), i) =>
           val issuedAsset = IssuedAsset(asset.id())
           val assetPair = AssetPair(issuedAsset, Waves)
           eventually {
             dex1.api.getTradableBalance(account, assetPair).getOrElse(issuedAsset, 0L) shouldBe oneOrderAmount
           }
-          mkOrder(account, assetPair, OrderType.SELL, oneOrderAmount, orderPrice)
+          mkOrder(account, assetPair, OrderType.SELL, oneOrderAmount, orderPrice, ts = now + i)
       }
 
       sells.foreach(placeAndAwaitAtDex(_))
@@ -86,7 +87,7 @@ class AutoCancelOrderTestSuite extends MatcherSuiteBase {
           OrderType.BUY,
           amount = oneOrderAmount / submittedOrdersNumber,
           price = orderPrice,
-          ttl = 1.day + i.minutes
+          ts = now + i
         )
 
       Await.ready(

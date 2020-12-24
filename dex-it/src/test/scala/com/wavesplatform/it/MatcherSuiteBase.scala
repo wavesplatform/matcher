@@ -21,6 +21,7 @@ import com.wavesplatform.dex.it.waves.{MkWavesEntities, ToWavesJConversions}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.waves.WavesFeeConstants
 import com.wavesplatform.it.api.ApiExtensions
+import im.mak.waves.transactions.ExchangeTransaction
 import io.qameta.allure.scalatest.AllureScalatestContext
 import org.scalatest.concurrent.Eventually
 import org.scalatest.freespec.AnyFreeSpec
@@ -55,7 +56,8 @@ trait MatcherSuiteBase
 
   GenesisConfig.setupAddressScheme()
 
-  implicit val httpV0OrderBookDiff: Diff[HttpV0OrderBook] = Derived[Diff[HttpV0OrderBook]].ignore[HttpV0OrderBook, Long](_.timestamp)
+  implicit val httpV0OrderBookDiff: Derived[Diff[HttpV0OrderBook]] = Derived(Diff.gen[HttpV0OrderBook].ignore[HttpV0OrderBook, Long](_.timestamp))
+  implicit val exchangeTransactionDiff: Derived[Diff[ExchangeTransaction]] = Derived(Diff[String].contramap[ExchangeTransaction](_.id().base58))
 
   override protected val moduleName: String = "dex-it"
 

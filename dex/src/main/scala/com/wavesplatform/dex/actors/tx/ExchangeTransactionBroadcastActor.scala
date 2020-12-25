@@ -4,22 +4,22 @@ import akka.actor.{Actor, Props}
 import cats.instances.future.catsStdInstancesForFuture
 import cats.syntax.functor._
 import com.wavesplatform.dex.actors.events.OrderEventsCoordinatorActor
-import com.wavesplatform.dex.actors.tx.BroadcastExchangeTransactionActor._
+import com.wavesplatform.dex.actors.tx.ExchangeTransactionBroadcastActor._
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.clients.BroadcastResult
 import com.wavesplatform.dex.model.Events.ExchangeTransactionCreated
-import com.wavesplatform.dex.settings.ExchangeTransactionBroadcastSettings
 import com.wavesplatform.dex.time.Time
 
 import scala.concurrent.Future
+import scala.concurrent.duration.FiniteDuration
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
 // TODO DEX-1043
-class BroadcastExchangeTransactionActor(
-  settings: ExchangeTransactionBroadcastSettings,
+class ExchangeTransactionBroadcastActor(
+  settings: Settings,
   time: Time,
   confirmed: Seq[ByteStr] => Future[Map[ByteStr, Boolean]],
   broadcast: ExchangeTransaction => Future[BroadcastResult]
@@ -144,7 +144,9 @@ class BroadcastExchangeTransactionActor(
   private def format(txs: Iterable[ExchangeTransaction]): String = txs.map(_.id().toString).mkString(", ")
 }
 
-object BroadcastExchangeTransactionActor {
+object ExchangeTransactionBroadcastActor {
+
+  case class Settings(broadcastUntilConfirmed: Boolean, interval: FiniteDuration, maxPendingTime: FiniteDuration)
 
   case class Broadcast(clientRef: akka.actor.typed.ActorRef[OrderEventsCoordinatorActor.Message], tx: ExchangeTransaction)
 
@@ -155,11 +157,11 @@ object BroadcastExchangeTransactionActor {
   final private case class StashTransactionsToCheck(txs: Seq[ExchangeTransaction])
 
   def props(
-    settings: ExchangeTransactionBroadcastSettings,
+    settings: Settings,
     time: Time,
     isConfirmed: Seq[ByteStr] => Future[Map[ByteStr, Boolean]],
     broadcast: ExchangeTransaction => Future[BroadcastResult]
   ): Props =
-    Props(new BroadcastExchangeTransactionActor(settings, time, isConfirmed, broadcast))
+    Props(new ExchangeTransactionBroadcastActor(settings, time, isConfirmed, broadcast))
 
 }

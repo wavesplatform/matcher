@@ -17,7 +17,7 @@ import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTr
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.grpc.integration.clients.BroadcastResult
 import com.wavesplatform.dex.model.Events.ExchangeTransactionCreated
-import com.wavesplatform.dex.settings.{ExchangeTransactionBroadcastSettings, loadConfig}
+import com.wavesplatform.dex.settings.{loadConfig, ExchangeTransactionBroadcastSettings}
 import com.wavesplatform.dex.time.Time
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.BeforeAndAfterEach
@@ -26,8 +26,8 @@ import org.scalatest.concurrent.Eventually
 import scala.concurrent.Future
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
-class BroadcastExchangeTransactionActorSpecification
-    extends MatcherSpec("BroadcastExchangeTransactionActor")
+class ExchangeTransactionBroadcastActorSpecification
+    extends MatcherSpec("ExchangeTransactionBroadcastActor")
     with MatcherSpecBase
     with BeforeAndAfterEach
     with PathMockFactory
@@ -80,8 +80,8 @@ class BroadcastExchangeTransactionActorSpecification
       broadcasted = Seq.empty
 
       // Will be re-sent on second call
-      actor ! BroadcastExchangeTransactionActor.CheckAndSend
-      actor ! BroadcastExchangeTransactionActor.CheckAndSend
+      actor ! ExchangeTransactionBroadcastActor.CheckAndSend
+      actor ! ExchangeTransactionBroadcastActor.CheckAndSend
       eventually {
         broadcasted shouldBe Seq(event.tx)
       }
@@ -103,8 +103,8 @@ class BroadcastExchangeTransactionActorSpecification
       actor ! event
       broadcasted = Seq.empty
 
-      actor ! BroadcastExchangeTransactionActor.CheckAndSend
-      actor ! BroadcastExchangeTransactionActor.CheckAndSend
+      actor ! ExchangeTransactionBroadcastActor.CheckAndSend
+      actor ! ExchangeTransactionBroadcastActor.CheckAndSend
       eventually {
         broadcasted shouldBe empty
       }
@@ -126,8 +126,8 @@ class BroadcastExchangeTransactionActorSpecification
       actor ! event
       broadcasted = Seq.empty
 
-      actor ! BroadcastExchangeTransactionActor.CheckAndSend
-      actor ! BroadcastExchangeTransactionActor.CheckAndSend
+      actor ! ExchangeTransactionBroadcastActor.CheckAndSend
+      actor ! ExchangeTransactionBroadcastActor.CheckAndSend
 
       eventually {
         broadcasted shouldBe empty
@@ -157,14 +157,14 @@ class BroadcastExchangeTransactionActorSpecification
           firstProcessed.get shouldBe true
         }
 
-        actor ! BroadcastExchangeTransactionActor.CheckAndSend
-        actor ! BroadcastExchangeTransactionActor.CheckAndSend
+        actor ! ExchangeTransactionBroadcastActor.CheckAndSend
+        actor ! ExchangeTransactionBroadcastActor.CheckAndSend
         eventually {
           triedToConfirm should not be empty
         }
         triedToConfirm = Seq.empty
 
-        actor ! BroadcastExchangeTransactionActor.CheckAndSend
+        actor ! ExchangeTransactionBroadcastActor.CheckAndSend
         eventually {
           triedToConfirm should not be empty
         }
@@ -191,7 +191,7 @@ class BroadcastExchangeTransactionActorSpecification
         }
 
         triedToBroadcast = Seq.empty
-        actor ! BroadcastExchangeTransactionActor.CheckAndSend
+        actor ! ExchangeTransactionBroadcastActor.CheckAndSend
         eventually {
           triedToBroadcast should not be empty
         }
@@ -203,9 +203,9 @@ class BroadcastExchangeTransactionActorSpecification
     time: Time,
     confirmed: Seq[ByteStr] => Future[Map[ByteStr, Boolean]],
     broadcast: ExchangeTransaction => Future[BroadcastResult]
-  ): TestActorRef[BroadcastExchangeTransactionActor] = TestActorRef(
-    new BroadcastExchangeTransactionActor(
-      settings = ExchangeTransactionBroadcastSettings(
+  ): TestActorRef[ExchangeTransactionBroadcastActor] = TestActorRef(
+    new ExchangeTransactionBroadcastActor(
+      settings = ExchangeTransactionBroadcastActor.Settings(
         broadcastUntilConfirmed = true,
         interval = 1.minute,
         maxPendingTime = 5.minute

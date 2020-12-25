@@ -1,11 +1,11 @@
 package com.wavesplatform.dex.settings
 
 import java.io.File
-
 import cats.data.NonEmptyList
 import cats.implicits.{catsSyntaxOptionId, none}
 import cats.syntax.either._
 import com.wavesplatform.dex.actors.address.AddressActor
+import com.wavesplatform.dex.actors.tx.ExchangeTransactionBroadcastActor
 import com.wavesplatform.dex.api.http.OrderBookHttpInfo
 import com.wavesplatform.dex.db.{AccountStorage, OrderDB}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -54,7 +54,7 @@ case class MatcherSettings(
   whiteListOnly: Boolean,
   allowedAssetPairs: Set[AssetPair],
   allowedOrderVersions: Set[Byte],
-  exchangeTransactionBroadcast: ExchangeTransactionBroadcastSettings,
+  exchangeTransactionBroadcast: ExchangeTransactionBroadcastActor.Settings,
   postgres: PostgresConnection,
   orderHistory: OrderHistorySettings,
   webSockets: WebSocketSettings,

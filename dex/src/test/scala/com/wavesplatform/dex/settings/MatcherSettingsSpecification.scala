@@ -3,6 +3,7 @@ package com.wavesplatform.dex.settings
 import cats.data.NonEmptyList
 import com.typesafe.config.Config
 import com.wavesplatform.dex.actors.address.AddressActor
+import com.wavesplatform.dex.actors.tx.ExchangeTransactionBroadcastActor
 import com.wavesplatform.dex.api.http.OrderBookHttpInfo
 import com.wavesplatform.dex.api.ws.actors.{WsExternalClientHandlerActor, WsHealthCheckSettings, WsInternalBroadcastActor, WsInternalClientHandlerActor}
 import com.wavesplatform.dex.db.{AccountStorage, OrderDB}
@@ -117,7 +118,7 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
     settings.allowedAssetPairs shouldBe Set.empty[AssetPair]
     settings.allowedOrderVersions shouldBe Set(11, 22)
     settings.orderRestrictions shouldBe Map.empty[AssetPair, OrderRestrictionsSettings]
-    settings.exchangeTransactionBroadcast shouldBe ExchangeTransactionBroadcastSettings(
+    settings.exchangeTransactionBroadcast shouldBe ExchangeTransactionBroadcastActor.Settings(
       broadcastUntilConfirmed = true,
       interval = 1.day,
       maxPendingTime = 30.days

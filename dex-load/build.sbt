@@ -13,3 +13,13 @@ TaskKey[Unit]("generateFeeder") := (runMain in Compile)
       .getOrElse("ASPKF", "key.txt")} -obnpa=${sys.env.getOrElse("OBNPA", "10")} -pf=pairs.txt -as=${sys.env.getOrElse("AS", "D")}"
   )
   .value
+TaskKey[Unit]("checkLeaps") := (runMain in Compile)
+  .toTask(
+    s" com.wavesplatform.dex.load.WavesDexLoadCli check -dra=${sys.env.get("MATCHER")} -an=100 -ct=15.seconds -wrwt=10.minutes -wct=leaps"
+  )
+  .value
+TaskKey[Unit]("checkUpdates") := (runMain in Compile)
+  .toTask(
+    s" com.wavesplatform.dex.load.WavesDexLoadCli check -dra=${sys.env.get("MATCHER")} -an=100 -ct=15.seconds -wrwt=10.minutes -wct=updates"
+  )
+  .value

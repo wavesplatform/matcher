@@ -13,11 +13,11 @@ import scala.concurrent.duration.FiniteDuration
 import scala.util.{Failure, Success, Try}
 
 /**
-  * Sends transactions to Waves NODE until it is confirmed or a timeout exceeds.
-  * Waves NODE doesn't guarantees that a valid transaction will be added to UTX without errors.
-  * For example, we can send a valid transaction 2 times in parallel and Waves NODE could return an error
-  *   without adding a transaction to UTX.
-  */
+ * Sends transactions to Waves NODE until it is confirmed or a timeout exceeds.
+ * Waves NODE doesn't guarantees that a valid transaction will be added to UTX without errors.
+ * For example, we can send a valid transaction 2 times in parallel and Waves NODE could return an error
+ *   without adding a transaction to UTX.
+ */
 object ExchangeTransactionBroadcastActor {
 
   case class Settings(interval: FiniteDuration, maxPendingTime: FiniteDuration)
@@ -63,7 +63,10 @@ object ExchangeTransactionBroadcastActor {
       context: ActorContext[Message],
       tx: ExchangeTransaction,
       clientRef: Option[ActorRef[OrderEventsCoordinatorActor.Message]] = None
-    ): Unit = context.pipeToSelf(blockchain.broadcast(tx))(Event.Broadcasted(clientRef, tx, _))
+    ): Unit = {
+      context.log.info(s"Broadcasting ${tx.id()}")
+      context.pipeToSelf(blockchain.broadcast(tx))(Event.Broadcasted(clientRef, tx, _))
+    }
 
     def default(inProgress: Map[ExchangeTransaction.Id, InProgressItem]): Behavior[Message] =
       Behaviors.receive[Message] { (context, message) =>
@@ -72,7 +75,9 @@ object ExchangeTransactionBroadcastActor {
             broadcast(context, message.tx, message.clientRef.some)
             default(inProgress.updated(message.tx.id(), InProgressItem(message.tx, defaultRestAttempts)))
 
-          case message: Command.ProcessConfirmed => default(inProgress -- message.txIds)
+          case message: Command.ProcessConfirmed =>
+            context.log.debug(s"Confirmed: ${message.txIds.mkString(", ")}")
+            default(inProgress -- message.txIds)
 
           case Command.Tick =>
             val updatedInProgress = inProgress.view.mapValues(_.decreasedAttempts).filter(_._2.isValid).toMap
@@ -82,6 +87,16 @@ object ExchangeTransactionBroadcastActor {
 
           case message: Event.Broadcasted =>
             val txId = message.tx.id()
+            message.result match {
+              case Failure(e) => context.log.warn(s"Failed to broadcast $txId", e)
+              case Success(x) =>
+                x match {
+                  case CheckedBroadcastResult.Unconfirmed => context.log.info(s"$txId is unconfirmed")
+                  case CheckedBroadcastResult.Confirmed => context.log.info(s"$txId is confirmed")
+                  case CheckedBroadcastResult.Failed(message) => context.log.warn(s"Failed to broadcast $txId: $message")
+                }
+            }
+
             if (inProgress.contains(txId)) {
               val (observed, confirmed) = message.result match {
                 case Success(x) => (true, x == CheckedBroadcastResult.Confirmed)

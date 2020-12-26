@@ -110,7 +110,7 @@ object OrderEventsCoordinatorActor {
               s"${txsToString("c", updates.confirmedTxs)}, ${txsToString("f", updates.failedTxs)})"
             )
 
-            broadcasterRef ! Broadcaster.ProcessConfirmed(updates.confirmedTxs.keySet)
+            if (updates.confirmedTxs.nonEmpty) broadcasterRef ! Broadcaster.ProcessConfirmed(updates.confirmedTxs.keySet)
 
             // All transactions are exchange and from this matcher's account
             val (updatedState1, balancesAfterTxs) = (updates.unconfirmedTxs ++ updates.confirmedTxs ++ updates.failedTxs)

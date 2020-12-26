@@ -155,7 +155,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
         inUtx <- context.transactionsApi.unconfirmedTransactionById(tx.id()).fold(false)(_ => true).asRight
         // Sometimes it could not be true, but we can ignore this
         confirmed <- if (inUtx) false.asRight else context.transactionsApi.transactionById(tx.id()).fold(false)(_ => true).asRight
-      } yield (tx, confirmed, inUtx || confirmed)
+      } yield (tx, confirmed, !(inUtx || confirmed))
     }
       .flatMap {
         case Right((tx, confirmed, shouldSend)) =>

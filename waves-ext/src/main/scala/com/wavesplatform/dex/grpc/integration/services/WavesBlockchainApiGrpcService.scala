@@ -1,7 +1,5 @@
 package com.wavesplatform.dex.grpc.integration.services
 
-import java.util.concurrent.ConcurrentHashMap
-
 import cats.implicits.catsSyntaxOptionId
 import cats.syntax.either._
 import com.google.protobuf.empty.Empty
@@ -34,6 +32,7 @@ import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 import shapeless.Coproduct
 
+import java.util.concurrent.ConcurrentHashMap
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.Future
 import scala.util.Try
@@ -146,6 +145,34 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
       }
       .explicitGetErr()
   }
+
+  override def checkedBroadcast(request: CheckedBroadcastRequest): Future[CheckedBroadcastResponse] =
+    Future {
+      for {
+        grpcTx <- request.transaction
+          .fold(GenericError("The signed transaction must be specified").asLeft[SignedExchangeTransaction])(_.asRight[GenericError])
+        tx <- grpcTx.toVanilla
+        inUtx <- context.transactionsApi.unconfirmedTransactionById(tx.id()).fold(false)(_ => true).asRight
+        // Sometimes it could not be true, but we can ignore this
+        confirmed <- if (inUtx) false.asRight else context.transactionsApi.transactionById(tx.id()).fold(false)(_ => true).asRight
+      } yield (tx, confirmed, inUtx || confirmed)
+    }
+      .flatMap {
+        case Right((tx, confirmed, shouldSend)) =>
+          if (shouldSend) context.transactionsApi.broadcastTransaction(tx).map(_.resultE.map(_ => confirmed))
+          else Future.successful(confirmed.asRight)
+        case Left(e) => Future.successful(e.asLeft)
+      }
+      .map {
+        case Right(confirmed) => CheckedBroadcastResponse(CheckedBroadcastResponse.Result.Confirmed(confirmed))
+        case Left(e) => CheckedBroadcastResponse(CheckedBroadcastResponse.Result.Failed(e.toString))
+      }
+      .recover {
+        case e: Throwable =>
+          log.error(s"Can't broadcast a transaction", e)
+          val message = Option(e.getMessage).getOrElse(e.getClass.getName)
+          CheckedBroadcastResponse(CheckedBroadcastResponse.Result.Failed(message))
+      }
 
   override def isFeatureActivated(request: IsFeatureActivatedRequest): Future[IsFeatureActivatedResponse] = Future {
     IsFeatureActivatedResponse(

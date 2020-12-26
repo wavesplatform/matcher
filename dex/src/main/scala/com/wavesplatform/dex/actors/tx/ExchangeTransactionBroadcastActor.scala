@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.actors.tx
 
-import akka.actor.{Actor, Props}
+import akka.actor.{typed, Actor, Props}
 import cats.instances.future.catsStdInstancesForFuture
 import cats.syntax.functor._
 import com.wavesplatform.dex.actors.events.OrderEventsCoordinatorActor
@@ -21,7 +21,7 @@ import scala.util.{Failure, Success}
 class ExchangeTransactionBroadcastActor(
   settings: Settings,
   time: Time,
-  confirmed: Seq[ByteStr] => Future[Map[ByteStr, Boolean]],
+  confirmed: Seq[ByteStr] => Future[Map[ByteStr, Boolean]], // TODO confirm, not appear!
   broadcast: ExchangeTransaction => Future[BroadcastResult]
 ) extends Actor
     with ScorexLogging {
@@ -42,7 +42,7 @@ class ExchangeTransactionBroadcastActor(
             true
         }
 
-        if (sendResponse) clientRef ! OrderEventsCoordinatorActor.Event.TxChecked(tx, result.map(_ => true)) // TODO DEX-1043 HACK
+        // if (sendResponse) clientRef ! OrderEventsCoordinatorActor.Event.TxChecked(tx, result.map(_ => true)) // TODO DEX-1043 HACK
       }
 
     case ExchangeTransactionCreated(tx) => broadcast(tx) // TODO DEX-1043 remove
@@ -104,7 +104,7 @@ class ExchangeTransactionBroadcastActor(
                 true
             }
 
-            if (sendResponse) clientRef ! OrderEventsCoordinatorActor.Event.TxChecked(tx, result.map(_ => true)) // TODO DEX-1043 HACK
+            // if (sendResponse) clientRef ! OrderEventsCoordinatorActor.Event.TxChecked(tx, result.map(_ => true)) // TODO DEX-1043 HACK
           }
       } yield confirmed
 
@@ -148,7 +148,7 @@ object ExchangeTransactionBroadcastActor {
 
   case class Settings(broadcastUntilConfirmed: Boolean, interval: FiniteDuration, maxPendingTime: FiniteDuration)
 
-  case class Broadcast(clientRef: akka.actor.typed.ActorRef[OrderEventsCoordinatorActor.Message], tx: ExchangeTransaction)
+  case class Broadcast(clientRef: typed.ActorRef[OrderEventsCoordinatorActor.Message], tx: ExchangeTransaction)
 
   final case object CheckAndSend
 

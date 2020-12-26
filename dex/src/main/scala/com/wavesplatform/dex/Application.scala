@@ -1,10 +1,5 @@
 package com.wavesplatform.dex
 
-import java.io.File
-import java.security.Security
-import java.util.concurrent.atomic.AtomicReference
-import java.util.concurrent.{ThreadLocalRandom, TimeoutException}
-
 import akka.Done
 import akka.actor.typed.scaladsl.adapter._
 import akka.actor.{typed, ActorRef, ActorSystem, CoordinatedShutdown, Props}
@@ -23,7 +18,7 @@ import com.wavesplatform.dex.actors.ActorSystemOps.ImplicitOps
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.actors.events.OrderEventsCoordinatorActor
 import com.wavesplatform.dex.actors.orderbook.{AggregatedOrderBookActor, OrderBookActor, OrderBookSnapshotStoreActor}
-import com.wavesplatform.dex.actors.tx.{ExchangeTransactionBroadcastActor, WriteExchangeTransactionActor}
+import com.wavesplatform.dex.actors.tx.{NewExchangeTransactionBroadcastActor, WriteExchangeTransactionActor}
 import com.wavesplatform.dex.actors.{MatcherActor, OrderBookAskAdapter, RootActorSystem, SpendableBalancesActor}
 import com.wavesplatform.dex.api.http.headers.{CustomMediaTypes, MatcherHttpServer}
 import com.wavesplatform.dex.api.http.routes.{MatcherApiRoute, MatcherApiRouteV1}
@@ -58,6 +53,10 @@ import mouse.any.anySyntaxMouse
 import org.slf4j.LoggerFactory
 import pureconfig.ConfigSource
 
+import java.io.File
+import java.security.Security
+import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.{ThreadLocalRandom, TimeoutException}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{blocking, Future, Promise}
@@ -166,14 +165,14 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
   private val txWriterRef = actorSystem.actorOf(WriteExchangeTransactionActor.props(db), WriteExchangeTransactionActor.name)
 
-  private val wavesNetTxBroadcasterRef = actorSystem.actorOf(
-    ExchangeTransactionBroadcastActor
-      .props(
-        settings.exchangeTransactionBroadcast,
-        time,
-        wavesBlockchainAsyncClient.areKnown,
-        wavesBlockchainAsyncClient.broadcastTx
+  private val wavesNetTxBroadcasterRef = actorSystem.spawn(
+    NewExchangeTransactionBroadcastActor(
+      NewExchangeTransactionBroadcastActor.Settings(
+        settings.exchangeTransactionBroadcast.interval,
+        settings.exchangeTransactionBroadcast.maxPendingTime
       ),
+      wavesBlockchainAsyncClient.checkedBroadcastTx
+    ),
     "exchange-transaction-broadcast"
   )
 
@@ -226,8 +225,8 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   private val orderEventsCoordinatorRef = actorSystem.spawn(
     behavior = OrderEventsCoordinatorActor.apply(
       addressDirectoryRef = addressDirectoryRef,
-      txWriterRef = txWriterRef,
-      broadcastRef = wavesNetTxBroadcasterRef,
+      dbWriterRef = txWriterRef,
+      broadcasterRef = wavesNetTxBroadcasterRef,
       createTransaction = transactionCreator.createTransaction,
       isTransactionKnown = txId => wavesBlockchainAsyncClient.areKnown(List(txId)).map(_.getOrElse(txId, false))
     ),
@@ -408,6 +407,11 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
         log.warn(s"The queue doesn't contain required offsets to recover all orders. Check retention settings of the queue. Continue...")
         Future.unit // Otherwise it would be hard to start the matcher
       } else Future.unit
+    }
+
+    _ = {
+      log.info("Starting a transactions broadcaster")
+      wavesNetTxBroadcasterRef ! NewExchangeTransactionBroadcastActor.Command.Tick
     }
 
     _ <- Future {

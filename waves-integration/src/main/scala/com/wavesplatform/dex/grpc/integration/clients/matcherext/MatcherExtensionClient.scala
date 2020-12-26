@@ -7,7 +7,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.grpc.integration.clients.domain.{BlockRef, BlockchainBalance, DiffIndex}
-import com.wavesplatform.dex.grpc.integration.clients.{BroadcastResult, RunScriptResult}
+import com.wavesplatform.dex.grpc.integration.clients.{BroadcastResult, CheckedBroadcastResult, RunScriptResult}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 
 import scala.concurrent.Future
@@ -32,6 +32,7 @@ trait MatcherExtensionClient {
 
   def areKnown(txIds: Seq[ByteStr]): Future[Map[ByteStr, Boolean]]
   def broadcastTx(tx: ExchangeTransaction): Future[BroadcastResult]
+  def checkedBroadcastTx(tx: ExchangeTransaction): Future[CheckedBroadcastResult]
 
   def forgedOrder(orderId: ByteStr): Future[Boolean]
 

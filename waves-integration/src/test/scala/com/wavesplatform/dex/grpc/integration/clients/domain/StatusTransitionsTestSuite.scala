@@ -54,7 +54,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
             newStatus = Normal(WavesChain(Vector(newBlock), 99)),
             updatedBalances = updatedBalances1,
             updatedLastBlockHeight = StatusUpdate.LastBlockHeight.Updated(1),
-            utxUpdate = UtxUpdate(forgedTxs = newBlock.forgedTxs),
+            utxUpdate = UtxUpdate(confirmedTxs = newBlock.forgedTxs),
             requestNextBlockchainEvent = true
           ))
         }
@@ -211,7 +211,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
             updatedBalances = block2B.changes |+| microBlock.changes,
             updatedLastBlockHeight = StatusUpdate.LastBlockHeight.Updated(2),
             utxUpdate = init.utxUpdate |+| UtxUpdate(
-              forgedTxs = block2B.forgedTxs ++ microBlock.forgedTxs,
+              confirmedTxs = block2B.forgedTxs ++ microBlock.forgedTxs,
               failedTxs = Map.empty // It doesn't affect now
             ),
             requestNextBlockchainEvent = true
@@ -261,7 +261,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
                 origChain = WavesChain(Vector(block3, block2A, block1), 97),
                 forkChain = WavesChain(Vector(block1), 99)
               ),
-              utxUpdate = UtxUpdate(forgedTxs = mkTransactionWithChangesMap(1))
+              utxUpdate = UtxUpdate(confirmedTxs = mkTransactionWithChangesMap(1))
             )
 
             val event = Appended(block2B)
@@ -298,7 +298,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
                 outLeases = Map(bob -> 10)
               ),
               utxUpdate = init.utxUpdate |+| UtxUpdate(
-                forgedTxs = block2B.forgedTxs ++ microBlock.forgedTxs,
+                confirmedTxs = block2B.forgedTxs ++ microBlock.forgedTxs,
                 failedTxs = Map.empty // Doesn't affect
               )
             ),

@@ -95,8 +95,9 @@ message CheckedBroadcastRequest {
 
 message CheckedBroadcastResponse {
     oneof result {
-        bool confirmed = 1;
-        string failed = 2;
+        bool unconfirmed = 1; // true == isNew
+        google.protobuf.Empty confirmed = 2;
+        string failed = 3;
     }
 }
 

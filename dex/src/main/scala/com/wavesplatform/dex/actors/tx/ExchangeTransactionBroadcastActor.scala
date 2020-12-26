@@ -91,22 +91,23 @@ object ExchangeTransactionBroadcastActor {
               case Failure(e) => context.log.warn(s"Failed to broadcast $txId", e)
               case Success(x) =>
                 x match {
-                  case CheckedBroadcastResult.Unconfirmed => context.log.info(s"$txId is unconfirmed")
+                  case CheckedBroadcastResult.Unconfirmed(isNew) => context.log.info(s"$txId is unconfirmed${if (isNew) " and is new" else ""}")
                   case CheckedBroadcastResult.Confirmed => context.log.info(s"$txId is confirmed")
                   case CheckedBroadcastResult.Failed(message) => context.log.warn(s"Failed to broadcast $txId: $message")
                 }
             }
 
             if (inProgress.contains(txId)) {
-              val (observed, confirmed) = message.result match {
-                case Success(x) => (true, x == CheckedBroadcastResult.Confirmed)
+              val confirmed = message.result match {
+                case Success(x) => x == CheckedBroadcastResult.Confirmed
                 case Failure(e) =>
                   context.log.warn(s"Broadcast failed for $txId", e)
-                  (false, false)
+                  false
               }
 
               message.clientRef.foreach { clientRef =>
-                if (observed) clientRef ! OrderEventsCoordinatorActor.Command.ApplyObserved(message.tx)
+                // If it is new, we will receive an event from UTX, otherwise we either
+                if (confirmed) clientRef ! OrderEventsCoordinatorActor.Command.ApplyConfirmed(message.tx)
               }
 
               val updatedInProgress = if (confirmed) inProgress - txId else inProgress

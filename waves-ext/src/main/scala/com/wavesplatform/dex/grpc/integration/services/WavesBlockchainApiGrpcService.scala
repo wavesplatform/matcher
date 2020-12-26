@@ -46,6 +46,8 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
 
   private val utxState = new TrieMap[ByteStr, UtxTransaction]()
 
+  private val empty = Empty()
+
   private val utxChangesSubscribers = ConcurrentHashMap.newKeySet[StreamObserver[UtxEvent]](2)
 
   private val initialEvents = ConcurrentSubject.publish[(StreamObserver[UtxEvent], UtxEvent)]
@@ -152,21 +154,23 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
         grpcTx <- request.transaction
           .fold(GenericError("The signed transaction must be specified").asLeft[SignedExchangeTransaction])(_.asRight[GenericError])
         tx <- grpcTx.toVanilla
-        inUtx <- context.transactionsApi.unconfirmedTransactionById(tx.id()).fold(false)(_ => true).asRight
-        // Sometimes it could not be true, but we can ignore this
-        confirmed <- if (inUtx) false.asRight else context.transactionsApi.transactionById(tx.id()).fold(false)(_ => true).asRight
-      } yield (tx, confirmed, !(inUtx || confirmed))
+        isConfirmed <- context.transactionsApi.transactionById(tx.id()).fold(false)(_ => true).asRight
+        isInUtx <- context.transactionsApi.unconfirmedTransactionById(tx.id()).fold(false)(_ => true).asRight
+      } yield (tx, isConfirmed, isInUtx)
     }
       .flatMap {
-        case Right((tx, confirmed, shouldSend)) =>
-          if (shouldSend) context.transactionsApi.broadcastTransaction(tx).map(_.resultE.map(_ => confirmed))
-          else Future.successful(confirmed.asRight)
-        case Left(e) => Future.successful(e.asLeft)
+        case Right((tx, isConfirmed, isInUtx)) =>
+          if (isConfirmed) Future.successful(CheckedBroadcastResponse.Result.Confirmed(empty))
+          else if (isInUtx) Future.successful(CheckedBroadcastResponse.Result.Unconfirmed(false)) // false == not new
+          else context.transactionsApi.broadcastTransaction(tx).map {
+            _.resultE match {
+              case Right(isNew) => CheckedBroadcastResponse.Result.Unconfirmed(isNew)
+              case Left(e) => CheckedBroadcastResponse.Result.Failed(e.toString)
+            }
+          }
+        case Left(e) => Future.successful(CheckedBroadcastResponse.Result.Failed(e.toString))
       }
-      .map {
-        case Right(confirmed) => CheckedBroadcastResponse(CheckedBroadcastResponse.Result.Confirmed(confirmed))
-        case Left(e) => CheckedBroadcastResponse(CheckedBroadcastResponse.Result.Failed(e.toString))
-      }
+      .map(CheckedBroadcastResponse(_))
       .recover {
         case e: Throwable =>
           log.error(s"Can't broadcast a transaction", e)

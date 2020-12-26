@@ -35,7 +35,7 @@ class MatcherExtensionAssetsWatchingClient(
       _ <- saveAssetsDescription(xs.keySet)
     } yield xs
 
-  override def updates: Observable[WavesNodeUpdates] = underlying
+  override lazy val updates: Observable[WavesNodeUpdates] = underlying
     .updates
     .mapEval { xs =>
       val assets = xs.updatedBalances.valuesIterator.flatMap(_.keysIterator).toSet

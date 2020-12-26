@@ -1,7 +1,5 @@
 package com.wavesplatform.dex.grpc.integration.clients.matcherext
 
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
 import com.google.protobuf.UnsafeByteOperations
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.api.grpc.TransactionsByIdRequest
@@ -11,8 +9,8 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.grpc.integration.clients.{BroadcastResult, CheckedBroadcastResult, RunScriptResult}
 import com.wavesplatform.dex.grpc.integration.clients.domain.{BlockRef, BlockchainBalance, DiffIndex}
+import com.wavesplatform.dex.grpc.integration.clients.{BroadcastResult, CheckedBroadcastResult, RunScriptResult}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.effect.Implicits.NettyFutureOps
 import com.wavesplatform.dex.grpc.integration.exceptions.{UnexpectedConnectionException, WavesNodeConnectionLostException}
@@ -25,6 +23,8 @@ import io.grpc.stub.{ClientCalls, StreamObserver}
 import io.netty.channel.EventLoopGroup
 import monix.execution.Scheduler
 
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
 /**
@@ -140,7 +140,8 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
       import CheckedBroadcastResponse.Result
       response.result match {
         case Result.Empty => CheckedBroadcastResult.Failed("Unexpected response on client: Result.Empty")
-        case Result.Confirmed(x) => if (x) CheckedBroadcastResult.Confirmed else CheckedBroadcastResult.Unconfirmed
+        case Result.Unconfirmed(isNew) => CheckedBroadcastResult.Unconfirmed(isNew)
+        case Result.Confirmed(_) => CheckedBroadcastResult.Confirmed
         case Result.Failed(message) => CheckedBroadcastResult.Failed(message)
       }
     }

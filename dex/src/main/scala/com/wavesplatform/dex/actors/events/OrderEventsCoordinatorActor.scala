@@ -34,7 +34,7 @@ object OrderEventsCoordinatorActor {
     case class ApplyUpdates(updates: WavesNodeUpdates) extends Command
 
     // Can be sent only from ExchangeTransactionBroadcastActor
-    case class ApplyObserved(tx: ExchangeTransaction) extends Command
+    case class ApplyConfirmed(tx: ExchangeTransaction) extends Command
   }
 
   def apply(
@@ -51,7 +51,7 @@ object OrderEventsCoordinatorActor {
       )
     }
 
-    def sendBalances(balances: AddressAssets): Unit = balances.foreach { case (address, balances) =>
+    def sendBalances(balances: AddressAssets): Unit = balances.view.filter(_._2.nonEmpty).foreach { case (address, balances) =>
       addressDirectoryRef ! AddressDirectoryActor.Envelope(
         address,
         AddressActor.Message.BalanceChanged(balances.keySet, balances)
@@ -132,7 +132,11 @@ object OrderEventsCoordinatorActor {
 
             holdUntilAppearOnNode(updatedState2)
 
-          case Command.ApplyObserved(tx) =>
+          case Command.ApplyConfirmed(tx) =>
+            // Why we react only on confirmed:
+            // * If it was before in UTX, then we received this before during UtxSwitched
+            // * If it was added to UTX, then we will receive it
+            // * If it was confirmed, then we haven't received (neither as unconfirmed, nor confirmed) it and won't receive
             val (updated, restBalances, resolved) = state.withKnownOnNodeTx(tx.traders, tx.id(), Map.empty)
             sendResolved(resolved)
             sendBalances(restBalances) // Actually, they should be empty, but anyway
@@ -165,13 +169,11 @@ object OrderEventsCoordinatorActor {
           Behaviors.same
 
         case Command.ApplyUpdates(updates) =>
-          updates.updatedBalances.foreach { case (address, updates) =>
-            addressDirectoryRef ! AddressDirectoryActor.Envelope(address, AddressActor.Message.BalanceChanged(updates.keySet, updates))
-          }
+          sendBalances(updates.updatedBalances)
           Behaviors.same
 
         case Command.Start => holdUntilAppearOnNode(OrderEventsActorState(Map.empty, FifoSet.limited(10000))) // TODO DEX-1042 settings
-        case _: Command.ApplyObserved => Behaviors.same
+        case _: Command.ApplyConfirmed => Behaviors.same
       }
     }
 

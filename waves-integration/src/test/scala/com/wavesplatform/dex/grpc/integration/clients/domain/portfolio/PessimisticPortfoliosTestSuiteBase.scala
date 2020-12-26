@@ -73,24 +73,25 @@ abstract class PessimisticPortfoliosTestSuiteBase
       }
     }
 
-    "processForged" - {
+    "processConfirmed" - {
       val testGen = for {
         initialTxs <- Gen.listOf(pessimisticTransactionGen)
-        forgedTxIds <- Gen.listOf(Gen.oneOf(mkPBTxId :: initialTxs.map(_.txId))) // + random tx id
-      } yield (initialTxs, forgedTxIds)
+        confirmedTxIds <- Gen.listOf(Gen.oneOf(mkPBTxId :: initialTxs.map(_.txId))) // + random tx id
+      } yield (initialTxs, confirmedTxIds)
 
       // TODO DEX-1013 Test results
-      "the new state combined with forged txs changes should be equal to the previous state" in forAll(testGen) {
-        case (initialTxs, forgedTxIds) =>
+      "the new state combined with confirmed txs changes should be equal to the previous state" in forAll(testGen) {
+        case (initialTxs, confirmedTxIds) =>
           val pp = mkPessimisticPortfolios(initialTxs)
 
           val initialTxsMap = initialTxs.map(x => x.txId -> x).toMap
-          val forgedTxsChanges = forgedTxIds.distinct.foldMap(id => initialTxsMap.get(id).fold(Map.empty: AddressAssets)(_.pessimisticPortfolio))
+          val confirmedTxsChanges =
+            confirmedTxIds.distinct.foldMap(id => initialTxsMap.get(id).fold(Map.empty: AddressAssets)(_.pessimisticPortfolio))
           val before = getState(pp)
 
-          pp.processForged(forgedTxIds)
+          pp.processConfirmed(confirmedTxIds)
 
-          combine(getState(pp), forgedTxsChanges) should matchTo(before)
+          combine(getState(pp), confirmedTxsChanges) should matchTo(before)
       }
     }
 
@@ -106,12 +107,13 @@ abstract class PessimisticPortfoliosTestSuiteBase
           val pp = mkPessimisticPortfolios(initialTxs)
 
           val initialTxsMap = initialTxs.map(x => x.txId -> x).toMap
-          val forgedTxsChanges = failedTxIds.distinct.foldMap(id => initialTxsMap.get(id).fold(Map.empty: AddressAssets)(_.pessimisticPortfolio))
+          val confirmedTxsChanges = failedTxIds.distinct
+            .foldMap(id => initialTxsMap.get(id).fold(Map.empty: AddressAssets)(_.pessimisticPortfolio))
           val before = getState(pp)
 
           pp.removeFailed(failedTxIds)
 
-          combine(getState(pp), forgedTxsChanges) should matchTo(before)
+          combine(getState(pp), confirmedTxsChanges) should matchTo(before)
       }
     }
   }

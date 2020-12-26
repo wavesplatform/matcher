@@ -72,7 +72,7 @@ class DefaultPessimisticPortfolios() extends PessimisticPortfolios {
   /**
    * @return (affected addresses, unknown transactions)
    */
-  override def processForged(txIds: Iterable[ByteString]): (Set[Address], List[ByteString]) = {
+  override def processConfirmed(txIds: Iterable[ByteString]): (Set[Address], List[ByteString]) = {
     val (pessimisticChangesToRevert, unknownTxIds) = txIds.foldMap[(AddressAssets, List[ByteString])] { txId =>
       txs.remove(txId).fold[(AddressAssets, List[ByteString])]((Map.empty, List(txId)))((_, Nil))
     }

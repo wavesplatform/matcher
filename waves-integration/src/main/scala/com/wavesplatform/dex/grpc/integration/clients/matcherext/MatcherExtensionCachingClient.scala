@@ -49,7 +49,7 @@ class MatcherExtensionCachingClient(underlying: MatcherExtensionClient, defaultC
   override def broadcastTx(tx: ExchangeTransaction): Future[BroadcastResult] = underlying.broadcastTx(tx)
   override def checkedBroadcastTx(tx: ExchangeTransaction): Future[CheckedBroadcastResult] = underlying.checkedBroadcastTx(tx)
 
-  override def forgedOrder(orderId: ByteStr): Future[Boolean] = underlying.forgedOrder(orderId)
+  override def isOrderConfirmed(orderId: ByteStr): Future[Boolean] = underlying.isOrderConfirmed(orderId)
 
   override def currentBlockInfo: Future[BlockRef] = underlying.currentBlockInfo
 

@@ -119,7 +119,6 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
     settings.allowedOrderVersions shouldBe Set(11, 22)
     settings.orderRestrictions shouldBe Map.empty[AssetPair, OrderRestrictionsSettings]
     settings.exchangeTransactionBroadcast shouldBe ExchangeTransactionBroadcastActor.Settings(
-      broadcastUntilConfirmed = true,
       interval = 1.day,
       maxPendingTime = 30.days
     )

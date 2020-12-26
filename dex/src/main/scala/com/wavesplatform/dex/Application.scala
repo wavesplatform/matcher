@@ -18,7 +18,7 @@ import com.wavesplatform.dex.actors.ActorSystemOps.ImplicitOps
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.actors.events.OrderEventsCoordinatorActor
 import com.wavesplatform.dex.actors.orderbook.{AggregatedOrderBookActor, OrderBookActor, OrderBookSnapshotStoreActor}
-import com.wavesplatform.dex.actors.tx.{NewExchangeTransactionBroadcastActor, WriteExchangeTransactionActor}
+import com.wavesplatform.dex.actors.tx.{ExchangeTransactionBroadcastActor, WriteExchangeTransactionActor}
 import com.wavesplatform.dex.actors.{MatcherActor, OrderBookAskAdapter, RootActorSystem, SpendableBalancesActor}
 import com.wavesplatform.dex.api.http.headers.{CustomMediaTypes, MatcherHttpServer}
 import com.wavesplatform.dex.api.http.routes.{MatcherApiRoute, MatcherApiRouteV1}
@@ -166,8 +166,8 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   private val txWriterRef = actorSystem.actorOf(WriteExchangeTransactionActor.props(db), WriteExchangeTransactionActor.name)
 
   private val wavesNetTxBroadcasterRef = actorSystem.spawn(
-    NewExchangeTransactionBroadcastActor(
-      NewExchangeTransactionBroadcastActor.Settings(
+    ExchangeTransactionBroadcastActor(
+      ExchangeTransactionBroadcastActor.Settings(
         settings.exchangeTransactionBroadcast.interval,
         settings.exchangeTransactionBroadcast.maxPendingTime
       ),
@@ -411,7 +411,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
     _ = {
       log.info("Starting a transactions broadcaster")
-      wavesNetTxBroadcasterRef ! NewExchangeTransactionBroadcastActor.Command.Tick
+      wavesNetTxBroadcasterRef ! ExchangeTransactionBroadcastActor.Command.Tick
     }
 
     _ <- Future {

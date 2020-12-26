@@ -11,7 +11,7 @@ import com.wavesplatform.dex.grpc.integration.services.UtxTransaction
 
 class SynchronizedPessimisticPortfolios(settings: Settings) {
 
-  private val orig = new LookAheadPessimisticPortfolios(new DefaultPessimisticPortfolios(), settings.maxForgedTransactions)
+  private val orig = new LookAheadPessimisticPortfolios(new DefaultPessimisticPortfolios(), settings.maxConfirmedTransactions)
 
   private val reentrantLock = new ReentrantReadWriteLock()
 
@@ -32,8 +32,8 @@ class SynchronizedPessimisticPortfolios(settings: Settings) {
   /**
    * @return (affected addresses, unknown transactions)
    */
-  def processForged(txIds: Set[ByteString]): (Set[Address], List[ByteString]) = write {
-    orig.processForged(txIds)
+  def processConfirmed(txIds: Set[ByteString]): (Set[Address], List[ByteString]) = write {
+    orig.processConfirmed(txIds)
   }
 
   // TODO DEX-1013
@@ -51,5 +51,5 @@ class SynchronizedPessimisticPortfolios(settings: Settings) {
 }
 
 object SynchronizedPessimisticPortfolios {
-  case class Settings(maxForgedTransactions: Int)
+  case class Settings(maxConfirmedTransactions: Int)
 }

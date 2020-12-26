@@ -25,7 +25,7 @@ import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.Random
 
-class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase with NoStackTraceCancelAfterFailure {
+class WavesBlockchainClientTestSuite extends IntegrationSuiteBase with NoStackTraceCancelAfterFailure {
 
   private val grpcExecutor = Executors.newCachedThreadPool(
     new ThreadFactoryBuilder()
@@ -158,12 +158,12 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase with NoSt
     }
   }
 
-  "wasForged" - {
+  "areKnown" - {
     "false for unknown tx" in {
       wait(client.areKnown(Seq(BtcId))).values.head shouldBe false
     }
 
-    "true for forged tx" in {
+    "true for confirmed tx" in {
       broadcastAndAwait(IssueBtcTx)
       wait(client.areKnown(Seq(BtcId))).values.head shouldBe true
     }
@@ -334,9 +334,9 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase with NoSt
     }
   }
 
-  "forgedOrder" - {
+  "isOrderConfirmed" - {
     "no such order" in {
-      wait(client.isOrderForged(randomByteStr(32))) shouldBe false
+      wait(client.isOrderConfirmed(randomByteStr(32))) shouldBe false
     }
 
     "the order was in a forged ExchangeTransaction" in {
@@ -346,8 +346,8 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase with NoSt
       withClue(exchangeTx.id().base58) {
         broadcastAndAwait(exchangeTx)
         eventually {
-          wait(client.isOrderForged(exchangeTx.buyOrder().id())) shouldBe true
-          wait(client.isOrderForged(exchangeTx.sellOrder().id())) shouldBe true
+          wait(client.isOrderConfirmed(exchangeTx.buyOrder().id())) shouldBe true
+          wait(client.isOrderConfirmed(exchangeTx.sellOrder().id())) shouldBe true
         }
       }
     }

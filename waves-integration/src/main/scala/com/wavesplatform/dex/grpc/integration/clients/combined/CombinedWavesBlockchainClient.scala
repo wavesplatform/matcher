@@ -146,7 +146,7 @@ class CombinedWavesBlockchainClient(
     if (utxUpdate.resetCaches) pessimisticPortfolios.replaceWith(utxUpdate.unconfirmedTxs)
     else
       pessimisticPortfolios.addPending(utxUpdate.unconfirmedTxs) |+|
-      pessimisticPortfolios.processForged(utxUpdate.confirmedTxs.keySet)._1 |+|
+      pessimisticPortfolios.processConfirmed(utxUpdate.confirmedTxs.keySet)._1 |+|
       pessimisticPortfolios.removeFailed(utxUpdate.failedTxs.keySet)
 
   // TODO DEX-1015
@@ -240,8 +240,8 @@ class CombinedWavesBlockchainClient(
   override def broadcastTx(tx: ExchangeTransaction): Future[BroadcastResult] = meClient.broadcastTx(tx)
   override def checkedBroadcastTx(tx: ExchangeTransaction): Future[CheckedBroadcastResult] = meClient.checkedBroadcastTx(tx)
 
-  override def isOrderForged(orderId: ByteStr): Future[Boolean] =
-    meClient.forgedOrder(orderId)
+  override def isOrderConfirmed(orderId: ByteStr): Future[Boolean] =
+    meClient.isOrderConfirmed(orderId)
 
   override def close(): Future[Unit] =
     meClient.close().zip(bClient.close()).map(_ => ())

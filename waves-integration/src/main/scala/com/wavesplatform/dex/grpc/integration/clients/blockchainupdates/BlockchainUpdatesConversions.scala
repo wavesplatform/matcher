@@ -47,7 +47,7 @@ object BlockchainUpdatesConversions {
             reference = reference,
             changes = BlockchainBalance(regularBalanceChanges, outLeasesChanges),
             tpe = tpe,
-            forgedTxs = updates.transactionIds.view
+            confirmedTxs = updates.transactionIds.view
               .zip(updates.transactionStateUpdates)
               .zip(transactionBodies)
               .map {

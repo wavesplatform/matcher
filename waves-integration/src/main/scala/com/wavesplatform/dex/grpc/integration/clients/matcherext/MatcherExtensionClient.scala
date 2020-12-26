@@ -34,7 +34,7 @@ trait MatcherExtensionClient {
   def broadcastTx(tx: ExchangeTransaction): Future[BroadcastResult]
   def checkedBroadcastTx(tx: ExchangeTransaction): Future[CheckedBroadcastResult]
 
-  def forgedOrder(orderId: ByteStr): Future[Boolean]
+  def isOrderConfirmed(orderId: ByteStr): Future[Boolean]
 
   def currentBlockInfo: Future[BlockRef]
 

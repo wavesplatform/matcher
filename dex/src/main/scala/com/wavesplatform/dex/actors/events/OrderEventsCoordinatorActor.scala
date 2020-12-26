@@ -5,7 +5,7 @@ import akka.actor.typed.Behavior
 import akka.actor.typed.scaladsl.Behaviors
 import akka.{actor => classic}
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
-import com.wavesplatform.dex.actors.tx.NewExchangeTransactionBroadcastActor.{Command => Broadcaster}
+import com.wavesplatform.dex.actors.tx.ExchangeTransactionBroadcastActor.{Command => Broadcaster}
 import com.wavesplatform.dex.collections.FifoSet
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction

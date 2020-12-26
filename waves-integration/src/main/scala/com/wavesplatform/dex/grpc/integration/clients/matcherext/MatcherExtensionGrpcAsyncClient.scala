@@ -146,7 +146,7 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
     }
   }.recover { case e => CheckedBroadcastResult.Failed(s"Failed on client: ${Option(e.getMessage).getOrElse(e.getClass.getName)}") }
 
-  override def forgedOrder(orderId: ByteStr): Future[Boolean] = handlingErrors {
+  override def isOrderConfirmed(orderId: ByteStr): Future[Boolean] = handlingErrors {
     asyncUnaryCall(METHOD_FORGED_ORDER, ForgedOrderRequest(orderId.toPB)).map(_.isForged)
   }
 

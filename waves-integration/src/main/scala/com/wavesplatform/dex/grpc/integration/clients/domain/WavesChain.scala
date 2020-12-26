@@ -116,7 +116,7 @@ object WavesChain {
         reference = x.reference,
         changes = x.changes |+| y.changes,
         tpe = x.tpe,
-        forgedTxs = x.forgedTxs ++ y.forgedTxs
+        confirmedTxs = x.confirmedTxs ++ y.confirmedTxs
       )
     }
 

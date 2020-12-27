@@ -97,7 +97,12 @@ message CheckedBroadcastResponse {
     oneof result {
         bool unconfirmed = 1; // true == isNew
         google.protobuf.Empty confirmed = 2;
-        string failed = 3;
+        Failure failed = 3;
+    }
+
+    message Failure {
+        string message = 1;
+        bool can_retry = 2;
     }
 }
 

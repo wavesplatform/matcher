@@ -19,7 +19,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.{ExecutionError, ValidationError}
 import com.wavesplatform.protobuf.Amount
-import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.{Asset, TxValidationError}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.ScriptRunner
@@ -165,18 +165,27 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
           else context.transactionsApi.broadcastTransaction(tx).map {
             _.resultE match {
               case Right(isNew) => CheckedBroadcastResponse.Result.Unconfirmed(isNew)
-              case Left(e) => CheckedBroadcastResponse.Result.Failed(e.toString)
+              case Left(e) => CheckedBroadcastResponse.Result.Failed(CheckedBroadcastResponse.Failure(e.toString, canRetry(e)))
             }
           }
-        case Left(e) => Future.successful(CheckedBroadcastResponse.Result.Failed(e.toString))
+        case Left(e) => Future.successful(CheckedBroadcastResponse.Result.Failed(CheckedBroadcastResponse.Failure(e.toString, canRetry(e))))
       }
       .map(CheckedBroadcastResponse(_))
       .recover {
         case e: Throwable =>
           log.error(s"Can't broadcast a transaction", e)
           val message = Option(e.getMessage).getOrElse(e.getClass.getName)
-          CheckedBroadcastResponse(CheckedBroadcastResponse.Result.Failed(message))
+          CheckedBroadcastResponse(CheckedBroadcastResponse.Result.Failed(CheckedBroadcastResponse.Failure(message, canRetry = false)))
       }
+
+  private def canRetry(x: ValidationError): Boolean = x match {
+    case x: GenericError
+        if x.err == "Transaction pool bytes size limit is reached"
+          || x.err == "Transaction pool size limit is reached" => true
+    // Could happen if one transaction is sent multiple times in parallel
+    case x: TxValidationError.OrderValidationError if x.err.startsWith("Too much") => true
+    case _ => false
+  }
 
   override def isFeatureActivated(request: IsFeatureActivatedRequest): Future[IsFeatureActivatedResponse] = Future {
     IsFeatureActivatedResponse(

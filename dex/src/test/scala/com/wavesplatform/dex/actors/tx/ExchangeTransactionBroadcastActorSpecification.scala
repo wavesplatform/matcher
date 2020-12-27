@@ -53,18 +53,23 @@ class ExchangeTransactionBroadcastActorSpecification
         broadcasted shouldBe Seq(event.tx)
       }
 
-      "send a response to a client, if a transaction was confirmed before" in {
-        val actor = defaultActor { _ =>
-          Future.successful(CheckedBroadcastResult.Confirmed)
+      "send a response to a client, if" - {
+        def test(result: CheckedBroadcastResult): Unit = {
+          val actor = defaultActor { _ =>
+            Future.successful(result)
+          }
+
+          val client = testKit.createTestProbe[OEC.Message]()
+          val event = sampleEvent(client.ref)
+          actor ! event
+          client.expectMessage(OEC.Command.ApplyConfirmed(event.tx))
         }
 
-        val client = testKit.createTestProbe[OEC.Message]()
-        val event = sampleEvent(client.ref)
-        actor ! event
-        client.expectMessage(OEC.Command.ApplyConfirmed(event.tx))
+        "a transaction was confirmed before" in test(CheckedBroadcastResult.Confirmed)
+        "a transaction failed and we can't retry" in test(CheckedBroadcastResult.Failed("error", canRetry = false))
       }
 
-      "don't send messages to a client, if a transaction wasn't confirmed" - {
+      "don't send messages to a client" - {
         def test(r: CheckedBroadcastResult): Unit = {
           val actor = defaultActor { _ =>
             Future.successful(r)
@@ -76,12 +81,12 @@ class ExchangeTransactionBroadcastActorSpecification
           client.expectNoMessage()
         }
 
-        "Unconfirmed" - {
+        "if a transaction is Unconfirmed and isNew=" - {
           "true" in test(CheckedBroadcastResult.Unconfirmed(true))
           "false" in test(CheckedBroadcastResult.Unconfirmed(false))
         }
 
-        "Failed" in test(CheckedBroadcastResult.Failed("test"))
+        "if a transaction is Failed and we can retry" in test(CheckedBroadcastResult.Failed("test", canRetry = true))
       }
 
       "when an expired transaction" - {
@@ -89,7 +94,7 @@ class ExchangeTransactionBroadcastActorSpecification
           val attempts = new AtomicInteger(0)
           val actor = defaultActor { _ =>
             attempts.incrementAndGet()
-            Future.successful(CheckedBroadcastResult.Failed("expired"))
+            Future.successful(CheckedBroadcastResult.Failed("expired", canRetry = true)) // We don't reach this
           }
 
           val client = testKit.createTestProbe[OEC.Message]()
@@ -111,11 +116,11 @@ class ExchangeTransactionBroadcastActorSpecification
     }
 
     "broadcast until" - {
-      val notConfirmed: Vector[Future[CheckedBroadcastResult]] = Vector(
+      val canRetry: Vector[Future[CheckedBroadcastResult]] = Vector(
         Future.failed(new RuntimeException("exception") with NoStackTrace),
         Future.successful(CheckedBroadcastResult.Unconfirmed(false)),
         Future.successful(CheckedBroadcastResult.Unconfirmed(true)),
-        Future.successful(CheckedBroadcastResult.Failed("failed"))
+        Future.successful(CheckedBroadcastResult.Failed("failed", canRetry = true))
       )
 
       val settings = ExchangeTransactionBroadcastActor.Settings(
@@ -131,12 +136,12 @@ class ExchangeTransactionBroadcastActorSpecification
         )
       )
 
-      "confirmed" in {
+      def stopTest(lastResult: CheckedBroadcastResult): Unit = {
         val maxAttempts = 5
         val actualAttempts = new AtomicInteger(0)
         val actor = mkActor {
-          if (actualAttempts.incrementAndGet() == maxAttempts) Future.successful(CheckedBroadcastResult.Confirmed)
-          else notConfirmed(ThreadLocalRandom.current().nextInt(notConfirmed.size))
+          if (actualAttempts.incrementAndGet() == maxAttempts) Future.successful(lastResult)
+          else canRetry(ThreadLocalRandom.current().nextInt(canRetry.size))
         }
 
         val client = testKit.createTestProbe[OEC.Message]()
@@ -154,11 +159,14 @@ class ExchangeTransactionBroadcastActorSpecification
         }
       }
 
+      "confirmed" in stopTest(CheckedBroadcastResult.Confirmed)
+      "failed and we can't retry" in stopTest(CheckedBroadcastResult.Failed("test", canRetry = false))
+
       "timed out" in {
         val attempts = new AtomicInteger(0)
         val actor = mkActor {
           attempts.incrementAndGet()
-          notConfirmed(ThreadLocalRandom.current().nextInt(notConfirmed.size))
+          canRetry(ThreadLocalRandom.current().nextInt(canRetry.size))
         }
 
         val client = testKit.createTestProbe[OEC.Message]()
@@ -179,7 +187,7 @@ class ExchangeTransactionBroadcastActorSpecification
             settings = settings,
             blockchain = { _ =>
               attempts.incrementAndGet()
-              notConfirmed(ThreadLocalRandom.current().nextInt(notConfirmed.size))
+              canRetry(ThreadLocalRandom.current().nextInt(canRetry.size))
             },
             time = testTime
           )

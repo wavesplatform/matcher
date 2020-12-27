@@ -127,7 +127,7 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
         val bobOrd2 = mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 1)
         dex1.api.place(bobOrd2)
 
-        dex1.api.waitForOrderStatus(aliceOrd1, Status.Filled)
+        dex1.api.waitForOrderStatus(aliceOrd1, Status.Filled) // <--
         dex1.api.waitForOrderStatus(aliceOrd2, Status.Filled)
         dex1.api.waitForOrderStatus(bobOrd1, Status.Filled)
         dex1.api.waitForOrderStatus(bobOrd2, Status.Filled)

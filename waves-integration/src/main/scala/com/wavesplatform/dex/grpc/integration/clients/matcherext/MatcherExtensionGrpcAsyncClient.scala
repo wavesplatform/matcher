@@ -139,13 +139,15 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
     asyncUnaryCall(METHOD_CHECKED_BROADCAST, CheckedBroadcastRequest(transaction = Some(tx.toPB))).map { response =>
       import CheckedBroadcastResponse.Result
       response.result match {
-        case Result.Empty => CheckedBroadcastResult.Failed("Unexpected response on client: Result.Empty")
+        case Result.Empty => CheckedBroadcastResult.Failed("Unexpected response on client: Result.Empty", canRetry = false)
         case Result.Unconfirmed(isNew) => CheckedBroadcastResult.Unconfirmed(isNew)
         case Result.Confirmed(_) => CheckedBroadcastResult.Confirmed
-        case Result.Failed(message) => CheckedBroadcastResult.Failed(message)
+        case Result.Failed(failure) => CheckedBroadcastResult.Failed(failure.message, failure.canRetry)
       }
     }
-  }.recover { case e => CheckedBroadcastResult.Failed(s"Failed on client: ${Option(e.getMessage).getOrElse(e.getClass.getName)}") }
+  }.recover { case e =>
+    CheckedBroadcastResult.Failed(s"Failed on client: ${Option(e.getMessage).getOrElse(e.getClass.getName)}", canRetry = true)
+  }
 
   override def isOrderConfirmed(orderId: ByteStr): Future[Boolean] = handlingErrors {
     asyncUnaryCall(METHOD_FORGED_ORDER, ForgedOrderRequest(orderId.toPB)).map(_.isForged)

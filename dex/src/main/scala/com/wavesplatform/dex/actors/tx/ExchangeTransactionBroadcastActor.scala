@@ -101,30 +101,35 @@ object ExchangeTransactionBroadcastActor {
 
           case message: Event.Broadcasted =>
             val txId = message.tx.id()
+            val isInProgress = inProgress.contains(txId)
             message.result match {
-              case Failure(e) => context.log.warn(s"Failed to broadcast $txId", e)
+              case Failure(e) => context.log.warn(s"Failed to broadcast $txId (inProgress=$isInProgress)", e)
               case Success(x) =>
                 x match {
-                  case CheckedBroadcastResult.Unconfirmed(isNew) => context.log.info(s"$txId is unconfirmed${if (isNew) " and is new" else ""}")
-                  case CheckedBroadcastResult.Confirmed => context.log.info(s"$txId is confirmed")
-                  case CheckedBroadcastResult.Failed(message) => context.log.warn(s"Failed to broadcast $txId: $message")
+                  case CheckedBroadcastResult.Unconfirmed(isNew) =>
+                    context.log.info(s"$txId (inProgress=$isInProgress) is unconfirmed${if (isNew) " and is new" else ""}")
+                  case CheckedBroadcastResult.Confirmed =>
+                    context.log.info(s"$txId (inProgress=$isInProgress) is confirmed")
+                  case CheckedBroadcastResult.Failed(message, canRetry) =>
+                    context.log.warn(s"Failed to broadcast $txId (inProgress=$isInProgress, canRetry=$canRetry): $message")
                 }
             }
 
-            if (inProgress.contains(txId)) {
-              val isConfirmed = message.result match {
-                case Success(x) => x == CheckedBroadcastResult.Confirmed
-                case _ => false
+            if (isInProgress) {
+              val canRetry = message.result match {
+                case Success(CheckedBroadcastResult.Confirmed) => false
+                case Success(CheckedBroadcastResult.Failed(_, x)) => x
+                case _ => true
               }
 
-              if (isConfirmed)
-                message.clientRef.foreach { clientRef =>
-                  // If it is new, we will receive an event from UTX, otherwise we either
-                  clientRef ! OrderEventsCoordinatorActor.Command.ApplyConfirmed(message.tx)
-                }
-              else if (!timer.isTimerActive(timerKey)) timer.startSingleTimer(timerKey, Command.Tick, settings.interval)
+              if (canRetry) {
+                if (!timer.isTimerActive(timerKey)) timer.startSingleTimer(timerKey, Command.Tick, settings.interval)
+              } else message.clientRef.foreach { clientRef =>
+                // If it is new, we will receive an event from UTX, otherwise we either
+                clientRef ! OrderEventsCoordinatorActor.Command.ApplyConfirmed(message.tx)
+              }
 
-              val updatedInProgress = if (isConfirmed) inProgress - txId else inProgress
+              val updatedInProgress = if (canRetry) inProgress else inProgress - txId
               default(updatedInProgress)
             } else Behaviors.same
         }

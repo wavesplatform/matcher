@@ -167,11 +167,12 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
   private val wavesNetTxBroadcasterRef = actorSystem.spawn(
     ExchangeTransactionBroadcastActor(
-      ExchangeTransactionBroadcastActor.Settings(
+      settings = ExchangeTransactionBroadcastActor.Settings(
         settings.exchangeTransactionBroadcast.interval,
         settings.exchangeTransactionBroadcast.maxPendingTime
       ),
-      wavesBlockchainAsyncClient.checkedBroadcastTx
+      blockchain = wavesBlockchainAsyncClient.checkedBroadcastTx,
+      time = time
     ),
     "exchange-transaction-broadcast"
   )
@@ -409,11 +410,6 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
         log.warn(s"The queue doesn't contain required offsets to recover all orders. Check retention settings of the queue. Continue...")
         Future.unit // Otherwise it would be hard to start the matcher
       } else Future.unit
-    }
-
-    _ = {
-      log.info("Starting a transactions broadcaster")
-      wavesNetTxBroadcasterRef ! ExchangeTransactionBroadcastActor.Command.Tick
     }
 
     _ <- Future {

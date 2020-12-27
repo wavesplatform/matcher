@@ -6,10 +6,11 @@ import cats.syntax.option._
 import com.wavesplatform.dex.actors.events.OrderEventsCoordinatorActor
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.grpc.integration.clients.CheckedBroadcastResult
+import com.wavesplatform.dex.time.Time
 
 import scala.collection.immutable
 import scala.concurrent.Future
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -17,8 +18,12 @@ import scala.util.{Failure, Success, Try}
  * Waves NODE doesn't guarantees that a valid transaction will be added to UTX without errors.
  * For example, we can send a valid transaction 2 times in parallel and Waves NODE could return an error
  *   without adding a transaction to UTX.
+ * Or the UTX pool could be full, so we will receive "Transaction pool bytes size limit is reached" (or something similar)
  */
 object ExchangeTransactionBroadcastActor {
+
+  val ExchangeTransactionExpiration = 120.minutes
+  val ExchangeTransactionExpirationMillis = ExchangeTransactionExpiration.toMillis
 
   case class Settings(interval: FiniteDuration, maxPendingTime: FiniteDuration)
 
@@ -31,8 +36,6 @@ object ExchangeTransactionBroadcastActor {
     // TODO Message type coupling
     case class Broadcast(clientRef: ActorRef[OrderEventsCoordinatorActor.Message], tx: ExchangeTransaction) extends Command
     case class ProcessConfirmed(txIds: immutable.Iterable[ExchangeTransaction.Id]) extends Command
-
-    // Send once to start
     case object Tick extends Command
 
   }
@@ -55,9 +58,14 @@ object ExchangeTransactionBroadcastActor {
 
   def apply(
     settings: Settings,
-    blockchain: BlockchainInteraction
-  ): Behavior[Message] = Behaviors.setup { _ =>
-    val defaultRestAttempts = math.min((settings.maxPendingTime / settings.interval).intValue, 1) - 1
+    blockchain: BlockchainInteraction,
+    time: Time
+  ): Behavior[Message] = Behaviors.withTimers { timer =>
+    val timerKey = Command.Tick
+
+    val defaultRestAttempts = math.max((settings.maxPendingTime / settings.interval).intValue, 1) - 1
+
+    def isExpired(tx: ExchangeTransaction): Boolean = (time.correctedTime() - tx.timestamp) > ExchangeTransactionExpirationMillis
 
     def broadcast(
       context: ActorContext[Message],
@@ -72,17 +80,23 @@ object ExchangeTransactionBroadcastActor {
       Behaviors.receive[Message] { (context, message) =>
         message match {
           case message: Command.Broadcast =>
-            broadcast(context, message.tx, message.clientRef.some)
-            default(inProgress.updated(message.tx.id(), InProgressItem(message.tx, defaultRestAttempts)))
+            if (isExpired(message.tx)) {
+              message.clientRef ! OrderEventsCoordinatorActor.Command.ApplyConfirmed(message.tx)
+              Behaviors.same
+            } else {
+              broadcast(context, message.tx, message.clientRef.some)
+              default(inProgress.updated(message.tx.id(), InProgressItem(message.tx, defaultRestAttempts)))
+            }
 
           case message: Command.ProcessConfirmed =>
             context.log.debug(s"Confirmed: ${message.txIds.mkString(", ")}")
             default(inProgress -- message.txIds)
 
           case Command.Tick =>
-            val updatedInProgress = inProgress.view.mapValues(_.decreasedAttempts).filter(_._2.isValid).toMap
+            val updatedInProgress = inProgress.view.mapValues(_.decreasedAttempts)
+              .filter { case (_, x) => x.isValid && !isExpired(x.tx) }
+              .toMap
             if (updatedInProgress.nonEmpty) updatedInProgress.values.view.map(_.tx).foreach(broadcast(context, _))
-            context.scheduleOnce(settings.interval, context.self, Command.Tick)
             default(updatedInProgress)
 
           case message: Event.Broadcasted =>
@@ -98,19 +112,19 @@ object ExchangeTransactionBroadcastActor {
             }
 
             if (inProgress.contains(txId)) {
-              val confirmed = message.result match {
+              val isConfirmed = message.result match {
                 case Success(x) => x == CheckedBroadcastResult.Confirmed
-                case Failure(e) =>
-                  context.log.warn(s"Broadcast failed for $txId", e)
-                  false
+                case _ => false
               }
 
-              message.clientRef.foreach { clientRef =>
-                // If it is new, we will receive an event from UTX, otherwise we either
-                if (confirmed) clientRef ! OrderEventsCoordinatorActor.Command.ApplyConfirmed(message.tx)
-              }
+              if (isConfirmed)
+                message.clientRef.foreach { clientRef =>
+                  // If it is new, we will receive an event from UTX, otherwise we either
+                  clientRef ! OrderEventsCoordinatorActor.Command.ApplyConfirmed(message.tx)
+                }
+              else if (!timer.isTimerActive(timerKey)) timer.startSingleTimer(timerKey, Command.Tick, settings.interval)
 
-              val updatedInProgress = if (confirmed) inProgress - txId else inProgress
+              val updatedInProgress = if (isConfirmed) inProgress - txId else inProgress
               default(updatedInProgress)
             } else Behaviors.same
         }

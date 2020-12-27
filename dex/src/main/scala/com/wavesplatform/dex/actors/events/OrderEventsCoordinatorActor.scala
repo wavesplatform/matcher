@@ -1,11 +1,11 @@
 package com.wavesplatform.dex.actors.events
 
 import akka.actor.typed
-import akka.actor.typed.Behavior
 import akka.actor.typed.scaladsl.Behaviors
+import akka.actor.typed.{ActorRef, Behavior}
 import akka.{actor => classic}
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
-import com.wavesplatform.dex.actors.tx.ExchangeTransactionBroadcastActor.{Command => Broadcaster}
+import com.wavesplatform.dex.actors.tx.ExchangeTransactionBroadcastActor.{Confirmed, Command => Broadcaster}
 import com.wavesplatform.dex.collections.FifoSet
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
@@ -16,8 +16,6 @@ import com.wavesplatform.dex.model.Events
 import com.wavesplatform.dex.model.Events.ExchangeTransactionCreated
 import com.wavesplatform.dex.model.ExchangeTransactionCreator.CreateTransaction
 import play.api.libs.json.Json
-
-import scala.concurrent.Future
 
 // TODO DEX-1042
 object OrderEventsCoordinatorActor {
@@ -41,9 +39,8 @@ object OrderEventsCoordinatorActor {
     addressDirectoryRef: classic.ActorRef,
     dbWriterRef: classic.ActorRef,
     broadcasterRef: typed.ActorRef[Broadcaster],
-    createTransaction: CreateTransaction,
-    isTransactionKnown: ExchangeTransaction.Id => Future[Boolean] // TODO Move to broadcastRef
-  ): Behavior[Message] = Behaviors.setup { _ =>
+    createTransaction: CreateTransaction
+  ): Behavior[Message] = Behaviors.setup { context =>
     def sendResolved(resolved: Map[Address, PendingAddress]): Unit = resolved.foreach { case (address, x) =>
       addressDirectoryRef ! AddressDirectoryActor.Envelope(
         address,
@@ -60,6 +57,10 @@ object OrderEventsCoordinatorActor {
 
     def txsToString(label: String, xs: Map[ExchangeTransaction.Id, _]): String = s"$label=${xs.keys.mkString(", ")}"
 
+    val broadcastAdapter: ActorRef[Confirmed] = context.messageAdapter[Confirmed] {
+      case Confirmed(tx) => Command.ApplyConfirmed(tx)
+    }
+
     def holdUntilAppearOnNode(state: OrderEventsActorState): Behavior[Message] =
       Behaviors.receive[Message] { (context, message) =>
         message match {
@@ -75,7 +76,7 @@ object OrderEventsCoordinatorActor {
                     context.log.info(s"Created transaction: $tx")
                     val txCreated = ExchangeTransactionCreated(tx)
                     dbWriterRef ! txCreated
-                    broadcasterRef ! Broadcaster.Broadcast(context.self, tx)
+                    broadcasterRef ! Broadcaster.Broadcast(broadcastAdapter, tx)
 
                     val (updatedState, resolved) = state.withExecuted(tx.id(), event)
                     sendResolved(resolved) // TODO DEX-1042 pipeToSelf is needed if resolved?
@@ -133,10 +134,10 @@ object OrderEventsCoordinatorActor {
             holdUntilAppearOnNode(updatedState2)
 
           case Command.ApplyConfirmed(tx) =>
-            // Why we react only on confirmed:
+            // Why we react only if:
             // * If it was before in UTX, then we received this before during UtxSwitched
             // * If it was added to UTX, then we will receive it
-            // * If it was confirmed, then we haven't received (neither as unconfirmed, nor confirmed) it and won't receive
+            // * If it won't retry, then we haven't received (neither as unconfirmed, nor confirmed) it and won't receive
             val (updated, restBalances, resolved) = state.withKnownOnNodeTx(tx.traders, tx.id(), Map.empty)
             sendResolved(resolved)
             sendBalances(restBalances) // Actually, they should be empty, but anyway
@@ -157,7 +158,7 @@ object OrderEventsCoordinatorActor {
               createTransaction(event).foreach { tx =>
                 val txCreated = ExchangeTransactionCreated(tx)
                 dbWriterRef ! txCreated
-                broadcasterRef ! Broadcaster.Broadcast(context.self, tx)
+                broadcasterRef ! Broadcaster.Broadcast(broadcastAdapter, tx)
               }
 
             case _ =>

@@ -3,7 +3,6 @@ package com.wavesplatform.dex.actors.tx
 import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
 import akka.actor.typed.{ActorRef, Behavior}
 import cats.syntax.option._
-import com.wavesplatform.dex.actors.events.OrderEventsCoordinatorActor
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.grpc.integration.clients.CheckedBroadcastResult
 import com.wavesplatform.dex.time.Time
@@ -14,7 +13,10 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
 /**
- * Sends transactions to Waves NODE until it is confirmed or a timeout exceeds.
+ * Sends transactions to Waves NODE until:
+ * - It is confirmed;
+ * - A timeout exceeds;
+ * - Errors are insignificant (can_retry = true).
  * Waves NODE doesn't guarantees that a valid transaction will be added to UTX without errors.
  * For example, we can send a valid transaction 2 times in parallel and Waves NODE could return an error
  *   without adding a transaction to UTX.
@@ -33,8 +35,7 @@ object ExchangeTransactionBroadcastActor {
 
   object Command {
 
-    // TODO Message type coupling
-    case class Broadcast(clientRef: ActorRef[OrderEventsCoordinatorActor.Message], tx: ExchangeTransaction) extends Command
+    case class Broadcast(clientRef: ActorRef[Confirmed], tx: ExchangeTransaction) extends Command
     case class ProcessConfirmed(txIds: immutable.Iterable[ExchangeTransaction.Id]) extends Command
     case object Tick extends Command
 
@@ -45,7 +46,7 @@ object ExchangeTransactionBroadcastActor {
   object Event {
 
     case class Broadcasted(
-      clientRef: Option[ActorRef[OrderEventsCoordinatorActor.Message]],
+      clientRef: Option[ActorRef[Confirmed]],
       tx: ExchangeTransaction,
       result: Try[CheckedBroadcastResult]
     ) extends Event
@@ -70,7 +71,7 @@ object ExchangeTransactionBroadcastActor {
     def broadcast(
       context: ActorContext[Message],
       tx: ExchangeTransaction,
-      clientRef: Option[ActorRef[OrderEventsCoordinatorActor.Message]] = None
+      clientRef: Option[ActorRef[Confirmed]] = None
     ): Unit = {
       context.log.info(s"Broadcasting ${tx.id()}")
       context.pipeToSelf(blockchain.broadcast(tx))(Event.Broadcasted(clientRef, tx, _))
@@ -81,7 +82,7 @@ object ExchangeTransactionBroadcastActor {
         message match {
           case message: Command.Broadcast =>
             if (isExpired(message.tx)) {
-              message.clientRef ! OrderEventsCoordinatorActor.Command.ApplyConfirmed(message.tx)
+              message.clientRef ! Confirmed(message.tx)
               Behaviors.same
             } else {
               broadcast(context, message.tx, message.clientRef.some)
@@ -126,7 +127,7 @@ object ExchangeTransactionBroadcastActor {
                 if (!timer.isTimerActive(timerKey)) timer.startSingleTimer(timerKey, Command.Tick, settings.interval)
               } else message.clientRef.foreach { clientRef =>
                 // If it is new, we will receive an event from UTX, otherwise we either
-                clientRef ! OrderEventsCoordinatorActor.Command.ApplyConfirmed(message.tx)
+                clientRef ! Confirmed(message.tx)
               }
 
               val updatedInProgress = if (canRetry) inProgress else inProgress - txId
@@ -142,5 +143,7 @@ object ExchangeTransactionBroadcastActor {
     def decreasedAttempts: InProgressItem = copy(restAttempts = restAttempts - 1)
     def isValid: Boolean = restAttempts >= 0
   }
+
+  case class Confirmed(tx: ExchangeTransaction)
 
 }

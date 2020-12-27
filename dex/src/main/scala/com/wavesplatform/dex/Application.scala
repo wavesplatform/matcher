@@ -228,8 +228,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       addressDirectoryRef = addressDirectoryRef,
       dbWriterRef = txWriterRef,
       broadcasterRef = wavesNetTxBroadcasterRef,
-      createTransaction = transactionCreator.createTransaction,
-      isTransactionKnown = txId => wavesBlockchainAsyncClient.areKnown(List(txId)).map(_.getOrElse(txId, false))
+      createTransaction = transactionCreator.createTransaction
     ),
     name = "events-coordinator"
   )

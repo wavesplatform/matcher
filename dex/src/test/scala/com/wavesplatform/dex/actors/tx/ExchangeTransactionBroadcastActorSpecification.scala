@@ -2,8 +2,7 @@ package com.wavesplatform.dex.actors.tx
 
 import akka.actor.testkit.typed.scaladsl.{ManualTime, ScalaTestWithActorTestKit, TestProbe}
 import akka.actor.typed._
-import com.wavesplatform.dex.actors.events.{OrderEventsCoordinatorActor => OEC}
-import com.wavesplatform.dex.actors.tx.ExchangeTransactionBroadcastActor.Message
+import com.wavesplatform.dex.actors.tx.ExchangeTransactionBroadcastActor.{Confirmed, Message}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -46,10 +45,10 @@ class ExchangeTransactionBroadcastActorSpecification
           Future.successful(CheckedBroadcastResult.Confirmed)
         }
 
-        val client = testKit.createTestProbe[OEC.Message]()
+        val client = testKit.createTestProbe[Confirmed]()
         val event = sampleEvent(client.ref)
         actor ! event
-        client.expectMessageType[OEC.Command.ApplyConfirmed]
+        client.expectMessageType[Confirmed]
         broadcasted shouldBe Seq(event.tx)
       }
 
@@ -59,10 +58,10 @@ class ExchangeTransactionBroadcastActorSpecification
             Future.successful(result)
           }
 
-          val client = testKit.createTestProbe[OEC.Message]()
+          val client = testKit.createTestProbe[Confirmed]()
           val event = sampleEvent(client.ref)
           actor ! event
-          client.expectMessage(OEC.Command.ApplyConfirmed(event.tx))
+          client.expectMessage(Confirmed(event.tx))
         }
 
         "a transaction was confirmed before" in test(CheckedBroadcastResult.Confirmed)
@@ -75,7 +74,7 @@ class ExchangeTransactionBroadcastActorSpecification
             Future.successful(r)
           }
 
-          val client = testKit.createTestProbe[OEC.Message]()
+          val client = testKit.createTestProbe[Confirmed]()
 
           actor ! sampleEvent(client.ref)
           client.expectNoMessage()
@@ -90,14 +89,14 @@ class ExchangeTransactionBroadcastActorSpecification
       }
 
       "when an expired transaction" - {
-        def test(check: (TestProbe[OEC.Message], Int) => Unit): Unit = {
+        def test(check: (TestProbe[Confirmed], Int) => Unit): Unit = {
           val attempts = new AtomicInteger(0)
           val actor = defaultActor { _ =>
             attempts.incrementAndGet()
             Future.successful(CheckedBroadcastResult.Failed("expired", canRetry = true)) // We don't reach this
           }
 
-          val client = testKit.createTestProbe[OEC.Message]()
+          val client = testKit.createTestProbe[Confirmed]()
 
           actor ! sampleEvent(client.ref, createdTs = System.currentTimeMillis() - 1.day.toMillis)
           manualTime.timePasses(5.millis)
@@ -105,13 +104,8 @@ class ExchangeTransactionBroadcastActorSpecification
           check(client, attempts.get())
         }
 
-        "doesn't broadcast" in test { (_, attempts) =>
-          attempts shouldBe 0
-        }
-
-        "replies to a client" in test { (client, _) =>
-          client.expectMessageType[OEC.Command.ApplyConfirmed]
-        }
+        "doesn't broadcast" in test((_, attempts) => attempts shouldBe 0)
+        "replies to a client" in test((client, _) => client.expectMessageType[Confirmed])
       }
     }
 
@@ -144,7 +138,7 @@ class ExchangeTransactionBroadcastActorSpecification
           else canRetry(ThreadLocalRandom.current().nextInt(canRetry.size))
         }
 
-        val client = testKit.createTestProbe[OEC.Message]()
+        val client = testKit.createTestProbe[Confirmed]()
 
         actor ! sampleEvent(client.ref)
         (1 to maxAttempts).foreach(_ => manualTime.timePasses(21.millis)) // Once it was sent immediately
@@ -169,7 +163,7 @@ class ExchangeTransactionBroadcastActorSpecification
           canRetry(ThreadLocalRandom.current().nextInt(canRetry.size))
         }
 
-        val client = testKit.createTestProbe[OEC.Message]()
+        val client = testKit.createTestProbe[Confirmed]()
 
         actor ! sampleEvent(client.ref)
         (1 to 12).foreach(_ => manualTime.timePasses(21.millis))
@@ -193,7 +187,7 @@ class ExchangeTransactionBroadcastActorSpecification
           )
         )
 
-        val client = testKit.createTestProbe[OEC.Message]()
+        val client = testKit.createTestProbe[Confirmed]()
 
         actor ! sampleEvent(
           client.ref,
@@ -227,7 +221,7 @@ class ExchangeTransactionBroadcastActorSpecification
     )
 
   private def sampleEvent(
-    clientRef: ActorRef[OEC.Message],
+    clientRef: ActorRef[Confirmed],
     createdTs: Long = System.currentTimeMillis(),
     time: Time = new TestTime()
   ): ExchangeTransactionBroadcastActor.Command.Broadcast = {

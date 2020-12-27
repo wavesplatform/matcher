@@ -7,12 +7,8 @@ import com.wavesplatform.it.MatcherSuiteBase
 
 class BroadcastUntilConfirmedTestSuite extends MatcherSuiteBase {
 
-  override protected def dexInitialSuiteConfig: Config =
-    ConfigFactory
-      .parseString(s"""waves.dex.exchange-transaction-broadcast {
-                      |  broadcast-until-confirmed = yes
-                      |  interval = 10s
-                      |}""".stripMargin)
+  override protected def dexInitialSuiteConfig: Config = ConfigFactory
+    .parseString(s"waves.dex.exchange-transaction-broadcast.interval = 10s")
 
   // Validator node
   protected lazy val wavesNode2: WavesNodeContainer =

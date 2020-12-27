@@ -1,7 +1,6 @@
 package com.wavesplatform.dex.grpc.integration.clients.matcherext
 
 import java.time.Duration
-
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -10,7 +9,7 @@ import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.caches.{AssetDescriptionsCache, FeaturesCache}
 import com.wavesplatform.dex.grpc.integration.clients.domain.{BlockRef, BlockchainBalance, DiffIndex}
-import com.wavesplatform.dex.grpc.integration.clients.{BroadcastResult, RunScriptResult}
+import com.wavesplatform.dex.grpc.integration.clients.{BroadcastResult, CheckedBroadcastResult, RunScriptResult}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 
 import scala.concurrent.duration.FiniteDuration
@@ -30,7 +29,10 @@ class MatcherExtensionCachingClient(underlying: MatcherExtensionClient, defaultC
   override val utxEvents = underlying.utxEvents
 
   override def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] = underlying.spendableBalances(address, assets)
-  override def allAssetsSpendableBalance(address: Address, excludeAssets: Set[Asset]): Future[Map[Asset, Long]] = underlying.allAssetsSpendableBalance(address, excludeAssets)
+
+  override def allAssetsSpendableBalance(address: Address, excludeAssets: Set[Asset]): Future[Map[Asset, Long]] =
+    underlying.allAssetsSpendableBalance(address, excludeAssets)
+
   override def getBalances(index: DiffIndex): Future[BlockchainBalance] = underlying.getBalances(index)
 
   override def isFeatureActivated(id: Short): Future[Boolean] = featuresCache.get(id) map Boolean2boolean
@@ -45,8 +47,9 @@ class MatcherExtensionCachingClient(underlying: MatcherExtensionClient, defaultC
 
   override def areKnown(txIds: Seq[ByteStr]): Future[Map[ByteStr, Boolean]] = underlying.areKnown(txIds)
   override def broadcastTx(tx: ExchangeTransaction): Future[BroadcastResult] = underlying.broadcastTx(tx)
+  override def checkedBroadcastTx(tx: ExchangeTransaction): Future[CheckedBroadcastResult] = underlying.checkedBroadcastTx(tx)
 
-  override def forgedOrder(orderId: ByteStr): Future[Boolean] = underlying.forgedOrder(orderId)
+  override def isOrderConfirmed(orderId: ByteStr): Future[Boolean] = underlying.isOrderConfirmed(orderId)
 
   override def currentBlockInfo: Future[BlockRef] = underlying.currentBlockInfo
 

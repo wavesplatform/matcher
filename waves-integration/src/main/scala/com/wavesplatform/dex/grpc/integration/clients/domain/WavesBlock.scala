@@ -8,7 +8,7 @@ case class WavesBlock(
   reference: ByteStr,
   changes: BlockchainBalance,
   tpe: WavesBlock.Type,
-  forgedTxs: Map[ByteString, TransactionWithChanges]
+  confirmedTxs: Map[ByteString, TransactionWithChanges]
 ) {
 
   def diffIndex: DiffIndex = DiffIndex(
@@ -16,7 +16,7 @@ case class WavesBlock(
     outLeases = changes.outLeases.keySet
   )
 
-  override def toString: String = s"WavesBlock(id=${ref.id.base58.take(5)}, h=${ref.height}, tpe=$tpe, ftx=${forgedTxs.size})"
+  override def toString: String = s"WavesBlock(id=${ref.id.base58.take(5)}, h=${ref.height}, tpe=$tpe, c=${confirmedTxs.size})"
 
 }
 

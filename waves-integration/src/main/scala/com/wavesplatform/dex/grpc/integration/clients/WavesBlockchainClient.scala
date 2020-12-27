@@ -31,12 +31,16 @@ trait WavesBlockchainClient {
   def runScript(address: Address, input: Order): Future[RunScriptResult]
 
   /**
-   * Forged or unconfirmed
+   * Confirmed or not
    */
   def areKnown(txIds: Seq[ByteStr]): Future[Map[ByteStr, Boolean]]
+
+  // TODO Deprecated, remove in >= 2.3.1
   def broadcastTx(tx: ExchangeTransaction): Future[BroadcastResult]
 
-  def isOrderForged(orderId: ByteStr): Future[Boolean]
+  def checkedBroadcastTx(tx: ExchangeTransaction): Future[CheckedBroadcastResult]
+
+  def isOrderConfirmed(orderId: ByteStr): Future[Boolean]
 
   def close(): Future[Unit]
 }

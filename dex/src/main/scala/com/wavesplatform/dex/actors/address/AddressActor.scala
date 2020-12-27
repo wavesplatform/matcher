@@ -105,7 +105,7 @@ class AddressActor(
       // TODO DEX-1040 This code is not optimal, but it should work.
       // e.g. We need folding
       events.foreach(eventsProcessing(_))
-      if (started) working(Message.BalanceChanged(balanceUpdate.keySet, balanceUpdate))
+      if (started && balanceUpdate.nonEmpty) working(Message.BalanceChanged(balanceUpdate.keySet, balanceUpdate))
       log.info("ApplyBatch applied")
 
     case command @ OrderCancelFailed(id, reason) =>

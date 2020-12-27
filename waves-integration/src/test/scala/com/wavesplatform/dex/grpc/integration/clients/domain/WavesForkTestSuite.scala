@@ -26,7 +26,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
       outLeases = Map(bob -> 23L)
     ),
     tpe = WavesBlock.Type.FullBlock,
-    forgedTxs = mkTransactionWithChangesMap(1)
+    confirmedTxs = mkTransactionWithChangesMap(1)
   )
 
   private val block2 = WavesBlock(
@@ -37,7 +37,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
       outLeases = Map.empty
     ),
     tpe = WavesBlock.Type.FullBlock,
-    forgedTxs = mkTransactionWithChangesMap(2)
+    confirmedTxs = mkTransactionWithChangesMap(2)
   )
 
   private val block3 = WavesBlock(
@@ -48,7 +48,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
       outLeases = Map(alice -> 1L)
     ),
     tpe = WavesBlock.Type.FullBlock,
-    forgedTxs = mkTransactionWithChangesMap(3)
+    confirmedTxs = mkTransactionWithChangesMap(3)
   )
 
   "WavesFork" - {
@@ -67,7 +67,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
             outLeases = Map.empty
           ),
           tpe = WavesBlock.Type.FullBlock,
-          forgedTxs = mkTransactionWithChangesMap(10)
+          confirmedTxs = mkTransactionWithChangesMap(10)
         )
 
         val expectedUpdatedFork = WavesFork(
@@ -110,7 +110,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
               outLeases = Map(alice -> 1L)
             ),
             tpe = WavesBlock.Type.MicroBlock,
-            forgedTxs = mkTransactionWithChangesMap(10)
+            confirmedTxs = mkTransactionWithChangesMap(10)
           )
 
           val expectedUpdatedFork = WavesFork(
@@ -130,7 +130,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
               outLeases = Map(bob -> 2L)
             ),
             tpe = WavesBlock.Type.MicroBlock,
-            forgedTxs = mkTransactionWithChangesMap(10)
+            confirmedTxs = mkTransactionWithChangesMap(10)
           )
 
           val fork = WavesFork(
@@ -162,7 +162,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
               outLeases = Map(bob -> 10L)
             ),
             tpe = WavesBlock.Type.MicroBlock,
-            forgedTxs = mkTransactionWithChangesMap(10)
+            confirmedTxs = mkTransactionWithChangesMap(10)
           )
 
           fork.withBlock(microBlock) should matchTo(Status.Resolved(
@@ -173,7 +173,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
             ),
             lostDiffIndex = Monoid.empty[DiffIndex],
             lostTxIds = Map.empty,
-            forgedTxs = microBlock.forgedTxs
+            confirmedTxs = microBlock.confirmedTxs
           ): Status)
         }
 
@@ -186,7 +186,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
               outLeases = Map(bob -> 2L)
             ),
             tpe = WavesBlock.Type.MicroBlock,
-            forgedTxs = mkTransactionWithChangesMap(10)
+            confirmedTxs = mkTransactionWithChangesMap(10)
           )
 
           val microBlock2 = WavesBlock(
@@ -197,7 +197,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
               outLeases = Map(alice -> 9L)
             ),
             tpe = WavesBlock.Type.MicroBlock,
-            forgedTxs = mkTransactionWithChangesMap(11)
+            confirmedTxs = mkTransactionWithChangesMap(11)
           )
 
           val fork = WavesFork(
@@ -210,7 +210,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
             newChanges = microBlock2.changes,
             lostDiffIndex = Monoid.empty[DiffIndex],
             lostTxIds = Map.empty,
-            forgedTxs = microBlock2.forgedTxs
+            confirmedTxs = microBlock2.confirmedTxs
           ): Status)
         }
       }

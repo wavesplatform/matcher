@@ -45,7 +45,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
             reference = ByteStr.empty,
             changes = updatedBalances1,
             tpe = WavesBlock.Type.FullBlock,
-            forgedTxs = mkTransactionWithChangesMap(1)
+            confirmedTxs = mkTransactionWithChangesMap(1)
           )
 
           val init = Normal(WavesChain(Vector.empty, 100))
@@ -54,7 +54,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
             newStatus = Normal(WavesChain(Vector(newBlock), 99)),
             updatedBalances = updatedBalances1,
             updatedLastBlockHeight = StatusUpdate.LastBlockHeight.Updated(1),
-            utxUpdate = UtxUpdate(forgedTxs = newBlock.forgedTxs),
+            utxUpdate = UtxUpdate(confirmedTxs = newBlock.confirmedTxs),
             requestNextBlockchainEvent = true
           ))
         }
@@ -66,7 +66,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
               reference = ByteStr.empty,
               changes = updatedBalances1,
               tpe = WavesBlock.Type.FullBlock,
-              forgedTxs = mkTransactionWithChangesMap(1)
+              confirmedTxs = mkTransactionWithChangesMap(1)
             )
             val init = Normal(WavesChain(Vector(block1), 99))
             val event = Appended(block1)
@@ -111,7 +111,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
           reference = ByteStr.empty,
           changes = updatedBalances1,
           tpe = WavesBlock.Type.FullBlock,
-          forgedTxs = mkTransactionWithChangesMap(1)
+          confirmedTxs = mkTransactionWithChangesMap(1)
         )
 
         val block2 = WavesBlock(
@@ -119,7 +119,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
           reference = block1.ref.id,
           changes = updatedBalances2,
           tpe = WavesBlock.Type.FullBlock,
-          forgedTxs = mkTransactionWithChangesMap(2)
+          confirmedTxs = mkTransactionWithChangesMap(2)
         )
 
         val init = Normal(WavesChain(Vector(block2, block1), 98))
@@ -156,7 +156,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
         reference = ByteStr.empty,
         changes = updatedBalances1,
         tpe = WavesBlock.Type.FullBlock,
-        forgedTxs = mkTransactionWithChangesMap(1)
+        confirmedTxs = mkTransactionWithChangesMap(1)
       )
 
       val block2A = WavesBlock(
@@ -167,7 +167,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
           outLeases = Map.empty
         ),
         tpe = WavesBlock.Type.FullBlock,
-        forgedTxs = mkTransactionWithChangesMap(2)
+        confirmedTxs = mkTransactionWithChangesMap(2)
       )
 
       val block2B = WavesBlock(
@@ -178,7 +178,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
           outLeases = Map.empty
         ),
         tpe = WavesBlock.Type.FullBlock,
-        forgedTxs = mkTransactionWithChangesMap(3)
+        confirmedTxs = mkTransactionWithChangesMap(3)
       )
 
       val init = TransientRollback(
@@ -199,7 +199,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
               outLeases = Map(bob -> 10)
             ),
             tpe = WavesBlock.Type.MicroBlock,
-            forgedTxs = mkTransactionWithChangesMap(10)
+            confirmedTxs = mkTransactionWithChangesMap(10)
           )
 
           val event = Appended(microBlock)
@@ -211,7 +211,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
             updatedBalances = block2B.changes |+| microBlock.changes,
             updatedLastBlockHeight = StatusUpdate.LastBlockHeight.Updated(2),
             utxUpdate = init.utxUpdate |+| UtxUpdate(
-              forgedTxs = block2B.forgedTxs ++ microBlock.forgedTxs,
+              confirmedTxs = block2B.confirmedTxs ++ microBlock.confirmedTxs,
               failedTxs = Map.empty // It doesn't affect now
             ),
             requestNextBlockchainEvent = true
@@ -228,7 +228,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
                 outLeases = Map(bob -> 10)
               ),
               tpe = WavesBlock.Type.FullBlock,
-              forgedTxs = mkTransactionWithChangesMap(10)
+              confirmedTxs = mkTransactionWithChangesMap(10)
             )
 
             val event = Appended(newBlock)
@@ -253,7 +253,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
                 outLeases = Map.empty
               ),
               tpe = WavesBlock.Type.FullBlock,
-              forgedTxs = mkTransactionWithChangesMap(10)
+              confirmedTxs = mkTransactionWithChangesMap(10)
             )
 
             val init = TransientRollback(
@@ -261,7 +261,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
                 origChain = WavesChain(Vector(block3, block2A, block1), 97),
                 forkChain = WavesChain(Vector(block1), 99)
               ),
-              utxUpdate = UtxUpdate(forgedTxs = mkTransactionWithChangesMap(1))
+              utxUpdate = UtxUpdate(confirmedTxs = mkTransactionWithChangesMap(1))
             )
 
             val event = Appended(block2B)
@@ -285,7 +285,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
               outLeases = Map(bob -> 10)
             ),
             tpe = WavesBlock.Type.MicroBlock,
-            forgedTxs = mkTransactionWithChangesMap(10)
+            confirmedTxs = mkTransactionWithChangesMap(10)
           )
 
           val event = Appended(microBlock)
@@ -298,7 +298,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
                 outLeases = Map(bob -> 10)
               ),
               utxUpdate = init.utxUpdate |+| UtxUpdate(
-                forgedTxs = block2B.forgedTxs ++ microBlock.forgedTxs,
+                confirmedTxs = block2B.confirmedTxs ++ microBlock.confirmedTxs,
                 failedTxs = Map.empty // Doesn't affect
               )
             ),
@@ -364,7 +364,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
         reference = ByteStr.empty,
         changes = updatedBalances1,
         tpe = WavesBlock.Type.FullBlock,
-        forgedTxs = mkTransactionWithChangesMap(1)
+        confirmedTxs = mkTransactionWithChangesMap(1)
       )
 
       val microBlock = WavesBlock(
@@ -375,7 +375,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
           outLeases = Map.empty
         ),
         tpe = WavesBlock.Type.MicroBlock,
-        forgedTxs = mkTransactionWithChangesMap(2)
+        confirmedTxs = mkTransactionWithChangesMap(2)
       )
 
       val init = TransientResolving(
@@ -402,7 +402,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
             outLeases = Map(carol -> 10)
           ),
           tpe = WavesBlock.Type.MicroBlock,
-          forgedTxs = mkTransactionWithChangesMap(10)
+          confirmedTxs = mkTransactionWithChangesMap(10)
         )
 
         stashedTest(Appended(microBlock2), requestNextBlockchainEvent = true)

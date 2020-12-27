@@ -34,7 +34,7 @@ object StatusTransitions extends ScorexLogging {
                   updatedLastBlockHeight =
                     if (block.tpe == WavesBlock.Type.FullBlock) LastBlockHeight.Updated(updatedFork.height)
                     else LastBlockHeight.NotChanged,
-                  utxUpdate = UtxUpdate(forgedTxs = block.forgedTxs),
+                  utxUpdate = UtxUpdate(confirmedTxs = block.confirmedTxs),
                   requestNextBlockchainEvent = true
                 )
             }
@@ -76,7 +76,7 @@ object StatusTransitions extends ScorexLogging {
             origStatus.fork.withBlock(block) match {
               case resolved: Status.Resolved =>
                 val finalUtxUpdate = origStatus.utxUpdate |+| UtxUpdate(
-                  forgedTxs = resolved.forgedTxs,
+                  confirmedTxs = resolved.confirmedTxs,
                   failedTxs = Map.empty // resolved.lostTxIds
                 )
 

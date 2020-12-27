@@ -49,7 +49,7 @@ object WavesNodeEvent {
 
   object WavesNodeUtxEvent {
     case class Updated(newTxs: Seq[UtxTransaction], failedTxs: Seq[UtxTransaction]) extends WavesNodeUtxEvent
-    case class Forged(txIds: Set[ByteString]) extends WavesNodeUtxEvent
+    case class Confirmed(txIds: Set[ByteString]) extends WavesNodeUtxEvent
     case class Switched(newTxs: Seq[UtxTransaction]) extends WavesNodeUtxEvent
   }
 

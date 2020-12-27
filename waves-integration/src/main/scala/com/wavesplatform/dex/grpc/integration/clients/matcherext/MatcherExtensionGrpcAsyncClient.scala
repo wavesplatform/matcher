@@ -1,8 +1,5 @@
 package com.wavesplatform.dex.grpc.integration.clients.matcherext
 
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
-
 import com.google.protobuf.UnsafeByteOperations
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.api.grpc.TransactionsByIdRequest
@@ -12,8 +9,8 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.grpc.integration.clients.{BroadcastResult, RunScriptResult}
 import com.wavesplatform.dex.grpc.integration.clients.domain.{BlockRef, BlockchainBalance, DiffIndex}
+import com.wavesplatform.dex.grpc.integration.clients.{BroadcastResult, CheckedBroadcastResult, RunScriptResult}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.effect.Implicits.NettyFutureOps
 import com.wavesplatform.dex.grpc.integration.exceptions.{UnexpectedConnectionException, WavesNodeConnectionLostException}
@@ -26,6 +23,8 @@ import io.grpc.stub.{ClientCalls, StreamObserver}
 import io.netty.channel.EventLoopGroup
 import monix.execution.Scheduler
 
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
 /**
@@ -136,7 +135,21 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
     }
   }.recover { case e => BroadcastResult.Failed(s"Failed on client: ${Option(e.getMessage).getOrElse(e.getClass.getName)}") }
 
-  override def forgedOrder(orderId: ByteStr): Future[Boolean] = handlingErrors {
+  override def checkedBroadcastTx(tx: transaction.ExchangeTransaction): Future[CheckedBroadcastResult] = handlingErrors {
+    asyncUnaryCall(METHOD_CHECKED_BROADCAST, CheckedBroadcastRequest(transaction = Some(tx.toPB))).map { response =>
+      import CheckedBroadcastResponse.Result
+      response.result match {
+        case Result.Empty => CheckedBroadcastResult.Failed("Unexpected response on client: Result.Empty", canRetry = false)
+        case Result.Unconfirmed(isNew) => CheckedBroadcastResult.Unconfirmed(isNew)
+        case Result.Confirmed(_) => CheckedBroadcastResult.Confirmed
+        case Result.Failed(failure) => CheckedBroadcastResult.Failed(failure.message, failure.canRetry)
+      }
+    }
+  }.recover { case e =>
+    CheckedBroadcastResult.Failed(s"Failed on client: ${Option(e.getMessage).getOrElse(e.getClass.getName)}", canRetry = true)
+  }
+
+  override def isOrderConfirmed(orderId: ByteStr): Future[Boolean] = handlingErrors {
     asyncUnaryCall(METHOD_FORGED_ORDER, ForgedOrderRequest(orderId.toPB)).map(_.isForged)
   }
 

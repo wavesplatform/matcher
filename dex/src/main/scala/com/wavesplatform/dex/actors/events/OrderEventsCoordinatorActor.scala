@@ -1,10 +1,11 @@
 package com.wavesplatform.dex.actors.events
 
-import akka.actor.typed.Behavior
+import akka.actor.typed
 import akka.actor.typed.scaladsl.Behaviors
+import akka.actor.typed.{ActorRef, Behavior}
 import akka.{actor => classic}
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
-import com.wavesplatform.dex.actors.tx.BroadcastExchangeTransactionActor
+import com.wavesplatform.dex.actors.tx.ExchangeTransactionBroadcastActor.{Confirmed, Command => Broadcaster}
 import com.wavesplatform.dex.collections.FifoSet
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
@@ -15,9 +16,6 @@ import com.wavesplatform.dex.model.Events
 import com.wavesplatform.dex.model.Events.ExchangeTransactionCreated
 import com.wavesplatform.dex.model.ExchangeTransactionCreator.CreateTransaction
 import play.api.libs.json.Json
-
-import scala.concurrent.Future
-import scala.util.{Failure, Success, Try}
 
 // TODO DEX-1042
 object OrderEventsCoordinatorActor {
@@ -32,21 +30,17 @@ object OrderEventsCoordinatorActor {
     case class Process(event: Events.Event) extends Command
     case class ProcessError(event: Events.OrderCancelFailed) extends Command
     case class ApplyUpdates(updates: WavesNodeUpdates) extends Command
-  }
 
-  sealed trait Event extends Message
-
-  object Event {
-    case class TxChecked(tx: ExchangeTransaction, isKnown: Try[Boolean]) extends Event
+    // Can be sent only from ExchangeTransactionBroadcastActor
+    case class ApplyConfirmed(tx: ExchangeTransaction) extends Command
   }
 
   def apply(
     addressDirectoryRef: classic.ActorRef,
-    txWriterRef: classic.ActorRef,
-    broadcastRef: classic.ActorRef,
-    createTransaction: CreateTransaction,
-    isTransactionKnown: ExchangeTransaction.Id => Future[Boolean] // TODO Move to broadcastRef
-  ): Behavior[Message] = Behaviors.setup { _ =>
+    dbWriterRef: classic.ActorRef,
+    broadcasterRef: typed.ActorRef[Broadcaster],
+    createTransaction: CreateTransaction
+  ): Behavior[Message] = Behaviors.setup { context =>
     def sendResolved(resolved: Map[Address, PendingAddress]): Unit = resolved.foreach { case (address, x) =>
       addressDirectoryRef ! AddressDirectoryActor.Envelope(
         address,
@@ -54,11 +48,17 @@ object OrderEventsCoordinatorActor {
       )
     }
 
-    def sendBalances(balances: AddressAssets): Unit = balances.foreach { case (address, balances) =>
+    def sendBalances(balances: AddressAssets): Unit = balances.view.filter(_._2.nonEmpty).foreach { case (address, balances) =>
       addressDirectoryRef ! AddressDirectoryActor.Envelope(
         address,
         AddressActor.Message.BalanceChanged(balances.keySet, balances)
       )
+    }
+
+    def txsToString(label: String, xs: Map[ExchangeTransaction.Id, _]): String = s"$label=${xs.keys.mkString(", ")}"
+
+    val broadcastAdapter: ActorRef[Confirmed] = context.messageAdapter[Confirmed] {
+      case Confirmed(tx) => Command.ApplyConfirmed(tx)
     }
 
     def holdUntilAppearOnNode(state: OrderEventsActorState): Behavior[Message] =
@@ -75,8 +75,8 @@ object OrderEventsCoordinatorActor {
                   case Right(tx) =>
                     context.log.info(s"Created transaction: $tx")
                     val txCreated = ExchangeTransactionCreated(tx)
-                    txWriterRef ! txCreated
-                    context.pipeToSelf(isTransactionKnown(tx.id()))(Event.TxChecked(tx, _))
+                    dbWriterRef ! txCreated
+                    broadcasterRef ! Broadcaster.Broadcast(broadcastAdapter, tx)
 
                     val (updatedState, resolved) = state.withExecuted(tx.id(), event)
                     sendResolved(resolved) // TODO DEX-1042 pipeToSelf is needed if resolved?
@@ -107,11 +107,14 @@ object OrderEventsCoordinatorActor {
 
           case Command.ApplyUpdates(updates) =>
             context.log.info(
-              s"Got ApplyUpdates(failedTxs=${updates.failedTxs.keys.mkString(", ")}, appearedTxs=${updates.appearedTxs.keys.mkString(", ")})"
+              s"Got ApplyUpdates(${txsToString("u", updates.unconfirmedTxs)}, " +
+              s"${txsToString("c", updates.confirmedTxs)}, ${txsToString("f", updates.failedTxs)})"
             )
 
+            if (updates.confirmedTxs.nonEmpty) broadcasterRef ! Broadcaster.ProcessConfirmed(updates.confirmedTxs.keySet)
+
             // All transactions are exchange and from this matcher's account
-            val (updatedState1, balancesAfterTxs) = (updates.appearedTxs ++ updates.failedTxs)
+            val (updatedState1, balancesAfterTxs) = (updates.unconfirmedTxs ++ updates.confirmedTxs ++ updates.failedTxs)
               .filterNot { case (txId, _) => state.knownOnNodeCache.contains(txId) }
               .foldLeft((state, updates.updatedBalances)) {
                 case ((state, restBalances), (txId, tx)) if tx.tx.isExchangeTransaction =>
@@ -130,26 +133,15 @@ object OrderEventsCoordinatorActor {
 
             holdUntilAppearOnNode(updatedState2)
 
-          case Event.TxChecked(tx, isKnown) =>
-            val txId = tx.id()
-            val inCache = state.knownOnNodeCache.contains(txId)
-
-            isKnown match {
-              case Success(x) => context.log.info(s"Got TxChecked(${tx.id()}, isKnown=$x), inCache: $inCache")
-              case Failure(e) => context.log.warn(s"Failed to check ${tx.id()} status", e)
-            }
-
-            if (inCache) Behaviors.same
-            else isKnown match {
-              case Success(false) =>
-                broadcastRef ! BroadcastExchangeTransactionActor.Broadcast(context.self, tx)
-                Behaviors.same
-              case _ =>
-                val (updated, restBalances, resolved) = state.withKnownOnNodeTx(tx.traders, txId, Map.empty)
-                sendResolved(resolved)
-                sendBalances(restBalances) // Actually, they should be empty, but anyway
-                holdUntilAppearOnNode(updated)
-            }
+          case Command.ApplyConfirmed(tx) =>
+            // Why we react only if:
+            // * If it was before in UTX, then we received this before during UtxSwitched
+            // * If it was added to UTX, then we will receive it
+            // * If it won't retry, then we haven't received (neither as unconfirmed, nor confirmed) it and won't receive
+            val (updated, restBalances, resolved) = state.withKnownOnNodeTx(tx.traders, tx.id(), Map.empty)
+            sendResolved(resolved)
+            sendBalances(restBalances) // Actually, they should be empty, but anyway
+            holdUntilAppearOnNode(updated)
 
           case Command.Start =>
             context.log.error("Unexpected Command.Start")
@@ -157,33 +149,33 @@ object OrderEventsCoordinatorActor {
         }
       }
 
-    val pass = Behaviors.receiveMessage[Message] {
-      case Command.Process(event) =>
-        addressDirectoryRef ! event
-        event match {
-          case event: Events.OrderExecuted =>
-            createTransaction(event).foreach { tx =>
-              val txCreated = ExchangeTransactionCreated(tx)
-              txWriterRef ! txCreated
-              broadcastRef ! txCreated
-            }
+    val pass = Behaviors.receive[Message] { (context, message) =>
+      message match {
+        case Command.Process(event) =>
+          addressDirectoryRef ! event
+          event match {
+            case event: Events.OrderExecuted =>
+              createTransaction(event).foreach { tx =>
+                val txCreated = ExchangeTransactionCreated(tx)
+                dbWriterRef ! txCreated
+                broadcasterRef ! Broadcaster.Broadcast(broadcastAdapter, tx)
+              }
 
-          case _ =>
-        }
-        Behaviors.same
+            case _ =>
+          }
+          Behaviors.same
 
-      case Command.ProcessError(event) =>
-        addressDirectoryRef ! event
-        Behaviors.same
+        case Command.ProcessError(event) =>
+          addressDirectoryRef ! event
+          Behaviors.same
 
-      case Command.ApplyUpdates(updates) =>
-        updates.updatedBalances.foreach { case (address, updates) =>
-          addressDirectoryRef ! AddressDirectoryActor.Envelope(address, AddressActor.Message.BalanceChanged(updates.keySet, updates))
-        }
-        Behaviors.same
+        case Command.ApplyUpdates(updates) =>
+          sendBalances(updates.updatedBalances)
+          Behaviors.same
 
-      case Command.Start => holdUntilAppearOnNode(OrderEventsActorState(Map.empty, FifoSet.limited(10000))) // TODO DEX-1042 settings
-      case _: Event.TxChecked => Behaviors.same
+        case Command.Start => holdUntilAppearOnNode(OrderEventsActorState(Map.empty, FifoSet.limited(10000))) // TODO DEX-1042 settings
+        case _: Command.ApplyConfirmed => Behaviors.same
+      }
     }
 
     pass

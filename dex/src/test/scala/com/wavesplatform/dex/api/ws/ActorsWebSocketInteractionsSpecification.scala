@@ -228,7 +228,7 @@ class ActorsWebSocketInteractionsSpecification
             )
           }
 
-          withClue("Sender received some ETH and this transfer transaction was forged\n") {
+          withClue("Sender received some ETH and this transfer transaction was confirmed\n") {
             updateBalances(Map(Waves -> 100.waves, usd -> 300.usd, eth -> 4.eth))
             expectWsBalancesAndOrders(
               Map(eth -> WsBalances(4, 0)),
@@ -320,7 +320,7 @@ class ActorsWebSocketInteractionsSpecification
             )
           }
 
-          withClue("1 counter (+10 Waves, -30 USD, -0.2 ETH), reserves: 150 -> 120 USD, 1 -> 0.8 ETH, transaction is immediately forged\n") {
+          withClue("1 counter (+10 Waves, -30 USD, -0.2 ETH), reserves: 150 -> 120 USD, 1 -> 0.8 ETH, transaction is immediately confirmed\n") {
             mo = matchOrders(mo, 10.waves)
             expectWsBalancesAndOrders(
               // tradable = total - reserved, so 180 = 300 - 120 USD, 2.2 = 3 - 0.8 ETH
@@ -389,7 +389,7 @@ class ActorsWebSocketInteractionsSpecification
             )
           }
 
-          withClue(s"Exchange transactions are forged and balance changes are sent in one batch") {
+          withClue(s"Exchange transactions are confirmed and balance changes are sent in one batch") {
             // TODO If balance changes aren't sent in one batch it could lead to tradable balance toggling! Use blockchain updates stream to solve this (Node v.1.2)
             updateBalances(Map(Waves -> 130.waves, usd -> 210.usd, eth -> 2.eth))
             expectWsBalancesAndOrders(

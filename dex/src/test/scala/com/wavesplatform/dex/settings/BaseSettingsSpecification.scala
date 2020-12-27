@@ -128,7 +128,7 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |      combined-client-settings {
          |        max-rollback-height = 90
          |        combined-stream.restart-delay = 199ms
-         |        pessimistic-portfolios.max-forged-transactions = 400
+         |        pessimistic-portfolios.max-confirmed-transactions = 400
          |      }
          |    }
          |    exchange-tx-base-fee = 300000
@@ -194,7 +194,6 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |    $orderRestrictionsStr
          |    $matchingRulesStr
          |    exchange-transaction-broadcast {
-         |      broadcast-until-confirmed = yes
          |      interval = 1 day
          |      max-pending-time = 30 days
          |    }

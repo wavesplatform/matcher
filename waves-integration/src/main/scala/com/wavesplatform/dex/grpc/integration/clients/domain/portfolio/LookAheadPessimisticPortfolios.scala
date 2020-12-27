@@ -10,16 +10,17 @@ import scala.util.chaining._
 /**
  * Caches unknown forged transactions and don't add them in pending
  */
-class LookAheadPessimisticPortfolios(orig: PessimisticPortfolios, maxForgedTransactions: Int) extends PessimisticPortfolios {
+class LookAheadPessimisticPortfolios(orig: PessimisticPortfolios, maxConfirmedTransactions: Int) extends PessimisticPortfolios {
 
-  private val forgedTxsEvictionQueue = new mutable.Queue[ByteString](maxForgedTransactions)
-  private val forgedTxs = new mutable.HashSet[ByteString]
+  // TODO FifoSet
+  private val confirmedTxsEvictionQueue = new mutable.Queue[ByteString](maxConfirmedTransactions)
+  private val confirmedTxs = new mutable.HashSet[ByteString]
 
   override def getAggregated(address: Address): Map[Asset, Long] = orig.getAggregated(address)
 
   override def replaceWith(setTxs: Seq[PessimisticTransaction]): Set[Address] = {
-    forgedTxs.clear()
-    forgedTxsEvictionQueue.clear()
+    confirmedTxs.clear()
+    confirmedTxsEvictionQueue.clear()
     orig.replaceWith(setTxs)
   }
 
@@ -29,9 +30,9 @@ class LookAheadPessimisticPortfolios(orig: PessimisticPortfolios, maxForgedTrans
   /**
    * @return (affected addresses, unknown transactions)
    */
-  override def processForged(txIds: Iterable[ByteString]): (Set[Address], List[ByteString]) =
+  override def processConfirmed(txIds: Iterable[ByteString]): (Set[Address], List[ByteString]) =
     // We don't filter, because a transaction can't be forged twice
-    orig.processForged(txIds).tap { case (_, unknownTxIds) =>
+    orig.processConfirmed(txIds).tap { case (_, unknownTxIds) =>
       unknownTxIds.foreach(put)
     }
 
@@ -39,17 +40,17 @@ class LookAheadPessimisticPortfolios(orig: PessimisticPortfolios, maxForgedTrans
     // txIds.foreach(remove) // a transaction can't be forged and failed both.
     orig.removeFailed(txIds)
 
-  private def put(txId: ByteString): Unit = forgedTxs.add(txId).tap { added =>
+  private def put(txId: ByteString): Unit = confirmedTxs.add(txId).tap { added =>
     if (added) {
-      if (forgedTxsEvictionQueue.size == maxForgedTransactions) forgedTxsEvictionQueue.removeLastOption().foreach(forgedTxs.remove)
-      forgedTxsEvictionQueue.enqueue(txId)
+      if (confirmedTxsEvictionQueue.size == maxConfirmedTransactions) confirmedTxsEvictionQueue.removeLastOption().foreach(confirmedTxs.remove)
+      confirmedTxsEvictionQueue.enqueue(txId)
     }
   }
 
   private def remove(tx: PessimisticTransaction): Boolean = remove(tx.txId)
 
-  private def remove(id: ByteString): Boolean = forgedTxs.remove(id).tap { had =>
-    if (had) forgedTxsEvictionQueue.removeFirst(_ == id)
+  private def remove(id: ByteString): Boolean = confirmedTxs.remove(id).tap { had =>
+    if (had) confirmedTxsEvictionQueue.removeFirst(_ == id)
   }
 
 }

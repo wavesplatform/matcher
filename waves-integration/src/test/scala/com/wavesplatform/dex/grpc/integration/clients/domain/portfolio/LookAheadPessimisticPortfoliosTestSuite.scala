@@ -11,7 +11,7 @@ class LookAheadPessimisticPortfoliosTestSuite extends PessimisticPortfoliosTestS
   "LookAheadPessimisticPortfolios" - {
     "default behavior" - defaultBehaviorTests()
 
-    "forged transactions" - {
+    "confirmed transactions" - {
       "replaceWith" - {
         val testGen = for {
           origTxs <- Gen.listOf(pessimisticTransactionGen)
@@ -19,23 +19,23 @@ class LookAheadPessimisticPortfoliosTestSuite extends PessimisticPortfoliosTestS
           unknownTxIds <- Gen.listOf(pbTxIdGen.suchThat { txId =>
             !newTxs.exists(_.txId == txId) && !origTxs.exists(_.txId == txId)
           })
-          maxForgedTransactions <- Gen.choose(0, unknownTxIds.size + 1)
-        } yield (mkPessimisticPortfolios(origTxs, maxForgedTransactions), newTxs, unknownTxIds)
+          maxConfirmedTransactions <- Gen.choose(0, unknownTxIds.size + 1)
+        } yield (mkPessimisticPortfolios(origTxs, maxConfirmedTransactions), newTxs, unknownTxIds)
 
         "caches cleared" in forAll(testGen) { case (pp, newTxs, unknownTxIds) =>
-          pp.processForged(unknownTxIds)._2 should matchTo(unknownTxIds) // Add to the cache, see below
+          pp.processConfirmed(unknownTxIds)._2 should matchTo(unknownTxIds) // Add to the cache, see below
           pp.replaceWith(newTxs)
-          pp.processForged(unknownTxIds)._2 should matchTo(unknownTxIds)
+          pp.processConfirmed(unknownTxIds)._2 should matchTo(unknownTxIds)
         }
       }
 
-      "unknown forged transactions" - {
+      "unknown confirmed transactions" - {
         val testGen = Gen.zip(pessimisticPortfoliosGen, pessimisticTransactionGen)
 
-        "are stored in a cache and observed in processForged" in forAll(testGen) { case (pp, unknownTx) =>
+        "are stored in a cache and observed in processConfirmed" in forAll(testGen) { case (pp, unknownTx) =>
           val expectedUnknownTxIds = List(unknownTx.txId)
 
-          val (_, actualUnknownTxIds) = pp.processForged(expectedUnknownTxIds)
+          val (_, actualUnknownTxIds) = pp.processConfirmed(expectedUnknownTxIds)
 
           actualUnknownTxIds should matchTo(expectedUnknownTxIds)
         }
@@ -43,7 +43,7 @@ class LookAheadPessimisticPortfoliosTestSuite extends PessimisticPortfoliosTestS
         "doesn't affect getAggregated" in forAll(testGen) { case (pp, unknownTx) =>
           val before = getState(pp)
 
-          pp.processForged(List(unknownTx.txId))
+          pp.processConfirmed(List(unknownTx.txId))
 
           getState(pp) should matchTo(before)
         }
@@ -51,17 +51,17 @@ class LookAheadPessimisticPortfoliosTestSuite extends PessimisticPortfoliosTestS
         "don't count in addPending" in forAll(testGen) { case (pp, unknownTx) =>
           val before = getState(pp)
 
-          pp.processForged(List(unknownTx.txId))
+          pp.processConfirmed(List(unknownTx.txId))
           pp.addPending(List(unknownTx))
 
           getState(pp) should matchTo(before)
         }
 
-        "are limited by maxForgedTransactions" in forAll(testGen, pessimisticTransactionGen) { case ((pp, unknownTx1), unknownTx2) =>
+        "are limited by maxConfirmedTransactions" in forAll(testGen, pessimisticTransactionGen) { case ((pp, unknownTx1), unknownTx2) =>
           val before = getState(pp)
 
-          // unknownTx1 is removed from the cache, because maxForgedTransactions = 1
-          pp.processForged(List(unknownTx1.txId, unknownTx2.txId))
+          // unknownTx1 is removed from the cache, because maxConfirmedTransactions = 1
+          pp.processConfirmed(List(unknownTx1.txId, unknownTx2.txId))
           pp.addPending(List(unknownTx1, unknownTx2))
 
           // so only unknownTx1 affects the state
@@ -73,12 +73,13 @@ class LookAheadPessimisticPortfoliosTestSuite extends PessimisticPortfoliosTestS
 
   override def mkPessimisticPortfolios(initialTxs: List[PessimisticTransaction]) = mkPessimisticPortfolios(initialTxs, 1)
 
-  private def mkPessimisticPortfolios(initialTxs: List[PessimisticTransaction], maxForgedTransactions: Int) = new LookAheadPessimisticPortfolios(
-    new DefaultPessimisticPortfolios(
-      initialTxs.foldMap(_.pessimisticPortfolio),
-      initialTxs.map(tx => tx.txId -> tx.pessimisticPortfolio).toMap
-    ),
-    maxForgedTransactions = maxForgedTransactions
-  )
+  private def mkPessimisticPortfolios(initialTxs: List[PessimisticTransaction], maxConfirmedTransactions: Int) =
+    new LookAheadPessimisticPortfolios(
+      new DefaultPessimisticPortfolios(
+        initialTxs.foldMap(_.pessimisticPortfolio),
+        initialTxs.map(tx => tx.txId -> tx.pessimisticPortfolio).toMap
+      ),
+      maxConfirmedTransactions = maxConfirmedTransactions
+    )
 
 }

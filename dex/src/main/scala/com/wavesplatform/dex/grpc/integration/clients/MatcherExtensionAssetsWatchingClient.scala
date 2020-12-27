@@ -35,7 +35,7 @@ class MatcherExtensionAssetsWatchingClient(
       _ <- saveAssetsDescription(xs.keySet)
     } yield xs
 
-  override def updates: Observable[WavesNodeUpdates] = underlying
+  override lazy val updates: Observable[WavesNodeUpdates] = underlying
     .updates
     .mapEval { xs =>
       val assets = xs.updatedBalances.valuesIterator.flatMap(_.keysIterator).toSet
@@ -58,7 +58,9 @@ class MatcherExtensionAssetsWatchingClient(
 
   override def broadcastTx(tx: ExchangeTransaction): Future[BroadcastResult] = underlying.broadcastTx(tx)
 
-  override def isOrderForged(orderId: ByteStr): Future[Boolean] = underlying.isOrderForged(orderId)
+  override def checkedBroadcastTx(tx: ExchangeTransaction): Future[CheckedBroadcastResult] = underlying.checkedBroadcastTx(tx)
+
+  override def isOrderConfirmed(orderId: ByteStr): Future[Boolean] = underlying.isOrderConfirmed(orderId)
 
   override def close(): Future[Unit] = underlying.close()
 

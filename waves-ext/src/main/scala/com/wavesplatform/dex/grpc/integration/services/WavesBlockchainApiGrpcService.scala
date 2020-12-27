@@ -1,7 +1,5 @@
 package com.wavesplatform.dex.grpc.integration.services
 
-import java.util.concurrent.ConcurrentHashMap
-
 import cats.implicits.catsSyntaxOptionId
 import cats.syntax.either._
 import com.google.protobuf.empty.Empty
@@ -21,7 +19,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.{ExecutionError, ValidationError}
 import com.wavesplatform.protobuf.Amount
-import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.{Asset, TxValidationError}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.ScriptRunner
@@ -34,6 +32,7 @@ import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 import shapeless.Coproduct
 
+import java.util.concurrent.ConcurrentHashMap
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.Future
 import scala.util.Try
@@ -46,6 +45,8 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
   private val descKey = Metadata.Key.of("desc", Metadata.ASCII_STRING_MARSHALLER)
 
   private val utxState = new TrieMap[ByteStr, UtxTransaction]()
+
+  private val empty = Empty()
 
   private val utxChangesSubscribers = ConcurrentHashMap.newKeySet[StreamObserver[UtxEvent]](2)
 
@@ -145,6 +146,45 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
           .leftFlatMap(e => BroadcastResponse(BroadcastResponse.Result.Failed(e.toString)).asRight)
       }
       .explicitGetErr()
+  }
+
+  override def checkedBroadcast(request: CheckedBroadcastRequest): Future[CheckedBroadcastResponse] =
+    Future {
+      for {
+        grpcTx <- request.transaction
+          .fold(GenericError("The signed transaction must be specified").asLeft[SignedExchangeTransaction])(_.asRight[GenericError])
+        tx <- grpcTx.toVanilla
+        isConfirmed <- context.transactionsApi.transactionById(tx.id()).fold(false)(_ => true).asRight
+        isInUtx <- context.transactionsApi.unconfirmedTransactionById(tx.id()).fold(false)(_ => true).asRight
+      } yield (tx, isConfirmed, isInUtx)
+    }
+      .flatMap {
+        case Right((tx, isConfirmed, isInUtx)) =>
+          if (isConfirmed) Future.successful(CheckedBroadcastResponse.Result.Confirmed(empty))
+          else if (isInUtx) Future.successful(CheckedBroadcastResponse.Result.Unconfirmed(false)) // false == not new
+          else context.transactionsApi.broadcastTransaction(tx).map {
+            _.resultE match {
+              case Right(isNew) => CheckedBroadcastResponse.Result.Unconfirmed(isNew)
+              case Left(e) => CheckedBroadcastResponse.Result.Failed(CheckedBroadcastResponse.Failure(e.toString, canRetry(e)))
+            }
+          }
+        case Left(e) => Future.successful(CheckedBroadcastResponse.Result.Failed(CheckedBroadcastResponse.Failure(e.toString, canRetry(e))))
+      }
+      .map(CheckedBroadcastResponse(_))
+      .recover {
+        case e: Throwable =>
+          log.error(s"Can't broadcast a transaction", e)
+          val message = Option(e.getMessage).getOrElse(e.getClass.getName)
+          CheckedBroadcastResponse(CheckedBroadcastResponse.Result.Failed(CheckedBroadcastResponse.Failure(message, canRetry = false)))
+      }
+
+  private def canRetry(x: ValidationError): Boolean = x match {
+    case x: GenericError
+        if x.err == "Transaction pool bytes size limit is reached"
+          || x.err == "Transaction pool size limit is reached" => true
+    // Could happen if one transaction is sent multiple times in parallel
+    case x: TxValidationError.OrderValidationError if x.err.startsWith("Too much") => true
+    case _ => false
   }
 
   override def isFeatureActivated(request: IsFeatureActivatedRequest): Future[IsFeatureActivatedResponse] = Future {

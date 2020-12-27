@@ -1,7 +1,6 @@
 package com.wavesplatform.dex.grpc.integration.clients.combined
 
 import java.util.concurrent.atomic.AtomicReference
-
 import cats.Monoid
 import cats.instances.long._
 import cats.instances.set._
@@ -22,7 +21,7 @@ import com.wavesplatform.dex.grpc.integration.clients.domain._
 import com.wavesplatform.dex.grpc.integration.clients.domain.portfolio.SynchronizedPessimisticPortfolios
 import com.wavesplatform.dex.grpc.integration.clients.matcherext.MatcherExtensionClient
 import com.wavesplatform.dex.grpc.integration.protobuf.DexToPbConversions._
-import com.wavesplatform.dex.grpc.integration.clients.{BroadcastResult, RunScriptResult, WavesBlockchainClient}
+import com.wavesplatform.dex.grpc.integration.clients.{BroadcastResult, CheckedBroadcastResult, RunScriptResult, WavesBlockchainClient}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import monix.eval.Task
 import monix.execution.Scheduler
@@ -57,7 +56,7 @@ class CombinedWavesBlockchainClient(
 
   private val dataUpdates = ConcurrentSubject.publish[WavesNodeEvent]
 
-  override val updates: Observable[WavesNodeUpdates] = Observable.fromFuture(meClient.currentBlockInfo)
+  override lazy val updates: Observable[WavesNodeUpdates] = Observable.fromFuture(meClient.currentBlockInfo)
     .flatMap { startBlockInfo =>
       log.info(s"Current block: $startBlockInfo")
       val startHeight = math.max(startBlockInfo.height - settings.maxRollbackHeight - 1, 1)
@@ -110,15 +109,15 @@ class CombinedWavesBlockchainClient(
             x.newStatus,
             WavesNodeUpdates(
               updatedFinalBalances,
-              appearedTxs = ({
-                x.utxUpdate.forgedTxs.view.collect { case (id, x) if isExchangeTransactionFromMatcher(x.tx) => id.toVanilla -> x }
-              } ++ {
+              unconfirmedTxs = {
                 for {
                   tx <- x.utxUpdate.unconfirmedTxs.view if isExchangeTransactionFromMatcher(tx)
                   signedTx <- tx.transaction
                   changes <- tx.diff.flatMap(_.stateUpdate)
                 } yield tx.id.toVanilla -> TransactionWithChanges(tx.id, signedTx, changes)
-              }).toMap,
+              }.toMap,
+              confirmedTxs = x.utxUpdate.confirmedTxs.view
+                .collect { case (id, x) if isExchangeTransactionFromMatcher(x.tx) => id.toVanilla -> x }.toMap,
               failedTxs = (for {
                 tx <- x.utxUpdate.failedTxs.values if isExchangeTransactionFromMatcher(tx)
                 signedTx <- tx.transaction
@@ -147,7 +146,7 @@ class CombinedWavesBlockchainClient(
     if (utxUpdate.resetCaches) pessimisticPortfolios.replaceWith(utxUpdate.unconfirmedTxs)
     else
       pessimisticPortfolios.addPending(utxUpdate.unconfirmedTxs) |+|
-      pessimisticPortfolios.processForged(utxUpdate.forgedTxs.keySet)._1 |+|
+      pessimisticPortfolios.processConfirmed(utxUpdate.confirmedTxs.keySet)._1 |+|
       pessimisticPortfolios.removeFailed(utxUpdate.failedTxs.keySet)
 
   // TODO DEX-1015
@@ -239,9 +238,10 @@ class CombinedWavesBlockchainClient(
     meClient.areKnown(txIds)
 
   override def broadcastTx(tx: ExchangeTransaction): Future[BroadcastResult] = meClient.broadcastTx(tx)
+  override def checkedBroadcastTx(tx: ExchangeTransaction): Future[CheckedBroadcastResult] = meClient.checkedBroadcastTx(tx)
 
-  override def isOrderForged(orderId: ByteStr): Future[Boolean] =
-    meClient.forgedOrder(orderId)
+  override def isOrderConfirmed(orderId: ByteStr): Future[Boolean] =
+    meClient.isOrderConfirmed(orderId)
 
   override def close(): Future[Unit] =
     meClient.close().zip(bClient.close()).map(_ => ())

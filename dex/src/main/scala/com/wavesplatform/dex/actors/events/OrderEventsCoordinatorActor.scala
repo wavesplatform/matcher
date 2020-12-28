@@ -61,7 +61,7 @@ object OrderEventsCoordinatorActor {
       case Confirmed(tx) => Command.ApplyConfirmed(tx)
     }
 
-    def holdUntilAppearOnNode(state: OrderEventsActorState): Behavior[Message] =
+    def holdUntilAppearOnNode(state: OrderEventsCoordinatorActorState): Behavior[Message] =
       Behaviors.receive[Message] { (context, message) =>
         message match {
           case Command.Process(event) =>
@@ -173,7 +173,7 @@ object OrderEventsCoordinatorActor {
           sendBalances(updates.updatedBalances)
           Behaviors.same
 
-        case Command.Start => holdUntilAppearOnNode(OrderEventsActorState(Map.empty, FifoSet.limited(10000))) // TODO DEX-1042 settings
+        case Command.Start => holdUntilAppearOnNode(OrderEventsCoordinatorActorState(Map.empty, FifoSet.limited(10000))) // TODO DEX-1042 settings
         case _: Command.ApplyConfirmed => Behaviors.same
       }
     }

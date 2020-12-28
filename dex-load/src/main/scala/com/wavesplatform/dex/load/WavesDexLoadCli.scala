@@ -4,7 +4,6 @@ import java.io.File
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.util.concurrent.Executors
-
 import akka.actor.ActorSystem
 import cats.instances.future._
 import cats.syntax.either._
@@ -18,6 +17,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.error.Implicits.ThrowableOps
 import com.wavesplatform.dex.it.time.GlobalTimer
 import com.wavesplatform.dex.it.time.GlobalTimer.TimerOpsImplicits
+import com.wavesplatform.dex.load.WavesDexLoadCli.WsCheckType.{CheckLeaps, CheckUpdates}
 import com.wavesplatform.dex.load.ws.WsCollectChangesClient
 import com.wavesplatform.dex.{cli, Version}
 import scopt.{OParser, RenderingMode}
@@ -97,7 +97,11 @@ object WavesDexLoadCli extends ScoptImplicits {
             opt[FiniteDuration]("ws-response-wait-time")
               .abbr("wrwt")
               .text("The time to wait data on second stage")
-              .action((x, s) => s.copy(wsResponseWaitTime = x))
+              .action((x, s) => s.copy(wsResponseWaitTime = x)),
+            opt[WsCheckType]("ws-check-type")
+              .abbr("wct")
+              .text("Type of checking data with ws")
+              .action((x, s) => s.copy(wsCheckType = x))
           ),
         cmd(Command.CreateRequests.name)
           .action((_, s) => s.copy(command = Command.CreateRequests.some))
@@ -157,16 +161,43 @@ object WavesDexLoadCli extends ScoptImplicits {
             AddressScheme.current = new AddressScheme {
               override val chainId: Byte = args.addressSchemeByte.toByte
             }
+
             command match {
               case Command.CreateRequests =>
+                cli.log[Id](
+                  s"""Arguments:
+                     |  Requests type                     : ${args.requestsType}
+                     |  Requests count                    : ${args.requestsCount}
+                     |  Pairs file                        : ${args.pairsFile.get}
+                     |  Seed prefix                       : ${args.seedPrefix}
+                     |  Output file                       : ${args.requestsFile.getAbsoluteFile}
+                     |  Count of accounts                 : ${args.accountsNumber}\n""".stripMargin
+                )
+
                 TankGenerator
                   .mkRequests(args.seedPrefix, args.pairsFile, args.requestsFile, args.requestsCount, args.requestsType, args.accountsNumber)
 
               case Command.DeleteRequests =>
+                cli.log[Id](
+                  s"""Arguments:
+                     |  Requests file                     : ${args.requestsFile.getAbsolutePath}
+                     |  Requests count                    : ${args.requestsCount}\n""".stripMargin
+                )
+
                 RequestDeleter.delRequests(args.requestsFile, args.requestsCount)
 
               case Command.CreateFeederFile =>
+                cli.log[Id](
+                  s"""Arguments:
+                     |  Count of accounts                 : ${args.accountsNumber}
+                     |  Seed prefix                       : ${args.seedPrefix}
+                     |  Pairs file                        : ${args.pairsFile.get}
+                     |  Count of order books per account  : ${args.orderBookNumberPerAccount}
+                     |  Auth key file                     : ${args.authServicesPrivateKeyFile}\n""".stripMargin
+                )
+
                 val authPrivateKey = new String(Files.readAllBytes(args.authServicesPrivateKeyFile.toPath), StandardCharsets.UTF_8)
+
                 GatlingFeeder.mkFile(
                   accountsNumber = args.accountsNumber,
                   seedPrefix = args.seedPrefix,
@@ -179,6 +210,114 @@ object WavesDexLoadCli extends ScoptImplicits {
               case Command.Check =>
                 implicit val system = ActorSystem()
 
+                def checkLeaps() = {
+                  val clients: Seq[WsCollectChangesClient] =
+                    WsAccumulateChanges.createClients(args.dexWsApi, args.feederFile, args.accountsNumber, args.wsCheckType)
+
+                  val withLeaps =
+                    try {
+                      Future.traverse(clients)(_.run())
+                      Thread.sleep(args.wsResponseWaitTime.toMillis)
+
+                      clients.filter(_.addressUpdateLeaps.size != 0)
+                    } finally {
+                      clients.foreach(_.close())
+                      system.terminate()
+                      GlobalTimer.instance.stop()
+                    }
+
+                  if (withLeaps.size > 0) {
+                    println("Balance leaps:")
+                    println(s"Count of addresses with leaps: ${withLeaps.size}")
+                    println(s"Leaps: ${withLeaps.size}")
+                    withLeaps.foreach { c =>
+                      println(c.getAddress)
+                      c.addressUpdateLeaps.foreach(println(_))
+                    }
+                    sys.exit(1)
+                  } else
+                    println("Congratulations! All checks passed!")
+                }
+
+                def checkUpdates() = {
+                  val clients: Seq[WsCollectChangesClient] = cli.wrapByLogs[Id, Seq[WsCollectChangesClient]]("Creating clients.. ") {
+                    WsAccumulateChanges.createClients(args.dexWsApi, args.feederFile, args.accountsNumber, args.wsCheckType)
+                  }
+
+                  val r =
+                    try {
+                      val checks = for {
+                        _ <- cli.wrapByLogs("Stage 1. Running clients... ")(Future.traverse(clients)(_.run()))
+                        _ <- cli.wrapByLogs(s"Stage 1. Waiting ${args.collectTime}... ")(GlobalTimer.instance.sleep(args.collectTime))
+                        watchedAddresses <- cli.wrapByLogs("Stage 1. Getting collected addresses... ") {
+                          Future.successful(getOrThrow(checkUniq(clients.map(_.collectedAddressState).groupBy(_.address))))
+                        }
+                        watchedOrderBooks <- cli.wrapByLogs("Stage 1. Getting collected order books... ") {
+                          Future.successful(getOrThrow(checkUniq(switch(clients.map(_.collectedOrderBooks)))))
+                        }
+                        _ <- cli.wrapByLogs("Stage 1. Checking amount of pings... ") {
+                          Future.successful(println(clients.map(_.pingsNumber).mkString(", ")))
+                        }
+                        _ <- cli.wrapByLogs("Stage 1. Stopping clients... ")(Future.traverse(clients)(_.close()))
+
+                        _ <- cli.wrapByLogs("Stage 2. Running new clients... ")(Future.traverse(clients)(_.run()))
+                        _ <- cli.wrapByLogs(s"Stage 2. Waiting ${args.wsResponseWaitTime}... ") {
+                          GlobalTimer.instance.sleep(args.wsResponseWaitTime)
+                        }
+                        finalAddresses <- cli.wrapByLogs("Stage 2. Getting final addresses... ") {
+                          Future.successful {
+                            getOrThrow(checkUniq(clients.map(_.collectedAddressState).groupBy(_.address)))
+                          }
+                        }
+                        finalOrderBooks <- cli.wrapByLogs("Stage 2. Getting final order books... ") {
+                          Future.successful {
+                            getOrThrow(checkUniq(switch(clients.map(_.collectedOrderBooks))))
+                          }
+                        }
+
+                        _ <- cli.wrapByLogs("Stage 2. Stopping clients... ")(Future.traverse(clients)(_.close()))
+
+                        _ <- cli.wrapByLogs("Stage 3. Comparing collected and final addresses... ") {
+                          Future {
+                            val addressesCompareResult = compare(watchedAddresses, finalAddresses)
+                            if (!addressesCompareResult.isIdentical) {
+                              println(s"Found issues:\n${addressesCompareResult.show}")
+                              throw new IllegalStateException("Found issues")
+                            }
+                          }
+                        }
+
+                        _ <- cli.wrapByLogs("Stage 3. Comparing collected and final order books... ") {
+                          Future {
+                            val orderBooksCompareResult = compare(watchedOrderBooks, finalOrderBooks)
+                            if (!orderBooksCompareResult.isIdentical) {
+                              println(s"Found issues:\n${orderBooksCompareResult.show}")
+                              throw new IllegalStateException("Found issues")
+                            }
+                          }
+                        }
+                      } yield ()
+
+                      val r = checks
+                        .map(_ => "Congratulations! All checks passed!".asRight[String])
+                        .recover { case x => x.getWithStackTrace.asLeft[String] }
+
+                      Await.result(r, Duration.Inf)
+                    } finally {
+                      clients.foreach(_.close())
+                      system.terminate()
+                      GlobalTimer.instance.stop()
+                    }
+
+                  r match {
+                    case Right(diagnosticNotes) => println(diagnosticNotes)
+                    case Left(error) =>
+                      println(error)
+                      sys.exit(1)
+                  }
+
+                }
+
                 cli.log[Id](
                   s"""Arguments:
                      |  DEX REST API            : ${args.dexRestApi}
@@ -186,83 +325,13 @@ object WavesDexLoadCli extends ScoptImplicits {
                      |  Feeder file             : ${args.feederFile.getAbsolutePath}
                      |  Accounts number         : ${args.accountsNumber}
                      |  Collect time            : ${args.collectTime}
-                     |  WebSocket response time : ${args.wsResponseWaitTime}\n""".stripMargin
+                     |  WebSocket response time : ${args.wsResponseWaitTime}
+                     |  WebSocket check type    : ${args.wsCheckType}\n""".stripMargin
                 )
 
-                val clients: Seq[WsCollectChangesClient] = cli.wrapByLogs[Id, Seq[WsCollectChangesClient]]("Creating clients.. ") {
-                  WsAccumulateChanges.createClients(args.dexWsApi, args.feederFile, args.accountsNumber)
-                }
-
-                val r =
-                  try {
-                    val checks = for {
-                      _ <- cli.wrapByLogs("Stage 1. Running clients... ")(Future.traverse(clients)(_.run()))
-                      _ <- cli.wrapByLogs(s"Stage 1. Waiting ${args.collectTime}... ")(GlobalTimer.instance.sleep(args.collectTime))
-                      watchedAddresses <- cli.wrapByLogs("Stage 1. Getting collected addresses... ") {
-                        Future.successful(getOrThrow(checkUniq(clients.map(_.collectedAddressState).groupBy(_.address))))
-                      }
-                      watchedOrderBooks <- cli.wrapByLogs("Stage 1. Getting collected order books... ") {
-                        Future.successful(getOrThrow(checkUniq(switch(clients.map(_.collectedOrderBooks)))))
-                      }
-                      _ <- cli.wrapByLogs("Stage 1. Checking amount of pings... ") {
-                        Future.successful(println(clients.map(_.pingsNumber).mkString(", ")))
-                      }
-                      _ <- cli.wrapByLogs("Stage 1. Stopping clients... ")(Future.traverse(clients)(_.close()))
-
-                      _ <- cli.wrapByLogs("Stage 2. Running new clients... ")(Future.traverse(clients)(_.run()))
-                      _ <- cli.wrapByLogs(s"Stage 2. Waiting ${args.wsResponseWaitTime}... ") {
-                        GlobalTimer.instance.sleep(args.wsResponseWaitTime)
-                      }
-                      finalAddresses <- cli.wrapByLogs("Stage 2. Getting final addresses... ") {
-                        Future.successful {
-                          getOrThrow(checkUniq(clients.map(_.collectedAddressState).groupBy(_.address)))
-                        }
-                      }
-                      finalOrderBooks <- cli.wrapByLogs("Stage 2. Getting final order books... ") {
-                        Future.successful {
-                          getOrThrow(checkUniq(switch(clients.map(_.collectedOrderBooks))))
-                        }
-                      }
-
-                      _ <- cli.wrapByLogs("Stage 2. Stopping clients... ")(Future.traverse(clients)(_.close()))
-
-                      _ <- cli.wrapByLogs("Stage 3. Comparing collected and final addresses... ") {
-                        Future {
-                          val addressesCompareResult = compare(watchedAddresses, finalAddresses)
-                          if (!addressesCompareResult.isIdentical) {
-                            println(s"Found issues:\n${addressesCompareResult.show}")
-                            throw new IllegalStateException("Found issues")
-                          }
-                        }
-                      }
-
-                      _ <- cli.wrapByLogs("Stage 3. Comparing collected and final order books... ") {
-                        Future {
-                          val orderBooksCompareResult = compare(watchedOrderBooks, finalOrderBooks)
-                          if (!orderBooksCompareResult.isIdentical) {
-                            println(s"Found issues:\n${orderBooksCompareResult.show}")
-                            throw new IllegalStateException("Found issues")
-                          }
-                        }
-                      }
-                    } yield ()
-
-                    val r = checks
-                      .map(_ => "Congratulations! All checks passed!".asRight[String])
-                      .recover { case x => x.getWithStackTrace.asLeft[String] }
-
-                    Await.result(r, Duration.Inf)
-                  } finally {
-                    clients.foreach(_.close())
-                    system.terminate()
-                    GlobalTimer.instance.stop()
-                  }
-
-                r match {
-                  case Right(diagnosticNotes) => println(diagnosticNotes)
-                  case Left(error) =>
-                    println(error)
-                    sys.exit(1)
+                args.wsCheckType match {
+                  case CheckLeaps => checkLeaps()
+                  case CheckUpdates => checkUpdates()
                 }
             }
             println("Done")
@@ -295,11 +364,25 @@ object WavesDexLoadCli extends ScoptImplicits {
 
   }
 
+  sealed trait WsCheckType
+
+  object WsCheckType {
+    case object CheckLeaps extends WsCheckType
+    case object CheckUpdates extends WsCheckType
+
+    implicit val wsCheckTypeRead: scopt.Read[WsCheckType] = scopt.Read.reads {
+      case "leaps" => CheckLeaps
+      case "updates" => CheckUpdates
+      case x => throw new IllegalArgumentException(s"Expected 'leaps', 'updates', but got '$x'")
+    }
+
+  }
+
   private val defaultFeederFile = new File("feeder.csv")
   private val defaultAuthFile = new File("authkey.txt")
 
   private case class Args(
-    addressSchemeByte: Char = 'T',
+    addressSchemeByte: Char = 'D',
     command: Option[Command] = None,
     authServicesPrivateKeyFile: File = defaultAuthFile,
     feederFile: File = defaultFeederFile,
@@ -312,7 +395,8 @@ object WavesDexLoadCli extends ScoptImplicits {
     requestsFile: File = new File(s"requests-${System.currentTimeMillis}.txt"),
     dexRestApi: String = "",
     collectTime: FiniteDuration = 5.seconds,
-    wsResponseWaitTime: FiniteDuration = 5.seconds
+    wsResponseWaitTime: FiniteDuration = 5.seconds,
+    wsCheckType: WsCheckType = CheckUpdates
   ) {
     def dexWsApi: String = s"${prependScheme(dexRestApi)}/ws/v0"
   }

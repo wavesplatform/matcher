@@ -10,7 +10,7 @@ pipeline {
         string(name: 'SEED', defaultValue: 'test-seed', description: 'Seed prefix of generated accounts')
         string(name: 'AN', defaultValue: '6000', description: 'Count of generated accounts')
         string(name: 'RC', defaultValue: '216060', description: 'Count of requests')
-        string(name: 'RT', defaultValue: '6', description: 'Generation type')
+        string(name: 'RT', defaultValue: '7', description: 'Generation type')
         string(name: 'AS', defaultValue: 'D', description: 'Chain ID')
     }
     environment {
@@ -64,10 +64,9 @@ pipeline {
                         }
                     }
                  }
-                 stage("Web Socket") {
+                 stage("Web Socket Check Leaps") {
                     steps {
-                        sh 'mv ./dex-load/feeder.csv ./dex-ws-load/'
-                        sh 'cd ./dex-ws-load && sbt -Dff=feeder.csv -Dws=ws://${AIM}:6886/ws/v0 -Drt=30 -Duc=${AN} gatling:testOnly load.ConnectionsOnlyTest > /dev/null'
+                        sh 'sbt "dex-load/checkLeaps"'
                     }
                  }
             }

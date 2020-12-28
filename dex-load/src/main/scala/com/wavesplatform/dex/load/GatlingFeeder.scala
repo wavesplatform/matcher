@@ -1,22 +1,20 @@
 package com.wavesplatform.dex.load
 
-import java.io.{File, PrintWriter}
-import java.security
-import java.security.KeyFactory
-import java.security.spec.PKCS8EncodedKeySpec
-import java.util.Base64
-
 import com.wavesplatform.dex.api.ws.protocol.WsAddressSubscribe.JwtPayload
 import com.wavesplatform.dex.auth.JwtUtils
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
-import com.wavesplatform.dex.domain.bytes.codec.Base58
-import com.wavesplatform.dex.domain.utils.EitherExt2
 import play.api.libs.json.Json
 
+import java.io.{File, PrintWriter}
+import java.nio.charset.StandardCharsets
+import java.security
+import java.security.KeyFactory
+import java.security.spec.PKCS8EncodedKeySpec
+import java.util.Base64
 import scala.concurrent.duration._
 import scala.io.Source
-import scala.util.Random
+import scala.util.{Random, Using}
 
 object GatlingFeeder {
 
@@ -52,14 +50,12 @@ object GatlingFeeder {
       Json.toJsObject(mkJwtSignedPayload(accountKeyPair))
     )}"}"""
 
-  private def mkObsStrings(pairsFile: File, numberPerClient: Int): String = {
-    val source = Source.fromFile(pairsFile)
-    try {
+  private def mkObsStrings(pairsFile: File, numberPerClient: Int): String =
+    Using(Source.fromFile(pairsFile)) { source =>
       val pairs = Random.shuffle(source.getLines().toVector)
       require(numberPerClient <= pairs.size, "numberPerClient > available asset pairs in file")
       pairs.take(numberPerClient).map(x => s"""{"T":"obs","S":"$x","d":100}""").mkString(";")
-    } finally source.close()
-  }
+    }.get
 
   def mkFile(
     accountsNumber: Int,
@@ -77,7 +73,8 @@ object GatlingFeeder {
       }
       output.println()
       (0 until accountsNumber).foreach { i =>
-        val kp = KeyPair.fromSeed(Base58.encode(s"$seedPrefix$i".getBytes)).explicitGet()
+        val seedBytes = s"$seedPrefix$i".getBytes(StandardCharsets.UTF_8)
+        val kp = KeyPair(ByteStr(seedBytes))
         output.println(s"""${kp.toAddress};${mkAusString(kp, authKp)};${mkObsStrings(pairsFile, orderBookNumberPerAccount)}""")
       }
     } finally output.close()

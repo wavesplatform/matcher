@@ -23,9 +23,11 @@ case class Request(
     HttpHeaders.HOST -> settings.hosts.shooted
   )
 
-  def mkGet(path: String, tag: RequestTag, additionalHeaders: Map[String, String] = Map.empty) = {
+  def mkGet(path: String, tag: RequestTag, additionalHeaders: Map[String, String] = Map.empty): String = {
     val request =
-      s"${RequestType.GET} $path HTTP/1.1\r\n${(defaultHeaders ++ additionalHeaders).map { case (k, v) => s"$k: $v" }.mkString("\r\n")}\r\n\r\n"
+      s"${RequestType.GET} $path HTTP/1.1\r\n${(defaultHeaders ++ additionalHeaders).map { case (k, v) =>
+        s"$k: $v"
+      }.mkString("\r\n")}\r\n\r\n"
 
     s"${request.length} $tag\r\n$request\r\n"
   }

@@ -273,7 +273,7 @@ object LimitOrder {
 }
 
 case class BuyLimitOrder(amount: Long, fee: Long, order: Order, avgWeighedPriceNominator: BigInteger) extends BuyOrder with LimitOrder {
-  override def toString: String = s"BuyLimitOrder($amount,$fee,$id,$avgWeighedPriceNominator)"
+  override def toString: String = s"BuyLimitOrder($amount,$fee,$id,$avgWeighedPriceNominator,o=${order.sender.toAddress})"
 
   def partial(amount: Long, fee: Long, avgWeighedPriceNominator: BigInteger): BuyLimitOrder =
     copy(amount = amount, fee = fee, avgWeighedPriceNominator = avgWeighedPriceNominator)
@@ -281,7 +281,7 @@ case class BuyLimitOrder(amount: Long, fee: Long, order: Order, avgWeighedPriceN
 }
 
 case class SellLimitOrder(amount: Long, fee: Long, order: Order, avgWeighedPriceNominator: BigInteger) extends SellOrder with LimitOrder {
-  override def toString: String = s"SellLimitOrder($amount,$fee,$id,$avgWeighedPriceNominator)"
+  override def toString: String = s"SellLimitOrder($amount,$fee,$id,$avgWeighedPriceNominator,o=${order.sender.toAddress})"
 
   def partial(amount: Long, fee: Long, avgWeighedPriceNominator: BigInteger): SellLimitOrder =
     copy(amount = amount, fee = fee, avgWeighedPriceNominator = avgWeighedPriceNominator)

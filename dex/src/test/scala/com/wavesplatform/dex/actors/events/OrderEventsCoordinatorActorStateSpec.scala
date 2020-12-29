@@ -4,8 +4,8 @@ import com.softwaremill.diffx.DiffxSupport
 import com.softwaremill.diffx.scalatest.DiffMatcher
 import com.wavesplatform.dex.NoShrink
 import com.wavesplatform.dex.collections.FifoSet
-import com.wavesplatform.dex.domain.account.Address
-import com.wavesplatform.dex.domain.account.KeyPair.toPublicKey
+import com.wavesplatform.dex.domain.account.{Address, KeyPair}
+import com.wavesplatform.dex.domain.account.KeyPair.{toAddress, toPublicKey}
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.OrderType
@@ -15,6 +15,7 @@ import com.wavesplatform.dex.model.Events.OrderCanceledReason
 import com.wavesplatform.dex.model.{Events, LimitOrder}
 import com.wavesplatform.dex.test.WavesEntitiesGen
 import org.scalacheck.Gen
+import org.scalatest.enablers.Emptiness
 import org.scalatest.freespec.AnyFreeSpecLike
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -33,6 +34,8 @@ class OrderEventsCoordinatorActorStateSpec
   // 1. KnownOnNode in cache + KnownOnMatcher
   // 2. PendingAddress non empty list of txId
 
+  implicit val optionEmptiness: Emptiness[Option[Any]] = (thing: Option[Any]) => thing.isEmpty
+
   private val definedAssets: List[Asset] = Asset.Waves :: Gen.listOfN(2, assetGen).sample.get
 
   private val definedAssetsGen: Gen[Asset] = Gen.oneOf(definedAssets)
@@ -43,12 +46,14 @@ class OrderEventsCoordinatorActorStateSpec
 
   private val pendingTxTypeGen: Gen[PendingTransactionType] = Gen.oneOf(PendingTransactionType.KnownOnMatcher, PendingTransactionType.KnownOnNode)
 
-  private val balancesGen: Gen[Map[Asset, Long]] = Gen.mapOf(Gen.zip(definedAssetsGen, Gen.choose(0, 10L)))
+  private val balancesGen: Gen[Map[Asset, Long]] = Gen.choose(0, definedAssets.size).flatMap { size =>
+    Gen.mapOfN(size, Gen.zip(definedAssetsGen, Gen.choose(0, 10L)))
+  }
 
-  private val executedEventGen: Gen[Events.OrderExecuted] =
+  private def executedEventGen(counterGen: Gen[KeyPair] = keyPairGen, submitterGen: Gen[KeyPair] = keyPairGen): Gen[Events.OrderExecuted] =
     for {
-      (submitted, _) <- orderAndSenderGen(sideGen = Gen.const(OrderType.BUY), matcherGen = toPublicKey(matcher))
-      (counter, _) <- orderAndSenderGen(sideGen = Gen.const(OrderType.SELL), matcherGen = toPublicKey(matcher))
+      (counter, _) <- orderAndSenderGen(sideGen = Gen.const(OrderType.SELL), senderGen = counterGen, matcherGen = toPublicKey(matcher))
+      (submitted, _) <- orderAndSenderGen(sideGen = Gen.const(OrderType.BUY), senderGen = submitterGen, matcherGen = toPublicKey(matcher))
     } yield Events.OrderExecuted(
       submitted = LimitOrder(submitted),
       counter = LimitOrder(counter),
@@ -57,20 +62,24 @@ class OrderEventsCoordinatorActorStateSpec
       submittedExecutedFee = submitted.matcherFee
     )
 
-  private val canceledEventGen: Gen[Events.OrderCanceled] =
+  private def canceledEventGen(senderGen: Gen[KeyPair] = keyPairGen): Gen[Events.OrderCanceled] =
     for {
-      (order, _) <- orderAndSenderGen(matcherGen = toPublicKey(matcher))
+      (order, _) <- orderAndSenderGen(senderGen = senderGen, matcherGen = toPublicKey(matcher))
     } yield Events.OrderCanceled(
       acceptedOrder = LimitOrder(order),
       reason = OrderCanceledReason.BecameInvalid,
       timestamp = order.timestamp
     )
 
-  private val eventGen: Gen[Events.Event] = Gen.oneOf(executedEventGen, canceledEventGen)
+  private val eventGen: Gen[Events.Event] = Gen.oneOf(executedEventGen(), canceledEventGen())
 
-  private val pendingAddressGen: Gen[PendingAddress] =
+  private def pendingAddressGen(
+    pendingTxsSizeGen: Gen[Int] = Gen.choose(1, 3),
+    pendingTxTypeGen: Gen[PendingTransactionType] = pendingTxTypeGen
+  ): Gen[PendingAddress] =
     for {
-      pendingTxs <- Gen.nonEmptyMap(Gen.zip(txIdGen, pendingTxTypeGen))
+      pendingTxsSize <- pendingTxsSizeGen
+      pendingTxs <- Gen.mapOfN(pendingTxsSize, Gen.zip(txIdGen, pendingTxTypeGen))
       balances <- balancesGen
       events <- Gen.containerOf[Queue, Events.Event](eventGen)
     } yield PendingAddress(
@@ -79,35 +88,46 @@ class OrderEventsCoordinatorActorStateSpec
       events = events
     )
 
-  private val knownOnNodeCacheGen: Gen[FifoSet[ExchangeTransaction.Id]] = Gen.listOf(txIdGen).map { xs =>
-    xs.foldLeft(FifoSet.limited[ExchangeTransaction.Id](100))(_.append(_))
+  private val knownOnNodeCacheGen: Gen[FifoSet[ExchangeTransaction.Id]] = Gen.choose(0, 2).flatMap { size =>
+    Gen.listOfN(size, txIdGen).map { xs =>
+      xs.foldLeft(FifoSet.limited[ExchangeTransaction.Id](100))(_.append(_))
+    }
   }
 
-  private val stateGen: Gen[OrderEventsCoordinatorActorState] = for {
-    addresses <- Gen.mapOf(Gen.zip(addressGen, pendingAddressGen))
+  private val stateWithAddressKpsGen: Gen[(List[KeyPair], OrderEventsCoordinatorActorState)] = for {
+    pendingAddressesSize <- Gen.choose(0, 3)
+    keyPairs <- Gen.listOfN(pendingAddressesSize, keyPairGen)
+    pendingAddresses <- Gen.listOfN(pendingAddressesSize, pendingAddressGen())
     knownOnNodeCache <- knownOnNodeCacheGen
   } yield {
+    val addresses = keyPairs.map(_.toAddress).zip(pendingAddresses).toMap
     val knownOnNodeByPending = addresses.values.flatMap(_.pendingTxs).collect {
       case (txId, PendingTransactionType.KnownOnNode) => txId
     }
-    OrderEventsCoordinatorActorState(addresses, knownOnNodeByPending.foldLeft(knownOnNodeCache)(_.append(_)))
+    (keyPairs, OrderEventsCoordinatorActorState(addresses, knownOnNodeByPending.foldLeft(knownOnNodeCache)(_.append(_))))
   }
+
+  private val stateGen: Gen[OrderEventsCoordinatorActorState] = stateWithAddressKpsGen.map(_._2)
 
   "OrderEventsCoordinatorActorState" - {
     "withBalanceUpdates" - {
       val testGen = for {
         state <- stateGen
         knownAddresses = state.addresses.keySet
+        balancesSize <- Gen.choose(0, 3)
         balances <- {
           val unknownAddressesGen = addressGen.filterNot(knownAddresses.contains)
-          Gen.mapOf(Gen.zip(
-            if (knownAddresses.isEmpty) unknownAddressesGen
-            else Gen.oneOf(
-              Gen.oneOf(knownAddresses),
-              unknownAddressesGen
-            ),
-            balancesGen
-          ))
+          Gen.mapOfN(
+            balancesSize,
+            Gen.zip(
+              if (knownAddresses.isEmpty) unknownAddressesGen
+              else Gen.oneOf(
+                Gen.oneOf(knownAddresses),
+                unknownAddressesGen
+              ),
+              balancesGen
+            )
+          )
         }
       } yield (state, knownAddresses, balances)
 
@@ -149,17 +169,123 @@ class OrderEventsCoordinatorActorStateSpec
     }
 
     "withPendingCancel" - {
-      "passes updates for not tracked addresses, holds updates for tracked addresses" in {}
-      "tracked information contains fresh updates if an address is tracked" in {}
-      "tracked information is not changed if an address is not tracked" in {}
+      val testGen = for {
+        (addressKps, state) <- stateWithAddressKpsGen
+        kp <- {
+          val randomAddressGen = keyPairGen.filterNot(x => state.addresses.contains(x.toAddress))
+          if (state.addresses.isEmpty) randomAddressGen
+          else Gen.oneOf(
+            Gen.oneOf(addressKps),
+            randomAddressGen
+          )
+        }
+        event <- canceledEventGen(senderGen = Gen.const(kp))
+      } yield (state, event.acceptedOrder.order.sender.toAddress, event)
+
+      "passes updates for not tracked addresses, holds updates for tracked addresses" in forAll(testGen) {
+        case (state, eventAddress, event) =>
+          val (_, eventOpt) = state.withPendingCancel(event)
+          if (state.addresses.contains(eventAddress)) eventOpt shouldBe empty
+          else eventOpt shouldNot be(empty)
+      }
+
+      "tracked information contains fresh updates if an address is tracked otherwise it remains" in forAll(testGen) {
+        case (state, eventAddress, event) =>
+          val (updatedState, _) = state.withPendingCancel(event)
+          if (state.addresses.contains(eventAddress)) updatedState.addresses(eventAddress).events.last shouldBe event
+          else updatedState should matchTo(state)
+      }
     }
 
     "withExecuted" - {
-      "for not tracked addresses - passes updates" in {}
+      "updates the state of not resolved addresses" in {
+        val testGen = for {
+          (knownAddressKps, state) <- stateWithAddressKpsGen
+          txId <- {
+            val knownTxIds = state.addresses.values.flatMap(_.pendingTxs.keys).toSet
+            txIdGen.filterNot(knownTxIds.contains) // Filter out impossible cases
+          }
+          event <- {
+            val allKps = knownAddressKps.map(x => x.toAddress -> x).toMap
 
-      "for tracked addresses" - {
-        "passes updates" in {}
-        "updates a tracked address information" in {}
+            // Collect addresses, which can't be resolved
+            val kps = state.addresses.collect {
+              case (address, x) if x.pendingTxs.values.exists(_ == PendingTransactionType.KnownOnMatcher) => allKps(address)
+            }
+
+            val kpGen = if (kps.isEmpty) keyPairGen else Gen.oneOf(keyPairGen, Gen.oneOf(kps))
+            executedEventGen(counterGen = kpGen, submitterGen = kpGen)
+          }
+        } yield (state, txId, event)
+
+        forAll(testGen) {
+          case (state, txId, event) =>
+            val (updatedState, resolved) = state.withExecuted(txId, event)
+            resolved shouldBe empty
+            event.traders.foreach { address =>
+              val pendingAddress = updatedState.addresses(address)
+              pendingAddress.pendingTxs.keySet should contain(txId)
+              pendingAddress.events.last shouldBe event
+            }
+        }
+      }
+
+      "for tracked addresses and resolved" - {
+        val customStateGen: Gen[(List[KeyPair], OrderEventsCoordinatorActorState)] = for {
+          pendingAddressesSize <- Gen.choose(1, 3)
+          keyPairs <- Gen.listOfN(pendingAddressesSize, keyPairGen)
+          willBeResolvedSize <- Gen.choose(1, pendingAddressesSize)
+          willBeResolved <- Gen.listOfN(
+            willBeResolvedSize,
+            pendingAddressGen(
+              pendingTxsSizeGen = Gen.const(1),
+              pendingTxTypeGen = Gen.const(PendingTransactionType.KnownOnMatcher)
+            )
+          )
+          wontResolved <- Gen.listOfN(pendingAddressesSize - willBeResolvedSize, pendingAddressGen())
+          knownOnNodeCache <- {
+            val resolvedTxIds = willBeResolved.flatMap(_.pendingTxs.keys).toSet
+            knownOnNodeCacheGen.filterNot(xs => resolvedTxIds.exists(xs.contains))
+          }
+        } yield {
+          val addresses = keyPairs.map(_.toAddress).zip(willBeResolved ::: wontResolved).toMap
+          val knownOnNodeByPending = addresses.values.flatMap(_.pendingTxs).collect {
+            case (txId, PendingTransactionType.KnownOnNode) => txId
+          }
+          (keyPairs, OrderEventsCoordinatorActorState(addresses, knownOnNodeByPending.foldLeft(knownOnNodeCache)(_.append(_))))
+        }
+
+        val testGen = for {
+          (knownAddressKps, state) <- customStateGen
+          txId <- {
+            val knownTxIds = state.addresses.values.flatMap(_.pendingTxs.keys).toSet
+            txIdGen.filterNot(knownTxIds.contains) // Filter out impossible cases
+          }
+          event <- {
+            val allKps = knownAddressKps.map(x => x.toAddress -> x).toMap
+
+            // Collect addresses, which can't be resolved
+            val kps = state.addresses.collect {
+              case (address, x) if x.pendingTxs.size == 1 && x.pendingTxs.head._2 == PendingTransactionType.KnownOnMatcher => allKps(address)
+            }
+
+            val kpGen = if (kps.isEmpty) keyPairGen else Gen.oneOf(keyPairGen, Gen.oneOf(kps))
+            executedEventGen(counterGen = kpGen, submitterGen = kpGen)
+          }
+        } yield (state, txId, event, Seq.empty[Address])
+
+        "passes updates and removes resolved addresses from tracking" in forAll(testGen) {
+          case (state, txId, event, resolvedAddresses) =>
+            val (updatedState, resolved) = state.withExecuted(txId, event)
+            val xs = resolved.keySet
+
+            xs should matchTo(resolvedAddresses)
+            xs.foreach { address =>
+              updatedState.addresses.get(address) shouldBe empty
+            }
+        }
+
+        "removed from tracking" in {}
       }
 
       "tracked and not tracked case" in {}

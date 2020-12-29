@@ -46,6 +46,7 @@ trait WavesEntitiesGen {
 
   def orderAndSenderGen(
     sideGen: Gen[OrderType] = orderSideGen,
+    senderGen: Gen[KeyPair] = keyPairGen,
     matcherGen: Gen[PublicKey] = publicKeyGen,
     assetPairGen: Gen[AssetPair] = assetPairGen,
     priceGen: Gen[Long] = orderPriceGen,
@@ -54,7 +55,7 @@ trait WavesEntitiesGen {
   ): Gen[(Order, KeyPair)] =
     for {
       tpe <- sideGen
-      sender <- keyPairGen
+      sender <- senderGen
       matcher <- matcherGen
       assetPair <- assetPairGen
       amount <- orderAmountGen

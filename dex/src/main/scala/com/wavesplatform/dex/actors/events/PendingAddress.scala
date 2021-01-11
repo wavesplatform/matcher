@@ -16,24 +16,26 @@ case class PendingAddress(
 
   def withUpdatedBalances(xs: Map[Asset, Long]): PendingAddress = copy(stashedBalance = stashedBalance ++ xs)
 
-  def withKnownOnNode(txId: ExchangeTransaction.Id, balanceUpdates: Map[Asset, Long]): PendingAddress =
+  def withKnownOnNode(txId: ExchangeTransaction.Id, balanceUpdates: Map[Asset, Long]): PendingAddress = {
+    val updatedStashedBalance = stashedBalance ++ balanceUpdates
     pendingTxs.get(txId) match {
-      case Some(PendingTransactionType.KnownOnNode) => this
+      case Some(PendingTransactionType.KnownOnNode) => copy(stashedBalance = updatedStashedBalance)
       case Some(PendingTransactionType.KnownOnMatcher) =>
         copy(
           pendingTxs = pendingTxs - txId,
-          stashedBalance = stashedBalance ++ balanceUpdates
+          stashedBalance = updatedStashedBalance
         )
       case _ =>
         copy(
           pendingTxs = pendingTxs.updated(txId, PendingTransactionType.KnownOnNode),
-          stashedBalance = stashedBalance ++ balanceUpdates
+          stashedBalance = updatedStashedBalance
         )
     }
+  }
 
   def withKnownOnMatcher(txId: ExchangeTransaction.Id, event: Events.OrderExecuted): PendingAddress =
     pendingTxs.get(txId) match {
-      case Some(PendingTransactionType.KnownOnMatcher) => this
+      case Some(PendingTransactionType.KnownOnMatcher) => this // ???
       case Some(PendingTransactionType.KnownOnNode) =>
         copy(
           pendingTxs = pendingTxs - txId,
@@ -46,5 +48,5 @@ case class PendingAddress(
         )
     }
 
-  def withEvent(event: Events.Event): PendingAddress = copy(events = events.enqueue(event))
+  def withEvent(event: Events.OrderCanceled): PendingAddress = copy(events = events.enqueue(event))
 }

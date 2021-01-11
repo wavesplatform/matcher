@@ -42,6 +42,7 @@ object MapImplicits {
   implicit final class MapOps[K, V](val self: Map[K, V]) extends AnyVal {
     def appendIfDefined(k: K, v: Option[V]): Map[K, V] = v.fold(self)(self.updated(k, _))
     def appendIfDefinedMany(kv: (K, Option[V])*): Map[K, V] = kv.foldLeft(self) { case (r, (k, v)) => r.appendIfDefined(k, v) }
+    def filterByMap(other: Map[K, V]): Map[K, V] = self.view.filterKeys(other.contains).toMap
   }
 
 }

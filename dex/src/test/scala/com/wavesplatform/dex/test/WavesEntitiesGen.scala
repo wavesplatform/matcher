@@ -9,11 +9,15 @@ import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTr
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.gen._
 import org.scalacheck.Gen
+import org.scalatest.enablers.Emptiness
 
 import java.nio.charset.StandardCharsets
 
 // TODO Copy from waves-ext with some modifications
 trait WavesEntitiesGen {
+
+  implicit val optionEmptiness: Emptiness[Option[Any]] = (thing: Option[Any]) => thing.isEmpty
+
   val AssetIdLength = 32
 
   val defaultWavesFee = 300000

@@ -1,31 +1,19 @@
 package com.wavesplatform.dex.actors.events
 
-import com.softwaremill.diffx.DiffxSupport
 import com.softwaremill.diffx.scalatest.DiffMatcher
 import com.wavesplatform.dex.NoShrink
-import com.wavesplatform.dex.collections.FifoSet
 import com.wavesplatform.dex.domain.account.{Address, KeyPair}
-import com.wavesplatform.dex.domain.account.KeyPair.{toAddress, toPublicKey}
-import com.wavesplatform.dex.domain.asset.Asset
-import com.wavesplatform.dex.domain.bytes.ByteStr
-import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionV2}
+import com.wavesplatform.dex.domain.order.OrderType
+import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV2
 import com.wavesplatform.dex.domain.utils.EitherExt2
-import com.wavesplatform.dex.gen.{byteArrayGen, bytes32gen}
-import com.wavesplatform.dex.model.Events.OrderCanceledReason
-import com.wavesplatform.dex.model.{Events, LimitOrder}
-import com.wavesplatform.dex.test.WavesEntitiesGen
 import org.scalacheck.Gen
-import org.scalatest.enablers.Emptiness
 import org.scalatest.freespec.AnyFreeSpecLike
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import scala.collection.immutable.Queue
-
 class OrderEventsCoordinatorActorStateSpec
     extends AnyFreeSpecLike
-    with WavesEntitiesGen
+    with Generators
     with DiffMatcher
     with Matchers
     with ScalaCheckPropertyChecks
@@ -34,66 +22,6 @@ class OrderEventsCoordinatorActorStateSpec
   // TODO properties:
   // 1. KnownOnNode in cache + KnownOnMatcher
   // 2. PendingAddress non empty list of txId
-
-  implicit val optionEmptiness: Emptiness[Option[Any]] = (thing: Option[Any]) => thing.isEmpty
-
-  private val definedAssets: List[Asset] = Asset.Waves :: Gen.listOfN(2, assetGen).sample.get
-
-  private val definedAssetsGen: Gen[Asset] = Gen.oneOf(definedAssets)
-
-  private val addressGen: Gen[Address] = keyPairGen.map(_.toAddress)
-
-  private val txIdGen: Gen[ExchangeTransaction.Id] = bytes32gen.map(ByteStr(_))
-
-  private val pendingTxTypeGen: Gen[PendingTransactionType] = Gen.oneOf(PendingTransactionType.KnownOnMatcher, PendingTransactionType.KnownOnNode)
-
-  private val balancesGen: Gen[Map[Asset, Long]] = Gen.choose(0, definedAssets.size).flatMap { size =>
-    Gen.mapOfN(size, Gen.zip(definedAssetsGen, Gen.choose(0, 10L)))
-  }
-
-  private def executedEventGen(counterGen: Gen[KeyPair] = keyPairGen, submitterGen: Gen[KeyPair] = keyPairGen): Gen[Events.OrderExecuted] =
-    for {
-      (counter, _) <- orderAndSenderGen(sideGen = Gen.const(OrderType.SELL), senderGen = counterGen, matcherGen = toPublicKey(matcher))
-      (submitted, _) <- orderAndSenderGen(sideGen = Gen.const(OrderType.BUY), senderGen = submitterGen, matcherGen = toPublicKey(matcher))
-    } yield Events.OrderExecuted(
-      submitted = LimitOrder(submitted),
-      counter = LimitOrder(counter),
-      timestamp = submitted.timestamp,
-      counterExecutedFee = counter.matcherFee,
-      submittedExecutedFee = submitted.matcherFee
-    )
-
-  private def canceledEventGen(senderGen: Gen[KeyPair] = keyPairGen): Gen[Events.OrderCanceled] =
-    for {
-      (order, _) <- orderAndSenderGen(senderGen = senderGen, matcherGen = toPublicKey(matcher))
-    } yield Events.OrderCanceled(
-      acceptedOrder = LimitOrder(order),
-      reason = OrderCanceledReason.BecameInvalid,
-      timestamp = order.timestamp
-    )
-
-  private val eventGen: Gen[Events.Event] = Gen.oneOf(executedEventGen(), canceledEventGen())
-
-  private def pendingAddressGen(
-    pendingTxsSizeGen: Gen[Int] = Gen.choose(1, 3),
-    pendingTxTypeGen: Gen[PendingTransactionType] = pendingTxTypeGen
-  ): Gen[PendingAddress] =
-    for {
-      pendingTxsSize <- pendingTxsSizeGen
-      pendingTxs <- Gen.mapOfN(pendingTxsSize, Gen.zip(txIdGen, pendingTxTypeGen))
-      balances <- balancesGen
-      events <- Gen.containerOf[Queue, Events.Event](eventGen)
-    } yield PendingAddress(
-      pendingTxs = pendingTxs,
-      stashedBalance = balances,
-      events = events
-    )
-
-  private val knownOnNodeCacheGen: Gen[FifoSet[ExchangeTransaction.Id]] = Gen.choose(0, 2).flatMap { size =>
-    Gen.listOfN(size, txIdGen).map { xs =>
-      xs.foldLeft(FifoSet.limited[ExchangeTransaction.Id](100))(_.append(_))
-    }
-  }
 
   private val stateWithAddressKpsGen: Gen[(List[KeyPair], OrderEventsCoordinatorActorState)] = for {
     pendingAddressesSize <- Gen.choose(0, 3)
@@ -312,7 +240,7 @@ class OrderEventsCoordinatorActorStateSpec
       } yield (state, knownAddresses, balances.keySet -- knownAddresses, tx, balances)
 
       "unexpected" - {
-        "don't resolves addresses" in forAll(testGen) {
+        "doesn't resolve addresses" in forAll(testGen) {
           case (state, _, _, tx, balanceUpdates) =>
             val txId = tx.id()
             val (_, _, resolved) = state.withKnownOnNodeTx(tx.traders, txId, balanceUpdates)

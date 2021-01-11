@@ -9,7 +9,20 @@ import com.wavesplatform.dex.model.Events
 
 import scala.collection.immutable.Queue
 
-// TODO DEX-1041
+/**
+ * Holds changes (executed and cancel events and balance changes) until OrderExecuted is resolved by a transaction.
+ * It could be resolved in two ways:
+ * 1. Direct order:
+ *   1. We create and broadcast a transaction (withExecuted)
+ *   2. We hold changes for maker and taker
+ *   3. We receive the sent transaction from the blockchain stream (withKnownOnNodeTx, with same id)
+ *   4. Changes are passed
+ * 2. Indirect order:
+ *   1. We receive a transaction, which we haven't yet created (withKnownOnNodeTx)
+ *   2. We hold changes for maker and taker
+ *   3. We create the received transaction (withExecuted, with same id)
+ *   4. Changes are passed
+ */
 case class OrderEventsCoordinatorActorState(addresses: Map[Address, PendingAddress], knownOnNodeCache: FifoSet[ExchangeTransaction.Id]) {
 
   /**
@@ -65,11 +78,11 @@ case class OrderEventsCoordinatorActorState(addresses: Map[Address, PendingAddre
   def withKnownOnNodeTx(
     traders: Set[Address],
     txId: ExchangeTransaction.Id,
-    balanceUpdates: AddressAssets
+    balanceUpdates: AddressAssets // it could contain not only trader changes!! <---
   ): (OrderEventsCoordinatorActorState, AddressAssets, Map[Address, PendingAddress]) =
     if (knownOnNodeCache.contains(txId)) (this, balanceUpdates, Map.empty)
     else {
-      val (updatedAddresses, restUpdates, resolved) = traders.foldLeft((addresses, balanceUpdates, Map.empty[Address, PendingAddress])) {
+      val (updatedAddresses1, restUpdates1, resolved) = traders.foldLeft((addresses, balanceUpdates, Map.empty[Address, PendingAddress])) {
         case ((addresses, restUpdates, resolved), address) =>
           addresses.get(address) match {
             case Some(pendingAddress) =>
@@ -86,9 +99,17 @@ case class OrderEventsCoordinatorActorState(addresses: Map[Address, PendingAddre
           }
       }
 
+      val (updatedAddresses2, restUpdates2) = restUpdates1.foldLeft((updatedAddresses1, Map.empty: AddressAssets)) {
+        case ((addresses, restUpdates), pair @ (address, xs)) =>
+          addresses.get(address) match {
+            case None => (addresses, restUpdates + pair)
+            case Some(pendingAddress) => (addresses.updated(address, pendingAddress.withUpdatedBalances(xs)), restUpdates - address)
+          }
+      }
+
       (
-        OrderEventsCoordinatorActorState(updatedAddresses, knownOnNodeCache.append(txId)),
-        restUpdates,
+        OrderEventsCoordinatorActorState(updatedAddresses2, knownOnNodeCache.append(txId)),
+        restUpdates2,
         resolved
       )
     }

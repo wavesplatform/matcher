@@ -16,6 +16,8 @@ import java.nio.charset.StandardCharsets
 trait WavesEntitiesGen {
   val AssetIdLength = 32
 
+  val defaultWavesFee = 300000
+
   val matcher: KeyPair = KeyPair(ByteStr("matcher".getBytes(StandardCharsets.UTF_8)))
 
   def issuedAssetGen: Gen[IssuedAsset] = byteArrayGen(AssetIdLength).map { xs =>
@@ -118,7 +120,6 @@ trait WavesEntitiesGen {
     } yield {
       val amount = math.min(buyOrder.amount, sellOrder.amount)
       val price = buyOrder.price
-      val fixedVersion = if (buyOrder.feeAsset == Waves && sellOrder.feeAsset == Waves) version else math.max(version, 2).toByte
       ExchangeTransactionV2
         .create(
           matcher = matcher,

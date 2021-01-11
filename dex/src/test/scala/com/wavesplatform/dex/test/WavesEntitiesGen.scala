@@ -140,4 +140,41 @@ trait WavesEntitiesGen {
     }
   }
 
+  protected def exchangeTransactionBuyerSellerGen(buyerGen: Gen[KeyPair], sellerGen: Gen[KeyPair]): Gen[ExchangeTransactionV2] = for {
+    matcher <- keyPairGen
+    matcherPublicKeyGen = Gen.const(matcher.publicKey)
+    timestamp <- timestampGen
+    orderTimestampGen = Gen.choose(1, 1000L).map(_ + timestamp)
+    (buyOrder, _) <- orderAndSenderGen(
+      sideGen = Gen.const(OrderType.BUY),
+      senderGen = buyerGen,
+      matcherGen = matcherPublicKeyGen,
+      timestampGen = orderTimestampGen
+    )
+    (sellOrder, _) <- orderAndSenderGen(
+      sideGen = Gen.const(OrderType.SELL),
+      senderGen = sellerGen,
+      matcherGen = matcherPublicKeyGen,
+      assetPairGen = Gen.const(buyOrder.assetPair),
+      priceGen = Gen.choose(1L, buyOrder.price),
+      timestampGen = orderTimestampGen
+    )
+  } yield {
+    val amount = math.min(buyOrder.amount, sellOrder.amount)
+    val price = buyOrder.price
+    ExchangeTransactionV2
+      .create(
+        matcher = matcher,
+        buyOrder = buyOrder,
+        sellOrder = sellOrder,
+        amount = amount,
+        price = price,
+        buyMatcherFee = buyOrder.matcherFee,
+        sellMatcherFee = sellOrder.matcherFee,
+        fee = defaultWavesFee,
+        timestamp = timestamp
+      )
+      .explicitGet()
+  }
+
 }

@@ -33,8 +33,22 @@ trait Generators extends WavesEntitiesGen {
 
   protected def executedEventGen(counterGen: Gen[KeyPair] = keyPairGen, submitterGen: Gen[KeyPair] = keyPairGen): Gen[Events.OrderExecuted] =
     for {
-      (counter, _) <- orderAndSenderGen(sideGen = Gen.const(OrderType.SELL), senderGen = counterGen, matcherGen = toPublicKey(matcher))
-      (submitted, _) <- orderAndSenderGen(sideGen = Gen.const(OrderType.BUY), senderGen = submitterGen, matcherGen = toPublicKey(matcher))
+      assetPair <- assetPairGen
+      now = Gen.const(System.currentTimeMillis())
+      (counter, _) <- orderAndSenderGen(
+        sideGen = Gen.const(OrderType.SELL),
+        senderGen = counterGen,
+        matcherGen = toPublicKey(matcher),
+        assetPairGen = Gen.const(assetPair),
+        timestampGen = now
+      )
+      (submitted, _) <- orderAndSenderGen(
+        sideGen = Gen.const(OrderType.BUY),
+        senderGen = submitterGen,
+        matcherGen = toPublicKey(matcher),
+        assetPairGen = Gen.const(assetPair),
+        timestampGen = now
+      )
     } yield Events.OrderExecuted(
       submitted = LimitOrder(submitted),
       counter = LimitOrder(counter),
@@ -57,10 +71,13 @@ trait Generators extends WavesEntitiesGen {
   protected def pendingAddressGen(
     pendingTxsSizeGen: Gen[Int] = Gen.choose(1, 3),
     pendingTxTypeGen: Gen[PendingTransactionType] = pendingTxTypeGen
-  ): Gen[PendingAddress] =
+  ): Gen[PendingAddress] = pendingTxsSizeGen
+    .map(Gen.mapOfN(_, Gen.zip(txIdGen, pendingTxTypeGen)))
+    .flatMap(pendingAddressWithTxsGen)
+
+  protected def pendingAddressWithTxsGen(pendingTxGen: Gen[Map[ExchangeTransaction.Id, PendingTransactionType]]): Gen[PendingAddress] =
     for {
-      pendingTxsSize <- pendingTxsSizeGen
-      pendingTxs <- Gen.mapOfN(pendingTxsSize, Gen.zip(txIdGen, pendingTxTypeGen))
+      pendingTxs <- pendingTxGen
       balances <- balancesGen
       events <- Gen.containerOf[Queue, Events.Event](eventGen)
     } yield PendingAddress(

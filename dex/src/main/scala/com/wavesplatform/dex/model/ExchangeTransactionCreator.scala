@@ -9,14 +9,12 @@ import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTr
 import com.wavesplatform.dex.model.Events.OrderExecuted
 import com.wavesplatform.dex.model.ExchangeTransactionCreator._
 
-import scala.concurrent.ExecutionContext
-
 class ExchangeTransactionCreator(
   matcherPrivateKey: KeyPair,
   exchangeTxBaseFee: Long,
   hasMatcherAccountScript: => Boolean,
   hasAssetScript: IssuedAsset => Boolean
-)(implicit ec: ExecutionContext) {
+) {
 
   def createTransaction(orderExecutedEvent: OrderExecuted): Either[ValidationError, ExchangeTransaction] = {
     import orderExecutedEvent.{counter, executedAmount, submitted, timestamp}

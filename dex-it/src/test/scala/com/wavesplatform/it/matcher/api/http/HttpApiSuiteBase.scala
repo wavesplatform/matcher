@@ -6,9 +6,9 @@ import com.wavesplatform.dex.domain.order.OrderType.BUY
 import com.wavesplatform.dex.it.api.RawHttpChecks
 import com.wavesplatform.it.MatcherSuiteBase
 
-class HttpApiSuiteBase extends MatcherSuiteBase with RawHttpChecks {
+trait HttpApiSuiteBase extends MatcherSuiteBase with RawHttpChecks {
 
-  private def placeAndGetIds(): Set[String] =
+  protected def placeAndGetIds(): Set[String] =
     Set(
       mkOrder(alice, wavesUsdPair, BUY, 10.waves, 1.usd),
       mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd),

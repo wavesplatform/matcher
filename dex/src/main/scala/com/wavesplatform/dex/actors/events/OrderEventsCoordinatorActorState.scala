@@ -29,7 +29,6 @@ case class OrderEventsCoordinatorActorState(addresses: Map[Address, PendingAddre
    * @return (updated, passUpdates), passUpdates can be sent to recipients
    */
   def withBalanceUpdates(updates: AddressAssets): (OrderEventsCoordinatorActorState, AddressAssets) = {
-    // TODO DEX-1041 probably, we need fold on addresses, because updates.size >> addresses.size
     val (updatedAddresses, passUpdates) = updates.foldLeft((addresses, Map.empty: AddressAssets)) {
       case ((addresses, passUpdates), item @ (address, updates)) =>
         addresses.get(address) match {

@@ -1,4 +1,4 @@
-package com.wavesplatform.it.matcher.api.http
+package com.wavesplatform.it.matcher.api.http.markets
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderBookStatus

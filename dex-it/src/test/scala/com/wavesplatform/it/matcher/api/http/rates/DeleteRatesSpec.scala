@@ -4,11 +4,10 @@ import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpRates
 import com.wavesplatform.dex.domain.asset.Asset.Waves
-import com.wavesplatform.dex.it.api.RawHttpChecks
 import com.wavesplatform.dex.it.docker.apiKey
-import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.matcher.api.http.HttpApiSuiteBase
 
-class DeleteRatesSpec extends MatcherSuiteBase with RawHttpChecks {
+class DeleteRatesSpec extends HttpApiSuiteBase {
 
   val defaultRates: HttpRates = Map(Waves -> 1d)
 
@@ -43,17 +42,13 @@ class DeleteRatesSpec extends MatcherSuiteBase with RawHttpChecks {
       validateMatcherError(dex1.rawApi.deleteRate(Waves), StatusCodes.BadRequest, 20971531, "The rate for WAVES cannot be changed")
     }
 
-    "should return an error without X-API-KEY header" in {
-      validateAuthorizationError(dex1.rawApi.deleteRate(UsdId.toString))
-    }
-
-    "should return an error with incorrect X-API-KEY header value" in {
-      validateAuthorizationError(dex1.rawApi.deleteRate(UsdId.toString, Map("X-API-KEY" -> "incorrect")))
-    }
-
     //TODO: change after DEX-980
     "should return an error when assetId is not a correct base58 string" in {
       validate404Exception(dex1.rawApi.deleteRate("null", Map("X-API-Key" -> apiKey)))
     }
+
+    shouldReturnErrorWithoutApiKeyHeader
+
+    shouldReturnErrorWithIncorrectApiKeyValue
   }
 }

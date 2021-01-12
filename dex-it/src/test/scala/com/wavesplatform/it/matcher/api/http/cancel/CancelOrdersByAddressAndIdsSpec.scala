@@ -5,10 +5,9 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.api.http.entities.HttpSuccessfulSingleCancel
 import com.wavesplatform.dex.domain.order.OrderType.BUY
-import com.wavesplatform.dex.it.api.RawHttpChecks
-import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.matcher.api.http.HttpApiSuiteBase
 
-class CancelOrdersByAddressAndIdsSpec extends MatcherSuiteBase with RawHttpChecks {
+class CancelOrdersByAddressAndIdsSpec extends HttpApiSuiteBase {
 
   override protected def dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(
@@ -22,16 +21,6 @@ class CancelOrdersByAddressAndIdsSpec extends MatcherSuiteBase with RawHttpCheck
     broadcastAndAwait(IssueUsdTx)
     dex1.start()
   }
-
-  private def placeAndGetIds(): Set[String] =
-    Set(
-      mkOrder(alice, wavesUsdPair, BUY, 10.waves, 1.usd),
-      mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd),
-      mkOrder(alice, wavesUsdPair, BUY, 10.waves, 3.usd)
-    ).map { o =>
-      placeAndAwaitAtDex(o)
-      o.idStr()
-    }
 
   "POST /matcher/orders/{address}/cancel" - {
     "should cancel orders by ids" in {
@@ -85,17 +74,9 @@ class CancelOrdersByAddressAndIdsSpec extends MatcherSuiteBase with RawHttpCheck
       )
     }
 
-    "should return an error when without headers" in {
-      validateAuthorizationError(
-        dex1.rawApi.cancelAllByAddressAndIds(alice.toAddress.stringRepr, placeAndGetIds(), Map.empty)
-      )
-    }
+    shouldReturnErrorWithoutApiKeyHeader
 
-    "should return an error when the public api-key header is not correct" in {
-      validateAuthorizationError(
-        dex1.rawApi.cancelAllByAddressAndIds(alice.toAddress.stringRepr, placeAndGetIds(), Map("X-API-Key" -> "incorrect"))
-      )
-    }
+    shouldReturnErrorWithIncorrectApiKeyValue
   }
 
 }

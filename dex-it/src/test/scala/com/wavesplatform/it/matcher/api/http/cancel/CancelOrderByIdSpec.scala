@@ -4,11 +4,10 @@ import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.order.OrderType.BUY
-import com.wavesplatform.dex.it.api.RawHttpChecks
 import com.wavesplatform.dex.it.docker.apiKey
-import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.matcher.api.http.HttpApiSuiteBase
 
-class CancelOrderByIdSpec extends MatcherSuiteBase with RawHttpChecks {
+class CancelOrderByIdSpec extends HttpApiSuiteBase {
 
   override protected def dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(
@@ -59,13 +58,6 @@ class CancelOrderByIdSpec extends MatcherSuiteBase with RawHttpChecks {
       validate404Exception(dex1.rawApi.cancelOrderById("null", Map("X-API-KEY" -> apiKey)))
     }
 
-    "should return an error without headers" in {
-      val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 1.usd)
-      placeAndAwaitAtDex(order)
-
-      validateAuthorizationError(dex1.rawApi.cancelOrderById(order.idStr(), Map.empty[String, String]))
-    }
-
     "should return an error when the public-key header is not a correct base58 string" in {
       val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 1.usd)
       placeAndAwaitAtDex(order)
@@ -91,14 +83,9 @@ class CancelOrderByIdSpec extends MatcherSuiteBase with RawHttpChecks {
       )
     }
 
-    "should return an error when the api-key header is not correct" in {
-      val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 1.usd)
-      placeAndAwaitAtDex(order)
+    shouldReturnErrorWithoutApiKeyHeader
 
-      validateAuthorizationError(
-        dex1.rawApi.cancelOrderById(order.idStr(), Map("X-API-Key" -> "incorrect"))
-      )
-    }
+    shouldReturnErrorWithIncorrectApiKeyValue
+
   }
-
 }

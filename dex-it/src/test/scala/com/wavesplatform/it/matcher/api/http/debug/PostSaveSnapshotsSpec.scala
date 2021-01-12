@@ -2,10 +2,9 @@ package com.wavesplatform.it.matcher.api.http.debug
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.order.OrderType.BUY
-import com.wavesplatform.dex.it.api.RawHttpChecks
-import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.matcher.api.http.HttpApiSuiteBase
 
-class PostSaveSnapshotsSpec extends MatcherSuiteBase with RawHttpChecks {
+class PostSaveSnapshotsSpec extends HttpApiSuiteBase {
 
   override protected def dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(
@@ -34,13 +33,9 @@ class PostSaveSnapshotsSpec extends MatcherSuiteBase with RawHttpChecks {
       }
     }
 
-    "should return an error without X-API-KEY" in {
-      validateAuthorizationError(dex1.rawApi.saveSnapshots(Map("X-API-KEY" -> "incorrect")))
-    }
+    shouldReturnErrorWithoutApiKeyHeader
 
-    "should return an error with incorrect X-API-KEY" in {
-      validateAuthorizationError(dex1.rawApi.saveSnapshots(Map.empty))
-    }
+    shouldReturnErrorWithIncorrectApiKeyValue
   }
 
 }

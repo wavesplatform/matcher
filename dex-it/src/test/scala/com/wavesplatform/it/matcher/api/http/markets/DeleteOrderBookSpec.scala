@@ -2,13 +2,12 @@ package com.wavesplatform.it.matcher.api.http.markets
 
 import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.domain.order.OrderType.SELL
-import com.wavesplatform.dex.it.api.RawHttpChecks
-import com.wavesplatform.dex.it.docker.apiKey
-import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
+import com.wavesplatform.dex.domain.order.OrderType.SELL
+import com.wavesplatform.dex.it.docker.apiKey
+import com.wavesplatform.it.matcher.api.http.HttpApiSuiteBase
 
-class DeleteOrderBookSpec extends MatcherSuiteBase with RawHttpChecks {
+class DeleteOrderBookSpec extends HttpApiSuiteBase {
 
   override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(
     s"""waves.dex {
@@ -35,14 +34,6 @@ class DeleteOrderBookSpec extends MatcherSuiteBase with RawHttpChecks {
       }
     }
 
-    "should return an error without x-api-key header" in {
-      validateAuthorizationError(dex1.rawApi.deleteOrderBook("WAVES", UsdId.toString, Map.empty))
-    }
-
-    "should return an error with incorrect x-api-key header" in {
-      validateAuthorizationError(dex1.rawApi.deleteOrderBook("WAVES", UsdId.toString, Map("X-API-KEY" -> "incorrect")))
-    }
-
     //TODO: DEX-986
     "should return an error if orderbook doesn't exists" ignore {
       validateMatcherError(
@@ -62,6 +53,10 @@ class DeleteOrderBookSpec extends MatcherSuiteBase with RawHttpChecks {
     "should return an error exception when the price asset is not correct base58 string" in {
       validate404Exception(dex1.rawApi.deleteOrderBook("WAVES", "null", Map("X-API-KEY" -> apiKey)))
     }
+
+    shouldReturnErrorWithoutApiKeyHeader
+
+    shouldReturnErrorWithIncorrectApiKeyValue
   }
 
 }

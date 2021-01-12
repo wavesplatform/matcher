@@ -4,6 +4,7 @@
 .ensime_cache/
 .metals/
 .bsp/
+matcher.iml
 
 # scala build folders and files
 target

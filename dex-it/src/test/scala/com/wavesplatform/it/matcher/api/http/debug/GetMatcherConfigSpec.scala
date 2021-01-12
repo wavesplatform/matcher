@@ -1,10 +1,9 @@
 package com.wavesplatform.it.matcher.api.http.debug
 
-import com.wavesplatform.dex.it.api.RawHttpChecks
 import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
-import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.matcher.api.http.HttpApiSuiteBase
 
-class GetMatcherConfigSpec extends MatcherSuiteBase with RawHttpChecks {
+class GetMatcherConfigSpec extends HttpApiSuiteBase {
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
@@ -19,13 +18,8 @@ class GetMatcherConfigSpec extends MatcherSuiteBase with RawHttpChecks {
       Set("user", "pass", "seed", "private", "java", "sun", "api").foreach(config should not contain _)
     }
 
-    "should return correct error with incorrect x-api-key header" in {
-      validateAuthorizationError(dex1.rawApi.getMatcherConfig(Map("X-API_KEY" -> "incorrect")))
-    }
+    shouldReturnErrorWithoutApiKeyHeader
 
-    "should return correct error without x-api-key header" in {
-      validateAuthorizationError(dex1.rawApi.getMatcherConfig(Map.empty))
-    }
+    shouldReturnErrorWithIncorrectApiKeyValue
   }
-
 }

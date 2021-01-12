@@ -9,32 +9,46 @@ import com.wavesplatform.dex.model.Events
 
 import scala.collection.immutable.Queue
 
-// TODO DEX-1041
-case class OrderEventsActorState(addresses: Map[Address, PendingAddress], knownOnNodeCache: FifoSet[ExchangeTransaction.Id]) {
+/**
+ * Holds changes (executed and cancel events and balance changes) until OrderExecuted is resolved by a transaction.
+ * It could be resolved in two ways:
+ * 1. Direct order:
+ *   1. We create and broadcast a transaction (withExecuted)
+ *   2. We hold changes for maker and taker
+ *   3. We receive the sent transaction from the blockchain stream (withKnownOnNodeTx, with same id)
+ *   4. Changes are passed
+ * 2. Indirect order:
+ *   1. We receive a transaction, which we haven't yet created (withKnownOnNodeTx)
+ *   2. We hold changes for maker and taker
+ *   3. We create the received transaction (withExecuted, with same id)
+ *   4. Changes are passed
+ */
+case class OrderEventsCoordinatorActorState(addresses: Map[Address, PendingAddress], knownOnNodeCache: FifoSet[ExchangeTransaction.Id]) {
 
   /**
    * @return (updated, passUpdates), passUpdates can be sent to recipients
    */
-  def withBalanceUpdates(updates: AddressAssets): (OrderEventsActorState, AddressAssets) = {
-    // TODO DEX-1041 probably, we need fold on addresses, because updates.size >> addresses.size
+  def withBalanceUpdates(updates: AddressAssets): (OrderEventsCoordinatorActorState, AddressAssets) = {
     val (updatedAddresses, passUpdates) = updates.foldLeft((addresses, Map.empty: AddressAssets)) {
       case ((addresses, passUpdates), item @ (address, updates)) =>
         addresses.get(address) match {
           case Some(x) => (addresses.updated(address, x.withUpdatedBalances(updates)), passUpdates)
-          case None => (addresses, passUpdates + item)
+          case None =>
+            if (updates.isEmpty) (addresses, passUpdates)
+            else (addresses, passUpdates + item)
         }
     }
 
-    (OrderEventsActorState(updatedAddresses, knownOnNodeCache), passUpdates)
+    (OrderEventsCoordinatorActorState(updatedAddresses, knownOnNodeCache), passUpdates)
   }
 
   /**
    * @return (updated, passEvent), passEvent can be sent to a recipient
    */
-  def withPendingCancel(event: Events.OrderCanceled): (OrderEventsActorState, Option[Events.OrderCanceled]) = {
+  def withPendingCancel(event: Events.OrderCanceled): (OrderEventsCoordinatorActorState, Option[Events.OrderCanceled]) = {
     val address = event.acceptedOrder.order.senderPublicKey.toAddress
     addresses.get(address) match {
-      case Some(x) => (OrderEventsActorState(addresses.updated(address, x.withEvent(event)), knownOnNodeCache), none)
+      case Some(x) => (OrderEventsCoordinatorActorState(addresses.updated(address, x.withEvent(event)), knownOnNodeCache), none)
       case _ => (this, event.some)
     }
   }
@@ -42,7 +56,10 @@ case class OrderEventsActorState(addresses: Map[Address, PendingAddress], knownO
   /**
    * @return (updated, resolved)
    */
-  def withExecuted(txId: ExchangeTransaction.Id, event: Events.OrderExecuted): (OrderEventsActorState, Map[Address, PendingAddress]) = {
+  def withKnownOnMatcher(
+    txId: ExchangeTransaction.Id,
+    event: Events.OrderExecuted
+  ): (OrderEventsCoordinatorActorState, Map[Address, PendingAddress]) = {
     lazy val defaultPendingAddress = PendingAddress(
       pendingTxs = Map[ExchangeTransaction.Id, PendingTransactionType](txId -> PendingTransactionType.KnownOnMatcher),
       stashedBalance = Map.empty,
@@ -56,20 +73,23 @@ case class OrderEventsActorState(addresses: Map[Address, PendingAddress], knownO
         else (addresses.updated(address, x), resolved)
     }
 
-    (OrderEventsActorState(updatedAddresses, knownOnNodeCache), resolved)
+    (OrderEventsCoordinatorActorState(updatedAddresses, knownOnNodeCache), resolved)
   }
 
   /**
    * @return (updated, passUpdates, resolved)
+   * @note balanceUpdates probably should be separated from withKnownOnNode
    */
-  def withKnownOnNodeTx(
+  def withKnownOnNode(
     traders: Set[Address],
     txId: ExchangeTransaction.Id,
     balanceUpdates: AddressAssets
-  ): (OrderEventsActorState, AddressAssets, Map[Address, PendingAddress]) =
-    if (knownOnNodeCache.contains(txId)) (this, balanceUpdates, Map.empty)
-    else {
-      val (updatedAddresses, restUpdates, resolved) = traders.foldLeft((addresses, balanceUpdates, Map.empty[Address, PendingAddress])) {
+  ): (OrderEventsCoordinatorActorState, AddressAssets, Map[Address, PendingAddress]) =
+    if (knownOnNodeCache.contains(txId)) {
+      val (updated, restUpdates) = withBalanceUpdates(balanceUpdates)
+      (updated, restUpdates, Map.empty)
+    } else {
+      val (updatedAddresses1, restUpdates1, resolved) = traders.foldLeft((addresses, balanceUpdates, Map.empty[Address, PendingAddress])) {
         case ((addresses, restUpdates, resolved), address) =>
           addresses.get(address) match {
             case Some(pendingAddress) =>
@@ -86,9 +106,19 @@ case class OrderEventsActorState(addresses: Map[Address, PendingAddress], knownO
           }
       }
 
+      val (updatedAddresses2, restUpdates2) = restUpdates1.foldLeft((updatedAddresses1, Map.empty: AddressAssets)) {
+        case ((addresses, restUpdates), pair @ (address, xs)) =>
+          addresses.get(address) match {
+            case Some(pendingAddress) => (addresses.updated(address, pendingAddress.withUpdatedBalances(xs)), restUpdates - address)
+            case None =>
+              if (xs.isEmpty) (addresses, restUpdates)
+              else (addresses, restUpdates + pair)
+          }
+      }
+
       (
-        OrderEventsActorState(updatedAddresses, knownOnNodeCache.append(txId)),
-        restUpdates,
+        OrderEventsCoordinatorActorState(updatedAddresses2, knownOnNodeCache.append(txId)),
+        restUpdates2,
         resolved
       )
     }

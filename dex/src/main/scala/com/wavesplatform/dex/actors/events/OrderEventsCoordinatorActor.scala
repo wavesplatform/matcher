@@ -78,7 +78,7 @@ object OrderEventsCoordinatorActor {
                     dbWriterRef ! txCreated
                     broadcasterRef ! Broadcaster.Broadcast(broadcastAdapter, tx)
 
-                    val (updatedState, resolved) = state.withExecuted(tx.id(), event)
+                    val (updatedState, resolved) = state.withKnownOnMatcher(tx.id(), event)
                     sendResolved(resolved) // TODO DEX-1042 pipeToSelf is needed if resolved?
 
                     holdUntilAppearOnNode(updatedState)
@@ -120,7 +120,7 @@ object OrderEventsCoordinatorActor {
                 case ((state, restBalances), (txId, tx)) if tx.tx.isExchangeTransaction =>
                   val traderAddresses = tx.tx.exchangeTransactionTraders
 
-                  val (updatedState, updatedRestBalances, resolved) = state.withKnownOnNodeTx(traderAddresses, txId, restBalances)
+                  val (updatedState, updatedRestBalances, resolved) = state.withKnownOnNode(traderAddresses, txId, restBalances)
                   sendResolved(resolved)
 
                   (updatedState, updatedRestBalances)
@@ -138,7 +138,7 @@ object OrderEventsCoordinatorActor {
             // * If it was before in UTX, then we received this before during UtxSwitched
             // * If it was added to UTX, then we will receive it
             // * If it won't retry, then we haven't received (neither as unconfirmed, nor confirmed) it and won't receive
-            val (updated, restBalances, resolved) = state.withKnownOnNodeTx(tx.traders, tx.id(), Map.empty)
+            val (updated, restBalances, resolved) = state.withKnownOnNode(tx.traders, tx.id(), Map.empty)
             sendResolved(resolved)
             sendBalances(restBalances) // Actually, they should be empty, but anyway
             holdUntilAppearOnNode(updated)

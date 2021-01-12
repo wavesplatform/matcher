@@ -34,7 +34,9 @@ case class OrderEventsCoordinatorActorState(addresses: Map[Address, PendingAddre
       case ((addresses, passUpdates), item @ (address, updates)) =>
         addresses.get(address) match {
           case Some(x) => (addresses.updated(address, x.withUpdatedBalances(updates)), passUpdates)
-          case None => (addresses, passUpdates + item)
+          case None =>
+            if (updates.isEmpty) (addresses, passUpdates)
+            else (addresses, passUpdates + item)
         }
     }
 
@@ -55,7 +57,10 @@ case class OrderEventsCoordinatorActorState(addresses: Map[Address, PendingAddre
   /**
    * @return (updated, resolved)
    */
-  def withExecuted(txId: ExchangeTransaction.Id, event: Events.OrderExecuted): (OrderEventsCoordinatorActorState, Map[Address, PendingAddress]) = {
+  def withKnownOnMatcher(
+    txId: ExchangeTransaction.Id,
+    event: Events.OrderExecuted
+  ): (OrderEventsCoordinatorActorState, Map[Address, PendingAddress]) = {
     lazy val defaultPendingAddress = PendingAddress(
       pendingTxs = Map[ExchangeTransaction.Id, PendingTransactionType](txId -> PendingTransactionType.KnownOnMatcher),
       stashedBalance = Map.empty,
@@ -74,14 +79,17 @@ case class OrderEventsCoordinatorActorState(addresses: Map[Address, PendingAddre
 
   /**
    * @return (updated, passUpdates, resolved)
+   * @note balanceUpdates probably should be separated from withKnownOnNode
    */
-  def withKnownOnNodeTx(
+  def withKnownOnNode(
     traders: Set[Address],
     txId: ExchangeTransaction.Id,
-    balanceUpdates: AddressAssets // it could contain not only trader changes!! <---
+    balanceUpdates: AddressAssets
   ): (OrderEventsCoordinatorActorState, AddressAssets, Map[Address, PendingAddress]) =
-    if (knownOnNodeCache.contains(txId)) (this, balanceUpdates, Map.empty)
-    else {
+    if (knownOnNodeCache.contains(txId)) {
+      val (updated, restUpdates) = withBalanceUpdates(balanceUpdates)
+      (updated, restUpdates, Map.empty)
+    } else {
       val (updatedAddresses1, restUpdates1, resolved) = traders.foldLeft((addresses, balanceUpdates, Map.empty[Address, PendingAddress])) {
         case ((addresses, restUpdates, resolved), address) =>
           addresses.get(address) match {
@@ -102,8 +110,10 @@ case class OrderEventsCoordinatorActorState(addresses: Map[Address, PendingAddre
       val (updatedAddresses2, restUpdates2) = restUpdates1.foldLeft((updatedAddresses1, Map.empty: AddressAssets)) {
         case ((addresses, restUpdates), pair @ (address, xs)) =>
           addresses.get(address) match {
-            case None => (addresses, restUpdates + pair)
             case Some(pendingAddress) => (addresses.updated(address, pendingAddress.withUpdatedBalances(xs)), restUpdates - address)
+            case None =>
+              if (xs.isEmpty) (addresses, restUpdates)
+              else (addresses, restUpdates + pair)
           }
       }
 

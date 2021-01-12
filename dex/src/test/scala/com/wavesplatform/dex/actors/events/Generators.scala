@@ -5,7 +5,7 @@ import com.wavesplatform.dex.domain.account.KeyPair.toPublicKey
 import com.wavesplatform.dex.domain.account.{Address, KeyPair}
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.bytes.ByteStr
-import com.wavesplatform.dex.domain.order.OrderType
+import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.gen.bytes32gen
 import com.wavesplatform.dex.model.Events.OrderCanceledReason
@@ -31,15 +31,18 @@ trait Generators extends WavesEntitiesGen {
     Gen.mapOfN(size, Gen.zip(definedAssetsGen, Gen.choose(0, 10L)))
   }
 
+  // With a constant price!
   protected def executedEventGen(counterGen: Gen[KeyPair] = keyPairGen, submitterGen: Gen[KeyPair] = keyPairGen): Gen[Events.OrderExecuted] =
     for {
       assetPair <- assetPairGen
       now = Gen.const(System.currentTimeMillis())
+      sellPrice <- orderPriceGen
       (counter, _) <- orderAndSenderGen(
         sideGen = Gen.const(OrderType.SELL),
         senderGen = counterGen,
         matcherGen = toPublicKey(matcher),
         assetPairGen = Gen.const(assetPair),
+        priceGen = Gen.const(sellPrice),
         timestampGen = now
       )
       (submitted, _) <- orderAndSenderGen(
@@ -47,6 +50,7 @@ trait Generators extends WavesEntitiesGen {
         senderGen = submitterGen,
         matcherGen = toPublicKey(matcher),
         assetPairGen = Gen.const(assetPair),
+        priceGen = Gen.choose(sellPrice, 1000L * Order.PriceConstant),
         timestampGen = now
       )
     } yield Events.OrderExecuted(

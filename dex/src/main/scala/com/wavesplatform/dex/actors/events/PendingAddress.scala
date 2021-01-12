@@ -6,7 +6,6 @@ import com.wavesplatform.dex.model.Events
 
 import scala.collection.immutable.Queue
 
-// TODO DEX-1041
 case class PendingAddress(
   pendingTxs: Map[ExchangeTransaction.Id, PendingTransactionType],
   stashedBalance: Map[Asset, Long],
@@ -35,7 +34,7 @@ case class PendingAddress(
 
   def withKnownOnMatcher(txId: ExchangeTransaction.Id, event: Events.OrderExecuted): PendingAddress =
     pendingTxs.get(txId) match {
-      case Some(PendingTransactionType.KnownOnMatcher) => this // ???
+      case Some(PendingTransactionType.KnownOnMatcher) => this
       case Some(PendingTransactionType.KnownOnNode) =>
         copy(
           pendingTxs = pendingTxs - txId,

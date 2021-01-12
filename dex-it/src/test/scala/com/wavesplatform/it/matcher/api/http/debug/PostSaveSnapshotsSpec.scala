@@ -33,9 +33,9 @@ class PostSaveSnapshotsSpec extends HttpApiSuiteBase {
       }
     }
 
-    shouldReturnErrorWithoutApiKeyHeader
+    shouldReturnErrorWithoutApiKeyHeader()
 
-    shouldReturnErrorWithIncorrectApiKeyValue
+    shouldReturnErrorWithIncorrectApiKeyValue()
   }
 
 }

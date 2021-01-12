@@ -66,8 +66,8 @@ class UpdateRatesByAssetIdSpec extends HttpApiSuiteBase {
       validate404Exception(dex1.rawApi.upsertRate("null", 0.1))
     }
 
-    shouldReturnErrorWithoutApiKeyHeader
+    shouldReturnErrorWithoutApiKeyHeader()
 
-    shouldReturnErrorWithIncorrectApiKeyValue
+    shouldReturnErrorWithIncorrectApiKeyValue()
   }
 }

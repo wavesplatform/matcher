@@ -32,9 +32,9 @@ class GetCurrentOffsetSpec extends HttpApiSuiteBase {
       validate200Json(dex1.rawApi.getCurrentOffset) should be(2)
     }
 
-    shouldReturnErrorWithoutApiKeyHeader
+    shouldReturnErrorWithoutApiKeyHeader()
 
-    shouldReturnErrorWithIncorrectApiKeyValue
+    shouldReturnErrorWithIncorrectApiKeyValue()
   }
 
 }

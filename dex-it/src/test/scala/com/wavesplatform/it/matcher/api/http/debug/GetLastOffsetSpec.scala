@@ -32,9 +32,9 @@ class GetLastOffsetSpec extends HttpApiSuiteBase {
       validate200Json(dex1.rawApi.getLastOffset) should be(2)
     }
 
-    shouldReturnErrorWithoutApiKeyHeader
+    shouldReturnErrorWithoutApiKeyHeader()
 
-    shouldReturnErrorWithIncorrectApiKeyValue
+    shouldReturnErrorWithIncorrectApiKeyValue()
   }
 
 }

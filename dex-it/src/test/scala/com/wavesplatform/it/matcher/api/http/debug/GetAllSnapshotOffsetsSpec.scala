@@ -40,9 +40,9 @@ class GetAllSnapshotOffsetsSpec extends HttpApiSuiteBase {
       }
     }
 
-    shouldReturnErrorWithoutApiKeyHeader
+    shouldReturnErrorWithoutApiKeyHeader()
 
-    shouldReturnErrorWithIncorrectApiKeyValue
+    shouldReturnErrorWithIncorrectApiKeyValue()
   }
 
 }

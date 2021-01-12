@@ -34,9 +34,9 @@ class GetOldestSnapshotOffsetSpec extends HttpApiSuiteBase {
       validate200Json(dex1.rawApi.getOldestSnapshotOffset) should be(2)
     }
 
-    shouldReturnErrorWithoutApiKeyHeader
+    shouldReturnErrorWithoutApiKeyHeader()
 
-    shouldReturnErrorWithIncorrectApiKeyValue
+    shouldReturnErrorWithIncorrectApiKeyValue()
   }
 
 }

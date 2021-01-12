@@ -82,9 +82,9 @@ class GetOrderHistoryByApiKeySpec extends HttpApiSuiteBase {
       )
     }
 
-    shouldReturnErrorWithoutApiKeyHeader
+    shouldReturnErrorWithoutApiKeyHeader()
 
-    shouldReturnErrorWithIncorrectApiKeyValue
+    shouldReturnErrorWithIncorrectApiKeyValue()
   }
 
 }

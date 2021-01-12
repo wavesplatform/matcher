@@ -83,9 +83,9 @@ class CancelOrderByIdSpec extends HttpApiSuiteBase {
       )
     }
 
-    shouldReturnErrorWithoutApiKeyHeader
+    shouldReturnErrorWithoutApiKeyHeader()
 
-    shouldReturnErrorWithIncorrectApiKeyValue
+    shouldReturnErrorWithIncorrectApiKeyValue()
 
   }
 }

@@ -54,9 +54,9 @@ class DeleteOrderBookSpec extends HttpApiSuiteBase {
       validate404Exception(dex1.rawApi.deleteOrderBook("WAVES", "null", Map("X-API-KEY" -> apiKey)))
     }
 
-    shouldReturnErrorWithoutApiKeyHeader
+    shouldReturnErrorWithoutApiKeyHeader()
 
-    shouldReturnErrorWithIncorrectApiKeyValue
+    shouldReturnErrorWithIncorrectApiKeyValue()
   }
 
 }

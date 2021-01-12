@@ -47,8 +47,8 @@ class DeleteRatesSpec extends HttpApiSuiteBase {
       validate404Exception(dex1.rawApi.deleteRate("null", Map("X-API-Key" -> apiKey)))
     }
 
-    shouldReturnErrorWithoutApiKeyHeader
+    shouldReturnErrorWithoutApiKeyHeader()
 
-    shouldReturnErrorWithIncorrectApiKeyValue
+    shouldReturnErrorWithIncorrectApiKeyValue()
   }
 }

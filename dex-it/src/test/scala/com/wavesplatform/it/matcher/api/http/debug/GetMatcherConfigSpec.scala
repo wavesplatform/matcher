@@ -18,8 +18,8 @@ class GetMatcherConfigSpec extends HttpApiSuiteBase {
       Set("user", "pass", "seed", "private", "java", "sun", "api").foreach(config should not contain _)
     }
 
-    shouldReturnErrorWithoutApiKeyHeader
+    shouldReturnErrorWithoutApiKeyHeader()
 
-    shouldReturnErrorWithIncorrectApiKeyValue
+    shouldReturnErrorWithIncorrectApiKeyValue()
   }
 }

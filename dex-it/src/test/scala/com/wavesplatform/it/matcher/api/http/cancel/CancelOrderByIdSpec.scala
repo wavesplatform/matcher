@@ -24,7 +24,7 @@ class CancelOrderByIdSpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
   }
 
   protected def placeAndGetIds(count: Int): Set[String] =
-    (0 to count).map { i =>
+    (1 to count).map { i =>
       val o = mkOrder(alice, wavesUsdPair, BUY, 10.waves, i.usd)
       placeAndAwaitAtDex(o)
       o.idStr()

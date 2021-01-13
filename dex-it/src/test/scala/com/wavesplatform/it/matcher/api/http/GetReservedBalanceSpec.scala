@@ -1,6 +1,7 @@
 package com.wavesplatform.it.matcher.api.http
 
 import com.google.common.primitives.Longs
+import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.bytes.codec.Base58
@@ -58,7 +59,12 @@ class GetReservedBalanceSpec extends MatcherSuiteBase with TableDrivenPropertyCh
 
     //TODO: change after DEX-978
     "should return an error if publicKey is not correct base58 string" in {
-      validate404Exception(dex1.rawApi.getReservedBalance("null", System.currentTimeMillis, "sign"))
+      validateMatcherError(
+        dex1.rawApi.getReservedBalance("null", System.currentTimeMillis, "sign"),
+        StatusCodes.BadRequest,
+        4194304,
+        "Provided public key in not correct, reason: Unable to decode base58: requirement failed: Wrong char 'l' in Base58 string 'null'"
+      )
     }
 
     "should return an error if publicKey parameter has the different value of used in signature" in {

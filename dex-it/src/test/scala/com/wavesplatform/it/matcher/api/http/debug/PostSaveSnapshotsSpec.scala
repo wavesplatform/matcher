@@ -2,9 +2,10 @@ package com.wavesplatform.it.matcher.api.http.debug
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.order.OrderType.BUY
-import com.wavesplatform.it.matcher.api.http.HttpApiSuiteBase
+import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.matcher.api.http.ApiKeyHeaderChecks
 
-class PostSaveSnapshotsSpec extends HttpApiSuiteBase {
+class PostSaveSnapshotsSpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
 
   override protected def dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(
@@ -29,13 +30,13 @@ class PostSaveSnapshotsSpec extends HttpApiSuiteBase {
 
       validate200Json(dex1.rawApi.saveSnapshots).message should be("Saving started")
       eventually {
-        validate200Json(dex1.rawApi.getAllSnapshotOffsets) should have size (1)
+        validate200Json(dex1.rawApi.getAllSnapshotOffsets) should have size 1
       }
     }
 
-    shouldReturnErrorWithoutApiKeyHeader()
+    shouldReturnErrorWithoutApiKeyHeader(dex1.rawApi.saveSnapshots(Map.empty))
 
-    shouldReturnErrorWithIncorrectApiKeyValue()
+    shouldReturnErrorWithIncorrectApiKeyValue(dex1.rawApi.saveSnapshots(incorrectApiKeyHeader))
   }
 
 }

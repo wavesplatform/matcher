@@ -5,9 +5,10 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.order.OrderType.BUY
 import com.wavesplatform.dex.it.docker.apiKey
-import com.wavesplatform.it.matcher.api.http.HttpApiSuiteBase
+import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.matcher.api.http.ApiKeyHeaderChecks
 
-class CancelOrderByIdSpec extends HttpApiSuiteBase {
+class CancelOrderByIdSpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
 
   override protected def dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(
@@ -21,6 +22,13 @@ class CancelOrderByIdSpec extends HttpApiSuiteBase {
     broadcastAndAwait(IssueUsdTx)
     dex1.start()
   }
+
+  protected def placeAndGetIds(count: Int): Set[String] =
+    (0 to count).map { i =>
+      val o = mkOrder(alice, wavesUsdPair, BUY, 10.waves, i.usd)
+      placeAndAwaitAtDex(o)
+      o.idStr()
+    }.toSet
 
   "POST /matcher/orders/cancel/{id}" - {
     "should cancel order by id" in {
@@ -83,9 +91,13 @@ class CancelOrderByIdSpec extends HttpApiSuiteBase {
       )
     }
 
-    shouldReturnErrorWithoutApiKeyHeader()
+    shouldReturnErrorWithoutApiKeyHeader(dex1.rawApi.cancelAllByAddressAndIds(alice.toAddress.stringRepr, placeAndGetIds(3), Map.empty))
 
-    shouldReturnErrorWithIncorrectApiKeyValue()
+    shouldReturnErrorWithIncorrectApiKeyValue(dex1.rawApi.cancelAllByAddressAndIds(
+      alice.toAddress.stringRepr,
+      placeAndGetIds(3),
+      Map("X-API-KEY" -> "incorrect")
+    ))
 
   }
 }

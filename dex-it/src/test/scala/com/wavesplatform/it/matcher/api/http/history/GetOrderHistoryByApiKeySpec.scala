@@ -6,9 +6,10 @@ import com.wavesplatform.dex.domain.account.KeyPair.toAddress
 import com.wavesplatform.dex.domain.order.OrderType.BUY
 import com.wavesplatform.dex.it.docker.apiKey
 import com.wavesplatform.dex.model.OrderStatus
-import com.wavesplatform.it.matcher.api.http.{HttpApiSuiteBase, toHttpOrderBookHistoryItem}
+import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.matcher.api.http.{toHttpOrderBookHistoryItem, ApiKeyHeaderChecks}
 
-class GetOrderHistoryByApiKeySpec extends HttpApiSuiteBase {
+class GetOrderHistoryByApiKeySpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
 
   override protected def dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(
@@ -82,9 +83,9 @@ class GetOrderHistoryByApiKeySpec extends HttpApiSuiteBase {
       )
     }
 
-    shouldReturnErrorWithoutApiKeyHeader()
+    shouldReturnErrorWithoutApiKeyHeader(dex1.rawApi.getOrderHistoryByApiKey(toAddress(alice).stringRepr, false, true, Map.empty))
 
-    shouldReturnErrorWithIncorrectApiKeyValue()
+    shouldReturnErrorWithIncorrectApiKeyValue(dex1.rawApi.getOrderHistoryByApiKey(toAddress(alice).stringRepr, false, true, incorrectApiKeyHeader))
   }
 
 }

@@ -6,11 +6,11 @@ import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
-import com.wavesplatform.dex.it.api.RawHttpChecks
 import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.matcher.api.http.ApiKeyHeaderChecks
 import org.scalatest.prop.TableDrivenPropertyChecks
 
-class GetReservedBalanceSpec extends MatcherSuiteBase with TableDrivenPropertyChecks with RawHttpChecks {
+class GetReservedBalanceSpec extends MatcherSuiteBase with TableDrivenPropertyChecks with ApiKeyHeaderChecks {
 
   override protected def dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(
@@ -52,9 +52,9 @@ class GetReservedBalanceSpec extends MatcherSuiteBase with TableDrivenPropertyCh
       validate200Json(dex1.rawApi.getReservedBalanceWithApiKey(acc)) should be(Map(Waves -> 9.009.waves, usd -> 20.usd))
     }
 
-    "should return non-zero balances with incorrect X-API-KEY" in {
-      validateAuthorizationError(dex1.rawApi.getReservedBalance(Base58.encode(alice.publicKey), Map("X-API-KEY" -> "incorrect")))
-    }
+    shouldReturnErrorWithoutApiKeyHeader(dex1.rawApi.getReservedBalance(Base58.encode(alice.publicKey), headers = Map.empty))
+
+    shouldReturnErrorWithIncorrectApiKeyValue(dex1.rawApi.getReservedBalance(Base58.encode(alice.publicKey), incorrectApiKeyHeader))
 
     //TODO: change after DEX-978
     "should return an error if publicKey is not correct base58 string" in {

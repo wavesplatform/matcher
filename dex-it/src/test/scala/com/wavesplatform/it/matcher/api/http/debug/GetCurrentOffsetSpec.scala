@@ -2,9 +2,10 @@ package com.wavesplatform.it.matcher.api.http.debug
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.order.OrderType.BUY
-import com.wavesplatform.it.matcher.api.http.HttpApiSuiteBase
+import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.matcher.api.http.ApiKeyHeaderChecks
 
-class GetCurrentOffsetSpec extends HttpApiSuiteBase {
+class GetCurrentOffsetSpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
 
   override protected def dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(
@@ -32,9 +33,9 @@ class GetCurrentOffsetSpec extends HttpApiSuiteBase {
       validate200Json(dex1.rawApi.getCurrentOffset) should be(2)
     }
 
-    shouldReturnErrorWithoutApiKeyHeader()
+    shouldReturnErrorWithoutApiKeyHeader(dex1.rawApi.getLastOffset(Map.empty))
 
-    shouldReturnErrorWithIncorrectApiKeyValue()
+    shouldReturnErrorWithIncorrectApiKeyValue(dex1.rawApi.getLastOffset(incorrectApiKeyHeader))
   }
 
 }

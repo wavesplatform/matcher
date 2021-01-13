@@ -5,9 +5,10 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.order.OrderType.SELL
 import com.wavesplatform.dex.it.docker.apiKey
-import com.wavesplatform.it.matcher.api.http.HttpApiSuiteBase
+import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.matcher.api.http.ApiKeyHeaderChecks
 
-class DeleteOrderBookSpec extends HttpApiSuiteBase {
+class DeleteOrderBookSpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
 
   override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(
     s"""waves.dex {
@@ -54,9 +55,9 @@ class DeleteOrderBookSpec extends HttpApiSuiteBase {
       validate404Exception(dex1.rawApi.deleteOrderBook("WAVES", "null", Map("X-API-KEY" -> apiKey)))
     }
 
-    shouldReturnErrorWithoutApiKeyHeader()
+    shouldReturnErrorWithoutApiKeyHeader(dex1.rawApi.deleteOrderBook("WAVES", UsdId.toString, Map.empty))
 
-    shouldReturnErrorWithIncorrectApiKeyValue()
+    shouldReturnErrorWithIncorrectApiKeyValue(dex1.rawApi.deleteOrderBook("WAVES", UsdId.toString, incorrectApiKeyHeader))
   }
 
 }

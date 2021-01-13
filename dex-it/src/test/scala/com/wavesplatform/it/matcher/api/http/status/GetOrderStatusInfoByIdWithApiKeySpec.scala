@@ -7,10 +7,11 @@ import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.it.docker.apiKey
 import com.wavesplatform.dex.model.OrderStatus
-import com.wavesplatform.it.matcher.api.http.{HttpApiSuiteBase, toHttpOrderBookHistoryItem}
+import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.matcher.api.http.{toHttpOrderBookHistoryItem, ApiKeyHeaderChecks}
 import org.scalatest.prop.TableDrivenPropertyChecks
 
-class GetOrderStatusInfoByIdWithApiKeySpec extends HttpApiSuiteBase with TableDrivenPropertyChecks {
+class GetOrderStatusInfoByIdWithApiKeySpec extends MatcherSuiteBase with ApiKeyHeaderChecks with TableDrivenPropertyChecks {
 
   override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(
     s"""waves.dex {
@@ -92,9 +93,13 @@ class GetOrderStatusInfoByIdWithApiKeySpec extends HttpApiSuiteBase with TableDr
       )
     }
 
-    shouldReturnErrorWithoutApiKeyHeader()
+    shouldReturnErrorWithoutApiKeyHeader(dex1.rawApi.getOrderStatusInfoById(alice.toAddress.stringRepr, order.idStr(), Map.empty))
 
-    shouldReturnErrorWithIncorrectApiKeyValue()
+    shouldReturnErrorWithIncorrectApiKeyValue(dex1.rawApi.getOrderStatusInfoById(
+      alice.toAddress.stringRepr,
+      order.idStr(),
+      Map("X-API-KEY" -> "incorrect")
+    ))
 
     "should return an error when the order doesn't exist" in {
       val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd)

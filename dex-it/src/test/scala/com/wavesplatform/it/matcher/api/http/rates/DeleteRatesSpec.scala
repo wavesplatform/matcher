@@ -5,9 +5,10 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpRates
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.it.docker.apiKey
-import com.wavesplatform.it.matcher.api.http.HttpApiSuiteBase
+import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.matcher.api.http.ApiKeyHeaderChecks
 
-class DeleteRatesSpec extends HttpApiSuiteBase {
+class DeleteRatesSpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
 
   val defaultRates: HttpRates = Map(Waves -> 1d)
 
@@ -47,8 +48,8 @@ class DeleteRatesSpec extends HttpApiSuiteBase {
       validate404Exception(dex1.rawApi.deleteRate("null", Map("X-API-Key" -> apiKey)))
     }
 
-    shouldReturnErrorWithoutApiKeyHeader()
+    shouldReturnErrorWithoutApiKeyHeader(dex1.rawApi.deleteRate(UsdId.toString, Map.empty))
 
-    shouldReturnErrorWithIncorrectApiKeyValue()
+    shouldReturnErrorWithIncorrectApiKeyValue(dex1.rawApi.deleteRate(UsdId.toString, incorrectApiKeyHeader))
   }
 }

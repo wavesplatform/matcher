@@ -2,9 +2,10 @@ package com.wavesplatform.it.matcher.api.http.debug
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.order.OrderType.BUY
-import com.wavesplatform.it.matcher.api.http.HttpApiSuiteBase
+import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.matcher.api.http.ApiKeyHeaderChecks
 
-class GetAllSnapshotOffsetsSpec extends HttpApiSuiteBase {
+class GetAllSnapshotOffsetsSpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
 
   override protected def dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(
@@ -40,9 +41,9 @@ class GetAllSnapshotOffsetsSpec extends HttpApiSuiteBase {
       }
     }
 
-    shouldReturnErrorWithoutApiKeyHeader()
+    shouldReturnErrorWithoutApiKeyHeader(dex1.rawApi.getAllSnapshotOffsets(Map.empty))
 
-    shouldReturnErrorWithIncorrectApiKeyValue()
+    shouldReturnErrorWithIncorrectApiKeyValue(dex1.rawApi.getAllSnapshotOffsets(incorrectApiKeyHeader))
   }
 
 }

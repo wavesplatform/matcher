@@ -5,6 +5,9 @@
 .metals/
 .bsp/
 matcher.iml
+.bloop/
+project/metals.sbt
+project/project/
 
 # scala build folders and files
 target

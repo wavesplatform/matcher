@@ -5,6 +5,9 @@ import com.wavesplatform.dex.collections.MapOps.Ops2D
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 
+/**
+  * @param outLeases Are always positive
+  */
 case class BlockchainBalance(regular: Map[Address, Map[Asset, Long]], outLeases: Map[Address, Long]) {
 
   def diffIndex: DiffIndex = DiffIndex(

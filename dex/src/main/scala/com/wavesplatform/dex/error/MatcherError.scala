@@ -589,7 +589,7 @@ case class SubscriptionsLimitReached(limit: Int, id: String)
     )
 
 case class InvalidPublicKey(reason: String)
-  extends MatcherError(address, commonEntity, commonClass, e"Provided public key in not correct, reason: ${Symbol("reason") -> reason}")
+  extends MatcherError(pubKey, commonEntity, commonClass, e"Provided public key in not correct, reason: ${Symbol("reason") -> reason}")
 
 case class InvalidAddress(reason: String)
     extends MatcherError(address, commonEntity, commonClass, e"Provided address in not correct, reason: ${Symbol("reason") -> reason}")

@@ -525,7 +525,15 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
 
       "public key" in test { route =>
         mkGet(route)(";;", ts, Base58.encode(signature)) ~> check {
-          handled shouldBe false
+          responseAs[HttpError] should matchTo(
+            HttpError(
+              error = 12582912,
+              message = "Provided public key in not correct, reason: Invalid public key: Unable to decode base58: requirement failed: Wrong char ';' in Base58 string ';;'",
+              template = "Provided public key in not correct, reason: {{reason}}",
+              params = Some(Json.obj("reason" -> "Invalid public key: Unable to decode base58: requirement failed: Wrong char ';' in Base58 string ';;'")),
+              status = "InvalidPublicKey"
+            )
+          )
         }
       }
     }

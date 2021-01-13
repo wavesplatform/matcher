@@ -62,7 +62,7 @@ class GetReservedBalanceSpec extends MatcherSuiteBase with TableDrivenPropertyCh
       validateMatcherError(
         dex1.rawApi.getReservedBalance("null", System.currentTimeMillis, "sign"),
         StatusCodes.BadRequest,
-        4194304,
+        12582912,
         "Provided public key in not correct, reason: Unable to decode base58: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )
     }

@@ -10,7 +10,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeUpdates
+import com.wavesplatform.dex.grpc.integration.clients.domain.{AddressBalanceUpdates, WavesNodeUpdates}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.settings.WavesBlockchainClientSettings
 import monix.eval.Task
@@ -26,19 +26,20 @@ class MatcherExtensionAssetsWatchingClient(
     extends WavesBlockchainClient
     with ScorexLogging {
 
-  override def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] =
-    saveAssetsDescription(assets) *> underlying.spendableBalances(address, assets)
+  // TODO without "snapshot" word?
+  override def partialBalancesSnapshot(address: Address, assets: Set[Asset]): Future[AddressBalanceUpdates] =
+    saveAssetsDescription(assets) *> underlying.partialBalancesSnapshot(address, assets)
 
-  override def allAssetsSpendableBalance(address: Address, excludeAssets: Set[Asset]): Future[Map[Asset, Long]] =
+  override def fullBalancesSnapshot(address: Address, excludeAssets: Set[Asset]): Future[AddressBalanceUpdates] =
     for {
-      xs <- underlying.allAssetsSpendableBalance(address, excludeAssets)
-      _ <- saveAssetsDescription(xs.keySet)
+      xs <- underlying.fullBalancesSnapshot(address, excludeAssets)
+      _ <- saveAssetsDescription(xs.regular.keySet ++ xs.pessimisticCorrection.keySet)
     } yield xs
 
   override lazy val updates: Observable[WavesNodeUpdates] = underlying
     .updates
     .mapEval { xs =>
-      val assets = xs.balanceUpdates.valuesIterator.flatMap(_.keysIterator).toSet
+      val assets = xs.balanceUpdates.valuesIterator.flatMap(x => x.regular.keysIterator ++ x.pessimisticCorrection.keysIterator).toSet
       Task.fromFuture(saveAssetsDescription(assets)).map(_ => xs)
     }
 

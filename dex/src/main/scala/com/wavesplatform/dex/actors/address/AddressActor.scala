@@ -265,11 +265,11 @@ class AddressActor(
       }
 
       val changesForAudit = spendableAfter.filter {
-        case (asset, v) => spendableBefore(asset) > v
+        // "exist" solves (I believe the rare case) when we receive: PlaceOrder, BalanceChanged, GotPartialBalancesByRequest
+        case (asset, v) => spendableBefore.get(asset).exists(_ > 0)
       }
 
       val toCancel = getOrdersToCancel(changesForAudit).filterNot(ao => isCancelling(ao.order.id()))
-
       if (toCancel.isEmpty) log.trace(s"Got $msg, nothing to cancel")
       else {
         val cancelledText = toCancel.map(x => s"${x.insufficientAmount} ${x.assetId} for ${x.order.idStr()}").mkString(", ")
@@ -697,9 +697,7 @@ object AddressActor {
   sealed trait Message
 
   object Message {
-
     case class BalanceChanged(updates: AddressBalanceUpdates) extends Message
-
   }
 
   sealed trait Query extends Message
@@ -809,6 +807,7 @@ object AddressActor {
     val default: Settings = Settings(100.milliseconds, 20.seconds, 200)
   }
 
+  // TODO merge with BalanceUpdated and cancel orders too?
   final private case class GotPartialBalancesByRequest(partial: AddressBalanceUpdates)
   final private case class GotFullBalancesByRequest(full: Either[MatcherError, AddressBalanceUpdates])
 

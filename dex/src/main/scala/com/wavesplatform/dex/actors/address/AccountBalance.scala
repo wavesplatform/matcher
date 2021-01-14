@@ -83,7 +83,7 @@ object AccountBalance {
   val empty = AccountBalance(
     allFetched = false,
     regular = Map.empty,
-    outLease = 0L,
+    outLease = None,
     pessimisticCorrection = Map.empty,
     openVolume = Map.empty
   )

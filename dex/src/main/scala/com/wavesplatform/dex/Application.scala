@@ -202,10 +202,10 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   private val addressActorBlockchainInteraction = new AddressActor.BlockchainInteraction {
 
     override def getFullBalances(address: Address, exclude: Set[Asset]): Future[AddressBalanceUpdates] =
-      wavesBlockchainAsyncClient.allAssetsSpendableBalance(address, exclude)
+      wavesBlockchainAsyncClient.fullBalancesSnapshot(address, exclude)
 
     override def getPartialBalances(address: Address, assets: Set[Asset]): Future[AddressBalanceUpdates] =
-      wavesBlockchainAsyncClient.spendableBalances(address, assets)
+      wavesBlockchainAsyncClient.partialBalancesSnapshot(address, assets)
 
   }
 

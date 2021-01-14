@@ -31,16 +31,19 @@ service WavesBlockchainApi {
 
     rpc RunAddressScript (RunAddressScriptRequest) returns (RunScriptResponse);
 
+    // TODO
     rpc SpendableAssetsBalances (SpendableAssetsBalancesRequest) returns (SpendableAssetsBalancesResponse);
 
     rpc ForgedOrder (ForgedOrderRequest) returns (ForgedOrderResponse);
 
     rpc GetUtxEvents (google.protobuf.Empty) returns (stream UtxEvent);
 
+    // TODO
     rpc AllAssetsSpendableBalance (AddressRequest) returns (AllAssetsSpendableBalanceResponse);
 
     rpc GetCurrentBlockInfo (google.protobuf.Empty) returns (CurrentBlockInfoResponse);
 
+    // TODO
     rpc GetBalances (GetBalancesRequest) returns (GetBalancesResponse);
 }
 

@@ -57,13 +57,12 @@ class GetReservedBalanceSpec extends MatcherSuiteBase with TableDrivenPropertyCh
       validateAuthorizationError(dex1.rawApi.getReservedBalance(Base58.encode(alice.publicKey), Map("X-API-KEY" -> "incorrect")))
     }
 
-    //TODO: change after DEX-978
     "should return an error if publicKey is not correct base58 string" in {
       validateMatcherError(
         dex1.rawApi.getReservedBalance("null", System.currentTimeMillis, "sign"),
         StatusCodes.BadRequest,
         12582912,
-        "Provided public key in not correct, reason: Unable to decode base58: requirement failed: Wrong char 'l' in Base58 string 'null'"
+        "Provided public key in not correct, reason: Invalid public key: Unable to decode base58: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )
     }
 

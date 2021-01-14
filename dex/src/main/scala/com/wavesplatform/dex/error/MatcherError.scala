@@ -536,7 +536,7 @@ case object ApiKeyIsNotProvided
 case object ApiKeyIsNotValid extends MatcherError(auth, commonEntity, commonClass, e"Provided API key is not correct")
 
 case class UserPublicKeyIsNotValid(reason: String = "invalid public key")
-    extends MatcherError(account, pubKey, broken, e"Provided public key in not correct, reason: ${Symbol("reason") -> reason}")
+    extends MatcherError(account, pubKey, broken, e"Provided public key is not correct, reason: ${Symbol("reason") -> reason}")
 
 case class AddressAndPublicKeyAreIncompatible(address: Address, publicKey: PublicKey)
     extends MatcherError(

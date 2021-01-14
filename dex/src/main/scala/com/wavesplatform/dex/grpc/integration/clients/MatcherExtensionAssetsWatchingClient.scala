@@ -38,7 +38,7 @@ class MatcherExtensionAssetsWatchingClient(
   override lazy val updates: Observable[WavesNodeUpdates] = underlying
     .updates
     .mapEval { xs =>
-      val assets = xs.updatedBalances.valuesIterator.flatMap(_.keysIterator).toSet
+      val assets = xs.balanceUpdates.valuesIterator.flatMap(_.keysIterator).toSet
       Task.fromFuture(saveAssetsDescription(assets)).map(_ => xs)
     }
 

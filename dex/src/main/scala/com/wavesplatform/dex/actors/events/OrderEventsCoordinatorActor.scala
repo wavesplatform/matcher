@@ -9,7 +9,7 @@ import com.wavesplatform.dex.actors.tx.ExchangeTransactionBroadcastActor.{Confir
 import com.wavesplatform.dex.collections.FifoSet
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
-import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeUpdates
+import com.wavesplatform.dex.grpc.integration.clients.domain.{AddressBalanceUpdates, WavesNodeUpdates}
 import com.wavesplatform.dex.grpc.integration.clients.domain.portfolio.AddressAssets
 import com.wavesplatform.dex.grpc.integration.ops.SignedTransactionOps.Implicits
 import com.wavesplatform.dex.model.Events
@@ -48,7 +48,7 @@ object OrderEventsCoordinatorActor {
       )
     }
 
-    def sendBalances(balances: AddressAssets): Unit = balances.view.filter(_._2.nonEmpty).foreach { case (address, balances) =>
+    def sendBalances(updates: AddressBalanceUpdates): Unit = update.view.filter(_._2.nonEmpty).foreach { case (address, balances) =>
       addressDirectoryRef ! AddressDirectoryActor.Envelope(
         address,
         AddressActor.Message.BalanceChanged(balances.keySet, balances)
@@ -116,7 +116,7 @@ object OrderEventsCoordinatorActor {
             // All transactions are exchange and from this matcher's account
             val (updatedState1, balancesAfterTxs) = (updates.unconfirmedTxs ++ updates.confirmedTxs ++ updates.failedTxs)
               .filterNot { case (txId, _) => state.knownOnNodeCache.contains(txId) }
-              .foldLeft((state, updates.updatedBalances)) {
+              .foldLeft((state, updates.balanceUpdates)) {
                 case ((state, restBalances), (txId, tx)) if tx.tx.isExchangeTransaction =>
                   val traderAddresses = tx.tx.exchangeTransactionTraders
 
@@ -170,7 +170,7 @@ object OrderEventsCoordinatorActor {
           Behaviors.same
 
         case Command.ApplyUpdates(updates) =>
-          sendBalances(updates.updatedBalances)
+          sendBalances(updates.balanceUpdates)
           Behaviors.same
 
         case Command.Start => holdUntilAppearOnNode(OrderEventsCoordinatorActorState(Map.empty, FifoSet.limited(10000))) // TODO DEX-1042 settings

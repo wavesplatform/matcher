@@ -3,6 +3,7 @@ package com.wavesplatform.dex.actors.address
 import akka.actor.{Actor, ActorRef, Props, SupervisorStrategy, Terminated}
 import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.dex.domain.account.Address
+import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.utils.{EitherExt2, ScorexLogging}
 import com.wavesplatform.dex.history.HistoryRouterActor._
 import com.wavesplatform.dex.model.Events

@@ -2,16 +2,17 @@ package com.wavesplatform.dex
 
 import akka.Done
 import akka.actor.typed.scaladsl.adapter._
-import akka.actor.{typed, ActorRef, ActorSystem, CoordinatedShutdown, Props}
+import akka.actor.{ActorRef, ActorSystem, CoordinatedShutdown, Props, typed}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Directives.respondWithHeader
-import akka.pattern.{ask, gracefulStop, CircuitBreaker}
+import akka.pattern.{CircuitBreaker, ask, gracefulStop}
 import akka.stream.Materializer
 import akka.util.Timeout
 import cats.data.EitherT
 import cats.instances.future.catsStdInstancesForFuture
 import cats.syntax.functor._
 import cats.syntax.option._
+import cats.syntax.either._
 import ch.qos.logback.classic.LoggerContext
 import com.typesafe.config._
 import com.wavesplatform.dex.actors.ActorSystemOps.ImplicitOps
@@ -19,7 +20,7 @@ import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor
 import com.wavesplatform.dex.actors.events.OrderEventsCoordinatorActor
 import com.wavesplatform.dex.actors.orderbook.{AggregatedOrderBookActor, OrderBookActor, OrderBookSnapshotStoreActor}
 import com.wavesplatform.dex.actors.tx.{ExchangeTransactionBroadcastActor, WriteExchangeTransactionActor}
-import com.wavesplatform.dex.actors.{MatcherActor, OrderBookAskAdapter, RootActorSystem, SpendableBalancesActor}
+import com.wavesplatform.dex.actors.{MatcherActor, OrderBookAskAdapter, RootActorSystem}
 import com.wavesplatform.dex.api.http.headers.{CustomMediaTypes, MatcherHttpServer}
 import com.wavesplatform.dex.api.http.routes.{MatcherApiRoute, MatcherApiRouteV1}
 import com.wavesplatform.dex.api.http.{CompositeHttpService, OrderBookHttpInfo}
@@ -35,9 +36,10 @@ import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.utils.{EitherExt2, LoggerFacade, ScorexLogging}
-import com.wavesplatform.dex.effect.{liftValueAsync, FutureResult}
+import com.wavesplatform.dex.effect.{FutureResult, liftValueAsync}
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
 import com.wavesplatform.dex.grpc.integration.WavesClientBuilder
+import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
 import com.wavesplatform.dex.grpc.integration.clients.{MatcherExtensionAssetsWatchingClient, WavesBlockchainClient}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.history.HistoryRouterActor
@@ -59,7 +61,7 @@ import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.{ThreadLocalRandom, TimeoutException}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{blocking, Future, Promise}
+import scala.concurrent.{Future, Promise, blocking}
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
@@ -197,6 +199,16 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     ).some
     else none
 
+  private val addressActorBlockchainInteraction = new AddressActor.BlockchainInteraction {
+
+    override def getFullBalances(address: Address, exclude: Set[Asset]): Future[AddressBalanceUpdates] =
+      wavesBlockchainAsyncClient.allAssetsSpendableBalance(address, exclude)
+
+    override def getPartialBalances(address: Address, assets: Set[Asset]): Future[AddressBalanceUpdates] =
+      wavesBlockchainAsyncClient.spendableBalances(address, assets)
+
+  }
+
   private val addressDirectoryRef =
     actorSystem.actorOf(AddressDirectoryActor.props(orderDB, mkAddressActorProps, historyRouterRef), AddressDirectoryActor.name)
 
@@ -217,11 +229,9 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     ValidationStages.mkSecond(wavesBlockchainAsyncClient, orderBookAskAdapter),
     storeCommand,
     started,
-    spendableBalancesRef,
+    addressActorBlockchainInteraction,
     settings.addressActor
   )
-
-  private val spendableBalancesRef = actorSystem.actorOf(SpendableBalancesActor.props(wavesBlockchainAsyncClient, addressDirectoryRef))
 
   private val orderEventsCoordinatorRef = actorSystem.spawn(
     behavior = OrderEventsCoordinatorActor.apply(

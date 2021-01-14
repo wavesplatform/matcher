@@ -28,10 +28,10 @@ class MatcherExtensionCachingClient(underlying: MatcherExtensionClient, defaultC
 
   override val utxEvents = underlying.utxEvents
 
-  override def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] = underlying.spendableBalances(address, assets)
+  override def regularBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] = underlying.regularBalances(address, assets)
 
-  override def allAssetsSpendableBalance(address: Address, excludeAssets: Set[Asset]): Future[Map[Asset, Long]] =
-    underlying.allAssetsSpendableBalance(address, excludeAssets)
+  override def allRegularBalances(address: Address, excludeAssets: Set[Asset]): Future[Map[Asset, Long]] =
+    underlying.allRegularBalances(address, excludeAssets)
 
   override def getBalances(index: DiffIndex): Future[BlockchainBalance] = underlying.getBalances(index)
 

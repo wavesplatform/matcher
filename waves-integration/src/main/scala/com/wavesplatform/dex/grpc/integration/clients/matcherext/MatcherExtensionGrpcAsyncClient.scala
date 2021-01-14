@@ -61,14 +61,14 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
 
   override val utxEvents = new GrpcUtxEventsControlledStream(channel)(monixScheduler)
 
-  override def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] = handlingErrors {
+  override def regularBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] = handlingErrors {
     asyncUnaryCall(
       METHOD_SPENDABLE_ASSETS_BALANCES,
       SpendableAssetsBalancesRequest(address = address.toPB, assets.map(a => SpendableAssetsBalancesRequest.Record(a.toPB)).toSeq)
     ).map(response => response.balances.map(record => record.assetId.toVanillaAsset -> record.balance).toMap)
   }
 
-  override def allAssetsSpendableBalance(address: Address, excludeAssets: Set[Asset]): Future[Map[Asset, Long]] = handlingErrors {
+  override def allRegularBalances(address: Address, excludeAssets: Set[Asset]): Future[Map[Asset, Long]] = handlingErrors {
     asyncUnaryCall(METHOD_ALL_ASSETS_SPENDABLE_BALANCE, AddressRequest(address.toPB, excludeAssetIds = excludeAssets.map(_.toPB).toSeq))
       .map(response => response.balances.map(record => record.assetId.toVanillaAsset -> record.balance).toMap)
   }

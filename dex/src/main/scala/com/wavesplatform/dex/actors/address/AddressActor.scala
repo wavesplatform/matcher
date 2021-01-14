@@ -1,16 +1,13 @@
 package com.wavesplatform.dex.actors.address
 
-import java.time.{Instant, Duration => JDuration}
-
 import akka.actor.typed.scaladsl.adapter._
 import akka.actor.{typed, Actor, ActorRef, Cancellable, Props, Status}
-import akka.pattern.{ask, pipe, CircuitBreakerOpenException}
+import akka.pattern.{pipe, CircuitBreakerOpenException}
 import akka.{actor => classic}
 import cats.instances.long.catsKernelStdGroupForLong
-import cats.kernel.Group
 import cats.syntax.either._
-import cats.syntax.group.{catsSyntaxGroup, catsSyntaxSemigroup}
-import com.wavesplatform.dex.actors.SpendableBalancesActor
+import cats.syntax.group.catsSyntaxGroup
+import com.wavesplatform.dex.actors.WorkingStash
 import com.wavesplatform.dex.actors.address.AddressActor.Settings.default
 import com.wavesplatform.dex.actors.address.AddressActor._
 import com.wavesplatform.dex.api.http.entities.MatcherResponse
@@ -24,9 +21,11 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.model.Denormalization.denormalizeAmountAndFee
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.utils.{LoggerFacade, ScorexLogging}
+import com.wavesplatform.dex.effect.Implicits.FutureOps
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError, UnexpectedError, WavesNodeConnectionBroken}
 import com.wavesplatform.dex.fp.MapImplicits.group
+import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCancelFailed, OrderCanceled, OrderCanceledReason, OrderExecuted, Event => OrderEvent}
 import com.wavesplatform.dex.model._
@@ -35,11 +34,12 @@ import com.wavesplatform.dex.queue.ValidatedCommand
 import com.wavesplatform.dex.time.Time
 import org.slf4j.LoggerFactory
 
+import java.time.{Instant, Duration => JDuration}
 import scala.collection.immutable.Queue
 import scala.collection.mutable.{AnyRefMap => MutableMap, HashSet => MutableSet}
 import scala.concurrent.duration._
 import scala.concurrent.{Future, TimeoutException}
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 
 class AddressActor(
   owner: Address,
@@ -47,11 +47,12 @@ class AddressActor(
   orderDB: OrderDB,
   validate: (AcceptedOrder, Map[Asset, Long]) => Future[Either[MatcherError, Unit]],
   store: StoreValidatedCommand,
-  var started: Boolean,
-  spendableBalancesActor: ActorRef,
+  var recovered: Boolean,
+  blockchain: BlockchainInteraction,
   settings: AddressActor.Settings = AddressActor.Settings.default
 )(implicit efc: ErrorFormatterContext)
     extends Actor
+    with WorkingStash
     with ScorexLogging {
 
   import context.dispatcher
@@ -63,17 +64,15 @@ class AddressActor(
   private val pendingCommands = MutableMap.empty[Order.Id, PendingCommand]
 
   private val activeOrders = MutableMap.empty[Order.Id, AcceptedOrder]
-  @volatile private var openVolume = Map.empty[Asset, Long]
   private val expiration = MutableMap.empty[Order.Id, Cancellable]
 
   // Saves from cases when a client does multiple requests with the same order
   private val failedPlacements = MutableSet.empty[Order.Id]
 
   private var wsAddressState = WsAddressState.empty(owner)
-  private var wsSendSchedule: Cancellable = Cancellable.alreadyCancelled
+  private var wsSendSchedule = Cancellable.alreadyCancelled
 
-  private var allAssetsKnown = false
-  private val spendableBalances = MutableMap.empty[Asset, Long]
+  private var balances = AccountBalance.empty
 
   // if (started) because we haven't pendingCommands during the start
   private val eventsProcessing: Receive = {
@@ -81,7 +80,7 @@ class AddressActor(
       import event.order
       log.debug(s"OrderAdded(${order.id}, ${event.reason}, ${event.timestamp})")
       refreshOrderState(order, event)
-      if (started) pendingCommands.remove(order.id).foreach { command =>
+      if (recovered) pendingCommands.remove(order.id).foreach { command =>
         log.trace(s"Confirming placement for ${order.id}")
         command.client ! Event.OrderAccepted(order.order)
       }
@@ -95,39 +94,74 @@ class AddressActor(
       val isActive = activeOrders.contains(id)
       log.debug(s"OrderCanceled($id, $reason, $ts, isActive=$isActive)")
       if (isActive) refreshOrderState(ao, event)
-      if (started) pendingCommands.remove(id).foreach { pc =>
+      if (recovered) pendingCommands.remove(id).foreach { pc =>
         log.trace(s"Confirming cancellation for $id")
         pc.client ! Event.OrderCanceled(id)
       }
 
-    case msg @ Command.ApplyBatch(events, balanceUpdate) =>
+    case msg @ Command.ApplyBatch(events, balanceUpdates) =>
       log.info(s"Got $msg")
       // TODO DEX-1040 This code is not optimal, but it should work.
       // e.g. We need folding
       events.foreach(eventsProcessing(_))
-      if (started && balanceUpdate.nonEmpty) working(Message.BalanceChanged(balanceUpdate.keySet, balanceUpdate))
+      if (recovered && balanceUpdates.nonEmpty) working(Message.BalanceChanged(balanceUpdates)) // during start
       log.info("ApplyBatch applied")
 
     case command @ OrderCancelFailed(id, reason) =>
-      if (started) pendingCommands.remove(id) match {
+      if (recovered) pendingCommands.remove(id) match {
         case None => // Ok on secondary matcher
         case Some(pc) =>
           log.trace(s"Got $command, sending a response to a client")
           pc.client ! reason
       }
+
   }
 
   private val failuresProcessing: Receive = { case Status.Failure(e) =>
     log.error(s"Got $e", e)
   }
 
-  private val starting: Receive = eventsProcessing orElse failuresProcessing orElse { case AddressDirectoryActor.StartWork =>
-    activeOrders.values.foreach(x => scheduleExpiration(x.order))
-    started = true
-    context.become(working)
+  private val recovering: Receive = eventsProcessing orElse failuresProcessing orElse {
+    case AddressDirectoryActor.StartWork => context.become(starting)
+    case x => stash(x)
+  }
+
+  private def starting: Receive = {
+    recovered = true
+    val spendingAssets = activeOrders.values.foldLeft(Set.empty[Asset]) { case (r, x) => r + x.spentAsset + x.feeAsset }
+    blockchain
+      .getPartialBalances(owner, spendingAssets)
+      .safe
+      .map(Command.SetInitialBalances)
+      .pipeTo(self)
+
+    {
+      case command: Command.SetInitialBalances =>
+        command.snapshot match {
+          case Success(x) => balances = balances.withProbablyStale(x)
+          case Failure(e) => throw new IllegalStateException("Can't receive initial balances, see logs", e)
+        }
+        activeOrders.values.foreach(x => scheduleExpiration(x.order))
+        unstashAll()
+        context.become(working)
+
+      case x => stash(x)
+    }: Receive
   }
 
   private val working: Receive = eventsProcessing orElse failuresProcessing orElse {
+    case msg: GotPartialBalancesByRequest => balances = balances.withProbablyStale(msg.partial)
+    case msg: GotFullBalancesByRequest =>
+      msg.full match {
+        case Left(e) =>
+          wsAddressState.pendingSubscription.foreach(_.unsafeUpcast[WsServerMessage] ! WsError.from(e, time.correctedTime()))
+          wsAddressState = wsAddressState.copy(pendingSubscription = Set.empty)
+
+        case Right(x) =>
+          balances = balances.withProbablyStale(x).withAllFetched
+          sendWsSnapshotAndFlushPendingSubscriptions() // Received a snapshot for pending connections
+      }
+
     case command: Command.PlaceOrder =>
       log.debug(s"Got $command")
       val orderId = command.order.id()
@@ -219,13 +253,22 @@ class AddressActor(
       }
 
     case msg: Message.BalanceChanged =>
-      msg.changesForAudit.foreach(Function.tupled(spendableBalances.update))
+      val changedAssets = msg.updates.changedAssets
+      val spendableBefore = balances.tradableBalances(changedAssets)
+
+      balances = balances.withFresh(msg.updates)
+      val spendableAfter = balances.tradableBalances(changedAssets)
+
       if (wsAddressState.hasActiveSubscriptions) {
-        wsAddressState = wsAddressState.putSpendableAssets(msg.changedAssets)
+        wsAddressState = wsAddressState.putSpendableAssets(changedAssets)
         scheduleNextDiffSending()
       }
 
-      val toCancel = getOrdersToCancel(msg.changesForAudit).filterNot(ao => isCancelling(ao.order.id()))
+      val changesForAudit = spendableAfter.filter {
+        case (asset, v) => spendableBefore(asset) > v
+      }
+
+      val toCancel = getOrdersToCancel(changesForAudit).filterNot(ao => isCancelling(ao.order.id()))
 
       if (toCancel.isEmpty) log.trace(s"Got $msg, nothing to cancel")
       else {
@@ -241,8 +284,25 @@ class AddressActor(
         }
       }
 
-    case Query.GetReservedBalance => sender() ! Reply.Balance(openVolume.filter(_._2 > 0))
-    case Query.GetTradableBalance(forAssets) => getTradableBalance(forAssets).map(Reply.Balance).pipeTo(sender()) // TODO DEX-1016
+    case Query.GetReservedBalance => sender() ! Reply.Balance(balances.openVolume.filter(_._2 > 0).asRight)
+
+    case query: Query.GetTradableBalance =>
+      val unknown = balances.needFetch(query.forAssets)
+      if (unknown.isEmpty) sender() ! Reply.Balance(balances.tradableBalances(query.forAssets).asRight)
+      else {
+        val savedBalances = balances
+        blockchain
+          .getPartialBalances(owner, unknown)
+          .transform {
+            case Success(r) =>
+              self ! GotPartialBalancesByRequest(r) // To store them locally
+              Success(Reply.Balance(savedBalances.withProbablyStale(r).tradableBalances(query.forAssets).asRight))
+            case Failure(e) =>
+              log.error("Can't receive tradable balances, see logs", e)
+              Success(Reply.Balance(error.WavesNodeConnectionBroken.asLeft))
+          }
+          .pipeTo(sender())
+      }
 
     case Query.GetOrderStatus(orderId) =>
       sender() ! Reply.GetOrderStatus(activeOrders.get(orderId).fold[OrderStatus](orderDB.status(orderId))(_.status))
@@ -273,7 +333,7 @@ class AddressActor(
         queueEvent match {
           case ValidatedCommand.PlaceOrder(_) | ValidatedCommand.PlaceMarketOrder(_) =>
             activeOrders.remove(orderId).foreach { ao =>
-              openVolume = openVolume |-| ao.reservableBalance
+              balances = balances.withoutVolume(ao.reservableBalance)
               if (wsAddressState.hasActiveSubscriptions) {
                 wsAddressState = wsAddressState.putReservedAssets(ao.reservableBalance.keySet)
                 scheduleNextDiffSending()
@@ -306,10 +366,18 @@ class AddressActor(
     case WsCommand.AddWsSubscription(client) =>
       log.trace(s"[c=${client.path.name}] Added WebSocket subscription")
       wsAddressState = wsAddressState.addPendingSubscription(client)
-      if (allAssetsKnown) sendWsSnapshotAndFlushPendingSubscriptions()
+
+      if (balances.allFetched) sendWsSnapshotAndFlushPendingSubscriptions()
       else {
-        // to(Set) because we need an immutable set
-        spendableBalancesActor ! SpendableBalancesActor.Query.GetSnapshot(owner, spendableBalances.keys.to(Set))
+        blockchain
+          .getFullBalances(owner, balances.fetched)
+          .transform {
+            case Success(r) => Success(GotFullBalancesByRequest(r.asRight))
+            case Failure(e) =>
+              log.error("Can't receive tradable balances, see logs", e)
+              Success(GotFullBalancesByRequest(error.WavesNodeConnectionBroken.asLeft))
+          }
+          .pipeTo(self)
         context.watch(client)
       }
 
@@ -318,28 +386,12 @@ class AddressActor(
       wsAddressState = wsAddressState.removeSubscription(client)
       context.unwatch(client)
 
-    // Received a snapshot for pending connections
-    case SpendableBalancesActor.Reply.GetSnapshot(allAssetsSpendableBalance) =>
-      allAssetsSpendableBalance match {
-        case Right(snapshotSpendableBalance) =>
-          allAssetsKnown = true
-          snapshotSpendableBalance.view
-            .filterKeys(asset => !spendableBalances.contains(asset))
-            .foreach(Function.tupled(spendableBalances.update))
-
-          sendWsSnapshotAndFlushPendingSubscriptions()
-
-        case Left(matcherError) =>
-          wsAddressState.pendingSubscription.foreach(_.unsafeUpcast[WsServerMessage] ! WsError.from(matcherError, time.correctedTime()))
-          wsAddressState = wsAddressState.copy(pendingSubscription = Set.empty)
-      }
-
     // It is time to send updates to clients. This block of code asks balances
-    case WsCommand.PrepareDiffForWsSubscribers =>
+    case WsCommand.SendDiff =>
       if (wsAddressState.hasActiveSubscriptions && wsAddressState.hasChanges) {
         wsAddressState = wsAddressState
           .sendDiffs(
-            balances = mkWsBalances(spendableBalances.view.filterKeys(wsAddressState.getAllChangedAssets.contains).to(Map)),
+            balances = mkWsBalances(balances.tradableBalances(wsAddressState.getAllChangedAssets)),
             orders = wsAddressState.getAllOrderChanges
           )
           .cleanOrderChanges()
@@ -349,36 +401,22 @@ class AddressActor(
       }
       wsSendSchedule = Cancellable.alreadyCancelled
 
-    // It is time to send updates to clients. This block of code sends balances
-    case SpendableBalancesActor.Reply.GetState(getStateSpendableBalances) =>
-      wsAddressState =
-        if (wsAddressState.hasActiveSubscriptions)
-          wsAddressState.sendDiffs(
-            balances = mkWsBalances(getStateSpendableBalances ++ spendableBalances.view.filterKeys(getStateSpendableBalances.contains)),
-            orders = wsAddressState.getAllOrderChanges
-          )
-        else if (wsAddressState.pendingSubscription.isEmpty)
-          wsAddressState.cleanBalanceChanges() // There are neither active, nor pending connections
-        else wsAddressState
-
-      wsAddressState = wsAddressState.cleanOrderChanges()
-
     case classic.Terminated(wsSource) => wsAddressState = wsAddressState.removeSubscription(wsSource)
   }
 
-  override val receive: Receive = if (started) working else starting
+  override val receive: Receive = if (recovered) starting else recovering // TODO retrieve balances
 
   /** Schedules next balances and order changes sending only if it wasn't scheduled before */
   private def scheduleNextDiffSending(): Unit =
     if (wsSendSchedule.isCancelled)
-      wsSendSchedule = context.system.scheduler.scheduleOnce(settings.wsMessagesInterval, self, WsCommand.PrepareDiffForWsSubscribers)
+      wsSendSchedule = context.system.scheduler.scheduleOnce(settings.wsMessagesInterval, self, WsCommand.SendDiff)
 
   private def denormalizedBalanceValue(asset: Asset, decimals: Int)(balanceSource: Map[Asset, Long]): Double =
     denormalizeAmountAndFee(balanceSource.getOrElse(asset, 0L), decimals).toDouble
 
-  private def mkWsBalances(spendableBalances: Map[Asset, Long]): Map[Asset, WsBalances] = {
-    val tradableBalance = (spendableBalances |-| openVolume.view.filterKeys(spendableBalances.keySet).toMap).filter(_._2 >= 0)
-    spendableBalances.keySet
+  private def mkWsBalances(tradableBalances: Map[Asset, Long]): Map[Asset, WsBalances] =
+    tradableBalances
+      .keys
       .flatMap { asset =>
         efc.assetDecimals(asset) match {
           case None =>
@@ -386,11 +424,15 @@ class AddressActor(
             List.empty // It is better to hide unknown assets rather than stop working
           case Some(decimals) =>
             val assetDenormalizedBalanceFrom = denormalizedBalanceValue(asset, decimals)(_)
-            List(asset -> WsBalances(assetDenormalizedBalanceFrom(tradableBalance), assetDenormalizedBalanceFrom(openVolume)))
+            List(
+              asset -> WsBalances(
+                assetDenormalizedBalanceFrom(tradableBalances),
+                assetDenormalizedBalanceFrom(balances.openVolume)
+              )
+            )
         }
       }
       .to(Map)
-  }
 
   private def isCancelling(id: Order.Id): Boolean = pendingCommands.get(id).exists(_.command.isInstanceOf[Command.CancelOrder])
 
@@ -403,41 +445,43 @@ class AddressActor(
       case Some(nextCommand) =>
         nextCommand.command match {
           case command: Command.PlaceOrder =>
+            val spendingAssets = Set(command.order.getSpendAssetId, command.order.feeAsset)
             val validationResult =
               for {
-                tradableBalance <- getTradableBalance(Set(command.order.getSpendAssetId, command.order.feeAsset))
+                tradableBalance <- {
+                  val unknown = balances.needFetch(spendingAssets)
+                  if (unknown.isEmpty) Future.successful(balances.tradableBalances(spendingAssets))
+                  else {
+                    val savedBalances = balances
+                    blockchain
+                      .getPartialBalances(owner, unknown)
+                      .map { r =>
+                        self ! GotPartialBalancesByRequest(r) // To store them locally
+                        savedBalances.withProbablyStale(r).tradableBalances(spendingAssets)
+                      }
+                  }
+                }
                 ao = command.toAcceptedOrder(tradableBalance)
                 r <- validate(ao, tradableBalance)
               } yield r match {
-                case Left(error) => Event.ValidationFailed(ao.id, error)
+                case Left(error) => Event.ValidationFailed(command.order.id(), error)
                 case Right(_) => Event.ValidationPassed(ao)
               }
 
-            validationResult recover {
-              case ex: WavesNodeConnectionLostException =>
-                log.error("Waves Node connection lost", ex)
-                Event.ValidationFailed(command.order.id(), WavesNodeConnectionBroken)
-              case ex =>
-                log.error("An unexpected error occurred", ex)
-                Event.ValidationFailed(command.order.id(), UnexpectedError)
-            } pipeTo self
+            validationResult
+              .recover {
+                case ex: WavesNodeConnectionLostException =>
+                  log.error("Waves Node connection lost", ex)
+                  Event.ValidationFailed(command.order.id(), WavesNodeConnectionBroken)
+                case ex =>
+                  log.error("An unexpected error occurred", ex)
+                  Event.ValidationFailed(command.order.id(), UnexpectedError)
+              }
+              .pipeTo(self)
 
           case x => throw new IllegalStateException(s"Can't process $x, only PlaceOrder is allowed")
         }
     }
-  }
-
-  private def getTradableBalance(forAssets: Set[Asset])(implicit group: Group[Map[Asset, Long]]): Future[Map[Asset, Long]] = {
-    val (known, unknown) = forAssets.partition(spendableBalances.contains)
-    val knownBalance = spendableBalances.view.filterKeys(known.contains).toMap
-
-    val askUnknown =
-      if (allAssetsKnown || unknown.isEmpty) Future.successful(SpendableBalancesActor.Reply.GetState(Map.empty))
-      else spendableBalancesActor
-        .ask(SpendableBalancesActor.Query.GetState(owner, unknown))(5.seconds, self) // TODO replace ask pattern by better solution
-        .mapTo[SpendableBalancesActor.Reply.GetState]
-
-    askUnknown.map(xs => (xs.state ++ knownBalance |-| openVolume.view.filterKeys(forAssets).toMap).filter(_._2 > 0).withDefaultValue(0L))
   }
 
   private def scheduleExpiration(order: Order): Unit = if (!expiration.contains(order.id())) {
@@ -467,12 +511,12 @@ class AddressActor(
     status match {
       case status: OrderStatus.Final =>
         expiration.remove(remaining.id).foreach(_.cancel())
-        activeOrders.remove(remaining.id).foreach(ao => openVolume = openVolume |-| ao.reservableBalance)
+        activeOrders.remove(remaining.id).foreach(ao => balances = balances.withoutVolume(ao.reservableBalance))
         orderDB.saveOrderInfo(remaining.id, owner, OrderInfo.v6(remaining, status))
 
       case _ =>
         activeOrders.put(remaining.id, remaining)
-        openVolume = openVolume |+| openVolumeDiff
+        balances = balances.withVolume(openVolumeDiff)
         status match {
           case OrderStatus.Accepted =>
             orderDB.saveOrder(remaining.order)
@@ -507,7 +551,7 @@ class AddressActor(
   private def sendWsSnapshotAndFlushPendingSubscriptions(): Unit = {
     wsAddressState.sendSnapshot(
       // spendableBalances contains the latest balances
-      balances = mkWsBalances(spendableBalances.view.filter(_._2 > 0).to(Map)),
+      balances = mkWsBalances(balances.allTradableBalances.filter(_._2 > 0)),
       orders = activeOrders.values.map(WsOrder.fromDomain(_)).to(Seq)
     )
     wsAddressState = wsAddressState.flushPendingSubscriptions()
@@ -545,7 +589,7 @@ class AddressActor(
   }
 
   private def place(ao: AcceptedOrder): Unit = {
-    openVolume = openVolume |+| ao.reservableBalance
+    balances = balances.withVolume(ao.reservableBalance)
     activeOrders.put(ao.id, ao)
 
     if (wsAddressState.hasActiveSubscriptions) {
@@ -605,6 +649,11 @@ class AddressActor(
 
 object AddressActor {
 
+  trait BlockchainInteraction {
+    def getFullBalances(address: Address, exclude: Set[Asset]): Future[AddressBalanceUpdates]
+    def getPartialBalances(address: Address, assets: Set[Asset]): Future[AddressBalanceUpdates]
+  }
+
   type Resp = MatcherResponse
 
   private val ExpirationThreshold = 50.millis
@@ -616,7 +665,7 @@ object AddressActor {
     validate: (AcceptedOrder, Map[Asset, Long]) => Future[Either[MatcherError, Unit]],
     store: StoreValidatedCommand,
     started: Boolean,
-    spendableBalancesActor: ActorRef,
+    blockchain: BlockchainInteraction,
     settings: AddressActor.Settings = AddressActor.Settings.default
   )(implicit efc: ErrorFormatterContext): Props = Props(
     new AddressActor(
@@ -626,7 +675,7 @@ object AddressActor {
       validate,
       store,
       started,
-      spendableBalancesActor,
+      blockchain,
       settings
     )
   )
@@ -648,7 +697,9 @@ object AddressActor {
   sealed trait Message
 
   object Message {
-    case class BalanceChanged(changedAssets: Set[Asset], changesForAudit: Map[Asset, Long]) extends Message
+
+    case class BalanceChanged(updates: AddressBalanceUpdates) extends Message
+
   }
 
   sealed trait Query extends Message
@@ -666,7 +717,7 @@ object AddressActor {
   object Reply {
     case class GetOrderStatus(x: OrderStatus) extends Reply
     case class OrdersStatuses(xs: Seq[(Order.Id, OrderInfo[OrderStatus])]) extends Reply
-    case class Balance(balance: Map[Asset, Long]) extends Reply
+    case class Balance(balance: Either[MatcherError, Map[Asset, Long]]) extends Reply
     case class OrdersStatusInfo(maybeOrderStatusInfo: Option[OrderInfo[OrderStatus]]) extends Reply
   }
 
@@ -675,7 +726,9 @@ object AddressActor {
 
   object Command {
 
-    case class ApplyBatch(events: Queue[Events.Event], balanceUpdate: Map[Asset, Long]) extends Command
+    case class SetInitialBalances(snapshot: Try[AddressBalanceUpdates]) extends Command
+
+    case class ApplyBatch(events: Queue[Events.Event], balanceUpdates: AddressBalanceUpdates) extends Command
 
     case class PlaceOrder(order: Order, isMarket: Boolean) extends OneOrderCommand {
 
@@ -729,7 +782,7 @@ object AddressActor {
   object WsCommand {
     case class AddWsSubscription(client: typed.ActorRef[WsAddressChanges]) extends WsCommand
     case class RemoveWsSubscription(client: typed.ActorRef[WsAddressChanges]) extends WsCommand
-    private[AddressActor] case object PrepareDiffForWsSubscribers extends WsCommand
+    private[AddressActor] case object SendDiff extends WsCommand
   }
 
   private case class CancelExpiredOrder(orderId: Order.Id)
@@ -755,5 +808,8 @@ object AddressActor {
   object Settings {
     val default: Settings = Settings(100.milliseconds, 20.seconds, 200)
   }
+
+  final private case class GotPartialBalancesByRequest(partial: AddressBalanceUpdates)
+  final private case class GotFullBalancesByRequest(full: Either[MatcherError, AddressBalanceUpdates])
 
 }

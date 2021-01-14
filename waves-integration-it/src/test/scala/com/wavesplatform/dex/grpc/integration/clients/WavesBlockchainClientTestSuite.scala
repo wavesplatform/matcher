@@ -120,7 +120,7 @@ class WavesBlockchainClientTestSuite extends IntegrationSuiteBase with NoStackTr
     broadcastAndAwait(IssueUsdTx)
     client.updates.foreach { update =>
       log.info(s"Got in test: $update")
-      balanceChanges.updateAndGet(_.deepReplace(update.updatedBalances))
+      balanceChanges.updateAndGet(_.deepReplace(update.balanceUpdates))
     }
   }
 

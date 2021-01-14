@@ -100,7 +100,7 @@ class MatcherApiRoute(
   private val filteredConfig = config.withoutKeys(excludedConfigKeys)
 
   private def invalidJsonResponse(error: MatcherError): StandardRoute = complete(InvalidJsonResponse(error))
-  private val invalidUserPublicKey: StandardRoute = complete(SimpleErrorResponse(StatusCodes.Forbidden, error.UserPublicKeyIsNotValid))
+  private val invalidUserPublicKey: StandardRoute = complete(SimpleErrorResponse(StatusCodes.Forbidden, error.UserPublicKeyIsNotValid()))
 
   private val invalidJsonParsingRejectionsHandler =
     server.RejectionHandler

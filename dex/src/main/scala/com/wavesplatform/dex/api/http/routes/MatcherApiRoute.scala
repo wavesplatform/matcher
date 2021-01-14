@@ -181,8 +181,8 @@ class MatcherApiRoute(
       case Left(e) => complete(InfoNotFound(e))
     }
 
-  private def withValidPublicKey(addressOrError: Either[ValidationError.InvalidPublicKey, PublicKey])(f: PublicKey => Route): Route =
-    addressOrError.fold(ia => complete(InvalidPublicKey(ia.reason)), f)
+  private def withValidPublicKey(publicKeyOrError: Either[ValidationError.InvalidPublicKey, PublicKey])(f: PublicKey => Route): Route =
+    publicKeyOrError.fold(ia => complete(InvalidPublicKey(ia.reason)), f)
 
   private def withCorrectAddress(addressOrError: Either[ValidationError.InvalidAddress, Address])(f: Address => Route): Route =
     addressOrError.fold(ia => complete(InvalidAddress(ia.reason)), f)

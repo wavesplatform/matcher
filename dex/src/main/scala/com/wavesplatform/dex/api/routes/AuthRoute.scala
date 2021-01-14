@@ -37,7 +37,7 @@ trait AuthRoute { this: ApiRoute =>
       case None => provide(None)
       case Some(rawPublicKey) =>
         PublicKey.fromBase58String(rawPublicKey.value) match {
-          case Left(_) => complete(SimpleErrorResponse(StatusCodes.BadRequest, UserPublicKeyIsNotValid))
+          case Left(e) => complete(SimpleErrorResponse(StatusCodes.BadRequest, UserPublicKeyIsNotValid(e.reason)))
           case Right(x) => provide[Option[PublicKey]](Some(PublicKey(x)))
         }
     }

@@ -537,6 +537,8 @@ case object ApiKeyIsNotValid extends MatcherError(auth, commonEntity, commonClas
 
 case object UserPublicKeyIsNotValid extends MatcherError(account, pubKey, broken, e"Provided user public key is not correct")
 
+case class UserPublicKeyIsNotValid(reason: String) extends MatcherError(account, pubKey, broken, e"Provided public key in not correct, reason: ${Symbol("reason") -> reason}")
+
 case class AddressAndPublicKeyAreIncompatible(address: Address, publicKey: PublicKey)
     extends MatcherError(
       auth,
@@ -587,9 +589,6 @@ case class SubscriptionsLimitReached(limit: Int, id: String)
       limitReached,
       e"The limit of ${Symbol("limit") -> limit} subscriptions of this type was reached. The subscription of ${Symbol("id") -> id} was stopped"
     )
-
-case class InvalidPublicKey(reason: String)
-  extends MatcherError(pubKey, commonEntity, commonClass, e"Provided public key in not correct, reason: ${Symbol("reason") -> reason}")
 
 case class InvalidAddress(reason: String)
     extends MatcherError(address, commonEntity, commonClass, e"Provided address in not correct, reason: ${Symbol("reason") -> reason}")

@@ -74,7 +74,7 @@ class CancelOrderByIdSpec extends MatcherSuiteBase with RawHttpChecks {
         dex1.rawApi.cancelOrderById(order.idStr(), Map("X-API-Key" -> apiKey, "X-User-Public-Key" -> "null")),
         StatusCodes.BadRequest,
         3148801,
-        "Provided user public key is not correct"
+        "Provided public key in not correct, reason: invalid public key"
       )
     }
 

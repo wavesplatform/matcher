@@ -97,7 +97,7 @@ class GetOrderStatusInfoByIdWithApiKeySpec extends MatcherSuiteBase with TableDr
         dex1.rawApi.getOrderStatusInfoByIdWithApiKey(alice, order.id(), Some(bob.publicKey)),
         StatusCodes.Forbidden,
         3148801,
-        "Provided user public key is not correct"
+        "Provided public key in not correct, reason: invalid public key"
       )
     }
 

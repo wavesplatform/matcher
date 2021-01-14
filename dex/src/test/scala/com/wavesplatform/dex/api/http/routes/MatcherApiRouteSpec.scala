@@ -530,7 +530,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
               error = 3148801,
               message = "Provided public key is not correct, reason: Unable to decode base58: requirement failed: Wrong char ';' in Base58 string ';;'",
               template = "Provided public key is not correct, reason: {{reason}}",
-              params = Some(Json.obj("reason" -> "Invalid public key: Unable to decode base58: requirement failed: Wrong char ';' in Base58 string ';;'")),
+              params = Some(Json.obj("reason" -> "Unable to decode base58: requirement failed: Wrong char ';' in Base58 string ';;'")),
               status = "InvalidPublicKey"
             )
           )

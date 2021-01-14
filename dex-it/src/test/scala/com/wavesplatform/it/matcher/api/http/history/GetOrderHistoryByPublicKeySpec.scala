@@ -75,7 +75,7 @@ class GetOrderHistoryByPublicKeySpec extends MatcherSuiteBase with RawHttpChecks
         dex1.rawApi.getOrderHistoryByPublicKey("null", ts, sign),
         StatusCodes.BadRequest,
         3148801,
-        "Provided public key is not correct, reason: Invalid public key: Unable to decode base58: requirement failed: Wrong char 'l' in Base58 string 'null'"
+        "Provided public key is not correct, reason: Unable to decode base58: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )
     }
 

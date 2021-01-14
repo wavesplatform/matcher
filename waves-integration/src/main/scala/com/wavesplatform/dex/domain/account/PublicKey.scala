@@ -25,7 +25,7 @@ object PublicKey extends TaggedType[ByteStr] {
     (for {
       _ <- Either.cond(base58.length <= KeyStringLength, (), "Bad public key string length")
       bytes <- Base58.tryDecodeWithLimit(base58).toEither.left.map(ex => s"Unable to decode base58: ${ex.getMessage}")
-    } yield PublicKey(bytes)).left.map(err => InvalidPublicKey(s"Invalid public key: $err"))
+    } yield PublicKey(bytes)).left.map(err => InvalidPublicKey(err))
   }
 
   def unapply(arg: Array[Byte]): Option[PublicKey] = Some(apply(arg))

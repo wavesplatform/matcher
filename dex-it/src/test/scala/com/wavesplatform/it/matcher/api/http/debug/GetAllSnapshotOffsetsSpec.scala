@@ -2,10 +2,10 @@ package com.wavesplatform.it.matcher.api.http.debug
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.order.OrderType.BUY
-import com.wavesplatform.dex.it.api.RawHttpChecks
 import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.matcher.api.http.ApiKeyHeaderChecks
 
-class GetAllSnapshotOffsets extends MatcherSuiteBase with RawHttpChecks {
+class GetAllSnapshotOffsetsSpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
 
   override protected def dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(
@@ -22,7 +22,7 @@ class GetAllSnapshotOffsets extends MatcherSuiteBase with RawHttpChecks {
 
   "GET /matcher/debug/allSnapshotOffsets" - {
     "should return all saved snapshot offsets" in {
-      validate200Json(dex1.rawApi.getAllSnapshotOffsets) should have size (0)
+      validate200Json(dex1.rawApi.getAllSnapshotOffsets) should have size 0
 
       List(
         mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd),
@@ -35,19 +35,15 @@ class GetAllSnapshotOffsets extends MatcherSuiteBase with RawHttpChecks {
 
       dex1.api.saveSnapshots
 
-      eventually{
-        validate200Json(dex1.rawApi.getAllSnapshotOffsets) should have size(2)
+      eventually {
+        validate200Json(dex1.rawApi.getAllSnapshotOffsets) should have size 2
         validate200Json(dex1.rawApi.getAllSnapshotOffsets) should be(Map(wavesBtcPair -> 5, wavesUsdPair -> 5))
       }
     }
 
-    "should return an error without X-API-KEY" in {
-      validateAuthorizationError(dex1.rawApi.getAllSnapshotOffsets(Map("X-API-KEY" -> "incorrect")))
-    }
+    shouldReturnErrorWithoutApiKeyHeader(dex1.rawApi.getAllSnapshotOffsets(Map.empty))
 
-    "should return an error with incorrect X-API-KEY" in {
-      validateAuthorizationError(dex1.rawApi.getAllSnapshotOffsets(Map.empty))
-    }
+    shouldReturnErrorWithIncorrectApiKeyValue(dex1.rawApi.getAllSnapshotOffsets(incorrectApiKeyHeader))
   }
 
 }

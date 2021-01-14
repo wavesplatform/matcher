@@ -2,10 +2,10 @@ package com.wavesplatform.it.matcher.api.http.debug
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.order.OrderType.BUY
-import com.wavesplatform.dex.it.api.RawHttpChecks
 import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.matcher.api.http.ApiKeyHeaderChecks
 
-class GetOldestSnapshotOffsetSpec extends MatcherSuiteBase with RawHttpChecks {
+class GetOldestSnapshotOffsetSpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
 
   override protected def dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(
@@ -35,13 +35,9 @@ class GetOldestSnapshotOffsetSpec extends MatcherSuiteBase with RawHttpChecks {
       validate200Json(dex1.rawApi.getOldestSnapshotOffset) should be(2)
     }
 
-    "should return an error without X-API-KEY" in {
-      validateAuthorizationError(dex1.rawApi.getOldestSnapshotOffset(Map("X-API-KEY" -> "incorrect")))
-    }
+    shouldReturnErrorWithoutApiKeyHeader(dex1.rawApi.getOldestSnapshotOffset(Map.empty))
 
-    "should return an error with incorrect X-API-KEY" in {
-      validateAuthorizationError(dex1.rawApi.getOldestSnapshotOffset(Map.empty))
-    }
+    shouldReturnErrorWithIncorrectApiKeyValue(dex1.rawApi.getOldestSnapshotOffset(incorrectApiKeyHeader))
   }
 
 }

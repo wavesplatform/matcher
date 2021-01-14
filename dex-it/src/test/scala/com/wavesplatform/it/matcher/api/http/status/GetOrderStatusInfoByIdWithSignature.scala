@@ -1,4 +1,4 @@
-package com.wavesplatform.it.matcher.api.http
+package com.wavesplatform.it.matcher.api.http.status
 
 import com.google.common.primitives.Longs
 import com.softwaremill.sttp.StatusCodes

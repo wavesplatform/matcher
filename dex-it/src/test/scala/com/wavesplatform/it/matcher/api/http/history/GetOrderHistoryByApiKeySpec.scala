@@ -4,13 +4,12 @@ import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.account.KeyPair.toAddress
 import com.wavesplatform.dex.domain.order.OrderType.BUY
-import com.wavesplatform.dex.it.api.RawHttpChecks
 import com.wavesplatform.dex.it.docker.apiKey
 import com.wavesplatform.dex.model.OrderStatus
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.it.matcher.api.http.toHttpOrderBookHistoryItem
+import com.wavesplatform.it.matcher.api.http.{toHttpOrderBookHistoryItem, ApiKeyHeaderChecks}
 
-class GetOrderHistoryByApiKeySpec extends MatcherSuiteBase with RawHttpChecks {
+class GetOrderHistoryByApiKeySpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
 
   override protected def dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(
@@ -84,13 +83,9 @@ class GetOrderHistoryByApiKeySpec extends MatcherSuiteBase with RawHttpChecks {
       )
     }
 
-    "should return and error without X-API-KEY" in {
-      validateAuthorizationError(dex1.rawApi.getOrderHistoryByApiKey(toAddress(alice).stringRepr, false, true, Map.empty))
-    }
+    shouldReturnErrorWithoutApiKeyHeader(dex1.rawApi.getOrderHistoryByApiKey(toAddress(alice).stringRepr, false, true, Map.empty))
 
-    "should return and error with incorrect X-API-KEY" in {
-      validateAuthorizationError(dex1.rawApi.getOrderHistoryByApiKey(toAddress(alice).stringRepr, false, true, Map("X-API-KEY" -> "incorrect")))
-    }
+    shouldReturnErrorWithIncorrectApiKeyValue(dex1.rawApi.getOrderHistoryByApiKey(toAddress(alice).stringRepr, false, true, incorrectApiKeyHeader))
   }
 
 }

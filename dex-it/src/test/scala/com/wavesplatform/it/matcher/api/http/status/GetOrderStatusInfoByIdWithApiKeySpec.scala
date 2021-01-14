@@ -1,17 +1,17 @@
-package com.wavesplatform.it.matcher.api.http
+package com.wavesplatform.it.matcher.api.http.status
 
 import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.account.KeyPair.toAddress
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
-import com.wavesplatform.dex.it.api.RawHttpChecks
 import com.wavesplatform.dex.it.docker.apiKey
 import com.wavesplatform.dex.model.OrderStatus
 import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.matcher.api.http.{toHttpOrderBookHistoryItem, ApiKeyHeaderChecks}
 import org.scalatest.prop.TableDrivenPropertyChecks
 
-class GetOrderStatusInfoByIdWithApiKeySpec extends MatcherSuiteBase with TableDrivenPropertyChecks with RawHttpChecks {
+class GetOrderStatusInfoByIdWithApiKeySpec extends MatcherSuiteBase with ApiKeyHeaderChecks with TableDrivenPropertyChecks {
 
   override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(
     s"""waves.dex {
@@ -82,14 +82,6 @@ class GetOrderStatusInfoByIdWithApiKeySpec extends MatcherSuiteBase with TableDr
       }
     }
 
-    "should return an error when without headers" in {
-      val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd)
-      placeAndAwaitAtDex(order)
-      validateAuthorizationError(
-        dex1.rawApi.getOrderStatusInfoById(alice.toAddress.stringRepr, order.idStr())
-      )
-    }
-
     "should return an error when the public key header is not of order owner" in {
       val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd)
       placeAndAwaitAtDex(order)
@@ -101,18 +93,13 @@ class GetOrderStatusInfoByIdWithApiKeySpec extends MatcherSuiteBase with TableDr
       )
     }
 
-    "should return an error when the public api-key header is not correct" in {
-      val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd)
-      placeAndAwaitAtDex(order)
+    shouldReturnErrorWithoutApiKeyHeader(dex1.rawApi.getOrderStatusInfoById(alice.toAddress.stringRepr, order.idStr(), Map.empty))
 
-      validateAuthorizationError(
-        dex1.rawApi.getOrderStatusInfoById(
-          alice.toAddress.stringRepr,
-          order.idStr(),
-          Map("X-User-Public-Key" -> Base58.encode(alice.publicKey), "X-API-Key" -> "incorrect")
-        )
-      )
-    }
+    shouldReturnErrorWithIncorrectApiKeyValue(dex1.rawApi.getOrderStatusInfoById(
+      alice.toAddress.stringRepr,
+      order.idStr(),
+      Map("X-API-KEY" -> "incorrect")
+    ))
 
     "should return an error when the order doesn't exist" in {
       val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd)

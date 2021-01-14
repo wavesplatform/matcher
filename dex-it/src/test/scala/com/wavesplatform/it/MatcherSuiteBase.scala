@@ -2,7 +2,6 @@ package com.wavesplatform.it
 
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.ThreadLocalRandom
-
 import cats.instances.FutureInstances
 import com.softwaremill.diffx.{Derived, Diff}
 import com.wavesplatform.dex.api.http.entities.HttpV0OrderBook
@@ -10,6 +9,7 @@ import com.wavesplatform.dex.asset.DoubleOps
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.order.OrderType.BUY
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.it.api.BaseContainersKit
 import com.wavesplatform.dex.it.api.dex.HasDex
@@ -96,4 +96,10 @@ trait MatcherSuiteBase
     account
   }
 
+  protected def placeAndGetIds(count: Int): Set[String] =
+    (1 to count).map { i =>
+      val o = mkOrder(alice, wavesUsdPair, BUY, 10.waves, i.usd)
+      placeAndAwaitAtDex(o)
+      o.idStr()
+    }.toSet
 }

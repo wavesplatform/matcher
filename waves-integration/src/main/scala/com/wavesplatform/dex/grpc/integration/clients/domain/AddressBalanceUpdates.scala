@@ -31,4 +31,6 @@ object AddressBalanceUpdates {
 
   }
 
+  val empty = accountBalanceUpdatesMonoid.empty
+
 }

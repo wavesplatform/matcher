@@ -6,18 +6,23 @@ import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.fp.MapImplicits.group
 import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
 
-case class AccountBalance(
-  allFetched: Boolean,
-  regular: Map[Asset, Long],
-  outLease: Option[Long], // always positive, receive at start
-  pessimisticCorrection: Map[Asset, Long], // always negative, receive at start
-  openVolume: Map[Asset, Long]
-  // todo OECState
+/**
+ * @param outgoingLeasing Always positive, receive at start
+ * @param pessimisticCorrection Always negative, receive at start
+ * @param openVolume Always positive, amount of assets those reserved for open orders
+ */
+case class AddressBalance(
+                           allFetched: Boolean,
+                           regular: Map[Asset, Long],
+                           outgoingLeasing: Option[Long],
+                           pessimisticCorrection: AddressPessimisticCorrection,
+                           openVolume: Map[Asset, Long]
+                           // unconfirmedTxs: Map[ExchangeTransaction.Id] // this will be hard. Add ,but not remove pessimistic portfolio
 ) {
 
-  def fetched: Set[Asset] =
-    // We don't add "++ openVolume.keySet", because openVolume is created from orders, thus regular balances were received
-    regular.keySet ++ pessimisticCorrection.keySet + Asset.Waves
+  // We count only regular, because openVolume is created from orders and
+  //  pessimisticCorrection updated by a stream (so, this asset couldn't be fetched)
+  def fetched: Set[Asset] = regular.keySet
 
   // TODO always used with tradableBalances?
   def needFetch(assets: Set[Asset]): Set[Asset] =
@@ -41,50 +46,50 @@ case class AccountBalance(
       case (r, asset) =>
         val x =
           regular.getOrElse(asset, throw new RuntimeException(s"regular($asset)")) -
-          outLease.getOrElse(throw new RuntimeException("outLease")) +
-          pessimisticCorrection.getOrElse(asset, 0L) - // always have this information
+          outgoingLeasing.getOrElse(throw new RuntimeException("outLease")) +
+          pessimisticCorrection.getBy(asset) - // we always have this information
           openVolume.getOrElse(asset, 0L)
 
         r.updated(asset, math.max(0L, x))
     }
 
-  def withProbablyStale(snapshot: AddressBalanceUpdates): AccountBalance =
+  def withProbablyStale(snapshot: AddressBalanceUpdates): AddressBalance =
     // The original data have a higher precedence, because we receive it from the stream
     // And it is guaranteed to be eventually consistent.
     // Otherwise we can get a stale data and replace the fresh one by it.
-    AccountBalance(
+    AddressBalance(
       allFetched = allFetched,
       regular = snapshot.regular ++ regular,
-      outLease = outLease.orElse(snapshot.outLease),
+      outgoingLeasing = outgoingLeasing.orElse(snapshot.outLease),
       pessimisticCorrection = snapshot.pessimisticCorrection ++ pessimisticCorrection,
       openVolume = openVolume
     )
 
   //  E.g. if we receive changes from a stream - it is a high precedence
   //                             by a request - it is a low precedence
-  def withFresh(updates: AddressBalanceUpdates): AccountBalance =
-    AccountBalance(
+  def withFresh(updates: AddressBalanceUpdates): AddressBalance =
+    AddressBalance(
       allFetched = allFetched,
       regular = regular ++ updates.regular,
-      outLease = updates.outLease.orElse(outLease),
-      pessimisticCorrection = pessimisticCorrection ++ updates.pessimisticCorrection,
+      outgoingLeasing = updates.outLease.orElse(outgoingLeasing),
+      pessimisticCorrection = pessimisticCorrection.withUnconfirmed(updates.pessimisticCorrection),
       openVolume = openVolume
     )
 
-  def withAllFetched: AccountBalance = copy(allFetched = true)
+  def withAllFetched: AddressBalance = copy(allFetched = true)
 
-  def withVolume(xs: Map[Asset, Long]): AccountBalance = copy(openVolume = openVolume |+| xs)
-  def withoutVolume(xs: Map[Asset, Long]): AccountBalance = copy(openVolume = openVolume |-| xs)
+  def withVolume(xs: Map[Asset, Long]): AddressBalance = copy(openVolume = openVolume |+| xs)
+  def withoutVolume(xs: Map[Asset, Long]): AddressBalance = copy(openVolume = openVolume |-| xs)
 
 }
 
-object AccountBalance {
+object AddressBalance {
 
-  val empty = AccountBalance(
+  val empty = AddressBalance(
     allFetched = false,
     regular = Map.empty,
-    outLease = None,
-    pessimisticCorrection = Map.empty,
+    outgoingLeasing = None,
+    pessimisticCorrection = AddressPessimisticCorrection(Map.empty, Map.empty, Set.empty),
     openVolume = Map.empty
   )
 

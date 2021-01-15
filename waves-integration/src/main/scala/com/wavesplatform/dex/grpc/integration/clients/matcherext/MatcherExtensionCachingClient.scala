@@ -28,13 +28,13 @@ class MatcherExtensionCachingClient(underlying: MatcherExtensionClient, defaultC
 
   override val utxEvents = underlying.utxEvents
 
-  override def addressOutLease(address: Address): Future[Long] = underlying.addressOutLease(address)
+  override def getOutLeasing(address: Address): Future[Long] = underlying.getOutLeasing(address)
 
-  override def addressPartialRegularBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] =
-    underlying.addressPartialRegularBalances(address, assets)
+  override def getAddressPartialRegularBalance(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] =
+    underlying.getAddressPartialRegularBalance(address, assets)
 
-  override def addressFullRegularBalances(address: Address, excludeAssets: Set[Asset]): Future[Map[Asset, Long]] =
-    underlying.addressFullRegularBalances(address, excludeAssets)
+  override def getAddressFullRegularBalance(address: Address, excludeAssets: Set[Asset]): Future[Map[Asset, Long]] =
+    underlying.getAddressFullRegularBalance(address, excludeAssets)
 
   override def getBalances(index: DiffIndex): Future[BlockchainBalance] = underlying.getBalances(index)
 

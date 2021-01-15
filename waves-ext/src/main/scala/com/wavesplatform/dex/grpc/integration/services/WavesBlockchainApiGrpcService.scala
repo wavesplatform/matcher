@@ -261,22 +261,44 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
     RunScriptResponse(r)
   }
 
-  override def spendableAssetsBalances(request: SpendableAssetsBalancesRequest): Future[SpendableAssetsBalancesResponse] = Future {
+  override def getOutgoingLeasing(request: AddressRequest): Future[GetOutgoingLeasingResponse] = Future {
+    val address = request.address.toVanillaAddress
+    GetOutgoingLeasingResponse(context.blockchain.leaseBalance(address).out)
+  }
 
-    val address = Address.fromBytes(request.address.toVanilla.arr).explicitGetErr()
+  override def getAddressPartialRegularBalance(request: GetAddressPartialRegularBalanceRequest)
+    : Future[GetAddressPartialRegularBalanceResponse] = Future {
+    val address = request.address.toVanillaAddress
 
     val assetsBalances =
       request.assetIds
         .map { requestedAssetRecord =>
-          SpendableAssetsBalancesResponse.Record(
+          GetAddressPartialRegularBalanceResponse.Record(
             requestedAssetRecord.assetId,
-            spendableBalance(address, requestedAssetRecord.assetId.toVanillaAsset)
+            context.blockchain.balance(address, requestedAssetRecord.assetId.toVanillaAsset)
           )
         }
         .filter(_.balance > 0)
 
-    SpendableAssetsBalancesResponse(assetsBalances)
+    GetAddressPartialRegularBalanceResponse(assetsBalances)
   }
+
+  override def getAddressFullRegularBalance(request: GetAddressFullRegularBalanceRequest): Future[GetAddressFullRegularBalanceResponse] = {
+    for {
+      address <- Task.fromTry(Try(request.address.toVanillaAddress))
+      assetBalances <- context.accountsApi.portfolio(address).toListL // TODO DEX-997 optimize
+    } yield {
+      val excludeAssets = request.excludeAssetIds.view.map(_.toVanillaAsset).toSet
+      GetAddressFullRegularBalanceResponse(
+        (Waves :: assetBalances.map(_._1))
+          .filterNot(excludeAssets.contains)
+          .map(a =>
+            GetAddressFullRegularBalanceResponse.Record(a.toPB, context.blockchain.balance(address, a))
+          ) // TODO DEX-997 do not use spendableBalance
+          .filterNot(_.balance == 0L)
+      )
+    }
+  }.runToFuture
 
   // TODO DEX-997 optimize
   override def getBalances(request: GetBalancesRequest): Future[GetBalancesResponse] = Future {
@@ -360,27 +382,6 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
         log.trace(error.formatStackTrace(e))
         Result.Exception(Exception(e.getClass.getCanonicalName, Option(e.getMessage).getOrElse("No message")))
     }
-  }
-
-  override def allAssetsSpendableBalance(request: AddressRequest): Future[AllAssetsSpendableBalanceResponse] = {
-    for {
-      address <- Task.fromTry(Try(request.address.toVanillaAddress))
-      assetBalances <- context.accountsApi.portfolio(address).toListL // TODO DEX-997 optimize
-    } yield {
-      val excludeAssets = request.excludeAssetIds.view.map(_.toVanillaAsset).toSet
-      AllAssetsSpendableBalanceResponse(
-        (Waves :: assetBalances.map(_._1))
-          .filterNot(excludeAssets.contains)
-          .map(a => AllAssetsSpendableBalanceResponse.Record(a.toPB, spendableBalance(address, a))) // TODO DEX-997 do not use spendableBalance
-          .filterNot(_.balance == 0L)
-      )
-    }
-  }.runToFuture
-
-  private def spendableBalance(address: Address, asset: Asset): Long = {
-    val stateBalance = context.blockchain.balance(address, asset)
-    val leasedBalance = asset.fold(context.blockchain.leaseBalance(address).out)(_ => 0L)
-    stateBalance - leasedBalance
   }
 
   private def throwInvalidArgument(description: String): Nothing = {

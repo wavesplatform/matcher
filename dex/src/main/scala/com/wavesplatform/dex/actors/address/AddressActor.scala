@@ -72,7 +72,7 @@ class AddressActor(
   private var wsAddressState = WsAddressState.empty(owner)
   private var wsSendSchedule = Cancellable.alreadyCancelled
 
-  private var balances = AccountBalance.empty
+  private var balances = AddressBalance.empty
 
   // if (started) because we haven't pendingCommands during the start
   private val eventsProcessing: Receive = {
@@ -266,7 +266,7 @@ class AddressActor(
 
       val changesForAudit = spendableAfter.filter {
         // "exist" solves (I believe the rare case) when we receive: PlaceOrder, BalanceChanged, GotPartialBalancesByRequest
-        case (asset, v) => spendableBefore.get(asset).exists(_ > 0)
+        case (asset, _) => spendableBefore.get(asset).exists(_ > 0)
       }
 
       val toCancel = getOrdersToCancel(changesForAudit).filterNot(ao => isCancelling(ao.order.id()))

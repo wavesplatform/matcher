@@ -30,7 +30,6 @@ import monix.execution.Scheduler
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 
-import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.chaining._
 import scala.util.{Failure, Success}
@@ -103,15 +102,15 @@ class CombinedWavesBlockchainClient(
               updatedFinalBalances,
               unconfirmedTxs = {
                 for {
-                  tx <- x.utxUpdate.unconfirmedTxs.view if isExchangeTransactionFromMatcher(tx)
+                  tx <- x.utxUpdate.unconfirmedTxs.view if isExchangeTxFromMatcher(tx)
                   signedTx <- tx.transaction
                   changes <- tx.diff.flatMap(_.stateUpdate)
                 } yield tx.id.toVanilla -> TransactionWithChanges(tx.id, signedTx, changes)
               }.toMap,
               confirmedTxs = x.utxUpdate.confirmedTxs.view
-                .collect { case (id, x) if isExchangeTransactionFromMatcher(x.tx) => id.toVanilla -> x }.toMap,
+                .collect { case (id, x) if isExchangeTxFromMatcher(x.tx) => id.toVanilla -> x }.toMap,
               failedTxs = (for {
-                tx <- x.utxUpdate.failedTxs.values if isExchangeTransactionFromMatcher(tx)
+                tx <- x.utxUpdate.failedTxs.values if isExchangeTxFromMatcher(tx)
                 signedTx <- tx.transaction
                 changes <- tx.diff.flatMap(_.stateUpdate)
               } yield tx.id.toVanilla -> TransactionWithChanges(tx.id, signedTx, changes)).toMap
@@ -141,17 +140,17 @@ class CombinedWavesBlockchainClient(
           requestBalances(x)
       }
 
-  private def isExchangeTransactionFromMatcher(tx: SignedTransaction): Boolean =
+  private def isExchangeTxFromMatcher(tx: SignedTransaction): Boolean =
     tx.transaction.exists { tx =>
       tx.data.isExchange && ByteString.unsignedLexicographicalComparator().compare(tx.senderPublicKey, pbMatcherPublicKey) == 0
     }
 
-  private def isExchangeTransactionFromMatcher(tx: UtxTransaction): Boolean = tx.transaction.exists(isExchangeTransactionFromMatcher)
+  private def isExchangeTxFromMatcher(tx: UtxTransaction): Boolean = tx.transaction.exists(isExchangeTxFromMatcher)
 
   override def partialBalancesSnapshot(address: Address, assets: Set[Asset]): Future[AddressBalanceUpdates] =
     (
-      meClient.addressPartialRegularBalances(address, assets),
-      if (assets.contains(Asset.Waves)) meClient.addressOutLease(address).map(_.some) else Future.successful(none),
+      meClient.getAddressPartialRegularBalance(address, assets),
+      if (assets.contains(Asset.Waves)) meClient.getOutLeasing(address).map(_.some) else Future.successful(none),
       Future.successful(pessimisticPortfolios.getAggregated(address).filter {
         case (asset, _) => assets.contains(asset)
       })
@@ -159,8 +158,8 @@ class CombinedWavesBlockchainClient(
 
   override def fullBalancesSnapshot(address: Address, excludeAssets: Set[Asset]): Future[AddressBalanceUpdates] =
     (
-      meClient.addressFullRegularBalances(address, excludeAssets),
-      if (excludeAssets.contains(Asset.Waves)) Future.successful(none) else meClient.addressOutLease(address).map(_.some),
+      meClient.getAddressFullRegularBalance(address, excludeAssets),
+      if (excludeAssets.contains(Asset.Waves)) Future.successful(none) else meClient.getOutLeasing(address).map(_.some),
       Future.successful(pessimisticPortfolios.getAggregated(address).filterNot {
         case (asset, _) => excludeAssets.contains(asset)
       })

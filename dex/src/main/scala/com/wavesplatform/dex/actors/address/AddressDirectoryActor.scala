@@ -4,7 +4,9 @@ import akka.actor.{Actor, ActorRef, Props, SupervisorStrategy, Terminated}
 import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.domain.utils.{EitherExt2, ScorexLogging}
+import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
 import com.wavesplatform.dex.history.HistoryRouterActor._
 import com.wavesplatform.dex.model.Events
 import com.wavesplatform.dex.model.Events.OrderCancelFailed
@@ -62,6 +64,8 @@ class AddressDirectoryActor(
         case None => log.warn(s"The order '${e.id}' not found")
       }
 
+    case BatchUpdate(xs) => ???
+
     case StartWork =>
       started = true
       context.children.foreach(_ ! StartWork)
@@ -98,5 +102,6 @@ object AddressDirectoryActor {
   )
 
   case class Envelope(address: Address, message: AddressActor.Message)
+  case class BatchUpdate(xs: Map[Address, (AddressBalanceUpdates, Set[ExchangeTransaction.Id])])
   case object StartWork
 }

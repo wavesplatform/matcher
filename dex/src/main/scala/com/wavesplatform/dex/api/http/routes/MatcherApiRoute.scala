@@ -1185,5 +1185,4 @@ class MatcherApiRoute(
         case (true, false) => OrderListType.ActiveOnly
         case (false, false) => OrderListType.All
       }
-
 }

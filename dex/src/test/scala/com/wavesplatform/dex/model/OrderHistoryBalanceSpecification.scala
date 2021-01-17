@@ -1,7 +1,6 @@
 package com.wavesplatform.dex.model
 
 import java.math.BigInteger
-
 import akka.actor.{ActorRef, ActorSystem}
 import akka.pattern.ask
 import akka.testkit.TestKit
@@ -15,6 +14,7 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.Order.Id
+import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderAddedReason, OrderCanceled}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.time.SystemTime
@@ -940,7 +940,7 @@ private object OrderHistoryBalanceSpecification {
     def allOrderIdsByPair(pair: AssetPair): Vector[Order.Id] = orderIds(Some(pair), OrderListType.All)
 
     def openVolume(asset: Asset): Long =
-      askAddressActor[AddressActor.Reply.Balance](ref, AddressActor.Query.GetReservedBalance).balance.getOrElse(asset, 0L)
+      askAddressActor[AddressActor.Reply.Balance](ref, AddressActor.Query.GetReservedBalance).balance.explicitGet().getOrElse(asset, 0L)
 
     def orderStatus(orderId: ByteStr): OrderStatus =
       askAddressActor[AddressActor.Reply.GetOrderStatus](ref, AddressActor.Query.GetOrderStatus(orderId)).x

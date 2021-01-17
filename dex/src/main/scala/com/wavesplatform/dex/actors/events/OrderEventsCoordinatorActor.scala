@@ -80,7 +80,7 @@ object OrderEventsCoordinatorActor {
           Behaviors.same
 
         case command: Command.ApplyConfirmed =>
-          val updatesByAddresses = command.tx.traders.map(_ -> (AddressBalanceUpdates.empty, Set(command.tx.id()))).toMap
+          val updatesByAddresses = command.tx.traders.map((_ ,(AddressBalanceUpdates.empty, Set(command.tx.id())))).toMap
           addressDirectoryRef ! AddressDirectoryActor.BatchUpdate(updatesByAddresses)
           Behaviors.same
       }

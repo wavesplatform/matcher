@@ -1,13 +1,11 @@
 package com.wavesplatform.dex.api.ws
 
-import java.util.concurrent.atomic.AtomicReference
-
 import akka.actor.testkit.typed.scaladsl.{ActorTestKit, TestProbe => TypedTestProbe}
 import akka.actor.{ActorRef, ActorSystem, PoisonPill, Props}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import cats.syntax.option._
 import com.wavesplatform.dex.MatcherSpecBase
-import com.wavesplatform.dex.actors.SpendableBalancesActor
+import com.wavesplatform.dex.actors.address.AddressActor.BlockchainInteraction
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.api.ws.entities.{WsBalances, WsOrder}
 import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsError, WsMessage}
@@ -18,6 +16,7 @@ import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.state.{LeaseBalance, Portfolio}
 import com.wavesplatform.dex.error.{ErrorFormatterContext, WavesNodeConnectionBroken}
+import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderAddedReason, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder, MarketOrder, _}
@@ -27,6 +26,7 @@ import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 
+import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.Future
 
 class ActorsWebSocketInteractionsSpecification
@@ -60,23 +60,28 @@ class ActorsWebSocketInteractionsSpecification
     val wsEventsProbe: TypedTestProbe[WsMessage] = testKit.createTestProbe[WsMessage]()
 
     val currentPortfolio = new AtomicReference[Portfolio](Portfolio.empty)
-    val address = KeyPair("test".getBytes)
+    val kp = KeyPair("test".getBytes)
 
-    def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] =
-      Future.successful((currentPortfolio.get().assets ++ Map(Waves -> currentPortfolio.get().balance).view.filterKeys(assets)).toMap)
+    val blockchainInteraction = new BlockchainInteraction {
+      override def getFullBalances(a: Address, exclude: Set[Asset]): Future[AddressBalanceUpdates] =
+        if (a == kp.toAddress) Future.successful(
+          AddressBalanceUpdates(
+            regular = (currentPortfolio.get().assets ++ Map(Waves -> currentPortfolio.get().balance)).filter(_._2 > 0).toMap,
+            outLease = None,
+            pessimisticCorrection = Map.empty
+          )
+        )
+        else Future.failed(WavesNodeConnectionLostException("Node unavailable", new IllegalStateException))
 
-    def allAssetsSpendableBalance(a: Address, excludeAssets: Set[Asset]): Future[Map[Asset, Long]] =
-      if (a == address.toAddress) Future.successful {
-        (currentPortfolio.get().assets ++ Map(Waves -> currentPortfolio.get().balance)).filter(_._2 > 0).toMap
-      }
-      else Future.failed(WavesNodeConnectionLostException("Node unavailable", new IllegalStateException))
-
-    lazy val addressDir = system.actorOf(Props(new AddressDirectoryActor(EmptyOrderDB, createAddressActor, None, started = true)))
-
-    lazy val spendableBalancesActor =
-      system.actorOf(
-        Props(new SpendableBalancesActor(spendableBalances, allAssetsSpendableBalance, addressDir))
-      )
+      override def getPartialBalances(address: Address, assets: Set[Asset]): Future[AddressBalanceUpdates] =
+        Future.successful(
+          AddressBalanceUpdates(
+            regular = (currentPortfolio.get().assets ++ Map(Waves -> currentPortfolio.get().balance).view.filterKeys(assets)).toMap,
+            outLease = None,
+            pessimisticCorrection = Map.empty
+          )
+        )
+    }
 
     def createAddressActor(address: Address, started: Boolean): Props =
       Props(
@@ -90,14 +95,16 @@ class ActorsWebSocketInteractionsSpecification
             Future.successful(Some(ValidatedCommandWithMeta(0L, 0L, command)))
           },
           started,
-          spendableBalancesActor
+          blockchainInteraction
         )
       )
 
-    def subscribe(): Unit = addressDir ! AddressDirectoryActor.Envelope(address, AddressActor.WsCommand.AddWsSubscription(wsEventsProbe.ref))
+    val addressDir = system.actorOf(Props(new AddressDirectoryActor(EmptyOrderDB, createAddressActor, None, recovered = true)))
+
+    def subscribe(): Unit = addressDir ! AddressDirectoryActor.Envelope(kp, AddressActor.WsCommand.AddWsSubscription(wsEventsProbe.ref))
 
     def placeOrder(ao: AcceptedOrder): Unit = {
-      addressDir ! AddressDirectoryActor.Envelope(address, AddressActor.Command.PlaceOrder(ao.order, ao.isMarket))
+      addressDir ! AddressDirectoryActor.Envelope(kp, AddressActor.Command.PlaceOrder(ao.order, ao.isMarket))
       commandsProbe.expectMsg(ao match {
         case lo: LimitOrder => ValidatedCommand.PlaceOrder(lo); case mo: MarketOrder => ValidatedCommand.PlaceMarketOrder(mo)
       })
@@ -109,7 +116,7 @@ class ActorsWebSocketInteractionsSpecification
         val source =
           if (unmatchable) AddressActor.Command.Source.Request // Not important in this test suite
           else AddressActor.Command.Source.Request
-        addressDir ! AddressDirectoryActor.Envelope(address, AddressActor.Command.CancelOrder(ao.id, source))
+        addressDir ! AddressDirectoryActor.Envelope(kp, AddressActor.Command.CancelOrder(ao.id, source))
         commandsProbe.expectMsg(ValidatedCommand.CancelOrder(ao.order.assetPair, ao.id, source))
       }
 
@@ -129,14 +136,23 @@ class ActorsWebSocketInteractionsSpecification
       val updatedPortfolio = Portfolio(changes.getOrElse(Waves, 0), LeaseBalance.empty, changes.collect { case (a: IssuedAsset, b) => a -> b })
       val prevPortfolio = Option(currentPortfolio getAndSet updatedPortfolio).getOrElse(Portfolio.empty)
 
-      val spendableBalanceChanges: Map[Asset, Long] =
+      val regularBalanceChanges: Map[Asset, Long] =
         prevPortfolio
           .changedAssetIds(updatedPortfolio)
           .map(asset => asset -> updatedPortfolio.spendableBalanceOf(asset))
           .toMap
           .withDefaultValue(0)
 
-      spendableBalancesActor ! SpendableBalancesActor.Command.UpdateStates(Map(address.toAddress -> spendableBalanceChanges))
+      addressDir ! AddressDirectoryActor.Envelope(
+        kp.toAddress,
+        AddressActor.Message.BalanceChanged(
+          AddressBalanceUpdates(
+            regular = regularBalanceChanges,
+            outLease = None,
+            pessimisticCorrection = Map.empty
+          )
+        )
+      )
     }
 
     def expectBalancesAndOrders(expectedBalances: Map[Asset, WsBalances], expectedOrders: Seq[WsOrder], expectedUpdateId: Long): Unit = {
@@ -150,7 +166,7 @@ class ActorsWebSocketInteractionsSpecification
       addressDir,
       commandsProbe,
       wsEventsProbe,
-      address,
+      kp,
       () => subscribe(),
       placeOrder,
       cancelOrder,

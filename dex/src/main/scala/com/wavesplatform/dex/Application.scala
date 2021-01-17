@@ -12,7 +12,6 @@ import cats.data.EitherT
 import cats.instances.future.catsStdInstancesForFuture
 import cats.syntax.functor._
 import cats.syntax.option._
-import cats.syntax.either._
 import ch.qos.logback.classic.LoggerContext
 import com.typesafe.config._
 import com.wavesplatform.dex.actors.ActorSystemOps.ImplicitOps

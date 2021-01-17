@@ -5,17 +5,20 @@ import akka.pattern.ask
 import akka.testkit.TestProbe
 import akka.util.Timeout
 import com.wavesplatform.dex.MatcherSpecBase
+import com.wavesplatform.dex.actors.MatcherSpecLike
+import com.wavesplatform.dex.actors.address.AddressActor.BlockchainInteraction
 import com.wavesplatform.dex.actors.address.AddressActor.Command.PlaceOrder
 import com.wavesplatform.dex.actors.address.AddressDirectoryActor.Envelope
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
-import com.wavesplatform.dex.actors.{MatcherSpecLike, SpendableBalancesActor}
 import com.wavesplatform.dex.db.{EmptyOrderDB, TestOrderDB, WithDB}
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.error.ErrorFormatterContext
+import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
 import com.wavesplatform.dex.meta.getSimpleName
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderAddedReason, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model.{Events, LimitOrder, MarketOrder}
@@ -89,16 +92,17 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
         EmptyOrderDB,
         createAddressActor,
         None,
-        started = true
+        recovered = true
       )
     )
   )
 
-  private val spendableBalances: (Address, Set[Asset]) => Future[Map[Asset, Long]] = (_, _) => Future.successful(Map.empty[Asset, Long])
-  private val allAssetsSpendableBalances: (Address, Set[Asset]) => Future[Map[Asset, Long]] = (_, _) => Future.successful(Map.empty[Asset, Long])
+  private val emptyAddressBalanceUpdatesF = Future.successful(AddressBalanceUpdates.empty)
 
-  private val spendableBalancesActor =
-    system.actorOf(Props(new SpendableBalancesActor(spendableBalances, allAssetsSpendableBalances, addressDir)))
+  private val blockchainInteraction = new BlockchainInteraction {
+    override def getFullBalances(address: Address, exclude: Set[Asset]): Future[AddressBalanceUpdates] = emptyAddressBalanceUpdatesF
+    override def getPartialBalances(address: Address, assets: Set[Asset]): Future[AddressBalanceUpdates] = emptyAddressBalanceUpdatesF
+  }
 
   private def createAddressActor(address: Address, started: Boolean): Props =
     Props(
@@ -109,7 +113,7 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
         (_, _) => Future.successful(Right(())),
         _ => Future.failed(new IllegalStateException("Should not be used in the test")),
         started,
-        spendableBalancesActor
+        blockchainInteraction
       )
     )
 
@@ -124,6 +128,7 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
           .Envelope(senderPublicKey, AddressActor.Query.GetReservedBalance)).mapTo[AddressActor.Reply.Balance].map(_.balance),
         Duration.Inf
       )
+      .explicitGet()
       .getOrElse(assetId, 0L)
 
   def execute(counter: Order, submitted: Order): OrderExecuted = {
@@ -469,19 +474,10 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
 
   private def addressDirWithSpendableBalance(spendableBalances: Set[Asset] => Future[Map[Asset, Long]], testProbe: TestProbe): ActorRef = {
 
-    lazy val addressDir = system.actorOf(
-      Props(
-        new AddressDirectoryActor(
-          new TestOrderDB(100),
-          createAddressActor,
-          None,
-          started = true
-        )
-      )
-    )
-
-    lazy val spendableBalancesActor =
-      system.actorOf(Props(new SpendableBalancesActor((_, assets) => spendableBalances(assets), allAssetsSpendableBalances, addressDir)))
+    val blockchainInteraction = new BlockchainInteraction {
+      override def getFullBalances(address: Address, exclude: Set[Asset]): Future[AddressBalanceUpdates] = emptyAddressBalanceUpdatesF
+      override def getPartialBalances(address: Address, assets: Set[Asset]): Future[AddressBalanceUpdates] = spendableBalances(assets).map(AddressBalanceUpdates(_, None, Map.empty))
+    }
 
     def createAddressActor(address: Address, started: Boolean): Props =
       Props(
@@ -495,9 +491,20 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
             Future.successful(Some(ValidatedCommandWithMeta(0L, System.currentTimeMillis, command)))
           },
           started,
-          spendableBalancesActor
+          blockchainInteraction
         )
       )
+
+    val addressDir = system.actorOf(
+      Props(
+        new AddressDirectoryActor(
+          new TestOrderDB(100),
+          createAddressActor,
+          None,
+          recovered = true
+        )
+      )
+    )
 
     addressDir
   }

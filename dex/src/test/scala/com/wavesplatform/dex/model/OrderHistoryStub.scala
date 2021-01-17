@@ -1,13 +1,14 @@
 package com.wavesplatform.dex.model
 
 import akka.actor.{ActorRef, ActorSystem, Props}
-import com.wavesplatform.dex.actors.SpendableBalancesActor
+import com.wavesplatform.dex.actors.address.AddressActor.BlockchainInteraction
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.db.{EmptyOrderDB, TestOrderDB}
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.error.ErrorFormatterContext
+import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
 import com.wavesplatform.dex.queue.ValidatedCommandWithMeta
 import com.wavesplatform.dex.time.Time
 
@@ -21,10 +22,12 @@ class OrderHistoryStub(system: ActorSystem, time: Time, maxActiveOrders: Int, ma
   private val refs = mutable.AnyRefMap.empty[Address, ActorRef]
   private val orders = mutable.AnyRefMap.empty[ByteStr, Address]
 
-  private val spendableBalances: (Address, Set[Asset]) => Future[Map[Asset, Long]] = (_, _) => Future.successful(Map.empty[Asset, Long])
-  private val allAssetsSpendableBalances: (Address, Set[Asset]) => Future[Map[Asset, Long]] = (_, _) => Future.successful(Map.empty[Asset, Long])
+  private val emptyAddressBalanceUpdatesF = Future.successful(AddressBalanceUpdates.empty)
 
-  private val spendableBalanceActor = system.actorOf(Props(new SpendableBalancesActor(spendableBalances, allAssetsSpendableBalances, addressDir)))
+  private val blockchainInteraction = new BlockchainInteraction {
+    override def getFullBalances(address: Address, exclude: Set[Asset]): Future[AddressBalanceUpdates] = emptyAddressBalanceUpdatesF
+    override def getPartialBalances(address: Address, assets: Set[Asset]): Future[AddressBalanceUpdates] = emptyAddressBalanceUpdatesF
+  }
 
   def createAddressActor(address: Address, started: Boolean): Props =
     Props(
@@ -35,7 +38,7 @@ class OrderHistoryStub(system: ActorSystem, time: Time, maxActiveOrders: Int, ma
         (_, _) => Future.successful(Right(())),
         e => Future.successful(Some(ValidatedCommandWithMeta(0L, 0, e))),
         started,
-        spendableBalanceActor,
+        blockchainInteraction,
         AddressActor.Settings.default.copy(maxActiveOrders = maxActiveOrders)
       )
     )
@@ -52,7 +55,7 @@ class OrderHistoryStub(system: ActorSystem, time: Time, maxActiveOrders: Int, ma
         EmptyOrderDB,
         createAddressActor,
         None,
-        started = true
+        recovered = true
       )
     )
   )

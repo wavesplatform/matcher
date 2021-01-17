@@ -3,7 +3,6 @@ package com.wavesplatform.dex.actors.address
 import akka.actor.{Actor, ActorRef, Props, SupervisorStrategy, Terminated}
 import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.dex.domain.account.Address
-import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.domain.utils.{EitherExt2, ScorexLogging}
 import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
@@ -17,7 +16,7 @@ class AddressDirectoryActor(
   orderDB: OrderDB,
   mkAddressActorProps: (Address, Boolean) => Props,
   historyRouterRef: Option[ActorRef],
-  var started: Boolean = false
+  var recovered: Boolean = false
 ) extends Actor
     with ScorexLogging {
 
@@ -30,7 +29,7 @@ class AddressDirectoryActor(
 
   private def createAddressActor(address: Address): ActorRef = {
     log.debug(s"Creating address actor for $address")
-    watch(actorOf(mkAddressActorProps(address, started), address.toString))
+    watch(actorOf(mkAddressActorProps(address, recovered), address.toString))
   }
 
   private def forward(address: Address, msg: Any): Unit = (children get address, msg) match {
@@ -67,7 +66,7 @@ class AddressDirectoryActor(
     case BatchUpdate(xs) => ???
 
     case StartWork =>
-      started = true
+      recovered = true
       context.children.foreach(_ ! StartWork)
 
     case Terminated(child) =>

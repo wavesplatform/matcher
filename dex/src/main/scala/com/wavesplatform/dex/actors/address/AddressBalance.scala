@@ -12,12 +12,11 @@ import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdat
  * @param openVolume Always positive, amount of assets those reserved for open orders
  */
 case class AddressBalance(
-                           allFetched: Boolean,
-                           regular: Map[Asset, Long],
-                           outgoingLeasing: Option[Long],
-                           pessimisticCorrection: AddressPessimisticCorrection,
-                           openVolume: Map[Asset, Long]
-                           // unconfirmedTxs: Map[ExchangeTransaction.Id] // this will be hard. Add ,but not remove pessimistic portfolio
+  allFetched: Boolean,
+  regular: Map[Asset, Long],
+  outgoingLeasing: Option[Long],
+  pessimisticCorrection: AddressPessimisticCorrection,
+  openVolume: Map[Asset, Long]
 ) {
 
   // We count only regular, because openVolume is created from orders and
@@ -61,7 +60,7 @@ case class AddressBalance(
       allFetched = allFetched,
       regular = snapshot.regular ++ regular,
       outgoingLeasing = outgoingLeasing.orElse(snapshot.outLease),
-      pessimisticCorrection = snapshot.pessimisticCorrection ++ pessimisticCorrection,
+      pessimisticCorrection = pessimisticCorrection.withProbablyStaleUnconfirmed(snapshot.pessimisticCorrection),
       openVolume = openVolume
     )
 
@@ -72,7 +71,7 @@ case class AddressBalance(
       allFetched = allFetched,
       regular = regular ++ updates.regular,
       outgoingLeasing = updates.outLease.orElse(outgoingLeasing),
-      pessimisticCorrection = pessimisticCorrection.withUnconfirmed(updates.pessimisticCorrection),
+      pessimisticCorrection = pessimisticCorrection.withFreshUnconfirmed(updates.pessimisticCorrection),
       openVolume = openVolume
     )
 

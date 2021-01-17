@@ -29,7 +29,9 @@ case class AddressPessimisticCorrection(
   // base always negative
   // either in unconfirmed, or futureExchangeTxs
 
-  def withUnconfirmed(update: Map[Asset, Long]): AddressPessimisticCorrection = copy(unconfirmed = unconfirmed ++ update)
+  def withProbablyStaleUnconfirmed(update: Map[Asset, Long]): AddressPessimisticCorrection = copy(unconfirmed = update ++ unconfirmed)
+
+  def withFreshUnconfirmed(update: Map[Asset, Long]): AddressPessimisticCorrection = copy(unconfirmed = unconfirmed ++ update)
 
   def withExecuted(txId: ExchangeTransaction.Id, volume: Map[Asset, Long]): AddressPessimisticCorrection =
     if (futureTxs.contains(txId))

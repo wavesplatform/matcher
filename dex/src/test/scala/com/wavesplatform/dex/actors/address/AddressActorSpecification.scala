@@ -1,14 +1,13 @@
 package com.wavesplatform.dex.actors.address
 
-import java.util.concurrent.atomic.AtomicReference
-
 import akka.actor.testkit.typed.{scaladsl => typed}
 import akka.actor.typed.scaladsl.adapter._
 import akka.actor.{ActorRef, ActorSystem, PoisonPill, Props}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import cats.kernel.Monoid
+import cats.syntax.either._
 import com.wavesplatform.dex.MatcherSpecBase
-import com.wavesplatform.dex.actors.SpendableBalancesActor
+import com.wavesplatform.dex.actors.address.AddressActor.BlockchainInteraction
 import com.wavesplatform.dex.actors.address.AddressActor.Command.Source
 import com.wavesplatform.dex.actors.address.AddressActor.Query.GetTradableBalance
 import com.wavesplatform.dex.actors.address.AddressActor.Reply.Balance
@@ -21,6 +20,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV1}
 import com.wavesplatform.dex.domain.state.{LeaseBalance, Portfolio}
 import com.wavesplatform.dex.error.ErrorFormatterContext
+import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderAddedReason}
 import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder, MarketOrder}
 import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
@@ -29,6 +29,7 @@ import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 
+import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
@@ -140,7 +141,7 @@ class AddressActorSpecification
 
       ref ! GetTradableBalance(Set(Waves))
       expectMsgPF(hint = "Balance") {
-        case r: Balance => r should matchTo(Balance(Map(Waves -> 0L)))
+        case r: Balance => r should matchTo(Balance(Map[Asset, Long](Waves -> 0L).asRight))
         case _ =>
       }
     }
@@ -233,19 +234,27 @@ class AddressActorSpecification
     val currentPortfolio = new AtomicReference[Portfolio]()
     val address = addr("test")
 
-    def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] = Future.successful {
-      (currentPortfolio.get().assets ++ Map(Waves -> currentPortfolio.get().balance).view.filterKeys(assets.contains)).toMap
-    }
-
-    def allAssetsSpendableBalance(address: Address, excludeAssets: Set[Asset]): Future[Map[Asset, Long]] =
-      Future.successful((currentPortfolio.get().assets ++ Map(Waves -> currentPortfolio.get().balance)).toMap)
-
-    lazy val spendableBalancesActor =
-      system.actorOf(
-        Props(
-          new SpendableBalancesActor(spendableBalances, allAssetsSpendableBalance, addressDir)
+    val blockchainInteraction = new BlockchainInteraction {
+      override def getFullBalances(address: Address, exclude: Set[Asset]): Future[AddressBalanceUpdates] =
+        Future.successful(
+          AddressBalanceUpdates(
+            regular = currentPortfolio.get().assets.toMap[Asset, Long].updated(Waves, currentPortfolio.get().balance),
+            outLease = None,
+            pessimisticCorrection = Map.empty
+          )
         )
-      )
+
+      override def getPartialBalances(address: Address, assets: Set[Asset]): Future[AddressBalanceUpdates] =
+        Future.successful(
+          AddressBalanceUpdates(
+            regular = currentPortfolio.get().assets.toMap[Asset, Long]
+              .updated(Waves, currentPortfolio.get().balance)
+              .view.filterKeys(assets.contains).toMap,
+            outLease = None,
+            pessimisticCorrection = Map.empty
+          )
+        )
+    }
 
     def createAddressActor(address: Address, started: Boolean): Props =
       Props(
@@ -259,11 +268,11 @@ class AddressActorSpecification
             Future.successful(Some(ValidatedCommandWithMeta(0L, 0L, command)))
           },
           started,
-          spendableBalancesActor
+          blockchainInteraction
         )
       )
 
-    lazy val addressDir = system.actorOf(Props(new AddressDirectoryActor(EmptyOrderDB, createAddressActor, None, started = true)))
+    lazy val addressDir = system.actorOf(Props(new AddressDirectoryActor(EmptyOrderDB, createAddressActor, None, recovered = true)))
 
     def addOrder(ao: AcceptedOrder): Unit = {
       addressDir ! AddressDirectoryActor.Envelope(address, AddressActor.Command.PlaceOrder(ao.order, ao.isMarket))
@@ -282,14 +291,21 @@ class AddressActorSpecification
       updatedPortfolio => {
         val prevPortfolio = Option(currentPortfolio.getAndSet(updatedPortfolio)).getOrElse(Portfolio.empty)
 
-        val spendableBalanceChanges: Map[Asset, Long] =
+        val regularBalanceChanges: Map[Asset, Long] =
           prevPortfolio
             .changedAssetIds(updatedPortfolio)
             .map(asset => asset -> updatedPortfolio.spendableBalanceOf(asset))
             .toMap
             .withDefaultValue(0)
 
-        spendableBalancesActor ! SpendableBalancesActor.Command.UpdateStates(Map(address -> spendableBalanceChanges))
+        addressDir ! AddressDirectoryActor.Envelope(
+          address,
+          AddressActor.Message.BalanceChanged(AddressBalanceUpdates(
+            regular = regularBalanceChanges,
+            outLease = None,
+            pessimisticCorrection = Map.empty
+          ))
+        )
       }
     )
 

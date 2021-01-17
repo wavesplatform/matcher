@@ -1120,7 +1120,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       val response = msg match {
         case AddressDirectoryActor.Envelope(_, msg) =>
           msg match {
-            case AddressActor.Query.GetReservedBalance => AddressActor.Reply.Balance(Map(Waves -> 350L))
+            case AddressActor.Query.GetReservedBalance => AddressActor.Reply.Balance(Map[Asset, Long](Waves -> 350L).asRight)
             case PlaceOrder(x, _) => if (x.id() == okOrder.id()) AddressActor.Event.OrderAccepted(x) else error.OrderDuplicate(x.id())
 
             case AddressActor.Query.GetOrdersStatuses(_, _) =>
@@ -1152,7 +1152,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
                 }.toMap
               )
 
-            case GetTradableBalance(xs) => AddressActor.Reply.Balance(xs.map(_ -> 100L).toMap)
+            case GetTradableBalance(xs) => AddressActor.Reply.Balance(xs.map(_ -> 100L).toMap.asRight)
 
             case _: AddressActor.Query.GetOrderStatusInfo =>
               AddressActor.Reply.OrdersStatusInfo(OrderInfo.v5(LimitOrder(orderToCancel), OrderStatus.Accepted).some)

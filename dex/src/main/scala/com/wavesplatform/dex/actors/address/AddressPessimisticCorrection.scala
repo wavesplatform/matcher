@@ -18,27 +18,34 @@ import com.wavesplatform.dex.fp.MapImplicits.group
  *
  * @param notObserved Volume by ExchangeTransactions which haven't yet observed in streams. Contains only positive values
  * @param unconfirmed Includes all transactions (exchange, transfer, issue, etc.). Contains only negative values
- * @param futureTxs ExchangeTransactions which hasn't been registered as unconfirmed, but will be
+ * @param future ExchangeTransactions which hasn't been registered as unconfirmed, but will be
  */
 case class AddressPessimisticCorrection(
   notObserved: Map[ExchangeTransaction.Id, Map[Asset, Long]],
   unconfirmed: Map[Asset, Long],
-  futureTxs: Set[ExchangeTransaction.Id]
+  future: Set[ExchangeTransaction.Id]
 ) {
-  // properties:
-  // base always negative
-  // either in unconfirmed, or futureExchangeTxs
 
-  def withProbablyStaleUnconfirmed(update: Map[Asset, Long]): AddressPessimisticCorrection = copy(unconfirmed = update ++ unconfirmed)
+  /**
+   * @param updates Should be non positive
+   */
+  def withInit(updates: Map[Asset, Long]): AddressPessimisticCorrection = copy(unconfirmed = updates ++ unconfirmed)
 
-  def withFreshUnconfirmed(update: Map[Asset, Long]): AddressPessimisticCorrection = copy(unconfirmed = unconfirmed ++ update)
+  /**
+   * @param updates Should be non positive
+   */
+  def withFreshUnconfirmed(updates: Map[Asset, Long]): AddressPessimisticCorrection = copy(unconfirmed = unconfirmed ++ updates)
 
+  /**
+   * TODO with himself. volume by spending asset 0 ?
+   * @param volume Should be non negative
+   */
   def withExecuted(txId: ExchangeTransaction.Id, volume: Map[Asset, Long]): AddressPessimisticCorrection =
-    if (futureTxs.contains(txId))
-      copy(
-        unconfirmed = unconfirmed |-| volume,
-        futureTxs = futureTxs - txId
-      )
+    if (notObserved.contains(txId)) throw new RuntimeException(s"$txId executed twice!")
+    else if (future.contains(txId)) copy(
+      unconfirmed = unconfirmed |-| volume,
+      future = future - txId
+    )
     else copy(
       unconfirmed = unconfirmed |-| volume,
       notObserved = notObserved.updated(txId, volume)
@@ -47,9 +54,9 @@ case class AddressPessimisticCorrection(
   def withObserved(txId: ExchangeTransaction.Id): AddressPessimisticCorrection =
     if (notObserved.contains(txId)) copy(notObserved = notObserved.removed(txId))
     else
-      // Should not happen, because a transaction shouldn't be forged and registered in CombinedWavesBlockchainClient twice.
-      // Even this happen, we just have a hanging txId in futureTxs, which won't affect the process, only consumes small amount of memory.
-      copy(futureTxs = futureTxs + txId)
+      // Could happen during rollbacks, but CombinedWavesBlockchainClient solves this situation.
+      // Even this happen, we just have a hanging txId in "future", which won't affect the process, only consumes small amount of memory.
+      copy(future = future + txId)
 
   /**
    * @return A negative value

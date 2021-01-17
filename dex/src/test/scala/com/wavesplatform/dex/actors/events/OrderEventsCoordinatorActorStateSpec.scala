@@ -2,6 +2,7 @@ package com.wavesplatform.dex.actors.events
 
 import com.softwaremill.diffx.scalatest.DiffMatcher
 import com.wavesplatform.dex.NoShrink
+import com.wavesplatform.dex.actors.Generators
 import com.wavesplatform.dex.domain.account.{Address, KeyPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction

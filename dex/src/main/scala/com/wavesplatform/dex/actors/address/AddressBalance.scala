@@ -43,14 +43,14 @@ case class AddressBalance(
         r.updated(asset, math.max(0L, x))
     }
 
-  def withProbablyStale(snapshot: AddressBalanceUpdates): AddressBalance =
+  def withInit(snapshot: AddressBalanceUpdates): AddressBalance =
     // The original data have a higher precedence, because we receive it from the stream
     // And it is guaranteed to be eventually consistent.
     // Otherwise we can get a stale data and replace the fresh one by it.
     AddressBalance(
       regular = snapshot.regular ++ regular,
       outgoingLeasing = outgoingLeasing.orElse(snapshot.outLease),
-      pessimisticCorrection = pessimisticCorrection.withProbablyStaleUnconfirmed(snapshot.pessimisticCorrection),
+      pessimisticCorrection = pessimisticCorrection.withInit(snapshot.pessimisticCorrection),
       openVolume = openVolume
     )
 

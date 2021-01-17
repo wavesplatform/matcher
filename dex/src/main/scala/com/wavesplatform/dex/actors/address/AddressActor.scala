@@ -137,7 +137,7 @@ class AddressActor(
     {
       case command: Command.SetInitialBalances =>
         command.snapshot match {
-          case Success(x) => balances = balances.withProbablyStale(x)
+          case Success(x) => balances = balances.withInit(x)
           case Failure(e) => throw new IllegalStateException("Can't receive initial balances, see logs", e)
         }
         activeOrders.values.foreach(x => scheduleExpiration(x.order))

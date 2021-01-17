@@ -1,5 +1,6 @@
-package com.wavesplatform.dex.actors.events
+package com.wavesplatform.dex.actors
 
+import com.wavesplatform.dex.actors.events.{PendingAddress, PendingTransactionType}
 import com.wavesplatform.dex.collections.FifoSet
 import com.wavesplatform.dex.domain.account.KeyPair.toPublicKey
 import com.wavesplatform.dex.domain.account.{Address, KeyPair}

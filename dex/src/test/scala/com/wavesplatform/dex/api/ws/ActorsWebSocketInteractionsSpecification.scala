@@ -72,15 +72,6 @@ class ActorsWebSocketInteractionsSpecification
           )
         )
         else Future.failed(WavesNodeConnectionLostException("Node unavailable", new IllegalStateException))
-
-      override def getPartialBalances(address: Address, assets: Set[Asset]): Future[AddressBalanceUpdates] =
-        Future.successful(
-          AddressBalanceUpdates(
-            regular = (currentPortfolio.get().assets ++ Map(Waves -> currentPortfolio.get().balance).view.filterKeys(assets)).toMap,
-            outLease = None,
-            pessimisticCorrection = Map.empty
-          )
-        )
     }
 
     def createAddressActor(address: Address, started: Boolean): Props =

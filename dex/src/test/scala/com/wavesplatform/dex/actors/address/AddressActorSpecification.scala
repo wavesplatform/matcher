@@ -243,17 +243,6 @@ class AddressActorSpecification
             pessimisticCorrection = Map.empty
           )
         )
-
-      override def getPartialBalances(address: Address, assets: Set[Asset]): Future[AddressBalanceUpdates] =
-        Future.successful(
-          AddressBalanceUpdates(
-            regular = currentPortfolio.get().assets.toMap[Asset, Long]
-              .updated(Waves, currentPortfolio.get().balance)
-              .view.filterKeys(assets.contains).toMap,
-            outLease = None,
-            pessimisticCorrection = Map.empty
-          )
-        )
     }
 
     def createAddressActor(address: Address, started: Boolean): Props =

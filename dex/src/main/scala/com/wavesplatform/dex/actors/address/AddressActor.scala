@@ -12,7 +12,7 @@ import com.wavesplatform.dex.actors.address.AddressActor.Settings.default
 import com.wavesplatform.dex.actors.address.AddressActor._
 import com.wavesplatform.dex.api.http.entities.MatcherResponse
 import com.wavesplatform.dex.api.ws.entities.{WsBalances, WsOrder}
-import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsError, WsServerMessage}
+import com.wavesplatform.dex.api.ws.protocol.WsAddressChanges
 import com.wavesplatform.dex.api.ws.state.WsAddressState
 import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.dex.db.OrderDB.orderInfoOrdering
@@ -128,9 +128,8 @@ class AddressActor(
 
   private def starting: Receive = {
     recovered = true
-    val spendingAssets = activeOrders.values.foldLeft(Set.empty[Asset]) { case (r, x) => r + x.spentAsset + x.feeAsset }
     blockchain
-      .getPartialBalances(owner, spendingAssets)
+      .getFullBalances(owner, Set.empty)
       .safe
       .map(Command.SetInitialBalances)
       .pipeTo(self)
@@ -150,18 +149,6 @@ class AddressActor(
   }
 
   private val working: Receive = eventsProcessing orElse failuresProcessing orElse {
-    case msg: GotPartialBalancesByRequest => balances = balances.withProbablyStale(msg.partial)
-    case msg: GotFullBalancesByRequest =>
-      msg.full match {
-        case Left(e) =>
-          wsAddressState.pendingSubscription.foreach(_.unsafeUpcast[WsServerMessage] ! WsError.from(e, time.correctedTime()))
-          wsAddressState = wsAddressState.copy(pendingSubscription = Set.empty)
-
-        case Right(x) =>
-          balances = balances.withProbablyStale(x).withAllFetched
-          sendWsSnapshotAndFlushPendingSubscriptions() // Received a snapshot for pending connections
-      }
-
     case command: Command.PlaceOrder =>
       log.debug(s"Got $command")
       val orderId = command.order.id()
@@ -285,24 +272,7 @@ class AddressActor(
       }
 
     case Query.GetReservedBalance => sender() ! Reply.Balance(balances.openVolume.filter(_._2 > 0).asRight)
-
-    case query: Query.GetTradableBalance =>
-      val unknown = balances.needFetch(query.forAssets)
-      if (unknown.isEmpty) sender() ! Reply.Balance(balances.tradableBalances(query.forAssets).asRight)
-      else {
-        val savedBalances = balances
-        blockchain
-          .getPartialBalances(owner, unknown)
-          .transform {
-            case Success(r) =>
-              self ! GotPartialBalancesByRequest(r) // To store them locally
-              Success(Reply.Balance(savedBalances.withProbablyStale(r).tradableBalances(query.forAssets).asRight))
-            case Failure(e) =>
-              log.error("Can't receive tradable balances, see logs", e)
-              Success(Reply.Balance(error.WavesNodeConnectionBroken.asLeft))
-          }
-          .pipeTo(sender())
-      }
+    case query: Query.GetTradableBalance => sender() ! Reply.Balance(balances.tradableBalances(query.forAssets).asRight)
 
     case Query.GetOrderStatus(orderId) =>
       sender() ! Reply.GetOrderStatus(activeOrders.get(orderId).fold[OrderStatus](orderDB.status(orderId))(_.status))
@@ -365,21 +335,12 @@ class AddressActor(
 
     case WsCommand.AddWsSubscription(client) =>
       log.trace(s"[c=${client.path.name}] Added WebSocket subscription")
-      wsAddressState = wsAddressState.addPendingSubscription(client)
-
-      if (balances.allFetched) sendWsSnapshotAndFlushPendingSubscriptions()
-      else {
-        blockchain
-          .getFullBalances(owner, balances.fetched)
-          .transform {
-            case Success(r) => Success(GotFullBalancesByRequest(r.asRight))
-            case Failure(e) =>
-              log.error("Can't receive tradable balances, see logs", e)
-              Success(GotFullBalancesByRequest(error.WavesNodeConnectionBroken.asLeft))
-          }
-          .pipeTo(self)
-        context.watch(client)
-      }
+      wsAddressState = wsAddressState.addSubscription(
+        client,
+        mkWsBalances(balances.allTradableBalances.filter(_._2 > 0)),
+        activeOrders.values.map(WsOrder.fromDomain(_)).to(Seq)
+      )
+      context.watch(client)
 
     case WsCommand.RemoveWsSubscription(client) =>
       log.trace(s"[c=${client.path.name}] Removed WebSocket subscription")
@@ -446,29 +407,13 @@ class AddressActor(
         nextCommand.command match {
           case command: Command.PlaceOrder =>
             val spendingAssets = Set(command.order.getSpendAssetId, command.order.feeAsset)
-            val validationResult =
-              for {
-                tradableBalance <- {
-                  val unknown = balances.needFetch(spendingAssets)
-                  if (unknown.isEmpty) Future.successful(balances.tradableBalances(spendingAssets))
-                  else {
-                    val savedBalances = balances
-                    blockchain
-                      .getPartialBalances(owner, unknown)
-                      .map { r =>
-                        self ! GotPartialBalancesByRequest(r) // To store them locally
-                        savedBalances.withProbablyStale(r).tradableBalances(spendingAssets)
-                      }
-                  }
-                }
-                ao = command.toAcceptedOrder(tradableBalance)
-                r <- validate(ao, tradableBalance)
-              } yield r match {
+            val tradableBalances = balances.tradableBalances(spendingAssets)
+            val ao = command.toAcceptedOrder(tradableBalances)
+            validate(ao, tradableBalances)
+              .map {
                 case Left(error) => Event.ValidationFailed(command.order.id(), error)
                 case Right(_) => Event.ValidationPassed(ao)
               }
-
-            validationResult
               .recover {
                 case ex: WavesNodeConnectionLostException =>
                   log.error("Waves Node connection lost", ex)
@@ -543,18 +488,6 @@ class AddressActor(
 
       scheduleNextDiffSending()
     }
-  }
-
-  /**
-   * Use only if allAssetsKnown == true!
-   */
-  private def sendWsSnapshotAndFlushPendingSubscriptions(): Unit = {
-    wsAddressState.sendSnapshot(
-      // spendableBalances contains the latest balances
-      balances = mkWsBalances(balances.allTradableBalances.filter(_._2 > 0)),
-      orders = activeOrders.values.map(WsOrder.fromDomain(_)).to(Seq)
-    )
-    wsAddressState = wsAddressState.flushPendingSubscriptions()
   }
 
   private def getOrdersToCancel(actualBalance: Map[Asset, Long]): Queue[InsufficientBalanceOrder] = {
@@ -651,7 +584,6 @@ object AddressActor {
 
   trait BlockchainInteraction {
     def getFullBalances(address: Address, exclude: Set[Asset]): Future[AddressBalanceUpdates]
-    def getPartialBalances(address: Address, assets: Set[Asset]): Future[AddressBalanceUpdates]
   }
 
   type Resp = MatcherResponse
@@ -806,9 +738,5 @@ object AddressActor {
   object Settings {
     val default: Settings = Settings(100.milliseconds, 20.seconds, 200)
   }
-
-  // TODO merge with BalanceUpdated and cancel orders too?
-  final private case class GotPartialBalancesByRequest(partial: AddressBalanceUpdates)
-  final private case class GotFullBalancesByRequest(full: Either[MatcherError, AddressBalanceUpdates])
 
 }

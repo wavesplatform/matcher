@@ -2,10 +2,10 @@ package com.wavesplatform.dex
 
 import akka.Done
 import akka.actor.typed.scaladsl.adapter._
-import akka.actor.{ActorRef, ActorSystem, CoordinatedShutdown, Props, typed}
+import akka.actor.{typed, ActorRef, ActorSystem, CoordinatedShutdown, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Directives.respondWithHeader
-import akka.pattern.{CircuitBreaker, ask, gracefulStop}
+import akka.pattern.{ask, gracefulStop, CircuitBreaker}
 import akka.stream.Materializer
 import akka.util.Timeout
 import cats.data.EitherT
@@ -35,7 +35,7 @@ import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.utils.{EitherExt2, LoggerFacade, ScorexLogging}
-import com.wavesplatform.dex.effect.{FutureResult, liftValueAsync}
+import com.wavesplatform.dex.effect.{liftValueAsync, FutureResult}
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
 import com.wavesplatform.dex.grpc.integration.WavesClientBuilder
 import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
@@ -60,7 +60,7 @@ import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.{ThreadLocalRandom, TimeoutException}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{Future, Promise, blocking}
+import scala.concurrent.{blocking, Future, Promise}
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
@@ -202,9 +202,6 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
     override def getFullBalances(address: Address, exclude: Set[Asset]): Future[AddressBalanceUpdates] =
       wavesBlockchainAsyncClient.fullBalancesSnapshot(address, exclude)
-
-    override def getPartialBalances(address: Address, assets: Set[Asset]): Future[AddressBalanceUpdates] =
-      wavesBlockchainAsyncClient.partialBalancesSnapshot(address, assets)
 
   }
 

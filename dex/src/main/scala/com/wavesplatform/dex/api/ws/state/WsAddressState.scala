@@ -14,7 +14,6 @@ import com.wavesplatform.dex.model.{AcceptedOrder, OrderStatus}
 case class WsAddressState(
   address: Address,
   activeSubscription: Map[ActorRef[WsAddressChanges], Long],
-  pendingSubscription: Set[ActorRef[WsAddressChanges]],
   changedSpendableAssets: Set[Asset],
   changedReservableAssets: Set[Asset],
   ordersChanges: Map[Order.Id, WsOrder]
@@ -26,11 +25,10 @@ case class WsAddressState(
   def getAllChangedAssets: Set[Asset] = changedSpendableAssets ++ changedReservableAssets
   def getAllOrderChanges: Seq[WsOrder] = ordersChanges.values.toSeq
 
-  def addPendingSubscription(subscriber: ActorRef[WsAddressChanges]): WsAddressState =
-    copy(pendingSubscription = pendingSubscription + subscriber)
-
-  def flushPendingSubscriptions(): WsAddressState =
-    copy(activeSubscription = activeSubscription ++ pendingSubscription.iterator.map(_ -> 0L), pendingSubscription = Set.empty)
+  def addSubscription(subscriber: ActorRef[WsAddressChanges], balances: Map[Asset, WsBalances], orders: Seq[WsOrder]): WsAddressState = {
+    subscriber ! WsAddressChanges(address, balances, orders, 0)
+    copy(activeSubscription = activeSubscription.updated(subscriber, 0))
+  }
 
   def removeSubscription(subscriber: ActorRef[WsAddressChanges]): WsAddressState = {
     val updated = copy(activeSubscription = activeSubscription - subscriber)
@@ -69,11 +67,6 @@ case class WsAddressState(
     )
   }
 
-  def sendSnapshot(balances: Map[Asset, WsBalances], orders: Seq[WsOrder]): Unit = {
-    val snapshot = WsAddressChanges(address, balances, orders, 0)
-    pendingSubscription.foreach(_ ! snapshot)
-  }
-
   def sendDiffs(balances: Map[Asset, WsBalances], orders: Seq[WsOrder]): WsAddressState = copy(
     activeSubscription = activeSubscription.map { // dirty but one pass
       case (conn, updateId) =>
@@ -90,7 +83,7 @@ case class WsAddressState(
 
 object WsAddressState {
 
-  def empty(address: Address): WsAddressState = WsAddressState(address, Map.empty, Set.empty, Set.empty, Set.empty, Map.empty)
+  def empty(address: Address): WsAddressState = WsAddressState(address, Map.empty, Set.empty, Set.empty, Map.empty)
   val numberMaxSafeInteger = 9007199254740991L
 
   def getNextUpdateId(currentUpdateId: Long): Long = if (currentUpdateId == numberMaxSafeInteger) 1 else currentUpdateId + 1

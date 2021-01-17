@@ -26,7 +26,6 @@ class OrderHistoryStub(system: ActorSystem, time: Time, maxActiveOrders: Int, ma
 
   private val blockchainInteraction = new BlockchainInteraction {
     override def getFullBalances(address: Address, exclude: Set[Asset]): Future[AddressBalanceUpdates] = emptyAddressBalanceUpdatesF
-    override def getPartialBalances(address: Address, assets: Set[Asset]): Future[AddressBalanceUpdates] = emptyAddressBalanceUpdatesF
   }
 
   def createAddressActor(address: Address, started: Boolean): Props =

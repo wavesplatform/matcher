@@ -101,7 +101,6 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
 
   private val blockchainInteraction = new BlockchainInteraction {
     override def getFullBalances(address: Address, exclude: Set[Asset]): Future[AddressBalanceUpdates] = emptyAddressBalanceUpdatesF
-    override def getPartialBalances(address: Address, assets: Set[Asset]): Future[AddressBalanceUpdates] = emptyAddressBalanceUpdatesF
   }
 
   private def createAddressActor(address: Address, started: Boolean): Props =
@@ -476,7 +475,6 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
 
     val blockchainInteraction = new BlockchainInteraction {
       override def getFullBalances(address: Address, exclude: Set[Asset]): Future[AddressBalanceUpdates] = emptyAddressBalanceUpdatesF
-      override def getPartialBalances(address: Address, assets: Set[Asset]): Future[AddressBalanceUpdates] = spendableBalances(assets).map(AddressBalanceUpdates(_, None, Map.empty))
     }
 
     def createAddressActor(address: Address, started: Boolean): Props =

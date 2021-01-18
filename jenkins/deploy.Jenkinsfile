@@ -95,6 +95,7 @@ pipeline {
                 sshagent (credentials: ['buildagent-matcher']) {
                     sh "ssh -o StrictHostKeyChecking=no -l buildagent-matcher ${MATCHER} hostname"
                     sh "scp ./matcher/target/release/waves-dex*all*.deb buildagent-matcher@${MATCHER}:/home/buildagent-matcher"
+                    sh "scp ./waves/grpc-server/target/*.deb buildagent-matcher@${NODE4}:/home/buildagent-matcher"
                     sh "scp ./matcher/target/release/waves-dex-extension-devnet*all*.deb buildagent-matcher@${NODE4}:/home/buildagent-matcher"
                     sh "scp ./matcher/dex-load/src/main/resources/reinstallExtension.sh buildagent-matcher@${NODE4}:/home/buildagent-matcher"
                     sh "scp ./matcher/dex-load/src/main/resources/reinstallMatcher.sh buildagent-matcher@${MATCHER}:/home/buildagent-matcher"

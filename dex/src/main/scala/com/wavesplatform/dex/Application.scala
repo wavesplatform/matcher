@@ -370,7 +370,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       // Note, updates is lazy, so it is initialized here as it should be,
       // Because OrderEventsCoordinator must receive transactions from UtxSwitched.
       wavesBlockchainAsyncClient.updates.foreach { updates =>
-        orderEventsCoordinatorRef ! OrderEventsCoordinatorActor.Command.ApplyUpdates(updates)
+        orderEventsCoordinatorRef ! OrderEventsCoordinatorActor.Command.ApplyNodeUpdates(updates)
       }(monixScheduler)
     }
 
@@ -426,8 +426,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     }
   } yield {
     log.info("Last offset has been reached, switching to a normal mode")
-    orderEventsCoordinatorRef ! OrderEventsCoordinatorActor.Command.Start
-    addressDirectoryRef ! AddressDirectoryActor.StartWork
+    addressDirectoryRef ! AddressDirectoryActor.Command.StartWork
   }
 
   startGuard.onComplete {

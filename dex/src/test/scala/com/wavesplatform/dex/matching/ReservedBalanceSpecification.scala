@@ -8,7 +8,7 @@ import com.wavesplatform.dex.MatcherSpecBase
 import com.wavesplatform.dex.actors.MatcherSpecLike
 import com.wavesplatform.dex.actors.address.AddressActor.BlockchainInteraction
 import com.wavesplatform.dex.actors.address.AddressActor.Command.PlaceOrder
-import com.wavesplatform.dex.actors.address.AddressDirectoryActor.Envelope
+import com.wavesplatform.dex.actors.address.AddressDirectoryActor.Command.ForwardMessage
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.db.{EmptyOrderDB, TestOrderDB, WithDB}
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
@@ -123,8 +123,8 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
   private def openVolume(senderPublicKey: PublicKey, assetId: Asset, addressDirectory: ActorRef = addressDir): Long =
     Await
       .result(
-        (addressDirectory ? AddressDirectoryActor
-          .Envelope(senderPublicKey, AddressActor.Query.GetReservedBalance)).mapTo[AddressActor.Reply.Balance].map(_.balance),
+        (addressDirectory ? AddressDirectoryActor.Command.ForwardMessage(senderPublicKey, AddressActor.Query.GetReservedBalance))
+          .mapTo[AddressActor.Reply.GetBalance].map(_.balance),
         Duration.Inf
       )
       .explicitGet()
@@ -508,7 +508,7 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
   }
 
   private def placeMarketOrder(tp: TestProbe, addressDir: ActorRef, marketOrder: MarketOrder): Unit =
-    tp.send(addressDir, Envelope(marketOrder.order.senderPublicKey, PlaceOrder(marketOrder.order, isMarket = true)))
+    tp.send(addressDir, ForwardMessage(marketOrder.order.senderPublicKey, PlaceOrder(marketOrder.order, isMarket = true)))
 
   private def systemCancelMarketOrder(addressDir: ActorRef, marketOrder: MarketOrder): Unit =
     addressDir ! OrderCanceled(marketOrder, Events.OrderCanceledReason.BecameUnmatchable, System.currentTimeMillis)

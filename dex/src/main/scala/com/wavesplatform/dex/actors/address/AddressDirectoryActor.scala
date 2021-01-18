@@ -3,9 +3,7 @@ package com.wavesplatform.dex.actors.address
 import akka.actor.{Actor, ActorRef, Props, SupervisorStrategy, Terminated}
 import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.dex.domain.account.Address
-import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.domain.utils.{EitherExt2, ScorexLogging}
-import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
 import com.wavesplatform.dex.history.HistoryRouterActor._
 import com.wavesplatform.dex.model.Events
 import com.wavesplatform.dex.model.Events.OrderCancelFailed
@@ -33,48 +31,38 @@ class AddressDirectoryActor(
   }
 
   private def forward(address: Address, msg: Any): Unit = (children get address, msg) match {
-    case (None, _: AddressActor.Message.BalanceChanged) =>
-    case _ =>
-      msg match {
-        case msg: AddressActor.Command.ApplyBatch => msg.events.foreach(sendEventToHistoryRouter)
-        case _ =>
-      }
-      children.getOrElseUpdate(address, createAddressActor(address)) forward msg
+    case (None, _: AddressActor.Command.ChangeBalances | _: OrderCancelFailed) =>
+    case _ => children.getOrElseUpdate(address, createAddressActor(address)) forward msg
   }
 
   override def receive: Receive = {
-    case Envelope(address, message) => forward(address, message)
+    case Command.ForwardMessage(address, message) =>
+      forward(address, message)
 
-    case e: Events.OrderAdded =>
-      forward(e.order.order.sender, e)
-      sendEventToHistoryRouter(e)
-
-    case e: Events.OrderExecuted =>
-      Set(e.counter.order, e.submitted.order).map(_.sender).foreach(forward(_, e))
-      sendEventToHistoryRouter(e)
-
-    case e: Events.OrderCanceled =>
-      forward(e.acceptedOrder.order.sender, e)
-      sendEventToHistoryRouter(e)
+    case command: AddressActor.Command.HasOrderBookEvent =>
+      sendEventToHistoryRouter(command)
+      command.affectedOrders.map(_.order.sender.toAddress).toSet // Could be one trader
+        .foreach(forward(_, command))
 
     case e: OrderCancelFailed =>
+      // This shouldn't work, because we save an order to DB only when it terminates
       orderDB.get(e.id) match {
         case Some(order) => forward(order.sender.toAddress, e)
         case None => log.warn(s"The order '${e.id}' not found")
       }
-
-    case BatchUpdate(xs) => ???
-
-    case StartWork =>
-      recovered = true
-      context.children.foreach(_ ! StartWork)
 
     case Terminated(child) =>
       val addressString = child.path.name
       val address = Address.fromString(addressString).explicitGet()
       children.remove(address)
       log.warn(s"Address handler for $addressString terminated")
+
+    case Command.StartWork =>
+      recovered = true
+      context.children.foreach(_ ! AddressActor.Command.StartWork)
   }
+
+  private def sendEventToHistoryRouter(command: AddressActor.Command.HasOrderBookEvent): Unit = sendEventToHistoryRouter(command.event)
 
   private def sendEventToHistoryRouter(event: Events.Event): Unit = historyRouterRef.foreach { historyRouterRef =>
     val msg = event match {
@@ -100,7 +88,11 @@ object AddressDirectoryActor {
     )
   )
 
-  case class Envelope(address: Address, message: AddressActor.Message)
-  case class BatchUpdate(xs: Map[Address, (AddressBalanceUpdates, Set[ExchangeTransaction.Id])])
-  case object StartWork
+  sealed trait Command extends Product with Serializable
+
+  object Command {
+    case class ForwardMessage(address: Address, message: AddressActor.Message)
+    case object StartWork
+  }
+
 }

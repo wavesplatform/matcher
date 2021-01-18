@@ -14,15 +14,13 @@ import com.wavesplatform.dex.model.{AcceptedOrder, OrderStatus}
 case class WsAddressState(
   address: Address,
   activeSubscription: Map[ActorRef[WsAddressChanges], Long],
-  changedSpendableAssets: Set[Asset],
-  changedReservableAssets: Set[Asset],
+  changedAssets: Set[Asset],
   ordersChanges: Map[Order.Id, WsOrder]
 ) { // TODO Probably use an ordered Map and pass it to WsAddressChanges
 
   val hasActiveSubscriptions: Boolean = activeSubscription.nonEmpty
-  val hasChanges: Boolean = getAllChangedAssets.nonEmpty || ordersChanges.nonEmpty
+  val hasChanges: Boolean = changedAssets.nonEmpty || ordersChanges.nonEmpty
 
-  def getAllChangedAssets: Set[Asset] = changedSpendableAssets ++ changedReservableAssets
   def getAllOrderChanges: Seq[WsOrder] = ordersChanges.values.toSeq
 
   def addSubscription(subscriber: ActorRef[WsAddressChanges], balances: Map[Asset, WsBalances], orders: Seq[WsOrder]): WsAddressState = {
@@ -36,8 +34,7 @@ case class WsAddressState(
     else updated
   }
 
-  def putReservedAssets(diff: Set[Asset]): WsAddressState = copy(changedReservableAssets = changedReservableAssets ++ diff)
-  def putSpendableAssets(diff: Set[Asset]): WsAddressState = copy(changedSpendableAssets = changedSpendableAssets ++ diff)
+  def putChangedAssets(diff: Set[Asset]): WsAddressState = copy(changedAssets = changedAssets ++ diff)
 
   def putOrderUpdate(id: Order.Id, update: WsOrder): WsAddressState = copy(ordersChanges = ordersChanges + (id -> update))
 
@@ -76,14 +73,14 @@ case class WsAddressState(
     }
   )
 
-  def cleanAllChanges(): WsAddressState = copy(changedSpendableAssets = Set.empty, changedReservableAssets = Set.empty, ordersChanges = Map.empty)
+  def cleanAllChanges(): WsAddressState = copy(changedAssets = Set.empty, ordersChanges = Map.empty)
   def cleanOrderChanges(): WsAddressState = copy(ordersChanges = Map.empty)
-  def cleanBalanceChanges(): WsAddressState = copy(changedSpendableAssets = Set.empty, changedReservableAssets = Set.empty)
+  def cleanBalanceChanges(): WsAddressState = copy(changedAssets = Set.empty)
 }
 
 object WsAddressState {
 
-  def empty(address: Address): WsAddressState = WsAddressState(address, Map.empty, Set.empty, Set.empty, Map.empty)
+  def empty(address: Address): WsAddressState = WsAddressState(address, Map.empty, Set.empty, Map.empty)
   val numberMaxSafeInteger = 9007199254740991L
 
   def getNextUpdateId(currentUpdateId: Long): Long = if (currentUpdateId == numberMaxSafeInteger) 1 else currentUpdateId + 1

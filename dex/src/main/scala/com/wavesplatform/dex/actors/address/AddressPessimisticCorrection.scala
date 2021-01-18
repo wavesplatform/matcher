@@ -40,23 +40,20 @@ case class AddressPessimisticCorrection(
    * TODO with himself. volume by spending asset 0 ?
    * @param volume Should be non negative
    */
-  def withExecuted(txId: ExchangeTransaction.Id, volume: Map[Asset, Long]): AddressPessimisticCorrection =
+  def withExecuted(txId: ExchangeTransaction.Id, volume: Map[Asset, Long]): (AddressPessimisticCorrection, Set[Asset]) =
     if (notObserved.contains(txId)) throw new RuntimeException(s"$txId executed twice!")
-    else if (future.contains(txId)) copy(
-      unconfirmed = unconfirmed |-| volume,
-      future = future - txId
-    )
-    else copy(
-      unconfirmed = unconfirmed |-| volume,
-      notObserved = notObserved.updated(txId, volume)
-    )
+    else if (future.contains(txId)) (copy(unconfirmed = unconfirmed |-| volume, future = future - txId), volume.keySet)
+    else (copy(unconfirmed = unconfirmed |-| volume, notObserved = notObserved.updated(txId, volume)), Set.empty) // Set.empty - see getBy
 
-  def withObserved(txId: ExchangeTransaction.Id): AddressPessimisticCorrection =
-    if (notObserved.contains(txId)) copy(notObserved = notObserved.removed(txId))
-    else
-      // Could happen during rollbacks, but CombinedWavesBlockchainClient solves this situation.
-      // Even this happen, we just have a hanging txId in "future", which won't affect the process, only consumes small amount of memory.
-      copy(future = future + txId)
+  // TODO changes with unconfirmed? not only, if aproved by broadcaster
+  def withObserved(txId: ExchangeTransaction.Id): (AddressPessimisticCorrection, Set[Asset]) =
+    notObserved.get(txId) match {
+      case Some(v) => (copy(notObserved = notObserved.removed(txId)), v.keySet)
+      case None =>
+        // Could happen during rollbacks, but CombinedWavesBlockchainClient solves this situation.
+        // Even this happen, we just have a hanging txId in "future", which won't affect the process, only consumes small amount of memory.
+        (copy(future = future + txId), Set.empty)
+    }
 
   /**
    * @return A negative value
@@ -65,4 +62,8 @@ case class AddressPessimisticCorrection(
     .flatMap(_.collect { case (`asset`, v) => v })
     .sum
 
+}
+
+object AddressPessimisticCorrection {
+  val empty = AddressPessimisticCorrection(Map.empty, Map.empty, Set.empty)
 }

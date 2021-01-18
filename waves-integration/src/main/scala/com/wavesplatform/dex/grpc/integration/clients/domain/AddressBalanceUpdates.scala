@@ -15,7 +15,7 @@ case class AddressBalanceUpdates(
     pessimisticCorrection.keySet
 
   def nonEmpty: Boolean = regular.nonEmpty || outLease.nonEmpty || pessimisticCorrection.nonEmpty
-
+  def isEmpty: Boolean = regular.isEmpty && outLease.isEmpty && pessimisticCorrection.isEmpty
 }
 
 object AddressBalanceUpdates {

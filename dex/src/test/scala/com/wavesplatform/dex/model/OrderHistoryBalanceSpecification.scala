@@ -927,7 +927,7 @@ private object OrderHistoryBalanceSpecification {
   implicit private class AddressActorExt(val ref: ActorRef) extends AnyVal {
 
     def orderIds(assetPair: Option[AssetPair], orderListType: OrderListType): Vector[Order.Id] =
-      askAddressActor[AddressActor.Reply.OrdersStatuses](ref, AddressActor.Query.GetOrdersStatuses(assetPair, orderListType))
+      askAddressActor[AddressActor.Reply.GetOrderStatuses](ref, AddressActor.Query.GetOrdersStatuses(assetPair, orderListType))
         .xs
         .map(_._1).toVector
 
@@ -940,7 +940,7 @@ private object OrderHistoryBalanceSpecification {
     def allOrderIdsByPair(pair: AssetPair): Vector[Order.Id] = orderIds(Some(pair), OrderListType.All)
 
     def openVolume(asset: Asset): Long =
-      askAddressActor[AddressActor.Reply.Balance](ref, AddressActor.Query.GetReservedBalance).balance.explicitGet().getOrElse(asset, 0L)
+      askAddressActor[AddressActor.Reply.GetBalance](ref, AddressActor.Query.GetReservedBalance).balance.explicitGet().getOrElse(asset, 0L)
 
     def orderStatus(orderId: ByteStr): OrderStatus =
       askAddressActor[AddressActor.Reply.GetOrderStatus](ref, AddressActor.Query.GetOrderStatus(orderId)).x

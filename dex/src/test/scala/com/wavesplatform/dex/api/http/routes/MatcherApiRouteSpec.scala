@@ -1118,13 +1118,13 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     val addressActor = TestProbe("address")
     addressActor.setAutoPilot { (sender: ActorRef, msg: Any) =>
       val response = msg match {
-        case AddressDirectoryActor.Envelope(_, msg) =>
+        case AddressDirectoryActor.Command.ForwardMessage(_, msg) =>
           msg match {
-            case AddressActor.Query.GetReservedBalance => AddressActor.Reply.Balance(Map[Asset, Long](Waves -> 350L).asRight)
+            case AddressActor.Query.GetReservedBalance => AddressActor.Reply.GetBalance(Map[Asset, Long](Waves -> 350L).asRight)
             case PlaceOrder(x, _) => if (x.id() == okOrder.id()) AddressActor.Event.OrderAccepted(x) else error.OrderDuplicate(x.id())
 
             case AddressActor.Query.GetOrdersStatuses(_, _) =>
-              AddressActor.Reply.OrdersStatuses(List(okOrder.id() -> OrderInfo.v5(LimitOrder(okOrder), OrderStatus.Accepted)))
+              AddressActor.Reply.GetOrderStatuses(List(okOrder.id() -> OrderInfo.v5(LimitOrder(okOrder), OrderStatus.Accepted)))
 
             case AddressActor.Query.GetOrderStatus(orderId) =>
               if (orderId == okOrder.id()) AddressActor.Reply.GetOrderStatus(OrderStatus.Accepted)
@@ -1152,10 +1152,10 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
                 }.toMap
               )
 
-            case GetTradableBalance(xs) => AddressActor.Reply.Balance(xs.map(_ -> 100L).toMap.asRight)
+            case GetTradableBalance(xs) => AddressActor.Reply.GetBalance(xs.map(_ -> 100L).toMap.asRight)
 
             case _: AddressActor.Query.GetOrderStatusInfo =>
-              AddressActor.Reply.OrdersStatusInfo(OrderInfo.v5(LimitOrder(orderToCancel), OrderStatus.Accepted).some)
+              AddressActor.Reply.GetOrdersStatusInfo(OrderInfo.v5(LimitOrder(orderToCancel), OrderStatus.Accepted).some)
 
             case x => Status.Failure(new RuntimeException(s"Unknown command: $x"))
           }

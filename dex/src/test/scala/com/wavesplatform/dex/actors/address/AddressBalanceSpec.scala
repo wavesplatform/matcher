@@ -5,6 +5,7 @@ import org.scalatest.matchers.should.Matchers
 
 class AddressBalanceSpec extends AnyFreeSpecLike with Matchers {
   "AddressBalance" - {
-
+    "withInit" - {}
+    "withFresh" - {}
   }
 }

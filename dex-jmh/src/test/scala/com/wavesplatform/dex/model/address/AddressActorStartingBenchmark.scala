@@ -92,7 +92,7 @@ object AddressActorStartingBenchmark {
 
     implicit val efc: ErrorFormatterContext = ErrorFormatterContext.from(_ => 8)
 
-    def run(): AddressActor.Reply.OrdersStatuses = {
+    def run(): AddressActor.Reply.GetOrderStatuses = {
 
       val system: ActorSystem = ActorSystem(s"addressActorBenchmark-${ThreadLocalRandom.current().nextInt()}")
 
@@ -115,7 +115,7 @@ object AddressActorStartingBenchmark {
       addressActor ! AddressDirectoryActor.StartWork
 
       val ordersStatuses = Await.result(
-        addressActor.ask(Query.GetOrdersStatuses(None, AddressActor.OrderListType.All))(3.minutes).mapTo[AddressActor.Reply.OrdersStatuses],
+        addressActor.ask(Query.GetOrdersStatuses(None, AddressActor.OrderListType.All))(3.minutes).mapTo[AddressActor.Reply.GetOrderStatuses],
         3.minutes
       )
 

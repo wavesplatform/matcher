@@ -3,6 +3,7 @@ package com.wavesplatform.dex.actors.address
 import cats.instances.long._
 import cats.syntax.group._
 import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.fp.MapImplicits.group
 import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
 
@@ -27,9 +28,6 @@ case class AddressBalance(
    */
   def allTradableBalances: Map[Asset, Long] = tradableBalances(allAssets)
 
-  /**
-   * Use this method only if sure, that we known all information about specified assets
-   */
   def tradableBalances(assets: Set[Asset]): Map[Asset, Long] =
     assets.foldLeft(Map.empty[Asset, Long]) {
       case (r, asset) =>
@@ -41,6 +39,18 @@ case class AddressBalance(
           openVolume.getOrElse(asset, 0L)
 
         r.updated(asset, math.max(0L, x))
+    }
+
+  def nodeBalances(assets: Set[Asset]): Map[Asset, Long] =
+    assets.foldLeft(Map.empty[Asset, Long]) {
+      case (r, asset) =>
+        // getOrElse, because we fetch this information at start
+        val x =
+          regular.getOrElse(asset, 0L) -
+            outgoingLeasing.getOrElse(0L) +
+            pessimisticCorrection.getBy(asset)
+
+        r.updated(asset, x)
     }
 
   def withInit(snapshot: AddressBalanceUpdates): AddressBalance =
@@ -64,6 +74,16 @@ case class AddressBalance(
 
   def withVolume(xs: Map[Asset, Long]): AddressBalance = copy(openVolume = openVolume |+| xs)
   def withoutVolume(xs: Map[Asset, Long]): AddressBalance = copy(openVolume = openVolume |-| xs)
+
+  def withExecuted(txId: ExchangeTransaction.Id, volume: Map[Asset, Long]): (AddressBalance, Set[Asset]) = {
+    val (updated, changedAssets) = pessimisticCorrection.withExecuted(txId, volume)
+    (copy(pessimisticCorrection = updated), changedAssets)
+  }
+
+  def withObserved(txId: ExchangeTransaction.Id): (AddressBalance, Set[Asset]) = {
+    val (updated, changedAssets) = pessimisticCorrection.withObserved(txId)
+    (copy(pessimisticCorrection = updated), changedAssets)
+  }
 
 }
 

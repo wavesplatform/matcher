@@ -10,7 +10,7 @@ import com.wavesplatform.dex.MatcherSpecBase
 import com.wavesplatform.dex.actors.address.AddressActor.BlockchainInteraction
 import com.wavesplatform.dex.actors.address.AddressActor.Command.Source
 import com.wavesplatform.dex.actors.address.AddressActor.Query.GetTradableBalance
-import com.wavesplatform.dex.actors.address.AddressActor.Reply.Balance
+import com.wavesplatform.dex.actors.address.AddressActor.Reply.GetBalance
 import com.wavesplatform.dex.api.ws.protocol.WsAddressChanges
 import com.wavesplatform.dex.db.EmptyOrderDB
 import com.wavesplatform.dex.domain.account.{Address, KeyPair, PublicKey}
@@ -32,6 +32,7 @@ import org.scalatest.wordspec.AnyWordSpecLike
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
+import scala.util.Success
 
 class AddressActorSpecification
     extends TestKit(ActorSystem("AddressActorSpecification"))
@@ -94,8 +95,8 @@ class AddressActorSpecification
     "cancel orders" when {
       "asset balance changed" in test { (_, commandsProbe, addOrder, updatePortfolio) =>
         val initPortfolio = sellToken1Portfolio
-
         updatePortfolio(initPortfolio)
+
         addOrder(LimitOrder(sellTokenOrder1))
 
         updatePortfolio(initPortfolio.copy(assets = Map.empty))
@@ -141,7 +142,7 @@ class AddressActorSpecification
 
       ref ! GetTradableBalance(Set(Waves))
       expectMsgPF(hint = "Balance") {
-        case r: Balance => r should matchTo(Balance(Map[Asset, Long](Waves -> 0L).asRight))
+        case r: GetBalance => r should matchTo(GetBalance(Map[Asset, Long](Waves -> 0L).asRight))
         case _ =>
       }
     }
@@ -211,13 +212,22 @@ class AddressActorSpecification
       addOrder(LimitOrder(sellTokenOrder1))
 
       val subscription1 = typed.TestProbe[WsAddressChanges]("probe-1")
-      ref ! AddressDirectoryActor.Envelope(sellTokenOrder1.sender.toAddress, AddressActor.WsCommand.AddWsSubscription(subscription1.ref))
+      ref ! AddressDirectoryActor.Command.ForwardMessage(
+        sellTokenOrder1.sender.toAddress,
+        AddressActor.WsCommand.AddWsSubscription(subscription1.ref)
+      )
       subscription1.receiveMessage()
 
-      ref ! AddressDirectoryActor.Envelope(sellTokenOrder1.sender.toAddress, AddressActor.WsCommand.RemoveWsSubscription(subscription1.ref))
+      ref ! AddressDirectoryActor.Command.ForwardMessage(
+        sellTokenOrder1.sender.toAddress,
+        AddressActor.WsCommand.RemoveWsSubscription(subscription1.ref)
+      )
 
       val subscription2 = typed.TestProbe[WsAddressChanges]("probe-2")
-      ref ! AddressDirectoryActor.Envelope(sellTokenOrder1.sender.toAddress, AddressActor.WsCommand.AddWsSubscription(subscription2.ref))
+      ref ! AddressDirectoryActor.Command.ForwardMessage(
+        sellTokenOrder1.sender.toAddress,
+        AddressActor.WsCommand.AddWsSubscription(subscription2.ref)
+      )
       subscription2.receiveMessage()
 
       updatePortfolio(initPortfolio.copy(balance = initPortfolio.balance + 1))
@@ -264,11 +274,11 @@ class AddressActorSpecification
     lazy val addressDir = system.actorOf(Props(new AddressDirectoryActor(EmptyOrderDB, createAddressActor, None, recovered = true)))
 
     def addOrder(ao: AcceptedOrder): Unit = {
-      addressDir ! AddressDirectoryActor.Envelope(address, AddressActor.Command.PlaceOrder(ao.order, ao.isMarket))
+      addressDir ! AddressDirectoryActor.Command.ForwardMessage(address, AddressActor.Command.PlaceOrder(ao.order, ao.isMarket))
       ao match {
         case lo: LimitOrder =>
           commandsProbe.expectMsg(ValidatedCommand.PlaceOrder(lo))
-          addressDir ! OrderAdded(lo, OrderAddedReason.RequestExecuted, System.currentTimeMillis)
+          addressDir ! AddressActor.Command.ApplyOrderBookAdded(OrderAdded(lo, OrderAddedReason.RequestExecuted, System.currentTimeMillis))
         case mo: MarketOrder => commandsProbe.expectMsg(ValidatedCommand.PlaceMarketOrder(mo))
       }
     }
@@ -278,7 +288,8 @@ class AddressActorSpecification
       commandsProbe,
       addOrder,
       updatedPortfolio => {
-        val prevPortfolio = Option(currentPortfolio.getAndSet(updatedPortfolio)).getOrElse(Portfolio.empty)
+        val prevPortfolioOption = Option(currentPortfolio.getAndSet(updatedPortfolio))
+        val prevPortfolio = prevPortfolioOption.getOrElse(Portfolio.empty)
 
         val regularBalanceChanges: Map[Asset, Long] =
           prevPortfolio
@@ -287,14 +298,17 @@ class AddressActorSpecification
             .toMap
             .withDefaultValue(0)
 
-        addressDir ! AddressDirectoryActor.Envelope(
-          address,
-          AddressActor.Message.BalanceChanged(AddressBalanceUpdates(
-            regular = regularBalanceChanges,
-            outLease = None,
-            pessimisticCorrection = Map.empty
-          ))
+        val changes = AddressBalanceUpdates(
+          regular = regularBalanceChanges,
+          outLease = None,
+          pessimisticCorrection = Map.empty
         )
+
+        val message =
+          if (prevPortfolioOption.isEmpty) AddressActor.Command.SetInitialBalances(Success(changes))
+          else AddressActor.Command.ChangeBalances(changes)
+
+        addressDir ! AddressDirectoryActor.Command.ForwardMessage(address, message)
       }
     )
 

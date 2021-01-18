@@ -1,5 +1,6 @@
 package com.wavesplatform.it.matcher.api.http.transactions
 
+import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.it.api.RawHttpChecks
@@ -21,7 +22,7 @@ class GetOrderTransactionsSpec extends MatcherSuiteBase with TableDrivenProperty
     dex1.start()
   }
 
-  "GET /matcher/balance/reserved/{publicKey}" - {
+  "GET /matcher/transactions/{orderId}" - {
 
     "should return empty list when order doesn't exists " in {
       validate200Json(dex1.rawApi.getTransactionsByOrder(mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd))) should be(empty)
@@ -63,7 +64,12 @@ class GetOrderTransactionsSpec extends MatcherSuiteBase with TableDrivenProperty
 
     //TODO: change after DEX-980
     "should return an error when orderId is not a correct base58 string" in {
-      validate404Exception(dex1.rawApi.getTransactionsByOrder("null"))
+      validateMatcherError(
+        dex1.rawApi.getTransactionsByOrder("null"),
+        StatusCodes.BadRequest,
+        9437185,
+        "Provided value is not a correct base58 string, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
+      )
     }
   }
 

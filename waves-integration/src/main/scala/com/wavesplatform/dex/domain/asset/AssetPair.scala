@@ -1,7 +1,9 @@
 package com.wavesplatform.dex.domain.asset
 
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.bytes.{deser, ByteStr}
+import com.wavesplatform.dex.domain.error.ValidationError.InvalidAsset
 import com.wavesplatform.dex.domain.validation.Validation
 import com.wavesplatform.dex.domain.validation.Validation.booleanOperators
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
@@ -45,6 +47,12 @@ case class AssetPair(
 }
 
 object AssetPair {
+
+  def validateAndExtractAsset(a: String): Either[InvalidAsset, Asset] =
+    for {
+      _ <- Either.cond(Base58.tryDecode(a).isSuccess, (), InvalidAsset(s"Unable to decode: $a is not a correct base58 string"))
+      asset = extractAsset(a).get
+    } yield asset
 
   def extractAsset(a: String): Try[Asset] = a match {
     case Asset.WavesName => Success(Waves)

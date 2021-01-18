@@ -98,3 +98,5 @@ case object InternalError
 
 case class InvalidAddress(reason: String) extends MatcherResponse(C.BadRequest, error.InvalidAddress(reason))
 case class InvalidPublicKey(reason: String) extends MatcherResponse(C.BadRequest, error.UserPublicKeyIsNotValid(reason))
+case class InvalidAsset(reason: String) extends MatcherResponse(C.BadRequest, error.InvalidAsset(reason))
+case class InvalidBase58String(reason: String) extends MatcherResponse(C.BadRequest, error.InvalidBase58String(reason))

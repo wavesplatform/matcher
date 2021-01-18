@@ -6,7 +6,7 @@ import akka.http.scaladsl.server.{PathMatcher, PathMatcher1, PathMatchers => Akk
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
-import com.wavesplatform.dex.domain.error.ValidationError.{InvalidAddress, InvalidPublicKey}
+import com.wavesplatform.dex.domain.error.ValidationError.{InvalidAddress, InvalidAsset, InvalidBase58String, InvalidPublicKey}
 
 object PathMatchers {
 
@@ -24,11 +24,16 @@ object PathMatchers {
     case _ => None
   }
 
-  val AssetPM: PathMatcher1[Asset] = AkkaMatchers.Segment.flatMap { s =>
-    AssetPair.extractAsset(s).toOption
-  }
+  object AssetPM extends Base58[Either[InvalidAsset, Asset]](s => Option(AssetPair.validateAndExtractAsset(s)))
 
-  object ByteStrPM extends Base58[ByteStr](ByteStr.decodeBase58(_).toOption)
+  object OrderPM
+      extends Base58[Either[InvalidBase58String, ByteStr]](s =>
+        Option(try Right(ByteStr.decodeBase58(s).get)
+        catch {
+          case e: Exception =>
+            Left(InvalidBase58String(e.getMessage))
+        })
+      )
 
   object PublicKeyPM extends Base58[Either[InvalidPublicKey, PublicKey]](s => Option(PublicKey fromBase58String s))
 

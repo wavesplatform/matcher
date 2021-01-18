@@ -1,3 +1,4 @@
+import Dependencies.Version.levelDbVersion
 import sbt.Keys._
 import sbt.{Def, compilerPlugin, _}
 
@@ -70,6 +71,7 @@ object Dependencies {
     val javaLevelDb = "0.12"
     val jniLevelDb = "1.18.3"
     val influxDb = "2.20"
+    val levelDbVersion = "1.22.1"
 
     val commonsNet = "3.7"
     val nettyCodec = "4.1.33.Final"
@@ -144,6 +146,17 @@ object Dependencies {
   private val allureScalaTest = "io.qameta.allure" %% "allure-scalatest" % Version.allureScalaTest
   private val jaxbApi = "javax.xml.bind" % "jaxb-api" % Version.jaxbApi
 
+  private[this] val levelDBJNA = {
+    Seq(
+      "com.wavesplatform.leveldb-jna" % "leveldb-jna-core"   % levelDbVersion,
+      "com.wavesplatform.leveldb-jna" % "leveldb-jna-native" % levelDbVersion classifier "linux-x86_64",
+      "com.wavesplatform.leveldb-jna" % "leveldb-jna-native" % levelDbVersion classifier "windows-x86_64",
+      "com.wavesplatform.leveldb-jna" % "leveldb-jna-native" % levelDbVersion classifier "osx"
+    )
+  }
+
+  private val leveldbJna = "com.protonail.leveldb-jna" % "leveldb-jna" % "1.20.0" pomOnly()
+
   private val pureConfig: Seq[ModuleID] =
     Seq("pureconfig", "pureconfig-cats", "pureconfig-enumeratum").map("com.github.pureconfig" %% _ % Version.pureConfig)
 
@@ -210,7 +223,7 @@ object Dependencies {
       slf4j,
       grpcNetty,
       nettyCodec
-    ) ++ pureConfig ++ enumeratum
+    ) ++ pureConfig ++ enumeratum ++ levelDBJNA
   )
 
   object Module {
@@ -243,7 +256,7 @@ object Dependencies {
       sttpClient,
       wavesJ,
       betterMonadicFor
-    ) ++ pureConfig ++ enumeratum ++ testKit ++ quill ++ monocle
+    ) ++ pureConfig ++ enumeratum ++ testKit ++ quill ++ monocle ++ levelDBJNA
 
     lazy val dexLoad: Seq[ModuleID] = Seq(diffx) ++ pureConfig
 

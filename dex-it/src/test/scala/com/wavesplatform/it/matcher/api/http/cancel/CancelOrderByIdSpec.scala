@@ -67,7 +67,7 @@ class CancelOrderByIdSpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
         dex1.rawApi.cancelOrderById(order.idStr(), Map("X-API-Key" -> apiKey, "X-User-Public-Key" -> "null")),
         StatusCodes.BadRequest,
         3148801,
-        "Provided user public key is not correct"
+        "Provided public key is not correct, reason: Unable to decode base58: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )
     }
 

@@ -1,6 +1,7 @@
 package com.wavesplatform.it.matcher.api.http.history
 
 import com.google.common.primitives.Longs
+import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
@@ -65,12 +66,16 @@ class GetOrderHistoryByAssetPairAndPublicKeySpec extends MatcherSuiteBase with R
       }
     }
 
-    //TODO: change after DEX-980
     "should return an error if public key is not a correct base58 string" in {
       val ts = System.currentTimeMillis
       val sign = Base58.encode(crypto.sign(alice, alice.publicKey ++ Longs.toByteArray(ts)))
 
-      validate404Exception(dex1.rawApi.getOrderHistoryByAssetPairAndPublicKey("null", "WAVES", UsdId.toString, ts, sign))
+      validateMatcherError(
+        dex1.rawApi.getOrderHistoryByAssetPairAndPublicKey("null", "WAVES", UsdId.toString, ts, sign),
+        StatusCodes.BadRequest,
+        3148801,
+        "Provided public key is not correct, reason: Unable to decode base58: requirement failed: Wrong char 'l' in Base58 string 'null'"
+      )
     }
 
     //TODO: change after DEX-980

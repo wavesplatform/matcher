@@ -1,6 +1,7 @@
 package com.wavesplatform.it.matcher.api.http.history
 
 import com.google.common.primitives.Longs
+import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
@@ -70,7 +71,12 @@ class GetOrderHistoryByPublicKeySpec extends MatcherSuiteBase with RawHttpChecks
       val ts = System.currentTimeMillis
       val sign = Base58.encode(crypto.sign(alice, alice.publicKey ++ Longs.toByteArray(ts)))
 
-      validate404Exception(dex1.rawApi.getOrderHistoryByPublicKey("null", ts, sign))
+      validateMatcherError(
+        dex1.rawApi.getOrderHistoryByPublicKey("null", ts, sign),
+        StatusCodes.BadRequest,
+        3148801,
+        "Provided public key is not correct, reason: Unable to decode base58: requirement failed: Wrong char 'l' in Base58 string 'null'"
+      )
     }
 
     "should return an error if public key parameter has the different value of used in signature" in {

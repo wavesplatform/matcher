@@ -1,12 +1,12 @@
 package com.wavesplatform.dex.api.http.routes
 
-import akka.actor.{typed, ActorRef}
+import akka.actor.{ActorRef, typed}
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.{HttpEntity, HttpResponse, StatusCodes}
 import akka.http.scaladsl.server
 import akka.http.scaladsl.server._
 import akka.http.scaladsl.server.directives.FutureDirectives
-import akka.pattern.{ask, AskTimeoutException}
+import akka.pattern.{AskTimeoutException, ask}
 import akka.stream.Materializer
 import akka.util.Timeout
 import cats.syntax.option._
@@ -18,7 +18,7 @@ import com.wavesplatform.dex.actors.address.AddressActor.OrderListType
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.api.http._
 import com.wavesplatform.dex.api.http.entities._
-import com.wavesplatform.dex.api.http.headers.{`X-User-Public-Key`, CustomContentTypes}
+import com.wavesplatform.dex.api.http.headers.{CustomContentTypes, `X-User-Public-Key`}
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
 import com.wavesplatform.dex.api.ws.actors.WsExternalClientDirectoryActor
@@ -47,6 +47,7 @@ import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
 import com.wavesplatform.dex.settings.{MatcherSettings, OrderFeeSettings}
 import io.swagger.annotations._
+
 import javax.ws.rs.Path
 import kamon.Kamon
 import play.api.libs.json._
@@ -99,7 +100,7 @@ class MatcherApiRoute(
   private val filteredConfig = config.withoutKeys(excludedConfigKeys)
 
   private def invalidJsonResponse(error: MatcherError): StandardRoute = complete(InvalidJsonResponse(error))
-  private val invalidUserPublicKey: StandardRoute = complete(SimpleErrorResponse(StatusCodes.Forbidden, error.UserPublicKeyIsNotValid))
+  private val invalidUserPublicKey: StandardRoute = complete(SimpleErrorResponse(StatusCodes.Forbidden, error.UserPublicKeyIsNotValid()))
 
   private val invalidJsonParsingRejectionsHandler =
     server.RejectionHandler
@@ -179,6 +180,9 @@ class MatcherApiRoute(
       case Right(_) => provide(a)
       case Left(e) => complete(InfoNotFound(e))
     }
+
+  private def withValidPublicKey(publicKeyOrError: Either[ValidationError.InvalidPublicKey, PublicKey])(f: PublicKey => Route): Route =
+    publicKeyOrError.fold(ia => complete(InvalidPublicKey(ia.reason)), f)
 
   private def withCorrectAddress(addressOrError: Either[ValidationError.InvalidAddress, Address])(f: Address => Route): Route =
     addressOrError.fold(ia => complete(InvalidAddress(ia.reason)), f)
@@ -737,14 +741,17 @@ class MatcherApiRoute(
       )
     )
   )
-  def getOrderHistoryByAssetPairAndPublicKey: Route = (path(AssetPairPM / "publicKey" / PublicKeyPM) & get) { (p, publicKey) =>
-    withAssetPair(p, redirectToInverse = true, s"/publicKey/$publicKey") { pair =>
-      parameters("activeOnly".as[Boolean].?, "closedOnly".as[Boolean].?) { (activeOnly, closedOnly) =>
-        signedGet(publicKey) {
-          loadOrders(publicKey, Some(pair), getOrderListType(activeOnly, closedOnly, OrderListType.All))
+  def getOrderHistoryByAssetPairAndPublicKey: Route = (path(AssetPairPM / "publicKey" / PublicKeyPM) & get) {
+    (p, publicKeyOrError) =>
+      withValidPublicKey(publicKeyOrError) { publicKey =>
+        withAssetPair(p, redirectToInverse = true, s"/publicKey/$publicKey") { pair =>
+          parameters("activeOnly".as[Boolean].?, "closedOnly".as[Boolean].?) { (activeOnly, closedOnly) =>
+            signedGet(publicKey) {
+              loadOrders(publicKey, Some(pair), getOrderListType(activeOnly, closedOnly, OrderListType.All))
+            }
+          }
         }
       }
-    }
   }
 
   @Path("/orderbook/{publicKey}")
@@ -784,10 +791,12 @@ class MatcherApiRoute(
       )
     )
   )
-  def getOrderHistoryByPublicKey: Route = (path(PublicKeyPM) & get) { publicKey =>
-    parameters("activeOnly".as[Boolean].?, "closedOnly".as[Boolean].?) { (activeOnly, closedOnly) =>
-      signedGet(publicKey) {
-        loadOrders(publicKey, None, getOrderListType(activeOnly, closedOnly, OrderListType.All))
+  def getOrderHistoryByPublicKey: Route = (path(PublicKeyPM) & get) { publicKeyOrError =>
+    withValidPublicKey(publicKeyOrError) { publicKey =>
+      parameters("activeOnly".as[Boolean].?, "closedOnly".as[Boolean].?) { (activeOnly, closedOnly) =>
+        signedGet(publicKey) {
+          loadOrders(publicKey, None, getOrderListType(activeOnly, closedOnly, OrderListType.All))
+        }
       }
     }
   }
@@ -900,8 +909,10 @@ class MatcherApiRoute(
       )
     )
   )
-  def getOrderStatusInfoByIdWithSignature: Route = (path(PublicKeyPM / ByteStrPM) & get) { (publicKey, orderId) =>
-    signedGet(publicKey)(getOrderStatusInfo(orderId, publicKey.toAddress))
+  def getOrderStatusInfoByIdWithSignature: Route = (path(PublicKeyPM / ByteStrPM) & get) { (publicKeyOrError, orderId) =>
+    withValidPublicKey(publicKeyOrError) { publicKey =>
+      signedGet(publicKey)(getOrderStatusInfo(orderId, publicKey.toAddress))
+    }
   }
 
   @Path("/orderbook/{amountAsset}/{priceAsset}/tradableBalance/{address}")
@@ -950,14 +961,18 @@ class MatcherApiRoute(
       )
     )
   )
-  def reservedBalance: Route = (path("reserved" / PublicKeyPM) & get) { publicKey =>
-    (signedGet(publicKey).tmap(_ => Option.empty[PublicKey]) | (withAuth & withUserPublicKeyOpt)) {
-      case Some(upk) if upk != publicKey => invalidUserPublicKey
-      case _ =>
-        complete {
-          askMapAddressActor[AddressActor.Reply.Balance](publicKey, AddressActor.Query.GetReservedBalance)(_.balance.toJson)
+  def reservedBalance: Route = (path("reserved" / PublicKeyPM) & get) { publicKeyOrError =>
+    withValidPublicKey(publicKeyOrError) {
+      publicKey =>
+        (signedGet(publicKey).tmap(_ => Option.empty[PublicKey]) | (withAuth & withUserPublicKeyOpt)) {
+          case Some(upk) if upk != publicKey => invalidUserPublicKey
+          case _ =>
+            complete {
+              askMapAddressActor[AddressActor.Reply.Balance](publicKey, AddressActor.Query.GetReservedBalance)(_.balance.toJson)
+            }
         }
     }
+
   }
 
   @Path("/orderbook/{amountAsset}/{priceAsset}/{orderId}")

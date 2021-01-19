@@ -21,31 +21,19 @@ object PathMatchers {
 
   val AssetPairPM: PathMatcher1[Either[InvalidAsset, AssetPair]] = AkkaMatchers.Segments(2).flatMap {
     case a1 :: a2 :: Nil =>
-      Option(try Right(AssetPair.createAssetPair(a1, a2).get)
-      catch {
-        case e: Exception =>
-          if (e.getMessage.contains(a1)) Left(InvalidAsset(a1, e.getMessage))
-          else Left(InvalidAsset(a2, e.getMessage))
+      Option(AssetPair.createAssetPair(a1, a2).toEither.left.map { ex =>
+        val m = ex.getMessage
+        if (m.contains(a1)) InvalidAsset(a1, m) else InvalidAsset(a2, m)
       })
     case _ => Option(Left(InvalidAsset(null, "Unexpected error")))
   }
 
   object AssetPM
-      extends Base58[Either[InvalidAsset, Asset]](s =>
-        Option(try Right(AssetPair.extractAsset(s).get)
-        catch {
-          case e: Exception =>
-            Left(InvalidAsset(s, e.getMessage))
-        })
-      )
+      extends Base58[Either[InvalidAsset, Asset]](s => Option(AssetPair.extractAsset(s).toEither.left.map(ex => InvalidAsset(s, ex.getMessage))))
 
   object OrderPM
       extends Base58[Either[InvalidBase58String, ByteStr]](s =>
-        Option(try Right(ByteStr.decodeBase58(s).get)
-        catch {
-          case e: Exception =>
-            Left(InvalidBase58String(e.getMessage))
-        })
+        Option(ByteStr.decodeBase58(s).toEither.left.map(ex => InvalidBase58String(ex.getMessage)))
       )
 
   object PublicKeyPM extends Base58[Either[InvalidPublicKey, PublicKey]](s => Option(PublicKey fromBase58String s))

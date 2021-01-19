@@ -62,7 +62,6 @@ class GetOrderTransactionsSpec extends MatcherSuiteBase with TableDrivenProperty
       r.foreach(_.orders().get(0).id().toString should be(o.idStr()))
     }
 
-    //TODO: change after DEX-980
     "should return an error when orderId is not a correct base58 string" in {
       validateMatcherError(
         dex1.rawApi.getTransactionsByOrder("null"),

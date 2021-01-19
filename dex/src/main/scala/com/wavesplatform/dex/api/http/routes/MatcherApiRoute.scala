@@ -184,6 +184,9 @@ class MatcherApiRoute(
   private def withValidOrderId(orderIdOrError: Either[ValidationError.InvalidBase58String, ByteStr])(f: ByteStr => Route): Route =
     orderIdOrError.fold(io => complete(InvalidBase58String(io.reason)), f)
 
+  private def withValidAssetPair(pairOrError: Either[ValidationError.InvalidAsset, AssetPair])(f: AssetPair => Route): Route =
+    pairOrError.fold(ia => complete(InvalidAsset(ia.asset, ia.reason)), f)
+
   private def withValidAsset(assetOrError: Either[ValidationError.InvalidAsset, Asset])(f: Asset => Route): Route =
     assetOrError.fold(ia => complete(InvalidAsset(ia.asset, ia.reason)), f)
 
@@ -386,10 +389,12 @@ class MatcherApiRoute(
       )
     )
   )
-  def getOrderBook: Route = (path(AssetPairPM) & get) { p =>
-    parameters("depth".as[Int].?) { depth =>
-      withAssetPair(p, redirectToInverse = true, depth.fold("")(d => s"?depth=$d")) { pair =>
-        complete(orderBookHttpInfo.getHttpView(pair, MatcherModel.Normalized, depth))
+  def getOrderBook: Route = (path(AssetPairPM) & get) { pairOrError =>
+    withValidAssetPair(pairOrError) { p =>
+      parameters("depth".as[Int].?) { depth =>
+        withAssetPair(p, redirectToInverse = true, depth.fold("")(d => s"?depth=$d")) { pair =>
+          complete(orderBookHttpInfo.getHttpView(pair, MatcherModel.Normalized, depth))
+        }
       }
     }
   }
@@ -408,9 +413,12 @@ class MatcherApiRoute(
       new ApiImplicitParam(name = "priceAsset", value = "Price Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path")
     )
   )
-  def getOrderBookStatus: Route = (path(AssetPairPM / "status") & get) { p =>
-    withAssetPair(p, redirectToInverse = true, suffix = "/status") { pair =>
-      complete(orderBookHttpInfo.getMarketStatus(pair))
+  def getOrderBookStatus: Route = (path(AssetPairPM / "status") & get) { pairOrError =>
+    withValidAssetPair(pairOrError) {
+      p =>
+        withAssetPair(p, redirectToInverse = true, suffix = "/status") { pair =>
+          complete(orderBookHttpInfo.getMarketStatus(pair))
+        }
     }
   }
 
@@ -427,9 +435,11 @@ class MatcherApiRoute(
       new ApiImplicitParam(name = "priceAsset", value = "Price Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path")
     )
   )
-  def getOrderBookInfo: Route = (path(AssetPairPM / "info") & get) { p =>
-    withAssetPair(p, redirectToInverse = true, suffix = "/info") { pair =>
-      complete(SimpleResponse(getOrderBookInfo(pair)))
+  def getOrderBookInfo: Route = (path(AssetPairPM / "info") & get) { pairOrError =>
+    withValidAssetPair(pairOrError) { p =>
+      withAssetPair(p, redirectToInverse = true, suffix = "/info") { pair =>
+        complete(SimpleResponse(getOrderBookInfo(pair)))
+      }
     }
   }
 
@@ -577,10 +587,12 @@ class MatcherApiRoute(
       )
     )
   )
-  def cancel: Route = (path(AssetPairPM / "cancel") & post) { p =>
-    withAssetPair(p, formatError = e => OrderCancelRejected(e)) { pair =>
-      unavailableOrderBookBarrier(pair) {
-        handleCancelRequest(Some(pair))
+  def cancel: Route = (path(AssetPairPM / "cancel") & post) { pairOrError =>
+    withValidAssetPair(pairOrError) { p =>
+      withAssetPair(p, formatError = e => OrderCancelRejected(e)) { pair =>
+        unavailableOrderBookBarrier(pair) {
+          handleCancelRequest(Some(pair))
+        }
       }
     }
   }
@@ -759,12 +771,14 @@ class MatcherApiRoute(
     )
   )
   def getOrderHistoryByAssetPairAndPublicKey: Route = (path(AssetPairPM / "publicKey" / PublicKeyPM) & get) {
-    (p, publicKeyOrError) =>
-      withValidPublicKey(publicKeyOrError) { publicKey =>
-        withAssetPair(p, redirectToInverse = true, s"/publicKey/$publicKey") { pair =>
-          parameters("activeOnly".as[Boolean].?, "closedOnly".as[Boolean].?) { (activeOnly, closedOnly) =>
-            signedGet(publicKey) {
-              loadOrders(publicKey, Some(pair), getOrderListType(activeOnly, closedOnly, OrderListType.All))
+    (pairOrError, publicKeyOrError) =>
+      withValidAssetPair(pairOrError) { p =>
+        withValidPublicKey(publicKeyOrError) { publicKey =>
+          withAssetPair(p, redirectToInverse = true, s"/publicKey/$publicKey") { pair =>
+            parameters("activeOnly".as[Boolean].?, "closedOnly".as[Boolean].?) { (activeOnly, closedOnly) =>
+              signedGet(publicKey) {
+                loadOrders(publicKey, Some(pair), getOrderListType(activeOnly, closedOnly, OrderListType.All))
+              }
             }
           }
         }
@@ -951,11 +965,13 @@ class MatcherApiRoute(
       new ApiImplicitParam(name = "address", value = "Account Address", required = true, dataType = "string", paramType = "path")
     )
   )
-  def tradableBalance: Route = (path(AssetPairPM / "tradableBalance" / AddressPM) & get) { (pair, addressOrError) =>
-    withValidAddress(addressOrError) { address =>
-      withAssetPair(pair, redirectToInverse = true, s"/tradableBalance/$address") { pair =>
-        complete {
-          askMapAddressActor[AddressActor.Reply.Balance](address, AddressActor.Query.GetTradableBalance(pair.assets))(_.balance.toJson)
+  def tradableBalance: Route = (path(AssetPairPM / "tradableBalance" / AddressPM) & get) { (pairOrError, addressOrError) =>
+    withValidAssetPair(pairOrError) { pair =>
+      withValidAddress(addressOrError) { address =>
+        withAssetPair(pair, redirectToInverse = true, s"/tradableBalance/$address") { pair =>
+          complete {
+            askMapAddressActor[AddressActor.Reply.Balance](address, AddressActor.Query.GetTradableBalance(pair.assets))(_.balance.toJson)
+          }
         }
       }
     }
@@ -1011,17 +1027,21 @@ class MatcherApiRoute(
       new ApiImplicitParam(name = "orderId", value = "Order ID", required = true, dataType = "string", paramType = "path")
     )
   )
-  def orderStatus: Route = (path(AssetPairPM / OrderPM) & get) { (p, orderIdOrError) =>
-    withValidOrderId(orderIdOrError) { orderId =>
-      withAssetPair(p, redirectToInverse = true, s"/$orderId") { _ =>
-        complete {
-          orderDb.get(orderId) match {
-            case Some(order) =>
-              askMapAddressActor[AddressActor.Reply.GetOrderStatus](order.sender, AddressActor.Query.GetOrderStatus(orderId)) { r =>
-                HttpOrderStatus.from(r.x)
-              }
-            case None =>
-              Future.successful(orderDb.getOrderInfo(orderId).fold(HttpOrderStatus.from(OrderStatus.NotFound))(x => HttpOrderStatus.from(x.status)))
+  def orderStatus: Route = (path(AssetPairPM / OrderPM) & get) { (pairOrError, orderIdOrError) =>
+    withValidAssetPair(pairOrError) { p =>
+      withValidOrderId(orderIdOrError) { orderId =>
+        withAssetPair(p, redirectToInverse = true, s"/$orderId") { _ =>
+          complete {
+            orderDb.get(orderId) match {
+              case Some(order) =>
+                askMapAddressActor[AddressActor.Reply.GetOrderStatus](order.sender, AddressActor.Query.GetOrderStatus(orderId)) { r =>
+                  HttpOrderStatus.from(r.x)
+                }
+              case None =>
+                Future.successful(orderDb.getOrderInfo(orderId).fold(HttpOrderStatus.from(OrderStatus.NotFound))(x =>
+                  HttpOrderStatus.from(x.status)
+                ))
+            }
           }
         }
       }
@@ -1043,21 +1063,23 @@ class MatcherApiRoute(
       new ApiImplicitParam(name = "priceAsset", value = "Price Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path")
     )
   )
-  def deleteOrderBook: Route = (path(AssetPairPM) & delete & withAuth) { pair =>
-    orderBook(pair) match {
-      case Some(Right(_)) =>
-        complete(
-          storeCommand(ValidatedCommand.DeleteOrderBook(pair))
-            .map {
-              case None => NotImplemented(error.FeatureDisabled)
-              case _ => SimpleResponse(StatusCodes.Accepted, "Deleting order book")
-            }
-            .recover { case e: Throwable =>
-              log.error("Can not persist event", e)
-              CanNotPersist(error.CanNotPersistEvent)
-            }
-        )
-      case _ => complete(OrderBookUnavailable(error.OrderBookBroken(pair)))
+  def deleteOrderBook: Route = (path(AssetPairPM) & delete & withAuth) { pairOrError =>
+    withValidAssetPair(pairOrError) { pair =>
+      orderBook(pair) match {
+        case Some(Right(_)) =>
+          complete(
+            storeCommand(ValidatedCommand.DeleteOrderBook(pair))
+              .map {
+                case None => NotImplemented(error.FeatureDisabled)
+                case _ => SimpleResponse(StatusCodes.Accepted, "Deleting order book")
+              }
+              .recover { case e: Throwable =>
+                log.error("Can not persist event", e)
+                CanNotPersist(error.CanNotPersistEvent)
+              }
+          )
+        case _ => complete(OrderBookUnavailable(error.OrderBookBroken(pair)))
+      }
     }
   }
 

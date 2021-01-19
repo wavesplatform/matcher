@@ -60,14 +60,22 @@ class GetTradableBalanceSpec extends MatcherSuiteBase with TableDrivenPropertyCh
       }
     }
 
-    //TODO: change after DEX-980
     "should return an error exception when the amount asset is not correct base58 string" in {
-      validate404Exception(dex1.rawApi.getTradableBalance(alice.toAddress.stringRepr, "null", UsdId.toString))
+      validateMatcherError(
+        dex1.rawApi.getTradableBalance(alice.toAddress.stringRepr, "null", UsdId.toString),
+        StatusCodes.BadRequest,
+        11534337,
+        s"The asset 'null' is wrong, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
+      )
     }
 
-    //TODO: change after DEX-980
     "should return an error exception when the price asset is not correct base58 string" in {
-      validate404Exception(dex1.rawApi.getTradableBalance(alice.toAddress.stringRepr, "WAVES", "null"))
+      validateMatcherError(
+        dex1.rawApi.getTradableBalance(alice.toAddress.stringRepr, "WAVES", "null"),
+        StatusCodes.BadRequest,
+        11534337,
+        s"The asset 'null' is wrong, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
+      )
     }
 
     "should return an error when amount asset doesn't exist" in {

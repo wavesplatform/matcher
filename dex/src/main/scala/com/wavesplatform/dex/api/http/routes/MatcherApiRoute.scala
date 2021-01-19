@@ -185,7 +185,7 @@ class MatcherApiRoute(
     orderIdOrError.fold(io => complete(InvalidBase58String(io.reason)), f)
 
   private def withValidAsset(assetOrError: Either[ValidationError.InvalidAsset, Asset])(f: Asset => Route): Route =
-    assetOrError.fold(ia => complete(InvalidAsset(ia.reason)), f)
+    assetOrError.fold(ia => complete(InvalidAsset(ia.asset, ia.reason)), f)
 
   private def withValidPublicKey(publicKeyOrError: Either[ValidationError.InvalidPublicKey, PublicKey])(f: PublicKey => Route): Route =
     publicKeyOrError.fold(ipk => complete(InvalidPublicKey(ipk.reason)), f)

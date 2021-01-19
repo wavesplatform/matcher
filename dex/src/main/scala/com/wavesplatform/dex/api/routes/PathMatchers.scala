@@ -24,7 +24,13 @@ object PathMatchers {
     case _ => None
   }
 
-  object AssetPM extends Base58[Either[InvalidAsset, Asset]](s => Option(AssetPair.validateAndExtractAsset(s)))
+  object AssetPM  extends Base58[Either[InvalidAsset, Asset]](s =>
+    Option(try Right(AssetPair.extractAsset(s).get)
+    catch {
+      case e: Exception =>
+        Left(InvalidAsset(s, e.getMessage))
+    })
+  )
 
   object OrderPM
       extends Base58[Either[InvalidBase58String, ByteStr]](s =>

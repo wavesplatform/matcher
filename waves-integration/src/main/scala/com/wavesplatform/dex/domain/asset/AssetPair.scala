@@ -48,12 +48,6 @@ case class AssetPair(
 
 object AssetPair {
 
-  def validateAndExtractAsset(a: String): Either[InvalidAsset, Asset] =
-    for {
-      _ <- Either.cond(Base58.tryDecode(a).isSuccess, (), InvalidAsset(s"Unable to decode: $a is not a correct base58 string"))
-      asset = extractAsset(a).get
-    } yield asset
-
   def extractAsset(a: String): Try[Asset] = a match {
     case Asset.WavesName => Success(Waves)
     case other => ByteStr.decodeBase58(other).map(IssuedAsset)

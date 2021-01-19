@@ -67,7 +67,7 @@ class UpdateRatesByAssetIdSpec extends MatcherSuiteBase with ApiKeyHeaderChecks 
         dex1.rawApi.upsertRate("null", 0.1, Map("X-API-Key" -> apiKey)),
         StatusCodes.BadRequest,
         11534337,
-        "The asset 'Unable to decode: null is not a correct base58 string' is wrong. It should be 'WAVES' or a Base58 string" //TODO: fix
+        "The asset 'null' is wrong, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )
     }
 

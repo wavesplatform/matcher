@@ -42,10 +42,12 @@ class OrderHistoryStub(system: ActorSystem, time: Time, maxActiveOrders: Int, ma
       )
     )
 
-  private def actorFor(ao: AcceptedOrder): ActorRef =
+  private def actorFor(ao: AcceptedOrder): ActorRef = actorForAddress(ao.order.sender)
+
+  private def actorForAddress(address: Address): ActorRef =
     refs.getOrElseUpdate(
-      ao.order.sender,
-      system.actorOf(createAddressActor(ao.order.sender, started = true))
+      address,
+      system.actorOf(createAddressActor(address, started = true))
     )
 
   lazy val addressDir = system.actorOf(
@@ -65,15 +67,16 @@ class OrderHistoryStub(system: ActorSystem, time: Time, maxActiveOrders: Int, ma
   def process(event: Events.Event): Unit = event match {
     case oa: Events.OrderAdded =>
       orders += oa.order.order.id() -> oa.order.order.sender
-      actorFor(oa.order) ! oa
+      actorFor(oa.order) ! AddressActor.Command.ApplyOrderBookAdded(oa)
 
     case ox: Events.OrderExecuted =>
       orders += ox.submitted.order.id() -> ox.submitted.order.sender
       orders += ox.counter.order.id() -> ox.counter.order.sender
-      actorFor(ox.counter) ! ox
-      actorFor(ox.submitted) ! ox
+      val command = AddressActor.Command.ApplyOrderBookExecuted(ox, None)
+      List(ox.counter, ox.submitted).map(_.order.sender.toAddress).toSet.map(actorForAddress).foreach(_ ! command)
 
-    case oc: Events.OrderCanceled => actorFor(oc.acceptedOrder) ! oc
+    case oc: Events.OrderCanceled =>
+      actorFor(oc.acceptedOrder) ! AddressActor.Command.ApplyOrderBookCanceled(oc)
   }
 
   def processAll(events: Events.Event*): Unit = events.foreach(process)

@@ -103,7 +103,7 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
     override def getFullBalances(address: Address, exclude: Set[Asset]): Future[AddressBalanceUpdates] = emptyAddressBalanceUpdatesF
   }
 
-  private def createAddressActor(address: Address, started: Boolean): Props =
+  private def createAddressActor(address: Address, recovered: Boolean): Props =
     Props(
       new AddressActor(
         address,
@@ -111,7 +111,7 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
         new TestOrderDB(100),
         (_, _) => Future.successful(Right(())),
         _ => Future.failed(new IllegalStateException("Should not be used in the test")),
-        started,
+        recovered,
         blockchainInteraction
       )
     )
@@ -133,10 +133,10 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
   def execute(counter: Order, submitted: Order): OrderExecuted = {
     val now = time.getTimestamp()
 
-    addressDir ! OrderAdded(LimitOrder(submitted), OrderAddedReason.RequestExecuted, now)
-    addressDir ! OrderAdded(LimitOrder(counter), OrderAddedReason.RequestExecuted, now)
+    addressDir ! AddressActor.Command.ApplyOrderBookAdded(OrderAdded(LimitOrder(counter), OrderAddedReason.RequestExecuted, now))
+    addressDir ! AddressActor.Command.ApplyOrderBookAdded(OrderAdded(LimitOrder(submitted), OrderAddedReason.RequestExecuted, now))
     val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter), submitted.timestamp, counter.matcherFee, submitted.matcherFee)
-    addressDir ! exec
+    addressDir ! AddressActor.Command.ApplyOrderBookExecuted(exec, None)
     exec
   }
 
@@ -152,6 +152,7 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
       (SELL, 2.waves, 2.2.usd, 2.waves, 2.3.usd)
     )
   ) { (counterType: OrderType, counterAmount: Long, counterPrice: Long, submittedAmount: Long, submittedPrice: Long) =>
+    // TODO with itself?
     property(s"Reserves should be 0 when remains are 0: $counterType $counterAmount/$counterPrice:$submittedAmount/$submittedPrice") {
       val counter = if (counterType == BUY) rawBuy(pair, counterAmount, counterPrice) else rawSell(pair, counterAmount, counterPrice)
       val submitted = if (counterType == BUY) rawSell(pair, submittedAmount, submittedPrice) else rawBuy(pair, submittedAmount, submittedPrice)
@@ -471,10 +472,16 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
 
   }
 
-  private def addressDirWithSpendableBalance(spendableBalances: Set[Asset] => Future[Map[Asset, Long]], testProbe: TestProbe): ActorRef = {
+  private def addressDirWithSpendableBalance(spendableBalances: Map[Asset, Long], testProbe: TestProbe): ActorRef = {
 
     val blockchainInteraction = new BlockchainInteraction {
-      override def getFullBalances(address: Address, exclude: Set[Asset]): Future[AddressBalanceUpdates] = emptyAddressBalanceUpdatesF
+      override def getFullBalances(address: Address, exclude: Set[Asset]): Future[AddressBalanceUpdates] = Future.successful(
+        AddressBalanceUpdates(
+          regular = spendableBalances.filterNot(p => exclude.contains(p._1)),
+          outLease = None,
+          pessimisticCorrection = Map.empty
+        )
+      )
     }
 
     def createAddressActor(address: Address, started: Boolean): Props =
@@ -511,13 +518,21 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
     tp.send(addressDir, ForwardMessage(marketOrder.order.senderPublicKey, PlaceOrder(marketOrder.order, isMarket = true)))
 
   private def systemCancelMarketOrder(addressDir: ActorRef, marketOrder: MarketOrder): Unit =
-    addressDir ! OrderCanceled(marketOrder, Events.OrderCanceledReason.BecameUnmatchable, System.currentTimeMillis)
+    addressDir ! AddressActor.Command.ApplyOrderBookCanceled(OrderCanceled(
+      marketOrder,
+      Events.OrderCanceledReason.BecameUnmatchable,
+      System.currentTimeMillis
+    ))
 
   private def executeMarketOrder(addressDirWithOrderBookCache: ActorRef, marketOrder: MarketOrder, limitOrder: LimitOrder): OrderExecuted = {
     val executionEvent = mkOrderExecuted(marketOrder, limitOrder, marketOrder.order.timestamp)
 
-    addressDirWithOrderBookCache ! OrderAdded(limitOrder, OrderAddedReason.RequestExecuted, time.getTimestamp())
-    addressDirWithOrderBookCache ! executionEvent
+    addressDirWithOrderBookCache ! AddressActor.Command.ApplyOrderBookAdded(OrderAdded(
+      limitOrder,
+      OrderAddedReason.RequestExecuted,
+      time.getTimestamp()
+    ))
+    addressDirWithOrderBookCache ! AddressActor.Command.ApplyOrderBookExecuted(executionEvent, None)
 
     executionEvent
   }
@@ -569,8 +584,7 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
     } {
 
       val tp = TestProbe()
-      val addressDir =
-        addressDirWithSpendableBalance(assets => Future.successful(balance.view.filterKeys(assets.contains).toMap), testProbe = tp)
+      val addressDir = addressDirWithSpendableBalance(balance, testProbe = tp)
       val fee = Some(feeAsset.amt(matcherFee))
 
       val order = orderType match {
@@ -586,7 +600,14 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
       val expectedFeeAssetReserve = reserves(marketOrder.feeAsset)
 
       placeMarketOrder(tp, addressDir, marketOrder)
-      tp.expectMsg(ValidatedCommand.PlaceMarketOrder(marketOrder))
+      val validated = tp.expectMsgType[ValidatedCommand.PlaceMarketOrder]
+      validated should matchTo(ValidatedCommand.PlaceMarketOrder(marketOrder))
+
+      addressDir ! AddressActor.Command.ApplyOrderBookAdded(OrderAdded(
+        validated.marketOrder,
+        reason = OrderAddedReason.RequestExecuted,
+        timestamp = marketOrder.order.timestamp
+      ))
 
       withClue {
         s"Place market $orderType order, fee in ${feeAsset.toStringSRT(orderType)} asset, " +
@@ -685,7 +706,7 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
       } {
 
         val tp = TestProbe()
-        val addressDir = addressDirWithSpendableBalance(assets => Future.successful(balance.view.filterKeys(assets.contains).toMap), tp)
+        val addressDir = addressDirWithSpendableBalance(balance, tp)
         val fee = Some(moFeeAsst.amt(matcherFee))
 
         val (order, counter) = moTpe match {

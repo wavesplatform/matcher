@@ -462,7 +462,7 @@ object Events {
 
   case object OrderExecutedReason extends EventReason
 
-  case class OrderAdded(order: AcceptedOrder, reason: OrderAddedReason, timestamp: Price) extends Event
+  case class OrderAdded(order: AcceptedOrder, reason: OrderAddedReason, timestamp: Long) extends Event
   sealed trait OrderAddedReason extends EventReason
 
   object OrderAddedReason {

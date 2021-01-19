@@ -4,6 +4,7 @@ import cats.instances.long._
 import cats.syntax.group._
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.fp.MapImplicits.group
 import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
 
@@ -72,12 +73,22 @@ case class AddressBalance(
       openVolume = openVolume
     )
 
-  def withVolume(xs: Map[Asset, Long]): AddressBalance = copy(openVolume = openVolume |+| xs)
-  def withoutVolume(xs: Map[Asset, Long]): AddressBalance = copy(openVolume = openVolume |-| xs)
+  def appendedOpenVolume(diff: Map[Asset, Long]): AddressBalance = {
+    val r = copy(openVolume = openVolume |+| diff)
+    AddressBalance.l.info(s"open volume updated to: ${r.openVolume.mkString(", ")}, diff: ${diff.mkString(", ")}")
+    r
+  }
+  def removedOpenVolume(diff: Map[Asset, Long]): AddressBalance = copy(openVolume = openVolume |-| diff)
 
-  def withExecuted(txId: ExchangeTransaction.Id, volume: Map[Asset, Long]): (AddressBalance, Set[Asset]) = {
-    val (updated, changedAssets) = pessimisticCorrection.withExecuted(txId, volume)
-    (copy(pessimisticCorrection = updated), changedAssets)
+  /**
+   * @param totalVolume An order's executed assets or a sum of two
+   */
+  def withExecuted(txId: Option[ExchangeTransaction.Id], totalVolume: Map[Asset, Long]): (AddressBalance, Set[Asset]) = {
+    val (updated, changedAssets) = pessimisticCorrection.withExecuted(txId, totalVolume)
+    (
+      copy(pessimisticCorrection = updated, openVolume = openVolume |+| totalVolume),
+      changedAssets
+    )
   }
 
   def withObserved(txId: ExchangeTransaction.Id): (AddressBalance, Set[Asset]) = {
@@ -87,7 +98,9 @@ case class AddressBalance(
 
 }
 
-object AddressBalance {
+object AddressBalance extends ScorexLogging {
+
+  def l = log
 
   val empty = AddressBalance(
     regular = Map.empty,

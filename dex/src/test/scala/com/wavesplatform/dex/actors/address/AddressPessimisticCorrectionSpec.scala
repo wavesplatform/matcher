@@ -3,6 +3,7 @@ package com.wavesplatform.dex.actors.address
 import cats.instances.long._
 import cats.instances.map._
 import cats.syntax.semigroup._
+import cats.syntax.option._
 import com.softwaremill.diffx.scalatest.DiffMatcher
 import com.wavesplatform.dex.NoShrink
 import com.wavesplatform.dex.actors.Generators
@@ -49,7 +50,7 @@ class AddressPessimisticCorrectionSpec
       "notObserved and future doesn't contain tx in same time" in forAll(testGen) { case (orig, txId, txVolume, calls) =>
         val updated = calls.foldLeft(orig) {
           case (orig, "withObserved") => orig.withObserved(txId)._1
-          case (orig, "withExecuted") => orig.withExecuted(txId, txVolume)._1
+          case (orig, "withExecuted") => orig.withExecuted(txId.some, txVolume)._1
           case (orig, _) => orig
         }
 
@@ -66,7 +67,7 @@ class AddressPessimisticCorrectionSpec
       "correction doesn't change when withObserved, withExecuted" ignore forAll(testGen) { case (orig, txId, txVolume, calls) =>
         val updated = calls.foldLeft(orig) {
           case (orig, "withObserved") => orig.withObserved(txId)._1
-          case (orig, "withExecuted") => orig.withExecuted(txId, txVolume)._1
+          case (orig, "withExecuted") => orig.withExecuted(txId.some, txVolume)._1
           case (orig, _) => orig
         }
 
@@ -114,7 +115,7 @@ class AddressPessimisticCorrectionSpec
       } yield {
         val init = AddressPessimisticCorrection.empty.copy(unconfirmed = unconfirmed, future = future)
         val orig = if (observed) init.withObserved(txId)._1 else init
-        (orig, txId, txVolume, orig.withExecuted(txId, txVolume)._1)
+        (orig, txId, txVolume, orig.withExecuted(txId.some, txVolume)._1)
       }
 
       "future doesn't contain txId" in forAll(stateGen) { case (_, txId, _, updated) =>

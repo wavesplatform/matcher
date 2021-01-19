@@ -38,12 +38,17 @@ case class AddressPessimisticCorrection(
 
   /**
    * TODO with himself. volume by spending asset 0 ?
+   * @param txId Could be None if a transaction wasn't created (see ExchangeTransactionCreator)
    * @param volume Should be non negative
    */
-  def withExecuted(txId: ExchangeTransaction.Id, volume: Map[Asset, Long]): (AddressPessimisticCorrection, Set[Asset]) =
-    if (notObserved.contains(txId)) throw new RuntimeException(s"$txId executed twice!")
-    else if (future.contains(txId)) (copy(unconfirmed = unconfirmed |-| volume, future = future - txId), volume.keySet)
-    else (copy(unconfirmed = unconfirmed |-| volume, notObserved = notObserved.updated(txId, volume)), Set.empty) // Set.empty - see getBy
+  def withExecuted(txId: Option[ExchangeTransaction.Id], volume: Map[Asset, Long]): (AddressPessimisticCorrection, Set[Asset]) =
+    txId match {
+      case None => (copy(unconfirmed = unconfirmed |-| volume), volume.keySet)
+      case Some(txId) =>
+        if (notObserved.contains(txId)) throw new RuntimeException(s"$txId executed twice!") // Could be called twice if one trader
+        else if (future.contains(txId)) (copy(unconfirmed = unconfirmed |-| volume, future = future - txId), volume.keySet)
+        else (copy(unconfirmed = unconfirmed |-| volume, notObserved = notObserved.updated(txId, volume)), Set.empty) // Set.empty - see getBy
+    }
 
   // TODO changes with unconfirmed? not only, if aproved by broadcaster
   def withObserved(txId: ExchangeTransaction.Id): (AddressPessimisticCorrection, Set[Asset]) =

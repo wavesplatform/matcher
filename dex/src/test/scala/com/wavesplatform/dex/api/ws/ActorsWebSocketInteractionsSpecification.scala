@@ -92,7 +92,8 @@ class ActorsWebSocketInteractionsSpecification
 
     val addressDir = system.actorOf(Props(new AddressDirectoryActor(EmptyOrderDB, createAddressActor, None, recovered = true)))
 
-    def subscribe(): Unit = addressDir ! AddressDirectoryActor.Command.ForwardMessage(kp, AddressActor.WsCommand.AddWsSubscription(wsEventsProbe.ref))
+    def subscribe(): Unit =
+      addressDir ! AddressDirectoryActor.Command.ForwardMessage(kp, AddressActor.WsCommand.AddWsSubscription(wsEventsProbe.ref))
 
     def placeOrder(ao: AcceptedOrder): Unit = {
       addressDir ! AddressDirectoryActor.Command.ForwardMessage(kp, AddressActor.Command.PlaceOrder(ao.order, ao.isMarket))

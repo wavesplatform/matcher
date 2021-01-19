@@ -5,6 +5,7 @@ import akka.actor.{typed, Actor, ActorRef, Cancellable, Props, Status}
 import akka.pattern.{pipe, CircuitBreakerOpenException}
 import akka.{actor => classic}
 import alleycats.std.all.alleyCatsSetTraverse
+import cats.instances.list._
 import cats.instances.long.catsKernelStdGroupForLong
 import cats.syntax.either._
 import cats.syntax.foldable._
@@ -30,7 +31,7 @@ import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError, Unexpec
 import com.wavesplatform.dex.fp.MapImplicits.group
 import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
-import com.wavesplatform.dex.model.Events.{OrderCancelFailed, OrderCanceled, OrderCanceledReason, Event => OrderEvent}
+import com.wavesplatform.dex.model.Events.{OrderCancelFailed, OrderCanceled, OrderCanceledReason}
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.MatcherQueue.StoreValidatedCommand
 import com.wavesplatform.dex.queue.ValidatedCommand
@@ -82,8 +83,27 @@ class AddressActor(
     case command: Command.ApplyOrderBookAdded =>
       import command.event
       import event.order
-      log.debug(s"OrderAdded(${order.id}, ${event.reason}, ${event.timestamp})")
-      refreshOrderState(order, event)
+
+      // isNew means that:
+      //  - for master DEX order was previously removed from active ones in handling of Event.StoreFailed
+      //  - for slave DEX it is a new order and we have to send balance changes via WS API
+      val isNew = !activeOrders.contains(order.id)
+      log.debug(s"OrderAdded(${order.id}, ${event.reason}, ${event.timestamp}, isNew=$isNew)")
+
+      val volumeDiff = refreshOrderState(order, command)
+
+      if (isNew) { // <---
+      log.debug(s"ApplyOrderBookAdded(${order.id}) volume diff: $volumeDiff")
+        // If it is not new, appendedOpenVolume and putChangedAssets called in ValidationPassed -> place,
+        //  so we don't need to do this again.
+        balances = balances.appendedOpenVolume(volumeDiff)
+
+        if (wsAddressState.hasActiveSubscriptions) {
+          wsAddressState.putChangedAssets(volumeDiff.keySet)
+          scheduleNextDiffSending()
+        }
+      }
+
       if (recovered) pendingCommands.remove(order.id).foreach { command =>
         log.trace(s"Confirming placement for ${order.id}")
         command.client ! Event.OrderAccepted(order.order)
@@ -91,20 +111,41 @@ class AddressActor(
 
     case command: Command.ApplyOrderBookExecuted =>
       import command.event
-      log.debug(s"OrderExecuted(${event.submittedRemaining.id}, ${event.counterRemaining.id}), amount=${event.executedAmount}")
-      command.tx.foreach { tx =>
-        val (updated, changedAssets) = balances.withObserved(tx.id())
-        balances = updated
+      log.debug(
+        s"OrderExecuted(${event.submittedRemaining.id}, ${event.counterRemaining.id}), amount=${event.executedAmount}, tx=${command.tx.map(_.id())}"
+      )
+      val volumeDiff = List(event.counterRemaining, event.submittedRemaining)
+        .filter(_.order.sender.toAddress == owner)
+        .foldMap(refreshOrderState(_, command))(group)
+
+      log.info(s"ApplyOrderBookExecuted volume diff: $volumeDiff")
+
+      val (updated, changedAssets) = balances.withExecuted(command.tx.map(_.id()), volumeDiff)
+      balances = updated
+
+      if (wsAddressState.hasActiveSubscriptions) {
         wsAddressState.putChangedAssets(changedAssets)
+        scheduleNextDiffSending()
       }
-      List(event.submittedRemaining, event.counterRemaining).filter(_.order.sender.toAddress == owner).foreach(refreshOrderState(_, event))
 
     case command: Command.ApplyOrderBookCanceled =>
       import command.event._
       val id = acceptedOrder.id
       val isActive = activeOrders.contains(id)
       log.debug(s"OrderCanceled($id, $reason, $timestamp, isActive=$isActive)")
-      if (isActive) refreshOrderState(acceptedOrder, command.event)
+
+      // Can be received twice, because multiple matchers can cancel same order
+      if (isActive) {
+        val volumeDiff = refreshOrderState(acceptedOrder, command)
+        log.info(s"ApplyOrderBookCanceled($id) volume diff: $volumeDiff")
+        balances = balances.appendedOpenVolume(volumeDiff)
+
+        if (wsAddressState.hasActiveSubscriptions) {
+          wsAddressState.putChangedAssets(volumeDiff.keySet)
+          scheduleNextDiffSending()
+        }
+      }
+
       if (recovered) pendingCommands.remove(id).foreach { pc =>
         log.trace(s"Confirming cancellation for $id")
         pc.client ! Event.OrderCanceled(id)
@@ -152,7 +193,7 @@ class AddressActor(
       .pipeTo(self)
     log.trace("Recovered")
 
-    {
+    eventsProcessing orElse failuresProcessing orElse {
       case command: Command.SetInitialBalances => // TODO test
         command.snapshot match {
           case Failure(e) => throw new IllegalStateException("Can't receive initial balances, see logs", e)
@@ -319,7 +360,7 @@ class AddressActor(
         queueEvent match {
           case ValidatedCommand.PlaceOrder(_) | ValidatedCommand.PlaceMarketOrder(_) =>
             activeOrders.remove(orderId).foreach { ao =>
-              balances = balances.withoutVolume(ao.reservableBalance)
+              balances = balances.removedOpenVolume(ao.reservableBalance)
               if (wsAddressState.hasActiveSubscriptions) {
                 wsAddressState = wsAddressState.putChangedAssets(ao.reservableBalance.keySet)
                 scheduleNextDiffSending()
@@ -383,9 +424,9 @@ class AddressActor(
 
   override val receive: Receive = if (recovered) starting else recovering
 
-  /** Schedules next balances and order changes sending only if it wasn't scheduled before */
+  /** Schedules next balances and order changes sending only if it wasn't scheduled before -- TODO wrong!!!! */
   private def scheduleNextDiffSending(): Unit =
-    if (wsSendSchedule.isCancelled)
+    if (wsSendSchedule.isCancelled) // TODO Note, if it is not canceled, if was executed
       wsSendSchedule = context.system.scheduler.scheduleOnce(settings.wsMessagesInterval, self, WsCommand.SendDiff)
 
   private def denormalizedBalanceValue(asset: Asset, decimals: Int)(balanceSource: Map[Asset, Long]): Double =
@@ -456,14 +497,8 @@ class AddressActor(
       order.id() -> context.system.scheduler.scheduleOnce(timeToExpiration.millis, self, CancelExpiredOrder(order.id()))
   }
 
-  private def refreshOrderState(remaining: AcceptedOrder, event: OrderEvent): Unit = {
-
-    val origActiveOrder = activeOrders.get(remaining.id)
-
-    lazy val origReservableBalance = origActiveOrder.fold(Map.empty[Asset, Long])(_.reservableBalance)
-    lazy val openVolumeDiff = remaining.reservableBalance |-| origReservableBalance
-
-    val (status, unmatchable) = event match {
+  private def refreshOrderState(remaining: AcceptedOrder, command: Command.HasOrderBookEvent): Map[Asset, Long] = {
+    val (status, unmatchable) = command.event match {
       case event: OrderCanceled =>
         val unmatchable = OrderCanceledReason.becameUnmatchable(event.reason)
         (OrderStatus.finalCancelStatus(remaining, event.reason), unmatchable)
@@ -473,20 +508,27 @@ class AddressActor(
 
     log.trace(s"New status of ${remaining.id} is $status")
 
-    status match {
+    val volumeDiff = status match {
       case status: OrderStatus.Final =>
         expiration.remove(remaining.id).foreach(_.cancel())
-        activeOrders.remove(remaining.id).foreach(ao => balances = balances.withoutVolume(ao.reservableBalance))
         orderDB.saveOrderInfo(remaining.id, owner, OrderInfo.v6(remaining, status))
+        // None is not possible
+        activeOrders.remove(remaining.id).fold {
+          log.error(s"Can't find order ${remaining.id}")
+          throw new RuntimeException(s"Can't find order ${remaining.id}")
+        }(_.reservableBalance.inverse())
 
       case _ =>
+        val origActiveOrder = activeOrders.get(remaining.id)
         activeOrders.put(remaining.id, remaining)
-        balances = balances.withVolume(openVolumeDiff)
         status match {
           case OrderStatus.Accepted =>
             orderDB.saveOrder(remaining.order)
             scheduleExpiration(remaining.order)
+            remaining.reservableBalance
           case _ =>
+            val origReservableBalance = origActiveOrder.fold(Map.empty[Asset, Long])(_.reservableBalance)
+            remaining.reservableBalance |-| origReservableBalance
         }
     }
 
@@ -495,19 +537,15 @@ class AddressActor(
         case OrderStatus.Accepted => wsAddressState.putOrderUpdate(remaining.id, WsOrder.fromDomain(remaining, status))
         case _: OrderStatus.Cancelled => wsAddressState.putOrderStatusNameUpdate(remaining.id, status)
         case _ =>
+          // unmatchable can be only if OrderStatus.Filled
           if (unmatchable) wsAddressState.putOrderStatusNameUpdate(remaining.id, status)
           else wsAddressState.putOrderFillingInfoAndStatusNameUpdate(remaining, status)
       }
 
-      // OrderStatus.Accepted means that we've already notified clients about these balance changes after order passed validation (see def place)
-      // Empty origActiveOrder means that:
-      //  - for master DEX order was previously removed from active ones in handling of Event.StoreFailed
-      //  - for slave DEX it is a new order and we have to send balance changes via WS API
-      if (status != OrderStatus.Accepted || origActiveOrder.isEmpty)
-        wsAddressState = wsAddressState.putChangedAssets(openVolumeDiff.keySet)
-
       scheduleNextDiffSending()
     }
+
+    volumeDiff
   }
 
   private def getOrdersToCancel(actualNodeBalance: Map[Asset, Long]): Queue[InsufficientBalanceOrder] = {
@@ -542,9 +580,11 @@ class AddressActor(
   }
 
   private def place(ao: AcceptedOrder): Unit = {
-    balances = balances.withVolume(ao.reservableBalance)
     activeOrders.put(ao.id, ao)
+    log.info(s"place(${ao.id}) volume diff: ${ao.reservableBalance}")
+    balances = balances.appendedOpenVolume(ao.reservableBalance)
 
+    // TODO make syntax for: hasActiveSubscriptions + scheduleNextDiffSending
     if (wsAddressState.hasActiveSubscriptions) {
       wsAddressState = wsAddressState.putChangedAssets(ao.reservableBalance.keySet)
       scheduleNextDiffSending()
@@ -774,6 +814,13 @@ object AddressActor {
 
   object Settings {
     val default: Settings = Settings(100.milliseconds, 20.seconds, 200)
+  }
+
+  sealed trait OrderRefreshResult extends Product with Serializable
+
+  object OrderRefreshResult {
+    case class Removed(volume: Map[Asset, Long]) extends OrderRefreshResult
+    case class Updated(volumeDiff: Map[Asset, Long]) extends OrderRefreshResult
   }
 
 }

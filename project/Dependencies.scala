@@ -46,7 +46,7 @@ object Dependencies {
     val sttp = "1.7.2"
     val sttpClient = "2.2.7"
 
-    val testContainers = "0.38.6"
+    val testContainers = "0.38.8"
     val testContainersPostgres = "1.15.0"
     val testContainersKafka = "1.15.0"
     val testContainersToxiProxy = "1.15.0"

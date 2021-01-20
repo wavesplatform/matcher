@@ -61,7 +61,7 @@ object WavesNodeUpdates {
         val addresses = for {
           tx <- tx.tx.transaction.toSet[Transaction] // maker and taker could be the same
           order <- tx.getExchange.orders
-        } yield order.senderPublicKey.toVanillaAddress
+        } yield order.senderPublicKey.toVanillaPublicKey.toAddress
 
         addresses.foldLeft(r) {
           case (r, address) => r.updated(address, r(address) + txId)

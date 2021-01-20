@@ -151,15 +151,15 @@ class AddressActor(
     case command: Command.ApplyBatch =>
       log.info(s"Got $command")
       // TODO DEX-1040 This code is not optimal, but it should work.
-      // e.g. We need folding
-      command.messages.foreach(receive(_))
+      command.messages.foreach {
+        case command: Command.ChangeBalances => changeBalances(command.updates)
+        case command: Command.MarkTxsObserved => markTxsObserved(command.txIds)
+      }
       log.info("ApplyBatch applied")
 
     case command: Command.MarkTxsObserved =>
-      val (updated, changedAssets) = command.txIds
-        .foldl((balances, Set.empty[Asset]))(_._1.withObserved(_))
-      balances = updated
-      wsAddressState = wsAddressState.putChangedAssets(changedAssets)
+      log.info(s"Got $command")
+      markTxsObserved(command.txIds)
 
     case command @ OrderCancelFailed(id, reason) =>
       if (recovered) pendingCommands.remove(id) match {
@@ -177,7 +177,7 @@ class AddressActor(
 
   private val recovering: Receive = eventsProcessing orElse failuresProcessing orElse {
     case Command.StartWork => context.become(starting)
-    case command: Command.ChangeBalances => balances = balances.withFresh(command.updates)
+    case command: Command.ChangeBalances => balances = balances.withFresh(command.updates) // TODO
     case x => stash(x)
   }
 
@@ -298,31 +298,8 @@ class AddressActor(
       }
 
     case command: Command.ChangeBalances =>
-      val changedAssets = command.updates.changedAssets
-      val before = balances.nodeBalances(changedAssets)
-
-      balances = balances.withFresh(command.updates)
-      val after = balances.nodeBalances(changedAssets)
-
-      val changesForAudit = after.collect { case (asset, v) if before.getOrElse(asset, 0L) > v => asset -> math.max(0, v) }
-      val toCancel = getOrdersToCancel(changesForAudit).filterNot(ao => isCancelling(ao.order.id()))
-      if (toCancel.isEmpty) log.trace(s"Got $command, nothing to cancel")
-      else {
-        val cancelledText = toCancel.map(x => s"${x.insufficientAmount} ${x.assetId} for ${x.order.idStr()}").mkString(", ")
-        log.debug(s"Got $command, canceling ${toCancel.size} of ${activeOrders.size}: doesn't have $cancelledText")
-        toCancel.foreach { x =>
-          val id = x.order.id()
-          pendingCommands.put(
-            id,
-            PendingCommand(Command.CancelOrder(id, Command.Source.BalanceTracking), ignoreRef)
-          ) // To prevent orders being cancelled twice
-          cancel(x.order, Command.Source.BalanceTracking)
-        }
-      }
-
-      scheduleWs {
-        wsAddressState = wsAddressState.putChangedAssets(changedAssets)
-      }
+      log.info(s"Got $command")
+      changeBalances(command.updates)
 
     case Query.GetReservedBalance => sender() ! Reply.GetBalance(balances.openVolume.filter(_._2 > 0).asRight)
     case query: Query.GetTradableBalance => sender() ! Reply.GetBalance(balances.tradableBalances(query.forAssets).asRight)
@@ -403,7 +380,9 @@ class AddressActor(
     case WsCommand.SendDiff =>
       log.info(s"WsCommand.SendDiff: hasActiveSubscriptions: ${wsAddressState.hasActiveSubscriptions} && hasChanges: ${wsAddressState.hasChanges}")
       if (wsAddressState.hasActiveSubscriptions && wsAddressState.hasChanges) {
-        log.info(s"WsCommand.SendDiff: changedAssets: ${wsAddressState.changedAssets.mkString(", ")}, newBalance: ${balances.tradableBalances(wsAddressState.changedAssets)}")
+        log.info(
+          s"WsCommand.SendDiff: changedAssets: ${wsAddressState.changedAssets.mkString(", ")}, newBalance: ${balances.tradableBalances(wsAddressState.changedAssets)}"
+        )
         wsAddressState = wsAddressState
           .sendDiffs(
             balances = mkWsBalances(balances.tradableBalances(wsAddressState.changedAssets)),
@@ -420,6 +399,43 @@ class AddressActor(
   }
 
   override val receive: Receive = if (recovered) starting else recovering
+
+  private def changeBalances(updates: AddressBalanceUpdates): Unit = {
+    val changedAssets = updates.changedAssets
+    val before = balances.nodeBalances(changedAssets)
+
+    balances = balances.withFresh(updates)
+    val after = balances.nodeBalances(changedAssets)
+
+    // TODO only if working
+
+    val changesForAudit = after.collect { case (asset, v) if before.getOrElse(asset, 0L) > v => asset -> math.max(0, v) }
+    val toCancel = getOrdersToCancel(changesForAudit).filterNot(ao => isCancelling(ao.order.id()))
+    if (toCancel.isEmpty) log.trace("Nothing to cancel")
+    else {
+      val cancelledText = toCancel.map(x => s"${x.insufficientAmount} ${x.assetId} for ${x.order.idStr()}").mkString(", ")
+      log.debug(s"Canceling ${toCancel.size} of ${activeOrders.size}: doesn't have $cancelledText")
+      toCancel.foreach { x =>
+        val id = x.order.id()
+        pendingCommands.put(
+          id,
+          PendingCommand(Command.CancelOrder(id, Command.Source.BalanceTracking), ignoreRef)
+        ) // To prevent orders being cancelled twice
+        cancel(x.order, Command.Source.BalanceTracking)
+      }
+    }
+
+    scheduleWs {
+      wsAddressState = wsAddressState.putChangedAssets(changedAssets)
+    }
+  }
+
+  private def markTxsObserved(txIds: Set[ExchangeTransaction.Id]): Unit = {
+    val (updated, changedAssets) = txIds
+      .foldl((balances, Set.empty[Asset]))(_._1.withObserved(_))
+    balances = updated
+    wsAddressState = wsAddressState.putChangedAssets(changedAssets)
+  }
 
   /** Schedules next balances and order changes sending only if it wasn't scheduled before */
   private def scheduleNextDiffSending(): Unit =
@@ -463,8 +479,7 @@ class AddressActor(
       case Some(nextCommand) =>
         nextCommand.command match {
           case command: Command.PlaceOrder =>
-            val spendingAssets = Set(command.order.getSpendAssetId, command.order.feeAsset)
-            val tradableBalances = balances.tradableBalances(spendingAssets)
+            val tradableBalances = balances.tradableBalances(Set(command.order.getSpendAssetId, command.order.feeAsset))
             val ao = command.toAcceptedOrder(tradableBalances)
             validate(ao, tradableBalances)
               .map {

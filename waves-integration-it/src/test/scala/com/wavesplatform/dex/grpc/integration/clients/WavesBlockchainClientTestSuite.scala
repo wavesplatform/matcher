@@ -1,9 +1,5 @@
 package com.wavesplatform.dex.grpc.integration.clients
 
-import java.nio.charset.StandardCharsets
-import java.util.concurrent.Executors
-import java.util.concurrent.atomic.AtomicReference
-
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.wavesplatform.dex.collections.MapOps.Ops2D
 import com.wavesplatform.dex.domain.account.{Address, KeyPair, PublicKey}
@@ -21,6 +17,9 @@ import com.wavesplatform.dex.grpc.integration.{IntegrationSuiteBase, WavesClient
 import com.wavesplatform.dex.it.test.{NoStackTraceCancelAfterFailure, Scripts}
 import monix.execution.Scheduler
 
+import java.nio.charset.StandardCharsets
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.Random
@@ -77,14 +76,15 @@ class WavesBlockchainClientTestSuite extends IntegrationSuiteBase with NoStackTr
     interval = 1.second
   )
 
-  private val balanceChanges = new AtomicReference(Map.empty[Address, Map[Asset, Long]])
+  private val regularBalance = new AtomicReference(Map.empty[Address, Map[Asset, Long]])
 
   private val trueScript = Option(Scripts.alwaysTrue)
 
-  private def assertBalanceChanges(expectedBalanceChanges: Map[Address, Map[Asset, Long]]): Unit = eventually {
+  // TODO tests with outLease, pessimistic
+  private def assertRegularBalanceChanges(expectedBalanceChanges: Map[Address, Map[Asset, Long]]): Unit = eventually {
     // Remove pairs (address, asset) those expectedBalanceChanges has not
     val actual = simplify(
-      balanceChanges.get.view
+      regularBalance.get.view
         .filterKeys(expectedBalanceChanges.keys.toSet)
         .map {
           case (address, balance) => address -> balance.view.filterKeys(expectedBalanceChanges(address).contains).toMap
@@ -120,7 +120,11 @@ class WavesBlockchainClientTestSuite extends IntegrationSuiteBase with NoStackTr
     broadcastAndAwait(IssueUsdTx)
     client.updates.foreach { update =>
       log.info(s"Got in test: $update")
-      balanceChanges.updateAndGet(_.deepReplace(update.balanceUpdates))
+      regularBalance.updateAndGet { orig =>
+        update.balanceUpdates.foldLeft(orig) { case (r, (address, xs)) =>
+          r.deepReplace(Map(address -> xs.regular))
+        }
+      }
     }
   }
 
@@ -130,10 +134,10 @@ class WavesBlockchainClientTestSuite extends IntegrationSuiteBase with NoStackTr
     val issueAssetTx = mkIssue(alice, "name", someAssetAmount, 2)
     val issuedAsset = IssuedAsset(issueAssetTx.id())
 
-    balanceChanges.set(Map.empty)
+    regularBalance.set(Map.empty)
     broadcastAndAwait(issueAssetTx)
 
-    assertBalanceChanges {
+    assertRegularBalanceChanges {
       Map(
         alice.toAddress -> Map(
           Waves -> (aliceInitialBalance - issueFee),
@@ -142,10 +146,10 @@ class WavesBlockchainClientTestSuite extends IntegrationSuiteBase with NoStackTr
       )
     }
 
-    balanceChanges.set(Map.empty)
+    regularBalance.set(Map.empty)
     broadcastAndAwait(mkTransfer(alice, bob, someAssetAmount, issuedAsset))
 
-    assertBalanceChanges {
+    assertRegularBalanceChanges {
       Map(
         alice.toAddress -> Map(
           Waves -> (aliceInitialBalance - issueFee - minFee),
@@ -307,12 +311,13 @@ class WavesBlockchainClientTestSuite extends IntegrationSuiteBase with NoStackTr
     }
   }
 
-  "spendableBalances" in {
-    wait(client.spendableBalances(bob, Set(Waves, randomIssuedAsset))) should matchTo(Map[Asset, Long](Waves -> 494994798999996L))
+  // TODO full check
+  "partialBalancesSnapshot" in {
+    wait(client.partialBalancesSnapshot(bob, Set(Waves, randomIssuedAsset))).regular should matchTo(Map[Asset, Long](Waves -> 494994798999996L))
   }
 
-  "allAssetsSpendableBalance" in {
-
+  // TODO full check
+  "fullBalancesSnapshot" in {
     val carol = mkKeyPair("carol")
 
     broadcastAndAwait(
@@ -324,7 +329,7 @@ class WavesBlockchainClientTestSuite extends IntegrationSuiteBase with NoStackTr
     wavesNode1.api.broadcast(mkTransfer(carol, bob, 1.waves, Waves))
 
     eventually {
-      wait(client.allAssetsSpendableBalance(carol, Set.empty)) should matchTo(
+      wait(client.fullBalancesSnapshot(carol, Set.empty)).regular should matchTo(
         Map[Asset, Long](
           Waves -> (10.waves - 1.waves - minFee),
           usd -> 1.usd,

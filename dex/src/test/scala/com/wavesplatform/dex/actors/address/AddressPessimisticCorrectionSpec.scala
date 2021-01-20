@@ -64,17 +64,17 @@ class AddressPessimisticCorrectionSpec
       }
 
       // invariant?
-      "correction doesn't change when withObserved, withExecuted" ignore forAll(testGen) { case (orig, txId, txVolume, calls) =>
-        val updated = calls.foldLeft(orig) {
-          case (orig, "withObserved") => orig.withObserved(txId)._1
-          case (orig, "withExecuted") => orig.withExecuted(txId.some, txVolume)._1
-          case (orig, _) => orig
-        }
+//      "correction doesn't change when withObserved, withExecuted" ignore forAll(testGen) { case (orig, txId, txVolume, calls) =>
+//        val updated = calls.foldLeft(orig) {
+//          case (orig, "withObserved") => orig.withObserved(txId)._1
+//          case (orig, "withExecuted") => orig.withExecuted(txId.some, txVolume)._1
+//          case (orig, _) => orig
+//        }
 
 //        (orig.unconfirmed.keySet ++ txVolume.keySet).foreach { asset =>
 //          orig.getBy(asset) shouldBe
 //        }
-      }
+//      }
     }
 
     "withProbablyStaleUnconfirmed - an update have the lower precedence unconfirmed" in forAll(assetsMapGen, assetsMapGen) {

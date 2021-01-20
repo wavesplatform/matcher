@@ -39,15 +39,18 @@ case class AddressPessimisticCorrection(
   /**
    * TODO with himself. volume by spending asset 0 ?
    * @param txId Could be None if a transaction wasn't created (see ExchangeTransactionCreator)
-   * @param volume Should be non negative
+   * @param executionTotalVolumeDiff Should be non negative
    */
-  def withExecuted(txId: Option[ExchangeTransaction.Id], volume: Map[Asset, Long]): (AddressPessimisticCorrection, Set[Asset]) =
+  def withExecuted(txId: Option[ExchangeTransaction.Id], executionTotalVolumeDiff: Map[Asset, Long]): (AddressPessimisticCorrection, Set[Asset]) =
     txId match {
-      case None => (copy(unconfirmed = unconfirmed |-| volume), volume.keySet)
+      case None => (this, executionTotalVolumeDiff.keySet) // (copy(unconfirmed = unconfirmed |-| volume), volume.keySet) // - ?????
       case Some(txId) =>
         if (notObserved.contains(txId)) throw new RuntimeException(s"$txId executed twice!") // Could be called twice if one trader
-        else if (future.contains(txId)) (copy(unconfirmed = unconfirmed |-| volume, future = future - txId), volume.keySet)
-        else (copy(unconfirmed = unconfirmed |-| volume, notObserved = notObserved.updated(txId, volume)), Set.empty) // Set.empty - see getBy
+        // If it among future, then unconfirmed is updated with withFreshUnconfirmed, (copy(unconfirmed = unconfirmed |-| volume, future = future - txId), volume.keySet) //
+        else if (future.contains(txId)) (copy(future = future - txId), executionTotalVolumeDiff.keySet)
+        // unconfirmed is updated only with withFreshUnconfirmed
+        // else (copy(unconfirmed = unconfirmed |-| executionTotalVolumeDiff, notObserved = notObserved.updated(txId, executionTotalVolumeDiff)), Set.empty) // Set.empty - see getBy
+        else (copy(unconfirmed = unconfirmed, notObserved = notObserved.updated(txId, executionTotalVolumeDiff)), Set.empty) // Set.empty - see getBy
     }
 
   // TODO changes with unconfirmed? not only, if aproved by broadcaster

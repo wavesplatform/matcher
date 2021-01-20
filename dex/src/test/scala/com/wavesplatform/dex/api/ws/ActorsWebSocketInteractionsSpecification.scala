@@ -28,6 +28,7 @@ import org.scalatest.wordspec.AnyWordSpecLike
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.Future
+import scala.util.Success
 
 class ActorsWebSocketInteractionsSpecification
     extends TestKit(ActorSystem("ActorsWebSocketInteractionsSpecification"))
@@ -126,7 +127,8 @@ class ActorsWebSocketInteractionsSpecification
     def updateBalances(changes: Map[Asset, Long]): Unit = {
 
       val updatedPortfolio = Portfolio(changes.getOrElse(Waves, 0), LeaseBalance.empty, changes.collect { case (a: IssuedAsset, b) => a -> b })
-      val prevPortfolio = Option(currentPortfolio getAndSet updatedPortfolio).getOrElse(Portfolio.empty)
+      val prevPortfolioOpt = Option(currentPortfolio getAndSet updatedPortfolio)
+      val prevPortfolio = prevPortfolioOpt.getOrElse(Portfolio.empty)
 
       val regularBalanceChanges: Map[Asset, Long] =
         prevPortfolio
@@ -135,15 +137,16 @@ class ActorsWebSocketInteractionsSpecification
           .toMap
           .withDefaultValue(0)
 
+      val updates = AddressBalanceUpdates(
+        regular = regularBalanceChanges,
+        outLease = None,
+        pessimisticCorrection = Map.empty
+      )
+
       addressDir ! AddressDirectoryActor.Command.ForwardMessage(
         kp.toAddress,
-        AddressActor.Command.ChangeBalances(
-          AddressBalanceUpdates(
-            regular = regularBalanceChanges,
-            outLease = None,
-            pessimisticCorrection = Map.empty
-          )
-        )
+        if (prevPortfolioOpt.isEmpty) AddressActor.Command.SetInitialBalances(Success(updates))
+        else AddressActor.Command.ChangeBalances(updates)
       )
     }
 
@@ -200,7 +203,7 @@ class ActorsWebSocketInteractionsSpecification
 
           cancel(lo, false)
           expectWsBalancesAndOrders(
-            Map(usd -> WsBalances(300, 0), Waves -> WsBalances(100, 0)),
+            Map(usd -> WsBalances(300, 0), Waves -> WsBalances(100, 0)), // <---
             Seq(WsOrder(lo.id, status = OrderStatus.Cancelled.name.some)),
             2
           )
@@ -332,7 +335,7 @@ class ActorsWebSocketInteractionsSpecification
             mo = matchOrders(mo, 10.waves)
             expectWsBalancesAndOrders(
               // tradable = total - reserved, so 180 = 300 - 120 USD, 2.2 = 3 - 0.8 ETH
-              Map(usd -> WsBalances(180, 120), eth -> WsBalances(2.2, 0.8)),
+              Map(usd -> WsBalances(180, 120), eth -> WsBalances(2.2, 0.8)), // <--
               Seq(
                 WsOrder(
                   id = mo.id,

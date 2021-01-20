@@ -92,15 +92,14 @@ class AddressActor(
 
       val volumeDiff = refreshOrderState(order, command)
 
-      if (isNew) { // <---
-      log.debug(s"ApplyOrderBookAdded(${order.id}) volume diff: $volumeDiff")
+      if (isNew) {
+        log.debug(s"ApplyOrderBookAdded(${order.id}) volume diff: $volumeDiff")
         // If it is not new, appendedOpenVolume and putChangedAssets called in ValidationPassed -> place,
         //  so we don't need to do this again.
         balances = balances.appendedOpenVolume(volumeDiff)
 
-        if (wsAddressState.hasActiveSubscriptions) {
-          wsAddressState.putChangedAssets(volumeDiff.keySet)
-          scheduleNextDiffSending()
+        scheduleWs {
+          wsAddressState = wsAddressState.putChangedAssets(volumeDiff.keySet)
         }
       }
 
@@ -123,9 +122,8 @@ class AddressActor(
       val (updated, changedAssets) = balances.withExecuted(command.tx.map(_.id()), volumeDiff)
       balances = updated
 
-      if (wsAddressState.hasActiveSubscriptions) {
-        wsAddressState.putChangedAssets(changedAssets)
-        scheduleNextDiffSending()
+      scheduleWs {
+        wsAddressState = wsAddressState.putChangedAssets(changedAssets)
       }
 
     case command: Command.ApplyOrderBookCanceled =>
@@ -140,9 +138,8 @@ class AddressActor(
         log.info(s"ApplyOrderBookCanceled($id) volume diff: $volumeDiff")
         balances = balances.appendedOpenVolume(volumeDiff)
 
-        if (wsAddressState.hasActiveSubscriptions) {
-          wsAddressState.putChangedAssets(volumeDiff.keySet)
-          scheduleNextDiffSending()
+        scheduleWs {
+          wsAddressState = wsAddressState.putChangedAssets(volumeDiff.keySet)
         }
       }
 
@@ -162,7 +159,7 @@ class AddressActor(
       val (updated, changedAssets) = command.txIds
         .foldl((balances, Set.empty[Asset]))(_._1.withObserved(_))
       balances = updated
-      wsAddressState.putChangedAssets(changedAssets)
+      wsAddressState = wsAddressState.putChangedAssets(changedAssets)
 
     case command @ OrderCancelFailed(id, reason) =>
       if (recovered) pendingCommands.remove(id) match {
@@ -323,9 +320,8 @@ class AddressActor(
         }
       }
 
-      if (wsAddressState.hasActiveSubscriptions) {
+      scheduleWs {
         wsAddressState = wsAddressState.putChangedAssets(changedAssets)
-        scheduleNextDiffSending()
       }
 
     case Query.GetReservedBalance => sender() ! Reply.GetBalance(balances.openVolume.filter(_._2 > 0).asRight)
@@ -361,9 +357,8 @@ class AddressActor(
           case ValidatedCommand.PlaceOrder(_) | ValidatedCommand.PlaceMarketOrder(_) =>
             activeOrders.remove(orderId).foreach { ao =>
               balances = balances.removedOpenVolume(ao.reservableBalance)
-              if (wsAddressState.hasActiveSubscriptions) {
+              scheduleWs {
                 wsAddressState = wsAddressState.putChangedAssets(ao.reservableBalance.keySet)
-                scheduleNextDiffSending()
               }
             }
           case _ =>
@@ -406,7 +401,9 @@ class AddressActor(
 
     // It is time to send updates to clients. This block of code asks balances
     case WsCommand.SendDiff =>
+      log.info(s"WsCommand.SendDiff: hasActiveSubscriptions: ${wsAddressState.hasActiveSubscriptions} && hasChanges: ${wsAddressState.hasChanges}")
       if (wsAddressState.hasActiveSubscriptions && wsAddressState.hasChanges) {
+        log.info(s"WsCommand.SendDiff: changedAssets: ${wsAddressState.changedAssets.mkString(", ")}, newBalance: ${balances.tradableBalances(wsAddressState.changedAssets)}")
         wsAddressState = wsAddressState
           .sendDiffs(
             balances = mkWsBalances(balances.tradableBalances(wsAddressState.changedAssets)),
@@ -424,10 +421,9 @@ class AddressActor(
 
   override val receive: Receive = if (recovered) starting else recovering
 
-  /** Schedules next balances and order changes sending only if it wasn't scheduled before -- TODO wrong!!!! */
+  /** Schedules next balances and order changes sending only if it wasn't scheduled before */
   private def scheduleNextDiffSending(): Unit =
-    if (wsSendSchedule.isCancelled) // TODO Note, if it is not canceled, if was executed
-      wsSendSchedule = context.system.scheduler.scheduleOnce(settings.wsMessagesInterval, self, WsCommand.SendDiff)
+    if (wsSendSchedule.isCancelled) wsSendSchedule = context.system.scheduler.scheduleOnce(settings.wsMessagesInterval, self, WsCommand.SendDiff)
 
   private def denormalizedBalanceValue(asset: Asset, decimals: Int)(balanceSource: Map[Asset, Long]): Double =
     denormalizeAmountAndFee(balanceSource.getOrElse(asset, 0L), decimals).toDouble
@@ -532,7 +528,7 @@ class AddressActor(
         }
     }
 
-    if (wsAddressState.hasActiveSubscriptions) {
+    scheduleWs {
       wsAddressState = status match {
         case OrderStatus.Accepted => wsAddressState.putOrderUpdate(remaining.id, WsOrder.fromDomain(remaining, status))
         case _: OrderStatus.Cancelled => wsAddressState.putOrderStatusNameUpdate(remaining.id, status)
@@ -541,8 +537,6 @@ class AddressActor(
           if (unmatchable) wsAddressState.putOrderStatusNameUpdate(remaining.id, status)
           else wsAddressState.putOrderFillingInfoAndStatusNameUpdate(remaining, status)
       }
-
-      scheduleNextDiffSending()
     }
 
     volumeDiff
@@ -584,10 +578,8 @@ class AddressActor(
     log.info(s"place(${ao.id}) volume diff: ${ao.reservableBalance}")
     balances = balances.appendedOpenVolume(ao.reservableBalance)
 
-    // TODO make syntax for: hasActiveSubscriptions + scheduleNextDiffSending
-    if (wsAddressState.hasActiveSubscriptions) {
+    scheduleWs {
       wsAddressState = wsAddressState.putChangedAssets(ao.reservableBalance.keySet)
-      scheduleNextDiffSending()
     }
 
     storeCommand(ao.id)(
@@ -632,6 +624,11 @@ class AddressActor(
       ao <- activeOrders.values
       if ao.isLimit && maybePair.forall(_ == ao.order.assetPair)
     } yield ao
+
+  private def scheduleWs(f: => Unit): Unit = if (wsAddressState.hasActiveSubscriptions) {
+    f
+    scheduleNextDiffSending()
+  }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
     log.error(s"Failed on $message", reason)

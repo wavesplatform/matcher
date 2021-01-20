@@ -34,6 +34,7 @@ case class WsAddressState(
     else updated
   }
 
+  // TODO better name
   def putChangedAssets(diff: Set[Asset]): WsAddressState = copy(changedAssets = changedAssets ++ diff)
 
   def putOrderUpdate(id: Order.Id, update: WsOrder): WsAddressState = copy(ordersChanges = ordersChanges + (id -> update))

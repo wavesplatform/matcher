@@ -81,12 +81,12 @@ case class AddressBalance(
   def removedOpenVolume(diff: Map[Asset, Long]): AddressBalance = copy(openVolume = openVolume |-| diff)
 
   /**
-   * @param totalVolume An order's executed assets or a sum of two
+   * @param executionTotalVolumeDiff An order's executed assets or a sum of two
    */
-  def withExecuted(txId: Option[ExchangeTransaction.Id], totalVolume: Map[Asset, Long]): (AddressBalance, Set[Asset]) = {
-    val (updated, changedAssets) = pessimisticCorrection.withExecuted(txId, totalVolume)
+  def withExecuted(txId: Option[ExchangeTransaction.Id], executionTotalVolumeDiff: Map[Asset, Long]): (AddressBalance, Set[Asset]) = {
+    val (updated, changedAssets) = pessimisticCorrection.withExecuted(txId, executionTotalVolumeDiff)
     (
-      copy(pessimisticCorrection = updated, openVolume = openVolume |+| totalVolume),
+      copy(pessimisticCorrection = updated, openVolume = openVolume |+| executionTotalVolumeDiff), // + if tx is empty ????
       changedAssets
     )
   }

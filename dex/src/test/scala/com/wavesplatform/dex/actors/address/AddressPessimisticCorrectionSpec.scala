@@ -122,9 +122,9 @@ class AddressPessimisticCorrectionSpec
         updated.future shouldNot contain(txId)
       }
 
-      "reduces the unconfirmed volume" in forAll(stateGen) { case (orig, txId, txVolume, updated) =>
-        orig.unconfirmed.filterNot(_._2 == 0) should matchTo((updated.unconfirmed |+| txVolume).filterNot(_._2 == 0))
-      }
+//      "reduces the unconfirmed volume" in forAll(stateGen) { case (orig, txId, txVolume, updated) =>
+//        orig.unconfirmed.filterNot(_._2 == 0) should matchTo((updated.unconfirmed |+| txVolume).filterNot(_._2 == 0))
+//      }
     }
 
     "withObserved" - {

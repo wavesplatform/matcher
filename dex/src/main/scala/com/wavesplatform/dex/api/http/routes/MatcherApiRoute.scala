@@ -205,7 +205,7 @@ class MatcherApiRoute(
 
   private def placeOrder(endpoint: Option[PathMatcher[Unit]], isMarket: Boolean): Route = {
     val route = (pathEndOrSingleSlash & entity(as[Order])) { order =>
-      withAssetPair(order.assetPair, formatError = e => StatusCodes.BadRequest -> HttpError.from(e, "OrderRejected")) { pair =>
+      withAssetPair(Right(order.assetPair), formatError = e => StatusCodes.BadRequest -> HttpError.from(e, "OrderRejected")) { pair =>
         unavailableOrderBookBarrier(pair) {
           complete(
             placeTimer.measureFuture {

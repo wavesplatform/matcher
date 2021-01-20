@@ -10,6 +10,7 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionV2}
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.grpc.integration.clients.combined.{CombinedStream, CombinedWavesBlockchainClient}
+import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
 import com.wavesplatform.dex.grpc.integration.clients.domain.portfolio.SynchronizedPessimisticPortfolios
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.settings.{GrpcClientSettings, WavesBlockchainClientSettings}
@@ -117,7 +118,7 @@ class WavesBlockchainClientTestSuite extends IntegrationSuiteBase with NoStackTr
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    broadcastAndAwait(IssueUsdTx)
+    broadcastAndAwait(IssueUsdTx, IssueBtcTx)
     client.updates.foreach { update =>
       log.info(s"Got in test: $update")
       regularBalance.updateAndGet { orig =>
@@ -164,12 +165,14 @@ class WavesBlockchainClientTestSuite extends IntegrationSuiteBase with NoStackTr
 
   "areKnown" - {
     "false for unknown tx" in {
-      wait(client.areKnown(Seq(BtcId))).values.head shouldBe false
+      wait(client.areKnown(Seq(EthId))).values.head shouldBe false
     }
 
     "true for confirmed tx" in {
-      broadcastAndAwait(IssueBtcTx)
-      wait(client.areKnown(Seq(BtcId))).values.head shouldBe true
+      broadcastAndAwait(IssueEthTx)
+      eventually {
+        wait(client.areKnown(Seq(EthId))).values.head shouldBe true
+      }
     }
   }
 
@@ -188,8 +191,11 @@ class WavesBlockchainClientTestSuite extends IntegrationSuiteBase with NoStackTr
       }
 
       "if the transaction is in the blockchain" in {
-        val exchangeTx = mkExchangeTx
+        // Otherwise there is a high probability, that exchangeTx will be moved to a priority pool during an appending of a key block
+        //  thus it will be added without expected issues.
+        wavesNode1.api.waitForHeightArise()
 
+        val exchangeTx = mkExchangeTx
         withClue(exchangeTx.id().base58) {
           broadcastAndAwait(exchangeTx.toWavesJ())
           wait(client.broadcastTx(exchangeTx)) shouldBe a[BroadcastResult.Failed]
@@ -239,7 +245,7 @@ class WavesBlockchainClientTestSuite extends IntegrationSuiteBase with NoStackTr
 
   "assetDescription" - {
     "returns None if there is no such asset" in {
-      wait(client.assetDescription(eth)) shouldBe None
+      wait(client.assetDescription(wct)) shouldBe None
     }
 
     "returns an information for created assets" in {
@@ -311,12 +317,37 @@ class WavesBlockchainClientTestSuite extends IntegrationSuiteBase with NoStackTr
     }
   }
 
-  // TODO full check
   "partialBalancesSnapshot" in {
-    wait(client.partialBalancesSnapshot(bob, Set(Waves, randomIssuedAsset))).regular should matchTo(Map[Asset, Long](Waves -> 494994798999996L))
+    val leaseAmount = 1.waves
+    val leaseTx = mkLease(bob, alice, leaseAmount)
+    val balanceBefore = wavesNode1.api.balance(bob, Waves)
+    wavesNode1.api.broadcast(leaseTx)
+
+    wait(client.partialBalancesSnapshot(bob, Set(Waves, randomIssuedAsset))) should {
+      // leaseTx haven't been added to UTX yet
+      matchTo(AddressBalanceUpdates(
+        regular = Map(Waves -> balanceBefore),
+        outLease = Some(0L),
+        pessimisticCorrection = Map.empty
+      )) or
+      // not confirmed
+      matchTo(AddressBalanceUpdates(
+        regular = Map(Waves -> balanceBefore),
+        outLease = Some(0L),
+        pessimisticCorrection = Map(Waves -> -(leaseAmount + leasingFee))
+      )) or
+      // confirmed
+      matchTo(AddressBalanceUpdates(
+        regular = Map(Waves -> (balanceBefore - leaseAmount - leasingFee)),
+        outLease = Some(leaseAmount),
+        pessimisticCorrection = Map.empty
+      ))
+    }
+
+    wavesNode1.api.waitForTransaction(leaseTx)
+    broadcastAndAwait(mkLeaseCancel(bob, leaseTx.id()))
   }
 
-  // TODO full check
   "fullBalancesSnapshot" in {
     val carol = mkKeyPair("carol")
 
@@ -326,16 +357,38 @@ class WavesBlockchainClientTestSuite extends IntegrationSuiteBase with NoStackTr
       mkTransfer(bob, carol, 1.btc, btc)
     )
 
-    wavesNode1.api.broadcast(mkTransfer(carol, bob, 1.waves, Waves))
+    val leaseAmount = 1.waves
+    val leaseTx = mkLease(carol, bob, leaseAmount)
+    wavesNode1.api.broadcast(leaseTx)
 
-    eventually {
-      wait(client.fullBalancesSnapshot(carol, Set.empty)).regular should matchTo(
-        Map[Asset, Long](
-          Waves -> (10.waves - 1.waves - minFee),
-          usd -> 1.usd,
-          btc -> 1.btc
-        )
-      )
+    wait(client.fullBalancesSnapshot(carol, Set(btc))) should {
+      // leaseTx haven't been added to UTX yet
+      matchTo(AddressBalanceUpdates(
+        regular = Map[Asset, Long](
+          Waves -> 10.waves,
+          usd -> 1.usd
+        ),
+        outLease = Some(0L),
+        pessimisticCorrection = Map.empty
+      )) or
+      // not confirmed
+      matchTo(AddressBalanceUpdates(
+        regular = Map[Asset, Long](
+          Waves -> 10.waves,
+          usd -> 1.usd
+        ),
+        outLease = Some(0L),
+        pessimisticCorrection = Map(Waves -> -(leaseAmount + leasingFee))
+      )) or
+      // confirmed
+      matchTo(AddressBalanceUpdates(
+        regular = Map[Asset, Long](
+          Waves -> (10.waves - leaseAmount - leasingFee),
+          usd -> 1.usd
+        ),
+        outLease = Some(leaseAmount),
+        pessimisticCorrection = Map.empty
+      ))
     }
   }
 

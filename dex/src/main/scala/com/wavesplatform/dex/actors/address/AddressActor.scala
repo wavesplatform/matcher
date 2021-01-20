@@ -654,6 +654,7 @@ class AddressActor(
 
 object AddressActor {
 
+  @FunctionalInterface
   trait BlockchainInteraction {
     def getFullBalances(address: Address, exclude: Set[Asset]): Future[AddressBalanceUpdates]
   }

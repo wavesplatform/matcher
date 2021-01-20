@@ -5,7 +5,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.ByteStr._
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto._
-import com.wavesplatform.dex.domain.error.ValidationError.InvalidAddress
+import com.wavesplatform.dex.domain.error.ValidationError.InvalidPublicKey
 import com.wavesplatform.dex.domain.utils.base58Length
 import play.api.libs.json.{Format, Writes}
 import supertagged._
@@ -21,11 +21,11 @@ object PublicKey extends TaggedType[ByteStr] {
   def apply(publicKey: ByteStr): PublicKey = interner.intern(publicKey @@ this)
   def apply(publicKey: Array[Byte]): PublicKey = apply(ByteStr(publicKey))
 
-  def fromBase58String(base58: String): Either[InvalidAddress, PublicKey] =
+  def fromBase58String(base58: String): Either[InvalidPublicKey, PublicKey] =
     (for {
       _ <- Either.cond(base58.length <= KeyStringLength, (), "Bad public key string length")
       bytes <- Base58.tryDecodeWithLimit(base58).toEither.left.map(ex => s"Unable to decode base58: ${ex.getMessage}")
-    } yield PublicKey(bytes)).left.map(err => InvalidAddress(s"Invalid sender: $err"))
+    } yield PublicKey(bytes)).left.map(err => InvalidPublicKey(err))
 
   def unapply(arg: Array[Byte]): Option[PublicKey] = Some(apply(arg))
 

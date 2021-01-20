@@ -1,10 +1,7 @@
 package com.wavesplatform.dex.actors.address
 
-import cats.instances.long._
-import cats.syntax.group._
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
-import com.wavesplatform.dex.fp.MapImplicits.group
 
 /**
  * We must treat a not observed transaction as a part of unconfirmed transactions until we observe it.
@@ -41,7 +38,10 @@ case class AddressPessimisticCorrection(
    * @param txId Could be None if a transaction wasn't created (see ExchangeTransactionCreator)
    * @param executionTotalVolumeDiff Should be non negative
    */
-  def withExecuted(txId: Option[ExchangeTransaction.Id], executionTotalVolumeDiff: Map[Asset, Long]): (AddressPessimisticCorrection, Set[Asset]) =
+  def withExecuted(
+    txId: Option[ExchangeTransaction.Id],
+    executionTotalVolumeDiff: Map[Asset, Long]
+  ): (AddressPessimisticCorrection, Set[Asset]) =
     txId match {
       case None => (this, executionTotalVolumeDiff.keySet) // (copy(unconfirmed = unconfirmed |-| volume), volume.keySet) // - ?????
       case Some(txId) =>
@@ -50,7 +50,11 @@ case class AddressPessimisticCorrection(
         else if (future.contains(txId)) (copy(future = future - txId), executionTotalVolumeDiff.keySet)
         // unconfirmed is updated only with withFreshUnconfirmed
         // else (copy(unconfirmed = unconfirmed |-| executionTotalVolumeDiff, notObserved = notObserved.updated(txId, executionTotalVolumeDiff)), Set.empty) // Set.empty - see getBy
-        else (copy(unconfirmed = unconfirmed, notObserved = notObserved.updated(txId, executionTotalVolumeDiff)), Set.empty) // Set.empty - see getBy
+        else
+          (
+            copy(unconfirmed = unconfirmed, notObserved = notObserved.updated(txId, executionTotalVolumeDiff)),
+            Set.empty
+          ) // Set.empty - see getBy
     }
 
   // TODO changes with unconfirmed? not only, if aproved by broadcaster

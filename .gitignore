@@ -4,6 +4,7 @@
 .ensime_cache/
 .metals/
 .bsp/
+matcher.iml
 .bloop/
 project/metals.sbt
 project/project/

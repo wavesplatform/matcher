@@ -1,16 +1,17 @@
-package com.wavesplatform.it.matcher.api.http
+package com.wavesplatform.it.matcher.api.http.balances
 
 import com.google.common.primitives.Longs
+import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
-import com.wavesplatform.dex.it.api.RawHttpChecks
 import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.matcher.api.http.ApiKeyHeaderChecks
 import org.scalatest.prop.TableDrivenPropertyChecks
 
-class GetReservedBalanceSpec extends MatcherSuiteBase with TableDrivenPropertyChecks with RawHttpChecks {
+class GetReservedBalanceSpec extends MatcherSuiteBase with TableDrivenPropertyChecks with ApiKeyHeaderChecks {
 
   override protected def dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(
@@ -52,13 +53,17 @@ class GetReservedBalanceSpec extends MatcherSuiteBase with TableDrivenPropertyCh
       validate200Json(dex1.rawApi.getReservedBalanceWithApiKey(acc)) should be(Map(Waves -> 9.009.waves, usd -> 20.usd))
     }
 
-    "should return non-zero balances with incorrect X-API-KEY" in {
-      validateAuthorizationError(dex1.rawApi.getReservedBalance(Base58.encode(alice.publicKey), Map("X-API-KEY" -> "incorrect")))
-    }
+    shouldReturnErrorWithoutApiKeyHeader(dex1.rawApi.getReservedBalance(Base58.encode(alice.publicKey), headers = Map.empty))
 
-    //TODO: change after DEX-978
+    shouldReturnErrorWithIncorrectApiKeyValue(dex1.rawApi.getReservedBalance(Base58.encode(alice.publicKey), incorrectApiKeyHeader))
+
     "should return an error if publicKey is not correct base58 string" in {
-      validate404Exception(dex1.rawApi.getReservedBalance("null", System.currentTimeMillis, "sign"))
+      validateMatcherError(
+        dex1.rawApi.getReservedBalance("null", System.currentTimeMillis, "sign"),
+        StatusCodes.BadRequest,
+        3148801,
+        "Provided public key is not correct, reason: Unable to decode base58: requirement failed: Wrong char 'l' in Base58 string 'null'"
+      )
     }
 
     "should return an error if publicKey parameter has the different value of used in signature" in {

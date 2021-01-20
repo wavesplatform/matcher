@@ -19,8 +19,8 @@ import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.{ExecutionError, ValidationError}
 import com.wavesplatform.protobuf.Amount
-import com.wavesplatform.transaction.{Asset, TxValidationError}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.TxValidationError
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.utils.ScorexLogging

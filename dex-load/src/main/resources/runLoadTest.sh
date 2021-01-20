@@ -6,7 +6,7 @@ if [ ! "$(docker ps -q -f name=dexload)" ]; then
     if [ "$(docker ps -aq -f status=exited -f name=dexload)" ]; then
         docker rm dexload
     fi
-    docker run -v $(pwd):/var/loadtest -v /home/ngadiyak/.ssh:/root/.ssh --rm --net host -it --entrypoint /bin/bash -d --name dexload direvius/yandex-tank:latest
+    docker run -v /home/yatank/loadtest:/var/loadtest -v /home/ngadiyak/.ssh:/root/.ssh --rm --net host -it --entrypoint /bin/bash -d --name dexload direvius/yandex-tank:latest
 fi
 docker exec -i dexload yandex-tank -c dexload.yaml > /dev/null
 echo "The performance has been finished"

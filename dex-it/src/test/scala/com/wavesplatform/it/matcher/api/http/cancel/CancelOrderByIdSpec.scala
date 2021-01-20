@@ -4,11 +4,11 @@ import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.order.OrderType.BUY
-import com.wavesplatform.dex.it.api.RawHttpChecks
 import com.wavesplatform.dex.it.docker.apiKey
 import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.matcher.api.http.ApiKeyHeaderChecks
 
-class CancelOrderByIdSpec extends MatcherSuiteBase with RawHttpChecks {
+class CancelOrderByIdSpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
 
   override protected def dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(
@@ -59,13 +59,6 @@ class CancelOrderByIdSpec extends MatcherSuiteBase with RawHttpChecks {
       validate404Exception(dex1.rawApi.cancelOrderById("null", Map("X-API-KEY" -> apiKey)))
     }
 
-    "should return an error without headers" in {
-      val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 1.usd)
-      placeAndAwaitAtDex(order)
-
-      validateAuthorizationError(dex1.rawApi.cancelOrderById(order.idStr(), Map.empty[String, String]))
-    }
-
     "should return an error when the public-key header is not a correct base58 string" in {
       val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 1.usd)
       placeAndAwaitAtDex(order)
@@ -74,7 +67,7 @@ class CancelOrderByIdSpec extends MatcherSuiteBase with RawHttpChecks {
         dex1.rawApi.cancelOrderById(order.idStr(), Map("X-API-Key" -> apiKey, "X-User-Public-Key" -> "null")),
         StatusCodes.BadRequest,
         3148801,
-        "Provided user public key is not correct"
+        "Provided public key is not correct, reason: Unable to decode base58: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )
     }
 
@@ -91,14 +84,13 @@ class CancelOrderByIdSpec extends MatcherSuiteBase with RawHttpChecks {
       )
     }
 
-    "should return an error when the api-key header is not correct" in {
-      val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 1.usd)
-      placeAndAwaitAtDex(order)
+    shouldReturnErrorWithoutApiKeyHeader(dex1.rawApi.cancelAllByAddressAndIds(alice.toAddress.stringRepr, placeAndGetIds(3), Map.empty))
 
-      validateAuthorizationError(
-        dex1.rawApi.cancelOrderById(order.idStr(), Map("X-API-Key" -> "incorrect"))
-      )
-    }
+    shouldReturnErrorWithIncorrectApiKeyValue(dex1.rawApi.cancelAllByAddressAndIds(
+      alice.toAddress.stringRepr,
+      placeAndGetIds(3),
+      Map("X-API-KEY" -> "incorrect")
+    ))
+
   }
-
 }

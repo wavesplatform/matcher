@@ -372,7 +372,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
     "reject proxy requests if X-User-Public-Key doesn't match query param and process them correctly otherwise " - {
 
       "/matcher/balance/reserved/{publicKey}" in {
-        dex1.tryApi.getReservedBalanceWithApiKey(alice, Some(bob.publicKey)) should failWith(3148801, "Provided user public key is not correct")
+        dex1.tryApi.getReservedBalanceWithApiKey(alice, Some(bob.publicKey)) should failWith(3148801, "Provided public key is not correct, reason: invalid public key")
         dex1.tryApi.getReservedBalanceWithApiKey(alice, Some(alice.publicKey)) shouldBe Symbol("right")
       }
 
@@ -389,7 +389,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
         dex1.tryApi.cancelAllByApiKeyAndIds(bob, orderIds, Some(alice.publicKey)) should failWith(
           3148801,
-          "Provided user public key is not correct"
+          "Provided public key is not correct, reason: invalid public key"
         )
         dex1.tryApi.cancelAllByApiKeyAndIds(bob, orderIds, Some(bob.publicKey)) shouldBe Symbol("right")
       }
@@ -398,7 +398,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         dex1.tryApi.orderHistoryWithApiKey(
           owner = bob,
           xUserPublicKey = Some(alice.publicKey)
-        ) should failWith(3148801, "Provided user public key is not correct")
+        ) should failWith(3148801, "Provided public key is not correct, reason: invalid public key")
 
         dex1.tryApi.orderHistoryWithApiKey(
           owner = bob,
@@ -420,7 +420,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
           owner = bob,
           orderId = order.id(),
           xUserPublicKey = Some(alice.publicKey)
-        ) should failWith(3148801, "Provided user public key is not correct")
+        ) should failWith(3148801, "Provided public key is not correct, reason: invalid public key")
 
         dex1.tryApi.getOrderStatusInfoByIdWithApiKey(
           owner = bob,

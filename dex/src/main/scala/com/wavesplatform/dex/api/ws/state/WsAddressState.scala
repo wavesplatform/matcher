@@ -15,7 +15,8 @@ case class WsAddressState(
   address: Address,
   activeSubscription: Map[ActorRef[WsAddressChanges], Long],
   changedAssets: Set[Asset],
-  ordersChanges: Map[Order.Id, WsOrder]
+  ordersChanges: Map[Order.Id, WsOrder],
+  previousBalanceChanges: Map[Asset, WsBalances]
 ) { // TODO Probably use an ordered Map and pass it to WsAddressChanges
 
   val hasActiveSubscriptions: Boolean = activeSubscription.nonEmpty
@@ -30,7 +31,7 @@ case class WsAddressState(
 
   def removeSubscription(subscriber: ActorRef[WsAddressChanges]): WsAddressState = {
     val updated = copy(activeSubscription = activeSubscription - subscriber)
-    if (updated.activeSubscription.isEmpty) updated.cleanAllChanges()
+    if (updated.activeSubscription.isEmpty) updated.clean()
     else updated
   }
 
@@ -69,19 +70,20 @@ case class WsAddressState(
     activeSubscription = activeSubscription.map { // dirty but one pass
       case (conn, updateId) =>
         val newUpdateId = WsAddressState.getNextUpdateId(updateId)
-        conn ! WsAddressChanges(address, balances, orders, newUpdateId)
+        conn ! WsAddressChanges(address, balances.filterNot(Function.tupled(sameAsInPrevious)), orders, newUpdateId)
         conn -> newUpdateId
-    }
+    },
+    previousBalanceChanges = balances
   )
 
-  def cleanAllChanges(): WsAddressState = copy(changedAssets = Set.empty, ordersChanges = Map.empty)
-  def cleanOrderChanges(): WsAddressState = copy(ordersChanges = Map.empty)
-  def cleanBalanceChanges(): WsAddressState = copy(changedAssets = Set.empty)
+  def clean(): WsAddressState = copy(changedAssets = Set.empty, ordersChanges = Map.empty)
+
+  private def sameAsInPrevious(asset: Asset, wsBalances: WsBalances): Boolean = previousBalanceChanges.get(asset).contains(wsBalances)
 }
 
 object WsAddressState {
 
-  def empty(address: Address): WsAddressState = WsAddressState(address, Map.empty, Set.empty, Map.empty)
+  def empty(address: Address): WsAddressState = WsAddressState(address, Map.empty, Set.empty, Map.empty, Map.empty)
   val numberMaxSafeInteger = 9007199254740991L
 
   def getNextUpdateId(currentUpdateId: Long): Long = if (currentUpdateId == numberMaxSafeInteger) 1 else currentUpdateId + 1

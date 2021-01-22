@@ -220,13 +220,10 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
         placeAndAwaitAtNode(mkOrderDP(alice, wavesUsdPair, SELL, 10.waves, 1.0))
 
         assertChanges(wsc)(
-          Map(usd -> WsBalances(0, 10), Waves -> WsBalances(9.997, 0.003)),
-          Map(Waves -> WsBalances(9.997, 0)),
-          Map(usd -> WsBalances(0, 0)),
-          Map(Waves -> WsBalances(
-            19.997,
-            0
-          )) // since balance increasing comes after transaction mining, + 10 - 0.003, Waves balance on Node = 19.997
+          Map(Waves -> WsBalances(9.997, 0.003), usd -> WsBalances(0, 10)),
+          Map(Waves -> WsBalances(10, 0), usd -> WsBalances(0, 0)),
+          // since balance increasing comes after transaction mining, + 10 - 0.003, Waves balance on Node = 19.997
+          Map(Waves -> WsBalances(19.997, 0))
         )(
           WsOrder.fromDomain(LimitOrder(bo)),
           WsOrder(

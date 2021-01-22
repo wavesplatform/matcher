@@ -385,7 +385,7 @@ class AddressActor(
       log.trace(s"[c=${client.path.name}] Added WebSocket subscription")
       wsAddressState = wsAddressState.addSubscription(
         client,
-        mkWsBalances(balances.allTradableBalances),
+        mkWsBalances(balances.allTradableBalances, includeEmpty = false),
         activeOrders.values.map(WsOrder.fromDomain(_)).to(Seq)
       )
       context.watch(client)
@@ -404,13 +404,10 @@ class AddressActor(
         )
         wsAddressState = wsAddressState
           .sendDiffs(
-            balances = mkWsBalances(balances.tradableBalances(wsAddressState.changedAssets)),
+            balances = mkWsBalances(balances.tradableBalances(wsAddressState.changedAssets), includeEmpty = true),
             orders = wsAddressState.getAllOrderChanges
           )
-          .cleanOrderChanges()
-          .cleanBalanceChanges()
-
-        wsAddressState = wsAddressState.cleanOrderChanges()
+          .clean()
       }
       wsSendSchedule = Cancellable.alreadyCancelled
 
@@ -468,7 +465,8 @@ class AddressActor(
   private def denormalizedBalanceValue(asset: Asset, decimals: Int)(balanceSource: Map[Asset, Long]): Double =
     denormalizeAmountAndFee(balanceSource.getOrElse(asset, 0L), decimals).toDouble
 
-  private def mkWsBalances(tradableBalances: Map[Asset, Long]): Map[Asset, WsBalances] =
+  // TODO refactor
+  private def mkWsBalances(tradableBalances: Map[Asset, Long], includeEmpty: Boolean): Map[Asset, WsBalances] =
     tradableBalances
       .keys
       .flatMap { asset =>
@@ -479,7 +477,7 @@ class AddressActor(
           case Some(decimals) =>
             val tradable = tradableBalances(asset)
             val openVolume = balances.openVolume.getOrElse(asset, 0L)
-            if (tradable > 0 || openVolume > 0) {
+            if (tradable > 0 || openVolume > 0 || includeEmpty) {
               val assetDenormalizedBalanceFrom = denormalizedBalanceValue(asset, decimals)(_)
               List(
                 asset -> WsBalances(

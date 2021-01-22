@@ -127,11 +127,13 @@ class AddressActor(
         .filter(_.order.sender.toAddress == owner)
         .foldMap(refreshOrderState(_, command))(group)
 
-        log.info(s"volume diff: ${format(volumeDiff)}")
+      log.info(s"volume diff: ${format(volumeDiff)}")
       val (updated, changedAssets) = balances.withExecuted(command.tx.map(_.id()), volumeDiff) // 0 ?
       balances = updated
       log.info(
-        s"[Balance] 💵: ${format(balances.tradableBalances(volumeDiff.keySet))}; e: ${format(volumeDiff)}; r: ${format(balances.regular.xs)}, ov: ${format(balances.openVolume.xs)}, pc.u: ${format(
+        s"[Balance] 💵: ${format(balances.tradableBalances(volumeDiff.keySet))}; e: ${format(volumeDiff)}; r: ${format(
+          balances.regular.xs
+        )}, ov: ${format(balances.openVolume.xs)}, pc.u: ${format(
           balances.pessimisticCorrection.unconfirmed.xs
         )}, pc.no: ${balances.pessimisticCorrection.notObserved.map { case (id, xs) => s"$id -> ${format(xs.xs)}" }.mkString(", ")}"
       )
@@ -555,22 +557,23 @@ class AddressActor(
       case _ =>
         val origActiveOrder = activeOrders.get(remaining.id)
         activeOrders.put(remaining.id, remaining)
-        status match {
+        val origReservableBalance = status match {
           case OrderStatus.Accepted =>
             orderDB.saveOrder(remaining.order)
             scheduleExpiration(remaining.order)
-
             // The order can be added before in the "place" function
-            val origReservableBalance = origActiveOrder.fold(Map.empty[Asset, Long])(_.reservableBalance)
-            remaining.reservableBalance |-| origReservableBalance
+            origActiveOrder.fold(Map.empty[Asset, Long])(_.reservableBalance)
 
           case _ =>
-            val origReservableBalance = origActiveOrder.fold {
-              log.error(s"Can't find order: ${remaining.id}")
-              throw new RuntimeException(s"Can't find order ${remaining.id}")
-            }(_.reservableBalance)
-            (remaining.reservableBalance |-| origReservableBalance) // .filter(_._2 != 0)
+            origActiveOrder
+              .getOrElse {
+                log.error(s"Can't find order: ${remaining.id}")
+                throw new RuntimeException(s"Can't find order ${remaining.id}")
+              }
+              .reservableBalance
         }
+
+        (remaining.reservableBalance |-| origReservableBalance).filterNot(_._2 == 0) // Could be 0 if an order executed by a small amount
     }
 
     scheduleWs {

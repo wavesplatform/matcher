@@ -1,8 +1,8 @@
 package com.wavesplatform.dex.actors.address
 
 import akka.actor.typed.scaladsl.adapter._
-import akka.actor.{typed, Actor, ActorRef, Cancellable, Props, Status}
-import akka.pattern.{pipe, CircuitBreakerOpenException}
+import akka.actor.{Actor, ActorRef, Cancellable, Props, Status, typed}
+import akka.pattern.{CircuitBreakerOpenException, pipe}
 import akka.{actor => classic}
 import alleycats.std.all.alleyCatsSetTraverse
 import cats.instances.list._
@@ -167,10 +167,9 @@ class AddressActor(
     case command: Command.ApplyBatch =>
       log.info(s"Got $command")
       // TODO DEX-1040 This code is not optimal, but it should work.
-      command.messages.foreach {
-        case command: Command.ChangeBalances => changeBalances(command.updates)
-        case command: Command.MarkTxsObserved => markTxsObserved(command.txIds)
-      }
+      // Do not change an order of these operation, otherwise some orders can be canceled
+      markTxsObserved(command.markTxsObserved.txIds)
+      changeBalances(command.changedBalances.updates)
       log.info("ApplyBatch applied")
 
     case command: Command.MarkTxsObserved =>
@@ -761,11 +760,10 @@ object AddressActor {
     case object StartWork extends Command
     case class SetInitialBalances(snapshot: Try[AddressBalanceUpdates]) extends Command
 
-    sealed trait CanBatchCommand extends Command
-    case class ApplyBatch(messages: Queue[CanBatchCommand]) extends Command
+    case class ApplyBatch(markTxsObserved: MarkTxsObserved, changedBalances: ChangeBalances) extends Command
 
-    case class ChangeBalances(updates: AddressBalanceUpdates) extends CanBatchCommand
-    case class MarkTxsObserved(txIds: Set[ExchangeTransaction.Id]) extends CanBatchCommand
+    case class ChangeBalances(updates: AddressBalanceUpdates) extends Command
+    case class MarkTxsObserved(txIds: Set[ExchangeTransaction.Id]) extends Command
 
     sealed trait HasOrderBookEvent {
       def event: Events.Event

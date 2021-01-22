@@ -53,9 +53,13 @@ class OrderPercentFeeReceivingTestSuite extends OrderFeeBaseTestSuite {
     }
 
     s"users should pay correct fee when fee asset-type = $assetType and order partially filled" in {
-
       val accountBuyer = mkAccountWithBalance(minimalFeeWaves -> Waves, fullyAmountUsd -> usd)
       val accountSeller = mkAccountWithBalance(partiallyAmountWaves -> Waves, minimalFee -> usd)
+
+      log.info(
+        s"accountBuyer: ${accountBuyer.publicKey.base58} / ${accountBuyer.toAddress}, " +
+        s"accountSeller: ${accountSeller.publicKey.base58} / ${accountSeller.toAddress}"
+      )
 
       placeAndAwaitAtDex(mkOrder(accountBuyer, wavesUsdPair, BUY, fullyAmountWaves, price, matcherFee = minimalFeeWaves, version = version))
       placeAndAwaitAtNode(
@@ -67,7 +71,7 @@ class OrderPercentFeeReceivingTestSuite extends OrderFeeBaseTestSuite {
       wavesNode1.api.balance(accountSeller, Waves) shouldBe 0L
       wavesNode1.api.balance(accountSeller, usd) shouldBe partiallyAmountUsd
 
-      dex1.api.getReservedBalance(accountBuyer).getOrElse(Waves, 0L) shouldBe 1.5.waves // 3.75 - 9 / 15 * 3.75
+      dex1.api.getReservedBalance(accountBuyer).getOrElse(Waves, 0L) shouldBe 1.5.waves // 3.75 - 9 / 15 * 3.75 <----
       dex1.api.getReservedBalance(accountBuyer).getOrElse(usd, 0L) shouldBe fullyAmountUsd - partiallyAmountUsd
       dex1.api.getReservedBalance(accountSeller).getOrElse(Waves, 0L) shouldBe 0L
       dex1.api.getReservedBalance(accountSeller).getOrElse(usd, 0L) shouldBe 0L

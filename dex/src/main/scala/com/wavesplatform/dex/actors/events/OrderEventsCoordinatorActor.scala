@@ -75,10 +75,10 @@ object OrderEventsCoordinatorActor {
         case Command.ApplyNodeUpdates(updates) =>
           updates.updatesByAddresses.foreach {
             case (address, (balanceUpdates, observedTxs)) =>
-              val changeBalanceCommand = if (balanceUpdates.isEmpty) none else AddressActor.Command.ChangeBalances(balanceUpdates).some
               val markObservedCommand = if (observedTxs.isEmpty) none else AddressActor.Command.MarkTxsObserved(observedTxs).some
-              val message = (changeBalanceCommand, markObservedCommand) match {
-                case (Some(a), Some(b)) => AddressActor.Command.ApplyBatch(Queue(a, b)).some
+              val changeBalanceCommand = if (balanceUpdates.isEmpty) none else AddressActor.Command.ChangeBalances(balanceUpdates).some
+              val message = (markObservedCommand, changeBalanceCommand) match {
+                case (Some(a), Some(b)) => AddressActor.Command.ApplyBatch(a, b).some
                 case (a, b) => a.orElse(b)
               }
               message.foreach(addressDirectoryRef ! AddressDirectoryActor.Command.ForwardMessage(address, _))

@@ -160,21 +160,25 @@ class MatcherApiRoute(
   }
 
   private def withAssetPair(
-    pairOrError: Either[ValidationError.InvalidAsset, AssetPair],
-    redirectToInverse: Boolean = false,
-    suffix: String = "",
-    formatError: MatcherError => ToResponseMarshallable = InfoNotFound.apply
+                             pairOrError: Either[ValidationError.InvalidAsset, AssetPair],
+                             redirectToInverse: Boolean = false,
+                             suffix: String = "",
+                             formatError: MatcherError => ToResponseMarshallable = InfoNotFound.apply,
+                             validate: Boolean = true
   ): Directive1[AssetPair] =
     pairOrError match {
-      case Right(p) => FutureDirectives.onSuccess(assetPairBuilder.validateAssetPair(p).value) flatMap {
-          case Right(_) => provide(p)
-          case Left(e) if redirectToInverse =>
-            FutureDirectives.onSuccess(assetPairBuilder.validateAssetPair(p.reverse).value) flatMap {
-              case Right(_) => redirect(s"/matcher/orderbook/${p.priceAssetStr}/${p.amountAssetStr}$suffix", StatusCodes.MovedPermanently)
-              case Left(_) => complete(formatError(e))
-            }
-          case Left(e) => complete(formatError(e))
-        }
+      case Right(p) =>
+        if (validate)
+          FutureDirectives.onSuccess(assetPairBuilder.validateAssetPair(p).value) flatMap {
+            case Right(_) => provide(p)
+            case Left(e) if redirectToInverse =>
+              FutureDirectives.onSuccess(assetPairBuilder.validateAssetPair(p.reverse).value) flatMap {
+                case Right(_) => redirect(s"/matcher/orderbook/${p.priceAssetStr}/${p.amountAssetStr}$suffix", StatusCodes.MovedPermanently)
+                case Left(_) => complete(formatError(e))
+              }
+            case Left(e) => complete(formatError(e))
+          }
+        else provide(p)
       case Left(ia) => complete(InvalidAsset(ia.asset, ia.reason))
     }
 
@@ -1039,7 +1043,7 @@ class MatcherApiRoute(
     )
   )
   def deleteOrderBook: Route = (path(AssetPairPM) & delete & withAuth) { pairOrError =>
-    withAssetPair(pairOrError) { pair =>
+    withAssetPair(pairOrError, validate = false) { pair =>
       orderBook(pair) match {
         case Some(Right(_)) =>
           complete(

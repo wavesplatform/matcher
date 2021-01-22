@@ -43,9 +43,13 @@ class DeleteRatesSpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
       validateMatcherError(dex1.rawApi.deleteRate(Waves), StatusCodes.BadRequest, 20971531, "The rate for WAVES cannot be changed")
     }
 
-    //TODO: change after DEX-980
     "should return an error when assetId is not a correct base58 string" in {
-      validate404Exception(dex1.rawApi.deleteRate("null", Map("X-API-Key" -> apiKey)))
+      validateMatcherError(
+        dex1.rawApi.deleteRate("null", Map("X-API-Key" -> apiKey)),
+        StatusCodes.BadRequest,
+        11534337,
+        "The asset 'null' is wrong, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
+      )
     }
 
     shouldReturnErrorWithoutApiKeyHeader(dex1.rawApi.deleteRate(UsdId.toString, Map.empty))

@@ -78,20 +78,28 @@ class GetOrderHistoryByAssetPairAndPublicKeySpec extends MatcherSuiteBase with R
       )
     }
 
-    //TODO: change after DEX-980
     "should return an error if amount asset is not a correct base58 string" in {
       val ts = System.currentTimeMillis
       val sign = Base58.encode(crypto.sign(alice, alice.publicKey ++ Longs.toByteArray(ts)))
 
-      validate404Exception(dex1.rawApi.getOrderHistoryByAssetPairAndPublicKey(Base58.encode(alice.publicKey), "null", UsdId.toString, ts, sign))
+      validateMatcherError(
+        dex1.rawApi.getOrderHistoryByAssetPairAndPublicKey(Base58.encode(alice.publicKey), "WAVES", "null", ts, sign),
+        StatusCodes.BadRequest,
+        11534337,
+        s"The asset 'null' is wrong, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
+      )
     }
 
-    //TODO: change after DEX-980
     "should return an error if price asset is not a correct base58 string" in {
       val ts = System.currentTimeMillis
       val sign = Base58.encode(crypto.sign(alice, alice.publicKey ++ Longs.toByteArray(ts)))
 
-      validate404Exception(dex1.rawApi.getOrderHistoryByAssetPairAndPublicKey(Base58.encode(alice.publicKey), "WAVES", "null", ts, sign))
+      validateMatcherError(
+        dex1.rawApi.getOrderHistoryByAssetPairAndPublicKey(Base58.encode(alice.publicKey), "WAVES", "null", ts, sign),
+        StatusCodes.BadRequest,
+        11534337,
+        s"The asset 'null' is wrong, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
+      )
     }
 
     "should return an error if publicKey parameter has the different value of used in signature" in {

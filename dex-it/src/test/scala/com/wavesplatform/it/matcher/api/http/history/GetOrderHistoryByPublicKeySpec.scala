@@ -66,7 +66,6 @@ class GetOrderHistoryByPublicKeySpec extends MatcherSuiteBase with RawHttpChecks
       }
     }
 
-    //TODO: change after DEX-980
     "should return an error if public key is not a correct base58 string" in {
       val ts = System.currentTimeMillis
       val sign = Base58.encode(crypto.sign(alice, alice.publicKey ++ Longs.toByteArray(ts)))

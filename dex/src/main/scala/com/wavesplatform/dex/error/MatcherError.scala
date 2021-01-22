@@ -173,12 +173,12 @@ case class WrongExpiration(currentTs: Long, minExpirationOffset: Long, givenExpi
 case class OrderCommonValidationFailed(details: String)
     extends MatcherError(order, commonEntity, commonClass, e"The order is invalid: ${Symbol("details") -> details}")
 
-case class InvalidAsset(theAsset: String)
+case class InvalidAsset(theAsset: String, reason: String = "It should be 'WAVES' or a Base58 string")
     extends MatcherError(
       asset,
       commonEntity,
       broken,
-      e"The asset '${Symbol("assetId") -> theAsset}' is wrong. It should be 'WAVES' or a Base58 string"
+      e"The asset '${Symbol("assetId") -> theAsset}' is wrong, reason: ${Symbol("reason") -> reason}"
     )
 
 case class AssetBlacklisted(theAsset: IssuedAsset)
@@ -537,6 +537,9 @@ case object ApiKeyIsNotValid extends MatcherError(auth, commonEntity, commonClas
 
 case class UserPublicKeyIsNotValid(reason: String = "invalid public key")
     extends MatcherError(account, pubKey, broken, e"Provided public key is not correct, reason: ${Symbol("reason") -> reason}")
+
+case class InvalidBase58String(reason: String)
+  extends MatcherError(order, commonEntity, broken, e"Provided value is not a correct base58 string, reason: ${Symbol("reason") -> reason}")
 
 case class AddressAndPublicKeyAreIncompatible(address: Address, publicKey: PublicKey)
     extends MatcherError(

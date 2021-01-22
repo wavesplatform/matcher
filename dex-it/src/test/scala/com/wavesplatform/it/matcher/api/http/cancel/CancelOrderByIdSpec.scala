@@ -54,9 +54,13 @@ class CancelOrderByIdSpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
       validateMatcherError(dex1.rawApi.cancelOrderById(order), StatusCodes.BadRequest, 9437193, s"The order ${order.idStr()} not found")
     }
 
-    //TODO: DEX-980
     "should return an error when orderId is not a correct base58 string" in {
-      validate404Exception(dex1.rawApi.cancelOrderById("null", Map("X-API-KEY" -> apiKey)))
+      validateMatcherError(
+        dex1.rawApi.cancelOrderById("null", Map("X-API-KEY" -> apiKey)),
+        StatusCodes.BadRequest,
+        9437185,
+        "Provided value is not a correct base58 string, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
+      )
     }
 
     "should return an error when the public-key header is not a correct base58 string" in {

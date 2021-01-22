@@ -1,5 +1,6 @@
 package com.wavesplatform.it.matcher.api.http.markets
 
+import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderBookStatus
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -100,12 +101,22 @@ class GetOrderBookStatusSpec extends MatcherSuiteBase with TableDrivenPropertyCh
       validate200Json(dex1.rawApi.getOrderBookStatus(wavesBtcPair)) should matchTo(HttpOrderBookStatus(None, None, None, None, None, None, None))
     }
 
-    "should return exception when amount is not a correct base58 string" in { // TODO: ? Create task for change it to matcherError?
-      validate404Exception(dex1.rawApi.getOrderBookStatus("null", "WAVES"))
+    "should return exception when amount is not a correct base58 string" in {
+      validateMatcherError(
+        dex1.rawApi.getOrderBookStatus("null", "WAVES"),
+        StatusCodes.BadRequest,
+        11534337,
+        "The asset 'null' is wrong, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
+      )
     }
 
     "should return exception when price is not a correct base58 string" in {
-      validate404Exception(dex1.rawApi.getOrderBookStatus("WAVES", "null"))
+      validateMatcherError(
+        dex1.rawApi.getOrderBookStatus("WAVES", "null"),
+        StatusCodes.BadRequest,
+        11534337,
+        "The asset 'null' is wrong, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
+      )
     }
 
     forAll(Table(

@@ -62,9 +62,13 @@ class UpdateRatesByAssetIdSpec extends MatcherSuiteBase with ApiKeyHeaderChecks 
       validateMatcherError(dex1.rawApi.upsertRate(Waves, 0.5), StatusCodes.BadRequest, 20971531, "The rate for WAVES cannot be changed")
     }
 
-    //TODO: change after DEX-980
     "should return error exception when the amount asset is not correct base58 string" in {
-      validate404Exception(dex1.rawApi.upsertRate("null", 0.1))
+      validateMatcherError(
+        dex1.rawApi.upsertRate("null", 0.1, Map("X-API-Key" -> apiKey)),
+        StatusCodes.BadRequest,
+        11534337,
+        "The asset 'null' is wrong, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
+      )
     }
 
     shouldReturnErrorWithoutApiKeyHeader(dex1.rawApi.upsertRate(UsdId.toString, 0.5))

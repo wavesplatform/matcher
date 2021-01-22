@@ -6,7 +6,7 @@ import akka.http.scaladsl.server.{PathMatcher, PathMatcher1, PathMatchers => Akk
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
-import com.wavesplatform.dex.domain.error.ValidationError.{InvalidAddress, InvalidPublicKey}
+import com.wavesplatform.dex.domain.error.ValidationError.{InvalidAddress, InvalidAsset, InvalidBase58String, InvalidPublicKey}
 
 object PathMatchers {
 
@@ -19,16 +19,22 @@ object PathMatchers {
 
   }
 
-  val AssetPairPM: PathMatcher1[AssetPair] = AkkaMatchers.Segments(2).flatMap {
-    case a1 :: a2 :: Nil => AssetPair.createAssetPair(a1, a2).toOption
-    case _ => None
+  val AssetPairPM: PathMatcher1[Either[InvalidAsset, AssetPair]] = AkkaMatchers.Segments(2).flatMap {
+    case a1 :: a2 :: Nil =>
+      Option(AssetPair.createAssetPair(a1, a2).toEither.left.map { ex =>
+        val m = ex.getMessage
+        if (m.contains(a1)) InvalidAsset(a1, m) else InvalidAsset(a2, m)
+      })
+    case _ => Option(Left(InvalidAsset(null, "Unexpected error")))
   }
 
-  val AssetPM: PathMatcher1[Asset] = AkkaMatchers.Segment.flatMap { s =>
-    AssetPair.extractAsset(s).toOption
-  }
+  object AssetPM
+      extends Base58[Either[InvalidAsset, Asset]](s => Option(AssetPair.extractAsset(s).toEither.left.map(ex => InvalidAsset(s, ex.getMessage))))
 
-  object ByteStrPM extends Base58[ByteStr](ByteStr.decodeBase58(_).toOption)
+  object OrderPM
+      extends Base58[Either[InvalidBase58String, ByteStr]](s =>
+        Option(ByteStr.decodeBase58(s).toEither.left.map(ex => InvalidBase58String(ex.getMessage)))
+      )
 
   object PublicKeyPM extends Base58[Either[InvalidPublicKey, PublicKey]](s => Option(PublicKey fromBase58String s))
 

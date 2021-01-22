@@ -125,14 +125,16 @@ class GetOrderStatusInfoByIdWithApiKeySpec extends MatcherSuiteBase with ApiKeyH
       )
     }
 
-    //TODO: change after DEX-980
     "should return an error when orderId is not a correct base58 string" in {
-      validate404Exception(
+      validateMatcherError(
         dex1.rawApi.getOrderStatusInfoById(
           alice.toAddress.stringRepr,
           "null",
           Map("X-User-Public-Key" -> Base58.encode(alice.publicKey), "X-API-Key" -> apiKey)
-        )
+        ),
+        StatusCodes.BadRequest,
+        9437185,
+        "Provided value is not a correct base58 string, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )
     }
 

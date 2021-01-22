@@ -1,5 +1,6 @@
 package com.wavesplatform.it.matcher.api.http.markets
 
+import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.{HttpMatchingRules, HttpOrderRestrictions}
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -10,12 +11,7 @@ import org.scalatest.prop.TableDrivenPropertyChecks
 class GetOrderBookInfoSpec extends MatcherSuiteBase with TableDrivenPropertyChecks with RawHttpChecks {
 
   val expectedOrderRestrictions = HttpOrderRestrictions(
-    0.1,
-    0.1,
-    100000000,
-    0.001,
-    0.0001,
-    1000
+    0.1, 0.1, 100000000, 0.001, 0.0001, 1000
   )
 
   override protected def dexInitialSuiteConfig: Config = {
@@ -46,12 +42,22 @@ class GetOrderBookInfoSpec extends MatcherSuiteBase with TableDrivenPropertyChec
 
   "GET /matcher/orderbook/{amountAsset}/{priceAsset}/info " - {
 
-    "should return exception when amount is not a correct base58 string" in { // TODO: ? Create task for change it to matcherError?
-      validate404Exception(dex1.rawApi.getOrderBookInfo("null", "WAVES"))
+    "should return exception when amount is not a correct base58 string" in {
+      validateMatcherError(
+        dex1.rawApi.getOrderBookInfo("null", "WAVES"),
+        StatusCodes.BadRequest,
+        11534337,
+        "The asset 'null' is wrong, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
+      )
     }
 
     "should return exception when price is not a correct base58 string" in {
-      validate404Exception(dex1.rawApi.getOrderBookInfo("WAVES", "null"))
+      validateMatcherError(
+        dex1.rawApi.getOrderBookInfo("WAVES", "null"),
+        StatusCodes.BadRequest,
+        11534337,
+        "The asset 'null' is wrong, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
+      )
     }
 
     "should return correct matching rules" in {

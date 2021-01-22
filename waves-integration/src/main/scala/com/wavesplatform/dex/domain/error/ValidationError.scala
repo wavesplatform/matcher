@@ -10,6 +10,8 @@ object ValidationError {
 
   type Validation[T] = Either[ValidationError, T]
 
+  case class InvalidAsset(asset: String, reason: String) extends ValidationError
+  case class InvalidBase58String(reason: String) extends ValidationError
   case class InvalidAddress(reason: String) extends ValidationError
   case class InvalidPublicKey(reason: String) extends ValidationError
   case class NonPositiveAmount(amount: Long, of: String) extends ValidationError

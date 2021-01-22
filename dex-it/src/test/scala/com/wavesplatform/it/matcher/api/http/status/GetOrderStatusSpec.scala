@@ -58,14 +58,22 @@ class GetOrderStatusSpec extends MatcherSuiteBase with TableDrivenPropertyChecks
       }
     }
 
-    //TODO: change after DEX-969
     "should return an error exception when the amount asset is not correct base58 string" in {
-      validate404Exception(dex1.rawApi.getOrderStatus("null", UsdId.toString, order.idStr()))
+      validateMatcherError(
+        dex1.rawApi.getOrderStatus("null", UsdId.toString, order.idStr()),
+        StatusCodes.BadRequest,
+        11534337,
+        "The asset 'null' is wrong, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
+      )
     }
 
-    //TODO: change after DEX-969
     "should return an error exception when the price asset is not correct base58 string" in {
-      validate404Exception(dex1.rawApi.getOrderStatus("WAVES", "null", order.idStr()))
+      validateMatcherError(
+        dex1.rawApi.getOrderStatus("WAVES", "null", order.idStr()),
+        StatusCodes.BadRequest,
+        11534337,
+        "The asset 'null' is wrong, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
+      )
     }
 
     "should return an error when amount asset doesn't exist" in {

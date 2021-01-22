@@ -52,6 +52,7 @@ object OrderEventsCoordinatorActor {
               val tx = createTransaction(event) match {
                 case Right(tx) =>
                   val txCreated = ExchangeTransactionCreated(tx)
+                  context.log.info(s"Created ${tx.json()}")
                   dbWriterRef ! txCreated
                   broadcasterRef ! Broadcaster.Broadcast(broadcastAdapter, tx)
                   tx.some

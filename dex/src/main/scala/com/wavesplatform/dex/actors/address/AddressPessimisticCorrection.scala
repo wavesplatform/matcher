@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.actors.address
 
+import com.wavesplatform.dex.collections.{NegativeMap, NonPositiveMap}
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 
@@ -13,25 +14,26 @@ import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
  * 4. The transaction is observed in UTX
  * 5. Pessimistic portfolio increased, thus the account gets the right tradable balance
  *
- * @param notObserved Volume by ExchangeTransactions which haven't yet observed in streams. Contains only positive values
- * @param unconfirmed Includes all transactions (exchange, transfer, issue, etc.). Contains only negative values
+ * @param unconfirmed Includes all transactions (exchange, transfer, issue, etc.)
+ * @param notObserved Volume by ExchangeTransactions which haven't yet observed in streams
  * @param future ExchangeTransactions which hasn't been registered as unconfirmed, but will be
  */
 case class AddressPessimisticCorrection(
-  notObserved: Map[ExchangeTransaction.Id, Map[Asset, Long]],
-  unconfirmed: Map[Asset, Long],
+  unconfirmed: NonPositiveMap[Asset, Long],
+  notObserved: Map[ExchangeTransaction.Id, NegativeMap[Asset, Long]],
   future: Set[ExchangeTransaction.Id]
 ) {
 
   /**
    * @param updates Should be non positive
    */
-  def withInit(updates: Map[Asset, Long]): AddressPessimisticCorrection = copy(unconfirmed = updates ++ unconfirmed)
+  def withInit(updates: NonPositiveMap[Asset, Long]): AddressPessimisticCorrection = copy(unconfirmed = updates ++ unconfirmed)
 
   /**
    * @param updates Should be non positive
    */
-  def withFreshUnconfirmed(updates: Map[Asset, Long]): AddressPessimisticCorrection = copy(unconfirmed = unconfirmed ++ updates)
+  def withFreshUnconfirmed(updates: NonPositiveMap[Asset, Long]): AddressPessimisticCorrection =
+    copy(unconfirmed = unconfirmed ++ updates) // TODO becomes 0!
 
   /**
    * TODO with himself. volume by spending asset 0 ?
@@ -52,7 +54,7 @@ case class AddressPessimisticCorrection(
         // else (copy(unconfirmed = unconfirmed |-| executionTotalVolumeDiff, notObserved = notObserved.updated(txId, executionTotalVolumeDiff)), Set.empty) // Set.empty - see getBy
         else
           (
-            copy(unconfirmed = unconfirmed, notObserved = notObserved.updated(txId, executionTotalVolumeDiff)),
+            copy(notObserved = notObserved.updated(txId, NegativeMap(executionTotalVolumeDiff))), // TODO <---
             Set.empty
           ) // Set.empty - see getBy
     }
@@ -70,12 +72,12 @@ case class AddressPessimisticCorrection(
   /**
    * @return A negative value
    */
-  def getBy(asset: Asset): Long = unconfirmed.getOrElse(asset, 0L) - notObserved.valuesIterator
+  def getBy(asset: Asset): Long = unconfirmed.getOrElse(asset, 0L) + notObserved.valuesIterator
     .flatMap(_.collect { case (`asset`, v) => v })
     .sum
 
 }
 
 object AddressPessimisticCorrection {
-  val empty = AddressPessimisticCorrection(Map.empty, Map.empty, Set.empty)
+  val empty = AddressPessimisticCorrection(NonPositiveMap.empty, Map.empty, Set.empty)
 }

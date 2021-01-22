@@ -126,7 +126,7 @@ object ExchangeTransactionBroadcastActor {
               if (canRetry) {
                 if (!timer.isTimerActive(timerKey)) timer.startSingleTimer(timerKey, Command.Tick, settings.interval)
               } else message.clientRef.foreach { clientRef =>
-                // If it is new, we will receive an event from UTX, otherwise we either
+                // If it is new, we will receive an event from UTX, otherwise we either TODO
                 clientRef ! Confirmed(message.tx)
               }
 

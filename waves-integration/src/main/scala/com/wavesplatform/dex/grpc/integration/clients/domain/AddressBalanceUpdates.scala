@@ -4,9 +4,9 @@ import cats.Monoid
 import com.wavesplatform.dex.domain.asset.Asset
 
 case class AddressBalanceUpdates(
-  regular: Map[Asset, Long],
+  regular: Map[Asset, Long], // TODO Positive
   outLease: Option[Long],
-  pessimisticCorrection: Map[Asset, Long]
+  pessimisticCorrection: Map[Asset, Long] // TODO Negative
 ) {
 
   def changedAssets: Set[Asset] =

@@ -78,6 +78,16 @@ class AddressActor(
 
   private var balances = AddressBalance.empty
 
+  // TODO check frequency
+  private def format(xs: Map[Asset, Long]): String =
+    xs.toList.sortBy(_._1.maybeBase58Repr).map { case (asset, v) => s"$v ${asset.maybeBase58Repr.fold("🔷")(_.take(5))}" }.mkString(
+      "{",
+      ", ",
+      "}"
+    )
+
+  private def format(xs: AddressBalanceUpdates): String = s"r=${format(xs.regular)}, l=${xs.outLease}, p=${format(xs.pessimisticCorrection)}"
+
   // if (started) because we haven't pendingCommands during the start
   private val eventsProcessing: Receive = {
     case command: Command.ApplyOrderBookAdded =>
@@ -93,10 +103,10 @@ class AddressActor(
       val volumeDiff = refreshOrderState(order, command)
 
       if (isNew) {
-        log.debug(s"ApplyOrderBookAdded(${order.id}) volume diff: $volumeDiff")
         // If it is not new, appendedOpenVolume and putChangedAssets called in ValidationPassed -> place,
         //  so we don't need to do this again.
         balances = balances.appendedOpenVolume(volumeDiff)
+        log.info(s"[Balance] 💵: ${format(balances.tradableBalances(volumeDiff.keySet))}; ov Δ: ${format(volumeDiff)}")
 
         scheduleWs {
           wsAddressState = wsAddressState.putChangedAssets(volumeDiff.keySet)
@@ -111,16 +121,20 @@ class AddressActor(
     case command: Command.ApplyOrderBookExecuted =>
       import command.event
       log.debug(
-        s"OrderExecuted(${event.submittedRemaining.id}, ${event.counterRemaining.id}), amount=${event.executedAmount}, tx=${command.tx.map(_.id())}"
+        s"OrderExecuted(c=${event.counterRemaining.id}, s=${event.submittedRemaining.id}), a=${event.executedAmount}, cf=${event.counterExecutedFee}, sf=${event.submittedExecutedFee}, tx=${command.tx.map(_.id())}"
       )
       val volumeDiff = List(event.counterRemaining, event.submittedRemaining)
         .filter(_.order.sender.toAddress == owner)
         .foldMap(refreshOrderState(_, command))(group)
 
-      log.info(s"ApplyOrderBookExecuted volume diff: $volumeDiff")
-
-      val (updated, changedAssets) = balances.withExecuted(command.tx.map(_.id()), volumeDiff)
+        log.info(s"volume diff: ${format(volumeDiff)}")
+      val (updated, changedAssets) = balances.withExecuted(command.tx.map(_.id()), volumeDiff) // 0 ?
       balances = updated
+      log.info(
+        s"[Balance] 💵: ${format(balances.tradableBalances(volumeDiff.keySet))}; e: ${format(volumeDiff)}; r: ${format(balances.regular.xs)}, ov: ${format(balances.openVolume.xs)}, pc.u: ${format(
+          balances.pessimisticCorrection.unconfirmed.xs
+        )}, pc.no: ${balances.pessimisticCorrection.notObserved.map { case (id, xs) => s"$id -> ${format(xs.xs)}" }.mkString(", ")}"
+      )
 
       scheduleWs {
         wsAddressState = wsAddressState.putChangedAssets(changedAssets)
@@ -135,8 +149,8 @@ class AddressActor(
       // Can be received twice, because multiple matchers can cancel same order
       if (isActive) {
         val volumeDiff = refreshOrderState(acceptedOrder, command)
-        log.info(s"ApplyOrderBookCanceled($id) volume diff: $volumeDiff")
         balances = balances.appendedOpenVolume(volumeDiff)
+        log.info(s"[Balance] 💵: ${format(balances.tradableBalances(volumeDiff.keySet))}; ov Δ: ${format(volumeDiff)}")
 
         scheduleWs {
           wsAddressState = wsAddressState.putChangedAssets(volumeDiff.keySet)
@@ -177,7 +191,9 @@ class AddressActor(
 
   private val recovering: Receive = eventsProcessing orElse failuresProcessing orElse {
     case Command.StartWork => context.become(starting)
-    case command: Command.ChangeBalances => balances = balances.withFresh(command.updates) // TODO
+    case command: Command.ChangeBalances =>
+      balances = balances.withFresh(command.updates) // TODO
+      log.info(s"[Balance] 💵: ${format(balances.tradableBalances(command.updates.changedAssets))}; u: ${format(command.updates)}")
     case x => stash(x)
   }
 
@@ -195,8 +211,8 @@ class AddressActor(
         command.snapshot match {
           case Failure(e) => throw new IllegalStateException("Can't receive initial balances, see logs", e)
           case Success(x) =>
-            log.info(s"Initial balance: $x")
             balances = balances.withInit(x)
+            log.info(s"[Balance] 💵: ${format(x)}")
         }
         activeOrders.values.foreach(x => scheduleExpiration(x.order))
         unstashAll()
@@ -333,7 +349,9 @@ class AddressActor(
         queueEvent match {
           case ValidatedCommand.PlaceOrder(_) | ValidatedCommand.PlaceMarketOrder(_) =>
             activeOrders.remove(orderId).foreach { ao =>
-              balances = balances.removedOpenVolume(ao.reservableBalance)
+              val reservableBalance = ao.reservableBalance
+              balances = balances.removedOpenVolume(reservableBalance)
+              log.info(s"[Balance] 💵: ${format(balances.tradableBalances(reservableBalance.keySet))}; ov -Δ: ${format(reservableBalance)}")
               scheduleWs {
                 wsAddressState = wsAddressState.putChangedAssets(ao.reservableBalance.keySet)
               }
@@ -405,6 +423,7 @@ class AddressActor(
     val before = balances.nodeBalances(changedAssets)
 
     balances = balances.withFresh(updates)
+    log.info(s"[Balance] 💵: ${format(balances.tradableBalances(updates.changedAssets))}; u: ${format(updates)}")
     val after = balances.nodeBalances(changedAssets)
 
     // TODO only if working
@@ -431,10 +450,14 @@ class AddressActor(
   }
 
   private def markTxsObserved(txIds: Set[ExchangeTransaction.Id]): Unit = {
-    val (updated, changedAssets) = txIds
-      .foldl((balances, Set.empty[Asset]))(_._1.withObserved(_))
-    balances = updated
-    wsAddressState = wsAddressState.putChangedAssets(changedAssets)
+    val (updated, changedAssets) = txIds.foldl((balances, Set.empty[Asset]))(_._1.withObserved(_))
+    if (changedAssets.nonEmpty) {
+      balances = updated
+      log.info(s"[Balance] otx=${txIds.mkString(", ")}; 💵: ${format(balances.tradableBalances(changedAssets))}")
+      scheduleWs {
+        wsAddressState = wsAddressState.putChangedAssets(changedAssets)
+      }
+    }
   }
 
   /** Schedules next balances and order changes sending only if it wasn't scheduled before */
@@ -460,7 +483,7 @@ class AddressActor(
               List(
                 asset -> WsBalances(
                   assetDenormalizedBalanceFrom(tradableBalances), // TODO
-                  assetDenormalizedBalanceFrom(balances.openVolume)
+                  assetDenormalizedBalanceFrom(balances.openVolume.xs)
                 )
               )
             } else List.empty
@@ -525,7 +548,7 @@ class AddressActor(
         orderDB.saveOrderInfo(remaining.id, owner, OrderInfo.v6(remaining, status))
         // None is not possible
         activeOrders.remove(remaining.id).fold {
-          log.error(s"Can't find order ${remaining.id}")
+          log.error(s"Can't find order for finalization: ${remaining.id}")
           throw new RuntimeException(s"Can't find order ${remaining.id}")
         }(_.reservableBalance.inverse())
 
@@ -536,10 +559,17 @@ class AddressActor(
           case OrderStatus.Accepted =>
             orderDB.saveOrder(remaining.order)
             scheduleExpiration(remaining.order)
-            remaining.reservableBalance
-          case _ =>
+
+            // The order can be added before in the "place" function
             val origReservableBalance = origActiveOrder.fold(Map.empty[Asset, Long])(_.reservableBalance)
             remaining.reservableBalance |-| origReservableBalance
+
+          case _ =>
+            val origReservableBalance = origActiveOrder.fold {
+              log.error(s"Can't find order: ${remaining.id}")
+              throw new RuntimeException(s"Can't find order ${remaining.id}")
+            }(_.reservableBalance)
+            (remaining.reservableBalance |-| origReservableBalance) // .filter(_._2 != 0)
         }
     }
 
@@ -589,12 +619,13 @@ class AddressActor(
   }
 
   private def place(ao: AcceptedOrder): Unit = {
-    activeOrders.put(ao.id, ao)
-    log.info(s"place(${ao.id}) volume diff: ${ao.reservableBalance}")
-    balances = balances.appendedOpenVolume(ao.reservableBalance)
+    activeOrders.put(ao.id, ao) // affects regreshOrderState
+    val reservableBalance = ao.reservableBalance
+    balances = balances.appendedOpenVolume(reservableBalance)
+    log.info(s"[Balance] o=${ao.id}; 💵: ${format(balances.tradableBalances(reservableBalance.keySet))}; ov Δ: ${format(reservableBalance)}")
 
     scheduleWs {
-      wsAddressState = wsAddressState.putChangedAssets(ao.reservableBalance.keySet)
+      wsAddressState = wsAddressState.putChangedAssets(reservableBalance.keySet)
     }
 
     storeCommand(ao.id)(

@@ -35,6 +35,10 @@ class AsyncEnrichedNodeApi(apiKey: String, host: => InetSocketAddress)(implicit 
     sttp.get(uri"$apiUri/transactions/info/$id")
   }
 
+  override def unconfirmedTransactions: R[List[Transaction]] = mk {
+    sttp.get(uri"$apiUri/transactions/unconfirmed")
+  }
+
   override def unconfirmedTransactionInfo(id: Id): R[Transaction] = mk {
     sttp.get(uri"$apiUri/transactions/unconfirmed/info/$id")
   }

@@ -3,7 +3,6 @@ package com.wavesplatform.it.matcher.api.http.markets
 import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
-import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.order.OrderType.SELL
 import com.wavesplatform.dex.it.docker.apiKey
 import com.wavesplatform.it.MatcherSuiteBase
@@ -36,11 +35,10 @@ class DeleteOrderBookSpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
       }
     }
 
-    //TODO: DEX-986
-    "should return an error if orderbook doesn't exists" ignore {
+    "should return an error if orderbook doesn't exists" in {
       validateMatcherError(
         dex1.rawApi.deleteOrderBook(wavesUsdPair),
-        StatusCodes.BadRequest,
+        StatusCodes.ServiceUnavailable,
         8388609,
         s"The order book for WAVES-$UsdId is unavailable, please contact with the administrator"
       )

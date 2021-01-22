@@ -411,7 +411,7 @@ object Events {
     def reason: EventReason
   }
 
-  case class OrderExecuted(submitted: AcceptedOrder, counter: LimitOrder, timestamp: Long, counterExecutedFee: Price, submittedExecutedFee: Price)
+  case class OrderExecuted(submitted: AcceptedOrder, counter: LimitOrder, timestamp: Long, counterExecutedFee: Long, submittedExecutedFee: Long)
       extends Event {
 
     def executedPrice: Long = counter.price

@@ -101,12 +101,17 @@ class AddressActor(
       log.debug(s"OrderAdded(${order.id}, ${event.reason}, ${event.timestamp}, isNew=$isNew)")
 
       val volumeDiff = refreshOrderState(order, command)
+      log.info(s"volume diff: ${format(volumeDiff)}")
 
       if (isNew) {
         // If it is not new, appendedOpenVolume and putChangedAssets called in ValidationPassed -> place,
         //  so we don't need to do this again.
         balances = balances.appendedOpenVolume(volumeDiff)
-        log.info(s"[Balance] 💵: ${format(balances.tradableBalances(volumeDiff.keySet))}; ov Δ: ${format(volumeDiff)}")
+        log.info(s"[Balance] 💵: ${format(balances.tradableBalances(volumeDiff.keySet))}; ov Δ: ${format(volumeDiff)}; r: ${format(
+          balances.regular.xs
+        )}, ov: ${format(balances.openVolume.xs)}, pc.u: ${format(
+          balances.pessimisticCorrection.unconfirmed.xs
+        )}, pc.no: ${balances.pessimisticCorrection.notObserved.map { case (id, xs) => s"$id -> ${format(xs.xs)}" }.mkString(", ")}")
 
         scheduleWs {
           wsAddressState = wsAddressState.putChangedAssets(volumeDiff.keySet)

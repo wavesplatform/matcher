@@ -354,14 +354,17 @@ class OrderHistoryBalanceSpecification
     orderStatus(submitted1.order.id()) shouldBe OrderStatus.Filled(50000000, 300001)
 
     val exec2 = mkOrderExecuted(submitted2, exec1.counterRemaining)
-    oh.process(exec2)
+    oh.processAll(
+      OrderAdded(submitted2, OrderAddedReason.RequestExecuted, time.getTimestamp()),
+      exec2
+    )
 
     withClue(s"counter: ${counter.order.idStr()}") {
       orderStatus(counter.order.id()) shouldBe OrderStatus.Filled(100000000, 300000)
     }
 
     orderStatus(submitted1.order.id()) shouldBe OrderStatus.Filled(50000000, 300001)
-    orderStatus(submitted2.order.id()) shouldBe OrderStatus.PartiallyFilled(50000000, 187500)
+    orderStatus(submitted2.order.id()) shouldBe OrderStatus.PartiallyFilled(50000000, 187500) // <--
 
     openVolume(counter.order.senderPublicKey, WavesBtc.priceAsset) shouldBe 0L
     openVolume(counter.order.senderPublicKey, WavesBtc.amountAsset) shouldBe 0L

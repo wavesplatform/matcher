@@ -203,7 +203,7 @@ class ActorsWebSocketInteractionsSpecification
 
           cancel(lo, false)
           expectWsBalancesAndOrders(
-            Map(usd -> WsBalances(300, 0), Waves -> WsBalances(100, 0)), // <---
+            Map(usd -> WsBalances(300, 0), Waves -> WsBalances(100, 0)),
             Seq(WsOrder(lo.id, status = OrderStatus.Cancelled.name.some)),
             2
           )
@@ -520,8 +520,8 @@ class ActorsWebSocketInteractionsSpecification
       "trade with itself" in webSocketTest { (ad, ep, _, address, subscribeAddress, _, _, _, updateBalances, expectWsBalancesAndOrders) =>
         updateBalances(Map(Waves -> 100.waves, btc -> 1.btc))
 
-        val counter = LimitOrder(createOrder(wavesUsdPair, BUY, 5.waves, 3.0, sender = address))
-        val submitted = LimitOrder(createOrder(wavesUsdPair, SELL, 5.waves, 3.0, sender = address))
+        val counter = LimitOrder(createOrder(wavesBtcPair, BUY, 5.waves, 3.0, sender = address))
+        val submitted = LimitOrder(createOrder(wavesBtcPair, SELL, 5.waves, 3.0, sender = address))
 
         subscribeAddress()
         expectWsBalancesAndOrders(
@@ -535,13 +535,13 @@ class ActorsWebSocketInteractionsSpecification
 
         ad ! AddressDirectoryActor.Command.ForwardMessage(address, AddressActor.Command.PlaceOrder(submitted.order, submitted.isMarket))
         ep.expectMsg(ValidatedCommand.PlaceOrder(submitted))
-
         ad ! AddressActor.Command.ApplyOrderBookAdded(OrderAdded(submitted, OrderAddedReason.RequestExecuted, now))
-        val oe = OrderExecuted(submitted, counter, System.currentTimeMillis, submitted.matcherFee, counter.matcherFee)
+
+        val oe = OrderExecuted(submitted, counter, System.currentTimeMillis, counter.matcherFee, submitted.matcherFee)
         ad ! AddressActor.Command.ApplyOrderBookExecuted(oe, none)
 
         expectWsBalancesAndOrders(
-          Map(Waves -> WsBalances(100, 0)),
+          Map(Waves -> WsBalances(100, 0), btc -> WsBalances(1, 0)),
           Seq(WsOrder.fromDomain(oe.counterRemaining), WsOrder.fromDomain(oe.submittedRemaining)),
           1
         )

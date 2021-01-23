@@ -38,7 +38,8 @@ case class WavesFork private[domain] (origChain: WavesChain, forkChain: WavesCha
 
         Status.Resolved(
           activeChain = updatedForkChain,
-          newChanges = updatedForkAllChanges, // TODO DEX-1011 Probably we can filter out this, but it is done on next layer. Should we do?
+          // We should not filter it, because we can ask balances before a fork is resolved
+          newChanges = updatedForkAllChanges, // TODO DEX-1011
           lostDiffIndex = origForkDiffIndex.without(updatedForkDiffIndex),
           lostTxIds = origTxs -- forkTxs.keys,
           confirmedTxs = forkTxs -- origTxs.keys

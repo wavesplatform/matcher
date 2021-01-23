@@ -224,6 +224,10 @@ class AddressActor(
         unstashAll()
         context.become(working)
 
+      case command: Command.ChangeBalances =>
+        balances = balances.withFresh(command.updates) // TODO
+        log.info(s"[Balance] 💵: ${format(balances.tradableBalances(command.updates.changedAssets))}; u: ${format(command.updates)}")
+
       case x => stash(x)
     }: Receive
   }

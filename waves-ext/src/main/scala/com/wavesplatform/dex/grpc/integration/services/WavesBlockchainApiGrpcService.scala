@@ -6,6 +6,7 @@ import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.grpc._
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.dex.collections.Implicits.ListOps
 import com.wavesplatform.dex.grpc.integration._
 import com.wavesplatform.dex.grpc.integration.protobuf.EitherVEExt
 import com.wavesplatform.dex.grpc.integration.protobuf.PbToWavesConversions._
@@ -20,7 +21,7 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.{ExecutionError, ValidationError}
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.TxValidationError
+import com.wavesplatform.transaction.{Asset, TxValidationError}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.utils.ScorexLogging
@@ -37,6 +38,7 @@ import scala.collection.concurrent.TrieMap
 import scala.concurrent.Future
 import scala.util.Try
 import scala.util.control.NonFatal
+import cats.syntax.option._
 
 class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Scheduler)
     extends WavesBlockchainApiGrpc.WavesBlockchainApi
@@ -284,20 +286,28 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
   }
 
   override def getAddressFullRegularBalance(request: GetAddressFullRegularBalanceRequest): Future[GetAddressFullRegularBalanceResponse] = {
+    import scala.util.chaining._
     for {
       address <- Task.fromTry(Try(request.address.toVanillaAddress))
-      assetBalances <- context.accountsApi.portfolio(address).toListL // TODO DEX-997 optimize
-    } yield {
-      val excludeAssets = request.excludeAssetIds.view.map(_.toVanillaAsset).toSet
-      GetAddressFullRegularBalanceResponse(
-        (Waves :: assetBalances.map(_._1))
-          .filterNot(excludeAssets.contains)
-          .map(a =>
-            GetAddressFullRegularBalanceResponse.Record(a.toPB, context.blockchain.balance(address, a))
-          ) // TODO DEX-997 do not use spendableBalance
-          .filterNot(_.balance == 0L)
-      )
-    }
+      assetBalances <- {
+        log.info(s"[getAddressFullRegularBalance] Asking balances for $address")
+        context.accountsApi.portfolio(address).toListL
+      } // TODO DEX-997 optimize
+      excludeAssets = request.excludeAssetIds.view.map(_.toVanillaAsset).toSet
+      wavesBalance <- if (excludeAssets.contains(Waves)) Task.now(none) else Task(context.accountsApi.balance(address).some)
+    } yield GetAddressFullRegularBalanceResponse(
+      (assetBalances: List[(Asset, Long)])
+        .view
+        .filterNot { case (asset, v) => excludeAssets.contains(asset) /*|| v == 0*/ }
+        .map { case (asset, v) => GetAddressFullRegularBalanceResponse.Record(asset.toPB, v) }
+        .toList
+        .prependIf(wavesBalance.nonEmpty) {
+          GetAddressFullRegularBalanceResponse.Record(Waves.toPB, wavesBalance.get)
+        }
+        .tap { xs =>
+          log.info(s"[getAddressFullRegularBalance] Sending to $address: ${xs.map(x => s"${x.balance} ${x.assetId.toVanillaAsset}").mkString(", ")}")
+        }
+    )
   }.runToFuture
 
   // TODO DEX-997 optimize

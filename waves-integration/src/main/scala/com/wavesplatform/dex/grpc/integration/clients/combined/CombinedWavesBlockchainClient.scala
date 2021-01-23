@@ -52,6 +52,11 @@ class CombinedWavesBlockchainClient(
 
   private val dataUpdates = ConcurrentSubject.publish[WavesNodeEvent]
 
+  // We need to store last two updates and consider them as stale, because we can face an issue during fullBalancesSnapshot
+  //   when balance changes were deleted from LiquidBlock's diff, but haven't yet saved to DB.
+  @volatile private var lastUpdates = List.empty[BlockchainBalance]
+  private val maxPreviousBlockUpdates = 5 // + 1 = max size of lastUpdates. TODO why 5?
+
   override lazy val updates: Observable[WavesNodeUpdates] = Observable.fromFuture(meClient.currentBlockInfo)
     .flatMap { startBlockInfo =>
       log.info(s"Current block: $startBlockInfo")
@@ -83,6 +88,11 @@ class CombinedWavesBlockchainClient(
               )
             }
             .toMap
+
+          if (!x.updatedBalances.isEmpty) {
+            log.info(s"Updating.r: ${x.updatedBalances.regular}")
+            lastUpdates = x.updatedBalances :: lastUpdates.take(maxPreviousBlockUpdates)
+          } // TODO 2 blocks are enough?
 
           // // Not useful for UTX, because it doesn't consider the current state of orders
           // // Will be useful, when blockchain updates send order fills.
@@ -147,6 +157,7 @@ class CombinedWavesBlockchainClient(
 
   private def isExchangeTxFromMatcher(tx: UtxTransaction): Boolean = tx.transaction.exists(isExchangeTxFromMatcher)
 
+  // TODO Seems not used
   override def partialBalancesSnapshot(address: Address, assets: Set[Asset]): Future[AddressBalanceUpdates] =
     (
       meClient.getAddressPartialRegularBalance(address, assets),
@@ -156,14 +167,34 @@ class CombinedWavesBlockchainClient(
       })
     ).mapN(AddressBalanceUpdates(_, _, _))
 
+  // TODO Optimize
+  private def foldRight[K, V](xs: List[Map[K, V]]): Map[K, V] = xs.foldRight(Map.empty[K, V])(_ ++ _)
+
   override def fullBalancesSnapshot(address: Address, excludeAssets: Set[Asset]): Future[AddressBalanceUpdates] =
     (
       meClient.getAddressFullRegularBalance(address, excludeAssets),
-      if (excludeAssets.contains(Asset.Waves)) Future.successful(none) else meClient.getOutLeasing(address).map(_.some),
-      Future.successful(pessimisticPortfolios.getAggregated(address).filterNot {
-        case (asset, _) => excludeAssets.contains(asset)
-      })
-    ).mapN(AddressBalanceUpdates(_, _, _))
+      if (excludeAssets.contains(Asset.Waves)) Future.successful(none[Long]) else meClient.getOutLeasing(address).map(_.some)
+    ).mapN { case (regular, outLeasing) =>
+      val response = BlockchainBalance(
+        regular = Map(address -> regular),
+        outLeases = outLeasing.fold(Map.empty[Address, Long])(x => Map(address -> x))
+      )
+
+      val prioritizedLastUpdates = lastUpdates match {
+        case fresh :: tail => fresh :: response :: tail
+        case Nil => List(response)
+      }
+
+      val r = prioritizedLastUpdates.map(_.regular.getOrElse(address, Map.empty))
+      log.info(s"fullBalancesSnapshot($address).r = $r")
+      AddressBalanceUpdates(
+        regular = foldRight(r),
+        outLease = if (outLeasing.isEmpty) none[Long] else prioritizedLastUpdates.map(_.outLeases.get(address)).foldLeft(none[Long])(_.orElse(_)),
+        pessimisticCorrection = pessimisticPortfolios.getAggregated(address).filterNot {
+          case (asset, _) => excludeAssets.contains(asset)
+        }
+      )
+    }
 
   // TODO DEX-1012
   override def isFeatureActivated(id: Short): Future[Boolean] =

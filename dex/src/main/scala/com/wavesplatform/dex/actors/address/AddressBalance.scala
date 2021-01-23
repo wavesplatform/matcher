@@ -2,7 +2,7 @@ package com.wavesplatform.dex.actors.address
 
 import cats.instances.long._
 import cats.syntax.group._
-import com.wavesplatform.dex.collections.{NonPositiveMap, PositiveMap}
+import com.wavesplatform.dex.collections.{NonNegativeMap, NonPositiveMap, PositiveMap}
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.fp.MapImplicits.group
@@ -14,7 +14,7 @@ import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdat
  * @param openVolume Amount of assets those reserved for open orders
  */
 case class AddressBalance(
-  regular: PositiveMap[Asset, Long],
+  regular: NonNegativeMap[Asset, Long],
   outgoingLeasing: Option[Long],
   pessimisticCorrection: AddressPessimisticCorrection,
   openVolume: PositiveMap[Asset, Long]
@@ -59,7 +59,7 @@ case class AddressBalance(
     // And it is guaranteed to be eventually consistent.
     // Otherwise we can get a stale data and replace the fresh one by it.
     AddressBalance(
-      regular = PositiveMap((snapshot.regular ++ regular.xs).filter(_._2 != 0)),
+      regular = NonNegativeMap(snapshot.regular ++ regular.xs),
       outgoingLeasing = outgoingLeasing.orElse(snapshot.outLease),
       pessimisticCorrection = pessimisticCorrection.withInit(NonPositiveMap(snapshot.pessimisticCorrection)),
       openVolume = openVolume
@@ -67,7 +67,7 @@ case class AddressBalance(
 
   def withFresh(updates: AddressBalanceUpdates): AddressBalance =
     AddressBalance(
-      regular = PositiveMap((regular.xs ++ updates.regular).filter(_._2 != 0)),
+      regular = NonNegativeMap(regular.xs ++ updates.regular),
       outgoingLeasing = updates.outLease.orElse(outgoingLeasing),
       pessimisticCorrection = pessimisticCorrection.withFreshUnconfirmed(NonPositiveMap(updates.pessimisticCorrection)),
       openVolume = openVolume
@@ -98,7 +98,7 @@ case class AddressBalance(
 object AddressBalance {
 
   val empty = AddressBalance(
-    regular = PositiveMap.empty,
+    regular = NonNegativeMap.empty,
     outgoingLeasing = None,
     pessimisticCorrection = AddressPessimisticCorrection(NonPositiveMap.empty, Map.empty, Set.empty),
     openVolume = PositiveMap.empty

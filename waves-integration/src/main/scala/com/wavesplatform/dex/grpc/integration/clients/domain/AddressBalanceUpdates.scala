@@ -5,7 +5,7 @@ import com.wavesplatform.dex.domain.asset.Asset
 
 case class AddressBalanceUpdates(
   regular: Map[Asset, Long], // TODO Positive
-  outLease: Option[Long],
+  outLease: Option[Long], // TODO outgoingLeasing
   pessimisticCorrection: Map[Asset, Long] // TODO Negative
 ) {
 

@@ -298,7 +298,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
     } yield GetAddressFullRegularBalanceResponse(
       (assetBalances: List[(Asset, Long)])
         .view
-        .filterNot { case (asset, v) => excludeAssets.contains(asset) /*|| v == 0*/ }
+        .filterNot { case (asset, v) => excludeAssets.contains(asset) || v == 0 }
         .map { case (asset, v) => GetAddressFullRegularBalanceResponse.Record(asset.toPB, v) }
         .toList
         .prependIf(wavesBalance.nonEmpty) {

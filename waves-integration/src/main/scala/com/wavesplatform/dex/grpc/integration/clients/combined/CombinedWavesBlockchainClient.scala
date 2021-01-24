@@ -161,11 +161,30 @@ class CombinedWavesBlockchainClient(
   override def partialBalancesSnapshot(address: Address, assets: Set[Asset]): Future[AddressBalanceUpdates] =
     (
       meClient.getAddressPartialRegularBalance(address, assets),
-      if (assets.contains(Asset.Waves)) meClient.getOutLeasing(address).map(_.some) else Future.successful(none),
-      Future.successful(pessimisticPortfolios.getAggregated(address).filter {
-        case (asset, _) => assets.contains(asset)
-      })
-    ).mapN(AddressBalanceUpdates(_, _, _))
+      if (assets.contains(Asset.Waves)) meClient.getOutLeasing(address).map(_.some) else Future.successful(none)
+    ).mapN { case (regular, outLeasing) =>
+      val response = BlockchainBalance(
+        regular = Map(address -> regular),
+        outLeases = outLeasing.fold(Map.empty[Address, Long])(x => Map(address -> x))
+      )
+
+      val prioritizedLastUpdates = lastUpdates match {
+        case fresh :: tail => fresh :: response :: tail
+        case Nil => List(response)
+      }
+
+      val r = prioritizedLastUpdates.map(_.regular.getOrElse(address, Map.empty))
+      log.info(s"prioritizedLastUpdates($address).r = $r")
+      AddressBalanceUpdates(
+        regular = foldRight(r).filter { case (asset, _) => assets.contains(asset) },
+        outLease =
+          if (outLeasing.isEmpty) none[Long]
+          else prioritizedLastUpdates.map(_.outLeases.get(address)).foldLeft(none[Long])(_.orElse(_)),
+        pessimisticCorrection = pessimisticPortfolios.getAggregated(address).filter {
+          case (asset, _) => assets.contains(asset)
+        }
+      )
+    }
 
   // TODO Optimize
   private def foldRight[K, V](xs: List[Map[K, V]]): Map[K, V] = xs.foldRight(Map.empty[K, V])(_ ++ _)
@@ -188,10 +207,11 @@ class CombinedWavesBlockchainClient(
       val r = prioritizedLastUpdates.map(_.regular.getOrElse(address, Map.empty))
       log.info(s"fullBalancesSnapshot($address).r = $r")
       AddressBalanceUpdates(
-        regular = foldRight(r),
-        outLease = if (outLeasing.isEmpty) none[Long] else prioritizedLastUpdates.map(_.outLeases.get(address)).foldLeft(none[Long])(_.orElse(_)),
-        pessimisticCorrection = pessimisticPortfolios.getAggregated(address).filterNot {
-          case (asset, _) => excludeAssets.contains(asset)
+        regular = foldRight(r).filter { case (asset, _) => !excludeAssets.contains(asset) },
+        outLease =
+          if (outLeasing.isEmpty) none[Long] else prioritizedLastUpdates.map(_.outLeases.get(address)).foldLeft(none[Long])(_.orElse(_)),
+        pessimisticCorrection = pessimisticPortfolios.getAggregated(address).filter {
+          case (asset, _) => !excludeAssets.contains(asset)
         }
       )
     }

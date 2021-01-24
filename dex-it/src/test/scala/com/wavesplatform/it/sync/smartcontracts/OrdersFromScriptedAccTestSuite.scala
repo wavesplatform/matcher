@@ -191,13 +191,20 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
 
       broadcastAndAwait(mkSetAccountMayBeScript(dapp, Some(Scripts.fromBase64(script)), fee = setScriptFee + smartFee))
 
-      placeAndAwaitAtDex(mkOrder(dapp, aliceWavesPair, BUY, 10, 1.waves, version = 3.toByte)) //dapp balance is 100.waves
+      val o = mkOrder(dapp, aliceWavesPair, BUY, 10, 1.waves, version = 3.toByte)
+      placeAndAwaitAtDex(o) //dapp balance is 100.waves
 
       eventually {
         dex1.api.getTradableBalance(dapp, aliceWavesPair).getOrElse(Waves, 0L) shouldBe 9999699990L //89.997.waves ??
         dex1.api.getReservedBalance(dapp) shouldBe Map(Waves -> 300010L) //10.003.waves ??
       }
 
+      cancelAndAwait(dapp, o)
+
+      eventually {
+        dex1.api.getTradableBalance(dapp, aliceWavesPair).getOrElse(Waves, 0L) shouldBe 100.waves
+        dex1.api.getReservedBalance(dapp) shouldBe Map.empty
+      }
     }
   }
 }

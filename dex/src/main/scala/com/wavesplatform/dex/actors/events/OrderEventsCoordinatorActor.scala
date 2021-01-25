@@ -14,8 +14,6 @@ import com.wavesplatform.dex.model.Events.ExchangeTransactionCreated
 import com.wavesplatform.dex.model.ExchangeTransactionCreator.CreateTransaction
 import play.api.libs.json.Json
 
-import scala.collection.immutable.Queue
-
 // TODO DEX-1042
 object OrderEventsCoordinatorActor {
 

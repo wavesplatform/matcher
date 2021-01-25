@@ -1,8 +1,8 @@
 package com.wavesplatform.dex.actors.address
 
 import akka.actor.typed.scaladsl.adapter._
-import akka.actor.{Actor, ActorRef, Cancellable, Props, Status, typed}
-import akka.pattern.{CircuitBreakerOpenException, pipe}
+import akka.actor.{typed, Actor, ActorRef, Cancellable, Props, Status}
+import akka.pattern.{pipe, CircuitBreakerOpenException}
 import akka.{actor => classic}
 import alleycats.std.all.alleyCatsSetTraverse
 import cats.instances.list._
@@ -563,21 +563,16 @@ class AddressActor(
       case _ =>
         val origActiveOrder = activeOrders.get(remaining.id)
         activeOrders.put(remaining.id, remaining)
-        val origReservableBalance = status match {
+        status match {
           case OrderStatus.Accepted =>
             orderDB.saveOrder(remaining.order)
             scheduleExpiration(remaining.order)
-            // The order can be added before in the "place" function
-            origActiveOrder.fold(Map.empty[Asset, Long])(_.reservableBalance)
-
           case _ =>
-            origActiveOrder
-              .getOrElse {
-                log.error(s"Can't find order: ${remaining.id}")
-                throw new RuntimeException(s"Can't find order ${remaining.id}")  // TODO
-              }
-              .reservableBalance
         }
+
+        // OrderStatus.Accepted: why could we have an order? The order can be added before in the "place" function.
+        // Other: why couldn't we have an order? There could be no order during a recovery process, when we receive OrderAdded, but it is partially filled
+        val origReservableBalance = origActiveOrder.fold(Map.empty[Asset, Long])(_.reservableBalance)
 
         (remaining.reservableBalance |-| origReservableBalance).filterNot(_._2 == 0) // Could be 0 if an order executed by a small amount
     }

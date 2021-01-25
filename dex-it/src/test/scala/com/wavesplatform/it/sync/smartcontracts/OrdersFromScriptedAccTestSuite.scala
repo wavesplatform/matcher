@@ -199,7 +199,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
 
       broadcastAndAwait(mkSetAccountMayBeScript(dapp, Some(Scripts.fromBase64(script)), fee = setScriptFee + smartFee))
 
-      val o = mkOrderDP(dapp, aliceWavesPair, BUY, 10, 1.waves.toDouble, version = 3.toByte)
+      val o = mkOrderDP(dapp, aliceWavesPair, BUY, 10.waves, 1, version = 3.toByte)
 
       broadcastAndAwait(mkInvokeScript(alice, dapp))
 

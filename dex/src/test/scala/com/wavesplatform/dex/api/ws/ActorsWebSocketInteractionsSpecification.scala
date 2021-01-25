@@ -145,7 +145,7 @@ class ActorsWebSocketInteractionsSpecification
 
       addressDir ! AddressDirectoryActor.Command.ForwardMessage(
         kp.toAddress,
-        if (prevPortfolioOpt.isEmpty) AddressActor.Command.SetInitialBalances(Success(updates))
+        if (prevPortfolioOpt.isEmpty) AddressActor.Command.SetInitialBalances(Success(updates), 0)
         else AddressActor.Command.ChangeBalances(updates)
       )
     }
@@ -335,7 +335,7 @@ class ActorsWebSocketInteractionsSpecification
             mo = matchOrders(mo, 10.waves)
             expectWsBalancesAndOrders(
               // tradable = total - reserved, so 180 = 300 - 120 USD, 2.2 = 3 - 0.8 ETH
-              Map(usd -> WsBalances(180, 120), eth -> WsBalances(2.2, 0.8)), // <--
+              Map(usd -> WsBalances(180, 120), eth -> WsBalances(2.2, 0.8)),
               Seq(
                 WsOrder(
                   id = mo.id,

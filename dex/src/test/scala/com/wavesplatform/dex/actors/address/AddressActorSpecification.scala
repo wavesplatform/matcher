@@ -305,7 +305,7 @@ class AddressActorSpecification
         )
 
         val message =
-          if (prevPortfolioOption.isEmpty) AddressActor.Command.SetInitialBalances(Success(changes))
+          if (prevPortfolioOption.isEmpty) AddressActor.Command.SetInitialBalances(Success(changes), 0)
           else AddressActor.Command.ChangeBalances(changes)
 
         addressDir ! AddressDirectoryActor.Command.ForwardMessage(address, message)

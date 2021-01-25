@@ -35,6 +35,7 @@ import com.wavesplatform.dex.model.Events.{OrderCancelFailed, OrderCanceled, Ord
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.MatcherQueue.StoreValidatedCommand
 import com.wavesplatform.dex.queue.ValidatedCommand
+import com.wavesplatform.dex.remote.Delay
 import com.wavesplatform.dex.time.Time
 import org.slf4j.LoggerFactory
 
@@ -78,16 +79,6 @@ class AddressActor(
 
   private var balances = AddressBalance.empty
 
-  // TODO check frequency
-  private def format(xs: Map[Asset, Long]): String =
-    xs.toList.sortBy(_._1.maybeBase58Repr).map { case (asset, v) => s"$v ${asset.maybeBase58Repr.fold("🔷")(_.take(5))}" }.mkString(
-      "{",
-      ", ",
-      "}"
-    )
-
-  private def format(xs: AddressBalanceUpdates): String = s"r=${format(xs.regular)}, l=${xs.outLease}, p=${format(xs.pessimisticCorrection)}"
-
   // if (started) because we haven't pendingCommands during the start
   private val eventsProcessing: Receive = {
     case command: Command.ApplyOrderBookAdded =>
@@ -107,11 +98,7 @@ class AddressActor(
         // If it is not new, appendedOpenVolume and putChangedAssets called in ValidationPassed -> place,
         //  so we don't need to do this again.
         balances = balances.appendedOpenVolume(volumeDiff)
-        log.info(s"[Balance] 💵: ${format(balances.tradableBalances(volumeDiff.keySet))}; ov Δ: ${format(volumeDiff)}; r: ${format(
-          balances.regular.xs
-        )}, ov: ${format(balances.openVolume.xs)}, pc.u: ${format(
-          balances.pessimisticCorrection.unconfirmed.xs
-        )}, pc.no: ${balances.pessimisticCorrection.notObserved.map { case (id, xs) => s"$id -> ${format(xs.xs)}" }.mkString(", ")}")
+        log.info(s"[Balance] 💵: ${format(balances.tradableBalances(volumeDiff.keySet))}; ov Δ: ${format(volumeDiff)}")
 
         scheduleWs {
           wsAddressState = wsAddressState.putChangedAssets(volumeDiff.keySet)
@@ -125,23 +112,14 @@ class AddressActor(
 
     case command: Command.ApplyOrderBookExecuted =>
       import command.event
-      log.debug(
-        s"OrderExecuted(c=${event.counterRemaining.id}, s=${event.submittedRemaining.id}), a=${event.executedAmount}, cf=${event.counterExecutedFee}, sf=${event.submittedExecutedFee}, tx=${command.tx.map(_.id())}"
-      )
+      log.debug(s"OrderExecuted(c=${event.counterRemaining.id}, s=${event.submittedRemaining.id}), tx=${command.tx.map(_.id())}")
       val volumeDiff = List(event.counterRemaining, event.submittedRemaining)
         .filter(_.order.sender.toAddress == owner)
         .foldMap(refreshOrderState(_, command))(group)
 
-      log.info(s"volume diff: ${format(volumeDiff)}")
-      val (updated, changedAssets) = balances.withExecuted(command.tx.map(_.id()), volumeDiff) // 0 ?
+      val (updated, changedAssets) = balances.withExecuted(command.tx.map(_.id()), volumeDiff)
       balances = updated
-      log.info(
-        s"[Balance] 💵: ${format(balances.tradableBalances(volumeDiff.keySet))}; e: ${format(volumeDiff)}; r: ${format(
-          balances.regular.xs
-        )}, ov: ${format(balances.openVolume.xs)}, pc.u: ${format(
-          balances.pessimisticCorrection.unconfirmed.xs
-        )}, pc.no: ${balances.pessimisticCorrection.notObserved.map { case (id, xs) => s"$id -> ${format(xs.xs)}" }.mkString(", ")}"
-      )
+      log.info(s"[Balance] 💵: ${format(balances.tradableBalances(volumeDiff.keySet))}; e: ${format(volumeDiff)}")
 
       scheduleWs {
         wsAddressState = wsAddressState.putChangedAssets(changedAssets)
@@ -205,24 +183,23 @@ class AddressActor(
 
   private def starting: Receive = {
     recovered = true
-    blockchain
-      .getFullBalances(owner, Set.empty)
-      .safe
-      .map(Command.SetInitialBalances)
-      .pipeTo(self)
+    askFullBalances(0)
     log.trace("Recovered")
 
     eventsProcessing orElse failuresProcessing orElse {
       case command: Command.SetInitialBalances => // TODO test
         command.snapshot match {
-          case Failure(e) => throw new IllegalStateException("Can't receive initial balances, see logs", e)
+          case Failure(_) =>
+            log.warn("Can't receive initial balances")
+            askFullBalances(command.attempt + 1)
+
           case Success(x) =>
             balances = balances.withInit(x)
             log.info(s"[Balance] 💵: ${format(x)}")
+            activeOrders.values.foreach(x => scheduleExpiration(x.order))
+            unstashAll()
+            context.become(working)
         }
-        activeOrders.values.foreach(x => scheduleExpiration(x.order))
-        unstashAll()
-        context.become(working)
 
       case command: Command.ChangeBalances =>
         balances = balances.withFresh(command.updates) // TODO
@@ -680,6 +657,17 @@ class AddressActor(
     scheduleNextDiffSending()
   }
 
+  private def askFullBalances(attempt: Int): Unit = {
+    def send(): Unit = blockchain
+      .getFullBalances(owner, Set.empty)
+      .safe
+      .map(Command.SetInitialBalances(_, attempt))
+      .pipeTo(self)
+
+    if (attempt == 0) send()
+    else context.system.scheduler.scheduleOnce(Delay.fullJitter(100.millis, attempt, 5.seconds))(send())
+  }
+
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
     log.error(s"Failed on $message", reason)
     super.preRestart(reason, message)
@@ -760,7 +748,7 @@ object AddressActor {
 
   object Command {
     case object StartWork extends Command
-    case class SetInitialBalances(snapshot: Try[AddressBalanceUpdates]) extends Command
+    case class SetInitialBalances(snapshot: Try[AddressBalanceUpdates], attempt: Int) extends Command
 
     case class ApplyBatch(markTxsObserved: MarkTxsObserved, changedBalances: ChangeBalances) extends Command
 
@@ -869,5 +857,12 @@ object AddressActor {
     case class Removed(volume: Map[Asset, Long]) extends OrderRefreshResult
     case class Updated(volumeDiff: Map[Asset, Long]) extends OrderRefreshResult
   }
+
+  def format(xs: Map[Asset, Long]): String =
+    xs.toList.sortBy(_._1.maybeBase58Repr)
+      .map { case (asset, v) => s"$v ${asset.maybeBase58Repr.fold("🔷")(_.take(5))}" }
+      .mkString("{", ", ", "}")
+
+  def format(xs: AddressBalanceUpdates): String = s"r=${format(xs.regular)}, l=${xs.outLease}, p=${format(xs.pessimisticCorrection)}"
 
 }

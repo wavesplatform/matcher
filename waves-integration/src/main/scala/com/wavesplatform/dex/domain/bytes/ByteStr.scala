@@ -12,7 +12,7 @@ final case class ByteStr(arr: Array[Byte]) {
   lazy val base64Raw: String = Base64.encode(arr)
   lazy val base64: String = "base64:" + base64Raw
 
-  lazy val trim: String = s"${if (arr.length < 1024) base58.toString.take(7) else base64Raw} ..."
+  lazy val trim: String = s"${if (arr.length < 1024) base58.take(7) else base64Raw} ..."
 
   override lazy val toString: String = if (arr.length < 1024) base58 else base64
 

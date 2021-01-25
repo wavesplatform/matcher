@@ -557,7 +557,7 @@ class AddressActor(
         // None is not possible
         activeOrders.remove(remaining.id).fold {
           log.error(s"Can't find order for finalization: ${remaining.id}")
-          throw new RuntimeException(s"Can't find order ${remaining.id}")
+          throw new RuntimeException(s"Can't find order ${remaining.id}") // TODO
         }(_.reservableBalance.inverse())
 
       case _ =>
@@ -574,7 +574,7 @@ class AddressActor(
             origActiveOrder
               .getOrElse {
                 log.error(s"Can't find order: ${remaining.id}")
-                throw new RuntimeException(s"Can't find order ${remaining.id}")
+                throw new RuntimeException(s"Can't find order ${remaining.id}")  // TODO
               }
               .reservableBalance
         }

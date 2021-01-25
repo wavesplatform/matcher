@@ -168,11 +168,7 @@ class CombinedWavesBlockchainClient(
         outLeases = outLeasing.fold(Map.empty[Address, Long])(x => Map(address -> x))
       )
 
-      val prioritizedLastUpdates = lastUpdates match {
-        case fresh :: tail => fresh :: response :: tail
-        case Nil => List(response)
-      }
-
+      val prioritizedLastUpdates = lastUpdates :+ response
       val r = prioritizedLastUpdates.map(_.regular.getOrElse(address, Map.empty))
       log.info(s"prioritizedLastUpdates($address).r = $r")
       AddressBalanceUpdates(
@@ -199,11 +195,7 @@ class CombinedWavesBlockchainClient(
         outLeases = outLeasing.fold(Map.empty[Address, Long])(x => Map(address -> x))
       )
 
-      val prioritizedLastUpdates = lastUpdates match {
-        case fresh :: tail => fresh :: response :: tail
-        case Nil => List(response)
-      }
-
+      val prioritizedLastUpdates = lastUpdates :+ response
       val r = prioritizedLastUpdates.map(_.regular.getOrElse(address, Map.empty))
       log.info(s"fullBalancesSnapshot($address).r = $r")
       AddressBalanceUpdates(

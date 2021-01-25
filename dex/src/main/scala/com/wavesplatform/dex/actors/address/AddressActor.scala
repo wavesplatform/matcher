@@ -305,7 +305,7 @@ class AddressActor(
       changeBalances(command.updates)
 
     case Query.GetReservedBalance => sender() ! Reply.GetBalance(balances.openVolume.filter(_._2 > 0).asRight)
-    case query: Query.GetTradableBalance => sender() ! Reply.GetBalance(balances.tradableBalances(query.forAssets).asRight)
+    case query: Query.GetTradableBalance => sender() ! Reply.GetBalance(balances.tradableBalances(query.forAssets).filter(_._2 > 0).asRight)
 
     case Query.GetOrderStatus(orderId) =>
       sender() ! Reply.GetOrderStatus(activeOrders.get(orderId).fold[OrderStatus](orderDB.status(orderId))(_.status))
@@ -383,18 +383,13 @@ class AddressActor(
 
     // It is time to send updates to clients. This block of code asks balances
     case WsCommand.SendDiff =>
-      log.info(s"WsCommand.SendDiff: hasActiveSubscriptions: ${wsAddressState.hasActiveSubscriptions} && hasChanges: ${wsAddressState.hasChanges}")
-      if (wsAddressState.hasActiveSubscriptions && wsAddressState.hasChanges) {
-        log.info(
-          s"WsCommand.SendDiff: changedAssets: ${wsAddressState.changedAssets.mkString(", ")}, newBalance: ${balances.tradableBalances(wsAddressState.changedAssets)}"
-        )
+      if (wsAddressState.hasActiveSubscriptions && wsAddressState.hasChanges)
         wsAddressState = wsAddressState
           .sendDiffs(
             balances = mkWsBalances(balances.tradableBalances(wsAddressState.changedAssets), includeEmpty = true),
             orders = wsAddressState.getAllOrderChanges
           )
           .clean()
-      }
       wsSendSchedule = Cancellable.alreadyCancelled
 
     case classic.Terminated(wsSource) => wsAddressState = wsAddressState.removeSubscription(wsSource)

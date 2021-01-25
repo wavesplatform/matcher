@@ -41,7 +41,7 @@ class OrderEventsCoordinatorActorStateSpec
     val knownOnNodeByPending = addresses.values.flatMap(_.pendingTxs).collect {
       case (txId, PendingTransactionType.KnownOnNode) => txId
     }
-    (keyPairs, OrderEventsCoordinatorActorState(addresses, knownOnNodeByPending.foldLeft(knownOnNodeCache)(_.append(_))))
+    (keyPairs, OrderEventsCoordinatorActorState(addresses, knownOnNodeByPending.foldLeft(knownOnNodeCache)(_.append(_)._1)))
   }
 
   private val stateGen: Gen[OrderEventsCoordinatorActorState] = stateWithAddressKpsGen.map(_._2)
@@ -199,7 +199,7 @@ class OrderEventsCoordinatorActorStateSpec
           }
 
           (
-            OrderEventsCoordinatorActorState(addresses, knownOnNodeByPending.foldLeft(knownOnNodeCache)(_.append(_))),
+            OrderEventsCoordinatorActorState(addresses, knownOnNodeByPending.foldLeft(knownOnNodeCache)(_.append(_)._1)),
             tx.id(),
             event,
             resolvedAddresses,
@@ -354,7 +354,7 @@ class OrderEventsCoordinatorActorStateSpec
           }
 
           KnownOnNodeExpectedItem(
-            state = OrderEventsCoordinatorActorState(addresses, knownOnNodeByPending.foldLeft(knownOnNodeCache)(_.append(_))),
+            state = OrderEventsCoordinatorActorState(addresses, knownOnNodeByPending.foldLeft(knownOnNodeCache)(_.append(_)._1)),
             tx = tx,
             balanceUpdates = balanceUpdates,
             resolvedAddresses = resolvedAddresses,

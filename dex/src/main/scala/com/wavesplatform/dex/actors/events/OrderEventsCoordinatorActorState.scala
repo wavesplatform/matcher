@@ -117,7 +117,7 @@ case class OrderEventsCoordinatorActorState(addresses: Map[Address, PendingAddre
       }
 
       (
-        OrderEventsCoordinatorActorState(updatedAddresses2, knownOnNodeCache.append(txId)),
+        OrderEventsCoordinatorActorState(updatedAddresses2, knownOnNodeCache.append(txId)._1),
         restUpdates2,
         resolved
       )

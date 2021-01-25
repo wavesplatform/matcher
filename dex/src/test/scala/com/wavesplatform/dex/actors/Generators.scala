@@ -93,7 +93,7 @@ trait Generators extends WavesEntitiesGen {
 
   protected val knownOnNodeCacheGen: Gen[FifoSet[ExchangeTransaction.Id]] = Gen.choose(0, 2).flatMap { size =>
     Gen.listOfN(size, txIdGen).map { xs =>
-      xs.foldLeft(FifoSet.limited[ExchangeTransaction.Id](100))(_.append(_))
+      xs.foldLeft(FifoSet.limited[ExchangeTransaction.Id](100))(_.append(_)._1)
     }
   }
 

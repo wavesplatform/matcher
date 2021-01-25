@@ -106,26 +106,22 @@ class CombinedWavesBlockchainClient(
           //
           // if (fillsDebugInfo.nonEmpty) log.info(s"Detected fills:\n${fillsDebugInfo.mkString("\n")}")
 
-          (
-            x.newStatus,
-            WavesNodeUpdates(
-              updatedFinalBalances,
-              unconfirmedTxs = {
-                for {
-                  tx <- x.utxUpdate.unconfirmedTxs.view if isExchangeTxFromMatcher(tx)
-                  signedTx <- tx.transaction
-                  changes <- tx.diff.flatMap(_.stateUpdate)
-                } yield tx.id.toVanilla -> TransactionWithChanges(tx.id, signedTx, changes)
-              }.toMap,
-              confirmedTxs = x.utxUpdate.confirmedTxs.view
-                .collect { case (id, x) if isExchangeTxFromMatcher(x.tx) => id.toVanilla -> x }.toMap,
-              failedTxs = (for {
-                tx <- x.utxUpdate.failedTxs.values if isExchangeTxFromMatcher(tx)
-                signedTx <- tx.transaction
-                changes <- tx.diff.flatMap(_.stateUpdate)
-              } yield tx.id.toVanilla -> TransactionWithChanges(tx.id, signedTx, changes)).toMap
-            )
-          )
+          val unconfirmedTxs = for {
+            tx <- x.utxUpdate.unconfirmedTxs.view if isExchangeTxFromMatcher(tx)
+            signedTx <- tx.transaction
+            changes <- tx.diff.flatMap(_.stateUpdate)
+          } yield tx.id.toVanilla -> TransactionWithChanges(tx.id, signedTx, changes)
+
+          val confirmedTxs = x.utxUpdate.confirmedTxs.view
+            .collect { case (id, x) if isExchangeTxFromMatcher(x.tx) => id.toVanilla -> x }
+
+          val failedTxs = for {
+            tx <- x.utxUpdate.failedTxs.values.view if isExchangeTxFromMatcher(tx)
+            signedTx <- tx.transaction
+            changes <- tx.diff.flatMap(_.stateUpdate)
+          } yield tx.id.toVanilla -> TransactionWithChanges(tx.id, signedTx, changes)
+
+          (x.newStatus, WavesNodeUpdates(updatedFinalBalances, (unconfirmedTxs ++ confirmedTxs ++ failedTxs).toMap))
         }
         .filterNot(_.isEmpty)
         .tap(_ => combinedStream.startFrom(startHeight))

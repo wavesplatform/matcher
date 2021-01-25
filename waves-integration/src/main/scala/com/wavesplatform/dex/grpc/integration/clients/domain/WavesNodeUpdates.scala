@@ -1,10 +1,7 @@
 package com.wavesplatform.dex.grpc.integration.clients.domain
 
 import cats.Monoid
-import cats.instances.list._
 import cats.instances.map._
-import cats.instances.set._
-import cats.syntax.foldable._
 import cats.syntax.monoid._
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
@@ -17,12 +14,10 @@ import com.wavesplatform.protobuf.transaction.Transaction
  */
 case class WavesNodeUpdates(
   balanceUpdates: Map[Address, AddressBalanceUpdates],
-  unconfirmedTxs: Map[ExchangeTransaction.Id, TransactionWithChanges],
-  confirmedTxs: Map[ExchangeTransaction.Id, TransactionWithChanges],
-  failedTxs: Map[ExchangeTransaction.Id, TransactionWithChanges]
+  observedTxs: Map[ExchangeTransaction.Id, TransactionWithChanges]
 ) {
-  def isEmpty: Boolean = balanceUpdates.isEmpty && unconfirmedTxs.isEmpty && confirmedTxs.isEmpty && failedTxs.isEmpty
-  def observedTxIdsByAddresses: Map[Address, Set[ExchangeTransaction.Id]] = List(unconfirmedTxs, confirmedTxs, failedTxs).foldMap(addressTxOf)
+  def isEmpty: Boolean = balanceUpdates.isEmpty && observedTxs.isEmpty
+  def observedTxIdsByAddresses: Map[Address, Set[ExchangeTransaction.Id]] = addressTxOf(observedTxs)
 
   def updatesByAddresses: Map[Address, (AddressBalanceUpdates, Set[ExchangeTransaction.Id])] = {
     val observedTxIds = observedTxIdsByAddresses
@@ -44,13 +39,11 @@ case class WavesNodeUpdates(
 object WavesNodeUpdates {
 
   implicit val updatesMonoid: Monoid[WavesNodeUpdates] = new Monoid[WavesNodeUpdates] {
-    override val empty: WavesNodeUpdates = WavesNodeUpdates(Map.empty, Map.empty, Map.empty, Map.empty)
+    override val empty: WavesNodeUpdates = WavesNodeUpdates(Map.empty, Map.empty)
 
     override def combine(x: WavesNodeUpdates, y: WavesNodeUpdates): WavesNodeUpdates = WavesNodeUpdates(
       balanceUpdates = x.balanceUpdates |+| y.balanceUpdates,
-      unconfirmedTxs = x.unconfirmedTxs ++ y.unconfirmedTxs,
-      confirmedTxs = x.confirmedTxs ++ y.confirmedTxs,
-      failedTxs = x.failedTxs ++ y.failedTxs
+      observedTxs = x.observedTxs ++ y.observedTxs
     )
 
   }

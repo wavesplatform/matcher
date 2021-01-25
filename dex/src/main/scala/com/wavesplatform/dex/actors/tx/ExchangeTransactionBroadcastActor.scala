@@ -35,7 +35,7 @@ object ExchangeTransactionBroadcastActor {
 
   object Command {
 
-    case class Broadcast(clientRef: ActorRef[Confirmed], tx: ExchangeTransaction) extends Command
+    case class Broadcast(clientRef: ActorRef[Observed], tx: ExchangeTransaction) extends Command
     case class ProcessConfirmed(txIds: immutable.Iterable[ExchangeTransaction.Id]) extends Command
     case object Tick extends Command
 
@@ -46,7 +46,7 @@ object ExchangeTransactionBroadcastActor {
   object Event {
 
     case class Broadcasted(
-      clientRef: Option[ActorRef[Confirmed]],
+      clientRef: Option[ActorRef[Observed]],
       tx: ExchangeTransaction,
       result: Try[CheckedBroadcastResult]
     ) extends Event
@@ -71,7 +71,7 @@ object ExchangeTransactionBroadcastActor {
     def broadcast(
       context: ActorContext[Message],
       tx: ExchangeTransaction,
-      clientRef: Option[ActorRef[Confirmed]] = None
+      clientRef: Option[ActorRef[Observed]] = None
     ): Unit = {
       context.log.info(s"Broadcasting ${tx.id()}")
       context.pipeToSelf(blockchain.broadcast(tx))(Event.Broadcasted(clientRef, tx, _))
@@ -81,8 +81,9 @@ object ExchangeTransactionBroadcastActor {
       Behaviors.receive[Message] { (context, message) =>
         message match {
           case message: Command.Broadcast =>
+            // It would be better to just send the tx, but we can overload the node
             if (isExpired(message.tx)) {
-              message.clientRef ! Confirmed(message.tx)
+              message.clientRef ! Observed(message.tx)
               Behaviors.same
             } else {
               broadcast(context, message.tx, message.clientRef.some)
@@ -125,10 +126,7 @@ object ExchangeTransactionBroadcastActor {
 
               if (canRetry) {
                 if (!timer.isTimerActive(timerKey)) timer.startSingleTimer(timerKey, Command.Tick, settings.interval)
-              } else message.clientRef.foreach { clientRef =>
-                // If it is new, we will receive an event from UTX, otherwise we either TODO
-                clientRef ! Confirmed(message.tx)
-              }
+              } else message.clientRef.foreach(_ ! Observed(message.tx)) // This means, the transaction failed
 
               val updatedInProgress = if (canRetry) inProgress else inProgress - txId
               default(updatedInProgress)
@@ -144,6 +142,6 @@ object ExchangeTransactionBroadcastActor {
     def isValid: Boolean = restAttempts >= 0
   }
 
-  case class Confirmed(tx: ExchangeTransaction)
+  case class Observed(tx: ExchangeTransaction)
 
 }

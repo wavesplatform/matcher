@@ -64,7 +64,8 @@ case class AddressPessimisticCorrection(
     notObserved.get(txId) match {
       case Some(v) => (copy(notObserved = notObserved.removed(txId)), v.keySet)
       case None =>
-        // Could happen during rollbacks, but CombinedWavesBlockchainClient solves this situation.
+        // Could happen twice: after appending to MemPool and after confirming in a new block.
+        // OrderEventsCoordinatorActor has the deduplication logic.
         // Even this happen, we just have a hanging txId in "future", which won't affect the process, only consumes small amount of memory.
         (copy(future = future + txId), Set.empty)
     }

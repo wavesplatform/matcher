@@ -1,9 +1,7 @@
 package com.wavesplatform.dex.it.waves
 
-import java.nio.charset.StandardCharsets
-import java.util.concurrent.ThreadLocalRandom
-
 import cats.syntax.option._
+import com.wavesplatform.dex.domain.account.KeyPair.toAddress
 import com.wavesplatform.dex.domain.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -19,9 +17,12 @@ import com.wavesplatform.dex.it.waves.Implicits._
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.waves.WavesFeeConstants._
 import im.mak.waves.transactions.common.{Amount, Base64String}
+import im.mak.waves.transactions.invocation.Function
 import im.mak.waves.transactions.mass.Transfer
 import im.mak.waves.transactions.{ExchangeTransaction => JExchangeTransaction, _}
 
+import java.nio.charset.StandardCharsets
+import java.util.concurrent.ThreadLocalRandom
 import scala.concurrent.duration.{Duration, DurationInt}
 import scala.jdk.CollectionConverters._
 
@@ -285,6 +286,21 @@ trait MkWavesEntities {
       .fee(fee)
       .timestamp(timestamp)
       .version(2)
+      .getSignedWith(sender)
+
+  def mkInvokeScript(
+    sender: KeyPair,
+    dapp: KeyPair,
+    function: Function = null,
+    fee: Long = invokeScriptFee,
+    timestamp: Long = System.currentTimeMillis,
+    chainId: Byte = GenesisConfig.chainId
+  ): InvokeScriptTransaction =
+    InvokeScriptTransaction
+      .builder(toAddress(dapp), function)
+      .chainId(chainId)
+      .fee(fee)
+      .timestamp(timestamp)
       .getSignedWith(sender)
 
 }

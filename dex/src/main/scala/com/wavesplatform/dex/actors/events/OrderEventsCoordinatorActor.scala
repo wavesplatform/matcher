@@ -50,15 +50,19 @@ object OrderEventsCoordinatorActor {
               Behaviors.same
 
             case event: Events.OrderExecuted =>
-              val (tx, updatedBehavior) = createTransaction(event) match {
+              val tx = createTransaction(event) match {
                 case Right(tx) =>
+                  val txId = tx.id()
                   val txCreated = ExchangeTransactionCreated(tx)
                   context.log.info(s"Created ${tx.json()}")
                   dbWriterRef ! txCreated
 
-                  val (updatedKnownTxIds, isNew) = knownTxIds.append(tx.id())
-                  if (isNew) broadcasterRef ! Broadcaster.Broadcast(broadcastAdapter, tx)
-                  (tx.some, default(updatedKnownTxIds))
+                  if (knownTxIds.contains(txId)) {
+                    val addressActorMessage = AddressActor.Command.MarkTxsObserved(Set(txId))
+                    tx.traders.foreach(addressDirectoryRef ! AddressDirectoryActor.Command.ForwardMessage(_, addressActorMessage))
+                  } else broadcasterRef ! Broadcaster.Broadcast(broadcastAdapter, tx)
+
+                  tx.some
 
                 case Left(e) =>
                   // We don't touch a state, because this transaction neither created, nor appeared on Node
@@ -68,10 +72,10 @@ object OrderEventsCoordinatorActor {
                        |o1: (amount=${submitted.amount}, fee=${submitted.fee}): ${Json.prettyPrint(submitted.order.json())}
                        |o2: (amount=${counter.amount}, fee=${counter.fee}): ${Json.prettyPrint(counter.order.json())}""".stripMargin
                   )
-                  (none, Behaviors.same[Message])
+                  none
               }
               addressDirectoryRef ! AddressActor.Command.ApplyOrderBookExecuted(event, tx)
-              updatedBehavior
+              Behaviors.same
 
             case event: Events.OrderCanceled =>
               addressDirectoryRef ! AddressActor.Command.ApplyOrderBookCanceled(event)

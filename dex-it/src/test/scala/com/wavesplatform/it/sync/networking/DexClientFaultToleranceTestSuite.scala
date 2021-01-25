@@ -119,7 +119,12 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProx
   }
 
   "DEXClient should correctly handle gRPC errors" in {
+    val randomKP = mkKeyPair("random")
     val order = mkOrder(alice, wavesUsdPair, OrderType.BUY, 1.waves, 300)
+
+    // This request creates an actor. Otherwise the further check will fail by another reason:
+    //   an actor will stuck during the initialization.
+    dex1.api.getTradableBalance(randomKP, wavesUsdPair) should matchTo(Map.empty[Asset, Long])
 
     wavesNode1.disconnectFromNetwork()
 
@@ -128,7 +133,7 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProx
       "Waves Node is unavailable, please retry later or contact with the administrator"
     )
 
-    dex1.tryApi.getTradableBalance(mkKeyPair("random"), wavesUsdPair) should failWith(
+    dex1.tryApi.getTradableBalance(randomKP, wavesUsdPair) should failWith(
       105906177,
       "Waves Node is unavailable, please retry later or contact with the administrator"
     )
@@ -137,7 +142,7 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProx
 
     dex1.api.waitForOrderPlacement(order)
     dex1.api.waitForOrderStatus(order, Status.Accepted)
-    dex1.api.getTradableBalance(mkKeyPair("random"), wavesUsdPair) should matchTo(Map.empty[Asset, Long])
+    dex1.api.getTradableBalance(randomKP, wavesUsdPair) should matchTo(Map.empty[Asset, Long])
   }
 
   private def usdBalancesShouldBe(wavesNodeApi: NodeApi[Id], expectedAliceBalance: Long, expectedBobBalance: Long): Unit = {

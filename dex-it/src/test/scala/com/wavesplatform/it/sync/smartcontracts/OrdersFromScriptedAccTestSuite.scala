@@ -166,7 +166,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
        *  }
        *
        *  @Verifier(tx)
-       *  func verify() = match tx { case o: Order => o.amount > 1000 case _=> true }
+       *  func verify() = match tx { case o: Order => o.amount > 1 case _=> true }
        */
       val dapp = mkAccountWithBalance(100.waves + setScriptFee + smartFee -> Waves)
 

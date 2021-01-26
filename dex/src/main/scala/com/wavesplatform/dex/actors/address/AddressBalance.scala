@@ -80,8 +80,8 @@ case class AddressBalance(
   /**
    * @param executionTotalVolumeDiff An order's executed assets or a sum of two
    */
-  def withExecuted(txId: Option[ExchangeTransaction.Id], executionTotalVolumeDiff: Map[Asset, Long]): (AddressBalance, Set[Asset]) = {
-    val (updated, changedAssets) = pessimisticCorrection.withExecuted(txId, executionTotalVolumeDiff)
+  def withExecuted(expectedTxId: Option[ExchangeTransaction.Id], executionTotalVolumeDiff: Map[Asset, Long]): (AddressBalance, Set[Asset]) = {
+    val (updated, changedAssets) = pessimisticCorrection.withExecuted(expectedTxId, executionTotalVolumeDiff)
     (
       copy(pessimisticCorrection = updated, openVolume = PositiveMap((openVolume.xs |+| executionTotalVolumeDiff).filter(_._2 != 0))),
       changedAssets

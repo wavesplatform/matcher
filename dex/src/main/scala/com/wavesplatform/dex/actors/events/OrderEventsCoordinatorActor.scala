@@ -50,19 +50,18 @@ object OrderEventsCoordinatorActor {
               Behaviors.same
 
             case event: Events.OrderExecuted =>
-              val tx = createTransaction(event) match {
+              // If we here, AddressActor is guaranteed to be created, because this happens only after Events.OrderAdded
+              val expectedTx = createTransaction(event) match {
                 case Right(tx) =>
-                  val txId = tx.id()
                   val txCreated = ExchangeTransactionCreated(tx)
                   context.log.info(s"Created ${tx.json()}")
                   dbWriterRef ! txCreated
 
-                  if (knownTxIds.contains(txId)) {
-                    val addressActorMessage = AddressActor.Command.MarkTxsObserved(Set(txId))
-                    tx.traders.foreach(addressDirectoryRef ! AddressDirectoryActor.Command.ForwardMessage(_, addressActorMessage))
-                  } else broadcasterRef ! Broadcaster.Broadcast(broadcastAdapter, tx)
-
-                  tx.some
+                  if (knownTxIds.contains(tx.id())) none // We won't expect a tx, because already have
+                  else {
+                    broadcasterRef ! Broadcaster.Broadcast(broadcastAdapter, tx)
+                    tx.some
+                  }
 
                 case Left(e) =>
                   // We don't touch a state, because this transaction neither created, nor appeared on Node
@@ -74,23 +73,24 @@ object OrderEventsCoordinatorActor {
                   )
                   none
               }
-              addressDirectoryRef ! AddressActor.Command.ApplyOrderBookExecuted(event, tx)
+              addressDirectoryRef ! AddressActor.Command.ApplyOrderBookExecuted(event, expectedTx)
               Behaviors.same
 
             case event: Events.OrderCanceled =>
+              // If we here, AddressActor is guaranteed to be created, because this happens only after Events.OrderAdded
               addressDirectoryRef ! AddressActor.Command.ApplyOrderBookCanceled(event)
               Behaviors.same
           }
 
         case Command.ApplyNodeUpdates(updates) =>
-          val (updatedKnownTxIds, filteredObservedTxs) = updates.observedTxs.keys.foldLeft((knownTxIds, List.empty[ExchangeTransaction.Id])) {
+          val (updatedKnownTxIds, oldTxIds) = updates.observedTxs.keys.foldLeft((knownTxIds, List.empty[ExchangeTransaction.Id])) {
             case ((knownTxIds, exclude), txId) =>
               val (updatedKnownTxIds, isNew) = knownTxIds.append(txId)
               val updatedExclude = if (isNew) exclude else txId :: exclude
               (updatedKnownTxIds, updatedExclude)
           }
 
-          updates.copy(observedTxs = updates.observedTxs -- filteredObservedTxs).updatesByAddresses.foreach {
+          updates.copy(observedTxs = updates.observedTxs -- oldTxIds).updatesByAddresses.foreach {
             case (address, (balanceUpdates, observedTxs)) =>
               val markObservedCommand = if (observedTxs.isEmpty) none else AddressActor.Command.MarkTxsObserved(observedTxs).some
               val changeBalanceCommand = if (balanceUpdates.isEmpty) none else AddressActor.Command.ChangeBalances(balanceUpdates).some

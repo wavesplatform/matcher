@@ -37,14 +37,14 @@ case class AddressPessimisticCorrection(
 
   /**
    * TODO with himself. volume by spending asset 0 ?
-   * @param txId Could be None if a transaction wasn't created (see ExchangeTransactionCreator)
+   * @param expectedTxId Could be None if a transaction wasn't created or has been already created (see OrderEventsCoordinatorActor)
    * @param executionTotalVolumeDiff Should be non negative
    */
   def withExecuted(
-    txId: Option[ExchangeTransaction.Id],
+    expectedTxId: Option[ExchangeTransaction.Id],
     executionTotalVolumeDiff: Map[Asset, Long]
   ): (AddressPessimisticCorrection, Set[Asset]) =
-    txId match {
+    expectedTxId match {
       case None => (this, executionTotalVolumeDiff.keySet) // (copy(unconfirmed = unconfirmed |-| volume), volume.keySet) // - ?????
       case Some(txId) =>
         if (notObserved.contains(txId)) throw new RuntimeException(s"$txId executed twice!") // Could be called twice if one trader

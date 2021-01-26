@@ -112,12 +112,12 @@ class AddressActor(
 
     case command: Command.ApplyOrderBookExecuted =>
       import command.event
-      log.debug(s"OrderExecuted(c=${event.counterRemaining.id}, s=${event.submittedRemaining.id}), tx=${command.tx.map(_.id())}")
+      log.debug(s"OrderExecuted(c=${event.counterRemaining.id}, s=${event.submittedRemaining.id}), tx=${command.expectedTx.map(_.id())}")
       val volumeDiff = List(event.counterRemaining, event.submittedRemaining)
         .filter(_.order.sender.toAddress == owner)
         .foldMap(refreshOrderState(_, command))(group)
 
-      val (updated, changedAssets) = balances.withExecuted(command.tx.map(_.id()), volumeDiff)
+      val (updated, changedAssets) = balances.withExecuted(command.expectedTx.map(_.id()), volumeDiff)
       balances = updated
       log.info(s"[Balance] 💵: ${format(balances.tradableBalances(volumeDiff.keySet))}; e: ${format(volumeDiff)}")
 
@@ -759,7 +759,9 @@ object AddressActor {
       override def affectedOrders: List[AcceptedOrder] = List(event.order)
     }
 
-    case class ApplyOrderBookExecuted(event: Events.OrderExecuted, tx: Option[ExchangeTransaction]) extends Command with HasOrderBookEvent {
+    case class ApplyOrderBookExecuted(event: Events.OrderExecuted, expectedTx: Option[ExchangeTransaction])
+        extends Command
+        with HasOrderBookEvent {
       override def affectedOrders: List[AcceptedOrder] = List(event.counter, event.submitted)
     }
 

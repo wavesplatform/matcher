@@ -146,7 +146,7 @@ class BouncingBalancesTestSuite extends WsSuiteBase {
       }
 
       val aliceUsdChanges = collectTradableBalanceChanges(aliceWsc, usd)
-      checkOrdering("alice usd", aliceUsdChanges)(_ shouldBe >=(_))
+      checkOrdering("alice usd", aliceUsdChanges)(_ shouldBe >=(_)) // <--
 
       // probably we need to zip with aliceUsdChanges and check
       //  val aliceWavesChanges = collectTradableBalanceChanges(aliceWsc, Waves)

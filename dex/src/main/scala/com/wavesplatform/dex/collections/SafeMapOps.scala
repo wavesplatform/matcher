@@ -8,6 +8,7 @@ trait SafeMapOps[K, V, CC[KK, VV] <: SafeMapOps[KK, VV, CC, _], C <: SafeMapOps[
   def getOrElse(k: K, v: => V): V = xs.getOrElse(k, v)
   def collect[W](pf: PartialFunction[(K, V), W]): Iterable[W] = xs.collect(pf)
   def filter(pred: ((K, V)) => Boolean): Map[K, V] = xs.filter(pred)
+  def foreach(f: ((K, V)) => Unit): Unit = xs.foreach(f)
 
   def ++(other: C): CC[K, V] = factory.safeMk(xs ++ other.xs)
 

@@ -7,6 +7,8 @@
 //import com.softwaremill.diffx.scalatest.DiffMatcher
 //import com.wavesplatform.dex.NoShrink
 //import com.wavesplatform.dex.actors.Generators
+//import com.wavesplatform.dex.collections.{NegativeMap, NonPositiveMap}
+//import com.wavesplatform.dex.domain.asset.Asset
 //import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 //import org.scalacheck.{Arbitrary, Gen}
 //import org.scalatest.freespec.AnyFreeSpecLike
@@ -21,116 +23,146 @@
 //    with ScalaCheckPropertyChecks
 //    with NoShrink {
 //
-//  private val assetsMapGen = Gen.mapOf(Gen.zip(
-//    Gen.oneOf(definedAssetsGen, assetGen),
-//    Gen.choose(0L, 10L)
-//  ))
+//  private val nonPositiveAssetsMapGen = assetsMapGen(Gen.choose(-10L, 0))
+//  private val negativeAssetsMapGen = assetsMapGen(Gen.choose(-10L, -1))
+//
+//  private def assetsMapGen(valuesGen: Gen[Long]): Gen[Map[Asset, Long]] =
+//    Gen.mapOf(Gen.zip(Gen.oneOf(definedAssetsGen, assetGen), valuesGen))
 //
 //  "AddressPessimisticCorrection" - {
 //    "common properties" - {
 //      val testGen = for {
 //        txId <- txIdGen
-//        txVolume <- assetsMapGen
-//        unconfirmed <- assetsMapGen
+//        txVolumeDiff <- negativeAssetsMapGen
+//        unconfirmed <- nonPositiveAssetsMapGen
 //        future <- Gen.choose(0, 2).flatMap(Gen.containerOfN[Set, ExchangeTransaction.Id](_, txIdGen.filterNot(_ == txId)))
-//        observedCalls <- Gen.choose(0, 2)
-//        executedCallPos <- Gen.option(Gen.choose(0, observedCalls))
+//        executedIsFirst <- Arbitrary.arbBool.arbitrary
 //      } yield {
-//        val orig = AddressPessimisticCorrection.empty.copy(unconfirmed = unconfirmed |+| txVolume, future = future)
-//        val c1 = List.fill(observedCalls)("withObserved")
-//        val calls = executedCallPos match {
-//          case None => c1
-//          case Some(pos) =>
-//            val (left, right) = c1.splitAt(pos)
-//            left.appended("withExecuted") ::: right
-//        }
-//        (orig, txId, txVolume, calls)
+//        val orig = AddressPessimisticCorrection.empty.copy(unconfirmed = NonPositiveMap(unconfirmed |+| txVolumeDiff), futureTxIds = future)
+//        (orig, txId, NegativeMap(txVolumeDiff), executedIsFirst)
 //      }
 //
-//      "notObserved and future doesn't contain tx in same time" in forAll(testGen) { case (orig, txId, txVolume, calls) =>
-//        val updated = calls.foldLeft(orig) {
-//          case (orig, "withObserved") => orig.withObserved(txId)._1
-//          case (orig, "withExecuted") => orig.withExecuted(txId.some, txVolume)._1
-//          case (orig, _) => orig
-//        }
+//      "notObservedTxs and futureTxIds doesn't contain tx in same time" in forAll(testGen) { case (orig, txId, txVolumeDiff, executedIsFirst) =>
+//        val updated = if (executedIsFirst) orig.withExecuted(txId.some, txVolumeDiff)._1 else orig.withObserved(txId)._1
+//        val notObserved = updated.notObservedTxs.contains(txId)
+//        val futureTxIds = updated.futureTxIds.contains(txId)
 //
-//        val notObserved = updated.notObserved.contains(txId)
-//        val future = updated.future.contains(txId)
-//
-//        val cond = !(notObserved && future)
-//        withClue(s"notObserved: $notObserved, future: $future:") {
+//        val cond = !(notObserved && futureTxIds)
+//        withClue(s"notObserved: $notObserved, futureTxIds: $futureTxIds:") {
 //          cond shouldBe true
 //        }
 //      }
-//
-//      // invariant?
-////      "correction doesn't change when withObserved, withExecuted" ignore forAll(testGen) { case (orig, txId, txVolume, calls) =>
-////        val updated = calls.foldLeft(orig) {
-////          case (orig, "withObserved") => orig.withObserved(txId)._1
-////          case (orig, "withExecuted") => orig.withExecuted(txId.some, txVolume)._1
-////          case (orig, _) => orig
-////        }
-//
-////        (orig.unconfirmed.keySet ++ txVolume.keySet).foreach { asset =>
-////          orig.getBy(asset) shouldBe
-////        }
-////      }
 //    }
 //
-//    "withProbablyStaleUnconfirmed - an update have the lower precedence unconfirmed" in forAll(assetsMapGen, assetsMapGen) {
-//      (unconfirmed, updates) =>
-//        val orig = AddressPessimisticCorrection(
-//          notObserved = Map.empty,
-//          unconfirmed = unconfirmed,
-//          future = Set.empty
-//        )
+//    "withInitUnconfirmed" - {
+//      "doesn't affect other assets" in unconfirmedTest { (orig, unconfirmed, updates) =>
+//        val updated = orig.withInitUnconfirmed(updates)
+//        (unconfirmed.xs.keySet -- updates.xs.keys).foreach { asset =>
+//          updated.getBy(asset) shouldBe unconfirmed.getOrElse(asset, 0L)
+//        }
+//      }
 //
-//        val updated = orig.withInit(updates)
+//      "an update have the lower precedence unconfirmed" in unconfirmedTest { (orig, unconfirmed, updates) =>
+//        val updated = orig.withInitUnconfirmed(updates)
 //        updates.foreach { case (asset, v) =>
 //          updated.getBy(asset) shouldBe unconfirmed.getOrElse(asset, v)
 //        }
+//      }
 //    }
 //
-//    "withFreshUnconfirmed - an update have the higher precedence over unconfirmed" in forAll(assetsMapGen, assetsMapGen) {
-//      (unconfirmed, updates) =>
-//        val orig = AddressPessimisticCorrection(
-//          notObserved = Map.empty,
-//          unconfirmed = unconfirmed,
-//          future = Set.empty
-//        )
+//    "withFreshUnconfirmed" - {
+//      "doesn't affect other assets" in unconfirmedTest { (orig, unconfirmed, updates) =>
+//        val updated = orig.withFreshUnconfirmed(updates)
+//        (unconfirmed.xs.keySet -- updates.xs.keys).foreach { asset =>
+//          updated.getBy(asset) shouldBe unconfirmed.getOrElse(asset, 0L)
+//        }
+//      }
 //
+//      "an update have the higher precedence over unconfirmed" in unconfirmedTest { (orig, _, updates) =>
 //        val updated = orig.withFreshUnconfirmed(updates)
 //        updates.foreach { case (asset, v) =>
 //          updated.getBy(asset) shouldBe v
 //        }
+//      }
 //    }
 //
-//    "withExecuted" - {
-//      val stateGen = for {
-//        unconfirmed <- assetsMapGen
-//        future <- Gen.choose(0, 2).flatMap(Gen.containerOfN[Set, ExchangeTransaction.Id](_, txIdGen))
-//        txId <- txIdGen
-//        txVolume <- assetsMapGen
-//        observed <- Arbitrary.arbBool.arbitrary
-//      } yield {
-//        val init = AddressPessimisticCorrection.empty.copy(unconfirmed = unconfirmed, future = future)
-//        val orig = if (observed) init.withObserved(txId)._1 else init
-//        (orig, txId, txVolume, orig.withExecuted(txId.some, txVolume)._1)
+//    "withExecuted either" - {
+//      "if a tx isn't expected - does nothing" in {
+//        val stateGen = for {
+//          unconfirmed <- nonPositiveAssetsMapGen
+//          futureTxIds <- Gen.choose(0, 2).flatMap(Gen.containerOfN[Set, ExchangeTransaction.Id](_, txIdGen))
+//          txVolumeDiff <- negativeAssetsMapGen
+//        } yield {
+//          val init = AddressPessimisticCorrection.empty.copy(unconfirmed = NonPositiveMap(unconfirmed |+| txVolumeDiff), futureTxIds = futureTxIds)
+//          (init, NegativeMap(txVolumeDiff))
+//        }
+//
+//        forAll(stateGen) { case (orig, txVolumeDiff) =>
+//          val (updated, affected) = orig.withExecuted(none, txVolumeDiff)
+//          updated should matchTo(orig)
+//          affected should matchTo(txVolumeDiff.xs.keySet)
+//        }
 //      }
 //
-//      "future doesn't contain txId" in forAll(stateGen) { case (_, txId, _, updated) =>
-//        updated.future shouldNot contain(txId)
-//      }
+//      "if a tx is expected, either" - {
+//        "removes it from futureTxIds" in {
+//          val stateGen = for {
+//            unconfirmed <- nonPositiveAssetsMapGen
+//            futureTxIds <- Gen.choose(1, 2).flatMap(Gen.containerOfN[Set, ExchangeTransaction.Id](_, txIdGen))
+//            txId <- Gen.oneOf(futureTxIds)
+//            txVolumeDiff <- negativeAssetsMapGen
+//          } yield {
+//            val init =
+//              AddressPessimisticCorrection.empty.copy(unconfirmed = NonPositiveMap(unconfirmed |+| txVolumeDiff), futureTxIds = futureTxIds)
+//            (init, txId, NegativeMap(txVolumeDiff))
+//          }
 //
-////      "reduces the unconfirmed volume" in forAll(stateGen) { case (orig, txId, txVolume, updated) =>
-////        orig.unconfirmed.filterNot(_._2 == 0) should matchTo((updated.unconfirmed |+| txVolume).filterNot(_._2 == 0))
-////      }
+//          forAll(stateGen) { case (orig, txId, txVolumeDiff) =>
+//            val (updated, affected) = orig.withExecuted(txId.some, txVolumeDiff)
+//            updated.futureTxIds shouldNot contain(txId)
+//            affected should matchTo(txVolumeDiff.xs.keySet)
+//          }
+//        }
+//
+//        "adds it to notObservedTxs" in {
+//          val stateGen = for {
+//            unconfirmed <- nonPositiveAssetsMapGen
+//            futureTxIds <- Gen.choose(0, 2).flatMap(Gen.containerOfN[Set, ExchangeTransaction.Id](_, txIdGen))
+//            txId <- txIdGen.filterNot(futureTxIds.contains)
+//            txVolumeDiff <- negativeAssetsMapGen
+//          } yield {
+//            val init = AddressPessimisticCorrection.empty.copy(unconfirmed = NonPositiveMap(unconfirmed |+| txVolumeDiff), futureTxIds = futureTxIds)
+//            (init, txId, NegativeMap(txVolumeDiff))
+//          }
+//
+//          forAll(stateGen) { case (orig, txId, txVolumeDiff) =>
+//            val (updated, affected) = orig.withExecuted(txId.some, txVolumeDiff)
+//            updated.notObservedTxs.keySet should contain(txId)
+//            affected shouldBe empty // Because
+//          }
+//        }
+//      }
 //    }
 //
-//    "withObserved" - {
-//      "tx is either among notObserver or in future" ignore {}
+//    "withObserved either" - {
+//      "removes an tx observed previously" ignore {}
+//      "adds a tx to futureTxIds" ignore {}
 //    }
 //
 //    "getBy - takes into account a pessimistic correction by both unconfirmed and not observer" ignore {}
 //  }
+//
+//  private def unconfirmedTest(f: (AddressPessimisticCorrection, NonPositiveMap[Asset, Long], NonPositiveMap[Asset, Long]) => Unit): Unit =
+//    forAll(nonPositiveAssetsMapGen, nonPositiveAssetsMapGen) {
+//      (unconfirmed, updates) =>
+//        val unconfirmedTyped = NonPositiveMap(unconfirmed)
+//        val orig = AddressPessimisticCorrection(
+//          notObservedTxs = Map.empty,
+//          unconfirmed = unconfirmedTyped,
+//          futureTxIds = Set.empty
+//        )
+//
+//        f(orig, unconfirmedTyped, NonPositiveMap(updates))
+//    }
+//
 //}

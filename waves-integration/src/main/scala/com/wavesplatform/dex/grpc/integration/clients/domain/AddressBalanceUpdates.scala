@@ -4,18 +4,18 @@ import cats.Monoid
 import com.wavesplatform.dex.domain.asset.Asset
 
 case class AddressBalanceUpdates(
-  regular: Map[Asset, Long], // TODO Positive
-  outLease: Option[Long], // TODO outgoingLeasing
-  pessimisticCorrection: Map[Asset, Long] // TODO Negative
+  regular: Map[Asset, Long], // TODO DEX-1058
+  outgoingLeasing: Option[Long],
+  pessimisticCorrection: Map[Asset, Long] // TODO DEX-1058
 ) {
 
   def changedAssets: Set[Asset] =
     regular.keySet ++
-    outLease.fold(Set.empty[Asset])(_ => Set(Asset.Waves)) ++
+    outgoingLeasing.fold(Set.empty[Asset])(_ => Set(Asset.Waves)) ++
     pessimisticCorrection.keySet
 
-  def nonEmpty: Boolean = regular.nonEmpty || outLease.nonEmpty || pessimisticCorrection.nonEmpty
-  def isEmpty: Boolean = regular.isEmpty && outLease.isEmpty && pessimisticCorrection.isEmpty
+  def nonEmpty: Boolean = regular.nonEmpty || outgoingLeasing.nonEmpty || pessimisticCorrection.nonEmpty
+  def isEmpty: Boolean = regular.isEmpty && outgoingLeasing.isEmpty && pessimisticCorrection.isEmpty
 }
 
 object AddressBalanceUpdates {
@@ -25,7 +25,7 @@ object AddressBalanceUpdates {
 
     override def combine(x: AddressBalanceUpdates, y: AddressBalanceUpdates): AddressBalanceUpdates = AddressBalanceUpdates(
       regular = x.regular ++ y.regular,
-      outLease = y.outLease.orElse(x.outLease),
+      outgoingLeasing = y.outgoingLeasing.orElse(x.outgoingLeasing),
       pessimisticCorrection = x.pessimisticCorrection ++ y.pessimisticCorrection
     )
 

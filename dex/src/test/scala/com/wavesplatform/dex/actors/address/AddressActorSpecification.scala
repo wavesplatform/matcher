@@ -305,7 +305,7 @@ class AddressActorSpecification
         Future.successful(
           AddressBalanceUpdates(
             regular = currentPortfolio.get().assets.toMap[Asset, Long].updated(Waves, currentPortfolio.get().balance),
-            outLease = None,
+            outgoingLeasing = None,
             pessimisticCorrection = Map.empty
           )
         )
@@ -356,7 +356,7 @@ class AddressActorSpecification
 
         val changes = AddressBalanceUpdates(
           regular = regularBalanceChanges,
-          outLease = None,
+          outgoingLeasing = None,
           pessimisticCorrection = Map.empty
         )
 

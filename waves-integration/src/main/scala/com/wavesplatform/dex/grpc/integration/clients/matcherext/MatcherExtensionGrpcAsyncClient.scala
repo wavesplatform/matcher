@@ -61,11 +61,11 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
 
   override val utxEvents = new GrpcUtxEventsControlledStream(channel)(monixScheduler)
 
-  override def getOutLeasing(address: Address): Future[Long] = handlingErrors {
+  override def getOutgoingLeasing(address: Address): Future[Long] = handlingErrors {
     asyncUnaryCall(
       METHOD_GET_OUTGOING_LEASING,
       AddressRequest(address = address.toPB)
-    ).map(_.outLeases)
+    ).map(_.outgoingLeasing)
   }
 
   override def getAddressPartialRegularBalance(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] = handlingErrors {
@@ -90,7 +90,7 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
           assets = assets.map(_.toPB).toSeq
         )
       }.toSeq,
-      outLeaseAddresses = index.outLeases.map(_.toPB).toSeq
+      outgoingLeasingAddresses = index.outgoingLeasing.map(_.toPB).toSeq
     )
 
     asyncUnaryCall(WavesBlockchainApiGrpc.METHOD_GET_BALANCES, request)
@@ -99,7 +99,7 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
           regular = response.regular
             .map(pair => pair.address.toVanillaAddress -> pair.amount.map(x => x.assetId.toVanillaAsset -> x.amount).toMap)
             .toMap,
-          outLeases = response.outLeases.map(x => x.address.toVanillaAddress -> x.amount).toMap
+          outgoingLeasing = response.outgoingLeasing.map(x => x.address.toVanillaAddress -> x.amount).toMap
         )
       }
   }

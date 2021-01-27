@@ -481,7 +481,7 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
       override def getFullBalances(address: Address, exclude: Set[Asset]): Future[AddressBalanceUpdates] = Future.successful(
         AddressBalanceUpdates(
           regular = spendableBalances.filterNot(p => exclude.contains(p._1)),
-          outLease = None,
+          outgoingLeasing = None,
           pessimisticCorrection = Map.empty
         )
       )

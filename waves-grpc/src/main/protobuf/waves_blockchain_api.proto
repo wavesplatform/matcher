@@ -212,7 +212,7 @@ message CurrentBlockInfoResponse {
 }
 
 message GetOutgoingLeasingResponse {
-  int64 out_leases = 1;
+  int64 outgoing_leasing = 1;
 }
 
 message UtxStateResponse {
@@ -223,8 +223,8 @@ message GetBalancesRequest {
   // regular: Map[Address, Set[Asset]]
   repeated RegularPair regular = 1;
 
-  // outLeases: Set[Address]
-  repeated bytes outLeaseAddresses = 2;
+  // outgoingLeasing: Set[Address]
+  repeated bytes outgoingLeasingAddresses = 2;
 
   message RegularPair {
     bytes address = 1;
@@ -234,14 +234,14 @@ message GetBalancesRequest {
 
 message GetBalancesResponse {
   repeated RegularPair regular = 1;
-  repeated OutLeasePair outLeases = 2;
+  repeated OutgoingLeasingPair outgoingLeasing = 2;
 
   message RegularPair {
     bytes address = 1;
     repeated waves.Amount amount = 2;
   }
 
-  message OutLeasePair {
+  message OutgoingLeasingPair {
     bytes address = 1;
     int64 amount = 2;
   }

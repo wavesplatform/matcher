@@ -81,7 +81,6 @@ class WavesBlockchainClientTestSuite extends IntegrationSuiteBase with NoStackTr
 
   private val trueScript = Option(Scripts.alwaysTrue)
 
-  // TODO tests with outLease, pessimistic
   private def assertRegularBalanceChanges(expectedBalanceChanges: Map[Address, Map[Asset, Long]]): Unit = eventually {
     // Remove pairs (address, asset) those expectedBalanceChanges has not
     val actual = simplify(
@@ -327,19 +326,19 @@ class WavesBlockchainClientTestSuite extends IntegrationSuiteBase with NoStackTr
       // leaseTx haven't been added to UTX yet
       matchTo(AddressBalanceUpdates(
         regular = Map(Waves -> balanceBefore),
-        outLease = Some(0L),
+        outgoingLeasing = Some(0L),
         pessimisticCorrection = Map.empty
       )) or
       // not confirmed
       matchTo(AddressBalanceUpdates(
         regular = Map(Waves -> balanceBefore),
-        outLease = Some(0L),
+        outgoingLeasing = Some(0L),
         pessimisticCorrection = Map(Waves -> -(leaseAmount + leasingFee))
       )) or
       // confirmed
       matchTo(AddressBalanceUpdates(
         regular = Map(Waves -> (balanceBefore - leaseAmount - leasingFee)),
-        outLease = Some(leaseAmount),
+        outgoingLeasing = Some(leaseAmount),
         pessimisticCorrection = Map.empty
       ))
     }
@@ -368,7 +367,7 @@ class WavesBlockchainClientTestSuite extends IntegrationSuiteBase with NoStackTr
           Waves -> 10.waves,
           usd -> 1.usd
         ),
-        outLease = Some(0L),
+        outgoingLeasing = Some(0L),
         pessimisticCorrection = Map.empty
       )) or
       // not confirmed
@@ -377,7 +376,7 @@ class WavesBlockchainClientTestSuite extends IntegrationSuiteBase with NoStackTr
           Waves -> 10.waves,
           usd -> 1.usd
         ),
-        outLease = Some(0L),
+        outgoingLeasing = Some(0L),
         pessimisticCorrection = Map(Waves -> -(leaseAmount + leasingFee))
       )) or
       // confirmed
@@ -386,7 +385,7 @@ class WavesBlockchainClientTestSuite extends IntegrationSuiteBase with NoStackTr
           Waves -> (10.waves - leaseAmount - leasingFee),
           usd -> 1.usd
         ),
-        outLease = Some(leaseAmount),
+        outgoingLeasing = Some(leaseAmount),
         pessimisticCorrection = Map.empty
       ))
     }

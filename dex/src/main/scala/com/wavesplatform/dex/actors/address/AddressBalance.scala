@@ -64,14 +64,14 @@ case class AddressBalance(
     // Otherwise we can get a stale data and replace the fresh one by this.
     copy(
       regular = NonNegativeMap(snapshot.regular ++ regular.xs),
-      outgoingLeasing = outgoingLeasing.orElse(snapshot.outLease),
+      outgoingLeasing = outgoingLeasing.orElse(snapshot.outgoingLeasing),
       unconfirmed = NonPositiveMap(snapshot.pessimisticCorrection ++ unconfirmed.xs)
     )
 
   def withFresh(updates: AddressBalanceUpdates): AddressBalance =
     copy(
       regular = NonNegativeMap(regular.xs ++ updates.regular),
-      outgoingLeasing = updates.outLease.orElse(outgoingLeasing),
+      outgoingLeasing = updates.outgoingLeasing.orElse(outgoingLeasing),
       unconfirmed = NonPositiveMap(unconfirmed.xs ++ updates.pessimisticCorrection)
     )
 

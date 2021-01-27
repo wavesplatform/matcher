@@ -322,14 +322,14 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
         )
       }
 
-    val outLeases = request.outLeaseAddresses.map { address =>
-      GetBalancesResponse.OutLeasePair(
+    val outgoingLeasing = request.outgoingLeasingAddresses.map { address =>
+      GetBalancesResponse.OutgoingLeasingPair(
         address = address,
         amount = context.blockchain.leaseBalance(address.toVanillaAddress).out
       )
     }
 
-    GetBalancesResponse(regular, outLeases)
+    GetBalancesResponse(regular, outgoingLeasing)
   }
 
   override def forgedOrder(request: ForgedOrderRequest): Future[ForgedOrderResponse] = Future {

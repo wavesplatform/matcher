@@ -77,12 +77,12 @@ class CombinedWavesBlockchainClient(
           if (x.requestNextBlockchainEvent) bClient.blockchainEvents.requestNext()
           requestBalances(x.requestBalances)
           val updatedPessimistic = processUtxEvents(x.utxUpdate) // TODO DEX-1045 Do we need to filter out known transactions (WavesChain)?
-          val changedAddresses = x.updatedBalances.regular.keySet ++ x.updatedBalances.outLeases.keySet ++ updatedPessimistic
+          val changedAddresses = x.updatedBalances.regular.keySet ++ x.updatedBalances.outgoingLeasing.keySet ++ updatedPessimistic
           val updatedFinalBalances = changedAddresses
             .map { address =>
               address -> AddressBalanceUpdates(
                 regular = x.updatedBalances.regular.getOrElse(address, Map.empty),
-                outLease = x.updatedBalances.outLeases.get(address),
+                outgoingLeasing = x.updatedBalances.outgoingLeasing.get(address),
                 pessimisticCorrection =
                   if (updatedPessimistic.contains(address)) pessimisticPortfolios.getAggregated(address)
                   else Map.empty
@@ -154,7 +154,7 @@ class CombinedWavesBlockchainClient(
   override def partialBalancesSnapshot(address: Address, assets: Set[Asset]): Future[AddressBalanceUpdates] =
     (
       meClient.getAddressPartialRegularBalance(address, assets),
-      if (assets.contains(Asset.Waves)) meClient.getOutLeasing(address).map(_.some) else Future.successful(none)
+      if (assets.contains(Asset.Waves)) meClient.getOutgoingLeasing(address).map(_.some) else Future.successful(none)
     ).mapN { case (regular, outgoingLeasing) =>
       def pred(p: (Asset, Long)): Boolean = assets.contains(p._1)
       val full = getFreshBalances(address, regular, outgoingLeasing)
@@ -167,7 +167,7 @@ class CombinedWavesBlockchainClient(
   override def fullBalancesSnapshot(address: Address, excludeAssets: Set[Asset]): Future[AddressBalanceUpdates] =
     (
       meClient.getAddressFullRegularBalance(address, excludeAssets),
-      if (excludeAssets.contains(Asset.Waves)) Future.successful(none[Long]) else meClient.getOutLeasing(address).map(_.some)
+      if (excludeAssets.contains(Asset.Waves)) Future.successful(none[Long]) else meClient.getOutgoingLeasing(address).map(_.some)
     ).mapN { case (regular, outgoingLeasing) =>
       def pred(p: (Asset, Long)): Boolean = !excludeAssets.contains(p._1)
       val full = getFreshBalances(address, regular, outgoingLeasing)
@@ -182,9 +182,9 @@ class CombinedWavesBlockchainClient(
     val r = prioritizedLastUpdates.map(_.regular.getOrElse(address, Map.empty))
     AddressBalanceUpdates(
       regular = r.foldSkipped,
-      outLease =
+      outgoingLeasing =
         if (outgoingLeasing.isEmpty) none[Long]
-        else prioritizedLastUpdates.map(_.outLeases.get(address)).foldLeft(none[Long])(_.orElse(_)),
+        else prioritizedLastUpdates.map(_.outgoingLeasing.get(address)).foldLeft(none[Long])(_.orElse(_)),
       pessimisticCorrection = pessimisticPortfolios.getAggregated(address)
     )
   }
@@ -192,7 +192,7 @@ class CombinedWavesBlockchainClient(
   private def mkBlockchainBalance(address: Address, regular: Map[Asset, Long], outgoingLeasing: Option[Long]): BlockchainBalance =
     BlockchainBalance(
       regular = Map(address -> regular),
-      outLeases = outgoingLeasing.fold(Map.empty[Address, Long])(x => Map(address -> x))
+      outgoingLeasing = outgoingLeasing.fold(Map.empty[Address, Long])(x => Map(address -> x))
     )
 
   // TODO DEX-1012

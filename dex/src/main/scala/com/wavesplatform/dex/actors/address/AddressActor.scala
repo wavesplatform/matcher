@@ -853,6 +853,6 @@ object AddressActor {
       .map { case (asset, v) => s"$v ${asset.maybeBase58Repr.fold("🔷")(_.take(5))}" }
       .mkString("{", ", ", "}")
 
-  def format(xs: AddressBalanceUpdates): String = s"r=${format(xs.regular)}, l=${xs.outLease}, p=${format(xs.pessimisticCorrection)}"
+  def format(xs: AddressBalanceUpdates): String = s"r=${format(xs.regular)}, l=${xs.outgoingLeasing}, p=${format(xs.pessimisticCorrection)}"
 
 }

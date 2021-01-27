@@ -68,7 +68,7 @@ class ActorsWebSocketInteractionsSpecification
         if (a == kp.toAddress) Future.successful(
           AddressBalanceUpdates(
             regular = (currentPortfolio.get().assets ++ Map(Waves -> currentPortfolio.get().balance)).filter(_._2 > 0).toMap,
-            outLease = None,
+            outgoingLeasing = None,
             pessimisticCorrection = Map.empty
           )
         )
@@ -139,7 +139,7 @@ class ActorsWebSocketInteractionsSpecification
 
       val updates = AddressBalanceUpdates(
         regular = regularBalanceChanges,
-        outLease = None,
+        outgoingLeasing = None,
         pessimisticCorrection = Map.empty
       )
 

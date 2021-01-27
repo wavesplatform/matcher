@@ -5,15 +5,15 @@ import com.wavesplatform.dex.collections.MapOps.Ops2D
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 
+// TODO DEX-1058
 /**
-  * @param outLeases Are always positive TODO outLeasing
-  * TODO positive?
-  */
-case class BlockchainBalance(regular: Map[Address, Map[Asset, Long]], outLeases: Map[Address, Long]) {
+ * @param outgoingLeasing Are always positive
+ */
+case class BlockchainBalance(regular: Map[Address, Map[Asset, Long]], outgoingLeasing: Map[Address, Long]) {
 
   def diffIndex: DiffIndex = DiffIndex(
     regular = regular.view.mapValues(_.keySet).toMap,
-    outLeases = outLeases.keySet
+    outgoingLeasing = outgoingLeasing.keySet
   )
 
   def filter(by: DiffIndex): BlockchainBalance = BlockchainBalance(
@@ -21,12 +21,12 @@ case class BlockchainBalance(regular: Map[Address, Map[Asset, Long]], outLeases:
       .map { case (address, assets) => address -> by.regular.get(address).fold(Map.empty[Asset, Long])(assets.view.filterKeys(_).toMap) }
       .filterNot(_._2.isEmpty)
       .toMap,
-    outLeases = outLeases.filter { case (address, _) => by.outLeases.contains(address) }
+    outgoingLeasing = outgoingLeasing.filter { case (address, _) => by.outgoingLeasing.contains(address) }
   )
 
-  def isEmpty: Boolean = regular.isEmpty && outLeases.isEmpty
+  def isEmpty: Boolean = regular.isEmpty && outgoingLeasing.isEmpty
 
-  override def toString: String = s"BlockchainBalance(r={${regular.keys.mkString(", ")}}, ol={${outLeases.keys.mkString(", ")}})"
+  override def toString: String = s"BlockchainBalance(r={${regular.keys.mkString(", ")}}, ol={${outgoingLeasing.keys.mkString(", ")}})"
 }
 
 object BlockchainBalance {
@@ -37,7 +37,7 @@ object BlockchainBalance {
 
     override def combine(x: BlockchainBalance, y: BlockchainBalance): BlockchainBalance = BlockchainBalance(
       regular = x.regular.deepReplace(y.regular),
-      outLeases = x.outLeases ++ y.outLeases
+      outgoingLeasing = x.outgoingLeasing ++ y.outgoingLeasing
     )
 
   }

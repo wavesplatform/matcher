@@ -28,12 +28,12 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
 
   private val updatedBalances1 = BlockchainBalance(
     regular = Map(alice -> Map(Waves -> 10, usd -> 2L)),
-    outLeases = Map(bob -> 23L)
+    outgoingLeasing = Map(bob -> 23L)
   )
 
   private val updatedBalances2 = BlockchainBalance(
     regular = Map(bob -> Map(usd -> 35)),
-    outLeases = Map.empty
+    outgoingLeasing = Map.empty
   )
 
   "StatusTransitions" - {
@@ -141,7 +141,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
         val init = Normal(WavesChain(Vector.empty, 100))
         val event = DataReceived(BlockchainBalance(
           regular = Map.empty,
-          outLeases = Map(alice -> 999L)
+          outgoingLeasing = Map(alice -> 999L)
         ))
         StatusTransitions(init, event) should matchTo(StatusUpdate(
           newStatus = init, // Ignoring
@@ -164,7 +164,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
         reference = block1.ref.id,
         changes = BlockchainBalance(
           regular = Map(carol -> Map(Waves -> 10)),
-          outLeases = Map.empty
+          outgoingLeasing = Map.empty
         ),
         tpe = WavesBlock.Type.FullBlock,
         confirmedTxs = mkTransactionWithChangesMap(2)
@@ -175,7 +175,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
         reference = block1.ref.id,
         changes = BlockchainBalance(
           regular = Map(bob -> Map(usd -> 12), alice -> Map(usd -> 41)),
-          outLeases = Map.empty
+          outgoingLeasing = Map.empty
         ),
         tpe = WavesBlock.Type.FullBlock,
         confirmedTxs = mkTransactionWithChangesMap(3)
@@ -196,7 +196,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
             reference = block2B.ref.id,
             changes = BlockchainBalance(
               regular = Map(alice -> Map(usd -> 8), carol -> Map(Waves -> 4)),
-              outLeases = Map(bob -> 10)
+              outgoingLeasing = Map(bob -> 10)
             ),
             tpe = WavesBlock.Type.MicroBlock,
             confirmedTxs = mkTransactionWithChangesMap(10)
@@ -225,7 +225,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
               reference = ByteStr(Array[Byte](98, 2, -1)),
               changes = BlockchainBalance(
                 regular = Map(alice -> Map(usd -> 8), carol -> Map(Waves -> 4)),
-                outLeases = Map(bob -> 10)
+                outgoingLeasing = Map(bob -> 10)
               ),
               tpe = WavesBlock.Type.FullBlock,
               confirmedTxs = mkTransactionWithChangesMap(10)
@@ -250,7 +250,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
               reference = block2A.ref.id,
               changes = BlockchainBalance(
                 regular = Map(carol -> Map(Waves -> 11)),
-                outLeases = Map.empty
+                outgoingLeasing = Map.empty
               ),
               tpe = WavesBlock.Type.FullBlock,
               confirmedTxs = mkTransactionWithChangesMap(10)
@@ -282,7 +282,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
             reference = block2B.ref.id,
             changes = BlockchainBalance(
               regular = Map(alice -> Map(usd -> 8)),
-              outLeases = Map(bob -> 10)
+              outgoingLeasing = Map(bob -> 10)
             ),
             tpe = WavesBlock.Type.MicroBlock,
             confirmedTxs = mkTransactionWithChangesMap(10)
@@ -295,14 +295,14 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
               main = WavesChain(Vector(microBlock, block2B, block1), 98),
               stashChanges = BlockchainBalance( // block2B + microBlock
                 regular = Map(alice -> Map(usd -> 8), bob -> Map(usd -> 12)),
-                outLeases = Map(bob -> 10)
+                outgoingLeasing = Map(bob -> 10)
               ),
               utxUpdate = init.utxUpdate |+| UtxUpdate(
                 confirmedTxs = block2B.confirmedTxs ++ microBlock.confirmedTxs,
                 failedTxs = Map.empty // Doesn't affect
               )
             ),
-            requestBalances = DiffIndex(regular = Map(carol -> Set(Waves: Asset)), outLeases = Set.empty),
+            requestBalances = DiffIndex(regular = Map(carol -> Set(Waves: Asset)), outgoingLeasing = Set.empty),
             updatedLastBlockHeight = LastBlockHeight.NotChanged
           ))
         }
@@ -372,7 +372,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
         reference = block.ref.id,
         changes = BlockchainBalance(
           regular = Map(carol -> Map(Waves -> 10)),
-          outLeases = Map.empty
+          outgoingLeasing = Map.empty
         ),
         tpe = WavesBlock.Type.MicroBlock,
         confirmedTxs = mkTransactionWithChangesMap(2)
@@ -382,7 +382,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
         main = WavesChain(Vector(microBlock, block), 99),
         stashChanges = BlockchainBalance(
           regular = Map(carol -> Map(Waves -> 10)),
-          outLeases = Map.empty
+          outgoingLeasing = Map.empty
         ),
         utxUpdate = UtxUpdate(failedTxs = mkUtxTransactionMap(30))
       )
@@ -399,7 +399,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
           reference = microBlock.ref.id,
           changes = BlockchainBalance(
             regular = Map(bob -> Map(usd -> 1)),
-            outLeases = Map(carol -> 10)
+            outgoingLeasing = Map(carol -> 10)
           ),
           tpe = WavesBlock.Type.MicroBlock,
           confirmedTxs = mkTransactionWithChangesMap(10)
@@ -445,7 +445,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
       "DataReceived -> Normal" in {
         val event = DataReceived(BlockchainBalance(
           regular = Map(alice -> Map(Waves -> 1)),
-          outLeases = Map.empty
+          outgoingLeasing = Map.empty
         ))
         StatusTransitions(init, event) should matchTo(StatusUpdate(
           newStatus = Normal(init.main),
@@ -454,7 +454,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
               alice -> Map(Waves -> 1),
               carol -> Map(Waves -> 10)
             ),
-            outLeases = Map.empty
+            outgoingLeasing = Map.empty
           ),
           updatedLastBlockHeight = LastBlockHeight.Updated(init.main.height),
           utxUpdate = init.utxUpdate,

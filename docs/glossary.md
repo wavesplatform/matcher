@@ -5,14 +5,14 @@
 * **regular balance**
 * **outgoing leasing**
 * **pessimistic correction** is a sum of all spending by **unconfirmed transactions** of this account
-* **open volume** is all reserved by active orders assets
+* **reserved** is all reserved by active orders assets (open volume)
 * **node balance**
   ```text
   node balance = regular balance - outgoing leasing - pessimistic correction
   ```
 * **tradable balance**
   ```text
-  tradable balance = node balance - open volume
+  tradable balance = node balance - reserved
   ```
 
 ## Transactions

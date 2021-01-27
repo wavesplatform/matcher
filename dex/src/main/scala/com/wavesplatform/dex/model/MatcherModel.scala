@@ -127,7 +127,7 @@ sealed trait AcceptedOrder {
   def forMarket(fm: MarketOrder => Unit): Unit
   def forLimit(fl: LimitOrder => Unit): Unit
 
-  def status: OrderStatus =
+  lazy val status: OrderStatus =
     if (amount == order.amount) OrderStatus.Accepted
     else if (isValid) OrderStatus.PartiallyFilled(filledAmount, filledFee)
     else OrderStatus.Filled(filledAmount, filledFee)

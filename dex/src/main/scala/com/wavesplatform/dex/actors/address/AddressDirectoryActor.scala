@@ -59,7 +59,7 @@ class AddressDirectoryActor(
 
     case Command.StartWork =>
       recovered = true
-      context.children.foreach(_ ! AddressActor.Command.StartWork)
+      context.children.foreach(_ ! AddressActor.Command.CompleteRecovering)
   }
 
   private def sendEventToHistoryRouter(command: AddressActor.Command.HasOrderBookEvent): Unit = sendEventToHistoryRouter(command.event)
@@ -84,7 +84,7 @@ object AddressDirectoryActor {
       orderDB,
       mkAddressActorProps,
       historyRouterRef,
-      false
+      recovered = false
     )
   )
 

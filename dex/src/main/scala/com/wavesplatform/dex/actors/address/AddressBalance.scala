@@ -46,9 +46,8 @@ case class AddressBalance(
    */
   def allTradableBalances: NonNegativeMap[Asset, Long] = tradableBalances(allAssets)
 
-  def tradableBalances(assets: Set[Asset]): NonNegativeMap[Asset, Long] = NonNegativeMap(assets.fproduct(tradableBalanceBy).toMap)
-
-  private def tradableBalanceBy(asset: Asset): Long = math.max(0L, nodeBalanceBy(asset) - reserved.getOrElse(asset, 0L))
+  def tradableBalances(assets: Set[Asset]): NonNegativeMap[Asset, Long] = NonNegativeMap(assets.fproduct(tradableBalance).toMap)
+  def tradableBalance(asset: Asset): Long = math.max(0L, nodeBalanceBy(asset) - reserved.getOrElse(asset, 0L))
 
   def nodeBalances(assets: Set[Asset]): Map[Asset, Long] = assets.fproduct(nodeBalanceBy).toMap
 
@@ -85,7 +84,8 @@ case class AddressBalance(
 
   /**
    * @param expectedTxId Could be None if a transaction wasn't created or has been already created (see OrderEventsCoordinatorActor)
-   * @param executionTotalVolumeDiff An order's executed assets or a sum of two
+   * @param executionTotalVolumeDiff An order's executed volume diff or a sum of two. We require a negative diff,
+   *                                 because reservation is decreased each time we execute an order.
    * @return (updated, affected assets)
    */
   def withExecuted(expectedTxId: Option[ExchangeTransaction.Id], executionTotalVolumeDiff: NegativeMap[Asset, Long]): (AddressBalance, Set[Asset]) = {

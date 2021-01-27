@@ -105,7 +105,7 @@ class AddressActor(
       lazy val orderReserve = order.reservableBalance
       order.status match {
         case OrderStatus.Accepted =>
-          orderDB.saveOrder(order.order) // TODO write once
+          orderDB.saveOrder(order.order) // TODO DEX-1057
           origActiveOrder match {
             case Some(_) => // The order added before in the ValidationPassed -> place function, balances are already updated
             case None => reserve(orderReserve)
@@ -141,7 +141,7 @@ class AddressActor(
               expiration.remove(remaining.id).foreach(_.cancel())
               orderDB.saveOrderInfo(remaining.id, owner, OrderInfo.v6(remaining, status))
               activeOrders.remove(remaining.id) match {
-                case Some(origActiveOrder) => origActiveOrder.reservableBalance.inverse() // TODO
+                case Some(origActiveOrder) => origActiveOrder.reservableBalance.inverse()
                 case None => throw new IllegalStateException(s"Can't find order ${remaining.id} during finalization")
               }
 
@@ -233,6 +233,9 @@ class AddressActor(
           log.info(s"[Balance] 💵: ${format(x)}")
           if (recovered) becomeWorking() else context.become(starting(recovered, gotBalances = true))
       }
+
+    case Query.GetReservedBalance => sender() ! Reply.GetBalance(error.AddressHandlerIsStarting.asLeft)
+    case _: Query.GetTradableBalance => sender() ! Reply.GetBalance(error.AddressHandlerIsStarting.asLeft)
 
     case x => stash(x)
   }
@@ -340,7 +343,6 @@ class AddressActor(
       log.info(s"Got $command")
       changeBalances(command.updates)
 
-    // TODO actually we can't fail here. asLeft probably during an initialization? Or should we use another approach?
     case Query.GetReservedBalance => sender() ! Reply.GetBalance(balances.reserved.xs.asRight)
     case query: Query.GetTradableBalance => sender() ! Reply.GetBalance(balances.tradableBalances(query.forAssets).filter(_._2 > 0).asRight)
 
@@ -406,7 +408,7 @@ class AddressActor(
       log.trace(s"[c=${client.path.name}] Added WebSocket subscription")
       wsAddressState = wsAddressState.addSubscription(
         client,
-        mkWsBalances(balances.allTradableBalances.xs, includeEmpty = false),
+        mkWsBalances(balances.allAssets, includeEmpty = false),
         activeOrders.values.map(WsOrder.fromDomain(_)).to(Seq)
       )
       context.watch(client)
@@ -421,7 +423,7 @@ class AddressActor(
       if (wsAddressState.hasActiveSubscriptions && wsAddressState.hasChanges)
         wsAddressState = wsAddressState
           .sendDiffs(
-            balances = mkWsBalances(balances.tradableBalances(wsAddressState.changedAssets).xs, includeEmpty = true),
+            balances = mkWsBalances(wsAddressState.changedAssets, includeEmpty = true),
             orders = wsAddressState.getAllOrderChanges
           )
           .clean()
@@ -474,33 +476,27 @@ class AddressActor(
   private def scheduleNextDiffSending(): Unit =
     if (wsSendSchedule.isCancelled) wsSendSchedule = context.system.scheduler.scheduleOnce(settings.wsMessagesInterval, self, WsCommand.SendDiff)
 
-  private def denormalizedBalanceValue(asset: Asset, decimals: Int)(balanceSource: Map[Asset, Long]): Double =
-    denormalizeAmountAndFee(balanceSource.getOrElse(asset, 0L), decimals).toDouble
+  private def mkWsBalances(forAssets: Set[Asset], includeEmpty: Boolean): Map[Asset, WsBalances] = forAssets
+    .flatMap { asset =>
+      efc.assetDecimals(asset) match {
+        case None =>
+          log.error(s"Can't find asset decimals for $asset")
+          Nil // It is better to hide unknown assets rather than stop working
 
-  // TODO refactor
-  private def mkWsBalances(tradableBalances: Map[Asset, Long], includeEmpty: Boolean): Map[Asset, WsBalances] =
-    tradableBalances
-      .keys
-      .flatMap { asset =>
-        efc.assetDecimals(asset) match {
-          case None =>
-            log.error(s"Can't find asset decimals for $asset")
-            List.empty // It is better to hide unknown assets rather than stop working
-          case Some(decimals) =>
-            val tradable = tradableBalances(asset)
-            val reserved = balances.reserved.getOrElse(asset, 0L)
-            if (tradable > 0 || reserved > 0 || includeEmpty) {
-              val assetDenormalizedBalanceFrom = denormalizedBalanceValue(asset, decimals)(_)
-              List(
-                asset -> WsBalances(
-                  assetDenormalizedBalanceFrom(tradableBalances), // TODO
-                  assetDenormalizedBalanceFrom(balances.reserved.xs)
-                )
+        case Some(decimals) =>
+          val tradable = balances.tradableBalance(asset)
+          val reserved = balances.reserved.getOrElse(asset, 0L)
+          if (includeEmpty || tradable > 0 || reserved > 0)
+            List(
+              asset -> WsBalances(
+                tradable = denormalizeAmountAndFee(tradable, decimals).toDouble,
+                reserved = denormalizeAmountAndFee(reserved, decimals).toDouble
               )
-            } else List.empty
-        }
+            )
+          else Nil
       }
-      .to(Map)
+    }
+    .to(Map)
 
   private def isCancelling(id: Order.Id): Boolean = pendingCommands.get(id).exists(_.command.isInstanceOf[Command.CancelOrder])
 

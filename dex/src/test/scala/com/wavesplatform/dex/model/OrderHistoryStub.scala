@@ -28,7 +28,7 @@ class OrderHistoryStub(system: ActorSystem, time: Time, maxActiveOrders: Int, ma
     override def getFullBalances(address: Address, exclude: Set[Asset]): Future[AddressBalanceUpdates] = emptyAddressBalanceUpdatesF
   }
 
-  def createAddressActor(address: Address, started: Boolean): Props =
+  def createAddressActor(address: Address, recovered: Boolean): Props =
     Props(
       new AddressActor(
         address,
@@ -36,7 +36,7 @@ class OrderHistoryStub(system: ActorSystem, time: Time, maxActiveOrders: Int, ma
         new TestOrderDB(maxFinalizedOrders),
         (_, _) => Future.successful(Right(())),
         e => Future.successful(Some(ValidatedCommandWithMeta(0L, 0, e))),
-        started,
+        recovered,
         blockchainInteraction,
         AddressActor.Settings.default.copy(maxActiveOrders = maxActiveOrders)
       )
@@ -47,7 +47,7 @@ class OrderHistoryStub(system: ActorSystem, time: Time, maxActiveOrders: Int, ma
   private def actorForAddress(address: Address): ActorRef =
     refs.getOrElseUpdate(
       address,
-      system.actorOf(createAddressActor(address, started = true))
+      system.actorOf(createAddressActor(address, recovered = true))
     )
 
   lazy val addressDir = system.actorOf(

@@ -75,7 +75,7 @@ class ActorsWebSocketInteractionsSpecification
         else Future.failed(WavesNodeConnectionLostException("Node unavailable", new IllegalStateException))
     }
 
-    def createAddressActor(address: Address, started: Boolean): Props =
+    def createAddressActor(address: Address, recovered: Boolean): Props =
       Props(
         new AddressActor(
           address,
@@ -86,7 +86,7 @@ class ActorsWebSocketInteractionsSpecification
             commandsProbe.ref ! command
             Future.successful(Some(ValidatedCommandWithMeta(0L, 0L, command)))
           },
-          started,
+          recovered,
           blockchainInteraction
         )
       )

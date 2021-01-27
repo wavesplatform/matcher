@@ -218,13 +218,13 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   private def storeCommand(payload: ValidatedCommand): Future[Option[ValidatedCommandWithMeta]] =
     storeBreaker.withCircuitBreaker(matcherQueue.store(payload))
 
-  private def mkAddressActorProps(address: Address, started: Boolean): Props = AddressActor.props(
+  private def mkAddressActorProps(address: Address, recovered: Boolean): Props = AddressActor.props(
     address,
     time,
     orderDB,
     ValidationStages.mkSecond(wavesBlockchainAsyncClient, orderBookAskAdapter),
     storeCommand,
-    started,
+    recovered,
     addressActorBlockchainInteraction,
     settings.addressActor
   )

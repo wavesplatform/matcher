@@ -128,9 +128,17 @@ object ReleasePlugin extends AutoPlugin {
     ) ++ Seq(
       commands += Command.command("packageAllForNetworks") { state =>
         NodeNetwork.All.foreach { x =>
+          // See also https://gitter.im/sbt/sbt-native-packager?at=55b2761752d85d450f4008ff
+          println(s"Building for '$x' network...")
           val updatedNetworkState = Project
             .extract(state)
-            .appendWithoutSession(Seq(Global / network := x), state)
+            .appendWithoutSession(
+              Seq(
+                Global / network := x,
+                Global / scalacOptions += "-Xdisable-assertions"
+              ),
+              state
+            )
 
           Project.extract(updatedNetworkState).runTask(Compile / packageAll, updatedNetworkState)
         }

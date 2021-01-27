@@ -21,7 +21,7 @@ trait SafeMapOpsFactory[C[_, _]] {
 
   def apply[K, V](xs: Map[K, V])(implicit n: Numeric[V]): C[K, V] = {
     lazy val invalidPair = xs.find { case (_, v) => !isValid(v) }
-    assume(invalidPair.isEmpty, s"Found illegal value in pair: ${invalidPair.get}")
+    assert(invalidPair.isEmpty, s"Found illegal value in pair: ${invalidPair.get}")
     safeMk(xs)
   }
 

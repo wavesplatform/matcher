@@ -1,6 +1,8 @@
 libraryDependencies ++= Dependencies.Module.dexLoad
 run / fork := true
 
+scalacOptions += "-P:silencer:globalFilters=^magnolia: using fallback derivation.*$" // https://github.com/softwaremill/diffx#customization
+
 TaskKey[Unit]("generateAmmo") := (runMain in Compile)
   .toTask(
     s" com.wavesplatform.dex.load.WavesDexLoadCli create-requests -rsp=${sys.env.getOrElse("SEED", "test")} -an=${sys.env.getOrElse("AN", "6000")} -rc=${sys.env

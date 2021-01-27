@@ -258,7 +258,7 @@ object Dependencies {
       betterMonadicFor
     ) ++ pureConfig ++ enumeratum ++ testKit ++ quill ++ monocle ++ levelDBJNA
 
-    lazy val dexLoad: Seq[ModuleID] = Seq(diffx) ++ pureConfig
+    lazy val dexLoad: Seq[ModuleID] = Seq(diffx) ++ pureConfig ++ silencer
 
     lazy val dexIt: Seq[ModuleID] = integrationTestKit ++ Seq(parCollections)
 

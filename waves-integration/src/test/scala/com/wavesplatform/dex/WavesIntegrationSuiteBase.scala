@@ -2,6 +2,8 @@ package com.wavesplatform.dex
 
 import com.google.protobuf.{ByteString, UnsafeByteOperations}
 import com.softwaremill.diffx.{ConsoleColorConfig, Derived, Diff, DiffResultDifferent, DiffResultValue, FieldPath, Identical}
+import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.grpc.integration.clients.domain.TransactionWithChanges
@@ -31,6 +33,14 @@ trait WavesIntegrationSuiteBase extends AnyFreeSpecLike with Matchers with Allur
   // Fixes "Class too large" compiler issue
   implicit val derivedSignedTransactionDiff: Derived[Diff[TransactionWithChanges]] =
     Derived(byteStringDiff.contramap[TransactionWithChanges](_.txId))
+
+  implicit val issuedAssetDiff: Diff[IssuedAsset] = { (left: IssuedAsset, right: IssuedAsset, _: List[FieldPath]) =>
+    if (left.id == right.id) Identical(left) else DiffResultValue(left, right)
+  }
+
+  implicit val assetDiff: Diff[Asset] = { (left: Asset, right: Asset, _: List[FieldPath]) =>
+    if (left == right) Identical(left) else DiffResultValue(left, right)
+  }
 
   def getDiff[T](comparison: (T, T) => Boolean): Diff[T] = { (left: T, right: T, _: List[FieldPath]) =>
     if (comparison(left, right)) Identical(left) else DiffResultValue(left, right)

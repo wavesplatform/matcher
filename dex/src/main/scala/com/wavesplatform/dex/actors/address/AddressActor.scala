@@ -222,20 +222,20 @@ class AddressActor(
   private def starting(recovered: Boolean, gotBalances: Boolean): Receive = eventsProcessing orElse failuresProcessing orElse {
     case Command.CompleteRecovering => if (gotBalances) becomeWorking() else context.become(starting(recovered = true, gotBalances))
 
-    case command: Command.SetInitialBalances => // TODO test
+    case command: Command.SetInitialBalances =>
       command.snapshot match {
         case Failure(_) =>
-          log.warn("Can't receive initial balances")
           askFullBalances(command.attempt + 1)
+          val message = s"Can't receive initial balances (${command.attempt})"
+          if (command.attempt < 5) log.debug(message)
+          else if (command.attempt < 10) log.warn(message)
+          else log.error(message)
 
         case Success(x) =>
           balances = balances.withInit(x)
           log.info(s"[Balance] 💵: ${format(x)}")
           if (recovered) becomeWorking() else context.become(starting(recovered, gotBalances = true))
       }
-
-    case Query.GetReservedBalance => sender() ! Reply.GetBalance(error.AddressHandlerIsStarting.asLeft)
-    case _: Query.GetTradableBalance => sender() ! Reply.GetBalance(error.AddressHandlerIsStarting.asLeft)
 
     case x => stash(x)
   }
@@ -343,8 +343,8 @@ class AddressActor(
       log.info(s"Got $command")
       changeBalances(command.updates)
 
-    case Query.GetReservedBalance => sender() ! Reply.GetBalance(balances.reserved.xs.asRight)
-    case query: Query.GetTradableBalance => sender() ! Reply.GetBalance(balances.tradableBalances(query.forAssets).filter(_._2 > 0).asRight)
+    case Query.GetReservedBalance => sender() ! Reply.GetBalance(balances.reserved.xs)
+    case query: Query.GetTradableBalance => sender() ! Reply.GetBalance(balances.tradableBalances(query.forAssets).filter(_._2 > 0))
 
     case Query.GetOrderStatus(orderId) =>
       sender() ! Reply.GetOrderStatus(activeOrders.get(orderId).fold[OrderStatus](orderDB.status(orderId))(_.status))
@@ -719,7 +719,7 @@ object AddressActor {
     case class GetOrderStatus(x: OrderStatus) extends Reply
     case class GetOrderStatuses(xs: Seq[(Order.Id, OrderInfo[OrderStatus])]) extends Reply
     case class GetOrdersStatusInfo(maybeOrderStatusInfo: Option[OrderInfo[OrderStatus]]) extends Reply
-    case class GetBalance(balance: Either[MatcherError, Map[Asset, Long]]) extends Reply
+    case class GetBalance(balance: Map[Asset, Long]) extends Reply
   }
 
   sealed trait Command extends Message

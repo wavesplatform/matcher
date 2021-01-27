@@ -528,7 +528,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
           responseAs[HttpError] should matchTo(
             HttpError(
               error = 3148801,
-              message = "Provided public key is not correct, reason: Unable to decode base58: requirement failed: Wrong char ';' in Base58 string ';;'",
+              message =
+                "Provided public key is not correct, reason: Unable to decode base58: requirement failed: Wrong char ';' in Base58 string ';;'",
               template = "Provided public key is not correct, reason: {{reason}}",
               params = Some(Json.obj("reason" -> "Unable to decode base58: requirement failed: Wrong char ';' in Base58 string ';;'")),
               status = "InvalidPublicKey"
@@ -1128,7 +1129,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       val response = msg match {
         case AddressDirectoryActor.Command.ForwardMessage(_, msg) =>
           msg match {
-            case AddressActor.Query.GetReservedBalance => AddressActor.Reply.GetBalance(Map[Asset, Long](Waves -> 350L).asRight)
+            case AddressActor.Query.GetReservedBalance => AddressActor.Reply.GetBalance(Map[Asset, Long](Waves -> 350L))
             case PlaceOrder(x, _) => if (x.id() == okOrder.id()) AddressActor.Event.OrderAccepted(x) else error.OrderDuplicate(x.id())
 
             case AddressActor.Query.GetOrdersStatuses(_, _) =>
@@ -1160,7 +1161,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
                 }.toMap
               )
 
-            case GetTradableBalance(xs) => AddressActor.Reply.GetBalance(xs.map(_ -> 100L).toMap.asRight)
+            case GetTradableBalance(xs) => AddressActor.Reply.GetBalance(xs.map(_ -> 100L).toMap)
 
             case _: AddressActor.Query.GetOrderStatusInfo =>
               AddressActor.Reply.GetOrdersStatusInfo(OrderInfo.v5(LimitOrder(orderToCancel), OrderStatus.Accepted).some)

@@ -954,12 +954,7 @@ class MatcherApiRoute(
     withAddress(addressOrError) { address =>
       withAssetPair(pairOrError, redirectToInverse = true, s"/tradableBalance/$address") { pair =>
         complete {
-          askMapAddressActor[AddressActor.Reply.GetBalance](address, AddressActor.Query.GetTradableBalance(pair.assets)) { x =>
-            x.balance match {
-              case Right(x) => StatusCodes.OK -> x.toJson
-              case Left(e) => StatusCodes.ServiceUnavailable -> HttpError.from(e, "NotAvailable")
-            }
-          }
+          askMapAddressActor[AddressActor.Reply.GetBalance](address, AddressActor.Query.GetTradableBalance(pair.assets))(_.balance.toJson)
         }
       }
     }
@@ -992,12 +987,7 @@ class MatcherApiRoute(
         case Some(upk) if upk != publicKey => invalidUserPublicKey
         case _ =>
           complete {
-            askMapAddressActor[AddressActor.Reply.GetBalance](publicKey, AddressActor.Query.GetReservedBalance) { x =>
-              x.balance match {
-                case Right(x) => StatusCodes.OK -> x.toJson
-                case Left(e) => StatusCodes.ServiceUnavailable -> HttpError.from(e, "NotAvailable")
-              }
-            }
+            askMapAddressActor[AddressActor.Reply.GetBalance](publicKey, AddressActor.Query.GetReservedBalance)(_.balance.toJson)
           }
       }
     }

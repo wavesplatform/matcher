@@ -5,7 +5,6 @@ import akka.actor.typed.scaladsl.adapter._
 import akka.actor.{ActorRef, ActorSystem, PoisonPill, Props}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import cats.kernel.Monoid
-import cats.syntax.either._
 import com.wavesplatform.dex.MatcherSpecBase
 import com.wavesplatform.dex.actors.address.AddressActor.BlockchainInteraction
 import com.wavesplatform.dex.actors.address.AddressActor.Command.Source
@@ -26,9 +25,11 @@ import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder, MarketOrder}
 import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import org.scalatest.BeforeAndAfterAll
+import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
@@ -41,7 +42,8 @@ class AddressActorSpecification
     with BeforeAndAfterAll
     with ImplicitSender
     with DiffMatcherWithImplicits
-    with MatcherSpecBase {
+    with MatcherSpecBase
+    with Eventually {
 
   implicit private val typedSystem = system.toTyped
   implicit private val efc: ErrorFormatterContext = ErrorFormatterContext.from(_ => 8)
@@ -92,6 +94,35 @@ class AddressActorSpecification
   private val sellWavesPortfolio = requiredPortfolio(sellWavesOrder)
 
   "AddressActorSpecification" should {
+    val failed = Future.failed(new RuntimeException("test"))
+    val kp = KeyPair(ByteStr("test".getBytes(StandardCharsets.UTF_8)))
+
+    "request balances during a start" in {
+      @volatile var requested = false
+
+      def createAddressActor(address: Address, recovered: Boolean): Props =
+        Props(
+          new AddressActor(
+            address,
+            time,
+            EmptyOrderDB,
+            (_, _) => Future.successful(Right(())),
+            _ => failed,
+            recovered,
+            (_: Address, _: Set[Asset]) => {
+              requested = true
+              failed
+            }
+          )
+        )
+
+      val addressDir = system.actorOf(Props(new AddressDirectoryActor(EmptyOrderDB, createAddressActor, None, recovered = false)))
+      addressDir ! AddressDirectoryActor.Command.ForwardMessage(kp, AddressActor.Query.GetReservedBalance) // Creating an actor with kp's address
+      eventually {
+        requested shouldBe true
+      }
+    }
+
     "cancel orders" when {
       "asset balance changed" in test { (_, commandsProbe, addOrder, updatePortfolio) =>
         val initPortfolio = sellToken1Portfolio
@@ -135,14 +166,15 @@ class AddressActorSpecification
     }
 
     "return reservable balance without excess assets" in test { (ref, _, addOrder, updatePortfolio) =>
-      val initPortfolio = sellToken1Portfolio
-      updatePortfolio(initPortfolio)
+      updatePortfolio(sellToken1Portfolio)
 
       addOrder(LimitOrder(sellTokenOrder1))
 
-      ref ! GetTradableBalance(Set(Waves))
+      ref ! GetTradableBalance(Set(Waves)) // TODO reservable?
       expectMsgPF(hint = "Balance") {
-        case r: GetBalance => r should matchTo(GetBalance(Map[Asset, Long](Waves -> 0L).asRight))
+        case r: GetBalance =>
+          println(r.toString)
+          r should matchTo(GetBalance(Map[Asset, Long](Waves -> 0L)))
         case _ =>
       }
     }

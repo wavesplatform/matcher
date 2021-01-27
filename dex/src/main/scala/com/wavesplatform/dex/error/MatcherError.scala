@@ -246,8 +246,6 @@ case object RequestInvalidSignature extends MatcherError(request, signature, com
 case class RequestArgumentInvalid(name: String)
     extends MatcherError(request, commonEntity, commonClass, e"The request argument '${Symbol("name") -> name}' is invalid")
 
-case object AddressHandlerIsStarting extends MatcherError(address, commonEntity, starting, e"Address handler is starting. Please retry later")
-
 case class AccountFeatureUnsupported(x: BlockchainFeature)
     extends MatcherError(
       feature,

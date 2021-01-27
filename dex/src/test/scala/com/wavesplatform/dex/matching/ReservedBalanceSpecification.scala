@@ -16,7 +16,6 @@ import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
 import com.wavesplatform.dex.meta.getSimpleName
@@ -128,7 +127,6 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
           .mapTo[AddressActor.Reply.GetBalance].map(_.balance),
         Duration.Inf
       )
-      .explicitGet()
       .getOrElse(assetId, 0L)
 
   def execute(counter: Order, submitted: Order): OrderExecuted = {

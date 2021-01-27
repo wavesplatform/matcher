@@ -19,7 +19,7 @@ object Fee {
 
     def absoluteFee(totalCounterFee: Long, totalSubmittedFee: Long): (Long, Long) = {
       val counterExecutedFee = partialFee(totalCounterFee, c.order.amount, executedAmount)
-      val submittedExecutedFee = partialFee(totalSubmittedFee, s.order.amount, executedAmount) // (1920, 200000000000, 100000000)
+      val submittedExecutedFee = partialFee(totalSubmittedFee, s.order.amount, executedAmount)
 
       (
         if (c.isFirstMatch && c.order.version >= 3) counterExecutedFee max 1L else counterExecutedFee,

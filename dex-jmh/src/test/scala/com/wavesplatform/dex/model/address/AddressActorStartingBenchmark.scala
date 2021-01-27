@@ -105,7 +105,7 @@ object AddressActorStartingBenchmark {
             validate = (_, _) => Future.successful(().asRight),
             store = command => Future.successful(Some(ValidatedCommandWithMeta(0L, 0L, command))),
             recovered = true,
-            blockchain = (address: Address, exclude: Set[Asset]) => Future.successful(AddressBalanceUpdates.empty),
+            blockchain = (_: Address, _: Set[Asset]) => Future.successful(AddressBalanceUpdates.empty),
             settings = AddressActor.Settings.default
           )
         )

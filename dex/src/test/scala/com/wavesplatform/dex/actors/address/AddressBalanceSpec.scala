@@ -106,7 +106,7 @@ class AddressBalanceSpec extends AnyFreeSpecLike with Generators with DiffMatche
           "adds it to notObservedTxs" in forAll(balanceAndTxGen) { case (orig, txId, txReserve) =>
             val (updated, affected) = orig.withExecuted(txId.some, NegativeMap(txReserve.inverse()))
             updated.notObservedTxs.keySet should contain(txId)
-            affected shouldBe empty // Because
+            affected shouldBe empty
           }
         }
       }

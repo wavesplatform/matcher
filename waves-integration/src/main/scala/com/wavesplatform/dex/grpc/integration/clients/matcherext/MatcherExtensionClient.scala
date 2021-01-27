@@ -18,6 +18,7 @@ trait MatcherExtensionClient {
 
   def getBalances(index: DiffIndex): Future[BlockchainBalance]
 
+  // TODO outgoing
   def getOutLeasing(address: Address): Future[Long]
   def getAddressPartialRegularBalance(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]]
   def getAddressFullRegularBalance(address: Address, excludeAssets: Set[Asset]): Future[Map[Asset, Long]]

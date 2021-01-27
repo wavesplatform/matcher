@@ -286,13 +286,10 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
   }
 
   override def getAddressFullRegularBalance(request: GetAddressFullRegularBalanceRequest): Future[GetAddressFullRegularBalanceResponse] = {
-    import scala.util.chaining._
+    // TODO DEX-997 optimize
     for {
       address <- Task.fromTry(Try(request.address.toVanillaAddress))
-      assetBalances <- {
-        log.info(s"[getAddressFullRegularBalance] Asking balances for $address")
-        context.accountsApi.portfolio(address).toListL
-      } // TODO DEX-997 optimize
+      assetBalances <- context.accountsApi.portfolio(address).toListL
       excludeAssets = request.excludeAssetIds.view.map(_.toVanillaAsset).toSet
       wavesBalance <- if (excludeAssets.contains(Waves)) Task.now(none) else Task(context.accountsApi.balance(address).some)
     } yield GetAddressFullRegularBalanceResponse(
@@ -303,9 +300,6 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
         .toList
         .prependIf(wavesBalance.nonEmpty) {
           GetAddressFullRegularBalanceResponse.Record(Waves.toPB, wavesBalance.get)
-        }
-        .tap { xs =>
-          log.info(s"[getAddressFullRegularBalance] Sending to $address: ${xs.map(x => s"${x.balance} ${x.assetId.toVanillaAsset}").mkString(", ")}")
         }
     )
   }.runToFuture

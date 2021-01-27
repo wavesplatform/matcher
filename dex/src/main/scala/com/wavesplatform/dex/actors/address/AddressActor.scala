@@ -68,6 +68,8 @@ class AddressActor(
 
   private var isWorking = false
 
+  // We need this because an order's validation is asynchronous and
+  //  placing an order may affect following places.
   private var placementQueue = Queue.empty[Order.Id]
   private val pendingCommands = MutableMap.empty[Order.Id, PendingCommand]
 
@@ -389,7 +391,7 @@ class AddressActor(
     case event: ValidationEvent =>
       log.trace(s"Got $event")
       placementQueue.dequeueOption.foreach { case (orderId, restQueue) =>
-        if (orderId == event.orderId) {
+        if (orderId == event.orderId) { // TODO Could this really happen?
           event match {
             case Event.ValidationPassed(ao) => pendingCommands.get(ao.id).foreach(_ => place(ao))
             case Event.ValidationFailed(_, reason) =>

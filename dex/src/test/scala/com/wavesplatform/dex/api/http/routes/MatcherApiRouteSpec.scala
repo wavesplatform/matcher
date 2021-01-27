@@ -1129,7 +1129,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       val response = msg match {
         case AddressDirectoryActor.Command.ForwardMessage(_, msg) =>
           msg match {
-            case AddressActor.Query.GetReservedBalance => AddressActor.Reply.GetBalance(Map[Asset, Long](Waves -> 350L))
+            case AddressActor.Query.GetReservedBalance => AddressActor.Reply.GetBalance(Map(Waves -> 350L))
             case PlaceOrder(x, _) => if (x.id() == okOrder.id()) AddressActor.Event.OrderAccepted(x) else error.OrderDuplicate(x.id())
 
             case AddressActor.Query.GetOrdersStatuses(_, _) =>

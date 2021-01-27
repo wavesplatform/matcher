@@ -432,11 +432,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
     }
 
     "partially filled order with non-waves fee" in {
-      eventually {
-        wavesNode1.api.unconfirmedTransactions shouldBe empty
-      }
-
-      val aliceEthBalance = dex1.api.getTradableBalance(alice, ethWavesPair)(eth) // 999899987303
+      val aliceEthBalance = dex1.api.getTradableBalance(alice, ethWavesPair)(eth)
       upsertRates(btc -> btcRate, eth -> ethRate)
 
       val bobOrder = mkOrder(
@@ -452,8 +448,6 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
 
       dex1.api.place(bobOrder)
 
-      // amount 2000 ?
-      // filledFee = 1 ?
       val aliceOrder = mkOrder(
         owner = alice,
         pair = wavesBtcPair,
@@ -470,13 +464,6 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
       dex1.api.getReservedBalance(alice).keys.size shouldBe 0
       wavesNode1.api.balance(alice, eth) shouldBe (aliceEthBalance - 960L) // 960 = 1920/2
       List(btc, eth).foreach(dex1.api.deleteRate)
-
-      // TODO why did 6X5Z7PcNi1cuwgeAZoUUekh4UaB7s2vZ2KtmtWYorN8G come twice?
-      /*
-      2021-01-20 18:38:07,255 [Balance] otx=6X5Z7PcNi1cuwgeAZoUUekh4UaB7s2vZ2KtmtWYorN8G; 💵: 999899985384 GLLhy, 495149949900000 ?
-      2021-01-20 18:38:07,999 [Balance] 💵: 495149849900000 ?, 500000 3mt5G, 999899984424 GLLhy; u: r=495150049900000 ?, 500000 3mt5G, 999899986344 GLLhy, l=None, p=
-      2021-01-20 18:38:07,999 [Balance] otx=6X5Z7PcNi1cuwgeAZoUUekh4UaB7s2vZ2KtmtWYorN8G; 💵:
-       */
     }
   }
 
@@ -617,7 +604,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
 
       val sellOrder = mkOrder(bob, wavesUsdPair, OrderType.SELL, 1.waves, 100, 0.003.waves, version = 2: Byte)
 
-      placeAndAwaitAtDex(sellOrder, Status.Filled) // <---
+      placeAndAwaitAtDex(sellOrder, Status.Filled)
       waitForOrderAtNode(sellOrder)
 
       dex1.api.waitForOrderStatus(buyOrder, Status.PartiallyFilled).filledAmount shouldBe Some(1.waves)

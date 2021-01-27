@@ -12,21 +12,18 @@ import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.clients.domain.{AddressBalanceUpdates, WavesNodeUpdates}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
-import com.wavesplatform.dex.grpc.integration.settings.WavesBlockchainClientSettings
 import monix.eval.Task
 import monix.reactive.Observable
 
 import scala.concurrent.{ExecutionContext, Future}
 
 class MatcherExtensionAssetsWatchingClient(
-  settings: WavesBlockchainClientSettings, // TODO remove
   underlying: WavesBlockchainClient,
   assetsStorage: AssetsStorage
 )(implicit grpcExecutionContext: ExecutionContext)
     extends WavesBlockchainClient
     with ScorexLogging {
 
-  // TODO without "snapshot" word?
   override def partialBalancesSnapshot(address: Address, assets: Set[Asset]): Future[AddressBalanceUpdates] =
     saveAssetsDescription(assets) *> underlying.partialBalancesSnapshot(address, assets)
 

@@ -36,8 +36,7 @@ class AddressDirectoryActor(
   }
 
   override def receive: Receive = {
-    case Command.ForwardMessage(address, message) =>
-      forward(address, message)
+    case Command.ForwardMessage(address, message) => forward(address, message)
 
     case command: AddressActor.Command.HasOrderBookEvent =>
       sendEventToHistoryRouter(command)
@@ -45,7 +44,7 @@ class AddressDirectoryActor(
         .foreach(forward(_, command))
 
     case e: OrderCancelFailed =>
-      // This shouldn't work, because we save an order to DB only when it terminates
+      // We save an order when accept it in AddressActor
       orderDB.get(e.id) match {
         case Some(order) => forward(order.sender.toAddress, e)
         case None => log.warn(s"The order '${e.id}' not found")

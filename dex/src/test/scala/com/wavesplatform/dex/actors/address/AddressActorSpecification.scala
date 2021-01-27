@@ -8,7 +8,7 @@ import cats.kernel.Monoid
 import com.wavesplatform.dex.MatcherSpecBase
 import com.wavesplatform.dex.actors.address.AddressActor.BlockchainInteraction
 import com.wavesplatform.dex.actors.address.AddressActor.Command.Source
-import com.wavesplatform.dex.actors.address.AddressActor.Query.GetTradableBalance
+import com.wavesplatform.dex.actors.address.AddressActor.Query.{GetReservedBalance, GetTradableBalance}
 import com.wavesplatform.dex.actors.address.AddressActor.Reply.GetBalance
 import com.wavesplatform.dex.api.ws.protocol.WsAddressChanges
 import com.wavesplatform.dex.db.EmptyOrderDB
@@ -165,18 +165,42 @@ class AddressActorSpecification
       }
     }
 
+    "return tradable balance" that {
+      "without excess assets" in test { (ref, _, addOrder, updatePortfolio) =>
+        updatePortfolio(sellToken1Portfolio.copy(balance = sellToken1Portfolio.balance + 1L))
+
+        addOrder(LimitOrder(sellTokenOrder1))
+
+        ref ! AddressDirectoryActor.Command.ForwardMessage(sellTokenOrder1.sender, GetTradableBalance(Set(Waves)))
+        fishForSpecificMessage[GetBalance](hint = "Balance") {
+          case x: GetBalance => x
+        } should matchTo(GetBalance(Map[Asset, Long](Waves -> 1L)))
+      }
+
+      "without zero assets" in test { (ref, _, addOrder, updatePortfolio) =>
+        updatePortfolio(sellToken1Portfolio)
+
+        addOrder(LimitOrder(sellTokenOrder1))
+
+        ref ! AddressDirectoryActor.Command.ForwardMessage(sellTokenOrder1.sender, GetTradableBalance(Set(Waves)))
+        fishForSpecificMessage[GetBalance](hint = "Balance") {
+          case x: GetBalance => x
+        } should matchTo(GetBalance(Map.empty))
+      }
+    }
+
     "return reservable balance without excess assets" in test { (ref, _, addOrder, updatePortfolio) =>
-      updatePortfolio(sellToken1Portfolio)
+      updatePortfolio(sellToken1Portfolio.copy(balance = sellToken1Portfolio.balance + 1L))
 
       addOrder(LimitOrder(sellTokenOrder1))
 
-      ref ! GetTradableBalance(Set(Waves)) // TODO reservable?
-      expectMsgPF(hint = "Balance") {
-        case r: GetBalance =>
-          println(r.toString)
-          r should matchTo(GetBalance(Map[Asset, Long](Waves -> 0L)))
-        case _ =>
-      }
+      ref ! AddressDirectoryActor.Command.ForwardMessage(sellTokenOrder1.sender, GetReservedBalance)
+      fishForSpecificMessage[GetBalance](hint = "Balance") {
+        case x: GetBalance => x
+      } should matchTo(GetBalance(Map[Asset, Long](
+        Waves -> 30000,
+        sellTokenOrder1.assetPair.priceAsset -> 100
+      )))
     }
 
     "track canceled orders and don't cancel more on same BalanceUpdated message" in test { (_, commandsProbe, addOrder, updatePortfolio) =>

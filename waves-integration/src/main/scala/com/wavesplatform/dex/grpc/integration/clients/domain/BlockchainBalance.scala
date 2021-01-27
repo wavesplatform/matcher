@@ -7,6 +7,7 @@ import com.wavesplatform.dex.domain.asset.Asset
 
 /**
   * @param outLeases Are always positive TODO outLeasing
+  * TODO positive?
   */
 case class BlockchainBalance(regular: Map[Address, Map[Asset, Long]], outLeases: Map[Address, Long]) {
 

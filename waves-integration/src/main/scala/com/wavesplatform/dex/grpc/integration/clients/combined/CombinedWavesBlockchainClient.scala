@@ -52,10 +52,10 @@ class CombinedWavesBlockchainClient(
 
   private val dataUpdates = ConcurrentSubject.publish[WavesNodeEvent]
 
-  // We need to store last two updates and consider them as stale, because we can face an issue during fullBalancesSnapshot
-  //   when balance changes were deleted from LiquidBlock's diff, but haven't yet saved to DB.
+  // NODE: We need to store last updates and consider them as fresh, because we can face an issue during fullBalancesSnapshot
+  //   when balance changes were deleted from LiquidBlock's diff, but haven't yet saved to DB
   @volatile private var lastUpdates = List.empty[BlockchainBalance]
-  private val maxPreviousBlockUpdates = 5 // + 1 = max size of lastUpdates. TODO why 5?
+  private val maxPreviousBlockUpdates = 5 // 2 could be enough (last + previous), but we add some ratio
 
   override lazy val updates: Observable[WavesNodeUpdates] = Observable.fromFuture(meClient.currentBlockInfo)
     .flatMap { startBlockInfo =>
@@ -89,10 +89,7 @@ class CombinedWavesBlockchainClient(
             }
             .toMap
 
-          if (!x.updatedBalances.isEmpty) {
-            log.info(s"Updating.r: ${x.updatedBalances.regular}")
-            lastUpdates = x.updatedBalances :: lastUpdates.take(maxPreviousBlockUpdates)
-          } // TODO 2 blocks are enough?
+          if (!x.updatedBalances.isEmpty) lastUpdates = x.updatedBalances :: lastUpdates.take(maxPreviousBlockUpdates)
 
           // // Not useful for UTX, because it doesn't consider the current state of orders
           // // Will be useful, when blockchain updates send order fills.
@@ -153,7 +150,7 @@ class CombinedWavesBlockchainClient(
 
   private def isExchangeTxFromMatcher(tx: UtxTransaction): Boolean = tx.transaction.exists(isExchangeTxFromMatcher)
 
-  // TODO Seems not used
+  // TODO dedup with fullBalancesSnapshot
   override def partialBalancesSnapshot(address: Address, assets: Set[Asset]): Future[AddressBalanceUpdates] =
     (
       meClient.getAddressPartialRegularBalance(address, assets),
@@ -166,7 +163,6 @@ class CombinedWavesBlockchainClient(
 
       val prioritizedLastUpdates = lastUpdates :+ response
       val r = prioritizedLastUpdates.map(_.regular.getOrElse(address, Map.empty))
-      log.info(s"prioritizedLastUpdates($address).r = $r")
       AddressBalanceUpdates(
         regular = foldRight(r).filter { case (asset, _) => assets.contains(asset) },
         outLease =
@@ -193,7 +189,6 @@ class CombinedWavesBlockchainClient(
 
       val prioritizedLastUpdates = lastUpdates :+ response
       val r = prioritizedLastUpdates.map(_.regular.getOrElse(address, Map.empty))
-      log.info(s"fullBalancesSnapshot($address).r = $r")
       AddressBalanceUpdates(
         regular = foldRight(r).filter { case (asset, _) => !excludeAssets.contains(asset) },
         outLease =

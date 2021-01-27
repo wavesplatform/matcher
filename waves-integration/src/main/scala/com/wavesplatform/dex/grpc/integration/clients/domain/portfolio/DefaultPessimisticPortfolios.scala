@@ -88,7 +88,8 @@ class DefaultPessimisticPortfolios() extends PessimisticPortfolios {
 
   private def revert(toRevert: AddressAssets): Unit = toRevert.foreach { case (address, toRevert) =>
     portfolios.updateWith(address) { prev =>
-      prev.map(xs => (xs |-| toRevert).filter(_._2 <= 0)) // TODO DEX-1013: prev.map(xs => (xs |-| toRevert).filter(_._2 < 0)).filter(_.nonEmpty)
+      // 0 is critical here, otherwise we won't know about zeroing
+      prev.map(xs => (xs |-| toRevert).filter(_._2 <= 0)) // TODO DEX-1013
     }
   }
 

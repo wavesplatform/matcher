@@ -28,6 +28,7 @@ class MatcherExtensionCachingClient(underlying: MatcherExtensionClient, defaultC
 
   override val utxEvents = underlying.utxEvents
 
+  // TODO outgoing
   override def getOutLeasing(address: Address): Future[Long] = underlying.getOutLeasing(address)
 
   override def getAddressPartialRegularBalance(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] =

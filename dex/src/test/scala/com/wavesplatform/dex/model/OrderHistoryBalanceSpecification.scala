@@ -1,6 +1,5 @@
 package com.wavesplatform.dex.model
 
-import java.math.BigInteger
 import akka.actor.{ActorRef, ActorSystem}
 import akka.pattern.ask
 import akka.testkit.TestKit
@@ -14,7 +13,6 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.Order.Id
-import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderAddedReason, OrderCanceled}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.time.SystemTime
@@ -22,6 +20,7 @@ import org.scalatest._
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.propspec.AnyPropSpecLike
 
+import java.math.BigInteger
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.reflect.ClassTag
@@ -364,7 +363,7 @@ class OrderHistoryBalanceSpecification
     }
 
     orderStatus(submitted1.order.id()) shouldBe OrderStatus.Filled(50000000, 300001)
-    orderStatus(submitted2.order.id()) shouldBe OrderStatus.PartiallyFilled(50000000, 187500) // <--
+    orderStatus(submitted2.order.id()) shouldBe OrderStatus.PartiallyFilled(50000000, 187500)
 
     openVolume(counter.order.senderPublicKey, WavesBtc.priceAsset) shouldBe 0L
     openVolume(counter.order.senderPublicKey, WavesBtc.amountAsset) shouldBe 0L

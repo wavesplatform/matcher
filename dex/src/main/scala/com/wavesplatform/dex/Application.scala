@@ -147,7 +147,6 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   )
 
   private val wavesBlockchainAsyncClient = new MatcherExtensionAssetsWatchingClient(
-    settings = settings.wavesBlockchainClient,
     underlying = WavesClientBuilder.async(
       settings.wavesBlockchainClient,
       matcherPublicKey,

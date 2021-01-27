@@ -6,6 +6,7 @@ import cats.syntax.contravariantSemigroupal._
 import cats.syntax.group._
 import cats.syntax.option._
 import com.google.protobuf.ByteString
+import com.wavesplatform.dex.collections.ListOps.ListOfMapsOps
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
@@ -150,54 +151,49 @@ class CombinedWavesBlockchainClient(
 
   private def isExchangeTxFromMatcher(tx: UtxTransaction): Boolean = tx.transaction.exists(isExchangeTxFromMatcher)
 
-  // TODO dedup with fullBalancesSnapshot
   override def partialBalancesSnapshot(address: Address, assets: Set[Asset]): Future[AddressBalanceUpdates] =
     (
       meClient.getAddressPartialRegularBalance(address, assets),
       if (assets.contains(Asset.Waves)) meClient.getOutLeasing(address).map(_.some) else Future.successful(none)
-    ).mapN { case (regular, outLeasing) =>
-      val response = BlockchainBalance(
-        regular = Map(address -> regular),
-        outLeases = outLeasing.fold(Map.empty[Address, Long])(x => Map(address -> x))
-      )
-
-      val prioritizedLastUpdates = lastUpdates :+ response
-      val r = prioritizedLastUpdates.map(_.regular.getOrElse(address, Map.empty))
-      AddressBalanceUpdates(
-        regular = foldRight(r).filter { case (asset, _) => assets.contains(asset) },
-        outLease =
-          if (outLeasing.isEmpty) none[Long]
-          else prioritizedLastUpdates.map(_.outLeases.get(address)).foldLeft(none[Long])(_.orElse(_)),
-        pessimisticCorrection = pessimisticPortfolios.getAggregated(address).filter {
-          case (asset, _) => assets.contains(asset)
-        }
+    ).mapN { case (regular, outgoingLeasing) =>
+      def pred(p: (Asset, Long)): Boolean = assets.contains(p._1)
+      val full = getFreshBalances(address, regular, outgoingLeasing)
+      full.copy(
+        regular = full.regular.filter(pred),
+        pessimisticCorrection = full.pessimisticCorrection.filter(pred)
       )
     }
-
-  // TODO Optimize
-  private def foldRight[K, V](xs: List[Map[K, V]]): Map[K, V] = xs.foldRight(Map.empty[K, V])(_ ++ _)
 
   override def fullBalancesSnapshot(address: Address, excludeAssets: Set[Asset]): Future[AddressBalanceUpdates] =
     (
       meClient.getAddressFullRegularBalance(address, excludeAssets),
       if (excludeAssets.contains(Asset.Waves)) Future.successful(none[Long]) else meClient.getOutLeasing(address).map(_.some)
-    ).mapN { case (regular, outLeasing) =>
-      val response = BlockchainBalance(
-        regular = Map(address -> regular),
-        outLeases = outLeasing.fold(Map.empty[Address, Long])(x => Map(address -> x))
-      )
-
-      val prioritizedLastUpdates = lastUpdates :+ response
-      val r = prioritizedLastUpdates.map(_.regular.getOrElse(address, Map.empty))
-      AddressBalanceUpdates(
-        regular = foldRight(r).filter { case (asset, _) => !excludeAssets.contains(asset) },
-        outLease =
-          if (outLeasing.isEmpty) none[Long] else prioritizedLastUpdates.map(_.outLeases.get(address)).foldLeft(none[Long])(_.orElse(_)),
-        pessimisticCorrection = pessimisticPortfolios.getAggregated(address).filter {
-          case (asset, _) => !excludeAssets.contains(asset)
-        }
+    ).mapN { case (regular, outgoingLeasing) =>
+      def pred(p: (Asset, Long)): Boolean = !excludeAssets.contains(p._1)
+      val full = getFreshBalances(address, regular, outgoingLeasing)
+      full.copy(
+        regular = full.regular.filter(pred),
+        pessimisticCorrection = full.pessimisticCorrection.filter(pred)
       )
     }
+
+  private def getFreshBalances(address: Address, regular: Map[Asset, Long], outgoingLeasing: Option[Long]): AddressBalanceUpdates = {
+    val prioritizedLastUpdates = lastUpdates :+ mkBlockchainBalance(address, regular, outgoingLeasing)
+    val r = prioritizedLastUpdates.map(_.regular.getOrElse(address, Map.empty))
+    AddressBalanceUpdates(
+      regular = r.foldSkipped,
+      outLease =
+        if (outgoingLeasing.isEmpty) none[Long]
+        else prioritizedLastUpdates.map(_.outLeases.get(address)).foldLeft(none[Long])(_.orElse(_)),
+      pessimisticCorrection = pessimisticPortfolios.getAggregated(address)
+    )
+  }
+
+  private def mkBlockchainBalance(address: Address, regular: Map[Asset, Long], outgoingLeasing: Option[Long]): BlockchainBalance =
+    BlockchainBalance(
+      regular = Map(address -> regular),
+      outLeases = outgoingLeasing.fold(Map.empty[Address, Long])(x => Map(address -> x))
+    )
 
   // TODO DEX-1012
   override def isFeatureActivated(id: Short): Future[Boolean] =

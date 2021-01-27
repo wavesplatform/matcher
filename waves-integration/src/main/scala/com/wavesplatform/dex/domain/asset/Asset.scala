@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.domain.asset
 
+import com.google.common.collect.Interners
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.utils.base58Length
@@ -18,7 +19,13 @@ object Asset {
   //  1. toString is a method used only for debugging purposes.
   //     Also for better readability it should contain a class like IssuedAsset(stringHere)
   //  2. Used something else for any logic. E.g. trait Representation[T], where T <: String
-  final case class IssuedAsset(id: ByteStr) extends Asset { override def toString: String = id.base58 }
+  sealed abstract case class IssuedAsset private (id: ByteStr) extends Asset { override def toString: String = id.base58 }
+
+  object IssuedAsset {
+    private[this] val interner = Interners.newWeakInterner[IssuedAsset]()
+    def apply(id: ByteStr): IssuedAsset = interner.intern(new IssuedAsset(id) {})
+  }
+
   final case object Waves extends Asset { override def toString: String = WavesName }
 
   implicit val assetFormat: Format[Asset] = Format(
@@ -42,8 +49,7 @@ object Asset {
     if (x == WavesName) Some(Waves)
     else ByteStr.decodeBase58(x).fold(_ => None, xs => Some(IssuedAsset(xs)))
 
-  def fromCompatId(maybeBStr: Option[ByteStr]): Asset =
-    maybeBStr.fold[Asset](Waves)(IssuedAsset)
+  def fromCompatId(maybeBStr: Option[ByteStr]): Asset = maybeBStr.fold[Asset](Waves)(IssuedAsset(_))
 
   implicit class AssetOps(private val ai: Asset) extends AnyVal {
 

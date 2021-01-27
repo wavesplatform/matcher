@@ -48,7 +48,7 @@ object AssetPair {
 
   def extractAsset(a: String): Try[Asset] = a match {
     case Asset.WavesName => Success(Waves)
-    case other => ByteStr.decodeBase58(other).map(IssuedAsset)
+    case other => ByteStr.decodeBase58(other).map(IssuedAsset(_))
   }
 
   def extractAssetPair(s: String): Try[AssetPair] = s.split('-') match {

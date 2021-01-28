@@ -21,6 +21,9 @@ trait DiffMatcherWithImplicits extends DiffMatcher {
     if (left == right) Identical(left) else DiffResultValue(left, right)
   }
 
+  implicit val issuedAssetDerivedDiff: Derived[Diff[IssuedAsset]] = Derived(issuedAssetDiff)
+  implicit val assetDerivedDiff: Derived[Diff[Asset]] = Derived(assetDiff)
+
 }
 
 object DiffMatcherWithImplicits {

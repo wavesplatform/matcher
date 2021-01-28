@@ -39,6 +39,12 @@ trait WavesIntegrationSuiteBase extends AnyFreeSpecLike with Matchers with Allur
     if (left == right) Identical(left) else DiffResultValue(left, right)
   }
 
+  // TODO Duplicate
+  implicit val issuedAssetDerivedDiff: Derived[Diff[IssuedAsset]] = Derived(issuedAssetDiff)
+
+  // TODO Duplicate
+  implicit val assetDerivedDiff: Derived[Diff[Asset]] = Derived(assetDiff)
+
 
   // Fixes "Class too large" compiler issue
   implicit val derivedSignedTransactionDiff: Derived[Diff[TransactionWithChanges]] =

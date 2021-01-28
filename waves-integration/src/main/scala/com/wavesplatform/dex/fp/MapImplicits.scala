@@ -31,7 +31,11 @@ object MapImplicits {
       }
     }
 
-    private def nonEmpty(xs: Map[K, V]): Map[K, V] = xs.filterNot { case (_, v) => v == 0 }
+    private def nonEmpty(xs: Map[K, V]): Map[K, V] = {
+      val empty = Group[V].empty
+      xs.filterNot { case (_, v) => v == empty }
+    }
+
   }
 
   implicit final class MapNumericOps[K, V](val self: Map[K, V])(implicit numeric: Numeric[V]) {

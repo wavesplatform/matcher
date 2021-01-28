@@ -160,11 +160,11 @@ class MatcherApiRoute(
   }
 
   private def withAssetPair(
-                             pairOrError: Either[ValidationError.InvalidAsset, AssetPair],
-                             redirectToInverse: Boolean = false,
-                             suffix: String = "",
-                             formatError: MatcherError => ToResponseMarshallable = InfoNotFound.apply,
-                             validate: Boolean = true
+    pairOrError: Either[ValidationError.InvalidAsset, AssetPair],
+    redirectToInverse: Boolean = false,
+    suffix: String = "",
+    formatError: MatcherError => ToResponseMarshallable = InfoNotFound.apply,
+    validate: Boolean = true
   ): Directive1[AssetPair] =
     pairOrError match {
       case Right(p) =>
@@ -713,7 +713,7 @@ class MatcherApiRoute(
     Function.tupled(HttpOrderBookHistoryItem.fromOrderInfo)
 
   private def loadOrders(address: Address, pair: Option[AssetPair], orderListType: OrderListType): Route = complete {
-    askMapAddressActor[AddressActor.Reply.OrdersStatuses](address, AddressActor.Query.GetOrdersStatuses(pair, orderListType)) { reply =>
+    askMapAddressActor[AddressActor.Reply.GetOrderStatuses](address, AddressActor.Query.GetOrdersStatuses(pair, orderListType)) { reply =>
       reply.xs.map(tupledOrderBookHistoryItem)
     }
   }
@@ -860,7 +860,7 @@ class MatcherApiRoute(
   }
 
   private def getOrderStatusInfo(id: Order.Id, address: Address): StandardRoute = complete {
-    askMapAddressActor[AddressActor.Reply.OrdersStatusInfo](address, AddressActor.Query.GetOrderStatusInfo(id)) {
+    askMapAddressActor[AddressActor.Reply.GetOrdersStatusInfo](address, AddressActor.Query.GetOrderStatusInfo(id)) {
       _.maybeOrderStatusInfo match {
         case Some(oi) => SimpleResponse(HttpOrderBookHistoryItem.fromOrderInfo(id, oi))
         case None => InfoNotFound(error.OrderNotFound(id))
@@ -954,7 +954,7 @@ class MatcherApiRoute(
     withAddress(addressOrError) { address =>
       withAssetPair(pairOrError, redirectToInverse = true, s"/tradableBalance/$address") { pair =>
         complete {
-          askMapAddressActor[AddressActor.Reply.Balance](address, AddressActor.Query.GetTradableBalance(pair.assets))(_.balance.toJson)
+          askMapAddressActor[AddressActor.Reply.GetBalance](address, AddressActor.Query.GetTradableBalance(pair.assets))(_.balance.toJson)
         }
       }
     }
@@ -982,17 +982,15 @@ class MatcherApiRoute(
     )
   )
   def reservedBalance: Route = (path("reserved" / PublicKeyPM) & get) { publicKeyOrError =>
-    withPublicKey(publicKeyOrError) {
-      publicKey =>
-        (signedGet(publicKey).tmap(_ => Option.empty[PublicKey]) | (withAuth & withUserPublicKeyOpt)) {
-          case Some(upk) if upk != publicKey => invalidUserPublicKey
-          case _ =>
-            complete {
-              askMapAddressActor[AddressActor.Reply.Balance](publicKey, AddressActor.Query.GetReservedBalance)(_.balance.toJson)
-            }
-        }
+    withPublicKey(publicKeyOrError) { publicKey =>
+      (signedGet(publicKey).tmap(_ => Option.empty[PublicKey]) | (withAuth & withUserPublicKeyOpt)) {
+        case Some(upk) if upk != publicKey => invalidUserPublicKey
+        case _ =>
+          complete {
+            askMapAddressActor[AddressActor.Reply.GetBalance](publicKey, AddressActor.Query.GetReservedBalance)(_.balance.toJson)
+          }
+      }
     }
-
   }
 
   @Path("/orderbook/{amountAsset}/{priceAsset}/{orderId}")
@@ -1178,7 +1176,7 @@ class MatcherApiRoute(
   private def askMapAddressActor[A: ClassTag](sender: Address, msg: AddressActor.Message)(
     f: A => ToResponseMarshallable
   ): Future[ToResponseMarshallable] =
-    (addressActor ? AddressDirectoryActor.Envelope(sender, msg))
+    (addressActor ? AddressDirectoryActor.Command.ForwardMessage(sender, msg))
       .mapTo[A]
       .map(f)
       .recover { case e: AskTimeoutException =>
@@ -1193,7 +1191,7 @@ class MatcherApiRoute(
 
   @inline
   private def askAddressActor(sender: Address, msg: AddressActor.Message)(handleResponse: LogicResponseHandler): Future[ToResponseMarshallable] =
-    (addressActor ? AddressDirectoryActor.Envelope(sender, msg))
+    (addressActor ? AddressDirectoryActor.Command.ForwardMessage(sender, msg))
       .map(handleResponse.orElse(handleUnknownResponse))
       .recover { case e: AskTimeoutException =>
         log.error(s"Error processing $msg", e)

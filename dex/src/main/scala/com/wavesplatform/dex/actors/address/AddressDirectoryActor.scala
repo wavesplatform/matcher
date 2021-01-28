@@ -14,7 +14,7 @@ class AddressDirectoryActor(
   orderDB: OrderDB,
   mkAddressActorProps: (Address, Boolean) => Props,
   historyRouterRef: Option[ActorRef],
-  var started: Boolean = false
+  var recovered: Boolean = false
 ) extends Actor
     with ScorexLogging {
 
@@ -27,50 +27,41 @@ class AddressDirectoryActor(
 
   private def createAddressActor(address: Address): ActorRef = {
     log.debug(s"Creating address actor for $address")
-    watch(actorOf(mkAddressActorProps(address, started), address.toString))
+    watch(actorOf(mkAddressActorProps(address, recovered), address.toString))
   }
 
   private def forward(address: Address, msg: Any): Unit = (children get address, msg) match {
-    case (None, _: AddressActor.Message.BalanceChanged) =>
-    case _ =>
-      msg match {
-        case msg: AddressActor.Command.ApplyBatch => msg.events.foreach(sendEventToHistoryRouter)
-        case _ =>
-      }
-      children.getOrElseUpdate(address, createAddressActor(address)) forward msg
+    case (None, _: AddressActor.Command.ChangeBalances | _: OrderCancelFailed) =>
+    case _ => children.getOrElseUpdate(address, createAddressActor(address)) forward msg
   }
 
   override def receive: Receive = {
-    case Envelope(address, message) => forward(address, message)
+    case Command.ForwardMessage(address, message) => forward(address, message)
 
-    case e: Events.OrderAdded =>
-      forward(e.order.order.sender, e)
-      sendEventToHistoryRouter(e)
-
-    case e: Events.OrderExecuted =>
-      Set(e.counter.order, e.submitted.order).map(_.sender).foreach(forward(_, e))
-      sendEventToHistoryRouter(e)
-
-    case e: Events.OrderCanceled =>
-      forward(e.acceptedOrder.order.sender, e)
-      sendEventToHistoryRouter(e)
+    case command: AddressActor.Command.HasOrderBookEvent =>
+      sendEventToHistoryRouter(command)
+      command.affectedOrders.map(_.order.sender.toAddress).toSet // Could be one trader
+        .foreach(forward(_, command))
 
     case e: OrderCancelFailed =>
+      // We save an order when accept it in AddressActor
       orderDB.get(e.id) match {
         case Some(order) => forward(order.sender.toAddress, e)
         case None => log.warn(s"The order '${e.id}' not found")
       }
-
-    case StartWork =>
-      started = true
-      context.children.foreach(_ ! StartWork)
 
     case Terminated(child) =>
       val addressString = child.path.name
       val address = Address.fromString(addressString).explicitGet()
       children.remove(address)
       log.warn(s"Address handler for $addressString terminated")
+
+    case Command.StartWork =>
+      recovered = true
+      context.children.foreach(_ ! AddressActor.Command.CompleteRecovering)
   }
+
+  private def sendEventToHistoryRouter(command: AddressActor.Command.HasOrderBookEvent): Unit = sendEventToHistoryRouter(command.event)
 
   private def sendEventToHistoryRouter(event: Events.Event): Unit = historyRouterRef.foreach { historyRouterRef =>
     val msg = event match {
@@ -92,10 +83,15 @@ object AddressDirectoryActor {
       orderDB,
       mkAddressActorProps,
       historyRouterRef,
-      false
+      recovered = false
     )
   )
 
-  case class Envelope(address: Address, message: AddressActor.Message)
-  case object StartWork
+  sealed trait Command extends Product with Serializable
+
+  object Command {
+    case class ForwardMessage(address: Address, message: AddressActor.Message)
+    case object StartWork
+  }
+
 }

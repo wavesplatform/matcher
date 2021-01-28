@@ -19,7 +19,7 @@ import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor
 import com.wavesplatform.dex.actors.events.OrderEventsCoordinatorActor
 import com.wavesplatform.dex.actors.orderbook.{AggregatedOrderBookActor, OrderBookActor, OrderBookSnapshotStoreActor}
 import com.wavesplatform.dex.actors.tx.{ExchangeTransactionBroadcastActor, WriteExchangeTransactionActor}
-import com.wavesplatform.dex.actors.{MatcherActor, OrderBookAskAdapter, RootActorSystem, SpendableBalancesActor}
+import com.wavesplatform.dex.actors.{MatcherActor, OrderBookAskAdapter, RootActorSystem}
 import com.wavesplatform.dex.api.http.headers.{CustomMediaTypes, MatcherHttpServer}
 import com.wavesplatform.dex.api.http.routes.{MatcherApiRoute, MatcherApiRouteV1}
 import com.wavesplatform.dex.api.http.{CompositeHttpService, OrderBookHttpInfo}
@@ -38,6 +38,7 @@ import com.wavesplatform.dex.domain.utils.{EitherExt2, LoggerFacade, ScorexLoggi
 import com.wavesplatform.dex.effect.{liftValueAsync, FutureResult}
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
 import com.wavesplatform.dex.grpc.integration.WavesClientBuilder
+import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
 import com.wavesplatform.dex.grpc.integration.clients.{MatcherExtensionAssetsWatchingClient, WavesBlockchainClient}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.history.HistoryRouterActor
@@ -146,7 +147,6 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   )
 
   private val wavesBlockchainAsyncClient = new MatcherExtensionAssetsWatchingClient(
-    settings = settings.wavesBlockchainClient,
     underlying = WavesClientBuilder.async(
       settings.wavesBlockchainClient,
       matcherPublicKey,
@@ -197,6 +197,13 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     ).some
     else none
 
+  private val addressActorBlockchainInteraction = new AddressActor.BlockchainInteraction {
+
+    override def getFullBalances(address: Address, exclude: Set[Asset]): Future[AddressBalanceUpdates] =
+      wavesBlockchainAsyncClient.fullBalancesSnapshot(address, exclude)
+
+  }
+
   private val addressDirectoryRef =
     actorSystem.actorOf(AddressDirectoryActor.props(orderDB, mkAddressActorProps, historyRouterRef), AddressDirectoryActor.name)
 
@@ -210,18 +217,16 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   private def storeCommand(payload: ValidatedCommand): Future[Option[ValidatedCommandWithMeta]] =
     storeBreaker.withCircuitBreaker(matcherQueue.store(payload))
 
-  private def mkAddressActorProps(address: Address, started: Boolean): Props = AddressActor.props(
+  private def mkAddressActorProps(address: Address, recovered: Boolean): Props = AddressActor.props(
     address,
     time,
     orderDB,
     ValidationStages.mkSecond(wavesBlockchainAsyncClient, orderBookAskAdapter),
     storeCommand,
-    started,
-    spendableBalancesRef,
+    recovered,
+    addressActorBlockchainInteraction,
     settings.addressActor
   )
-
-  private val spendableBalancesRef = actorSystem.actorOf(SpendableBalancesActor.props(wavesBlockchainAsyncClient, addressDirectoryRef))
 
   private val orderEventsCoordinatorRef = actorSystem.spawn(
     behavior = OrderEventsCoordinatorActor.apply(
@@ -361,10 +366,9 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
     _ = {
       log.info("Start watching Node updates")
-      // Note, updates is lazy, so it is initialized here as it should be,
-      // Because OrderEventsCoordinator must receive transactions from UtxSwitched.
+      // Note, updates is lazy, so it is initialized here
       wavesBlockchainAsyncClient.updates.foreach { updates =>
-        orderEventsCoordinatorRef ! OrderEventsCoordinatorActor.Command.ApplyUpdates(updates)
+        orderEventsCoordinatorRef ! OrderEventsCoordinatorActor.Command.ApplyNodeUpdates(updates)
       }(monixScheduler)
     }
 
@@ -420,8 +424,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     }
   } yield {
     log.info("Last offset has been reached, switching to a normal mode")
-    orderEventsCoordinatorRef ! OrderEventsCoordinatorActor.Command.Start
-    addressDirectoryRef ! AddressDirectoryActor.StartWork
+    addressDirectoryRef ! AddressDirectoryActor.Command.StartWork
   }
 
   startGuard.onComplete {

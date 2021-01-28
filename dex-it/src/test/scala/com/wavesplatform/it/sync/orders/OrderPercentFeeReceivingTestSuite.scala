@@ -53,9 +53,13 @@ class OrderPercentFeeReceivingTestSuite extends OrderFeeBaseTestSuite {
     }
 
     s"users should pay correct fee when fee asset-type = $assetType and order partially filled" in {
-
       val accountBuyer = mkAccountWithBalance(minimalFeeWaves -> Waves, fullyAmountUsd -> usd)
       val accountSeller = mkAccountWithBalance(partiallyAmountWaves -> Waves, minimalFee -> usd)
+
+      log.info(
+        s"accountBuyer: ${accountBuyer.publicKey.base58} / ${accountBuyer.toAddress}, " +
+        s"accountSeller: ${accountSeller.publicKey.base58} / ${accountSeller.toAddress}"
+      )
 
       placeAndAwaitAtDex(mkOrder(accountBuyer, wavesUsdPair, BUY, fullyAmountWaves, price, matcherFee = minimalFeeWaves, version = version))
       placeAndAwaitAtNode(

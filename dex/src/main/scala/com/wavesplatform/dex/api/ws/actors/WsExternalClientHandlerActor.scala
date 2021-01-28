@@ -98,7 +98,7 @@ object WsExternalClientHandlerActor {
 
       def unsubscribeAddress(address: Address): Unit = {
         context.log.debug(s"WsUnsubscribe(address=$address)")
-        addressRef ! AddressDirectoryActor.Envelope(address, AddressActor.WsCommand.RemoveWsSubscription(clientRef))
+        addressRef ! AddressDirectoryActor.Command.ForwardMessage(address, AddressActor.WsCommand.RemoveWsSubscription(clientRef))
       }
 
       def unsubscribeOrderBook(assetPair: AssetPair): Unit = {
@@ -183,7 +183,7 @@ object WsExternalClientHandlerActor {
                         .find(_._1 == subscribe.key)
                         .fold {
 
-                          addressRef ! AddressDirectoryActor.Envelope(subscribe.key, AddressActor.WsCommand.AddWsSubscription(clientRef))
+                          addressRef ! AddressDirectoryActor.Command.ForwardMessage(subscribe.key, AddressActor.WsCommand.AddWsSubscription(clientRef))
                           context.log.debug(s"WsAddressSubscribe(k=$address, t=$authType) is successful, will expire in $subscriptionLifetime")
 
                           if (addressSubscriptions.lengthCompare(maxAddressNumber) == 0) {

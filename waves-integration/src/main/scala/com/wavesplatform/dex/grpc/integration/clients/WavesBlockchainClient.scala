@@ -6,7 +6,7 @@ import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
-import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeUpdates
+import com.wavesplatform.dex.grpc.integration.clients.domain.{AddressBalanceUpdates, WavesNodeUpdates}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import monix.reactive.Observable
 
@@ -16,9 +16,8 @@ import scala.concurrent.Future
 trait WavesBlockchainClient {
   def updates: Observable[WavesNodeUpdates]
 
-  def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]]
-
-  def allAssetsSpendableBalance(address: Address, excludeAssets: Set[Asset]): Future[Map[Asset, Long]]
+  def partialBalancesSnapshot(address: Address, assets: Set[Asset]): Future[AddressBalanceUpdates]
+  def fullBalancesSnapshot(address: Address, excludeAssets: Set[Asset]): Future[AddressBalanceUpdates]
 
   def isFeatureActivated(id: Short): Future[Boolean]
 

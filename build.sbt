@@ -207,7 +207,6 @@ fullCheckRaw := Def
 def mkCheckCommand(name: String, task: TaskKey[Unit]): Command = Command.command(name) { state =>
   val updatedState = Project
     .extract(state)
-    .appendWithoutSession(Seq.empty, state)
     .appendWithoutSession(Seq(Global / scalacOptions ++= Seq("-Xfatal-warnings", "-Ywarn-unused:-imports")), state)
 
   Project.extract(updatedState).runTask(task, updatedState)

@@ -10,7 +10,7 @@ import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.utils.EitherExt2
-import com.wavesplatform.dex.effect.FutureOps.Implicits
+import com.wavesplatform.dex.effect.Implicits.FutureCompanionOps
 import com.wavesplatform.dex.it.time.GlobalTimer
 import com.wavesplatform.dex.it.time.GlobalTimer.TimerOpsImplicits
 import com.wavesplatform.it.MatcherSuiteBase

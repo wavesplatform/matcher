@@ -1,5 +1,8 @@
 package com.wavesplatform.dex
 
+import java.math.BigInteger
+import java.security.SecureRandom
+import java.util.concurrent.atomic.AtomicLong
 import com.google.common.base.Charsets
 import com.google.common.primitives.{Bytes, Ints}
 import com.softwaremill.diffx.{Derived, Diff}
@@ -22,7 +25,7 @@ import com.wavesplatform.dex.model.OrderValidator.Result
 import com.wavesplatform.dex.model.{BuyLimitOrder, LimitOrder, OrderValidator, SellLimitOrder, _}
 import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import com.wavesplatform.dex.settings.OrderFeeSettings._
-import com.wavesplatform.dex.settings.{AssetType, MatcherSettings, OrderFeeSettings, loadConfig}
+import com.wavesplatform.dex.settings.{loadConfig, AssetType, MatcherSettings, OrderFeeSettings}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.time.SystemTime
 import com.wavesplatform.dex.waves.WavesFeeConstants
@@ -43,7 +46,9 @@ trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with Doub
   _: Suite =>
 
   implicit protected val wsErrorDiff: Derived[Diff[WsError]] = Derived(Diff.gen[WsError].ignore[WsError, Long](_.timestamp))
-  implicit protected val orderCanceledDiff: Derived[Diff[OrderCanceled]] = Derived(Diff.gen[OrderCanceled].value.ignore[OrderCanceled, Long](_.timestamp))
+
+  implicit protected val orderCanceledDiff: Derived[Diff[OrderCanceled]] =
+    Derived(Diff.gen[OrderCanceled].value.ignore[OrderCanceled, Long](_.timestamp))
 
   private val WalletSeed: ByteStr = ByteStr("Matcher".getBytes("utf-8"))
   private val MatcherSeed: Array[Byte] = wcrypto.secureHash(Bytes.concat(Ints.toByteArray(0), WalletSeed.arr))

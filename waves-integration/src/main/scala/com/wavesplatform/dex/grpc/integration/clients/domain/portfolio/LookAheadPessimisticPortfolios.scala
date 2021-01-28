@@ -8,7 +8,9 @@ import scala.collection.mutable
 import scala.util.chaining._
 
 /**
- * Caches unknown forged transactions and don't add them in pending
+ * Caches unknown forged transactions and don't add them in pending.
+ * This class is needed, because we have two separate streams: Blockchain and UTX events.
+ * Solves the rare case, when we get a new block event with a new transaction before UTX events with this transaction.
  */
 class LookAheadPessimisticPortfolios(orig: PessimisticPortfolios, maxConfirmedTransactions: Int) extends PessimisticPortfolios {
 

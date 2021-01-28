@@ -4,14 +4,12 @@ import akka.actor.typed
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, Behavior}
 import akka.{actor => classic}
+import cats.syntax.option._
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
-import com.wavesplatform.dex.actors.tx.ExchangeTransactionBroadcastActor.{Confirmed, Command => Broadcaster}
+import com.wavesplatform.dex.actors.tx.ExchangeTransactionBroadcastActor.{Observed, Command => Broadcaster}
 import com.wavesplatform.dex.collections.FifoSet
-import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeUpdates
-import com.wavesplatform.dex.grpc.integration.clients.domain.portfolio.AddressAssets
-import com.wavesplatform.dex.grpc.integration.ops.SignedTransactionOps.Implicits
 import com.wavesplatform.dex.model.Events
 import com.wavesplatform.dex.model.Events.ExchangeTransactionCreated
 import com.wavesplatform.dex.model.ExchangeTransactionCreator.CreateTransaction
@@ -25,14 +23,12 @@ object OrderEventsCoordinatorActor {
   sealed trait Command extends Message
 
   object Command {
-    case object Start extends Command
-
     case class Process(event: Events.Event) extends Command
     case class ProcessError(event: Events.OrderCancelFailed) extends Command
-    case class ApplyUpdates(updates: WavesNodeUpdates) extends Command
+    case class ApplyNodeUpdates(updates: WavesNodeUpdates) extends Command
 
     // Can be sent only from ExchangeTransactionBroadcastActor
-    case class ApplyConfirmed(tx: ExchangeTransaction) extends Command
+    case class ApplyObservedByBroadcaster(tx: ExchangeTransaction) extends Command
   }
 
   def apply(
@@ -41,144 +37,123 @@ object OrderEventsCoordinatorActor {
     broadcasterRef: typed.ActorRef[Broadcaster],
     createTransaction: CreateTransaction
   ): Behavior[Message] = Behaviors.setup { context =>
-    def sendResolved(resolved: Map[Address, PendingAddress]): Unit = resolved.foreach { case (address, x) =>
-      addressDirectoryRef ! AddressDirectoryActor.Envelope(
-        address,
-        AddressActor.Command.ApplyBatch(x.events, x.stashedBalance)
-      )
+    val broadcastAdapter: ActorRef[Observed] = context.messageAdapter[Observed] {
+      case Observed(tx) => Command.ApplyObservedByBroadcaster(tx)
     }
 
-    def sendBalances(balances: AddressAssets): Unit = balances.view.filter(_._2.nonEmpty).foreach { case (address, balances) =>
-      addressDirectoryRef ! AddressDirectoryActor.Envelope(
-        address,
-        AddressActor.Message.BalanceChanged(balances.keySet, balances)
-      )
-    }
-
-    def txsToString(label: String, xs: Map[ExchangeTransaction.Id, _]): String = s"$label=${xs.keys.mkString(", ")}"
-
-    val broadcastAdapter: ActorRef[Confirmed] = context.messageAdapter[Confirmed] {
-      case Confirmed(tx) => Command.ApplyConfirmed(tx)
-    }
-
-    def holdUntilAppearOnNode(state: OrderEventsCoordinatorActorState): Behavior[Message] =
-      Behaviors.receive[Message] { (context, message) =>
-        message match {
-          case Command.Process(event) =>
-            event match {
-              case event: Events.OrderAdded =>
-                addressDirectoryRef ! event
-                Behaviors.same
-
-              case event: Events.OrderExecuted =>
-                createTransaction(event) match {
-                  case Right(tx) =>
-                    context.log.info(s"Created transaction: $tx")
-                    val txCreated = ExchangeTransactionCreated(tx)
-                    dbWriterRef ! txCreated
-                    broadcasterRef ! Broadcaster.Broadcast(broadcastAdapter, tx)
-
-                    val (updatedState, resolved) = state.withKnownOnMatcher(tx.id(), event)
-                    sendResolved(resolved) // TODO DEX-1042 pipeToSelf is needed if resolved?
-
-                    holdUntilAppearOnNode(updatedState)
-
-                  case Left(ex) =>
-                    // We just pass an event without touching a state, because this transaction neither created, nor appeared on Node
-                    import event._
-                    context.log.warn(
-                      s"""Can't create tx: $ex
-                         |o1: (amount=${submitted.amount}, fee=${submitted.fee}): ${Json.prettyPrint(submitted.order.json())}
-                         |o2: (amount=${counter.amount}, fee=${counter.fee}): ${Json.prettyPrint(counter.order.json())}""".stripMargin
-                    )
-                    addressDirectoryRef ! event
-                    Behaviors.same
-                }
-
-              case event: Events.OrderCanceled =>
-                val (updated, x) = state.withPendingCancel(event)
-                x.foreach(addressDirectoryRef ! _)
-                holdUntilAppearOnNode(updated)
-            }
-
-          case Command.ProcessError(event) =>
-            addressDirectoryRef ! event // We don't add this to pending, because this event is only for notification for HTTP API
-            Behaviors.same
-
-          case Command.ApplyUpdates(updates) =>
-            context.log.info(
-              s"Got ApplyUpdates(${txsToString("u", updates.unconfirmedTxs)}, " +
-              s"${txsToString("c", updates.confirmedTxs)}, ${txsToString("f", updates.failedTxs)})"
-            )
-
-            if (updates.confirmedTxs.nonEmpty) broadcasterRef ! Broadcaster.ProcessConfirmed(updates.confirmedTxs.keySet)
-
-            // All transactions are exchange and from this matcher's account
-            val (updatedState1, balancesAfterTxs) = (updates.unconfirmedTxs ++ updates.confirmedTxs ++ updates.failedTxs)
-              .filterNot { case (txId, _) => state.knownOnNodeCache.contains(txId) }
-              .foldLeft((state, updates.updatedBalances)) {
-                case ((state, restBalances), (txId, tx)) if tx.tx.isExchangeTransaction =>
-                  val traderAddresses = tx.tx.exchangeTransactionTraders
-
-                  val (updatedState, updatedRestBalances, resolved) = state.withKnownOnNode(traderAddresses, txId, restBalances)
-                  sendResolved(resolved)
-
-                  (updatedState, updatedRestBalances)
-
-                case (r, _) => r
-              }
-
-            val (updatedState2, balancesToSend) = updatedState1.withBalanceUpdates(balancesAfterTxs)
-            sendBalances(balancesToSend)
-
-            holdUntilAppearOnNode(updatedState2)
-
-          case Command.ApplyConfirmed(tx) =>
-            // Why we react only if:
-            // * If it was before in UTX, then we received this before during UtxSwitched
-            // * If it was added to UTX, then we will receive it
-            // * If it won't retry, then we haven't received (neither as unconfirmed, nor confirmed) it and won't receive
-            val (updated, restBalances, resolved) = state.withKnownOnNode(tx.traders, tx.id(), Map.empty)
-            sendResolved(resolved)
-            sendBalances(restBalances) // Actually, they should be empty, but anyway
-            holdUntilAppearOnNode(updated)
-
-          case Command.Start =>
-            context.log.error("Unexpected Command.Start")
-            Behaviors.same
-        }
-      }
-
-    val pass = Behaviors.receive[Message] { (context, message) =>
+    def default(knownTxIds: FifoSet[ExchangeTransaction.Id]): Behaviors.Receive[Message] = Behaviors.receive[Message] { (context, message) =>
       message match {
         case Command.Process(event) =>
-          addressDirectoryRef ! event
           event match {
-            case event: Events.OrderExecuted =>
-              createTransaction(event).foreach { tx =>
-                val txCreated = ExchangeTransactionCreated(tx)
-                dbWriterRef ! txCreated
-                broadcasterRef ! Broadcaster.Broadcast(broadcastAdapter, tx)
-              }
+            case event: Events.OrderAdded =>
+              addressDirectoryRef ! AddressActor.Command.ApplyOrderBookAdded(event)
+              Behaviors.same
 
-            case _ =>
+            case event: Events.OrderExecuted =>
+              // If we here, AddressActor is guaranteed to be created, because this happens only after Events.OrderAdded
+              val expectedTx = createTransaction(event) match {
+                case Right(tx) =>
+                  val txCreated = ExchangeTransactionCreated(tx)
+                  context.log.info(s"Created ${tx.json()}")
+                  dbWriterRef ! txCreated
+
+                  if (knownTxIds.contains(tx.id())) none // We won't expect a tx, because already have
+                  else {
+                    broadcasterRef ! Broadcaster.Broadcast(broadcastAdapter, tx)
+                    tx.some
+                  }
+
+                case Left(e) =>
+                  // We don't touch a state, because this transaction neither created, nor appeared on Node
+                  import event._
+                  context.log.warn(
+                    s"""Can't create tx: $e
+                       |o1: (amount=${submitted.amount}, fee=${submitted.fee}): ${Json.prettyPrint(submitted.order.json())}
+                       |o2: (amount=${counter.amount}, fee=${counter.fee}): ${Json.prettyPrint(counter.order.json())}""".stripMargin
+                  )
+                  none
+              }
+              addressDirectoryRef ! AddressActor.Command.ApplyOrderBookExecuted(event, expectedTx)
+              Behaviors.same
+
+            case event: Events.OrderCanceled =>
+              // If we here, AddressActor is guaranteed to be created, because this happens only after Events.OrderAdded
+              addressDirectoryRef ! AddressActor.Command.ApplyOrderBookCanceled(event)
+              Behaviors.same
           }
-          Behaviors.same
+
+        case Command.ApplyNodeUpdates(updates) =>
+          val (updatedKnownTxIds, oldTxIds) = updates.observedTxs.keys.foldLeft((knownTxIds, List.empty[ExchangeTransaction.Id])) {
+            case ((knownTxIds, exclude), txId) =>
+              val (updatedKnownTxIds, isNew) = knownTxIds.append(txId)
+              val updatedExclude = if (isNew) exclude else txId :: exclude
+              (updatedKnownTxIds, updatedExclude)
+          }
+
+          updates.copy(observedTxs = updates.observedTxs -- oldTxIds).updatesByAddresses.foreach {
+            case (address, (balanceUpdates, observedTxs)) =>
+              val markObservedCommand = if (observedTxs.isEmpty) none else AddressActor.Command.MarkTxsObserved(observedTxs).some
+              val changeBalanceCommand = if (balanceUpdates.isEmpty) none else AddressActor.Command.ChangeBalances(balanceUpdates).some
+              val message = (markObservedCommand, changeBalanceCommand) match {
+                case (Some(a), Some(b)) => AddressActor.Command.ApplyBatch(a, b).some
+                case (a, b) => a.orElse(b)
+              }
+              message.foreach(addressDirectoryRef ! AddressDirectoryActor.Command.ForwardMessage(address, _))
+          }
+
+          default(updatedKnownTxIds)
+
+        case command: Command.ApplyObservedByBroadcaster =>
+          val txId = command.tx.id()
+          val addressActorMessage = AddressActor.Command.MarkTxsObserved(Set(txId))
+          command.tx.traders.foreach(addressDirectoryRef ! AddressDirectoryActor.Command.ForwardMessage(_, addressActorMessage))
+          val (updatedKnownTxIds, _) = knownTxIds.append(txId)
+          default(updatedKnownTxIds)
 
         case Command.ProcessError(event) =>
           addressDirectoryRef ! event
           Behaviors.same
-
-        case Command.ApplyUpdates(updates) =>
-          sendBalances(updates.updatedBalances)
-          Behaviors.same
-
-        case Command.Start => holdUntilAppearOnNode(OrderEventsCoordinatorActorState(Map.empty, FifoSet.limited(10000))) // TODO DEX-1042 settings
-        case _: Command.ApplyConfirmed => Behaviors.same
       }
     }
 
-    pass
+    // According to https://github.com/wavesplatform/protobuf-schemas/blob/master/proto/waves/transaction.proto
+    // Transaction
+    //   chain_id: 4 +
+    //   sender_public_key: 32 +
+    //   fee: Amount
+    //     asset_id: 0 +
+    //     amount: 8 +
+    //   timestamp: 8 +
+    //   version: 4 +
+    //   exchange: ExchangeTransactionData
+    //	   amount: 8 +
+    // 	   price: 8 +
+    //     buy_matcher_fee: 8 +
+    //     sell_matcher_fee: 8 +
+    //     orders: Order: 2 *
+    //	     chain_id: 4 +
+    //       sender_public_key: 32 +
+    //       matcher_public_key: 32 +
+    //       asset_pair: AssetPair:
+    //         amount_asset_id: 0 +
+    //         price_asset_id: 0 +
+    //       order_side: 1 +
+    //       amount: 8 +
+    //       price: 8 +
+    //       timestamp: 8 +
+    //       expiration: 8 +
+    //       matcher_fee: 0 + 8 +
+    //       version: 4 +
+    //       proofs: 32
+    // The minimal size of exchange transaction of v3 is 376 bytes =
+    //   4 + 32 + 0 + 8 + 8 + 4 + 8 + 8 + 8 + 8 + 2 * (4 + 32 + 32 + 0 + 0 + 1 + 8 + 8 + 8 + 8 + 0 + 8 + 3 + 32)
+    //
+    // According to https://docs.waves.tech/en/blockchain/block/
+    // The maximum size of a block is 1MB = 1048576 bytes
+    //
+    // Thus ≈ 2789 exchange transactions fit into a block.
+    // 2 blocks for this FifoSet is enough, because it is auxiliary functionality.
+    default(FifoSet.limited[ExchangeTransaction.Id](6000))
   }
 
 }

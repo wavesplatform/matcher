@@ -28,4 +28,18 @@ object ListOps {
 
   }
 
+  implicit final class ListOfMapsOps[K, V](val self: List[Map[K, V]]) extends AnyVal {
+
+    /**
+     * List(Map(a -> 1, b -> 2), Map(a -> 4, d -> 3)).foldSkipped == Map(a -> 1, b -> 2, d -> 3)
+     */
+    def foldSkipped: Map[K, V] = self.foldLeft(Map.empty[K, V]) { case (r, xs) =>
+      xs.foldLeft(r) { case (r, (k, v)) =>
+        if (r.contains(k)) r
+        else r.updated(k, v)
+      }
+    }
+
+  }
+
 }

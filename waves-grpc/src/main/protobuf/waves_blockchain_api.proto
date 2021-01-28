@@ -12,299 +12,309 @@ import "waves/node/grpc/transactions_api.proto";
 
 service WavesBlockchainApi {
 
-    rpc GetStatuses (waves.node.grpc.TransactionsByIdRequest) returns (TransactionsStatusesResponse);
+  rpc GetStatuses (waves.node.grpc.TransactionsByIdRequest) returns (TransactionsStatusesResponse);
 
-    // TODO Deprecated, remove in >= 2.3.1
-    rpc Broadcast (BroadcastRequest) returns (BroadcastResponse);
+  // TODO Deprecated, remove in >= 2.3.1
+  rpc Broadcast (BroadcastRequest) returns (BroadcastResponse);
 
-    rpc CheckedBroadcast (CheckedBroadcastRequest) returns (CheckedBroadcastResponse);
+  rpc CheckedBroadcast (CheckedBroadcastRequest) returns (CheckedBroadcastResponse);
 
-    rpc IsFeatureActivated (IsFeatureActivatedRequest) returns (IsFeatureActivatedResponse);
+  rpc IsFeatureActivated (IsFeatureActivatedRequest) returns (IsFeatureActivatedResponse);
 
-    rpc AssetDescription (AssetIdRequest) returns (AssetDescriptionResponse);
+  rpc AssetDescription (AssetIdRequest) returns (AssetDescriptionResponse);
 
-    rpc HasAssetScript (AssetIdRequest) returns (HasScriptResponse);
+  rpc HasAssetScript (AssetIdRequest) returns (HasScriptResponse);
 
-    rpc RunAssetScript (RunAssetScriptRequest) returns (RunScriptResponse);
+  rpc RunAssetScript (RunAssetScriptRequest) returns (RunScriptResponse);
 
-    rpc HasAddressScript (HasAddressScriptRequest) returns (HasScriptResponse);
+  rpc HasAddressScript (HasAddressScriptRequest) returns (HasScriptResponse);
 
-    rpc RunAddressScript (RunAddressScriptRequest) returns (RunScriptResponse);
+  rpc RunAddressScript (RunAddressScriptRequest) returns (RunScriptResponse);
 
-    rpc SpendableAssetsBalances (SpendableAssetsBalancesRequest) returns (SpendableAssetsBalancesResponse);
+  rpc ForgedOrder (ForgedOrderRequest) returns (ForgedOrderResponse);
 
-    rpc ForgedOrder (ForgedOrderRequest) returns (ForgedOrderResponse);
+  rpc GetUtxEvents (google.protobuf.Empty) returns (stream UtxEvent);
 
-    rpc GetUtxEvents (google.protobuf.Empty) returns (stream UtxEvent);
+  rpc GetCurrentBlockInfo (google.protobuf.Empty) returns (CurrentBlockInfoResponse);
 
-    rpc AllAssetsSpendableBalance (AddressRequest) returns (AllAssetsSpendableBalanceResponse);
+  rpc GetOutgoingLeasing (AddressRequest) returns (GetOutgoingLeasingResponse);
 
-    rpc GetCurrentBlockInfo (google.protobuf.Empty) returns (CurrentBlockInfoResponse);
+  rpc GetAddressPartialRegularBalance (GetAddressPartialRegularBalanceRequest) returns (GetAddressPartialRegularBalanceResponse);
 
-    rpc GetBalances (GetBalancesRequest) returns (GetBalancesResponse);
+  rpc GetAddressFullRegularBalance (GetAddressFullRegularBalanceRequest) returns (GetAddressFullRegularBalanceResponse);
+
+  rpc GetBalances (GetBalancesRequest) returns (GetBalancesResponse);
 }
 
 // Common requests
 
 message AssetIdRequest {
-    bytes asset_id = 1;
+  bytes asset_id = 1;
 }
 
 message AddressRequest {
-    bytes address = 1;
-    repeated bytes exclude_asset_ids = 2;
+  bytes address = 1;
 }
 
 // Common responses
 
 message HasScriptResponse {
-    bool has = 1;
+  bool has = 1;
 }
 
 message RunScriptResponse {
-    // empty if there is no script or the script returned TRUE
-    oneof result {
-        string wrong_input = 1;
-        string script_error = 2;
-        string unexpected_result = 3;
-        Exception exception = 4;
-        google.protobuf.Empty denied = 5;
-    }
+  // empty if there is no script or the script returned TRUE
+  oneof result {
+    string wrong_input = 1;
+    string script_error = 2;
+    string unexpected_result = 3;
+    Exception exception = 4;
+    google.protobuf.Empty denied = 5;
+  }
 }
 
 // Specific requests and responses
 
 message TransactionsStatusesResponse {
-    repeated waves.node.grpc.TransactionStatus transactions_statutes = 1;
+  repeated waves.node.grpc.TransactionStatus transactions_statutes = 1;
 }
 
 message BroadcastRequest {
-    SignedExchangeTransaction transaction = 1;
+  SignedExchangeTransaction transaction = 1;
 }
 
 message BroadcastResponse {
-    oneof result {
-        bool added = 1;
-        string failed = 2;
-    }
+  oneof result {
+    bool added = 1;
+    string failed = 2;
+  }
 }
 
 message CheckedBroadcastRequest {
-    SignedExchangeTransaction transaction = 1;
+  SignedExchangeTransaction transaction = 1;
 }
 
 message CheckedBroadcastResponse {
-    oneof result {
-        bool unconfirmed = 1; // true == isNew
-        google.protobuf.Empty confirmed = 2;
-        Failure failed = 3;
-    }
+  oneof result {
+    bool unconfirmed = 1; // true == isNew
+    google.protobuf.Empty confirmed = 2;
+    Failure failed = 3;
+  }
 
-    message Failure {
-        string message = 1;
-        bool can_retry = 2;
-    }
+  message Failure {
+    string message = 1;
+    bool can_retry = 2;
+  }
 }
 
 message IsFeatureActivatedRequest {
-    int32 feature_id = 1;
+  int32 feature_id = 1;
 }
 
 message IsFeatureActivatedResponse {
-    bool is_activated = 1;
+  bool is_activated = 1;
 }
 
 message AssetDescriptionResponse {
-    oneof maybe_description {
-        AssetDescription description = 1;
-    }
+  oneof maybe_description {
+    AssetDescription description = 1;
+  }
 }
 
 message AssetDescription {
-    bytes name = 1;
-    int32 decimals = 2;
-    bool has_script = 3;
+  bytes name = 1;
+  int32 decimals = 2;
+  bool has_script = 3;
 }
 
 message RunAssetScriptRequest {
-    bytes asset_id = 1;
-    SignedExchangeTransaction transaction = 2;
+  bytes asset_id = 1;
+  SignedExchangeTransaction transaction = 2;
 }
 
 message RunAddressScriptRequest {
-    bytes address = 1;
-    waves.Order order = 2;
+  bytes address = 1;
+  waves.Order order = 2;
 }
 
 message HasAddressScriptRequest {
-    bytes address = 1;
+  bytes address = 1;
 }
 
 // TODO remove after release 2.1.3
 message SpendableAssetBalanceRequest {
-    bytes address = 1;
-    bytes asset_id = 2;
+  bytes address = 1;
+  bytes asset_id = 2;
 }
 
 // TODO remove after release 2.1.3
 message SpendableAssetBalanceResponse {
-    int64 balance = 1;
+  int64 balance = 1;
 }
 
-message SpendableAssetsBalancesRequest {
-    bytes address = 1;
-    message Record {
-        bytes asset_id = 1;
-    }
-    repeated Record asset_ids = 2;
+message GetAddressPartialRegularBalanceRequest {
+  bytes address = 1;
+  message Record {
+    bytes asset_id = 1;
+  }
+  repeated Record asset_ids = 2;
 }
 
-message SpendableAssetsBalancesResponse {
-    message Record {
-        bytes asset_id = 1;
-        int64 balance = 2;
-    }
-    repeated Record balances = 1;
+message GetAddressPartialRegularBalanceResponse {
+  message Record {
+    bytes asset_id = 1;
+    int64 balance = 2;
+  }
+  repeated Record balances = 1;
 }
 
 message ForgedOrderRequest {
-    bytes order_id = 1;
+  bytes order_id = 1;
 }
 
 message ForgedOrderResponse {
-    bool is_forged = 1;
+  bool is_forged = 1;
 }
 
 // TODO rename to BalanceChangesResponse after release 2.1.2
 message BalanceChangesFlattenResponse {
-    bytes address = 1;
-    bytes asset = 2;
-    int64 balance = 3;
+  bytes address = 1;
+  bytes asset = 2;
+  int64 balance = 3;
 }
 
 // TODO remove after release 2.1.2
 message BalanceChangesResponse {
-    message Record {
-        bytes address = 1;
-        bytes asset = 2;
-        int64 balance = 3;
-    }
-    repeated Record batch = 1;
+  message Record {
+    bytes address = 1;
+    bytes asset = 2;
+    int64 balance = 3;
+  }
+  repeated Record batch = 1;
 }
 
-message AllAssetsSpendableBalanceResponse {
-    message Record {
-        bytes asset_id = 1;
-        int64 balance = 2;
-    }
-    repeated Record balances = 1;
+message GetAddressFullRegularBalanceRequest {
+  bytes address = 1;
+  repeated bytes exclude_asset_ids = 2;
+}
+
+message GetAddressFullRegularBalanceResponse {
+  message Record {
+    bytes asset_id = 1;
+    int64 balance = 2;
+  }
+  repeated Record balances = 1;
 }
 
 message CurrentBlockInfoResponse {
-    int32 height = 1;
-    bytes block_id = 2;
+  int32 height = 1;
+  bytes block_id = 2;
+}
+
+message GetOutgoingLeasingResponse {
+  int64 outgoing_leasing = 1;
 }
 
 message UtxStateResponse {
-    repeated UtxTransaction transactions = 1;
+  repeated UtxTransaction transactions = 1;
 }
 
 message GetBalancesRequest {
-    // regular: Map[Address, Set[Asset]]
-    repeated RegularPair regular = 1;
+  // regular: Map[Address, Set[Asset]]
+  repeated RegularPair regular = 1;
 
-    // outLeases: Set[Address]
-    repeated bytes outLeaseAddresses = 2;
+  // outgoingLeasing: Set[Address]
+  repeated bytes outgoingLeasingAddresses = 2;
 
-    message RegularPair {
-        bytes address = 1;
-        repeated bytes assets = 2;
-    }
+  message RegularPair {
+    bytes address = 1;
+    repeated bytes assets = 2;
+  }
 }
 
 message GetBalancesResponse {
-    repeated RegularPair regular = 1;
-    repeated OutLeasePair outLeases = 2;
+  repeated RegularPair regular = 1;
+  repeated OutgoingLeasingPair outgoingLeasing = 2;
 
-    message RegularPair {
-        bytes address = 1;
-        repeated waves.Amount amount = 2;
-    }
+  message RegularPair {
+    bytes address = 1;
+    repeated waves.Amount amount = 2;
+  }
 
-    message OutLeasePair {
-        bytes address = 1;
-        int64 amount = 2;
-    }
+  message OutgoingLeasingPair {
+    bytes address = 1;
+    int64 amount = 2;
+  }
 }
 
 // Other entities
 
 message Exception {
-    string name = 1;
-    string message = 2;
+  string name = 1;
+  string message = 2;
 }
 
 message SignedExchangeTransaction {
-    ExchangeTransaction transaction = 1;
-    repeated bytes proofs = 2;
+  ExchangeTransaction transaction = 1;
+  repeated bytes proofs = 2;
 }
 
 message ExchangeTransaction {
-    int32 chain_id = 1;
-    bytes sender_public_key = 2;
-    waves.Amount fee = 3;
-    int64 timestamp = 4;
-    int32 version = 5;
+  int32 chain_id = 1;
+  bytes sender_public_key = 2;
+  waves.Amount fee = 3;
+  int64 timestamp = 4;
+  int32 version = 5;
 
-    // compatibility with wavesplatform/protobuf-schemas
-    oneof data {
-        waves.ExchangeTransactionData exchange = 107;
-    }
+  // compatibility with wavesplatform/protobuf-schemas
+  oneof data {
+    waves.ExchangeTransactionData exchange = 107;
+  }
 }
 
 message UtxEvent {
-    oneof type {
-        Switch switch = 1;
-        Update update = 2;
+  oneof type {
+    Switch switch = 1;
+    Update update = 2;
+  }
+
+  message Switch {
+    repeated UtxTransaction transactions = 1;
+  }
+
+  message Update {
+    repeated Added added = 1;
+    repeated Removed removed = 2;
+
+    message Added {
+      UtxTransaction transaction = 1;
     }
 
-    message Switch {
-        repeated UtxTransaction transactions = 1;
+    message Removed {
+      UtxTransaction transaction = 1;
+      Reason reason = 2;
+
+      message Reason {
+        string name = 1;
+        string message = 2;
+      }
     }
-
-    message Update {
-        repeated Added added = 1;
-        repeated Removed removed = 2;
-
-        message Added {
-            UtxTransaction transaction = 1;
-        }
-
-        message Removed {
-            UtxTransaction transaction = 1;
-            Reason reason = 2;
-
-            message Reason {
-                string name = 1;
-                string message = 2;
-            }
-        }
-    }
+  }
 }
 
 message UtxTransaction {
-    bytes id = 1;
-    SignedTransaction transaction = 2;
-    TransactionDiff diff = 3;
+  bytes id = 1;
+  SignedTransaction transaction = 2;
+  TransactionDiff diff = 3;
 }
 
 message TransactionDiff {
-    waves.events.StateUpdate state_update = 1;
-    repeated OrderFill order_fills = 2;
+  waves.events.StateUpdate state_update = 1;
+  repeated OrderFill order_fills = 2;
 
-    message OrderFill {
-        bytes order_id = 1;
-        int64 volume = 2;
-        int64 fee = 3;
-    }
+  message OrderFill {
+    bytes order_id = 1;
+    int64 volume = 2;
+    int64 fee = 3;
+  }
 }

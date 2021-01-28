@@ -1,6 +1,5 @@
 package com.wavesplatform.dex.grpc.integration.clients.matcherext
 
-import java.time.Duration
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -12,6 +11,7 @@ import com.wavesplatform.dex.grpc.integration.clients.domain.{BlockRef, Blockcha
 import com.wavesplatform.dex.grpc.integration.clients.{BroadcastResult, CheckedBroadcastResult, RunScriptResult}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 
+import java.time.Duration
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -28,10 +28,13 @@ class MatcherExtensionCachingClient(underlying: MatcherExtensionClient, defaultC
 
   override val utxEvents = underlying.utxEvents
 
-  override def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] = underlying.spendableBalances(address, assets)
+  override def getOutgoingLeasing(address: Address): Future[Long] = underlying.getOutgoingLeasing(address)
 
-  override def allAssetsSpendableBalance(address: Address, excludeAssets: Set[Asset]): Future[Map[Asset, Long]] =
-    underlying.allAssetsSpendableBalance(address, excludeAssets)
+  override def getAddressPartialRegularBalance(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] =
+    underlying.getAddressPartialRegularBalance(address, assets)
+
+  override def getAddressFullRegularBalance(address: Address, excludeAssets: Set[Asset]): Future[Map[Asset, Long]] =
+    underlying.getAddressFullRegularBalance(address, excludeAssets)
 
   override def getBalances(index: DiffIndex): Future[BlockchainBalance] = underlying.getBalances(index)
 

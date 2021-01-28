@@ -94,7 +94,7 @@ class WsExternalClientHandlerActorSpec extends AnyFreeSpecLike with Matchers wit
         val jwtPayload = mkJwtSignedPayload(clientKeyPair)
         t.wsHandlerRef ! ProcessClientMessage(WsAddressSubscribe(clientKeyPair, WsAddressSubscribe.defaultAuthType, mkJwt(jwtPayload)))
         t.addressProbe.expectMsg(
-          AddressDirectoryActor.Envelope(
+          AddressDirectoryActor.Command.ForwardMessage(
             clientKeyPair,
             AddressActor.WsCommand.AddWsSubscription(t.clientProbe.ref)
           )
@@ -210,12 +210,12 @@ class WsExternalClientHandlerActorSpec extends AnyFreeSpecLike with Matchers wit
       t.wsHandlerRef ! ProcessClientMessage(WsAddressSubscribe(clientKeyPair, WsAddressSubscribe.defaultAuthType, mkJwt(jwtPayload)))
 
       t.matcherProbe.expectMsg(AggregatedOrderBookEnvelope(assetPair, Command.AddWsSubscription(clientRef)))
-      t.addressProbe.expectMsg(AddressDirectoryActor.Envelope(clientKeyPair, WsCommand.AddWsSubscription(clientRef)))
+      t.addressProbe.expectMsg(AddressDirectoryActor.Command.ForwardMessage(clientKeyPair, WsCommand.AddWsSubscription(clientRef)))
 
       t.wsHandlerRef ! WsExternalClientHandlerActor.Event.Completed(().asRight)
 
       t.matcherProbe.expectMsg(AggregatedOrderBookEnvelope(assetPair, Command.RemoveWsSubscription(clientRef)))
-      t.addressProbe.expectMsg(AddressDirectoryActor.Envelope(clientKeyPair, WsCommand.RemoveWsSubscription(clientRef)))
+      t.addressProbe.expectMsg(AddressDirectoryActor.Command.ForwardMessage(clientKeyPair, WsCommand.RemoveWsSubscription(clientRef)))
     }
 
     "should close old order book subscriptions if total order book subscriptions number has reached limit" in test { t =>
@@ -246,14 +246,14 @@ class WsExternalClientHandlerActorSpec extends AnyFreeSpecLike with Matchers wit
 
       def sendSubscriptionRequest(keyPair: KeyPair): Unit = {
         t.wsHandlerRef ! ProcessClientMessage(WsAddressSubscribe(keyPair, WsAddressSubscribe.defaultAuthType, mkJwt(mkJwtSignedPayload(keyPair))))
-        t.addressProbe.expectMsg(AddressDirectoryActor.Envelope(keyPair, WsCommand.AddWsSubscription(t.clientProbe.ref)))
+        t.addressProbe.expectMsg(AddressDirectoryActor.Command.ForwardMessage(keyPair, WsCommand.AddWsSubscription(t.clientProbe.ref)))
       }
 
       keyPairs.foreach(sendSubscriptionRequest)
 
       def checkEviction(newSubscription: KeyPair, oldSubscription: KeyPair): Unit = {
         sendSubscriptionRequest(newSubscription)
-        t.addressProbe.expectMsg(AddressDirectoryActor.Envelope(oldSubscription, WsCommand.RemoveWsSubscription(t.clientProbe.ref)))
+        t.addressProbe.expectMsg(AddressDirectoryActor.Command.ForwardMessage(oldSubscription, WsCommand.RemoveWsSubscription(t.clientProbe.ref)))
         t.clientProbe.expectMessageType[WsError] should matchTo {
           WsError.from(SubscriptionsLimitReached(subscriptionsSettings.maxAddressNumber, oldSubscription.toAddress.toString), time.getTimestamp())
         }

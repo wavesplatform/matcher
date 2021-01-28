@@ -462,7 +462,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
       List(bobOrder, aliceOrder).foreach(waitForOrderAtNode(_))
       dex1.api.cancelOrder(alice, aliceOrder).status shouldBe "OrderCanceled"
       dex1.api.getReservedBalance(alice).keys.size shouldBe 0
-      wavesNode1.api.balance(alice, eth) shouldBe (aliceEthBalance - 960L)
+      wavesNode1.api.balance(alice, eth) shouldBe (aliceEthBalance - 960L) // 960 = 1920/2
       List(btc, eth).foreach(dex1.api.deleteRate)
     }
   }

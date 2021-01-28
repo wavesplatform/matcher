@@ -3,12 +3,13 @@ package com.wavesplatform.dex.it.config
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.it.config.PredefinedAccounts._
 import com.wavesplatform.dex.it.waves.Implicits._
 import com.wavesplatform.dex.it.waves.MkWavesEntities.mkIssue
 import im.mak.waves.transactions.IssueTransaction
 
-trait PredefinedAssets {
+trait PredefinedAssets extends ScorexLogging {
 
   val defaultAssetQuantity: Long = 999999999999L
 
@@ -53,5 +54,14 @@ trait PredefinedAssets {
 
   implicit val assetDecimalsMap: Map[Asset, Int] =
     Map[Asset, Int](Waves -> 8, usd -> 2, usdn -> 6, wct -> 2, eth -> 8, btc -> 8).withDefaultValue(8)
+
+  log.info(
+    s"""Assets:
+       |$usdAssetName: $UsdId
+       |$usdnAssetName: $UsdnId
+       |$wctAssetName: $WctId
+       |$ethAssetName: $EthId
+       |$btcAssetName: $BtcId""".stripMargin
+  )
 
 }

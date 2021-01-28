@@ -28,7 +28,7 @@ object BlockchainUpdatesConversions {
       case Update.Empty => none // Nothing to do
       case Update.Append(updates) =>
         val regularBalanceChanges = combineBalanceUpdates(updates.stateUpdate.view ++ updates.transactionStateUpdates)
-        val outLeasesChanges = combineLeaseUpdates(updates.stateUpdate.view ++ updates.transactionStateUpdates)
+        val outgoingLeasingChanges = combineLeaseUpdates(updates.stateUpdate.view ++ updates.transactionStateUpdates)
 
         // block.transactions, updates.transactionIds, updates.transactionStateUpdates have the same order
         val blockInfo = updates.body match {
@@ -45,7 +45,7 @@ object BlockchainUpdatesConversions {
           val block = WavesBlock(
             ref = blockRef,
             reference = reference,
-            changes = BlockchainBalance(regularBalanceChanges, outLeasesChanges),
+            changes = BlockchainBalance(regularBalanceChanges, outgoingLeasingChanges),
             tpe = tpe,
             confirmedTxs = updates.transactionIds.view
               .zip(updates.transactionStateUpdates)

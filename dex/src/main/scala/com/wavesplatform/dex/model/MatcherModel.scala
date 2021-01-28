@@ -127,7 +127,7 @@ sealed trait AcceptedOrder {
   def forMarket(fm: MarketOrder => Unit): Unit
   def forLimit(fl: LimitOrder => Unit): Unit
 
-  def status: OrderStatus =
+  lazy val status: OrderStatus =
     if (amount == order.amount) OrderStatus.Accepted
     else if (isValid) OrderStatus.PartiallyFilled(filledAmount, filledFee)
     else OrderStatus.Filled(filledAmount, filledFee)
@@ -411,7 +411,7 @@ object Events {
     def reason: EventReason
   }
 
-  case class OrderExecuted(submitted: AcceptedOrder, counter: LimitOrder, timestamp: Long, counterExecutedFee: Price, submittedExecutedFee: Price)
+  case class OrderExecuted(submitted: AcceptedOrder, counter: LimitOrder, timestamp: Long, counterExecutedFee: Long, submittedExecutedFee: Long)
       extends Event {
 
     def executedPrice: Long = counter.price
@@ -462,7 +462,7 @@ object Events {
 
   case object OrderExecutedReason extends EventReason
 
-  case class OrderAdded(order: AcceptedOrder, reason: OrderAddedReason, timestamp: Price) extends Event
+  case class OrderAdded(order: AcceptedOrder, reason: OrderAddedReason, timestamp: Long) extends Event
   sealed trait OrderAddedReason extends EventReason
 
   object OrderAddedReason {

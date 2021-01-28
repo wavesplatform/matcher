@@ -22,7 +22,7 @@ object Asset {
   sealed abstract case class IssuedAsset private (id: ByteStr) extends Asset { override def toString: String = id.base58 }
 
   object IssuedAsset {
-    private[this] val interner = Interners.newWeakInterner[IssuedAsset]()
+    private val interner = Interners.newWeakInterner[IssuedAsset]()
     def apply(id: ByteStr): IssuedAsset = interner.intern(new IssuedAsset(id) {})
   }
 

@@ -127,6 +127,7 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |      balance-stream-buffer-size = 100
          |      combined-client-settings {
          |        max-rollback-height = 90
+         |        max-cached-latest-block-updates = 7
          |        combined-stream.restart-delay = 199ms
          |        pessimistic-portfolios.max-confirmed-transactions = 400
          |      }

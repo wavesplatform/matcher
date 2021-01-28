@@ -72,6 +72,7 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
         balanceStreamBufferSize = 100,
         combinedClientSettings = CombinedWavesBlockchainClient.Settings(
           maxRollbackHeight = 90,
+          maxCachedLatestBlockUpdates = 7,
           combinedStream = CombinedStream.Settings(199.millis),
           pessimisticPortfolios = SynchronizedPessimisticPortfolios.Settings(400)
         )

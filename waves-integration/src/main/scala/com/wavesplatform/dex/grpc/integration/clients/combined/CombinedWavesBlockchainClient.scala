@@ -53,10 +53,10 @@ class CombinedWavesBlockchainClient(
 
   private val dataUpdates = ConcurrentSubject.publish[WavesNodeEvent]
 
-  // NODE: We need to store last updates and consider them as fresh, because we can face an issue during fullBalancesSnapshot
+  // HACK: NODE: We need to store last updates and consider them as fresh, because we can face an issue during fullBalancesSnapshot
   //   when balance changes were deleted from LiquidBlock's diff, but haven't yet saved to DB
   @volatile private var lastUpdates = List.empty[BlockchainBalance]
-  private val maxPreviousBlockUpdates = 5 // 2 could be enough (last + previous), but we add some ratio
+  private val maxPreviousBlockUpdates = settings.maxCachedLatestBlockUpdates - 1 // TODO microblocks!!!!
 
   override lazy val updates: Observable[WavesNodeUpdates] = Observable.fromFuture(meClient.currentBlockInfo)
     .flatMap { startBlockInfo =>
@@ -233,6 +233,7 @@ object CombinedWavesBlockchainClient {
 
   case class Settings(
     maxRollbackHeight: Int,
+    maxCachedLatestBlockUpdates: Int,
     combinedStream: CombinedStream.Settings,
     pessimisticPortfolios: SynchronizedPessimisticPortfolios.Settings
   )

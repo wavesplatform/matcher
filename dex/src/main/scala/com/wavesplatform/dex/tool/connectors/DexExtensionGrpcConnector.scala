@@ -63,7 +63,7 @@ object DexExtensionGrpcConnector {
         blockchainUpdatesGrpcSettings,
         100.milliseconds,
         100,
-        CombinedWavesBlockchainClient.Settings(100, CombinedStream.Settings(1.second), SynchronizedPessimisticPortfolios.Settings(100))
+        CombinedWavesBlockchainClient.Settings(100, 5, CombinedStream.Settings(1.second), SynchronizedPessimisticPortfolios.Settings(100))
       )
       WavesClientBuilder.async(clientSettings, matcherPublicKey, monixScheduler, executionContext)
     }.toEither

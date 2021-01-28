@@ -8,6 +8,7 @@ import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.grpc.integration.clients.domain.portfolio.AddressAssets
 import com.wavesplatform.dex.model.ExchangeTransactionCreator
+import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import org.scalacheck.Gen
 import org.scalatest.freespec.AnyFreeSpecLike
 import org.scalatest.matchers.should.Matchers
@@ -19,6 +20,7 @@ class OrderEventsCoordinatorActorStateSpec
     extends AnyFreeSpecLike
     with Generators
     with DiffMatcher
+    with DiffMatcherWithImplicits
     with Matchers
     with ScalaCheckPropertyChecks
     with NoShrink {

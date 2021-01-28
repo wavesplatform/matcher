@@ -7,11 +7,12 @@ import com.wavesplatform.dex.api.ws.connection.WsConnection.WsRawMessage
 import com.wavesplatform.dex.api.ws.entities.WsFullOrder
 import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsError, WsPingOrPong, WsServerMessage}
 import com.wavesplatform.dex.it.api.websockets.HasWebSockets
+import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.reflect.ClassTag
 
-trait WsSuiteBase extends MatcherSuiteBase with HasWebSockets {
+trait WsSuiteBase extends MatcherSuiteBase with HasWebSockets with DiffMatcherWithImplicits {
 
   implicit protected val wsErrorDiff: Derived[Diff[WsError]] = Derived(Diff.gen[WsError].value.ignore[WsError, Long](_.timestamp))
 

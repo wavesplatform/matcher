@@ -2,7 +2,8 @@ package com.wavesplatform.dex
 
 import com.google.protobuf.{ByteString, UnsafeByteOperations}
 import com.softwaremill.diffx.{ConsoleColorConfig, Derived, Diff, DiffResultDifferent, DiffResultValue, FieldPath, Identical}
-import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.grpc.integration.clients.domain.TransactionWithChanges
 import com.wavesplatform.dex.grpc.integration.services.UtxTransaction
@@ -14,6 +15,7 @@ import org.scalatest.freespec.AnyFreeSpecLike
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.matchers.{MatchResult, Matcher}
 
+
 // TODO DEX-994
 trait WavesIntegrationSuiteBase extends AnyFreeSpecLike with Matchers with AllureScalatestContext {
 
@@ -24,9 +26,25 @@ trait WavesIntegrationSuiteBase extends AnyFreeSpecLike with Matchers with Allur
   // diffx
   val byteStringDiff: Diff[ByteString] = Diff[String].contramap[ByteString](xs => Base58.encode(xs.toByteArray))
 
-  implicit val derivedByteStrDiff: Derived[Diff[ByteStr]] = Derived(Diff[String].contramap[ByteStr](_.toString)) // TODO duplication
   implicit val derivedByteStringDiff: Derived[Diff[ByteString]] = Derived(byteStringDiff)
   implicit val derivedUtxTransactionDiff: Derived[Diff[UtxTransaction]] = Derived(byteStringDiff.contramap[UtxTransaction](_.id))
+
+  // TODO Duplicate
+  implicit val issuedAssetDiff: Diff[IssuedAsset] = { (left: IssuedAsset, right: IssuedAsset, _: List[FieldPath]) =>
+    if (left.id == right.id) Identical(left) else DiffResultValue(left, right)
+  }
+
+  // TODO Duplicate
+  implicit val assetDiff: Diff[Asset] = { (left: Asset, right: Asset, _: List[FieldPath]) =>
+    if (left == right) Identical(left) else DiffResultValue(left, right)
+  }
+
+  // TODO Duplicate
+  implicit val issuedAssetDerivedDiff: Derived[Diff[IssuedAsset]] = Derived(issuedAssetDiff)
+
+  // TODO Duplicate
+  implicit val assetDerivedDiff: Derived[Diff[Asset]] = Derived(assetDiff)
+
 
   // Fixes "Class too large" compiler issue
   implicit val derivedSignedTransactionDiff: Derived[Diff[TransactionWithChanges]] =

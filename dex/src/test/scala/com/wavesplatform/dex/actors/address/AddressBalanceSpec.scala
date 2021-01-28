@@ -10,12 +10,13 @@ import com.wavesplatform.dex.collections.{NegativeMap, NonNegativeMap, NonPositi
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.fp.MapImplicits.group
+import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.freespec.AnyFreeSpecLike
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class AddressBalanceSpec extends AnyFreeSpecLike with Generators with DiffMatcher with Matchers with ScalaCheckPropertyChecks with NoShrink {
+class AddressBalanceSpec extends AnyFreeSpecLike with Generators with DiffMatcher with DiffMatcherWithImplicits with Matchers with ScalaCheckPropertyChecks with NoShrink {
 
   private val positiveAssetsMapGen = assetsMapGen(Gen.choose(1L, 10))
   private val nonPositiveAssetsMapGen = assetsMapGen(Gen.choose(-10L, 0))

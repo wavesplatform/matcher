@@ -1,0 +1,38 @@
+// @formatter:off
+digraph G {
+  graph [label = "Modules"]
+  edge [fontsize = 11, arrowsize = 0.5]
+
+  dtc [label="dex-test-common"]
+  dex
+  dic [label="dex-it-common"]
+  di [label="dex-it"]
+  dl [label="dex-load"]
+  wg [label="waves-grpc"]
+  we [label="waves-ext"]
+  wi [label="waves-integration"]
+  wit [label="waves-integration-it"]
+  dj [label="dex-jmh"]
+
+  dtc -> wi
+
+  dex -> wi
+  dex -> dtc[taillabel="test->compile", labeldistance=2, labelangle=0]
+
+  dic -> dex[taillabel="compile;runtime->provided", minlen = 4, labeldistance = 5, labelangle=-40]
+  dic -> dtc
+
+  di -> dex[headlabel="compile;test->test", labeldistance = 10, labelangle = 20]
+  di -> wit,dic
+
+  dl -> dex,dic
+
+  we -> wg
+  we -> dtc[label="test->compile"]
+
+  wi -> wg
+
+  wit -> wi,dic
+
+  dj -> dex[taillabel="compile;test->test", minlen = 2, labelangle=10]
+}

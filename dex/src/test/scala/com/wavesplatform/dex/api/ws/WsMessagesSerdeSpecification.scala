@@ -1,8 +1,5 @@
 package com.wavesplatform.dex.api.ws
 
-import java.math.BigInteger
-import java.nio.charset.StandardCharsets
-
 import com.softwaremill.diffx.Diff
 import com.wavesplatform.dex.MatcherSpecBase
 import com.wavesplatform.dex.api.http.PlayJsonException
@@ -22,6 +19,8 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import play.api.libs.json.{Format, Json}
 
+import java.math.BigInteger
+import java.nio.charset.StandardCharsets
 import scala.collection.immutable.TreeMap
 
 class WsMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDrivenPropertyChecks with Matchers with MatcherSpecBase {

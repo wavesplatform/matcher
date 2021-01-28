@@ -63,6 +63,7 @@ class WavesBlockchainClientTestSuite extends IntegrationSuiteBase with NoStackTr
         balanceStreamBufferSize = 100,
         combinedClientSettings = CombinedWavesBlockchainClient.Settings(
           maxRollbackHeight = 100,
+          maxCachedLatestBlockUpdates = 5,
           combinedStream = CombinedStream.Settings(1.second),
           pessimisticPortfolios = SynchronizedPessimisticPortfolios.Settings(100)
         )

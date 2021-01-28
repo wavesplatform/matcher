@@ -528,7 +528,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
           responseAs[HttpError] should matchTo(
             HttpError(
               error = 3148801,
-              message = "Provided public key is not correct, reason: Unable to decode base58: requirement failed: Wrong char ';' in Base58 string ';;'",
+              message =
+                "Provided public key is not correct, reason: Unable to decode base58: requirement failed: Wrong char ';' in Base58 string ';;'",
               template = "Provided public key is not correct, reason: {{reason}}",
               params = Some(Json.obj("reason" -> "Unable to decode base58: requirement failed: Wrong char ';' in Base58 string ';;'")),
               status = "InvalidPublicKey"
@@ -1126,13 +1127,13 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     val addressActor = TestProbe("address")
     addressActor.setAutoPilot { (sender: ActorRef, msg: Any) =>
       val response = msg match {
-        case AddressDirectoryActor.Envelope(_, msg) =>
+        case AddressDirectoryActor.Command.ForwardMessage(_, msg) =>
           msg match {
-            case AddressActor.Query.GetReservedBalance => AddressActor.Reply.Balance(Map(Waves -> 350L))
+            case AddressActor.Query.GetReservedBalance => AddressActor.Reply.GetBalance(Map(Waves -> 350L))
             case PlaceOrder(x, _) => if (x.id() == okOrder.id()) AddressActor.Event.OrderAccepted(x) else error.OrderDuplicate(x.id())
 
             case AddressActor.Query.GetOrdersStatuses(_, _) =>
-              AddressActor.Reply.OrdersStatuses(List(okOrder.id() -> OrderInfo.v5(LimitOrder(okOrder), OrderStatus.Accepted)))
+              AddressActor.Reply.GetOrderStatuses(List(okOrder.id() -> OrderInfo.v5(LimitOrder(okOrder), OrderStatus.Accepted)))
 
             case AddressActor.Query.GetOrderStatus(orderId) =>
               if (orderId == okOrder.id()) AddressActor.Reply.GetOrderStatus(OrderStatus.Accepted)
@@ -1160,10 +1161,10 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
                 }.toMap
               )
 
-            case GetTradableBalance(xs) => AddressActor.Reply.Balance(xs.map(_ -> 100L).toMap)
+            case GetTradableBalance(xs) => AddressActor.Reply.GetBalance(xs.map(_ -> 100L).toMap)
 
             case _: AddressActor.Query.GetOrderStatusInfo =>
-              AddressActor.Reply.OrdersStatusInfo(OrderInfo.v5(LimitOrder(orderToCancel), OrderStatus.Accepted).some)
+              AddressActor.Reply.GetOrdersStatusInfo(OrderInfo.v5(LimitOrder(orderToCancel), OrderStatus.Accepted).some)
 
             case x => Status.Failure(new RuntimeException(s"Unknown command: $x"))
           }

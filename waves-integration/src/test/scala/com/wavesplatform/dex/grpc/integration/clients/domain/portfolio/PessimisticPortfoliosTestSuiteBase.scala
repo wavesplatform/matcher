@@ -45,7 +45,8 @@ abstract class PessimisticPortfoliosTestSuiteBase
 
         "in general" in forAll(testGen) { case (pp, arg) =>
           pp.replaceWith(arg)
-          getState(pp) should matchTo(collectChanges(arg))
+          val expected = collectChanges(arg)
+          filterAddressesBy(getState(pp), expected) should matchTo(expected)
         }
 
         "for each address" in forAll(testGen) { case (pp, arg) =>
@@ -54,7 +55,7 @@ abstract class PessimisticPortfoliosTestSuiteBase
           val expectedState = arg.foldMap(_.pessimisticPortfolio)
           expectedState.foreach { case (address, expectedPP) =>
             withClue(s"$address: ") {
-              pp.getAggregated(address) should matchTo(expectedPP)
+              filterAssetsBy(pp.getAggregated(address), expectedPP) should matchTo(expectedPP)
             }
           }
         }
@@ -69,7 +70,8 @@ abstract class PessimisticPortfoliosTestSuiteBase
       ) { (pp, arg) =>
         val before = getState(pp)
         pp.addPending(arg)
-        getState(pp) should matchTo(combine(before, collectChanges(arg)))
+        val expected = combine(before, collectChanges(arg))
+        filterAddressesBy(getState(pp), expected) should matchTo(expected)
       }
     }
 
@@ -90,8 +92,7 @@ abstract class PessimisticPortfoliosTestSuiteBase
           val before = getState(pp)
 
           pp.processConfirmed(confirmedTxIds)
-
-          combine(getState(pp), confirmedTxsChanges) should matchTo(before)
+          filterAddressesBy(combine(getState(pp), confirmedTxsChanges), before) should matchTo(before)
       }
     }
 
@@ -113,7 +114,7 @@ abstract class PessimisticPortfoliosTestSuiteBase
 
           pp.removeFailed(failedTxIds)
 
-          combine(getState(pp), confirmedTxsChanges) should matchTo(before)
+          filterAddressesBy(combine(getState(pp), confirmedTxsChanges), before) should matchTo(before)
       }
     }
   }
@@ -125,6 +126,12 @@ abstract class PessimisticPortfoliosTestSuiteBase
 
   def getState(pp: PessimisticPortfolios): AddressAssets =
     addresses.view.map(x => x -> pp.getAggregated(x)).filter(_._2.nonEmpty).toMap
+
+  def filterAddressesBy(xs: AddressAssets, by: AddressAssets): AddressAssets = xs.collect {
+    case (address, xs) if by.contains(address) => address -> filterAssetsBy(xs, by(address))
+  }
+
+  def filterAssetsBy(xs: Map[Asset, Long], by: Map[Asset, Long]): Map[Asset, Long] = xs.filter { case (asset, _) => by.contains(asset) }
 
   def mkPessimisticPortfolios(initialTxs: List[PessimisticTransaction]): PessimisticPortfolios
 

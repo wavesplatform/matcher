@@ -72,8 +72,8 @@ object Price {
 
 case class MatcherErrorMessage(text: String, template: String, params: JsObject)
 
-case object MatcherIsStarting extends MatcherError(commonEntity, commonEntity, starting, e"System is starting")
-case object MatcherIsStopping extends MatcherError(commonEntity, commonEntity, stopping, e"System is shutting down")
+case object MatcherIsStarting extends MatcherError(commonEntity, commonEntity, starting, e"System is starting. Please retry later")
+case object MatcherIsStopping extends MatcherError(commonEntity, commonEntity, stopping, e"System is shutting down. Please retry later")
 case object RequestTimeout extends MatcherError(request, commonEntity, stopping, e"Request timed out. Please retry later")
 case object FeatureNotImplemented extends MatcherError(commonEntity, feature, unsupported, e"This feature is not implemented")
 case object FeatureDisabled extends MatcherError(commonEntity, feature, disabled, e"This feature is disabled, contact with the administrator")

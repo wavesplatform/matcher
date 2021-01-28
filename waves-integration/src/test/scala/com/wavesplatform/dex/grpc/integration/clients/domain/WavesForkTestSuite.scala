@@ -23,7 +23,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
     reference = ByteStr.empty,
     changes = BlockchainBalance(
       regular = Map(alice -> Map(Waves -> 10, usd -> 2L)),
-      outLeases = Map(bob -> 23L)
+      outgoingLeasing = Map(bob -> 23L)
     ),
     tpe = WavesBlock.Type.FullBlock,
     confirmedTxs = mkTransactionWithChangesMap(1)
@@ -34,7 +34,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
     reference = block1.ref.id,
     changes = BlockchainBalance(
       regular = Map(bob -> Map(usd -> 35)),
-      outLeases = Map.empty
+      outgoingLeasing = Map.empty
     ),
     tpe = WavesBlock.Type.FullBlock,
     confirmedTxs = mkTransactionWithChangesMap(2)
@@ -45,7 +45,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
     reference = block2.ref.id,
     changes = BlockchainBalance(
       regular = Map(alice -> Map(usd -> 30)),
-      outLeases = Map(alice -> 1L)
+      outgoingLeasing = Map(alice -> 1L)
     ),
     tpe = WavesBlock.Type.FullBlock,
     confirmedTxs = mkTransactionWithChangesMap(3)
@@ -64,7 +64,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
           reference = ByteStr(Array[Byte](-98)),
           changes = BlockchainBalance(
             regular = Map(bob -> Map(usd -> 35)),
-            outLeases = Map.empty
+            outgoingLeasing = Map.empty
           ),
           tpe = WavesBlock.Type.FullBlock,
           confirmedTxs = mkTransactionWithChangesMap(10)
@@ -107,7 +107,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
             reference = block2.ref.id,
             changes = BlockchainBalance(
               regular = Map(alice -> Map(usd -> 30)),
-              outLeases = Map(alice -> 1L)
+              outgoingLeasing = Map(alice -> 1L)
             ),
             tpe = WavesBlock.Type.MicroBlock,
             confirmedTxs = mkTransactionWithChangesMap(10)
@@ -127,7 +127,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
             reference = block1.ref.id,
             changes = BlockchainBalance(
               regular = Map(alice -> Map(usd -> 69)),
-              outLeases = Map(bob -> 2L)
+              outgoingLeasing = Map(bob -> 2L)
             ),
             tpe = WavesBlock.Type.MicroBlock,
             confirmedTxs = mkTransactionWithChangesMap(10)
@@ -159,7 +159,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
             reference = block2.ref.id,
             changes = BlockchainBalance(
               regular = Map(bob -> Map(usd -> 31)),
-              outLeases = Map(bob -> 10L)
+              outgoingLeasing = Map(bob -> 10L)
             ),
             tpe = WavesBlock.Type.MicroBlock,
             confirmedTxs = mkTransactionWithChangesMap(10)
@@ -169,7 +169,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
             activeChain = WavesChain(Vector(microBlock, block2, block1), 98),
             newChanges = BlockchainBalance(
               regular = Map(bob -> Map(usd -> 31)),
-              outLeases = Map(bob -> 10L)
+              outgoingLeasing = Map(bob -> 10L)
             ),
             lostDiffIndex = Monoid.empty[DiffIndex],
             lostTxIds = Map.empty,
@@ -183,7 +183,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
             reference = block1.ref.id,
             changes = BlockchainBalance(
               regular = Map(alice -> Map(usd -> 69)),
-              outLeases = Map(bob -> 2L)
+              outgoingLeasing = Map(bob -> 2L)
             ),
             tpe = WavesBlock.Type.MicroBlock,
             confirmedTxs = mkTransactionWithChangesMap(10)
@@ -194,7 +194,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
             reference = microBlock1.ref.id,
             changes = BlockchainBalance(
               regular = Map(bob -> Map(Waves -> 11)),
-              outLeases = Map(alice -> 9L)
+              outgoingLeasing = Map(alice -> 9L)
             ),
             tpe = WavesBlock.Type.MicroBlock,
             confirmedTxs = mkTransactionWithChangesMap(11)

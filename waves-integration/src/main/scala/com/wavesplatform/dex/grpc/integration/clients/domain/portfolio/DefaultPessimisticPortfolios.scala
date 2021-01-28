@@ -11,7 +11,7 @@ import cats.syntax.option._
 import com.google.protobuf.ByteString
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
-import com.wavesplatform.dex.fp.MapImplicits.cleaningGroup
+import com.wavesplatform.dex.fp.MapImplicits.group // TODO cleaning DEX-1013
 
 import scala.collection.mutable
 import scala.util.chaining._
@@ -88,7 +88,8 @@ class DefaultPessimisticPortfolios() extends PessimisticPortfolios {
 
   private def revert(toRevert: AddressAssets): Unit = toRevert.foreach { case (address, toRevert) =>
     portfolios.updateWith(address) { prev =>
-      prev.map(xs => (xs |-| toRevert).filter(_._2 < 0)).filter(_.nonEmpty)
+      // 0 is critical here, otherwise we won't know about zeroing
+      prev.map(xs => (xs |-| toRevert).filter(_._2 <= 0)) // TODO DEX-1013
     }
   }
 

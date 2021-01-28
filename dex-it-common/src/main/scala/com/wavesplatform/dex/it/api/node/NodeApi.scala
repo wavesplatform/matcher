@@ -17,6 +17,7 @@ trait NodeApi[F[_]] {
   def assetBalanceOrig(address: Address, asset: IssuedAsset): F[AssetBalanceResponse]
 
   def broadcast(tx: Transaction): F[Unit]
+  def unconfirmedTransactions: F[List[Transaction]]
   def transactionInfo(id: Id): F[Transaction]
   def unconfirmedTransactionInfo(id: Id): F[Transaction]
 

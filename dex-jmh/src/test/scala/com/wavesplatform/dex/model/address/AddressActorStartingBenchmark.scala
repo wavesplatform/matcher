@@ -1,20 +1,19 @@
 package com.wavesplatform.dex.model.address
 
-import java.nio.charset.StandardCharsets
-import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
-
 import akka.actor.{ActorRef, ActorSystem}
 import akka.pattern.ask
 import cats.syntax.either._
 import com.wavesplatform.dex.actors.address.AddressActor.Query
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.db.TestOrderDB
-import com.wavesplatform.dex.domain.account.KeyPair
+import com.wavesplatform.dex.domain.account.{Address, KeyPair}
+import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.OrderOps._
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.gen.OrderBookGen
+import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
 import com.wavesplatform.dex.model.address.AddressActorStartingBenchmark.AddressState
 import com.wavesplatform.dex.model.{AcceptedOrder, Events, LimitOrder}
 import com.wavesplatform.dex.queue.ValidatedCommandWithMeta
@@ -23,9 +22,10 @@ import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 import org.scalacheck.Gen
 
+import java.nio.charset.StandardCharsets
+import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
-import scala.jdk.CollectionConverters._
 
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))
@@ -92,7 +92,7 @@ object AddressActorStartingBenchmark {
 
     implicit val efc: ErrorFormatterContext = ErrorFormatterContext.from(_ => 8)
 
-    def run(): AddressActor.Reply.OrdersStatuses = {
+    def run(): AddressActor.Reply.GetOrderStatuses = {
 
       val system: ActorSystem = ActorSystem(s"addressActorBenchmark-${ThreadLocalRandom.current().nextInt()}")
 
@@ -104,18 +104,18 @@ object AddressActorStartingBenchmark {
             orderDB = new TestOrderDB(10000),
             validate = (_, _) => Future.successful(().asRight),
             store = command => Future.successful(Some(ValidatedCommandWithMeta(0L, 0L, command))),
-            started = true,
-            spendableBalancesActor = ActorRef.noSender,
+            recovered = true,
+            blockchain = (_: Address, _: Set[Asset]) => Future.successful(AddressBalanceUpdates.empty),
             settings = AddressActor.Settings.default
           )
         )
 
       eventsGen.sample.get.foreach(addressActor ! _)
 
-      addressActor ! AddressDirectoryActor.StartWork
+      addressActor ! AddressDirectoryActor.Command.StartWork
 
       val ordersStatuses = Await.result(
-        addressActor.ask(Query.GetOrdersStatuses(None, AddressActor.OrderListType.All))(3.minutes).mapTo[AddressActor.Reply.OrdersStatuses],
+        addressActor.ask(Query.GetOrdersStatuses(None, AddressActor.OrderListType.All))(3.minutes).mapTo[AddressActor.Reply.GetOrderStatuses],
         3.minutes
       )
 

@@ -13,7 +13,7 @@ case class WavesBlock(
 
   def diffIndex: DiffIndex = DiffIndex(
     regular = changes.regular.view.mapValues(_.keySet).toMap,
-    outLeases = changes.outLeases.keySet
+    outgoingLeasing = changes.outgoingLeasing.keySet
   )
 
   override def toString: String = s"WavesBlock(id=${ref.id.base58.take(5)}, h=${ref.height}, tpe=$tpe, c=${confirmedTxs.size})"

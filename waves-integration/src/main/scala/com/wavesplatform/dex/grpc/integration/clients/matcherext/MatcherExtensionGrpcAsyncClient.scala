@@ -61,16 +61,25 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
 
   override val utxEvents = new GrpcUtxEventsControlledStream(channel)(monixScheduler)
 
-  override def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] = handlingErrors {
+  override def getOutgoingLeasing(address: Address): Future[Long] = handlingErrors {
     asyncUnaryCall(
-      METHOD_SPENDABLE_ASSETS_BALANCES,
-      SpendableAssetsBalancesRequest(address = address.toPB, assets.map(a => SpendableAssetsBalancesRequest.Record(a.toPB)).toSeq)
+      METHOD_GET_OUTGOING_LEASING,
+      AddressRequest(address = address.toPB)
+    ).map(_.outgoingLeasing)
+  }
+
+  override def getAddressPartialRegularBalance(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] = handlingErrors {
+    asyncUnaryCall(
+      METHOD_GET_ADDRESS_PARTIAL_REGULAR_BALANCE,
+      GetAddressPartialRegularBalanceRequest(address = address.toPB, assets.map(a => GetAddressPartialRegularBalanceRequest.Record(a.toPB)).toSeq)
     ).map(response => response.balances.map(record => record.assetId.toVanillaAsset -> record.balance).toMap)
   }
 
-  override def allAssetsSpendableBalance(address: Address, excludeAssets: Set[Asset]): Future[Map[Asset, Long]] = handlingErrors {
-    asyncUnaryCall(METHOD_ALL_ASSETS_SPENDABLE_BALANCE, AddressRequest(address.toPB, excludeAssetIds = excludeAssets.map(_.toPB).toSeq))
-      .map(response => response.balances.map(record => record.assetId.toVanillaAsset -> record.balance).toMap)
+  override def getAddressFullRegularBalance(address: Address, excludeAssets: Set[Asset]): Future[Map[Asset, Long]] = handlingErrors {
+    asyncUnaryCall(
+      METHOD_GET_ADDRESS_FULL_REGULAR_BALANCE,
+      GetAddressFullRegularBalanceRequest(address.toPB, excludeAssetIds = excludeAssets.map(_.toPB).toSeq)
+    ).map(response => response.balances.map(record => record.assetId.toVanillaAsset -> record.balance).toMap)
   }
 
   override def getBalances(index: DiffIndex): Future[BlockchainBalance] = handlingErrors {
@@ -81,7 +90,7 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
           assets = assets.map(_.toPB).toSeq
         )
       }.toSeq,
-      outLeaseAddresses = index.outLeases.map(_.toPB).toSeq
+      outgoingLeasingAddresses = index.outgoingLeasing.map(_.toPB).toSeq
     )
 
     asyncUnaryCall(WavesBlockchainApiGrpc.METHOD_GET_BALANCES, request)
@@ -90,7 +99,7 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
           regular = response.regular
             .map(pair => pair.address.toVanillaAddress -> pair.amount.map(x => x.assetId.toVanillaAsset -> x.amount).toMap)
             .toMap,
-          outLeases = response.outLeases.map(x => x.address.toVanillaAddress -> x.amount).toMap
+          outgoingLeasing = response.outgoingLeasing.map(x => x.address.toVanillaAddress -> x.amount).toMap
         )
       }
   }

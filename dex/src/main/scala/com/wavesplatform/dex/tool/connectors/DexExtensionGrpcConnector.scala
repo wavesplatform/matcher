@@ -37,7 +37,7 @@ case class DexExtensionGrpcConnector private (target: String, grpcAsyncClient: W
 
   def matcherBalanceAsync(address: Address): Future[DetailedBalance] =
     for {
-      balances <- grpcAsyncClient.allAssetsSpendableBalance(address, Set.empty)
+      balances <- grpcAsyncClient.fullBalancesSnapshot(address, Set.empty).map(_.regular)
       balancesWithDescription <- balances.toList.traverse { case (a, b) => getDetailedBalance(a, b) }
     } yield balancesWithDescription.toMap
 

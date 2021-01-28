@@ -3,7 +3,6 @@ package com.wavesplatform.dex
 import java.math.BigInteger
 import java.security.SecureRandom
 import java.util.concurrent.atomic.AtomicLong
-
 import com.google.common.base.Charsets
 import com.google.common.primitives.{Bytes, Ints}
 import com.softwaremill.diffx.{Derived, Diff}

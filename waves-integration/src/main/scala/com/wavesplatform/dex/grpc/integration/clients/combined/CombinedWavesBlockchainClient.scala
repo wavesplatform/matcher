@@ -1,40 +1,39 @@
 package com.wavesplatform.dex.grpc.integration.clients.combined
 
-import java.util.concurrent.atomic.AtomicReference
-import cats.Monoid
-import cats.instances.long._
+import cats.instances.future._
 import cats.instances.set._
+import cats.syntax.contravariantSemigroupal._
 import cats.syntax.group._
+import cats.syntax.option._
 import com.google.protobuf.ByteString
+import com.wavesplatform.dex.collections.ListOps.ListOfMapsOps
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset
-import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.fp.MapImplicits.group
 import com.wavesplatform.dex.grpc.integration.clients.blockchainupdates.BlockchainUpdatesClient
 import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedWavesBlockchainClient._
 import com.wavesplatform.dex.grpc.integration.clients.domain.StatusUpdate.LastBlockHeight
 import com.wavesplatform.dex.grpc.integration.clients.domain._
 import com.wavesplatform.dex.grpc.integration.clients.domain.portfolio.SynchronizedPessimisticPortfolios
 import com.wavesplatform.dex.grpc.integration.clients.matcherext.MatcherExtensionClient
-import com.wavesplatform.dex.grpc.integration.protobuf.DexToPbConversions._
 import com.wavesplatform.dex.grpc.integration.clients.{BroadcastResult, CheckedBroadcastResult, RunScriptResult, WavesBlockchainClient}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
+import com.wavesplatform.dex.grpc.integration.protobuf.DexToPbConversions._
+import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions._
+import com.wavesplatform.dex.grpc.integration.services.UtxTransaction
+import com.wavesplatform.protobuf.transaction.SignedTransaction
 import monix.eval.Task
 import monix.execution.Scheduler
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 
-import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.chaining._
 import scala.util.{Failure, Success}
-import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions._
-import com.wavesplatform.dex.grpc.integration.services.UtxTransaction
-import com.wavesplatform.protobuf.transaction.SignedTransaction
 
 class CombinedWavesBlockchainClient(
   settings: Settings,
@@ -50,18 +49,19 @@ class CombinedWavesBlockchainClient(
 
   private val pbMatcherPublicKey = matcherPublicKey.toPB
 
-  private val knownBalances: AtomicReference[BlockchainBalance] = new AtomicReference(Monoid.empty[BlockchainBalance])
-
   private val pessimisticPortfolios = new SynchronizedPessimisticPortfolios(settings.pessimisticPortfolios)
 
   private val dataUpdates = ConcurrentSubject.publish[WavesNodeEvent]
+
+  // NODE: We need to store last updates and consider them as fresh, because we can face an issue during fullBalancesSnapshot
+  //   when balance changes were deleted from LiquidBlock's diff, but haven't yet saved to DB
+  @volatile private var lastUpdates = List.empty[BlockchainBalance]
+  private val maxPreviousBlockUpdates = 5 // 2 could be enough (last + previous), but we add some ratio
 
   override lazy val updates: Observable[WavesNodeUpdates] = Observable.fromFuture(meClient.currentBlockInfo)
     .flatMap { startBlockInfo =>
       log.info(s"Current block: $startBlockInfo")
       val startHeight = math.max(startBlockInfo.height - settings.maxRollbackHeight - 1, 1)
-
-      val finalBalance = mutable.Map.empty[Address, Map[Asset, Long]]
       val init: BlockchainStatus = BlockchainStatus.Normal(WavesChain(Vector.empty, startHeight, settings.maxRollbackHeight + 1))
 
       val combinedStream = new CombinedStream(settings.combinedStream, bClient.blockchainEvents, meClient.utxEvents)
@@ -76,22 +76,21 @@ class CombinedWavesBlockchainClient(
           }
           if (x.requestNextBlockchainEvent) bClient.blockchainEvents.requestNext()
           requestBalances(x.requestBalances)
-          val finalKnownBalances = knownBalances.updateAndGet(_ |+| x.updatedBalances)
           val updatedPessimistic = processUtxEvents(x.utxUpdate) // TODO DEX-1045 Do we need to filter out known transactions (WavesChain)?
-          val changedAddresses = finalKnownBalances.regular.keySet ++ finalKnownBalances.outLeases.keySet ++ updatedPessimistic
+          val changedAddresses = x.updatedBalances.regular.keySet ++ x.updatedBalances.outgoingLeasing.keySet ++ updatedPessimistic
           val updatedFinalBalances = changedAddresses
             .map { address =>
-              address -> combineBalances(
-                updatedRegular = x.updatedBalances.regular.getOrElse(address, Map.empty),
-                updatedOutLease = x.updatedBalances.outLeases.get(address).fold(Map.empty[Asset, Long])(x => Map(Waves -> x)),
-                // TODO DEX-1013
-                updatedPessimistic = if (updatedPessimistic.contains(address)) pessimisticPortfolios.getAggregated(address) else Map.empty,
-                finalRegular = finalKnownBalances.regular.getOrElse(address, Map.empty),
-                finalOutLease = finalKnownBalances.outLeases.get(address).fold(Map.empty[Asset, Long])(x => Map(Waves -> x)),
-                finalPessimistic = pessimisticPortfolios.getAggregated(address)
+              address -> AddressBalanceUpdates(
+                regular = x.updatedBalances.regular.getOrElse(address, Map.empty),
+                outgoingLeasing = x.updatedBalances.outgoingLeasing.get(address),
+                pessimisticCorrection =
+                  if (updatedPessimistic.contains(address)) pessimisticPortfolios.getAggregated(address)
+                  else Map.empty
               )
             }
             .toMap
+
+          if (!x.updatedBalances.isEmpty) lastUpdates = x.updatedBalances :: lastUpdates.take(maxPreviousBlockUpdates)
 
           // // Not useful for UTX, because it doesn't consider the current state of orders
           // // Will be useful, when blockchain updates send order fills.
@@ -105,38 +104,24 @@ class CombinedWavesBlockchainClient(
           //
           // if (fillsDebugInfo.nonEmpty) log.info(s"Detected fills:\n${fillsDebugInfo.mkString("\n")}")
 
-          (
-            x.newStatus,
-            WavesNodeUpdates(
-              updatedFinalBalances,
-              unconfirmedTxs = {
-                for {
-                  tx <- x.utxUpdate.unconfirmedTxs.view if isExchangeTransactionFromMatcher(tx)
-                  signedTx <- tx.transaction
-                  changes <- tx.diff.flatMap(_.stateUpdate)
-                } yield tx.id.toVanilla -> TransactionWithChanges(tx.id, signedTx, changes)
-              }.toMap,
-              confirmedTxs = x.utxUpdate.confirmedTxs.view
-                .collect { case (id, x) if isExchangeTransactionFromMatcher(x.tx) => id.toVanilla -> x }.toMap,
-              failedTxs = (for {
-                tx <- x.utxUpdate.failedTxs.values if isExchangeTransactionFromMatcher(tx)
-                signedTx <- tx.transaction
-                changes <- tx.diff.flatMap(_.stateUpdate)
-              } yield tx.id.toVanilla -> TransactionWithChanges(tx.id, signedTx, changes)).toMap
-            )
-          )
+          val unconfirmedTxs = for {
+            tx <- x.utxUpdate.unconfirmedTxs.view if isExchangeTxFromMatcher(tx)
+            signedTx <- tx.transaction
+            changes <- tx.diff.flatMap(_.stateUpdate)
+          } yield tx.id.toVanilla -> TransactionWithChanges(tx.id, signedTx, changes)
+
+          val confirmedTxs = x.utxUpdate.confirmedTxs.view
+            .collect { case (id, x) if isExchangeTxFromMatcher(x.tx) => id.toVanilla -> x }
+
+          val failedTxs = for {
+            tx <- x.utxUpdate.failedTxs.values.view if isExchangeTxFromMatcher(tx)
+            signedTx <- tx.transaction
+            changes <- tx.diff.flatMap(_.stateUpdate)
+          } yield tx.id.toVanilla -> TransactionWithChanges(tx.id, signedTx, changes)
+
+          (x.newStatus, WavesNodeUpdates(updatedFinalBalances, (unconfirmedTxs ++ confirmedTxs ++ failedTxs).toMap))
         }
         .filterNot(_.isEmpty)
-        .map { updated => // TODO DEX-1014
-          updated.copy(
-            updatedBalances = updated.updatedBalances.filter { case (address, updatedBalance) =>
-              val prev = finalBalance.getOrElse(address, Map.empty).filter { case (k, _) => updatedBalance.contains(k) }
-              val different = prev != updatedBalance
-              if (different) finalBalance.update(address, prev ++ updatedBalance)
-              different
-            }
-          )
-        }
         .tap(_ => combinedStream.startFrom(startHeight))
     }
     .doOnError(e => Task(log.error("Got an error in the combined stream", e)))
@@ -159,60 +144,56 @@ class CombinedWavesBlockchainClient(
           requestBalances(x)
       }
 
-  private def combineBalances(
-    updatedRegular: Map[Asset, Long],
-    updatedOutLease: Map[Asset, Long],
-    updatedPessimistic: Map[Asset, Long],
-    finalRegular: Map[Asset, Long],
-    finalOutLease: Map[Asset, Long],
-    finalPessimistic: Map[Asset, Long]
-  ): Map[Asset, Long] = {
-    val changedAssets = updatedRegular.keySet ++ updatedPessimistic.keySet ++ updatedOutLease.keySet
-    changedAssets.map { asset =>
-      val assetRegular = updatedRegular.get(asset).orElse(finalRegular.get(asset)).getOrElse(0L)
-      val assetOutLease = updatedOutLease.get(asset).orElse(finalOutLease.get(asset)).getOrElse(0L)
-      val assetPessimistic = updatedPessimistic.get(asset).orElse(finalPessimistic.get(asset)).getOrElse(0L)
-      // TODO solve overflow?
-      val r = math.max(0L, assetRegular - assetOutLease + assetPessimistic) // pessimistic is negative
-      asset -> r
-    }.toMap
-  }
-
-  private def isExchangeTransactionFromMatcher(tx: SignedTransaction): Boolean =
+  private def isExchangeTxFromMatcher(tx: SignedTransaction): Boolean =
     tx.transaction.exists { tx =>
       tx.data.isExchange && ByteString.unsignedLexicographicalComparator().compare(tx.senderPublicKey, pbMatcherPublicKey) == 0
     }
 
-  private def isExchangeTransactionFromMatcher(tx: UtxTransaction): Boolean = tx.transaction.exists(isExchangeTransactionFromMatcher)
+  private def isExchangeTxFromMatcher(tx: UtxTransaction): Boolean = tx.transaction.exists(isExchangeTxFromMatcher)
 
-  override def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] = {
-    val known = knownBalances.get
-    val regular = known.regular.getOrElse(address, Map.empty).filter { case (k, _) => assets.contains(k) }
-    val blockchainBalance = combineBalances(
-      updatedRegular = regular,
-      updatedOutLease = Map.empty,
-      updatedPessimistic = Map.empty,
-      finalRegular = Map.empty,
-      // Will be used only if Waves in assets, see combineBalances
-      finalOutLease = known.outLeases.get(address).fold(Map.empty[Asset, Long])(x => Map(Waves -> x)),
-      finalPessimistic = Map.empty
-    )
-
-    val toRequest = assets -- blockchainBalance.keySet
-    val response = if (toRequest.isEmpty) Future.successful(Map.empty) else meClient.spendableBalances(address, toRequest)
-    response.map { response =>
-      (blockchainBalance ++ response) |+| pessimisticPortfolios.getAggregated(address).collect {
-        case p @ (asset, _) if assets.contains(asset) => p
-      }
+  override def partialBalancesSnapshot(address: Address, assets: Set[Asset]): Future[AddressBalanceUpdates] =
+    (
+      meClient.getAddressPartialRegularBalance(address, assets),
+      if (assets.contains(Asset.Waves)) meClient.getOutgoingLeasing(address).map(_.some) else Future.successful(none)
+    ).mapN { case (regular, outgoingLeasing) =>
+      def pred(p: (Asset, Long)): Boolean = assets.contains(p._1)
+      val full = getFreshBalances(address, regular, outgoingLeasing)
+      full.copy(
+        regular = full.regular.filter(pred),
+        pessimisticCorrection = full.pessimisticCorrection.filter(pred)
+      )
     }
+
+  override def fullBalancesSnapshot(address: Address, excludeAssets: Set[Asset]): Future[AddressBalanceUpdates] =
+    (
+      meClient.getAddressFullRegularBalance(address, excludeAssets),
+      if (excludeAssets.contains(Asset.Waves)) Future.successful(none[Long]) else meClient.getOutgoingLeasing(address).map(_.some)
+    ).mapN { case (regular, outgoingLeasing) =>
+      def pred(p: (Asset, Long)): Boolean = !excludeAssets.contains(p._1)
+      val full = getFreshBalances(address, regular, outgoingLeasing)
+      full.copy(
+        regular = full.regular.filter(pred),
+        pessimisticCorrection = full.pessimisticCorrection.filter(pred)
+      )
+    }
+
+  private def getFreshBalances(address: Address, regular: Map[Asset, Long], outgoingLeasing: Option[Long]): AddressBalanceUpdates = {
+    val prioritizedLastUpdates = lastUpdates :+ mkBlockchainBalance(address, regular, outgoingLeasing)
+    val r = prioritizedLastUpdates.map(_.regular.getOrElse(address, Map.empty))
+    AddressBalanceUpdates(
+      regular = r.foldSkipped,
+      outgoingLeasing =
+        if (outgoingLeasing.isEmpty) none[Long]
+        else prioritizedLastUpdates.map(_.outgoingLeasing.get(address)).foldLeft(none[Long])(_.orElse(_)),
+      pessimisticCorrection = pessimisticPortfolios.getAggregated(address)
+    )
   }
 
-  override def allAssetsSpendableBalance(address: Address, excludeAssets: Set[Asset]): Future[Map[Asset, Long]] =
-    meClient.allAssetsSpendableBalance(address, excludeAssets).map { xs =>
-      xs |+| pessimisticPortfolios.getAggregated(address).collect {
-        case p @ (asset, _) if xs.keySet.contains(asset) => p
-      }
-    }
+  private def mkBlockchainBalance(address: Address, regular: Map[Asset, Long], outgoingLeasing: Option[Long]): BlockchainBalance =
+    BlockchainBalance(
+      regular = Map(address -> regular),
+      outgoingLeasing = outgoingLeasing.fold(Map.empty[Address, Long])(x => Map(address -> x))
+    )
 
   // TODO DEX-1012
   override def isFeatureActivated(id: Short): Future[Boolean] =

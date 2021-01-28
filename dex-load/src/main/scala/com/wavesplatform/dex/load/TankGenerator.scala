@@ -1,39 +1,35 @@
 package com.wavesplatform.dex.load
 
-import java.io.{File, PrintWriter}
-import java.net.URI
-import java.nio.file.Files
-import java.util.concurrent.{ExecutorService, Executors}
 import com.softwaremill.sttp.{MonadError => _}
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
-import com.wavesplatform.dex.domain.account.{Address, AddressScheme, KeyPair, PrivateKey, PublicKey}
+import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.dex.domain.bytes.ByteStr
-import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
-import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.load.request._
 import com.wavesplatform.dex.load.utils._
-import com.wavesplatform.protobuf.transaction.Recipient
-import im.mak.waves.transactions.{MassTransferTransaction, TransactionOrOrder, TransferTransaction, WavesConfig}
 import im.mak.waves.transactions.account.{PrivateKey => JPrivateKey, PublicKey => JPublicKey}
-import im.mak.waves.transactions.common.{Amount, AssetId, Base58String, Recipient}
+import im.mak.waves.transactions.common.{Amount, AssetId}
 import im.mak.waves.transactions.exchange.{AssetPair, Order, OrderType}
 import im.mak.waves.transactions.mass.Transfer
+import im.mak.waves.transactions.{MassTransferTransaction, TransferTransaction, WavesConfig}
 import org.apache.http.HttpResponse
 import org.apache.http.client.config.{CookieSpecs, RequestConfig}
 import org.apache.http.client.methods.RequestBuilder
+import org.apache.http.client.protocol.HttpClientContext
 import org.apache.http.entity.{ContentType, StringEntity}
 import org.apache.http.impl.client.{CloseableHttpClient, HttpClients}
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager
 import play.api.libs.json.{JsError, JsSuccess, JsValue}
 
+import java.io.{File, PrintWriter}
+import java.net.URI
+import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+import java.util.concurrent.{ExecutorService, Executors}
 import scala.concurrent._
 import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters._
 import scala.util.Random
-import org.apache.http.client.protocol.HttpClientContext
-
-import java.nio.charset.StandardCharsets
 
 object TankGenerator {
 

@@ -5,7 +5,6 @@ import org.scalatest.matchers.{MatchResult, Matcher}
 import scala.util.matching.Regex
 import scala.util.{Left, Right}
 
-// TODO DEX-994
 object ProduceError {
 
   def produce(errorPattern: Regex): Matcher[Either[_, _]] = {

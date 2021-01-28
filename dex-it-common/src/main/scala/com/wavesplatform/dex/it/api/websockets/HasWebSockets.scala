@@ -1,8 +1,5 @@
 package com.wavesplatform.dex.it.api.websockets
 
-import java.lang
-import java.util.concurrent.ConcurrentHashMap
-
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.Uri
 import akka.stream.Materializer
@@ -21,6 +18,8 @@ import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Suite}
 
+import java.lang
+import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.duration._
 
 trait HasWebSockets extends BeforeAndAfterAll with BeforeAndAfterEach with HasJwt with WsConnectionOps with WsMessageOps {

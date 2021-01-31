@@ -61,7 +61,7 @@ class ExchangeTransactionBroadcastActorSpecification
           val client = testKit.createTestProbe[Observed]()
           val event = sampleEvent(client.ref)
           actor ! event
-          client.expectMessage(Observed(event.tx))
+          client.expectMessage(Observed(event.tx, Map.empty))
         }
 
         "a transaction was confirmed before" in test(CheckedBroadcastResult.Confirmed)
@@ -228,8 +228,9 @@ class ExchangeTransactionBroadcastActorSpecification
     val now = time.getTimestamp()
     val expiration = now + 1.day.toMillis
     ExchangeTransactionBroadcastActor.Command.Broadcast(
-      clientRef,
-      ExchangeTransactionV2
+      clientRef = clientRef,
+      addressSpendings = Map.empty,
+      tx = ExchangeTransactionV2
         .create(
           buyOrder = Order.buy(
             sender = KeyPair(Array.emptyByteArray),

@@ -3,7 +3,7 @@ package com.wavesplatform.it.sync
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.effect.Implicits.FutureCompanionOps
 import com.wavesplatform.dex.it.docker.DexContainer
@@ -17,12 +17,6 @@ import scala.concurrent.{Await, Future}
 
 @DexItExternalKafkaRequired
 class AutoCancelOrderTestSuite extends MatcherSuiteBase {
-
-  override protected val wavesNodeInitialSuiteConfig: Config = ConfigFactory.parseString(
-    s"""waves.dex {
-       |  utx.ignore-exchange-sender-pk-in-pessimistic-portfolio = "${matcher.publicKey.base58}"
-       |}""".stripMargin
-  )
 
   override protected def dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "$BtcId", "WAVES" ]""")
@@ -51,7 +45,8 @@ class AutoCancelOrderTestSuite extends MatcherSuiteBase {
 
   "Auto cancel" - {
     "wrong cancel when match orders on all coins" in {
-      val accounts = (1 to 5).map(i => createAccountWithBalance(i, issueFee -> Waves))
+      info("initializing: transfer initial balances and creating assets")
+      val accounts = (1 to 5).map(createAccountWithBalance(_))
       knownAccounts = knownAccounts ++ accounts
 
       val oneOrderAmount = 10000
@@ -64,19 +59,32 @@ class AutoCancelOrderTestSuite extends MatcherSuiteBase {
       }.toMap
       broadcastAndAwait(accountsAndAssets.values.toSeq: _*)
 
+      info("placing sell orders")
       val now = System.currentTimeMillis()
       val sells = accountsAndAssets.zipWithIndex.map {
         case ((account, asset), i) =>
           val issuedAsset = IssuedAsset(asset.id())
           val assetPair = AssetPair(issuedAsset, Waves)
           eventually {
-            dex1.api.getTradableBalance(account, assetPair).getOrElse(issuedAsset, 0L) shouldBe oneOrderAmount
+            dex1.api.getTradableBalance(account, assetPair) should matchTo(Map[Asset, Long](
+              Waves -> matcherFee,
+              issuedAsset -> oneOrderAmount
+            ))
           }
           mkOrder(account, assetPair, OrderType.SELL, oneOrderAmount, orderPrice, ts = now + i)
       }
 
       sells.foreach(placeAndAwaitAtDex(_))
 
+      info("checking there is no tradable Waves on accounts")
+      accountsAndAssets.foreach { case (account, asset) =>
+        val assetPair = AssetPair(IssuedAsset(asset.id()), Waves)
+        eventually {
+          dex1.api.getTradableBalance(account, assetPair) should matchTo(Map.empty[Asset, Long])
+        }
+      }
+
+      info("placing buy orders (10 for each sell)")
       val submittedOrdersNumber = 10
       val buyOrders =
         for {
@@ -98,6 +106,7 @@ class AutoCancelOrderTestSuite extends MatcherSuiteBase {
         5.minutes
       )
 
+      info("checking that order weren't canceled")
       val firstCanceled = sells.view
         .map { order =>
           order.idStr() -> dex1.api.waitForOrder(order)(r => r.status == Status.Filled || r.status == Status.Cancelled).status
@@ -107,7 +116,7 @@ class AutoCancelOrderTestSuite extends MatcherSuiteBase {
         }
 
       firstCanceled.foreach { id =>
-        fail(s"$id is canceled")
+        fail(s"$id is canceled") // <--
       }
 
       sells.foreach { o =>
@@ -117,6 +126,7 @@ class AutoCancelOrderTestSuite extends MatcherSuiteBase {
 
       wavesNode1.api.waitForHeightArise()
 
+      info("post-checks")
       withClue("transactions check:\n") {
         sells.foreach { o =>
           withClue(s"oId=${o.id()}: ") {

@@ -11,12 +11,14 @@ import cats.syntax.option._
 import com.google.protobuf.ByteString
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
-import com.wavesplatform.dex.fp.MapImplicits.group // TODO cleaning DEX-1013
+import com.wavesplatform.dex.domain.utils.ScorexLogging
+import com.wavesplatform.dex.fp.MapImplicits.group
 
 import scala.collection.mutable
 import scala.util.chaining._
+import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions._
 
-class DefaultPessimisticPortfolios() extends PessimisticPortfolios {
+class DefaultPessimisticPortfolios() extends PessimisticPortfolios with ScorexLogging {
   // Longs are negative in both maps, see getPessimisticPortfolio
   private val portfolios = new mutable.AnyRefMap[Address, Map[Asset, Long]]()
   private val txs = new mutable.AnyRefMap[ByteString, Map[Address, Map[Asset, Long]]]
@@ -47,6 +49,7 @@ class DefaultPessimisticPortfolios() extends PessimisticPortfolios {
       }
 
       val subtractPortfolios = removeTxIds.toList.foldMap(txs.remove(_).getOrElse(Map.empty))
+      log.info(s"[replace] added: ${putTxIds.map(_.toVanilla).mkString(",")}; removed: ${removeTxIds.map(_.toVanilla).mkString(",")}")
 
       val diff = addPortfolios |-| subtractPortfolios
       diff.foreach { case (address, diff) =>
@@ -61,9 +64,10 @@ class DefaultPessimisticPortfolios() extends PessimisticPortfolios {
   }
 
   override def addPending(addTxs: Iterable[PessimisticTransaction]): Set[Address] = {
-    val pessimisticChanges = addTxs
-      .filterNot(addTxs => txs.contains(addTxs.txId))
-      .foldMap[AddressAssets](tx => tx.pessimisticPortfolio.tap(txs.put(tx.txId, _)))
+    val newTxs = addTxs.filterNot(addTxs => txs.contains(addTxs.txId))
+    log.info(s"[add] ${newTxs.map(_.txId.toVanilla).mkString(", ")}")
+
+    val pessimisticChanges = newTxs.foldMap[AddressAssets](tx => tx.pessimisticPortfolio.tap(txs.put(tx.txId, _)))
 
     pessimisticChanges.foreach { case (address, p) => portfolios.updateWith(address)(_.foldLeft(p)(Semigroup.combine).some) }
     pessimisticChanges.keySet
@@ -73,6 +77,8 @@ class DefaultPessimisticPortfolios() extends PessimisticPortfolios {
    * @return (affected addresses, unknown transactions)
    */
   override def processConfirmed(txIds: Iterable[ByteString]): (Set[Address], List[ByteString]) = {
+    log.info(s"[confirmed] ${txIds.map(_.toVanilla).mkString(", ")}")
+
     val (pessimisticChangesToRevert, unknownTxIds) = txIds.foldMap[(AddressAssets, List[ByteString])] { txId =>
       txs.remove(txId).fold[(AddressAssets, List[ByteString])]((Map.empty, List(txId)))((_, Nil))
     }
@@ -82,6 +88,8 @@ class DefaultPessimisticPortfolios() extends PessimisticPortfolios {
 
   override def removeFailed(txIds: Iterable[ByteString]): Set[Address] = {
     val pessimisticChangesToRevert = txIds.foldMap[AddressAssets](txs.remove(_).getOrElse(Map.empty))
+    log.info(s"[failed] ${txIds.map(_.toVanilla).mkString(", ")}")
+
     revert(pessimisticChangesToRevert)
     pessimisticChangesToRevert.keySet
   }

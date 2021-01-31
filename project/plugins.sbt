@@ -24,7 +24,8 @@ Seq(
   // dependencyCheck to check against OWASP
   "net.vonbuchholtz" % "sbt-dependency-check" % "1.3.3",
   // dependencyUpdates
-  "com.timushev.sbt" % "sbt-updates" % "0.5.0"
+  "com.timushev.sbt" % "sbt-updates" % "0.5.0",
+  "com.github.tkawachi" % "sbt-repeat" % "0.1.0"
 ).map(addSbtPlugin)
 
 libraryDependencies ++= Seq(

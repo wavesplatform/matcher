@@ -4,7 +4,7 @@ pipeline {
     }
     options {
         ansiColor('xterm')
-        timeout(time: 45, unit: 'MINUTES')
+        timeout(time: 90, unit: 'MINUTES')
     }
     parameters {
         string(name: 'SEED', defaultValue: 'test-seed', description: 'Seed prefix of generated accounts')

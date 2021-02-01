@@ -24,7 +24,8 @@ Seq(
   // dependencyCheck to check against OWASP
   "net.vonbuchholtz" % "sbt-dependency-check" % "1.3.3",
   // dependencyUpdates
-  "com.timushev.sbt" % "sbt-updates" % "0.5.0"
+  "com.timushev.sbt" % "sbt-updates" % "0.5.0",
+  "io.kamon" % "sbt-kanela-runner" % "2.0.6"
 ).map(addSbtPlugin)
 
 libraryDependencies ++= Seq(

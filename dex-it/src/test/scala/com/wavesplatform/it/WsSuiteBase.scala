@@ -16,8 +16,11 @@ trait WsSuiteBase extends MatcherSuiteBase with HasWebSockets with DiffMatcherWi
 
   implicit protected val wsErrorDiff: Derived[Diff[WsError]] = Derived(Diff.gen[WsError].value.ignore[WsError, Long](_.timestamp))
 
-  implicit protected val wsAddressChangesDiff: Derived[Diff[WsAddressChanges]] =
-    Derived(Diff.gen[WsAddressChanges].value.ignore[WsAddressChanges, Long](_.timestamp))
+  implicit protected val wsAddressChangesDiff: Derived[Diff[WsAddressChanges]] = Derived(
+    Diff.gen[WsAddressChanges].value
+      .ignore[WsAddressChanges, Long](_.timestamp)
+      .ignore[WsAddressChanges, Long](_.updateId)
+  )
 
   implicit protected val wsCompleteOrderDiff: Diff[WsFullOrder] =
     Derived(Diff.gen[WsFullOrder].value.ignore[WsFullOrder, Long](_.timestamp).ignore[WsFullOrder, Long](_.eventTimestamp))

@@ -83,14 +83,22 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with
     val bobCancels = (1 to cancelsNumber).map(_ => choose(bobOrders)).toSet.map(MatcherCommand.Cancel(dex2, bob, _))
     val cancels = Random.shuffle(aliceCancels ++ bobCancels)
 
-    successfulCommandsNumber = executeCommands(places ++ cancels)
+    successfulCommandsNumber = executeCommands(places)
+    // We have to do this separately because an order could be in progress (during placement).
+    //  So we could cancel it, but later.
+    //  But instead we receive OrderNotFound.
+    //    And this is the different case than OrderNotFound in an order book (executed),
+    //    because we didn't saved it to the queue.
+    successfulCommandsNumber += executeCommands(cancels.toSeq)
+
     successfulCommandsNumber += executeCommands(List(MatcherCommand.Place(dex1, lastOrder)))
     log.info(s"Successful commands: $successfulCommandsNumber")
   }
 
   "Wait until all requests are processed" in {
+    val expectedOffset = successfulCommandsNumber - 1
     try {
-      val offset1 = dex1.api.waitForCurrentOffset(_ == successfulCommandsNumber - 1) // Index starts from 0
+      val offset1 = dex1.api.waitForCurrentOffset(_ == expectedOffset) // Index starts from 0
       dex2.api.waitForCurrentOffset(_ == offset1)
 
       withClue("Last command processed") {
@@ -98,7 +106,7 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with
       }
     } catch {
       case NonFatal(e) =>
-        log.info(s"Last offsets: node1=${dex1.api.getLastOffset}, node2=${dex2.api.getLastOffset}")
+        log.info(s"Last offsets: node1=${dex1.api.getLastOffset}, node2=${dex2.api.getLastOffset}, expected=$expectedOffset")
         throw e
     }
   }
@@ -131,7 +139,7 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with
       val obs1 = wsob1.receiveAtLeastN[WsOrderBookChanges](1).reduce(mergeOrderBookChanges)
       val obs2 = wsob2.receiveAtLeastN[WsOrderBookChanges](1).reduce(mergeOrderBookChanges)
 
-      obs1 should be equals obs2
+      obs1 should matchTo(obs2)
     }
 
     wsob1.close()

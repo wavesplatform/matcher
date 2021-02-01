@@ -65,34 +65,40 @@ class DefaultPessimisticPortfolios() extends PessimisticPortfolios with ScorexLo
 
   override def addPending(addTxs: Iterable[PessimisticTransaction]): Set[Address] = {
     val newTxs = addTxs.filterNot(addTxs => txs.contains(addTxs.txId))
-    log.info(s"[add] ${newTxs.map(_.txId.toVanilla).mkString(", ")}")
+    if (newTxs.isEmpty) Set.empty
+    else {
+      log.info(s"[add] ${newTxs.map(_.txId.toVanilla).mkString(", ")}")
+      val pessimisticChanges = newTxs.foldMap[AddressAssets](tx => tx.pessimisticPortfolio.tap(txs.put(tx.txId, _)))
 
-    val pessimisticChanges = newTxs.foldMap[AddressAssets](tx => tx.pessimisticPortfolio.tap(txs.put(tx.txId, _)))
-
-    pessimisticChanges.foreach { case (address, p) => portfolios.updateWith(address)(_.foldLeft(p)(Semigroup.combine).some) }
-    pessimisticChanges.keySet
+      pessimisticChanges.foreach { case (address, p) => portfolios.updateWith(address)(_.foldLeft(p)(Semigroup.combine).some) }
+      pessimisticChanges.keySet
+    }
   }
 
   /**
    * @return (affected addresses, unknown transactions)
    */
-  override def processConfirmed(txIds: Iterable[ByteString]): (Set[Address], List[ByteString]) = {
-    log.info(s"[confirmed] ${txIds.map(_.toVanilla).mkString(", ")}")
+  override def processConfirmed(txIds: Iterable[ByteString]): (Set[Address], List[ByteString]) =
+    if (txIds.isEmpty) (Set.empty, Nil)
+    else {
+      log.info(s"[confirmed] ${txIds.map(_.toVanilla).mkString(", ")}")
 
-    val (pessimisticChangesToRevert, unknownTxIds) = txIds.foldMap[(AddressAssets, List[ByteString])] { txId =>
-      txs.remove(txId).fold[(AddressAssets, List[ByteString])]((Map.empty, List(txId)))((_, Nil))
+      val (pessimisticChangesToRevert, unknownTxIds) = txIds.foldMap[(AddressAssets, List[ByteString])] { txId =>
+        txs.remove(txId).fold[(AddressAssets, List[ByteString])]((Map.empty, List(txId)))((_, Nil))
+      }
+      revert(pessimisticChangesToRevert)
+      (pessimisticChangesToRevert.keySet, unknownTxIds)
     }
-    revert(pessimisticChangesToRevert)
-    (pessimisticChangesToRevert.keySet, unknownTxIds)
-  }
 
-  override def removeFailed(txIds: Iterable[ByteString]): Set[Address] = {
-    val pessimisticChangesToRevert = txIds.foldMap[AddressAssets](txs.remove(_).getOrElse(Map.empty))
-    log.info(s"[failed] ${txIds.map(_.toVanilla).mkString(", ")}")
+  override def removeFailed(txIds: Iterable[ByteString]): Set[Address] =
+    if (txIds.isEmpty) Set.empty
+    else {
+      val pessimisticChangesToRevert = txIds.foldMap[AddressAssets](txs.remove(_).getOrElse(Map.empty))
+      log.info(s"[failed] ${txIds.map(_.toVanilla).mkString(", ")}")
 
-    revert(pessimisticChangesToRevert)
-    pessimisticChangesToRevert.keySet
-  }
+      revert(pessimisticChangesToRevert)
+      pessimisticChangesToRevert.keySet
+    }
 
   private def revert(toRevert: AddressAssets): Unit = toRevert.foreach { case (address, toRevert) =>
     portfolios.updateWith(address) { prev =>

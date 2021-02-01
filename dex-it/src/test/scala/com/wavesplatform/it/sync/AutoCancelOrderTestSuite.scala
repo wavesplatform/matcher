@@ -116,7 +116,7 @@ class AutoCancelOrderTestSuite extends MatcherSuiteBase {
         }
 
       firstCanceled.foreach { id =>
-        fail(s"$id is canceled") // <--
+        fail(s"$id is canceled")
       }
 
       sells.foreach { o =>

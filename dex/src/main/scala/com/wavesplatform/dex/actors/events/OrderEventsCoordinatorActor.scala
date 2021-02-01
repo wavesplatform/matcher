@@ -63,15 +63,12 @@ object OrderEventsCoordinatorActor {
                   context.log.info(s"Created ${tx.json()}")
                   dbWriterRef ! txCreated
 
-                  //if (knownTxIds.contains(tx.id())) none // We won't expect a tx, because already have
-                  //else {
-                    val addressSpendings =
-                      Map(event.counter.order.sender.toAddress -> PositiveMap(event.counterExecutedSpending)) |+|
-                      Map(event.submitted.order.sender.toAddress -> PositiveMap(event.submittedExecutedSpending))
+                  val addressSpendings =
+                    Map(event.counter.order.sender.toAddress -> PositiveMap(event.counterExecutedSpending)) |+|
+                    Map(event.submitted.order.sender.toAddress -> PositiveMap(event.submittedExecutedSpending))
 
-                    broadcasterRef ! Broadcaster.Broadcast(broadcastAdapter, addressSpendings, tx)
-                    tx.some
-                  //}
+                  broadcasterRef ! Broadcaster.Broadcast(broadcastAdapter, addressSpendings, tx)
+                  tx.some
 
                 case Left(e) =>
                   // We don't touch a state, because this transaction neither created, nor appeared on Node

@@ -1,0 +1,29 @@
+// @formatter:off
+digraph G {
+  graph [label="How can transactions affect it"]
+  node [shape=rect]
+  edge [fontsize=11, arrowsize=0.5]
+
+  o[label="observed transaction"]
+  f[label="failed transaction"]
+  u[label="unconfirmed transaction"]
+  c[label="confirmed transaction"]
+
+  w[label="wait to be known"]
+  k[label="is known?", shape=diamond]
+  kf[label="is known?", shape=diamond]
+
+  cs[label="compensate spendings for audit balance"]
+  r[label="remove from a list"]
+
+  o:s->f:n,u:n,c:n[minlen=2]
+
+  f:s->kf:n[minlen=2]
+  kf:w->w:n[taillabel="no", minlen=2]
+  kf:e->r:n[minlen=2]
+
+  u:s,c:s->k:n[minlen=2]
+
+  k:w->r:n[minlen=2]
+  k:e->cs:n[taillabel="no",minlen=2]
+}

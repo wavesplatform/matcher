@@ -15,6 +15,7 @@ object Implicits {
   // Probably we need to move ByteString -> Address conversion further
   implicit final class StateUpdateOps(val self: StateUpdate) extends AnyVal {
 
+    // TODO DEX-1069 does this work if it is exchange transaction with one trader?
     // TODO DEX-1023 Could we do it faster?
     def pessimisticPortfolio: AddressAssets = {
       // Balances

@@ -454,6 +454,17 @@ object Events {
       case mo: MarketOrder => submittedMarketRemaining(mo)
     }
 
+    def spentAmount(orderType: OrderType): Long = if (orderType == OrderType.SELL) executedAmount else executedAmountOfPriceAsset
+
+    // TODO tests?
+    def counterExecutedSpending: Map[Asset, Long] =
+      Map(counter.spentAsset -> spentAmount(counter.order.orderType)) |+|
+      Map(counter.feeAsset -> counterExecutedFee)
+
+    def submittedExecutedSpending: Map[Asset, Long] =
+      Map(submitted.spentAsset -> spentAmount(submitted.order.orderType)) |+|
+      Map(submitted.feeAsset -> submittedExecutedFee)
+
     // Set, because is could be one trader
     def traders: Set[Address] = Set(counter.order.senderPublicKey.toAddress, submitted.order.senderPublicKey.toAddress)
 

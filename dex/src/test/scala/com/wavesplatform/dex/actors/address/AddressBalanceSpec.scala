@@ -8,7 +8,6 @@ import com.wavesplatform.dex.NoShrink
 import com.wavesplatform.dex.actors.Generators
 import com.wavesplatform.dex.collections.{NegativeMap, NonNegativeMap, NonPositiveMap, PositiveMap}
 import com.wavesplatform.dex.domain.asset.Asset
-import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.fp.MapImplicits.group
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import org.scalacheck.{Arbitrary, Gen}
@@ -16,7 +15,14 @@ import org.scalatest.freespec.AnyFreeSpecLike
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class AddressBalanceSpec extends AnyFreeSpecLike with Generators with DiffMatcher with DiffMatcherWithImplicits with Matchers with ScalaCheckPropertyChecks with NoShrink {
+class AddressBalanceSpec
+    extends AnyFreeSpecLike
+    with Generators
+    with DiffMatcher
+    with DiffMatcherWithImplicits
+    with Matchers
+    with ScalaCheckPropertyChecks
+    with NoShrink {
 
   private val positiveAssetsMapGen = assetsMapGen(Gen.choose(1L, 10))
   private val nonPositiveAssetsMapGen = assetsMapGen(Gen.choose(-10L, 0))
@@ -27,28 +33,38 @@ class AddressBalanceSpec extends AnyFreeSpecLike with Generators with DiffMatche
 
   "AddressPessimisticCorrection" - {
     "common properties" - {
-      "both notObservedTxs and futureTxIds doesn't contain same tx" in {
+      "both notObservedTxs and notCreatedTxs doesn't contain same tx" in {
         val testGen = for {
           txId <- txIdGen
           txVolumeDiff <- negativeAssetsMapGen
-          future <- Gen.choose(0, 2).flatMap(Gen.containerOfN[Set, ExchangeTransaction.Id](_, txIdGen.filterNot(_ == txId)))
+          notCreatedTxs <- Gen.choose(0, 2).flatMap { n =>
+            Gen.mapOfN(
+              n,
+              Gen.zip(
+                txIdGen.filterNot(_ == txId),
+                positiveAssetsMapGen.map(PositiveMap(_))
+              )
+            )
+          }
           executedIsFirst <- Arbitrary.arbBool.arbitrary
         } yield {
           val orig = AddressBalance.empty.copy(
             // executed means we reserve it before
             reserved = if (executedIsFirst) PositiveMap(txVolumeDiff.inverse()) else PositiveMap.empty,
-            futureTxIds = future
+            notCreatedTxs = notCreatedTxs
           )
           (orig, txId, NegativeMap(txVolumeDiff), executedIsFirst)
         }
 
         forAll(testGen) { case (orig, txId, txVolumeDiff, executedIsFirst) =>
-          val updated = if (executedIsFirst) orig.withExecuted(txId.some, txVolumeDiff)._1 else orig.withObserved(txId)._1
+          val updated =
+            if (executedIsFirst) orig.withExecuted(txId.some, txVolumeDiff)._1
+            else orig.withObserved(txId, PositiveMap(txVolumeDiff.xs.view.mapValues(-_).toMap))._1
           val notObserved = updated.notObservedTxs.contains(txId)
-          val futureTxIds = updated.futureTxIds.contains(txId)
+          val notCreated = updated.notCreatedTxs.contains(txId)
 
-          val cond = !(notObserved && futureTxIds)
-          withClue(s"notObserved: $notObserved, futureTxIds: $futureTxIds:") {
+          val cond = !(notObserved && notCreated)
+          withClue(s"notObserved: $notObserved, notCreatedTxs: $notCreated:") {
             cond shouldBe true
           }
         }
@@ -62,13 +78,15 @@ class AddressBalanceSpec extends AnyFreeSpecLike with Generators with DiffMatche
 
         forAll(testGen) { case (orig, txId, txReserve, executedIsFirst) =>
           val txExecutedDiff = NegativeMap(txReserve.inverse())
-          val updated1 = if (executedIsFirst) orig.withExecuted(txId.some, txExecutedDiff)._1 else orig.withObserved(txId)._1
-          updated1.allTradableBalances should matchTo(orig.allTradableBalances)
+          val updated1 =
+            if (executedIsFirst) orig.withExecuted(txId.some, txExecutedDiff)._1 else orig.withObserved(txId, PositiveMap(txReserve))._1
+          updated1.allTradableBalance should matchTo(orig.allTradableBalance)
 
-          val (updated2, diff) = if (executedIsFirst) updated1.withObserved(txId) else updated1.withExecuted(txId.some, txExecutedDiff)
-          val actual = updated2.allTradableBalances.filter { case (asset, _) => diff.contains(asset) }
+          val (updated2, diff) =
+            if (executedIsFirst) updated1.withObserved(txId, PositiveMap(txReserve)) else updated1.withExecuted(txId.some, txExecutedDiff)
+          val actual = updated2.allTradableBalance.filter { case (asset, _) => diff.contains(asset) }
 
-          val expected = orig.tradableBalances(txReserve.keySet).xs |+| txReserve
+          val expected = orig.tradableBalance(txReserve.keySet).xs |+| txReserve
           actual should matchTo(expected)
         }
       }
@@ -97,9 +115,9 @@ class AddressBalanceSpec extends AnyFreeSpecLike with Generators with DiffMatche
         "if a tx is expected, either" - {
           "removes it from futureTxIds" in forAll(balanceAndTxGen) { case (orig, txId, txReserve) =>
             val (updated, affected) = orig
-              .copy(futureTxIds = orig.futureTxIds + txId)
+              .copy(notCreatedTxs = orig.notCreatedTxs.updated(txId, PositiveMap(txReserve)))
               .withExecuted(txId.some, NegativeMap(txReserve.inverse()))
-            updated.futureTxIds shouldNot contain(txId)
+            updated.notCreatedTxs shouldNot contain(txId)
             updated.notObservedTxs.keySet shouldNot contain(txId)
             affected should matchTo(txReserve.keySet)
           }
@@ -117,15 +135,15 @@ class AddressBalanceSpec extends AnyFreeSpecLike with Generators with DiffMatche
       "removes an tx from the notObservedTxs map" in forAll(balanceAndTxGen) { case (orig, txId, txReserve) =>
         val (updated, affected) = orig
           .copy(notObservedTxs = orig.notObservedTxs.updated(txId, NegativeMap(txReserve.inverse())))
-          .withObserved(txId)
-        updated.futureTxIds shouldNot contain(txId)
+          .withObserved(txId, PositiveMap(txReserve))
+        updated.notCreatedTxs shouldNot contain(txId)
         updated.notObservedTxs.keySet shouldNot contain(txId)
         affected should matchTo(txReserve.keySet)
       }
 
-      "adds a tx to futureTxIds" in forAll(balanceAndTxGen) { case (orig, txId, _) =>
-        val (updated, affected) = orig.withObserved(txId)
-        updated.futureTxIds should contain(txId)
+      "adds a tx to futureTxIds" in forAll(balanceAndTxGen) { case (orig, txId, txReserve) =>
+        val (updated, affected) = orig.withObserved(txId, PositiveMap(txReserve))
+        updated.notCreatedTxs.keySet should contain(txId)
         affected shouldBe empty
       }
     }
@@ -136,7 +154,15 @@ class AddressBalanceSpec extends AnyFreeSpecLike with Generators with DiffMatche
     regularBase <- positiveAssetsMapGen
     outgoingLeasing <- Gen.option(Gen.choose(0L, 10L))
     unconfirmed <- nonPositiveAssetsMapGen
-    futureTxIds <- Gen.choose(0, 2).flatMap(Gen.containerOfN[Set, ExchangeTransaction.Id](_, txIdGen.filterNot(_ == txId)))
+    notCreatedTxs <- Gen.choose(0, 2).flatMap { n =>
+      Gen.mapOfN(
+        n,
+        Gen.zip(
+          txIdGen.filterNot(_ == txId),
+          positiveAssetsMapGen.map(PositiveMap(_))
+        )
+      )
+    }
     txReserve <- positiveAssetsMapGen
   } yield {
     val orig = AddressBalance.empty.copy(
@@ -149,7 +175,7 @@ class AddressBalanceSpec extends AnyFreeSpecLike with Generators with DiffMatche
       outgoingLeasing = outgoingLeasing,
       reserved = PositiveMap(txReserve),
       unconfirmed = NonPositiveMap(unconfirmed),
-      futureTxIds = futureTxIds
+      notCreatedTxs = notCreatedTxs
     )
     (orig, txId, txReserve)
   }

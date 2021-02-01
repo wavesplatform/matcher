@@ -26,7 +26,9 @@ import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdat
  * @param reserved Amount of assets those reserved for open orders
  * @param unconfirmed Includes all transactions (exchange, transfer, issue, etc.)
  * @param notObservedTxs Volume by ExchangeTransactions which haven't yet observed in streams
- * @param futureTxIds ExchangeTransactions which hasn't been registered as unconfirmed, but will be
+ * @param notCreatedTxs ExchangeTransactions which hasn't been created on this matcher, but will be
+ *
+ * @see /docs/order-auto-canceling.md
  */
 case class AddressBalance(
   regular: NonNegativeMap[Asset, Long],
@@ -34,7 +36,7 @@ case class AddressBalance(
   reserved: PositiveMap[Asset, Long],
   unconfirmed: NonPositiveMap[Asset, Long],
   notObservedTxs: Map[ExchangeTransaction.Id, NegativeMap[Asset, Long]],
-  futureTxIds: Set[ExchangeTransaction.Id]
+  notCreatedTxs: Map[ExchangeTransaction.Id, PositiveMap[Asset, Long]]
 ) {
 
   // We count only regular, because openVolume is created from orders and
@@ -44,19 +46,25 @@ case class AddressBalance(
   /**
    * Use this method only if sure, that we known all information about specified assets
    */
-  def allTradableBalances: NonNegativeMap[Asset, Long] = tradableBalances(allAssets)
+  def allTradableBalance: NonNegativeMap[Asset, Long] = tradableBalance(allAssets)
 
-  def tradableBalances(assets: Set[Asset]): NonNegativeMap[Asset, Long] = NonNegativeMap(assets.fproduct(tradableBalance).toMap)
+  def tradableBalance(assets: Set[Asset]): NonNegativeMap[Asset, Long] = NonNegativeMap(assets.fproduct(tradableBalance).toMap)
   def tradableBalance(asset: Asset): Long = math.max(0L, nodeBalanceBy(asset) - reserved.getOrElse(asset, 0L))
 
-  def nodeBalances(assets: Set[Asset]): Map[Asset, Long] = assets.fproduct(nodeBalanceBy).toMap
+  def balanceForAudit(assets: Set[Asset]): Map[Asset, Long] = assets.fproduct(balanceForAudit).toMap
+
+  def balanceForAudit(asset: Asset): Long =
+    nodeBalanceBy(asset) +
+    // Compensate notCreatedTxs until they are observed
+    // TODO DEX-1068 Could be slow for a lot of items in Set[Asset]
+    notCreatedTxs.valuesIterator.map(_.xs.getOrElse(asset, 0L)).sum
 
   private def nodeBalanceBy(asset: Asset): Long =
     // getOrElse is allowed here, because we fetch this information at start
     regular.getOrElse(asset, 0L) -
     (if (asset == Asset.Waves) outgoingLeasing.getOrElse(0L) else 0L) +
     unconfirmed.getOrElse(asset, 0L) +
-    notObservedTxs.valuesIterator.flatMap(_.collect { case (`asset`, v) => v }).sum
+    notObservedTxs.valuesIterator.map(_.xs.getOrElse(asset, 0L)).sum // TODO DEX-1068 Could be slow for a lot of items in Set[Asset]
 
   def withInit(snapshot: AddressBalanceUpdates): AddressBalance =
     // The original data have a higher precedence, because we receive it from the stream
@@ -94,7 +102,7 @@ case class AddressBalance(
       case None => (updated, executionTotalVolumeDiff.keySet) // Won't expect withObserved with this txId
       case Some(txId) =>
         if (notObservedTxs.contains(txId)) throw new RuntimeException(s"$txId executed twice!")
-        else if (futureTxIds.contains(txId)) (updated.copy(futureTxIds = futureTxIds - txId), executionTotalVolumeDiff.keySet)
+        else if (notCreatedTxs.contains(txId)) (updated.copy(notCreatedTxs = notCreatedTxs - txId), executionTotalVolumeDiff.keySet)
         else (
           updated.copy(notObservedTxs = notObservedTxs.updated(txId, executionTotalVolumeDiff)),
           Set.empty // Because notObservedTxs compensates updatedOpenVolume
@@ -106,16 +114,16 @@ case class AddressBalance(
    * Expected to call at most once for each txId.
    * A tx could appear twice: after appending to MemPool and after confirming in a new block.
    * But OrderEventsCoordinatorActor has a deduplication logic.
-   * Even this happen, we just have a hanging txId in futureTxIds, which won't affect the process, only consumes small amount of memory.
+   * Even this happen, we just have a hanging txId in notCreatedTxs, which won't affect the process, only consumes small amount of memory.
    */
-  def withObserved(txId: ExchangeTransaction.Id): (AddressBalance, Set[Asset]) =
+  def withObserved(txId: ExchangeTransaction.Id, pessimisticChanges: PositiveMap[Asset, Long]): (AddressBalance, Set[Asset]) =
     notObservedTxs.get(txId) match {
       case Some(v) => (copy(notObservedTxs = notObservedTxs.removed(txId)), v.keySet)
-      case None => (copy(futureTxIds = futureTxIds + txId), Set.empty)
+      case None => (copy(notCreatedTxs = notCreatedTxs.updated(txId, pessimisticChanges)), Set.empty)
     }
 
 }
 
 object AddressBalance {
-  val empty = AddressBalance(NonNegativeMap.empty, None, PositiveMap.empty, NonPositiveMap.empty, Map.empty, Set.empty)
+  val empty = AddressBalance(NonNegativeMap.empty, None, PositiveMap.empty, NonPositiveMap.empty, Map.empty, Map.empty)
 }

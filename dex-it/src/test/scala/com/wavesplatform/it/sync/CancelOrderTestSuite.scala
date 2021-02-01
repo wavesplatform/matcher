@@ -145,6 +145,26 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
         dex1.api.waitForOrderStatus(order, Status.Cancelled)
       }
     }
+
+    "automatically - if the trader makes a transaction which spend reserved assets" in {
+      val bobBalanceBefore = wavesNode1.api.balance(bob, Waves)
+
+      val order = mkBobOrder // Sells WAVES
+      placeAndAwaitAtDex(order)
+      broadcastAndAwait(mkTransfer(bob, alice, bobBalanceBefore - order.matcherFee - minFee, Waves))
+
+      dex1.api.waitForOrderStatus(order, Status.Cancelled)
+      dex1.api.getOrderHistoryByAssetPairAndPublicKey(bob, wavesUsdPair).collectFirst {
+        case o if o.id == order.id() => o.status shouldEqual Status.Cancelled.name
+      }
+
+      broadcastAndAwait(mkTransfer(alice, bob, bobBalanceBefore, Waves))
+      eventually {
+        val orderBook = dex1.api.getOrderBook(wavesUsdPair)
+        orderBook.bids shouldBe empty
+        orderBook.asks shouldBe empty
+      }
+    }
   }
 
   "Cancel is rejected" - {

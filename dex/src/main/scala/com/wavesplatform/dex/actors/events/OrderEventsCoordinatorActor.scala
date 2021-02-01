@@ -4,10 +4,15 @@ import akka.actor.typed
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, Behavior}
 import akka.{actor => classic}
+import cats.instances.long._
+import cats.instances.map._
 import cats.syntax.option._
+import cats.syntax.semigroup._
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.actors.tx.ExchangeTransactionBroadcastActor.{Observed, Command => Broadcaster}
-import com.wavesplatform.dex.collections.FifoSet
+import com.wavesplatform.dex.collections.{FifoSet, NegativeMap, PositiveMap}
+import com.wavesplatform.dex.domain.account.Address
+import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeUpdates
 import com.wavesplatform.dex.model.Events
@@ -28,7 +33,7 @@ object OrderEventsCoordinatorActor {
     case class ApplyNodeUpdates(updates: WavesNodeUpdates) extends Command
 
     // Can be sent only from ExchangeTransactionBroadcastActor
-    case class ApplyObservedByBroadcaster(tx: ExchangeTransaction) extends Command
+    case class ApplyObservedByBroadcaster(tx: ExchangeTransaction, addressSpending: Map[Address, PositiveMap[Asset, Long]]) extends Command
   }
 
   def apply(
@@ -38,9 +43,10 @@ object OrderEventsCoordinatorActor {
     createTransaction: CreateTransaction
   ): Behavior[Message] = Behaviors.setup { context =>
     val broadcastAdapter: ActorRef[Observed] = context.messageAdapter[Observed] {
-      case Observed(tx) => Command.ApplyObservedByBroadcaster(tx)
+      case Observed(tx, addressSpending) => Command.ApplyObservedByBroadcaster(tx, addressSpending)
     }
 
+    // TODO think about initialized and non-initialized AA for knownTxIds
     def default(knownTxIds: FifoSet[ExchangeTransaction.Id]): Behaviors.Receive[Message] = Behaviors.receive[Message] { (context, message) =>
       message match {
         case Command.Process(event) =>
@@ -57,11 +63,12 @@ object OrderEventsCoordinatorActor {
                   context.log.info(s"Created ${tx.json()}")
                   dbWriterRef ! txCreated
 
-                  if (knownTxIds.contains(tx.id())) none // We won't expect a tx, because already have
-                  else {
-                    broadcasterRef ! Broadcaster.Broadcast(broadcastAdapter, tx)
-                    tx.some
-                  }
+                  val addressSpendings =
+                    Map(event.counter.order.sender.toAddress -> PositiveMap(event.counterExecutedSpending)) |+|
+                    Map(event.submitted.order.sender.toAddress -> PositiveMap(event.submittedExecutedSpending))
+
+                  broadcasterRef ! Broadcaster.Broadcast(broadcastAdapter, addressSpendings, tx)
+                  tx.some
 
                 case Left(e) =>
                   // We don't touch a state, because this transaction neither created, nor appeared on Node
@@ -92,7 +99,12 @@ object OrderEventsCoordinatorActor {
 
           updates.copy(observedTxs = updates.observedTxs -- oldTxIds).updatesByAddresses.foreach {
             case (address, (balanceUpdates, observedTxs)) =>
-              val markObservedCommand = if (observedTxs.isEmpty) none else AddressActor.Command.MarkTxsObserved(observedTxs).some
+              val markObservedCommand =
+                if (observedTxs.isEmpty) none
+                else {
+                  val xs = observedTxs.view.mapValues(xs => PositiveMap(xs.view.mapValues(-_).toMap)).toMap
+                  AddressActor.Command.MarkTxsObserved(xs).some
+                }
               val changeBalanceCommand = if (balanceUpdates.isEmpty) none else AddressActor.Command.ChangeBalances(balanceUpdates).some
               val message = (markObservedCommand, changeBalanceCommand) match {
                 case (Some(a), Some(b)) => AddressActor.Command.ApplyBatch(a, b).some
@@ -105,10 +117,14 @@ object OrderEventsCoordinatorActor {
 
         case command: Command.ApplyObservedByBroadcaster =>
           val txId = command.tx.id()
-          val addressActorMessage = AddressActor.Command.MarkTxsObserved(Set(txId))
-          command.tx.traders.foreach(addressDirectoryRef ! AddressDirectoryActor.Command.ForwardMessage(_, addressActorMessage))
+          command.tx.traders.foreach { address =>
+            val addressActorMessage =
+              AddressActor.Command.MarkTxsObserved(Map(txId -> command.addressSpending.getOrElse(address, PositiveMap.empty)))
+            addressDirectoryRef ! AddressDirectoryActor.Command.ForwardMessage(address, addressActorMessage)
+          }
           val (updatedKnownTxIds, _) = knownTxIds.append(txId)
           default(updatedKnownTxIds)
+          Behaviors.same
 
         case Command.ProcessError(event) =>
           addressDirectoryRef ! event

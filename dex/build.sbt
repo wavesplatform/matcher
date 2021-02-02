@@ -15,7 +15,9 @@ enablePlugins(
   GitVersioning,
   VersionSourcePlugin,
   sbtdocker.DockerPlugin,
-  ImageVersionPlugin
+  ImageVersionPlugin,
+  JavaAppPackaging,
+  JavaAgent
 )
 
 V.scalaPackage := "com.wavesplatform.dex"
@@ -112,6 +114,7 @@ inConfig(Universal)(
     // Common JVM parameters
     // -J prefix is required by a parser
     javaOptions ++= Seq("-Xmx2g", "-Xms128m").map(x => s"-J$x"),
+    javaAgents += "io.kamon" % "kanela-agent" % "1.0.7",
     mappings ++=
       sbt.IO
         .listFiles((Compile / packageSource).value / "doc")

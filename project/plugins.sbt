@@ -25,7 +25,8 @@ Seq(
   "net.vonbuchholtz" % "sbt-dependency-check" % "1.3.3",
   // dependencyUpdates
   "com.timushev.sbt" % "sbt-updates" % "0.5.0",
-  "io.kamon" % "sbt-kanela-runner" % "2.0.6"
+  "io.kamon" % "sbt-kanela-runner" % "2.0.6",
+  "com.lightbend.sbt" % "sbt-javaagent" % "0.1.5"
 ).map(addSbtPlugin)
 
 libraryDependencies ++= Seq(

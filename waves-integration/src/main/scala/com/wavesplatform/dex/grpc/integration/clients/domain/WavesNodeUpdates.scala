@@ -52,7 +52,7 @@ object WavesNodeUpdates {
   def addressTxOf(xs: Map[ExchangeTransaction.Id, TransactionWithChanges]): Map[Address, Map[ExchangeTransaction.Id, Map[Asset, Long]]] =
     xs.foldLeft(Map.empty[Address, Map[ExchangeTransaction.Id, Map[Asset, Long]]].withDefaultValue(Map.empty)) {
       case (r, (txId, tx)) =>
-        val pp = tx.changes.pessimisticPortfolio
+        val pp = tx.pessimisticPortfolios
 
         val addresses = for {
           tx <- tx.tx.transaction.toSeq

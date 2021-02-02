@@ -25,7 +25,7 @@ class SynchronizedPessimisticPortfolios(settings: Settings) {
 
   // TODO DEX-1013
   def replaceWith(setTxs: Seq[UtxTransaction]): Set[Address] = write {
-    orig.replaceWith(setTxs.map(x => PessimisticTransaction(x.id, x.pessimisticPortfolio)))
+    orig.replaceWith(setTxs.map(x => PessimisticTransaction(x.id, x.pessimisticPortfolios)))
   }
 
   // TODO DEX-1013
@@ -43,7 +43,7 @@ class SynchronizedPessimisticPortfolios(settings: Settings) {
 
   // TODO DEX-1013
   def addPending(txs: Seq[UtxTransaction]): Set[Address] = write {
-    orig.addPending(txs.map(x => PessimisticTransaction(x.id, x.pessimisticPortfolio)))
+    orig.addPending(txs.map(x => PessimisticTransaction(x.id, x.pessimisticPortfolios)))
   }
 
   def getAggregated(address: Address): Map[Asset, Long] = read(orig.getAggregated(address))

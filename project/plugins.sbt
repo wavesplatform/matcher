@@ -29,7 +29,8 @@ Seq(
 
 libraryDependencies ++= Seq(
   "org.vafer" % "jdeb" % "1.5" artifacts Artifact("jdeb", "jar", "jar"), // Required for "release" task
-  "com.thesamet.scalapb" %% "compilerplugin" % "0.9.0", // Have to wait NODE: https://github.com/wavesplatform/Waves/blob/master/project/plugins.sbt
+  // Have to wait NODE: https://github.com/wavesplatform/Waves/blob/master/project/plugins.sbt , also don't forget to update our jsonScalaPb
+  "com.thesamet.scalapb" %% "compilerplugin" % "0.9.0",
   "commons-codec" % "commons-codec" % "1.14"
 )
 

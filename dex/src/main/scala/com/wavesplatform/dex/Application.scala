@@ -37,7 +37,7 @@ import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.utils.{EitherExt2, LoggerFacade, ScorexLogging}
 import com.wavesplatform.dex.effect.{liftValueAsync, FutureResult}
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
-import com.wavesplatform.dex.grpc.integration.WavesClientBuilder
+import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedWavesBlockchainClient
 import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
 import com.wavesplatform.dex.grpc.integration.clients.{MatcherExtensionAssetsWatchingClient, WavesBlockchainClient}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
@@ -147,7 +147,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   )
 
   private val wavesBlockchainAsyncClient = new MatcherExtensionAssetsWatchingClient(
-    underlying = WavesClientBuilder.async(
+    underlying = CombinedWavesBlockchainClient(
       settings.wavesBlockchainClient,
       matcherPublicKey,
       monixScheduler = monixScheduler,

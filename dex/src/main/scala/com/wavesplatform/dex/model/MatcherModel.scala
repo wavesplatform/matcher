@@ -456,7 +456,6 @@ object Events {
 
     def spentAmount(orderType: OrderType): Long = if (orderType == OrderType.SELL) executedAmount else executedAmountOfPriceAsset
 
-    // TODO tests?
     def counterExecutedSpending: Map[Asset, Long] =
       Map(counter.spentAsset -> spentAmount(counter.order.orderType)) |+|
       Map(counter.feeAsset -> counterExecutedFee)

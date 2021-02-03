@@ -15,7 +15,7 @@ Seq(
   "se.marcuslonnberg" % "sbt-docker" % "1.7.0",
   "com.typesafe.sbt" % "sbt-git" % "1.0.0",
   "org.scalameta" % "sbt-scalafmt" % "2.0.1",
-  "ch.epfl.scala" % "sbt-scalafix" % "0.9.19",
+  "ch.epfl.scala" % "sbt-scalafix" % "0.9.25",
   /*
   undeclaredCompileDependencies{test}
   unusedCompileDependencies{test}

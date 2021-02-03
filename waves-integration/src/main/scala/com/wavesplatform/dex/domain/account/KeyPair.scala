@@ -10,7 +10,10 @@ import play.api.libs.json.{Format, Json, Writes}
 import scala.util.{Failure, Success}
 
 final case class KeyPair(seed: ByteStr) {
-  lazy val (PrivateKey(privateKey), PublicKey(publicKey)) = crypto.createKeyPair(seed)
+  lazy val (privateKey, publicKey) = crypto.createKeyPair(seed) match {
+    case (PrivateKey(privateKey), PublicKey(publicKey)) => (privateKey, publicKey)
+    case _ => throw new IllegalArgumentException(s"Can't create key pair by provided seed=$seed")
+  }
 }
 
 object KeyPair {

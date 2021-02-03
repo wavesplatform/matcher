@@ -221,6 +221,7 @@ object WsFullOrder {
       case OrderStatus.Filled.name => JsString(Status.Filled.toString)
       case OrderStatus.PartiallyFilled.name => JsString(Status.PartiallyFilled.toString)
       case OrderStatus.Cancelled.name => JsString(Status.Cancelled.toString)
+      case _ => throw new IllegalArgumentException("Cannot parse order status")
     }
   )
 

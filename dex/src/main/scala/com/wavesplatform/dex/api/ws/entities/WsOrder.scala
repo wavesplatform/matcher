@@ -95,6 +95,7 @@ object WsOrder {
           case JsDefined(JsNull) => JsSuccess(Waves.some)
           case JsDefined(value) => Asset.assetFormat.reads(value).map(_.some)
           case JsUndefined() => JsSuccess(None)
+          case _ => throw new IllegalArgumentException(s"Can't process json=$json")
         }
       },
       Writes.nullable[Asset](path)(Asset.assetFormat.writes _)

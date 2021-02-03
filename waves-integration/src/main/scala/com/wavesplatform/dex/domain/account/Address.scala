@@ -71,7 +71,10 @@ object Address extends ScorexLogging {
           )
           .flatMap {
             _ =>
-              val Array(version, network, _*) = addressBytes.arr
+              val (version, network) = addressBytes.arr match {
+                case Array(version, network, _*) => (version, network)
+                case _ => throw new IllegalArgumentException(s"Can't process order bytes of len=${addressBytes.size}, there should be both version and network")
+              }
               (
                 for {
                   _ <- Either.cond(version == AddressVersion, (), s"Unknown address version: $version")

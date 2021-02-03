@@ -136,7 +136,10 @@ abstract class WsPingPongBaseSuite extends WsSuiteBase {
       }
 
       val expectedError = InvalidJson(Nil)
-      val List(actualInvalidJsonError, actualPongTimeoutError) = errors
+      val (actualInvalidJsonError, actualPongTimeoutError) = errors match {
+        case List(actualInvalidJsonError, actualPongTimeoutError) => (actualInvalidJsonError, actualPongTimeoutError)
+        case _ => throw new IllegalArgumentException(s"Unexpected error")
+      }
 
       actualInvalidJsonError.code should be(expectedError.code)
       actualInvalidJsonError.message should include regex "broken"

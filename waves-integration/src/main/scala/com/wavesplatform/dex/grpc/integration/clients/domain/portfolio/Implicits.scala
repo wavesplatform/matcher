@@ -68,11 +68,11 @@ object Implicits {
   def exchangeTransactionPessimisticPortfolios(tx: ExchangeTransactionData): AddressAssets = tx.orders.toList.foldMap { o =>
     val sender = o.senderPublicKey.toVanillaPublicKey.toAddress
 
-    val feeSpending = o.matcherFee.fold(Map.empty[Asset, Long])(x => Map(x.assetId.toVanillaAsset -> x.amount))
+    val feeSpending = o.matcherFee.fold(Map.empty[Asset, Long])(x => Map(x.assetId.toVanillaAsset -> -x.amount))
     val assetSpending =
-      if (o.orderSide.isSell) Map(o.getAssetPair.amountAssetId.toVanillaAsset -> tx.amount)
+      if (o.orderSide.isSell) Map(o.getAssetPair.amountAssetId.toVanillaAsset -> -tx.amount)
       else {
-        val amount = new BigDecimal(tx.price)
+        val amount = -new BigDecimal(tx.price)
           .multiply(new BigDecimal(tx.amount))
           .scaleByPowerOfTen(-Order.PriceConstantExponent)
           .setScale(0, RoundingMode.FLOOR)

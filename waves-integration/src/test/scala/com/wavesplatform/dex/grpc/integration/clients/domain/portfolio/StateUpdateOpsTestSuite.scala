@@ -171,8 +171,8 @@ class StateUpdateOpsTestSuite extends WavesIntegrationSuiteBase with PBEntitiesG
 
           Implicits.exchangeTransactionPessimisticPortfolios(tx) should matchTo(Map(
             alice -> Map[Asset, Long](
-              Asset.Waves -> (3_00000000 + 2 * 300_000), // sell 3 WAVES and spend fees for both orders
-              usd -> 3 * 200 // buy 3 WAVES for 200 cents each
+              Asset.Waves -> -(3_00000000 + 2 * 300_000), // sell 3 WAVES and spend fees for both orders
+              usd -> -3 * 200 // buy 3 WAVES for 200 cents each
             )
           ))
         }
@@ -239,11 +239,11 @@ class StateUpdateOpsTestSuite extends WavesIntegrationSuiteBase with PBEntitiesG
 
           Implicits.exchangeTransactionPessimisticPortfolios(tx) should matchTo(Map(
             bob -> Map[Asset, Long](
-              Asset.Waves -> (3_00000000 + 300_000), // sell 3 WAVES and spend fee
+              Asset.Waves -> -(3_00000000 + 300_000), // sell 3 WAVES and spend fee
             ),
             alice -> Map[Asset, Long](
-              Asset.Waves -> 300_000, // spend fee
-              usd -> 3 * 200 // buy 3 WAVES for 200 cents each
+              Asset.Waves -> -300_000, // spend fee
+              usd -> -3 * 200 // buy 3 WAVES for 200 cents each
             )
           ))
         }

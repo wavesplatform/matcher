@@ -5,7 +5,7 @@ import com.softwaremill.diffx.{Derived, Diff}
 import com.wavesplatform.dex.api.ws.connection.WsConnection
 import com.wavesplatform.dex.api.ws.connection.WsConnection.WsRawMessage
 import com.wavesplatform.dex.api.ws.entities.WsFullOrder
-import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsError, WsPingOrPong, WsServerMessage}
+import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsError, WsOrderBookChanges, WsPingOrPong, WsServerMessage}
 import com.wavesplatform.dex.it.api.websockets.HasWebSockets
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 
@@ -21,6 +21,9 @@ trait WsSuiteBase extends MatcherSuiteBase with HasWebSockets with DiffMatcherWi
       .ignore[WsAddressChanges, Long](_.timestamp)
       .ignore[WsAddressChanges, Long](_.updateId)
   )
+
+  implicit private val wsOrderBookChangesDiff: Derived[Diff[WsOrderBookChanges]] =
+    Derived(Diff.gen[WsOrderBookChanges].value.ignore[WsOrderBookChanges, Long](_.timestamp).ignore[WsOrderBookChanges, Long](_.updateId))
 
   implicit protected val wsCompleteOrderDiff: Diff[WsFullOrder] =
     Derived(Diff.gen[WsFullOrder].value.ignore[WsFullOrder, Long](_.timestamp).ignore[WsFullOrder, Long](_.eventTimestamp))

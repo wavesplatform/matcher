@@ -132,7 +132,19 @@ object ExchangeTransactionBroadcastActor {
 
               if (canRetry) {
                 if (!timer.isTimerActive(timerKey)) timer.startSingleTimer(timerKey, Command.Tick, settings.interval)
-              } else message.clientRef.foreach(_ ! Observed(message.tx, message.addressSpendings)) // This means, the transaction failed
+              } else { // This means, the transaction failed
+                // TODO separate from sending
+
+                /**
+                 * Unconfirmed (new) - don't reply, because an event come from UTX
+                 * Unconfirmed (old) - should reply, because AA could be initialized after tx went to UTX
+                 * Confirmed - should reply
+                 * Failed (no retry) - should reply
+                 * Failed (retry) - don't reply, wait
+                 */
+
+                message.clientRef.foreach(_ ! Observed(message.tx, message.addressSpendings))
+              }
 
               val updatedInProgress = if (canRetry) inProgress else inProgress - txId
               default(updatedInProgress)

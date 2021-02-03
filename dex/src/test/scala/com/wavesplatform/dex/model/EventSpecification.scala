@@ -65,6 +65,13 @@ class EventSpecification extends AnyFreeSpec with Matchers with MatcherSpecBase 
         eth -> 2000L
       ))
     }
+
+    "empty fee" in {
+      val counter = sell(wavesBtcPair, 100000000, 0.0008, matcherFee = Some(0L), feeAsset = eth, sender = alicePk.some, version = 3)
+      val submitted = buy(wavesBtcPair, 120000000, 0.00085, matcherFee = Some(1000L), sender = alicePk.some)
+      val exec = mkOrderExecutedRaw(submitted, counter)
+      exec.counterExecutedSpending should matchTo(Map[Asset, Long](Waves -> 100000000))
+    }
   }
 
   "submittedExecutedSpending - Expected values when" - {
@@ -84,5 +91,13 @@ class EventSpecification extends AnyFreeSpec with Matchers with MatcherSpecBase 
         btc -> 80000 // 100000000*0.0008
       ))
     }
+
+    "empty fee" in {
+      val counter = sell(wavesBtcPair, 100000000, 0.0008, matcherFee = Some(2000L), sender = alicePk.some)
+      val submitted = buy(wavesBtcPair, 120000000, 0.00085, matcherFee = Some(0L), feeAsset = eth, sender = alicePk.some, version = 3)
+      val exec = mkOrderExecutedRaw(submitted, counter)
+      exec.submittedExecutedSpending should matchTo(Map[Asset, Long](btc -> 80000)) // = 100000000*0.0008
+    }
+
   }
 }

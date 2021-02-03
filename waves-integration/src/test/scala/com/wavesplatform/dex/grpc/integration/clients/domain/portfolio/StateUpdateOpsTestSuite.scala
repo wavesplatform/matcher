@@ -170,8 +170,6 @@ class StateUpdateOpsTestSuite extends WavesIntegrationSuiteBase with PBEntitiesG
             //</editor-fold>
 
             val tx = JsonFormat.fromJsonString[Transaction](aliceVsAliceTxJson).getExchange
-            val usd = IssuedAsset(ByteStr.decodeBase58("GptXPPw96xEGjtwK6rN7wi6RtJN2rxN26DRVGVZnwoZC").get)
-
             Implicits.exchangeTransactionPessimisticPortfolios(tx) should matchTo(Map(
               alice -> Map[Asset, Long](
                 Asset.Waves -> -(3_00000000 + 2 * 300_000), // sell 3 WAVES and spend fees for both orders
@@ -308,8 +306,6 @@ class StateUpdateOpsTestSuite extends WavesIntegrationSuiteBase with PBEntitiesG
             //</editor-fold>
 
             val tx = JsonFormat.fromJsonString[Transaction](aliceVsBobTxJson).getExchange
-            val usd = IssuedAsset(ByteStr.decodeBase58("8VK91Wi3LrLoSFamB1aeXJVfArpaH5iJi2wA69fyNGmH").get)
-
             Implicits.exchangeTransactionPessimisticPortfolios(tx) should matchTo(Map(
               bob -> Map[Asset, Long](
                 Asset.Waves -> -(3_00000000 + 300_000) // sell 3 WAVES and spend fee
@@ -389,6 +385,75 @@ class StateUpdateOpsTestSuite extends WavesIntegrationSuiteBase with PBEntitiesG
               )
             ))
           }
+        }
+
+        "empty fees" in {
+          //<editor-fold desc="json">
+
+          val aliceVsBobTxJson = """{
+  "chainId": 84,
+  "senderPublicKey": "XdsW0Tpqk/mGWGot+4VH+c6Uvnz+qsHGIvfaGIlp01Q=",
+  "fee": {
+    "amount": "300000"
+  },
+  "timestamp": "1612280151130",
+  "version": 2,
+  "exchange": {
+    "amount": "300000000",
+    "price": "200",
+    "buyMatcherFee": "0",
+    "sellMatcherFee": "0",
+    "orders": [
+      {
+        "chainId": 84,
+        "senderPublicKey": "v9+YGXWTywCXMq+5JoZdhdGKQqWXO2D07qyh4HLR+FA=",
+        "matcherPublicKey": "XdsW0Tpqk/mGWGot+4VH+c6Uvnz+qsHGIvfaGIlp01Q=",
+        "assetPair": {
+          "priceAssetId": "b0KUdpo/mnF9aAZZoHVt/jKeEsLYgNHUB/hBAR9ozSw="
+        },
+        "amount": "300000000",
+        "price": "200",
+        "timestamp": "1612280151132",
+        "expiration": "1614872150132",
+        "matcherFee": {
+          "amount": "300000"
+        },
+        "version": 3,
+        "proofs": []
+      },
+      {
+        "chainId": 84,
+        "senderPublicKey": "4yIwFXOsQBp6QXLUlIgznonWf/ocrh85ag04xDO8PFk=",
+        "matcherPublicKey": "XdsW0Tpqk/mGWGot+4VH+c6Uvnz+qsHGIvfaGIlp01Q=",
+        "assetPair": {
+          "priceAssetId": "b0KUdpo/mnF9aAZZoHVt/jKeEsLYgNHUB/hBAR9ozSw="
+        },
+        "orderSide": "SELL",
+        "amount": "300000000",
+        "price": "200",
+        "timestamp": "1612280151149",
+        "expiration": "1614872150149",
+        "matcherFee": {
+          "amount": "300000"
+        },
+        "version": 3,
+        "proofs": []
+      }
+    ]
+  }
+}"""
+          //</editor-fold>
+
+          val usd = IssuedAsset(ByteStr.decodeBase58("8VK91Wi3LrLoSFamB1aeXJVfArpaH5iJi2wA69fyNGmH").get)
+          val tx = JsonFormat.fromJsonString[Transaction](aliceVsBobTxJson).getExchange
+          Implicits.exchangeTransactionPessimisticPortfolios(tx) should matchTo(Map(
+            bob -> Map[Asset, Long](
+              Asset.Waves -> -3_00000000
+            ),
+            alice -> Map[Asset, Long](
+              usd -> -3 * 200 // buy 3 WAVES for 200 cents each
+            )
+          ))
         }
       }
 

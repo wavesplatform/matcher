@@ -1,11 +1,15 @@
 package com.wavesplatform.dex.grpc.integration.clients.domain.portfolio
 
-import cats.implicits._
+import cats.instances.list._
 import cats.instances.long.catsKernelStdGroupForLong
 import cats.kernel.Monoid
+import cats.syntax.foldable._
+import cats.syntax.option._
+import cats.syntax.semigroup._
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.fp.MapImplicits.cleaningGroup
 import com.wavesplatform.dex.grpc.integration.clients.domain.TransactionWithChanges
 import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions._
 import com.wavesplatform.dex.grpc.integration.services.UtxTransaction
@@ -71,7 +75,8 @@ object Implicits {
 
     val feeSpending = o.matcherFee.fold(Map.empty[Asset, Long]) { x =>
       val amount = if (o.orderSide.isSell) tx.sellMatcherFee else tx.buyMatcherFee
-      Map(x.assetId.toVanillaAsset -> -amount)
+      if (amount == 0) Map.empty
+      else Map(x.assetId.toVanillaAsset -> -amount)
     }
 
     val assetSpending =

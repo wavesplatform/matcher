@@ -80,6 +80,8 @@ object Dependencies {
     val pureConfig = "0.14.0"
     val allureScalaTest = "2.13.8"
     val enumeratum = "1.6.1"
+
+    val scalaPbJson = "0.9.3"
   }
 
   private def akkaModule(module: String, version: String): ModuleID = "com.typesafe.akka" %% module % version
@@ -136,6 +138,7 @@ object Dependencies {
   private val playJson = "com.typesafe.play" %% "play-json" % Version.playJson
   private val scorexCrypto = "org.scorexfoundation" %% "scrypto" % Version.scorexCrypto
   private val grpcScalaPb = "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion
+  private val jsonScalaPb = "com.thesamet.scalapb" %% "scalapb-json4s" % Version.scalaPbJson
   private val monixReactive = monixModule("reactive")
   private val supertagged = "org.rudogma" %% "supertagged" % Version.supertagged
   private val javaLevelDb = "org.iq80.leveldb" % "leveldb" % Version.javaLevelDb
@@ -297,10 +300,13 @@ object Dependencies {
       mouse,
       grpcNetty,
       wavesProtobufSchemas
-    ) ++ testKit ++ silencer
+    ) ++ testKit ++ silencer ++ Seq(
+      jsonScalaPb % Test // for testing purposes
+    )
 
     lazy val wavesIntegrationIt: Seq[ModuleID] = Seq(
-      julToSlf4j
+      julToSlf4j,
+      jsonScalaPb % Test // for testing purposes
     ) ++ integrationTestKit
 
   }

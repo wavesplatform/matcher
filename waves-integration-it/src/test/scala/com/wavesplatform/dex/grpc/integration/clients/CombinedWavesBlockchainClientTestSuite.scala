@@ -9,12 +9,12 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionV2}
 import com.wavesplatform.dex.domain.utils.EitherExt2
+import com.wavesplatform.dex.grpc.integration.IntegrationSuiteBase
 import com.wavesplatform.dex.grpc.integration.clients.combined.{CombinedStream, CombinedWavesBlockchainClient}
 import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
 import com.wavesplatform.dex.grpc.integration.clients.domain.portfolio.SynchronizedPessimisticPortfolios
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.settings.{GrpcClientSettings, WavesBlockchainClientSettings}
-import com.wavesplatform.dex.grpc.integration.{IntegrationSuiteBase, WavesClientBuilder}
 import com.wavesplatform.dex.it.test.{NoStackTraceCancelAfterFailure, Scripts}
 import monix.execution.Scheduler
 
@@ -25,7 +25,7 @@ import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.Random
 
-class WavesBlockchainClientTestSuite extends IntegrationSuiteBase with NoStackTraceCancelAfterFailure {
+class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with NoStackTraceCancelAfterFailure {
 
   private val grpcExecutor = Executors.newCachedThreadPool(
     new ThreadFactoryBuilder()
@@ -37,7 +37,7 @@ class WavesBlockchainClientTestSuite extends IntegrationSuiteBase with NoStackTr
   implicit private val monixScheduler: Scheduler = monix.execution.Scheduler.cached("monix", 1, 5)
 
   private lazy val client =
-    WavesClientBuilder.async(
+    CombinedWavesBlockchainClient(
       wavesBlockchainClientSettings = WavesBlockchainClientSettings(
         grpc = GrpcClientSettings(
           target = wavesNode1.matcherExtApiTarget,
@@ -178,7 +178,7 @@ class WavesBlockchainClientTestSuite extends IntegrationSuiteBase with NoStackTr
 
   "broadcastTx" - {
     "returns true" - {
-      val pair: AssetPair = AssetPair.createAssetPair(UsdId.toString, "WAVES").get // TODO
+      val pair = AssetPair.createAssetPair(UsdId.toString, "WAVES").get
       def mkExchangeTx: ExchangeTransaction = mkDomainExchange(bob, alice, pair, 1L, 2 * Order.PriceConstant, matcher = matcher)
 
       "if the transaction passed the validation and was added to the UTX pool" in {

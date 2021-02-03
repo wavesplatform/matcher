@@ -75,8 +75,8 @@ class BlockchainUpdatesClientTestSuite extends IntegrationSuiteBase with NoStack
       withClue(s"pp: ${pp.mkString(", ")}: ") {
         pp should matchTo(Map(
           alice.toAddress -> Map[Asset, Long](
-            Asset.Waves -> (3_00000000 + 2 * matcherFee), // sell 3 WAVES and spend fees for both orders
-            usd -> 3 * 200 // buy 3 WAVES for 200 cents each
+            Asset.Waves -> -(3_00000000 + 2 * matcherFee), // sell 3 WAVES and spend fees for both orders
+            usd -> -3 * 200 // buy 3 WAVES for 200 cents each
           )
         ))
       }

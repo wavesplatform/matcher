@@ -4,10 +4,11 @@ pipeline {
     }
     options {
         ansiColor('xterm')
-        timeout(time: 90, unit: 'MINUTES')
+        timeout(time: 45, unit: 'MINUTES')
     }
     parameters {
         string(name: 'SEED', defaultValue: 'test-seed', description: 'Seed prefix of generated accounts')
+        string(name: 'PROFILE', defaultValue: 'line(1, 600, 1m) const(600, 5m) line(600, 1, 1m)', description: 'Requests schedule')
         string(name: 'AN', defaultValue: '6000', description: 'Count of generated accounts')
         string(name: 'RC', defaultValue: '216060', description: 'Count of requests')
         string(name: 'RT', defaultValue: '6', description: 'Generation type')
@@ -48,6 +49,7 @@ pipeline {
                      sh "ssh -o StrictHostKeyChecking=no -l buildagent-matcher ${LOADGEN} hostname"
                      sh "scp ./dex-load/requests-*.txt buildagent-matcher@${LOADGEN}:/home/buildagent-matcher"
                      sh "scp ./dex-load/pairs.txt buildagent-matcher@${LOADGEN}:/home/buildagent-matcher"
+                     sh "echo ${PROFILE} >> profile.txt && scp profile.txt buildagent-matcher@${LOADGEN}:/home/buildagent-matcher"
                      sh "scp ./dex-load/src/main/resources/runLoadTest.sh buildagent-matcher@${LOADGEN}:/home/buildagent-matcher"
                      sh "ssh -q buildagent-matcher@${LOADGEN} sudo sh runLoadTest.sh"
                 }

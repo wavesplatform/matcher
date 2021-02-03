@@ -456,7 +456,7 @@ class AddressActor(
 
   private def markTxsObserved(txs: Map[ExchangeTransaction.Id, PositiveMap[Asset, Long]]): Unit = {
     log.info(
-      s"Observed: ${txs.map { case (id, v) => s"$id ${if (balances.notObservedTxs.contains(id)) "(not observed) " else ""}-> ${format(v.xs)}" }.mkString(", ")}"
+      s"Observed: ${txs.map { case (id, v) => s"$id ${if (balances.notObservedTxs.contains(id)) "(wasn't before) " else ""}-> ${format(v.xs)}" }.mkString(", ")}"
     )
     val (updated, changedAssets) = txs.toList.foldl((balances, Set.empty[Asset])) {
       case ((r, _), (id, v)) => r.withObserved(id, v)

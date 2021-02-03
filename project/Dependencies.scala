@@ -306,7 +306,7 @@ object Dependencies {
 
     lazy val wavesIntegrationIt: Seq[ModuleID] = Seq(
       julToSlf4j,
-      jsonScalaPb // for testing purposes
+      jsonScalaPb % Test // for testing purposes
     ) ++ integrationTestKit
 
   }

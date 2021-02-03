@@ -53,6 +53,7 @@ object Implicits {
           else (address -> balances).some
       }
 
+      // Leasing
       Monoid
         .combineAll(
           p1 ::
@@ -68,7 +69,11 @@ object Implicits {
   def exchangeTransactionPessimisticPortfolios(tx: ExchangeTransactionData): AddressAssets = tx.orders.toList.foldMap { o =>
     val sender = o.senderPublicKey.toVanillaPublicKey.toAddress
 
-    val feeSpending = o.matcherFee.fold(Map.empty[Asset, Long])(x => Map(x.assetId.toVanillaAsset -> -x.amount))
+    val feeSpending = o.matcherFee.fold(Map.empty[Asset, Long]) { x =>
+      val amount = if (o.orderSide.isSell) tx.sellMatcherFee else tx.buyMatcherFee
+      Map(x.assetId.toVanillaAsset -> -amount)
+    }
+
     val assetSpending =
       if (o.orderSide.isSell) Map(o.getAssetPair.amountAssetId.toVanillaAsset -> -tx.amount)
       else {

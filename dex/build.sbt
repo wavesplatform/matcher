@@ -113,7 +113,7 @@ inConfig(Universal)(
     packageName := s"waves-dex-${version.value}", // An archive file name
     // Common JVM parameters
     // -J prefix is required by a parser
-    javaOptions ++= Seq("-Xmx2g", "-Xms128m").map(x => s"-J$x"),
+    javaOptions ++= Seq("-Xmx2g", "-Xms512m").map(x => s"-J$x"),
     javaAgents += "io.kamon" % "kanela-agent" % "1.0.7",
     mappings ++=
       sbt.IO

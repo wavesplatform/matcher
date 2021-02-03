@@ -1,6 +1,6 @@
-
 import CommonSettings.autoImport.network
 import ReleasePlugin.autoImport._
+import com.typesafe.sbt.packager.archetypes.JavaAppPackaging
 import sbt.Keys._
 import sbt._
 import sbt.internal.inc.ReflectUtilities
@@ -169,7 +169,7 @@ git.gitDescribedVersion := git.gitDescribedVersion { _ =>
 }.value
 
 // root project settings
-enablePlugins(ReleasePlugin)
+enablePlugins(ReleasePlugin, JavaAppPackaging, JavaAgent)
 
 // https://stackoverflow.com/a/48592704/4050580
 def allProjects: List[ProjectReference] = ReflectUtilities.allVals[Project](this).values.toList.map(x => x: ProjectReference)

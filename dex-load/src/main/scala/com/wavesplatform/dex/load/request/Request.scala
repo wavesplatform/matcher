@@ -49,7 +49,7 @@ case class Request(
     pw.println(httpType match {
       case RequestType.POST => mkPost(jsonBody, path, tag, stringBody)
       case RequestType.GET => mkGet(path, tag, headers)
-      case _ => throw new IllegalArgumentException(s"Unexpected request type")
+      case _ => throw new IllegalArgumentException(s"Unexpected request type: $httpType")
     })
 
 }

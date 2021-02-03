@@ -46,7 +46,7 @@ class ExchangeTransactionCreatorSpecification
 
             tc.createTransaction(oe).explicitGet() shouldBe a[ExchangeTransactionV2]
           }
-        case _ => throw new IllegalArgumentException(s"Unexpected list")
+        case _ => throw new RuntimeException("Unexpected list")
       }
     }
 

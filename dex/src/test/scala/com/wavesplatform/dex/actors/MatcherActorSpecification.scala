@@ -504,7 +504,7 @@ object MatcherActorSpecification {
     p.setAutoPilot { (sender: ActorRef, msg: Any) =>
       msg match {
         case _: Message.GetSnapshot => sender ! Response.GetSnapshot(None)
-        case _ => throw new IllegalArgumentException(s"Unexpected error")
+        case _ => throw new RuntimeException(s"Unexpected message: $msg")
       }
       TestActor.KeepRunning
     }

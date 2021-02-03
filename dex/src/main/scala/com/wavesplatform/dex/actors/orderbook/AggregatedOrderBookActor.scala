@@ -266,7 +266,7 @@ object AggregatedOrderBookActor {
   def sum(orig: TreeMap[Price, Amount], diff: Map[Price, Amount]): TreeMap[Price, Amount] =
     diff.foldLeft(orig) {
       case (r, (price, amount)) =>
-        @nowarn val updatedAmount = r.getOrElse(price, 0L) + amount
+        val updatedAmount = r.getOrElse(price, 0L) + amount
         if (updatedAmount == 0) r - price else r.updated(price, updatedAmount)
     }
 

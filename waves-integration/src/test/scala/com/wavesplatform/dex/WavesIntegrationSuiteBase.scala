@@ -2,6 +2,7 @@ package com.wavesplatform.dex
 
 import com.google.protobuf.{ByteString, UnsafeByteOperations}
 import com.softwaremill.diffx.{ConsoleColorConfig, Derived, Diff, DiffResultDifferent, DiffResultValue, FieldPath, Identical}
+import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.bytes.codec.Base58
@@ -28,6 +29,8 @@ trait WavesIntegrationSuiteBase extends AnyFreeSpecLike with Matchers with Allur
 
   implicit val derivedByteStringDiff: Derived[Diff[ByteString]] = Derived(byteStringDiff)
   implicit val derivedUtxTransactionDiff: Derived[Diff[UtxTransaction]] = Derived(byteStringDiff.contramap[UtxTransaction](_.id))
+
+  implicit val addressDiff: Diff[Address] = Diff[String].contramap[Address](_.stringRepr)
 
   // TODO Duplicate
   implicit val issuedAssetDiff: Diff[IssuedAsset] = { (left: IssuedAsset, right: IssuedAsset, _: List[FieldPath]) =>

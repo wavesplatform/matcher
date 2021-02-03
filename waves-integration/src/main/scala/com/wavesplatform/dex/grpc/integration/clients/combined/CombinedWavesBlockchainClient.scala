@@ -14,18 +14,23 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.grpc.integration.clients.blockchainupdates.BlockchainUpdatesClient
-import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedWavesBlockchainClient._
+import com.wavesplatform.dex.grpc.integration.clients.blockchainupdates.{BlockchainUpdatesClient, DefaultBlockchainUpdatesClient}
+import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedWavesBlockchainClient.Settings
 import com.wavesplatform.dex.grpc.integration.clients.domain.StatusUpdate.LastBlockHeight
 import com.wavesplatform.dex.grpc.integration.clients.domain._
 import com.wavesplatform.dex.grpc.integration.clients.domain.portfolio.SynchronizedPessimisticPortfolios
-import com.wavesplatform.dex.grpc.integration.clients.matcherext.MatcherExtensionClient
+import com.wavesplatform.dex.grpc.integration.clients.matcherext.{MatcherExtensionCachingClient, MatcherExtensionClient, MatcherExtensionGrpcAsyncClient}
 import com.wavesplatform.dex.grpc.integration.clients.{BroadcastResult, CheckedBroadcastResult, RunScriptResult, WavesBlockchainClient}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.protobuf.DexToPbConversions._
 import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions._
 import com.wavesplatform.dex.grpc.integration.services.UtxTransaction
+import com.wavesplatform.dex.grpc.integration.settings.WavesBlockchainClientSettings
 import com.wavesplatform.protobuf.transaction.SignedTransaction
+import io.grpc.ManagedChannel
+import io.grpc.internal.DnsNameResolverProvider
+import io.netty.channel.nio.NioEventLoopGroup
+import io.netty.channel.socket.nio.NioSocketChannel
 import monix.eval.Task
 import monix.execution.Scheduler
 import monix.reactive.Observable
@@ -229,7 +234,7 @@ class CombinedWavesBlockchainClient(
 
 }
 
-object CombinedWavesBlockchainClient {
+object CombinedWavesBlockchainClient extends ScorexLogging {
 
   case class Settings(
     maxRollbackHeight: Int,
@@ -237,5 +242,46 @@ object CombinedWavesBlockchainClient {
     combinedStream: CombinedStream.Settings,
     pessimisticPortfolios: SynchronizedPessimisticPortfolios.Settings
   )
+
+  // TODO DEX-998
+  def apply(
+    wavesBlockchainClientSettings: WavesBlockchainClientSettings,
+    matcherPublicKey: PublicKey,
+    monixScheduler: Scheduler,
+    grpcExecutionContext: ExecutionContext
+  ): WavesBlockchainClient = {
+
+    val eventLoopGroup = new NioEventLoopGroup
+
+    log.info(s"Building Matcher Extension gRPC client for server: ${wavesBlockchainClientSettings.grpc.target}")
+    val matcherExtensionChannel: ManagedChannel =
+      wavesBlockchainClientSettings.grpc.toNettyChannelBuilder
+        .nameResolverFactory(new DnsNameResolverProvider)
+        .executor((command: Runnable) => grpcExecutionContext.execute(command))
+        .eventLoopGroup(eventLoopGroup)
+        .channelType(classOf[NioSocketChannel])
+        .usePlaintext()
+        .build
+
+    log.info(s"Building Blockchain Updates Extension gRPC client for server: ${wavesBlockchainClientSettings.blockchainUpdatesGrpc.target}")
+    val blockchainUpdatesChannel: ManagedChannel =
+      wavesBlockchainClientSettings.blockchainUpdatesGrpc.toNettyChannelBuilder
+        .nameResolverFactory(new DnsNameResolverProvider)
+        .executor((command: Runnable) => grpcExecutionContext.execute(command))
+        .eventLoopGroup(eventLoopGroup)
+        .channelType(classOf[NioSocketChannel])
+        .usePlaintext()
+        .build
+
+    new CombinedWavesBlockchainClient(
+      wavesBlockchainClientSettings.combinedClientSettings,
+      matcherPublicKey,
+      meClient = new MatcherExtensionCachingClient(
+        new MatcherExtensionGrpcAsyncClient(eventLoopGroup, matcherExtensionChannel, monixScheduler)(grpcExecutionContext),
+        wavesBlockchainClientSettings.defaultCachesExpiration
+      )(grpcExecutionContext),
+      bClient = new DefaultBlockchainUpdatesClient(eventLoopGroup, blockchainUpdatesChannel, monixScheduler)(grpcExecutionContext)
+    )(grpcExecutionContext, monixScheduler)
+  }
 
 }

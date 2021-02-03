@@ -3,11 +3,13 @@ package com.wavesplatform.dex.actors.tx
 import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
 import akka.actor.typed.{ActorRef, Behavior}
 import cats.syntax.option._
+import com.wavesplatform.dex.collections.PositiveMap
+import com.wavesplatform.dex.domain.account.Address
+import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.grpc.integration.clients.CheckedBroadcastResult
 import com.wavesplatform.dex.time.Time
 
-import scala.collection.immutable
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
@@ -35,8 +37,12 @@ object ExchangeTransactionBroadcastActor {
 
   object Command {
 
-    case class Broadcast(clientRef: ActorRef[Observed], tx: ExchangeTransaction) extends Command
-    case class ProcessConfirmed(txIds: immutable.Iterable[ExchangeTransaction.Id]) extends Command
+    /**
+     * Try to send and reply to clientRef when it fails
+     */
+    case class Broadcast(clientRef: ActorRef[Observed], addressSpendings: Map[Address, PositiveMap[Asset, Long]], tx: ExchangeTransaction)
+        extends Command
+
     case object Tick extends Command
 
   }
@@ -47,6 +53,7 @@ object ExchangeTransactionBroadcastActor {
 
     case class Broadcasted(
       clientRef: Option[ActorRef[Observed]],
+      addressSpendings: Map[Address, PositiveMap[Asset, Long]],
       tx: ExchangeTransaction,
       result: Try[CheckedBroadcastResult]
     ) extends Event
@@ -71,10 +78,11 @@ object ExchangeTransactionBroadcastActor {
     def broadcast(
       context: ActorContext[Message],
       tx: ExchangeTransaction,
-      clientRef: Option[ActorRef[Observed]] = None
+      clientRef: Option[ActorRef[Observed]],
+      addressSpendings: Map[Address, PositiveMap[Asset, Long]]
     ): Unit = {
       context.log.info(s"Broadcasting ${tx.id()}")
-      context.pipeToSelf(blockchain.broadcast(tx))(Event.Broadcasted(clientRef, tx, _))
+      context.pipeToSelf(blockchain.broadcast(tx))(Event.Broadcasted(clientRef, addressSpendings, tx, _))
     }
 
     def default(inProgress: Map[ExchangeTransaction.Id, InProgressItem]): Behavior[Message] =
@@ -83,22 +91,20 @@ object ExchangeTransactionBroadcastActor {
           case message: Command.Broadcast =>
             // It would be better to just send the tx, but we can overload the node
             if (isExpired(message.tx)) {
-              message.clientRef ! Observed(message.tx)
+              message.clientRef ! Observed(message.tx, message.addressSpendings)
               Behaviors.same
             } else {
-              broadcast(context, message.tx, message.clientRef.some)
+              broadcast(context, message.tx, message.clientRef.some, message.addressSpendings)
               default(inProgress.updated(message.tx.id(), InProgressItem(message.tx, defaultRestAttempts)))
             }
-
-          case message: Command.ProcessConfirmed =>
-            context.log.debug(s"Confirmed: ${message.txIds.mkString(", ")}")
-            default(inProgress -- message.txIds)
 
           case Command.Tick =>
             val updatedInProgress = inProgress.view.mapValues(_.decreasedAttempts)
               .filter { case (_, x) => x.isValid && !isExpired(x.tx) }
               .toMap
-            if (updatedInProgress.nonEmpty) updatedInProgress.values.view.map(_.tx).foreach(broadcast(context, _))
+            if (updatedInProgress.nonEmpty) updatedInProgress.foreach {
+              case (_, x) => broadcast(context, x.tx, none, Map.empty)
+            }
             default(updatedInProgress)
 
           case message: Event.Broadcasted =>
@@ -126,7 +132,7 @@ object ExchangeTransactionBroadcastActor {
 
               if (canRetry) {
                 if (!timer.isTimerActive(timerKey)) timer.startSingleTimer(timerKey, Command.Tick, settings.interval)
-              } else message.clientRef.foreach(_ ! Observed(message.tx)) // This means, the transaction failed
+              } else message.clientRef.foreach(_ ! Observed(message.tx, message.addressSpendings)) // This means, the transaction failed
 
               val updatedInProgress = if (canRetry) inProgress else inProgress - txId
               default(updatedInProgress)
@@ -142,6 +148,6 @@ object ExchangeTransactionBroadcastActor {
     def isValid: Boolean = restAttempts >= 0
   }
 
-  case class Observed(tx: ExchangeTransaction)
+  case class Observed(tx: ExchangeTransaction, addressSpending: Map[Address, PositiveMap[Asset, Long]])
 
 }

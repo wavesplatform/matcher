@@ -66,9 +66,9 @@ class MultipleMatchersOrderCancelTestSuite extends MatcherSuiteBase {
       dex1.api.waitForOrderStatus(sellOrders(i), Status.Accepted)
     }
 
-    // TODO problem solution should prevent sell orders from cancelling!
+    // Matcher should prevent sell orders from cancelling!
     (3 to 4).foreach { i =>
-      dex1.api.waitForOrderStatus(sellOrders(i), Status.Cancelled)
+      dex1.api.waitForOrderStatus(sellOrders(i), Status.Accepted)
     }
   }
 }

@@ -66,6 +66,7 @@ object NumberAsStringSerializer extends JsonSerializer[JsValue] {
         json.writeEndObject()
 
       case JsNull => json.writeNull()
+      case _ => throw new IllegalArgumentException(s"Can't process json value=$value")
     }
 
 }

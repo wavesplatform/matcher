@@ -98,7 +98,10 @@ object ExchangeTransactionV2 extends ExchangeTransactionParser[ExchangeTransacti
 
     if (bytes.length < 3) throw new IllegalArgumentException(s"The buffer is too small, it has ${bytes.length} elements")
 
-    val Array(parsedMark, parsedTypeId, parsedVersion) = bytes.take(3)
+    val (parsedMark, parsedTypeId, parsedVersion) = bytes.take(3) match {
+      case Array(parsedMark, parsedTypeId, parsedVersion) => (parsedMark, parsedTypeId, parsedVersion)
+      case _ => throw new IllegalArgumentException(s"Can't parse header=$bytes")
+    }
 
     if (parsedMark != 0) throw new IllegalArgumentException(s"Expected the '0' byte, but got '$parsedMark'")
     if (parsedTypeId != typeId) throw new IllegalArgumentException(s"Expected type of transaction '$typeId', but got '$parsedTypeId'")

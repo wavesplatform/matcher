@@ -6,63 +6,63 @@ object Dependencies {
 
   object Version {
 
-    val parCollections = "0.2.0"
+    val parCollections = "1.0.0"
 
-    val akka = "2.6.8"
-    val akkaHttp = "10.2.0"
+    val akka = "2.6.12"
+    val akkaHttp = "10.2.3"
 
-    val scalaTest = "3.2.2"
-    val scalaCheck = "1.15.0"
+    val scalaTest = "3.2.3"
+    val scalaCheck = "1.15.2"
     val scalaTestPlusCheck = "3.2.3.0"
-    val scalaMock = "4.4.0"
+    val scalaMock = "5.1.0"
     val diffx = "0.3.29" // Can't update to 0.3.30, we have an issue with child traits of AcceptedOrder
 
     val cats = "2.1.1"
-    val catsTaglessMacros = "0.11"
+    val catsTaglessMacros = "0.12"
     val kindProjector = "0.9.10"
     val betterMonadicFor = "0.3.1"
-    val mouse = "0.25"
+    val mouse = "0.26.2"
     val shapeless = "2.3.3"
     val monocle = "2.1.0"
 
-    val typesafeConfig = "1.4.0"
-    val scopt = "4.0.0-RC2"
+    val typesafeConfig = "1.4.1"
+    val scopt = "4.0.0"
 
     val logback = "1.2.3"
     val slf4j = "1.7.30"
-    val janino = "3.1.2"
-    val logbackJsonEncoder = "6.4"
+    val janino = "3.1.3"
+    val logbackJsonEncoder = "6.6"
 
-    val silencer = "1.7.1"
+    val silencer = "1.7.2"
 
-    val kamonCore = "2.1.6"
-    val kamonInfluxDb = "2.1.6"
+    val kamonCore = "2.1.10"
+    val kamonInfluxDb = "2.1.10"
 
     val wavesProtobufSchemas = "1.2.8"
     val wavesJ = "1.0.1"
 
-    val postgresql = "42.2.16"
-    val quillJdbc = "3.5.2"
+    val postgresql = "42.2.18"
+    val quillJdbc = "3.6.0"
 
     val sttp = "1.7.2"
-    val sttpClient = "2.2.7"
+    val sttpClient = "2.2.9"
 
     val testContainers = "0.38.8"
-    val testContainersPostgres = "1.15.0"
-    val testContainersKafka = "1.15.0"
-    val testContainersToxiProxy = "1.15.0"
+    val testContainersPostgres = "1.15.1"
+    val testContainersKafka = "1.15.1"
+    val testContainersToxiProxy = "1.15.1"
 
     val jackson = "2.10.0"
-    val playJson = "2.9.0"
+    val playJson = "2.9.2"
 
     val googleGuava = "28.2-jre"
-    val kafka = "2.6.0"
+    val kafka = "2.7.0"
 
     val swagger = "1.1.2"
     val swaggerUi = "3.32.5"
     val jaxbApi = "2.3.1"
 
-    val scorexCrypto = "2.1.9"
+    val scorexCrypto = "2.1.10"
 
     val monix = "3.3.0"
 
@@ -70,16 +70,18 @@ object Dependencies {
 
     val javaLevelDb = "0.12"
     val jniLevelDb = "1.18.3"
-    val influxDb = "2.20"
+    val influxDb = "2.21"
     val levelDbVersion = "1.22.1"
 
-    val commonsNet = "3.7"
+    val commonsNet = "3.7.2"
     val nettyCodec = "4.1.33.Final"
-    val jwt = "4.3.0"
+    val jwt = "5.0.0"
 
     val pureConfig = "0.14.0"
-    val allureScalaTest = "2.13.5"
+    val allureScalaTest = "2.13.8"
     val enumeratum = "1.6.1"
+
+    val scalaPbJson = "0.9.3"
   }
 
   private def akkaModule(module: String, version: String): ModuleID = "com.typesafe.akka" %% module % version
@@ -104,7 +106,7 @@ object Dependencies {
   private val diffx = "com.softwaremill.diffx" %% "diffx-scalatest" % Version.diffx
   private val catsCore = catsModule("core")
   private val catsTaglessMacros = "org.typelevel" %% "cats-tagless-macros" % Version.catsTaglessMacros
-  private val kindProjector = compilerPlugin("org.typelevel" %% "kind-projector" % "0.11.0" cross CrossVersion.full)
+  private val kindProjector = compilerPlugin("org.typelevel" %% "kind-projector" % "0.11.3" cross CrossVersion.full)
   private val betterMonadicFor = compilerPlugin("com.olegpy" %% "better-monadic-for" % Version.betterMonadicFor)
   private val mouse = "org.typelevel" %% "mouse" % Version.mouse
   private val shapeless = "com.chuusai" %% "shapeless" % Version.shapeless
@@ -136,6 +138,7 @@ object Dependencies {
   private val playJson = "com.typesafe.play" %% "play-json" % Version.playJson
   private val scorexCrypto = "org.scorexfoundation" %% "scrypto" % Version.scorexCrypto
   private val grpcScalaPb = "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion
+  private val jsonScalaPb = "com.thesamet.scalapb" %% "scalapb-json4s" % Version.scalaPbJson
   private val monixReactive = monixModule("reactive")
   private val supertagged = "org.rudogma" %% "supertagged" % Version.supertagged
   private val javaLevelDb = "org.iq80.leveldb" % "leveldb" % Version.javaLevelDb
@@ -297,10 +300,13 @@ object Dependencies {
       mouse,
       grpcNetty,
       wavesProtobufSchemas
-    ) ++ testKit ++ silencer
+    ) ++ testKit ++ silencer ++ Seq(
+      jsonScalaPb % Test // for testing purposes
+    )
 
     lazy val wavesIntegrationIt: Seq[ModuleID] = Seq(
-      julToSlf4j
+      julToSlf4j,
+      jsonScalaPb % Test // for testing purposes
     ) ++ integrationTestKit
 
   }

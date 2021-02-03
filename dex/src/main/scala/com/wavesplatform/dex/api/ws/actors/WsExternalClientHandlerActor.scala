@@ -271,6 +271,8 @@ object WsExternalClientHandlerActor {
 
                     case Inr(Inr(_)) => Behaviors.same
                   }
+
+                case _ => throw new IllegalArgumentException(s"Can't process message=$wsMessage")
               }
 
             case Event.AssetPairValidated(assetPair) =>

@@ -21,13 +21,14 @@ case class WavesFork private[domain] (origChain: WavesChain, forkChain: WavesCha
   def withBlock(block: WavesBlock): Status = forkChain.withBlock(block) match {
     case Left(e) => Status.Failed(withoutLast, e)
     case Right(updatedForkChain) =>
-      // Compare heights to solve a situation when there are no transactions in the network since some height
       if (
-        block.ref.height < origChain.height
-        || block.tpe == WavesBlock.Type.FullBlock
-        || block.tpe == WavesBlock.Type.MicroBlock && origChain.has(block.ref) // On the same chain
-      ) Status.NotResolved(copy(forkChain = updatedForkChain))
-      else {
+        // +1 because we expect a micro block on origChain.height.
+        // > resolves a fork when there are no transactions in the network on a new chain
+        block.tpe == WavesBlock.Type.FullBlock && block.ref.height > (origChain.height + 1) ||
+        // A new micro block on the same chain. The fork is not resolved when we append a micro block, that existed on an original chain
+        // Also micro block can't happen on a height less than origChain.height, see docs/waves-node-interaction.md#Forks
+        block.tpe == WavesBlock.Type.MicroBlock && block.ref.height >= origChain.height && !origChain.has(block.ref)
+      ) {
         val (origDropped, forkDropped) = WavesChain.dropDifference(origChain, updatedForkChain)
 
         val origTxs = origDropped.foldLeft(Map.empty[ByteString, TransactionWithChanges])(_ ++ _.confirmedTxs)
@@ -44,7 +45,7 @@ case class WavesFork private[domain] (origChain: WavesChain, forkChain: WavesCha
           lostTxIds = origTxs -- forkTxs.keys,
           confirmedTxs = forkTxs -- origTxs.keys
         )
-      }
+      } else Status.NotResolved(copy(forkChain = updatedForkChain))
   }
 
   def withoutLast: WavesFork = copy(forkChain = forkChain.withoutLastLiquidOrFull)

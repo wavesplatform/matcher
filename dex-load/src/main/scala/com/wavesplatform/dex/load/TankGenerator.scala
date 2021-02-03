@@ -79,7 +79,7 @@ object TankGenerator {
         node.broadcast(tx)
         println(s"Broadcast $tx")
       }.recover {
-        case e: Throwable => println(s"Error during operation: $e"); null
+        case e => println(s"Error during operation: $e"); null
       }
     }
 

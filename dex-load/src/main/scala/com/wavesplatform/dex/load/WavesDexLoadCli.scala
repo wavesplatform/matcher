@@ -438,8 +438,9 @@ object WavesDexLoadCli extends ScoptImplicits with DiffMatcherWithImplicits {
   implicit private val wsOrderBookChangesDiff: Derived[Diff[WsOrderBookChanges]] =
     Derived(Diff.gen[WsOrderBookChanges].value.ignore[WsOrderBookChanges, Long](_.timestamp).ignore[WsOrderBookChanges, Long](_.updateId))
 
-  private def getDiff[T](comparison: (T, T) => Boolean): Diff[T] = { (left: T, right: T, _: List[FieldPath]) =>
-    if (comparison(left, right)) Identical(left) else DiffResultValue(left, right)
-  }
+// [error]  private method getDiff in object WavesDexLoadCli is never used
+//  private def getDiff[T](comparison: (T, T) => Boolean): Diff[T] = { (left: T, right: T, _: List[FieldPath]) =>
+//    if (comparison(left, right)) Identical(left) else DiffResultValue(left, right)
+//  }
 
 }

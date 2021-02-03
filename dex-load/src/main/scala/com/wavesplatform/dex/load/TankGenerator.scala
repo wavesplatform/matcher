@@ -78,8 +78,6 @@ object TankGenerator {
       Future {
         node.broadcast(tx)
         println(s"Broadcast $tx")
-      }.recover {
-        case e => println(s"Error during operation: $e"); null
       }
     }
 
@@ -143,8 +141,6 @@ object TankGenerator {
         .map { case (group, index) =>
           Future {
             node.broadcast(mkMassTransfer(transfers = group, asset = AssetId.as(asset), ts = now + index))
-          }.recover {
-            case e: Throwable => println(s"Error during operation: $e"); null
           }
         }
       val requestsAwaitingTime = (futures.size / threadCount).seconds

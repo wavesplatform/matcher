@@ -37,6 +37,7 @@ class WsCollectChangesClient(apiUri: String, address: String, aus: String, obs: 
       }
       orderBookUpdates.put(diff.assetPair, updatedOb)
       none
+    case _ => throw new IllegalArgumentException(s"Unexpected message")
   }
 
   def getAddress: String = address

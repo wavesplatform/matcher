@@ -10,6 +10,7 @@ class OrderOps(val o: Order) extends AnyVal {
     case o1: OrderV1 => withV1(o1)
     case o2: OrderV2 => withV2(o2)
     case o3: OrderV3 => withV3(o3)
+    case _ => throw new IllegalArgumentException(s"Can't process the order ${o.id()} of version ${o.version}")
   }
 
   @inline def updateProofs(p: Proofs): Order =

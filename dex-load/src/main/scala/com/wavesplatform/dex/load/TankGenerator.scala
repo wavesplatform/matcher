@@ -87,7 +87,10 @@ object TankGenerator {
       .shuffle(
         assets
           .combinations(2)
-          .map { case List(aa, pa) => if (aa >= pa) (aa, pa) else (pa, aa) }
+          .map {
+            case List(aa, pa) => if (aa >= pa) (aa, pa) else (pa, aa)
+            case _ => throw new IllegalArgumentException(s"Can't create asset-pair")
+          }
           .map(Function.tupled((a, p) => new AssetPair(AssetId.as(a), AssetId.as(p))))
       )
       .take(count)

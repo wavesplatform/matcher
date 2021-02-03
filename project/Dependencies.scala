@@ -59,7 +59,7 @@ object Dependencies {
     val kafka = "2.7.0"
 
     val swagger = "1.1.2"
-    val swaggerUi = "3.40.0"
+    val swaggerUi = "3.32.5"
     val jaxbApi = "2.3.1"
 
     val scorexCrypto = "2.1.10"

@@ -104,6 +104,7 @@ class OrderValidatorSpecification
         val unsigned = newBuyOrder(pk) match {
           case x: OrderV1 => x.copy(amount = 0L)
           case x: OrderV2 => x.copy(amount = 0L)
+          case _ => throw new IllegalArgumentException(s"Invalid key pair")
         }
         val signed = Order.sign(unsigned, pk)
         OrderValidator.timeAware(time)(signed).left.map(Json.toJsObject(_)) should produce("amount should be > 0")
@@ -117,6 +118,7 @@ class OrderValidatorSpecification
         val order = newBuyOrder(pk) match {
           case x: OrderV1 => x.copy(proofs = Proofs(Seq(ByteStr(Array.emptyByteArray))))
           case x: OrderV2 => x.copy(proofs = Proofs(Seq(ByteStr(Array.emptyByteArray))))
+          case _ => throw new IllegalArgumentException(s"Unexpected key pair")
         }
 
         awaitResult(ov(order)) should produce("InvalidSignature")

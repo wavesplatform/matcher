@@ -189,6 +189,8 @@ class CombinedStream(
 
           case _ => ignore()
         }
+
+      case _ => throw new IllegalArgumentException(s"Can't process unexpected status=$origStatus. It should be member of ${Status.getClass}")
     }
   }
 
@@ -260,6 +262,7 @@ class CombinedStream(
 
           case _ => ignore()
         }
+      case _ => throw new IllegalArgumentException(s"Can't process unexpected status=$origStatus. It should be member of ${Status.getClass}")
     }
   }
 

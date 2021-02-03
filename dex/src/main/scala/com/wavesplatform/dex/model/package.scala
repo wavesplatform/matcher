@@ -19,7 +19,7 @@ package object model {
     def best: Option[(Price, LimitOrder)] = side.headOption.flatMap { case (levelPrice, level) => level.headOption.map(levelPrice -> _) }
 
     def enqueue(levelPrice: Price, lo: LimitOrder): Side = {
-      @nowarn val v = side.getOrElse(levelPrice, Queue.empty)
+      val v = side.getOrElse(levelPrice, Queue.empty)
       side.updated(levelPrice, v.enqueue(lo))
     }
 
@@ -40,7 +40,7 @@ package object model {
     }
 
     def unsafeRemove(price: Price, orderId: ByteStr): (Side, LimitOrder) = {
-      @nowarn val v = side.getOrElse(price, Queue.empty)
+      val v = side.getOrElse(price, Queue.empty)
       val (toRemove, toKeep) = v.partition(_.order.id() == orderId)
       require(toRemove.nonEmpty, s"Order $orderId not found at $price")
       val updatedSide = if (toKeep.isEmpty) side - price else side.updated(price, toKeep)
@@ -48,7 +48,7 @@ package object model {
     }
 
     def put(price: Price, lo: LimitOrder): Side = {
-      @nowarn val v = side.getOrElse(price, Queue.empty)
+      val v = side.getOrElse(price, Queue.empty)
       side.updated(price, v.enqueue(lo))
     }
 

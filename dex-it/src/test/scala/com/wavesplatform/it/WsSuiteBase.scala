@@ -56,6 +56,7 @@ trait WsSuiteBase extends MatcherSuiteBase with HasWebSockets with DiffMatcherWi
           .partitionMap {
             case x: WsError => x.asLeft
             case x: WsPingOrPong => x.asRight
+            case _ => throw new IllegalArgumentException(s"Unexpected error")
           }
 
         errors.size should be >= errorsNumber

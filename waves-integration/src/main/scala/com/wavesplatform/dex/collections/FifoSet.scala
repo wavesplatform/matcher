@@ -2,6 +2,10 @@ package com.wavesplatform.dex.collections
 
 sealed trait FifoSet[T] {
   def contains(x: T): Boolean
+
+  /**
+   * @return (updated, added?)
+   */
   def append(x: T): (FifoSet[T], Boolean)
 }
 

@@ -47,7 +47,7 @@ object OrderEventsCoordinatorActor {
     }
 
     // TODO think about initialized and non-initialized AA for knownTxIds
-    def default(knownTxIds: FifoSet[ExchangeTransaction.Id]): Behaviors.Receive[Message] = Behaviors.receive[Message] { (context, message) =>
+    def default(observedTxIds: FifoSet[ExchangeTransaction.Id]): Behaviors.Receive[Message] = Behaviors.receive[Message] { (context, message) =>
       message match {
         case Command.Process(event) =>
           event match {
@@ -81,7 +81,7 @@ object OrderEventsCoordinatorActor {
                   none
               }
               addressDirectoryRef ! AddressActor.Command.ApplyOrderBookExecuted(event, expectedTx)
-              Behaviors.same
+              Behaviors.same // We don't update "observedTxIds" here, because expectedTx relates to "createdTxs"
 
             case event: Events.OrderCanceled =>
               // If we here, AddressActor is guaranteed to be created, because this happens only after Events.OrderAdded
@@ -90,7 +90,7 @@ object OrderEventsCoordinatorActor {
           }
 
         case Command.ApplyNodeUpdates(updates) =>
-          val (updatedKnownTxIds, oldTxIds) = updates.observedTxs.keys.foldLeft((knownTxIds, List.empty[ExchangeTransaction.Id])) {
+          val (updatedKnownTxIds, oldTxIds) = updates.observedTxs.keys.foldLeft((observedTxIds, List.empty[ExchangeTransaction.Id])) {
             case ((knownTxIds, exclude), txId) =>
               val (updatedKnownTxIds, isNew) = knownTxIds.append(txId)
               val updatedExclude = if (isNew) exclude else txId :: exclude
@@ -117,14 +117,14 @@ object OrderEventsCoordinatorActor {
 
         case command: Command.ApplyObservedByBroadcaster =>
           val txId = command.tx.id()
-          command.tx.traders.foreach { address =>
-            val addressActorMessage =
-              AddressActor.Command.MarkTxsObserved(Map(txId -> command.addressSpending.getOrElse(address, PositiveMap.empty)))
-            addressDirectoryRef ! AddressDirectoryActor.Command.ForwardMessage(address, addressActorMessage)
-          }
-          val (updatedKnownTxIds, _) = knownTxIds.append(txId)
-          default(updatedKnownTxIds)
-          Behaviors.same
+          val (updatedKnownTxIds, added) = observedTxIds.append(txId)
+          if (added) {
+            command.tx.traders.foreach { address =>
+              val x = AddressActor.Command.MarkTxsObserved(Map(txId -> command.addressSpending.getOrElse(address, PositiveMap.empty)))
+              addressDirectoryRef ! AddressDirectoryActor.Command.ForwardMessage(address, x)
+            }
+            default(updatedKnownTxIds)
+          } else Behaviors.same
 
         case Command.ProcessError(event) =>
           addressDirectoryRef ! event

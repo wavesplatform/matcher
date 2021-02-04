@@ -2,7 +2,7 @@ package com.wavesplatform.dex.actors.tx
 
 import akka.actor.testkit.typed.scaladsl.{ManualTime, ScalaTestWithActorTestKit, TestProbe}
 import akka.actor.typed._
-import com.wavesplatform.dex.actors.tx.ExchangeTransactionBroadcastActor.{Message, Observed}
+import com.wavesplatform.dex.actors.tx.ExchangeTransactionBroadcastActor.{Message, Observed, Settings}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -52,7 +52,7 @@ class ExchangeTransactionBroadcastActorSpecification
         broadcasted shouldBe Seq(event.tx)
       }
 
-      "send a response to a client, if" - {
+      "send a response to a client, if a transaction" - {
         def test(result: CheckedBroadcastResult): Unit = {
           val actor = defaultActor { _ =>
             Future.successful(result)
@@ -64,11 +64,53 @@ class ExchangeTransactionBroadcastActorSpecification
           client.expectMessage(Observed(event.tx, Map.empty))
         }
 
-        "a transaction was confirmed before" in test(CheckedBroadcastResult.Confirmed)
-        "a transaction failed and we can't retry" in test(CheckedBroadcastResult.Failed("error", canRetry = false))
+        "confirmed before" in test(CheckedBroadcastResult.Confirmed)
+        "failed and we can't retry" in test(CheckedBroadcastResult.Failed("error", canRetry = false))
+
+        "failed and this was the last attempt" in {
+          val result = CheckedBroadcastResult.Failed("error", canRetry = true)
+
+          val settings = Settings(100.millis, 500.millis)
+          val actor = defaultActorWithSettings(settings) { _ =>
+            Future.successful(result)
+          }
+
+          val client = testKit.createTestProbe[Observed]()
+          val event = sampleEvent(client.ref)
+
+          actor ! event
+          (1 to 5).foreach(_ => manualTime.timePasses(settings.interval))
+
+          client.expectMessage(Observed(event.tx, Map.empty))
+        }
+
+        "expired and this was the last attempt" in {
+          val result = CheckedBroadcastResult.Failed("error", canRetry = true)
+
+          val settings = Settings(100.millis, 500.millis)
+
+          val ntpTime = new TestTime()
+          val actor = testKit.spawn(
+            ExchangeTransactionBroadcastActor(
+              settings = settings,
+              blockchain = { _ => Future.successful(result) },
+              time = ntpTime
+            )
+          )
+
+          val client = testKit.createTestProbe[Observed]()
+          val event = sampleEvent(client.ref)
+
+          actor ! event
+          (1 to 3).foreach(_ => manualTime.timePasses(settings.interval))
+          ntpTime.advance(10.days)
+          manualTime.timePasses(settings.interval)
+
+          client.expectMessage(Observed(event.tx, Map.empty))
+        }
       }
 
-      "don't send messages to a client" - {
+      "don't send a response to a client" - {
         def test(r: CheckedBroadcastResult): Unit = {
           val actor = defaultActor { _ =>
             Future.successful(r)
@@ -80,11 +122,13 @@ class ExchangeTransactionBroadcastActorSpecification
           client.expectNoMessage()
         }
 
+        // Because they will be received from the stream
         "if a transaction is Unconfirmed and isNew=" - {
           "true" in test(CheckedBroadcastResult.Unconfirmed(true))
           "false" in test(CheckedBroadcastResult.Unconfirmed(false))
         }
 
+        // Because it hasn't yet appeared in UTX
         "if a transaction is Failed and we can retry" in test(CheckedBroadcastResult.Failed("test", canRetry = true))
       }
 
@@ -117,18 +161,12 @@ class ExchangeTransactionBroadcastActorSpecification
         Future.successful(CheckedBroadcastResult.Failed("failed", canRetry = true))
       )
 
-      val settings = ExchangeTransactionBroadcastActor.Settings(
+      val settings = Settings(
         interval = 20.millis,
         maxPendingTime = 200.millis
       )
 
-      def mkActor(broadcast: => Future[CheckedBroadcastResult]): ActorRef[Message] = testKit.spawn(
-        ExchangeTransactionBroadcastActor(
-          settings = settings,
-          blockchain = { _ => broadcast },
-          time = new TestTime()
-        )
-      )
+      def mkActor(broadcast: => Future[CheckedBroadcastResult]): ActorRef[Message] = defaultActorWithSettings(settings)(_ => broadcast)
 
       def stopTest(lastResult: CheckedBroadcastResult): Unit = {
         val maxAttempts = 5
@@ -209,12 +247,15 @@ class ExchangeTransactionBroadcastActorSpecification
   }
 
   private def defaultActor(broadcast: ExchangeTransaction => Future[CheckedBroadcastResult]): ActorRef[Message] =
+    defaultActorWithSettings(Settings(
+      interval = 1.minute,
+      maxPendingTime = 5.minute
+    ))(broadcast)
+
+  private def defaultActorWithSettings(settings: Settings)(broadcast: ExchangeTransaction => Future[CheckedBroadcastResult]): ActorRef[Message] =
     testKit.spawn(
       ExchangeTransactionBroadcastActor(
-        settings = ExchangeTransactionBroadcastActor.Settings(
-          interval = 1.minute,
-          maxPendingTime = 5.minute
-        ),
+        settings = settings,
         blockchain = broadcast(_),
         time = new TestTime()
       )

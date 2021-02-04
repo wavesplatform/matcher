@@ -4,7 +4,6 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.model.Price
 import com.wavesplatform.dex.domain.order.Order
 
-import scala.annotation.nowarn
 import scala.collection.immutable.{Queue, TreeMap}
 
 package object model {

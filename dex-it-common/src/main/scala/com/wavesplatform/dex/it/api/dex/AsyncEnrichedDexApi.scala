@@ -29,7 +29,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
     extends AsyncEnrichedApi[MatcherError](host)
     with DexApi[AsyncEnrichedDexApi.R] {
 
-  override val publicKey: R[HttpMatcherPublicKey] = mk(sttp.get(uri"$apiUri/matcher"))
+  override def publicKey: R[HttpMatcherPublicKey] = mk(sttp.get(uri"$apiUri/matcher"))
 
   override def getReservedBalance(publicKey: String, timestamp: Long, signature: String): R[HttpBalance] =
     getReservedBalance(publicKey, Map("timestamp" -> timestamp.toString, "signature" -> signature))

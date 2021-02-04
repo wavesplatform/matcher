@@ -13,7 +13,6 @@ import com.wavesplatform.dex.domain.model.{Amount, Price}
 import com.wavesplatform.dex.model.{LastTrade, LevelAmounts, OrderBook}
 import monocle.macros.GenLens
 
-import scala.annotation.nowarn
 import scala.collection.immutable.TreeMap
 
 case class WsOrderBookState(

@@ -53,9 +53,7 @@ AddressActor should receive events about a transaction only once. `(2)` protects
 🟨 - happens rarely
 ⬜ - impossible
 
-TODO: 
-1. Add BE with no event ???
-2. What if connection to NODE is broken
+Here is not all cases, but most interesting.
 
 ### When another Matcher works faster
 

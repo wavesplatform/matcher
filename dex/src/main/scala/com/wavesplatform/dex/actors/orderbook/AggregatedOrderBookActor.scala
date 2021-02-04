@@ -18,7 +18,6 @@ import com.wavesplatform.dex.settings.OrderRestrictionsSettings
 import com.wavesplatform.dex.time.Time
 import monocle.macros.GenLens
 
-import scala.annotation.nowarn
 import scala.collection.immutable.TreeMap
 import scala.concurrent.duration.FiniteDuration
 

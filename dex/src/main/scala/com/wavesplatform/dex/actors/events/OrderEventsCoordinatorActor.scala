@@ -117,14 +117,14 @@ object OrderEventsCoordinatorActor {
 
         case command: Command.ApplyObservedByBroadcaster =>
           val txId = command.tx.id()
-          command.tx.traders.foreach { address =>
-            val addressActorMessage =
-              AddressActor.Command.MarkTxsObserved(Map(txId -> command.addressSpending.getOrElse(address, PositiveMap.empty)))
-            addressDirectoryRef ! AddressDirectoryActor.Command.ForwardMessage(address, addressActorMessage)
-          }
-          val (updatedKnownTxIds, _) = observedTxIds.append(txId)
-          default(updatedKnownTxIds)
-          Behaviors.same
+          val (updatedKnownTxIds, added) = observedTxIds.append(txId)
+          if (added) {
+            command.tx.traders.foreach { address =>
+              val x = AddressActor.Command.MarkTxsObserved(Map(txId -> command.addressSpending.getOrElse(address, PositiveMap.empty)))
+              addressDirectoryRef ! AddressDirectoryActor.Command.ForwardMessage(address, x)
+            }
+            default(updatedKnownTxIds)
+          } else Behaviors.same
 
         case Command.ProcessError(event) =>
           addressDirectoryRef ! event

@@ -13,6 +13,7 @@ import com.wavesplatform.dex.time.Time
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
+import scala.util.chaining._
 
 /**
  * Sends transactions to Waves NODE until:
@@ -50,14 +51,7 @@ object ExchangeTransactionBroadcastActor {
   sealed trait Event extends Message
 
   object Event {
-
-    case class Broadcasted(
-      clientRef: Option[ActorRef[Observed]],
-      addressSpendings: Map[Address, PositiveMap[Asset, Long]],
-      tx: ExchangeTransaction,
-      result: Try[CheckedBroadcastResult]
-    ) extends Event
-
+    case class Broadcasted(tx: ExchangeTransaction, result: Try[CheckedBroadcastResult]) extends Event
   }
 
   @FunctionalInterface trait BlockchainInteraction {
@@ -71,19 +65,16 @@ object ExchangeTransactionBroadcastActor {
   ): Behavior[Message] = Behaviors.withTimers { timer =>
     val timerKey = Command.Tick
 
-    val defaultRestAttempts = math.max((settings.maxPendingTime / settings.interval).intValue, 1) - 1
+    val defaultAttempts = math.max((settings.maxPendingTime / settings.interval).intValue, 1) - 1
 
     def isExpired(tx: ExchangeTransaction): Boolean = (time.correctedTime() - tx.timestamp) > ExchangeTransactionExpirationMillis
 
-    def broadcast(
-      context: ActorContext[Message],
-      tx: ExchangeTransaction,
-      clientRef: Option[ActorRef[Observed]],
-      addressSpendings: Map[Address, PositiveMap[Asset, Long]]
-    ): Unit = {
+    def broadcast(context: ActorContext[Message], tx: ExchangeTransaction): Unit = {
       context.log.info(s"Broadcasting ${tx.id()}")
-      context.pipeToSelf(blockchain.broadcast(tx))(Event.Broadcasted(clientRef, addressSpendings, tx, _))
+      context.pipeToSelf(blockchain.broadcast(tx))(Event.Broadcasted(tx, _))
     }
+
+    def reply(item: InProgressItem): Unit = item.clientRef.foreach(_ ! Observed(item.tx, item.addressSpendings))
 
     def default(inProgress: Map[ExchangeTransaction.Id, InProgressItem]): Behavior[Message] =
       Behaviors.receive[Message] { (context, message) =>
@@ -94,22 +85,35 @@ object ExchangeTransactionBroadcastActor {
               message.clientRef ! Observed(message.tx, message.addressSpendings)
               Behaviors.same
             } else {
-              broadcast(context, message.tx, message.clientRef.some, message.addressSpendings)
-              default(inProgress.updated(message.tx.id(), InProgressItem(message.tx, defaultRestAttempts)))
+              broadcast(context, message.tx)
+              default(inProgress.updated(
+                message.tx.id(),
+                InProgressItem(message.tx, defaultAttempts, message.clientRef.some, message.addressSpendings)
+              ))
             }
 
           case Command.Tick =>
             val updatedInProgress = inProgress.view.mapValues(_.decreasedAttempts)
-              .filter { case (_, x) => x.isValid && !isExpired(x.tx) }
+              .filter {
+                case (txId, x) =>
+                  val valid = x.isValid // This could be in Event.Broadcasted
+                  val expired = isExpired(x.tx)
+                  (valid && !expired).tap { retry =>
+                    if (retry) broadcast(context, x.tx)
+                    else {
+                      context.log.info(s"$txId v=$valid, exp=$expired")
+                      reply(x)
+                    }
+                  }
+              }
               .toMap
-            if (updatedInProgress.nonEmpty) updatedInProgress.foreach {
-              case (_, x) => broadcast(context, x.tx, none, Map.empty)
-            }
             default(updatedInProgress)
 
           case message: Event.Broadcasted =>
             val txId = message.tx.id()
-            val isInProgress = inProgress.contains(txId)
+            val item = inProgress.get(txId)
+            val isInProgress = item.nonEmpty
+
             message.result match {
               case Failure(e) => context.log.warn(s"Failed to broadcast $txId (inProgress=$isInProgress)", e)
               case Success(x) =>
@@ -123,39 +127,63 @@ object ExchangeTransactionBroadcastActor {
                 }
             }
 
-            if (isInProgress) {
-              val canRetry = message.result match {
-                case Success(CheckedBroadcastResult.Confirmed) => false
-                case Success(CheckedBroadcastResult.Failed(_, x)) => x
-                case _ => true
-              }
+            item match {
+              case None => Behaviors.same
+              case Some(item) =>
+                val canRetry = message.result match {
+                  case Success(CheckedBroadcastResult.Confirmed) => false
+                  case Success(CheckedBroadcastResult.Failed(_, canRetry)) => canRetry
+                  case _ => true
+                }
 
-              if (canRetry) {
-                if (!timer.isTimerActive(timerKey)) timer.startSingleTimer(timerKey, Command.Tick, settings.interval)
-              } else { // This means, the transaction failed
-                // TODO separate from sending
+                val updatedInProgress1 =
+                  if (canRetry) {
+                    if (!timer.isTimerActive(timerKey)) timer.startSingleTimer(timerKey, Command.Tick, settings.interval)
+                    inProgress
+                  } else inProgress - txId
 
-                /**
-                 * Unconfirmed (new) - don't reply, because an event come from UTX
-                 * Unconfirmed (old) - should reply, because AA could be initialized after tx went to UTX
-                 * Confirmed - should reply
-                 * Failed (no retry) - should reply
-                 * Failed (retry) - don't reply, wait
-                 */
+                // About AA - it breaks some rules, but this is measured
+                val sendReply = message.result match {
+                  case Success(CheckedBroadcastResult.Confirmed) =>
+                    // We don't know, how old is this tx. AA could not be created
+                    true
+                  case Success(CheckedBroadcastResult.Failed(_, x)) =>
+                    // no retry - should reply, it won't appear in UTX
+                    // retry - don't reply, because it hasn't yet appeared in UTX
+                    !x
+                  case _ =>
+                    // Don't reply:
+                    // Unconfirmed(new) - because an event will come from UTX and AA is created
+                    // Unconfirmed(old) - because an event came from UTX and AA is created
+                    // Failed - tx hasn't yet appeared in UTX
+                    // AA is created, because we create it on MarkTxsObserved
+                    false
+                }
 
-                message.clientRef.foreach(_ ! Observed(message.tx, message.addressSpendings))
-              }
+                val updatedInProgress2 =
+                  if (sendReply) {
+                    reply(item)
+                    if (canRetry) updatedInProgress1.updatedWith(txId) {
+                      case Some(x) => x.copy(clientRef = none).some // Shouldn't send in future
+                      case x => x
+                    }
+                    else updatedInProgress1 // Already removed
+                  } else updatedInProgress1
 
-              val updatedInProgress = if (canRetry) inProgress else inProgress - txId
-              default(updatedInProgress)
-            } else Behaviors.same
+                default(updatedInProgress2)
+            }
         }
       }
 
     default(Map.empty)
   }
 
-  private case class InProgressItem(tx: ExchangeTransaction, restAttempts: Int) {
+  private case class InProgressItem(
+    tx: ExchangeTransaction,
+    restAttempts: Int,
+    clientRef: Option[ActorRef[Observed]],
+    addressSpendings: Map[Address, PositiveMap[Asset, Long]]
+  ) {
     def decreasedAttempts: InProgressItem = copy(restAttempts = restAttempts - 1)
     def isValid: Boolean = restAttempts >= 0
   }

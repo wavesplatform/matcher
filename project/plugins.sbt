@@ -25,7 +25,7 @@ resolvers ++= Seq(
   "net.vonbuchholtz" % "sbt-dependency-check" % "1.3.3",
   // dependencyUpdates
   "com.timushev.sbt" % "sbt-updates" % "0.5.0"
-) ++ (if (System.getenv("DEX_DEBUG") == "true") Seq("com.github.tkawachi" % "sbt-repeat" % "0.1.0") else Seq.empty).map(addSbtPlugin)
+) ++ (if (System.getenv("DEX_DEBUG") == "true") Seq("com.github.tkawachi" % "sbt-repeat" % "0.1.0") else Seq.empty)).map(addSbtPlugin)
 
 libraryDependencies ++= Seq(
   "org.vafer" % "jdeb" % "1.5" artifacts Artifact("jdeb", "jar", "jar"), // Required for "release" task

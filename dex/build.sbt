@@ -1,10 +1,10 @@
 import java.nio.charset.StandardCharsets
-
 import Dependencies.Version
 import ImageVersionPlugin.autoImport.nameOfImage
 import VersionSourcePlugin.V
 import com.typesafe.sbt.SbtNativePackager.Universal
 import com.typesafe.sbt.packager.archetypes.TemplateWriter
+import sbt.Keys.javaOptions
 
 enablePlugins(
   RewriteSwaggerConfigPlugin,
@@ -128,7 +128,8 @@ inConfig(Linux)(
   Seq(
     name := "waves-dex", // A staging directory name
     normalizedName := name.value, // An archive file name
-    packageName := name.value // In a control file
+    packageName := name.value, // In a control file
+    javaAgents += "io.kamon" % "kanela-agent" % "1.0.7",
   )
 )
 
@@ -149,6 +150,7 @@ inConfig(Debian)(
 
       Seq(upstartScript -> s"/etc/init/${packageName.value}.conf").map(packageMapping(_).withConfig().withPerms("644"))
     },
+    javaAgents += "io.kamon" % "kanela-agent" % "1.0.7",
     linuxScriptReplacements += "detect-loader" ->
     """is_systemd() {
       |    which systemctl >/dev/null 2>&1 && \

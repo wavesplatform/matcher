@@ -5,7 +5,7 @@ resolvers ++= Seq(
   Resolver.sbtPluginRepo("releases")
 )
 
-Seq(
+(Seq(
   "com.thesamet" %% "sbt-protoc" % "0.99.28", // Have to wait NODE: https://github.com/wavesplatform/Waves/blob/master/project/plugins.sbt#L7
   "org.jetbrains" % "sbt-ide-settings" % "1.0.0",
   "com.typesafe.sbt" % "sbt-native-packager" % "1.4.1",
@@ -25,6 +25,7 @@ Seq(
   "net.vonbuchholtz" % "sbt-dependency-check" % "1.3.3",
   // dependencyUpdates
   "com.timushev.sbt" % "sbt-updates" % "0.5.0",
+  // metrics
   "io.kamon" % "sbt-kanela-runner" % "2.0.6",
   "com.lightbend.sbt" % "sbt-javaagent" % "0.1.5"
 ).map(addSbtPlugin)

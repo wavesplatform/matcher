@@ -19,9 +19,13 @@ import com.wavesplatform.dex.domain.error.ValidationError
 import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV1}
 import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionV2}
 import com.wavesplatform.dex.domain.utils.EitherExt2
+import com.wavesplatform.dex.grpc.integration.clients.domain.{AddressBalanceUpdates, TransactionWithChanges, WavesNodeUpdates}
+import com.wavesplatform.dex.grpc.integration.protobuf.DexToPbConversions._
 import com.wavesplatform.dex.model.Events.ExchangeTransactionCreated
 import com.wavesplatform.dex.model.{Events, LimitOrder}
 import com.wavesplatform.dex.{error, MatcherSpecBase}
+import com.wavesplatform.events.protobuf.StateUpdate
+import com.wavesplatform.protobuf.transaction.{SignedTransaction, Transaction}
 import org.scalatest.freespec.AnyFreeSpecLike
 import org.scalatest.matchers.should.Matchers
 
@@ -36,6 +40,29 @@ class OrderEventsCoordinatorActorSpec extends ScalaTestWithActorTestKit() with M
 
   private val defaultSettings = OrderEventsCoordinatorActor.Settings(1000)
   private val assetPair = AssetPair(Waves, btc)
+
+  private val validCounter = buy(wavesBtcPair, 100000, 0.0008, matcherFee = Some(2000L))
+  private val validSubmitted = sell(wavesBtcPair, 100000, 0.0007, matcherFee = Some(1000L))
+  private val validEvent = Events.OrderExecuted(LimitOrder(validSubmitted), LimitOrder(validCounter), nowTs, 2000L, 1000L)
+
+  private val validTx = ExchangeTransactionV2
+    .create(
+      buyOrder = validCounter,
+      sellOrder = validSubmitted,
+      amount = 100000,
+      price = 80000L,
+      buyMatcherFee = 2000L,
+      sellMatcherFee = 1000L,
+      fee = 300000L,
+      timestamp = nowTs,
+      proofs = Proofs.empty
+    )
+    .explicitGet()
+
+  private val validTxSpendings = Map[Address, PositiveMap[Asset, Long]](
+    validCounter.sender.toAddress -> PositiveMap(validEvent.counterExecutedSpending),
+    validSubmitted.sender.toAddress -> PositiveMap(validEvent.submittedExecutedSpending)
+  )
 
   "OrderEventsCoordinatorActor" - {
     "Process" - {
@@ -85,23 +112,6 @@ class OrderEventsCoordinatorActorSpec extends ScalaTestWithActorTestKit() with M
       "OrderExecuted" - {
         val expiration = nowTs + 10.days.toMillis
         "if is able to create a tx" - {
-          val counter = buy(wavesBtcPair, 100000, 0.0008, matcherFee = Some(2000L))
-          val submitted = sell(wavesBtcPair, 100000, 0.0007, matcherFee = Some(1000L))
-          val event = Events.OrderExecuted(LimitOrder(submitted), LimitOrder(counter), nowTs, 300000L, 300000L)
-          val tx = ExchangeTransactionV2
-            .create(
-              buyOrder = counter,
-              sellOrder = submitted,
-              amount = 100000,
-              price = 80000L,
-              buyMatcherFee = 2000L,
-              sellMatcherFee = 1000L,
-              fee = 300000L,
-              timestamp = nowTs,
-              proofs = Proofs.empty
-            )
-            .explicitGet()
-
           val addressDirectory = classic.TestProbe()
           val broadcastActor = TestProbe[ExchangeTransactionBroadcastActor.Command]()
           val dbWriter = classic.TestProbe()
@@ -110,15 +120,15 @@ class OrderEventsCoordinatorActorSpec extends ScalaTestWithActorTestKit() with M
             addressDirectory.ref,
             dbWriter.ref,
             broadcastActor.ref,
-            _ => tx.asRight
+            _ => validTx.asRight
           ))
-          oecRef ! OrderEventsCoordinatorActor.Command.Process(event)
+          oecRef ! OrderEventsCoordinatorActor.Command.Process(validEvent)
 
           "broadcasts it" in {
             val actual = broadcastActor.expectMessageType[ExchangeTransactionBroadcastActor.Command.Broadcast]
             val spendings = Map[Address, PositiveMap[Asset, Long]](
-              counter.sender.toAddress -> PositiveMap(event.counterExecutedSpending),
-              submitted.sender.toAddress -> PositiveMap(event.submittedExecutedSpending)
+              validCounter.sender.toAddress -> PositiveMap(validEvent.counterExecutedSpending),
+              validSubmitted.sender.toAddress -> PositiveMap(validEvent.submittedExecutedSpending)
             )
 
             implicit val broadcastDiff: Derived[Diff[Broadcast]] = Derived(
@@ -127,17 +137,17 @@ class OrderEventsCoordinatorActorSpec extends ScalaTestWithActorTestKit() with M
                 .ignore[Broadcast, ActorRef[ExchangeTransactionBroadcastActor.Observed]](_.clientRef)
             )
 
-            actual should matchTo(Broadcast(TestProbe[ExchangeTransactionBroadcastActor.Observed]().ref, spendings, tx))
+            actual should matchTo(Broadcast(TestProbe[ExchangeTransactionBroadcastActor.Observed]().ref, spendings, validTx))
           }
 
           "saves it" in {
             val actual = dbWriter.expectMsgType[ExchangeTransactionCreated]
-            actual should matchTo(ExchangeTransactionCreated(tx))
+            actual should matchTo(ExchangeTransactionCreated(validTx))
           }
 
           "passes an event with a tx" in {
             val actual = addressDirectory.expectMsgType[AddressActor.Command.ApplyOrderBookExecuted]
-            actual should matchTo(AddressActor.Command.ApplyOrderBookExecuted(event, tx.some))
+            actual should matchTo(AddressActor.Command.ApplyOrderBookExecuted(validEvent, validTx.some))
           }
         }
 
@@ -178,29 +188,21 @@ class OrderEventsCoordinatorActorSpec extends ScalaTestWithActorTestKit() with M
     }
 
     "ApplyNodeUpdates" - {
-
-    }
-
-    "ApplyObservedByBroadcaster" - {
-      val counter = buy(wavesBtcPair, 100000, 0.0008, matcherFee = Some(2000L))
-      val submitted = sell(wavesBtcPair, 100000, 0.0007, matcherFee = Some(1000L))
-      val event = Events.OrderExecuted(LimitOrder(submitted), LimitOrder(counter), nowTs, 300000L, 300000L)
-      val tx = ExchangeTransactionV2
-        .create(
-          buyOrder = counter,
-          sellOrder = submitted,
-          amount = 100000,
-          price = 80000L,
-          buyMatcherFee = 2000L,
-          sellMatcherFee = 1000L,
-          fee = 300000L,
-          timestamp = nowTs,
-          proofs = Proofs.empty
-        )
-        .explicitGet()
-      val spendings = Map[Address, PositiveMap[Asset, Long]](
-        counter.sender.toAddress -> PositiveMap(event.counterExecutedSpending),
-        submitted.sender.toAddress -> PositiveMap(event.submittedExecutedSpending)
+      val validTxWithChanges = TransactionWithChanges(
+        validTx.id().toPB,
+        tx = SignedTransaction(
+          transaction = validTx.toPB.transaction.map { tx =>
+            Transaction(
+              chainId = tx.chainId,
+              senderPublicKey = tx.senderPublicKey,
+              fee = tx.fee,
+              timestamp = tx.timestamp,
+              version = tx.version,
+              data = com.wavesplatform.protobuf.transaction.Transaction.Data.Exchange(tx.getExchange)
+            )
+          }
+        ),
+        changes = StateUpdate()
       )
 
       "if a transaction is already observed - ignores it" in {
@@ -210,9 +212,138 @@ class OrderEventsCoordinatorActorSpec extends ScalaTestWithActorTestKit() with M
           classic.TestProbe().ref,
           TestProbe[ExchangeTransactionBroadcastActor.Command]().ref,
           _ => ValidationError.GenericError("test").asLeft,
-          FifoSet.limited[ExchangeTransaction.Id](10).append(tx.id())._1
+          FifoSet.limited[ExchangeTransaction.Id](10).append(validTx.id())._1
         ))
-        oecRef ! OrderEventsCoordinatorActor.Command.ApplyObservedByBroadcaster(tx, Map.empty)
+        oecRef ! OrderEventsCoordinatorActor.Command.ApplyNodeUpdates(WavesNodeUpdates(
+          balanceUpdates = Map.empty,
+          observedTxs = Map(validTx.id() -> validTxWithChanges)
+        ))
+        addressDirectory.expectNoMessage()
+      }
+
+      "if a transaction is not observed - adds it" in {
+        val addressDirectory = classic.TestProbe()
+        val oecRef = testKit.spawn(OrderEventsCoordinatorActor(
+          defaultSettings,
+          addressDirectory.ref,
+          classic.TestProbe().ref,
+          TestProbe[ExchangeTransactionBroadcastActor.Command]().ref,
+          _ => ValidationError.GenericError("test").asLeft
+        ))
+        oecRef ! OrderEventsCoordinatorActor.Command.ApplyNodeUpdates(WavesNodeUpdates(
+          balanceUpdates = Map.empty,
+          observedTxs = Map(validTx.id() -> validTxWithChanges)
+        ))
+        (1 to 2).foreach(_ => addressDirectory.expectMsgType[AddressDirectoryActor.Command.ForwardMessage]) // Ignore messages
+        oecRef ! OrderEventsCoordinatorActor.Command.ApplyNodeUpdates(WavesNodeUpdates(
+          balanceUpdates = Map.empty,
+          observedTxs = Map(validTx.id() -> validTxWithChanges)
+        ))
+        addressDirectory.expectNoMessage()
+      }
+
+      "sends" - {
+        "MarkTxsObserved" in {
+          val addressDirectory = classic.TestProbe()
+          val oecRef = testKit.spawn(OrderEventsCoordinatorActor(
+            defaultSettings,
+            addressDirectory.ref,
+            classic.TestProbe().ref,
+            TestProbe[ExchangeTransactionBroadcastActor.Command]().ref,
+            _ => ValidationError.GenericError("test").asLeft
+          ))
+          oecRef ! OrderEventsCoordinatorActor.Command.ApplyNodeUpdates(WavesNodeUpdates(
+            balanceUpdates = Map.empty,
+            observedTxs = Map(validTx.id() -> validTxWithChanges)
+          ))
+
+          val actual1 = addressDirectory.expectMsgType[AddressDirectoryActor.Command.ForwardMessage]
+          actual1 should matchTo(AddressDirectoryActor.Command.ForwardMessage(
+            validCounter.sender.toAddress,
+            AddressActor.Command.MarkTxsObserved(Map(
+              validTx.id() -> PositiveMap(validEvent.counterExecutedSpending)
+            ))
+          ))
+
+          val actual2 = addressDirectory.expectMsgType[AddressDirectoryActor.Command.ForwardMessage]
+          actual2 should matchTo(AddressDirectoryActor.Command.ForwardMessage(
+            validSubmitted.sender.toAddress,
+            AddressActor.Command.MarkTxsObserved(Map(
+              validTx.id() -> PositiveMap(validEvent.submittedExecutedSpending)
+            ))
+          ))
+        }
+
+        "ChangeBalances" in {
+          val addressDirectory = classic.TestProbe()
+          val oecRef = testKit.spawn(OrderEventsCoordinatorActor(
+            defaultSettings,
+            addressDirectory.ref,
+            classic.TestProbe().ref,
+            TestProbe[ExchangeTransactionBroadcastActor.Command]().ref,
+            _ => ValidationError.GenericError("test").asLeft
+          ))
+          val addressBalanceUpdates = AddressBalanceUpdates(
+            regular = Map(Waves -> 10L),
+            outgoingLeasing = none,
+            pessimisticCorrection = Map.empty
+          )
+          oecRef ! OrderEventsCoordinatorActor.Command.ApplyNodeUpdates(WavesNodeUpdates(
+            balanceUpdates = Map(validCounter.sender.toAddress -> addressBalanceUpdates),
+            observedTxs = Map.empty
+          ))
+
+          val actual = addressDirectory.expectMsgType[AddressDirectoryActor.Command.ForwardMessage]
+          actual should matchTo(AddressDirectoryActor.Command.ForwardMessage(
+            validCounter.sender.toAddress,
+            AddressActor.Command.ChangeBalances(addressBalanceUpdates)
+          ))
+        }
+
+        "ApplyBatch" in {
+          val addressDirectory = classic.TestProbe()
+          val oecRef = testKit.spawn(OrderEventsCoordinatorActor(
+            defaultSettings,
+            addressDirectory.ref,
+            classic.TestProbe().ref,
+            TestProbe[ExchangeTransactionBroadcastActor.Command]().ref,
+            _ => ValidationError.GenericError("test").asLeft
+          ))
+          val addressBalanceUpdates = AddressBalanceUpdates(
+            regular = Map(Waves -> 10L),
+            outgoingLeasing = none,
+            pessimisticCorrection = Map.empty
+          )
+          oecRef ! OrderEventsCoordinatorActor.Command.ApplyNodeUpdates(WavesNodeUpdates(
+            balanceUpdates = Map(validCounter.sender.toAddress -> addressBalanceUpdates),
+            observedTxs = Map(validTx.id() -> validTxWithChanges)
+          ))
+
+          val actual = addressDirectory.expectMsgType[AddressDirectoryActor.Command.ForwardMessage]
+          actual should matchTo(AddressDirectoryActor.Command.ForwardMessage(
+            validCounter.sender.toAddress,
+            AddressActor.Command.ApplyBatch(
+              AddressActor.Command.MarkTxsObserved(Map(
+                validTx.id() -> PositiveMap(validEvent.counterExecutedSpending)
+              )),
+              AddressActor.Command.ChangeBalances(addressBalanceUpdates)
+            )
+          ))
+        }
+      }
+    }
+
+    "ApplyObservedByBroadcaster" - {
+      "if a transaction is already observed - ignores it" in {
+        val addressDirectory = classic.TestProbe()
+        val oecRef = testKit.spawn(OrderEventsCoordinatorActor(
+          addressDirectory.ref,
+          classic.TestProbe().ref,
+          TestProbe[ExchangeTransactionBroadcastActor.Command]().ref,
+          _ => ValidationError.GenericError("test").asLeft,
+          FifoSet.limited[ExchangeTransaction.Id](10).append(validTx.id())._1
+        ))
+        oecRef ! OrderEventsCoordinatorActor.Command.ApplyObservedByBroadcaster(validTx, Map.empty)
         addressDirectory.expectNoMessage()
       }
 
@@ -226,21 +357,21 @@ class OrderEventsCoordinatorActorSpec extends ScalaTestWithActorTestKit() with M
             TestProbe[ExchangeTransactionBroadcastActor.Command]().ref,
             _ => ValidationError.GenericError("test").asLeft
           ))
-          oecRef ! OrderEventsCoordinatorActor.Command.ApplyObservedByBroadcaster(tx, spendings)
+          oecRef ! OrderEventsCoordinatorActor.Command.ApplyObservedByBroadcaster(validTx, validTxSpendings)
 
           val actual1 = addressDirectory.expectMsgType[AddressDirectoryActor.Command.ForwardMessage]
           actual1 should matchTo(AddressDirectoryActor.Command.ForwardMessage(
-            counter.sender.toAddress,
+            validCounter.sender.toAddress,
             AddressActor.Command.MarkTxsObserved(Map(
-              tx.id() -> PositiveMap(event.counterExecutedSpending)
+              validTx.id() -> PositiveMap(validEvent.counterExecutedSpending)
             ))
           ))
 
           val actual2 = addressDirectory.expectMsgType[AddressDirectoryActor.Command.ForwardMessage]
           actual2 should matchTo(AddressDirectoryActor.Command.ForwardMessage(
-            submitted.sender.toAddress,
+            validSubmitted.sender.toAddress,
             AddressActor.Command.MarkTxsObserved(Map(
-              tx.id() -> PositiveMap(event.submittedExecutedSpending)
+              validTx.id() -> PositiveMap(validEvent.submittedExecutedSpending)
             ))
           ))
         }
@@ -254,10 +385,10 @@ class OrderEventsCoordinatorActorSpec extends ScalaTestWithActorTestKit() with M
             TestProbe[ExchangeTransactionBroadcastActor.Command]().ref,
             _ => ValidationError.GenericError("test").asLeft
           ))
-          oecRef ! OrderEventsCoordinatorActor.Command.ApplyObservedByBroadcaster(tx, spendings)
+          oecRef ! OrderEventsCoordinatorActor.Command.ApplyObservedByBroadcaster(validTx, validTxSpendings)
           (1 to 2).foreach(_ => addressDirectory.expectMsgType[AddressDirectoryActor.Command.ForwardMessage]) // Ignore messages
 
-          oecRef ! OrderEventsCoordinatorActor.Command.ApplyObservedByBroadcaster(tx, spendings)
+          oecRef ! OrderEventsCoordinatorActor.Command.ApplyObservedByBroadcaster(validTx, validTxSpendings)
           addressDirectory.expectNoMessage()
         }
       }

@@ -43,6 +43,20 @@ object OrderEventsCoordinatorActor {
     dbWriterRef: classic.ActorRef,
     broadcasterRef: typed.ActorRef[Broadcaster],
     createTransaction: CreateTransaction
+  ): Behavior[Message] = apply(
+    addressDirectoryRef,
+    dbWriterRef,
+    broadcasterRef,
+    createTransaction,
+    FifoSet.limited[ExchangeTransaction.Id](settings.exchangeTransactionCacheSize)
+  )
+
+  def apply(
+    addressDirectoryRef: classic.ActorRef,
+    dbWriterRef: classic.ActorRef,
+    broadcasterRef: typed.ActorRef[Broadcaster],
+    createTransaction: CreateTransaction,
+    initObservedTxIds: FifoSet[ExchangeTransaction.Id]
   ): Behavior[Message] = Behaviors.setup { context =>
     val broadcastAdapter: ActorRef[Observed] = context.messageAdapter[Observed] {
       case Observed(tx, addressSpending) => Command.ApplyObservedByBroadcaster(tx, addressSpending)
@@ -133,7 +147,7 @@ object OrderEventsCoordinatorActor {
       }
     }
 
-    default(FifoSet.limited[ExchangeTransaction.Id](settings.exchangeTransactionCacheSize))
+    default(initObservedTxIds)
   }
 
 }

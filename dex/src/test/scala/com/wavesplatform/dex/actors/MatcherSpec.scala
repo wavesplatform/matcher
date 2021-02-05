@@ -10,13 +10,13 @@ import org.scalatest.wordspec.AnyWordSpecLike
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Suite}
 
 abstract class MatcherSpec(_actorSystemName: String) extends AnyWordSpecLike with MatcherSpecLike {
-  protected def actorSystemName: String = _actorSystemName
+  protected override def actorSystemName: String = _actorSystemName
 }
 
 trait MatcherSpecLike extends TestKitBase with Matchers with BeforeAndAfterAll with BeforeAndAfterEach with ScorexLogging {
   this: Suite =>
 
-  protected def actorSystemName: String
+  protected def actorSystemName: String = getClass.getName
 
   implicit override lazy val system: ActorSystem = ActorSystem(
     actorSystemName,

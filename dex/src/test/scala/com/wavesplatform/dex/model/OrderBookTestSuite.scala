@@ -63,7 +63,6 @@ class OrderBookTestSuite
 
   }
 
-  private val now = time.getTimestamp()
   val pair: AssetPair = AssetPair(Waves, mkAssetId("BTC"))
 
   "place buy orders with different prices" in {
@@ -71,7 +70,7 @@ class OrderBookTestSuite
     val ord2 = LimitOrder(buy(pair, 170484969L, 34120))
     val ord3 = LimitOrder(buy(pair, 44521418496L, 34000))
 
-    val OrderBookUpdates(ob, _, _, _) = OrderBook.empty.appendAllAccepted(List(ord1, ord2, ord3), now)
+    val OrderBookUpdates(ob, _, _, _) = OrderBook.empty.appendAllAccepted(List(ord1, ord2, ord3), nowTs)
     ob.allOrders.toList should matchTo(List(ord2, ord1, ord3))
   }
 
@@ -88,7 +87,7 @@ class OrderBookTestSuite
         case (tickSize, askPrices, bidPrices) =>
           val asks = askPrices.map(x => sell(pair, 984651354686L, x))
           val bids = bidPrices.map(x => buy(pair, 1583290045643L, x))
-          (tickSize, OrderBook.empty.appendAllLimit(asks ++ bids, now, tickSize = tickSize).orderBook)
+          (tickSize, OrderBook.empty.appendAllLimit(asks ++ bids, nowTs, tickSize = tickSize).orderBook)
       }
 
     forAll(gen) {
@@ -131,7 +130,7 @@ class OrderBookTestSuite
 
     val OrderBookUpdates(ob, _, _, _) = OrderBook.empty.appendAllAccepted(
       List(buyOrd1, buyOrd2, buyOrd3, buyOrd4, buyOrd5, buyOrd6, buyOrdZero, sellOrd1, sellOrd2, sellOrd3, sellOrd4, sellOrd5, sellOrd6),
-      now,
+      nowTs,
       normalizedTickSize
     )
 
@@ -175,15 +174,15 @@ class OrderBookTestSuite
 
     val ob1 = withClue("matchable orders should be matched without tick size:\n") {
 
-      val OrderBookUpdates(ob1, events1, _, _) = OrderBook.empty.append(counterSellOrder, now)
-      val OrderBookUpdates(ob, events2, _, _) = ob1.append(submittedBuyOrder, now + 1)
+      val OrderBookUpdates(ob1, events1, _, _) = OrderBook.empty.append(counterSellOrder, nowTs)
+      val OrderBookUpdates(ob, events2, _, _) = ob1.append(submittedBuyOrder, nowTs + 1)
       val events = events1 ++ events2
 
       events should matchTo(
         Queue[Event](
-          OrderAdded(counterSellOrder, OrderAddedReason.RequestExecuted, now),
-          OrderAdded(submittedBuyOrder, OrderAddedReason.RequestExecuted, now + 1),
-          OrderExecuted(submittedBuyOrder, counterSellOrder, now + 1, counterSellOrder.matcherFee, submittedBuyOrder.matcherFee)
+          OrderAdded(counterSellOrder, OrderAddedReason.RequestExecuted, nowTs),
+          OrderAdded(submittedBuyOrder, OrderAddedReason.RequestExecuted, nowTs + 1),
+          OrderExecuted(submittedBuyOrder, counterSellOrder, nowTs + 1, counterSellOrder.matcherFee, submittedBuyOrder.matcherFee)
         )
       )
 
@@ -194,7 +193,7 @@ class OrderBookTestSuite
 
     withClue("matchable orders should not be matched with tick size:\n") {
       val OrderBookUpdates(ob, events, _, _) =
-        ob1.appendAllAccepted(List(counterSellOrder, submittedBuyOrder), now, tickSize = normalizedTickSize)
+        ob1.appendAllAccepted(List(counterSellOrder, submittedBuyOrder), nowTs, tickSize = normalizedTickSize)
 
       withClue(s"Events: $events\n") {
         ob.asks should matchTo(
@@ -244,7 +243,7 @@ class OrderBookTestSuite
         val normalizedTickSize = toNormalized(100L)
 
         val sellOrder = LimitOrder(sell(pair, 54521418493L, 44389))
-        val OrderBookUpdates(ob, _, _, _) = OrderBook.empty.appendAllAccepted(List(sellOrder, sellOrder), now, tickSize = normalizedTickSize)
+        val OrderBookUpdates(ob, _, _, _) = OrderBook.empty.appendAllAccepted(List(sellOrder, sellOrder), nowTs, tickSize = normalizedTickSize)
 
         ob.asks should have size 1
         ob.asks.head._2.toList should matchTo(List(sellOrder, sellOrder))
@@ -254,7 +253,7 @@ class OrderBookTestSuite
         val sellOrder = LimitOrder(sell(pair, 54521418493L, 44389))
 
         val OrderBookUpdates(ob, _, _, _) =
-          OrderBook.empty.appendAllAccepted(List(sellOrder, sellOrder), now, tickSize = MatchingRule.DefaultRule.tickSize)
+          OrderBook.empty.appendAllAccepted(List(sellOrder, sellOrder), nowTs, tickSize = MatchingRule.DefaultRule.tickSize)
 
         ob.asks should have size 1
         ob.asks.head._2.toList should matchTo(List(sellOrder, sellOrder))
@@ -279,7 +278,7 @@ class OrderBookTestSuite
     val ord1 = buy(pair, 10 * Order.PriceConstant, 100)
     val ord2 = buy(pair, 10 * Order.PriceConstant, 105)
 
-    val OrderBookUpdates(ob1, _, _, _) = OrderBook.empty.appendAllLimit(List(ord1, ord2), now)
+    val OrderBookUpdates(ob1, _, _, _) = OrderBook.empty.appendAllLimit(List(ord1, ord2), nowTs)
     ob1.allOrders.toList should matchTo {
       List[LimitOrder](
         BuyLimitOrder(ord2.amount, ord2.matcherFee, ord2, BigInteger.ZERO),
@@ -288,7 +287,7 @@ class OrderBookTestSuite
     }
 
     val ord3 = sell(pair, 10 * Order.PriceConstant, 100)
-    val OrderBookUpdates(ob2, _, _, _) = ob1.append(LimitOrder(ord3), now)
+    val OrderBookUpdates(ob2, _, _, _) = ob1.append(LimitOrder(ord3), nowTs)
 
     ob2.allOrders.toList should matchTo(List[LimitOrder](BuyLimitOrder(ord1.amount, ord1.matcherFee, ord1, BigInteger.ZERO)))
   }
@@ -300,7 +299,7 @@ class OrderBookTestSuite
     val ord3 = sell(pair, 10 * Order.PriceConstant, 110, matcherFee = Some(300000))
     val ord4 = buy(pair, 22 * Order.PriceConstant, 115, matcherFee = Some(300000))
 
-    val OrderBookUpdates(ob, _, _, _) = OrderBook.empty.appendAllAccepted(List(ord1, ord2, ord3, ord4).map(LimitOrder.apply), now)
+    val OrderBookUpdates(ob, _, _, _) = OrderBook.empty.appendAllAccepted(List(ord1, ord2, ord3, ord4).map(LimitOrder.apply), nowTs)
     val restAmount = ord1.amount + ord2.amount + ord3.amount - ord4.amount
 
     ob.allOrders.toList should matchTo(
@@ -320,7 +319,7 @@ class OrderBookTestSuite
     val ord2 = sell(pair, 100000000L, 0.0004)
     val ord3 = buy(pair, 100000001L, 0.00045)
 
-    val OrderBookUpdates(ob, _, _, _) = OrderBook.empty.appendAllAccepted(List(ord1, ord2, ord3).map(LimitOrder(_)), now)
+    val OrderBookUpdates(ob, _, _, _) = OrderBook.empty.appendAllAccepted(List(ord1, ord2, ord3).map(LimitOrder(_)), nowTs)
     ob.allOrders.toList should matchTo(List[LimitOrder](SellLimitOrder(ord1.amount, ord1.matcherFee, ord1, BigInteger.ZERO)))
   }
 
@@ -329,7 +328,7 @@ class OrderBookTestSuite
     val ord2 = sell(pair, 30.75248828.waves, 0.00067634)
     val ord3 = buy(pair, 30.75363900.waves, 0.00073697)
 
-    val OrderBookUpdates(ob, _, _, _) = OrderBook.empty.appendAllAccepted(List(ord1, ord2, ord3).map(LimitOrder(_)), now)
+    val OrderBookUpdates(ob, _, _, _) = OrderBook.empty.appendAllAccepted(List(ord1, ord2, ord3).map(LimitOrder(_)), nowTs)
 
     val corrected1 = Order.correctAmount(ord2.amount, ord2.price)
     val leftovers1 = ord3.amount - corrected1
@@ -346,7 +345,7 @@ class OrderBookTestSuite
     val ord2 = sell(pair, 0.01.waves, 1840)
     val ord3 = buy(pair, 0.01000010.waves, 2000)
 
-    val OrderBookUpdates(ob, _, _, _) = OrderBook.empty.appendAllLimit(List(ord1, ord2, ord3), now)
+    val OrderBookUpdates(ob, _, _, _) = OrderBook.empty.appendAllLimit(List(ord1, ord2, ord3), nowTs)
 
     val restAmount = ord1.amount - (ord3.amount - ord2.amount)
     val restFee = ord1.matcherFee - AcceptedOrder.partialFee(ord1.matcherFee, ord1.amount, ord3.amount - ord2.amount)
@@ -360,7 +359,7 @@ class OrderBookTestSuite
     val b = rawBuy(p, 0.007.waves, 280L)
     val s = rawSell(p, 300.0.waves, 280L)
 
-    val OrderBookUpdates(ob, _, _, _) = OrderBook.empty.appendAllLimit(List(s, b), now)
+    val OrderBookUpdates(ob, _, _, _) = OrderBook.empty.appendAllLimit(List(s, b), nowTs)
 
     val restSAmount = Order.correctAmount(700000L, 280)
     val restAmount = 30000000000L - restSAmount
@@ -496,7 +495,7 @@ class OrderBookTestSuite
       val gmtf = Fee.getMakerTakerFee(ofs)(_, _)
 
       // Ignore first two OrderAdded, take next OrderExecuted, other events aren't interesting
-      val evt = OrderBook.empty.appendAll(List(maker, taker))(_.add(_, now, gmtf)).events.drop(2).head
+      val evt = OrderBook.empty.appendAll(List(maker, taker))(_.add(_, nowTs, gmtf)).events.drop(2).head
 
       evt shouldBe a[OrderExecuted]
       val oe = evt.asInstanceOf[OrderExecuted]
@@ -509,7 +508,7 @@ class OrderBookTestSuite
     val sellOrder = LimitOrder(rawSell(pair, 345506L, 9337000000L))
     val buyOrder = MarketOrder(rawBuy(pair, 80902L, 10270700000L), 26L)
 
-    val r = OrderBook.empty.appendAllAccepted(List(sellOrder, buyOrder), now)
+    val r = OrderBook.empty.appendAllAccepted(List(sellOrder, buyOrder), nowTs)
     r.events should have size 3
     val lastEvent = r.events.last match {
       case x: OrderCanceled => x
@@ -534,7 +533,7 @@ class OrderBookTestSuite
       val sell3 = LimitOrder(createOrder(wavesUsdPair, SELL, 110.waves, 3.0))
 
       val OrderBookUpdates(_, events, _, _) = ob.appendAll(Seq(sell1, sell2, sell3, buy).zipWithIndex) {
-        case (ob, (order, timeOffset)) => ob.add(order, now + timeOffset, getDefaultMakerTakerFee)
+        case (ob, (order, timeOffset)) => ob.add(order, nowTs + timeOffset, getDefaultMakerTakerFee)
       }
 
       events should have size (if (buy.isLimit) 7 else 8)
@@ -579,7 +578,7 @@ class OrderBookTestSuite
             OrderCanceled(
               buyMo.partial(remainingAmount, remainingFee, 10.usd, awpNominator),
               Events.OrderCanceledReason.BecameUnmatchable,
-              now + 3
+              nowTs + 3
             )
           }
         }

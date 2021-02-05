@@ -230,6 +230,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
   private val orderEventsCoordinatorRef = actorSystem.spawn(
     behavior = OrderEventsCoordinatorActor.apply(
+      settings = settings.orderEventsCoordinatorActor,
       addressDirectoryRef = addressDirectoryRef,
       dbWriterRef = txWriterRef,
       broadcasterRef = wavesNetTxBroadcasterRef,

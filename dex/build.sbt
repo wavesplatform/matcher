@@ -112,7 +112,6 @@ inConfig(Universal)(
     // Common JVM parameters
     // -J prefix is required by a parser
     javaOptions ++= Seq("-Xmx2g", "-Xms512m").map(x => s"-J$x"),
-    javaAgents += "io.kamon" % "kanela-agent" % "1.0.7",
     mappings ++=
       sbt.IO
         .listFiles((Compile / packageSource).value / "doc")
@@ -126,7 +125,6 @@ inConfig(Linux)(
   Seq(
     name := "waves-dex", // A staging directory name
     normalizedName := name.value, // An archive file name
-    javaAgents += "io.kamon" % "kanela-agent" % "1.0.7",
     packageName := name.value, // In a control file
   )
 )

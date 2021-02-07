@@ -16,15 +16,16 @@ scalafixDependencies in ThisBuild ++= List(
 addCompilerPlugin(scalafixSemanticdb)
 
 lazy val commonOwaspSettings = Seq(
-  dependencyCheckAssemblyAnalyzerEnabled := Some(false),
-  javaAgents += "io.kamon" % "kanela-agent" % "1.0.7"
+  dependencyCheckAssemblyAnalyzerEnabled := Some(false)
 )
 
 // Used in unit and integration tests
 lazy val `dex-test-common` = project.settings(commonOwaspSettings).dependsOn(`waves-integration`)
 
 lazy val dex = project
-  .settings(commonOwaspSettings)
+  .settings(
+    commonOwaspSettings
+  )
   .dependsOn(
     `waves-integration`,
     `dex-test-common` % "test->compile"

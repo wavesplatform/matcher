@@ -1,10 +1,10 @@
 import java.nio.charset.StandardCharsets
+
 import Dependencies.Version
 import ImageVersionPlugin.autoImport.nameOfImage
 import VersionSourcePlugin.V
 import com.typesafe.sbt.SbtNativePackager.Universal
 import com.typesafe.sbt.packager.archetypes.TemplateWriter
-import sbt.Keys.javaOptions
 
 enablePlugins(
   RewriteSwaggerConfigPlugin,
@@ -15,7 +15,9 @@ enablePlugins(
   GitVersioning,
   VersionSourcePlugin,
   sbtdocker.DockerPlugin,
-  ImageVersionPlugin
+  ImageVersionPlugin,
+  JavaAppPackaging,
+  JavaAgent
 )
 
 V.scalaPackage := "com.wavesplatform.dex"
@@ -112,6 +114,7 @@ inConfig(Universal)(
     // Common JVM parameters
     // -J prefix is required by a parser
     javaOptions ++= Seq("-Xmx2g", "-Xms512m").map(x => s"-J$x"),
+    javaAgents += "io.kamon" % "kanela-agent" % "1.0.7",
     mappings ++=
       sbt.IO
         .listFiles((Compile / packageSource).value / "doc")
@@ -126,6 +129,7 @@ inConfig(Linux)(
     name := "waves-dex", // A staging directory name
     normalizedName := name.value, // An archive file name
     packageName := name.value, // In a control file
+    javaAgents += "io.kamon" % "kanela-agent" % "1.0.7",
   )
 )
 

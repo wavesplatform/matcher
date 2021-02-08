@@ -226,6 +226,9 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |      ws-messages-interval = 100ms
          |      batch-cancel-timeout = 18 seconds
          |    }
+         |    order-events-coordinator-actor {
+         |      exchange-transaction-cache-size = 999
+         |    }
          |  }
          |}""".stripMargin
 

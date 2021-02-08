@@ -6,7 +6,7 @@ import com.softwaremill.diffx.{Derived, Diff}
 import com.wavesplatform.dex.api.ws.protocol.WsError
 import com.wavesplatform.dex.asset.DoubleOps
 import com.wavesplatform.dex.caches.RateCache
-import com.wavesplatform.dex.domain.account.KeyPair
+import com.wavesplatform.dex.domain.account.{Address, KeyPair}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -354,17 +354,17 @@ trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with Doub
 
   protected val orderV3MirrorPairGenerator: Gen[((KeyPair, Order), (KeyPair, Order))] =
     for {
-      senderBuy: KeyPair <- accountGen
-      senderSell: KeyPair <- accountGen
+      senderBuy <- accountGen
+      senderSell <- accountGen
       pair <- assetPairGen
-      amount: Long <- maxWavesAmountGen
-      price: Long <- Gen.choose(1, (Long.MaxValue / amount) - 100)
-      timestampBuy: Long <- createdTimeGen
-      timestampSell: Long <- createdTimeGen
-      expirationBuy: Long <- maxTimeGen
-      expirationSell: Long <- maxTimeGen
-      matcherFeeBuy: Long <- maxWavesAmountGen
-      matcherFeeSell: Long <- maxWavesAmountGen
+      amount <- maxWavesAmountGen
+      price <- Gen.choose(1, (Long.MaxValue / amount) - 100)
+      timestampBuy <- createdTimeGen
+      timestampSell <- createdTimeGen
+      expirationBuy <- maxTimeGen
+      expirationSell <- maxTimeGen
+      matcherFeeBuy <- maxWavesAmountGen
+      matcherFeeSell <- maxWavesAmountGen
       arbitraryAsset <- arbitraryAssetGen
       feeAsset <- Gen.oneOf(pair.amountAsset, pair.priceAsset, Waves, arbitraryAsset)
     } yield (
@@ -486,5 +486,9 @@ trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with Doub
       AcceptedOrder.partialFee(submittedAo.matcherFee, submittedAo.order.amount, executedAmount)
     )
   }
+
+  protected def addr(seed: String): Address = privateKey(seed).toAddress
+  protected def privateKey(seed: String): KeyPair = KeyPair(seed.getBytes("utf-8"))
+  protected def nowTs: Long = System.currentTimeMillis()
 
 }

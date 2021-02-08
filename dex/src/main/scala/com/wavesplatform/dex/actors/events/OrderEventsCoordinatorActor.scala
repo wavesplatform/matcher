@@ -20,8 +20,9 @@ import com.wavesplatform.dex.model.Events.ExchangeTransactionCreated
 import com.wavesplatform.dex.model.ExchangeTransactionCreator.CreateTransaction
 import play.api.libs.json.Json
 
-// TODO DEX-1042
 object OrderEventsCoordinatorActor {
+
+  case class Settings(exchangeTransactionCacheSize: Int)
 
   sealed trait Message extends Product with Serializable
 
@@ -37,16 +38,30 @@ object OrderEventsCoordinatorActor {
   }
 
   def apply(
+    settings: Settings,
     addressDirectoryRef: classic.ActorRef,
     dbWriterRef: classic.ActorRef,
     broadcasterRef: typed.ActorRef[Broadcaster],
     createTransaction: CreateTransaction
+  ): Behavior[Message] = apply(
+    addressDirectoryRef,
+    dbWriterRef,
+    broadcasterRef,
+    createTransaction,
+    FifoSet.limited[ExchangeTransaction.Id](settings.exchangeTransactionCacheSize)
+  )
+
+  def apply(
+    addressDirectoryRef: classic.ActorRef,
+    dbWriterRef: classic.ActorRef,
+    broadcasterRef: typed.ActorRef[Broadcaster],
+    createTransaction: CreateTransaction,
+    initObservedTxIds: FifoSet[ExchangeTransaction.Id]
   ): Behavior[Message] = Behaviors.setup { context =>
     val broadcastAdapter: ActorRef[Observed] = context.messageAdapter[Observed] {
       case Observed(tx, addressSpending) => Command.ApplyObservedByBroadcaster(tx, addressSpending)
     }
 
-    // TODO think about initialized and non-initialized AA for knownTxIds
     def default(observedTxIds: FifoSet[ExchangeTransaction.Id]): Behaviors.Receive[Message] = Behaviors.receive[Message] { (context, message) =>
       message match {
         case Command.Process(event) =>
@@ -132,44 +147,7 @@ object OrderEventsCoordinatorActor {
       }
     }
 
-    // According to https://github.com/wavesplatform/protobuf-schemas/blob/master/proto/waves/transaction.proto
-    // Transaction
-    //   chain_id: 4 +
-    //   sender_public_key: 32 +
-    //   fee: Amount
-    //     asset_id: 0 +
-    //     amount: 8 +
-    //   timestamp: 8 +
-    //   version: 4 +
-    //   exchange: ExchangeTransactionData
-    //	   amount: 8 +
-    // 	   price: 8 +
-    //     buy_matcher_fee: 8 +
-    //     sell_matcher_fee: 8 +
-    //     orders: Order: 2 *
-    //	     chain_id: 4 +
-    //       sender_public_key: 32 +
-    //       matcher_public_key: 32 +
-    //       asset_pair: AssetPair:
-    //         amount_asset_id: 0 +
-    //         price_asset_id: 0 +
-    //       order_side: 1 +
-    //       amount: 8 +
-    //       price: 8 +
-    //       timestamp: 8 +
-    //       expiration: 8 +
-    //       matcher_fee: 0 + 8 +
-    //       version: 4 +
-    //       proofs: 32
-    // The minimal size of exchange transaction of v3 is 376 bytes =
-    //   4 + 32 + 0 + 8 + 8 + 4 + 8 + 8 + 8 + 8 + 2 * (4 + 32 + 32 + 0 + 0 + 1 + 8 + 8 + 8 + 8 + 0 + 8 + 3 + 32)
-    //
-    // According to https://docs.waves.tech/en/blockchain/block/
-    // The maximum size of a block is 1MB = 1048576 bytes
-    //
-    // Thus ≈ 2789 exchange transactions fit into a block.
-    // 2 blocks for this FifoSet is enough, because it is auxiliary functionality.
-    default(FifoSet.limited[ExchangeTransaction.Id](6000))
+    default(initObservedTxIds)
   }
 
 }

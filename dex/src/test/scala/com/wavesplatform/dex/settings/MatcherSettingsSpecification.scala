@@ -3,6 +3,7 @@ package com.wavesplatform.dex.settings
 import cats.data.NonEmptyList
 import com.typesafe.config.Config
 import com.wavesplatform.dex.actors.address.AddressActor
+import com.wavesplatform.dex.actors.events.OrderEventsCoordinatorActor
 import com.wavesplatform.dex.actors.tx.ExchangeTransactionBroadcastActor
 import com.wavesplatform.dex.api.http.OrderBookHttpInfo
 import com.wavesplatform.dex.api.ws.actors.{WsExternalClientHandlerActor, WsHealthCheckSettings, WsInternalBroadcastActor, WsInternalClientHandlerActor}
@@ -135,6 +136,7 @@ baz"""
       )
     )
     settings.addressActor should matchTo(AddressActor.Settings(100.milliseconds, 18.seconds, 400))
+    settings.orderEventsCoordinatorActor should matchTo(OrderEventsCoordinatorActor.Settings(999))
   }
 
   "DeviationsSettings in MatcherSettings" should "be validated" in {

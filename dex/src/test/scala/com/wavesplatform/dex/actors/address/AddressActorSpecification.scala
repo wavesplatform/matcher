@@ -376,9 +376,6 @@ class AddressActorSpecification
     Portfolio(b.getOrElse(Waves, 0L), LeaseBalance.empty, b.collect { case (id @ IssuedAsset(_), v) => id -> v })
   }
 
-  private def addr(seed: String): Address = privateKey(seed).toAddress
-  private def privateKey(seed: String): KeyPair = KeyPair(seed.getBytes("utf-8"))
-
   override protected def afterAll(): Unit = {
     TestKit.shutdownActorSystem(system)
     super.afterAll()

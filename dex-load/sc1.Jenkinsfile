@@ -20,6 +20,7 @@ pipeline {
         SBT_OPTS = '-Xmx10g -XX:ReservedCodeCacheSize=128m -XX:+CMSClassUnloadingEnabled'
         PATH = "${env.SBT_HOME}/bin:${env.PATH}"
         SEED = "${SEED}"
+        PROFILE = "${PROFILE}"
         AN = "${AN}"
         RC = "${RC}"
         RT = "${RT}"
@@ -49,7 +50,6 @@ pipeline {
                      sh "ssh -o StrictHostKeyChecking=no -l buildagent-matcher ${LOADGEN} hostname"
                      sh "scp ./dex-load/requests-*.txt buildagent-matcher@${LOADGEN}:/home/buildagent-matcher"
                      sh "scp ./dex-load/pairs.txt buildagent-matcher@${LOADGEN}:/home/buildagent-matcher"
-                     sh "echo ${PROFILE} >> profile.txt && scp profile.txt buildagent-matcher@${LOADGEN}:/home/buildagent-matcher"
                      sh "scp ./dex-load/src/main/resources/runLoadTest.sh buildagent-matcher@${LOADGEN}:/home/buildagent-matcher"
                      sh "ssh -q buildagent-matcher@${LOADGEN} sudo sh runLoadTest.sh"
                 }

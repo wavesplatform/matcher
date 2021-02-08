@@ -60,6 +60,7 @@ import java.util.concurrent.{ThreadLocalRandom, TimeoutException}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{blocking, Future, Promise}
+import scala.jdk.CollectionConverters._
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
@@ -556,6 +557,14 @@ object Application {
       System.setProperty("waves.dex.root-directory", config.getString("waves.dex.root-directory"))
 
     val log = LoggerFacade(LoggerFactory getLogger getClass)
+
+    if (config.getBoolean("kamon.enable")) {
+      // IMPORTANT: to make use of default settings for histograms and timers, it's crucial to reconfigure Kamon with
+      //            our merged config BEFORE initializing any metrics, including in settings-related companion objects
+      Kamon.init(config)
+      log.info("Enabled kamon metrics")
+    }
+
     log.info("Starting...")
 
     RootActorSystem.start("wavesplatform", config) { implicit actorSystem =>
@@ -585,8 +594,6 @@ object Application {
     import com.wavesplatform.dex.settings.loadConfig
     import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
 
-    import scala.jdk.CollectionConverters._
-
     val config = loadConfig(external map ConfigFactory.parseFile)
     val scalaContextPath = "scala.concurrent.context"
 
@@ -596,11 +603,6 @@ object Application {
 
     // Initialize global var with actual address scheme
     AddressScheme.current = new AddressScheme { override val chainId: Byte = settings.addressSchemeCharacter.toByte }
-
-    if (config.getBoolean("kamon.enable"))
-      // IMPORTANT: to make use of default settings for histograms and timers, it's crucial to reconfigure Kamon with
-      //            our merged config BEFORE initializing any metrics, including in settings-related companion objects
-      Kamon.init(config)
 
     (config, settings)
   }

@@ -29,7 +29,7 @@ import com.wavesplatform.dex.api.ws.routes.MatcherWebSocketRoute
 import com.wavesplatform.dex.app._
 import com.wavesplatform.dex.caches.{MatchingRulesCache, OrderFeeSettingsCache, RateCache}
 import com.wavesplatform.dex.db._
-import com.wavesplatform.dex.db.leveldb.openDB
+import com.wavesplatform.dex.db.leveldb.{openDB, AsyncLevelDB}
 import com.wavesplatform.dex.domain.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -67,7 +67,8 @@ import scala.util.{Failure, Success}
 class Application(settings: MatcherSettings, config: Config)(implicit val actorSystem: ActorSystem) extends ScorexLogging {
 
   private val monixScheduler = monix.execution.Scheduler.Implicits.global.withExecutionModel(ExecutionModel.AlwaysAsyncExecution)
-  private val grpcExecutionContext = actorSystem.dispatchers.lookup("akka.actor.grpc-dispatcher")
+  private val grpcEc = actorSystem.dispatchers.lookup("akka.actor.grpc-dispatcher")
+  private val levelDbEc = actorSystem.dispatchers.lookup("akka.actor.leveldb-dispatcher")
 
   private val cs = CoordinatedShutdown(actorSystem)
 
@@ -151,7 +152,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       settings.wavesBlockchainClient,
       matcherPublicKey,
       monixScheduler = monixScheduler,
-      grpcExecutionContext = grpcExecutionContext
+      grpcExecutionContext = grpcEc
     ),
     assetsStorage = assetsCache
   )
@@ -163,7 +164,10 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   private val pairBuilder =
     new AssetPairBuilder(settings, getAndCacheDescription(assetsCache, wavesBlockchainAsyncClient, _), settings.blacklistedAssets)
 
-  private val txWriterRef = actorSystem.actorOf(WriteExchangeTransactionActor.props(db), WriteExchangeTransactionActor.name)
+  private val asyncLevelDb = AsyncLevelDB(db)(levelDbEc)
+
+  private val txWriterRef =
+    actorSystem.actorOf(WriteExchangeTransactionActor.props(ExchangeTxStorage.levelDB(asyncLevelDb)), WriteExchangeTransactionActor.name)
 
   private val wavesNetTxBroadcasterRef = actorSystem.spawn(
     ExchangeTransactionBroadcastActor(

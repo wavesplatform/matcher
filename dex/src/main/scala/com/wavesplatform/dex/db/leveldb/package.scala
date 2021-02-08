@@ -36,11 +36,11 @@ package object leveldb extends ScorexLogging {
     /**
      * @note Runs operations in batch, so keep in mind, that previous changes don't appear lately in f
      */
-    def readWrite[A](f: RW => A): A = {
+    def readWrite[A](f: ReadWriteDB => A): A = {
       val snapshot = db.getSnapshot
       val readOptions = new ReadOptions().snapshot(snapshot)
       val batch = db.createWriteBatch()
-      val rw = new RW(db, readOptions, batch)
+      val rw = new ReadWriteDB(db, readOptions, batch)
       try {
         val r = f(rw)
         db.write(batch)

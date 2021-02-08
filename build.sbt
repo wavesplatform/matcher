@@ -1,4 +1,3 @@
-
 import CommonSettings.autoImport.network
 import ReleasePlugin.autoImport._
 import sbt.Keys._

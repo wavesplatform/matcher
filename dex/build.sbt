@@ -15,7 +15,9 @@ enablePlugins(
   GitVersioning,
   VersionSourcePlugin,
   sbtdocker.DockerPlugin,
-  ImageVersionPlugin
+  ImageVersionPlugin,
+  JavaAppPackaging,
+  JavaAgent
 )
 
 V.scalaPackage := "com.wavesplatform.dex"
@@ -25,6 +27,7 @@ Test / scalacOptions += "-P:silencer:globalFilters=^magnolia: using fallback der
 
 resolvers += "dnvriend" at "https://dl.bintray.com/dnvriend/maven"
 libraryDependencies ++= Dependencies.Module.dex
+javaAgents += Dependencies.kanela
 
 val packageSettings = Seq(
   maintainer := "wavesplatform.com",
@@ -111,7 +114,7 @@ inConfig(Universal)(
     packageName := s"waves-dex-${version.value}", // An archive file name
     // Common JVM parameters
     // -J prefix is required by a parser
-    javaOptions ++= Seq("-Xmx2g", "-Xms128m").map(x => s"-J$x"),
+    javaOptions ++= Seq("-Xmx2g", "-Xms512m").map(x => s"-J$x"),
     mappings ++=
       sbt.IO
         .listFiles((Compile / packageSource).value / "doc")

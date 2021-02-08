@@ -2,7 +2,6 @@ package com.wavesplatform.dex.api.http.routes
 
 import java.util.concurrent.ThreadLocalRandom
 import java.util.concurrent.atomic.AtomicReference
-
 import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import akka.actor.{ActorRef, Status}
 import akka.http.scaladsl.model.headers.RawHeader
@@ -32,8 +31,8 @@ import com.wavesplatform.dex.api.http.{entities, OrderBookHttpInfo}
 import com.wavesplatform.dex.api.ws.actors.WsExternalClientDirectoryActor
 import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.caches.RateCache
-import com.wavesplatform.dex.db.leveldb.DBExt
-import com.wavesplatform.dex.db.{DbKeys, OrderDB, WithDB}
+import com.wavesplatform.dex.db.leveldb.{AsyncLevelDB, DBExt}
+import com.wavesplatform.dex.db.{DbKeys, ExchangeTxStorage, OrderDB, WithDB}
 import com.wavesplatform.dex.domain.account.{Address, AddressScheme, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -1240,29 +1239,22 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       TestActor.KeepRunning
     }
 
-    db.readWrite { rw =>
-      val tx =
-        ExchangeTransactionV2
-          .create(
-            matcherKeyPair.privateKey,
-            okOrder.updateType(BUY),
-            okOrder.updateType(SELL),
-            okOrder.amount,
-            okOrder.price,
-            okOrder.matcherFee,
-            okOrder.matcherFee,
-            0.003.waves,
-            System.currentTimeMillis
-          )
-          .explicitGet()
-
-      val txKey = DbKeys.exchangeTransaction(tx.id())
-      if (!rw.has(txKey)) {
-        rw.put(txKey, Some(tx))
-        WriteExchangeTransactionActor.appendTxId(rw, tx.buyOrder.id(), tx.id())
-        WriteExchangeTransactionActor.appendTxId(rw, tx.sellOrder.id(), tx.id())
-      }
-    }
+    val exchangeTxStorage = ExchangeTxStorage.levelDB(AsyncLevelDB(db))
+    exchangeTxStorage.put(
+      ExchangeTransactionV2
+        .create(
+          matcherKeyPair.privateKey,
+          okOrder.updateType(BUY),
+          okOrder.updateType(SELL),
+          okOrder.amount,
+          okOrder.price,
+          okOrder.matcherFee,
+          okOrder.matcherFee,
+          0.003.waves,
+          System.currentTimeMillis
+        )
+        .explicitGet()
+    )
 
     val odb = OrderDB(settings.orderDb, db)
     odb.saveOrder(orderToCancel)

@@ -1,7 +1,5 @@
 import CommonSettings.autoImport.network
 import ReleasePlugin.autoImport._
-import com.lightbend.sbt.javaagent.JavaAgent.JavaAgentKeys.javaAgents
-import com.typesafe.sbt.packager.archetypes.JavaAppPackaging
 import sbt.Keys._
 import sbt._
 import sbt.internal.inc.ReflectUtilities
@@ -23,9 +21,7 @@ lazy val commonOwaspSettings = Seq(
 lazy val `dex-test-common` = project.settings(commonOwaspSettings).dependsOn(`waves-integration`)
 
 lazy val dex = project
-  .settings(
-    commonOwaspSettings
-  )
+  .settings(commonOwaspSettings)
   .dependsOn(
     `waves-integration`,
     `dex-test-common` % "test->compile"
@@ -172,7 +168,7 @@ git.gitDescribedVersion := git.gitDescribedVersion { _ =>
 }.value
 
 // root project settings
-enablePlugins(ReleasePlugin, JavaAppPackaging, JavaAgent)
+enablePlugins(ReleasePlugin)
 
 // https://stackoverflow.com/a/48592704/4050580
 def allProjects: List[ProjectReference] = ReflectUtilities.allVals[Project](this).values.toList.map(x => x: ProjectReference)

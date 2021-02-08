@@ -35,8 +35,8 @@ object Dependencies {
 
     val silencer = "1.7.2"
 
-    val kamonCore = "2.1.10"
-    val kamonInfluxDb = "2.1.10"
+    val kanela = "1.0.7" // instrumentation
+    val kamon = "2.1.11" // metrics
 
     val wavesProtobufSchemas = "1.2.8"
     val wavesJ = "1.0.1"
@@ -90,7 +90,7 @@ object Dependencies {
   private def sttpModule(module: String): ModuleID = "com.softwaremill.sttp" %% module % Version.sttp
   private def jacksonModule(group: String, module: String): ModuleID = s"com.fasterxml.jackson.$group" % s"jackson-$module" % Version.jackson
   private def monixModule(module: String): ModuleID = "io.monix" %% s"monix-$module" % Version.monix
-  private def kamonModule(module: String, version: String): ModuleID = "io.kamon" %% s"kamon-$module" % version
+  private def kamonModule(module: String, version: String = Version.kamon): ModuleID = "io.kamon" %% s"kamon-$module" % version
   private def jwtModule(module: String): ModuleID = "com.pauldijou" %% s"jwt-$module" % Version.jwt
 
   private val alleyCatsCore = "org.typelevel" %% "alleycats-core" % Version.cats
@@ -117,7 +117,7 @@ object Dependencies {
   private val slf4j = "org.slf4j" %% "slf4j-api" % Version.slf4j
   private val julToSlf4j = "org.slf4j" % "jul-to-slf4j" % Version.slf4j
   private val janino = "org.codehaus.janino" % "janino" % Version.janino
-  private val kamonCore = kamonModule("core", Version.kamonCore)
+  private val kamonCore = kamonModule("core", Version.kamon)
 
   private val wavesProtobufSchemas =
     ("com.wavesplatform" % "protobuf-schemas" % Version.wavesProtobufSchemas classifier "proto") % "protobuf" // for teamcity
@@ -198,6 +198,8 @@ object Dependencies {
 
   private val integrationTestKit: Seq[ModuleID] = Seq(wavesJ, logback % Test) ++ testKit
 
+  val kanela = "io.kamon" % "kanela-agent" % Version.kanela
+
   val globalEnforcedVersions = Def.setting(
     Seq(
       akkaActor,
@@ -249,7 +251,8 @@ object Dependencies {
       janino,
       jniLevelDb,
       kamonCore,
-      kamonModule("influxdb", Version.kamonInfluxDb),
+      kamonModule("influxdb"),
+      kamonModule("system-metrics"),
       influxDb,
       commonsNet,
       swaggerUi,

@@ -48,7 +48,6 @@ import com.wavesplatform.dex.queue._
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.dex.time.NTP
 import kamon.Kamon
-import kamon.influxdb.InfluxDBReporter
 import monix.execution.ExecutionModel
 import mouse.any.anySyntaxMouse
 import org.slf4j.LoggerFactory
@@ -598,11 +597,10 @@ object Application {
     // Initialize global var with actual address scheme
     AddressScheme.current = new AddressScheme { override val chainId: Byte = settings.addressSchemeCharacter.toByte }
 
-    // IMPORTANT: to make use of default settings for histograms and timers, it's crucial to reconfigure Kamon with
-    //            our merged config BEFORE initializing any metrics, including in settings-related companion objects
-    Kamon.reconfigure(config)
-
-    if (config.getBoolean("kamon.enable")) Kamon.registerModule("InfluxDB", new InfluxDBReporter())
+    if (config.getBoolean("kamon.enable"))
+      // IMPORTANT: to make use of default settings for histograms and timers, it's crucial to reconfigure Kamon with
+      //            our merged config BEFORE initializing any metrics, including in settings-related companion objects
+      Kamon.init(config)
 
     (config, settings)
   }

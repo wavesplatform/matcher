@@ -8,7 +8,6 @@ pipeline {
     }
     parameters {
         string(name: 'SEED', defaultValue: 'test-seed', description: 'Seed prefix of generated accounts')
-        string(name: 'PROFILE', defaultValue: 'line(1, 600, 1m) const(600, 5m) line(600, 1, 1m)', description: 'Requests schedule')
         string(name: 'AN', defaultValue: '6000', description: 'Count of generated accounts')
         string(name: 'RC', defaultValue: '216060', description: 'Count of requests')
         string(name: 'RT', defaultValue: '6', description: 'Generation type')
@@ -20,7 +19,6 @@ pipeline {
         SBT_OPTS = '-Xmx10g -XX:ReservedCodeCacheSize=128m -XX:+CMSClassUnloadingEnabled'
         PATH = "${env.SBT_HOME}/bin:${env.PATH}"
         SEED = "${SEED}"
-        PROFILE = "${PROFILE}"
         AN = "${AN}"
         RC = "${RC}"
         RT = "${RT}"

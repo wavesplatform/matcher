@@ -11,7 +11,7 @@ import im.mak.waves.transactions.account.{PrivateKey => JPrivateKey, PublicKey =
 import im.mak.waves.transactions.common.{Amount, AssetId}
 import im.mak.waves.transactions.exchange.{AssetPair, Order, OrderType}
 import im.mak.waves.transactions.mass.Transfer
-import im.mak.waves.transactions.{MassTransferTransaction, TransferTransaction, WavesConfig}
+import im.mak.waves.transactions.{MassTransferTransaction, Transaction, TransferTransaction, WavesConfig}
 import org.apache.http.HttpResponse
 import org.apache.http.client.config.{CookieSpecs, RequestConfig}
 import org.apache.http.client.methods.RequestBuilder
@@ -71,13 +71,28 @@ object TankGenerator {
   private def mkAssets(count: Int = settings.assets.count): List[String] = {
     println(s"Generating $count assets... ")
 
-    val assets = (1 to count).map(_ => mkAsset()).toList
+    val assetsTxs = for (_ <- 1 to count) yield mkAsset()
+    val assets = assetsTxs.map(_.assetId())
+
+    val futures = assetsTxs.map { tx =>
+      Future {
+        node.broadcast(tx)
+        println(s"Broadcast $tx")
+      }
+    }
+
+    val requestsAwaitingTime = (count / threadCount).seconds
+    print(
+      s"Awaiting creating assets, requests count = $count, treads count = $threadCount, waiting at most $requestsAwaitingTime... "
+    )
+    Await.result(Future.sequence(futures), requestsAwaitingTime)
+
     val asset = assets(new Random().nextInt(assets.length))
 
     do waitForHeightArise() while (node.getAssetBalance(issuer.address(), asset) <= 0)
 
     println("Assets have been successfully issued")
-    assets.map(_.toString)
+    assets.map(_.toString).toList
   }
 
   private def mkAssetPairs(assets: List[String], count: Int = settings.assets.pairsCount): List[AssetPair] = {
@@ -119,14 +134,18 @@ object TankGenerator {
 
     assets.foreach { asset =>
       println(s"\t -- $asset")
-      accounts
+      val futures = accounts
         .map(account => new Transfer(account.address(), minimumNeededAssetBalance))
         .grouped(100)
         .zipWithIndex
-        .foreach { case (group, index) =>
-          try node.broadcast(mkMassTransfer(transfers = group, asset = AssetId.as(asset), ts = now + index))
-          catch { case e: Exception => println(e) }
+        .map { case (group, index) =>
+          Future {
+            node.broadcast(mkMassTransfer(transfers = group, asset = AssetId.as(asset), ts = now + index))
+          }
         }
+      val requestsAwaitingTime = (futures.size / threadCount).seconds
+      Await.result(Future.sequence(futures), requestsAwaitingTime)
+
     }
 
     println(s"\t -- WAVES")

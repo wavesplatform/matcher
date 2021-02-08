@@ -61,7 +61,7 @@ package object utils {
     println("Done")
   }
 
-  def mkAsset(): AssetId = {
+  def mkAsset(): IssueTransaction = {
     val tx =
       IssueTransaction
         .builder(Random.nextInt(10000000).toString, settings.assets.quantity, 8)
@@ -73,9 +73,8 @@ package object utils {
         .version(2)
         .getSignedWith(issuer)
 
-    println(s"\tSending Issue TX: ${tx.toJson}")
-    node.broadcast(tx)
-    tx.assetId()
+    println(s"\tCreated Issue TX: ${tx.toJson}")
+    tx
   }
 
   def mkOrder(acc: PrivateKey, orderType: OrderType, amount: Long, price: Long, pair: AssetPair): Order =

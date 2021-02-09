@@ -1,13 +1,12 @@
 package com.wavesplatform.dex.actors
 
-import java.util.concurrent.atomic.AtomicReference
-
 import akka.actor.{Actor, ActorRef, Props, SupervisorStrategy, Terminated}
 import cats.implicits.catsSyntaxEitherId
 import com.wavesplatform.dex.actors.orderbook.OrderBookActor.{OrderBookRecovered, OrderBookSnapshotUpdateCompleted}
 import com.wavesplatform.dex.actors.orderbook.{AggregatedOrderBookActor, OrderBookActor}
 import com.wavesplatform.dex.api.http.entities.OrderBookUnavailable
-import com.wavesplatform.dex.db.AssetPairsDB
+import com.wavesplatform.dex.app.{forceStopApplication, StartingMatcherError}
+import com.wavesplatform.dex.db.AssetPairsDb
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.utils.ScorexLogging
@@ -19,11 +18,13 @@ import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import com.wavesplatform.dex.settings.MatcherSettings
 import scorex.utils._
 
-import scala.util.Failure
+import java.util.concurrent.atomic.AtomicReference
+import scala.concurrent.Future
+import scala.util.{Failure, Success}
 
 class MatcherActor(
   settings: MatcherSettings,
-  assetPairsDB: AssetPairsDB,
+  assetPairsDB: AssetPairsDb[Future],
   recoveryCompletedWithEventNr: Either[String, Long] => Unit,
   orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
   orderBookActorProps: (AssetPair, ActorRef) => Props,
@@ -34,6 +35,7 @@ class MatcherActor(
     with ScorexLogging {
 
   import MatcherActor._
+  import context.dispatcher
 
   override def supervisorStrategy: SupervisorStrategy = SupervisorStrategy.stoppingStrategy
 
@@ -43,24 +45,31 @@ class MatcherActor(
   private var snapshotsState = SnapshotsState.empty
 
   override val receive: Receive = {
-    val (errors, validAssetPairs) = assetPairsDB.all().partitionMap { assetPair =>
-      validateAssetPair(assetPair) match {
-        case Left(e) => s"$assetPair: ${e.message.text}".asLeft
-        case Right(x) => x.asRight
+    case Start(assetPairs) =>
+      val (errors, validAssetPairs) = assetPairs.partitionMap { assetPair =>
+        validateAssetPair(assetPair) match {
+          case Left(e) => s"$assetPair: ${e.message.text}".asLeft
+          case Right(x) => x.asRight
+        }
       }
-    }
 
-    if (errors.nonEmpty) log.warn(s"Invalid asset pairs:\n${errors.mkString("\n")}")
+      if (errors.nonEmpty) log.warn(s"Invalid asset pairs:\n${errors.mkString("\n")}")
 
-    if (validAssetPairs.isEmpty) {
-      log.info("Recovery completed!")
-      recoveryCompletedWithEventNr(-1L asRight)
-      working
-    } else {
-      log.info(s"Recovery completed, waiting order books to restore: ${validAssetPairs.mkString(", ")}")
-      validAssetPairs.foreach(createOrderBook)
-      collectOrderBooks(validAssetPairs.size, None, -1L, Map.empty)
-    }
+      val nextState =
+        if (validAssetPairs.isEmpty) {
+          log.info("Recovery completed!")
+          recoveryCompletedWithEventNr(-1L asRight)
+          working
+        } else {
+          log.info(s"Recovery completed, waiting order books to restore: ${validAssetPairs.mkString(", ")}")
+          validAssetPairs.foreach(createOrderBook)
+          collectOrderBooks(validAssetPairs.size, None, -1L, Map.empty)
+        }
+
+      unstashAll()
+      context.become(nextState)
+
+    case x => stash(x)
   }
 
   private def orderBook(pair: AssetPair): Option[Either[Unit, ActorRef]] = Option(orderBooks.get()).flatMap(_.get(pair))
@@ -279,6 +288,15 @@ class MatcherActor(
     recoveryCompletedWithEventNr(safestStartOffset.asRight)
   }
 
+  // Init
+
+  assetPairsDB.all().onComplete {
+    case Success(xs) => self ! Start(xs)
+    case Failure(e) =>
+      log.error("Can't receive asset pairs", e)
+      forceStopApplication(StartingMatcherError)
+  }
+
 }
 
 object MatcherActor {
@@ -287,7 +305,7 @@ object MatcherActor {
 
   def props(
     matcherSettings: MatcherSettings,
-    assetPairsDB: AssetPairsDB,
+    assetPairsDB: AssetPairsDb[Future],
     recoveryCompletedWithEventNr: Either[String, Long] => Unit,
     orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
     orderBookProps: (AssetPair, ActorRef) => Props,
@@ -306,6 +324,8 @@ object MatcherActor {
   )
 
   private case class ShutdownStatus(initiated: Boolean, oldMessagesDeleted: Boolean, oldSnapshotsDeleted: Boolean, onComplete: () => Unit)
+
+  private case class Start(knownAssetPairs: Set[AssetPair])
 
   case object ForceSaveSnapshots
   case class SaveSnapshot(globalEventNr: EventOffset)

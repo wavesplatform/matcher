@@ -36,7 +36,6 @@ import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 class OrderValidatorSpecification

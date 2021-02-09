@@ -174,15 +174,17 @@ class OrderBookTestSuite
 
     val ob1 = withClue("matchable orders should be matched without tick size:\n") {
 
-      val OrderBookUpdates(ob1, events1, _, _) = OrderBook.empty.append(counterSellOrder, nowTs)
-      val OrderBookUpdates(ob, events2, _, _) = ob1.append(submittedBuyOrder, nowTs + 1)
+      val ts = nowTs
+
+      val OrderBookUpdates(ob1, events1, _, _) = OrderBook.empty.append(counterSellOrder, ts)
+      val OrderBookUpdates(ob, events2, _, _) = ob1.append(submittedBuyOrder, ts + 1)
       val events = events1 ++ events2
 
       events should matchTo(
         Queue[Event](
-          OrderAdded(counterSellOrder, OrderAddedReason.RequestExecuted, nowTs),
-          OrderAdded(submittedBuyOrder, OrderAddedReason.RequestExecuted, nowTs + 1),
-          OrderExecuted(submittedBuyOrder, counterSellOrder, nowTs + 1, counterSellOrder.matcherFee, submittedBuyOrder.matcherFee)
+          OrderAdded(counterSellOrder, OrderAddedReason.RequestExecuted, ts),
+          OrderAdded(submittedBuyOrder, OrderAddedReason.RequestExecuted, ts + 1),
+          OrderExecuted(submittedBuyOrder, counterSellOrder, ts + 1, counterSellOrder.matcherFee, submittedBuyOrder.matcherFee)
         )
       )
 
@@ -524,6 +526,8 @@ class OrderBookTestSuite
     val balance = Map[Asset, Long](usd -> 500.usd).withDefaultValue(0L)
     val submitted = createOrder(wavesUsdPair, BUY, 200.waves, 3.0)
 
+    val ts = nowTs
+
     Seq(LimitOrder(submitted), MarketOrder(submitted, a => balance(a))).foreach { buy =>
       val orderType = if (buy.isLimit) "Limit order" else "Market order"
       val ob = OrderBook.empty
@@ -533,7 +537,7 @@ class OrderBookTestSuite
       val sell3 = LimitOrder(createOrder(wavesUsdPair, SELL, 110.waves, 3.0))
 
       val OrderBookUpdates(_, events, _, _) = ob.appendAll(Seq(sell1, sell2, sell3, buy).zipWithIndex) {
-        case (ob, (order, timeOffset)) => ob.add(order, nowTs + timeOffset, getDefaultMakerTakerFee)
+        case (ob, (order, timeOffset)) => ob.add(order, ts + timeOffset, getDefaultMakerTakerFee)
       }
 
       events should have size (if (buy.isLimit) 7 else 8)
@@ -578,7 +582,7 @@ class OrderBookTestSuite
             OrderCanceled(
               buyMo.partial(remainingAmount, remainingFee, 10.usd, awpNominator),
               Events.OrderCanceledReason.BecameUnmatchable,
-              nowTs + 3
+              ts + 3
             )
           }
         }

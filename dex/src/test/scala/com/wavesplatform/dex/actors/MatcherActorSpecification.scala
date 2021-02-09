@@ -1,7 +1,6 @@
 package com.wavesplatform.dex.actors
 
 import java.util.concurrent.atomic.AtomicReference
-
 import akka.actor.typed.scaladsl.adapter._
 import akka.actor.{Actor, ActorRef, ActorSystem, Kill, Props, Terminated}
 import akka.testkit.{ImplicitSender, TestActor, TestActorRef, TestProbe}
@@ -13,7 +12,7 @@ import com.wavesplatform.dex.actors.MatcherActorSpecification.{DeletingActor, Fa
 import com.wavesplatform.dex.actors.orderbook.OrderBookActor.{OrderBookRecovered, OrderBookSnapshotUpdateCompleted}
 import com.wavesplatform.dex.actors.orderbook.OrderBookSnapshotStoreActor.{Message, Response}
 import com.wavesplatform.dex.actors.orderbook.{AggregatedOrderBookActor, OrderBookActor, OrderBookSnapshotStoreActor}
-import com.wavesplatform.dex.db.{AssetPairsDB, OrderBookSnapshotDB, WithDB}
+import com.wavesplatform.dex.db.{AssetPairsDb, OrderBookSnapshotDB, WithDB}
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -27,7 +26,7 @@ import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.concurrent.Eventually
 
-import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
 class MatcherActorSpecification
@@ -423,7 +422,7 @@ class MatcherActorSpecification
 
   private def defaultActor(
     ob: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]] = emptyOrderBookRefs,
-    apdb: AssetPairsDB = mkAssetPairsDB,
+    apdb: AssetPairsDb[Future] = mkAssetPairsDB,
     addressActor: ActorRef = TestProbe().ref,
     snapshotStoreActor: ActorRef = emptySnapshotStoreActor
   ): TestActorRef[MatcherActor] = {
@@ -456,10 +455,10 @@ class MatcherActorSpecification
     )
   }
 
-  private def mkAssetPairsDB: AssetPairsDB = AssetPairsDB(db)
+  private def mkAssetPairsDB: AssetPairsDb[Future] = AssetPairsDb.levelDb(asyncLevelDb)
   private def mkOrderBookSnapshotDB: OrderBookSnapshotDB = OrderBookSnapshotDB(db)
 
-  private def matcherHadOrderBooksBefore(apdb: AssetPairsDB, obsdb: OrderBookSnapshotDB, pairs: (AssetPair, Long)*): Unit = {
+  private def matcherHadOrderBooksBefore(apdb: AssetPairsDb[Future], obsdb: OrderBookSnapshotDB, pairs: (AssetPair, Long)*): Unit = {
     pairs.map(_._1).foreach(apdb.add)
     pairs.foreach { case (pair, offset) => obsdb.update(pair, offset, Some(OrderBookSnapshot.empty)) }
   }
@@ -471,6 +470,8 @@ class MatcherActorSpecification
 }
 
 object MatcherActorSpecification {
+  import scala.concurrent.ExecutionContext.Implicits.global
+
   private class NothingDoActor extends Actor { override def receive: Receive = Actor.ignoringBehavior }
 
   private class RecoveringActor(owner: ActorRef, assetPair: AssetPair, startOffset: Option[Long] = None) extends Actor {

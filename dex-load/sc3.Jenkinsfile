@@ -15,7 +15,7 @@ pipeline {
         SBT_HOME = tool name: 'sbt-1.2.6', type: 'org.jvnet.hudson.plugins.SbtPluginBuilder$SbtInstallation'
         SBT_THREAD_NUMBER = "6"
         SBT_OPTS = '-Xmx10g -XX:ReservedCodeCacheSize=128m -XX:+CMSClassUnloadingEnabled'
-        JAVA_OPTS ="-Xms6144m -Xmx6144m -XX:NewSize=256m -XX:MaxNewSize=356m -XX:PermSize=256m -XX:MaxPermSize=356m"
+        JAVA_OPTS ="-Xmx6144m"
         PATH = "${env.SBT_HOME}/bin:${env.PATH}"
         SEED = "${SEED}"
         AN = "${AN}"

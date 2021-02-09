@@ -99,15 +99,17 @@ object TankGenerator {
     println(s"Creating $count asset pairs... ")
 
     val randomAssetPairs = Random
-      .shuffle(
-        assets
+      .shuffle {
+        val pairs = assets
           .combinations(2)
           .map {
-            case List(aa, pa) => if (aa >= pa) (aa, pa) else (pa, aa)
+            case List(aa, pa) => if (aa < pa) (aa, pa) else (pa, aa)
             case _ => throw new RuntimeException("Can't create asset-pair")
           }
           .map(Function.tupled((a, p) => new AssetPair(AssetId.as(a), AssetId.as(p))))
-      )
+        pairs.filter(p => pairs.filter(p1 => p1.right() == p.left()).size == 0)
+        pairs
+      }
       .take(count)
       .toList
 

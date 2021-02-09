@@ -4,7 +4,7 @@ import com.wavesplatform.dex.metrics.LevelDBStats
 import com.wavesplatform.dex.metrics.LevelDBStats.DbHistogramExt
 import org.iq80.leveldb.{DB, ReadOptions, WriteBatch}
 
-class ReadWriteDB(db: DB, readOptions: ReadOptions, batch: WriteBatch) extends ReadOnlyDB(db, readOptions) {
+class ReadWriteDb(db: DB, readOptions: ReadOptions, batch: WriteBatch) extends ReadOnlyDb(db, readOptions) {
 
   def put[V](key: Key[V], value: V): Unit = {
     val bytes = key.encode(value)

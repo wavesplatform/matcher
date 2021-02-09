@@ -1,15 +1,19 @@
 package com.wavesplatform.dex.api.http.routes
 
-import akka.actor.{typed, ActorRef}
+import akka.actor.{ActorRef, typed}
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.{HttpEntity, HttpResponse, StatusCodes}
 import akka.http.scaladsl.server
 import akka.http.scaladsl.server._
 import akka.http.scaladsl.server.directives.FutureDirectives
-import akka.pattern.{ask, AskTimeoutException}
+import akka.pattern.{AskTimeoutException, ask}
 import akka.stream.Materializer
 import akka.util.Timeout
+import cats.instances.future._
+import cats.instances.list._
 import cats.syntax.option._
+import cats.syntax.semigroupal._
+import cats.syntax.traverse._
 import com.google.common.primitives.Longs
 import com.typesafe.config.Config
 import com.wavesplatform.dex._
@@ -20,7 +24,7 @@ import com.wavesplatform.dex.actors.address.AddressActor.Reply.GetState
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.api.http._
 import com.wavesplatform.dex.api.http.entities._
-import com.wavesplatform.dex.api.http.headers.{`X-User-Public-Key`, CustomContentTypes}
+import com.wavesplatform.dex.api.http.headers.{CustomContentTypes, `X-User-Public-Key`}
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
 import com.wavesplatform.dex.api.ws.actors.WsExternalClientDirectoryActor
@@ -42,7 +46,9 @@ import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedStream
+import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
+import com.wavesplatform.dex.grpc.integration.services.AssetDescription
 import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.MatcherQueue.StoreValidatedCommand
@@ -56,8 +62,11 @@ import play.api.libs.json._
 import javax.ws.rs.Path
 import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag
-import scala.util.Success
+import scala.util.{Failure, Success}
 
+/**
+ * @param getActualTickSize We need FutureResult, because it is used internally in methods which face with a potentially unknown asset pairs
+ */
 @Path("/matcher")
 @Api()
 class MatcherApiRoute(
@@ -70,7 +79,7 @@ class MatcherApiRoute(
   storeCommand: StoreValidatedCommand,
   orderBook: AssetPair => Option[Either[Unit, ActorRef]],
   orderBookHttpInfo: OrderBookHttpInfo,
-  getActualTickSize: AssetPair => BigDecimal,
+  getActualTickSize: AssetPair => FutureResult[BigDecimal],
   orderValidator: Order => FutureResult[Order],
   matcherSettings: MatcherSettings,
   override val matcherStatus: () => MatcherStatus,
@@ -82,7 +91,8 @@ class MatcherApiRoute(
   rateCache: RateCache,
   validatedAllowedOrderVersions: () => Future[Set[Byte]],
   getActualOrderFeeSettings: () => OrderFeeSettings,
-  externalClientDirectoryRef: typed.ActorRef[WsExternalClientDirectoryActor.Message]
+  externalClientDirectoryRef: typed.ActorRef[WsExternalClientDirectoryActor.Message],
+  getAssetDescription: Asset => FutureResult[BriefAssetDescription]
 )(implicit mat: Materializer)
     extends ApiRoute
     with AuthRoute
@@ -159,9 +169,17 @@ class MatcherApiRoute(
     case None => forceCheckOrderBook(p)
   }
 
-  private def forceCheckOrderBook(p: AssetPair): Directive0 = onComplete(matcher ? ForceStartOrderBook(p)).flatMap {
-    case Success(_) => pass
-    case _ => complete(OrderBookUnavailable(error.OrderBookBroken(p)))
+  private def forceCheckOrderBook(p: AssetPair): Directive0 = {
+    val withCachedAssets = getAssetDescription(p.amountAsset)
+      .product(getAssetDescription(p.priceAsset))
+      .semiflatMap(_ => matcher ? ForceStartOrderBook(p))
+
+    onComplete(withCachedAssets.value)
+      .flatMap {
+        case Success(Right(_)) => pass
+        case Success(Left(e)) => complete(SimpleErrorResponse(StatusCodes.BadRequest, e))
+        case Failure(e) => complete(OrderBookUnavailable(error.OrderBookBroken(p)))
+      }
   }
 
   private def withAssetPair(
@@ -442,14 +460,19 @@ class MatcherApiRoute(
   )
   def getOrderBookInfo: Route = (path(AssetPairPM / "info") & get) { pairOrError =>
     withAssetPair(pairOrError, redirectToInverse = true, suffix = "/info") { pair =>
-      complete(SimpleResponse(getOrderBookInfo(pair)))
+      complete(getOrderBookInfo(pair).value.map {
+        case Right(x) => SimpleResponse(x)
+        case Left(e) => InfoNotFound(e)
+      })
     }
   }
 
-  private def getOrderBookInfo(pair: AssetPair) = HttpOrderBookInfo(
-    restrictions = matcherSettings.orderRestrictions.get(pair).map(HttpOrderRestrictions.fromSettings),
-    matchingRules = HttpMatchingRules(tickSize = getActualTickSize(pair).toDouble)
-  )
+  private def getOrderBookInfo(pair: AssetPair): FutureResult[HttpOrderBookInfo] = getActualTickSize(pair).map { tickSize =>
+    HttpOrderBookInfo(
+      restrictions = matcherSettings.orderRestrictions.get(pair).map(HttpOrderRestrictions.fromSettings),
+      matchingRules = HttpMatchingRules(tickSize = tickSize.toDouble)
+    )
+  }
 
   @Path("/orderbook")
   @ApiOperation(
@@ -507,26 +530,28 @@ class MatcherApiRoute(
   )
   def getOrderBooks: Route = (pathEndOrSingleSlash & get) {
     complete(
-      (matcher ? GetMarkets).mapTo[Seq[MarketData]].map { markets =>
-        SimpleResponse(
-          HttpTradingMarkets(
-            matcherPublicKey,
-            markets.map { md =>
-              val meta = getOrderBookInfo(md.pair)
-              HttpMarketDataWithMeta(
-                md.pair.amountAsset,
-                md.amountAssetName,
-                md.amountAssetInfo.map(HttpAssetInfo.fromAssetInfo),
-                md.pair.priceAsset,
-                md.priceAssetName,
-                md.priceAssetInfo.map(HttpAssetInfo.fromAssetInfo),
-                md.created,
-                meta.restrictions,
-                meta.matchingRules
-              )
-            }
-          )
-        )
+      (matcher ? GetMarkets).mapTo[List[MarketData]].flatMap { markets =>
+        markets
+          .map { md =>
+            getOrderBookInfo(md.pair)
+              .map { meta =>
+                HttpMarketDataWithMeta(
+                  md.pair.amountAsset,
+                  md.amountAssetName,
+                  md.amountAssetInfo.map(HttpAssetInfo.fromAssetInfo),
+                  md.pair.priceAsset,
+                  md.priceAssetName,
+                  md.priceAssetInfo.map(HttpAssetInfo.fromAssetInfo),
+                  md.created,
+                  meta.restrictions,
+                  meta.matchingRules
+                )
+              }
+              .value
+          }
+          .sequence
+          .map(_.collect { case Right(x) => x })
+          .map(x => SimpleResponse(HttpTradingMarkets(matcherPublicKey, x)))
       }
     )
   }

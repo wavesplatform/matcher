@@ -42,6 +42,7 @@ trait Order extends ByteAndJsonSerializable with Proven {
   def version: Byte
   def signature: Array[Byte] = proofs.toSignature
   def feeAsset: Asset = Waves
+  def assets: Set[Asset] = Set(assetPair.amountAsset, assetPair.priceAsset, feeAsset)
 
   import Order._
 

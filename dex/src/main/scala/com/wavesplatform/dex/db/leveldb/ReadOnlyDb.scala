@@ -6,7 +6,7 @@ import org.iq80.leveldb.{DB, DBIterator, ReadOptions}
 
 import scala.annotation.tailrec
 
-class ReadOnlyDB(db: DB, readOptions: ReadOptions) {
+class ReadOnlyDb(db: DB, readOptions: ReadOptions) {
 
   def get[V](key: Key[V]): V = {
     val bytes = db.get(key.keyBytes, readOptions)

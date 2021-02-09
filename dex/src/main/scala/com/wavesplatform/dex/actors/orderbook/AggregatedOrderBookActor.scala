@@ -5,7 +5,6 @@ import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
 import akka.actor.typed.{ActorRef, Behavior, Terminated}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
 import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.State._
-import com.wavesplatform.dex.actors.orderbook.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.api.http.entities.HttpOrderBook
 import com.wavesplatform.dex.api.ws.protocol.{WsError, WsOrderBookChanges, WsServerMessage}
 import com.wavesplatform.dex.api.ws.state.WsOrderBookState
@@ -258,6 +257,12 @@ object AggregatedOrderBookActor {
     )
 
   }
+
+  case class MarketStatus(
+    lastTrade: Option[LastTrade],
+    bestBid: Option[LevelAgg],
+    bestAsk: Option[LevelAgg]
+  )
 
   def toLevelAgg(x: (Price, Amount)): LevelAgg = LevelAgg(x._2, x._1)
 

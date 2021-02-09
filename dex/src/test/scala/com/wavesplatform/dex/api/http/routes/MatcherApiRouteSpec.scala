@@ -19,7 +19,7 @@ import com.wavesplatform.dex.actors.address.AddressActor.Command.{PlaceOrder, So
 import com.wavesplatform.dex.actors.address.AddressActor.Query.GetTradableBalance
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor
-import com.wavesplatform.dex.actors.orderbook.OrderBookActor.MarketStatus
+import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.MarketStatus
 import com.wavesplatform.dex.api.RouteSpec
 import com.wavesplatform.dex.api.http.ApiMarshallers._
 import com.wavesplatform.dex.api.http.entities._
@@ -29,6 +29,7 @@ import com.wavesplatform.dex.api.http.{entities, OrderBookHttpInfo}
 import com.wavesplatform.dex.api.ws.actors.WsExternalClientDirectoryActor
 import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.caches.RateCache
+import com.wavesplatform.dex.db.{DbKeys, ExchangeTxStorage, OrderDB, WithDB}
 import com.wavesplatform.dex.db._
 import com.wavesplatform.dex.domain.account.{Address, AddressScheme, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
@@ -1267,8 +1268,9 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         settings = settings.orderBookHttp,
         askAdapter = orderBookAskAdapter,
         time = time,
-        assetDecimals =
-          x => if (x == smartAsset) Some(smartAssetDesc.decimals) else throw new IllegalArgumentException(s"No information about $x")
+        assetDecimals = x =>
+          if (x == smartAsset) liftValueAsync(smartAssetDesc.decimals)
+          else liftFutureAsync(Future.failed(new IllegalArgumentException(s"No information about $x")))
       )
 
     val testKit = ActorTestKit()
@@ -1302,7 +1304,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
           case _ => None
         },
         orderBookHttpInfo = orderBookHttpInfo,
-        getActualTickSize = _ => 0.1,
+        getActualTickSize = _ => liftValueAsync(BigDecimal(0.1)),
         orderValidator = {
           case x if x == okOrder || x == badOrder => liftValueAsync(x)
           case _ => liftErrorAsync(error.FeatureNotImplemented)
@@ -1317,7 +1319,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         rateCache = rateCache,
         validatedAllowedOrderVersions = () => Future.successful(Set(1, 2, 3)),
         () => DynamicSettings.symmetric(matcherFee),
-        externalClientDirectoryRef = testKit.spawn(WsExternalClientDirectoryActor(), s"ws-external-cd-${Random.nextInt(Int.MaxValue)}")
+        externalClientDirectoryRef = testKit.spawn(WsExternalClientDirectoryActor(), s"ws-external-cd-${Random.nextInt(Int.MaxValue)}"),
+        getAssetDescription = _ => liftValueAsync(BriefAssetDescription("test", 8, hasScript = false))
       )
 
     f(route.route)

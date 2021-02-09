@@ -77,7 +77,7 @@ class KafkaMatcherQueue(settings: Settings) extends MatcherQueue with ScorexLogg
     }
   }
 
-  override def startConsume(fromOffset: ValidatedCommandWithMeta.Offset, process: Seq[ValidatedCommandWithMeta] => Future[Unit]): Unit = {
+  override def startConsume(fromOffset: ValidatedCommandWithMeta.Offset, process: List[ValidatedCommandWithMeta] => Future[Unit]): Unit = {
     val scheduler = Scheduler(consumerExecutionContext, executionModel = ExecutionModel.AlwaysAsyncExecution)
     consumerTask.cancel()
     consumerTask = Observable

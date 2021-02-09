@@ -4,6 +4,7 @@ import java.util.concurrent.atomic.AtomicReference
 import akka.actor.typed.scaladsl.adapter._
 import akka.actor.{Actor, ActorRef, ActorSystem, Kill, Props, Terminated}
 import akka.testkit.{ImplicitSender, TestActor, TestActorRef, TestProbe}
+import cats.Id
 import cats.data.NonEmptyList
 import cats.implicits.catsSyntaxEitherId
 import com.wavesplatform.dex.MatcherSpecBase
@@ -12,7 +13,7 @@ import com.wavesplatform.dex.actors.MatcherActorSpecification.{DeletingActor, Fa
 import com.wavesplatform.dex.actors.orderbook.OrderBookActor.{OrderBookRecovered, OrderBookSnapshotUpdateCompleted}
 import com.wavesplatform.dex.actors.orderbook.OrderBookSnapshotStoreActor.{Message, Response}
 import com.wavesplatform.dex.actors.orderbook.{AggregatedOrderBookActor, OrderBookActor, OrderBookSnapshotStoreActor}
-import com.wavesplatform.dex.db.{AssetPairsDb, OrderBookSnapshotDb, TestAssetPairDb, TestOrderBookSnapshotDb}
+import com.wavesplatform.dex.db.{AssetPairsDb, AssetsStorage, AssetsStorageCache, OrderBookSnapshotDb, TestAssetPairDb, TestOrderBookSnapshotDb}
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -40,8 +41,17 @@ class MatcherActorSpecification
     with Eventually
     with SystemTime {
 
-  private def assetDescription(assetId: Asset): Option[BriefAssetDescription] =
-    Some(BriefAssetDescription(name = "Unknown", decimals = 8, hasScript = false))
+  private val assetsStorageCache = new AssetsStorageCache() {
+    override val cached: AssetsStorage[Id] = new AssetsStorage[Id] {
+      override def put(asset: IssuedAsset, item: BriefAssetDescription): Id[Unit] = {}
+      override def get(asset: IssuedAsset): Id[Option[BriefAssetDescription]] = Some(BriefAssetDescription(name = "Unknown", decimals = 8, hasScript = false))
+      override def putAll(xs: Map[IssuedAsset, BriefAssetDescription]): Id[Unit] = {}
+      override def contained(xs: Set[IssuedAsset]): Id[Set[IssuedAsset]] = xs
+    }
+
+    override def get(asset: Asset): Future[Option[BriefAssetDescription]] = Future.successful(cached.get(asset))
+    override def put(asset: Asset, item: BriefAssetDescription): Future[Unit] = Future.unit
+  }
 
   "MatcherActor" should {
     "return all open markets" in {
@@ -82,7 +92,7 @@ class MatcherActorSpecification
             doNothingOnRecovery,
             ob,
             (_, _) => Props(new FailAtStartActor),
-            assetDescription,
+            assetsStorageCache,
             _.asRight
           )
         )
@@ -136,7 +146,7 @@ class MatcherActorSpecification
             startResult => working = startResult.isRight,
             ob,
             (_, _) => Props(new FailAtStartActor()),
-            assetDescription,
+            assetsStorageCache,
             _.asRight
           )
         )
@@ -168,7 +178,7 @@ class MatcherActorSpecification
                 startResult => stopped = startResult.isLeft,
                 ob,
                 (_, _) => Props(new FailAtStartActor),
-                assetDescription,
+                assetsStorageCache,
                 _.asRight
               )
             )
@@ -197,7 +207,7 @@ class MatcherActorSpecification
                 startResult => stopped = startResult.isLeft,
                 ob,
                 (_, _) => Props(new NothingDoActor),
-                assetDescription,
+                assetsStorageCache,
                 _.asRight
               )
             )
@@ -307,7 +317,7 @@ class MatcherActorSpecification
               _ => {},
               ob,
               (pair, matcherActor) => Props(new RecoveringActor(matcherActor, pair)),
-              assetDescription,
+              assetsStorageCache,
               _.asRight
             )
           )
@@ -331,7 +341,7 @@ class MatcherActorSpecification
             doNothingOnRecovery,
             ob,
             (assetPair, matcher) => Props(new DeletingActor(matcher, assetPair, Some(9L))),
-            assetDescription,
+            assetsStorageCache,
             _.asRight
           )
         )
@@ -392,7 +402,7 @@ class MatcherActorSpecification
           if (idx < 0) throw new RuntimeException(s"Can't find $assetPair in $assetPairs")
           r(idx)._1
         },
-        assetDescription,
+        assetsStorageCache,
         _.asRight
       )
     )
@@ -449,7 +459,7 @@ class MatcherActorSpecification
             _ => makerTakerPartialFee,
             None
           ),
-        assetDescription,
+        assetsStorageCache,
         _.asRight
       )
     )

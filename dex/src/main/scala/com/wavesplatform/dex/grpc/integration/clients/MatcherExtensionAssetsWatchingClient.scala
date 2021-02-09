@@ -2,7 +2,7 @@ package com.wavesplatform.dex.grpc.integration.clients
 
 import cats.instances.future._
 import cats.syntax.apply._
-import com.wavesplatform.dex.db.AssetsStorage
+import com.wavesplatform.dex.db.AssetsStorageCache
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
@@ -17,10 +17,11 @@ import monix.eval.Task
 import monix.reactive.Observable
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Success
 
 class MatcherExtensionAssetsWatchingClient(
   underlying: WavesBlockchainClient,
-  assetsStorage: AssetsStorage
+  assetsCache: AssetsStorageCache
 )(implicit grpcExecutionContext: ExecutionContext)
     extends WavesBlockchainClient
     with ScorexLogging {
@@ -43,7 +44,15 @@ class MatcherExtensionAssetsWatchingClient(
 
   override def isFeatureActivated(id: Short): Future[Boolean] = underlying.isFeatureActivated(id)
 
-  override def assetDescription(asset: IssuedAsset): Future[Option[BriefAssetDescription]] = underlying.assetDescription(asset)
+  override def assetDescription(asset: IssuedAsset): Future[Option[BriefAssetDescription]] =
+    for {
+      cached <- assetsCache.get(asset)
+      desc <- if (cached.isEmpty) underlying.assetDescription(asset) else Future.successful(None)
+      _ <- desc match {
+        case None => Future.unit
+        case Some(desc) => assetsCache.put(asset, desc)
+      }
+    } yield cached.orElse(desc)
 
   override def hasScript(asset: IssuedAsset): Future[Boolean] = underlying.hasScript(asset)
 
@@ -63,20 +72,20 @@ class MatcherExtensionAssetsWatchingClient(
 
   override def close(): Future[Unit] = underlying.close()
 
-  private def saveAssetsDescription(assets: Set[Asset]): Future[Unit] =
-    Future.traverse(assets.iterator.collect { case asset: IssuedAsset if !assetsStorage.contains(asset) => asset })(saveAssetDescription).map(
-      _ => ()
-    )
-
-  private def saveAssetDescription(asset: IssuedAsset): Future[Unit] =
-    assetsStorage.get(asset) match {
-      case Some(_) => Future.unit
-      case None =>
-        assetDescription(asset).map {
-          case Some(x) => assetsStorage.put(asset, x)
-          case None => log.warn(s"Can't find the '$asset' asset in the blockchain")
-        }
+  private def saveAssetsDescription(assets: Set[Asset]): Future[Unit] = {
+    val issuedAssets = assets.iterator.collect {
+      case asset: IssuedAsset => asset
     }
+
+    Future
+      .traverse(issuedAssets) { asset =>
+        for {
+          contains <- assetsCache.contains(asset)
+          _ <- if (contains) Future.unit else assetDescription(asset)
+        } yield ()
+      }
+      .map(_ => ())
+  }
 
   override def status(): Status = underlying.status()
 }

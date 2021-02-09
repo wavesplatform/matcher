@@ -29,7 +29,7 @@ import com.wavesplatform.dex.api.ws.routes.MatcherWebSocketRoute
 import com.wavesplatform.dex.app._
 import com.wavesplatform.dex.caches.{MatchingRulesCache, OrderFeeSettingsCache, RateCache}
 import com.wavesplatform.dex.db._
-import com.wavesplatform.dex.db.leveldb.{openDB, AsyncLevelDB}
+import com.wavesplatform.dex.db.leveldb.{openDB, LevelDb}
 import com.wavesplatform.dex.domain.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -107,11 +107,13 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   }
 
   private val db = openDB(settings.dataDirectory)
+  private val asyncLevelDb = LevelDb.async(db)(levelDbEc)
+
   cs.addTask(CoordinatedShutdown.PhaseActorSystemTerminate, "DB") { () =>
     Future { blocking(db.close()); Done }
   }
 
-  private val assetPairsDB = AssetPairsDB(db)
+  private val assetPairsDB = AssetPairsDb.levelDb(asyncLevelDb)
   private val orderBookSnapshotDB = OrderBookSnapshotDB(db)
   private val orderDB = OrderDB(settings.orderDb, db)
   private val assetsCache = AssetsStorage.cache(AssetsStorage.levelDB(db))
@@ -163,8 +165,6 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
   private val pairBuilder =
     new AssetPairBuilder(settings, getAndCacheDescription(assetsCache, wavesBlockchainAsyncClient, _), settings.blacklistedAssets)
-
-  private val asyncLevelDb = AsyncLevelDB(db)(levelDbEc)
 
   private val txWriterRef =
     actorSystem.actorOf(WriteExchangeTransactionActor.props(ExchangeTxStorage.levelDB(asyncLevelDb)), WriteExchangeTransactionActor.name)
@@ -441,7 +441,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   }
 
   private def loadAllKnownAssets(): Future[Unit] =
-    Future(blocking(assetPairsDB.all()).flatMap(_.assets) ++ settings.mentionedAssets).flatMap { assetsToLoad =>
+    assetPairsDB.all().map(_.flatMap(_.assets) ++ settings.mentionedAssets).flatMap { assetsToLoad =>
       Future
         .traverse(assetsToLoad)(asset => getDecimalsFromCache(asset).value tupleLeft asset)
         .map { xs =>

@@ -1,18 +1,18 @@
 package com.wavesplatform.dex.db
 
-import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
+import com.wavesplatform.dex.db.leveldb.{LevelDb, ReadWriteDB}
 import com.wavesplatform.dex.domain.bytes.ByteStr
-import com.wavesplatform.dex.db.leveldb.{AsyncLevelDB, ReadWriteDB}
+import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 
-import scala.concurrent.Future
-
-trait ExchangeTxStorage {
-  def put(tx: ExchangeTransaction): Future[Unit]
+trait ExchangeTxStorage[F[_]] {
+  def put(tx: ExchangeTransaction): F[Unit]
 }
 
 object ExchangeTxStorage {
-  def levelDB(db: AsyncLevelDB): ExchangeTxStorage = new ExchangeTxStorage {
-    override def put(tx: ExchangeTransaction): Future[Unit] = db.readWrite { rw =>
+
+  def levelDB[F[_]](db: LevelDb[F]): ExchangeTxStorage[F] = new ExchangeTxStorage[F] {
+
+    override def put(tx: ExchangeTransaction): F[Unit] = db.readWrite { rw =>
       val txKey = DbKeys.exchangeTransaction(tx.id())
       if (!rw.has(txKey)) {
         rw.put(txKey, Some(tx))
@@ -27,5 +27,7 @@ object ExchangeTxStorage {
       rw.put(key, nextSeqNr)
       rw.put(DbKeys.orderTxId(orderId, nextSeqNr), txId)
     }
+
   }
+
 }

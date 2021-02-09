@@ -5,9 +5,10 @@ import com.wavesplatform.dex.db.ExchangeTxStorage
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.model.Events._
 
+import scala.concurrent.Future
 import scala.util.Failure
 
-class WriteExchangeTransactionActor(storage: ExchangeTxStorage) extends Actor with ScorexLogging {
+class WriteExchangeTransactionActor(storage: ExchangeTxStorage[Future]) extends Actor with ScorexLogging {
 
   import context.dispatcher
 
@@ -25,5 +26,5 @@ class WriteExchangeTransactionActor(storage: ExchangeTxStorage) extends Actor wi
 
 object WriteExchangeTransactionActor {
   val name: String = "WriteExchangeTransactionActor"
-  def props(storage: ExchangeTxStorage): Props = Props(new WriteExchangeTransactionActor(storage))
+  def props(storage: ExchangeTxStorage[Future]): Props = Props(new WriteExchangeTransactionActor(storage))
 }

@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.db
 
+import cats.Id
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
@@ -8,7 +9,7 @@ import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class AssetPairsDBSpec extends AnyFreeSpec with Matchers with WithDB with MatcherSpecBase with PropertyChecks with NoShrink {
+class AssetPairsDbSpec extends AnyFreeSpec with Matchers with WithDB with MatcherSpecBase with PropertyChecks with NoShrink {
 
   private val fixedAssetPairGen = assetPairGen.filterNot(x => x.amountAsset == Waves && x.priceAsset == Waves)
 
@@ -42,6 +43,6 @@ class AssetPairsDBSpec extends AnyFreeSpec with Matchers with WithDB with Matche
 
   }
 
-  private def test(f: AssetPairsDB => Any): Any = tempDb(db => f(AssetPairsDB(db)))
+  private def test(f: AssetPairsDb[Id] => Any): Any = tempLevelDb(db => f(AssetPairsDb.levelDb(db)))
 
 }

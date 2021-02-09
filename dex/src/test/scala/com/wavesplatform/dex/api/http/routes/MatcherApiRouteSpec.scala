@@ -1,7 +1,5 @@
 package com.wavesplatform.dex.api.http.routes
 
-import java.util.concurrent.ThreadLocalRandom
-import java.util.concurrent.atomic.AtomicReference
 import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import akka.actor.{ActorRef, Status}
 import akka.http.scaladsl.model.headers.RawHeader
@@ -21,7 +19,6 @@ import com.wavesplatform.dex.actors.address.AddressActor.Query.GetTradableBalanc
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor
 import com.wavesplatform.dex.actors.orderbook.OrderBookActor.MarketStatus
-import com.wavesplatform.dex.actors.tx.WriteExchangeTransactionActor
 import com.wavesplatform.dex.api.RouteSpec
 import com.wavesplatform.dex.api.http.ApiMarshallers._
 import com.wavesplatform.dex.api.http.entities._
@@ -31,7 +28,7 @@ import com.wavesplatform.dex.api.http.{entities, OrderBookHttpInfo}
 import com.wavesplatform.dex.api.ws.actors.WsExternalClientDirectoryActor
 import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.caches.RateCache
-import com.wavesplatform.dex.db.leveldb.{AsyncLevelDB, DBExt}
+import com.wavesplatform.dex.db.leveldb.LevelDb
 import com.wavesplatform.dex.db.{DbKeys, ExchangeTxStorage, OrderDB, WithDB}
 import com.wavesplatform.dex.domain.account.{Address, AddressScheme, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
@@ -58,6 +55,8 @@ import org.scalatest.concurrent.Eventually
 import play.api.libs.json.{JsArray, JsString, Json, JsonFacade => _}
 import pureconfig.ConfigSource
 
+import java.util.concurrent.ThreadLocalRandom
+import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.util.Random
@@ -1239,7 +1238,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       TestActor.KeepRunning
     }
 
-    val exchangeTxStorage = ExchangeTxStorage.levelDB(AsyncLevelDB(db))
+    val exchangeTxStorage = ExchangeTxStorage.levelDB(asyncLevelDb)
     exchangeTxStorage.put(
       ExchangeTransactionV2
         .create(

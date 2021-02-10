@@ -9,7 +9,7 @@ pipeline {
         stage ('Trigger job: Deploy Devnet') {
             steps {
                 build job: 'Waves.Exchange/Matcher/Deploy Devnet', propagate: false, wait: false, parameters: [
-                  [$class: 'GitParameterValue', name: 'BRANCH_DEX', value: "${VERSION}-${LABEL}"]
+                  [$class: 'GitParameterValue', name: 'BRANCH_DEX', value: "${VERSION}"]
                 ]
             }
         }
@@ -17,7 +17,7 @@ pipeline {
             steps {
                 build job: 'Waves.Exchange/Matcher/Performance Test/SC1', propagate: false, wait: false, parameters: [
                   [$class: 'GitParameterValue', name: 'BRANCH', value: "${BRANCH}"],
-                  [$class: 'StringParameterValue', name: 'LABEL', value: "${VERSION}"]
+                  [$class: 'StringParameterValue', name: 'LABEL', value: "${VERSION}-${LABEL}"]
                 ]
             }
         }
@@ -30,7 +30,7 @@ pipeline {
             steps {
                 build job: 'Waves.Exchange/Matcher/Performance Test/SC2', propagate: false, wait: false, parameters: [
                   [$class: 'GitParameterValue', name: 'BRANCH', value: "${BRANCH}"],
-                  [$class: 'StringParameterValue', name: 'LABEL', value: "${VERSION}"]
+                  [$class: 'StringParameterValue', name: 'LABEL', value: "${VERSION}-${LABEL}"]
                 ]
             }
         }
@@ -43,7 +43,7 @@ pipeline {
             steps {
                 build job: 'Waves.Exchange/Matcher/Performance Test/SC3', propagate: false, wait: false, parameters: [
                   [$class: 'GitParameterValue', name: 'BRANCH', value: "${BRANCH}"],
-                  [$class: 'StringParameterValue', name: 'LABEL', value: "${VERSION}"]
+                  [$class: 'StringParameterValue', name: 'LABEL', value: "${VERSION}-${LABEL}"]
                 ]
             }
         }
@@ -56,7 +56,7 @@ pipeline {
             steps {
                 build job: 'Waves.Exchange/Matcher/Performance Test/SC4', propagate: false, wait: false, parameters: [
                   [$class: 'GitParameterValue', name: 'BRANCH', value: "${BRANCH}"],
-                  [$class: 'StringParameterValue', name: 'LABEL', value: "${VERSION}"]
+                  [$class: 'StringParameterValue', name: 'LABEL', value: "${VERSION}-${LABEL}"]
                 ]
             }
         }

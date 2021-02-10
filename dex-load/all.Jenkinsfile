@@ -9,7 +9,7 @@ pipeline {
         stage ('Trigger job: Deploy Devnet') {
             steps {
                 build job: 'Waves.Exchange/Matcher/Deploy Devnet', propagate: false, wait: false, parameters: [
-                  [$class: 'GitParameterValue', name: 'BRANCH_DEX', value: "${VERSION}"]
+                  [$class: 'GitParameterValue', name: 'BRANCH_DEX', value: "${VERSION}-${LABEL}"]
                 ]
             }
         }

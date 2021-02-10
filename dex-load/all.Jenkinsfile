@@ -80,7 +80,7 @@ pipeline {
                 sc3Build = "<a href='/job/Waves.Exchange/job/Matcher/job/Performance Test/job/SC3/${SC3}'>SC3</a>"
                 sc4Build = "<a href='/job/Waves.Exchange/job/Matcher/job/Performance Test/job/SC4/${SC4}'>SC4</a>"
 
-                currentBuild.displayName = "${VERSION}"
+                currentBuild.displayName = "${VERSION}-${LABEL}"
                 currentBuild.description = "${sc1Build} | ${sc2Build} | ${sc3Build} | ${sc4Build}"
             }
         }

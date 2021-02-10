@@ -69,7 +69,7 @@ pipeline {
                     steps {
                         sleep time: 1, unit: 'MINUTES'
                         sh 'mv ./dex-load/feeder.csv ./dex-ws-load/'
-                        sh 'cd ./dex-ws-load && sbt -Dff=feeder.csv -Dws=ws://${AIM}:6886/ws/v0 -Drt=30 -Duc=${AN} gatling:testOnly load.ConnectionsAndStreamsTest > /dev/null'
+                        sh 'cd ./dex-ws-load && sbt -Dff=feeder.csv -Dws=ws://${AIM}:6886/ws/v0 -Drt=15 -Duc=${AN} gatling:testOnly load.ConnectionsAndStreamsTest > /dev/null'
                     }
                  }
             }

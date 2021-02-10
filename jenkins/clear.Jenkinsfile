@@ -5,7 +5,7 @@ def cleanStateAndRestart (host, service) {
 
              sh "ssh -q buildagent-matcher@${host} sudo systemctl stop ${service}"
              sh "ssh -q buildagent-matcher@${host} sudo rm -rf /var/lib/${service}/data"
-             sh "ssh -q buildagent-matcher@${host} systemctl start ${service}"
+             sh "ssh -q buildagent-matcher@${host} sudo systemctl start ${service}"
          }
     }
 }

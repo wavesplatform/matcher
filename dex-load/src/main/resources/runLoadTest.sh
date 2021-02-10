@@ -1,4 +1,5 @@
 sed -i "6s/.*/ ammofile: $(ls | grep requests)/" /home/yatank/loadtest/dexload.yaml
+sed -i "23s/.*/ job_name: $1/" /home/yatank/loadtest/dexload.yaml
 mv $(ls | grep requests) /home/yatank/loadtest/
 rm -rf /home/yatank/loadtest/logs/*
 echo "The performance test has been launched, but we made the decision not to print its stdout. Keep patience, it will be finished near $(date -d '+ 9 minutes')"

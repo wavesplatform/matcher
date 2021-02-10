@@ -51,7 +51,7 @@ pipeline {
                     sh "ssh -o StrictHostKeyChecking=no -l buildagent-matcher ${MATCHER} hostname"
                     sh "ssh -q buildagent-matcher@${MATCHER} sudo systemctl stop waves-dex"
                     sh "ssh -q buildagent-matcher@${MATCHER} sudo rm -rf /var/lib/waves-dex/data/*"
-                    sh 'ssh -q buildagent-matcher@${MATCHER} sudo sed -i "5s/.*/      topic = "${cat /proc/sys/kernel/random/uuid}"/" /etc/waves-dex/queue.conf'
+                    sh 'ssh -q buildagent-matcher@${MATCHER} sudo sed -i \\"5s/.*/ topic = $(cat /proc/sys/kernel/random/uuid) /\\"  /etc/waves-dex/queue.conf'
                     sh "ssh -q buildagent-matcher@${MATCHER} sudo systemctl start waves-dex"
                 }
             }

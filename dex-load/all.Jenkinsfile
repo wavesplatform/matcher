@@ -11,6 +11,7 @@ pipeline {
                 build job: 'Waves.Exchange/Matcher/Deploy Devnet', propagate: false, wait: false, parameters: [
                   [$class: 'GitParameterValue', name: 'BRANCH_DEX', value: "${VERSION}"]
                 ]
+                sleep time: 10, unit: 'SECONDS'
             }
         }
         stage ('Trigger job: SC1') {
@@ -19,6 +20,7 @@ pipeline {
                   [$class: 'GitParameterValue', name: 'BRANCH', value: "${BRANCH}"],
                   [$class: 'StringParameterValue', name: 'LABEL', value: "${VERSION}-${LABEL}"]
                 ]
+                sleep time: 10, unit: 'SECONDS'
             }
         }
         stage ('Trigger job: Clean Devnet 1') {
@@ -32,11 +34,13 @@ pipeline {
                   [$class: 'GitParameterValue', name: 'BRANCH', value: "${BRANCH}"],
                   [$class: 'StringParameterValue', name: 'LABEL', value: "${VERSION}-${LABEL}"]
                 ]
+                sleep time: 10, unit: 'SECONDS'
             }
         }
         stage ('Trigger job: Clean Devnet 2') {
             steps {
                 build job: 'Waves.Exchange/Matcher/Clean Devnet', propagate: false, wait: false, parameters: [ ]
+                sleep time: 10, unit: 'SECONDS'
             }
         }
         stage ('Trigger job: SC3') {
@@ -45,6 +49,7 @@ pipeline {
                   [$class: 'GitParameterValue', name: 'BRANCH', value: "${BRANCH}"],
                   [$class: 'StringParameterValue', name: 'LABEL', value: "${VERSION}-${LABEL}"]
                 ]
+                sleep time: 10, unit: 'SECONDS'
             }
         }
         stage ('Trigger job: Clean Devnet 3') {
@@ -58,6 +63,7 @@ pipeline {
                   [$class: 'GitParameterValue', name: 'BRANCH', value: "${BRANCH}"],
                   [$class: 'StringParameterValue', name: 'LABEL', value: "${VERSION}-${LABEL}"]
                 ]
+                sleep time: 10, unit: 'SECONDS'
             }
         }
     }

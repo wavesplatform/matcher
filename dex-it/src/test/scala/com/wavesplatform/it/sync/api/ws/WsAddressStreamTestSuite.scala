@@ -446,7 +446,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
     }
 
     wsc.receiveAtLeastN[WsAddressChanges](1) // snapshot
-    wsc.receiveNoMessages(3.5.seconds)
+    wsc.receiveNoMessagesOf[WsAddressChanges](3.5.seconds)
 
     wsc.close()
   }
@@ -617,6 +617,38 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
       // without tradable balance request
       val eve = mkAccountWithBalance(initialBalance)
       getBalanceSnapshot(eve) should matchTo(expectedBalanceSnapshot)
+    }
+
+    "DEX-1082 Balances not updated" in {
+      val acc = mkAccountWithBalance(10.waves -> Waves)
+      val wsc = mkWsAddressConnection(acc, dex1)
+
+      eventually(wsc.balanceChanges should have size 1)
+
+      broadcastAndAwait(mkTransfer(alice, acc.toAddress, 2.usd, usd, feeAmount = 1.waves))
+      wsc.balanceChanges.last should matchTo(Map[Asset, WsBalances](
+        usd -> WsBalances(2.0, 0.0)
+      ))
+      wsc.close()
+      Thread.sleep(1000)
+
+      broadcastAndAwait(mkTransfer(acc, alice, 2.usd, usd, feeAmount = 1.waves))
+      Thread.sleep(1000)
+
+      val wsc2 = mkWsAddressConnection(acc, dex1)
+      eventually {
+        wsc2.balanceChanges should matchTo(List(Map[Asset, WsBalances](
+          Waves -> WsBalances(9.0, 0.0)
+        )))
+      }
+
+      wsc2.clearMessages()
+      broadcastAndAwait(mkTransfer(alice, acc.toAddress, 2.usd, usd, feeAmount = 1.waves))
+      eventually {
+        wsc2.balanceChanges.squashed should matchTo(Map[Asset, WsBalances](
+          usd -> WsBalances(2.0, 0.0)
+        ))
+      }
     }
   }
 }

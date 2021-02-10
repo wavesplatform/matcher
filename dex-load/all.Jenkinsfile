@@ -21,7 +21,7 @@ pipeline {
                 ]
             }
         }
-        stage ('Trigger job: Clean Devnet') {
+        stage ('Trigger job: Clean Devnet 1') {
             steps {
                 build job: 'Waves.Exchange/Matcher/Clean Devnet', propagate: false, wait: false, parameters: [ ]
             }
@@ -34,7 +34,7 @@ pipeline {
                 ]
             }
         }
-        stage ('Trigger job: Clean Devnet') {
+        stage ('Trigger job: Clean Devnet 2') {
             steps {
                 build job: 'Waves.Exchange/Matcher/Clean Devnet', propagate: false, wait: false, parameters: [ ]
             }
@@ -47,7 +47,7 @@ pipeline {
                 ]
             }
         }
-        stage ('Trigger job: Clean Devnet') {
+        stage ('Trigger job: Clean Devnet 3') {
             steps {
                 build job: 'Waves.Exchange/Matcher/Clean Devnet', propagate: false, wait: false, parameters: [ ]
             }

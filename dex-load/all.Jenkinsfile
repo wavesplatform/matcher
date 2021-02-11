@@ -26,6 +26,7 @@ pipeline {
         stage ('Trigger job: Clean Devnet 1') {
             steps {
                 build job: 'Waves.Exchange/Matcher/Clean Devnet', propagate: false, wait: false, parameters: [ ]
+                sleep time: 10, unit: 'SECONDS'
             }
         }
         stage ('Trigger job: SC2') {
@@ -55,6 +56,7 @@ pipeline {
         stage ('Trigger job: Clean Devnet 3') {
             steps {
                 build job: 'Waves.Exchange/Matcher/Clean Devnet', propagate: false, wait: false, parameters: [ ]
+                sleep time: 10, unit: 'SECONDS'
             }
         }
         stage ('Trigger job: SC4') {
@@ -70,10 +72,10 @@ pipeline {
     post {
         always {
             script {
-                SC1 = Jenkins.instance.getItemByFullName('Waves.Exchange/Matcher/Performance Test/SC1').getLastBuild().getNumber() + 1
-                SC2 = Jenkins.instance.getItemByFullName('Waves.Exchange/Matcher/Performance Test/SC2').getLastBuild().getNumber() + 1
-                SC3 = Jenkins.instance.getItemByFullName('Waves.Exchange/Matcher/Performance Test/SC3').getLastBuild().getNumber() + 1
-                SC4 = Jenkins.instance.getItemByFullName('Waves.Exchange/Matcher/Performance Test/SC4').getLastBuild().getNumber() + 1
+                SC1 = Jenkins.instance.getItemByFullName('Waves.Exchange/Matcher/Performance Test/SC1').getLastBuild().getNumber()
+                SC2 = Jenkins.instance.getItemByFullName('Waves.Exchange/Matcher/Performance Test/SC2').getLastBuild().getNumber()
+                SC3 = Jenkins.instance.getItemByFullName('Waves.Exchange/Matcher/Performance Test/SC3').getLastBuild().getNumber()
+                SC4 = Jenkins.instance.getItemByFullName('Waves.Exchange/Matcher/Performance Test/SC4').getLastBuild().getNumber()
 
                 sc1Build = "<a href='/job/Waves.Exchange/job/Matcher/job/Performance Test/job/SC1/${SC1}'>SC1</a>"
                 sc2Build = "<a href='/job/Waves.Exchange/job/Matcher/job/Performance Test/job/SC2/${SC2}'>SC2</a>"

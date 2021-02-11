@@ -12,6 +12,7 @@ pipeline {
         string(name: 'RC', defaultValue: '216060', description: 'Count of requests')
         string(name: 'RT', defaultValue: '6', description: 'Generation type')
         string(name: 'AS', defaultValue: 'D', description: 'Chain ID')
+        string(name: 'LABEL', defaultValue: '', description: 'Label')
     }
     environment {
         SBT_HOME = tool name: 'sbt-1.2.6', type: 'org.jvnet.hudson.plugins.SbtPluginBuilder$SbtInstallation'
@@ -49,7 +50,7 @@ pipeline {
                      sh "scp ./dex-load/requests-*.txt buildagent-matcher@${LOADGEN}:/home/buildagent-matcher"
                      sh "scp ./dex-load/pairs.txt buildagent-matcher@${LOADGEN}:/home/buildagent-matcher"
                      sh "scp ./dex-load/src/main/resources/runLoadTest.sh buildagent-matcher@${LOADGEN}:/home/buildagent-matcher"
-                     sh "ssh -q buildagent-matcher@${LOADGEN} sudo sh runLoadTest.sh"
+                     sh "ssh -q buildagent-matcher@${LOADGEN} sudo sh runLoadTest.sh SC1_${params.LABEL}"
                 }
             }
         }
@@ -59,9 +60,12 @@ pipeline {
             sshagent (credentials: ['buildagent-matcher']) {
                 script {
                     OVERLOAD = sh(script:"ssh -q buildagent-matcher@${LOADGEN} ls /home/yatank/loadtest/logs/lunapark", returnStdout: true)
-                    GRAFANA = sh( script: '''
-                                            echo "https://${GRAFANA_URL}/d/WsyjIiHiz/system-metrics?orgId=5&var-hostname=${MATCHER_URL}&from=$(date -d '- 20 minutes' +'%s')000&to=$(date -d '+ 5 minutes' +'%s')000"
+                    GRAFANA = sh(script: '''
+                                            echo "https://${GRAFANA_URL}/d/WsyjIiHiz/system-metrics?orgId=5&var-hostname=${MATCHER_URL}&from=$(date -d '- 10 minutes' +'%s')000&to=$(date -d '+ 5 minutes' +'%s')000"
                                           ''', returnStdout: true)
+                    if(params.LABEL != '') {
+                        currentBuild.displayName = "${params.LABEL}"
+                    }
                     currentBuild.description = "<a href='https://overload.yandex.net/${OVERLOAD}'>Yandex</a> <br/> <a href='${GRAFANA}'>Grafana</a>"
                 }
             }

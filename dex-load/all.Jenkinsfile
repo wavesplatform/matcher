@@ -46,7 +46,9 @@ pipeline {
         }
         stage ('Trigger job: Clean Devnet 3') {
             steps {
-                build job: 'Waves.Exchange/Matcher/Clean Devnet', propagate: false, wait: false, parameters: [ ]
+                build job: 'Waves.Exchange/Matcher/Clean Devnet', propagate: false, wait: false, parameters: [
+                  [$class: 'GitParameterValue', name: 'BRANCH', value: "${BRANCH}"]
+                ]
                 sleep time: 10, unit: 'SECONDS'
             }
         }

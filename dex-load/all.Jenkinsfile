@@ -14,6 +14,12 @@ pipeline {
                 sleep time: 10, unit: 'SECONDS'
             }
         }
+        stage ('Trigger job: Clean Devnet 1') {
+            steps {
+                build job: 'Waves.Exchange/Matcher/Clean Devnet', propagate: false, wait: false, parameters: [ ]
+                sleep time: 10, unit: 'SECONDS'
+            }
+        }
         stage ('Trigger job: SC1') {
             steps {
                 build job: 'Waves.Exchange/Matcher/Performance Test/SC1', propagate: false, wait: false, parameters: [
@@ -23,7 +29,7 @@ pipeline {
                 sleep time: 10, unit: 'SECONDS'
             }
         }
-        stage ('Trigger job: Clean Devnet 1') {
+        stage ('Trigger job: Clean Devnet 2') {
             steps {
                 build job: 'Waves.Exchange/Matcher/Clean Devnet', propagate: false, wait: false, parameters: [ ]
                 sleep time: 10, unit: 'SECONDS'
@@ -38,7 +44,7 @@ pipeline {
                 sleep time: 10, unit: 'SECONDS'
             }
         }
-        stage ('Trigger job: Clean Devnet 2') {
+        stage ('Trigger job: Clean Devnet 3') {
             steps {
                 build job: 'Waves.Exchange/Matcher/Clean Devnet', propagate: false, wait: false, parameters: [ ]
                 sleep time: 10, unit: 'SECONDS'
@@ -53,7 +59,7 @@ pipeline {
                 sleep time: 10, unit: 'SECONDS'
             }
         }
-        stage ('Trigger job: Clean Devnet 3') {
+        stage ('Trigger job: Clean Devnet 4') {
             steps {
                 build job: 'Waves.Exchange/Matcher/Clean Devnet', propagate: false, wait: false, parameters: [ ]
                 sleep time: 10, unit: 'SECONDS'

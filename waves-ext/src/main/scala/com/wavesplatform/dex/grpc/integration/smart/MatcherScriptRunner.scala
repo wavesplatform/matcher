@@ -46,14 +46,14 @@ object MatcherScriptRunner {
     override def hasAccountScript(address: Address) = kill("hasAccountScript")
 
     override def settings: BlockchainSettings = kill("settings")
-    override def height: Int = kill("height")
+    override def height: Int = 0 // kill("height")
     override def score: BigInt = kill("score")
     override def carryFee: Long = kill("carryFee")
     override def heightOf(blockId: ByteStr): Option[Int] = kill("heightOf")
 
     /** Features related */
     override def approvedFeatures: Map[Short, Int] = kill("approvedFeatures")
-    override def activatedFeatures: Map[Short, Int] = kill("activatedFeatures")
+    override def activatedFeatures: Map[Short, Int] = Map.empty // kill("activatedFeatures")
     override def featureVotes(height: Int): Map[Short, Int] = kill("featureVotes")
     override def containsTransaction(tx: Transaction): Boolean = kill("containsTransaction")
     override def assetDescription(id: Asset.IssuedAsset): Option[AssetDescription] = kill("assetDescription")

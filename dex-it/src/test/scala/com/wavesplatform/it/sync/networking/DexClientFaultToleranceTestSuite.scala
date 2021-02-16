@@ -24,8 +24,8 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProx
       s"""waves.dex {
          |  price-assets = [ "$UsdId", "WAVES" ]
          |  waves-blockchain-client { 
-         |    grpc.target = "$toxiProxyHostName:${getInnerToxiProxyPort(wavesNodeProxy)}"
-         |    blockchain-updates-grpc.target = "$toxiProxyHostName:${getInnerToxiProxyPort(blockchainUpdatesExtensionProxy)}"
+         |    grpc.target = "dns:///$toxiProxyHostName:${getInnerToxiProxyPort(wavesNodeProxy)}"
+         |    blockchain-updates-grpc.target = "dns:///$toxiProxyHostName:${getInnerToxiProxyPort(blockchainUpdatesExtensionProxy)}"
          |  }
          |}""".stripMargin
     )

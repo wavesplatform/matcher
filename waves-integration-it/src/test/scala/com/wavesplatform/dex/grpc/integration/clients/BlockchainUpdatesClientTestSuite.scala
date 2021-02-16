@@ -16,7 +16,6 @@ import com.wavesplatform.dex.it.docker.WavesNodeContainer
 import com.wavesplatform.dex.it.test.NoStackTraceCancelAfterFailure
 import im.mak.waves.transactions.Transaction
 import io.grpc.ManagedChannel
-import io.grpc.internal.DnsNameResolverProvider
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.nio.NioSocketChannel
 import monix.eval.Task
@@ -62,7 +61,6 @@ class BlockchainUpdatesClientTestSuite extends IntegrationSuiteBase with HasToxi
       idleTimeout = 1.day,
       channelOptions = GrpcClientSettings.ChannelOptionsSettings(connectTimeout = 5.seconds)
     ).toNettyChannelBuilder
-      .nameResolverFactory(new DnsNameResolverProvider)
       .executor((command: Runnable) => grpcExecutor.execute(command))
       .eventLoopGroup(eventLoopGroup)
       .channelType(classOf[NioSocketChannel])

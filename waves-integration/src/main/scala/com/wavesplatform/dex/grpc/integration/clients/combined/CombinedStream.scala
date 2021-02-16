@@ -82,8 +82,8 @@ class CombinedStream(
         mergedEvents.onNext(x)
         Ack.Continue
       },
-      e => log.error(s"utxEvents failed", e), // Won't happen
-      () => log.info(s"utxEvents completed") // We do this manually in finish()
+      e => log.error("utxEvents system stream failed", e), // Won't happen
+      () => log.info("utxEvents system stream completed") // We do this manually in finish()
     )
 
   blockchainUpdates.systemStream
@@ -93,8 +93,8 @@ class CombinedStream(
         mergedEvents.onNext(x)
         Ack.Continue
       },
-      e => log.error(s"bu failed", e), // Won't happen
-      () => log.info(s"bu completed") // We do this manually in finish()
+      e => log.error("bu system stream failed", e), // Won't happen
+      () => log.info("bu system stream completed") // We do this manually in finish()
     )
 
   // TODO DEX-1034

@@ -26,6 +26,7 @@
     <logger name="org.asynchttpclient" level="INFO"/>
     <logger name="io.netty" level="INFO"/>
     <logger name="io.grpc.netty" level="WARN"/>
+    <logger name="io.grpc.Context" level="INFO"/>
     <logger name="io.swagger" level="OFF"/>
     <logger name="com.github.dockerjava" level="WARN"/>
     <logger name="org.testcontainers" level="WARN"/>

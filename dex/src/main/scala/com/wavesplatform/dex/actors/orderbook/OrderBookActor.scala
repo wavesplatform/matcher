@@ -204,7 +204,7 @@ class OrderBookActor(
         aggregatedRef ! AggregatedOrderBookActor.Command.ApplyChanges(levelChanges, None, None, cancelEvent.timestamp)
         processEvents(cancelEvent.timestamp, List(cancelEvent))
       case _ =>
-        log.warn(s"Error applying $command: order not found")
+        log.warn(s"Can't apply $command: order not found")
         eventsCoordinatorRef ! OrderEventsCoordinatorActor.Command.ProcessError(
           OrderCancelFailed(cancelCommand.orderId, error.OrderNotFound(cancelCommand.orderId))
         )

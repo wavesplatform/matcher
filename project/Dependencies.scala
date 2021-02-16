@@ -131,8 +131,7 @@ object Dependencies {
   private val toxiProxy = "org.testcontainers" % "toxiproxy" % Version.testContainersToxiProxy
   private val googleGuava = "com.google.guava" % "guava" % Version.googleGuava
   private val kafka = "org.apache.kafka" % "kafka-clients" % Version.kafka
-  private val grpcNetty = "io.grpc" % "grpc-netty" % scalapb.compiler.Version.grpcJavaVersion
-  private val nettyCodec = "io.netty" % "netty-codec-http2" % Version.nettyCodec
+  private val grpcNetty = "io.grpc" % "grpc-netty" % "1.35.0" // scalapb.compiler.Version.grpcJavaVersion // "1.31.1" on NODE 1.2.17
   private val swagger = "com.github.swagger-akka-http" %% "swagger-akka-http" % Version.swagger
   private val swaggerUi = "org.webjars" % "swagger-ui" % Version.swaggerUi
   private val playJson = "com.typesafe.play" %% "play-json" % Version.playJson
@@ -224,8 +223,7 @@ object Dependencies {
       scalaTest % Test,
       googleGuava,
       slf4j,
-      grpcNetty,
-      nettyCodec
+      grpcNetty
     ) ++ pureConfig ++ enumeratum ++ levelDBJNA
   )
 

@@ -435,7 +435,7 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
       broadcastAndAwait(leasing)
 
       cancellable.cancel()
-      val r = Await.result(eventsF, 5.seconds).foldMap(_.balanceUpdates)
+      val r = Await.result(eventsF, 1.minute).foldMap(_.balanceUpdates)
 
       def filtered(in: AddressBalanceUpdates): AddressBalanceUpdates = in.copy(
         regular = in.regular.view.filterKeys(_ == Waves).toMap,

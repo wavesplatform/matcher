@@ -139,7 +139,7 @@ class BlockchainUpdatesClientTestSuite extends IntegrationSuiteBase with HasToxi
       Thread.sleep(5.seconds.toMillis)
 
       cancellable.cancel()
-      val events = Await.result(eventsF, 5.seconds).map { evt =>
+      val events = Await.result(eventsF, 1.minute).map { evt =>
         val event = BlockchainUpdatesConversions.toEvent(evt.getUpdate)
         log.debug(s"Got $event")
         event.flatMap {

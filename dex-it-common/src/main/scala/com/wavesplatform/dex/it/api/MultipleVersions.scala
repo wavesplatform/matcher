@@ -18,8 +18,8 @@ trait MultipleVersions extends HasDex with HasWavesNode { self: BaseContainersKi
   protected def dex2SuiteConfig: Config = dexInitialSuiteConfig.withFallback {
     ConfigFactory.parseString(
       s"""waves.dex.waves-blockchain-client {
-         |  grpc.target = "${wavesNode2.networkAddress.getHostName}:6887"
-         |  blockchain-updates-grpc.target = "${wavesNode2.networkAddress.getHostName}:6881"
+         |  grpc.target = "dns:///${wavesNode2.networkAddress.getHostName}:6887"
+         |  blockchain-updates-grpc.target = "dns:///${wavesNode2.networkAddress.getHostName}:6881"
          |}""".stripMargin
     )
   }

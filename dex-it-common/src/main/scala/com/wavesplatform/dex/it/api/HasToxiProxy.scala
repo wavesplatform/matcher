@@ -9,7 +9,7 @@ trait HasToxiProxy { self: BaseContainersKit =>
 
   protected val toxiProxyHostName = s"$networkName-toxiproxy"
 
-  private val container: ToxiproxyContainer = new ToxiproxyContainer("shopify/toxiproxy:2.1.0")
+  protected val toxiContainer: ToxiproxyContainer = new ToxiproxyContainer("shopify/toxiproxy:2.1.0")
     .withNetwork(network)
     .withNetworkAliases(toxiProxyHostName)
     .withExposedPorts(8666, 8667) // Two ports for two extensions: blockchain updates and ours
@@ -19,12 +19,12 @@ trait HasToxiProxy { self: BaseContainersKit =>
     }
 
   protected def getInnerToxiProxyPort(proxy: ContainerProxy): Int =
-    container.getContainerInfo.getNetworkSettings.getPorts.getBindings.asScala
+    toxiContainer.getContainerInfo.getNetworkSettings.getPorts.getBindings.asScala
       .find { case (_, bindings) => bindings.head.getHostPortSpec == proxy.getProxyPort.toString }
       .map(_._1.getPort)
       .getOrElse(throw new IllegalStateException(s"There is no inner port for proxied one: ${proxy.getProxyPort}"))
 
-  protected def mkToxiProxy(hostname: String, port: Int): ToxiproxyContainer.ContainerProxy = container.getProxy(hostname, port)
+  protected def mkToxiProxy(hostname: String, port: Int): ToxiproxyContainer.ContainerProxy = toxiContainer.getProxy(hostname, port)
 
-  container.start()
+  toxiContainer.start()
 }

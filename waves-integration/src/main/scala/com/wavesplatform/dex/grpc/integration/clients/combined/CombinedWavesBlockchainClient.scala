@@ -28,7 +28,6 @@ import com.wavesplatform.dex.grpc.integration.services.UtxTransaction
 import com.wavesplatform.dex.grpc.integration.settings.WavesBlockchainClientSettings
 import com.wavesplatform.protobuf.transaction.SignedTransaction
 import io.grpc.ManagedChannel
-import io.grpc.internal.DnsNameResolverProvider
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.nio.NioSocketChannel
 import monix.eval.Task
@@ -256,7 +255,6 @@ object CombinedWavesBlockchainClient extends ScorexLogging {
     log.info(s"Building Matcher Extension gRPC client for server: ${wavesBlockchainClientSettings.grpc.target}")
     val matcherExtensionChannel: ManagedChannel =
       wavesBlockchainClientSettings.grpc.toNettyChannelBuilder
-        .nameResolverFactory(new DnsNameResolverProvider)
         .executor((command: Runnable) => grpcExecutionContext.execute(command))
         .eventLoopGroup(eventLoopGroup)
         .channelType(classOf[NioSocketChannel])
@@ -266,7 +264,6 @@ object CombinedWavesBlockchainClient extends ScorexLogging {
     log.info(s"Building Blockchain Updates Extension gRPC client for server: ${wavesBlockchainClientSettings.blockchainUpdatesGrpc.target}")
     val blockchainUpdatesChannel: ManagedChannel =
       wavesBlockchainClientSettings.blockchainUpdatesGrpc.toNettyChannelBuilder
-        .nameResolverFactory(new DnsNameResolverProvider)
         .executor((command: Runnable) => grpcExecutionContext.execute(command))
         .eventLoopGroup(eventLoopGroup)
         .channelType(classOf[NioSocketChannel])

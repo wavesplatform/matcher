@@ -77,7 +77,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
 
         fork.withBlock(invalidBlock) should matchTo(Status.Failed(
           updatedFork = expectedUpdatedFork,
-          reason = "The new block BlockRef(h=2, ZvGf) (reference=3j) must be after BlockRef(h=1, 8TZ)"
+          reason = "The new block Ref(h=2, ZvGf) (reference=3j) must be after Ref(h=1, 8TZ)"
         ): Status)
       }
 

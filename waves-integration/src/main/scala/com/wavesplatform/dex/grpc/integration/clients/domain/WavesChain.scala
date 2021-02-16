@@ -16,8 +16,11 @@ import scala.annotation.tailrec
  * @param blocksCapacity How many full blocks we can append
  */
 case class WavesChain(history: Vector[WavesBlock], height: Int, blocksCapacity: Int) {
-  require(history.headOption.map(_.ref.height).forall(_ == height), "height corresponds last block")
-  require(blocksCapacity >= 0, "blocksCapacity >= 0")
+  {
+    val historyHeight = history.headOption.map(_.ref.height)
+    require(historyHeight.forall(_ == height), s"height=$height should correspond the height of the last block=$historyHeight")
+    require(blocksCapacity >= 0, "blocksCapacity >= 0")
+  }
 
   // We prepend block, because it is easier to use dropWhile
 

@@ -24,8 +24,8 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProx
       s"""waves.dex {
          |  price-assets = [ "$UsdId", "WAVES" ]
          |  waves-blockchain-client { 
-         |    grpc.target = "$toxiProxyHostName:${getInnerToxiProxyPort(wavesNodeProxy)}"
-         |    blockchain-updates-grpc.target = "$toxiProxyHostName:${getInnerToxiProxyPort(blockchainUpdatesExtensionProxy)}"
+         |    grpc.target = "dns:///$toxiProxyHostName:${getInnerToxiProxyPort(wavesNodeProxy)}"
+         |    blockchain-updates-grpc.target = "dns:///$toxiProxyHostName:${getInnerToxiProxyPort(blockchainUpdatesExtensionProxy)}"
          |  }
          |}""".stripMargin
     )
@@ -45,17 +45,17 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProx
     lazy val alice2BobTransferTx = mkTransfer(alice, bob, amount = wavesNode1.api.balance(alice, usd), asset = usd)
     lazy val bob2AliceTransferTx = mkTransfer(bob, alice, amount = wavesNode1.api.balance(bob, usd), asset = usd)
 
-    markup("Alice places order that requires some amount of USD, DEX receives balances stream from the node 1")
+    step("Alice places order that requires some amount of USD, DEX receives balances stream from the node 1")
     dex1.api.place(aliceBuyOrder)
     dex1.api.waitForOrderStatus(aliceBuyOrder, Status.Accepted)
 
-    markup(s"Disconnect DEX from the network and perform USD transfer from Alice to Bob")
+    step(s"Disconnect DEX from the network and perform USD transfer from Alice to Bob")
     wavesNodeProxy.setConnectionCut(true)
 
     broadcastAndAwait(alice2BobTransferTx)
     usdBalancesShouldBe(wavesNode1.api, 0, defaultAssetQuantity)
 
-    markup("Connect DEX back to the network, DEX should know about transfer and cancel Alice's order")
+    step("Connect DEX back to the network, DEX should know about transfer and cancel Alice's order")
     wavesNodeProxy.setConnectionCut(false)
 
     dex1.api.waitForOrderStatus(aliceBuyOrder, Status.Cancelled)
@@ -76,11 +76,11 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProx
     lazy val alice2BobTransferTx = mkTransfer(alice, bob, amount = wavesNode2.api.balance(alice, usd), asset = usd)
     lazy val bob2AliceTransferTx = mkTransfer(bob, alice, amount = wavesNode1.api.balance(bob, usd), asset = usd)
 
-    markup("Alice places order that requires some amount of USD, DEX receives balances stream from the node 1")
+    step("Alice places order that requires some amount of USD, DEX receives balances stream from the node 1")
     dex1.api.place(aliceBuyOrder)
     dex1.api.waitForOrderStatus(aliceBuyOrder, Status.Accepted)
 
-    markup("Up node 2")
+    step("Up node 2")
     wavesNode2.start()
     wavesNode2.api.connect(wavesNode1.networkAddress)
     wavesNode2.api.waitForConnectedPeer(wavesNode1.networkAddress)
@@ -88,33 +88,33 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProx
     wavesNode2.api.waitForHeight(wavesNode1.api.currentHeight)
     wavesNode2.api.waitForTransaction(IssueUsdTx)
 
-    markup(s"Stop node 1 and perform USD transfer from Alice to Bob")
+    step(s"Stop node 1 and perform USD transfer from Alice to Bob")
     wavesNode1.stopWithoutRemove()
 
     broadcastAndAwait(wavesNode2.api, alice2BobTransferTx)
     usdBalancesShouldBe(wavesNode2.api, expectedAliceBalance = 0, expectedBobBalance = defaultAssetQuantity)
 
-    markup("Now DEX receives balances stream from the node 2 and cancels Alice's order")
+    step("Now DEX receives balances stream from the node 2 and cancels Alice's order")
     dex1.api.waitForOrderStatus(aliceBuyOrder, Status.Cancelled)
 
-    markup("Bob places order that requires some amount of USD, DEX receives balances stream from the node 2")
+    step("Bob places order that requires some amount of USD, DEX receives balances stream from the node 2")
     dex1.api.place(bobBuyOrder)
     dex1.api.waitForOrderStatus(bobBuyOrder, Status.Accepted)
 
-    markup("Up node 1")
+    step("Up node 1")
     wavesNode1.start()
 
     wavesNode2.api.connect(wavesNode1.networkAddress)
     wavesNode2.api.waitForConnectedPeer(wavesNode1.networkAddress)
     wavesNode1.api.waitForTransaction(alice2BobTransferTx)
 
-    markup(s"Stop node 2 and perform USD transfer from Bob to Alice")
+    step(s"Stop node 2 and perform USD transfer from Bob to Alice")
     wavesNode2.stopWithoutRemove()
 
     broadcastAndAwait(wavesNode1.api, bob2AliceTransferTx)
     usdBalancesShouldBe(wavesNode1.api, defaultAssetQuantity, 0)
 
-    markup("Now DEX receives balances stream from the node 1 and cancels Bob's order")
+    step("Now DEX receives balances stream from the node 1 and cancels Bob's order")
     dex1.api.waitForOrderStatus(bobBuyOrder, Status.Cancelled)
   }
 

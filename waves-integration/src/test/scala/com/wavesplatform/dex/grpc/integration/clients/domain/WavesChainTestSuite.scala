@@ -168,8 +168,8 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
           val history2 = detachedHistory2.appendedAll(commonBlocks)
           (
             commonBlocks,
-            WavesChain(history1, 100),
-            WavesChain(history2, 100)
+            WavesChain(history1, history1.headOption.fold(0)(_.ref.height), 100),
+            WavesChain(history2, history2.headOption.fold(0)(_.ref.height), 100)
           )
         }
 
@@ -185,8 +185,8 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
           val (history1, history2) = if (lessBlockChain == 1) (partialHistory, fullHistory) else (fullHistory, partialHistory)
           (
             partialHistory,
-            WavesChain(history1, 100),
-            WavesChain(history2, 100)
+            WavesChain(history1, history1.headOption.fold(0)(_.ref.height), 100),
+            WavesChain(history2, history2.headOption.fold(0)(_.ref.height), 100)
           )
         }
 
@@ -211,7 +211,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
               )
             }
           }
-        } yield (WavesChain(history1, 100), WavesChain(history2, 100))
+        } yield (mkChain(history1, 100), mkChain(history2, 100))
 
         "dropped all" in forAll(testGen) { case (chain1, chain2) =>
           val (dropped1, dropped2) = WavesChain.dropDifference(chain1, chain2)
@@ -226,10 +226,16 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
         val testGen: Gen[(WavesChain, WavesBlock)] =
           Gen.oneOf(
             historyGen(0 to 2, 0 to 2, 0 to 2).map { history =>
-              (WavesChain(history, 100), mkNextFullBlock(if (history.isEmpty) defaultInitBlock else history.head))
+              (
+                WavesChain(history, history.headOption.fold(0)(_.ref.height), 100),
+                mkNextFullBlock(if (history.isEmpty) defaultInitBlock else history.head)
+              )
             },
             historyGen(1 to 2, 0 to 2, 0 to 2).map { history =>
-              (WavesChain(history, 100), mkNextMicroBlock(history.head))
+              (
+                WavesChain(history, history.headOption.fold(0)(_.ref.height), 100),
+                mkNextMicroBlock(history.head)
+              )
             }
           )
 
@@ -257,7 +263,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
         "the length preserved if we append a block and the capacity exhausted" in {
           val testGen = for {
             history <- historyGen(1 to 2, 0 to 0, 0 to 2)
-          } yield (WavesChain(history, 0), mkNextFullBlock(history.head))
+          } yield (mkChain(history, 0), mkNextFullBlock(history.head))
 
           forAll(testGen) { case (chain, newBlock) =>
             chain.withBlock(newBlock) match {
@@ -270,7 +276,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
         "the length increased if we append a micro block even the capacity exhausted" in {
           val testGen = for {
             history <- historyGen(1 to 2, 0 to 2, 0 to 2)
-          } yield (WavesChain(history, 0), mkNextMicroBlock(history.head))
+          } yield (mkChain(history, 0), mkNextMicroBlock(history.head))
 
           forAll(testGen) { case (chain, newBlock) =>
             chain.withBlock(newBlock) match {
@@ -282,14 +288,14 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
       }
 
       "empty +" - {
-        val init = WavesChain(emptyChain, 100)
+        val init = WavesChain(emptyChain, 0, 100)
 
         "block" - {
-          "valid" in { init.withBlock(block1) should matchTo(WavesChain(Vector(block1), 99).asRight[String]) }
+          "valid" in { init.withBlock(block1) should matchTo(mkChain(Vector(block1), 99).asRight[String]) }
 
           "invalid" in {
-            val block1A = block1.copy(ref = block1.ref.copy(height = block1.ref.height + 2))
-            init.withBlock(block1A) should matchTo("The new block Ref(h=3, 8TZ) (reference=) must be on height 1".asLeft[WavesChain])
+            val block1A = block1.copy(ref = block1.ref.copy(height = block1.ref.height + 1))
+            init.withBlock(block1A) should matchTo("The new block Ref(h=2, 8TZ) (reference=) must be on height 1".asLeft[WavesChain])
           }
         }
 
@@ -300,9 +306,9 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
       }
 
       "block +" - {
-        val init = WavesChain(Vector(block1), 99)
+        val init = WavesChain(Vector(block1), block1.ref.height, 99)
         "expected" - {
-          "block" in { init.withBlock(block2) should matchTo(WavesChain(Vector(block2, block1), 98).asRight[String]) }
+          "block" in { init.withBlock(block2) should matchTo(mkChain(Vector(block2, block1), 98).asRight[String]) }
 
           "micro block" in {
             val microBlock = block2.copy(
@@ -310,7 +316,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
               tpe = WavesBlock.Type.MicroBlock
             )
 
-            init.withBlock(microBlock) should matchTo(WavesChain(Vector(microBlock, block1), 99).asRight[String])
+            init.withBlock(microBlock) should matchTo(mkChain(Vector(microBlock, block1), 99).asRight[String])
           }
         }
 
@@ -321,7 +327,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
             "unexpected reference" in test("(?s)^The new block.+must be after.+".r, _.copy(reference = ByteStr.empty))
 
             "unexpected height" - {
-              def heightTest(h: Int): Unit = test("(?s)^The new block.+must be after.+".r, x => x.copy(ref = x.ref.copy(height = h)))
+              def heightTest(h: Int): Unit = test("(?s)^The new block.+must be on height.+".r, x => x.copy(ref = x.ref.copy(height = h)))
               "1" in heightTest(1)
               "3" in heightTest(3)
             }
@@ -360,7 +366,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
           confirmedTxs = mkTransactionWithChangesMap(5)
         )
 
-        val init = WavesChain(Vector(microBlock1, block1), 99)
+        val init = WavesChain(Vector(microBlock1, block1), microBlock1.ref.height, 99)
 
         "expected" - {
           "block referenced to the" - {
@@ -384,7 +390,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
                 confirmedTxs = block1.confirmedTxs ++ microBlock1.confirmedTxs
               )
 
-              init.withBlock(newBlock) should matchTo(WavesChain(Vector(newBlock, hardenedBlock), 98).asRight[String])
+              init.withBlock(newBlock) should matchTo(mkChain(Vector(newBlock, hardenedBlock), 98).asRight[String])
             }
           }
 
@@ -395,7 +401,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
               tpe = WavesBlock.Type.MicroBlock
             )
 
-            init.withBlock(microBlock2) should matchTo(WavesChain(Vector(microBlock2, microBlock1, block1), 99).asRight[String])
+            init.withBlock(microBlock2) should matchTo(mkChain(Vector(microBlock2, microBlock1, block1), 99).asRight[String])
           }
         }
 
@@ -407,7 +413,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
             "unexpected reference" in test("(?s)^The new block.+must be after.+".r, _.copy(reference = ByteStr.empty))
 
             "unexpected height" - {
-              def heightTest(h: Int): Unit = test("(?s)^The new block.+must be after.+".r, x => x.copy(ref = x.ref.copy(height = h)))
+              def heightTest(h: Int): Unit = test("(?s)^The new block.+must be on height.+".r, x => x.copy(ref = x.ref.copy(height = h)))
               "1" in heightTest(1)
               "3" in heightTest(3)
             }
@@ -472,7 +478,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
           confirmedTxs = mkTransactionWithChangesMap(2)
         )
 
-        val init = WavesChain(Vector(microBlock2, microBlock1, block1), 99)
+        val init = mkChain(Vector(microBlock2, microBlock1, block1), 99)
 
         "unexpected" - {
           "block referenced to the previous micro block" in {
@@ -521,7 +527,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
           confirmedTxs = mkTransactionWithChangesMap(5)
         )
 
-        val init = WavesChain(Vector(microBlock, block2, block1), 98)
+        val init = mkChain(Vector(microBlock, block2, block1), 98)
 
         val newBlock = WavesBlock(
           ref = BlockRef(height = 3, id = ByteStr(Array[Byte](98, 1, 0))),
@@ -543,7 +549,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
         history <- historyGen(1 to 3, 0 to 2, 0 to 2)
         refToDrop <- Gen.oneOf(history.map(_.ref))
         capacity <- Gen.choose(0, 2)
-      } yield (WavesChain(history, capacity), refToDrop)
+      } yield (mkChain(history, capacity), refToDrop)
 
       "the block with a specified ref" - {
         "remains" in forAll(testGen) { case (chain, ref) =>
@@ -589,7 +595,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
         val testGen = for {
           history <- historyGen(1 to 3, 0 to 2, 0 to 2)
           capacity <- Gen.choose(0, 2)
-        } yield WavesChain(history, capacity)
+        } yield mkChain(history, capacity)
 
         forAll(testGen) { chain =>
           val (updatedChain, _) = chain.dropAfter(chain.last.get.ref)
@@ -602,7 +608,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
           history <- historyGen(1 to 3, 0 to 2, 0 to 2)
           refToDrop <- Gen.oneOf(history.map(_.ref))
           capacity <- Gen.choose(0, 2)
-        } yield (WavesChain(history, capacity), refToDrop)
+        } yield (mkChain(history, capacity), refToDrop)
 
         forAll(testGen) { case (chain, ref) =>
           val (updatedChain, _) = chain.dropAfter(ref)
@@ -615,7 +621,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
           history <- historyGen(1 to 3, 0 to 2, 0 to 2)
           refToDrop <- Gen.oneOf(history.map(_.ref))
           capacity <- Gen.choose(0, 2)
-        } yield (WavesChain(history, capacity), refToDrop)
+        } yield (mkChain(history, capacity), refToDrop)
 
         forAll(testGen) { case (chain, ref) =>
           val (updatedChain, dropped) = chain.dropAfter(ref)
@@ -629,7 +635,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
         history <- historyGen(1 to 3, 0 to 2, 0 to 2)
         refToDrop <- Gen.oneOf(history.map(_.ref))
         capacity <- Gen.choose(0, 2)
-      } yield (WavesChain(history, capacity), refToDrop.height)
+      } yield (mkChain(history, capacity), refToDrop.height)
 
       "the block with a specified height or less" - {
         "remains" in forAll(testGen) { case (chain, height) =>
@@ -684,7 +690,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
         val testGen = for {
           history <- historyGen(1 to 3, 0 to 2, 0 to 2)
           capacity <- Gen.choose(0, 2)
-        } yield WavesChain(history, capacity)
+        } yield mkChain(history, capacity)
 
         forAll(testGen) { chain =>
           val (updatedChain, _) = chain.dropAfter(chain.last.get.ref.height)
@@ -697,7 +703,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
           history <- historyGen(1 to 3, 0 to 2, 0 to 2)
           refToDrop <- Gen.oneOf(history.map(_.ref))
           capacity <- Gen.choose(0, 2)
-        } yield (WavesChain(history, capacity), refToDrop.height)
+        } yield (mkChain(history, capacity), refToDrop.height)
 
         forAll(testGen) { case (chain, height) =>
           val (updatedChain, _) = chain.dropAfter(height)
@@ -710,7 +716,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
           history <- historyGen(1 to 3, 0 to 2, 0 to 2)
           refToDrop <- Gen.oneOf(history.map(_.ref))
           capacity <- Gen.choose(0, 2)
-        } yield (WavesChain(history, capacity), refToDrop.height)
+        } yield (mkChain(history, capacity), refToDrop.height)
 
         forAll(testGen) { case (chain, height) =>
           val (updatedChain, dropped) = chain.dropAfter(height)
@@ -723,7 +729,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
       def testGen(maxMicroBlocks: Range = 0 to 2): Gen[WavesChain] = for {
         history <- historyGen(1 to 2, maxMicroBlocks, 0 to 2)
         capacity <- Gen.choose(0, 2)
-      } yield WavesChain(history, capacity)
+      } yield mkChain(history, capacity)
 
       "the last block disappears" in forAll(testGen()) { chain =>
         val updatedChain = chain.withoutLastLiquidOrFull
@@ -745,7 +751,7 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
       def testGen(maxMicroBlocks: Range = 0 to 2): Gen[WavesChain] = for {
         history <- historyGen(1 to 2, maxMicroBlocks, 0 to 2)
         capacity <- Gen.choose(0, 2)
-      } yield WavesChain(history, capacity)
+      } yield mkChain(history, capacity)
 
       "the last block disappears" in forAll(testGen()) { chain =>
         val (updatedChain, _) = chain.withoutLast

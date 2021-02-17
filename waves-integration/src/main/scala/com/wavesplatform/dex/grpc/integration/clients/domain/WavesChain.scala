@@ -38,21 +38,22 @@ case class WavesChain(history: Vector[WavesBlock], height: Int, blocksCapacity: 
    * It is expected, that block references the last block in the history
    * @return Guarantees WavesFork is not empty
    */
-  private def withFullBlock(block: WavesBlock): Either[String, WavesChain] = history.headOption match {
-    case None =>
-      if (block.ref.height == height + 1) WavesChain(history.prepended(block), block.ref.height, blocksCapacity = blocksCapacity - 1).asRight
-      else s"The new block ${block.ref} (reference=${block.reference}) must be on height ${height + 1}".asLeft
-    case Some(prev) =>
-      if (block.ref.height == prev.ref.height + 1 && block.reference == prev.ref.id) {
-        val (liquidBlock, restHistory) = dropLiquidBlock(block, history)
-        val newHistory = liquidBlock match {
-          case Nil => restHistory.prepended(block)
-          case x :: xs => restHistory.prepended(mkHardenedBlock(NonEmptyList(x, xs))).prepended(block)
-        }
-        if (blocksCapacity == 0) WavesChain(newHistory.dropRight(1), block.ref.height, blocksCapacity = 0).asRight
-        else WavesChain(newHistory, block.ref.height, blocksCapacity = blocksCapacity - 1).asRight
-      } else s"The new block ${block.ref} (reference=${block.reference}) must be after ${prev.ref}".asLeft
-  }
+  private def withFullBlock(block: WavesBlock): Either[String, WavesChain] =
+    if (block.ref.height == height + 1)
+      history.headOption match {
+        case None => WavesChain(history.prepended(block), block.ref.height, blocksCapacity = blocksCapacity - 1).asRight
+        case Some(prev) =>
+          if (block.reference == prev.ref.id) {
+            val (liquidBlock, restHistory) = dropLiquidBlock(block, history)
+            val newHistory = liquidBlock match {
+              case Nil => restHistory.prepended(block)
+              case x :: xs => restHistory.prepended(mkHardenedBlock(NonEmptyList(x, xs))).prepended(block)
+            }
+            if (blocksCapacity == 0) WavesChain(newHistory.dropRight(1), block.ref.height, blocksCapacity = 0).asRight
+            else WavesChain(newHistory, block.ref.height, blocksCapacity = blocksCapacity - 1).asRight
+          } else s"The new block ${block.ref} (reference=${block.reference}) must be after ${prev.ref}".asLeft
+      }
+    else s"The new block ${block.ref} (reference=${block.reference}) must be on height ${height + 1}".asLeft
 
   private def withMicroBlock(microBlock: WavesBlock): Either[String, WavesChain] = history.headOption match {
     case None => s"Can't attach a micro block $microBlock to empty chain".asLeft
@@ -124,12 +125,6 @@ object WavesChain {
     }
 
   }
-
-  /**
-   * If history is empty, the height is supposed to be 0
-   */
-  def apply(history: Vector[WavesBlock], blocksCapacity: Int): WavesChain =
-    WavesChain(history, history.headOption.fold(0)(_.ref.height), blocksCapacity) // TODO????
 
   /**
    * @return (liquidBlock, restHistory)

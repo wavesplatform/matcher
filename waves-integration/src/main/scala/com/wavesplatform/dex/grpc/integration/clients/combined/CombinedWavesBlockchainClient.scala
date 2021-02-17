@@ -60,13 +60,13 @@ class CombinedWavesBlockchainClient(
   // HACK: NODE: We need to store last updates and consider them as fresh, because we can face an issue during fullBalancesSnapshot
   //   when balance changes were deleted from LiquidBlock's diff, but haven't yet saved to DB
   @volatile private var lastUpdates = List.empty[BlockchainBalance]
-  private val maxPreviousBlockUpdates = settings.maxCachedLatestBlockUpdates - 1 // TODO microblocks!!!!
+  private val maxPreviousBlockUpdates = settings.maxCachedLatestBlockUpdates - 1 // TODO??? microblocks!!!!
 
   override lazy val updates: Observable[WavesNodeUpdates] = Observable.fromFuture(meClient.currentBlockInfo)
     .flatMap { startBlockInfo =>
       log.info(s"Current block: $startBlockInfo")
       val startHeight = math.max(startBlockInfo.height - settings.maxRollbackHeight - 1, 1)
-      val init: BlockchainStatus = BlockchainStatus.Normal(WavesChain(Vector.empty, startHeight, settings.maxRollbackHeight + 1))
+      val init: BlockchainStatus = BlockchainStatus.Normal(WavesChain(Vector.empty, startHeight - 1, settings.maxRollbackHeight + 1))
 
       val combinedStream = new CombinedStream(settings.combinedStream, bClient.blockchainEvents, meClient.utxEvents)
       Observable(dataUpdates, combinedStream.stream)

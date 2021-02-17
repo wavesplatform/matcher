@@ -50,6 +50,7 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
 
   private lazy val matcherExtProxy = toxiContainer.getProxy(wavesNode1.underlying.container, WavesNodeContainer.matcherGrpcExtensionPort)
 
+  private val keepAliveTime = 2.seconds
   private val keepAliveTimeout = 5.seconds
 
   private lazy val client =
@@ -60,7 +61,7 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
           maxHedgedAttempts = 5,
           maxRetryAttempts = 5,
           keepAliveWithoutCalls = true,
-          keepAliveTime = 2.seconds,
+          keepAliveTime = keepAliveTime,
           keepAliveTimeout = keepAliveTimeout,
           idleTimeout = 1.minute,
           channelOptions = GrpcClientSettings.ChannelOptionsSettings(connectTimeout = 5.seconds)
@@ -70,7 +71,7 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
           maxHedgedAttempts = 5,
           maxRetryAttempts = 5,
           keepAliveWithoutCalls = true,
-          keepAliveTime = 2.seconds,
+          keepAliveTime = keepAliveTime,
           keepAliveTimeout = keepAliveTimeout,
           idleTimeout = 1.day,
           channelOptions = GrpcClientSettings.ChannelOptionsSettings(connectTimeout = 5.seconds)
@@ -424,7 +425,7 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
       val transfer2 = mkTransfer(bob, matcher, 2.waves, Asset.Waves)
       broadcastAndAwait(transfer2)
 
-      Thread.sleep((keepAliveTimeout + 1.second).toMillis) // Connection should be closed
+      Thread.sleep((keepAliveTime + keepAliveTimeout + 2.seconds).toMillis) // Connection should be closed
 
       step("Enable connection to gRPC extension")
       blockchainUpdatesProxy.setConnectionCut(false)

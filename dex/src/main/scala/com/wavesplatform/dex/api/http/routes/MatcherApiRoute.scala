@@ -38,7 +38,7 @@ import com.wavesplatform.dex.domain.order.OrderJson.orderFormat
 import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV2
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.effect.FutureResult
-import com.wavesplatform.dex.error.{MatcherError, RequestArgumentInvalid}
+import com.wavesplatform.dex.error.{MatcherError}
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
 import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model._
@@ -55,7 +55,6 @@ import play.api.libs.json._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag
 import scala.util.Success
-import scala.util.control.Exception._
 
 @Path("/matcher")
 @Api()

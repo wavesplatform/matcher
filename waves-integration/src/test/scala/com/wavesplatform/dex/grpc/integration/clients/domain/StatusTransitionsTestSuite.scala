@@ -39,24 +39,54 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
   "StatusTransitions" - {
     "Normal +" - {
       "Appended ->" - {
-        "Normal" in {
-          val newBlock = WavesBlock(
-            ref = BlockRef(height = 1, id = ByteStr(Array[Byte](1, 2, 3))),
-            reference = ByteStr.empty,
-            changes = updatedBalances1,
-            tpe = WavesBlock.Type.FullBlock,
-            confirmedTxs = mkTransactionWithChangesMap(1)
-          )
+        "Normal" - {
+          "a valid block" in {
+            val newBlock = WavesBlock(
+              ref = BlockRef(height = 1, id = ByteStr(Array[Byte](1, 2, 3))),
+              reference = ByteStr.empty,
+              changes = updatedBalances1,
+              tpe = WavesBlock.Type.FullBlock,
+              confirmedTxs = mkTransactionWithChangesMap(1)
+            )
 
-          val init = Normal(WavesChain(Vector.empty, 100))
-          val event = Appended(newBlock)
-          StatusTransitions(init, event) should matchTo(StatusUpdate(
-            newStatus = Normal(WavesChain(Vector(newBlock), 99)),
-            updatedBalances = updatedBalances1,
-            updatedLastBlockHeight = StatusUpdate.LastBlockHeight.Updated(1),
-            utxUpdate = UtxUpdate(confirmedTxs = newBlock.confirmedTxs),
-            requestNextBlockchainEvent = true
-          ))
+            val init = Normal(WavesChain(Vector.empty, 100))
+            val event = Appended(newBlock)
+            StatusTransitions(init, event) should matchTo(StatusUpdate(
+              newStatus = Normal(WavesChain(Vector(newBlock), 99)),
+              updatedBalances = updatedBalances1,
+              updatedLastBlockHeight = StatusUpdate.LastBlockHeight.Updated(1),
+              utxUpdate = UtxUpdate(confirmedTxs = newBlock.confirmedTxs),
+              requestNextBlockchainEvent = true
+            ))
+          }
+
+          "empty chain" - {
+            "because of an invalid new block" in test(WavesBlock(
+              // height is higher, than in chain
+              ref = BlockRef(height = 3, id = ByteStr(Array[Byte](1, 2, 3))),
+              reference = ByteStr.empty,
+              changes = updatedBalances1,
+              tpe = WavesBlock.Type.FullBlock,
+              confirmedTxs = mkTransactionWithChangesMap(1)
+            ))
+
+            "because we try to add a micro block" in test(WavesBlock(
+              ref = BlockRef(height = 1, id = ByteStr(Array[Byte](1, 2, 3))),
+              reference = ByteStr.empty,
+              changes = updatedBalances1,
+              tpe = WavesBlock.Type.MicroBlock,
+              confirmedTxs = mkTransactionWithChangesMap(1)
+            ))
+
+            def test(newBlock: WavesBlock): Unit = {
+              val init = Normal(WavesChain(Vector.empty, 1, 100))
+              val event = Appended(newBlock)
+              StatusTransitions(init, event) should matchTo(StatusUpdate(
+                newStatus = init,
+                updatedLastBlockHeight = StatusUpdate.LastBlockHeight.RestartRequired(1) // Same height as in chain
+              ))
+            }
+          }
         }
 
         "TransientRollback" - {

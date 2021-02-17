@@ -284,7 +284,14 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
       "empty +" - {
         val init = WavesChain(emptyChain, 100)
 
-        "block" in { init.withBlock(block1) should matchTo(WavesChain(Vector(block1), 99).asRight[String]) }
+        "block" - {
+          "valid" in { init.withBlock(block1) should matchTo(WavesChain(Vector(block1), 99).asRight[String]) }
+
+          "invalid" in {
+            val block1A = block1.copy(ref = block1.ref.copy(height = block1.ref.height + 2))
+            init.withBlock(block1A) should matchTo("The new block Ref(h=3, 8TZ) (reference=) must be on height 1".asLeft[WavesChain])
+          }
+        }
 
         "micro block" in {
           val microBlock = block1.copy(tpe = WavesBlock.Type.MicroBlock)

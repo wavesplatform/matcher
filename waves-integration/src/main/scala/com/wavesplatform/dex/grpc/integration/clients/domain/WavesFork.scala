@@ -12,9 +12,7 @@ case class WavesFork private[domain] (origChain: WavesChain, forkChain: WavesCha
 
   // TODO DEX-1009 Move to tests in the end
 
-  require(!origChain.isEmpty, "empty origChain")
-
-  // TODO DEX-1009 An additional invariant: forkChain should contain only one common block!
+  require(!origChain.isEmpty, s"empty $origChain")
 
   def height: Int = forkChain.height
 
@@ -48,10 +46,10 @@ case class WavesFork private[domain] (origChain: WavesChain, forkChain: WavesCha
       } else Status.NotResolved(copy(forkChain = updatedForkChain))
   }
 
-  def withoutLast: WavesFork = copy(forkChain = forkChain.withoutLastLiquidOrFull)
-
   def rollbackTo(height: Int): WavesFork = copy(forkChain = forkChain.dropAfter(height)._1)
   def rollbackTo(ref: BlockRef): WavesFork = copy(forkChain = forkChain.dropAfter(ref)._1)
+
+  protected[WavesFork] def withoutLast: WavesFork = copy(forkChain = forkChain.withoutLastLiquidOrFull)
 
   override def toString: String = s"WavesFork(o=$origChain, f=$forkChain)"
 }
@@ -61,8 +59,14 @@ object WavesFork {
   def mk(origChain: WavesChain, commonBlockRef: BlockRef): WavesFork = WavesFork(origChain, origChain.dropAfter(commonBlockRef)._1)
   def mk(origChain: WavesChain, commonHeight: Int): WavesFork = WavesFork(origChain, origChain.dropAfter(commonHeight)._1)
 
-  def mkRolledBackByOne(origChain: WavesChain): WavesFork =
-    WavesFork(origChain, origChain.withoutLastLiquidOrFull) // Or better use WavesFork.withoutLast
+  /**
+   * Create a fork (origChain, origChain - 1 full|liquid block)
+   * Called only if we can't apply a block in a normal state, thus, origChain can't be empty
+   */
+  def mkRolledBackByOne(origChain: WavesChain): WavesFork = {
+    require(!origChain.isEmpty, s"$origChain is empty")
+    WavesFork(origChain, origChain).withoutLast
+  }
 
   sealed trait Status extends Product with Serializable
 

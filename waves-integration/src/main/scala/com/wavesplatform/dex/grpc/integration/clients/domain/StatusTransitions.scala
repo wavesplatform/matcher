@@ -13,7 +13,7 @@ import com.wavesplatform.dex.meta.getSimpleName
 object StatusTransitions extends ScorexLogging {
 
   def apply(origStatus: BlockchainStatus, event: WavesNodeEvent): StatusUpdate = {
-    log.info(s"${origStatus.name} + $event")
+    log.info(s"${origStatus.name} + $event") // TODO why don't we have this in logs?
     val r = origStatus match {
       case origStatus: Normal =>
         event match {
@@ -21,11 +21,18 @@ object StatusTransitions extends ScorexLogging {
             origStatus.main.withBlock(block) match {
               case Left(e) =>
                 log.error(s"Forcibly rollback, because of error: $e")
-                val fork = WavesFork.mkRolledBackByOne(origStatus.main)
-                StatusUpdate(
-                  newStatus = TransientRollback(fork, Monoid.empty[UtxUpdate]),
-                  updatedLastBlockHeight = LastBlockHeight.RestartRequired(fork.height + 1)
-                )
+                if (origStatus.main.isEmpty)
+                  StatusUpdate(
+                    newStatus = origStatus,
+                    updatedLastBlockHeight = LastBlockHeight.RestartRequired(origStatus.main.height)
+                  )
+                else {
+                  val fork = WavesFork.mkRolledBackByOne(origStatus.main)
+                  StatusUpdate(
+                    newStatus = TransientRollback(fork, Monoid.empty[UtxUpdate]),
+                    updatedLastBlockHeight = LastBlockHeight.RestartRequired(fork.height + 1) // Same height with origStatus.main
+                  )
+                }
 
               case Right(updatedFork) =>
                 StatusUpdate(

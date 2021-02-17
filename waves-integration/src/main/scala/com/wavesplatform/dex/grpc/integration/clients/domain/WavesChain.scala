@@ -39,7 +39,9 @@ case class WavesChain(history: Vector[WavesBlock], height: Int, blocksCapacity: 
    * @return Guarantees WavesFork is not empty
    */
   private def withFullBlock(block: WavesBlock): Either[String, WavesChain] = history.headOption match {
-    case None => WavesChain(history.prepended(block), block.ref.height, blocksCapacity = blocksCapacity - 1).asRight
+    case None =>
+      if (block.ref.height == height + 1) WavesChain(history.prepended(block), block.ref.height, blocksCapacity = blocksCapacity - 1).asRight
+      else s"The new block ${block.ref} (reference=${block.reference}) must be on height ${height + 1}".asLeft
     case Some(prev) =>
       if (block.ref.height == prev.ref.height + 1 && block.reference == prev.ref.id) {
         val (liquidBlock, restHistory) = dropLiquidBlock(block, history)
@@ -64,13 +66,11 @@ case class WavesChain(history: Vector[WavesBlock], height: Int, blocksCapacity: 
   def diffIndex: DiffIndex = history.foldMap(_.diffIndex)
 
   def withoutLastLiquidOrFull: WavesChain = {
-    val heightCorrection = if (history.isEmpty) 0 else 1
+    val heightCorrection = if (history.isEmpty) 0 else 1 // TODO ???
     val updatedHistory =
       if (history.isEmpty) history
-      else if (history.headOption.exists(_.tpe == WavesBlock.Type.MicroBlock))
-        // Remove a liquid block. tail is safe, because we can't append a micro block without a block in the history
-        history.dropWhile(_.tpe == WavesBlock.Type.MicroBlock).tail
-      else history.tail // Remove a full block
+      // Remove a liquid block. tail is safe, because we can't append a micro block without a block in the history
+      else history.dropWhile(_.tpe == WavesBlock.Type.MicroBlock).tail // tail to remove the key block
     WavesChain(updatedHistory, height - heightCorrection, blocksCapacity = blocksCapacity + heightCorrection)
   }
 
@@ -129,7 +129,7 @@ object WavesChain {
    * If history is empty, the height is supposed to be 0
    */
   def apply(history: Vector[WavesBlock], blocksCapacity: Int): WavesChain =
-    WavesChain(history, history.headOption.fold(0)(_.ref.height), blocksCapacity)
+    WavesChain(history, history.headOption.fold(0)(_.ref.height), blocksCapacity) // TODO????
 
   /**
    * @return (liquidBlock, restHistory)

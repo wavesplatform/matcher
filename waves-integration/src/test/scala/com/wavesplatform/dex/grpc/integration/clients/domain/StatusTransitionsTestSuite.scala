@@ -1,7 +1,5 @@
 package com.wavesplatform.dex.grpc.integration.clients.domain
 
-import java.nio.charset.StandardCharsets
-
 import cats.Monoid
 import cats.syntax.semigroup._
 import com.google.protobuf.UnsafeByteOperations
@@ -16,6 +14,7 @@ import com.wavesplatform.dex.grpc.integration.clients.domain.StatusUpdate.LastBl
 import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeEvent.{Appended, DataReceived, RolledBack, UtxSwitched, UtxUpdated}
 import com.wavesplatform.dex.grpc.integration.services.UtxTransaction
 
+import java.nio.charset.StandardCharsets
 import scala.collection.immutable.Vector
 
 class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
@@ -83,14 +82,12 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
               val event = Appended(newBlock)
               StatusTransitions(init, event) should matchTo(StatusUpdate(
                 newStatus = init,
-                updatedLastBlockHeight = StatusUpdate.LastBlockHeight.RestartRequired(1) // Same height as in chain
+                updatedLastBlockHeight = StatusUpdate.LastBlockHeight.RestartRequired
               ))
             }
           }
-        }
 
-        "TransientRollback" - {
-          "because of an invalid new block" in {
+          "with RestartRequired because of an invalid new block" in {
             val block1 = WavesBlock(
               ref = BlockRef(height = 2, id = ByteStr(Array[Byte](1, 2, 3))),
               reference = ByteStr.empty,
@@ -101,11 +98,8 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
             val init = Normal(mkChain(Vector(block1), 99))
             val event = Appended(block1)
             StatusTransitions(init, event) should matchTo(StatusUpdate(
-              newStatus = TransientRollback(
-                fork = WavesFork(init.main, WavesChain(Vector.empty, 1, 100)),
-                utxUpdate = Monoid.empty[UtxUpdate]
-              ),
-              updatedLastBlockHeight = StatusUpdate.LastBlockHeight.RestartRequired(2)
+              newStatus = init,
+              updatedLastBlockHeight = StatusUpdate.LastBlockHeight.RestartRequired
             ))
           }
         }
@@ -249,31 +243,6 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
         }
 
         "TransientRollback" - {
-          "because of an unrelated new block" in {
-            val newBlock = WavesBlock(
-              ref = BlockRef(height = 3, id = ByteStr(Array[Byte](98, 2, 0))),
-              reference = ByteStr(Array[Byte](98, 2, -1)),
-              changes = BlockchainBalance(
-                regular = Map(alice -> Map(usd -> 8), carol -> Map(Waves -> 4)),
-                outgoingLeasing = Map(bob -> 10)
-              ),
-              tpe = WavesBlock.Type.FullBlock,
-              confirmedTxs = mkTransactionWithChangesMap(10)
-            )
-
-            val event = Appended(newBlock)
-
-            // See StatusTransitions
-            StatusTransitions(init, event) should matchTo(StatusUpdate(
-              newStatus = TransientRollback(
-                // TODO test with more than 1 block
-                fork = WavesFork(init.fork.origChain, mkChain(Vector(block1), 99)),
-                utxUpdate = init.utxUpdate
-              ),
-              updatedLastBlockHeight = StatusUpdate.LastBlockHeight.RestartRequired(2)
-            ))
-          }
-
           "because the resolving process haven't yet completed" in {
             val block3 = WavesBlock(
               ref = BlockRef(height = 3, id = ByteStr(Array[Byte](98, 2, 0))),
@@ -302,6 +271,26 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
                 utxUpdate = init.utxUpdate
               ),
               requestNextBlockchainEvent = true
+            ))
+          }
+
+          "because of an unrelated new block" in {
+            val newBlock = WavesBlock(
+              ref = BlockRef(height = 3, id = ByteStr(Array[Byte](98, 2, 0))),
+              reference = ByteStr(Array[Byte](98, 2, -1)),
+              changes = BlockchainBalance(
+                regular = Map(alice -> Map(usd -> 8), carol -> Map(Waves -> 4)),
+                outgoingLeasing = Map(bob -> 10)
+              ),
+              tpe = WavesBlock.Type.FullBlock,
+              confirmedTxs = mkTransactionWithChangesMap(10)
+            )
+
+            val event = Appended(newBlock)
+
+            StatusTransitions(init, event) should matchTo(StatusUpdate(
+              newStatus = init,
+              updatedLastBlockHeight = StatusUpdate.LastBlockHeight.RestartRequired
             ))
           }
         }

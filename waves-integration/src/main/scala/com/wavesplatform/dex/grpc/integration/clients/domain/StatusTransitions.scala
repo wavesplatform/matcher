@@ -21,18 +21,10 @@ object StatusTransitions extends ScorexLogging {
             origStatus.main.withBlock(block) match {
               case Left(e) =>
                 log.error(s"Forcibly rollback, because of error: $e")
-                if (origStatus.main.isEmpty)
-                  StatusUpdate(
-                    newStatus = origStatus,
-                    updatedLastBlockHeight = LastBlockHeight.RestartRequired(origStatus.main.height)
-                  )
-                else {
-                  val fork = WavesFork.mkRolledBackByOne(origStatus.main)
-                  StatusUpdate(
-                    newStatus = TransientRollback(fork, Monoid.empty[UtxUpdate]),
-                    updatedLastBlockHeight = LastBlockHeight.RestartRequired(fork.height + 1) // Same height with origStatus.main
-                  )
-                }
+                StatusUpdate(
+                  newStatus = origStatus, // We will wait for RolledBack after RestartRequired
+                  updatedLastBlockHeight = LastBlockHeight.RestartRequired
+                )
 
               case Right(updatedFork) =>
                 StatusUpdate(
@@ -60,11 +52,12 @@ object StatusTransitions extends ScorexLogging {
             )
 
           case RolledBack(to) => // This could happen during an appending of a new key block too
+            val initFork = WavesFork(origStatus.main, origStatus.main)
             StatusUpdate(
               newStatus = TransientRollback(
                 fork = to match {
-                  case To.CommonBlockRef(ref) => WavesFork.mk(origStatus.main, ref)
-                  case To.Height(h) => WavesFork.mk(origStatus.main, h)
+                  case To.CommonBlockRef(ref) => initFork.rollbackTo(ref)
+                  case To.Height(h) => initFork.rollbackTo(h)
                 },
                 utxUpdate = Monoid.empty[UtxUpdate]
               ),
@@ -113,11 +106,11 @@ object StatusTransitions extends ScorexLogging {
                   requestNextBlockchainEvent = true
                 )
 
-              case Status.Failed(updatedFork, reason) =>
+              case Status.Failed(reason) =>
                 log.error(s"Forcibly rollback, because of error: $reason")
                 StatusUpdate(
-                  origStatus.copy(fork = updatedFork),
-                  updatedLastBlockHeight = LastBlockHeight.RestartRequired(updatedFork.height + 1)
+                  origStatus, // We will wait for RolledBack after RestartRequired
+                  updatedLastBlockHeight = LastBlockHeight.RestartRequired
                 )
             }
 
@@ -138,7 +131,7 @@ object StatusTransitions extends ScorexLogging {
               )
             )
 
-          case RolledBack(to) =>
+          case RolledBack(to) => // TODO test with higher height
             val fork = to match {
               case To.CommonBlockRef(ref) => origStatus.fork.rollbackTo(ref)
               case To.Height(h) => origStatus.fork.rollbackTo(h)

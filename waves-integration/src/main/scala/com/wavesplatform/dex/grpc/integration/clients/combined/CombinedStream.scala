@@ -109,11 +109,10 @@ class CombinedStream(
 
   def currentHeightHint: Int = heightHint
 
-  def restartFrom(height: Int): Unit = {
-    updateHeightHint(height)
-
+  def restart(): Unit = {
+    log.info("Restarting")
     // Self-healed above
-    runWithDelay(() => blockchainUpdates.stop())
+    blockchainUpdates.stop()
   }
 
   private def utxEventsTransitions(origStatus: Status, event: SystemEvent): Status = {

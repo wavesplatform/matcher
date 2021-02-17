@@ -75,7 +75,7 @@ class CombinedWavesBlockchainClient(
           val x = StatusTransitions(origStatus, event)
           x.updatedLastBlockHeight match {
             case LastBlockHeight.Updated(to) => combinedStream.updateHeightHint(to)
-            case LastBlockHeight.RestartRequired(from) => combinedStream.restartFrom(from)
+            case LastBlockHeight.RestartRequired => combinedStream.restart()
             case _ =>
           }
           if (x.requestNextBlockchainEvent) bClient.blockchainEvents.requestNext()

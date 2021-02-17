@@ -388,13 +388,16 @@ class MatcherApiRoute(
   )
   def getOrderBook: Route = (path(AssetPairPM) & get) { pairOrError =>
     parameters("depth".as[String].?) { depth =>
+
+      def response(d: Int = 0) = withAssetPair(pairOrError, redirectToInverse = true, s"?depth=$d") { pair =>
+        complete(orderBookHttpInfo.getHttpView(pair, MatcherModel.Normalized, Some(d)))
+      }
+
       allCatch.opt(depth.get.toInt) match {
-        case Some(i: Int) if i >= 0 =>
-          withAssetPair(pairOrError, redirectToInverse = true, s"?depth=$i") { pair =>
-            complete(orderBookHttpInfo.getHttpView(pair, MatcherModel.Normalized, Some(i)))
-          }
-        case Some(i: Int) => complete(InvalidDepth(s"Depth value must be positive"))
-        case _ => complete(InvalidDepth(s"Depth value must be an Integer"))
+        case None => response()
+        case Some(i: Int) if i >= 0 => response(i)
+        case Some(i: Int) => complete(InvalidDepth(s"Depth value [$i] must be positive"))
+        case i => complete(InvalidDepth(s"Depth value [$i] must be an Integer"))
       }
     }
   }

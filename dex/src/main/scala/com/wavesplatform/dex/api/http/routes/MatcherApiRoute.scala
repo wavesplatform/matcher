@@ -1,12 +1,12 @@
 package com.wavesplatform.dex.api.http.routes
 
-import akka.actor.{typed, ActorRef}
+import akka.actor.{ActorRef, typed}
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.{HttpEntity, HttpResponse, StatusCodes}
 import akka.http.scaladsl.server
 import akka.http.scaladsl.server._
 import akka.http.scaladsl.server.directives.FutureDirectives
-import akka.pattern.{ask, AskTimeoutException}
+import akka.pattern.{AskTimeoutException, ask}
 import akka.stream.Materializer
 import akka.util.Timeout
 import cats.syntax.option._
@@ -18,7 +18,7 @@ import com.wavesplatform.dex.actors.address.AddressActor.OrderListType
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.api.http._
 import com.wavesplatform.dex.api.http.entities._
-import com.wavesplatform.dex.api.http.headers.{`X-User-Public-Key`, CustomContentTypes}
+import com.wavesplatform.dex.api.http.headers.{CustomContentTypes, `X-User-Public-Key`}
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
 import com.wavesplatform.dex.api.ws.actors.WsExternalClientDirectoryActor
@@ -38,7 +38,7 @@ import com.wavesplatform.dex.domain.order.OrderJson.orderFormat
 import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV2
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.effect.FutureResult
-import com.wavesplatform.dex.error.MatcherError
+import com.wavesplatform.dex.error.{MatcherError, RequestArgumentInvalid}
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
 import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model._
@@ -393,11 +393,15 @@ class MatcherApiRoute(
         complete(orderBookHttpInfo.getHttpView(pair, MatcherModel.Normalized, Some(d)))
       }
 
-      allCatch.opt(depth.get.toInt) match {
+      depth match {
         case None => response()
-        case Some(i: Int) if i >= 0 => response(i)
-        case Some(i: Int) => complete(InvalidDepth(s"Depth value [$i] must be positive"))
-        case i => complete(InvalidDepth(s"Depth value [$i] must be an Integer"))
+        case Some(depth) =>
+          depth.toIntOption match {
+            case None => complete(InvalidDepth(s"Depth value '$depth' must be an Integer"))
+            case Some(depth) =>
+              if (depth > 0) response(depth)
+              else complete(InvalidDepth(s"Depth value '$depth' must be positive"))
+          }
       }
     }
   }

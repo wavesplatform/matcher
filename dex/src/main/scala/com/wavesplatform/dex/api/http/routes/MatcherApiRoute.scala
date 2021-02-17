@@ -55,6 +55,7 @@ import play.api.libs.json._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag
 import scala.util.Success
+import scala.util.control.Exception._
 
 @Path("/matcher")
 @Api()
@@ -386,9 +387,14 @@ class MatcherApiRoute(
     )
   )
   def getOrderBook: Route = (path(AssetPairPM) & get) { pairOrError =>
-    parameters("depth".as[Int].?) { depth =>
-      withAssetPair(pairOrError, redirectToInverse = true, depth.fold("")(d => s"?depth=$d")) { pair =>
-        complete(orderBookHttpInfo.getHttpView(pair, MatcherModel.Normalized, depth))
+    parameters("depth".as[String].?) { depth =>
+      allCatch.opt(depth.get.toInt) match {
+        case Some(i: Int) if i >= 0 =>
+          withAssetPair(pairOrError, redirectToInverse = true, s"?depth=$i") { pair =>
+            complete(orderBookHttpInfo.getHttpView(pair, MatcherModel.Normalized, Some(i)))
+          }
+        case Some(i: Int) => complete(InvalidDepth(s"Depth value must be positive"))
+        case _ => complete(InvalidDepth(s"Depth value must be an Integer"))
       }
     }
   }

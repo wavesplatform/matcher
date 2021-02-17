@@ -97,6 +97,7 @@ case object InternalError
     extends MatcherResponse(C.ServiceUnavailable, MatcherResponseContent.Single(Json.obj("message" -> "Internal server error")))
 
 case class InvalidAddress(reason: String) extends MatcherResponse(C.BadRequest, error.InvalidAddress(reason))
+case class InvalidDepth(reason: String) extends MatcherResponse(C.BadRequest, error.InvalidDepth(reason))
 case class InvalidPublicKey(reason: String) extends MatcherResponse(C.BadRequest, error.UserPublicKeyIsNotValid(reason))
 case class InvalidAsset(asset: String, reason: String) extends MatcherResponse(C.BadRequest, error.InvalidAsset(asset, reason))
 case class InvalidBase58String(reason: String) extends MatcherResponse(C.BadRequest, error.InvalidBase58String(reason))

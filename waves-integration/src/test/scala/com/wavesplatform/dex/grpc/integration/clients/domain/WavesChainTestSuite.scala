@@ -46,6 +46,11 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
     confirmedTxs = mkTransactionWithChangesMap(2)
   )
 
+  private val defaultChainGen = for {
+    history <- historyGen(1 to 3, 0 to 2, 0 to 2)
+    capacity <- Gen.choose(0, 2)
+  } yield mkChain(history, capacity)
+
   private val emptyChain = Vector.empty[WavesBlock]
 
   "WavesChain" - {
@@ -546,10 +551,9 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
 
     "dropAfter(ref)" - {
       val testGen = for {
-        history <- historyGen(1 to 3, 0 to 2, 0 to 2)
-        refToDrop <- Gen.oneOf(history.map(_.ref))
-        capacity <- Gen.choose(0, 2)
-      } yield (mkChain(history, capacity), refToDrop)
+        chain <- defaultChainGen
+        refToDrop <- Gen.oneOf(chain.history.map(_.ref))
+      } yield (chain, refToDrop)
 
       "the block with a specified ref" - {
         "remains" in forAll(testGen) { case (chain, ref) =>
@@ -560,6 +564,23 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
         "should not be among dropped" in forAll(testGen) { case (chain, ref) =>
           val (_, dropped) = chain.dropAfter(ref)
           dropped.map(_.ref) should not contain ref
+        }
+      }
+
+      "if the ref points to a block with the same or a higher height than of chain" - {
+        val testGen = for {
+          chain <- defaultChainGen
+          refHeight <- Gen.choose(chain.height + 1, chain.height + 3)
+        } yield (chain, BlockRef(refHeight, id = ByteStr(Array[Byte](-1, -2, -3))))
+
+        "height invariant is preserved and chain remains" in forAll(testGen) { case (chain, nextRef) =>
+          val (updatedChain, _) = chain.dropAfter(nextRef)
+          updatedChain should matchTo(chain)
+        }
+
+        "no blocks are droppped" in forAll(testGen) { case (chain, nextRef) =>
+          val (_, dropped) = chain.dropAfter(nextRef)
+          dropped shouldBe empty
         }
       }
 
@@ -649,6 +670,23 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
         }
       }
 
+      "if the height is higher than of chain" - {
+        val testGen = for {
+          chain <- defaultChainGen
+          dropAfterHeight <- Gen.choose(chain.height + 1, chain.height + 3)
+        } yield (chain, dropAfterHeight)
+
+        "height invariant is preserved and chain remains" in forAll(testGen) { case (chain, height) =>
+          val (updatedChain, _) = chain.dropAfter(height)
+          updatedChain should matchTo(chain)
+        }
+
+        "no blocks are droppped" in forAll(testGen) { case (chain, height) =>
+          val (_, dropped) = chain.dropAfter(height)
+          dropped shouldBe empty
+        }
+      }
+
       "dropped blocks" - {
         "were in the original chain" in forAll(testGen) { case (chain, height) =>
           val (_, dropped) = chain.dropAfter(height)
@@ -722,28 +760,6 @@ class WavesChainTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDrive
           val (updatedChain, dropped) = chain.dropAfter(height)
           updatedChain.blocksCapacity shouldBe chain.blocksCapacity + dropped.count(_.tpe == WavesBlock.Type.FullBlock)
         }
-      }
-    }
-
-    "withoutLastLiquidOrFull" - {
-      def testGen(maxMicroBlocks: Range = 0 to 2): Gen[WavesChain] = for {
-        history <- historyGen(1 to 2, maxMicroBlocks, 0 to 2)
-        capacity <- Gen.choose(0, 2)
-      } yield mkChain(history, capacity)
-
-      "the last block disappears" in forAll(testGen()) { chain =>
-        val updatedChain = chain.withoutLastLiquidOrFull
-        updatedChain.history should not contain chain.last.get
-      }
-
-      "micro blocks disappear" in forAll(testGen(1 to 2)) { chain =>
-        val updatedChain = chain.withoutLastLiquidOrFull
-        updatedChain.history.find(_.tpe == WavesBlock.Type.MicroBlock) shouldBe empty
-      }
-
-      "the capacity increases" in forAll(testGen()) { chain =>
-        val updatedChain = chain.withoutLastLiquidOrFull
-        updatedChain.blocksCapacity shouldBe chain.blocksCapacity + 1
       }
     }
 

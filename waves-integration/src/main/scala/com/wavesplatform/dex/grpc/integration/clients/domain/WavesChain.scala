@@ -66,15 +66,6 @@ case class WavesChain(history: Vector[WavesBlock], height: Int, blocksCapacity: 
 
   def diffIndex: DiffIndex = history.foldMap(_.diffIndex)
 
-  def withoutLastLiquidOrFull: WavesChain = {
-    val heightCorrection = if (history.isEmpty) 0 else 1 // TODO ???
-    val updatedHistory =
-      if (history.isEmpty) history
-      // Remove a liquid block. tail is safe, because we can't append a micro block without a block in the history
-      else history.dropWhile(_.tpe == WavesBlock.Type.MicroBlock).tail // tail to remove the key block
-    WavesChain(updatedHistory, height - heightCorrection, blocksCapacity = blocksCapacity + heightCorrection)
-  }
-
   def withoutLast: (WavesChain, Option[WavesBlock]) =
     if (isEmpty) (this, None)
     else {
@@ -86,22 +77,26 @@ case class WavesChain(history: Vector[WavesBlock], height: Int, blocksCapacity: 
   /**
    * @return (new chain, dropped blocks), where dropped blocks are ordered from oldest to newest
    */
-  def dropAfter(ref: BlockRef): (WavesChain, List[WavesBlock]) = {
+  def dropAfter(ref: BlockRef): (WavesChain, List[WavesBlock]) =
     // TODO DEX-1032
-    val (droppedBlocks, commonHistory) = history.splitOnCondReversed(x => !(x.ref.height == ref.height && x.ref.id == ref.id))
-    val droppedFullBlocksNumber = droppedBlocks.count(_.tpe == WavesBlock.Type.FullBlock)
-    (WavesChain(commonHistory, ref.height, blocksCapacity = blocksCapacity + droppedFullBlocksNumber), droppedBlocks)
-  }
+    if (ref.height > height) (this, List.empty)
+    else {
+      val (droppedBlocks, commonHistory) = history.splitOnCondReversed(x => !(x.ref.height == ref.height && x.ref.id == ref.id))
+      val droppedFullBlocksNumber = droppedBlocks.count(_.tpe == WavesBlock.Type.FullBlock)
+      (WavesChain(commonHistory, ref.height, blocksCapacity = blocksCapacity + droppedFullBlocksNumber), droppedBlocks)
+    }
 
   /**
    * @return (new chain, dropped blocks), where dropped blocks are ordered from oldest to newest
    */
-  def dropAfter(height: Int): (WavesChain, List[WavesBlock]) = {
+  def dropAfter(h: Int): (WavesChain, List[WavesBlock]) =
     // TODO DEX-1032
-    val (droppedBlocks, commonHistory) = history.splitOnCondReversed(_.ref.height > height)
-    val droppedFullBlocksNumber = droppedBlocks.count(_.tpe == WavesBlock.Type.FullBlock)
-    (WavesChain(commonHistory, height, blocksCapacity = blocksCapacity + droppedFullBlocksNumber), droppedBlocks)
-  }
+    if (h > height) (this, List.empty)
+    else {
+      val (droppedBlocks, commonHistory) = history.splitOnCondReversed(_.ref.height > h)
+      val droppedFullBlocksNumber = droppedBlocks.count(_.tpe == WavesBlock.Type.FullBlock)
+      (WavesChain(commonHistory, h, blocksCapacity = blocksCapacity + droppedFullBlocksNumber), droppedBlocks)
+    }
 
   private def mkHardenedBlock(blocks: NonEmptyList[WavesBlock]): WavesBlock = blocks.reduce(WavesChain.blockSemigroup)
 

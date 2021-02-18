@@ -13,7 +13,7 @@ import com.wavesplatform.dex.meta.getSimpleName
 object StatusTransitions extends ScorexLogging {
 
   def apply(origStatus: BlockchainStatus, event: WavesNodeEvent): StatusUpdate = {
-    log.info(s"${origStatus.name} + $event") // TODO why don't we have this in logs?
+    log.info(s"${origStatus.name} + $event")
     val r = origStatus match {
       case origStatus: Normal =>
         event match {
@@ -113,7 +113,7 @@ object StatusTransitions extends ScorexLogging {
                 )
             }
 
-          case RolledBack(to) => // TODO test with higher height
+          case RolledBack(to) =>
             val updatedFork = to match {
               case To.CommonBlockRef(ref) => origStatus.fork.rollbackTo(ref)
               case To.Height(h) => origStatus.fork.rollbackTo(h)

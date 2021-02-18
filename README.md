@@ -285,7 +285,7 @@ To run:
 
 ### 6.4. GRPC-server extension installation and configuration
 
-Since version **2.3.0** Matcher have using grpc-blockchain-stream from the Node to get data with a blockchain events and updates
+Since version **2.3.0** Matcher have been using grpc-blockchain-stream from the Node to get data with a blockchain events and updates
 
 ℹ️ **IMPORTANT:** Matcher doesn't start without installed grpc-server extension at the node.
 

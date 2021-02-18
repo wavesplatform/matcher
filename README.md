@@ -1,5 +1,13 @@
+
 # Matcher
 
+<p>
+<img alt="Build status" src="https://jenkins.wvservices.com/buildStatus/icon?job=Waves.Exchange%2FMatcher%2Fit-debug%2Fmaster"  />
+<a href="https://github.com/wavesplatform/matcher/releases" target="_blank">
+    <img alt="Downloads" src="https://img.shields.io/github/downloads/wavesplatform/matcher/total?cache=false&style=flat-square&style=flat-square" />
+</a>
+</p>
+  
 Matcher for Waves Node.
 
 In the master branch there is a code with functions that is under development. 

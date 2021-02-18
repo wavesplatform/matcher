@@ -294,7 +294,7 @@ To run:
 
 Since version **2.3.0** Matcher has been using grpc-blockchain-stream from the Node to get data with a blockchain events and updates
 
-ℹ️ **IMPORTANT:** Matcher doesn't start without installed grpc-server extension at the node. You must to install that extension at the Node
+ℹ️ **IMPORTANT:** Matcher doesn't start without installed grpc-server extension. You must to install that extension at the Node
 
 Artifacts of GRPC-server extension have names like:
 * `grpc-server{supported-network}_{version}.deb` for DEB artifact. `{supported-network}` is empty for MainNet;

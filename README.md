@@ -2,7 +2,6 @@
 # Matcher
 
 <p>
-<img alt="Build status" src="https://jenkins.wvservices.com/buildStatus/icon?job=Waves.Exchange%2FMatcher%2Fit-debug%2Fmaster"  />
 <a href="https://github.com/wavesplatform/matcher/releases" target="_blank">
     <img alt="Downloads" src="https://img.shields.io/github/downloads/wavesplatform/matcher/total?cache=false&style=flat-square&style=flat-square" />
 </a>
@@ -302,9 +301,9 @@ Artifacts of GRPC-server extension have names like:
 
 #### 📦 Installation
 
-[a. Installation through DEB](#a--installation-through-deb-1)
+[a. Installation through DEB](#a--installation-through-deb)
 
-[b. Installation through ZIP](#b--installation-through-zip-1)
+[b. Installation through ZIP](#b--installation-through-zip)
 
 #### 📃 Configration of GRPC-server extension
 
@@ -315,8 +314,6 @@ waves-blockchain-client {
   grpc {
      target = "node_host:6887" # host and port of the Node with installed grpc-server extension
   }
-
-  default-caches-expiration = 100ms
 }
 
 ````

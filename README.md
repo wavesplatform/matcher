@@ -30,8 +30,6 @@ For further information please refer the official [documentation](https://docs.w
             * [b. Installation through ZIP](#b--installation-through-zip-1)
             * [Configuration of Matcher server](#-configuration-of-matcher-server)
          * [6.4. GRPC-server extension installation and configuration](#64-grpc-server-extension-installation-and-configuration)
-            * [a. Installation through DEB](#a--installation-through-deb)
-            * [b. Installation through ZIP](#b--installation-through-zip)
             * [Configration of Matcher extension](#-configration-of-matcher-extension)
       * [7. Running an extension project locally during development](#7-running-an-extension-project-locally-during-development)
          * [SBT](#sbt-1)
@@ -287,43 +285,15 @@ To run:
 
 Since version **2.3.0** Matcher have been using grpc-blockchain-stream from the Node to get data with a blockchain events and updates
 
-ℹ️ **IMPORTANT:** Matcher doesn't start without installed grpc-server extension at the node.
+ℹ️ **IMPORTANT:** Matcher doesn't start without installed grpc-server extension at the node. You must to install that extension at the Node
 
 Artifacts of GRPC-server extension have names like:
 * `grpc-server{supported-network}_{version}.deb` for DEB artifact. `{supported-network}` is empty for MainNet;
 * `grpc-server-{version}.zip` for ZIP artifact;
 
-#### a. 📦 Installation through DEB
+[a. Installation through DEB](#a--installation-through-deb-1)
 
-> If the Node installed from DEB
-
-Run: `sudo dpkg -i deb-artifact.deb`
-
-The extension will be automatically installed to the Node.
-
-#### b. 🗜 Installation through ZIP
-
-> If the Node is running manually.
-> Note, if you installed Node from a DEB package, Matcher will be removed after update.
-
-To install a GRPC-server extension from ZIP file:
-
-1. Copy the archive to the directory with Node's JAR
-2. Extract the archive. Its files will be added to the existed directories.
-
-To run the Node with Matcher extension use following commands:
-
-*Debian/Ubuntu/macOS*:
-
-```
-java <your_JVM_options> -cp "/absolute_path_to_fat_jar/waves-all.jar:/absolute_path_to_fat_jar/lib/*" com.wavesplatform.Application /path/to/config.conf
-```
-
-*Windows*:
-
-```
-java <your_JVM_options> -cp "/absolute_path_to_fat_jar/waves-all.jar;/absolute_path_to_fat_jar/lib/*" com.wavesplatform.Application /path/to/config.conf
-```
+[b. Installation through ZIP](#b--installation-through-zip-1)
 
 #### 📃 Configration of GRPC-server extension
 

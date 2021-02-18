@@ -62,7 +62,7 @@ class GetOrderBookSpec extends MatcherSuiteBase with TableDrivenPropertyChecks w
       ("2147483648", "More than Int.Max", "Provided depth in not correct, reason: Depth value '2147483648' must be an Integer"),
       ("100.0", "Double", "Provided depth in not correct, reason: Depth value '100.0' must be an Integer"),
       ("incorrect", "Alphabetical", "Provided depth in not correct, reason: Depth value 'incorrect' must be an Integer"),
-      ("-1", "Less than zero", "Provided depth in not correct, reason: Depth value '-1' must be positive")
+      ("-1", "Less than zero", "Provided depth in not correct, reason: Depth value '-1' must be non-negative")
     )) { (v: String, t: String, m: String) =>
       s"for depth = $v ($t) should return exception" in {
         validateMatcherError(

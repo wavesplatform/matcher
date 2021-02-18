@@ -398,8 +398,8 @@ class MatcherApiRoute(
           depth.toIntOption match {
             case None => complete(InvalidDepth(s"Depth value '$depth' must be an Integer"))
             case Some(depth) =>
-              if (depth > 0) response(depth)
-              else complete(InvalidDepth(s"Depth value '$depth' must be positive"))
+              if (depth >= 0) response(depth)
+              else complete(InvalidDepth(s"Depth value '$depth' must be non-negative"))
           }
       }
     }

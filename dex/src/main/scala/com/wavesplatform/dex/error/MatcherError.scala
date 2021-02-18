@@ -596,7 +596,7 @@ case class InvalidAddress(reason: String)
     extends MatcherError(address, commonEntity, commonClass, e"Provided address in not correct, reason: ${Symbol("reason") -> reason}")
 
 case class InvalidDepth(reason: String)
-  extends MatcherError(depth, commonEntity, commonClass, e"Provided depth in not correct, reason: ${Symbol("reason") -> reason}")
+  extends MatcherError(request, depth, commonClass, e"Provided depth in not correct, reason: ${Symbol("reason") -> reason}")
 
 sealed abstract class Entity(val code: Int)
 

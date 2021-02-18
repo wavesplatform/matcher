@@ -68,7 +68,7 @@ class GetOrderBookSpec extends MatcherSuiteBase with TableDrivenPropertyChecks w
         validateMatcherError(
           dex1.rawApi.getOrderBook(wavesUsdPair, v),
           StatusCodes.BadRequest,
-          113246208,
+          1076224,
           m
         )
       }

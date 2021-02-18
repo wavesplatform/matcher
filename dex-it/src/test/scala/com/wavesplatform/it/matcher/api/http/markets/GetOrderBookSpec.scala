@@ -58,13 +58,19 @@ class GetOrderBookSpec extends MatcherSuiteBase with TableDrivenPropertyChecks w
     }
 
     forAll(Table(
-      ("Value", "Title"),
-      ("2147483648", "More than Int.Max"),
-      ("100.0", "Double"),
-      ("incorrect", "Alphabetical")
-    )) { (v: String, t: String) =>
-      s"for depth = $v ($t) should return exception" in { // TODO fix, endpoint should return something like 400/Bad Request
-        validate404Exception(dex1.rawApi.getOrderBook(wavesUsdPair, v))
+      ("Value", "Title", "Error message"),
+      ("2147483648", "More than Int.Max", "Provided depth in not correct, reason: Depth value '2147483648' must be an Integer"),
+      ("100.0", "Double", "Provided depth in not correct, reason: Depth value '100.0' must be an Integer"),
+      ("incorrect", "Alphabetical", "Provided depth in not correct, reason: Depth value 'incorrect' must be an Integer"),
+      ("-1", "Less than zero", "Provided depth in not correct, reason: Depth value '-1' must be non-negative")
+    )) { (v: String, t: String, m: String) =>
+      s"for depth = $v ($t) should return exception" in {
+        validateMatcherError(
+          dex1.rawApi.getOrderBook(wavesUsdPair, v),
+          StatusCodes.BadRequest,
+          1076224,
+          m
+        )
       }
     }
 

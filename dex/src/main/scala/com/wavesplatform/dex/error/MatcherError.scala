@@ -595,6 +595,9 @@ case class SubscriptionsLimitReached(limit: Int, id: String)
 case class InvalidAddress(reason: String)
     extends MatcherError(address, commonEntity, commonClass, e"Provided address in not correct, reason: ${Symbol("reason") -> reason}")
 
+case class InvalidDepth(reason: String)
+  extends MatcherError(request, depth, commonClass, e"Provided depth in not correct, reason: ${Symbol("reason") -> reason}")
+
 sealed abstract class Entity(val code: Int)
 
 // noinspection ScalaStyle
@@ -635,6 +638,7 @@ object Entity {
   object token extends Entity(105)
   object payload extends Entity(106)
   object subscription extends Entity(107)
+  object depth extends Entity(108)
 }
 
 sealed abstract class Class(val code: Int)

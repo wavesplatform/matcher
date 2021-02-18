@@ -1,12 +1,12 @@
 package com.wavesplatform.dex.api.http.routes
 
-import akka.actor.{typed, ActorRef}
+import akka.actor.{ActorRef, typed}
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.{HttpEntity, HttpResponse, StatusCodes}
 import akka.http.scaladsl.server
 import akka.http.scaladsl.server._
 import akka.http.scaladsl.server.directives.FutureDirectives
-import akka.pattern.{ask, AskTimeoutException}
+import akka.pattern.{AskTimeoutException, ask}
 import akka.stream.Materializer
 import akka.util.Timeout
 import cats.syntax.option._
@@ -18,7 +18,7 @@ import com.wavesplatform.dex.actors.address.AddressActor.OrderListType
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.api.http._
 import com.wavesplatform.dex.api.http.entities._
-import com.wavesplatform.dex.api.http.headers.{`X-User-Public-Key`, CustomContentTypes}
+import com.wavesplatform.dex.api.http.headers.{CustomContentTypes, `X-User-Public-Key`}
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
 import com.wavesplatform.dex.api.ws.actors.WsExternalClientDirectoryActor
@@ -38,7 +38,7 @@ import com.wavesplatform.dex.domain.order.OrderJson.orderFormat
 import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV2
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.effect.FutureResult
-import com.wavesplatform.dex.error.MatcherError
+import com.wavesplatform.dex.error.{MatcherError}
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
 import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model._
@@ -386,9 +386,20 @@ class MatcherApiRoute(
     )
   )
   def getOrderBook: Route = (path(AssetPairPM) & get) { pairOrError =>
-    parameters("depth".as[Int].?) { depth =>
-      withAssetPair(pairOrError, redirectToInverse = true, depth.fold("")(d => s"?depth=$d")) { pair =>
-        complete(orderBookHttpInfo.getHttpView(pair, MatcherModel.Normalized, depth))
+    parameters("depth".as[String].?) { depth =>
+      depth match {
+        case None => withAssetPair(pairOrError, redirectToInverse = true, "") { pair =>
+          complete(orderBookHttpInfo.getHttpView(pair, MatcherModel.Normalized, None))
+        }
+        case Some(depth) =>
+          depth.toIntOption match {
+            case None => complete(InvalidDepth(s"Depth value '$depth' must be an Integer"))
+            case Some(d) =>
+              if (d >= 0) withAssetPair(pairOrError, redirectToInverse = true, s"?depth=$d") { pair =>
+                complete(orderBookHttpInfo.getHttpView(pair, MatcherModel.Normalized, Some(d)))
+              }
+              else complete(InvalidDepth(s"Depth value '$depth' must be non-negative"))
+          }
       }
     }
   }

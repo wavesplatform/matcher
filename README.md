@@ -291,6 +291,8 @@ Artifacts of GRPC-server extension have names like:
 * `grpc-server{supported-network}_{version}.deb` for DEB artifact. `{supported-network}` is empty for MainNet;
 * `grpc-server-{version}.zip` for ZIP artifact;
 
+#### 📦 Installation
+
 [a. Installation through DEB](#a--installation-through-deb-1)
 
 [b. Installation through ZIP](#b--installation-through-zip-1)

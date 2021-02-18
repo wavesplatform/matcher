@@ -222,7 +222,118 @@ waves.dex {
 }
 ````
 
-### 6.3. Matcher server installation and configuration
+### 6.2. Matcher extension installation and configuration
+
+Artifacts of Matcher extension have names like:
+* `waves-dex-extension{supported-network}_{version}.deb` for DEB artifact. `{supported-network}` is empty for MainNet;
+* `waves-dex-extension-{version}.zip` for ZIP artifact;
+
+#### a. 📦 Installation through DEB
+
+> If the Node installed from DEB
+
+Run: `sudo dpkg -i deb-artifact.deb`
+
+The extension will be automatically installed to the Node.
+
+#### b. 🗜 Installation through ZIP
+
+> If the Node is running manually.
+> Note, if you installed Node from a DEB package, Matcher will be removed after update.
+
+To install a Matcher extension from ZIP file:
+
+1. Copy the archive to the directory with Node's JAR
+2. Extract the archive. Its files will be added to the existed directories.
+
+To run the Node with Matcher extension use following commands:
+
+*Debian/Ubuntu/macOS*:
+
+```
+java <your_JVM_options> -cp "/absolute_path_to_fat_jar/waves-all.jar:/absolute_path_to_fat_jar/lib/*" com.wavesplatform.Application /path/to/config.conf
+```
+
+*Windows*:
+
+```
+java <your_JVM_options> -cp "/absolute_path_to_fat_jar/waves-all.jar;/absolute_path_to_fat_jar/lib/*" com.wavesplatform.Application /path/to/config.conf
+```
+
+#### 📃 Configration of Matcher extension
+
+Add lines to the Node's configuration:
+
+```hocon
+waves.extensions += "com.wavesplatform.dex.grpc.integration.DEXExtension"
+
+waves.dex {
+  # gRPC integration settings for Waves Node
+  grpc.integration {
+    host = "127.0.0.1" # "0.0.0.0" if the Matcher server connects to the Matcher extension from other machine 
+    port = 6887
+  }
+}
+````
+
+### 6.3. GRPC-server extension installation and configuration
+
+Since version 2.3.2 Matcher have using grpc-blockchain-stream from the Node to get data with a blockchain events and updates
+
+ℹ️ **IMPORTANT:** Matcher doesn't start without installed grpc-server extension at the node.
+
+Artifacts of GRPC-server extension have names like:
+* `grpc-server{supported-network}_{version}.deb` for DEB artifact. `{supported-network}` is empty for MainNet;
+* `grpc-server-{version}.zip` for ZIP artifact;
+
+#### a. 📦 Installation through DEB
+
+> If the Node installed from DEB
+
+Run: `sudo dpkg -i deb-artifact.deb`
+
+The extension will be automatically installed to the Node.
+
+#### b. 🗜 Installation through ZIP
+
+> If the Node is running manually.
+> Note, if you installed Node from a DEB package, Matcher will be removed after update.
+
+To install a GRPC-server extension from ZIP file:
+
+1. Copy the archive to the directory with Node's JAR
+2. Extract the archive. Its files will be added to the existed directories.
+
+To run the Node with Matcher extension use following commands:
+
+*Debian/Ubuntu/macOS*:
+
+```
+java <your_JVM_options> -cp "/absolute_path_to_fat_jar/waves-all.jar:/absolute_path_to_fat_jar/lib/*" com.wavesplatform.Application /path/to/config.conf
+```
+
+*Windows*:
+
+```
+java <your_JVM_options> -cp "/absolute_path_to_fat_jar/waves-all.jar;/absolute_path_to_fat_jar/lib/*" com.wavesplatform.Application /path/to/config.conf
+```
+
+#### 📃 Configration of GRPC-server extension
+
+Add lines to the Matcher's configuration:
+
+```hocon
+waves-blockchain-client {
+  grpc {
+     target = "node_host:6887" # host and port of the Node with installed grpc-server extension
+  }
+
+  default-caches-expiration = 100ms
+}
+
+````
+
+### 6.4. Matcher server installation and configuration
 
 Artifacts of Matcher extension have names like `waves-dex{version}.{deb|zip}`.
 

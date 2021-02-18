@@ -51,9 +51,9 @@ case class WavesChain(history: Vector[WavesBlock], height: Int, blocksCapacity: 
             }
             if (blocksCapacity == 0) WavesChain(newHistory.dropRight(1), block.ref.height, blocksCapacity = 0).asRight
             else WavesChain(newHistory, block.ref.height, blocksCapacity = blocksCapacity - 1).asRight
-          } else s"The new block ${block.ref} (reference=${block.reference}) must be after ${prev.ref}".asLeft
+          } else s"The new block ${block.ref} (reference=${block.reference.take(5)}) must be after ${prev.ref}".asLeft
       }
-    else s"The new block ${block.ref} (reference=${block.reference}) must be on height ${height + 1}".asLeft
+    else s"The new block ${block.ref} (reference=${block.reference.take(5)}) must be on height ${height + 1}".asLeft
 
   private def withMicroBlock(microBlock: WavesBlock): Either[String, WavesChain] = history.headOption match {
     case None => s"Can't attach a micro block $microBlock to empty chain".asLeft
@@ -61,7 +61,7 @@ case class WavesChain(history: Vector[WavesBlock], height: Int, blocksCapacity: 
       if (microBlock.ref.height == prev.ref.height && microBlock.reference == prev.ref.id)
         WavesChain(history.prepended(microBlock), microBlock.ref.height, blocksCapacity = blocksCapacity).asRight
       else
-        s"The new micro block ${microBlock.ref} (reference=${microBlock.reference}) must reference the last block ${prev.ref}".asLeft
+        s"The new micro block ${microBlock.ref} (reference=${microBlock.reference.take(5)}) must reference the last block ${prev.ref}".asLeft
   }
 
   def diffIndex: DiffIndex = history.foldMap(_.diffIndex)

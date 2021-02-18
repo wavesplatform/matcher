@@ -36,7 +36,7 @@ class CombinedStreamTestSuite extends WavesIntegrationSuiteBase with Eventually 
 
       "the height hint is default" in {
         val t = mk()
-        t.cs.currentHeightHint shouldBe 1
+        t.cs.currentProcessedHeight shouldBe 1
       }
     }
 
@@ -51,15 +51,15 @@ class CombinedStreamTestSuite extends WavesIntegrationSuiteBase with Eventually 
       "affects the recovery height hint" in {
         val t = mk()
         t.cs.startFrom(10)
-        t.cs.currentHeightHint shouldBe 10
+        t.cs.currentProcessedHeight shouldBe 10
       }
     }
 
     "updateHeightHint" - {
       "affects the recovery height" in {
         val t = mk()
-        t.cs.updateHeightHint(10)
-        t.cs.currentHeightHint shouldBe 10
+        t.cs.updateProcessedHeight(10)
+        t.cs.currentProcessedHeight shouldBe 10
       }
     }
 
@@ -82,7 +82,7 @@ class CombinedStreamTestSuite extends WavesIntegrationSuiteBase with Eventually 
         val t = mk()
         t.cs.startFrom(10)
         t.cs.restart()
-        t.cs.currentHeightHint shouldBe 10
+        t.cs.currentProcessedHeight shouldBe 10
       }
     }
 

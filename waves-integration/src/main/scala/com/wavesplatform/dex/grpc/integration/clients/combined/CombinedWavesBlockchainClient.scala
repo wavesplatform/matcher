@@ -74,7 +74,7 @@ class CombinedWavesBlockchainClient(
         .mapAccumulate(init) { case (origStatus, event) =>
           val x = StatusTransitions(origStatus, event)
           x.updatedLastBlockHeight match {
-            case LastBlockHeight.Updated(to) => combinedStream.updateHeightHint(to)
+            case LastBlockHeight.Updated(to) => combinedStream.updateProcessedHeight(to)
             case LastBlockHeight.RestartRequired => combinedStream.restart()
             case _ =>
           }

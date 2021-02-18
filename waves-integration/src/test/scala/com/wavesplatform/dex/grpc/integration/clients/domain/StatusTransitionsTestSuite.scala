@@ -153,7 +153,6 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
             fork = WavesFork(init.main, mkChain(Vector(block1), 99)),
             utxUpdate = Monoid.empty[UtxUpdate]
           ),
-          updatedLastBlockHeight = StatusUpdate.LastBlockHeight.NotChanged,
           requestNextBlockchainEvent = true
         ))
 
@@ -322,7 +321,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
               )
             ),
             requestBalances = DiffIndex(regular = Map(carol -> Set(Waves: Asset)), outgoingLeasing = Set.empty),
-            updatedLastBlockHeight = LastBlockHeight.NotChanged
+            updatedLastBlockHeight = LastBlockHeight.Updated(microBlock.ref.height)
           ))
         }
       }

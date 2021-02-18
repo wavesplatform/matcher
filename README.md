@@ -29,7 +29,7 @@ For further information please refer the official [documentation](https://docs.w
             * [a. Installation through DEB](#a--installation-through-deb-1)
             * [b. Installation through ZIP](#b--installation-through-zip-1)
             * [Configuration of Matcher server](#-configuration-of-matcher-server)
-         * [6.4. GRPC-server extension installation and configuration](#64-grpc-server-installation-and-configuration)
+         * [6.4. GRPC-server extension installation and configuration](#64-grpc-server-extension-installation-and-configuration)
             * [a. Installation through DEB](#a--installation-through-deb)
             * [b. Installation through ZIP](#b--installation-through-zip)
             * [Configration of Matcher extension](#-configration-of-matcher-extension)

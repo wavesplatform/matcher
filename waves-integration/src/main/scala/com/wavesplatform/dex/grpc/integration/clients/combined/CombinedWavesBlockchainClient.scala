@@ -62,7 +62,7 @@ class CombinedWavesBlockchainClient(
   @volatile private var lastUpdates = List.empty[BlockchainBalance]
   private val maxPreviousBlockUpdates = settings.maxCachedLatestBlockUpdates - 1
 
-  override lazy val updates: Observable[WavesNodeUpdates] = Observable.fromFuture(meClient.currentBlockInfo)
+  override lazy val updates: Observable[(WavesNodeUpdates, Boolean)] = Observable.fromFuture(meClient.currentBlockInfo)
     .flatMap { startBlockInfo =>
       log.info(s"Current block: $startBlockInfo")
       val startHeight = math.max(startBlockInfo.height - settings.maxRollbackHeight - 1, 1)
@@ -124,9 +124,10 @@ class CombinedWavesBlockchainClient(
             changes <- tx.diff.flatMap(_.stateUpdate)
           } yield tx.id.toVanilla -> TransactionWithChanges(tx.id, signedTx, changes)
 
-          (x.newStatus, WavesNodeUpdates(updatedFinalBalances, (unconfirmedTxs ++ confirmedTxs ++ failedTxs).toMap))
+          val updates = WavesNodeUpdates(updatedFinalBalances, (unconfirmedTxs ++ confirmedTxs ++ failedTxs).toMap)
+          (x.newStatus, (updates, combinedStream.currentProcessedHeight >= startBlockInfo.height))
         }
-        .filterNot(_.isEmpty)
+        .filterNot(_._1.isEmpty)
         .tap(_ => combinedStream.startFrom(startHeight))
     }
     .doOnError(e => Task(log.error("Got an error in the combined stream", e)))

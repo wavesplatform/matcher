@@ -102,7 +102,7 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
     updates.foreach { update =>
       log.info(s"Got in test: $update")
       regularBalance.updateAndGet { orig =>
-        update.balanceUpdates.foldLeft(orig) { case (r, (address, xs)) =>
+        update._1.balanceUpdates.foldLeft(orig) { case (r, (address, xs)) =>
           r.deepReplace(Map(address -> xs.regular))
         }
       }
@@ -438,7 +438,7 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
       broadcastAndAwait(leasing)
 
       cancellable.cancel()
-      val r = Await.result(eventsF, 1.minute).foldMap(_.balanceUpdates)
+      val r = Await.result(eventsF, 1.minute).foldMap(_._1.balanceUpdates)
 
       def filtered(in: AddressBalanceUpdates): AddressBalanceUpdates = in.copy(
         regular = in.regular.view.filterKeys(_ == Waves).toMap,

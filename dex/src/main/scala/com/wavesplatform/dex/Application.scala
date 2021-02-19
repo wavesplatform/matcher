@@ -367,9 +367,11 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     _ = {
       log.info("Start watching Node updates")
       // Note, updates is lazy, so it is initialized here
-      wavesBlockchainAsyncClient.updates.foreach { updates =>
-        orderEventsCoordinatorRef ! OrderEventsCoordinatorActor.Command.ApplyNodeUpdates(updates)
-      }(monixScheduler)
+      wavesBlockchainAsyncClient.updates
+        .dropWhile { case (_, isReady) => !isReady }
+        .foreach { update =>
+          orderEventsCoordinatorRef ! OrderEventsCoordinatorActor.Command.ApplyNodeUpdates(update._1)
+        }(monixScheduler)
     }
 
     _ <- {

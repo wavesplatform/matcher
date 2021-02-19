@@ -14,7 +14,10 @@ import scala.concurrent.Future
 
 // TODO DEX-998
 trait WavesBlockchainClient {
-  def updates: Observable[WavesNodeUpdates]
+  /**
+   * @return (update, ready) ready == the last processed height >= the last height in blockchain
+   */
+  def updates: Observable[(WavesNodeUpdates, Boolean)]
 
   def partialBalancesSnapshot(address: Address, assets: Set[Asset]): Future[AddressBalanceUpdates]
   def fullBalancesSnapshot(address: Address, excludeAssets: Set[Asset]): Future[AddressBalanceUpdates]

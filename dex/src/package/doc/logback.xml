@@ -51,6 +51,7 @@
 
     <!-- Waves NODE interaction -->
     <logger name="com.wavesplatform.dex.grpc.integration.clients.blockchainupdates" level="DEBUG"/>
+    <logger name="com.wavesplatform.dex.grpc.integration.clients.matcherext.MatcherExtensionGrpcAsyncClient" level="DEBUG"/> <!-- gRPC requests to NODE -->
 
     <if condition='property("logback.stdout.enabled").contains("true")'>
         <then>

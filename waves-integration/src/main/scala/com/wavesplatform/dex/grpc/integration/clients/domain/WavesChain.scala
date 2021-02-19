@@ -38,19 +38,22 @@ case class WavesChain(history: Vector[WavesBlock], height: Int, blocksCapacity: 
    * It is expected, that block references the last block in the history
    * @return Guarantees WavesFork is not empty
    */
-  private def withFullBlock(block: WavesBlock): Either[String, WavesChain] = history.headOption match {
-    case None => WavesChain(history.prepended(block), block.ref.height, blocksCapacity = blocksCapacity - 1).asRight
-    case Some(prev) =>
-      if (block.ref.height == prev.ref.height + 1 && block.reference == prev.ref.id) {
-        val (liquidBlock, restHistory) = dropLiquidBlock(block, history)
-        val newHistory = liquidBlock match {
-          case Nil => restHistory.prepended(block)
-          case x :: xs => restHistory.prepended(mkHardenedBlock(NonEmptyList(x, xs))).prepended(block)
-        }
-        if (blocksCapacity == 0) WavesChain(newHistory.dropRight(1), block.ref.height, blocksCapacity = 0).asRight
-        else WavesChain(newHistory, block.ref.height, blocksCapacity = blocksCapacity - 1).asRight
-      } else s"The new block ${block.ref} (reference=${block.reference}) must be after ${prev.ref}".asLeft
-  }
+  private def withFullBlock(block: WavesBlock): Either[String, WavesChain] =
+    if (block.ref.height == height + 1)
+      history.headOption match {
+        case None => WavesChain(history.prepended(block), block.ref.height, blocksCapacity = blocksCapacity - 1).asRight
+        case Some(prev) =>
+          if (block.reference == prev.ref.id) {
+            val (liquidBlock, restHistory) = dropLiquidBlock(block, history)
+            val newHistory = liquidBlock match {
+              case Nil => restHistory.prepended(block)
+              case x :: xs => restHistory.prepended(mkHardenedBlock(NonEmptyList(x, xs))).prepended(block)
+            }
+            if (blocksCapacity == 0) WavesChain(newHistory.dropRight(1), block.ref.height, blocksCapacity = 0).asRight
+            else WavesChain(newHistory, block.ref.height, blocksCapacity = blocksCapacity - 1).asRight
+          } else s"The new block ${block.ref} (reference=${block.reference.take(5)}) must be after ${prev.ref}".asLeft
+      }
+    else s"The new block ${block.ref} (reference=${block.reference.take(5)}) must be on height ${height + 1}".asLeft
 
   private def withMicroBlock(microBlock: WavesBlock): Either[String, WavesChain] = history.headOption match {
     case None => s"Can't attach a micro block $microBlock to empty chain".asLeft
@@ -58,21 +61,10 @@ case class WavesChain(history: Vector[WavesBlock], height: Int, blocksCapacity: 
       if (microBlock.ref.height == prev.ref.height && microBlock.reference == prev.ref.id)
         WavesChain(history.prepended(microBlock), microBlock.ref.height, blocksCapacity = blocksCapacity).asRight
       else
-        s"The new micro block ${microBlock.ref} (reference=${microBlock.reference}) must reference the last block ${prev.ref}".asLeft
+        s"The new micro block ${microBlock.ref} (reference=${microBlock.reference.take(5)}) must reference the last block ${prev.ref}".asLeft
   }
 
   def diffIndex: DiffIndex = history.foldMap(_.diffIndex)
-
-  def withoutLastLiquidOrFull: WavesChain = {
-    val heightCorrection = if (history.isEmpty) 0 else 1
-    val updatedHistory =
-      if (history.isEmpty) history
-      else if (history.headOption.exists(_.tpe == WavesBlock.Type.MicroBlock))
-        // Remove a liquid block. tail is safe, because we can't append a micro block without a block in the history
-        history.dropWhile(_.tpe == WavesBlock.Type.MicroBlock).tail
-      else history.tail // Remove a full block
-    WavesChain(updatedHistory, height - heightCorrection, blocksCapacity = blocksCapacity + heightCorrection)
-  }
 
   def withoutLast: (WavesChain, Option[WavesBlock]) =
     if (isEmpty) (this, None)
@@ -85,22 +77,26 @@ case class WavesChain(history: Vector[WavesBlock], height: Int, blocksCapacity: 
   /**
    * @return (new chain, dropped blocks), where dropped blocks are ordered from oldest to newest
    */
-  def dropAfter(ref: BlockRef): (WavesChain, List[WavesBlock]) = {
+  def dropAfter(ref: BlockRef): (WavesChain, List[WavesBlock]) =
     // TODO DEX-1032
-    val (droppedBlocks, commonHistory) = history.splitOnCondReversed(x => !(x.ref.height == ref.height && x.ref.id == ref.id))
-    val droppedFullBlocksNumber = droppedBlocks.count(_.tpe == WavesBlock.Type.FullBlock)
-    (WavesChain(commonHistory, ref.height, blocksCapacity = blocksCapacity + droppedFullBlocksNumber), droppedBlocks)
-  }
+    if (ref.height > height) (this, List.empty)
+    else {
+      val (droppedBlocks, commonHistory) = history.splitOnCondReversed(x => !(x.ref.height == ref.height && x.ref.id == ref.id))
+      val droppedFullBlocksNumber = droppedBlocks.count(_.tpe == WavesBlock.Type.FullBlock)
+      (WavesChain(commonHistory, ref.height, blocksCapacity = blocksCapacity + droppedFullBlocksNumber), droppedBlocks)
+    }
 
   /**
    * @return (new chain, dropped blocks), where dropped blocks are ordered from oldest to newest
    */
-  def dropAfter(height: Int): (WavesChain, List[WavesBlock]) = {
+  def dropAfter(h: Int): (WavesChain, List[WavesBlock]) =
     // TODO DEX-1032
-    val (droppedBlocks, commonHistory) = history.splitOnCondReversed(_.ref.height > height)
-    val droppedFullBlocksNumber = droppedBlocks.count(_.tpe == WavesBlock.Type.FullBlock)
-    (WavesChain(commonHistory, height, blocksCapacity = blocksCapacity + droppedFullBlocksNumber), droppedBlocks)
-  }
+    if (h > height) (this, List.empty)
+    else {
+      val (droppedBlocks, commonHistory) = history.splitOnCondReversed(_.ref.height > h)
+      val droppedFullBlocksNumber = droppedBlocks.count(_.tpe == WavesBlock.Type.FullBlock)
+      (WavesChain(commonHistory, h, blocksCapacity = blocksCapacity + droppedFullBlocksNumber), droppedBlocks)
+    }
 
   private def mkHardenedBlock(blocks: NonEmptyList[WavesBlock]): WavesBlock = blocks.reduce(WavesChain.blockSemigroup)
 
@@ -124,12 +120,6 @@ object WavesChain {
     }
 
   }
-
-  /**
-   * If history is empty, the height is supposed to be 0
-   */
-  def apply(history: Vector[WavesBlock], blocksCapacity: Int): WavesChain =
-    WavesChain(history, history.headOption.fold(0)(_.ref.height), blocksCapacity)
 
   /**
    * @return (liquidBlock, restHistory)

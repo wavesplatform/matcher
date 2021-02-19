@@ -12,14 +12,12 @@ case class WavesFork private[domain] (origChain: WavesChain, forkChain: WavesCha
 
   // TODO DEX-1009 Move to tests in the end
 
-  require(!origChain.isEmpty, "empty origChain")
-
-  // TODO DEX-1009 An additional invariant: forkChain should contain only one common block!
+  require(!origChain.isEmpty, s"empty $origChain")
 
   def height: Int = forkChain.height
 
   def withBlock(block: WavesBlock): Status = forkChain.withBlock(block) match {
-    case Left(e) => Status.Failed(withoutLast, e)
+    case Left(e) => Status.Failed(e)
     case Right(updatedForkChain) =>
       if (
         // +1 because we expect a micro block on origChain.height.
@@ -48,8 +46,6 @@ case class WavesFork private[domain] (origChain: WavesChain, forkChain: WavesCha
       } else Status.NotResolved(copy(forkChain = updatedForkChain))
   }
 
-  def withoutLast: WavesFork = copy(forkChain = forkChain.withoutLastLiquidOrFull)
-
   def rollbackTo(height: Int): WavesFork = copy(forkChain = forkChain.dropAfter(height)._1)
   def rollbackTo(ref: BlockRef): WavesFork = copy(forkChain = forkChain.dropAfter(ref)._1)
 
@@ -57,12 +53,6 @@ case class WavesFork private[domain] (origChain: WavesChain, forkChain: WavesCha
 }
 
 object WavesFork {
-
-  def mk(origChain: WavesChain, commonBlockRef: BlockRef): WavesFork = WavesFork(origChain, origChain.dropAfter(commonBlockRef)._1)
-  def mk(origChain: WavesChain, commonHeight: Int): WavesFork = WavesFork(origChain, origChain.dropAfter(commonHeight)._1)
-
-  def mkRolledBackByOne(origChain: WavesChain): WavesFork =
-    WavesFork(origChain, origChain.withoutLastLiquidOrFull) // Or better use WavesFork.withoutLast
 
   sealed trait Status extends Product with Serializable
 
@@ -77,7 +67,7 @@ object WavesFork {
     ) extends Status
 
     case class NotResolved(updatedFork: WavesFork) extends Status
-    case class Failed(updatedFork: WavesFork, reason: String) extends Status
+    case class Failed(reason: String) extends Status
   }
 
 }

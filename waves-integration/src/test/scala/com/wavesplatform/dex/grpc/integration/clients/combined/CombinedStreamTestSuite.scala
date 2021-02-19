@@ -36,7 +36,7 @@ class CombinedStreamTestSuite extends WavesIntegrationSuiteBase with Eventually 
 
       "the height hint is default" in {
         val t = mk()
-        t.cs.currentHeightHint shouldBe 1
+        t.cs.currentProcessedHeight shouldBe 1
       }
     }
 
@@ -51,15 +51,15 @@ class CombinedStreamTestSuite extends WavesIntegrationSuiteBase with Eventually 
       "affects the recovery height hint" in {
         val t = mk()
         t.cs.startFrom(10)
-        t.cs.currentHeightHint shouldBe 10
+        t.cs.currentProcessedHeight shouldBe 10
       }
     }
 
     "updateHeightHint" - {
       "affects the recovery height" in {
         val t = mk()
-        t.cs.updateHeightHint(10)
-        t.cs.currentHeightHint shouldBe 10
+        t.cs.updateProcessedHeight(10)
+        t.cs.currentProcessedHeight shouldBe 10
       }
     }
 
@@ -67,22 +67,22 @@ class CombinedStreamTestSuite extends WavesIntegrationSuiteBase with Eventually 
       "stop blockchainUpdates" in {
         val t = mk()
         t.cs.startFrom(10)
-        t.cs.restartFrom(5)
+        t.cs.restart()
         logged(t.blockchainUpdates.systemStream)(_.tail.head shouldBe SystemEvent.Stopped)
       }
 
       "stops utxEvents" in {
         val t = mk()
         t.cs.startFrom(10)
-        t.cs.restartFrom(5)
+        t.cs.restart()
         logged(t.utxEvents.systemStream)(_.tail.head shouldBe SystemEvent.Stopped)
       }
 
-      "affects the recovery height" in {
+      "doesn't affect the recovery height" in {
         val t = mk()
         t.cs.startFrom(10)
-        t.cs.restartFrom(5)
-        t.cs.currentHeightHint shouldBe 5
+        t.cs.restart()
+        t.cs.currentProcessedHeight shouldBe 10
       }
     }
 

@@ -55,8 +55,8 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
     "withBlock" - {
       "Failed - on an unexpected block, removes the last block" in {
         val fork = WavesFork(
-          WavesChain(Vector(block2, block1), 98),
-          WavesChain(Vector(block1), 98)
+          mkChain(Vector(block2, block1), 98),
+          mkChain(Vector(block1), 98)
         )
 
         val invalidBlock = WavesBlock(
@@ -70,36 +70,30 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
           confirmedTxs = mkTransactionWithChangesMap(10)
         )
 
-        val expectedUpdatedFork = WavesFork(
-          WavesChain(Vector(block2, block1), 98),
-          WavesChain(Vector.empty, 99)
+        fork.withBlock(invalidBlock) should matchTo[Status](
+          Status.Failed("The new block Ref(h=2, ZvGf) (reference=3j) must be after Ref(h=1, 8TZ)")
         )
-
-        fork.withBlock(invalidBlock) should matchTo(Status.Failed(
-          updatedFork = expectedUpdatedFork,
-          reason = "The new block Ref(h=2, ZvGf) (reference=3j) must be after Ref(h=1, 8TZ)"
-        ): Status)
       }
 
       "NotResolved - the height is still less or equal to the previous chain" - {
         "a full block" in {
           val fork = WavesFork(
-            WavesChain(Vector(block2, block1), 98),
-            WavesChain(Vector(block1), 99)
+            mkChain(Vector(block2, block1), 98),
+            mkChain(Vector(block1), 99)
           )
 
           val expectedUpdatedFork = WavesFork(
-            WavesChain(Vector(block2, block1), 98),
-            WavesChain(Vector(block2, block1), 98)
+            mkChain(Vector(block2, block1), 98),
+            mkChain(Vector(block2, block1), 98)
           )
 
-          fork.withBlock(block2) should matchTo(Status.NotResolved(expectedUpdatedFork): Status)
+          fork.withBlock(block2) should matchTo[Status](Status.NotResolved(expectedUpdatedFork))
         }
 
         "a micro block with a lesser key block height than in the original chain" in {
           val fork = WavesFork(
-            WavesChain(Vector(block3, block2, block1), 97),
-            WavesChain(Vector(block2, block1), 98)
+            mkChain(Vector(block3, block2, block1), 97),
+            mkChain(Vector(block2, block1), 98)
           )
 
           val microBlock = WavesBlock(
@@ -114,11 +108,11 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
           )
 
           val expectedUpdatedFork = WavesFork(
-            WavesChain(Vector(block3, block2, block1), 97),
-            WavesChain(Vector(microBlock, block2, block1), 98)
+            mkChain(Vector(block3, block2, block1), 97),
+            mkChain(Vector(microBlock, block2, block1), 98)
           )
 
-          fork.withBlock(microBlock) should matchTo(Status.NotResolved(expectedUpdatedFork): Status)
+          fork.withBlock(microBlock) should matchTo[Status](Status.NotResolved(expectedUpdatedFork))
         }
 
         "an existed micro block on the same chain" in {
@@ -134,16 +128,16 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
           )
 
           val fork = WavesFork(
-            WavesChain(Vector(microBlock1, block1), 99),
-            WavesChain(Vector(block1), 99)
+            mkChain(Vector(microBlock1, block1), 99),
+            mkChain(Vector(block1), 99)
           )
 
           val expectedUpdatedFork = WavesFork(
-            WavesChain(Vector(microBlock1, block1), 99),
-            WavesChain(Vector(microBlock1, block1), 99)
+            mkChain(Vector(microBlock1, block1), 99),
+            mkChain(Vector(microBlock1, block1), 99)
           )
 
-          fork.withBlock(microBlock1) should matchTo(Status.NotResolved(expectedUpdatedFork): Status)
+          fork.withBlock(microBlock1) should matchTo[Status](Status.NotResolved(expectedUpdatedFork))
         }
       }
 
@@ -161,12 +155,12 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
           )
 
           val fork = WavesFork(
-            WavesChain(Vector(block2, block1), 98),
-            WavesChain(Vector(block3, block2, block1), 97)
+            mkChain(Vector(block2, block1), 98),
+            mkChain(Vector(block3, block2, block1), 97)
           )
 
-          fork.withBlock(block4) should matchTo(Status.Resolved(
-            activeChain = WavesChain(Vector(block4, block3, block2, block1), 96),
+          fork.withBlock(block4) should matchTo[Status](Status.Resolved(
+            activeChain = mkChain(Vector(block4, block3, block2, block1), 96),
             newChanges = BlockchainBalance(
               regular = Map(alice -> Map(usd -> 30L, Waves -> 10)),
               outgoingLeasing = Map(alice -> 1L, bob -> 10)
@@ -174,14 +168,14 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
             lostDiffIndex = Monoid.empty[DiffIndex],
             lostTxIds = Map.empty,
             confirmedTxs = block3.confirmedTxs ++ block4.confirmedTxs
-          ): Status)
+          ))
         }
 
         "on a micro block" - {
           "after the key block with the same height (same blocks)" in {
             val fork = WavesFork(
-              WavesChain(Vector(block2, block1), 98),
-              WavesChain(Vector(block2, block1), 98)
+              mkChain(Vector(block2, block1), 98),
+              mkChain(Vector(block2, block1), 98)
             )
 
             val microBlock = WavesBlock(
@@ -195,8 +189,8 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
               confirmedTxs = mkTransactionWithChangesMap(10)
             )
 
-            fork.withBlock(microBlock) should matchTo(Status.Resolved(
-              activeChain = WavesChain(Vector(microBlock, block2, block1), 98),
+            fork.withBlock(microBlock) should matchTo[Status](Status.Resolved(
+              activeChain = mkChain(Vector(microBlock, block2, block1), 98),
               newChanges = BlockchainBalance(
                 regular = Map(bob -> Map(usd -> 31)),
                 outgoingLeasing = Map(bob -> 10L)
@@ -204,7 +198,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
               lostDiffIndex = Monoid.empty[DiffIndex],
               lostTxIds = Map.empty,
               confirmedTxs = microBlock.confirmedTxs
-            ): Status)
+            ))
           }
 
           "after the micro block with the same height (same blocks and micro blocks)" in {
@@ -231,17 +225,17 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
             )
 
             val fork = WavesFork(
-              WavesChain(Vector(microBlock1, block1), 99),
-              WavesChain(Vector(microBlock1, block1), 99)
+              mkChain(Vector(microBlock1, block1), 99),
+              mkChain(Vector(microBlock1, block1), 99)
             )
 
-            fork.withBlock(microBlock2) should matchTo(Status.Resolved(
-              activeChain = WavesChain(Vector(microBlock2, microBlock1, block1), 99),
+            fork.withBlock(microBlock2) should matchTo[Status](Status.Resolved(
+              activeChain = mkChain(Vector(microBlock2, microBlock1, block1), 99),
               newChanges = microBlock2.changes,
               lostDiffIndex = Monoid.empty[DiffIndex],
               lostTxIds = Map.empty,
               confirmedTxs = microBlock2.confirmedTxs
-            ): Status)
+            ))
           }
         }
       }

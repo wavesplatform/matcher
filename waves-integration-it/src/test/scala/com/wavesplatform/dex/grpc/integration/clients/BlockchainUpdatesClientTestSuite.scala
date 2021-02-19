@@ -48,6 +48,7 @@ class BlockchainUpdatesClientTestSuite extends IntegrationSuiteBase with HasToxi
 
   private lazy val eventLoopGroup = new NioEventLoopGroup
 
+  private val keepAliveTime = 2.seconds
   private val keepAliveTimeout = 5.seconds
 
   private lazy val blockchainUpdatesChannel: ManagedChannel =
@@ -56,7 +57,7 @@ class BlockchainUpdatesClientTestSuite extends IntegrationSuiteBase with HasToxi
       maxHedgedAttempts = 5,
       maxRetryAttempts = 5,
       keepAliveWithoutCalls = true,
-      keepAliveTime = 2.seconds,
+      keepAliveTime = keepAliveTime,
       keepAliveTimeout = keepAliveTimeout,
       idleTimeout = 1.day,
       channelOptions = GrpcClientSettings.ChannelOptionsSettings(connectTimeout = 5.seconds)
@@ -92,12 +93,14 @@ class BlockchainUpdatesClientTestSuite extends IntegrationSuiteBase with HasToxi
     }
   }
 
+  private val events = client.blockchainEvents.stream
+
   "Bugs" - {
     "DEX-1084 No updates from Blockchain updates" in {
       val cancellable = BooleanCancelable()
       @volatile var lastStatus: SystemEvent = SystemEvent.BecameReady
 
-      val eventsF = client.blockchainEvents.stream
+      val eventsF = events
         .takeWhileNotCanceled(cancellable)
         .doOnNext(_ => Task(client.blockchainEvents.requestNext()))
         .doOnComplete(Task(log.info("events completed")))
@@ -127,7 +130,7 @@ class BlockchainUpdatesClientTestSuite extends IntegrationSuiteBase with HasToxi
       val transfer2 = mkTransfer(bob, matcher, 1, Asset.Waves)
       broadcastAndAwait(transfer2)
 
-      Thread.sleep((keepAliveTimeout + 2.seconds).toMillis)
+      Thread.sleep((keepAliveTime + keepAliveTimeout + 3.seconds).toMillis)
 
       step("Enable connection to gRPC extension")
       blockchainUpdatesProxy.setConnectionCut(false)
@@ -139,7 +142,7 @@ class BlockchainUpdatesClientTestSuite extends IntegrationSuiteBase with HasToxi
       Thread.sleep(5.seconds.toMillis)
 
       cancellable.cancel()
-      val events = Await.result(eventsF, 1.minute).map { evt =>
+      val xs = Await.result(eventsF, 1.minute).map { evt =>
         val event = BlockchainUpdatesConversions.toEvent(evt.getUpdate)
         log.debug(s"Got $event")
         event.flatMap {
@@ -149,7 +152,7 @@ class BlockchainUpdatesClientTestSuite extends IntegrationSuiteBase with HasToxi
       }
       client.blockchainEvents.stop()
 
-      val gotTxIds = events.flatMap {
+      val gotTxIds = xs.flatMap {
         case None => List.empty
         case Some(txIds) => txIds.map(_.base58)
       }
@@ -179,7 +182,7 @@ class BlockchainUpdatesClientTestSuite extends IntegrationSuiteBase with HasToxi
       .doOnNext(evt => Task(log.info(s"System event: $evt")))
       .lastOptionL.runToFuture
 
-    val receivedTxFuture = client.blockchainEvents.stream
+    val receivedTxFuture = events
       .flatMapIterable(evt => immutable.Iterable.from(evt.update.flatMap(BlockchainUpdatesConversions.toEvent)))
       .map { evt =>
         log.debug(s"Got $evt")

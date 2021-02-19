@@ -50,7 +50,8 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
 
   private lazy val matcherExtProxy = toxiContainer.getProxy(wavesNode1.underlying.container, WavesNodeContainer.matcherGrpcExtensionPort)
 
-  private val keepAliveTimeout = 5.seconds
+  private val keepAliveTime = 10.seconds
+  private val keepAliveTimeout = 1.seconds
 
   private lazy val client =
     CombinedWavesBlockchainClient(
@@ -60,20 +61,20 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
           maxHedgedAttempts = 5,
           maxRetryAttempts = 5,
           keepAliveWithoutCalls = true,
-          keepAliveTime = 2.seconds,
+          keepAliveTime = keepAliveTime,
           keepAliveTimeout = keepAliveTimeout,
-          idleTimeout = 1.minute,
-          channelOptions = GrpcClientSettings.ChannelOptionsSettings(connectTimeout = 5.seconds)
+          idleTimeout = 1.day,
+          channelOptions = GrpcClientSettings.ChannelOptionsSettings(connectTimeout = 1.seconds)
         ),
         blockchainUpdatesGrpc = GrpcClientSettings(
           target = s"127.0.0.1:${blockchainUpdatesProxy.getProxyPort}",
-          maxHedgedAttempts = 5,
-          maxRetryAttempts = 5,
-          keepAliveWithoutCalls = true,
-          keepAliveTime = 2.seconds,
-          keepAliveTimeout = keepAliveTimeout,
+          maxHedgedAttempts = 2,
+          maxRetryAttempts = 2,
+          keepAliveWithoutCalls = false,
+          keepAliveTime = 500.millis,
+          keepAliveTimeout = 1.second,
           idleTimeout = 1.day,
-          channelOptions = GrpcClientSettings.ChannelOptionsSettings(connectTimeout = 5.seconds)
+          channelOptions = GrpcClientSettings.ChannelOptionsSettings(connectTimeout = 1.seconds)
         ),
         defaultCachesExpiration = 100.milliseconds,
         balanceStreamBufferSize = 100,
@@ -420,14 +421,16 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
 
       step("Cut connection to gRPC extension")
       blockchainUpdatesProxy.setConnectionCut(true)
+      matcherExtProxy.setConnectionCut(true)
 
       val transfer2 = mkTransfer(bob, matcher, 2.waves, Asset.Waves)
       broadcastAndAwait(transfer2)
 
-      Thread.sleep((keepAliveTimeout + 1.second).toMillis) // Connection should be closed
+      Thread.sleep((keepAliveTime + keepAliveTimeout + 2.seconds).toMillis) // Connection should be closed
 
       step("Enable connection to gRPC extension")
       blockchainUpdatesProxy.setConnectionCut(false)
+      matcherExtProxy.setConnectionCut(false)
 
       // Connection should be restored without our intervention
       Thread.sleep(5.seconds.toMillis)

@@ -6,7 +6,7 @@ import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.bytes.codec.Base58
-import com.wavesplatform.dex.grpc.integration.clients.domain.TransactionWithChanges
+import com.wavesplatform.dex.grpc.integration.clients.domain.{TransactionWithChanges, WavesBlock, WavesChain}
 import com.wavesplatform.dex.grpc.integration.services.UtxTransaction
 import com.wavesplatform.events.protobuf.StateUpdate
 import com.wavesplatform.protobuf.transaction.SignedTransaction
@@ -16,6 +16,7 @@ import org.scalatest.freespec.AnyFreeSpecLike
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.matchers.{MatchResult, Matcher}
 
+import scala.collection.immutable.Vector
 
 // TODO DEX-994
 trait WavesIntegrationSuiteBase extends AnyFreeSpecLike with Matchers with AllureScalatestContext {
@@ -47,7 +48,6 @@ trait WavesIntegrationSuiteBase extends AnyFreeSpecLike with Matchers with Allur
 
   // TODO Duplicate
   implicit val assetDerivedDiff: Derived[Diff[Asset]] = Derived(assetDiff)
-
 
   // Fixes "Class too large" compiler issue
   implicit val derivedSignedTransactionDiff: Derived[Diff[TransactionWithChanges]] =
@@ -86,5 +86,11 @@ trait WavesIntegrationSuiteBase extends AnyFreeSpecLike with Matchers with Allur
     require(n <= 127) // or we need complex implementation
     UnsafeByteOperations.unsafeWrap(new Array[Byte](n))
   }
+
+  /**
+   * If history is empty, the height is supposed to be 0
+   */
+  protected def mkChain(history: Vector[WavesBlock], blocksCapacity: Int): WavesChain =
+    WavesChain(history, history.headOption.getOrElse(throw new IllegalArgumentException("history is empty")).ref.height, blocksCapacity)
 
 }

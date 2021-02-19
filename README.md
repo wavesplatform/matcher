@@ -31,7 +31,7 @@ For further information please refer the official [documentation](https://docs.w
          * [6.2. Node extension installation and configuration](#62-node-extension-installation-and-configuration)
             * [a. Installation through DEB](#a--installation-through-deb)
             * [b. Installation through ZIP](#b--installation-through-zip)
-            * [Configration of Matcher extension](#-configration-of-matcher-extension)
+            * [Configration](#-configration)
          * [6.3. Matcher server installation and configuration](#63-matcher-server-installation-and-configuration)
             * [a. Installation through DEB](#a--installation-through-deb-1)
             * [b. Installation through ZIP](#b--installation-through-zip-1)

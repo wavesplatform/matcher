@@ -1,5 +1,12 @@
+
 # Matcher
 
+<p>
+<a href="https://github.com/wavesplatform/matcher/releases" target="_blank">
+    <img alt="Downloads" src="https://img.shields.io/github/downloads/wavesplatform/matcher/total?cache=false&style=flat-square&style=flat-square" />
+</a>
+</p>
+  
 Matcher for Waves Node.
 
 In the master branch there is a code with functions that is under development. 
@@ -21,10 +28,10 @@ For further information please refer the official [documentation](https://docs.w
          * [Testnet](#testnet)
       * [6. Installing and running](#6-installing-and-running)
          * [6.1. Node installation](#61-node-installation)
-         * [6.2. Matcher extension installation and configuration](#62-matcher-extension-installation-and-configuration)
+         * [6.2. Node extension installation and configuration](#62-node-extension-installation-and-configuration)
             * [a. Installation through DEB](#a--installation-through-deb)
             * [b. Installation through ZIP](#b--installation-through-zip)
-            * [Configration of Matcher extension](#-configration-of-matcher-extension)
+            * [Configration](#-configuration)
          * [6.3. Matcher server installation and configuration](#63-matcher-server-installation-and-configuration)
             * [a. Installation through DEB](#a--installation-through-deb-1)
             * [b. Installation through ZIP](#b--installation-through-zip-1)
@@ -158,8 +165,8 @@ sbt -Dnetwork=testnet packageAll
 
 The Matcher server runs as a separate service and communicates with a Matcher extension on the Node. So:
 
-1. First of all, you need an installed Node.
-2. Then you need to install a Matcher extension to the Node and update its configuration. This is a bridge between the Matcher server and the Node.
+1. First, you need an installed Node.
+2. Then you need to install a extensions to the Node and update its configuration. This is a bridge between the Matcher server and the Node.
 3. Next you should install Matcher server and properly configure it.
 4. Run the Node, wait until it will be up with the network.
 5. Run the Matcher.
@@ -168,17 +175,25 @@ The Matcher server runs as a separate service and communicates with a Matcher ex
 
 See instructions in their [documentation](https://docs.wavesplatform.com/en/waves-node/how-to-install-a-node/how-to-install-a-node.html).
 
-### 6.2. Matcher extension installation and configuration 
+### 6.2. Node extension installation and configuration
 
-Artifacts of Matcher extension have names like:
-* `waves-dex-extension{supported-network}_{version}.deb` for DEB artifact. `{supported-network}` is empty for MainNet;
-* `waves-dex-extension-{version}.zip` for ZIP artifact;
+Since a version **2.3.0** Matcher has been using grpc-blockchain-stream from the Node to get data with a blockchain events and updates
+
+ℹ️ **IMPORTANT:** Matcher doesn't start without installed grpc-server extension. You must install that extension at the Node
+
+You must install extensions at the Node:
+* waves-dex-extension
+* grpc-server
+
+Artifacts of extensions have names like:
+* `ext-name-{supported-network}_{version}.deb` for DEB artifact. `{supported-network}` is empty for MainNet;
+* `ext-name-{version}.zip` for ZIP artifact;
 
 #### a. 📦 Installation through DEB
 
 > If the Node installed from DEB
 
-Run: `sudo dpkg -i deb-artifact.deb` 
+Run: `sudo dpkg -i deb-artifact.deb`
 
 The extension will be automatically installed to the Node.
 
@@ -187,12 +202,12 @@ The extension will be automatically installed to the Node.
 > If the Node is running manually.
 > Note, if you installed Node from a DEB package, Matcher will be removed after update.
 
-To install a Matcher extension from ZIP file:
+To install an extension from ZIP file:
 
 1. Copy the archive to the directory with Node's JAR
 2. Extract the archive. Its files will be added to the existed directories.
 
-To run the Node with Matcher extension use following commands:
+To run the Node with an extension use following commands:
 
 *Debian/Ubuntu/macOS*:
 
@@ -206,7 +221,7 @@ java <your_JVM_options> -cp "/absolute_path_to_fat_jar/waves-all.jar:/absolute_p
 java <your_JVM_options> -cp "/absolute_path_to_fat_jar/waves-all.jar;/absolute_path_to_fat_jar/lib/*" com.wavesplatform.Application /path/to/config.conf
 ```
 
-#### 📃 Configration of Matcher extension
+#### 📃 Configuration
 
 Add lines to the Node's configuration:
 
@@ -219,6 +234,23 @@ waves.dex {
     host = "127.0.0.1" # "0.0.0.0" if the Matcher server connects to the Matcher extension from other machine 
     port = 6887
   }
+  
+  blockchain-updates {
+    grpc-port = 6881
+  }
+}
+````
+
+Add lines to the **Matcher's** configuration:
+
+```hocon
+waves-blockchain-client {
+  grpc {
+     target = "node_host:6887" # host and port of the Node with installed grpc-server extension
+  }
+}
+blockchain-updates {
+  grpc-port = 6881 # must ms the same with port at same Node's configuration
 }
 ````
 

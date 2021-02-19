@@ -28,7 +28,7 @@ For further information please refer the official [documentation](https://docs.w
          * [Testnet](#testnet)
       * [6. Installing and running](#6-installing-and-running)
          * [6.1. Node installation](#61-node-installation)
-         * [6.2. Matcher extension installation and configuration](#62-matcher-extension-installation-and-configuration)
+         * [6.2. Node extension installation and configuration](#62-node-extension-installation-and-configuration)
             * [a. Installation through DEB](#a--installation-through-deb)
             * [b. Installation through ZIP](#b--installation-through-zip)
             * [Configration of Matcher extension](#-configration-of-matcher-extension)
@@ -36,9 +36,6 @@ For further information please refer the official [documentation](https://docs.w
             * [a. Installation through DEB](#a--installation-through-deb-1)
             * [b. Installation through ZIP](#b--installation-through-zip-1)
             * [Configuration of Matcher server](#-configuration-of-matcher-server)
-         * [6.4. GRPC-server extension installation and configuration](#64-grpc-server-extension-installation-and-configuration)
-            * [Installation](#-installation)
-            * [Configration](#-configration-of-grpc-server-extension)
       * [7. Running an extension project locally during development](#7-running-an-extension-project-locally-during-development)
          * [SBT](#sbt-1)
          * [IntelliJ IDEA](#intellij-idea-1)
@@ -168,7 +165,7 @@ sbt -Dnetwork=testnet packageAll
 
 The Matcher server runs as a separate service and communicates with a Matcher extension on the Node. So:
 
-1. First of all, you need an installed Node.
+1. First, you need an installed Node.
 2. Then you need to install a Matcher extension to the Node and update its configuration. This is a bridge between the Matcher server and the Node.
 3. Next you should install Matcher server and properly configure it.
 4. Run the Node, wait until it will be up with the network.
@@ -178,11 +175,19 @@ The Matcher server runs as a separate service and communicates with a Matcher ex
 
 See instructions in their [documentation](https://docs.wavesplatform.com/en/waves-node/how-to-install-a-node/how-to-install-a-node.html).
 
-### 6.2. Matcher extension installation and configuration
+### 6.2. Node extension installation and configuration
 
-Artifacts of Matcher extension have names like:
-* `waves-dex-extension{supported-network}_{version}.deb` for DEB artifact. `{supported-network}` is empty for MainNet;
-* `waves-dex-extension-{version}.zip` for ZIP artifact;
+Since version **2.3.0** Matcher has been using grpc-blockchain-stream from the Node to get data with a blockchain events and updates
+
+ℹ️ **IMPORTANT:** Matcher doesn't start without installed grpc-server extension. You must install that extension at the Node
+
+You must install extensions at the Node:
+* waves-dex-extension
+* grpc-server
+
+Artifacts of extensions have names like:
+* `ext-name-{supported-network}_{version}.deb` for DEB artifact. `{supported-network}` is empty for MainNet;
+* `ext-name-{version}.zip` for ZIP artifact;
 
 #### a. 📦 Installation through DEB
 
@@ -216,7 +221,7 @@ java <your_JVM_options> -cp "/absolute_path_to_fat_jar/waves-all.jar:/absolute_p
 java <your_JVM_options> -cp "/absolute_path_to_fat_jar/waves-all.jar;/absolute_path_to_fat_jar/lib/*" com.wavesplatform.Application /path/to/config.conf
 ```
 
-#### 📃 Configration of Matcher extension
+#### 📃 Configuration
 
 Add lines to the Node's configuration:
 
@@ -228,6 +233,16 @@ waves.dex {
   grpc.integration {
     host = "127.0.0.1" # "0.0.0.0" if the Matcher server connects to the Matcher extension from other machine 
     port = 6887
+  }
+}
+````
+
+Add lines to the **Matcher's** configuration:
+
+```hocon
+waves-blockchain-client {
+  grpc {
+     target = "node_host:6887" # host and port of the Node with installed grpc-server extension
   }
 }
 ````
@@ -288,35 +303,6 @@ To run:
     ```
 
 2. Generate an [account storage](#81-generating-account-storage) and update your configuration.
-
-### 6.4. GRPC-server extension installation and configuration
-
-Since version **2.3.0** Matcher has been using grpc-blockchain-stream from the Node to get data with a blockchain events and updates
-
-ℹ️ **IMPORTANT:** Matcher doesn't start without installed grpc-server extension. You must to install that extension at the Node
-
-Artifacts of GRPC-server extension have names like:
-* `grpc-server{supported-network}_{version}.deb` for DEB artifact. `{supported-network}` is empty for MainNet;
-* `grpc-server-{version}.zip` for ZIP artifact;
-
-#### 📦 Installation
-
-[a. Installation through DEB](#a--installation-through-deb)
-
-[b. Installation through ZIP](#b--installation-through-zip)
-
-#### 📃 Configration of GRPC-server extension
-
-Add lines to the **Matcher's** configuration:
-
-```hocon
-waves-blockchain-client {
-  grpc {
-     target = "node_host:6887" # host and port of the Node with installed grpc-server extension
-  }
-}
-
-````
 
 ## 7. Running an extension project locally during development
 

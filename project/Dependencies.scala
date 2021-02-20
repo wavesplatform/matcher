@@ -88,6 +88,7 @@ object Dependencies {
   private def scalaModule(module: String, version: String): ModuleID = "org.scala-lang" % module % version
   private def catsModule(module: String): ModuleID = "org.typelevel" %% s"cats-$module" % Version.cats
   private def sttpModule(module: String): ModuleID = "com.softwaremill.sttp" %% module % Version.sttp
+  private def sttpClientModule(module: String): ModuleID = "com.softwaremill.sttp.client" %% module % Version.sttpClient
   private def jacksonModule(group: String, module: String): ModuleID = s"com.fasterxml.jackson.$group" % s"jackson-$module" % Version.jackson
   private def monixModule(module: String): ModuleID = "io.monix" %% s"monix-$module" % Version.monix
   private def kamonModule(module: String, version: String): ModuleID = "io.kamon" %% s"kamon-$module" % version
@@ -144,7 +145,8 @@ object Dependencies {
   private val jniLevelDb = "org.ethereum" % "leveldbjni-all" % Version.jniLevelDb
   private val influxDb = "org.influxdb" % "influxdb-java" % Version.influxDb
   private val commonsNet = "commons-net" % "commons-net" % Version.commonsNet
-  private val sttpClient = "com.softwaremill.sttp.client" %% "core" % Version.sttpClient
+  private val sttpClient = sttpClientModule("core")
+  private val sttpAsyncHttpClient = sttpClientModule("async-http-client-backend-future")
   private val allureScalaTest = "io.qameta.allure" %% "allure-scalatest" % Version.allureScalaTest
   private val jaxbApi = "javax.xml.bind" % "jaxb-api" % Version.jaxbApi
 
@@ -255,6 +257,7 @@ object Dependencies {
       jwtModule("core"),
       jwtModule("play-json"),
       sttpClient,
+      sttpAsyncHttpClient,
       wavesJ,
       betterMonadicFor
     ) ++ pureConfig ++ enumeratum ++ testKit ++ quill ++ monocle ++ levelDBJNA

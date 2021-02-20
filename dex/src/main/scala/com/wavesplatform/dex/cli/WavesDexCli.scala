@@ -4,7 +4,7 @@ import java.io.{File, PrintWriter}
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.util.{Base64, Scanner}
-import cats.{catsInstancesForId, Comparison}
+
 import cats.syntax.flatMap._
 import cats.syntax.option._
 import com.wavesplatform.dex._
@@ -14,8 +14,8 @@ import com.wavesplatform.dex.doc.MatcherErrorDoc
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
-import com.wavesplatform.dex.tool.{Checker, ComparisonTool}
 import com.wavesplatform.dex.tool.connectors.SuperConnector
+import com.wavesplatform.dex.tool.{Checker, ComparisonTool}
 import scopt.{OParser, RenderingMode}
 
 import scala.util.{Failure, Success, Try}
@@ -134,7 +134,7 @@ object WavesDexCli extends ScoptImplicits {
           .action((_, s) => s.copy(command = Command.RunComparison.some))
           .text("Compares the data from multiple matchers")
           .children(
-            opt[String]("config")
+            opt[String]("dex-config")
               .abbr("dc")
               .text("DEX config path")
               .valueName("<raw-string>")
@@ -254,7 +254,7 @@ object WavesDexCli extends ScoptImplicits {
               }
 
             case Command.RunComparison =>
-              for {
+              (for {
                 _ <- cli.log(
                   s"""
                      |Passed arguments:
@@ -263,7 +263,10 @@ object WavesDexCli extends ScoptImplicits {
                 )
                 tool <- ComparisonTool(args.configPath)
                 _ <- cli.lift(tool.run()) // TODO logger context
-              } yield ()
+              } yield ()) match {
+                case Right(_) =>
+                case Left(error) => println(error); forceStopApplication(MatcherStateCheckingFailedError)
+              }
           }
           println("Done")
       }

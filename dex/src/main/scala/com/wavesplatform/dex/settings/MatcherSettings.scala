@@ -2,8 +2,7 @@ package com.wavesplatform.dex.settings
 
 import java.io.File
 import cats.data.NonEmptyList
-import cats.implicits.{catsSyntaxOptionId, none}
-import cats.syntax.either._
+import cats.implicits._
 import com.wavesplatform.dex.actors.address.AddressActor
 import com.wavesplatform.dex.actors.tx.ExchangeTransactionBroadcastActor
 import com.wavesplatform.dex.api.http.OrderBookHttpInfo
@@ -12,7 +11,8 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.grpc.integration.settings.WavesBlockchainClientSettings
 import com.wavesplatform.dex.model.OrderValidator.exchangeTransactionCreationFee
 import com.wavesplatform.dex.settings.utils.ConfigReaderOps.Implicits
-import com.wavesplatform.dex.settings.utils.{validationOf, ConfigReaders, RawFailureReason}
+import com.wavesplatform.dex.settings.utils.{ConfigReaders, RawFailureReason, validationOf}
+import com.wavesplatform.dex.tool.ComparisonTool
 import pureconfig.ConfigReader
 import pureconfig.configurable.genericMapReader
 import pureconfig.error.{ExceptionThrown, FailureReason}
@@ -58,7 +58,8 @@ case class MatcherSettings(
   postgres: PostgresConnection,
   orderHistory: OrderHistorySettings,
   webSockets: WebSocketSettings,
-  addressActor: AddressActor.Settings
+  addressActor: AddressActor.Settings,
+  comparisonTool: ComparisonTool.Settings
 ) {
 
   val recoverOrderHistory = !new File(dataDirectory).exists()

@@ -26,7 +26,7 @@ import scala.concurrent.duration._
 import scala.util.Random
 
 // noinspection ScalaStyle
-case class Checker(superConnector: SuperConnector) {
+class Checker(superConnector: SuperConnector) {
 
   import Checker._
   import superConnector._

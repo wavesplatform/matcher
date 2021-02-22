@@ -259,7 +259,8 @@ object WavesDexCli extends ScoptImplicits {
                   s"""
                      |Passed arguments:
                      |  DEX config path : ${args.configPath}
-                   """.stripMargin
+                     |Running in background
+                     |""".stripMargin
                 )
                 tool <- ComparisonTool(args.configPath)
                 _ <- cli.lift(tool.run()) // TODO logger context

@@ -230,6 +230,7 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |    comparison-tool {
          |      checks {
          |        interval = 55m
+         |        duration = 3d
          |        strike = 9
          |      }
          |

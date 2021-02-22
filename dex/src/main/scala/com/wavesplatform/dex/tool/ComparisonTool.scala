@@ -3,7 +3,7 @@ package com.wavesplatform.dex.tool
 import com.wavesplatform.dex.domain.asset.Asset
 import java.io.File
 import java.util.{Timer, TimerTask}
-import java.util.concurrent.Executors
+import java.util.concurrent.{Executors, TimeUnit}
 
 import cats.data.NonEmptyList
 import cats.syntax.either._
@@ -23,26 +23,39 @@ import sttp.client.asynchttpclient.future.AsyncHttpClientFutureBackend
 import sttp.model.Uri
 import sttp.client._
 
-import scala.concurrent.{ExecutionContext, Future}
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.concurrent.duration._
 import scala.util.{Failure, Random, Success, Try}
 
 class ComparisonTool(settings: Settings) extends ScorexLogging {
 
-  implicit private val ec = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(5, new ThreadFactoryBuilder().setDaemon(false).build()))
+  private val threadPool = Executors.newFixedThreadPool(5, new ThreadFactoryBuilder().setDaemon(false).build())
+  implicit private val ec = ExecutionContext.fromExecutor(threadPool)
   implicit protected val backend = AsyncHttpClientFutureBackend()(ec)
+  private val timer = new Timer("runTradableBalanceChecks")
 
   @volatile private var strikes = 0
 
   def run(): Unit = {
-    val timer = new Timer(false)
-    timer.scheduleAtFixedRate(
-      new TimerTask {
-        override def run(): Unit = runTradableBalanceChecks()
-      },
-      0,
-      settings.checks.interval.toMillis
-    )
+    val deadline = settings.checks.duration.fromNow
+    def loop(): Unit =
+      if (deadline.hasTimeLeft()) {
+        runTradableBalanceChecks()
+        timer.schedule(
+          new TimerTask {
+            override def run(): Unit = loop()
+          },
+          settings.checks.interval.toMillis
+        )
+      } else {
+        timer.cancel()
+        Await.ready(backend.close(), 5.seconds)
+        threadPool.shutdown()
+        threadPool.awaitTermination(5L, TimeUnit.SECONDS)
+        log.info("Done")
+      }
+
+    loop()
   }
 
   private def runTradableBalanceChecks(): Unit = {
@@ -51,13 +64,11 @@ class ComparisonTool(settings: Settings) extends ScorexLogging {
         baseUri <- settings.matcherRestApis
         assetPair <- settings.tradableBalanceCheck.assetPairs
         pk <- settings.tradableBalanceCheck.accountPks
-      } yield {
-        basicRequest
-          .get(uri"$baseUri/matcher/orderbook/${assetPair.amountAsset}/${assetPair.priceAsset}/tradableBalance/${pk.toAddress}")
-          .response(asString("UTF-8"))
-          .send()
-          .map(r => ((pk, assetPair), baseUri, parse(r)))
-      }
+      } yield basicRequest
+        .get(uri"$baseUri/matcher/orderbook/${assetPair.amountAsset}/${assetPair.priceAsset}/tradableBalance/${pk.toAddress}")
+        .response(asString("UTF-8"))
+        .send()
+        .map(r => ((pk, assetPair), baseUri, parse(r)))
 
     Future
       .sequence(xs)

@@ -139,7 +139,7 @@ baz"""
     )
     settings.addressActor should matchTo(AddressActor.Settings(100.milliseconds, 18.seconds, 400))
     settings.comparisonTool should matchTo(ComparisonTool.Settings(
-      checks = ComparisonTool.ChecksSettings(interval = 55.minutes, strike = 9),
+      checks = ComparisonTool.ChecksSettings(interval = 55.minutes, duration = 3.days, strike = 9),
       matcherRestApis = List(uri"https://127.0.0.1:1234"),
       tradableBalanceCheck = ComparisonTool.TradableBalanceCheck(
         accountPks = List(PublicKey.fromBase58String("DuzcrAJcA8B7dEdaGfutD8NKQHB1Vix9JUoNWiMK9PMH").explicitGet()),

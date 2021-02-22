@@ -12,6 +12,7 @@ import cats.syntax.group.catsSyntaxGroup
 import com.wavesplatform.dex.actors.WorkingStash
 import com.wavesplatform.dex.actors.address.AddressActor.Settings.default
 import com.wavesplatform.dex.actors.address.AddressActor._
+import com.wavesplatform.dex.actors.address.BalancesFormatter.format
 import com.wavesplatform.dex.api.http.entities.MatcherResponse
 import com.wavesplatform.dex.api.ws.entities.{WsBalances, WsOrder}
 import com.wavesplatform.dex.api.ws.protocol.WsAddressChanges
@@ -842,12 +843,5 @@ object AddressActor {
     case class Starting(recovered: Boolean, gotBalances: Boolean) extends AddressActorStatus
     case object Working extends AddressActorStatus
   }
-
-  def format(xs: Map[Asset, Long]): String =
-    xs.toList.sortBy(_._1.maybeBase58Repr)
-      .map { case (asset, v) => s"$v ${asset.maybeBase58Repr.fold("🔷")(_.take(5))}" }
-      .mkString("{", ", ", "}")
-
-  def format(xs: AddressBalanceUpdates): String = s"r=${format(xs.regular)}, l=${xs.outgoingLeasing}, p=${format(xs.pessimisticCorrection)}"
 
 }

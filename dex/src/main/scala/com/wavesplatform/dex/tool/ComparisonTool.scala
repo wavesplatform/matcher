@@ -9,12 +9,13 @@ import cats.data.NonEmptyList
 import cats.syntax.either._
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.typesafe.config.ConfigFactory.parseFile
+import com.wavesplatform.dex.actors.address.BalancesFormatter
 import com.wavesplatform.dex.cli.ErrorOr
 import com.wavesplatform.dex.domain.account.{AddressScheme, PublicKey}
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.error.Implicits.ThrowableOps
 import com.wavesplatform.dex.json
-import com.wavesplatform.dex.settings.{MatcherSettings, loadConfig}
+import com.wavesplatform.dex.settings.{loadConfig, MatcherSettings}
 import com.wavesplatform.dex.tool.ComparisonTool._
 import com.wavesplatform.dex.domain.asset.AssetPair
 import play.api.libs.json.Json
@@ -29,10 +30,11 @@ import scala.util.{Failure, Random, Success, Try}
 
 class ComparisonTool(settings: Settings) extends ScorexLogging {
 
+  private val timer = new Timer("runTradableBalanceChecks")
   private val threadPool = Executors.newFixedThreadPool(5, new ThreadFactoryBuilder().setDaemon(false).build())
+
   implicit private val ec = ExecutionContext.fromExecutor(threadPool)
   implicit protected val backend = AsyncHttpClientFutureBackend()(ec)
-  private val timer = new Timer("runTradableBalanceChecks")
 
   @volatile private var strikes = 0
 
@@ -79,7 +81,9 @@ class ComparisonTool(settings: Settings) extends ScorexLogging {
             .groupMap(_._1) { case (_, server, response) => (server, response) }
             .foreach { case ((pk, assetPair), responses) =>
               val (str, areSame) = compareResponses(NonEmptyList.fromList(responses).getOrElse(throw new RuntimeException("Improsibru!")))
-              val message = s"${pk.toAddress}, $assetPair: $str"
+              val message =
+                s"${pk.toAddress.stringRepr.take(5)}, " +
+                s"${assetPair.amountAssetStr.take(5)}-${assetPair.priceAssetStr.take(5)}${if (areSame) " same" else ""}: $str"
               if (!areSame) strikes += 1
               if (strikes >= settings.checks.strike) log.error(message)
               else if (Random.nextFloat() < 0.01) log.info(message)
@@ -127,7 +131,11 @@ object ComparisonTool {
 
   private[ComparisonTool] object TradableBalanceCheckResponse {
     case class Failed(httpErrorCode: Int) extends TradableBalanceCheckResponse
-    case class Parsed(xs: Map[Asset, Long]) extends TradableBalanceCheckResponse
+
+    case class Parsed(xs: Map[Asset, Long]) extends TradableBalanceCheckResponse {
+      override def toString: String = s"Parsed${BalancesFormatter.format(xs)}"
+    }
+
   }
 
 }

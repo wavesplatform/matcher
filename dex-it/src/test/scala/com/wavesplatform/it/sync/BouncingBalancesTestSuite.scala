@@ -108,7 +108,7 @@ class BouncingBalancesTestSuite extends WsSuiteBase {
 
       withClue(s"After rollback order should not be cancelled and balances should not be decreased\n") {
         wavesNode1.api.rollback(heightInitial, returnTransactionsToUtx = false)
-        wavesNode1.api.currentHeight shouldBe heightInitial
+        wavesNode1.api.currentHeight shouldBe >= (heightInitial)
 
         wavesNode1.api.waitForHeight(heightSecondTransfer)
         dex1.api.getOrderStatus(bobOrder).status shouldBe Status.Accepted

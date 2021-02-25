@@ -4,12 +4,10 @@ import cats.syntax.option._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
-import com.wavesplatform.dex.it.api.RawHttpChecks
 import com.wavesplatform.it.MatcherSuiteBase
-import org.scalatest.prop.TableDrivenPropertyChecks
 
 // Wrong balances
-class Dex1052BugSpec extends MatcherSuiteBase with TableDrivenPropertyChecks with RawHttpChecks {
+class Dex1052BugSpec extends MatcherSuiteBase {
 
   private val storedBlocks = 2
 

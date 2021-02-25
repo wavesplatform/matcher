@@ -54,4 +54,8 @@ trait IntegrationSuiteBase
     super.afterAll()
   }
 
+  override protected def step(text: String): Unit = {
+    info(text)
+    super.step(text)
+  }
 }

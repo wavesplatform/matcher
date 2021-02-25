@@ -4,7 +4,7 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
+import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, TRUE}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.lang.{ExecutionError, ValidationError}
@@ -12,7 +12,7 @@ import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain, DataEntry, LeaseBalance, VolumeAndFee}
 import com.wavesplatform.transaction.assets.exchange.Order
-import com.wavesplatform.transaction.smart.script.ScriptRunner
+import com.wavesplatform.transaction.smart.script.{ScriptRunnerFixed}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
 import shapeless.Coproduct
@@ -21,13 +21,16 @@ import scala.util.control.NoStackTrace
 
 object MatcherScriptRunner {
 
-  def apply(script: Script, order: Order): Either[ExecutionError, EVALUATED] =
-    ScriptRunner(
-      in = Coproduct[ScriptRunner.TxOrd](order),
+  def apply(script: Script, order: Order, useStdLibFromScript: Boolean = false): Either[ExecutionError, EVALUATED] =
+    ScriptRunnerFixed(
+      in = Coproduct[ScriptRunnerFixed.TxOrd](order),
       blockchain = deniedBlockchain,
       script = script,
       isAssetScript = false,
-      scriptContainerAddress = Coproduct[Environment.Tthis](Recipient.Address(ByteStr(order.senderPublicKey.toAddress.bytes)))
+      scriptContainerAddress = Coproduct[Environment.Tthis](Recipient.Address(ByteStr(order.senderPublicKey.toAddress.bytes))),
+      complexityLimit = Int.MaxValue,
+      default = TRUE,
+      useStdLibFromScript
     )._2
 
   private class Denied(methodName: String)

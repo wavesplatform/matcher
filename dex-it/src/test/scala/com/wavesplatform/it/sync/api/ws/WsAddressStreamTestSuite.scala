@@ -626,9 +626,11 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
       eventually(wsc.balanceChanges should have size 1)
 
       broadcastAndAwait(mkTransfer(alice, acc.toAddress, 2.usd, usd, feeAmount = 1.waves))
-      wsc.balanceChanges.last should matchTo(Map[Asset, WsBalances](
-        usd -> WsBalances(2.0, 0.0)
-      ))
+      eventually {
+        wsc.balanceChanges.last should matchTo(Map[Asset, WsBalances](
+          usd -> WsBalances(2.0, 0.0)
+        ))
+      }
       wsc.close()
       Thread.sleep(1000)
 

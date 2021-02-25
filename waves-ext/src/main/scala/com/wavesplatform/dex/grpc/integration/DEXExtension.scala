@@ -2,12 +2,11 @@ package com.wavesplatform.dex.grpc.integration
 
 import java.net.InetSocketAddress
 import java.util.concurrent.TimeUnit
-
 import com.wavesplatform.dex.grpc.integration.services._
 import com.wavesplatform.extensions.{Extension, Context => ExtensionContext}
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.Server
-import io.grpc.netty.NettyServerBuilder
+import io.grpc.netty.{InternalNettyServerBuilder, NettyServerBuilder}
 import monix.execution.{ExecutionModel, Scheduler}
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.NameMapper
@@ -36,14 +35,16 @@ class DEXExtension(context: ExtensionContext) extends Extension with ScorexLoggi
     val bindAddress = new InetSocketAddress(host, port)
     apiService = new WavesBlockchainApiGrpcService(context)
 
-    server = NettyServerBuilder
+    val builder = NettyServerBuilder
       .forAddress(bindAddress)
       .permitKeepAliveWithoutCalls(true)
       .permitKeepAliveTime(500, TimeUnit.MILLISECONDS)
       .addService(WavesBlockchainApiGrpc.bindService(apiService, apiScheduler))
-      .build()
-      .start()
 
+    InternalNettyServerBuilder.setStatsEnabled(builder, false)
+    InternalNettyServerBuilder.setTracingEnabled(builder, false)
+
+    server = builder.build().start()
     log.info(s"gRPC DEX extension was bound to $bindAddress")
   }
 

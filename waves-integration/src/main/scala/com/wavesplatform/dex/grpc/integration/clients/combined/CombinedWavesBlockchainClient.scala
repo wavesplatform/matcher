@@ -28,7 +28,6 @@ import com.wavesplatform.dex.grpc.integration.services.UtxTransaction
 import com.wavesplatform.dex.grpc.integration.settings.WavesBlockchainClientSettings
 import com.wavesplatform.protobuf.transaction.SignedTransaction
 import io.grpc.ManagedChannel
-import io.grpc.internal.DnsNameResolverProvider
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.nio.NioSocketChannel
 import monix.eval.Task
@@ -61,13 +60,13 @@ class CombinedWavesBlockchainClient(
   // HACK: NODE: We need to store last updates and consider them as fresh, because we can face an issue during fullBalancesSnapshot
   //   when balance changes were deleted from LiquidBlock's diff, but haven't yet saved to DB
   @volatile private var lastUpdates = List.empty[BlockchainBalance]
-  private val maxPreviousBlockUpdates = settings.maxCachedLatestBlockUpdates - 1 // TODO microblocks!!!!
+  private val maxPreviousBlockUpdates = settings.maxCachedLatestBlockUpdates - 1
 
-  override lazy val updates: Observable[WavesNodeUpdates] = Observable.fromFuture(meClient.currentBlockInfo)
+  override lazy val updates: Observable[(WavesNodeUpdates, Boolean)] = Observable.fromFuture(meClient.currentBlockInfo)
     .flatMap { startBlockInfo =>
       log.info(s"Current block: $startBlockInfo")
       val startHeight = math.max(startBlockInfo.height - settings.maxRollbackHeight - 1, 1)
-      val init: BlockchainStatus = BlockchainStatus.Normal(WavesChain(Vector.empty, startHeight, settings.maxRollbackHeight + 1))
+      val init: BlockchainStatus = BlockchainStatus.Normal(WavesChain(Vector.empty, startHeight - 1, settings.maxRollbackHeight + 1))
 
       val combinedStream = new CombinedStream(settings.combinedStream, bClient.blockchainEvents, meClient.utxEvents)
       Observable(dataUpdates, combinedStream.stream)
@@ -75,8 +74,8 @@ class CombinedWavesBlockchainClient(
         .mapAccumulate(init) { case (origStatus, event) =>
           val x = StatusTransitions(origStatus, event)
           x.updatedLastBlockHeight match {
-            case LastBlockHeight.Updated(to) => combinedStream.updateHeightHint(to)
-            case LastBlockHeight.RestartRequired(from) => combinedStream.restartFrom(from)
+            case LastBlockHeight.Updated(to) => combinedStream.updateProcessedHeight(to)
+            case LastBlockHeight.RestartRequired => combinedStream.restart()
             case _ =>
           }
           if (x.requestNextBlockchainEvent) bClient.blockchainEvents.requestNext()
@@ -95,6 +94,7 @@ class CombinedWavesBlockchainClient(
             }
             .toMap
 
+          // It is safe even we are during a rollback, because StatusTransitions doesn't propagate data until fork is resolved
           if (!x.updatedBalances.isEmpty) lastUpdates = x.updatedBalances :: lastUpdates.take(maxPreviousBlockUpdates)
 
           // // Not useful for UTX, because it doesn't consider the current state of orders
@@ -124,9 +124,10 @@ class CombinedWavesBlockchainClient(
             changes <- tx.diff.flatMap(_.stateUpdate)
           } yield tx.id.toVanilla -> TransactionWithChanges(tx.id, signedTx, changes)
 
-          (x.newStatus, WavesNodeUpdates(updatedFinalBalances, (unconfirmedTxs ++ confirmedTxs ++ failedTxs).toMap))
+          val updates = WavesNodeUpdates(updatedFinalBalances, (unconfirmedTxs ++ confirmedTxs ++ failedTxs).toMap)
+          (x.newStatus, (updates, combinedStream.currentProcessedHeight >= startBlockInfo.height))
         }
-        .filterNot(_.isEmpty)
+        .filterNot(_._1.isEmpty)
         .tap(_ => combinedStream.startFrom(startHeight))
     }
     .doOnError(e => Task(log.error("Got an error in the combined stream", e)))
@@ -256,7 +257,6 @@ object CombinedWavesBlockchainClient extends ScorexLogging {
     log.info(s"Building Matcher Extension gRPC client for server: ${wavesBlockchainClientSettings.grpc.target}")
     val matcherExtensionChannel: ManagedChannel =
       wavesBlockchainClientSettings.grpc.toNettyChannelBuilder
-        .nameResolverFactory(new DnsNameResolverProvider)
         .executor((command: Runnable) => grpcExecutionContext.execute(command))
         .eventLoopGroup(eventLoopGroup)
         .channelType(classOf[NioSocketChannel])
@@ -266,7 +266,6 @@ object CombinedWavesBlockchainClient extends ScorexLogging {
     log.info(s"Building Blockchain Updates Extension gRPC client for server: ${wavesBlockchainClientSettings.blockchainUpdatesGrpc.target}")
     val blockchainUpdatesChannel: ManagedChannel =
       wavesBlockchainClientSettings.blockchainUpdatesGrpc.toNettyChannelBuilder
-        .nameResolverFactory(new DnsNameResolverProvider)
         .executor((command: Runnable) => grpcExecutionContext.execute(command))
         .eventLoopGroup(eventLoopGroup)
         .channelType(classOf[NioSocketChannel])

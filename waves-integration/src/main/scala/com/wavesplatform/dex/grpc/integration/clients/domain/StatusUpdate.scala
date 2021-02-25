@@ -24,7 +24,7 @@ object StatusUpdate {
   object LastBlockHeight {
     case object NotChanged extends LastBlockHeight
     case class Updated(to: Int) extends LastBlockHeight
-    case class RestartRequired(from: Int) extends LastBlockHeight
+    case object RestartRequired extends LastBlockHeight
   }
 
 }

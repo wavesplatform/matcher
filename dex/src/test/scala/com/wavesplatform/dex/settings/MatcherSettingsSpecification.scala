@@ -8,6 +8,7 @@ import com.wavesplatform.dex.actors.tx.ExchangeTransactionBroadcastActor
 import com.wavesplatform.dex.api.http.OrderBookHttpInfo
 import com.wavesplatform.dex.api.ws.actors.{WsExternalClientHandlerActor, WsHealthCheckSettings, WsInternalBroadcastActor, WsInternalClientHandlerActor}
 import com.wavesplatform.dex.db.{AccountStorage, OrderDB}
+import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -21,8 +22,10 @@ import com.wavesplatform.dex.settings.EventsQueueSettings.CircuitBreakerSettings
 import com.wavesplatform.dex.settings.OrderFeeSettings.PercentSettings
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.test.matchers.ProduceError.produce
+import com.wavesplatform.dex.tool.ComparisonTool
 import org.scalatest.matchers.should.Matchers
 import pureconfig.ConfigSource
+import sttp.client.UriContext
 
 import scala.concurrent.duration._
 
@@ -137,6 +140,14 @@ baz"""
     )
     settings.addressActor should matchTo(AddressActor.Settings(100.milliseconds, 18.seconds, 400))
     settings.orderEventsCoordinatorActor should matchTo(OrderEventsCoordinatorActor.Settings(999))
+    settings.comparisonTool should matchTo(ComparisonTool.Settings(
+      checks = ComparisonTool.ChecksSettings(interval = 55.minutes, duration = 3.days, strike = 9),
+      matcherRestApis = List(uri"https://127.0.0.1:1234"),
+      tradableBalanceCheck = ComparisonTool.TradableBalanceCheck(
+        accountPks = List(PublicKey.fromBase58String("DuzcrAJcA8B7dEdaGfutD8NKQHB1Vix9JUoNWiMK9PMH").explicitGet()),
+        assetPairs = List(AssetPair.extractAssetPair("WAVES-8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS").get)
+      )
+    ))
   }
 
   "DeviationsSettings in MatcherSettings" should "be validated" in {

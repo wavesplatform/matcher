@@ -1,9 +1,9 @@
 package com.wavesplatform.dex.grpc.observers
 
+import monix.reactive.Observer
+
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
-
-import monix.reactive.Observer
 
 /**
  * 1. Pushes events to monix observer
@@ -11,8 +11,10 @@ import monix.reactive.Observer
  */
 abstract class IntegrationObserver[ArgT, EventT](dest: Observer[EventT]) extends ClosingObserver[ArgT, EventT] {
 
-  private val awaitNext = new AtomicBoolean(true)
-  private val buffer = new ConcurrentLinkedQueue[EventT]()
+  // Invariant: awaitNext == buffer.isEmpty
+
+  private[observers] val awaitNext = new AtomicBoolean(true)
+  private[observers] val buffer = new ConcurrentLinkedQueue[EventT]()
 
   override def onNext(value: EventT): Unit = {
     buffer.add(value)

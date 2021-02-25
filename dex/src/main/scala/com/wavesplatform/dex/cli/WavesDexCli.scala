@@ -5,7 +5,6 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.util.{Base64, Scanner}
 
-import cats.catsInstancesForId
 import cats.syntax.flatMap._
 import cats.syntax.option._
 import com.wavesplatform.dex._
@@ -15,8 +14,8 @@ import com.wavesplatform.dex.doc.MatcherErrorDoc
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
-import com.wavesplatform.dex.tool.Checker
 import com.wavesplatform.dex.tool.connectors.SuperConnector
+import com.wavesplatform.dex.tool.{Checker, ComparisonTool}
 import scopt.{OParser, RenderingMode}
 
 import scala.util.{Failure, Success, Try}
@@ -119,7 +118,7 @@ object WavesDexCli extends ScoptImplicits {
               .text("DEX config path")
               .valueName("<raw-string>")
               .required()
-              .action((x, s) => s.copy(dexConfigPath = x)),
+              .action((x, s) => s.copy(configPath = x)),
             opt[String]("auth-rest-api")
               .abbr("ara")
               .text("Auth Service REST API uri. Format: scheme://host:port/path/to/token (default scheme will be picked if none was specified)")
@@ -130,6 +129,17 @@ object WavesDexCli extends ScoptImplicits {
               .text("Seed for checking account updates")
               .valueName("<raw-string>")
               .action((x, s) => s.copy(accountSeed = x.some))
+          ),
+        cmd(Command.RunComparison.name)
+          .action((_, s) => s.copy(command = Command.RunComparison.some))
+          .text("Compares the data from multiple matchers")
+          .children(
+            opt[String]("dex-config")
+              .abbr("dc")
+              .text("DEX config path")
+              .valueName("<raw-string>")
+              .required()
+              .action((x, s) => s.copy(configPath = x))
           )
       )
     }
@@ -229,17 +239,33 @@ object WavesDexCli extends ScoptImplicits {
                        |  DEX REST API          : ${args.dexRestApi}
                        |  Waves Node REST API   : ${args.nodeRestApi}
                        |  Expected DEX version  : ${args.version}
-                       |  DEX config path       : ${args.dexConfigPath}
+                       |  DEX config path       : ${args.configPath}
                        |  Auth Service REST API : ${args.authServiceRestApi.getOrElse("")}
                        |  Account seed          : ${args.accountSeed.getOrElse("")}
                    """.stripMargin
                   )
-                  superConnector <- SuperConnector.create(args.dexConfigPath, args.dexRestApi, args.nodeRestApi, args.authServiceRestApi)
-                  checkResult <- Checker(superConnector).checkState(args.version, args.accountSeed)
+                  superConnector <- SuperConnector.create(args.configPath, args.dexRestApi, args.nodeRestApi, args.authServiceRestApi)
+                  checkResult <- new Checker(superConnector).checkState(args.version, args.accountSeed)
                   _ <- cli.lift(superConnector.close())
                 } yield checkResult
               ) match {
                 case Right(diagnosticNotes) => println(s"$diagnosticNotes\nCongratulations! All checks passed!")
+                case Left(error) => println(error); forceStopApplication(MatcherStateCheckingFailedError)
+              }
+
+            case Command.RunComparison =>
+              (for {
+                _ <- cli.log(
+                  s"""
+                     |Passed arguments:
+                     |  DEX config path : ${args.configPath}
+                     |Running in background
+                     |""".stripMargin
+                )
+                tool <- ComparisonTool(args.configPath)
+                _ <- cli.lift(tool.run()) // TODO logger context
+              } yield ()) match {
+                case Right(_) =>
                 case Left(error) => println(error); forceStopApplication(MatcherStateCheckingFailedError)
               }
           }
@@ -274,6 +300,10 @@ object WavesDexCli extends ScoptImplicits {
       override def name: String = "check-server"
     }
 
+    case object RunComparison extends Command {
+      override def name: String = "run-comparison"
+    }
+
   }
 
   sealed private trait SeedFormat
@@ -305,7 +335,7 @@ object WavesDexCli extends ScoptImplicits {
     dexRestApi: String = "",
     nodeRestApi: String = "",
     version: String = "",
-    dexConfigPath: String = "",
+    configPath: String = "",
     authServiceRestApi: Option[String] = None,
     accountSeed: Option[String] = None
   )

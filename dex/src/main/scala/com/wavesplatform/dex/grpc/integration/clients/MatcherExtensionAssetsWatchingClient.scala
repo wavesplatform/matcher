@@ -33,11 +33,11 @@ class MatcherExtensionAssetsWatchingClient(
       _ <- saveAssetsDescription(xs.regular.keySet ++ xs.pessimisticCorrection.keySet)
     } yield xs
 
-  override lazy val updates: Observable[WavesNodeUpdates] = underlying
+  override lazy val updates: Observable[(WavesNodeUpdates, Boolean)] = underlying
     .updates
-    .mapEval { xs =>
-      val assets = xs.balanceUpdates.valuesIterator.flatMap(x => x.regular.keysIterator ++ x.pessimisticCorrection.keysIterator).toSet
-      Task.fromFuture(saveAssetsDescription(assets)).map(_ => xs)
+    .mapEval { update =>
+      val assets = update._1.balanceUpdates.valuesIterator.flatMap(x => x.regular.keysIterator ++ x.pessimisticCorrection.keysIterator).toSet
+      Task.fromFuture(saveAssetsDescription(assets)).map(_ => update)
     }
 
   override def isFeatureActivated(id: Short): Future[Boolean] = underlying.isFeatureActivated(id)

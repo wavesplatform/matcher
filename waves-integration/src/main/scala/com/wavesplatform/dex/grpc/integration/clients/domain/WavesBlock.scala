@@ -16,7 +16,7 @@ case class WavesBlock(
     outgoingLeasing = changes.outgoingLeasing.keySet
   )
 
-  override def toString: String = s"WavesBlock(id=${ref.id.base58.take(5)}, h=${ref.height}, tpe=$tpe, c=${confirmedTxs.size})"
+  override def toString: String = s"B($ref, tpe=$tpe, c=${confirmedTxs.size})"
 
 }
 

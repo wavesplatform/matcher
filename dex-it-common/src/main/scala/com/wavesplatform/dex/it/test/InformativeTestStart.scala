@@ -12,6 +12,9 @@ trait InformativeTestStart extends TestSuite { self: BaseContainersKit =>
 
   @volatile private var preventLogs = false
 
+  // As a part of the test
+  protected def step(text: String): Unit = print(text)
+
   override protected def runTest(testName: String, args: Args): Status = {
     if (shouldWrite(success = true)) print(s"STARTED: $testName")
     super.runTest(testName, args).unsafeTap {

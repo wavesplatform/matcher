@@ -30,8 +30,10 @@ class CombinedStream(
 )(implicit scheduler: Scheduler)
     extends ScorexLogging {
 
-  // Note, it is not a processed height! A less value could be emitted to control
-  @volatile private var heightHint = 1
+  // Note, it is:
+  // * limited by 1
+  // * could be decreased during rollbacks
+  @volatile private var processedHeight = 1
 
   private val internalStream = ConcurrentSubject.publish[WavesNodeEvent]
   val stream: Observable[WavesNodeEvent] = internalStream
@@ -82,8 +84,8 @@ class CombinedStream(
         mergedEvents.onNext(x)
         Ack.Continue
       },
-      e => log.error(s"utxEvents failed", e), // Won't happen
-      () => log.info(s"utxEvents completed") // We do this manually in finish()
+      e => log.error("utxEvents system stream failed", e), // Won't happen
+      () => log.info("utxEvents system stream completed") // We do this manually in finish()
     )
 
   blockchainUpdates.systemStream
@@ -93,27 +95,26 @@ class CombinedStream(
         mergedEvents.onNext(x)
         Ack.Continue
       },
-      e => log.error(s"bu failed", e), // Won't happen
-      () => log.info(s"bu completed") // We do this manually in finish()
+      e => log.error("bu system stream failed", e), // Won't happen
+      () => log.info("bu system stream completed") // We do this manually in finish()
     )
 
   // TODO DEX-1034
   def startFrom(height: Int): Unit = {
     log.info(s"Starting from $height")
-    updateHeightHint(height)
+    updateProcessedHeight(height)
     utxEvents.start()
   }
 
-  def updateHeightHint(height: Int): Unit =
-    heightHint = height
+  def updateProcessedHeight(height: Int): Unit =
+    processedHeight = height
 
-  def currentHeightHint: Int = heightHint
+  def currentProcessedHeight: Int = processedHeight
 
-  def restartFrom(height: Int): Unit = {
-    updateHeightHint(height)
-
+  def restart(): Unit = {
+    log.info("Restarting")
     // Self-healed above
-    runWithDelay(() => blockchainUpdates.stop())
+    blockchainUpdates.stop()
   }
 
   private def utxEventsTransitions(origStatus: Status, event: SystemEvent): Status = {
@@ -129,7 +130,7 @@ class CombinedStream(
             if (origStatus.utxEvents) ignore()
             else if (origStatus.oneDone) Status.Working
             else {
-              blockchainUpdates.startFrom(heightHint)
+              blockchainUpdates.startFrom(processedHeight)
               origStatus.copy(utxEvents = true)
             }
 
@@ -267,9 +268,11 @@ class CombinedStream(
   }
 
   private def recover(): Unit = {
-    // Note, heightHint remains
-    val rollbackHeight = math.max(1, heightHint - 1)
-    internalStream.onNext(WavesNodeEvent.RolledBack(WavesNodeEvent.RolledBack.To.Height(rollbackHeight)))
+    // Failed to process the new block and haven't yet updated processedHeight.
+    // So drop the last processed block.
+    processedHeight = math.max(1, processedHeight - 1)
+    // And rollback to the previous, because we will download a block at processedHeight
+    internalStream.onNext(WavesNodeEvent.RolledBack(WavesNodeEvent.RolledBack.To.Height(processedHeight - 1)))
     runWithDelay(() => utxEvents.start())
   }
 

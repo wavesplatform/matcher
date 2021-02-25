@@ -31,8 +31,8 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
         s"""waves.dex {
            |  price-assets = [ "$UsdId", "WAVES" ]
            |  waves-blockchain-client {
-           |    grpc.target = "$toxiProxyHostName:${getInnerToxiProxyPort(matcherExtensionProxy)}"
-           |    blockchain-updates-grpc.target = "$toxiProxyHostName:${getInnerToxiProxyPort(blockchainUpdatesExtensionProxy)}"
+           |    grpc.target = "dns:///$toxiProxyHostName:${getInnerToxiProxyPort(matcherExtensionProxy)}"
+           |    blockchain-updates-grpc.target = "dns:///$toxiProxyHostName:${getInnerToxiProxyPort(blockchainUpdatesExtensionProxy)}"
            |  }
            |}""".stripMargin
       )
@@ -162,8 +162,8 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
       s"""waves.dex {
          |  price-assets = [ "$UsdId", "WAVES" ]
          |  waves-blockchain-client { 
-         |    grpc.target = "${WavesNodeContainer.wavesNodeNetAlias}:${WavesNodeContainer.matcherGrpcExtensionPort}"
-         |    blockchain-updates-grpc.target = "${WavesNodeContainer.wavesNodeNetAlias}:${WavesNodeContainer.blockchainUpdatesGrpcExtensionPort}"
+         |    grpc.target = "dns:///${WavesNodeContainer.wavesNodeNetAlias}:${WavesNodeContainer.matcherGrpcExtensionPort}"
+         |    blockchain-updates-grpc.target = "dns:///${WavesNodeContainer.wavesNodeNetAlias}:${WavesNodeContainer.blockchainUpdatesGrpcExtensionPort}"
          |  }
          |}""".stripMargin
     )

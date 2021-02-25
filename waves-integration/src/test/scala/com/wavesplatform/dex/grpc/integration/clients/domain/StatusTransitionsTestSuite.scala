@@ -1,7 +1,5 @@
 package com.wavesplatform.dex.grpc.integration.clients.domain
 
-import java.nio.charset.StandardCharsets
-
 import cats.Monoid
 import cats.syntax.semigroup._
 import com.google.protobuf.UnsafeByteOperations
@@ -16,6 +14,7 @@ import com.wavesplatform.dex.grpc.integration.clients.domain.StatusUpdate.LastBl
 import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeEvent.{Appended, DataReceived, RolledBack, UtxSwitched, UtxUpdated}
 import com.wavesplatform.dex.grpc.integration.services.UtxTransaction
 
+import java.nio.charset.StandardCharsets
 import scala.collection.immutable.Vector
 
 class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
@@ -39,28 +38,56 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
   "StatusTransitions" - {
     "Normal +" - {
       "Appended ->" - {
-        "Normal" in {
-          val newBlock = WavesBlock(
-            ref = BlockRef(height = 1, id = ByteStr(Array[Byte](1, 2, 3))),
-            reference = ByteStr.empty,
-            changes = updatedBalances1,
-            tpe = WavesBlock.Type.FullBlock,
-            confirmedTxs = mkTransactionWithChangesMap(1)
-          )
+        "Normal" - {
+          "a valid block" in {
+            val newBlock = WavesBlock(
+              ref = BlockRef(height = 1, id = ByteStr(Array[Byte](1, 2, 3))),
+              reference = ByteStr.empty,
+              changes = updatedBalances1,
+              tpe = WavesBlock.Type.FullBlock,
+              confirmedTxs = mkTransactionWithChangesMap(1)
+            )
 
-          val init = Normal(WavesChain(Vector.empty, 100))
-          val event = Appended(newBlock)
-          StatusTransitions(init, event) should matchTo(StatusUpdate(
-            newStatus = Normal(WavesChain(Vector(newBlock), 99)),
-            updatedBalances = updatedBalances1,
-            updatedLastBlockHeight = StatusUpdate.LastBlockHeight.Updated(1),
-            utxUpdate = UtxUpdate(confirmedTxs = newBlock.confirmedTxs),
-            requestNextBlockchainEvent = true
-          ))
-        }
+            val init = Normal(WavesChain(Vector.empty, 0, 100))
+            val event = Appended(newBlock)
+            StatusTransitions(init, event) should matchTo(StatusUpdate(
+              newStatus = Normal(mkChain(Vector(newBlock), 99)),
+              updatedBalances = updatedBalances1,
+              updatedLastBlockHeight = StatusUpdate.LastBlockHeight.Updated(1),
+              utxUpdate = UtxUpdate(confirmedTxs = newBlock.confirmedTxs),
+              requestNextBlockchainEvent = true
+            ))
+          }
 
-        "TransientRollback" - {
-          "because of an invalid new block" in {
+          "empty chain" - {
+            "because of an invalid new block" in test(WavesBlock(
+              // height is higher, than in chain
+              ref = BlockRef(height = 3, id = ByteStr(Array[Byte](1, 2, 3))),
+              reference = ByteStr.empty,
+              changes = updatedBalances1,
+              tpe = WavesBlock.Type.FullBlock,
+              confirmedTxs = mkTransactionWithChangesMap(1)
+            ))
+
+            "because we try to add a micro block" in test(WavesBlock(
+              ref = BlockRef(height = 1, id = ByteStr(Array[Byte](1, 2, 3))),
+              reference = ByteStr.empty,
+              changes = updatedBalances1,
+              tpe = WavesBlock.Type.MicroBlock,
+              confirmedTxs = mkTransactionWithChangesMap(1)
+            ))
+
+            def test(newBlock: WavesBlock): Unit = {
+              val init = Normal(WavesChain(Vector.empty, 1, 100))
+              val event = Appended(newBlock)
+              StatusTransitions(init, event) should matchTo(StatusUpdate(
+                newStatus = init,
+                updatedLastBlockHeight = StatusUpdate.LastBlockHeight.RestartRequired
+              ))
+            }
+          }
+
+          "with RestartRequired because of an invalid new block" in {
             val block1 = WavesBlock(
               ref = BlockRef(height = 2, id = ByteStr(Array[Byte](1, 2, 3))),
               reference = ByteStr.empty,
@@ -68,14 +95,11 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
               tpe = WavesBlock.Type.FullBlock,
               confirmedTxs = mkTransactionWithChangesMap(1)
             )
-            val init = Normal(WavesChain(Vector(block1), 99))
+            val init = Normal(mkChain(Vector(block1), 99))
             val event = Appended(block1)
             StatusTransitions(init, event) should matchTo(StatusUpdate(
-              newStatus = TransientRollback(
-                fork = WavesFork(init.main, WavesChain(Vector.empty, 1, 100)),
-                utxUpdate = Monoid.empty[UtxUpdate]
-              ),
-              updatedLastBlockHeight = StatusUpdate.LastBlockHeight.RestartRequired(2)
+              newStatus = init,
+              updatedLastBlockHeight = StatusUpdate.LastBlockHeight.RestartRequired
             ))
           }
         }
@@ -83,7 +107,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
 
       "[UtxEvent] -> Normal, where [UtxEvent] is" - {
         "UtxUpdated" in {
-          val init = Normal(WavesChain(Vector.empty, 100))
+          val init = Normal(WavesChain(Vector.empty, 0, 100))
           val newTxs = Seq(UtxTransaction(id = mkTxId(1)))
           val event = UtxUpdated(newTxs, Nil)
           StatusTransitions(init, event) should matchTo(StatusUpdate(
@@ -94,7 +118,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
         }
 
         "UtxSwitched" in {
-          val init = Normal(WavesChain(Vector.empty, 100))
+          val init = Normal(WavesChain(Vector.empty, 0, 100))
           val txs = Seq(UtxTransaction(id = mkTxId(1)))
           val event = UtxSwitched(txs)
           StatusTransitions(init, event) should matchTo(StatusUpdate(
@@ -122,14 +146,13 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
           confirmedTxs = mkTransactionWithChangesMap(2)
         )
 
-        val init = Normal(WavesChain(Vector(block2, block1), 98))
+        val init = Normal(mkChain(Vector(block2, block1), 98))
 
         def test(to: RolledBack.To): Unit = StatusTransitions(init, RolledBack(to)) should matchTo(StatusUpdate(
           newStatus = TransientRollback(
-            fork = WavesFork(init.main, WavesChain(Vector(block1), 99)),
+            fork = WavesFork(init.main, mkChain(Vector(block1), 99)),
             utxUpdate = Monoid.empty[UtxUpdate]
           ),
-          updatedLastBlockHeight = StatusUpdate.LastBlockHeight.NotChanged,
           requestNextBlockchainEvent = true
         ))
 
@@ -138,7 +161,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
       }
 
       "DataReceived -> Normal" in {
-        val init = Normal(WavesChain(Vector.empty, 100))
+        val init = Normal(WavesChain(Vector.empty, 0, 100))
         val event = DataReceived(BlockchainBalance(
           regular = Map.empty,
           outgoingLeasing = Map(alice -> 999L)
@@ -183,8 +206,8 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
 
       val init = TransientRollback(
         fork = WavesFork(
-          origChain = WavesChain(Vector(block2A, block1), 98),
-          forkChain = WavesChain(Vector(block2B, block1), 98)
+          origChain = mkChain(Vector(block2A, block1), 98),
+          forkChain = mkChain(Vector(block2B, block1), 98)
         ),
         utxUpdate = UtxUpdate(failedTxs = mkUtxTransactionMap(30))
       )
@@ -206,7 +229,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
 
           StatusTransitions(init, event) should matchTo(StatusUpdate(
             newStatus = Normal(
-              main = WavesChain(Vector(microBlock, block2B, block1), 98)
+              main = mkChain(Vector(microBlock, block2B, block1), 98)
             ),
             updatedBalances = block2B.changes |+| microBlock.changes,
             updatedLastBlockHeight = StatusUpdate.LastBlockHeight.Updated(2),
@@ -219,31 +242,6 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
         }
 
         "TransientRollback" - {
-          "because of an unrelated new block" in {
-            val newBlock = WavesBlock(
-              ref = BlockRef(height = 3, id = ByteStr(Array[Byte](98, 2, 0))),
-              reference = ByteStr(Array[Byte](98, 2, -1)),
-              changes = BlockchainBalance(
-                regular = Map(alice -> Map(usd -> 8), carol -> Map(Waves -> 4)),
-                outgoingLeasing = Map(bob -> 10)
-              ),
-              tpe = WavesBlock.Type.FullBlock,
-              confirmedTxs = mkTransactionWithChangesMap(10)
-            )
-
-            val event = Appended(newBlock)
-
-            // See StatusTransitions
-            StatusTransitions(init, event) should matchTo(StatusUpdate(
-              newStatus = TransientRollback(
-                // TODO test with more than 1 block
-                fork = WavesFork(init.fork.origChain, WavesChain(Vector(block1), 99)),
-                utxUpdate = init.utxUpdate
-              ),
-              updatedLastBlockHeight = StatusUpdate.LastBlockHeight.RestartRequired(2)
-            ))
-          }
-
           "because the resolving process haven't yet completed" in {
             val block3 = WavesBlock(
               ref = BlockRef(height = 3, id = ByteStr(Array[Byte](98, 2, 0))),
@@ -258,8 +256,8 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
 
             val init = TransientRollback(
               fork = WavesFork(
-                origChain = WavesChain(Vector(block3, block2A, block1), 97),
-                forkChain = WavesChain(Vector(block1), 99)
+                origChain = mkChain(Vector(block3, block2A, block1), 97),
+                forkChain = mkChain(Vector(block1), 99)
               ),
               utxUpdate = UtxUpdate(confirmedTxs = mkTransactionWithChangesMap(1))
             )
@@ -268,10 +266,30 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
 
             StatusTransitions(init, event) should matchTo(StatusUpdate(
               newStatus = TransientRollback(
-                fork = WavesFork(init.fork.origChain, WavesChain(Vector(block2B, block1), 98)),
+                fork = WavesFork(init.fork.origChain, mkChain(Vector(block2B, block1), 98)),
                 utxUpdate = init.utxUpdate
               ),
               requestNextBlockchainEvent = true
+            ))
+          }
+
+          "because of an unrelated new block" in {
+            val newBlock = WavesBlock(
+              ref = BlockRef(height = 3, id = ByteStr(Array[Byte](98, 2, 0))),
+              reference = ByteStr(Array[Byte](98, 2, -1)),
+              changes = BlockchainBalance(
+                regular = Map(alice -> Map(usd -> 8), carol -> Map(Waves -> 4)),
+                outgoingLeasing = Map(bob -> 10)
+              ),
+              tpe = WavesBlock.Type.FullBlock,
+              confirmedTxs = mkTransactionWithChangesMap(10)
+            )
+
+            val event = Appended(newBlock)
+
+            StatusTransitions(init, event) should matchTo(StatusUpdate(
+              newStatus = init,
+              updatedLastBlockHeight = StatusUpdate.LastBlockHeight.RestartRequired
             ))
           }
         }
@@ -292,7 +310,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
 
           StatusTransitions(init, event) should matchTo(StatusUpdate(
             newStatus = TransientResolving(
-              main = WavesChain(Vector(microBlock, block2B, block1), 98),
+              main = mkChain(Vector(microBlock, block2B, block1), 98),
               stashChanges = BlockchainBalance( // block2B + microBlock
                 regular = Map(alice -> Map(usd -> 8), bob -> Map(usd -> 12)),
                 outgoingLeasing = Map(bob -> 10)
@@ -303,7 +321,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
               )
             ),
             requestBalances = DiffIndex(regular = Map(carol -> Set(Waves: Asset)), outgoingLeasing = Set.empty),
-            updatedLastBlockHeight = LastBlockHeight.NotChanged
+            updatedLastBlockHeight = LastBlockHeight.Updated(microBlock.ref.height)
           ))
         }
       }
@@ -338,8 +356,8 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
           StatusTransitions(init, RolledBack(rolledBackTo)) should matchTo(StatusUpdate(
             newStatus = TransientRollback(
               fork = WavesFork(
-                origChain = WavesChain(Vector(block2A, block1), 98),
-                forkChain = WavesChain(Vector(block1), 99)
+                origChain = mkChain(Vector(block2A, block1), 98),
+                forkChain = mkChain(Vector(block1), 99)
               ),
               utxUpdate = init.utxUpdate
             ),
@@ -379,7 +397,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
       )
 
       val init = TransientResolving(
-        main = WavesChain(Vector(microBlock, block), 99),
+        main = mkChain(Vector(microBlock, block), 99),
         stashChanges = BlockchainBalance(
           regular = Map(carol -> Map(Waves -> 10)),
           outgoingLeasing = Map.empty

@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.grpc.integration.settings
 
 import com.wavesplatform.dex.grpc.integration.settings.GrpcClientSettings.ChannelOptionsSettings
-import io.grpc.netty.NettyChannelBuilder
+import io.grpc.netty.{InternalNettyChannelBuilder, NettyChannelBuilder}
 import io.netty.channel.ChannelOption
 
 import scala.concurrent.duration.FiniteDuration
@@ -17,8 +17,8 @@ case class GrpcClientSettings(
   channelOptions: ChannelOptionsSettings
 ) {
 
-  def toNettyChannelBuilder: NettyChannelBuilder =
-    NettyChannelBuilder
+  def toNettyChannelBuilder: NettyChannelBuilder = {
+    val r = NettyChannelBuilder
       .forTarget(target)
       .maxHedgedAttempts(maxHedgedAttempts)
       .maxRetryAttempts(maxRetryAttempts)
@@ -27,6 +27,10 @@ case class GrpcClientSettings(
       .keepAliveTimeout(keepAliveTimeout.length, keepAliveTimeout.unit)
       .idleTimeout(idleTimeout.length, idleTimeout.unit)
       .withOption[Integer](ChannelOption.CONNECT_TIMEOUT_MILLIS, channelOptions.connectTimeout.toMillis.toInt)
+    InternalNettyChannelBuilder.setStatsEnabled(r, false)
+    InternalNettyChannelBuilder.setTracingEnabled(r, false)
+    r
+  }
 
 }
 

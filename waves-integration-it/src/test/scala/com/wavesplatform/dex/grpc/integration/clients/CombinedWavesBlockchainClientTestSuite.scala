@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.grpc.integration.clients
 
+import cats.implicits._
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.wavesplatform.dex.collections.MapOps.Ops2D
 import com.wavesplatform.dex.domain.account.{Address, KeyPair, PublicKey}
@@ -15,8 +16,11 @@ import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdat
 import com.wavesplatform.dex.grpc.integration.clients.domain.portfolio.SynchronizedPessimisticPortfolios
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.settings.{GrpcClientSettings, WavesBlockchainClientSettings}
+import com.wavesplatform.dex.it.api.HasToxiProxy
+import com.wavesplatform.dex.it.docker.WavesNodeContainer
 import com.wavesplatform.dex.it.test.{NoStackTraceCancelAfterFailure, Scripts}
 import monix.execution.Scheduler
+import monix.execution.cancelables.BooleanCancelable
 
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.Executors
@@ -25,7 +29,12 @@ import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.Random
 
-class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with NoStackTraceCancelAfterFailure {
+class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with HasToxiProxy with NoStackTraceCancelAfterFailure {
+
+  implicit override def patienceConfig: PatienceConfig = super.patienceConfig.copy(
+    timeout = 1.minute,
+    interval = 1.second
+  )
 
   private val grpcExecutor = Executors.newCachedThreadPool(
     new ThreadFactoryBuilder()
@@ -36,28 +45,36 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with N
 
   implicit private val monixScheduler: Scheduler = monix.execution.Scheduler.cached("monix", 1, 5)
 
+  private lazy val blockchainUpdatesProxy =
+    toxiContainer.getProxy(wavesNode1.underlying.container, WavesNodeContainer.blockchainUpdatesGrpcExtensionPort)
+
+  private lazy val matcherExtProxy = toxiContainer.getProxy(wavesNode1.underlying.container, WavesNodeContainer.matcherGrpcExtensionPort)
+
+  private val keepAliveTime = 10.seconds
+  private val keepAliveTimeout = 1.seconds
+
   private lazy val client =
     CombinedWavesBlockchainClient(
       wavesBlockchainClientSettings = WavesBlockchainClientSettings(
         grpc = GrpcClientSettings(
-          target = wavesNode1.matcherExtApiTarget,
+          target = s"127.0.0.1:${matcherExtProxy.getProxyPort}",
           maxHedgedAttempts = 5,
           maxRetryAttempts = 5,
           keepAliveWithoutCalls = true,
-          keepAliveTime = 2.seconds,
-          keepAliveTimeout = 5.seconds,
-          idleTimeout = 1.minute,
-          channelOptions = GrpcClientSettings.ChannelOptionsSettings(connectTimeout = 5.seconds)
+          keepAliveTime = keepAliveTime,
+          keepAliveTimeout = keepAliveTimeout,
+          idleTimeout = 1.day,
+          channelOptions = GrpcClientSettings.ChannelOptionsSettings(connectTimeout = 1.seconds)
         ),
         blockchainUpdatesGrpc = GrpcClientSettings(
-          target = wavesNode1.blockchainUpdatesExtApiTarget,
-          maxHedgedAttempts = 5,
-          maxRetryAttempts = 5,
-          keepAliveWithoutCalls = true,
-          keepAliveTime = 2.seconds,
-          keepAliveTimeout = 5.seconds,
-          idleTimeout = 1.minute,
-          channelOptions = GrpcClientSettings.ChannelOptionsSettings(connectTimeout = 5.seconds)
+          target = s"127.0.0.1:${blockchainUpdatesProxy.getProxyPort}",
+          maxHedgedAttempts = 2,
+          maxRetryAttempts = 2,
+          keepAliveWithoutCalls = false,
+          keepAliveTime = 500.millis,
+          keepAliveTimeout = 1.second,
+          idleTimeout = 1.day,
+          channelOptions = GrpcClientSettings.ChannelOptionsSettings(connectTimeout = 1.seconds)
         ),
         defaultCachesExpiration = 100.milliseconds,
         balanceStreamBufferSize = 100,
@@ -73,56 +90,19 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with N
       grpcExecutionContext = ExecutionContext.fromExecutor(grpcExecutor)
     )
 
-  implicit override def patienceConfig: PatienceConfig = super.patienceConfig.copy(
-    timeout = 1.minute,
-    interval = 1.second
-  )
+  private lazy val updates = client.updates.share
 
   private val regularBalance = new AtomicReference(Map.empty[Address, Map[Asset, Long]])
 
   private val trueScript = Option(Scripts.alwaysTrue)
 
-  private def assertRegularBalanceChanges(expectedBalanceChanges: Map[Address, Map[Asset, Long]]): Unit = eventually {
-    // Remove pairs (address, asset) those expectedBalanceChanges has not
-    val actual = simplify(
-      regularBalance.get.view
-        .filterKeys(expectedBalanceChanges.keys.toSet)
-        .map {
-          case (address, balance) => address -> balance.view.filterKeys(expectedBalanceChanges(address).contains).toMap
-        }
-        .toMap
-    )
-    val expected = simplify(expectedBalanceChanges)
-    withClue(s"actual=$actual vs expected=$expected\n") {
-      actual should matchTo(expected)
-    }
-  }
-
-  private def simplify(xs: Map[Address, Map[Asset, Long]]): String =
-    xs.toList
-      .map {
-        case (address, assets) =>
-          val xs = assets
-            .map { case (asset, v) => asset.toString -> v }
-            .toList
-            .sortBy(_._1)
-            .map { case (asset, v) => s"$v $asset" }
-            .mkString(", ")
-          address.stringRepr -> xs
-      }
-      .sortBy(_._1)
-      .map {
-        case (address, assets) => s"$address: ($assets)"
-      }
-      .mkString("; ")
-
   override def beforeAll(): Unit = {
     super.beforeAll()
     broadcastAndAwait(IssueUsdTx, IssueBtcTx)
-    client.updates.foreach { update =>
+    updates.foreach { update =>
       log.info(s"Got in test: $update")
       regularBalance.updateAndGet { orig =>
-        update.balanceUpdates.foldLeft(orig) { case (r, (address, xs)) =>
+        update._1.balanceUpdates.foldLeft(orig) { case (r, (address, xs)) =>
           r.deepReplace(Map(address -> xs.regular))
         }
       }
@@ -424,6 +404,65 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with N
     }
   }
 
+  "Bugs" - {
+    "DEX-1084 No updates from Blockchain updates" in {
+      val aliceBalanceBefore = wavesNode1.api.balance(alice, Waves)
+      val bobBalanceBefore = wavesNode1.api.balance(bob, Waves)
+
+      val cancellable = BooleanCancelable()
+
+      val eventsF = updates
+        .takeWhileNotCanceled(cancellable)
+        .toListL.runToFuture
+
+      step("transfer1")
+      val transfer1 = mkTransfer(alice, bob, 1.waves, Asset.Waves)
+      broadcastAndAwait(transfer1)
+
+      step("Cut connection to gRPC extension")
+      blockchainUpdatesProxy.setConnectionCut(true)
+      matcherExtProxy.setConnectionCut(true)
+
+      val transfer2 = mkTransfer(bob, matcher, 2.waves, Asset.Waves)
+      broadcastAndAwait(transfer2)
+
+      Thread.sleep((keepAliveTime + keepAliveTimeout + 2.seconds).toMillis) // Connection should be closed
+
+      step("Enable connection to gRPC extension")
+      blockchainUpdatesProxy.setConnectionCut(false)
+      matcherExtProxy.setConnectionCut(false)
+
+      // Connection should be restored without our intervention
+      Thread.sleep(5.seconds.toMillis)
+      val leasing = mkLease(bob, alice, 3.waves)
+      broadcastAndAwait(leasing)
+
+      cancellable.cancel()
+      val r = Await.result(eventsF, 1.minute).foldMap(_._1.balanceUpdates)
+
+      def filtered(in: AddressBalanceUpdates): AddressBalanceUpdates = in.copy(
+        regular = in.regular.view.filterKeys(_ == Waves).toMap,
+        pessimisticCorrection = Map(Waves -> in.pessimisticCorrection.getOrElse(Waves, 0L))
+      )
+
+      withClue("alice: ") {
+        r.get(alice).map(filtered) should matchTo(AddressBalanceUpdates(
+          regular = Map(Waves -> (aliceBalanceBefore - 1.waves - minFee)),
+          outgoingLeasing = 0L.some,
+          pessimisticCorrection = Map(Waves -> 0)
+        ).some)
+      }
+
+      withClue("bob: ") {
+        r.get(bob).map(filtered) should matchTo(AddressBalanceUpdates(
+          regular = Map(Waves -> (bobBalanceBefore + 1.waves - 2.waves - minFee - leasingFee)),
+          outgoingLeasing = 3.waves.some,
+          pessimisticCorrection = Map(Waves -> 0)
+        ).some)
+      }
+    }
+  }
+
   // TODO check that the functions returns new data after the state is changed?
 
   override protected def afterAll(): Unit = {
@@ -431,6 +470,40 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with N
     super.afterAll()
     grpcExecutor.shutdownNow()
   }
+
+  private def assertRegularBalanceChanges(expectedBalanceChanges: Map[Address, Map[Asset, Long]]): Unit = eventually {
+    // Remove pairs (address, asset) those expectedBalanceChanges has not
+    val actual = simplify(
+      regularBalance.get.view
+        .filterKeys(expectedBalanceChanges.keys.toSet)
+        .map {
+          case (address, balance) => address -> balance.view.filterKeys(expectedBalanceChanges(address).contains).toMap
+        }
+        .toMap
+    )
+    val expected = simplify(expectedBalanceChanges)
+    withClue(s"actual=$actual vs expected=$expected\n") {
+      actual should matchTo(expected)
+    }
+  }
+
+  private def simplify(xs: Map[Address, Map[Asset, Long]]): String =
+    xs.toList
+      .map {
+        case (address, assets) =>
+          val xs = assets
+            .map { case (asset, v) => asset.toString -> v }
+            .toList
+            .sortBy(_._1)
+            .map { case (asset, v) => s"$v $asset" }
+            .mkString(", ")
+          address.stringRepr -> xs
+      }
+      .sortBy(_._1)
+      .map {
+        case (address, assets) => s"$address: ($assets)"
+      }
+      .mkString("; ")
 
   private def wait[T](f: => Future[T]): T = Await.result(f, 10.seconds)
 

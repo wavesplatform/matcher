@@ -33,6 +33,7 @@
     <!-- Networking -->
     <logger name="io.netty" level="INFO"/>
     <logger name="io.grpc.netty" level="ERROR"/>
+    <logger name="io.grpc.Context" level="INFO"/> <!-- To ignore "Storage override doesn't exist. Using default" -->
 
     <!-- Queues -->
     <logger name="org.apache.kafka" level="INFO"/>
@@ -47,6 +48,10 @@
     <!-- REST API -->
     <logger name="io.swagger" level="INFO"/>
     <logger name="com.wavesplatform.dex.api.http" level="WARN"/> <!-- Requests -->
+
+    <!-- Waves NODE interaction -->
+    <logger name="com.wavesplatform.dex.grpc.integration.clients.blockchainupdates" level="DEBUG"/>
+    <logger name="com.wavesplatform.dex.grpc.integration.clients.matcherext.MatcherExtensionGrpcAsyncClient" level="DEBUG"/> <!-- gRPC requests to NODE -->
 
     <if condition='property("logback.stdout.enabled").contains("true")'>
         <then>

@@ -88,6 +88,7 @@ object Dependencies {
   private def scalaModule(module: String, version: String): ModuleID = "org.scala-lang" % module % version
   private def catsModule(module: String): ModuleID = "org.typelevel" %% s"cats-$module" % Version.cats
   private def sttpModule(module: String): ModuleID = "com.softwaremill.sttp" %% module % Version.sttp
+  private def sttpClientModule(module: String): ModuleID = "com.softwaremill.sttp.client" %% module % Version.sttpClient
   private def jacksonModule(group: String, module: String): ModuleID = s"com.fasterxml.jackson.$group" % s"jackson-$module" % Version.jackson
   private def monixModule(module: String): ModuleID = "io.monix" %% s"monix-$module" % Version.monix
   private def kamonModule(module: String, version: String = Version.kamon): ModuleID = "io.kamon" %% s"kamon-$module" % version
@@ -131,8 +132,7 @@ object Dependencies {
   private val toxiProxy = "org.testcontainers" % "toxiproxy" % Version.testContainersToxiProxy
   private val googleGuava = "com.google.guava" % "guava" % Version.googleGuava
   private val kafka = "org.apache.kafka" % "kafka-clients" % Version.kafka
-  private val grpcNetty = "io.grpc" % "grpc-netty" % scalapb.compiler.Version.grpcJavaVersion
-  private val nettyCodec = "io.netty" % "netty-codec-http2" % Version.nettyCodec
+  private val grpcNetty = "io.grpc" % "grpc-netty" % "1.35.0" // scalapb.compiler.Version.grpcJavaVersion // "1.31.1" on NODE 1.2.17
   private val swagger = "com.github.swagger-akka-http" %% "swagger-akka-http" % Version.swagger
   private val swaggerUi = "org.webjars" % "swagger-ui" % Version.swaggerUi
   private val playJson = "com.typesafe.play" %% "play-json" % Version.playJson
@@ -145,7 +145,8 @@ object Dependencies {
   private val jniLevelDb = "org.ethereum" % "leveldbjni-all" % Version.jniLevelDb
   private val influxDb = "org.influxdb" % "influxdb-java" % Version.influxDb
   private val commonsNet = "commons-net" % "commons-net" % Version.commonsNet
-  private val sttpClient = "com.softwaremill.sttp.client" %% "core" % Version.sttpClient
+  private val sttpClient = sttpClientModule("core")
+  private val sttpAsyncHttpClient = sttpClientModule("async-http-client-backend-future")
   private val allureScalaTest = "io.qameta.allure" %% "allure-scalatest" % Version.allureScalaTest
   private val jaxbApi = "javax.xml.bind" % "jaxb-api" % Version.jaxbApi
 
@@ -226,8 +227,7 @@ object Dependencies {
       scalaTest % Test,
       googleGuava,
       slf4j,
-      grpcNetty,
-      nettyCodec
+      grpcNetty
     ) ++ pureConfig ++ enumeratum ++ levelDBJNA
   )
 
@@ -260,6 +260,7 @@ object Dependencies {
       jwtModule("core"),
       jwtModule("play-json"),
       sttpClient,
+      sttpAsyncHttpClient,
       wavesJ,
       betterMonadicFor
     ) ++ pureConfig ++ enumeratum ++ testKit ++ quill ++ monocle ++ levelDBJNA

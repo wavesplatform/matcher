@@ -18,7 +18,7 @@ pipeline {
         stage('Cleanup') {
             steps {
                 script {
-                    if (!(BRANCH_NAME ==~ /(origin\/)?(DEX\-.*|master|version\-.*|v?\d+\.\d+\.\d+(\.\d+)?)/)) {
+                    if (!(BRANCH_NAME ==~ /(origin\/)?(DEX\-.*|master|merge\-.*|version\-.*|v?\d+\.\d+\.\d+(\.\d+)?)/)) {
                         currentBuild.result = 'ABORTED'
                         error("The branch '${BRANCH_NAME}' have an incorrect name. Allowed names: master, version-, DEX-")
                     }

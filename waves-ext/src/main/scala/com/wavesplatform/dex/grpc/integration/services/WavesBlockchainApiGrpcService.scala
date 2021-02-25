@@ -14,7 +14,7 @@ import com.wavesplatform.dex.grpc.integration.protobuf.WavesToPbConversions._
 import com.wavesplatform.dex.grpc.integration.smart.MatcherScriptRunner
 import com.wavesplatform.events.UtxEvent.{TxAdded, TxRemoved}
 import com.wavesplatform.extensions.{Context => ExtensionContext}
-import com.wavesplatform.features.BlockchainFeatureStatus
+import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures}
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}
 import com.wavesplatform.lang.v1.traits.Environment
@@ -23,7 +23,7 @@ import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.{Asset, TxValidationError}
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction.smart.script.ScriptRunner
+import com.wavesplatform.transaction.smart.script.ScriptRunnerFixed
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.stub.{ServerCallStreamObserver, StreamObserver}
 import io.grpc.{Metadata, Status, StatusRuntimeException}
@@ -228,7 +228,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
           .toVanilla
           .getOrElse(throwInvalidArgument("Can't parse the transaction"))
         parseScriptResult(
-          ScriptRunner(
+          ScriptRunnerFixed(
             in = Coproduct(tx),
             blockchain = context.blockchain,
             script = info.script,
@@ -257,7 +257,8 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
       case None => Result.Empty
       case Some(scriptInfo) =>
         val order = request.order.map(_.toVanilla).getOrElse(throwInvalidArgument("Expected an order"))
-        parseScriptResult(MatcherScriptRunner(scriptInfo.script, order))
+        val useStdLibFromScript = context.blockchain.isFeatureActivated(BlockchainFeatures.ContinuationTransaction)
+        parseScriptResult(MatcherScriptRunner(scriptInfo.script, order, useStdLibFromScript))
     }
 
     RunScriptResponse(r)

@@ -153,7 +153,8 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
             fork = WavesFork(init.main, mkChain(Vector(block1), 99)),
             utxUpdate = Monoid.empty[UtxUpdate]
           ),
-          requestNextBlockchainEvent = true
+          requestNextBlockchainEvent = true,
+          updatedLastBlockHeight = LastBlockHeight.Updated(1)
         ))
 
         "Height" in test(RolledBack.To.Height(1))
@@ -269,7 +270,8 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
                 fork = WavesFork(init.fork.origChain, mkChain(Vector(block2B, block1), 98)),
                 utxUpdate = init.utxUpdate
               ),
-              requestNextBlockchainEvent = true
+              requestNextBlockchainEvent = true,
+              updatedLastBlockHeight = LastBlockHeight.Updated(2)
             ))
           }
 
@@ -361,7 +363,8 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
               ),
               utxUpdate = init.utxUpdate
             ),
-            requestNextBlockchainEvent = true
+            requestNextBlockchainEvent = true,
+            updatedLastBlockHeight = LastBlockHeight.Updated(1)
           ))
 
         "Height" in test(RolledBack.To.Height(1))

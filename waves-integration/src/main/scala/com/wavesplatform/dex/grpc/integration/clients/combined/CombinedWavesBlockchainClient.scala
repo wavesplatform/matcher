@@ -187,7 +187,10 @@ class CombinedWavesBlockchainClient(
     val prioritizedLastUpdates = lastUpdates :+ mkBlockchainBalance(address, regular, outgoingLeasing)
     val r = prioritizedLastUpdates.map(_.regular.getOrElse(address, Map.empty))
     AddressBalanceUpdates(
-      regular = r.foldSkipped,
+      regular = r.foldSkipped.map(r => {
+        if (r._1 == Asset.Waves)  (r._1, r._2 - outgoingLeasing.getOrElse(0L))
+        else r
+      }),
       outgoingLeasing =
         if (outgoingLeasing.isEmpty) none[Long]
         else prioritizedLastUpdates.map(_.outgoingLeasing.get(address)).foldLeft(none[Long])(_.orElse(_)),

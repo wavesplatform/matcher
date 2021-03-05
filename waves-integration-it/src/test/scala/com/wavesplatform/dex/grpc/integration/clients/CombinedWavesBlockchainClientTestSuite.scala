@@ -299,76 +299,136 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
 
   "partialBalancesSnapshot" in {
     val leaseAmount = 1.waves
-    val leaseTx = mkLease(bob, alice, leaseAmount)
-    val balanceBefore = wavesNode1.api.balance(bob, Waves)
-    wavesNode1.api.broadcast(leaseTx)
 
-    wait(client.partialBalancesSnapshot(bob, Set(Waves, randomIssuedAsset))) should {
-      // leaseTx haven't been added to UTX yet
-      matchTo(AddressBalanceUpdates(
-        regular = Map(Waves -> balanceBefore),
-        outgoingLeasing = Some(0L),
-        pessimisticCorrection = Map.empty
-      )) or
-      // not confirmed
-      matchTo(AddressBalanceUpdates(
-        regular = Map(Waves -> balanceBefore),
-        outgoingLeasing = Some(0L),
-        pessimisticCorrection = Map(Waves -> -(leaseAmount + leasingFee))
-      )) or
-      // confirmed
-      matchTo(AddressBalanceUpdates(
-        regular = Map(Waves -> (balanceBefore - leaseAmount - leasingFee)),
-        outgoingLeasing = Some(leaseAmount),
-        pessimisticCorrection = Map.empty
-      ))
+    def notInUtx(balanceBefore: Long) = matchTo(AddressBalanceUpdates(
+      regular = Map(Waves -> balanceBefore),
+      outgoingLeasing = Some(0L),
+      pessimisticCorrection = Map.empty
+    ))
+
+    def notConfirmed(balanceBefore: Long) = matchTo(AddressBalanceUpdates(
+      regular = Map(Waves -> balanceBefore),
+      outgoingLeasing = Some(0L),
+      pessimisticCorrection = Map(Waves -> -(leaseAmount + leasingFee))
+    ))
+
+    def confirmed(balanceBefore: Long) = matchTo(AddressBalanceUpdates(
+      regular = Map(Waves -> (balanceBefore - leaseAmount - leasingFee)),
+      outgoingLeasing = Some(leaseAmount),
+      pessimisticCorrection = Map(Waves -> 0)
+    ))
+
+    withClue("transaction is not in UTX") {
+      val balance1 = wavesNode1.api.balance(bob, Waves)
+      val leaseTx = mkLease(bob, alice, leaseAmount)
+      broadcast(leaseTx)
+
+      wait(client.partialBalancesSnapshot(bob, Set(Waves, randomIssuedAsset))) should {
+        notInUtx(balance1) or notConfirmed(balance1) or confirmed(balance1)
+      }
+
+      wavesNode1.api.waitForTransaction(leaseTx)
+      broadcastAndAwait(mkLeaseCancel(bob, leaseTx.id()))
     }
 
-    wavesNode1.api.waitForTransaction(leaseTx)
-    broadcastAndAwait(mkLeaseCancel(bob, leaseTx.id()))
+    withClue("transaction is in UTX but not confirmed") {
+      val balance1 = wavesNode1.api.balance(bob, Waves)
+      val leaseTx = mkLease(bob, alice, leaseAmount)
+      broadcast(leaseTx)
+
+      wait(client.partialBalancesSnapshot(bob, Set(Waves, randomIssuedAsset))) should {
+        notConfirmed(balance1) or confirmed(balance1)
+      }
+
+      wavesNode1.api.waitForTransaction(leaseTx)
+      broadcastAndAwait(mkLeaseCancel(bob, leaseTx.id()))
+    }
+
+    withClue("transaction is confirmed") {
+      val balance1 = wavesNode1.api.balance(bob, Waves)
+      val leaseTx = mkLease(bob, alice, leaseAmount)
+
+      broadcastAndAwait(leaseTx)
+      wavesNode1.api.waitForHeightArise()
+
+      wait(client.partialBalancesSnapshot(bob, Set(Waves, randomIssuedAsset))) should {
+        confirmed(balance1)
+      }
+
+      broadcastAndAwait(mkLeaseCancel(bob, leaseTx.id()))
+    }
   }
 
   "fullBalancesSnapshot" in {
-    val carol = mkKeyPair("carol")
+    val acc1 = mkKeyPair("acc1")
+    val acc2 = mkKeyPair("acc2")
+    val acc3 = mkKeyPair("acc3")
+    val leaseAmount = 1.waves
 
     broadcastAndAwait(
-      mkTransfer(bob, carol, 10.waves, Waves),
-      mkTransfer(alice, carol, 1.usd, usd),
-      mkTransfer(bob, carol, 1.btc, btc)
+      mkTransfer(bob, acc1, 10.waves, Waves),
+      mkTransfer(alice, acc1, 1.usd, usd),
+      mkTransfer(bob, acc1, 1.btc, btc),
+      mkTransfer(bob, acc2, 10.waves, Waves),
+      mkTransfer(alice, acc2, 1.usd, usd),
+      mkTransfer(bob, acc2, 1.btc, btc),
+      mkTransfer(bob, acc3, 10.waves, Waves),
+      mkTransfer(alice, acc3, 1.usd, usd),
+      mkTransfer(bob, acc3, 1.btc, btc)
     )
 
-    val leaseAmount = 1.waves
-    val leaseTx = mkLease(carol, bob, leaseAmount)
-    wavesNode1.api.broadcast(leaseTx)
+    def notInUtx() = matchTo(AddressBalanceUpdates(
+      regular = Map[Asset, Long](
+        Waves -> 10.waves,
+        usd -> 1.usd
+      ),
+      outgoingLeasing = Some(0L),
+      pessimisticCorrection = Map.empty
+    ))
 
-    wait(client.fullBalancesSnapshot(carol, Set(btc))) should {
-      // leaseTx haven't been added to UTX yet
-      matchTo(AddressBalanceUpdates(
-        regular = Map[Asset, Long](
-          Waves -> 10.waves,
-          usd -> 1.usd
-        ),
-        outgoingLeasing = Some(0L),
-        pessimisticCorrection = Map.empty
-      )) or
-      // not confirmed
-      matchTo(AddressBalanceUpdates(
-        regular = Map[Asset, Long](
-          Waves -> 10.waves,
-          usd -> 1.usd
-        ),
-        outgoingLeasing = Some(0L),
-        pessimisticCorrection = Map(Waves -> -(leaseAmount + leasingFee))
-      )) or
-      // confirmed
-      matchTo(AddressBalanceUpdates(
-        regular = Map[Asset, Long](
-          Waves -> (10.waves - leaseAmount - leasingFee),
-          usd -> 1.usd
-        ),
-        outgoingLeasing = Some(leaseAmount),
-        pessimisticCorrection = Map.empty
-      ))
+    def notConfirmed() = matchTo(AddressBalanceUpdates(
+      regular = Map[Asset, Long](
+        Waves -> 10.waves,
+        usd -> 1.usd
+      ),
+      outgoingLeasing = Some(0L),
+      pessimisticCorrection = Map(Waves -> -(leaseAmount + leasingFee))
+    ))
+
+    def confirmed() = matchTo(AddressBalanceUpdates(
+      regular = Map[Asset, Long](
+        Waves -> (10.waves - leaseAmount - leasingFee),
+        usd -> 1.usd
+      ),
+      outgoingLeasing = Some(leaseAmount),
+      pessimisticCorrection = Map(Waves -> 0)
+    ))
+
+    withClue("transaction is not in UTX") {
+      broadcast(mkLease(acc1, bob, leaseAmount))
+
+      wait(client.fullBalancesSnapshot(acc1, Set(btc))) should {
+        notInUtx() or notConfirmed() or confirmed()
+      }
+    }
+
+    withClue("transaction is in UTX but not confirmed") {
+      broadcast(mkLease(acc2, bob, leaseAmount))
+
+      wait(client.fullBalancesSnapshot(acc2, Set(btc))) should {
+        notConfirmed() or confirmed()
+      }
+    }
+
+    withClue("transaction is confirmed") {
+      broadcastAndAwait(mkLease(acc3, bob, leaseAmount))
+      wavesNode1.api.waitForHeightArise()
+
+      eventually {
+        wait(client.fullBalancesSnapshot(acc3, Set(btc))) should {
+          confirmed()
+        }
+      }
     }
   }
 

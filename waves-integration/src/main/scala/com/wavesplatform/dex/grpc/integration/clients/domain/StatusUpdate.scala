@@ -23,7 +23,11 @@ object StatusUpdate {
 
   object LastBlockHeight {
     case object NotChanged extends LastBlockHeight
+
+    // We confirm the latest event from the blockchain updates stream
     case class Updated(to: Int) extends LastBlockHeight
+
+    // Something is broken, so we need to rollback and reconnect
     case object RestartRequired extends LastBlockHeight
   }
 

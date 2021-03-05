@@ -109,6 +109,7 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
     settings.eventsQueue.kafka.consumer.maxBufferSize shouldBe 777
     settings.eventsQueue.kafka.consumer.client.getInt("foo") shouldBe 2
     settings.eventsQueue.kafka.producer.client.getInt("bar") shouldBe 3
+    settings.eventsQueue.kafka.producer.enable shouldBe false
     settings.eventsQueue.circuitBreaker should matchTo(
       CircuitBreakerSettings(
         maxFailures = 999,

@@ -75,10 +75,17 @@ object StatusTransitions extends ScorexLogging {
           case Appended(block) =>
             origStatus.fork.withBlock(block) match {
               case resolved: Status.Resolved =>
-                val finalUtxUpdate = origStatus.utxUpdate |+| UtxUpdate(
-                  confirmedTxs = resolved.confirmedTxs,
-                  failedTxs = Map.empty // resolved.lostTxIds
-                )
+                val finalUtxUpdate = {
+                  val x = origStatus.utxUpdate |+| UtxUpdate(
+                    confirmedTxs = resolved.newConfirmedTxs,
+                    failedTxs = Map.empty // resolved.lostTxIds
+                  )
+
+                  // This solves a situation when rolled back transactions are moved to UTX Pool
+                  // and then confirmed in a micro block.
+                  // Relates DEX-1099
+                  x.copy(unconfirmedTxs = x.unconfirmedTxs.filterNot(x => resolved.commonTxIds.contains(x.id)))
+                }
 
                 if (resolved.lostDiffIndex.isEmpty)
                   StatusUpdate(

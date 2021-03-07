@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.grpc.integration.clients.domain
 
 import cats.Monoid
-import cats.syntax.semigroup._
+import cats.implicits._
 import com.google.protobuf.UnsafeByteOperations
 import com.wavesplatform.dex.WavesIntegrationSuiteBase
 import com.wavesplatform.dex.domain.account.KeyPair
@@ -210,7 +210,14 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
           origChain = mkChain(Vector(block2A, block1), 98),
           forkChain = mkChain(Vector(block2B, block1), 98)
         ),
-        utxUpdate = UtxUpdate(failedTxs = mkUtxTransactionMap(30))
+        utxUpdate = UtxUpdate(
+          unconfirmedTxs = List(
+            2, // from block2A to UTX Pool during a rollback
+            31,
+            32
+          ).foldMapK(mkUtxTransactionMap).values.toSeq,
+          failedTxs = mkUtxTransactionMap(30)
+        )
       )
 
       "Appended ->" - {
@@ -223,7 +230,11 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
               outgoingLeasing = Map(bob -> 10)
             ),
             tpe = WavesBlock.Type.MicroBlock,
-            confirmedTxs = mkTransactionWithChangesMap(10)
+            confirmedTxs = List(
+              2, // The tx migrates from block2A to a new micro block, relates DEX-1099
+              10,
+              31 // init.utxUpdate
+            ).foldMapK(mkTransactionWithChangesMap)
           )
 
           val event = Appended(microBlock)
@@ -234,9 +245,14 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
             ),
             updatedBalances = block2B.changes |+| microBlock.changes,
             updatedLastBlockHeight = StatusUpdate.LastBlockHeight.Updated(2),
-            utxUpdate = init.utxUpdate |+| UtxUpdate(
-              confirmedTxs = block2B.confirmedTxs ++ microBlock.confirmedTxs,
-              failedTxs = Map.empty // It doesn't affect now
+            utxUpdate = UtxUpdate(
+              unconfirmedTxs = mkUtxTransactionMap(32).values.toSeq, // init.utxUpdate, 31 is gone, because confirmed
+              confirmedTxs = List(
+                3, // block2B
+                10, // microBlock
+                31 // microBlock
+              ).foldMapK(mkTransactionWithChangesMap),
+              failedTxs = mkUtxTransactionMap(30) // init.utxUpdate
             ),
             requestNextBlockchainEvent = true
           ))

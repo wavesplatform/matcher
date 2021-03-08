@@ -313,7 +313,7 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
     ))
 
     def confirmed(balanceBefore: Long) = matchTo(AddressBalanceUpdates(
-      regular = Map(Waves -> (balanceBefore - leaseAmount - leasingFee)),
+      regular = Map(Waves -> (balanceBefore - leasingFee)),
       outgoingLeasing = Some(leaseAmount),
       pessimisticCorrection = Map(Waves -> 0)
     ))
@@ -397,7 +397,7 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
 
     def confirmed() = matchTo(AddressBalanceUpdates(
       regular = Map[Asset, Long](
-        Waves -> (10.waves - leaseAmount - leasingFee),
+        Waves -> (10.waves - leasingFee),
         usd -> 1.usd
       ),
       outgoingLeasing = Some(leaseAmount),

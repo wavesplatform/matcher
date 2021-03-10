@@ -35,7 +35,7 @@ class GrpcUtxEventsControlledStream(channel: ManagedChannel)(implicit scheduler:
 
   override def start(): Unit = {
     log.info(s"$logPrefix Connecting to UTX stream")
-    val call = channel.newCall(WavesBlockchainApiGrpc.METHOD_GET_UTX_EVENTS, CallOptions.DEFAULT.withWaitForReady()) // TODO DEX-1001
+    val call = channel.newCall(WavesBlockchainApiGrpc.METHOD_GET_UTX_EVENTS, CallOptions.DEFAULT)
     val observer = new UtxEventObserver(call)
     grpcObserver = observer.some
     ClientCalls.asyncServerStreamingCall(call, empty, observer)

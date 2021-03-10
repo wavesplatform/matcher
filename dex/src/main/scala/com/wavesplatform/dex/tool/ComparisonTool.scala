@@ -69,7 +69,7 @@ class ComparisonTool(settings: Settings) extends ScorexLogging {
       } yield basicRequest
         .get(uri"$baseUri/matcher/orderbook/${assetPair.amountAsset}/${assetPair.priceAsset}/tradableBalance/${pk.toAddress}")
         .response(asString("UTF-8"))
-        .send()
+        .send(backend)
         .map(r => ((pk, assetPair), baseUri, parse(r)))
 
     Future

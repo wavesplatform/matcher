@@ -5,20 +5,20 @@ import com.wavesplatform.dex.cli.ErrorOr
 import com.wavesplatform.dex.error.Implicits.ThrowableOps
 import com.wavesplatform.dex.tool.connectors.RestConnector.{ErrorOrJsonResponse, RequestFunction}
 import play.api.libs.json.{JsValue, Json}
-import sttp.client._
+import sttp.client3.{basicRequest, _}
 
 import scala.util.Try
 
 trait RestConnector extends Connector {
 
-  implicit protected val backend: SttpBackend[Identity, Nothing, NothingT] = HttpURLConnectionBackend()
+  implicit protected val backend: SttpBackend[Identity, Any] = HttpURLConnectionBackend()
 
   protected lazy val targetUri = uri"$target"
 
   protected def mkResponse(request: RequestFunction): ErrorOrJsonResponse =
     for {
-      errorOrResponse <- Try(request(basicRequest).send().body).toEither.leftMap(ex => s"Cannot send request! ${ex.getWithStackTrace}")
-      response <- errorOrResponse
+      errorOrResponse <- Try(request(basicRequest).body.toString).toEither.leftMap(ex => s"Cannot send request! ${ex.getWithStackTrace}")
+      response <- Right(errorOrResponse)
     } yield Json.parse(response)
 
   override def close(): Unit = backend.close()

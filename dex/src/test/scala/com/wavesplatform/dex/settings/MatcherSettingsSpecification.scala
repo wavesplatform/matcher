@@ -25,7 +25,7 @@ import com.wavesplatform.dex.test.matchers.ProduceError.produce
 import com.wavesplatform.dex.tool.ComparisonTool
 import org.scalatest.matchers.should.Matchers
 import pureconfig.ConfigSource
-import sttp.client.UriContext
+import sttp.client3.UriContext
 
 import scala.concurrent.duration._
 

@@ -45,7 +45,7 @@ object Dependencies {
     val quillJdbc = "3.6.0"
 
     val sttp = "1.7.2"
-    val sttpClient = "2.2.9"
+    val sttpClient = "3.1.7"
 
     val testContainers = "0.38.8"
     val testContainersPostgres = "1.15.1"
@@ -88,7 +88,7 @@ object Dependencies {
   private def scalaModule(module: String, version: String): ModuleID = "org.scala-lang" % module % version
   private def catsModule(module: String): ModuleID = "org.typelevel" %% s"cats-$module" % Version.cats
   private def sttpModule(module: String): ModuleID = "com.softwaremill.sttp" %% module % Version.sttp
-  private def sttpClientModule(module: String): ModuleID = "com.softwaremill.sttp.client" %% module % Version.sttpClient
+  private def sttpClientModule(module: String): ModuleID = "com.softwaremill.sttp.client3" %% module % Version.sttpClient
   private def jacksonModule(group: String, module: String): ModuleID = s"com.fasterxml.jackson.$group" % s"jackson-$module" % Version.jackson
   private def monixModule(module: String): ModuleID = "io.monix" %% s"monix-$module" % Version.monix
   private def kamonModule(module: String, version: String = Version.kamon): ModuleID = "io.kamon" %% s"kamon-$module" % version

@@ -20,9 +20,9 @@ import com.wavesplatform.dex.tool.ComparisonTool._
 import com.wavesplatform.dex.domain.asset.AssetPair
 import play.api.libs.json.Json
 import pureconfig.ConfigSource
-import sttp.client.asynchttpclient.future.AsyncHttpClientFutureBackend
+import sttp.client3.asynchttpclient.future.AsyncHttpClientFutureBackend
 import sttp.model.Uri
-import sttp.client._
+import sttp.client3._
 
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration._

@@ -2,8 +2,7 @@ package com.wavesplatform.dex.it.api.node
 
 import java.net.InetSocketAddress
 
-import com.softwaremill.sttp._
-import com.softwaremill.sttp.playJson._
+import sttp.client3._
 import com.wavesplatform.dex.api.http.entities.HttpMessage
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
@@ -20,35 +19,35 @@ class AsyncEnrichedNodeApi(apiKey: String, host: => InetSocketAddress)(implicit 
     with NodeApi[AsyncEnrichedNodeApi.R] {
 
   override def wavesBalanceOrig(address: Address): R[WavesBalanceResponse] = mk {
-    sttp.get(uri"$apiUri/addresses/balance/$address")
+    basicRequest.get(uri"$apiUri/addresses/balance/$address")
   }
 
   override def assetBalanceOrig(address: Address, asset: Asset.IssuedAsset): R[AssetBalanceResponse] = mk {
-    sttp.get(uri"$apiUri/assets/balance/$address/$asset")
+    basicRequest.get(uri"$apiUri/assets/balance/$address/$asset")
   }
 
   override def broadcast(tx: Transaction): R[Unit] = mkIgnore {
-    sttp.post(uri"$apiUri/transactions/broadcast").body(tx.toJson).contentType("application/json")
+    basicRequest.post(uri"$apiUri/transactions/broadcast").body(tx.toJson).contentType("application/json")
   }
 
   override def transactionInfo(id: Id): R[Transaction] = mk {
-    sttp.get(uri"$apiUri/transactions/info/$id")
+    basicRequest.get(uri"$apiUri/transactions/info/$id")
   }
 
   override def unconfirmedTransactions: R[List[Transaction]] = mk {
-    sttp.get(uri"$apiUri/transactions/unconfirmed")
+    basicRequest.get(uri"$apiUri/transactions/unconfirmed")
   }
 
   override def unconfirmedTransactionInfo(id: Id): R[Transaction] = mk {
-    sttp.get(uri"$apiUri/transactions/unconfirmed/info/$id")
+    basicRequest.get(uri"$apiUri/transactions/unconfirmed/info/$id")
   }
 
   override def currentHeightOrig: R[HeightResponse] = mk {
-    sttp.get(uri"$apiUri/blocks/height")
+    basicRequest.get(uri"$apiUri/blocks/height")
   }
 
   override def activationStatus: R[ActivationStatusResponse] = mk {
-    sttp.get(uri"$apiUri/activation/status")
+    basicRequest.get(uri"$apiUri/activation/status")
   }
 
   override def connect(toNode: InetSocketAddress): R[Unit] = mkIgnore {
@@ -59,7 +58,7 @@ class AsyncEnrichedNodeApi(apiKey: String, host: => InetSocketAddress)(implicit 
   }
 
   override def connectedPeers: R[ConnectedPeersResponse] = mk {
-    sttp.get(uri"$apiUri/peers/connected")
+    basicRequest.get(uri"$apiUri/peers/connected")
   }
 
   override def rollback(toHeight: StatusCode, returnTransactionsToUtx: Boolean): R[Unit] = mkIgnore {

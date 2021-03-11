@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.it.api
 
-import com.softwaremill.sttp.StatusCodes
+import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import org.scalatest.matchers.should.Matchers
 
@@ -22,25 +22,25 @@ trait RawHttpChecks extends Matchers {
   }
 
   protected def validate200Hocon[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT]): EntityT =
-    validateResponse(r, StatusCodes.Ok, "application/hocon")
+    validateResponse(r, StatusCodes.OK.intValue, "application/hocon")
 
   protected def validate200Json[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT]): EntityT =
-    validateResponse(r, StatusCodes.Ok, "application/json")
+    validateResponse(r, StatusCodes.OK.intValue, "application/json")
 
   protected def validate201Json[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT]): EntityT =
-    validateResponse(r, StatusCodes.Created, "application/json")
+    validateResponse(r, StatusCodes.Created.intValue, "application/json")
 
   protected def validate202Json[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT]): EntityT =
-    validateResponse(r, StatusCodes.Accepted, "application/json")
+    validateResponse(r, StatusCodes.Accepted.intValue, "application/json")
 
   protected def validate301Redirect[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT]): Unit =
-    r.response.code should be(StatusCodes.MovedPermanently)
+    r.response.code should be(StatusCodes.MovedPermanently.intValue)
 
   protected def validateIncorrectSignature[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT]) =
-    validateMatcherError(r, StatusCodes.BadRequest, 1051904, "The request has an invalid signature")
+    validateMatcherError(r, StatusCodes.BadRequest.intValue, 1051904, "The request has an invalid signature")
 
   protected def validateAuthorizationError[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT]): Unit =
-    validateMatcherError(r, StatusCodes.Forbidden, 106954752, "Provided API key is not correct")
+    validateMatcherError(r, StatusCodes.Forbidden.intValue, 106954752, "Provided API key is not correct")
 
   protected def validateMatcherErrorContainText[ErrorT, EntityT](
     r: EnrichedResponse[ErrorT, EntityT],
@@ -75,7 +75,7 @@ trait RawHttpChecks extends Matchers {
   }
 
   protected def validate404Exception[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT]): Unit = {
-    r.response.code should be(StatusCodes.NotFound)
+    r.response.code should be(StatusCodes.NotFound.intValue)
     validateResponseContainHeaders(r, "Content-Type" -> "text/plain; charset=UTF-8")
     r.response.body should be(Left("The requested resource could not be found but may be available again in the future."))
   }

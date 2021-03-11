@@ -87,7 +87,6 @@ object Dependencies {
   private def akkaModule(module: String, version: String): ModuleID = "com.typesafe.akka" %% module % version
   private def scalaModule(module: String, version: String): ModuleID = "org.scala-lang" % module % version
   private def catsModule(module: String): ModuleID = "org.typelevel" %% s"cats-$module" % Version.cats
-  private def sttpModule(module: String): ModuleID = "com.softwaremill.sttp" %% module % Version.sttp
   private def sttpClientModule(module: String): ModuleID = "com.softwaremill.sttp.client3" %% module % Version.sttpClient
   private def jacksonModule(group: String, module: String): ModuleID = s"com.fasterxml.jackson.$group" % s"jackson-$module" % Version.jackson
   private def monixModule(module: String): ModuleID = "io.monix" %% s"monix-$module" % Version.monix
@@ -271,9 +270,6 @@ object Dependencies {
 
     lazy val dexItCommon: Seq[ModuleID] = Seq(
       kindProjector,
-      sttpModule("core"),
-      sttpModule("play-json"),
-      sttpModule("async-http-client-backend-future"),
       catsCore,
       alleyCatsCore,
       catsTaglessMacros,
@@ -281,7 +277,8 @@ object Dependencies {
       mouse,
       scalaTest,
       toxiProxy,
-      wavesJ
+      wavesJ,
+      sttpClient
     ) ++ testContainers
 
     lazy val dexTestCommon: Seq[ModuleID] = Seq(diffx, scalaTest, scalaCheck, scalaTestPlusCheck, allureScalaTest)

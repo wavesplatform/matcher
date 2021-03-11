@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.it.api
 
 import cats.~>
-import com.softwaremill.sttp.Response
+import sttp.client3.Response
 import com.wavesplatform.dex.meta.getSimpleName
 
 import scala.concurrent.ExecutionContext.Implicits.global

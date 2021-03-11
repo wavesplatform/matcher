@@ -3,9 +3,6 @@ package com.wavesplatform.dex.it.api.dex
 import java.net.InetSocketAddress
 import java.util.UUID
 import com.google.common.primitives.Longs
-import com.softwaremill.sttp.Uri.QueryFragment
-import com.softwaremill.sttp._
-import com.softwaremill.sttp.playJson._
 import com.typesafe.config.Config
 import com.wavesplatform.dex.api.http.entities._
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
@@ -21,6 +18,7 @@ import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import com.wavesplatform.dex.it.json._
 import im.mak.waves.transactions.ExchangeTransaction
 import play.api.libs.json.{JsObject, Json}
+import sttp.client3._
 
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, Future}
@@ -38,13 +36,14 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
     getReservedBalance(Base58.encode(of.publicKey), timestampAndSignatureHeaders(of, timestamp))
 
   override def getReservedBalance(publicKey: String, headers: Map[String, String]): R[HttpBalance] = mk {
-    sttp
+    basicRequest
       .get(uri"$apiUri/matcher/balance/reserved/$publicKey")
       .headers(headers)
+
   }
 
   override def getReservedBalanceWithApiKey(of: KeyPair, xUserPublicKey: Option[PublicKey]): R[HttpBalance] = mk {
-    sttp
+    basicRequest
       .get(uri"$apiUri/matcher/balance/reserved/${Base58.encode(of.publicKey)}")
       .headers(apiKeyWithUserPublicKeyHeaders(xUserPublicKey))
   }
@@ -61,7 +60,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
     getTradableBalance(of.publicKey.toAddress.stringRepr, assetPair.amountAssetStr, assetPair.priceAssetStr)
 
   override def place(order: Order): R[HttpSuccessfulPlace] = mk {
-    sttp
+    basicRequest
       .post(uri"$apiUri/matcher/orderbook")
       .readTimeout(3.minutes) // TODO find a way to decrease the timeout!
       .followRedirects(false) // TODO move ?

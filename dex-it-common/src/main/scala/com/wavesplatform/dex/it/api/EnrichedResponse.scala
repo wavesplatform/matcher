@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.it.api
 
 import cats.implicits.catsSyntaxEitherId
-import com.softwaremill.sttp.Response
+import sttp.client3.Response
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.it.api.EnrichedResponse.As
 import play.api.libs.json.{Json, Reads}

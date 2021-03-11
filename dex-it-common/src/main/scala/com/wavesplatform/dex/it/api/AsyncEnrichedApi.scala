@@ -17,13 +17,20 @@ abstract class AsyncEnrichedApi[ErrorT: Reads](host: => InetSocketAddress)(impli
   type R[EntityT] = Future[EnrichedResponse[ErrorT, EntityT]]
 
   def mk[EntityT: Reads](req: Request[Either[String, String], Any]): R[EntityT] =
-    req.tag("requestId", UUID.randomUUID).send(httpBackend).map(EnrichedResponse(_, new EnrichedResponse.AsJson[ErrorT, EntityT]))
+    req
+      .tag("requestId", UUID.randomUUID)
+      .contentType("application/json")
+      .send(httpBackend)
+      .map(EnrichedResponse(_, new EnrichedResponse.AsJson[ErrorT, EntityT]))
 
   def mkHocon[EntityT](req: Request[Either[String, String], Any]): R[Config] =
     req.tag("requestId", UUID.randomUUID).send(httpBackend).map(EnrichedResponse(_, new EnrichedResponse.AsHocon[ErrorT]))
 
   def mkIgnore(req: Request[Either[String, String], Any]): R[Unit] =
-    req.tag("requestId", UUID.randomUUID).send(httpBackend).map(EnrichedResponse(_, new EnrichedResponse.Ignore[ErrorT]))
+    req.tag("requestId", UUID.randomUUID).response(asString("UTF-8")).send(httpBackend).map(EnrichedResponse(
+      _,
+      new EnrichedResponse.Ignore[ErrorT]
+    ))
 
   def apiUri: String = {
     val savedHost = host

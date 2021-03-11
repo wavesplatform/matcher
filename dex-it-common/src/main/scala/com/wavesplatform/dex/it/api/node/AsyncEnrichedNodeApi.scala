@@ -3,6 +3,7 @@ package com.wavesplatform.dex.it.api.node
 import java.net.InetSocketAddress
 
 import sttp.client3._
+import sttp.client3.playJson
 import com.wavesplatform.dex.api.http.entities.HttpMessage
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset

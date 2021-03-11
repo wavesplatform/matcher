@@ -62,7 +62,7 @@ final case class WavesNodeContainer(override val internalIp: String, underlying:
     val r = Iterator
       .continually {
         Thread.sleep(1000)
-        try httpApi.currentHeightOrig.code == StatusCode.Ok.code
+        try httpApi.currentHeightOrig.code == StatusCode.Ok
         catch {
           case _: Throwable => false
         }

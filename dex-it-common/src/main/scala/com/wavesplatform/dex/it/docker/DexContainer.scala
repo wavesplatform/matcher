@@ -1,6 +1,5 @@
 package com.wavesplatform.dex.it.docker
 
-import akka.http.scaladsl.model.StatusCodes
 
 import java.net.InetSocketAddress
 import java.nio.file.{Path, Paths}
@@ -18,6 +17,7 @@ import com.wavesplatform.dex.it.sttp.LoggingSttpBackend
 import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
 import org.testcontainers.containers.BindMode
 import org.testcontainers.containers.Network.NetworkImpl
+import sttp.model.StatusCode
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
@@ -59,7 +59,7 @@ final case class DexContainer private (override val internalIp: String, underlyi
     val r = Iterator
       .continually {
         Thread.sleep(1000)
-        try httpApi.getOrderBooks.code == StatusCodes.OK.intValue
+        try httpApi.getOrderBooks.code == StatusCode.Ok
         catch {
           case _: Throwable => false
         }

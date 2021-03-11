@@ -74,9 +74,9 @@ class GetOrderBookInfoSpec extends MatcherSuiteBase with TableDrivenPropertyChec
 
     forAll(Table(
       ("Amount", "Price", "Http status", "Error code", "Message"),
-      ("incorrect", "WAVES", 404, 11534345, "The asset incorrect not found"),
-      ("WAVES", "incorrect", 404, 9440771, "The WAVES-incorrect asset pair should be reversed")
-    )) { (a: String, p: String, c: Int, e: Int, m: String) =>
+      ("incorrect", "WAVES", StatusCode.NotFound, 11534345, "The asset incorrect not found"),
+      ("WAVES", "incorrect", StatusCode.NotFound, 9440771, "The WAVES-incorrect asset pair should be reversed")
+    )) { (a: String, p: String, c: StatusCode, e: Int, m: String) =>
       s"for $a/$p should return (HTTP-$c; [$e: $m]) " in {
         validateMatcherError(dex1.rawApi.getOrderBookInfo(AssetPair.createAssetPair(a, p).get), c, e, m)
       }

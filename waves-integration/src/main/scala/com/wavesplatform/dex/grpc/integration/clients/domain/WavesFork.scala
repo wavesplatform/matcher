@@ -41,7 +41,8 @@ case class WavesFork private[domain] (origChain: WavesChain, forkChain: WavesCha
           newChanges = updatedForkAllChanges, // TODO DEX-1011
           lostDiffIndex = origForkDiffIndex.without(updatedForkDiffIndex),
           lostTxIds = origTxs -- forkTxs.keys,
-          confirmedTxs = forkTxs -- origTxs.keys
+          newConfirmedTxs = forkTxs -- origTxs.keys,
+          commonTxIds = forkTxs.keySet.intersect(origTxs.keySet)
         )
       } else Status.NotResolved(copy(forkChain = updatedForkChain))
   }
@@ -58,12 +59,16 @@ object WavesFork {
 
   object Status {
 
+    /**
+     * @param commonTxIds Common on a forked part of chain
+     */
     case class Resolved(
       activeChain: WavesChain,
       newChanges: BlockchainBalance,
       lostDiffIndex: DiffIndex,
       lostTxIds: Map[ByteString, TransactionWithChanges], // Will be used in the future
-      confirmedTxs: Map[ByteString, TransactionWithChanges]
+      newConfirmedTxs: Map[ByteString, TransactionWithChanges],
+      commonTxIds: Set[ByteString]
     ) extends Status
 
     case class NotResolved(updatedFork: WavesFork) extends Status

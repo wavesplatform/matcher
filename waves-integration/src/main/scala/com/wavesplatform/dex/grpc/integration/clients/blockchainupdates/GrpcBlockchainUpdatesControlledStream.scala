@@ -38,7 +38,7 @@ class GrpcBlockchainUpdatesControlledStream(channel: ManagedChannel)(implicit sc
     require(height >= 1, "We can not get blocks on height <= 0")
     log.info(s"$logPrefix Connecting to Blockchain events stream, getting blocks from $height")
 
-    val call = channel.newCall(BlockchainUpdatesApiGrpc.METHOD_SUBSCRIBE, CallOptions.DEFAULT.withWaitForReady()) // TODO DEX-1001
+    val call = channel.newCall(BlockchainUpdatesApiGrpc.METHOD_SUBSCRIBE, CallOptions.DEFAULT)
     val observer = new BlockchainUpdatesObserver(call, height)
     grpcObserver = observer.some
     ClientCalls.asyncServerStreamingCall(call, new SubscribeRequest(height), observer)

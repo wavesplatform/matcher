@@ -19,6 +19,8 @@ import com.wavesplatform.dex.it.json._
 import im.mak.waves.transactions.ExchangeTransaction
 import play.api.libs.json.{JsObject, Json}
 import sttp.client3._
+import sttp.model.Uri
+import sttp.model.Uri.QuerySegment
 
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, Future}
@@ -519,11 +521,11 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
   def appendFilters(uri: Uri, activeOnly: Option[Boolean], closedOnly: Option[Boolean]): Uri = {
     val activeOnlyQuery = boolQueryFragments("activeOnly", activeOnly)
     val closedOnlyQuery = boolQueryFragments("closedOnly", closedOnly)
-    uri.copy(queryFragments = activeOnlyQuery ++ closedOnlyQuery)
+    uri.copy(querySegments = activeOnlyQuery ++ closedOnlyQuery)
   }
 
-  def boolQueryFragments(name: String, x: Option[Boolean]): List[QueryFragment] =
-    x.fold(List.empty[QueryFragment])(x => List(QueryFragment.KeyValue(name, x.toString)))
+  def boolQueryFragments(name: String, x: Option[Boolean]): List[QuerySegment] =
+    x.fold(List.empty[QuerySegment])(x => List(QuerySegment.KeyValue(name, x.toString)))
 
   def timestampAndSignatureHeaders(owner: KeyPair, timestamp: Long): Map[String, String] = Map(
     "Timestamp" -> timestamp.toString,

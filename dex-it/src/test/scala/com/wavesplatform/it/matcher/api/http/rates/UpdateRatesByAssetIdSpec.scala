@@ -1,6 +1,6 @@
 package com.wavesplatform.it.matcher.api.http.rates
 
-import com.softwaremill.sttp.StatusCodes
+import sttp.model.StatusCode
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpRates
 import com.wavesplatform.dex.domain.asset.Asset.Waves
@@ -40,32 +40,32 @@ class UpdateRatesByAssetIdSpec extends MatcherSuiteBase with ApiKeyHeaderChecks 
     }
 
     "should return an error for incorrect rate values" in {
-      validateMatcherError(dex1.rawApi.upsertRate(btc, -1), StatusCodes.BadRequest, 20971535, "Asset rate should be positive")
-      validateMatcherError(dex1.rawApi.upsertRate(btc, 0), StatusCodes.BadRequest, 20971535, "Asset rate should be positive")
+      validateMatcherError(dex1.rawApi.upsertRate(btc, -1), StatusCode.BadRequest, 20971535, "Asset rate should be positive")
+      validateMatcherError(dex1.rawApi.upsertRate(btc, 0), StatusCode.BadRequest, 20971535, "Asset rate should be positive")
     }
 
     //TODO: DEX-985
     "should return error if  the rate value more than Double.max" ignore {
-      validateMatcherError(dex1.rawApi.upsertRate(btc, "2.79769311348623157E308"), StatusCodes.BadRequest, -1, "Error")
+      validateMatcherError(dex1.rawApi.upsertRate(btc, "2.79769311348623157E308"), StatusCode.BadRequest, -1, "Error")
     }
 
     "should return an error for unexisted asset" in {
       validateMatcherError(
         dex1.rawApi.upsertRate("AAA", 0.5, Map("X-API-Key" -> apiKey)),
-        StatusCodes.NotFound,
+        StatusCode.NotFound,
         11534345,
         "The asset AAA not found"
       )
     }
 
     "should return an error when user try to update Waves rate" in {
-      validateMatcherError(dex1.rawApi.upsertRate(Waves, 0.5), StatusCodes.BadRequest, 20971531, "The rate for WAVES cannot be changed")
+      validateMatcherError(dex1.rawApi.upsertRate(Waves, 0.5), StatusCode.BadRequest, 20971531, "The rate for WAVES cannot be changed")
     }
 
     "should return error exception when the amount asset is not correct base58 string" in {
       validateMatcherError(
         dex1.rawApi.upsertRate("null", 0.1, Map("X-API-Key" -> apiKey)),
-        StatusCodes.BadRequest,
+        StatusCode.BadRequest,
         11534337,
         "The asset 'null' is wrong, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )

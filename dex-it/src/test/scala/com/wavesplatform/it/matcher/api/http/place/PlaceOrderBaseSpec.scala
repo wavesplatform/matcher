@@ -1,6 +1,6 @@
 package com.wavesplatform.it.matcher.api.http.place
 
-import com.softwaremill.sttp.StatusCodes
+import sttp.model.StatusCode
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType.BUY
@@ -38,19 +38,19 @@ class PlaceOrderBaseSpec extends MatcherSuiteBase with TableDrivenPropertyChecks
     (
       1,
       mkOrder(alice, wavesUsdPair, BUY, -10.waves, 1.usd, 0.003.waves, Waves, correctExpiration, 1.day, 1.toByte, matcher.publicKey),
-      StatusCodes.BadRequest,
+      StatusCode.BadRequest,
       MatcherError(9437184, "The order is invalid: amount should be > 0", "OrderRejected", Some(Params(None, None, None)))
     ),
     (
       2,
       mkOrder(alice, wavesUsdPair, BUY, 10.waves, -1.usd, 0.003.waves, Waves, correctExpiration, 1.day, 1.toByte, matcher.publicKey),
-      StatusCodes.BadRequest,
+      StatusCode.BadRequest,
       MatcherError(9437184, "The order is invalid: price should be > 0", "OrderRejected", Some(Params(None, None, None)))
     ),
     (
       3,
       mkOrder(alice, wavesUsdPair, BUY, 10.waves, 1.usd, 0L, Waves, correctExpiration, 1.day, 1.toByte, matcher.publicKey),
-      StatusCodes.BadRequest,
+      StatusCode.BadRequest,
       MatcherError(9441542, "Required 0.003 WAVES as fee for this order, but given 0 WAVES", "OrderRejected", Some(Params(None, None, None)))
     ),
     (
@@ -67,19 +67,19 @@ class PlaceOrderBaseSpec extends MatcherSuiteBase with TableDrivenPropertyChecks
     (
       5,
       mkOrder(alice, wavesUsdPair, BUY, 10.waves, 1.usd, 0.003.waves, Waves, -1L, 1.day, 1.toByte, matcher.publicKey),
-      StatusCodes.BadRequest,
+      StatusCode.BadRequest,
       MatcherError(9441798, "The expiration should be at least", "OrderRejected", Some(Params(None, None, None)))
     ),
     (
       6,
       mkOrder(alice, wavesUsdPair, BUY, 10.waves, 1.usd, 0.003.waves, Waves, correctExpiration, 31.days, 1.toByte, matcher.publicKey),
-      StatusCodes.BadRequest,
+      StatusCode.BadRequest,
       MatcherError(9437184, "The order is invalid: expiration should be earlier than 30 days", "OrderRejected", Some(Params(None, None, None)))
     ),
     (
       7,
       mkOrder(alice, wavesUsdPair, BUY, 10.waves, 1.usd, 0.003.waves, Waves, correctExpiration, 1.day, 1.toByte, alice.publicKey),
-      StatusCodes.BadRequest,
+      StatusCode.BadRequest,
       MatcherError(
         3076,
         s"The required matcher public key for this DEX is ${matcher.publicKey}, but given ${alice.publicKey}",

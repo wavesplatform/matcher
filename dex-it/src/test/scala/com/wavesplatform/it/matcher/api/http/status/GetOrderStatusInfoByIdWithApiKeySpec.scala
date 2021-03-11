@@ -1,6 +1,6 @@
 package com.wavesplatform.it.matcher.api.http.status
 
-import com.softwaremill.sttp.StatusCodes
+import sttp.model.StatusCode
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.account.KeyPair.toAddress
 import com.wavesplatform.dex.domain.bytes.codec.Base58
@@ -87,7 +87,7 @@ class GetOrderStatusInfoByIdWithApiKeySpec extends MatcherSuiteBase with ApiKeyH
       placeAndAwaitAtDex(order)
       validateMatcherError(
         dex1.rawApi.getOrderStatusInfoByIdWithApiKey(alice, order.id(), Some(bob.publicKey)),
-        StatusCodes.Forbidden,
+        StatusCode.Forbidden,
         3148801,
         "Provided public key is not correct, reason: invalid public key"
       )
@@ -105,7 +105,7 @@ class GetOrderStatusInfoByIdWithApiKeySpec extends MatcherSuiteBase with ApiKeyH
       val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd)
       validateMatcherError(
         dex1.rawApi.getOrderStatusInfoByIdWithApiKey(alice, order.id(), Some(alice.publicKey)),
-        StatusCodes.NotFound,
+        StatusCode.NotFound,
         9437193,
         s"The order ${order.idStr()} not found"
       )
@@ -119,7 +119,7 @@ class GetOrderStatusInfoByIdWithApiKeySpec extends MatcherSuiteBase with ApiKeyH
           order.idStr(),
           Map("X-User-Public-Key" -> Base58.encode(alice.publicKey), "X-API-Key" -> apiKey)
         ),
-        StatusCodes.BadRequest,
+        StatusCode.BadRequest,
         4194304,
         "Provided address in not correct, reason: Unable to decode base58: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )
@@ -132,7 +132,7 @@ class GetOrderStatusInfoByIdWithApiKeySpec extends MatcherSuiteBase with ApiKeyH
           "null",
           Map("X-User-Public-Key" -> Base58.encode(alice.publicKey), "X-API-Key" -> apiKey)
         ),
-        StatusCodes.BadRequest,
+        StatusCode.BadRequest,
         9437185,
         "Provided value is not a correct base58 string, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )

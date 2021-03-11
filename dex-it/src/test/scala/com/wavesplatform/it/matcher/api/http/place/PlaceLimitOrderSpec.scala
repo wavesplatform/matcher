@@ -1,6 +1,6 @@
 package com.wavesplatform.it.matcher.api.http.place
 
-import com.softwaremill.sttp.StatusCodes
+import sttp.model.StatusCode
 import com.wavesplatform.dex.api.http.entities.HttpSuccessfulPlace
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.OrderType.BUY
@@ -20,7 +20,7 @@ class PlaceLimitOrderSpec extends PlaceOrderBaseSpec {
     "should return error with incorrect order signature" in {
       validateMatcherErrorContainText(
         dex1.rawApi.place(mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd).json().deepMerge(Json.obj("amount" -> 3.waves))),
-        StatusCodes.BadRequest,
+        StatusCode.BadRequest,
         9440512,
         s"The signature of order"
       )

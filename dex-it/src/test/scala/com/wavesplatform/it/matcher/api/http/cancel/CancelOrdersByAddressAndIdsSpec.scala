@@ -1,6 +1,6 @@
 package com.wavesplatform.it.matcher.api.http.cancel
 
-import com.softwaremill.sttp.StatusCodes
+import sttp.model.StatusCode
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.api.http.entities.HttpSuccessfulSingleCancel
@@ -62,7 +62,7 @@ class CancelOrdersByAddressAndIdsSpec extends MatcherSuiteBase with ApiKeyHeader
     "should return an error when one of ids is not a correct base58 string" in {
       validateMatcherError(
         dex1.rawApi.cancelAllByAddressAndIds(alice.toAddress.stringRepr, placeAndGetIds(3) + "null"),
-        StatusCodes.BadRequest,
+        StatusCode.BadRequest,
         1048577,
         "The provided JSON contains invalid fields: (3). Check the documentation"
       )
@@ -71,7 +71,7 @@ class CancelOrdersByAddressAndIdsSpec extends MatcherSuiteBase with ApiKeyHeader
     "should return an error when address is not a correct base58 string" in {
       validateMatcherError(
         dex1.rawApi.cancelAllByAddressAndIds("null", placeAndGetIds(3)),
-        StatusCodes.BadRequest,
+        StatusCode.BadRequest,
         4194304,
         "Provided address in not correct, reason: Unable to decode base58: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )

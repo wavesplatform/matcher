@@ -1,7 +1,7 @@
 package com.wavesplatform.it.matcher.api.http.history
 
 import com.google.common.primitives.Longs
-import com.softwaremill.sttp.StatusCodes
+import sttp.model.StatusCode
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
@@ -72,7 +72,7 @@ class GetOrderHistoryByAssetPairAndPublicKeySpec extends MatcherSuiteBase with R
 
       validateMatcherError(
         dex1.rawApi.getOrderHistoryByAssetPairAndPublicKey("null", "WAVES", UsdId.toString, ts, sign),
-        StatusCodes.BadRequest,
+        StatusCode.BadRequest,
         3148801,
         "Provided public key is not correct, reason: Unable to decode base58: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )
@@ -84,7 +84,7 @@ class GetOrderHistoryByAssetPairAndPublicKeySpec extends MatcherSuiteBase with R
 
       validateMatcherError(
         dex1.rawApi.getOrderHistoryByAssetPairAndPublicKey(Base58.encode(alice.publicKey), "WAVES", "null", ts, sign),
-        StatusCodes.BadRequest,
+        StatusCode.BadRequest,
         11534337,
         s"The asset 'null' is wrong, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )
@@ -96,7 +96,7 @@ class GetOrderHistoryByAssetPairAndPublicKeySpec extends MatcherSuiteBase with R
 
       validateMatcherError(
         dex1.rawApi.getOrderHistoryByAssetPairAndPublicKey(Base58.encode(alice.publicKey), "WAVES", "null", ts, sign),
-        StatusCodes.BadRequest,
+        StatusCode.BadRequest,
         11534337,
         s"The asset 'null' is wrong, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )

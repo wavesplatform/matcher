@@ -1,6 +1,6 @@
 package com.wavesplatform.it.matcher.api.http.cancel
 
-import com.softwaremill.sttp.StatusCodes
+import sttp.model.StatusCode
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.order.OrderType.BUY
@@ -44,20 +44,20 @@ class CancelOrderByIdSpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
 
       dex1.api.cancelOrder(alice, order)
 
-      validateMatcherError(dex1.rawApi.cancelOrderById(order), StatusCodes.BadRequest, 9437194, s"The order ${order.idStr()} is canceled")
+      validateMatcherError(dex1.rawApi.cancelOrderById(order), StatusCode.BadRequest, 9437194, s"The order ${order.idStr()} is canceled")
     }
 
     //TODO: DEX-1024
     "should return error doesn't exist" in {
       val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 1.usd)
 
-      validateMatcherError(dex1.rawApi.cancelOrderById(order), StatusCodes.BadRequest, 9437193, s"The order ${order.idStr()} not found")
+      validateMatcherError(dex1.rawApi.cancelOrderById(order), StatusCode.BadRequest, 9437193, s"The order ${order.idStr()} not found")
     }
 
     "should return an error when orderId is not a correct base58 string" in {
       validateMatcherError(
         dex1.rawApi.cancelOrderById("null", Map("X-API-KEY" -> apiKey)),
-        StatusCodes.BadRequest,
+        StatusCode.BadRequest,
         9437185,
         "Provided value is not a correct base58 string, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )
@@ -69,7 +69,7 @@ class CancelOrderByIdSpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
 
       validateMatcherError(
         dex1.rawApi.cancelOrderById(order.idStr(), Map("X-API-Key" -> apiKey, "X-User-Public-Key" -> "null")),
-        StatusCodes.BadRequest,
+        StatusCode.BadRequest,
         3148801,
         "Provided public key is not correct, reason: Unable to decode base58: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )
@@ -82,7 +82,7 @@ class CancelOrderByIdSpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
 
       validateMatcherError(
         dex1.rawApi.cancelOrderById(order.idStr(), Map("X-API-Key" -> apiKey, "X-User-Public-Key" -> bob.publicKey.stringRepr)),
-        StatusCodes.BadRequest,
+        StatusCode.BadRequest,
         9437193,
         s"The order ${order.idStr()} not found"
       )

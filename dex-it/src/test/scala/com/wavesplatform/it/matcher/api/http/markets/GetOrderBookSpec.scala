@@ -1,6 +1,6 @@
 package com.wavesplatform.it.matcher.api.http.markets
 
-import com.softwaremill.sttp.StatusCodes
+import sttp.model.StatusCode
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
@@ -51,7 +51,7 @@ class GetOrderBookSpec extends MatcherSuiteBase with TableDrivenPropertyChecks w
     "should return exception when price is not a correct base58 string" in {
       validateMatcherError(
         dex1.rawApi.getOrderBook("WAVES", "null"),
-        StatusCodes.BadRequest,
+        StatusCode.BadRequest,
         9437185,
         s"Provided value is not a correct base58 string, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )
@@ -67,7 +67,7 @@ class GetOrderBookSpec extends MatcherSuiteBase with TableDrivenPropertyChecks w
       s"for depth = $v ($t) should return exception" in {
         validateMatcherError(
           dex1.rawApi.getOrderBook(wavesUsdPair, v),
-          StatusCodes.BadRequest,
+          StatusCode.BadRequest,
           1076224,
           m
         )

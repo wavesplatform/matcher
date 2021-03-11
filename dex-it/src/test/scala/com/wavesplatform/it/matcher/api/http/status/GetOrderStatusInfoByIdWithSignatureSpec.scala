@@ -1,7 +1,7 @@
 package com.wavesplatform.it.matcher.api.http.status
 
 import com.google.common.primitives.Longs
-import com.softwaremill.sttp.StatusCodes
+import sttp.model.StatusCode
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderBookHistoryItem
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
@@ -124,7 +124,7 @@ class GetOrderStatusInfoByIdWithSignatureSpec extends MatcherSuiteBase with Tabl
       val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd)
       validateMatcherError(
         dex1.rawApi.getOrderStatusInfoByIdWithSignature(alice, order),
-        StatusCodes.NotFound,
+        StatusCode.NotFound,
         9437193,
         s"The order ${order.idStr()} not found"
       )
@@ -136,7 +136,7 @@ class GetOrderStatusInfoByIdWithSignatureSpec extends MatcherSuiteBase with Tabl
 
       validateMatcherError(
         dex1.rawApi.getOrderStatusInfoByIdWithSignature("null", "null", ts, sign),
-        StatusCodes.BadRequest,
+        StatusCode.BadRequest,
         9437185,
         s"Provided value is not a correct base58 string, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )
@@ -150,7 +150,7 @@ class GetOrderStatusInfoByIdWithSignatureSpec extends MatcherSuiteBase with Tabl
 
       validateMatcherError(
         dex1.rawApi.getOrderStatusInfoByIdWithSignature(Base58.encode(alice.publicKey), "null", ts, sign),
-        StatusCodes.BadRequest,
+        StatusCode.BadRequest,
         9437185,
         s"Provided value is not a correct base58 string, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )

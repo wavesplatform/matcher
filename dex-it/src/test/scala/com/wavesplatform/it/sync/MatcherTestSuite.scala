@@ -571,7 +571,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       )
 
       withClue("The old order book is not available") {
-        dex1.httpApi.getOrderBook(ethWavesPair).code shouldBe StatusCodes.MovedPermanently
+        dex1.httpApi.getOrderBook(ethWavesPair).code shouldBe StatusCode.MovedPermanently
       }
 
       val wavesEthPair = AssetPair(Waves, eth)

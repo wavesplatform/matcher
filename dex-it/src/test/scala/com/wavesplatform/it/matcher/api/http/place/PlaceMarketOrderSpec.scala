@@ -26,7 +26,7 @@ class PlaceMarketOrderSpec extends PlaceOrderBaseSpec {
       )
     }
 
-    forAll(orderCases) { (n: Int, order: Order, code: Int, error: MatcherError) =>
+    forAll(orderCases) { (n: Int, order: Order, code: StatusCode, error: MatcherError) =>
       s"Case $n: For order [$order] should return error [$error]" in {
         validateMatcherError(dex1.rawApi.placeMarket(order), code, error)
       }

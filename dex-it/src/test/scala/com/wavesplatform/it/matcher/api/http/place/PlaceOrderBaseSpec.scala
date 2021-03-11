@@ -56,7 +56,7 @@ class PlaceOrderBaseSpec extends MatcherSuiteBase with TableDrivenPropertyChecks
     (
       4,
       mkOrder(alice, wavesUsdPair, BUY, 10.waves, 1.usd, 0.003.waves, usd, correctExpiration, 1.day, 1.toByte, matcher.publicKey),
-      400,
+      StatusCode.BadRequest,
       MatcherError(
         9441540,
         s"Required one of the following fee asset: WAVES. But given ${UsdId.toString}",

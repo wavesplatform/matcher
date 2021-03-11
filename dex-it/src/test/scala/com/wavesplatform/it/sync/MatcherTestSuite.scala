@@ -2,6 +2,7 @@ package com.wavesplatform.it.sync
 
 import cats.syntax.option._
 import sttp.client3._
+import sttp.model._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.api.http.entities.{HttpAssetInfo, HttpOrderBookHistoryItem, HttpV0LevelAgg, HttpV0OrderBook}
@@ -110,12 +111,12 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
       "frozen amount should be listed via matcherBalance REST endpoint" in {
         dex1.api.getReservedBalance(alice) shouldBe Map(Waves -> matcherFee, aliceAsset -> aliceSellAmount)
-        dex1.api.getReservedBalance(bob) shouldBe empty
+        dex1.api.getReservedBalance(bob) should have size 0
       }
 
       "frozen amount should be listed via matcherBalance REST endpoint with Api Key" in {
         dex1.api.getReservedBalanceWithApiKey(alice) shouldBe Map(Waves -> matcherFee, aliceAsset -> aliceSellAmount)
-        dex1.api.getReservedBalanceWithApiKey(bob) shouldBe empty
+        dex1.api.getReservedBalanceWithApiKey(bob) should have size 0
       }
 
       "and should be listed by trader's publiс key via REST" in {
@@ -168,7 +169,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         val aliceOrders = dex1.api.getOrderHistoryByPublicKey(alice, activeOnly = Some(true))
         aliceOrders.map(_.id) shouldBe Seq(order1.id())
         val bobOrders = dex1.api.getOrderHistoryByPublicKey(bob, activeOnly = Some(true))
-        bobOrders.map(_.id) shouldBe empty
+        bobOrders.map(_.id) should have size 0
       }
 
       "submitting sell orders should check availability of asset" in {
@@ -525,7 +526,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       val ob = dex1.api.getOrderBook(btcUsdnPair)
 
       ob.asks shouldBe List(HttpV0LevelAgg(345506L, 9337000000L))
-      ob.bids shouldBe empty
+      ob.bids should have size 0
 
       dex1.api.getOrderBookStatus(btcUsdnPair).lastTrade should matchTo(btcUsdnPairLastTrade)
 
@@ -564,7 +565,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
       val ob = dex1.api.getOrderBook(ethWavesPair)
       ob.asks should have size 1
-      ob.bids shouldBe empty
+      ob.bids should have size 0
 
       // Before: [ "$UsdnId", "$BtcId", "$UsdId", "WAVES", $EthId ]
       dex1.restartWithNewSuiteConfig(

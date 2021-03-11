@@ -1,5 +1,7 @@
 package com.wavesplatform.dex.it.api
 
+import cats.implicits.catsStdInstancesForTry
+
 import java.net.InetAddress
 import java.nio.file.{Files, Path, Paths}
 import java.time.LocalDateTime
@@ -19,6 +21,8 @@ import org.asynchttpclient.DefaultAsyncHttpClientConfig
 import org.testcontainers.containers.Network
 import org.testcontainers.containers.Network.NetworkImpl
 import sttp.client3.asynchttpclient.future.AsyncHttpClientFutureBackend
+import cats.instances.future._
+import cats.instances.try_._
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Random, Try}

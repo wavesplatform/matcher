@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.load
 
-import com.softwaremill.sttp.{MonadError => _}
+import sttp.client3.monad._
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.dex.domain.bytes.ByteStr

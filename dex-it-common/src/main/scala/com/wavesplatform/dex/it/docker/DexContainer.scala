@@ -24,8 +24,8 @@ import scala.util.Try
 
 final case class DexContainer private (override val internalIp: String, underlying: GenericContainer)(
   implicit
-  tryHttpBackend: LoggingSttpBackend[Try, Nothing],
-  futureHttpBackend: LoggingSttpBackend[Future, Nothing],
+  tryHttpBackend: LoggingSttpBackend[Try, Any],
+  futureHttpBackend: LoggingSttpBackend[Future, Any],
   ec: ExecutionContext
 ) extends BaseContainer(DexContainer.baseContainerPath, underlying) {
 
@@ -91,8 +91,8 @@ object DexContainer extends ScorexLogging {
     localLogsDir: Path,
     image: String
   )(implicit
-    tryHttpBackend: LoggingSttpBackend[Try, Nothing],
-    futureHttpBackend: LoggingSttpBackend[Future, Nothing],
+    tryHttpBackend: LoggingSttpBackend[Try, Any],
+    futureHttpBackend: LoggingSttpBackend[Future, Any],
     ec: ExecutionContext
   ): DexContainer = {
 

@@ -2,9 +2,8 @@ package com.wavesplatform.dex.load
 
 import java.io.{File, PrintWriter}
 import java.nio.file.Files
-
 import com.google.common.primitives.Longs
-import com.softwaremill.sttp.{HttpURLConnectionBackend, MonadError => _, _}
+import sttp.client3._
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.utils.EitherExt2
@@ -16,6 +15,7 @@ import im.mak.waves.transactions.exchange.{AssetPair, Order, OrderType}
 import play.api.libs.json.{JsValue, Json}
 import pureconfig.ConfigSource
 import pureconfig.generic.auto._
+import sttp.client3.HttpURLConnectionBackend
 
 import scala.io.Source
 import scala.util.Random
@@ -46,10 +46,10 @@ package object utils {
   def getOrderBook(account: PrivateKey, activeOnly: Boolean = true): JsValue =
     Json
       .parse(
-        sttp
+        basicRequest
           .get(uri"${settings.hosts.matcher}/matcher/orderbook/${account.publicKey().toString}?activeOnly=$activeOnly")
           .headers(mkOrderHistoryHeaders(account))
-          .send()
+          .send(backend)
           .body
           .explicitGet()
       )

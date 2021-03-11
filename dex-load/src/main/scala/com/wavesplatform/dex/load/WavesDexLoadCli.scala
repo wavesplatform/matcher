@@ -13,7 +13,6 @@ import com.softwaremill.diffx._
 import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsOrderBookChanges}
 import com.wavesplatform.dex.cli.ScoptImplicits
 import com.wavesplatform.dex.domain.account.AddressScheme
-import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.error.Implicits.ThrowableOps
 import com.wavesplatform.dex.it.time.GlobalTimer
 import com.wavesplatform.dex.it.time.GlobalTimer.TimerOpsImplicits

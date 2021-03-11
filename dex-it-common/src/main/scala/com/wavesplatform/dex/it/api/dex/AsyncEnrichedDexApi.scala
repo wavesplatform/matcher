@@ -25,7 +25,7 @@ import sttp.model.Uri.QuerySegment
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, Future}
 
-class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit ec: ExecutionContext, httpBackend: SttpBackend[Future, Nothing])
+class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit ec: ExecutionContext, httpBackend: SttpBackend[Future, Any])
     extends AsyncEnrichedApi[MatcherError](host)
     with DexApi[AsyncEnrichedDexApi.R] {
 

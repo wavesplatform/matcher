@@ -14,7 +14,7 @@ import play.api.libs.json.Json
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class AsyncEnrichedNodeApi(apiKey: String, host: => InetSocketAddress)(implicit ec: ExecutionContext, httpBackend: SttpBackend[Future, Nothing])
+class AsyncEnrichedNodeApi(apiKey: String, host: => InetSocketAddress)(implicit ec: ExecutionContext, httpBackend: SttpBackend[Future, Any])
     extends AsyncEnrichedApi[ErrorResponse](host)
     with NodeApi[AsyncEnrichedNodeApi.R] {
 

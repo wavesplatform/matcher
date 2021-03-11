@@ -27,7 +27,7 @@ abstract class AsyncEnrichedApi[ErrorT: Reads](host: => InetSocketAddress)(impli
     req.tag("requestId", UUID.randomUUID).send(httpBackend).map(EnrichedResponse(_, new EnrichedResponse.AsHocon[ErrorT]))
 
   def mkIgnore(req: Request[Either[String, String], Any]): R[Unit] =
-    req.tag("requestId", UUID.randomUUID).response(asString("UTF-8")).send(httpBackend).map(EnrichedResponse(
+    req.tag("requestId", UUID.randomUUID).send(httpBackend).map(EnrichedResponse(
       _,
       new EnrichedResponse.Ignore[ErrorT]
     ))

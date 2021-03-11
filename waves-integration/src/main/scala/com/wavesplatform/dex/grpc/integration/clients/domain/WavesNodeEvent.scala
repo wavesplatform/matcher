@@ -23,10 +23,13 @@ object WavesNodeEvent {
 
     object To {
 
+      // Only from the blockchain updates stream.
+      // Either rollback to a block, or to a micro block (micro fork).
       case class CommonBlockRef(ref: BlockRef) extends To {
         override def toString: String = s"CommonBlockRef(${ref.height}, ${ref.id})"
       }
 
+      // Only during issues: a wrong block, disconnects
       case class Height(h: Int) extends To
 
     }

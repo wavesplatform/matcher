@@ -3,6 +3,7 @@ package com.wavesplatform.dex.grpc.integration.clients.domain
 import java.nio.charset.StandardCharsets
 
 import cats.Monoid
+import cats.implicits._
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -142,7 +143,7 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
       }
 
       "Resolved" - {
-        "on a key block with a higher height" in {
+        "on a block with a higher height" in {
           val block4 = WavesBlock(
             ref = BlockRef(height = 4, id = ByteStr(Array[Byte](98, 1, 1, 1, 0))),
             reference = block3.ref.id,
@@ -167,7 +168,8 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
             ),
             lostDiffIndex = Monoid.empty[DiffIndex],
             lostTxIds = Map.empty,
-            confirmedTxs = block3.confirmedTxs ++ block4.confirmedTxs
+            newConfirmedTxs = block3.confirmedTxs ++ block4.confirmedTxs,
+            commonTxIds = Set.empty
           ))
         }
 
@@ -197,7 +199,59 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
               ),
               lostDiffIndex = Monoid.empty[DiffIndex],
               lostTxIds = Map.empty,
-              confirmedTxs = microBlock.confirmedTxs
+              newConfirmedTxs = microBlock.confirmedTxs,
+              commonTxIds = Set.empty
+            ))
+          }
+
+          "after the key block with the higher height" in {
+            val microBlock1 = WavesBlock(
+              ref = BlockRef(height = 1, id = ByteStr(Array[Byte](98, 2))),
+              reference = block1.ref.id,
+              changes = BlockchainBalance(
+                regular = Map(alice -> Map(usd -> 69)),
+                outgoingLeasing = Map(bob -> 2L)
+              ),
+              tpe = WavesBlock.Type.MicroBlock,
+              confirmedTxs = (10 to 12).toList.foldMapK(mkTransactionWithChangesMap)
+            )
+
+            val block2B = WavesBlock(
+              ref = BlockRef(height = 2, id = ByteStr(Array[Byte](98, 1, 0))),
+              reference = block1.ref.id,
+              changes = BlockchainBalance(
+                regular = Map(bob -> Map(usd -> 35)),
+                outgoingLeasing = Map.empty
+              ),
+              tpe = WavesBlock.Type.FullBlock,
+              confirmedTxs = mkTransactionWithChangesMap(2) ++
+                mkTransactionWithChangesMap(11) // migrated from microBlock1
+            )
+
+            val microBlock2 = WavesBlock(
+              ref = BlockRef(height = 2, id = ByteStr(Array[Byte](98, 1, 1))),
+              reference = block2B.ref.id,
+              changes = BlockchainBalance(
+                regular = Map(bob -> Map(Waves -> 11)),
+                outgoingLeasing = Map(alice -> 9L)
+              ),
+              tpe = WavesBlock.Type.MicroBlock,
+              confirmedTxs = mkTransactionWithChangesMap(100) ++
+                mkTransactionWithChangesMap(12) // migrated from microBlock1
+            )
+
+            val fork = WavesFork(
+              mkChain(Vector(microBlock1, block1), 99),
+              mkChain(Vector(block2B, block1), 98)
+            )
+
+            fork.withBlock(microBlock2) should matchTo[Status](Status.Resolved(
+              activeChain = mkChain(Vector(microBlock2, block2B, block1), 98),
+              newChanges = block2B.changes |+| microBlock2.changes,
+              lostDiffIndex = microBlock1.diffIndex,
+              lostTxIds = mkTransactionWithChangesMap(10), // from microBlock1
+              newConfirmedTxs = List(2, 100).foldMapK(mkTransactionWithChangesMap),
+              commonTxIds = Set(mkTxId(11), mkTxId(12))
             ))
           }
 
@@ -234,7 +288,8 @@ class WavesForkTestSuite extends WavesIntegrationSuiteBase with ScalaCheckDriven
               newChanges = microBlock2.changes,
               lostDiffIndex = Monoid.empty[DiffIndex],
               lostTxIds = Map.empty,
-              confirmedTxs = microBlock2.confirmedTxs
+              newConfirmedTxs = microBlock2.confirmedTxs,
+              commonTxIds = Set.empty
             ))
           }
         }

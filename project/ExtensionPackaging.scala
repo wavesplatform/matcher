@@ -73,7 +73,7 @@ object ExtensionPackaging extends AutoPlugin {
       },
       classpath := makeRelativeClasspathNames(classpathOrdering.value),
       nodePackageName := s"waves${network.value.packageSuffix}",
-      debianPackageDependencies := Seq(s"${nodePackageName.value} (= ${wavesNodeVersion.value})"),
+      debianPackageDependencies := Seq(s"${nodePackageName.value} (= ${wavesNodeVersion.value})"), // "Depends:" in control
       // To write files to Waves NODE directory
       linuxPackageMappings := getUniversalFolderMappings(
         nodePackageName.value,

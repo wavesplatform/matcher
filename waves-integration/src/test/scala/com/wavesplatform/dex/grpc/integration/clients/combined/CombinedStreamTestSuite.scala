@@ -51,7 +51,7 @@ class CombinedStreamTestSuite extends WavesIntegrationSuiteBase with Eventually 
       "affects the recovery height hint" in {
         val t = mk()
         t.cs.startFrom(10)
-        t.cs.currentProcessedHeight shouldBe 10
+        t.cs.currentProcessedHeight shouldBe 9
       }
     }
 
@@ -63,7 +63,7 @@ class CombinedStreamTestSuite extends WavesIntegrationSuiteBase with Eventually 
       }
     }
 
-    "restartFrom" - {
+    "restart" - {
       "stop blockchainUpdates" in {
         val t = mk()
         t.cs.startFrom(10)
@@ -81,8 +81,10 @@ class CombinedStreamTestSuite extends WavesIntegrationSuiteBase with Eventually 
       "doesn't affect the recovery height" in {
         val t = mk()
         t.cs.startFrom(10)
+        t.cs.currentProcessedHeight shouldBe 9
+
         t.cs.restart()
-        t.cs.currentProcessedHeight shouldBe 10
+        t.cs.currentProcessedHeight shouldBe 9
       }
     }
 
@@ -179,7 +181,7 @@ class CombinedStreamTestSuite extends WavesIntegrationSuiteBase with Eventually 
 
   private def mkStarted(): TestClasses = mk().tap(_.utxEvents.systemStream.onNext(SystemEvent.BecameReady))
 
-  private def logged[T](subject: Observable[T])(f: List[T] => Unit): Unit = {
+  private def logged[T](subject: Observable[T])(f: List[T] => Unit): Unit = eventually {
     val xs = subject.takeByTimespan(200.millis).toListL.runSyncUnsafe()
     withClue(s"$xs: ") {
       try f(xs)

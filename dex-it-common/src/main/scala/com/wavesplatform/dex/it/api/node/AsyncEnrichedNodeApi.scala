@@ -51,7 +51,7 @@ class AsyncEnrichedNodeApi(apiKey: String, host: => InetSocketAddress)(implicit 
   }
 
   override def connect(toNode: InetSocketAddress): R[Unit] = mkIgnore {
-    sttp
+    basicRequest
       .post(uri"$apiUri/peers/connect")
       .body(ConnectReq(toNode.getHostName, toNode.getPort))
       .header("X-API-Key", apiKey)
@@ -61,15 +61,15 @@ class AsyncEnrichedNodeApi(apiKey: String, host: => InetSocketAddress)(implicit 
     basicRequest.get(uri"$apiUri/peers/connected")
   }
 
-  override def rollback(toHeight: StatusCode, returnTransactionsToUtx: Boolean): R[Unit] = mkIgnore {
-    sttp
+  override def rollback(toHeight: Int, returnTransactionsToUtx: Boolean): R[Unit] = mkIgnore {
+    basicRequest
       .post(uri"$apiUri/debug/rollback")
       .body(RollbackReq(toHeight, returnTransactionsToUtx))
       .header("X-API-Key", apiKey)
   }
 
   override def print(message: String): R[Unit] = mkIgnore {
-    sttp
+    basicRequest
       .post(uri"$apiUri/debug/print")
       .body(Json.toJson(HttpMessage(message)))
       .header("X-API-Key", apiKey)

@@ -1,12 +1,12 @@
 package com.wavesplatform.dex.it.sttp
 
-import cats.MonadError
+import sttp.monad._
 import sttp.client3._
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 
 class LoggingSttpBackend[R[_], S](delegate: SttpBackend[R, S]) extends SttpBackend[R, S] with ScorexLogging {
 
-  override def send[T](request: Request[T, S]): R[Response[T]] = {
+  def send[T](request: Request[T, S]): R[Response[T]] = {
     val logRequest = !request.uri.path.mkString("/").endsWith("debug/print")
 
     val prefix = s"[${request.tag("requestId").fold("unknown")(_.toString.take(8))}]"

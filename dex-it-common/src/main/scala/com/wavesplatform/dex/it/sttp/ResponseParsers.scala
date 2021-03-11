@@ -3,19 +3,24 @@ package com.wavesplatform.dex.it.sttp
 import com.google.common.primitives.Longs
 import com.typesafe.config.{Config, ConfigFactory}
 import play.api.libs.json.JsError
-import sttp.client3.{DeserializationException, ResponseAs}
+import sttp.client3._
 
 import scala.util.{Failure, Success, Try}
 
 object ResponseParsers {
 
-  val asUtf8String: ResponseAs[String, Nothing] = asString("UTF-8")
+  val asUtf8String: ResponseAs[Either[String, String], Nothing] = asString("UTF-8")
 
   def asLong: ResponseAs[Either[DeserializationException[JsError], Long], Nothing] =
-    asUtf8String.map { string =>
-      val r = Longs.tryParse(string)
-      if (r == null) Left(DeserializationException[JsError](string, JsError("Can't parse Long"), "Can't parse Long"))
-      else Right(r)
+    asUtf8String.map {
+      _ match {
+        case Left(l) =>Right(1L) // TODO: ???
+        case Right(r) =>
+          val l = Longs.tryParse(r)
+          if (l == null) Left(DeserializationException[JsError](r, JsError("Can't parse Long")))
+          else Right(l)
+      }
+
     }
 
   def asConfig: ResponseAs[Either[DeserializationException[JsError], Config], Nothing] =

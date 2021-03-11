@@ -68,7 +68,7 @@ trait BaseContainersKit extends ScorexLogging {
     Executors.newFixedThreadPool(10, new ThreadFactoryBuilder().setNameFormat(s"${getClass.getSimpleName}-%d").setDaemon(true).build)
   }
 
-  implicit protected val futureHttpBackend: LoggingSttpBackend[Future, Nothing] = new LoggingSttpBackend[Future, Nothing](
+  implicit protected val futureHttpBackend: LoggingSttpBackend[Future, Any] = new LoggingSttpBackend[Future, Any](
     AsyncHttpClientFutureBackend.usingConfig(
       new DefaultAsyncHttpClientConfig.Builder()
         .setMaxRequestRetry(0)
@@ -80,7 +80,7 @@ trait BaseContainersKit extends ScorexLogging {
     )
   )
 
-  implicit protected val tryHttpBackend: LoggingSttpBackend[Try, Nothing] = new LoggingSttpBackend[Try, Nothing](
+  implicit protected val tryHttpBackend: LoggingSttpBackend[Try, Any] = new LoggingSttpBackend[Try, Any](
     TryHttpURLConnectionBackend(customizeConnection = conn => {
       // For tests with a high latency
       conn.setConnectTimeout(30000)

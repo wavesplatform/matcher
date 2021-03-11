@@ -1,4 +1,5 @@
 import Dependencies.Version.levelDbVersion
+import Dependencies.sttpPlayJson
 import sbt.Keys._
 import sbt.{Def, compilerPlugin, _}
 
@@ -145,6 +146,7 @@ object Dependencies {
   private val influxDb = "org.influxdb" % "influxdb-java" % Version.influxDb
   private val commonsNet = "commons-net" % "commons-net" % Version.commonsNet
   private val sttpClient = sttpClientModule("core")
+  private val sttpPlayJson = sttpClientModule("play-json")
   private val sttpAsyncHttpClient = sttpClientModule("async-http-client-backend-future")
   private val allureScalaTest = "io.qameta.allure" %% "allure-scalatest" % Version.allureScalaTest
   private val jaxbApi = "javax.xml.bind" % "jaxb-api" % Version.jaxbApi
@@ -259,6 +261,7 @@ object Dependencies {
       jwtModule("core"),
       jwtModule("play-json"),
       sttpClient,
+      sttpPlayJson,
       sttpAsyncHttpClient,
       wavesJ,
       betterMonadicFor
@@ -278,7 +281,8 @@ object Dependencies {
       scalaTest,
       toxiProxy,
       wavesJ,
-      sttpClient
+      sttpClient,
+      sttpPlayJson
     ) ++ testContainers
 
     lazy val dexTestCommon: Seq[ModuleID] = Seq(diffx, scalaTest, scalaCheck, scalaTestPlusCheck, allureScalaTest)

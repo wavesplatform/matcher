@@ -59,7 +59,7 @@ final case class DexContainer private (override val internalIp: String, underlyi
     val r = Iterator
       .continually {
         Thread.sleep(1000)
-        try httpApi.getOrderBooks.code == StatusCodes.OK
+        try httpApi.getOrderBooks.code == StatusCodes.OK.intValue
         catch {
           case _: Throwable => false
         }

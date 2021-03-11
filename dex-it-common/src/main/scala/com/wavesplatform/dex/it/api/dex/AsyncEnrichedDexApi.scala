@@ -27,7 +27,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
     extends AsyncEnrichedApi[MatcherError](host)
     with DexApi[AsyncEnrichedDexApi.R] {
 
-  override def publicKey: R[HttpMatcherPublicKey] = mk(sttp.get(uri"$apiUri/matcher"))
+  override def publicKey: R[HttpMatcherPublicKey] = mk(basicRequest.get(uri"$apiUri/matcher"))
 
   override def getReservedBalance(publicKey: String, timestamp: Long, signature: String): R[HttpBalance] =
     getReservedBalance(publicKey, Map("timestamp" -> timestamp.toString, "signature" -> signature))
@@ -61,30 +61,30 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
 
   override def place(order: Order): R[HttpSuccessfulPlace] = mk {
     basicRequest
+      .body(order.toJson.toString())
       .post(uri"$apiUri/matcher/orderbook")
       .readTimeout(3.minutes) // TODO find a way to decrease the timeout!
       .followRedirects(false) // TODO move ?
-      .body(order)
   }
 
   override def place(order: JsObject): R[HttpSuccessfulPlace] = mk {
-    sttp
+    basicRequest
       .post(uri"$apiUri/matcher/orderbook")
       .readTimeout(3.minutes) // TODO find a way to decrease the timeout!
       .followRedirects(false) // TODO move ?
-      .body(order)
+      .body(order.toJson.toString())
   }
 
   override def placeMarket(order: JsObject): R[HttpSuccessfulPlace] = mk {
-    sttp
+    basicRequest
       .post(uri"$apiUri/matcher/orderbook/market")
       .readTimeout(3.minutes) // TODO find a way to decrease the timeout!
       .followRedirects(false) // TODO move ?
-      .body(order)
+      .body(order.toJson.toString())
   }
 
   override def placeMarket(order: Order): R[HttpSuccessfulPlace] = mk {
-    sttp.post(uri"$apiUri/matcher/orderbook/market").body(order)
+    basicRequest.post(uri"$apiUri/matcher/orderbook/market").body(order.toJson.toString())
   }
 
   override def cancelOrder(
@@ -95,7 +95,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
     timestamp: Long,
     signature: ByteStr
   ): R[HttpSuccessfulSingleCancel] = mk {
-    sttp
+    basicRequest
       .post(uri"$apiUri/matcher/orderbook/$amountAsset/$priceAsset/cancel")
       .readTimeout(3.minutes) // TODO find a way to decrease the timeout!
       .followRedirects(false)
@@ -105,7 +105,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
 
   override def cancelOrder(owner: KeyPair, assetPair: AssetPair, id: Id): R[HttpSuccessfulSingleCancel] = mk {
     val body = Json.stringify(Json.toJson(cancelRequest(owner, id.toString)))
-    sttp
+    basicRequest
       .post(uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/cancel")
       .readTimeout(3.minutes) // TODO find a way to decrease the timeout!
       .followRedirects(false)
@@ -115,14 +115,14 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
 
 
   override def cancelOrderById(id: String, headers: Map[String, String]): R[HttpSuccessfulSingleCancel] = mk {
-    sttp
+    basicRequest
       .post(uri"$apiUri/matcher/orders/cancel/$id")
       .headers(headers)
       .contentType("application/json", "UTF-8")
   }
 
   override def cancelOrderById(id: Id, xUserPublicKey: Option[PublicKey]): R[HttpSuccessfulSingleCancel] = mk {
-    sttp
+    basicRequest
       .post(uri"$apiUri/matcher/orders/cancel/${id.toString}")
       .headers(apiKeyWithUserPublicKeyHeaders(xUserPublicKey))
       .contentType("application/json", "UTF-8")

@@ -6,13 +6,11 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicReference
-
 import com.github.dockerjava.api.command.CreateNetworkCmd
 import com.github.dockerjava.api.model.Network.Ipam
 import com.google.common.primitives.Ints.toByteArray
 import com.google.common.util.concurrent.ThreadFactoryBuilder
-import com.softwaremill.sttp.TryHttpURLConnectionBackend
-import com.softwaremill.sttp.asynchttpclient.future.AsyncHttpClientFutureBackend
+import sttp.client3._
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.it.docker.BaseContainer
 import com.wavesplatform.dex.it.sttp.LoggingSttpBackend
@@ -20,6 +18,7 @@ import mouse.any._
 import org.asynchttpclient.DefaultAsyncHttpClientConfig
 import org.testcontainers.containers.Network
 import org.testcontainers.containers.Network.NetworkImpl
+import sttp.client3.asynchttpclient.future.AsyncHttpClientFutureBackend
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Random, Try}

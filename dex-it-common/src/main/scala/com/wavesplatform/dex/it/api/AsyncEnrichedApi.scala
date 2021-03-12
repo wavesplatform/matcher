@@ -16,12 +16,15 @@ abstract class AsyncEnrichedApi[ErrorT: Reads](host: => InetSocketAddress)(impli
 
   type R[EntityT] = Future[EnrichedResponse[ErrorT, EntityT]]
 
-  def mk[EntityT: Reads](req: Request[Either[String, String], Any]): R[EntityT] =
+  def mk[EntityT: Reads](req: Request[Either[String, String], Any]): R[EntityT] = {
+    println(req.toCurl)
+
     req
       .tag("requestId", UUID.randomUUID)
       .contentType("application/json")
       .send(httpBackend)
       .map(EnrichedResponse(_, new EnrichedResponse.AsJson[ErrorT, EntityT]))
+  }
 
   def mkHocon[EntityT](req: Request[Either[String, String], Any]): R[Config] =
     req.tag("requestId", UUID.randomUUID).send(httpBackend).map(EnrichedResponse(_, new EnrichedResponse.AsHocon[ErrorT]))

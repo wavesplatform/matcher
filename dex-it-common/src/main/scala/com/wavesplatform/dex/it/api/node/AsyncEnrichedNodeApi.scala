@@ -55,8 +55,9 @@ class AsyncEnrichedNodeApi(apiKey: String, host: => InetSocketAddress)(implicit 
   override def connect(toNode: InetSocketAddress): R[Unit] = mkIgnore {
     basicRequest
       .post(uri"$apiUri/peers/connect")
-      .body(ConnectReq(toNode.getHostName, toNode.getPort).toString)
+      .body(ConnectReq(toNode.getHostName, toNode.getPort))
       .header("X-API-Key", apiKey)
+      .contentType(MediaType.ApplicationJson)
   }
 
   override def connectedPeers: R[ConnectedPeersResponse] = mk {
@@ -73,7 +74,7 @@ class AsyncEnrichedNodeApi(apiKey: String, host: => InetSocketAddress)(implicit 
   override def print(message: String): R[Unit] = mkIgnore {
     basicRequest
       .post(uri"$apiUri/debug/print")
-      .body(Json.toJson(HttpMessage(message)).toString)
+      .body(Json.toJson(HttpMessage(message)))
       .header("X-API-Key", apiKey)
   }
 

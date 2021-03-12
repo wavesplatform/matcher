@@ -1,7 +1,5 @@
 package com.wavesplatform.dex.it.api.dex
 
-import java.net.InetSocketAddress
-import java.util.UUID
 import com.google.common.primitives.Longs
 import com.typesafe.config.Config
 import com.wavesplatform.dex.api.http.entities._
@@ -15,14 +13,15 @@ import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.Order.Id
 import com.wavesplatform.dex.it.api._
 import com.wavesplatform.dex.it.api.responses.dex.MatcherError
-import com.wavesplatform.dex.it.json._
 import im.mak.waves.transactions.ExchangeTransaction
 import play.api.libs.json.{JsObject, Json}
 import sttp.client3._
-import sttp.model.MediaType
-import sttp.model.Uri
+import sttp.model.{MediaType, Uri}
 import sttp.model.Uri.QuerySegment
+import com.wavesplatform.dex.it.json._
 
+import java.net.InetSocketAddress
+import java.util.UUID
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, Future}
 

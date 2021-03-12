@@ -19,6 +19,7 @@ import com.wavesplatform.dex.it.json._
 import im.mak.waves.transactions.ExchangeTransaction
 import play.api.libs.json.{JsObject, Json}
 import sttp.client3._
+import sttp.model.MediaType
 import sttp.model.Uri
 import sttp.model.Uri.QuerySegment
 
@@ -102,7 +103,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .readTimeout(3.minutes) // TODO find a way to decrease the timeout!
       .followRedirects(false)
       .body(Json.stringify(Json.toJson(cancelRequest(owner, orderId).copy(signature = signature))))
-      .contentType("application/json", "UTF-8")
+      .contentType(MediaType.ApplicationJson)
   }
 
   override def cancelOrder(owner: KeyPair, assetPair: AssetPair, id: Id): R[HttpSuccessfulSingleCancel] = mk {
@@ -112,7 +113,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .readTimeout(3.minutes) // TODO find a way to decrease the timeout!
       .followRedirects(false)
       .body(body)
-      .contentType("application/json", "UTF-8")
+      .contentType(MediaType.ApplicationJson)
   }
 
 
@@ -120,21 +121,21 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
     basicRequest
       .post(uri"$apiUri/matcher/orders/cancel/$id")
       .headers(headers)
-      .contentType("application/json", "UTF-8")
+      .contentType(MediaType.ApplicationJson)
   }
 
   override def cancelOrderById(id: Id, xUserPublicKey: Option[PublicKey]): R[HttpSuccessfulSingleCancel] = mk {
     basicRequest
       .post(uri"$apiUri/matcher/orders/cancel/${id.toString}")
       .headers(apiKeyWithUserPublicKeyHeaders(xUserPublicKey))
-      .contentType("application/json", "UTF-8")
+      .contentType(MediaType.ApplicationJson)
   }
 
   override def cancelAll(sender: KeyPair, timestamp: Long, signature: ByteStr): R[HttpSuccessfulBatchCancel] = mk {
     basicRequest
       .post(uri"$apiUri/matcher/orderbook/cancel")
       .body(Json.stringify(Json.toJson(batchCancelRequest(sender, timestamp).copy(signature = signature))))
-      .contentType("application/json", "UTF-8")
+      .contentType(MediaType.ApplicationJson)
   }
 
   override def cancelAll(owner: KeyPair, timestamp: Long): R[HttpSuccessfulBatchCancel] = mk {
@@ -142,7 +143,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
     basicRequest
       .post(uri"$apiUri/matcher/orderbook/cancel")
       .body(body)
-      .contentType("application/json", "UTF-8")
+      .contentType(MediaType.ApplicationJson)
   }
 
   override def cancelAllByPair(owner: KeyPair, assetPair: AssetPair, timestamp: Long): R[HttpSuccessfulBatchCancel] = mk {
@@ -150,7 +151,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
     basicRequest
       .post(uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/cancel")
       .body(body)
-      .contentType("application/json", "UTF-8")
+      .contentType(MediaType.ApplicationJson)
   }
 
   def cancelAllByAddressAndIds(
@@ -162,7 +163,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .post(uri"$apiUri/matcher/orders/$address/cancel")
       .headers(headers)
       .body(Json.stringify(Json.toJson(ids)))
-      .contentType("application/json", "UTF-8")
+      .contentType(MediaType.ApplicationJson)
   }
 
   def cancelAllByAddressAndIds(address: String, ids: Set[String]): R[HttpSuccessfulBatchCancel] =
@@ -173,7 +174,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .post(uri"$apiUri/matcher/orders/$owner/cancel")
       .headers(headers)
       .body(Json.stringify(Json.toJson(orderIds)))
-      .contentType("application/json", "UTF-8")
+      .contentType(MediaType.ApplicationJson)
   }
 
   def cancelAllByApiKeyAndIds(owner: Address, orderIds: Set[Order.Id]): R[HttpSuccessfulBatchCancel] =
@@ -188,7 +189,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .post(uri"$apiUri/matcher/orders/$owner/cancel")
       .headers(apiKeyWithUserPublicKeyHeaders(xUserPublicKey))
       .body(Json.stringify(Json.toJson(orderIds)))
-      .contentType("application/json", "UTF-8")
+      .contentType(MediaType.ApplicationJson)
   }
 
   override def getOrderStatus(amountAsset: String, priceAsset: String, id: String): R[HttpOrderStatus] = mk {
@@ -251,7 +252,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .post(uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/delete")
       .followRedirects(false)
       .body(Json.stringify(Json.toJson(cancelRequest(owner, orderId))))
-      .contentType("application/json", "UTF-8")
+      .contentType(MediaType.ApplicationJson)
 
   }
 
@@ -391,7 +392,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
     basicRequest
       .put(uri"$apiUri/matcher/settings/rates/$assetId")
       .body(Json.stringify(Json.toJson(rate)))
-      .contentType("application/json", "UTF-8")
+      .contentType(MediaType.ApplicationJson)
       .headers(headers)
       .tag("requestId", UUID.randomUUID)
   }
@@ -400,7 +401,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
     basicRequest
       .put(uri"$apiUri/matcher/settings/rates/${asset.toString}")
       .body(Json.stringify(Json.toJson(rate)))
-      .contentType("application/json", "UTF-8")
+      .contentType(MediaType.ApplicationJson)
       .headers(apiKeyHeaders)
       .tag("requestId", UUID.randomUUID)
   }
@@ -410,7 +411,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
   override def deleteRate(assetId: String, headers: Map[String, String]): R[HttpMessage] = mk {
     basicRequest
       .delete(uri"$apiUri/matcher/settings/rates/$assetId")
-      .contentType("application/json", "UTF-8")
+      .contentType(MediaType.ApplicationJson)
       .headers(headers)
   }
 
@@ -489,7 +490,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .post(uri"$apiUri/matcher/debug/print")
       .headers(apiKeyHeaders)
       .body(Json.stringify(Json.toJson(HttpMessage(message))))
-      .contentType("application/json", "UTF-8")
+      .contentType(MediaType.ApplicationJson)
   }
 
   override def wsConnections: R[HttpWebSocketConnections] = mk {
@@ -502,7 +503,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
     basicRequest
       .delete(uri"$apiUri/ws/v0/connections")
       .body(Json.toJson(HttpWebSocketCloseFilter(oldestNumber)).toString())
-      .contentType("application/json", "UTF-8")
+      .contentType(MediaType.ApplicationJson)
       .headers(apiKeyHeaders)
   }
 

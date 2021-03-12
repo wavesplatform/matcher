@@ -395,7 +395,7 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
     val height = wavesNode1.api.currentHeight
     wavesNode1.api.waitForHeight(height + 2)
 
-    val aliceBalanceBefore = wavesNode1.api.balance(alice, Waves)
+   val aliceBalanceBefore = wavesNode1.api.balance(alice, Waves)
     wavesNode1.api.rollback(height, returnTransactionsToUtx = false)
 
     wavesNode1.api.broadcast(mkTransfer(alice, bob, 1.waves, Waves))

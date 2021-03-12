@@ -1,8 +1,5 @@
 package com.wavesplatform.dex.it.api.node
 
-import java.net.InetSocketAddress
-
-import sttp.client3._
 import com.wavesplatform.dex.api.http.entities.HttpMessage
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
@@ -10,8 +7,13 @@ import com.wavesplatform.dex.it.api.responses.node._
 import com.wavesplatform.dex.it.api.{AsyncEnrichedApi, EnrichedResponse}
 import im.mak.waves.transactions.Transaction
 import im.mak.waves.transactions.common.Id
+import io.circe.generic.auto._
 import play.api.libs.json.Json
+import sttp.client3._
+import sttp.model._
+import sttp.client3.circe._
 
+import java.net.InetSocketAddress
 import scala.concurrent.{ExecutionContext, Future}
 
 class AsyncEnrichedNodeApi(apiKey: String, host: => InetSocketAddress)(implicit ec: ExecutionContext, httpBackend: SttpBackend[Future, Any])
@@ -27,7 +29,7 @@ class AsyncEnrichedNodeApi(apiKey: String, host: => InetSocketAddress)(implicit 
   }
 
   override def broadcast(tx: Transaction): R[Unit] = mkIgnore {
-    basicRequest.post(uri"$apiUri/transactions/broadcast").body(tx.toJson).contentType("application/json")
+    basicRequest.post(uri"$apiUri/transactions/broadcast").body(tx.toJson).contentType(MediaType.ApplicationJson)
   }
 
   override def transactionInfo(id: Id): R[Transaction] = mk {
@@ -64,7 +66,7 @@ class AsyncEnrichedNodeApi(apiKey: String, host: => InetSocketAddress)(implicit 
   override def rollback(toHeight: Int, returnTransactionsToUtx: Boolean): R[Unit] = mkIgnore {
     basicRequest
       .post(uri"$apiUri/debug/rollback")
-      .body(RollbackReq(toHeight, returnTransactionsToUtx).toString)
+      .body(RollbackReq(toHeight, returnTransactionsToUtx))
       .header("X-API-Key", apiKey)
   }
 

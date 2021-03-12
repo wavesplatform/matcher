@@ -12,8 +12,8 @@ Matcher for Waves Node.
 In the master branch there is a code with functions that is under development. 
 The latest release for each network can be found in the [Releases section](https://github.com/wavesplatform/matcher/releases), you can switch to the corresponding tag and build the application.
 
-For further information please refer the official [documentation](https://docs.wavesplatform.com).
-
+<!--ts-->
+   * [Matcher](#matcher)
    * [How to Build and Test](#how-to-build-and-test)
       * [1. Setup the environment](#1-setup-the-environment)
          * [1.1. Installing Java](#11-installing-java)
@@ -26,19 +26,20 @@ For further information please refer the official [documentation](https://docs.w
       * [5. Building packages](#5-building-packages)
          * [Mainnet](#mainnet)
          * [Testnet](#testnet)
-      * [6. Installing and running](#6-installing-and-running)
-         * [6.1. Node installation](#61-node-installation)
-         * [6.2. Node extension installation and configuration](#62-node-extension-installation-and-configuration)
-            * [a. Installation through DEB](#a--installation-through-deb)
-            * [b. Installation through ZIP](#b--installation-through-zip)
-            * [Configration](#-configuration)
-         * [6.3. Matcher server installation and configuration](#63-matcher-server-installation-and-configuration)
-            * [a. Installation through DEB](#a--installation-through-deb-1)
-            * [b. Installation through ZIP](#b--installation-through-zip-1)
-            * [Configuration of Matcher server](#-configuration-of-matcher-server)
-      * [7. Running an extension project locally during development](#7-running-an-extension-project-locally-during-development)
+      * [6. Running an extension project locally during development](#6-running-an-extension-project-locally-during-development)
          * [SBT](#sbt-1)
          * [IntelliJ IDEA](#intellij-idea-1)
+   * [Installing and running](#installing-and-running)
+      * [1. Node installation](#1-node-installation)
+      * [2. Node extension installation](#2-node-extension-installation)
+         * [2.a. Installation through DEB](#2a--installation-through-deb)
+         * [2.b. Installation through ZIP](#2b--installation-through-zip)
+      * [3. Node's configuration](#3--nodes-configuration)
+      * [4. Matcher server installation](#4-matcher-server-installation)
+         * [4.a. Installation through DEB](#4a--installation-through-deb)
+         * [4.b. Installation through ZIP](#4b--installation-through-zip)
+      * [5. Matcher's configuration](#5--matchers-configuration)
+      * [6. That's all](#6--thats-all)
    * [CLI](#cli)
       * [1. Generating account storage](#1-generating-account-storage)
       * [2. Generating API key](#2-generating-api-key)
@@ -53,10 +54,12 @@ For further information please refer the official [documentation](https://docs.w
       * [Branches](#branches)
       * [Publishing a new release](#publishing-a-new-release)
 
+<!--te-->
+
 # How to Build and Test
 
 The Matcher as Node can be built and installed wherever java can run. We ship following artifacts:
-1. A DEB file is recommended way to install Matcher on Debian and its derivatives. 
+1. A DEB file is a recommended way to install Matcher on Debian and its derivatives. 
 2. A TGZ file contains all required JARs
 
 To build and test it your own, you will need to follow these steps:
@@ -161,157 +164,7 @@ sbt packageAll
 sbt -Dnetwork=testnet packageAll
 ```
 
-## 6. Installing and running
-
-The Matcher server runs as a separate service and communicates with a Matcher extension on the Node. So:
-
-1. First, you need an installed Node.
-2. Then you need to install a extensions to the Node and update its configuration. This is a bridge between the Matcher server and the Node.
-3. Next you should install Matcher server and properly configure it.
-4. Run the Node, wait until it will be up with the network.
-5. Run the Matcher.
-
-### 6.1. Node installation
-
-See instructions in their [documentation](https://docs.wavesplatform.com/en/waves-node/how-to-install-a-node/how-to-install-a-node.html).
-
-### 6.2. Node extension installation and configuration
-
-Since a version **2.3.0** Matcher has been using grpc-blockchain-stream from the Node to get data with a blockchain events and updates
-
-ℹ️ **IMPORTANT:** Matcher doesn't start without installed grpc-server extension. You must install that extension at the Node
-
-You must install extensions at the Node:
-* waves-dex-extension
-* grpc-server
-
-Artifacts of extensions have names like:
-* `ext-name-{supported-network}_{version}.deb` for DEB artifact. `{supported-network}` is empty for MainNet;
-* `ext-name-{version}.zip` for ZIP artifact;
-
-#### a. 📦 Installation through DEB
-
-> If the Node installed from DEB
-
-Run: `sudo dpkg -i deb-artifact.deb`
-
-The extension will be automatically installed to the Node.
-
-#### b. 🗜 Installation through ZIP
-
-> If the Node is running manually.
-> Note, if you installed Node from a DEB package, Matcher will be removed after update.
-
-To install an extension from ZIP file:
-
-1. Copy the archive to the directory with Node's JAR
-2. Extract the archive. Its files will be added to the existed directories.
-
-To run the Node with an extension use following commands:
-
-*Debian/Ubuntu/macOS*:
-
-```
-java <your_JVM_options> -cp "/absolute_path_to_fat_jar/waves-all.jar:/absolute_path_to_fat_jar/lib/*" com.wavesplatform.Application /path/to/config.conf
-```
-
-*Windows*:
-
-```
-java <your_JVM_options> -cp "/absolute_path_to_fat_jar/waves-all.jar;/absolute_path_to_fat_jar/lib/*" com.wavesplatform.Application /path/to/config.conf
-```
-
-#### 📃 Configuration
-
-Add lines to the Node's configuration:
-
-```hocon
-waves.extensions += "com.wavesplatform.dex.grpc.integration.DEXExtension"
-
-waves.dex {
-  # gRPC integration settings for Waves Node
-  grpc.integration {
-    host = "127.0.0.1" # "0.0.0.0" if the Matcher server connects to the Matcher extension from other machine 
-    port = 6887
-  }
-  
-  blockchain-updates {
-    grpc-port = 6881
-  }
-}
-````
-
-Add lines to the **Matcher's** configuration:
-
-```hocon
-waves-blockchain-client {
-  grpc {
-     target = "node_host:6887" # host and port of the Node with installed grpc-server extension
-  }
-}
-blockchain-updates {
-  grpc-port = 6881 # must ms the same with port at same Node's configuration
-}
-````
-
-### 6.3. Matcher server installation and configuration
-
-Artifacts of Matcher extension have names like `waves-dex{version}.{deb|zip}`.
-
-#### a. 📦 Installation through DEB
-
-Run: `sudo dpkg -i deb-artifact.deb`
-
-The Matcher server will be installed. Note, the service will not start. You should update the configuration (see below) and then start the service:
-* If you are using `system.d` (used on Ubuntu since 15.04): `sudo systemctl start waves-dex`
-* If you are using `init.d`: `sudo /etc/init.d/waves-dex`
-
-If it is a fresh install, configurations were copied to `/etc/waves-dex`.
-
-#### b. 🗜 Installation through ZIP
-
-To install a Matcher server from ZIP file:
- 
-1. Extract it
-2. There are sample configurations:
-
-    * doc/main.conf is a sample Matcher server configuration;
-    * doc/logback.xml is a sample logging configuration.
-    
-    Copy them to a directory with production configurations. 
-
-To run:
-
-*Debian/Ubuntu/macOS*:
-
-```
-/path/to/matcher/directory/bin/waves-dex -Dlogback.configurationFile=/path/to/config/directory/logback.xml <your_JVM_options> /path/to/config/directory/main.conf
-```
-
-*Windows*:
-
-```
-/path/to/matcher/directory/bin/waves-dex.bat -Dlogback.configurationFile=/path/to/config/directory/logback.xml <your_JVM_options> /path/to/config/directory/main.conf
-```
-
-#### 📃 Configuration of Matcher server
-
-1. There is an example of configuration in the "doc" directory. You need to update the Matcher's server configuration or create a new one in (for example, conf/dex.conf):
-
-    ```hocon
-    # ... here many lines of your Matcher's configuration
-    waves.dex {
-      root-directory = "/full/path/to/base/dex/directory"
-      # rest-api.bind-address = "0.0.0.0" # uncomment this line to accept connections from any host
-
-      # host:port of Matcher extension gRPC server
-      waves-blockchain-client.grpc.target = "127.0.0.1:6887"
-    }
-    ```
-
-2. Generate an [account storage](#81-generating-account-storage) and update your configuration.
-
-## 7. Running an extension project locally during development
+## 6. Running an extension project locally during development
 
 ### SBT
 
@@ -335,6 +188,147 @@ sbt "dex/run /path/to/configuration"
 
 All files will be stored in `_local/runtime/mainnet`, including logs in the `log/` directory.
 
+# Installing and running
+
+The Matcher server runs as a separate service and communicates with a Matcher extension on the Node. So:
+
+1. First, you need an installed Node.
+2. Then you need to install a extensions to the Node and update its configuration. This is a bridge between the Matcher server and the Node.
+3. Next you should install Matcher server and properly configure it, including a generation of file with **Matcher's account seed**.
+4. Run the Node, wait until it will be up with the network.
+5. Run the Matcher.
+
+## 1. Node installation
+
+See instructions in their [documentation](https://docs.wavesplatform.com/en/waves-node/how-to-install-a-node/how-to-install-a-node.html).
+
+## 2. Node extension installation
+
+Since a version **2.3.0** Matcher has been using `grpc-server` extension from the Node to get data with a blockchain events and updates.
+
+**You must install extensions at the Node:**
+* `waves-dex-extension`
+* `grpc-server`
+
+ℹ️ **IMPORTANT:** `grpc-server` writes own data during blockchain updates. You have remove Node's state and import blockchain again, if you didn't install `grpc-server` before. 
+See the official Node [documentation](https://docs.waves.tech/en/waves-node/extensions/grpc-server/#client-generation) for details.
+
+Artifacts of extensions have names like:
+* `ext-name-{supported-network}_{version}.deb` for DEB artifact. `{supported-network}` is empty for MainNet;
+* `ext-name-{version}.zip` for ZIP artifact.
+
+### 2.a. 📦 Installation through DEB
+
+> If the Node installed from DEB
+
+Run: `sudo dpkg -i deb-artifact.deb`
+
+The extension will be automatically installed to the Node.
+
+### 2.b. 🗜 Installation through ZIP
+
+> If the Node is running manually.
+> Note, if you installed Node from a DEB package, Matcher will be removed after update.
+
+To install an extension from ZIP file:
+
+1. Copy the archive to the directory with Node's JAR
+2. Extract the archive. Its files will be added to the existed directories.
+
+To run the Node with an extension use following commands:
+
+*Debian/Ubuntu/macOS*:
+
+```
+java <your_JVM_options> -cp "/absolute_path_to_fat_jar/waves-all.jar:/absolute_path_to_fat_jar/lib/*" com.wavesplatform.Application /path/to/config.conf
+```
+
+*Windows*:
+
+```
+java <your_JVM_options> -cp "/absolute_path_to_fat_jar/waves-all.jar;/absolute_path_to_fat_jar/lib/*" com.wavesplatform.Application /path/to/config.conf
+```
+
+## 3. 📃 Node's configuration
+
+Usually it is `/etc/waves-{network}/waves.conf`
+
+Add these lines:
+```hocon
+waves {
+  # Enable required extensions
+  extensions += "com.wavesplatform.events.BlockchainUpdates"
+  extensions += "com.wavesplatform.dex.grpc.integration.DEXExtension"
+
+  # Other settings: https://github.com/wavesplatform/Waves/blob/version-1.2.x/grpc-server/src/main/resources/application.conf 
+  grpc.host = "127.0.0.1" # "0.0.0.0" if Node and Matcher installed on different servers
+
+  # Other settings: https://github.com/wavesplatform/matcher/blob/master/waves-ext/src/main/resources/application.conf#L4
+  dex.grpc.integration.host = "127.0.0.1" # "0.0.0.0" if Node and Matcher installed on different servers
+}
+```
+
+## 4. Matcher server installation
+
+Artifacts of Matcher extension have names like `waves-dex{version}.{deb|zip}`.
+
+### 4.a. 📦 Installation through DEB
+
+Run: `sudo dpkg -i deb-artifact.deb`
+
+The Matcher server will be installed. Note, the service will not start. You should update the configuration (see below) and then start the service:
+* If you are using `system.d` (used on Ubuntu since 15.04): `sudo systemctl start waves-dex`
+* If you are using `init.d`: `sudo /etc/init.d/waves-dex`
+
+If it is a fresh install, configurations were copied to `/etc/waves-dex`.
+
+### 4.b. 🗜 Installation through ZIP
+
+To install a Matcher server from ZIP file:
+ 
+1. Extract it
+2. There are sample configurations:
+
+    * `doc/main.conf` is a sample Matcher server configuration;
+    * `doc/logback.xml` is a sample logging configuration.
+    
+    Copy them to a directory with production configurations. 
+
+To run:
+
+*Debian/Ubuntu/macOS*:
+
+```
+/path/to/matcher/directory/bin/waves-dex -Dlogback.configurationFile=/path/to/config/directory/logback.xml <your_JVM_options> /path/to/config/directory/main.conf
+```
+
+*Windows*:
+
+```
+/path/to/matcher/directory/bin/waves-dex.bat -Dlogback.configurationFile=/path/to/config/directory/logback.xml <your_JVM_options> /path/to/config/directory/main.conf
+```
+
+## 5. 📃 Matcher's configuration
+
+Usually it is `/etc/waves-dex/main.conf`
+Also there is an example of logging configuration in the "doc" directory.
+
+1. Generate an [account storage](#81-generating-account-storage) and update your config. 
+   Don't forget to check, that the generated file belongs to `waves-dex` user and group.
+2. Uncomment and edit these options in the config:
+
+    ```hocon
+    # Client for com.wavesplatform.dex.grpc.integration.DEXExtension
+    # grpc.target = "127.0.0.1:6887" # Replace host and port. 6887 is a default port.
+
+    # Client for com.wavesplatform.events.BlockchainUpdates
+    # blockchain-updates-grpc.target = "127.0.0.1:6881" # Replace host and port. 6881 is a default port.
+    ```
+   
+## 6. ✅ That's all
+
+Your Node should up with the network. If that, run the Matcher.
+
 # CLI
 
 We have CLI tools accompanying to Matcher server. Run `waves-dex-cli` to see a full documentation. The CLI functionality includes:
@@ -355,7 +349,7 @@ dex/runMain com.wavesplatform.dex.cli.WavesDexCli here-your-arguments
 Example:
 
 ```bash
-./bin/waves-dex-cli create-account-storage --address-scheme W --seed-format base64 --account-nonce 3 --output-directory /var/lib/waves-dex
+waves-dex-cli create-account-storage --address-scheme W --seed-format base64 --account-nonce 3 --output-directory /var/lib/waves-dex
 ```
 
 here:

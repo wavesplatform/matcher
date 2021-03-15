@@ -310,7 +310,9 @@ object Dependencies {
       betterMonadicFor,
       mouse,
       grpcNetty,
-      wavesProtobufSchemas
+      wavesProtobufSchemas,
+      sttpClient,
+      sttpPlayJson
     ) ++ testKit ++ silencer ++ Seq(
       jsonScalaPb % Test // for testing purposes
     )

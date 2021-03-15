@@ -9,6 +9,8 @@ import com.wavesplatform.dex.domain.crypto.{Proofs, SignatureLength}
 import play.api.libs.functional.syntax._
 import play.api.libs.json.Reads._
 import play.api.libs.json._
+import sttp.client3.playJson.asJson
+import sttp.client3.{IsOption, ResponseAs, _}
 
 import scala.util.{Failure, Success}
 

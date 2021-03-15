@@ -1,5 +1,4 @@
 import Dependencies.Version.levelDbVersion
-import Dependencies.sttpPlayJson
 import sbt.Keys._
 import sbt.{Def, compilerPlugin, _}
 
@@ -47,8 +46,6 @@ object Dependencies {
 
     val sttp = "1.7.2"
     val sttpClient = "3.1.7"
-
-    val circe = "0.13.0"
 
     val testContainers = "0.38.8"
     val testContainersPostgres = "1.15.1"
@@ -149,8 +146,6 @@ object Dependencies {
   private val commonsNet = "commons-net" % "commons-net" % Version.commonsNet
   private val sttpClient = sttpClientModule("core")
   private val sttpPlayJson = sttpClientModule("play-json")
-  private val sttpCirce = sttpClientModule("circe")
-  private val circe = "io.circe" %% "circe-generic" % Version.circe
   private val sttpAsyncHttpClient = sttpClientModule("async-http-client-backend-future")
   private val allureScalaTest = "io.qameta.allure" %% "allure-scalatest" % Version.allureScalaTest
   private val jaxbApi = "javax.xml.bind" % "jaxb-api" % Version.jaxbApi
@@ -286,9 +281,7 @@ object Dependencies {
       toxiProxy,
       wavesJ,
       sttpClient,
-      sttpPlayJson,
-      sttpCirce,
-      circe
+      sttpPlayJson
     ) ++ testContainers
 
     lazy val dexTestCommon: Seq[ModuleID] = Seq(diffx, scalaTest, scalaCheck, scalaTestPlusCheck, allureScalaTest)

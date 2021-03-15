@@ -9,7 +9,7 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
-import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.domain.order.{Order}
 import com.wavesplatform.dex.domain.order.Order.Id
 import com.wavesplatform.dex.it.api._
 import com.wavesplatform.dex.it.api.responses.dex.MatcherError
@@ -17,6 +17,7 @@ import com.wavesplatform.dex.it.json._
 import im.mak.waves.transactions.ExchangeTransaction
 import play.api.libs.json.{JsObject, Json}
 import sttp.client3._
+import sttp.client3.playJson._
 import sttp.model.Uri.QuerySegment
 import sttp.model.{MediaType, Uri}
 
@@ -63,7 +64,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
 
   override def place(order: Order): R[HttpSuccessfulPlace] = mk {
     basicRequest
-      .body(order.toJson.toString())
+      .body(order)
       .post(uri"$apiUri/matcher/orderbook")
       .readTimeout(3.minutes) // TODO find a way to decrease the timeout!
       .followRedirects(false) // TODO move ?
@@ -74,7 +75,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .post(uri"$apiUri/matcher/orderbook")
       .readTimeout(3.minutes) // TODO find a way to decrease the timeout!
       .followRedirects(false) // TODO move ?
-      .body(order.toJson.toString())
+      .body(order)
   }
 
   override def placeMarket(order: JsObject): R[HttpSuccessfulPlace] = mk {
@@ -82,11 +83,11 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .post(uri"$apiUri/matcher/orderbook/market")
       .readTimeout(3.minutes) // TODO find a way to decrease the timeout!
       .followRedirects(false) // TODO move ?
-      .body(order.toJson.toString())
+      .body(order)
   }
 
   override def placeMarket(order: Order): R[HttpSuccessfulPlace] = mk {
-    basicRequest.post(uri"$apiUri/matcher/orderbook/market").body(order.toJson.toString())
+    basicRequest.post(uri"$apiUri/matcher/orderbook/market").body(order)
   }
 
   override def cancelOrder(

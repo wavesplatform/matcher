@@ -26,17 +26,17 @@ object StatusTransitions extends ScorexLogging {
                   updatedLastBlockHeight = LastBlockHeight.RestartRequired
                 )
 
-              case Right(updatedFork) =>
+              case Right(updatedChain) =>
                 StatusUpdate(
-                  newStatus = Normal(updatedFork),
+                  newStatus = Normal(updatedChain),
                   updatedBalances = block.changes,
-                  updatedLastBlockHeight = LastBlockHeight.Updated(block.ref.height),
+                  updatedLastBlockHeight = LastBlockHeight.Updated(updatedChain.height),
                   utxUpdate = UtxUpdate(confirmedTxs = block.confirmedTxs),
                   requestNextBlockchainEvent = true
                 )
             }
 
-          case RolledBack(to) => // This could happen during an appending of a new key block too
+          case RolledBack(to) =>
             val initFork = WavesFork(origStatus.main, origStatus.main)
             val updatedFork = to match {
               case To.CommonBlockRef(ref) => initFork.rollbackTo(ref)
@@ -47,6 +47,7 @@ object StatusTransitions extends ScorexLogging {
                 fork = updatedFork,
                 utxUpdate = Monoid.empty[UtxUpdate]
               ),
+              updatedLastBlockHeight = LastBlockHeight.Updated(updatedFork.height),
               requestNextBlockchainEvent = true
             )
 
@@ -74,16 +75,23 @@ object StatusTransitions extends ScorexLogging {
           case Appended(block) =>
             origStatus.fork.withBlock(block) match {
               case resolved: Status.Resolved =>
-                val finalUtxUpdate = origStatus.utxUpdate |+| UtxUpdate(
-                  confirmedTxs = resolved.confirmedTxs,
-                  failedTxs = Map.empty // resolved.lostTxIds
-                )
+                val finalUtxUpdate = {
+                  val x = origStatus.utxUpdate |+| UtxUpdate(
+                    confirmedTxs = resolved.newConfirmedTxs,
+                    failedTxs = Map.empty // resolved.lostTxIds
+                  )
+
+                  // This solves a situation when rolled back transactions are moved to UTX Pool
+                  // and then confirmed in a micro block.
+                  // Relates DEX-1099
+                  x.copy(unconfirmedTxs = x.unconfirmedTxs.filterNot(x => resolved.commonTxIds.contains(x.id)))
+                }
 
                 if (resolved.lostDiffIndex.isEmpty)
                   StatusUpdate(
                     newStatus = Normal(resolved.activeChain),
                     updatedBalances = resolved.newChanges,
-                    updatedLastBlockHeight = LastBlockHeight.Updated(block.ref.height),
+                    updatedLastBlockHeight = LastBlockHeight.Updated(resolved.activeChain.height),
                     utxUpdate = finalUtxUpdate,
                     requestNextBlockchainEvent = true
                   )
@@ -94,7 +102,7 @@ object StatusTransitions extends ScorexLogging {
                       stashChanges = resolved.newChanges,
                       utxUpdate = finalUtxUpdate
                     ),
-                    updatedLastBlockHeight = LastBlockHeight.Updated(block.ref.height),
+                    updatedLastBlockHeight = LastBlockHeight.Updated(resolved.activeChain.height),
                     requestBalances = resolved.lostDiffIndex
                     // requestNextBlockchainEvent = true // Because we are waiting for DataReceived
                   )
@@ -102,6 +110,7 @@ object StatusTransitions extends ScorexLogging {
               case Status.NotResolved(updatedFork) =>
                 StatusUpdate(
                   newStatus = origStatus.copy(fork = updatedFork),
+                  updatedLastBlockHeight = LastBlockHeight.Updated(updatedFork.height),
                   requestNextBlockchainEvent = true
                 )
 
@@ -120,6 +129,7 @@ object StatusTransitions extends ScorexLogging {
             }
             StatusUpdate(
               newStatus = origStatus.copy(fork = updatedFork),
+              updatedLastBlockHeight = LastBlockHeight.Updated(updatedFork.height),
               requestNextBlockchainEvent = true
             )
 

@@ -72,8 +72,8 @@ class CombinedStream(
       case (orig, Left(evt)) => utxEventsTransitions(orig, evt).tap(updated => log.info(s"utx: $orig + $evt -> $updated"))
       case (orig, Right(evt)) => blockchainEventsTransitions(orig, evt).tap(updated => log.info(s"bu: $orig + $evt -> $updated"))
     }
-    .doOnComplete(Task(log.info(s"lastStatus completed")))
-    .doOnError(e => Task(log.error(s"lastStatus failed", e)))
+    .doOnComplete(Task(log.info("lastStatus completed")))
+    .doOnError(e => Task(log.error("lastStatus failed", e)))
     .lastL
     .runToFuture
 
@@ -102,18 +102,18 @@ class CombinedStream(
   // TODO DEX-1034
   def startFrom(height: Int): Unit = {
     log.info(s"Starting from $height")
-    updateProcessedHeight(height)
+    updateProcessedHeight(height - 1) // Consider we processed the previous
     utxEvents.start()
   }
 
-  def updateProcessedHeight(height: Int): Unit =
-    processedHeight = height
-
+  def updateProcessedHeight(height: Int): Unit = processedHeight = height
   def currentProcessedHeight: Int = processedHeight
 
   def restart(): Unit = {
     log.info("Restarting")
-    // Self-healed above
+    // Self-healed,
+    // see blockchainEventsTransitions: ? + Stopped
+    // then utxEventsTransitions: Stopping + Stopped
     blockchainUpdates.stop()
   }
 
@@ -130,7 +130,7 @@ class CombinedStream(
             if (origStatus.utxEvents) ignore()
             else if (origStatus.oneDone) Status.Working
             else {
-              blockchainUpdates.startFrom(processedHeight)
+              blockchainUpdates.startFrom(processedHeight + 1)
               origStatus.copy(utxEvents = true)
             }
 
@@ -267,12 +267,15 @@ class CombinedStream(
     }
   }
 
+  // Recovering after stopped streams
   private def recover(): Unit = {
-    // Failed to process the new block and haven't yet updated processedHeight.
-    // So drop the last processed block.
-    processedHeight = math.max(1, processedHeight - 1)
-    // And rollback to the previous, because we will download a block at processedHeight
-    internalStream.onNext(WavesNodeEvent.RolledBack(WavesNodeEvent.RolledBack.To.Height(processedHeight - 1)))
+    // We don't know, did we process the last block. It could be liquid and we could not receive all micro blocks.
+    // But we processed the previous block without doubt.
+    val updatedProcessedHeight = math.max(1, processedHeight - 1)
+    internalStream.onNext(WavesNodeEvent.RolledBack(WavesNodeEvent.RolledBack.To.Height(updatedProcessedHeight)))
+    // We need to updated this too, because RolledBack could not be processed
+    // before we call startFrom in utxEventsTransitions: Starting + BecameReady
+    updateProcessedHeight(updatedProcessedHeight)
     runWithDelay(() => utxEvents.start())
   }
 

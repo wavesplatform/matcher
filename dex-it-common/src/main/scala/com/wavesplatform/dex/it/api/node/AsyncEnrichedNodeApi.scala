@@ -7,11 +7,10 @@ import com.wavesplatform.dex.it.api.responses.node._
 import com.wavesplatform.dex.it.api.{AsyncEnrichedApi, EnrichedResponse}
 import im.mak.waves.transactions.Transaction
 import im.mak.waves.transactions.common.Id
-import io.circe.generic.auto._
-import play.api.libs.json.Json
+import play.api.libs.json._
 import sttp.client3._
 import sttp.model._
-import sttp.client3.circe._
+import sttp.client3.playJson._
 
 import java.net.InetSocketAddress
 import scala.concurrent.{ExecutionContext, Future}

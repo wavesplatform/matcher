@@ -16,18 +16,6 @@ trait RestConnector extends Connector {
   protected lazy val targetUri = uri"$target"
 
   protected def mkResponse(request: RequestFunction): ErrorOrJsonResponse = {
-//    val response = Try(backend.send(request(basicRequest)).body).toEither.leftMap(ex => s"Cannot send request! ${ex.getWithStackTrace}")
-//
-//    // addressOrError.fold(ia => complete(InvalidAddress(ia.reason)), f)
-//    response //.fold(f => "", f)
-//
-////    response match {
-////      case Left(ex) => s"Cannot send request! ${ex}"
-////      case _ => Json.parse(response.toString)
-////    }
-////
-////
-//
     for {
       errorOrResponse <- Try(backend.send(request(basicRequest)).body).toEither.leftMap(ex => s"Cannot send request! ${ex.getWithStackTrace}")
       response <- errorOrResponse
@@ -43,13 +31,3 @@ object RestConnector {
   type RequestFunction = RequestT[Empty, Either[String, String], Any] => Request[Either[String, String], Any]
 
 }
-/**
-
-[error]  found   : sttp.client3.Request[Either[String,String],Nothing]
-[error]     (which expands to)  sttp.client3.RequestT[sttp.client3.Identity,Either[String,String],Nothing]
-[error]  required: sttp.client3.Request[T,R]
-[error]     (which expands to)  sttp.client3.RequestT[sttp.client3.Identity,T,R]
-[error]       errorOrResponse <- Try(backend.send(request(basicRequest)).body).toEither.leftMap(ex => s"Cannot send request! ${ex.getWithStackTrace}")
-
-
-*/

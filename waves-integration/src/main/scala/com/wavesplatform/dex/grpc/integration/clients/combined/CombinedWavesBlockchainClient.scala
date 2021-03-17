@@ -51,7 +51,7 @@ class CombinedWavesBlockchainClient(
   type Balances = Map[Address, Map[Asset, Long]]
   type Leases = Map[Address, Long]
 
-  @volatile private var blockchainStatus = "1"
+  @volatile private var blockchainStatus = ""
 
   def status: String = blockchainStatus
 

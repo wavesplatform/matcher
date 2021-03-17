@@ -13,7 +13,6 @@ import monix.execution.CancelableFuture
 import monix.reactive.Observable
 
 import scala.concurrent.Future
-import scala.util.Try
 
 // TODO DEX-998
 trait WavesBlockchainClient {

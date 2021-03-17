@@ -1,12 +1,12 @@
 package com.wavesplatform.dex.api.http.routes
 
-import akka.actor.{ActorRef, typed}
+import akka.actor.{typed, ActorRef}
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.{HttpEntity, HttpResponse, StatusCodes}
 import akka.http.scaladsl.server
 import akka.http.scaladsl.server._
 import akka.http.scaladsl.server.directives.FutureDirectives
-import akka.pattern.{AskTimeoutException, ask}
+import akka.pattern.{ask, AskTimeoutException}
 import akka.stream.Materializer
 import akka.util.Timeout
 import cats.syntax.option._
@@ -18,7 +18,7 @@ import com.wavesplatform.dex.actors.address.AddressActor.OrderListType
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.api.http._
 import com.wavesplatform.dex.api.http.entities._
-import com.wavesplatform.dex.api.http.headers.{CustomContentTypes, `X-User-Public-Key`}
+import com.wavesplatform.dex.api.http.headers.{`X-User-Public-Key`, CustomContentTypes}
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
 import com.wavesplatform.dex.api.ws.actors.WsExternalClientDirectoryActor
@@ -133,7 +133,9 @@ class MatcherApiRoute(
   private val transactionsRoutes: Route = pathPrefix("transactions")(protect(getOrderTransactions))
 
   private val debugRoutes: Route = pathPrefix("debug") {
-    getMatcherStatus ~ getMatcherConfig ~ getCurrentOffset ~ getLastOffset ~ getOldestSnapshotOffset ~ getAllSnapshotOffsets ~ protect(saveSnapshots) ~ print
+    getMatcherStatus ~ getMatcherConfig ~ getCurrentOffset ~ getLastOffset ~ getOldestSnapshotOffset ~ getAllSnapshotOffsets ~ protect(
+      saveSnapshots
+    ) ~ print
   }
 
   private val orderBookRoutes: Route = pathPrefix("orderbook") {
@@ -392,8 +394,8 @@ class MatcherApiRoute(
     parameters("depth".as[String].?) { depth =>
       depth match {
         case None => withAssetPair(pairOrError, redirectToInverse = true, "") { pair =>
-          complete(orderBookHttpInfo.getHttpView(pair, MatcherModel.Normalized, None))
-        }
+            complete(orderBookHttpInfo.getHttpView(pair, MatcherModel.Normalized, None))
+          }
         case Some(depth) =>
           depth.toIntOption match {
             case None => complete(InvalidDepth(s"Depth value '$depth' must be an Integer"))
@@ -1186,7 +1188,7 @@ class MatcherApiRoute(
     response = classOf[MatcherStatusResponse]
   )
   def getMatcherStatus: Route = (path("status") & get & withAuth) {
-    complete (MatcherStatusResponse(matcherStatus().toString, blockchainClient.status()))
+    complete(MatcherStatusResponse(matcherStatus().toString, blockchainClient.status()))
   }
 
   // Hidden

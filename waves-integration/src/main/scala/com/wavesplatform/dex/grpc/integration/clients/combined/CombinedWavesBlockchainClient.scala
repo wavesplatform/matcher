@@ -31,13 +31,13 @@ import io.grpc.ManagedChannel
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.nio.NioSocketChannel
 import monix.eval.Task
-import monix.execution.Scheduler
+import monix.execution.{CancelableFuture, Scheduler}
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.chaining._
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 
 class CombinedWavesBlockchainClient(
   settings: Settings,
@@ -50,6 +50,11 @@ class CombinedWavesBlockchainClient(
 
   type Balances = Map[Address, Map[Asset, Long]]
   type Leases = Map[Address, Long]
+
+  @volatile var blockchainStatus = "1"
+
+
+  def status: String = blockchainStatus
 
   private val pbMatcherPublicKey = matcherPublicKey.toPB
 
@@ -69,6 +74,12 @@ class CombinedWavesBlockchainClient(
       val init: BlockchainStatus = BlockchainStatus.Normal(WavesChain(Vector.empty, startHeight - 1, settings.maxRollbackHeight + 1))
 
       val combinedStream = new CombinedStream(settings.combinedStream, bClient.blockchainEvents, meClient.utxEvents)
+
+      combinedStream.lastStatus.onComplete  {
+        case Failure(x) => log.error(s"Something went wrong $x"); blockchainStatus = x.toString
+        case _ => log.info("lastStatus caught"); blockchainStatus = "error"
+      }
+
       Observable(dataUpdates, combinedStream.stream)
         .merge
         .mapAccumulate(init) { case (origStatus, event) =>
@@ -232,7 +243,6 @@ class CombinedWavesBlockchainClient(
 
   override def close(): Future[Unit] =
     meClient.close().zip(bClient.close()).map(_ => ())
-
 }
 
 object CombinedWavesBlockchainClient extends ScorexLogging {

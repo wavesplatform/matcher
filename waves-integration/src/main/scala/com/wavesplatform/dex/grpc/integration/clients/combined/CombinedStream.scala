@@ -117,7 +117,7 @@ class CombinedStream(
     blockchainUpdates.stop()
   }
 
-  private def utxEventsTransitions(origStatus: Status, event: SystemEvent): Status = {
+  def utxEventsTransitions(origStatus: Status, event: SystemEvent): Status = {
     def ignore(): Status = {
       log.error(s"utx: Unexpected transition $origStatus + $event, ignore")
       origStatus

@@ -10,9 +10,11 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
+import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedStream
 import com.wavesplatform.dex.grpc.integration.clients.domain.{AddressBalanceUpdates, WavesNodeUpdates}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import monix.eval.Task
+import monix.execution.CancelableFuture
 import monix.reactive.Observable
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -39,6 +41,8 @@ class MatcherExtensionAssetsWatchingClient(
       val assets = update._1.balanceUpdates.valuesIterator.flatMap(x => x.regular.keysIterator ++ x.pessimisticCorrection.keysIterator).toSet
       Task.fromFuture(saveAssetsDescription(assets)).map(_ => update)
     }
+
+  def get: WavesBlockchainClient = underlying
 
   override def isFeatureActivated(id: Short): Future[Boolean] = underlying.isFeatureActivated(id)
 
@@ -77,4 +81,5 @@ class MatcherExtensionAssetsWatchingClient(
         }
     }
 
+  override def status(): String = ???
 }

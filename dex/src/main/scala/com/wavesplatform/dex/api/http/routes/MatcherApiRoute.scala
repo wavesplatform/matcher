@@ -38,7 +38,9 @@ import com.wavesplatform.dex.domain.order.OrderJson.orderFormat
 import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV2
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.effect.FutureResult
-import com.wavesplatform.dex.error.{MatcherError}
+import com.wavesplatform.dex.error.MatcherError
+import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient
+import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedStream
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
 import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model._
@@ -64,6 +66,7 @@ class MatcherApiRoute(
   config: Config,
   matcher: ActorRef,
   addressActor: ActorRef,
+  blockchainClient: WavesBlockchainClient,
   storeCommand: StoreValidatedCommand,
   orderBook: AssetPair => Option[Either[Unit, ActorRef]],
   orderBookHttpInfo: OrderBookHttpInfo,
@@ -130,7 +133,7 @@ class MatcherApiRoute(
   private val transactionsRoutes: Route = pathPrefix("transactions")(protect(getOrderTransactions))
 
   private val debugRoutes: Route = pathPrefix("debug") {
-    getMatcherConfig ~ getCurrentOffset ~ getLastOffset ~ getOldestSnapshotOffset ~ getAllSnapshotOffsets ~ protect(saveSnapshots) ~ print
+    getMatcherStatus ~ getMatcherConfig ~ getCurrentOffset ~ getLastOffset ~ getOldestSnapshotOffset ~ getAllSnapshotOffsets ~ protect(saveSnapshots) ~ print
   }
 
   private val orderBookRoutes: Route = pathPrefix("orderbook") {
@@ -1172,6 +1175,18 @@ class MatcherApiRoute(
       matcher ! ForceSaveSnapshots
       SimpleResponse(StatusCodes.OK, "Saving started")
     }
+  }
+
+  @Path("/debug/status")
+  @ApiOperation(
+    value = "Returns current matcher's status",
+    httpMethod = "GET",
+    authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
+    tags = Array("debug"),
+    response = classOf[MatcherStatusResponse]
+  )
+  def getMatcherStatus: Route = (path("status") & get & withAuth) {
+    complete (MatcherStatusResponse(matcherStatus().toString, blockchainClient.status()))
   }
 
   // Hidden

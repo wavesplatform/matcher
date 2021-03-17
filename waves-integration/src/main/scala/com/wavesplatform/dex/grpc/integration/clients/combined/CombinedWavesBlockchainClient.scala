@@ -31,13 +31,13 @@ import io.grpc.ManagedChannel
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.nio.NioSocketChannel
 import monix.eval.Task
-import monix.execution.{CancelableFuture, Scheduler}
+import monix.execution.Scheduler
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.chaining._
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Success}
 
 class CombinedWavesBlockchainClient(
   settings: Settings,
@@ -51,8 +51,7 @@ class CombinedWavesBlockchainClient(
   type Balances = Map[Address, Map[Asset, Long]]
   type Leases = Map[Address, Long]
 
-  @volatile var blockchainStatus = "1"
-
+  @volatile private var blockchainStatus = "1"
 
   def status: String = blockchainStatus
 

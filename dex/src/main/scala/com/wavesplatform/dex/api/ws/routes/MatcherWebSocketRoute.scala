@@ -242,7 +242,7 @@ class MatcherWebSocketRoute(
 
         case bm: BinaryMessage =>
           bm.dataStream.runWith(Sink.ignore)
-          Future.failed(new BinaryMessagesNotSupportedException("Binary messages are not supported"))
+          Future.failed(new BinaryMessagesNotSupportedException)
       }
       .watchTermination() { (notUsed, future) =>
         closeHandler.closeOn(future)

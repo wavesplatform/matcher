@@ -336,8 +336,6 @@ class AddressActor(
 
     case Query.GetCurrentState => sender() ! Reply.GetState(balances.allTradableBalance.xs, balances.reserved.xs, placementQueue)
 
-    case Query.GetAllTradableBalance => sender() ! Reply.GetBalance(balances.allTradableBalance.xs)
-
     case Query.GetReservedBalance => sender() ! Reply.GetBalance(balances.reserved.xs)
 
     case query: Query.GetTradableBalance => sender() ! Reply.GetBalance(balances.tradableBalance(query.forAssets).filter(_._2 > 0))
@@ -714,7 +712,6 @@ object AddressActor {
     case class GetOrderStatusInfo(orderId: Order.Id) extends Query
     case class GetTradableBalance(forAssets: Set[Asset]) extends Query
     case object GetReservedBalance extends Query
-    case object GetAllTradableBalance extends Query
     case object GetCurrentState extends Query
   }
 

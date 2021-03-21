@@ -201,11 +201,8 @@ class MatcherApiRoute(
   private def withPublicKey(publicKeyOrError: Either[ValidationError.InvalidPublicKey, PublicKey])(f: PublicKey => Route): Route =
     publicKeyOrError.fold(ipk => complete(InvalidPublicKey(ipk.reason)), f)
 
-  private def withAddress(addressOrError: Either[ValidationError.InvalidAddress, Address])(f: Address => Route): Route = {
-
-    val r = addressOrError.fold(ia => complete(InvalidAddress(ia.reason)), f)
-    r
-  }
+  private def withAddress(addressOrError: Either[ValidationError.InvalidAddress, Address])(f: Address => Route): Route =
+    addressOrError.fold(ia => complete(InvalidAddress(ia.reason)), f)
 
   private def withCancelRequest(f: HttpCancelOrder => Route): Route =
     post {

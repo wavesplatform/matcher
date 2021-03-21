@@ -206,8 +206,8 @@ trait DexApi[F[_]] {
   def getMatcherConfig: F[Config]
   def getMatcherConfig(headers: Map[String, String]): F[Config]
 
-  def getMatcherStatus: F[HttpSMatcherStatus]
-  def getMatcherStatus(headers: Map[String, String]): F[HttpSMatcherStatus]
+  def getMatcherStatus: F[HttpMatcherStatus]
+  def getMatcherStatus(headers: Map[String, String]): F[HttpMatcherStatus]
 
   def getMatcherPublicKey: F[String]
 

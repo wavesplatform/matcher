@@ -1,12 +1,12 @@
 package com.wavesplatform.dex.api.http.routes
 
-import akka.actor.{ActorRef, typed}
+import akka.actor.{typed, ActorRef}
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.{HttpEntity, HttpResponse, StatusCodes}
 import akka.http.scaladsl.server
 import akka.http.scaladsl.server._
 import akka.http.scaladsl.server.directives.FutureDirectives
-import akka.pattern.{AskTimeoutException, ask}
+import akka.pattern.{ask, AskTimeoutException}
 import akka.stream.Materializer
 import akka.util.Timeout
 import cats.syntax.option._
@@ -15,10 +15,12 @@ import com.typesafe.config.Config
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.actors.MatcherActor._
 import com.wavesplatform.dex.actors.address.AddressActor.OrderListType
+import com.wavesplatform.dex.actors.address.AddressActor.Query.GetCurrentState
+import com.wavesplatform.dex.actors.address.AddressActor.Reply.GetState
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.api.http._
 import com.wavesplatform.dex.api.http.entities._
-import com.wavesplatform.dex.api.http.headers.{CustomContentTypes, `X-User-Public-Key`}
+import com.wavesplatform.dex.api.http.headers.{`X-User-Public-Key`, CustomContentTypes}
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
 import com.wavesplatform.dex.api.ws.actors.WsExternalClientDirectoryActor
@@ -29,6 +31,7 @@ import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.bytes.ByteStr.toByteArray
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.error.ValidationError
@@ -38,7 +41,7 @@ import com.wavesplatform.dex.domain.order.OrderJson.orderFormat
 import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV2
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.effect.FutureResult
-import com.wavesplatform.dex.error.{MatcherError}
+import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
 import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model._
@@ -47,11 +50,10 @@ import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
 import com.wavesplatform.dex.settings.{MatcherSettings, OrderFeeSettings}
 import io.swagger.annotations._
-
-import javax.ws.rs.Path
 import kamon.Kamon
 import play.api.libs.json._
 
+import javax.ws.rs.Path
 import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag
 import scala.util.Success
@@ -130,7 +132,9 @@ class MatcherApiRoute(
   private val transactionsRoutes: Route = pathPrefix("transactions")(protect(getOrderTransactions))
 
   private val debugRoutes: Route = pathPrefix("debug") {
-    getMatcherConfig ~ getCurrentOffset ~ getLastOffset ~ getOldestSnapshotOffset ~ getAllSnapshotOffsets ~ protect(saveSnapshots) ~ print
+    getAddressActorState ~ getMatcherConfig ~ getCurrentOffset ~ getLastOffset ~ getOldestSnapshotOffset ~ getAllSnapshotOffsets ~ protect(
+      saveSnapshots
+    ) ~ print
   }
 
   private val orderBookRoutes: Route = pathPrefix("orderbook") {
@@ -197,8 +201,11 @@ class MatcherApiRoute(
   private def withPublicKey(publicKeyOrError: Either[ValidationError.InvalidPublicKey, PublicKey])(f: PublicKey => Route): Route =
     publicKeyOrError.fold(ipk => complete(InvalidPublicKey(ipk.reason)), f)
 
-  private def withAddress(addressOrError: Either[ValidationError.InvalidAddress, Address])(f: Address => Route): Route =
-    addressOrError.fold(ia => complete(InvalidAddress(ia.reason)), f)
+  private def withAddress(addressOrError: Either[ValidationError.InvalidAddress, Address])(f: Address => Route): Route = {
+
+    val r = addressOrError.fold(ia => complete(InvalidAddress(ia.reason)), f)
+    r
+  }
 
   private def withCancelRequest(f: HttpCancelOrder => Route): Route =
     post {
@@ -389,8 +396,8 @@ class MatcherApiRoute(
     parameters("depth".as[String].?) { depth =>
       depth match {
         case None => withAssetPair(pairOrError, redirectToInverse = true, "") { pair =>
-          complete(orderBookHttpInfo.getHttpView(pair, MatcherModel.Normalized, None))
-        }
+            complete(orderBookHttpInfo.getHttpView(pair, MatcherModel.Normalized, None))
+          }
         case Some(depth) =>
           depth.toIntOption match {
             case None => complete(InvalidDepth(s"Depth value '$depth' must be an Integer"))
@@ -1172,6 +1179,31 @@ class MatcherApiRoute(
       matcher ! ForceSaveSnapshots
       SimpleResponse(StatusCodes.OK, "Saving started")
     }
+  }
+
+  @Path("/debug/address/{address}")
+  @ApiOperation(
+    value = "Get state (balances, placement queue by address",
+    httpMethod = "GET",
+    authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
+    tags = Array("debug"),
+    response = classOf[HttpAddressActorState]
+  )
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "address", value = "Address", dataType = "string", paramType = "path")
+    )
+  )
+  def getAddressActorState: Route = (path("address" / AddressPM) & get & withAuth) {
+    addressOrError =>
+      withAddress(addressOrError) { address =>
+        complete {
+          askMapAddressActor[GetState](address, GetCurrentState) {
+            reply =>
+              Map("tradable" -> reply.tradable.toJson, "reserved" -> reply.reserved.toJson, "placementQueue" -> reply.placementQueue.toJson)
+          }
+        }
+      }
   }
 
   // Hidden

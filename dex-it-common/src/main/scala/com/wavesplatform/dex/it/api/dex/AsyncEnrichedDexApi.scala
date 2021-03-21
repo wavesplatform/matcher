@@ -479,6 +479,14 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
 
   override def getMatcherConfig: R[Config] = getMatcherConfig(apiKeyHeaders)
 
+  override def getAddressActorState(address: String, headers: Map[String, String]): R[HttpAddressActorState] = mk {
+    sttp
+      .get(uri"$apiUri/matcher/debug/address/$address")
+      .headers(headers)
+  }
+
+  override def getAddressActorState(address: String): R[HttpAddressActorState] = getAddressActorState(address, apiKeyHeaders)
+
   override def getMatcherPublicKey: R[String] = mk {
     sttp.get(uri"$apiUri/matcher")
   }

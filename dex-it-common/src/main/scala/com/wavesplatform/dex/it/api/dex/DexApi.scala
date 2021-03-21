@@ -29,7 +29,15 @@ trait DexApi[F[_]] {
   def placeMarket(order: JsObject): F[HttpSuccessfulPlace]
   def placeMarket(order: Order): F[HttpSuccessfulPlace]
 
-  def cancelOrder(owner: KeyPair, amountAsset: String, priceAsset: String, orderId: String, timestamp: Long, signature: ByteStr): F[HttpSuccessfulSingleCancel]
+  def cancelOrder(
+    owner: KeyPair,
+    amountAsset: String,
+    priceAsset: String,
+    orderId: String,
+    timestamp: Long,
+    signature: ByteStr
+  ): F[HttpSuccessfulSingleCancel]
+
   def cancelOrder(owner: KeyPair, order: Order): F[HttpSuccessfulSingleCancel] = cancelOrder(owner, order.assetPair, order.id())
   def cancelOrder(owner: KeyPair, assetPair: AssetPair, id: Order.Id): F[HttpSuccessfulSingleCancel]
 
@@ -205,6 +213,9 @@ trait DexApi[F[_]] {
   def getMatcherSettings: F[HttpMatcherPublicSettings]
   def getMatcherConfig: F[Config]
   def getMatcherConfig(headers: Map[String, String]): F[Config]
+
+  def getAddressActorState(address: String): F[HttpAddressActorState]
+  def getAddressActorState(address: String, headers: Map[String, String]): F[HttpAddressActorState]
 
   def getMatcherPublicKey: F[String]
 

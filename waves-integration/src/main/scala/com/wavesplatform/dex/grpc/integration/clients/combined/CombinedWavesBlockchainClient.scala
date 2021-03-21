@@ -55,7 +55,7 @@ class CombinedWavesBlockchainClient(
 
   @volatile private var blockchainStatus: Status  = Starting.apply()
 
-  def status: Status = blockchainStatus
+  def status(): Status = blockchainStatus
 
   private val pbMatcherPublicKey = matcherPublicKey.toPB
 

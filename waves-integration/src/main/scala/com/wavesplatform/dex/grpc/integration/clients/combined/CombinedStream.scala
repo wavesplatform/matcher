@@ -67,11 +67,16 @@ class CombinedStream(
 
   private val mergedEvents = ConcurrentSubject.publish[Either[SystemEvent, SystemEvent]]
 
+  @volatile var blockchainStatus: Status = Status.Starting.apply()
+
+  def getBlockchainStatus: Status = blockchainStatus
+
   val lastStatus = mergedEvents
     .foldLeft[Status](Status.Starting()) {
       case (orig, Left(evt)) => utxEventsTransitions(orig, evt).tap(updated => log.info(s"utx: $orig + $evt -> $updated"))
       case (orig, Right(evt)) => blockchainEventsTransitions(orig, evt).tap(updated => log.info(s"bu: $orig + $evt -> $updated"))
     }
+    .tap(_ => blockchainStatus = Status.Working)
     .doOnComplete(Task(log.info("lastStatus completed")))
     .doOnError(e => Task(log.error("lastStatus failed", e)))
     .lastL

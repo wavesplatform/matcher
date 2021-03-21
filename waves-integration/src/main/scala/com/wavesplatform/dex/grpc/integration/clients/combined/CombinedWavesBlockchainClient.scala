@@ -15,6 +15,8 @@ import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.clients.blockchainupdates.{BlockchainUpdatesClient, DefaultBlockchainUpdatesClient}
+import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedStream.Status
+import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedStream.Status.Starting
 import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedWavesBlockchainClient.Settings
 import com.wavesplatform.dex.grpc.integration.clients.domain.StatusUpdate.LastBlockHeight
 import com.wavesplatform.dex.grpc.integration.clients.domain._
@@ -51,9 +53,9 @@ class CombinedWavesBlockchainClient(
   type Balances = Map[Address, Map[Asset, Long]]
   type Leases = Map[Address, Long]
 
-  @volatile private var blockchainStatus = ""
+  @volatile private var blockchainStatus: Status  = Starting.apply()
 
-  def status: String = blockchainStatus
+  def status: Status = blockchainStatus
 
   private val pbMatcherPublicKey = matcherPublicKey.toPB
 
@@ -74,10 +76,7 @@ class CombinedWavesBlockchainClient(
 
       val combinedStream = new CombinedStream(settings.combinedStream, bClient.blockchainEvents, meClient.utxEvents)
 
-      combinedStream.lastStatus.onComplete  {
-        case Failure(x) => log.error(s"Something went wrong $x"); blockchainStatus = x.toString
-        case _ => log.info("lastStatus caught"); blockchainStatus = "error"
-      }
+      blockchainStatus = combinedStream.blockchainStatus
 
       Observable(dataUpdates, combinedStream.stream)
         .merge

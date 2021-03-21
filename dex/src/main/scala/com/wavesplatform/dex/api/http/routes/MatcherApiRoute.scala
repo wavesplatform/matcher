@@ -1185,10 +1185,10 @@ class MatcherApiRoute(
     httpMethod = "GET",
     authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
     tags = Array("debug"),
-    response = classOf[MatcherStatusResponse]
+    response = classOf[HttpSMatcherStatus]
   )
   def getMatcherStatus: Route = (path("status") & get & withAuth) {
-    complete(MatcherStatusResponse(matcherStatus().toString, blockchainClient.status()))
+    complete(Map("service" -> matcherStatus().toString, "blockchain" -> blockchainClient.status().toString))
   }
 
   // Hidden

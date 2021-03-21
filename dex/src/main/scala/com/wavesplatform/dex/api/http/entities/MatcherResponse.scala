@@ -94,9 +94,6 @@ case class InfoNotFound(error: MatcherError) extends MatcherResponse(C.NotFound,
 case class WavesNodeUnavailable(error: MatcherError) extends MatcherResponse(C.ServiceUnavailable, error)
 case class RateError(error: MatcherError, code: StatusCode = C.BadRequest) extends MatcherResponse(code, error)
 
-case class MatcherStatusResponse(service: String, blockchain: String)
-    extends MatcherResponse(C.OK, Json.obj("service" -> service, "blockchain" -> blockchain))
-
 case object InternalError
     extends MatcherResponse(C.ServiceUnavailable, MatcherResponseContent.Single(Json.obj("message" -> "Internal server error")))
 

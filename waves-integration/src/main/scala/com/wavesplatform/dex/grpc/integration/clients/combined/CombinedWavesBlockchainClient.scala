@@ -53,7 +53,7 @@ class CombinedWavesBlockchainClient(
   type Balances = Map[Address, Map[Asset, Long]]
   type Leases = Map[Address, Long]
 
-  @volatile private var blockchainStatus: Status  = Starting.apply()
+  @volatile private var blockchainStatus: Status  = Starting()
 
   override def status(): Status = blockchainStatus
 

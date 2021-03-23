@@ -27,6 +27,7 @@ object HttpSystemStatus {
       case MatcherStatus.Starting => Status.Starting
       case MatcherStatus.Stopping => Status.Stopping
       case MatcherStatus.Working => Status.Working
+      case _ => throw new IllegalArgumentException(s"Unexpected matcher status: $x")
     }
 
     def fromCS(x: CombinedStream.Status) = x match {
@@ -34,6 +35,7 @@ object HttpSystemStatus {
       case CombinedStream.Status.Stopping(_, _) => Status.Stopping
       case CombinedStream.Status.Working => Status.Working
       case CombinedStream.Status.Closing(_, _) => Status.Closing
+      case _ => throw new IllegalArgumentException(s"Unexpected CombinedStream status: $x")
     }
     HttpSystemStatus(fromMS(service), fromCS(blockchain))
   }

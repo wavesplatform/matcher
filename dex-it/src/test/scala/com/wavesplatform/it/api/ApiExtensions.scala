@@ -22,10 +22,10 @@ trait ApiExtensions extends NodeApiExtensions {
   this: MatcherSuiteBase =>
 
   protected def placeAndAwaitAtDex(
-    order: Order,
-    expectedStatus: HttpOrderStatus.Status = Status.Accepted,
-    dex: DexContainer = dex1,
-    isMarketOrder: Boolean = false
+                                    order: Order,
+                                    expectedStatus: HttpOrderStatus.Status = Status.Accepted,
+                                    dex: DexContainer = dex1,
+                                    isMarketOrder: Boolean = false
   ): HttpOrderStatus = {
     if (isMarketOrder) dex.api.placeMarket(order) else dex.api.place(order)
     dex.api.waitForOrderStatus(order, expectedStatus)

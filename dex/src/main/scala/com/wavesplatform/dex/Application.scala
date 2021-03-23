@@ -307,7 +307,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       config,
       matcherActorRef,
       addressDirectoryRef,
-      wavesBlockchainAsyncClient.get,
+      wavesBlockchainAsyncClient.status(),
       matcherQueue.store,
       p => Option(orderBooks.get()) flatMap (_ get p),
       orderBookHttpInfo,

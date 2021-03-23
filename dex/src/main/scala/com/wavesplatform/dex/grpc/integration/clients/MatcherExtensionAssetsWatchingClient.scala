@@ -41,8 +41,6 @@ class MatcherExtensionAssetsWatchingClient(
       Task.fromFuture(saveAssetsDescription(assets)).map(_ => update)
     }
 
-  def get: WavesBlockchainClient = underlying
-
   override def isFeatureActivated(id: Short): Future[Boolean] = underlying.isFeatureActivated(id)
 
   override def assetDescription(asset: IssuedAsset): Future[Option[BriefAssetDescription]] = underlying.assetDescription(asset)
@@ -80,5 +78,5 @@ class MatcherExtensionAssetsWatchingClient(
         }
     }
 
-  override def status(): Status = ???
+  override def status(): Status = underlying.status()
 }

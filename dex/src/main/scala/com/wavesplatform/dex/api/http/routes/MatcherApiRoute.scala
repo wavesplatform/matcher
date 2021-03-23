@@ -39,7 +39,6 @@ import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV2
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.error.MatcherError
-import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient
 import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedStream
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
 import com.wavesplatform.dex.metrics.TimerExt
@@ -66,7 +65,7 @@ class MatcherApiRoute(
   config: Config,
   matcher: ActorRef,
   addressActor: ActorRef,
-  blockchainClient: WavesBlockchainClient,
+  blockchainStatus: => CombinedStream.Status,
   storeCommand: StoreValidatedCommand,
   orderBook: AssetPair => Option[Either[Unit, ActorRef]],
   orderBookHttpInfo: OrderBookHttpInfo,
@@ -1185,10 +1184,10 @@ class MatcherApiRoute(
     httpMethod = "GET",
     authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
     tags = Array("debug"),
-    response = classOf[HttpMatcherStatus]
+    response = classOf[HttpSystemStatus]
   )
   def getMatcherStatus: Route = (path("status") & get & withAuth) {
-    complete(Map("service" -> matcherStatus().toString, "blockchain" -> blockchainClient.status().toString))
+    complete(HttpSystemStatus.from(matcherStatus(), blockchainStatus))
   }
 
   // Hidden

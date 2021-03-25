@@ -20,16 +20,15 @@ object HttpAddressState {
 
   implicit val HttpAddressStateFormat: Format[HttpAddressState] = Json.format
 
-  def apply(s: GetState): HttpAddressState =
-    new HttpAddressState(
-      s.balances.regular.xs,
-      s.balances.reserved.xs,
-      s.balances.allTradableBalance.xs,
-      s.balances.unconfirmed.xs,
-      s.balances.outgoingLeasing.getOrElse(0L),
-      s.balances.notCreatedTxs.map(e => e._1.toString -> e._2.xs),
-      s.balances.notObservedTxs.map(e => e._1.toString -> e._2.xs),
-      s.placementQueue.map(_.toString).toList
-    )
+  def apply(s: GetState): HttpAddressState = new HttpAddressState(
+    s.balances.regular.xs,
+    s.balances.reserved.xs,
+    s.balances.allTradableBalance.xs,
+    s.balances.unconfirmed.xs,
+    s.balances.outgoingLeasing.getOrElse(0L),
+    s.balances.notCreatedTxs map { case (k, v) => (k.toString, v.xs) },
+    s.balances.notObservedTxs map { case (k, v) => (k.toString, v.xs) },
+    s.placementQueue.map(_.toString).toList
+  )
 
 }

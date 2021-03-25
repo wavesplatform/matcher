@@ -334,7 +334,7 @@ class AddressActor(
           }
       }
 
-    case Query.GetCurrentState => sender() ! Reply.GetState(balances.allTradableBalance.xs, balances.reserved.xs, placementQueue)
+    case Query.GetCurrentState => sender() ! Reply.GetState(balances, placementQueue)
 
     case Query.GetReservedBalance => sender() ! Reply.GetBalance(balances.reserved.xs)
 
@@ -722,7 +722,7 @@ object AddressActor {
     case class GetOrderStatuses(xs: Seq[(Order.Id, OrderInfo[OrderStatus])]) extends Reply
     case class GetOrdersStatusInfo(maybeOrderStatusInfo: Option[OrderInfo[OrderStatus]]) extends Reply
     case class GetBalance(balance: Map[Asset, Long]) extends Reply
-    case class GetState(tradable: Map[Asset, Long], reserved: Map[Asset, Long], placementQueue: Queue[Order.Id]) extends Reply
+    case class GetState(balances: AddressBalance, placementQueue: Queue[Order.Id]) extends Reply
   }
 
   sealed trait Command extends Message

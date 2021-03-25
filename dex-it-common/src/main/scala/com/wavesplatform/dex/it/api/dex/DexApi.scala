@@ -214,8 +214,10 @@ trait DexApi[F[_]] {
   def getMatcherConfig: F[Config]
   def getMatcherConfig(headers: Map[String, String]): F[Config]
 
-  def getAddressActorState(address: String): F[HttpAddressActorState]
-  def getAddressActorState(address: String, headers: Map[String, String]): F[HttpAddressActorState]
+  def getAddressState(address: Address): F[HttpAddressState]
+  def getAddressState(address: String): F[HttpAddressState]
+  def getAddressState(address: Address, headers: Map[String, String]): F[HttpAddressState]
+  def getAddressState(address: String, headers: Map[String, String]): F[HttpAddressState]
 
   def getMatcherPublicKey: F[String]
 

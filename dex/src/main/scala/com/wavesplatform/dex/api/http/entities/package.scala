@@ -13,7 +13,6 @@ package object entities {
   type HttpOffset = ValidatedCommandWithMeta.Offset
   type HttpSnapshotOffsets = Map[AssetPair, HttpOffset]
   type HttpBalance = Map[Asset, Long]
-  type HttpAddressActorState = Map[String, JsValue]
 
   implicit val httpMatcherPublicKeyFormat: Format[PublicKey] = PublicKey.publicKeyJsonFormat
   implicit val httpRatesFormat: Format[HttpRates] = assetDoubleMapFormat

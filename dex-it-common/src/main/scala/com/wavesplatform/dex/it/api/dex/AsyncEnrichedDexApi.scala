@@ -114,7 +114,6 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .contentType("application/json", "UTF-8")
   }
 
-
   override def cancelOrderById(id: String, headers: Map[String, String]): R[HttpSuccessfulSingleCancel] = mk {
     sttp
       .post(uri"$apiUri/matcher/orders/cancel/$id")
@@ -479,13 +478,17 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
 
   override def getMatcherConfig: R[Config] = getMatcherConfig(apiKeyHeaders)
 
-  override def getAddressActorState(address: String, headers: Map[String, String]): R[HttpAddressActorState] = mk {
+  override def getAddressState(address: String, headers: Map[String, String]): R[HttpAddressState] = mk {
     sttp
       .get(uri"$apiUri/matcher/debug/address/$address")
       .headers(headers)
   }
 
-  override def getAddressActorState(address: String): R[HttpAddressActorState] = getAddressActorState(address, apiKeyHeaders)
+  override def getAddressState(address: Address): R[HttpAddressState] = getAddressState(address.stringRepr, apiKeyHeaders)
+
+  override def getAddressState(address: Address, headers: Map[String, String]): R[HttpAddressState] = getAddressState(address, headers)
+
+  override def getAddressState(address: String): R[HttpAddressState] = getAddressState(address, apiKeyHeaders)
 
   override def getMatcherPublicKey: R[String] = mk {
     sttp.get(uri"$apiUri/matcher")

@@ -76,7 +76,7 @@ class CombinedStream(
       case (orig, Left(evt)) => utxEventsTransitions(orig, evt).tap(updated => log.info(s"utx: $orig + $evt -> $updated"))
       case (orig, Right(evt)) => blockchainEventsTransitions(orig, evt).tap(updated => log.info(s"bu: $orig + $evt -> $updated"))
     }
-    .tap(_.foreach(blockchainStatus = _)) //TODO: it doesn't work
+    .tap(_.map(blockchainStatus = _))
     .doOnComplete(Task(log.info("lastStatus completed")))
     .doOnError(e => Task(log.error("lastStatus failed", e)))
     .lastL

@@ -1187,7 +1187,7 @@ class MatcherApiRoute(
     response = classOf[HttpSystemStatus]
   )
   def getMatcherStatus: Route = (path("status") & get & withAuth) {
-    complete(HttpSystemStatus.from(matcherStatus(), blockchainStatus))
+    complete(HttpSystemStatus(matcherStatus(), blockchainStatus))
   }
 
   // Hidden

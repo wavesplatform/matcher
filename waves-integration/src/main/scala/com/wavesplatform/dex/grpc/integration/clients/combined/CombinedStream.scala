@@ -67,7 +67,9 @@ class CombinedStream(
 
   private val mergedEvents = ConcurrentSubject.publish[Either[SystemEvent, SystemEvent]]
 
-  @volatile var blockchainStatus: Status = Status.Closing()
+  @volatile var blockchainStatus: Status = Status.Starting()
+
+  def status(): Status = blockchainStatus
 
   val lastStatus = mergedEvents
     .foldLeft[Status](Status.Starting()) {

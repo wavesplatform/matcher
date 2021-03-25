@@ -76,8 +76,6 @@ class CombinedWavesBlockchainClient(
 
       val combinedStream = new CombinedStream(settings.combinedStream, bClient.blockchainEvents, meClient.utxEvents)
 
-      blockchainStatus = combinedStream.blockchainStatus
-
       Observable(dataUpdates, combinedStream.stream)
         .merge
         .mapAccumulate(init) { case (origStatus, event) =>
@@ -133,11 +131,14 @@ class CombinedWavesBlockchainClient(
             changes <- tx.diff.flatMap(_.stateUpdate)
           } yield tx.id.toVanilla -> TransactionWithChanges(tx.id, signedTx, changes)
 
+          blockchainStatus = combinedStream.status()
+
           val updates = WavesNodeUpdates(updatedFinalBalances, (unconfirmedTxs ++ confirmedTxs ++ failedTxs).toMap)
           (x.newStatus, (updates, combinedStream.currentProcessedHeight >= startBlockInfo.height))
         }
         .filterNot(_._1.isEmpty)
         .tap(_ => combinedStream.startFrom(startHeight))
+
     }
     .doOnError(e => Task(log.error("Got an error in the combined stream", e)))
 

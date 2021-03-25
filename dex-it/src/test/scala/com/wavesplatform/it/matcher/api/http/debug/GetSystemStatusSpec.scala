@@ -12,7 +12,7 @@ class GetSystemStatusSpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
   "GET /matcher/debug/status" - {
     "should return matcher status" in {
       eventually {
-        validate200Json(dex1.rawApi.getSystemStatus) should matchTo(HttpSystemStatus.from(MatcherStatus.Working, CombinedStream.Status.Working))
+        validate200Json(dex1.rawApi.getSystemStatus) should matchTo(HttpSystemStatus(MatcherStatus.Working, CombinedStream.Status.Working))
       }
     }
 

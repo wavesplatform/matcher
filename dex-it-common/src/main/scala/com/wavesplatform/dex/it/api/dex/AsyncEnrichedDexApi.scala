@@ -486,7 +486,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
 
   override def getAddressState(address: Address): R[HttpAddressState] = getAddressState(address.stringRepr, apiKeyHeaders)
 
-  override def getAddressState(address: Address, headers: Map[String, String]): R[HttpAddressState] = getAddressState(address, headers)
+  override def getAddressState(address: Address, headers: Map[String, String]): R[HttpAddressState] = getAddressState(address.stringRepr, headers)
 
   override def getAddressState(address: String): R[HttpAddressState] = getAddressState(address, apiKeyHeaders)
 

@@ -1194,10 +1194,7 @@ class MatcherApiRoute(
     addressOrError =>
       withAddress(addressOrError) { address =>
         complete {
-          askMapAddressActor[GetState](address, GetCurrentState) {
-            state =>
-              HttpAddressState(state.balances, state.placementQueue)
-          }
+          askMapAddressActor[GetState](address, GetCurrentState) { HttpAddressState(_) }
         }
       }
   }

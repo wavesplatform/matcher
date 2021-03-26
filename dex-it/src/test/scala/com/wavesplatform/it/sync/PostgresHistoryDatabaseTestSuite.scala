@@ -2,7 +2,6 @@ package com.wavesplatform.it.sync
 
 import java.sql.{Connection, DriverManager}
 import java.time.LocalDateTime
-
 import cats.syntax.option._
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.typesafe.config.{Config, ConfigFactory}
@@ -18,6 +17,7 @@ import com.wavesplatform.dex.model.Events
 import com.wavesplatform.dex.model.Events.{EventReason, OrderCanceledReason, OrderExecutedReason}
 import com.wavesplatform.dex.settings.PostgresConnection
 import com.wavesplatform.it.MatcherSuiteBase
+import org.scalatest.OptionValues
 import org.scalatest.concurrent.PatienceConfiguration.{Interval, Timeout}
 import pureconfig.ConfigSource
 import pureconfig.generic.auto._
@@ -26,10 +26,10 @@ import scala.concurrent.duration.DurationInt
 import scala.io.Source
 import scala.util.Try
 
-class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgresJdbcContext {
+class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgresJdbcContext with OptionValues {
 
   override def connectionConfig: Config = ConfigSource
-    .string(getPostgresConnectionCfgString("localhost", postgres mappedPort postgresContainerPort))
+    .string(getPostgresConnectionCfgString("localhost", postgres mappedPort postgresContainerPort, "CheckPostgresConnectionApp"))
     .at("postgres")
     .loadOrThrow[PostgresConnection]
     .getQuillContextConfig
@@ -37,6 +37,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
   private val customDB: String = "user_db"
   private val customUser: String = "user"
   private val customPassword: String = "user"
+  private val customAppName: String = "TestApplicationName"
 
   private val postgresContainerName = "pgc"
   private val postgresContainerPort = 5432
@@ -47,14 +48,14 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
     s"""
        |waves.dex {
        |  price-assets = [ "$UsdId", "$BtcId", "WAVES", "$EthId", "$WctId" ]
-       |  ${getPostgresConnectionCfgString(postgresContainerName, postgresContainerPort)}
+       |  ${getPostgresConnectionCfgString(postgresContainerName, postgresContainerPort, customAppName)}
        |  order-db.max-orders = $maxOrders
        |  order-history.enable = yes
        |}
     """.stripMargin
   )
 
-  private def getPostgresConnectionCfgString(serverName: String, port: Int): String =
+  private def getPostgresConnectionCfgString(serverName: String, port: Int, appName: String): String =
     s"""
        |postgres {
        |  server-name = $serverName
@@ -63,6 +64,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
        |  user = $customUser
        |  password = $customPassword
        |  data-source-class-name = "org.postgresql.ds.PGSimpleDataSource"
+       |  application-name = $appName
        |}
     """.stripMargin
 
@@ -208,6 +210,20 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
   private def cleanTables(): Unit = {
     ctx.run(querySchema[OrderRecord]("orders").delete)
     ctx.run(querySchema[EventRecord]("events").delete)
+  }
+
+  "Node should provide its name to postgres" in {
+
+    val buyOrder = mkOrder(bob, wavesBtcPair, BUY, 270477189L, 28259L)
+    val sellOrder = mkOrder(alice, wavesBtcPair, SELL, 274413799L, 28259L)
+
+    placeAndAwaitAtDex(buyOrder)
+    placeAndAwaitAtNode(sellOrder)
+
+    findUserWithApplicationName().value shouldBe PgStatActivity(customUser, customAppName)
+
+    Seq(alice, bob).foreach(dex1.api.cancelAll(_))
+    cleanTables()
   }
 
   "Postgres order history should save correct filled status of closed orders" in {
@@ -637,4 +653,16 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
       .map(_.timestamp)
       .headOption
 
+  private def findUserWithApplicationName(): Option[PgStatActivity] =
+    ctx
+      .run (
+        querySchema[PgStatActivity](
+          "pg_stat_activity",
+          _.userName -> "usename",
+          _.applicationName -> "application_name"
+        ).filter(_.applicationName == lift(customAppName))
+      ).headOption
+
 }
+
+final case class PgStatActivity(userName: String, applicationName: String)

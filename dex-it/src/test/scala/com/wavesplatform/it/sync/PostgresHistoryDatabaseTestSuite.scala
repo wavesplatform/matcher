@@ -215,10 +215,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
   "Node should provide its name to postgres" in {
 
     val buyOrder = mkOrder(bob, wavesBtcPair, BUY, 270477189L, 28259L)
-    val sellOrder = mkOrder(alice, wavesBtcPair, SELL, 274413799L, 28259L)
-
     placeAndAwaitAtDex(buyOrder)
-    placeAndAwaitAtNode(sellOrder)
 
     findUserWithApplicationName().value shouldBe PgStatActivity(customUser, customAppName)
 

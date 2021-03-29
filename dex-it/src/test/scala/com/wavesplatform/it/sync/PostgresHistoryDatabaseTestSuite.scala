@@ -214,25 +214,25 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
 
   "Node should provide its name to postgres" in {
 
-    val buyOrder = mkOrder(bob, wavesBtcPair, BUY, 270477189L, 28259L)
+    val buyOrder = mkOrder(bob, wavesBtcPair, BUY, 25.waves, 20.btc)
     placeAndAwaitAtDex(buyOrder)
 
     findUserWithApplicationName().value shouldBe PgStatActivity(customUser, customAppName)
 
-    Seq(alice, bob).foreach(dex1.api.cancelAll(_))
+    dex1.api.cancelAll(bob)
     cleanTables()
   }
 
   "Postgres order history should save correct filled status of closed orders" in {
 
-    val buyOrder = mkOrder(bob, wavesBtcPair, BUY, 270477189L, 28259L)
-    val sellOrder = mkOrder(alice, wavesBtcPair, SELL, 274413799L, 28259L)
+    val buyOrder = mkOrder(bob, wavesBtcPair, BUY, 1.waves, 0.02.btc)
+    val sellOrder = mkOrder(alice, wavesBtcPair, SELL, 1.5.waves, 0.02.btc)
 
     placeAndAwaitAtDex(buyOrder)
     placeAndAwaitAtNode(sellOrder)
 
     // buy counter order is not executed completely, but has filled status
-    dex1.api.getOrderStatus(buyOrder) should matchTo(HttpOrderStatus(Status.Filled, 270476663L.some, 299999L.some))
+    dex1.api.getOrderStatus(buyOrder) should matchTo(HttpOrderStatus(Status.Filled, 1.waves.some, 0.003.btc.some))
 
     eventually {
       val buyOrderEvents = getEventsInfoByOrderId(buyOrder.id())

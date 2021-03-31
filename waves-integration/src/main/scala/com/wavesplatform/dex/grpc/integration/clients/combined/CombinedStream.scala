@@ -72,15 +72,15 @@ class CombinedStream(
 
   def status(): Status = blockchainStatus
 
-  def foo(last: Status): Unit =
-    blockchainStatus = last
-
   val lastStatus = mergedEvents
     .foldLeft[Status](Status.Starting()) {
       case (orig, Left(evt)) => utxEventsTransitions(orig, evt).tap(updated => log.info(s"utx: $orig + $evt -> $updated"))
       case (orig, Right(evt)) => blockchainEventsTransitions(orig, evt).tap(updated => log.info(s"bu: $orig + $evt -> $updated"))
     }
-    .doOnNext(_ => Task(foo(_)))
+    .doOnNext(s => {
+      blockchainStatus = s
+      Task(log.info(s"blockchainStatus updated: $s"))
+    })
     .doOnComplete(Task(log.info("lastStatus completed")))
     .doOnError(e => Task(log.error("lastStatus failed", e)))
     .lastL

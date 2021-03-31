@@ -1,6 +1,5 @@
 package com.wavesplatform.it.matcher.api.http.debug
 
-import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpSystemStatus
 import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedStream

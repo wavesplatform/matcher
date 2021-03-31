@@ -284,6 +284,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   }
 
   private val httpApiRouteV0: MatcherApiRoute = {
+
     val orderValidation = ValidationStages.mkFirst(
       settings,
       matcherPublicKey,
@@ -306,6 +307,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       config,
       matcherActorRef,
       addressDirectoryRef,
+      wavesBlockchainAsyncClient.status(),
       matcherQueue.store,
       p => Option(orderBooks.get()) flatMap (_ get p),
       orderBookHttpInfo,

@@ -1,12 +1,12 @@
 package com.wavesplatform.dex.api.http.routes
 
-import akka.actor.{ActorRef, typed}
+import akka.actor.{typed, ActorRef}
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.{HttpEntity, HttpResponse, StatusCodes}
 import akka.http.scaladsl.server
 import akka.http.scaladsl.server._
 import akka.http.scaladsl.server.directives.FutureDirectives
-import akka.pattern.{AskTimeoutException, ask}
+import akka.pattern.{ask, AskTimeoutException}
 import akka.stream.Materializer
 import akka.util.Timeout
 import cats.syntax.option._
@@ -18,7 +18,7 @@ import com.wavesplatform.dex.actors.address.AddressActor.OrderListType
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.api.http._
 import com.wavesplatform.dex.api.http.entities._
-import com.wavesplatform.dex.api.http.headers.{CustomContentTypes, `X-User-Public-Key`}
+import com.wavesplatform.dex.api.http.headers.{`X-User-Public-Key`, CustomContentTypes}
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
 import com.wavesplatform.dex.api.ws.actors.WsExternalClientDirectoryActor
@@ -38,7 +38,8 @@ import com.wavesplatform.dex.domain.order.OrderJson.orderFormat
 import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV2
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.effect.FutureResult
-import com.wavesplatform.dex.error.{MatcherError}
+import com.wavesplatform.dex.error.MatcherError
+import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedStream
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
 import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model._
@@ -64,6 +65,7 @@ class MatcherApiRoute(
   config: Config,
   matcher: ActorRef,
   addressActor: ActorRef,
+  blockchainStatus: => CombinedStream.Status,
   storeCommand: StoreValidatedCommand,
   orderBook: AssetPair => Option[Either[Unit, ActorRef]],
   orderBookHttpInfo: OrderBookHttpInfo,
@@ -130,7 +132,9 @@ class MatcherApiRoute(
   private val transactionsRoutes: Route = pathPrefix("transactions")(protect(getOrderTransactions))
 
   private val debugRoutes: Route = pathPrefix("debug") {
-    getMatcherConfig ~ getCurrentOffset ~ getLastOffset ~ getOldestSnapshotOffset ~ getAllSnapshotOffsets ~ protect(saveSnapshots) ~ print
+    getMatcherStatus ~ getMatcherConfig ~ getCurrentOffset ~ getLastOffset ~ getOldestSnapshotOffset ~ getAllSnapshotOffsets ~ protect(
+      saveSnapshots
+    ) ~ print
   }
 
   private val orderBookRoutes: Route = pathPrefix("orderbook") {
@@ -389,8 +393,8 @@ class MatcherApiRoute(
     parameters("depth".as[String].?) { depth =>
       depth match {
         case None => withAssetPair(pairOrError, redirectToInverse = true, "") { pair =>
-          complete(orderBookHttpInfo.getHttpView(pair, MatcherModel.Normalized, None))
-        }
+            complete(orderBookHttpInfo.getHttpView(pair, MatcherModel.Normalized, None))
+          }
         case Some(depth) =>
           depth.toIntOption match {
             case None => complete(InvalidDepth(s"Depth value '$depth' must be an Integer"))
@@ -1172,6 +1176,18 @@ class MatcherApiRoute(
       matcher ! ForceSaveSnapshots
       SimpleResponse(StatusCodes.OK, "Saving started")
     }
+  }
+
+  @Path("/debug/status")
+  @ApiOperation(
+    value = "Returns current matcher's status",
+    httpMethod = "GET",
+    authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
+    tags = Array("debug"),
+    response = classOf[HttpSystemStatus]
+  )
+  def getMatcherStatus: Route = (path("status") & get & withAuth) {
+    complete(HttpSystemStatus(matcherStatus(), blockchainStatus))
   }
 
   // Hidden

@@ -22,9 +22,9 @@ import com.wavesplatform.dex.actors.orderbook.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.api.RouteSpec
 import com.wavesplatform.dex.api.http.ApiMarshallers._
 import com.wavesplatform.dex.api.http.entities._
-import com.wavesplatform.dex.api.http.headers.{`X-Api-Key`, CustomContentTypes}
+import com.wavesplatform.dex.api.http.headers.{CustomContentTypes, `X-Api-Key`}
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
-import com.wavesplatform.dex.api.http.{entities, OrderBookHttpInfo}
+import com.wavesplatform.dex.api.http.{OrderBookHttpInfo, entities}
 import com.wavesplatform.dex.api.ws.actors.WsExternalClientDirectoryActor
 import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.caches.RateCache
@@ -44,6 +44,7 @@ import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV2
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.gen.issuedAssetIdGen
+import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedStream
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.MatcherModel.Denormalized
 import com.wavesplatform.dex.model.{LimitOrder, OrderInfo, OrderStatus, _}
@@ -1290,6 +1291,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         config = ConfigFactory.load().atKey("waves.dex"),
         matcher = matcherActor.ref,
         addressActor = addressActor.ref,
+        CombinedStream.Status.Working,
         storeCommand = {
           case ValidatedCommand.DeleteOrderBook(pair) if pair == okOrder.assetPair =>
             Future.successful(ValidatedCommandWithMeta(1L, System.currentTimeMillis, ValidatedCommand.DeleteOrderBook(pair)).some)

@@ -11,7 +11,7 @@ import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.it.api.dex.DexApi
 import com.wavesplatform.dex.it.api.node.{NodeApi, NodeApiExtensions}
 import com.wavesplatform.dex.it.docker.DexContainer
-import com.wavesplatform.it.{MatcherSuiteBase, api}
+import com.wavesplatform.it.{api, MatcherSuiteBase}
 import im.mak.waves.transactions.ExchangeTransaction
 import mouse.any._
 

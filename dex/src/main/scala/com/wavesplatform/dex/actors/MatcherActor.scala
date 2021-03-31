@@ -152,7 +152,7 @@ class MatcherActor(
       }
       snapshotsState = updatedSnapshotState
       snapshotsState.nearestSnapshotOffset.foreach { snapshotOffset =>
-        snapshotOffsetGauge.update(snapshotOffset._2)
+        snapshotOffsetGauge.update(snapshotOffset._2.toDouble)
       }
     }
 
@@ -176,7 +176,7 @@ class MatcherActor(
         case _ => runFor(request.command.assetPair)((sender, orderBook) => orderBook.tell(request, sender))
       }
       lastProcessedNr = math.max(request.offset, lastProcessedNr)
-      currentOffsetGauge.update(lastProcessedNr)
+      currentOffsetGauge.update(lastProcessedNr.toDouble)
       createSnapshotFor(lastProcessedNr)
 
     case request: ForceStartOrderBook => runFor(request.assetPair)((sender, orderBook) => orderBook.tell(request, sender))

@@ -6,14 +6,14 @@ import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{Format, Json}
 
 case class HttpSystemStatus(
-  @ApiModelProperty() service: String,
-  @ApiModelProperty() blockchain: String
+  @ApiModelProperty() service: MatcherStatus,
+  @ApiModelProperty() blockchain: CombinedStream.Status
 )
 
 object HttpSystemStatus {
 
   implicit val HttpSystemStatusFormat: Format[HttpSystemStatus] = Json.format
 
-  def apply(m: MatcherStatus, b: CombinedStream.Status) = new HttpSystemStatus(m.toString, b.toString)
+  def apply(m: MatcherStatus, b: CombinedStream.Status) = new HttpSystemStatus(m, b)
 
 }

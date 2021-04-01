@@ -4,13 +4,13 @@ import cats.syntax.flatMap._
 import cats.syntax.option._
 import com.typesafe.config.ConfigFactory.parseFile
 import com.wavesplatform.dex._
-import com.wavesplatform.dex.app.{MatcherStateCheckingFailedError, forceStopApplication}
+import com.wavesplatform.dex.app.{forceStopApplication, MatcherStateCheckingFailedError}
 import com.wavesplatform.dex.db.AccountStorage
 import com.wavesplatform.dex.doc.MatcherErrorDoc
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
-import com.wavesplatform.dex.settings.{MatcherSettings, loadConfig}
+import com.wavesplatform.dex.settings.{loadConfig, MatcherSettings}
 import com.wavesplatform.dex.tool.connectors.SuperConnector
 import com.wavesplatform.dex.tool.{Checker, ComparisonTool}
 import pureconfig.ConfigSource
@@ -334,7 +334,8 @@ object WavesDexCli extends ScoptImplicits {
               basicRequest
                 .post(uri"${args.dexRestApi}/matcher/debug/saveSnapshots")
                 .headers(Map("X-API-KEY" -> key.toString))
-                .send().body match {
+                .send()
+                .body match {
                 case Right(x) => cli.log(s"Snapshot saving: $x")
                 case Left(e) => println(s"ERROR: $e"); System.exit(1)
               }
@@ -345,7 +346,7 @@ object WavesDexCli extends ScoptImplicits {
 
                   if (oldestSnapshotOffset > currentOffset) {
                     println(s"Current oldestSnapshotOffset: $oldestSnapshotOffset")
-                    break
+                    break()
                   }
 
                   Thread.sleep(1000)

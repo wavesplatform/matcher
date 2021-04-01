@@ -150,7 +150,7 @@ object WavesDexCli extends ScoptImplicits {
           ),
         cmd(Command.MakeOrderbookSnapshots.name)
           .action((_, s) => s.copy(command = Command.MakeOrderbookSnapshots.some))
-          .text("Description here")
+          .text("Creates snapshots with validating offset after saving")
           .children(
             opt[String]("dex-config")
               .abbr("dc")

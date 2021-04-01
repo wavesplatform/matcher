@@ -333,7 +333,7 @@ object WavesDexCli extends ScoptImplicits {
 
               basicRequest
                 .post(uri"${args.dexRestApi}/matcher/debug/saveSnapshots")
-                .headers(Map("X-API-KEY" -> "integration-test-rest-api"))
+                .headers(Map("X-API-KEY" -> key.toString))
                 .send().body match {
                 case Right(x) => cli.log(s"Snapshot saving: $x")
                 case Left(e) => println(s"ERROR: $e"); System.exit(1)
@@ -341,7 +341,7 @@ object WavesDexCli extends ScoptImplicits {
 
               breakable {
                 for (_ <- 0 to args.timeout.toSeconds.toInt) {
-                  val oldestSnapshotOffset = get("oldestSnapshotOffset", "integration-test-rest-api")
+                  val oldestSnapshotOffset = get("oldestSnapshotOffset", key.toString)
 
                   if (oldestSnapshotOffset > currentOffset) {
                     println(s"Current oldestSnapshotOffset: $oldestSnapshotOffset")

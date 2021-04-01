@@ -22,12 +22,187 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.util.{Base64, Scanner}
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
-import scala.util.control.Breaks._
 import scala.util.{Failure, Success, Try}
 
 object WavesDexCli extends ScoptImplicits {
 
   implicit val backend = HttpURLConnectionBackend()
+
+  def generateAccountSeed(args: Args): Unit = {
+    val seedPromptText = s"Enter the${if (args.accountNonce.isEmpty) " seed of DEX's account" else " base seed"}: "
+    val rawSeed = readSeedFromFromStdIn(seedPromptText, args.seedFormat)
+    val accountSeed = KeyPair(args.accountNonce.fold(rawSeed)(AccountStorage.getAccountSeed(rawSeed, _)))
+
+    println(s"""Do not share this information with others!
+               |
+               |The seed is:
+               |Base58 format: ${Base58.encode(accountSeed.seed.arr)}
+               |Base64 format: ${Base64.getEncoder.encodeToString(accountSeed.seed.arr)}
+               |
+               |The private key is:
+               |Base58 format: ${Base58.encode(accountSeed.privateKey.arr)}
+               |Base64 format: ${Base64.getEncoder.encodeToString(accountSeed.privateKey.arr)}
+               |
+               |The public key is:
+               |Base58 format: ${Base58.encode(accountSeed.publicKey.arr)}
+               |Base64 format: ${Base64.getEncoder.encodeToString(accountSeed.publicKey.arr)}
+               |
+               |The address is:
+               |Base58 format: ${Base58.encode(accountSeed.publicKey.toAddress.bytes)}
+               |""".stripMargin)
+  }
+
+  def createAccountStorage(args: Args): Unit = {
+
+    val accountFile = args.outputDirectory.toPath.resolve("account.dat").toFile.getAbsoluteFile
+    if (accountFile.isFile) {
+      System.err.println(s"The '$accountFile' is already exist. If you want to create a file with a new seed, delete the file before.")
+      System.exit(1)
+    }
+
+    val seedPromptText = s"Enter the${if (args.accountNonce.isEmpty) " seed of DEX's account" else " base seed"}: "
+    val rawSeed = readSeedFromFromStdIn(seedPromptText, args.seedFormat)
+    val password = readSecretFromStdIn("Enter the password for file: ")
+    val accountSeed = args.accountNonce.fold(rawSeed)(AccountStorage.getAccountSeed(rawSeed, _))
+
+    AccountStorage.save(
+      accountSeed,
+      AccountStorage.Settings.EncryptedFile(
+        accountFile,
+        password
+      )
+    )
+
+    println(s"""Saved the seed to '$accountFile'.
+               |Don't forget to update your settings:
+               |
+               |waves.dex {
+               |  account-storage {
+               |    type = "encrypted-file"
+               |    encrypted-file {
+               |      path = "$accountFile"
+               |      password = "paste-entered-password-here"
+               |    }
+               |  }
+               |}
+               |""".stripMargin)
+  }
+
+  def createDocumentation(args: Args): Unit = {
+    val outputBasePath = args.outputDirectory.toPath
+    val errorsFile = outputBasePath.resolve("errors.md").toFile
+
+    Files.createDirectories(outputBasePath)
+
+    val errors = new PrintWriter(errorsFile)
+
+    try {
+      errors.write(MatcherErrorDoc.mkMarkdown)
+      println(s"Saved errors documentation to $errorsFile")
+    } finally errors.close()
+  }
+
+  def createApiKey(args: Args): Unit = {
+    val hashedApiKey = Base58.encode(domain.crypto.secureHash(args.apiKey))
+    println(s"""Your API Key: $hashedApiKey
+               |Don't forget to update your settings:
+               |
+               |waves.dex.rest-api.api-key-hash = "$hashedApiKey"
+               |""".stripMargin)
+  }
+
+  def checkServer(args: Args): Unit =
+    (
+      for {
+        _ <- cli.log(
+          s"""
+             |Passed arguments:
+             |  DEX REST API          : ${args.dexRestApi}
+             |  Waves Node REST API   : ${args.nodeRestApi}
+             |  Expected DEX version  : ${args.version}
+             |  DEX config path       : ${args.configPath}
+             |  Auth Service REST API : ${args.authServiceRestApi.getOrElse("")}
+             |  Account seed          : ${args.accountSeed.getOrElse("")}
+                   """.stripMargin
+        )
+        superConnector <- SuperConnector.create(args.configPath, args.dexRestApi, args.nodeRestApi, args.authServiceRestApi)
+        checkResult <- new Checker(superConnector).checkState(args.version, args.accountSeed)
+        _ <- cli.lift(superConnector.close())
+      } yield checkResult
+    ) match {
+      case Right(diagnosticNotes) => println(s"$diagnosticNotes\nCongratulations! All checks passed!")
+      case Left(error) => println(error); forceStopApplication(MatcherStateCheckingFailedError)
+    }
+
+  def runComparison(args: Args): Unit =
+    (for {
+      _ <- cli.log(
+        s"""
+           |Passed arguments:
+           |  DEX config path : ${args.configPath}
+           |Running in background
+           |""".stripMargin
+      )
+      tool <- ComparisonTool(args.configPath)
+      _ <- cli.lift(tool.run()) // TODO logger context
+    } yield ()) match {
+      case Right(_) =>
+      case Left(error) => println(error); forceStopApplication(MatcherStateCheckingFailedError)
+    }
+
+  def makeSnapshots(args: Args): Unit = {
+    cli.log(
+      s"""
+         |Passed arguments:
+         |  DEX config path : ${args.configPath}
+         |  DEX REST API    : ${args.dexRestApi}
+         |  Timeout         : ${args.timeout}
+         |Running in background
+         |""".stripMargin
+    )
+
+    print("Input X-API-KEY: ")
+    val key = System.console().readPassword()
+
+    val apiUrl =
+      if (args.dexRestApi.isEmpty) {
+        val matcherSettings =
+          ConfigSource.fromConfig(loadConfig(parseFile(new File(args.configPath)))).at("waves.dex").loadOrThrow[MatcherSettings]
+        s"${matcherSettings.restApi.address}:${matcherSettings.restApi.port}"
+      } else args.dexRestApi
+
+    def sendRequest(urlPart: String, key: String, method: String = "get"): String = {
+      print(s"Sending ${method.toUpperCase} $urlPart... Response: ")
+      val r = basicRequest.headers(Map("X-API-KEY" -> key))
+
+      val body = method match {
+        case "post" => r.post(uri"$apiUrl/matcher/debug/$urlPart").send().body
+        case _ => r.get(uri"$apiUrl/matcher/debug/$urlPart").send().body
+      }
+
+      body match {
+        case Right(x) => println(x); x
+        case Left(e) => println(s"ERROR: $e"); System.exit(1); e
+      }
+    }
+
+    val currentOffset = sendRequest("currentOffset", key.toString).toInt
+    sendRequest("saveSnapshots", key.toString, "post")
+
+    for (_ <- 0 to args.timeout.toSeconds.toInt) {
+      val oldestSnapshotOffset = sendRequest("oldestSnapshotOffset", key.toString).toInt
+
+      if (oldestSnapshotOffset > currentOffset) {
+        println(s"Current oldestSnapshotOffset: $oldestSnapshotOffset")
+        System.exit(0)
+      }
+
+      Thread.sleep(1000)
+    }
+
+    println("Snapshots wasn't saved before reaching timeout")
+    System.exit(1)
+  }
 
   // todo commands:
   // get account by seed [and nonce]
@@ -180,181 +355,13 @@ object WavesDexCli extends ScoptImplicits {
           println(s"Running '${command.name}' command")
           AddressScheme.current = new AddressScheme { override val chainId: Byte = args.addressSchemeByte.getOrElse('T').toByte }
           command match {
-            case Command.GenerateAccountSeed =>
-              val seedPromptText = s"Enter the${if (args.accountNonce.isEmpty) " seed of DEX's account" else " base seed"}: "
-              val rawSeed = readSeedFromFromStdIn(seedPromptText, args.seedFormat)
-              val accountSeed = KeyPair(args.accountNonce.fold(rawSeed)(AccountStorage.getAccountSeed(rawSeed, _)))
-
-              println(s"""Do not share this information with others!
-                         |
-                         |The seed is:
-                         |Base58 format: ${Base58.encode(accountSeed.seed.arr)}
-                         |Base64 format: ${Base64.getEncoder.encodeToString(accountSeed.seed.arr)}
-                         |
-                         |The private key is:
-                         |Base58 format: ${Base58.encode(accountSeed.privateKey.arr)}
-                         |Base64 format: ${Base64.getEncoder.encodeToString(accountSeed.privateKey.arr)}
-                         |
-                         |The public key is:
-                         |Base58 format: ${Base58.encode(accountSeed.publicKey.arr)}
-                         |Base64 format: ${Base64.getEncoder.encodeToString(accountSeed.publicKey.arr)}
-                         |
-                         |The address is:
-                         |Base58 format: ${Base58.encode(accountSeed.publicKey.toAddress.bytes)}
-                         |""".stripMargin)
-
-            case Command.CreateAccountStorage =>
-              val accountFile = args.outputDirectory.toPath.resolve("account.dat").toFile.getAbsoluteFile
-              if (accountFile.isFile) {
-                System.err.println(s"The '$accountFile' is already exist. If you want to create a file with a new seed, delete the file before.")
-                System.exit(1)
-              }
-
-              val seedPromptText = s"Enter the${if (args.accountNonce.isEmpty) " seed of DEX's account" else " base seed"}: "
-              val rawSeed = readSeedFromFromStdIn(seedPromptText, args.seedFormat)
-              val password = readSecretFromStdIn("Enter the password for file: ")
-              val accountSeed = args.accountNonce.fold(rawSeed)(AccountStorage.getAccountSeed(rawSeed, _))
-
-              AccountStorage.save(
-                accountSeed,
-                AccountStorage.Settings.EncryptedFile(
-                  accountFile,
-                  password
-                )
-              )
-
-              println(s"""Saved the seed to '$accountFile'.
-                         |Don't forget to update your settings:
-                         |
-                         |waves.dex {
-                         |  account-storage {
-                         |    type = "encrypted-file"
-                         |    encrypted-file {
-                         |      path = "$accountFile"
-                         |      password = "paste-entered-password-here"
-                         |    }
-                         |  }
-                         |}
-                         |""".stripMargin)
-
-            case Command.CreateDocumentation =>
-              val outputBasePath = args.outputDirectory.toPath
-              val errorsFile = outputBasePath.resolve("errors.md").toFile
-
-              Files.createDirectories(outputBasePath)
-
-              val errors = new PrintWriter(errorsFile)
-
-              try {
-                errors.write(MatcherErrorDoc.mkMarkdown)
-                println(s"Saved errors documentation to $errorsFile")
-              } finally errors.close()
-
-            case Command.CreateApiKey =>
-              val hashedApiKey = Base58.encode(domain.crypto.secureHash(args.apiKey))
-              println(s"""Your API Key: $hashedApiKey
-                         |Don't forget to update your settings:
-                         |
-                         |waves.dex.rest-api.api-key-hash = "$hashedApiKey"
-                         |""".stripMargin)
-
-            case Command.CheckServer =>
-              (
-                for {
-                  _ <- cli.log(
-                    s"""
-                       |Passed arguments:
-                       |  DEX REST API          : ${args.dexRestApi}
-                       |  Waves Node REST API   : ${args.nodeRestApi}
-                       |  Expected DEX version  : ${args.version}
-                       |  DEX config path       : ${args.configPath}
-                       |  Auth Service REST API : ${args.authServiceRestApi.getOrElse("")}
-                       |  Account seed          : ${args.accountSeed.getOrElse("")}
-                   """.stripMargin
-                  )
-                  superConnector <- SuperConnector.create(args.configPath, args.dexRestApi, args.nodeRestApi, args.authServiceRestApi)
-                  checkResult <- new Checker(superConnector).checkState(args.version, args.accountSeed)
-                  _ <- cli.lift(superConnector.close())
-                } yield checkResult
-              ) match {
-                case Right(diagnosticNotes) => println(s"$diagnosticNotes\nCongratulations! All checks passed!")
-                case Left(error) => println(error); forceStopApplication(MatcherStateCheckingFailedError)
-              }
-
-            case Command.RunComparison =>
-              (for {
-                _ <- cli.log(
-                  s"""
-                     |Passed arguments:
-                     |  DEX config path : ${args.configPath}
-                     |Running in background
-                     |""".stripMargin
-                )
-                tool <- ComparisonTool(args.configPath)
-                _ <- cli.lift(tool.run()) // TODO logger context
-              } yield ()) match {
-                case Right(_) =>
-                case Left(error) => println(error); forceStopApplication(MatcherStateCheckingFailedError)
-              }
-
-            case Command.MakeOrderbookSnapshots =>
-              cli.log(
-                s"""
-                   |Passed arguments:
-                   |  DEX config path : ${args.configPath}
-                   |  DEX REST API    : ${args.dexRestApi}
-                   |  Timeout         : ${args.timeout}
-                   |Running in background
-                   |""".stripMargin
-              )
-
-              val apiUrl =
-                if (args.dexRestApi.isEmpty) {
-                  val matcherSettings =
-                    ConfigSource.fromConfig(loadConfig(parseFile(new File(args.configPath)))).at("waves.dex").loadOrThrow[MatcherSettings]
-                  s"${matcherSettings.restApi.address}:${matcherSettings.restApi.port}"
-                } else args.dexRestApi
-
-              def get(urlPart: String, key: String): Int = {
-                println(s"Getting: $urlPart")
-                basicRequest
-                  .get(uri"$apiUrl/matcher/debug/$urlPart")
-                  .headers(Map("X-API-KEY" -> key))
-                  .send()
-                  .body match {
-                  case Right(x) => x.toInt
-                  case Left(e) => println(s"ERROR: $e"); -1
-                }
-              }
-
-              print("Input X-API-KEY: ")
-              val key = System.console().readPassword()
-              val currentOffset = get("currentOffset", key.toString)
-
-              basicRequest
-                .post(uri"${args.dexRestApi}/matcher/debug/saveSnapshots")
-                .headers(Map("X-API-KEY" -> key.toString))
-                .send()
-                .body match {
-                case Right(x) => cli.log(s"Snapshot saving: $x")
-                case Left(e) => println(s"ERROR: $e"); System.exit(1)
-              }
-
-              breakable {
-                for (_ <- 0 to args.timeout.toSeconds.toInt) {
-                  val oldestSnapshotOffset = get("oldestSnapshotOffset", key.toString)
-
-                  if (oldestSnapshotOffset > currentOffset) {
-                    println(s"Current oldestSnapshotOffset: $oldestSnapshotOffset")
-                    break()
-                  }
-
-                  Thread.sleep(1000)
-                }
-              }
-              println("Snapshots wasn't saved before reaching timeout")
-              System.exit(1)
-
+            case Command.GenerateAccountSeed => generateAccountSeed(args)
+            case Command.CreateAccountStorage => createAccountStorage(args)
+            case Command.CreateDocumentation => createDocumentation(args)
+            case Command.CreateApiKey => createApiKey(args)
+            case Command.CheckServer => checkServer(args)
+            case Command.RunComparison => runComparison(args)
+            case Command.MakeOrderbookSnapshots => makeSnapshots(args)
           }
           println("Done")
       }

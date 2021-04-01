@@ -1,26 +1,33 @@
 package com.wavesplatform.dex.cli
 
-import java.io.{File, PrintWriter}
-import java.nio.charset.StandardCharsets
-import java.nio.file.Files
-import java.util.{Base64, Scanner}
-
 import cats.syntax.flatMap._
 import cats.syntax.option._
+import com.typesafe.config.ConfigFactory.parseFile
 import com.wavesplatform.dex._
-import com.wavesplatform.dex.app.{forceStopApplication, MatcherStateCheckingFailedError}
+import com.wavesplatform.dex.app.{MatcherStateCheckingFailedError, forceStopApplication}
 import com.wavesplatform.dex.db.AccountStorage
 import com.wavesplatform.dex.doc.MatcherErrorDoc
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
+import com.wavesplatform.dex.settings.{MatcherSettings, loadConfig}
 import com.wavesplatform.dex.tool.connectors.SuperConnector
 import com.wavesplatform.dex.tool.{Checker, ComparisonTool}
+import pureconfig.ConfigSource
 import scopt.{OParser, RenderingMode}
+import sttp.client._
 
+import java.io.{File, PrintWriter}
+import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+import java.util.{Base64, Scanner}
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
+import scala.util.control.Breaks._
 import scala.util.{Failure, Success, Try}
 
 object WavesDexCli extends ScoptImplicits {
+
+  implicit val backend = HttpURLConnectionBackend()
 
   // todo commands:
   // get account by seed [and nonce]
@@ -140,6 +147,27 @@ object WavesDexCli extends ScoptImplicits {
               .valueName("<raw-string>")
               .required()
               .action((x, s) => s.copy(configPath = x))
+          ),
+        cmd(Command.MakeOrderbookSnapshots.name)
+          .action((_, s) => s.copy(command = Command.MakeOrderbookSnapshots.some))
+          .text("Description here")
+          .children(
+            opt[String]("dex-config")
+              .abbr("dc")
+              .text("DEX config path")
+              .valueName("<raw-string>")
+              .required()
+              .action((x, s) => s.copy(configPath = x)),
+            opt[String]("dex-rest-api")
+              .abbr("dra")
+              .text("DEX REST API uri. Format: scheme://host:port (default scheme will be picked if none was specified)")
+              .valueName("<raw-string>")
+              .action((x, s) => s.copy(dexRestApi = x)),
+            opt[FiniteDuration]("timeout")
+              .abbr("to")
+              .text("Timeout")
+              .valueName("<raw-string>")
+              .action((x, s) => s.copy(timeout = x))
           )
       )
     }
@@ -268,6 +296,64 @@ object WavesDexCli extends ScoptImplicits {
                 case Right(_) =>
                 case Left(error) => println(error); forceStopApplication(MatcherStateCheckingFailedError)
               }
+
+            case Command.MakeOrderbookSnapshots =>
+              cli.log(
+                s"""
+                   |Passed arguments:
+                   |  DEX config path : ${args.configPath}
+                   |  DEX REST API    : ${args.dexRestApi}
+                   |  Timeout         : ${args.timeout}
+                   |Running in background
+                   |""".stripMargin
+              )
+
+              val apiUrl =
+                if (args.dexRestApi.isEmpty) {
+                  val matcherSettings =
+                    ConfigSource.fromConfig(loadConfig(parseFile(new File(args.configPath)))).at("waves.dex").loadOrThrow[MatcherSettings]
+                  s"${matcherSettings.restApi.address}:${matcherSettings.restApi.port}"
+                } else args.dexRestApi
+
+              def get(urlPart: String, key: String): Int = {
+                println(s"Getting: $urlPart")
+                basicRequest
+                  .get(uri"$apiUrl/matcher/debug/$urlPart")
+                  .headers(Map("X-API-KEY" -> key))
+                  .send()
+                  .body match {
+                  case Right(x) => x.toInt
+                  case Left(e) => println(s"ERROR: $e"); -1
+                }
+              }
+
+              print("Input X-API-KEY: ")
+              val key = System.console().readPassword()
+              val currentOffset = get("currentOffset", key.toString)
+
+              basicRequest
+                .post(uri"${args.dexRestApi}/matcher/debug/saveSnapshots")
+                .headers(Map("X-API-KEY" -> "integration-test-rest-api"))
+                .send().body match {
+                case Right(x) => cli.log(s"Snapshot saving: $x")
+                case Left(e) => println(s"ERROR: $e"); System.exit(1)
+              }
+
+              breakable {
+                for (_ <- 0 to args.timeout.toSeconds.toInt) {
+                  val oldestSnapshotOffset = get("oldestSnapshotOffset", "integration-test-rest-api")
+
+                  if (oldestSnapshotOffset > currentOffset) {
+                    println(s"Current oldestSnapshotOffset: $oldestSnapshotOffset")
+                    break
+                  }
+
+                  Thread.sleep(1000)
+                }
+              }
+              println("Snapshots wasn't saved before reaching timeout")
+              System.exit(1)
+
           }
           println("Done")
       }
@@ -304,6 +390,10 @@ object WavesDexCli extends ScoptImplicits {
       override def name: String = "run-comparison"
     }
 
+    case object MakeOrderbookSnapshots extends Command {
+      override def name: String = "make-orderbook-snapshots"
+    }
+
   }
 
   sealed private trait SeedFormat
@@ -337,7 +427,8 @@ object WavesDexCli extends ScoptImplicits {
     version: String = "",
     configPath: String = "",
     authServiceRestApi: Option[String] = None,
-    accountSeed: Option[String] = None
+    accountSeed: Option[String] = None,
+    timeout: FiniteDuration = 30 seconds
   )
 
   // noinspection ScalaStyle

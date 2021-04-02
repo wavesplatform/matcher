@@ -210,9 +210,9 @@ object WavesDexCli extends ScoptImplicits {
       }
     }
 
-    val validation = Task(validate)
+    val validation = Task(validate())
       .onErrorFallbackTo(
-        Task(validate)
+        Task(validate())
           .delayExecution(1.second)
           .onErrorRestart(args.timeout.toSeconds)
       )

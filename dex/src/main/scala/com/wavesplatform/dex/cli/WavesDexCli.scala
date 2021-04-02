@@ -13,6 +13,9 @@ import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.settings.{loadConfig, MatcherSettings}
 import com.wavesplatform.dex.tool.connectors.SuperConnector
 import com.wavesplatform.dex.tool.{Checker, ComparisonTool}
+import monix.eval.Task
+import monix.execution.{ExecutionModel, Scheduler}
+import monix.execution.schedulers.SchedulerService
 import pureconfig.ConfigSource
 import scopt.{OParser, RenderingMode}
 import sttp.client._
@@ -21,6 +24,7 @@ import java.io.{File, PrintWriter}
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.util.{Base64, Scanner}
+import scala.concurrent.Await
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.util.{Failure, Success, Try}
 
@@ -161,6 +165,12 @@ object WavesDexCli extends ScoptImplicits {
          |""".stripMargin
     )
 
+    implicit val scheduler: SchedulerService = Scheduler.singleThread(
+      name = "time-impl",
+      daemonic = false,
+      executionModel = ExecutionModel.AlwaysAsyncExecution
+    )
+
     print("Input X-API-KEY: ")
     val key = System.console().readPassword()
 
@@ -189,16 +199,25 @@ object WavesDexCli extends ScoptImplicits {
     val currentOffset = sendRequest("currentOffset", key.toString).toInt
     sendRequest("saveSnapshots", key.toString, "post")
 
-    for (_ <- 0 to args.timeout.toSeconds.toInt) {
+    def validate(): Unit = {
       val oldestSnapshotOffset = sendRequest("oldestSnapshotOffset", key.toString).toInt
 
-      if (oldestSnapshotOffset > currentOffset) {
+      if (oldestSnapshotOffset <= currentOffset)
+        throw new IllegalArgumentException
+      else {
         println(s"Current oldestSnapshotOffset: $oldestSnapshotOffset")
         System.exit(0)
       }
-
-      Thread.sleep(1000)
     }
+
+    val validation = Task(validate)
+      .onErrorFallbackTo(
+        Task(validate)
+          .delayExecution(1.second)
+          .onErrorRestart(args.timeout.toSeconds)
+      )
+
+    Await.ready(validation.runToFuture, args.timeout)
 
     println("Snapshots wasn't saved before reaching timeout")
     System.exit(1)

@@ -172,7 +172,7 @@ object WavesDexCli extends ScoptImplicits {
     )
 
     print("Input X-API-KEY: ")
-    val key = System.console().readPassword()
+    val key = "integration-test-rest-api"; //System.console().readPassword().mkString
 
     val apiUrl =
       if (args.dexRestApi.isEmpty) {
@@ -196,18 +196,15 @@ object WavesDexCli extends ScoptImplicits {
       }
     }
 
-    val currentOffset = sendRequest("currentOffset", key.toString).toInt
-    sendRequest("saveSnapshots", key.toString, "post")
+    val currentOffset = sendRequest("currentOffset", key).toInt
+    sendRequest("saveSnapshots", key, "post")
 
-    def validate(): Unit = {
-      val oldestSnapshotOffset = sendRequest("oldestSnapshotOffset", key.toString).toInt
+    def validate(): Int = {
+      val oldestSnapshotOffset = sendRequest("oldestSnapshotOffset", key).toInt
 
       if (oldestSnapshotOffset <= currentOffset)
-        throw new IllegalArgumentException
-      else {
-        println(s"Current oldestSnapshotOffset: $oldestSnapshotOffset")
-        System.exit(0)
-      }
+        throw new RuntimeException
+      else oldestSnapshotOffset
     }
 
     val validation = Task(validate())
@@ -217,10 +214,10 @@ object WavesDexCli extends ScoptImplicits {
           .onErrorRestart(args.timeout.toSeconds)
       )
 
-    Await.ready(validation.runToFuture, args.timeout)
-
-    println("Snapshots wasn't saved before reaching timeout")
-    System.exit(1)
+    Try(Await.ready(validation.runToFuture, args.timeout)) match {
+      case Success(value) => println(s"Success! Current oldestSnapshotOffset: $value");
+      case Failure(_) => println("Snapshots wasn't saved before reaching timeout"); System.exit(1)
+    }
   }
 
   // todo commands:

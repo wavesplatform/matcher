@@ -172,7 +172,7 @@ object WavesDexCli extends ScoptImplicits {
     )
 
     print("Input X-API-KEY: ")
-    val key = "integration-test-rest-api"; //System.console().readPassword().mkString
+    val key = System.console().readPassword().mkString
 
     val apiUrl =
       if (args.dexRestApi.isEmpty) {

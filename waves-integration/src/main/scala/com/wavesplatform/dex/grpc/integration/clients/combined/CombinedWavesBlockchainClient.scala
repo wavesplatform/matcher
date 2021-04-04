@@ -15,6 +15,8 @@ import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.clients.blockchainupdates.{BlockchainUpdatesClient, DefaultBlockchainUpdatesClient}
+import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedStream.Status
+import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedStream.Status.Starting
 import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedWavesBlockchainClient.Settings
 import com.wavesplatform.dex.grpc.integration.clients.domain.StatusUpdate.LastBlockHeight
 import com.wavesplatform.dex.grpc.integration.clients.domain._
@@ -51,6 +53,10 @@ class CombinedWavesBlockchainClient(
   type Balances = Map[Address, Map[Asset, Long]]
   type Leases = Map[Address, Long]
 
+  @volatile private var blockchainStatus: Status  = Starting()
+
+  override def status(): Status = blockchainStatus
+
   private val pbMatcherPublicKey = matcherPublicKey.toPB
 
   private val pessimisticPortfolios = new SynchronizedPessimisticPortfolios(settings.pessimisticPortfolios)
@@ -69,6 +75,7 @@ class CombinedWavesBlockchainClient(
       val init: BlockchainStatus = BlockchainStatus.Normal(WavesChain(Vector.empty, startHeight - 1, settings.maxRollbackHeight + 1))
 
       val combinedStream = new CombinedStream(settings.combinedStream, bClient.blockchainEvents, meClient.utxEvents)
+
       Observable(dataUpdates, combinedStream.stream)
         .merge
         .mapAccumulate(init) { case (origStatus, event) =>
@@ -124,11 +131,14 @@ class CombinedWavesBlockchainClient(
             changes <- tx.diff.flatMap(_.stateUpdate)
           } yield tx.id.toVanilla -> TransactionWithChanges(tx.id, signedTx, changes)
 
+          blockchainStatus = combinedStream.status()
+
           val updates = WavesNodeUpdates(updatedFinalBalances, (unconfirmedTxs ++ confirmedTxs ++ failedTxs).toMap)
           (x.newStatus, (updates, combinedStream.currentProcessedHeight >= startBlockInfo.height))
         }
         .filterNot(_._1.isEmpty)
         .tap(_ => combinedStream.startFrom(startHeight))
+
     }
     .doOnError(e => Task(log.error("Got an error in the combined stream", e)))
 
@@ -232,7 +242,6 @@ class CombinedWavesBlockchainClient(
 
   override def close(): Future[Unit] =
     meClient.close().zip(bClient.close()).map(_ => ())
-
 }
 
 object CombinedWavesBlockchainClient extends ScorexLogging {

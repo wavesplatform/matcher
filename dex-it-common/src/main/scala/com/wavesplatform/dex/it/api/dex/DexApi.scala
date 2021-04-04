@@ -219,6 +219,10 @@ trait DexApi[F[_]] {
   def getAddressState(address: Address, headers: Map[String, String]): F[HttpAddressState]
   def getAddressState(address: String, headers: Map[String, String]): F[HttpAddressState]
 
+  def getSystemStatus: F[HttpSystemStatus]
+  def getSystemStatus(headers: Map[String, String]): F[HttpSystemStatus]
+
+
   def getMatcherPublicKey: F[String]
 
   def print(message: String): F[Unit]

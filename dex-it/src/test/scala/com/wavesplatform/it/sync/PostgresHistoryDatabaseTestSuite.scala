@@ -217,7 +217,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
     placeAndAwaitAtDex(mkOrder(bob, wavesBtcPair, BUY, 25.waves, 20.btc))
     placeAndAwaitAtNode(mkOrder(bob, wavesBtcPair, SELL, 25.waves, 20.btc))
 
-    findUserWithApplicationName.getOrElse(PgStatActivity) shouldBe PgStatActivity(customUser, customAppName)
+    findUserWithApplicationName().getOrElse(PgStatActivity) shouldBe PgStatActivity(customUser, customAppName)
 
     cleanTables()
   }

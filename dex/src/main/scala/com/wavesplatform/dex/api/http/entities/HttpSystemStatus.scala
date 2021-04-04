@@ -14,8 +14,6 @@ object HttpSystemStatus {
 
   implicit val HttpSystemStatusFormat: Format[HttpSystemStatus] = Json.format
 
-  def from(str: String) = new HttpSystemStatus(null, null)
-
   def apply(service: MatcherStatus, blockchain: CombinedStream.Status) = new HttpSystemStatus(service, blockchain)
 
 }

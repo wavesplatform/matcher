@@ -4,7 +4,6 @@ import java.net.InetSocketAddress
 import java.nio.file.{Path, Paths}
 import cats.tagless.FunctorK
 import com.dimafeng.testcontainers.GenericContainer
-import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.Config
 import com.wavesplatform.dex.app.MatcherStatus.Working
 import com.wavesplatform.dex.domain.utils.ScorexLogging
@@ -79,7 +78,7 @@ final case class DexContainer private (override val internalIp: String, underlyi
 object DexContainer extends ScorexLogging {
 
   private val isProfilingEnabled: Boolean = Option(System.getenv("WAVES_DEX_PROFILING")).getOrElse("false").toBoolean
-  private val baseContainerPath: String = "/usr/share/waves-dex";
+  private val baseContainerPath: String = "/usr/share/waves-dex"
   private val containerLogsPath: String = s"$baseContainerPath/logs"
 
   private val restApiPort: Int = 6886 // application.conf waves.dex.rest-api.port

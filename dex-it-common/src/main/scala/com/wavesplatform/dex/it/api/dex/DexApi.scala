@@ -222,7 +222,6 @@ trait DexApi[F[_]] {
   def getSystemStatus: F[HttpSystemStatus]
   def getSystemStatus(headers: Map[String, String]): F[HttpSystemStatus]
 
-
   def getMatcherPublicKey: F[String]
 
   def print(message: String): F[Unit]

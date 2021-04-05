@@ -1,6 +1,5 @@
 package com.wavesplatform.dex.it.docker
 
-
 import cats.tagless.FunctorK
 import com.dimafeng.testcontainers.GenericContainer
 import com.typesafe.config.Config

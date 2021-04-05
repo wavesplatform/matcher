@@ -130,29 +130,29 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
   private def getEventsCount: Long = ctx.run(querySchema[EventRecord]("events", _.orderId -> "order_id").size)
 
   private case class OrderBriefInfo(
-    id: String,
-    tpe: Byte,
-    senderPublicKey: String,
-    side: Byte,
-    amountAsset: String,
-    priceAsset: String,
-    feeAsset: String,
-    amount: Double,
-    price: Double,
-    fee: Double,
-    closedAt: Option[LocalDateTime]
-  )
+                                     id: String,
+                                     tpe: Byte,
+                                     senderPublicKey: String,
+                                     side: Byte,
+                                     amountAsset: String,
+                                     priceAsset: String,
+                                     feeAsset: String,
+                                     amount: Double,
+                                     price: Double,
+                                     fee: Double,
+                                     closedAt: Option[LocalDateTime]
+                                   )
 
   private case class EventBriefInfo(
-    orderId: String,
-    eventType: Byte,
-    filled: Double,
-    totalFilled: Double,
-    feeFilled: Double,
-    feeTotalFilled: Double,
-    status: Byte,
-    reason: EventReason = Events.NotTracked
-  )
+                                     orderId: String,
+                                     eventType: Byte,
+                                     filled: Double,
+                                     totalFilled: Double,
+                                     feeFilled: Double,
+                                     feeTotalFilled: Double,
+                                     status: Byte,
+                                     reason: EventReason = Events.NotTracked
+                                   )
 
   private def getOrderInfoById(orderId: Order.Id): Option[OrderBriefInfo] =
     ctx
@@ -191,8 +191,8 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
       )
       .sortWith { (l, r) =>
         ((l.timestamp isBefore r.timestamp) || (l.timestamp isEqual r.timestamp)) &&
-        (l.status <= r.status) &&
-        (l.totalFilled <= r.totalFilled)
+          (l.status <= r.status) &&
+          (l.totalFilled <= r.totalFilled)
       }
       .map { r =>
         EventBriefInfo(

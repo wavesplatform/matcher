@@ -15,6 +15,8 @@ import com.typesafe.config.Config
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.actors.MatcherActor._
 import com.wavesplatform.dex.actors.address.AddressActor.OrderListType
+import com.wavesplatform.dex.actors.address.AddressActor.Query.GetCurrentState
+import com.wavesplatform.dex.actors.address.AddressActor.Reply.GetState
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.api.http._
 import com.wavesplatform.dex.api.http.entities._
@@ -48,11 +50,10 @@ import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
 import com.wavesplatform.dex.settings.{MatcherSettings, OrderFeeSettings}
 import io.swagger.annotations._
-
-import javax.ws.rs.Path
 import kamon.Kamon
 import play.api.libs.json._
 
+import javax.ws.rs.Path
 import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag
 import scala.util.Success
@@ -132,7 +133,7 @@ class MatcherApiRoute(
   private val transactionsRoutes: Route = pathPrefix("transactions")(protect(getOrderTransactions))
 
   private val debugRoutes: Route = pathPrefix("debug") {
-    getMatcherStatus ~ getMatcherConfig ~ getCurrentOffset ~ getLastOffset ~ getOldestSnapshotOffset ~ getAllSnapshotOffsets ~ protect(
+    getMatcherStatus ~ getAddressState ~ getMatcherConfig ~ getCurrentOffset ~ getLastOffset ~ getOldestSnapshotOffset ~ getAllSnapshotOffsets ~ protect(
       saveSnapshots
     ) ~ print
   }
@@ -1176,6 +1177,30 @@ class MatcherApiRoute(
       matcher ! ForceSaveSnapshots
       SimpleResponse(StatusCodes.OK, "Saving started")
     }
+  }
+
+  @Path("/debug/address/{address}")
+  @ApiOperation(
+    value = "Get state (balances, placement queue by address)",
+    httpMethod = "GET",
+    authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
+    tags = Array("debug"),
+    response = classOf[HttpAddressState]
+  )
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "address", value = "Address", dataType = "string", paramType = "path")
+    )
+  )
+  def getAddressState: Route = (path("address" / AddressPM) & get & withAuth) {
+    addressOrError =>
+      withAddress(addressOrError) { address =>
+        complete {
+          askMapAddressActor[GetState](address, GetCurrentState) {
+            HttpAddressState(_)
+          }
+        }
+      }
   }
 
   @Path("/debug/status")

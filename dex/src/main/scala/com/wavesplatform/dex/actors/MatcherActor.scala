@@ -16,6 +16,7 @@ import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.queue.ValidatedCommandWithMeta.{Offset => EventOffset}
 import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import com.wavesplatform.dex.settings.MatcherSettings
+import kamon.Kamon
 import scorex.utils._
 
 import java.util.concurrent.atomic.AtomicReference
@@ -39,6 +40,12 @@ class MatcherActor(
 
   override def supervisorStrategy: SupervisorStrategy = SupervisorStrategy.stoppingStrategy
 
+  private val currentOffsetGauge =
+    Kamon.gauge("matcher.queue.current").withTag("node", settings.id)
+
+  private val snapshotOffsetGauge =
+    Kamon.gauge("matcher.snapshots.oldest").withTag("node", settings.id)
+
   private var tradedPairs: Map[AssetPair, MarketData] = Map.empty
   private var lastProcessedNr: Long = -1L
 
@@ -48,7 +55,7 @@ class MatcherActor(
     case Start(assetPairs) =>
       val (errors, validAssetPairs) = assetPairs.partitionMap { assetPair =>
         validateAssetPair(assetPair) match {
-          case Left(e) => s"$assetPair: ${e.message.text}".asLeft
+          case Left(e)  => s"$assetPair: ${e.message.text}".asLeft
           case Right(x) => x.asRight
         }
       }
@@ -144,6 +151,9 @@ class MatcherActor(
         case None => log.warn(s"Can't create a snapshot for $assetPair: the order book has't yet started or was removed.")
       }
       snapshotsState = updatedSnapshotState
+      snapshotsState.nearestSnapshotOffset.foreach { snapshotOffset =>
+        snapshotOffsetGauge.update(snapshotOffset._2.toDouble)
+      }
     }
 
   private def working: Receive = {
@@ -166,6 +176,7 @@ class MatcherActor(
         case _ => runFor(request.command.assetPair)((sender, orderBook) => orderBook.tell(request, sender))
       }
       lastProcessedNr = math.max(request.offset, lastProcessedNr)
+      currentOffsetGauge.update(lastProcessedNr.toDouble)
       createSnapshotFor(lastProcessedNr)
 
     case request: ForceStartOrderBook => runFor(request.assetPair)((sender, orderBook) => orderBook.tell(request, sender))

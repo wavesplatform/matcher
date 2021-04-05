@@ -3,6 +3,7 @@ package com.wavesplatform.dex.api.http.entities
 import akka.http.scaladsl.marshalling.{Marshaller, ToResponseMarshaller}
 import akka.http.scaladsl.model.{StatusCodes => C, HttpMessage => _, _}
 import akka.util.ByteString
+import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.domain.bytes.ByteStr.byteStrFormat
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.error

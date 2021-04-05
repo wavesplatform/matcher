@@ -2,11 +2,10 @@ package com.wavesplatform.dex.api.ws.routes
 
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
-
 import akka.actor.typed.Scheduler
 import akka.actor.typed.scaladsl.AskPattern._
 import akka.actor.typed.scaladsl.adapter._
-import akka.actor.{typed, ActorRef}
+import akka.actor.{ActorRef, typed}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import akka.http.scaladsl.server.{Directive0, Route}
@@ -27,10 +26,12 @@ import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error.{InvalidJson, MatcherIsStopping}
+import com.wavesplatform.dex.exceptions.BinaryMessagesNotSupportedException
 import com.wavesplatform.dex.model.AssetPairBuilder
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.dex.time.Time
 import io.swagger.annotations._
+
 import javax.ws.rs.Path
 import play.api.libs.json.{JsError, JsSuccess, Json, Reads}
 
@@ -241,7 +242,7 @@ class MatcherWebSocketRoute(
 
         case bm: BinaryMessage =>
           bm.dataStream.runWith(Sink.ignore)
-          Future.failed(new IllegalArgumentException("Binary messages are not supported"))
+          Future.failed(new BinaryMessagesNotSupportedException)
       }
       .watchTermination() { (notUsed, future) =>
         closeHandler.closeOn(future)

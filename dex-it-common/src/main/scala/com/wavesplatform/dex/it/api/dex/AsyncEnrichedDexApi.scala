@@ -481,6 +481,15 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
 
   override def getMatcherConfig: R[Config] = getMatcherConfig(apiKeyHeaders)
 
+  override def getSystemStatus(headers: Map[String, String]): R[HttpSystemStatus] = mk {
+    sttp
+      .get(uri"$apiUri/matcher/debug/status")
+      .headers(headers)
+  }
+
+  override def getSystemStatus: R[HttpSystemStatus] = getSystemStatus(apiKeyHeaders)
+
+
   override def getMatcherPublicKey: R[String] = mk {
     basicRequest.get(uri"$apiUri/matcher")
   }

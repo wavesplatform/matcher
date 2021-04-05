@@ -12,6 +12,7 @@ import monix.eval.Task
 import monix.execution.{Ack, Scheduler}
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
+import play.api.libs.json.{Format, Reads, Writes}
 
 import scala.concurrent.duration.FiniteDuration
 import scala.util.Failure
@@ -67,10 +68,20 @@ class CombinedStream(
 
   private val mergedEvents = ConcurrentSubject.publish[Either[SystemEvent, SystemEvent]]
 
+  @volatile var blockchainStatus: Status = Status.Starting()
+
+  def status(): Status = blockchainStatus
+
   val lastStatus = mergedEvents
     .foldLeft[Status](Status.Starting()) {
-      case (orig, Left(evt)) => utxEventsTransitions(orig, evt).tap(updated => log.info(s"utx: $orig + $evt -> $updated"))
-      case (orig, Right(evt)) => blockchainEventsTransitions(orig, evt).tap(updated => log.info(s"bu: $orig + $evt -> $updated"))
+      case (orig, Left(evt)) => utxEventsTransitions(orig, evt).tap(updated => {
+        blockchainStatus = updated
+        log.info(s"utx: $orig + $evt -> $updated")
+      })
+      case (orig, Right(evt)) => blockchainEventsTransitions(orig, evt).tap(updated => {
+        blockchainStatus = updated
+        log.info(s"bu: $orig + $evt -> $updated")
+      })
     }
     .doOnComplete(Task(log.info("lastStatus completed")))
     .doOnError(e => Task(log.error("lastStatus failed", e)))
@@ -290,9 +301,28 @@ class CombinedStream(
 object CombinedStream {
   case class Settings(restartDelay: FiniteDuration)
 
-  trait Status extends Product with Serializable
+  sealed abstract class Status extends Product with Serializable {
+    val name: String = getSimpleName(this)
+  }
 
   object Status {
+
+    final case class Starting(blockchainUpdates: Boolean = false, utxEvents: Boolean = false) extends Status with HasStreams
+    final case class Stopping(blockchainUpdates: Boolean = false, utxEvents: Boolean = false) extends Status with HasStreams
+    final case class Closing(blockchainUpdates: Boolean = false, utxEvents: Boolean = false) extends Status with HasStreams
+    final case object Working extends Status
+
+    val All = List(Starting(), Stopping(), Closing(), Working)
+
+    implicit val format: Format[Status] = Format(
+      Reads.StringReads.map { x =>
+        All.find(_.name == x) match {
+          case Some(r) => r
+          case None => throw new IllegalArgumentException(s"Can't parse '$x' as CombinedStream.Status")
+        }
+      },
+      Writes.StringWrites.contramap(_.name)
+    )
 
     sealed trait HasStreams {
       def blockchainUpdates: Boolean
@@ -302,10 +332,6 @@ object CombinedStream {
       override def toString: String = s"${getSimpleName(this)}(b=$blockchainUpdates, u=$utxEvents)"
     }
 
-    case class Starting(blockchainUpdates: Boolean = false, utxEvents: Boolean = false) extends Status with HasStreams
-    case class Stopping(blockchainUpdates: Boolean = false, utxEvents: Boolean = false) extends Status with HasStreams
-    case class Closing(blockchainUpdates: Boolean = false, utxEvents: Boolean = false) extends Status with HasStreams
-    case object Working extends Status
   }
 
 }

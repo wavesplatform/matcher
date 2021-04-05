@@ -10,6 +10,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
+import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedStream.Status
 import com.wavesplatform.dex.grpc.integration.clients.domain.{AddressBalanceUpdates, WavesNodeUpdates}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import monix.eval.Task
@@ -77,4 +78,5 @@ class MatcherExtensionAssetsWatchingClient(
         }
     }
 
+  override def status(): Status = underlying.status()
 }

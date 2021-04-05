@@ -116,7 +116,6 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .contentType(MediaType.ApplicationJson)
   }
 
-
   override def cancelOrderById(id: String, headers: Map[String, String]): R[HttpSuccessfulSingleCancel] = mk {
     basicRequest
       .post(uri"$apiUri/matcher/orders/cancel/$id")
@@ -480,6 +479,26 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
   }
 
   override def getMatcherConfig: R[Config] = getMatcherConfig(apiKeyHeaders)
+
+  override def getAddressState(address: String, headers: Map[String, String]): R[HttpAddressState] = mk {
+    sttp
+      .get(uri"$apiUri/matcher/debug/address/$address")
+      .headers(headers)
+  }
+
+  override def getAddressState(address: Address): R[HttpAddressState] = getAddressState(address.stringRepr, apiKeyHeaders)
+
+  override def getAddressState(address: Address, headers: Map[String, String]): R[HttpAddressState] = getAddressState(address.stringRepr, headers)
+
+  override def getAddressState(address: String): R[HttpAddressState] = getAddressState(address, apiKeyHeaders)
+
+  override def getSystemStatus(headers: Map[String, String]): R[HttpSystemStatus] = mk {
+    sttp
+      .get(uri"$apiUri/matcher/debug/status")
+      .headers(headers)
+  }
+
+  override def getSystemStatus: R[HttpSystemStatus] = getSystemStatus(apiKeyHeaders)
 
   override def getMatcherPublicKey: R[String] = mk {
     basicRequest.get(uri"$apiUri/matcher")

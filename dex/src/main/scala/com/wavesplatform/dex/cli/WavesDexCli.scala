@@ -116,6 +116,7 @@ object WavesDexCli extends ScoptImplicits {
   }
 
   def checkServer(args: Args): Unit = {
+    val apiKey = readSecretFromStdIn("Enter X-API-KEY: ")
     val apiUrl = args.dexRestApi.getOrElse {
       val matcherSettings =
         ConfigSource.fromConfig(loadConfig(parseFile(new File(args.configPath)))).at("waves.dex").loadOrThrow[MatcherSettings]
@@ -136,7 +137,7 @@ object WavesDexCli extends ScoptImplicits {
         )
 
         superConnector <- SuperConnector.create(args.configPath, apiUrl, args.nodeRestApi, args.authServiceRestApi)
-        checkResult <- new Checker(superConnector).checkState(args.version, args.accountSeed, args.apiKey)
+        checkResult <- new Checker(superConnector).checkState(args.version, args.accountSeed, apiKey)
         _ <- cli.lift(superConnector.close())
       } yield checkResult
     ) match {
@@ -320,11 +321,6 @@ object WavesDexCli extends ScoptImplicits {
               .valueName("<raw-string>")
               .required()
               .action((x, s) => s.copy(configPath = x)),
-            opt[String]("api-key")
-              .abbr("ak")
-              .text("Raw API key, which will be passed to REST API in the X-Api-Key header")
-              .required()
-              .action((x, s) => s.copy(apiKey = x)),
             opt[String]("auth-rest-api")
               .abbr("ara")
               .text("Auth Service REST API uri. Format: scheme://host:port/path/to/token (default scheme will be picked if none was specified)")

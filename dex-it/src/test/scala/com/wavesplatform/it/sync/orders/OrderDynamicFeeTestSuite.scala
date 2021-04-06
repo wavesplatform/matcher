@@ -1,6 +1,6 @@
 package com.wavesplatform.it.sync.orders
 
-import com.softwaremill.sttp.StatusCodes
+import sttp.model.StatusCode
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.api.http.entities.HttpV0LevelAgg
@@ -273,7 +273,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
 
       val newBtcRate = btcRate * 2
 
-      dex1.httpApi.upsertRate(btc, newBtcRate).code shouldBe StatusCodes.Ok
+      dex1.httpApi.upsertRate(btc, newBtcRate).code shouldBe StatusCode.Ok
       dex1.api.getReservedBalance(bob)(btc) shouldBe 50150L
       dex1.api.place(mkAliceOrder)
 

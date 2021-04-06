@@ -23,8 +23,8 @@ import scala.util.Try
 
 final case class WavesNodeContainer(override val internalIp: String, underlying: GenericContainer)(
   implicit
-  tryHttpBackend: LoggingSttpBackend[Try, Nothing],
-  futureHttpBackend: LoggingSttpBackend[Future, Nothing],
+  tryHttpBackend: LoggingSttpBackend[Try, Any],
+  futureHttpBackend: LoggingSttpBackend[Future, Any],
   ec: ExecutionContext
 ) extends BaseContainer(WavesNodeContainer.baseContainerPath, underlying) {
 
@@ -62,7 +62,7 @@ final case class WavesNodeContainer(override val internalIp: String, underlying:
     val r = Iterator
       .continually {
         Thread.sleep(1000)
-        try httpApi.currentHeightOrig.code == StatusCode.Ok.code
+        try httpApi.currentHeightOrig.code == StatusCode.Ok
         catch {
           case _: Throwable => false
         }
@@ -106,8 +106,8 @@ object WavesNodeContainer extends ScorexLogging {
     image: String,
     netAlias: Option[String] = Some(wavesNodeNetAlias)
   )(implicit
-    tryHttpBackend: LoggingSttpBackend[Try, Nothing],
-    futureHttpBackend: LoggingSttpBackend[Future, Nothing],
+    tryHttpBackend: LoggingSttpBackend[Try, Any],
+    futureHttpBackend: LoggingSttpBackend[Future, Any],
     ec: ExecutionContext
   ): WavesNodeContainer = {
 

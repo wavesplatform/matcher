@@ -1,6 +1,6 @@
 package com.wavesplatform.it.sync
 
-import com.softwaremill.sttp.StatusCodes
+import sttp.model.StatusCode
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpRates
 import com.wavesplatform.dex.domain.asset.Asset.Waves
@@ -38,19 +38,19 @@ class RatesTestSuite extends MatcherSuiteBase {
 
   "Changing rates affects order validation" in {
     // set rate for btc
-    dex1.httpApi.upsertRate(btc, 1).code shouldBe StatusCodes.Created
+    dex1.httpApi.upsertRate(btc, 1).code shouldBe StatusCode.Created
 
     // place order with admissible fee (according to btc rate = 1)
     placeAndAwaitAtDex(newOrder)
 
     // slightly increase rate for btc
-    dex1.httpApi.upsertRate(btc, 1.2).code shouldBe StatusCodes.Ok
+    dex1.httpApi.upsertRate(btc, 1.2).code shouldBe StatusCode.Ok
 
     // the same order is passed, because we choose the minimal rate between 1 and 1.1
     placeAndAwaitAtDex(newOrder)
 
     // now a new order doesn't match both rates
-    dex1.httpApi.upsertRate(btc, 1.1).code shouldBe StatusCodes.Ok
+    dex1.httpApi.upsertRate(btc, 1.1).code shouldBe StatusCode.Ok
 
     // the same order now is rejected
     dex1.tryApi.place(newOrder) should failWith(
@@ -59,7 +59,7 @@ class RatesTestSuite extends MatcherSuiteBase {
     )
 
     // return previous rate for btc
-    dex1.httpApi.upsertRate(btc, 1).code shouldBe StatusCodes.Ok
+    dex1.httpApi.upsertRate(btc, 1).code shouldBe StatusCode.Ok
 
     placeAndAwaitAtDex(newOrder)
 
@@ -68,7 +68,7 @@ class RatesTestSuite extends MatcherSuiteBase {
 
   "Rates are restored from the DB after matcher's restart" in {
     // add high rate for btc
-    dex1.httpApi.upsertRate(btc, 1.1).code shouldBe StatusCodes.Created
+    dex1.httpApi.upsertRate(btc, 1.1).code shouldBe StatusCode.Created
 
     // order with low fee should be rejected
     dex1.tryApi.place(newOrder) should failWith(

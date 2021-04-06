@@ -1,6 +1,6 @@
 package com.wavesplatform.it.matcher.api.http.status
 
-import com.softwaremill.sttp.StatusCodes
+import sttp.model.StatusCode
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
@@ -61,7 +61,7 @@ class GetOrderStatusSpec extends MatcherSuiteBase with TableDrivenPropertyChecks
     "should return an error exception when the amount asset is not correct base58 string" in {
       validateMatcherError(
         dex1.rawApi.getOrderStatus("null", UsdId.toString, order.idStr()),
-        StatusCodes.BadRequest,
+        StatusCode.BadRequest,
         11534337,
         "The asset 'null' is wrong, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )
@@ -70,7 +70,7 @@ class GetOrderStatusSpec extends MatcherSuiteBase with TableDrivenPropertyChecks
     "should return an error exception when the price asset is not correct base58 string" in {
       validateMatcherError(
         dex1.rawApi.getOrderStatus("WAVES", "null", order.idStr()),
-        StatusCodes.BadRequest,
+        StatusCode.BadRequest,
         11534337,
         "The asset 'null' is wrong, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )
@@ -81,7 +81,7 @@ class GetOrderStatusSpec extends MatcherSuiteBase with TableDrivenPropertyChecks
 
       validateMatcherError(
         dex1.rawApi.getOrderStatus(incorrectAsset, "WAVES", order.idStr()),
-        StatusCodes.NotFound,
+        StatusCode.NotFound,
         11534345,
         s"The asset $incorrectAsset not found"
       )

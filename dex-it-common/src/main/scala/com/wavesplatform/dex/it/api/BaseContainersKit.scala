@@ -1,18 +1,18 @@
 package com.wavesplatform.dex.it.api
 
+import cats.implicits.catsStdInstancesForTry
+
 import java.net.InetAddress
 import java.nio.file.{Files, Path, Paths}
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicReference
-
 import com.github.dockerjava.api.command.CreateNetworkCmd
 import com.github.dockerjava.api.model.Network.Ipam
 import com.google.common.primitives.Ints.toByteArray
 import com.google.common.util.concurrent.ThreadFactoryBuilder
-import com.softwaremill.sttp.TryHttpURLConnectionBackend
-import com.softwaremill.sttp.asynchttpclient.future.AsyncHttpClientFutureBackend
+import sttp.client3._
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.it.docker.BaseContainer
 import com.wavesplatform.dex.it.sttp.LoggingSttpBackend
@@ -20,6 +20,9 @@ import mouse.any._
 import org.asynchttpclient.DefaultAsyncHttpClientConfig
 import org.testcontainers.containers.Network
 import org.testcontainers.containers.Network.NetworkImpl
+import sttp.client3.asynchttpclient.future.AsyncHttpClientFutureBackend
+import cats.instances.future._
+import cats.instances.try_._
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Random, Try}
@@ -69,7 +72,7 @@ trait BaseContainersKit extends ScorexLogging {
     Executors.newFixedThreadPool(10, new ThreadFactoryBuilder().setNameFormat(s"${getClass.getSimpleName}-%d").setDaemon(true).build)
   }
 
-  implicit protected val futureHttpBackend: LoggingSttpBackend[Future, Nothing] = new LoggingSttpBackend[Future, Nothing](
+  implicit protected val futureHttpBackend: LoggingSttpBackend[Future, Any] = new LoggingSttpBackend[Future, Any](
     AsyncHttpClientFutureBackend.usingConfig(
       new DefaultAsyncHttpClientConfig.Builder()
         .setMaxRequestRetry(0)
@@ -81,7 +84,7 @@ trait BaseContainersKit extends ScorexLogging {
     )
   )
 
-  implicit protected val tryHttpBackend: LoggingSttpBackend[Try, Nothing] = new LoggingSttpBackend[Try, Nothing](
+  implicit protected val tryHttpBackend: LoggingSttpBackend[Try, Any] = new LoggingSttpBackend[Try, Any](
     TryHttpURLConnectionBackend(customizeConnection = conn => {
       // For tests with a high latency
       conn.setConnectTimeout(30000)

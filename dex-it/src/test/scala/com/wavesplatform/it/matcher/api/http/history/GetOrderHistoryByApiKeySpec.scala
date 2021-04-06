@@ -1,6 +1,6 @@
 package com.wavesplatform.it.matcher.api.http.history
 
-import com.softwaremill.sttp.StatusCodes
+import sttp.model.StatusCode
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.account.KeyPair.toAddress
 import com.wavesplatform.dex.domain.order.OrderType.BUY
@@ -68,7 +68,7 @@ class GetOrderHistoryByApiKeySpec extends MatcherSuiteBase with ApiKeyHeaderChec
     "should return an error if address is not correct base58 string" in {
       validateMatcherError(
         dex1.rawApi.getOrderHistoryByApiKey("null"),
-        StatusCodes.BadRequest,
+        StatusCode.BadRequest,
         4194304,
         "Provided address in not correct, reason: Unable to decode base58: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )
@@ -77,7 +77,7 @@ class GetOrderHistoryByApiKeySpec extends MatcherSuiteBase with ApiKeyHeaderChec
     "should return an error if address has an incorrect length" in {
       validateMatcherError(
         dex1.rawApi.getOrderHistoryByApiKey("AAAAA"),
-        StatusCodes.BadRequest,
+        StatusCode.BadRequest,
         4194304,
         "Provided address in not correct, reason: Wrong addressBytes length: expected: 26, actual: 4"
       )

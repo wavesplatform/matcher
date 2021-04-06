@@ -11,7 +11,7 @@ import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.tool.connectors.RestConnector.ErrorOrJsonResponse
 import play.api.libs.json.{JsValue, Json}
-import sttp.client._
+import sttp.client3._
 import sttp.model.MediaType
 import sttp.model.Uri.QuerySegment
 

@@ -1,7 +1,7 @@
 package com.wavesplatform.it.matcher.api.http.history
 
 import com.google.common.primitives.Longs
-import com.softwaremill.sttp.StatusCodes
+import sttp.model.StatusCode
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
@@ -72,7 +72,7 @@ class GetOrderHistoryByPublicKeySpec extends MatcherSuiteBase with RawHttpChecks
 
       validateMatcherError(
         dex1.rawApi.getOrderHistoryByPublicKey("null", ts, sign),
-        StatusCodes.BadRequest,
+        StatusCode.BadRequest,
         3148801,
         "Provided public key is not correct, reason: Unable to decode base58: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )

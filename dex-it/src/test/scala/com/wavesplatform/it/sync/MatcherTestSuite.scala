@@ -1,7 +1,8 @@
 package com.wavesplatform.it.sync
 
 import cats.syntax.option._
-import com.softwaremill.sttp._
+import sttp.client3._
+import sttp.model._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.api.http.entities.{HttpAssetInfo, HttpOrderBookHistoryItem, HttpV0LevelAgg, HttpV0OrderBook}
@@ -58,7 +59,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
   "Swagger page is available" in {
     val addr = dex1.restApiAddress
-    tryHttpBackend.send(sttp.response(asString).get(uri"http://${addr.getHostName}:${addr.getPort}/api-docs/index.html")) shouldBe Symbol(
+    tryHttpBackend.send(basicRequest.response(asString).get(uri"http://${addr.getHostName}:${addr.getPort}/api-docs/index.html")) shouldBe Symbol(
       "success"
     )
   }
@@ -110,12 +111,12 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
       "frozen amount should be listed via matcherBalance REST endpoint" in {
         dex1.api.getReservedBalance(alice) shouldBe Map(Waves -> matcherFee, aliceAsset -> aliceSellAmount)
-        dex1.api.getReservedBalance(bob) shouldBe empty
+        dex1.api.getReservedBalance(bob) should have size 0
       }
 
       "frozen amount should be listed via matcherBalance REST endpoint with Api Key" in {
         dex1.api.getReservedBalanceWithApiKey(alice) shouldBe Map(Waves -> matcherFee, aliceAsset -> aliceSellAmount)
-        dex1.api.getReservedBalanceWithApiKey(bob) shouldBe empty
+        dex1.api.getReservedBalanceWithApiKey(bob) should have size 0
       }
 
       "and should be listed by trader's publiс key via REST" in {
@@ -168,7 +169,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         val aliceOrders = dex1.api.getOrderHistoryByPublicKey(alice, activeOnly = Some(true))
         aliceOrders.map(_.id) shouldBe Seq(order1.id())
         val bobOrders = dex1.api.getOrderHistoryByPublicKey(bob, activeOnly = Some(true))
-        bobOrders.map(_.id) shouldBe empty
+        bobOrders.map(_.id) should have size 0
       }
 
       "submitting sell orders should check availability of asset" in {
@@ -372,7 +373,10 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
     "reject proxy requests if X-User-Public-Key doesn't match query param and process them correctly otherwise " - {
 
       "/matcher/balance/reserved/{publicKey}" in {
-        dex1.tryApi.getReservedBalanceWithApiKey(alice, Some(bob.publicKey)) should failWith(3148801, "Provided public key is not correct, reason: invalid public key")
+        dex1.tryApi.getReservedBalanceWithApiKey(alice, Some(bob.publicKey)) should failWith(
+          3148801,
+          "Provided public key is not correct, reason: invalid public key"
+        )
         dex1.tryApi.getReservedBalanceWithApiKey(alice, Some(alice.publicKey)) shouldBe Symbol("right")
       }
 
@@ -522,7 +526,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       val ob = dex1.api.getOrderBook(btcUsdnPair)
 
       ob.asks shouldBe List(HttpV0LevelAgg(345506L, 9337000000L))
-      ob.bids shouldBe empty
+      ob.bids should have size 0
 
       dex1.api.getOrderBookStatus(btcUsdnPair).lastTrade should matchTo(btcUsdnPairLastTrade)
 
@@ -561,7 +565,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
       val ob = dex1.api.getOrderBook(ethWavesPair)
       ob.asks should have size 1
-      ob.bids shouldBe empty
+      ob.bids should have size 0
 
       // Before: [ "$UsdnId", "$BtcId", "$UsdId", "WAVES", $EthId ]
       dex1.restartWithNewSuiteConfig(
@@ -571,7 +575,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       )
 
       withClue("The old order book is not available") {
-        dex1.httpApi.getOrderBook(ethWavesPair).code shouldBe StatusCodes.MovedPermanently
+        dex1.httpApi.getOrderBook(ethWavesPair).code shouldBe StatusCode.MovedPermanently
       }
 
       val wavesEthPair = AssetPair(Waves, eth)

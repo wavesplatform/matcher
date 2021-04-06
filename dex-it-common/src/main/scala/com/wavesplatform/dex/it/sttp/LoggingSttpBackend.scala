@@ -1,11 +1,14 @@
 package com.wavesplatform.dex.it.sttp
 
-import com.softwaremill.sttp.{MonadError, Request, Response, SttpBackend}
+import cats.Applicative
+import sttp.monad._
+import sttp.client3._
 import com.wavesplatform.dex.domain.utils.ScorexLogging
+import sttp.capabilities
 
-class LoggingSttpBackend[R[_], S](delegate: SttpBackend[R, S]) extends SttpBackend[R, S] with ScorexLogging {
+class LoggingSttpBackend[R[_]: Applicative, S](delegate: SttpBackend[R, S]) extends SttpBackend[R, S] with ScorexLogging {
 
-  override def send[T](request: Request[T, S]): R[Response[T]] = {
+  override def send[T, RR >: S with capabilities.Effect[R]](request: Request[T, RR]): R[Response[T]] = {
     val logRequest = !request.uri.path.mkString("/").endsWith("debug/print")
 
     val prefix = s"[${request.tag("requestId").fold("unknown")(_.toString.take(8))}]"
@@ -26,6 +29,7 @@ class LoggingSttpBackend[R[_], S](delegate: SttpBackend[R, S]) extends SttpBacke
       }
   }
 
-  override def close(): Unit = delegate.close()
+  override def close(): R[Unit] = Applicative[R].pure(delegate.close())
   override def responseMonad: MonadError[R] = delegate.responseMonad
+
 }

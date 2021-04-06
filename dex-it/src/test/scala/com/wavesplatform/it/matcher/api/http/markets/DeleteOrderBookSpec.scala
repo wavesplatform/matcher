@@ -1,6 +1,6 @@
 package com.wavesplatform.it.matcher.api.http.markets
 
-import com.softwaremill.sttp.StatusCodes
+import sttp.model.StatusCode
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.order.OrderType.SELL
@@ -38,7 +38,7 @@ class DeleteOrderBookSpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
     "should return an error if orderbook doesn't exists" in {
       validateMatcherError(
         dex1.rawApi.deleteOrderBook(wavesUsdPair),
-        StatusCodes.ServiceUnavailable,
+        StatusCode.ServiceUnavailable,
         8388609,
         s"The order book for WAVES-$UsdId is unavailable, please contact with the administrator"
       )
@@ -47,7 +47,7 @@ class DeleteOrderBookSpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
     "should return an error exception when the amount asset is not correct base58 string" in {
       validateMatcherError(
         dex1.rawApi.deleteOrderBook("null", UsdId.toString, Map("X-API-KEY" -> apiKey)),
-        StatusCodes.BadRequest,
+        StatusCode.BadRequest,
         11534337,
         s"The asset 'null' is wrong, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )
@@ -56,7 +56,7 @@ class DeleteOrderBookSpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
     "should return an error exception when the price asset is not correct base58 string" in {
       validateMatcherError(
         dex1.rawApi.deleteOrderBook("WAVES", "null", Map("X-API-KEY" -> apiKey)),
-        StatusCodes.BadRequest,
+        StatusCode.BadRequest,
         11534337,
         s"The asset 'null' is wrong, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )

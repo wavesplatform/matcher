@@ -1,6 +1,6 @@
 package com.wavesplatform.it.matcher.api.http.markets
 
-import com.softwaremill.sttp.StatusCodes
+import sttp.model.StatusCode
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
@@ -51,7 +51,7 @@ class GetOrderBookSpec extends MatcherSuiteBase with TableDrivenPropertyChecks w
     "should return exception when price is not a correct base58 string" in {
       validateMatcherError(
         dex1.rawApi.getOrderBook("WAVES", "null"),
-        StatusCodes.BadRequest,
+        StatusCode.BadRequest,
         9437185,
         s"Provided value is not a correct base58 string, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )
@@ -67,7 +67,7 @@ class GetOrderBookSpec extends MatcherSuiteBase with TableDrivenPropertyChecks w
       s"for depth = $v ($t) should return exception" in {
         validateMatcherError(
           dex1.rawApi.getOrderBook(wavesUsdPair, v),
-          StatusCodes.BadRequest,
+          StatusCode.BadRequest,
           1076224,
           m
         )
@@ -76,9 +76,9 @@ class GetOrderBookSpec extends MatcherSuiteBase with TableDrivenPropertyChecks w
 
     forAll(Table(
       ("Amount", "Price", "Http status", "Error code", "Message"),
-      ("incorrect", "WAVES", 404, 11534345, "The asset incorrect not found"),
-      ("WAVES", "incorrect", 404, 9440771, "The WAVES-incorrect asset pair should be reversed")
-    )) { (a: String, p: String, c: Int, e: Int, m: String) =>
+      ("incorrect", "WAVES", StatusCode.NotFound, 11534345, "The asset incorrect not found"),
+      ("WAVES", "incorrect", StatusCode.NotFound, 9440771, "The WAVES-incorrect asset pair should be reversed")
+    )) { (a: String, p: String, c: StatusCode, e: Int, m: String) =>
       s"for $a/$p should return (HTTP-$c; [$e: $m]) " in {
         validateMatcherError(dex1.rawApi.getOrderBook(AssetPair.createAssetPair(a, p).get), c, e, m)
       }

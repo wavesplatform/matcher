@@ -6,7 +6,7 @@ import com.wavesplatform.dex.tool.connectors.Connector.RepeatRequestOptions
 import com.wavesplatform.dex.tool.connectors.RestConnector.ErrorOrJsonResponse
 import im.mak.waves.transactions.Transaction
 import play.api.libs.json.JsValue
-import sttp.client._
+import sttp.client3._
 import sttp.model.MediaType
 
 import scala.annotation.tailrec

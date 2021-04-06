@@ -1,7 +1,7 @@
 package com.wavesplatform.it.matcher.api.http.cancel
 
 import com.google.common.primitives.Longs
-import com.softwaremill.sttp.StatusCodes
+import sttp.model.StatusCode
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.crypto
@@ -44,13 +44,13 @@ class CancelOrderSpec extends MatcherSuiteBase with RawHttpChecks {
       placeAndAwaitAtDex(o)
 
       cancelAndAwait(alice, o)
-      validateMatcherError(dex1.rawApi.cancelOrder(alice, o), StatusCodes.BadRequest, 9437194, s"The order ${o.idStr()} is canceled")
+      validateMatcherError(dex1.rawApi.cancelOrder(alice, o), StatusCode.BadRequest, 9437194, s"The order ${o.idStr()} is canceled")
     }
 
     //TODO: DEX-1024
     "should return error when order doesn't exist" in {
       val o = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 1.usd)
-      validateMatcherError(dex1.rawApi.cancelOrder(alice, o), StatusCodes.BadRequest, 9437193, s"The order ${o.idStr()} not found")
+      validateMatcherError(dex1.rawApi.cancelOrder(alice, o), StatusCode.BadRequest, 9437193, s"The order ${o.idStr()} not found")
     }
 
     "should return an error if publicKey parameter has the different value of used in signature" in {

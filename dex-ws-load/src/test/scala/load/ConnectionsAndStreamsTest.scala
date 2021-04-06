@@ -3,7 +3,7 @@ package load
 import io.gatling.core.Predef._
 import io.gatling.http.Predef._
 
-class ConnectionsAndStreamsTest extends Simulation {
+class ConnectionsAndStramsTest extends Simulation {
 
   val feeder = separatedValues(System.getProperty("ff"), ';').batch
 

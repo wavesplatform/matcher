@@ -18,7 +18,7 @@ import monix.execution.{ExecutionModel, Scheduler}
 import monix.execution.schedulers.SchedulerService
 import pureconfig.ConfigSource
 import scopt.{OParser, RenderingMode}
-import sttp.client._
+import sttp.client3._
 
 import java.io.{File, PrintWriter}
 import java.nio.charset.StandardCharsets
@@ -30,7 +30,7 @@ import scala.util.{Failure, Success, Try}
 
 object WavesDexCli extends ScoptImplicits {
 
-  implicit val backend = HttpURLConnectionBackend()
+  private val backend = HttpURLConnectionBackend()
 
   def generateAccountSeed(args: Args): Unit = {
     val seedPromptText = s"Enter the${if (args.accountNonce.isEmpty) " seed of DEX's account" else " base seed"}: "
@@ -136,7 +136,7 @@ object WavesDexCli extends ScoptImplicits {
         )
 
         superConnector <- SuperConnector.create(args.configPath, apiUrl, args.nodeRestApi, args.authServiceRestApi)
-        checkResult <- new Checker(superConnector).checkState(args.version, args.accountSeed)
+        checkResult <- new Checker(superConnector).checkState(args.version, args.accountSeed, args.apiKey)
         _ <- cli.lift(superConnector.close())
       } yield checkResult
     ) match {
@@ -192,8 +192,8 @@ object WavesDexCli extends ScoptImplicits {
       val r = basicRequest.headers(Map("X-API-KEY" -> key))
 
       val body = method match {
-        case "post" => r.post(uri"$apiUrl/matcher/debug/$urlPart").send().body
-        case _ => r.get(uri"$apiUrl/matcher/debug/$urlPart").send().body
+        case "post" => r.post(uri"$apiUrl/matcher/debug/$urlPart").send(backend).body
+        case _ => r.get(uri"$apiUrl/matcher/debug/$urlPart").send(backend).body
       }
 
       body match {
@@ -320,6 +320,11 @@ object WavesDexCli extends ScoptImplicits {
               .valueName("<raw-string>")
               .required()
               .action((x, s) => s.copy(configPath = x)),
+            opt[String]("api-key")
+              .abbr("ak")
+              .text("Raw API key, which will be passed to REST API in the X-Api-Key header")
+              .required()
+              .action((x, s) => s.copy(apiKey = x)),
             opt[String]("auth-rest-api")
               .abbr("ara")
               .text("Auth Service REST API uri. Format: scheme://host:port/path/to/token (default scheme will be picked if none was specified)")

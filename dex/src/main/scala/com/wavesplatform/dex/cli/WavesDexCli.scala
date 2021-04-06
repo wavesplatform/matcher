@@ -18,7 +18,7 @@ import monix.execution.{ExecutionModel, Scheduler}
 import monix.execution.schedulers.SchedulerService
 import pureconfig.ConfigSource
 import scopt.{OParser, RenderingMode}
-import sttp.client._
+import sttp.client3._
 
 import java.io.{File, PrintWriter}
 import java.nio.charset.StandardCharsets
@@ -30,7 +30,7 @@ import scala.util.{Failure, Success, Try}
 
 object WavesDexCli extends ScoptImplicits {
 
-  implicit val backend = HttpURLConnectionBackend()
+  private val backend = HttpURLConnectionBackend()
 
   def generateAccountSeed(args: Args): Unit = {
     val seedPromptText = s"Enter the${if (args.accountNonce.isEmpty) " seed of DEX's account" else " base seed"}: "
@@ -116,6 +116,7 @@ object WavesDexCli extends ScoptImplicits {
   }
 
   def checkServer(args: Args): Unit = {
+    val apiKey = readSecretFromStdIn("Enter X-API-KEY: ")
     val apiUrl = args.dexRestApi.getOrElse {
       val matcherSettings =
         ConfigSource.fromConfig(loadConfig(parseFile(new File(args.configPath)))).at("waves.dex").loadOrThrow[MatcherSettings]
@@ -136,7 +137,7 @@ object WavesDexCli extends ScoptImplicits {
         )
 
         superConnector <- SuperConnector.create(args.configPath, apiUrl, args.nodeRestApi, args.authServiceRestApi)
-        checkResult <- new Checker(superConnector).checkState(args.version, args.accountSeed)
+        checkResult <- new Checker(superConnector).checkState(args.version, args.accountSeed, apiKey)
         _ <- cli.lift(superConnector.close())
       } yield checkResult
     ) match {
@@ -192,8 +193,8 @@ object WavesDexCli extends ScoptImplicits {
       val r = basicRequest.headers(Map("X-API-KEY" -> key))
 
       val body = method match {
-        case "post" => r.post(uri"$apiUrl/matcher/debug/$urlPart").send().body
-        case _ => r.get(uri"$apiUrl/matcher/debug/$urlPart").send().body
+        case "post" => r.post(uri"$apiUrl/matcher/debug/$urlPart").send(backend).body
+        case _ => r.get(uri"$apiUrl/matcher/debug/$urlPart").send(backend).body
       }
 
       body match {

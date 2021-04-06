@@ -15,6 +15,7 @@ import com.wavesplatform.dex.domain.model.{Denormalization, Normalization}
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV3}
 import com.wavesplatform.dex.model.OrderStatus
+import com.wavesplatform.dex.tool.connectors.Connector.RepeatRequestOptions
 import com.wavesplatform.dex.tool.connectors.DexExtensionGrpcConnector.DetailedBalance
 import com.wavesplatform.dex.tool.connectors.SuperConnector
 import im.mak.waves.transactions.IssueTransaction
@@ -94,6 +95,18 @@ class Checker(superConnector: SuperConnector) {
       .fold(issueAsset(assetName, testAssetDescription, mnogo)) {
         case (a, (d, b)) => (AssetInfo(a, d.name) -> s"Balance = ${denormalize(b)} ${d.name} (${a.toString})").asRight
       }
+
+  private def waitUntilMatcherStarts(apiKey: String): ErrorOr[Unit] = {
+    val attempts = {
+      superConnector.env.matcherSettings.snapshotsLoadingTimeout +
+        superConnector.env.matcherSettings.startEventsProcessingTimeout +
+        superConnector.env.matcherSettings.orderBooksRecoveringTimeout
+    }.toSeconds.toInt
+    dexRest.repeatRequest(dexRest.getMatcherStatus(apiKey))(_.exists { jsonResponse =>
+      (jsonResponse \ "service").as[String] == "Working" &&
+        (jsonResponse \ "blockchain").as[String] == "Working"
+    })(RepeatRequestOptions(attempts, 1.second)).map(_ => ())
+  }
 
   private def mkMatcherOrder(assetPair: AssetPair, orderType: OrderType): Order = {
     val timestamp = System.currentTimeMillis
@@ -203,19 +216,20 @@ class Checker(superConnector: SuperConnector) {
          """.stripMargin
     }
 
-  def checkState(version: String, maybeAccountSeed: Option[String]): ErrorOr[String] =
+  def checkState(version: String, maybeAccountSeed: Option[String], apiKey: String): ErrorOr[String] =
     for {
       _ <- log[ErrorOr]("\nChecking:\n")
       _ <- logCheck("1. DEX version")(checkVersion(version))
       (balance, balanceNotes) <- logCheck("2. Matcher balance")(checkBalance)
       (wuJIoInfo, firstAssetNotes) <- logCheck("3. First test asset")(checkTestAsset(balance, firstTestAssetName))
       (mbIJIoInfo, secondAssetNotes) <- logCheck("4. Second test asset")(checkTestAsset(balance, secondTestAssetName))
-      (assetPairInfo, activeOrdersNotes) <- logCheck("5. Matcher active orders")(checkActiveOrders(wuJIoInfo, mbIJIoInfo))
-      (order, placementNotes) <- logCheck("6. Order placement")(checkPlacement(assetPairInfo))
-      (_, cancellationNotes) <- logCheck("7. Order cancellation")(checkCancellation(order))
-      executionNotes <- logCheck("8. Execution")(checkExecution(assetPairInfo))
-      orderBookWsStreamNotes <- logCheck("9. Order book WS stream")(checkWsOrderBook(assetPairInfo))
-      accountUpdatesWsStreamNotes <- logCheck("10. Account updates WS stream")(checkWsAccountUpdates(maybeAccountSeed))
+      _ <- logCheck("5. Wait until matcher starts")(waitUntilMatcherStarts(apiKey))
+      (assetPairInfo, activeOrdersNotes) <- logCheck("6. Matcher active orders")(checkActiveOrders(wuJIoInfo, mbIJIoInfo))
+      (order, placementNotes) <- logCheck("7. Order placement")(checkPlacement(assetPairInfo))
+      (_, cancellationNotes) <- logCheck("8. Order cancellation")(checkCancellation(order))
+      executionNotes <- logCheck("9. Execution")(checkExecution(assetPairInfo))
+      orderBookWsStreamNotes <- logCheck("10. Order book WS stream")(checkWsOrderBook(assetPairInfo))
+      accountUpdatesWsStreamNotes <- logCheck("11. Account updates WS stream")(checkWsAccountUpdates(maybeAccountSeed))
     } yield s"""
                |Diagnostic notes:
                |  Matcher balance           : $balanceNotes 

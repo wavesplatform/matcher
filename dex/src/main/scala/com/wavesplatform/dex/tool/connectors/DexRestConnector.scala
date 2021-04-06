@@ -59,6 +59,10 @@ case class DexRestConnector(target: String) extends RestConnector {
   def waitForOrderStatus(order: Order, expectedStatusName: String): ErrorOrJsonResponse =
     waitForOrderStatus(order.id(), order.assetPair, expectedStatusName)
 
+  def getMatcherStatus(apiKey: String): ErrorOrJsonResponse = mkResponse {
+    _.get(uri"$apiUri/debug/status").header("X-Api-Key", apiKey)
+  }
+
   def getActiveOrdersByPair(keyPair: KeyPair, assetPair: AssetPair): ErrorOr[Seq[JsValue]] = {
     val uri =
       uri"$apiUri/orderbook/${assetPair.amountAsset}/${assetPair.priceAsset}/publicKey/${keyPair.publicKey.toString}"

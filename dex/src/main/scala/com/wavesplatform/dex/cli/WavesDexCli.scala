@@ -24,7 +24,7 @@ import java.io.{File, PrintWriter}
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.util.{Base64, Scanner}
-import scala.concurrent.Await
+import scala.concurrent.{Await, TimeoutException}
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.util.{Failure, Success, Try}
 
@@ -115,7 +115,12 @@ object WavesDexCli extends ScoptImplicits {
                |""".stripMargin)
   }
 
-  def checkServer(args: Args): Unit =
+  def checkServer(args: Args): Unit = {
+    val apiUrl = args.dexRestApi.getOrElse {
+      val matcherSettings =
+        ConfigSource.fromConfig(loadConfig(parseFile(new File(args.configPath)))).at("waves.dex").loadOrThrow[MatcherSettings]
+      s"${matcherSettings.restApi.address}:${matcherSettings.restApi.port}"
+    }
     (
       for {
         _ <- cli.log(
@@ -129,7 +134,8 @@ object WavesDexCli extends ScoptImplicits {
              |  Account seed          : ${args.accountSeed.getOrElse("")}
                    """.stripMargin
         )
-        superConnector <- SuperConnector.create(args.configPath, args.dexRestApi, args.nodeRestApi, args.authServiceRestApi)
+
+        superConnector <- SuperConnector.create(args.configPath, apiUrl, args.nodeRestApi, args.authServiceRestApi)
         checkResult <- new Checker(superConnector).checkState(args.version, args.accountSeed)
         _ <- cli.lift(superConnector.close())
       } yield checkResult
@@ -137,6 +143,7 @@ object WavesDexCli extends ScoptImplicits {
       case Right(diagnosticNotes) => println(s"$diagnosticNotes\nCongratulations! All checks passed!")
       case Left(error) => println(error); forceStopApplication(MatcherStateCheckingFailedError)
     }
+  }
 
   def runComparison(args: Args): Unit =
     (for {
@@ -167,19 +174,18 @@ object WavesDexCli extends ScoptImplicits {
 
     implicit val scheduler: SchedulerService = Scheduler.singleThread(
       name = "time-impl",
-      daemonic = false,
+      daemonic = true,
       executionModel = ExecutionModel.AlwaysAsyncExecution
     )
 
     print("Input X-API-KEY: ")
     val key = System.console().readPassword().mkString
 
-    val apiUrl =
-      if (args.dexRestApi.isEmpty) {
-        val matcherSettings =
-          ConfigSource.fromConfig(loadConfig(parseFile(new File(args.configPath)))).at("waves.dex").loadOrThrow[MatcherSettings]
-        s"${matcherSettings.restApi.address}:${matcherSettings.restApi.port}"
-      } else args.dexRestApi
+    val apiUrl = args.dexRestApi.getOrElse {
+      val matcherSettings =
+        ConfigSource.fromConfig(loadConfig(parseFile(new File(args.configPath)))).at("waves.dex").loadOrThrow[MatcherSettings]
+      s"${matcherSettings.restApi.address}:${matcherSettings.restApi.port}"
+    }
 
     def sendRequest(urlPart: String, key: String, method: String = "get"): String = {
       print(s"Sending ${method.toUpperCase} $urlPart... Response: ")
@@ -199,24 +205,21 @@ object WavesDexCli extends ScoptImplicits {
     val currentOffset = sendRequest("currentOffset", key).toInt
     sendRequest("saveSnapshots", key, "post")
 
-    def validate(): Int = {
-      val oldestSnapshotOffset = sendRequest("oldestSnapshotOffset", key).toInt
+    val validation = Task(sendRequest("oldestSnapshotOffset", key).toInt <= currentOffset)
+      .delayExecution(1.second)
+      .onErrorRestart(Long.MaxValue)
+      .restartUntil(_ == true)
+      .timeout(args.timeout)
+      .runToFuture
 
-      if (oldestSnapshotOffset <= currentOffset)
-        throw new RuntimeException
-      else oldestSnapshotOffset
-    }
-
-    val validation = Task(validate())
-      .onErrorFallbackTo(
-        Task(validate())
-          .delayExecution(1.second)
-          .onErrorRestart(args.timeout.toSeconds)
-      )
-
-    Try(Await.ready(validation.runToFuture, args.timeout)) match {
-      case Success(value) => println(s"Success! Current oldestSnapshotOffset: $value");
-      case Failure(_) => println("Snapshots wasn't saved before reaching timeout"); System.exit(1)
+    Try(Await.ready(validation, args.timeout)) match {
+      case Success(_) => println(s"Success!")
+      case Failure(e) =>
+        e match {
+          case _: TimeoutException => println("Snapshots wasn't saved before reaching timeout")
+          case _ => println(s"Other error happened:\n${e.printStackTrace()}")
+        }
+        System.exit(1)
     }
   }
 
@@ -299,7 +302,7 @@ object WavesDexCli extends ScoptImplicits {
               .abbr("dra")
               .text("DEX REST API uri. Format: scheme://host:port (default scheme will be picked if none was specified)")
               .valueName("<raw-string>")
-              .action((x, s) => s.copy(dexRestApi = x)),
+              .action((x, s) => s.copy(dexRestApi = x.some)),
             opt[String]("node-rest-api")
               .abbr("nra")
               .text("Waves Node REST API uri. Format: scheme://host:port (default scheme will be picked if none was specified)")
@@ -353,7 +356,7 @@ object WavesDexCli extends ScoptImplicits {
               .abbr("dra")
               .text("DEX REST API uri. Format: scheme://host:port (default scheme will be picked if none was specified)")
               .valueName("<raw-string>")
-              .action((x, s) => s.copy(dexRestApi = x)),
+              .action((x, s) => s.copy(dexRestApi = x.some)),
             opt[FiniteDuration]("timeout")
               .abbr("to")
               .text("Timeout")
@@ -446,7 +449,7 @@ object WavesDexCli extends ScoptImplicits {
     command: Option[Command] = None,
     outputDirectory: File = defaultFile,
     apiKey: String = "",
-    dexRestApi: String = "",
+    dexRestApi: Option[String] = None,
     nodeRestApi: String = "",
     version: String = "",
     configPath: String = "",

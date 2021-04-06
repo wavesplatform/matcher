@@ -184,7 +184,7 @@ object WavesDexCli extends ScoptImplicits {
     val apiUrl = args.dexRestApi.getOrElse {
       val matcherSettings =
         ConfigSource.fromConfig(loadConfig(parseFile(new File(args.configPath)))).at("waves.dex").loadOrThrow[MatcherSettings]
-      s"${matcherSettings.restApi.address}:${matcherSettings.restApi.port}"
+      s"http://${matcherSettings.restApi.address}:${matcherSettings.restApi.port}"
     }
 
     def sendRequest(urlPart: String, key: String, method: String = "get"): String = {

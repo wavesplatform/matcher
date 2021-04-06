@@ -191,8 +191,8 @@ object WavesDexCli extends ScoptImplicits {
       val r = basicRequest.headers(Map("X-API-KEY" -> key))
 
       val body = method match {
-        case "post" => r.post(uri"$apiUrl/matcher/debug/$urlPart").send().body
-        case _ => r.get(uri"$apiUrl/matcher/debug/$urlPart").send().body
+        case "post" => r.post(uri"$apiUrl/matcher/debug/$urlPart").send(backend).body
+        case _ => r.get(uri"$apiUrl/matcher/debug/$urlPart").send(backend).body
       }
 
       body match {

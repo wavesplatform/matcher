@@ -214,12 +214,11 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
 
   "Node should provide its name to postgres" in {
 
-    val buyOrder = mkOrder(bob, wavesBtcPair, BUY, 25.waves, 20.btc)
-    placeAndAwaitAtDex(buyOrder)
+    placeAndAwaitAtDex(mkOrder(bob, wavesBtcPair, BUY, 25.waves, 20.btc))
+    placeAndAwaitAtNode(mkOrder(bob, wavesBtcPair, SELL, 25.waves, 20.btc))
 
-    findUserWithApplicationName().value shouldBe PgStatActivity(customUser, customAppName)
+    findUserWithApplicationName().getOrElse(PgStatActivity) shouldBe PgStatActivity(customUser, customAppName)
 
-    dex1.api.cancelAll(bob)
     cleanTables()
   }
 
@@ -652,7 +651,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
 
   private def findUserWithApplicationName(): Option[PgStatActivity] =
     ctx
-      .run (
+      .run(
         querySchema[PgStatActivity](
           "pg_stat_activity",
           _.userName -> "usename",
@@ -662,4 +661,4 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
 
 }
 
-final case class PgStatActivity(userName: String, applicationName: String)
+final case class PgStatActivity(userName: String = "", applicationName: String = "")

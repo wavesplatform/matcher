@@ -8,8 +8,8 @@ import cats.kernel.Monoid
 import com.wavesplatform.dex.MatcherSpecBase
 import com.wavesplatform.dex.actors.address.AddressActor.BlockchainInteraction
 import com.wavesplatform.dex.actors.address.AddressActor.Command.Source
-import com.wavesplatform.dex.actors.address.AddressActor.Query.{GetReservedBalance, GetTradableBalance}
-import com.wavesplatform.dex.actors.address.AddressActor.Reply.GetBalance
+import com.wavesplatform.dex.actors.address.AddressActor.Query.{GetCurrentState, GetReservedBalance, GetTradableBalance}
+import com.wavesplatform.dex.actors.address.AddressActor.Reply.{GetBalance, GetState}
 import com.wavesplatform.dex.api.ws.protocol.WsAddressChanges
 import com.wavesplatform.dex.db.EmptyOrderDB
 import com.wavesplatform.dex.domain.account.{Address, KeyPair, PublicKey}
@@ -288,6 +288,20 @@ class AddressActorSpecification
 
       updatePortfolio(initPortfolio.copy(balance = initPortfolio.balance + 1))
       subscription2.receiveMessage()
+    }
+
+    "return state" in test { (ref, _, addOrder, updatePortfolio) =>
+      updatePortfolio(sellToken1Portfolio.copy(balance = sellToken1Portfolio.balance + 1L))
+
+      addOrder(LimitOrder(sellTokenOrder1))
+
+      ref ! AddressDirectoryActor.Command.ForwardMessage(sellTokenOrder1.sender, GetCurrentState)
+      val res = fishForSpecificMessage[GetState](hint = "State") {
+        case x: GetState => x
+      }
+
+      res.balances.reserved.xs shouldBe Map(Waves -> 30000L, IssuedAsset(assetId) -> 100)
+      res.placementQueue should have size 0
     }
   }
 

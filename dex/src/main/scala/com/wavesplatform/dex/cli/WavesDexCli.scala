@@ -4,13 +4,13 @@ import cats.syntax.flatMap._
 import cats.syntax.option._
 import com.typesafe.config.ConfigFactory.parseFile
 import com.wavesplatform.dex._
-import com.wavesplatform.dex.app.{forceStopApplication, MatcherStateCheckingFailedError}
+import com.wavesplatform.dex.app.{MatcherStateCheckingFailedError, forceStopApplication}
 import com.wavesplatform.dex.db.AccountStorage
 import com.wavesplatform.dex.doc.MatcherErrorDoc
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
-import com.wavesplatform.dex.settings.{loadConfig, MatcherSettings}
+import com.wavesplatform.dex.settings.{MatcherSettings, loadConfig}
 import com.wavesplatform.dex.tool.connectors.SuperConnector
 import com.wavesplatform.dex.tool.{Checker, ComparisonTool}
 import monix.eval.Task
@@ -179,8 +179,7 @@ object WavesDexCli extends ScoptImplicits {
       executionModel = ExecutionModel.AlwaysAsyncExecution
     )
 
-    print("Input X-API-KEY: ")
-    val key = System.console().readPassword().mkString
+    val key = readSecretFromStdIn("Enter X-API-KEY: ")
 
     val apiUrl = args.dexRestApi.getOrElse {
       val matcherSettings =

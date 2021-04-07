@@ -34,7 +34,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
   private val aliceAsset = IssuedAsset(aliceAssetTx.id())
   private val aliceWavesPair = AssetPair(aliceAsset, Waves)
 
-  private val orderV2 = mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2)
+  private def orderV2 = mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2)
 
   private def updateBobScript(binaryCodeInBase64: String): Unit =
     broadcastAndAwait(mkSetAccountMayBeScript(bob, Some(Scripts.fromBase64(binaryCodeInBase64)), fee = setScriptFee + smartFee))

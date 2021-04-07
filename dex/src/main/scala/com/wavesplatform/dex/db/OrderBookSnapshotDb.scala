@@ -1,6 +1,8 @@
 package com.wavesplatform.dex.db
 
-import cats.Id
+import cats.Applicative
+import cats.syntax.applicative._
+import cats.syntax.functor._
 import cats.instances.option.catsStdInstancesForOption
 import cats.syntax.apply.catsSyntaxTuple2Semigroupal
 import com.wavesplatform.dex.db.leveldb.{Key, LevelDb}
@@ -9,7 +11,6 @@ import com.wavesplatform.dex.model.OrderBookSnapshot
 import com.wavesplatform.dex.queue.ValidatedCommandWithMeta.Offset
 
 import java.util.concurrent.ConcurrentHashMap
-import scala.concurrent.{ExecutionContext, Future}
 
 trait OrderBookSnapshotDb[F[_]] {
   def get(assetPair: AssetPair): F[Option[(Offset, OrderBookSnapshot)]]
@@ -43,28 +44,17 @@ object OrderBookSnapshotDb {
 
   }
 
-  def syncInMem: OrderBookSnapshotDb[Id] = new OrderBookSnapshotDb[Id] {
+  def inMem[F[_]: Applicative]: OrderBookSnapshotDb[F] = new OrderBookSnapshotDb[F] {
     private val storage = new ConcurrentHashMap[AssetPair, (Offset, OrderBookSnapshot)]()
 
-    override def get(assetPair: AssetPair): Option[(Offset, OrderBookSnapshot)] = Option(storage.get(assetPair))
+    override def get(assetPair: AssetPair): F[Option[(Offset, OrderBookSnapshot)]] =
+      Option(storage.get(assetPair)).pure[F]
 
-    override def update(assetPair: AssetPair, offset: Offset, newSnapshot: Option[OrderBookSnapshot]): Unit =
-      storage.compute(assetPair, (_, current) => (offset, newSnapshot.getOrElse(current._2)))
+    override def update(assetPair: AssetPair, offset: Offset, newSnapshot: Option[OrderBookSnapshot]): F[Unit] =
+      storage.compute(assetPair, (_, current) => (offset, newSnapshot.getOrElse(current._2))).pure[F].void
 
-    override def delete(assetPair: AssetPair): Unit = storage.remove(assetPair)
-  }
-
-  def asyncInMem(implicit ec: ExecutionContext): OrderBookSnapshotDb[Future] = new OrderBookSnapshotDb[Future] {
-    private val storage = new ConcurrentHashMap[AssetPair, (Offset, OrderBookSnapshot)]()
-
-    override def get(assetPair: AssetPair): Future[Option[(Offset, OrderBookSnapshot)]] =
-      Future(Option(storage.get(assetPair)))
-
-    override def update(assetPair: AssetPair, offset: Offset, newSnapshot: Option[OrderBookSnapshot]): Future[Unit] =
-      Future(storage.compute(assetPair, (_, current) => (offset, newSnapshot.getOrElse(current._2))))
-
-    override def delete(assetPair: AssetPair): Future[Unit] =
-      Future(storage.remove(assetPair))
+    override def delete(assetPair: AssetPair): F[Unit] =
+      storage.remove(assetPair).pure[F].void
   }
 
 }

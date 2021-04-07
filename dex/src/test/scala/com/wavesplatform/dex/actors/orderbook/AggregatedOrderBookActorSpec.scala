@@ -11,6 +11,7 @@ import akka.actor.typed.scaladsl.adapter._
 import akka.http.scaladsl.model.HttpResponse
 import akka.testkit.TestProbe
 import cats.data.NonEmptyList
+import cats.instances.future._
 import com.wavesplatform.dex.NoShrink
 import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.{Command, Message, Query}
 import com.wavesplatform.dex.actors.orderbook.OrderBookActor.MarketStatus
@@ -36,7 +37,7 @@ import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import scala.concurrent.Await
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 
 class AggregatedOrderBookActorSpec
@@ -91,7 +92,7 @@ class AggregatedOrderBookActorSpec
   "AggregatedOrderBookActor" - {
     "properties" - {
       "aggregate(updatedOrderBook) == updatedAggregatedOrderBook" in forAll(orderBookGen, ordersGen(10)) { (initOb, orders) =>
-        val obsdb = OrderBookSnapshotDb.asyncInMem
+        val obsdb = OrderBookSnapshotDb.inMem[Future]
         Await.result(obsdb.update(pair, 0L, Some(initOb.snapshot)), 5.second)
 
         implicit val efc: ErrorFormatterContext = ErrorFormatterContext.from(_ => 8)

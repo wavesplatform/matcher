@@ -6,6 +6,7 @@ import akka.actor.{Actor, ActorRef, ActorSystem, Kill, Props, Terminated}
 import akka.testkit.{ImplicitSender, TestActor, TestActorRef, TestProbe}
 import cats.data.NonEmptyList
 import cats.implicits.catsSyntaxEitherId
+import cats.instances.future._
 import com.wavesplatform.dex.MatcherSpecBase
 import com.wavesplatform.dex.actors.MatcherActor.{ForceStartOrderBook, GetMarkets, MarketData, SaveSnapshot}
 import com.wavesplatform.dex.actors.MatcherActorSpecification.{DeletingActor, FailAtStartActor, NothingDoActor, RecoveringActor, _}
@@ -455,8 +456,8 @@ class MatcherActorSpecification
     )
   }
 
-  private def mkAssetPairsDB: AssetPairsDb[Future] = AssetPairsDb.asyncInMem
-  private def mkOrderBookSnapshotDb: OrderBookSnapshotDb[Future] = OrderBookSnapshotDb.asyncInMem
+  private def mkAssetPairsDB: AssetPairsDb[Future] = AssetPairsDb.inMem
+  private def mkOrderBookSnapshotDb: OrderBookSnapshotDb[Future] = OrderBookSnapshotDb.inMem
 
   private def matcherHadOrderBooksBefore(apdb: AssetPairsDb[Future], obsdb: OrderBookSnapshotDb[Future], pairs: (AssetPair, Long)*): Unit = {
     val future = for {

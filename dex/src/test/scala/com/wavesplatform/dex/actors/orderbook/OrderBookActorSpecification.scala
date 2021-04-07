@@ -7,6 +7,7 @@ import akka.actor.typed.scaladsl.adapter._
 import akka.testkit.{ImplicitSender, TestActorRef, TestProbe}
 import cats.data.NonEmptyList
 import cats.syntax.option._
+import cats.instances.future._
 import com.wavesplatform.dex.MatcherSpecBase
 import com.wavesplatform.dex.actors.MatcherActor.SaveSnapshot
 import com.wavesplatform.dex.actors.address.AddressActor.Command.Source
@@ -80,7 +81,7 @@ class OrderBookActorSpecification
 
     val tp = TestProbe()
     val pair = AssetPair(wctAsset, Waves)
-    val obsdb = OrderBookSnapshotDb.asyncInMem
+    val obsdb = OrderBookSnapshotDb.inMem[Future]
 
     prepare(obsdb, pair)
 

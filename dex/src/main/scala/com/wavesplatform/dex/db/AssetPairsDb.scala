@@ -1,11 +1,12 @@
 package com.wavesplatform.dex.db
 
-import cats.Id
+import cats.Applicative
+import cats.syntax.applicative._
+import cats.syntax.functor._
 import com.wavesplatform.dex.db.leveldb.LevelDb
 import com.wavesplatform.dex.domain.asset.AssetPair
 
 import java.util.concurrent.ConcurrentHashMap
-import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.IteratorHasAsScala
 
 trait AssetPairsDb[F[_]] {
@@ -33,18 +34,11 @@ object AssetPairsDb {
 
   }
 
-  def syncInMem: AssetPairsDb[Id] = new AssetPairsDb[Id] {
+  def inMem[F[_]: Applicative]: AssetPairsDb[F] = new AssetPairsDb[F] {
     private val storage = ConcurrentHashMap.newKeySet[AssetPair]()
-    override def add(pair: AssetPair): Unit = storage.add(pair)
-    override def remove(pair: AssetPair): Unit = storage.remove(pair)
-    override def all(): Set[AssetPair] = storage.iterator().asScala.toSet
-  }
-
-  def asyncInMem(implicit ec: ExecutionContext): AssetPairsDb[Future] = new AssetPairsDb[Future] {
-    private val storage = ConcurrentHashMap.newKeySet[AssetPair]()
-    override def add(pair: AssetPair): Future[Unit] = Future(storage.add(pair))
-    override def remove(pair: AssetPair): Future[Unit] = Future(storage.remove(pair))
-    override def all(): Future[Set[AssetPair]] = Future(storage.iterator().asScala.toSet)
+    override def add(pair: AssetPair): F[Unit] = storage.add(pair).pure[F].void
+    override def remove(pair: AssetPair): F[Unit] = storage.remove(pair).pure[F].void
+    override def all(): F[Set[AssetPair]] = storage.iterator().asScala.toSet.pure[F]
   }
 
 }

@@ -52,7 +52,7 @@ object ConfigChecker extends ConfigWriters {
               if (checkProperty(key, co).value) {
                 acc
               } else {
-                acc :+ key
+                key :: acc
               }
             }
         }

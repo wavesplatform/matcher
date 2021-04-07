@@ -55,12 +55,13 @@ class Checker(superConnector: SuperConnector) {
   }
 
   private def checkConfigs(cfg: Config, matcherConfig: MatcherSettings): ErrorOr[Unit] = {
-    import PrettyPrintHelper._
+    import helpers.PrettyPrintHelper._
 
-    ConfigChecker.checkConfig(cfg, matcherConfig).map(prettyPrintUnusedProperties).leftMap { error =>
-      println(error)
-      error
-    }
+    ConfigChecker.checkConfig(cfg, matcherConfig)
+      .map(prettyPrintUnusedProperties).leftMap { error =>
+        println(error)
+        error
+      }
   }
 
   private def issueAsset(name: String, description: String, quantity: Long): CheckLoggedResult[AssetInfo] = {

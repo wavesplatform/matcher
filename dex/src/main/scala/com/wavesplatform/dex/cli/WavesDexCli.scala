@@ -1,6 +1,5 @@
 package com.wavesplatform.dex.cli
 
-import cats.syntax.flatMap._
 import cats.syntax.option._
 import cats.syntax.either._
 import cats.instances.either._
@@ -20,7 +19,7 @@ import monix.eval.Task
 import monix.execution.{ExecutionModel, Scheduler}
 import monix.execution.schedulers.SchedulerService
 import pureconfig.ConfigSource
-import com.wavesplatform.dex.tool.{Checker, ComparisonTool, ConfigChecker}
+import com.wavesplatform.dex.tool._
 import scopt.{OParser, RenderingMode}
 import sttp.client3._
 
@@ -240,7 +239,7 @@ object WavesDexCli extends ScoptImplicits {
   }
 
   def checkConfig(args: Args): Unit = {
-    import tool.PrettyPrintHelper._
+    import tool.helpers.PrettyPrintHelper._
 
     (for {
       _ <- cli.log(

@@ -5,6 +5,7 @@ import com.wavesplatform.dex.db.leveldb.LevelDb
 import com.wavesplatform.dex.domain.asset.AssetPair
 
 import java.util.concurrent.ConcurrentHashMap
+import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.IteratorHasAsScala
 
 trait AssetPairsDb[F[_]] {
@@ -32,11 +33,18 @@ object AssetPairsDb {
 
   }
 
-  def inMem: AssetPairsDb[Id] = new AssetPairsDb[Id] {
+  def syncInMem: AssetPairsDb[Id] = new AssetPairsDb[Id] {
     private val storage = ConcurrentHashMap.newKeySet[AssetPair]()
     override def add(pair: AssetPair): Unit = storage.add(pair)
     override def remove(pair: AssetPair): Unit = storage.remove(pair)
     override def all(): Set[AssetPair] = storage.iterator().asScala.toSet
+  }
+
+  def asyncInMem(implicit ec: ExecutionContext): AssetPairsDb[Future] = new AssetPairsDb[Future] {
+    private val storage = ConcurrentHashMap.newKeySet[AssetPair]()
+    override def add(pair: AssetPair): Future[Unit] = Future(storage.add(pair))
+    override def remove(pair: AssetPair): Future[Unit] = Future(storage.remove(pair))
+    override def all(): Future[Set[AssetPair]] = Future(storage.iterator().asScala.toSet)
   }
 
 }

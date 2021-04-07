@@ -2,21 +2,46 @@ package com.wavesplatform.dex.actors.orderbook
 
 import akka.actor.{Actor, Props}
 import com.wavesplatform.dex.actors.orderbook.OrderBookSnapshotStoreActor._
-import com.wavesplatform.dex.db.OrderBookSnapshotDB
+import com.wavesplatform.dex.db.OrderBookSnapshotDb
 import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.model.OrderBookSnapshot
 import com.wavesplatform.dex.queue.ValidatedCommandWithMeta.Offset
 
-class OrderBookSnapshotStoreActor(db: OrderBookSnapshotDB) extends Actor {
+import scala.concurrent.Future
+import scala.util.{Failure, Success}
+
+class OrderBookSnapshotStoreActor(db: OrderBookSnapshotDb[Future]) extends Actor with ScorexLogging {
+
+  import context.dispatcher
 
   override def receive: Receive = {
-    case Message.GetSnapshot(p) => sender() ! Response.GetSnapshot(db.get(p))
+    case Message.GetSnapshot(p) =>
+      val origSender = sender()
+      db.get(p).onComplete {
+        case Success(result) =>
+          origSender ! Response.GetSnapshot(result)
+        case Failure(th) =>
+          log.error(s"error retrieving snapshot for asset pair: $p", th)
+      }
 
     case Message.Update(p, offset, newSnapshot) =>
-      db.update(p, offset, newSnapshot)
-      sender() ! Response.Updated(offset)
+      val origSender = sender()
+      db.update(p, offset, newSnapshot).onComplete {
+        case Success(_) =>
+          origSender ! Response.Updated(offset)
+        case Failure(th) =>
+          log.error(s"error while updating offset for asset pair: $p, offset: $offset", th)
+      }
 
-    case Message.Delete(p) => db.delete(p)
+    case Message.Delete(p) =>
+      val origSender = sender()
+      db.delete(p).onComplete {
+        case Success(_) =>
+          origSender ! Response.Deleted(p)
+        case Failure(th) =>
+          log.error(s"error while deleting offset for asset pair: $p", th)
+      }
   }
 
 }
@@ -43,5 +68,5 @@ object OrderBookSnapshotStoreActor {
     case class Deleted(assetPair: AssetPair) extends Response
   }
 
-  def props(db: OrderBookSnapshotDB): Props = Props(new OrderBookSnapshotStoreActor(db))
+  def props(db: OrderBookSnapshotDb[Future]): Props = Props(new OrderBookSnapshotStoreActor(db))
 }

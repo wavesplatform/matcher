@@ -13,7 +13,7 @@ import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.settings.OrderFeeSettings._
-import pureconfig.{ConfigSource, ConfigWriter}
+import pureconfig.ConfigWriter
 import pureconfig._
 import pureconfig.generic.auto._
 import pureconfig.configurable.genericMapWriter
@@ -27,20 +27,27 @@ import scala.util.Try
 
 object ConfigChecker extends ConfigWriters {
 
-  val skippedPaths = Seq("events-queue.kafka")
+  val skippedPaths = Seq(
+    "events-queue.kafka.consumer.client",
+    "events-queue.kafka.producer.client"
+  )
 
   def checkConfig(configPath: String): ErrorOr[Seq[String]] =
-    checkConfig(loadConfigFromFile(configPath))
+    checkConfig(parseFile(new File(configPath)))
 
   def checkConfig(rawCfg: Config): ErrorOr[Seq[String]] =
+    loadMatcherSettings(rawCfg).toEither.leftMap(ex => s"Cannot load matcher settings: ${ex.getWithStackTrace}")
+      .flatMap(ms => checkConfig(rawCfg, ms))
+
+  def checkConfig(rawCfg: Config, matcherSettings: MatcherSettings): ErrorOr[Seq[String]] =
     Try {
-      val usingProperties: ConfigValue = getUsingProperties(rawCfg)
+      val usingProperties: ConfigValue = ConfigWriter[MatcherSettings].to(matcherSettings)
       val allProperties = rawCfg.getConfig("waves.dex").entrySet()
       getConfigObject(usingProperties)
         .map { co =>
           allProperties.asScala.toSeq
             .filter(e => skippedPaths.forall(b => !e.getKey.startsWith(b)))
-            .foldLeft(Seq.empty[String]) { (acc, elem) =>
+            .foldLeft(List.empty[String]) { (acc, elem) =>
               val key = elem.getKey
               if (checkProperty(key, co).value) {
                 acc
@@ -49,17 +56,8 @@ object ConfigChecker extends ConfigWriters {
               }
             }
         }
-        .getOrElse(Seq.empty)
+        .getOrElse(List.empty)
     }.toEither.leftMap(ex => s"Cannot check settings: ${ex.getWithStackTrace}")
-
-  private def getUsingProperties(rawCfg: Config): ConfigValue = {
-    val msCfg = ConfigSource
-      .fromConfig(getMatcherSettingsConfig(rawCfg))
-      .at("waves.dex")
-      .loadOrThrow[MatcherSettings]
-
-    ConfigWriter[MatcherSettings].to(msCfg)
-  }
 
   private def getConfigObject(cv: ConfigValue): Option[ConfigObject] =
     cv match {
@@ -78,18 +76,6 @@ object ConfigChecker extends ConfigWriters {
           .fold(Eval.now(false))(co => checkProperty(pureBranch, co)))
     } else Eval.now(Option(cfg.get(property)).nonEmpty)
   }
-
-  private def getMatcherSettingsConfig(userConfig: Config): Config = {
-    ConfigFactory
-      .defaultOverrides()
-      .withFallback(userConfig)
-      .withFallback(ConfigFactory.defaultApplication())
-      .withFallback(ConfigFactory.defaultReference())
-      .resolve()
-  }
-
-  private def loadConfigFromFile(configPath: String): Config =
-    parseFile(new File(configPath))
 
 }
 

@@ -2,6 +2,9 @@ package com.wavesplatform.dex
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
+import pureconfig.ConfigSource
+
+import scala.util.Try
 
 package object settings {
 
@@ -11,6 +14,10 @@ package object settings {
 
   /** Formats amount or price */
   def formatValue(value: BigDecimal): String = format.format(value.bigDecimal)
+
+  def loadMatcherSettings(userConfig: Config): Try[MatcherSettings] = Try {
+    ConfigSource.fromConfig(loadConfig(userConfig)).at("waves.dex").loadOrThrow[MatcherSettings]
+  }
 
   def loadConfig(userConfig: Config): Config = loadConfig(Some(userConfig))
 

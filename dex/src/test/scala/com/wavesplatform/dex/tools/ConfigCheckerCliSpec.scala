@@ -11,13 +11,13 @@ class ConfigCheckerCliSpec
     with Matchers
     with EitherValues {
 
-  "ConfigChecker" should "match fully config sample " in {
+  "ConfigChecker" should "match fully config sample" in {
     val cfg = loadCleanConfigSample()
     val result = ConfigChecker.checkConfig(cfg)
     result.value shouldBe Seq.empty[String]
   }
 
-  it should "find unexpected value in path waves.dex.bla-bla-value " in {
+  it should "find unexpected value in path waves.dex.bla-bla-value" in {
     val blablaValue = "waves.dex.bla-bla-value"
     val cfg = loadCleanConfigSample().withValue(
       blablaValue,
@@ -27,7 +27,7 @@ class ConfigCheckerCliSpec
     result.value shouldBe Seq(cutWavesDexSection(blablaValue))
   }
 
-  it should "find unexpected value in path waves.dex.order-fee.-1.dynamic.bla-bla-value " in {
+  it should "find unexpected value in path waves.dex.order-fee.-1.dynamic.bla-bla-value" in {
     val blablaValuePath = "waves.dex.order-fee.-1.dynamic.bla-bla-value"
     val cfg = loadCleanConfigSample().withValue(
       blablaValuePath,
@@ -37,7 +37,7 @@ class ConfigCheckerCliSpec
     result.value shouldBe Seq(cutWavesDexSection(blablaValuePath))
   }
 
-  it should "find more than one unexpected values " in {
+  it should "find more than one unexpected values" in {
     val blablaValuePathSeq = Seq(
       "waves.dex.order-fee.-1.dynamic.bla-bla-value",
       "waves.dex.bla-value",

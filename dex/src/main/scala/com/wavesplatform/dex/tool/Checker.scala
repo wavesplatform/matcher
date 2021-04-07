@@ -5,6 +5,7 @@ import cats.instances.list.catsStdInstancesForList
 import cats.syntax.either._
 import cats.syntax.option._
 import cats.syntax.traverse._
+import com.typesafe.config.Config
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus
 import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsOrderBookChanges}
 import com.wavesplatform.dex.cli._
@@ -15,6 +16,7 @@ import com.wavesplatform.dex.domain.model.{Denormalization, Normalization}
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV3}
 import com.wavesplatform.dex.model.OrderStatus
+import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.dex.tool.connectors.Connector.RepeatRequestOptions
 import com.wavesplatform.dex.tool.connectors.DexExtensionGrpcConnector.DetailedBalance
 import com.wavesplatform.dex.tool.connectors.SuperConnector
@@ -50,6 +52,15 @@ class Checker(superConnector: SuperConnector) {
   private def checkVersion(version: String): ErrorOr[Unit] = dexRest.getMatcherSettings.flatMap { response =>
     val parsedVersion = (response \ "matcherVersion").get.as[String]
     Either.cond(parsedVersion == version, (), s"""Failed! Expected "$version", but got "$parsedVersion"""")
+  }
+
+  private def checkConfigs(cfg: Config, matcherConfig: MatcherSettings): ErrorOr[Unit] = {
+    import PrettyPrintHelper._
+
+    ConfigChecker.checkConfig(cfg, matcherConfig).map(prettyPrintUnusedProperties).leftMap { error =>
+      println(error)
+      error
+    }
   }
 
   private def issueAsset(name: String, description: String, quantity: Long): CheckLoggedResult[AssetInfo] = {
@@ -216,23 +227,30 @@ class Checker(superConnector: SuperConnector) {
          """.stripMargin
     }
 
-  def checkState(version: String, maybeAccountSeed: Option[String], apiKey: String): ErrorOr[String] =
+  def checkState(
+    version: String,
+    maybeAccountSeed: Option[String],
+    apiKey: String,
+    cfgToCheck: Config,
+    matcherSettings: MatcherSettings
+  ): ErrorOr[String] =
     for {
       _ <- log[ErrorOr]("\nChecking:\n")
-      _ <- logCheck("1. DEX version")(checkVersion(version))
-      (balance, balanceNotes) <- logCheck("2. Matcher balance")(checkBalance)
-      (wuJIoInfo, firstAssetNotes) <- logCheck("3. First test asset")(checkTestAsset(balance, firstTestAssetName))
-      (mbIJIoInfo, secondAssetNotes) <- logCheck("4. Second test asset")(checkTestAsset(balance, secondTestAssetName))
-      _ <- logCheck("5. Wait until matcher starts")(waitUntilMatcherStarts(apiKey))
-      (assetPairInfo, activeOrdersNotes) <- logCheck("6. Matcher active orders")(checkActiveOrders(wuJIoInfo, mbIJIoInfo))
-      (order, placementNotes) <- logCheck("7. Order placement")(checkPlacement(assetPairInfo))
-      (_, cancellationNotes) <- logCheck("8. Order cancellation")(checkCancellation(order))
-      executionNotes <- logCheck("9. Execution")(checkExecution(assetPairInfo))
-      orderBookWsStreamNotes <- logCheck("10. Order book WS stream")(checkWsOrderBook(assetPairInfo))
-      accountUpdatesWsStreamNotes <- logCheck("11. Account updates WS stream")(checkWsAccountUpdates(maybeAccountSeed))
+      _ <- logCheck("1. DEX configs")(checkConfigs(cfgToCheck, matcherSettings))
+      _ <- logCheck("2. DEX version")(checkVersion(version))
+      (balance, balanceNotes) <- logCheck("3. Matcher balance")(checkBalance)
+      (wuJIoInfo, firstAssetNotes) <- logCheck("4. First test asset")(checkTestAsset(balance, firstTestAssetName))
+      (mbIJIoInfo, secondAssetNotes) <- logCheck("5. Second test asset")(checkTestAsset(balance, secondTestAssetName))
+      _ <- logCheck("6. Wait until matcher starts")(waitUntilMatcherStarts(apiKey))
+      (assetPairInfo, activeOrdersNotes) <- logCheck("7. Matcher active orders")(checkActiveOrders(wuJIoInfo, mbIJIoInfo))
+      (order, placementNotes) <- logCheck("8. Order placement")(checkPlacement(assetPairInfo))
+      (_, cancellationNotes) <- logCheck("9. Order cancellation")(checkCancellation(order))
+      executionNotes <- logCheck("10. Execution")(checkExecution(assetPairInfo))
+      orderBookWsStreamNotes <- logCheck("11. Order book WS stream")(checkWsOrderBook(assetPairInfo))
+      accountUpdatesWsStreamNotes <- logCheck("12. Account updates WS stream")(checkWsAccountUpdates(maybeAccountSeed))
     } yield s"""
                |Diagnostic notes:
-               |  Matcher balance           : $balanceNotes 
+               |  Matcher balance           : $balanceNotes
                |  First asset               : $firstAssetNotes
                |  Second asset              : $secondAssetNotes
                |  Matcher active orders     : $activeOrdersNotes

@@ -1,12 +1,13 @@
 package com.wavesplatform.dex.cli
 
+import cats.syntax.flatMap._
 import cats.syntax.option._
 import cats.syntax.either._
 import cats.instances.either._
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory.parseFile
 import com.wavesplatform.dex._
-import com.wavesplatform.dex.app.{forceStopApplication, MatcherStateCheckingFailedError}
+import com.wavesplatform.dex.app.{MatcherStateCheckingFailedError, forceStopApplication}
 import com.wavesplatform.dex.db.AccountStorage
 import com.wavesplatform.dex.doc.MatcherErrorDoc
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair}
@@ -15,11 +16,11 @@ import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.error.Implicits.ThrowableOps
 import com.wavesplatform.dex.settings.{MatcherSettings, loadConfig, loadMatcherSettings}
 import com.wavesplatform.dex.tool.connectors.SuperConnector
+import com.wavesplatform.dex.tool.{Checker, ComparisonTool}
 import monix.eval.Task
 import monix.execution.{ExecutionModel, Scheduler}
 import monix.execution.schedulers.SchedulerService
 import pureconfig.ConfigSource
-import com.wavesplatform.dex.tool._
 import scopt.{OParser, RenderingMode}
 import sttp.client3._
 
@@ -193,8 +194,7 @@ object WavesDexCli extends ScoptImplicits {
       executionModel = ExecutionModel.AlwaysAsyncExecution
     )
 
-    print("Input X-API-KEY: ")
-    val key = System.console().readPassword().mkString
+    val key = readSecretFromStdIn("Enter X-API-KEY: ")
 
     val apiUrl = args.dexRestApi.getOrElse {
       val matcherSettings =

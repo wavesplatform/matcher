@@ -12,11 +12,11 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.settings.{loadConfig, MatcherSettings}
 import com.wavesplatform.dex.tool.connectors.SuperConnector
-import com.wavesplatform.dex.tool.{Checker, ComparisonTool}
 import monix.eval.Task
 import monix.execution.{ExecutionModel, Scheduler}
 import monix.execution.schedulers.SchedulerService
 import pureconfig.ConfigSource
+import com.wavesplatform.dex.tool.{Checker, ComparisonTool, ConfigChecker}
 import scopt.{OParser, RenderingMode}
 import sttp.client3._
 
@@ -224,6 +224,32 @@ object WavesDexCli extends ScoptImplicits {
     }
   }
 
+  def checkConfig(args: Args): Unit = {
+    def prettyPrintUnusedProperties(unusedProperties: Seq[String]): Unit = {
+      if (unusedProperties.nonEmpty) {
+        println(s"Warning! Found ${unusedProperties.size} potentially unused properties.")
+        println("Unused matcher properties found:")
+        unusedProperties.foreach(p => println(s"  $p"))
+      } else {
+        println("No unused properties found!")
+      }
+    }
+
+    (for {
+      _ <- cli.log(
+        s"""
+           |Passed arguments:
+           |  DEX config path : ${args.configPath}
+           |Running in background
+           |""".stripMargin
+      )
+      result <- ConfigChecker.checkConfig(args.configPath)
+    } yield result) match {
+      case Right(unused) => prettyPrintUnusedProperties(unused)
+      case Left(error) => println(error); forceStopApplication(MatcherStateCheckingFailedError)
+    }
+  }
+
   // todo commands:
   // get account by seed [and nonce]
   def main(rawArgs: Array[String]): Unit = {
@@ -363,6 +389,17 @@ object WavesDexCli extends ScoptImplicits {
               .text("Timeout")
               .valueName("<raw-string>")
               .action((x, s) => s.copy(timeout = x))
+          ),
+          cmd(Command.CheckConfigFile.name)
+          .action((_, s) => s.copy(command = Command.CheckConfigFile.some))
+          .text("Reports all unused properties from file")
+          .children(
+            opt[String]("dex-config")
+              .abbr("dc")
+              .text("DEX config path")
+              .valueName("<raw-string>")
+              .required()
+              .action((x, s) => s.copy(configPath = x))
           )
       )
     }
@@ -382,6 +419,7 @@ object WavesDexCli extends ScoptImplicits {
             case Command.CheckServer => checkServer(args)
             case Command.RunComparison => runComparison(args)
             case Command.MakeOrderbookSnapshots => makeSnapshots(args)
+            case Command.CheckConfigFile => checkConfig(args)
           }
           println("Done")
       }
@@ -416,6 +454,10 @@ object WavesDexCli extends ScoptImplicits {
 
     case object RunComparison extends Command {
       override def name: String = "run-comparison"
+    }
+
+    case object CheckConfigFile extends Command {
+      override def name: String = "check"
     }
 
     case object MakeOrderbookSnapshots extends Command {

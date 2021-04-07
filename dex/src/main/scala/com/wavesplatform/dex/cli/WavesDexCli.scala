@@ -1,6 +1,5 @@
 package com.wavesplatform.dex.cli
 
-import cats.syntax.flatMap._
 import cats.syntax.option._
 import cats.syntax.either._
 import cats.instances.either._
@@ -16,7 +15,7 @@ import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.error.Implicits.ThrowableOps
 import com.wavesplatform.dex.settings.{MatcherSettings, loadConfig, loadMatcherSettings}
 import com.wavesplatform.dex.tool.connectors.SuperConnector
-import com.wavesplatform.dex.tool.{Checker, ComparisonTool}
+import com.wavesplatform.dex.tool._
 import monix.eval.Task
 import monix.execution.{ExecutionModel, Scheduler}
 import monix.execution.schedulers.SchedulerService

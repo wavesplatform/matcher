@@ -48,7 +48,7 @@ class ConfigCheckerCliSpec
         cfg.withValue(path, ConfigValueFactory.fromAnyRef("some-simple-value"))
     }
     val result = ConfigChecker.checkConfig(cfg)
-    result.value shouldBe blablaValuePathSeq.map(cutWavesDexSection)
+    result.value should contain theSameElementsAs blablaValuePathSeq.map(cutWavesDexSection)
   }
 
   it should "ignore unknown values from skipped paths" in {
@@ -64,7 +64,7 @@ class ConfigCheckerCliSpec
       cfg.withValue(path, ConfigValueFactory.fromAnyRef("some-simple-value"))
     }
     val result = ConfigChecker.checkConfig(cfg)
-    result.value shouldBe blablaValuePathSeq.map(cutWavesDexSection)
+    result.value should contain theSameElementsAs blablaValuePathSeq.map(cutWavesDexSection)
   }
 
   private def cutWavesDexSection(str: String): String = str.drop("waves.dex.".length)

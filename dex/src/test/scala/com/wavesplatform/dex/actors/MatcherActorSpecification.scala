@@ -6,13 +6,14 @@ import akka.actor.{Actor, ActorRef, ActorSystem, Kill, Props, Terminated}
 import akka.testkit.{ImplicitSender, TestActor, TestActorRef, TestProbe}
 import cats.data.NonEmptyList
 import cats.implicits.catsSyntaxEitherId
+import cats.instances.future._
 import com.wavesplatform.dex.MatcherSpecBase
 import com.wavesplatform.dex.actors.MatcherActor.{ForceStartOrderBook, GetMarkets, MarketData, SaveSnapshot}
 import com.wavesplatform.dex.actors.MatcherActorSpecification.{DeletingActor, FailAtStartActor, NothingDoActor, RecoveringActor, _}
 import com.wavesplatform.dex.actors.orderbook.OrderBookActor.{OrderBookRecovered, OrderBookSnapshotUpdateCompleted}
 import com.wavesplatform.dex.actors.orderbook.OrderBookSnapshotStoreActor.{Message, Response}
 import com.wavesplatform.dex.actors.orderbook.{AggregatedOrderBookActor, OrderBookActor, OrderBookSnapshotStoreActor}
-import com.wavesplatform.dex.db.{AssetPairsDb, OrderBookSnapshotDB, WithDB}
+import com.wavesplatform.dex.db.{AssetPairsDb, OrderBookSnapshotDb}
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -26,13 +27,13 @@ import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.concurrent.Eventually
 
-import scala.concurrent.Future
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration.DurationInt
+import scala.concurrent.ExecutionContext.Implicits.global
 
 class MatcherActorSpecification
     extends MatcherSpec("MatcherActor")
     with MatcherSpecBase
-    with WithDB
     with HasOecInteraction
     with BeforeAndAfterEach
     with PathMockFactory
@@ -152,7 +153,7 @@ class MatcherActorSpecification
     "stop the work" when {
       "an order book as failed during recovery" in {
         val apdb = mkAssetPairsDB
-        val obsdb = mkOrderBookSnapshotDB
+        val obsdb = mkOrderBookSnapshotDb
         val pair = AssetPair(randomAssetId, randomAssetId)
         val ob = emptyOrderBookRefs
         var stopped = false
@@ -181,7 +182,7 @@ class MatcherActorSpecification
 
       "received Shutdown during start" in {
         val apdb = mkAssetPairsDB
-        val obsdb = mkOrderBookSnapshotDB
+        val obsdb = mkOrderBookSnapshotDb
         val pair = AssetPair(randomAssetId, randomAssetId)
         val ob = emptyOrderBookRefs
         var stopped = false
@@ -275,7 +276,7 @@ class MatcherActorSpecification
     "create an order book" when {
       "place order - new order book" in {
         val apdb = mkAssetPairsDB
-        val obsdb = mkOrderBookSnapshotDB
+        val obsdb = mkOrderBookSnapshotDb
         val pair1 = AssetPair(randomAssetId, randomAssetId)
         val pair2 = AssetPair(randomAssetId, randomAssetId)
 
@@ -319,7 +320,7 @@ class MatcherActorSpecification
 
       "after delete" in {
         val apdb = mkAssetPairsDB
-        val obsdb = OrderBookSnapshotDB.inMem
+        val obsdb = mkOrderBookSnapshotDb
         val pair = AssetPair(randomAssetId, randomAssetId)
 
         matcherHadOrderBooksBefore(apdb, obsdb, pair -> 9L)
@@ -455,12 +456,15 @@ class MatcherActorSpecification
     )
   }
 
-  private def mkAssetPairsDB: AssetPairsDb[Future] = AssetPairsDb.levelDb(asyncLevelDb)
-  private def mkOrderBookSnapshotDB: OrderBookSnapshotDB = OrderBookSnapshotDB(db)
+  private def mkAssetPairsDB: AssetPairsDb[Future] = AssetPairsDb.inMem
+  private def mkOrderBookSnapshotDb: OrderBookSnapshotDb[Future] = OrderBookSnapshotDb.inMem
 
-  private def matcherHadOrderBooksBefore(apdb: AssetPairsDb[Future], obsdb: OrderBookSnapshotDB, pairs: (AssetPair, Long)*): Unit = {
-    pairs.map(_._1).foreach(apdb.add)
-    pairs.foreach { case (pair, offset) => obsdb.update(pair, offset, Some(OrderBookSnapshot.empty)) }
+  private def matcherHadOrderBooksBefore(apdb: AssetPairsDb[Future], obsdb: OrderBookSnapshotDb[Future], pairs: (AssetPair, Long)*): Unit = {
+    val future = for {
+      _ <- Future.sequence(pairs.map(_._1).map(apdb.add))
+      _ <- Future.sequence(pairs.map { case (pair, offset) => obsdb.update(pair, offset, Some(OrderBookSnapshot.empty)) })
+    } yield ()
+    Await.ready(future, 5.seconds)
   }
 
   private def doNothingOnRecovery(x: Either[String, ValidatedCommandWithMeta.Offset]): Unit = {}

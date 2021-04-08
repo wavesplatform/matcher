@@ -114,7 +114,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   }
 
   private val assetPairsDB = AssetPairsDb.levelDb(asyncLevelDb)
-  private val orderBookSnapshotDB = OrderBookSnapshotDB(db)
+  private val orderBookSnapshotDB = OrderBookSnapshotDb.levelDb(asyncLevelDb)
   private val orderDB = OrderDB(settings.orderDb, db)
   private val assetsCache = AssetsStorage.cache(AssetsStorage.levelDB(db))
   private val rateCache = RateCache(db)

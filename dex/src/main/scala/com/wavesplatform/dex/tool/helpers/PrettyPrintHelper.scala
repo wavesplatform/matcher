@@ -1,14 +1,20 @@
 package com.wavesplatform.dex.tool.helpers
 
+import cats.implicits._
+import com.wavesplatform.dex.cli
+import com.wavesplatform.dex.cli.ErrorOr
+
 object PrettyPrintHelper {
 
-  def prettyPrintUnusedProperties(unusedProperties: Seq[String]): Unit = {
+  def prettyPrintUnusedProperties(unusedProperties: Seq[String], indent: Option[Int] = None): ErrorOr[Unit] = {
     if (unusedProperties.nonEmpty) {
-      println(s"Warning! Found ${unusedProperties.size} potentially unused properties.")
-      println("Unused matcher properties found in waves.dex:")
-      unusedProperties.foreach(p => println(s"  $p"))
+      for {
+        _ <- cli.log[ErrorOr](s"\nWarning! Found ${unusedProperties.size} potentially unused properties.", indent)
+        _ <- cli.log[ErrorOr]("\nUnused matcher properties found in waves.dex:", indent)
+      } yield
+        unusedProperties.foreach(p => cli.log[ErrorOr](s"\n$p", indent))
     } else {
-      println("No unused properties in waves.dex found!")
+      cli.log[ErrorOr]("No unused properties in waves.dex found!", indent)
     }
   }
 

@@ -54,11 +54,11 @@ class Checker(superConnector: SuperConnector) {
     Either.cond(parsedVersion == version, (), s"""Failed! Expected "$version", but got "$parsedVersion"""")
   }
 
-  private def checkConfigs(cfg: Config, matcherConfig: MatcherSettings): ErrorOr[Unit] = {
+  private def checkConfigs(cfg: Config, matcherConfig: MatcherSettings, indent: Option[Int]): ErrorOr[Unit] = {
     import helpers.PrettyPrintHelper._
 
     ConfigChecker.checkConfig(cfg, matcherConfig)
-      .map(prettyPrintUnusedProperties).leftMap { error =>
+      .flatMap(prettyPrintUnusedProperties(_, indent)).leftMap { error =>
         println(error)
         error
       }
@@ -233,7 +233,7 @@ class Checker(superConnector: SuperConnector) {
   ): ErrorOr[String] =
     for {
       _ <- log[ErrorOr]("\nChecking:\n")
-      _ <- logCheck("1. DEX configs")(checkConfigs(cfgToCheck, matcherSettings))
+      _ <- logCheck("1. DEX configs")(checkConfigs(cfgToCheck, matcherSettings, 4.some))
       _ <- logCheck("2. DEX version")(checkVersion(version))
       (balance, balanceNotes) <- logCheck("3. Matcher balance")(checkBalance)
       (wuJIoInfo, firstAssetNotes) <- logCheck("4. First test asset")(checkTestAsset(balance, firstTestAssetName))

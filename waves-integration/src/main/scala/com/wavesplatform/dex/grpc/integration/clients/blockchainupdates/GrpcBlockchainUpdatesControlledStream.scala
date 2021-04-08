@@ -11,16 +11,19 @@ import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
 import io.grpc.stub.ClientCalls
 import io.grpc.{CallOptions, ClientCall, Grpc, ManagedChannel}
-import monix.execution.Scheduler
+import monix.execution.{Cancelable, Scheduler}
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
+
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
+import scala.concurrent.duration.FiniteDuration
 
 // TODO DEX-999
 /*
   From the docs of reactive streams: the grammar must still be respected: (onNext)* (onComplete | onError)
   On error we just restart the stream, so r receives updates from a new stream. That is why we don't propagate errors to r
  */
-class GrpcBlockchainUpdatesControlledStream(channel: ManagedChannel)(implicit scheduler: Scheduler)
+class GrpcBlockchainUpdatesControlledStream(channel: ManagedChannel, noDataTimeout: FiniteDuration)(implicit scheduler: Scheduler)
     extends BlockchainUpdatesControlledStream
     with ScorexLogging {
 
@@ -68,13 +71,29 @@ class GrpcBlockchainUpdatesControlledStream(channel: ManagedChannel)(implicit sc
   private class BlockchainUpdatesObserver(call: ClientCall[SubscribeRequest, SubscribeEvent], startHeight: Int)
       extends IntegrationObserver[SubscribeRequest, SubscribeEvent](internalStream) {
 
+    private val ready = new AtomicBoolean(false)
+
+    private val timeout = new AtomicReference[Option[Cancelable]](None)
+
     override def onReady(): Unit = {
-      internalSystemStream.onNext(SystemEvent.BecameReady)
+      // internalSystemStream.onNext(SystemEvent.BecameReady)
       val address = Option(call.getAttributes.get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR)).fold("unknown")(_.toString)
       log.info(s"$logPrefix Getting blockchain events from $address starting from $startHeight")
     }
 
     override def onNext(value: SubscribeEvent): Unit = {
+      timeout
+        .getAndSet(Some(scheduler.scheduleOnce(noDataTimeout) {
+          log.warn(s"No data for $noDataTimeout, restarting!")
+          stop()
+        }))
+        .foreach(_.cancel())
+
+      if (ready.compareAndSet(false, true)) {
+        log.info(s"$logPrefix Ready!")
+        internalSystemStream.onNext(SystemEvent.BecameReady)
+      }
+
       def message = {
         val update = value.getUpdate
         def ref = BlockRef(update.height, update.id.toVanilla)
@@ -101,7 +120,11 @@ class GrpcBlockchainUpdatesControlledStream(channel: ManagedChannel)(implicit sc
         internalSystemStream.onNext(SystemEvent.Stopped)
       }
 
-    override def onCompleted(): Unit = log.error(s"$logPrefix Unexpected onCompleted")
+    override def onCompleted(): Unit = {
+      log.error(s"$logPrefix Unexpected onCompleted")
+      timeout.get().foreach(_.cancel())
+    }
+
   }
 
 }

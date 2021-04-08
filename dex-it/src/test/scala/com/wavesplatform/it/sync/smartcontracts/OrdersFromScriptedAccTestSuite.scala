@@ -15,7 +15,7 @@ import org.scalatest.Assertion
 
 class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
 
-  private val activationHeight = 10
+  private val activationHeight = 20
 
   override protected val wavesNodeInitialSuiteConfig: Config = ConfigFactory.parseString(
     s"""waves {

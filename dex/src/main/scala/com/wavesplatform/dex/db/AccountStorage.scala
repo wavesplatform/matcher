@@ -26,11 +26,17 @@ object AccountStorage {
     case class InMem(seedInBase64: ByteStr) extends Settings
 
     object InMem extends ConfigReaders {
+      val empty: InMem = new InMem(ByteStr.empty)
+
       implicit val byteStrConfigReader = byteStr64ConfigReader
       implicit val inMemConfigReader = semiauto.deriveReader[InMem]
     }
 
     case class EncryptedFile(path: File, password: String) extends Settings
+
+    object EncryptedFile {
+      val empty: EncryptedFile = new EncryptedFile(new File(""), "")
+    }
 
     implicit val accountStorageHint = new WrappedDescendantHint[Settings]()
   }

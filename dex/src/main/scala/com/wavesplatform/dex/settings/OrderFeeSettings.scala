@@ -18,6 +18,9 @@ object OrderFeeSettings {
   }
 
   object DynamicSettings {
+
+    val empty: DynamicSettings = DynamicSettings(1L, 1L)
+
     def symmetric(baseFee: Long): DynamicSettings = DynamicSettings(baseFee, baseFee)
 
     implicit val dynamicConfigReader = semiauto
@@ -33,6 +36,8 @@ object OrderFeeSettings {
 
   object FixedSettings extends ConfigReaders {
 
+    val empty: FixedSettings = FixedSettings(Asset.Waves, 0L)
+
     implicit val fixedConfigReader = semiauto
       .deriveReader[FixedSettings]
       .validatedField(validationOf.field[FixedSettings, "minFee"].mk(x => rules.gtEq0(x.minFee)))
@@ -42,6 +47,8 @@ object OrderFeeSettings {
   final case class PercentSettings(assetType: AssetType, minFee: Double) extends OrderFeeSettings
 
   object PercentSettings {
+
+    val empty: PercentSettings = PercentSettings(AssetType.Amount, 0d)
 
     implicit val percentConfigReader = semiauto
       .deriveReader[PercentSettings]

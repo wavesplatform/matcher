@@ -1,18 +1,21 @@
 package com.wavesplatform.dex.cli
 
-import cats.syntax.flatMap._
 import cats.syntax.option._
+import cats.syntax.either._
+import cats.instances.either._
+import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory.parseFile
 import com.wavesplatform.dex._
-import com.wavesplatform.dex.app.{MatcherStateCheckingFailedError, forceStopApplication}
+import com.wavesplatform.dex.app.{forceStopApplication, MatcherStateCheckingFailedError}
 import com.wavesplatform.dex.db.AccountStorage
 import com.wavesplatform.dex.doc.MatcherErrorDoc
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
-import com.wavesplatform.dex.settings.{MatcherSettings, loadConfig}
+import com.wavesplatform.dex.error.Implicits.ThrowableOps
+import com.wavesplatform.dex.settings.{loadConfig, loadMatcherSettings, MatcherSettings}
 import com.wavesplatform.dex.tool.connectors.SuperConnector
-import com.wavesplatform.dex.tool.{Checker, ComparisonTool}
+import com.wavesplatform.dex.tool._
 import monix.eval.Task
 import monix.execution.{ExecutionModel, Scheduler}
 import monix.execution.schedulers.SchedulerService
@@ -135,15 +138,25 @@ object WavesDexCli extends ScoptImplicits {
              |  Account seed          : ${args.accountSeed.getOrElse("")}
                    """.stripMargin
         )
-
-        superConnector <- SuperConnector.create(args.configPath, apiUrl, args.nodeRestApi, args.authServiceRestApi)
-        checkResult <- new Checker(superConnector).checkState(args.version, args.accountSeed, apiKey)
+        (config, matcherConfig) <- cli.wrapByLogs("  Loading Matcher settings... ")(loadAllConfigs(args.configPath))
+        superConnector <- SuperConnector.create(matcherConfig, apiUrl, args.nodeRestApi, args.authServiceRestApi)
+        checkResult <- new Checker(superConnector).checkState(args.version, args.accountSeed, apiKey, config, matcherConfig)
         _ <- cli.lift(superConnector.close())
       } yield checkResult
     ) match {
       case Right(diagnosticNotes) => println(s"$diagnosticNotes\nCongratulations! All checks passed!")
       case Left(error) => println(error); forceStopApplication(MatcherStateCheckingFailedError)
     }
+  }
+
+  private def loadAllConfigs(dexConfigPath: String): ErrorOr[(Config, MatcherSettings)] =
+    (for {
+      cfg <- loadConfigAtPath(dexConfigPath)
+      matcherSettings <- loadMatcherSettings(cfg)
+    } yield (cfg, matcherSettings)).toEither.leftMap(ex => s"Cannot load matcher settings by path $dexConfigPath: ${ex.getWithStackTrace}")
+
+  private def loadConfigAtPath(dexConfigPath: String): Try[Config] = Try {
+    parseFile(new File(dexConfigPath))
   }
 
   def runComparison(args: Args): Unit =
@@ -220,6 +233,24 @@ object WavesDexCli extends ScoptImplicits {
           case _ => println(s"Other error happened:\n${e.printStackTrace()}")
         }
         System.exit(1)
+    }
+  }
+
+  def checkConfig(args: Args): Unit = {
+    import PrettyPrinter._
+
+    (for {
+      _ <- cli.log(
+        s"""
+           |Passed arguments:
+           |  DEX config path : ${args.configPath}
+           |Running in background
+           |""".stripMargin
+      )
+      result <- ConfigChecker.checkConfig(args.configPath)
+    } yield result) match {
+      case Right(unused) => prettyPrintUnusedProperties(unused)
+      case Left(error) => println(error)
     }
   }
 
@@ -362,6 +393,17 @@ object WavesDexCli extends ScoptImplicits {
               .text("Timeout")
               .valueName("<raw-string>")
               .action((x, s) => s.copy(timeout = x))
+          ),
+        cmd(Command.CheckConfigFile.name)
+          .action((_, s) => s.copy(command = Command.CheckConfigFile.some))
+          .text("Reports all unused properties from file")
+          .children(
+            opt[String]("dex-config")
+              .abbr("dc")
+              .text("DEX config path")
+              .valueName("<raw-string>")
+              .required()
+              .action((x, s) => s.copy(configPath = x))
           )
       )
     }
@@ -381,6 +423,7 @@ object WavesDexCli extends ScoptImplicits {
             case Command.CheckServer => checkServer(args)
             case Command.RunComparison => runComparison(args)
             case Command.MakeOrderbookSnapshots => makeSnapshots(args)
+            case Command.CheckConfigFile => checkConfig(args)
           }
           println("Done")
       }
@@ -415,6 +458,10 @@ object WavesDexCli extends ScoptImplicits {
 
     case object RunComparison extends Command {
       override def name: String = "run-comparison"
+    }
+
+    case object CheckConfigFile extends Command {
+      override def name: String = "check"
     }
 
     case object MakeOrderbookSnapshots extends Command {

@@ -1,20 +1,13 @@
 package com.wavesplatform.dex.tool.connectors
 
-import java.io.File
-
 import cats.instances.either._
 import cats.syntax.either._
 import cats.syntax.option._
-import com.typesafe.config.ConfigFactory._
 import com.wavesplatform.dex.cli._
 import com.wavesplatform.dex.db.AccountStorage
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair}
-import com.wavesplatform.dex.error.Implicits.ThrowableOps
-import com.wavesplatform.dex.settings.{loadConfig, MatcherSettings}
+import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.dex.tool.connectors.SuperConnector.Env
-import pureconfig.ConfigSource
-
-import scala.util.Try
 
 case class SuperConnector private (
   env: Env,
@@ -39,7 +32,7 @@ object SuperConnector {
 
   private val processLeftIndent = 110
 
-  def create(dexConfigPath: String, dexRestApi: String, nodeRestApi: String, authServiceRestApi: Option[String]): ErrorOr[SuperConnector] = {
+  def create(matcherSettings: MatcherSettings, dexRestApi: String, nodeRestApi: String, authServiceRestApi: Option[String]): ErrorOr[SuperConnector] = {
 
     def prependScheme(uri: String): String = {
       val uriWithoutSlash = if (uri.last == '/') uri.init else uri
@@ -49,20 +42,13 @@ object SuperConnector {
 
     def logProcessing[A](processing: String)(f: => ErrorOr[A]): ErrorOr[A] = wrapByLogs(s"  $processing... ", "Done\n", processLeftIndent.some)(f)
 
-    def loadMatcherSettings(confPath: String): ErrorOr[MatcherSettings] =
-      Try {
-        val matcherSettings =
-          ConfigSource.fromConfig(loadConfig(parseFile(new File(dexConfigPath)))).at("waves.dex").loadOrThrow[MatcherSettings]
-        AddressScheme.current = new AddressScheme { override val chainId: Byte = matcherSettings.addressSchemeCharacter.toByte }
-        matcherSettings
-      }.toEither.leftMap(ex => s"Cannot load matcher settings by path $confPath: ${ex.getWithStackTrace}")
-
     def loadMatcherKeyPair(accountStorage: AccountStorage.Settings): ErrorOr[KeyPair] =
       AccountStorage.load(accountStorage).bimap(ex => s"Cannot load Matcher account! $ex", _.keyPair)
 
+    AddressScheme.current = new AddressScheme { override val chainId: Byte = matcherSettings.addressSchemeCharacter.toByte }
+
     for {
       _ <- log("\nSetting up the Super Connector:\n")
-      matcherSettings <- logProcessing("Loading Matcher settings")(loadMatcherSettings(dexConfigPath))
       matcherKeyPair <- logProcessing("Loading Matcher Key Pair")(loadMatcherKeyPair(matcherSettings.accountStorage))
 
       dexRestIpAndPort = s"${matcherSettings.restApi.address}:${matcherSettings.restApi.port}"

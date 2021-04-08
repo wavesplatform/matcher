@@ -51,18 +51,20 @@ class ConfigCheckerCliSpec extends BaseSettingsSpecification with Matchers with 
   }
 
   it should "ignore unknown values from skipped paths" in {
-    val skippedProperties =
-      ConfigChecker.skippedPaths.map(s => s"waves.dex.$s.unknown-property")
+    val skippedProperties = Seq("events-queue.kafka.consumer.client", "events-queue.kafka.producer.client", "events-queue.kafka.servers")
     val blablaValuePathSeq = Seq(
       "waves.dex.order-fee.-1.dynamic.bla-bla-value",
       "waves.dex.bla-value",
       "waves.dex.order-db.some-unexpected-path"
     )
+    val uncheckingPathsProperty = skippedProperties.reduce { (s1, s2) =>
+      s"$s1;$s2"
+    }
     val cfg = (blablaValuePathSeq ++ skippedProperties).foldLeft(
       loadCleanConfigSample()
     ) { (cfg, path) =>
       cfg.withValue(path, ConfigValueFactory.fromAnyRef("some-simple-value"))
-    }
+    }.withValue("waves.dex.unchecking-configs", ConfigValueFactory.fromAnyRef(uncheckingPathsProperty))
     val result = ConfigChecker.checkConfig(cfg)
     result.value should contain theSameElementsAs blablaValuePathSeq.map(cutWavesDexSection)
   }

@@ -62,7 +62,8 @@ case class MatcherSettings(
   webSockets: WebSocketSettings,
   addressActor: AddressActor.Settings,
   orderEventsCoordinatorActor: OrderEventsCoordinatorActor.Settings,
-  comparisonTool: ComparisonTool.Settings
+  comparisonTool: ComparisonTool.Settings,
+  uncheckingConfigs: Option[String]
 ) {
 
   val recoverOrderHistory = !new File(dataDirectory).exists()

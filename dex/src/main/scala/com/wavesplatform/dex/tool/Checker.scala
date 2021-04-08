@@ -55,7 +55,7 @@ class Checker(superConnector: SuperConnector) {
   }
 
   private def checkConfigs(cfg: Config, matcherConfig: MatcherSettings, indent: Option[Int]): ErrorOr[Unit] = {
-    import helpers.PrettyPrintHelper._
+    import PrettyPrinter._
 
     ConfigChecker.checkConfig(cfg, matcherConfig)
       .flatMap(prettyPrintUnusedProperties(_, indent)).leftMap { error =>
@@ -112,7 +112,7 @@ class Checker(superConnector: SuperConnector) {
     dexRest.repeatRequest(dexRest.getMatcherStatus(apiKey)) { response =>
       response.isLeft || response.exists { jsValue =>
         (jsValue \ "service").asOpt[String].contains("Working") &&
-          (jsValue \ "blockchain").asOpt[String].contains("Working")
+        (jsValue \ "blockchain").asOpt[String].contains("Working")
       }
     }(RepeatRequestOptions(waitingTime.toSeconds.toInt, 1.second)).map(_ => ())
 

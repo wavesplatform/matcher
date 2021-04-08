@@ -6,14 +6,14 @@ import cats.instances.either._
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory.parseFile
 import com.wavesplatform.dex._
-import com.wavesplatform.dex.app.{MatcherStateCheckingFailedError, forceStopApplication}
+import com.wavesplatform.dex.app.{forceStopApplication, MatcherStateCheckingFailedError}
 import com.wavesplatform.dex.db.AccountStorage
 import com.wavesplatform.dex.doc.MatcherErrorDoc
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.error.Implicits.ThrowableOps
-import com.wavesplatform.dex.settings.{MatcherSettings, loadConfig, loadMatcherSettings}
+import com.wavesplatform.dex.settings.{loadConfig, loadMatcherSettings, MatcherSettings}
 import com.wavesplatform.dex.tool.connectors.SuperConnector
 import com.wavesplatform.dex.tool._
 import monix.eval.Task
@@ -153,8 +153,7 @@ object WavesDexCli extends ScoptImplicits {
     (for {
       cfg <- loadConfigAtPath(dexConfigPath)
       matcherSettings <- loadMatcherSettings(cfg)
-    } yield  (cfg, matcherSettings)).toEither.leftMap(ex => s"Cannot load matcher settings by path $dexConfigPath: ${ex.getWithStackTrace}")
-
+    } yield (cfg, matcherSettings)).toEither.leftMap(ex => s"Cannot load matcher settings by path $dexConfigPath: ${ex.getWithStackTrace}")
 
   private def loadConfigAtPath(dexConfigPath: String): Try[Config] = Try {
     parseFile(new File(dexConfigPath))
@@ -238,7 +237,7 @@ object WavesDexCli extends ScoptImplicits {
   }
 
   def checkConfig(args: Args): Unit = {
-    import tool.helpers.PrettyPrintHelper._
+    import PrettyPrinter._
 
     (for {
       _ <- cli.log(
@@ -251,7 +250,7 @@ object WavesDexCli extends ScoptImplicits {
       result <- ConfigChecker.checkConfig(args.configPath)
     } yield result) match {
       case Right(unused) => prettyPrintUnusedProperties(unused)
-      case Left(error)   => println(error)
+      case Left(error) => println(error)
     }
   }
 
@@ -395,7 +394,7 @@ object WavesDexCli extends ScoptImplicits {
               .valueName("<raw-string>")
               .action((x, s) => s.copy(timeout = x))
           ),
-          cmd(Command.CheckConfigFile.name)
+        cmd(Command.CheckConfigFile.name)
           .action((_, s) => s.copy(command = Command.CheckConfigFile.some))
           .text("Reports all unused properties from file")
           .children(

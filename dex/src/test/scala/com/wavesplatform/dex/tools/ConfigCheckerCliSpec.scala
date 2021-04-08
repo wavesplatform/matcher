@@ -6,10 +6,7 @@ import com.wavesplatform.dex.tool.ConfigChecker
 import org.scalatest.EitherValues
 import org.scalatest.matchers.should.Matchers
 
-class ConfigCheckerCliSpec
-    extends BaseSettingsSpecification
-    with Matchers
-    with EitherValues {
+class ConfigCheckerCliSpec extends BaseSettingsSpecification with Matchers with EitherValues {
 
   "ConfigChecker" should "match fully config sample" in {
     val cfg = loadCleanConfigSample()
@@ -21,7 +18,8 @@ class ConfigCheckerCliSpec
     val blablaValue = "waves.dex.bla-bla-value"
     val cfg = loadCleanConfigSample().withValue(
       blablaValue,
-      ConfigValueFactory.fromAnyRef("some-simple-value"))
+      ConfigValueFactory.fromAnyRef("some-simple-value")
+    )
 
     val result = ConfigChecker.checkConfig(cfg)
     result.value shouldBe Seq(cutWavesDexSection(blablaValue))
@@ -31,7 +29,8 @@ class ConfigCheckerCliSpec
     val blablaValuePath = "waves.dex.order-fee.-1.dynamic.bla-bla-value"
     val cfg = loadCleanConfigSample().withValue(
       blablaValuePath,
-      ConfigValueFactory.fromAnyRef("some-simple-value"))
+      ConfigValueFactory.fromAnyRef("some-simple-value")
+    )
 
     val result = ConfigChecker.checkConfig(cfg)
     result.value shouldBe Seq(cutWavesDexSection(blablaValuePath))
@@ -60,7 +59,8 @@ class ConfigCheckerCliSpec
       "waves.dex.order-db.some-unexpected-path"
     )
     val cfg = (blablaValuePathSeq ++ skippedProperties).foldLeft(
-      loadCleanConfigSample()) { (cfg, path) =>
+      loadCleanConfigSample()
+    ) { (cfg, path) =>
       cfg.withValue(path, ConfigValueFactory.fromAnyRef("some-simple-value"))
     }
     val result = ConfigChecker.checkConfig(cfg)

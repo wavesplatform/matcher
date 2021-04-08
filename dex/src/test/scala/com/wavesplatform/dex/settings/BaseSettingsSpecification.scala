@@ -250,4 +250,196 @@ class BaseSettingsSpecification extends AnyFlatSpec {
     loadConfig(ConfigFactory.parseString(configStr))
   }
 
+  def loadCleanConfigSample(): Config = {
+    val configStr =
+      s"""waves.dex {
+         |  data-directory = "data"
+         |  id = "default"
+         |  address-scheme-character = "W"
+         |  account-storage {
+         |    type = "in-mem"
+         |    in-mem.seed-in-base-64 = ""
+         |    encrypted-file {
+         |      path = "/path/to/account.dat"
+         |      password = "password-for-file"
+         |    }
+         |  }
+         |  ntp-server = "pool.ntp.org"
+         |  rest-api {
+         |    address = "127.0.0.1"
+         |    port = 6886
+         |    api-key-hash = ""
+         |    cors = yes
+         |    api-key-different-host = no
+         |  }
+         |  address-actor {
+         |    max-active-orders = 400
+         |  }
+         |  order-db {
+         |    max-orders = 100
+         |  }
+         |  waves-blockchain-client {
+         |    grpc {
+         |      target = "127.0.0.1:6887"
+         |      max-hedged-attempts = 5
+         |      max-retry-attempts = 30
+         |      keep-alive-without-calls = true
+         |      keep-alive-time = 10s
+         |      keep-alive-timeout = 5s
+         |      idle-timeout = 300d
+         |      channel-options {
+         |        connect-timeout = 5s
+         |      }
+         |    }
+         |    blockchain-updates-grpc {
+         |      target = "127.0.0.1:6881"
+         |      max-hedged-attempts = 5
+         |      max-retry-attempts = 30
+         |      keep-alive-without-calls = false
+         |      keep-alive-time = 10s
+         |      keep-alive-timeout = 5s
+         |      idle-timeout = 300d
+         |      channel-options {
+         |        connect-timeout = 5s
+         |      }
+         |    }
+         |    default-caches-expiration = 100ms
+         |    combined-client-settings {
+         |      max-rollback-height = 100
+         |      max-cached-latest-block-updates = 12
+         |      combined-stream.restart-delay = 1s
+         |      pessimistic-portfolios.max-confirmed-transactions = 10000
+         |    }
+         |  }
+         |  exchange-tx-base-fee = 300000
+         |  order-fee {
+         |    -1: {
+         |      mode = "dynamic" # | "fixed" | "percent"
+         |      dynamic {
+         |        base-maker-fee = 300000
+         |        base-taker-fee = 300000
+         |      }
+         |      fixed {
+         |        asset = "WAVES" # | "some issued asset (base58)"
+         |        min-fee = 300000
+         |      }
+         |      percent {
+         |        asset-type = "amount" # | "price" | "spending" | "receiving"
+         |        min-fee = 0.1
+         |      }
+         |    }
+         |  }
+         |  max-price-deviations {
+         |    enable = no
+         |    max-price-profit = 1000000
+         |    max-price-loss = 1000000
+         |    max-fee-deviation = 1000000
+         |  }
+         |  order-restrictions = {}
+         |  matching-rules = {}
+         |  postgres {
+         |    server-name = "localhost"
+         |    port-number = 5435
+         |    database = "user"
+         |    user = "user"
+         |    password = "user"
+         |    data-source-class-name = "org.postgresql.ds.PGSimpleDataSource"
+         |    application-name = "my-matcher"
+         |  }
+         |  order-history {
+         |    enable = no
+         |    orders-batch-linger-ms = 1000
+         |    orders-batch-entries = 10000
+         |    events-batch-linger-ms = 1000
+         |    events-batch-entries = 10000
+         |  }
+         |  snapshots-interval = 1000000
+         |  snapshots-loading-timeout = 10m
+         |  start-events-processing-timeout = 20m
+         |  order-books-recovering-timeout = 10m
+         |  price-assets: []
+         |  blacklisted-assets: []
+         |  blacklisted-names: []
+         |  blacklisted-addresses: []
+         |  white-list-only = no
+         |  allowed-asset-pairs: []
+         |  allowed-order-versions = [1, 2, 3]
+         |  order-book-http {
+         |    depth-ranges = [10, 100]
+         |    default-depth = 100
+         |  }
+         |  events-queue {
+         |    type = "local"
+         |    local {
+         |      enable-storing = yes
+         |      polling-interval = 20ms
+         |      max-elements-per-poll = 100
+         |      clean-before-consume = yes
+         |    }
+         |    circuit-breaker {
+         |      max-failures = 10
+         |      call-timeout = 300ms
+         |      reset-timeout = 10s
+         |    }
+         |  }
+         |  exchange-transaction-broadcast {
+         |    interval = 7 seconds
+         |    max-pending-time = 15 minutes
+         |  }
+         |  web-sockets {
+         |    external-client-handler {
+         |      messages-interval = 100ms
+         |      max-connection-lifetime = 24h
+         |      jwt-public-key = \"\"\"-----BEGIN PUBLIC KEY-----
+         |-----END PUBLIC KEY-----\"\"\"
+         |      subscriptions {
+         |        max-order-book-number = 10
+         |        max-address-number = 10
+         |      }
+         |      health-check {
+         |          ping-interval = 10m
+         |          pong-timeout = 374m
+         |        }
+         |    }
+         |    internal-broadcast {
+         |      messages-interval = 1s
+         |    }
+         |    internal-client-handler {
+         |      health-check {
+         |          ping-interval = 10m
+         |          pong-timeout = 374m
+         |        }
+         |    }
+         |  }
+         |}
+         |waves.dex.comparison-tool {
+         |  checks {
+         |    interval = 5s
+         |    duration = 10m
+         |    strike = 4
+         |  }
+         |  matcher-rest-apis = []
+         |
+         |  tradable-balance-check {
+         |    account-pks = []
+         |    asset-pairs = []
+         |  }
+         |}
+         |
+         |waves.dex {
+         |  actor-response-timeout = 30 seconds
+         |  process-consumed-timeout = 10 seconds
+         |  waves-blockchain-client.balance-stream-buffer-size = 100
+         |  address-actor {
+         |    ws-messages-interval = 20 seconds
+         |    batch-cancel-timeout = 18 seconds
+         |  }
+         |  order-events-coordinator-actor {
+         |    exchange-transaction-cache-size = 6000
+         |  }
+         |} """.stripMargin
+
+    ConfigFactory.parseString(configStr)
+  }
+
 }

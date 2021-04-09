@@ -1,17 +1,16 @@
 package com.wavesplatform.dex.db
 
 import cats.Monad
-import cats.implicits._
 
 import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.{AtomicLong, AtomicReference}
 import com.google.common.primitives.{Longs, Shorts}
 import com.wavesplatform.dex.db.DbKeys._
 import com.wavesplatform.dex.db.leveldb.Key
 import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import com.wavesplatform.dex.db.leveldb.LevelDb
 
-trait AbstractLocalQueueStore[F[_]] {
+trait LocalQueueStore[F[_]] {
 
   def enqueue(command: ValidatedCommand, timestamp: Long): F[ValidatedCommandWithMeta.Offset]
 
@@ -25,13 +24,20 @@ trait AbstractLocalQueueStore[F[_]] {
 
 }
 
-class LocalQueueStore[F[_]](levelDb: LevelDb[F])(implicit fa: Monad[F]) extends AbstractLocalQueueStore[F]{
+object LocalQueueStore {
+
+  def levelDb[F[_]: Monad](levelDb: LevelDb[F]): LocalQueueStore[F] = new LevelDbLocalQueueStore(levelDb)
+
+}
+
+class LevelDbLocalQueueStore[F[_]: Monad](levelDb: LevelDb[F]) extends LocalQueueStore[F] {
+  import cats.syntax.monad._
 
   private val newestIdx = levelDb.get(lqNewestIdx).map(s => new AtomicLong(s))
   private val inMemQueue = new ConcurrentLinkedQueue[ValidatedCommandWithMeta]
-  private var startInMemOffset = Option.empty[ValidatedCommandWithMeta.Offset]
+  private val startInMemOffset = new AtomicReference[ValidatedCommandWithMeta.Offset](-1L)
 
-  override def enqueue(command: ValidatedCommand, timestamp: Long): F[ValidatedCommandWithMeta.Offset] = {
+  override def enqueue(command: ValidatedCommand, timestamp: Long): F[ValidatedCommandWithMeta.Offset] =
     newestIdx.flatMap { oldOffset =>
       val offset = oldOffset.incrementAndGet()
       val eventKey: Key[Option[ValidatedCommandWithMeta]] = lpqElement(offset)
@@ -41,15 +47,14 @@ class LocalQueueStore[F[_]](levelDb: LevelDb[F])(implicit fa: Monad[F]) extends 
         rw.put(eventKey, Some(x))
         rw.put(lqNewestIdx, offset)
       }.map { _ =>
-        inMemQueue.add(x)
-        if (startInMemOffset.isEmpty) startInMemOffset = Some(offset)
+        inMemQueue.add(x) // TODO Probably concurrent work issues
+        startInMemOffset.compareAndSet(-1L, offset)
         offset
       }
     }
-  }
 
   override def getFrom(offset: ValidatedCommandWithMeta.Offset, maxElements: Int): F[Vector[ValidatedCommandWithMeta]] =
-    if (startInMemOffset.exists(_ <= offset))
+    if (startInMemOffset.get() <= offset)
       if (inMemQueue.isEmpty) Vector.empty[ValidatedCommandWithMeta].pure[F]
       else {
         val xs = Vector.newBuilder[ValidatedCommandWithMeta]
@@ -77,13 +82,11 @@ class LocalQueueStore[F[_]](levelDb: LevelDb[F])(implicit fa: Monad[F]) extends 
       }.headOption
     }
 
-  override def newestOffset: F[Option[ValidatedCommandWithMeta.Offset]] = {
-    newestIdx.flatMap { oldOffset =>
-      val idx = oldOffset.get()
-      val eventKey = lpqElement(idx)
-      levelDb.get(eventKey).map(_.map(_.offset))
-    }
-  }
+  override def newestOffset: F[Option[ValidatedCommandWithMeta.Offset]] =
+    for {
+      eventKey <- newestIdx.map(v => lpqElement(v.get))
+      result <- levelDb.get(eventKey).map(_.map(_.offset))
+    } yield result
 
   override def dropUntil(offset: ValidatedCommandWithMeta.Offset): F[Unit] = levelDb.get(lqOldestIdx).flatMap { idx =>
     levelDb.readWrite { rw =>

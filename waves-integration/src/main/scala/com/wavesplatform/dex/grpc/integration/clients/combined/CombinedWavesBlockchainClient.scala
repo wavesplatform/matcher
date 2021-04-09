@@ -288,7 +288,12 @@ object CombinedWavesBlockchainClient extends ScorexLogging {
         new MatcherExtensionGrpcAsyncClient(eventLoopGroup, matcherExtensionChannel, monixScheduler)(grpcExecutionContext),
         wavesBlockchainClientSettings.defaultCachesExpiration
       )(grpcExecutionContext),
-      bClient = new DefaultBlockchainUpdatesClient(eventLoopGroup, blockchainUpdatesChannel, monixScheduler)(grpcExecutionContext)
+      bClient = new DefaultBlockchainUpdatesClient(
+        eventLoopGroup,
+        blockchainUpdatesChannel,
+        monixScheduler,
+        wavesBlockchainClientSettings.blockchainUpdatesGrpc.noDataTimeout
+      )(grpcExecutionContext)
     )(grpcExecutionContext, monixScheduler)
   }
 

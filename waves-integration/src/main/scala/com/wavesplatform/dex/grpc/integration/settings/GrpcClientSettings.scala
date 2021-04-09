@@ -14,7 +14,8 @@ case class GrpcClientSettings(
   keepAliveTime: FiniteDuration,
   keepAliveTimeout: FiniteDuration,
   idleTimeout: FiniteDuration,
-  channelOptions: ChannelOptionsSettings
+  channelOptions: ChannelOptionsSettings,
+  noDataTimeout: FiniteDuration
 ) {
 
   def toNettyChannelBuilder: NettyChannelBuilder = {

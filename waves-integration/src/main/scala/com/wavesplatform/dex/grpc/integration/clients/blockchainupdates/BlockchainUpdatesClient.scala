@@ -1,12 +1,12 @@
 package com.wavesplatform.dex.grpc.integration.clients.blockchainupdates
 
-import java.util.concurrent.TimeUnit
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.effect.Implicits.NettyFutureOps
 import io.grpc.ManagedChannel
 import io.netty.channel.EventLoopGroup
 import monix.execution.Scheduler
 
+import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -26,7 +26,8 @@ class DefaultBlockchainUpdatesClient(
   channel: ManagedChannel,
   monixScheduler: Scheduler,
   noDataTimeout: FiniteDuration
-)(implicit  grpcExecutionContext: ExecutionContext) extends BlockchainUpdatesClient
+)(implicit grpcExecutionContext: ExecutionContext)
+    extends BlockchainUpdatesClient
     with ScorexLogging {
 
   override val blockchainEvents = new GrpcBlockchainUpdatesControlledStream(channel, noDataTimeout)(monixScheduler)

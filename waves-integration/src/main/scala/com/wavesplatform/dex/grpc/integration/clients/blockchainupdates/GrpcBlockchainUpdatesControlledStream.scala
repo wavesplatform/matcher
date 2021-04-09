@@ -15,7 +15,7 @@ import monix.execution.{Cancelable, Scheduler}
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 
-import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
+import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.duration.FiniteDuration
 
 // TODO DEX-999
@@ -71,14 +71,12 @@ class GrpcBlockchainUpdatesControlledStream(channel: ManagedChannel, noDataTimeo
   private class BlockchainUpdatesObserver(call: ClientCall[SubscribeRequest, SubscribeEvent], startHeight: Int)
       extends IntegrationObserver[SubscribeRequest, SubscribeEvent](internalStream) {
 
-    private val ready = new AtomicBoolean(false)
-
     private val timeout = new AtomicReference[Option[Cancelable]](None)
 
     override def onReady(): Unit = {
-      // internalSystemStream.onNext(SystemEvent.BecameReady)
+      internalSystemStream.onNext(SystemEvent.BecameReady)
       val address = Option(call.getAttributes.get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR)).fold("unknown")(_.toString)
-      log.info(s"$logPrefix Getting blockchain events from $address starting from $startHeight")
+      log.info(s"$logPrefix Ready to receive from $address")
     }
 
     override def onNext(value: SubscribeEvent): Unit = {
@@ -88,11 +86,6 @@ class GrpcBlockchainUpdatesControlledStream(channel: ManagedChannel, noDataTimeo
           stop()
         }))
         .foreach(_.cancel())
-
-      if (ready.compareAndSet(false, true)) {
-        log.info(s"$logPrefix Ready!")
-        internalSystemStream.onNext(SystemEvent.BecameReady)
-      }
 
       def message = {
         val update = value.getUpdate
@@ -113,12 +106,14 @@ class GrpcBlockchainUpdatesControlledStream(channel: ManagedChannel, noDataTimeo
       super.onNext(value)
     }
 
-    override def onError(e: Throwable): Unit =
+    override def onError(e: Throwable): Unit = {
       if (isClosed) log.trace(s"$logPrefix Got an expected error during closing: ${Option(e.getMessage).getOrElse("null")}")
       else {
         log.warn(s"$logPrefix Got an error in blockchain events", e)
         internalSystemStream.onNext(SystemEvent.Stopped)
       }
+      timeout.get().foreach(_.cancel())
+    }
 
     override def onCompleted(): Unit = {
       log.error(s"$logPrefix Unexpected onCompleted")

@@ -26,7 +26,7 @@ import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
 import com.wavesplatform.dex.api.ws.actors.WsExternalClientDirectoryActor
 import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.caches.RateCache
-import com.wavesplatform.dex.db.OrderDB
+import com.wavesplatform.dex.db.OrderDb
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -56,7 +56,7 @@ import play.api.libs.json._
 import javax.ws.rs.Path
 import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag
-import scala.util.Success
+import scala.util.{Failure, Success}
 
 @Path("/matcher")
 @Api()
@@ -74,7 +74,7 @@ class MatcherApiRoute(
   orderValidator: Order => FutureResult[Order],
   matcherSettings: MatcherSettings,
   override val matcherStatus: () => MatcherStatus,
-  orderDb: OrderDB,
+  orderDb: OrderDb[Future],
   currentOffset: () => ValidatedCommandWithMeta.Offset,
   lastOffset: () => Future[ValidatedCommandWithMeta.Offset],
   matcherAccountFee: Long,
@@ -391,21 +391,19 @@ class MatcherApiRoute(
     )
   )
   def getOrderBook: Route = (path(AssetPairPM) & get) { pairOrError =>
-    parameters("depth".as[String].?) { depth =>
-      depth match {
-        case None => withAssetPair(pairOrError, redirectToInverse = true, "") { pair =>
-            complete(orderBookHttpInfo.getHttpView(pair, MatcherModel.Normalized, None))
-          }
-        case Some(depth) =>
-          depth.toIntOption match {
-            case None => complete(InvalidDepth(s"Depth value '$depth' must be an Integer"))
-            case Some(d) =>
-              if (d >= 0) withAssetPair(pairOrError, redirectToInverse = true, s"?depth=$d") { pair =>
-                complete(orderBookHttpInfo.getHttpView(pair, MatcherModel.Normalized, Some(d)))
-              }
-              else complete(InvalidDepth(s"Depth value '$depth' must be non-negative"))
-          }
-      }
+    parameters("depth".as[String].?) {
+      case None => withAssetPair(pairOrError, redirectToInverse = true, "") { pair =>
+          complete(orderBookHttpInfo.getHttpView(pair, MatcherModel.Normalized, None))
+        }
+      case Some(depth) =>
+        depth.toIntOption match {
+          case None => complete(InvalidDepth(s"Depth value '$depth' must be an Integer"))
+          case Some(d) =>
+            if (d >= 0) withAssetPair(pairOrError, redirectToInverse = true, s"?depth=$d") { pair =>
+              complete(orderBookHttpInfo.getHttpView(pair, MatcherModel.Normalized, Some(d)))
+            }
+            else complete(InvalidDepth(s"Depth value '$depth' must be non-negative"))
+        }
     }
   }
 
@@ -682,12 +680,20 @@ class MatcherApiRoute(
   )
   def cancelByApi: Route = (path("cancel" / OrderPM) & post & withAuth & withUserPublicKeyOpt) { (orderIdOrError, userPublicKey) =>
     withOrderId(orderIdOrError) { orderId =>
-      def reject: StandardRoute = complete(OrderCancelRejected(error.OrderNotFound(orderId)))
-      (orderDb.get(orderId), userPublicKey) match {
-        case (None, _) => reject
-        case (Some(order), Some(pk)) if pk.toAddress != order.sender.toAddress => reject
-        case (Some(order), _) => handleCancelRequest(None, order.sender, Some(orderId), None)
-      }
+      def reject: StandardRoute =
+        complete(OrderCancelRejected(error.OrderNotFound(orderId)))
+
+      onComplete(orderDb.get(orderId)).map {
+        case Success(maybeOrder) =>
+          (maybeOrder, userPublicKey) match {
+            case (None, _) => reject
+            case (Some(order), Some(pk)) if pk.toAddress != order.sender.toAddress => reject
+            case (Some(order), _) => handleCancelRequest(None, order.sender, Some(orderId), None)
+          }
+        case Failure(th) =>
+          log.error("error while retrieving order", th)
+          complete(entities.InternalError)
+      }.tapply(_._1)
     }
   }
 
@@ -1027,16 +1033,30 @@ class MatcherApiRoute(
   def orderStatus: Route = (path(AssetPairPM / OrderPM) & get) { (pairOrError, orderIdOrError) =>
     withOrderId(orderIdOrError) { orderId =>
       withAssetPair(pairOrError, redirectToInverse = true, s"/$orderId") { _ =>
-        complete {
-          orderDb.get(orderId) match {
-            case Some(order) =>
-              askMapAddressActor[AddressActor.Reply.GetOrderStatus](order.sender, AddressActor.Query.GetOrderStatus(orderId)) { r =>
-                HttpOrderStatus.from(r.x)
+        val future =
+          for {
+            maybeOrder <- orderDb.get(orderId)
+            result <- {
+              maybeOrder match {
+                case Some(order) =>
+                  askMapAddressActor[AddressActor.Reply.GetOrderStatus](order.sender, AddressActor.Query.GetOrderStatus(orderId)) { r =>
+                    HttpOrderStatus.from(r.x)
+                  }
+                case None =>
+                  orderDb
+                    .getOrderInfo(orderId)
+                    .map(_.fold(HttpOrderStatus.from(OrderStatus.NotFound))(x => HttpOrderStatus.from(x.status)))
+                    .map(ToResponseMarshallable(_))
               }
-            case None =>
-              Future.successful(orderDb.getOrderInfo(orderId).fold(HttpOrderStatus.from(OrderStatus.NotFound))(x => HttpOrderStatus.from(x.status)))
-          }
-        }
+            }
+          } yield result
+
+        onComplete(future).map {
+          case Success(response) => complete(response)
+          case Failure(th) =>
+            log.error("error while retrieving order status", th)
+            complete(entities.InternalError)
+        }.tapply(_._1)
       }
     }
   }
@@ -1090,7 +1110,14 @@ class MatcherApiRoute(
     )
   )
   def getOrderTransactions: Route = (path(OrderPM) & get) { orderIdOrError =>
-    withOrderId(orderIdOrError)(orderId => complete(Json.toJson(orderDb.transactionsByOrder(orderId))))
+    withOrderId(orderIdOrError) { orderId =>
+      onComplete(orderDb.transactionsByOrder(orderId)).map {
+        case Success(txns) => complete(Json.toJson(txns))
+        case Failure(th) =>
+          log.error("error while retrieving order transactions", th)
+          complete(entities.InternalError)
+      }.tapply(_._1)
+    }
   }
 
   @Path("/debug/config")

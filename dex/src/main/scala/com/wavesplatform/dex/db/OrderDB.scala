@@ -1,86 +1,101 @@
 package com.wavesplatform.dex.db
 
-import com.wavesplatform.dex.db.leveldb.DBExt
+import cats.Monad
+import com.wavesplatform.dex.db.leveldb.LevelDb
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.Order.Id
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
-import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.model.OrderInfo.FinalOrderInfo
 import com.wavesplatform.dex.model.{OrderInfo, OrderStatus}
-import org.iq80.leveldb.DB
+import cats.syntax.functor._
+import cats.syntax.flatMap._
+import cats.syntax.traverse._
+import cats.instances.list._
 
 /**
  * Contains only finalized orders
  */
-trait OrderDB {
-  def containsInfo(id: Order.Id): Boolean
-  def status(id: Order.Id): OrderStatus.Final
-  def saveOrderInfo(id: Order.Id, sender: Address, oi: OrderInfo[OrderStatus.Final]): Unit
-  def saveOrder(o: Order): Unit
-  def get(id: Order.Id): Option[Order]
-  def getFinalizedOrders(owner: Address, maybePair: Option[AssetPair]): Seq[(Order.Id, OrderInfo[OrderStatus])]
-  def getOrderInfo(id: Order.Id): Option[FinalOrderInfo]
-  def transactionsByOrder(orderId: ByteStr): Seq[ExchangeTransaction]
+trait OrderDb[F[_]] {
+  def containsInfo(id: Order.Id): F[Boolean]
+  def status(id: Order.Id): F[OrderStatus.Final]
+  def saveOrderInfo(id: Order.Id, sender: Address, oi: OrderInfo[OrderStatus.Final]): F[Unit]
+  def saveOrder(o: Order): F[Unit]
+  def get(id: Order.Id): F[Option[Order]]
+  def getFinalizedOrders(owner: Address, maybePair: Option[AssetPair]): F[Seq[(Order.Id, OrderInfo[OrderStatus])]]
+  def getOrderInfo(id: Order.Id): F[Option[FinalOrderInfo]]
+  def transactionsByOrder(orderId: ByteStr): F[Seq[ExchangeTransaction]]
 }
 
-object OrderDB {
+object OrderDb {
   case class Settings(maxOrders: Int)
 
-  def apply(settings: Settings, db: DB): OrderDB = new OrderDB with ScorexLogging {
-    override def containsInfo(id: Order.Id): Boolean = db.readOnly(_.has(DbKeys.orderInfo(id)))
+  def levelDb[F[_]](settings: Settings, levelDb: LevelDb[F])(implicit F: Monad[F]): OrderDb[F] = new OrderDb[F] {
 
-    override def status(id: Order.Id): OrderStatus.Final = db.readOnly { ro =>
+    override def containsInfo(id: Order.Id): F[Boolean] =
+      levelDb.readOnly(_.has(DbKeys.orderInfo(id)))
+
+    override def status(id: Order.Id): F[OrderStatus.Final] = levelDb.readOnly { ro =>
       ro.get(DbKeys.orderInfo(id)).fold[OrderStatus.Final](OrderStatus.NotFound)(_.status)
     }
 
-    override def saveOrder(o: Order): Unit = db.readWrite { rw =>
+    override def saveOrder(o: Order): F[Unit] = levelDb.readWrite { rw =>
       val k = DbKeys.order(o.id())
       if (!rw.has(k))
         rw.put(k, Some(o))
     }
 
-    override def get(id: Order.Id): Option[Order] = db.readOnly(_.get(DbKeys.order(id)))
+    override def get(id: Order.Id): F[Option[Order]] = levelDb.readOnly(_.get(DbKeys.order(id)))
 
-    override def saveOrderInfo(id: Order.Id, sender: Address, oi: FinalOrderInfo): Unit = {
+    override def saveOrderInfo(id: Order.Id, sender: Address, oi: FinalOrderInfo): F[Unit] = {
       val orderInfoKey = DbKeys.orderInfo(id)
-      if (!db.has(orderInfoKey))
-        db.readWrite { rw =>
-          val newCommonSeqNr = rw.inc(DbKeys.finalizedCommonSeqNr(sender))
-          rw.put(DbKeys.finalizedCommon(sender, newCommonSeqNr), Some(id))
+      for {
+        hasKey <- levelDb.has(orderInfoKey)
+        _ <-
+          F.whenA(!hasKey) {
+            levelDb.readWrite { rw =>
+              val newCommonSeqNr = rw.inc(DbKeys.finalizedCommonSeqNr(sender))
+              rw.put(DbKeys.finalizedCommon(sender, newCommonSeqNr), Some(id))
 
-          val newPairSeqNr = rw.inc(DbKeys.finalizedPairSeqNr(sender, oi.assetPair))
-          rw.put(DbKeys.finalizedPair(sender, oi.assetPair, newPairSeqNr), Some(id))
-          if (newPairSeqNr > settings.maxOrders) // Indexes start with 1, so if maxOrders=100 and newPairSeqNr=101, we delete 1 (the first)
-            rw.get(DbKeys.finalizedPair(sender, oi.assetPair, newPairSeqNr - settings.maxOrders))
-              .map(DbKeys.order)
-              .foreach(x => rw.delete(x))
+              val newPairSeqNr = rw.inc(DbKeys.finalizedPairSeqNr(sender, oi.assetPair))
+              rw.put(DbKeys.finalizedPair(sender, oi.assetPair, newPairSeqNr), Some(id))
+              if (newPairSeqNr > settings.maxOrders) // Indexes start with 1, so if maxOrders=100 and newPairSeqNr=101, we delete 1 (the first)
+                rw.get(DbKeys.finalizedPair(sender, oi.assetPair, newPairSeqNr - settings.maxOrders))
+                  .map(DbKeys.order)
+                  .foreach(x => rw.delete(x))
 
-          rw.put(orderInfoKey, Some(oi))
-        }
+              rw.put(orderInfoKey, Some(oi))
+            }
+          }
+      } yield ()
     }
 
-    override def getFinalizedOrders(owner: Address, maybePair: Option[AssetPair]): Seq[(Order.Id, OrderInfo[OrderStatus])] =
-      db.readOnly { ro =>
-        val (seqNr, key) = maybePair match {
-          case Some(p) =>
-            (ro.get(DbKeys.finalizedPairSeqNr(owner, p)), DbKeys.finalizedPair(owner, p, _: Int))
-          case None =>
-            (ro.get(DbKeys.finalizedCommonSeqNr(owner)), DbKeys.finalizedCommon(owner, _: Int))
+    override def getFinalizedOrders(owner: Address, maybePair: Option[AssetPair]): F[Seq[(Order.Id, OrderInfo[OrderStatus])]] =
+      for {
+        (seqNr, key) <- levelDb.readOnly { ro =>
+          maybePair match {
+            case Some(p) =>
+              (ro.get(DbKeys.finalizedPairSeqNr(owner, p)), DbKeys.finalizedPair(owner, p, _: Int))
+            case None =>
+              (ro.get(DbKeys.finalizedCommonSeqNr(owner)), DbKeys.finalizedCommon(owner, _: Int))
+          }
         }
+        offsets = 0 until math.min(seqNr, settings.maxOrders)
+        ids <- offsets
+          .toList
+          .traverse(offset => levelDb.get(key(seqNr - offset)))
+          .map(_.flatten)
+        results <- ids
+          .traverse(id => levelDb.get(DbKeys.orderInfo(id)).map(maybeOrderInfo => maybeOrderInfo.map(x => id -> x)))
+          .map(_.flatten)
+      } yield results.sorted
 
-        (for {
-          offset <- 0 until math.min(seqNr, settings.maxOrders)
-          id <- db.get(key(seqNr - offset))
-          oi <- db.get(DbKeys.orderInfo(id))
-        } yield id -> oi).sorted
-      }
+    override def getOrderInfo(id: Id): F[Option[FinalOrderInfo]] =
+      levelDb.readOnly(_.get(DbKeys.orderInfo(id)))
 
-    override def getOrderInfo(id: Id): Option[FinalOrderInfo] = db.readOnly(_.get(DbKeys.orderInfo(id)))
-
-    override def transactionsByOrder(orderId: Id): Seq[ExchangeTransaction] = db.readOnly { ro =>
+    override def transactionsByOrder(orderId: Id): F[Seq[ExchangeTransaction]] = levelDb.readOnly { ro =>
       for {
         seqNr <- 1 to ro.get(DbKeys.orderTxIdsSeqNr(orderId))
         txId = ro.get(DbKeys.orderTxId(orderId, seqNr))

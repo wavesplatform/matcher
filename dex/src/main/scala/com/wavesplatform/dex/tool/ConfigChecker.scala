@@ -39,7 +39,7 @@ object ConfigChecker extends ConfigWriters {
 
   def checkConfig(rawCfg: Config, matcherSettings: MatcherSettings): ErrorOr[Seq[String]] =
     Either.catchNonFatal {
-      val skippedPaths = matcherSettings.cli.fold(Seq.empty[String])(_.ignoreUnusedProperties)
+      val skippedPaths = matcherSettings.cli.ignoreUnusedProperties
       val usingProperties: ConfigValue = ConfigWriter[MatcherSettings].to(matcherSettings)
       val allProperties = rawCfg.getConfig("waves.dex").entrySet()
       getConfigObject(usingProperties)

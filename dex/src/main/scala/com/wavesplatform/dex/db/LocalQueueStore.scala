@@ -1,6 +1,9 @@
 package com.wavesplatform.dex.db
 
 import cats.Monad
+import cats.syntax.flatMap._
+import cats.syntax.functor._
+import cats.syntax.applicative._
 
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.{AtomicLong, AtomicReference}
@@ -31,7 +34,6 @@ object LocalQueueStore {
 }
 
 class LevelDbLocalQueueStore[F[_]: Monad](levelDb: LevelDb[F]) extends LocalQueueStore[F] {
-  import cats.syntax.monad._
 
   private val newestIdx = levelDb.get(lqNewestIdx).map(s => new AtomicLong(s))
   private val inMemQueue = new ConcurrentLinkedQueue[ValidatedCommandWithMeta]

@@ -115,7 +115,7 @@ object LocalMatcherQueue {
           val ts = time.correctedTime()
           store.enqueue(command, time.correctedTime()).onComplete {
             case Success(offset) => p.success(ValidatedCommandWithMeta(offset, ts, command))
-            case Failure(ex) => log.error(s"Got exception ${ex.getWithStackTrace} when enqueueing command ${command}")
+            case Failure(ex) => log.error(s"Got exception ${ex.getWithStackTrace} when enqueueing command $command")
           }
         }
       })

@@ -64,7 +64,8 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
           keepAliveTime = keepAliveTime,
           keepAliveTimeout = keepAliveTimeout,
           idleTimeout = 1.day,
-          channelOptions = GrpcClientSettings.ChannelOptionsSettings(connectTimeout = 1.seconds)
+          channelOptions = GrpcClientSettings.ChannelOptionsSettings(connectTimeout = 1.seconds),
+          noDataTimeout = 5.minutes
         ),
         blockchainUpdatesGrpc = GrpcClientSettings(
           target = s"127.0.0.1:${blockchainUpdatesProxy.getProxyPort}",
@@ -74,7 +75,8 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
           keepAliveTime = 500.millis,
           keepAliveTimeout = 1.second,
           idleTimeout = 1.day,
-          channelOptions = GrpcClientSettings.ChannelOptionsSettings(connectTimeout = 1.seconds)
+          channelOptions = GrpcClientSettings.ChannelOptionsSettings(connectTimeout = 1.seconds),
+          noDataTimeout = 5.minutes
         ),
         defaultCachesExpiration = 100.milliseconds,
         balanceStreamBufferSize = 100,

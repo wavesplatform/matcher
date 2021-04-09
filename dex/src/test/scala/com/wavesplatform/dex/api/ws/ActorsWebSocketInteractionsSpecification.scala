@@ -4,12 +4,13 @@ import akka.actor.testkit.typed.scaladsl.{ActorTestKit, TestProbe => TypedTestPr
 import akka.actor.{ActorRef, ActorSystem, PoisonPill, Props}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import cats.syntax.option._
+import cats.instances.future._
 import com.wavesplatform.dex.MatcherSpecBase
 import com.wavesplatform.dex.actors.address.AddressActor.BlockchainInteraction
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.api.ws.entities.{WsBalances, WsOrder}
 import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsMessage}
-import com.wavesplatform.dex.db.EmptyOrderDB
+import com.wavesplatform.dex.db.EmptyOrderDb
 import com.wavesplatform.dex.domain.account.{Address, KeyPair}
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
@@ -39,6 +40,8 @@ class ActorsWebSocketInteractionsSpecification
     with MatcherSpecBase {
 
   private val testKit = ActorTestKit()
+
+  import system.dispatcher
 
   implicit private val efc: ErrorFormatterContext = ErrorFormatterContext.from(asset => getDefaultAssetDescriptions(asset).decimals)
 
@@ -80,7 +83,7 @@ class ActorsWebSocketInteractionsSpecification
         new AddressActor(
           address,
           time,
-          EmptyOrderDB,
+          new EmptyOrderDb,
           (_, _) => Future.successful(Right(())),
           command => {
             commandsProbe.ref ! command
@@ -91,7 +94,7 @@ class ActorsWebSocketInteractionsSpecification
         )
       )
 
-    val addressDir = system.actorOf(Props(new AddressDirectoryActor(EmptyOrderDB, createAddressActor, None, recovered = true)))
+    val addressDir = system.actorOf(Props(new AddressDirectoryActor(new EmptyOrderDb, createAddressActor, None, recovered = true)))
 
     def subscribe(): Unit =
       addressDir ! AddressDirectoryActor.Command.ForwardMessage(kp, AddressActor.WsCommand.AddWsSubscription(wsEventsProbe.ref))

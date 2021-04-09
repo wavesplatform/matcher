@@ -18,8 +18,8 @@ import com.wavesplatform.dex.api.ws.entities.{WsBalances, WsOrder}
 import com.wavesplatform.dex.api.ws.protocol.WsAddressChanges
 import com.wavesplatform.dex.api.ws.state.WsAddressState
 import com.wavesplatform.dex.collections.{NegativeMap, PositiveMap}
-import com.wavesplatform.dex.db.OrderDB
-import com.wavesplatform.dex.db.OrderDB.orderInfoOrdering
+import com.wavesplatform.dex.db.OrderDb
+import com.wavesplatform.dex.db.OrderDb.orderInfoOrdering
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.model.Denormalization.denormalizeAmountAndFee
@@ -50,7 +50,7 @@ import scala.util.{Failure, Success, Try}
 class AddressActor(
   owner: Address,
   time: Time,
-  orderDB: OrderDB,
+  orderDb: OrderDb[Future],
   validate: (AcceptedOrder, Map[Asset, Long]) => Future[Either[MatcherError, Unit]],
   store: StoreValidatedCommand,
   recovered: Boolean,
@@ -107,7 +107,7 @@ class AddressActor(
       lazy val orderReserve = order.reservableBalance
       order.status match {
         case OrderStatus.Accepted =>
-          orderDB.saveOrder(order.order) // TODO DEX-1057
+          orderDb.saveOrder(order.order) // TODO DEX-1057
           origActiveOrder match {
             case Some(_) => // The order added before in the ValidationPassed -> place function, balances are already updated
             case None => reserve(orderReserve)
@@ -140,7 +140,7 @@ class AddressActor(
           remaining.status match {
             case status: OrderStatus.Final =>
               expiration.remove(remaining.id).foreach(_.cancel())
-              orderDB.saveOrderInfo(remaining.id, owner, OrderInfo.v6(remaining, status))
+              orderDb.saveOrderInfo(remaining.id, owner, OrderInfo.v6(remaining, status))
               activeOrders.remove(remaining.id) match {
                 case Some(origActiveOrder) => origActiveOrder.reservableBalance.inverse()
                 case None => throw new IllegalStateException(s"Can't find order ${remaining.id} during finalization")
@@ -176,7 +176,7 @@ class AddressActor(
         case None => // Can be received twice, because multiple matchers can cancel same order
         case Some(origActiveOrder) =>
           expiration.remove(acceptedOrder.id).foreach(_.cancel())
-          orderDB.saveOrderInfo(acceptedOrder.id, owner, OrderInfo.v6(acceptedOrder, orderStatus))
+          orderDb.saveOrderInfo(acceptedOrder.id, owner, OrderInfo.v6(acceptedOrder, orderStatus))
 
           val orderReserve = origActiveOrder.reservableBalance
 
@@ -249,13 +249,21 @@ class AddressActor(
       val orderId = command.order.id()
 
       if (totalActiveOrders >= settings.maxActiveOrders) sender() ! error.ActiveOrdersLimitReached(settings.maxActiveOrders)
-      else if (failedPlacements.contains(orderId) || hasOrder(orderId)) sender() ! error.OrderDuplicate(orderId)
+      else if (failedPlacements.contains(orderId)) sender() ! error.OrderDuplicate(orderId)
       else {
-        val shouldProcess = placementQueue.isEmpty
-        placementQueue = placementQueue.enqueue(orderId)
-        pendingCommands.put(orderId, PendingCommand(command, sender()))
-        if (shouldProcess) processNextPlacement()
-        else log.trace(s"${placementQueue.headOption} is processing, moving $orderId to the queue")
+        val origSender = sender()
+        hasOrder(orderId).onComplete {
+          case Success(hasOrder) if hasOrder =>
+            origSender ! error.OrderDuplicate(orderId)
+          case Success(_) =>
+            val shouldProcess = placementQueue.isEmpty
+            placementQueue = placementQueue.enqueue(orderId)
+            pendingCommands.put(orderId, PendingCommand(command, sender()))
+            if (shouldProcess) processNextPlacement()
+            else log.trace(s"${placementQueue.headOption} is processing, moving $orderId to the queue")
+          case Failure(th) =>
+            log.error("error while retrieving order info", th)
+        }
       }
 
     case command: Command.CancelOrder =>
@@ -273,12 +281,16 @@ class AddressActor(
         case None =>
           activeOrders.get(orderId) match {
             case None =>
-              sender() ! {
-                orderDB.status(orderId) match {
-                  case OrderStatus.NotFound => error.OrderNotFound(orderId)
-                  case _: OrderStatus.Cancelled => error.OrderCanceled(orderId)
-                  case _: OrderStatus.Filled => error.OrderFull(orderId)
-                }
+              val origSender = sender()
+              orderDb.status(orderId).onComplete {
+                case Success(OrderStatus.NotFound) =>
+                  origSender ! error.OrderNotFound(orderId)
+                case Success(_: OrderStatus.Cancelled) =>
+                  origSender ! error.OrderCanceled(orderId)
+                case Success(_: OrderStatus.Filled) =>
+                  origSender ! error.OrderFull(orderId)
+                case Failure(th) =>
+                  log.error(s"error while retrieving order status", th)
               }
 
             case Some(ao) =>
@@ -341,14 +353,32 @@ class AddressActor(
     case query: Query.GetTradableBalance => sender() ! Reply.GetBalance(balances.tradableBalance(query.forAssets).filter(_._2 > 0))
 
     case Query.GetOrderStatus(orderId) =>
-      sender() ! Reply.GetOrderStatus(activeOrders.get(orderId).fold[OrderStatus](orderDB.status(orderId))(_.status))
+      val origSender = sender()
+      activeOrders.get(orderId) match {
+        case Some(order) =>
+          origSender ! Reply.GetOrderStatus(order.status)
+        case None =>
+          orderDb.status(orderId).onComplete {
+            case Success(x) =>
+              origSender ! Reply.GetOrderStatus(x)
+            case Failure(th) =>
+              log.error("error while retrieving order status", th)
+          }
+      }
 
     case Query.GetOrderStatusInfo(orderId) =>
-      sender() ! Reply.GetOrdersStatusInfo(
-        activeOrders
-          .get(orderId)
-          .map(ao => OrderInfo.v6(ao, ao.status)) orElse orderDB.getOrderInfo(orderId)
-      )
+      val origSender = sender()
+      activeOrders.get(orderId).map(ao => OrderInfo.v6(ao, ao.status)) match {
+        case maybeOrderInfo @ Some(_) =>
+          origSender ! Reply.GetOrdersStatusInfo(maybeOrderInfo)
+        case None =>
+          orderDb.getOrderInfo(orderId).onComplete {
+            case Success(maybeOrderInfo) =>
+              origSender ! Reply.GetOrdersStatusInfo(maybeOrderInfo)
+            case Failure(th) =>
+              log.error("error while retrieving order info", th)
+          }
+      }
 
     case Query.GetOrdersStatuses(maybePair, orderListType) =>
       val matchingActiveOrders =
@@ -358,9 +388,18 @@ class AddressActor(
             .toSeq
             .sorted
         else Seq.empty
-
-      val matchingClosedOrders = if (orderListType.hasClosed) orderDB.getFinalizedOrders(owner, maybePair) else Seq.empty
-      sender() ! Reply.GetOrderStatuses(matchingActiveOrders ++ matchingClosedOrders)
+      val matchingClosedOrders =
+        if (orderListType.hasClosed)
+          orderDb.getFinalizedOrders(owner, maybePair)
+        else
+          Future.successful(Seq.empty)
+      val origSender = sender()
+      matchingClosedOrders.onComplete {
+        case Success(matchingClosedOrders) =>
+          origSender ! Reply.GetOrderStatuses(matchingActiveOrders ++ matchingClosedOrders)
+        case Failure(th) =>
+          log.error("error while retrieving finalized orders", th)
+      }
 
     case Event.StoreFailed(orderId, reason, queueEvent) =>
       failedPlacements.add(orderId)
@@ -622,7 +661,8 @@ class AddressActor(
         case _ => throw new IllegalStateException("Impossibru")
       }
 
-  private def hasOrder(id: Order.Id): Boolean = activeOrders.contains(id) || pendingCommands.contains(id) || orderDB.containsInfo(id)
+  private def hasOrder(id: Order.Id): Future[Boolean] =
+    orderDb.containsInfo(id).map(x => activeOrders.contains(id) || pendingCommands.contains(id) || x)
 
   private def totalActiveOrders: Int = activeOrders.size + placementQueue.size
 
@@ -669,7 +709,7 @@ object AddressActor {
   def props(
     owner: Address,
     time: Time,
-    orderDB: OrderDB,
+    orderDb: OrderDb[Future],
     validate: (AcceptedOrder, Map[Asset, Long]) => Future[Either[MatcherError, Unit]],
     store: StoreValidatedCommand,
     recovered: Boolean,
@@ -679,7 +719,7 @@ object AddressActor {
     new AddressActor(
       owner,
       time,
-      orderDB,
+      orderDb,
       validate,
       store,
       recovered,

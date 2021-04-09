@@ -9,11 +9,9 @@ import com.wavesplatform.dex.queue.LocalMatcherQueue._
 import com.wavesplatform.dex.queue.MatcherQueue.{IgnoreProducer, Producer}
 import com.wavesplatform.dex.queue.ValidatedCommandWithMeta.Offset
 import com.wavesplatform.dex.time.Time
-import com.wavesplatform.dex.error.Implicits.ThrowableOps
 
 import scala.concurrent._
 import scala.concurrent.duration.FiniteDuration
-import scala.util.{Failure, Success}
 import scala.util.control.NonFatal
 
 class LocalMatcherQueue(settings: Settings, store: LocalQueueStore[Future], time: Time) extends MatcherQueue with ScorexLogging {
@@ -96,7 +94,7 @@ class LocalMatcherQueue(settings: Settings, store: LocalQueueStore[Future], time
 object LocalMatcherQueue {
   case class Settings(enableStoring: Boolean, pollingInterval: FiniteDuration, maxElementsPerPoll: Int, cleanBeforeConsume: Boolean)
 
-  private class LocalProducer(store: LocalQueueStore[Future], time: Time) extends Producer with ScorexLogging {
+  private class LocalProducer(store: LocalQueueStore[Future], time: Time) extends Producer {
 
     private val executor = Executors.newSingleThreadExecutor {
       new ThreadFactoryBuilder()
@@ -113,10 +111,8 @@ object LocalMatcherQueue {
       executor.submit(new Runnable {
         override def run(): Unit = {
           val ts = time.correctedTime()
-          store.enqueue(command, time.correctedTime()).onComplete {
-            case Success(offset) => p.success(ValidatedCommandWithMeta(offset, ts, command))
-            case Failure(ex) => log.error(s"Got exception ${ex.getWithStackTrace} when enqueueing command $command")
-          }
+          val commandFuture = store.enqueue(command, time.correctedTime()).map(offset => ValidatedCommandWithMeta(offset, ts, command))
+          p.completeWith(commandFuture)
         }
       })
       p.future.map(Some(_))

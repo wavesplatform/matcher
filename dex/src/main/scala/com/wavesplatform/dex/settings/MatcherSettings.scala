@@ -62,7 +62,7 @@ case class MatcherSettings(
   addressActor: AddressActor.Settings,
   orderEventsCoordinatorActor: OrderEventsCoordinatorActor.Settings,
   comparisonTool: ComparisonTool.Settings,
-  cliSettings: Option[CliSettings]
+  cli: Option[CliSettings]
 ) {
 
   val recoverOrderHistory = !new File(dataDirectory).exists()

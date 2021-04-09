@@ -62,7 +62,7 @@ class ConfigCheckerCliSpec extends BaseSettingsSpecification with Matchers with 
       loadCleanConfigSample()
     ) { (cfg, path) =>
       cfg.withValue(path, ConfigValueFactory.fromAnyRef("some-simple-value"))
-    }.withValue("waves.dex.cli-settings.ignore-unused-properties", ConfigValueFactory.fromIterable(skippedProperties.asJava))
+    }.withValue("waves.dex.cli.ignore-unused-properties", ConfigValueFactory.fromIterable(skippedProperties.asJava))
     val result = ConfigChecker.checkConfig(cfg)
     result.value should contain theSameElementsAs blablaValuePathSeq.map(cutWavesDexSection)
   }

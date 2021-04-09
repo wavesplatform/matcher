@@ -110,6 +110,7 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |        channel-options {
          |          connect-timeout = 99s
          |        }
+         |        no-data-timeout = 999m
          |      }
          |      blockchain-updates-grpc {
          |        target = "127.1.2.10:7444"
@@ -122,6 +123,7 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |        channel-options {
          |          connect-timeout = 100s
          |        }
+         |        no-data-timeout = 782m
          |      }
          |      default-caches-expiration = 101ms
          |      balance-stream-buffer-size = 100

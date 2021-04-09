@@ -58,7 +58,8 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
           idleTimeout = 20.seconds,
           channelOptions = GrpcClientSettings.ChannelOptionsSettings(
             connectTimeout = 99.seconds
-          )
+          ),
+          noDataTimeout = 999.minutes
         ),
         blockchainUpdatesGrpc = GrpcClientSettings(
           target = "127.1.2.10:7444",
@@ -70,7 +71,8 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
           idleTimeout = 21.seconds,
           channelOptions = GrpcClientSettings.ChannelOptionsSettings(
             connectTimeout = 100.seconds
-          )
+          ),
+          noDataTimeout = 782.minutes
         ),
         defaultCachesExpiration = 101.millis,
         balanceStreamBufferSize = 100,

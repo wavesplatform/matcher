@@ -51,17 +51,20 @@ class BlockchainUpdatesClientTestSuite extends IntegrationSuiteBase with HasToxi
   private val keepAliveTime = 2.seconds
   private val keepAliveTimeout = 5.seconds
 
+  private val grpcSettings = GrpcClientSettings(
+    target = s"127.0.0.1:${blockchainUpdatesProxy.getProxyPort}",
+    maxHedgedAttempts = 5,
+    maxRetryAttempts = 5,
+    keepAliveWithoutCalls = true,
+    keepAliveTime = keepAliveTime,
+    keepAliveTimeout = keepAliveTimeout,
+    idleTimeout = 1.day,
+    channelOptions = GrpcClientSettings.ChannelOptionsSettings(connectTimeout = 5.seconds),
+    noDataTimeout = 5.minutes
+  )
+
   private lazy val blockchainUpdatesChannel: ManagedChannel =
-    GrpcClientSettings(
-      target = s"127.0.0.1:${blockchainUpdatesProxy.getProxyPort}",
-      maxHedgedAttempts = 5,
-      maxRetryAttempts = 5,
-      keepAliveWithoutCalls = true,
-      keepAliveTime = keepAliveTime,
-      keepAliveTimeout = keepAliveTimeout,
-      idleTimeout = 1.day,
-      channelOptions = GrpcClientSettings.ChannelOptionsSettings(connectTimeout = 5.seconds)
-    ).toNettyChannelBuilder
+    grpcSettings.toNettyChannelBuilder
       .executor((command: Runnable) => grpcExecutor.execute(command))
       .eventLoopGroup(eventLoopGroup)
       .channelType(classOf[NioSocketChannel])
@@ -69,7 +72,9 @@ class BlockchainUpdatesClientTestSuite extends IntegrationSuiteBase with HasToxi
       .build
 
   private lazy val client =
-    new DefaultBlockchainUpdatesClient(eventLoopGroup, blockchainUpdatesChannel, monixScheduler)(ExecutionContext.fromExecutor(grpcExecutor))
+    new DefaultBlockchainUpdatesClient(eventLoopGroup, blockchainUpdatesChannel, monixScheduler, grpcSettings.noDataTimeout)(
+      ExecutionContext.fromExecutor(grpcExecutor)
+    )
 
   override def beforeAll(): Unit = {
     super.beforeAll()

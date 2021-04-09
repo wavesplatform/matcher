@@ -66,7 +66,7 @@ class GrpcUtxEventsControlledStream(channel: ManagedChannel)(implicit scheduler:
 
     override def onReady(): Unit = {
       val address = Option(call.getAttributes.get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR)).fold("unknown")(_.toString)
-      log.info(s"$logPrefix Getting utx events from $address")
+      log.info(s"$logPrefix The source is $address")
     }
 
     override def onNext(value: UtxEvent): Unit = {

@@ -8,6 +8,7 @@ import akka.http.scaladsl.server.Route
 import akka.testkit.{TestActor, TestProbe}
 import cats.syntax.either._
 import cats.syntax.option._
+import cats.instances.future._
 import com.google.common.primitives.Longs
 import com.softwaremill.diffx.{Derived, Diff}
 import com.typesafe.config.ConfigFactory
@@ -22,14 +23,13 @@ import com.wavesplatform.dex.actors.orderbook.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.api.RouteSpec
 import com.wavesplatform.dex.api.http.ApiMarshallers._
 import com.wavesplatform.dex.api.http.entities._
-import com.wavesplatform.dex.api.http.headers.{CustomContentTypes, `X-Api-Key`}
+import com.wavesplatform.dex.api.http.headers.{`X-Api-Key`, CustomContentTypes}
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
-import com.wavesplatform.dex.api.http.{OrderBookHttpInfo, entities}
+import com.wavesplatform.dex.api.http.{entities, OrderBookHttpInfo}
 import com.wavesplatform.dex.api.ws.actors.WsExternalClientDirectoryActor
 import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.caches.RateCache
-import com.wavesplatform.dex.db.leveldb.LevelDb
-import com.wavesplatform.dex.db.{DbKeys, ExchangeTxStorage, OrderDB, WithDB}
+import com.wavesplatform.dex.db.{DbKeys, ExchangeTxStorage, OrderDb, WithDB}
 import com.wavesplatform.dex.domain.account.{Address, AddressScheme, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -58,7 +58,7 @@ import pureconfig.ConfigSource
 
 import java.util.concurrent.ThreadLocalRandom
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.Future
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration.DurationInt
 import scala.util.Random
 
@@ -1256,8 +1256,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         .explicitGet()
     )
 
-    val odb = OrderDB(settings.orderDb, db)
-    odb.saveOrder(orderToCancel)
+    val odb = OrderDb.levelDb(settings.orderDb, asyncLevelDb)
+    Await.result(odb.saveOrder(orderToCancel), 10.seconds)
 
     val orderBooks = new AtomicReference(Map(smartWavesPair -> orderBookActor.ref.asRight[Unit]))
     val orderBookAskAdapter = new OrderBookAskAdapter(orderBooks, 5.seconds)

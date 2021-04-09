@@ -14,12 +14,16 @@ import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 import org.scalatest.concurrent.Eventually
 import org.scalatest.exceptions.TestFailedException
+import org.scalatest.time.{Millis, Seconds, Span}
 
 import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
 import scala.util.chaining._
 
 class CombinedStreamTestSuite extends WavesIntegrationSuiteBase with Eventually {
+
+  implicit override val patienceConfig: PatienceConfig =
+    PatienceConfig(timeout = Span(5, Seconds), interval = Span(5, Millis))
 
   implicit private val runNow = Scheduler(
     ec = scala.concurrent.ExecutionContext.Implicits.global,

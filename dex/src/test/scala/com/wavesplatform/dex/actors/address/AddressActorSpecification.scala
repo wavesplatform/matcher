@@ -5,13 +5,14 @@ import akka.actor.typed.scaladsl.adapter._
 import akka.actor.{ActorRef, ActorSystem, PoisonPill, Props}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import cats.kernel.Monoid
+import cats.instances.future._
 import com.wavesplatform.dex.MatcherSpecBase
 import com.wavesplatform.dex.actors.address.AddressActor.BlockchainInteraction
 import com.wavesplatform.dex.actors.address.AddressActor.Command.Source
 import com.wavesplatform.dex.actors.address.AddressActor.Query.{GetCurrentState, GetReservedBalance, GetTradableBalance}
 import com.wavesplatform.dex.actors.address.AddressActor.Reply.{GetBalance, GetState}
 import com.wavesplatform.dex.api.ws.protocol.WsAddressChanges
-import com.wavesplatform.dex.db.EmptyOrderDB
+import com.wavesplatform.dex.db.EmptyOrderDb
 import com.wavesplatform.dex.domain.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -47,6 +48,8 @@ class AddressActorSpecification
 
   implicit private val typedSystem = system.toTyped
   implicit private val efc: ErrorFormatterContext = ErrorFormatterContext.from(_ => 8)
+
+  import system.dispatcher
 
   private val assetId = ByteStr("asset".getBytes("utf-8"))
   override val matcherFee = 30000L
@@ -105,7 +108,7 @@ class AddressActorSpecification
           new AddressActor(
             address,
             time,
-            EmptyOrderDB,
+            new EmptyOrderDb,
             (_, _) => Future.successful(Right(())),
             _ => failed,
             recovered,
@@ -116,7 +119,7 @@ class AddressActorSpecification
           )
         )
 
-      val addressDir = system.actorOf(Props(new AddressDirectoryActor(EmptyOrderDB, createAddressActor, None, recovered = false)))
+      val addressDir = system.actorOf(Props(new AddressDirectoryActor(new EmptyOrderDb, createAddressActor, None, recovered = false)))
       addressDir ! AddressDirectoryActor.Command.ForwardMessage(kp, AddressActor.Query.GetReservedBalance) // Creating an actor with kp's address
       eventually {
         requested shouldBe true
@@ -330,7 +333,7 @@ class AddressActorSpecification
         new AddressActor(
           address,
           time,
-          EmptyOrderDB,
+          new EmptyOrderDb,
           (_, _) => Future.successful(Right(())),
           command => {
             commandsProbe.ref ! command
@@ -341,7 +344,7 @@ class AddressActorSpecification
         )
       )
 
-    lazy val addressDir = system.actorOf(Props(new AddressDirectoryActor(EmptyOrderDB, createAddressActor, None, recovered = true)))
+    lazy val addressDir = system.actorOf(Props(new AddressDirectoryActor(new EmptyOrderDb, createAddressActor, None, recovered = true)))
 
     def addOrder(ao: AcceptedOrder): Unit = {
       addressDir ! AddressDirectoryActor.Command.ForwardMessage(address, AddressActor.Command.PlaceOrder(ao.order, ao.isMarket))

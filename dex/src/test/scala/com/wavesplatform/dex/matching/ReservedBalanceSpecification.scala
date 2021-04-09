@@ -4,13 +4,14 @@ import akka.actor.{ActorRef, Props}
 import akka.pattern.ask
 import akka.testkit.TestProbe
 import akka.util.Timeout
+import cats.instances.future._
 import com.wavesplatform.dex.MatcherSpecBase
 import com.wavesplatform.dex.actors.MatcherSpecLike
 import com.wavesplatform.dex.actors.address.AddressActor.BlockchainInteraction
 import com.wavesplatform.dex.actors.address.AddressActor.Command.PlaceOrder
 import com.wavesplatform.dex.actors.address.AddressDirectoryActor.Command.ForwardMessage
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
-import com.wavesplatform.dex.db.{EmptyOrderDB, TestOrderDB, WithDB}
+import com.wavesplatform.dex.db.{EmptyOrderDb, TestOrderDb, WithDB}
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -82,14 +83,12 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
   implicit private val efc: ErrorFormatterContext = ErrorFormatterContext.from(_ => 8)
   implicit private val timeout: Timeout = 5.seconds
 
-  import system.dispatcher
-
   private val pair: AssetPair = AssetPair(mkAssetId("WAVES"), mkAssetId("USD"))
 
   private val addressDir = system.actorOf(
     Props(
       new AddressDirectoryActor(
-        EmptyOrderDB,
+        new EmptyOrderDb,
         createAddressActor,
         None,
         recovered = true
@@ -108,7 +107,7 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
       new AddressActor(
         address,
         time,
-        new TestOrderDB(100),
+        new TestOrderDb(100),
         (_, _) => Future.successful(Right(())),
         _ => Future.failed(new IllegalStateException("Should not be used in the test")),
         recovered,
@@ -492,7 +491,7 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
         new AddressActor(
           owner = address,
           time = time,
-          orderDB = new TestOrderDB(100),
+          orderDb = new TestOrderDb(100),
           (_, _) => Future.successful(Right(())),
           store = command => {
             testProbe.ref ! command
@@ -506,7 +505,7 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
     val addressDir = system.actorOf(
       Props(
         new AddressDirectoryActor(
-          new TestOrderDB(100),
+          new TestOrderDb(100),
           createAddressActor,
           None,
           recovered = true

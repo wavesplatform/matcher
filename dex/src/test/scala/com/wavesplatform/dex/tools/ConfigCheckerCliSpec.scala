@@ -5,6 +5,7 @@ import com.wavesplatform.dex.settings.BaseSettingsSpecification
 import com.wavesplatform.dex.tool.ConfigChecker
 import org.scalatest.EitherValues
 import org.scalatest.matchers.should.Matchers
+import scala.jdk.CollectionConverters._
 
 class ConfigCheckerCliSpec extends BaseSettingsSpecification with Matchers with EitherValues {
 
@@ -57,14 +58,11 @@ class ConfigCheckerCliSpec extends BaseSettingsSpecification with Matchers with 
       "waves.dex.bla-value",
       "waves.dex.order-db.some-unexpected-path"
     )
-    val uncheckingPathsProperty = skippedProperties.reduce { (s1, s2) =>
-      s"$s1;$s2"
-    }
     val cfg = (blablaValuePathSeq ++ skippedProperties).foldLeft(
       loadCleanConfigSample()
     ) { (cfg, path) =>
       cfg.withValue(path, ConfigValueFactory.fromAnyRef("some-simple-value"))
-    }.withValue("waves.dex.unchecking-configs", ConfigValueFactory.fromAnyRef(uncheckingPathsProperty))
+    }.withValue("waves.dex.cli-settings.ignore-unused-properties", ConfigValueFactory.fromIterable(skippedProperties.asJava))
     val result = ConfigChecker.checkConfig(cfg)
     result.value should contain theSameElementsAs blablaValuePathSeq.map(cutWavesDexSection)
   }

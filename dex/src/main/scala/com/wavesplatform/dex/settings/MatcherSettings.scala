@@ -12,8 +12,7 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.grpc.integration.settings.WavesBlockchainClientSettings
 import com.wavesplatform.dex.model.OrderValidator.exchangeTransactionCreationFee
 import com.wavesplatform.dex.settings.utils.ConfigReaderOps.Implicits
-import com.wavesplatform.dex.settings.utils.{ConfigReaders, RawFailureReason, validationOf}
-import com.wavesplatform.dex.settings.utils.{ConfigReaders, RawFailureReason, validationOf}
+import com.wavesplatform.dex.settings.utils.{validationOf, ConfigReaders, RawFailureReason}
 import com.wavesplatform.dex.tool.ComparisonTool
 import pureconfig.ConfigReader
 import pureconfig.configurable.genericMapReader
@@ -63,7 +62,7 @@ case class MatcherSettings(
   addressActor: AddressActor.Settings,
   orderEventsCoordinatorActor: OrderEventsCoordinatorActor.Settings,
   comparisonTool: ComparisonTool.Settings,
-  uncheckingConfigs: Option[String]
+  cliSettings: Option[CliSettings]
 ) {
 
   val recoverOrderHistory = !new File(dataDirectory).exists()

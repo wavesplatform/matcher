@@ -23,11 +23,8 @@ import sttp.model.Uri
 
 import scala.jdk.CollectionConverters._
 import java.io.File
-import scala.util.Try
 
 object ConfigChecker extends ConfigWriters {
-
-  private val skippedPathsDelimiter = ";"
 
   def checkConfig(configPath: String): ErrorOr[Seq[String]] = {
     val file = new File(configPath)
@@ -42,7 +39,7 @@ object ConfigChecker extends ConfigWriters {
 
   def checkConfig(rawCfg: Config, matcherSettings: MatcherSettings): ErrorOr[Seq[String]] =
     Either.catchNonFatal {
-      val skippedPaths = matcherSettings.uncheckingConfigs.fold(Seq.empty[String])(_.split(skippedPathsDelimiter).toSeq)
+      val skippedPaths = matcherSettings.cliSettings.fold(Seq.empty[String])(_.ignoreUnusedProperties)
       val usingProperties: ConfigValue = ConfigWriter[MatcherSettings].to(matcherSettings)
       val allProperties = rawCfg.getConfig("waves.dex").entrySet()
       getConfigObject(usingProperties)

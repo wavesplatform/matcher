@@ -22,7 +22,6 @@ import org.testcontainers.containers.Network
 import org.testcontainers.containers.Network.NetworkImpl
 import sttp.client3.asynchttpclient.future.AsyncHttpClientFutureBackend
 import cats.instances.future._
-import cats.instances.try_._
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Random, Try}

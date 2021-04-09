@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.actors.address
 
 import akka.actor.{Actor, ActorRef, Props, SupervisorStrategy, Terminated}
-import com.wavesplatform.dex.db.OrderDB
+import com.wavesplatform.dex.db.OrderDb
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.utils.{EitherExt2, ScorexLogging}
 import com.wavesplatform.dex.history.HistoryRouterActor._
@@ -9,9 +9,11 @@ import com.wavesplatform.dex.model.Events
 import com.wavesplatform.dex.model.Events.OrderCancelFailed
 
 import scala.collection.mutable
+import scala.concurrent.Future
+import scala.util.{Failure, Success}
 
 class AddressDirectoryActor(
-  orderDB: OrderDB,
+  orderDb: OrderDb[Future],
   mkAddressActorProps: (Address, Boolean) => Props,
   historyRouterRef: Option[ActorRef],
   var recovered: Boolean = false
@@ -45,9 +47,13 @@ class AddressDirectoryActor(
 
     case e: OrderCancelFailed =>
       // We save an order when accept it in AddressActor
-      orderDB.get(e.id) match {
-        case Some(order) => forward(order.sender.toAddress, e)
-        case None => log.warn(s"The order '${e.id}' not found")
+      orderDb.get(e.id).onComplete {
+        case Success(Some(order)) =>
+          forward(order.sender.toAddress, e)
+        case Success(None) =>
+          log.warn(s"The order '${e.id}' not found")
+        case Failure(th) =>
+          log.error(s"error while retrieving order by id ${e.id}", th)
       }
 
     case Terminated(child) =>
@@ -78,7 +84,7 @@ class AddressDirectoryActor(
 object AddressDirectoryActor {
   val name = "addresses"
 
-  def props(orderDB: OrderDB, mkAddressActorProps: (Address, Boolean) => Props, historyRouterRef: Option[ActorRef]): Props = Props(
+  def props(orderDB: OrderDb[Future], mkAddressActorProps: (Address, Boolean) => Props, historyRouterRef: Option[ActorRef]): Props = Props(
     new AddressDirectoryActor(
       orderDB,
       mkAddressActorProps,

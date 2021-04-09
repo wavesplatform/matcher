@@ -1,6 +1,5 @@
 package com.wavesplatform.dex.load
 
-import sttp.client3.monad._
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -11,7 +10,7 @@ import im.mak.waves.transactions.account.{PrivateKey => JPrivateKey, PublicKey =
 import im.mak.waves.transactions.common.{Amount, AssetId}
 import im.mak.waves.transactions.exchange.{AssetPair, Order, OrderType}
 import im.mak.waves.transactions.mass.Transfer
-import im.mak.waves.transactions.{MassTransferTransaction, Transaction, TransferTransaction, WavesConfig}
+import im.mak.waves.transactions.{MassTransferTransaction, TransferTransaction, WavesConfig}
 import org.apache.http.HttpResponse
 import org.apache.http.client.config.{CookieSpecs, RequestConfig}
 import org.apache.http.client.methods.RequestBuilder

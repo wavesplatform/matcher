@@ -7,7 +7,7 @@ import com.wavesplatform.dex.actors.events.OrderEventsCoordinatorActor
 import com.wavesplatform.dex.actors.tx.ExchangeTransactionBroadcastActor
 import com.wavesplatform.dex.api.http.OrderBookHttpInfo
 import com.wavesplatform.dex.api.ws.actors.{WsExternalClientHandlerActor, WsHealthCheckSettings, WsInternalBroadcastActor, WsInternalClientHandlerActor}
-import com.wavesplatform.dex.db.{AccountStorage, OrderDB}
+import com.wavesplatform.dex.db.{AccountStorage, OrderDb}
 import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -90,7 +90,7 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
     settings.snapshotsInterval should be(999)
     settings.snapshotsLoadingTimeout should be(423.seconds)
     settings.startEventsProcessingTimeout should be(543.seconds)
-    settings.orderDb should be(OrderDB.Settings(199))
+    settings.orderDb should be(OrderDb.Settings(199))
     settings.priceAssets should be(
       Seq(
         Waves,

@@ -7,7 +7,7 @@ import com.wavesplatform.dex.actors.address.AddressActor
 import com.wavesplatform.dex.actors.events.OrderEventsCoordinatorActor
 import com.wavesplatform.dex.actors.tx.ExchangeTransactionBroadcastActor
 import com.wavesplatform.dex.api.http.OrderBookHttpInfo
-import com.wavesplatform.dex.db.{AccountStorage, OrderDB}
+import com.wavesplatform.dex.db.{AccountStorage, OrderDb}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.grpc.integration.settings.WavesBlockchainClientSettings
 import com.wavesplatform.dex.model.OrderValidator.exchangeTransactionCreationFee
@@ -42,7 +42,7 @@ case class MatcherSettings(
   priceAssets: Seq[Asset],
   blacklistedAssets: Set[Asset.IssuedAsset],
   blacklistedNames: Seq[Regex],
-  orderDb: OrderDB.Settings,
+  orderDb: OrderDb.Settings,
   // this is not a Set[Address] because to parse an address, global AddressScheme must be initialized
   blacklistedAddresses: Set[String],
   orderBookHttp: OrderBookHttpInfo.Settings,

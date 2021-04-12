@@ -3,7 +3,7 @@ package com.wavesplatform.dex.model
 import com.google.common.base.Charsets
 import com.wavesplatform.dex.actors.orderbook.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.caches.RateCache
-import com.wavesplatform.dex.db.WithDB
+import com.wavesplatform.dex.db.WithDb
 import com.wavesplatform.dex.domain.account.{Address, KeyPair}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -34,13 +34,14 @@ import org.scalatest._
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import scala.concurrent.ExecutionContext.Implicits.global
 import play.api.libs.json.Json
 
 import scala.concurrent.Future
 
 class OrderValidatorSpecification
     extends AnyWordSpec
-    with WithDB
+    with WithDb
     with Matchers
     with MatcherSpecBase
     with BeforeAndAfterAll

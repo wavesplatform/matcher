@@ -14,7 +14,7 @@ import com.wavesplatform.dex.actors.address.AddressActor.Command.Source
 import com.wavesplatform.dex.actors.orderbook.OrderBookActor.{MarketStatus, OrderBookRecovered, OrderBookSnapshotUpdateCompleted}
 import com.wavesplatform.dex.actors.{HasOecInteraction, MatcherSpec, OrderBookAskAdapter}
 import com.wavesplatform.dex.caches.OrderFeeSettingsCache
-import com.wavesplatform.dex.db.OrderBookSnapshotDb
+import com.wavesplatform.dex.db.{OrderBookSnapshotDb, TestOrderBookSnapshotDb}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -81,7 +81,7 @@ class OrderBookActorSpecification
 
     val tp = TestProbe()
     val pair = AssetPair(wctAsset, Waves)
-    val obsdb = OrderBookSnapshotDb.inMem[Future]
+    val obsdb = new TestOrderBookSnapshotDb[Future]
 
     prepare(obsdb, pair)
 

@@ -11,7 +11,7 @@ import com.wavesplatform.dex.actors.address.AddressActor.BlockchainInteraction
 import com.wavesplatform.dex.actors.address.AddressActor.Command.PlaceOrder
 import com.wavesplatform.dex.actors.address.AddressDirectoryActor.Command.ForwardMessage
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
-import com.wavesplatform.dex.db.{EmptyOrderDb, TestOrderDb, WithDB}
+import com.wavesplatform.dex.db.{EmptyOrderDb, TestOrderDb, WithDb}
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -76,9 +76,11 @@ import scala.util.Success
  * Buy         | A_c > A_s | A_corr < A      | P_c = P_s  | A_min             | A_min - 1
  * Sell        | A_c > A_s | A_corr < A      | P_c = P_s  | A_min             | A_min - 1
  */
-class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike with WithDB with MatcherSpecBase with TableDrivenPropertyChecks {
+class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike with WithDb with MatcherSpecBase with TableDrivenPropertyChecks {
 
   override protected def actorSystemName: String = getSimpleName(this)
+
+  import system.dispatcher
 
   implicit private val efc: ErrorFormatterContext = ErrorFormatterContext.from(_ => 8)
   implicit private val timeout: Timeout = 5.seconds

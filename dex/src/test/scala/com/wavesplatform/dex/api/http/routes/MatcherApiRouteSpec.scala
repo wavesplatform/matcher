@@ -29,7 +29,7 @@ import com.wavesplatform.dex.api.http.{entities, OrderBookHttpInfo}
 import com.wavesplatform.dex.api.ws.actors.WsExternalClientDirectoryActor
 import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.caches.RateCache
-import com.wavesplatform.dex.db.{DbKeys, ExchangeTxStorage, OrderDb, WithDB}
+import com.wavesplatform.dex.db.{DbKeys, ExchangeTxStorage, OrderDb, WithDb}
 import com.wavesplatform.dex.domain.account.{Address, AddressScheme, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -62,7 +62,7 @@ import scala.concurrent.{Await, Future}
 import scala.concurrent.duration.DurationInt
 import scala.util.Random
 
-class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase with PathMockFactory with Eventually with WithDB {
+class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase with PathMockFactory with Eventually with WithDb {
 
   private val apiKey = "apiKey"
   private val apiKeyHeader = RawHeader(`X-Api-Key`.headerName, apiKey)

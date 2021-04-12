@@ -13,7 +13,7 @@ import com.wavesplatform.dex.actors.MatcherActorSpecification.{DeletingActor, Fa
 import com.wavesplatform.dex.actors.orderbook.OrderBookActor.{OrderBookRecovered, OrderBookSnapshotUpdateCompleted}
 import com.wavesplatform.dex.actors.orderbook.OrderBookSnapshotStoreActor.{Message, Response}
 import com.wavesplatform.dex.actors.orderbook.{AggregatedOrderBookActor, OrderBookActor, OrderBookSnapshotStoreActor}
-import com.wavesplatform.dex.db.{AssetPairsDb, OrderBookSnapshotDb}
+import com.wavesplatform.dex.db.{AssetPairsDb, OrderBookSnapshotDb, TestAssetPairDb, TestOrderBookSnapshotDb}
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -456,8 +456,8 @@ class MatcherActorSpecification
     )
   }
 
-  private def mkAssetPairsDB: AssetPairsDb[Future] = AssetPairsDb.inMem
-  private def mkOrderBookSnapshotDb: OrderBookSnapshotDb[Future] = OrderBookSnapshotDb.inMem
+  private def mkAssetPairsDB: AssetPairsDb[Future] = new TestAssetPairDb[Future]
+  private def mkOrderBookSnapshotDb: OrderBookSnapshotDb[Future] = new TestOrderBookSnapshotDb[Future]
 
   private def matcherHadOrderBooksBefore(apdb: AssetPairsDb[Future], obsdb: OrderBookSnapshotDb[Future], pairs: (AssetPair, Long)*): Unit = {
     val future = for {

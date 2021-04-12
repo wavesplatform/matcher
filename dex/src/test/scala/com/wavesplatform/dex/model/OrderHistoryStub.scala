@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.model
 
-import cats.instances.future._
 import akka.actor.{ActorRef, ActorSystem, Props}
+import cats.instances.future._
 import com.wavesplatform.dex.actors.address.AddressActor.BlockchainInteraction
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.db.{EmptyOrderDb, TestOrderDb}

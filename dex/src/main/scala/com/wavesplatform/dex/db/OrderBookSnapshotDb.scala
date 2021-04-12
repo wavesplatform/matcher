@@ -1,16 +1,11 @@
 package com.wavesplatform.dex.db
 
-import cats.Applicative
-import cats.syntax.applicative._
-import cats.syntax.functor._
 import cats.instances.option.catsStdInstancesForOption
 import cats.syntax.apply.catsSyntaxTuple2Semigroupal
 import com.wavesplatform.dex.db.leveldb.{Key, LevelDb}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.model.OrderBookSnapshot
 import com.wavesplatform.dex.queue.ValidatedCommandWithMeta.Offset
-
-import java.util.concurrent.ConcurrentHashMap
 
 trait OrderBookSnapshotDb[F[_]] {
   def get(assetPair: AssetPair): F[Option[(Offset, OrderBookSnapshot)]]
@@ -41,20 +36,6 @@ object OrderBookSnapshotDb {
 
     private def keys(assetPair: AssetPair): (Key[Option[Offset]], Key[Option[OrderBookSnapshot]]) =
       (DbKeys.orderBookSnapshotOffset(assetPair), DbKeys.orderBookSnapshot(assetPair))
-
-  }
-
-  def inMem[F[_]: Applicative]: OrderBookSnapshotDb[F] = new OrderBookSnapshotDb[F] {
-    private val storage = new ConcurrentHashMap[AssetPair, (Offset, OrderBookSnapshot)]()
-
-    override def get(assetPair: AssetPair): F[Option[(Offset, OrderBookSnapshot)]] =
-      Option(storage.get(assetPair)).pure[F]
-
-    override def update(assetPair: AssetPair, offset: Offset, newSnapshot: Option[OrderBookSnapshot]): F[Unit] =
-      storage.compute(assetPair, (_, current) => (offset, newSnapshot.getOrElse(current._2))).pure[F].void
-
-    override def delete(assetPair: AssetPair): F[Unit] =
-      storage.remove(assetPair).pure[F].void
 
   }
 

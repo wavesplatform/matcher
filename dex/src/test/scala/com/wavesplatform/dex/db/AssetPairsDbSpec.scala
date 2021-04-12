@@ -9,7 +9,7 @@ import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class AssetPairsDbSpec extends AnyFreeSpec with Matchers with WithDB with MatcherSpecBase with PropertyChecks with NoShrink {
+class AssetPairsDbSpec extends AnyFreeSpec with Matchers with WithDb with MatcherSpecBase with PropertyChecks with NoShrink {
 
   private val fixedAssetPairGen = assetPairGen.filterNot(x => x.amountAsset == Waves && x.priceAsset == Waves)
 

@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.caches
 
-import com.wavesplatform.dex.db.{RateDB, WithDB}
+import com.wavesplatform.dex.db.{RateDB, WithDb}
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
@@ -9,7 +9,7 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class RateCacheSpecification extends AnyWordSpecLike with Matchers with WithDB with MatcherSpecBase with PropertyChecks with NoShrink {
+class RateCacheSpecification extends AnyWordSpecLike with Matchers with WithDb with MatcherSpecBase with PropertyChecks with NoShrink {
 
   private def test(f: RateCache => Unit): Unit = {
     withClue("with DB")(f(RateCache(db)))

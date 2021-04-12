@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.model
 
 import cats.instances.future._
-import com.wavesplatform.dex.db.{OrderDb, WithDB}
+import com.wavesplatform.dex.db.{OrderDb, WithDb}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.Order
@@ -12,11 +12,12 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 import scala.concurrent.Future
+import scala.concurrent.ExecutionContext.Implicits.global
 import org.scalatest.concurrent.ScalaFutures._
 import org.scalatest.concurrent.ScalaFutures.PatienceConfig
 import org.scalatest.time.{Millis, Seconds, Span}
 
-class OrderDbSpec extends AnyFreeSpec with Matchers with WithDB with MatcherSpecBase with PropertyChecks with NoShrink {
+class OrderDbSpec extends AnyFreeSpec with Matchers with WithDb with MatcherSpecBase with PropertyChecks with NoShrink {
   import OrderDbSpec._
 
   implicit val patienceConfig: PatienceConfig =

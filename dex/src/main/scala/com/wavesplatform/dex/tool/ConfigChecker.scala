@@ -23,17 +23,15 @@ import sttp.model.Uri
 
 import scala.jdk.CollectionConverters._
 import java.io.File
-import scala.util.Try
 
 object ConfigChecker extends ConfigWriters {
 
-  val skippedPaths = Seq(
-    "events-queue.kafka.consumer.client",
-    "events-queue.kafka.producer.client"
-  )
-
-  def checkConfig(configPath: String): ErrorOr[Seq[String]] =
-    checkConfig(parseFile(new File(configPath)))
+  def checkConfig(configPath: String): ErrorOr[Seq[String]] = {
+    val file = new File(configPath)
+    if (file.exists())
+      checkConfig(parseFile(file))
+    else s"File with configs $configPath not found".asLeft
+  }
 
   def checkConfig(rawCfg: Config): ErrorOr[Seq[String]] =
     loadMatcherSettings(rawCfg).toEither.leftMap(ex => s"Cannot load matcher settings: ${ex.getWithStackTrace}")
@@ -41,6 +39,7 @@ object ConfigChecker extends ConfigWriters {
 
   def checkConfig(rawCfg: Config, matcherSettings: MatcherSettings): ErrorOr[Seq[String]] =
     Either.catchNonFatal {
+      val skippedPaths = matcherSettings.cli.ignoreUnusedProperties
       val usingProperties: ConfigValue = ConfigWriter[MatcherSettings].to(matcherSettings)
       val allProperties = rawCfg.getConfig("waves.dex").entrySet()
       getConfigObject(usingProperties)
@@ -122,7 +121,6 @@ sealed trait ConfigWriters {
         allOrderFeeSettingsWriter.to(
           AllOrderFeeSettings("fixed", DynamicSettings.empty, PercentSettings.empty, a)
         )
-
     }
 
   implicit val allAccStorageSettingsWriter: ConfigWriter[AllAccountStorageSettings] =

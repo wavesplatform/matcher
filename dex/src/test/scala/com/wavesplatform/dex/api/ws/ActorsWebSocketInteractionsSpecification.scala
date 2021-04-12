@@ -170,7 +170,7 @@ class ActorsWebSocketInteractionsSpecification
         env
           .subscribeAddress()
           .expectWsBalancesAndOrders(Map.empty, Seq.empty, 0)
-          .kill
+          .kill()
       }
 
       "sender places order and then cancel it" in {
@@ -197,7 +197,7 @@ class ActorsWebSocketInteractionsSpecification
             Seq(WsOrder(lo.id, status = OrderStatus.Cancelled.name.some)),
             2
           )
-          .kill
+          .kill()
       }
 
       // DEX-989
@@ -289,7 +289,7 @@ class ActorsWebSocketInteractionsSpecification
             )
         }
 
-        env.kill
+        env.kill()
       }
 
       "sender places market order in nonempty order book, fee in ETH" in {
@@ -407,7 +407,7 @@ class ActorsWebSocketInteractionsSpecification
             )
         }
 
-        env.kill
+        env.kill()
       }
 
       // DEX-989
@@ -452,7 +452,7 @@ class ActorsWebSocketInteractionsSpecification
         expectWsBalance(mobileSubscription, Map(usd -> WsBalances(300, 0), Waves -> WsBalances(100, 0)), 2)
         expectWsBalance(desktopSubscription, Map(usd -> WsBalances(300, 0), Waves -> WsBalances(100, 0)), 1)
 
-        env.kill
+        env.kill()
       }
 
       "so far unsubscribed address made some actions and then subscribes" in {
@@ -470,7 +470,7 @@ class ActorsWebSocketInteractionsSpecification
             Seq(WsOrder.fromDomain(lo)),
             0
           )
-          .kill
+          .kill()
       }
 
       "spendable balance is equal to reserved" in {
@@ -486,7 +486,7 @@ class ActorsWebSocketInteractionsSpecification
             Seq(WsOrder.fromDomain(lo)),
             0
           )
-          .kill
+          .kill()
       }
 
       // DEX-989
@@ -524,7 +524,7 @@ class ActorsWebSocketInteractionsSpecification
             Seq(WsOrder.fromDomain(oe.submittedRemaining)),
             1
           )
-          .kill
+          .kill()
       }
 
       "trade with itself" in {
@@ -560,7 +560,7 @@ class ActorsWebSocketInteractionsSpecification
             Seq(WsOrder.fromDomain(oe.counterRemaining), WsOrder.fromDomain(oe.submittedRemaining)),
             1
           )
-          .kill
+          .kill()
       }
 
       "market order executes (address is sender of counters)" in {
@@ -666,7 +666,7 @@ class ActorsWebSocketInteractionsSpecification
             Seq.empty,
             8
           )
-          .kill
+          .kill()
       }
 
       // DEX-989
@@ -757,7 +757,7 @@ class ActorsWebSocketInteractionsSpecification
             Seq.empty,
             5
           )
-          .kill
+          .kill()
       }
     }
 
@@ -809,7 +809,7 @@ class ActorsWebSocketInteractionsSpecification
           Seq(WsOrder(id = bo.id, status = OrderStatus.Cancelled.name.some)),
           4
         )
-        .kill
+        .kill()
     }
   }
 

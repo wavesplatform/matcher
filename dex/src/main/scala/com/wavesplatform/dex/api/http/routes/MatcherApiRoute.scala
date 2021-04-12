@@ -56,7 +56,7 @@ import play.api.libs.json._
 import javax.ws.rs.Path
 import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag
-import scala.util.{Failure, Success}
+import scala.util.Success
 
 @Path("/matcher")
 @Api()

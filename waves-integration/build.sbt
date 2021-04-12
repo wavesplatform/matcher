@@ -5,7 +5,7 @@ libraryDependencies ++= Dependencies.Module.wavesIntegration
 // Google's descriptor.proto contains a deprecated field:
 //  optional bool java_generate_equals_and_hash = 20 [deprecated=true];
 // When scalac compiles a generated class, it warns about a deprecated field.
-scalacOptions += "-P:silencer:pathFilters=FileOptions"
+scalacOptions += "-P:silencer:pathFilters=FileOptions;TransactionsApiGrpc"
 
 inConfig(Compile)(
   Seq(

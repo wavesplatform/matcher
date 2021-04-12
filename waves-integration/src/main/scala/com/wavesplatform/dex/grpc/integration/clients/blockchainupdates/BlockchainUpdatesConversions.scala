@@ -71,7 +71,7 @@ object BlockchainUpdatesConversions {
   def combineBalanceUpdates(stateUpdate: View[StateUpdate]): Balances =
     stateUpdate.flatMap(_.balances).foldLeft[Balances](Map.empty) {
       case (r, x) =>
-        x.amount.fold(r) { assetAmount =>
+        x.amountAfter.fold(r) { assetAmount =>
           val address = x.address.toVanillaAddress
           r.updated(
             address,
@@ -83,6 +83,6 @@ object BlockchainUpdatesConversions {
     }
 
   def combineLeaseUpdates(stateUpdate: View[StateUpdate]): Leases =
-    stateUpdate.flatMap(_.leases).map(x => x.address.toVanillaAddress -> x.out).foldLeft[Leases](Map.empty)(_ + _)
+    stateUpdate.flatMap(_.leasingForAddress).map(x => x.address.toVanillaAddress -> x.outAfter).foldLeft[Leases](Map.empty)(_ + _)
 
 }

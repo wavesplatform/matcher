@@ -12,10 +12,9 @@ import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.model.OrderInfo.FinalOrderInfo
 import com.wavesplatform.dex.model.{OrderInfo, OrderStatus}
 
-class TestOrderDb[F[_]](
+class TestOrderDb[F[_]: MonadError[*[_], Throwable]](
   maxFinalizedOrders: Int
-)(implicit F: MonadError[F, Throwable])
-    extends OrderDb[F] {
+) extends OrderDb[F] {
 
   private var knownOrders = Map.empty[Order.Id, Order]
   private var orderInfo = Map.empty[Order.Id, OrderInfo[OrderStatus.Final]]

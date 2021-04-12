@@ -258,7 +258,7 @@ class AddressActor(
           case Success(_) =>
             val shouldProcess = placementQueue.isEmpty
             placementQueue = placementQueue.enqueue(orderId)
-            pendingCommands.put(orderId, PendingCommand(command, sender()))
+            pendingCommands.put(orderId, PendingCommand(command, origSender))
             if (shouldProcess) processNextPlacement()
             else log.trace(s"${placementQueue.headOption} is processing, moving $orderId to the queue")
           case Failure(th) =>

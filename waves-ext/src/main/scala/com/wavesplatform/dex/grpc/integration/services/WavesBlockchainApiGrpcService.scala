@@ -32,6 +32,7 @@ import monix.execution.Scheduler
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 import shapeless.Coproduct
+import net.ceedubs.ficus.Ficus._
 
 import java.util.concurrent.ConcurrentHashMap
 import scala.collection.concurrent.TrieMap
@@ -39,6 +40,7 @@ import scala.concurrent.Future
 import scala.util.Try
 import scala.util.control.NonFatal
 import cats.syntax.option._
+import com.wavesplatform.transaction.assets.exchange
 
 class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Scheduler)
     extends WavesBlockchainApiGrpc.WavesBlockchainApi
@@ -64,6 +66,13 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
 
     withUtxChangesSubscribers("send onError", _.onError(shutdownError))
     utxChangesSubscribers.clear()
+  }
+
+  private val inUtxHandler: exchange.ExchangeTransaction => Future[CheckedBroadcastResponse.Result] = {
+    if (context.settings.config.as[Boolean]("waves.extension.dex.allow-tx-rebroadcasting"))
+      handleTxInUtx
+    else
+      _ => Future.successful(CheckedBroadcastResponse.Result.Unconfirmed(false))
   }
 
   // TODO DEX-994
@@ -163,7 +172,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
       .flatMap {
         case Right((tx, isConfirmed, isInUtx)) =>
           if (isConfirmed) Future.successful(CheckedBroadcastResponse.Result.Confirmed(empty))
-          else if (isInUtx) Future.successful(CheckedBroadcastResponse.Result.Unconfirmed(false)) // false == not new
+          else if (isInUtx) inUtxHandler(tx)
           else context.transactionsApi.broadcastTransaction(tx).map {
             _.resultE match {
               case Right(isNew) => CheckedBroadcastResponse.Result.Unconfirmed(isNew)
@@ -179,6 +188,14 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
           val message = Option(e.getMessage).getOrElse(e.getClass.getName)
           CheckedBroadcastResponse(CheckedBroadcastResponse.Result.Failed(CheckedBroadcastResponse.Failure(message, canRetry = false)))
       }
+
+  private def handleTxInUtx(tx: exchange.ExchangeTransaction): Future[CheckedBroadcastResponse.Result] =
+    context.transactionsApi.broadcastTransaction(tx).map { //todo: check with tests
+      _.resultE match {
+        case Right(isNew) => CheckedBroadcastResponse.Result.Unconfirmed(isNew)
+        case Left(e) => CheckedBroadcastResponse.Result.Failed(CheckedBroadcastResponse.Failure(e.toString, canRetry(e)))
+      }
+    }
 
   private def canRetry(x: ValidationError): Boolean = x match {
     case x: GenericError

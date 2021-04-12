@@ -15,6 +15,7 @@ import scala.concurrent.Future
 
 // TODO DEX-998
 trait WavesBlockchainClient {
+
   /**
    * @return (update, ready) ready == the last processed height >= the last height in blockchain
    */

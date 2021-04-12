@@ -32,7 +32,12 @@ object SuperConnector {
 
   private val processLeftIndent = 110
 
-  def create(matcherSettings: MatcherSettings, dexRestApi: String, nodeRestApi: String, authServiceRestApi: Option[String]): ErrorOr[SuperConnector] = {
+  def create(
+    matcherSettings: MatcherSettings,
+    dexRestApi: String,
+    nodeRestApi: String,
+    authServiceRestApi: Option[String]
+  ): ErrorOr[SuperConnector] = {
 
     def prependScheme(uri: String): String = {
       val uriWithoutSlash = if (uri.last == '/') uri.init else uri

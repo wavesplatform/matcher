@@ -5,6 +5,7 @@ import com.wavesplatform.dex.settings.BaseSettingsSpecification
 import com.wavesplatform.dex.tool.ConfigChecker
 import org.scalatest.EitherValues
 import org.scalatest.matchers.should.Matchers
+import scala.jdk.CollectionConverters._
 
 class ConfigCheckerCliSpec extends BaseSettingsSpecification with Matchers with EitherValues {
 
@@ -51,8 +52,7 @@ class ConfigCheckerCliSpec extends BaseSettingsSpecification with Matchers with 
   }
 
   it should "ignore unknown values from skipped paths" in {
-    val skippedProperties =
-      ConfigChecker.skippedPaths.map(s => s"waves.dex.$s.unknown-property")
+    val skippedProperties = Seq("events-queue.kafka.consumer.client", "events-queue.kafka.producer.client", "events-queue.kafka.servers")
     val blablaValuePathSeq = Seq(
       "waves.dex.order-fee.-1.dynamic.bla-bla-value",
       "waves.dex.bla-value",
@@ -62,7 +62,7 @@ class ConfigCheckerCliSpec extends BaseSettingsSpecification with Matchers with 
       loadCleanConfigSample()
     ) { (cfg, path) =>
       cfg.withValue(path, ConfigValueFactory.fromAnyRef("some-simple-value"))
-    }
+    }.withValue("waves.dex.cli.ignore-unused-properties", ConfigValueFactory.fromIterable(skippedProperties.asJava))
     val result = ConfigChecker.checkConfig(cfg)
     result.value should contain theSameElementsAs blablaValuePathSeq.map(cutWavesDexSection)
   }

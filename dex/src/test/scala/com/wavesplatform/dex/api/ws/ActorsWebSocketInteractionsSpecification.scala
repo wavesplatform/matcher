@@ -159,7 +159,7 @@ class ActorsWebSocketInteractionsSpecification
       this
     }
 
-    def kill: Unit = addressDir ! PoisonPill
+    def kill(): Unit = addressDir ! PoisonPill
   }
 
   "Actors web socket interaction" should {

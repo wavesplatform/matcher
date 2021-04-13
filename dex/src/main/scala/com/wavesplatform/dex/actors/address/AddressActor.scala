@@ -270,7 +270,7 @@ class AddressActor(
         val origSender = sender()
         orderDb.containsInfo(orderId).onComplete {
           case Success(containsInfo) =>
-            self.tell(Command.PlaceOrderFinalized(command.order, command.isMarket, containsInfo), origSender)
+            self.tell(Command.PlaceOrderFinalized(command, containsInfo), origSender)
           case Failure(th) =>
             log.error("error while retrieving order info", th)
             origSender ! UnexpectedError
@@ -279,13 +279,14 @@ class AddressActor(
 
     case command: Command.PlaceOrderFinalized =>
       log.debug(s"$command")
-      val orderId = command.order.id()
+      val placeOrder = command.placeOrder
+      val orderId = placeOrder.order.id()
       if (command.containsInfo || activeOrders.contains(orderId) || pendingCommands.contains(orderId))
         sender() ! error.OrderDuplicate(orderId)
       else {
         val shouldProcess = placementQueue.isEmpty
         placementQueue = placementQueue.enqueue(orderId)
-        pendingCommands.put(orderId, PendingCommand(command, sender()))
+        pendingCommands.put(orderId, PendingCommand(placeOrder, sender()))
         if (shouldProcess) processNextPlacement()
         else log.trace(s"${placementQueue.headOption} is processing, moving $orderId to the queue")
       }
@@ -832,7 +833,9 @@ object AddressActor {
 
     }
 
-    case class PlaceOrderFinalized(order: Order, isMarket: Boolean, containsInfo: Boolean) extends OneOrderCommand {
+    case class PlaceOrderFinalized(placeOrder: PlaceOrder, containsInfo: Boolean) extends OneOrderCommand {
+
+      import placeOrder._
 
       override lazy val toString =
         s"PlaceOrderFinalized(${if (isMarket) "market" else "limit"},id=${order.id()},js=${order.jsonStr},containsInfo=$containsInfo)"

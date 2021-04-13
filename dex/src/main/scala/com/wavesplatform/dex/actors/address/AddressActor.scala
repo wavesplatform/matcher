@@ -835,7 +835,7 @@ object AddressActor {
     case class PlaceOrderFinalized(order: Order, isMarket: Boolean, containsInfo: Boolean) extends OneOrderCommand {
 
       override lazy val toString =
-        s"PlaceOrder2(${if (isMarket) "market" else "limit"},id=${order.id()},js=${order.jsonStr},containsInfo=$containsInfo)"
+        s"PlaceOrderFinalized(${if (isMarket) "market" else "limit"},id=${order.id()},js=${order.jsonStr},containsInfo=$containsInfo)"
 
     }
 

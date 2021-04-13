@@ -1,7 +1,5 @@
 package com.wavesplatform.dex.grpc.integration.clients.matcherext
 
-import java.util.concurrent.atomic.AtomicBoolean
-
 import cats.syntax.option._
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.dex.domain.utils.ScorexLogging
@@ -14,14 +12,14 @@ import monix.execution.Scheduler
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 
+import java.util.concurrent.atomic.AtomicBoolean
+
 /**
  * @see GrpcBlockchainUpdatesControlledStream
  */
 class GrpcUtxEventsControlledStream(channel: ManagedChannel)(implicit scheduler: Scheduler)
     extends UtxEventsControlledStream
     with ScorexLogging {
-
-  private val logPrefix = s"[${hashCode()}]" // TODO remove in future versions
 
   @volatile private var grpcObserver: Option[UtxEventObserver] = None
 
@@ -34,7 +32,7 @@ class GrpcUtxEventsControlledStream(channel: ManagedChannel)(implicit scheduler:
   private val empty: Empty = Empty()
 
   override def start(): Unit = {
-    log.info(s"$logPrefix Connecting to UTX stream")
+    log.info("Connecting to UTX stream")
     val call = channel.newCall(WavesBlockchainApiGrpc.METHOD_GET_UTX_EVENTS, CallOptions.DEFAULT)
     val observer = new UtxEventObserver(call)
     grpcObserver = observer.some
@@ -42,13 +40,13 @@ class GrpcUtxEventsControlledStream(channel: ManagedChannel)(implicit scheduler:
   }
 
   override def stop(): Unit = if (grpcObserver.nonEmpty) {
-    log.info(s"$logPrefix Stopping utx events stream")
+    log.info("Stopping utx events stream")
     stopGrpcObserver()
     internalSystemStream.onNext(SystemEvent.Stopped)
   }
 
   override def close(): Unit = {
-    log.info(s"$logPrefix Closing utx events stream")
+    log.info("Closing utx events stream")
     stopGrpcObserver()
     internalStream.onComplete()
     internalSystemStream.onNext(SystemEvent.Closed)
@@ -62,6 +60,7 @@ class GrpcUtxEventsControlledStream(channel: ManagedChannel)(implicit scheduler:
 
   private class UtxEventObserver(call: ClientCall[Empty, UtxEvent]) extends ClosingObserver[Empty, UtxEvent] {
 
+    private val logPrefix = s"[${hashCode()}]" // TODO remove in future versions
     private val ready = new AtomicBoolean(false)
 
     override def onReady(): Unit = {

@@ -98,17 +98,9 @@ class LevelDbLocalQueueStore[F[_]: Monad](levelDb: LevelDb[F]) extends LocalQueu
     }
 
   private def getNewestIdx(ro: ReadOnlyDB): Long =
-    if (newestIdx.get() < 0) {
-      val v = ro.get(lqNewestIdx)
-      newestIdx.set(v)
-      v
-    } else newestIdx.get()
+    newestIdx.updateAndGet(x1 => if (x1 < 0) ro.get(lqNewestIdx) else x1)
 
   private def getAndIncrementNewestIdx(ro: ReadOnlyDB): Long =
-    if (newestIdx.get() < 0) {
-      val v = ro.get(lqNewestIdx) + 1
-      newestIdx.set(v)
-      v
-    } else newestIdx.getAndIncrement()
+    newestIdx.updateAndGet(x1 => if (x1 < 0) ro.get(lqNewestIdx) + 1 else x1 + 1)
 
 }

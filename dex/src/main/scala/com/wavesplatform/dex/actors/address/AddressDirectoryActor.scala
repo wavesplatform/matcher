@@ -6,7 +6,7 @@ import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.utils.{EitherExt2, ScorexLogging}
 import com.wavesplatform.dex.history.HistoryRouterActor._
 import com.wavesplatform.dex.model.Events
-import com.wavesplatform.dex.model.Events.OrderCancelFailed
+import com.wavesplatform.dex.model.Events.{OrderCancelFailed, OrderCancelFailedFinalized}
 
 import scala.collection.mutable
 import scala.concurrent.Future
@@ -47,14 +47,18 @@ class AddressDirectoryActor(
 
     case e: OrderCancelFailed =>
       // We save an order when accept it in AddressActor
+      val origSender = sender()
       orderDb.get(e.id).onComplete {
         case Success(Some(order)) =>
-          forward(order.sender.toAddress, e)
+          self.tell(OrderCancelFailedFinalized(order, e.reason), origSender)
         case Success(None) =>
           log.warn(s"The order '${e.id}' not found")
         case Failure(th) =>
           log.error(s"error while retrieving order by id ${e.id}", th)
       }
+
+    case e: OrderCancelFailedFinalized =>
+      forward(e.order.sender.toAddress, e)
 
     case Terminated(child) =>
       val addressString = child.path.name

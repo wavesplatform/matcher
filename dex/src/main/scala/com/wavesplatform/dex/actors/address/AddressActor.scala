@@ -107,7 +107,13 @@ class AddressActor(
       lazy val orderReserve = order.reservableBalance
       order.status match {
         case OrderStatus.Accepted =>
-          orderDb.saveOrder(order.order) // TODO DEX-1057
+          orderDb.saveOrder(order.order).onComplete { // TODO DEX-1057
+            case Success(_) =>
+            case Failure(th) =>
+              //TODO probably inconsistent state can be introduced
+              log.error("error while saving order", th)
+          }
+
           origActiveOrder match {
             case Some(_) => // The order added before in the ValidationPassed -> place function, balances are already updated
             case None => reserve(orderReserve)
@@ -140,7 +146,12 @@ class AddressActor(
           remaining.status match {
             case status: OrderStatus.Final =>
               expiration.remove(remaining.id).foreach(_.cancel())
-              orderDb.saveOrderInfo(remaining.id, owner, OrderInfo.v6(remaining, status))
+              orderDb.saveOrderInfo(remaining.id, owner, OrderInfo.v6(remaining, status)).onComplete {
+                case Success(_) =>
+                case Failure(th) =>
+                  //TODO probably inconsistent state can be introduced
+                  log.error("error while saving order info", th)
+              }
               activeOrders.remove(remaining.id) match {
                 case Some(origActiveOrder) => origActiveOrder.reservableBalance.inverse()
                 case None => throw new IllegalStateException(s"Can't find order ${remaining.id} during finalization")
@@ -176,7 +187,12 @@ class AddressActor(
         case None => // Can be received twice, because multiple matchers can cancel same order
         case Some(origActiveOrder) =>
           expiration.remove(acceptedOrder.id).foreach(_.cancel())
-          orderDb.saveOrderInfo(acceptedOrder.id, owner, OrderInfo.v6(acceptedOrder, orderStatus))
+          orderDb.saveOrderInfo(acceptedOrder.id, owner, OrderInfo.v6(acceptedOrder, orderStatus)).onComplete {
+            case Success(_) =>
+            case Failure(th) =>
+              //TODO probably inconsistent state can be introduced
+              log.error("error while saving order info", th)
+          }
 
           val orderReserve = origActiveOrder.reservableBalance
 

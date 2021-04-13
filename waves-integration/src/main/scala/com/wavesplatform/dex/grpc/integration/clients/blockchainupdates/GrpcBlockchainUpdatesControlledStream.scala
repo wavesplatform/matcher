@@ -27,9 +27,7 @@ class GrpcBlockchainUpdatesControlledStream(channel: ManagedChannel, noDataTimeo
     extends BlockchainUpdatesControlledStream
     with ScorexLogging {
 
-  private val logPrefix = s"[${hashCode()}]" // TODO remove in future versions
-
-  @volatile private var grpcObserver: Option[BlockchainUpdatesObserver] = None
+  private val grpcObserver = new AtomicReference[Option[BlockchainUpdatesObserver]](None)
 
   private val internalStream = ConcurrentSubject.publish[SubscribeEvent]
   override val stream: Observable[SubscribeEvent] = internalStream
@@ -39,53 +37,47 @@ class GrpcBlockchainUpdatesControlledStream(channel: ManagedChannel, noDataTimeo
 
   override def startFrom(height: Int): Unit = {
     require(height >= 1, "We can not get blocks on height <= 0")
-    log.info(s"$logPrefix Connecting to Blockchain events stream, getting blocks from $height")
+    log.info(s"Connecting to Blockchain events stream, getting blocks from $height")
 
     val call = channel.newCall(BlockchainUpdatesApiGrpc.METHOD_SUBSCRIBE, CallOptions.DEFAULT)
-    val observer = new BlockchainUpdatesObserver(call, height)
-    grpcObserver = observer.some
+    val observer = new BlockchainUpdatesObserver(call)
+    grpcObserver.getAndSet(observer.some).foreach(_.close())
     ClientCalls.asyncServerStreamingCall(call, new SubscribeRequest(height), observer)
   }
 
-  override def requestNext(): Unit = grpcObserver.foreach(_.requestNext())
+  override def requestNext(): Unit = grpcObserver.get().foreach(_.requestNext())
 
-  override def stop(): Unit = if (grpcObserver.nonEmpty) {
-    log.info(s"$logPrefix Stopping balance updates stream")
-    stopGrpcObserver()
+  override def stop(): Unit = grpcObserver.get().foreach { x =>
+    log.info("Stopping balance updates stream")
+    x.close()
     internalSystemStream.onNext(SystemEvent.Stopped)
   }
 
   override def close(): Unit = {
-    log.info(s"$logPrefix Closing balance updates stream")
+    log.info("Closing balance updates stream")
     stopGrpcObserver()
     internalStream.onComplete()
     internalSystemStream.onNext(SystemEvent.Closed)
     internalSystemStream.onComplete()
   }
 
-  private def stopGrpcObserver(): Unit = {
-    grpcObserver.foreach(_.close())
-    grpcObserver = None
-  }
+  private def stopGrpcObserver(): Unit = grpcObserver.get().foreach(_.close())
 
-  private class BlockchainUpdatesObserver(call: ClientCall[SubscribeRequest, SubscribeEvent], startHeight: Int)
+  private class BlockchainUpdatesObserver(call: ClientCall[SubscribeRequest, SubscribeEvent])
       extends IntegrationObserver[SubscribeRequest, SubscribeEvent](internalStream) {
 
+    private val logPrefix = s"[${hashCode()}]" // TODO remove in future versions
     private val timeout = new AtomicReference[Option[Cancelable]](None)
 
     override def onReady(): Unit = {
       internalSystemStream.onNext(SystemEvent.BecameReady)
       val address = Option(call.getAttributes.get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR)).fold("unknown")(_.toString)
       log.info(s"$logPrefix Ready to receive from $address")
+      scheduleRestart()
     }
 
     override def onNext(value: SubscribeEvent): Unit = {
-      timeout
-        .getAndSet(Some(scheduler.scheduleOnce(noDataTimeout) {
-          log.warn(s"No data for $noDataTimeout, restarting!")
-          stop()
-        }))
-        .foreach(_.cancel())
+      scheduleRestart()
 
       def message = {
         val update = value.getUpdate
@@ -119,6 +111,17 @@ class GrpcBlockchainUpdatesControlledStream(channel: ManagedChannel, noDataTimeo
       log.error(s"$logPrefix Unexpected onCompleted")
       timeout.get().foreach(_.cancel())
     }
+
+    private def scheduleRestart(): Unit = timeout
+      .getAndSet(Some(scheduler.scheduleOnce(noDataTimeout) {
+        // This situation happens when we in same time receive a new data (thus schedule the timer again)
+        //   and receive a timeout.
+        if (grpcObserver.get().contains(this)) {
+          log.warn(s"No data for $noDataTimeout, restarting!")
+          stopGrpcObserver()
+        } else log.warn("False positive no-data timeout")
+      }))
+      .foreach(_.cancel())
 
   }
 

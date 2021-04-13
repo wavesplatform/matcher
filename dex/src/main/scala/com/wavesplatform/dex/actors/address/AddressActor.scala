@@ -263,7 +263,6 @@ class AddressActor(
     case command: Command.PlaceOrder =>
       log.debug(s"$command")
       val orderId = command.order.id()
-
       if (totalActiveOrders >= settings.maxActiveOrders) sender() ! error.ActiveOrdersLimitReached(settings.maxActiveOrders)
       else if (failedPlacements.contains(orderId)) sender() ! error.OrderDuplicate(orderId)
       else {

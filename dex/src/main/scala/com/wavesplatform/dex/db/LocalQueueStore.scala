@@ -1,16 +1,15 @@
 package com.wavesplatform.dex.db
 
 import cats.Monad
-import cats.syntax.flatMap._
-import cats.syntax.functor._
 import cats.syntax.applicative._
+import cats.syntax.functor._
+import com.google.common.primitives.{Longs, Shorts}
+import com.wavesplatform.dex.db.DbKeys._
+import com.wavesplatform.dex.db.leveldb.{LevelDb, ReadOnlyDB}
+import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.{AtomicLong, AtomicReference}
-import com.google.common.primitives.{Longs, Shorts}
-import com.wavesplatform.dex.db.DbKeys._
-import com.wavesplatform.dex.db.leveldb.{Key, LevelDb, ReadOnlyDB}
-import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 
 trait LocalQueueStore[F[_]] {
 
@@ -38,22 +37,21 @@ class LevelDbLocalQueueStore[F[_]: Monad](levelDb: LevelDb[F]) extends LocalQueu
   private val inMemQueue = new ConcurrentLinkedQueue[ValidatedCommandWithMeta]
   private val startInMemOffset = new AtomicReference[ValidatedCommandWithMeta.Offset](-1L)
 
-  override def enqueue(command: ValidatedCommand, timestamp: Long): F[ValidatedCommandWithMeta.Offset] = {
-      levelDb.readWrite { rw =>
-        val offset = getAndIncrementNewestIdx(rw)
-        val eventKey: Key[Option[ValidatedCommandWithMeta]] = lpqElement(offset)
-        val x = ValidatedCommandWithMeta(offset, timestamp, command)
+  override def enqueue(command: ValidatedCommand, timestamp: Long): F[ValidatedCommandWithMeta.Offset] =
+    levelDb.readWrite { rw =>
+      val offset = getAndIncrementNewestIdx(rw)
+      val eventKey = lpqElement(offset)
+      val x = ValidatedCommandWithMeta(offset, timestamp, command)
 
-        rw.put(eventKey, Some(x))
-        rw.put(lqNewestIdx, offset)
-        (x, offset)
-      }.map { t =>
-        val (command, offset) = t
-        inMemQueue.add(command)                           // TODO Probably concurrent work issues
-        startInMemOffset.compareAndSet(-1L, offset)
-        offset
-      }
-  }
+      rw.put(eventKey, Some(x))
+      rw.put(lqNewestIdx, offset)
+      (x, offset)
+    }.map { t =>
+      val (command, offset) = t
+      inMemQueue.add(command)
+      startInMemOffset.compareAndSet(-1L, offset)
+      offset
+    }
 
   override def getFrom(offset: ValidatedCommandWithMeta.Offset, maxElements: Int): F[Vector[ValidatedCommandWithMeta]] =
     if (startInMemOffset.get() <= offset)
@@ -70,8 +68,8 @@ class LevelDbLocalQueueStore[F[_]: Monad](levelDb: LevelDb[F]) extends LocalQueu
         xs.result()
       }.pure[F]
     else
-      levelDb.readOnly { rw =>
-        rw.read(LqElementKeyName, LqElementPrefixBytes, lpqElement(math.max(offset, 0)).keyBytes, Int.MaxValue) { e =>
+      levelDb.readOnly { ro =>
+        ro.read(LqElementKeyName, LqElementPrefixBytes, lpqElement(math.max(offset, 0)).keyBytes, Int.MaxValue) { e =>
           val offset = Longs.fromByteArray(e.getKey.slice(Shorts.BYTES, Shorts.BYTES + Longs.BYTES))
           lpqElement(offset).parse(e.getValue).getOrElse(throw new RuntimeException(s"Can't find a queue event at $offset"))
         }
@@ -85,9 +83,9 @@ class LevelDbLocalQueueStore[F[_]: Monad](levelDb: LevelDb[F]) extends LocalQueu
     }
 
   override def newestOffset: F[Option[ValidatedCommandWithMeta.Offset]] = levelDb.readOnly { ro =>
-      val eventKey = lpqElement(getNewestIdx(ro))
-      ro.get(eventKey).map(_.offset)
-    }
+    val eventKey = lpqElement(getNewestIdx(ro))
+    ro.get(eventKey).map(_.offset)
+  }
 
   override def dropUntil(offset: ValidatedCommandWithMeta.Offset): F[Unit] =
     levelDb.readWrite { rw =>
@@ -102,19 +100,15 @@ class LevelDbLocalQueueStore[F[_]: Monad](levelDb: LevelDb[F]) extends LocalQueu
   private def getNewestIdx(ro: ReadOnlyDB): Long =
     if (newestIdx.get() < 0) {
       val v = ro.get(lqNewestIdx)
-     newestIdx.set(v)
+      newestIdx.set(v)
       v
-    } else {
-      newestIdx.get()
-    }
+    } else newestIdx.get()
 
   private def getAndIncrementNewestIdx(ro: ReadOnlyDB): Long =
     if (newestIdx.get() < 0) {
       val v = ro.get(lqNewestIdx) + 1
       newestIdx.set(v)
       v
-    } else {
-      newestIdx.getAndIncrement()
-    }
+    } else newestIdx.getAndIncrement()
 
 }

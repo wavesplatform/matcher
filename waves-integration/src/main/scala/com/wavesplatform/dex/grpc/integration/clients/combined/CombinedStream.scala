@@ -67,10 +67,20 @@ class CombinedStream(
 
   private val mergedEvents = ConcurrentSubject.publish[Either[SystemEvent, SystemEvent]]
 
+  @volatile var blockchainStatus: Status = Status.Starting()
+
+  def status(): Status = blockchainStatus
+
   val lastStatus = mergedEvents
     .foldLeft[Status](Status.Starting()) {
-      case (orig, Left(evt)) => utxEventsTransitions(orig, evt).tap(updated => log.info(s"utx: $orig + $evt -> $updated"))
-      case (orig, Right(evt)) => blockchainEventsTransitions(orig, evt).tap(updated => log.info(s"bu: $orig + $evt -> $updated"))
+      case (orig, Left(evt)) => utxEventsTransitions(orig, evt).tap { updated =>
+          blockchainStatus = updated
+          log.info(s"utx: $orig + $evt -> $updated")
+        }
+      case (orig, Right(evt)) => blockchainEventsTransitions(orig, evt).tap { updated =>
+          blockchainStatus = updated
+          log.info(s"bu: $orig + $evt -> $updated")
+        }
     }
     .doOnComplete(Task(log.info("lastStatus completed")))
     .doOnError(e => Task(log.error("lastStatus failed", e)))
@@ -135,11 +145,10 @@ class CombinedStream(
             }
 
           case SystemEvent.Stopped =>
-            // Stopping, because we doesn't know, it is an issue of a server, or just this connection.
-            // In the second case, blockchainUpdates will be closed by itself.
-            // So we are expecting blockchainUpdates will be stopped by itself or our request.
-            blockchainUpdates.stop()
-            Status.Stopping(utxEvents = true)
+            // We don't need to stop blockchain updates, because we start it
+            // only after receiving SystemEvent.BecameReady from UTX Stream
+            recover()
+            Status.Starting()
 
           case SystemEvent.Closed =>
             blockchainUpdates.close()

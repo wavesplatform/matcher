@@ -29,7 +29,7 @@ import com.wavesplatform.dex.api.http.{entities, OrderBookHttpInfo}
 import com.wavesplatform.dex.api.ws.actors.WsExternalClientDirectoryActor
 import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.caches.RateCache
-import com.wavesplatform.dex.db.{DbKeys, ExchangeTxStorage, OrderDb, WithDb}
+import com.wavesplatform.dex.db.{DbKeys, ExchangeTxStorage, OrderDb, TestRateDb, WithDb}
 import com.wavesplatform.dex.domain.account.{Address, AddressScheme, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -917,7 +917,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
   // upsertRate, deleteRate
   routePath("/settings/rates/{assetId}") - {
 
-    val rateCache = RateCache.inMem
+    val rateCache = awaitResult(RateCache(TestRateDb()))
 
     val rate = 0.0055
     val updatedRate = 0.0067
@@ -930,7 +930,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
           rateCache.getAllRates(smartAsset) shouldBe rate
         },
       apiKey,
-      rateCache
+      Some(rateCache)
     )
 
     "update rate" in test(
@@ -943,7 +943,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
           rateCache.getAllRates(smartAsset) shouldBe updatedRate
         },
       apiKey,
-      rateCache
+      Some(rateCache)
     )
 
     "update rate incorrectly (incorrect body)" in test(
@@ -956,7 +956,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
           responseAs[HttpMessage] should matchTo(HttpMessage("The provided JSON is invalid. Check the documentation"))
         },
       apiKey,
-      rateCache
+      Some(rateCache)
     )
 
     "update rate incorrectly (incorrect value)" in test(
@@ -966,7 +966,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
           responseAs[HttpMessage] should matchTo(HttpMessage("Asset rate should be positive"))
         },
       apiKey,
-      rateCache
+      Some(rateCache)
     )
 
     "update rate incorrectly (incorrect content type)" in test(
@@ -977,7 +977,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
           responseAs[HttpMessage] should matchTo(HttpMessage("The provided Content-Type is not supported, please provide JSON"))
         },
       apiKey,
-      rateCache
+      Some(rateCache)
     )
 
     "delete rate" in test(
@@ -988,7 +988,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
           rateCache.getAllRates.keySet should not contain smartAsset
         },
       apiKey,
-      rateCache
+      Some(rateCache)
     )
 
     "changing waves rate" in test(
@@ -1054,7 +1054,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         }
       },
       apiKey,
-      rateCache
+      Some(rateCache)
     )
   }
 
@@ -1121,8 +1121,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     db.put(orderKey.keyBytes, orderKey.encode(Some(okOrder)))
   }
 
-  private def test[U](f: Route => U, apiKey: String = "", rateCache: RateCache = RateCache.inMem): U = {
-
+  private def test[U](f: Route => U, apiKey: String = "", maybeRateCache: Option[RateCache] = None): U = {
+    val rateCache = maybeRateCache.getOrElse(awaitResult(RateCache(TestRateDb())))
     val addressActor = TestProbe("address")
     addressActor.setAutoPilot { (sender: ActorRef, msg: Any) =>
       val response = msg match {
@@ -1257,7 +1257,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     )
 
     val odb = OrderDb.levelDb(settings.orderDb, asyncLevelDb)
-    Await.result(odb.saveOrder(orderToCancel), 10.seconds)
+    awaitResult(odb.saveOrder(orderToCancel))
 
     val orderBooks = new AtomicReference(Map(smartWavesPair -> orderBookActor.ref.asRight[Unit]))
     val orderBookAskAdapter = new OrderBookAskAdapter(orderBooks, 5.seconds)

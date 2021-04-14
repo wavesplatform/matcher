@@ -6,9 +6,9 @@ import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.Route
 import akka.testkit.{TestActor, TestProbe}
+import cats.instances.future._
 import cats.syntax.either._
 import cats.syntax.option._
-import cats.instances.future._
 import com.google.common.primitives.Longs
 import com.softwaremill.diffx.{Derived, Diff}
 import com.typesafe.config.ConfigFactory
@@ -29,7 +29,7 @@ import com.wavesplatform.dex.api.http.{entities, OrderBookHttpInfo}
 import com.wavesplatform.dex.api.ws.actors.WsExternalClientDirectoryActor
 import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.caches.RateCache
-import com.wavesplatform.dex.db.{DbKeys, ExchangeTxStorage, OrderDb, TestRateDb, WithDb}
+import com.wavesplatform.dex.db._
 import com.wavesplatform.dex.domain.account.{Address, AddressScheme, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -58,7 +58,7 @@ import pureconfig.ConfigSource
 
 import java.util.concurrent.ThreadLocalRandom
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.util.Random
 

@@ -5,7 +5,7 @@ import akka.pattern.ask
 import cats.syntax.either._
 import com.wavesplatform.dex.actors.address.AddressActor.Query
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
-import com.wavesplatform.dex.db.TestOrderDB
+import com.wavesplatform.dex.db.TestOrderDb
 import com.wavesplatform.dex.domain.account.{Address, KeyPair}
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -101,7 +101,7 @@ object AddressActorStartingBenchmark {
           AddressActor.props(
             owner = owner,
             time = new TestTime(),
-            orderDB = new TestOrderDB(10000),
+            orderDb = TestOrderDb(10000),
             validate = (_, _) => Future.successful(().asRight),
             store = command => Future.successful(Some(ValidatedCommandWithMeta(0L, 0L, command))),
             recovered = true,

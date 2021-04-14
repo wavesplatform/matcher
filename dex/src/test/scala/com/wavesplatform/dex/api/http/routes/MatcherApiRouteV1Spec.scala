@@ -17,7 +17,7 @@ import com.wavesplatform.dex.api.http.ApiMarshallers._
 import com.wavesplatform.dex.api.http.entities.{HttpOrderBook, HttpV1LevelAgg, HttpV1OrderBook}
 import com.wavesplatform.dex.api.http.{entities, OrderBookHttpInfo}
 import com.wavesplatform.dex.app.MatcherStatus
-import com.wavesplatform.dex.db.WithDB
+import com.wavesplatform.dex.db.WithDb
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.effect.{liftErrorAsync, liftValueAsync}
@@ -31,7 +31,7 @@ import pureconfig.ConfigSource
 
 import scala.concurrent.duration.DurationInt
 
-class MatcherApiRouteV1Spec extends RouteSpec("/api/v1") with MatcherSpecBase with PathMockFactory with Eventually with WithDB {
+class MatcherApiRouteV1Spec extends RouteSpec("/api/v1") with MatcherSpecBase with PathMockFactory with Eventually with WithDb {
 
   private val settings =
     ConfigSource.fromConfig(ConfigFactory.load()).at("waves.dex").loadOrThrow[MatcherSettings].copy(priceAssets = Seq(usd, Waves))

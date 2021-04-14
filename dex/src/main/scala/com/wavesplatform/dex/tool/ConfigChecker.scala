@@ -14,7 +14,6 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.settings.OrderFeeSettings._
 import pureconfig.ConfigWriter
-import pureconfig._
 import pureconfig.generic.auto._
 import pureconfig.configurable.genericMapWriter
 import pureconfig.generic.semiauto

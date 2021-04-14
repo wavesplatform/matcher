@@ -113,9 +113,9 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     Future { blocking(db.close()); Done }
   }
 
-  private val assetPairsDB = AssetPairsDb.levelDb(asyncLevelDb)
-  private val orderBookSnapshotDB = OrderBookSnapshotDb.levelDb(asyncLevelDb)
-  private val orderDB = OrderDB(settings.orderDb, db)
+  private val assetPairsDb = AssetPairsDb.levelDb(asyncLevelDb)
+  private val orderBookSnapshotDb = OrderBookSnapshotDb.levelDb(asyncLevelDb)
+  private val orderDb = OrderDb.levelDb(settings.orderDb, asyncLevelDb)
   private val assetsCache = AssetsStorage.cache(AssetsStorage.levelDB(db))
   private val rateCache = RateCache(db)
 
@@ -190,7 +190,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     actorSystem.spawn(WsExternalClientDirectoryActor(), s"ws-external-cd-${ThreadLocalRandom.current().nextInt(Int.MaxValue)}")
 
   private val orderBookSnapshotStoreRef: ActorRef = actorSystem.actorOf(
-    OrderBookSnapshotStoreActor.props(orderBookSnapshotDB),
+    OrderBookSnapshotStoreActor.props(orderBookSnapshotDb),
     "order-book-snapshot-store"
   )
 
@@ -209,7 +209,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   }
 
   private val addressDirectoryRef =
-    actorSystem.actorOf(AddressDirectoryActor.props(orderDB, mkAddressActorProps, historyRouterRef), AddressDirectoryActor.name)
+    actorSystem.actorOf(AddressDirectoryActor.props(orderDb, mkAddressActorProps, historyRouterRef), AddressDirectoryActor.name)
 
   private val storeBreaker = new CircuitBreaker(
     actorSystem.scheduler,
@@ -224,7 +224,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   private def mkAddressActorProps(address: Address, recovered: Boolean): Props = AddressActor.props(
     address,
     time,
-    orderDB,
+    orderDb,
     ValidationStages.mkSecond(wavesBlockchainAsyncClient, orderBookAskAdapter),
     storeCommand,
     recovered,
@@ -265,7 +265,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     actorSystem.actorOf(
       MatcherActor.props(
         settings,
-        assetPairsDB,
+        assetPairsDb,
         {
           case Right(startOffset) => snapshotsRestored.success(startOffset)
           case Left(msg) => snapshotsRestored.failure(RecoveryError(msg))
@@ -317,7 +317,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       orderValidation,
       settings,
       () => status,
-      orderDB,
+      orderDb,
       () => lastProcessedOffset,
       () => matcherQueue.lastOffset,
       ExchangeTransactionCreator.getAdditionalFeeForScript(hasMatcherAccountScript),
@@ -445,7 +445,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   }
 
   private def loadAllKnownAssets(): Future[Unit] =
-    assetPairsDB.all().map(_.flatMap(_.assets) ++ settings.mentionedAssets).flatMap { assetsToLoad =>
+    assetPairsDb.all().map(_.flatMap(_.assets) ++ settings.mentionedAssets).flatMap { assetsToLoad =>
       Future
         .traverse(assetsToLoad)(asset => getDecimalsFromCache(asset).value tupleLeft asset)
         .map { xs =>

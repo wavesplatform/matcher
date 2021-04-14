@@ -9,7 +9,7 @@ import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class OrderBookSnapshotDbSpec extends AnyFreeSpec with Matchers with WithDB with MatcherSpecBase with PropertyChecks with NoShrink {
+class OrderBookSnapshotDbSpec extends AnyFreeSpec with Matchers with WithDb with MatcherSpecBase with PropertyChecks with NoShrink {
 
   private val fixedAssetPairGen = assetPairGen.filterNot(x => x.amountAsset == Waves && x.priceAsset == Waves)
 
@@ -71,4 +71,5 @@ class OrderBookSnapshotDbSpec extends AnyFreeSpec with Matchers with WithDB with
     assetPair <- fixedAssetPairGen
     offset <- Gen.choose(0L, Long.MaxValue)
   } yield (snapshot, assetPair, offset)
+
 }

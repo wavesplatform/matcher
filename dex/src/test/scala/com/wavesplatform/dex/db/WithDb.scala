@@ -1,6 +1,7 @@
 package com.wavesplatform.dex.db
 
 import cats.Id
+import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.wavesplatform.dex.db.leveldb.{LevelDBFactory, LevelDb}
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
@@ -11,11 +12,13 @@ import org.iq80.leveldb.{DB, Options}
 import org.scalatest.{BeforeAndAfterEach, Suite}
 
 import java.nio.file.Files
-import scala.concurrent.Future
+import java.util.concurrent.Executors
+import scala.concurrent.{ExecutionContext, Future}
 
-trait WithDB extends BeforeAndAfterEach { this: Suite =>
+trait WithDb extends BeforeAndAfterEach { this: Suite =>
 
-  implicit protected val executionContext = scala.concurrent.ExecutionContext.Implicits.global
+  implicit private val ec: ExecutionContext =
+    ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor(new ThreadFactoryBuilder().setDaemon(true).build()))
 
   private val path = Files.createTempDirectory("lvl").toAbsolutePath
   private var currentDBInstance: DB = _

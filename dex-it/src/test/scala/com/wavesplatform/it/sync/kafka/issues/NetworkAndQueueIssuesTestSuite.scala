@@ -1,8 +1,5 @@
 package com.wavesplatform.it.sync.kafka.issues
 
-import java.util.Collections
-import java.util.concurrent.ThreadLocalRandom
-
 import cats.implicits.catsSyntaxOptionId
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
@@ -15,9 +12,8 @@ import com.wavesplatform.dex.it.api.HasKafka
 import com.wavesplatform.dex.it.api.websockets.HasWebSockets
 import com.wavesplatform.dex.model.{LimitOrder, OrderStatus}
 import com.wavesplatform.it.WsSuiteBase
-import org.apache.kafka.clients.admin.{AlterConfigOp, ConfigEntry}
-import org.apache.kafka.common.config.{ConfigResource, TopicConfig}
 
+import java.util.concurrent.ThreadLocalRandom
 import scala.concurrent.duration.DurationInt
 
 class NetworkAndQueueIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka {

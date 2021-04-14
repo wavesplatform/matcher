@@ -9,7 +9,7 @@ import com.wavesplatform.dex.db.leveldb.{LevelDb, ReadOnlyDB}
 import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 
 import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.concurrent.atomic.{AtomicLong, AtomicReference}
+import java.util.concurrent.atomic.AtomicReference
 
 trait LocalQueueStore[F[_]] {
 
@@ -34,7 +34,9 @@ object LocalQueueStore {
 class LevelDbLocalQueueStore[F[_]: Monad](levelDb: LevelDb[F]) extends LocalQueueStore[F] {
 
   private val inMemQueue = new ConcurrentLinkedQueue[ValidatedCommandWithMeta]
-  private val startInMemOffset = new AtomicReference[ValidatedCommandWithMeta.Offset](-1L)
+
+  // -2, because LocalMatcherQueue tries to read all messages from -1, see LocalMatcherQueue: lastUnreadOffset and runOnce
+  private val startInMemOffset = new AtomicReference[ValidatedCommandWithMeta.Offset](-2L)
 
   override def enqueue(command: ValidatedCommand, timestamp: Long): F[ValidatedCommandWithMeta.Offset] =
     levelDb.readWrite { rw =>
@@ -48,7 +50,7 @@ class LevelDbLocalQueueStore[F[_]: Monad](levelDb: LevelDb[F]) extends LocalQueu
     }.map { t =>
       val (command, offset) = t
       inMemQueue.add(command)
-      startInMemOffset.compareAndSet(-1L, offset)
+      startInMemOffset.compareAndSet(-2L, offset)
       offset
     }
 

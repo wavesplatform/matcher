@@ -5,24 +5,23 @@ import cats.data.NonEmptyList
 import cats.syntax.either._
 import com.typesafe.config.ConfigFactory.parseFile
 import com.typesafe.config._
-import com.wavesplatform.dex.settings._
 import com.wavesplatform.dex.cli.ErrorOr
-import com.wavesplatform.dex.error.Implicits.ThrowableOps
 import com.wavesplatform.dex.db.AccountStorage
 import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.error.Implicits.ThrowableOps
 import com.wavesplatform.dex.settings.OrderFeeSettings._
+import com.wavesplatform.dex.settings._
 import pureconfig.ConfigWriter
-import pureconfig._
-import pureconfig.generic.auto._
 import pureconfig.configurable.genericMapWriter
+import pureconfig.generic.auto._
 import pureconfig.generic.semiauto
 import pureconfig.module.cats.nonEmptyListWriter
 import sttp.model.Uri
 
-import scala.jdk.CollectionConverters._
 import java.io.File
+import scala.jdk.CollectionConverters._
 
 object ConfigChecker extends ConfigWriters {
 

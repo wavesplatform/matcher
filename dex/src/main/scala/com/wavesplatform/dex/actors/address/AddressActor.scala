@@ -297,27 +297,30 @@ class AddressActor(
         case Some(pc) =>
           sender() ! {
             pc.command match {
-              case _: Command.PlaceOrder | _: Command.PlaceOrderFinalized =>
+              case _: Command.PlaceOrder =>
                 error.OrderNotFound(orderId)
-              case _: Command.CancelOrder => error.OrderCanceled(orderId)
+              case _: Command.CancelOrder =>
+                error.OrderCanceled(orderId)
+              case x =>
+                log.error(s"found unexpected command '$x' while cancelling order")
+                error.UnexpectedError
             }
           }
 
         case None =>
           activeOrders.get(orderId) match {
             case None =>
-              val origSender = sender()
-              orderDb.status(orderId).onComplete {
-                case Success(OrderStatus.NotFound) =>
-                  origSender ! error.OrderNotFound(orderId)
-                case Success(_: OrderStatus.Cancelled) =>
-                  origSender ! error.OrderCanceled(orderId)
-                case Success(_: OrderStatus.Filled) =>
-                  origSender ! error.OrderFull(orderId)
-                case Failure(th) =>
-                  log.error(s"error while retrieving order status", th)
-                  origSender ! UnexpectedError
-              }
+              orderDb.status(orderId).map {
+                case OrderStatus.NotFound =>
+                  error.OrderNotFound(orderId)
+                case _: OrderStatus.Cancelled =>
+                  error.OrderCanceled(orderId)
+                case _: OrderStatus.Filled =>
+                  error.OrderFull(orderId)
+              }.recover { case th =>
+                log.error(s"error while retrieving order status", th)
+                UnexpectedError
+              }.pipeTo(sender())
 
             case Some(ao) =>
               if (ao.isMarket) sender() ! error.MarketOrderCancel(orderId)
@@ -379,56 +382,52 @@ class AddressActor(
     case query: Query.GetTradableBalance => sender() ! Reply.GetBalance(balances.tradableBalance(query.forAssets).filter(_._2 > 0))
 
     case Query.GetOrderStatus(orderId) =>
-      val origSender = sender()
       activeOrders.get(orderId) match {
         case Some(order) =>
-          origSender ! Reply.GetOrderStatus(order.status)
+          sender() ! Reply.GetOrderStatus(order.status)
         case None =>
-          orderDb.status(orderId).onComplete {
-            case Success(x) =>
-              origSender ! Reply.GetOrderStatus(x)
-            case Failure(th) =>
+          orderDb.status(orderId)
+            .map(Reply.GetOrderStatus(_))
+            .recover { case th =>
               log.error("error while retrieving order status", th)
-              origSender ! UnexpectedError
-          }
+              UnexpectedError
+            }
+            .pipeTo(sender())
       }
 
     case Query.GetOrderStatusInfo(orderId) =>
-      val origSender = sender()
       activeOrders.get(orderId).map(ao => OrderInfo.v6(ao, ao.status)) match {
         case maybeOrderInfo @ Some(_) =>
-          origSender ! Reply.GetOrdersStatusInfo(maybeOrderInfo)
+          sender() ! Reply.GetOrdersStatusInfo(maybeOrderInfo)
         case None =>
-          orderDb.getOrderInfo(orderId).onComplete {
-            case Success(maybeOrderInfo) =>
-              origSender ! Reply.GetOrdersStatusInfo(maybeOrderInfo)
-            case Failure(th) =>
+          orderDb.getOrderInfo(orderId)
+            .map(Reply.GetOrdersStatusInfo(_))
+            .recover { case th =>
               log.error("error while retrieving order info", th)
-              origSender ! UnexpectedError
-          }
+              UnexpectedError
+            }
+            .pipeTo(sender())
       }
 
     case Query.GetOrdersStatuses(maybePair, orderListType) =>
       val matchingActiveOrders =
-        (if (orderListType.hasActive)
-           getActiveLimitOrders(maybePair)
-             .map(ao => ao.id -> OrderInfo.v6(ao, ao.status))
-             .toSeq
-             .sorted
-         else Seq.empty).toList
+        if (orderListType.hasActive)
+          getActiveLimitOrders(maybePair)
+            .map(ao => ao.id -> OrderInfo.v6(ao, ao.status))
+            .toList
+            .sorted
+        else List.empty
       val matchingClosedOrders =
         if (orderListType.hasClosed)
           orderDb.getFinalizedOrders(owner, maybePair)
         else
           Future.successful(Seq.empty)
-      val origSender = sender()
-      matchingClosedOrders.onComplete {
-        case Success(matchingClosedOrders) =>
-          origSender ! Reply.GetOrderStatuses(matchingActiveOrders ++ matchingClosedOrders)
-        case Failure(th) =>
+      matchingClosedOrders
+        .map(x => Reply.GetOrderStatuses(matchingActiveOrders ++ x))
+        .recover { case th =>
           log.error("error while retrieving finalized orders", th)
-          origSender ! UnexpectedError
-      }
+          UnexpectedError
+        }.pipeTo(sender())
 
     case Event.StoreFailed(orderId, reason, queueEvent) =>
       failedPlacements.add(orderId)

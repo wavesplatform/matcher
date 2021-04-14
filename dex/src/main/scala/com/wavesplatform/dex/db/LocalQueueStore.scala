@@ -33,7 +33,6 @@ object LocalQueueStore {
 
 class LevelDbLocalQueueStore[F[_]: Monad](levelDb: LevelDb[F]) extends LocalQueueStore[F] {
 
-  private val newestIdx = new AtomicLong(-1L)
   private val inMemQueue = new ConcurrentLinkedQueue[ValidatedCommandWithMeta]
   private val startInMemOffset = new AtomicReference[ValidatedCommandWithMeta.Offset](-1L)
 
@@ -98,9 +97,9 @@ class LevelDbLocalQueueStore[F[_]: Monad](levelDb: LevelDb[F]) extends LocalQueu
     }
 
   private def getNewestIdx(ro: ReadOnlyDB): Long =
-    newestIdx.updateAndGet(x1 => if (x1 < 0) ro.get(lqNewestIdx) else x1)
+    ro.get(lqNewestIdx)
 
   private def getAndIncrementNewestIdx(ro: ReadOnlyDB): Long =
-    newestIdx.updateAndGet(x1 => if (x1 < 0) ro.get(lqNewestIdx) + 1 else x1 + 1)
+    getNewestIdx(ro) + 1
 
 }

@@ -417,10 +417,17 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     _ <- {
       log.info(s"Offsets: earliest snapshot = $earliestSnapshotOffset, first = $firstQueueOffset, last = $lastOffsetQueue")
       if (lastOffsetQueue < earliestSnapshotOffset)
-        Future.failed(RecoveryError("The queue doesn't have messages to recover all orders and continue work. Did you clear the queue?"))
+        Future.failed(RecoveryError("The queue doesn't have messages to recover all orders and continue work. Did you change the queue?"))
       else if (earliestSnapshotOffset < firstQueueOffset) {
+        /*
+         If Kafka has the wrong retention config, there are only two possible outcomes:
+         1. Throw an error - then the state of the Matcher should be reset, otherwise, we couldn't start it.
+            So we lost all orders including order books
+         2. Ignore and warn - then we could have probably unexpected matches, but orders will be preserved and we don't need to reset
+            the state of the Matcher in order to start it. We chose the second.
+         */
         log.warn(s"The queue doesn't contain required offsets to recover all orders. Check retention settings of the queue. Continue...")
-        Future.unit // Otherwise it would be hard to start the matcher
+        Future.unit
       } else Future.unit
     }
 

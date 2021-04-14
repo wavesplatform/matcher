@@ -96,7 +96,7 @@ trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with Doub
   protected def wrapLimitOrder(n: Long, x: Order): ValidatedCommandWithMeta = wrapCommand(n, ValidatedCommand.PlaceOrder(LimitOrder(x)))
   protected def wrapMarketOrder(mo: MarketOrder): ValidatedCommandWithMeta = wrapCommand(ValidatedCommand.PlaceMarketOrder(mo))
 
-  private val futureAwaitTimeout = 2.minutes
+  private lazy val futureAwaitTimeout = 2.minutes
   protected def awaitResult[A](result: FutureResult[A]): Result[A] = Await.result(result.value, futureAwaitTimeout)
   protected def awaitResult[A](result: Future[A]): A = Await.result(result, futureAwaitTimeout)
 

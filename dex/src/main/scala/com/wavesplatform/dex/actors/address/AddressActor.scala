@@ -158,7 +158,10 @@ class AddressActor(
       val (updated, changedAssets) = balances.withExecuted(command.expectedTx.map(_.id()), NegativeMap(cumulativeDiff))
       balances = updated
       scheduleWs(wsAddressState.putChangedAssets(changedAssets))
-      log.info(s"[Balance] 💵: ${format(balances.tradableBalance(cumulativeDiff.keySet).xs)}; e: ${format(cumulativeDiff)}")
+
+      val reservedAssets = ownerRemainingOrders.flatMap(_.requiredBalance.keys).toSet
+      val newReserved = balances.reserved.filter { case (asset, _) => reservedAssets.contains(asset) }
+      log.info(s"[Balance] 💵: ${format(balances.tradableBalance(cumulativeDiff.keySet).xs)}; e: ${format(cumulativeDiff)}, ov: ${format(newReserved)}")
 
     case command: Command.ApplyOrderBookCanceled =>
       import command.event._

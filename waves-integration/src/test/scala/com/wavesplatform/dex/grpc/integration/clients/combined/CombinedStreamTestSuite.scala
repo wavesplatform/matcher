@@ -1,6 +1,7 @@
 package com.wavesplatform.dex.grpc.integration.clients.combined
 
 import cats.syntax.option._
+import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.wavesplatform.dex.WavesIntegrationSuiteBase
 import com.wavesplatform.dex.grpc.integration.clients.ControlledStream.SystemEvent
 import com.wavesplatform.dex.grpc.integration.clients.blockchainupdates.BlockchainUpdatesControlledStream
@@ -15,6 +16,7 @@ import monix.reactive.subjects.ConcurrentSubject
 import org.scalatest.concurrent.Eventually
 import org.scalatest.exceptions.TestFailedException
 
+import java.util.concurrent.Executors
 import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
 import scala.util.chaining._
@@ -22,7 +24,12 @@ import scala.util.chaining._
 class CombinedStreamTestSuite extends WavesIntegrationSuiteBase with Eventually {
 
   implicit private val runNow = Scheduler(
-    ec = scala.concurrent.ExecutionContext.Implicits.global,
+    executor = Executors.newSingleThreadExecutor {
+      new ThreadFactoryBuilder()
+        .setDaemon(true)
+        .setNameFormat("combined-stream-test-suite-%d")
+        .build()
+    },
     executionModel = ExecutionModel.AlwaysAsyncExecution
   )
 
@@ -98,13 +105,13 @@ class CombinedStreamTestSuite extends WavesIntegrationSuiteBase with Eventually 
 
         "Stopped" - {
           "stops utxEvents" in {
-            val t = mkStarted()
+            val t = mkEventuallyWorking()
             t.blockchainUpdates.systemStream.onNext(SystemEvent.Stopped)
             logged(t.utxEvents.systemStream)(_.tail.head shouldBe SystemEvent.Stopped)
           }
 
           "both recovered" in {
-            val t = mkStarted()
+            val t = mkEventuallyWorking()
             t.blockchainUpdates.systemStream.onNext(SystemEvent.Stopped)
 
             logged(t.utxEvents.systemStream)(_.last shouldBe SystemEvent.BecameReady)
@@ -116,13 +123,13 @@ class CombinedStreamTestSuite extends WavesIntegrationSuiteBase with Eventually 
 
         "Closed" - {
           "closes utxEvents" in {
-            val t = mkStarted()
+            val t = mkEventuallyWorking()
             t.blockchainUpdates.close()
             logged(t.utxEvents.systemStream)(_.last shouldBe SystemEvent.Closed)
           }
 
           "no recovery" in {
-            val t = mkStarted()
+            val t = mkEventuallyWorking()
             t.blockchainUpdates.close()
             Await.result(t.cs.lastStatus, 5.seconds) should matchTo[Status](Status.Closing(blockchainUpdates = true, utxEvents = true))
           }
@@ -138,13 +145,13 @@ class CombinedStreamTestSuite extends WavesIntegrationSuiteBase with Eventually 
 
         "Stopped" - {
           "stops blockchainUpdates" in {
-            val t = mkStarted()
+            val t = mkEventuallyWorking()
             t.utxEvents.systemStream.onNext(SystemEvent.Stopped)
             logged(t.blockchainUpdates.systemStream)(_.tail.headOption shouldBe SystemEvent.Stopped.some)
           }
 
           "recovery started" in {
-            val t = mkStarted()
+            val t = mkEventuallyWorking()
             t.utxEvents.systemStream.onNext(SystemEvent.Stopped)
             logged(t.utxEvents.systemStream)(_.last shouldBe SystemEvent.BecameReady)
             logged(t.blockchainUpdates.systemStream)(_.last shouldBe SystemEvent.BecameReady)
@@ -153,13 +160,13 @@ class CombinedStreamTestSuite extends WavesIntegrationSuiteBase with Eventually 
 
         "Closed" - {
           "closes blockchainUpdates" in {
-            val t = mkStarted()
+            val t = mkEventuallyWorking()
             t.utxEvents.close()
             logged(t.blockchainUpdates.systemStream)(_.last shouldBe SystemEvent.Closed)
           }
 
           "no recovery" in {
-            val t = mkStarted()
+            val t = mkEventuallyWorking()
             t.utxEvents.close()
             Await.result(t.cs.lastStatus, 5.seconds) should matchTo[Status](Status.Closing(blockchainUpdates = true, utxEvents = true))
           }
@@ -179,7 +186,12 @@ class CombinedStreamTestSuite extends WavesIntegrationSuiteBase with Eventually 
     new TestClasses(cs, blockchainUpdates, utxEvents)
   }
 
-  private def mkStarted(): TestClasses = mk().tap(_.utxEvents.systemStream.onNext(SystemEvent.BecameReady))
+  private def mkEventuallyWorking(): TestClasses = mk().tap { x =>
+    x.utxEvents.systemStream.onNext(SystemEvent.BecameReady)
+    eventually {
+      x.cs.blockchainStatus shouldBe Status.Working
+    }
+  }
 
   private def logged[T](subject: Observable[T])(f: List[T] => Unit): Unit = eventually {
     val xs = subject.takeByTimespan(200.millis).toListL.runSyncUnsafe()

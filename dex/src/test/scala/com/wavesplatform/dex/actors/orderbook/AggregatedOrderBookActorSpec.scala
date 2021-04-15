@@ -1,8 +1,5 @@
 package com.wavesplatform.dex.actors.orderbook
 
-import java.nio.charset.StandardCharsets
-import java.util.concurrent.ThreadLocalRandom
-import java.util.concurrent.atomic.AtomicReference
 import akka.actor.Props
 import akka.actor.testkit.typed.scaladsl.{ActorTestKit, TestProbe => TypedTestProbe}
 import akka.actor.typed.ActorRef
@@ -11,7 +8,6 @@ import akka.actor.typed.scaladsl.adapter._
 import akka.http.scaladsl.model.HttpResponse
 import akka.testkit.TestProbe
 import cats.data.NonEmptyList
-import cats.instances.future._
 import com.wavesplatform.dex.NoShrink
 import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.{Command, Message, Query}
 import com.wavesplatform.dex.actors.orderbook.OrderBookActor.MarketStatus
@@ -19,7 +15,7 @@ import com.wavesplatform.dex.actors.{MatcherActor, MatcherSpecLike, OrderBookAsk
 import com.wavesplatform.dex.api.http.entities.{HttpV0LevelAgg, HttpV0OrderBook}
 import com.wavesplatform.dex.api.ws.entities.WsOrderBookSettings
 import com.wavesplatform.dex.api.ws.protocol.{WsMessage, WsOrderBookChanges}
-import com.wavesplatform.dex.db.OrderBookSnapshotDb
+import com.wavesplatform.dex.db.TestOrderBookSnapshotDb
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -37,7 +33,10 @@ import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import scala.concurrent.{Await, Future}
+import java.nio.charset.StandardCharsets
+import java.util.concurrent.ThreadLocalRandom
+import java.util.concurrent.atomic.AtomicReference
+import scala.concurrent.Await
 import scala.concurrent.duration._
 
 class AggregatedOrderBookActorSpec
@@ -92,7 +91,7 @@ class AggregatedOrderBookActorSpec
   "AggregatedOrderBookActor" - {
     "properties" - {
       "aggregate(updatedOrderBook) == updatedAggregatedOrderBook" in forAll(orderBookGen, ordersGen(10)) { (initOb, orders) =>
-        val obsdb = OrderBookSnapshotDb.inMem[Future]
+        val obsdb = TestOrderBookSnapshotDb()
         Await.result(obsdb.update(pair, 0L, Some(initOb.snapshot)), 5.second)
 
         implicit val efc: ErrorFormatterContext = ErrorFormatterContext.from(_ => 8)

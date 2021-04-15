@@ -1,8 +1,5 @@
 package com.wavesplatform.it.sync.kafka.issues
 
-import java.util.Collections
-import java.util.concurrent.ThreadLocalRandom
-
 import cats.implicits.catsSyntaxOptionId
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
@@ -15,9 +12,8 @@ import com.wavesplatform.dex.it.api.HasKafka
 import com.wavesplatform.dex.it.api.websockets.HasWebSockets
 import com.wavesplatform.dex.model.{LimitOrder, OrderStatus}
 import com.wavesplatform.it.WsSuiteBase
-import org.apache.kafka.clients.admin.{AlterConfigOp, ConfigEntry}
-import org.apache.kafka.common.config.{ConfigResource, TopicConfig}
 
+import java.util.concurrent.ThreadLocalRandom
 import scala.concurrent.duration.DurationInt
 
 class NetworkAndQueueIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka {
@@ -147,31 +143,6 @@ class NetworkAndQueueIssuesTestSuite extends WsSuiteBase with HasWebSockets with
   }
 
   "Matcher should stop working with appropriate error if the queue was " - {
-    "cleared" in {
-      fillQueueAndSaveSnapshots()
-
-      dex1.replaceSuiteConfig(
-        ConfigFactory
-          .parseString("""waves.dex {
-  events-queue.kafka.topic = cleared-topic
-  snapshots-interval = 3
-}""").withFallback(dexInitialSuiteConfig)
-      )
-      dex1.stopWithoutRemove()
-      clearTopic(topicName)
-
-      try {
-        dex1.start()
-        fail("Expected Matcher stopped with the exit code of 12")
-      } catch {
-        case _: Throwable =>
-          dex1.getState().getExitCodeLong shouldBe 12 // RecoveryError.code
-      } finally {
-        dex1.stop()
-        dex1.start()
-      }
-    }
-
     "switched" in {
       fillQueueAndSaveSnapshots()
 
@@ -179,9 +150,10 @@ class NetworkAndQueueIssuesTestSuite extends WsSuiteBase with HasWebSockets with
         dex1.restartWithNewSuiteConfig(
           ConfigFactory
             .parseString("""waves.dex {
-  events-queue.kafka.topic = new-topic
-  snapshots-interval = 3
-}""").withFallback(dexInitialSuiteConfig)
+                            events-queue.kafka.topic = new-topic
+                            snapshots-interval = 3
+                          }""")
+            .withFallback(dexInitialSuiteConfig)
         )
         fail("Expected Matcher stopped with the exit code of 12")
       } catch {
@@ -189,20 +161,6 @@ class NetworkAndQueueIssuesTestSuite extends WsSuiteBase with HasWebSockets with
           dex1.getState().getExitCodeLong shouldBe 12 // RecoveryError.code
       } // Add finally (above) if you write a new test
     }
-  }
-
-  private def clearTopic(topicName: String): Unit = {
-    val kafkaClient = mkKafkaAdminClient(s"$kafkaIp:9092")
-    try {
-      val resource = new ConfigResource(ConfigResource.Type.TOPIC, topicName)
-      val retentionEntry = new ConfigEntry(TopicConfig.RETENTION_MS_CONFIG, "100") // Small retention to clear topic
-      val alterRetentionOp = new AlterConfigOp(retentionEntry, AlterConfigOp.OpType.SET)
-
-      val updateConfig = new java.util.HashMap[ConfigResource, java.util.Collection[AlterConfigOp]]()
-      updateConfig.put(resource, Collections.singletonList(alterRetentionOp))
-
-      kafkaClient.incrementalAlterConfigs(updateConfig)
-    } finally kafkaClient.close()
   }
 
   private def fillQueueAndSaveSnapshots(): Unit = {

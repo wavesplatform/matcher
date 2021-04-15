@@ -1,6 +1,7 @@
 package com.wavesplatform.dex.model
 
-import com.wavesplatform.dex.db.{OrderDB, WithDB}
+import cats.instances.future._
+import com.wavesplatform.dex.db.{OrderDb, WithDb}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.Order
@@ -10,8 +11,17 @@ import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class OrderDBSpec extends AnyFreeSpec with Matchers with WithDB with MatcherSpecBase with PropertyChecks with NoShrink {
-  import OrderDBSpec._
+import scala.concurrent.Future
+import scala.concurrent.ExecutionContext.Implicits.global
+import org.scalatest.concurrent.ScalaFutures._
+import org.scalatest.concurrent.ScalaFutures.PatienceConfig
+import org.scalatest.time.{Millis, Seconds, Span}
+
+class OrderDbSpec extends AnyFreeSpec with Matchers with WithDb with MatcherSpecBase with PropertyChecks with NoShrink {
+  import OrderDbSpec._
+
+  implicit val patienceConfig: PatienceConfig =
+    PatienceConfig(timeout = Span(2, Seconds), interval = Span(5, Millis))
 
   private def finalizedOrderInfoGen(o: Order): Gen[(Order, OrderInfo[OrderStatus.Final])] =
     for {
@@ -32,23 +42,23 @@ class OrderDBSpec extends AnyFreeSpec with Matchers with WithDB with MatcherSpec
     result <- finalizedOrderInfoGen(o)
   } yield result
 
-  private def test(f: OrderDB => Any): Any = f(OrderDB(matcherSettings.orderDb, db))
+  private def test(f: OrderDb[Future] => Any): Any = f(OrderDb.levelDb(matcherSettings.orderDb, asyncLevelDb))
 
   "Default OrderDB implementation" - {
     "stores" - {
       "order" in test { odb =>
         forAll(orderGenerator) {
           case (o, _) =>
-            odb.saveOrder(o)
+            odb.saveOrder(o).futureValue
         }
       }
 
       "order info for terminated orders" in test { odb =>
         forAll(finalizedOrderInfoGen) {
           case (o, oi) =>
-            odb.saveOrderInfo(o.id(), o.sender, oi)
-            odb.containsInfo(o.id()) shouldBe true
-            odb.status(o.id()) shouldBe oi.status
+            odb.saveOrderInfo(o.id(), o.sender, oi).futureValue
+            odb.containsInfo(o.id()).futureValue shouldBe true
+            odb.status(o.id()).futureValue shouldBe oi.status
         }
       }
     }
@@ -69,10 +79,10 @@ class OrderDBSpec extends AnyFreeSpec with Matchers with WithDB with MatcherSpec
 
       forAll(dualFinalizedOrderInfoGen) {
         case (o, oi1, oi2) =>
-          odb.saveOrderInfo(o.id(), o.sender, oi1)
-          odb.saveOrderInfo(o.id(), o.sender, oi2)
+          odb.saveOrderInfo(o.id(), o.sender, oi1).futureValue
+          odb.saveOrderInfo(o.id(), o.sender, oi2).futureValue
 
-          odb.status(o.id()) shouldBe oi1.status
+          odb.status(o.id()).futureValue shouldBe oi1.status
       }
     }
 
@@ -80,35 +90,35 @@ class OrderDBSpec extends AnyFreeSpec with Matchers with WithDB with MatcherSpec
       forAll(finalizedOrderSeqGen(20)) {
         case (sender, pair, orders) =>
           for ((o, i) <- orders) {
-            odb.saveOrder(o)
-            odb.saveOrderInfo(o.id(), o.sender, i)
+            odb.saveOrder(o).futureValue
+            odb.saveOrderInfo(o.id(), o.sender, i).futureValue
           }
 
-          val tuples = odb.getFinalizedOrders(sender, Some(pair))
+          val tuples = odb.getFinalizedOrders(sender, Some(pair)).futureValue
           tuples should contain allElementsOf orders.map { case (o, i) => o.id() -> i }
       }
     }
 
     "does not load more orders than limit" in {
       val settings = matcherSettings.orderDb.copy(maxOrders = 30)
-      val odb = OrderDB(settings, db)
+      val odb = OrderDb.levelDb(settings, asyncLevelDb)
       val paramGen = finalizedOrderSeqGen(40)
 
       forAll(paramGen) {
         case (sender, pair, finalized) =>
           for ((o, i) <- finalized) {
-            odb.saveOrder(o)
-            odb.saveOrderInfo(o.id(), o.sender, i)
+            odb.saveOrder(o).futureValue
+            odb.saveOrderInfo(o.id(), o.sender, i).futureValue
           }
 
-          val loadedOrders = odb.getFinalizedOrders(sender, Some(pair))
+          val loadedOrders = odb.getFinalizedOrders(sender, Some(pair)).futureValue
           loadedOrders.size shouldBe settings.maxOrders
       }
     }
   }
 }
 
-object OrderDBSpec {
+object OrderDbSpec {
 
   implicit private class OrderExt(val o: Order) extends AnyVal {
 

@@ -1,13 +1,7 @@
 package com.wavesplatform.dex.db
 
-import cats.Applicative
-import cats.syntax.applicative._
-import cats.syntax.functor._
 import com.wavesplatform.dex.db.leveldb.LevelDb
 import com.wavesplatform.dex.domain.asset.AssetPair
-
-import java.util.concurrent.ConcurrentHashMap
-import scala.jdk.CollectionConverters.IteratorHasAsScala
 
 trait AssetPairsDb[F[_]] {
   def add(pair: AssetPair): F[Unit]
@@ -32,13 +26,6 @@ object AssetPairsDb {
       r.result()
     }
 
-  }
-
-  def inMem[F[_]: Applicative]: AssetPairsDb[F] = new AssetPairsDb[F] {
-    private val storage = ConcurrentHashMap.newKeySet[AssetPair]()
-    override def add(pair: AssetPair): F[Unit] = storage.add(pair).pure[F].void
-    override def remove(pair: AssetPair): F[Unit] = storage.remove(pair).pure[F].void
-    override def all(): F[Set[AssetPair]] = storage.iterator().asScala.toSet.pure[F]
   }
 
 }

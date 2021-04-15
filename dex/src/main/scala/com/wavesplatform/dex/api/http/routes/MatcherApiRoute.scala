@@ -26,7 +26,7 @@ import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
 import com.wavesplatform.dex.api.ws.actors.WsExternalClientDirectoryActor
 import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.caches.RateCache
-import com.wavesplatform.dex.db.OrderDB
+import com.wavesplatform.dex.db.OrderDb
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -74,7 +74,7 @@ class MatcherApiRoute(
   orderValidator: Order => FutureResult[Order],
   matcherSettings: MatcherSettings,
   override val matcherStatus: () => MatcherStatus,
-  orderDb: OrderDB,
+  orderDb: OrderDb[Future],
   currentOffset: () => ValidatedCommandWithMeta.Offset,
   lastOffset: () => Future[ValidatedCommandWithMeta.Offset],
   matcherAccountFee: Long,
@@ -391,21 +391,19 @@ class MatcherApiRoute(
     )
   )
   def getOrderBook: Route = (path(AssetPairPM) & get) { pairOrError =>
-    parameters("depth".as[String].?) { depth =>
-      depth match {
-        case None => withAssetPair(pairOrError, redirectToInverse = true, "") { pair =>
-            complete(orderBookHttpInfo.getHttpView(pair, MatcherModel.Normalized, None))
-          }
-        case Some(depth) =>
-          depth.toIntOption match {
-            case None => complete(InvalidDepth(s"Depth value '$depth' must be an Integer"))
-            case Some(d) =>
-              if (d >= 0) withAssetPair(pairOrError, redirectToInverse = true, s"?depth=$d") { pair =>
-                complete(orderBookHttpInfo.getHttpView(pair, MatcherModel.Normalized, Some(d)))
-              }
-              else complete(InvalidDepth(s"Depth value '$depth' must be non-negative"))
-          }
-      }
+    parameters("depth".as[String].?) {
+      case None => withAssetPair(pairOrError, redirectToInverse = true, "") { pair =>
+          complete(orderBookHttpInfo.getHttpView(pair, MatcherModel.Normalized, None))
+        }
+      case Some(depth) =>
+        depth.toIntOption match {
+          case None => complete(InvalidDepth(s"Depth value '$depth' must be an Integer"))
+          case Some(d) =>
+            if (d >= 0) withAssetPair(pairOrError, redirectToInverse = true, s"?depth=$d") { pair =>
+              complete(orderBookHttpInfo.getHttpView(pair, MatcherModel.Normalized, Some(d)))
+            }
+            else complete(InvalidDepth(s"Depth value '$depth' must be non-negative"))
+        }
     }
   }
 
@@ -544,28 +542,35 @@ class MatcherApiRoute(
     case x: error.MatcherError => StatusCodes.ServiceUnavailable -> HttpError.from(x, "BatchCancelRejected")
   }
 
-  private def handleCancelRequest(assetPair: Option[AssetPair], sender: Address, orderId: Option[ByteStr], timestamp: Option[Long]): Route =
-    complete {
-      (timestamp, orderId) match {
-        case (Some(ts), None) =>
-          askAddressActor(sender, AddressActor.Command.CancelAllOrders(assetPair, ts, AddressActor.Command.Source.Request))(
-            handleBatchCancelResponse
-          )
-        case (None, Some(oid)) =>
-          askAddressActor(sender, AddressActor.Command.CancelOrder(oid, AddressActor.Command.Source.Request)) {
-            case AddressActor.Event.OrderCanceled(x) => SimpleResponse(HttpSuccessfulSingleCancel(x))
-            case x: error.MatcherError =>
-              if (x == error.CanNotPersistEvent) StatusCodes.ServiceUnavailable -> HttpError.from(x, "WavesNodeUnavailable")
-              else StatusCodes.BadRequest -> HttpError.from(x, "OrderCancelRejected")
-          }
-        case _ => StatusCodes.BadRequest -> HttpError.from(error.CancelRequestIsIncomplete, "OrderCancelRejected")
-      }
+  private def handleCancelRequestToFuture(
+    assetPair: Option[AssetPair],
+    sender: Address,
+    orderId: Option[ByteStr],
+    timestamp: Option[Long]
+  ): Future[ToResponseMarshallable] =
+    (timestamp, orderId) match {
+      case (Some(ts), None) =>
+        askAddressActor(sender, AddressActor.Command.CancelAllOrders(assetPair, ts, AddressActor.Command.Source.Request))(
+          handleBatchCancelResponse
+        )
+      case (None, Some(oid)) =>
+        askAddressActor(sender, AddressActor.Command.CancelOrder(oid, AddressActor.Command.Source.Request)) {
+          case AddressActor.Event.OrderCanceled(x) => SimpleResponse(HttpSuccessfulSingleCancel(x))
+          case x: error.MatcherError =>
+            if (x == error.CanNotPersistEvent) StatusCodes.ServiceUnavailable -> HttpError.from(x, "WavesNodeUnavailable")
+            else StatusCodes.BadRequest -> HttpError.from(x, "OrderCancelRejected")
+        }
+      case _ =>
+        Future.successful(StatusCodes.BadRequest -> HttpError.from(error.CancelRequestIsIncomplete, "OrderCancelRejected"))
     }
 
-  private def handleCancelRequest(assetPair: Option[AssetPair]): Route =
+  private def handleCancelRequestToRoute(assetPair: Option[AssetPair], sender: Address, orderId: Option[ByteStr], timestamp: Option[Long]): Route =
+    complete(handleCancelRequestToFuture(assetPair, sender, orderId, timestamp): Future[ToResponseMarshallable])
+
+  private def handleCancelRequestToRoute(assetPair: Option[AssetPair]): Route =
     withCancelRequest { req =>
       assetPair.fold(pass)(unavailableOrderBookBarrier).apply {
-        handleCancelRequest(assetPair, req.sender, req.orderId, req.timestamp)
+        handleCancelRequestToRoute(assetPair, req.sender, req.orderId, req.timestamp)
       }
     }
 
@@ -595,7 +600,7 @@ class MatcherApiRoute(
   def cancel: Route = (path(AssetPairPM / "cancel") & post) { pairOrError =>
     withAssetPair(pairOrError, formatError = e => OrderCancelRejected(e)) { pair =>
       unavailableOrderBookBarrier(pair) {
-        handleCancelRequest(Some(pair))
+        handleCancelRequestToRoute(Some(pair))
       }
     }
   }
@@ -620,7 +625,7 @@ class MatcherApiRoute(
       )
     )
   )
-  def cancelAll: Route = (path("cancel") & post)(handleCancelRequest(None))
+  def cancelAll: Route = (path("cancel") & post)(handleCancelRequestToRoute(None))
 
   @Path("/orders/{address}/cancel")
   @ApiOperation(
@@ -682,12 +687,25 @@ class MatcherApiRoute(
   )
   def cancelByApi: Route = (path("cancel" / OrderPM) & post & withAuth & withUserPublicKeyOpt) { (orderIdOrError, userPublicKey) =>
     withOrderId(orderIdOrError) { orderId =>
-      def reject: StandardRoute = complete(OrderCancelRejected(error.OrderNotFound(orderId)))
-      (orderDb.get(orderId), userPublicKey) match {
-        case (None, _) => reject
-        case (Some(order), Some(pk)) if pk.toAddress != order.sender.toAddress => reject
-        case (Some(order), _) => handleCancelRequest(None, order.sender, Some(orderId), None)
-      }
+      def reject =
+        ToResponseMarshallable(OrderCancelRejected(error.OrderNotFound(orderId)))
+
+      val future =
+        orderDb.get(orderId).flatMap { maybeOrder =>
+          (maybeOrder, userPublicKey) match {
+            case (None, _) =>
+              Future.successful(reject)
+            case (Some(order), Some(pk)) if pk.toAddress != order.sender.toAddress =>
+              Future.successful(reject)
+            case (Some(order), _) =>
+              handleCancelRequestToFuture(None, order.sender, Some(orderId), None)
+          }
+        }.recover { case th =>
+          log.error("error while cancelling order", th)
+          ToResponseMarshallable(entities.InternalError)
+        }
+
+      complete(future)
     }
   }
 
@@ -1027,14 +1045,28 @@ class MatcherApiRoute(
   def orderStatus: Route = (path(AssetPairPM / OrderPM) & get) { (pairOrError, orderIdOrError) =>
     withOrderId(orderIdOrError) { orderId =>
       withAssetPair(pairOrError, redirectToInverse = true, s"/$orderId") { _ =>
-        complete {
-          orderDb.get(orderId) match {
-            case Some(order) =>
-              askMapAddressActor[AddressActor.Reply.GetOrderStatus](order.sender, AddressActor.Query.GetOrderStatus(orderId)) { r =>
-                HttpOrderStatus.from(r.x)
+        val future =
+          for {
+            maybeOrder <- orderDb.get(orderId)
+            result <- {
+              maybeOrder match {
+                case Some(order) =>
+                  askMapAddressActor[AddressActor.Reply.GetOrderStatus](order.sender, AddressActor.Query.GetOrderStatus(orderId)) { r =>
+                    HttpOrderStatus.from(r.x)
+                  }
+                case None =>
+                  orderDb
+                    .getOrderInfo(orderId)
+                    .map(_.fold(HttpOrderStatus.from(OrderStatus.NotFound))(x => HttpOrderStatus.from(x.status)))
+                    .map(ToResponseMarshallable(_))
               }
-            case None =>
-              Future.successful(orderDb.getOrderInfo(orderId).fold(HttpOrderStatus.from(OrderStatus.NotFound))(x => HttpOrderStatus.from(x.status)))
+            }
+          } yield result
+
+        complete {
+          future.recover { case th =>
+            log.error("error while retrieving order status", th)
+            ToResponseMarshallable(entities.InternalError)
           }
         }
       }
@@ -1090,7 +1122,15 @@ class MatcherApiRoute(
     )
   )
   def getOrderTransactions: Route = (path(OrderPM) & get) { orderIdOrError =>
-    withOrderId(orderIdOrError)(orderId => complete(Json.toJson(orderDb.transactionsByOrder(orderId))))
+    withOrderId(orderIdOrError) { orderId =>
+      complete {
+        orderDb.transactionsByOrder(orderId).map(x => ToResponseMarshallable(Json.toJson(x))).recover {
+          case th =>
+            log.error("error while retrieving order transactions", th)
+            ToResponseMarshallable(entities.InternalError)
+        }
+      }
+    }
   }
 
   @Path("/debug/config")

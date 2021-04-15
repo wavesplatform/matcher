@@ -3,7 +3,7 @@ package com.wavesplatform.dex.model
 import com.google.common.base.Charsets
 import com.wavesplatform.dex.actors.orderbook.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.caches.RateCache
-import com.wavesplatform.dex.db.WithDB
+import com.wavesplatform.dex.db.TestRateDb
 import com.wavesplatform.dex.domain.account.{Address, KeyPair}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -34,13 +34,13 @@ import org.scalatest._
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import scala.concurrent.ExecutionContext.Implicits.global
 import play.api.libs.json.Json
 
 import scala.concurrent.Future
 
 class OrderValidatorSpecification
     extends AnyWordSpec
-    with WithDB
     with Matchers
     with MatcherSpecBase
     with BeforeAndAfterAll
@@ -611,7 +611,7 @@ class OrderValidatorSpecification
 
       "matcherFee is too small according to rate of fee asset" in {
 
-        val rateCache: RateCache = RateCache.inMem
+        val rateCache: RateCache = awaitResult(RateCache(TestRateDb()))
         val validateByRate: Order => Result[Order] = validateByMatcherSettings(DynamicSettings.symmetric(0.003.waves), rateCache = rateCache)
         val order: Order = createOrder(wavesUsdPair, BUY, 1.waves, 3.00, 0.01.usd, feeAsset = usd)
 
@@ -622,7 +622,7 @@ class OrderValidatorSpecification
       }
 
       "matcherFee is too small according to two latest rates of fee asset" in {
-        val rateCache: RateCache = RateCache.inMem
+        val rateCache: RateCache = awaitResult(RateCache(TestRateDb()))
         val validateByRate: Order => Result[Order] = validateByMatcherSettings(DynamicSettings.symmetric(0.003.waves), rateCache = rateCache)
         val order: Order = createOrder(wavesUsdPair, BUY, 1.waves, 3.00, 0.01.usd, feeAsset = usd)
 
@@ -640,7 +640,7 @@ class OrderValidatorSpecification
 
       "matcherFee is enough according to rate of fee asset" in {
 
-        val rateCache: RateCache = RateCache.inMem
+        val rateCache: RateCache = awaitResult(RateCache(TestRateDb()))
         val validateByRate: Order => Result[Order] = validateByMatcherSettings(DynamicSettings.symmetric(0.003.waves), rateCache = rateCache)
         val order: Order = createOrder(wavesUsdPair, BUY, 1.waves, 3.00, 0.01.usd, feeAsset = usd)
 
@@ -651,7 +651,7 @@ class OrderValidatorSpecification
       }
 
       "matcherFee is enough according to two latest rates of fee asset" in {
-        val rateCache: RateCache = RateCache.inMem
+        val rateCache: RateCache = awaitResult(RateCache(TestRateDb()))
         val validateByRate: Order => Result[Order] = validateByMatcherSettings(DynamicSettings.symmetric(0.003.waves), rateCache = rateCache)
         val order: Order = createOrder(wavesUsdPair, BUY, 1.waves, 3.00, 0.01.usd, feeAsset = usd)
 
@@ -764,7 +764,7 @@ class OrderValidatorSpecification
 
       "matcherFee is not enough (dynamic settings, different fee for maker and taker)" in {
 
-        val rateCache = RateCache.inMem unsafeTap { _.upsertRate(btc, 0.00011167) }
+        val rateCache = awaitResult(RateCache(TestRateDb())) unsafeTap { _.upsertRate(btc, 0.00011167) }
 
         def orderWithFee(fee: Long, feeAsset: Asset = Waves): Order =
           createOrder(wavesUsdPair, BUY, 1.waves, 3.0, matcherFee = fee, feeAsset = feeAsset)

@@ -59,7 +59,7 @@ import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.{ThreadLocalRandom, TimeoutException}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{blocking, Future, Promise}
+import scala.concurrent.{blocking, Await, Future, Promise}
 import scala.jdk.CollectionConverters._
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
@@ -113,13 +113,14 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     Future { blocking(db.close()); Done }
   }
 
-  private val assetPairsDB = AssetPairsDb.levelDb(asyncLevelDb)
-  private val orderBookSnapshotDB = OrderBookSnapshotDb.levelDb(asyncLevelDb)
-  private val orderDB = OrderDB(settings.orderDb, db)
+  private val assetPairsDb = AssetPairsDb.levelDb(asyncLevelDb)
+  private val orderBookSnapshotDb = OrderBookSnapshotDb.levelDb(asyncLevelDb)
+  private val orderDb = OrderDb.levelDb(settings.orderDb, asyncLevelDb)
   private val assetsCache = AssetsStorage.cache(AssetsStorage.levelDB(db))
-  private val rateCache = RateCache(db)
+  private val rateCache = Await.result(RateCache(asyncLevelDb), 5.minutes)
 
-  implicit private val errorContext: ErrorFormatterContext = ErrorFormatterContext.fromOptional(assetsCache.get(_: Asset).map(_.decimals))
+  implicit private val errorContext: ErrorFormatterContext =
+    ErrorFormatterContext.fromOptional(assetsCache.get(_: Asset).map(_.decimals))
 
   private val matcherQueue: MatcherQueue = settings.eventsQueue.`type` match {
     case "local" =>
@@ -190,7 +191,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     actorSystem.spawn(WsExternalClientDirectoryActor(), s"ws-external-cd-${ThreadLocalRandom.current().nextInt(Int.MaxValue)}")
 
   private val orderBookSnapshotStoreRef: ActorRef = actorSystem.actorOf(
-    OrderBookSnapshotStoreActor.props(orderBookSnapshotDB),
+    OrderBookSnapshotStoreActor.props(orderBookSnapshotDb),
     "order-book-snapshot-store"
   )
 
@@ -209,7 +210,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   }
 
   private val addressDirectoryRef =
-    actorSystem.actorOf(AddressDirectoryActor.props(orderDB, mkAddressActorProps, historyRouterRef), AddressDirectoryActor.name)
+    actorSystem.actorOf(AddressDirectoryActor.props(orderDb, mkAddressActorProps, historyRouterRef), AddressDirectoryActor.name)
 
   private val storeBreaker = new CircuitBreaker(
     actorSystem.scheduler,
@@ -224,7 +225,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   private def mkAddressActorProps(address: Address, recovered: Boolean): Props = AddressActor.props(
     address,
     time,
-    orderDB,
+    orderDb,
     ValidationStages.mkSecond(wavesBlockchainAsyncClient, orderBookAskAdapter),
     storeCommand,
     recovered,
@@ -265,7 +266,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     actorSystem.actorOf(
       MatcherActor.props(
         settings,
-        assetPairsDB,
+        assetPairsDb,
         {
           case Right(startOffset) => snapshotsRestored.success(startOffset)
           case Left(msg) => snapshotsRestored.failure(RecoveryError(msg))
@@ -317,7 +318,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       orderValidation,
       settings,
       () => status,
-      orderDB,
+      orderDb,
       () => lastProcessedOffset,
       () => matcherQueue.lastOffset,
       ExchangeTransactionCreator.getAdditionalFeeForScript(hasMatcherAccountScript),
@@ -417,10 +418,17 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     _ <- {
       log.info(s"Offsets: earliest snapshot = $earliestSnapshotOffset, first = $firstQueueOffset, last = $lastOffsetQueue")
       if (lastOffsetQueue < earliestSnapshotOffset)
-        Future.failed(RecoveryError("The queue doesn't have messages to recover all orders and continue work. Did you clear the queue?"))
-      else if (earliestSnapshotOffset > -1 && earliestSnapshotOffset < firstQueueOffset) {
+        Future.failed(RecoveryError("The queue doesn't have messages to recover all orders and continue work. Did you change the queue?"))
+      else if (earliestSnapshotOffset < firstQueueOffset) {
+        /*
+         If Kafka has the wrong retention config, there are only two possible outcomes:
+         1. Throw an error - then the state of the Matcher should be reset, otherwise, we couldn't start it.
+            So we lost all orders including order books
+         2. Ignore and warn - then we could have probably unexpected matches, but orders will be preserved and we don't need to reset
+            the state of the Matcher in order to start it. We chose the second.
+         */
         log.warn(s"The queue doesn't contain required offsets to recover all orders. Check retention settings of the queue. Continue...")
-        Future.unit // Otherwise it would be hard to start the matcher
+        Future.unit
       } else Future.unit
     }
 
@@ -445,7 +453,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   }
 
   private def loadAllKnownAssets(): Future[Unit] =
-    assetPairsDB.all().map(_.flatMap(_.assets) ++ settings.mentionedAssets).flatMap { assetsToLoad =>
+    assetPairsDb.all().map(_.flatMap(_.assets) ++ settings.mentionedAssets).flatMap { assetsToLoad =>
       Future
         .traverse(assetsToLoad)(asset => getDecimalsFromCache(asset).value tupleLeft asset)
         .map { xs =>

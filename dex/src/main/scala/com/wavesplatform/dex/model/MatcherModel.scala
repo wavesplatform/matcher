@@ -502,5 +502,7 @@ object Events {
 
   case class OrderCancelFailed(id: Order.Id, reason: error.MatcherError)
 
+  case class OrderCancelFailedFinalized(order: Order, reason: error.MatcherError)
+
   case class ExchangeTransactionCreated(tx: ExchangeTransaction)
 }

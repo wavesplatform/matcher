@@ -3,7 +3,7 @@ package com.wavesplatform.dex.model
 import akka.actor.{ActorRef, ActorSystem, Props}
 import com.wavesplatform.dex.actors.address.AddressActor.BlockchainInteraction
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
-import com.wavesplatform.dex.db.{EmptyOrderDB, TestOrderDB}
+import com.wavesplatform.dex.db.{EmptyOrderDb, TestOrderDb}
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -33,7 +33,7 @@ class OrderHistoryStub(system: ActorSystem, time: Time, maxActiveOrders: Int, ma
       new AddressActor(
         address,
         time,
-        new TestOrderDB(maxFinalizedOrders),
+        TestOrderDb(maxFinalizedOrders),
         (_, _) => Future.successful(Right(())),
         e => Future.successful(Some(ValidatedCommandWithMeta(0L, 0, e))),
         recovered,
@@ -53,7 +53,7 @@ class OrderHistoryStub(system: ActorSystem, time: Time, maxActiveOrders: Int, ma
   lazy val addressDir = system.actorOf(
     Props(
       new AddressDirectoryActor(
-        EmptyOrderDB,
+        EmptyOrderDb(),
         createAddressActor,
         None,
         recovered = true

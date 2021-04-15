@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.caches
 
-import com.wavesplatform.dex.db.{RateDB, WithDB}
+import com.wavesplatform.dex.db.{RateDb, TestRateDb, WithDb}
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
@@ -9,11 +9,18 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class RateCacheSpecification extends AnyWordSpecLike with Matchers with WithDB with MatcherSpecBase with PropertyChecks with NoShrink {
+import scala.concurrent.ExecutionContext.Implicits.global
+import org.scalatest.concurrent.ScalaFutures._
+import org.scalatest.time.{Millis, Seconds, Span}
+
+class RateCacheSpecification extends AnyWordSpecLike with Matchers with WithDb with MatcherSpecBase with PropertyChecks with NoShrink {
+
+  implicit val patienceConfig: PatienceConfig =
+    PatienceConfig(timeout = Span(2, Seconds), interval = Span(5, Millis))
 
   private def test(f: RateCache => Unit): Unit = {
-    withClue("with DB")(f(RateCache(db)))
-    withClue("in mem")(f(RateCache.inMem))
+    withClue("with DB")(f(RateCache(TestRateDb()).futureValue))
+    withClue("in mem")(f(RateCache(TestRateDb()).futureValue))
   }
 
   private val WavesRate: Map[Asset, Double] = Map(Waves -> 1d)
@@ -53,15 +60,15 @@ class RateCacheSpecification extends AnyWordSpecLike with Matchers with WithDB w
     }
 
     "correctly restore state from db" in {
-      val rateDB = RateDB(db)
+      val rateDb = RateDb(asyncLevelDb)
 
       val asset1 = mkAssetId("First")
       val asset2 = mkAssetId("Second")
 
-      rateDB.upsertRate(asset1, 1.5)
-      rateDB.upsertRate(asset2, 5.1)
+      rateDb.upsertRate(asset1, 1.5).futureValue
+      rateDb.upsertRate(asset2, 5.1).futureValue
 
-      RateCache(db).getAllRates should matchTo(Map(asset1 -> 1.5, asset2 -> 5.1) ++ WavesRate)
+      RateCache(asyncLevelDb).futureValue.getAllRates should matchTo(Map(asset1 -> 1.5, asset2 -> 5.1) ++ WavesRate)
     }
   }
 }

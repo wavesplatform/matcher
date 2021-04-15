@@ -17,8 +17,10 @@ import com.wavesplatform.dex.model.Events.{OrderAdded, OrderAddedReason, OrderCa
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.time.SystemTime
 import org.scalatest._
+import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.propspec.AnyPropSpecLike
+import org.scalatest.time.{Millis, Seconds, Span}
 
 import java.math.BigInteger
 import scala.concurrent.Await
@@ -32,7 +34,11 @@ class OrderHistoryBalanceSpecification
     with MatcherSpecBase
     with BeforeAndAfterEach
     with DiffMatcherWithImplicits
-    with SystemTime {
+    with SystemTime
+    with Eventually {
+
+  implicit override val patienceConfig: PatienceConfig =
+    PatienceConfig(timeout = Span(2, Seconds), interval = Span(5, Millis))
 
   import OrderHistoryBalanceSpecification._
 
@@ -566,7 +572,9 @@ class OrderHistoryBalanceSpecification
       )
     )
 
-    orderStatus(counter.id()) shouldBe OrderStatus.Cancelled(1000000000, 142857)
+    eventually {
+      orderStatus(counter.id()) shouldBe OrderStatus.Cancelled(1000000000, 142857)
+    }
     orderStatus(submitted.id()) shouldBe OrderStatus.Filled(1000000000, 300000)
 
     openVolume(counter.senderPublicKey, WavesBtc.amountAsset) shouldBe 0L

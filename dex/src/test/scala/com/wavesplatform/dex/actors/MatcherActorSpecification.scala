@@ -6,14 +6,13 @@ import akka.actor.{Actor, ActorRef, ActorSystem, Kill, Props, Terminated}
 import akka.testkit.{ImplicitSender, TestActor, TestActorRef, TestProbe}
 import cats.data.NonEmptyList
 import cats.implicits.catsSyntaxEitherId
-import cats.instances.future._
 import com.wavesplatform.dex.MatcherSpecBase
 import com.wavesplatform.dex.actors.MatcherActor.{ForceStartOrderBook, GetMarkets, MarketData, SaveSnapshot}
 import com.wavesplatform.dex.actors.MatcherActorSpecification.{DeletingActor, FailAtStartActor, NothingDoActor, RecoveringActor, _}
 import com.wavesplatform.dex.actors.orderbook.OrderBookActor.{OrderBookRecovered, OrderBookSnapshotUpdateCompleted}
 import com.wavesplatform.dex.actors.orderbook.OrderBookSnapshotStoreActor.{Message, Response}
 import com.wavesplatform.dex.actors.orderbook.{AggregatedOrderBookActor, OrderBookActor, OrderBookSnapshotStoreActor}
-import com.wavesplatform.dex.db.{AssetPairsDb, OrderBookSnapshotDb}
+import com.wavesplatform.dex.db.{AssetPairsDb, OrderBookSnapshotDb, TestAssetPairDb, TestOrderBookSnapshotDb}
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -456,8 +455,8 @@ class MatcherActorSpecification
     )
   }
 
-  private def mkAssetPairsDB: AssetPairsDb[Future] = AssetPairsDb.inMem
-  private def mkOrderBookSnapshotDb: OrderBookSnapshotDb[Future] = OrderBookSnapshotDb.inMem
+  private def mkAssetPairsDB: AssetPairsDb[Future] = TestAssetPairDb()
+  private def mkOrderBookSnapshotDb: OrderBookSnapshotDb[Future] = TestOrderBookSnapshotDb()
 
   private def matcherHadOrderBooksBefore(apdb: AssetPairsDb[Future], obsdb: OrderBookSnapshotDb[Future], pairs: (AssetPair, Long)*): Unit = {
     val future = for {

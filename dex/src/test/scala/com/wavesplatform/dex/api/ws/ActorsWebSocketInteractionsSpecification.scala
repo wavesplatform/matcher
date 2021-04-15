@@ -9,7 +9,7 @@ import com.wavesplatform.dex.actors.address.AddressActor.BlockchainInteraction
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.api.ws.entities.{WsBalances, WsOrder}
 import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsMessage}
-import com.wavesplatform.dex.db.EmptyOrderDB
+import com.wavesplatform.dex.db.EmptyOrderDb
 import com.wavesplatform.dex.domain.account.{Address, KeyPair}
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
@@ -69,7 +69,7 @@ class ActorsWebSocketInteractionsSpecification
         new AddressActor(
           address,
           Time.system,
-          EmptyOrderDB,
+          EmptyOrderDb(),
           (_, _) => Future.successful(Right(())),
           command => {
             commandsProbe.ref ! command
@@ -80,7 +80,7 @@ class ActorsWebSocketInteractionsSpecification
         )(efc)
       )
 
-    val addressDir = system.actorOf(Props(new AddressDirectoryActor(EmptyOrderDB, createAddressActor, None, recovered = true)))
+    val addressDir = system.actorOf(Props(new AddressDirectoryActor(EmptyOrderDb(), createAddressActor, None, recovered = true)))
 
     def subscribeAddress(): WebSocketTestEnvironment = {
       addressDir ! AddressDirectoryActor.Command.ForwardMessage(address, AddressActor.WsCommand.AddWsSubscription(wsEventsProbe.ref))

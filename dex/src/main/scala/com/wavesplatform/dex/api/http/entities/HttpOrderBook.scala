@@ -14,6 +14,9 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.model.Denormalization
 import com.wavesplatform.dex.model.LevelAgg
 
+import java.text.{DecimalFormat, DecimalFormatSymbols}
+import java.util.Locale
+
 @JsonSerialize(using = classOf[HttpOrderBook.Serializer])
 case class HttpOrderBook(timestamp: Long, pair: AssetPair, bids: Seq[LevelAgg], asks: Seq[LevelAgg], assetPairDecimals: Option[(Int, Int)] = None)
 
@@ -43,7 +46,10 @@ object HttpOrderBook {
 
   }
 
-  private def formatValue(value: BigDecimal, decimals: Int): String = new java.text.DecimalFormat(s"0.${"0" * decimals}").format(value)
+  private def formatValue(value: BigDecimal, decimals: Int): String = {
+    val symbols = new DecimalFormatSymbols(Locale.US)
+    new DecimalFormat(s"0.${"0" * decimals}", symbols).format(value)
+  }
 
   private def denormalizeAndSerializeSide(side: Seq[LevelAgg], amountAssetDecimals: Int, priceAssetDecimals: Int, jg: JsonGenerator): Unit =
     side.foreach { levelAgg =>

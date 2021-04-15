@@ -4,13 +4,16 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
 import pureconfig.ConfigSource
 
+import java.text.{DecimalFormat, DecimalFormatSymbols}
+import java.util.Locale
 import scala.util.Try
 
 package object settings {
 
   implicit def toConfigOps(config: Config): ConfigOps = new ConfigOps(config)
 
-  private val format = new java.text.DecimalFormat("#.################")
+  private val symbols = new DecimalFormatSymbols(Locale.US)
+  private val format = new DecimalFormat("#.################", symbols)
 
   /** Formats amount or price */
   def formatValue(value: BigDecimal): String = format.format(value.bigDecimal)

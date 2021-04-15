@@ -1,11 +1,12 @@
 package com.wavesplatform.dex.settings.utils
 
+import cats.implicits.{catsSyntaxOptionId, none}
+import com.wavesplatform.dex.tool.LocaleUtils
+
 import java.text.DecimalFormat
 
-import cats.implicits.{catsSyntaxOptionId, none}
-
 object rules {
-  private val doubleFormat = new DecimalFormat("#")
+  private val doubleFormat = new DecimalFormat("#", LocaleUtils.symbols)
   doubleFormat.setMinimumIntegerDigits(1)
   doubleFormat.setMaximumFractionDigits(20)
 

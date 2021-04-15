@@ -35,8 +35,7 @@ class LevelDbLocalQueueStore[F[_]: Monad](levelDb: LevelDb[F]) extends LocalQueu
 
   private val inMemQueue = new ConcurrentLinkedQueue[ValidatedCommandWithMeta]
 
-  // -2, because LocalMatcherQueue tries to read all messages from -1, see LocalMatcherQueue: lastUnreadOffset and runOnce
-  private val startInMemOffset = new AtomicReference[ValidatedCommandWithMeta.Offset](-2L)
+  private val startInMemOffset = new AtomicReference[Option[ValidatedCommandWithMeta.Offset]](None)
 
   override def enqueue(command: ValidatedCommand, timestamp: Long): F[ValidatedCommandWithMeta.Offset] =
     levelDb.readWrite { rw =>
@@ -50,12 +49,12 @@ class LevelDbLocalQueueStore[F[_]: Monad](levelDb: LevelDb[F]) extends LocalQueu
     }.map { t =>
       val (command, offset) = t
       inMemQueue.add(command)
-      startInMemOffset.compareAndSet(-2L, offset)
+      startInMemOffset.compareAndSet(None, Some(offset))
       offset
     }
 
   override def getFrom(offset: ValidatedCommandWithMeta.Offset, maxElements: Int): F[Vector[ValidatedCommandWithMeta]] =
-    if (startInMemOffset.get() <= offset)
+    if (startInMemOffset.get().exists(_ <= offset))
       if (inMemQueue.isEmpty) Vector.empty[ValidatedCommandWithMeta].pure[F]
       else {
         val xs = Vector.newBuilder[ValidatedCommandWithMeta]
@@ -70,7 +69,7 @@ class LevelDbLocalQueueStore[F[_]: Monad](levelDb: LevelDb[F]) extends LocalQueu
       }.pure[F]
     else
       levelDb.readOnly { ro =>
-        ro.read(LqElementKeyName, LqElementPrefixBytes, lpqElement(math.max(offset, 0)).keyBytes, Int.MaxValue) { e =>
+        ro.read(LqElementKeyName, LqElementPrefixBytes, lpqElement(math.max(offset, 0)).keyBytes, maxElements) { e =>
           val offset = Longs.fromByteArray(e.getKey.slice(Shorts.BYTES, Shorts.BYTES + Longs.BYTES))
           lpqElement(offset).parse(e.getValue).getOrElse(throw new RuntimeException(s"Can't find a queue event at $offset"))
         }
@@ -98,10 +97,8 @@ class LevelDbLocalQueueStore[F[_]: Monad](levelDb: LevelDb[F]) extends LocalQueu
       rw.put(lqOldestIdx, offset)
     }
 
-  private def getNewestIdx(ro: ReadOnlyDB): Long =
-    ro.get(lqNewestIdx)
+  private def getNewestIdx(ro: ReadOnlyDB): Long = ro.get(lqNewestIdx)
 
-  private def getAndIncrementNewestIdx(ro: ReadOnlyDB): Long =
-    getNewestIdx(ro) + 1
+  private def getAndIncrementNewestIdx(ro: ReadOnlyDB): Long = getNewestIdx(ro) + 1
 
 }

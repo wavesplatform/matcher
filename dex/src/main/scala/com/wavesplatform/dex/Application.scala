@@ -418,7 +418,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       log.info(s"Offsets: earliest snapshot = $earliestSnapshotOffset, first = $firstQueueOffset, last = $lastOffsetQueue")
       if (lastOffsetQueue < earliestSnapshotOffset)
         Future.failed(RecoveryError("The queue doesn't have messages to recover all orders and continue work. Did you clear the queue?"))
-      else if (earliestSnapshotOffset < firstQueueOffset) {
+      else if (earliestSnapshotOffset > -1 && earliestSnapshotOffset < firstQueueOffset) {
         log.warn(s"The queue doesn't contain required offsets to recover all orders. Check retention settings of the queue. Continue...")
         Future.unit // Otherwise it would be hard to start the matcher
       } else Future.unit

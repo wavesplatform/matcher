@@ -59,7 +59,7 @@ import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.{ThreadLocalRandom, TimeoutException}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{blocking, Future, Promise}
+import scala.concurrent.{blocking, Await, Future, Promise}
 import scala.jdk.CollectionConverters._
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
@@ -117,9 +117,10 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   private val orderBookSnapshotDb = OrderBookSnapshotDb.levelDb(asyncLevelDb)
   private val orderDb = OrderDb.levelDb(settings.orderDb, asyncLevelDb)
   private val assetsCache = AssetsStorage.cache(AssetsStorage.levelDB(db))
-  private val rateCache = RateCache(db)
+  private val rateCache = Await.result(RateCache(asyncLevelDb), 5.minutes)
 
-  implicit private val errorContext: ErrorFormatterContext = ErrorFormatterContext.fromOptional(assetsCache.get(_: Asset).map(_.decimals))
+  implicit private val errorContext: ErrorFormatterContext =
+    ErrorFormatterContext.fromOptional(assetsCache.get(_: Asset).map(_.decimals))
 
   private val matcherQueue: MatcherQueue = settings.eventsQueue.`type` match {
     case "local" =>

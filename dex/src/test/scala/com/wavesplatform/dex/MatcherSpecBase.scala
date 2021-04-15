@@ -6,6 +6,7 @@ import com.softwaremill.diffx.{Derived, Diff}
 import com.wavesplatform.dex.api.ws.protocol.WsError
 import com.wavesplatform.dex.asset.DoubleOps
 import com.wavesplatform.dex.caches.RateCache
+import com.wavesplatform.dex.db.TestRateDb
 import com.wavesplatform.dex.domain.account.{Address, KeyPair}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -35,8 +36,9 @@ import pureconfig.ConfigSource
 import java.math.BigInteger
 import java.security.SecureRandom
 import java.util.concurrent.atomic.AtomicLong
-import scala.concurrent.duration.Duration
+import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Random
 
 trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with DoubleOps with WavesFeeConstants with AllureScalatestContext {
@@ -61,7 +63,10 @@ trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with Doub
   protected val wavesUsdPair: AssetPair = AssetPair(Waves, usd)
   protected val btcUsdPair: AssetPair = AssetPair(btc, usd)
 
-  protected val rateCache: RateCache = RateCache.inMem unsafeTap { _.upsertRate(usd, 3.7) } unsafeTap { _.upsertRate(btc, 0.00011167) }
+  protected val rateCache: RateCache = awaitResult(RateCache(TestRateDb()))
+    .unsafeTap(_.upsertRate(usd, 3.7))
+    .unsafeTap(_.upsertRate(btc, 0.00011167))
+
   protected val smallFee: Option[Price] = Some(toNormalized(1))
 
   protected val defaultAssetDescription: BriefAssetDescription = BriefAssetDescription("Asset", 8, hasScript = false)
@@ -91,8 +96,9 @@ trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with Doub
   protected def wrapLimitOrder(n: Long, x: Order): ValidatedCommandWithMeta = wrapCommand(n, ValidatedCommand.PlaceOrder(LimitOrder(x)))
   protected def wrapMarketOrder(mo: MarketOrder): ValidatedCommandWithMeta = wrapCommand(ValidatedCommand.PlaceMarketOrder(mo))
 
-  protected def awaitResult[A](result: FutureResult[A]): Result[A] = Await.result(result.value, Duration.Inf)
-  protected def awaitResult[A](result: Future[A]): A = Await.result(result, Duration.Inf)
+  private lazy val futureAwaitTimeout = 2.minutes
+  protected def awaitResult[A](result: FutureResult[A]): Result[A] = Await.result(result.value, futureAwaitTimeout)
+  protected def awaitResult[A](result: Future[A]): A = Await.result(result, futureAwaitTimeout)
 
   protected def getSpentAmountWithFee(order: Order): Long = {
     val lo = LimitOrder(order)

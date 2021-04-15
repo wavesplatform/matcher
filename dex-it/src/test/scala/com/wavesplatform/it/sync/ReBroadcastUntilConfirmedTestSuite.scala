@@ -14,21 +14,12 @@ class ReBroadcastUntilConfirmedTestSuite extends MatcherSuiteBase with EitherVal
 
   override protected def dexInitialSuiteConfig: Config = ConfigFactory
     .parseString(s"waves.dex.exchange-transaction-broadcast.interval = 10s" +
-      s"| waves.dex.waves-blockchain-client.blockchain-updates-grpc.target = ${wavesNode2.internalIp}:6881")
-
+    s"| waves.dex.waves-blockchain-client.blockchain-updates-grpc.target = ${wavesNode2.internalIp}:6881" +
+    s"| waves.dex.waves-blockchain-client.grpc.target = ${wavesNode2.internalIp}:6881")
 
   private val aliceOrder = mkOrder(alice, ethWavesPair, OrderType.SELL, 100000L, 80000L)
   private val bobOrder = mkOrder(bob, ethWavesPair, OrderType.BUY, 200000L, 100000L)
 
-  /*
-  *    Test plan:
-  * 1) matcher connected to not a miner node
-  * 2) matcher matches two orders and sends transaction to node
-  * 3) not a miner node isn't connected to miner node
-  * 4) check that transaction is created at not a miner node and it is not confirmed
-  * 5) connect miner node to network
-  * 6) check that transaction is confirmed
-  */
   "ReBroadcastUntilConfirmed" in {
     markup("Disconnect a miner node from the network")
     wavesNode1.disconnectFromNetwork()
@@ -69,4 +60,3 @@ class ReBroadcastUntilConfirmedTestSuite extends MatcherSuiteBase with EitherVal
   }
 
 }
-

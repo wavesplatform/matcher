@@ -68,13 +68,6 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
     utxChangesSubscribers.clear()
   }
 
-  private val inUtxHandler: exchange.ExchangeTransaction => Future[CheckedBroadcastResponse.Result] = {
-    if (context.settings.config.as[Boolean]("waves.extension.dex.allow-tx-rebroadcasting"))
-      handleTxInUtx
-    else
-      _ => Future.successful(CheckedBroadcastResponse.Result.Unconfirmed(false))
-  }
-
   // TODO DEX-994
   private def getSimpleName(x: Any): String = x.getClass.getName.replaceAll(".*?(\\w+)\\$?$", "$1")
 
@@ -172,7 +165,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
       .flatMap {
         case Right((tx, isConfirmed, isInUtx)) =>
           if (isConfirmed) Future.successful(CheckedBroadcastResponse.Result.Confirmed(empty))
-          else if (isInUtx) inUtxHandler(tx)
+          else if (isInUtx) handleTxInUtx(tx)
           else context.transactionsApi.broadcastTransaction(tx).map {
             _.resultE match {
               case Right(isNew) => CheckedBroadcastResponse.Result.Unconfirmed(isNew)
@@ -190,10 +183,12 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
       }
 
   private def handleTxInUtx(tx: exchange.ExchangeTransaction): Future[CheckedBroadcastResponse.Result] =
-    context.transactionsApi.broadcastTransaction(tx).map { //todo: check with tests
+    context.transactionsApi.broadcastTransaction(tx).map {
       _.resultE match {
-        case Right(isNew) => CheckedBroadcastResponse.Result.Unconfirmed(isNew)
-        case Left(e) => CheckedBroadcastResponse.Result.Failed(CheckedBroadcastResponse.Failure(e.toString, canRetry(e)))
+        case Right(_) => CheckedBroadcastResponse.Result.Unconfirmed(false)
+        case Left(e) =>
+          log.error(s"Error rebroadcasting transaction: $e")
+          CheckedBroadcastResponse.Result.Unconfirmed(false)
       }
     }
 

@@ -44,9 +44,7 @@ object Dependencies {
     val postgresql = "42.2.18"
     val quillJdbc = "3.6.0"
 
-    val sttp = "1.7.2"
-    val sttpClient = "3.1.7"
-    val asyncHttpClient = "2.12.3"
+    val sttpClient = "3.2.3"
 
     val testContainers = "0.38.8"
     val testContainersPostgres = "1.15.1"
@@ -148,7 +146,6 @@ object Dependencies {
   private val sttpClient = sttpClientModule("core")
   private val sttpPlayJson = sttpClientModule("play-json")
   private val sttpAsyncHttpClient = sttpClientModule("async-http-client-backend-future")
-  private val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % Version.asyncHttpClient
   private val allureScalaTest = "io.qameta.allure" %% "allure-scalatest" % Version.allureScalaTest
   private val jaxbApi = "javax.xml.bind" % "jaxb-api" % Version.jaxbApi
 
@@ -264,7 +261,6 @@ object Dependencies {
       sttpClient,
       sttpPlayJson,
       sttpAsyncHttpClient,
-      asyncHttpClient,
       wavesJ,
       betterMonadicFor
     ) ++ pureConfig ++ enumeratum ++ testKit ++ quill ++ monocle ++ levelDBJNA

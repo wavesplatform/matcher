@@ -13,7 +13,7 @@ def deployNode (host) {
 
 pipeline {
     agent {
-        label 'buildagent-matcher'
+        label 'buildagent-matcher-load-test'
     }
     options {
         ansiColor('xterm')

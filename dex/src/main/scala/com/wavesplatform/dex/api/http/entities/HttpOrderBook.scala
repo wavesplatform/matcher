@@ -29,6 +29,8 @@ object HttpOrderBook {
   mapper.registerModule(DefaultScalaModule)
   mapper.registerModule(coreTypeSerializers)
 
+  private val symbols = new DecimalFormatSymbols(Locale.US)
+
   private def serialize(value: Any): String = mapper.writeValueAsString(value)
 
   private class AssetPairDeserializer extends StdDeserializer[AssetPair](classOf[AssetPair]) {
@@ -46,10 +48,8 @@ object HttpOrderBook {
 
   }
 
-  private def formatValue(value: BigDecimal, decimals: Int): String = {
-    val symbols = new DecimalFormatSymbols(Locale.US)
+  private def formatValue(value: BigDecimal, decimals: Int): String =
     new DecimalFormat(s"0.${"0" * decimals}", symbols).format(value)
-  }
 
   private def denormalizeAndSerializeSide(side: Seq[LevelAgg], amountAssetDecimals: Int, priceAssetDecimals: Int, jg: JsonGenerator): Unit =
     side.foreach { levelAgg =>

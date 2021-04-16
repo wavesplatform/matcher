@@ -87,7 +87,6 @@ class MatcherActor(
       case _ => desc.fold("Unknown")(_.name)
     }
 
-  // EitherT?
   private def getAssetInfo(asset: Asset, desc: Option[BriefAssetDescription]): Option[AssetInfo] =
     asset.fold(Option(8))(_ => desc.map(_.decimals)).map(AssetInfo)
 
@@ -314,7 +313,7 @@ class MatcherActor(
 
   val assetPairsInit = for {
     assetPairs <- assetPairsDB.all()
-    // We need to do this, because assets the must be cached before order books created
+    // We need to do this, because assets must be cached before order books created
     _ <- Future.sequence(assetPairs.flatMap(_.assets).map(assetStorageCache.get))
   } yield assetPairs
 

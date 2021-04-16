@@ -15,7 +15,7 @@ import com.wavesplatform.dex.time.Time
 import scala.concurrent.{ExecutionContext, Future}
 
 /**
- * @param assetDecimals Returns FutureResult, because we potentially face with new assets and should ask the blockchain
+ * @param assetDecimals Returns FutureResult, because we potentially face with unknown assets
  */
 class OrderBookHttpInfo(
   settings: OrderBookHttpInfo.Settings,
@@ -59,7 +59,7 @@ class OrderBookHttpInfo(
       case Left(e) => toHttpResponse(SimpleErrorResponse(StatusCodes.BadRequest, e))
     }
 
-  private def assetPairDecimals(assetPair: AssetPair, format: DecimalsFormat): FutureResult[Option[(Int, Int)]] = format match {
+  private def assetPairDecimals(assetPair: AssetPair, format: DecimalsFormat): FutureResult[Option[(Depth, Depth)]] = format match {
     case Denormalized => assetDecimals(assetPair.amountAsset).product(assetDecimals(assetPair.priceAsset)).map(Some(_))
     case _ => liftValueAsync(None)
   }

@@ -35,6 +35,18 @@ object AssetsCache {
         case asset: Asset.IssuedAsset =>
           cached.get(asset) match {
             case None =>
+              // We don't need to fall back to blockchain client here, because we guarantee all assets will be cached retrieved during:
+              //   1. An asset pair validation in AssetPairBuilder
+              //   2. An order validation in ValidationStages.mkFirst
+              //   2. Consuming from a queue in Application.consumeMessages
+              // So all input assets will be saved in memory cache before they will be used.
+              //
+              // What if the cache failed? It will fail
+              //   1. AssetPairBuilder.validateAssetId, so we won't allow to access this order book
+              //   2. ValidationStages.mkFirst, so the order won't process
+              //   3. Application.consumeMessages, so we'll stop the application
+              //
+              // We will refactor this later and guarantee availability of this information.
               storage
                 .get(asset)
                 .andThen {

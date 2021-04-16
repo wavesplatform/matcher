@@ -66,7 +66,7 @@ trait PBEntitiesGen {
       amount <- amountGen
     } yield StateUpdate.BalanceUpdate(
       address = address,
-      amountAfter = Amount(asset, amount).some
+      amount = Amount(asset, amount).some
     )
 
   val pbBalanceUpdateListGen = Gen
@@ -83,8 +83,8 @@ trait PBEntitiesGen {
       out <- outGen
     } yield StateUpdate.LeasingUpdate(
       address = address,
-      inAfter = in,
-      outAfter = out
+      in = in,
+      out = out
     )
 
   val pbLeasingUpdateListGen = Gen
@@ -94,7 +94,7 @@ trait PBEntitiesGen {
   val pbStateUpdateGen: Gen[StateUpdate] = for {
     balanceUpdates <- pbBalanceUpdateListGen
     leasingUpdates <- pbLeasingUpdateListGen
-  } yield StateUpdate(balances = balanceUpdates, leasingForAddress = leasingUpdates)
+  } yield StateUpdate(balances = balanceUpdates, leases = leasingUpdates)
 
   val pbUtxTransactionGen: Gen[UtxTransaction] =
     for {

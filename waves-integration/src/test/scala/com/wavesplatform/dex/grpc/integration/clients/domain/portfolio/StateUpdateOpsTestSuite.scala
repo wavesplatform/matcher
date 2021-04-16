@@ -34,7 +34,7 @@ class StateUpdateOpsTestSuite extends WavesIntegrationSuiteBase with PBEntitiesG
           balances = changes.map { case (address, asset, v) =>
             StateUpdate.BalanceUpdate(
               address = address,
-              amountAfter = Amount(asset, v).some
+              amount = Amount(asset, v).some
             )
           }
         )
@@ -55,10 +55,10 @@ class StateUpdateOpsTestSuite extends WavesIntegrationSuiteBase with PBEntitiesG
         )
 
         val update = StateUpdate(
-          leasingForAddress = changes.map { case (address, v) =>
+          leases = changes.map { case (address, v) =>
             StateUpdate.LeasingUpdate(
               address = address,
-              outAfter = v
+              out = v
             )
           }
         )
@@ -86,13 +86,13 @@ class StateUpdateOpsTestSuite extends WavesIntegrationSuiteBase with PBEntitiesG
           balances = balanceUpdateChanges.map { case (address, asset, v) =>
             StateUpdate.BalanceUpdate(
               address = address,
-              amountAfter = Amount(asset, v).some
+              amount = Amount(asset, v).some
             )
           },
-          leasingForAddress = leasingChanges.map { case (address, v) =>
+          leases = leasingChanges.map { case (address, v) =>
             StateUpdate.LeasingUpdate(
               address = address,
-              outAfter = v
+              out = v
             )
           }
         )

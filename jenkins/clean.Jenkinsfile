@@ -13,12 +13,13 @@ def cleanStateAndRestart (host, service) {
 
 pipeline {
     agent {
-        label 'buildagent-matcher'
+        label 'buildagent-matcher-load-test'
     }
     options {
         ansiColor('xterm')
         timeout(time: 15, unit: 'MINUTES')
         timestamps()
+        disableConcurrentBuilds()
     }
     stages {
         stage('Clean state and restart nodes') {

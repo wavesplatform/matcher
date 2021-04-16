@@ -13,12 +13,13 @@ def deployNode (host) {
 
 pipeline {
     agent {
-        label 'buildagent-matcher'
+        label 'buildagent-matcher-load-test'
     }
     options {
         ansiColor('xterm')
         timeout(time: 15, unit: 'MINUTES')
         timestamps()
+        disableConcurrentBuilds()
     }
     environment {
         SBT_HOME = tool name: 'sbt-1.2.6', type: 'org.jvnet.hudson.plugins.SbtPluginBuilder$SbtInstallation'

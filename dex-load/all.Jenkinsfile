@@ -1,6 +1,6 @@
 pipeline {
     agent {
-        label 'buildagent-matcher'
+        label 'buildagent-matcher-load-test'
     }
     parameters {
         string(name: 'LABEL', defaultValue: '', description: 'Label')

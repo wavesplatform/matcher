@@ -4,7 +4,7 @@ pipeline {
     }
     options {
         ansiColor('xterm')
-        timeout(time: 67, unit: 'MINUTES')
+        timeout(time: 66, unit: 'MINUTES')
         timestamps()
         disableConcurrentBuilds()
     }

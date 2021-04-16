@@ -13,9 +13,10 @@ class ReBroadcastUntilConfirmedTestSuite extends MatcherSuiteBase with EitherVal
     createWavesNode("waves-2", suiteInitialConfig = ConfigFactory.parseString("waves.miner.enable = no") withFallback wavesNodeInitialSuiteConfig)
 
   override protected def dexInitialSuiteConfig: Config = ConfigFactory
-    .parseString(s"waves.dex.exchange-transaction-broadcast.interval = 10s" +
-    s"| waves.dex.waves-blockchain-client.blockchain-updates-grpc.target = ${wavesNode2.internalIp}:6881" +
-    s"| waves.dex.waves-blockchain-client.grpc.target = ${wavesNode2.internalIp}:6881")
+    .parseString(s"""waves.dex.exchange-transaction-broadcast.interval = 10s
+                    | waves.dex.waves-blockchain-client.blockchain-updates-grpc.target = "${wavesNode2.internalIp}:6881"
+                    | waves.dex.waves-blockchain-client.grpc.target = "${wavesNode2.internalIp}:6881"
+    """)
 
   private val aliceOrder = mkOrder(alice, ethWavesPair, OrderType.SELL, 100000L, 80000L)
   private val bobOrder = mkOrder(bob, ethWavesPair, OrderType.BUY, 200000L, 100000L)
@@ -29,7 +30,7 @@ class ReBroadcastUntilConfirmedTestSuite extends MatcherSuiteBase with EitherVal
     dex1.api.place(bobOrder)
 
     markup("Wait for a transaction")
-    val exchangeTxId = dex1.api.waitForTransactionsByOrder(aliceOrder, 0).head.id()
+    val exchangeTxId = dex1.api.waitForTransactionsByOrder(aliceOrder, 1).head.id()
 
     markup("Check that disconnected miner node didn't get a transaction")
     wavesNode2.tryApi.unconfirmedTransactionInfo(exchangeTxId).isRight shouldBe true

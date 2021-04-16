@@ -1,11 +1,9 @@
 package com.wavesplatform.dex.api.http.routes
 
-import java.util.concurrent.atomic.AtomicReference
 import akka.actor.ActorRef
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.Route
 import akka.testkit.{TestActor, TestProbe}
-import cats.data.EitherT
 import cats.syntax.either._
 import cats.syntax.option._
 import com.typesafe.config.ConfigFactory
@@ -15,13 +13,13 @@ import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor
 import com.wavesplatform.dex.api.RouteSpec
 import com.wavesplatform.dex.api.http.ApiMarshallers._
 import com.wavesplatform.dex.api.http.entities.{HttpOrderBook, HttpV1LevelAgg, HttpV1OrderBook}
-import com.wavesplatform.dex.api.http.{OrderBookHttpInfo, entities}
+import com.wavesplatform.dex.api.http.{entities, OrderBookHttpInfo}
 import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.db.WithDb
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.effect.{liftErrorAsync, liftFutureAsync, liftValueAsync}
-import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
+import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.{AssetPairBuilder, LevelAgg, OrderBookAggregatedSnapshot}
 import com.wavesplatform.dex.settings.MatcherSettings
@@ -29,9 +27,9 @@ import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 import pureconfig.ConfigSource
 
+import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
-import cats.instances.future._
 
 class MatcherApiRouteV1Spec extends RouteSpec("/api/v1") with MatcherSpecBase with PathMockFactory with Eventually with WithDb {
 
@@ -96,7 +94,11 @@ class MatcherApiRouteV1Spec extends RouteSpec("/api/v1") with MatcherSpecBase wi
         askAdapter = orderBookAskAdapter,
         time = time,
         assetDecimals = {
-          case a if a == `usd` || a == Waves => EitherT.fromOption[Future].apply[MatcherError, Int](efc.assetDecimals(a), error.UnexpectedError)
+          case a if a == `usd` || a == Waves =>
+            efc.assetDecimals(a) match {
+              case Some(decimals) => liftValueAsync(decimals)
+              case None => liftErrorAsync(error.UnexpectedError)
+            }
           case x => liftFutureAsync(Future.failed(new IllegalArgumentException(s"No information about $x")))
         }
       )

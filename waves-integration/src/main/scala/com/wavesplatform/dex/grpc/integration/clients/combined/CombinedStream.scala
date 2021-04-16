@@ -221,7 +221,6 @@ class CombinedStream(
 
           case SystemEvent.Stopped =>
             // See utxEventsTransitions: Starting + Stopped
-            // TODO
             utxEvents.stop()
             Status.Stopping(blockchainUpdates = true)
 

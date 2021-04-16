@@ -2,15 +2,14 @@ package com.wavesplatform.dex.db
 
 import cats.Id
 import com.wavesplatform.dex.domain.asset.Asset
-import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 
 import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Success}
+import scala.util.Success
 
-abstract class AssetsStorageCache(implicit ec: ExecutionContext) {
+abstract class AssetsCache(implicit ec: ExecutionContext) {
   val cached: AssetsStorage[Id]
 
   def contains(asset: Asset): Future[Boolean] = get(asset).map(_.nonEmpty)
@@ -18,32 +17,18 @@ abstract class AssetsStorageCache(implicit ec: ExecutionContext) {
   def put(asset: Asset, item: BriefAssetDescription): Future[Unit]
 }
 
-object AssetsStorageCache {
+object AssetsCache {
 
-  def from(storage: AssetsStorage[Future])(implicit ec: ExecutionContext): AssetsStorageCache =
-    new AssetsStorageCache with ScorexLogging {
+  def from(storage: AssetsStorage[Future])(implicit ec: ExecutionContext): AssetsCache =
+    new AssetsCache with ScorexLogging {
       private val assetsCache = new ConcurrentHashMap[Asset, BriefAssetDescription]
 
       override val cached = new AssetsStorage[Id] {
 
-        // TODO REMOVE?
-        // We don't check assetCache here before put, because it is a responsibility of a user.
-        override def put(asset: Asset.IssuedAsset, item: BriefAssetDescription): Unit = {
-          storage.put(asset, item).onComplete {
-            case Success(_) =>
-            case Failure(e) => log.error(s"Can't save asset $asset with $item", e)
-          }
-          assetsCache.put(asset, item)
-        }
+        override def put(asset: Asset.IssuedAsset, item: BriefAssetDescription): Unit =
+          throw new IllegalAccessException("This method should not be called, use AssetsCache.put!")
 
         override def get(asset: Asset.IssuedAsset): Option[BriefAssetDescription] = Option(assetsCache.get(asset))
-
-        override def putAll(xs: Map[IssuedAsset, BriefAssetDescription]): Unit = {
-          storage.putAll(xs)
-          xs.foreach(Function.tupled(assetsCache.put))
-        }
-
-        override def contained(xs: Set[IssuedAsset]): Set[IssuedAsset] = xs.filter(assetsCache.containsKey)
       }
 
       override def get(asset: Asset): Future[Option[BriefAssetDescription]] = asset match {

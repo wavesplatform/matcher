@@ -62,8 +62,7 @@ import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.{ThreadLocalRandom, TimeoutException}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{Future, Promise, blocking}
-import scala.concurrent.{blocking, Await, Future, Promise}
+import scala.concurrent.{Await, Future, Promise, blocking}
 import scala.jdk.CollectionConverters._
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
@@ -121,13 +120,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   private val orderBookSnapshotDb = OrderBookSnapshotDb.levelDb(asyncLevelDb)
   private val orderDb = OrderDb.levelDb(settings.orderDb, asyncLevelDb)
 
-  private val assetsCache = AssetsStorageCache.from(
-    AssetsStorage.levelDB(asyncLevelDb)
-//    retrieve = asset =>
-//      wavesBlockchainAsyncClient
-//        .assetDescription(asset)
-//        .map(_.map(desc => BriefAssetDescription(desc.name, desc.decimals, desc.hasScript)))
-  )
+  private val assetsCache = AssetsCache.from(AssetsStorage.levelDB(asyncLevelDb))
 
   private val rateCache = Await.result(RateCache(asyncLevelDb), 5.minutes)
 
@@ -207,6 +200,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
   private val historyRouterRef =
     if (settings.orderHistory.enable) actorSystem.actorOf(
+      // Safe here, retrieve during MatcherActor starting, consuming or placing
       HistoryRouterActor.props(assetsCache.cached.unsafeGetDecimals, settings.postgres, settings.orderHistory),
       "history-router"
     ).some
@@ -256,6 +250,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
   private val matcherActorRef: ActorRef = {
     def mkOrderBookProps(assetPair: AssetPair, matcherActor: ActorRef): Props = {
+      // Safe here, because we receive this information during MatcherActor starting, placing or consuming
       val amountAssetDecimals = errorContext.unsafeAssetDecimals(assetPair.amountAsset)
       val priceAssetDecimals = errorContext.unsafeAssetDecimals(assetPair.priceAsset)
       matchingRulesCache.setCurrentMatchingRuleForNewOrderBook(assetPair, lastProcessedOffset, amountAssetDecimals, priceAssetDecimals)

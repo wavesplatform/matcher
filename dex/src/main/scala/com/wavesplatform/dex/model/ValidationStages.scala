@@ -53,7 +53,14 @@ object ValidationStages {
         .tickSize
 
       for {
-        _ <- matcherSettingsAware(matcherPublicKey, blacklistedAddresses, settings, orderAssetsDecimals(o.feeAsset), rateCache, actualOrderFeeSettings)(o)
+        _ <- matcherSettingsAware(
+          matcherPublicKey,
+          blacklistedAddresses,
+          settings,
+          orderAssetsDecimals(o.feeAsset),
+          rateCache,
+          actualOrderFeeSettings
+        )(o)
         _ <- timeAware(time)(o)
         _ <- tickSizeAware(actualTickSize)(o)
         _ <-
@@ -74,14 +81,22 @@ object ValidationStages {
         hasMatcherAccountScript
       )(o)
 
+    def knownAssets: FutureResult[Map[Asset, BriefAssetDescription]] = o.assets
+      .map(asset => assetsDescription(asset).map(x => asset -> x))
+      .sequence
+      .map(_.toMap)
+
+    def mkGetAssetDescFn(xs: Map[Asset, BriefAssetDescription])(asset: Asset): BriefAssetDescription =
+      xs.getOrElse(asset, throw new IllegalStateException(s"Impossible case. Unknown asset: $asset"))
+
     for {
-      assetDesc <- o.assets.map(asset => assetsDescription(asset).map(x => asset -> x)).sequence.map(_.toMap)
+      getAssetDesc <- knownAssets.map(mkGetAssetDescFn)
       marketStatus <- {
         if (settings.maxPriceDeviations.enable) EitherT(orderBookAskAdapter.getMarketStatus(o.assetPair))
         else liftValueAsync(Option.empty[MarketStatus])
       }
-      _ <- liftAsync(syncValidation(marketStatus, assetDesc.get(_).fold(8)(_.decimals)))
-      _ <- asyncValidation(asset => assetDesc.getOrElse(asset, throw new RuntimeException(s"Unknown asset: $asset")))
+      _ <- liftAsync(syncValidation(marketStatus, getAssetDesc(_).decimals))
+      _ <- asyncValidation(getAssetDesc)
     } yield o
   }
 

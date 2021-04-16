@@ -2,7 +2,7 @@ package com.wavesplatform.dex.grpc.integration.clients
 
 import cats.instances.future._
 import cats.syntax.apply._
-import com.wavesplatform.dex.db.AssetsStorageCache
+import com.wavesplatform.dex.db.AssetsCache
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
@@ -17,11 +17,10 @@ import monix.eval.Task
 import monix.reactive.Observable
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.Success
 
 class MatcherExtensionAssetsWatchingClient(
   underlying: WavesBlockchainClient,
-  assetsCache: AssetsStorageCache
+  assetsCache: AssetsCache
 )(implicit grpcExecutionContext: ExecutionContext)
     extends WavesBlockchainClient
     with ScorexLogging {

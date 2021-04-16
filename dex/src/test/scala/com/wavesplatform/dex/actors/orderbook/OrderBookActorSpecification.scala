@@ -1,7 +1,5 @@
 package com.wavesplatform.dex.actors.orderbook
 
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicReference
 import akka.actor.ActorRef
 import akka.actor.typed.scaladsl.adapter._
 import akka.testkit.{ImplicitSender, TestActorRef, TestProbe}
@@ -36,9 +34,9 @@ import org.scalatest.concurrent.Eventually
 
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.{Await, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 
 class OrderBookActorSpecification
     extends MatcherSpec("OrderBookActor")

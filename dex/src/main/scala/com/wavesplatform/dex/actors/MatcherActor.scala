@@ -6,7 +6,7 @@ import com.wavesplatform.dex.actors.orderbook.OrderBookActor.{OrderBookRecovered
 import com.wavesplatform.dex.actors.orderbook.{AggregatedOrderBookActor, OrderBookActor}
 import com.wavesplatform.dex.api.http.entities.OrderBookUnavailable
 import com.wavesplatform.dex.app.{forceStopApplication, StartingMatcherError}
-import com.wavesplatform.dex.db.{AssetPairsDb, AssetsStorageCache}
+import com.wavesplatform.dex.db.{AssetPairsDb, AssetsCache}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.utils.ScorexLogging
@@ -29,7 +29,7 @@ class MatcherActor(
   recoveryCompletedWithEventNr: Either[String, Long] => Unit,
   orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
   orderBookActorProps: (AssetPair, ActorRef) => Props,
-  assetStorageCache: AssetsStorageCache,
+  assetStorageCache: AssetsCache,
   validateAssetPair: AssetPair => Either[MatcherError, AssetPair]
 ) extends Actor
     with WorkingStash
@@ -337,7 +337,7 @@ object MatcherActor {
     recoveryCompletedWithEventNr: Either[String, Long] => Unit,
     orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
     orderBookProps: (AssetPair, ActorRef) => Props,
-    assetStorageCache: AssetsStorageCache,
+    assetStorageCache: AssetsCache,
     validateAssetPair: AssetPair => Either[MatcherError, AssetPair]
   ): Props = Props(
     new MatcherActor(

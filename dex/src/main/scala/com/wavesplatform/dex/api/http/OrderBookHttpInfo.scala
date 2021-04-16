@@ -1,7 +1,6 @@
 package com.wavesplatform.dex.api.http
 
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse, StatusCodes}
-import cats.Applicative
 import cats.instances.future._
 import cats.syntax.semigroupal._
 import com.wavesplatform.dex.actors.OrderBookAskAdapter
@@ -9,7 +8,7 @@ import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.{Depth, M
 import com.wavesplatform.dex.api.http.entities.MatcherResponse.toHttpResponse
 import com.wavesplatform.dex.api.http.entities.{HttpOrderBook, HttpOrderBookStatus, OrderBookUnavailable, SimpleErrorResponse, SimpleResponse}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
-import com.wavesplatform.dex.effect.FutureResult
+import com.wavesplatform.dex.effect.{liftValueAsync, FutureResult}
 import com.wavesplatform.dex.model.MatcherModel.{DecimalsFormat, Denormalized}
 import com.wavesplatform.dex.time.Time
 
@@ -62,7 +61,7 @@ class OrderBookHttpInfo(
 
   private def assetPairDecimals(assetPair: AssetPair, format: DecimalsFormat): FutureResult[Option[(Int, Int)]] = format match {
     case Denormalized => assetDecimals(assetPair.amountAsset).product(assetDecimals(assetPair.priceAsset)).map(Some(_))
-    case _ => Applicative[FutureResult].pure(None)
+    case _ => liftValueAsync(None)
   }
 
 }

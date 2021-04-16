@@ -43,7 +43,7 @@ class MatcherActorSpecification
 
   private val assetsCache = new AssetsCache() {
 
-    override val cached: AssetsStorage[Id] = new AssetsStorage[Id] {
+    override val cached: AssetsDb[Id] = new AssetsDb[Id] {
       override def put(asset: IssuedAsset, item: BriefAssetDescription): Id[Unit] = {}
 
       override def get(asset: IssuedAsset): Id[Option[BriefAssetDescription]] =

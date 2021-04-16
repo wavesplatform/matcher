@@ -10,7 +10,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Success
 
 abstract class AssetsCache(implicit ec: ExecutionContext) {
-  val cached: AssetsStorage[Id]
+  val cached: AssetsDb[Id]
 
   def contains(asset: Asset): Future[Boolean] = get(asset).map(_.nonEmpty)
   def get(asset: Asset): Future[Option[BriefAssetDescription]]
@@ -19,11 +19,11 @@ abstract class AssetsCache(implicit ec: ExecutionContext) {
 
 object AssetsCache {
 
-  def from(storage: AssetsStorage[Future])(implicit ec: ExecutionContext): AssetsCache =
+  def from(storage: AssetsDb[Future])(implicit ec: ExecutionContext): AssetsCache =
     new AssetsCache with ScorexLogging {
       private val assetsCache = new ConcurrentHashMap[Asset, BriefAssetDescription]
 
-      override val cached = new AssetsStorage[Id] {
+      override val cached = new AssetsDb[Id] {
 
         override def put(asset: Asset.IssuedAsset, item: BriefAssetDescription): Unit =
           throw new IllegalAccessException("This method should not be called, use AssetsCache.put!")

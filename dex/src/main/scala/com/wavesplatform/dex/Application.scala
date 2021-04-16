@@ -120,7 +120,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   private val orderBookSnapshotDb = OrderBookSnapshotDb.levelDb(asyncLevelDb)
   private val orderDb = OrderDb.levelDb(settings.orderDb, asyncLevelDb)
 
-  private val assetsCache = AssetsCache.from(AssetsStorage.levelDB(asyncLevelDb))
+  private val assetsCache = AssetsCache.from(AssetsDb.levelDb(asyncLevelDb))
 
   private val rateCache = Await.result(RateCache(asyncLevelDb), 5.minutes)
 

@@ -8,28 +8,19 @@ import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 
-import java.util.concurrent.ConcurrentHashMap
-
-// TODO tests
-trait AssetsStorage[F[_]] {
+trait AssetsDb[F[_]] {
   def put(asset: IssuedAsset, item: BriefAssetDescription): F[Unit]
   def get(asset: IssuedAsset): F[Option[BriefAssetDescription]]
 }
 
-object AssetsStorage {
+object AssetsDb {
 
-  def levelDB[F[_]](levelDb: LevelDb[F]): AssetsStorage[F] = new AssetsStorage[F] {
+  def levelDb[F[_]](levelDb: LevelDb[F]): AssetsDb[F] = new AssetsDb[F] {
     override def put(asset: IssuedAsset, record: BriefAssetDescription): F[Unit] = levelDb.readWrite(_.put(DbKeys.asset(asset), Some(record)))
     override def get(asset: IssuedAsset): F[Option[BriefAssetDescription]] = levelDb.readOnly(_.get(DbKeys.asset(asset)))
   }
 
-  def inMem[F[_]: Applicative]: AssetsStorage[F] = new AssetsStorage[F] {
-    private val assetsCache = new ConcurrentHashMap[Asset, BriefAssetDescription]
-    override def put(asset: IssuedAsset, item: BriefAssetDescription): F[Unit] = assetsCache.putIfAbsent(asset, item).pure[F].as(())
-    override def get(asset: IssuedAsset): F[Option[BriefAssetDescription]] = Option(assetsCache get asset).pure[F]
-  }
-
-  implicit final class Ops[F[_]: Applicative](val self: AssetsStorage[F]) {
+  implicit final class Ops[F[_]: Applicative](val self: AssetsDb[F]) {
     def contains(asset: IssuedAsset): F[Boolean] = self.get(asset).map(_.nonEmpty)
 
     def get(asset: Asset): F[Option[BriefAssetDescription]] = asset match {

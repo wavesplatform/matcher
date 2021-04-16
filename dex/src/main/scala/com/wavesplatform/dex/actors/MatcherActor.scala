@@ -29,7 +29,7 @@ class MatcherActor(
   recoveryCompletedWithEventNr: Either[String, Long] => Unit,
   orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
   orderBookActorProps: (AssetPair, ActorRef) => Props,
-  assetStorageCache: AssetsCache,
+  assetsCache: AssetsCache,
   validateAssetPair: AssetPair => Either[MatcherError, AssetPair]
 ) extends Actor
     with WorkingStash
@@ -91,7 +91,7 @@ class MatcherActor(
     asset.fold(Option(8))(_ => desc.map(_.decimals)).map(AssetInfo)
 
   private def getAssetDesc(asset: Asset): Option[BriefAssetDescription] =
-    asset.fold[Option[BriefAssetDescription]](None)(assetStorageCache.cached.get)
+    asset.fold[Option[BriefAssetDescription]](None)(assetsCache.cached.get)
 
   private def createMarketData(pair: AssetPair): MarketData = {
     val amountAssetDescription = getAssetDesc(pair.amountAsset)
@@ -314,7 +314,7 @@ class MatcherActor(
   val assetPairsInit = for {
     assetPairs <- assetPairsDB.all()
     // We need to do this, because assets must be cached before order books created
-    _ <- Future.sequence(assetPairs.flatMap(_.assets).map(assetStorageCache.get))
+    _ <- Future.sequence(assetPairs.flatMap(_.assets).map(assetsCache.get))
   } yield assetPairs
 
   assetPairsInit.onComplete {
@@ -336,7 +336,7 @@ object MatcherActor {
     recoveryCompletedWithEventNr: Either[String, Long] => Unit,
     orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
     orderBookProps: (AssetPair, ActorRef) => Props,
-    assetStorageCache: AssetsCache,
+    assetsCache: AssetsCache,
     validateAssetPair: AssetPair => Either[MatcherError, AssetPair]
   ): Props = Props(
     new MatcherActor(
@@ -345,7 +345,7 @@ object MatcherActor {
       recoveryCompletedWithEventNr,
       orderBooks,
       orderBookProps,
-      assetStorageCache,
+      assetsCache,
       validateAssetPair
     )
   )

@@ -1,6 +1,5 @@
 package com.wavesplatform.dex.grpc.integration.clients.combined
 
-import cats.syntax.option._
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.wavesplatform.dex.WavesIntegrationSuiteBase
 import com.wavesplatform.dex.grpc.integration.clients.ControlledStream.SystemEvent

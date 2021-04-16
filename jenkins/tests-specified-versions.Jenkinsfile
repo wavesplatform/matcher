@@ -6,6 +6,7 @@ pipeline {
         ansiColor('xterm')
         timeout(time: 70, unit: 'MINUTES')
         timestamps()
+        disableConcurrentBuilds()
     }
     parameters {
         string(name: 'LABEL', defaultValue: '', description: '')

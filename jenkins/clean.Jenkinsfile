@@ -19,6 +19,7 @@ pipeline {
         ansiColor('xterm')
         timeout(time: 15, unit: 'MINUTES')
         timestamps()
+        disableConcurrentBuilds()
     }
     stages {
         stage('Clean state and restart nodes') {

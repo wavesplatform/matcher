@@ -5,6 +5,7 @@ pipeline {
     options {
         ansiColor('xterm')
         timeout(time: 70, unit: 'MINUTES')
+        disableConcurrentBuilds()
     }
     parameters {
         string(name: 'SEED', defaultValue: 'test-seed', description: 'Seed prefix of generated accounts')

@@ -32,7 +32,9 @@ class GetOldestSnapshotOffsetSpec extends MatcherSuiteBase with ApiKeyHeaderChec
 
       validate200Json(dex1.rawApi.getOldestSnapshotOffset) should be(-1)
       dex1.api.saveSnapshots
-      validate200Json(dex1.rawApi.getOldestSnapshotOffset) should be(2)
+      eventually {
+        validate200Json(dex1.rawApi.getOldestSnapshotOffset) should be(2)
+      }
     }
 
     shouldReturnErrorWithoutApiKeyHeader(dex1.rawApi.getOldestSnapshotOffset(Map.empty))

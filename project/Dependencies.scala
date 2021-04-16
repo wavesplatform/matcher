@@ -44,8 +44,7 @@ object Dependencies {
     val postgresql = "42.2.18"
     val quillJdbc = "3.6.0"
 
-    val sttp = "1.7.2"
-    val sttpClient = "3.1.7"
+    val sttpClient = "3.2.3"
 
     val testContainers = "0.38.8"
     val testContainersPostgres = "1.15.1"

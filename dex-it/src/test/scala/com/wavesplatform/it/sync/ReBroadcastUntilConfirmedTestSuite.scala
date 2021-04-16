@@ -14,8 +14,8 @@ class ReBroadcastUntilConfirmedTestSuite extends MatcherSuiteBase with EitherVal
 
   override protected def dexInitialSuiteConfig: Config = ConfigFactory
     .parseString(s"""waves.dex.exchange-transaction-broadcast.interval = 10s
-                    | waves.dex.waves-blockchain-client.blockchain-updates-grpc.target = "${wavesNode2.internalIp}:6881"
-                    | waves.dex.waves-blockchain-client.grpc.target = "${wavesNode2.internalIp}:6881"
+                    | waves.dex.waves-blockchain-client.blockchain-updates-grpc.target = "${wavesNode2.internalIp}:6887"
+                    | waves.dex.waves-blockchain-client.grpc.target = "${wavesNode2.internalIp}:6887"
     """)
 
   private val aliceOrder = mkOrder(alice, ethWavesPair, OrderType.SELL, 100000L, 80000L)

@@ -10,6 +10,7 @@ import com.wavesplatform.dex.db.{AssetPairsDb, AssetsCache}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.utils.ScorexLogging
+import com.wavesplatform.dex.effect.Implicits.FutureCompanionOps
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
@@ -314,7 +315,7 @@ class MatcherActor(
   val assetPairsInit = for {
     assetPairs <- assetPairsDB.all()
     // We need to do this, because assets must be cached before order books created
-    _ <- Future.sequence(assetPairs.flatMap(_.assets).map(assetsCache.get))
+    _ <- Future.inSeries(assetPairs.flatMap(_.assets))(assetsCache.get)
   } yield assetPairs
 
   assetPairsInit.onComplete {

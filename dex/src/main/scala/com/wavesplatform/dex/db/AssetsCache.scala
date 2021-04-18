@@ -50,7 +50,7 @@ object AssetsCache {
               storage
                 .get(asset)
                 .andThen {
-                  case Success(Some(x)) => cached.put(asset, x)
+                  case Success(Some(x)) => assetsCache.put(asset, x)
                 }
 
             case x => Future.successful(x)

@@ -61,7 +61,7 @@ object AssetsCache {
 
       override def put(asset: Asset, item: BriefAssetDescription): Future[Unit] = asset match {
         case asset: Asset.IssuedAsset =>
-          cached.put(asset, item)
+          assetsCache.put(asset, item)
           storage.put(asset, item)
 
         case _ => Future.unit

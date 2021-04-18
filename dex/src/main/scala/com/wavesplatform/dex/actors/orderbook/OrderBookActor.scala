@@ -291,16 +291,6 @@ object OrderBookActor {
 
   def name(assetPair: AssetPair): String = assetPair.toString
 
-  case class MarketStatus(
-    lastTrade: Option[LastTrade],
-    bestBid: Option[LevelAgg],
-    bestAsk: Option[LevelAgg]
-  )
-
-  object MarketStatus {
-    def apply(ob: OrderBook): MarketStatus = MarketStatus(ob.lastTrade, ob.bestBid, ob.bestAsk)
-  }
-
   case class Snapshot(eventNr: Option[Long], orderBook: OrderBookSnapshot)
 
   // Internal messages

@@ -9,9 +9,7 @@ import akka.http.scaladsl.model.HttpResponse
 import akka.testkit.TestProbe
 import cats.data.NonEmptyList
 import com.wavesplatform.dex.NoShrink
-import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.{Command, MarketStatus, Message, Query}
-import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.{Command, InputMessage, Query}
-import com.wavesplatform.dex.actors.orderbook.OrderBookActor.MarketStatus
+import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.{Command, InputMessage, MarketStatus, Query}
 import com.wavesplatform.dex.actors.{MatcherActor, MatcherSpecLike, OrderBookAskAdapter}
 import com.wavesplatform.dex.api.http.entities.{HttpV0LevelAgg, HttpV0OrderBook}
 import com.wavesplatform.dex.api.ws.entities.WsOrderBookSettings

@@ -2,7 +2,7 @@ package com.wavesplatform.dex.db
 
 import com.google.common.primitives.{Longs, Shorts}
 import com.wavesplatform.dex.db.DbKeys._
-import com.wavesplatform.dex.db.leveldb.{LevelDb, ReadOnlyDB}
+import com.wavesplatform.dex.db.leveldb.{LevelDb, ReadOnlyDb}
 import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -12,7 +12,7 @@ trait LocalQueueStore[F[_]] {
 
   def enqueue(command: ValidatedCommand, timestamp: Long): F[ValidatedCommandWithMeta.Offset]
 
-  def getFrom(offset: ValidatedCommandWithMeta.Offset, maxElements: Int): F[Vector[ValidatedCommandWithMeta]]
+  def getFrom(offset: ValidatedCommandWithMeta.Offset, maxElements: Int): F[List[ValidatedCommandWithMeta]]
 
   def oldestOffset: F[Option[ValidatedCommandWithMeta.Offset]]
 
@@ -52,24 +52,24 @@ class LevelDbLocalQueueStore[F[_]](levelDb: LevelDb[F]) extends LocalQueueStore[
       offset
     }
 
-  override def getFrom(offset: ValidatedCommandWithMeta.Offset, maxElements: Int): F[Vector[ValidatedCommandWithMeta]] =
+  override def getFrom(offset: ValidatedCommandWithMeta.Offset, maxElements: Int): F[List[ValidatedCommandWithMeta]] =
     levelDb.readOnly { ro =>
       // We need to process it here, otherwise we have a race condition, thus a wrong order of messages in the queue
       if (startInMemOffset.get().exists(_ <= offset))
-        if (inMemQueue.isEmpty) Vector.empty[ValidatedCommandWithMeta]
+        if (inMemQueue.isEmpty) Nil
         else {
-          val xs = Vector.newBuilder[ValidatedCommandWithMeta]
+          var xs = List.empty[ValidatedCommandWithMeta]
           var added = 0
 
           while (!inMemQueue.isEmpty && added < maxElements) Option(inMemQueue.poll()).foreach { x =>
-            xs += x
+            xs ::= x
             added += 1
           }
 
-          xs.result()
+          xs.reverse
         }
       else
-        ro.read(LqElementKeyName, LqElementPrefixBytes, lpqElement(math.max(offset, 0)).keyBytes, maxElements) { e =>
+        ro.readList(LqElementKeyName, LqElementPrefixBytes, lpqElement(math.max(offset, 0)).keyBytes, maxElements) { e =>
           val offset = Longs.fromByteArray(e.getKey.slice(Shorts.BYTES, Shorts.BYTES + Longs.BYTES))
           lpqElement(offset).parse(e.getValue).getOrElse(throw new RuntimeException(s"Can't find a queue event at $offset"))
         }
@@ -77,9 +77,11 @@ class LevelDbLocalQueueStore[F[_]](levelDb: LevelDb[F]) extends LocalQueueStore[
 
   override def oldestOffset: F[Option[ValidatedCommandWithMeta.Offset]] =
     levelDb.readOnly { ro =>
-      ro.read(LqElementKeyName, LqElementPrefixBytes, lpqElement(0).keyBytes, 1) { e =>
-        Longs.fromByteArray(e.getKey.slice(Shorts.BYTES, Shorts.BYTES + Longs.BYTES))
-      }.headOption
+      ro
+        .readList(LqElementKeyName, LqElementPrefixBytes, lpqElement(0).keyBytes, 1) { e =>
+          Longs.fromByteArray(e.getKey.slice(Shorts.BYTES, Shorts.BYTES + Longs.BYTES))
+        }
+        .headOption
     }
 
   override def newestOffset: F[Option[ValidatedCommandWithMeta.Offset]] = levelDb.readOnly { ro =>
@@ -97,8 +99,8 @@ class LevelDbLocalQueueStore[F[_]](levelDb: LevelDb[F]) extends LocalQueueStore[
       rw.put(lqOldestIdx, offset)
     }
 
-  private def getNewestIdx(ro: ReadOnlyDB): Long = ro.get(lqNewestIdx)
+  private def getNewestIdx(ro: ReadOnlyDb): Long = ro.get(lqNewestIdx)
 
-  private def getAndIncrementNewestIdx(ro: ReadOnlyDB): Long = getNewestIdx(ro) + 1
+  private def getAndIncrementNewestIdx(ro: ReadOnlyDb): Long = getNewestIdx(ro) + 1
 
 }

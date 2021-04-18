@@ -1,8 +1,5 @@
 package com.wavesplatform.dex.queue
 
-import java.util.concurrent.Executors
-import java.util.{Timer, TimerTask}
-
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.wavesplatform.dex.db.LocalQueueStore
 import com.wavesplatform.dex.domain.utils.ScorexLogging
@@ -11,11 +8,14 @@ import com.wavesplatform.dex.queue.MatcherQueue.{IgnoreProducer, Producer}
 import com.wavesplatform.dex.queue.ValidatedCommandWithMeta.Offset
 import com.wavesplatform.dex.time.Time
 
+import java.util.concurrent.Executors
+import java.util.{Timer, TimerTask}
 import scala.concurrent._
 import scala.concurrent.duration.FiniteDuration
 import scala.util.control.NonFatal
+import scala.util.{Failure, Success}
 
-class LocalMatcherQueue(settings: Settings, store: LocalQueueStore, time: Time) extends MatcherQueue with ScorexLogging {
+class LocalMatcherQueue(settings: Settings, store: LocalQueueStore[Future], time: Time) extends MatcherQueue with ScorexLogging {
 
   @volatile private var lastUnreadOffset: ValidatedCommandWithMeta.Offset = -1L
 
@@ -37,17 +37,20 @@ class LocalMatcherQueue(settings: Settings, store: LocalQueueStore, time: Time) 
   }
 
   override def startConsume(fromOffset: ValidatedCommandWithMeta.Offset, process: Seq[ValidatedCommandWithMeta] => Future[Unit]): Unit = {
-    if (settings.cleanBeforeConsume) store.dropUntil(fromOffset)
-
-    def runOnce(from: ValidatedCommandWithMeta.Offset): Future[ValidatedCommandWithMeta.Offset] = {
-      val requests = store.getFrom(from, settings.maxElementsPerPoll)
-      if (requests.isEmpty) Future.successful(from)
-      else {
-        val newOffset = requests.last.offset + 1
-        log.trace(s"Read ${newOffset - from} commands")
-        process(requests).map(_ => newOffset)
-      }
+    if (settings.cleanBeforeConsume) store.dropUntil(fromOffset).onComplete {
+      case Success(_) =>
+      case Failure(e) => log.error(s"Can't drop messages from $fromOffset", e)
     }
+
+    def runOnce(from: ValidatedCommandWithMeta.Offset): Future[ValidatedCommandWithMeta.Offset] =
+      store.getFrom(from, settings.maxElementsPerPoll).flatMap { requests =>
+        if (requests.isEmpty) Future.successful(from)
+        else {
+          val newOffset = requests.last.offset + 1
+          log.trace(s"Read ${newOffset - from} commands")
+          process(requests).map(_ => newOffset)
+        }
+      }
 
     val pollingInterval = settings.pollingInterval.toNanos
     def loop(from: ValidatedCommandWithMeta.Offset): Unit = {
@@ -77,9 +80,9 @@ class LocalMatcherQueue(settings: Settings, store: LocalQueueStore, time: Time) 
 
   override def store(command: ValidatedCommand): Future[Option[ValidatedCommandWithMeta]] = producer.store(command)
 
-  override def firstOffset: Future[Offset] = Future(store.oldestOffset.getOrElse(-1L))
+  override def firstOffset: Future[Offset] = store.oldestOffset.map(_.getOrElse(-1L))
 
-  override def lastOffset: Future[ValidatedCommandWithMeta.Offset] = Future(store.newestOffset.getOrElse(-1L))
+  override def lastOffset: Future[ValidatedCommandWithMeta.Offset] = store.newestOffset.map(_.getOrElse(-1L))
 
   override def close(timeout: FiniteDuration): Future[Unit] =
     Future {
@@ -95,8 +98,9 @@ class LocalMatcherQueue(settings: Settings, store: LocalQueueStore, time: Time) 
 object LocalMatcherQueue {
   case class Settings(enableStoring: Boolean, pollingInterval: FiniteDuration, maxElementsPerPoll: Int, cleanBeforeConsume: Boolean)
 
-  private class LocalProducer(store: LocalQueueStore, time: Time) extends Producer {
+  private class LocalProducer(store: LocalQueueStore[Future], time: Time) extends Producer {
 
+    // Need to guarantee the order
     private val executor = Executors.newSingleThreadExecutor {
       new ThreadFactoryBuilder()
         .setDaemon(true)
@@ -107,16 +111,10 @@ object LocalMatcherQueue {
     implicit private val executionContext: ExecutionContextExecutor = ExecutionContext.fromExecutor(executor)
 
     override def store(command: ValidatedCommand): Future[Option[ValidatedCommandWithMeta]] = {
-      val p = Promise[ValidatedCommandWithMeta]()
-      // Need to guarantee the order
-      executor.submit(new Runnable {
-        override def run(): Unit = {
-          val ts = time.correctedTime()
-          val offset = store.enqueue(command, time.correctedTime())
-          p.success(ValidatedCommandWithMeta(offset, ts, command))
-        }
-      })
-      p.future.map(Some(_))
+      val ts = time.correctedTime()
+      store
+        .enqueue(command, ts)
+        .map(offset => Option(ValidatedCommandWithMeta(offset, ts, command)))
     }
 
     override def close(timeout: FiniteDuration): Unit = executor.shutdown()

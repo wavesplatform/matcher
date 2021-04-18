@@ -50,7 +50,7 @@ class OrderBookActor(
 
   override protected lazy val log = LoggerFacade(LoggerFactory.getLogger(s"OrderBookActor[$assetPair]"))
 
-  private var aggregatedRef: typed.ActorRef[AggregatedOrderBookActor.Message] = _
+  private var aggregatedRef: typed.ActorRef[AggregatedOrderBookActor.InputMessage] = _
 
   private var savingSnapshot = Option.empty[ValidatedCommandWithMeta.Offset]
   private var lastSavedSnapshotOffset = Option.empty[ValidatedCommandWithMeta.Offset]
@@ -138,10 +138,11 @@ class OrderBookActor(
               process(request.timestamp, orderBook.cancelAll(request.timestamp, OrderCanceledReason.OrderBookDeleted))
               // We don't delete the snapshot, because it could be required after restart
               // snapshotStore ! OrderBookSnapshotStoreActor.Message.Delete(assetPair)
-              aggregatedRef ! AggregatedOrderBookActor.Event.OrderBookRemoved
-              context.stop(self)
+              aggregatedRef ! AggregatedOrderBookActor.Command.Stop(self, error.OrderBookStopped(assetPair))
           }
       }
+
+    case AggregatedOrderBookActor.Event.Stopped => context.stop(self)
 
     case MatcherActor.Ping => sender() ! MatcherActor.Pong
 
@@ -159,7 +160,7 @@ class OrderBookActor(
         savingSnapshot = Some(globalEventNr)
       }
 
-    case x: AggregatedOrderBookActor.Message => aggregatedRef.tell(x)
+    case x: AggregatedOrderBookActor.InputMessage => aggregatedRef.tell(x)
 
     case classic.Terminated(ref) =>
       log.error(s"Terminated actor: $ref")
@@ -199,6 +200,7 @@ class OrderBookActor(
   private def onCancelOrder(command: ValidatedCommandWithMeta, cancelCommand: ValidatedCommand.CancelOrder): Unit = cancelTimer.measure {
     orderBook.cancel(cancelCommand.orderId, toReason(cancelCommand.source), command.timestamp) match {
       case (updatedOrderBook, Some(cancelEvent), levelChanges) =>
+        log.trace(s"Applied $command")
         // TODO replace by process() in Scala 2.13
         orderBook = updatedOrderBook
         aggregatedRef ! AggregatedOrderBookActor.Command.ApplyChanges(levelChanges, None, None, cancelEvent.timestamp)

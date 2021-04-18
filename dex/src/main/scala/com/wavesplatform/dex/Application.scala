@@ -125,7 +125,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   private val matcherQueue: MatcherQueue = settings.eventsQueue.`type` match {
     case "local" =>
       log.info("Commands will be stored locally")
-      new LocalMatcherQueue(settings.eventsQueue.local, new LocalQueueStore(db), time)
+      new LocalMatcherQueue(settings.eventsQueue.local, LocalQueueStore.levelDb(asyncLevelDb), time)
 
     case "kafka" =>
       log.info("Commands will be stored in Kafka")

@@ -1,8 +1,5 @@
 package com.wavesplatform.dex.db
 
-import cats.Monad
-import cats.syntax.applicative._
-import cats.syntax.functor._
 import com.google.common.primitives.{Longs, Shorts}
 import com.wavesplatform.dex.db.DbKeys._
 import com.wavesplatform.dex.db.leveldb.{LevelDb, ReadOnlyDB}
@@ -27,14 +24,16 @@ trait LocalQueueStore[F[_]] {
 
 object LocalQueueStore {
 
-  def levelDb[F[_]: Monad](levelDb: LevelDb[F]): LocalQueueStore[F] = new LevelDbLocalQueueStore(levelDb)
+  def levelDb[F[_]](levelDb: LevelDb[F]): LocalQueueStore[F] = new LevelDbLocalQueueStore(levelDb)
 
 }
 
-class LevelDbLocalQueueStore[F[_]: Monad](levelDb: LevelDb[F]) extends LocalQueueStore[F] {
+/**
+ * Note, this works only for single thread pool!
+ */
+class LevelDbLocalQueueStore[F[_]](levelDb: LevelDb[F]) extends LocalQueueStore[F] {
 
   private val inMemQueue = new ConcurrentLinkedQueue[ValidatedCommandWithMeta]
-
   private val startInMemOffset = new AtomicReference[Option[ValidatedCommandWithMeta.Offset]](None)
 
   override def enqueue(command: ValidatedCommand, timestamp: Long): F[ValidatedCommandWithMeta.Offset] =
@@ -45,35 +44,36 @@ class LevelDbLocalQueueStore[F[_]: Monad](levelDb: LevelDb[F]) extends LocalQueu
 
       rw.put(eventKey, Some(x))
       rw.put(lqNewestIdx, offset)
-      (x, offset)
-    }.map { t =>
-      val (command, offset) = t
-      inMemQueue.add(command)
+
+      // We need to process it here, otherwise we have a race condition, thus a wrong order of messages in the queue
+      inMemQueue.add(x)
       startInMemOffset.compareAndSet(None, Some(offset))
+
       offset
     }
 
   override def getFrom(offset: ValidatedCommandWithMeta.Offset, maxElements: Int): F[Vector[ValidatedCommandWithMeta]] =
-    if (startInMemOffset.get().exists(_ <= offset))
-      if (inMemQueue.isEmpty) Vector.empty[ValidatedCommandWithMeta].pure[F]
-      else {
-        val xs = Vector.newBuilder[ValidatedCommandWithMeta]
-        var added = 0
+    levelDb.readOnly { ro =>
+      // We need to process it here, otherwise we have a race condition, thus a wrong order of messages in the queue
+      if (startInMemOffset.get().exists(_ <= offset))
+        if (inMemQueue.isEmpty) Vector.empty[ValidatedCommandWithMeta]
+        else {
+          val xs = Vector.newBuilder[ValidatedCommandWithMeta]
+          var added = 0
 
-        while (!inMemQueue.isEmpty && added < maxElements) Option(inMemQueue.poll()).foreach { x =>
-          xs += x
-          added += 1
+          while (!inMemQueue.isEmpty && added < maxElements) Option(inMemQueue.poll()).foreach { x =>
+            xs += x
+            added += 1
+          }
+
+          xs.result()
         }
-
-        xs.result()
-      }.pure[F]
-    else
-      levelDb.readOnly { ro =>
+      else
         ro.read(LqElementKeyName, LqElementPrefixBytes, lpqElement(math.max(offset, 0)).keyBytes, maxElements) { e =>
           val offset = Longs.fromByteArray(e.getKey.slice(Shorts.BYTES, Shorts.BYTES + Longs.BYTES))
           lpqElement(offset).parse(e.getValue).getOrElse(throw new RuntimeException(s"Can't find a queue event at $offset"))
         }
-      }
+    }
 
   override def oldestOffset: F[Option[ValidatedCommandWithMeta.Offset]] =
     levelDb.readOnly { ro =>

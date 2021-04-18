@@ -26,7 +26,9 @@ object AggregatedOrderBookActor {
 
   sealed trait Message extends Product with Serializable
 
-  sealed trait Query extends Message
+  sealed trait InputMessage extends Message
+
+  sealed trait Query extends InputMessage
 
   object Query {
     case class GetHttpView(format: DecimalsFormat, depth: Depth, client: ActorRef[HttpResponse]) extends Query
@@ -34,19 +36,20 @@ object AggregatedOrderBookActor {
     case class GetAggregatedSnapshot(client: ActorRef[OrderBookAggregatedSnapshot]) extends Query
   }
 
-  sealed trait Command extends Message
+  sealed trait Command extends InputMessage
 
   object Command {
     case class ApplyChanges(levelChanges: LevelAmounts, lastTrade: Option[LastTrade], tickSize: Option[Double], ts: Long) extends Command
     case class AddWsSubscription(client: ActorRef[WsOrderBookChanges]) extends Command
     case class RemoveWsSubscription(client: ActorRef[WsOrderBookChanges]) extends Command
+    case class Stop(client: ActorRef[Event], reason: error.MatcherError) extends Command
     private[AggregatedOrderBookActor] case object SendWsUpdates extends Command
   }
 
   sealed trait Event extends Message
 
   object Event {
-    case object OrderBookRemoved extends Event
+    case object Stopped extends Event
   }
 
   case class Settings(wsMessagesInterval: FiniteDuration)
@@ -60,14 +63,14 @@ object AggregatedOrderBookActor {
     tickSize: Double,
     time: Time,
     init: State
-  ): Behavior[Message] =
+  ): Behavior[InputMessage] =
     Behaviors.setup { context =>
       context.setLoggerName(s"AggregatedOrderBookActor[p=${assetPair.key}]")
       val compile = mkCompile(assetPair, amountDecimals, priceDecimals)(_, _, _)
 
-      def default(state: State): Behavior[Message] =
+      def default(state: State): Behavior[InputMessage] =
         Behaviors
-          .receiveMessage[Message] {
+          .receiveMessage[InputMessage] {
             case query: Query =>
               query match {
                 case Query.GetMarketStatus(client) =>
@@ -133,9 +136,8 @@ object AggregatedOrderBookActor {
                 ).withCompletedSchedule
               )
 
-            case Event.OrderBookRemoved =>
+            case Command.Stop(sender, reason) =>
               context.log.warn("Order book was deleted, closing all WebSocket connections...")
-              val reason = error.OrderBookStopped(assetPair)
               state.ws.wsConnections.foreach {
                 case (client, _) =>
                   context.log.trace(
@@ -145,6 +147,7 @@ object AggregatedOrderBookActor {
                   )
                   client.unsafeUpcast[WsServerMessage] ! WsError.from(reason, time.getTimestamp())
               }
+              sender ! Event.Stopped
               Behaviors.stopped
           }
           .receiveSignal {
@@ -218,7 +221,7 @@ object AggregatedOrderBookActor {
 
     def modifyWs(f: WsOrderBookState => WsOrderBookState): State = wsLens.modify(f)(this)
 
-    def runSchedule(interval: FiniteDuration, context: ActorContext[Message]): State =
+    def runSchedule(interval: FiniteDuration, context: ActorContext[InputMessage]): State =
       if (wsSendSchedule.isCancelled && ws.hasSubscriptions)
         copy(wsSendSchedule = context.scheduleOnce(interval, context.self, Command.SendWsUpdates))
       else this

@@ -155,7 +155,7 @@ object OrderBookHttpInfoSpec {
     )
 
     override def receive: Receive = {
-      case x: AggregatedOrderBookActor.Message => aggOrderBookRef ! x
+      case x: AggregatedOrderBookActor.InputMessage => aggOrderBookRef ! x
     }
 
   }

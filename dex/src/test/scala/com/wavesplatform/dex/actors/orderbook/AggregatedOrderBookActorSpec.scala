@@ -9,7 +9,7 @@ import akka.http.scaladsl.model.HttpResponse
 import akka.testkit.TestProbe
 import cats.data.NonEmptyList
 import com.wavesplatform.dex.NoShrink
-import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.{Command, Message, Query}
+import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.{Command, InputMessage, Query}
 import com.wavesplatform.dex.actors.orderbook.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.actors.{MatcherActor, MatcherSpecLike, OrderBookAskAdapter}
 import com.wavesplatform.dex.api.http.entities.{HttpV0LevelAgg, HttpV0OrderBook}
@@ -378,7 +378,7 @@ class AggregatedOrderBookActorSpec
           snapshot.settings should matchTo(Option(WsOrderBookSettings(maybeRestrictions, Some(tickSize))))
         }
 
-        def mkAoba(maybeRestrictions: Option[OrderRestrictionsSettings], tickSize: Double): ActorRef[Message] =
+        def mkAoba(maybeRestrictions: Option[OrderRestrictionsSettings], tickSize: Double): ActorRef[InputMessage] =
           mk(OrderBook.empty, maybeRestrictions, tickSize)
 
         withClue("Empty restrictions and default tick size") {
@@ -433,7 +433,7 @@ class AggregatedOrderBookActorSpec
     ob: OrderBook,
     restrictions: Option[OrderRestrictionsSettings] = None,
     tickSize: Double = DenormalizedMatchingRule.DefaultTickSize.toDouble
-  ): ActorRef[Message] = system.spawn(
+  ): ActorRef[InputMessage] = system.spawn(
     AggregatedOrderBookActor(
       AggregatedOrderBookActor.Settings(100.millis),
       pair,
@@ -447,7 +447,7 @@ class AggregatedOrderBookActorSpec
     s"aggregated-${ThreadLocalRandom.current().nextInt()}"
   )
 
-  private def get[R](ref: ActorRef[Message])(mkMessage: ActorRef[R] => Message): R =
+  private def get[R](ref: ActorRef[InputMessage])(mkMessage: ActorRef[R] => InputMessage): R =
     Await.result(ref.ask[R](mkMessage)(5.seconds, system.scheduler.toTyped), 5.seconds)
 
   override protected def actorSystemName: String = "AggregatedOrderBookSpec"

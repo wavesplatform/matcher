@@ -13,7 +13,7 @@ trait AssetsReadOnlyDb[F[_]] {
 
 object AssetsReadOnlyDb {
 
-  implicit final class AssetsReadOnlyDbOps[F[_]](val self: AssetsReadOnlyDb[F]) {
+  implicit final class AssetsReadOnlyDbOps[F[_]](val self: AssetsReadOnlyDb[F]) extends AnyVal {
     def contains(asset: IssuedAsset)(implicit F: Applicative[F]): F[Boolean] = self.get(asset).map(_.nonEmpty)
 
     def get(asset: Asset)(implicit F: Applicative[F]): F[Option[BriefAssetDescription]] = asset match {

@@ -33,7 +33,7 @@ import com.wavesplatform.dex.api.ws.routes.MatcherWebSocketRoute
 import com.wavesplatform.dex.app._
 import com.wavesplatform.dex.caches.{MatchingRulesCache, OrderFeeSettingsCache, RateCache}
 import com.wavesplatform.dex.db._
-import com.wavesplatform.dex.db.leveldb.{LevelDb, openDB}
+import com.wavesplatform.dex.db.leveldb.{LevelDb, openDb}
 import com.wavesplatform.dex.domain.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.codec.Base58
@@ -109,7 +109,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     Future { blocking(time.close()); Done }
   }
 
-  private val db = openDB(settings.dataDirectory)
+  private val db = openDb(settings.dataDirectory)
   private val asyncLevelDb = LevelDb.async(db)(levelDbEc)
 
   cs.addTask(CoordinatedShutdown.PhaseActorSystemTerminate, "DB") { () =>

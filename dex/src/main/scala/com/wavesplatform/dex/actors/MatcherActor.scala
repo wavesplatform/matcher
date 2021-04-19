@@ -26,7 +26,7 @@ import scala.util.{Failure, Success}
 
 class MatcherActor(
   settings: MatcherSettings,
-  assetPairsDB: AssetPairsDb[Future],
+  assetPairsDb: AssetPairsDb[Future],
   recoveryCompletedWithEventNr: Either[String, Long] => Unit,
   orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
   orderBookActorProps: (AssetPair, ActorRef) => Props,
@@ -130,7 +130,7 @@ class MatcherActor(
           s ! OrderBookUnavailable(error.OrderBookUnexpectedState(assetPair))
         } else if (autoCreate) {
           val ob = createOrderBook(assetPair)
-          assetPairsDB
+          assetPairsDb
             .add(assetPair)
             .onComplete {
               case Failure(e) => log.error(s"Can't save $assetPair", e)
@@ -176,7 +176,7 @@ class MatcherActor(
             orderBooks.getAndUpdate(_.filterNot(_._2.exists(_ == ref)))
             snapshotsState = snapshotsState.without(assetPair)
             tradedPairs -= assetPair
-            assetPairsDB
+            assetPairsDb
               .remove(assetPair)
               .onComplete {
                 case Failure(e) => log.error(s"Can't remove $assetPair", e)
@@ -313,7 +313,7 @@ class MatcherActor(
   // Init
 
   val assetPairsInit = for {
-    assetPairs <- assetPairsDB.all()
+    assetPairs <- assetPairsDb.all()
     // We need to do this, because assets must be cached before order books created
     _ <- Future.inSeries(assetPairs.flatMap(_.assets))(assetsCache.get)
   } yield assetPairs

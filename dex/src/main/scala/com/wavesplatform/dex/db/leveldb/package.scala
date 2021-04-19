@@ -1,15 +1,15 @@
 package com.wavesplatform.dex.db
 
-import java.io.File
-import java.util.{Map => JMap}
-
 import com.google.common.primitives.Shorts
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import org.iq80.leveldb.{DB, Options, ReadOptions}
 
+import java.io.File
+import java.util.{Map => JMap}
+
 package object leveldb extends ScorexLogging {
 
-  def openDB(path: String, recreate: Boolean = false): DB = {
+  def openDb(path: String, recreate: Boolean = false): DB = {
 
     log.debug(s"Open DB at $path")
 

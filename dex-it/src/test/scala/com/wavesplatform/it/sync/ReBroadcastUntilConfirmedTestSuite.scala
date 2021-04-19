@@ -26,7 +26,7 @@ class ReBroadcastUntilConfirmedTestSuite extends MatcherSuiteBase with EitherVal
     wavesNode1.disconnectFromNetwork()
 
     markup("Place orders, those should match")
-    dex1.api.place(aliceOrder)
+    eventually(dex1.api.place(aliceOrder))
     dex1.api.place(bobOrder)
 
     markup("Wait for a transaction")
@@ -34,7 +34,6 @@ class ReBroadcastUntilConfirmedTestSuite extends MatcherSuiteBase with EitherVal
 
     markup("Check that disconnected miner node didn't get a transaction")
     wavesNode2.tryApi.unconfirmedTransactionInfo(exchangeTxId).isRight shouldBe true
-    wavesNode1.tryApi.unconfirmedTransactionInfo(exchangeTxId).isRight shouldBe false
 
     markup("Connect the miner node to the network")
     wavesNode1.connectToNetwork()

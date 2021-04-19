@@ -32,7 +32,6 @@ import monix.execution.Scheduler
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 import shapeless.Coproduct
-import net.ceedubs.ficus.Ficus._
 
 import java.util.concurrent.ConcurrentHashMap
 import scala.collection.concurrent.TrieMap

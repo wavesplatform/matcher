@@ -18,8 +18,16 @@ object UtxEventConversions extends ScorexLogging {
             tx.reason match {
               case None => none // Because we remove them during adding a full/micro block
               case Some(reason) =>
-                tx.transaction.tapEach { tx =>
-                  log.info(s"${tx.id.toVanilla} failed: ${reason.name}, ${reason.message}")
+                tx.transaction match {
+                  case None => none
+                  case r @ Some(tx) =>
+                    if (isFalsePositive(reason)) {
+                      log.debug(s"${tx.id.toVanilla} failed by a false-positive reason: ${reason.name}, ${reason.message}")
+                      none
+                    } else {
+                      log.info(s"${tx.id.toVanilla} failed: ${reason.name}, ${reason.message}")
+                      r
+                    }
                 }
             }
           }
@@ -30,5 +38,10 @@ object UtxEventConversions extends ScorexLogging {
         log.error(s"Can't convert $event to a domain event")
         none
     }
+
+  // DEX-1120
+  private def isFalsePositive(e: UtxEvent.Update.Removed.Reason): Boolean =
+    // See WavesBlockchainApiGrpcService.canRetry
+    e.name == "OrderValidationError" && e.message.startsWith("Too much")
 
 }

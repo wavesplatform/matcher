@@ -2,6 +2,7 @@ package com.wavesplatform.dex.grpc.integration.services
 
 import cats.implicits.catsSyntaxOptionId
 import cats.syntax.either._
+import cats.syntax.option._
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.grpc._
@@ -20,10 +21,12 @@ import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.{ExecutionError, ValidationError}
 import com.wavesplatform.protobuf.Amount
+import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.{Asset, TxValidationError}
 import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.assets.exchange
 import com.wavesplatform.transaction.smart.script.ScriptRunnerFixed
+import com.wavesplatform.transaction.{Asset, TxValidationError}
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.stub.{ServerCallStreamObserver, StreamObserver}
 import io.grpc.{Metadata, Status, StatusRuntimeException}
@@ -38,8 +41,6 @@ import scala.collection.concurrent.TrieMap
 import scala.concurrent.Future
 import scala.util.Try
 import scala.util.control.NonFatal
-import cats.syntax.option._
-import com.wavesplatform.transaction.assets.exchange
 
 class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Scheduler)
     extends WavesBlockchainApiGrpc.WavesBlockchainApi
@@ -106,8 +107,13 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
               case None => log.debug(s"Can't find removed ${tx.id()} with reason: $reason")
               case utxTransaction =>
                 val gReason = reason.map { x =>
+                  val preciseErrorObject = x match {
+                    case x: TransactionValidationError => x.cause
+                    case _ => x
+                  }
+
                   UtxEvent.Update.Removed.Reason(
-                    name = getSimpleName(x),
+                    name = getSimpleName(preciseErrorObject),
                     message = x.toString
                   )
                 }
@@ -195,7 +201,11 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
     case x: GenericError
         if x.err == "Transaction pool bytes size limit is reached"
           || x.err == "Transaction pool size limit is reached" => true
-    // Could happen if one transaction is sent multiple times in parallel
+    // Could happen when:
+    // 1. One transaction is sent multiple times in parallel
+    // 2. There are two exchanges tx1 and tx2 those fill the order:
+    // 2.1. tx1 is mined and still present in UTX pool (race condition on NODE), thus the order considered as partially filled by tx1 * 2
+    // 2.2. tx2 fails for some reason
     case x: TxValidationError.OrderValidationError if x.err.startsWith("Too much") => true
     case _ => false
   }

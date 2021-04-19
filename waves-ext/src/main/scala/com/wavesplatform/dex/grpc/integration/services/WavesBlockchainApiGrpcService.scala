@@ -39,6 +39,7 @@ import scala.concurrent.Future
 import scala.util.Try
 import scala.util.control.NonFatal
 import cats.syntax.option._
+import com.wavesplatform.transaction.assets.exchange
 
 class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Scheduler)
     extends WavesBlockchainApiGrpc.WavesBlockchainApi
@@ -163,7 +164,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
       .flatMap {
         case Right((tx, isConfirmed, isInUtx)) =>
           if (isConfirmed) Future.successful(CheckedBroadcastResponse.Result.Confirmed(empty))
-          else if (isInUtx) Future.successful(CheckedBroadcastResponse.Result.Unconfirmed(false)) // false == not new
+          else if (isInUtx) handleTxInUtx(tx)
           else context.transactionsApi.broadcastTransaction(tx).map {
             _.resultE match {
               case Right(isNew) => CheckedBroadcastResponse.Result.Unconfirmed(isNew)
@@ -179,6 +180,16 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
           val message = Option(e.getMessage).getOrElse(e.getClass.getName)
           CheckedBroadcastResponse(CheckedBroadcastResponse.Result.Failed(CheckedBroadcastResponse.Failure(message, canRetry = false)))
       }
+
+  private def handleTxInUtx(tx: exchange.ExchangeTransaction): Future[CheckedBroadcastResponse.Result] =
+    context.transactionsApi.broadcastTransaction(tx).map {
+      _.resultE match {
+        case Right(_) => CheckedBroadcastResponse.Result.Unconfirmed(false)
+        case Left(e) =>
+          log.error(s"Error rebroadcasting transaction: $e")
+          CheckedBroadcastResponse.Result.Unconfirmed(false)
+      }
+    }
 
   private def canRetry(x: ValidationError): Boolean = x match {
     case x: GenericError

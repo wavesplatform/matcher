@@ -1,20 +1,28 @@
 package com.wavesplatform.dex.api.http
 
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse, StatusCodes}
+import cats.instances.future._
+import cats.syntax.semigroupal._
 import com.wavesplatform.dex.actors.OrderBookAskAdapter
-import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.Depth
-import com.wavesplatform.dex.actors.orderbook.OrderBookActor.MarketStatus
+import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.{Depth, MarketStatus}
 import com.wavesplatform.dex.api.http.entities.MatcherResponse.toHttpResponse
-import com.wavesplatform.dex.api.http.entities.{HttpOrderBookStatus, HttpOrderBook, OrderBookUnavailable, SimpleResponse}
+import com.wavesplatform.dex.api.http.entities.{HttpOrderBook, HttpOrderBookStatus, OrderBookUnavailable, SimpleErrorResponse, SimpleResponse}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.effect.{liftValueAsync, FutureResult}
 import com.wavesplatform.dex.model.MatcherModel.{DecimalsFormat, Denormalized}
 import com.wavesplatform.dex.time.Time
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class OrderBookHttpInfo(settings: OrderBookHttpInfo.Settings, askAdapter: OrderBookAskAdapter, time: Time, assetDecimals: Asset => Option[Int])(
-  implicit ec: ExecutionContext
-) {
+/**
+ * @param assetDecimals Returns FutureResult, because we potentially face with unknown assets
+ */
+class OrderBookHttpInfo(
+  settings: OrderBookHttpInfo.Settings,
+  askAdapter: OrderBookAskAdapter,
+  time: Time,
+  assetDecimals: Asset => FutureResult[Int]
+)(implicit ec: ExecutionContext) {
 
   private val emptyMarketStatus = toHttpMarketStatusResponse(MarketStatus(None, None, None))
 
@@ -31,24 +39,29 @@ class OrderBookHttpInfo(settings: OrderBookHttpInfo.Settings, askAdapter: OrderB
   private def toHttpMarketStatusResponse(ms: MarketStatus): HttpResponse = toHttpResponse(SimpleResponse(HttpOrderBookStatus fromMarketStatus ms))
 
   def getHttpView(assetPair: AssetPair, format: DecimalsFormat, depth: Option[Depth]): Future[HttpResponse] =
-    askAdapter.getHttpView(assetPair, format, settings.nearestBigger(depth)).map {
-      case Right(x) => x.getOrElse(getDefaultHttpView(assetPair, format))
-      case Left(e) => toHttpResponse(OrderBookUnavailable(e))
+    askAdapter.getHttpView(assetPair, format, settings.nearestBigger(depth)).flatMap {
+      case Right(Some(x)) => Future.successful(x)
+      case Right(None) => getDefaultHttpView(assetPair, format)
+      case Left(e) => Future.successful(toHttpResponse(OrderBookUnavailable(e)))
     }
 
-  private def getDefaultHttpView(assetPair: AssetPair, format: DecimalsFormat): HttpResponse = {
-    val entity = HttpOrderBook(time.correctedTime(), assetPair, Seq.empty, Seq.empty, assetPairDecimals(assetPair, format))
-    HttpResponse(
-      entity = HttpEntity(
-        ContentTypes.`application/json`,
-        HttpOrderBook.toJson(entity)
-      )
-    )
-  }
+  private def getDefaultHttpView(assetPair: AssetPair, format: DecimalsFormat): Future[HttpResponse] =
+    assetPairDecimals(assetPair, format).value.map {
+      case Right(assetPairDecimals) =>
+        val entity = HttpOrderBook(time.correctedTime(), assetPair, Seq.empty, Seq.empty, assetPairDecimals)
+        HttpResponse(
+          entity = HttpEntity(
+            ContentTypes.`application/json`,
+            HttpOrderBook.toJson(entity)
+          )
+        )
 
-  private def assetPairDecimals(assetPair: AssetPair, format: DecimalsFormat): Option[(Depth, Depth)] = format match {
-    case Denormalized => assetDecimals(assetPair.amountAsset).zip(assetDecimals(assetPair.priceAsset))
-    case _ => None
+      case Left(e) => toHttpResponse(SimpleErrorResponse(StatusCodes.BadRequest, e))
+    }
+
+  private def assetPairDecimals(assetPair: AssetPair, format: DecimalsFormat): FutureResult[Option[(Depth, Depth)]] = format match {
+    case Denormalized => assetDecimals(assetPair.amountAsset).product(assetDecimals(assetPair.priceAsset)).map(Some(_))
+    case _ => liftValueAsync(None)
   }
 
 }

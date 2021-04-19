@@ -4,7 +4,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 
 trait MatcherQueue {
-  def startConsume(fromOffset: ValidatedCommandWithMeta.Offset, process: Seq[ValidatedCommandWithMeta] => Future[Unit]): Unit
+  def startConsume(fromOffset: ValidatedCommandWithMeta.Offset, process: List[ValidatedCommandWithMeta] => Future[Unit]): Unit
 
   /**
    * @return Depending on settings and result:

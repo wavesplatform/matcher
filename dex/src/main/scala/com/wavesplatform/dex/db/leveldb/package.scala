@@ -1,15 +1,15 @@
 package com.wavesplatform.dex.db
 
-import java.io.File
-import java.util.{Map => JMap}
-
 import com.google.common.primitives.Shorts
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import org.iq80.leveldb.{DB, Options, ReadOptions}
 
+import java.io.File
+import java.util.{Map => JMap}
+
 package object leveldb extends ScorexLogging {
 
-  def openDB(path: String, recreate: Boolean = false): DB = {
+  def openDb(path: String, recreate: Boolean = false): DB = {
 
     log.debug(s"Open DB at $path")
 
@@ -17,30 +17,30 @@ package object leveldb extends ScorexLogging {
     val options = new Options().createIfMissing(true).paranoidChecks(true)
 
     if (recreate)
-      LevelDBFactory.factory.destroy(file, options)
+      LevelDbFactory.factory.destroy(file, options)
 
     file.getAbsoluteFile.getParentFile.mkdirs()
-    LevelDBFactory.factory.open(file, options)
+    LevelDbFactory.factory.open(file, options)
   }
 
   final type DBEntry = JMap.Entry[Array[Byte], Array[Byte]]
 
   implicit class DBExt(val db: DB) extends AnyVal {
 
-    def readOnly[A](f: ReadOnlyDB => A): A = {
+    def readOnly[A](f: ReadOnlyDb => A): A = {
       val snapshot = db.getSnapshot
-      try f(new ReadOnlyDB(db, new ReadOptions().snapshot(snapshot)))
+      try f(new ReadOnlyDb(db, new ReadOptions().snapshot(snapshot)))
       finally snapshot.close()
     }
 
     /**
      * @note Runs operations in batch, so keep in mind, that previous changes don't appear lately in f
      */
-    def readWrite[A](f: ReadWriteDB => A): A = {
+    def readWrite[A](f: ReadWriteDb => A): A = {
       val snapshot = db.getSnapshot
       val readOptions = new ReadOptions().snapshot(snapshot)
       val batch = db.createWriteBatch()
-      val rw = new ReadWriteDB(db, readOptions, batch)
+      val rw = new ReadWriteDb(db, readOptions, batch)
       try {
         val r = f(rw)
         db.write(batch)

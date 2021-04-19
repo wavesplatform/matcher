@@ -6,10 +6,11 @@ import com.wavesplatform.dex.actors.orderbook.OrderBookActor.{OrderBookRecovered
 import com.wavesplatform.dex.actors.orderbook.{AggregatedOrderBookActor, OrderBookActor}
 import com.wavesplatform.dex.api.http.entities.OrderBookUnavailable
 import com.wavesplatform.dex.app.{forceStopApplication, StartingMatcherError}
-import com.wavesplatform.dex.db.AssetPairsDb
+import com.wavesplatform.dex.db.{AssetPairsDb, AssetsCache}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.utils.ScorexLogging
+import com.wavesplatform.dex.effect.Implicits.FutureCompanionOps
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
@@ -25,11 +26,11 @@ import scala.util.{Failure, Success}
 
 class MatcherActor(
   settings: MatcherSettings,
-  assetPairsDB: AssetPairsDb[Future],
+  assetPairsDb: AssetPairsDb[Future],
   recoveryCompletedWithEventNr: Either[String, Long] => Unit,
   orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
   orderBookActorProps: (AssetPair, ActorRef) => Props,
-  assetDescription: Asset => Option[BriefAssetDescription],
+  assetsCache: AssetsCache,
   validateAssetPair: AssetPair => Either[MatcherError, AssetPair]
 ) extends Actor
     with WorkingStash
@@ -55,7 +56,7 @@ class MatcherActor(
     case Start(assetPairs) =>
       val (errors, validAssetPairs) = assetPairs.partitionMap { assetPair =>
         validateAssetPair(assetPair) match {
-          case Left(e)  => s"$assetPair: ${e.message.text}".asLeft
+          case Left(e) => s"$assetPair: ${e.message.text}".asLeft
           case Right(x) => x.asRight
         }
       }
@@ -90,10 +91,10 @@ class MatcherActor(
   private def getAssetInfo(asset: Asset, desc: Option[BriefAssetDescription]): Option[AssetInfo] =
     asset.fold(Option(8))(_ => desc.map(_.decimals)).map(AssetInfo)
 
-  private def getAssetDesc(asset: Asset): Option[BriefAssetDescription] = asset.fold[Option[BriefAssetDescription]](None)(assetDescription)
+  private def getAssetDesc(asset: Asset): Option[BriefAssetDescription] =
+    asset.fold[Option[BriefAssetDescription]](None)(assetsCache.cached.get)
 
   private def createMarketData(pair: AssetPair): MarketData = {
-
     val amountAssetDescription = getAssetDesc(pair.amountAsset)
     val priceAssetDescription = getAssetDesc(pair.priceAsset)
 
@@ -129,7 +130,12 @@ class MatcherActor(
           s ! OrderBookUnavailable(error.OrderBookUnexpectedState(assetPair))
         } else if (autoCreate) {
           val ob = createOrderBook(assetPair)
-          assetPairsDB.add(assetPair)
+          assetPairsDb
+            .add(assetPair)
+            .onComplete {
+              case Failure(e) => log.error(s"Can't save $assetPair", e)
+              case _ =>
+            }
           f(s, ob)
         } else {
           log.warn(s"OrderBook for $assetPair is stopped and autoCreate is $autoCreate, respond to client with OrderBookUnavailable")
@@ -158,7 +164,7 @@ class MatcherActor(
 
   private def working: Receive = {
 
-    case GetMarkets => sender() ! tradedPairs.values.toSeq
+    case GetMarkets => sender() ! tradedPairs.values.toList
     case GetSnapshotOffsets => sender() ! SnapshotOffsetsResponse(snapshotsState.snapshotOffsets)
 
     case request: ValidatedCommandWithMeta =>
@@ -170,7 +176,12 @@ class MatcherActor(
             orderBooks.getAndUpdate(_.filterNot(_._2.exists(_ == ref)))
             snapshotsState = snapshotsState.without(assetPair)
             tradedPairs -= assetPair
-            assetPairsDB.remove(assetPair)
+            assetPairsDb
+              .remove(assetPair)
+              .onComplete {
+                case Failure(e) => log.error(s"Can't remove $assetPair", e)
+                case _ =>
+              }
           }
 
         case _ => runFor(request.command.assetPair)((sender, orderBook) => orderBook.tell(request, sender))
@@ -301,7 +312,13 @@ class MatcherActor(
 
   // Init
 
-  assetPairsDB.all().onComplete {
+  val assetPairsInit = for {
+    assetPairs <- assetPairsDb.all()
+    // We need to do this, because assets must be cached before order books created
+    _ <- Future.inSeries(assetPairs.flatMap(_.assets))(assetsCache.get)
+  } yield assetPairs
+
+  assetPairsInit.onComplete {
     case Success(xs) => self ! Start(xs)
     case Failure(e) =>
       log.error("Can't receive asset pairs", e)
@@ -320,7 +337,7 @@ object MatcherActor {
     recoveryCompletedWithEventNr: Either[String, Long] => Unit,
     orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
     orderBookProps: (AssetPair, ActorRef) => Props,
-    assetDescription: Asset => Option[BriefAssetDescription],
+    assetsCache: AssetsCache,
     validateAssetPair: AssetPair => Either[MatcherError, AssetPair]
   ): Props = Props(
     new MatcherActor(
@@ -329,7 +346,7 @@ object MatcherActor {
       recoveryCompletedWithEventNr,
       orderBooks,
       orderBookProps,
-      assetDescription,
+      assetsCache,
       validateAssetPair
     )
   )

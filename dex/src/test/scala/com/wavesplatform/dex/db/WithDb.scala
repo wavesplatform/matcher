@@ -2,7 +2,7 @@ package com.wavesplatform.dex.db
 
 import cats.Id
 import com.google.common.util.concurrent.ThreadFactoryBuilder
-import com.wavesplatform.dex.db.leveldb.{LevelDBFactory, LevelDb}
+import com.wavesplatform.dex.db.leveldb.{LevelDbFactory, LevelDb}
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.util.Implicits._
@@ -29,7 +29,7 @@ trait WithDb extends BeforeAndAfterEach { this: Suite =>
   protected val ignoreSpendableBalanceChanged: Subject[(Address, Asset), (Address, Asset)] = Subject.empty
 
   override def beforeEach(): Unit = {
-    currentDBInstance = LevelDBFactory.factory.open(path.toFile, new Options().createIfMissing(true))
+    currentDBInstance = LevelDbFactory.factory.open(path.toFile, new Options().createIfMissing(true))
     super.beforeEach()
   }
 
@@ -41,7 +41,7 @@ trait WithDb extends BeforeAndAfterEach { this: Suite =>
 
   protected def tempDb(f: DB => Any): Any = {
     val path = Files.createTempDirectory("lvl-temp").toAbsolutePath
-    val db = LevelDBFactory.factory.open(path.toFile, new Options().createIfMissing(true))
+    val db = LevelDbFactory.factory.open(path.toFile, new Options().createIfMissing(true))
     try f(db)
     finally {
       try db.close()

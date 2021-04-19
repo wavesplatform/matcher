@@ -1,7 +1,5 @@
 package com.wavesplatform.dex.api.http.routes
 
-import java.util.concurrent.atomic.AtomicReference
-
 import akka.actor.ActorRef
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.Route
@@ -20,7 +18,7 @@ import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.db.WithDb
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.crypto
-import com.wavesplatform.dex.effect.{liftErrorAsync, liftValueAsync}
+import com.wavesplatform.dex.effect.{liftErrorAsync, liftFutureAsync, liftValueAsync}
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.{AssetPairBuilder, LevelAgg, OrderBookAggregatedSnapshot}
@@ -29,6 +27,8 @@ import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 import pureconfig.ConfigSource
 
+import java.util.concurrent.atomic.AtomicReference
+import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
 class MatcherApiRouteV1Spec extends RouteSpec("/api/v1") with MatcherSpecBase with PathMockFactory with Eventually with WithDb {
@@ -94,8 +94,12 @@ class MatcherApiRouteV1Spec extends RouteSpec("/api/v1") with MatcherSpecBase wi
         askAdapter = orderBookAskAdapter,
         time = time,
         assetDecimals = {
-          case a if a == `usd` || a == Waves => efc.assetDecimals(a)
-          case x => throw new IllegalArgumentException(s"No information about $x")
+          case a if a == `usd` || a == Waves =>
+            efc.assetDecimals(a) match {
+              case Some(decimals) => liftValueAsync(decimals)
+              case None => liftErrorAsync(error.UnexpectedError)
+            }
+          case x => liftFutureAsync(Future.failed(new IllegalArgumentException(s"No information about $x")))
         }
       )
 

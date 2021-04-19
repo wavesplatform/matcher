@@ -36,7 +36,7 @@ class LocalMatcherQueue(settings: Settings, store: LocalQueueStore[Future], time
     r
   }
 
-  override def startConsume(fromOffset: ValidatedCommandWithMeta.Offset, process: Seq[ValidatedCommandWithMeta] => Future[Unit]): Unit = {
+  override def startConsume(fromOffset: ValidatedCommandWithMeta.Offset, process: List[ValidatedCommandWithMeta] => Future[Unit]): Unit = {
     if (settings.cleanBeforeConsume) store.dropUntil(fromOffset).onComplete {
       case Success(_) =>
       case Failure(e) => log.error(s"Can't drop messages from $fromOffset", e)

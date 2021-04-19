@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.api.http.entities
 
-import com.wavesplatform.dex.actors.orderbook.OrderBookActor.MarketStatus
+import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.MarketStatus
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.model.{LastTrade, LevelAgg}
 import io.swagger.annotations.ApiModelProperty

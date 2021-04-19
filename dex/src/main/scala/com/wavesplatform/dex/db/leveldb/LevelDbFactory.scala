@@ -5,7 +5,7 @@ import org.iq80.leveldb.DBFactory
 
 import scala.util.Try
 
-object LevelDBFactory extends ScorexLogging {
+object LevelDbFactory extends ScorexLogging {
   private[this] val jnaFactory = "com.wavesplatform.dex.db.leveldb.jna.LevelDBJNADBFactory"
   private[this] val jniFactory = "org.fusesource.leveldbjni.JniDBFactory"
   private[this] val javaFactory = "org.iq80.leveldb.impl.Iq80DBFactory"

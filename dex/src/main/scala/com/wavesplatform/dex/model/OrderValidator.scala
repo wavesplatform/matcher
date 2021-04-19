@@ -7,7 +7,7 @@ import cats.instances.map.catsKernelStdCommutativeMonoidForMap
 import cats.syntax.either._
 import cats.syntax.flatMap._
 import cats.syntax.semigroup.catsSyntaxSemigroup
-import com.wavesplatform.dex.actors.orderbook.OrderBookActor.MarketStatus
+import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.MarketStatus
 import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset
@@ -255,18 +255,17 @@ object OrderValidator extends ScorexLogging {
    *
    * @param order            placed order
    * @param orderFeeSettings matcher settings for the fee of orders
-   * @param assetDecimals    obtaining asset decimals from the blockchain
    * @param rateCache        assets rate cache
    */
   private[dex] def getMinValidFeeForSettings(
     order: Order,
     orderFeeSettings: OrderFeeSettings,
-    assetDecimals: Asset => Int,
+    feeDecimals: Int,
     rateCache: RateCache
   ): Result[Long] = orderFeeSettings match {
     case FixedSettings(_, fixedMinFee) => lift(fixedMinFee)
     case ps: PercentSettings => lift(getMinValidFeeForPercentFeeSettings(order, ps, order.price))
-    case ds: DynamicSettings => convertFeeByAssetRate(ds.maxBaseFee, order.feeAsset, assetDecimals(order.feeAsset), rateCache)
+    case ds: DynamicSettings => convertFeeByAssetRate(ds.maxBaseFee, order.feeAsset, feeDecimals, rateCache)
   }
 
   private def validateFeeAsset(order: Order, orderFeeSettings: OrderFeeSettings, rateCache: RateCache): Result[Order] = {
@@ -274,10 +273,10 @@ object OrderValidator extends ScorexLogging {
     cond(requiredFeeAssets contains order.feeAsset, order, error.UnexpectedFeeAsset(requiredFeeAssets, order.feeAsset))
   }
 
-  private def validateFee(order: Order, orderFeeSettings: OrderFeeSettings, assetDecimals: Asset => Int, rateCache: RateCache)(implicit
+  private def validateFee(order: Order, orderFeeSettings: OrderFeeSettings, feeDecimals: Int, rateCache: RateCache)(implicit
     efc: ErrorFormatterContext
   ): Result[Order] =
-    getMinValidFeeForSettings(order, orderFeeSettings, assetDecimals, rateCache) flatMap { requiredFee =>
+    getMinValidFeeForSettings(order, orderFeeSettings, feeDecimals, rateCache) flatMap { requiredFee =>
       cond(order.matcherFee >= requiredFee, order, error.FeeNotEnough(requiredFee, order.matcherFee, order.feeAsset))
     }
 
@@ -285,7 +284,7 @@ object OrderValidator extends ScorexLogging {
     matcherPublicKey: PublicKey,
     blacklistedAddresses: Set[Address],
     matcherSettings: MatcherSettings,
-    assetDecimals: Asset => Int,
+    feeDecimals: Int,
     rateCache: RateCache,
     getActualOrderFeeSettings: => OrderFeeSettings
   )(order: Order)(implicit efc: ErrorFormatterContext): Result[Order] = {
@@ -302,7 +301,7 @@ object OrderValidator extends ScorexLogging {
         )
       _ <- validateBlacklistedAsset(order.feeAsset, error.FeeAssetBlacklisted)
       _ <- validateFeeAsset(order, getActualOrderFeeSettings, rateCache)
-      _ <- validateFee(order, getActualOrderFeeSettings, assetDecimals, rateCache)
+      _ <- validateFee(order, getActualOrderFeeSettings, feeDecimals, rateCache)
     } yield order
   }
 

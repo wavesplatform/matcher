@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.model
 
 import com.google.common.base.Charsets
-import com.wavesplatform.dex.actors.orderbook.OrderBookActor.MarketStatus
+import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.MarketStatus
 import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.db.TestRateDb
 import com.wavesplatform.dex.domain.account.{Address, KeyPair}
@@ -1032,7 +1032,7 @@ class OrderValidatorSpecification
       o.matcherPublicKey,
       ba,
       matcherSettings,
-      getDefaultAssetDescriptions(_).decimals,
+      getDefaultAssetDescriptions(o.feeAsset).decimals,
       rateCache,
       DynamicSettings.symmetric(matcherFee)
     )
@@ -1051,7 +1051,7 @@ class OrderValidatorSpecification
         Set.empty,
         matcherSettings
           .copy(allowedAssetPairs = allowedAssetPairs, allowedOrderVersions = allowedOrderVersions, blacklistedAssets = blacklistedAssets),
-        assetDecimals,
+        assetDecimals(order.feeAsset),
         rateCache,
         orderFeeSettings
       )(order)

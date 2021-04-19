@@ -48,13 +48,13 @@ class GrpcBlockchainUpdatesControlledStream(channel: ManagedChannel, noDataTimeo
   override def requestNext(): Unit = grpcObserver.get().foreach(_.requestNext())
 
   override def stop(): Unit = grpcObserver.get().foreach { x =>
-    log.info("Stopping balance updates stream")
+    log.info("Stopping blockchain updates stream")
     x.close()
     internalSystemStream.onNext(SystemEvent.Stopped)
   }
 
   override def close(): Unit = {
-    log.info("Closing balance updates stream")
+    log.info("Closing blockchain updates stream")
     stopGrpcObserver()
     internalStream.onComplete()
     internalSystemStream.onNext(SystemEvent.Closed)

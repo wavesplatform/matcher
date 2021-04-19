@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.db
 
-import com.wavesplatform.dex.db.leveldb.{LevelDb, ReadWriteDB}
+import com.wavesplatform.dex.db.leveldb.{LevelDb, ReadWriteDb}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 
@@ -21,7 +21,7 @@ object ExchangeTxStorage {
       }
     }
 
-    private def appendTxId(rw: ReadWriteDB, orderId: ByteStr, txId: ByteStr): Unit = {
+    private def appendTxId(rw: ReadWriteDb, orderId: ByteStr, txId: ByteStr): Unit = {
       val key = DbKeys.orderTxIdsSeqNr(orderId)
       val nextSeqNr = rw.get(key) + 1
       rw.put(key, nextSeqNr)

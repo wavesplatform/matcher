@@ -1,6 +1,5 @@
 package com.wavesplatform.dex.settings
 
-import java.io.File
 import cats.data.NonEmptyList
 import cats.implicits._
 import com.wavesplatform.dex.actors.address.AddressActor
@@ -21,6 +20,7 @@ import pureconfig.generic.auto._
 import pureconfig.generic.semiauto
 import pureconfig.module.cats.nonEmptyListReader
 
+import java.io.File
 import scala.concurrent.duration.FiniteDuration
 import scala.util.matching.Regex
 

@@ -1,6 +1,5 @@
 package com.wavesplatform.dex.grpc.integration.clients.combined
 
-import cats.syntax.option._
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.wavesplatform.dex.WavesIntegrationSuiteBase
 import com.wavesplatform.dex.grpc.integration.clients.ControlledStream.SystemEvent
@@ -79,14 +78,14 @@ class CombinedStreamTestSuite extends WavesIntegrationSuiteBase with Eventually 
         val t = mk()
         t.cs.startFrom(10)
         t.cs.restart()
-        logged(t.blockchainUpdates.systemStream)(_.tail.head shouldBe SystemEvent.Stopped)
+        logged(t.blockchainUpdates.systemStream)(_.contains(SystemEvent.Stopped))
       }
 
       "stops utxEvents" in {
         val t = mk()
         t.cs.startFrom(10)
         t.cs.restart()
-        logged(t.utxEvents.systemStream)(_.tail.head shouldBe SystemEvent.Stopped)
+        logged(t.utxEvents.systemStream)(_.contains(SystemEvent.Stopped))
       }
 
       "doesn't affect the recovery height" in {
@@ -111,7 +110,7 @@ class CombinedStreamTestSuite extends WavesIntegrationSuiteBase with Eventually 
           "stops utxEvents" in {
             val t = mkEventuallyWorking()
             t.blockchainUpdates.systemStream.onNext(SystemEvent.Stopped)
-            logged(t.utxEvents.systemStream)(_.tail.head shouldBe SystemEvent.Stopped)
+            logged(t.utxEvents.systemStream)(_.contains(SystemEvent.Stopped))
           }
 
           "both recovered" in {
@@ -129,7 +128,7 @@ class CombinedStreamTestSuite extends WavesIntegrationSuiteBase with Eventually 
           "closes utxEvents" in {
             val t = mkEventuallyWorking()
             t.blockchainUpdates.close()
-            logged(t.utxEvents.systemStream)(_.last shouldBe SystemEvent.Closed)
+            logged(t.utxEvents.systemStream)(_.contains(SystemEvent.Closed))
           }
 
           "no recovery" in {
@@ -151,7 +150,7 @@ class CombinedStreamTestSuite extends WavesIntegrationSuiteBase with Eventually 
           "stops blockchainUpdates" in {
             val t = mkEventuallyWorking()
             t.utxEvents.systemStream.onNext(SystemEvent.Stopped)
-            logged(t.blockchainUpdates.systemStream)(_.tail.headOption shouldBe SystemEvent.Stopped.some)
+            logged(t.blockchainUpdates.systemStream)(_.contains(SystemEvent.Stopped))
           }
 
           "recovery started" in {

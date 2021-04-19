@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.settings
 
 import cats.data.NonEmptyList
-import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.model.Normalization
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.queue.ValidatedCommandWithMeta
@@ -12,10 +12,10 @@ import pureconfig.generic.semiauto
 /** Denormalized representation of the matching rule passed from the application.conf */
 case class DenormalizedMatchingRule(startOffset: Long, tickSize: BigDecimal) {
 
-  def normalize(assetPair: AssetPair, assetDecimals: Asset => Int): MatchingRule =
+  def normalize(amountAssetDecimals: Int, priceAssetDecimals: Int): MatchingRule =
     MatchingRule(
       startOffset,
-      Normalization.normalizePrice(tickSize, assetDecimals(assetPair.amountAsset), assetDecimals(assetPair.priceAsset))
+      Normalization.normalizePrice(tickSize, amountAssetDecimals, priceAssetDecimals)
     )
 
 }
@@ -31,8 +31,8 @@ object DenormalizedMatchingRule extends ScorexLogging {
       validationOf.field[DenormalizedMatchingRule, "tickSize"].mk(x => rules.gt0(x.tickSize))
     )
 
-  def getDefaultRule(assetPair: AssetPair, assetDecimals: Asset => Int): DenormalizedMatchingRule = {
-    val DenormalizedMatchingRule(startOffset, tickSize) = MatchingRule.DefaultRule.denormalize(assetPair, assetDecimals)
+  def getDefaultRule(amountAssetDecimals: Int, priceAssetDecimals: Int): DenormalizedMatchingRule = {
+    val DenormalizedMatchingRule(startOffset, tickSize) = MatchingRule.DefaultRule.denormalize(amountAssetDecimals, priceAssetDecimals)
     DenormalizedMatchingRule(startOffset, tickSize max DefaultTickSize)
   }
 
@@ -57,10 +57,11 @@ object DenormalizedMatchingRule extends ScorexLogging {
    */
   def getDenormalizedMatchingRules(
     settings: MatcherSettings,
-    assetDecimals: Asset => Int,
-    assetPair: AssetPair
+    assetPair: AssetPair,
+    amountAssetDecimals: Int,
+    priceAssetDecimals: Int
   ): NonEmptyList[DenormalizedMatchingRule] = {
-    lazy val defaultRule = getDefaultRule(assetPair, assetDecimals)
+    lazy val defaultRule = getDefaultRule(amountAssetDecimals, priceAssetDecimals)
     val rules = settings.matchingRules.getOrElse(assetPair, NonEmptyList.one(defaultRule))
     if (rules.head.startOffset == 0) rules else defaultRule :: rules
   }

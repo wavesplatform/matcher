@@ -1,16 +1,15 @@
 package com.wavesplatform.dex.settings
 
-import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.model.Denormalization
 import com.wavesplatform.dex.queue.ValidatedCommandWithMeta
 
 /** Normalized representation of the matching rule */
 case class MatchingRule(startOffset: ValidatedCommandWithMeta.Offset, tickSize: Long) {
 
-  def denormalize(assetPair: AssetPair, getAssetDecimals: Asset => Int): DenormalizedMatchingRule =
+  def denormalize(amountAssetDecimals: Int, priceAssetDecimals: Int): DenormalizedMatchingRule =
     DenormalizedMatchingRule(
       startOffset,
-      Denormalization.denormalizePrice(tickSize, getAssetDecimals(assetPair.amountAsset), getAssetDecimals(assetPair.priceAsset))
+      Denormalization.denormalizePrice(tickSize, amountAssetDecimals, priceAssetDecimals)
     )
 
 }

@@ -455,7 +455,7 @@ trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with Doub
         order
           .updateFeeAsset(OrderValidator.getValidFeeAssetForSettings(order, percentSettings, rateCache).head)
           .updateFee {
-            OrderValidator.getMinValidFeeForSettings(order, percentSettings, getDefaultAssetDescriptions(_).decimals, rateCache).explicitGet()
+            OrderValidator.getMinValidFeeForSettings(order, percentSettings, getDefaultAssetDescriptions(order.feeAsset).decimals, rateCache).explicitGet()
           }
       case (_, ds @ DynamicSettings(_, _)) =>
         order

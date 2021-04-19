@@ -11,7 +11,7 @@ import com.wavesplatform.dex.actors.MatcherActor.{ForceStartOrderBook, OrderBook
 import com.wavesplatform.dex.actors.address.AddressActor
 import com.wavesplatform.dex.actors.events.OrderEventsCoordinatorActor
 import com.wavesplatform.dex.actors.orderbook.OrderBookActor._
-import com.wavesplatform.dex.actors.{MatcherActor, WorkingStash, orderbook}
+import com.wavesplatform.dex.actors.{orderbook, MatcherActor, WorkingStash}
 import com.wavesplatform.dex.api.ws.actors.WsInternalBroadcastActor
 import com.wavesplatform.dex.api.ws.protocol.WsOrdersUpdate
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -21,7 +21,7 @@ import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model.Events._
 import com.wavesplatform.dex.model.OrderBook.OrderBookUpdates
-import com.wavesplatform.dex.model.{LastTrade, _}
+import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatchingRule, OrderRestrictionsSettings}
 import com.wavesplatform.dex.time.Time
@@ -291,20 +291,9 @@ object OrderBookActor {
 
   def name(assetPair: AssetPair): String = assetPair.toString
 
-  case class MarketStatus(
-    lastTrade: Option[LastTrade],
-    bestBid: Option[LevelAgg],
-    bestAsk: Option[LevelAgg]
-  )
-
-  object MarketStatus {
-    def apply(ob: OrderBook): MarketStatus = MarketStatus(ob.lastTrade, ob.bestBid, ob.bestAsk)
-  }
-
   case class Snapshot(eventNr: Option[Long], orderBook: OrderBookSnapshot)
 
   // Internal messages
   case class OrderBookRecovered(assetPair: AssetPair, eventNr: Option[Long])
   case class OrderBookSnapshotUpdateCompleted(assetPair: AssetPair, currentOffset: Option[Long])
-  case object SendWsUpdates
 }

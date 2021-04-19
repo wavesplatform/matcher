@@ -1,9 +1,9 @@
 package com.wavesplatform.dex.actors
 
-import java.util.concurrent.atomic.AtomicReference
 import akka.actor.typed.scaladsl.adapter._
 import akka.actor.{Actor, ActorRef, ActorSystem, Kill, Props, Terminated}
 import akka.testkit.{ImplicitSender, TestActor, TestActorRef, TestProbe}
+import cats.Id
 import cats.data.NonEmptyList
 import cats.implicits.catsSyntaxEitherId
 import com.wavesplatform.dex.MatcherSpecBase
@@ -12,7 +12,7 @@ import com.wavesplatform.dex.actors.MatcherActorSpecification.{DeletingActor, Fa
 import com.wavesplatform.dex.actors.orderbook.OrderBookActor.{OrderBookRecovered, OrderBookSnapshotUpdateCompleted}
 import com.wavesplatform.dex.actors.orderbook.OrderBookSnapshotStoreActor.{Message, Response}
 import com.wavesplatform.dex.actors.orderbook.{AggregatedOrderBookActor, OrderBookActor, OrderBookSnapshotStoreActor}
-import com.wavesplatform.dex.db.{AssetPairsDb, OrderBookSnapshotDb, TestAssetPairDb, TestOrderBookSnapshotDb}
+import com.wavesplatform.dex.db._
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -26,9 +26,10 @@ import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.concurrent.Eventually
 
-import scala.concurrent.{Await, Future}
-import scala.concurrent.duration.DurationInt
+import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration.DurationInt
+import scala.concurrent.{Await, Future}
 
 class MatcherActorSpecification
     extends MatcherSpec("MatcherActor")
@@ -40,8 +41,14 @@ class MatcherActorSpecification
     with Eventually
     with SystemTime {
 
-  private def assetDescription(assetId: Asset): Option[BriefAssetDescription] =
-    Some(BriefAssetDescription(name = "Unknown", decimals = 8, hasScript = false))
+  private val assetsCache = new AssetsCache() {
+
+    override val cached: AssetsReadOnlyDb[Id] =
+      (asset: IssuedAsset) => Some(BriefAssetDescription(name = "Unknown", decimals = 8, hasScript = false))
+
+    override def get(asset: Asset): Future[Option[BriefAssetDescription]] = Future.successful(cached.get(asset))
+    override def put(asset: Asset, item: BriefAssetDescription): Future[Unit] = Future.unit
+  }
 
   "MatcherActor" should {
     "return all open markets" in {
@@ -82,7 +89,7 @@ class MatcherActorSpecification
             doNothingOnRecovery,
             ob,
             (_, _) => Props(new FailAtStartActor),
-            assetDescription,
+            assetsCache,
             _.asRight
           )
         )
@@ -136,7 +143,7 @@ class MatcherActorSpecification
             startResult => working = startResult.isRight,
             ob,
             (_, _) => Props(new FailAtStartActor()),
-            assetDescription,
+            assetsCache,
             _.asRight
           )
         )
@@ -168,7 +175,7 @@ class MatcherActorSpecification
                 startResult => stopped = startResult.isLeft,
                 ob,
                 (_, _) => Props(new FailAtStartActor),
-                assetDescription,
+                assetsCache,
                 _.asRight
               )
             )
@@ -197,7 +204,7 @@ class MatcherActorSpecification
                 startResult => stopped = startResult.isLeft,
                 ob,
                 (_, _) => Props(new NothingDoActor),
-                assetDescription,
+                assetsCache,
                 _.asRight
               )
             )
@@ -307,7 +314,7 @@ class MatcherActorSpecification
               _ => {},
               ob,
               (pair, matcherActor) => Props(new RecoveringActor(matcherActor, pair)),
-              assetDescription,
+              assetsCache,
               _.asRight
             )
           )
@@ -331,7 +338,7 @@ class MatcherActorSpecification
             doNothingOnRecovery,
             ob,
             (assetPair, matcher) => Props(new DeletingActor(matcher, assetPair, Some(9L))),
-            assetDescription,
+            assetsCache,
             _.asRight
           )
         )
@@ -392,7 +399,7 @@ class MatcherActorSpecification
           if (idx < 0) throw new RuntimeException(s"Can't find $assetPair in $assetPairs")
           r(idx)._1
         },
-        assetDescription,
+        assetsCache,
         _.asRight
       )
     )
@@ -449,7 +456,7 @@ class MatcherActorSpecification
             _ => makerTakerPartialFee,
             None
           ),
-        assetDescription,
+        assetsCache,
         _.asRight
       )
     )
@@ -473,7 +480,6 @@ class MatcherActorSpecification
 }
 
 object MatcherActorSpecification {
-  import scala.concurrent.ExecutionContext.Implicits.global
 
   private class NothingDoActor extends Actor { override def receive: Receive = Actor.ignoringBehavior }
 

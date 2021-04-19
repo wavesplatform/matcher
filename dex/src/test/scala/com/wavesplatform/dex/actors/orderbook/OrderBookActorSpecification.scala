@@ -1,7 +1,5 @@
 package com.wavesplatform.dex.actors.orderbook
 
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicReference
 import akka.actor.ActorRef
 import akka.actor.typed.scaladsl.adapter._
 import akka.testkit.{ImplicitSender, TestActorRef, TestProbe}
@@ -10,7 +8,8 @@ import cats.syntax.option._
 import com.wavesplatform.dex.MatcherSpecBase
 import com.wavesplatform.dex.actors.MatcherActor.SaveSnapshot
 import com.wavesplatform.dex.actors.address.AddressActor.Command.Source
-import com.wavesplatform.dex.actors.orderbook.OrderBookActor.{MarketStatus, OrderBookRecovered, OrderBookSnapshotUpdateCompleted}
+import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.MarketStatus
+import com.wavesplatform.dex.actors.orderbook.OrderBookActor.{OrderBookRecovered, OrderBookSnapshotUpdateCompleted}
 import com.wavesplatform.dex.actors.{HasOecInteraction, MatcherSpec, OrderBookAskAdapter}
 import com.wavesplatform.dex.caches.OrderFeeSettingsCache
 import com.wavesplatform.dex.db.{OrderBookSnapshotDb, TestOrderBookSnapshotDb}
@@ -33,9 +32,11 @@ import com.wavesplatform.dex.time.SystemTime
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 
-import scala.concurrent.{Await, Future}
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 
 class OrderBookActorSpecification
     extends MatcherSpec("OrderBookActor")

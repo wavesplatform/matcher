@@ -38,10 +38,12 @@ class Dex1052BugSpec extends MatcherSuiteBase {
     wavesNode1.api.broadcast(mkTransfer(alice, bob, transferAmount, usd))
 
     withClue("alice: ") {
-      dex1.api.getTradableBalance(alice, wavesUsdPair) should matchTo(Map[Asset, Long](
-        Waves -> (aliceWavesBalanceBefore - minFee),
-        usd -> (IssueUsdTx.quantity() - transferAmount)
-      ))
+      eventually {
+        dex1.api.getTradableBalance(alice, wavesUsdPair) should matchTo(Map[Asset, Long](
+          Waves -> (aliceWavesBalanceBefore - minFee),
+          usd -> (IssueUsdTx.quantity() - transferAmount)
+        ))
+      }
       dex1.api.getTradableBalance(alice, ethWavesPair).get(eth) should matchTo(IssueEthTx.quantity().some)
       dex1.api.getTradableBalance(alice, wavesBtcPair).get(btc) should matchTo(none[Long])
     }

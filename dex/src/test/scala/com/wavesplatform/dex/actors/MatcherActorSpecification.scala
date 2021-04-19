@@ -43,13 +43,8 @@ class MatcherActorSpecification
 
   private val assetsCache = new AssetsCache() {
 
-    override val cached: AssetsDb[Id] = new AssetsDb[Id] {
-      override def put(asset: IssuedAsset, item: BriefAssetDescription): Id[Unit] = {}
-
-      override def get(asset: IssuedAsset): Id[Option[BriefAssetDescription]] =
-        Some(BriefAssetDescription(name = "Unknown", decimals = 8, hasScript = false))
-
-    }
+    override val cached: AssetsReadOnlyDb[Id] =
+      (asset: IssuedAsset) => Some(BriefAssetDescription(name = "Unknown", decimals = 8, hasScript = false))
 
     override def get(asset: Asset): Future[Option[BriefAssetDescription]] = Future.successful(cached.get(asset))
     override def put(asset: Asset, item: BriefAssetDescription): Future[Unit] = Future.unit

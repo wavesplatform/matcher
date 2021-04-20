@@ -172,7 +172,9 @@ class AddressActor(
 
       val reservedAssets = ownerRemainingOrders.flatMap(_.requiredBalance.keys).toSet
       val newReserved = balances.reserved.filter { case (asset, _) => reservedAssets.contains(asset) }
-      log.info(s"[Balance] 💵: ${format(balances.tradableBalance(cumulativeDiff.keySet).xs)}; e: ${format(cumulativeDiff)}, ov: ${format(newReserved)}")
+      log.info(
+        s"[Balance] 💵: ${format(balances.tradableBalance(cumulativeDiff.keySet).xs)}; e: ${format(cumulativeDiff)}, ov: ${format(newReserved)}"
+      )
 
     case command: Command.ApplyOrderBookCanceled =>
       import command.event._
@@ -418,7 +420,7 @@ class AddressActor(
           getActiveLimitOrders(maybePair)
             .map(ao => ao.id -> OrderInfo.v6(ao, ao.status))
             .toList
-            .sorted
+            .sorted(orderInfoOrdering[OrderStatus])
         else List.empty
       val matchingClosedOrders =
         if (orderListType.hasClosed)

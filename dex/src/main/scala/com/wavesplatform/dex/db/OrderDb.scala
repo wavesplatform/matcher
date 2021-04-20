@@ -81,7 +81,7 @@ object OrderDb {
           id <- ro.get(key(seqNr - offset))
           oi <- ro.get(DbKeys.orderInfo(id))
         } yield id -> oi
-      }.map(_.sorted)
+      }.map(_.sorted(orderInfoOrdering[OrderStatus]))
 
     override def getOrderInfo(id: Id): F[Option[FinalOrderInfo]] =
       levelDb.readOnly(_.get(DbKeys.orderInfo(id)))
@@ -96,5 +96,10 @@ object OrderDb {
 
   }
 
-  implicit def orderInfoOrdering[S <: OrderStatus]: Ordering[(ByteStr, OrderInfo[S])] = Ordering.by { case (id, oi) => (-oi.timestamp, id) }
+  val orderIdOrdering: Ordering[(Order.Id, Long)] = Ordering.by { case (id, ts) => (-ts, id) }
+
+  def orderInfoOrdering[S <: OrderStatus]: Ordering[(ByteStr, OrderInfo[S])] = orderIdOrdering.on {
+    case (id, orderInfo) => (id, orderInfo.timestamp)
+  }
+
 }

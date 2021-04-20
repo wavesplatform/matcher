@@ -136,7 +136,9 @@ class BouncingBalancesTestSuite extends WsSuiteBase {
       val aliceWsc = mkWsAddressConnection(alice, dex1)
       val bobWsc = mkWsAddressConnection(bob, dex1)
 
-      val heightInitial = wavesNode1.api.currentHeight
+      val heightInitial = wavesNode1.api.waitForHeightArise()
+      val aliceBalance1 = dex1.api.getTradableBalance(alice, wavesUsdPair)
+      val bobBalance1 = dex1.api.getTradableBalance(bob, wavesUsdPair)
 
       val now = System.currentTimeMillis()
       val counterOrders = (1 to 25).map(i => mkOrderDP(alice, wavesUsdPair, OrderType.BUY, 1.waves, 10, ts = now + i))
@@ -160,19 +162,23 @@ class BouncingBalancesTestSuite extends WsSuiteBase {
       val aliceUsdChanges = collectTradableBalanceChanges(aliceWsc, usd)
       checkOrdering("alice usd", aliceUsdChanges)(_ shouldBe >=(_))
 
-      // probably we need to zip with aliceUsdChanges and check
-      //  val aliceWavesChanges = collectTradableBalanceChanges(aliceWsc, Waves)
-      //  checkOrdering("alice Waves", aliceWavesChanges)(_ shouldBe <=(_))
-
-      //  val bobUsdChanges = collectTradableBalanceChanges(bobWsc, usd)
-      //  checkOrdering("bob usd", bobUsdChanges)(_ shouldBe <=(_))
-
       val bobWavesChanges = collectTradableBalanceChanges(bobWsc, Waves)
       checkOrdering("bob Waves", bobWavesChanges)(_ shouldBe >=(_))
 
       submittedOrders.foreach(waitForOrderAtNode(_))
+
       val finalHeight = wavesNode1.api.waitForHeightArise()
-      val bobBalanceBefore = dex1.api.getTradableBalance(bob, wavesUsdPair)
+      eventually {
+        val balance = dex1.api.getTradableBalance(alice, wavesUsdPair)
+        balance.getOrElse(Waves, 0L) should matchTo(aliceBalance1.getOrElse(Waves, 0L) + 25 * (1.waves - matcherFee))
+        balance
+      }
+
+      val bobBalance2 = eventually {
+        val balance = dex1.api.getTradableBalance(bob, wavesUsdPair)
+        balance.getOrElse(usd, 0L) should matchTo(bobBalance1.getOrElse(usd, 0L) + 250.usd)
+        balance
+      }
 
       step("Doing a rollback")
       wavesNode1.asyncApi.rollback(heightInitial, returnTransactionsToUtx = true) // true as on Node
@@ -188,7 +194,7 @@ class BouncingBalancesTestSuite extends WsSuiteBase {
 
       // Relates DEX-1099
       eventually {
-        dex1.api.getTradableBalance(bob, wavesUsdPair) should matchTo(bobBalanceBefore)
+        dex1.api.getTradableBalance(bob, wavesUsdPair) should matchTo(bobBalance2)
       }
 
       aliceWsc.close()

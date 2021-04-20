@@ -107,14 +107,14 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
               case None => log.debug(s"Can't find removed ${tx.id()} with reason: $reason")
               case utxTransaction =>
                 val gReason = reason.map { x =>
-                  val preciseErrorObject = x match {
-                    case x: TransactionValidationError => x.cause
-                    case _ => x
+                  val (preciseErrorObject, preciseErrorMessage) = x match {
+                    case TransactionValidationError(x: TxValidationError.OrderValidationError, _) => (x, x.err)
+                    case _ => (x, x.toString)
                   }
 
                   UtxEvent.Update.Removed.Reason(
                     name = getSimpleName(preciseErrorObject),
-                    message = x.toString
+                    message = preciseErrorMessage
                   )
                 }
 

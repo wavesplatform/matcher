@@ -147,7 +147,7 @@ class BlockchainUpdatesClientTestSuite extends IntegrationSuiteBase with HasToxi
       Thread.sleep(5.seconds.toMillis)
 
       cancellable.cancel()
-      val xs = Await.result(eventsF, 1.minute).map { evt =>
+      val xs = eventsF.futureValue.map { evt =>
         val event = BlockchainUpdatesConversions.toEvent(evt.getUpdate)
         log.debug(s"Got $event")
         event.flatMap {
@@ -215,6 +215,6 @@ class BlockchainUpdatesClientTestSuite extends IntegrationSuiteBase with HasToxi
     receivedTx
   }
 
-  private def wait[T](f: => Future[T]): T = Await.result(f, 1.minute)
+  private def wait[T](f: => Future[T]): T = f.futureValue
 
 }

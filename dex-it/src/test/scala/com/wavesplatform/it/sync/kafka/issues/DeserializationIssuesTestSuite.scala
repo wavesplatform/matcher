@@ -10,7 +10,7 @@ import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord, RecordM
 import org.apache.kafka.common.serialization.StringSerializer
 
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.{Await, Promise}
+import scala.concurrent.Promise
 
 class DeserializationIssuesTestSuite extends MatcherSuiteBase with HasKafka {
 
@@ -45,7 +45,7 @@ class DeserializationIssuesTestSuite extends MatcherSuiteBase with HasKafka {
           case None => sendResult.success(())
         }
     )
-    Await.result(sendResult.future, 10.seconds)
+    sendResult.future.isReadyWithin(10.seconds) shouldBe true
     producer.close()
     eventually {
       dex1.getState().getExitCodeLong shouldBe QueueMessageDeserializationError.code

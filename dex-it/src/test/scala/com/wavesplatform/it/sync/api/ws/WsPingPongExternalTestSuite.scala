@@ -3,8 +3,9 @@ package com.wavesplatform.it.sync.api.ws
 import akka.http.scaladsl.model.Uri
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.ws.protocol.WsError
+import com.wavesplatform.it.Implicits.durationToScalatestTimeout
+import org.scalatest.concurrent.PatienceConfiguration.Timeout
 
-import scala.concurrent.Await
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
 class WsPingPongExternalTestSuite extends WsPingPongBaseSuite {
@@ -30,7 +31,7 @@ class WsPingPongExternalTestSuite extends WsPingPongBaseSuite {
     s"by max-connection-lifetime = $maxConnectionLifetime" in {
 
       val wsac = mkWsAddressConnection(alice, dex1)
-      val connectionLifetime = Await.result(wsac.connectionLifetime, maxConnectionLifetime + delta)
+      val connectionLifetime = wsac.connectionLifetime.futureValue(maxConnectionLifetime + delta)
       val (errors, pings) = wsac.receiveAtLeastNErrorsAndPings(1, 5)
 
       connectionLifetime should (be >= maxConnectionLifetime and be <= maxConnectionLifetime + delta)

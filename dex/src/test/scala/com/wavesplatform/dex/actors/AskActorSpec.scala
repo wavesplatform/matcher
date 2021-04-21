@@ -4,11 +4,12 @@ import akka.actor.ActorRef
 import akka.testkit.TestProbe
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.time.SystemTime
+import com.wavesplatform.dex.util.Implicits.durationToScalatestTimeout
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.{Await, Future, TimeoutException}
+import scala.concurrent.{Future, TimeoutException}
 
 class AskActorSpec extends AnyFreeSpec with Matchers with SystemTime with MatcherSpecLike with DiffMatcherWithImplicits {
 
@@ -18,17 +19,17 @@ class AskActorSpec extends AnyFreeSpec with Matchers with SystemTime with Matche
   "AskActor" - {
     "happy path" in test { (ref, future) =>
       ref ! defaultResponse
-      val actual = Await.result(future, defaultTimeout)
+      val actual = future.futureValue(defaultTimeout)
       actual should matchTo(defaultResponse)
     }
 
     "timeout" in test { (_, future) =>
-      Await.result(future.failed, defaultTimeout) shouldBe a[TimeoutException]
+      future.failed.futureValue(defaultTimeout) shouldBe a[TimeoutException]
     }
 
     "unexpected response type" in test { (ref, future) =>
       ref ! 100500
-      Await.result(future.failed, defaultTimeout) shouldBe a[IllegalArgumentException]
+      future.failed.futureValue(defaultTimeout) shouldBe a[IllegalArgumentException]
     }
   }
 

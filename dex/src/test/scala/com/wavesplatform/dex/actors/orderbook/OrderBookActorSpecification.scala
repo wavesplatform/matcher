@@ -29,6 +29,7 @@ import com.wavesplatform.dex.queue.ValidatedCommand.CancelOrder
 import com.wavesplatform.dex.settings.OrderFeeSettings.DynamicSettings
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatchingRule}
 import com.wavesplatform.dex.time.SystemTime
+import com.wavesplatform.dex.util.Implicits.durationToScalatestTimeout
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 
@@ -36,7 +37,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
 
 class OrderBookActorSpecification
     extends MatcherSpec("OrderBookActor")
@@ -720,7 +721,7 @@ class OrderBookActorSpecification
   private def getAggregatedSnapshot(orderBookRef: ActorRef): OrderBookAggregatedSnapshot = {
     val pair = wavesUsdPair // hack
     val askAdapter = new OrderBookAskAdapter(new AtomicReference(Map(pair -> Right(orderBookRef))), 5.seconds)
-    Await.result(askAdapter.getAggregatedSnapshot(pair), 1.second).toOption.flatten.getOrElse(throw new IllegalStateException(
+    askAdapter.getAggregatedSnapshot(pair).futureValue(1.second).toOption.flatten.getOrElse(throw new IllegalStateException(
       "Can't get snapshot"
     ))
   }

@@ -26,6 +26,7 @@ import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatchingRule, OrderRestrictionsSettings}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.time.{SystemTime, Time}
+import com.wavesplatform.dex.util.Implicits.durationToScalatestTimeout
 import org.scalacheck.Gen
 import org.scalatest.concurrent.Eventually
 import org.scalatest.freespec.AnyFreeSpec
@@ -35,7 +36,6 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.ThreadLocalRandom
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.Await
 import scala.concurrent.duration._
 
 class AggregatedOrderBookActorSpec
@@ -91,7 +91,7 @@ class AggregatedOrderBookActorSpec
     "properties" - {
       "aggregate(updatedOrderBook) == updatedAggregatedOrderBook" in forAll(orderBookGen, ordersGen(10)) { (initOb, orders) =>
         val obsdb = TestOrderBookSnapshotDb()
-        Await.result(obsdb.update(pair, 0L, Some(initOb.snapshot)), 5.second)
+        obsdb.update(pair, 0L, Some(initOb.snapshot)).isReadyWithin(5.second) shouldBe true
 
         implicit val efc: ErrorFormatterContext = ErrorFormatterContext.from(_ => 8)
 
@@ -124,12 +124,12 @@ class AggregatedOrderBookActorSpec
         val orderBookAskAdapter = new OrderBookAskAdapter(new AtomicReference(Map(pair -> Right(orderBookRef))), 5.seconds)
 
         val updatedOrderBook = eventually {
-          val ob = Await.result(obsdb.get(pair), 5.seconds)
+          val ob = obsdb.get(pair).futureValue(5.seconds)
           ob shouldNot be(empty)
           ob.get._2
         }
 
-        val actual = Await.result(orderBookAskAdapter.getAggregatedSnapshot(pair), 5.seconds).explicitGet().get
+        val actual = orderBookAskAdapter.getAggregatedSnapshot(pair).futureValue(5.seconds).explicitGet().get
 
         val expected = OrderBookAggregatedSnapshot(
           asks = sum(updatedOrderBook.asks),
@@ -447,7 +447,7 @@ class AggregatedOrderBookActorSpec
   )
 
   private def get[R](ref: ActorRef[InputMessage])(mkMessage: ActorRef[R] => InputMessage): R =
-    Await.result(ref.ask[R](mkMessage)(5.seconds, system.scheduler.toTyped), 5.seconds)
+    ref.ask[R](mkMessage)(5.seconds, system.scheduler.toTyped).futureValue(5.seconds)
 
   override protected def actorSystemName: String = "AggregatedOrderBookSpec"
 }

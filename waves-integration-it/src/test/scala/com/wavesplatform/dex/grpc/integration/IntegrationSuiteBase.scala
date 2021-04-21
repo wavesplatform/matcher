@@ -10,7 +10,7 @@ import com.wavesplatform.dex.it.waves.{MkWavesEntities, ToWavesJConversions}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.waves.WavesFeeConstants
 import io.qameta.allure.scalatest.AllureScalatestContext
-import org.scalatest.concurrent.Eventually
+import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}
@@ -35,6 +35,7 @@ trait IntegrationSuiteBase
     with InformativeTestStart
     with ToWavesJConversions
     with AllureScalatestContext
+    with ScalaFutures
     with ScorexLogging {
 
   GenesisConfig.setupAddressScheme()
@@ -58,4 +59,5 @@ trait IntegrationSuiteBase
     info(text)
     super.step(text)
   }
+
 }

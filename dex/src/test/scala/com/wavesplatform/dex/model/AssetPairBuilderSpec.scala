@@ -10,23 +10,24 @@ import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.OrderValidator.Result
 import com.wavesplatform.dex.settings.{loadConfig, MatcherSettings}
 import com.wavesplatform.dex.test.matchers.ProduceError.produce
+import com.wavesplatform.dex.util.Implicits.durationToScalatestTimeout
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.prop.TableDrivenPropertyChecks._
 import pureconfig.ConfigSource
 
-import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration.Duration
+import scala.concurrent.duration._
 
-class AssetPairBuilderSpec extends AnyFreeSpec with Matchers with MockFactory {
+class AssetPairBuilderSpec extends AnyFreeSpec with Matchers with MockFactory with ScalaFutures {
 
   import AssetPairBuilderSpec._
 
   private def b(v: String) = ByteStr.decodeBase58(v).get
 
-  def awaitResult[A](result: FutureResult[A]): Result[A] = Await.result(result.value, Duration.Inf)
+  def awaitResult[A](result: FutureResult[A]): Result[A] = result.value.futureValue(5.minutes)
 
   private val WAVES = "WAVES"
   private val WUSD = IssuedAsset(ByteStr.decodeBase58("HyFJ3rrq5m7FxdkWtQXkZrDat1F7LjVVGfpSkUuEXQHj").get)

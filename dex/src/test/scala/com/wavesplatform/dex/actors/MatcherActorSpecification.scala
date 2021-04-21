@@ -29,7 +29,7 @@ import org.scalatest.concurrent.Eventually
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
 
 class MatcherActorSpecification
     extends MatcherSpec("MatcherActor")
@@ -470,7 +470,7 @@ class MatcherActorSpecification
       _ <- Future.sequence(pairs.map(_._1).map(apdb.add))
       _ <- Future.sequence(pairs.map { case (pair, offset) => obsdb.update(pair, offset, Some(OrderBookSnapshot.empty)) })
     } yield ()
-    Await.ready(future, 5.seconds)
+    future.isReadyWithin(5.seconds) shouldBe true
   }
 
   private def doNothingOnRecovery(x: Either[String, ValidatedCommandWithMeta.Offset]): Unit = {}

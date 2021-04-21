@@ -1,13 +1,13 @@
 package com.wavesplatform.it.sync
 
 import java.util.concurrent.ThreadLocalRandom
-
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.account.KeyPair.toAddress
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.order.Order.Id
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.effect.Implicits.FutureCompanionOps
@@ -15,9 +15,11 @@ import com.wavesplatform.dex.it.time.GlobalTimer
 import com.wavesplatform.dex.it.time.GlobalTimer.TimerOpsImplicits
 import com.wavesplatform.it.MatcherSuiteBase
 import im.mak.waves.transactions.mass.Transfer
+import org.scalatest.Assertion
 
+import scala.collection.immutable.Queue
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
 
 class CancelOrderTestSuite extends MatcherSuiteBase {
 
@@ -302,15 +304,12 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
         i <- 1 to 10
       } yield mkOrder(alice, AssetPair(IssuedAsset(asset.id()), Waves), OrderType.BUY, amount = oneOrderAmount / 10, price = orderPrice, ttl = 30.days - i.seconds) // to make different orders
 
-      Await.ready(
-        Future.traverse(buyOrders.groupBy(_.assetPair).values) { orders =>
-          Future.inSeries(orders)(dex1.asyncApi.place(_).flatMap { _ =>
-            val wait = ThreadLocalRandom.current().nextInt(100, 1200).millis
-            GlobalTimer.instance.sleep(wait)
-          })
-        },
-        5.minutes
-      )
+      Future.traverse(buyOrders.groupBy(_.assetPair).values) { orders =>
+        Future.inSeries(orders)(dex1.asyncApi.place(_).flatMap { _ =>
+          val wait = ThreadLocalRandom.current().nextInt(100, 1200).millis
+          GlobalTimer.instance.sleep(wait)
+        })
+      }.isReadyWithin(5.minutes) shouldBe true
 
       val statuses = sells.map { order =>
         order -> dex1.api.waitForOrder(order)(r => r.status == Status.Cancelled || r.status == Status.Filled).status
@@ -347,28 +346,29 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       Future.sequence(futures).map(_ => orders.map(_.id()))
     }
 
-    Await.ready(
-      for {
-        orderIds <- {
-          val pairs = accounts.zipWithIndex.map { case (account, i) => (account, (i + 1) * 1000) }
-          Future.inSeries(pairs)(Function.tupled(place(_, _, ordersPerAccount))).map(_.flatten)
+    def getOrderIds(): Future[Queue[Id]] = {
+      val pairs = accounts.zipWithIndex.map { case (account, i) => (account, (i + 1) * 1000) }
+      Future.inSeries(pairs)(Function.tupled(place(_, _, ordersPerAccount))).map(_.flatten)
+    }
+
+    def traverseAccounts(): Future[List[Assertion]] = Future.traverse(accounts) { account =>
+      dex1.asyncApi.getOrderHistoryByAssetPairAndPublicKey(account, wavesUsdPair).map { orders =>
+        withClue(s"account $account: ") {
+          orders.size shouldBe ordersPerAccount
         }
-        _ <- Future.traverse(accounts) { account =>
-          dex1.asyncApi.getOrderHistoryByAssetPairAndPublicKey(account, wavesUsdPair).map { orders =>
-            withClue(s"account $account: ") {
-              orders.size shouldBe ordersPerAccount
-            }
-          }
-        }
-        _ <- Future.traverse(accounts)(dex1.asyncApi.cancelAll(_))
-        _ <- Future.inSeries(orderIds)(dex1.asyncApi.waitForOrderStatus(wavesUsdPair, _, Status.Cancelled))
-        orderBook <- dex1.asyncApi.getOrderBook(wavesUsdPair)
-      } yield {
-        orderBook.bids should be(empty)
-        orderBook.asks should be(empty)
-      },
-      5.minutes
-    )
+      }
+    }
+
+    (for {
+      orderIds <- getOrderIds()
+      _ <- traverseAccounts()
+      _ <- Future.traverse(accounts)(dex1.asyncApi.cancelAll(_))
+      _ <- Future.inSeries(orderIds)(dex1.asyncApi.waitForOrderStatus(wavesUsdPair, _, Status.Cancelled))
+      orderBook <- dex1.asyncApi.getOrderBook(wavesUsdPair)
+    } yield {
+      orderBook.bids should be(empty)
+      orderBook.asks should be(empty)
+    }).isReadyWithin(5.minutes) shouldBe true
   }
 
   private def mkBobOrder = mkOrderDP(bob, wavesUsdPair, OrderType.SELL, 100.waves, 8)

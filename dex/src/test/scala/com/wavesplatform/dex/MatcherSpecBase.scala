@@ -31,17 +31,24 @@ import io.qameta.allure.scalatest.AllureScalatestContext
 import mouse.any._
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Suite
+import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.time.{Millis, Minutes, Span}
 import pureconfig.ConfigSource
 
 import java.math.BigInteger
 import java.security.SecureRandom
 import java.util.concurrent.atomic.AtomicLong
-import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Random
 
-trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with DoubleOps with WavesFeeConstants with AllureScalatestContext {
+trait MatcherSpecBase
+    extends SystemTime
+    with DiffMatcherWithImplicits
+    with DoubleOps
+    with WavesFeeConstants
+    with AllureScalatestContext
+    with ScalaFutures {
   _: Suite =>
 
   implicit protected val wsErrorDiff: Derived[Diff[WsError]] = Derived(Diff.gen[WsError].ignore[WsError, Long](_.timestamp))
@@ -96,9 +103,9 @@ trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with Doub
   protected def wrapLimitOrder(n: Long, x: Order): ValidatedCommandWithMeta = wrapCommand(n, ValidatedCommand.PlaceOrder(LimitOrder(x)))
   protected def wrapMarketOrder(mo: MarketOrder): ValidatedCommandWithMeta = wrapCommand(ValidatedCommand.PlaceMarketOrder(mo))
 
-  private lazy val futureAwaitTimeout = 2.minutes
-  protected def awaitResult[A](result: FutureResult[A]): Result[A] = Await.result(result.value, futureAwaitTimeout)
-  protected def awaitResult[A](result: Future[A]): A = Await.result(result, futureAwaitTimeout)
+  implicit protected lazy val pc: PatienceConfig = PatienceConfig(timeout = Span(2, Minutes), interval = Span(5, Millis))
+  protected def awaitResult[A](result: FutureResult[A]): Result[A] = result.value.futureValue
+  protected def awaitResult[A](result: Future[A]): A = result.futureValue
 
   protected def getSpentAmountWithFee(order: Order): Long = {
     val lo = LimitOrder(order)
@@ -455,7 +462,12 @@ trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with Doub
         order
           .updateFeeAsset(OrderValidator.getValidFeeAssetForSettings(order, percentSettings, rateCache).head)
           .updateFee {
-            OrderValidator.getMinValidFeeForSettings(order, percentSettings, getDefaultAssetDescriptions(order.feeAsset).decimals, rateCache).explicitGet()
+            OrderValidator.getMinValidFeeForSettings(
+              order,
+              percentSettings,
+              getDefaultAssetDescriptions(order.feeAsset).decimals,
+              rateCache
+            ).explicitGet()
           }
       case (_, ds @ DynamicSettings(_, _)) =>
         order

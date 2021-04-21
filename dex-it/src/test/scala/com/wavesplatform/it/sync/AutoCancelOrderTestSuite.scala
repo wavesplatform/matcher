@@ -13,7 +13,7 @@ import im.mak.waves.transactions.ExchangeTransaction
 import im.mak.waves.transactions.mass.Transfer
 
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
 
 @DexItExternalKafkaRequired
 class AutoCancelOrderTestSuite extends MatcherSuiteBase {
@@ -99,12 +99,9 @@ class AutoCancelOrderTestSuite extends MatcherSuiteBase {
           ts = now + i
         )
 
-      Await.ready(
-        Future.traverse(buyOrders.groupBy(_.assetPair).values) { orders =>
-          Future.inSeries(orders)(dex2.asyncApi.place(_))
-        },
-        5.minutes
-      )
+      Future.traverse(buyOrders.groupBy(_.assetPair).values) { orders =>
+        Future.inSeries(orders)(dex2.asyncApi.place(_))
+      }.isReadyWithin(5.minutes) shouldBe true
 
       info("checking that order weren't canceled")
       val firstCanceled = sells.view

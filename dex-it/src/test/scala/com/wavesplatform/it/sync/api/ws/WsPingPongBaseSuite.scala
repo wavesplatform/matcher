@@ -6,8 +6,9 @@ import com.wavesplatform.dex.api.ws.connection.WsConnection
 import com.wavesplatform.dex.api.ws.protocol._
 import com.wavesplatform.dex.error.InvalidJson
 import com.wavesplatform.it.WsSuiteBase
+import com.wavesplatform.it.Implicits.durationToScalatestTimeout
+import org.scalatest.concurrent.PatienceConfiguration.Timeout
 
-import scala.concurrent.Await
 import scala.concurrent.duration._
 
 abstract class WsPingPongBaseSuite extends WsSuiteBase {
@@ -42,7 +43,7 @@ abstract class WsPingPongBaseSuite extends WsSuiteBase {
         errors should matchTo(List(pongTimeoutError))
 
         val expectedConnectionLifetime = pingInterval + pongTimeout
-        val connectionLifetime = Await.result(wsac.connectionLifetime, expectedConnectionLifetime + delta)
+        val connectionLifetime = wsac.connectionLifetime.futureValue(expectedConnectionLifetime + delta)
 
         connectionLifetime should (be >= expectedConnectionLifetime and be <= expectedConnectionLifetime + delta)
         wsac.isClosed shouldBe true
@@ -69,7 +70,7 @@ abstract class WsPingPongBaseSuite extends WsSuiteBase {
         pings.size should (be >= 2 and be <= 3)
         errors should matchTo(List(pongTimeoutError))
 
-        val connectionLifetime = Await.result(wsac.connectionLifetime, pongTimeout + delta)
+        val connectionLifetime = wsac.connectionLifetime.futureValue(pongTimeout + delta)
         val expectedConnectionLifetime = pingInterval * 2 + pongTimeout
 
         connectionLifetime should (be >= expectedConnectionLifetime and be <= expectedConnectionLifetime + delta)
@@ -88,8 +89,8 @@ abstract class WsPingPongBaseSuite extends WsSuiteBase {
         Seq(wsac1, wsac2).foreach(_.clearMessages())
 
         val expectedConnectionsLifetime = pingInterval + pongTimeout
-        val connection1Lifetime = Await.result(wsac1.connectionLifetime, pongTimeout + delta)
-        val connection2Lifetime = Await.result(wsac2.connectionLifetime, pongTimeout + delta)
+        val connection1Lifetime = wsac1.connectionLifetime.futureValue(pongTimeout + delta)
+        val connection2Lifetime = wsac2.connectionLifetime.futureValue(pongTimeout + delta)
 
         Seq(wsac1 -> connection1Lifetime, wsac2 -> connection2Lifetime).foreach {
           case (conn, connLifetime) =>
@@ -124,7 +125,7 @@ abstract class WsPingPongBaseSuite extends WsSuiteBase {
       wsc.send(firstPing.copy(timestamp = -1)) // wrong message sent
       wsc.clearMessages()
 
-      val connectionLifetime = Await.result(wsc.connectionLifetime, pingInterval + pongTimeout + delta)
+      val connectionLifetime = wsc.connectionLifetime.futureValue(pingInterval + pongTimeout + delta)
       val expectedConnectionsLifetime = pingInterval * 2 + pongTimeout
       connectionLifetime should (be >= expectedConnectionsLifetime and be <= expectedConnectionsLifetime + delta)
 

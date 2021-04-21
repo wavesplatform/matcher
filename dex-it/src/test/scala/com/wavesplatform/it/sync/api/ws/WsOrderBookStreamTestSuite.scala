@@ -21,7 +21,7 @@ import com.wavesplatform.it.{executeCommands, WsSuiteBase}
 
 import scala.collection.immutable.TreeMap
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
 import play.api.libs.json._
 
 import scala.util.Random
@@ -513,10 +513,10 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
         mkOrderDP(carol, wavesBtcPair, BUY, 1.waves + i, 0.00012 + i / 100000.0d)
       }
 
-      Await.result(Future.traverse(orders)(dex1.asyncApi.place), 1.minute)
+      Future.traverse(orders)(dex1.asyncApi.place).isReadyWithin(1.minute) shouldBe true
       dex1.api.cancelAll(carol)
 
-      Await.result(Future.traverse(wscs)(wsc => Future(wsc.close())), 1.minute)
+      Future.traverse(wscs)(wsc => Future(wsc.close())).isReadyWithin(1.minute) shouldBe true
       Thread.sleep(3000)
       mainWsc.clearMessages()
 

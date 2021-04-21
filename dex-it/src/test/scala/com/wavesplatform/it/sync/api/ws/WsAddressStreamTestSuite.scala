@@ -19,7 +19,7 @@ import org.scalatest.prop.TableDrivenPropertyChecks
 
 import scala.collection.parallel.CollectionConverters._
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
 
 class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChecks {
 
@@ -518,7 +518,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           mkOrderDP(bob, wavesBtcPair, BUY, 1.waves, 0.00012, ts = now + i)
         }
 
-        Await.result(Future.traverse(orders)(dex1.asyncApi.place), 1.minute)
+        Future.traverse(orders)(dex1.asyncApi.place).isReadyWithin(1.minute) shouldBe true
         dex1.api.cancelAll(bob)
 
         wscs.par.foreach(_.close())
@@ -543,7 +543,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           mkTransfer(carol, alice, 5.waves - minFee, Waves, minFee, timestamp = now + i)
         }
         val simulation = Future.traverse(txs)(wavesNode1.asyncApi.broadcast(_))
-        Await.result(simulation, 1.minute)
+        simulation.isReadyWithin(1.minute) shouldBe true
         wavesNode1.api.waitForHeightArise()
 
         wsc.balanceChanges.zipWithIndex.foreach {

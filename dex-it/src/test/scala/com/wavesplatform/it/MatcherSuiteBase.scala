@@ -23,7 +23,7 @@ import com.wavesplatform.dex.waves.WavesFeeConstants
 import com.wavesplatform.it.api.ApiExtensions
 import im.mak.waves.transactions.ExchangeTransaction
 import io.qameta.allure.scalatest.AllureScalatestContext
-import org.scalatest.concurrent.Eventually
+import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}
@@ -51,6 +51,7 @@ trait MatcherSuiteBase
     with DiffMatcherWithImplicits
     with InformativeTestStart
     with FutureInstances
+    with ScalaFutures
     with ToWavesJConversions
     with ScorexLogging {
 
@@ -102,4 +103,5 @@ trait MatcherSuiteBase
       placeAndAwaitAtDex(o)
       o.idStr()
     }.toSet
+
 }

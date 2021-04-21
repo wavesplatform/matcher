@@ -16,6 +16,7 @@ import com.wavesplatform.dex.domain.order.Order.Id
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderAddedReason, OrderCanceled}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.time.SystemTime
+import com.wavesplatform.dex.util.Implicits.durationToScalatestTimeout
 import org.scalatest._
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should.Matchers
@@ -23,7 +24,6 @@ import org.scalatest.propspec.AnyPropSpecLike
 import org.scalatest.time.{Millis, Seconds, Span}
 
 import java.math.BigInteger
-import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.reflect.ClassTag
 
@@ -875,6 +875,8 @@ class OrderHistoryBalanceSpecification
 }
 
 private object OrderHistoryBalanceSpecification {
+  import org.scalatest.concurrent.ScalaFutures._
+
   val MaxActiveOrders = 100
   val MaxFinalizedOrders = 70
   val MaxTotalOrders = MaxActiveOrders + MaxFinalizedOrders
@@ -882,7 +884,7 @@ private object OrderHistoryBalanceSpecification {
   implicit val askTimeout: Timeout = 5.seconds
 
   private def askAddressActor[A: ClassTag](ref: ActorRef, msg: Any) =
-    Await.result((ref ? msg).mapTo[A], 5.seconds)
+    (ref ? msg).mapTo[A].futureValue(5.seconds)
 
   implicit private class AddressActorExt(val ref: ActorRef) extends AnyVal {
 

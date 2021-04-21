@@ -11,6 +11,7 @@ import com.wavesplatform.dex.grpc.integration.services.UtxTransaction
 import com.wavesplatform.events.protobuf.StateUpdate
 import com.wavesplatform.protobuf.transaction.SignedTransaction
 import io.qameta.allure.scalatest.AllureScalatestContext
+import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.enablers.Emptiness
 import org.scalatest.freespec.AnyFreeSpecLike
 import org.scalatest.matchers.should.Matchers
@@ -19,7 +20,7 @@ import org.scalatest.matchers.{MatchResult, Matcher}
 import scala.collection.immutable.Vector
 
 // TODO DEX-994
-trait WavesIntegrationSuiteBase extends AnyFreeSpecLike with Matchers with AllureScalatestContext {
+trait WavesIntegrationSuiteBase extends AnyFreeSpecLike with Matchers with AllureScalatestContext with ScalaFutures {
 
   // scalatest
 

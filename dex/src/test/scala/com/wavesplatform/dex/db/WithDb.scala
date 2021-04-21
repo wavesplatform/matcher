@@ -2,7 +2,7 @@ package com.wavesplatform.dex.db
 
 import cats.Id
 import com.google.common.util.concurrent.ThreadFactoryBuilder
-import com.wavesplatform.dex.db.leveldb.{LevelDbFactory, LevelDb}
+import com.wavesplatform.dex.db.leveldb.{LevelDb, LevelDbFactory}
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.util.Implicits._

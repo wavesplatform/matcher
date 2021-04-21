@@ -503,7 +503,7 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
       val leasing = mkLease(bob, alice, 3.waves)
       broadcastAndAwait(leasing)
 
-      val r = Await.result(eventsF, 1.minute).foldMap(_._1.balanceUpdates)
+      val r = eventsF.futureValue.foldMap(_._1.balanceUpdates)
 
       def filtered(in: AddressBalanceUpdates): AddressBalanceUpdates = in.copy(
         regular = in.regular.view.filterKeys(_ == Waves).toMap,
@@ -570,7 +570,7 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
       }
       .mkString("; ")
 
-  private def wait[T](f: => Future[T]): T = Await.result(f, 10.seconds)
+  private def wait[T](f: => Future[T]): T = f.futureValue
 
   private def randomByteStr(len: Int): ByteStr = {
     val inner = new Array[Byte](len)

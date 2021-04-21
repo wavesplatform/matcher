@@ -3,8 +3,10 @@ package com.wavesplatform.dex.util
 import monix.execution.{Ack, Cancelable}
 import monix.reactive.observers.Subscriber
 import monix.reactive.subjects.Subject
+import org.scalatest.concurrent.PatienceConfiguration.Timeout
 
 import scala.concurrent.Future
+import scala.concurrent.duration.Duration
 
 object Implicits {
 
@@ -19,5 +21,7 @@ object Implicits {
     }
 
   }
+
+  implicit def durationToScalatestTimeout(d: Duration): Timeout = Timeout(d)
 
 }

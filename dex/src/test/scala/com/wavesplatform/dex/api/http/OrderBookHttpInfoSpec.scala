@@ -16,13 +16,13 @@ import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.model.{LastTrade, LevelAmounts, MatcherModel, OrderBook}
 import com.wavesplatform.dex.settings.DenormalizedMatchingRule
 import com.wavesplatform.dex.time.{SystemTime, Time}
+import com.wavesplatform.dex.util.Implicits.durationToScalatestTimeout
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.prop.TableDrivenPropertyChecks
 
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
@@ -39,7 +39,7 @@ class OrderBookHttpInfoSpec extends AnyFreeSpec with Matchers with SystemTime wi
         val askAdapter = new OrderBookAskAdapter(new AtomicReference(Map(pair -> Right(aggOrderBookRef))), 5.seconds)
         val orderBookHttpInfo = new OrderBookHttpInfo(OrderBookHttpInfo.Settings(List(3, 9), None), askAdapter, time, _ => 8.pure[FutureResult])
         def get(depth: Option[Int]): HttpV0OrderBook =
-          HttpV0OrderBook.fromHttpResponse(Await.result(orderBookHttpInfo.getHttpView(pair, MatcherModel.Normalized, depth), 5.seconds))
+          HttpV0OrderBook.fromHttpResponse(orderBookHttpInfo.getHttpView(pair, MatcherModel.Normalized, depth).futureValue(5.seconds))
 
         val middlePrice = 1000L
         val now = time.getTimestamp()

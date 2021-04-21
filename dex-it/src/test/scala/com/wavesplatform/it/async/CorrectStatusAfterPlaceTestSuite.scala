@@ -12,10 +12,11 @@ import com.wavesplatform.dex.domain.order.Order.Id
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.Implicits.durationToScalatestTimeout
 import im.mak.waves.transactions.mass.Transfer
 
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
 
 class CorrectStatusAfterPlaceTestSuite extends MatcherSuiteBase {
 
@@ -90,17 +91,14 @@ class CorrectStatusAfterPlaceTestSuite extends MatcherSuiteBase {
       i <- 1 to accountOrderInPair
     } yield mkOrder(account, pair, OrderType.SELL, 100000L, 10000L, ts = ts + i)
 
-    Await
-      .result(
-        for {
-          r <- Future.traverse(orders.grouped(orders.size / 5))(requests)
-          _ <- {
-            val totalSent = r.map(_.count(_._3)).sum
-            dex1.asyncApi.waitForCurrentOffset(_ == totalSent - 1)
-          }
-        } yield r,
-        10.minutes
-      )
+    val future = for {
+      r <- Future.traverse(orders.grouped(orders.size / 5))(requests)
+      _ <- {
+        val totalSent = r.map(_.count(_._3)).sum
+        dex1.asyncApi.waitForCurrentOffset(_ == totalSent - 1)
+      }
+    } yield r
+    future.futureValue(10.minutes)
       .flatten
       .foreach {
         case (id, status, sent) => if (sent) withClue(s"$id")(status should not be Status.NotFound)

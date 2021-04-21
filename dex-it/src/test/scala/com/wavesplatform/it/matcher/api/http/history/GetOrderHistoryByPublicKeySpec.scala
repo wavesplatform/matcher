@@ -3,6 +3,7 @@ package com.wavesplatform.it.matcher.api.http.history
 import com.google.common.primitives.Longs
 import sttp.model.StatusCode
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.api.http.entities.HttpOrderBookHistoryItem
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.order.OrderType.BUY
@@ -42,7 +43,7 @@ class GetOrderHistoryByPublicKeySpec extends MatcherSuiteBase with RawHttpChecks
       val historyActive = orders.map { order =>
         placeAndAwaitAtDex(order)
         toHttpOrderBookHistoryItem(order, OrderStatus.Accepted)
-      }.reverse
+      }.sorted(HttpOrderBookHistoryItem.httpOrderBookHistoryItemOrdering)
 
       withClue("active only") {
         validate200Json(

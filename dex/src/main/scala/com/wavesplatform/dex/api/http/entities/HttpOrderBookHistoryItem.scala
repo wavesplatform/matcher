@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.api.http.entities
 
+import com.wavesplatform.dex.db.OrderDb.orderIdOrdering
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.model.{AcceptedOrderType, OrderInfo, OrderStatus}
@@ -50,6 +51,8 @@ case class HttpOrderBookHistoryItem(
 object HttpOrderBookHistoryItem {
 
   implicit val httpOrderBookHistoryItemFormat: OFormat[HttpOrderBookHistoryItem] = Json.format
+
+  val httpOrderBookHistoryItemOrdering: Ordering[HttpOrderBookHistoryItem] = orderIdOrdering.on(item => (item.id, item.timestamp))
 
   def fromOrderInfo(id: Order.Id, info: OrderInfo[OrderStatus]): HttpOrderBookHistoryItem = HttpOrderBookHistoryItem(
     id = id,

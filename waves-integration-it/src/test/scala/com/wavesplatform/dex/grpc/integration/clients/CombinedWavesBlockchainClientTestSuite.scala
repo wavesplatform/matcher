@@ -20,7 +20,6 @@ import com.wavesplatform.dex.it.api.HasToxiProxy
 import com.wavesplatform.dex.it.docker.WavesNodeContainer
 import com.wavesplatform.dex.it.test.{NoStackTraceCancelAfterFailure, Scripts}
 import monix.execution.Scheduler
-import monix.execution.cancelables.BooleanCancelable
 
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.Executors
@@ -72,7 +71,7 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
           maxHedgedAttempts = 2,
           maxRetryAttempts = 2,
           keepAliveWithoutCalls = false,
-          keepAliveTime = 500.millis,
+          keepAliveTime = 2.minutes,
           keepAliveTimeout = 1.second,
           idleTimeout = 1.day,
           channelOptions = GrpcClientSettings.ChannelOptionsSettings(connectTimeout = 1.seconds),
@@ -471,11 +470,16 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
       val aliceBalanceBefore = wavesNode1.api.balance(alice, Waves)
       val bobBalanceBefore = wavesNode1.api.balance(bob, Waves)
 
-      val cancellable = BooleanCancelable()
-
       val eventsF = updates
-        .takeWhileNotCanceled(cancellable)
-        .toListL.runToFuture
+        .takeWhileInclusive { x =>
+          val balanceUpdates = x._1.balanceUpdates
+          val cond =
+            balanceUpdates.get(alice).exists(_.outgoingLeasing.isDefined) &&
+            balanceUpdates.get(bob).exists(_.outgoingLeasing.isDefined)
+          !cond
+        }
+        .toListL
+        .runToFuture
 
       step("transfer1")
       val transfer1 = mkTransfer(alice, bob, 1.waves, Asset.Waves)
@@ -499,7 +503,6 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
       val leasing = mkLease(bob, alice, 3.waves)
       broadcastAndAwait(leasing)
 
-      cancellable.cancel()
       val r = Await.result(eventsF, 1.minute).foldMap(_._1.balanceUpdates)
 
       def filtered(in: AddressBalanceUpdates): AddressBalanceUpdates = in.copy(

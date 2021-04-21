@@ -22,7 +22,7 @@ pipeline {
                 build job: 'Waves.Exchange/Matcher/Matcher Server - OS - Test - Multiple Versions', propagate: false, wait: false, parameters: [
                   [$class: 'StringParameterValue', name: 'BRANCH', value: "${PREVIOUS_BRANCH_OR_TAG}"],
                   [$class: 'StringParameterValue', name: 'OTHER_DEX_IMAGE', value: "${params.REGISTRY}/waves/dex/${params.DEX_NEW_IMAGE}"],
-                  [$class: 'StringParameterValue', name: 'OTHER_NODE_IMAGE', value: "${params.REGISTRY}/waves/dex/${params.DEX_NEW_IMAGE}"],
+                  [$class: 'StringParameterValue', name: 'OTHER_NODE_IMAGE', value: "${params.REGISTRY}/waves/dex/${params.NODE_NEW_IMAGE}"],
                   [$class: 'StringParameterValue', name: 'LABEL', value: "- PRE RELEASE"]
                 ]
             }

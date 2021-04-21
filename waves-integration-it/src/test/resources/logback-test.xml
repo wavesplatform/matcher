@@ -29,7 +29,7 @@
     <logger name="io.grpc.Context" level="INFO"/>
     <logger name="io.swagger" level="OFF"/>
     <logger name="com.github.dockerjava" level="WARN"/>
-    <logger name="org.testcontainers.shaded.com.github.dockerjava" level="INFO"/>
+    <logger name="com.github.dockerjava.zerodep.shaded.org.apache" level="INFO"/>
 
     <logger name="org.testcontainers" level="WARN"/>
     <logger name="com.wavesplatform" level="TRACE"/>

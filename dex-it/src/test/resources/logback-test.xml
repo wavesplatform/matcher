@@ -26,8 +26,7 @@
     <logger name="org.asynchttpclient" level="INFO"/>
     <logger name="io.netty" level="INFO"/>
     <logger name="io.swagger" level="OFF"/>
-    <logger name="com.github.dockerjava" level="INFO"/>
-    <logger name="org.testcontainers.shaded.com.github.dockerjava" level="INFO"/>
+    <logger name="com.github.dockerjava.zerodep.shaded.org.apache" level="INFO"/>
 
     <root level="TRACE">
         <appender-ref ref="${waves.it.logging.appender:-STDOUT}"/>

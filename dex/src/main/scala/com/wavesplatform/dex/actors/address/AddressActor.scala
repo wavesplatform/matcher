@@ -420,7 +420,7 @@ class AddressActor(
           getActiveLimitOrders(maybePair)
             .map(ao => ao.id -> OrderInfo.v6(ao, ao.status))
             .toList
-            .sorted(orderInfoOrdering[OrderStatus])
+            .sorted(orderInfoOrdering)
         else List.empty
       val matchingClosedOrders =
         if (orderListType.hasClosed)

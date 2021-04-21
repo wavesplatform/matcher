@@ -23,9 +23,10 @@ object ImageVersionPlugin extends AutoPlugin {
         val maybeGitTag: Option[String] = git.gitDescribedVersion.value
         val mkTag: String => String = imageTagMakeFunction.value
         val isRelease: Boolean = !isSnapshot.value && maybeGitTag.isDefined
+        val allowedPrefixes = List("version-", "dex-")
 
         val mandatoryImageNames =
-          if (currentBranchNameLowerCase.startsWith("dex-") || currentBranchNameLowerCase == "master")
+          if (currentBranchNameLowerCase == "master" || allowedPrefixes.exists(currentBranchNameLowerCase.startsWith))
             Seq(latestImageName, ImageName(s"${nameOfImage.value}:$currentBranchName"))
           else Seq(latestImageName)
 

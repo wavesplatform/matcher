@@ -6,7 +6,6 @@ import org.scalamock.scalatest.MockFactory
 
 import java.util.concurrent.TimeUnit
 import scala.concurrent.duration._
-import scala.concurrent.duration.TimeUnit
 
 class RestartableManagedChannelSuite extends WavesIntegrationSuiteBase with MockFactory {
 

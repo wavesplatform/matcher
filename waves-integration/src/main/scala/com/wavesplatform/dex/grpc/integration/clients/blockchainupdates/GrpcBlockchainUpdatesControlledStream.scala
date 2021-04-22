@@ -5,12 +5,13 @@ import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.clients.ControlledStream.SystemEvent
 import com.wavesplatform.dex.grpc.integration.clients.domain.BlockRef
 import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions._
+import com.wavesplatform.dex.grpc.integration.tool.RestartableManagedChannel
 import com.wavesplatform.dex.grpc.observers.IntegrationObserver
 import com.wavesplatform.events.api.grpc.protobuf.{BlockchainUpdatesApiGrpc, SubscribeEvent, SubscribeRequest}
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
 import io.grpc.stub.ClientCalls
-import io.grpc.{CallOptions, ClientCall, Grpc, ManagedChannel}
+import io.grpc.{CallOptions, ClientCall, Grpc}
 import monix.execution.{Cancelable, Scheduler}
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
@@ -23,7 +24,7 @@ import scala.concurrent.duration.FiniteDuration
   From the docs of reactive streams: the grammar must still be respected: (onNext)* (onComplete | onError)
   On error we just restart the stream, so r receives updates from a new stream. That is why we don't propagate errors to r
  */
-class GrpcBlockchainUpdatesControlledStream(channel: ManagedChannel, noDataTimeout: FiniteDuration)(implicit scheduler: Scheduler)
+class GrpcBlockchainUpdatesControlledStream(channel: RestartableManagedChannel, noDataTimeout: FiniteDuration)(implicit scheduler: Scheduler)
     extends BlockchainUpdatesControlledStream
     with ScorexLogging {
 
@@ -39,7 +40,8 @@ class GrpcBlockchainUpdatesControlledStream(channel: ManagedChannel, noDataTimeo
     require(height >= 1, "We can not get blocks on height <= 0")
     log.info(s"Connecting to Blockchain events stream, getting blocks from $height")
 
-    val call = channel.newCall(BlockchainUpdatesApiGrpc.METHOD_SUBSCRIBE, CallOptions.DEFAULT)
+    channel.restart()
+    val call = channel.getChannel.newCall(BlockchainUpdatesApiGrpc.METHOD_SUBSCRIBE, CallOptions.DEFAULT)
     val observer = new BlockchainUpdatesObserver(call)
     grpcObserver.getAndSet(observer.some).foreach(_.close())
     ClientCalls.asyncServerStreamingCall(call, new SubscribeRequest(height), observer)

@@ -11,11 +11,11 @@ import com.wavesplatform.dex.grpc.integration.clients.domain.portfolio.Implicits
 import com.wavesplatform.dex.grpc.integration.clients.domain.{TransactionWithChanges, WavesNodeEvent}
 import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions._
 import com.wavesplatform.dex.grpc.integration.settings.GrpcClientSettings
+import com.wavesplatform.dex.grpc.integration.tool.RestartableManagedChannel
 import com.wavesplatform.dex.it.api.HasToxiProxy
 import com.wavesplatform.dex.it.docker.WavesNodeContainer
 import com.wavesplatform.dex.it.test.NoStackTraceCancelAfterFailure
 import im.mak.waves.transactions.Transaction
-import io.grpc.ManagedChannel
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.nio.NioSocketChannel
 import monix.eval.Task
@@ -63,13 +63,15 @@ class BlockchainUpdatesClientTestSuite extends IntegrationSuiteBase with HasToxi
     noDataTimeout = 5.minutes
   )
 
-  private lazy val blockchainUpdatesChannel: ManagedChannel =
-    grpcSettings.toNettyChannelBuilder
-      .executor((command: Runnable) => grpcExecutor.execute(command))
-      .eventLoopGroup(eventLoopGroup)
-      .channelType(classOf[NioSocketChannel])
-      .usePlaintext()
-      .build
+  private lazy val blockchainUpdatesChannel: RestartableManagedChannel =
+    new RestartableManagedChannel(() =>
+      grpcSettings.toNettyChannelBuilder
+        .executor((command: Runnable) => grpcExecutor.execute(command))
+        .eventLoopGroup(eventLoopGroup)
+        .channelType(classOf[NioSocketChannel])
+        .usePlaintext()
+        .build
+    )
 
   private lazy val client =
     new DefaultBlockchainUpdatesClient(eventLoopGroup, blockchainUpdatesChannel, monixScheduler, grpcSettings.noDataTimeout)(

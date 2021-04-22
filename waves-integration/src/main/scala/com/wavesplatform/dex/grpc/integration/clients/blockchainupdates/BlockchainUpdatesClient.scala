@@ -2,12 +2,12 @@ package com.wavesplatform.dex.grpc.integration.clients.blockchainupdates
 
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.effect.Implicits.NettyFutureOps
-import io.grpc.ManagedChannel
+import com.wavesplatform.dex.grpc.integration.tool.RestartableManagedChannel
 import io.netty.channel.EventLoopGroup
 import monix.execution.Scheduler
 
 import java.util.concurrent.TimeUnit
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 
 trait BlockchainUpdatesClient {
@@ -23,7 +23,7 @@ trait BlockchainUpdatesClient {
 
 class DefaultBlockchainUpdatesClient(
   eventLoopGroup: EventLoopGroup,
-  channel: ManagedChannel,
+  channel: RestartableManagedChannel,
   monixScheduler: Scheduler,
   noDataTimeout: FiniteDuration
 )(implicit grpcExecutionContext: ExecutionContext)
@@ -34,8 +34,7 @@ class DefaultBlockchainUpdatesClient(
 
   override def close(): Future[Unit] = {
     blockchainEvents.close()
-    channel.shutdown()
-    channel.awaitTermination(500, TimeUnit.MILLISECONDS)
+    channel.shutdown(500.millis)
     // TODO DEX-998
     if (eventLoopGroup.isShuttingDown) Future.successful(())
     else eventLoopGroup.shutdownGracefully(0, 500, TimeUnit.MILLISECONDS).asScala.map(_ => ())

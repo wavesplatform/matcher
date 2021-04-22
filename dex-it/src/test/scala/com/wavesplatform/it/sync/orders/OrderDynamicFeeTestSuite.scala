@@ -6,11 +6,14 @@ import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.api.http.entities.HttpV0LevelAgg
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import scala.concurrent.duration._
 
 // TODO refactor balances retrieving
 class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
 
   private val baseFee = 300000
+
+  implicit override val patienceConfig: PatienceConfig = super.patienceConfig.copy(timeout = 90.seconds, interval = 1.second)
 
   override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(
     s"""

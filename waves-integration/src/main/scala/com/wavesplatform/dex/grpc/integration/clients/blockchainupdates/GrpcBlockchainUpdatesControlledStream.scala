@@ -121,6 +121,8 @@ class GrpcBlockchainUpdatesControlledStream(channel: RestartableManagedChannel, 
         if (grpcObserver.get().contains(this)) {
           log.warn(s"No data for $noDataTimeout, restarting!")
           stopGrpcObserver()
+          channel.stop()
+          internalSystemStream.onNext(SystemEvent.Stopped)
         } else log.warn("False positive no-data timeout")
       }))
       .foreach(_.cancel())

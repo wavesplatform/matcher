@@ -10,6 +10,14 @@ final class RestartableManagedChannel(mkManagedChannel: () => ManagedChannel) {
   private var channel: ManagedChannel = _
   private var isClosed: Boolean = false
 
+  def stop(): Unit = synchronized {
+    checkIsClosed()
+    if (channel != null) {
+      channel.shutdown()
+      channel = null
+    }
+  }
+
   def restart(): Unit = synchronized {
     checkIsClosed()
     if (channel != null)

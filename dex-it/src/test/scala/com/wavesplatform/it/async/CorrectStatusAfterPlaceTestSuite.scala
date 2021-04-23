@@ -12,7 +12,7 @@ import com.wavesplatform.dex.domain.order.Order.Id
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.it.Implicits.durationToScalatestTimeout
+import com.wavesplatform.dex.Implicits.durationToScalatestTimeout
 import im.mak.waves.transactions.mass.Transfer
 
 import scala.concurrent.duration._

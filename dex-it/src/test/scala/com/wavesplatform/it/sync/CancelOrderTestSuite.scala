@@ -351,7 +351,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       Future.inSeries(pairs)(Function.tupled(place(_, _, ordersPerAccount))).map(_.flatten)
     }
 
-    def traverseAccounts(): Future[List[Assertion]] = Future.traverse(accounts) { account =>
+    def checkAccountsOrders(): Future[List[Assertion]] = Future.traverse(accounts) { account =>
       dex1.asyncApi.getOrderHistoryByAssetPairAndPublicKey(account, wavesUsdPair).map { orders =>
         withClue(s"account $account: ") {
           orders.size shouldBe ordersPerAccount
@@ -361,7 +361,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
 
     (for {
       orderIds <- getOrderIds()
-      _ <- traverseAccounts()
+      _ <- checkAccountsOrders()
       _ <- Future.traverse(accounts)(dex1.asyncApi.cancelAll(_))
       _ <- Future.inSeries(orderIds)(dex1.asyncApi.waitForOrderStatus(wavesUsdPair, _, Status.Cancelled))
       orderBook <- dex1.asyncApi.getOrderBook(wavesUsdPair)

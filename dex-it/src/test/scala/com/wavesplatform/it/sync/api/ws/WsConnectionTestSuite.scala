@@ -9,7 +9,7 @@ import com.wavesplatform.dex.domain.order.OrderType.SELL
 import com.wavesplatform.dex.fp.MapImplicits.MapNumericOps
 import com.wavesplatform.dex.it.docker.DexContainer
 import com.wavesplatform.it.WsSuiteBase
-import com.wavesplatform.it.Implicits.durationToScalatestTimeout
+import com.wavesplatform.dex.Implicits.durationToScalatestTimeout
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
 
 import scala.concurrent.duration._

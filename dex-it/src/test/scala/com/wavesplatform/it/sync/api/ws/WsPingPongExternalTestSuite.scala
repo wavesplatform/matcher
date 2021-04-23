@@ -3,8 +3,7 @@ package com.wavesplatform.it.sync.api.ws
 import akka.http.scaladsl.model.Uri
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.ws.protocol.WsError
-import com.wavesplatform.it.Implicits.durationToScalatestTimeout
-import org.scalatest.concurrent.PatienceConfiguration.Timeout
+import com.wavesplatform.dex.Implicits.durationToScalatestTimeout
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 

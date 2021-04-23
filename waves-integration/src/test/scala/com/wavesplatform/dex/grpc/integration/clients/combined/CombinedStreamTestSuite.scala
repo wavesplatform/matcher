@@ -9,12 +9,10 @@ import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedStreamTes
 import com.wavesplatform.dex.grpc.integration.clients.matcherext.UtxEventsControlledStream
 import com.wavesplatform.dex.grpc.integration.services.UtxEvent
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
-import com.wavesplatform.dex.Implicits.durationToScalatestTimeout
 import monix.execution.{ExecutionModel, Scheduler}
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 import org.scalatest.concurrent.Eventually
-import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.exceptions.TestFailedException
 import org.scalatest.time.{Millis, Seconds, Span}
 
@@ -135,7 +133,7 @@ class CombinedStreamTestSuite extends WavesIntegrationSuiteBase with Eventually 
           "no recovery" in {
             val t = mkEventuallyWorking()
             t.blockchainUpdates.close()
-            t.cs.lastStatus.futureValue(5.seconds) should matchTo[Status](Status.Closing(blockchainUpdates = true, utxEvents = true))
+            t.cs.lastStatus.futureValue should matchTo[Status](Status.Closing(blockchainUpdates = true, utxEvents = true))
           }
         }
       }
@@ -172,7 +170,7 @@ class CombinedStreamTestSuite extends WavesIntegrationSuiteBase with Eventually 
           "no recovery" in {
             val t = mkEventuallyWorking()
             t.utxEvents.close()
-            t.cs.lastStatus.futureValue(5.seconds) should matchTo[Status](Status.Closing(blockchainUpdates = true, utxEvents = true))
+            t.cs.lastStatus.futureValue should matchTo[Status](Status.Closing(blockchainUpdates = true, utxEvents = true))
           }
         }
       }

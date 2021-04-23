@@ -215,6 +215,6 @@ class BlockchainUpdatesClientTestSuite extends IntegrationSuiteBase with HasToxi
     receivedTx
   }
 
-  private def wait[T](f: => Future[T]): T = f.futureValue
+  @inline private def wait[T](f: => Future[T]): T = f.futureValue
 
 }

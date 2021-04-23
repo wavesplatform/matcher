@@ -15,7 +15,7 @@ import scala.util.control.NonFatal
 
 package object it {
   import org.scalatest.concurrent.ScalaFutures._
-  import Implicits.durationToScalatestTimeout
+  import com.wavesplatform.dex.Implicits.durationToScalatestTimeout
 
   /**
    * @return The number of successful commands

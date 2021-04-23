@@ -17,7 +17,7 @@ import com.wavesplatform.it._
 import com.wavesplatform.it.api.{MatcherCommand, MatcherState}
 import com.wavesplatform.it.config.DexTestConfig.createAssetPair
 import com.wavesplatform.it.tags.DexItExternalKafkaRequired
-import com.wavesplatform.it.Implicits.durationToScalatestTimeout
+import com.wavesplatform.dex.Implicits.durationToScalatestTimeout
 import org.scalacheck.Gen
 
 import scala.concurrent.duration.DurationInt

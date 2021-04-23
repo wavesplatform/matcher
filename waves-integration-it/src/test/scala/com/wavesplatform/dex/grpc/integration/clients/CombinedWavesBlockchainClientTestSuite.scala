@@ -570,7 +570,7 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
       }
       .mkString("; ")
 
-  private def wait[T](f: => Future[T]): T = f.futureValue
+  @inline private def wait[T](f: => Future[T]): T = f.futureValue
 
   private def randomByteStr(len: Int): ByteStr = {
     val inner = new Array[Byte](len)

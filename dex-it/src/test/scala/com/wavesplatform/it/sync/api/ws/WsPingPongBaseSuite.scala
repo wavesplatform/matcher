@@ -6,7 +6,7 @@ import com.wavesplatform.dex.api.ws.connection.WsConnection
 import com.wavesplatform.dex.api.ws.protocol._
 import com.wavesplatform.dex.error.InvalidJson
 import com.wavesplatform.it.WsSuiteBase
-import com.wavesplatform.it.Implicits.durationToScalatestTimeout
+import com.wavesplatform.dex.Implicits.durationToScalatestTimeout
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
 
 import scala.concurrent.duration._

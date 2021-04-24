@@ -28,8 +28,8 @@ import com.wavesplatform.dex.grpc.integration.protobuf.DexToPbConversions._
 import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions._
 import com.wavesplatform.dex.grpc.integration.services.UtxTransaction
 import com.wavesplatform.dex.grpc.integration.settings.WavesBlockchainClientSettings
+import com.wavesplatform.dex.grpc.integration.tool.RestartableManagedChannel
 import com.wavesplatform.protobuf.transaction.SignedTransaction
-import io.grpc.ManagedChannel
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.nio.NioSocketChannel
 import monix.eval.Task
@@ -53,7 +53,7 @@ class CombinedWavesBlockchainClient(
   type Balances = Map[Address, Map[Asset, Long]]
   type Leases = Map[Address, Long]
 
-  @volatile private var blockchainStatus: Status  = Starting()
+  @volatile private var blockchainStatus: Status = Starting()
 
   override def status(): Status = blockchainStatus
 
@@ -242,6 +242,7 @@ class CombinedWavesBlockchainClient(
 
   override def close(): Future[Unit] =
     meClient.close().zip(bClient.close()).map(_ => ())
+
 }
 
 object CombinedWavesBlockchainClient extends ScorexLogging {
@@ -264,7 +265,7 @@ object CombinedWavesBlockchainClient extends ScorexLogging {
     val eventLoopGroup = new NioEventLoopGroup
 
     log.info(s"Building Matcher Extension gRPC client for server: ${wavesBlockchainClientSettings.grpc.target}")
-    val matcherExtensionChannel: ManagedChannel =
+    val matcherExtensionChannel =
       wavesBlockchainClientSettings.grpc.toNettyChannelBuilder
         .executor((command: Runnable) => grpcExecutionContext.execute(command))
         .eventLoopGroup(eventLoopGroup)
@@ -273,13 +274,15 @@ object CombinedWavesBlockchainClient extends ScorexLogging {
         .build
 
     log.info(s"Building Blockchain Updates Extension gRPC client for server: ${wavesBlockchainClientSettings.blockchainUpdatesGrpc.target}")
-    val blockchainUpdatesChannel: ManagedChannel =
-      wavesBlockchainClientSettings.blockchainUpdatesGrpc.toNettyChannelBuilder
-        .executor((command: Runnable) => grpcExecutionContext.execute(command))
-        .eventLoopGroup(eventLoopGroup)
-        .channelType(classOf[NioSocketChannel])
-        .usePlaintext()
-        .build
+    val blockchainUpdatesChannel =
+      new RestartableManagedChannel(() =>
+        wavesBlockchainClientSettings.blockchainUpdatesGrpc.toNettyChannelBuilder
+          .executor((command: Runnable) => grpcExecutionContext.execute(command))
+          .eventLoopGroup(eventLoopGroup)
+          .channelType(classOf[NioSocketChannel])
+          .usePlaintext()
+          .build
+      )
 
     new CombinedWavesBlockchainClient(
       wavesBlockchainClientSettings.combinedClientSettings,

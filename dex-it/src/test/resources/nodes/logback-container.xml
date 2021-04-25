@@ -19,15 +19,12 @@
     <logger name="sun.rmi" level="INFO"/>
     <logger name="javax.management" level="INFO"/>
 
-    <logger name="io.grpc.netty" level="WARN"/>
+    <logger name="io.grpc.netty" level="TRACE"/>
 
     <appender name="BRIEF" class="ch.qos.logback.core.FileAppender">
         <file>${logback.brief.fullPath}</file>
         <append>true</append>
         <immediateFlush>false</immediateFlush>
-        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-            <level>TRACE</level>
-        </filter>
         <encoder>
             <pattern>${logback.pattern:-${default.pattern}}</pattern>
         </encoder>

@@ -7,9 +7,6 @@
         <file>${logback.brief.fullPath}</file>
         <append>true</append>
         <immediateFlush>false</immediateFlush>
-        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-            <level>TRACE</level>
-        </filter>
         <encoder>
             <pattern>${logback.common.pattern}</pattern>
         </encoder>
@@ -19,9 +16,6 @@
         <file>${logback.detailed.fullPath}</file>
         <append>true</append>
         <immediateFlush>false</immediateFlush>
-        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-            <level>TRACE</level>
-        </filter>
         <encoder>
             <pattern>${logback.common.pattern}</pattern>
         </encoder>
@@ -36,7 +30,7 @@
     <logger name="io.netty" level="INFO" additivity="false">
         <appender-ref ref="DETAILED"/>
     </logger>
-    <logger name="io.grpc.netty" level="INFO" additivity="false">
+    <logger name="io.grpc.netty" level="TRACE" additivity="false">
         <appender-ref ref="DETAILED"/>
     </logger>
     <logger name="akka.http" level="TRACE" additivity="false">

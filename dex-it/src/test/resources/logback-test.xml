@@ -4,18 +4,12 @@
 
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <target>System.out</target>
-        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-            <level>${logback.stdout.level:-DEBUG}</level>
-        </filter>
         <encoder>
             <pattern>${pattern}</pattern>
         </encoder>
     </appender>
 
     <appender name="FILE" class="ch.qos.logback.core.FileAppender">
-        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-            <level>${logback.file.level:-TRACE}</level>
-        </filter>
         <file>${waves.it.logging.dir:-target/logs}/test.log</file>
         <append>false</append>
         <encoder>
@@ -27,6 +21,7 @@
     <logger name="io.netty" level="INFO"/>
     <logger name="io.swagger" level="OFF"/>
     <logger name="com.github.dockerjava.zerodep.shaded.org.apache" level="INFO"/>
+    <logger name="io.grpc.netty" level="TRACE"/>
 
     <root level="TRACE">
         <appender-ref ref="${waves.it.logging.appender:-STDOUT}"/>

@@ -72,6 +72,8 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProx
 
     val aliceBuyOrder = mkOrder(alice, wavesUsdPair, OrderType.BUY, 1.waves, 300)
     val bobBuyOrder = mkOrder(bob, wavesUsdPair, OrderType.BUY, 1.waves, 300)
+    writeGlobalLog(s"*************** ALICE PRIVATE ${alice.privateKey}, PUBLIC ${alice.publicKey}, ORDER $aliceBuyOrder")
+    writeGlobalLog(s"*************** ALICE PRIVATE ${bob.privateKey}, PUBLIC ${bob.publicKey}, ORDER $bobBuyOrder")
 
     lazy val alice2BobTransferTx = mkTransfer(alice, bob, amount = wavesNode2.api.balance(alice, usd), asset = usd)
     lazy val bob2AliceTransferTx = mkTransfer(bob, alice, amount = wavesNode1.api.balance(bob, usd), asset = usd)

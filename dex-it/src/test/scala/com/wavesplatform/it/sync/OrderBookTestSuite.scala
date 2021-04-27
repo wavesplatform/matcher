@@ -15,6 +15,8 @@ import scala.concurrent.Future
 
 class OrderBookTestSuite extends MatcherSuiteBase {
 
+  implicit override def patienceConfig = PatienceConfig(1.minute)
+
   override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "WAVES" ]""")
 
   private case class ReservedBalances(wct: Long, usd: Long, waves: Long)
@@ -117,7 +119,7 @@ class OrderBookTestSuite extends MatcherSuiteBase {
         .map(_ => ())
         .recover { case _ => () } // It's ok: either this should fail, or restartNode should work
 
-      deleteMultipleTimes.isReadyWithin(1.minute) shouldBe true
+      deleteMultipleTimes.futureValue
       dex1.restart()
     }
   }

@@ -18,6 +18,8 @@ import scala.concurrent.Future
 @DexItExternalKafkaRequired
 class AutoCancelOrderTestSuite extends MatcherSuiteBase {
 
+  implicit private val patConfig = PatienceConfig(timeout = 2.minutes)
+
   override protected def dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "$BtcId", "WAVES" ]""")
 
@@ -101,7 +103,7 @@ class AutoCancelOrderTestSuite extends MatcherSuiteBase {
 
       Future.traverse(buyOrders.groupBy(_.assetPair).values) { orders =>
         Future.inSeries(orders)(dex2.asyncApi.place(_))
-      }.isReadyWithin(5.minutes) shouldBe true
+      }.futureValue
 
       info("checking that order weren't canceled")
       val firstCanceled = sells.view

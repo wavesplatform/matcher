@@ -29,7 +29,6 @@ import com.wavesplatform.dex.queue.ValidatedCommand.CancelOrder
 import com.wavesplatform.dex.settings.OrderFeeSettings.DynamicSettings
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatchingRule}
 import com.wavesplatform.dex.time.SystemTime
-import com.wavesplatform.dex.util.Implicits.durationToScalatestTimeout
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 
@@ -721,7 +720,7 @@ class OrderBookActorSpecification
   private def getAggregatedSnapshot(orderBookRef: ActorRef): OrderBookAggregatedSnapshot = {
     val pair = wavesUsdPair // hack
     val askAdapter = new OrderBookAskAdapter(new AtomicReference(Map(pair -> Right(orderBookRef))), 5.seconds)
-    askAdapter.getAggregatedSnapshot(pair).futureValue(1.second).toOption.flatten.getOrElse(throw new IllegalStateException(
+    askAdapter.getAggregatedSnapshot(pair).futureValue.toOption.flatten.getOrElse(throw new IllegalStateException(
       "Can't get snapshot"
     ))
   }

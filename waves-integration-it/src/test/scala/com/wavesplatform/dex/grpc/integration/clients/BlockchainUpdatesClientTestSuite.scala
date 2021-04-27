@@ -25,7 +25,7 @@ import monix.execution.cancelables.BooleanCancelable
 import java.util.concurrent.Executors
 import scala.collection.immutable
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.concurrent.{Await, ExecutionContext}
 
 class BlockchainUpdatesClientTestSuite extends IntegrationSuiteBase with HasToxiProxy with NoStackTraceCancelAfterFailure {
 
@@ -208,7 +208,7 @@ class BlockchainUpdatesClientTestSuite extends IntegrationSuiteBase with HasToxi
     broadcastAndAwait(tx)
 
     client.blockchainEvents.startFrom(startHeight)
-    val receivedTx = wait(receivedTxFuture)
+    val receivedTx = receivedTxFuture.futureValue
     client.blockchainEvents.stop()
 
     Thread.sleep(1000)
@@ -216,7 +216,5 @@ class BlockchainUpdatesClientTestSuite extends IntegrationSuiteBase with HasToxi
 
     receivedTx
   }
-
-  @inline private def wait[T](f: => Future[T]): T = f.futureValue
 
 }

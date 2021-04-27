@@ -23,6 +23,8 @@ import scala.concurrent.Future
 
 class CancelOrderTestSuite extends MatcherSuiteBase {
 
+  implicit private val patConfig = PatienceConfig(timeout = 5.minutes)
+
   override protected def dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "$BtcId", "WAVES" ]""")
 
@@ -309,7 +311,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
           val wait = ThreadLocalRandom.current().nextInt(100, 1200).millis
           GlobalTimer.instance.sleep(wait)
         })
-      }.isReadyWithin(5.minutes) shouldBe true
+      }.futureValue
 
       val statuses = sells.map { order =>
         order -> dex1.api.waitForOrder(order)(r => r.status == Status.Cancelled || r.status == Status.Filled).status
@@ -368,7 +370,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
     } yield {
       orderBook.bids should be(empty)
       orderBook.asks should be(empty)
-    }).isReadyWithin(5.minutes) shouldBe true
+    }).futureValue
   }
 
   private def mkBobOrder = mkOrderDP(bob, wavesUsdPair, OrderType.SELL, 100.waves, 8)

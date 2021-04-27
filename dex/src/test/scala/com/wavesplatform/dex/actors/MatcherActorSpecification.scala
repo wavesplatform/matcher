@@ -41,10 +41,12 @@ class MatcherActorSpecification
     with Eventually
     with SystemTime {
 
+  private val twoHundredMillisTimeout = 200.millis
+
   private val assetsCache = new AssetsCache() {
 
     override val cached: AssetsReadOnlyDb[Id] =
-      (asset: IssuedAsset) => Some(BriefAssetDescription(name = "Unknown", decimals = 8, hasScript = false))
+      (_: IssuedAsset) => Some(BriefAssetDescription(name = "Unknown", decimals = 8, hasScript = false))
 
     override def get(asset: Asset): Future[Option[BriefAssetDescription]] = Future.successful(cached.get(asset))
     override def put(asset: Asset, item: BriefAssetDescription): Future[Unit] = Future.unit
@@ -153,7 +155,7 @@ class MatcherActorSpecification
       probe.send(actor, MatcherActor.GetSnapshotOffsets)
       probe.expectMsg(MatcherActor.SnapshotOffsetsResponse(Map.empty))
 
-      eventually(timeout(2.seconds))(working shouldBe true)
+      eventually(timeout(fiveSecTimeout))(working shouldBe true)
     }
 
     "stop the work" when {
@@ -251,15 +253,15 @@ class MatcherActorSpecification
           sendBuyOrders(eventSender, matcherActor, pair23, 0 to 1)
           sendBuyOrders(eventSender, matcherActor, pair45, 2 to 3)
 
-          probe23.expectNoMessage(200.millis)
-          probe45.expectNoMessage(200.millis)
+          probe23.expectNoMessage(twoHundredMillisTimeout)
+          probe45.expectNoMessage(twoHundredMillisTimeout)
 
           sendBuyOrders(eventSender, matcherActor, pair45, 4 to 10)
           probe23.expectMsg(OrderBookSnapshotUpdateCompleted(pair23, Some(9)))
-          probe45.expectNoMessage(200.millis)
+          probe45.expectNoMessage(twoHundredMillisTimeout)
 
           sendBuyOrders(eventSender, matcherActor, pair23, 11 to 14)
-          probe23.expectNoMessage(200.millis)
+          probe23.expectNoMessage(twoHundredMillisTimeout)
           probe45.expectMsg(OrderBookSnapshotUpdateCompleted(pair45, Some(12)))
         }
       }
@@ -270,12 +272,13 @@ class MatcherActorSpecification
         sendBuyOrders(eventSender, matcherActor, pair23, 0 to 30)
         probe.expectMsg(OrderBookSnapshotUpdateCompleted(pair23, Some(9)))
 
-        // OrderBookSnapshotUpdated(pair23, 26) is ignored in OrderBookActor, because it's waiting for SaveSnapshotSuccess of 9 from SnapshotStore.
-        probe.expectNoMessage(200.millis)
+        // OrderBookSnapshotUpdated(pair23, 26) is ignored in OrderBookActor,
+        // because it's waiting for SaveSnapshotSuccess of 9 from SnapshotStore.
+        probe.expectNoMessage(twoHundredMillisTimeout)
 
         sendBuyOrders(eventSender, matcherActor, pair23, 31 to 45)
         probe.expectMsg(OrderBookSnapshotUpdateCompleted(pair23, Some(43)))
-        probe.expectNoMessage(200.millis)
+        probe.expectNoMessage(twoHundredMillisTimeout)
       }
     }
 
@@ -416,7 +419,7 @@ class MatcherActorSpecification
         case x: ValidatedCommandWithMeta if x.offset > nr => nr = x.offset
         case SaveSnapshot(globalNr) =>
           val event = OrderBookSnapshotUpdateCompleted(assetPair, Some(globalNr))
-          context.system.scheduler.scheduleOnce(200.millis) {
+          context.system.scheduler.scheduleOnce(twoHundredMillisTimeout) {
             context.parent ! event
             probe.ref ! event
           }
@@ -470,7 +473,7 @@ class MatcherActorSpecification
       _ <- Future.sequence(pairs.map(_._1).map(apdb.add))
       _ <- Future.sequence(pairs.map { case (pair, offset) => obsdb.update(pair, offset, Some(OrderBookSnapshot.empty)) })
     } yield ()
-    future.isReadyWithin(5.seconds) shouldBe true
+    future.futureValue
   }
 
   private def doNothingOnRecovery(x: Either[String, ValidatedCommandWithMeta.Offset]): Unit = {}

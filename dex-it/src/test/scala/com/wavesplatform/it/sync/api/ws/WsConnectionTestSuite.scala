@@ -9,10 +9,7 @@ import com.wavesplatform.dex.domain.order.OrderType.SELL
 import com.wavesplatform.dex.fp.MapImplicits.MapNumericOps
 import com.wavesplatform.dex.it.docker.DexContainer
 import com.wavesplatform.it.WsSuiteBase
-import com.wavesplatform.dex.Implicits.durationToScalatestTimeout
-import org.scalatest.concurrent.PatienceConfiguration.Timeout
 
-import scala.concurrent.duration._
 import scala.concurrent.Future
 
 class WsConnectionTestSuite extends WsSuiteBase {
@@ -59,7 +56,7 @@ class WsConnectionTestSuite extends WsSuiteBase {
   }
 
   "Matcher should handle many connections simultaneously" in {
-    Future.traverse((1 to 200).toList)(_ => Future(mkDexWsConnection(dex1))).futureValue(25.seconds).foreach { wsc =>
+    Future.traverse((1 to 200).toList)(_ => Future(mkDexWsConnection(dex1))).futureValue.foreach { wsc =>
       wsc.isClosed shouldBe false
       wsc.close()
     }

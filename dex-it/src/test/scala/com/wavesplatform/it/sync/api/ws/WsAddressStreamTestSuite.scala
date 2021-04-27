@@ -23,6 +23,8 @@ import scala.concurrent.Future
 
 class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChecks {
 
+  implicit private val patConfig = PatienceConfig(timeout = 1.minute)
+
   override protected val dexInitialSuiteConfig: Config = ConfigFactory
     .parseString(s"""waves.dex {
                     |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
@@ -518,7 +520,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           mkOrderDP(bob, wavesBtcPair, BUY, 1.waves, 0.00012, ts = now + i)
         }
 
-        Future.traverse(orders)(dex1.asyncApi.place).isReadyWithin(1.minute) shouldBe true
+        Future.traverse(orders)(dex1.asyncApi.place).futureValue
         dex1.api.cancelAll(bob)
 
         wscs.par.foreach(_.close())
@@ -543,7 +545,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           mkTransfer(carol, alice, 5.waves - minFee, Waves, minFee, timestamp = now + i)
         }
         val simulation = Future.traverse(txs)(wavesNode1.asyncApi.broadcast(_))
-        simulation.isReadyWithin(1.minute) shouldBe true
+        simulation.futureValue
         wavesNode1.api.waitForHeightArise()
 
         wsc.balanceChanges.zipWithIndex.foreach {

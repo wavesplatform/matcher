@@ -10,12 +10,8 @@ import org.scalatest.wordspec.AnyWordSpecLike
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import org.scalatest.time.{Millis, Seconds, Span}
 
 class RateCacheSpecification extends AnyWordSpecLike with Matchers with WithDb with MatcherSpecBase with PropertyChecks with NoShrink {
-
-  implicit override def patienceConfig: PatienceConfig =
-    PatienceConfig(timeout = Span(2, Seconds), interval = Span(5, Millis))
 
   private def test(f: RateCache => Unit): Unit = {
     withClue("with DB")(f(RateCache(TestRateDb()).futureValue))

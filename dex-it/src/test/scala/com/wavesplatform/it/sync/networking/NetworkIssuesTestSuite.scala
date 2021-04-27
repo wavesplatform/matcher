@@ -21,6 +21,7 @@ import scala.concurrent.{blocking, Future}
 @NetworkTests
 class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
 
+  implicit private val patConfig = PatienceConfig(timeout = 2.minutes)
   private val matcherExtensionProxy = mkToxiProxy(WavesNodeContainer.wavesNodeNetAlias, WavesNodeContainer.matcherGrpcExtensionPort)
 
   private val blockchainUpdatesExtensionProxy =
@@ -65,7 +66,7 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
     (for {
       _ <- placeOrders()
       orderBook <- dex1.asyncApi.getOrderBook(wavesUsdPair)
-    } yield orderBook.asks should have size 100).isReadyWithin(2.minute) shouldBe true
+    } yield orderBook.asks should have size 100).futureValue
 
     orders.foreach(dex1.api.waitForOrderStatus(_, HttpOrderStatus.Status.Accepted))
     dex1.api.cancelAllByPair(alice, wavesUsdPair)

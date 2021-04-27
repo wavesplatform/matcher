@@ -17,7 +17,6 @@ import com.wavesplatform.it._
 import com.wavesplatform.it.api.{MatcherCommand, MatcherState}
 import com.wavesplatform.it.config.DexTestConfig.createAssetPair
 import com.wavesplatform.it.tags.DexItExternalKafkaRequired
-import com.wavesplatform.dex.Implicits.durationToScalatestTimeout
 import org.scalacheck.Gen
 
 import scala.concurrent.duration.DurationInt
@@ -49,6 +48,8 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with
   private val bobOrders = mkOrders(bob)
   private val orders = aliceOrders ++ bobOrders
   private val lastOrder = orderGen(matcher, alice, assetPairs).sample.get
+
+  implicit private val patConfig = PatienceConfig(timeout = 2.minutes)
 
   private var successfulCommandsNumber = 0
 
@@ -208,10 +209,10 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with
     batchCancels(alice, assetPairs)
       .zip(singleCancels(alice, allOrders.filter(_.sender == alice.publicKey)))
       .zip(singleCancels(bob, allOrders.filter(_.sender == bob.publicKey)))
-      .zip(batchCancels(bob, assetPairs)).isReadyWithin(3.minutes) shouldBe true
+      .zip(batchCancels(bob, assetPairs)).futureValue
 
-    dex1.asyncApi.getOrderHistoryByPublicKey(alice, Some(true)).futureValue(5.seconds) shouldBe empty
-    dex1.asyncApi.getOrderHistoryByPublicKey(bob, Some(true)).futureValue(5.seconds) shouldBe empty
+    dex1.api.getOrderHistoryByPublicKey(alice, Some(true)) shouldBe empty
+    dex1.api.getOrderHistoryByPublicKey(bob, Some(true)) shouldBe empty
   }
 
   private def mkOrders(account: KeyPair, number: Int = placesNumber) =

@@ -28,6 +28,8 @@ import scala.util.Random
 
 class WsOrderBookStreamTestSuite extends WsSuiteBase {
 
+  implicit private val patConfig = PatienceConfig(timeout = 1.minute)
+
   private val carol: KeyPair = mkKeyPair("carol")
 
   private val orderBookSettings: Option[WsOrderBookSettings] = WsOrderBookSettings(
@@ -513,10 +515,10 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
         mkOrderDP(carol, wavesBtcPair, BUY, 1.waves + i, 0.00012 + i / 100000.0d)
       }
 
-      Future.traverse(orders)(dex1.asyncApi.place).isReadyWithin(1.minute) shouldBe true
+      Future.traverse(orders)(dex1.asyncApi.place).futureValue
       dex1.api.cancelAll(carol)
 
-      Future.traverse(wscs)(wsc => Future(wsc.close())).isReadyWithin(1.minute) shouldBe true
+      Future.traverse(wscs)(wsc => Future(wsc.close())).futureValue
       Thread.sleep(3000)
       mainWsc.clearMessages()
 

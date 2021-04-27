@@ -16,10 +16,8 @@ import com.wavesplatform.dex.domain.order.OrderOps._
 import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV3}
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.domain.{crypto => wcrypto}
-import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.Events.{OrderCanceled, OrderExecuted}
-import com.wavesplatform.dex.model.OrderValidator.Result
 import com.wavesplatform.dex.model.{BuyLimitOrder, LimitOrder, OrderValidator, SellLimitOrder, _}
 import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import com.wavesplatform.dex.settings.OrderFeeSettings._
@@ -32,13 +30,12 @@ import mouse.any._
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Suite
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.time.{Millis, Minutes, Span}
+import org.scalatest.time.{Millis, Seconds, Span}
 import pureconfig.ConfigSource
 
 import java.math.BigInteger
 import java.security.SecureRandom
 import java.util.concurrent.atomic.AtomicLong
-import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Random
 
@@ -50,6 +47,8 @@ trait MatcherSpecBase
     with AllureScalatestContext
     with ScalaFutures {
   _: Suite =>
+
+  implicit override def patienceConfig: PatienceConfig = PatienceConfig(timeout = Span(2, Seconds), interval = Span(5, Millis))
 
   implicit protected val wsErrorDiff: Derived[Diff[WsError]] = Derived(Diff.gen[WsError].ignore[WsError, Long](_.timestamp))
 
@@ -70,7 +69,7 @@ trait MatcherSpecBase
   protected val wavesUsdPair: AssetPair = AssetPair(Waves, usd)
   protected val btcUsdPair: AssetPair = AssetPair(btc, usd)
 
-  protected val rateCache: RateCache = awaitResult(RateCache(TestRateDb()))
+  protected val rateCache: RateCache = RateCache(TestRateDb()).futureValue
     .unsafeTap(_.upsertRate(usd, 3.7))
     .unsafeTap(_.upsertRate(btc, 0.00011167))
 
@@ -103,10 +102,11 @@ trait MatcherSpecBase
   protected def wrapLimitOrder(n: Long, x: Order): ValidatedCommandWithMeta = wrapCommand(n, ValidatedCommand.PlaceOrder(LimitOrder(x)))
   protected def wrapMarketOrder(mo: MarketOrder): ValidatedCommandWithMeta = wrapCommand(ValidatedCommand.PlaceMarketOrder(mo))
 
-  implicit protected lazy val pc: PatienceConfig = PatienceConfig(timeout = Span(2, Minutes), interval = Span(5, Millis))
-  protected def awaitResult[A](result: FutureResult[A]): Result[A] = result.value.futureValue
-  protected def awaitResult[A](result: Future[A]): A = result.futureValue
-
+  /*
+  private val futureAwaitTimeout: Timeout = 2.minutes
+  protected def awaitResult[A](result: FutureResult[A]): Result[A] = result.value.futureValue(futureAwaitTimeout)
+  protected def awaitResult[A](result: Future[A]): A = result.futureValue(futureAwaitTimeout)
+   */
   protected def getSpentAmountWithFee(order: Order): Long = {
     val lo = LimitOrder(order)
     lo.spentAmount + (if (order.getSpendAssetId == order.feeAsset) lo.fee else 0)

@@ -4,7 +4,6 @@ import akka.actor.ActorRef
 import akka.testkit.TestProbe
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.time.SystemTime
-import com.wavesplatform.dex.util.Implicits.durationToScalatestTimeout
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 
@@ -16,20 +15,22 @@ class AskActorSpec extends AnyFreeSpec with Matchers with SystemTime with Matche
   private val defaultTimeout = 5.seconds
   private val defaultResponse = "foo"
 
+  implicit override val patienceConfig = PatienceConfig(timeout = defaultTimeout)
+
   "AskActor" - {
     "happy path" in test { (ref, future) =>
       ref ! defaultResponse
-      val actual = future.futureValue(defaultTimeout)
+      val actual = future.futureValue
       actual should matchTo(defaultResponse)
     }
 
     "timeout" in test { (_, future) =>
-      future.failed.futureValue(defaultTimeout) shouldBe a[TimeoutException]
+      future.failed.futureValue shouldBe a[TimeoutException]
     }
 
     "unexpected response type" in test { (ref, future) =>
       ref ! 100500
-      future.failed.futureValue(defaultTimeout) shouldBe a[IllegalArgumentException]
+      future.failed.futureValue shouldBe a[IllegalArgumentException]
     }
   }
 

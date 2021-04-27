@@ -917,7 +917,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
   // upsertRate, deleteRate
   routePath("/settings/rates/{assetId}") - {
 
-    val rateCache = awaitResult(RateCache(TestRateDb()))
+    val rateCache = RateCache(TestRateDb()).futureValue
 
     val rate = 0.0055
     val updatedRate = 0.0067
@@ -1122,7 +1122,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
   }
 
   private def test[U](f: Route => U, apiKey: String = "", maybeRateCache: Option[RateCache] = None): U = {
-    val rateCache = maybeRateCache.getOrElse(awaitResult(RateCache(TestRateDb())))
+    val rateCache = maybeRateCache.getOrElse(RateCache(TestRateDb()).futureValue)
     val addressActor = TestProbe("address")
     addressActor.setAutoPilot { (sender: ActorRef, msg: Any) =>
       val response = msg match {
@@ -1257,7 +1257,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     )
 
     val odb = OrderDb.levelDb(settings.orderDb, asyncLevelDb)
-    awaitResult(odb.saveOrder(orderToCancel))
+    odb.saveOrder(orderToCancel).futureValue
 
     val orderBooks = new AtomicReference(Map(smartWavesPair -> orderBookActor.ref.asRight[Unit]))
     val orderBookAskAdapter = new OrderBookAskAdapter(orderBooks, 5.seconds)

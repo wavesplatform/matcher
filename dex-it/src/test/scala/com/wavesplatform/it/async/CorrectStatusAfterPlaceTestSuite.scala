@@ -12,12 +12,13 @@ import com.wavesplatform.dex.domain.order.Order.Id
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.dex.Implicits.durationToScalatestTimeout
 import im.mak.waves.transactions.mass.Transfer
 
-import scala.concurrent.duration._
 import scala.concurrent.Future
 
+// leave default Patience config with timeout = 30 seconds
+// but if there will be timeout errors, set it up to 1-2 minutes,
+// because it was Duration.Inf timeout before
 class CorrectStatusAfterPlaceTestSuite extends MatcherSuiteBase {
 
   private val issuer = alice
@@ -98,7 +99,7 @@ class CorrectStatusAfterPlaceTestSuite extends MatcherSuiteBase {
         dex1.asyncApi.waitForCurrentOffset(_ == totalSent - 1)
       }
     } yield r
-    future.futureValue(10.minutes)
+    future.futureValue
       .flatten
       .foreach {
         case (id, status, sent) => if (sent) withClue(s"$id")(status should not be Status.NotFound)

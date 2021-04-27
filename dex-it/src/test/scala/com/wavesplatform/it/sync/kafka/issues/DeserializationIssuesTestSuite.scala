@@ -14,6 +14,8 @@ import scala.concurrent.Promise
 
 class DeserializationIssuesTestSuite extends MatcherSuiteBase with HasKafka {
 
+  implicit private val patConfig = PatienceConfig(timeout = 10.seconds)
+
   private val topicName = s"test-${ThreadLocalRandom.current.nextInt(0, Int.MaxValue)}"
   override protected lazy val dexRunConfig = dexKafkaConfig(topicName)
 
@@ -45,7 +47,7 @@ class DeserializationIssuesTestSuite extends MatcherSuiteBase with HasKafka {
           case None => sendResult.success(())
         }
     )
-    sendResult.future.isReadyWithin(10.seconds) shouldBe true
+    sendResult.future.futureValue
     producer.close()
     eventually {
       dex1.getState().getExitCodeLong shouldBe QueueMessageDeserializationError.code

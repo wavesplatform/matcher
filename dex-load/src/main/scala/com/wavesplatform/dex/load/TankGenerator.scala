@@ -86,9 +86,10 @@ object TankGenerator {
     )
     Await.result(Future.sequence(futures), requestsAwaitingTime)
 
-    val asset = assets(new Random().nextInt(assets.length))
-
-    do waitForHeightArise() while (node.getAssetBalance(issuer.address(), asset) <= 0)
+    println("Waiting for mass assets...")
+    while (node.getUtxSize() > 0) {
+      waitForHeightArise()
+    }
 
     println("Assets have been successfully issued")
     assets.map(_.toString).toList
@@ -139,7 +140,8 @@ object TankGenerator {
         .zipWithIndex
         .map { case (group, index) =>
           Future {
-            node.broadcast(mkMassTransfer(transfers = group, asset = AssetId.as(asset), ts = now + index))
+            val tx = mkMassTransfer(transfers = group, asset = AssetId.as(asset), ts = now + index)
+            node.broadcast(tx)
           }
         }
       val requestsAwaitingTime = (futures.size / threadCount).seconds
@@ -162,7 +164,10 @@ object TankGenerator {
     val asset = AssetId.as(assets(new Random().nextInt(assets.length)))
     val account = accounts(new Random().nextInt(accounts.length))
 
-    while (node.getAssetBalance(account.address(), asset) == 0) waitForHeightArise()
+    println("Waiting for mass transers...")
+    while (node.getUtxSize() > 0) {
+      waitForHeightArise()
+    }
   }
 
   private def mkOrders(accounts: List[JPrivateKey], pairs: List[AssetPair], matching: Boolean): List[Request] = {
@@ -416,6 +421,9 @@ object TankGenerator {
   }
 
   def placeOrder(order: Order): Future[HttpResponse] = Future {
+
+    println(s"PLACE:     ${order.toJson}")
+
     val res = httpClient.execute(
       RequestBuilder
         .post(matcherHttpUri.resolve(s"/matcher/orderbook"))
@@ -423,6 +431,10 @@ object TankGenerator {
         .build(),
       HttpClientContext.create
     )
+
+    println(s"PLACE:     ${res.toString}")
+
+
     res.close()
     res
   }
@@ -450,6 +462,7 @@ object TankGenerator {
 
       placeOrder(order).recover {
         case e: Throwable => println(s"Error during operation: $e"); null
+        case _ => println(order.toJson)
       }
     }
 

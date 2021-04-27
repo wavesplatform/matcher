@@ -309,6 +309,8 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       hasMatcherAccountScript
     )(_)
 
+    wavesBlockchainAsyncClient.updates.
+
     new MatcherApiRoute(
       pairBuilder,
       matcherPublicKey,

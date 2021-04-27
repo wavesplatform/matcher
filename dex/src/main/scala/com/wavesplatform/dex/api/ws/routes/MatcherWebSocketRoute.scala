@@ -31,6 +31,7 @@ import com.wavesplatform.dex.exceptions.BinaryMessagesNotSupportedException
 import com.wavesplatform.dex.model.AssetPairBuilder
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.dex.time.Time
+import com.wavesplatform.dex.tool.KamonTraceUtils.setSpanNameAndForceSamplingDecision
 import io.swagger.annotations._
 
 import javax.ws.rs.Path
@@ -80,6 +81,7 @@ class MatcherWebSocketRoute(
   )
   def connectionsRoute: Route = get {
     (measureResponse("connectionsRoute") & withAuth) {
+      setSpanNameAndForceSamplingDecision("/connectionsRoute")
       complete {
         externalClientDirectoryRef.ask(WsExternalClientDirectoryActor.Query.GetActiveNumber).mapTo[HttpWebSocketConnections]
       }
@@ -106,6 +108,7 @@ class MatcherWebSocketRoute(
     )
   )
   def closeConnectionsRoute: Route = (delete & measureResponse("closeConnectionsRoute") & withAuth) {
+    setSpanNameAndForceSamplingDecision("/closeConnectionsRoute")
     entity(as[HttpWebSocketCloseFilter]) { req =>
       externalClientDirectoryRef ! WsExternalClientDirectoryActor.Command.CloseOldest(req.oldest)
       complete {
@@ -117,6 +120,8 @@ class MatcherWebSocketRoute(
   private val commonWsRoute: Route = (pathEnd & get & measureResponse("commonWsRoute") &
     parameters("a_os".withDefault("Unknown OS"), "a_client".withDefault("Unknown Client"))) { (aOs: String, aClient: String) =>
     import matcherSettings.webSockets.externalClientHandler
+
+    setSpanNameAndForceSamplingDecision("/commonWsRoute")
 
     val clientId = UUID.randomUUID().toString
 
@@ -168,6 +173,8 @@ class MatcherWebSocketRoute(
 
   private val internalWsRoute: Route = (path("internal") & get & measureResponse("internalWsRoute")) {
     import matcherSettings.webSockets.internalClientHandler
+
+    setSpanNameAndForceSamplingDecision("/internalWsRoute")
 
     val clientId = UUID.randomUUID().toString
 

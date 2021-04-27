@@ -14,6 +14,7 @@ import com.wavesplatform.dex.domain.error.ValidationError
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
 import com.wavesplatform.dex.model.{AssetPairBuilder, MatcherModel}
+import com.wavesplatform.dex.tool.KamonTraceUtils.setSpanNameAndForceSamplingDecision
 import io.swagger.annotations.{Api, ApiImplicitParam, ApiImplicitParams, ApiOperation}
 
 import javax.ws.rs.Path
@@ -35,9 +36,7 @@ case class MatcherApiRouteV1(
   import PathMatchers._
 
   override lazy val route: Route = pathPrefix("api" / "v1") {
-    matcherStatusBarrier {
-      getOrderBook
-    }
+    matcherStatusBarrier(getOrderBook)
   }
 
   private def withValidAssetPair(pairOrError: Either[ValidationError.InvalidAsset, AssetPair])(f: AssetPair => Route): Route =
@@ -82,6 +81,7 @@ case class MatcherApiRouteV1(
   def getOrderBook: Route =
     (path("orderbook" / AssetPairPM) & get) { pairOrError =>
       measureResponse("V1.getOrderBook") {
+        setSpanNameAndForceSamplingDecision("/V1.getOrderBook")
         withValidAssetPair(pairOrError) { p =>
           parameters(Symbol("depth").as[Int].?) {
             depth =>

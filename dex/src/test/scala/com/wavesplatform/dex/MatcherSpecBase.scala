@@ -99,8 +99,12 @@ trait MatcherSpecBase
     ValidatedCommandWithMeta(seqNr.incrementAndGet(), System.currentTimeMillis(), command)
 
   protected def wrapLimitOrder(x: Order): ValidatedCommandWithMeta = wrapLimitOrder(seqNr.incrementAndGet(), x)
-  protected def wrapLimitOrder(n: Long, x: Order): ValidatedCommandWithMeta = wrapCommand(n, ValidatedCommand.PlaceOrder(LimitOrder(x)))
-  protected def wrapMarketOrder(mo: MarketOrder): ValidatedCommandWithMeta = wrapCommand(ValidatedCommand.PlaceMarketOrder(mo))
+
+  protected def wrapLimitOrder(n: Long, x: Order): ValidatedCommandWithMeta =
+    wrapCommand(n, ValidatedCommand.PlaceOrder(LimitOrder(x)))
+
+  protected def wrapMarketOrder(mo: MarketOrder): ValidatedCommandWithMeta =
+    wrapCommand(ValidatedCommand.PlaceMarketOrder(mo))
 
   protected def getSpentAmountWithFee(order: Order): Long = {
     val lo = LimitOrder(order)

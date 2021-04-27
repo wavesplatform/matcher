@@ -28,7 +28,7 @@ import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}
 
-import scala.concurrent.duration.DurationInt
+import scala.concurrent.duration._
 
 trait MatcherSuiteBase
     extends AnyFreeSpec
@@ -75,6 +75,8 @@ trait MatcherSuiteBase
 
   override protected def afterAll(): Unit = {
     log.debug(s"Perform afterAll")
+    if (Option(System.getenv("DEX_JAEGER_ENABLED")).contains("true"))
+      Thread.sleep(10.seconds.toMillis)
     stopBaseContainers()
     super.afterAll()
   }

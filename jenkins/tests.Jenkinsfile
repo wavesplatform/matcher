@@ -14,6 +14,8 @@ pipeline {
         SBT_OPTS = '-Xmx12g -XX:ReservedCodeCacheSize=128m -XX:+CMSClassUnloadingEnabled'
         PATH = "${env.SBT_HOME}/bin:${env.PATH}"
         SCALATEST_EXCLUDE_TAGS = 'com.wavesplatform.it.tags.DexItKafkaRequired com.wavesplatform.it.tags.DexItExternalKafkaRequired com.wavesplatform.it.tags.DexMultipleVersions'
+        DEX_JAEGER_HOST = "${DEX_JAEGER_HOST}"
+        DEX_JAEGER_ENABLED = "true"
     }
     stages {
         stage('Cleanup') {

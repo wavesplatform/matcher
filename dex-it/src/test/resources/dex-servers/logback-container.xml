@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- And additional file. The base configuration is dex/src/package/doc/logback.xml -->
 <included>
-    <property name="logback.common.pattern" value="${logback.common.pattern:-%date{HH:mm:ss.SSS,UTC} %-5level [%.25thread] %logger{26} - %msg%n%rEx}"/>
+    <conversionRule conversionWord="traceID" converterClass="kamon.instrumentation.logback.tools.TraceIDConverter" />
+    <conversionRule conversionWord="spanID" converterClass="kamon.instrumentation.logback.tools.SpanIDConverter" />
+
+    <property name="logback.common.pattern" value="${%date{HH:mm:ss.SSS,UTC} %-5level [%.25thread] %logger{26} [%traceID] [%spanID] - %msg%n%rEx}"/>
 
     <appender name="BRIEF" class="ch.qos.logback.core.FileAppender">
         <file>${logback.brief.fullPath}</file>
@@ -50,6 +53,7 @@
     <logger name="org.apache.kafka.clients.producer.KafkaProducer" level="TRACE" additivity="false">
         <appender-ref ref="DETAILED"/>
     </logger>
+    <logger name="oshi.util.FileUtil" level="INFO"/>
     <logger name="org.apache.kafka.common.metrics.Metrics" level="INFO"/>
     <logger name="org.apache.kafka.common.network.Selector" level="DEBUG" additivity="false">
         <appender-ref ref="BRIEF"/>

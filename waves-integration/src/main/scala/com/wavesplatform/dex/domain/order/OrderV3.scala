@@ -7,7 +7,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.ByteStr.byteStrFormat
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.bytes.deser.EntityParser
-import com.wavesplatform.dex.domain.bytes.deser.EntityParser.Stateful
+import com.wavesplatform.dex.domain.bytes.deser.EntityParser.{ConsumedBytesOffset, Stateful}
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.crypto.Proofs
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
@@ -186,7 +186,7 @@ object OrderV3 extends EntityParser[OrderV3] {
     unsigned.copy(proofs = Proofs(Seq(ByteStr(sig))))
   }
 
-  override def statefulParse: Stateful[OrderV3] =
+  override def statefulParse: Stateful[(ConsumedBytesOffset, OrderV3)] =
     for {
       _ <- read[Byte].map(v => if (v != 3) throw new Exception(s"Incorrect order version: expect 3 but found $v"))
       sender <- read[PublicKey]
@@ -201,7 +201,8 @@ object OrderV3 extends EntityParser[OrderV3] {
       matcherFee <- read[Long]
       feeAsset <- read[Asset]
       proofs <- read[Proofs]
-    } yield OrderV3(
+      offset <- read[ConsumedBytesOffset]
+    } yield offset -> OrderV3(
       sender,
       matcher,
       AssetPair(amountAsset, priceAsset),

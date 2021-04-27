@@ -52,6 +52,7 @@ import com.wavesplatform.dex.queue._
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
 import com.wavesplatform.dex.time.NTP
+import com.wavesplatform.dex.tool.KamonTraceUtils
 import com.wavesplatform.dex.tool.WaitOffsetTool
 import kamon.Kamon
 import monix.execution.ExecutionModel
@@ -104,8 +105,6 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   @volatile private var hasMatcherAccountScript = false
   private val orderBooks = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
   private val snapshotsRestored = Promise[ValidatedCommandWithMeta.Offset]() // Earliest offset among snapshots
-
-  private val wavesLifted: FutureResult[BriefAssetDescription] = liftValueAsync(BriefAssetDescription.wavesDescription)
 
   private val time = new NTP(settings.ntpServer)
   cs.addTask(CoordinatedShutdown.PhaseActorSystemTerminate, "NTP") { () =>
@@ -425,7 +424,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
         }
         .bindFlow(MetricHttpFlow.metricFlow(combinedRoute))
         .map(_.addToCoordinatedShutdown(hardTerminationDeadline = 5.seconds))
-    } map { serverBinding =>
+    }.map { serverBinding =>
       log.info(s"REST and WebSocket API bound to ${serverBinding.localAddress}")
     }
 
@@ -515,10 +514,29 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       loadAssets.flatMap { _ =>
         val assetPairs: Set[AssetPair] = xs
           .map { validatedCommandWithMeta =>
-            log.debug(s"Consumed $validatedCommandWithMeta")
-            orderBookDirectoryActorRef ! validatedCommandWithMeta
-            lastProcessedOffset = validatedCommandWithMeta.offset
-            validatedCommandWithMeta.command.assetPair
+            lazy val handleValidatedCommandWithMeta = {
+              log.debug(s"Consumed $validatedCommandWithMeta")
+              orderBookDirectoryActorRef ! validatedCommandWithMeta
+              lastProcessedOffset = validatedCommandWithMeta.offset
+              validatedCommandWithMeta.command.assetPair
+            }
+
+            validatedCommandWithMeta.command.maybeCtx.fold(handleValidatedCommandWithMeta) { ctx =>
+              val isApplicationStarted = startGuard.value.exists(_.isSuccess)
+              if (isApplicationStarted) {
+                val parentSpan = ctx.get(kamon.trace.Span.Key)
+                val span =
+                  Kamon.spanBuilder(s"consumedValidatedCommandWithMeta")
+                    .asChildOf(parentSpan)
+                    .traceId(parentSpan.trace.id)
+                    .tag(ctx.tags)
+                    .samplingDecision(KamonTraceUtils.Sample)
+                    .doNotTrackMetrics()
+                    .start()
+                Kamon.runWithSpan[AssetPair](span, finishSpan = true)(handleValidatedCommandWithMeta)
+              } else
+                handleValidatedCommandWithMeta
+            }
           }
           .to(Set)
 
@@ -553,7 +571,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
   private def getAndCacheDescription(asset: Asset): FutureResult[BriefAssetDescription] =
     asset match {
-      case Asset.Waves => wavesLifted
+      case Asset.Waves => liftValueAsync(BriefAssetDescription.wavesDescription)
       case asset: Asset.IssuedAsset =>
         EitherT(wavesBlockchainAsyncClient.assetDescription(asset).map {
           case Some(x) => x.asRight

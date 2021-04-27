@@ -8,7 +8,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.ByteStr.byteStrFormat
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.bytes.deser.EntityParser
-import com.wavesplatform.dex.domain.bytes.deser.EntityParser.Stateful
+import com.wavesplatform.dex.domain.bytes.deser.EntityParser.{ConsumedBytesOffset, Stateful}
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.crypto.{Proofs, Proven}
 import com.wavesplatform.dex.domain.error.ValidationError
@@ -274,17 +274,19 @@ object Order extends EntityParser[Order] {
     if (o1.orderType == OrderType.BUY) (o1, o2) else (o2, o1)
   }
 
-  def fromBytes(version: Byte, bytes: Array[Byte]): Order = {
+  def fromBytes(version: Byte, bytes: Array[Byte]): (ConsumedBytesOffset, Order) = {
     val order = version match {
       case 1 => OrderV1
       case 2 => OrderV2
       case 3 => OrderV3
+      case unexpected =>
+        throw new RuntimeException(s"unexpected order version $unexpected")
     }
     order.parseBytes(bytes).get
   }
 
   /** Can be used whenever Order V1 is serialized with prepended version, see [[com.wavesplatform.dex.domain.transaction.ExchangeTransactionV2]] */
-  override def statefulParse: Stateful[Order] =
+  override def statefulParse: Stateful[(ConsumedBytesOffset, Order)] =
     read[Byte]
       .transform { case (s, v) => s.copy(offset = s.offset - (if (v == 1) 0 else 1)) -> v }
       .flatMap { version =>
@@ -294,7 +296,7 @@ object Order extends EntityParser[Order] {
           case 3 => OrderV3
           case other => throw new IllegalArgumentException(s"Unexpected order version: $other")
         }
-        ep.statefulParse.widen[Order]
+        ep.statefulParse.widen[(ConsumedBytesOffset, Order)]
       }
 
 }

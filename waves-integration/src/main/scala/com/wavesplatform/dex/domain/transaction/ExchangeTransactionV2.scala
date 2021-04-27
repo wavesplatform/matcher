@@ -3,7 +3,7 @@ package com.wavesplatform.dex.domain.transaction
 import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.dex.domain.account.PrivateKey
 import com.wavesplatform.dex.domain.bytes.ByteStr
-import com.wavesplatform.dex.domain.bytes.deser.EntityParser.Stateful
+import com.wavesplatform.dex.domain.bytes.deser.EntityParser.{ConsumedBytesOffset, Stateful}
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.crypto.Proofs
 import com.wavesplatform.dex.domain.error.ValidationError
@@ -110,12 +110,12 @@ object ExchangeTransactionV2 extends ExchangeTransactionParser[ExchangeTransacti
     3
   }
 
-  override def statefulParse: Stateful[ExchangeTransactionV2] =
+  override def statefulParse: Stateful[(ConsumedBytesOffset, ExchangeTransactionV2)] =
     for {
       _ <- read[Int]
-      buyOrder <- Order.statefulParse
+      (_, buyOrder) <- Order.statefulParse
       _ <- read[Int]
-      sellOrder <- Order.statefulParse
+      (_, sellOrder) <- Order.statefulParse
       price <- read[Long]
       amount <- read[Long]
       buyMatcherFee <- read[Long]
@@ -123,6 +123,7 @@ object ExchangeTransactionV2 extends ExchangeTransactionParser[ExchangeTransacti
       fee <- read[Long]
       timestamp <- read[Long]
       proofs <- read[Proofs]
-    } yield ExchangeTransactionV2(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, proofs)
+      offset <- read[ConsumedBytesOffset]
+    } yield offset -> ExchangeTransactionV2(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, proofs)
 
 }

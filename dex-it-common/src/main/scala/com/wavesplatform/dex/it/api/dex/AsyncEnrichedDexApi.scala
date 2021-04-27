@@ -22,7 +22,6 @@ import sttp.model.Uri.QuerySegment
 import sttp.model.{MediaType, Uri}
 
 import java.net.InetSocketAddress
-import java.util.UUID
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -42,7 +41,6 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
     basicRequest
       .get(uri"$apiUri/matcher/balance/reserved/$publicKey")
       .headers(headers)
-
   }
 
   override def getReservedBalanceWithApiKey(of: KeyPair, xUserPublicKey: Option[PublicKey]): R[HttpBalance] = mk {
@@ -394,7 +392,6 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .body(Json.stringify(Json.toJson(rate)))
       .contentType(MediaType.ApplicationJson)
       .headers(headers)
-      .tag("requestId", UUID.randomUUID)
   }
 
   override def upsertAssetRate(asset: Asset, rate: String): R[HttpMessage] = mk {
@@ -403,7 +400,6 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .body(rate)
       .contentType(MediaType.ApplicationJson)
       .headers(apiKeyHeaders)
-      .tag("requestId", UUID.randomUUID)
   }
 
   override def upsertAssetRate(asset: Asset, rate: Double): R[HttpMessage] = upsertAssetRate(asset.toString, rate, apiKeyHeaders)

@@ -30,15 +30,13 @@ trait MatcherQueue {
 object MatcherQueue {
   type StoreValidatedCommand = ValidatedCommand => Future[Option[ValidatedCommandWithMeta]]
 
-  private val stored: Future[Option[ValidatedCommandWithMeta]] = Future.successful(None)
-
   private[queue] trait Producer {
     def store(command: ValidatedCommand): Future[Option[ValidatedCommandWithMeta]]
     def close(timeout: FiniteDuration): Unit
   }
 
   private[queue] object IgnoreProducer extends Producer {
-    override def store(command: ValidatedCommand): Future[Option[ValidatedCommandWithMeta]] = stored
+    override def store(command: ValidatedCommand): Future[Option[ValidatedCommandWithMeta]] = Future.successful(None)
     override def close(timeout: FiniteDuration): Unit = {}
   }
 

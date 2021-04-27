@@ -5,7 +5,7 @@ import com.wavesplatform.dex.domain.account.{KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.deser.EntityParser
-import com.wavesplatform.dex.domain.bytes.deser.EntityParser.{Signature, Stateful}
+import com.wavesplatform.dex.domain.bytes.deser.EntityParser.{ConsumedBytesOffset, Signature, Stateful}
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.crypto._
 import monix.eval.Coeval
@@ -96,7 +96,7 @@ object OrderV1 extends EntityParser[OrderV1] {
     unsigned.copy(proofs = Proofs(List(ByteStr(sig))))
   }
 
-  override def statefulParse: Stateful[OrderV1] =
+  override def statefulParse: Stateful[(ConsumedBytesOffset, OrderV1)] =
     for {
       sender <- read[PublicKey]
       matcher <- read[PublicKey]
@@ -109,7 +109,8 @@ object OrderV1 extends EntityParser[OrderV1] {
       expiration <- read[Long]
       matcherFee <- read[Long]
       signature <- read[Signature]
-    } yield OrderV1(
+      offset <- read[ConsumedBytesOffset]
+    } yield offset -> OrderV1(
       sender,
       matcher,
       AssetPair(amountAsset, priceAsset),

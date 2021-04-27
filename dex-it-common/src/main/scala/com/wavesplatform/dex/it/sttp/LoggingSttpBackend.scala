@@ -11,7 +11,7 @@ class LoggingSttpBackend[R[_]: Applicative, S](delegate: SttpBackend[R, S]) exte
   override def send[T, RR >: S with capabilities.Effect[R]](request: Request[T, RR]): R[Response[T]] = {
     val logRequest = !request.uri.path.mkString("/").endsWith("debug/print")
 
-    val prefix = s"[${request.tag("requestId").fold("unknown")(_.toString.take(8))}]"
+    val prefix = s"[${request.tag("traceId").fold("unknown")(_.toString)}]"
     if (logRequest) log.info(s"$prefix Sending $request")
 
     responseMonad

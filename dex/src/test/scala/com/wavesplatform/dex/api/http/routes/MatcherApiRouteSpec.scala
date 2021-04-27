@@ -1304,7 +1304,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         addressActor = addressActor.ref,
         CombinedStream.Status.Working(10),
         storeCommand = {
-          case ValidatedCommand.DeleteOrderBook(pair) if pair == okOrder.assetPair =>
+          case ValidatedCommand.DeleteOrderBook(pair, _) if pair == okOrder.assetPair =>
             Future.successful(ValidatedCommandWithMeta(1L, System.currentTimeMillis, ValidatedCommand.DeleteOrderBook(pair)).some)
           case _ => Future.failed(new NotImplementedError("Storing is not implemented"))
         },

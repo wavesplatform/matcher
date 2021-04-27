@@ -132,8 +132,8 @@ class OrderBookActor(
         case _ =>
           lastProcessedOffset = Some(request.offset)
           request.command match {
-            case ValidatedCommand.PlaceOrder(limitOrder) => onAddOrder(request, limitOrder)
-            case ValidatedCommand.PlaceMarketOrder(marketOrder) => onAddOrder(request, marketOrder)
+            case ValidatedCommand.PlaceOrder(limitOrder, _) => onAddOrder(request, limitOrder)
+            case ValidatedCommand.PlaceMarketOrder(marketOrder, _) => onAddOrder(request, marketOrder)
             case x: ValidatedCommand.CancelOrder => onCancelOrder(request, x)
             case _: ValidatedCommand.DeleteOrderBook =>
               process(request.timestamp, orderBook.cancelAll(request.timestamp, OrderCanceledReason.OrderBookDeleted))

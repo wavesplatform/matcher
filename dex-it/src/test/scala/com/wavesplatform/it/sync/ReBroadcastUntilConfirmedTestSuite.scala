@@ -31,9 +31,13 @@ class ReBroadcastUntilConfirmedTestSuite extends MatcherSuiteBase with EitherVal
 
     markup("Wait for a transaction")
     val exchangeTxId = dex1.api.waitForTransactionsByOrder(aliceOrder, 1).head.id()
+    eventually {
+      // Wait for this to make sure, that the Node broadcasted the tx to neighbours
+      wavesNode2.tryApi.unconfirmedTransactionInfo(exchangeTxId).isRight shouldBe true
+    }
 
-    markup("Check that disconnected miner node didn't get a transaction")
-    wavesNode2.tryApi.unconfirmedTransactionInfo(exchangeTxId).isRight shouldBe true
+    // This Node is not available, so we can't do this check
+    // wavesNode1.tryApi.unconfirmedTransactionInfo(exchangeTxId).isRight shouldBe false
 
     markup("Connect the miner node to the network")
     wavesNode1.connectToNetwork()
@@ -41,6 +45,7 @@ class ReBroadcastUntilConfirmedTestSuite extends MatcherSuiteBase with EitherVal
     markup("Wait until it receives the transaction")
     wavesNode1.api.waitForTransaction(exchangeTxId)
 
+    // We expect here, that a broadcaster will send a tx again and it will be broadcasted
     markup("Check that transaction is confirmed")
     wavesNode2.tryApi.transactionInfo(exchangeTxId).isRight shouldBe true
     wavesNode1.tryApi.transactionInfo(exchangeTxId).isRight shouldBe true

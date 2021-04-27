@@ -18,9 +18,12 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.matchers.{MatchResult, Matcher}
 
 import scala.collection.immutable.Vector
+import scala.concurrent.duration._
 
 // TODO DEX-994
 trait WavesIntegrationSuiteBase extends AnyFreeSpecLike with Matchers with AllureScalatestContext with ScalaFutures {
+
+  implicit override def patienceConfig = PatienceConfig(5.seconds)
 
   // scalatest
 

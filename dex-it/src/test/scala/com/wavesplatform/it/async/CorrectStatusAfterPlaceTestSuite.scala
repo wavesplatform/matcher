@@ -1,7 +1,6 @@
 package com.wavesplatform.it.async
 
 import java.nio.charset.StandardCharsets
-
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
@@ -13,6 +12,7 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.it.MatcherSuiteBase
 import im.mak.waves.transactions.mass.Transfer
+import org.scalatest.time.{Minutes, Second, Span}
 
 import scala.concurrent.Future
 
@@ -23,6 +23,8 @@ class CorrectStatusAfterPlaceTestSuite extends MatcherSuiteBase {
 
   private val issuer = alice
   private val now = System.currentTimeMillis()
+
+  override implicit def patienceConfig = PatienceConfig(timeout = Span(3, Minutes), interval = Span(1, Second))
 
   private val IssueResults(issueAsset1Tx, issuedAsset1Id, issuedAsset1) =
     mkIssueExtended(issuer, "asset1", Long.MaxValue, decimals = 0, timestamp = now)

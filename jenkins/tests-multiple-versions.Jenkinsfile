@@ -38,7 +38,7 @@ pipeline {
         }
         stage('Build Docker') {
             steps {
-                sh 'sbt dex-it/docker'git
+                sh 'sbt dex-it/docker'
             }
         }
         stage ('Run Integration Tests with multiple versions') {

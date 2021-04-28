@@ -1,7 +1,9 @@
 package com.wavesplatform.dex.load
 
+import akka.util.ByteString
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
+import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.load.request._
@@ -29,10 +31,11 @@ import scala.concurrent._
 import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters._
 import scala.util.Random
+import scala.Ordered._
 
 object TankGenerator {
 
-  private val threadCount: Int = sys.env.getOrElse("SBT_THREAD_NUMBER", "6").toInt
+  private val threadCount: Int = sys.env.getOrElse("SBT_THREAD_NUMBER", "3").toInt
   private val executor: ExecutorService = Executors.newFixedThreadPool(threadCount)
 
   implicit private val blockingContext: ExecutionContextExecutor = ExecutionContext.fromExecutor(executor)
@@ -46,9 +49,9 @@ object TankGenerator {
   val httpClient: CloseableHttpClient = HttpClients.custom
     .setDefaultRequestConfig(
       RequestConfig.custom
-        .setSocketTimeout(5000)
-        .setConnectTimeout(5000)
-        .setConnectionRequestTimeout(5000)
+        .setSocketTimeout(10000)
+        .setConnectTimeout(10000)
+        .setConnectionRequestTimeout(10000)
         .setCookieSpec(CookieSpecs.STANDARD)
         .build
     )
@@ -67,6 +70,12 @@ object TankGenerator {
     accounts.toList
   }
 
+  def waitForEmptyUtx(): Unit = {
+    println("Waiting for empty UTX...")
+    while (node.getUtxSize() > 0)
+      waitForHeightArise()
+  }
+
   private def mkAssets(count: Int = settings.assets.count): List[String] = {
     println(s"Generating $count assets... ")
 
@@ -76,7 +85,6 @@ object TankGenerator {
     val futures = assetsTxs.map { tx =>
       Future {
         node.broadcast(tx)
-        println(s"Broadcast $tx")
       }
     }
 
@@ -86,10 +94,7 @@ object TankGenerator {
     )
     Await.result(Future.sequence(futures), requestsAwaitingTime)
 
-    println("Waiting for mass assets...")
-    while (node.getUtxSize() > 0) {
-      waitForHeightArise()
-    }
+    waitForEmptyUtx()
 
     println("Assets have been successfully issued")
     assets.map(_.toString).toList
@@ -103,7 +108,7 @@ object TankGenerator {
         assets
           .combinations(2)
           .map {
-            case List(aa, pa) => if (pa < aa) (aa, pa) else (pa, aa)
+            case List(aa, pa) => if (IssuedAsset(pa.getBytes()).compatId < IssuedAsset(aa.getBytes()).compatId) (aa, pa) else (pa, aa)
             case _ => throw new RuntimeException("Can't create asset-pair")
           }
           .map(Function.tupled((a, p) => new AssetPair(AssetId.as(a), AssetId.as(p))))
@@ -140,13 +145,11 @@ object TankGenerator {
         .zipWithIndex
         .map { case (group, index) =>
           Future {
-            val tx = mkMassTransfer(transfers = group, asset = AssetId.as(asset), ts = now + index)
-            node.broadcast(tx)
+            node.broadcast(mkMassTransfer(transfers = group, asset = AssetId.as(asset), ts = now + index))
           }
         }
       val requestsAwaitingTime = (futures.size / threadCount).seconds
       Await.result(Future.sequence(futures), requestsAwaitingTime)
-
     }
 
     println(s"\t -- WAVES")
@@ -161,13 +164,7 @@ object TankGenerator {
       }
     println(s" Done")
 
-    val asset = AssetId.as(assets(new Random().nextInt(assets.length)))
-    val account = accounts(new Random().nextInt(accounts.length))
-
-    println("Waiting for mass transers...")
-    while (node.getUtxSize() > 0) {
-      waitForHeightArise()
-    }
+    waitForEmptyUtx()
   }
 
   private def mkOrders(accounts: List[JPrivateKey], pairs: List[AssetPair], matching: Boolean): List[Request] = {
@@ -396,7 +393,7 @@ object TankGenerator {
       } catch { case e: Exception => println(e) }
     }
 
-    waitForHeightArise()
+    waitForEmptyUtx()
 
     val now = System.currentTimeMillis()
     val massTransfers =
@@ -421,9 +418,6 @@ object TankGenerator {
   }
 
   def placeOrder(order: Order): Future[HttpResponse] = Future {
-
-    println(s"PLACE:     ${order.toJson}")
-
     val res = httpClient.execute(
       RequestBuilder
         .post(matcherHttpUri.resolve(s"/matcher/orderbook"))
@@ -431,11 +425,10 @@ object TankGenerator {
         .build(),
       HttpClientContext.create
     )
-
-    println(s"PLACE:     ${res.toString}")
-
-
     res.close()
+    if (res.getStatusLine.getStatusCode != 200)
+      throw new RuntimeException(s"placing fail: ${order.toJson}")
+    else println(s"Placing OK: ${order.toJson}")
     res
   }
 
@@ -461,8 +454,7 @@ object TankGenerator {
           .getSignedWith(account)
 
       placeOrder(order).recover {
-        case e: Throwable => println(s"Error during operation: $e"); null
-        case _ => println(order.toJson)
+        case e: Throwable => println(e.getMessage); null
       }
     }
 

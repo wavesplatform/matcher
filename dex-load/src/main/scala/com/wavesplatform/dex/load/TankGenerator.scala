@@ -1,9 +1,9 @@
 package com.wavesplatform.dex.load
 
-import akka.util.ByteString
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
+import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.load.request._
@@ -21,6 +21,7 @@ import org.apache.http.entity.{ContentType, StringEntity}
 import org.apache.http.impl.client.{CloseableHttpClient, HttpClients}
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager
 import play.api.libs.json.{JsError, JsSuccess, JsValue}
+import com.wavesplatform.dex.model.AssetPairBuilder.assetIdOrdering
 
 import java.io.{File, PrintWriter}
 import java.net.URI
@@ -106,12 +107,13 @@ object TankGenerator {
     val randomAssetPairs = Random
       .shuffle {
         assets
+          .map(Asset.fromString(_).get)
           .combinations(2)
           .map {
-            case List(aa, pa) => if (IssuedAsset(pa.getBytes()).compatId < IssuedAsset(aa.getBytes()).compatId) (aa, pa) else (pa, aa)
+            case List(aa, pa) => if (aa.compatId < pa.compatId) (aa, pa) else (pa, aa)
             case _ => throw new RuntimeException("Can't create asset-pair")
           }
-          .map(Function.tupled((a, p) => new AssetPair(AssetId.as(a), AssetId.as(p))))
+          .map(Function.tupled((a, p) => new AssetPair(AssetId.as(a.toString), AssetId.as(p.toString))))
       }
       .take(count)
       .toList

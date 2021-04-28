@@ -17,6 +17,9 @@ package object it {
   import org.scalatest.concurrent.ScalaFutures._
   import com.wavesplatform.dex.Implicits.durationToScalatestTimeout
 
+  // Using here specified timeouts for futureValue because these methods execute long operations
+  // Regular PatienceConfigs were defined for faster operations
+
   /**
    * @return The number of successful commands
    */

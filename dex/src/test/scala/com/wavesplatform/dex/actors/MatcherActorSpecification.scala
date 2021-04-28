@@ -32,7 +32,7 @@ import scala.concurrent.duration.DurationInt
 import scala.concurrent.Future
 
 class MatcherActorSpecification
-    extends MatcherSpec("MatcherActor")
+    extends MatcherSpec
     with MatcherSpecBase
     with HasOecInteraction
     with BeforeAndAfterEach
@@ -155,7 +155,7 @@ class MatcherActorSpecification
       probe.send(actor, MatcherActor.GetSnapshotOffsets)
       probe.expectMsg(MatcherActor.SnapshotOffsetsResponse(Map.empty))
 
-      eventually(timeout(fiveSecTimeout))(working shouldBe true)
+      eventually(working shouldBe true)
     }
 
     "stop the work" when {

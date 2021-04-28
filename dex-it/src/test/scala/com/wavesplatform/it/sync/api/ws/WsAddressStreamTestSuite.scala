@@ -18,12 +18,10 @@ import com.wavesplatform.it.WsSuiteBase
 import org.scalatest.prop.TableDrivenPropertyChecks
 
 import scala.collection.parallel.CollectionConverters._
-import scala.concurrent.duration._
 import scala.concurrent.Future
+import scala.concurrent.duration._
 
 class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChecks {
-
-  implicit private val patConfig = PatienceConfig(timeout = 1.minute)
 
   override protected val dexInitialSuiteConfig: Config = ConfigFactory
     .parseString(s"""waves.dex {

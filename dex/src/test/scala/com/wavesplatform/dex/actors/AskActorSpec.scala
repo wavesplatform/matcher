@@ -12,10 +12,7 @@ import scala.concurrent.{Future, TimeoutException}
 
 class AskActorSpec extends AnyFreeSpec with Matchers with SystemTime with MatcherSpecLike with DiffMatcherWithImplicits {
 
-  private val defaultTimeout = 5.seconds
   private val defaultResponse = "foo"
-
-  implicit override val patienceConfig = PatienceConfig(timeout = defaultTimeout)
 
   "AskActor" - {
     "happy path" in test { (ref, future) =>
@@ -41,8 +38,7 @@ class AskActorSpec extends AnyFreeSpec with Matchers with SystemTime with Matche
 
     f(ref, future)
 
-    p.expectTerminated(ref, defaultTimeout)
+    p.expectTerminated(ref, timeout)
   }
 
-  override protected def actorSystemName: String = "AskActorSpec"
 }

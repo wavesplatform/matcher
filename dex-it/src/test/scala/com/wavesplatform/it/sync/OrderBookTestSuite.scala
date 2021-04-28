@@ -10,12 +10,9 @@ import com.wavesplatform.dex.domain.order.OrderType._
 import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import com.wavesplatform.it.MatcherSuiteBase
 
-import scala.concurrent.duration.DurationInt
 import scala.concurrent.Future
 
 class OrderBookTestSuite extends MatcherSuiteBase {
-
-  implicit override def patienceConfig = PatienceConfig(1.minute)
 
   override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "WAVES" ]""")
 

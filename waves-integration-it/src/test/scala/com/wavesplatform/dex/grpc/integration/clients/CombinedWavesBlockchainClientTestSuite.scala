@@ -30,10 +30,7 @@ import scala.util.Random
 
 class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with HasToxiProxy with NoStackTraceCancelAfterFailure {
 
-  implicit override def patienceConfig: PatienceConfig = super.patienceConfig.copy(
-    timeout = 1.minute,
-    interval = 1.second
-  )
+  implicit override def patienceConfig = PatienceConfig(1.minute, 1.second)
 
   private val grpcExecutor = Executors.newCachedThreadPool(
     new ThreadFactoryBuilder()

@@ -29,11 +29,6 @@ import scala.concurrent.{Await, ExecutionContext}
 
 class BlockchainUpdatesClientTestSuite extends IntegrationSuiteBase with HasToxiProxy with NoStackTraceCancelAfterFailure {
 
-  implicit override def patienceConfig: PatienceConfig = super.patienceConfig.copy(
-    timeout = 1.minute,
-    interval = 1.second
-  )
-
   private val grpcExecutor = Executors.newCachedThreadPool(
     new ThreadFactoryBuilder()
       .setDaemon(true)

@@ -125,10 +125,8 @@ class MatcherMassOrdersTestSuite extends MatcherSuiteBase {
     }
 
     "Filled and Cancelled orders should be sorted by timestamp." in {
-      val filledAndCancelledOrders =
-        dex1.api.getOrderHistoryByPublicKey(alice).filter(o => o.status === Status.Filled.name || o.status == Status.Cancelled.name).map(
-          _.timestamp
-        )
+      val filledAndCancelledOrders = dex1.api.getOrderHistoryByPublicKey(alice)
+        .filter(o => o.status === Status.Filled.name || o.status == Status.Cancelled.name).map(_.timestamp)
       filledAndCancelledOrders.reverse shouldBe sorted
     }
 

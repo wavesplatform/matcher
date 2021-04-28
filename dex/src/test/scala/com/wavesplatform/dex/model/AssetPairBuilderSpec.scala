@@ -25,7 +25,7 @@ class AssetPairBuilderSpec extends AnyFreeSpec with Matchers with MockFactory wi
 
   private def b(v: String) = ByteStr.decodeBase58(v).get
 
-  implicit override def patienceConfig = PatienceConfig(timeout = 2.minutes)
+  implicit override def patienceConfig = PatienceConfig(timeout = 5.seconds)
 
   private val WAVES = "WAVES"
   private val WUSD = IssuedAsset(ByteStr.decodeBase58("HyFJ3rrq5m7FxdkWtQXkZrDat1F7LjVVGfpSkUuEXQHj").get)

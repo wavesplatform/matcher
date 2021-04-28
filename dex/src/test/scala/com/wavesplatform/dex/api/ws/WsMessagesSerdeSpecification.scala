@@ -72,7 +72,7 @@ class WsMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDrivenProp
     account <- Gen.alphaNumStr.map(x => KeyPair(ByteStr(x.getBytes(StandardCharsets.UTF_8))))
     balanceChanges <- Gen.choose(0, 5)
     orderChanges <- Gen.const(5 - balanceChanges)
-    assets <- Gen.listOfN(balanceChanges, assetGen)
+    assets <- Gen.listOfN(balanceChanges, arbitraryAssetGen)
     balances <- Gen.listOfN(balanceChanges, wsBalancesGen)
     orders <- Gen.listOfN(orderChanges, wsOrderGen)
     updateId <- Gen.choose(0L, Long.MaxValue)
@@ -151,7 +151,7 @@ class WsMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDrivenProp
     timestamp <- Gen.choose(0L, Long.MaxValue)
     updateId <- Gen.choose(0L, Long.MaxValue)
     ratesCount <- Gen.choose(1, 5)
-    assets <- Gen.listOfN(ratesCount, assetGen)
+    assets <- Gen.listOfN(ratesCount, arbitraryAssetGen)
     rates <- Gen.listOfN(ratesCount, Gen.frequency((4, Gen.choose(0.05d, 100500d)), (1, Gen.const(-1d))))
   } yield WsRatesUpdates(assets.zip(rates).toMap, updateId, timestamp)
 

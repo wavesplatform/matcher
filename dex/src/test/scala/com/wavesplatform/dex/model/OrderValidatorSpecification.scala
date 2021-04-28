@@ -157,7 +157,7 @@ class OrderValidatorSpecification
 
       "matcherFeeAssetId is blacklisted" in {
         val preconditions = for {
-          matcherFeeAsset <- arbitraryAssetGen map (asset => IssuedAsset(asset.compatId.get))
+          matcherFeeAsset <- arbitraryIssuedAssetGen map (asset => IssuedAsset(asset.compatId.get))
           (_, order) <- orderV3WithPredefinedFeeAssetGenerator(Some(matcherFeeAsset))
         } yield order -> matcherFeeAsset
 
@@ -183,7 +183,7 @@ class OrderValidatorSpecification
         val preconditions =
           for {
             order <- orderV3Generator
-            fixedFeeAsset <- arbitraryAssetGen
+            fixedFeeAsset <- arbitraryIssuedAssetGen
             fixedFeeSettings <- fixedSettingsGenerator(fixedFeeAsset)
           } yield (order, fixedFeeSettings)
 

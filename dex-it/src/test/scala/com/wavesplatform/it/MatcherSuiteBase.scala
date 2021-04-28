@@ -62,7 +62,7 @@ trait MatcherSuiteBase
 
   override protected val moduleName: String = "dex-it"
 
-  implicit override def patienceConfig: PatienceConfig = super.patienceConfig.copy(timeout = 30.seconds, interval = 1.second)
+  implicit override def patienceConfig: PatienceConfig = super.patienceConfig.copy(timeout = 1.minute, interval = 1.second)
 
   override protected def beforeAll(): Unit = {
     log.debug(s"Perform beforeAll")

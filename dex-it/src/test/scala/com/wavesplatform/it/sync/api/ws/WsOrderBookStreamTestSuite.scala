@@ -18,17 +18,13 @@ import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, OrderRestrictionsSettings}
 import com.wavesplatform.it.api.MatcherCommand
 import com.wavesplatform.it.{executeCommands, WsSuiteBase}
-
-import scala.collection.immutable.TreeMap
-import scala.concurrent.duration.DurationInt
-import scala.concurrent.Future
 import play.api.libs.json._
 
+import scala.collection.immutable.TreeMap
+import scala.concurrent.Future
 import scala.util.Random
 
 class WsOrderBookStreamTestSuite extends WsSuiteBase {
-
-  implicit private val patConfig = PatienceConfig(timeout = 1.minute)
 
   private val carol: KeyPair = mkKeyPair("carol")
 

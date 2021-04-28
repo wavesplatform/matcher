@@ -19,7 +19,7 @@ class RateDbSpecification extends AnyWordSpecLike with Matchers with WithDb with
           .listOfN(
             100,
             for {
-              asset <- arbitraryAssetGen
+              asset <- arbitraryIssuedAssetGen
               rateValue <- Gen.choose(1, 100).map(_.toDouble / 100)
             } yield asset -> rateValue
           )
@@ -34,7 +34,7 @@ class RateDbSpecification extends AnyWordSpecLike with Matchers with WithDb with
     }
 
     "update rate if it already exists" in test { rdb =>
-      forAll(arbitraryAssetGen) { asset =>
+      forAll(arbitraryIssuedAssetGen) { asset =>
         rdb.upsertRate(asset, 1).futureValue
         rdb.getAllRates.futureValue shouldBe Map(asset -> 1)
 

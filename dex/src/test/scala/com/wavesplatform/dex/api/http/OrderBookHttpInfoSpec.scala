@@ -35,7 +35,7 @@ class OrderBookHttpInfoSpec extends AnyFreeSpec with Matchers with SystemTime wi
         // Two levels: one is aggregated and one is not
 
         val aggOrderBookRef = system.actorOf(Props(new FakeOrderBookActor(pair)))
-        val askAdapter = new OrderBookAskAdapter(new AtomicReference(Map(pair -> Right(aggOrderBookRef))), fiveSecTimeout)
+        val askAdapter = new OrderBookAskAdapter(new AtomicReference(Map(pair -> Right(aggOrderBookRef))), timeout)
         val orderBookHttpInfo = new OrderBookHttpInfo(OrderBookHttpInfo.Settings(List(3, 9), None), askAdapter, time, _ => 8.pure[FutureResult])
         def get(depth: Option[Int]): HttpV0OrderBook =
           HttpV0OrderBook.fromHttpResponse(orderBookHttpInfo.getHttpView(pair, MatcherModel.Normalized, depth).futureValue)
@@ -134,7 +134,6 @@ class OrderBookHttpInfoSpec extends AnyFreeSpec with Matchers with SystemTime wi
     }
   }
 
-  override protected def actorSystemName: String = "OrderBookHttpInfoSpec"
 }
 
 object OrderBookHttpInfoSpec {

@@ -1,7 +1,7 @@
 package com.wavesplatform.it.async
 
-import java.nio.charset.StandardCharsets
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.Implicits.durationToScalatestTimeout
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.account.KeyPair
@@ -12,9 +12,10 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.it.MatcherSuiteBase
 import im.mak.waves.transactions.mass.Transfer
-import org.scalatest.time.{Minutes, Second, Span}
 
+import java.nio.charset.StandardCharsets
 import scala.concurrent.Future
+import scala.concurrent.duration._
 
 // leave default Patience config with timeout = 30 seconds
 // but if there will be timeout errors, set it up to 1-2 minutes,
@@ -24,7 +25,7 @@ class CorrectStatusAfterPlaceTestSuite extends MatcherSuiteBase {
   private val issuer = alice
   private val now = System.currentTimeMillis()
 
-  override implicit def patienceConfig = PatienceConfig(timeout = Span(3, Minutes), interval = Span(1, Second))
+  implicit override def patienceConfig = PatienceConfig(3.minutes, 1.second)
 
   private val IssueResults(issueAsset1Tx, issuedAsset1Id, issuedAsset1) =
     mkIssueExtended(issuer, "asset1", Long.MaxValue, decimals = 0, timestamp = now)
@@ -101,7 +102,10 @@ class CorrectStatusAfterPlaceTestSuite extends MatcherSuiteBase {
         dex1.asyncApi.waitForCurrentOffset(_ == totalSent - 1)
       }
     } yield r
-    future.futureValue
+
+    // There are 1800 orders and the contention during running tests in parallel on CI.
+    // So we specified the huge timeout for this job.
+    future.futureValue(10.minutes)
       .flatten
       .foreach {
         case (id, status, sent) => if (sent) withClue(s"$id")(status should not be Status.NotFound)

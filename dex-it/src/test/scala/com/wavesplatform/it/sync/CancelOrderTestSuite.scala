@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync
 
-import java.util.concurrent.ThreadLocalRandom
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.Implicits.durationToScalatestTimeout
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.account.KeyPair.toAddress
@@ -17,13 +17,12 @@ import com.wavesplatform.it.MatcherSuiteBase
 import im.mak.waves.transactions.mass.Transfer
 import org.scalatest.Assertion
 
+import java.util.concurrent.ThreadLocalRandom
 import scala.collection.immutable.Queue
-import scala.concurrent.duration.DurationInt
 import scala.concurrent.Future
+import scala.concurrent.duration.DurationInt
 
 class CancelOrderTestSuite extends MatcherSuiteBase {
-
-  implicit private val patConfig = PatienceConfig(timeout = 5.minutes)
 
   override protected def dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "$BtcId", "WAVES" ]""")
@@ -311,7 +310,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
           val wait = ThreadLocalRandom.current().nextInt(100, 1200).millis
           GlobalTimer.instance.sleep(wait)
         })
-      }.futureValue
+      }.futureValue(5.minutes)
 
       val statuses = sells.map { order =>
         order -> dex1.api.waitForOrder(order)(r => r.status == Status.Cancelled || r.status == Status.Filled).status
@@ -370,7 +369,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
     } yield {
       orderBook.bids should be(empty)
       orderBook.asks should be(empty)
-    }).futureValue
+    }).futureValue(5.minutes)
   }
 
   private def mkBobOrder = mkOrderDP(bob, wavesUsdPair, OrderType.SELL, 100.waves, 8)

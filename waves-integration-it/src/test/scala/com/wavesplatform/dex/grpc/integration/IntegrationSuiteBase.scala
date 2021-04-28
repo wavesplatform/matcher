@@ -42,7 +42,7 @@ trait IntegrationSuiteBase
 
   override protected val moduleName: String = "waves-integration-it"
 
-  implicit override def patienceConfig: PatienceConfig = super.patienceConfig.copy(timeout = 30.seconds, interval = 1.second)
+  implicit override def patienceConfig: PatienceConfig = super.patienceConfig.copy(1.minute, 1.second)
 
   override protected def beforeAll(): Unit = {
     log.debug(s"Perform beforeAll")

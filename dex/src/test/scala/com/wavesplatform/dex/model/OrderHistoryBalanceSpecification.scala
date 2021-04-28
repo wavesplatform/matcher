@@ -17,11 +17,10 @@ import com.wavesplatform.dex.model.Events.{OrderAdded, OrderAddedReason, OrderCa
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.time.SystemTime
 import org.scalactic.source
-import org.scalatest._
+import org.scalatest.BeforeAndAfterEach
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.propspec.AnyPropSpecLike
-import org.scalatest.time.{Millis, Seconds, Span}
 
 import java.math.BigInteger
 import scala.concurrent.duration._
@@ -39,7 +38,7 @@ class OrderHistoryBalanceSpecification
 
   import OrderHistoryBalanceSpecification._
 
-  implicit override def patienceConfig: PatienceConfig = PatienceConfig(timeout = Span(2, Seconds), interval = Span(5, Millis))
+  implicit override def patienceConfig: PatienceConfig = PatienceConfig(2.seconds, 5.millis)
 
   private val WctBtc = AssetPair(mkAssetId("WCT"), mkAssetId("BTC"))
   private val WavesBtc = AssetPair(Waves, mkAssetId("BTC"))

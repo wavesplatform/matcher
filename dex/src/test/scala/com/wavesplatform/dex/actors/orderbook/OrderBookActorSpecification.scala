@@ -35,11 +35,11 @@ import org.scalatest.concurrent.Eventually
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
 import scala.concurrent.Future
+import scala.concurrent.duration._
 
 class OrderBookActorSpecification
-    extends MatcherSpec("OrderBookActor")
+    extends MatcherSpec
     with HasOecInteraction
     with SystemTime
     with ImplicitSender

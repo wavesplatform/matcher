@@ -113,14 +113,14 @@ class AggregatedOrderBookActorSpec
             )
           )
         )
-        owner.expectMsgType[OrderBookActor.OrderBookRecovered](fiveSecTimeout)
+        owner.expectMsgType[OrderBookActor.OrderBookRecovered]
 
         orders.foreach(orderBookRef ! _)
 
         orderBookRef ! MatcherActor.SaveSnapshot(100L)
         owner.expectMsgType[OrderBookActor.OrderBookSnapshotUpdateCompleted]
 
-        val orderBookAskAdapter = new OrderBookAskAdapter(new AtomicReference(Map(pair -> Right(orderBookRef))), fiveSecTimeout)
+        val orderBookAskAdapter = new OrderBookAskAdapter(new AtomicReference(Map(pair -> Right(orderBookRef))), timeout)
 
         val updatedOrderBook = eventually {
           val ob = obsdb.get(pair).futureValue
@@ -446,7 +446,6 @@ class AggregatedOrderBookActorSpec
   )
 
   private def get[R](ref: ActorRef[InputMessage])(mkMessage: ActorRef[R] => InputMessage): R =
-    ref.ask[R](mkMessage)(fiveSecTimeout, system.scheduler.toTyped).futureValue
+    ref.ask[R](mkMessage)(timeout, system.scheduler.toTyped).futureValue
 
-  override protected def actorSystemName: String = "AggregatedOrderBookSpec"
 }

@@ -69,10 +69,10 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
 
   private val matcherKeyPair = KeyPair("matcher".getBytes("utf-8"))
 
-  private val smartAsset = arbitraryAssetGen.sample.get
+  private val smartAsset = arbitraryIssuedAssetGen.sample.get
   private val smartAssetId = smartAsset.id
 
-  private val unknownAsset = arbitraryAssetGen.sample.get
+  private val unknownAsset = arbitraryIssuedAssetGen.sample.get
   private val unknownAssetId = unknownAsset.id
 
   // Will be refactored in DEX-548

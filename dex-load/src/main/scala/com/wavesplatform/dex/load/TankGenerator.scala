@@ -427,7 +427,7 @@ object TankGenerator {
     )
     res.close()
     if (res.getStatusLine.getStatusCode != 200)
-      throw new RuntimeException(s"Зlacing fail: ${order.toJson}")
+      throw new RuntimeException(s"Placing FAIL: ${order.toJson}")
     else println(s"Placing OK: ${order.toJson}")
     res
   }

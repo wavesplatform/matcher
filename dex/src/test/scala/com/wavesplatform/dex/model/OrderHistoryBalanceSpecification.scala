@@ -21,6 +21,7 @@ import org.scalatest.BeforeAndAfterEach
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.propspec.AnyPropSpecLike
+import org.scalatest.concurrent.ScalaFutures._
 
 import java.math.BigInteger
 import scala.concurrent.duration._
@@ -873,7 +874,6 @@ class OrderHistoryBalanceSpecification
 }
 
 private object OrderHistoryBalanceSpecification {
-  import org.scalatest.concurrent.ScalaFutures._
 
   val MaxActiveOrders = 100
   val MaxFinalizedOrders = 70

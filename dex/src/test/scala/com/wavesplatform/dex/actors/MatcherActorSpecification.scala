@@ -41,8 +41,6 @@ class MatcherActorSpecification
     with Eventually
     with SystemTime {
 
-  private val noMsgTimeout = 200.millis
-
   private val assetsCache = new AssetsCache() {
 
     override val cached: AssetsReadOnlyDb[Id] =
@@ -253,15 +251,15 @@ class MatcherActorSpecification
           sendBuyOrders(eventSender, matcherActor, pair23, 0 to 1)
           sendBuyOrders(eventSender, matcherActor, pair45, 2 to 3)
 
-          probe23.expectNoMessage(noMsgTimeout)
-          probe45.expectNoMessage(noMsgTimeout)
+          probe23.expectNoMessage()
+          probe45.expectNoMessage()
 
           sendBuyOrders(eventSender, matcherActor, pair45, 4 to 10)
           probe23.expectMsg(OrderBookSnapshotUpdateCompleted(pair23, Some(9)))
-          probe45.expectNoMessage(noMsgTimeout)
+          probe45.expectNoMessage()
 
           sendBuyOrders(eventSender, matcherActor, pair23, 11 to 14)
-          probe23.expectNoMessage(noMsgTimeout)
+          probe23.expectNoMessage()
           probe45.expectMsg(OrderBookSnapshotUpdateCompleted(pair45, Some(12)))
         }
       }
@@ -274,11 +272,11 @@ class MatcherActorSpecification
 
         // OrderBookSnapshotUpdated(pair23, 26) is ignored in OrderBookActor,
         // because it's waiting for SaveSnapshotSuccess of 9 from SnapshotStore.
-        probe.expectNoMessage(noMsgTimeout)
+        probe.expectNoMessage()
 
         sendBuyOrders(eventSender, matcherActor, pair23, 31 to 45)
         probe.expectMsg(OrderBookSnapshotUpdateCompleted(pair23, Some(43)))
-        probe.expectNoMessage(noMsgTimeout)
+        probe.expectNoMessage()
       }
     }
 
@@ -419,7 +417,7 @@ class MatcherActorSpecification
         case x: ValidatedCommandWithMeta if x.offset > nr => nr = x.offset
         case SaveSnapshot(globalNr) =>
           val event = OrderBookSnapshotUpdateCompleted(assetPair, Some(globalNr))
-          context.system.scheduler.scheduleOnce(noMsgTimeout) {
+          context.system.scheduler.scheduleOnce(200.millis) {
             context.parent ! event
             probe.ref ! event
           }

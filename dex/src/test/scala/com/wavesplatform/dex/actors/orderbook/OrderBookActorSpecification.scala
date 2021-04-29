@@ -276,7 +276,7 @@ class OrderBookActorSpecification
       (1 to 10).foreach { i =>
         actor ! wrapLimitOrder(i, buy(pair, 100000000L, 0.00041))
       }
-      tp.expectNoMessage(100.millis)
+      tp.expectNoMessage()
     }
 
     "respond on SaveSnapshotCommand" in obcTest { (pair, actor, tp) =>
@@ -306,7 +306,7 @@ class OrderBookActorSpecification
       actor ! SaveSnapshot(10L)
       actor ! SaveSnapshot(10L)
       tp.expectMsgType[OrderBookSnapshotUpdateCompleted]
-      tp.expectNoMessage(200.millis)
+      tp.expectNoMessage()
     }
 
     "restore its state at start" in obcTest { (pair, actor, tp) =>

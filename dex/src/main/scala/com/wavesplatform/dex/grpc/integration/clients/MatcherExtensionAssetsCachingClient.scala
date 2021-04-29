@@ -18,7 +18,7 @@ import monix.reactive.Observable
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class MatcherExtensionAssetsWatchingClient(
+class MatcherExtensionAssetsCachingClient(
   underlying: WavesBlockchainClient,
   assetsCache: AssetsCache
 )(implicit grpcExecutionContext: ExecutionContext)

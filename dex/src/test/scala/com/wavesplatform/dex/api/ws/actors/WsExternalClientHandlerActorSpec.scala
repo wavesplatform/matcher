@@ -9,7 +9,7 @@ import akka.actor.typed.scaladsl.adapter._
 import akka.testkit.TestProbe
 import cats.syntax.either._
 import com.wavesplatform.dex._
-import com.wavesplatform.dex.actors.MatcherActor.AggregatedOrderBookEnvelope
+import com.wavesplatform.dex.actors.OrderBookDirectoryActor.AggregatedOrderBookEnvelope
 import com.wavesplatform.dex.actors.address.AddressActor.WsCommand
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor

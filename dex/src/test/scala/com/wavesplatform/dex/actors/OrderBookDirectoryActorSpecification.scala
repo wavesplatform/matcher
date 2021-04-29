@@ -32,7 +32,7 @@ import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, Future}
 
 class OrderBookDirectoryActorSpecification
-    extends MatcherSpec("MatcherActor")
+    extends MatcherSpec("OrderBookDirectoryActor")
     with MatcherSpecBase
     with HasOecInteraction
     with BeforeAndAfterEach
@@ -50,7 +50,7 @@ class OrderBookDirectoryActorSpecification
     override def put(asset: Asset, item: BriefAssetDescription): Future[Unit] = Future.unit
   }
 
-  "MatcherActor" should {
+  "OrderBookDirectoryActor" should {
     "return all open markets" in {
       val actor = defaultActor()
       val probe = TestProbe()
@@ -226,54 +226,54 @@ class OrderBookDirectoryActorSpecification
 
     "force an order book to create a snapshot" when {
       "it didn't do snapshots for a long time" when {
-        "first time" in snapshotTest(pair23) { (matcherActor, probes) =>
+        "first time" in snapshotTest(pair23) { (orderBookDirectoryActor, probes) =>
           val eventSender = TestProbe()
-          sendBuyOrders(eventSender, matcherActor, pair23, 0 to 9)
+          sendBuyOrders(eventSender, orderBookDirectoryActor, pair23, 0 to 9)
           probes.head.expectMsg(OrderBookSnapshotUpdateCompleted(pair23, Some(9)))
         }
 
-        "later" in snapshotTest(pair23) { (matcherActor, probes) =>
+        "later" in snapshotTest(pair23) { (orderBookDirectoryActor, probes) =>
           val eventSender = TestProbe()
           val probe = probes.head
-          sendBuyOrders(eventSender, matcherActor, pair23, 0 to 10)
+          sendBuyOrders(eventSender, orderBookDirectoryActor, pair23, 0 to 10)
           probe.expectMsg(OrderBookSnapshotUpdateCompleted(pair23, Some(9)))
 
-          sendBuyOrders(eventSender, matcherActor, pair23, 10 to 28)
+          sendBuyOrders(eventSender, orderBookDirectoryActor, pair23, 10 to 28)
           probe.expectMsg(OrderBookSnapshotUpdateCompleted(pair23, Some(26)))
         }
 
-        "multiple order books" in snapshotTest(pair23, pair45) { (matcherActor, probes) =>
+        "multiple order books" in snapshotTest(pair23, pair45) { (orderBookDirectoryActor, probes) =>
           val eventSender = TestProbe()
           val (probe23, probe45) = probes match {
             case List(probe23, probe45) => (probe23, probe45)
             case _ => throw new IllegalArgumentException(s"Unexpected snapshots")
           }
-          sendBuyOrders(eventSender, matcherActor, pair23, 0 to 1)
-          sendBuyOrders(eventSender, matcherActor, pair45, 2 to 3)
+          sendBuyOrders(eventSender, orderBookDirectoryActor, pair23, 0 to 1)
+          sendBuyOrders(eventSender, orderBookDirectoryActor, pair45, 2 to 3)
 
           probe23.expectNoMessage(200.millis)
           probe45.expectNoMessage(200.millis)
 
-          sendBuyOrders(eventSender, matcherActor, pair45, 4 to 10)
+          sendBuyOrders(eventSender, orderBookDirectoryActor, pair45, 4 to 10)
           probe23.expectMsg(OrderBookSnapshotUpdateCompleted(pair23, Some(9)))
           probe45.expectNoMessage(200.millis)
 
-          sendBuyOrders(eventSender, matcherActor, pair23, 11 to 14)
+          sendBuyOrders(eventSender, orderBookDirectoryActor, pair23, 11 to 14)
           probe23.expectNoMessage(200.millis)
           probe45.expectMsg(OrderBookSnapshotUpdateCompleted(pair45, Some(12)))
         }
       }
 
-      "received a lot of messages and skipped the middle offset" in snapshotTest(pair23) { (matcherActor, probes) =>
+      "received a lot of messages and skipped the middle offset" in snapshotTest(pair23) { (orderBookDirectoryActor, probes) =>
         val eventSender = TestProbe()
         val probe = probes.head
-        sendBuyOrders(eventSender, matcherActor, pair23, 0 to 30)
+        sendBuyOrders(eventSender, orderBookDirectoryActor, pair23, 0 to 30)
         probe.expectMsg(OrderBookSnapshotUpdateCompleted(pair23, Some(9)))
 
         // OrderBookSnapshotUpdated(pair23, 26) is ignored in OrderBookActor, because it's waiting for SaveSnapshotSuccess of 9 from SnapshotStore.
         probe.expectNoMessage(200.millis)
 
-        sendBuyOrders(eventSender, matcherActor, pair23, 31 to 45)
+        sendBuyOrders(eventSender, orderBookDirectoryActor, pair23, 31 to 45)
         probe.expectMsg(OrderBookSnapshotUpdateCompleted(pair23, Some(43)))
         probe.expectNoMessage(200.millis)
       }
@@ -313,7 +313,7 @@ class OrderBookDirectoryActorSpecification
               mkAssetPairsDB,
               _ => {},
               ob,
-              (pair, matcherActor) => Props(new RecoveringActor(matcherActor, pair)),
+              (pair, orderBookDirectoryActor) => Props(new RecoveringActor(orderBookDirectoryActor, pair)),
               assetsCache,
               _.asRight
             )
@@ -384,7 +384,7 @@ class OrderBookDirectoryActorSpecification
   }
 
   /**
-   * @param f (MatcherActor, TestProbe) => Any
+   * @param f (orderBookDirectoryActor, TestProbe) => Any
    */
   private def snapshotTest(assetPairs: AssetPair*)(f: (ActorRef, List[TestProbe]) => Any): Any = {
     val r = assetPairs.map(fakeOrderBookActor).toList

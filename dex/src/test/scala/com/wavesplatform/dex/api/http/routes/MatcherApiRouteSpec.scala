@@ -13,7 +13,7 @@ import com.google.common.primitives.Longs
 import com.softwaremill.diffx.{Derived, Diff}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.dex._
-import com.wavesplatform.dex.actors.MatcherActor._
+import com.wavesplatform.dex.actors.OrderBookDirectoryActor._
 import com.wavesplatform.dex.actors.OrderBookAskAdapter
 import com.wavesplatform.dex.actors.address.AddressActor.Command.{PlaceOrder, Source}
 import com.wavesplatform.dex.actors.address.AddressActor.Query.GetTradableBalance
@@ -1175,8 +1175,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       TestActor.KeepRunning
     }
 
-    val matcherActor = TestProbe("matcher")
-    matcherActor.setAutoPilot { (sender: ActorRef, msg: Any) =>
+    val orderBookDirectoryActor = TestProbe("matcher")
+    orderBookDirectoryActor.setAutoPilot { (sender: ActorRef, msg: Any) =>
       msg match {
         case GetSnapshotOffsets =>
           sender ! SnapshotOffsetsResponse(
@@ -1290,7 +1290,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         ),
         matcherPublicKey = matcherKeyPair.publicKey,
         config = ConfigFactory.load().atKey("waves.dex"),
-        matcher = matcherActor.ref,
+        matcher = orderBookDirectoryActor.ref,
         addressActor = addressActor.ref,
         CombinedStream.Status.Working,
         storeCommand = {

@@ -43,7 +43,7 @@ package object utils {
     "Signature" -> getSignatureByPrivateKeyAndTimestamp(account, timestamp)
   )
 
-  def getOrderBook(account: PrivateKey, activeOnly: Boolean = true): JsValue =
+  def getOrderBook(account: PrivateKey, activeOnly: Boolean = true): JsValue = {
     Json
       .parse(
         basicRequest
@@ -53,6 +53,7 @@ package object utils {
           .body
           .explicitGet()
       )
+  }
 
   def waitForHeightArise(): Unit = {
     val toHeight = node.getHeight + 1

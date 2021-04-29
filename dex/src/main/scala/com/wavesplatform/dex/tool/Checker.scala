@@ -165,6 +165,20 @@ class Checker(superConnector: SuperConnector) {
     val submitted = mkMatcherOrder(assetPairInfo.assetPair, SELL)
     val submittedId = submitted.id()
 
+    def cancelAllOrders(): ErrorOr[Boolean] = {
+      dexRest.getActiveOrdersByPair(env.matcherKeyPair, assetPairInfo.assetPair).map {
+        _.map(j => (j \ "id").as[ByteStr]).map { id =>
+          dexRest.cancelOrder(id, assetPairInfo.assetPair, env.matcherKeyPair)
+          dexRest.waitForOrderStatus(id, assetPairInfo.assetPair, OrderStatus.Cancelled.name)
+        }
+      }
+
+
+      (for {
+        ids <- dexRest.getActiveOrdersByPair(env.matcherKeyPair, assetPairInfo.assetPair)
+      } yield ids.isEmpty)
+    }
+
     def checkFillingAtDex(orderStatus: JsValue): ErrorOr[Boolean] = {
 
       lazy val expectedFilledStatus = {
@@ -189,6 +203,7 @@ class Checker(superConnector: SuperConnector) {
       } yield txs
 
     for {
+      ids <- dexRest.getActiveOrdersByPair(env.matcherKeyPair, assetPairInfo.assetPair)
       _ <- dexRest.placeOrder(counter)
       counterStatus <- dexRest.waitForOrderStatus(counter, OrderStatus.Accepted.name)
       _ <- dexRest.placeOrder(submitted)

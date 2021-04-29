@@ -225,7 +225,7 @@ object TankGenerator {
         getOrderBook(a)
           .as[Array[JsValue]]
           .map { o =>
-            val id = (o \ "id").as[String]
+            val id = (o \ "id").as[ByteStr]
             val aa = ((o \ "assetPair").as[JsValue] \ "amountAsset").validate[String] match {
               case JsSuccess(name, _) => name
               case _: JsError => "WAVES"
@@ -238,7 +238,7 @@ object TankGenerator {
             val unsignedRequest =
               HttpCancelOrder(
                 sender = PublicKey(a.publicKey().bytes()),
-                orderId = Some(id.getBytes()),
+                orderId = Some(id),
                 timestamp = None,
                 signature = Array.emptyByteArray
               )
@@ -427,7 +427,7 @@ object TankGenerator {
     )
     res.close()
     if (res.getStatusLine.getStatusCode != 200)
-      throw new RuntimeException(s"placing fail: ${order.toJson}")
+      throw new RuntimeException(s"Зlacing fail: ${order.toJson}")
     else println(s"Placing OK: ${order.toJson}")
     res
   }
@@ -468,8 +468,8 @@ object TankGenerator {
 
   private def mkAllTypes(accounts: List[JPrivateKey], requestsCount: Int, pairsFile: Option[File]): List[Request] = {
     println("Making requests:")
-
     placeOrdersForCancel(accounts, (requestsCount * settings.distribution.placeOrder).toInt, pairsFile)
+
     Random.shuffle(
       mkOrderStatuses(accounts, (requestsCount * settings.distribution.orderStatus).toInt) ++
       mkMatching(accounts, (requestsCount * settings.distribution.placeOrder).toInt, pairsFile, distributed = true) ++
@@ -486,7 +486,7 @@ object TankGenerator {
     val massTransfersRequestsCount = step2MatcherRequestsCount / 15
 
     val requests = mkAllTypes(accounts.slice(0, accounts.size - massTransfersAccounts.size), requestsCount, pairsFile)
-    val step1And3 = requests.slice(0, step1And3RequestsCount).toList
+    val step1And3 = requests.slice(0, step1And3RequestsCount)
     val step2 = requests.slice(step1And3RequestsCount, step1And3RequestsCount + step2MatcherRequestsCount)
     val massTransfers = mkMassTransfers(massTransfersAccounts, massTransfersRequestsCount)
 

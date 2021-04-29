@@ -16,14 +16,12 @@ import com.wavesplatform.dex.domain.order.OrderOps._
 import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV3}
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.domain.{crypto => wcrypto}
-import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.Events.{OrderCanceled, OrderExecuted}
-import com.wavesplatform.dex.model.OrderValidator.Result
 import com.wavesplatform.dex.model.{BuyLimitOrder, LimitOrder, OrderValidator, SellLimitOrder, _}
 import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import com.wavesplatform.dex.settings.OrderFeeSettings._
-import com.wavesplatform.dex.settings.{loadConfig, AssetType, MatcherSettings, OrderFeeSettings}
+import com.wavesplatform.dex.settings.{AssetType, MatcherSettings, OrderFeeSettings, loadConfig}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.time.SystemTime
 import com.wavesplatform.dex.waves.WavesFeeConstants
@@ -31,18 +29,26 @@ import io.qameta.allure.scalatest.AllureScalatestContext
 import mouse.any._
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Suite
+import org.scalatest.concurrent.ScalaFutures
 import pureconfig.ConfigSource
 
 import java.math.BigInteger
 import java.security.SecureRandom
 import java.util.concurrent.atomic.AtomicLong
-import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
 import scala.util.Random
 
-trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with DoubleOps with WavesFeeConstants with AllureScalatestContext {
+trait MatcherSpecBase
+    extends SystemTime
+    with DiffMatcherWithImplicits
+    with DoubleOps
+    with WavesFeeConstants
+    with AllureScalatestContext
+    with ScalaFutures {
   _: Suite =>
+
+  implicit override def patienceConfig: PatienceConfig = PatienceConfig(2.seconds, 5.millis)
 
   implicit protected val wsErrorDiff: Derived[Diff[WsError]] = Derived(Diff.gen[WsError].ignore[WsError, Long](_.timestamp))
 
@@ -63,7 +69,7 @@ trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with Doub
   protected val wavesUsdPair: AssetPair = AssetPair(Waves, usd)
   protected val btcUsdPair: AssetPair = AssetPair(btc, usd)
 
-  protected val rateCache: RateCache = awaitResult(RateCache(TestRateDb()))
+  protected val rateCache: RateCache = RateCache(TestRateDb()).futureValue
     .unsafeTap(_.upsertRate(usd, 3.7))
     .unsafeTap(_.upsertRate(btc, 0.00011167))
 
@@ -95,10 +101,6 @@ trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with Doub
   protected def wrapLimitOrder(x: Order): ValidatedCommandWithMeta = wrapLimitOrder(seqNr.incrementAndGet(), x)
   protected def wrapLimitOrder(n: Long, x: Order): ValidatedCommandWithMeta = wrapCommand(n, ValidatedCommand.PlaceOrder(LimitOrder(x)))
   protected def wrapMarketOrder(mo: MarketOrder): ValidatedCommandWithMeta = wrapCommand(ValidatedCommand.PlaceMarketOrder(mo))
-
-  private lazy val futureAwaitTimeout = 2.minutes
-  protected def awaitResult[A](result: FutureResult[A]): Result[A] = Await.result(result.value, futureAwaitTimeout)
-  protected def awaitResult[A](result: Future[A]): A = Await.result(result, futureAwaitTimeout)
 
   protected def getSpentAmountWithFee(order: Order): Long = {
     val lo = LimitOrder(order)
@@ -132,14 +134,14 @@ trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with Doub
       feeAsset = feeAsset
     )
 
-  protected def assetGen: Gen[Asset] = Gen.frequency((9, arbitraryAssetGen), (1, Gen.const(Waves)))
+  protected def arbitraryAssetGen: Gen[Asset] = Gen.frequency((9, arbitraryIssuedAssetGen), (1, Gen.const(Waves)))
 
   protected def issuedAssetGen(prefix: Byte): Gen[IssuedAsset] =
     Gen
       .listOfN(Asset.AssetIdLength - 1, Arbitrary.arbitrary[Byte])
       .map(xs => IssuedAsset(ByteStr(Array(prefix, xs: _*))))
 
-  protected def arbitraryAssetGen: Gen[IssuedAsset] = issuedAssetGen(Random.nextInt(Byte.MaxValue).toByte)
+  protected def arbitraryIssuedAssetGen: Gen[IssuedAsset] = issuedAssetGen(Random.nextInt(Byte.MaxValue).toByte)
 
   protected val distinctPairGen: Gen[AssetPair] = for {
     a1 <- issuedAssetGen(1.toByte)
@@ -271,7 +273,7 @@ trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with Doub
       expiration: Long <- maxTimeGen
       matcherFee: Long <- maxWavesAmountGen
       orderVersion: Byte <- Gen.oneOf(1: Byte, 2: Byte, 3: Byte)
-      arbitraryAsset <- arbitraryAssetGen
+      arbitraryAsset <- arbitraryIssuedAssetGen
       feeAsset <- Gen.oneOf(pair.amountAsset, pair.priceAsset, Waves, arbitraryAsset)
     } yield
       if (orderVersion == 3)
@@ -330,7 +332,7 @@ trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with Doub
       timestamp: Long <- createdTimeGen
       expiration: Long <- maxTimeGen
       matcherFee: Long <- maxWavesAmountGen
-      arbitraryAsset <- arbitraryAssetGen
+      arbitraryAsset <- arbitraryIssuedAssetGen
       feeAsset <- Gen.oneOf(pair.amountAsset, pair.priceAsset, Waves, arbitraryAsset)
     } yield OrderV3(sender, MatcherAccount, pair, orderType, amount, price, timestamp, expiration, matcherFee, feeAsset)
 
@@ -344,7 +346,7 @@ trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with Doub
       timestamp: Long <- createdTimeGen
       expiration: Long <- maxTimeGen
       matcherFee: Long <- maxWavesAmountGen
-      arbitraryAsset <- arbitraryAssetGen
+      arbitraryAsset <- arbitraryIssuedAssetGen
     } yield sender -> OrderV3(
       sender,
       MatcherAccount,
@@ -371,7 +373,7 @@ trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with Doub
       expirationSell <- maxTimeGen
       matcherFeeBuy <- maxWavesAmountGen
       matcherFeeSell <- maxWavesAmountGen
-      arbitraryAsset <- arbitraryAssetGen
+      arbitraryAsset <- arbitraryIssuedAssetGen
       feeAsset <- Gen.oneOf(pair.amountAsset, pair.priceAsset, Waves, arbitraryAsset)
     } yield (
       senderBuy -> OrderV3(
@@ -414,15 +416,15 @@ trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with Doub
 
   private def orderFeeSettingsGenerator(defaultAssetForFixedSettings: Option[Asset] = None): Gen[OrderFeeSettings] =
     for {
-      defaultAsset <- defaultAssetForFixedSettings.fold(arbitraryAssetGen)(_.fold(arbitraryAssetGen)(Gen.const))
+      defaultAsset <- defaultAssetForFixedSettings.fold(arbitraryIssuedAssetGen)(_.fold(arbitraryIssuedAssetGen)(Gen.const))
       orderFeeSettings <- Gen.oneOf(dynamicSettingsGenerator(), fixedSettingsGenerator(defaultAsset), percentSettingsGenerator)
     } yield orderFeeSettings
 
   protected val orderWithoutWavesInPairAndWithFeeSettingsGenerator: Gen[(Order, KeyPair, OrderFeeSettings)] = {
     for {
       sender: KeyPair <- accountGen
-      amountAsset <- arbitraryAssetGen
-      priceAsset <- arbitraryAssetGen
+      amountAsset <- arbitraryIssuedAssetGen
+      priceAsset <- arbitraryIssuedAssetGen
       orderFeeSettings <- orderFeeSettingsGenerator()
       order <- orderGenerator(sender, AssetPair(amountAsset, priceAsset))
     } yield {
@@ -455,7 +457,12 @@ trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with Doub
         order
           .updateFeeAsset(OrderValidator.getValidFeeAssetForSettings(order, percentSettings, rateCache).head)
           .updateFee {
-            OrderValidator.getMinValidFeeForSettings(order, percentSettings, getDefaultAssetDescriptions(order.feeAsset).decimals, rateCache).explicitGet()
+            OrderValidator.getMinValidFeeForSettings(
+              order,
+              percentSettings,
+              getDefaultAssetDescriptions(order.feeAsset).decimals,
+              rateCache
+            ).explicitGet()
           }
       case (_, ds @ DynamicSettings(_, _)) =>
         order

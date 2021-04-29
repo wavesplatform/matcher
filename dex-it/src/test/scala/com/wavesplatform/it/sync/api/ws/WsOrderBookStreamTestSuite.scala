@@ -18,12 +18,10 @@ import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, OrderRestrictionsSettings}
 import com.wavesplatform.it.api.MatcherCommand
 import com.wavesplatform.it.{executeCommands, WsSuiteBase}
-
-import scala.collection.immutable.TreeMap
-import scala.concurrent.duration.DurationInt
-import scala.concurrent.{Await, Future}
 import play.api.libs.json._
 
+import scala.collection.immutable.TreeMap
+import scala.concurrent.Future
 import scala.util.Random
 
 class WsOrderBookStreamTestSuite extends WsSuiteBase {
@@ -513,10 +511,10 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
         mkOrderDP(carol, wavesBtcPair, BUY, 1.waves + i, 0.00012 + i / 100000.0d)
       }
 
-      Await.result(Future.traverse(orders)(dex1.asyncApi.place), 1.minute)
+      Future.traverse(orders)(dex1.asyncApi.place).futureValue
       dex1.api.cancelAll(carol)
 
-      Await.result(Future.traverse(wscs)(wsc => Future(wsc.close())), 1.minute)
+      Future.traverse(wscs)(wsc => Future(wsc.close())).futureValue
       Thread.sleep(3000)
       mainWsc.clearMessages()
 

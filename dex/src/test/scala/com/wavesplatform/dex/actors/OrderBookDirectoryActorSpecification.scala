@@ -29,10 +29,10 @@ import org.scalatest.concurrent.Eventually
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
 
 class OrderBookDirectoryActorSpecification
-    extends MatcherSpec("OrderBookDirectoryActor")
+  extends MatcherSpec
     with MatcherSpecBase
     with HasOecInteraction
     with BeforeAndAfterEach
@@ -44,7 +44,7 @@ class OrderBookDirectoryActorSpecification
   private val assetsCache = new AssetsCache() {
 
     override val cached: AssetsReadOnlyDb[Id] =
-      (asset: IssuedAsset) => Some(BriefAssetDescription(name = "Unknown", decimals = 8, hasScript = false))
+      (_: IssuedAsset) => Some(BriefAssetDescription(name = "Unknown", decimals = 8, hasScript = false))
 
     override def get(asset: Asset): Future[Option[BriefAssetDescription]] = Future.successful(cached.get(asset))
     override def put(asset: Asset, item: BriefAssetDescription): Future[Unit] = Future.unit
@@ -153,7 +153,7 @@ class OrderBookDirectoryActorSpecification
       probe.send(actor, OrderBookDirectoryActor.GetSnapshotOffsets)
       probe.expectMsg(OrderBookDirectoryActor.SnapshotOffsetsResponse(Map.empty))
 
-      eventually(timeout(2.seconds))(working shouldBe true)
+      eventually(working shouldBe true)
     }
 
     "stop the work" when {
@@ -226,56 +226,57 @@ class OrderBookDirectoryActorSpecification
 
     "force an order book to create a snapshot" when {
       "it didn't do snapshots for a long time" when {
-        "first time" in snapshotTest(pair23) { (orderBookDirectoryActor, probes) =>
+        "first time" in snapshotTest(pair23) { (OrderBookDirectoryActor, probes) =>
           val eventSender = TestProbe()
-          sendBuyOrders(eventSender, orderBookDirectoryActor, pair23, 0 to 9)
+          sendBuyOrders(eventSender, OrderBookDirectoryActor, pair23, 0 to 9)
           probes.head.expectMsg(OrderBookSnapshotUpdateCompleted(pair23, Some(9)))
         }
 
-        "later" in snapshotTest(pair23) { (orderBookDirectoryActor, probes) =>
+        "later" in snapshotTest(pair23) { (OrderBookDirectoryActor, probes) =>
           val eventSender = TestProbe()
           val probe = probes.head
-          sendBuyOrders(eventSender, orderBookDirectoryActor, pair23, 0 to 10)
+          sendBuyOrders(eventSender, OrderBookDirectoryActor, pair23, 0 to 10)
           probe.expectMsg(OrderBookSnapshotUpdateCompleted(pair23, Some(9)))
 
-          sendBuyOrders(eventSender, orderBookDirectoryActor, pair23, 10 to 28)
+          sendBuyOrders(eventSender, OrderBookDirectoryActor, pair23, 10 to 28)
           probe.expectMsg(OrderBookSnapshotUpdateCompleted(pair23, Some(26)))
         }
 
-        "multiple order books" in snapshotTest(pair23, pair45) { (orderBookDirectoryActor, probes) =>
+        "multiple order books" in snapshotTest(pair23, pair45) { (OrderBookDirectoryActor, probes) =>
           val eventSender = TestProbe()
           val (probe23, probe45) = probes match {
             case List(probe23, probe45) => (probe23, probe45)
             case _ => throw new IllegalArgumentException(s"Unexpected snapshots")
           }
-          sendBuyOrders(eventSender, orderBookDirectoryActor, pair23, 0 to 1)
-          sendBuyOrders(eventSender, orderBookDirectoryActor, pair45, 2 to 3)
+          sendBuyOrders(eventSender, OrderBookDirectoryActor, pair23, 0 to 1)
+          sendBuyOrders(eventSender, OrderBookDirectoryActor, pair45, 2 to 3)
 
-          probe23.expectNoMessage(200.millis)
-          probe45.expectNoMessage(200.millis)
+          probe23.expectNoMessage()
+          probe45.expectNoMessage()
 
-          sendBuyOrders(eventSender, orderBookDirectoryActor, pair45, 4 to 10)
+          sendBuyOrders(eventSender, OrderBookDirectoryActor, pair45, 4 to 10)
           probe23.expectMsg(OrderBookSnapshotUpdateCompleted(pair23, Some(9)))
-          probe45.expectNoMessage(200.millis)
+          probe45.expectNoMessage()
 
-          sendBuyOrders(eventSender, orderBookDirectoryActor, pair23, 11 to 14)
-          probe23.expectNoMessage(200.millis)
+          sendBuyOrders(eventSender, OrderBookDirectoryActor, pair23, 11 to 14)
+          probe23.expectNoMessage()
           probe45.expectMsg(OrderBookSnapshotUpdateCompleted(pair45, Some(12)))
         }
       }
 
-      "received a lot of messages and skipped the middle offset" in snapshotTest(pair23) { (orderBookDirectoryActor, probes) =>
+      "received a lot of messages and skipped the middle offset" in snapshotTest(pair23) { (OrderBookDirectoryActor, probes) =>
         val eventSender = TestProbe()
         val probe = probes.head
-        sendBuyOrders(eventSender, orderBookDirectoryActor, pair23, 0 to 30)
+        sendBuyOrders(eventSender, OrderBookDirectoryActor, pair23, 0 to 30)
         probe.expectMsg(OrderBookSnapshotUpdateCompleted(pair23, Some(9)))
 
-        // OrderBookSnapshotUpdated(pair23, 26) is ignored in OrderBookActor, because it's waiting for SaveSnapshotSuccess of 9 from SnapshotStore.
-        probe.expectNoMessage(200.millis)
+        // OrderBookSnapshotUpdated(pair23, 26) is ignored in OrderBookActor,
+        // because it's waiting for SaveSnapshotSuccess of 9 from SnapshotStore.
+        probe.expectNoMessage()
 
-        sendBuyOrders(eventSender, orderBookDirectoryActor, pair23, 31 to 45)
+        sendBuyOrders(eventSender, OrderBookDirectoryActor, pair23, 31 to 45)
         probe.expectMsg(OrderBookSnapshotUpdateCompleted(pair23, Some(43)))
-        probe.expectNoMessage(200.millis)
+        probe.expectNoMessage()
       }
     }
 
@@ -313,7 +314,7 @@ class OrderBookDirectoryActorSpecification
               mkAssetPairsDB,
               _ => {},
               ob,
-              (pair, orderBookDirectoryActor) => Props(new RecoveringActor(orderBookDirectoryActor, pair)),
+              (pair, OrderBookDirectoryActor) => Props(new RecoveringActor(OrderBookDirectoryActor, pair)),
               assetsCache,
               _.asRight
             )
@@ -384,7 +385,7 @@ class OrderBookDirectoryActorSpecification
   }
 
   /**
-   * @param f (orderBookDirectoryActor, TestProbe) => Any
+   * @param f (OrderBookDirectoryActor, TestProbe) => Any
    */
   private def snapshotTest(assetPairs: AssetPair*)(f: (ActorRef, List[TestProbe]) => Any): Any = {
     val r = assetPairs.map(fakeOrderBookActor).toList
@@ -428,11 +429,11 @@ class OrderBookDirectoryActorSpecification
   }
 
   private def defaultActor(
-    ob: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]] = emptyOrderBookRefs,
-    apdb: AssetPairsDb[Future] = mkAssetPairsDB,
-    addressActor: ActorRef = TestProbe().ref,
-    snapshotStoreActor: ActorRef = emptySnapshotStoreActor
-  ): TestActorRef[OrderBookDirectoryActor] = {
+                            ob: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]] = emptyOrderBookRefs,
+                            apdb: AssetPairsDb[Future] = mkAssetPairsDB,
+                            addressActor: ActorRef = TestProbe().ref,
+                            snapshotStoreActor: ActorRef = emptySnapshotStoreActor
+                          ): TestActorRef[OrderBookDirectoryActor] = {
     implicit val efc: ErrorFormatterContext = ErrorFormatterContext.from(_ => 8)
 
     TestActorRef(
@@ -470,7 +471,7 @@ class OrderBookDirectoryActorSpecification
       _ <- Future.sequence(pairs.map(_._1).map(apdb.add))
       _ <- Future.sequence(pairs.map { case (pair, offset) => obsdb.update(pair, offset, Some(OrderBookSnapshot.empty)) })
     } yield ()
-    Await.ready(future, 5.seconds)
+    future.futureValue
   }
 
   private def doNothingOnRecovery(x: Either[String, ValidatedCommandWithMeta.Offset]): Unit = {}
@@ -504,7 +505,7 @@ object OrderBookDirectoryActorSpecification {
   }
 
   private class DeletingActor(owner: ActorRef, assetPair: AssetPair, startOffset: Option[Long] = None)
-      extends RecoveringActor(owner, assetPair, startOffset) {
+    extends RecoveringActor(owner, assetPair, startOffset) {
     override def receive: Receive = handleDelete orElse super.receive
     private def handleDelete: Receive = { case ValidatedCommandWithMeta(_, _, _: ValidatedCommand.DeleteOrderBook) => context.stop(self) }
   }

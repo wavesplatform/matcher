@@ -35,10 +35,10 @@ class GetOrderBooksSpec extends MatcherSuiteBase with TableDrivenPropertyChecks 
       placeAndAwaitAtDex(mkOrder(alice, wavesUsdPair, BUY, 1.waves, 1.usd))
       placeAndAwaitAtDex(mkOrder(alice, wavesBtcPair, SELL, 1.btc, 1.waves))
 
-      val markets = validate200Json(dex1.rawApi.getOrderBooks).markets.map(x =>  AssetPair(x.amountAsset, x.priceAsset))
+      val markets = validate200Json(dex1.rawApi.getOrderBooks).markets.map(x => AssetPair(x.amountAsset, x.priceAsset))
       markets should have size 2
-      markets should contain (wavesBtcPair)
-      markets should contain (wavesUsdPair)
+      markets should contain(wavesBtcPair)
+      markets should contain(wavesUsdPair)
     }
   }
 }

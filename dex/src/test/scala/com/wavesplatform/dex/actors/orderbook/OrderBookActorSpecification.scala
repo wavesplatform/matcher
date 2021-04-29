@@ -35,11 +35,11 @@ import org.scalatest.concurrent.Eventually
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
 
 class OrderBookActorSpecification
-    extends MatcherSpec("OrderBookActor")
+    extends MatcherSpec
     with HasOecInteraction
     with SystemTime
     with ImplicitSender
@@ -276,7 +276,7 @@ class OrderBookActorSpecification
       (1 to 10).foreach { i =>
         actor ! wrapLimitOrder(i, buy(pair, 100000000L, 0.00041))
       }
-      tp.expectNoMessage(100.millis)
+      tp.expectNoMessage()
     }
 
     "respond on SaveSnapshotCommand" in obcTest { (pair, actor, tp) =>
@@ -306,7 +306,7 @@ class OrderBookActorSpecification
       actor ! SaveSnapshot(10L)
       actor ! SaveSnapshot(10L)
       tp.expectMsgType[OrderBookSnapshotUpdateCompleted]
-      tp.expectNoMessage(200.millis)
+      tp.expectNoMessage()
     }
 
     "restore its state at start" in obcTest { (pair, actor, tp) =>
@@ -720,7 +720,7 @@ class OrderBookActorSpecification
   private def getAggregatedSnapshot(orderBookRef: ActorRef): OrderBookAggregatedSnapshot = {
     val pair = wavesUsdPair // hack
     val askAdapter = new OrderBookAskAdapter(new AtomicReference(Map(pair -> Right(orderBookRef))), 5.seconds)
-    Await.result(askAdapter.getAggregatedSnapshot(pair), 1.second).toOption.flatten.getOrElse(throw new IllegalStateException(
+    askAdapter.getAggregatedSnapshot(pair).futureValue.toOption.flatten.getOrElse(throw new IllegalStateException(
       "Can't get snapshot"
     ))
   }

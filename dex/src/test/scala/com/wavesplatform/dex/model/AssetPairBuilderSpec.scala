@@ -7,26 +7,25 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
-import com.wavesplatform.dex.model.OrderValidator.Result
 import com.wavesplatform.dex.settings.{loadConfig, MatcherSettings}
 import com.wavesplatform.dex.test.matchers.ProduceError.produce
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.prop.TableDrivenPropertyChecks._
 import pureconfig.ConfigSource
 
-import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration.Duration
+import scala.concurrent.duration._
 
-class AssetPairBuilderSpec extends AnyFreeSpec with Matchers with MockFactory {
+class AssetPairBuilderSpec extends AnyFreeSpec with Matchers with MockFactory with ScalaFutures {
 
   import AssetPairBuilderSpec._
 
   private def b(v: String) = ByteStr.decodeBase58(v).get
 
-  def awaitResult[A](result: FutureResult[A]): Result[A] = Await.result(result.value, Duration.Inf)
+  implicit override def patienceConfig = PatienceConfig(timeout = 5.seconds)
 
   private val WAVES = "WAVES"
   private val WUSD = IssuedAsset(ByteStr.decodeBase58("HyFJ3rrq5m7FxdkWtQXkZrDat1F7LjVVGfpSkUuEXQHj").get)
@@ -95,7 +94,7 @@ class AssetPairBuilderSpec extends AnyFreeSpec with Matchers with MockFactory {
       val builder = mkBuilder(assets: _*)
 
       forAll(pairs) { case (amountAsset, priceAsset, isValid) =>
-        val pair = awaitResult(builder.createAssetPair(amountAsset, priceAsset))
+        val pair = builder.createAssetPair(amountAsset, priceAsset).value.futureValue
         isValid match {
           case Right(_) => pair shouldBe Symbol("right")
           case Left(e) => pair should produce(e)
@@ -106,7 +105,7 @@ class AssetPairBuilderSpec extends AnyFreeSpec with Matchers with MockFactory {
       "blacklist" - {
         "contains asset id" in {
           val builder = mkBuilder(Asset3 -> mkAssetDescription())
-          awaitResult(builder.validateAssetPair(AssetPair(Asset3, Waves))) should produce("AmountAssetBlacklisted")
+          builder.validateAssetPair(AssetPair(Asset3, Waves)).value.futureValue should produce("AmountAssetBlacklisted")
         }
         "matchers asset name" in {
           val builder = mkBuilder(
@@ -115,8 +114,8 @@ class AssetPairBuilderSpec extends AnyFreeSpec with Matchers with MockFactory {
             Asset3 -> mkAssetDescription("name of an asset")
           )
 
-          awaitResult(builder.validateAssetPair(AssetPair(Asset3, Asset1))) should produce("AmountAssetBlacklisted")
-          awaitResult(builder.validateAssetPair(AssetPair(Asset2, Asset1))) should produce("AmountAssetBlacklisted")
+          builder.validateAssetPair(AssetPair(Asset3, Asset1)).value.futureValue should produce("AmountAssetBlacklisted")
+          builder.validateAssetPair(AssetPair(Asset2, Asset1)).value.futureValue should produce("AmountAssetBlacklisted")
         }
       }
       "asset was not issued" in {
@@ -125,15 +124,15 @@ class AssetPairBuilderSpec extends AnyFreeSpec with Matchers with MockFactory {
           Asset2 -> mkAssetDescription()
         )
 
-        awaitResult(builder.validateAssetPair(AssetPair(Asset2, Asset1))) should produce("AssetNotFound")
+        builder.validateAssetPair(AssetPair(Asset2, Asset1)).value.futureValue should produce("AssetNotFound")
       }
       "amount and price assets are the same" in {
-        awaitResult(mkBuilder().validateAssetPair(AssetPair(WUSD, WUSD))) should produce("AssetPairSameAsset")
+        mkBuilder().validateAssetPair(AssetPair(WUSD, WUSD)).value.futureValue should produce("AssetPairSameAsset")
       }
       "pair is not in allowedAssetPairs and whiteListOnly is enabled" in {
         val builder = new AssetPairBuilder(settings.copy(whiteListOnly = true), x => liftErrorAsync(error.AssetNotFound(x)), blacklistedAssets)
         val assetPair = AssetPair(Waves, WUSD)
-        awaitResult(builder.validateAssetPair(assetPair)) should produce("AssetPairIsDenied")
+        builder.validateAssetPair(assetPair).value.futureValue should produce("AssetPairIsDenied")
       }
     }
   }

@@ -41,12 +41,12 @@ class CancelAllOrdersSpec extends MatcherSuiteBase with RawHttpChecks {
       r.status should be("BatchCancelCompleted")
       r.message.head should have size orders.size
 
-      r.message.foreach(m => {
+      r.message.foreach { m =>
         m.foreach {
           case util.Right(HttpSuccessfulSingleCancel(_, success, status)) => success should be(true); status should be("OrderCanceled")
           case _ => fail(s"Unexpected response $r")
         }
-      })
+      }
 
       orders.foreach(dex1.api.waitForOrderStatus(_, Status.Cancelled))
     }

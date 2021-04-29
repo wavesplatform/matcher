@@ -30,7 +30,7 @@ class MatcherScriptRunnerSpecification extends WavesExtSuiteBase {
     matcherFee = 30000L
   )
 
-  private def run(script: Script): Either[String, Terms.EVALUATED] = MatcherScriptRunner(script, sampleOrder, false)
+  private def run(script: Script): Either[String, Terms.EVALUATED] = MatcherScriptRunner(script, sampleOrder)
 
   "dApp sunny day" in {
     run(dAppScriptSunny).explicitGet() shouldBe Terms.FALSE

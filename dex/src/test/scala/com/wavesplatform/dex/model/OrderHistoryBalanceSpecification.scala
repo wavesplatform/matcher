@@ -16,14 +16,14 @@ import com.wavesplatform.dex.domain.order.Order.Id
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderAddedReason, OrderCanceled}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.time.SystemTime
-import org.scalatest._
+import org.scalactic.source
+import org.scalatest.BeforeAndAfterEach
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.propspec.AnyPropSpecLike
-import org.scalatest.time.{Millis, Seconds, Span}
+import org.scalatest.concurrent.ScalaFutures._
 
 import java.math.BigInteger
-import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.reflect.ClassTag
 
@@ -37,10 +37,9 @@ class OrderHistoryBalanceSpecification
     with SystemTime
     with Eventually {
 
-  implicit override val patienceConfig: PatienceConfig =
-    PatienceConfig(timeout = Span(2, Seconds), interval = Span(5, Millis))
-
   import OrderHistoryBalanceSpecification._
+
+  implicit override def patienceConfig: PatienceConfig = PatienceConfig(2.seconds, 5.millis)
 
   private val WctBtc = AssetPair(mkAssetId("WCT"), mkAssetId("BTC"))
   private val WavesBtc = AssetPair(Waves, mkAssetId("BTC"))
@@ -875,14 +874,15 @@ class OrderHistoryBalanceSpecification
 }
 
 private object OrderHistoryBalanceSpecification {
+
   val MaxActiveOrders = 100
   val MaxFinalizedOrders = 70
   val MaxTotalOrders = MaxActiveOrders + MaxFinalizedOrders
 
   implicit val askTimeout: Timeout = 5.seconds
 
-  private def askAddressActor[A: ClassTag](ref: ActorRef, msg: Any) =
-    Await.result((ref ? msg).mapTo[A], 5.seconds)
+  private def askAddressActor[A: ClassTag](ref: ActorRef, msg: Any)(implicit pc: PatienceConfig, pos: source.Position) =
+    (ref ? msg).mapTo[A].futureValue(pc, pos)
 
   implicit private class AddressActorExt(val ref: ActorRef) extends AnyVal {
 

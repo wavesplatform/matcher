@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.Implicits.durationToScalatestTimeout
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -12,8 +13,8 @@ import com.wavesplatform.it.tags.DexItExternalKafkaRequired
 import im.mak.waves.transactions.ExchangeTransaction
 import im.mak.waves.transactions.mass.Transfer
 
+import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.{Await, Future}
 
 @DexItExternalKafkaRequired
 class AutoCancelOrderTestSuite extends MatcherSuiteBase {
@@ -99,12 +100,9 @@ class AutoCancelOrderTestSuite extends MatcherSuiteBase {
           ts = now + i
         )
 
-      Await.ready(
-        Future.traverse(buyOrders.groupBy(_.assetPair).values) { orders =>
-          Future.inSeries(orders)(dex2.asyncApi.place(_))
-        },
-        5.minutes
-      )
+      Future.traverse(buyOrders.groupBy(_.assetPair).values) { orders =>
+        Future.inSeries(orders)(dex2.asyncApi.place(_))
+      }.futureValue(2.minutes)
 
       info("checking that order weren't canceled")
       val firstCanceled = sells.view

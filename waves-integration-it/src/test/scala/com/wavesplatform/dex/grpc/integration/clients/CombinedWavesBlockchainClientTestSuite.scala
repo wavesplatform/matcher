@@ -25,15 +25,12 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.concurrent.{Await, ExecutionContext}
 import scala.util.Random
 
 class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with HasToxiProxy with NoStackTraceCancelAfterFailure {
 
-  implicit override def patienceConfig: PatienceConfig = super.patienceConfig.copy(
-    timeout = 1.minute,
-    interval = 1.second
-  )
+  implicit override def patienceConfig = PatienceConfig(1.minute, 1.second)
 
   private val grpcExecutor = Executors.newCachedThreadPool(
     new ThreadFactoryBuilder()
@@ -146,13 +143,13 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
 
   "areKnown" - {
     "false for unknown tx" in {
-      wait(client.areKnown(Seq(EthId))).values.head shouldBe false
+      client.areKnown(Seq(EthId)).futureValue.values.head shouldBe false
     }
 
     "true for confirmed tx" in {
       broadcastAndAwait(IssueEthTx)
       eventually {
-        wait(client.areKnown(Seq(EthId))).values.head shouldBe true
+        client.areKnown(Seq(EthId)).futureValue.values.head shouldBe true
       }
     }
   }
@@ -166,7 +163,7 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
         val exchangeTx = mkExchangeTx
 
         withClue(exchangeTx.id().base58) {
-          wait(client.broadcastTx(exchangeTx)) shouldBe BroadcastResult.Added
+          client.broadcastTx(exchangeTx).futureValue shouldBe BroadcastResult.Added
           wavesNode1.api.waitForTransaction(exchangeTx.id())
         }
       }
@@ -179,7 +176,7 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
         val exchangeTx = mkExchangeTx
         withClue(exchangeTx.id().base58) {
           broadcastAndAwait(exchangeTx.toWavesJ())
-          wait(client.broadcastTx(exchangeTx)) shouldBe a[BroadcastResult.Failed]
+          client.broadcastTx(exchangeTx).futureValue shouldBe a[BroadcastResult.Failed]
         }
       }
     }
@@ -210,27 +207,27 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
           )
           .explicitGet()
 
-      wait(client.broadcastTx(exchangeTx)) shouldBe a[BroadcastResult.Failed]
+      client.broadcastTx(exchangeTx).futureValue shouldBe a[BroadcastResult.Failed]
     }
   }
 
   "isFeatureActivated" - {
     "returns false for not yet activated feature" in {
-      wait(client.isFeatureActivated(1)) shouldBe false // node's BlockchainFeatures.SmallerMinimalGeneratingBalance.id
+      client.isFeatureActivated(1).futureValue shouldBe false // node's BlockchainFeatures.SmallerMinimalGeneratingBalance.id
     }
 
     "returns true for activated feature" in {
-      wait(client.isFeatureActivated(2)) shouldBe true // node's BlockchainFeatures.NG.id
+      client.isFeatureActivated(2).futureValue shouldBe true // node's BlockchainFeatures.NG.id
     }
   }
 
   "assetDescription" - {
     "returns None if there is no such asset" in {
-      wait(client.assetDescription(wct)) shouldBe None
+      client.assetDescription(wct).futureValue shouldBe None
     }
 
     "returns an information for created assets" in {
-      wait(client.assetDescription(usd)) should matchTo(
+      client.assetDescription(usd).futureValue should matchTo(
         Option(
           BriefAssetDescription(
             name = IssueUsdTx.name(),
@@ -244,7 +241,7 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
 
   "hasScript/runScript(IssuedAsset)" - {
     "hasn't a script" in {
-      wait(client.hasScript(usd)) shouldBe false
+      client.hasScript(usd).futureValue shouldBe false
     }
 
     "has a script" in {
@@ -254,7 +251,7 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
         broadcastAndAwait(issueTx)
 
         eventually {
-          wait(client.hasScript(IssuedAsset(issueTx.id()))) shouldBe true
+          client.hasScript(IssuedAsset(issueTx.id())).futureValue shouldBe true
         }
       }
 
@@ -262,14 +259,14 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
         val pair = AssetPair.createAssetPair(issueTx.id().toString, "WAVES").get
         val exchangeTx = mkDomainExchange(bob, alice, pair, 1L, 2 * Order.PriceConstant, matcherFee = 1.waves, matcher = matcher)
 
-        wait(client.runScript(IssuedAsset(issueTx.id()), exchangeTx)) shouldBe RunScriptResult.Allowed
+        client.runScript(IssuedAsset(issueTx.id()), exchangeTx).futureValue shouldBe RunScriptResult.Allowed
       }
     }
   }
 
   "hasScript/runScript(Address)" - {
     "returns false if there is no script" in {
-      wait(client.hasScript(matcher)) shouldBe false
+      client.hasScript(matcher).futureValue shouldBe false
     }
 
     "returns true if a script was assigned" in {
@@ -284,7 +281,7 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
         broadcastAndAwait(setScriptTx)
 
         eventually {
-          wait(client.hasScript(receiver)) shouldBe true
+          client.hasScript(receiver).futureValue shouldBe true
         }
       }
 
@@ -293,7 +290,7 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
         val pair = AssetPair.createAssetPair(UsdId.toString, "WAVES").get
         val buy = Order.buy(bob, matcher, pair, 1L, 2 * Order.PriceConstant, now, now + 1.day.toMillis, 0)
 
-        wait(client.runScript(receiver, buy)) shouldBe RunScriptResult.Allowed
+        client.runScript(receiver, buy).futureValue shouldBe RunScriptResult.Allowed
       }
     }
   }
@@ -324,7 +321,7 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
       val leaseTx = mkLease(bob, alice, leaseAmount)
       broadcast(leaseTx)
 
-      wait(client.partialBalancesSnapshot(bob, Set(Waves, randomIssuedAsset))) should {
+      client.partialBalancesSnapshot(bob, Set(Waves, randomIssuedAsset)).futureValue should {
         notInUtx(balance1) or notConfirmed(balance1) or confirmed(balance1)
       }
 
@@ -337,7 +334,7 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
       val leaseTx = mkLease(bob, alice, leaseAmount)
       broadcast(leaseTx)
 
-      wait(client.partialBalancesSnapshot(bob, Set(Waves, randomIssuedAsset))) should {
+      client.partialBalancesSnapshot(bob, Set(Waves, randomIssuedAsset)).futureValue should {
         notConfirmed(balance1) or confirmed(balance1)
       }
 
@@ -352,7 +349,7 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
       broadcastAndAwait(leaseTx)
       wavesNode1.api.waitForHeightArise()
 
-      wait(client.partialBalancesSnapshot(bob, Set(Waves, randomIssuedAsset))) should {
+      client.partialBalancesSnapshot(bob, Set(Waves, randomIssuedAsset)).futureValue should {
         confirmed(balance1)
       }
 
@@ -408,7 +405,7 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
     withClue("transaction is not in UTX") {
       broadcast(mkLease(acc1, bob, leaseAmount))
 
-      wait(client.fullBalancesSnapshot(acc1, Set(btc))) should {
+      client.fullBalancesSnapshot(acc1, Set(btc)).futureValue should {
         notInUtx() or notConfirmed() or confirmed()
       }
     }
@@ -416,7 +413,7 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
     withClue("transaction is in UTX but not confirmed") {
       broadcast(mkLease(acc2, bob, leaseAmount))
 
-      wait(client.fullBalancesSnapshot(acc2, Set(btc))) should {
+      client.fullBalancesSnapshot(acc2, Set(btc)).futureValue should {
         notConfirmed() or confirmed()
       }
     }
@@ -426,7 +423,7 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
       wavesNode1.api.waitForHeightArise()
 
       eventually {
-        wait(client.fullBalancesSnapshot(acc3, Set(btc))) should {
+        client.fullBalancesSnapshot(acc3, Set(btc)).futureValue should {
           confirmed()
         }
       }
@@ -435,7 +432,7 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
 
   "isOrderConfirmed" - {
     "no such order" in {
-      wait(client.isOrderConfirmed(randomByteStr(32))) shouldBe false
+      client.isOrderConfirmed(randomByteStr(32)).futureValue shouldBe false
     }
 
     "the order was in a forged ExchangeTransaction" in {
@@ -445,8 +442,8 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
       withClue(exchangeTx.id().base58) {
         broadcastAndAwait(exchangeTx)
         eventually {
-          wait(client.isOrderConfirmed(exchangeTx.buyOrder().id())) shouldBe true
-          wait(client.isOrderConfirmed(exchangeTx.sellOrder().id())) shouldBe true
+          client.isOrderConfirmed(exchangeTx.buyOrder().id()).futureValue shouldBe true
+          client.isOrderConfirmed(exchangeTx.sellOrder().id()).futureValue shouldBe true
         }
       }
     }
@@ -503,7 +500,7 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
       val leasing = mkLease(bob, alice, 3.waves)
       broadcastAndAwait(leasing)
 
-      val r = Await.result(eventsF, 1.minute).foldMap(_._1.balanceUpdates)
+      val r = eventsF.futureValue.foldMap(_._1.balanceUpdates)
 
       def filtered(in: AddressBalanceUpdates): AddressBalanceUpdates = in.copy(
         regular = in.regular.view.filterKeys(_ == Waves).toMap,
@@ -569,8 +566,6 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
         case (address, assets) => s"$address: ($assets)"
       }
       .mkString("; ")
-
-  private def wait[T](f: => Future[T]): T = Await.result(f, 10.seconds)
 
   private def randomByteStr(len: Int): ByteStr = {
     val inner = new Array[Byte](len)

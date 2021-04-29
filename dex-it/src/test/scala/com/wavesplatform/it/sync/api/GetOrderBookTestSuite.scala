@@ -24,7 +24,8 @@ class GetOrderBookTestSuite extends MatcherSuiteBase {
     )
 
   // DEX-642
-  implicit private val orderBookResponseDiff: Derived[Diff[HttpV0OrderBook]] = Derived(Diff.gen[HttpV0OrderBook].value.ignore[HttpV0OrderBook, Long](_.timestamp))
+  implicit private val orderBookResponseDiff: Derived[Diff[HttpV0OrderBook]] =
+    Derived(Diff.gen[HttpV0OrderBook].value.ignore[HttpV0OrderBook, Long](_.timestamp))
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()

@@ -26,7 +26,6 @@ class MatcherTickerTestSuite extends MatcherSuiteBase {
 
   "matcher ticker validation" - {
 
-
     val bidPrice = 200
     val bidAmount = 1.waves
     val askPrice = 400

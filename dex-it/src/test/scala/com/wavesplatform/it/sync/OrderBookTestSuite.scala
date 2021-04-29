@@ -10,8 +10,7 @@ import com.wavesplatform.dex.domain.order.OrderType._
 import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import com.wavesplatform.it.MatcherSuiteBase
 
-import scala.concurrent.duration.DurationInt
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
 
 class OrderBookTestSuite extends MatcherSuiteBase {
 
@@ -117,7 +116,7 @@ class OrderBookTestSuite extends MatcherSuiteBase {
         .map(_ => ())
         .recover { case _ => () } // It's ok: either this should fail, or restartNode should work
 
-      Await.ready(deleteMultipleTimes, 1.minute)
+      deleteMultipleTimes.futureValue
       dex1.restart()
     }
   }

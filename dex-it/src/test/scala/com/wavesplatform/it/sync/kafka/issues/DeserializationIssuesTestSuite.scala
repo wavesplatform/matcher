@@ -1,16 +1,16 @@
 package com.wavesplatform.it.sync.kafka.issues
 
-import java.util.Properties
-import java.util.concurrent.ThreadLocalRandom
-
+import com.wavesplatform.dex.Implicits.durationToScalatestTimeout
 import com.wavesplatform.dex.app.QueueMessageDeserializationError
 import com.wavesplatform.dex.it.api.HasKafka
 import com.wavesplatform.it.MatcherSuiteBase
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord, RecordMetadata}
 import org.apache.kafka.common.serialization.StringSerializer
 
+import java.util.Properties
+import java.util.concurrent.ThreadLocalRandom
+import scala.concurrent.Promise
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.{Await, Promise}
 
 class DeserializationIssuesTestSuite extends MatcherSuiteBase with HasKafka {
 
@@ -45,7 +45,7 @@ class DeserializationIssuesTestSuite extends MatcherSuiteBase with HasKafka {
           case None => sendResult.success(())
         }
     )
-    Await.result(sendResult.future, 10.seconds)
+    sendResult.future.futureValue(10.seconds)
     producer.close()
     eventually {
       dex1.getState().getExitCodeLong shouldBe QueueMessageDeserializationError.code

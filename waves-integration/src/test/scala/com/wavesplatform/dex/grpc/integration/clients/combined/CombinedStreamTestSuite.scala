@@ -17,7 +17,6 @@ import org.scalatest.exceptions.TestFailedException
 import org.scalatest.time.{Millis, Seconds, Span}
 
 import java.util.concurrent.Executors
-import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
 import scala.util.chaining._
 
@@ -134,7 +133,7 @@ class CombinedStreamTestSuite extends WavesIntegrationSuiteBase with Eventually 
           "no recovery" in {
             val t = mkEventuallyWorking()
             t.blockchainUpdates.close()
-            Await.result(t.cs.lastStatus, 5.seconds) should matchTo[Status](Status.Closing(blockchainUpdates = true, utxEvents = true))
+            t.cs.lastStatus.futureValue should matchTo[Status](Status.Closing(blockchainUpdates = true, utxEvents = true))
           }
         }
       }
@@ -171,7 +170,7 @@ class CombinedStreamTestSuite extends WavesIntegrationSuiteBase with Eventually 
           "no recovery" in {
             val t = mkEventuallyWorking()
             t.utxEvents.close()
-            Await.result(t.cs.lastStatus, 5.seconds) should matchTo[Status](Status.Closing(blockchainUpdates = true, utxEvents = true))
+            t.cs.lastStatus.futureValue should matchTo[Status](Status.Closing(blockchainUpdates = true, utxEvents = true))
           }
         }
       }

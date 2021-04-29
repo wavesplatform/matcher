@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync.networking
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.Implicits.durationToScalatestTimeout
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset.Waves
@@ -14,8 +15,9 @@ import com.wavesplatform.it.WsSuiteBase
 import com.wavesplatform.it.tags.NetworkTests
 import eu.rekawek.toxiproxy.model.ToxicDirection
 
+import scala.collection.immutable.Queue
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.{blocking, Await, Future}
+import scala.concurrent.{Future, blocking}
 
 @NetworkTests
 class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
@@ -56,15 +58,15 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
       mkOrder(alice, wavesUsdPair, OrderType.SELL, 1.waves, 100 + i)
     }
 
-    Await.result(
-      for {
-        _ <- Future.inSeries(orders)(dex1.asyncApi.place(_).recover { case _ => () }).zip {
-          Future(blocking(wavesNode1.reconnectToNetwork(500, 500)))
-        }
-        orderBook <- dex1.asyncApi.getOrderBook(wavesUsdPair)
-      } yield orderBook.asks should have size 100,
-      2.minute
-    )
+    def placeOrders(): Future[(Queue[Any], Unit)] =
+      Future.inSeries(orders)(dex1.asyncApi.place(_).recover { case _ => () }).zip {
+        Future(blocking(wavesNode1.reconnectToNetwork(500, 500)))
+      }
+
+    (for {
+      _ <- placeOrders()
+      orderBook <- dex1.asyncApi.getOrderBook(wavesUsdPair)
+    } yield orderBook.asks should have size 100).futureValue(2.minutes)
 
     orders.foreach(dex1.api.waitForOrderStatus(_, HttpOrderStatus.Status.Accepted))
     dex1.api.cancelAllByPair(alice, wavesUsdPair)

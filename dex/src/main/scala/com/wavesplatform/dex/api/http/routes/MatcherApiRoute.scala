@@ -17,7 +17,7 @@ import cats.syntax.traverse._
 import com.google.common.primitives.Longs
 import com.typesafe.config.Config
 import com.wavesplatform.dex._
-import com.wavesplatform.dex.actors.MatcherActor._
+import com.wavesplatform.dex.actors.OrderBookDirectoryActor._
 import com.wavesplatform.dex.actors.address.AddressActor.OrderListType
 import com.wavesplatform.dex.actors.address.AddressActor.Query.GetCurrentState
 import com.wavesplatform.dex.actors.address.AddressActor.Reply.GetState

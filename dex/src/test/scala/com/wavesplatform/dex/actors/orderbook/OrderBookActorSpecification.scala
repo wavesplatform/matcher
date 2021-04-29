@@ -6,7 +6,7 @@ import akka.testkit.{ImplicitSender, TestActorRef, TestProbe}
 import cats.data.NonEmptyList
 import cats.syntax.option._
 import com.wavesplatform.dex.MatcherSpecBase
-import com.wavesplatform.dex.actors.MatcherActor.SaveSnapshot
+import com.wavesplatform.dex.actors.OrderBookDirectoryActor.SaveSnapshot
 import com.wavesplatform.dex.actors.address.AddressActor.Command.Source
 import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.MarketStatus
 import com.wavesplatform.dex.actors.orderbook.OrderBookActor.{OrderBookRecovered, OrderBookSnapshotUpdateCompleted}

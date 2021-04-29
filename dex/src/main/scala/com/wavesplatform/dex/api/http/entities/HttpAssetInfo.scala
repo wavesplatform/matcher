@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.api.http.entities
 
-import com.wavesplatform.dex.actors.MatcherActor.AssetInfo
+import com.wavesplatform.dex.actors.OrderBookDirectoryActor.AssetInfo
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{Format, Json}
 

@@ -1,6 +1,6 @@
 package com.wavesplatform.it.config
 
-import com.wavesplatform.dex.actors.MatcherActor
+import com.wavesplatform.dex.actors.OrderBookDirectoryActor
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -47,7 +47,7 @@ object DexTestConfig {
     val IssueResults(issuePriceAssetTx, priceAssetId, priceAsset) =
       mkIssueExtended(priceAssetIssuer, Random.nextString(4), someAssetAmount, priceAssetDecimals, issueFee)
 
-    if (MatcherActor.compare(Some(priceAssetId.arr), Some(amountAssetId.arr)) < 0)
+    if (OrderBookDirectoryActor.compare(Some(priceAssetId.arr), Some(amountAssetId.arr)) < 0)
       (issueAmountAssetTx, issuePriceAssetTx, AssetPair(amountAsset, priceAsset))
     else issueAssetPair(amountAssetIssuer, priceAssetIssuer, amountAssetDecimals, priceAssetDecimals)
   }
@@ -59,7 +59,7 @@ object DexTestConfig {
     val priceAssetId: ByteStr = issuePriceAssetTx.id()
     val priceAsset = IssuedAsset(priceAssetId)
 
-    if (MatcherActor.compare(Some(priceAssetId.arr), amountAsset.compatId.map(_.arr)) < 0)
+    if (OrderBookDirectoryActor.compare(Some(priceAssetId.arr), amountAsset.compatId.map(_.arr)) < 0)
       (issuePriceAssetTx, AssetPair(amountAsset, priceAsset))
     else assetPairIssuePriceAsset(issuer, amountAsset, priceAssetDecimals)
   }

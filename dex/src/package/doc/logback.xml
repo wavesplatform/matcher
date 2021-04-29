@@ -42,7 +42,7 @@
 
     <!-- DEX Actors -->
     <logger name="com.wavesplatform.dex.actors.orderbook.OrderBookActor" level="INFO"/>
-    <logger name="com.wavesplatform.dex.actors.MatcherActor" level="TRACE"/>
+    <logger name="com.wavesplatform.dex.actors.OrderBookDirectoryActor" level="TRACE"/>
     <logger name="com.wavesplatform.dex.actors.address.AddressActor" level="TRACE"/>
 
     <!-- REST API -->

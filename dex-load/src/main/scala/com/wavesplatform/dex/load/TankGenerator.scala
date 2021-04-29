@@ -2,12 +2,12 @@ package com.wavesplatform.dex.load
 
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
-import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.load.request._
 import com.wavesplatform.dex.load.utils._
+import com.wavesplatform.dex.model.AssetPairBuilder.assetIdOrdering._
 import im.mak.waves.transactions.account.{PrivateKey => JPrivateKey, PublicKey => JPublicKey}
 import im.mak.waves.transactions.common.{Amount, AssetId}
 import im.mak.waves.transactions.exchange.{AssetPair, Order, OrderType}
@@ -21,7 +21,6 @@ import org.apache.http.entity.{ContentType, StringEntity}
 import org.apache.http.impl.client.{CloseableHttpClient, HttpClients}
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager
 import play.api.libs.json.{JsError, JsSuccess, JsValue}
-import com.wavesplatform.dex.model.AssetPairBuilder.assetIdOrdering
 
 import java.io.{File, PrintWriter}
 import java.net.URI
@@ -32,7 +31,6 @@ import scala.concurrent._
 import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters._
 import scala.util.Random
-import scala.Ordered._
 
 object TankGenerator {
 
@@ -110,7 +108,7 @@ object TankGenerator {
           .map(Asset.fromString(_).get)
           .combinations(2)
           .map {
-            case List(aa, pa) => if (aa.compatId < pa.compatId) (aa, pa) else (pa, aa)
+            case List(aa, pa) => if (aa.compatId > pa.compatId) (aa, pa) else (pa, aa)
             case _ => throw new RuntimeException("Can't create asset-pair")
           }
           .map(Function.tupled((a, p) => new AssetPair(AssetId.as(a.toString), AssetId.as(p.toString))))

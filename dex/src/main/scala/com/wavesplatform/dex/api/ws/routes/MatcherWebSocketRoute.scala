@@ -5,7 +5,7 @@ import java.util.concurrent.ConcurrentHashMap
 import akka.actor.typed.Scheduler
 import akka.actor.typed.scaladsl.AskPattern._
 import akka.actor.typed.scaladsl.adapter._
-import akka.actor.{ActorRef, typed}
+import akka.actor.{typed, ActorRef}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import akka.http.scaladsl.server.{Directive0, Route}
@@ -16,6 +16,7 @@ import akka.util.Timeout
 import akka.{Done, NotUsed}
 import cats.syntax.either._
 import com.wavesplatform.dex.api.http.SwaggerDocService
+import com.wavesplatform.dex.api.http.directives.HttpKamonMetricsProtectedDirectives
 import com.wavesplatform.dex.api.http.entities.{HttpMessage, HttpWebSocketCloseFilter, HttpWebSocketConnections}
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
 import com.wavesplatform.dex.api.ws.actors.{WsExternalClientDirectoryActor, WsExternalClientHandlerActor, WsInternalBroadcastActor, WsInternalClientHandlerActor}
@@ -51,11 +52,12 @@ class MatcherWebSocketRoute(
   assetPairBuilder: AssetPairBuilder,
   override val apiKeyHash: Option[Array[Byte]],
   matcherSettings: MatcherSettings,
-  matcherStatus: () => MatcherStatus,
+  override val matcherStatus: () => MatcherStatus,
   getRatesSnapshot: () => Map[Asset, Double]
 )(implicit mat: Materializer)
     extends ApiRoute
     with AuthRoute
+    with HttpKamonMetricsProtectedDirectives
     with ScorexLogging {
 
   import mat.executionContext
@@ -66,9 +68,7 @@ class MatcherWebSocketRoute(
   private val wsHandlers = ConcurrentHashMap.newKeySet[CloseHandler]()
 
   override def route: Route = pathPrefix("ws" / "v0") {
-    matcherStatusBarrier {
-      internalWsRoute ~ commonWsRoute ~ (pathPrefix("connections") & withAuth)(connectionsRoute ~ closeConnectionsRoute)
-    }
+    internalWsRoute ~ commonWsRoute ~ (pathPrefix("connections") & withAuth)(connectionsRoute ~ closeConnectionsRoute)
   }
 
   @Path("/connections")
@@ -80,8 +80,10 @@ class MatcherWebSocketRoute(
     response = classOf[HttpWebSocketConnections]
   )
   def connectionsRoute: Route = get {
-    complete {
-      externalClientDirectoryRef.ask(WsExternalClientDirectoryActor.Query.GetActiveNumber).mapTo[HttpWebSocketConnections]
+    (statusBarrierMeasureResponses("connectionsWsRoute") & withAuth) {
+      complete {
+        externalClientDirectoryRef.ask(WsExternalClientDirectoryActor.Query.GetActiveNumber).mapTo[HttpWebSocketConnections]
+      }
     }
   }
 
@@ -105,15 +107,17 @@ class MatcherWebSocketRoute(
     )
   )
   def closeConnectionsRoute: Route = delete {
-    entity(as[HttpWebSocketCloseFilter]) { req =>
-      externalClientDirectoryRef ! WsExternalClientDirectoryActor.Command.CloseOldest(req.oldest)
-      complete {
-        HttpMessage("In progress")
+    (statusBarrierMeasureResponses("closeWsConnections") & withAuth) {
+      entity(as[HttpWebSocketCloseFilter]) { req =>
+        externalClientDirectoryRef ! WsExternalClientDirectoryActor.Command.CloseOldest(req.oldest)
+        complete {
+          HttpMessage("In progress")
+        }
       }
     }
   }
 
-  private val commonWsRoute: Route = (pathEnd & get &
+  private val commonWsRoute: Route = (pathEnd & get & statusBarrierMeasureResponses("commonWsRoute") &
     parameters("a_os".withDefault("Unknown OS"), "a_client".withDefault("Unknown Client"))) { (aOs: String, aClient: String) =>
     import matcherSettings.webSockets.externalClientHandler
 
@@ -165,7 +169,7 @@ class MatcherWebSocketRoute(
     handleWebSocketMessages(flow)
   }
 
-  private val internalWsRoute: Route = (path("internal") & get) {
+  private val internalWsRoute: Route = (path("internal") & get & statusBarrierMeasureResponses("internalWsRoute")) {
     import matcherSettings.webSockets.internalClientHandler
 
     val clientId = UUID.randomUUID().toString
@@ -266,7 +270,7 @@ class MatcherWebSocketRoute(
     Future.sequence(activeConnections.map(_.closed.future)).map(_ => ())
   }
 
-  private def matcherStatusBarrier: Directive0 = matcherStatus() match {
+  override def matcherStatusBarrier: Directive0 = matcherStatus() match {
     case MatcherStatus.Working => pass
     case MatcherStatus.Starting => complete(error.MatcherIsStarting.toWsHttpResponse(StatusCodes.ServiceUnavailable))
     case MatcherStatus.Stopping => complete(error.MatcherIsStopping.toWsHttpResponse(StatusCodes.ServiceUnavailable))

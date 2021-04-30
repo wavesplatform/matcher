@@ -110,6 +110,7 @@ class WsRatesUpdatesTestSuite extends WsSuiteBase {
     wsc.receiveAtLeastN[WsError](1)
 
     wsc.send(WsUnsubscribe("ru"))
+    Thread.sleep(1000) // No other way to guarantee that the client received and processed WsUnsubscribe
 
     dex1.api.upsertRate(btc, 100500)
     wsc.receiveNoMessages()

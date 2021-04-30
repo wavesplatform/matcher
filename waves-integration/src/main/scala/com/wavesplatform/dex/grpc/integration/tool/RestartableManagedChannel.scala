@@ -8,7 +8,7 @@ import scala.concurrent.duration.Duration
 final class RestartableManagedChannel(mkManagedChannel: () => ManagedChannel) {
 
   private var channel: ManagedChannel = _
-  private var isClosed: Boolean = false
+  // private var isClosed: Boolean = false
 
   def stop(): Unit = synchronized {
     checkIsClosed()
@@ -41,13 +41,11 @@ final class RestartableManagedChannel(mkManagedChannel: () => ManagedChannel) {
     }
   }
 
-  private def checkIsClosed(): Unit =
-    if (isClosed)
-      throw new RuntimeException("managed channel is closed")
+  private def checkIsClosed(): Unit = {} // if (isClosed) throw new RuntimeException("managed channel is closed")
 
   private def mkClosed(): Unit = {
     checkIsClosed()
-    isClosed = true
+    //isClosed = true
   }
 
 }

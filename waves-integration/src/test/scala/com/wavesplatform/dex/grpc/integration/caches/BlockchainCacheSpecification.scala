@@ -1,15 +1,12 @@
 package com.wavesplatform.dex.grpc.integration.caches
 
-import java.time.Duration
-import java.util.concurrent.{ConcurrentHashMap, ExecutorService, Executors}
 import com.wavesplatform.dex.WavesIntegrationSuiteBase
 import mouse.any.anySyntaxMouse
 import org.scalatest.BeforeAndAfterAll
-import org.scalatest.time.Span
-import org.scalatest.time.{Minutes, Seconds}
 
+import java.time.Duration
+import java.util.concurrent.{ConcurrentHashMap, ExecutorService, Executors}
 import scala.concurrent._
-import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
 
 class BlockchainCacheSpecification extends WavesIntegrationSuiteBase with BeforeAndAfterAll {

@@ -98,7 +98,10 @@ object SuperConnector {
         )
       }
 
-      dexWsApiUri = s"${if (dexRestApiUri startsWith "http://") "ws://" else "wss://"}$dexRestIpAndPort/ws/v0"
+      dexWsApiUri = {
+        val protocol = if (dexRestApiUri.startsWith("http://")) "ws" else "wss"
+        s"$protocol://$dexRestIpAndPort/ws/v0"
+      }
 
       (dexWsConnector, wsInitial) <- logProcessing("Setting up connection with DEX WS API")(
         for {

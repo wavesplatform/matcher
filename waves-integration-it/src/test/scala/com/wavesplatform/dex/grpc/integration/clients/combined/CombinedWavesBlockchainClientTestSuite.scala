@@ -1,5 +1,6 @@
-package com.wavesplatform.dex.grpc.integration.clients
+package com.wavesplatform.dex.grpc.integration.clients.combined
 
+import akka.actor.ActorSystem
 import cats.implicits._
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.wavesplatform.dex.collections.MapOps.Ops2D
@@ -11,7 +12,8 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionV2}
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.grpc.integration.IntegrationSuiteBase
-import com.wavesplatform.dex.grpc.integration.clients.combined.{CombinedStream, CombinedWavesBlockchainClient}
+import com.wavesplatform.dex.grpc.integration.clients.{BroadcastResult, RunScriptResult}
+import com.wavesplatform.dex.grpc.integration.clients.combined.{AkkaCombinedStream, CombinedStream, CombinedWavesBlockchainClient}
 import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
 import com.wavesplatform.dex.grpc.integration.clients.domain.portfolio.SynchronizedPessimisticPortfolios
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
@@ -31,6 +33,7 @@ import scala.util.Random
 class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with HasToxiProxy with NoStackTraceCancelAfterFailure {
 
   implicit override def patienceConfig = PatienceConfig(1.minute, 1.second)
+  private val actorSystem = ActorSystem()
 
   private val grpcExecutor = Executors.newCachedThreadPool(
     new ThreadFactoryBuilder()
@@ -85,7 +88,13 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
       ),
       matcherPublicKey = PublicKey(Array.emptyByteArray), // Doesn't matter here
       monixScheduler = monixScheduler,
-      grpcExecutionContext = ExecutionContext.fromExecutor(grpcExecutor)
+      grpcExecutionContext = ExecutionContext.fromExecutor(grpcExecutor),
+      (meClient, buClient) =>
+        new AkkaCombinedStream(
+          CombinedStream.Settings(1.second),
+          buClient.blockchainEvents,
+          meClient.utxEvents
+        )(actorSystem, monixScheduler)
     )
 
   private lazy val updates = client.updates.share
@@ -529,6 +538,7 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
 
   override protected def afterAll(): Unit = {
     Await.ready(client.close(), 10.seconds)
+    actorSystem.terminate()
     super.afterAll()
     grpcExecutor.shutdownNow()
   }

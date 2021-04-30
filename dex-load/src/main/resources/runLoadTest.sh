@@ -11,4 +11,4 @@ if [ ! "$(docker ps -q -f name=dexload)" ]; then
 fi
 docker exec -i dexload yandex-tank -c dexload.yaml > /dev/null
 echo "The performance has been finished"
-echo "$(cat /home/yatank/loadtest/logs/lunapark/$(sudo ls /home/yatank/loadtest/logs/lunapark/)finish_status.yaml | grep -Po -m 1 https://overload.yandex.net/[0-9]+)"
+echo "$(cat /home/yatank/loadtest/logs/lunapark/$(sudo ls /home/yatank/loadtest/logs/lunapark/)/finish_status.yaml | grep -Po -m 1 https://overload.yandex.net/[0-9]+)"

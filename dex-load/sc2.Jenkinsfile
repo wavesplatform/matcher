@@ -6,6 +6,7 @@ pipeline {
         ansiColor('xterm')
         timeout(time: 70, unit: 'MINUTES')
         disableConcurrentBuilds()
+        timestamps()
     }
     parameters {
         string(name: 'SEED', defaultValue: 'test-seed', description: 'Seed prefix of generated accounts')
@@ -69,7 +70,7 @@ pipeline {
                  stage("Web Socket") {
                     steps {
                         sh 'mv ./dex-load/feeder.csv ./dex-ws-load/'
-                        sh 'cd ./dex-ws-load && sbt -Dff=feeder.csv -Dws=ws://${AIM}:6886/ws/v0 -Drt=15 -Duc=${AN} gatling:testOnly load.ConnectionsOnlyTest > /dev/null'
+                        sh 'cd ./dex-ws-load && sbt -Dff=feeder.csv -Dws=ws://${AIM}:6886/ws/v0 -Drt=15 -Duc=${AN} gatling:testOnly load.ConnectionsOnlyTest > /dev/null || true'
                     }
                  }
             }

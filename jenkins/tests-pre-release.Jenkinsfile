@@ -13,7 +13,7 @@ pipeline {
             steps {
                 build job: 'Waves.Exchange/Matcher/Matcher Server - OS - Test - Kafka', propagate: false, wait: false, parameters: [
                   [$class: 'GitParameterValue', name: 'BRANCH', value: "${NEW_BRANCH_OR_TAG}"],
-                  [$class: 'StringParameterValue', name: 'LABEL', value: "- PRE RELEASE"]
+                  [$class: 'StringParameterValue', name: 'LABEL', value: "${NEW_BRANCH_OR_TAG}"]
                 ]
             }
         }

@@ -93,7 +93,7 @@ object WavesToPbConversions {
       TransactionDiff(
         stateUpdate = StateUpdate(
           balances = portfolioUpdates.balanceUpdates,
-          leases = portfolioUpdates.leasingUpdates,
+          leasingForAddress = portfolioUpdates.leasingUpdates,
           dataEntries = self.accountData.view.flatMap {
             case (address, dataEntries) =>
               dataEntries.data.values.map { dataEntry =>
@@ -119,7 +119,7 @@ object WavesToPbConversions {
             if (v == 0) r
             else StateUpdate.BalanceUpdate(
               address = address.toPB,
-              amount = Amount(asset.toPB, v).some
+              amountAfter = Amount(asset.toPB, v).some
             ) :: r
         }
         .prependIf(portfolio.balance != 0)(StateUpdate.BalanceUpdate(pbAddress, Amount(pbWaves, portfolio.balance).some))
@@ -128,8 +128,8 @@ object WavesToPbConversions {
       val leasingUpdates = init.leasingUpdates.prependIf(lease.in != 0 || lease.out != 0) {
         StateUpdate.LeasingUpdate(
           address = pbAddress,
-          in = portfolio.lease.in,
-          out = portfolio.lease.out
+          inAfter = portfolio.lease.in,
+          outAfter = portfolio.lease.out
         )
       }
 

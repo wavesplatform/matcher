@@ -18,42 +18,23 @@ pipeline {
     stages {
         stage('Cleanup') {
             steps {
-                githubNotify description: 'This is a shorted example',  status: 'SUCCESS'
-                script {
-                    if (!(BRANCH_NAME ==~ /(origin\/)?(DEX\-.*|master|merge\-.*|version\-.*|v?\d+\.\d+\.\d+(\.\d+)?)/)) {
-                        currentBuild.result = 'ABORTED'
-                        error("The branch '${BRANCH_NAME}' have an incorrect name. Allowed names: master, version-, DEX-")
-                    }
-                }
-                sh 'git fetch --tags'
-                sh 'docker rmi `docker images --format "{{.Repository}}:{{.Tag}}" | grep "wavesplatform"` || true'
-                sh 'docker system prune -f || true'
-                sh 'find ~/.sbt/1.0/staging/*/waves -type d -name target | xargs -I{} rm -rf {}'
-                sh 'find . -type d \\( -name "test-reports" -o -name "allure-results" -o -name "target" \\) | xargs -I{} rm -rf {}'
-                sh 'sbt "cleanAll"'
+                sh 'ls'
             }
         }
         stage('Build & Run All Tests') {
             steps {
-                sh 'sbt "fullCheck"'
+                sh 'ls'
             }
         }
         stage ('Push images') {
             steps {
-                build job: 'Waves.Exchange/Matcher/Matcher Server - OS - Docker', propagate: false, wait: false, parameters: [
-                  [$class: 'StringParameterValue', name: 'BRANCH', value: "${BRANCH_NAME}"]
-                ]
+                sh 'ls'
             }
         }
     }
     post {
         always {
-            sh 'tar zcf logs.tar.gz ./dex-it/target/logs* ./waves-integration-it/target/logs* || true'
-            archiveArtifacts artifacts: 'logs.tar.gz', fingerprint: true
-            junit '**/test-reports/*.xml'
-            sh "mkdir allure-results || true"
-            sh '''echo "TARGET_NODE=$(cat wavesNode.sbt | grep -Po '[0-9].[0-9].[0-9]+')" > ./allure-results/environment.properties'''
-            allure results: [[path: 'allure-results']]
+            sh 'ls'
         }
         cleanup {
             cleanWs()

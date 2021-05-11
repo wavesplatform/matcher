@@ -18,6 +18,7 @@ pipeline {
     stages {
         stage('Cleanup') {
             steps {
+                githubNotify description: 'This is a shorted example',  status: 'SUCCESS'
                 script {
                     if (!(BRANCH_NAME ==~ /(origin\/)?(DEX\-.*|master|merge\-.*|version\-.*|v?\d+\.\d+\.\d+(\.\d+)?)/)) {
                         currentBuild.result = 'ABORTED'

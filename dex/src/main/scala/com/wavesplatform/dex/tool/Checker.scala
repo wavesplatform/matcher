@@ -59,9 +59,9 @@ class Checker(superConnector: SuperConnector) {
 
     ConfigChecker.checkConfig(cfg, matcherConfig)
       .flatMap(prettyPrintUnusedProperties(_, indent)).leftMap { error =>
-        println(error)
-        error
-      }
+      println(error)
+      error
+    }
   }
 
   private def issueAsset(name: String, description: String, quantity: Long): CheckLoggedResult[AssetInfo] = {
@@ -112,7 +112,7 @@ class Checker(superConnector: SuperConnector) {
     dexRest.repeatRequest(dexRest.getMatcherStatus(apiKey)) { response =>
       response.isLeft || response.exists { jsValue =>
         (jsValue \ "service").asOpt[String].contains("Working") &&
-        (jsValue \ "blockchain").asOpt[String].contains("Working")
+          (jsValue \ "blockchain").asOpt[String].contains("Working")
       }
     }(RepeatRequestOptions(waitingTime.toSeconds.toInt, 1.second)).map(_ => ())
 
@@ -177,7 +177,7 @@ class Checker(superConnector: SuperConnector) {
           filledAmount <- (orderStatus \ "filledAmount").asOpt[Long]
           filledFee <- (orderStatus \ "filledFee").asOpt[Long]
         } yield filledAmount == submitted.amount && filledFee == submitted.matcherFee
-      ).toRight[String](s"Check of submitted order filling failed! Expected $expectedFilledStatus, but got ${orderStatus.toString}")
+        ).toRight[String](s"Check of submitted order filling failed! Expected $expectedFilledStatus, but got ${orderStatus.toString}")
     }
 
     def awaitSubmittedOrderAtNode: ErrorOr[Seq[JsValue]] =
@@ -225,12 +225,12 @@ class Checker(superConnector: SuperConnector) {
     }
 
   def checkState(
-    version: String,
-    maybeAccountSeed: Option[String],
-    apiKey: String,
-    cfgToCheck: Config,
-    matcherSettings: MatcherSettings
-  ): ErrorOr[String] =
+                  version: String,
+                  maybeAccountSeed: Option[String],
+                  apiKey: String,
+                  cfgToCheck: Config,
+                  matcherSettings: MatcherSettings
+                ): ErrorOr[String] =
     for {
       _ <- log[ErrorOr]("\nChecking:\n")
       _ <- logCheck("1. DEX configs")(checkConfigs(cfgToCheck, matcherSettings, 4.some))
@@ -240,8 +240,8 @@ class Checker(superConnector: SuperConnector) {
       (mbIJIoInfo, secondAssetNotes) <- logCheck("5. Second test asset")(checkTestAsset(balance, secondTestAssetName))
       waitingTime = {
         superConnector.env.matcherSettings.snapshotsLoadingTimeout +
-        superConnector.env.matcherSettings.startEventsProcessingTimeout +
-        superConnector.env.matcherSettings.orderBooksRecoveringTimeout
+          superConnector.env.matcherSettings.startEventsProcessingTimeout +
+          superConnector.env.matcherSettings.orderBooksRecoveringTimeout
       }
       _ <- logCheck(s"6. Wait until matcher starts ($waitingTime)")(waitUntilMatcherStarts(apiKey, waitingTime))
       (assetPairInfo, activeOrdersNotes) <- logCheck("7. Matcher active orders")(checkActiveOrders(wuJIoInfo, mbIJIoInfo))

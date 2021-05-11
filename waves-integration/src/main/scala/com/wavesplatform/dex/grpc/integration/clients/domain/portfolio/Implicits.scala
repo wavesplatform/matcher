@@ -46,7 +46,7 @@ object Implicits {
       val p1 = self.balances.groupBy(_.address).flatMap {
         case (address, updates) =>
           val balances = updates.view
-            .flatMap(_.amount)
+            .flatMap(_.amountAfter)
             .collect {
               case x if x.amount < 0 => x.assetId.toVanillaAsset -> x.amount // Count only pessimistic
             }
@@ -61,8 +61,8 @@ object Implicits {
       Monoid
         .combineAll(
           p1 ::
-          self.leases.view
-            .collect { case x if x.out > 0 => Map(x.address -> Map[Asset, Long](Waves -> -x.out)) }
+          self.leasingForAddress.view
+            .collect { case x if x.outAfter > 0 => Map(x.address -> Map[Asset, Long](Waves -> -x.outAfter)) }
             .toList
         )
         .map { case (address, xs) => address.toVanillaAddress -> xs }

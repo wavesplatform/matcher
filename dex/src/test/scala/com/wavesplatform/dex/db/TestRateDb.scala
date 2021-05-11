@@ -28,4 +28,5 @@ object TestRateDb {
     implicit val ec: ExecutionContext = ExecutionContext.fromExecutor((command: Runnable) => command.run())
     new TestRateDb[Future]()
   }
+
 }

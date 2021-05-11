@@ -7,11 +7,11 @@ import cats.data.NonEmptyList
 import cats.instances.option.catsStdInstancesForOption
 import cats.syntax.apply._
 import cats.syntax.option._
-import com.wavesplatform.dex.actors.MatcherActor.{ForceStartOrderBook, OrderBookCreated, SaveSnapshot}
+import com.wavesplatform.dex.actors.OrderBookDirectoryActor.{ForceStartOrderBook, OrderBookCreated, SaveSnapshot}
 import com.wavesplatform.dex.actors.address.AddressActor
 import com.wavesplatform.dex.actors.events.OrderEventsCoordinatorActor
 import com.wavesplatform.dex.actors.orderbook.OrderBookActor._
-import com.wavesplatform.dex.actors.{orderbook, MatcherActor, WorkingStash}
+import com.wavesplatform.dex.actors.{orderbook, OrderBookDirectoryActor, WorkingStash}
 import com.wavesplatform.dex.api.ws.actors.WsInternalBroadcastActor
 import com.wavesplatform.dex.api.ws.protocol.WsOrdersUpdate
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -144,7 +144,7 @@ class OrderBookActor(
 
     case AggregatedOrderBookActor.Event.Stopped => context.stop(self)
 
-    case MatcherActor.Ping => sender() ! MatcherActor.Pong
+    case OrderBookDirectoryActor.Ping => sender() ! OrderBookDirectoryActor.Pong
 
     case ForceStartOrderBook(p) if p == assetPair => sender() ! OrderBookCreated(assetPair)
 
@@ -164,7 +164,7 @@ class OrderBookActor(
 
     case classic.Terminated(ref) =>
       log.error(s"Terminated actor: $ref")
-      // If this happens the issue is critical and should not be handled. The order book will be stopped, see MatcherActor
+      // If this happens the issue is critical and should not be handled. The order book will be stopped, see OrderBookDirectoryActor
       if (ref == aggregatedRef) throw new RuntimeException("Aggregated order book was terminated")
   }
 

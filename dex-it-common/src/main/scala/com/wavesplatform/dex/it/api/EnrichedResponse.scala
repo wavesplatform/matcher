@@ -6,7 +6,6 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.it.api.EnrichedResponse.As
 import play.api.libs.json.{Json, Reads}
 
-
 case class EnrichedResponse[ErrorT, EntityT](response: Response[Either[String, String]], as: As[ErrorT, EntityT]) {
   def tryGet: Either[ErrorT, EntityT] = as.tryGet(response)
 

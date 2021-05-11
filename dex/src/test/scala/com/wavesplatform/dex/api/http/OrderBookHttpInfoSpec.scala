@@ -22,7 +22,6 @@ import org.scalatest.prop.TableDrivenPropertyChecks
 
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
@@ -36,10 +35,10 @@ class OrderBookHttpInfoSpec extends AnyFreeSpec with Matchers with SystemTime wi
         // Two levels: one is aggregated and one is not
 
         val aggOrderBookRef = system.actorOf(Props(new FakeOrderBookActor(pair)))
-        val askAdapter = new OrderBookAskAdapter(new AtomicReference(Map(pair -> Right(aggOrderBookRef))), 5.seconds)
+        val askAdapter = new OrderBookAskAdapter(new AtomicReference(Map(pair -> Right(aggOrderBookRef))), timeout)
         val orderBookHttpInfo = new OrderBookHttpInfo(OrderBookHttpInfo.Settings(List(3, 9), None), askAdapter, time, _ => 8.pure[FutureResult])
         def get(depth: Option[Int]): HttpV0OrderBook =
-          HttpV0OrderBook.fromHttpResponse(Await.result(orderBookHttpInfo.getHttpView(pair, MatcherModel.Normalized, depth), 5.seconds))
+          HttpV0OrderBook.fromHttpResponse(orderBookHttpInfo.getHttpView(pair, MatcherModel.Normalized, depth).futureValue)
 
         val middlePrice = 1000L
         val now = time.getTimestamp()
@@ -135,7 +134,6 @@ class OrderBookHttpInfoSpec extends AnyFreeSpec with Matchers with SystemTime wi
     }
   }
 
-  override protected def actorSystemName: String = "OrderBookHttpInfoSpec"
 }
 
 object OrderBookHttpInfoSpec {

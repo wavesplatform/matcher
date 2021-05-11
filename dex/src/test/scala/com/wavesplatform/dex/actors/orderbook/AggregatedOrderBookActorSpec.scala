@@ -10,7 +10,7 @@ import akka.testkit.TestProbe
 import cats.data.NonEmptyList
 import com.wavesplatform.dex.NoShrink
 import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.{Command, InputMessage, MarketStatus, Query}
-import com.wavesplatform.dex.actors.{MatcherActor, MatcherSpecLike, OrderBookAskAdapter}
+import com.wavesplatform.dex.actors.{OrderBookDirectoryActor, MatcherSpecLike, OrderBookAskAdapter}
 import com.wavesplatform.dex.api.http.entities.{HttpV0LevelAgg, HttpV0OrderBook}
 import com.wavesplatform.dex.api.ws.entities.WsOrderBookSettings
 import com.wavesplatform.dex.api.ws.protocol.{WsMessage, WsOrderBookChanges}
@@ -35,7 +35,6 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.ThreadLocalRandom
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.Await
 import scala.concurrent.duration._
 
 class AggregatedOrderBookActorSpec
@@ -91,7 +90,7 @@ class AggregatedOrderBookActorSpec
     "properties" - {
       "aggregate(updatedOrderBook) == updatedAggregatedOrderBook" in forAll(orderBookGen, ordersGen(10)) { (initOb, orders) =>
         val obsdb = TestOrderBookSnapshotDb()
-        Await.result(obsdb.update(pair, 0L, Some(initOb.snapshot)), 5.second)
+        obsdb.update(pair, 0L, Some(initOb.snapshot)).futureValue
 
         implicit val efc: ErrorFormatterContext = ErrorFormatterContext.from(_ => 8)
 
@@ -114,22 +113,22 @@ class AggregatedOrderBookActorSpec
             )
           )
         )
-        owner.expectMsgType[OrderBookActor.OrderBookRecovered](5.seconds)
+        owner.expectMsgType[OrderBookActor.OrderBookRecovered]
 
         orders.foreach(orderBookRef ! _)
 
-        orderBookRef ! MatcherActor.SaveSnapshot(100L)
+        orderBookRef ! OrderBookDirectoryActor.SaveSnapshot(100L)
         owner.expectMsgType[OrderBookActor.OrderBookSnapshotUpdateCompleted]
 
-        val orderBookAskAdapter = new OrderBookAskAdapter(new AtomicReference(Map(pair -> Right(orderBookRef))), 5.seconds)
+        val orderBookAskAdapter = new OrderBookAskAdapter(new AtomicReference(Map(pair -> Right(orderBookRef))), timeout)
 
         val updatedOrderBook = eventually {
-          val ob = Await.result(obsdb.get(pair), 5.seconds)
+          val ob = obsdb.get(pair).futureValue
           ob shouldNot be(empty)
           ob.get._2
         }
 
-        val actual = Await.result(orderBookAskAdapter.getAggregatedSnapshot(pair), 5.seconds).explicitGet().get
+        val actual = orderBookAskAdapter.getAggregatedSnapshot(pair).futureValue.explicitGet().get
 
         val expected = OrderBookAggregatedSnapshot(
           asks = sum(updatedOrderBook.asks),
@@ -447,7 +446,6 @@ class AggregatedOrderBookActorSpec
   )
 
   private def get[R](ref: ActorRef[InputMessage])(mkMessage: ActorRef[R] => InputMessage): R =
-    Await.result(ref.ask[R](mkMessage)(5.seconds, system.scheduler.toTyped), 5.seconds)
+    ref.ask[R](mkMessage)(timeout, system.scheduler.toTyped).futureValue
 
-  override protected def actorSystemName: String = "AggregatedOrderBookSpec"
 }

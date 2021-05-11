@@ -348,7 +348,9 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
               case OrderListType.ClosedOnly => closedOnly
             }
 
-            dex1.api.getOrderHistoryByAssetPairAndPublicKey(carol, wavesUsdPair, activeOnlyParam, closedOnlyParam).map(_.id) should matchTo(expected)
+            dex1.api.getOrderHistoryByAssetPairAndPublicKey(carol, wavesUsdPair, activeOnlyParam, closedOnlyParam).map(_.id) should matchTo(
+              expected
+            )
             dex1.api.getOrderHistoryByPublicKey(carol, activeOnlyParam, closedOnlyParam).map(_.id) should matchTo(expected)
             dex1.api.orderHistoryWithApiKey(carol, activeOnlyParam, closedOnlyParam).map(_.id) should matchTo(expected)
           }

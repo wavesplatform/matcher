@@ -1,25 +1,30 @@
 package com.wavesplatform
 
+import com.wavesplatform.dex.Implicits.durationToScalatestTimeout
 import com.wavesplatform.dex.domain.account.{KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.waves.WavesFeeConstants._
 import com.wavesplatform.it.api.MatcherCommand
 import org.scalacheck.Gen
+import org.scalatest.concurrent.ScalaFutures._
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
-import scala.concurrent.{Await, Future}
 import scala.util.Random
 import scala.util.control.NonFatal
 
 package object it {
 
+  // Using here specified timeouts for futureValue because these methods execute long operations
+  // Regular PatienceConfigs were defined for faster operations
+
   /**
    * @return The number of successful commands
    */
   def executeCommands(xs: Seq[MatcherCommand], ignoreErrors: Boolean = true, timeout: FiniteDuration = 3.minutes): Int =
-    Await.result(Future.sequence(xs.map(executeCommand(_, ignoreErrors))), timeout).sum
+    Future.sequence(xs.map(executeCommand(_, ignoreErrors))).futureValue(timeout).sum
 
   def executePlaces(xs: Seq[MatcherCommand.Place], ignoreErrors: Boolean = true, timeout: FiniteDuration = 3.minutes): Vector[Order] = {
     def execute(c: MatcherCommand.Place): Future[Seq[Order]] =
@@ -27,7 +32,7 @@ package object it {
         case 0 => Nil
         case _ => List(c.order)
       }
-    Await.result(Future.sequence(xs.map(execute)), timeout).flatten.toVector
+    Future.sequence(xs.map(execute)).futureValue(timeout).flatten.toVector
   }
 
   private def executeCommand(x: MatcherCommand, ignoreErrors: Boolean): Future[Int] =

@@ -2,12 +2,14 @@ package com.wavesplatform.dex.grpc.integration.caches
 
 import java.time.Duration
 import java.util.concurrent.{ConcurrentHashMap, ExecutorService, Executors}
-
 import com.wavesplatform.dex.WavesIntegrationSuiteBase
 import mouse.any.anySyntaxMouse
 import org.scalatest.BeforeAndAfterAll
+import org.scalatest.time.Span
+import org.scalatest.time.{Minutes, Seconds}
 
 import scala.concurrent._
+import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
 
 class BlockchainCacheSpecification extends WavesIntegrationSuiteBase with BeforeAndAfterAll {
@@ -52,16 +54,13 @@ class BlockchainCacheSpecification extends WavesIntegrationSuiteBase with Before
 
       val badKeyAccessCount = 10
 
-      Await.result(
-        (1 to badKeyAccessCount).foldLeft(Future.successful("")) { (prev, _) =>
-          for {
-            _ <- prev
-            _ <- cache get goodKey
-            r <- cache get badKey recover { case _ => "sad" }
-          } yield { Thread.sleep(andThenAwaitTimeout); r }
-        },
-        scala.concurrent.duration.Duration.Inf
-      )
+      (1 to badKeyAccessCount).foldLeft(Future.successful("")) { (prev, _) =>
+        for {
+          _ <- prev
+          _ <- cache get goodKey
+          r <- cache get badKey recover { case _ => "sad" }
+        } yield { Thread.sleep(andThenAwaitTimeout); r }
+      }.futureValue
 
       keyAccessMap.get(goodKey) shouldBe 1
       keyAccessMap.get(badKey) should be > 1
@@ -79,16 +78,13 @@ class BlockchainCacheSpecification extends WavesIntegrationSuiteBase with Before
         invalidationPredicate = _.startsWith("2")
       )
 
-      Await.result(
-        (1 to 10).foldLeft(Future.successful("")) { (prev, _) =>
-          for {
-            _ <- prev
-            _ <- cache get goodKey
-            r <- cache get badKey
-          } yield blocking { Thread.sleep(andThenAwaitTimeout); r }
-        },
-        scala.concurrent.duration.Duration.Inf
-      )
+      (1 to 10).foldLeft(Future.successful("")) { (prev, _) =>
+        for {
+          _ <- prev
+          _ <- cache get goodKey
+          r <- cache get badKey
+        } yield blocking { Thread.sleep(andThenAwaitTimeout); r }
+      }.futureValue
 
       keyAccessMap.get(goodKey) shouldBe 1
       keyAccessMap.get(badKey) should be > 1

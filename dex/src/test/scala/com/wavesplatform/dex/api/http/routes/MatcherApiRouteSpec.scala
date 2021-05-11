@@ -13,7 +13,7 @@ import com.google.common.primitives.Longs
 import com.softwaremill.diffx.{Derived, Diff}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.dex._
-import com.wavesplatform.dex.actors.MatcherActor._
+import com.wavesplatform.dex.actors.OrderBookDirectoryActor._
 import com.wavesplatform.dex.actors.OrderBookAskAdapter
 import com.wavesplatform.dex.actors.address.AddressActor.Command.{PlaceOrder, Source}
 import com.wavesplatform.dex.actors.address.AddressActor.Query.GetTradableBalance
@@ -69,10 +69,10 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
 
   private val matcherKeyPair = KeyPair("matcher".getBytes("utf-8"))
 
-  private val smartAsset = arbitraryAssetGen.sample.get
+  private val smartAsset = arbitraryIssuedAssetGen.sample.get
   private val smartAssetId = smartAsset.id
 
-  private val unknownAsset = arbitraryAssetGen.sample.get
+  private val unknownAsset = arbitraryIssuedAssetGen.sample.get
   private val unknownAssetId = unknownAsset.id
 
   // Will be refactored in DEX-548
@@ -917,7 +917,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
   // upsertRate, deleteRate
   routePath("/settings/rates/{assetId}") - {
 
-    val rateCache = awaitResult(RateCache(TestRateDb()))
+    val rateCache = RateCache(TestRateDb()).futureValue
 
     val rate = 0.0055
     val updatedRate = 0.0067
@@ -1122,7 +1122,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
   }
 
   private def test[U](f: Route => U, apiKey: String = "", maybeRateCache: Option[RateCache] = None): U = {
-    val rateCache = maybeRateCache.getOrElse(awaitResult(RateCache(TestRateDb())))
+    val rateCache = maybeRateCache.getOrElse(RateCache(TestRateDb()).futureValue)
     val addressActor = TestProbe("address")
     addressActor.setAutoPilot { (sender: ActorRef, msg: Any) =>
       val response = msg match {
@@ -1175,8 +1175,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       TestActor.KeepRunning
     }
 
-    val matcherActor = TestProbe("matcher")
-    matcherActor.setAutoPilot { (sender: ActorRef, msg: Any) =>
+    val orderBookDirectoryActor = TestProbe("matcher")
+    orderBookDirectoryActor.setAutoPilot { (sender: ActorRef, msg: Any) =>
       msg match {
         case GetSnapshotOffsets =>
           sender ! SnapshotOffsetsResponse(
@@ -1257,7 +1257,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     )
 
     val odb = OrderDb.levelDb(settings.orderDb, asyncLevelDb)
-    awaitResult(odb.saveOrder(orderToCancel))
+    odb.saveOrder(orderToCancel).futureValue
 
     val orderBooks = new AtomicReference(Map(smartWavesPair -> orderBookActor.ref.asRight[Unit]))
     val orderBookAskAdapter = new OrderBookAskAdapter(orderBooks, 5.seconds)
@@ -1290,7 +1290,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         ),
         matcherPublicKey = matcherKeyPair.publicKey,
         config = ConfigFactory.load().atKey("waves.dex"),
-        matcher = matcherActor.ref,
+        matcher = orderBookDirectoryActor.ref,
         addressActor = addressActor.ref,
         CombinedStream.Status.Working,
         storeCommand = {

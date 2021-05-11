@@ -37,7 +37,8 @@ class RestOrderLimitTestSuite extends MatcherSuiteBase {
   private def activeOrdersBy(pair: AssetPair, n: KeyPair = alice): List[Order.Id] =
     dex1.api.getOrderHistoryByAssetPairAndPublicKey(n, pair, activeOnly = Some(true)).map(_.id)
 
-  private def allOrdersBy(pair: AssetPair, n: KeyPair = alice): List[Order.Id] = dex1.api.getOrderHistoryByAssetPairAndPublicKey(n, pair).map(_.id)
+  private def allOrdersBy(pair: AssetPair, n: KeyPair = alice): List[Order.Id] =
+    dex1.api.getOrderHistoryByAssetPairAndPublicKey(n, pair).map(_.id)
 
   markup("""Test suite checks only Alice's OrderHistory.
            |Bob places orders only for matching Alice's orders.""".stripMargin)

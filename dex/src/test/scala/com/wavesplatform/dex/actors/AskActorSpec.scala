@@ -8,27 +8,26 @@ import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.{Await, Future, TimeoutException}
+import scala.concurrent.{Future, TimeoutException}
 
 class AskActorSpec extends AnyFreeSpec with Matchers with SystemTime with MatcherSpecLike with DiffMatcherWithImplicits {
 
-  private val defaultTimeout = 5.seconds
   private val defaultResponse = "foo"
 
   "AskActor" - {
     "happy path" in test { (ref, future) =>
       ref ! defaultResponse
-      val actual = Await.result(future, defaultTimeout)
+      val actual = future.futureValue
       actual should matchTo(defaultResponse)
     }
 
     "timeout" in test { (_, future) =>
-      Await.result(future.failed, defaultTimeout) shouldBe a[TimeoutException]
+      future.failed.futureValue shouldBe a[TimeoutException]
     }
 
     "unexpected response type" in test { (ref, future) =>
       ref ! 100500
-      Await.result(future.failed, defaultTimeout) shouldBe a[IllegalArgumentException]
+      future.failed.futureValue shouldBe a[IllegalArgumentException]
     }
   }
 
@@ -39,8 +38,7 @@ class AskActorSpec extends AnyFreeSpec with Matchers with SystemTime with Matche
 
     f(ref, future)
 
-    p.expectTerminated(ref, defaultTimeout)
+    p.expectTerminated(ref, timeout)
   }
 
-  override protected def actorSystemName: String = "AskActorSpec"
 }

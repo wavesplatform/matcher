@@ -23,7 +23,7 @@ import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor
 import com.wavesplatform.dex.actors.events.OrderEventsCoordinatorActor
 import com.wavesplatform.dex.actors.orderbook.{AggregatedOrderBookActor, OrderBookActor, OrderBookSnapshotStoreActor}
 import com.wavesplatform.dex.actors.tx.{ExchangeTransactionBroadcastActor, WriteExchangeTransactionActor}
-import com.wavesplatform.dex.actors.{MatcherActor, OrderBookAskAdapter, RootActorSystem}
+import com.wavesplatform.dex.actors.{OrderBookDirectoryActor, OrderBookAskAdapter, RootActorSystem}
 import com.wavesplatform.dex.api.http.headers.{CustomMediaTypes, MatcherHttpServer}
 import com.wavesplatform.dex.api.http.routes.{MatcherApiRoute, MatcherApiRouteV1}
 import com.wavesplatform.dex.api.http.{CompositeHttpService, OrderBookHttpInfo}
@@ -40,7 +40,7 @@ import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.utils.{EitherExt2, LoggerFacade, ScorexLogging}
 import com.wavesplatform.dex.effect.{FutureResult, liftValueAsync}
 import com.wavesplatform.dex.error.ErrorFormatterContext
-import com.wavesplatform.dex.grpc.integration.clients.MatcherExtensionAssetsWatchingClient
+import com.wavesplatform.dex.grpc.integration.clients.MatcherExtensionAssetsCachingClient
 import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedWavesBlockchainClient
 import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
@@ -154,7 +154,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     assetsCache.cached.unsafeGetHasScript // Should be in the cache, because assets decimals are required during an order book creation
   )
 
-  private val wavesBlockchainAsyncClient = new MatcherExtensionAssetsWatchingClient(
+  private val wavesBlockchainAsyncClient = new MatcherExtensionAssetsCachingClient(
     underlying = CombinedWavesBlockchainClient(
       settings.wavesBlockchainClient,
       matcherPublicKey,
@@ -200,7 +200,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
   private val historyRouterRef =
     if (settings.orderHistory.enable) actorSystem.actorOf(
-      // Safe here, retrieve during MatcherActor starting, consuming or placing
+      // Safe here, retrieve during OrderBookDirectoryActor starting, consuming or placing
       HistoryRouterActor.props(assetsCache.cached.unsafeGetDecimals, settings.postgres, settings.orderHistory),
       "history-router"
     ).some
@@ -248,15 +248,15 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     name = "events-coordinator"
   )
 
-  private val matcherActorRef: ActorRef = {
-    def mkOrderBookProps(assetPair: AssetPair, matcherActor: ActorRef): Props = {
-      // Safe here, because we receive this information during MatcherActor starting, placing or consuming
+  private val orderBookDirectoryActorRef: ActorRef = {
+    def mkOrderBookProps(assetPair: AssetPair, orderBookDirectoryActor: ActorRef): Props = {
+      // Safe here, because we receive this information during OrderBookDirectoryActor starting, placing or consuming
       val amountAssetDecimals = errorContext.unsafeAssetDecimals(assetPair.amountAsset)
       val priceAssetDecimals = errorContext.unsafeAssetDecimals(assetPair.priceAsset)
       matchingRulesCache.setCurrentMatchingRuleForNewOrderBook(assetPair, lastProcessedOffset, amountAssetDecimals, priceAssetDecimals)
       OrderBookActor.props(
         OrderBookActor.Settings(AggregatedOrderBookActor.Settings(settings.webSockets.externalClientHandler.messagesInterval)),
-        matcherActor,
+        orderBookDirectoryActor,
         orderEventsCoordinatorRef,
         orderBookSnapshotStoreRef,
         wsInternalBroadcastRef,
@@ -271,7 +271,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     }
 
     actorSystem.actorOf(
-      MatcherActor.props(
+      OrderBookDirectoryActor.props(
         settings,
         assetPairsDb,
         {
@@ -283,12 +283,12 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
         assetsCache,
         pairBuilder.quickValidateAssetPair
       ),
-      MatcherActor.name
+      OrderBookDirectoryActor.name
     )
   }
 
   cs.addTask(CoordinatedShutdown.PhaseServiceRequestsDone, "Actors") { () =>
-    gracefulStop(matcherActorRef, 3.seconds, MatcherActor.Shutdown).map(_ => Done)
+    gracefulStop(orderBookDirectoryActorRef, 3.seconds, OrderBookDirectoryActor.Shutdown).map(_ => Done)
   }
 
   private val httpApiRouteV0: MatcherApiRoute = {
@@ -313,7 +313,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       pairBuilder,
       matcherPublicKey,
       config,
-      matcherActorRef,
+      orderBookDirectoryActorRef,
       addressDirectoryRef,
       wavesBlockchainAsyncClient.status(),
       matcherQueue.store,
@@ -354,7 +354,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     wsInternalBroadcastRef,
     externalClientDirectoryRef,
     addressDirectoryRef,
-    matcherActorRef,
+    orderBookDirectoryActorRef,
     time,
     pairBuilder,
     maybeApiKeyHash,
@@ -396,7 +396,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
     _ <- {
       log.info(s"Preparing HTTP service (Matcher's ID = ${settings.id}) ...")
-      // Indirectly initializes matcherActor, so it must be after loadAllKnownAssets
+      // Indirectly initializes OrderBookDirectoryActor, so it must be after loadAllKnownAssets
       val combinedRoute = respondWithHeader(MatcherHttpServer(settings.id)) {
         new CompositeHttpService(matcherApiTypes, matcherApiRoutes, settings.restApi).compositeRoute
       }
@@ -487,14 +487,14 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
         val assetPairs: Set[AssetPair] = xs
           .map { validatedCommandWithMeta =>
             log.debug(s"Consumed $validatedCommandWithMeta")
-            matcherActorRef ! validatedCommandWithMeta
+            orderBookDirectoryActorRef ! validatedCommandWithMeta
             lastProcessedOffset = validatedCommandWithMeta.offset
             validatedCommandWithMeta.command.assetPair
           }
           .to(Set)
 
-        matcherActorRef
-          .ask(MatcherActor.PingAll(assetPairs))(processConsumedTimeout)
+        orderBookDirectoryActorRef
+          .ask(OrderBookDirectoryActor.PingAll(assetPairs))(processConsumedTimeout)
           .recover { case NonFatal(e) => log.error("PingAll is timed out!", e) }
           .map(_ => ())
       } andThen {

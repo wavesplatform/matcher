@@ -6,7 +6,7 @@ import akka.actor.typed.{ActorRef, Behavior, Terminated}
 import akka.{actor => classic}
 import cats.implicits.catsSyntaxEitherId
 import cats.syntax.option._
-import com.wavesplatform.dex.actors.MatcherActor
+import com.wavesplatform.dex.actors.OrderBookDirectoryActor
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor
 import com.wavesplatform.dex.api.ws.actors.WsExternalClientHandlerActor.Command.CancelAddressSubscription
@@ -103,7 +103,7 @@ object WsExternalClientHandlerActor {
 
       def unsubscribeOrderBook(assetPair: AssetPair): Unit = {
         context.log.debug(s"WsUnsubscribe(assetPair=$assetPair)")
-        matcherRef ! MatcherActor.AggregatedOrderBookEnvelope(assetPair, AggregatedOrderBookActor.Command.RemoveWsSubscription(clientRef))
+        matcherRef ! OrderBookDirectoryActor.AggregatedOrderBookEnvelope(assetPair, AggregatedOrderBookActor.Command.RemoveWsSubscription(clientRef))
       }
 
       def awaitPong(
@@ -276,7 +276,7 @@ object WsExternalClientHandlerActor {
               }
 
             case Event.AssetPairValidated(assetPair) =>
-              matcherRef ! MatcherActor.AggregatedOrderBookEnvelope(assetPair, AggregatedOrderBookActor.Command.AddWsSubscription(clientRef))
+              matcherRef ! OrderBookDirectoryActor.AggregatedOrderBookEnvelope(assetPair, AggregatedOrderBookActor.Command.AddWsSubscription(clientRef))
 
               if (orderBookSubscriptions.lengthCompare(maxOrderBookNumber) == 0) {
                 // safe since maxOrderBookNumber > 0

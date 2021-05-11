@@ -12,12 +12,12 @@ class Transformations[ErrorT](syncTimeout: FiniteDuration = 10.minutes) {
 
   type AsyncRaw[EntityT] = Future[EnrichedResponse[ErrorT, EntityT]]
 
-  type AsyncHttp[_] = Future[Response[Either[String,String]]]
+  type AsyncHttp[_] = Future[Response[Either[String, String]]]
   type AsyncTry[EntityT] = Future[Either[ErrorT, EntityT]]
   type AsyncUnsafe[EntityT] = Future[EntityT]
 
   type SyncRaw[EntityT] = EnrichedResponse[ErrorT, EntityT]
-  type SyncHttp[_] = Response[Either[String,String]]
+  type SyncHttp[_] = Response[Either[String, String]]
   type SyncTry[EntityT] = Either[ErrorT, EntityT]
   type SyncUnsafe[EntityT] = EntityT
 

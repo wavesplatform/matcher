@@ -2,6 +2,7 @@ package com.wavesplatform.it.sync
 
 import cats.Id
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.Implicits.durationToScalatestTimeout
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.api.http.entities.HttpSuccessfulBatchCancel
 import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsOrderBookChanges}
@@ -19,8 +20,8 @@ import com.wavesplatform.it.config.DexTestConfig.createAssetPair
 import com.wavesplatform.it.tags.DexItExternalKafkaRequired
 import org.scalacheck.Gen
 
+import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.{Await, Future}
 import scala.util.Random
 import scala.util.control.NonFatal
 
@@ -204,16 +205,14 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with
       assetPairs.map(dex2.asyncApi.cancelAllByPair(owner, _, System.currentTimeMillis)).toList
     }
 
-    Await.result(
-      batchCancels(alice, assetPairs)
-        .zip(singleCancels(alice, allOrders.filter(_.sender == alice.publicKey)))
-        .zip(singleCancels(bob, allOrders.filter(_.sender == bob.publicKey)))
-        .zip(batchCancels(bob, assetPairs)),
-      3.minutes
-    )
+    batchCancels(alice, assetPairs)
+      .zip(singleCancels(alice, allOrders.filter(_.sender == alice.publicKey)))
+      .zip(singleCancels(bob, allOrders.filter(_.sender == bob.publicKey)))
+      .zip(batchCancels(bob, assetPairs))
+      .futureValue(2.minutes)
 
-    Await.result(dex1.asyncApi.getOrderHistoryByPublicKey(alice, Some(true)), 5.seconds) shouldBe empty
-    Await.result(dex1.asyncApi.getOrderHistoryByPublicKey(bob, Some(true)), 5.seconds) shouldBe empty
+    dex1.api.getOrderHistoryByPublicKey(alice, Some(true)) shouldBe empty
+    dex1.api.getOrderHistoryByPublicKey(bob, Some(true)) shouldBe empty
   }
 
   private def mkOrders(account: KeyPair, number: Int = placesNumber) =

@@ -2,10 +2,12 @@ package com.wavesplatform.dex.load
 
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
+import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.load.request._
 import com.wavesplatform.dex.load.utils._
+import com.wavesplatform.dex.model.AssetPairBuilder.assetIdOrdering._
 import im.mak.waves.transactions.account.{PrivateKey => JPrivateKey, PublicKey => JPublicKey}
 import im.mak.waves.transactions.common.{Amount, AssetId}
 import im.mak.waves.transactions.exchange.{AssetPair, Order, OrderType}
@@ -32,7 +34,7 @@ import scala.util.Random
 
 object TankGenerator {
 
-  private val threadCount: Int = sys.env.getOrElse("SBT_THREAD_NUMBER", "6").toInt
+  private val threadCount: Int = sys.env.getOrElse("SBT_THREAD_NUMBER", "3").toInt
   private val executor: ExecutorService = Executors.newFixedThreadPool(threadCount)
 
   implicit private val blockingContext: ExecutionContextExecutor = ExecutionContext.fromExecutor(executor)
@@ -46,9 +48,9 @@ object TankGenerator {
   val httpClient: CloseableHttpClient = HttpClients.custom
     .setDefaultRequestConfig(
       RequestConfig.custom
-        .setSocketTimeout(5000)
-        .setConnectTimeout(5000)
-        .setConnectionRequestTimeout(5000)
+        .setSocketTimeout(10000)
+        .setConnectTimeout(10000)
+        .setConnectionRequestTimeout(10000)
         .setCookieSpec(CookieSpecs.STANDARD)
         .build
     )
@@ -67,6 +69,12 @@ object TankGenerator {
     accounts.toList
   }
 
+  def waitForEmptyUtx(): Unit = {
+    println("Waiting for empty UTX...")
+    while (node.getUtxSize() > 0)
+      waitForHeightArise()
+  }
+
   private def mkAssets(count: Int = settings.assets.count): List[String] = {
     println(s"Generating $count assets... ")
 
@@ -76,7 +84,6 @@ object TankGenerator {
     val futures = assetsTxs.map { tx =>
       Future {
         node.broadcast(tx)
-        println(s"Broadcast $tx")
       }
     }
 
@@ -86,9 +93,7 @@ object TankGenerator {
     )
     Await.result(Future.sequence(futures), requestsAwaitingTime)
 
-    val asset = assets(new Random().nextInt(assets.length))
-
-    do waitForHeightArise() while (node.getAssetBalance(issuer.address(), asset) <= 0)
+    waitForEmptyUtx()
 
     println("Assets have been successfully issued")
     assets.map(_.toString).toList
@@ -100,12 +105,13 @@ object TankGenerator {
     val randomAssetPairs = Random
       .shuffle {
         assets
+          .map(Asset.fromString(_).get)
           .combinations(2)
           .map {
-            case List(aa, pa) => if (pa < aa) (aa, pa) else (pa, aa)
+            case List(aa, pa) => if (aa.compatId > pa.compatId) (aa, pa) else (pa, aa)
             case _ => throw new RuntimeException("Can't create asset-pair")
           }
-          .map(Function.tupled((a, p) => new AssetPair(AssetId.as(a), AssetId.as(p))))
+          .map(Function.tupled((a, p) => new AssetPair(AssetId.as(a.toString), AssetId.as(p.toString))))
       }
       .take(count)
       .toList
@@ -144,7 +150,6 @@ object TankGenerator {
         }
       val requestsAwaitingTime = (futures.size / threadCount).seconds
       Await.result(Future.sequence(futures), requestsAwaitingTime)
-
     }
 
     println(s"\t -- WAVES")
@@ -159,10 +164,7 @@ object TankGenerator {
       }
     println(s" Done")
 
-    val asset = AssetId.as(assets(new Random().nextInt(assets.length)))
-    val account = accounts(new Random().nextInt(accounts.length))
-
-    while (node.getAssetBalance(account.address(), asset) == 0) waitForHeightArise()
+    waitForEmptyUtx()
   }
 
   private def mkOrders(accounts: List[JPrivateKey], pairs: List[AssetPair], matching: Boolean): List[Request] = {
@@ -223,7 +225,7 @@ object TankGenerator {
         getOrderBook(a)
           .as[Array[JsValue]]
           .map { o =>
-            val id = (o \ "id").as[String]
+            val id = (o \ "id").as[ByteStr]
             val aa = ((o \ "assetPair").as[JsValue] \ "amountAsset").validate[String] match {
               case JsSuccess(name, _) => name
               case _: JsError => "WAVES"
@@ -236,7 +238,7 @@ object TankGenerator {
             val unsignedRequest =
               HttpCancelOrder(
                 sender = PublicKey(a.publicKey().bytes()),
-                orderId = Some(id.getBytes()),
+                orderId = Some(id),
                 timestamp = None,
                 signature = Array.emptyByteArray
               )
@@ -391,7 +393,7 @@ object TankGenerator {
       } catch { case e: Exception => println(e) }
     }
 
-    waitForHeightArise()
+    waitForEmptyUtx()
 
     val now = System.currentTimeMillis()
     val massTransfers =
@@ -424,6 +426,9 @@ object TankGenerator {
       HttpClientContext.create
     )
     res.close()
+    if (res.getStatusLine.getStatusCode != 200)
+      throw new RuntimeException(s"Placing FAIL: ${order.toJson}")
+    else println(s"Placing OK: ${order.toJson}")
     res
   }
 
@@ -449,7 +454,7 @@ object TankGenerator {
           .getSignedWith(account)
 
       placeOrder(order).recover {
-        case e: Throwable => println(s"Error during operation: $e"); null
+        case e: Throwable => println(e.getMessage); null
       }
     }
 
@@ -463,8 +468,8 @@ object TankGenerator {
 
   private def mkAllTypes(accounts: List[JPrivateKey], requestsCount: Int, pairsFile: Option[File]): List[Request] = {
     println("Making requests:")
-
     placeOrdersForCancel(accounts, (requestsCount * settings.distribution.placeOrder).toInt, pairsFile)
+
     Random.shuffle(
       mkOrderStatuses(accounts, (requestsCount * settings.distribution.orderStatus).toInt) ++
       mkMatching(accounts, (requestsCount * settings.distribution.placeOrder).toInt, pairsFile, distributed = true) ++
@@ -481,7 +486,7 @@ object TankGenerator {
     val massTransfersRequestsCount = step2MatcherRequestsCount / 15
 
     val requests = mkAllTypes(accounts.slice(0, accounts.size - massTransfersAccounts.size), requestsCount, pairsFile)
-    val step1And3 = requests.slice(0, step1And3RequestsCount).toList
+    val step1And3 = requests.slice(0, step1And3RequestsCount)
     val step2 = requests.slice(step1And3RequestsCount, step1And3RequestsCount + step2MatcherRequestsCount)
     val massTransfers = mkMassTransfers(massTransfersAccounts, massTransfersRequestsCount)
 

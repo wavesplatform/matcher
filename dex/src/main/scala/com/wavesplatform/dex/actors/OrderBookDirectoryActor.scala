@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
-class MatcherActor(
+class OrderBookDirectoryActor(
   settings: MatcherSettings,
   assetPairsDb: AssetPairsDb[Future],
   recoveryCompletedWithEventNr: Either[String, Long] => Unit,
@@ -36,7 +36,7 @@ class MatcherActor(
     with WorkingStash
     with ScorexLogging {
 
-  import MatcherActor._
+  import OrderBookDirectoryActor._
   import context.dispatcher
 
   override def supervisorStrategy: SupervisorStrategy = SupervisorStrategy.stoppingStrategy
@@ -327,7 +327,7 @@ class MatcherActor(
 
 }
 
-object MatcherActor {
+object OrderBookDirectoryActor {
 
   def name: String = "matcher"
 
@@ -340,7 +340,7 @@ object MatcherActor {
     assetsCache: AssetsCache,
     validateAssetPair: AssetPair => Either[MatcherError, AssetPair]
   ): Props = Props(
-    new MatcherActor(
+    new OrderBookDirectoryActor(
       matcherSettings,
       assetPairsDB,
       recoveryCompletedWithEventNr,

@@ -165,22 +165,21 @@ class Checker(superConnector: SuperConnector) {
     val submitted = mkMatcherOrder(assetPairInfo.assetPair, SELL)
     val submittedId = submitted.id()
 
-    def checkEmptyListOfActiveOrders(): ErrorOr[Boolean] =
-      for {
-        _ <- dexRest.getActiveOrdersByPair(env.matcherKeyPair, assetPairInfo.assetPair)
-          .map {
-            case left: Seq[JsValue] => left.foreach { e =>
-                val id = (e \ "id").as[ByteStr]
-                dexRest.cancelOrder(id, assetPairInfo.assetPair, env.matcherKeyPair)
-                dexRest.waitForOrderStatus(id, assetPairInfo.assetPair, OrderStatus.Cancelled.name)
-              }
-            case _ => _
-          }
-
-        ids <- dexRest
-          .getActiveOrdersByPair(env.matcherKeyPair, assetPairInfo.assetPair)
-          .ensure("Count of active orders > 0")(_.isEmpty)
-      } yield ids.isEmpty
+    def cancelActiveOrders(): ErrorOr[Boolean] =
+      dexRest.getActiveOrdersByPair(env.matcherKeyPair, assetPairInfo.assetPair) match {
+        case Left(x) => Left(x)
+        case Right(v: Seq[JsValue]) =>
+          if (
+            !v.map { e =>
+              val id = (e \ "id").as[ByteStr]
+              dexRest.cancelOrder(id, assetPairInfo.assetPair, env.matcherKeyPair)
+              dexRest.waitForOrderStatus(id, assetPairInfo.assetPair, OrderStatus.Cancelled.name)
+            }.exists(f => f.isLeft)
+          )
+            Left("Matcher still has active orders")
+          else
+            Right(true)
+      }
 
     def checkFillingAtDex(orderStatus: JsValue): ErrorOr[Boolean] = {
 
@@ -206,7 +205,7 @@ class Checker(superConnector: SuperConnector) {
       } yield txs
 
     for {
-      _ <- checkEmptyListOfActiveOrders()
+      _ <- cancelActiveOrders()
       _ <- dexRest.placeOrder(counter)
       counterStatus <- dexRest.waitForOrderStatus(counter, OrderStatus.Accepted.name)
       _ <- dexRest.placeOrder(submitted)

@@ -174,7 +174,7 @@ class Checker(superConnector: SuperConnector) {
               val id = (e \ "id").as[ByteStr]
               dexRest.cancelOrder(id, assetPairInfo.assetPair, env.matcherKeyPair)
               dexRest.waitForOrderStatus(id, assetPairInfo.assetPair, OrderStatus.Cancelled.name)
-            }.exists(f => f.isLeft)
+            }.exists(r => r.isLeft)
           )
             Left("Matcher still has active orders")
           else

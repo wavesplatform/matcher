@@ -134,7 +134,9 @@ class MatcherApiRoute(
   )
 
   override lazy val route: Route = pathPrefix("matcher") {
-    getMatcherPublicKey ~ settingsRoutes ~ debugRoutes ~ orderBookRoutes ~ ordersRoutes ~ balanceRoutes ~ transactionsRoutes
+    protect { // to make a readable response for undefined requests
+      getMatcherPublicKey ~ settingsRoutes ~ debugRoutes ~ orderBookRoutes ~ ordersRoutes ~ balanceRoutes ~ transactionsRoutes
+    }
   }
 
   private def unavailableOrderBookBarrier(p: AssetPair): Directive0 = orderBook(p) match {

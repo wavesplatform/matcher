@@ -6,14 +6,13 @@ import akka.stream.scaladsl.{BidiFlow, Flow}
 import akka.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}
 import akka.stream.{Attributes, BidiShape, Inlet, Outlet}
 import com.wavesplatform.dex.api.http.directives.HttpKamonMetricsDirectives._
-import com.wavesplatform.dex.domain.utils.ScorexLogging
 import kamon.Kamon
 import kamon.metric.{Metric, Timer}
 
 import java.util.UUID
 import scala.collection.mutable
 
-class MetricStage() extends GraphStage[BidiShape[HttpRequest, HttpRequest, HttpResponse, HttpResponse]] with ScorexLogging {
+class MetricStage() extends GraphStage[BidiShape[HttpRequest, HttpRequest, HttpResponse, HttpResponse]] {
 
   private val requestIn = Inlet[HttpRequest]("MetricStage.requestIn")
   private val requestOut = Outlet[HttpRequest]("MetricStage.requestOut")
@@ -76,13 +75,11 @@ class MetricStage() extends GraphStage[BidiShape[HttpRequest, HttpRequest, HttpR
       override def onUpstreamFinish(): Unit =
         complete(responseOut)
 
-      override def onUpstreamFailure(ex: Throwable): Unit = {
+      override def onUpstreamFailure(ex: Throwable): Unit =
         fail(responseOut, ex)
-      }
 
-      override def onDownstreamFinish(cause: Throwable): Unit = {
+      override def onDownstreamFinish(cause: Throwable): Unit =
         cancel(responseIn)
-      }
 
     }
 

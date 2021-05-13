@@ -16,7 +16,7 @@ import akka.util.Timeout
 import akka.{Done, NotUsed}
 import cats.syntax.either._
 import com.wavesplatform.dex.api.http.SwaggerDocService
-import com.wavesplatform.dex.api.http.directives.HttpKamonMetricsProtectedDirectives
+import com.wavesplatform.dex.api.http.directives.HttpKamonMetricsDirectives._
 import com.wavesplatform.dex.api.http.entities.{HttpMessage, HttpWebSocketCloseFilter, HttpWebSocketConnections}
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
 import com.wavesplatform.dex.api.ws.actors.{WsExternalClientDirectoryActor, WsExternalClientHandlerActor, WsInternalBroadcastActor, WsInternalClientHandlerActor}
@@ -52,12 +52,11 @@ class MatcherWebSocketRoute(
   assetPairBuilder: AssetPairBuilder,
   override val apiKeyHash: Option[Array[Byte]],
   matcherSettings: MatcherSettings,
-  override val matcherStatus: () => MatcherStatus,
+  matcherStatus: () => MatcherStatus,
   getRatesSnapshot: () => Map[Asset, Double]
 )(implicit mat: Materializer)
     extends ApiRoute
     with AuthRoute
-    with HttpKamonMetricsProtectedDirectives
     with ScorexLogging {
 
   import mat.executionContext
@@ -68,9 +67,7 @@ class MatcherWebSocketRoute(
   private val wsHandlers = ConcurrentHashMap.newKeySet[CloseHandler]()
 
   override def route: Route = pathPrefix("ws" / "v0") {
-    statusBarrierMeasureResponses("wsRoutes") {
-      internalWsRoute ~ commonWsRoute ~ (pathPrefix("connections") & withAuth)(connectionsRoute ~ closeConnectionsRoute)
-    }
+    internalWsRoute ~ commonWsRoute ~ pathPrefix("connections")(connectionsRoute ~ closeConnectionsRoute)
   }
 
   @Path("/connections")
@@ -82,8 +79,12 @@ class MatcherWebSocketRoute(
     response = classOf[HttpWebSocketConnections]
   )
   def connectionsRoute: Route = get {
-    complete {
-      externalClientDirectoryRef.ask(WsExternalClientDirectoryActor.Query.GetActiveNumber).mapTo[HttpWebSocketConnections]
+    (measureResponse("connectionsRoute") & withAuth) {
+      matcherStatusBarrier {
+        complete {
+          externalClientDirectoryRef.ask(WsExternalClientDirectoryActor.Query.GetActiveNumber).mapTo[HttpWebSocketConnections]
+        }
+      }
     }
   }
 
@@ -107,103 +108,116 @@ class MatcherWebSocketRoute(
     )
   )
   def closeConnectionsRoute: Route = delete {
-    entity(as[HttpWebSocketCloseFilter]) { req =>
-      externalClientDirectoryRef ! WsExternalClientDirectoryActor.Command.CloseOldest(req.oldest)
-      complete {
-        HttpMessage("In progress")
+    (measureResponse("closeConnectionsRoute") & withAuth) {
+      entity(as[HttpWebSocketCloseFilter]) { req =>
+        matcherStatusBarrier {
+          externalClientDirectoryRef ! WsExternalClientDirectoryActor.Command.CloseOldest(req.oldest)
+          complete {
+            HttpMessage("In progress")
+          }
+        }
       }
     }
   }
 
-  private val commonWsRoute: Route = (pathEnd & get &
-    parameters("a_os".withDefault("Unknown OS"), "a_client".withDefault("Unknown Client"))) { (aOs: String, aClient: String) =>
-    import matcherSettings.webSockets.externalClientHandler
+  private val commonWsRoute: Route = (pathEnd & get & measureResponse("commonWsRoute")) {
+    parameters("a_os".withDefault("Unknown OS"), "a_client".withDefault("Unknown Client")) { (aOs: String, aClient: String) =>
+      matcherStatusBarrier {
+        import matcherSettings.webSockets.externalClientHandler
 
-    val clientId = UUID.randomUUID().toString
+        val clientId = UUID.randomUUID().toString
 
-    val client = mkSource(clientId)
-    val (clientRef, clientSource) = client.preMaterialize()
+        val client = mkSource(clientId)
+        val (clientRef, clientSource) = client.preMaterialize()
 
-    val webSocketHandlerRef: typed.ActorRef[WsExternalClientHandlerActor.Message] =
-      mat.system.spawn(
-        behavior = WsExternalClientHandlerActor(
-          externalClientHandler,
-          time,
-          assetPairBuilder,
-          clientRef,
-          matcher,
-          addressDirectory,
-          clientId,
-          getRatesSnapshot
-        ),
-        name = s"handler-$clientId"
-      )
+        val webSocketHandlerRef: typed.ActorRef[WsExternalClientHandlerActor.Message] =
+          mat.system.spawn(
+            behavior = WsExternalClientHandlerActor(
+              externalClientHandler,
+              time,
+              assetPairBuilder,
+              clientRef,
+              matcher,
+              addressDirectory,
+              clientId,
+              getRatesSnapshot
+            ),
+            name = s"handler-$clientId"
+          )
 
-    val closeHandler = new CloseHandler(() => webSocketHandlerRef ! WsExternalClientHandlerActor.Command.CloseConnection(MatcherIsStopping))
-    wsHandlers.add(closeHandler)
-    externalClientDirectoryRef ! WsExternalClientDirectoryActor.Command.Subscribe(webSocketHandlerRef, aOs, aClient)
+        val closeHandler = new CloseHandler(() => webSocketHandlerRef ! WsExternalClientHandlerActor.Command.CloseConnection(MatcherIsStopping))
+        wsHandlers.add(closeHandler)
+        externalClientDirectoryRef ! WsExternalClientDirectoryActor.Command.Subscribe(webSocketHandlerRef, aOs, aClient)
 
-    val server: Sink[WsExternalClientHandlerActor.Message, NotUsed] =
-      ActorSink
-        .actorRef[WsExternalClientHandlerActor.Message](
-          ref = webSocketHandlerRef,
-          onCompleteMessage = WsExternalClientHandlerActor.Event.Completed(().asRight),
-          onFailureMessage = e => WsExternalClientHandlerActor.Event.Completed(e.asLeft)
-        )
-        .named(s"server-$clientId")
+        val server: Sink[WsExternalClientHandlerActor.Message, NotUsed] =
+          ActorSink
+            .actorRef[WsExternalClientHandlerActor.Message](
+              ref = webSocketHandlerRef,
+              onCompleteMessage = WsExternalClientHandlerActor.Event.Completed(().asRight),
+              onFailureMessage = e => WsExternalClientHandlerActor.Event.Completed(e.asLeft)
+            )
+            .named(s"server-$clientId")
 
-    val serverSink: Sink[Message, NotUsed] =
-      mkServerSink[WsClientMessage, WsExternalClientHandlerActor.Command](
-        clientId,
-        closeHandler,
-        externalClientHandler.healthCheck.pingInterval / 5
-      ) {
-        case Right(x) => WsExternalClientHandlerActor.Command.ProcessClientMessage(x)
-        case Left(x) => WsExternalClientHandlerActor.Command.ForwardToClient(x)
-      }.to(server)
+        val serverSink: Sink[Message, NotUsed] =
+          mkServerSink[WsClientMessage, WsExternalClientHandlerActor.Command](
+            clientId,
+            closeHandler,
+            externalClientHandler.healthCheck.pingInterval / 5
+          ) {
+            case Right(x) => WsExternalClientHandlerActor.Command.ProcessClientMessage(x)
+            case Left(x) => WsExternalClientHandlerActor.Command.ForwardToClient(x)
+          }.to(server)
 
-    val flow: Flow[Message, TextMessage.Strict, NotUsed] = Flow.fromSinkAndSourceCoupled(serverSink, clientSource)
-    flow.watchTermination()((_, future) => closeHandler.closeOn(future))
-    handleWebSocketMessages(flow)
+        val flow: Flow[Message, TextMessage.Strict, NotUsed] = Flow.fromSinkAndSourceCoupled(serverSink, clientSource)
+        flow.watchTermination()((_, future) => closeHandler.closeOn(future))
+        handleWebSocketMessages(flow)
+      }
+    }
   }
 
-  private val internalWsRoute: Route = (path("internal") & get) {
-    import matcherSettings.webSockets.internalClientHandler
+  private val internalWsRoute: Route = (path("internal") & get & measureResponse("internalWsRoute")) {
+    matcherStatusBarrier {
+      import matcherSettings.webSockets.internalClientHandler
 
-    val clientId = UUID.randomUUID().toString
+      val clientId = UUID.randomUUID().toString
 
-    val client = mkSource(clientId)
-    val (clientRef, clientSource) = client.preMaterialize()
+      val client = mkSource(clientId)
+      val (clientRef, clientSource) = client.preMaterialize()
 
-    val webSocketHandlerRef: typed.ActorRef[WsInternalClientHandlerActor.Message] =
-      mat.system.spawn(
-        behavior = WsInternalClientHandlerActor(internalClientHandler, time, assetPairBuilder, clientRef, matcher, addressDirectory, clientId),
-        name = s"handler-$clientId"
-      )
-
-    val closeHandler = new CloseHandler(() => webSocketHandlerRef ! WsInternalClientHandlerActor.Command.CloseConnection(MatcherIsStopping))
-    wsHandlers.add(closeHandler)
-
-    wsInternalBroadcastRef ! WsInternalBroadcastActor.Command.Subscribe(webSocketHandlerRef)
-
-    val server: Sink[WsInternalClientHandlerActor.Message, NotUsed] =
-      ActorSink
-        .actorRef[WsInternalClientHandlerActor.Message](
-          ref = webSocketHandlerRef,
-          onCompleteMessage = WsInternalClientHandlerActor.Event.Completed(().asRight),
-          onFailureMessage = e => WsInternalClientHandlerActor.Event.Completed(e.asLeft)
+      val webSocketHandlerRef: typed.ActorRef[WsInternalClientHandlerActor.Message] =
+        mat.system.spawn(
+          behavior = WsInternalClientHandlerActor(internalClientHandler, time, assetPairBuilder, clientRef, matcher, addressDirectory, clientId),
+          name = s"handler-$clientId"
         )
-        .named(s"server-$clientId")
 
-    val serverSink: Sink[Message, NotUsed] =
-      mkServerSink[WsPingOrPong, WsInternalClientHandlerActor.Command](clientId, closeHandler, internalClientHandler.healthCheck.pingInterval / 5) {
-        case Right(x) => WsInternalClientHandlerActor.Command.ProcessClientMessage(x)
-        case Left(x) => WsInternalClientHandlerActor.Command.ForwardToClient(x)
-      }.to(server)
+      val closeHandler = new CloseHandler(() => webSocketHandlerRef ! WsInternalClientHandlerActor.Command.CloseConnection(MatcherIsStopping))
+      wsHandlers.add(closeHandler)
 
-    val flow: Flow[Message, TextMessage.Strict, NotUsed] = Flow.fromSinkAndSourceCoupled(serverSink, clientSource)
-    flow.watchTermination()((_, future) => closeHandler.closeOn(future))
-    handleWebSocketMessages(flow)
+      wsInternalBroadcastRef ! WsInternalBroadcastActor.Command.Subscribe(webSocketHandlerRef)
+
+      val server: Sink[WsInternalClientHandlerActor.Message, NotUsed] =
+        ActorSink
+          .actorRef[WsInternalClientHandlerActor.Message](
+            ref = webSocketHandlerRef,
+            onCompleteMessage = WsInternalClientHandlerActor.Event.Completed(().asRight),
+            onFailureMessage = e => WsInternalClientHandlerActor.Event.Completed(e.asLeft)
+          )
+          .named(s"server-$clientId")
+
+      val serverSink: Sink[Message, NotUsed] =
+        mkServerSink[WsPingOrPong, WsInternalClientHandlerActor.Command](
+          clientId,
+          closeHandler,
+          internalClientHandler.healthCheck.pingInterval / 5
+        ) {
+          case Right(x) => WsInternalClientHandlerActor.Command.ProcessClientMessage(x)
+          case Left(x) => WsInternalClientHandlerActor.Command.ForwardToClient(x)
+        }.to(server)
+
+      val flow: Flow[Message, TextMessage.Strict, NotUsed] = Flow.fromSinkAndSourceCoupled(serverSink, clientSource)
+      flow.watchTermination()((_, future) => closeHandler.closeOn(future))
+      handleWebSocketMessages(flow)
+    }
   }
 
   // From server to client
@@ -268,10 +282,12 @@ class MatcherWebSocketRoute(
     Future.sequence(activeConnections.map(_.closed.future)).map(_ => ())
   }
 
-  override def matcherStatusBarrier: Directive0 = matcherStatus() match {
-    case MatcherStatus.Working => pass
-    case MatcherStatus.Starting => complete(error.MatcherIsStarting.toWsHttpResponse(StatusCodes.ServiceUnavailable))
-    case MatcherStatus.Stopping => complete(error.MatcherIsStopping.toWsHttpResponse(StatusCodes.ServiceUnavailable))
+  def matcherStatusBarrier: Directive0 = matcherStatus() match {
+    case MatcherStatus.Working => log.error("passing barrier"); pass
+    case MatcherStatus.Starting =>
+      log.error("barrier not passed: Starting"); complete(error.MatcherIsStarting.toWsHttpResponse(StatusCodes.ServiceUnavailable))
+    case MatcherStatus.Stopping =>
+      log.error("barrier not passed: Stopping"); complete(error.MatcherIsStopping.toWsHttpResponse(StatusCodes.ServiceUnavailable))
   }
 
 }

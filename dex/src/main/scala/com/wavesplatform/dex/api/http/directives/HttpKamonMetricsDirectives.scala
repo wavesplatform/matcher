@@ -12,9 +12,6 @@ trait HttpKamonMetricsProtectedDirectives extends Directives with ProtectDirecti
   def protectedMeasureResponses(endpoint: String): Directive0 =
     measureResponse(endpoint) & protect
 
-  def statusBarrierMeasureResponses(endpoint: String): Directive0 =
-    measureResponse(endpoint) & matcherStatusBarrier
-
 }
 
 object HttpKamonMetricsDirectives {

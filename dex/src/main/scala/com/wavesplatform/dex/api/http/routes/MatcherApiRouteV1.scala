@@ -80,7 +80,7 @@ case class MatcherApiRouteV1(
   )
   def getOrderBook: Route =
     (path("orderbook" / AssetPairPM) & get) { pairOrError =>
-      protectedMeasureResponses("V1.getOrderBookForAssetPair") {
+      protectedMeasureResponses("V1.getOrderBook") {
         matcherStatusBarrier {
           withValidAssetPair(pairOrError) {
             p =>

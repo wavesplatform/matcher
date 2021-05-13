@@ -5,7 +5,7 @@ import com.wavesplatform.dex.domain.utils.ScorexLogging
 
 object SystemInformationReporter extends ScorexLogging {
 
-  def report(config: Config): Unit = {
+  def report(safeConfig: Config): Unit = {
     val renderOptions = ConfigRenderOptions
       .defaults()
       .setOriginComments(false)
@@ -31,7 +31,7 @@ object SystemInformationReporter extends ScorexLogging {
     ).map { x =>
       x -> System.getProperty(x)
     } ++ Seq(
-      "Configuration" -> config.root.render(renderOptions)
+      "Configuration" -> safeConfig.root.render(renderOptions)
     )
 
     log.debug(logInfo.map { case (n, v) => s"$n: $v" }.mkString("\n"))

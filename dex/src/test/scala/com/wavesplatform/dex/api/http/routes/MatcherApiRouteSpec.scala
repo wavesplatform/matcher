@@ -1289,7 +1289,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
           Set.empty
         ),
         matcherPublicKey = matcherKeyPair.publicKey,
-        config = ConfigFactory.load().atKey("waves.dex"),
+        safeConfig = ConfigFactory.load().atKey("waves.dex"),
         matcher = orderBookDirectoryActor.ref,
         addressActor = addressActor.ref,
         CombinedStream.Status.Working,

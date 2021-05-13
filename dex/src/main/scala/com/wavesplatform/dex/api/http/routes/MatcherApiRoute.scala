@@ -71,7 +71,7 @@ import scala.util.{Failure, Success}
 class MatcherApiRoute(
   assetPairBuilder: AssetPairBuilder,
   matcherPublicKey: PublicKey,
-  config: Config,
+  safeConfig: Config,
   matcher: ActorRef,
   addressActor: ActorRef,
   blockchainStatus: => CombinedStream.Status,
@@ -1165,7 +1165,7 @@ class MatcherApiRoute(
   )
   def getMatcherConfig: Route = (path("config") & get & withAuth) {
     complete {
-      HttpEntity(config.rendered).withContentType(CustomContentTypes.`application/hocon`)
+      HttpEntity(safeConfig.rendered).withContentType(CustomContentTypes.`application/hocon`)
     }
   }
 

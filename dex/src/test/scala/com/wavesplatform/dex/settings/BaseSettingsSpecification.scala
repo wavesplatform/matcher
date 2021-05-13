@@ -12,6 +12,8 @@ class BaseSettingsSpecification extends AnyFlatSpec {
   def getSettingByConfig(conf: Config): Either[String, MatcherSettings] =
     Try(ConfigSource.fromConfig(conf).at("waves.dex").loadOrThrow[MatcherSettings]).toEither.leftMap(_.getMessage)
 
+  val correctSecureKeys: Set[String] = Set("user", "pass", "seed", "private", "java", "sun", "api")
+
   val correctOrderFeeStr: String =
     s"""
        |order-fee {
@@ -72,6 +74,7 @@ class BaseSettingsSpecification extends AnyFlatSpec {
        """.stripMargin
 
   def configWithSettings(
+    secureKeys: Set[String] = correctSecureKeys,
     orderFeeStr: String = correctOrderFeeStr,
     deviationsStr: String = correctDeviationsStr,
     allowedAssetPairsStr: String = correctAllowedAssetPairsStr,
@@ -82,6 +85,7 @@ class BaseSettingsSpecification extends AnyFlatSpec {
     val configStr =
       s"""waves {
          |  directory = /waves
+         |  secure-keys = [ "user", "pass", "seed", "private", "java", "sun", "api" ]
          |  dex {
          |    id = "matcher-1"
          |    account-storage {

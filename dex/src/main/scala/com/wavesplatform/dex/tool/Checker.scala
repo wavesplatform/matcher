@@ -132,6 +132,22 @@ class Checker(superConnector: SuperConnector) {
     )
   }
 
+  def cancelActiveOrders(assetPairInfo: AssetPairInfo): ErrorOr[Boolean] =
+    dexRest.getActiveOrdersByPair(env.matcherKeyPair, assetPairInfo.assetPair) match {
+      case Left(x) => Left(x)
+      case Right(v: Seq[JsValue]) =>
+        v.foreach { o =>
+          val id = (o \ "id").as[ByteStr]
+          dexRest.cancelOrder(id, assetPairInfo.assetPair, env.matcherKeyPair)
+          dexRest.waitForOrderStatus(id, assetPairInfo.assetPair, OrderStatus.Cancelled.name)
+        }
+        dexRest.getActiveOrdersByPair(env.matcherKeyPair, assetPairInfo.assetPair) match {
+          case Left(x) => Left(x)
+          case Right(v: Seq[JsValue]) =>
+            if (v.isEmpty) Right(true) else Left(s"Matcher still has active orders: \n${v.map(o => (o \ "id").as[ByteStr]).mkString("\n")}")
+        }
+    }
+
   private def checkActiveOrders(firstAssetInfo: AssetInfo, secondAssetInfo: AssetInfo): CheckLoggedResult[AssetPairInfo] = {
     val assetPairInfo = getAssetPairInfo(firstAssetInfo, secondAssetInfo)
     val assetPair = assetPairInfo.assetPair
@@ -165,22 +181,6 @@ class Checker(superConnector: SuperConnector) {
     val submitted = mkMatcherOrder(assetPairInfo.assetPair, SELL)
     val submittedId = submitted.id()
 
-    def cancelActiveOrders(): ErrorOr[Boolean] =
-      dexRest.getActiveOrdersByPair(env.matcherKeyPair, assetPairInfo.assetPair) match {
-        case Left(x) => Left(x)
-        case Right(v: Seq[JsValue]) =>
-          v.foreach { o =>
-            val id = (o \ "id").as[ByteStr]
-            dexRest.cancelOrder(id, assetPairInfo.assetPair, env.matcherKeyPair)
-            dexRest.waitForOrderStatus(id, assetPairInfo.assetPair, OrderStatus.Cancelled.name)
-          }
-          dexRest.getActiveOrdersByPair(env.matcherKeyPair, assetPairInfo.assetPair) match {
-            case Left(x) => Left(x)
-            case Right(v: Seq[JsValue]) =>
-              if (v.isEmpty) Right(true) else Left(s"Matcher still has active orders: \n${v.map(o => (o \ "id").as[ByteStr]).mkString("\n")}")
-          }
-      }
-
     def checkFillingAtDex(orderStatus: JsValue): ErrorOr[Boolean] = {
 
       lazy val expectedFilledStatus = {
@@ -205,7 +205,6 @@ class Checker(superConnector: SuperConnector) {
       } yield txs
 
     for {
-      _ <- cancelActiveOrders()
       _ <- dexRest.placeOrder(counter)
       counterStatus <- dexRest.waitForOrderStatus(counter, OrderStatus.Accepted.name)
       _ <- dexRest.placeOrder(submitted)
@@ -264,6 +263,7 @@ class Checker(superConnector: SuperConnector) {
       (assetPairInfo, activeOrdersNotes) <- logCheck("7. Matcher active orders")(checkActiveOrders(wuJIoInfo, mbIJIoInfo))
       (order, placementNotes) <- logCheck("8. Order placement")(checkPlacement(assetPairInfo))
       (_, cancellationNotes) <- logCheck("9. Order cancellation")(checkCancellation(order))
+      _ <- cancelActiveOrders(assetPairInfo)
       executionNotes <- logCheck("10. Execution")(checkExecution(assetPairInfo))
       orderBookWsStreamNotes <- logCheck("11. Order book WS stream")(checkWsOrderBook(assetPairInfo))
       accountUpdatesWsStreamNotes <- logCheck("12. Account updates WS stream")(checkWsAccountUpdates(maybeAccountSeed))

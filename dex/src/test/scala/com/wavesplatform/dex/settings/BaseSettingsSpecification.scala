@@ -85,13 +85,13 @@ class BaseSettingsSpecification extends AnyFlatSpec {
     val configStr =
       s"""waves {
          |  directory = /waves
-         |  secure-keys = [${secureKeys.mkString(",")}]
          |  dex {
          |    id = "matcher-1"
          |    account-storage {
          |      type = "in-mem"
          |      in-mem.seed-in-base-64 = "c3lrYWJsZXlhdA=="
          |    }
+         |    secure-keys = [${secureKeys.mkString(",")}]
          |    order-db {
          |      max-orders = 199
          |    }

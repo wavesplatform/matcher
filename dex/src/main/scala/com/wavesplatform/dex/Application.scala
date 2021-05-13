@@ -564,7 +564,7 @@ object Application {
     val configFile = args.headOption
     val (config, settings) = loadApplicationConfig(configFile.map(new File(_)))
 
-    val excludedConfigKeys = config.getStringList("waves.dex.secure-keys").asScala.toSet
+    val excludedConfigKeys = settings.secureKeys
     val filterredConfig = config.withoutKeys(excludedConfigKeys)
 
     // This option is used in logback.xml by default

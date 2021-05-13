@@ -12,7 +12,7 @@ class BaseSettingsSpecification extends AnyFlatSpec {
   def getSettingByConfig(conf: Config): Either[String, MatcherSettings] =
     Try(ConfigSource.fromConfig(conf).at("waves.dex").loadOrThrow[MatcherSettings]).toEither.leftMap(_.getMessage)
 
-  val correctSecureKeys: Set[String] = Set("user", "pass", "seed", "private", "java", "sun", "api")
+  val correctSecureKeys: Set[String] = Set("foo", "bar", "baz")
 
   val correctOrderFeeStr: String =
     s"""

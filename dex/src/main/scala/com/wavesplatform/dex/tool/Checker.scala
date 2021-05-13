@@ -17,7 +17,6 @@ import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV3}
 import com.wavesplatform.dex.model.OrderStatus
 import com.wavesplatform.dex.settings.MatcherSettings
-import com.wavesplatform.dex.tool.connectors.Connector.RepeatRequestOptions
 import com.wavesplatform.dex.tool.connectors.DexExtensionGrpcConnector.DetailedBalance
 import com.wavesplatform.dex.tool.connectors.SuperConnector
 import im.mak.waves.transactions.IssueTransaction

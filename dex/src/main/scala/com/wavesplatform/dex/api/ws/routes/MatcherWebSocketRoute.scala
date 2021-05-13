@@ -68,7 +68,9 @@ class MatcherWebSocketRoute(
   private val wsHandlers = ConcurrentHashMap.newKeySet[CloseHandler]()
 
   override def route: Route = pathPrefix("ws" / "v0") {
-    internalWsRoute ~ commonWsRoute ~ (pathPrefix("connections") & withAuth)(connectionsRoute ~ closeConnectionsRoute)
+    statusBarrierMeasureResponses("wsRoutes") {
+      internalWsRoute ~ commonWsRoute ~ (pathPrefix("connections") & withAuth)(connectionsRoute ~ closeConnectionsRoute)
+    }
   }
 
   @Path("/connections")
@@ -80,10 +82,8 @@ class MatcherWebSocketRoute(
     response = classOf[HttpWebSocketConnections]
   )
   def connectionsRoute: Route = get {
-    (statusBarrierMeasureResponses("connectionsWsRoute") & withAuth) {
-      complete {
-        externalClientDirectoryRef.ask(WsExternalClientDirectoryActor.Query.GetActiveNumber).mapTo[HttpWebSocketConnections]
-      }
+    complete {
+      externalClientDirectoryRef.ask(WsExternalClientDirectoryActor.Query.GetActiveNumber).mapTo[HttpWebSocketConnections]
     }
   }
 
@@ -107,17 +107,15 @@ class MatcherWebSocketRoute(
     )
   )
   def closeConnectionsRoute: Route = delete {
-    (statusBarrierMeasureResponses("closeWsConnections") & withAuth) {
-      entity(as[HttpWebSocketCloseFilter]) { req =>
-        externalClientDirectoryRef ! WsExternalClientDirectoryActor.Command.CloseOldest(req.oldest)
-        complete {
-          HttpMessage("In progress")
-        }
+    entity(as[HttpWebSocketCloseFilter]) { req =>
+      externalClientDirectoryRef ! WsExternalClientDirectoryActor.Command.CloseOldest(req.oldest)
+      complete {
+        HttpMessage("In progress")
       }
     }
   }
 
-  private val commonWsRoute: Route = (pathEnd & get & statusBarrierMeasureResponses("commonWsRoute") &
+  private val commonWsRoute: Route = (pathEnd & get &
     parameters("a_os".withDefault("Unknown OS"), "a_client".withDefault("Unknown Client"))) { (aOs: String, aClient: String) =>
     import matcherSettings.webSockets.externalClientHandler
 
@@ -169,7 +167,7 @@ class MatcherWebSocketRoute(
     handleWebSocketMessages(flow)
   }
 
-  private val internalWsRoute: Route = (path("internal") & get & statusBarrierMeasureResponses("internalWsRoute")) {
+  private val internalWsRoute: Route = (path("internal") & get) {
     import matcherSettings.webSockets.internalClientHandler
 
     val clientId = UUID.randomUUID().toString

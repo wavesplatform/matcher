@@ -36,9 +36,7 @@ case class MatcherApiRouteV1(
   import PathMatchers._
 
   override lazy val route: Route = pathPrefix("api" / "v1") {
-    protect {
-      getOrderBook
-    }
+    getOrderBook
   }
 
   private def withValidAssetPair(pairOrError: Either[ValidationError.InvalidAsset, AssetPair])(f: AssetPair => Route): Route =

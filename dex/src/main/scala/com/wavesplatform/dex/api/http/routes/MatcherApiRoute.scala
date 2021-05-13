@@ -134,9 +134,7 @@ class MatcherApiRoute(
   )
 
   override lazy val route: Route = pathPrefix("matcher") {
-    protect { // to make a readable response for undefined requests
-      getMatcherPublicKey ~ settingsRoutes ~ debugRoutes ~ orderBookRoutes ~ ordersRoutes ~ balanceRoutes ~ transactionsRoutes
-    }
+    getMatcherPublicKey ~ settingsRoutes ~ debugRoutes ~ orderBookRoutes ~ ordersRoutes ~ balanceRoutes ~ transactionsRoutes
   }
 
   private def unavailableOrderBookBarrier(p: AssetPair): Directive0 = orderBook(p) match {
@@ -204,28 +202,26 @@ class MatcherApiRoute(
     } ~ complete(StatusCodes.BadRequest)
 
   private def placeOrder(endpoint: Option[PathMatcher[Unit]], isMarket: Boolean): Route = {
-    val route = (pathEndOrSingleSlash & entity(as[Order])) { order =>
-      val marketOfLimit = if (isMarket) "Market" else "Limit"
-      protectedMeasureResponses(s"place${marketOfLimit}Order") {
-        withAssetPair(Right(order.assetPair), formatError = e => StatusCodes.BadRequest -> HttpError.from(e, "OrderRejected")) { pair =>
-          unavailableOrderBookBarrier(pair) {
-            complete(
-              placeTimer.measureFuture {
-                orderValidator(order).value flatMap {
-                  case Right(o) =>
-                    placeTimer.measureFuture {
-                      askAddressActor(o.sender, AddressActor.Command.PlaceOrder(o, isMarket)) {
-                        case AddressActor.Event.OrderAccepted(x) => SimpleResponse(HttpSuccessfulPlace(x))
-                        case x: error.MatcherError =>
-                          if (x == error.CanNotPersistEvent) StatusCodes.ServiceUnavailable -> HttpError.from(x, "WavesNodeUnavailable")
-                          else StatusCodes.BadRequest -> HttpError.from(x, "OrderRejected")
-                      }
+    val marketOfLimit = if (isMarket) "Market" else "Limit"
+    val route = (pathEndOrSingleSlash & post & protectedMeasureResponses(s"place${marketOfLimit}Order") & entity(as[Order])) { order =>
+      withAssetPair(Right(order.assetPair), formatError = e => StatusCodes.BadRequest -> HttpError.from(e, "OrderRejected")) { pair =>
+        unavailableOrderBookBarrier(pair) {
+          complete(
+            placeTimer.measureFuture {
+              orderValidator(order).value flatMap {
+                case Right(o) =>
+                  placeTimer.measureFuture {
+                    askAddressActor(o.sender, AddressActor.Command.PlaceOrder(o, isMarket)) {
+                      case AddressActor.Event.OrderAccepted(x) => SimpleResponse(HttpSuccessfulPlace(x))
+                      case x: error.MatcherError =>
+                        if (x == error.CanNotPersistEvent) StatusCodes.ServiceUnavailable -> HttpError.from(x, "WavesNodeUnavailable")
+                        else StatusCodes.BadRequest -> HttpError.from(x, "OrderRejected")
                     }
-                  case Left(e) => Future.successful[ToResponseMarshallable](StatusCodes.BadRequest -> HttpError.from(e, "OrderRejected"))
-                }
+                  }
+                case Left(e) => Future.successful[ToResponseMarshallable](StatusCodes.BadRequest -> HttpError.from(e, "OrderRejected"))
               }
-            )
-          }
+            }
+          )
         }
       }
     }
@@ -1264,7 +1260,7 @@ class MatcherApiRoute(
   )
   def getOldestSnapshotOffset: Route =
     (path("oldestSnapshotOffset") & get) {
-      protectedMeasureResponses("getOldestSnapshotOffsetFromQueue") {
+      (protectedMeasureResponses("getOldestSnapshotOffsetFromQueue") & withAuth) {
         complete {
           (matcher ? GetSnapshotOffsets).mapTo[SnapshotOffsetsResponse].map { response =>
             val defined = response.offsets.valuesIterator.collect { case Some(x) => x }

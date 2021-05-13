@@ -169,16 +169,16 @@ class Checker(superConnector: SuperConnector) {
       dexRest.getActiveOrdersByPair(env.matcherKeyPair, assetPairInfo.assetPair) match {
         case Left(x) => Left(x)
         case Right(v: Seq[JsValue]) =>
-          if (
-            !v.map { e =>
-              val id = (e \ "id").as[ByteStr]
-              dexRest.cancelOrder(id, assetPairInfo.assetPair, env.matcherKeyPair)
-              dexRest.waitForOrderStatus(id, assetPairInfo.assetPair, OrderStatus.Cancelled.name)
-            }.exists(r => r.isLeft)
-          )
-            Left("Matcher still has active orders")
-          else
-            Right(true)
+          v.foreach { o =>
+            val id = (o \ "id").as[ByteStr]
+            dexRest.cancelOrder(id, assetPairInfo.assetPair, env.matcherKeyPair)
+            dexRest.waitForOrderStatus(id, assetPairInfo.assetPair, OrderStatus.Cancelled.name)
+          }
+          dexRest.getActiveOrdersByPair(env.matcherKeyPair, assetPairInfo.assetPair) match {
+            case Left(x) => Left(x)
+            case Right(v: Seq[JsValue]) =>
+              if (v.isEmpty) Right(true) else Left(s"Matcher still has active orders: \n${v.map(o => (o \ "id").as[ByteStr]).mkString("\n")}")
+          }
       }
 
     def checkFillingAtDex(orderStatus: JsValue): ErrorOr[Boolean] = {

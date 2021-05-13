@@ -85,7 +85,7 @@ class BaseSettingsSpecification extends AnyFlatSpec {
     val configStr =
       s"""waves {
          |  directory = /waves
-         |  secure-keys = [ "user", "pass", "seed", "private", "java", "sun", "api" ]
+         |  secure-keys = [${secureKeys.mkString(",")}]
          |  dex {
          |    id = "matcher-1"
          |    account-storage {

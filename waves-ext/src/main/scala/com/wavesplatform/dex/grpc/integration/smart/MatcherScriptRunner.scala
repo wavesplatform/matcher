@@ -31,7 +31,7 @@ object MatcherScriptRunner {
       complexityLimit = Int.MaxValue,
       default = TRUE,
       false
-    )._2
+    )._3
 
   private class Denied(methodName: String)
       extends SecurityException(s"An access to the blockchain.$methodName is denied on DEX")
@@ -40,6 +40,8 @@ object MatcherScriptRunner {
   private def kill(methodName: String) = throw new Denied(methodName)
 
   private val deniedBlockchain = new Blockchain {
+
+    override def hasData(address: Address): Boolean = kill("hasData")
 
     override def transactionInfo(id: BlockId) = kill("transactionInfo")
     override def accountScript(address: Address) = kill("accountScript")

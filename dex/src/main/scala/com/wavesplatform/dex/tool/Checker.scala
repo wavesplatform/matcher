@@ -132,7 +132,7 @@ class Checker(superConnector: SuperConnector) {
     )
   }
 
-  def cancelActiveOrders(assetPairInfo: AssetPairInfo): ErrorOr[Boolean] =
+  private def cancelActiveOrders(assetPairInfo: AssetPairInfo): ErrorOr[Boolean] =
     dexRest.getActiveOrdersByPair(env.matcherKeyPair, assetPairInfo.assetPair) match {
       case Left(x) => Left(x)
       case Right(v: Seq[JsValue]) =>

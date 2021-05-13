@@ -284,10 +284,8 @@ class MatcherWebSocketRoute(
 
   def matcherStatusBarrier: Directive0 = matcherStatus() match {
     case MatcherStatus.Working => log.error("passing barrier"); pass
-    case MatcherStatus.Starting =>
-      log.error("barrier not passed: Starting"); complete(error.MatcherIsStarting.toWsHttpResponse(StatusCodes.ServiceUnavailable))
-    case MatcherStatus.Stopping =>
-      log.error("barrier not passed: Stopping"); complete(error.MatcherIsStopping.toWsHttpResponse(StatusCodes.ServiceUnavailable))
+    case MatcherStatus.Starting => complete(error.MatcherIsStarting.toWsHttpResponse(StatusCodes.ServiceUnavailable))
+    case MatcherStatus.Stopping => complete(error.MatcherIsStopping.toWsHttpResponse(StatusCodes.ServiceUnavailable))
   }
 
 }

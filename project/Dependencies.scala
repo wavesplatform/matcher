@@ -38,7 +38,7 @@ object Dependencies {
     val kanela = "1.0.7" // instrumentation
     val kamon = "2.1.11" // metrics
 
-    val wavesProtobufSchemas = "1.2.11"
+    val wavesProtobufSchemas = "1.3.1"
     val wavesJ = "1.0.1"
 
     val postgresql = "42.2.18"

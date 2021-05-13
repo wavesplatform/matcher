@@ -255,7 +255,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
             script = info.script,
             isAssetScript = true,
             scriptContainerAddress = Coproduct[Environment.Tthis](Environment.AssetId(asset.byteRepr))
-          )._2
+          )._3
         )
     }
     RunScriptResponse(r)

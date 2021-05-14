@@ -17,7 +17,6 @@ import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV3}
 import com.wavesplatform.dex.model.OrderStatus
 import com.wavesplatform.dex.settings.MatcherSettings
-import com.wavesplatform.dex.tool.connectors.Connector.RepeatRequestOptions
 import com.wavesplatform.dex.tool.connectors.DexExtensionGrpcConnector.DetailedBalance
 import com.wavesplatform.dex.tool.connectors.SuperConnector
 import im.mak.waves.transactions.IssueTransaction
@@ -107,14 +106,6 @@ class Checker(superConnector: SuperConnector) {
       .fold(issueAsset(assetName, testAssetDescription, mnogo)) {
         case (a, (d, b)) => (AssetInfo(a, d.name) -> s"Balance = ${denormalize(b)} ${d.name} (${a.toString})").asRight
       }
-
-  private def waitUntilMatcherStarts(apiKey: String, waitingTime: FiniteDuration): ErrorOr[Unit] =
-    dexRest.repeatRequest(dexRest.getMatcherStatus(apiKey)) { response =>
-      response.isLeft || response.exists { jsValue =>
-        (jsValue \ "service").asOpt[String].contains("Working") &&
-          (jsValue \ "blockchain").asOpt[String].contains("Working")
-      }
-    }(RepeatRequestOptions(waitingTime.toSeconds.toInt, 1.second)).map(_ => ())
 
   private def mkMatcherOrder(assetPair: AssetPair, orderType: OrderType): Order = {
     val timestamp = System.currentTimeMillis
@@ -259,7 +250,6 @@ class Checker(superConnector: SuperConnector) {
           superConnector.env.matcherSettings.startEventsProcessingTimeout +
           superConnector.env.matcherSettings.orderBooksRecoveringTimeout
       }
-      _ <- logCheck(s"6. Wait until matcher starts ($waitingTime)")(waitUntilMatcherStarts(apiKey, waitingTime))
       (assetPairInfo, activeOrdersNotes) <- logCheck("7. Matcher active orders")(checkActiveOrders(wuJIoInfo, mbIJIoInfo))
       (order, placementNotes) <- logCheck("8. Order placement")(checkPlacement(assetPairInfo))
       (_, cancellationNotes) <- logCheck("9. Order cancellation")(checkCancellation(order))

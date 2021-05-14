@@ -7,7 +7,10 @@ import com.wavesplatform.dex.cli._
 import com.wavesplatform.dex.db.AccountStorage
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair}
 import com.wavesplatform.dex.settings.MatcherSettings
+import com.wavesplatform.dex.tool.connectors.Connector.RepeatRequestOptions
 import com.wavesplatform.dex.tool.connectors.SuperConnector.Env
+
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
 case class SuperConnector private (
   env: Env,
@@ -36,7 +39,8 @@ object SuperConnector {
     matcherSettings: MatcherSettings,
     dexRestApi: String,
     nodeRestApi: String,
-    authServiceRestApi: Option[String]
+    authServiceRestApi: Option[String],
+    apiKey: String
   ): ErrorOr[SuperConnector] = {
 
     def prependScheme(uri: String): String = {
@@ -52,14 +56,17 @@ object SuperConnector {
 
     AddressScheme.current = new AddressScheme { override val chainId: Byte = matcherSettings.addressSchemeCharacter.toByte }
 
+    def waitUntilMatcherStarts(dexRest: DexRestConnector, apiKey: String, waitingTime: FiniteDuration): ErrorOr[Unit] =
+      dexRest.repeatRequest(dexRest.getMatcherStatus(apiKey)) { response =>
+        response.isLeft || response.exists { jsValue =>
+          (jsValue \ "service").asOpt[String].contains("Working") &&
+          (jsValue \ "blockchain").asOpt[String].contains("Working")
+        }
+      }(RepeatRequestOptions(waitingTime.toSeconds.toInt, 1.second)).map(_ => ())
+
     for {
       _ <- log("\nSetting up the Super Connector:\n")
       matcherKeyPair <- logProcessing("Loading Matcher Key Pair")(loadMatcherKeyPair(matcherSettings.accountStorage))
-
-      dexRestIpAndPort = s"${matcherSettings.restApi.address}:${matcherSettings.restApi.port}"
-      dexRestApiUri = prependScheme(if (dexRestApi.isEmpty) dexRestIpAndPort else dexRestApi)
-      dexRestConnector = DexRestConnector(dexRestApiUri)
-      _ <- logProcessing(s"Setting up connection with DEX REST API (${dexRestConnector.repeatRequestOptions})")(success)
 
       chainId = AddressScheme.current.chainId
       nodeRestApiUri = prependScheme(
@@ -67,6 +74,18 @@ object SuperConnector {
       )
       nodeRestConnector = NodeRestConnector(nodeRestApiUri, chainId)
       _ <- logProcessing(s"Setting up connection with Node REST API (${nodeRestConnector.repeatRequestOptions})")(success)
+
+      dexRestIpAndPort = s"${matcherSettings.restApi.address}:${matcherSettings.restApi.port}"
+      dexRestApiUri = prependScheme(if (dexRestApi.isEmpty) dexRestIpAndPort else dexRestApi)
+      dexRestConnector = DexRestConnector(dexRestApiUri)
+      _ <- logProcessing(s"Setting up connection with DEX REST API (${dexRestConnector.repeatRequestOptions})")(success)
+
+      waitingTime = {
+        matcherSettings.snapshotsLoadingTimeout +
+        matcherSettings.startEventsProcessingTimeout +
+        matcherSettings.orderBooksRecoveringTimeout
+      }
+      _ <- logProcessing(s"Wait until matcher starts ($waitingTime)")(waitUntilMatcherStarts(dexRestConnector, apiKey, waitingTime))
 
       extensionGrpcApiUri = matcherSettings.wavesBlockchainClient.grpc.target
       blockchainUpdatesExtensionGrpcApiUri = matcherSettings.wavesBlockchainClient.blockchainUpdatesGrpc.target

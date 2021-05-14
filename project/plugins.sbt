@@ -40,3 +40,5 @@ libraryDependencies ++= Seq(
 
 addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.1" cross CrossVersion.full) // Remove after scala 2.13 migration
 addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.0" cross CrossVersion.full)
+
+addDependencyTreePlugin // https://github.com/sbt/sbt-dependency-graph

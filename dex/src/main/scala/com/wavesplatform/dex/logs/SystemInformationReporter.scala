@@ -1,26 +1,11 @@
 package com.wavesplatform.dex.logs
 
-import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
+import com.typesafe.config.{Config, ConfigRenderOptions}
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 
 object SystemInformationReporter extends ScorexLogging {
 
-  def report(config: Config): Unit = {
-    val resolved = config.resolve()
-    val configForLogs = {
-      val orig = Seq(
-        "waves",
-        "metrics"
-      ).foldLeft(ConfigFactory.empty()) { case (r, path) => r.withFallback(resolved.withOnlyPath(path)) }
-
-      Seq(
-        "waves.custom.genesis",
-        "waves.wallet",
-        "waves.rest-api.api-key-hash",
-        "metrics.influx-db"
-      ).foldLeft(orig)(_.withoutPath(_))
-    }
-
+  def report(safeConfig: Config): Unit = {
     val renderOptions = ConfigRenderOptions
       .defaults()
       .setOriginComments(false)
@@ -46,7 +31,7 @@ object SystemInformationReporter extends ScorexLogging {
     ).map { x =>
       x -> System.getProperty(x)
     } ++ Seq(
-      "Configuration" -> configForLogs.root.render(renderOptions)
+      "Configuration" -> safeConfig.root.render(renderOptions)
     )
 
     log.debug(logInfo.map { case (n, v) => s"$n: $v" }.mkString("\n"))

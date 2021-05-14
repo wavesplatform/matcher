@@ -12,6 +12,8 @@ class BaseSettingsSpecification extends AnyFlatSpec {
   def getSettingByConfig(conf: Config): Either[String, MatcherSettings] =
     Try(ConfigSource.fromConfig(conf).at("waves.dex").loadOrThrow[MatcherSettings]).toEither.leftMap(_.getMessage)
 
+  val correctSecureKeys: Set[String] = Set("foo", "bar", "baz")
+
   val correctOrderFeeStr: String =
     s"""
        |order-fee {
@@ -72,6 +74,7 @@ class BaseSettingsSpecification extends AnyFlatSpec {
        """.stripMargin
 
   def configWithSettings(
+    secureKeys: Set[String] = correctSecureKeys,
     orderFeeStr: String = correctOrderFeeStr,
     deviationsStr: String = correctDeviationsStr,
     allowedAssetPairsStr: String = correctAllowedAssetPairsStr,
@@ -88,6 +91,7 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |      type = "in-mem"
          |      in-mem.seed-in-base-64 = "c3lrYWJsZXlhdA=="
          |    }
+         |    secure-keys = [${secureKeys.mkString(",")}]
          |    order-db {
          |      max-orders = 199
          |    }

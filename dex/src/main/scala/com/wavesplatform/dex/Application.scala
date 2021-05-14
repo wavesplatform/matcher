@@ -2,10 +2,10 @@ package com.wavesplatform.dex
 
 import akka.Done
 import akka.actor.typed.scaladsl.adapter._
-import akka.actor.{ActorRef, ActorSystem, CoordinatedShutdown, Props, typed}
+import akka.actor.{typed, ActorRef, ActorSystem, CoordinatedShutdown, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Directives.respondWithHeader
-import akka.pattern.{CircuitBreaker, ask, gracefulStop}
+import akka.pattern.{ask, gracefulStop, CircuitBreaker}
 import akka.stream.Materializer
 import akka.util.Timeout
 import cats.data.EitherT
@@ -23,7 +23,7 @@ import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor
 import com.wavesplatform.dex.actors.events.OrderEventsCoordinatorActor
 import com.wavesplatform.dex.actors.orderbook.{AggregatedOrderBookActor, OrderBookActor, OrderBookSnapshotStoreActor}
 import com.wavesplatform.dex.actors.tx.{ExchangeTransactionBroadcastActor, WriteExchangeTransactionActor}
-import com.wavesplatform.dex.actors.{OrderBookDirectoryActor, OrderBookAskAdapter, RootActorSystem}
+import com.wavesplatform.dex.actors.{OrderBookAskAdapter, OrderBookDirectoryActor, RootActorSystem}
 import com.wavesplatform.dex.api.http.headers.{CustomMediaTypes, MatcherHttpServer}
 import com.wavesplatform.dex.api.http.routes.{MatcherApiRoute, MatcherApiRouteV1}
 import com.wavesplatform.dex.api.http.{CompositeHttpService, OrderBookHttpInfo}
@@ -33,12 +33,12 @@ import com.wavesplatform.dex.api.ws.routes.MatcherWebSocketRoute
 import com.wavesplatform.dex.app._
 import com.wavesplatform.dex.caches.{MatchingRulesCache, OrderFeeSettingsCache, RateCache}
 import com.wavesplatform.dex.db._
-import com.wavesplatform.dex.db.leveldb.{LevelDb, openDb}
+import com.wavesplatform.dex.db.leveldb.{openDb, LevelDb}
 import com.wavesplatform.dex.domain.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.utils.{EitherExt2, LoggerFacade, ScorexLogging}
-import com.wavesplatform.dex.effect.{FutureResult, liftValueAsync}
+import com.wavesplatform.dex.effect.{liftValueAsync, FutureResult}
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.grpc.integration.clients.MatcherExtensionAssetsCachingClient
 import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedWavesBlockchainClient
@@ -62,10 +62,11 @@ import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.{ThreadLocalRandom, TimeoutException}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future, Promise, blocking}
+import scala.concurrent.{blocking, Await, Future, Promise}
 import scala.jdk.CollectionConverters._
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
+import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
 
 class Application(settings: MatcherSettings, config: Config)(implicit val actorSystem: ActorSystem) extends ScorexLogging {
 
@@ -563,6 +564,9 @@ object Application {
     val configFile = args.headOption
     val (config, settings) = loadApplicationConfig(configFile.map(new File(_)))
 
+    val excludedConfigKeys = settings.secureKeys
+    val filterredConfig = config.withoutKeys(excludedConfigKeys)
+
     // This option is used in logback.xml by default
     if (Option(System.getProperty("waves.dex.root-directory")).isEmpty)
       System.setProperty("waves.dex.root-directory", config.getString("waves.dex.root-directory"))
@@ -584,7 +588,7 @@ object Application {
       val cs = CoordinatedShutdown(actorSystem)
 
       cs.addCancellableJvmShutdownHook {
-        SystemInformationReporter.report(config)
+        SystemInformationReporter.report(filterredConfig)
       }
 
       cs.addCancellableTask(CoordinatedShutdown.PhaseBeforeActorSystemTerminate, "Kamon") { () =>
@@ -596,7 +600,7 @@ object Application {
         Future { blocking(loggerContext.stop()); Done }
       }
 
-      new Application(settings, config)
+      new Application(settings, filterredConfig)
     }
   }
 

@@ -1,12 +1,12 @@
 package com.wavesplatform.dex.api.http.routes
 
-import akka.actor.{typed, ActorRef}
+import akka.actor.{ActorRef, typed}
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.{HttpEntity, HttpResponse, StatusCodes}
 import akka.http.scaladsl.server
 import akka.http.scaladsl.server._
 import akka.http.scaladsl.server.directives.FutureDirectives
-import akka.pattern.{ask, AskTimeoutException}
+import akka.pattern.{AskTimeoutException, ask}
 import akka.stream.Materializer
 import akka.util.Timeout
 import cats.instances.future._
@@ -24,7 +24,7 @@ import com.wavesplatform.dex.actors.address.AddressActor.Reply.GetState
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.api.http._
 import com.wavesplatform.dex.api.http.entities._
-import com.wavesplatform.dex.api.http.headers.{`X-User-Public-Key`, CustomContentTypes}
+import com.wavesplatform.dex.api.http.headers.{CustomContentTypes, `X-User-Public-Key`}
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
 import com.wavesplatform.dex.api.ws.actors.WsExternalClientDirectoryActor
@@ -71,7 +71,7 @@ import scala.util.{Failure, Success}
 class MatcherApiRoute(
   assetPairBuilder: AssetPairBuilder,
   matcherPublicKey: PublicKey,
-  config: Config,
+  safeConfig: Config,
   matcher: ActorRef,
   addressActor: ActorRef,
   blockchainStatus: => CombinedStream.Status,
@@ -107,9 +107,6 @@ class MatcherApiRoute(
 
   private val timer = Kamon.timer("matcher.api-requests")
   private val placeTimer = timer.withTag("action", "place")
-
-  private val excludedConfigKeys = Set("user", "pass", "seed", "private", "java", "sun", "api")
-  private val filteredConfig = config.withoutKeys(excludedConfigKeys)
 
   private def invalidJsonResponse(error: MatcherError): StandardRoute = complete(InvalidJsonResponse(error))
   private val invalidUserPublicKey: StandardRoute = complete(SimpleErrorResponse(StatusCodes.Forbidden, error.UserPublicKeyIsNotValid()))
@@ -1168,7 +1165,7 @@ class MatcherApiRoute(
   )
   def getMatcherConfig: Route = (path("config") & get & withAuth) {
     complete {
-      HttpEntity(filteredConfig.rendered).withContentType(CustomContentTypes.`application/hocon`)
+      HttpEntity(safeConfig.rendered).withContentType(CustomContentTypes.`application/hocon`)
     }
   }
 

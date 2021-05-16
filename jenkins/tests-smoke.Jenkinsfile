@@ -57,7 +57,7 @@ pipeline {
             archiveArtifacts artifacts: 'logs.tar.gz', fingerprint: true
             junit '**/test-reports/*.xml'
             sh "mkdir allure-results || true"
-            sh "echo 'KAFKA_SERVER=${KAFKA_SERVER}\r\nDEX_IMAGE=${DEX_IMAGE}\r\nNODE_IMAGE=${NODE_IMAGE}' > allure-results/environment.properties"
+            sh "echo 'DEX_IMAGE=${DEX_IMAGE}\r\nNODE_IMAGE=${NODE_IMAGE}' > allure-results/environment.properties"
             allure results: [[path: 'allure-results']]
         }
         cleanup {

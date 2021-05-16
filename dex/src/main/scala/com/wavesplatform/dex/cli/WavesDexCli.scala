@@ -139,7 +139,7 @@ object WavesDexCli extends ScoptImplicits {
                    """.stripMargin
         )
         (config, matcherConfig) <- cli.wrapByLogs("  Loading Matcher settings... ")(loadAllConfigs(args.configPath))
-        superConnector <- SuperConnector.create(matcherConfig, apiUrl, args.nodeRestApi, args.authServiceRestApi, args.apiKey)
+        superConnector <- SuperConnector.create(matcherConfig, apiUrl, args.nodeRestApi, args.authServiceRestApi, apiKey)
         checkResult <- new Checker(superConnector).checkState(args.version, args.accountSeed, apiKey, config, matcherConfig)
         _ <- cli.lift(superConnector.close())
       } yield checkResult

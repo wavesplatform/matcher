@@ -17,10 +17,12 @@ import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.model.{AcceptedOrderType, OrderStatus}
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.config.DexTestConfig.issueAssetPair
+import com.wavesplatform.it.tags.SmokeTests
 import org.scalatest.prop.TableDrivenPropertyChecks
 
 import scala.concurrent.duration._
 
+@SmokeTests
 class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
   private val aliceSellAmount = 500

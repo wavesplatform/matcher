@@ -24,7 +24,7 @@ pipeline {
         stage('Cleanup') {
             steps {
                 script {
-                    if(params.LABEL = '') {
+                    if(params.LABEL == '') {
                         currentBuild.displayName = "${params.BRANCH}: ${NODE_IMAGE}_${DEX_IMAGE}"
                     }
                     else {

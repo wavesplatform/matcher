@@ -27,7 +27,7 @@ import com.wavesplatform.dex.actors.tx.{ExchangeTransactionBroadcastActor, Write
 import com.wavesplatform.dex.actors.{OrderBookAskAdapter, OrderBookDirectoryActor, RootActorSystem}
 import com.wavesplatform.dex.api.http.headers.{CustomMediaTypes, MatcherHttpServer}
 import com.wavesplatform.dex.api.http.routes.{MatcherApiRoute, MatcherApiRouteV1}
-import com.wavesplatform.dex.api.http.{CompositeHttpService, MetricStage, OrderBookHttpInfo}
+import com.wavesplatform.dex.api.http.{CompositeHttpService, MetricHttpFlow, OrderBookHttpInfo}
 import com.wavesplatform.dex.api.routes.ApiRoute
 import com.wavesplatform.dex.api.ws.actors.{WsExternalClientDirectoryActor, WsInternalBroadcastActor}
 import com.wavesplatform.dex.api.ws.routes.MatcherWebSocketRoute
@@ -409,7 +409,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
           settings.withParserSettings(settings.parserSettings.withCustomMediaTypes(CustomMediaTypes.`application/hocon`))
         }.connectionSource().to {
           Sink.foreach { connection =>
-            connection.handleWith(MetricStage.metricFlow().join(combinedRoute))
+            connection.handleWith(MetricHttpFlow.metricFlow(combinedRoute))
           }
         }.run().map(_.addToCoordinatedShutdown(hardTerminationDeadline = 5.seconds))
     } map { serverBinding =>

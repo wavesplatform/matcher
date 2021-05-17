@@ -11,7 +11,7 @@ trait ProtectDirective extends ApiRoute with HasStatusBarrier {
 
   private def invalidJsonResponse(error: MatcherError): StandardRoute = complete(InvalidJsonResponse(error))
 
-  def protect: Directive0 = matcherStatusBarrier & handleExceptions(gRPCExceptionsHandler) & handleRejections(invalidJsonParsingRejectionsHandler)
+  def protect: Directive0 = handleExceptions(gRPCExceptionsHandler) & handleRejections(invalidJsonParsingRejectionsHandler)
 
   private val invalidJsonParsingRejectionsHandler =
     RejectionHandler

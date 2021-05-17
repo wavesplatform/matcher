@@ -4,7 +4,7 @@ import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.directives.FutureDirectives
 import akka.http.scaladsl.server.{Directive1, Route}
-import com.wavesplatform.dex.api.http.directives.HttpKamonMetricsProtectedDirectives
+import com.wavesplatform.dex.api.http.directives.HttpKamonMetricsDirectives._
 import com.wavesplatform.dex.api.http.entities.{HttpV1OrderBook, InfoNotFound, InvalidAsset}
 import com.wavesplatform.dex.api.http.{HasStatusBarrier, OrderBookHttpInfo}
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute, PathMatchers}
@@ -29,14 +29,15 @@ case class MatcherApiRouteV1(
 )(implicit val errorContext: ErrorFormatterContext, ex: ExecutionContext)
     extends ApiRoute
     with AuthRoute
-    with HttpKamonMetricsProtectedDirectives
     with HasStatusBarrier
     with ScorexLogging {
 
   import PathMatchers._
 
   override lazy val route: Route = pathPrefix("api" / "v1") {
-    getOrderBook
+    matcherStatusBarrier {
+      getOrderBook
+    }
   }
 
   private def withValidAssetPair(pairOrError: Either[ValidationError.InvalidAsset, AssetPair])(f: AssetPair => Route): Route =
@@ -80,16 +81,13 @@ case class MatcherApiRouteV1(
   )
   def getOrderBook: Route =
     (path("orderbook" / AssetPairPM) & get) { pairOrError =>
-      protectedMeasureResponses("V1.getOrderBook") {
-        matcherStatusBarrier {
-          withValidAssetPair(pairOrError) {
-            p =>
-              parameters(Symbol("depth").as[Int].?) {
-                depth =>
-                  withAssetPair(p, redirectToInverse = true) {
-                    pair =>
-                      complete(orderBookHttpInfo.getHttpView(pair, MatcherModel.Denormalized, depth))
-                  }
+      measureResponse("V1.getOrderBook") {
+        withValidAssetPair(pairOrError) { p =>
+          parameters(Symbol("depth").as[Int].?) {
+            depth =>
+              withAssetPair(p, redirectToInverse = true) {
+                pair =>
+                  complete(orderBookHttpInfo.getHttpView(pair, MatcherModel.Denormalized, depth))
               }
           }
         }

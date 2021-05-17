@@ -1,32 +1,26 @@
 package com.wavesplatform.dex.api.http.directives
 
 import akka.http.scaladsl.model.AttributeKey
-import akka.http.scaladsl.server.Directives.{attribute, mapResponse}
-import akka.http.scaladsl.server.{Directive0, Directives}
-import com.wavesplatform.dex.api.http.directives.HttpKamonMetricsDirectives._
-
-import java.util.UUID
-
-trait HttpKamonMetricsProtectedDirectives extends Directives with ProtectDirective {
-
-  def protectedMeasureResponses(endpoint: String): Directive0 =
-    measureResponse(endpoint) & protect
-
-}
+import akka.http.scaladsl.server.Directives.{extractRequest, mapResponse}
+import kamon.Kamon
+import kamon.metric.{Counter, Timer}
 
 object HttpKamonMetricsDirectives {
 
-  val endpointAttributeKey: AttributeKey[String] = AttributeKey[String]("endpoint")
-  val requestIdAttributeKey: AttributeKey[UUID] = AttributeKey("req-id", classOf[UUID])
+  val requestMetricsAttributeKey: AttributeKey[RequestMetrics] = AttributeKey[RequestMetrics]("reqMetrics")
 
-  def measureResponse(endpoint: String): Directive0 =
-    mapResponse(_.addAttribute(endpointAttributeKey, endpoint))
+  private val timer = Kamon.timer("matcher.http.endpoints.timer")
+  private val counter = Kamon.counter("matcher.http.responses.counter")
 
-  def passRequestIdAttributeToResponse: Directive0 = passAttributeToResponse(requestIdAttributeKey)
-
-  def passAttributeToResponse[T](attrKey: AttributeKey[T]): Directive0 =
-    attribute(attrKey).flatMap { id =>
-      mapResponse(_.addAttribute(attrKey, id))
-    }
+  def measureResponse(endpoint: String) = extractRequest.tflatMap { req =>
+    val path = req._1.uri.path.toString()
+    val method = req._1.method.value
+    val startedTimer = timer.withTag("path", path).withTag("endpoint", endpoint).withTag("method", method).start()
+    val taggedCounter = counter.withTag("path", path).withTag("endpoint", endpoint).withTag("method", method)
+    val metrics = RequestMetrics(taggedCounter, startedTimer)
+    mapResponse(_.addAttribute(requestMetricsAttributeKey, metrics))
+  }
 
 }
+
+case class RequestMetrics(counter: Counter, startedTimer: Timer.Started)

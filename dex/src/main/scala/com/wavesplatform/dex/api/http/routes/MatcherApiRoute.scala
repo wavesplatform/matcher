@@ -22,7 +22,8 @@ import com.wavesplatform.dex.actors.address.AddressActor.Query.GetCurrentState
 import com.wavesplatform.dex.actors.address.AddressActor.Reply.GetState
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.api.http._
-import com.wavesplatform.dex.api.http.directives.HttpKamonMetricsProtectedDirectives
+import com.wavesplatform.dex.api.http.directives.HttpKamonMetricsDirectives._
+import com.wavesplatform.dex.api.http.directives.ProtectDirective
 import com.wavesplatform.dex.api.http.entities._
 import com.wavesplatform.dex.api.http.headers.{CustomContentTypes, `X-User-Public-Key`}
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
@@ -93,7 +94,7 @@ class MatcherApiRoute(
   getAssetDescription: Asset => FutureResult[BriefAssetDescription]
 )(implicit mat: Materializer)
     extends ApiRoute
-    with HttpKamonMetricsProtectedDirectives
+    with ProtectDirective
     with AuthRoute
     with ScorexLogging {
 
@@ -113,25 +114,32 @@ class MatcherApiRoute(
 
   private val invalidUserPublicKey: StandardRoute = complete(SimpleErrorResponse(StatusCodes.Forbidden, error.UserPublicKeyIsNotValid()))
 
-  private val ratesRoutes: Route = pathPrefix("rates")(getRates ~ upsertRate ~ deleteRate)
+  private val ratesRoutes: Route = pathPrefix("rates") {
+    getRates ~ matcherStatusBarrier(upsertRate ~ deleteRate)
+  }
+
   private val settingsRoutes: Route = pathPrefix("settings")(getSettings ~ ratesRoutes)
   private val balanceRoutes: Route = pathPrefix("balance")(reservedBalance)
   private val transactionsRoutes: Route = pathPrefix("transactions")(getOrderTransactions)
 
+  //todo: etsybrenko: protecting here only saveSnapshots route
   private val debugRoutes: Route = pathPrefix("debug") {
-    getMatcherStatus ~ getAddressState ~ getMatcherConfig ~ getCurrentOffset ~ getLastOffset ~ getOldestSnapshotOffset ~ getAllSnapshotOffsets ~
-    saveSnapshots ~ print
+    getMatcherStatus ~ getAddressState ~ getMatcherConfig ~ getCurrentOffset ~ getLastOffset ~
+    getOldestSnapshotOffset ~ getAllSnapshotOffsets ~ saveSnapshots ~ print
   }
 
   private val orderBookRoutes: Route = pathPrefix("orderbook") {
-    getOrderBookInfo ~ getOrderStatusInfoByIdWithSignature ~ getOrderBook ~ getOrderBookStatus ~ placeLimitOrder ~
-    placeMarketOrder ~ getOrderHistoryByAssetPairAndPublicKey ~ getOrderHistoryByPublicKey ~ tradableBalance ~
-    orderStatus ~ deleteHistory ~ cancel ~ cancelAll ~ getOrderBooks ~ deleteOrderBook
+    matcherStatusBarrier {
+      getOrderBookInfo ~ getOrderStatusInfoByIdWithSignature ~ getOrderBook ~ getOrderBookStatus ~ placeLimitOrder ~ placeMarketOrder ~
+      getOrderHistoryByAssetPairAndPublicKey ~ getOrderHistoryByPublicKey ~ tradableBalance ~ orderStatus ~ deleteHistory ~ cancel ~
+      cancelAll ~ getOrderBooks ~ deleteOrderBook
+    }
   }
 
-  private val ordersRoutes: Route = pathPrefix("orders")(
-    getOrderHistoryByApiKey ~ getOrderStatusInfoByIdWithApiKey ~ cancelAllByApiKeyAndIds ~ cancelByApi
-  )
+  private val ordersRoutes: Route = pathPrefix("orders") {
+    matcherStatusBarrier(getOrderHistoryByApiKey ~ getOrderStatusInfoByIdWithApiKey ~ cancelAllByApiKeyAndIds ~ cancelByApi)
+
+  }
 
   override lazy val route: Route = pathPrefix("matcher") {
     getMatcherPublicKey ~ settingsRoutes ~ debugRoutes ~ orderBookRoutes ~ ordersRoutes ~ balanceRoutes ~ transactionsRoutes
@@ -197,13 +205,15 @@ class MatcherApiRoute(
     addressOrError.fold(ia => complete(InvalidAddress(ia.reason)), f)
 
   private def withCancelRequest(f: HttpCancelOrder => Route): Route =
-    entity(as[HttpCancelOrder]) { req =>
-      if (req.isSignatureValid()) f(req) else complete(InvalidSignature)
-    } ~ complete(StatusCodes.BadRequest)
+    post {
+      entity(as[HttpCancelOrder]) { req =>
+        if (req.isSignatureValid()) f(req) else complete(InvalidSignature)
+      } ~ complete(StatusCodes.BadRequest)
+    } ~ complete(StatusCodes.MethodNotAllowed)
 
   private def placeOrder(endpoint: Option[PathMatcher[Unit]], isMarket: Boolean): Route = {
     val marketOfLimit = if (isMarket) "Market" else "Limit"
-    val route = (pathEndOrSingleSlash & post & protectedMeasureResponses(s"place${marketOfLimit}Order") & entity(as[Order])) { order =>
+    val route = (pathEndOrSingleSlash & post & measureResponse(s"place${marketOfLimit}Order") & protect & entity(as[Order])) { order =>
       withAssetPair(Right(order.assetPair), formatError = e => StatusCodes.BadRequest -> HttpError.from(e, "OrderRejected")) { pair =>
         unavailableOrderBookBarrier(pair) {
           complete(
@@ -246,7 +256,7 @@ class MatcherApiRoute(
     response = classOf[String]
   )
   def getMatcherPublicKey: Route =
-    (pathEndOrSingleSlash & get)(protectedMeasureResponses("getMatcherPublicKey")(complete(matcherPublicKey.toJson)))
+    (pathEndOrSingleSlash & get)((measureResponse("getMatcherPublicKey") & protect)(complete(matcherPublicKey.toJson)))
 
   @Path("/settings")
   @ApiOperation(
@@ -258,7 +268,7 @@ class MatcherApiRoute(
   )
   def getSettings: Route =
     (pathEndOrSingleSlash & get) {
-      protectedMeasureResponses("getSettings") {
+      measureResponse("getSettings") {
         complete(
           validatedAllowedOrderVersions() map { allowedOrderVersions =>
             SimpleResponse(
@@ -288,7 +298,7 @@ class MatcherApiRoute(
     tags = Array("rates"),
     response = classOf[HttpRates]
   )
-  def getRates: Route = (pathEndOrSingleSlash & get)(protectedMeasureResponses("getRates")(complete(rateCache.getAllRates.toJson)))
+  def getRates: Route = (pathEndOrSingleSlash & get)(measureResponse("getRates")(complete(rateCache.getAllRates.toJson)))
 
   @Path("/settings/rates/{assetId}")
   @ApiOperation(
@@ -312,7 +322,7 @@ class MatcherApiRoute(
   )
   def upsertRate: Route =
     (path(AssetPM) & put) { assetOrError =>
-      (protectedMeasureResponses("upsertRate") & withAuth) {
+      (measureResponse("upsertRate") & protect & withAuth) {
         entity(as[Double]) { rate =>
           if (rate <= 0) complete(RateError(error.NonPositiveAssetRate))
           else
@@ -350,7 +360,7 @@ class MatcherApiRoute(
   )
   def deleteRate: Route =
     (path(AssetPM) & delete) { assetOrError =>
-      (protectedMeasureResponses("deleteRate") & withAuth) {
+      (measureResponse("deleteRate") & protect & withAuth) {
         withAsset(assetOrError) { asset =>
           complete(
             if (asset == Waves) RateError(error.WavesImmutableRate)
@@ -391,7 +401,7 @@ class MatcherApiRoute(
   )
   def getOrderBook: Route =
     (path(AssetPairPM) & get) { pairOrError =>
-      protectedMeasureResponses("getOrderBook") {
+      (measureResponse("getOrderBook") & protect) {
         parameters("depth".as[String].?) {
           case None => withAssetPair(pairOrError, redirectToInverse = true, "") { pair =>
               complete(orderBookHttpInfo.getHttpView(pair, MatcherModel.Normalized, None))
@@ -425,7 +435,7 @@ class MatcherApiRoute(
   )
   def getOrderBookStatus: Route =
     (path(AssetPairPM / "status") & get) { pairOrError =>
-      protectedMeasureResponses("getOrderBookStatus") {
+      (measureResponse("getOrderBookStatus") & protect) {
         withAssetPair(pairOrError, redirectToInverse = true, suffix = "/status") { pair =>
           complete(orderBookHttpInfo.getMarketStatus(pair))
         }
@@ -447,7 +457,7 @@ class MatcherApiRoute(
   )
   def getOrderBookInfo: Route =
     (path(AssetPairPM / "info") & get) { pairOrError =>
-      protectedMeasureResponses("getOrderBookInfo") {
+      (measureResponse("getOrderBookInfo") & protect) {
         withAssetPair(pairOrError, redirectToInverse = true, suffix = "/info") { pair =>
           complete(getOrderBookInfo(pair).value.map {
             case Right(x) => SimpleResponse(x)
@@ -520,7 +530,7 @@ class MatcherApiRoute(
   )
   def getOrderBooks: Route =
     (pathEndOrSingleSlash & get) {
-      protectedMeasureResponses("getOrderBooks") {
+      (measureResponse("getOrderBooks") & protect) {
         complete(
           (matcher ? GetMarkets).mapTo[List[MarketData]].flatMap { markets =>
             markets
@@ -617,7 +627,7 @@ class MatcherApiRoute(
   )
   def cancel: Route =
     (path(AssetPairPM / "cancel") & post) { pairOrError =>
-      protectedMeasureResponses("cancel") {
+      (measureResponse("cancel") & protect) {
         withAssetPair(pairOrError, formatError = e => OrderCancelRejected(e)) { pair =>
           unavailableOrderBookBarrier(pair) {
             handleCancelRequestToRoute(Some(pair))
@@ -646,7 +656,7 @@ class MatcherApiRoute(
       )
     )
   )
-  def cancelAll: Route = (path("cancel") & post)(protectedMeasureResponses("cancelAll")(handleCancelRequestToRoute(None)))
+  def cancelAll: Route = (path("cancel") & post)((measureResponse("cancelAll") & protect)(handleCancelRequestToRoute(None)))
 
   @Path("/orders/{address}/cancel")
   @ApiOperation(
@@ -672,7 +682,7 @@ class MatcherApiRoute(
   )
   def cancelAllByApiKeyAndIds: Route =
     (path(AddressPM / "cancel") & post) { addressOrError =>
-      protectedMeasureResponses("cancelAllByApiKeyAndIds") {
+      (measureResponse("cancelAllByApiKeyAndIds") & protect) {
         (withAuth & withUserPublicKeyOpt) { userPublicKey =>
           withAddress(addressOrError) { address =>
             userPublicKey match {
@@ -715,7 +725,7 @@ class MatcherApiRoute(
   )
   def cancelByApi: Route =
     (path("cancel" / OrderPM) & post) { orderIdOrError =>
-      protectedMeasureResponses("cancelByApi") {
+      (measureResponse("cancelByApi") & protect) {
         (withAuth & withUserPublicKeyOpt) { userPublicKey =>
           withOrderId(orderIdOrError) { orderId =>
             def reject =
@@ -768,7 +778,7 @@ class MatcherApiRoute(
   )
   def deleteHistory: Route =
     path(AssetPairPM / "delete") { _ =>
-      protectedMeasureResponses("deleteHistory") {
+      (measureResponse("deleteHistory") & protect) {
         post {
           entity(as[HttpCancelOrder]) { req =>
             complete {
@@ -829,7 +839,7 @@ class MatcherApiRoute(
   )
   def getOrderHistoryByAssetPairAndPublicKey: Route =
     (path(AssetPairPM / "publicKey" / PublicKeyPM) & get) { (pairOrError, publicKeyOrError) =>
-      protectedMeasureResponses("getOrderHistoryByAssetPairAndPublicKey") {
+      (measureResponse("getOrderHistoryByAssetPairAndPublicKey") & protect) {
         withPublicKey(publicKeyOrError) { publicKey =>
           withAssetPair(pairOrError, redirectToInverse = true, s"/publicKey/$publicKey") { pair =>
             parameters("activeOnly".as[Boolean].?, "closedOnly".as[Boolean].?) { (activeOnly, closedOnly) =>
@@ -881,7 +891,7 @@ class MatcherApiRoute(
   )
   def getOrderHistoryByPublicKey: Route =
     (path(PublicKeyPM) & get) { publicKeyOrError =>
-      protectedMeasureResponses("getOrderHistoryByPublicKey") {
+      (measureResponse("getOrderHistoryByPublicKey") & protect) {
         parameters("activeOnly".as[Boolean].?, "closedOnly".as[Boolean].?) { (activeOnly, closedOnly) =>
           withPublicKey(publicKeyOrError) { publicKey =>
             signedGet(publicKey) {
@@ -924,7 +934,7 @@ class MatcherApiRoute(
   )
   def getOrderHistoryByApiKey: Route =
     (path(AddressPM) & get) { addressOrError =>
-      protectedMeasureResponses("getOrderHistoryByApiKey") {
+      (measureResponse("getOrderHistoryByApiKey") & protect) {
         (withAuth & withUserPublicKeyOpt) { userPublicKey =>
           withAddress(addressOrError) { address =>
             userPublicKey match {
@@ -973,7 +983,7 @@ class MatcherApiRoute(
   )
   def getOrderStatusInfoByIdWithApiKey: Route =
     (path(AddressPM / OrderPM) & get) { (addressOrError, orderIdOrError) =>
-      protectedMeasureResponses("getOrderStatusInfoByIdWithApiKey") {
+      (measureResponse("getOrderStatusInfoByIdWithApiKey") & protect) {
         (withAuth & withUserPublicKeyOpt) {
           userPublicKey =>
             withAddress(addressOrError) { address =>
@@ -1014,7 +1024,7 @@ class MatcherApiRoute(
   )
   def getOrderStatusInfoByIdWithSignature: Route =
     (path(PublicKeyPM / OrderPM) & get) { (publicKeyOrError, orderIdOrError) =>
-      protectedMeasureResponses("getOrderStatusInfoByIdWithSignature") {
+      (measureResponse("getOrderStatusInfoByIdWithSignature") & protect) {
         withOrderId(orderIdOrError) { orderId =>
           withPublicKey(publicKeyOrError) { publicKey =>
             signedGet(publicKey) {
@@ -1042,7 +1052,7 @@ class MatcherApiRoute(
   )
   def tradableBalance: Route =
     (path(AssetPairPM / "tradableBalance" / AddressPM) & get) { (pairOrError, addressOrError) =>
-      protectedMeasureResponses("tradableBalance") {
+      (measureResponse("tradableBalance") & protect) {
         withAddress(addressOrError) { address =>
           withAssetPair(pairOrError, redirectToInverse = true, s"/tradableBalance/$address") { pair =>
             complete {
@@ -1075,7 +1085,7 @@ class MatcherApiRoute(
     )
   )
   def reservedBalance: Route = (path("reserved" / PublicKeyPM) & get) { publicKeyOrError =>
-    protectedMeasureResponses("reservedBalance") {
+    (measureResponse("reservedBalance") & protect) {
       withPublicKey(publicKeyOrError) { publicKey =>
         (signedGet(publicKey).tmap(_ => Option.empty[PublicKey]) | (withAuth & withUserPublicKeyOpt)) {
           case Some(upk) if upk != publicKey => invalidUserPublicKey
@@ -1104,7 +1114,7 @@ class MatcherApiRoute(
     )
   )
   def orderStatus: Route = (path(AssetPairPM / OrderPM) & get) { (pairOrError, orderIdOrError) =>
-    protectedMeasureResponses("orderStatus") {
+    (measureResponse("orderStatus") & protect) {
       withOrderId(orderIdOrError) { orderId =>
         withAssetPair(pairOrError, redirectToInverse = true, s"/$orderId") { _ =>
           val future =
@@ -1153,7 +1163,7 @@ class MatcherApiRoute(
   )
   def deleteOrderBook: Route =
     (path(AssetPairPM) & delete) { pairOrError =>
-      (protectedMeasureResponses("deleteOrderBook") & withAuth) {
+      (measureResponse("deleteOrderBook") & protect & withAuth) {
         withAssetPair(pairOrError, validate = false) { pair =>
           orderBook(pair) match {
             case Some(Right(_)) =>
@@ -1189,7 +1199,7 @@ class MatcherApiRoute(
   )
   def getOrderTransactions: Route =
     (path(OrderPM) & get) { orderIdOrError =>
-      protectedMeasureResponses("getOrderTransactions") {
+      (measureResponse("getOrderTransactions") & protect) {
         withOrderId(orderIdOrError) { orderId =>
           complete {
             orderDb.transactionsByOrder(orderId).map(x => ToResponseMarshallable(Json.toJson(x))).recover {
@@ -1213,7 +1223,7 @@ class MatcherApiRoute(
   )
   def getMatcherConfig: Route =
     (path("config") & get) {
-      (protectedMeasureResponses("getMatcherConfig") & withAuth) {
+      (measureResponse("getMatcherConfig") & protect & withAuth) {
         complete {
           HttpEntity(filteredConfig.rendered).withContentType(CustomContentTypes.`application/hocon`)
         }
@@ -1230,7 +1240,7 @@ class MatcherApiRoute(
   )
   def getCurrentOffset: Route =
     (path("currentOffset") & get) {
-      (protectedMeasureResponses("getCurrentOffset") & withAuth) {
+      (measureResponse("getCurrentOffset") & protect & withAuth) {
         complete(currentOffset().toJson)
       }
     }
@@ -1245,7 +1255,7 @@ class MatcherApiRoute(
   )
   def getLastOffset: Route =
     (path("lastOffset") & get) {
-      (protectedMeasureResponses("getLastOffset") & withAuth) {
+      (measureResponse("getLastOffset") & protect & withAuth) {
         complete(lastOffset() map (_.toJson))
       }
     }
@@ -1260,7 +1270,7 @@ class MatcherApiRoute(
   )
   def getOldestSnapshotOffset: Route =
     (path("oldestSnapshotOffset") & get) {
-      (protectedMeasureResponses("getOldestSnapshotOffset") & withAuth) {
+      (measureResponse("getOldestSnapshotOffset") & protect & withAuth) {
         complete {
           (matcher ? GetSnapshotOffsets).mapTo[SnapshotOffsetsResponse].map { response =>
             val defined = response.offsets.valuesIterator.collect { case Some(x) => x }
@@ -1281,7 +1291,7 @@ class MatcherApiRoute(
   )
   def getAllSnapshotOffsets: Route =
     (path("allSnapshotOffsets") & get) {
-      (protectedMeasureResponses("getAllSnapshotOffsets") & withAuth) {
+      (measureResponse("getAllSnapshotOffsets") & protect & withAuth) {
         complete {
           (matcher ? GetSnapshotOffsets).mapTo[SnapshotOffsetsResponse].map { x =>
             x.offsets.collect { case (assetPair, Some(offset)) => assetPair -> offset }.toJson
@@ -1300,7 +1310,7 @@ class MatcherApiRoute(
   )
   def saveSnapshots: Route =
     (path("saveSnapshots") & post) {
-      (protectedMeasureResponses("saveSnapshots") & withAuth) {
+      (measureResponse("saveSnapshots") & protect & withAuth) {
         complete {
           matcher ! ForceSaveSnapshots
           SimpleResponse(StatusCodes.OK, "Saving started")
@@ -1323,7 +1333,7 @@ class MatcherApiRoute(
   )
   def getAddressState: Route =
     (path("address" / AddressPM) & get) { addressOrError =>
-      (protectedMeasureResponses("getAddressState") & withAuth) {
+      (measureResponse("getAddressState") & protect & withAuth) {
         withAddress(addressOrError) { address =>
           complete {
             askMapAddressActor[GetState](address, GetCurrentState) {
@@ -1344,7 +1354,7 @@ class MatcherApiRoute(
   )
   def getMatcherStatus: Route =
     (path("status") & get) {
-      (protectedMeasureResponses("getMatcherStatus") & withAuth) {
+      (measureResponse("getMatcherStatus") & protect & withAuth) {
         complete(HttpSystemStatus(matcherStatus(), blockchainStatus))
       }
     }
@@ -1352,7 +1362,7 @@ class MatcherApiRoute(
   // Hidden
   def print: Route =
     (path("print") & post) {
-      (protectedMeasureResponses("print") & withAuth) {
+      (measureResponse("print") & protect & withAuth) {
         entity(as[HttpMessage]) { x =>
           log.warn(x.message)
           complete {

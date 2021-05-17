@@ -108,9 +108,8 @@ class MatcherApiRoute(
   private val timer = Kamon.timer("matcher.api-requests")
   private val placeTimer = timer.withTag("action", "place")
 
-  private def invalidJsonResponse(error: MatcherError): StandardRoute = complete(InvalidJsonResponse(error))
   private val excludedConfigKeys = Set("user", "pass", "seed", "private", "java", "sun", "api")
-  private val filteredConfig = config.withoutKeys(excludedConfigKeys)
+  private val filteredConfig = safeConfig.withoutKeys(excludedConfigKeys)
 
   private val invalidUserPublicKey: StandardRoute = complete(SimpleErrorResponse(StatusCodes.Forbidden, error.UserPublicKeyIsNotValid()))
 
@@ -137,7 +136,6 @@ class MatcherApiRoute(
 
   private val ordersRoutes: Route = pathPrefix("orders") {
     matcherStatusBarrier(getOrderHistoryByApiKey ~ getOrderStatusInfoByIdWithApiKey ~ cancelAllByApiKeyAndIds ~ cancelByApi)
-
   }
 
   override lazy val route: Route = pathPrefix("matcher") {
@@ -211,8 +209,8 @@ class MatcherApiRoute(
     } ~ complete(StatusCodes.MethodNotAllowed)
 
   private def placeOrder(endpoint: Option[PathMatcher[Unit]], isMarket: Boolean): Route = {
-    val marketOfLimit = if (isMarket) "Market" else "Limit"
-    val route = (pathEndOrSingleSlash & post & measureResponse(s"place${marketOfLimit}Order") & protect & entity(as[Order])) { order =>
+    val orderType = if (isMarket) "Market" else "Limit"
+    val route = (pathEndOrSingleSlash & post & measureResponse(s"place${orderType}Order") & protect & entity(as[Order])) { order =>
       withAssetPair(Right(order.assetPair), formatError = e => StatusCodes.BadRequest -> HttpError.from(e, "OrderRejected")) { pair =>
         unavailableOrderBookBarrier(pair) {
           complete(

@@ -117,7 +117,7 @@ class CombinedWavesBlockchainClient(
           // if (fillsDebugInfo.nonEmpty) log.info(s"Detected fills:\n${fillsDebugInfo.mkString("\n")}")
 
           val unconfirmedTxs = for {
-            tx <- x.utxUpdate.unconfirmedTxs.view if isExchangeTxFromMatcher(tx)
+            tx <- x.utxUpdate.unconfirmedTxs.values.view if isExchangeTxFromMatcher(tx)
             signedTx <- tx.transaction
             changes <- tx.diff.flatMap(_.stateUpdate)
           } yield tx.id.toVanilla -> TransactionWithChanges(tx.id, signedTx, changes)
@@ -144,9 +144,9 @@ class CombinedWavesBlockchainClient(
 
   // TODO DEX-1013
   private def processUtxEvents(utxUpdate: UtxUpdate): Set[Address] =
-    if (utxUpdate.resetCaches) pessimisticPortfolios.replaceWith(utxUpdate.unconfirmedTxs)
+    if (utxUpdate.resetCaches) pessimisticPortfolios.replaceWith(utxUpdate.unconfirmedTxs.values.toSeq)
     else
-      pessimisticPortfolios.addPending(utxUpdate.unconfirmedTxs) |+|
+      pessimisticPortfolios.addPending(utxUpdate.unconfirmedTxs.values.toSeq) |+|
       pessimisticPortfolios.processConfirmed(utxUpdate.confirmedTxs.keySet)._1 |+|
       pessimisticPortfolios.removeFailed(utxUpdate.failedTxs.keySet)
 

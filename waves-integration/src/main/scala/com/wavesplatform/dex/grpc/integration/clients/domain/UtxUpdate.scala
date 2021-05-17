@@ -5,7 +5,7 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.dex.grpc.integration.services.UtxTransaction
 
 case class UtxUpdate(
-  unconfirmedTxs: Seq[UtxTransaction] = Nil,
+  unconfirmedTxs: Map[ByteString, UtxTransaction] = Map.empty,
   confirmedTxs: Map[ByteString, TransactionWithChanges] = Map.empty,
   failedTxs: Map[ByteString, UtxTransaction] = Map.empty,
   resetCaches: Boolean = false
@@ -27,9 +27,9 @@ object UtxUpdate {
     )
 
     private def removeDone(
-      unconfirmedTxs: Seq[UtxTransaction],
+      unconfirmedTxs: Map[ByteString, UtxTransaction],
       by: UtxUpdate
-    ): Seq[UtxTransaction] = unconfirmedTxs.filterNot(tx => by.confirmedTxs.contains(tx.id) || by.failedTxs.contains(tx.id))
+    ): Map[ByteString, UtxTransaction] = unconfirmedTxs.filterNot(tx => by.confirmedTxs.contains(tx._1) || by.failedTxs.contains(tx._1))
 
   }
 

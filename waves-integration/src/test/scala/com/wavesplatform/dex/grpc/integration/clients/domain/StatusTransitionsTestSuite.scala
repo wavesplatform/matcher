@@ -108,8 +108,9 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
       "[UtxEvent] -> Normal, where [UtxEvent] is" - {
         "UtxUpdated" in {
           val init = Normal(WavesChain(Vector.empty, 0, 100))
-          val newTxs = Seq(UtxTransaction(id = mkTxId(1)))
-          val event = UtxUpdated(newTxs, Nil)
+          val txId = mkTxId(1)
+          val newTxs = Map(txId -> UtxTransaction(id = txId))
+          val event = UtxUpdated(newTxs.values.toSeq, Nil)
           StatusTransitions(init, event) should matchTo(StatusUpdate(
             newStatus = init,
             utxUpdate = UtxUpdate(unconfirmedTxs = newTxs),
@@ -119,8 +120,9 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
 
         "UtxSwitched" in {
           val init = Normal(WavesChain(Vector.empty, 0, 100))
-          val txs = Seq(UtxTransaction(id = mkTxId(1)))
-          val event = UtxSwitched(txs)
+          val txId = mkTxId(1)
+          val txs = Map(txId -> UtxTransaction(id = txId))
+          val event = UtxSwitched(txs.values.toSeq)
           StatusTransitions(init, event) should matchTo(StatusUpdate(
             newStatus = init,
             utxUpdate = UtxUpdate(unconfirmedTxs = txs, resetCaches = true),
@@ -215,7 +217,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
             2, // from block2A to UTX Pool during a rollback
             31,
             32
-          ).foldMapK(mkUtxTransactionMap).values.toSeq,
+          ).foldMapK(mkUtxTransactionMap),
           failedTxs = mkUtxTransactionMap(30)
         )
       )
@@ -246,7 +248,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
             updatedBalances = block2B.changes |+| microBlock.changes,
             updatedLastBlockHeight = StatusUpdate.LastBlockHeight.Updated(2),
             utxUpdate = UtxUpdate(
-              unconfirmedTxs = mkUtxTransactionMap(32).values.toSeq, // init.utxUpdate, 31 is gone, because confirmed
+              unconfirmedTxs = mkUtxTransactionMap(32), // init.utxUpdate, 31 is gone, because confirmed
               confirmedTxs = List(
                 3, // block2B
                 10, // microBlock
@@ -346,8 +348,9 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
 
       "[UtxEvent] -> TransientRollback, where [UtxEvent] is" - {
         "UtxUpdated" in {
-          val newTxs = Seq(UtxTransaction(id = UnsafeByteOperations.unsafeWrap(Array[Byte](5, 6, 7))))
-          val event = UtxUpdated(newTxs, Nil)
+          val txId = UnsafeByteOperations.unsafeWrap(Array[Byte](5, 6, 7))
+          val newTxs = Map(txId -> UtxTransaction(id = txId))
+          val event = UtxUpdated(newTxs.values.toSeq, Nil)
           StatusTransitions(init, event) should matchTo(StatusUpdate(
             newStatus = init.copy(
               utxUpdate = init.utxUpdate |+| UtxUpdate(unconfirmedTxs = newTxs)
@@ -356,8 +359,9 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
         }
 
         "UtxSwitched" in {
-          val txs = Seq(UtxTransaction(id = UnsafeByteOperations.unsafeWrap(Array[Byte](5, 6, 7))))
-          val event = UtxSwitched(txs)
+          val txId = UnsafeByteOperations.unsafeWrap(Array[Byte](5, 6, 7))
+          val txs = Map(txId -> UtxTransaction(id = txId))
+          val event = UtxSwitched(txs.values.toSeq)
           StatusTransitions(init, event) should matchTo(StatusUpdate(
             newStatus = init.copy(
               utxUpdate = UtxUpdate(
@@ -455,7 +459,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
           StatusTransitions(init, event) should matchTo(StatusUpdate(
             newStatus = init.copy(
               utxUpdate = init.utxUpdate |+| UtxUpdate(
-                unconfirmedTxs = event.addedTxs,
+                unconfirmedTxs = event.addedTxs.map(tx => tx.id -> tx).toMap,
                 failedTxs = event.failedTxs.headOption.map(x => x.id -> x).toMap
               )
             )
@@ -467,7 +471,7 @@ class StatusTransitionsTestSuite extends WavesIntegrationSuiteBase {
 
           StatusTransitions(init, event) should matchTo(StatusUpdate(
             newStatus = init.copy(
-              utxUpdate = UtxUpdate(unconfirmedTxs = event.newTxs, resetCaches = true)
+              utxUpdate = UtxUpdate(unconfirmedTxs = event.newTxs.map(tx => tx.id -> tx).toMap, resetCaches = true)
             )
           ))
         }

@@ -122,7 +122,6 @@ class MatcherApiRoute(
   private val balanceRoutes: Route = pathPrefix("balance")(reservedBalance)
   private val transactionsRoutes: Route = pathPrefix("transactions")(getOrderTransactions)
 
-  //todo: etsybrenko: protecting here only saveSnapshots route
   private val debugRoutes: Route = pathPrefix("debug") {
     getMatcherStatus ~ getAddressState ~ getMatcherConfig ~ getCurrentOffset ~ getLastOffset ~
     getOldestSnapshotOffset ~ getAllSnapshotOffsets ~ saveSnapshots ~ print
@@ -1223,7 +1222,7 @@ class MatcherApiRoute(
   )
   def getMatcherConfig: Route =
     (path("config") & get) {
-      (measureResponse("getMatcherConfig") & protect & withAuth) {
+      (measureResponse("getMatcherConfig") & withAuth) {
         complete {
           HttpEntity(filteredConfig.rendered).withContentType(CustomContentTypes.`application/hocon`)
         }
@@ -1240,7 +1239,7 @@ class MatcherApiRoute(
   )
   def getCurrentOffset: Route =
     (path("currentOffset") & get) {
-      (measureResponse("getCurrentOffset") & protect & withAuth) {
+      (measureResponse("getCurrentOffset") & withAuth) {
         complete(currentOffset().toJson)
       }
     }
@@ -1255,7 +1254,7 @@ class MatcherApiRoute(
   )
   def getLastOffset: Route =
     (path("lastOffset") & get) {
-      (measureResponse("getLastOffset") & protect & withAuth) {
+      (measureResponse("getLastOffset") & withAuth) {
         complete(lastOffset() map (_.toJson))
       }
     }
@@ -1270,7 +1269,7 @@ class MatcherApiRoute(
   )
   def getOldestSnapshotOffset: Route =
     (path("oldestSnapshotOffset") & get) {
-      (measureResponse("getOldestSnapshotOffset") & protect & withAuth) {
+      (measureResponse("getOldestSnapshotOffset") & withAuth) {
         complete {
           (matcher ? GetSnapshotOffsets).mapTo[SnapshotOffsetsResponse].map { response =>
             val defined = response.offsets.valuesIterator.collect { case Some(x) => x }
@@ -1291,7 +1290,7 @@ class MatcherApiRoute(
   )
   def getAllSnapshotOffsets: Route =
     (path("allSnapshotOffsets") & get) {
-      (measureResponse("getAllSnapshotOffsets") & protect & withAuth) {
+      (measureResponse("getAllSnapshotOffsets") & withAuth) {
         complete {
           (matcher ? GetSnapshotOffsets).mapTo[SnapshotOffsetsResponse].map { x =>
             x.offsets.collect { case (assetPair, Some(offset)) => assetPair -> offset }.toJson
@@ -1333,7 +1332,7 @@ class MatcherApiRoute(
   )
   def getAddressState: Route =
     (path("address" / AddressPM) & get) { addressOrError =>
-      (measureResponse("getAddressState") & protect & withAuth) {
+      (measureResponse("getAddressState") & withAuth) {
         withAddress(addressOrError) { address =>
           complete {
             askMapAddressActor[GetState](address, GetCurrentState) {
@@ -1354,7 +1353,7 @@ class MatcherApiRoute(
   )
   def getMatcherStatus: Route =
     (path("status") & get) {
-      (measureResponse("getMatcherStatus") & protect & withAuth) {
+      (measureResponse("getMatcherStatus") & withAuth) {
         complete(HttpSystemStatus(matcherStatus(), blockchainStatus))
       }
     }
@@ -1362,7 +1361,7 @@ class MatcherApiRoute(
   // Hidden
   def print: Route =
     (path("print") & post) {
-      (measureResponse("print") & protect & withAuth) {
+      (measureResponse("print") & withAuth) {
         entity(as[HttpMessage]) { x =>
           log.warn(x.message)
           complete {

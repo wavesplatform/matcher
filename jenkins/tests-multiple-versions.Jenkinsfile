@@ -26,7 +26,7 @@ pipeline {
             steps {
                 script {
                     currentBuild.displayName = "${params.LABEL}"
-                    currentBuild.description = "<a href='https://${OTHER_DEX_IMAGE}'>Dex image</a> <br/> <a href='https://${OTHER_NODE_IMAGE}'>Node image</a>"
+                    currentBuild.description = "<a href='https://${REGISTRY}/harbor/projects/11/repositories/waves%2Fdex%2Fdex-it/tags/${params.OTHER_DEX_IMAGE.replaceAll('dex-it:','')}'>Dex image</a> <br/> <a href='https://${REGISTRY}/harbor/projects/11/repositories/waves%2Fdex%2Fwaves-integration-it/tags/${params.OTHER_NODE_IMAGE.replaceAll('waves-integration-it:','')}'>Node image</a>"
                 }
                 sh 'git fetch --tags'
                 sh 'docker rmi `docker images --format "{{.Repository}}:{{.Tag}}" | grep "wavesplatform"` || true'

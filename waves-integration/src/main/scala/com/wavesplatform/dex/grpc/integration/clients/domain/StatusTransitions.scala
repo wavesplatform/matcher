@@ -195,7 +195,7 @@ object StatusTransitions extends ScorexLogging {
         }
     }
 
-    log.info(s"Result: $r")
+    log.trace(s"Result: $r")
     r
   }
 

@@ -13,8 +13,8 @@ object OrderFeeSettings {
 
   final case class DynamicSettings(baseMakerFee: Long, baseTakerFee: Long) extends OrderFeeSettings {
     val maxBaseFee: Long = math.max(baseMakerFee, baseTakerFee)
-    val makerRatio: Double = (BigDecimal(baseMakerFee) / maxBaseFee).toDouble
-    val takerRatio: Double = (BigDecimal(baseTakerFee) / maxBaseFee).toDouble
+    val makerRatio = BigDecimal(baseMakerFee) / maxBaseFee
+    val takerRatio = BigDecimal(baseTakerFee) / maxBaseFee
   }
 
   object DynamicSettings {

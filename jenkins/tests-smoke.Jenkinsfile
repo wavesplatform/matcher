@@ -17,8 +17,8 @@ pipeline {
         SBT_OPTS = '-Xmx10g -XX:ReservedCodeCacheSize=128m -XX:+CMSClassUnloadingEnabled'
         PATH = "${env.SBT_HOME}/bin:${env.PATH}"
         SCALATEST_INCLUDE_TAGS = 'com.wavesplatform.it.tags.SmokeTests'
-        DEX_IMAGE = "wavesplatform/${DEX_IMAGE}"
-        NODE_IMAGE = "wavesplatform/${NODE_IMAGE}"
+        DEX_IMAGE = "${DEX_IMAGE}"
+        NODE_IMAGE = "${NODE_IMAGE}"
     }
     stages {
         stage('Cleanup') {

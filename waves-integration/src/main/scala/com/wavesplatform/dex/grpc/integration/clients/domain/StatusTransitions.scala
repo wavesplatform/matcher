@@ -54,14 +54,14 @@ object StatusTransitions extends ScorexLogging {
           case UtxUpdated(newTxs, failedTxs) =>
             StatusUpdate(
               newStatus = origStatus,
-              utxUpdate = UtxUpdate(unconfirmedTxs = newTxs, failedTxs = failedTxs.view.map(x => x.id -> x).toMap)
+              utxUpdate = UtxUpdate(unconfirmedTxs = newTxs.map(tx => tx.id -> tx).toMap, failedTxs = failedTxs.view.map(x => x.id -> x).toMap)
             )
 
           case UtxSwitched(newTxs) =>
             // Normally won't happen
             StatusUpdate(
               newStatus = origStatus,
-              utxUpdate = UtxUpdate(unconfirmedTxs = newTxs, resetCaches = true)
+              utxUpdate = UtxUpdate(unconfirmedTxs = newTxs.map(tx => tx.id -> tx).toMap, resetCaches = true)
             )
 
           case _ =>
@@ -84,7 +84,7 @@ object StatusTransitions extends ScorexLogging {
                   // This solves a situation when rolled back transactions are moved to UTX Pool
                   // and then confirmed in a micro block.
                   // Relates DEX-1099
-                  x.copy(unconfirmedTxs = x.unconfirmedTxs.filterNot(x => resolved.commonTxIds.contains(x.id)))
+                  x.copy(unconfirmedTxs = x.unconfirmedTxs.filterNot(tx => resolved.commonTxIds.contains(tx._1)))
                 }
 
                 if (resolved.lostDiffIndex.isEmpty)
@@ -137,7 +137,7 @@ object StatusTransitions extends ScorexLogging {
             StatusUpdate(
               newStatus = origStatus.copy(
                 utxUpdate = origStatus.utxUpdate |+| UtxUpdate(
-                  unconfirmedTxs = newTxs,
+                  unconfirmedTxs = newTxs.map(tx => tx.id -> tx).toMap,
                   failedTxs = failedTxs.view.map(x => x.id -> x).toMap
                 )
               )
@@ -146,7 +146,7 @@ object StatusTransitions extends ScorexLogging {
           case UtxSwitched(newTxs) =>
             StatusUpdate(
               newStatus = origStatus.copy(
-                utxUpdate = UtxUpdate(unconfirmedTxs = newTxs, resetCaches = true) // Forget the previous
+                utxUpdate = UtxUpdate(unconfirmedTxs = newTxs.map(tx => tx.id -> tx).toMap, resetCaches = true) // Forget the previous
               )
             )
 
@@ -171,7 +171,7 @@ object StatusTransitions extends ScorexLogging {
             StatusUpdate(
               newStatus = origStatus.copy(
                 utxUpdate = origStatus.utxUpdate |+| UtxUpdate(
-                  unconfirmedTxs = newTxs,
+                  unconfirmedTxs = newTxs.map(tx => tx.id -> tx).toMap,
                   failedTxs = failedTxs.view.map(x => x.id -> x).toMap
                 )
               )
@@ -181,7 +181,7 @@ object StatusTransitions extends ScorexLogging {
             log.error("Unexpected UTxSwitched, reset utxUpdate")
             StatusUpdate(
               newStatus = origStatus.copy(
-                utxUpdate = UtxUpdate(unconfirmedTxs = newTxs, resetCaches = true) // Forget the previous
+                utxUpdate = UtxUpdate(unconfirmedTxs = newTxs.map(tx => tx.id -> tx).toMap, resetCaches = true) // Forget the previous
               )
             )
 

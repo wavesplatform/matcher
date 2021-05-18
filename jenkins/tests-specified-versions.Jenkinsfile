@@ -18,15 +18,14 @@ pipeline {
         PATH = "${env.SBT_HOME}/bin:${env.PATH}"
         SCALATEST_EXCLUDE_TAGS = 'com.wavesplatform.it.tags.DexItKafkaRequired com.wavesplatform.it.tags.DexItExternalKafkaRequired com.wavesplatform.it.tags.DexMultipleVersions'
         KAFKA_SERVER = "${KAFKA_SERVER}"
-        DEX_TAG = "${DEX_TAG}"
-        NODE_TAG = "${NODE_TAG}"
+        DEX_IMAGE = "${REGISTRY}/waves/dex/${DEX_IMAGE}"
+        NODE_IMAGE = "${REGISTRY}/waves/dex/${NODE_IMAGE}"
     }
     stages {
         stage('Cleanup') {
             steps {
                 script {
                     currentBuild.displayName = "${params.LABEL}"
-                    currentBuild.description = "<a href='${REGISTRY}/waves/dex/${DEX_TAG}'>Dex image</a> <br/> <a href='${REGISTRY}/waves/dex/${NODE_TAG}'>Node image</a>"
                 }
                 sh 'git fetch --tags'
                 sh 'docker rmi `docker images --format "{{.Repository}}:{{.Tag}}" | grep "wavesplatform"` || true'
@@ -53,7 +52,7 @@ pipeline {
             archiveArtifacts artifacts: 'logs.tar.gz', fingerprint: true
             junit '**/test-reports/*.xml'
             sh "mkdir allure-results || true"
-            sh "echo 'KAFKA_SERVER=${KAFKA_SERVER}\r\nDEX_TAG=${DEX_TAG}\r\nNODE_TAG=${NODE_TAG}' > allure-results/environment.properties"
+            sh "echo 'KAFKA_SERVER=${KAFKA_SERVER}\r\nDEX_IMAGE=${DEX_IMAGE}\r\nNODE_IMAGE=${NODE_IMAGE}' > allure-results/environment.properties"
             allure results: [[path: 'allure-results']]
         }
         cleanup {

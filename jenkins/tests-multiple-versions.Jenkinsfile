@@ -18,15 +18,15 @@ pipeline {
         PATH = "${env.SBT_HOME}/bin:${env.PATH}"
         SCALATEST_INCLUDE_TAGS = 'com.wavesplatform.it.tags.DexMultipleVersions'
         KAFKA_SERVER = "${KAFKA_SERVER}"
-        OTHER_DEX_IMAGE = "${OTHER_DEX_IMAGE}"
-        OTHER_NODE_IMAGE = "${OTHER_NODE_IMAGE}"
+        OTHER_DEX_IMAGE = "${REGISTRY}/waves/dex/${OTHER_DEX_IMAGE}"
+        OTHER_NODE_IMAGE = "${REGISTRY}/waves/dex/${OTHER_NODE_IMAGE}"
     }
     stages {
         stage('Cleanup') {
             steps {
                 script {
                     currentBuild.displayName = "${params.LABEL}"
-                    currentBuild.description = "<a href='${REGISTRY}/waves/dex/${OTHER_DEX_IMAGE}'>Dex image</a> <br/> <a href='${REGISTRY}/waves/dex/${OTHER_NODE_IMAGE}'>Node image</a>"
+                    currentBuild.description = "<a href='${OTHER_DEX_IMAGE}'>Dex image</a> <br/> <a href='${OTHER_NODE_IMAGE}'>Node image</a>"
                 }
                 sh 'git fetch --tags'
                 sh 'docker rmi `docker images --format "{{.Repository}}:{{.Tag}}" | grep "wavesplatform"` || true'

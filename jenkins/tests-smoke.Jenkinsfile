@@ -17,8 +17,8 @@ pipeline {
         SBT_OPTS = '-Xmx10g -XX:ReservedCodeCacheSize=128m -XX:+CMSClassUnloadingEnabled'
         PATH = "${env.SBT_HOME}/bin:${env.PATH}"
         SCALATEST_INCLUDE_TAGS = 'com.wavesplatform.it.tags.SmokeTests'
-        DEX_IMAGE = "${DEX_IMAGE}"
-        NODE_IMAGE = "${NODE_IMAGE}"
+        DEX_IMAGE = "${REGISTRY}/waves/dex/${DEX_IMAGE}"
+        NODE_IMAGE = "${REGISTRY}/waves/dex/${NODE_IMAGE}"
     }
     stages {
         stage('Cleanup') {
@@ -30,7 +30,7 @@ pipeline {
                     else {
                         currentBuild.displayName = "${params.LABEL}"
                     }
-                    currentBuild.description = "<a href='${REGISTRY}/waves/dex/${DEX_IMAGE}'>Dex image</a> <br/> <a href='${REGISTRY}/waves/dex/${NODE_IMAGE}'>Node image</a>"
+                    currentBuild.description = "<a href='${DEX_IMAGE}'>Dex image</a> <br/> <a href='${NODE_IMAGE}'>Node image</a>"
                 }
                 sh 'git fetch --tags'
                 sh 'docker rmi `docker images --format "{{.Repository}}:{{.Tag}}" | grep "wavesplatform"` || true'

@@ -513,15 +513,7 @@ case object UnexpectedError
 case object WavesImmutableRate
     extends MatcherError(rate, commonEntity, immutable, e"The rate for ${Symbol("assetId") -> (Waves: Asset)} cannot be changed")
 
-case object NonPositiveAssetRate extends MatcherError(rate, commonEntity, outOfBound, e"Asset rate should be positive")
-
-case object AssetRateOverflow
-    extends MatcherError(
-      rate,
-      commonEntity,
-      outOfBound,
-      e"Asset rate value should fit into double"
-    )
+case object InvalidAssetRate extends MatcherError(rate, commonEntity, outOfBound, e"Asset rate should be positive and should fit into double")
 
 case class RateNotFound(theAsset: Asset)
     extends MatcherError(rate, commonEntity, notFound, e"The rate for the asset ${Symbol("assetId") -> theAsset} was not specified")

@@ -2,16 +2,16 @@ package com.wavesplatform.dex.api.http.directives
 
 import akka.http.scaladsl.server._
 import com.wavesplatform.dex.api.http.entities.{InvalidJsonResponse, WavesNodeUnavailable}
-import com.wavesplatform.dex.api.http.{HasStatusBarrier, PlayJsonException}
+import com.wavesplatform.dex.api.http.PlayJsonException
 import com.wavesplatform.dex.api.routes.ApiRoute
 import com.wavesplatform.dex.error._
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
 
-trait ProtectDirective extends ApiRoute with HasStatusBarrier {
+private[http] trait ProtectDirective { self: ApiRoute =>
 
   private def invalidJsonResponse(error: MatcherError): StandardRoute = complete(InvalidJsonResponse(error))
 
-  def protect: Directive0 = handleExceptions(gRPCExceptionsHandler) & handleRejections(invalidJsonParsingRejectionsHandler)
+  protected def protect: Directive0 = handleExceptions(gRPCExceptionsHandler) & handleRejections(invalidJsonParsingRejectionsHandler)
 
   private val invalidJsonParsingRejectionsHandler =
     RejectionHandler

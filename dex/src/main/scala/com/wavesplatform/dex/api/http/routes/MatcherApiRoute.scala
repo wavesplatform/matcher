@@ -95,6 +95,7 @@ class MatcherApiRoute(
 )(implicit mat: Materializer)
     extends ApiRoute
     with ProtectDirective
+    with HasStatusBarrier
     with AuthRoute
     with ScorexLogging {
 
@@ -488,7 +489,7 @@ class MatcherApiRoute(
         dataType = "com.wavesplatform.dex.domain.order.OrderV3"
       )
     )
-  ) //placed metrics inside method placeOrder
+  )
   def placeLimitOrder: Route = placeOrder(none, isMarket = false)
 
   @Path("/orderbook/market")
@@ -511,7 +512,7 @@ class MatcherApiRoute(
         dataType = "com.wavesplatform.dex.domain.order.OrderV3"
       )
     )
-  ) //placed metrics inside method placeOrder
+  )
   def placeMarketOrder: Route = placeOrder(PathMatcher("market").some, isMarket = true)
 
   @Path("/orderbook")

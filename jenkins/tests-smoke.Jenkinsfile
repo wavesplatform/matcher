@@ -25,7 +25,7 @@ pipeline {
             steps {
                 script {
                     if(params.LABEL == '') {
-                        currentBuild.displayName = "${params.BRANCH}: ${params.NODE_IMAGE}_${params.DEX_IMAGE}"
+                        currentBuild.displayName = "${params.BRANCH.replaceAll('origin/','')}: ${params.NODE_IMAGE}_${params.DEX_IMAGE}"
                     }
                     else {
                         currentBuild.displayName = "${params.LABEL}"

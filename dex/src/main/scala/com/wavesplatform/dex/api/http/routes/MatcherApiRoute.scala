@@ -319,7 +319,8 @@ class MatcherApiRoute(
     (path(AssetPM) & put) { assetOrError =>
       (measureResponse("upsertRate") & protect & withAuth) {
         entity(as[Double]) { rate =>
-          if (rate <= 0) complete(RateError(error.NonPositiveAssetRate))
+          if (rate.isInfinite) complete(RateError(error.AssetRateValueOverflow))
+        else if (rate <= 0) complete(RateError(error.NonPositiveAssetRate))
           else
             withAsset(assetOrError) { asset =>
               complete(

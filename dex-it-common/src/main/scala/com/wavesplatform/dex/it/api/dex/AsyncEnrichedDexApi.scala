@@ -399,7 +399,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
   override def upsertRate(asset: Asset, rate: String): R[HttpMessage] = mk {
     basicRequest
       .put(uri"$apiUri/matcher/settings/rates/${asset.toString}")
-      .body(Json.stringify(Json.toJson(rate)))
+      .body(rate)
       .contentType(MediaType.ApplicationJson)
       .headers(apiKeyHeaders)
       .tag("requestId", UUID.randomUUID)

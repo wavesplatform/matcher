@@ -515,7 +515,7 @@ case object WavesImmutableRate
 
 case object NonPositiveAssetRate extends MatcherError(rate, commonEntity, outOfBound, e"Asset rate should be positive")
 
-case object AssetRateValueOverflow
+case object AssetRateOverflow
     extends MatcherError(
       rate,
       commonEntity,

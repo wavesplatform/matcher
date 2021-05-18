@@ -100,7 +100,8 @@ case class WavesChain(history: Vector[WavesBlock], height: Int, blocksCapacity: 
 
   private def mkHardenedBlock(blocks: NonEmptyList[WavesBlock]): WavesBlock = blocks.reduce(WavesChain.blockSemigroup)
 
-  override def toString: String = s"WavesChain(his=${history.map(x => s"${x.tpe}-${x.ref}")}, h=$height)"
+  override def toString: String = s"WavesChain(his=${history.take(6).map(x => s"${x.tpe}-${x.ref}")}, h=$height)"
+
 }
 
 object WavesChain {

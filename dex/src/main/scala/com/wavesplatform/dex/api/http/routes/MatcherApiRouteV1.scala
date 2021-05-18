@@ -4,6 +4,7 @@ import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.directives.FutureDirectives
 import akka.http.scaladsl.server.{Directive1, Route}
+import com.wavesplatform.dex.api.http.directives.HttpKamonMetricsDirectives._
 import com.wavesplatform.dex.api.http.entities.{HttpV1OrderBook, InfoNotFound, InvalidAsset}
 import com.wavesplatform.dex.api.http.{HasStatusBarrier, OrderBookHttpInfo}
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute, PathMatchers}
@@ -16,6 +17,7 @@ import com.wavesplatform.dex.model.{AssetPairBuilder, MatcherModel}
 import io.swagger.annotations.{Api, ApiImplicitParam, ApiImplicitParams, ApiOperation}
 
 import javax.ws.rs.Path
+import scala.concurrent.ExecutionContext
 
 @Path("/api/v1")
 @Api(value = "/api v1/")
@@ -24,7 +26,7 @@ case class MatcherApiRouteV1(
   orderBookHttpInfo: OrderBookHttpInfo,
   matcherStatus: () => MatcherStatus,
   apiKeyHash: Option[Array[Byte]]
-)(implicit val errorContext: ErrorFormatterContext)
+)(implicit val errorContext: ErrorFormatterContext, ex: ExecutionContext)
     extends ApiRoute
     with AuthRoute
     with HasStatusBarrier
@@ -77,14 +79,19 @@ case class MatcherApiRouteV1(
       )
     )
   )
-  def getOrderBook: Route = (path("orderbook" / AssetPairPM) & get) { pairOrError =>
-    withValidAssetPair(pairOrError) { p =>
-      parameters(Symbol("depth").as[Int].?) { depth =>
-        withAssetPair(p, redirectToInverse = true) { pair =>
-          complete(orderBookHttpInfo.getHttpView(pair, MatcherModel.Denormalized, depth))
+  def getOrderBook: Route =
+    (path("orderbook" / AssetPairPM) & get) { pairOrError =>
+      measureResponse("V1.getOrderBook") {
+        withValidAssetPair(pairOrError) { p =>
+          parameters(Symbol("depth").as[Int].?) {
+            depth =>
+              withAssetPair(p, redirectToInverse = true) {
+                pair =>
+                  complete(orderBookHttpInfo.getHttpView(pair, MatcherModel.Denormalized, depth))
+              }
+          }
         }
       }
     }
-  }
 
 }

@@ -7,6 +7,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Directives.respondWithHeader
 import akka.pattern.{ask, gracefulStop, CircuitBreaker}
 import akka.stream.Materializer
+import akka.stream.scaladsl.Sink
 import akka.util.Timeout
 import cats.data.EitherT
 import cats.instances.future.catsStdInstancesForFuture
@@ -26,7 +27,7 @@ import com.wavesplatform.dex.actors.tx.{ExchangeTransactionBroadcastActor, Write
 import com.wavesplatform.dex.actors.{OrderBookAskAdapter, OrderBookDirectoryActor, RootActorSystem}
 import com.wavesplatform.dex.api.http.headers.{CustomMediaTypes, MatcherHttpServer}
 import com.wavesplatform.dex.api.http.routes.{MatcherApiRoute, MatcherApiRouteV1}
-import com.wavesplatform.dex.api.http.{CompositeHttpService, OrderBookHttpInfo}
+import com.wavesplatform.dex.api.http.{CompositeHttpService, MetricHttpFlow, OrderBookHttpInfo}
 import com.wavesplatform.dex.api.routes.ApiRoute
 import com.wavesplatform.dex.api.ws.actors.{WsExternalClientDirectoryActor, WsInternalBroadcastActor}
 import com.wavesplatform.dex.api.ws.routes.MatcherWebSocketRoute
@@ -403,13 +404,14 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       }
 
       log.info(s"Binding REST and WebSocket API ${settings.restApi.address}:${settings.restApi.port} ...")
-      http
-        .newServerAt(settings.restApi.address, settings.restApi.port)
+      http.newServerAt(settings.restApi.address, settings.restApi.port)
         .adaptSettings { settings =>
           settings.withParserSettings(settings.parserSettings.withCustomMediaTypes(CustomMediaTypes.`application/hocon`))
-        }
-        .bind(combinedRoute)
-        .map(_.addToCoordinatedShutdown(hardTerminationDeadline = 5.seconds))
+        }.connectionSource().to {
+          Sink.foreach { connection =>
+            connection.handleWith(MetricHttpFlow.metricFlow(combinedRoute))
+          }
+        }.run().map(_.addToCoordinatedShutdown(hardTerminationDeadline = 5.seconds))
     } map { serverBinding =>
       log.info(s"REST and WebSocket API bound to ${serverBinding.localAddress}")
     }

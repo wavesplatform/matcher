@@ -40,13 +40,27 @@ class UpdateRatesByAssetIdSpec extends MatcherSuiteBase with ApiKeyHeaderChecks 
     }
 
     "should return an error for incorrect rate values" in {
-      validateMatcherError(dex1.rawApi.upsertRate(btc, -1), StatusCode.BadRequest, 20971535, "Asset rate should be positive")
-      validateMatcherError(dex1.rawApi.upsertRate(btc, 0), StatusCode.BadRequest, 20971535, "Asset rate should be positive")
+      validateMatcherError(
+        dex1.rawApi.upsertRate(btc, -1),
+        StatusCode.BadRequest,
+        20971535,
+        "Asset rate should be positive and should fit into double"
+      )
+      validateMatcherError(
+        dex1.rawApi.upsertRate(btc, 0),
+        StatusCode.BadRequest,
+        20971535,
+        "Asset rate should be positive and should fit into double"
+      )
     }
 
-    //TODO: DEX-985
-    "should return error if  the rate value more than Double.max" ignore {
-      validateMatcherError(dex1.rawApi.upsertRate(btc, "2.79769311348623157E308"), StatusCode.BadRequest, -1, "Error")
+    "should return error if the rate value more than Double.max" in {
+      validateMatcherError(
+        dex1.rawApi.upsertRate(btc, "2.79769311348623157E308"),
+        StatusCode.BadRequest,
+        20971535,
+        "Asset rate should be positive and should fit into double"
+      )
     }
 
     "should return an error for unexisted asset" in {

@@ -963,7 +963,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       route =>
         Put(routePath(s"/settings/rates/$smartAssetId"), 0).withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldEqual StatusCodes.BadRequest
-          responseAs[HttpMessage] should matchTo(HttpMessage("Asset rate should be positive"))
+          responseAs[HttpMessage] should matchTo(HttpMessage("Asset rate should be positive and should fit into double"))
         },
       apiKey,
       Some(rateCache)

@@ -513,7 +513,7 @@ case object UnexpectedError
 case object WavesImmutableRate
     extends MatcherError(rate, commonEntity, immutable, e"The rate for ${Symbol("assetId") -> (Waves: Asset)} cannot be changed")
 
-case object NonPositiveAssetRate extends MatcherError(rate, commonEntity, outOfBound, e"Asset rate should be positive")
+case object InvalidAssetRate extends MatcherError(rate, commonEntity, outOfBound, e"Asset rate should be positive and should fit into double")
 
 case class RateNotFound(theAsset: Asset)
     extends MatcherError(rate, commonEntity, notFound, e"The rate for the asset ${Symbol("assetId") -> theAsset} was not specified")
@@ -539,7 +539,7 @@ case class UserPublicKeyIsNotValid(reason: String = "invalid public key")
     extends MatcherError(account, pubKey, broken, e"Provided public key is not correct, reason: ${Symbol("reason") -> reason}")
 
 case class InvalidBase58String(reason: String)
-  extends MatcherError(order, commonEntity, broken, e"Provided value is not a correct base58 string, reason: ${Symbol("reason") -> reason}")
+    extends MatcherError(order, commonEntity, broken, e"Provided value is not a correct base58 string, reason: ${Symbol("reason") -> reason}")
 
 case class AddressAndPublicKeyAreIncompatible(address: Address, publicKey: PublicKey)
     extends MatcherError(
@@ -596,7 +596,7 @@ case class InvalidAddress(reason: String)
     extends MatcherError(address, commonEntity, commonClass, e"Provided address in not correct, reason: ${Symbol("reason") -> reason}")
 
 case class InvalidDepth(reason: String)
-  extends MatcherError(request, depth, commonClass, e"Provided depth in not correct, reason: ${Symbol("reason") -> reason}")
+    extends MatcherError(request, depth, commonClass, e"Provided depth in not correct, reason: ${Symbol("reason") -> reason}")
 
 sealed abstract class Entity(val code: Int)
 

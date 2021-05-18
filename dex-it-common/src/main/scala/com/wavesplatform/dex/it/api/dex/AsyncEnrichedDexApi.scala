@@ -9,7 +9,7 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
-import com.wavesplatform.dex.domain.order.{Order}
+import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.Order.Id
 import com.wavesplatform.dex.it.api._
 import com.wavesplatform.dex.it.api.responses.dex.MatcherError

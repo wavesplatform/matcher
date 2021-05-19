@@ -37,6 +37,7 @@ import monix.reactive.subjects.ConcurrentSubject
 import shapeless.Coproduct
 
 import java.util.concurrent.ConcurrentHashMap
+import scala.annotation.tailrec
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.Future
 import scala.util.Try
@@ -105,29 +106,13 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
           case TxRemoved(tx, reason) =>
             utxState.remove(tx.id()) match {
               case None => log.debug(s"Can't find removed ${tx.id()} with reason: $reason")
+              case Some(_) if reason.exists(validationError => canRetry(validationError)) =>
+                log.debug(s"${tx.id} failed by a false-positive reason: $reason")
               case utxTransaction =>
                 val gReason = reason.map { x =>
-                  val (preciseErrorObject, preciseErrorMessage) = x match {
-                    //for now we care only about "Too much" error here
-                    //error message was taken from:
-                    //https://github.com/wavesplatform/Waves/blob/master/node/src/main/scala/com/wavesplatform/state/diffs/ExchangeTransactionDiff.scala#L169-L171
-                    case TransactionValidationError(x: TxValidationError.OrderValidationError, _) => (x, x.err)
-                    case x: TxValidationError.OrderValidationError => (x, x.err)
-
-                    //for now we care only about "negative asset balance" error here
-                    //error message was taken from:
-                    //https://github.com/wavesplatform/Waves/blob/master/node/src/main/scala/com/wavesplatform/state/diffs/BalanceDiffValidation.scala#L49
-                    case TransactionValidationError(x: TxValidationError.AccountBalanceError, _) =>
-                      (x, x.errs.values.find(_.startsWith("negative asset balance")).getOrElse(""))
-                    case x: TxValidationError.AccountBalanceError =>
-                      (x, x.errs.values.find(_.startsWith("negative asset balance")).getOrElse(""))
-
-                    case _ => (x, x.toString)
-                  }
-
                   UtxEvent.Update.Removed.Reason(
-                    name = getSimpleName(preciseErrorObject),
-                    message = preciseErrorMessage
+                    name = getSimpleName(x),
+                    message = x.toString
                   )
                 }
 
@@ -210,6 +195,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
       }
     }
 
+  @tailrec
   private def canRetry(x: ValidationError): Boolean = x match {
     case x: GenericError
         if x.err == "Transaction pool bytes size limit is reached"

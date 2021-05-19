@@ -221,9 +221,11 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
     // 2.1. tx1 is mined and still present in UTX pool (race condition on NODE), thus the order considered as partially filled by tx1 * 2
     // 2.2. tx2 fails for some reason
 
+    //error message was taken from:
     //https://github.com/wavesplatform/Waves/blob/master/node/src/main/scala/com/wavesplatform/state/diffs/ExchangeTransactionDiff.scala#L169-L171
     case x: TxValidationError.OrderValidationError if x.err.startsWith("Too much") => true
 
+    //error message was taken from:
     //https://github.com/wavesplatform/Waves/blob/master/node/src/main/scala/com/wavesplatform/state/diffs/BalanceDiffValidation.scala#L49
     case TxValidationError.AccountBalanceError(errs) if errs.values.exists(_.startsWith("negative asset balance")) => true
 

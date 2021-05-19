@@ -17,16 +17,14 @@ import com.wavesplatform.dex.model.Events.OrderCanceledReason
 object MatcherModel {
 
   def getCost(amount: Long, price: Long): Long =
-    new BigDecimal(price)
-      .multiply(new BigDecimal(amount))
+    BigDecimal.valueOf(price)
+      .multiply(BigDecimal.valueOf(amount))
       .scaleByPowerOfTen(-Order.PriceConstantExponent)
       .setScale(0, RoundingMode.FLOOR)
       .longValue()
 
-  def correctRateByAssetDecimals(value: Double, assetDecimals: Int): Double =
-    new BigDecimal(value)
-      .scaleByPowerOfTen(assetDecimals - 8)
-      .doubleValue()
+  def correctRateByAssetDecimals(value: Double, assetDecimals: Int): BigDecimal =
+    BigDecimal.valueOf(value).scaleByPowerOfTen(assetDecimals - 8)
 
   sealed trait DecimalsFormat
   final case object Denormalized extends DecimalsFormat
@@ -89,8 +87,8 @@ sealed trait AcceptedOrder {
   def availableBalanceBySpendableAssets(tradableBalance: Asset => Long): Map[Asset, Long] =
     Set(spentAsset, feeAsset).map(asset => asset -> tradableBalance(asset)).toMap
 
-  lazy val amountOfPriceAsset: Long = new BigDecimal(amount)
-    .multiply(new BigDecimal(price))
+  lazy val amountOfPriceAsset: Long = BigDecimal.valueOf(amount)
+    .multiply(BigDecimal.valueOf(price))
     .scaleByPowerOfTen(-Order.PriceConstantExponent)
     .setScale(0, RoundingMode.FLOOR)
     .longValue()
@@ -106,9 +104,9 @@ sealed trait AcceptedOrder {
     amount > 0 && amount >= minimalAmountOfAmountAssetByPrice(counterPrice) && amount < Order.MaxAmount && spentAmount > 0 && receiveAmount > 0
 
   protected def minimalAmountOfAmountAssetByPrice(p: Long): Long =
-    Order.PriceConstantDecimal.divide(new BigDecimal(p), 0, RoundingMode.CEILING).longValue()
+    Order.PriceConstantDecimal.divide(BigDecimal.valueOf(p), 0, RoundingMode.CEILING).longValue()
 
-  protected def correctedAmountOfAmountAsset(a: Long, p: Long): Long = correctedAmountOfAmountAsset(new BigDecimal(a), new BigDecimal(p))
+  protected def correctedAmountOfAmountAsset(a: Long, p: Long): Long = correctedAmountOfAmountAsset(BigDecimal.valueOf(a), BigDecimal.valueOf(p))
 
   protected def correctedAmountOfAmountAsset(a: BigDecimal, p: BigDecimal): Long = {
     val settledTotal = a
@@ -195,7 +193,7 @@ object AcceptedOrder {
   def executedAmount(submitted: AcceptedOrder, counter: LimitOrder): Long = {
 
     val matchedAmount = math.min(submitted.executionAmount(counter.price), counter.amountOfAmountAsset)
-    lazy val counterPrice = new BigDecimal(counter.price)
+    lazy val counterPrice = BigDecimal.valueOf(counter.price)
 
     def minBetweenMatchedAmountAnd(value: Long): Long = math.min(matchedAmount, value)
     def correctByCounterPrice(value: java.math.BigDecimal): Long = submitted.correctedAmountOfAmountAsset(value, counterPrice)
@@ -208,28 +206,28 @@ object AcceptedOrder {
             correctByCounterPrice {
               if (mo.spentAsset == mo.feeAsset) {
                 // mo.availableForSpending * mo.amount / (counter.price * mo.amount / Order.PriceConstant + mo.fee)
-                val moAmount = new BigDecimal(mo.amount)
-                new BigDecimal(mo.availableForSpending)
+                val moAmount = BigDecimal.valueOf(mo.amount)
+                BigDecimal.valueOf(mo.availableForSpending)
                   .multiply(moAmount)
                   .divide(
                     counterPrice
                       .multiply(moAmount)
                       .scaleByPowerOfTen(-Order.PriceConstantExponent)
-                      .add(new BigDecimal(mo.fee)),
+                      .add(BigDecimal.valueOf(mo.fee)),
                     0,
                     RoundingMode.FLOOR
                   )
               } else
                 // mo.availableForSpending * Order.PriceConstant / counter.price
-                new BigDecimal(mo.availableForSpending)
+                BigDecimal.valueOf(mo.availableForSpending)
                   .scaleByPowerOfTen(Order.PriceConstantExponent)
                   .divide(counterPrice, 0, RoundingMode.FLOOR)
             }
           else if (mo.spentAsset == mo.feeAsset)
             // mo.availableForSpending * mo.amount / (mo.amount + mo.fee)
-            new BigDecimal(mo.availableForSpending)
-              .multiply(new BigDecimal(mo.amount))
-              .divide(new BigDecimal(mo.amount + mo.fee), 0, RoundingMode.FLOOR)
+            BigDecimal.valueOf(mo.availableForSpending)
+              .multiply(BigDecimal.valueOf(mo.amount))
+              .divide(BigDecimal.valueOf(mo.amount + mo.fee), 0, RoundingMode.FLOOR)
               .longValue()
           else mo.availableForSpending
         }

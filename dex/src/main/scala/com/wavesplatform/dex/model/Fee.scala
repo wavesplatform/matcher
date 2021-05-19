@@ -4,7 +4,7 @@ import com.wavesplatform.dex.caches.OrderFeeSettingsCache
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.model.AcceptedOrder.partialFee
-import com.wavesplatform.dex.model.OrderValidator.multiplyFeeByDouble
+import com.wavesplatform.dex.model.OrderValidator.multiplyFeeByBigDecimal
 import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, FixedSettings, PercentSettings}
 import com.wavesplatform.dex.settings.{AssetType, OrderFeeSettings}
 
@@ -52,8 +52,8 @@ object Fee {
 
       case settings: DynamicSettings =>
         absoluteFee(
-          totalCounterFee = multiplyFeeByDouble(c.matcherFee, settings.makerRatio),
-          totalSubmittedFee = multiplyFeeByDouble(s.matcherFee, settings.takerRatio)
+          totalCounterFee = multiplyFeeByBigDecimal(c.matcherFee, settings.makerRatio),
+          totalSubmittedFee = multiplyFeeByBigDecimal(s.matcherFee, settings.takerRatio)
         )
 
       case _: FixedSettings =>

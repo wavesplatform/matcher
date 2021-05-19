@@ -82,8 +82,8 @@ object Implicits {
     val assetSpending =
       if (o.orderSide.isSell) Map(o.getAssetPair.amountAssetId.toVanillaAsset -> -tx.amount)
       else {
-        val amount = -new BigDecimal(tx.price)
-          .multiply(new BigDecimal(tx.amount))
+        val amount = -BigDecimal.valueOf(tx.price)
+          .multiply(BigDecimal.valueOf(tx.amount))
           .scaleByPowerOfTen(-Order.PriceConstantExponent)
           .setScale(0, RoundingMode.FLOOR)
           .longValue()

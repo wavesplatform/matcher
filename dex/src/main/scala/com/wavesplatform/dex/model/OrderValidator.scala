@@ -50,7 +50,7 @@ object OrderValidator extends ScorexLogging {
 
   private[dex] def multiplyAmountByDouble(a: Long, d: Double): Long = (BigDecimal(a) * d).setScale(0, RoundingMode.HALF_UP).toLong
   private[dex] def multiplyPriceByDouble(p: Long, d: Double): Long = (BigDecimal(p) * d).setScale(0, RoundingMode.HALF_UP).toLong
-  private[dex] def multiplyFeeByDouble(f: Long, d: Double): Long = (BigDecimal(f) * d).setScale(0, RoundingMode.CEILING).toLong
+  private[dex] def multiplyFeeByBigDecimal(f: Long, d: BigDecimal): Long = (BigDecimal(f) * d).setScale(0, RoundingMode.CEILING).toLong
 
   private def verifySignature(order: Order): FutureResult[Unit] = liftAsync {
     Verifier
@@ -229,7 +229,7 @@ object OrderValidator extends ScorexLogging {
   private[dex] def convertFeeByAssetRate(feeInWaves: Long, asset: Asset, assetDecimals: Int, rateCache: RateCache): Result[Long] =
     asset.fold(lift(feeInWaves)) { issuedAsset =>
       rateCache.getRate(issuedAsset) map { assetRate =>
-        multiplyFeeByDouble(
+        multiplyFeeByBigDecimal(
           feeInWaves,
           MatcherModel.correctRateByAssetDecimals(assetRate, assetDecimals)
         )

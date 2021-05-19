@@ -21,7 +21,7 @@ import com.wavesplatform.dex.model.Events.{OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model.{BuyLimitOrder, LimitOrder, OrderValidator, SellLimitOrder, _}
 import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import com.wavesplatform.dex.settings.OrderFeeSettings._
-import com.wavesplatform.dex.settings.{AssetType, MatcherSettings, OrderFeeSettings, loadConfig}
+import com.wavesplatform.dex.settings.{loadConfig, AssetType, MatcherSettings, OrderFeeSettings}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.time.SystemTime
 import com.wavesplatform.dex.waves.WavesFeeConstants
@@ -469,7 +469,7 @@ trait MatcherSpecBase
           .updateFeeAsset(matcherFeeAssetForDynamicSettings getOrElse Waves)
           .updateFee(
             rateForDynamicSettings.fold(ds.maxBaseFee) { rate =>
-              OrderValidator.multiplyFeeByDouble(ds.maxBaseFee, rate)
+              OrderValidator.multiplyFeeByBigDecimal(ds.maxBaseFee, BigDecimal.valueOf(rate))
             }
           )
       case _ => order

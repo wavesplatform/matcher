@@ -54,6 +54,13 @@ class OrderValidatorSpecification
 
   "OrderValidator" should {
 
+    "correctly count fee with rates" in {
+      OrderValidator.multiplyFeeByBigDecimal(
+        300_000,
+        MatcherModel.correctRateByAssetDecimals(7.2d, 6)
+      ) shouldBe 21600
+    }
+
     "reject new order" when {
 
       "this order had already been accepted" in asa(hasOrder = true)(_ should produce("OrderDuplicate"))
@@ -915,6 +922,7 @@ class OrderValidatorSpecification
 //        ov(newBuyOrder(account, version = 2)).left.map(_.toJson(errorContext)) should produce("An access to the blockchain.height is denied on DEX")
 //      }
 //    }
+
   }
 
   private def blockchainTest(

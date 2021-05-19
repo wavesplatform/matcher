@@ -37,7 +37,7 @@ During sending (see [WavesBlockchainApiGrcpService#checkedBroadcast](blob/master
 * Become failed, and we can't retry because of transaction's issues
 * Become failed, and we can retry (see [WavesBlockchainApiGrcpService#canRetry](blob/master/waves-ext/src/main/scala/com/wavesplatform/dex/grpc/integration/services/WavesBlockchainApiGrpcService.scala#L183)):
   * Transaction doesn't fit UTX either by number or size limit;
-  * Concurrency issues (see "Too much" in the code).
+  * Concurrency issues (see "Too much" & "negative asset balance" in the code).
 
 ## Cases
 

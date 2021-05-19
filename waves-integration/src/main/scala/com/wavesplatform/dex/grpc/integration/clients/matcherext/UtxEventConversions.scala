@@ -52,6 +52,6 @@ object UtxEventConversions extends ScorexLogging {
   // DEX-1120
   private def isFalsePositive(e: UtxEvent.Update.Removed.Reason): Boolean =
     // See WavesBlockchainApiGrpcService.canRetry
-    e.name == "OrderValidationError" && e.message.startsWith("Too much")
-
+    (e.name == "OrderValidationError" && e.message.startsWith("Too much")) ||
+      (e.name == "AccountBalanceError" && e.message.startsWith("negative asset balance"))
 }

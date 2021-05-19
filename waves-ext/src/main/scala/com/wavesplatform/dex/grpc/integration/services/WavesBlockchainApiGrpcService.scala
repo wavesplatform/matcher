@@ -108,7 +108,20 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
               case utxTransaction =>
                 val gReason = reason.map { x =>
                   val (preciseErrorObject, preciseErrorMessage) = x match {
+                    //for now we care only about "Too much" error here
+                    //error message was taken from:
+                    //https://github.com/wavesplatform/Waves/blob/master/node/src/main/scala/com/wavesplatform/state/diffs/ExchangeTransactionDiff.scala#L169-L171
                     case TransactionValidationError(x: TxValidationError.OrderValidationError, _) => (x, x.err)
+                    case x: TxValidationError.OrderValidationError => (x, x.err)
+
+                    //for now we care only about "negative asset balance" error here
+                    //error message was taken from:
+                    //https://github.com/wavesplatform/Waves/blob/master/node/src/main/scala/com/wavesplatform/state/diffs/BalanceDiffValidation.scala#L49
+                    case TransactionValidationError(x: TxValidationError.AccountBalanceError, _) =>
+                      (x, x.errs.values.find(_.startsWith("negative asset balance")).getOrElse(""))
+                    case x: TxValidationError.AccountBalanceError =>
+                      (x, x.errs.values.find(_.startsWith("negative asset balance")).getOrElse(""))
+
                     case _ => (x, x.toString)
                   }
 
@@ -201,12 +214,21 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
     case x: GenericError
         if x.err == "Transaction pool bytes size limit is reached"
           || x.err == "Transaction pool size limit is reached" => true
+
     // Could happen when:
     // 1. One transaction is sent multiple times in parallel
     // 2. There are two exchanges tx1 and tx2 those fill the order:
     // 2.1. tx1 is mined and still present in UTX pool (race condition on NODE), thus the order considered as partially filled by tx1 * 2
     // 2.2. tx2 fails for some reason
+
+    //https://github.com/wavesplatform/Waves/blob/master/node/src/main/scala/com/wavesplatform/state/diffs/ExchangeTransactionDiff.scala#L169-L171
     case x: TxValidationError.OrderValidationError if x.err.startsWith("Too much") => true
+
+    //https://github.com/wavesplatform/Waves/blob/master/node/src/main/scala/com/wavesplatform/state/diffs/BalanceDiffValidation.scala#L49
+    case TxValidationError.AccountBalanceError(errs) if errs.values.exists(_.startsWith("negative asset balance")) => true
+
+    case TransactionValidationError(cause, _) => canRetry(cause)
+
     case _ => false
   }
 

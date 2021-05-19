@@ -37,6 +37,7 @@ import monix.reactive.subjects.ConcurrentSubject
 import shapeless.Coproduct
 
 import java.util.concurrent.ConcurrentHashMap
+import scala.annotation.tailrec
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.Future
 import scala.util.Try
@@ -105,16 +106,13 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
           case TxRemoved(tx, reason) =>
             utxState.remove(tx.id()) match {
               case None => log.debug(s"Can't find removed ${tx.id()} with reason: $reason")
+              case Some(_) if reason.exists(validationError => canRetry(validationError)) =>
+                log.debug(s"${tx.id} failed by a false-positive reason: $reason")
               case utxTransaction =>
                 val gReason = reason.map { x =>
-                  val (preciseErrorObject, preciseErrorMessage) = x match {
-                    case TransactionValidationError(x: TxValidationError.OrderValidationError, _) => (x, x.err)
-                    case _ => (x, x.toString)
-                  }
-
                   UtxEvent.Update.Removed.Reason(
-                    name = getSimpleName(preciseErrorObject),
-                    message = preciseErrorMessage
+                    name = getSimpleName(x),
+                    message = x.toString
                   )
                 }
 
@@ -197,16 +195,28 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
       }
     }
 
+  @tailrec
   private def canRetry(x: ValidationError): Boolean = x match {
     case x: GenericError
         if x.err == "Transaction pool bytes size limit is reached"
           || x.err == "Transaction pool size limit is reached" => true
+
     // Could happen when:
     // 1. One transaction is sent multiple times in parallel
     // 2. There are two exchanges tx1 and tx2 those fill the order:
     // 2.1. tx1 is mined and still present in UTX pool (race condition on NODE), thus the order considered as partially filled by tx1 * 2
     // 2.2. tx2 fails for some reason
+
+    //error message was taken from:
+    //https://github.com/wavesplatform/Waves/blob/master/node/src/main/scala/com/wavesplatform/state/diffs/ExchangeTransactionDiff.scala#L169-L171
     case x: TxValidationError.OrderValidationError if x.err.startsWith("Too much") => true
+
+    //error message was taken from:
+    //https://github.com/wavesplatform/Waves/blob/master/node/src/main/scala/com/wavesplatform/state/diffs/BalanceDiffValidation.scala#L49
+    case TxValidationError.AccountBalanceError(errs) if errs.values.exists(_.startsWith("negative asset balance")) => true
+
+    case TransactionValidationError(cause, _) => canRetry(cause)
+
     case _ => false
   }
 

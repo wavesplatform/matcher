@@ -7,7 +7,6 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Directives.respondWithHeader
 import akka.pattern.{ask, gracefulStop, CircuitBreaker}
 import akka.stream.Materializer
-import akka.stream.scaladsl.Sink
 import akka.util.Timeout
 import cats.data.EitherT
 import cats.instances.future.catsStdInstancesForFuture

@@ -15,12 +15,13 @@ object HttpKamonMetricsDirectives {
   def measureResponse(endpoint: String) = extractRequest.tflatMap { req =>
     val path = req._1.uri.path.toString()
     val method = req._1.method.value
-    val startedTimer = timer.withTag("path", path).withTag("endpoint", endpoint).withTag("method", method).start()
+    //val startedTimer = timer.withTag("path", path).withTag("endpoint", endpoint).withTag("method", method).start()
     val taggedCounter = counter.withTag("path", path).withTag("endpoint", endpoint).withTag("method", method)
-    val metrics = RequestMetrics(taggedCounter, startedTimer)
+    val metrics = RequestMetrics(taggedCounter)
+    //startedTimer.stop() //todo: remove when proper stop code added
     mapResponse(_.addAttribute(requestMetricsAttributeKey, metrics))
   }
 
 }
 
-case class RequestMetrics(counter: Counter, startedTimer: Timer.Started)
+case class RequestMetrics(counter: Counter)

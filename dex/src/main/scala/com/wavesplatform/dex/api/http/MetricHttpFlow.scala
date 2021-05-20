@@ -15,7 +15,7 @@ object MetricHttpFlow {
   def metricFlow(): Flow[HttpResponse, HttpResponse, NotUsed] = Flow[HttpResponse].wireTap { response =>
     response.attribute(requestMetricsAttributeKey).foreach { metrics =>
       val status = response.status.intValue()
-      metrics.startedTimer.withTag("status", status).stop()
+     // metrics.startedTimer.withTag("status", status).stop()
       metrics.counter.withTag("status", status).increment()
     }
   }

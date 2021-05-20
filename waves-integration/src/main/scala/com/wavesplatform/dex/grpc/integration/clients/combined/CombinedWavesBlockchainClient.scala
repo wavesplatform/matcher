@@ -254,6 +254,7 @@ object CombinedWavesBlockchainClient extends ScorexLogging {
     pessimisticPortfolios: SynchronizedPessimisticPortfolios.Settings
   )
 
+  // TODO DEX-998
   def apply(
     wavesBlockchainClientSettings: WavesBlockchainClientSettings,
     matcherPublicKey: PublicKey,

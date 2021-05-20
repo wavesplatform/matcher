@@ -250,7 +250,7 @@ object CombinedWavesBlockchainClient extends ScorexLogging {
   case class Settings(
     maxRollbackHeight: Int,
     maxCachedLatestBlockUpdates: Int,
-    combinedStream: combined.CombinedStream.Settings,
+    combinedStream: CombinedStream.Settings,
     pessimisticPortfolios: SynchronizedPessimisticPortfolios.Settings
   )
 
@@ -299,9 +299,9 @@ object CombinedWavesBlockchainClient extends ScorexLogging {
     new CombinedWavesBlockchainClient(
       wavesBlockchainClientSettings.combinedClientSettings,
       matcherPublicKey,
-      meClient = meClient,
-      bClient = bClient,
-      mkCombinedStream = mkCombinedStream(meClient, bClient)
+      meClient,
+      bClient,
+      mkCombinedStream(meClient, bClient)
     )(grpcExecutionContext, monixScheduler)
   }
 

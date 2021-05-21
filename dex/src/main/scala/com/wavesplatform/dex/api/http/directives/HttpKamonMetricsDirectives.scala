@@ -28,7 +28,7 @@ object HttpKamonMetricsDirectives {
           taggedCounter.asInstanceOf[kamon.metric.Instrument[_, _]].remove()
         }
       },
-      60 * 1000,
+      60,
       TimeUnit.SECONDS
     )
     val metrics = RequestMetrics(taggedCounter, startedTimer.start())

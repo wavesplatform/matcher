@@ -46,7 +46,7 @@ class CombinedWavesBlockchainClient(
   matcherPublicKey: PublicKey,
   meClient: MatcherExtensionClient,
   bClient: BlockchainUpdatesClient,
-  mkCombinedStream: => CombinedStream
+  combinedStream: CombinedStream
 )(implicit ec: ExecutionContext, monixScheduler: Scheduler)
     extends WavesBlockchainClient
     with ScorexLogging {
@@ -75,7 +75,6 @@ class CombinedWavesBlockchainClient(
       val startHeight = math.max(startBlockInfo.height - settings.maxRollbackHeight - 1, 1)
       val init: BlockchainStatus = BlockchainStatus.Normal(WavesChain(Vector.empty, startHeight - 1, settings.maxRollbackHeight + 1))
 
-      val combinedStream = mkCombinedStream
       Observable(dataUpdates, combinedStream.stream)
         .merge
         .mapAccumulate(init) { case (origStatus, event) =>
@@ -260,7 +259,7 @@ object CombinedWavesBlockchainClient extends ScorexLogging {
     matcherPublicKey: PublicKey,
     monixScheduler: Scheduler,
     grpcExecutionContext: ExecutionContext,
-    mkCombinedStream: => (MatcherExtensionClient, BlockchainUpdatesClient) => CombinedStream
+    mkCombinedStream: (MatcherExtensionClient, BlockchainUpdatesClient) => CombinedStream
   ): WavesBlockchainClient = {
 
     val eventLoopGroup = new NioEventLoopGroup

@@ -3,6 +3,7 @@ package com.wavesplatform.dex.grpc.integration.clients.combined
 import akka.actor.typed.Behavior
 import akka.actor.typed.scaladsl.{Behaviors, StashBuffer}
 import com.wavesplatform.dex.actors.CustomLoggerBehaviorInterceptor
+import com.wavesplatform.dex.fp.PartialFunctionOps
 import com.wavesplatform.dex.fp.PartialFunctionOps.Implicits
 import com.wavesplatform.dex.grpc.integration.clients.ControlledStream.SystemEvent
 import com.wavesplatform.dex.grpc.integration.clients.blockchainupdates.{BlockchainUpdatesControlledStream, BlockchainUpdatesConversions}
@@ -56,34 +57,38 @@ object CombinedStreamActor {
 
     // Utilities
 
-    val ignore: Command => Behavior[Command] = _ => Behaviors.same
-    def partial(f: PartialFunction[Command, Behavior[Command]]): PartialFunction[Command, Behavior[Command]] = f
+    val ignoreAndKeepBehavior: Command => Behavior[Command] = _ => Behaviors.same
+    val mkPartial = PartialFunctionOps.mkPartial[Command, Behavior[Command]] _
 
-    def logAndIgnore(text: String): Behavior[Command] = {
+    def logAndKeepBehavior(text: String): Behavior[Command] = {
       context.log.warn(text)
       Behaviors.same[Command]
     }
 
     // Possible transitions:
     //   initial -> starting
-    //   starting -> working, quiet, stopping, closing
+    //   starting -> working, waitForContinue, stopping, closing
     //   working -> stopping, closing
-    //   quiet -> starting, closing
-    //   stopping -> quiet, closing
+    //   waitForContinue -> starting, closing
+    //   stopping -> waitForContinue, closing
     //   closing -> closed
 
     def closed: Behavior[Command] = {
-      context.log.info("closed")
+      context.log.info("Status: closed")
       status.onNext(Status.Closing(blockchainUpdates = true, utxEvents = true))
-      Behaviors.receiveMessage[Command](x => logAndIgnore(s"Unexpected $x"))
+      Behaviors.receiveMessage[Command](x => logAndKeepBehavior(s"Unexpected $x"))
     }
 
     def closing(utxEventsClosed: Boolean, blockchainUpdatesClosed: Boolean): Behavior[Command] = {
-      context.log.info(s"closing(utx=$utxEventsClosed, bu=$blockchainUpdatesClosed)")
+      context.log.info(s"Status: closing(utx=$utxEventsClosed, bu=$blockchainUpdatesClosed)")
       status.onNext(Status.Closing(blockchainUpdates = blockchainUpdatesClosed, utxEvents = utxEventsClosed))
       Behaviors.receiveMessage[Command] {
         case Command.ProcessUtxSystemEvent(SystemEvent.Closed) =>
-          if (utxEventsClosed) logAndIgnore("utx has already closed")
+          if (utxEventsClosed)
+            // We don't need to call blockchainUpdates.close() here, because utxEventsClosed=true means that
+            // we have already received Command.ProcessUtxSystemEvent(SystemEvent.Closed),
+            // thus we already called it.
+            logAndKeepBehavior("utx has already closed")
           else if (blockchainUpdatesClosed) closed
           else {
             blockchainUpdates.close()
@@ -91,7 +96,9 @@ object CombinedStreamActor {
           }
 
         case Command.ProcessBlockchainUpdatesSystemEvent(SystemEvent.Closed) =>
-          if (blockchainUpdatesClosed) logAndIgnore("bu has already closed")
+          if (blockchainUpdatesClosed)
+            // We should only log the suspicious behavior, see Command.ProcessUtxSystemEvent(SystemEvent.Closed) above.
+            logAndKeepBehavior("bu has already closed")
           else if (utxEventsClosed) closed
           else {
             utxEvents.close()
@@ -117,40 +124,42 @@ object CombinedStreamActor {
         Behaviors.same
     }
 
-    def quiet: Behavior[Command] = Behaviors.receiveMessage[Command] {
-      partial {
+    def waitForContinue: Behavior[Command] = Behaviors.receiveMessage[Command] {
+      mkPartial {
         case Command.Continue =>
           utxEvents.start()
           starting(utxEventsStarted = false, blockchainUpdatesStarted = false)
       }
         .orElse(onClosedOrRestart)
-        .toTotal(ignore)
+        .toTotal(ignoreAndKeepBehavior)
     }
 
-    def wait(): Behavior[Command] = {
+    def scheduleAndWaitForContinue(): Behavior[Command] = {
       context.scheduleOnce(settings.restartDelay, context.self, Command.Continue)
-      quiet
+      waitForContinue
     }
 
     def startWithRollback(): Behavior[Command] = {
-      context.log.info("startWithRollback")
+      context.log.info("Status: startWithRollback")
       output.onNext(WavesNodeEvent.RolledBack(WavesNodeEvent.RolledBack.To.Height(processedHeight.decrementAndGet())))
-      wait()
+      scheduleAndWaitForContinue()
     }
 
     def startWithoutRollback(): Behavior[Command] = {
-      context.log.info("startWithoutRollback")
-      wait()
+      context.log.info("Status: startWithoutRollback")
+      scheduleAndWaitForContinue()
     }
 
     def starting(utxEventsStarted: Boolean, blockchainUpdatesStarted: Boolean): Behavior[Command] = {
-      context.log.info(s"starting(utx=$utxEventsStarted, bu=$blockchainUpdatesStarted)")
+      context.log.info(s"Status: starting(utx=$utxEventsStarted, bu=$blockchainUpdatesStarted)")
       status.onNext(Status.Starting(blockchainUpdates = blockchainUpdatesStarted, utxEvents = utxEventsStarted))
       Behaviors.withStash[Command](Int.MaxValue) { stash =>
         Behaviors.receiveMessagePartial[Command] {
-          partial {
+          mkPartial {
             case Command.ProcessUtxSystemEvent(SystemEvent.BecameReady) =>
-              if (utxEventsStarted) logAndIgnore("utx has already started")
+              if (utxEventsStarted)
+                // We should only log the suspicious behavior, see closing:Command.ProcessUtxSystemEvent(SystemEvent.Closed) above.
+                logAndKeepBehavior("utx has already started")
               else if (blockchainUpdatesStarted) {
                 context.log.warn("Unexpected state: bu has already started")
                 becomeWorking(stash)
@@ -160,7 +169,9 @@ object CombinedStreamActor {
               }
 
             case Command.ProcessBlockchainUpdatesSystemEvent(SystemEvent.BecameReady) =>
-              if (blockchainUpdatesStarted) logAndIgnore("bu has already started")
+              if (blockchainUpdatesStarted)
+                // We should only log the suspicious behavior, see closing:Command.ProcessUtxSystemEvent(SystemEvent.Closed) above.
+                logAndKeepBehavior("bu has already started")
               else if (utxEventsStarted) becomeWorking(stash)
               else starting(utxEventsStarted, blockchainUpdatesStarted = true)
 
@@ -183,10 +194,10 @@ object CombinedStreamActor {
     }
 
     def working: Behavior[Command] = {
-      context.log.info("working")
+      context.log.info("Status: working")
       status.onNext(Status.Working)
       Behaviors.receiveMessagePartial[Command] {
-        partial {
+        mkPartial {
           case Command.ProcessUtxSystemEvent(SystemEvent.Stopped) =>
             // See Starting + Stopped
             blockchainUpdates.stop()
@@ -208,7 +219,7 @@ object CombinedStreamActor {
                 Behaviors.same
               case None =>
                 blockchainUpdates.requestNext()
-                logAndIgnore(s"Can't convert $evt to a domain event, asking next")
+                logAndKeepBehavior(s"Can't convert $evt to a domain event, asking next")
             }
 
           case Command.UpdateProcessedHeight(x) =>
@@ -221,12 +232,14 @@ object CombinedStreamActor {
     def becomeWorking(stash: StashBuffer[Command]): Behavior[Command] = stash.unstashAll(working)
 
     def stopping(utxEventsStopped: Boolean, blockchainUpdatesStopped: Boolean): Behavior[Command] = {
-      context.log.info(s"stopping(utx=$utxEventsStopped, bu=$blockchainUpdatesStopped)")
+      context.log.info(s"Status: stopping(utx=$utxEventsStopped, bu=$blockchainUpdatesStopped)")
       status.onNext(Status.Stopping(blockchainUpdates = blockchainUpdatesStopped, utxEvents = utxEventsStopped))
       Behaviors.receiveMessagePartial[Command] {
-        partial {
+        mkPartial {
           case Command.ProcessUtxSystemEvent(SystemEvent.Stopped) =>
-            if (utxEventsStopped) logAndIgnore("utx has already stopped")
+            if (utxEventsStopped)
+              // We should only log the suspicious behavior, see closing:Command.ProcessUtxSystemEvent(SystemEvent.Closed) above.
+              logAndKeepBehavior("utx has already stopped")
             else if (blockchainUpdatesStopped) startWithRollback()
             else {
               blockchainUpdates.stop()
@@ -234,8 +247,10 @@ object CombinedStreamActor {
             }
 
           case Command.ProcessBlockchainUpdatesSystemEvent(SystemEvent.Stopped) =>
-            if (blockchainUpdatesStopped) logAndIgnore("bu has already stopped")
-            else if (utxEventsStopped) startWithRollback()
+            if (blockchainUpdatesStopped) logAndKeepBehavior("bu has already stopped")
+            else if (utxEventsStopped)
+              // We should only log the suspicious behavior, see closing:Command.ProcessUtxSystemEvent(SystemEvent.Closed) above.
+              startWithRollback()
             else {
               utxEvents.stop()
               stopping(utxEventsStopped = false, blockchainUpdatesStopped = true)
@@ -243,11 +258,11 @@ object CombinedStreamActor {
 
           case Command.ProcessUtxSystemEvent(SystemEvent.BecameReady) =>
             utxEvents.stop()
-            logAndIgnore("Unexpected event, stopping utx forcefully")
+            logAndKeepBehavior("Unexpected event, stopping utx forcefully")
 
           case Command.ProcessBlockchainUpdatesSystemEvent(SystemEvent.BecameReady) =>
             blockchainUpdates.stop()
-            logAndIgnore("Unexpected event, stopping bu forcefully")
+            logAndKeepBehavior("Unexpected event, stopping bu forcefully")
 
           case _: Command.ProcessUtxEvent | _: Command.ProcessBlockchainUpdatesEvent => // Silently ignore, it's ok
             Behaviors.same

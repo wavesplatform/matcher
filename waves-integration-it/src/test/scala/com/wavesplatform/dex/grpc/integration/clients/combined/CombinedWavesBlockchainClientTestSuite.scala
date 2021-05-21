@@ -32,7 +32,7 @@ import scala.util.Random
 class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with HasToxiProxy with NoStackTraceCancelAfterFailure {
 
   implicit override def patienceConfig = PatienceConfig(1.minute, 1.second)
-  private val actorSystem = ActorSystem()
+  implicit private val actorSystem = ActorSystem()
 
   private val grpcExecutor = Executors.newCachedThreadPool(
     new ThreadFactoryBuilder()
@@ -93,7 +93,7 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
           CombinedStream.Settings(1.second),
           buClient.blockchainEvents,
           meClient.utxEvents
-        )(actorSystem, monixScheduler)
+        )
     )
 
   private lazy val updates = client.updates.share

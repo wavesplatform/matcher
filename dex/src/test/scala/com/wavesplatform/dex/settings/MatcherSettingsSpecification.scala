@@ -91,7 +91,7 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
     settings.snapshotsLoadingTimeout should be(423.seconds)
     settings.startEventsProcessingTimeout should be(543.seconds)
     settings.orderDb should be(OrderDb.Settings(199))
-    settings.secureKeys should be (correctSecureKeys)
+    settings.secureKeys should be(correctSecureKeys)
     settings.priceAssets should be(
       Seq(
         Waves,

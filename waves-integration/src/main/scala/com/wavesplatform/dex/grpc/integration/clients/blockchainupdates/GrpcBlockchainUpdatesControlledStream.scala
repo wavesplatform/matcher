@@ -49,9 +49,10 @@ class GrpcBlockchainUpdatesControlledStream(channel: RestartableManagedChannel, 
 
   override def requestNext(): Unit = grpcObserver.get().foreach(_.requestNext())
 
-  override def stop(): Unit = grpcObserver.get().foreach { x =>
+  override def stop(): Unit = {
     log.info("Stopping blockchain updates stream")
-    x.close()
+    stopGrpcObserver()
+    channel.stop()
     internalSystemStream.onNext(SystemEvent.Stopped)
   }
 

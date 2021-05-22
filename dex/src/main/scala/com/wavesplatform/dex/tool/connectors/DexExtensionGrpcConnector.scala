@@ -10,7 +10,7 @@ import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient
-import com.wavesplatform.dex.grpc.integration.clients.combined.{CombinedStream, CombinedWavesBlockchainClient}
+import com.wavesplatform.dex.grpc.integration.clients.combined.{CombinedStream, CombinedWavesBlockchainClient, NoOpCombinedStream}
 import com.wavesplatform.dex.grpc.integration.clients.domain.portfolio.SynchronizedPessimisticPortfolios
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.settings.GrpcClientSettings.ChannelOptionsSettings
@@ -64,7 +64,7 @@ object DexExtensionGrpcConnector {
         100,
         CombinedWavesBlockchainClient.Settings(100, 5, CombinedStream.Settings(1.second), SynchronizedPessimisticPortfolios.Settings(100))
       )
-      CombinedWavesBlockchainClient(clientSettings, matcherPublicKey, monixScheduler, executionContext)
+      CombinedWavesBlockchainClient(clientSettings, matcherPublicKey, monixScheduler, executionContext, (_, _) => NoOpCombinedStream)
     }.toEither
       .bimap(ex => s"Cannot establish gRPC connection to DEX Extension! $ex", client => DexExtensionGrpcConnector(target, client))
 

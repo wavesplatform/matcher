@@ -298,7 +298,8 @@ object Dependencies {
       betterMonadicFor,
       mouse,
       grpcNetty,
-      wavesProtobufSchemas
+      wavesProtobufSchemas,
+      akkaActorTyped
     ) ++ testKit ++ silencer ++ Seq(
       jsonScalaPb % Test // for testing purposes
     )

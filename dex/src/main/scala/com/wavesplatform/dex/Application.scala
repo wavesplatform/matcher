@@ -42,7 +42,7 @@ import com.wavesplatform.dex.domain.utils.{EitherExt2, LoggerFacade, ScorexLoggi
 import com.wavesplatform.dex.effect.{liftValueAsync, FutureResult}
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.grpc.integration.clients.MatcherExtensionAssetsCachingClient
-import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedWavesBlockchainClient
+import com.wavesplatform.dex.grpc.integration.clients.combined.{AkkaCombinedStream, CombinedWavesBlockchainClient}
 import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.history.HistoryRouterActor
@@ -50,6 +50,7 @@ import com.wavesplatform.dex.logs.SystemInformationReporter
 import com.wavesplatform.dex.model.{AssetPairBuilder, ExchangeTransactionCreator, Fee, OrderValidator, ValidationStages}
 import com.wavesplatform.dex.queue._
 import com.wavesplatform.dex.settings.MatcherSettings
+import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
 import com.wavesplatform.dex.time.NTP
 import kamon.Kamon
 import monix.execution.ExecutionModel
@@ -67,7 +68,6 @@ import scala.concurrent.{blocking, Await, Future, Promise}
 import scala.jdk.CollectionConverters._
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
-import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
 
 class Application(settings: MatcherSettings, config: Config)(implicit val actorSystem: ActorSystem) extends ScorexLogging {
 
@@ -161,7 +161,13 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       settings.wavesBlockchainClient,
       matcherPublicKey,
       monixScheduler = monixScheduler,
-      grpcExecutionContext = grpcEc
+      grpcExecutionContext = grpcEc,
+      mkCombinedStream = (meClient, buClient) =>
+        new AkkaCombinedStream(
+          settings.wavesBlockchainClient.combinedClientSettings.combinedStream,
+          buClient.blockchainEvents,
+          meClient.utxEvents
+        )(actorSystem, monixScheduler)
     ),
     assetsCache = assetsCache
   )

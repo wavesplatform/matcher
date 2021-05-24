@@ -22,7 +22,7 @@ trait WsSuiteBase extends MatcherSuiteBase with HasWebSockets with DiffMatcherWi
       .ignore[WsAddressChanges, Long](_.updateId)
   )
 
-  implicit private val wsOrderBookChangesDiff: Derived[Diff[WsOrderBookChanges]] =
+  implicit protected val wsOrderBookChangesDiff: Derived[Diff[WsOrderBookChanges]] =
     Derived(Diff.gen[WsOrderBookChanges].value.ignore[WsOrderBookChanges, Long](_.timestamp).ignore[WsOrderBookChanges, Long](_.updateId))
 
   implicit protected val wsCompleteOrderDiff: Diff[WsFullOrder] =

@@ -4,6 +4,7 @@ import akka.http.scaladsl.model.AttributeKey
 import akka.http.scaladsl.server.Directives.{extractRequest, mapResponse}
 import kamon.Kamon
 import kamon.metric.{Counter, Timer}
+import kamon.tag.TagSet
 
 object HttpKamonMetricsDirectives {
 
@@ -13,10 +14,14 @@ object HttpKamonMetricsDirectives {
   private val counter = Kamon.counter("matcher.http.responses.counter")
 
   def measureResponse(endpoint: String) = extractRequest.tflatMap { req =>
-    val path = req._1.uri.path.toString()
     val method = req._1.method.value
-    val startedTimer = timer.withTag("path", path).withTag("endpoint", endpoint).withTag("method", method).start()
-    val taggedCounter = counter.withTag("path", path).withTag("endpoint", endpoint).withTag("method", method)
+    val tagset =
+      TagSet.from(Map(
+        "endpoint" -> endpoint,
+        "method" -> method
+      ))
+    val startedTimer = timer.withTags(tagset).start()
+    val taggedCounter = counter.withTags(tagset)
     val metrics = RequestMetrics(taggedCounter, startedTimer)
     mapResponse(_.addAttribute(requestMetricsAttributeKey, metrics))
   }

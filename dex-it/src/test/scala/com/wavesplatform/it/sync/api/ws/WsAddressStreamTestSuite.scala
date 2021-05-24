@@ -12,6 +12,7 @@ import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.model.Denormalization
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.error.SubscriptionsLimitReached
+import com.wavesplatform.dex.it.test.Scripts
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.model.{LimitOrder, MarketOrder, OrderStatus}
 import com.wavesplatform.it.WsSuiteBase
@@ -320,6 +321,61 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
         )()
 
         wsc.close()
+      }
+
+      "NTF asset issued " - {
+        "via IssueTx shouldn't be in the address stream" in {
+          val acc = mkAccountWithBalance(10.waves -> Waves)
+          val IssueResults(txIssue, _, issuedAsset) = mkIssueExtended(acc, "testAssetNT", 1L, 0)
+
+          broadcastAndAwait(txIssue)
+
+          val wsc = mkWsAddressConnection(acc)
+          assertChanges(wsc)(
+            Map(Waves -> WsBalances(9, 0)),
+            Map(issuedAsset -> WsBalances(1, 0))
+          )()
+
+          wsc.close()
+        }
+
+        "via InvokeTx shouldn't be in the address stream" in {
+
+          /*
+            {-# STDLIB_VERSION 4 #-}
+            {-# CONTENT_TYPE DAPP #-}
+            {-# SCRIPT_TYPE ACCOUNT #-}
+
+            @Callable(i)
+            func default() = {
+              let asset = Issue("Asset", "", 1, 0, false, unit, 0)
+              let assetId = asset.calculateAssetId()
+              [
+                asset
+              ]
+            }
+
+            @Verifier(tx)
+            func verify() = sigVerify(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey)
+           */
+
+          val acc = mkAccountWithBalance(10.waves -> Waves)
+          val dapp = mkAccountWithBalance(100.waves + setScriptFee + smartFee -> Waves)
+
+          val script = "AAIEAAAAAAAAAAQIAhIAAAAAAAAAAAEAAAABaQEAAAAHZGVmYXVsdAAAAAAEAAAABWFzc2V0CQAEQwAAAAcCAAAABUFzc2V0AgAAAAAAAAAAAAAAAAEAAAAAAAAAAAAHBQAAAAR1bml0AAAAAAAAAAAABAAAAAdhc3NldElkCQAEOAAAAAEFAAAABWFzc2V0CQAETAAAAAIFAAAABWFzc2V0BQAAAANuaWwAAAABAAAAAnR4AQAAAAZ2ZXJpZnkAAAAACQAB9AAAAAMIBQAAAAJ0eAAAAAlib2R5Qnl0ZXMJAAGRAAAAAggFAAAAAnR4AAAABnByb29mcwAAAAAAAAAAAAgFAAAAAnR4AAAAD3NlbmRlclB1YmxpY0tleUzoh4g="
+
+          broadcastAndAwait(mkSetAccountMayBeScript(dapp, Some(Scripts.fromBase64(script)), fee = setScriptFee + smartFee))
+
+          val invokeTx = mkInvokeScript(acc, dapp, fee = 1.005.waves)
+
+          broadcastAndAwait(invokeTx)
+
+          val wsc = mkWsAddressConnection(acc)
+          assertChanges(wsc)(
+            Map(Waves -> WsBalances(8.995, 0))
+          )()
+
+        }
       }
 
       "user issued a new asset before establishing the connection" in {

@@ -37,12 +37,20 @@ package object it {
 
   private def executeCommand(x: MatcherCommand, ignoreErrors: Boolean): Future[Int] =
     try x match {
-      case MatcherCommand.Place(dex, order) => dex.asyncTryApi.place(order).map(_.fold(_ => 0, _ => 1))
+      case MatcherCommand.Place(dex, order, false) => dex.asyncTryApi.place(order).map(_.fold(_ => 0, _ => 1))
+      case MatcherCommand.Place(dex, order, _) => dex.asyncTryApi.placeMarket(order).map(_.fold(_ => 0, _ => 1))
       case MatcherCommand.Cancel(dex, owner, order) =>
         dex.asyncTryApi.cancelOrder(owner, order).map(_.fold(
           e => if (e.error == 9437193) 1 else 0, // OrderNotFound in the order book, but the request is saved
           _ => 1
         ))
+      case MatcherCommand.CancelByOrderId(dex, order) =>
+        dex.asyncTryApi.cancelOrderById(order).map(_.fold(
+          e => if (e.error == 9437193) 1 else 0, // OrderNotFound in the order book, but the request is saved
+          _ => 1
+        ))
+      case MatcherCommand.DeleteOrderBook(dex, assetPair) =>
+        dex.asyncTryApi.deleteOrderBook(assetPair).map(_.fold(_ => 0, _ => 1))
     } catch {
       case NonFatal(e) =>
         if (ignoreErrors) Future.successful(0)

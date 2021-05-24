@@ -20,9 +20,9 @@ object HttpKamonMetricsDirectives {
         "endpoint" -> endpoint,
         "method" -> method
       ))
-    val startedTimer = timer.withTags(tagset)
+    val startedTimer = timer.withTags(tagset).start()
     val taggedCounter = counter.withTags(tagset)
-    val metrics = RequestMetrics(taggedCounter, startedTimer.start())
+    val metrics = RequestMetrics(taggedCounter, startedTimer)
     mapResponse(_.addAttribute(requestMetricsAttributeKey, metrics))
   }
 

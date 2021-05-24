@@ -101,7 +101,7 @@ class AddressActor(
       def reserve(xs: Map[Asset, Long]): Unit = {
         balances = balances.reserve(PositiveMap(xs))
         scheduleWs(wsAddressState.putChangedAssets(xs.keySet))
-        log.info(s"[Balance] 💵: ${format(balances.tradableBalance(xs.keySet).xs)}; ov Δ: ${format(xs)}")
+        log.info(s"[Balance] 0. 💵: ${format(balances.tradableBalance(xs.keySet).xs)}; ov Δ: ${format(xs)}")
       }
 
       lazy val orderReserve = order.reservableBalance
@@ -203,7 +203,7 @@ class AddressActor(
 
           balances = balances.cancelReservation(PositiveMap(orderReserve))
           scheduleWs(wsAddressState.putChangedAssets(orderReserve.keySet))
-          log.info(s"[Balance] 💵: ${format(balances.tradableBalance(orderReserve.keySet).xs)}; ov Δ: ${format(orderReserve)}")
+          log.info(s"[Balance] 1. 💵: ${format(balances.tradableBalance(orderReserve.keySet).xs)}; ov Δ: ${format(orderReserve)}")
 
           scheduleOrderWs(acceptedOrder, orderStatus, unmatchable)
       }
@@ -249,7 +249,7 @@ class AddressActor(
 
         case Success(x) =>
           balances = balances.withInit(x)
-          log.info(s"[Balance] 💵: ${format(balances.allTradableBalance.xs)}; i: ${format(x)}")
+          log.info(s"[Balance] 2. 💵: ${format(balances.allTradableBalance.xs)}; i: ${format(x)}")
           if (recovered) becomeWorking() else context.become(starting(recovered, gotBalances = true))
       }
 
@@ -443,7 +443,7 @@ class AddressActor(
             activeOrders.remove(orderId).foreach { ao =>
               val reservableBalance = ao.reservableBalance
               balances = balances.cancelReservation(PositiveMap(reservableBalance))
-              log.info(s"[Balance] 💵: ${format(balances.tradableBalance(reservableBalance.keySet).xs)}; ov -Δ: ${format(reservableBalance)}")
+              log.info(s"[Balance] 3. 💵: ${format(balances.tradableBalance(reservableBalance.keySet).xs)}; ov -Δ: ${format(reservableBalance)}")
               scheduleWs(wsAddressState.putChangedAssets(ao.reservableBalance.keySet))
             }
           case _ =>
@@ -512,9 +512,9 @@ class AddressActor(
       val after = balances.balanceForAudit(changedAssets)
       val changesForAudit = after.collect { case (asset, v) if before.getOrElse(asset, 0L) > v => asset -> math.max(0, v) }
       val toCancel = getOrdersToCancel(changesForAudit).filterNot(x => isCancelling(x.order.id))
-      if (toCancel.isEmpty) log.info(s"[Balance] 💵: ${format(balances.tradableBalance(updates.changedAssets).xs)}; u: ${format(updates)}")
+      if (toCancel.isEmpty) log.info(s"[Balance] 4. 💵: ${format(balances.tradableBalance(updates.changedAssets).xs)}; u: ${format(updates)}")
       else {
-        log.info(s"[Balance] 💵: ${format(balances.tradableBalance(updates.changedAssets).xs)}; u: ${format(updates)}; au: ${format(after)}")
+        log.info(s"[Balance] 5. 💵: ${format(balances.tradableBalance(updates.changedAssets).xs)}; u: ${format(updates)}; au: ${format(after)}")
         val cancelledText =
           toCancel.map(x => s"${x.insufficientAmount} ${x.assetId} for ${x.order.id} (r: ${format(x.order.requiredBalance)})").mkString(", ")
         log.debug(s"Canceling ${toCancel.size}/${activeOrders.size}: doesn't have $cancelledText")
@@ -527,7 +527,7 @@ class AddressActor(
           cancel(x.order.order, Command.Source.BalanceTracking)
         }
       }
-    } else log.info(s"[Balance] 💵: ${format(balances.tradableBalance(updates.changedAssets).xs)}; u: ${format(updates)}")
+    } else log.info(s"[Balance] 6. 💵: ${format(balances.tradableBalance(updates.changedAssets).xs)}; u: ${format(updates)}")
   }
 
   private def markTxsObserved(txs: Map[ExchangeTransaction.Id, PositiveMap[Asset, Long]]): Unit = {
@@ -538,9 +538,9 @@ class AddressActor(
       case ((r, _), (id, v)) => r.withObserved(id, v)
     }
     balances = updated
-    if (changedAssets.isEmpty) log.info(s"[Balance] au 💵: ${format(balances.balanceForAudit(txs.values.flatMap(_.keySet).toSet))}")
+    if (changedAssets.isEmpty) log.info(s"[Balance] 7. au 💵: ${format(balances.balanceForAudit(txs.values.flatMap(_.keySet).toSet))}")
     else {
-      log.info(s"[Balance] otx 💵: ${format(balances.tradableBalance(changedAssets).xs)}")
+      log.info(s"[Balance] 8. otx 💵: ${format(balances.tradableBalance(changedAssets).xs)}")
       scheduleWs(wsAddressState.putChangedAssets(changedAssets))
     }
   }
@@ -658,7 +658,7 @@ class AddressActor(
     val reservableBalance = ao.reservableBalance
 
     balances = balances.reserve(PositiveMap(reservableBalance))
-    log.info(s"[Balance] o=${ao.id}; 💵: ${format(balances.tradableBalance(reservableBalance.keySet).xs)}; ov Δ: ${format(reservableBalance)}")
+    log.info(s"[Balance] 9. o=${ao.id}; 💵: ${format(balances.tradableBalance(reservableBalance.keySet).xs)}; ov Δ: ${format(reservableBalance)}")
     scheduleWs(wsAddressState.putChangedAssets(reservableBalance.keySet))
 
     storeCommand(ao.id)(

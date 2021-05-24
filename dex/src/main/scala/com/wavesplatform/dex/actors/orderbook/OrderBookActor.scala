@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.actors.orderbook
 
-import akka.actor.typed
 import akka.actor.typed.scaladsl.adapter._
+import akka.actor.{typed, Stash}
 import akka.{actor => classic}
 import cats.data.NonEmptyList
 import cats.instances.option.catsStdInstancesForOption
@@ -11,7 +11,7 @@ import com.wavesplatform.dex.actors.OrderBookDirectoryActor.{ForceStartOrderBook
 import com.wavesplatform.dex.actors.address.AddressActor
 import com.wavesplatform.dex.actors.events.OrderEventsCoordinatorActor
 import com.wavesplatform.dex.actors.orderbook.OrderBookActor._
-import com.wavesplatform.dex.actors.{orderbook, OrderBookDirectoryActor, WorkingStash}
+import com.wavesplatform.dex.actors.{orderbook, OrderBookDirectoryActor}
 import com.wavesplatform.dex.api.ws.actors.WsInternalBroadcastActor
 import com.wavesplatform.dex.api.ws.protocol.WsOrdersUpdate
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -45,7 +45,7 @@ class OrderBookActor(
   restrictions: Option[OrderRestrictionsSettings]
 )(implicit ec: ExecutionContext, efc: ErrorFormatterContext)
     extends classic.Actor
-    with WorkingStash
+    with Stash
     with ScorexLogging {
 
   override protected lazy val log = LoggerFacade(LoggerFactory.getLogger(s"OrderBookActor[$assetPair]"))
@@ -120,7 +120,7 @@ class OrderBookActor(
       context.become(working)
       unstashAll()
 
-    case x => stash(x)
+    case _ => stash()
   }
 
   private def working: Receive = {

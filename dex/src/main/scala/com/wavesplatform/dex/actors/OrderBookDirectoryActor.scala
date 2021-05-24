@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.actors
 
-import akka.actor.{Actor, ActorRef, Props, SupervisorStrategy, Terminated}
+import akka.actor.{Actor, ActorRef, Props, Stash, SupervisorStrategy, Terminated}
 import cats.implicits.catsSyntaxEitherId
 import com.wavesplatform.dex.actors.orderbook.OrderBookActor.{OrderBookRecovered, OrderBookSnapshotUpdateCompleted}
 import com.wavesplatform.dex.actors.orderbook.{AggregatedOrderBookActor, OrderBookActor}
@@ -33,7 +33,7 @@ class OrderBookDirectoryActor(
   assetsCache: AssetsCache,
   validateAssetPair: AssetPair => Either[MatcherError, AssetPair]
 ) extends Actor
-    with WorkingStash
+    with Stash
     with ScorexLogging {
 
   import OrderBookDirectoryActor._
@@ -77,7 +77,7 @@ class OrderBookDirectoryActor(
       unstashAll()
       context.become(nextState)
 
-    case x => stash(x)
+    case _ => stash()
   }
 
   private def orderBook(pair: AssetPair): Option[Either[Unit, ActorRef]] = Option(orderBooks.get()).flatMap(_.get(pair))
@@ -267,7 +267,7 @@ class OrderBookDirectoryActor(
       context.stop(self)
       recoveryCompletedWithEventNr("Received Shutdown command".asLeft)
 
-    case x => stash(x)
+    case _ => stash()
   }
 
   private def becomeWorking(

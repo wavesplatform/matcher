@@ -116,7 +116,7 @@ object Dependencies {
   private val slf4j = "org.slf4j" %% "slf4j-api" % Version.slf4j
   private val julToSlf4j = "org.slf4j" % "jul-to-slf4j" % Version.slf4j
   private val janino = "org.codehaus.janino" % "janino" % Version.janino
-  private val kamonCore = kamonModule("core", Version.kamon)
+  private val kamonCore = kamonModule("core")
 
   private val wavesProtobufSchemas = ("com.wavesplatform" % "protobuf-schemas" % Version.wavesProtobufSchemas classifier "proto") % "protobuf"
 
@@ -296,6 +296,7 @@ object Dependencies {
       supertagged,
       monixReactive,
       betterMonadicFor,
+      kamonCore,
       mouse,
       grpcNetty,
       wavesProtobufSchemas,

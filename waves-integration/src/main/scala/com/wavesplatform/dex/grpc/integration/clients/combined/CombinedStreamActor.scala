@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.grpc.integration.clients.combined
 
 import akka.actor.typed.Behavior
-import akka.actor.typed.scaladsl.{Behaviors, StashBuffer}
+import akka.actor.typed.scaladsl.{Behaviors, CustomBehaviors, StashBuffer}
 import com.wavesplatform.dex.actors.CustomLoggerBehaviorInterceptor
 import com.wavesplatform.dex.fp.PartialFunctionOps
 import com.wavesplatform.dex.fp.PartialFunctionOps.Implicits
@@ -153,7 +153,7 @@ object CombinedStreamActor {
     def starting(utxEventsStarted: Boolean, blockchainUpdatesStarted: Boolean): Behavior[Command] = {
       context.log.info(s"Status: starting(utx=$utxEventsStarted, bu=$blockchainUpdatesStarted)")
       status.onNext(Status.Starting(blockchainUpdates = blockchainUpdatesStarted, utxEvents = utxEventsStarted))
-      Behaviors.withStash[Command](Int.MaxValue) { stash =>
+      CustomBehaviors.stashWithCtxPropagation[Command](Int.MaxValue) { stash =>
         Behaviors.receiveMessagePartial[Command] {
           mkPartial {
             case Command.ProcessUtxSystemEvent(SystemEvent.BecameReady) =>

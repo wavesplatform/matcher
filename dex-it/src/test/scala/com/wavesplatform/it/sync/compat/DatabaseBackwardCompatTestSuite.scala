@@ -1,8 +1,8 @@
 package com.wavesplatform.it.sync.compat
 
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
+import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.Order
-import com.wavesplatform.dex.waves.WavesFeeConstants.matcherFee
 import com.wavesplatform.it.api.MatcherCommand
 import com.wavesplatform.it.tags.DexMultipleVersions
 import com.wavesplatform.it.{executeCommands, executePlaces, orderGen}
@@ -64,22 +64,27 @@ class DatabaseBackwardCompatTestSuite extends BackwardCompatSuiteBase {
       matcherFee,
       2
     )
-    executeCommands(Seq(MatcherCommand.Place(dex2, additionalOrder)), timeout = 5.second) // it must be short operation
+    executeCommands(Seq(MatcherCommand.Place(dex2, additionalOrder)), timeout = 10.second) // it must be short operation
     dex2.api.waitForOrder(additionalOrder)(_.status != Status.NotFound)
 
     markup("delete orderbook for additional asset pair at DEX2")
-    executeCommands(Seq(MatcherCommand.DeleteOrderBook(dex2, additionalAssetPair)), timeout = 5.second) // it must be short operation
+    executeCommands(Seq(MatcherCommand.DeleteOrderBook(dex2, additionalAssetPair)), timeout = 10.second) // it must be short operation
 
     Thread.sleep(2.minutes.toMillis) // An additional time to wait the concurrent processing
     val state2 = state(dex2.api, orders)
 
+    markup("stop DEX2 and start DEX1")
     dex2.stopWithoutRemove()
     dex1.start()
 
+    markup("wait for orders at DEX1")
     orders.groupBy(_.assetPair).valuesIterator.foreach { orders =>
       dex1.api.waitForOrder(orders.last)(_.status != Status.NotFound)
     }
+    dex1.api.waitForOrderStatus(orderToCancel, Status.Cancelled)
     Thread.sleep(2.minutes.toMillis) // An additional time to wait the concurrent processing
+
+    markup("check DEX1 and DEX2 states")
     val state1 = state(dex1.api, orders)
     state1 should matchTo(state2)
   }

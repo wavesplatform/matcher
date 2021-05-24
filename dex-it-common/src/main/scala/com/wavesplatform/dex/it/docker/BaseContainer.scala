@@ -152,6 +152,7 @@ abstract class BaseContainer(protected val baseContainerPath: String, private va
       .fold(log.warn(s"Can't start ${underlying.containerId}"))(_ => ())
 
     invalidateCaches()
+    logExposedPortsInfo("Connected container to network; ")
     waitReady()
   }
 
@@ -168,6 +169,7 @@ abstract class BaseContainer(protected val baseContainerPath: String, private va
       .fold(log.warn(s"Can't start ${underlying.containerId}"))(_ => ())
 
     invalidateCaches()
+    logExposedPortsInfo("Started container ")
     waitReady()
   }
 
@@ -179,6 +181,24 @@ abstract class BaseContainer(protected val baseContainerPath: String, private va
   def restartWithNewSuiteConfig(newSuiteConfig: Config): Unit = {
     replaceSuiteConfig(newSuiteConfig)
     restart()
+  }
+
+  private def logExposedPortsInfo(prefix: String): Unit = {
+    val networkSettings = dockerClient
+      .inspectContainerCmd(underlying.containerId)
+      .exec()
+      .getNetworkSettings
+    val portBindingsStr = networkSettings
+      .getPorts
+      .getBindings
+      .asScala
+      .flatMap { case (exposedPort, portBindings) =>
+        portBindings.headOption.map { containerPort =>
+          s"${exposedPort.getPort} -> ${containerPort.getHostPortSpec}/${exposedPort.getProtocol}"
+        }
+      }
+      .mkString("; ")
+    log.info(s"$prefix Exposed ports for networks ${networkSettings.getNetworks.keySet()}: $portBindingsStr")
   }
 
 }

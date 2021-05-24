@@ -72,7 +72,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
   // TODO DEX-994
   private def getSimpleName(x: Any): String = x.getClass.getName.replaceAll(".*?(\\w+)\\$?$", "$1")
 
-  private val utxBalanceUpdates = Observable(
+  private val utxEvents = Observable(
     initialEvents.map(_.asLeft[com.wavesplatform.events.UtxEvent]),
     context.utxEvents.map(_.asRight[(StreamObserver[UtxEvent], UtxEvent)])
   ).merge
@@ -369,7 +369,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
   }
 
   override def getUtxEvents(request: Empty, responseObserver: StreamObserver[UtxEvent]): Unit =
-    if (!utxBalanceUpdates.isCompleted) responseObserver match {
+    if (!utxEvents.isCompleted) responseObserver match {
       case x: ServerCallStreamObserver[_] =>
         x.setOnReadyHandler { () =>
           // We have such order of calls, because we have to guarantee non-concurrent calls to onNext

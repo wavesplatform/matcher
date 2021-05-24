@@ -16,7 +16,7 @@ import scala.util.Random
 class DatabaseBackwardCompatTestSuite extends BackwardCompatSuiteBase {
 
   val assetPairs = List(ethWavesPair, wavesUsdPair)
-  val additionalAssetPair = btcUsdnPair
+  val additionalAssetPair = ethUsdPair
 
   "Database backward compatibility test" in {
 

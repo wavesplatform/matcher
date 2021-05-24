@@ -46,7 +46,7 @@ class DatabaseBackwardCompatTestSuite extends BackwardCompatSuiteBase {
 
     markup("cancel one order at DEX2")
     val owner = Gen.oneOf(List(alice, bob)).sample.get
-    val orderToCancel = dex1.api.getOrderHistoryByPublicKey(owner, activeOnly = Some(true)).head
+    val orderToCancel = dex2.api.getOrderHistoryByPublicKey(owner, activeOnly = Some(true)).head
     dex2.api.cancelOrderById(orderToCancel.id, Some(owner.publicKey))
     dex2.api.waitForOrderStatus(orderToCancel.assetPair, orderToCancel.id, Status.Cancelled)
 

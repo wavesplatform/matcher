@@ -1,7 +1,8 @@
 package com.wavesplatform.it.sync.compat
 
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
-import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.api.http.entities.HttpSuccessfulPlace
+import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.it.api.MatcherCommand
 import com.wavesplatform.it.tags.DexMultipleVersions
 import com.wavesplatform.it.{executePlaces, orderGen}
@@ -51,19 +52,8 @@ class DatabaseBackwardCompatTestSuite extends BackwardCompatSuiteBase {
     dex2.api.waitForOrderStatus(orderToCancel.assetPair, orderToCancel.id, Status.Cancelled)
 
     markup("place order for additional asset pair at DEX2")
-    val ts = System.currentTimeMillis()
-    val additionalOrder = Order.buy(
-      alice,
-      matcher,
-      additionalAssetPair,
-      50,
-      50 * Order.PriceConstant,
-      ts,
-      ts + 6000000,
-      matcherFee,
-      2
-    )
-    dex2.tryApi.place(additionalOrder)
+    val additionalOrder = mkOrder(alice, additionalAssetPair, OrderType.BUY, 50, 50 * Order.PriceConstant)
+    dex2.api.place(additionalOrder)
     dex2.api.waitForOrder(additionalOrder)(_.status != Status.NotFound)
 
     markup("delete orderbook for additional asset pair at DEX2")

@@ -1,11 +1,10 @@
 package com.wavesplatform.it.sync.compat
 
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
-import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.it.api.MatcherCommand
 import com.wavesplatform.it.tags.DexMultipleVersions
-import com.wavesplatform.it.{executeCommands, executePlaces, orderGen}
+import com.wavesplatform.it.{executePlaces, orderGen}
 import org.scalacheck.Gen
 import org.testcontainers.containers.BindMode
 
@@ -38,17 +37,18 @@ class DatabaseBackwardCompatTestSuite extends BackwardCompatSuiteBase {
     markup("place orders at DEX2")
     val orders = executePlaces(placeCommands)
     withClue("orders.size: ") {
-      orders.size shouldBe >(100) // if its > 100, then there will be not only limit or place orders
+      orders.size shouldBe > (100) // if its > 100, then there will be not only limit or place orders
     }
 
-    orders.groupBy(_.assetPair).valuesIterator.foreach { orders =>
-      dex2.api.waitForOrder(orders.last)(_.status != Status.NotFound)
-    }
+    val notFilledOrder = orders.groupBy(_.assetPair).valuesIterator.map { orders =>
+      val order = orders.last
+      val status = dex2.api.waitForOrder(order)(_.status != Status.NotFound)
+      (order, status)
+    }.find(_._2.status == Status.Accepted).map(_._1)
 
     markup("cancel one order at DEX2")
-    val orderToCancel = orders.head
-    val cancelOrderCommand = MatcherCommand.CancelByOrderId(dex2, orderToCancel)
-    executeCommands(Seq(cancelOrderCommand), ignoreErrors = false, timeout = 5.second) // it must be short operation
+    val orderToCancel = notFilledOrder.last
+    dex2.api.cancelOrderById(orderToCancel)
     dex2.api.waitForOrderStatus(orderToCancel, Status.Cancelled)
 
     markup("place order for additional asset pair at DEX2")
@@ -64,11 +64,11 @@ class DatabaseBackwardCompatTestSuite extends BackwardCompatSuiteBase {
       matcherFee,
       2
     )
-    executeCommands(Seq(MatcherCommand.Place(dex2, additionalOrder)), timeout = 10.second) // it must be short operation
+    dex2.tryApi.place(additionalOrder)
     dex2.api.waitForOrder(additionalOrder)(_.status != Status.NotFound)
 
     markup("delete orderbook for additional asset pair at DEX2")
-    executeCommands(Seq(MatcherCommand.DeleteOrderBook(dex2, additionalAssetPair)), timeout = 10.second) // it must be short operation
+    dex2.tryApi.deleteOrderBook(additionalAssetPair)
 
     Thread.sleep(2.minutes.toMillis) // An additional time to wait the concurrent processing
     val state2 = state(dex2.api, orders)

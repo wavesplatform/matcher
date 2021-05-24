@@ -44,13 +44,6 @@ package object it {
           e => if (e.error == 9437193) 1 else 0, // OrderNotFound in the order book, but the request is saved
           _ => 1
         ))
-      case MatcherCommand.CancelByOrderId(dex, order) =>
-        dex.asyncTryApi.cancelOrderById(order).map(_.fold(
-          e => if (e.error == 9437193) 1 else 0, // OrderNotFound in the order book, but the request is saved
-          _ => 1
-        ))
-      case MatcherCommand.DeleteOrderBook(dex, assetPair) =>
-        dex.asyncTryApi.deleteOrderBook(assetPair).map(_.fold(_ => 0, _ => 1))
     } catch {
       case NonFatal(e) =>
         if (ignoreErrors) Future.successful(0)

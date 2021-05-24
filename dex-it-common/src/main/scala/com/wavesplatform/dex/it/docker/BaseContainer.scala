@@ -128,7 +128,7 @@ abstract class BaseContainer(protected val baseContainerPath: String, private va
     log.info(s"${prefix}Ports info:\n$str")
   }
 
-   def connectToNetwork(): Unit = {
+  def connectToNetwork(): Unit = {
     dockerClient
       .connectToNetworkCmd()
       .withContainerId(underlying.containerId)
@@ -184,19 +184,21 @@ abstract class BaseContainer(protected val baseContainerPath: String, private va
   }
 
   private def logExposedPortsInfo(prefix: String): Unit = {
-    val ns = dockerClient
+    val networkSettings = dockerClient
       .inspectContainerCmd(underlying.containerId)
-      .exec().getNetworkSettings()
-    val str = ns
-      .getPorts.getBindings()
+      .exec()
+      .getNetworkSettings
+    val portBindingsStr = networkSettings
+      .getPorts
+      .getBindings
       .asScala
-      .map { b =>
-        b._2.headOption.fold(s"${b._1.getPort()} -> ???/${b._1.getProtocol()}") { containerPort =>
-          s"${b._1.getPort()} -> ${containerPort.getHostPortSpec()}/${b._1.getProtocol()}"
+      .flatMap { case (exposedPort, portBindings) =>
+        portBindings.headOption.map { containerPort =>
+          s"${exposedPort.getPort} -> ${containerPort.getHostPortSpec}/${exposedPort.getProtocol}"
         }
       }
       .mkString("; ")
-    log.info(s"${prefix}Exposed ports for networks ${ns.getNetworks().keySet()}: $str")
+    log.info(s"$prefix Exposed ports for networks ${networkSettings.getNetworks.keySet()}: $portBindingsStr")
   }
 
 }

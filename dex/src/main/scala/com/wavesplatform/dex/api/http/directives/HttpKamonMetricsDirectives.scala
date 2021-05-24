@@ -14,7 +14,6 @@ object HttpKamonMetricsDirectives {
   private val counter = Kamon.counter("matcher.http.responses.counter")
 
   def measureResponse(endpoint: String) = extractRequest.tflatMap { req =>
-//    val path = req._1.uri.path.toString()
     val method = req._1.method.value
     val tagset =
       TagSet.from(Map(

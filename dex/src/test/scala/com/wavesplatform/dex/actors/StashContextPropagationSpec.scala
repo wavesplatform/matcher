@@ -1,7 +1,8 @@
 package com.wavesplatform.dex.actors
 
 import akka.actor.typed.Behavior
-import akka.actor.typed.scaladsl.{Behaviors, CustomBehaviors}
+import akka.actor.typed.scaladsl.Behaviors
+import akka.actor.typed.scaladsl.BehaviorsImplicits._
 import akka.actor.{Actor, ActorRef, Props, Stash}
 import akka.testkit.TestProbe
 import akka.actor.typed.scaladsl.adapter._
@@ -15,7 +16,7 @@ class StashContextPropagationSpec extends AnyFreeSpec with Matchers with SystemT
 
   import TestStashPropagationActor.Command
 
-  //TODO DEX-1149
+  //TODO unignore after DEX-1149
 
   "StashContextPropagationSpec" - {
 
@@ -99,7 +100,7 @@ object TestStashPropagationActor {
         Behaviors.same
     }
 
-    CustomBehaviors.stashWithCtxPropagation[Command](Integer.MAX_VALUE) { stash =>
+    Behaviors.stashWithCtxPropagation[Command](Integer.MAX_VALUE) { stash =>
       Behaviors.receiveMessage {
         case cmd @ Command.StashMessage(_) =>
           stash.stash(cmd)

@@ -1,21 +1,37 @@
 package akka.actor.typed.internal
 
+import scala.annotation.tailrec
+import scala.util.control.NonFatal
 import akka.actor.DeadLetter
-import akka.actor.typed._
+import akka.actor.typed.Behavior
+import akka.actor.typed.Signal
+import akka.actor.typed.TypedActorContext
+import akka.actor.typed.javadsl
+import akka.actor.typed.scaladsl
 import akka.actor.typed.scaladsl.ActorContext
-import akka.annotation.InternalStableApi
 import akka.japi.function.Procedure
-import akka.util.{unused, ConstantFun, OptionVal}
+import akka.util.ConstantFun
+import akka.util.OptionVal
 import kamon.Kamon
 import kamon.trace.Span
 
-import java.util.function.{Predicate, Function => JFunction}
-import scala.annotation.tailrec
-import scala.util.control.NonFatal
+import java.util.function.{Function => JFunction}
+import java.util.function.Predicate
 
 //https://github.com/akka/akka/blob/master/akka-actor-typed/src/main/scala/akka/actor/typed/internal/StashBufferImpl.scala
 
-final class StashBufferImplWithCtxPropagation[T] private (
+private[akka] object StashBufferImplWithCtxPropagation {
+
+  final private class Node[T](var next: Node[T], val message: T, val parentSpan: Span = Kamon.currentSpan()) {
+    def apply(f: T => Unit): Unit = f(message)
+  }
+
+  def apply[T](ctx: ActorContext[T], capacity: Int): StashBufferImplWithCtxPropagation[T] =
+    new StashBufferImplWithCtxPropagation(ctx, capacity, null, null)
+
+}
+
+final private[akka] class StashBufferImplWithCtxPropagation[T] private (
   ctx: ActorContext[T],
   val capacity: Int,
   private var _first: StashBufferImplWithCtxPropagation.Node[T],
@@ -45,7 +61,7 @@ final class StashBufferImplWithCtxPropagation[T] private (
         s"because stash with capacity [$capacity] is full"
       )
 
-    val node = createNode(message, ctx)
+    val node = createNode(message)
     if (isEmpty) {
       _first = node
       _last = node
@@ -62,14 +78,11 @@ final class StashBufferImplWithCtxPropagation[T] private (
     _first = null
     _last = null
     _size = 0
-    stashCleared(ctx)
   }
 
-  @InternalStableApi
-  private def createNode(message: T, @unused ctx: scaladsl.ActorContext[T]): Node[T] =
-    new Node(null, message, Kamon.currentSpan())
+  private def createNode(message: T): Node[T] =
+    new Node(null, message)
 
-  @InternalStableApi
   private def dropHeadForUnstash(): Node[T] = {
     val message = rawHead
     _first = _first.next
@@ -80,7 +93,6 @@ final class StashBufferImplWithCtxPropagation[T] private (
     message
   }
 
-  @InternalStableApi
   private def interpretUnstashedMessage(
     behavior: Behavior[T],
     ctx: TypedActorContext[T],
@@ -124,11 +136,8 @@ final class StashBufferImplWithCtxPropagation[T] private (
 
   override def anyMatch(predicate: Predicate[T]): Boolean = exists(predicate.test)
 
-  override def unstashAll(behavior: Behavior[T]): Behavior[T] = {
-    val behav = unstash(behavior, size, ConstantFun.scalaIdentityFunction[T])
-    stashCleared(ctx)
-    behav
-  }
+  override def unstashAll(behavior: Behavior[T]): Behavior[T] =
+    unstash(behavior, size, ConstantFun.scalaIdentityFunction[T])
 
   override def unstash(behavior: Behavior[T], numberOfMessages: Int, wrap: T => T): Behavior[T] =
     if (isEmpty)
@@ -141,11 +150,8 @@ final class StashBufferImplWithCtxPropagation[T] private (
         val iter = new Iterator[Node[T]] {
           override def hasNext: Boolean = StashBufferImplWithCtxPropagation.this.nonEmpty
 
-          override def next(): Node[T] = {
-            val next = StashBufferImplWithCtxPropagation.this.dropHeadForUnstash()
-            unstashed(ctx, next)
-            next
-          }
+          override def next(): Node[T] =
+            StashBufferImplWithCtxPropagation.this.dropHeadForUnstash()
         }.take(math.min(numberOfMessages, size))
         interpretUnstashedMessages(behavior, ctx, iter, wrap)
       } finally if (!unstashAlreadyInProgress)
@@ -220,23 +226,6 @@ final class StashBufferImplWithCtxPropagation[T] private (
     unstash(behavior, numberOfMessages, x => wrap.apply(x))
 
   override def toString: String =
-    s"StashBufferWithPropagation($size/$capacity)"
-
-  @InternalStableApi
-  private[akka] def unstashed(@unused ctx: ActorContext[T], @unused node: Node[T]): Unit = ()
-
-  @InternalStableApi
-  private def stashCleared(@unused ctx: ActorContext[T]): Unit = ()
-
-}
-
-object StashBufferImplWithCtxPropagation {
-
-  final private class Node[T](var next: Node[T], val message: T, val parentSpan: Span) {
-    def apply(f: T => Unit): Unit = f(message)
-  }
-
-  def apply[T](ctx: ActorContext[T], capacity: Int): StashBufferImplWithCtxPropagation[T] =
-    new StashBufferImplWithCtxPropagation(ctx, capacity, null, null)
+    s"StashBufferWithCtxPropagation($size/$capacity)"
 
 }

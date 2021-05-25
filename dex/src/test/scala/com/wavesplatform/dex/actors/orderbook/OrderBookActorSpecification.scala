@@ -1,8 +1,8 @@
 package com.wavesplatform.dex.actors.orderbook
 
-import akka.actor.ActorRef
 import akka.actor.typed.scaladsl.adapter._
-import akka.testkit.{ImplicitSender, TestActorRef, TestProbe}
+import akka.actor.{ActorRef, Props}
+import akka.testkit.{ImplicitSender, TestProbe}
 import cats.data.NonEmptyList
 import cats.syntax.option._
 import com.wavesplatform.dex.MatcherSpecBase
@@ -52,7 +52,7 @@ class OrderBookActorSpecification
   private val wctAsset = IssuedAsset(ByteStr(Array.fill(32)(1)))
   private val ethAsset = IssuedAsset(ByteStr("ETH".getBytes))
 
-  private def obcTest(f: (AssetPair, TestActorRef[OrderBookActor with RestartableActor], TestProbe) => Unit): Unit =
+  private def obcTest(f: (AssetPair, ActorRef, TestProbe) => Unit): Unit =
     obcTestWithPrepare((_, _) => ()) { (pair, actor, probe) =>
       probe.expectMsg(OrderBookRecovered(pair, None))
       f(pair, actor, probe)
@@ -75,7 +75,7 @@ class OrderBookActorSpecification
     prepare: (OrderBookSnapshotDb[Future], AssetPair) => Unit,
     matchingRules: NonEmptyList[DenormalizedMatchingRule] = NonEmptyList.one(DenormalizedMatchingRule(0, 0.00000001)),
     makerTakerFeeAtOffset: Long => (AcceptedOrder, LimitOrder) => (Long, Long) = _ => makerTakerPartialFee
-  )(f: (AssetPair, TestActorRef[OrderBookActor with RestartableActor], TestProbe) => Unit): Unit = {
+  )(f: (AssetPair, ActorRef, TestProbe) => Unit): Unit = {
 
     md.clear()
 
@@ -87,7 +87,7 @@ class OrderBookActorSpecification
 
     implicit val efc: ErrorFormatterContext = ErrorFormatterContext.from(_ => 8)
 
-    val orderBookActor = TestActorRef(
+    val orderBookActor = system.actorOf(Props {
       new OrderBookActor(
         OrderBookActor.Settings(AggregatedOrderBookActor.Settings(100.millis)),
         tp.ref,
@@ -102,7 +102,7 @@ class OrderBookActorSpecification
         makerTakerFeeAtOffset,
         None
       ) with RestartableActor
-    )
+    })
 
     f(pair, orderBookActor, tp)
     system.stop(orderBookActor)

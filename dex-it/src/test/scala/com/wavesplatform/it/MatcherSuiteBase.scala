@@ -76,7 +76,7 @@ trait MatcherSuiteBase
   override protected def afterAll(): Unit = {
     log.debug(s"Perform afterAll")
     if (Option(System.getenv("DEX_JAEGER_ENABLED")).contains("true"))
-      Thread.sleep(10.seconds.toMillis)
+      Thread.sleep(5.seconds.toMillis)
     stopBaseContainers()
     super.afterAll()
   }

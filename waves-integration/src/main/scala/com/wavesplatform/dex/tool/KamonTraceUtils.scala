@@ -54,7 +54,7 @@ object KamonTraceUtils {
 
   def runWithIgnoredSpan[A](f: => A): A = {
     val span = mkIgnoredSpan()
-    Kamon.runWithSpan(span, finishSpan = true)(f)
+    Kamon.runWithSpan(span)(f)
   }
 
   def writeCtx(ctx: Context): Array[Byte] = {

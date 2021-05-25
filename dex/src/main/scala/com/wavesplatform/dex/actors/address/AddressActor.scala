@@ -585,7 +585,7 @@ class AddressActor(
   private def processNextPlacement(): Unit =
     placementQueue.dequeueOption.foreach { case (EnqueuedOrder(firstOrderId, parentSpan), _) =>
       val span = Kamon.spanBuilder("processNextPlacement").asChildOf(parentSpan).start()
-      Kamon.runWithSpan(span, finishSpan = true) {
+      Kamon.runWithSpan(span) {
         pendingCommands.get(firstOrderId) match {
           case None =>
             throw new IllegalStateException(
@@ -789,7 +789,7 @@ object AddressActor {
         Either.cond(updatedAmount >= 0, curr.updated(assetId, updatedAmount), (updatedAmount, assetId))
     }
 
-  case class EnqueuedOrder(orderId: Order.Id, parentSpan: Span) {
+  private case class EnqueuedOrder(orderId: Order.Id, parentSpan: Span) {
     override def toString: String = orderId.toString
   }
 

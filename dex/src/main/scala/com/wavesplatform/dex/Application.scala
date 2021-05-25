@@ -522,8 +522,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
             }
 
             validatedCommandWithMeta.command.maybeCtx.fold(handleValidatedCommandWithMeta) { ctx =>
-              val isApplicationStarted = startGuard.value.exists(_.isSuccess)
-              if (isApplicationStarted) {
+              if (status == MatcherStatus.Working) {
                 val parentSpan = ctx.get(kamon.trace.Span.Key)
                 val span =
                   Kamon.spanBuilder(s"consumedValidatedCommandWithMeta")
@@ -533,7 +532,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
                     .samplingDecision(KamonTraceUtils.Sample)
                     .doNotTrackMetrics()
                     .start()
-                Kamon.runWithSpan[AssetPair](span, finishSpan = true)(handleValidatedCommandWithMeta)
+                Kamon.runWithSpan[AssetPair](span)(handleValidatedCommandWithMeta)
               } else
                 handleValidatedCommandWithMeta
             }

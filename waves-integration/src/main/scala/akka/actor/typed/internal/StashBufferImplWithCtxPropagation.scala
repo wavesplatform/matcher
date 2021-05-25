@@ -22,7 +22,7 @@ import java.util.function.Predicate
 
 private[akka] object StashBufferImplWithCtxPropagation {
 
-  final private class Node[T](var next: Node[T], val message: T, val parentSpan: Span = Kamon.currentSpan()) {
+  final private class Node[T](var next: Node[T], val message: T, val parentSpan: Span) {
     def apply(f: T => Unit): Unit = f(message)
   }
 
@@ -81,7 +81,7 @@ final private[akka] class StashBufferImplWithCtxPropagation[T] private (
   }
 
   private def createNode(message: T): Node[T] =
-    new Node(null, message)
+    new Node(null, message, Kamon.currentSpan())
 
   private def dropHeadForUnstash(): Node[T] = {
     val message = rawHead

@@ -49,7 +49,7 @@ pipeline {
         stage("Web Socket") {
             steps {
                 sh 'mv ./dex-load/feeder.csv ./dex-ws-load'
-                sh 'cd ./dex-ws-load && sbt -J-Xms1056M -J-Xmx8192M -Dff=feeder.csv -Dws=ws://${AIM}:6886/ws/v0 -Drt=15 -Duc=6000 gatling:testOnly load.ConnectionsOnlyTest'
+                sh 'cd ./dex-ws-load && sbt -J-Xms1056M -J-Xmx8192M -Dff=feeder.csv -Dws=ws://${AIM}:6886/ws/v0 -Drt=15 -Duc=6000 gatling:testOnly load.ConnectionsSimulation'
                 script {
                     GRAFANA = sh(script: '''
                                             echo "https://${GRAFANA_URL}/d/WsyjIiHiz/system-metrics?orgId=5&var-hostname=${MATCHER_URL}&from=$(date -d '- 10 minutes' +'%s')000&to=$(date -d '+ 5 minutes' +'%s')000"
@@ -70,8 +70,6 @@ pipeline {
                 }
                 currentBuild.description = "<a href='${GRAFANA}'>Grafana</a>"
             }
-        }
-        cleanup {
             cleanWs()
         }
     }

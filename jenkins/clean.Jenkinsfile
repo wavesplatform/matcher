@@ -4,8 +4,8 @@ def cleanStateAndRestart (host, service) {
              sh "ssh -o StrictHostKeyChecking=no -l buildagent-matcher ${host} hostname"
 
              sh "ssh -q buildagent-matcher@${host} sudo systemctl stop ${service}"
-             sh "ssh -q buildagent-matcher@${host} sudo rm -rf /var/lib/${service}/data"
-             sh "ssh -q buildagent-matcher@${host} sudo rm -rf /var/lib/${service}/blockchain-updates"
+             sh "ssh -q buildagent-matcher@${host} sudo rm -rf /var/lib/${service}/data/*"
+             sh "ssh -q buildagent-matcher@${host} sudo rm -rf /var/lib/${service}/blockchain-updates/*"
              sh "ssh -q buildagent-matcher@${host} sudo systemctl start ${service}"
          }
     }

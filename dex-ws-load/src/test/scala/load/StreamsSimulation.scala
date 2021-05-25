@@ -6,7 +6,7 @@ import io.gatling.http.Predef._
 class StreamsSimulation extends Simulation {
   val feeder = separatedValues(System.getProperty("ff"), ';').batch
 
-  val scn = scenario("ConnectionsAndStreamsTest")
+  val scn = scenario("StreamsSimulation")
     .feed(feeder)
     .exec(connect)
     .exec(ws("WS -- AU").sendText("""${m}"""))

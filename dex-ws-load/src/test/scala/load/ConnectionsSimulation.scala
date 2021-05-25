@@ -2,11 +2,11 @@ package load
 
 import io.gatling.core.Predef._
 
-class ConnectionsOnlyTest extends Simulation {
+class ConnectionsSimulation extends Simulation {
 
   val feeder = separatedValues(System.getProperty("ff"), ';').batch
 
-  val scn = scenario("ConnectionsOnlyTest")
+  val scn = scenario("ConnectionsSimulation")
     .feed(feeder)
     .exec(connect)
     .repeat(System.getProperty("rt").toInt) {

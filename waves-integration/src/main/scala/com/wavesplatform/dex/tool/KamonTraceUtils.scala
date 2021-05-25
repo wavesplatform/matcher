@@ -1,7 +1,5 @@
 package com.wavesplatform.dex.tool
 
-import akka.http.scaladsl.server.Directives.mapInnerRoute
-import akka.http.scaladsl.server.Route
 import kamon.Kamon
 import kamon.context.{BinaryPropagation, Context, Storage}
 import kamon.trace.Span
@@ -24,11 +22,6 @@ object KamonTraceUtils {
 
     Kamon.currentSpan().name(name)
   }
-
-  def mkTracedRoute(operationName: String)(route: Route): Route = mapInnerRoute { route => ctx =>
-    setSpanNameAndForceSamplingDecision(operationName)
-    route(ctx)
-  }(route)
 
   //https://github.com/kamon-io/Kamon/issues/829
   def propagateTraceCtxThroughCachedFuture[A](future: => Future[A])(implicit ec: ExecutionContext): Future[A] = {

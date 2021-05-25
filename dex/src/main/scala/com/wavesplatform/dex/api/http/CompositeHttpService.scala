@@ -11,14 +11,14 @@ import com.wavesplatform.dex.Application
 import com.wavesplatform.dex.api.routes.ApiRoute
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.settings.RestAPISettings
-import com.wavesplatform.dex.tool.KamonTraceUtils.mkTracedRoute
+import com.wavesplatform.dex.tool.KamonTraceUtils
 
 class CompositeHttpService(apiTypes: Set[Class[_]], routes: Seq[ApiRoute], settings: RestAPISettings) extends ScorexLogging {
 
   private val swaggerService = new SwaggerDocService(apiTypes, s"${settings.address}:${settings.port}")
   private val redirectToSwagger = redirect("/api-docs/index.html", StatusCodes.PermanentRedirect)
 
-  private val swaggerRoute: Route = mkTracedRoute("/swaggerRoute") {
+  private val swaggerRoute: Route = {
     swaggerService.routes ~
     (pathEndOrSingleSlash | path("swagger"))(redirectToSwagger) ~
     pathPrefix("api-docs") {
@@ -27,13 +27,15 @@ class CompositeHttpService(apiTypes: Set[Class[_]], routes: Seq[ApiRoute], setti
     }
   }
 
-  private val notFound: Route = mkTracedRoute("/notFound")(complete(StatusCodes.NotFound))
+  private val notFound: Route = complete(StatusCodes.NotFound)
 
-  //initially span name is "/rejected" and will be overridden in subsequent routes
-  //"/rejected" spans will be filtered out by FilteringRejectedHook
-  val compositeRoute: Route = mkTracedRoute("/rejected") {
-    extendRoute(concat(routes.map(_.route): _*)) ~ swaggerRoute ~ notFound
-  }
+  val compositeRoute: Route =
+    mapInnerRoute { route => ctx =>
+      //initially span name is "/rejected" and will be overridden in subsequent routes
+      //"/rejected" spans will be filtered out by FilteringRejectedHook
+      KamonTraceUtils.setSpanNameAndForceSamplingDecision("/rejected")
+      route(ctx)
+    }(extendRoute(concat(routes.map(_.route): _*)) ~ swaggerRoute ~ notFound)
 
   val loggingCompositeRoute: Route = DebuggingDirectives.logRequestResult(LoggingMagnet(_ => logRequestResponse))(compositeRoute)
 

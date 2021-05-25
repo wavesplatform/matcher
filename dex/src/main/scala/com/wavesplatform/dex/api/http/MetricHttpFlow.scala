@@ -5,7 +5,7 @@ import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.http.scaladsl.server.Route
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.Flow
-import com.wavesplatform.dex.api.http.directives.HttpKamonMetricsDirectives.requestMetricsAttributeKey
+import com.wavesplatform.dex.api.http.directives.HttpKamonDirectives.requestMetricsAttributeKey
 
 object MetricHttpFlow {
 

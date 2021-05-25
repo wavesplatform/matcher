@@ -165,9 +165,9 @@ object DexContainer extends ScorexLogging {
       jaegerHost.map(_ => if (isEnabled) "yes" else "no").getOrElse("no")
     }
     Map(
-      "JAEGER_ENABLED" -> jaegerEnabled,
-      "JAEGER_HOST" -> jaegerHost.getOrElse(""),
-      "TRACE_TICK_INTERVAL" -> "3.seconds",
+      "DEX_JAEGER_ENABLED" -> jaegerEnabled,
+      "DEX_JAEGER_HOST" -> jaegerHost.getOrElse(""),
+      "DEX_TRACE_TICK_INTERVAL" -> "3.seconds",
       "BRIEF_LOG_PATH" -> s"$containerLogsPath/container-$containerName.log",
       "DETAILED_LOG_PATH" -> s"$containerLogsPath/container-$containerName.detailed.log",
       "WAVES_DEX_CONFIGPATH" -> s"$baseContainerPath/$containerName.conf",

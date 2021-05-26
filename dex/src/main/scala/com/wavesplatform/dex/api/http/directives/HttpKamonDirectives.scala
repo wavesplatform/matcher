@@ -15,13 +15,11 @@ object HttpKamonDirectives {
   private val timer = Kamon.timer("matcher.http.endpoints.timer")
   private val counter = Kamon.counter("matcher.http.responses.counter")
 
-  def withMetricsAndTraces(endpoint: String): Directive[Unit] = {
-    withTraces(endpoint)
-    withMetrics(endpoint)
-  }
+  def withMetricsAndTraces(endpoint: String): Directive[Unit] =
+    withTraces(endpoint).tflatMap(_ => withMetrics(endpoint))
 
-  def withTraces(endpoint: String): Unit =
-    KamonTraceUtils.setSpanNameAndForceSamplingDecision("/" + endpoint)
+  def withTraces(endpoint: String): Directive[Unit] =
+    extractRequest.tmap(_ => KamonTraceUtils.setSpanNameAndForceSamplingDecision("/" + endpoint))
 
   def withMetrics(endpoint: String): Directive[Unit] = extractRequest.tflatMap { req =>
     val method = req._1.method.value

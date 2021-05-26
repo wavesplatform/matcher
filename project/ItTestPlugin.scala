@@ -8,6 +8,9 @@ import sbt._
 // Separate projects for integration tests because of IDEA: https://youtrack.jetbrains.com/issue/SCL-14363#focus=streamItem-27-3061842.0-0
 object ItTestPlugin extends AutoPlugin {
 
+  private val PORT_RANGE_LENGTH = 50
+  private val DEFAULT_PORT_RANGE = (30000, 65000)
+
   object autoImport extends ItKeys
   import autoImport._
 
@@ -58,8 +61,30 @@ object ItTestPlugin extends AutoPlugin {
           val logDirectoryValue = (Test / logDirectory).value
           val envVarsValue = (Test / envVars).value
           val javaOptionsValue = (Test / javaOptions).value
+          val (portRangeLowerBound, portRangeHigherBound) = sys.env.get("INTEGRATION_TESTS_PORT_RANGE").map { range =>
+            val limits = range.split('-')
+            if (limits.length != 2) throw new IllegalArgumentException(s"Illegal port range for tests! $range")
+            val first = limits.head.toInt
+            val second = limits.last.toInt
+            if (first >= second)
+              throw new IllegalArgumentException(s"Illegal port range for tests! First boundary $first is bigger or equals second $second!")
+            (first, second)
+          }.getOrElse(DEFAULT_PORT_RANGE)
+          val tests = (Test / definedTests).value
 
-          (Test / definedTests).value.map { suite =>
+          // checks that we will not get higher than portRangeHigherBound
+          if (tests.size * PORT_RANGE_LENGTH > portRangeHigherBound - portRangeLowerBound)
+            throw new RuntimeException(
+              s"""Cannot run tests;
+                 |They need at least ${tests.size * PORT_RANGE_LENGTH} available ports,
+                 | but specified interval has only ${portRangeHigherBound - portRangeLowerBound}
+                 | """.stripMargin
+            )
+
+          tests.zipWithIndex.map { value =>
+            val (suite, i) = value
+            val lowerBound = portRangeLowerBound + PORT_RANGE_LENGTH * i
+            val higherBound = lowerBound + PORT_RANGE_LENGTH - 1
             Group(
               suite.name,
               Seq(suite),
@@ -73,7 +98,7 @@ object ItTestPlugin extends AutoPlugin {
                     s"-Dwaves.it.logging.dir=${logDirectoryValue / suite.name.replaceAll("""(\w)\w*\.""", "$1.")}" // foo.bar.Baz -> f.b.Baz
                   ) ++ javaOptionsValue,
                   connectInput = false,
-                  envVars = envVarsValue
+                  envVars = envVarsValue + ("TEST_PORT_RANGE" -> s"$lowerBound-$higherBound")
                 )
               )
             )

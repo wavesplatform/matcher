@@ -19,6 +19,7 @@ import com.wavesplatform.dex.domain.{crypto => wcrypto}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.Events.{OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model.{BuyLimitOrder, LimitOrder, OrderValidator, SellLimitOrder, _}
+import com.wavesplatform.dex.queue.ValidatedCommand.{CancelOrder, DeleteOrderBook, PlaceMarketOrder, PlaceOrder}
 import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import com.wavesplatform.dex.settings.OrderFeeSettings._
 import com.wavesplatform.dex.settings.{loadConfig, AssetType, MatcherSettings, OrderFeeSettings}
@@ -26,6 +27,7 @@ import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.time.SystemTime
 import com.wavesplatform.dex.waves.WavesFeeConstants
 import io.qameta.allure.scalatest.AllureScalatestContext
+import kamon.context.Context
 import mouse.any._
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Suite
@@ -51,6 +53,18 @@ trait MatcherSpecBase
   implicit override def patienceConfig: PatienceConfig = PatienceConfig(2.seconds, 5.millis)
 
   implicit protected val wsErrorDiff: Derived[Diff[WsError]] = Derived(Diff.gen[WsError].ignore[WsError, Long](_.timestamp))
+
+  implicit protected val placeOrderDiff: Derived[Diff[PlaceOrder]] =
+    Derived(Diff.gen[PlaceOrder].ignore[PlaceOrder, Option[Context]](_.maybeCtx))
+
+  implicit protected val placeMarketOrderDiff: Derived[Diff[PlaceMarketOrder]] =
+    Derived(Diff.gen[PlaceMarketOrder].ignore[PlaceMarketOrder, Option[Context]](_.maybeCtx))
+
+  implicit protected val cancelOrderDiff: Derived[Diff[CancelOrder]] =
+    Derived(Diff.gen[CancelOrder].ignore[CancelOrder, Option[Context]](_.maybeCtx))
+
+  implicit protected val deleteOrderBookDiff: Derived[Diff[DeleteOrderBook]] =
+    Derived(Diff.gen[DeleteOrderBook].ignore[DeleteOrderBook, Option[Context]](_.maybeCtx))
 
   implicit protected val orderCanceledDiff: Derived[Diff[OrderCanceled]] =
     Derived(Diff.gen[OrderCanceled].value.ignore[OrderCanceled, Long](_.timestamp))

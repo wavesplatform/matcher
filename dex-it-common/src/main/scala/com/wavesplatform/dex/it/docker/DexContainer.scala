@@ -24,6 +24,8 @@ import java.nio.file.{Path, Paths}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
+import scala.jdk.CollectionConverters._
+
 final case class DexContainer private (override val internalIp: String, underlying: GenericContainer)(
   implicit
   tryHttpBackend: LoggingSttpBackend[Try, Any],
@@ -158,12 +160,9 @@ object DexContainer extends ScorexLogging {
     DexContainer(internalIp, underlying)
   }
 
-  private def getEnv(containerName: String): Map[String, String] =
+  private def getEnv(containerName: String): Map[String, String] = {
+    val configOverrides = System.getenv.asScala.view.filterKeys(_.startsWith("CONFIG_FORCE_")).toMap
     Map(
-      "CONFIG_FORCE_kamon_enable" -> Option(System.getenv("CONFIG_FORCE_kamon_enable")).getOrElse("false"),
-      "CONFIG_FORCE_kamon_modules_jaeger_enabled" -> Option(System.getenv("CONFIG_FORCE_kamon_modules_jaeger_enabled")).getOrElse("false"),
-      "CONFIG_FORCE_kamon_jaeger_http__url" -> Option(System.getenv("CONFIG_FORCE_kamon_jaeger_http__url")).getOrElse(""),
-      "CONFIG_FORCE_kamon_trace_tick__interval" -> "3.seconds",
       "BRIEF_LOG_PATH" -> s"$containerLogsPath/container-$containerName.log",
       "DETAILED_LOG_PATH" -> s"$containerLogsPath/container-$containerName.detailed.log",
       "WAVES_DEX_CONFIGPATH" -> s"$baseContainerPath/$containerName.conf",
@@ -184,7 +183,8 @@ object DexContainer extends ScorexLogging {
         s",sampling,monitors,sessionname=prof-$containerName,snapshot_name_format={sessionname}," +
         s"dir=$containerLogsPath,logdir=$containerLogsPath,onexit=snapshot"
       }.mkString(" ", " ", " ")
-    )
+    ) ++ configOverrides
+  }
 
   /**
    * @param resolve A relate to the base directory path of application

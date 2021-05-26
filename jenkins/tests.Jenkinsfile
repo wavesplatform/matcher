@@ -16,6 +16,7 @@ pipeline {
         SCALATEST_EXCLUDE_TAGS = 'com.wavesplatform.it.tags.DexItKafkaRequired com.wavesplatform.it.tags.DexItExternalKafkaRequired com.wavesplatform.it.tags.DexMultipleVersions'
         DEX_JAEGER_HOST = "${DEX_JAEGER_HOST}"
         DEX_JAEGER_ENABLED = "true"
+        DEX_KAMON_ENABLED = "true"
     }
     stages {
         stage('Cleanup') {

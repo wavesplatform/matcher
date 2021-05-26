@@ -159,15 +159,22 @@ object DexContainer extends ScorexLogging {
   }
 
   private def getEnv(containerName: String): Map[String, String] = {
+    //TODO refactor CI names
     val jaegerHost = Option(System.getenv("DEX_JAEGER_HOST"))
     val jaegerEnabled = {
       val isEnabled = Option(System.getenv("DEX_JAEGER_ENABLED")).contains("true")
       jaegerHost.map(_ => if (isEnabled) "yes" else "no").getOrElse("no")
     }
+    val kamonEnabled = {
+      val isEnabled = Option(System.getenv("DEX_KAMON_ENABLED")).contains("true")
+      if (isEnabled) "yes" else "no"
+    }
+
     Map(
-      "DEX_JAEGER_ENABLED" -> jaegerEnabled,
-      "DEX_JAEGER_HOST" -> jaegerHost.getOrElse(""),
-      "DEX_TRACE_TICK_INTERVAL" -> "3.seconds",
+      "CONFIG_FORCE_kamon_enable" -> kamonEnabled,
+      "CONFIG_FORCE_kamon_modules_jaeger_enabled" -> jaegerEnabled,
+      "CONFIG_FORCE_kamon_jaeger_http_url" -> jaegerHost.getOrElse(""),
+      "CONFIG_FORCE_kamon_trace_tick_interval" -> "3.seconds",
       "BRIEF_LOG_PATH" -> s"$containerLogsPath/container-$containerName.log",
       "DETAILED_LOG_PATH" -> s"$containerLogsPath/container-$containerName.detailed.log",
       "WAVES_DEX_CONFIGPATH" -> s"$baseContainerPath/$containerName.conf",
@@ -177,6 +184,7 @@ object DexContainer extends ScorexLogging {
         s"-Djava.util.logging.config.file=$baseContainerPath/jul.properties",
         "-Dlogback.stdout.enabled=false",
         "-Dlogback.file.enabled=false",
+        "-Dconfig.override_with_env_vars=true",
         s"-Dlogback.configurationFile=$baseContainerPath/doc/logback.xml",
         s"-Dlogback.include.file=$baseContainerPath/doc/logback-container.xml",
         s"-Dlogback.brief.fullPath=$containerLogsPath/container-$containerName.log",

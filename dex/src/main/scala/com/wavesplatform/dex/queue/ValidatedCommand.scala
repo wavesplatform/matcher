@@ -77,7 +77,7 @@ object ValidatedCommand {
 
   }
 
-  implicit final class Ops(val self: ValidatedCommand) extends AnyVal {
+  implicit final class ValidatedCommandOps(val self: ValidatedCommand) extends AnyVal {
 
     def assets: Set[Asset] = self match {
       case x: PlaceOrder => x.assetPair.assets + x.limitOrder.order.feeAsset

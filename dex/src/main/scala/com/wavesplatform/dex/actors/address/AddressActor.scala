@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.actors.address
 
 import akka.actor.typed.scaladsl.adapter._
-import akka.actor.{typed, Actor, ActorRef, Cancellable, Props, Status}
+import akka.actor.{typed, Actor, ActorRef, Cancellable, Props, Stash, Status}
 import akka.pattern.{pipe, CircuitBreakerOpenException}
 import akka.{actor => classic}
 import cats.instances.list._
@@ -9,7 +9,6 @@ import cats.instances.long.catsKernelStdGroupForLong
 import cats.syntax.either._
 import cats.syntax.foldable._
 import cats.syntax.group.catsSyntaxGroup
-import com.wavesplatform.dex.actors.WorkingStash
 import com.wavesplatform.dex.actors.address.AddressActor.Settings.default
 import com.wavesplatform.dex.actors.address.AddressActor._
 import com.wavesplatform.dex.actors.address.BalancesFormatter.format
@@ -58,7 +57,7 @@ class AddressActor(
   settings: AddressActor.Settings = AddressActor.Settings.default
 )(implicit efc: ErrorFormatterContext)
     extends Actor
-    with WorkingStash
+    with Stash
     with ScorexLogging {
 
   import context.dispatcher
@@ -253,7 +252,7 @@ class AddressActor(
           if (recovered) becomeWorking() else context.become(starting(recovered, gotBalances = true))
       }
 
-    case x => stash(x)
+    case _ => stash()
   }
 
   private def becomeWorking(): Unit = {

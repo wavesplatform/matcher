@@ -27,7 +27,7 @@ Test / scalacOptions += "-P:silencer:globalFilters=^magnolia: using fallback der
 
 resolvers += "dnvriend" at "https://dl.bintray.com/dnvriend/maven"
 libraryDependencies ++= Dependencies.Module.dex
-javaAgents += Dependencies.kanela
+javaAgents += Dependencies.kanela % "dist;test"
 
 val packageSettings = Seq(
   maintainer := "wavesplatform.com",

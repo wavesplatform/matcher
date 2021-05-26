@@ -32,7 +32,7 @@ import scala.concurrent.duration.DurationInt
 import scala.concurrent.Future
 
 class OrderBookDirectoryActorSpecification
-  extends MatcherSpec
+    extends MatcherSpec
     with MatcherSpecBase
     with HasOecInteraction
     with BeforeAndAfterEach
@@ -82,8 +82,8 @@ class OrderBookDirectoryActorSpecification
       "it crashes at start" in {
         val pair = AssetPair(randomAssetId, randomAssetId)
         val ob = emptyOrderBookRefs
-        val actor = TestActorRef(
-          new OrderBookDirectoryActor(
+        val actor = system.actorOf(
+          OrderBookDirectoryActor.props(
             matcherSettings,
             mkAssetPairsDB,
             doNothingOnRecovery,
@@ -102,7 +102,7 @@ class OrderBookDirectoryActorSpecification
 
       "it crashes during the work" in {
         val ob = emptyOrderBookRefs
-        val actor = defaultActor(ob)
+        val actor = defaultTestActor(ob)
         val probe = TestProbe()
 
         val a1, a2, a3 = randomAssetId
@@ -332,8 +332,8 @@ class OrderBookDirectoryActorSpecification
 
         matcherHadOrderBooksBefore(apdb, obsdb, pair -> 9L)
         val ob = emptyOrderBookRefs
-        val actor = TestActorRef(
-          new OrderBookDirectoryActor(
+        val actor = system.actorOf(
+          OrderBookDirectoryActor.props(
             matcherSettings,
             apdb,
             doNothingOnRecovery,
@@ -389,8 +389,8 @@ class OrderBookDirectoryActorSpecification
    */
   private def snapshotTest(assetPairs: AssetPair*)(f: (ActorRef, List[TestProbe]) => Any): Any = {
     val r = assetPairs.map(fakeOrderBookActor).toList
-    val actor = TestActorRef(
-      new OrderBookDirectoryActor(
+    val actor = system.actorOf(
+      OrderBookDirectoryActor.props(
         matcherSettings.copy(snapshotsInterval = 17),
         mkAssetPairsDB,
         doNothingOnRecovery,
@@ -429,13 +429,49 @@ class OrderBookDirectoryActorSpecification
   }
 
   private def defaultActor(
-                            ob: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]] = emptyOrderBookRefs,
-                            apdb: AssetPairsDb[Future] = mkAssetPairsDB,
-                            addressActor: ActorRef = TestProbe().ref,
-                            snapshotStoreActor: ActorRef = emptySnapshotStoreActor
-                          ): TestActorRef[OrderBookDirectoryActor] = {
+    ob: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]] = emptyOrderBookRefs,
+    apdb: AssetPairsDb[Future] = mkAssetPairsDB,
+    addressActor: ActorRef = TestProbe().ref,
+    snapshotStoreActor: ActorRef = emptySnapshotStoreActor
+  ): ActorRef = {
     implicit val efc: ErrorFormatterContext = ErrorFormatterContext.from(_ => 8)
+    system.actorOf(
+      OrderBookDirectoryActor.props(
+        matcherSettings,
+        apdb,
+        doNothingOnRecovery,
+        ob,
+        (assetPair, matcher) =>
+          OrderBookActor.props(
+            OrderBookActor.Settings(AggregatedOrderBookActor.Settings(100.millis)),
+            matcher,
+            addressActor,
+            snapshotStoreActor,
+            system.toTyped.ignoreRef,
+            assetPair,
+            time,
+            NonEmptyList.one(DenormalizedMatchingRule(0, 0.00000001)),
+            _ => {},
+            _ => MatchingRule.DefaultRule,
+            _ => makerTakerPartialFee,
+            None
+          ),
+        assetsCache,
+        _.asRight
+      )
+    )
+  }
 
+  //pay attention that TestActorRef doesn't process mailbox
+  //so Stash features won't work
+  //use it carefully
+  private def defaultTestActor(
+    ob: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
+    apdb: AssetPairsDb[Future] = mkAssetPairsDB,
+    addressActor: ActorRef = TestProbe().ref,
+    snapshotStoreActor: ActorRef = emptySnapshotStoreActor
+  ): TestActorRef[OrderBookDirectoryActor] = {
+    implicit val efc: ErrorFormatterContext = ErrorFormatterContext.from(_ => 8)
     TestActorRef(
       new OrderBookDirectoryActor(
         matcherSettings,
@@ -505,7 +541,7 @@ object OrderBookDirectoryActorSpecification {
   }
 
   private class DeletingActor(owner: ActorRef, assetPair: AssetPair, startOffset: Option[Long] = None)
-    extends RecoveringActor(owner, assetPair, startOffset) {
+      extends RecoveringActor(owner, assetPair, startOffset) {
     override def receive: Receive = handleDelete orElse super.receive
     private def handleDelete: Receive = { case ValidatedCommandWithMeta(_, _, _: ValidatedCommand.DeleteOrderBook) => context.stop(self) }
   }

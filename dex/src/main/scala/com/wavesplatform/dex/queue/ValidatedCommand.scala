@@ -13,6 +13,8 @@ import com.wavesplatform.dex.tool.KamonTraceUtils.{readCtx, writeCtx}
 import kamon.Kamon
 import kamon.context.Context
 
+import scala.util.hashing.MurmurHash3.productHash
+
 sealed trait ValidatedCommand extends Product with Serializable {
   def assetPair: AssetPair
   def maybeCtx: Option[Context]
@@ -23,6 +25,14 @@ object ValidatedCommand {
   case class PlaceOrder(limitOrder: LimitOrder, maybeCtx: Option[Context] = Some(Kamon.currentContext())) extends ValidatedCommand {
     override def assetPair: AssetPair = limitOrder.order.assetPair
     override def toString: String = s"PlaceOrder(${limitOrder.order.idStr()})"
+    override def hashCode(): Int = productHash(Tuple1(limitOrder))
+
+    override def equals(obj: Any): Boolean = obj match {
+      case that: PlaceOrder =>
+        that.canEqual(this) && limitOrder == that.limitOrder
+      case _ => false
+    }
+
   }
 
   case class PlaceMarketOrder(marketOrder: MarketOrder, maybeCtx: Option[Context] = Some(Kamon.currentContext())) extends ValidatedCommand {
@@ -31,13 +41,39 @@ object ValidatedCommand {
     override def toString: String =
       s"PlaceMarketOrder(${marketOrder.order.idStr()}, k=${marketOrder.order.assetPair.key}, afs=${marketOrder.availableForSpending})"
 
+    override def hashCode(): Int = productHash(Tuple1(marketOrder))
+
+    override def equals(obj: Any): Boolean = obj match {
+      case that: PlaceMarketOrder =>
+        that.canEqual(this) && marketOrder == that.marketOrder
+      case _ => false
+    }
+
   }
 
-  case class CancelOrder(assetPair: AssetPair, orderId: Order.Id, source: Source, maybeOwner: Option[Address]) extends ValidatedCommand {
+  case class CancelOrder(assetPair: AssetPair, orderId: Order.Id, source: Source, maybeOwner: Option[Address], maybeCtx: Option[Context] = Some(Kamon.currentContext()))
+      extends ValidatedCommand {
     override def toString: String = s"CancelOrder($orderId, ${assetPair.key}, $source, $maybeOwner)"
+
+    override def hashCode(): Int = productHash((assetPair, orderId, source))
+
+    override def equals(obj: Any): Boolean = obj match {
+      case that: CancelOrder =>
+        that.canEqual(this) && assetPair == that.assetPair && orderId == that.orderId && source == that.source && maybeOwner == that.maybeOwner
+      case _ => false
+    }
   }
+
   case class DeleteOrderBook(assetPair: AssetPair) extends ValidatedCommand {
     override def toString: String = s"DeleteOrderBook(${assetPair.key})"
+    override def hashCode(): Int = productHash(Tuple1(assetPair))
+
+    override def equals(obj: Any): Boolean = obj match {
+      case that: DeleteOrderBook =>
+        that.canEqual(this) && assetPair == that.assetPair
+      case _ => false
+    }
+
   }
 
   implicit final class Ops(val self: ValidatedCommand) extends AnyVal {

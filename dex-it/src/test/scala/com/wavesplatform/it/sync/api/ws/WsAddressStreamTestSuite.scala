@@ -359,10 +359,57 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
             func verify() = sigVerify(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey)
            */
 
+          val dapp = mkAccountWithBalance(100.waves + setScriptFee + smartFee -> Waves)
+
+          val script = "AAIEAAAAAAAAAAQIAhIAAAAAAAAAAAEAAAABaQEAAAAHZGVmYXVsdAAAAAAEAAAABWFzc2V0CQAEQwA" +
+            "AAAcCAAAABUFzc2V0AgAAAAAAAAAAAAAAAAEAAAAAAAAAAAAHBQAAAAR1bml0AAAAAAAAAAAABAAAAAdhc3NldElkC" +
+            "QAEOAAAAAEFAAAABWFzc2V0CQAETAAAAAIFAAAABWFzc2V0BQAAAANuaWwAAAABAAAAAnR4AQAAAAZ2ZXJpZnkAAAA" +
+            "ACQAB9AAAAAMIBQAAAAJ0eAAAAAlib2R5Qnl0ZXMJAAGRAAAAAggFAAAAAnR4AAAABnByb29mcwAAAAAAAAAAAAgFA" +
+            "AAAAnR4AAAAD3NlbmRlclB1YmxpY0tleUzoh4g="
+
+          broadcastAndAwait(mkSetAccountMayBeScript(dapp, Some(Scripts.fromBase64(script)), fee = setScriptFee + smartFee))
+
+          val invokeTx = mkInvokeScript(alice, dapp, fee = 1.005.waves)
+
+          broadcastAndAwait(invokeTx)
+
+          val wsc = mkWsAddressConnection(dapp)
+          assertChanges(wsc)(
+            Map(Waves -> WsBalances(100, 0))
+          )()
+
+        }
+
+        "via InvokeTx and then transferred by the script shouldn't be in the recipient's address stream" in {
+
+          /*
+           {-# STDLIB_VERSION 4 #-}
+           {-# CONTENT_TYPE DAPP #-}
+           {-# SCRIPT_TYPE ACCOUNT #-}
+
+           @Callable(i)
+           func default() = {
+             let asset = Issue("Asset", "", 1, 0, false, unit, 0)
+             let assetId = asset.calculateAssetId()
+             [
+               asset, ScriptTransfer(i.caller, 1, assetId)
+             ]
+           }
+
+           @Verifier(tx)
+           func verify() = sigVerify(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey)
+          */
+
           val acc = mkAccountWithBalance(10.waves -> Waves)
           val dapp = mkAccountWithBalance(100.waves + setScriptFee + smartFee -> Waves)
 
-          val script = "AAIEAAAAAAAAAAQIAhIAAAAAAAAAAAEAAAABaQEAAAAHZGVmYXVsdAAAAAAEAAAABWFzc2V0CQAEQwAAAAcCAAAABUFzc2V0AgAAAAAAAAAAAAAAAAEAAAAAAAAAAAAHBQAAAAR1bml0AAAAAAAAAAAABAAAAAdhc3NldElkCQAEOAAAAAEFAAAABWFzc2V0CQAETAAAAAIFAAAABWFzc2V0BQAAAANuaWwAAAABAAAAAnR4AQAAAAZ2ZXJpZnkAAAAACQAB9AAAAAMIBQAAAAJ0eAAAAAlib2R5Qnl0ZXMJAAGRAAAAAggFAAAAAnR4AAAABnByb29mcwAAAAAAAAAAAAgFAAAAAnR4AAAAD3NlbmRlclB1YmxpY0tleUzoh4g="
+          val script = "AAIEAAAAAAAAAAQIAhIAAAAAAAAAAAEAAAABaQEAAAAHZGVmYXVsdAAAAAAEAAAABWF" +
+            "zc2V0CQAEQwAAAAcCAAAABUFzc2V0AgAAAAAAAAAAAAAAAAEAAAAAAAAAAAAHBQAAAAR1bml0AAAAA" +
+            "AAAAAAABAAAAAdhc3NldElkCQAEOAAAAAEFAAAABWFzc2V0CQAETAAAAAIFAAAABWFzc2V0CQAETAA" +
+            "AAAIJAQAAAA5TY3JpcHRUcmFuc2ZlcgAAAAMIBQAAAAFpAAAABmNhbGxlcgAAAAAAAAAAAQUAAAAHY" +
+            "XNzZXRJZAUAAAADbmlsAAAAAQAAAAJ0eAEAAAAGdmVyaWZ5AAAAAAkAAfQAAAADCAUAAAACdHgAAAA" +
+            "JYm9keUJ5dGVzCQABkQAAAAIIBQAAAAJ0eAAAAAZwcm9vZnMAAAAAAAAAAAAIBQAAAAJ0eAAAAA9zZ" +
+            "W5kZXJQdWJsaWNLZXmSxqzL"
 
           broadcastAndAwait(mkSetAccountMayBeScript(dapp, Some(Scripts.fromBase64(script)), fee = setScriptFee + smartFee))
 
@@ -374,7 +421,6 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           assertChanges(wsc)(
             Map(Waves -> WsBalances(8.995, 0))
           )()
-
         }
       }
 

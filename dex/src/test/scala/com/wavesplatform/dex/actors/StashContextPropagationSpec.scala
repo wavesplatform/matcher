@@ -16,15 +16,13 @@ class StashContextPropagationSpec extends AnyFreeSpec with Matchers with SystemT
 
   import TestStashPropagationActor.Command
 
-  //TODO unignore after DEX-1149
-
   "StashContextPropagationSpec" - {
 
-    "context propagation for untyped actors" ignore test { probe =>
+    "context propagation for untyped actors" in test { probe =>
       system.actorOf(TestStashPropagationActor.untyped(probe.ref))
     }
 
-    "context propagation for typed actors" ignore test { probe =>
+    "context propagation for typed actors" in test { probe =>
       system.spawn(TestStashPropagationActor.typed(probe.ref), "TestStashPropagationActor").toClassic
     }
   }

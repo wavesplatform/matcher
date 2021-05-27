@@ -38,7 +38,9 @@ class AddressDirectoryActor(
   }
 
   override def receive: Receive = {
-    case Command.ForwardMessage(address, message) => forward(address, message)
+    case Command.ForwardMessage(address, message) =>
+      // DEX-1192 docs/places-and-cancels.md
+      forward(address, message)
 
     case command: AddressActor.Command.HasOrderBookEvent =>
       sendEventToHistoryRouter(command)

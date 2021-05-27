@@ -8,3 +8,11 @@ do
   echo "Converting $f..."
   docker run --rm --volume ${IMAGES_DIR}:/app --workdir=/app webuni/graphviz dot -Tsvg "$f" > $(echo $f | sed s/dot/svg/)
 done
+
+for f in *.mmd
+do
+  echo "Converting $f..."
+  # Online editor: https://mermaid-js.github.io/mermaid-live-editor/
+  # https://github.com/mermaid-js/mermaid-cli#use-docker
+  docker run --rm --volume ${IMAGES_DIR}:/data minlag/mermaid-cli:8.10.1 -i "$f" -o $(echo $f | sed s/mmd/svg/)
+done

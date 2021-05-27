@@ -206,6 +206,7 @@ class MatcherApiRoute(
       } ~ complete(StatusCodes.BadRequest)
     } ~ complete(StatusCodes.MethodNotAllowed)
 
+  // DEX-1192 docs/places-and-cancels.md
   private def placeOrder(endpoint: Option[PathMatcher[Unit]], isMarket: Boolean): Route = {
     val orderType = if (isMarket) "Market" else "Limit"
     val route = (pathEndOrSingleSlash & post & measureResponse(s"place${orderType}Order") & protect & entity(as[Order])) { order =>
@@ -621,7 +622,7 @@ class MatcherApiRoute(
       )
     )
   )
-  def cancel: Route =
+  def cancel: Route = // DEX-1192 docs/places-and-cancels.md
     (path(AssetPairPM / "cancel") & post) { pairOrError =>
       (measureResponse("cancel") & protect) {
         withAssetPair(pairOrError, formatError = e => OrderCancelRejected(e)) { pair =>

@@ -167,6 +167,7 @@ class OrderBookDirectoryActor(
     case GetMarkets => sender() ! tradedPairs.values.toList
     case GetSnapshotOffsets => sender() ! SnapshotOffsetsResponse(snapshotsState.snapshotOffsets)
 
+    // DEX-1192 docs/places-and-cancels.md
     case request: ValidatedCommandWithMeta =>
       request.command match {
         case ValidatedCommand.DeleteOrderBook(assetPair) =>

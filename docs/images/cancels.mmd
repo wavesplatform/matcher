@@ -9,9 +9,9 @@ sequenceDiagram
     activate AddressActor
     AddressActor->>AddressActor: finding an active order with this id
     AddressActor->>AddressActor: save a client's request sender
-    AddressActor->>Queue: store
+    AddressActor->>MatcherQueue: store
     deactivate AddressActor
-    Queue->>Application: ValidatedCommandWithMeta
+    MatcherQueue->>Application: ValidatedCommandWithMeta
     activate Application
     Application->>Application: consumeMessages
     Application->>OrderBookDirectoryActor: ValidatedCommandWithMeta

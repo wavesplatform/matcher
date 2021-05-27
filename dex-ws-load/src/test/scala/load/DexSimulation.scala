@@ -2,7 +2,7 @@ package load
 
 import io.gatling.core.Predef._
 
-class ConnectionsSimulation extends Simulation {
+class DexSimulation extends Simulation {
 
   val feeder = separatedValues(System.getProperty("ff"), ';').batch
 

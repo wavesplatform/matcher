@@ -49,7 +49,7 @@ pipeline {
         stage("Web Socket") {
             steps {
                 sh 'mv ./dex-load/feeder.csv ./dex-ws-load'
-                sh 'cd ./dex-ws-load && sbt "-Dff=feeder.csv -Dws=ws://${AIM}:6886/ws/v0 -Dsm=co -Drt=15 -Duc=6000 gatling:testOnly load.ConnectionsSimulation"'
+                sh 'cd ./dex-ws-load && sbt -Dff=feeder.csv -Dws=ws://${AIM}:6886/ws/v0 -Dsm=cs -Drt=15 -Duc=6000 gatling:testOnly load.DexSimulation'
                 script {
                     GRAFANA = sh(script: '''
                                             echo "https://${GRAFANA_URL}/d/WsyjIiHiz/system-metrics?orgId=5&var-hostname=${MATCHER_URL}&from=$(date -d '- 10 minutes' +'%s')000&to=$(date -d '+ 5 minutes' +'%s')000"

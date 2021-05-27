@@ -70,7 +70,7 @@ pipeline {
                  stage("Web Socket") {
                     steps {
                         sh 'mv ./dex-load/feeder.csv ./dex-ws-load/'
-                        sh 'cd ./dex-ws-load && sbt -Dff=feeder.csv -Dws=ws://${AIM}:6886/ws/v0 -Drt=15 -Duc=${AN} gatling:testOnly load.ConnectionsSimulation > /dev/null || true'
+                        sh 'cd ./dex-ws-load && sbt -Dff=feeder.csv -Dws=ws://${AIM}:6886/ws/v0 -Dsm=co -Drt=15 -Duc=6000 gatling:testOnly load.DexSimulation > /dev/null || true'
                     }
                  }
             }

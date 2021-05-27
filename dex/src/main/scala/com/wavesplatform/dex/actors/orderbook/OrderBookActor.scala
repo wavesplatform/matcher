@@ -124,6 +124,7 @@ class OrderBookActor(
   }
 
   private def working: Receive = {
+    // DEX-1192 docs/places-and-cancels.md
     case request: ValidatedCommandWithMeta =>
       actualizeRules(request.offset)
       lastProcessedOffset match {
@@ -177,6 +178,7 @@ class OrderBookActor(
   private def processEvents(timestamp: Long, events: IterableOnce[Event]): Unit =
     events.iterator.foreach { event =>
       logEvent(event)
+      // DEX-1192 docs/places-and-cancels.md
       eventsCoordinatorRef ! OrderEventsCoordinatorActor.Command.Process(event)
 
       val changes = event match {

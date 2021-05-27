@@ -64,6 +64,7 @@ object OrderEventsCoordinatorActor {
 
     def default(observedTxIds: FifoSet[ExchangeTransaction.Id]): Behaviors.Receive[Message] = Behaviors.receive[Message] { (context, message) =>
       message match {
+        // DEX-1192 docs/places-and-cancels.md
         case Command.Process(event) =>
           event match {
             case event: Events.OrderAdded =>

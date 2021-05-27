@@ -1,0 +1,36 @@
+sequenceDiagram
+    %% https://github.com/mermaid-js/mermaid/issues/1800#issuecomment-755722542
+    %%{ init: {'sequence': {'useMaxWidth':false}} }%%
+    autonumber
+    Client->>MatcherApiRoute: cancel
+    activate MatcherApiRoute
+    MatcherApiRoute->>AddressDirectoryActor: ForwardMessage<br/>(sender, Command.CancelOrder)
+    AddressDirectoryActor->>AddressActor: Command.CancelOrder
+    activate AddressActor
+    AddressActor->>AddressActor: finding an active order with this id
+    AddressActor->>AddressActor: save a client's request sender
+    AddressActor->>MatcherQueue: store
+    deactivate AddressActor
+    MatcherQueue->>Application: ValidatedCommandWithMeta
+    activate Application
+    Application->>Application: consumeMessages
+    Application->>OrderBookDirectoryActor: ValidatedCommandWithMeta
+    deactivate Application
+    OrderBookDirectoryActor->>OrderBookActor: ValidatedCommandWithMeta
+    activate OrderBookActor
+    Note right of OrderBookActor: Cancels the order and generates events
+    OrderBookActor->>OrderBookActor: process
+    loop Each event
+      Note right of OrderBookActor: OrderCanceled
+      OrderBookActor->>OrderEventsCoordinatorActor: <Events.Event>
+    end
+    deactivate OrderBookActor
+    Note right of OrderEventsCoordinatorActor: ApplyOrderBookCanceled
+    OrderEventsCoordinatorActor->>AddressDirectoryActor: <AddressActor.Command>
+    AddressDirectoryActor->>AddressActor: <AddressActor.Command>
+    activate AddressActor
+    AddressActor->>AddressActor: find a Client's request sender
+    AddressActor-->>MatcherApiRoute: AddressActor.Event.OrderCanceled|<br/>MatcherError
+    deactivate AddressActor
+    MatcherApiRoute-->>Client: response
+    deactivate MatcherApiRoute

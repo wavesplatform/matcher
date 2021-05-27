@@ -484,6 +484,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
         }
     }
 
+  // DEX-1192 docs/places-and-cancels.md
   private def consumeMessages(xs: List[ValidatedCommandWithMeta]): Future[Unit] =
     if (xs.isEmpty) Future.unit
     else {

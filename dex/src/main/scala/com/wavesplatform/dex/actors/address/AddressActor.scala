@@ -84,6 +84,7 @@ class AddressActor(
   private var balances = AddressBalance.empty
 
   // if (recovered) because we haven't pendingCommands during the start
+  // DEX-1192 docs/places-and-cancels.md
   private val eventsProcessing: Receive = {
     case command: Command.ApplyOrderBookAdded =>
       import command.event
@@ -264,6 +265,7 @@ class AddressActor(
   }
 
   private def working: Receive = eventsProcessing orElse failuresProcessing orElse {
+    // DEX-1192 docs/places-and-cancels.md
     case command: Command.PlaceOrder =>
       log.debug(s"$command")
       val orderId = command.order.id()
@@ -294,6 +296,7 @@ class AddressActor(
         else log.trace(s"${placementQueue.headOption} is processing, moving $orderId to the queue")
       }
 
+    // DEX-1192 docs/places-and-cancels.md
     case command: Command.CancelOrder =>
       import command.orderId
       log.debug(s"$command")
@@ -670,6 +673,7 @@ class AddressActor(
 
   private def cancel(o: Order, source: Command.Source): Unit = storeCommand(o.id())(ValidatedCommand.CancelOrder(o.assetPair, o.id(), source))
 
+  // DEX-1192 docs/places-and-cancels.md
   private def storeCommand(orderId: Order.Id)(command: ValidatedCommand): Unit =
     store(command)
       .transform {

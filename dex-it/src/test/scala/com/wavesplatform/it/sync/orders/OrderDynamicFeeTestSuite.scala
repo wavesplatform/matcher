@@ -802,13 +802,13 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
 
       broadcastAndAwait(mkTransfer(alice, bob, defaultAssetQuantity / 2, eth, 0.005.waves))
 
-      dex1.restartWithNewSuiteConfig(ConfigFactory.parseString("waves.dex.order-fee.-1.mode = percent").withFallback(dexInitialSuiteConfig))
+      dex1.safeRestartWithNewSuiteConfig(ConfigFactory.parseString("waves.dex.order-fee.-1.mode = percent").withFallback(dexInitialSuiteConfig))
       check()
 
-      dex1.restartWithNewSuiteConfig(ConfigFactory.parseString("waves.dex.order-fee.-1.mode = fixed").withFallback(dexInitialSuiteConfig))
+      dex1.safeRestartWithNewSuiteConfig(ConfigFactory.parseString("waves.dex.order-fee.-1.mode = fixed").withFallback(dexInitialSuiteConfig))
       check()
 
-      dex1.restartWithNewSuiteConfig(
+      dex1.safeRestartWithNewSuiteConfig(
         ConfigFactory
           .parseString(s"waves.dex.order-fee.-1.fixed.asset = $BtcId\nwaves.dex.order-fee.-1.mode = fixed")
           .withFallback(dexInitialSuiteConfig)

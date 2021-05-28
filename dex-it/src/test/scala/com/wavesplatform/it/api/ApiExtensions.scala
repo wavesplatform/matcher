@@ -58,12 +58,6 @@ trait ApiExtensions extends NodeApiExtensions {
       _.foreach(tx => wavesNodeApi.waitForTransaction(tx.id()))
     }
 
-  protected def saveSnapshotsAndWait(dexApi: DexApi[Id] = dex1.api): Unit = {
-    val currentOffset = dexApi.getCurrentOffset
-    dexApi.saveSnapshots
-    dexApi.waitForOldestSnapshotOffset(_ >= currentOffset)
-  }
-
   protected def matcherState(
     assetPairs: Seq[AssetPair],
     orders: IndexedSeq[Order],

@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.it.docker
 
+import cats.Functor
 import cats.tagless.FunctorK
 import com.dimafeng.testcontainers.GenericContainer
 import com.typesafe.config.Config
@@ -7,10 +8,11 @@ import com.wavesplatform.dex.app.MatcherStatus.Working
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedStream.Status
 import com.wavesplatform.dex.it.api._
-import com.wavesplatform.dex.it.api.dex.{AsyncEnrichedDexApi, DexApi}
+import com.wavesplatform.dex.it.api.dex.{AsyncEnrichedDexApi, DexApi, DexApiSyntax}
 import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import com.wavesplatform.dex.it.cache.CachedData
 import com.wavesplatform.dex.it.collections.Implicits.ListOps
+import com.wavesplatform.dex.it.fp.CanRepeat
 import com.wavesplatform.dex.it.resources.getRawContentFromResource
 import com.wavesplatform.dex.it.sttp.LoggingSttpBackend
 import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
@@ -54,6 +56,31 @@ final case class DexContainer private (override val internalIp: String, underlyi
   def asyncApi: DexApi[AsyncUnsafe] = apiFunctorK.mapK(asyncRawApi)(toAsyncUnsafe)
   def asyncTryApi: DexApi[AsyncTry] = apiFunctorK.mapK(asyncRawApi)(toAsyncTry)
   def asyncRawApi: AsyncEnrichedDexApi = new AsyncEnrichedDexApi(apiKey, restApiAddress)
+
+  implicit protected def toDexApiSyntax[F[_]: Functor: CanRepeat](self: DexApi[F]): DexApiSyntax.Ops[F] =
+    new DexApiSyntax.Ops[F](self)
+
+  def saveSnapshotAndWait(): Unit = {
+    val currentOffset = api.getCurrentOffset
+    api.saveSnapshots
+    api.waitForOldestSnapshotOffset(_ >= currentOffset)
+  }
+
+  /**
+   * Use this method to restart Matcher with a new config.
+   * @see restartWithNewSuiteConfig
+   */
+  def safeRestartWithNewSuiteConfig(newSuiteConfig: Config): Unit = {
+    saveSnapshotAndWait()
+    super.restartWithNewSuiteConfig(newSuiteConfig)
+  }
+
+  /**
+   * This method could affect an execution of orders. If you provide such settings, use safe.
+   * Use on your risk.
+   */
+  override def restartWithNewSuiteConfig(newSuiteConfig: Config): Unit =
+    super.restartWithNewSuiteConfig(newSuiteConfig)
 
   override def waitReady(): Unit = {
     val r = Iterator

@@ -35,8 +35,7 @@ class OrderFixedFeeTestSuite extends OrderFeeBaseTestSuite {
               val pair = AssetPair(asset, Waves)
               val orderAmount = 1
 
-              saveSnapshotsAndWait() // Otherwise previous matches could be changed
-              dex1.restartWithNewSuiteConfig(configWithOrderFeeFixed(asset))
+              dex1.safeRestartWithNewSuiteConfig(configWithOrderFeeFixed(asset))
               broadcastAndAwait(mkTransfer(alice, bob, wavesNode1.api.balance(alice, asset) / 2, asset, feeAmount = minFee + smartFee))
 
               val aliceAssetBalanceBefore = wavesNode1.api.balance(alice, asset)
@@ -74,8 +73,7 @@ class OrderFixedFeeTestSuite extends OrderFeeBaseTestSuite {
       }
 
       "should accept orders if sender received amount > than fee amount" in {
-        saveSnapshotsAndWait() // Otherwise previous matches could be changed
-        dex1.restartWithNewSuiteConfig(configWithOrderFeeFixed(aliceAsset))
+        dex1.safeRestartWithNewSuiteConfig(configWithOrderFeeFixed(aliceAsset))
         broadcastAndAwait(mkTransfer(bob, alice, minMatcherFee, aliceAsset))
         val pair = AssetPair(aliceAsset, Waves)
         placeAndAwaitAtDex(mkOrder(

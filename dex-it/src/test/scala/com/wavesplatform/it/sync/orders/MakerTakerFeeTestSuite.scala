@@ -123,8 +123,7 @@ class MakerTakerFeeTestSuite extends MatcherSuiteBase with TableDrivenPropertyCh
     val offset2 = offset1 + 1
     val offset3 = offset2 + 1
 
-    saveSnapshotsAndWait() // Otherwise previous matches could be changed
-    dex1.restartWithNewSuiteConfig(
+    dex1.safeRestartWithNewSuiteConfig(
       ConfigFactory.parseString(
         s"""
            |waves.dex {

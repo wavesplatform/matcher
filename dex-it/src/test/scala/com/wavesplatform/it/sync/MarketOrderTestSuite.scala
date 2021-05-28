@@ -149,8 +149,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
     "fixed fee mode" - {
 
       "processing market order (SELL)" in {
-        saveSnapshotsAndWait() // Otherwise previous matches could be changed
-        dex1.restartWithNewSuiteConfig(ConfigFactory.parseString(s"waves.dex.order-fee.-1.mode = fixed").withFallback(dexInitialSuiteConfig))
+        dex1.safeRestartWithNewSuiteConfig(ConfigFactory.parseString(s"waves.dex.order-fee.-1.mode = fixed").withFallback(dexInitialSuiteConfig))
 
         testFilledMarketOrder(SELL, FeeMode.Fixed)
       }
@@ -392,8 +391,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
     }
 
     "should be rejected if user has enough balance to fill market order, but has not enough balance to pay fee in another asset" in {
-      saveSnapshotsAndWait() // Otherwise previous matches could be changed
-      dex1.restartWithNewSuiteConfig(
+      dex1.safeRestartWithNewSuiteConfig(
         ConfigFactory
           .parseString(s"waves.dex.order-fee.-1.fixed.asset = $BtcId\nwaves.dex.order-fee.-1.mode = fixed")
           .withFallback(dexInitialSuiteConfig)
@@ -414,8 +412,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
   }
 
   "Market order creation is possible when spendable balance is equal to reservable" in {
-    saveSnapshotsAndWait() // Otherwise previous matches could be changed
-    dex1.restartWithNewSuiteConfig(ConfigFactory.parseString(s"waves.dex.order-fee.-1.mode = dynamic").withFallback(dexInitialSuiteConfig))
+    dex1.safeRestartWithNewSuiteConfig(ConfigFactory.parseString(s"waves.dex.order-fee.-1.mode = dynamic").withFallback(dexInitialSuiteConfig))
 
     val carol = KeyPair("carol".getBytes)
 
@@ -432,8 +429,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
   }
 
   "Market order should be executed even if sender balance isn't enough to cover order value" in {
-    saveSnapshotsAndWait() // Otherwise previous matches could be changed
-    dex1.restartWithNewSuiteConfig(ConfigFactory.parseString(s"waves.dex.order-fee.-1.mode = dynamic") withFallback dexInitialSuiteConfig)
+    dex1.safeRestartWithNewSuiteConfig(ConfigFactory.parseString(s"waves.dex.order-fee.-1.mode = dynamic") withFallback dexInitialSuiteConfig)
 
     val carol = mkAccountWithBalance(300.usd -> usd, 5.waves -> Waves)
 

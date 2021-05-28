@@ -1,7 +1,6 @@
 package com.wavesplatform.it.sync.compat
 
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
-import com.wavesplatform.dex.api.http.entities.HttpSuccessfulPlace
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.it.api.MatcherCommand
 import com.wavesplatform.it.tags.DexMultipleVersions

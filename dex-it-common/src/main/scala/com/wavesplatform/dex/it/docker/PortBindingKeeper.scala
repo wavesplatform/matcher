@@ -19,7 +19,7 @@ object PortBindingKeeper extends ScorexLogging {
     .getOrElse(throw new RuntimeException("Please specify the TEST_PORT_RANGE environment variable"))
 
   private val portsRange = parsePortRange()
-  private var currentPosition = portsRange.start + Random.nextInt(portsRange.size)
+  private var currentPosition = portsRange.start
 
   def getBindings(exposedPorts: Seq[Int]): util.List[PortBinding] = this.synchronized {
     log.debug(s"Getting ports for $exposedPorts")
@@ -50,7 +50,7 @@ object PortBindingKeeper extends ScorexLogging {
       }
     }
 
-  private def findFreePort(): Either[AvailablePortsNotFound, Int] = {
+  def findFreePort(): Either[AvailablePortsNotFound, Int] = {
     val result = (currentPosition to portsRange.end).find { i =>
       Using(new ServerSocket(i))(_.getLocalPort).isSuccess
     }.orElse {
@@ -60,7 +60,7 @@ object PortBindingKeeper extends ScorexLogging {
     }
     result match {
       case Some(value) =>
-        currentPosition = (value - 1).min(portsRange.end)
+        currentPosition = (value + 1).min(portsRange.end)
         log.debug(s"Got port: $value and current position is $currentPosition")
         Right(value)
 

@@ -7,6 +7,7 @@ import com.wavesplatform.dex.domain.utils.ScorexLogging
 
 import java.net.ServerSocket
 import java.util
+import scala.annotation.nowarn
 import scala.jdk.CollectionConverters._
 import scala.util.Using
 
@@ -53,6 +54,7 @@ object PortBindingKeeper extends ScorexLogging {
       Using(new ServerSocket(i))(_.getLocalPort).isSuccess
     }
 
+  @nowarn
   private def parsePortRange(stringRange: String): Range.Inclusive = {
     val limits = stringRange.split('-').map(_.toInt)
     if (limits.length != 2) throw new IllegalArgumentException(s"Illegal port range for tests! $stringRange")

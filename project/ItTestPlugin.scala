@@ -62,10 +62,9 @@ object ItTestPlugin extends AutoPlugin {
           val envVarsValue = (Test / envVars).value
           val javaOptionsValue = (Test / javaOptions).value
           val (portRangeLowerBound, portRangeHigherBound) = sys.env.get("INTEGRATION_TESTS_PORT_RANGE").map { range =>
-            val limits = range.split('-')
+            val limits = range.split('-').map(_.toInt)
             if (limits.length != 2) throw new IllegalArgumentException(s"Illegal port range for tests! $range")
-            val first = limits.head.toInt
-            val second = limits.last.toInt
+            val Array(first, second) = limits
             if (first >= second)
               throw new IllegalArgumentException(s"Illegal port range for tests! First boundary $first is bigger or equals second $second!")
             (first, second)
@@ -81,8 +80,7 @@ object ItTestPlugin extends AutoPlugin {
                  | """.stripMargin
             )
 
-          tests.zipWithIndex.map { value =>
-            val (suite, i) = value
+          tests.zipWithIndex.map { case (suite, i) =>
             val lowerBound = portRangeLowerBound + PORT_RANGE_LENGTH * i
             val higherBound = lowerBound + PORT_RANGE_LENGTH - 1
             Group(

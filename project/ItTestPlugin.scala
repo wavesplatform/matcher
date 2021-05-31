@@ -9,7 +9,7 @@ import sbt._
 object ItTestPlugin extends AutoPlugin {
 
   private val PORT_RANGE_LENGTH = 50
-  private val DEFAULT_PORT_RANGE = (30000, 65000)
+  private val DEFAULT_PORT_RANGE = (10000, 32000)
 
   object autoImport extends ItKeys
   import autoImport._

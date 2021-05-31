@@ -2,6 +2,7 @@ package com.wavesplatform.dex.it.api.dex
 
 import cats.Functor
 import cats.syntax.functor._
+import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status.{Accepted, Cancelled, Filled, NotFound, PartiallyFilled}
 import com.wavesplatform.dex.api.http.entities._
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -23,7 +24,17 @@ object DexApiSyntax {
       waitForOrderStatus(order.assetPair, order.id(), status)
 
     def waitForOrderStatus(assetPair: AssetPair, id: Order.Id, status: HttpOrderStatus.Status): F[HttpOrderStatus] =
-      waitForOrder(assetPair, id)(_.status == status)
+      waitForOrder(assetPair, id) { s =>
+        status match {
+          case Filled | PartiallyFilled => s.status match {
+              case Cancelled | NotFound => throw new RuntimeException(s"Expected status $status for order $id, but found ${s.status}")
+            }
+          case Accepted => s.status match {
+              case Cancelled => throw new RuntimeException(s"Expected status $status for order $id, but found ${s.status}")
+            }
+        }
+        s.status == status
+      }
 
     def waitForOrder(order: Order)(pred: HttpOrderStatus => Boolean): F[HttpOrderStatus] =
       waitForOrder(order.assetPair, order.id())(pred)

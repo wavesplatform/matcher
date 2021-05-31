@@ -24,7 +24,7 @@ object PortBindingKeeper extends ScorexLogging {
   def getBindings(exposedPorts: Seq[Int]): util.List[PortBinding] = this.synchronized {
     log.debug(s"Getting ports for $exposedPorts")
     val result = findFreePorts(exposedPorts.size)
-    log.debug("Successfully generated ports")
+    log.debug(s"Successfully generated ports: ${result}")
     exposedPorts.map(new ExposedPort(_)).zip(result.map(Binding.bindPort)).map { ports =>
       new PortBinding(ports._2, ports._1)
     }.asJava

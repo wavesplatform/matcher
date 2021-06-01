@@ -2,7 +2,6 @@ package com.wavesplatform.dex.it.docker
 
 import java.net.InetSocketAddress
 import java.nio.file.{Path, Paths}
-
 import cats.tagless.FunctorK
 import com.dimafeng.testcontainers.GenericContainer
 import com.typesafe.config.Config
@@ -93,6 +92,8 @@ object WavesNodeContainer extends ScorexLogging {
   val matcherGrpcExtensionPort: Int = 6887 // application.conf waves.dex.grpc.integration.port
   val blockchainUpdatesGrpcExtensionPort: Int = 6881 // application.conf waves.dex.blockchain-updates-grpc.integration.port
 
+  private val exposedPorts = List(restApiPort, networkPort, matcherGrpcExtensionPort, blockchainUpdatesGrpcExtensionPort)
+
   val wavesNodeNetAlias: String = "waves.nodes"
 
   def apply(
@@ -113,16 +114,16 @@ object WavesNodeContainer extends ScorexLogging {
 
     val underlying = GenericContainer(
       dockerImage = image,
-      exposedPorts = List(restApiPort, networkPort, matcherGrpcExtensionPort, blockchainUpdatesGrpcExtensionPort),
       env = getEnv(name, internalIp),
       waitStrategy = ignoreWaitStrategy
     ).configure { c =>
       c.withNetwork(network)
       netAlias.foreach(c.withNetworkAliases(_))
       c.withFileSystemBind(localLogsDir.toString, containerLogsPath, BindMode.READ_WRITE)
-      c.withCreateContainerCmdModifier {
-        _.withName(s"$networkName-$name") // network.getName returns random id
-          .withIpv4Address(internalIp): Unit
+      c.withCreateContainerCmdModifier { cmd =>
+        cmd.withName(s"$networkName-$name") // network.getName returns random id
+          .withIpv4Address(internalIp)
+        cmd.getHostConfig.withPortBindings(PortBindingKeeper.getBindings(cmd, exposedPorts))
       }
 
       // Copy files to container

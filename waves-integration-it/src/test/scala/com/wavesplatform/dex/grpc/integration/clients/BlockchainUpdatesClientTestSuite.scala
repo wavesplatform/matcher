@@ -47,7 +47,7 @@ class BlockchainUpdatesClientTestSuite extends IntegrationSuiteBase with HasToxi
   private val keepAliveTimeout = 5.seconds
 
   private val grpcSettings = GrpcClientSettings(
-    target = s"127.0.0.1:${blockchainUpdatesProxy.getProxyPort}",
+    target = s"127.0.0.1:${blockchainUpdatesProxy.proxyPort}",
     maxHedgedAttempts = 5,
     maxRetryAttempts = 5,
     keepAliveWithoutCalls = true,

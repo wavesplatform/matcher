@@ -55,7 +55,7 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
     CombinedWavesBlockchainClient(
       wavesBlockchainClientSettings = WavesBlockchainClientSettings(
         grpc = GrpcClientSettings(
-          target = s"127.0.0.1:${matcherExtProxy.getProxyPort}",
+          target = s"127.0.0.1:${matcherExtProxy.proxyPort}",
           maxHedgedAttempts = 5,
           maxRetryAttempts = 5,
           keepAliveWithoutCalls = true,
@@ -66,7 +66,7 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
           noDataTimeout = 5.minutes
         ),
         blockchainUpdatesGrpc = GrpcClientSettings(
-          target = s"127.0.0.1:${blockchainUpdatesProxy.getProxyPort}",
+          target = s"127.0.0.1:${blockchainUpdatesProxy.proxyPort}",
           maxHedgedAttempts = 2,
           maxRetryAttempts = 2,
           keepAliveWithoutCalls = false,

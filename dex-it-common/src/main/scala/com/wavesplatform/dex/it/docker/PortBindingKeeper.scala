@@ -15,9 +15,11 @@ object PortBindingKeeper extends ScorexLogging {
 
   case class AvailablePortsNotFound() extends Throwable
 
+  private val DEFAULT_TEST_PORT_RANGE = 10000 to 10050
+
   private val portsRange = Option(System.getenv("TEST_PORT_RANGE"))
     .map(parsePortRange)
-    .getOrElse(throw new RuntimeException("Please specify the TEST_PORT_RANGE environment variable"))
+    .getOrElse(DEFAULT_TEST_PORT_RANGE)
 
   private var currentPosition = portsRange.start
 

@@ -37,7 +37,7 @@ class DatabaseBackwardCompatTestSuite extends BackwardCompatSuiteBase {
     markup("place orders at DEX2")
     val orders = executePlaces(placeCommands)
     withClue("orders.size: ") {
-      orders.size shouldBe > (100) // if its > 100, then there will be not only limit or place orders
+      orders.size shouldBe >(100) // if its > 100, then there will be not only limit or place orders
     }
 
     orders.groupBy(_.assetPair).valuesIterator.foreach { orders =>

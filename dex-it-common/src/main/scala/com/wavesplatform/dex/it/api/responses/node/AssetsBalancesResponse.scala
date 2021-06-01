@@ -9,13 +9,13 @@ object AssetsBalancesResponse {
   implicit val format: Format[AssetsBalancesResponse] = Json.format[AssetsBalancesResponse]
 
   case class AssetBalance(
-                           assetId: String,
-                           balance: Long,
-                           reissuable: Boolean,
-                           minSponsoredAssetFee: Option[Long],
-                           sponsorBalance: Option[Long],
-                           quantity: Long,
-                           issueTransaction: Option[JsObject]
+    assetId: String,
+    balance: Long,
+    reissuable: Boolean,
+    minSponsoredAssetFee: Option[Long],
+    sponsorBalance: Option[Long],
+    quantity: Long,
+    issueTransaction: Option[JsObject]
   )
 
   object AssetBalance {

@@ -8,7 +8,7 @@ import sbt._
 // Separate projects for integration tests because of IDEA: https://youtrack.jetbrains.com/issue/SCL-14363#focus=streamItem-27-3061842.0-0
 object ItTestPlugin extends AutoPlugin {
 
-  private val PORT_PER_TEST = 50
+  private val PORTS_PER_TEST = 50
   private val DEFAULT_PORT_RANGE = (10000, 32000)
 
   object autoImport extends ItKeys
@@ -72,17 +72,17 @@ object ItTestPlugin extends AutoPlugin {
           val tests = (Test / definedTests).value
 
           // checks that we will not get higher than portRangeHigherBound
-          if (tests.size * PORT_PER_TEST > portRangeHigherBound - portRangeLowerBound)
+          if (tests.size * PORTS_PER_TEST > portRangeHigherBound - portRangeLowerBound)
             throw new RuntimeException(
               s"""Cannot run tests;
-                 |They need at least ${tests.size * PORT_PER_TEST} available ports,
+                 |They need at least ${tests.size * PORTS_PER_TEST} available ports,
                  | but specified interval has only ${portRangeHigherBound - portRangeLowerBound}
                  | """.stripMargin
             )
 
           tests.zipWithIndex.map { case (suite, i) =>
-            val lowerBound = portRangeLowerBound + PORT_PER_TEST * i
-            val higherBound = lowerBound + PORT_PER_TEST - 1
+            val lowerBound = portRangeLowerBound + PORTS_PER_TEST * i
+            val higherBound = lowerBound + PORTS_PER_TEST - 1
             Group(
               suite.name,
               Seq(suite),

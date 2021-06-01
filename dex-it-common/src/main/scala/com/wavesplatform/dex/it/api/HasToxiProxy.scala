@@ -11,9 +11,9 @@ trait HasToxiProxy { self: BaseContainersKit =>
   // Two ports for two extensions: blockchain updates and ours
   private val exposedPorts = Seq(WavesNodeContainer.matcherGrpcExtensionPort, WavesNodeContainer.blockchainUpdatesGrpcExtensionPort)
 
-  protected val toxiContainer: ConfigurableToxicProxyContainer = getToxiProxyContainer
+  protected val toxiContainer: ConfigurableToxicProxyContainer = mkToxiProxyContainer
 
-  private def getToxiProxyContainer = {
+  private def mkToxiProxyContainer = {
     val cfgContainer = new ConfigurableToxicProxyContainer("shopify/toxiproxy:2.1.0", exposedPorts.size)
     cfgContainer.container.withNetwork(network)
     cfgContainer.container.withNetworkAliases(toxiProxyHostName)

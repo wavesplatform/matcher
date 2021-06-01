@@ -21,10 +21,10 @@ object PortBindingKeeper extends ScorexLogging {
 
   private var currentPosition = portsRange.start
 
-  def getBindings(exposedPorts: Seq[Int]): util.List[PortBinding] = this.synchronized {
+  def getBindings(exposedPorts: Seq[Int]): util.List[PortBinding] = synchronized {
     log.debug(s"Getting ports for $exposedPorts")
     val result = findFreePorts(exposedPorts.size)
-    log.debug(s"Successfully generated ports: ${result}")
+    log.debug(s"Successfully generated ports: $result")
     exposedPorts.map(new ExposedPort(_)).zip(result.map(Binding.bindPort)).map { ports =>
       new PortBinding(ports._2, ports._1)
     }.asJava
@@ -32,7 +32,7 @@ object PortBindingKeeper extends ScorexLogging {
 
   def getBindings(cmd: CreateContainerCmd, exposedPorts: Seq[Int]): util.List[PortBinding] = {
     val cmdExposedPorts = cmd.getExposedPorts.toList.map(_.getPort)
-    PortBindingKeeper.getBindings(cmdExposedPorts ++ exposedPorts)
+    getBindings(cmdExposedPorts ++ exposedPorts)
   }
 
   def getBindings(exposedPort: Int): util.List[PortBinding] =
@@ -43,7 +43,7 @@ object PortBindingKeeper extends ScorexLogging {
       findFreePort() +: acc
     }
 
-  def findFreePort(): Int =
+  private def findFreePort(): Int =
     findFreePortIn(currentPosition to portsRange.end).fold(throw AvailablePortsNotFound()) { newPort =>
       currentPosition = (newPort + 1).min(portsRange.end)
       newPort

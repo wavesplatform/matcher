@@ -13,6 +13,7 @@ import com.typesafe.sbt.packager.universal.UniversalDeployPlugin
 import org.apache.commons.compress.archivers.{ArchiveEntry, ArchiveStreamFactory}
 import sbt.Keys._
 import sbt._
+import scala.util.Try
 
 import java.io.{BufferedInputStream, FilenameFilter}
 import java.nio.file.Files
@@ -73,7 +74,13 @@ object ExtensionPackaging extends AutoPlugin {
       },
       classpath := makeRelativeClasspathNames(classpathOrdering.value),
       nodePackageName := s"waves${network.value.packageSuffix}",
-      debianPackageDependencies := Seq(s"${nodePackageName.value} (= ${wavesNodeVersion.value})"), // "Depends:" in control
+      debianPackageDependencies := {
+        val nodeVersion = wavesNodeVersion.value
+        val minorNodeVersion = nodeVersion.split('.')
+          .lastOption.flatMap(x => Try(x.toInt).toOption).getOrElse(throw new RuntimeException(s"Can't parse waves node minor version of $nodeVersion"))
+        val nextNodeVersion = (nodeVersion.split('.').dropRight(1) :+ (minorNodeVersion + 1)).mkString(".")
+        Seq(s"${nodePackageName.value} (>= $nodeVersion)", s"${nodePackageName.value} (<< $nextNodeVersion)")
+      }, // "Depends:" in control
       // To write files to Waves NODE directory
       linuxPackageMappings := getUniversalFolderMappings(
         nodePackageName.value,

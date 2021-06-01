@@ -1,7 +1,6 @@
 package com.wavesplatform.dex.grpc.integration
 
 import java.net.InetSocketAddress
-import java.util.concurrent.TimeUnit
 import com.wavesplatform.dex.grpc.integration.services._
 import com.wavesplatform.extensions.{Extension, Context => ExtensionContext}
 import com.wavesplatform.utils.ScorexLogging
@@ -12,6 +11,7 @@ import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.NameMapper
 
 import scala.concurrent.Future
+import scala.concurrent.duration.FiniteDuration
 
 class DEXExtension(context: ExtensionContext) extends Extension with ScorexLogging {
 
@@ -31,6 +31,7 @@ class DEXExtension(context: ExtensionContext) extends Extension with ScorexLoggi
 
     val host: String = context.settings.config.as[String]("waves.dex.grpc.integration.host")
     val port: Int = context.settings.config.as[Int]("waves.dex.grpc.integration.port")
+    val permitKeepAliveTime: FiniteDuration = context.settings.config.as[FiniteDuration]("waves.blockchain-updates.min-keep-alive")
 
     val bindAddress = new InetSocketAddress(host, port)
     apiService = new WavesBlockchainApiGrpcService(context)
@@ -38,7 +39,7 @@ class DEXExtension(context: ExtensionContext) extends Extension with ScorexLoggi
     val builder = NettyServerBuilder
       .forAddress(bindAddress)
       .permitKeepAliveWithoutCalls(true)
-      .permitKeepAliveTime(500, TimeUnit.MILLISECONDS)
+      .permitKeepAliveTime(permitKeepAliveTime.length, permitKeepAliveTime.unit)
       .addService(WavesBlockchainApiGrpc.bindService(apiService, apiScheduler))
 
     InternalNettyServerBuilder.setStatsEnabled(builder, false)

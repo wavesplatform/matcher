@@ -27,6 +27,7 @@ trait LevelDb[F[_]] {
 object LevelDb {
 
   def async(db: DB)(implicit ec: ExecutionContext): LevelDb[Future] = new LevelDb[Future] {
+
     /**
      * Do not chain with map/flatMap/etc. See above
      */

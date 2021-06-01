@@ -29,12 +29,13 @@ pipeline {
                 sh 'docker system prune -f || true'
                 sh 'find ~/.sbt/1.0/staging/*/waves -type d -name target | xargs -I{} rm -rf {}'
                 sh 'find . -type d \\( -name "test-reports" -o -name "allure-results" -o -name "target" \\) | xargs -I{} rm -rf {}'
-                sh 'sbt "cleanAll"'
+                sh 'sbt cleanAll'
             }
         }
-        stage('Build & Run All Tests') {
+        stage('Build & Check formatting & Run All Tests') {
             steps {
-                sh 'sbt "fullCheck"'
+                sh 'sbt fmtCheck'
+                sh 'sbt fullCheck'
             }
         }
         stage ('Push images') {

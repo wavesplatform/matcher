@@ -35,10 +35,11 @@ case class WsOrderBookState(
 
   def hasChanges: Boolean = changedAsks.nonEmpty || changedBids.nonEmpty || lastTrade.nonEmpty || changedTickSize.nonEmpty
 
-  def denormalized(amountDecimals: Int, priceDecimals: Int, xs: TreeMap[Price, Amount], ordering: Ordering[Double]): TreeMap[Double, Double] = xs.map {
-    case (price, amount) =>
-      denormalizePrice(price, amountDecimals, priceDecimals).toDouble -> denormalizeAmountAndFee(amount, amountDecimals).toDouble
-  }(ordering)
+  def denormalized(amountDecimals: Int, priceDecimals: Int, xs: TreeMap[Price, Amount], ordering: Ordering[Double]): TreeMap[Double, Double] =
+    xs.map {
+      case (price, amount) =>
+        denormalizePrice(price, amountDecimals, priceDecimals).toDouble -> denormalizeAmountAndFee(amount, amountDecimals).toDouble
+    }(ordering)
 
   def lastTrade(amountDecimals: Int, priceDecimals: Int, x: LastTrade): WsLastTrade = WsLastTrade(
     price = denormalizePrice(x.price, amountDecimals, priceDecimals).toDouble,

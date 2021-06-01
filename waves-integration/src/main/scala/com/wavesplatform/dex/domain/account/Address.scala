@@ -73,7 +73,9 @@ object Address extends ScorexLogging {
             _ =>
               val (version, network) = addressBytes.arr match {
                 case Array(version, network, _*) => (version, network)
-                case _ => throw new IllegalArgumentException(s"Can't process order bytes of len=${addressBytes.size}, there should be both version and network")
+                case _ => throw new IllegalArgumentException(
+                    s"Can't process order bytes of len=${addressBytes.size}, there should be both version and network"
+                  )
               }
               (
                 for {

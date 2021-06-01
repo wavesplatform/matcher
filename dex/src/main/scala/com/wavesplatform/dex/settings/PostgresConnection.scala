@@ -2,7 +2,15 @@ package com.wavesplatform.dex.settings
 
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 
-case class PostgresConnection(serverName: String, portNumber: Int, database: String, user: String, password: String, dataSourceClassName: String, applicationName: String) {
+case class PostgresConnection(
+  serverName: String,
+  portNumber: Int,
+  database: String,
+  user: String,
+  password: String,
+  dataSourceClassName: String,
+  applicationName: String
+) {
 
   def getQuillContextConfig: Config =
     ConfigFactory

@@ -15,12 +15,11 @@ trait RestConnector extends Connector {
 
   protected lazy val targetUri = uri"$target"
 
-  protected def mkResponse(request: RequestFunction): ErrorOrJsonResponse = {
+  protected def mkResponse(request: RequestFunction): ErrorOrJsonResponse =
     for {
       errorOrResponse <- Try(backend.send(request(basicRequest)).body).toEither.leftMap(ex => s"Cannot send request! ${ex.getWithStackTrace}")
       response <- errorOrResponse
     } yield Json.parse(response)
-  }
 
   override def close(): Unit = backend.close()
 }

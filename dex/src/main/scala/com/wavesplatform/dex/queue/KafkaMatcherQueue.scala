@@ -7,9 +7,9 @@ import java.util.{Base64, Properties}
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.typesafe.config.Config
-import com.wavesplatform.dex.app.{QueueMessageDeserializationError, forceStopApplication}
+import com.wavesplatform.dex.app.{forceStopApplication, QueueMessageDeserializationError}
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.queue.KafkaMatcherQueue.{KafkaProducer, Settings, validatedCommandDeserializer}
+import com.wavesplatform.dex.queue.KafkaMatcherQueue.{validatedCommandDeserializer, KafkaProducer, Settings}
 import com.wavesplatform.dex.queue.MatcherQueue.{IgnoreProducer, Producer}
 import com.wavesplatform.dex.settings.toConfigOps
 import monix.eval.Task
@@ -22,7 +22,7 @@ import org.apache.kafka.common.errors.{SerializationException, WakeupException, 
 import org.apache.kafka.common.serialization._
 
 import scala.concurrent.duration.FiniteDuration
-import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
+import scala.concurrent.{blocking, ExecutionContext, Future, Promise}
 import scala.jdk.CollectionConverters._
 import scala.jdk.DurationConverters.ScalaDurationOps
 

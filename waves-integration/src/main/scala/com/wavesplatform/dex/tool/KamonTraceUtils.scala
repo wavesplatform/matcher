@@ -11,6 +11,9 @@ import scala.concurrent.{ExecutionContext, Future}
 
 object KamonTraceUtils {
 
+  def setSpanName(name: String): Unit =
+    Kamon.currentSpan().name(name)
+
   def setSpanNameAndForceSamplingDecision(name: String): Unit = {
 
     //initially span has Unknown state and there is no 100% guarantee that it will be logged in jaeger

@@ -33,7 +33,7 @@ class CompositeHttpService(apiTypes: Set[Class[_]], routes: Seq[ApiRoute], setti
     mapInnerRoute { route => ctx =>
       //initially span name is "/rejected" and will be overridden in subsequent routes
       //"/rejected" spans will be filtered out by FilteringRejectedHook
-      KamonTraceUtils.setSpanNameAndForceSamplingDecision("/rejected")
+      KamonTraceUtils.setSpanName("/rejected")
       route(ctx)
     }(extendRoute(concat(routes.map(_.route): _*)) ~ swaggerRoute ~ notFound)
 

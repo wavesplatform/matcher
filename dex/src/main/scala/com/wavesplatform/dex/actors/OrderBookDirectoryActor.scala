@@ -69,7 +69,7 @@ class OrderBookDirectoryActor(
           recoveryCompletedWithEventNr(-1L asRight)
           working
         } else {
-          log.info(s"Recovery completed, waiting order books to restore: ${validAssetPairs.mkString(", ")}")
+          log.info(s"Recovery completed, waiting ${validAssetPairs.size} order books to restore")
           validAssetPairs.foreach(createOrderBook)
           collectOrderBooks(validAssetPairs.size, None, -1L, Map.empty)
         }

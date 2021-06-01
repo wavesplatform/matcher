@@ -305,7 +305,7 @@ class AddressActor(
           sender() ! {
             pc.command match {
               case _: Command.PlaceOrder =>
-                error.OrderNotFound(orderId)
+                error.OrderIsPlacing(orderId) // ask Vyatcheslav Suharnikov why do we return an error
               case _: Command.CancelOrder =>
                 error.OrderCanceled(orderId)
               case x =>

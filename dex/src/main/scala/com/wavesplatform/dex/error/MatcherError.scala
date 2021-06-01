@@ -227,6 +227,8 @@ case class OrderDuplicate(id: Order.Id)
 
 case class OrderNotFound(id: Order.Id) extends MatcherError(order, commonEntity, notFound, e"The order ${Symbol("id") -> id} not found")
 
+case class OrderIsPlacing(id: Order.Id) extends MatcherError(order, commonEntity, pending, e"The order ${Symbol("id") -> id} is in the process of placing, please retry later")
+
 case class OrderCanceled(id: Order.Id) extends MatcherError(order, commonEntity, canceled, e"The order ${Symbol("id") -> id} is canceled")
 
 case class OrderFull(id: Order.Id) extends MatcherError(order, commonEntity, limitReached, e"The order ${Symbol("id") -> id} is filled")
@@ -664,4 +666,5 @@ object Class {
   object disabled extends Class(16)
   object notProvided extends Class(17)
   object optimization extends Class(18)
+  object pending extends Class(19)
 }

@@ -9,7 +9,7 @@ case class ValidatedCommandWithMeta(offset: ValidatedCommandWithMeta.Offset, tim
     val eventStr = command match {
       case PlaceOrder(lo) => s"PlaceOrder(${lo.order.idStr()})"
       case PlaceMarketOrder(mo) => s"PlaceMarketOrder(${mo.order.idStr()}, k=${mo.order.assetPair.key}, afs=${mo.availableForSpending})"
-      case CancelOrder(assetPair, id, source) => s"CancelOrder($id, ${assetPair.key}, $source)"
+      case CancelOrder(assetPair, id, source, maybeOwner) => s"CancelOrder($id, ${assetPair.key}, $source, $maybeOwner)"
       case DeleteOrderBook(p) => s"DeleteOrderBook(${p.key})"
     }
     s"ValidatedCommandWithMeta(offset=$offset, ts=$timestamp, $eventStr)"

@@ -224,7 +224,7 @@ class AddressActor(
 
     case command: Command.MarkTxsObserved => markTxsObserved(command.txsWithSpending)
 
-    case command @ OrderCancelFailed(id, reason) =>
+    case command @ OrderCancelFailed(id, reason, _) =>
       if (isWorking) pendingCommands.remove(id) match {
         case None => // Ok on secondary matcher
         case Some(pc) =>
@@ -671,7 +671,8 @@ class AddressActor(
     )
   }
 
-  private def cancel(o: Order, source: Command.Source): Unit = storeCommand(o.id())(ValidatedCommand.CancelOrder(o.assetPair, o.id(), source))
+  private def cancel(o: Order, source: Command.Source): Unit =
+    storeCommand(o.id())(ValidatedCommand.CancelOrder(o.assetPair, o.id(), source, Some(o.sender.toAddress)))
 
   // DEX-1192 docs/places-and-cancels.md
   private def storeCommand(orderId: Order.Id)(command: ValidatedCommand): Unit =

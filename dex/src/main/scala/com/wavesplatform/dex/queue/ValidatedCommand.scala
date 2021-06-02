@@ -2,6 +2,7 @@ package com.wavesplatform.dex.queue
 
 import com.google.common.primitives.Longs
 import com.wavesplatform.dex.actors.address.AddressActor.Command.Source
+import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.crypto.DigestSize
@@ -22,7 +23,7 @@ object ValidatedCommand {
     override def assetPair: AssetPair = marketOrder.order.assetPair
   }
 
-  case class CancelOrder(assetPair: AssetPair, orderId: Order.Id, source: Source) extends ValidatedCommand
+  case class CancelOrder(assetPair: AssetPair, orderId: Order.Id, source: Source, maybeOwner: Option[Address]) extends ValidatedCommand
   case class DeleteOrderBook(assetPair: AssetPair) extends ValidatedCommand
 
   implicit final class Ops(val self: ValidatedCommand) extends AnyVal {
@@ -37,10 +38,14 @@ object ValidatedCommand {
   }
 
   def toBytes(x: ValidatedCommand): Array[Byte] = x match {
-    case PlaceOrder(lo) => (1: Byte) +: lo.order.version +: lo.order.bytes()
-    case CancelOrder(assetPair, orderId, source) => (2: Byte) +: (assetPair.bytes ++ orderId.arr ++ sourceToBytes(source))
-    case DeleteOrderBook(assetPair) => (3: Byte) +: assetPair.bytes
-    case PlaceMarketOrder(mo) => (4: Byte) +: Array.concat(Longs.toByteArray(mo.availableForSpending), Array(mo.order.version), mo.order.bytes())
+    case PlaceOrder(lo) =>
+      (1: Byte) +: Array.concat(Array(lo.order.version), lo.order.bytes())
+    case CancelOrder(assetPair, orderId, source, maybeOwner) =>
+      (2: Byte) +: Array.concat(assetPair.bytes, orderId.arr, sourceToBytes(source), writeMaybeAddress(maybeOwner))
+    case DeleteOrderBook(assetPair) =>
+      (3: Byte) +: assetPair.bytes
+    case PlaceMarketOrder(mo) =>
+      (4: Byte) +: Array.concat(Longs.toByteArray(mo.availableForSpending), Array(mo.order.version), mo.order.bytes())
   }
 
   def fromBytes(xs: Array[Byte]): ValidatedCommand = xs.head match {
@@ -50,8 +55,10 @@ object ValidatedCommand {
       val (assetPair, offset1) = AssetPair.fromBytes(bodyBytes)
       val offset2 = offset1 + DigestSize
       val orderId = ByteStr(bodyBytes.slice(offset1, offset2))
-      CancelOrder(assetPair, orderId, bytesToSource(bodyBytes.drop(offset2)))
-
+      val source = bytesToSource(bodyBytes.drop(offset2))
+      val remainingBytes = bodyBytes.drop(offset2 + 1)
+      val (maybeAddress, _) = readMaybeAddress(remainingBytes)
+      CancelOrder(assetPair, orderId, source, maybeAddress)
     case 3 => DeleteOrderBook(AssetPair.fromBytes(xs.tail)._1)
     case 4 =>
       val afs = Longs.fromByteArray(xs.slice(1, 9)); PlaceMarketOrder(MarketOrder(Order.fromBytes(xs(9), xs.slice(10, Int.MaxValue)), afs))
@@ -66,9 +73,19 @@ object ValidatedCommand {
     Source.BalanceTracking -> Array(3)
   )
 
+  private def writeMaybeAddress(maybeAddress: Option[Address]): Array[Byte] =
+    maybeAddress.map(_.bytes.arr).getOrElse(Array.emptyByteArray)
+
+  private def readMaybeAddress(bytes: Array[Byte]): (Option[Address], Int) = {
+    val maybeAddress = Address.fromBytes(bytes).toOption
+    if (maybeAddress.isDefined)
+      maybeAddress -> Address.AddressLength
+    else
+      maybeAddress -> 0
+  }
+
   private def bytesToSource(xs: Array[Byte]): Source =
-    if (xs.length > 1) throw new IllegalArgumentException(s"Can't parse Source from array, xs.length = ${xs.length}")
-    else if (xs.isEmpty) Source.NotTracked
+    if (xs.isEmpty) Source.NotTracked
     else
       xs.head match {
         case 1 => Source.Request

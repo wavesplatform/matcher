@@ -49,7 +49,8 @@ object WsAddressSubscribe {
   val supportedAuthTypes = Set(defaultAuthType)
   val leewayInSeconds = 10
 
-  def wsUnapply(arg: WsAddressSubscribe): Option[(String, Address, String, String, Set[String])] = (arg.tpe, arg.key, arg.authType, arg.jwt, arg.filters).some
+  def wsUnapply(arg: WsAddressSubscribe): Option[(String, Address, String, String, Set[String])] =
+    (arg.tpe, arg.key, arg.authType, arg.jwt, arg.filters).some
 
   implicit val wsAddressSubscribeFormat: Format[WsAddressSubscribe] = (
     (__ \ "T").format[String] and

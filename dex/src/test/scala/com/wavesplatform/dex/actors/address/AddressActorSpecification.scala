@@ -11,16 +11,16 @@ import com.wavesplatform.dex.actors.address.AddressActor.Command.Source
 import com.wavesplatform.dex.actors.address.AddressActor.Query.{GetCurrentState, GetReservedBalance, GetTradableBalance}
 import com.wavesplatform.dex.actors.address.AddressActor.Reply.{GetBalance, GetState}
 import com.wavesplatform.dex.api.ws.protocol.WsAddressChanges
-import com.wavesplatform.dex.db.EmptyOrderDb
+import com.wavesplatform.dex.db.{EmptyOrderDb, OrderDb, TestOrderDb}
 import com.wavesplatform.dex.domain.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV1}
 import com.wavesplatform.dex.domain.state.{LeaseBalance, Portfolio}
-import com.wavesplatform.dex.error.ErrorFormatterContext
+import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError, UnexpectedError}
 import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
-import com.wavesplatform.dex.model.Events.{OrderAdded, OrderAddedReason}
+import com.wavesplatform.dex.model.Events.{OrderAdded, OrderAddedReason, OrderCancelFailed}
 import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder, MarketOrder}
 import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
@@ -303,13 +303,30 @@ class AddressActorSpecification
       res.balances.reserved.xs shouldBe Map(Waves -> 30000L, IssuedAsset(assetId) -> 100)
       res.placementQueue should have size 0
     }
+
+    "forward OrderCancelFailed to AddressActor" in {
+      val orderDb = TestOrderDb(100)
+      orderDb.saveOrder(sellTokenOrder1).futureValue
+      test(
+        { (ref, commandsProbe, _, updatePortfolio) =>
+          updatePortfolio(sellToken1Portfolio)
+          val lo = LimitOrder(sellTokenOrder1)
+          val probe = TestProbe()
+          val msg = AddressDirectoryActor.Command.ForwardMessage(addr("test"), AddressActor.Command.PlaceOrder(lo.order, lo.isMarket))
+          ref.tell(msg, probe.ref)
+          commandsProbe.expectMsg(ValidatedCommand.PlaceOrder(lo))
+          ref ! OrderCancelFailed(sellTokenOrder1.id(), UnexpectedError)
+          probe.expectMsg[MatcherError](UnexpectedError)
+        },
+        orderDb
+      )
+    }
   }
 
   /**
    * (updatedPortfolio: Portfolio, sendBalanceChanged: Boolean) => Unit
    */
-  private def test(f: (ActorRef, TestProbe, AcceptedOrder => Unit, Portfolio => Unit) => Unit): Unit = {
-
+  private def test(f: (ActorRef, TestProbe, AcceptedOrder => Unit, Portfolio => Unit) => Unit, orderDb: OrderDb[Future] = EmptyOrderDb()): Unit = {
     val commandsProbe = TestProbe()
     val currentPortfolio = new AtomicReference[Portfolio]()
     val address = addr("test")
@@ -330,7 +347,7 @@ class AddressActorSpecification
         new AddressActor(
           address,
           time,
-          EmptyOrderDb(),
+          orderDb,
           (_, _) => Future.successful(Right(())),
           command => {
             commandsProbe.ref ! command
@@ -341,7 +358,7 @@ class AddressActorSpecification
         )
       )
 
-    lazy val addressDir = system.actorOf(Props(new AddressDirectoryActor(EmptyOrderDb(), createAddressActor, None, recovered = true)))
+    lazy val addressDir = system.actorOf(Props(new AddressDirectoryActor(orderDb, createAddressActor, None, recovered = true)))
 
     def addOrder(ao: AcceptedOrder): Unit = {
       addressDir ! AddressDirectoryActor.Command.ForwardMessage(address, AddressActor.Command.PlaceOrder(ao.order, ao.isMarket))

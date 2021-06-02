@@ -52,15 +52,15 @@ class AddressDirectoryActor(
       val origSender = sender()
       orderDb.get(e.id).onComplete {
         case Success(Some(order)) =>
-          self.tell(OrderCancelFailedFinalized(order, e.reason), origSender)
+          self.tell(OrderCancelFailedFinalized(e, order.sender.toAddress), origSender)
         case Success(None) =>
           log.warn(s"The order '${e.id}' not found")
         case Failure(th) =>
           log.error(s"error while retrieving order by id ${e.id}", th)
       }
 
-    case e: OrderCancelFailedFinalized =>
-      forward(e.order.sender.toAddress, e)
+    case OrderCancelFailedFinalized(orderCancelFailed, owner) =>
+      forward(owner, orderCancelFailed)
 
     case Terminated(child) =>
       val addressString = child.path.name

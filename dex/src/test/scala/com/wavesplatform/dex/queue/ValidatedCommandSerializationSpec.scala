@@ -21,13 +21,13 @@ final class ValidatedCommandSerializationSpec extends MatcherSpec with MatcherSp
     "write & read cancel order command with owner" in {
       val cancelOrder = CancelOrder(order.assetPair, order.id(), Source.BalanceTracking, Some(order.sender.toAddress))
       val parsedCancelOrder = ValidatedCommand.fromBytes(ValidatedCommand.toBytes(cancelOrder))
-      cancelOrder shouldBe parsedCancelOrder
+      parsedCancelOrder shouldBe cancelOrder
     }
 
     "write & read cancel order command without owner" in {
       val cancelOrder = CancelOrder(order.assetPair, order.id(), Source.BalanceTracking, None)
       val parsedCancelOrder = ValidatedCommand.fromBytes(ValidatedCommand.toBytes(cancelOrder))
-      cancelOrder shouldBe parsedCancelOrder
+      parsedCancelOrder shouldBe cancelOrder
     }
   }
 

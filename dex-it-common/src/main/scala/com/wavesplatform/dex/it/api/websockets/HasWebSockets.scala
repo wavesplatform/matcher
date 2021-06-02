@@ -46,11 +46,12 @@ trait HasWebSockets extends BeforeAndAfterAll with BeforeAndAfterEach with HasJw
     client: KeyPair,
     dex: DexContainer,
     keepAlive: Boolean = true,
-    subscriptionLifetime: FiniteDuration = 1.hour
+    subscriptionLifetime: FiniteDuration = 1.hour,
+    filters: Set[String] = Set.empty
   ): WsConnection = {
     val jwt = mkJwt(client, lifetime = subscriptionLifetime)
-    val connection = mkDexWsConnection(dex, keepAlive = keepAlive)
-    connection.send(WsAddressSubscribe(client.toAddress, WsAddressSubscribe.defaultAuthType, jwt))
+    val connection = mkDexWsConnection(dex, keepAlive = keepAlive, filters = filters)
+    connection.send(WsAddressSubscribe(client.toAddress, WsAddressSubscribe.defaultAuthType, jwt, filters))
     connection
   }
 
@@ -73,7 +74,8 @@ trait HasWebSockets extends BeforeAndAfterAll with BeforeAndAfterEach with HasJw
     dex: DexContainer,
     os: Option[String] = None,
     client: Option[String] = None,
-    keepAlive: Boolean = true
+    keepAlive: Boolean = true,
+    filters: Set[String] = Set.empty
   ): WsConnection = {
     val query: Map[String, String] = Map
       .empty[String, String]

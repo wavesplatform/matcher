@@ -17,6 +17,7 @@ trait NodeApi[F[_]] {
   def assetBalanceOrig(address: Address, asset: IssuedAsset): F[AssetBalanceResponse]
 
   def assetsBalance(address: Address): F[AssetsBalancesResponse]
+  def nftAssetsByAddress(address: Address, limit: Long = 999L): F[Seq[NftAsset]]
 
   def broadcast(tx: Transaction): F[Unit]
   def unconfirmedTransactions: F[List[Transaction]]

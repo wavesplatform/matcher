@@ -31,7 +31,7 @@ final class ValidatedCommandSerializationSpec extends MatcherSpec with MatcherSp
     }
   }
 
-  private val WUSD = IssuedAsset(ByteStr.decodeBase58("HyFJ3rrq5m7FxdkWtQXkZrDat1F7LjVVGfpSkUuEXQHj").get)
+  private lazy val WUSD = IssuedAsset(ByteStr.decodeBase58("HyFJ3rrq5m7FxdkWtQXkZrDat1F7LjVVGfpSkUuEXQHj").get)
 
   private lazy val order = OrderV1(
     sender = privateKey("test"),

@@ -112,7 +112,6 @@ object ExchangeTransactionBroadcastActor {
 
           case message: Event.Broadcasted =>
             val txId = message.tx.id()
-            val tx = message.tx
             val item = inProgress.get(txId)
             val isInProgress = item.nonEmpty
 

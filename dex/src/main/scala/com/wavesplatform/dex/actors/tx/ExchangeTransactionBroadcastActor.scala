@@ -67,7 +67,11 @@ object ExchangeTransactionBroadcastActor {
 
     val defaultAttempts = math.max((settings.maxPendingTime / settings.interval).intValue, 1) - 1
 
-    def isExpired(tx: ExchangeTransaction): Boolean = (time.correctedTime() - tx.timestamp) > ExchangeTransactionExpirationMillis
+    def isExpired(tx: ExchangeTransaction): Boolean =
+      (time.correctedTime() - tx.timestamp) > ExchangeTransactionExpirationMillis
+
+    def willExpired(tx: ExchangeTransaction): Boolean =
+      (time.correctedTime() - (tx.timestamp + settings.interval.toMillis)) > ExchangeTransactionExpirationMillis
 
     def broadcast(context: ActorContext[Message], tx: ExchangeTransaction): Unit = {
       context.log.info(s"Broadcasting ${tx.id()}")
@@ -111,6 +115,7 @@ object ExchangeTransactionBroadcastActor {
 
           case message: Event.Broadcasted =>
             val txId = message.tx.id()
+            val tx = message.tx
             val item = inProgress.get(txId)
             val isInProgress = item.nonEmpty
 
@@ -123,7 +128,12 @@ object ExchangeTransactionBroadcastActor {
                   case CheckedBroadcastResult.Confirmed =>
                     context.log.info(s"$txId (inProgress=$isInProgress) is confirmed")
                   case CheckedBroadcastResult.Failed(message, canRetry) =>
-                    context.log.warn(s"Failed to broadcast $txId (inProgress=$isInProgress, canRetry=$canRetry): $message")
+                    val willRetry = !isInProgress || (canRetry && item.exists(_.isValid) && !willExpired(tx))
+                    val msg = s"Failed to broadcast $txId (inProgress=$isInProgress, canRetry=$canRetry, willRetry=$willRetry): $message"
+                    if (canRetry && willRetry)
+                      context.log.debug(msg)
+                    else
+                      context.log.warn(msg)
                 }
             }
 

@@ -1,9 +1,9 @@
 package com.wavesplatform.dex.api.ws.protocol
 
 import java.nio.charset.StandardCharsets
-
 import cats.syntax.either._
 import cats.syntax.option._
+import com.wavesplatform.dex.api.ws.entities.WsAddressBalancesFilter
 import com.wavesplatform.dex.api.ws.protocol.WsAddressSubscribe._
 import com.wavesplatform.dex.domain.account.{Address, PrivateKey, PublicKey}
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -15,7 +15,7 @@ import pdi.jwt.{JwtAlgorithm, JwtJson, JwtOptions}
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
-final case class WsAddressSubscribe(key: Address, authType: String, jwt: String, filters: Set[String] = Set.empty) extends WsClientMessage {
+final case class WsAddressSubscribe(key: Address, authType: String, jwt: String, filters: Set[WsAddressBalancesFilter] = Set.empty) extends WsClientMessage {
   override val tpe: String = WsAddressSubscribe.tpe
 
   def validate(jwtPublicKey: String, networkByte: Byte): Either[MatcherError, JwtPayload] =
@@ -49,7 +49,7 @@ object WsAddressSubscribe {
   val supportedAuthTypes = Set(defaultAuthType)
   val leewayInSeconds = 10
 
-  def wsUnapply(arg: WsAddressSubscribe): Option[(String, Address, String, String, Set[String])] =
+  def wsUnapply(arg: WsAddressSubscribe): Option[(String, Address, String, String, Set[WsAddressBalancesFilter])] =
     (arg.tpe, arg.key, arg.authType, arg.jwt, arg.filters).some
 
   implicit val wsAddressSubscribeFormat: Format[WsAddressSubscribe] = (
@@ -57,7 +57,7 @@ object WsAddressSubscribe {
       (__ \ "S").format[Address] and
       (__ \ "t").format[String] and
       (__ \ "j").format[String] and
-      (__ \ "f").format[Set[String]]
+      (__ \ "b" \ "f").format[Set[WsAddressBalancesFilter]]
   )(
     (_, key, authType, jwt, filters) => WsAddressSubscribe(key, authType, jwt, filters),
     unlift(WsAddressSubscribe.wsUnapply)

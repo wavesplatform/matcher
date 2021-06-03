@@ -4,7 +4,7 @@ import cats.syntax.option._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus
 import com.wavesplatform.dex.api.ws.connection.WsConnection
-import com.wavesplatform.dex.api.ws.entities.{WsBalances, WsOrder}
+import com.wavesplatform.dex.api.ws.entities.{WsAddressBalancesFilter, WsBalances, WsOrder}
 import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsAddressSubscribe, WsError, WsUnsubscribe}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.account.KeyPair.toAddress
@@ -13,7 +13,7 @@ import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.model.Denormalization
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.error.SubscriptionsLimitReached
-import com.wavesplatform.dex.it.test.Scripts
+import com.wavesplatform.dex.it.test.{InformativeTestStart, Scripts}
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.model.{LimitOrder, MarketOrder, OrderStatus}
 import com.wavesplatform.it.WsSuiteBase
@@ -23,7 +23,7 @@ import scala.collection.parallel.CollectionConverters._
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
-class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChecks {
+class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChecks with InformativeTestStart {
 
   override protected val dexInitialSuiteConfig: Config = ConfigFactory
     .parseString(s"""waves.dex {
@@ -43,7 +43,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
   private def mkWsAddressConnection(account: KeyPair): WsConnection = mkWsAddressConnection(account, dex1)
 
-  private def mkWsAddressFilteredConnection(account: KeyPair, filters: Set[String] = Set.empty): WsConnection =
+  private def mkWsAddressFilteredConnection(account: KeyPair, filters: Set[WsAddressBalancesFilter] = Set.empty): WsConnection =
     mkWsAddressConnection(account, dex1, filters = filters)
 
   "Address stream should" - {
@@ -327,7 +327,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
         wsc.close()
       }
 
-      "NTF asset " - {
+      "NTF asset" - {
 
         def validateBalances(wsc: WsConnection, wb: WsBalances, a: KeyPair, nft: Boolean = true): Unit = {
           def assetBalance(asset: String, balance: Double = 1.0): (Asset, WsBalances) = Asset.fromString(asset).get -> WsBalances(balance, 0)
@@ -347,17 +347,16 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
           broadcastAndAwait(mkIssue(acc, "testAssetNT", 1L, 0))
 
-          withClue(" should be in the address stream") {
-            val wsc = mkWsAddressConnection(acc)
-            validateBalances(wsc, WsBalances(9, 0), acc)
-            wsc.close()
-          }
+          step("should be in the address stream")
+          val wsc1 = mkWsAddressConnection(acc)
+          validateBalances(wsc1, WsBalances(9, 0), acc)
+          wsc1.close()
 
-          withClue(" shouldn't be in the filtered address stream") {
-            val wsc = mkWsAddressFilteredConnection(acc, Set("-nft"))
-            validateBalances(wsc, WsBalances(9, 0), acc, false)
-            wsc.close()
-          }
+          step("shouldn't be in the filtered address stream")
+          val wsc2 = mkWsAddressFilteredConnection(acc, Set(WsAddressBalancesFilter.ExcludeNft))
+          validateBalances(wsc2, WsBalances(8, 0), acc, false)
+          wsc2.close()
+
         }
 
         "issued via InvokeTx should be in the address stream" in {
@@ -391,17 +390,15 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           broadcastAndAwait(mkSetAccountMayBeScript(dapp, Some(Scripts.fromBase64(script)), fee = setScriptFee + smartFee))
           broadcastAndAwait(mkInvokeScript(alice, dapp, fee = 1.005.waves))
 
-          withClue(" should be in the address stream") {
-            val wsc = mkWsAddressConnection(dapp)
-            validateBalances(wsc, WsBalances(100, 0), dapp)
-            wsc.close()
-          }
+          step("should be in the address stream")
+          val wsc1 = mkWsAddressConnection(dapp)
+          validateBalances(wsc1, WsBalances(100, 0), dapp)
+          wsc1.close()
 
-          withClue(" shouldn't be in the filtered address stream") {
-            val wsc = mkWsAddressFilteredConnection(dapp, Set("-nft"))
-            validateBalances(wsc, WsBalances(100, 0), dapp, false)
-            wsc.close()
-          }
+          step("shouldn't be in the filtered address stream")
+          val wsc2 = mkWsAddressFilteredConnection(dapp, Set(WsAddressBalancesFilter.ExcludeNft))
+          validateBalances(wsc2, WsBalances(100, 0), dapp, false)
+          wsc2.close()
         }
 
         "issued via InvokeTx and then transferred by the script should be in the recipient's address stream" in {
@@ -438,36 +435,34 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           broadcastAndAwait(mkSetAccountMayBeScript(dapp, Some(Scripts.fromBase64(script)), fee = setScriptFee + smartFee))
           broadcastAndAwait(mkInvokeScript(acc, dapp, fee = 1.005.waves))
 
-          withClue(" should be in the address stream") {
-            val wsc = mkWsAddressConnection(acc)
-            validateBalances(wsc, WsBalances(8.995, 0), acc)
-            wsc.close()
-          }
+          step("should be in the address stream")
+          val wsc1 = mkWsAddressConnection(acc)
+          validateBalances(wsc1, WsBalances(8.995, 0), acc)
+          wsc1.close()
 
-          withClue(" shouldn't be in the filtered address stream") {
-            val wsc = mkWsAddressFilteredConnection(acc, Set("-nft"))
-            validateBalances(wsc, WsBalances(8.995, 0), acc, false)
-            wsc.close()
-          }
+          step("shouldn't be in the filtered address stream")
+          val wsc2 = mkWsAddressFilteredConnection(acc, Set(WsAddressBalancesFilter.ExcludeNft))
+          validateBalances(wsc2, WsBalances(7.995, 0), acc, false)
+          wsc2.close()
+
         }
 
         "issued after connection has been established" in {
 
           val acc = mkAccountWithBalance(10.waves -> Waves)
 
-          withClue(" should be in the address stream") {
-            val wsc = mkWsAddressConnection(acc)
-            broadcastAndAwait(mkIssue(acc, "testAssetNT", 1L, 0))
-            validateBalances(wsc, WsBalances(9, 0), acc)
-            wsc.close()
-          }
+          step("should be in the address stream")
+          val wsc1 = mkWsAddressConnection(acc)
+          broadcast(mkIssue(acc, "testAssetNT", 1L, 0))
+          validateBalances(wsc1, WsBalances(9, 0), acc)
+          wsc1.close()
 
-          withClue(" shouldn't be in the filtered address stream") {
-            val wsc = mkWsAddressFilteredConnection(acc, Set("-nft"))
-            broadcastAndAwait(mkIssue(acc, "testAssetNT", 1L, 0))
-            validateBalances(wsc, WsBalances(9, 0), acc, false)
-            wsc.close()
-          }
+          step("shouldn't be in the filtered address stream")
+          val wsc2 = mkWsAddressFilteredConnection(acc, Set(WsAddressBalancesFilter.ExcludeNft))
+          broadcast(mkIssue(acc, "testAssetNT", 1L, 0))
+          validateBalances(wsc2, WsBalances(8, 0), acc, false)
+          wsc2.close()
+
         }
       }
 

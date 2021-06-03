@@ -115,7 +115,7 @@ class ActorsWebSocketInteractionsSpecification
           if (unmatchable) AddressActor.Command.Source.Request // Not important in this test suite
           else AddressActor.Command.Source.Request
         addressDir ! AddressDirectoryActor.Command.ForwardMessage(address, AddressActor.Command.CancelOrder(ao.id, source))
-        commandsProbe.expectMsg(ValidatedCommand.CancelOrder(ao.order.assetPair, ao.id, source))
+        commandsProbe.expectMsg(ValidatedCommand.CancelOrder(ao.order.assetPair, ao.id, source, Some(ao.order.sender.toAddress)))
       }
 
       val reason = if (unmatchable) Events.OrderCanceledReason.BecameUnmatchable else Events.OrderCanceledReason.RequestExecuted

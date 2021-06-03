@@ -131,7 +131,12 @@ class AddressActorSpecification
         addOrder(LimitOrder(sellTokenOrder1))
 
         updatePortfolio(initPortfolio.copy(assets = Map.empty))
-        commandsProbe.expectMsg(ValidatedCommand.CancelOrder(sellTokenOrder1.assetPair, sellTokenOrder1.id(), Source.BalanceTracking))
+        commandsProbe.expectMsg(ValidatedCommand.CancelOrder(
+          sellTokenOrder1.assetPair,
+          sellTokenOrder1.id(),
+          Source.BalanceTracking,
+          Some(sellTokenOrder1.sender.toAddress)
+        ))
       }
 
       "waves balance changed" when {
@@ -145,7 +150,12 @@ class AddressActorSpecification
           addOrder(LimitOrder(sellWavesOrder))
 
           updatePortfolio(initPortfolio.copy(balance = restWaves))
-          commandsProbe.expectMsg(ValidatedCommand.CancelOrder(sellWavesOrder.assetPair, sellWavesOrder.id(), Source.BalanceTracking))
+          commandsProbe.expectMsg(ValidatedCommand.CancelOrder(
+            sellWavesOrder.assetPair,
+            sellWavesOrder.id(),
+            Source.BalanceTracking,
+            Some(sellWavesOrder.sender.toAddress)
+          ))
         }
       }
 
@@ -160,7 +170,12 @@ class AddressActorSpecification
           addOrder(LimitOrder(sellWavesOrder))
 
           updatePortfolio(initPortfolio.copy(lease = LeaseBalance(0, leasedWaves(initPortfolio))))
-          commandsProbe.expectMsg(ValidatedCommand.CancelOrder(sellWavesOrder.assetPair, sellWavesOrder.id(), Source.BalanceTracking))
+          commandsProbe.expectMsg(ValidatedCommand.CancelOrder(
+            sellWavesOrder.assetPair,
+            sellWavesOrder.id(),
+            Source.BalanceTracking,
+            Some(sellWavesOrder.sender.toAddress)
+          ))
         }
       }
     }
@@ -211,7 +226,12 @@ class AddressActorSpecification
       addOrder(LimitOrder(sellTokenOrder2))
 
       updatePortfolio(sellToken1Portfolio)
-      commandsProbe.expectMsg(ValidatedCommand.CancelOrder(sellTokenOrder2.assetPair, sellTokenOrder2.id(), Source.BalanceTracking))
+      commandsProbe.expectMsg(ValidatedCommand.CancelOrder(
+        sellTokenOrder2.assetPair,
+        sellTokenOrder2.id(),
+        Source.BalanceTracking,
+        Some(sellTokenOrder2.sender.toAddress)
+      ))
 
       updatePortfolio(sellToken1Portfolio) // same event
       commandsProbe.expectNoMessage()
@@ -225,8 +245,18 @@ class AddressActorSpecification
       addOrder(LimitOrder(sellTokenOrder2))
 
       updatePortfolio(sellWavesPortfolio)
-      commandsProbe.expectMsg(ValidatedCommand.CancelOrder(sellTokenOrder1.assetPair, sellTokenOrder1.id(), Source.BalanceTracking))
-      commandsProbe.expectMsg(ValidatedCommand.CancelOrder(sellTokenOrder2.assetPair, sellTokenOrder2.id(), Source.BalanceTracking))
+      commandsProbe.expectMsg(ValidatedCommand.CancelOrder(
+        sellTokenOrder1.assetPair,
+        sellTokenOrder1.id(),
+        Source.BalanceTracking,
+        Some(sellTokenOrder1.sender.toAddress)
+      ))
+      commandsProbe.expectMsg(ValidatedCommand.CancelOrder(
+        sellTokenOrder2.assetPair,
+        sellTokenOrder2.id(),
+        Source.BalanceTracking,
+        Some(sellTokenOrder2.sender.toAddress)
+      ))
     }
 
     "cancel only orders, those aren't fit" in test { (_, commandsProbe, addOrder, updatePortfolio) =>
@@ -236,8 +266,18 @@ class AddressActorSpecification
       Seq(sellTokenOrder1, sellWavesOrder, sellTokenOrder2).foreach(o => addOrder(LimitOrder(o)))
 
       updatePortfolio(sellWavesPortfolio)
-      commandsProbe.expectMsg(ValidatedCommand.CancelOrder(sellTokenOrder1.assetPair, sellTokenOrder1.id(), Source.BalanceTracking))
-      commandsProbe.expectMsg(ValidatedCommand.CancelOrder(sellTokenOrder2.assetPair, sellTokenOrder2.id(), Source.BalanceTracking))
+      commandsProbe.expectMsg(ValidatedCommand.CancelOrder(
+        sellTokenOrder1.assetPair,
+        sellTokenOrder1.id(),
+        Source.BalanceTracking,
+        Some(sellTokenOrder1.sender.toAddress)
+      ))
+      commandsProbe.expectMsg(ValidatedCommand.CancelOrder(
+        sellTokenOrder2.assetPair,
+        sellTokenOrder2.id(),
+        Source.BalanceTracking,
+        Some(sellTokenOrder2.sender.toAddress)
+      ))
     }
 
     "cancel expired orders" in test { (_, commandsProbe, addOrder, updatePortfolio) =>
@@ -259,7 +299,9 @@ class AddressActorSpecification
       )
       addOrder(lo)
 
-      commandsProbe.expectMsg(ValidatedCommand.CancelOrder(lo.order.assetPair, lo.id, Source.Expiration))
+      commandsProbe.expectMsg(
+        ValidatedCommand.CancelOrder(lo.order.assetPair, lo.id, Source.Expiration, Some(lo.order.sender.toAddress))
+      )
     }
 
     "should not send a message multiple times" in test { (ref, _, addOrder, updatePortfolio) =>
@@ -304,7 +346,7 @@ class AddressActorSpecification
       res.placementQueue should have size 0
     }
 
-    "forward OrderCancelFailed to AddressActor" in {
+    "forward OrderCancelFailed (owner is empty) to AddressActor" in {
       val orderDb = TestOrderDb(100)
       orderDb.saveOrder(sellTokenOrder1).futureValue
       test(
@@ -312,16 +354,29 @@ class AddressActorSpecification
           updatePortfolio(sellToken1Portfolio)
           val lo = LimitOrder(sellTokenOrder1)
           val probe = TestProbe()
-          val msg = AddressDirectoryActor.Command.ForwardMessage(addr("test"), AddressActor.Command.PlaceOrder(lo.order, lo.isMarket))
+          val msg = AddressDirectoryActor.Command.ForwardMessage(testAddress, AddressActor.Command.PlaceOrder(lo.order, lo.isMarket))
           ref.tell(msg, probe.ref)
           commandsProbe.expectMsg(ValidatedCommand.PlaceOrder(lo))
-          ref ! OrderCancelFailed(sellTokenOrder1.id(), UnexpectedError)
+          ref ! OrderCancelFailed(sellTokenOrder1.id(), UnexpectedError, None)
           probe.expectMsg[MatcherError](UnexpectedError)
         },
         orderDb
       )
     }
+
+    "forward OrderCancelFailed (owner is non empty) to AddressActor" in test { (ref, commandsProbe, _, updatePortfolio) =>
+      updatePortfolio(sellToken1Portfolio)
+      val lo = LimitOrder(sellTokenOrder1)
+      val probe = TestProbe()
+      val msg = AddressDirectoryActor.Command.ForwardMessage(testAddress, AddressActor.Command.PlaceOrder(lo.order, lo.isMarket))
+      ref.tell(msg, probe.ref)
+      commandsProbe.expectMsg(ValidatedCommand.PlaceOrder(lo))
+      ref ! OrderCancelFailed(sellTokenOrder1.id(), UnexpectedError, Some(sellTokenOrder1.sender.toAddress))
+      probe.expectMsg[MatcherError](UnexpectedError)
+    }
   }
+
+  private val testAddress = addr("test")
 
   /**
    * (updatedPortfolio: Portfolio, sendBalanceChanged: Boolean) => Unit
@@ -329,7 +384,6 @@ class AddressActorSpecification
   private def test(f: (ActorRef, TestProbe, AcceptedOrder => Unit, Portfolio => Unit) => Unit, orderDb: OrderDb[Future] = EmptyOrderDb()): Unit = {
     val commandsProbe = TestProbe()
     val currentPortfolio = new AtomicReference[Portfolio]()
-    val address = addr("test")
 
     val blockchainInteraction = new BlockchainInteraction {
       override def getFullBalances(address: Address, exclude: Set[Asset]): Future[AddressBalanceUpdates] =
@@ -361,7 +415,7 @@ class AddressActorSpecification
     lazy val addressDir = system.actorOf(Props(new AddressDirectoryActor(orderDb, createAddressActor, None, recovered = true)))
 
     def addOrder(ao: AcceptedOrder): Unit = {
-      addressDir ! AddressDirectoryActor.Command.ForwardMessage(address, AddressActor.Command.PlaceOrder(ao.order, ao.isMarket))
+      addressDir ! AddressDirectoryActor.Command.ForwardMessage(testAddress, AddressActor.Command.PlaceOrder(ao.order, ao.isMarket))
       ao match {
         case lo: LimitOrder =>
           commandsProbe.expectMsg(ValidatedCommand.PlaceOrder(lo))
@@ -395,7 +449,7 @@ class AddressActorSpecification
           if (prevPortfolioOption.isEmpty) AddressActor.Command.SetInitialBalances(Success(changes), 0)
           else AddressActor.Command.ChangeBalances(changes)
 
-        addressDir ! AddressDirectoryActor.Command.ForwardMessage(address, message)
+        addressDir ! AddressDirectoryActor.Command.ForwardMessage(testAddress, message)
       }
     )
 

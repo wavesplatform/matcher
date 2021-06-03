@@ -102,7 +102,7 @@ object ExchangeTransactionBroadcastActor {
                   (valid && !expired).tap { retry =>
                     if (retry) broadcast(context, x.tx)
                     else {
-                      context.log.info(s"$txId v=$valid, exp=$expired")
+                      context.log.warn(s"Failed to broadcast $txId (valid=$valid, expired=$expired)")
                       reply(x)
                     }
                   }
@@ -124,12 +124,11 @@ object ExchangeTransactionBroadcastActor {
                   case CheckedBroadcastResult.Confirmed =>
                     context.log.info(s"$txId (inProgress=$isInProgress) is confirmed")
                   case CheckedBroadcastResult.Failed(message, canRetry) =>
-                    val willRetry = !isInProgress || (canRetry && item.exists(_.isValid))
-                    val msg = s"Failed to broadcast $txId (inProgress=$isInProgress, canRetry=$canRetry, willRetry=$willRetry): $message"
-                    if (canRetry && willRetry)
-                      context.log.debug(msg)
+                    val logMessage = s"Failed to broadcast $txId (inProgress=$isInProgress, canRetry=$canRetry): $message"
+                    if (canRetry)
+                      context.log.debug(logMessage)
                     else
-                      context.log.warn(msg)
+                      context.log.warn(logMessage)
                 }
             }
 

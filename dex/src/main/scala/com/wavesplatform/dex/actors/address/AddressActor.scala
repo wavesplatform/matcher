@@ -478,9 +478,7 @@ class AddressActor(
       log.trace(s"[c=${client.path.name}] Added WebSocket subscription")
       wsAddressState = wsAddressState.addSubscription(
         client,
-        mkWsBalances(balances.allAssets, includeEmpty = false).map { case (asset, wsBalances) =>
-          (asset, WsAssetInfo(wsBalances, getAssetDescription(asset).map(_.isNft)))
-        },
+        mkWsBalances(balances.allAssets, includeEmpty = false),
         activeOrders.values.map(WsOrder.fromDomain(_)).to(Seq),
         options
       )
@@ -494,10 +492,7 @@ class AddressActor(
     // It is time to send updates to clients. This block of code asks balances
     case WsCommand.SendDiff =>
       if (wsAddressState.hasActiveSubscriptions && wsAddressState.hasChanges) {
-        val changedAssetInfo: Map[Asset, WsAssetInfo] =
-          mkWsBalances(wsAddressState.changedAssets, includeEmpty = true).map { case (asset, wsBalances) =>
-            (asset, WsAssetInfo(wsBalances, getAssetDescription(asset).map(_.isNft)))
-          }
+        val changedAssetInfo: Map[Asset, WsAssetInfo] = mkWsBalances(wsAddressState.changedAssets, includeEmpty = true)
         wsAddressState = wsAddressState
           .sendDiffs(
             assetInfo = changedAssetInfo,
@@ -561,9 +556,8 @@ class AddressActor(
   private def scheduleNextDiffSending(): Unit =
     if (wsSendSchedule.isCancelled) wsSendSchedule = context.system.scheduler.scheduleOnce(settings.wsMessagesInterval, self, WsCommand.SendDiff)
 
-  private def mkWsBalances(forAssets: Set[Asset], includeEmpty: Boolean): Map[Asset, WsBalances] = forAssets
+  private def mkWsBalances(forAssets: Set[Asset], includeEmpty: Boolean): Map[Asset, WsAssetInfo] = forAssets
     .flatMap { asset =>
-
       efc.assetDecimals(asset) match {
         case None =>
           log.error(s"Can't find asset decimals for $asset")
@@ -572,14 +566,15 @@ class AddressActor(
         case Some(decimals) =>
           val tradable = balances.tradableBalance(asset)
           val reserved = balances.reserved.getOrElse(asset, 0L)
-          if (includeEmpty || tradable > 0 || reserved > 0)
-            List(
-              asset -> WsBalances(
-                tradable = denormalizeAmountAndFee(tradable, decimals).toDouble,
-                reserved = denormalizeAmountAndFee(reserved, decimals).toDouble
-              )
+          if (includeEmpty || tradable > 0 || reserved > 0) {
+            val wsBalances = WsBalances(
+              tradable = denormalizeAmountAndFee(tradable, decimals).toDouble,
+              reserved = denormalizeAmountAndFee(reserved, decimals).toDouble
             )
-          else Nil
+            List(
+              asset -> WsAssetInfo(wsBalances, getAssetDescription(asset).map(_.isNft))
+            )
+          } else Nil
       }
     }
     .to(Map)

@@ -15,7 +15,8 @@ import pdi.jwt.{JwtAlgorithm, JwtJson, JwtOptions}
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
-final case class WsAddressSubscribe(key: Address, authType: String, jwt: String, filters: Set[WsAddressBalancesFilter] = Set.empty) extends WsClientMessage {
+final case class WsAddressSubscribe(key: Address, authType: String, jwt: String, filters: Set[WsAddressBalancesFilter] = Set.empty)
+    extends WsClientMessage {
   override val tpe: String = WsAddressSubscribe.tpe
 
   def validate(jwtPublicKey: String, networkByte: Byte): Either[MatcherError, JwtPayload] =

@@ -14,7 +14,8 @@ object BriefAssetDescription {
     BriefAssetDescription(
       name = Asset.WavesName,
       decimals = 8,
-      hasScript = false
+      hasScript = false,
+      nft = Some(false)
     )
 
   val someWavesDescription: Option[BriefAssetDescription] = Option(wavesDescription)

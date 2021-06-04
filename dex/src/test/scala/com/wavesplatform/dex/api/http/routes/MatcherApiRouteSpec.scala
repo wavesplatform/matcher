@@ -1122,7 +1122,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
   }
 
   private def test[U](f: Route => U, apiKey: String = "", maybeRateCache: Option[RateCache] = None): U = {
-
     val rateCache = maybeRateCache.getOrElse(RateCache(TestRateDb()).futureValue)
 
     val odb = OrderDb.levelDb(settings.orderDb, asyncLevelDb)

@@ -13,7 +13,7 @@ import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.model.Denormalization
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.error.SubscriptionsLimitReached
-import com.wavesplatform.dex.it.test.{InformativeTestStart, Scripts}
+import com.wavesplatform.dex.it.test.Scripts
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.model.{LimitOrder, MarketOrder, OrderStatus}
 import com.wavesplatform.it.WsSuiteBase
@@ -23,7 +23,7 @@ import scala.collection.parallel.CollectionConverters._
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
-class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChecks with InformativeTestStart {
+class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChecks {
 
   override protected val dexInitialSuiteConfig: Config = ConfigFactory
     .parseString(s"""waves.dex {
@@ -329,10 +329,10 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
       "NTF asset" - {
 
-        def validateBalances(wsc: WsConnection, wb: WsBalances, a: KeyPair, nft: Boolean = true): Unit = {
+        def validateBalances(wsc: WsConnection, wb: WsBalances, a: KeyPair, hasNft: Boolean = true): Unit = {
           def assetBalance(asset: String, balance: Double = 1.0): (Asset, WsBalances) = Asset.fromString(asset).get -> WsBalances(balance, 0)
 
-          val nftMap = if (nft) wavesNode1.api.nftAssetsByAddress(a).map(a => assetBalance(a.assetId)) else Map.empty
+          val nftMap = if (hasNft) wavesNode1.api.nftAssetsByAddress(a).map(a => assetBalance(a.assetId)) else Map.empty
 
           assertChanges(wsc)(
             (wavesNode1.api.assetsBalance(a).balances.map(b => assetBalance(b.assetId, b.balance.toDouble))
@@ -354,7 +354,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
           step("shouldn't be in the filtered address stream")
           val wsc2 = mkWsAddressFilteredConnection(acc, Set(WsAddressBalancesFilter.ExcludeNft))
-          validateBalances(wsc2, WsBalances(9, 0), acc, false)
+          validateBalances(wsc2, WsBalances(9, 0), acc, hasNft = false)
           wsc2.close()
 
         }
@@ -397,7 +397,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
           step("shouldn't be in the filtered address stream")
           val wsc2 = mkWsAddressFilteredConnection(dapp, Set(WsAddressBalancesFilter.ExcludeNft))
-          validateBalances(wsc2, WsBalances(100, 0), dapp, false)
+          validateBalances(wsc2, WsBalances(100, 0), dapp, hasNft = false)
           wsc2.close()
         }
 
@@ -442,7 +442,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
           step("shouldn't be in the filtered address stream")
           val wsc2 = mkWsAddressFilteredConnection(acc, Set(WsAddressBalancesFilter.ExcludeNft))
-          validateBalances(wsc2, WsBalances(8.995, 0), acc, false)
+          validateBalances(wsc2, WsBalances(8.995, 0), acc, hasNft = false)
           wsc2.close()
 
         }
@@ -460,7 +460,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           step("shouldn't be in the filtered address stream")
           val wsc2 = mkWsAddressFilteredConnection(acc, Set(WsAddressBalancesFilter.ExcludeNft))
           broadcast(mkIssue(acc, "testAssetNT", 1L, 0))
-          validateBalances(wsc2, WsBalances(8, 0), acc, false)
+          validateBalances(wsc2, WsBalances(8, 0), acc, hasNft = false)
           wsc2.close()
 
         }

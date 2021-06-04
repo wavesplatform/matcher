@@ -80,7 +80,7 @@ inTask(docker)(
 
       val grpcServerDir = unmanagedBase.value
         .listFiles(new FilenameFilter {
-          override def accept(dir: File, name: String): Boolean = name.startsWith("grpc-server") && name.endsWith(".tgz")
+          override def accept(dir: File, name: String): Boolean = name.startsWith("waves-grpc-server") && name.endsWith(".tgz")
         })
         .headOption match {
         case None => throw new RuntimeException("Can't find the grcp-server archive")

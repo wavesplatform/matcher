@@ -354,7 +354,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
           step("shouldn't be in the filtered address stream")
           val wsc2 = mkWsAddressFilteredConnection(acc, Set(WsAddressBalancesFilter.ExcludeNft))
-          validateBalances(wsc2, WsBalances(8, 0), acc, false)
+          validateBalances(wsc2, WsBalances(9, 0), acc, false)
           wsc2.close()
 
         }
@@ -442,7 +442,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
           step("shouldn't be in the filtered address stream")
           val wsc2 = mkWsAddressFilteredConnection(acc, Set(WsAddressBalancesFilter.ExcludeNft))
-          validateBalances(wsc2, WsBalances(7.995, 0), acc, false)
+          validateBalances(wsc2, WsBalances(8.995, 0), acc, false)
           wsc2.close()
 
         }

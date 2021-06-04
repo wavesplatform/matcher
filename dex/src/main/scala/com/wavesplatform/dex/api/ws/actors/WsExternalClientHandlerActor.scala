@@ -185,10 +185,9 @@ object WsExternalClientHandlerActor {
                       addressSubscriptions
                         .find(_._1 == subscribe.key)
                         .fold {
-
                           addressRef ! AddressDirectoryActor.Command.ForwardMessage(
                             subscribe.key,
-                            AddressActor.WsCommand.AddWsSubscription(clientRef)
+                            AddressActor.WsCommand.AddWsSubscription(clientRef, subscribe.filters)
                           )
                           context.log.debug(s"WsAddressSubscribe(k=$address, t=$authType) is successful, will expire in $subscriptionLifetime")
 

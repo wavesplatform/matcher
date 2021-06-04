@@ -2,31 +2,44 @@ package com.wavesplatform.dex.api.ws.state
 
 import akka.actor.typed.ActorRef
 import cats.syntax.option._
-import com.wavesplatform.dex.api.ws.entities.{WsBalances, WsOrder}
+import com.wavesplatform.dex.api.ws.entities.{WsAddressBalancesFilter, WsAssetInfo, WsBalances, WsOrder}
 import com.wavesplatform.dex.api.ws.protocol.WsAddressChanges
+import com.wavesplatform.dex.api.ws.state.WsAddressState.Subscription
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.model.Denormalization._
 import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.model.{AcceptedOrder, OrderStatus}
 
 case class WsAddressState(
   address: Address,
-  activeSubscription: Map[ActorRef[WsAddressChanges], Long],
+  activeSubscription: Map[ActorRef[WsAddressChanges], Subscription],
   changedAssets: Set[Asset],
   ordersChanges: Map[Order.Id, WsOrder],
   previousBalanceChanges: Map[Asset, WsBalances]
-) { // TODO Probably use an ordered Map and pass it to WsAddressChanges
+) extends ScorexLogging { // TODO Probably use an ordered Map and pass it to WsAddressChanges
 
   val hasActiveSubscriptions: Boolean = activeSubscription.nonEmpty
   val hasChanges: Boolean = changedAssets.nonEmpty || ordersChanges.nonEmpty
 
   def getAllOrderChanges: Seq[WsOrder] = ordersChanges.values.toSeq
 
-  def addSubscription(subscriber: ActorRef[WsAddressChanges], balances: Map[Asset, WsBalances], orders: Seq[WsOrder]): WsAddressState = {
+  def addSubscription(
+    subscriber: ActorRef[WsAddressChanges],
+    assetInfo: Map[Asset, WsAssetInfo],
+    orders: Seq[WsOrder],
+    options: Set[WsAddressBalancesFilter]
+  ): WsAddressState = {
+    val balances = assetInfo.filter { v =>
+      checkOptions(v._2, options)
+    }.map {
+      case (asset, info) =>
+        (asset, info.balances)
+    }
     subscriber ! WsAddressChanges(address, balances, orders, 0)
-    copy(activeSubscription = activeSubscription.updated(subscriber, 0))
+    copy(activeSubscription = activeSubscription.updated(subscriber, Subscription(0, options)))
   }
 
   def removeSubscription(subscriber: ActorRef[WsAddressChanges]): WsAddressState = {
@@ -65,22 +78,38 @@ case class WsAddressState(
     )
   }
 
-  def sendDiffs(balances: Map[Asset, WsBalances], orders: Seq[WsOrder]): WsAddressState = copy(
+  def sendDiffs(assetInfo: Map[Asset, WsAssetInfo], orders: Seq[WsOrder]): WsAddressState = copy(
     activeSubscription = activeSubscription.map { // dirty but one pass
-      case (conn, updateId) =>
-        val newUpdateId = WsAddressState.getNextUpdateId(updateId)
-        conn ! WsAddressChanges(address, balances.filterNot(Function.tupled(sameAsInPrevious)), orders, newUpdateId)
-        conn -> newUpdateId
+      case (conn, subscription) =>
+        val newUpdateId = WsAddressState.getNextUpdateId(subscription.updateId)
+        val preparedBalances = assetInfo
+          .filter(v => !sameAsInPrevious(v._1, v._2.balances) && checkOptions(v._2, subscription.options))
+          .map { case (asset, assetInfo) =>
+            log.trace(s"Sending $asset -> $assetInfo")
+            (asset, assetInfo.balances)
+          }
+        conn ! WsAddressChanges(address, preparedBalances, orders, newUpdateId)
+        conn -> subscription.copy(updateId = newUpdateId)
     },
-    previousBalanceChanges = balances
+    previousBalanceChanges = assetInfo.map { case (asset, assetInfo) =>
+      (asset, assetInfo.balances)
+    }
   )
 
   def clean(): WsAddressState = copy(changedAssets = Set.empty, ordersChanges = Map.empty)
 
+  def checkOptions(assetInfo: WsAssetInfo, options: Set[WsAddressBalancesFilter]): Boolean =
+    if (options.contains(WsAddressBalancesFilter.ExcludeNft))
+      assetInfo.isNft.fold(true)(!_)
+    else true
+
   private def sameAsInPrevious(asset: Asset, wsBalances: WsBalances): Boolean = previousBalanceChanges.get(asset).contains(wsBalances)
+
 }
 
 object WsAddressState {
+
+  case class Subscription(updateId: Long, options: Set[WsAddressBalancesFilter])
 
   def empty(address: Address): WsAddressState = WsAddressState(address, Map.empty, Set.empty, Map.empty, Map.empty)
   val numberMaxSafeInteger = 9007199254740991L

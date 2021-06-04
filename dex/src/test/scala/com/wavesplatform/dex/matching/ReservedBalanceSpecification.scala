@@ -17,6 +17,7 @@ import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
+import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderAddedReason, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model.{Events, LimitOrder, MarketOrder}
 import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
@@ -98,6 +99,9 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
     override def getFullBalances(address: Address, exclude: Set[Asset]): Future[AddressBalanceUpdates] = emptyAddressBalanceUpdatesF
   }
 
+  private def assetBriefInfo: Asset => Option[BriefAssetDescription] =
+    asset => Some(new BriefAssetDescription(asset.toString, 2, hasScript = false, nft = Some(false)))
+
   private def createAddressActor(address: Address, recovered: Boolean): Props =
     Props(
       new AddressActor(
@@ -107,7 +111,8 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
         (_, _) => Future.successful(Right(())),
         _ => Future.failed(new IllegalStateException("Should not be used in the test")),
         recovered,
-        blockchainInteraction
+        blockchainInteraction,
+        getAssetDescription = assetBriefInfo
       )
     )
 
@@ -494,7 +499,8 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
             Future.successful(Some(ValidatedCommandWithMeta(0L, System.currentTimeMillis, command)))
           },
           recovered,
-          blockchainInteraction
+          blockchainInteraction,
+          getAssetDescription = assetBriefInfo
         )
       )
 

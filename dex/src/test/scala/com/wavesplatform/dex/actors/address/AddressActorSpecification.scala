@@ -20,6 +20,7 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV1}
 import com.wavesplatform.dex.domain.state.{LeaseBalance, Portfolio}
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError, UnexpectedError}
 import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
+import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderAddedReason, OrderCancelFailed}
 import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder, MarketOrder}
 import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
@@ -93,6 +94,9 @@ class AddressActorSpecification
 
   private val sellWavesPortfolio = requiredPortfolio(sellWavesOrder)
 
+  private def assetBriefInfo: Asset => Option[BriefAssetDescription] =
+    asset => Some(new BriefAssetDescription(asset.toString, 2, hasScript = false, nft = Some(false)))
+
   "AddressActorSpecification" should {
     val failed = Future.failed(new RuntimeException("test"))
     val kp = KeyPair(ByteStr("test".getBytes(StandardCharsets.UTF_8)))
@@ -112,7 +116,8 @@ class AddressActorSpecification
             (_: Address, _: Set[Asset]) => {
               requested = true
               failed
-            }
+            },
+            getAssetDescription = assetBriefInfo
           )
         )
 
@@ -408,7 +413,8 @@ class AddressActorSpecification
             Future.successful(Some(ValidatedCommandWithMeta(0L, 0L, command)))
           },
           recovered,
-          blockchainInteraction
+          blockchainInteraction,
+          getAssetDescription = assetBriefInfo
         )
       )
 

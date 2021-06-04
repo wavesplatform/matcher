@@ -17,6 +17,7 @@ import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.state.{LeaseBalance, Portfolio}
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
+import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderAddedReason, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder, MarketOrder, _}
@@ -50,6 +51,9 @@ class ActorsWebSocketInteractionsSpecification
     val currentPortfolio = new AtomicReference[Portfolio](Portfolio.empty)
     val address = KeyPair("test".getBytes)
 
+    private def assetBriefInfo: Asset => Option[BriefAssetDescription] =
+      asset => Some(new BriefAssetDescription(asset.toString, 2, hasScript = false, nft = Some(false)))
+
     val blockchainInteraction = new BlockchainInteraction {
 
       override def getFullBalances(a: Address, exclude: Set[Asset]): Future[AddressBalanceUpdates] =
@@ -76,7 +80,8 @@ class ActorsWebSocketInteractionsSpecification
             Future.successful(Some(ValidatedCommandWithMeta(0L, 0L, command)))
           },
           recovered,
-          blockchainInteraction
+          blockchainInteraction,
+          getAssetDescription = assetBriefInfo
         )(efc)
       )
 

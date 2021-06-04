@@ -341,7 +341,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           )()
         }
 
-        "issued via IssueTx" ignore {
+        "issued via IssueTx" in {
 
           val acc = mkAccountWithBalance(10.waves -> Waves)
 
@@ -359,7 +359,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
         }
 
-        "issued via InvokeTx should be in the address stream" ignore {
+        "issued via InvokeTx should be in the address stream" in {
 
           /*
             {-# STDLIB_VERSION 4 #-}
@@ -401,7 +401,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           wsc2.close()
         }
 
-        "issued via InvokeTx and then transferred by the script should be in the recipient's address stream" ignore {
+        "issued via InvokeTx and then transferred by the script should be in the recipient's address stream" in {
 
           /*
            {-# STDLIB_VERSION 4 #-}
@@ -447,7 +447,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
         }
 
-        "issued after connection has been established" ignore {
+        "issued after connection has been established" in {
 
           val acc = mkAccountWithBalance(10.waves -> Waves)
 

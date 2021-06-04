@@ -9,6 +9,7 @@ import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
+import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.queue.ValidatedCommandWithMeta
 import com.wavesplatform.dex.time.Time
 
@@ -28,6 +29,9 @@ class OrderHistoryStub(system: ActorSystem, time: Time, maxActiveOrders: Int, ma
     override def getFullBalances(address: Address, exclude: Set[Asset]): Future[AddressBalanceUpdates] = emptyAddressBalanceUpdatesF
   }
 
+  private def assetBriefInfo: Asset => Option[BriefAssetDescription] =
+    asset => Some(new BriefAssetDescription(asset.toString, 2, hasScript = false, nft = Some(false)))
+
   def createAddressActor(address: Address, recovered: Boolean): Props =
     Props(
       new AddressActor(
@@ -38,7 +42,8 @@ class OrderHistoryStub(system: ActorSystem, time: Time, maxActiveOrders: Int, ma
         e => Future.successful(Some(ValidatedCommandWithMeta(0L, 0, e))),
         recovered,
         blockchainInteraction,
-        AddressActor.Settings.default.copy(maxActiveOrders = maxActiveOrders)
+        AddressActor.Settings.default.copy(maxActiveOrders = maxActiveOrders),
+        assetBriefInfo
       )
     )
 

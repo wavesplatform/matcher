@@ -723,27 +723,22 @@ class MatcherApiRoute(
   def cancelByApi: Route =
     (path("cancel" / OrderPM) & post) { orderIdOrError =>
       (measureResponse("cancelByApi") & protect) {
-        (withAuth & withUserPublicKeyOpt) { userPublicKey =>
+        (withAuth & withUserPublicKeyOpt) { maybeUserPublicKey =>
           withOrderId(orderIdOrError) { orderId =>
-            def reject =
-              ToResponseMarshallable(OrderCancelRejected(error.OrderNotFound(orderId)))
-
-            val future =
-              orderDb.get(orderId).flatMap { maybeOrder =>
-                (maybeOrder, userPublicKey) match {
-                  case (None, _) =>
-                    Future.successful(reject)
-                  case (Some(order), Some(pk)) if pk.toAddress != order.sender.toAddress =>
-                    Future.successful(reject)
-                  case (Some(order), _) =>
-                    handleCancelRequestToFuture(None, order.sender, Some(orderId), None)
-                }
-              }.recover { case th =>
-                log.error("error while cancelling order", th)
-                ToResponseMarshallable(entities.InternalError)
+            complete {
+              maybeUserPublicKey match {
+                case Some(userPublicKey) =>
+                  handleCancelRequestToFuture(None, userPublicKey.toAddress, Some(orderId), None)
+                case None =>
+                  orderDb.get(orderId).flatMap {
+                    case Some(order) => handleCancelRequestToFuture(None, order.sender, Some(orderId), None)
+                    case None => Future.successful(ToResponseMarshallable(OrderCancelRejected(error.OrderNotFound(orderId))))
+                  }.recover { case th =>
+                    log.error("error while cancelling order", th)
+                    ToResponseMarshallable(entities.InternalError)
+                  }
               }
-
-            complete(future)
+            }
           }
         }
       }

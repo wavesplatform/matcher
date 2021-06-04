@@ -94,12 +94,18 @@ trait HasWebSockets extends BeforeAndAfterAll with BeforeAndAfterEach with HasJw
       wsc.clearMessages()
     }
 
-  protected def assertChanges(c: WsConnection, squash: Boolean = true)(expBs: Map[Asset, WsBalances]*)(expOs: WsOrder*): Unit = {
+  protected def assertChanges(
+    c: WsConnection,
+    squash: Boolean = true,
+    onlySquashed: Boolean = false
+  )(expBs: Map[Asset, WsBalances]*)(expOs: WsOrder*): Unit = {
     eventually {
       if (squash) {
-        c.balanceChanges.size should be <= expBs.size
+        if (onlySquashed == false) {
+          c.balanceChanges.size should be <= expBs.size
+          c.orderChanges.size should be <= expOs.size
+        }
         c.balanceChanges.squashed should matchTo(expBs.toList.squashed)
-        c.orderChanges.size should be <= expOs.size
         c.orderChanges.squashed should matchTo(expOs.toList.squashed)
       } else {
         c.balanceChanges should matchTo(expBs)

@@ -334,7 +334,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
           val nftMap = if (hasNft) wavesNode1.api.nftAssetsByAddress(a).map(a => assetBalance(a.assetId)) else Map.empty
 
-          assertChanges(wsc)(
+          assertChanges(wsc, onlySquashed = true)(
             (wavesNode1.api.assetsBalance(a).balances.map(b => assetBalance(b.assetId, b.balance.toDouble))
             ++ Map(Waves -> wb)
             ++ nftMap).toMap

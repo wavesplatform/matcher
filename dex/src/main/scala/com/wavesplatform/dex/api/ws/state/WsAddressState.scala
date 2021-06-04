@@ -32,12 +32,7 @@ case class WsAddressState(
     orders: Seq[WsOrder],
     options: Set[WsAddressBalancesFilter]
   ): WsAddressState = {
-    val balances = assetInfo.filter { v =>
-      checkOptions(v._2, options)
-    }.map {
-      case (asset, info) =>
-        (asset, info.balances)
-    }
+    val balances = toBalancesMap(assetInfo.filter(v => checkOptions(v._2, options)))
     subscriber ! WsAddressChanges(address, balances, orders, 0)
     copy(activeSubscription = activeSubscription.updated(subscriber, Subscription(0, options)))
   }
@@ -82,18 +77,13 @@ case class WsAddressState(
     activeSubscription = activeSubscription.map { // dirty but one pass
       case (conn, subscription) =>
         val newUpdateId = WsAddressState.getNextUpdateId(subscription.updateId)
-        val preparedBalances = assetInfo
+        val preparedAssetInfo = assetInfo
           .filter(v => !sameAsInPrevious(v._1, v._2.balances) && checkOptions(v._2, subscription.options))
-          .map { case (asset, assetInfo) =>
-            log.trace(s"Sending $asset -> $assetInfo")
-            (asset, assetInfo.balances)
-          }
-        conn ! WsAddressChanges(address, preparedBalances, orders, newUpdateId)
+
+        conn ! WsAddressChanges(address, toBalancesMap(preparedAssetInfo), orders, newUpdateId)
         conn -> subscription.copy(updateId = newUpdateId)
     },
-    previousBalanceChanges = assetInfo.map { case (asset, assetInfo) =>
-      (asset, assetInfo.balances)
-    }
+    previousBalanceChanges = toBalancesMap(assetInfo)
   )
 
   def clean(): WsAddressState = copy(changedAssets = Set.empty, ordersChanges = Map.empty)
@@ -104,6 +94,11 @@ case class WsAddressState(
     else true
 
   private def sameAsInPrevious(asset: Asset, wsBalances: WsBalances): Boolean = previousBalanceChanges.get(asset).contains(wsBalances)
+
+  private def toBalancesMap(assetInfo: Map[Asset, WsAssetInfo]): Map[Asset, WsBalances] = assetInfo.map {
+    case (asset, info) =>
+      (asset, info.balances)
+  }
 
 }
 

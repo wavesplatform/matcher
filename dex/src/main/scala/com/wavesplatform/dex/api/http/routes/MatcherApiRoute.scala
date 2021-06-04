@@ -731,8 +731,8 @@ class MatcherApiRoute(
                   handleCancelRequestToFuture(None, userPublicKey.toAddress, Some(orderId), None)
                 case None =>
                   orderDb.get(orderId).flatMap {
-                    _.map(order => handleCancelRequestToFuture(None, order.sender, Some(orderId), None))
-                      .getOrElse(Future.successful(ToResponseMarshallable(OrderCancelRejected(error.OrderNotFound(orderId)))))
+                    case Some(order) => handleCancelRequestToFuture(None, order.sender, Some(orderId), None)
+                    case None => Future.successful(ToResponseMarshallable(OrderCancelRejected(error.OrderNotFound(orderId))))
                   }.recover { case th =>
                     log.error("error while cancelling order", th)
                     ToResponseMarshallable(entities.InternalError)

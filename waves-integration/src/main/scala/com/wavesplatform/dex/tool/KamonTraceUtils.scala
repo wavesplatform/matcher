@@ -1,13 +1,12 @@
 package com.wavesplatform.dex.tool
 
 import kamon.Kamon
-import kamon.context.{BinaryPropagation, Context, Storage}
+import kamon.context.{BinaryPropagation, Context}
 import kamon.trace.Span
 import kamon.trace.Trace.SamplingDecision
 import kamon.trace.Tracer.PreFinishHook
 
 import java.io.ByteArrayOutputStream
-import scala.concurrent.{ExecutionContext, Future}
 
 object KamonTraceUtils {
 
@@ -24,28 +23,6 @@ object KamonTraceUtils {
     Kamon.currentSpan().takeSamplingDecision()
 
     Kamon.currentSpan().name(name)
-  }
-
-  //https://github.com/kamon-io/Kamon/issues/829
-  def propagateTraceCtxThroughCachedFuture[A](future: => Future[A])(implicit ec: ExecutionContext): Future[A] = {
-    val span = mkIgnoredSpan()
-    val scope = Kamon.storeContext(Kamon.currentContext().withEntry(Span.Key, span))
-
-    try future.transform(
-      res => {
-        finishSpanAndContextScope(span, scope)
-        res
-      },
-      err => {
-        failSpanAndContextScope(span, scope, err)
-        err
-      }
-    )
-    catch {
-      case e: Throwable =>
-        failSpanAndContextScope(span, scope, e)
-        throw e
-    }
   }
 
   def runWithIgnoredSpan[A](f: => A): A = {
@@ -84,17 +61,6 @@ object KamonTraceUtils {
       .samplingDecision(DoNotSample)
       .traceId(Kamon.currentSpan().trace.id)
       .start()
-
-  private def finishSpanAndContextScope(span: Span, scope: Storage.Scope): Unit = {
-    span.finish()
-    scope.close()
-  }
-
-  private def failSpanAndContextScope(span: Span, scope: Storage.Scope, throwable: Throwable): Unit = {
-    span.fail(throwable.getMessage, throwable)
-    span.finish()
-    scope.close()
-  }
 
   final class FilteringRejectedHook extends PreFinishHook {
 

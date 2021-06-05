@@ -36,7 +36,7 @@ object Dependencies {
     val silencer = "1.7.2"
 
     val kanela = "1.0.9"
-    val kamon = "2.1.17"
+    val kamon = "2.2.0"
 
     val wavesProtobufSchemas = "1.3.1"
     val wavesJ = "1.0.1"

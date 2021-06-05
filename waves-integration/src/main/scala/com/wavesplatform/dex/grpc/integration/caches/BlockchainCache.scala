@@ -2,7 +2,6 @@ package com.wavesplatform.dex.grpc.integration.caches
 
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.tool.KamonTraceUtils.propagateTraceCtxThroughCachedFuture
 
 import java.time.Duration
 import scala.concurrent.{ExecutionContext, Future}
@@ -40,8 +39,7 @@ abstract class BlockchainCache[K <: AnyRef, V <: AnyRef](
       }
   }
 
-  def get(key: K): Future[V] =
-    propagateTraceCtxThroughCachedFuture(cache.get(key))
+  def get(key: K): Future[V] = cache.get(key)
 
   def put(key: K, value: Future[V]): Unit = cache.put(key, value)
 }

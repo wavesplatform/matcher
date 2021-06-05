@@ -73,7 +73,7 @@ object OrderV2 extends EntityParser[OrderV2] {
     unsigned.copy(proofs = Proofs(List(ByteStr(sig))))
   }
 
-  override def statefulParse: Stateful[(ConsumedBytesOffset, OrderV2)] =
+  override def statefulParse: Stateful[(OrderV2, ConsumedBytesOffset)] =
     for {
       _ <- read[Byte].map(v => if (v != 2) throw new Exception(s"Incorrect order version: expect 2 but found $v"))
       sender <- read[PublicKey]
@@ -88,7 +88,7 @@ object OrderV2 extends EntityParser[OrderV2] {
       matcherFee <- read[Long]
       proofs <- read[Proofs]
       offset <- read[ConsumedBytesOffset]
-    } yield offset -> OrderV2(
+    } yield OrderV2(
       sender,
       matcher,
       AssetPair(amountAsset, priceAsset),
@@ -99,6 +99,6 @@ object OrderV2 extends EntityParser[OrderV2] {
       expiration,
       matcherFee,
       proofs
-    )
+    ) -> offset
 
 }

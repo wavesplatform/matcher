@@ -110,7 +110,7 @@ object ValidatedCommand {
     xs.head match {
       case 1 =>
         val bodyBytes = xs.tail
-        val (offset, order) = Order.fromBytes(bodyBytes(0), bodyBytes.slice(1, Int.MaxValue))
+        val (order, offset) = Order.fromBytes(bodyBytes(0), bodyBytes.slice(1, Int.MaxValue))
         val maybeCtx = readMaybeCtx(bodyBytes.drop(offset.value + 1))
         PlaceOrder(LimitOrder(order), maybeCtx)
       case 2 =>
@@ -126,17 +126,15 @@ object ValidatedCommand {
       case 3 =>
         val bodyBytes = xs.tail
         val (assetPair, offset) = AssetPair.fromBytes(bodyBytes)
-        val remainingBytes = bodyBytes.drop(offset)
-        val ctx = readMaybeCtx(remainingBytes)
-        DeleteOrderBook(assetPair, ctx)
+        val maybeCtx = readMaybeCtx(bodyBytes.drop(offset))
+        DeleteOrderBook(assetPair, maybeCtx)
       case 4 =>
         val bodyBytes = xs.tail
         val afs = Longs.fromByteArray(bodyBytes.slice(0, 8))
-        val (offset, order) = Order.fromBytes(bodyBytes(8), bodyBytes.slice(9, Int.MaxValue))
+        val (order, offset) = Order.fromBytes(bodyBytes(8), bodyBytes.slice(9, Int.MaxValue))
         val consumedBytesLen = offset.value + 1
-        val remainingBytes = bodyBytes.drop(8 + consumedBytesLen)
-        val ctx = readMaybeCtx(remainingBytes)
-        PlaceMarketOrder(MarketOrder(order, afs), ctx)
+        val maybeCtx = readMaybeCtx(bodyBytes.drop(8 + consumedBytesLen))
+        PlaceMarketOrder(MarketOrder(order, afs), maybeCtx)
       case x =>
         throw new IllegalArgumentException(s"Unknown command type: $x")
     }
@@ -149,8 +147,8 @@ object ValidatedCommand {
     Source.BalanceTracking -> Array(3)
   )
 
-  private def writeMaybeCtx(ctx: Option[Context]): Array[Byte] =
-    ctx.map(writeCtx).getOrElse(Array.emptyByteArray)
+  private def writeMaybeCtx(maybeCtx: Option[Context]): Array[Byte] =
+    maybeCtx.map(writeCtx).getOrElse(Array.emptyByteArray)
 
   private def readMaybeCtx(bytes: Array[Byte]): Option[Context] =
     if (bytes.length > 0)

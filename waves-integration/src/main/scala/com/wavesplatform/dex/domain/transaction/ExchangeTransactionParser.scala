@@ -9,7 +9,7 @@ trait ExchangeTransactionParser[T <: ExchangeTransaction] extends EntityParser[T
 
   protected def parseHeader(bytes: Array[Byte]): Try[Int]
 
-  override def parseBytes(bytes: Array[Byte]): Try[(ConsumedBytesOffset, T)] =
+  override def parseBytes(bytes: Array[Byte]): Try[(T, ConsumedBytesOffset)] =
     parseHeader(bytes) flatMap (offset => super.parseBytes(bytes drop offset))
 
 }

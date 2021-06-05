@@ -17,9 +17,9 @@ trait EntityParser[E] {
 
   protected def read[R: Stateful]: Stateful[R] = implicitly
 
-  private[domain] def statefulParse: Stateful[(ConsumedBytesOffset, E)]
+  private[domain] def statefulParse: Stateful[(E, ConsumedBytesOffset)]
 
-  def parseBytes(bytes: Array[Byte]): Try[(ConsumedBytesOffset, E)] = Try(statefulParse.runA(S(0, bytes)).value)
+  def parseBytes(bytes: Array[Byte]): Try[(E, ConsumedBytesOffset)] = Try(statefulParse.runA(S(0, bytes)).value)
 }
 
 object EntityParser {

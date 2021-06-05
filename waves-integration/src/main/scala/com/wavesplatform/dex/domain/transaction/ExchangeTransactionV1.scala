@@ -101,12 +101,12 @@ object ExchangeTransactionV1 extends ExchangeTransactionParser[ExchangeTransacti
     1
   }
 
-  override def statefulParse: Stateful[(ConsumedBytesOffset, ExchangeTransactionV1)] =
+  override def statefulParse: Stateful[(ExchangeTransactionV1, ConsumedBytesOffset)] =
     for {
       _ <- read[Int]
       _ <- read[Int]
-      (_, buyOrder) <- OrderV1.statefulParse
-      (_, sellOrder) <- OrderV1.statefulParse
+      (buyOrder, _) <- OrderV1.statefulParse
+      (sellOrder, _) <- OrderV1.statefulParse
       price <- read[Long]
       amount <- read[Long]
       buyMatcherFee <- read[Long]
@@ -115,6 +115,6 @@ object ExchangeTransactionV1 extends ExchangeTransactionParser[ExchangeTransacti
       timestamp <- read[Long]
       signature <- read[Signature]
       offset <- read[ConsumedBytesOffset]
-    } yield offset -> ExchangeTransactionV1(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, signature)
+    } yield ExchangeTransactionV1(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, signature) -> offset
 
 }

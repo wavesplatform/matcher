@@ -119,8 +119,8 @@ object ValidatedCommand {
         val offset2 = offset1 + DigestSize
         val orderId = ByteStr(bodyBytes.slice(offset1, offset2))
         val source = bytesToSource(bodyBytes.drop(offset2))
-        val (maybeOwner, len) = readMaybeAddress(bodyBytes.slice(offset2 + 1, offset2 + 1 + Address.AddressLength))
-        val offset3 = offset2 + 1 + len
+        val maybeOwner = readMaybeAddress(bodyBytes.slice(offset2 + 1, offset2 + 1 + Address.AddressLength))
+        val offset3 = offset2 + 1 + maybeOwner.fold(0)(_ => Address.AddressLength)
         val maybeCtx = readMaybeCtx(bodyBytes.drop(offset3))
         CancelOrder(assetPair, orderId, source, maybeOwner, maybeCtx)
       case 3 =>
@@ -132,8 +132,7 @@ object ValidatedCommand {
         val bodyBytes = xs.tail
         val afs = Longs.fromByteArray(bodyBytes.slice(0, 8))
         val (order, offset) = Order.fromBytes(bodyBytes(8), bodyBytes.slice(9, Int.MaxValue))
-        val consumedBytesLen = offset.value + 1
-        val maybeCtx = readMaybeCtx(bodyBytes.drop(8 + consumedBytesLen))
+        val maybeCtx = readMaybeCtx(bodyBytes.drop(8 + offset.value + 1))
         PlaceMarketOrder(MarketOrder(order, afs), maybeCtx)
       case x =>
         throw new IllegalArgumentException(s"Unknown command type: $x")
@@ -151,21 +150,13 @@ object ValidatedCommand {
     maybeCtx.map(writeCtx).getOrElse(Array.emptyByteArray)
 
   private def readMaybeCtx(bytes: Array[Byte]): Option[Context] =
-    if (bytes.length > 0)
-      Either.catchNonFatal(readCtx(bytes)).toOption
-    else
-      None
+    Either.catchNonFatal(readCtx(bytes)).toOption
 
   private def writeMaybeAddress(maybeAddress: Option[Address]): Array[Byte] =
     maybeAddress.map(_.bytes.arr).getOrElse(Array.emptyByteArray)
 
-  private def readMaybeAddress(bytes: Array[Byte]): (Option[Address], Int) = {
-    val maybeAddress = Address.fromBytes(bytes).toOption
-    if (maybeAddress.isDefined)
-      maybeAddress -> Address.AddressLength
-    else
-      maybeAddress -> 0
-  }
+  private def readMaybeAddress(bytes: Array[Byte]): Option[Address] =
+    Address.fromBytes(bytes).toOption
 
   private def bytesToSource(xs: Array[Byte]): Source =
     if (xs.isEmpty) Source.NotTracked

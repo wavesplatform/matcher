@@ -52,8 +52,13 @@ object ValidatedCommand {
 
   }
 
-  final case class CancelOrder(assetPair: AssetPair, orderId: Order.Id, source: Source, maybeOwner: Option[Address], maybeCtx: Option[Context] = Some(Kamon.currentContext()))
-      extends ValidatedCommand {
+  final case class CancelOrder(
+    assetPair: AssetPair,
+    orderId: Order.Id,
+    source: Source,
+    maybeOwner: Option[Address],
+    maybeCtx: Option[Context] = Some(Kamon.currentContext())
+  ) extends ValidatedCommand {
     override def toString: String = s"CancelOrder($orderId, ${assetPair.key}, $source, $maybeOwner)"
 
     override def hashCode(): Int = productHash((assetPair, orderId, source))
@@ -63,6 +68,7 @@ object ValidatedCommand {
         assetPair == that.assetPair && orderId == that.orderId && source == that.source && maybeOwner == that.maybeOwner
       case _ => false
     }
+
   }
 
   final case class DeleteOrderBook(assetPair: AssetPair, maybeCtx: Option[Context] = Some(Kamon.currentContext())) extends ValidatedCommand {
@@ -88,51 +94,40 @@ object ValidatedCommand {
 
   }
 
-  def toBytes(x: ValidatedCommand): Array[Byte] = {
-    def writeCtxOpt(ctx: Option[Context]): Array[Byte] =
-      ctx.map(writeCtx).getOrElse(Array.emptyByteArray)
-
+  def toBytes(x: ValidatedCommand): Array[Byte] =
     x match {
-      case PlaceOrder(lo, ctx) =>
-        (1: Byte) +: Array.concat(Array(lo.order.version), lo.order.bytes(), writeCtxOpt(ctx))
-      case CancelOrder(assetPair, orderId, source, ctx) =>
-        (2: Byte) +: Array.concat(assetPair.bytes, orderId.arr, sourceToBytes(source), writeCtxOpt(ctx))
+      case PlaceOrder(lo, maybeCtx) =>
+        (1: Byte) +: Array.concat(Array(lo.order.version), lo.order.bytes(), writeMaybeCtx(maybeCtx))
+      case CancelOrder(assetPair, orderId, source, maybeOwner, maybeCtx) =>
+        (2: Byte) +: Array.concat(assetPair.bytes, orderId.arr, sourceToBytes(source), writeMaybeAddress(maybeOwner), writeMaybeCtx(maybeCtx))
       case DeleteOrderBook(assetPair, ctx) =>
-        (3: Byte) +: Array.concat(assetPair.bytes, writeCtxOpt(ctx))
+        (3: Byte) +: Array.concat(assetPair.bytes, writeMaybeCtx(ctx))
       case PlaceMarketOrder(mo, ctx) =>
-        (4: Byte) +: Array.concat(Longs.toByteArray(mo.availableForSpending), Array(mo.order.version), mo.order.bytes(), writeCtxOpt(ctx))
+        (4: Byte) +: Array.concat(Longs.toByteArray(mo.availableForSpending), Array(mo.order.version), mo.order.bytes(), writeMaybeCtx(ctx))
     }
-  }
 
-  def fromBytes(xs: Array[Byte]): ValidatedCommand = {
-    def readCtxOpt(bytes: Array[Byte]): Option[Context] =
-      if (bytes.length > 0)
-        Either.catchNonFatal(readCtx(bytes)).toOption
-      else
-        None
-
+  def fromBytes(xs: Array[Byte]): ValidatedCommand =
     xs.head match {
       case 1 =>
         val bodyBytes = xs.tail
         val (offset, order) = Order.fromBytes(bodyBytes(0), bodyBytes.slice(1, Int.MaxValue))
-        val consumedBytesLen = offset.value + 1
-        val remainingBytes = bodyBytes.drop(consumedBytesLen)
-        val ctx = readCtxOpt(remainingBytes)
-        PlaceOrder(LimitOrder(order), ctx)
+        val maybeCtx = readMaybeCtx(bodyBytes.drop(offset.value + 1))
+        PlaceOrder(LimitOrder(order), maybeCtx)
       case 2 =>
         val bodyBytes = xs.tail
         val (assetPair, offset1) = AssetPair.fromBytes(bodyBytes)
         val offset2 = offset1 + DigestSize
         val orderId = ByteStr(bodyBytes.slice(offset1, offset2))
         val source = bytesToSource(bodyBytes.drop(offset2))
-        val remainingBytes = bodyBytes.drop(offset2 + 1)
-        val ctx = readCtxOpt(remainingBytes)
-        CancelOrder(assetPair, orderId, source, ctx)
+        val (maybeOwner, len) = readMaybeAddress(bodyBytes.drop(offset2 + 1))
+        val offset3 = offset2 + 1 + len
+        val maybeCtx = readMaybeCtx(bodyBytes.drop(offset3))
+        CancelOrder(assetPair, orderId, source, maybeOwner, maybeCtx)
       case 3 =>
         val bodyBytes = xs.tail
         val (assetPair, offset) = AssetPair.fromBytes(bodyBytes)
         val remainingBytes = bodyBytes.drop(offset)
-        val ctx = readCtxOpt(remainingBytes)
+        val ctx = readMaybeCtx(remainingBytes)
         DeleteOrderBook(assetPair, ctx)
       case 4 =>
         val bodyBytes = xs.tail
@@ -140,12 +135,11 @@ object ValidatedCommand {
         val (offset, order) = Order.fromBytes(bodyBytes(8), bodyBytes.slice(9, Int.MaxValue))
         val consumedBytesLen = offset.value + 1
         val remainingBytes = bodyBytes.drop(8 + consumedBytesLen)
-        val ctx = readCtxOpt(remainingBytes)
+        val ctx = readMaybeCtx(remainingBytes)
         PlaceMarketOrder(MarketOrder(order, afs), ctx)
       case x =>
         throw new IllegalArgumentException(s"Unknown command type: $x")
     }
-  }
 
   // Pre-allocated
   private val sourceToBytes: Map[Source, Array[Byte]] = Map(
@@ -155,16 +149,27 @@ object ValidatedCommand {
     Source.BalanceTracking -> Array(3)
   )
 
+  private def writeMaybeCtx(ctx: Option[Context]): Array[Byte] =
+    ctx.map(writeCtx).getOrElse(Array.emptyByteArray)
+
+  private def readMaybeCtx(bytes: Array[Byte]): Option[Context] =
+    if (bytes.length > 0)
+      Either.catchNonFatal(readCtx(bytes)).toOption
+    else
+      None
+
   private def writeMaybeAddress(maybeAddress: Option[Address]): Array[Byte] =
     maybeAddress.map(_.bytes.arr).getOrElse(Array.emptyByteArray)
 
-  private def readMaybeAddress(bytes: Array[Byte]): (Option[Address], Int) = {
-    val maybeAddress = Address.fromBytes(bytes).toOption
-    if (maybeAddress.isDefined)
-      maybeAddress -> Address.AddressLength
-    else
-      maybeAddress -> 0
-  }
+  private def readMaybeAddress(bytes: Array[Byte]): (Option[Address], Int) =
+    if (bytes.length > 0) {
+      val maybeAddress = Address.fromBytes(bytes).toOption
+      if (maybeAddress.isDefined)
+        maybeAddress -> Address.AddressLength
+      else
+        maybeAddress -> 0
+    } else
+      None -> 0
 
   private def bytesToSource(xs: Array[Byte]): Source =
     if (xs.isEmpty) Source.NotTracked

@@ -61,7 +61,7 @@ object ValidatedCommand {
   ) extends ValidatedCommand {
     override def toString: String = s"CancelOrder($orderId, ${assetPair.key}, $source, $maybeOwner)"
 
-    override def hashCode(): Int = productHash((assetPair, orderId, source))
+    override def hashCode(): Int = productHash((assetPair, orderId, source, maybeOwner))
 
     override def equals(obj: Any): Boolean = obj match {
       case that: CancelOrder =>

@@ -119,7 +119,7 @@ object ValidatedCommand {
         val offset2 = offset1 + DigestSize
         val orderId = ByteStr(bodyBytes.slice(offset1, offset2))
         val source = bytesToSource(bodyBytes.drop(offset2))
-        val (maybeOwner, len) = readMaybeAddress(bodyBytes.drop(offset2 + 1))
+        val (maybeOwner, len) = readMaybeAddress(bodyBytes.slice(offset2 + 1, offset2 + 1 + Address.AddressLength))
         val offset3 = offset2 + 1 + len
         val maybeCtx = readMaybeCtx(bodyBytes.drop(offset3))
         CancelOrder(assetPair, orderId, source, maybeOwner, maybeCtx)
@@ -159,15 +159,13 @@ object ValidatedCommand {
   private def writeMaybeAddress(maybeAddress: Option[Address]): Array[Byte] =
     maybeAddress.map(_.bytes.arr).getOrElse(Array.emptyByteArray)
 
-  private def readMaybeAddress(bytes: Array[Byte]): (Option[Address], Int) =
-    if (bytes.length > 0) {
-      val maybeAddress = Address.fromBytes(bytes).toOption
-      if (maybeAddress.isDefined)
-        maybeAddress -> Address.AddressLength
-      else
-        maybeAddress -> 0
-    } else
-      None -> 0
+  private def readMaybeAddress(bytes: Array[Byte]): (Option[Address], Int) = {
+    val maybeAddress = Address.fromBytes(bytes).toOption
+    if (maybeAddress.isDefined)
+      maybeAddress -> Address.AddressLength
+    else
+      maybeAddress -> 0
+  }
 
   private def bytesToSource(xs: Array[Byte]): Source =
     if (xs.isEmpty) Source.NotTracked

@@ -52,21 +52,21 @@ trait MatcherSpecBase
 
   implicit override def patienceConfig: PatienceConfig = PatienceConfig(2.seconds, 5.millis)
 
-  implicit protected val wsErrorDiff: Derived[Diff[WsError]] = Derived(Diff.gen[WsError].ignore[WsError, Long](_.timestamp))
+  implicit protected def wsErrorDiff: Derived[Diff[WsError]] = Derived(Diff.gen[WsError].ignore[WsError, Long](_.timestamp))
 
-  implicit protected val placeOrderDiff: Derived[Diff[PlaceOrder]] =
+  implicit protected def placeOrderDiff: Derived[Diff[PlaceOrder]] =
     Derived(Diff.gen[PlaceOrder].ignore[PlaceOrder, Option[Context]](_.maybeCtx))
 
-  implicit protected val placeMarketOrderDiff: Derived[Diff[PlaceMarketOrder]] =
+  implicit protected def placeMarketOrderDiff: Derived[Diff[PlaceMarketOrder]] =
     Derived(Diff.gen[PlaceMarketOrder].ignore[PlaceMarketOrder, Option[Context]](_.maybeCtx))
 
-  implicit protected val cancelOrderDiff: Derived[Diff[CancelOrder]] =
+  implicit protected def cancelOrderDiff: Derived[Diff[CancelOrder]] =
     Derived(Diff.gen[CancelOrder].ignore[CancelOrder, Option[Context]](_.maybeCtx))
 
-  implicit protected val deleteOrderBookDiff: Derived[Diff[DeleteOrderBook]] =
+  implicit protected def deleteOrderBookDiff: Derived[Diff[DeleteOrderBook]] =
     Derived(Diff.gen[DeleteOrderBook].ignore[DeleteOrderBook, Option[Context]](_.maybeCtx))
 
-  implicit protected val orderCanceledDiff: Derived[Diff[OrderCanceled]] =
+  implicit protected def orderCanceledDiff: Derived[Diff[OrderCanceled]] =
     Derived(Diff.gen[OrderCanceled].value.ignore[OrderCanceled, Long](_.timestamp))
 
   private val WalletSeed: ByteStr = ByteStr("Matcher".getBytes("utf-8"))

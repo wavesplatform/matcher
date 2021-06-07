@@ -240,8 +240,7 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
           BriefAssetDescription(
             name = IssueUsdTx.name(),
             decimals = IssueUsdTx.decimals(),
-            hasScript = false,
-            nft = Some(false)
+            hasScript = false
           )
         )
       )

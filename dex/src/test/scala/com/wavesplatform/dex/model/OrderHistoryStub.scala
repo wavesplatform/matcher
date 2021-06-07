@@ -7,7 +7,6 @@ import com.wavesplatform.dex.db.{EmptyOrderDb, TestOrderDb}
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.bytes.ByteStr
-import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.queue.ValidatedCommandWithMeta
@@ -17,8 +16,6 @@ import scala.collection.mutable
 import scala.concurrent.Future
 
 class OrderHistoryStub(system: ActorSystem, time: Time, maxActiveOrders: Int, maxFinalizedOrders: Int) {
-
-  implicit private val efc: ErrorFormatterContext = ErrorFormatterContext.from(_ => 8)
 
   private val refs = mutable.AnyRefMap.empty[Address, ActorRef]
   private val orders = mutable.AnyRefMap.empty[ByteStr, Address]

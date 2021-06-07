@@ -15,7 +15,6 @@ import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderAddedReason, OrderCanceled, OrderExecuted}
@@ -77,8 +76,6 @@ import scala.util.Success
 class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike with WithDb with MatcherSpecBase with TableDrivenPropertyChecks {
 
   import system.dispatcher
-
-  implicit private val efc: ErrorFormatterContext = ErrorFormatterContext.from(_ => 8)
 
   private val pair: AssetPair = AssetPair(mkAssetId("WAVES"), mkAssetId("USD"))
 

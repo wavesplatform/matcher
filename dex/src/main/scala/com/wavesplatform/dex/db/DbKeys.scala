@@ -16,7 +16,6 @@ import com.wavesplatform.dex.model.{OrderBookSnapshot, OrderInfo}
 import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 
 import scala.collection.mutable
-import scala.util.Try
 
 object DbKeys {
 
@@ -130,7 +129,8 @@ object DbKeys {
         bb.get(name)
         val decimals = bb.getInt
         val hasScript = bb.get == 1
-        val isNft = Try(bb.get).fold(_ => false, _ == 1)
+        // for backward compatibility check if there is byte for isNft
+        val isNft = if (bb.hasRemaining) bb.get == 1 else false
 
         BriefAssetDescription(new String(name, StandardCharsets.UTF_8), decimals, hasScript, isNft)
       },

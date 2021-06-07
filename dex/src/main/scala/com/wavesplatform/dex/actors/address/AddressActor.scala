@@ -557,7 +557,7 @@ class AddressActor(
   private def scheduleNextDiffSending(): Unit =
     if (wsSendSchedule.isCancelled) wsSendSchedule = context.system.scheduler.scheduleOnce(settings.wsMessagesInterval, self, WsCommand.SendDiff)
 
-  private def mkWsBalances(forAssets: Set[Asset], includeEmpty: Boolean): List[WsAssetInfo] = forAssets
+  private def mkWsBalances(forAssets: Set[Asset], includeEmpty: Boolean): Map[Asset, WsAssetInfo] = forAssets
     .flatMap { asset =>
       val assetDescription = getAssetDescription(asset)
       val tradable = balances.tradableBalance(asset)
@@ -568,10 +568,10 @@ class AddressActor(
           reserved = denormalizeAmountAndFee(reserved, assetDescription.decimals).toDouble
         )
         List(
-          WsAssetInfo(asset, wsBalances, assetDescription.isNft)
+          asset -> WsAssetInfo(wsBalances, assetDescription.isNft)
         )
       } else Nil
-    }.toList
+    }.to(Map)
 
   private def isCancelling(id: Order.Id): Boolean = pendingCommands.get(id).exists(_.command.isInstanceOf[Command.CancelOrder])
 

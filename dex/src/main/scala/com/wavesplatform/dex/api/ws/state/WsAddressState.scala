@@ -27,11 +27,13 @@ case class WsAddressState(
 
   def addSubscription(
     subscriber: ActorRef[WsAddressChanges],
-    assetInfo: Seq[WsAssetInfo],
+    assetInfo: Map[Asset, WsAssetInfo],
     orders: Seq[WsOrder],
     options: Set[WsAddressBalancesFilter]
   ): WsAddressState = {
-    val balances = toBalancesMap(assetInfo.filter(v => checkOptions(v, options)))
+    val balances = mkBalancesMap(assetInfo.filter {
+      case (_: Asset, info) => checkOptions(info, options)
+    })
     subscriber ! WsAddressChanges(address, balances, orders, 0)
     copy(activeSubscription = activeSubscription.updated(subscriber, Subscription(0, options)))
   }
@@ -72,17 +74,19 @@ case class WsAddressState(
     )
   }
 
-  def sendDiffs(assetInfo: Seq[WsAssetInfo], orders: Seq[WsOrder]): WsAddressState = copy(
+  def sendDiffs(assetInfo: Map[Asset, WsAssetInfo], orders: Seq[WsOrder]): WsAddressState = copy(
     activeSubscription = activeSubscription.map { // dirty but one pass
       case (conn, subscription) =>
         val newUpdateId = WsAddressState.getNextUpdateId(subscription.updateId)
         val preparedAssetInfo = assetInfo
-          .filter(v => !sameAsInPrevious(v.asset, v.balances) && checkOptions(v, subscription.options))
+          .filter { case (asset, info) =>
+            !sameAsInPrevious(asset, info.balances) && checkOptions(info, subscription.options)
+          }
 
-        conn ! WsAddressChanges(address, toBalancesMap(preparedAssetInfo), orders, newUpdateId)
+        conn ! WsAddressChanges(address, mkBalancesMap(preparedAssetInfo), orders, newUpdateId)
         conn -> subscription.copy(updateId = newUpdateId)
     },
-    previousBalanceChanges = toBalancesMap(assetInfo)
+    previousBalanceChanges = mkBalancesMap(assetInfo)
   )
 
   def clean(): WsAddressState = copy(changedAssets = Set.empty, ordersChanges = Map.empty)
@@ -94,9 +98,9 @@ case class WsAddressState(
 
   private def sameAsInPrevious(asset: Asset, wsBalances: WsBalances): Boolean = previousBalanceChanges.get(asset).contains(wsBalances)
 
-  private def toBalancesMap(assetInfo: Seq[WsAssetInfo]): Map[Asset, WsBalances] = assetInfo.map { assetInfo =>
-    (assetInfo.asset, assetInfo.balances)
-  }.toMap
+  private def mkBalancesMap(assetInfo: Map[Asset, WsAssetInfo]): Map[Asset, WsBalances] = assetInfo.map { case (asset, info) =>
+    (asset, info.balances)
+  }
 
 }
 

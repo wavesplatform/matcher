@@ -9,7 +9,6 @@ import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.model.Denormalization._
 import com.wavesplatform.dex.domain.order.Order
-import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.model.{AcceptedOrder, OrderStatus}
 
@@ -19,7 +18,7 @@ case class WsAddressState(
   changedAssets: Set[Asset],
   ordersChanges: Map[Order.Id, WsOrder],
   previousBalanceChanges: Map[Asset, WsBalances]
-) extends ScorexLogging { // TODO Probably use an ordered Map and pass it to WsAddressChanges
+) { // TODO Probably use an ordered Map and pass it to WsAddressChanges
 
   val hasActiveSubscriptions: Boolean = activeSubscription.nonEmpty
   val hasChanges: Boolean = changedAssets.nonEmpty || ordersChanges.nonEmpty
@@ -28,11 +27,11 @@ case class WsAddressState(
 
   def addSubscription(
     subscriber: ActorRef[WsAddressChanges],
-    assetInfo: Map[Asset, WsAssetInfo],
+    assetInfo: Seq[WsAssetInfo],
     orders: Seq[WsOrder],
     options: Set[WsAddressBalancesFilter]
   ): WsAddressState = {
-    val balances = toBalancesMap(assetInfo.filter(v => checkOptions(v._2, options)))
+    val balances = toBalancesMap(assetInfo.filter(v => checkOptions(v, options)))
     subscriber ! WsAddressChanges(address, balances, orders, 0)
     copy(activeSubscription = activeSubscription.updated(subscriber, Subscription(0, options)))
   }
@@ -73,12 +72,12 @@ case class WsAddressState(
     )
   }
 
-  def sendDiffs(assetInfo: Map[Asset, WsAssetInfo], orders: Seq[WsOrder]): WsAddressState = copy(
+  def sendDiffs(assetInfo: Seq[WsAssetInfo], orders: Seq[WsOrder]): WsAddressState = copy(
     activeSubscription = activeSubscription.map { // dirty but one pass
       case (conn, subscription) =>
         val newUpdateId = WsAddressState.getNextUpdateId(subscription.updateId)
         val preparedAssetInfo = assetInfo
-          .filter(v => !sameAsInPrevious(v._1, v._2.balances) && checkOptions(v._2, subscription.options))
+          .filter(v => !sameAsInPrevious(v.asset, v.balances) && checkOptions(v, subscription.options))
 
         conn ! WsAddressChanges(address, toBalancesMap(preparedAssetInfo), orders, newUpdateId)
         conn -> subscription.copy(updateId = newUpdateId)
@@ -90,15 +89,14 @@ case class WsAddressState(
 
   def checkOptions(assetInfo: WsAssetInfo, options: Set[WsAddressBalancesFilter]): Boolean =
     if (options.contains(WsAddressBalancesFilter.ExcludeNft))
-      assetInfo.isNft.fold(true)(!_)
+      !assetInfo.isNft
     else true
 
   private def sameAsInPrevious(asset: Asset, wsBalances: WsBalances): Boolean = previousBalanceChanges.get(asset).contains(wsBalances)
 
-  private def toBalancesMap(assetInfo: Map[Asset, WsAssetInfo]): Map[Asset, WsBalances] = assetInfo.map {
-    case (asset, info) =>
-      (asset, info.balances)
-  }
+  private def toBalancesMap(assetInfo: Seq[WsAssetInfo]): Map[Asset, WsBalances] = assetInfo.map { assetInfo =>
+    (assetInfo.asset, assetInfo.balances)
+  }.toMap
 
 }
 

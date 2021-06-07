@@ -81,7 +81,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
   private val smartAssetDesc = BriefAssetDescription(
     name = "smart asset",
     decimals = Random.nextInt(9),
-    hasScript = false
+    hasScript = false,
+    isNft = false
   )
 
   private val orderRestrictions = OrderRestrictionsSettings(

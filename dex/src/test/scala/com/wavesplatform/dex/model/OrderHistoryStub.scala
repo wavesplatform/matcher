@@ -29,8 +29,8 @@ class OrderHistoryStub(system: ActorSystem, time: Time, maxActiveOrders: Int, ma
     override def getFullBalances(address: Address, exclude: Set[Asset]): Future[AddressBalanceUpdates] = emptyAddressBalanceUpdatesF
   }
 
-  private def assetBriefInfo: Asset => Option[BriefAssetDescription] =
-    asset => Some(new BriefAssetDescription(asset.toString, 2, hasScript = false, nft = Some(false)))
+  private def assetBriefInfo: Asset => BriefAssetDescription =
+    asset => BriefAssetDescription(asset.toString, 2, hasScript = false)
 
   def createAddressActor(address: Address, recovered: Boolean): Props =
     Props(

@@ -56,13 +56,14 @@ class AddressActor(
   recovered: Boolean,
   blockchain: BlockchainInteraction,
   settings: AddressActor.Settings = AddressActor.Settings.default,
-  getAssetDescription: Asset => Option[BriefAssetDescription]
-)(implicit efc: ErrorFormatterContext)
-    extends Actor
+  getAssetDescription: Asset => BriefAssetDescription
+) extends Actor
     with Stash
     with ScorexLogging {
 
   import context.dispatcher
+
+  implicit val efc = ErrorFormatterContext.from(a => getAssetDescription(a).decimals)
 
   override protected lazy val log = LoggerFacade(LoggerFactory.getLogger(s"AddressActor[$owner]"))
   private val ignoreRef = context.system.toTyped.ignoreRef.toClassic
@@ -492,7 +493,7 @@ class AddressActor(
     // It is time to send updates to clients. This block of code asks balances
     case WsCommand.SendDiff =>
       if (wsAddressState.hasActiveSubscriptions && wsAddressState.hasChanges) {
-        val changedAssetInfo: Map[Asset, WsAssetInfo] = mkWsBalances(wsAddressState.changedAssets, includeEmpty = true)
+        val changedAssetInfo = mkWsBalances(wsAddressState.changedAssets, includeEmpty = true)
         wsAddressState = wsAddressState
           .sendDiffs(
             assetInfo = changedAssetInfo,
@@ -556,28 +557,21 @@ class AddressActor(
   private def scheduleNextDiffSending(): Unit =
     if (wsSendSchedule.isCancelled) wsSendSchedule = context.system.scheduler.scheduleOnce(settings.wsMessagesInterval, self, WsCommand.SendDiff)
 
-  private def mkWsBalances(forAssets: Set[Asset], includeEmpty: Boolean): Map[Asset, WsAssetInfo] = forAssets
+  private def mkWsBalances(forAssets: Set[Asset], includeEmpty: Boolean): List[WsAssetInfo] = forAssets
     .flatMap { asset =>
-      efc.assetDecimals(asset) match {
-        case None =>
-          log.error(s"Can't find asset decimals for $asset")
-          Nil // It is better to hide unknown assets rather than stop working
-
-        case Some(decimals) =>
-          val tradable = balances.tradableBalance(asset)
-          val reserved = balances.reserved.getOrElse(asset, 0L)
-          if (includeEmpty || tradable > 0 || reserved > 0) {
-            val wsBalances = WsBalances(
-              tradable = denormalizeAmountAndFee(tradable, decimals).toDouble,
-              reserved = denormalizeAmountAndFee(reserved, decimals).toDouble
-            )
-            List(
-              asset -> WsAssetInfo(wsBalances, getAssetDescription(asset).map(_.isNft))
-            )
-          } else Nil
-      }
-    }
-    .to(Map)
+      val assetDescription = getAssetDescription(asset)
+      val tradable = balances.tradableBalance(asset)
+      val reserved = balances.reserved.getOrElse(asset, 0L)
+      if (includeEmpty || tradable > 0 || reserved > 0) {
+        val wsBalances = WsBalances(
+          tradable = denormalizeAmountAndFee(tradable, assetDescription.decimals).toDouble,
+          reserved = denormalizeAmountAndFee(reserved, assetDescription.decimals).toDouble
+        )
+        List(
+          WsAssetInfo(asset, wsBalances, assetDescription.isNft)
+        )
+      } else Nil
+    }.toList
 
   private def isCancelling(id: Order.Id): Boolean = pendingCommands.get(id).exists(_.command.isInstanceOf[Command.CancelOrder])
 
@@ -755,7 +749,7 @@ object AddressActor {
     recovered: Boolean,
     blockchain: BlockchainInteraction,
     settings: AddressActor.Settings = AddressActor.Settings.default,
-    getAssetDescription: Asset => Option[BriefAssetDescription]
+    getAssetDescription: Asset => BriefAssetDescription
   )(implicit efc: ErrorFormatterContext): Props = Props(
     new AddressActor(
       owner,

@@ -130,8 +130,9 @@ object DbKeys {
         bb.get(name)
         val decimals = bb.getInt
         val hasScript = bb.get == 1
+        val isNft = bb.get == 1
 
-        BriefAssetDescription(new String(name, StandardCharsets.UTF_8), decimals, hasScript)
+        BriefAssetDescription(new String(name, StandardCharsets.UTF_8), decimals, hasScript, isNft)
       },
       x => {
         val nameBytes = x.name.getBytes(StandardCharsets.UTF_8)

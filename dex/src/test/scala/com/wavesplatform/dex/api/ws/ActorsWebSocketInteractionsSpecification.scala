@@ -51,8 +51,8 @@ class ActorsWebSocketInteractionsSpecification
     val currentPortfolio = new AtomicReference[Portfolio](Portfolio.empty)
     val address = KeyPair("test".getBytes)
 
-    private def assetBriefInfo: Asset => Option[BriefAssetDescription] =
-      asset => Some(new BriefAssetDescription(asset.toString, 2, hasScript = false, nft = Some(false)))
+    private def assetBriefInfo: Asset => BriefAssetDescription =
+      asset => BriefAssetDescription(asset.toString, 2, hasScript = false)
 
     val blockchainInteraction = new BlockchainInteraction {
 
@@ -82,7 +82,7 @@ class ActorsWebSocketInteractionsSpecification
           recovered,
           blockchainInteraction,
           getAssetDescription = assetBriefInfo
-        )(efc)
+        )
       )
 
     val addressDir = system.actorOf(Props(new AddressDirectoryActor(EmptyOrderDb(), createAddressActor, None, recovered = true)))

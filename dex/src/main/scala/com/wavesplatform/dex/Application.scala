@@ -242,7 +242,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     recovered,
     addressActorBlockchainInteraction,
     settings.addressActor,
-    asset => assetsCache.cached.get(asset)
+    asset => assetsCache.cached.unsafeGet(asset)
   )
 
   private val orderEventsCoordinatorRef = actorSystem.spawn(

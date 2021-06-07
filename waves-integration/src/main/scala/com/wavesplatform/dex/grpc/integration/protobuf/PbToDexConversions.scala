@@ -29,7 +29,7 @@ object PbToDexConversions {
             name = value.name.toString(StandardCharsets.UTF_8),
             decimals = value.decimals,
             hasScript = value.hasScript,
-            nft = Some(value.nft)
+            isNft = value.nft
           )
         )
     }

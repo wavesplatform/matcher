@@ -1,3 +1,5 @@
 package com.wavesplatform.dex.api.ws.entities
 
-case class WsAssetInfo(balances: WsBalances, isNft: Option[Boolean])
+import com.wavesplatform.dex.domain.asset.Asset
+
+case class WsAssetInfo(asset: Asset, balances: WsBalances, isNft: Boolean)

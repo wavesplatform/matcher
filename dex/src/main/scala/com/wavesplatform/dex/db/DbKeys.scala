@@ -129,7 +129,6 @@ object DbKeys {
         bb.get(name)
         val decimals = bb.getInt
         val hasScript = bb.get == 1
-        // for backward compatibility check if there is byte for isNft
         val isNft = if (bb.hasRemaining) bb.get == 1 else false
 
         BriefAssetDescription(new String(name, StandardCharsets.UTF_8), decimals, hasScript, isNft)

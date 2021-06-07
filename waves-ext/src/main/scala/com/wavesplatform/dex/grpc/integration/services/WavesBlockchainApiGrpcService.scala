@@ -25,7 +25,7 @@ import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationErro
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.exchange
-import com.wavesplatform.transaction.smart.script.ScriptRunner
+import com.wavesplatform.transaction.smart.script.ScriptRunnerFixed
 import com.wavesplatform.transaction.{Asset, TxValidationError}
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.stub.{ServerCallStreamObserver, StreamObserver}
@@ -259,7 +259,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
           .toVanilla
           .getOrElse(throwInvalidArgument("Can't parse the transaction"))
         parseScriptResult(
-          ScriptRunner(
+          ScriptRunnerFixed(
             in = Coproduct(tx),
             blockchain = context.blockchain,
             script = info.script,

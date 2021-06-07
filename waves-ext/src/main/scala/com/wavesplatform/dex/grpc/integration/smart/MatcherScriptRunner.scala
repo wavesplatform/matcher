@@ -12,7 +12,7 @@ import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain, DataEntry, LeaseBalance, VolumeAndFee}
 import com.wavesplatform.transaction.assets.exchange.Order
-import com.wavesplatform.transaction.smart.script.{ScriptRunner}
+import com.wavesplatform.transaction.smart.script.ScriptRunnerFixed
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
 import shapeless.Coproduct
@@ -22,8 +22,8 @@ import scala.util.control.NoStackTrace
 object MatcherScriptRunner {
 
   def apply(script: Script, order: Order): Either[ExecutionError, EVALUATED] =
-    ScriptRunner.applyGeneric(
-      in = Coproduct[ScriptRunner.TxOrd](order),
+    ScriptRunnerFixed.applyGeneric(
+      in = Coproduct[ScriptRunnerFixed.TxOrd](order),
       blockchain = deniedBlockchain,
       script = script,
       isAssetScript = false,

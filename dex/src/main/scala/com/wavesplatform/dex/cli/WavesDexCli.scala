@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.cli
 
+import cats.Id
 import cats.syntax.option._
 import cats.syntax.either._
 import cats.instances.either._
@@ -7,12 +8,15 @@ import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory.parseFile
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.app.{forceStopApplication, MatcherStateCheckingFailedError}
-import com.wavesplatform.dex.db.AccountStorage
+import com.wavesplatform.dex.db.{AccountStorage, DbKeys}
+import com.wavesplatform.dex.db.leveldb.{openDb, LevelDb}
 import com.wavesplatform.dex.doc.MatcherErrorDoc
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair}
+import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.error.Implicits.ThrowableOps
+import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.settings.{loadConfig, loadMatcherSettings, MatcherSettings}
 import com.wavesplatform.dex.tool.connectors.SuperConnector
 import com.wavesplatform.dex.tool._
@@ -155,6 +159,9 @@ object WavesDexCli extends ScoptImplicits {
       matcherSettings <- loadMatcherSettings(cfg)
     } yield (cfg, matcherSettings)).toEither.leftMap(ex => s"Cannot load matcher settings by path $dexConfigPath: ${ex.getWithStackTrace}")
 
+  private def loadMatcherSettingsFromPath(path: String): MatcherSettings =
+    ConfigSource.fromConfig(loadConfig(parseFile(new File(path)))).at("waves.dex").loadOrThrow[MatcherSettings]
+
   private def loadConfigAtPath(dexConfigPath: String): Try[Config] = Try {
     parseFile(new File(dexConfigPath))
   }
@@ -253,6 +260,19 @@ object WavesDexCli extends ScoptImplicits {
       case Left(error) => println(error)
     }
   }
+
+  def cleanAssets(args: Args): Unit =
+    for {
+      _ <- cli.log(
+        s"""
+           |Passed arguments:
+           |  DEX config path : ${args.configPath}
+           |Running in background
+           |""".stripMargin
+      )
+      settings = loadMatcherSettingsFromPath(args.configPath)
+      _ <- AssetCacheCleaner.cleanAssets(settings.dataDirectory)
+    } yield println("Successfully removed all assets from levelDB cache!")
 
   // todo commands:
   // get account by seed [and nonce]
@@ -404,6 +424,17 @@ object WavesDexCli extends ScoptImplicits {
               .valueName("<raw-string>")
               .required()
               .action((x, s) => s.copy(configPath = x))
+          ),
+        cmd(Command.CleanAssets.name)
+          .action((_, s) => s.copy(command = Command.CleanAssets.some))
+          .text("Cleans levelDB cache with assets")
+          .children(
+            opt[String]("dex-config")
+              .abbr("dc")
+              .text("DEX config path")
+              .valueName("<raw-string>")
+              .required()
+              .action((x, s) => s.copy(configPath = x))
           )
       )
     }
@@ -424,6 +455,7 @@ object WavesDexCli extends ScoptImplicits {
             case Command.RunComparison => runComparison(args)
             case Command.MakeOrderbookSnapshots => makeSnapshots(args)
             case Command.CheckConfigFile => checkConfig(args)
+            case Command.CleanAssets => cleanAssets(args)
           }
           println("Done")
       }
@@ -466,6 +498,10 @@ object WavesDexCli extends ScoptImplicits {
 
     case object MakeOrderbookSnapshots extends Command {
       override def name: String = "make-orderbook-snapshots"
+    }
+
+    case object CleanAssets extends Command {
+      override def name: String = "clean-assets"
     }
 
   }

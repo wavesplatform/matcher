@@ -204,13 +204,14 @@ See instructions in their [documentation](https://docs.wavesplatform.com/en/wave
 
 ## 2. Node extension installation
 
-Since a version **2.3.0** Matcher has been using `grpc-server` extension from the Node to get data with a blockchain events and updates.
+Since a version **2.3.4** Matcher has been using `waves-grpc-server` extension from the Node to get data with a blockchain events and updates.
+Since a version **2.3.0** until **2.3.4** Matcher used `grpc-server` extension (the old name for `waves-grpc-server`).
 
 **You must install extensions at the Node:**
 * `waves-dex-extension`
-* `grpc-server`
+* `waves-grpc-server`
 
-ℹ️ **IMPORTANT:** `grpc-server` writes own data during blockchain updates. You have remove Node's state and import blockchain again, if you didn't install `grpc-server` before. 
+ℹ️ **IMPORTANT:** `waves-grpc-server` writes own data during blockchain updates. You have remove Node's state and import blockchain again, if you didn't install `waves-grpc-server` before. 
 See the official Node [documentation](https://docs.waves.tech/en/waves-node/extensions/grpc-server/#client-generation) for details.
 
 Artifacts of extensions have names like:

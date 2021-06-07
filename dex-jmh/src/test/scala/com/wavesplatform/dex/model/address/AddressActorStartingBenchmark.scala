@@ -14,6 +14,7 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.gen.OrderBookGen
 import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
+import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.address.AddressActorStartingBenchmark.AddressState
 import com.wavesplatform.dex.model.{AcceptedOrder, Events, LimitOrder}
 import com.wavesplatform.dex.queue.ValidatedCommandWithMeta
@@ -94,6 +95,9 @@ object AddressActorStartingBenchmark {
 
     def run(): AddressActor.Reply.GetOrderStatuses = {
 
+      def assetBriefInfo: Asset => BriefAssetDescription =
+        asset => new BriefAssetDescription(asset.toString, 2, hasScript = false, isNft = false)
+
       val system: ActorSystem = ActorSystem(s"addressActorBenchmark-${ThreadLocalRandom.current().nextInt()}")
 
       val addressActor: ActorRef =
@@ -106,7 +110,8 @@ object AddressActorStartingBenchmark {
             store = command => Future.successful(Some(ValidatedCommandWithMeta(0L, 0L, command))),
             recovered = true,
             blockchain = (_: Address, _: Set[Asset]) => Future.successful(AddressBalanceUpdates.empty),
-            settings = AddressActor.Settings.default
+            settings = AddressActor.Settings.default,
+            getAssetDescription = assetBriefInfo
           )
         )
 

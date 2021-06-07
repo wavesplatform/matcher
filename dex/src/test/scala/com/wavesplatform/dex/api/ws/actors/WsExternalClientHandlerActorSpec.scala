@@ -315,7 +315,7 @@ class WsExternalClientHandlerActorSpec extends AnyFreeSpecLike with Matchers wit
         time = time,
         assetPairBuilder = new AssetPairBuilder(
           matcherSettings,
-          assetDescription = x => effect.liftValueAsync(BriefAssetDescription(x.toString, 8, hasScript = false)),
+          assetDescription = x => effect.liftValueAsync(BriefAssetDescription(x.toString, 8, hasScript = false, isNft = false)),
           blacklistedAssets = Set.empty
         ),
         clientRef = clientInbox.ref,

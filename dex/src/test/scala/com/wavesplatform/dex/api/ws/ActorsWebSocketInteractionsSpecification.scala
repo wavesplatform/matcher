@@ -76,8 +76,9 @@ class ActorsWebSocketInteractionsSpecification
             Future.successful(Some(ValidatedCommandWithMeta(0L, 0L, command)))
           },
           recovered,
-          blockchainInteraction
-        )(efc)
+          blockchainInteraction,
+          getAssetDescription = getDefaultAssetDescriptions
+        )
       )
 
     val addressDir = system.actorOf(Props(new AddressDirectoryActor(EmptyOrderDb(), createAddressActor, None, recovered = true)))

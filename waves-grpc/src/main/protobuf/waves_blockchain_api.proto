@@ -125,6 +125,7 @@ message AssetDescription {
   bytes name = 1;
   int32 decimals = 2;
   bool has_script = 3;
+  bool nft = 4;
 }
 
 message RunAssetScriptRequest {

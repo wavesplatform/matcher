@@ -108,7 +108,7 @@ class MatcherApiRouteV1Spec extends RouteSpec("/api/v1") with MatcherSpecBase wi
         assetPairBuilder = new AssetPairBuilder(
           settings,
           {
-            case `usd` => liftValueAsync(BriefAssetDescription("USD", 8, hasScript = false))
+            case `usd` => liftValueAsync(BriefAssetDescription("USD", 8, hasScript = false, isNft = false))
             case x => liftErrorAsync[BriefAssetDescription](error.AssetNotFound(x))
           },
           Set.empty

@@ -18,8 +18,9 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV1}
 import com.wavesplatform.dex.domain.state.{LeaseBalance, Portfolio}
-import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError, UnexpectedError}
+import com.wavesplatform.dex.error.{MatcherError, UnexpectedError}
 import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
+import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderAddedReason, OrderCancelFailed}
 import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder, MarketOrder}
 import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
@@ -46,7 +47,6 @@ class AddressActorSpecification
     with Eventually {
 
   implicit private val typedSystem = system.toTyped
-  implicit private val efc: ErrorFormatterContext = ErrorFormatterContext.from(_ => 8)
 
   private val assetId = ByteStr("asset".getBytes("utf-8"))
   override val matcherFee = 30000L
@@ -93,6 +93,9 @@ class AddressActorSpecification
 
   private val sellWavesPortfolio = requiredPortfolio(sellWavesOrder)
 
+  private def assetBriefInfo: Asset => BriefAssetDescription =
+    asset => BriefAssetDescription(asset.toString, 2, hasScript = false, isNft = false)
+
   "AddressActorSpecification" should {
     val failed = Future.failed(new RuntimeException("test"))
     val kp = KeyPair(ByteStr("test".getBytes(StandardCharsets.UTF_8)))
@@ -112,7 +115,8 @@ class AddressActorSpecification
             (_: Address, _: Set[Asset]) => {
               requested = true
               failed
-            }
+            },
+            getAssetDescription = assetBriefInfo
           )
         )
 
@@ -408,7 +412,8 @@ class AddressActorSpecification
             Future.successful(Some(ValidatedCommandWithMeta(0L, 0L, command)))
           },
           recovered,
-          blockchainInteraction
+          blockchainInteraction,
+          getAssetDescription = assetBriefInfo
         )
       )
 

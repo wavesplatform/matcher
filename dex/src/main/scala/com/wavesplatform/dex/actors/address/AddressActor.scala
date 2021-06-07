@@ -13,7 +13,7 @@ import com.wavesplatform.dex.actors.address.AddressActor.Settings.default
 import com.wavesplatform.dex.actors.address.AddressActor._
 import com.wavesplatform.dex.actors.address.BalancesFormatter.format
 import com.wavesplatform.dex.api.http.entities.MatcherResponse
-import com.wavesplatform.dex.api.ws.entities.{WsBalances, WsOrder}
+import com.wavesplatform.dex.api.ws.entities.{WsAddressBalancesFilter, WsAssetInfo, WsBalances, WsOrder}
 import com.wavesplatform.dex.api.ws.protocol.WsAddressChanges
 import com.wavesplatform.dex.api.ws.state.WsAddressState
 import com.wavesplatform.dex.collections.{NegativeMap, PositiveMap}
@@ -30,6 +30,7 @@ import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError, UnexpectedError, WavesNodeConnectionBroken}
 import com.wavesplatform.dex.fp.MapImplicits.group
 import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
+import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
 import com.wavesplatform.dex.model.Events.{OrderCancelFailed, OrderCanceledReason}
 import com.wavesplatform.dex.model._
@@ -54,13 +55,15 @@ class AddressActor(
   store: StoreValidatedCommand,
   recovered: Boolean,
   blockchain: BlockchainInteraction,
-  settings: AddressActor.Settings = AddressActor.Settings.default
-)(implicit efc: ErrorFormatterContext)
-    extends Actor
+  settings: AddressActor.Settings = AddressActor.Settings.default,
+  getAssetDescription: Asset => BriefAssetDescription
+) extends Actor
     with Stash
     with ScorexLogging {
 
   import context.dispatcher
+
+  implicit val efc = ErrorFormatterContext.from(a => getAssetDescription(a).decimals)
 
   override protected lazy val log = LoggerFacade(LoggerFactory.getLogger(s"AddressActor[$owner]"))
   private val ignoreRef = context.system.toTyped.ignoreRef.toClassic
@@ -472,12 +475,13 @@ class AddressActor(
         } else log.warn(s"Received stale $event for $orderId")
       }
 
-    case WsCommand.AddWsSubscription(client) =>
+    case WsCommand.AddWsSubscription(client, options) =>
       log.trace(s"[c=${client.path.name}] Added WebSocket subscription")
       wsAddressState = wsAddressState.addSubscription(
         client,
         mkWsBalances(balances.allAssets, includeEmpty = false),
-        activeOrders.values.map(WsOrder.fromDomain(_)).to(Seq)
+        activeOrders.values.map(WsOrder.fromDomain(_)).to(Seq),
+        options
       )
       context.watch(client)
 
@@ -488,13 +492,15 @@ class AddressActor(
 
     // It is time to send updates to clients. This block of code asks balances
     case WsCommand.SendDiff =>
-      if (wsAddressState.hasActiveSubscriptions && wsAddressState.hasChanges)
+      if (wsAddressState.hasActiveSubscriptions && wsAddressState.hasChanges) {
+        val changedAssetInfo = mkWsBalances(wsAddressState.changedAssets, includeEmpty = true)
         wsAddressState = wsAddressState
           .sendDiffs(
-            balances = mkWsBalances(wsAddressState.changedAssets, includeEmpty = true),
+            assetInfo = changedAssetInfo,
             orders = wsAddressState.getAllOrderChanges
           )
           .clean()
+      }
       wsSendSchedule = Cancellable.alreadyCancelled
 
     case classic.Terminated(wsSource) => wsAddressState = wsAddressState.removeSubscription(wsSource)
@@ -551,27 +557,21 @@ class AddressActor(
   private def scheduleNextDiffSending(): Unit =
     if (wsSendSchedule.isCancelled) wsSendSchedule = context.system.scheduler.scheduleOnce(settings.wsMessagesInterval, self, WsCommand.SendDiff)
 
-  private def mkWsBalances(forAssets: Set[Asset], includeEmpty: Boolean): Map[Asset, WsBalances] = forAssets
+  private def mkWsBalances(forAssets: Set[Asset], includeEmpty: Boolean): Map[Asset, WsAssetInfo] = forAssets
     .flatMap { asset =>
-      efc.assetDecimals(asset) match {
-        case None =>
-          log.error(s"Can't find asset decimals for $asset")
-          Nil // It is better to hide unknown assets rather than stop working
-
-        case Some(decimals) =>
-          val tradable = balances.tradableBalance(asset)
-          val reserved = balances.reserved.getOrElse(asset, 0L)
-          if (includeEmpty || tradable > 0 || reserved > 0)
-            List(
-              asset -> WsBalances(
-                tradable = denormalizeAmountAndFee(tradable, decimals).toDouble,
-                reserved = denormalizeAmountAndFee(reserved, decimals).toDouble
-              )
-            )
-          else Nil
-      }
-    }
-    .to(Map)
+      val assetDescription = getAssetDescription(asset)
+      val tradable = balances.tradableBalance(asset)
+      val reserved = balances.reserved.getOrElse(asset, 0L)
+      if (includeEmpty || tradable > 0 || reserved > 0) {
+        val wsBalances = WsBalances(
+          tradable = denormalizeAmountAndFee(tradable, assetDescription.decimals).toDouble,
+          reserved = denormalizeAmountAndFee(reserved, assetDescription.decimals).toDouble
+        )
+        List(
+          asset -> WsAssetInfo(wsBalances, assetDescription.isNft)
+        )
+      } else Nil
+    }.to(Map)
 
   private def isCancelling(id: Order.Id): Boolean = pendingCommands.get(id).exists(_.command.isInstanceOf[Command.CancelOrder])
 
@@ -748,7 +748,8 @@ object AddressActor {
     store: StoreValidatedCommand,
     recovered: Boolean,
     blockchain: BlockchainInteraction,
-    settings: AddressActor.Settings = AddressActor.Settings.default
+    settings: AddressActor.Settings = AddressActor.Settings.default,
+    getAssetDescription: Asset => BriefAssetDescription
   )(implicit efc: ErrorFormatterContext): Props = Props(
     new AddressActor(
       owner,
@@ -758,7 +759,8 @@ object AddressActor {
       store,
       recovered,
       blockchain,
-      settings
+      settings,
+      getAssetDescription
     )
   )
 
@@ -889,7 +891,7 @@ object AddressActor {
   sealed trait WsCommand extends Message
 
   object WsCommand {
-    case class AddWsSubscription(client: typed.ActorRef[WsAddressChanges]) extends WsCommand
+    case class AddWsSubscription(client: typed.ActorRef[WsAddressChanges], options: Set[WsAddressBalancesFilter] = Set.empty) extends WsCommand
     case class RemoveWsSubscription(client: typed.ActorRef[WsAddressChanges]) extends WsCommand
     private[AddressActor] case object SendDiff extends WsCommand
   }

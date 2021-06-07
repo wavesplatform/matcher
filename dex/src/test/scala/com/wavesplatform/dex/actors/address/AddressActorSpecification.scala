@@ -94,7 +94,7 @@ class AddressActorSpecification
   private val sellWavesPortfolio = requiredPortfolio(sellWavesOrder)
 
   private def assetBriefInfo: Asset => BriefAssetDescription =
-    asset => BriefAssetDescription(asset.toString, 2, hasScript = false)
+    asset => BriefAssetDescription(asset.toString, 2, hasScript = false, isNft = false)
 
   "AddressActorSpecification" should {
     val failed = Future.failed(new RuntimeException("test"))

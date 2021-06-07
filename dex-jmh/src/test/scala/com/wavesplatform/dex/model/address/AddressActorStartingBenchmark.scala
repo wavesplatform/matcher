@@ -96,7 +96,7 @@ object AddressActorStartingBenchmark {
     def run(): AddressActor.Reply.GetOrderStatuses = {
 
       def assetBriefInfo: Asset => BriefAssetDescription =
-        asset => new BriefAssetDescription(asset.toString, 2, hasScript = false)
+        asset => new BriefAssetDescription(asset.toString, 2, hasScript = false, isNft = false)
 
       val system: ActorSystem = ActorSystem(s"addressActorBenchmark-${ThreadLocalRandom.current().nextInt()}")
 

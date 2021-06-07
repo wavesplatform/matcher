@@ -27,7 +27,7 @@ class OrderHistoryStub(system: ActorSystem, time: Time, maxActiveOrders: Int, ma
   }
 
   private def assetBriefInfo: Asset => BriefAssetDescription =
-    asset => BriefAssetDescription(asset.toString, 2, hasScript = false)
+    asset => BriefAssetDescription(asset.toString, 2, hasScript = false, isNft = false)
 
   def createAddressActor(address: Address, recovered: Boolean): Props =
     Props(

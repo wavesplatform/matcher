@@ -120,8 +120,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
   private val (okOrder, okOrderSenderPrivateKey) = orderGenerator.sample.get
   private val (badOrder, badOrderSenderPrivateKey) = orderGenerator.sample.get
 
-  private val amountAssetDesc = BriefAssetDescription("AmountAsset", 8, hasScript = false)
-  private val priceAssetDesc = BriefAssetDescription("PriceAsset", 8, hasScript = false)
+  private val amountAssetDesc = BriefAssetDescription("AmountAsset", 8, hasScript = false, isNft = false)
+  private val priceAssetDesc = BriefAssetDescription("PriceAsset", 8, hasScript = false, isNft = false)
 
   private val settings = ConfigSource
     .fromConfig(ConfigFactory.load())
@@ -1320,7 +1320,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         validatedAllowedOrderVersions = () => Future.successful(Set(1, 2, 3)),
         () => DynamicSettings.symmetric(matcherFee),
         externalClientDirectoryRef = testKit.spawn(WsExternalClientDirectoryActor(), s"ws-external-cd-${Random.nextInt(Int.MaxValue)}"),
-        getAssetDescription = _ => liftValueAsync(BriefAssetDescription("test", 8, hasScript = false))
+        getAssetDescription = _ => liftValueAsync(BriefAssetDescription("test", 8, hasScript = false, isNft = false))
       )
 
     f(route.route)

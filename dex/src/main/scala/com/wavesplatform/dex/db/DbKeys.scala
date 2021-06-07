@@ -2,7 +2,6 @@ package com.wavesplatform.dex.db
 
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
-
 import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.dex.db.leveldb.Key
 import com.wavesplatform.dex.domain.account.Address
@@ -17,6 +16,7 @@ import com.wavesplatform.dex.model.{OrderBookSnapshot, OrderInfo}
 import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 
 import scala.collection.mutable
+import scala.util.Try
 
 object DbKeys {
 
@@ -130,7 +130,7 @@ object DbKeys {
         bb.get(name)
         val decimals = bb.getInt
         val hasScript = bb.get == 1
-        val isNft = bb.get == 1
+        val isNft = Try(bb.get).fold(_ => false, _ == 1)
 
         BriefAssetDescription(new String(name, StandardCharsets.UTF_8), decimals, hasScript, isNft)
       },

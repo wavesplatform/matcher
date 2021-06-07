@@ -75,12 +75,12 @@ trait MatcherSpecBase
 
   protected val smallFee: Option[Price] = Some(toNormalized(1))
 
-  protected val defaultAssetDescription: BriefAssetDescription = BriefAssetDescription("Asset", 8, hasScript = false)
+  protected val defaultAssetDescription: BriefAssetDescription = BriefAssetDescription("Asset", 8, hasScript = false, isNft = false)
 
   protected val defaultAssetDescriptionsMap: Map[Asset, BriefAssetDescription] =
     Map[Asset, BriefAssetDescription](
-      usd -> BriefAssetDescription("USD", 2, hasScript = false),
-      btc -> BriefAssetDescription("BTC", 8, hasScript = false)
+      usd -> BriefAssetDescription("USD", 2, hasScript = false, isNft = false),
+      btc -> BriefAssetDescription("BTC", 8, hasScript = false, isNft = false)
     ).withDefaultValue(defaultAssetDescription)
 
   protected val getDefaultAssetDescriptions: Asset => BriefAssetDescription = defaultAssetDescriptionsMap.apply

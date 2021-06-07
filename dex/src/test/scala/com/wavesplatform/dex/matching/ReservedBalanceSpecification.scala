@@ -97,7 +97,7 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
   }
 
   private def assetBriefInfo: Asset => BriefAssetDescription =
-    asset => BriefAssetDescription(asset.toString, 2, hasScript = false)
+    asset => BriefAssetDescription(asset.toString, 2, hasScript = false, isNft = false)
 
   private def createAddressActor(address: Address, recovered: Boolean): Props =
     Props(

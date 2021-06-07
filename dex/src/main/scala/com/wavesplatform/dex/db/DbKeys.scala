@@ -136,8 +136,10 @@ object DbKeys {
       },
       x => {
         val nameBytes = x.name.getBytes(StandardCharsets.UTF_8)
-        Ints.toByteArray(nameBytes.length) ++ nameBytes ++ Ints.toByteArray(x.decimals) ++ Array[Byte](if (x.hasScript) 1 else 0)
+        Ints.toByteArray(nameBytes.length) ++ nameBytes ++ Ints.toByteArray(x.decimals) ++ Array[Byte](encodeBoolean(x.hasScript), encodeBoolean(x.isNft))
       }
     )
+
+  private def encodeBoolean(value: Boolean): Byte = if (value) 1 else 0
 
 }

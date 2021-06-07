@@ -16,11 +16,12 @@ class AssetsDbSpec extends AnyFreeSpec with Matchers with WithDb with MatcherSpe
     name <- Arbitrary.arbString.arbitrary
     decimals <- Gen.choose(0, 8)
     hasScript <- Arbitrary.arbBool.arbitrary
-  } yield (asset, BriefAssetDescription(name, decimals, hasScript))
+    isNft <- Gen.oneOf(true, false)
+  } yield (asset, BriefAssetDescription(name, decimals, hasScript, isNft))
 
   "AssetsDb.levelDb implementation" - {
     "stores and reads all assets" in forAll(Gen.mapOf(assetDescPairGen)) { assets =>
-      test { adb =>
+      test { adb: AssetsDb[Id] =>
         assets.foreach(Function.tupled(adb.put))
         assets.foreach {
           case (asset, desc) =>

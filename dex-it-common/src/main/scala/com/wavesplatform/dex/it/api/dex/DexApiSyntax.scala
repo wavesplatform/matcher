@@ -23,18 +23,18 @@ object DexApiSyntax {
     def waitForOrderStatus(order: Order, status: HttpOrderStatus.Status): F[HttpOrderStatus] =
       waitForOrderStatus(order.assetPair, order.id(), status)
 
-    def waitForOrderStatus(assetPair: AssetPair, id: Order.Id, status: HttpOrderStatus.Status): F[HttpOrderStatus] =
+    def waitForOrderStatus(assetPair: AssetPair, id: Order.Id, expectedStatus: HttpOrderStatus.Status): F[HttpOrderStatus] =
       waitForOrder(assetPair, id) { s =>
 
-        def fail() = throw new RuntimeException(s"Expected status $status for order $id, but found ${s.status}")
-        def check(): Boolean = s.status == status
+        def fail() = throw new RuntimeException(s"Expected status $expectedStatus for order $id, but found ${s.status}")
+        def check(): Boolean = s.status == expectedStatus
 
-        status match {
+        expectedStatus match {
           case Filled | PartiallyFilled => s.status match {
-              case Cancelled | NotFound => fail()
+              case Cancelled => fail()
               case _ => check()
             }
-          case Accepted | NotFound => s.status match {
+          case Accepted => s.status match {
               case Cancelled => fail()
               case _ => check()
             }

@@ -91,6 +91,7 @@ object Dependencies {
   private def monixModule(module: String): ModuleID = "io.monix" %% s"monix-$module" % Version.monix
   private def kamonModule(module: String, version: String = Version.kamon): ModuleID = "io.kamon" %% s"kamon-$module" % version
   private def jwtModule(module: String): ModuleID = "com.pauldijou" %% s"jwt-$module" % Version.jwt
+  private def iq80leveldb(module: String) = "org.iq80.leveldb" % module % "0.12"
 
   private val alleyCatsCore = "org.typelevel" %% "alleycats-core" % Version.cats
   private val parCollections = "org.scala-lang.modules" %% "scala-parallel-collections" % Version.parCollections
@@ -139,7 +140,6 @@ object Dependencies {
   private val monixReactive = monixModule("reactive")
   private val supertagged = "org.rudogma" %% "supertagged" % Version.supertagged
   private val javaLevelDb = "org.iq80.leveldb" % "leveldb" % Version.javaLevelDb
-  private val jniLevelDb = "org.ethereum" % "leveldbjni-all" % Version.jniLevelDb
   private val influxDb = "org.influxdb" % "influxdb-java" % Version.influxDb
   private val commonsNet = "commons-net" % "commons-net" % Version.commonsNet
   private val sttpClient = sttpClientModule("core")
@@ -189,7 +189,8 @@ object Dependencies {
     scalaMock,
     javaLevelDb,
     allureScalaTest,
-    diffx
+    diffx,
+    iq80leveldb("leveldb").exclude("com.google.guava", "guava")
   ).map(_ % Test) ++ silencer
 
   private val integrationTestKit: Seq[ModuleID] = Seq(wavesJ, logback % Test) ++ testKit
@@ -244,7 +245,6 @@ object Dependencies {
       scopt,
       kafka,
       janino,
-      jniLevelDb,
       kamonCore,
       kamonModule("influxdb"),
       kamonModule("system-metrics"),
@@ -258,7 +258,8 @@ object Dependencies {
       sttpPlayJson,
       sttpAsyncHttpClient,
       wavesJ,
-      betterMonadicFor
+      betterMonadicFor,
+      iq80leveldb("leveldb-api")
     ) ++ pureConfig ++ enumeratum ++ testKit ++ quill ++ monocle ++ levelDBJNA
 
     lazy val dexLoad: Seq[ModuleID] = Seq(diffx) ++ pureConfig ++ silencer

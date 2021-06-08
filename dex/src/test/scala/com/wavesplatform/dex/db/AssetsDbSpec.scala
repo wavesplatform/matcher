@@ -2,10 +2,9 @@ package com.wavesplatform.dex.db
 
 import cats.Id
 import cats.syntax.option._
+import com.wavesplatform.dex.NoShrink
 import com.wavesplatform.dex.gen.AssetDescriptionGen
-import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
-import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
-import org.scalacheck.{Arbitrary, Gen}
+import org.scalacheck.Gen
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}

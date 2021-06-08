@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.cli
 
+import cats.Id
 import cats.syntax.option._
 import cats.syntax.either._
 import cats.instances.either._
@@ -7,7 +8,8 @@ import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory.parseFile
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.app.{forceStopApplication, MatcherStateCheckingFailedError}
-import com.wavesplatform.dex.db.AccountStorage
+import com.wavesplatform.dex.db.{AccountStorage, DbKeys}
+import com.wavesplatform.dex.db.leveldb.{openDb, LevelDb}
 import com.wavesplatform.dex.doc.MatcherErrorDoc
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -19,6 +21,7 @@ import com.wavesplatform.dex.tool._
 import monix.eval.Task
 import monix.execution.{ExecutionModel, Scheduler}
 import monix.execution.schedulers.SchedulerService
+import org.iq80.leveldb.DB
 import pureconfig.ConfigSource
 import scopt.{OParser, RenderingMode}
 import sttp.client3._
@@ -29,7 +32,7 @@ import java.nio.file.Files
 import java.util.{Base64, Scanner}
 import scala.concurrent.{Await, TimeoutException}
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Success, Try, Using}
 
 object WavesDexCli extends ScoptImplicits {
 
@@ -267,8 +270,21 @@ object WavesDexCli extends ScoptImplicits {
            |""".stripMargin
       )
       settings = loadMatcherSettingsFromPath(args.configPath)
-      _ <- AssetCacheCleaner.cleanAssets(settings.dataDirectory)
-    } yield println("Successfully removed all assets from levelDB cache!")
+    } yield {
+      withLevelDb(settings.dataDirectory)(cleanAssets)
+      println("Successfully removed all assets from levelDB cache!")
+    }
+
+  def cleanAssets(levelDb: LevelDb[Id]): Unit = levelDb.readWrite { rw =>
+    rw.iterateOver(DbKeys.AssetPrefix) { entity =>
+      rw.delete(entity.getKey)
+    }
+  }
+
+  def withLevelDb(dataDirectory: String)(f: LevelDb[Id] => Unit): Unit =
+    Using(openDb(dataDirectory)) { db =>
+      f(LevelDb.sync(db))
+    }
 
   // todo commands:
   // get account by seed [and nonce]

@@ -1,9 +1,9 @@
 package com.wavesplatform.dex.tools
 
+import com.wavesplatform.dex.cli.WavesDexCli
 import com.wavesplatform.dex.db.{AssetPairsDb, AssetsDb, WithDb}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.gen.AssetDescriptionGen
-import com.wavesplatform.dex.tool.AssetCacheCleaner
 import org.scalacheck.Gen
 import org.scalatest.EitherValues
 import org.scalatest.freespec.AnyFreeSpec
@@ -29,7 +29,7 @@ class AssetCleanerCliSpec extends AnyFreeSpec with AssetDescriptionGen with With
       assetPairs.foreach(apDb.add)
 
       markup("successfully clean all BriefAssetDescription")
-      AssetCacheCleaner.cleanAssets(levelDb).isRight shouldBe true
+      WavesDexCli.cleanAssets(levelDb)
 
       assetDescriptions.foreach { case (asset, _) =>
         adDb.get(asset) shouldBe None

@@ -68,6 +68,7 @@ object Dependencies {
     val supertagged = "1.5"
 
     val javaLevelDb = "0.12"
+    val jniLevelDb = "1.18.3"
     val influxDb = "2.21"
     val levelDbVersion = "1.22.1"
 
@@ -138,6 +139,7 @@ object Dependencies {
   private val monixReactive = monixModule("reactive")
   private val supertagged = "org.rudogma" %% "supertagged" % Version.supertagged
   private val javaLevelDb = "org.iq80.leveldb" % "leveldb" % Version.javaLevelDb
+  private val jniLevelDb = "org.ethereum" % "leveldbjni-all" % Version.jniLevelDb
   private val influxDb = "org.influxdb" % "influxdb-java" % Version.influxDb
   private val commonsNet = "commons-net" % "commons-net" % Version.commonsNet
   private val sttpClient = sttpClientModule("core")
@@ -242,6 +244,7 @@ object Dependencies {
       scopt,
       kafka,
       janino,
+      jniLevelDb,
       kamonCore,
       kamonModule("influxdb"),
       kamonModule("system-metrics"),

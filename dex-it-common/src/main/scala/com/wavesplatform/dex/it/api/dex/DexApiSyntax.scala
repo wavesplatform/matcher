@@ -2,6 +2,7 @@ package com.wavesplatform.dex.it.api.dex
 
 import cats.Functor
 import cats.syntax.functor._
+import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status.{Accepted, Cancelled, Filled, NotFound, PartiallyFilled}
 import com.wavesplatform.dex.api.http.entities._
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -22,8 +23,24 @@ object DexApiSyntax {
     def waitForOrderStatus(order: Order, status: HttpOrderStatus.Status): F[HttpOrderStatus] =
       waitForOrderStatus(order.assetPair, order.id(), status)
 
-    def waitForOrderStatus(assetPair: AssetPair, id: Order.Id, status: HttpOrderStatus.Status): F[HttpOrderStatus] =
-      waitForOrder(assetPair, id)(_.status == status)
+    def waitForOrderStatus(assetPair: AssetPair, id: Order.Id, expectedStatus: HttpOrderStatus.Status): F[HttpOrderStatus] =
+      waitForOrder(assetPair, id) { s =>
+
+        def fail() = throw new RuntimeException(s"Expected status $expectedStatus for order $id, but found ${s.status}")
+        def check(): Boolean = s.status == expectedStatus
+
+        expectedStatus match {
+          case Filled | PartiallyFilled => s.status match {
+              case Cancelled => fail()
+              case _ => check()
+            }
+          case Accepted => s.status match {
+              case Cancelled => fail()
+              case _ => check()
+            }
+          case _ => check()
+        }
+      }
 
     def waitForOrder(order: Order)(pred: HttpOrderStatus => Boolean): F[HttpOrderStatus] =
       waitForOrder(order.assetPair, order.id())(pred)

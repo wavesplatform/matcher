@@ -20,4 +20,6 @@ class ReadWriteDb(db: DB, readOptions: ReadOptions, batch: WriteBatch) extends R
   }
 
   def delete[V](key: Key[V]): Unit = batch.delete(key.keyBytes)
+  def delete(key: Array[Byte]): Unit = batch.delete(key)
+
 }

@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.cli
 
+import cats.Id
 import cats.syntax.option._
 import cats.syntax.either._
 import cats.instances.either._
@@ -7,7 +8,8 @@ import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory.parseFile
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.app.{forceStopApplication, MatcherStateCheckingFailedError}
-import com.wavesplatform.dex.db.AccountStorage
+import com.wavesplatform.dex.db.{AccountStorage, DbKeys}
+import com.wavesplatform.dex.db.leveldb.{openDb, LevelDb}
 import com.wavesplatform.dex.doc.MatcherErrorDoc
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -19,6 +21,7 @@ import com.wavesplatform.dex.tool._
 import monix.eval.Task
 import monix.execution.{ExecutionModel, Scheduler}
 import monix.execution.schedulers.SchedulerService
+import org.iq80.leveldb.DB
 import pureconfig.ConfigSource
 import scopt.{OParser, RenderingMode}
 import sttp.client3._
@@ -29,7 +32,7 @@ import java.nio.file.Files
 import java.util.{Base64, Scanner}
 import scala.concurrent.{Await, TimeoutException}
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Success, Try, Using}
 
 object WavesDexCli extends ScoptImplicits {
 
@@ -155,6 +158,9 @@ object WavesDexCli extends ScoptImplicits {
       matcherSettings <- loadMatcherSettings(cfg)
     } yield (cfg, matcherSettings)).toEither.leftMap(ex => s"Cannot load matcher settings by path $dexConfigPath: ${ex.getWithStackTrace}")
 
+  private def loadMatcherSettingsFromPath(path: String): MatcherSettings =
+    ConfigSource.fromConfig(loadConfig(parseFile(new File(path)))).at("waves.dex").loadOrThrow[MatcherSettings]
+
   private def loadConfigAtPath(dexConfigPath: String): Try[Config] = Try {
     parseFile(new File(dexConfigPath))
   }
@@ -253,6 +259,32 @@ object WavesDexCli extends ScoptImplicits {
       case Left(error) => println(error)
     }
   }
+
+  def cleanAssets(args: Args): Unit =
+    for {
+      _ <- cli.log(
+        s"""
+           |Passed arguments:
+           |  DEX config path : ${args.configPath}
+           |Running in background
+           |""".stripMargin
+      )
+      settings = loadMatcherSettingsFromPath(args.configPath)
+    } yield {
+      withLevelDb(settings.dataDirectory)(cleanAssets)
+      println("Successfully removed all assets from levelDB cache!")
+    }
+
+  def cleanAssets(levelDb: LevelDb[Id]): Unit = levelDb.readWrite { rw =>
+    rw.iterateOver(DbKeys.AssetPrefix) { entity =>
+      rw.delete(entity.getKey)
+    }
+  }
+
+  def withLevelDb(dataDirectory: String)(f: LevelDb[Id] => Unit): Unit =
+    Using(openDb(dataDirectory)) { db =>
+      f(LevelDb.sync(db))
+    }
 
   // todo commands:
   // get account by seed [and nonce]
@@ -404,6 +436,17 @@ object WavesDexCli extends ScoptImplicits {
               .valueName("<raw-string>")
               .required()
               .action((x, s) => s.copy(configPath = x))
+          ),
+        cmd(Command.CleanAssets.name)
+          .action((_, s) => s.copy(command = Command.CleanAssets.some))
+          .text("Cleans levelDB cache with assets")
+          .children(
+            opt[String]("dex-config")
+              .abbr("dc")
+              .text("DEX config path")
+              .valueName("<raw-string>")
+              .required()
+              .action((x, s) => s.copy(configPath = x))
           )
       )
     }
@@ -424,6 +467,7 @@ object WavesDexCli extends ScoptImplicits {
             case Command.RunComparison => runComparison(args)
             case Command.MakeOrderbookSnapshots => makeSnapshots(args)
             case Command.CheckConfigFile => checkConfig(args)
+            case Command.CleanAssets => cleanAssets(args)
           }
           println("Done")
       }
@@ -466,6 +510,10 @@ object WavesDexCli extends ScoptImplicits {
 
     case object MakeOrderbookSnapshots extends Command {
       override def name: String = "make-orderbook-snapshots"
+    }
+
+    case object CleanAssets extends Command {
+      override def name: String = "clean-assets"
     }
 
   }

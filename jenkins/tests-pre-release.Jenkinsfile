@@ -70,8 +70,8 @@ pipeline {
                 kafkaBuild = "<a href='/job/Waves.Exchange/job/Matcher/job/Matcher Server - OS - Test - Kafka/${kafkaBuildNumber}'>Kafka</a>"
                 multipleBuild = "<a href='/job/Waves.Exchange/job/Matcher/job/Matcher Server - OS - Test - Multiple Versions/${multipleBuildNumber}'>Multiple</a>"
                 versionBuild = "<a href='/job/Waves.Exchange/job/Matcher/job/Matcher Server - OS - Test - Version/${versionBuildNumber}'>Version</a>"
-                smokeNBuild = "<a href='/job/Waves.Exchange/job/Matcher/job/Matcher Server - OS - Test - Smoke/${smokeONNMBuildNumber}'>Smoke (old node, new dex)</a>"
-                smokeMBuild = "<a href='/job/Waves.Exchange/job/Matcher/job/Matcher Server - OS - Test - Smoke/${smokeNNOMBuildNumber}'>Smoke (new node, old dex)</a>"
+                smokeNBuild = "<a href='/job/Waves.Exchange/job/Matcher/job/Matcher Server - OS - Test - Smoke/${smokeMBuildNumber}'>Smoke (old node, new dex)</a>"
+                smokeMBuild = "<a href='/job/Waves.Exchange/job/Matcher/job/Matcher Server - OS - Test - Smoke/${smokeNBuildNumber}'>Smoke (new node, old dex)</a>"
 
                 currentBuild.displayName = "${NEW_BRANCH_OR_TAG}"
                 currentBuild.description = "${kafkaBuild} <br/> ${multipleBuild} <br/> ${versionBuild} <br/> ${smokeMBuild} <br/> ${smokeNBuild}"

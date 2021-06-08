@@ -1,6 +1,5 @@
 package com.wavesplatform.dex.cli
 
-import cats.Id
 import cats.syntax.option._
 import cats.syntax.either._
 import cats.instances.either._
@@ -8,15 +7,12 @@ import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory.parseFile
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.app.{forceStopApplication, MatcherStateCheckingFailedError}
-import com.wavesplatform.dex.db.{AccountStorage, DbKeys}
-import com.wavesplatform.dex.db.leveldb.{openDb, LevelDb}
+import com.wavesplatform.dex.db.AccountStorage
 import com.wavesplatform.dex.doc.MatcherErrorDoc
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair}
-import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.error.Implicits.ThrowableOps
-import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.settings.{loadConfig, loadMatcherSettings, MatcherSettings}
 import com.wavesplatform.dex.tool.connectors.SuperConnector
 import com.wavesplatform.dex.tool._

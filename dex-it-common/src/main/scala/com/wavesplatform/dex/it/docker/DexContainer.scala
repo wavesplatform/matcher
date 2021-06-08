@@ -109,6 +109,7 @@ object DexContainer extends ScorexLogging {
   private val containerLogsPath: String = s"$baseContainerPath/logs"
 
   private val restApiPort: Int = 6886 // application.conf waves.dex.rest-api.port
+  private val exposedPorts = Seq(6886)
 
   def apply(
     name: String,
@@ -127,15 +128,15 @@ object DexContainer extends ScorexLogging {
 
     val underlying = GenericContainer(
       dockerImage = image,
-      exposedPorts = Seq(restApiPort),
       env = getEnv(name),
       waitStrategy = ignoreWaitStrategy
     ).configure { c =>
       c.withNetwork(network)
       c.withFileSystemBind(localLogsDir.toString, containerLogsPath, BindMode.READ_WRITE)
-      c.withCreateContainerCmdModifier {
-        _.withName(s"$networkName-$name") // network.getName returns random id
-          .withIpv4Address(internalIp): Unit
+      c.withCreateContainerCmdModifier { cmd =>
+        cmd.withName(s"$networkName-$name") // network.getName returns random id
+          .withIpv4Address(internalIp)
+        cmd.getHostConfig.withPortBindings(PortBindingKeeper.getBindings(cmd, exposedPorts))
       }
 
       // Copy files to container

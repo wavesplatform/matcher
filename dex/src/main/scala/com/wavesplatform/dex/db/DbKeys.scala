@@ -2,7 +2,6 @@ package com.wavesplatform.dex.db
 
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
-
 import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.dex.db.leveldb.Key
 import com.wavesplatform.dex.domain.account.Address
@@ -130,13 +129,19 @@ object DbKeys {
         bb.get(name)
         val decimals = bb.getInt
         val hasScript = bb.get == 1
+        val isNft = if (bb.hasRemaining) bb.get == 1 else false
 
-        BriefAssetDescription(new String(name, StandardCharsets.UTF_8), decimals, hasScript)
+        BriefAssetDescription(new String(name, StandardCharsets.UTF_8), decimals, hasScript, isNft)
       },
       x => {
         val nameBytes = x.name.getBytes(StandardCharsets.UTF_8)
-        Ints.toByteArray(nameBytes.length) ++ nameBytes ++ Ints.toByteArray(x.decimals) ++ Array[Byte](if (x.hasScript) 1 else 0)
+        Ints.toByteArray(nameBytes.length) ++ nameBytes ++ Ints.toByteArray(x.decimals) ++ Array[Byte](
+          encodeBoolean(x.hasScript),
+          encodeBoolean(x.isNft)
+        )
       }
     )
+
+  private def encodeBoolean(value: Boolean): Byte = if (value) 1 else 0
 
 }

@@ -26,7 +26,7 @@ import com.wavesplatform.dex.actors.tx.{ExchangeTransactionBroadcastActor, Write
 import com.wavesplatform.dex.actors.{OrderBookAskAdapter, OrderBookDirectoryActor, RootActorSystem}
 import com.wavesplatform.dex.api.http.headers.{CustomMediaTypes, MatcherHttpServer}
 import com.wavesplatform.dex.api.http.routes.{MatcherApiRoute, MatcherApiRouteV1}
-import com.wavesplatform.dex.api.http.{CompositeHttpService, OrderBookHttpInfo, MetricHttpFlow}
+import com.wavesplatform.dex.api.http.{CompositeHttpService, MetricHttpFlow, OrderBookHttpInfo}
 import com.wavesplatform.dex.api.routes.ApiRoute
 import com.wavesplatform.dex.api.ws.actors.{WsExternalClientDirectoryActor, WsInternalBroadcastActor}
 import com.wavesplatform.dex.api.ws.routes.MatcherWebSocketRoute
@@ -241,7 +241,8 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     storeCommand,
     recovered,
     addressActorBlockchainInteraction,
-    settings.addressActor
+    settings.addressActor,
+    asset => assetsCache.cached.unsafeGet(asset)
   )
 
   private val orderEventsCoordinatorRef = actorSystem.spawn(

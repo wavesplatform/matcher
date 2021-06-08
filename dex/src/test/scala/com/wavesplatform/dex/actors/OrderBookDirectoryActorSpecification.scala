@@ -44,7 +44,7 @@ class OrderBookDirectoryActorSpecification
   private val assetsCache = new AssetsCache() {
 
     override val cached: AssetsReadOnlyDb[Id] =
-      (_: IssuedAsset) => Some(BriefAssetDescription(name = "Unknown", decimals = 8, hasScript = false))
+      (_: IssuedAsset) => Some(BriefAssetDescription(name = "Unknown", decimals = 8, hasScript = false, isNft = false))
 
     override def get(asset: Asset): Future[Option[BriefAssetDescription]] = Future.successful(cached.get(asset))
     override def put(asset: Asset, item: BriefAssetDescription): Future[Unit] = Future.unit

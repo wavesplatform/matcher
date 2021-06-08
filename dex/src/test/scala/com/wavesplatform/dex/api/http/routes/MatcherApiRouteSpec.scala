@@ -81,7 +81,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
   private val smartAssetDesc = BriefAssetDescription(
     name = "smart asset",
     decimals = Random.nextInt(9),
-    hasScript = false
+    hasScript = false,
+    isNft = false
   )
 
   private val orderRestrictions = OrderRestrictionsSettings(
@@ -119,8 +120,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
   private val (okOrder, okOrderSenderPrivateKey) = orderGenerator.sample.get
   private val (badOrder, badOrderSenderPrivateKey) = orderGenerator.sample.get
 
-  private val amountAssetDesc = BriefAssetDescription("AmountAsset", 8, hasScript = false)
-  private val priceAssetDesc = BriefAssetDescription("PriceAsset", 8, hasScript = false)
+  private val amountAssetDesc = BriefAssetDescription("AmountAsset", 8, hasScript = false, isNft = false)
+  private val priceAssetDesc = BriefAssetDescription("PriceAsset", 8, hasScript = false, isNft = false)
 
   private val settings = ConfigSource
     .fromConfig(ConfigFactory.load())
@@ -1123,10 +1124,14 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
 
   private def test[U](f: Route => U, apiKey: String = "", maybeRateCache: Option[RateCache] = None): U = {
     val rateCache = maybeRateCache.getOrElse(RateCache(TestRateDb()).futureValue)
+
+    val odb = OrderDb.levelDb(settings.orderDb, asyncLevelDb)
+    odb.saveOrder(orderToCancel).futureValue
+
     val addressActor = TestProbe("address")
     addressActor.setAutoPilot { (sender: ActorRef, msg: Any) =>
       val response = msg match {
-        case AddressDirectoryActor.Command.ForwardMessage(_, msg) =>
+        case AddressDirectoryActor.Command.ForwardMessage(forwardAddress, msg) =>
           msg match {
             case AddressActor.Query.GetReservedBalance => AddressActor.Reply.GetBalance(Map(Waves -> 350L))
             case PlaceOrder(x, _) => if (x.id() == okOrder.id()) AddressActor.Event.OrderAccepted(x) else error.OrderDuplicate(x.id())
@@ -1139,8 +1144,15 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
               else Status.Failure(new RuntimeException(s"Unknown order $orderId"))
 
             case AddressActor.Command.CancelOrder(orderId, Source.Request) =>
-              if (orderId == okOrder.id() || orderId == orderToCancel.id()) AddressActor.Event.OrderCanceled(orderId)
-              else error.OrderNotFound(orderId)
+              def handleCancelOrder() =
+                if (orderId == okOrder.id() || orderId == orderToCancel.id()) AddressActor.Event.OrderCanceled(orderId)
+                else error.OrderNotFound(orderId)
+
+              odb.get(orderId).futureValue match {
+                case None => handleCancelOrder()
+                case Some(order) if order.sender.toAddress == forwardAddress => handleCancelOrder()
+                case _ => error.OrderNotFound(orderId)
+              }
 
             case x @ AddressActor.Command.CancelAllOrders(pair, _, Source.Request) =>
               if (pair.contains(badOrder.assetPair)) error.AddressIsBlacklisted(badOrder.sender)
@@ -1256,9 +1268,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         .explicitGet()
     )
 
-    val odb = OrderDb.levelDb(settings.orderDb, asyncLevelDb)
-    odb.saveOrder(orderToCancel).futureValue
-
     val orderBooks = new AtomicReference(Map(smartWavesPair -> orderBookActor.ref.asRight[Unit]))
     val orderBookAskAdapter = new OrderBookAskAdapter(orderBooks, 5.seconds)
 
@@ -1319,7 +1328,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         validatedAllowedOrderVersions = () => Future.successful(Set(1, 2, 3)),
         () => DynamicSettings.symmetric(matcherFee),
         externalClientDirectoryRef = testKit.spawn(WsExternalClientDirectoryActor(), s"ws-external-cd-${Random.nextInt(Int.MaxValue)}"),
-        getAssetDescription = _ => liftValueAsync(BriefAssetDescription("test", 8, hasScript = false))
+        getAssetDescription = _ => liftValueAsync(BriefAssetDescription("test", 8, hasScript = false, isNft = false))
       )
 
     f(route.route)

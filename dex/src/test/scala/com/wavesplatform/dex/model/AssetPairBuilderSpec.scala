@@ -64,7 +64,8 @@ class AssetPairBuilderSpec extends AnyFreeSpec with Matchers with MockFactory wi
     val assetDescription =
       knownAssets.toMap
         .map {
-          case (k, Some(x)) => k -> liftValueAsync[BriefAssetDescription](BriefAssetDescription(x.name, x.decimals, hasScript = false))
+          case (k, Some(x)) =>
+            k -> liftValueAsync[BriefAssetDescription](BriefAssetDescription(x.name, x.decimals, hasScript = false, isNft = false))
           case (k, None) => k -> liftErrorAsync[BriefAssetDescription](error.AssetNotFound(k))
         }
         .withDefault { x =>
@@ -142,6 +143,6 @@ object AssetPairBuilderSpec {
   private def mkAssetId(index: Byte): IssuedAsset = IssuedAsset(ByteStr(Array.fill[Byte](32)(index)))
 
   private def mkAssetDescription(assetName: String = ""): Option[BriefAssetDescription] =
-    Some(BriefAssetDescription(name = assetName, decimals = 8, hasScript = false))
+    Some(BriefAssetDescription(name = assetName, decimals = 8, hasScript = false, isNft = false))
 
 }

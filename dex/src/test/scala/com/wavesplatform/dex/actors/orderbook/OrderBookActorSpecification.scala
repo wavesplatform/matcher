@@ -325,7 +325,7 @@ class OrderBookActorSpecification
       orderBook ! wrapLimitOrder(1, buyOrder)
       tp.expectOecProcess[OrderAdded]
 
-      orderBook ! wrapCommand(2, CancelOrder(buyOrder.assetPair, buyOrder.id(), Source.Request))
+      orderBook ! wrapCommand(2, CancelOrder(buyOrder.assetPair, buyOrder.id(), Source.Request, Some(buyOrder.sender.toAddress)))
       tp.expectOecProcess[OrderCanceled]
     }
 
@@ -416,7 +416,7 @@ class OrderBookActorSpecification
 
       orderBook ! wrapCommand(
         2,
-        CancelOrder(buyOrder1.assetPair, buyOrder1.id(), Source.Request)
+        CancelOrder(buyOrder1.assetPair, buyOrder1.id(), Source.Request, Some(buyOrder1.sender.toAddress))
       ) // order book is looking for the price level of buyOrder1 correctly (41 but not 40)
       tp.expectOecProcess[OrderCanceled]
 

@@ -7,6 +7,7 @@ import com.wavesplatform.dex.domain.utils.{EitherExt2, ScorexLogging}
 import com.wavesplatform.dex.history.HistoryRouterActor._
 import com.wavesplatform.dex.model.Events
 import com.wavesplatform.dex.model.Events.{OrderCancelFailed, OrderCancelFailedFinalized}
+import kamon.Kamon
 
 import scala.collection.mutable
 import scala.concurrent.Future
@@ -24,6 +25,7 @@ class AddressDirectoryActor(
   import context._
 
   private[this] val children = mutable.AnyRefMap.empty[Address, ActorRef]
+  private val emptyOwnerCounter = Kamon.counter("matcher.address-directory-actor.empty-owner").withoutTags()
 
   override def supervisorStrategy: SupervisorStrategy = SupervisorStrategy.stoppingStrategy
 
@@ -50,17 +52,23 @@ class AddressDirectoryActor(
     case e: OrderCancelFailed =>
       // We save an order when accept it in AddressActor
       val origSender = sender()
-      orderDb.get(e.id).onComplete {
-        case Success(Some(order)) =>
-          self.tell(OrderCancelFailedFinalized(order, e.reason), origSender)
-        case Success(None) =>
-          log.warn(s"The order '${e.id}' not found")
-        case Failure(th) =>
-          log.error(s"error while retrieving order by id ${e.id}", th)
+      //TODO remove orderDb in this actor once maybeOwner will be always fulfilled
+      e.maybeOwner.map { owner =>
+        forward(owner, e)
+      }.getOrElse {
+        emptyOwnerCounter.increment()
+        orderDb.get(e.id).onComplete {
+          case Success(Some(order)) =>
+            self.tell(OrderCancelFailedFinalized(e, order.sender.toAddress), origSender)
+          case Success(None) =>
+            log.warn(s"The order '${e.id}' not found")
+          case Failure(th) =>
+            log.error(s"error while retrieving order by id ${e.id}", th)
+        }
       }
 
-    case e: OrderCancelFailedFinalized =>
-      forward(e.order.sender.toAddress, e)
+    case OrderCancelFailedFinalized(orderCancelFailed, owner) =>
+      forward(owner, orderCancelFailed)
 
     case Terminated(child) =>
       val addressString = child.path.name

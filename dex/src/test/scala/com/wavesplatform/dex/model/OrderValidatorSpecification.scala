@@ -141,7 +141,8 @@ class OrderValidatorSpecification
       "order price has invalid non-zero trailing decimals" in forAll(issuedAssetGen(1), accountGen, Gen.choose(1, 7)) {
         case (amountAsset, sender, amountDecimals) =>
           blockchainTest(
-            assetDescriptions = getDefaultAssetDescriptions(amountAsset -> BriefAssetDescription("AssetName", amountDecimals, hasScript = false))
+            assetDescriptions =
+              getDefaultAssetDescriptions(amountAsset -> BriefAssetDescription("AssetName", amountDecimals, hasScript = false, isNft = false))
           ) { (ov, bc) =>
             assignNoScript(bc, sender.toAddress)
             assignNoScript(bc, MatcherAccount.toAddress)
@@ -969,7 +970,7 @@ class OrderValidatorSpecification
   }
 
   private def mkAssetDescription(decimals: Int): BriefAssetDescription =
-    BriefAssetDescription(name = "name", decimals = decimals, hasScript = false)
+    BriefAssetDescription(name = "name", decimals = decimals, hasScript = false, isNft = false)
 
   private def newBuyOrder: Order = buy(pair = wavesBtcPair, amount = 100.waves, price = 0.0022, matcherFee = Some(0.003.waves))
 

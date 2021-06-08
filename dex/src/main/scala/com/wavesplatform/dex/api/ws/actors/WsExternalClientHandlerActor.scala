@@ -103,7 +103,10 @@ object WsExternalClientHandlerActor {
 
       def unsubscribeOrderBook(assetPair: AssetPair): Unit = {
         context.log.debug(s"WsUnsubscribe(assetPair=$assetPair)")
-        matcherRef ! OrderBookDirectoryActor.AggregatedOrderBookEnvelope(assetPair, AggregatedOrderBookActor.Command.RemoveWsSubscription(clientRef))
+        matcherRef ! OrderBookDirectoryActor.AggregatedOrderBookEnvelope(
+          assetPair,
+          AggregatedOrderBookActor.Command.RemoveWsSubscription(clientRef)
+        )
       }
 
       def awaitPong(
@@ -182,8 +185,10 @@ object WsExternalClientHandlerActor {
                       addressSubscriptions
                         .find(_._1 == subscribe.key)
                         .fold {
-
-                          addressRef ! AddressDirectoryActor.Command.ForwardMessage(subscribe.key, AddressActor.WsCommand.AddWsSubscription(clientRef))
+                          addressRef ! AddressDirectoryActor.Command.ForwardMessage(
+                            subscribe.key,
+                            AddressActor.WsCommand.AddWsSubscription(clientRef, subscribe.filters)
+                          )
                           context.log.debug(s"WsAddressSubscribe(k=$address, t=$authType) is successful, will expire in $subscriptionLifetime")
 
                           if (addressSubscriptions.lengthCompare(maxAddressNumber) == 0) {
@@ -276,7 +281,10 @@ object WsExternalClientHandlerActor {
               }
 
             case Event.AssetPairValidated(assetPair) =>
-              matcherRef ! OrderBookDirectoryActor.AggregatedOrderBookEnvelope(assetPair, AggregatedOrderBookActor.Command.AddWsSubscription(clientRef))
+              matcherRef ! OrderBookDirectoryActor.AggregatedOrderBookEnvelope(
+                assetPair,
+                AggregatedOrderBookActor.Command.AddWsSubscription(clientRef)
+              )
 
               if (orderBookSubscriptions.lengthCompare(maxOrderBookNumber) == 0) {
                 // safe since maxOrderBookNumber > 0

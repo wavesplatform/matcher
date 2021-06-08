@@ -17,7 +17,7 @@ import eu.rekawek.toxiproxy.model.ToxicDirection
 
 import scala.collection.immutable.Queue
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.{Future, blocking}
+import scala.concurrent.{blocking, Future}
 
 @NetworkTests
 class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
@@ -49,7 +49,7 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
   }
 
   override protected def afterEach(): Unit = {
-    matcherExtensionProxy.toxics().getAll.forEach(_.remove())
+    matcherExtensionProxy.toxics.getAll.forEach(_.remove())
     clearOrderBook()
   }
 
@@ -117,20 +117,20 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
 
   "DEXClient should works correctly despite of latency: " - {
     "high latency (from node to dex)" in {
-      matcherExtensionProxy.toxics().latency("latency", ToxicDirection.DOWNSTREAM, 4500)
+      matcherExtensionProxy.toxics.latency("latency", ToxicDirection.DOWNSTREAM, 4500)
       makeAndMatchOrders()
       matchingShouldBeSuccess()
     }
 
     "high latency (from dex to node)" in {
-      matcherExtensionProxy.toxics().latency("latency", ToxicDirection.UPSTREAM, 4500)
+      matcherExtensionProxy.toxics.latency("latency", ToxicDirection.UPSTREAM, 4500)
       makeAndMatchOrders()
       matchingShouldBeSuccess()
     }
 
     "high latency (both directions)" in {
-      matcherExtensionProxy.toxics().latency("latencyD", ToxicDirection.DOWNSTREAM, 4500)
-      matcherExtensionProxy.toxics().latency("latencyU", ToxicDirection.UPSTREAM, 4500)
+      matcherExtensionProxy.toxics.latency("latencyD", ToxicDirection.DOWNSTREAM, 4500)
+      matcherExtensionProxy.toxics.latency("latencyU", ToxicDirection.UPSTREAM, 4500)
       makeAndMatchOrders()
       matchingShouldBeSuccess()
     }
@@ -139,20 +139,20 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
   "DEXClient should works correctly despite of slow network: " - {
 
     "16 kbps from node to dex" in {
-      matcherExtensionProxy.toxics().bandwidth("bandwidth", ToxicDirection.DOWNSTREAM, 16)
+      matcherExtensionProxy.toxics.bandwidth("bandwidth", ToxicDirection.DOWNSTREAM, 16)
       makeAndMatchOrders()
       matchingShouldBeSuccess()
     }
 
     "16 kbps from dex to node" in {
-      matcherExtensionProxy.toxics().bandwidth("bandwidth", ToxicDirection.UPSTREAM, 16)
+      matcherExtensionProxy.toxics.bandwidth("bandwidth", ToxicDirection.UPSTREAM, 16)
       makeAndMatchOrders()
       matchingShouldBeSuccess()
     }
 
     "16 kbps in both directions" in {
-      matcherExtensionProxy.toxics().bandwidth("bandwidthD", ToxicDirection.DOWNSTREAM, 16)
-      matcherExtensionProxy.toxics().bandwidth("bandwidthU", ToxicDirection.UPSTREAM, 16)
+      matcherExtensionProxy.toxics.bandwidth("bandwidthD", ToxicDirection.DOWNSTREAM, 16)
+      matcherExtensionProxy.toxics.bandwidth("bandwidthU", ToxicDirection.UPSTREAM, 16)
       makeAndMatchOrders()
       matchingShouldBeSuccess()
     }

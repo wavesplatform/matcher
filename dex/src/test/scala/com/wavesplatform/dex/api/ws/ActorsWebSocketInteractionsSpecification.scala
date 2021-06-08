@@ -76,8 +76,9 @@ class ActorsWebSocketInteractionsSpecification
             Future.successful(Some(ValidatedCommandWithMeta(0L, 0L, command)))
           },
           recovered,
-          blockchainInteraction
-        )(efc)
+          blockchainInteraction,
+          getAssetDescription = getDefaultAssetDescriptions
+        )
       )
 
     val addressDir = system.actorOf(Props(new AddressDirectoryActor(EmptyOrderDb(), createAddressActor, None, recovered = true)))
@@ -115,7 +116,7 @@ class ActorsWebSocketInteractionsSpecification
           if (unmatchable) AddressActor.Command.Source.Request // Not important in this test suite
           else AddressActor.Command.Source.Request
         addressDir ! AddressDirectoryActor.Command.ForwardMessage(address, AddressActor.Command.CancelOrder(ao.id, source))
-        commandsProbe.expectMsg(ValidatedCommand.CancelOrder(ao.order.assetPair, ao.id, source))
+        commandsProbe.expectMsg(ValidatedCommand.CancelOrder(ao.order.assetPair, ao.id, source, Some(ao.order.sender.toAddress)))
       }
 
       val reason = if (unmatchable) Events.OrderCanceledReason.BecameUnmatchable else Events.OrderCanceledReason.RequestExecuted

@@ -10,7 +10,7 @@ import akka.testkit.TestProbe
 import cats.data.NonEmptyList
 import com.wavesplatform.dex.NoShrink
 import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.{Command, InputMessage, MarketStatus, Query}
-import com.wavesplatform.dex.actors.{OrderBookDirectoryActor, MatcherSpecLike, OrderBookAskAdapter}
+import com.wavesplatform.dex.actors.{MatcherSpecLike, OrderBookAskAdapter, OrderBookDirectoryActor}
 import com.wavesplatform.dex.api.http.entities.{HttpV0LevelAgg, HttpV0OrderBook}
 import com.wavesplatform.dex.api.ws.entities.WsOrderBookSettings
 import com.wavesplatform.dex.api.ws.protocol.{WsMessage, WsOrderBookChanges}

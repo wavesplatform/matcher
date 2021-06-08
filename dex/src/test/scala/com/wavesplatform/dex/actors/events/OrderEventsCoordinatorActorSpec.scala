@@ -183,7 +183,7 @@ class OrderEventsCoordinatorActorSpec extends ScalaTestWithActorTestKit() with M
 
     "ProcessError - passes" in {
       val orderId = ByteStr("order-id".getBytes(StandardCharsets.UTF_8))
-      val event = Events.OrderCancelFailed(orderId, error.UnexpectedError)
+      val event = Events.OrderCancelFailed(orderId, error.UnexpectedError, None)
       passToAddressDirectoryTest(OrderEventsCoordinatorActor.Command.ProcessError(event), event)
     }
 

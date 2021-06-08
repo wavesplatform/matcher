@@ -87,10 +87,10 @@ object WavesNodeArtifactsPlugin extends AutoPlugin {
         }
 
         // Additional steps
-        // Unpacking grpc-server extension JARs to have all required dependencies, including grpc ones
+        // Unpacking waves-grpc-server extension JARs to have all required dependencies, including grpc ones
         val grpcServerArchive = targetDir.listFiles(new FileFilter {
-          override def accept(pathname: File): Boolean = pathname.name.matches("grpc-server.+\\.tgz")
-        }).headOption.getOrElse(throw new RuntimeException("Can't find a grpc-server archive"))
+          override def accept(pathname: File): Boolean = pathname.name.matches("waves-grpc-server.+\\.tgz")
+        }).headOption.getOrElse(throw new RuntimeException("Can't find a waves-grpc-server archive"))
 
         MatcherIOUtils.decompressTgz(grpcServerArchive, targetDir)
         val grpcServerDir = targetDir / grpcServerArchive.name.replace(".tgz", "")
@@ -115,8 +115,8 @@ object WavesNodeArtifactsPlugin extends AutoPlugin {
   private def artifactNames(version: String): List[List[String]] = List(
     List(s"waves-all-$version.jar"),
     networkSuffixes.map(x => s"waves_$x${version}_all.deb"),
-    networkSuffixes.map(x => s"grpc-server$x-$version.tgz"),
-    networkSuffixes.map(x => s"grpc-server${x}_${version}_all.deb")
+    networkSuffixes.map(x => s"waves-grpc-server$x-$version.tgz"),
+    networkSuffixes.map(x => s"waves-grpc-server${x}_${version}_all.deb")
   )
 
   private def getFilesDownloadUrls(rawJson: String, version: String, fileNamesToDownload: List[List[String]])(implicit

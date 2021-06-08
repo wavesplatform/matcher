@@ -30,14 +30,21 @@ class MatcherScriptRunnerSpecification extends WavesExtSuiteBase {
     matcherFee = 30000L
   )
 
-  private def run(script: Script): Either[String, Terms.EVALUATED] = MatcherScriptRunner(script, sampleOrder)
+  private def run(script: Script, isSynchronousCallsActivated: Boolean): Either[String, Terms.EVALUATED] =
+    MatcherScriptRunner(script, sampleOrder, isSynchronousCallsActivated)
 
   "dApp sunny day" in {
-    run(dAppScriptSunny).explicitGet() shouldBe Terms.FALSE
+    List(false, true).foreach { isSynchronousCallsActivated =>
+      run(dAppScriptSunny, isSynchronousCallsActivated).explicitGet() shouldBe Terms.FALSE
+    }
   }
 
-  "Blockchain functions are disabled in dApp" in {
-    run(dAppScriptBlockchain) should produce("An access to <getBoolean(addressOrAlias: Address|Alias, key: String): Boolean|Unit> is denied")
+  "Blockchain functions are disabled in dApp (isSynchronousCallsActivated = false)" in {
+    List(false, true).foreach { isSynchronousCallsActivated =>
+      run(dAppScriptBlockchain, isSynchronousCallsActivated) should produce(
+        "An access to <getBoolean(addressOrAlias: Address|Alias, key: String): Boolean|Unit> is denied"
+      )
+    }
   }
 
   private def dAppScriptSunny: Script =

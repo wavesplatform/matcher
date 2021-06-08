@@ -28,7 +28,8 @@ object PbToDexConversions {
           BriefAssetDescription(
             name = value.name.toString(StandardCharsets.UTF_8),
             decimals = value.decimals,
-            hasScript = value.hasScript
+            hasScript = value.hasScript,
+            isNft = value.nft
           )
         )
     }

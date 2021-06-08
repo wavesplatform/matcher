@@ -498,9 +498,9 @@ object Events {
 
   case object NotTracked extends EventReason with OrderAddedReason with OrderCanceledReason
 
-  case class OrderCancelFailed(id: Order.Id, reason: error.MatcherError)
+  case class OrderCancelFailed(id: Order.Id, reason: error.MatcherError, maybeOwner: Option[Address])
 
-  case class OrderCancelFailedFinalized(order: Order, reason: error.MatcherError)
+  case class OrderCancelFailedFinalized(orderCancelFailed: OrderCancelFailed, owner: Address)
 
   case class ExchangeTransactionCreated(tx: ExchangeTransaction)
 }

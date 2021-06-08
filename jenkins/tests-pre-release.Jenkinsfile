@@ -64,13 +64,17 @@ pipeline {
                 kafkaBuildNumber = Jenkins.instance.getItemByFullName('Waves.Exchange/Matcher/Matcher Server - OS - Test - Kafka').getLastBuild().getNumber() + 1
                 multipleBuildNumber = Jenkins.instance.getItemByFullName('Waves.Exchange/Matcher/Matcher Server - OS - Test - Multiple Versions').getLastBuild().getNumber() + 1
                 versionBuildNumber = Jenkins.instance.getItemByFullName('Waves.Exchange/Matcher/Matcher Server - OS - Test - Version').getLastBuild().getNumber() + 1
+                smokeNBuildNumber = Jenkins.instance.getItemByFullName('Waves.Exchange/Matcher/Matcher Server - OS - Test - Version').getLastBuild().getNumber() + 1
+                smokeNBuildNumber = Jenkins.instance.getItemByFullName('Waves.Exchange/Matcher/Matcher Server - OS - Test - Version').getLastBuild().getNumber() + 1
 
                 kafkaBuild = "<a href='/job/Waves.Exchange/job/Matcher/job/Matcher Server - OS - Test - Kafka/${kafkaBuildNumber}'>Kafka</a>"
                 multipleBuild = "<a href='/job/Waves.Exchange/job/Matcher/job/Matcher Server - OS - Test - Multiple Versions/${multipleBuildNumber}'>Multiple</a>"
                 versionBuild = "<a href='/job/Waves.Exchange/job/Matcher/job/Matcher Server - OS - Test - Version/${versionBuildNumber}'>Version</a>"
-                
+                smokeMBuild = "<a href='/job/Waves.Exchange/job/Matcher/job/Matcher Server - OS - Test - Smoke/${smokeNBuildNumber}'>Smoke M</a>"
+                smokeNBuild = "<a href='/job/Waves.Exchange/job/Matcher/job/Matcher Server - OS - Test - Smoke/${smokeNBuildNumber}'>Smoke N</a>"
+
                 currentBuild.displayName = "${NEW_BRANCH_OR_TAG}"
-                currentBuild.description = "${kafkaBuild} | ${multipleBuild} | ${versionBuild}"
+                currentBuild.description = "${kafkaBuild} | ${multipleBuild} | ${versionBuild} | ${smokeMBuild} | ${smokeNBuild}"
             }
         }
         cleanup {

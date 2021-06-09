@@ -11,30 +11,23 @@ import scala.concurrent.duration.Deadline
 import scala.util.{Failure, Success}
 import scala.concurrent.duration._
 
-object WaitOffsetTool extends ScorexLogging {
+trait WaitOffsetTool extends ScorexLogging {
 
   case class TimeCheckTag(currentOffset: Offset, time: Long)
 
-  private def calculateCommandsPerSecond(lastCheckTime: Option[TimeCheckTag], lastProcessedOffset: Offset): Option[Double] = {
-    lastCheckTime.map { lastTimeCheck =>
-      val timeDifference = (System.nanoTime() - lastTimeCheck.time).nano.toSeconds
-      val commandDifference = lastProcessedOffset - lastTimeCheck.currentOffset
-      commandDifference/timeDifference
-    }
-  }
-
   def waitOffsetReached(
-    getLastOffset: Deadline => Future[Offset],
+    getLastOffset: => Future[Offset],
     getLastProcessedOffset: => Offset,
     startingLastOffset: Offset,
     deadline: Deadline,
-    settings: MatcherSettings
-  )(implicit scheduler: Scheduler, ex: ExecutionContext): Future[Unit] = {
+    settings: MatcherSettings,
+    scheduler: Scheduler
+  )(implicit ex: ExecutionContext): Future[Unit] = {
     val interval = settings.waitingQueue.checkInterval
     val maxWaitingTime = settings.waitingQueue.maxWaitingTime
 
     def canProcessNewCommands(lastOffset: Offset, currentOffset: Offset, commandsPerSecond: Option[Double]): Boolean =
-      commandsPerSecond.fold (currentOffset >= lastOffset) { k =>
+      commandsPerSecond.fold(currentOffset >= lastOffset) { k =>
         (lastOffset - currentOffset) / k <= maxWaitingTime.toSeconds
       }
 
@@ -56,7 +49,7 @@ object WaitOffsetTool extends ScorexLogging {
       lastOffsetOpt match {
         case Some(lastOffset) => processOffset(p, lastOffset, calculateCommandsPerSecond(lastCheckTime, getLastProcessedOffset))
         case None =>
-          getLastOffset(deadline).onComplete {
+          getLastOffset.onComplete {
             case Success(lastOffset) => processOffset(p, lastOffset, calculateCommandsPerSecond(lastCheckTime, getLastProcessedOffset))
             case Failure(ex) => p.failure(ex)
           }
@@ -66,5 +59,18 @@ object WaitOffsetTool extends ScorexLogging {
     loop(p, None, Some(startingLastOffset))
     p.future
   }
+
+  protected def calculateCommandsPerSecond(lastCheckTime: Option[TimeCheckTag], lastProcessedOffset: Offset): Option[Double]
+
+}
+
+object WaitOffsetTool extends WaitOffsetTool {
+
+  override def calculateCommandsPerSecond(lastCheckTime: Option[TimeCheckTag], lastProcessedOffset: Offset): Option[Double] =
+    lastCheckTime.map { lastTimeCheck =>
+      val timeDifference = (System.nanoTime() - lastTimeCheck.time).nano.toSeconds
+      val commandDifference = lastProcessedOffset - lastTimeCheck.currentOffset
+      commandDifference.toDouble / timeDifference.toDouble
+    }
 
 }

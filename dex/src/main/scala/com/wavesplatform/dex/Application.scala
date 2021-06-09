@@ -459,7 +459,14 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       matcherQueue.startConsume(firstConsumedOffset, consumeMessages)
     } zip {
       log.info(s"Last queue offset is $lastOffsetQueue")
-      WaitOffsetTool.waitOffsetReached(getLastQueueOffset, lastProcessedOffset, lastOffsetQueue, deadline, settings)(actorSystem.scheduler, actorSystem.dispatcher)
+      WaitOffsetTool.waitOffsetReached(
+        getLastQueueOffset(deadline),
+        lastProcessedOffset,
+        lastOffsetQueue,
+        deadline,
+        settings,
+        actorSystem.scheduler
+      )
     }
   } yield {
     log.info("Last offset has been reached, switching to a normal mode")

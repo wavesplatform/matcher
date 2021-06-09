@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.tool
 
-import akka.actor.ActorSystem
+import akka.actor.Scheduler
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.queue.ValidatedCommandWithMeta.Offset
 import com.wavesplatform.dex.settings.MatcherSettings
@@ -9,8 +9,19 @@ import java.util.concurrent.TimeoutException
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.concurrent.duration.Deadline
 import scala.util.{Failure, Success}
+import scala.concurrent.duration._
 
 object WaitOffsetTool extends ScorexLogging {
+
+  case class TimeCheckTag(currentOffset: Offset, time: Long)
+
+  private def calculateCommandsPerSecond(lastCheckTime: Option[TimeCheckTag], lastProcessedOffset: Offset): Option[Double] = {
+    lastCheckTime.map { lastTimeCheck =>
+      val timeDifference = (System.nanoTime() - lastTimeCheck.time).nano.toSeconds
+      val commandDifference = lastProcessedOffset - lastTimeCheck.currentOffset
+      commandDifference/timeDifference
+    }
+  }
 
   def waitOffsetReached(
     getLastOffset: Deadline => Future[Offset],
@@ -18,40 +29,41 @@ object WaitOffsetTool extends ScorexLogging {
     startingLastOffset: Offset,
     deadline: Deadline,
     settings: MatcherSettings
-  )(implicit actorSystem: ActorSystem, ex: ExecutionContext): Future[Unit] = {
-    val commandsPerSecond = settings.waitingQueueSettings.commandsPerSecond
-    val interval = settings.waitingQueueSettings.checkInterval
-    val maxWaitingTime = settings.waitingQueueSettings.maxWaitingTime
+  )(implicit scheduler: Scheduler, ex: ExecutionContext): Future[Unit] = {
+    val interval = settings.waitingQueue.checkInterval
+    val maxWaitingTime = settings.waitingQueue.maxWaitingTime
 
-    def canProcessNewCommands(lastOffset: Offset, currentOffset: Offset): Boolean = {
-      val leftTime = (lastOffset - currentOffset) / commandsPerSecond
-      log.trace(s"Left time before matcher starts: $leftTime")
-      leftTime <= maxWaitingTime.toSeconds
-    }
+    def canProcessNewCommands(lastOffset: Offset, currentOffset: Offset, commandsPerSecond: Option[Double]): Boolean =
+      commandsPerSecond.fold (currentOffset >= lastOffset) { k =>
+        (lastOffset - currentOffset) / k <= maxWaitingTime.toSeconds
+      }
 
-    def processOffset(p: Promise[Unit], lastOffset: Offset): Unit = {
+    def processOffset(p: Promise[Unit], lastOffset: Offset, commandsPerSecond: Option[Double]): Unit = {
       val currentOffset = getLastProcessedOffset
       log.trace(s"offsets: $currentOffset >= $lastOffset, deadline: ${deadline.isOverdue()}")
-      if (canProcessNewCommands(lastOffset, currentOffset))
+      val currentTime = System.nanoTime()
+      if (canProcessNewCommands(lastOffset, currentOffset, commandsPerSecond))
         p.success(())
       else if (deadline.isOverdue())
         p.failure(new TimeoutException(s"Can't process all events in ${settings.startEventsProcessingTimeout.toMinutes} minutes"))
       else
-        actorSystem.scheduler.scheduleOnce(interval)(loop(p))
+        scheduler.scheduleOnce(interval) {
+          loop(p, Some(TimeCheckTag(currentOffset, currentTime)))
+        }
     }
 
-    def loop(p: Promise[Unit], lastOffsetOpt: Option[Offset] = None): Unit =
+    def loop(p: Promise[Unit], lastCheckTime: Option[TimeCheckTag], lastOffsetOpt: Option[Offset] = None): Unit =
       lastOffsetOpt match {
-        case Some(lastOffset) => processOffset(p, lastOffset)
+        case Some(lastOffset) => processOffset(p, lastOffset, calculateCommandsPerSecond(lastCheckTime, getLastProcessedOffset))
         case None =>
           getLastOffset(deadline).onComplete {
-            case Success(lastOffset) => processOffset(p, lastOffset)
+            case Success(lastOffset) => processOffset(p, lastOffset, calculateCommandsPerSecond(lastCheckTime, getLastProcessedOffset))
             case Failure(ex) => p.failure(ex)
           }
       }
 
     val p = Promise[Unit]()
-    loop(p, Some(startingLastOffset))
+    loop(p, None, Some(startingLastOffset))
     p.future
   }
 

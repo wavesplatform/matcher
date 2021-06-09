@@ -68,7 +68,7 @@ object Dependencies {
     val supertagged = "1.5"
 
     val javaLevelDb = "0.12"
-    val jniLevelDb = "1.18.3"
+    val iq80levelDb = "0.12"
     val influxDb = "2.21"
     val levelDbVersion = "1.22.1"
 
@@ -117,6 +117,7 @@ object Dependencies {
   private val julToSlf4j = "org.slf4j" % "jul-to-slf4j" % Version.slf4j
   private val janino = "org.codehaus.janino" % "janino" % Version.janino
   private val kamonCore = kamonModule("core")
+  private val iq80leveldb = "org.iq80.leveldb" % "leveldb-api" % Version.iq80levelDb
 
   private val wavesProtobufSchemas = ("com.wavesplatform" % "protobuf-schemas" % Version.wavesProtobufSchemas classifier "proto") % "protobuf"
 
@@ -139,7 +140,6 @@ object Dependencies {
   private val monixReactive = monixModule("reactive")
   private val supertagged = "org.rudogma" %% "supertagged" % Version.supertagged
   private val javaLevelDb = "org.iq80.leveldb" % "leveldb" % Version.javaLevelDb
-  private val jniLevelDb = "org.ethereum" % "leveldbjni-all" % Version.jniLevelDb
   private val influxDb = "org.influxdb" % "influxdb-java" % Version.influxDb
   private val commonsNet = "commons-net" % "commons-net" % Version.commonsNet
   private val sttpClient = sttpClientModule("core")
@@ -244,7 +244,6 @@ object Dependencies {
       scopt,
       kafka,
       janino,
-      jniLevelDb,
       kamonCore,
       kamonModule("influxdb"),
       kamonModule("system-metrics"),
@@ -258,7 +257,8 @@ object Dependencies {
       sttpPlayJson,
       sttpAsyncHttpClient,
       wavesJ,
-      betterMonadicFor
+      betterMonadicFor,
+      iq80leveldb
     ) ++ pureConfig ++ enumeratum ++ testKit ++ quill ++ monocle ++ levelDBJNA
 
     lazy val dexLoad: Seq[ModuleID] = Seq(diffx) ++ pureConfig ++ silencer

@@ -189,8 +189,7 @@ object Dependencies {
     scalaMock,
     javaLevelDb,
     allureScalaTest,
-    diffx,
-    iq80leveldb("leveldb").exclude("com.google.guava", "guava")
+    diffx
   ).map(_ % Test) ++ silencer
 
   private val integrationTestKit: Seq[ModuleID] = Seq(wavesJ, logback % Test) ++ testKit

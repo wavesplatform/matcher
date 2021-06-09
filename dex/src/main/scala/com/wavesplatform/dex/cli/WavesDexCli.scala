@@ -21,7 +21,6 @@ import com.wavesplatform.dex.tool._
 import monix.eval.Task
 import monix.execution.{ExecutionModel, Scheduler}
 import monix.execution.schedulers.SchedulerService
-import org.iq80.leveldb.DB
 import pureconfig.ConfigSource
 import scopt.{OParser, RenderingMode}
 import sttp.client3._

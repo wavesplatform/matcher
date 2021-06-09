@@ -2,7 +2,7 @@ package com.wavesplatform.dex.it.api.dex
 
 import cats.Functor
 import cats.syntax.functor._
-import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status.{Accepted, Cancelled, Filled, NotFound, PartiallyFilled}
+import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status.{Accepted, Cancelled, Filled, PartiallyFilled}
 import com.wavesplatform.dex.api.http.entities._
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.AssetPair

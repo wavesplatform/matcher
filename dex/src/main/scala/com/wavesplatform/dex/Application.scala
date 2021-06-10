@@ -464,7 +464,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
         lastProcessedOffset,
         lastOffsetQueue,
         deadline,
-        settings,
+        settings.waitingOffsetTool,
         actorSystem.scheduler
       )
     }

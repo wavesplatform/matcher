@@ -3,7 +3,7 @@ package com.wavesplatform.dex.tool
 import akka.actor.Scheduler
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.queue.ValidatedCommandWithMeta.Offset
-import com.wavesplatform.dex.settings.MatcherSettings
+import com.wavesplatform.dex.settings.WaitingOffsetToolSettings
 import com.wavesplatform.dex.tool.WaitOffsetTool.OffsetAndTime
 
 import java.util.concurrent.TimeoutException
@@ -19,11 +19,11 @@ private[tool] trait WaitOffsetTool extends ScorexLogging {
     getLastProcessedOffset: => Offset,
     initialLastOffset: Offset,
     deadline: Deadline,
-    settings: MatcherSettings,
+    settings: WaitingOffsetToolSettings,
     scheduler: Scheduler
   )(implicit ex: ExecutionContext): Future[Unit] = {
-    val checkInterval = settings.waitingOffsetTool.checkInterval
-    val maxWaitingTime = settings.waitingOffsetTool.maxWaitingTime
+    val checkInterval = settings.checkInterval
+    val maxWaitingTime = settings.maxWaitingTime
 
     def canProcessNewCommands(lastOffset: Offset, commandsPerSecond: Double)(currentOffset: Offset): Boolean =
       (lastOffset - currentOffset) / commandsPerSecond <= maxWaitingTime.toSeconds
@@ -35,7 +35,7 @@ private[tool] trait WaitOffsetTool extends ScorexLogging {
       if (canProcessNewCommandCondition(currentOffset))
         p.success(())
       else if (deadline.isOverdue())
-        p.failure(new TimeoutException(s"Can't process all events in ${settings.startEventsProcessingTimeout.toMinutes} minutes"))
+        p.failure(new TimeoutException(s"Can't process all events in ${settings.queueProcessingTimeout.toMinutes} minutes"))
       else
         scheduler.scheduleOnce(checkInterval) {
           loop(p, OffsetAndTime(currentOffset, currentTime))

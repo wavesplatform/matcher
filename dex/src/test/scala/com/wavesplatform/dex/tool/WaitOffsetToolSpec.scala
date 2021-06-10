@@ -7,12 +7,13 @@ import com.wavesplatform.dex.settings.{MatcherSettings, WaitingOffsetToolSetting
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AnyFreeSpecLike
 import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpecLike
 import pureconfig.ConfigSource
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
-class WaitOffsetToolSpec extends ScalaTestWithActorTestKit(ManualTime.config) with AnyFreeSpecLike with ScalaFutures with Matchers {
+class WaitOffsetToolSpec extends ScalaTestWithActorTestKit(ManualTime.config) with AnyWordSpecLike with ScalaFutures with Matchers {
 
   private val checkInterval = 100.millis
   private val waitingSettings = WaitingOffsetToolSettings(5.seconds, checkInterval)
@@ -23,50 +24,121 @@ class WaitOffsetToolSpec extends ScalaTestWithActorTestKit(ManualTime.config) wi
     .loadOrThrow[MatcherSettings]
     .copy(waitingOffsetToolSettings = waitingSettings)
 
-  @volatile private var lastOffset = 200L
-  @volatile private var currentOffset = 170L
-
-  private def getCurrentOffset: Long = currentOffset
-
-  private def getLastOffset: Future[Long] = Future.successful(lastOffset)
+  private def getLastOffset(lo: Offset): Future[Long] = Future.successful(lo)
 
   private val manualTime: ManualTime = ManualTime()
 
-  "WaitOffsetTool" in {
+  "WaitOffsetTool" should {
     implicit val ex: ExecutionContextExecutor = system.executionContext
+    val deadline = Deadline.now + 2.minutes
 
-    markup("start future with waiting")
-    val future = new TestWaitOffsetTool()
-      .waitOffsetReached(
-        getLastOffset,
-        getCurrentOffset,
-        lastOffset,
-        Deadline.now + 2.minutes,
-        matcherSettings,
-        system.classicSystem.scheduler
-      )
+    "finish future with waiting if currentOffset equals lastOffset at start" in {
+      val lastOffset = 200L
+      val currentOffset = 200L
 
-    future.isCompleted shouldBe false
+      val future = new TestWaitOffsetTool()
+        .waitOffsetReached(
+          getLastOffset(lastOffset),
+          currentOffset,
+          lastOffset,
+          deadline,
+          matcherSettings,
+          system.classicSystem.scheduler
+        )
 
-    markup("not finish future if currentOffset is increased, but difference is too big")
-    currentOffset = 190L
-    manualTime.timePasses(checkInterval)
-    future.isCompleted shouldBe false
+      future.futureValue shouldBe ()
+    }
 
-    markup("not finish future if lastOffset is increased, so difference is bigger")
-    lastOffset = 250L
-    manualTime.timePasses(checkInterval)
-    future.isCompleted shouldBe false
+    "finish future with waiting only if difference between lo and co small enough" in {
+      val lastOffset = 200L
+      @volatile var currentOffset = 100L
 
-    markup("not finish future if currentOffset is increased after lastOffset was increased, but difference still big")
-    currentOffset = 220L
-    manualTime.timePasses(checkInterval)
-    future.isCompleted shouldBe false
+      val future = new TestWaitOffsetTool()
+        .waitOffsetReached(
+          getLastOffset(lastOffset),
+          currentOffset,
+          lastOffset,
+          deadline,
+          matcherSettings,
+          system.classicSystem.scheduler
+        )
+      future.isCompleted shouldBe false
 
-    markup("successfully finish future if difference is small enough")
-    currentOffset = 246L
-    manualTime.timePasses(checkInterval)
-    future.futureValue shouldBe ()
+      currentOffset = 150L
+      manualTime.timePasses(checkInterval)
+      future.isCompleted shouldBe false
+
+      currentOffset = 198L
+      manualTime.timePasses(checkInterval)
+      future.futureValue shouldBe ()
+
+    }
+
+    "update lastOffset value so if co is big enough for previous lo, but not new, future will not be finished" in {
+      @volatile var lastOffset = 200L
+      @volatile var currentOffset = 100L
+
+      val future = new TestWaitOffsetTool()
+        .waitOffsetReached(
+          getLastOffset(lastOffset),
+          currentOffset,
+          lastOffset,
+          deadline,
+          matcherSettings,
+          system.classicSystem.scheduler
+        )
+      future.isCompleted shouldBe false
+
+      currentOffset = 198L
+      lastOffset = 250L
+      manualTime.timePasses(checkInterval)
+      future.isCompleted shouldBe false
+
+      currentOffset = 259L
+      manualTime.timePasses(checkInterval)
+      future.futureValue shouldBe ()
+
+    }
+
+    "finish future if commandsPerSecond was increased" in {
+      @volatile var lastOffset = 200L
+      @volatile var currentOffset = 180L
+
+      val future = new WaitOffsetToolWithVariableCps()
+        .waitOffsetReached(
+          getLastOffset(lastOffset),
+          currentOffset,
+          lastOffset,
+          deadline,
+          matcherSettings,
+          system.classicSystem.scheduler
+        )
+      future.isCompleted shouldBe false
+
+      // commandsPerSecond = 2; minimal difference is 10
+      manualTime.timePasses(checkInterval)
+      future.isCompleted shouldBe false
+
+      // commandsPerSecond = 3; minimal difference is 15
+      manualTime.timePasses(checkInterval)
+      future.isCompleted shouldBe false
+
+      // commandsPerSecond = 4; minimal difference is 20
+      manualTime.timePasses(checkInterval)
+      future.futureValue shouldBe ()
+
+    }
+  }
+
+  private class WaitOffsetToolWithVariableCps extends WaitOffsetTool {
+    import WaitOffsetTool.OffsetAndTime
+
+    @volatile private var cps = 1
+
+    override def calcCommandsPerSecond(prevOffsetAndTime: OffsetAndTime, lastProcessedOffset: Offset): Double = {
+      cps += 1
+      cps
+    }
 
   }
 

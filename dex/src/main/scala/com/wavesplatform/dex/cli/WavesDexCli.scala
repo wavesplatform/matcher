@@ -29,6 +29,7 @@ import java.io.{File, PrintWriter}
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.util.{Base64, Scanner}
+import java.util.concurrent.atomic.AtomicLong
 import scala.concurrent.{Await, TimeoutException}
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.util.{Failure, Success, Try, Using}
@@ -270,20 +271,23 @@ object WavesDexCli extends ScoptImplicits {
       )
       settings = loadMatcherSettingsFromPath(args.configPath)
     } yield {
-      withLevelDb(settings.dataDirectory)(cleanAssets)
-      println("Successfully removed all assets from levelDB cache!")
+      val count = withLevelDb(settings.dataDirectory)(cleanAssets)
+      println(s"Successfully removed $count assets from levelDB cache!")
     }
 
-  def cleanAssets(levelDb: LevelDb[Id]): Unit = levelDb.readWrite { rw =>
+  def cleanAssets(levelDb: LevelDb[Id]): Long = levelDb.readWrite[Long] { rw =>
+    @volatile var removed = 0
     rw.iterateOver(DbKeys.AssetPrefix) { entity =>
       rw.delete(entity.getKey)
+      removed += 1
     }
+    removed
   }
 
-  def withLevelDb(dataDirectory: String)(f: LevelDb[Id] => Unit): Unit =
+  def withLevelDb[T](dataDirectory: String)(f: LevelDb[Id] => T): T =
     Using(openDb(dataDirectory)) { db =>
       f(LevelDb.sync(db))
-    }
+    }.get
 
   // todo commands:
   // get account by seed [and nonce]

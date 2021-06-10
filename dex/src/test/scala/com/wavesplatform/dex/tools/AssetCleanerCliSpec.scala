@@ -13,7 +13,8 @@ class AssetCleanerCliSpec extends AnyFreeSpec with AssetDescriptionGen with With
 
   "AssetCacheCleaner" in {
 
-    val assetDescriptions = assertDescriptionsGen(5).sample.get
+    val assetDescriptionsCount = 5
+    val assetDescriptions = assertDescriptionsGen(assetDescriptionsCount).sample.get
     val assetPairs = Gen.containerOf[Set, AssetPair](assetPairGen).sample.get
 
     tempLevelDb { levelDb =>
@@ -29,7 +30,7 @@ class AssetCleanerCliSpec extends AnyFreeSpec with AssetDescriptionGen with With
       assetPairs.foreach(apDb.add)
 
       markup("successfully clean all BriefAssetDescription")
-      WavesDexCli.cleanAssets(levelDb)
+      WavesDexCli.cleanAssets(levelDb) shouldBe assetDescriptionsCount
 
       assetDescriptions.foreach { case (asset, _) =>
         adDb.get(asset) shouldBe None

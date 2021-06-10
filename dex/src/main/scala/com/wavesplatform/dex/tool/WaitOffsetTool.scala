@@ -22,8 +22,8 @@ private[tool] trait WaitOffsetTool extends ScorexLogging {
     settings: MatcherSettings,
     scheduler: Scheduler
   )(implicit ex: ExecutionContext): Future[Unit] = {
-    val checkInterval = settings.waitingOffsetToolSettings.checkInterval
-    val maxWaitingTime = settings.waitingOffsetToolSettings.maxWaitingTime
+    val checkInterval = settings.waitingOffsetTool.checkInterval
+    val maxWaitingTime = settings.waitingOffsetTool.maxWaitingTime
 
     def canProcessNewCommands(lastOffset: Offset, commandsPerSecond: Double)(currentOffset: Offset): Boolean =
       (lastOffset - currentOffset) / commandsPerSecond <= maxWaitingTime.toSeconds

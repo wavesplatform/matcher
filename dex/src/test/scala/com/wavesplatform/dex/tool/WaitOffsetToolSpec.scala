@@ -5,7 +5,6 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.dex.queue.ValidatedCommandWithMeta.Offset
 import com.wavesplatform.dex.settings.{MatcherSettings, WaitingOffsetToolSettings}
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.freespec.AnyFreeSpecLike
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 import pureconfig.ConfigSource
@@ -22,7 +21,7 @@ class WaitOffsetToolSpec extends ScalaTestWithActorTestKit(ManualTime.config) wi
     .fromConfig(ConfigFactory.load())
     .at("waves.dex")
     .loadOrThrow[MatcherSettings]
-    .copy(waitingOffsetToolSettings = waitingSettings)
+    .copy(waitingOffsetTool = waitingSettings)
 
   private def getLastOffset(lo: Offset): Future[Long] = Future.successful(lo)
 
@@ -101,8 +100,8 @@ class WaitOffsetToolSpec extends ScalaTestWithActorTestKit(ManualTime.config) wi
     }
 
     "finish future if commandsPerSecond was increased" in {
-      @volatile var lastOffset = 200L
-      @volatile var currentOffset = 180L
+      val lastOffset = 200L
+      val currentOffset = 180L
 
       val future = new WaitOffsetToolWithVariableCps()
         .waitOffsetReached(

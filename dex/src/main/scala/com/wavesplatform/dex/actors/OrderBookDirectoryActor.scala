@@ -136,12 +136,18 @@ class OrderBookDirectoryActor(
               case Failure(e) => log.error(s"Can't save $assetPair", e)
               case _ =>
             }
+          createSnapshotForOrderbook(ob)
           f(s, ob)
         } else {
           log.warn(s"OrderBook for $assetPair is stopped and autoCreate is $autoCreate, respond to client with OrderBookUnavailable")
           s ! OrderBookUnavailable(error.OrderBookStopped(assetPair))
         }
     }
+  }
+
+  private def createSnapshotForOrderbook(orderbook: ActorRef, offset: EventOffset = lastProcessedNr): Unit = {
+    val off = if (offset < 0) 0L else offset
+    orderbook ! SaveSnapshot(off)
   }
 
   private def createSnapshotFor(offset: ValidatedCommandWithMeta.Offset): Unit =
@@ -154,7 +160,7 @@ class OrderBookDirectoryActor(
           actorRef ! SaveSnapshot(offset)
 
         case Some(Left(_)) => log.warn(s"Can't create a snapshot for $assetPair: the order book is down, ignoring it in the snapshot's rotation.")
-        case None => log.warn(s"Can't create a snapshot for $assetPair: the order book has't yet started or was removed.")
+        case None => log.warn(s"Can't create a snapshot for $assetPair: the order book hasn't yet started or was removed.")
       }
       snapshotsState = updatedSnapshotState
       snapshotsState.nearestSnapshotOffset.foreach { snapshotOffset =>
@@ -286,12 +292,12 @@ class OrderBookDirectoryActor(
     // 1. The DEX observes two snapshots: A (offset=6) and B (offset=12)
     // 2. The oldest snapshot is the snapshot for A with offset=6
     // 3. The DEX replays events from offset=6 and ignores offset=3 for order book C
-    val safeStartOffset = oldestSnapshotOffset.fold(0L)(_ / settings.snapshotsInterval * settings.snapshotsInterval) - 1L
+    val oldestOffset = oldestSnapshotOffset.getOrElse(-1L)
 
     val safestStartOffset = math.max(
       -1L,
-      settings.limitEventsDuringRecovery.fold(safeStartOffset) { limitEventsDuringRecovery =>
-        math.max(safeStartOffset, newestSnapshotOffset - limitEventsDuringRecovery)
+      settings.limitEventsDuringRecovery.fold(oldestOffset) { limitEventsDuringRecovery =>
+        math.max(oldestOffset, newestSnapshotOffset - limitEventsDuringRecovery)
       }
     )
 
@@ -303,7 +309,7 @@ class OrderBookDirectoryActor(
 
     log.info(
       s"All snapshots are loaded, oldestSnapshotOffset: $oldestSnapshotOffset, newestSnapshotOffset: $newestSnapshotOffset, " +
-      s"safeStartOffset: $safeStartOffset, safestStartOffset: $safestStartOffset, newestSnapshotOffset: $newestSnapshotOffset"
+      s" safestStartOffset: $safestStartOffset, newestSnapshotOffset: $newestSnapshotOffset"
     )
     log.trace(s"Expecting next snapshots at:\n${snapshotsState.nearestSnapshotOffsets.map { case (p, x) => s"$p -> $x" }.mkString("\n")}")
 

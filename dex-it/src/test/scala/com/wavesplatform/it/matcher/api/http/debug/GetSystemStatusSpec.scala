@@ -11,7 +11,9 @@ class GetSystemStatusSpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
   "GET /matcher/debug/status" - {
     "should return matcher status" in {
       eventually {
-        validate200Json(dex1.rawApi.getSystemStatus) should matchTo(HttpSystemStatus(MatcherStatus.Working, CombinedStream.Status.Working(10)))
+        val httpSystemStatus = validate200Json(dex1.rawApi.getSystemStatus)
+        httpSystemStatus.blockchain shouldBe a[CombinedStream.Status.Working]
+        httpSystemStatus.service shouldBe MatcherStatus.Working
       }
     }
 

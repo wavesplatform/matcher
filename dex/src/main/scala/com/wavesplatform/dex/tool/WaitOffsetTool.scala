@@ -13,7 +13,7 @@ import scala.concurrent.duration._
 
 private[tool] trait WaitOffsetTool extends ScorexLogging {
 
-  case class OffsetAndTime(offset: Offset, time: Long)
+  final case class OffsetAndTime(offset: Offset, time: Long)
 
   def waitOffsetReached(
     getLastOffset: => Future[Offset],

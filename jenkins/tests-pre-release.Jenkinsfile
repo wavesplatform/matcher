@@ -30,8 +30,8 @@ pipeline {
         stage ('Trigger job: Test - Version') {
             steps {
                 build job: 'Waves.Exchange/Matcher/Matcher Server - OS - Test - Version', propagate: false, wait: false, parameters: [
-                  [$class: 'StringParameterValue', name: 'DEX_IMAGE', value: "${params.REGISTRY}/waves/dex/${params.DEX_NEW_IMAGE}"],
-                  [$class: 'StringParameterValue', name: 'NODE_IMAGE', value: "${params.REGISTRY}/waves/dex/${params.NODE_NEW_IMAGE}"],
+                  [$class: 'StringParameterValue', name: 'DEX_IMAGE', value: "${params.DEX_NEW_IMAGE}"],
+                  [$class: 'StringParameterValue', name: 'NODE_IMAGE', value: "${params.NODE_NEW_IMAGE}"],
                   [$class: 'StringParameterValue', name: 'BRANCH', value: "${PREVIOUS_BRANCH_OR_TAG}"],
                   [$class: 'StringParameterValue', name: 'LABEL', value: "${PREVIOUS_BRANCH_OR_TAG}: ${params.NODE_NEW_IMAGE}_${params.DEX_NEW_IMAGE} - PRE RELEASE"]
                 ]

@@ -88,7 +88,7 @@ final case class DexContainer private (override val internalIp: String, underlyi
         Thread.sleep(1000)
         try {
           val s = api.getSystemStatus
-          s.blockchain == Status.Working && s.service == Working
+          s.blockchain.isInstanceOf[Status.Working] && s.service == Working
         } catch {
           case _: Throwable => false
         }

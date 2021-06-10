@@ -1301,7 +1301,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         safeConfig = ConfigFactory.load().atKey("waves.dex"),
         matcher = orderBookDirectoryActor.ref,
         addressActor = addressActor.ref,
-        CombinedStream.Status.Working,
+        CombinedStream.Status.Working(10),
         storeCommand = {
           case ValidatedCommand.DeleteOrderBook(pair) if pair == okOrder.assetPair =>
             Future.successful(ValidatedCommandWithMeta(1L, System.currentTimeMillis, ValidatedCommand.DeleteOrderBook(pair)).some)

@@ -71,6 +71,7 @@ class WaitOffsetToolSpec extends ScalaTestWithActorTestKit(ManualTime.config) wi
   }
 
   private class TestWaitOffsetTool extends WaitOffsetTool {
+    import WaitOffsetTool.OffsetAndTime
 
     override def calcCommandsPerSecond(prevOffsetAndTime: OffsetAndTime, lastProcessedOffset: Offset): Double = 1
 

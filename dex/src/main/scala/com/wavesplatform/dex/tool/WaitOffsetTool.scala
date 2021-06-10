@@ -4,6 +4,7 @@ import akka.actor.Scheduler
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.queue.ValidatedCommandWithMeta.Offset
 import com.wavesplatform.dex.settings.MatcherSettings
+import com.wavesplatform.dex.tool.WaitOffsetTool.OffsetAndTime
 
 import java.util.concurrent.TimeoutException
 import scala.concurrent.{ExecutionContext, Future, Promise}
@@ -16,7 +17,7 @@ private[tool] trait WaitOffsetTool extends ScorexLogging {
   def waitOffsetReached(
     getLastOffset: => Future[Offset],
     getLastProcessedOffset: => Offset,
-    startingLastOffset: Offset,
+    initialLastOffset: Offset,
     deadline: Deadline,
     settings: MatcherSettings,
     scheduler: Scheduler
@@ -50,7 +51,7 @@ private[tool] trait WaitOffsetTool extends ScorexLogging {
       }
 
     val p = Promise[Unit]()
-    processOffset(p, startingLastOffset, currentOffset => currentOffset >= startingLastOffset)
+    processOffset(p, initialLastOffset, currentOffset => currentOffset >= initialLastOffset)
     p.future
   }
 
@@ -59,6 +60,8 @@ private[tool] trait WaitOffsetTool extends ScorexLogging {
 }
 
 object WaitOffsetTool extends WaitOffsetTool {
+
+  final case class OffsetAndTime(offset: Offset, time: Long)
 
   override def calcCommandsPerSecond(prevOffsetAndTime: OffsetAndTime, lastProcessedOffset: Offset): Double = {
     val timeDifference = (System.nanoTime() - prevOffsetAndTime.time).nano.toSeconds

@@ -276,12 +276,12 @@ object WavesDexCli extends ScoptImplicits {
     }
 
   def cleanAssets(levelDb: LevelDb[Id]): Long = levelDb.readWrite[Long] { rw =>
-    @volatile var removed = 0
+    val removed = new AtomicLong(0)
     rw.iterateOver(DbKeys.AssetPrefix) { entity =>
       rw.delete(entity.getKey)
-      removed += 1
+      removed.incrementAndGet()
     }
-    removed
+    removed.get()
   }
 
   def withLevelDb[T](dataDirectory: String)(f: LevelDb[Id] => T): T =

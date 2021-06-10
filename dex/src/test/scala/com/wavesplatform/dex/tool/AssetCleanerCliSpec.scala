@@ -1,4 +1,4 @@
-package com.wavesplatform.dex.tools
+package com.wavesplatform.dex.tool
 
 import com.wavesplatform.dex.cli.WavesDexCli
 import com.wavesplatform.dex.db.{AssetPairsDb, AssetsDb, WithDb}

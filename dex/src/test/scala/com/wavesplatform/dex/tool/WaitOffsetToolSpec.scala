@@ -1,28 +1,27 @@
-package com.wavesplatform.dex.tools
+package com.wavesplatform.dex.tool
 
 import akka.actor.testkit.typed.scaladsl.{ManualTime, ScalaTestWithActorTestKit}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.dex.queue.ValidatedCommandWithMeta.Offset
-import com.wavesplatform.dex.settings.{MatcherSettings, WaitingOffsetQueueSettings}
-import com.wavesplatform.dex.tool.WaitOffsetTool
+import com.wavesplatform.dex.settings.{MatcherSettings, WaitingOffsetToolSettings}
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AnyFreeSpecLike
 import org.scalatest.matchers.should.Matchers
 import pureconfig.ConfigSource
 
-import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.concurrent.duration._
+import scala.concurrent.{ExecutionContextExecutor, Future}
 
 class WaitOffsetToolSpec extends ScalaTestWithActorTestKit(ManualTime.config) with AnyFreeSpecLike with ScalaFutures with Matchers {
 
   private val checkInterval = 100.millis
-  private val waitingSettings = WaitingOffsetQueueSettings(5.seconds, checkInterval)
+  private val waitingSettings = WaitingOffsetToolSettings(5.seconds, checkInterval)
 
-  private val settings = ConfigSource
+  private val matcherSettings = ConfigSource
     .fromConfig(ConfigFactory.load())
     .at("waves.dex")
     .loadOrThrow[MatcherSettings]
-    .copy(waitingQueue = waitingSettings)
+    .copy(waitingOffsetToolSettings = waitingSettings)
 
   @volatile private var lastOffset = 200L
   @volatile private var currentOffset = 170L
@@ -43,7 +42,7 @@ class WaitOffsetToolSpec extends ScalaTestWithActorTestKit(ManualTime.config) wi
         getCurrentOffset,
         lastOffset,
         Deadline.now + 2.minutes,
-        settings,
+        matcherSettings,
         system.classicSystem.scheduler
       )
 
@@ -73,8 +72,7 @@ class WaitOffsetToolSpec extends ScalaTestWithActorTestKit(ManualTime.config) wi
 
   private class TestWaitOffsetTool extends WaitOffsetTool {
 
-    override def calculateCommandsPerSecond(lastCheckTime: Option[TimeCheckTag], lastProcessedOffset: Offset): Option[Double] =
-      lastCheckTime.map(_ => 1)
+    override def calcCommandsPerSecond(prevOffsetAndTime: OffsetAndTime, lastProcessedOffset: Offset): Double = 1
 
   }
 

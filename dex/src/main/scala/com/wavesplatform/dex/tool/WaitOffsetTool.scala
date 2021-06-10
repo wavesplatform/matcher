@@ -11,9 +11,9 @@ import scala.concurrent.duration.Deadline
 import scala.util.{Failure, Success}
 import scala.concurrent.duration._
 
-trait WaitOffsetTool extends ScorexLogging {
+private[tool] trait WaitOffsetTool extends ScorexLogging {
 
-  case class TimeCheckTag(currentOffset: Offset, time: Long)
+  case class OffsetAndTime(offset: Offset, time: Long)
 
   def waitOffsetReached(
     getLastOffset: => Future[Offset],
@@ -23,54 +23,49 @@ trait WaitOffsetTool extends ScorexLogging {
     settings: MatcherSettings,
     scheduler: Scheduler
   )(implicit ex: ExecutionContext): Future[Unit] = {
-    val interval = settings.waitingQueue.checkInterval
-    val maxWaitingTime = settings.waitingQueue.maxWaitingTime
+    val checkInterval = settings.waitingOffsetToolSettings.checkInterval
+    val maxWaitingTime = settings.waitingOffsetToolSettings.maxWaitingTime
 
-    def canProcessNewCommands(lastOffset: Offset, currentOffset: Offset, commandsPerSecond: Option[Double]): Boolean =
-      commandsPerSecond.fold(currentOffset >= lastOffset) { k =>
-        (lastOffset - currentOffset) / k <= maxWaitingTime.toSeconds
-      }
+    def canProcessNewCommands(lastOffset: Offset, commandsPerSecond: Double)(currentOffset: Offset): Boolean =
+      (lastOffset - currentOffset) / commandsPerSecond <= maxWaitingTime.toSeconds
 
-    def processOffset(p: Promise[Unit], lastOffset: Offset, commandsPerSecond: Option[Double]): Unit = {
+    def processOffset(p: Promise[Unit], lastOffset: Offset, canProcessNewCommandCondition: Offset => Boolean): Unit = {
       val currentOffset = getLastProcessedOffset
       log.trace(s"offsets: $currentOffset >= $lastOffset, deadline: ${deadline.isOverdue()}")
       val currentTime = System.nanoTime()
-      if (canProcessNewCommands(lastOffset, currentOffset, commandsPerSecond))
+      if (canProcessNewCommandCondition(currentOffset))
         p.success(())
       else if (deadline.isOverdue())
         p.failure(new TimeoutException(s"Can't process all events in ${settings.startEventsProcessingTimeout.toMinutes} minutes"))
       else
-        scheduler.scheduleOnce(interval) {
-          loop(p, Some(TimeCheckTag(currentOffset, currentTime)))
+        scheduler.scheduleOnce(checkInterval) {
+          loop(p, OffsetAndTime(currentOffset, currentTime))
         }
     }
 
-    def loop(p: Promise[Unit], lastCheckTime: Option[TimeCheckTag], lastOffsetOpt: Option[Offset] = None): Unit =
-      lastOffsetOpt match {
-        case Some(lastOffset) => processOffset(p, lastOffset, calculateCommandsPerSecond(lastCheckTime, getLastProcessedOffset))
-        case None =>
-          getLastOffset.onComplete {
-            case Success(lastOffset) => processOffset(p, lastOffset, calculateCommandsPerSecond(lastCheckTime, getLastProcessedOffset))
-            case Failure(ex) => p.failure(ex)
-          }
+    def loop(p: Promise[Unit], prevOffsetAndTime: OffsetAndTime): Unit =
+      getLastOffset.onComplete {
+        case Success(lastOffset) =>
+          val commandsPerSecond = calcCommandsPerSecond(prevOffsetAndTime, getLastProcessedOffset)
+          processOffset(p, lastOffset, canProcessNewCommands(lastOffset, commandsPerSecond))
+        case Failure(ex) => p.failure(ex)
       }
 
     val p = Promise[Unit]()
-    loop(p, None, Some(startingLastOffset))
+    processOffset(p, startingLastOffset, currentOffset => currentOffset >= startingLastOffset)
     p.future
   }
 
-  protected def calculateCommandsPerSecond(lastCheckTime: Option[TimeCheckTag], lastProcessedOffset: Offset): Option[Double]
+  protected def calcCommandsPerSecond(prevOffsetAndTime: OffsetAndTime, lastProcessedOffset: Offset): Double
 
 }
 
 object WaitOffsetTool extends WaitOffsetTool {
 
-  override def calculateCommandsPerSecond(lastCheckTime: Option[TimeCheckTag], lastProcessedOffset: Offset): Option[Double] =
-    lastCheckTime.map { lastTimeCheck =>
-      val timeDifference = (System.nanoTime() - lastTimeCheck.time).nano.toSeconds
-      val commandDifference = lastProcessedOffset - lastTimeCheck.currentOffset
-      commandDifference.toDouble / timeDifference.toDouble
-    }
+  override def calcCommandsPerSecond(prevOffsetAndTime: OffsetAndTime, lastProcessedOffset: Offset): Double = {
+    val timeDifference = (System.nanoTime() - prevOffsetAndTime.time).nano.toSeconds
+    val commandDifference = lastProcessedOffset - prevOffsetAndTime.offset
+    commandDifference.toDouble / timeDifference.toDouble
+  }
 
 }

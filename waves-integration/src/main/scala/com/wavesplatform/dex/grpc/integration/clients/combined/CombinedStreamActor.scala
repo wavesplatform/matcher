@@ -196,7 +196,7 @@ object CombinedStreamActor {
 
     def working: Behavior[Command] = {
       context.log.info("Status: working")
-      status.onNext(Status.Working)
+      status.onNext(Status.Working(processedHeight.get()))
       Behaviors.receiveMessagePartial[Command] {
         mkPartial {
           case Command.ProcessUtxSystemEvent(SystemEvent.Stopped) =>
@@ -225,6 +225,7 @@ object CombinedStreamActor {
 
           case Command.UpdateProcessedHeight(x) =>
             processedHeight.set(x)
+            status.onNext(Status.Working(processedHeight.get()))
             Behaviors.same
         }.orElse(onClosedOrRestart)
       }

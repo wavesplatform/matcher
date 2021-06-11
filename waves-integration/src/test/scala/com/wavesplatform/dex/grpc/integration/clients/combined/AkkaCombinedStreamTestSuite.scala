@@ -83,6 +83,24 @@ class AkkaCombinedStreamTestSuite extends WavesIntegrationSuiteBase with TestKit
       }
     }
 
+    "currentStatus" - {
+      "returns correct working status" in {
+        val t = mk()
+        t.cs.startFrom(10)
+        eventually {
+          t.cs.currentStatus shouldBe Status.Working(9)
+        }
+      }
+
+      "returns correct working status after updating processed height" in {
+        val t = mkEventuallyWorking()
+        t.cs.updateProcessedHeight(10)
+        eventually {
+          t.cs.currentStatus shouldBe Status.Working(10)
+        }
+      }
+    }
+
     "restart" - {
       "stop blockchainUpdates" in {
         val t = mk()
@@ -135,7 +153,10 @@ class AkkaCombinedStreamTestSuite extends WavesIntegrationSuiteBase with TestKit
 
             Thread.sleep(100) // Because Working happens multiple times
             eventually {
-              t.cs.currentStatus should matchTo[Status](Status.Working)
+              t.cs.currentProcessedHeight shouldBe -1
+            }
+            eventually {
+              t.cs.currentStatus should matchTo[Status](Status.Working(-1))
             }
           }
         }
@@ -192,7 +213,10 @@ class AkkaCombinedStreamTestSuite extends WavesIntegrationSuiteBase with TestKit
 
             Thread.sleep(100) // Because Working happens multiple times
             eventually {
-              t.cs.currentStatus should matchTo[Status](Status.Working)
+              t.cs.currentProcessedHeight shouldBe -1
+            }
+            eventually {
+              t.cs.currentStatus should matchTo[Status](Status.Working(-1))
             }
           }
         }
@@ -238,7 +262,7 @@ class AkkaCombinedStreamTestSuite extends WavesIntegrationSuiteBase with TestKit
   private def mkEventuallyWorking(): TestClasses = mk().tap { x =>
     x.cs.startFrom(1)
     eventually {
-      x.cs.currentStatus shouldBe Status.Working
+      x.cs.currentStatus shouldBe Status.Working(0)
     }
   }
 

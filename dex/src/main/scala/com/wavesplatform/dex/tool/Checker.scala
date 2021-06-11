@@ -244,13 +244,13 @@ class Checker(superConnector: SuperConnector) {
       (balance, balanceNotes) <- logCheck("3. Matcher balance")(checkBalance)
       (wuJIoInfo, firstAssetNotes) <- logCheck("4. First test asset")(checkTestAsset(balance, firstTestAssetName))
       (mbIJIoInfo, secondAssetNotes) <- logCheck("5. Second test asset")(checkTestAsset(balance, secondTestAssetName))
-      (assetPairInfo, activeOrdersNotes) <- logCheck("7. Matcher active orders")(checkActiveOrders(wuJIoInfo, mbIJIoInfo))
-      (order, placementNotes) <- logCheck("8. Order placement")(checkPlacement(assetPairInfo))
-      (_, cancellationNotes) <- logCheck("9. Order cancellation")(checkCancellation(order))
+      (assetPairInfo, activeOrdersNotes) <- logCheck("6. Matcher active orders")(checkActiveOrders(wuJIoInfo, mbIJIoInfo))
+      (order, placementNotes) <- logCheck("7. Order placement")(checkPlacement(assetPairInfo))
+      (_, cancellationNotes) <- logCheck("8. Order cancellation")(checkCancellation(order))
       _ <- cancelActiveOrders(assetPairInfo)
-      executionNotes <- logCheck("10. Execution")(checkExecution(assetPairInfo))
-      orderBookWsStreamNotes <- logCheck("11. Order book WS stream")(checkWsOrderBook(assetPairInfo))
-      accountUpdatesWsStreamNotes <- logCheck("12. Account updates WS stream")(checkWsAccountUpdates(maybeAccountSeed))
+      executionNotes <- logCheck("9. Execution")(checkExecution(assetPairInfo))
+      orderBookWsStreamNotes <- logCheck("10. Order book WS stream")(checkWsOrderBook(assetPairInfo))
+      accountUpdatesWsStreamNotes <- logCheck("11. Account updates WS stream")(checkWsAccountUpdates(maybeAccountSeed))
     } yield s"""
                |Diagnostic notes:
                |  Matcher balance           : $balanceNotes

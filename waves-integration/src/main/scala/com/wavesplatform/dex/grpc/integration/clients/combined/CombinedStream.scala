@@ -4,7 +4,7 @@ import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedStream.St
 import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeEvent
 import com.wavesplatform.dex.meta.getSimpleName
 import monix.reactive.Observable
-import play.api.libs.json.{Format, Reads, Writes}
+import play.api.libs.json.{Format, JsError, JsNumber, JsObject, JsString, JsSuccess, Reads, Writes}
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -22,27 +22,33 @@ trait CombinedStream {
 
 object CombinedStream {
 
-  sealed abstract class Status extends Product with Serializable {
-    val name: String = getSimpleName(this)
-  }
+  sealed abstract class Status extends Product with Serializable
 
   object Status {
 
     final case class Starting(blockchainUpdates: Boolean = false, utxEvents: Boolean = false) extends Status with HasStreams
     final case class Stopping(blockchainUpdates: Boolean = false, utxEvents: Boolean = false) extends Status with HasStreams
     final case class Closing(blockchainUpdates: Boolean = false, utxEvents: Boolean = false) extends Status with HasStreams
-    final case object Working extends Status
-
-    val All = List(Starting(), Stopping(), Closing(), Working)
+    final case class Working(height: Int) extends Status
 
     implicit val format: Format[Status] = Format(
-      Reads.StringReads.map { x =>
-        All.find(_.name == x) match {
-          case Some(r) => r
-          case None => throw new IllegalArgumentException(s"Can't parse '$x' as CombinedStream.Status")
+      Reads { json =>
+        (json \ "name").as[String] match {
+          case "Starting" => JsSuccess(Starting())
+          case "Stopping" => JsSuccess(Stopping())
+          case "Closing" => JsSuccess(Closing())
+          case "Working" =>
+            val height = (json \ "height").as[Int]
+            JsSuccess(Working(height))
+          case x => JsError(s"Can't parse '$x' as CombinedStream.Status")
         }
       },
-      Writes.StringWrites.contramap(_.name)
+      Writes {
+        case _: Starting => JsObject(Map("name" -> JsString("Starting")))
+        case _: Stopping => JsObject(Map("name" -> JsString("Stopping")))
+        case _: Closing => JsObject(Map("name" -> JsString("Closing")))
+        case x: Working => JsObject(Map("name" -> JsString("Working"), "height" -> JsNumber(x.height)))
+      }
     )
 
     sealed trait HasStreams {

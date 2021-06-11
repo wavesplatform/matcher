@@ -39,6 +39,7 @@ case class MatcherSettings(
   snapshotsLoadingTimeout: FiniteDuration,
   startEventsProcessingTimeout: FiniteDuration,
   orderBooksRecoveringTimeout: FiniteDuration,
+  waitingOffsetTool: WaitingOffsetToolSettings,
   priceAssets: Seq[Asset],
   blacklistedAssets: Set[Asset.IssuedAsset],
   blacklistedNames: Seq[Regex],

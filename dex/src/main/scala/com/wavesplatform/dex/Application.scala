@@ -47,10 +47,12 @@ import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.history.HistoryRouterActor
 import com.wavesplatform.dex.logs.SystemInformationReporter
 import com.wavesplatform.dex.model.{AssetPairBuilder, ExchangeTransactionCreator, Fee, OrderValidator, ValidationStages}
+import com.wavesplatform.dex.queue.ValidatedCommandWithMeta.Offset
 import com.wavesplatform.dex.queue._
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
 import com.wavesplatform.dex.time.NTP
+import com.wavesplatform.dex.tool.WaitOffsetTool
 import kamon.Kamon
 import monix.execution.ExecutionModel
 import mouse.any.anySyntaxMouse
@@ -60,7 +62,7 @@ import pureconfig.ConfigSource
 import java.io.File
 import java.security.Security
 import java.util.concurrent.atomic.AtomicReference
-import java.util.concurrent.{ThreadLocalRandom, TimeoutException}
+import java.util.concurrent.ThreadLocalRandom
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{blocking, Await, Future, Promise}
@@ -457,7 +459,14 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       matcherQueue.startConsume(firstConsumedOffset, consumeMessages)
     } zip {
       log.info(s"Last queue offset is $lastOffsetQueue")
-      waitOffsetReached(lastOffsetQueue, deadline)
+      WaitOffsetTool.waitOffsetReached(
+        getLastQueueOffset(deadline),
+        lastProcessedOffset,
+        lastOffsetQueue,
+        deadline,
+        settings.waitingOffsetTool,
+        actorSystem.scheduler
+      )
     }
   } yield {
     log.info("Last offset has been reached, switching to a normal mode")
@@ -526,19 +535,8 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     )
   )
 
-  private def waitOffsetReached(lastQueueOffset: ValidatedCommandWithMeta.Offset, deadline: Deadline): Future[Unit] = {
-    def loop(p: Promise[Unit]): Unit = {
-      log.trace(s"offsets: $lastProcessedOffset >= $lastQueueOffset, deadline: ${deadline.isOverdue()}")
-      if (lastProcessedOffset >= lastQueueOffset) p.success(())
-      else if (deadline.isOverdue())
-        p.failure(new TimeoutException(s"Can't process all events in ${settings.startEventsProcessingTimeout.toMinutes} minutes"))
-      else actorSystem.scheduler.scheduleOnce(5.second)(loop(p))
-    }
-
-    val p = Promise[Unit]()
-    loop(p)
-    p.future
-  }
+  private def getLastQueueOffset(deadline: Deadline): Future[Offset] =
+    new RepeatableRequests(matcherQueue, deadline).lastOffset
 
   private def getAndCacheDecimals(asset: Asset): FutureResult[Int] = getAndCacheDescription(asset).map(_.decimals)
 

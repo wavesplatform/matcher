@@ -1,10 +1,10 @@
-package com.wavesplatform.dex.tools
+package com.wavesplatform.dex.tool
 
 import com.typesafe.config.ConfigValueFactory
 import com.wavesplatform.dex.settings.BaseSettingsSpecification
-import com.wavesplatform.dex.tool.ConfigChecker
 import org.scalatest.EitherValues
 import org.scalatest.matchers.should.Matchers
+
 import scala.jdk.CollectionConverters._
 
 class ConfigCheckerCliSpec extends BaseSettingsSpecification with Matchers with EitherValues {

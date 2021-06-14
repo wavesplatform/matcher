@@ -11,9 +11,9 @@ class Dex1086BugSpec extends MatcherSuiteBase {
 
   override protected def dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(s"""waves.dex {
-  price-assets = [ "$UsdId", "WAVES" ]
-  snapshots-interval = 1
-}""")
+      price-assets = [ "$UsdId", "WAVES" ]
+      snapshots-interval = 1
+    }""")
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()

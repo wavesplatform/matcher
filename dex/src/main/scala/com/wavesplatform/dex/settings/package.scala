@@ -1,6 +1,8 @@
 package com.wavesplatform.dex
 
+import cats.syntax.either._
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.error.Implicits.ThrowableOps
 import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
 import com.wavesplatform.dex.tool.LocaleUtils
 import pureconfig.ConfigSource
@@ -17,16 +19,16 @@ package object settings {
   /** Formats amount or price */
   def formatValue(value: BigDecimal): String = format.format(value.bigDecimal)
 
-  def loadMatcherSettings(userConfig: Config): Try[MatcherSettings] = Try {
-    ConfigSource.fromConfig(loadConfig(userConfig)).at("waves.dex").loadOrThrow[MatcherSettings]
-  }
+  def loadMatcherSettings(config: Config): Either[String, MatcherSettings] =
+    Try(ConfigSource.fromConfig(loadConfig(config)).at("waves.dex").loadOrThrow[MatcherSettings])
+      .toEither.leftMap(th => s"Cannot load matcher settings: ${th.getWithStackTrace}")
 
-  def loadConfig(userConfig: Config): Config = loadConfig(Some(userConfig))
+  def loadConfig(config: Config): Config = loadConfig(Some(config))
 
-  def loadConfig(maybeUserConfig: Option[Config]): Config = {
+  def loadConfig(maybeConfig: Option[Config]): Config = {
 
     val defaults = ConfigFactory.defaultOverrides()
-    val external = maybeUserConfig.fold(defaults)(defaults.withFallback)
+    val external = maybeConfig.fold(defaults)(defaults.withFallback)
 
     external
       .withFallback(ConfigFactory.defaultApplication())

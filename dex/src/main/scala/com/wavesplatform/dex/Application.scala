@@ -52,8 +52,7 @@ import com.wavesplatform.dex.queue._
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
 import com.wavesplatform.dex.time.NTP
-import com.wavesplatform.dex.tool.KamonTraceUtils
-import com.wavesplatform.dex.tool.WaitOffsetTool
+import com.wavesplatform.dex.tool.{KamonTraceUtils, WaitOffsetTool}
 import kamon.Kamon
 import monix.execution.ExecutionModel
 import mouse.any.anySyntaxMouse
@@ -62,8 +61,8 @@ import pureconfig.ConfigSource
 
 import java.io.File
 import java.security.Security
-import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.ThreadLocalRandom
+import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{blocking, Await, Future, Promise}

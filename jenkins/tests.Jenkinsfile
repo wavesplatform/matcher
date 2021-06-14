@@ -17,7 +17,8 @@ pipeline {
         CONFIG_FORCE_kamon_jaeger_http__url = "${DEX_JAEGER_HOST}"
         CONFIG_FORCE_kamon_modules_jaeger_enabled = "true"
         CONFIG_FORCE_kamon_enable = "true"
-        CONFIG_FORCE_kamon_trace_tick__interval = "3.seconds"
+        CONFIG_FORCE_kamon_trace_tick__interval = "10.seconds"
+        CONFIG_FORCE_kamon_trace_adaptive__sampler_throughput = "600"
     }
     stages {
         stage('Cleanup') {

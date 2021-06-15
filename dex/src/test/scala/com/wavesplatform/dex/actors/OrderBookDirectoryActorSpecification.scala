@@ -228,14 +228,20 @@ class OrderBookDirectoryActorSpecification
       "it didn't do snapshots for a long time" when {
         "first time" in snapshotTest(pair23) { (OrderBookDirectoryActor, probes) =>
           val eventSender = TestProbe()
-          sendBuyOrders(eventSender, OrderBookDirectoryActor, pair23, 0 to 9)
+          sendBuyOrders(eventSender, OrderBookDirectoryActor, pair23, 0 to 1)
+          probes.head.expectMsg(OrderBookSnapshotUpdateCompleted(pair23, Some(0)))
+
+          sendBuyOrders(eventSender, OrderBookDirectoryActor, pair23, 1 to 9)
           probes.head.expectMsg(OrderBookSnapshotUpdateCompleted(pair23, Some(9)))
         }
 
         "later" in snapshotTest(pair23) { (OrderBookDirectoryActor, probes) =>
           val eventSender = TestProbe()
           val probe = probes.head
-          sendBuyOrders(eventSender, OrderBookDirectoryActor, pair23, 0 to 10)
+          sendBuyOrders(eventSender, OrderBookDirectoryActor, pair23, 0 to 1)
+          probe.expectMsg(OrderBookSnapshotUpdateCompleted(pair23, Some(0)))
+
+          sendBuyOrders(eventSender, OrderBookDirectoryActor, pair23, 1 to 10)
           probe.expectMsg(OrderBookSnapshotUpdateCompleted(pair23, Some(9)))
 
           sendBuyOrders(eventSender, OrderBookDirectoryActor, pair23, 10 to 28)
@@ -251,8 +257,8 @@ class OrderBookDirectoryActorSpecification
           sendBuyOrders(eventSender, OrderBookDirectoryActor, pair23, 0 to 1)
           sendBuyOrders(eventSender, OrderBookDirectoryActor, pair45, 2 to 3)
 
-          probe23.expectNoMessage()
-          probe45.expectNoMessage()
+          probe23.expectMsg(OrderBookSnapshotUpdateCompleted(pair23, Some(0)))
+          probe45.expectMsg(OrderBookSnapshotUpdateCompleted(pair45, Some(2)))
 
           sendBuyOrders(eventSender, OrderBookDirectoryActor, pair45, 4 to 10)
           probe23.expectMsg(OrderBookSnapshotUpdateCompleted(pair23, Some(9)))
@@ -267,7 +273,10 @@ class OrderBookDirectoryActorSpecification
       "received a lot of messages and skipped the middle offset" in snapshotTest(pair23) { (OrderBookDirectoryActor, probes) =>
         val eventSender = TestProbe()
         val probe = probes.head
-        sendBuyOrders(eventSender, OrderBookDirectoryActor, pair23, 0 to 30)
+        sendBuyOrders(eventSender, OrderBookDirectoryActor, pair23, 0 to 1)
+        probe.expectMsg(OrderBookSnapshotUpdateCompleted(pair23, Some(0)))
+
+        sendBuyOrders(eventSender, OrderBookDirectoryActor, pair23, 1 to 30)
         probe.expectMsg(OrderBookSnapshotUpdateCompleted(pair23, Some(9)))
 
         // OrderBookSnapshotUpdated(pair23, 26) is ignored in OrderBookActor,
@@ -298,7 +307,7 @@ class OrderBookDirectoryActorSpecification
         probe.send(actor, wrapLimitOrder(buy(pair2, 2000L, 1)))
         eventually {
           probe.send(actor, OrderBookDirectoryActor.GetSnapshotOffsets)
-          probe.expectMsg(OrderBookDirectoryActor.SnapshotOffsetsResponse(Map(pair1 -> Some(9L), pair2 -> None)))
+          probe.expectMsg(OrderBookDirectoryActor.SnapshotOffsetsResponse(Map(pair1 -> Some(9L), pair2 -> Some(5L))))
         }
       }
 

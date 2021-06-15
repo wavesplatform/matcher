@@ -61,6 +61,7 @@ trait MatcherSuiteBase
   private val maybeTraceTickInterval =
     Option(System.getenv("CONFIG_FORCE_kamon_trace_tick__interval"))
       .flatMap(x => Either.catchNonFatal(Duration(x)).toOption)
+      .filter(_ => Option(System.getenv("CONFIG_FORCE_kamon_modules_jaeger_enabled")).contains("true"))
 
   implicit val httpV0OrderBookDiff: Derived[Diff[HttpV0OrderBook]] = Derived(Diff.gen[HttpV0OrderBook].ignore[HttpV0OrderBook, Long](_.timestamp))
   implicit val exchangeTransactionDiff: Derived[Diff[ExchangeTransaction]] = Derived(Diff[String].contramap[ExchangeTransaction](_.id().base58))

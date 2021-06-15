@@ -125,7 +125,7 @@ object WavesDexCli extends ScoptImplicits {
   }
 
   // noinspection ScalaStyle
-  def checkServer(args: Args): Unit = {
+  def checkServer(args: Args, config: Config, matcherSettings: MatcherSettings): Unit = {
     val apiKey = readSecretFromStdIn("Enter X-API-KEY: ")
     (
       for {
@@ -140,7 +140,6 @@ object WavesDexCli extends ScoptImplicits {
              |  Account seed          : ${args.accountSeed.getOrElse("")}
                    """.stripMargin
         )
-        (config, matcherSettings) <- cli.wrapByLogs("  Loading Matcher settings... ")(loadAllConfigs(args.configPath))
         superConnector <- SuperConnector.create(matcherSettings, args.dexRestApi, args.nodeRestApi, args.authServiceRestApi, apiKey)
         checkResult <- new Checker(superConnector).checkState(args.version, args.accountSeed, config, matcherSettings)
         _ <- cli.lift(superConnector.close())
@@ -150,15 +149,6 @@ object WavesDexCli extends ScoptImplicits {
       case Left(error) => println(error); forceStopApplication(MatcherStateCheckingFailedError)
     }
   }
-
-  private def loadAllConfigs(path: String): ErrorOr[(Config, MatcherSettings)] =
-    for {
-      config <- Try(parseFile(new File(path))).toEither.leftMap(th => s"Cannot load config at path $path: ${th.getWithStackTrace}")
-      matcherSettings <- loadMatcherSettings(config)
-    } yield config -> matcherSettings
-
-  private def loadMatcherSettingsUnsafe(path: String): MatcherSettings =
-    loadAllConfigs(path).map(_._2).fold(error => throw new RuntimeException(error), identity)
 
   // noinspection ScalaStyle
   def runComparison(args: Args): Unit =
@@ -252,7 +242,8 @@ object WavesDexCli extends ScoptImplicits {
     }
   }
 
-  def cleanAssets(args: Args): Unit =
+  // noinspection ScalaStyle
+  def cleanAssets(args: Args, matcherSettings: MatcherSettings): Unit =
     for {
       _ <- cli.log(
         s"""
@@ -261,9 +252,8 @@ object WavesDexCli extends ScoptImplicits {
            |Running in background
            |""".stripMargin
       )
-      settings = loadMatcherSettingsUnsafe(args.configPath)
     } yield {
-      val count = withLevelDb(settings.dataDirectory)(cleanAssets)
+      val count = withLevelDb(matcherSettings.dataDirectory)(cleanAssets)
       println(s"Successfully removed $count assets from levelDB cache!")
     }
 
@@ -446,9 +436,18 @@ object WavesDexCli extends ScoptImplicits {
       )
     }
 
+    def loadAllConfigsUnsafe(path: String): (Config, MatcherSettings) =
+      cli.wrapByLogs("  Loading Matcher settings... ") {
+        for {
+          config <- Try(parseFile(new File(path))).toEither.leftMap(th => s"Cannot load config at path $path: ${th.getWithStackTrace}")
+          matcherSettings <- loadMatcherSettings(config)
+        } yield config -> matcherSettings
+      }.fold(error => throw new RuntimeException(error), identity)
+
     // noinspection ScalaStyle
     OParser.parse(parser, rawArgs, Args()).foreach { args =>
-      val argsOverrides = loadMatcherSettingsUnsafe(args.configPath).cli.argsOverrides
+      val (config, matcherSettings) = loadAllConfigsUnsafe(args.configPath)
+      val argsOverrides = matcherSettings.cli.argsOverrides
       val updatedArgs = argsOverrides.updateArgs(args)
       updatedArgs.command match {
         case None => println(OParser.usage(parser, RenderingMode.TwoColumns))
@@ -460,11 +459,11 @@ object WavesDexCli extends ScoptImplicits {
             case Command.CreateAccountStorage => createAccountStorage(updatedArgs)
             case Command.CreateDocumentation => createDocumentation(updatedArgs)
             case Command.CreateApiKey => createApiKey(updatedArgs)
-            case Command.CheckServer => checkServer(updatedArgs)
+            case Command.CheckServer => checkServer(updatedArgs, config, matcherSettings)
             case Command.RunComparison => runComparison(updatedArgs)
             case Command.MakeOrderbookSnapshots => makeSnapshots(updatedArgs)
             case Command.CheckConfigFile => checkConfig(updatedArgs)
-            case Command.CleanAssets => cleanAssets(updatedArgs)
+            case Command.CleanAssets => cleanAssets(updatedArgs, matcherSettings)
           }
           println("Done")
       }

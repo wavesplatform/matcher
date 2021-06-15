@@ -1,9 +1,9 @@
 package com.wavesplatform.dex.settings
 
-import mouse.any._
 import com.wavesplatform.dex.cli.WavesDexCli.Args
 
 import scala.concurrent.duration.FiniteDuration
+import scala.util.chaining._
 
 final case class CliSettings(
   ignoreUnusedProperties: Seq[String],
@@ -21,22 +21,22 @@ final case class ArgsOverrides(
   // noinspection ScalaStyle
   def updateArgs(args: Args): Args = {
     val overrideAddressSchemeByte = addressSchemeByte
-      .unsafeTap(_.foreach(x => println(s"overriding address scheme byte [$x]")))
+      .tap(_.foreach(x => println(s"overriding address scheme byte with [$x]")))
       .orElse(args.addressSchemeByte)
     val overrideDexRestApi = dexRestApi
       .filterNot(_.isEmpty)
-      .unsafeTap(_.foreach(x => println(s"overriding dex rest api [$x]")))
+      .tap(_.foreach(x => println(s"overriding dex rest api with [$x]")))
       .getOrElse(args.dexRestApi)
     val overrideNodeRestApi = nodeRestApi
       .filterNot(_.isEmpty)
-      .unsafeTap(_.foreach(x => println(s"overriding node rest api [$x]")))
+      .tap(_.foreach(x => println(s"overriding node rest api with [$x]")))
       .getOrElse(args.nodeRestApi)
     val overrideAuthServiceRestApi = authServiceRestApi
       .filterNot(_.isEmpty)
-      .unsafeTap(_.foreach(x => println(s"overriding auth service rest api [$x]")))
+      .tap(_.foreach(x => println(s"overriding auth service rest api with [$x]")))
       .orElse(args.authServiceRestApi)
     val overrideTimeout = timeout
-      .unsafeTap(_.foreach(x => println(s"overriding timeout [$x]")))
+      .tap(_.foreach(x => println(s"overriding timeout with [$x]")))
       .getOrElse(args.timeout)
 
     args.copy(

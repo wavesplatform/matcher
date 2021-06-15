@@ -3,11 +3,11 @@ package com.wavesplatform.dex.api.ws
 import com.wavesplatform.dex.MatcherSpecBase
 import com.wavesplatform.dex.api.ws.entities.WsAddressBalancesFilter.ExcludeNft
 import com.wavesplatform.dex.api.ws.protocol.WsAddressSubscribe
-import org.scalatest.matchers.should.Matchers
-import org.scalatest.wordspec.AnyWordSpec
 import com.wavesplatform.dex.api.ws.protocol.WsAddressSubscribe.wsAddressSubscribeFormat
 import com.wavesplatform.dex.domain.account.Address
-import play.api.libs.json.{JsResult, Json}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpec
+import play.api.libs.json.Json
 
 class WsAddressSubscribeSerializationSpec extends AnyWordSpec with Matchers with MatcherSpecBase {
 

@@ -45,7 +45,8 @@ class LookAheadPessimisticPortfolios(orig: PessimisticPortfolios, maxConfirmedTr
 
   private def put(txId: ByteString): Unit = confirmedTxs.add(txId).tap { added =>
     if (added) {
-      if (confirmedTxsEvictionQueue.size == maxConfirmedTransactions) confirmedTxsEvictionQueue.removeLastOption().foreach(confirmedTxs.remove)
+      if (confirmedTxsEvictionQueue.size == maxConfirmedTransactions)
+        confirmedTxsEvictionQueue.removeHeadOption().foreach(confirmedTxs.remove)
       confirmedTxsEvictionQueue.enqueue(txId)
     }
   }

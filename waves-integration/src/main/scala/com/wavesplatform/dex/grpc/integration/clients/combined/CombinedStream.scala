@@ -33,7 +33,7 @@ object CombinedStream {
 
     implicit val format: Format[Status] = Format(
       Reads { json =>
-        (json \ "name").as[String] match {
+        (json \ "status").as[String] match {
           case "Starting" => JsSuccess(Starting())
           case "Stopping" => JsSuccess(Stopping())
           case "Closing" => JsSuccess(Closing())
@@ -44,10 +44,10 @@ object CombinedStream {
         }
       },
       Writes {
-        case _: Starting => JsObject(Map("name" -> JsString("Starting")))
-        case _: Stopping => JsObject(Map("name" -> JsString("Stopping")))
-        case _: Closing => JsObject(Map("name" -> JsString("Closing")))
-        case x: Working => JsObject(Map("name" -> JsString("Working"), "height" -> JsNumber(x.height)))
+        case _: Starting => JsObject(Map("status" -> JsString("Starting")))
+        case _: Stopping => JsObject(Map("status" -> JsString("Stopping")))
+        case _: Closing => JsObject(Map("status" -> JsString("Closing")))
+        case x: Working => JsObject(Map("status" -> JsString("Working"), "height" -> JsNumber(x.height)))
       }
     )
 

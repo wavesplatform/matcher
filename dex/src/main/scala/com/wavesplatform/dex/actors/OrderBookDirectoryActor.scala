@@ -282,14 +282,6 @@ class OrderBookDirectoryActor(
   ): Unit = {
     context.become(working)
 
-    // Imagine we have no order books and start the DEX:
-    // index:     0  1  2  3  4  5  6  7  8  9 10 11 12
-    // events:    A  A  B  C  A  B  A  A  A  A  B  B  A
-    // snapshots:                   ^ for A           ^ for B
-    // Then we restart the DEX:
-    // 1. The DEX observes two snapshots: A (offset=6) and B (offset=12)
-    // 2. The oldest snapshot is the snapshot for A with offset=6
-    // 3. The DEX replays events from offset=6 and ignores offset=3 for order book C
     val oldestOffset = oldestSnapshotOffset.getOrElse(-1L)
 
     val safestStartOffset = math.max(

@@ -258,7 +258,7 @@ class OrderBookDirectoryActorSpecification
           sendBuyOrders(eventSender, OrderBookDirectoryActor, pair45, 2 to 3)
 
           probe23.expectMsg(OrderBookSnapshotUpdateCompleted(pair23, Some(0)))
-          probe45.expectMsg(OrderBookSnapshotUpdateCompleted(pair45, Some(1)))
+          probe45.expectMsg(OrderBookSnapshotUpdateCompleted(pair45, Some(2)))
 
           sendBuyOrders(eventSender, OrderBookDirectoryActor, pair45, 4 to 10)
           probe23.expectMsg(OrderBookSnapshotUpdateCompleted(pair23, Some(9)))
@@ -307,7 +307,7 @@ class OrderBookDirectoryActorSpecification
         probe.send(actor, wrapLimitOrder(buy(pair2, 2000L, 1)))
         eventually {
           probe.send(actor, OrderBookDirectoryActor.GetSnapshotOffsets)
-          probe.expectMsg(OrderBookDirectoryActor.SnapshotOffsetsResponse(Map(pair1 -> Some(9L), pair2 -> Some(0L))))
+          probe.expectMsg(OrderBookDirectoryActor.SnapshotOffsetsResponse(Map(pair1 -> Some(9L), pair2 -> Some(5L))))
         }
       }
 

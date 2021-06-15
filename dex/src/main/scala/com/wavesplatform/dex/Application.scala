@@ -442,6 +442,8 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       if (lastOffsetQueue < earliestSnapshotOffset)
         Future.failed(RecoveryError("The queue doesn't have messages to recover all orders and continue work. Did you change the queue?"))
       else {
+        // if lastOffsetQueue == earliestSnapshotOffset
+        // then no commands will be processed and lastProcessedOffset will not be changed from -1
         if (lastOffsetQueue == earliestSnapshotOffset)
           lastProcessedOffset = lastOffsetQueue
         if (earliestSnapshotOffset < firstQueueOffset) {
@@ -538,11 +540,8 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     )
   )
 
-  private def getLastQueueOffset(deadline: Deadline): Future[Offset] = {
-    val req = new RepeatableRequests(matcherQueue, deadline)
-    log.error(s" now is error $req")
-    req.lastOffset
-  }
+  private def getLastQueueOffset(deadline: Deadline): Future[Offset] =
+    new RepeatableRequests(matcherQueue, deadline).lastOffset
 
   private def getAndCacheDecimals(asset: Asset): FutureResult[Int] = getAndCacheDescription(asset).map(_.decimals)
 

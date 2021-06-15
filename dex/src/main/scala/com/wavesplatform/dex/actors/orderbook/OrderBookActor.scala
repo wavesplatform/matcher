@@ -156,7 +156,7 @@ class OrderBookActor(
       savingSnapshot = None
 
     case SaveSnapshot(globalEventNr) =>
-      if (savingSnapshot.isEmpty && lastSavedSnapshotOffset.getOrElse(-1L) < globalEventNr) {
+      if (savingSnapshot.isEmpty && lastSavedSnapshotOffset.getOrElse(-2L) < globalEventNr) {
         saveSnapshotAt(globalEventNr)
         savingSnapshot = Some(globalEventNr)
       }

@@ -156,7 +156,7 @@ class OrderBookActor(
       savingSnapshot = None
 
     case SaveSnapshot(globalEventNr) =>
-      // Hack: now we may have snapshots at -1L, so we must let it be saved
+      // HACK: DEX-1216 Now we may have snapshots at -1L, so we must let it be saved
       if (savingSnapshot.isEmpty && lastSavedSnapshotOffset.getOrElse(-2L) < globalEventNr) {
         saveSnapshotAt(globalEventNr)
         savingSnapshot = Some(globalEventNr)

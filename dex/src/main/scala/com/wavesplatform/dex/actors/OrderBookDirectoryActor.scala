@@ -299,7 +299,7 @@ class OrderBookDirectoryActor(
 
     log.info(
       s"All snapshots are loaded, oldestSnapshotOffset: $oldestSnapshotOffset, newestSnapshotOffset: $newestSnapshotOffset, " +
-      s" safestStartOffset: $safestStartOffset, newestSnapshotOffset: $newestSnapshotOffset"
+      s"safestStartOffset: $safestStartOffset, newestSnapshotOffset: $newestSnapshotOffset"
     )
     log.trace(s"Expecting next snapshots at:\n${snapshotsState.nearestSnapshotOffsets.map { case (p, x) => s"$p -> $x" }.mkString("\n")}")
 

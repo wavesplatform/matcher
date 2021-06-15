@@ -32,15 +32,14 @@ object ConfigChecker extends ConfigWriters {
     else s"File with configs $configPath not found".asLeft
   }
 
-  def checkConfig(rawCfg: Config): ErrorOr[Seq[String]] =
-    loadMatcherSettings(rawCfg).toEither.leftMap(ex => s"Cannot load matcher settings: ${ex.getWithStackTrace}")
-      .flatMap(ms => checkConfig(rawCfg, ms))
+  def checkConfig(config: Config): ErrorOr[Seq[String]] =
+    loadMatcherSettings(config).flatMap(ms => checkConfig(config, ms))
 
-  def checkConfig(rawCfg: Config, matcherSettings: MatcherSettings): ErrorOr[Seq[String]] =
+  def checkConfig(config: Config, matcherSettings: MatcherSettings): ErrorOr[Seq[String]] =
     Either.catchNonFatal {
       val skippedPaths = matcherSettings.cli.ignoreUnusedProperties
       val usingProperties: ConfigValue = ConfigWriter[MatcherSettings].to(matcherSettings)
-      val allProperties = rawCfg.getConfig("waves.dex").entrySet()
+      val allProperties = config.getConfig("waves.dex").entrySet()
       getConfigObject(usingProperties)
         .map { co =>
           allProperties.asScala.toSeq

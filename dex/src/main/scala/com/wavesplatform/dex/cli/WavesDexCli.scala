@@ -1,43 +1,43 @@
 package com.wavesplatform.dex.cli
 
 import cats.Id
-import cats.syntax.option._
-import cats.syntax.either._
 import cats.instances.either._
+import cats.syntax.either._
+import cats.syntax.option._
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory.parseFile
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.app.{forceStopApplication, MatcherStateCheckingFailedError}
-import com.wavesplatform.dex.db.{AccountStorage, DbKeys}
 import com.wavesplatform.dex.db.leveldb.{openDb, LevelDb}
+import com.wavesplatform.dex.db.{AccountStorage, DbKeys}
 import com.wavesplatform.dex.doc.MatcherErrorDoc
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.error.Implicits.ThrowableOps
-import com.wavesplatform.dex.settings.{loadConfig, loadMatcherSettings, MatcherSettings}
-import com.wavesplatform.dex.tool.connectors.SuperConnector
+import com.wavesplatform.dex.settings.{loadMatcherSettings, MatcherSettings}
 import com.wavesplatform.dex.tool._
+import com.wavesplatform.dex.tool.connectors.SuperConnector
 import monix.eval.Task
-import monix.execution.{ExecutionModel, Scheduler}
 import monix.execution.schedulers.SchedulerService
-import pureconfig.ConfigSource
+import monix.execution.{ExecutionModel, Scheduler}
 import scopt.{OParser, RenderingMode}
 import sttp.client3._
 
 import java.io.{File, PrintWriter}
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
-import java.util.{Base64, Scanner}
 import java.util.concurrent.atomic.AtomicLong
-import scala.concurrent.{Await, TimeoutException}
+import java.util.{Base64, Scanner}
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
+import scala.concurrent.{Await, TimeoutException}
 import scala.util.{Failure, Success, Try, Using}
 
 object WavesDexCli extends ScoptImplicits {
 
   private val backend = HttpURLConnectionBackend()
 
+  // noinspection ScalaStyle
   def generateAccountSeed(args: Args): Unit = {
     val seedPromptText = s"Enter the${if (args.accountNonce.isEmpty) " seed of DEX's account" else " base seed"}: "
     val rawSeed = readSeedFromFromStdIn(seedPromptText, args.seedFormat)
@@ -62,6 +62,7 @@ object WavesDexCli extends ScoptImplicits {
                |""".stripMargin)
   }
 
+  // noinspection ScalaStyle
   def createAccountStorage(args: Args): Unit = {
 
     val accountFile = args.outputDirectory.toPath.resolve("account.dat").toFile.getAbsoluteFile
@@ -98,6 +99,7 @@ object WavesDexCli extends ScoptImplicits {
                |""".stripMargin)
   }
 
+  // noinspection ScalaStyle
   def createDocumentation(args: Args): Unit = {
     val outputBasePath = args.outputDirectory.toPath
     val errorsFile = outputBasePath.resolve("errors.md").toFile
@@ -112,6 +114,7 @@ object WavesDexCli extends ScoptImplicits {
     } finally errors.close()
   }
 
+  // noinspection ScalaStyle
   def createApiKey(args: Args): Unit = {
     val hashedApiKey = Base58.encode(domain.crypto.secureHash(args.apiKey))
     println(s"""Your API Key: $hashedApiKey
@@ -121,13 +124,9 @@ object WavesDexCli extends ScoptImplicits {
                |""".stripMargin)
   }
 
-  def checkServer(args: Args): Unit = {
+  // noinspection ScalaStyle
+  def checkServer(args: Args, config: Config, matcherSettings: MatcherSettings): Unit = {
     val apiKey = readSecretFromStdIn("Enter X-API-KEY: ")
-    val apiUrl = args.dexRestApi.getOrElse {
-      val matcherSettings =
-        ConfigSource.fromConfig(loadConfig(parseFile(new File(args.configPath)))).at("waves.dex").loadOrThrow[MatcherSettings]
-      s"${matcherSettings.restApi.address}:${matcherSettings.restApi.port}"
-    }
     (
       for {
         _ <- cli.log(
@@ -141,9 +140,8 @@ object WavesDexCli extends ScoptImplicits {
              |  Account seed          : ${args.accountSeed.getOrElse("")}
                    """.stripMargin
         )
-        (config, matcherConfig) <- cli.wrapByLogs("  Loading Matcher settings... ")(loadAllConfigs(args.configPath))
-        superConnector <- SuperConnector.create(matcherConfig, apiUrl, args.nodeRestApi, args.authServiceRestApi, apiKey)
-        checkResult <- new Checker(superConnector).checkState(args.version, args.accountSeed, config, matcherConfig)
+        superConnector <- SuperConnector.create(matcherSettings, args.dexRestApi, args.nodeRestApi, args.authServiceRestApi, apiKey)
+        checkResult <- new Checker(superConnector).checkState(args.version, args.accountSeed, config, matcherSettings)
         _ <- cli.lift(superConnector.close())
       } yield checkResult
     ) match {
@@ -152,19 +150,7 @@ object WavesDexCli extends ScoptImplicits {
     }
   }
 
-  private def loadAllConfigs(dexConfigPath: String): ErrorOr[(Config, MatcherSettings)] =
-    (for {
-      cfg <- loadConfigAtPath(dexConfigPath)
-      matcherSettings <- loadMatcherSettings(cfg)
-    } yield (cfg, matcherSettings)).toEither.leftMap(ex => s"Cannot load matcher settings by path $dexConfigPath: ${ex.getWithStackTrace}")
-
-  private def loadMatcherSettingsFromPath(path: String): MatcherSettings =
-    ConfigSource.fromConfig(loadConfig(parseFile(new File(path)))).at("waves.dex").loadOrThrow[MatcherSettings]
-
-  private def loadConfigAtPath(dexConfigPath: String): Try[Config] = Try {
-    parseFile(new File(dexConfigPath))
-  }
-
+  // noinspection ScalaStyle
   def runComparison(args: Args): Unit =
     (for {
       _ <- cli.log(
@@ -181,6 +167,7 @@ object WavesDexCli extends ScoptImplicits {
       case Left(error) => println(error); forceStopApplication(MatcherStateCheckingFailedError)
     }
 
+  // noinspection ScalaStyle
   def makeSnapshots(args: Args): Unit = {
     cli.log(
       s"""
@@ -200,19 +187,13 @@ object WavesDexCli extends ScoptImplicits {
 
     val key = readSecretFromStdIn("Enter X-API-KEY: ")
 
-    val apiUrl = args.dexRestApi.getOrElse {
-      val matcherSettings =
-        ConfigSource.fromConfig(loadConfig(parseFile(new File(args.configPath)))).at("waves.dex").loadOrThrow[MatcherSettings]
-      s"http://${matcherSettings.restApi.address}:${matcherSettings.restApi.port}"
-    }
-
     def sendRequest(urlPart: String, key: String, method: String = "get"): String = {
       print(s"Sending ${method.toUpperCase} $urlPart... Response: ")
       val r = basicRequest.headers(Map("X-API-KEY" -> key))
 
       val body = method match {
-        case "post" => r.post(uri"$apiUrl/matcher/debug/$urlPart").send(backend).body
-        case _ => r.get(uri"$apiUrl/matcher/debug/$urlPart").send(backend).body
+        case "post" => r.post(uri"${args.dexRestApi}/matcher/debug/$urlPart").send(backend).body
+        case _ => r.get(uri"${args.dexRestApi}/matcher/debug/$urlPart").send(backend).body
       }
 
       body match {
@@ -242,6 +223,7 @@ object WavesDexCli extends ScoptImplicits {
     }
   }
 
+  // noinspection ScalaStyle
   def checkConfig(args: Args): Unit = {
     import PrettyPrinter._
 
@@ -260,7 +242,8 @@ object WavesDexCli extends ScoptImplicits {
     }
   }
 
-  def cleanAssets(args: Args): Unit =
+  // noinspection ScalaStyle
+  def cleanAssets(args: Args, matcherSettings: MatcherSettings): Unit =
     for {
       _ <- cli.log(
         s"""
@@ -269,9 +252,8 @@ object WavesDexCli extends ScoptImplicits {
            |Running in background
            |""".stripMargin
       )
-      settings = loadMatcherSettingsFromPath(args.configPath)
     } yield {
-      val count = withLevelDb(settings.dataDirectory)(cleanAssets)
+      val count = withLevelDb(matcherSettings.dataDirectory)(cleanAssets)
       println(s"Successfully removed $count assets from levelDB cache!")
     }
 
@@ -368,7 +350,7 @@ object WavesDexCli extends ScoptImplicits {
               .abbr("dra")
               .text("DEX REST API uri. Format: scheme://host:port (default scheme will be picked if none was specified)")
               .valueName("<raw-string>")
-              .action((x, s) => s.copy(dexRestApi = x.some)),
+              .action((x, s) => s.copy(dexRestApi = x)),
             opt[String]("node-rest-api")
               .abbr("nra")
               .text("Waves Node REST API uri. Format: scheme://host:port (default scheme will be picked if none was specified)")
@@ -422,7 +404,7 @@ object WavesDexCli extends ScoptImplicits {
               .abbr("dra")
               .text("DEX REST API uri. Format: scheme://host:port (default scheme will be picked if none was specified)")
               .valueName("<raw-string>")
-              .action((x, s) => s.copy(dexRestApi = x.some)),
+              .action((x, s) => s.copy(dexRestApi = x)),
             opt[FiniteDuration]("timeout")
               .abbr("to")
               .text("Timeout")
@@ -454,30 +436,41 @@ object WavesDexCli extends ScoptImplicits {
       )
     }
 
+    def loadAllConfigsUnsafe(path: String): (Config, MatcherSettings) =
+      cli.wrapByLogs("  Loading Matcher settings... ") {
+        for {
+          config <- Try(parseFile(new File(path))).toEither.leftMap(th => s"Cannot load config at path $path: ${th.getWithStackTrace}")
+          matcherSettings <- loadMatcherSettings(config)
+        } yield config -> matcherSettings
+      }.fold(error => throw new RuntimeException(error), identity)
+
     // noinspection ScalaStyle
     OParser.parse(parser, rawArgs, Args()).foreach { args =>
-      args.command match {
+      val (config, matcherSettings) = loadAllConfigsUnsafe(args.configPath)
+      val argsOverrides = matcherSettings.cli.argsOverrides
+      val updatedArgs = argsOverrides.updateArgs(args)
+      updatedArgs.command match {
         case None => println(OParser.usage(parser, RenderingMode.TwoColumns))
         case Some(command) =>
           println(s"Running '${command.name}' command")
-          AddressScheme.current = new AddressScheme { override val chainId: Byte = args.addressSchemeByte.getOrElse('T').toByte }
+          AddressScheme.current = new AddressScheme { override val chainId: Byte = updatedArgs.addressSchemeByte.getOrElse('T').toByte }
           command match {
-            case Command.GenerateAccountSeed => generateAccountSeed(args)
-            case Command.CreateAccountStorage => createAccountStorage(args)
-            case Command.CreateDocumentation => createDocumentation(args)
-            case Command.CreateApiKey => createApiKey(args)
-            case Command.CheckServer => checkServer(args)
-            case Command.RunComparison => runComparison(args)
-            case Command.MakeOrderbookSnapshots => makeSnapshots(args)
-            case Command.CheckConfigFile => checkConfig(args)
-            case Command.CleanAssets => cleanAssets(args)
+            case Command.GenerateAccountSeed => generateAccountSeed(updatedArgs)
+            case Command.CreateAccountStorage => createAccountStorage(updatedArgs)
+            case Command.CreateDocumentation => createDocumentation(updatedArgs)
+            case Command.CreateApiKey => createApiKey(updatedArgs)
+            case Command.CheckServer => checkServer(updatedArgs, config, matcherSettings)
+            case Command.RunComparison => runComparison(updatedArgs)
+            case Command.MakeOrderbookSnapshots => makeSnapshots(updatedArgs)
+            case Command.CheckConfigFile => checkConfig(updatedArgs)
+            case Command.CleanAssets => cleanAssets(updatedArgs, matcherSettings)
           }
           println("Done")
       }
     }
   }
 
-  sealed private trait Command {
+  sealed trait Command {
     def name: String
   }
 
@@ -521,7 +514,7 @@ object WavesDexCli extends ScoptImplicits {
 
   }
 
-  sealed private trait SeedFormat
+  sealed trait SeedFormat
 
   private object SeedFormat {
 
@@ -540,14 +533,14 @@ object WavesDexCli extends ScoptImplicits {
 
   private val defaultFile = new File(".")
 
-  private case class Args(
+  final case class Args(
     addressSchemeByte: Option[Char] = None,
     seedFormat: SeedFormat = SeedFormat.RawString,
     accountNonce: Option[Int] = None,
     command: Option[Command] = None,
     outputDirectory: File = defaultFile,
     apiKey: String = "",
-    dexRestApi: Option[String] = None,
+    dexRestApi: String = "",
     nodeRestApi: String = "",
     version: String = "",
     configPath: String = "",

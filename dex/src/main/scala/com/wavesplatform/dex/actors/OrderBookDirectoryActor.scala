@@ -119,7 +119,7 @@ class OrderBookDirectoryActor(
   /**
    * @param f (sender, orderBook)
    */
-  private def runFor(assetPair: AssetPair, newOffset: EventOffset, autoCreate: Boolean = true)(f: (ActorRef, ActorRef) => Unit): Unit = {
+  private def runFor(assetPair: AssetPair, offset: EventOffset, autoCreate: Boolean = true)(f: (ActorRef, ActorRef) => Unit): Unit = {
     val s = sender()
     orderBook(assetPair) match {
       case Some(Right(ob)) => f(s, ob)
@@ -137,7 +137,7 @@ class OrderBookDirectoryActor(
               case _ =>
             }
           f(s, ob)
-          createSnapshotForOrderbook(ob, newOffset)
+          createSnapshotFor(ob, offset)
         } else {
           log.warn(s"OrderBook for $assetPair is stopped and autoCreate is $autoCreate, respond to client with OrderBookUnavailable")
           s ! OrderBookUnavailable(error.OrderBookStopped(assetPair))
@@ -145,7 +145,7 @@ class OrderBookDirectoryActor(
     }
   }
 
-  private def createSnapshotForOrderbook(orderbook: ActorRef, offset: EventOffset): Unit =
+  private def createSnapshotFor(orderbook: ActorRef, offset: EventOffset): Unit =
     orderbook ! SaveSnapshot(offset)
 
   private def createSnapshotFor(offset: ValidatedCommandWithMeta.Offset): Unit =
@@ -173,11 +173,11 @@ class OrderBookDirectoryActor(
 
     // DEX-1192 docs/places-and-cancels.md
     case request: ValidatedCommandWithMeta =>
-      val potentiallyNewOffset = math.max(request.offset, lastProcessedNr)
+      val currentLastProcessedNr = math.max(request.offset, lastProcessedNr)
       request.command match {
         case ValidatedCommand.DeleteOrderBook(assetPair) =>
           // autoCreate = false for case, when multiple OrderBookDeleted(A1-A2) events happen one after another
-          runFor(request.command.assetPair, potentiallyNewOffset, autoCreate = false) { (sender, ref) =>
+          runFor(request.command.assetPair, currentLastProcessedNr, autoCreate = false) { (sender, ref) =>
             ref.tell(request, sender)
             orderBooks.getAndUpdate(_.filterNot(_._2.exists(_ == ref)))
             snapshotsState = snapshotsState.without(assetPair)
@@ -190,9 +190,9 @@ class OrderBookDirectoryActor(
               }
           }
 
-        case _ => runFor(request.command.assetPair, potentiallyNewOffset)((sender, orderBook) => orderBook.tell(request, sender))
+        case _ => runFor(request.command.assetPair, currentLastProcessedNr)((sender, orderBook) => orderBook.tell(request, sender))
       }
-      lastProcessedNr = potentiallyNewOffset
+      lastProcessedNr = currentLastProcessedNr
       currentOffsetGauge.update(lastProcessedNr.toDouble)
       createSnapshotFor(lastProcessedNr)
 

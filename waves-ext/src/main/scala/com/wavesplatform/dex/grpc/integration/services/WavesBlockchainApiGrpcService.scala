@@ -26,6 +26,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.exchange
 import com.wavesplatform.transaction.smart.script.ScriptRunnerFixed
+import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, TxValidationError}
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.stub.{ServerCallStreamObserver, StreamObserver}
@@ -40,7 +41,7 @@ import java.util.concurrent.ConcurrentHashMap
 import scala.annotation.tailrec
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.Future
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 import scala.util.control.NonFatal
 
 class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Scheduler)
@@ -169,7 +170,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
         case Right((tx, isConfirmed, isInUtx)) =>
           if (isConfirmed) Future.successful(CheckedBroadcastResponse.Result.Confirmed(empty))
           else if (isInUtx) handleTxInUtx(tx)
-          else context.transactionsApi.broadcastTransaction(tx).map {
+          else broadcastTransaction(tx).map {
             _.resultE match {
               case Right(isNew) => CheckedBroadcastResponse.Result.Unconfirmed(isNew)
               case Left(e) => CheckedBroadcastResponse.Result.Failed(CheckedBroadcastResponse.Failure(e.toString, canRetry(e)))
@@ -180,13 +181,13 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
       .map(CheckedBroadcastResponse(_))
       .recover {
         case e: Throwable =>
-          log.error(s"Can't broadcast a transaction", e)
+          log.error("Broadcast failed", e)
           val message = Option(e.getMessage).getOrElse(e.getClass.getName)
           CheckedBroadcastResponse(CheckedBroadcastResponse.Result.Failed(CheckedBroadcastResponse.Failure(message, canRetry = false)))
       }
 
   private def handleTxInUtx(tx: exchange.ExchangeTransaction): Future[CheckedBroadcastResponse.Result] =
-    context.transactionsApi.broadcastTransaction(tx).map {
+    broadcastTransaction(tx).map {
       _.resultE match {
         case Right(_) => CheckedBroadcastResponse.Result.Unconfirmed(false)
         case Left(e) =>
@@ -194,6 +195,13 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
           CheckedBroadcastResponse.Result.Unconfirmed(false)
       }
     }
+
+  private def broadcastTransaction(tx: exchange.ExchangeTransaction): Future[TracedResult[ValidationError, Boolean]] = {
+    context.transactionsApi.broadcastTransaction(tx).andThen {
+      case Success(r) => log.info(s"Broadcast ${tx.id()}: ${r.resultE}")
+      case Failure(e) => log.warn(s"Can't broadcast ${tx.id()}", e)
+    }
+  }
 
   @tailrec
   private def canRetry(x: ValidationError): Boolean = x match {

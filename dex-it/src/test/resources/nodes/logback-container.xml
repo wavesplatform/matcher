@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
-    <property name="default.pattern" value="%date{HH:mm:ss.SSS,UTC} %-5level %logger{26} - %msg%n"/>
+    <shutdownHook/>
+
+    <property name="default.pattern" value="%date{HH:mm:ss.SSS,UTC} %-5level [%.25thread] %logger{26} - %msg%n"/>
 
     <logger name="io.netty" level="INFO"/>
     <logger name="io.swagger" level="INFO"/>

@@ -196,12 +196,11 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
       }
     }
 
-  private def broadcastTransaction(tx: exchange.ExchangeTransaction): Future[TracedResult[ValidationError, Boolean]] = {
+  private def broadcastTransaction(tx: exchange.ExchangeTransaction): Future[TracedResult[ValidationError, Boolean]] =
     context.transactionsApi.broadcastTransaction(tx).andThen {
       case Success(r) => log.info(s"Broadcast ${tx.id()}: ${r.resultE}")
       case Failure(e) => log.warn(s"Can't broadcast ${tx.id()}", e)
     }
-  }
 
   @tailrec
   private def canRetry(x: ValidationError): Boolean = x match {

@@ -74,7 +74,7 @@ object WsExternalClientHandlerActor {
       import context.executionContext
       import settings.subscriptions._
 
-      context.setLoggerName(s"WsExternalHandlerActor[c=${clientRef.path.name}]")
+      context.setLoggerName(s"WsExternalClientHandlerActor[c=${clientRef.path.name}]")
       context.watch(clientRef)
 
       def matcherTime: Long = time.getTimestamp()
@@ -310,7 +310,7 @@ object WsExternalClientHandlerActor {
               awaitPong(maybeExpectedPong, pongTimeout, nextPing, orderBookSubscriptions, newAddressSubscriptions, maybeRatesUpdateId)
 
             case command: Command.CloseConnection =>
-              context.log.trace("Got CloseConnection: {}", command.reason.message.text)
+              context.log.debug("Got CloseConnection: {}", command.reason.message.text)
               clientRef ! WsError.from(command.reason, matcherTime)
               context.scheduleOnce(100.millis, clientRef, WsServerMessage.Complete) // Otherwise a connection is closed too quickly
               cancelSchedules(nextPing, pongTimeout)

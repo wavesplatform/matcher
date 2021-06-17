@@ -123,8 +123,6 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
   private val assetsCache = AssetsCache.from(AssetsDb.levelDb(asyncLevelDb))
 
-  private val rateCache = Await.result(RateCache(asyncLevelDb), 5.minutes)
-
   implicit private val errorContext: ErrorFormatterContext =
     ErrorFormatterContext.fromOptional(assetsCache.cached.get(_: Asset).map(_.decimals))
 
@@ -174,6 +172,16 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   cs.addTask(CoordinatedShutdown.PhaseServiceStop, "Blockchain client") { () =>
     wavesBlockchainAsyncClient.close().map(_ => Done)
   }
+
+  private val allKnownAssetsFuture = loadAllKnownAssets()
+  private val rateCacheFuture = RateCache(asyncLevelDb)
+
+  private val cacheAndAssetFutures = for {
+    _ <- allKnownAssetsFuture
+    cache <- rateCacheFuture
+  } yield cache
+
+  private val rateCache = Await.result(cacheAndAssetFutures, 5.minutes)
 
   private val pairBuilder = new AssetPairBuilder(settings, getAndCacheDescription, settings.blacklistedAssets)
 
@@ -378,9 +386,6 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
   private val startGuard = for {
     (_, http) <- {
-      log.info("Loading known assets ...")
-      loadAllKnownAssets()
-    } zip {
       log.info("Checking matcher's account script ...")
       wavesBlockchainAsyncClient.hasScript(matcherKeyPair).map(hasMatcherAccountScript = _)
     } zip {

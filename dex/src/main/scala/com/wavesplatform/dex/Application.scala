@@ -173,6 +173,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     wavesBlockchainAsyncClient.close().map(_ => Done)
   }
 
+  log.info("Loading known assets ...")
   private val allKnownAssetsFuture = loadAllKnownAssets()
   private val rateCacheFuture = RateCache(asyncLevelDb)
 

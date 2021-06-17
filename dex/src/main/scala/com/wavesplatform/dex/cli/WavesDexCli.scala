@@ -1,26 +1,30 @@
 package com.wavesplatform.dex.cli
 
 import cats.Id
-import cats.syntax.option._
-import cats.syntax.either._
 import cats.instances.either._
+import cats.syntax.either._
+import cats.syntax.option._
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory.parseFile
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.app.{forceStopApplication, MatcherStateCheckingFailedError}
-import com.wavesplatform.dex.db.{AccountStorage, DbKeys}
 import com.wavesplatform.dex.db.leveldb.{openDb, LevelDb}
+import com.wavesplatform.dex.db._
 import com.wavesplatform.dex.doc.MatcherErrorDoc
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair}
+import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
+import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.error.Implicits.ThrowableOps
+import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
+import com.wavesplatform.dex.model.OrderBookSideSnapshot
 import com.wavesplatform.dex.settings.{loadConfig, loadMatcherSettings, MatcherSettings}
-import com.wavesplatform.dex.tool.connectors.SuperConnector
 import com.wavesplatform.dex.tool._
+import com.wavesplatform.dex.tool.connectors.SuperConnector
 import monix.eval.Task
-import monix.execution.{ExecutionModel, Scheduler}
 import monix.execution.schedulers.SchedulerService
+import monix.execution.{ExecutionModel, Scheduler}
 import pureconfig.ConfigSource
 import scopt.{OParser, RenderingMode}
 import sttp.client3._
@@ -28,10 +32,10 @@ import sttp.client3._
 import java.io.{File, PrintWriter}
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
-import java.util.{Base64, Scanner}
 import java.util.concurrent.atomic.AtomicLong
-import scala.concurrent.{Await, TimeoutException}
+import java.util.{Base64, Scanner}
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
+import scala.concurrent.{Await, TimeoutException}
 import scala.util.{Failure, Success, Try, Using}
 
 object WavesDexCli extends ScoptImplicits {
@@ -250,7 +254,6 @@ object WavesDexCli extends ScoptImplicits {
         s"""
            |Passed arguments:
            |  DEX config path : ${args.configPath}
-           |Running in background
            |""".stripMargin
       )
       result <- ConfigChecker.checkConfig(args.configPath)
@@ -266,13 +269,12 @@ object WavesDexCli extends ScoptImplicits {
         s"""
            |Passed arguments:
            |  DEX config path : ${args.configPath}
-           |Running in background
            |""".stripMargin
       )
       settings = loadMatcherSettingsFromPath(args.configPath)
     } yield {
       val count = withLevelDb(settings.dataDirectory)(cleanAssets)
-      println(s"Successfully removed $count assets from levelDB cache!")
+      println(s"Successfully removed $count assets from LevelDb cache!")
     }
 
   def cleanAssets(levelDb: LevelDb[Id]): Long = levelDb.readWrite[Long] { rw =>
@@ -283,6 +285,118 @@ object WavesDexCli extends ScoptImplicits {
     }
     removed.get()
   }
+
+  def mockAsset(args: Args): Unit =
+    for {
+      _ <- cli.log(
+        s"""
+           |Passed arguments:
+           |  DEX config path : ${args.configPath}
+           |  Asset id        : ${args.assetId}
+           |""".stripMargin
+      )
+      settings = loadMatcherSettingsFromPath(args.configPath)
+      assetIdBytes <- ByteStr.decodeBase58(args.assetId).toEither
+    } yield withLevelDb(settings.dataDirectory) { db =>
+      val briefAssetDescription = BriefAssetDescription(
+        name = args.assetId,
+        decimals = 8,
+        hasScript = false,
+        isNft = false
+      )
+
+      println(s"Writing $briefAssetDescription...")
+      AssetsDb.levelDb(db).put(IssuedAsset(assetIdBytes), briefAssetDescription)
+    }
+
+  def listOrderBooks(args: Args): Unit =
+    for {
+      _ <- cli.log(
+        s"""
+           |Passed arguments:
+           |  DEX config path : ${args.configPath}
+           |""".stripMargin
+      )
+      settings = loadMatcherSettingsFromPath(args.configPath)
+    } yield withLevelDb(settings.dataDirectory) { db =>
+      val assetPairs = AssetPairsDb.levelDb(db).all().toVector.sortBy(_.key)
+      if (assetPairs.isEmpty) println("There are no order books")
+      else {
+        println(s"Found ${assetPairs.size} order books:")
+        assetPairs.foreach(println)
+      }
+    }
+
+  def inspectOrderBook(args: Args): Unit =
+    for {
+      _ <- cli.log(
+        s"""
+           |Passed arguments:
+           |  DEX config path : ${args.configPath}
+           |  Asset pair      : ${args.assetPair}
+           |""".stripMargin
+      )
+      assetPair <- AssetPair.extractAssetPair(args.assetPair).toEither
+      settings = loadMatcherSettingsFromPath(args.configPath)
+    } yield withLevelDb(settings.dataDirectory) { db =>
+      OrderBookSnapshotDb.levelDb(db).get(assetPair) match {
+        case None => println("There is no such book")
+        case Some((offset, snapshot)) =>
+          println(
+            s"""
+               |Offset     : $offset
+               |Last trade : ${snapshot.lastTrade}
+               |Asks: 
+               |${snapshotToStr(snapshot.asks)}
+               |Bids: 
+               |${snapshotToStr(snapshot.bids)}
+               |""".stripMargin
+          )
+      }
+    }
+
+  def deleteOrderBook(args: Args): Unit =
+    for {
+      _ <- cli.log(
+        s"""
+           |Passed arguments:
+           |  DEX config path : ${args.configPath}
+           |  Asset pair      : ${args.assetPair}
+           |""".stripMargin
+      )
+      assetPair <- AssetPair.extractAssetPair(args.assetPair).toEither
+      settings = loadMatcherSettingsFromPath(args.configPath)
+    } yield withLevelDb(settings.dataDirectory) { db =>
+      println("Removing a snapshot...")
+      OrderBookSnapshotDb.levelDb(db).delete(assetPair)
+      println("Removing from known asset pairs...")
+      AssetPairsDb.levelDb(db).remove(assetPair)
+    }
+
+  def inspectOrder(args: Args): Unit =
+    for {
+      _ <- cli.log(
+        s"""
+           |Passed arguments:
+           |  DEX config path : ${args.configPath}
+           |  Order id        : ${args.orderId}
+           |""".stripMargin
+      )
+      oid <- ByteStr.decodeBase58(args.orderId).toEither
+      settings = loadMatcherSettingsFromPath(args.configPath)
+    } yield withLevelDb(settings.dataDirectory) { db =>
+      println("Getting an order...")
+      val orderDb = OrderDb.levelDb(settings.orderDb, db)
+      val order = orderDb.get(oid)
+      println(order.fold("  not found")(_.jsonStr))
+      println("Getting an order info...")
+      val orderInfo = orderDb.getOrderInfo(oid)
+      println(orderInfo.fold("  not found")(_.toString))
+    }
+
+  private def snapshotToStr(snapshot: OrderBookSideSnapshot): String =
+    if (snapshot.isEmpty) "empty"
+    else snapshot.toVector.sortBy(_._1).map { case (price, os) => s"$price: ${os.mkString(", ")}" }.mkString("  ", "\n  ", "")
 
   def withLevelDb[T](dataDirectory: String)(f: LevelDb[Id] => T): T =
     Using(openDb(dataDirectory)) { db =>
@@ -442,7 +556,7 @@ object WavesDexCli extends ScoptImplicits {
           ),
         cmd(Command.CleanAssets.name)
           .action((_, s) => s.copy(command = Command.CleanAssets.some))
-          .text("Cleans levelDB cache with assets")
+          .text("Cleans LevelDb cache with assets")
           .children(
             opt[String]("dex-config")
               .abbr("dc")
@@ -450,6 +564,85 @@ object WavesDexCli extends ScoptImplicits {
               .valueName("<raw-string>")
               .required()
               .action((x, s) => s.copy(configPath = x))
+          ),
+        cmd(Command.MockAsset.name)
+          .action((_, s) => s.copy(command = Command.MockAsset.some))
+          .text("Writes a mock value for this asset. This could be useful when there is asset from the stale fork")
+          .children(
+            opt[String]("dex-config")
+              .abbr("dc")
+              .text("DEX config path")
+              .valueName("<raw-string>")
+              .required()
+              .action((x, s) => s.copy(configPath = x)),
+            opt[String]("asset-id")
+              .abbr("aid")
+              .text("An asset id")
+              .valueName("<asset-id-in-base58>")
+              .required()
+              .action((x, s) => s.copy(assetId = x))
+          ),
+        cmd(Command.ListOrderBooks.name)
+          .action((_, s) => s.copy(command = Command.ListOrderBooks.some))
+          .text("List known order books from LevelDb")
+          .children(
+            opt[String]("dex-config")
+              .abbr("dc")
+              .text("DEX config path")
+              .valueName("<raw-string>")
+              .required()
+              .action((x, s) => s.copy(configPath = x))
+          ),
+        cmd(Command.InspectOrderBook.name)
+          .action((_, s) => s.copy(command = Command.InspectOrderBook.some))
+          .text("Inspect an order book")
+          .children(
+            opt[String]("dex-config")
+              .abbr("dc")
+              .text("DEX config path")
+              .valueName("<raw-string>")
+              .required()
+              .action((x, s) => s.copy(configPath = x)),
+            opt[String]("asset-pair")
+              .abbr("ap")
+              .text("An asset pair of order book")
+              .valueName("<amount-asset-id-in-base58>-<price-asset-id-in-base58>")
+              .required()
+              .action((x, s) => s.copy(assetPair = x))
+          ),
+        cmd(Command.DeleteOrderBook.name)
+          .action((_, s) => s.copy(command = Command.DeleteOrderBook.some))
+          .text("Deletes an order book")
+          .children(
+            opt[String]("dex-config")
+              .abbr("dc")
+              .text("DEX config path")
+              .valueName("<raw-string>")
+              .required()
+              .action((x, s) => s.copy(configPath = x)),
+            opt[String]("asset-pair")
+              .abbr("ap")
+              .text("An asset pair of order book")
+              .valueName("<amount-asset-id-in-base58>-<price-asset-id-in-base58>")
+              .required()
+              .action((x, s) => s.copy(assetPair = x))
+          ),
+        cmd(Command.InspectOrder.name)
+          .action((_, s) => s.copy(command = Command.InspectOrder.some))
+          .text("Inspect an order")
+          .children(
+            opt[String]("dex-config")
+              .abbr("dc")
+              .text("DEX config path")
+              .valueName("<raw-string>")
+              .required()
+              .action((x, s) => s.copy(configPath = x)),
+            opt[String]("order-id")
+              .abbr("oid")
+              .text("An order id")
+              .valueName("<order-id-in-base58>")
+              .required()
+              .action((x, s) => s.copy(orderId = x))
           )
       )
     }
@@ -471,6 +664,11 @@ object WavesDexCli extends ScoptImplicits {
             case Command.MakeOrderbookSnapshots => makeSnapshots(args)
             case Command.CheckConfigFile => checkConfig(args)
             case Command.CleanAssets => cleanAssets(args)
+            case Command.MockAsset => mockAsset(args)
+            case Command.ListOrderBooks => listOrderBooks(args)
+            case Command.InspectOrderBook => inspectOrderBook(args)
+            case Command.DeleteOrderBook => deleteOrderBook(args)
+            case Command.InspectOrder => inspectOrder(args)
           }
           println("Done")
       }
@@ -519,6 +717,26 @@ object WavesDexCli extends ScoptImplicits {
       override def name: String = "clean-assets"
     }
 
+    case object MockAsset extends Command {
+      override def name: String = "mock-asset"
+    }
+
+    case object ListOrderBooks extends Command {
+      override def name: String = "list-orderbooks"
+    }
+
+    case object InspectOrderBook extends Command {
+      override def name: String = "inspect-orderbook"
+    }
+
+    case object DeleteOrderBook extends Command {
+      override def name: String = "delete-orderbook"
+    }
+
+    case object InspectOrder extends Command {
+      override def name: String = "inspect-order"
+    }
+
   }
 
   sealed private trait SeedFormat
@@ -551,6 +769,9 @@ object WavesDexCli extends ScoptImplicits {
     nodeRestApi: String = "",
     version: String = "",
     configPath: String = "",
+    assetPair: String = "",
+    assetId: String = "",
+    orderId: String = "",
     authServiceRestApi: Option[String] = None,
     accountSeed: Option[String] = None,
     timeout: FiniteDuration = 30 seconds

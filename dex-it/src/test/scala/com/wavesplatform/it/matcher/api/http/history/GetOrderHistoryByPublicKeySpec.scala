@@ -58,7 +58,7 @@ class GetOrderHistoryByPublicKeySpec extends MatcherSuiteBase with RawHttpChecks
       val historyCancelled = orders.map { order =>
         cancelAndAwait(alice, order)
         toHttpOrderBookHistoryItem(order, OrderStatus.Cancelled(0, 0))
-      }.reverse
+      }.sorted(HttpOrderBookHistoryItem.httpOrderBookHistoryItemOrdering)
 
       withClue("closed only") {
         validate200Json(

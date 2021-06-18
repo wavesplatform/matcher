@@ -7,7 +7,9 @@ import com.wavesplatform.dex.domain.order.OrderType
 
 import scala.collection.mutable
 
-case class LastTrade(price: Long, amount: Long, side: OrderType)
+case class LastTrade(price: Long, amount: Long, side: OrderType) {
+  override def toString: String = s"LastTrade(p=$price, a=$amount, $side)"
+}
 
 object LastTrade {
 

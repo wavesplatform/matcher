@@ -353,7 +353,7 @@ object WavesDexCli extends ScoptImplicits {
       settings = loadMatcherSettingsFromPath(args.configPath)
     } yield withLevelDb(settings.dataDirectory) { db =>
       val assetPairs = AssetPairsDb.levelDb(db).all().toVector.sortBy(_.key)
-      if (assetPairs.isEmpty) println("There are no order books")
+      if (assetPairs.isEmpty) println("There are no asset pairs")
       else {
         println(s"Found ${assetPairs.size} order books:")
         assetPairs.foreach(println)

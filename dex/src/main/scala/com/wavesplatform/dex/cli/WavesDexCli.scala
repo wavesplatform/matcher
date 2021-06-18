@@ -355,7 +355,7 @@ object WavesDexCli extends ScoptImplicits {
       val assetPairs = AssetPairsDb.levelDb(db).all().toVector.sortBy(_.key)
       if (assetPairs.isEmpty) println("There are no asset pairs")
       else {
-        println(s"Found ${assetPairs.size} order books:")
+        println(s"Found ${assetPairs.size} asset pairs:")
         assetPairs.foreach(println)
       }
     }

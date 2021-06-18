@@ -232,9 +232,9 @@ class ExchangeTransactionBroadcastActorSpecification
           createdTs = testTime.getTimestamp() - ExchangeTransactionBroadcastActor.ExchangeTransactionExpirationMillis + 10
         )
 
-        manualTime.timePasses(10.millis)
+        manualTime.timePasses(11.millis)
         attempts.get() shouldBe 1
-        testTime.advance(10.millis)
+        testTime.advance(11.millis)
 
         (1 to 10).foreach { _ =>
           manualTime.timePasses(21.millis)

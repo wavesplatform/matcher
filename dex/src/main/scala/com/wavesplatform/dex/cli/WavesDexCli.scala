@@ -726,7 +726,8 @@ object WavesDexCli extends ScoptImplicits {
 
     // noinspection ScalaStyle
     OParser.parse(parser, rawArgs, Args()).foreach { args =>
-      val settings = loadMatcherSettingsFromPath(args.configPath)
+      // We need lazy here, because createDocumentation don't require a config, thus we're trying to load a default and invalid config
+      lazy val settings = loadMatcherSettingsFromPath(args.configPath)
       args.command match {
         case None => println(OParser.usage(parser, RenderingMode.TwoColumns))
         case Some(command) =>

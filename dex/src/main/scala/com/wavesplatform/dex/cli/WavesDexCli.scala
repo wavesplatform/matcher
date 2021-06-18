@@ -263,7 +263,8 @@ object WavesDexCli extends ScoptImplicits {
     }
   }
 
-  def cleanAssets(args: Args): Unit =
+  // noinspection ScalaStyle
+  def cleanAssets(args: Args, matcherSettings: MatcherSettings): Unit =
     for {
       _ <- cli.log(
         s"""
@@ -271,12 +272,12 @@ object WavesDexCli extends ScoptImplicits {
            |  DEX config path : ${args.configPath}
            |""".stripMargin
       )
-      settings = loadMatcherSettingsFromPath(args.configPath)
     } yield {
-      val count = withLevelDb(settings.dataDirectory)(cleanAssets)
+      val count = withLevelDb(matcherSettings.dataDirectory)(cleanAssets)
       println(s"Successfully removed $count assets from LevelDb cache!")
     }
 
+  // noinspection ScalaStyle
   def cleanAssets(levelDb: LevelDb[Id]): Long = levelDb.readWrite[Long] { rw =>
     val removed = new AtomicLong(0)
     rw.iterateOver(DbKeys.AssetPrefix) { entity =>
@@ -286,7 +287,8 @@ object WavesDexCli extends ScoptImplicits {
     removed.get()
   }
 
-  def inspectAsset(args: Args): Unit =
+  // noinspection ScalaStyle
+  def inspectAsset(args: Args, matcherSettings: MatcherSettings): Unit =
     for {
       _ <- cli.log(
         s"""
@@ -295,9 +297,8 @@ object WavesDexCli extends ScoptImplicits {
            |  Asset id        : ${args.assetId}
            |""".stripMargin
       )
-      settings = loadMatcherSettingsFromPath(args.configPath)
       assetIdBytes <- ByteStr.decodeBase58(args.assetId).toEither
-    } yield withLevelDb(settings.dataDirectory) { db =>
+    } yield withLevelDb(matcherSettings.dataDirectory) { db =>
       AssetsDb.levelDb(db).get(IssuedAsset(assetIdBytes)) match {
         case None => println("There is no such asset")
         case Some(x) =>
@@ -312,7 +313,8 @@ object WavesDexCli extends ScoptImplicits {
       }
     }
 
-  def mockAsset(args: Args): Unit = {
+  // noinspection ScalaStyle
+  def setAsset(args: Args, matcherSettings: MatcherSettings): Unit = {
     val name = if (args.name.isEmpty) args.assetId else args.name
     for {
       _ <- cli.log(
@@ -327,9 +329,8 @@ object WavesDexCli extends ScoptImplicits {
            |  Is NFT          : ${args.isNft}
            |""".stripMargin
       )
-      settings = loadMatcherSettingsFromPath(args.configPath)
       assetIdBytes <- ByteStr.decodeBase58(args.assetId).toEither
-    } yield withLevelDb(settings.dataDirectory) { db =>
+    } yield withLevelDb(matcherSettings.dataDirectory) { db =>
       val briefAssetDescription = BriefAssetDescription(
         name = name,
         decimals = args.decimals,
@@ -342,7 +343,8 @@ object WavesDexCli extends ScoptImplicits {
     }
   }
 
-  def listAssetPairs(args: Args): Unit =
+  // noinspection ScalaStyle
+  def listAssetPairs(args: Args, matcherSettings: MatcherSettings): Unit =
     for {
       _ <- cli.log(
         s"""
@@ -350,8 +352,7 @@ object WavesDexCli extends ScoptImplicits {
            |  DEX config path : ${args.configPath}
            |""".stripMargin
       )
-      settings = loadMatcherSettingsFromPath(args.configPath)
-    } yield withLevelDb(settings.dataDirectory) { db =>
+    } yield withLevelDb(matcherSettings.dataDirectory) { db =>
       val assetPairs = AssetPairsDb.levelDb(db).all().toVector.sortBy(_.key)
       if (assetPairs.isEmpty) println("There are no asset pairs")
       else {
@@ -360,7 +361,8 @@ object WavesDexCli extends ScoptImplicits {
       }
     }
 
-  def inspectOrderBook(args: Args): Unit =
+  // noinspection ScalaStyle
+  def inspectOrderBook(args: Args, matcherSettings: MatcherSettings): Unit =
     for {
       _ <- cli.log(
         s"""
@@ -370,8 +372,7 @@ object WavesDexCli extends ScoptImplicits {
            |""".stripMargin
       )
       assetPair <- AssetPair.extractAssetPair(args.assetPair).toEither
-      settings = loadMatcherSettingsFromPath(args.configPath)
-    } yield withLevelDb(settings.dataDirectory) { db =>
+    } yield withLevelDb(matcherSettings.dataDirectory) { db =>
       OrderBookSnapshotDb.levelDb(db).get(assetPair) match {
         case None => println("There is no such book")
         case Some((offset, snapshot)) =>
@@ -388,7 +389,8 @@ object WavesDexCli extends ScoptImplicits {
       }
     }
 
-  def deleteOrderBook(args: Args): Unit =
+  // noinspection ScalaStyle
+  def deleteOrderBook(args: Args, matcherSettings: MatcherSettings): Unit =
     for {
       _ <- cli.log(
         s"""
@@ -398,15 +400,15 @@ object WavesDexCli extends ScoptImplicits {
            |""".stripMargin
       )
       assetPair <- AssetPair.extractAssetPair(args.assetPair).toEither
-      settings = loadMatcherSettingsFromPath(args.configPath)
-    } yield withLevelDb(settings.dataDirectory) { db =>
+    } yield withLevelDb(matcherSettings.dataDirectory) { db =>
       println("Removing a snapshot...")
       OrderBookSnapshotDb.levelDb(db).delete(assetPair)
       println("Removing from known asset pairs...")
       AssetPairsDb.levelDb(db).remove(assetPair)
     }
 
-  def inspectOrder(args: Args): Unit =
+  // noinspection ScalaStyle
+  def inspectOrder(args: Args, matcherSettings: MatcherSettings): Unit =
     for {
       _ <- cli.log(
         s"""
@@ -416,10 +418,9 @@ object WavesDexCli extends ScoptImplicits {
            |""".stripMargin
       )
       oid <- ByteStr.decodeBase58(args.orderId).toEither
-      settings = loadMatcherSettingsFromPath(args.configPath)
-    } yield withLevelDb(settings.dataDirectory) { db =>
+    } yield withLevelDb(matcherSettings.dataDirectory) { db =>
       println("Getting an order...")
-      val orderDb = OrderDb.levelDb(settings.orderDb, db)
+      val orderDb = OrderDb.levelDb(matcherSettings.orderDb, db)
       val order = orderDb.get(oid)
       println(order.fold("  not found")(_.jsonStr))
       println("Getting an order info...")
@@ -615,8 +616,8 @@ object WavesDexCli extends ScoptImplicits {
               .required()
               .action((x, s) => s.copy(assetId = x))
           ),
-        cmd(Command.MockAsset.name)
-          .action((_, s) => s.copy(command = Command.MockAsset.some))
+        cmd(Command.SetAsset.name)
+          .action((_, s) => s.copy(command = Command.SetAsset.some))
           .text("Writes a mock value for this asset. This could be useful when there is asset from the stale fork")
           .children(
             opt[String]("dex-config")
@@ -725,6 +726,7 @@ object WavesDexCli extends ScoptImplicits {
 
     // noinspection ScalaStyle
     OParser.parse(parser, rawArgs, Args()).foreach { args =>
+      val settings = loadMatcherSettingsFromPath(args.configPath)
       args.command match {
         case None => println(OParser.usage(parser, RenderingMode.TwoColumns))
         case Some(command) =>
@@ -739,13 +741,13 @@ object WavesDexCli extends ScoptImplicits {
             case Command.RunComparison => runComparison(args)
             case Command.MakeOrderbookSnapshots => makeSnapshots(args)
             case Command.CheckConfigFile => checkConfig(args)
-            case Command.CleanAssets => cleanAssets(args)
-            case Command.InspectAsset => inspectAsset(args)
-            case Command.MockAsset => mockAsset(args)
-            case Command.ListAssetPairs => listAssetPairs(args)
-            case Command.InspectOrderBook => inspectOrderBook(args)
-            case Command.DeleteOrderBook => deleteOrderBook(args)
-            case Command.InspectOrder => inspectOrder(args)
+            case Command.CleanAssets => cleanAssets(args, settings)
+            case Command.InspectAsset => inspectAsset(args, settings)
+            case Command.SetAsset => setAsset(args, settings)
+            case Command.ListAssetPairs => listAssetPairs(args, settings)
+            case Command.InspectOrderBook => inspectOrderBook(args, settings)
+            case Command.DeleteOrderBook => deleteOrderBook(args, settings)
+            case Command.InspectOrder => inspectOrder(args, settings)
           }
           println("Done")
       }
@@ -798,8 +800,8 @@ object WavesDexCli extends ScoptImplicits {
       override def name: String = "inspect-asset"
     }
 
-    case object MockAsset extends Command {
-      override def name: String = "mock-asset"
+    case object SetAsset extends Command {
+      override def name: String = "set-asset"
     }
 
     case object ListAssetPairs extends Command {

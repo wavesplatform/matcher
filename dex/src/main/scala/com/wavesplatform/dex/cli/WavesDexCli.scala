@@ -286,7 +286,7 @@ object WavesDexCli extends ScoptImplicits {
     removed.get()
   }
 
-  def mockAsset(args: Args): Unit =
+  def inspectAsset(args: Args): Unit =
     for {
       _ <- cli.log(
         s"""
@@ -298,18 +298,51 @@ object WavesDexCli extends ScoptImplicits {
       settings = loadMatcherSettingsFromPath(args.configPath)
       assetIdBytes <- ByteStr.decodeBase58(args.assetId).toEither
     } yield withLevelDb(settings.dataDirectory) { db =>
+      AssetsDb.levelDb(db).get(IssuedAsset(assetIdBytes)) match {
+        case None => println("There is no such asset")
+        case Some(x) =>
+          println(
+            s"""
+               |Decimals   : ${x.decimals}
+               |Name       : ${x.name}
+               |Has script : ${x.hasScript}
+               |Is NFT     : ${x.isNft}
+               |""".stripMargin
+          )
+      }
+    }
+
+  def mockAsset(args: Args): Unit = {
+    val name = if (args.name.isEmpty) args.assetId else args.name
+    for {
+      _ <- cli.log(
+        s"""
+           |Passed arguments:
+           |  DEX config path : ${args.configPath}
+           |  Asset id        : ${args.assetId}
+           |  Name:           : ${args.name}
+           |     Will be used : $name
+           |  Decimals        : ${args.decimals}
+           |  Has script      : ${args.hasScript}
+           |  Is NFT          : ${args.isNft}
+           |""".stripMargin
+      )
+      settings = loadMatcherSettingsFromPath(args.configPath)
+      assetIdBytes <- ByteStr.decodeBase58(args.assetId).toEither
+    } yield withLevelDb(settings.dataDirectory) { db =>
       val briefAssetDescription = BriefAssetDescription(
-        name = args.assetId,
-        decimals = 8,
-        hasScript = false,
-        isNft = false
+        name = name,
+        decimals = args.decimals,
+        hasScript = args.hasScript,
+        isNft = args.isNft
       )
 
       println(s"Writing $briefAssetDescription...")
       AssetsDb.levelDb(db).put(IssuedAsset(assetIdBytes), briefAssetDescription)
     }
+  }
 
-  def listOrderBooks(args: Args): Unit =
+  def listAssetPairs(args: Args): Unit =
     for {
       _ <- cli.log(
         s"""
@@ -346,9 +379,9 @@ object WavesDexCli extends ScoptImplicits {
             s"""
                |Offset     : $offset
                |Last trade : ${snapshot.lastTrade}
-               |Asks: 
+               |Asks:
                |${snapshotToStr(snapshot.asks)}
-               |Bids: 
+               |Bids:
                |${snapshotToStr(snapshot.bids)}
                |""".stripMargin
           )
@@ -565,6 +598,23 @@ object WavesDexCli extends ScoptImplicits {
               .required()
               .action((x, s) => s.copy(configPath = x))
           ),
+        cmd(Command.InspectAsset.name)
+          .action((_, s) => s.copy(command = Command.InspectAsset.some))
+          .text("Inspect saved information about specified asset")
+          .children(
+            opt[String]("dex-config")
+              .abbr("dc")
+              .text("DEX config path")
+              .valueName("<raw-string>")
+              .required()
+              .action((x, s) => s.copy(configPath = x)),
+            opt[String]("asset-id")
+              .abbr("aid")
+              .text("An asset id")
+              .valueName("<asset-id-in-base58>")
+              .required()
+              .action((x, s) => s.copy(assetId = x))
+          ),
         cmd(Command.MockAsset.name)
           .action((_, s) => s.copy(command = Command.MockAsset.some))
           .text("Writes a mock value for this asset. This could be useful when there is asset from the stale fork")
@@ -580,11 +630,37 @@ object WavesDexCli extends ScoptImplicits {
               .text("An asset id")
               .valueName("<asset-id-in-base58>")
               .required()
-              .action((x, s) => s.copy(assetId = x))
+              .action((x, s) => s.copy(assetId = x)),
+            opt[String]("name")
+              .abbr("n")
+              .text("An asset name")
+              .valueName("<string>")
+              .optional()
+              .action((x, s) => s.copy(name = x.trim)),
+            opt[Int]("decimals")
+              .abbr("d")
+              .text("Asset decimals")
+              .valueName("<0-8>")
+              .optional()
+              .validate { x =>
+                if (x < 0 || x > 8) Left("Should be in [0; 8]")
+                else Right(())
+              }
+              .action((x, s) => s.copy(decimals = x)),
+            opt[Unit]("has-script")
+              .abbr("hs")
+              .text("This asset has a script")
+              .optional()
+              .action((x, s) => s.copy(hasScript = true)),
+            opt[Unit]("is-nft")
+              .abbr("nft")
+              .text("This asset is NFT")
+              .optional()
+              .action((x, s) => s.copy(isNft = true))
           ),
-        cmd(Command.ListOrderBooks.name)
-          .action((_, s) => s.copy(command = Command.ListOrderBooks.some))
-          .text("List known order books from LevelDb")
+        cmd(Command.ListAssetPairs.name)
+          .action((_, s) => s.copy(command = Command.ListAssetPairs.some))
+          .text("List known asset pairs from LevelDb")
           .children(
             opt[String]("dex-config")
               .abbr("dc")
@@ -664,8 +740,9 @@ object WavesDexCli extends ScoptImplicits {
             case Command.MakeOrderbookSnapshots => makeSnapshots(args)
             case Command.CheckConfigFile => checkConfig(args)
             case Command.CleanAssets => cleanAssets(args)
+            case Command.InspectAsset => inspectAsset(args)
             case Command.MockAsset => mockAsset(args)
-            case Command.ListOrderBooks => listOrderBooks(args)
+            case Command.ListAssetPairs => listAssetPairs(args)
             case Command.InspectOrderBook => inspectOrderBook(args)
             case Command.DeleteOrderBook => deleteOrderBook(args)
             case Command.InspectOrder => inspectOrder(args)
@@ -717,12 +794,16 @@ object WavesDexCli extends ScoptImplicits {
       override def name: String = "clean-assets"
     }
 
+    case object InspectAsset extends Command {
+      override def name: String = "inspect-asset"
+    }
+
     case object MockAsset extends Command {
       override def name: String = "mock-asset"
     }
 
-    case object ListOrderBooks extends Command {
-      override def name: String = "list-orderbooks"
+    case object ListAssetPairs extends Command {
+      override def name: String = "list-assetpairs"
     }
 
     case object InspectOrderBook extends Command {
@@ -771,6 +852,10 @@ object WavesDexCli extends ScoptImplicits {
     configPath: String = "",
     assetPair: String = "",
     assetId: String = "",
+    name: String = "",
+    decimals: Int = 8,
+    hasScript: Boolean = false,
+    isNft: Boolean = false,
     orderId: String = "",
     authServiceRestApi: Option[String] = None,
     accountSeed: Option[String] = None,

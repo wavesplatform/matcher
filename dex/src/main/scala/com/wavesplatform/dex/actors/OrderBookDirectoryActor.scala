@@ -119,7 +119,11 @@ class OrderBookDirectoryActor(
   /**
    * @param f (sender, orderBook)
    */
-  private def runFor(assetPair: AssetPair, maybeOffset: Option[EventOffset] = None, autoCreate: Boolean = true)(f: (ActorRef, ActorRef) => Unit): Unit = {
+  private def runFor(
+    assetPair: AssetPair,
+    maybeOffset: Option[EventOffset] = None,
+    autoCreate: Boolean = true
+  )(f: (ActorRef, ActorRef) => Unit): Unit = {
     val s = sender()
     orderBook(assetPair) match {
       case Some(Right(ob)) => f(s, ob)

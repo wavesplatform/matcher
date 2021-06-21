@@ -7,8 +7,8 @@ import cats.Id
 import cats.data.NonEmptyList
 import cats.implicits.catsSyntaxEitherId
 import com.wavesplatform.dex.MatcherSpecBase
-import com.wavesplatform.dex.actors.OrderBookDirectoryActor.{ForceStartOrderBook, GetMarkets, MarketData, SaveSnapshot}
-import com.wavesplatform.dex.actors.OrderBookDirectoryActorSpecification.{DeletingActor, FailAtStartActor, NothingDoActor, RecoveringActor, _}
+import com.wavesplatform.dex.actors.OrderBookDirectoryActor.{GetMarkets, MarketData, SaveSnapshot}
+import com.wavesplatform.dex.actors.OrderBookDirectoryActorSpecification.{DeletingActor, FailAtStartActor, NothingDoActor, _}
 import com.wavesplatform.dex.actors.orderbook.OrderBookActor.{OrderBookRecovered, OrderBookSnapshotUpdateCompleted}
 import com.wavesplatform.dex.actors.orderbook.OrderBookSnapshotStoreActor.{Message, Response}
 import com.wavesplatform.dex.actors.orderbook.{AggregatedOrderBookActor, OrderBookActor, OrderBookSnapshotStoreActor}
@@ -311,29 +311,6 @@ class OrderBookDirectoryActorSpecification
         }
       }
 
-      "force request" in {
-        val pair = AssetPair(randomAssetId, randomAssetId)
-        val ob = emptyOrderBookRefs
-
-        val probe = TestProbe()
-        val actor = system.actorOf(
-          Props(
-            new OrderBookDirectoryActor(
-              matcherSettings,
-              mkAssetPairsDB,
-              _ => {},
-              ob,
-              (pair, OrderBookDirectoryActor) => Props(new RecoveringActor(OrderBookDirectoryActor, pair)),
-              assetsCache,
-              _.asRight
-            )
-          )
-        )
-
-        probe.send(actor, OrderBookDirectoryActor.ForceStartOrderBook(pair))
-        probe.expectMsg(OrderBookDirectoryActor.OrderBookCreated(pair))
-      }
-
       "after delete" in {
         val apdb = mkAssetPairsDB
         val obsdb = mkOrderBookSnapshotDb
@@ -532,7 +509,6 @@ object OrderBookDirectoryActorSpecification {
   private class RecoveringActor(owner: ActorRef, assetPair: AssetPair, startOffset: Option[Long] = None) extends Actor {
     context.system.scheduler.scheduleOnce(50.millis, owner, OrderBookRecovered(assetPair, startOffset)) // emulates recovering
     override def receive: Receive = {
-      case ForceStartOrderBook(p) if p == assetPair => sender() ! OrderBookDirectoryActor.OrderBookCreated(assetPair)
       case _ =>
     }
 

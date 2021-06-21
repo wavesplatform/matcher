@@ -2,7 +2,6 @@ package com.wavesplatform.dex.api.ws.actors
 
 import java.nio.charset.StandardCharsets
 import java.util.{Base64, UUID}
-
 import akka.actor.testkit.typed.scaladsl.{ActorTestKit, TestProbe => TypedTestProbe}
 import akka.actor.typed.ActorRef
 import akka.actor.typed.scaladsl.adapter._

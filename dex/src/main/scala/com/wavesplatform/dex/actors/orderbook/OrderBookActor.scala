@@ -7,7 +7,7 @@ import cats.data.NonEmptyList
 import cats.instances.option.catsStdInstancesForOption
 import cats.syntax.apply._
 import cats.syntax.option._
-import com.wavesplatform.dex.actors.OrderBookDirectoryActor.{ForceStartOrderBook, OrderBookCreated, SaveSnapshot}
+import com.wavesplatform.dex.actors.OrderBookDirectoryActor.SaveSnapshot
 import com.wavesplatform.dex.actors.address.AddressActor
 import com.wavesplatform.dex.actors.events.OrderEventsCoordinatorActor
 import com.wavesplatform.dex.actors.orderbook.OrderBookActor._
@@ -147,8 +147,6 @@ class OrderBookActor(
 
     case OrderBookDirectoryActor.Ping => sender() ! OrderBookDirectoryActor.Pong
 
-    case ForceStartOrderBook(p) if p == assetPair => sender() ! OrderBookCreated(assetPair)
-
     case OrderBookSnapshotStoreActor.Response.Updated(offset) =>
       log.info(s"Snapshot has been saved at offset $offset")
       lastSavedSnapshotOffset = Some(offset)
@@ -156,8 +154,7 @@ class OrderBookActor(
       savingSnapshot = None
 
     case SaveSnapshot(globalEventNr) =>
-      // HACK: DEX-1216 Now we may have snapshots at -1L, so we must let it be saved
-      if (savingSnapshot.isEmpty && lastSavedSnapshotOffset.getOrElse(-2L) < globalEventNr) {
+      if (savingSnapshot.isEmpty && lastSavedSnapshotOffset.getOrElse(-1L) < globalEventNr) {
         saveSnapshotAt(globalEventNr)
         savingSnapshot = Some(globalEventNr)
       }

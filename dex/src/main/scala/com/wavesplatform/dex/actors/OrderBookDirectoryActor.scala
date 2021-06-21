@@ -119,7 +119,11 @@ class OrderBookDirectoryActor(
   /**
    * @param f (sender, orderBook)
    */
-  private def runFor(assetPair: AssetPair, offset: EventOffset, autoCreate: Boolean = true)(f: (ActorRef, ActorRef) => Unit): Unit = {
+  private def runFor(
+    assetPair: AssetPair,
+    maybeOffset: Option[EventOffset] = None,
+    autoCreate: Boolean = true
+  )(f: (ActorRef, ActorRef) => Unit): Unit = {
     val s = sender()
     orderBook(assetPair) match {
       case Some(Right(ob)) => f(s, ob)
@@ -137,7 +141,7 @@ class OrderBookDirectoryActor(
               case _ =>
             }
           f(s, ob)
-          createSnapshotFor(ob, offset)
+          maybeOffset.foreach(createSnapshotFor(ob, _))
         } else {
           log.warn(s"OrderBook for $assetPair is stopped and autoCreate is $autoCreate, respond to client with OrderBookUnavailable")
           s ! OrderBookUnavailable(error.OrderBookStopped(assetPair))
@@ -177,7 +181,7 @@ class OrderBookDirectoryActor(
       request.command match {
         case ValidatedCommand.DeleteOrderBook(assetPair) =>
           // autoCreate = false for case, when multiple OrderBookDeleted(A1-A2) events happen one after another
-          runFor(request.command.assetPair, currentLastProcessedNr, autoCreate = false) { (sender, ref) =>
+          runFor(request.command.assetPair, Some(currentLastProcessedNr), autoCreate = false) { (sender, ref) =>
             ref.tell(request, sender)
             orderBooks.getAndUpdate(_.filterNot(_._2.exists(_ == ref)))
             snapshotsState = snapshotsState.without(assetPair)
@@ -190,13 +194,11 @@ class OrderBookDirectoryActor(
               }
           }
 
-        case _ => runFor(request.command.assetPair, currentLastProcessedNr)((sender, orderBook) => orderBook.tell(request, sender))
+        case _ => runFor(request.command.assetPair, Some(currentLastProcessedNr))((sender, orderBook) => orderBook.tell(request, sender))
       }
       lastProcessedNr = currentLastProcessedNr
       currentOffsetGauge.update(lastProcessedNr.toDouble)
       createSnapshotFor(lastProcessedNr)
-
-    case request: ForceStartOrderBook => runFor(request.assetPair, lastProcessedNr)((sender, orderBook) => orderBook.tell(request, sender))
 
     case Shutdown =>
       context.children.foreach(context.unwatch)
@@ -233,7 +235,7 @@ class OrderBookDirectoryActor(
       val s = sender()
       context.actorOf(WatchDistributedCompletionActor.props(workers, s, Ping, Pong, settings.processConsumedTimeout))
 
-    case AggregatedOrderBookEnvelope(pair, message) => runFor(pair, lastProcessedNr) { (sender, ref) =>
+    case AggregatedOrderBookEnvelope(pair, message) => runFor(pair) { (sender, ref) =>
         ref.tell(message, sender)
       }
 
@@ -357,8 +359,6 @@ object OrderBookDirectoryActor {
 
   case class Snapshot(tradedPairsSet: Set[AssetPair])
 
-  case class ForceStartOrderBook(assetPair: AssetPair)
-  case class OrderBookCreated(assetPair: AssetPair)
   case class AggregatedOrderBookEnvelope(assetPair: AssetPair, message: AggregatedOrderBookActor.Message)
 
   case object GetMarkets

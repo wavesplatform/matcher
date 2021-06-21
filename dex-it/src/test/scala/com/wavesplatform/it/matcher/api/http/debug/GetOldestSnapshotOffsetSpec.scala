@@ -30,7 +30,9 @@ class GetOldestSnapshotOffsetSpec extends MatcherSuiteBase with ApiKeyHeaderChec
         mkOrder(alice, wavesUsdPair, BUY, 10.waves, 3.usd)
       ).foreach(placeAndAwaitAtDex(_))
 
-      validate200Json(dex1.rawApi.getOldestSnapshotOffset) should be(-1)
+      eventually {
+        validate200Json(dex1.rawApi.getOldestSnapshotOffset) should be(0)
+      }
       dex1.api.saveSnapshots
       eventually {
         validate200Json(dex1.rawApi.getOldestSnapshotOffset) should be(2)

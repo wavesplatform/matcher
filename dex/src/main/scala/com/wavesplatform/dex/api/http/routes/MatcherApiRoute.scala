@@ -11,7 +11,6 @@ import akka.util.Timeout
 import cats.instances.future._
 import cats.instances.list._
 import cats.syntax.option._
-import cats.syntax.semigroupal._
 import cats.syntax.traverse._
 import com.google.common.primitives.Longs
 import com.typesafe.config.Config
@@ -61,7 +60,7 @@ import play.api.libs.json._
 import javax.ws.rs.Path
 import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag
-import scala.util.{Failure, Success}
+import scala.util.Success
 
 /**
  * @param getActualTickSize We need FutureResult, because it is used internally in methods which face with a potentially unknown assets
@@ -140,24 +139,6 @@ class MatcherApiRoute(
     getMatcherPublicKey ~ settingsRoutes ~ debugRoutes ~ orderBookRoutes ~ ordersRoutes ~ balanceRoutes ~ transactionsRoutes
   }
 
-  private def unavailableOrderBookBarrier(p: AssetPair): Directive0 = orderBook(p) match {
-    case Some(x) => if (x.isRight) pass else complete(OrderBookUnavailable(error.OrderBookBroken(p)))
-    case None => forceCheckOrderBook(p)
-  }
-
-  private def forceCheckOrderBook(p: AssetPair): Directive0 = {
-    val withCachedAssets = getAssetDescription(p.amountAsset)
-      .product(getAssetDescription(p.priceAsset))
-      .semiflatMap(_ => matcher ? ForceStartOrderBook(p))
-
-    onComplete(withCachedAssets.value)
-      .flatMap {
-        case Success(Right(_)) => pass
-        case Success(Left(e)) => complete(SimpleErrorResponse(StatusCodes.BadRequest, e))
-        case Failure(e) => complete(OrderBookUnavailable(error.OrderBookBroken(p)))
-      }
-  }
-
   private def withAssetPair(
     pairOrError: Either[ValidationError.InvalidAsset, AssetPair],
     redirectToInverse: Boolean = false,
@@ -211,24 +192,22 @@ class MatcherApiRoute(
     val orderType = if (isMarket) "Market" else "Limit"
     val route = (pathEndOrSingleSlash & post & measureResponse(s"place${orderType}Order") & protect & entity(as[Order])) { order =>
       withAssetPair(Right(order.assetPair), formatError = e => StatusCodes.BadRequest -> HttpError.from(e, "OrderRejected")) { pair =>
-        unavailableOrderBookBarrier(pair) {
-          complete(
-            placeTimer.measureFuture {
-              orderValidator(order).value flatMap {
-                case Right(o) =>
-                  placeTimer.measureFuture {
-                    askAddressActor(o.sender, AddressActor.Command.PlaceOrder(o, isMarket)) {
-                      case AddressActor.Event.OrderAccepted(x) => SimpleResponse(HttpSuccessfulPlace(x))
-                      case x: error.MatcherError =>
-                        if (x == error.CanNotPersistEvent) StatusCodes.ServiceUnavailable -> HttpError.from(x, "WavesNodeUnavailable")
-                        else StatusCodes.BadRequest -> HttpError.from(x, "OrderRejected")
-                    }
+        complete(
+          placeTimer.measureFuture {
+            orderValidator(order).value flatMap {
+              case Right(o) =>
+                placeTimer.measureFuture {
+                  askAddressActor(o.sender, AddressActor.Command.PlaceOrder(o, isMarket)) {
+                    case AddressActor.Event.OrderAccepted(x) => SimpleResponse(HttpSuccessfulPlace(x))
+                    case x: error.MatcherError =>
+                      if (x == error.CanNotPersistEvent) StatusCodes.ServiceUnavailable -> HttpError.from(x, "WavesNodeUnavailable")
+                      else StatusCodes.BadRequest -> HttpError.from(x, "OrderRejected")
                   }
-                case Left(e) => Future.successful[ToResponseMarshallable](StatusCodes.BadRequest -> HttpError.from(e, "OrderRejected"))
-              }
+                }
+              case Left(e) => Future.successful[ToResponseMarshallable](StatusCodes.BadRequest -> HttpError.from(e, "OrderRejected"))
             }
-          )
-        }
+          }
+        )
       }
     }
 
@@ -594,9 +573,7 @@ class MatcherApiRoute(
 
   private def handleCancelRequestToRoute(assetPair: Option[AssetPair]): Route =
     withCancelRequest { req =>
-      assetPair.fold(pass)(unavailableOrderBookBarrier).apply {
-        handleCancelRequestToRoute(assetPair, req.sender, req.orderId, req.timestamp)
-      }
+      handleCancelRequestToRoute(assetPair, req.sender, req.orderId, req.timestamp)
     }
 
   @Path("/orderbook/{amountAsset}/{priceAsset}/cancel")
@@ -626,9 +603,8 @@ class MatcherApiRoute(
     (path(AssetPairPM / "cancel") & post) { pairOrError =>
       (measureResponse("cancel") & protect) {
         withAssetPair(pairOrError, formatError = e => OrderCancelRejected(e)) { pair =>
-          unavailableOrderBookBarrier(pair) {
-            handleCancelRequestToRoute(Some(pair))
-          }
+          handleCancelRequestToRoute(Some(pair))
+
         }
       }
     }

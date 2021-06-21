@@ -9,7 +9,7 @@ import com.typesafe.config.ConfigFactory.parseFile
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.app.{forceStopApplication, MatcherStateCheckingFailedError}
 import com.wavesplatform.dex.db.leveldb.{openDb, LevelDb}
-import com.wavesplatform.dex.db.{AccountStorage, DbKeys}
+import com.wavesplatform.dex.db._
 import com.wavesplatform.dex.doc.MatcherErrorDoc
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair}
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
@@ -423,7 +423,6 @@ object WavesDexCli extends ScoptImplicits {
   // todo commands:
   // get account by seed [and nonce]
   def main(rawArgs: Array[String]): Unit = {
-
     val builder = OParser.builder[Args]
 
     val parser = {
@@ -499,7 +498,7 @@ object WavesDexCli extends ScoptImplicits {
               .abbr("dra")
               .text("DEX REST API uri. Format: scheme://host:port (default scheme will be picked if none was specified)")
               .valueName("<raw-string>")
-              .action((x, s) => s.copy(dexRestApi = x.some)),
+              .action((x, s) => s.copy(dexRestApi = x)),
             opt[String]("node-rest-api")
               .abbr("nra")
               .text("Waves Node REST API uri. Format: scheme://host:port (default scheme will be picked if none was specified)")
@@ -553,7 +552,7 @@ object WavesDexCli extends ScoptImplicits {
               .abbr("dra")
               .text("DEX REST API uri. Format: scheme://host:port (default scheme will be picked if none was specified)")
               .valueName("<raw-string>")
-              .action((x, s) => s.copy(dexRestApi = x.some)),
+              .action((x, s) => s.copy(dexRestApi = x)),
             opt[FiniteDuration]("timeout")
               .abbr("to")
               .text("Timeout")
@@ -717,9 +716,7 @@ object WavesDexCli extends ScoptImplicits {
 
     // noinspection ScalaStyle
     OParser.parse(parser, rawArgs, Args()).foreach { args =>
-    // We need lazy here, because createDocumentation don't require a config, thus we're trying to load a default and invalid config
-      //      lazy val settings = loadMatcherSettingsFromPath(args.configPath)
-      val (config, matcherSettings) = loadAllConfigsUnsafe(args.configPath)
+      lazy val (config, matcherSettings) = loadAllConfigsUnsafe(args.configPath)
       val argsOverrides = matcherSettings.cli.argsOverrides
       val updatedArgs = argsOverrides.updateArgs(args)
       updatedArgs.command match {

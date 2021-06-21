@@ -32,7 +32,7 @@ import com.wavesplatform.dex.fp.MapImplicits.group
 import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
-import com.wavesplatform.dex.model.Events.{OrderCancelFailed, OrderCanceledReason}
+import com.wavesplatform.dex.model.Events.{OrderAddedReason, OrderCancelFailed, OrderCanceledReason}
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.MatcherQueue.StoreValidatedCommand
 import com.wavesplatform.dex.queue.ValidatedCommand
@@ -109,8 +109,8 @@ class AddressActor(
 
       lazy val orderReserve = order.reservableBalance
       order.status match {
-        case OrderStatus.Accepted =>
-          orderDb.saveOrder(order.order).onComplete { // TODO DEX-1057
+        case OrderStatus.Accepted if event.reason == OrderAddedReason.RequestExecuted =>
+          orderDb.saveOrder(order.order).onComplete {
             case Success(_) =>
             case Failure(th) =>
               //TODO probably inconsistent state can be introduced

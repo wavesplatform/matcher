@@ -26,7 +26,7 @@ trait InformativeTestStart extends TestSuite { self: BaseContainersKit =>
   }
 
   // Single quotes to emphasize the text in IDE
-  private def print(text: String): Unit = writeGlobalLog(s"'---------- [${LocalDateTime.now(ZoneId.of("UTC"))}] $text ----------'")
+  protected def print(text: String): Unit = writeGlobalLog(s"'---------- [${LocalDateTime.now(ZoneId.of("UTC"))}] $text ----------'")
 
   private def shouldWrite(success: Boolean): Boolean =
     this match {

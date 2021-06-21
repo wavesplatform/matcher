@@ -12,15 +12,20 @@ import com.wavesplatform.dex.db.leveldb.{openDb, LevelDb}
 import com.wavesplatform.dex.db.{AccountStorage, DbKeys}
 import com.wavesplatform.dex.doc.MatcherErrorDoc
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair}
+import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
+import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.error.Implicits.ThrowableOps
+import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
+import com.wavesplatform.dex.model.OrderBookSideSnapshot
 import com.wavesplatform.dex.settings.{loadMatcherSettings, MatcherSettings}
 import com.wavesplatform.dex.tool._
 import com.wavesplatform.dex.tool.connectors.SuperConnector
 import monix.eval.Task
 import monix.execution.schedulers.SchedulerService
 import monix.execution.{ExecutionModel, Scheduler}
+import pureconfig.ConfigSource
 import scopt.{OParser, RenderingMode}
 import sttp.client3._
 
@@ -232,7 +237,6 @@ object WavesDexCli extends ScoptImplicits {
         s"""
            |Passed arguments:
            |  DEX config path : ${args.configPath}
-           |Running in background
            |""".stripMargin
       )
       result <- ConfigChecker.checkConfig(args.configPath)
@@ -249,14 +253,14 @@ object WavesDexCli extends ScoptImplicits {
         s"""
            |Passed arguments:
            |  DEX config path : ${args.configPath}
-           |Running in background
            |""".stripMargin
       )
     } yield {
       val count = withLevelDb(matcherSettings.dataDirectory)(cleanAssets)
-      println(s"Successfully removed $count assets from levelDB cache!")
+      println(s"Successfully removed $count assets from LevelDb cache!")
     }
 
+  // noinspection ScalaStyle
   def cleanAssets(levelDb: LevelDb[Id]): Long = levelDb.readWrite[Long] { rw =>
     val removed = new AtomicLong(0)
     rw.iterateOver(DbKeys.AssetPrefix) { entity =>
@@ -265,6 +269,151 @@ object WavesDexCli extends ScoptImplicits {
     }
     removed.get()
   }
+
+  // noinspection ScalaStyle
+  def inspectAsset(args: Args, matcherSettings: MatcherSettings): Unit =
+    for {
+      _ <- cli.log(
+        s"""
+           |Passed arguments:
+           |  DEX config path : ${args.configPath}
+           |  Asset id        : ${args.assetId}
+           |""".stripMargin
+      )
+      assetIdBytes <- ByteStr.decodeBase58(args.assetId).toEither
+    } yield withLevelDb(matcherSettings.dataDirectory) { db =>
+      AssetsDb.levelDb(db).get(IssuedAsset(assetIdBytes)) match {
+        case None => println("There is no such asset")
+        case Some(x) =>
+          println(
+            s"""
+               |Decimals   : ${x.decimals}
+               |Name       : ${x.name}
+               |Has script : ${x.hasScript}
+               |Is NFT     : ${x.isNft}
+               |""".stripMargin
+          )
+      }
+    }
+
+  // noinspection ScalaStyle
+  def setAsset(args: Args, matcherSettings: MatcherSettings): Unit = {
+    val name = if (args.name.isEmpty) args.assetId else args.name
+    for {
+      _ <- cli.log(
+        s"""
+           |Passed arguments:
+           |  DEX config path : ${args.configPath}
+           |  Asset id        : ${args.assetId}
+           |  Name:           : ${args.name}
+           |     Will be used : $name
+           |  Decimals        : ${args.decimals}
+           |  Has script      : ${args.hasScript}
+           |  Is NFT          : ${args.isNft}
+           |""".stripMargin
+      )
+      assetIdBytes <- ByteStr.decodeBase58(args.assetId).toEither
+    } yield withLevelDb(matcherSettings.dataDirectory) { db =>
+      val briefAssetDescription = BriefAssetDescription(
+        name = name,
+        decimals = args.decimals,
+        hasScript = args.hasScript,
+        isNft = args.isNft
+      )
+
+      println(s"Writing $briefAssetDescription...")
+      AssetsDb.levelDb(db).put(IssuedAsset(assetIdBytes), briefAssetDescription)
+    }
+  }
+
+  // noinspection ScalaStyle
+  def listAssetPairs(args: Args, matcherSettings: MatcherSettings): Unit =
+    for {
+      _ <- cli.log(
+        s"""
+           |Passed arguments:
+           |  DEX config path : ${args.configPath}
+           |""".stripMargin
+      )
+    } yield withLevelDb(matcherSettings.dataDirectory) { db =>
+      val assetPairs = AssetPairsDb.levelDb(db).all().toVector.sortBy(_.key)
+      if (assetPairs.isEmpty) println("There are no asset pairs")
+      else {
+        println(s"Found ${assetPairs.size} asset pairs:")
+        assetPairs.foreach(println)
+      }
+    }
+
+  // noinspection ScalaStyle
+  def inspectOrderBook(args: Args, matcherSettings: MatcherSettings): Unit =
+    for {
+      _ <- cli.log(
+        s"""
+           |Passed arguments:
+           |  DEX config path : ${args.configPath}
+           |  Asset pair      : ${args.assetPair}
+           |""".stripMargin
+      )
+      assetPair <- AssetPair.extractAssetPair(args.assetPair).toEither
+    } yield withLevelDb(matcherSettings.dataDirectory) { db =>
+      OrderBookSnapshotDb.levelDb(db).get(assetPair) match {
+        case None => println("There is no such book")
+        case Some((offset, snapshot)) =>
+          println(
+            s"""
+               |Offset     : $offset
+               |Last trade : ${snapshot.lastTrade}
+               |Asks:
+               |${snapshotToStr(snapshot.asks)}
+               |Bids:
+               |${snapshotToStr(snapshot.bids)}
+               |""".stripMargin
+          )
+      }
+    }
+
+  // noinspection ScalaStyle
+  def deleteOrderBook(args: Args, matcherSettings: MatcherSettings): Unit =
+    for {
+      _ <- cli.log(
+        s"""
+           |Passed arguments:
+           |  DEX config path : ${args.configPath}
+           |  Asset pair      : ${args.assetPair}
+           |""".stripMargin
+      )
+      assetPair <- AssetPair.extractAssetPair(args.assetPair).toEither
+    } yield withLevelDb(matcherSettings.dataDirectory) { db =>
+      println("Removing a snapshot...")
+      OrderBookSnapshotDb.levelDb(db).delete(assetPair)
+      println("Removing from known asset pairs...")
+      AssetPairsDb.levelDb(db).remove(assetPair)
+    }
+
+  // noinspection ScalaStyle
+  def inspectOrder(args: Args, matcherSettings: MatcherSettings): Unit =
+    for {
+      _ <- cli.log(
+        s"""
+           |Passed arguments:
+           |  DEX config path : ${args.configPath}
+           |  Order id        : ${args.orderId}
+           |""".stripMargin
+      )
+      oid <- ByteStr.decodeBase58(args.orderId).toEither
+    } yield withLevelDb(matcherSettings.dataDirectory) { db =>
+      println("Getting an order...")
+      val orderDb = OrderDb.levelDb(matcherSettings.orderDb, db)
+      val order = orderDb.get(oid)
+      println(order.fold("  not found")(_.jsonStr))
+      println("Getting an order info...")
+      val orderInfo = orderDb.getOrderInfo(oid)
+      println(orderInfo.fold("  not found")(_.toString))
+    }
+
+  private def snapshotToStr(snapshot: OrderBookSideSnapshot): String =
+    if (snapshot.isEmpty) "empty"
+    else snapshot.toVector.sortBy(_._1).map { case (price, os) => s"$price: ${os.mkString(", ")}" }.mkString("  ", "\n  ", "")
 
   def withLevelDb[T](dataDirectory: String)(f: LevelDb[Id] => T): T =
     Using(openDb(dataDirectory)) { db =>
@@ -350,7 +499,7 @@ object WavesDexCli extends ScoptImplicits {
               .abbr("dra")
               .text("DEX REST API uri. Format: scheme://host:port (default scheme will be picked if none was specified)")
               .valueName("<raw-string>")
-              .action((x, s) => s.copy(dexRestApi = x)),
+              .action((x, s) => s.copy(dexRestApi = x.some)),
             opt[String]("node-rest-api")
               .abbr("nra")
               .text("Waves Node REST API uri. Format: scheme://host:port (default scheme will be picked if none was specified)")
@@ -404,7 +553,7 @@ object WavesDexCli extends ScoptImplicits {
               .abbr("dra")
               .text("DEX REST API uri. Format: scheme://host:port (default scheme will be picked if none was specified)")
               .valueName("<raw-string>")
-              .action((x, s) => s.copy(dexRestApi = x)),
+              .action((x, s) => s.copy(dexRestApi = x.some)),
             opt[FiniteDuration]("timeout")
               .abbr("to")
               .text("Timeout")
@@ -424,7 +573,7 @@ object WavesDexCli extends ScoptImplicits {
           ),
         cmd(Command.CleanAssets.name)
           .action((_, s) => s.copy(command = Command.CleanAssets.some))
-          .text("Cleans levelDB cache with assets")
+          .text("Cleans LevelDb cache with assets")
           .children(
             opt[String]("dex-config")
               .abbr("dc")
@@ -432,6 +581,128 @@ object WavesDexCli extends ScoptImplicits {
               .valueName("<raw-string>")
               .required()
               .action((x, s) => s.copy(configPath = x))
+          ),
+        cmd(Command.InspectAsset.name)
+          .action((_, s) => s.copy(command = Command.InspectAsset.some))
+          .text("Inspect saved information about specified asset")
+          .children(
+            opt[String]("dex-config")
+              .abbr("dc")
+              .text("DEX config path")
+              .valueName("<raw-string>")
+              .required()
+              .action((x, s) => s.copy(configPath = x)),
+            opt[String]("asset-id")
+              .abbr("aid")
+              .text("An asset id")
+              .valueName("<asset-id-in-base58>")
+              .required()
+              .action((x, s) => s.copy(assetId = x))
+          ),
+        cmd(Command.SetAsset.name)
+          .action((_, s) => s.copy(command = Command.SetAsset.some))
+          .text("Writes a mock value for this asset. This could be useful when there is asset from the stale fork")
+          .children(
+            opt[String]("dex-config")
+              .abbr("dc")
+              .text("DEX config path")
+              .valueName("<raw-string>")
+              .required()
+              .action((x, s) => s.copy(configPath = x)),
+            opt[String]("asset-id")
+              .abbr("aid")
+              .text("An asset id")
+              .valueName("<asset-id-in-base58>")
+              .required()
+              .action((x, s) => s.copy(assetId = x)),
+            opt[String]("name")
+              .abbr("n")
+              .text("An asset name")
+              .valueName("<string>")
+              .optional()
+              .action((x, s) => s.copy(name = x.trim)),
+            opt[Int]("decimals")
+              .abbr("d")
+              .text("Asset decimals")
+              .valueName("<0-8>")
+              .optional()
+              .validate { x =>
+                if (x < 0 || x > 8) Left("Should be in [0; 8]")
+                else Right(())
+              }
+              .action((x, s) => s.copy(decimals = x)),
+            opt[Unit]("has-script")
+              .abbr("hs")
+              .text("This asset has a script")
+              .optional()
+              .action((x, s) => s.copy(hasScript = true)),
+            opt[Unit]("is-nft")
+              .abbr("nft")
+              .text("This asset is NFT")
+              .optional()
+              .action((x, s) => s.copy(isNft = true))
+          ),
+        cmd(Command.ListAssetPairs.name)
+          .action((_, s) => s.copy(command = Command.ListAssetPairs.some))
+          .text("List known asset pairs from LevelDb")
+          .children(
+            opt[String]("dex-config")
+              .abbr("dc")
+              .text("DEX config path")
+              .valueName("<raw-string>")
+              .required()
+              .action((x, s) => s.copy(configPath = x))
+          ),
+        cmd(Command.InspectOrderBook.name)
+          .action((_, s) => s.copy(command = Command.InspectOrderBook.some))
+          .text("Inspect an order book")
+          .children(
+            opt[String]("dex-config")
+              .abbr("dc")
+              .text("DEX config path")
+              .valueName("<raw-string>")
+              .required()
+              .action((x, s) => s.copy(configPath = x)),
+            opt[String]("asset-pair")
+              .abbr("ap")
+              .text("An asset pair of order book")
+              .valueName("<amount-asset-id-in-base58>-<price-asset-id-in-base58>")
+              .required()
+              .action((x, s) => s.copy(assetPair = x))
+          ),
+        cmd(Command.DeleteOrderBook.name)
+          .action((_, s) => s.copy(command = Command.DeleteOrderBook.some))
+          .text("Deletes an order book")
+          .children(
+            opt[String]("dex-config")
+              .abbr("dc")
+              .text("DEX config path")
+              .valueName("<raw-string>")
+              .required()
+              .action((x, s) => s.copy(configPath = x)),
+            opt[String]("asset-pair")
+              .abbr("ap")
+              .text("An asset pair of order book")
+              .valueName("<amount-asset-id-in-base58>-<price-asset-id-in-base58>")
+              .required()
+              .action((x, s) => s.copy(assetPair = x))
+          ),
+        cmd(Command.InspectOrder.name)
+          .action((_, s) => s.copy(command = Command.InspectOrder.some))
+          .text("Inspect an order")
+          .children(
+            opt[String]("dex-config")
+              .abbr("dc")
+              .text("DEX config path")
+              .valueName("<raw-string>")
+              .required()
+              .action((x, s) => s.copy(configPath = x)),
+            opt[String]("order-id")
+              .abbr("oid")
+              .text("An order id")
+              .valueName("<order-id-in-base58>")
+              .required()
+              .action((x, s) => s.copy(orderId = x))
           )
       )
     }
@@ -446,6 +717,8 @@ object WavesDexCli extends ScoptImplicits {
 
     // noinspection ScalaStyle
     OParser.parse(parser, rawArgs, Args()).foreach { args =>
+    // We need lazy here, because createDocumentation don't require a config, thus we're trying to load a default and invalid config
+      //      lazy val settings = loadMatcherSettingsFromPath(args.configPath)
       val (config, matcherSettings) = loadAllConfigsUnsafe(args.configPath)
       val argsOverrides = matcherSettings.cli.argsOverrides
       val updatedArgs = argsOverrides.updateArgs(args)
@@ -464,6 +737,12 @@ object WavesDexCli extends ScoptImplicits {
             case Command.MakeOrderbookSnapshots => makeSnapshots(updatedArgs)
             case Command.CheckConfigFile => checkConfig(updatedArgs)
             case Command.CleanAssets => cleanAssets(updatedArgs, matcherSettings)
+            case Command.InspectAsset => inspectAsset(updatedArgs, matcherSettings)
+            case Command.SetAsset => setAsset(updatedArgs, matcherSettings)
+            case Command.ListAssetPairs => listAssetPairs(updatedArgs, matcherSettings)
+            case Command.InspectOrderBook => inspectOrderBook(updatedArgs, matcherSettings)
+            case Command.DeleteOrderBook => deleteOrderBook(updatedArgs, matcherSettings)
+            case Command.InspectOrder => inspectOrder(updatedArgs, matcherSettings)
           }
           println("Done")
       }
@@ -512,6 +791,30 @@ object WavesDexCli extends ScoptImplicits {
       override def name: String = "clean-assets"
     }
 
+    case object InspectAsset extends Command {
+      override def name: String = "inspect-asset"
+    }
+
+    case object SetAsset extends Command {
+      override def name: String = "set-asset"
+    }
+
+    case object ListAssetPairs extends Command {
+      override def name: String = "list-assetpairs"
+    }
+
+    case object InspectOrderBook extends Command {
+      override def name: String = "inspect-orderbook"
+    }
+
+    case object DeleteOrderBook extends Command {
+      override def name: String = "delete-orderbook"
+    }
+
+    case object InspectOrder extends Command {
+      override def name: String = "inspect-order"
+    }
+
   }
 
   sealed trait SeedFormat
@@ -544,6 +847,13 @@ object WavesDexCli extends ScoptImplicits {
     nodeRestApi: String = "",
     version: String = "",
     configPath: String = "",
+    assetPair: String = "",
+    assetId: String = "",
+    name: String = "",
+    decimals: Int = 8,
+    hasScript: Boolean = false,
+    isNft: Boolean = false,
+    orderId: String = "",
     authServiceRestApi: Option[String] = None,
     accountSeed: Option[String] = None,
     timeout: FiniteDuration = 30 seconds

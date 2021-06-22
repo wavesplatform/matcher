@@ -4,6 +4,7 @@ import sttp.model.StatusCode
 import com.wavesplatform.dex.api.http.entities.HttpSuccessfulPlace
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.OrderType.BUY
+import com.wavesplatform.dex.error.OrderInvalidSignature
 import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import play.api.libs.json.Json
 
@@ -21,7 +22,7 @@ class PlaceMarketOrderSpec extends PlaceOrderBaseSpec {
       validateMatcherErrorContainText(
         dex1.rawApi.placeMarket(mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd).json().deepMerge(Json.obj("amount" -> 3.waves))),
         StatusCode.BadRequest,
-        9440512,
+        OrderInvalidSignature.code,
         s"The signature of order"
       )
     }

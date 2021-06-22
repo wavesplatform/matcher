@@ -12,7 +12,7 @@ import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.model.Denormalization
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
-import com.wavesplatform.dex.error.SubscriptionsLimitReached
+import com.wavesplatform.dex.error.{AddressAndPublicKeyAreIncompatible, SubscriptionTokenExpired, SubscriptionsLimitReached}
 import com.wavesplatform.dex.it.test.Scripts
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.model.{LimitOrder, MarketOrder, OrderStatus}
@@ -65,7 +65,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
       errors.head should matchTo(
         WsError(
           timestamp = 0L, // ignored
-          code = 106957828, // AddressAndPublicKeyAreIncompatible
+          code = AddressAndPublicKeyAreIncompatible.code,
           message = "Address 3Q6LEwEVJVAomd4BjjjSPydZuNN4vDo3fSs and public key 54gGdY9o2vFgzkSMLXQ7iReTJMPo2XiGdaBQSsG5U3un are incompatible"
         )
       )
@@ -577,7 +577,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
     wsc.receiveAtLeastN[WsError](1).head should matchTo(
       WsError(
         0, // ignored
-        110105088, // SubscriptionTokenExpired
+        SubscriptionTokenExpired.code,
         s"The subscription token for address ${acc.toAddress} expired"
       )
     )

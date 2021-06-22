@@ -11,7 +11,7 @@ import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.OrderType._
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.error.OrderNotFound
+import com.wavesplatform.dex.error.{AssetNotFound, BalanceNotEnough, OrderNotFound, PriceLastDecimalsMustBeZero, UserPublicKeyIsNotValid}
 import com.wavesplatform.dex.it.api.responses.dex._
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.model.{AcceptedOrderType, OrderStatus}
@@ -177,7 +177,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       "submitting sell orders should check availability of asset" in {
         // Bob trying to place order on more assets than he has - order rejected
         val badOrder = mkOrder(bob, aliceWavesPair, SELL, 300, 1900.waves)
-        dex1.tryApi.place(badOrder) should failWith(3147270) // BalanceNotEnough
+        dex1.tryApi.place(badOrder) should failWith(BalanceNotEnough.code)
 
         // Bob places order on available amount of assets - order accepted
         val order3 = mkOrder(bob, aliceWavesPair, SELL, 150, 1900.waves)
@@ -270,9 +270,9 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
       "request order book for blacklisted pair" in {
         dex1.tryApi.getOrderBook(AssetPair(ForbiddenAsset, Waves)) should failWith(
-          11534345,
+          AssetNotFound.code,
           MatcherError.Params(assetId = Some(ForbiddenAsset.toString))
-        ) // AssetNotFound
+        )
       }
 
       // TODO DEX-992 this is not about UTX Pool, because waitForOrderAtNode waits for a transaction to be mined
@@ -292,7 +292,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
         waitForOrderAtNode(order7)
         // Bob tries to do the same operation, but at now he have no assets
-        dex1.tryApi.place(mkBobOrder) should failWith(3147270) // BalanceNotEnough
+        dex1.tryApi.place(mkBobOrder) should failWith(BalanceNotEnough.code)
       }
     }
   }
@@ -321,8 +321,8 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         val o1 = mkOrder(alice, pair, SELL, amount, minInvalid)
         val o2 = mkOrder(alice, pair, SELL, amount, maxInvalid)
 
-        dex1.tryApi.place(o1) should failWith(9441284, MatcherError.Params(insignificantDecimals = Some(6))) // PriceLastDecimalsMustBeZero
-        dex1.tryApi.place(o2) should failWith(9441284, MatcherError.Params(insignificantDecimals = Some(6))) // PriceLastDecimalsMustBeZero
+        dex1.tryApi.place(o1) should failWith(PriceLastDecimalsMustBeZero.code, MatcherError.Params(insignificantDecimals = Some(6)))
+        dex1.tryApi.place(o2) should failWith(PriceLastDecimalsMustBeZero.code, MatcherError.Params(insignificantDecimals = Some(6)))
       }
     }
 
@@ -376,7 +376,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
       "/matcher/balance/reserved/{publicKey}" in {
         dex1.tryApi.getReservedBalanceWithApiKey(alice, Some(bob.publicKey)) should failWith(
-          3148801,
+          UserPublicKeyIsNotValid.code,
           "Provided public key is not correct, reason: invalid public key"
         )
         dex1.tryApi.getReservedBalanceWithApiKey(alice, Some(alice.publicKey)) shouldBe Symbol("right")
@@ -394,7 +394,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         Seq(o1, o2).foreach(dex1.api.place)
 
         dex1.tryApi.cancelOrdersByIdsWithKey(bob, orderIds, Some(alice.publicKey)) should failWith(
-          3148801,
+          UserPublicKeyIsNotValid.code,
           "Provided public key is not correct, reason: invalid public key"
         )
         dex1.tryApi.cancelOrdersByIdsWithKey(bob, orderIds, Some(bob.publicKey)) shouldBe Symbol("right")
@@ -404,7 +404,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         dex1.tryApi.orderHistoryByAddressWithKey(
           owner = bob,
           xUserPublicKey = Some(alice.publicKey)
-        ) should failWith(3148801, "Provided public key is not correct, reason: invalid public key")
+        ) should failWith(UserPublicKeyIsNotValid.code, "Provided public key is not correct, reason: invalid public key")
 
         dex1.tryApi.orderHistoryByAddressWithKey(
           owner = bob,
@@ -426,7 +426,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
           owner = bob,
           orderId = order.id(),
           xUserPublicKey = Some(alice.publicKey)
-        ) should failWith(3148801, "Provided public key is not correct, reason: invalid public key")
+        ) should failWith(UserPublicKeyIsNotValid.code, "Provided public key is not correct, reason: invalid public key")
 
         dex1.tryApi.getOrderStatusByAddressAndIdWithKey(
           owner = bob,

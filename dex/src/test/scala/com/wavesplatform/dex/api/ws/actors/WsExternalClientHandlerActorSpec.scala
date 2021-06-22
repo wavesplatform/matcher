@@ -20,7 +20,7 @@ import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
-import com.wavesplatform.dex.error.SubscriptionsLimitReached
+import com.wavesplatform.dex.error.{AddressAndPublicKeyAreIncompatible, InvalidJwtPayloadSignature, JwtBroken, JwtCommonError, JwtPayloadBroken, OrderAssetPairReversed, RequestArgumentInvalid, SubscriptionAuthTypeUnsupported, SubscriptionTokenExpired, SubscriptionsLimitReached, TokenNetworkUnexpected}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.AssetPairBuilder
 import com.wavesplatform.dex.settings.SubscriptionsSettings
@@ -62,7 +62,7 @@ class WsExternalClientHandlerActorSpec extends AnyFreeSpecLike with Matchers wit
           WsOrderBookSubscribe(invalidAssetPair, 1),
           WsError(
             timestamp = 0L, // ignored
-            code = 9440771, // OrderAssetPairReversed
+            code = OrderAssetPairReversed.code,
             message = "The WAVES-T9euE6z4DWHFWxT asset pair should be reversed"
           )
         )
@@ -72,7 +72,7 @@ class WsExternalClientHandlerActorSpec extends AnyFreeSpecLike with Matchers wit
         WsOrderBookSubscribe(assetPair, -1),
         WsError(
           timestamp = 0L, // ignored
-          code = 1048576, // RequestArgumentInvalid
+          code = RequestArgumentInvalid.code,
           message = "The request argument 'depth' is invalid"
         )
       )
@@ -105,7 +105,7 @@ class WsExternalClientHandlerActorSpec extends AnyFreeSpecLike with Matchers wit
           WsAddressSubscribe(clientKeyPair, "password", ""),
           WsError(
             timestamp = 0L, // ignored
-            code = 106960131, // SubscriptionAuthTypeUnsupported
+            code = SubscriptionAuthTypeUnsupported.code,
             message = "The subscription authentication type 'password' is not supported. Required one of: jwt"
           )
         )
@@ -114,7 +114,7 @@ class WsExternalClientHandlerActorSpec extends AnyFreeSpecLike with Matchers wit
           "dGVzdA==",
           WsError(
             timestamp = 0L, // ignored
-            code = 110100481, // JwtBroken
+            code = JwtBroken.code,
             message = "JWT has invalid format"
           )
         )
@@ -123,7 +123,7 @@ class WsExternalClientHandlerActorSpec extends AnyFreeSpecLike with Matchers wit
           mkJwt(mkJwtSignedPayload(clientKeyPair, lifetime = -1.minute)),
           WsError(
             timestamp = 0L, // ignored
-            code = 110105088, // SubscriptionTokenExpired
+            code = SubscriptionTokenExpired.code,
             message = s"The subscription token for address ${clientKeyPair.toAddress} expired"
           )
         )
@@ -132,7 +132,7 @@ class WsExternalClientHandlerActorSpec extends AnyFreeSpecLike with Matchers wit
           "dGVzdA==.dGVzdA==",
           WsError(
             timestamp = 0L, // ignored
-            code = 110100480, // JwtCommonError
+            code = JwtCommonError.code,
             message =
               "JWT parsing and validation failed: Unrecognized token 'test': was expecting (JSON String, Number, Array, Object or token 'null', 'true' or 'false')  at [Source: (String)\"test\"; line: 1, column: 9]"
           )
@@ -144,7 +144,7 @@ class WsExternalClientHandlerActorSpec extends AnyFreeSpecLike with Matchers wit
             mkJwt(jwtPayload),
             WsError(
               timestamp = 0L, // ignored
-              code = 110127617, // JwtPayloadBroken
+              code = JwtPayloadBroken.code,
               message = "JWT payload has not expected fields"
             )
           )
@@ -154,7 +154,7 @@ class WsExternalClientHandlerActorSpec extends AnyFreeSpecLike with Matchers wit
           mkJwt(mkJwtSignedPayload(clientKeyPair, networkByte = 0)),
           WsError(
             timestamp = 0L, // ignored
-            code = 110106116, // TokenNetworkUnexpected
+            code = TokenNetworkUnexpected.code,
             message = "The required network is 84, but given 0"
           )
         )
@@ -163,7 +163,7 @@ class WsExternalClientHandlerActorSpec extends AnyFreeSpecLike with Matchers wit
           mkJwt(mkJwtNotSignedPayload(clientKeyPair)),
           WsError(
             timestamp = 0L, // ignored
-            code = 110103809, // InvalidJwtPayloadSignature
+            code = InvalidJwtPayloadSignature.code,
             message = "The token payload signature is invalid"
           )
         )
@@ -172,7 +172,7 @@ class WsExternalClientHandlerActorSpec extends AnyFreeSpecLike with Matchers wit
           WsAddressSubscribe(KeyPair(ByteStr("other-client".getBytes(StandardCharsets.UTF_8))), "jwt", mkJwt(mkJwtSignedPayload(clientKeyPair))),
           WsError(
             timestamp = 0L, // ignored
-            code = 106957828, // AddressAndPublicKeyAreIncompatible
+            code = AddressAndPublicKeyAreIncompatible.code,
             message = "Address 3N7nTwcKubzsH6X1uWerLoYFGX1pTKSbhUu and public key D6HmGZqpXCyAqpz8mCAfWijYDWsPKncKe5v3jq1nTpf5 are incompatible"
           )
         )
@@ -184,7 +184,7 @@ class WsExternalClientHandlerActorSpec extends AnyFreeSpecLike with Matchers wit
         t.wsHandlerRef ! ProcessClientMessage(WsAddressSubscribe(clientKeyPair, WsAddressSubscribe.defaultAuthType, mkJwt(jwtPayload)))
         val error = t.clientProbe.expectMessageType[WsError]
 
-        error.code shouldBe 110105088 // SubscriptionTokenExpired
+        error.code shouldBe SubscriptionTokenExpired.code
         error.message shouldBe s"The subscription token for address ${clientKeyPair.toAddress} expired"
       }
 

@@ -43,6 +43,7 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV2
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.effect._
+import com.wavesplatform.dex.error.{AddressIsBlacklisted, CanNotPersistEvent, InvalidAddress, InvalidJson, OrderDuplicate, OrderNotFound, RequestInvalidSignature, UnsupportedContentType, UserPublicKeyIsNotValid}
 import com.wavesplatform.dex.gen.issuedAssetIdGen
 import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedStream
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
@@ -338,7 +339,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         status shouldEqual StatusCodes.BadRequest
         responseAs[HttpError] should matchTo(
           HttpError(
-            error = 1048579,
+            error = UnsupportedContentType.code,
             message = "The provided Content-Type is not supported, please provide JSON",
             template = "The provided Content-Type is not supported, please provide JSON",
             status = "InvalidJsonResponse"
@@ -359,7 +360,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         status shouldEqual StatusCodes.BadRequest
         responseAs[HttpError] should matchTo(
           HttpError(
-            error = 3148040,
+            error = OrderDuplicate.code,
             message = s"The order ${badOrder.idStr()} has already been placed",
             template = "The order {{id}} has already been placed",
             params = Json.obj("id" -> badOrder.idStr()),
@@ -384,7 +385,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         status shouldEqual StatusCodes.BadRequest
         responseAs[HttpError] should matchTo(
           HttpError(
-            error = 3148040,
+            error = OrderDuplicate.code,
             message = s"The order ${badOrder.idStr()} has already been placed",
             template = "The order {{id}} has already been placed",
             params = Json.obj("id" -> badOrder.idStr()),
@@ -468,7 +469,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         status shouldEqual StatusCodes.BadRequest
         responseAs[HttpError] should matchTo(
           HttpError(
-            error = 4194304,
+            error = InvalidAddress.code,
             message = s"Provided address in not correct, reason: Data from other network: expected: $currentNetwork, actual: $otherNetwork",
             template = "Provided address in not correct, reason: {{reason}}",
             params = Json.obj("reason" -> s"Data from other network: expected: $currentNetwork, actual: $otherNetwork"),
@@ -514,7 +515,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
           status shouldBe StatusCodes.BadRequest
           responseAs[HttpError] should matchTo(
             HttpError(
-              error = 1051904,
+              error = RequestInvalidSignature.code,
               message = "The request has an invalid signature",
               template = "The request has an invalid signature",
               status = "InvalidSignature"
@@ -527,7 +528,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         mkGet(route)(";;", ts, Base58.encode(signature)) ~> check {
           responseAs[HttpError] should matchTo(
             HttpError(
-              error = 3148801,
+              error = UserPublicKeyIsNotValid.code,
               message =
                 "Provided public key is not correct, reason: Unable to decode base58: requirement failed: Wrong char ';' in Base58 string ';;'",
               template = "Provided public key is not correct, reason: {{reason}}",
@@ -653,7 +654,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
           status shouldEqual StatusCodes.BadRequest
           responseAs[HttpError] should matchTo(
             HttpError(
-              error = 9437193,
+              error = OrderNotFound.code,
               message = s"The order ${badOrder.id()} not found",
               template = "The order {{id}} not found",
               params = Json.obj("id" -> badOrder.id()),
@@ -685,7 +686,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
                 Right(HttpSuccessfulSingleCancel(orderId = okOrder.id())),
                 Left(
                   HttpError(
-                    error = 25601,
+                    error = CanNotPersistEvent.code,
                     message = "Can not persist command, please retry later or contact with the administrator",
                     template = "Can not persist command, please retry later or contact with the administrator",
                     status = "OrderCancelRejected"
@@ -713,7 +714,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
           status shouldEqual StatusCodes.ServiceUnavailable
           responseAs[HttpError] should matchTo(
             HttpError(
-              error = 3145733,
+              error = AddressIsBlacklisted.code,
               message = s"The account ${badOrder.sender.toAddress} is blacklisted",
               template = "The account {{address}} is blacklisted",
               params = Json.obj("address" -> badOrder.sender.toAddress),
@@ -744,7 +745,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
               Right(HttpSuccessfulSingleCancel(orderId = okOrder.id())),
               Left(
                 HttpError(
-                  error = 25601,
+                  error = CanNotPersistEvent.code,
                   message = "Can not persist command, please retry later or contact with the administrator",
                   template = "Can not persist command, please retry later or contact with the administrator",
                   status = "OrderCancelRejected"
@@ -892,7 +893,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
             status shouldEqual StatusCodes.BadRequest
             responseAs[HttpError] should matchTo(
               HttpError(
-                error = 9437193,
+                error = OrderNotFound.code,
                 message = s"The order ${badOrder.id()} not found",
                 template = "The order {{id}} not found",
                 params = Json.obj("id" -> badOrder.id()),
@@ -1089,7 +1090,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         status shouldEqual StatusCodes.BadRequest
         responseAs[HttpError] should matchTo(
           HttpError(
-            error = 1048577,
+            error = InvalidJson.code,
             message = "The provided JSON contains invalid fields: /amount. Check the documentation",
             template = "The provided JSON contains invalid fields: {{invalidFields}}. Check the documentation",
             params = Json.obj("invalidFields" -> JsArray(Seq(JsString("/amount")))),
@@ -1105,7 +1106,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         status shouldEqual StatusCodes.BadRequest
         responseAs[HttpError] should matchTo(
           HttpError(
-            error = 1048577,
+            error = InvalidJson.code,
             message = "The provided JSON is invalid. Check the documentation",
             template = "The provided JSON is invalid. Check the documentation",
             params = None,

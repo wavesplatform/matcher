@@ -4,6 +4,7 @@ import sttp.model.StatusCode
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpRates
 import com.wavesplatform.dex.domain.asset.Asset.Waves
+import com.wavesplatform.dex.error.{AssetNotFound, InvalidAsset, InvalidAssetRate, WavesImmutableRate}
 import com.wavesplatform.dex.it.docker.apiKey
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.matcher.api.http.ApiKeyHeaderChecks
@@ -43,13 +44,13 @@ class UpsertAssetRateSpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
       validateMatcherError(
         dex1.rawApi.upsertAssetRate(btc, -1),
         StatusCode.BadRequest,
-        20971535,
+        InvalidAssetRate.code,
         "Asset rate should be positive and should fit into double"
       )
       validateMatcherError(
         dex1.rawApi.upsertAssetRate(btc, 0),
         StatusCode.BadRequest,
-        20971535,
+        InvalidAssetRate.code,
         "Asset rate should be positive and should fit into double"
       )
     }
@@ -58,7 +59,7 @@ class UpsertAssetRateSpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
       validateMatcherError(
         dex1.rawApi.upsertAssetRate(btc, "2.79769311348623157E308"),
         StatusCode.BadRequest,
-        20971535,
+        InvalidAssetRate.code,
         "Asset rate should be positive and should fit into double"
       )
     }
@@ -67,20 +68,25 @@ class UpsertAssetRateSpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
       validateMatcherError(
         dex1.rawApi.upsertAssetRate("AAA", 0.5, Map("X-API-Key" -> apiKey)),
         StatusCode.NotFound,
-        11534345,
+        AssetNotFound.code,
         "The asset AAA not found"
       )
     }
 
     "should return an error when user try to update Waves rate" in {
-      validateMatcherError(dex1.rawApi.upsertAssetRate(Waves, 0.5), StatusCode.BadRequest, 20971531, "The rate for WAVES cannot be changed")
+      validateMatcherError(
+        dex1.rawApi.upsertAssetRate(Waves, 0.5),
+        StatusCode.BadRequest,
+        WavesImmutableRate.code,
+        "The rate for WAVES cannot be changed"
+      )
     }
 
     "should return error exception when the amount asset is not correct base58 string" in {
       validateMatcherError(
         dex1.rawApi.upsertAssetRate("null", 0.1, Map("X-API-Key" -> apiKey)),
         StatusCode.BadRequest,
-        11534337,
+        InvalidAsset.code,
         "The asset 'null' is wrong, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )
     }

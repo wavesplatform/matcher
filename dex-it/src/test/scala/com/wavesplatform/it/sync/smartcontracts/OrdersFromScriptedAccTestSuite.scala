@@ -8,6 +8,7 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.feature.BlockchainFeatures
 import com.wavesplatform.dex.domain.order.OrderType.BUY
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.error.{AccountFeatureUnsupported, AccountScriptDeniedOrder, AccountScriptReturnedError, OrderVersionUnsupported}
 import com.wavesplatform.dex.it.api.responses.node.ActivationStatusResponse.FeatureStatus.BlockchainStatus
 import com.wavesplatform.dex.it.test.Scripts
 import com.wavesplatform.it.MatcherSuiteBase
@@ -49,11 +50,11 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
     "trading is deprecated" in /* DEX-1121 */ {
       dex1.tryApi.place(
         mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 1)
-      ) should failWith(2097923, "An account's feature isn't yet supported") // AccountFeatureUnsupported
+      ) should failWith(AccountFeatureUnsupported.code, "An account's feature isn't yet supported")
     }
 
     "can't place an OrderV2 before the activation" in {
-      dex1.tryApi.place(orderV2) should failWith(2099459, "The order of version 2 isn't yet supported") // OrderVersionUnsupported
+      dex1.tryApi.place(orderV2) should failWith(OrderVersionUnsupported.code, "The order of version 2 isn't yet supported")
     }
 
     "invalid setScript at account" in {
@@ -63,7 +64,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
       // true && (height > 0)
       updateBobScript("AgMGCQAAZgAAAAIFAAAABmhlaWdodAAAAAAAAAAAAAeEODpj")
       Thread.sleep(3000) // TODO Sometimes fail without this awaiting, probably issue in the cache
-      dex1.tryApi.place(orderV2) should failWith(3147520, "An access to the blockchain.height is denied on DEX") // AccountScriptReturnedError
+      dex1.tryApi.place(orderV2) should failWith(AccountScriptReturnedError.code, "An access to the blockchain.height is denied on DEX")
     }
 
     "scripted account can trade once SmartAccountTrading is activated" in {
@@ -113,7 +114,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
       }
 
       "reject incorrect order" in {
-        dex1.tryApi.place(orderV2) should failWith(3147522) // AccountScriptDeniedOrder
+        dex1.tryApi.place(orderV2) should failWith(AccountScriptDeniedOrder.code)
       }
     }
 

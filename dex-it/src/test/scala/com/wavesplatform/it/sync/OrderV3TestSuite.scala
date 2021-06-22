@@ -3,6 +3,7 @@ package com.wavesplatform.it.sync
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.order.OrderType
+import com.wavesplatform.dex.error.OrderVersionDenied
 import com.wavesplatform.it.MatcherSuiteBase
 
 class OrderV3TestSuite extends MatcherSuiteBase {
@@ -20,7 +21,7 @@ class OrderV3TestSuite extends MatcherSuiteBase {
 
     "try to place not allowed orderV3" in {
       val orderV3 = mkOrder(alice, wavesUsdPair, OrderType.BUY, 3, price, version = 3)
-      dex1.tryApi.place(orderV3) should failWith(9439746, "The orders of version 3 are denied by matcher") // OrderVersionDenied
+      dex1.tryApi.place(orderV3) should failWith(OrderVersionDenied.code, "The orders of version 3 are denied by matcher")
     }
 
     "matching orderV1 and orderV3" in {

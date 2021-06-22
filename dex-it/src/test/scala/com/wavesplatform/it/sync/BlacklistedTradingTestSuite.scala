@@ -8,6 +8,7 @@ import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.OrderType._
+import com.wavesplatform.dex.error.{AddressIsBlacklisted, AmountAssetBlacklisted, PriceAssetBlacklisted}
 import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import com.wavesplatform.it.MatcherSuiteBase
 import org.scalatest._
@@ -106,7 +107,7 @@ class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
   }
 
   private def testOrderPlacementDenied(order: Order, address: Address): Unit =
-    dex1.tryApi.place(order) should failWith(3145733, MatcherError.Params(address = Some(address.stringRepr)))
+    dex1.tryApi.place(order) should failWith(AddressIsBlacklisted.code, MatcherError.Params(address = Some(address.stringRepr)))
 
   private def testOrderPlacementDenied(order: Order, blacklistedAsset: Asset): Unit =
     failedDueAssetBlacklist(dex1.tryApi.place(order), order.assetPair, blacklistedAsset)
@@ -121,8 +122,8 @@ class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
     r should failWith(expectedErrorCode(assetPair, blacklistedAsset), MatcherError.Params(assetId = Some(blacklistedAsset.toString)))
 
   private def expectedErrorCode(assetPair: AssetPair, blacklistedAsset: Asset): Int =
-    if (blacklistedAsset == assetPair.amountAsset) 11538181 // AmountAssetBlacklisted
-    else 11538437 // PriceAssetBlacklisted
+    if (blacklistedAsset == assetPair.amountAsset) AmountAssetBlacklisted.code
+    else PriceAssetBlacklisted.code
 
   private def configWithBlacklisted(
     assets: Array[Asset] = Array.empty,

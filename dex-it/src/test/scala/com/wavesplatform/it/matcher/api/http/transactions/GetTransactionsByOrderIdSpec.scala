@@ -3,6 +3,7 @@ package com.wavesplatform.it.matcher.api.http.transactions
 import sttp.model.StatusCode
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
+import com.wavesplatform.dex.error.InvalidBase58String
 import com.wavesplatform.dex.it.api.RawHttpChecks
 import com.wavesplatform.it.MatcherSuiteBase
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -66,7 +67,7 @@ class GetTransactionsByOrderIdSpec extends MatcherSuiteBase with TableDrivenProp
       validateMatcherError(
         dex1.rawApi.getTransactionsByOrderId("null"),
         StatusCode.BadRequest,
-        9437185,
+        InvalidBase58String.code,
         "Provided value is not a correct base58 string, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )
     }

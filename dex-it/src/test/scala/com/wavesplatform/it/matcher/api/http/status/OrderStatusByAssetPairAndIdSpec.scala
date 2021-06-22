@@ -4,6 +4,7 @@ import sttp.model.StatusCode
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
+import com.wavesplatform.dex.error.{AssetNotFound, InvalidAsset}
 import com.wavesplatform.dex.it.api.RawHttpChecks
 import com.wavesplatform.it.MatcherSuiteBase
 import im.mak.waves.transactions.IssueTransaction
@@ -62,7 +63,7 @@ class OrderStatusByAssetPairAndIdSpec extends MatcherSuiteBase with TableDrivenP
       validateMatcherError(
         dex1.rawApi.getOrderStatusByAssetPairAndId("null", UsdId.toString, order.idStr()),
         StatusCode.BadRequest,
-        11534337,
+        InvalidAsset.code,
         "The asset 'null' is wrong, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )
     }
@@ -71,7 +72,7 @@ class OrderStatusByAssetPairAndIdSpec extends MatcherSuiteBase with TableDrivenP
       validateMatcherError(
         dex1.rawApi.getOrderStatusByAssetPairAndId("WAVES", "null", order.idStr()),
         StatusCode.BadRequest,
-        11534337,
+        InvalidAsset.code,
         "The asset 'null' is wrong, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )
     }
@@ -82,7 +83,7 @@ class OrderStatusByAssetPairAndIdSpec extends MatcherSuiteBase with TableDrivenP
       validateMatcherError(
         dex1.rawApi.getOrderStatusByAssetPairAndId(incorrectAsset, "WAVES", order.idStr()),
         StatusCode.NotFound,
-        11534345,
+        AssetNotFound.code,
         s"The asset $incorrectAsset not found"
       )
     }

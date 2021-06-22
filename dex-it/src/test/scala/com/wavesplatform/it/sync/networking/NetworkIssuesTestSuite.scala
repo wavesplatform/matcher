@@ -8,6 +8,7 @@ import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.SELL
 import com.wavesplatform.dex.effect.Implicits.FutureCompanionOps
+import com.wavesplatform.dex.error.BalanceNotEnough
 import com.wavesplatform.dex.it.api.HasToxiProxy
 import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import com.wavesplatform.dex.it.docker.WavesNodeContainer
@@ -91,7 +92,7 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
       val o = mkOrder(acc, wavesUsdPair, SELL, 50.waves, 1.usd)
 
       dex1.tryApi.place(o) match {
-        case Left(MatcherError(x, _, _, _)) => x shouldBe 3147270
+        case Left(MatcherError(x, _, _, _)) => x shouldBe BalanceNotEnough.code
         case _ => dex1.api.waitForOrderStatus(o, Status.Cancelled)
       }
     }
@@ -109,7 +110,7 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
       val o = mkOrder(acc, wavesUsdPair, SELL, 50.waves, 1.usd)
 
       dex1.tryApi.place(o) match {
-        case Left(MatcherError(x, _, _, _)) => x shouldBe 3147270
+        case Left(MatcherError(x, _, _, _)) => x shouldBe BalanceNotEnough.code
         case _ => dex1.api.waitForOrderStatus(o, Status.Cancelled)
       }
     }

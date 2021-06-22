@@ -6,6 +6,7 @@ import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.model.Denormalization._
 import com.wavesplatform.dex.domain.model.Normalization._
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
+import com.wavesplatform.dex.error.FeeNotEnough
 import com.wavesplatform.it.MatcherSuiteBase
 import org.scalatest.prop.TableDrivenPropertyChecks
 
@@ -43,12 +44,12 @@ class MakerTakerFeeTestSuite extends MatcherSuiteBase with TableDrivenPropertyCh
 
     "should reject orders with insufficient fee" in {
       dex1.tryApi.place(mkOrderDP(maker, wavesUsdPair, SELL, 1.waves, 3.00, 0.00499999.waves)) should failWith(
-        9441542, // FeeNotEnough
+        FeeNotEnough.code,
         s"Required 0.005 WAVES as fee for this order, but given 0.00499999 WAVES"
       )
 
       dex1.tryApi.place(mkOrderDP(maker, wavesUsdPair, SELL, 1.waves, 3.00, 0.00002837.eth, eth)) should failWith(
-        9441542, // FeeNotEnough
+        FeeNotEnough.code,
         s"Required 0.00002838 $EthId as fee for this order, but given 0.00002837 $EthId"
       )
     }

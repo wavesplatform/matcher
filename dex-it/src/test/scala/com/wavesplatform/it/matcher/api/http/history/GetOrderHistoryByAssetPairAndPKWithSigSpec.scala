@@ -6,6 +6,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.order.OrderType.BUY
+import com.wavesplatform.dex.error.{InvalidAsset, UserPublicKeyIsNotValid}
 import com.wavesplatform.dex.it.api.RawHttpChecks
 import com.wavesplatform.dex.model.OrderStatus
 import com.wavesplatform.it.MatcherSuiteBase
@@ -73,7 +74,7 @@ class GetOrderHistoryByAssetPairAndPKWithSigSpec extends MatcherSuiteBase with R
       validateMatcherError(
         dex1.rawApi.getOrderHistoryByAssetPairAndPKWithSig("null", "WAVES", UsdId.toString, ts, sign),
         StatusCode.BadRequest,
-        3148801,
+        UserPublicKeyIsNotValid.code,
         "Provided public key is not correct, reason: Unable to decode base58: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )
     }
@@ -85,7 +86,7 @@ class GetOrderHistoryByAssetPairAndPKWithSigSpec extends MatcherSuiteBase with R
       validateMatcherError(
         dex1.rawApi.getOrderHistoryByAssetPairAndPKWithSig(Base58.encode(alice.publicKey), "WAVES", "null", ts, sign),
         StatusCode.BadRequest,
-        11534337,
+        InvalidAsset.code,
         s"The asset 'null' is wrong, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )
     }
@@ -97,7 +98,7 @@ class GetOrderHistoryByAssetPairAndPKWithSigSpec extends MatcherSuiteBase with R
       validateMatcherError(
         dex1.rawApi.getOrderHistoryByAssetPairAndPKWithSig(Base58.encode(alice.publicKey), "WAVES", "null", ts, sign),
         StatusCode.BadRequest,
-        11534337,
+        InvalidAsset.code,
         s"The asset 'null' is wrong, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )
     }

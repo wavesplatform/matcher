@@ -5,6 +5,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.order.OrderType
+import com.wavesplatform.dex.error.WavesNodeConnectionBroken
 import com.wavesplatform.dex.it.api.HasToxiProxy
 import com.wavesplatform.dex.it.api.node.NodeApi
 import com.wavesplatform.dex.it.docker.WavesNodeContainer
@@ -129,7 +130,7 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProx
     wavesNode1.disconnectFromNetwork()
 
     dex1.tryApi.place(order) should failWith(
-      105906177,
+      WavesNodeConnectionBroken.code,
       "Waves Node is unavailable, please retry later or contact with the administrator"
     )
 

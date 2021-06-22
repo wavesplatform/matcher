@@ -5,6 +5,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.account.KeyPair.toAddress
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
+import com.wavesplatform.dex.error.{InvalidAddress, InvalidBase58String, OrderNotFound, UserPublicKeyIsNotValid}
 import com.wavesplatform.dex.it.docker.apiKey
 import com.wavesplatform.dex.model.OrderStatus
 import com.wavesplatform.it.MatcherSuiteBase
@@ -88,7 +89,7 @@ class GetOrderStatusByAddressAndIdWithKeySpec extends MatcherSuiteBase with ApiK
       validateMatcherError(
         dex1.rawApi.getOrderStatusByAddressAndIdWithKey(alice, order.id(), Some(bob.publicKey)),
         StatusCode.Forbidden,
-        3148801,
+        UserPublicKeyIsNotValid.code,
         "Provided public key is not correct, reason: invalid public key"
       )
     }
@@ -106,7 +107,7 @@ class GetOrderStatusByAddressAndIdWithKeySpec extends MatcherSuiteBase with ApiK
       validateMatcherError(
         dex1.rawApi.getOrderStatusByAddressAndIdWithKey(alice, order.id(), Some(alice.publicKey)),
         StatusCode.NotFound,
-        9437193,
+        OrderNotFound.code,
         s"The order ${order.idStr()} not found"
       )
     }
@@ -120,7 +121,7 @@ class GetOrderStatusByAddressAndIdWithKeySpec extends MatcherSuiteBase with ApiK
           Map("X-User-Public-Key" -> Base58.encode(alice.publicKey), "X-API-Key" -> apiKey)
         ),
         StatusCode.BadRequest,
-        4194304,
+        InvalidAddress.code,
         "Provided address in not correct, reason: Unable to decode base58: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )
     }
@@ -133,7 +134,7 @@ class GetOrderStatusByAddressAndIdWithKeySpec extends MatcherSuiteBase with ApiK
           Map("X-User-Public-Key" -> Base58.encode(alice.publicKey), "X-API-Key" -> apiKey)
         ),
         StatusCode.BadRequest,
-        9437185,
+        InvalidBase58String.code,
         "Provided value is not a correct base58 string, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )
     }

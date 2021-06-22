@@ -11,6 +11,7 @@ import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.error.OrderCanceled
 import com.wavesplatform.dex.it.api.dex.DexApi
 import com.wavesplatform.dex.it.api.websockets.HasWebSockets
 import com.wavesplatform.dex.it.docker.DexContainer
@@ -194,7 +195,7 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with
         .sequence {
           orders.map { order =>
             dex1.asyncTryApi.cancelOneOrAllInPairOrdersWithSig(owner, order).map {
-              case Left(x) if x.error != 9437194 => throw new RuntimeException(s"Unexpected error: $x") // OrderCanceled
+              case Left(x) if x.error != OrderCanceled.code => throw new RuntimeException(s"Unexpected error: $x")
               case _ => ()
             }
           }.toList

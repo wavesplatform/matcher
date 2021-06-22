@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.it.api
 
+import com.wavesplatform.dex.error.{ApiKeyIsNotValid, RequestInvalidSignature}
 import sttp.model.{Header, MediaType, StatusCode}
 import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import org.scalatest.matchers.should.Matchers
@@ -39,10 +40,10 @@ trait RawHttpChecks extends Matchers {
     r.response.code should be(StatusCode.MovedPermanently)
 
   protected def validateIncorrectSignature[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT]) =
-    validateMatcherError(r, StatusCode.BadRequest, 1051904, "The request has an invalid signature")
+    validateMatcherError(r, StatusCode.BadRequest, RequestInvalidSignature.code, "The request has an invalid signature")
 
   protected def validateAuthorizationError[ErrorT, EntityT](r: EnrichedResponse[ErrorT, EntityT]): Unit =
-    validateMatcherError(r, StatusCode.Forbidden, 106954752, "Provided API key is not correct")
+    validateMatcherError(r, StatusCode.Forbidden, ApiKeyIsNotValid.code, "Provided API key is not correct")
 
   protected def validateMatcherErrorContainText[ErrorT, EntityT](
     r: EnrichedResponse[ErrorT, EntityT],

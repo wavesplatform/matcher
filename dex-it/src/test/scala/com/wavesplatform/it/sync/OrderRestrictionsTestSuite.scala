@@ -2,6 +2,7 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.order.OrderType.BUY
+import com.wavesplatform.dex.error.{OrderInvalidAmount, OrderInvalidPrice}
 import com.wavesplatform.it.MatcherSuiteBase
 
 class OrderRestrictionsTestSuite extends MatcherSuiteBase {
@@ -50,49 +51,49 @@ class OrderRestrictionsTestSuite extends MatcherSuiteBase {
 
   "low amount" in {
     dex1.tryApi.place(mkOrder(alice, wctUsdPair, BUY, 1, 100000000, matcherFee)) should failWith(
-      9441026, // OrderInvalidAmount
+      OrderInvalidAmount.code,
       s"The order's amount 0.01 $WctId does not meet matcher's requirements: max amount = 100000000, min amount = 0.1, step amount = 0.1"
     )
   }
 
   "high amount" in {
     dex1.tryApi.place(mkOrder(alice, wctUsdPair, BUY, 98778997800000123L, 100000000, matcherFee)) should failWith(
-      9441026, // OrderInvalidAmount
+      OrderInvalidAmount.code,
       s"The order's amount 987789978000001.23 $WctId does not meet matcher's requirements: max amount = 100000000, min amount = 0.1, step amount = 0.1"
     )
   }
 
   "wrong step amount" in {
     dex1.tryApi.place(mkOrder(alice, wctUsdPair, BUY, 15, 100000000, matcherFee)) should failWith(
-      9441026, // OrderInvalidAmount
+      OrderInvalidAmount.code,
       s"The order's amount 0.15 $WctId does not meet matcher's requirements: max amount = 100000000, min amount = 0.1, step amount = 0.1"
     )
   }
 
   "low price" in {
     dex1.tryApi.place(mkOrder(alice, wctUsdPair, BUY, 100000000, 25, matcherFee)) should failWith(
-      9441282, // OrderInvalidPrice
+      OrderInvalidPrice.code,
       "The order's price 0.00000025 does not meet matcher's requirements: max price = 1000, min price = 0.0001, step price = 0.001"
     )
   }
 
   "high price" in {
     dex1.tryApi.place(mkOrder(alice, wctUsdPair, BUY, 100000000, 1000000000000L, matcherFee)) should failWith(
-      9441282, // OrderInvalidPrice
+      OrderInvalidPrice.code,
       "The order's price 10000 does not meet matcher's requirements: max price = 1000, min price = 0.0001, step price = 0.001"
     )
   }
 
   "wrong step price" in {
     dex1.tryApi.place(mkOrder(alice, wctUsdPair, BUY, 100000000, 150000, matcherFee)) should failWith(
-      9441282, // OrderInvalidPrice
+      OrderInvalidPrice.code,
       "The order's price 0.0015 does not meet matcher's requirements: max price = 1000, min price = 0.0001, step price = 0.001"
     )
   }
 
   "invalid both amount & price" in {
     dex1.tryApi.place(mkOrder(alice, wctUsdPair, BUY, 100000000000L, 150000, matcherFee)) should failWith(
-      9441026, // OrderInvalidAmount
+      OrderInvalidAmount.code,
       s"The order's amount 1000000000 $WctId does not meet matcher's requirements: max amount = 100000000, min amount = 0.1, step amount = 0.1"
     )
   }

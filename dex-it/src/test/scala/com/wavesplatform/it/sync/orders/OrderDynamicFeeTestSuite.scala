@@ -6,6 +6,7 @@ import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.api.http.entities.HttpV0LevelAgg
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.error.{BalanceNotEnough, FeeNotEnough, UnexpectedFeeAsset}
 
 // TODO refactor balances retrieving
 class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
@@ -85,7 +86,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
           feeAsset = btc
         )
       ) should failWith(
-        9441542, // FeeNotEnough
+        FeeNotEnough.code,
         s"Required 0.0000015 $BtcId as fee for this order, but given 0.000001 $BtcId"
       ) // TODO
 
@@ -102,8 +103,8 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
         )
       )
 
-      r should failWith(3147270, s"0.0000192 $EthId") // BalanceNotEnough
-      r should failWith(3147270, s"0.0005 $BtcId") // BalanceNotEnough
+      r should failWith(BalanceNotEnough.code, s"0.0000192 $EthId")
+      r should failWith(BalanceNotEnough.code, s"0.0005 $BtcId")
 
       List(btc, eth).foreach(dex1.api.deleteAssetRate)
     }
@@ -176,7 +177,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
 
     "only waves supported" in {
       dex1.tryApi.place(order) should failWith(
-        9441540, // UnexpectedFeeAsset
+        UnexpectedFeeAsset.code,
         s"Required one of the following fee asset: WAVES. But given $BtcId"
       )
     }
@@ -184,7 +185,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
     "not only waves supported" in {
       upsertAssetRate(eth -> 0.1)
       dex1.tryApi.place(order) should failWith(
-        9441540, // UnexpectedFeeAsset
+        UnexpectedFeeAsset.code,
         s"But given $BtcId"
       )
       dex1.api.deleteAssetRate(eth)
@@ -470,7 +471,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
   "fee in pairs with different decimals count" in {
     upsertAssetRate(usd -> 5d)
     dex1.tryApi.place(mkOrder(bob, wavesUsdPair, OrderType.SELL, 1.waves, 300, matcherFee = 1L, feeAsset = usd)) should failWith(
-      9441542, // FeeNotEnough
+      FeeNotEnough.code,
       s"Required 0.02 $UsdId as fee for this order, but given 0.01 $UsdId"
     )
 

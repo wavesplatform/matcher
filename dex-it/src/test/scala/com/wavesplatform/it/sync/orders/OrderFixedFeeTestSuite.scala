@@ -6,6 +6,7 @@ import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.OrderType
+import com.wavesplatform.dex.error.FeeNotEnough
 import com.wavesplatform.dex.it.test.Scripts
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 
@@ -101,14 +102,14 @@ class OrderFixedFeeTestSuite extends OrderFeeBaseTestSuite {
         dex1.tryApi.place(
           mkOrder(alice, pair, OrderType.BUY, amount, priceFixed, matcherFee = insufficientMatcherFee, feeAsset = aliceAsset)
         ) should failWith(
-          9441542, // FeeNotEnough
+          FeeNotEnough.code,
           s"Required $minMatcherFee ${aliceAsset.toString}"
         )
 
         dex1.tryApi.place(
           mkOrder(bob, pair, OrderType.SELL, amount, priceFixed, matcherFee = insufficientMatcherFee, feeAsset = aliceAsset)
         ) should failWith(
-          9441542, // FeeNotEnough
+          FeeNotEnough.code,
           s"Required $minMatcherFee ${aliceAsset.toString}"
         )
       }

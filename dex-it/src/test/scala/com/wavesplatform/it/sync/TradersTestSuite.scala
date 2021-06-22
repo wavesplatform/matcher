@@ -1,7 +1,6 @@
 package com.wavesplatform.it.sync
 
 import java.util.concurrent.ThreadLocalRandom
-
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
@@ -10,6 +9,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.model.Price
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.error.{AssetNotFound, BalanceNotEnough, OrderInvalidSignature}
 import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import com.wavesplatform.it.MatcherSuiteBase
 
@@ -64,7 +64,7 @@ class TradersTestSuite extends MatcherSuiteBase {
       trickyBobWavesPairWB58.key shouldBe AssetPair(wct, Waves).key
 
       val trickyBobOrderWB58 = mkOrder(bob, trickyBobWavesPairWB58, OrderType.BUY, 1, 10.waves * Order.PriceConstant)
-      dex1.tryApi.place(trickyBobOrderWB58) should failWith(9440512) // OrderInvalidSignature
+      dex1.tryApi.place(trickyBobOrderWB58) should failWith(OrderInvalidSignature.code)
 
       val trickyBobWavesPairWS = AssetPair(
         amountAsset = IssuedAsset(ByteStr(Asset.WavesName.getBytes)),
@@ -73,7 +73,7 @@ class TradersTestSuite extends MatcherSuiteBase {
 
       val trickyBobOrderWS = mkOrder(bob, trickyBobWavesPairWS, OrderType.BUY, 100000, 10000000)
       dex1.tryApi.place(trickyBobOrderWS) should failWith(
-        11534345, // AssetNotFound
+        AssetNotFound.code,
         MatcherError.Params(assetId = Some(trickyBobWavesPairWS.amountAssetStr))
       )
 
@@ -313,7 +313,7 @@ class TradersTestSuite extends MatcherSuiteBase {
 
       val order = mkOrderDP(bob, wavesUsdPair, SELL, 100.waves, 3.00)
       log.info(s"Trying to place ${order.idStr()} during $txId")
-      dex1.tryApi.place(order) should failWith(3147270) // BalanceNotEnough
+      dex1.tryApi.place(order) should failWith(BalanceNotEnough.code)
     }
   }
 }

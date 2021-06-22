@@ -2,6 +2,7 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.error.FeatureDisabled
 import com.wavesplatform.it.MatcherSuiteBase
 
 class DisableProducerTestSuite extends MatcherSuiteBase {
@@ -25,7 +26,7 @@ class DisableProducerTestSuite extends MatcherSuiteBase {
     }
 
     "place an order and wait some time" in {
-      def test(order: Order): Unit = dex1.tryApi.place(order) should failWith(528) // FeatureDisabled
+      def test(order: Order): Unit = dex1.tryApi.place(order) should failWith(FeatureDisabled.code)
 
       List(
         mkOrder(alice, ethWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant),

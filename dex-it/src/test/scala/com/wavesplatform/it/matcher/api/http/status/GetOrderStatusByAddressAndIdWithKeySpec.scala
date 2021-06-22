@@ -93,7 +93,7 @@ class GetOrderStatusByAddressAndIdWithKeySpec extends MatcherSuiteBase with ApiK
       )
     }
 
-    shouldReturnErrorWithoutApiKeyHeader(dex1.rawApi.getOrderStatusByAddressAndIdWithKey(alice.toAddress.stringRepr, order.idStr(), Map.empty))
+    shouldReturnErrorWithoutApiKeyHeader(dex1.rawApi.getOrderStatusByAddressAndIdWithKey(alice.stringRepr, order.idStr()))
 
     shouldReturnErrorWithIncorrectApiKeyValue(dex1.rawApi.getOrderStatusByAddressAndIdWithKey(
       alice.toAddress.stringRepr,

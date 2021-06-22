@@ -56,12 +56,12 @@ class CancelOrdersByAddressAndIdsSpec extends MatcherSuiteBase with ApiKeyHeader
     }
 
     "should return OK if there is nothing to cancel" in {
-      validate200Json(dex1.rawApi.cancelOrdersByIdsWithKey(alice.toAddress.stringRepr, Set.empty))
+      validate200Json(dex1.rawApi.cancelOrdersByIdsWithKey(alice.stringRepr, Set.empty[String]))
     }
 
     "should return an error when one of ids is not a correct base58 string" in {
       validateMatcherError(
-        dex1.rawApi.cancelOrdersByIdsWithKey(alice.toAddress.stringRepr, placeAndGetIds(3) + "null"),
+        dex1.rawApi.cancelOrdersByIdsWithKey(alice.stringRepr, placeAndGetIds(3) + "null"),
         StatusCode.BadRequest,
         1048577,
         "The provided JSON contains invalid fields: (3). Check the documentation"

@@ -11,7 +11,7 @@ import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.matcher.api.http.ApiKeyHeaderChecks
 import org.scalatest.prop.TableDrivenPropertyChecks
 
-class GetReservedBalanceSpec extends MatcherSuiteBase with TableDrivenPropertyChecks with ApiKeyHeaderChecks {
+class GetReservedBalanceByPKSpec extends MatcherSuiteBase with TableDrivenPropertyChecks with ApiKeyHeaderChecks {
 
   override protected def dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(

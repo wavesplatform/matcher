@@ -24,13 +24,13 @@ class RestOrderLimitTestSuite extends MatcherSuiteBase {
 
   private def activeOrders: List[Order.Id] = {
     val activeOrders = dex1.api.getOrderHistoryByPKWithSig(alice, activeOnly = Some(true)).map(_.id)
-    dex1.api.orderHistoryWithApiKey(alice, activeOnly = Some(true)).map(_.id) should matchTo(activeOrders)
+    dex1.api.getOrderHistoryByAddressWithKey(alice, activeOnly = Some(true)).map(_.id) should matchTo(activeOrders)
     activeOrders
   }
 
   private def allOrders: List[Order.Id] = {
     val allOrders = dex1.api.getOrderHistoryByPKWithSig(alice).map(_.id)
-    dex1.api.orderHistoryWithApiKey(alice, activeOnly = Some(false)).map(_.id) should matchTo(allOrders)
+    dex1.api.getOrderHistoryByAddressWithKey(alice, activeOnly = Some(false)).map(_.id) should matchTo(allOrders)
     allOrders
   }
 

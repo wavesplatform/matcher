@@ -294,7 +294,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
       dex1.api.getReservedBalanceWithApiKey(alice) shouldBe empty
     }
 
-    val aliceOrders = dex1.api.orderHistoryWithApiKey(alice, activeOnly = Some(false))
+    val aliceOrders = dex1.api.getOrderHistoryByAddressWithKey(alice, activeOnly = Some(false))
     aliceOrders should not be empty
 
     val order = aliceOrders

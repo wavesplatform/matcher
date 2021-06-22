@@ -115,8 +115,7 @@ class BouncingBalancesTestSuite extends WsSuiteBase {
 
         wavesNode1.api.waitForHeight(heightSecondTransfer)
         wavesNode1.api.waitForHeightArise() // See WavesFork
-        Thread.sleep(3000) // TODO We need an API to see the state on Matcher
-        dex1.api.orderStatusByAssetPairAndId(bobOrder).status shouldBe Status.Accepted
+        dex1.api.waitForOrderStatus(bobOrder, Status.Accepted)
 
         //        wsc.messages.filter {
         //          case _: WsPingOrPong => false

@@ -405,7 +405,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
           r2 shouldBe Symbol("left")
           r2.swap.explicitGet().error shouldBe 307 // node's ApiError TransactionNotAllowedByAccountScript.Id
 
-          dex1.api.orderHistoryWithApiKey(alice, activeOnly = Some(true)).length shouldBe 0
+          dex1.api.getOrderHistoryByAddressWithKey(alice, activeOnly = Some(true)).length shouldBe 0
           dex1.api.getReservedBalanceWithApiKey(bob) shouldBe empty
 
           resetAliceAccountScript()

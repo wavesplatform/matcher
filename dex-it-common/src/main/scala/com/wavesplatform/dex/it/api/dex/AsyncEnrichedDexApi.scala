@@ -307,7 +307,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
   /**
    * param @activeOnly Server treats this parameter as true if it wasn't specified
    */
-  override def orderHistoryWithApiKey(
+  override def getOrderHistoryByAddressWithKey(
     owner: Address,
     activeOnly: Option[Boolean],
     closedOnly: Option[Boolean],

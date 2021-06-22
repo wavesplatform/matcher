@@ -86,7 +86,6 @@ trait DexApi[F[_]] {
     xUserPublicKey: Option[PublicKey]
   ): F[HttpOrderBookHistoryItem]
 
-  // orderStatusByAssetPairAndId
   def getOrderStatusByPKAndIdWithSig(publicKey: String, orderId: String, timestamp: Long, signature: String): F[HttpOrderBookHistoryItem]
 
   def getOrderStatusByPKAndIdWithSig(publicKey: String, orderId: String, headers: Map[String, String]): F[HttpOrderBookHistoryItem]
@@ -147,7 +146,7 @@ trait DexApi[F[_]] {
   /**
    * param @activeOnly Server treats this parameter as true if it wasn't specified
    */
-  def orderHistoryWithApiKey(
+  def getOrderHistoryByAddressWithKey(
     owner: Address,
     activeOnly: Option[Boolean] = None,
     closedOnly: Option[Boolean] = None,

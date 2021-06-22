@@ -12,7 +12,6 @@ pipeline {
         string(name: 'SBT_THREAD_NUMBER', defaultValue: '6', description: 'Number of threads for sbt')
         string(name: 'SUITE', defaultValue: 'MatcherTestSuite', description: 'Name of class with test')
         string(name: 'RUNS', defaultValue: '10', description: 'Number of runs')
-        parameters { choice(name: 'MODULE', choices: ['dex-it', 'waves-integration-it'], description: 'Module to run test in') }
     }
     environment {
         SBT_HOME = tool name: 'sbt-1.2.6', type: 'org.jvnet.hudson.plugins.SbtPluginBuilder$SbtInstallation'

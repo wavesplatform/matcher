@@ -29,11 +29,11 @@ class UpdateRatesByAssetIdSpec extends MatcherSuiteBase with ApiKeyHeaderChecks 
     "should update rate by asset id" in {
 
       withClue(" - asset doesn't have a rate") {
-        validate201Json(dex1.rawApi.upsertRate(usd, 0.01)).message should be(s"The rate 0.01 for the asset $UsdId added")
+        validate201Json(dex1.rawApi.upsertAssetRate(usd, 0.01)).message should be(s"The rate 0.01 for the asset $UsdId added")
       }
 
       withClue(" - asset already have a rate") {
-        validate200Json(dex1.rawApi.upsertRate(usd, 0.02)).message should be(
+        validate200Json(dex1.rawApi.upsertAssetRate(usd, 0.02)).message should be(
           s"The rate for the asset $UsdId updated, old value = 0.01, new value = 0.02"
         )
       }
@@ -41,13 +41,13 @@ class UpdateRatesByAssetIdSpec extends MatcherSuiteBase with ApiKeyHeaderChecks 
 
     "should return an error for incorrect rate values" in {
       validateMatcherError(
-        dex1.rawApi.upsertRate(btc, -1),
+        dex1.rawApi.upsertAssetRate(btc, -1),
         StatusCode.BadRequest,
         20971535,
         "Asset rate should be positive and should fit into double"
       )
       validateMatcherError(
-        dex1.rawApi.upsertRate(btc, 0),
+        dex1.rawApi.upsertAssetRate(btc, 0),
         StatusCode.BadRequest,
         20971535,
         "Asset rate should be positive and should fit into double"
@@ -56,7 +56,7 @@ class UpdateRatesByAssetIdSpec extends MatcherSuiteBase with ApiKeyHeaderChecks 
 
     "should return error if the rate value more than Double.max" in {
       validateMatcherError(
-        dex1.rawApi.upsertRate(btc, "2.79769311348623157E308"),
+        dex1.rawApi.upsertAssetRate(btc, "2.79769311348623157E308"),
         StatusCode.BadRequest,
         20971535,
         "Asset rate should be positive and should fit into double"
@@ -65,7 +65,7 @@ class UpdateRatesByAssetIdSpec extends MatcherSuiteBase with ApiKeyHeaderChecks 
 
     "should return an error for unexisted asset" in {
       validateMatcherError(
-        dex1.rawApi.upsertRate("AAA", 0.5, Map("X-API-Key" -> apiKey)),
+        dex1.rawApi.upsertAssetRate("AAA", 0.5, Map("X-API-Key" -> apiKey)),
         StatusCode.NotFound,
         11534345,
         "The asset AAA not found"
@@ -73,20 +73,20 @@ class UpdateRatesByAssetIdSpec extends MatcherSuiteBase with ApiKeyHeaderChecks 
     }
 
     "should return an error when user try to update Waves rate" in {
-      validateMatcherError(dex1.rawApi.upsertRate(Waves, 0.5), StatusCode.BadRequest, 20971531, "The rate for WAVES cannot be changed")
+      validateMatcherError(dex1.rawApi.upsertAssetRate(Waves, 0.5), StatusCode.BadRequest, 20971531, "The rate for WAVES cannot be changed")
     }
 
     "should return error exception when the amount asset is not correct base58 string" in {
       validateMatcherError(
-        dex1.rawApi.upsertRate("null", 0.1, Map("X-API-Key" -> apiKey)),
+        dex1.rawApi.upsertAssetRate("null", 0.1, Map("X-API-Key" -> apiKey)),
         StatusCode.BadRequest,
         11534337,
         "The asset 'null' is wrong, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )
     }
 
-    shouldReturnErrorWithoutApiKeyHeader(dex1.rawApi.upsertRate(UsdId.toString, 0.5))
+    shouldReturnErrorWithoutApiKeyHeader(dex1.rawApi.upsertAssetRate(UsdId.toString, 0.5))
 
-    shouldReturnErrorWithIncorrectApiKeyValue(dex1.rawApi.upsertRate(UsdId.toString, 0.5, incorrectApiKeyHeader))
+    shouldReturnErrorWithIncorrectApiKeyValue(dex1.rawApi.upsertAssetRate(UsdId.toString, 0.5, incorrectApiKeyHeader))
   }
 }

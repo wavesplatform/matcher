@@ -115,14 +115,14 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
 
     dex1.start()
 
-    dex1.api.upsertRate(eth, 0.00567593)
-    dex1.api.upsertRate(btc, 0.00009855)
-    dex1.api.upsertRate(usd, 0.5)
+    dex1.api.upsertAssetRate(eth, 0.00567593)
+    dex1.api.upsertAssetRate(btc, 0.00009855)
+    dex1.api.upsertAssetRate(usd, 0.5)
   }
 
   override def afterEach(): Unit = {
     super.afterEach()
-    Seq(alice, bob).foreach(dex1.api.cancelAll(_))
+    Seq(alice, bob).foreach(dex1.api.cancelAllOrdersWithSig(_))
   }
 
   import ctx._
@@ -231,7 +231,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
     placeAndAwaitAtNode(sellOrder)
 
     // buy counter order is not executed completely, but has filled status
-    dex1.api.getOrderStatus(buyOrder) should matchTo(HttpOrderStatus(Status.Filled, 1.waves.some, 0.003.btc.some))
+    dex1.api.orderStatusByAssetPairAndId(buyOrder) should matchTo(HttpOrderStatus(Status.Filled, 1.waves.some, 0.003.btc.some))
 
     eventually {
       val buyOrderEvents = getEventsInfoByOrderId(buyOrder.id())
@@ -241,7 +241,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
 
     getEventsInfoByOrderId(sellOrder.id()).last.status shouldBe statusPartiallyFilled
 
-    Seq(alice, bob).foreach(dex1.api.cancelAll(_))
+    Seq(alice, bob).foreach(dex1.api.cancelAllOrdersWithSig(_))
     cleanTables()
   }
 
@@ -284,7 +284,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
 
       // Because we have to wait more than 30 seconds
       eventually(timeout = Timeout(90.seconds), interval = Interval(1.second)) {
-        dex1.api.getOrderStatus(order).status shouldBe Status.Cancelled
+        dex1.api.orderStatusByAssetPairAndId(order).status shouldBe Status.Cancelled
       }
 
       eventually {
@@ -625,7 +625,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
         }
       }
 
-      Seq(alice, bob).foreach(dex1.api.cancelAll(_))
+      Seq(alice, bob).foreach(dex1.api.cancelAllOrdersWithSig(_))
     }
   }
 

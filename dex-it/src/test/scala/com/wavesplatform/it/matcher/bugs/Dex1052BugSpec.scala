@@ -39,29 +39,29 @@ class Dex1052BugSpec extends MatcherSuiteBase {
 
     withClue("alice: ") {
       eventually {
-        dex1.api.getTradableBalance(alice, wavesUsdPair) should matchTo(Map[Asset, Long](
+        dex1.api.getTradableBalanceByAssetPairAndAddress(alice, wavesUsdPair) should matchTo(Map[Asset, Long](
           Waves -> (aliceWavesBalanceBefore - minFee),
           usd -> (IssueUsdTx.quantity() - transferAmount)
         ))
       }
-      dex1.api.getTradableBalance(alice, ethWavesPair).get(eth) should matchTo(IssueEthTx.quantity().some)
-      dex1.api.getTradableBalance(alice, wavesBtcPair).get(btc) should matchTo(none[Long])
+      dex1.api.getTradableBalanceByAssetPairAndAddress(alice, ethWavesPair).get(eth) should matchTo(IssueEthTx.quantity().some)
+      dex1.api.getTradableBalanceByAssetPairAndAddress(alice, wavesBtcPair).get(btc) should matchTo(none[Long])
     }
 
     withClue("bob: ") {
-      dex1.api.getTradableBalance(bob, wavesUsdPair).get(usd) should (
+      dex1.api.getTradableBalanceByAssetPairAndAddress(bob, wavesUsdPair).get(usd) should (
         matchTo(none[Long]) or // not confirmed
         matchTo(transferAmount.some) // confirmed
       )
-      dex1.api.getTradableBalance(bob, ethWavesPair).get(eth) should matchTo(none[Long])
-      dex1.api.getTradableBalance(bob, wavesBtcPair) should matchTo(Map[Asset, Long](
+      dex1.api.getTradableBalanceByAssetPairAndAddress(bob, ethWavesPair).get(eth) should matchTo(none[Long])
+      dex1.api.getTradableBalanceByAssetPairAndAddress(bob, wavesBtcPair) should matchTo(Map[Asset, Long](
         Waves -> bobWavesBalanceBefore,
         btc -> IssueBtcTx.quantity()
       ))
     }
 
     wavesNode1.api.waitForHeightArise()
-    dex1.api.getTradableBalance(bob, wavesUsdPair).get(usd) should matchTo(transferAmount.some)
+    dex1.api.getTradableBalanceByAssetPairAndAddress(bob, wavesUsdPair).get(usd) should matchTo(transferAmount.some)
   }
 
 }

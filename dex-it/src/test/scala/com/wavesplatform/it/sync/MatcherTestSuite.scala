@@ -94,8 +94,8 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
           orders.head.orderType shouldBe AcceptedOrderType.Limit
         }
 
-        validateHistory("by pair", dex1.api.getOrderHistoryByAssetPairAndPublicKey(alice, aliceWavesPair))
-        validateHistory("full", dex1.api.getOrderHistoryByPublicKey(alice))
+        validateHistory("by pair", dex1.api.getOrderHistoryByAssetPairAndPKWithSig(alice, aliceWavesPair))
+        validateHistory("full", dex1.api.getOrderHistoryByPKWithSig(alice))
         validateHistory("admin", dex1.api.orderHistoryWithApiKey(alice, activeOnly = Some(false)))
       }
 
@@ -112,17 +112,17 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       }
 
       "frozen amount should be listed via matcherBalance REST endpoint" in {
-        dex1.api.getReservedBalance(alice) shouldBe Map(Waves -> matcherFee, aliceAsset -> aliceSellAmount)
-        dex1.api.getReservedBalance(bob) should have size 0
+        dex1.api.getReservedBalanceByPK(alice) shouldBe Map(Waves -> matcherFee, aliceAsset -> aliceSellAmount)
+        dex1.api.getReservedBalanceByPK(bob) should have size 0
       }
 
       "frozen amount should be listed via matcherBalance REST endpoint with Api Key" in {
-        dex1.api.getReservedBalanceWithApiKey(alice) shouldBe Map(Waves -> matcherFee, aliceAsset -> aliceSellAmount)
-        dex1.api.getReservedBalanceWithApiKey(bob) should have size 0
+        dex1.api.getReservedBalanceByPK(alice) shouldBe Map(Waves -> matcherFee, aliceAsset -> aliceSellAmount)
+        dex1.api.getReservedBalanceByPK(bob) should have size 0
       }
 
       "and should be listed by trader's publiс key via REST" in {
-        dex1.api.getOrderHistoryByPublicKey(alice).map(_.id) should contain(order1.id())
+        dex1.api.getOrderHistoryByPKWithSig(alice).map(_.id) should contain(order1.id())
       }
 
       "and should match with buy order" in {
@@ -137,8 +137,8 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         dex1.api.waitForOrderStatus(order1, Status.PartiallyFilled)
         dex1.api.waitForOrderStatus(order2, Status.Filled)
 
-        dex1.api.getOrderHistoryByAssetPairAndPublicKey(bob, aliceWavesPair).map(_.id) should contain(order2.id())
-        dex1.api.getOrderHistoryByPublicKey(bob).map(_.id) should contain(order2.id())
+        dex1.api.getOrderHistoryByAssetPairAndPKWithSig(bob, aliceWavesPair).map(_.id) should contain(order2.id())
+        dex1.api.getOrderHistoryByPKWithSig(bob).map(_.id) should contain(order2.id())
 
         waitForOrderAtNode(order2)
         eventually {
@@ -168,9 +168,9 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       }
 
       "request activeOnly orders" in {
-        val aliceOrders = dex1.api.getOrderHistoryByPublicKey(alice, activeOnly = Some(true))
+        val aliceOrders = dex1.api.getOrderHistoryByPKWithSig(alice, activeOnly = Some(true))
         aliceOrders.map(_.id) shouldBe Seq(order1.id())
-        val bobOrders = dex1.api.getOrderHistoryByPublicKey(bob, activeOnly = Some(true))
+        val bobOrders = dex1.api.getOrderHistoryByPKWithSig(bob, activeOnly = Some(true))
         bobOrders.map(_.id) should have size 0
       }
 
@@ -350,7 +350,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
     orders.foreach(dex1.api.place)
     orders.foreach { order =>
-      val status = dex1.api.getOrderStatus(order).status
+      val status = dex1.api.orderStatusByAssetPairAndId(order).status
       withClue(order.idStr())(status should not be Status.NotFound)
     }
   }
@@ -375,11 +375,11 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
     "reject proxy requests if X-User-Public-Key doesn't match query param and process them correctly otherwise " - {
 
       "/matcher/balance/reserved/{publicKey}" in {
-        dex1.tryApi.getReservedBalanceWithApiKey(alice, Some(bob.publicKey)) should failWith(
+        dex1.tryApi.getReservedBalanceByPK(alice, Some(bob.publicKey)) should failWith(
           3148801,
           "Provided public key is not correct, reason: invalid public key"
         )
-        dex1.tryApi.getReservedBalanceWithApiKey(alice, Some(alice.publicKey)) shouldBe Symbol("right")
+        dex1.tryApi.getReservedBalanceByPK(alice, Some(alice.publicKey)) shouldBe Symbol("right")
       }
 
       "/matcher/orders/{address}/cancel" in {
@@ -393,11 +393,11 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
         Seq(o1, o2).foreach(dex1.api.place)
 
-        dex1.tryApi.cancelAllByApiKeyAndIds(bob, orderIds, Some(alice.publicKey)) should failWith(
+        dex1.tryApi.cancelOrdersByIdsWithKey(bob, orderIds, Some(alice.publicKey)) should failWith(
           3148801,
           "Provided public key is not correct, reason: invalid public key"
         )
-        dex1.tryApi.cancelAllByApiKeyAndIds(bob, orderIds, Some(bob.publicKey)) shouldBe Symbol("right")
+        dex1.tryApi.cancelOrdersByIdsWithKey(bob, orderIds, Some(bob.publicKey)) shouldBe Symbol("right")
       }
 
       "/matcher/orders/{address}" in {
@@ -422,19 +422,19 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
         placeAndAwaitAtDex(order)
 
-        dex1.tryApi.getOrderStatusInfoByIdWithApiKey(
+        dex1.tryApi.getOrderStatusByAddressAndIdWithKey(
           owner = bob,
           orderId = order.id(),
           xUserPublicKey = Some(alice.publicKey)
         ) should failWith(3148801, "Provided public key is not correct, reason: invalid public key")
 
-        dex1.tryApi.getOrderStatusInfoByIdWithApiKey(
+        dex1.tryApi.getOrderStatusByAddressAndIdWithKey(
           owner = bob,
           orderId = notPlacedOrder.id(),
           xUserPublicKey = Some(bob.publicKey)
         ) should failWith(notFoundError.code, notFoundError.message.text)
 
-        dex1.tryApi.getOrderStatusInfoByIdWithApiKey(
+        dex1.tryApi.getOrderStatusByAddressAndIdWithKey(
           owner = bob,
           orderId = order.id(),
           xUserPublicKey = Some(bob.publicKey)
@@ -458,7 +458,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
           )
         )
 
-        dex1.api.cancelAll(bob)
+        dex1.api.cancelAllOrdersWithSig(bob)
       }
     }
 
@@ -472,7 +472,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
       placeAndAwaitAtDex(order)
 
-      dex1.tryApi.getOrderStatusInfoByIdWithSignature(alice, order) shouldBe Right(
+      dex1.tryApi.getOrderStatusByPKAndIdWithSig(alice, order) shouldBe Right(
         HttpOrderBookHistoryItem(
           id = order.id(),
           `type` = SELL,
@@ -492,7 +492,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         )
       )
 
-      dex1.tryApi.getOrderStatusInfoByIdWithSignature(alice, notPlacedOrder) should failWith(notFoundError.code, notFoundError.message.text)
+      dex1.tryApi.getOrderStatusByPKAndIdWithSig(alice, notPlacedOrder) should failWith(notFoundError.code, notFoundError.message.text)
     }
 
     "correctly calculate average weighed price when submitted becomes counter" in {
@@ -505,10 +505,10 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       placeAndAwaitAtDex(sellOrder, Status.PartiallyFilled)
       placeAndAwaitAtNode(buyOrder2)
 
-      dex1.tryApi.getOrderStatusInfoByIdWithSignature(bob, sellOrder).map(_.avgWeighedPrice) shouldBe Right(9351722813L)
+      dex1.tryApi.getOrderStatusByPKAndIdWithSig(bob, sellOrder).map(_.avgWeighedPrice) shouldBe Right(9351722813L)
 
       Seq(alice, bob).foreach { owner =>
-        dex1.api.cancelAll(owner)
+        dex1.api.cancelAllOrdersWithSig(owner)
       }
     }
 
@@ -533,7 +533,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       dex1.api.getOrderBookStatus(btcUsdnPair).lastTrade should matchTo(btcUsdnPairLastTrade)
 
       Seq(bob, carol).foreach { owner =>
-        dex1.api.cancelAll(owner)
+        dex1.api.cancelAllOrdersWithSig(owner)
       }
     }
 
@@ -541,7 +541,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
       val carol = mkAccountWithBalance(10.waves -> Waves, 100.usdn -> usdn)
 
-      dex1.api.upsertRate(usdn, 3.63615)
+      dex1.api.upsertAssetRate(usdn, 3.63615)
 
       // matcherFee = baseFee * 10^(feeAssetDecimals - 8) * rate = 3 * 10^5 * 10^(6 - 8) * 3.63615 = 10908.45 = 10909 USDN cents = 0.010909 USDN
 
@@ -551,13 +551,13 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       placeAndAwaitAtDex(sellOrder)
       placeAndAwaitAtNode(buyOrder)
 
-      val sellOrderStatus = dex1.api.getOrderStatusInfoByIdWithSignature(carol, sellOrder)
-      val buyOrderStatus = dex1.api.getOrderStatusInfoByIdWithSignature(alice, buyOrder)
+      val sellOrderStatus = dex1.api.getOrderStatusByPKAndIdWithSig(carol, sellOrder)
+      val buyOrderStatus = dex1.api.getOrderStatusByPKAndIdWithSig(alice, buyOrder)
 
       Seq(sellOrderStatus, buyOrderStatus).foreach(_.totalExecutedPriceAssets shouldBe 12.2.usdn)
       sellOrderStatus.filledFee shouldBe 0.010909.usdn
 
-      dex1.api.deleteRate(usdn)
+      dex1.api.deleteAssetRate(usdn)
     }
 
     "delete order books if their asset pair became invalid" in {
@@ -581,7 +581,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       }
 
       val wavesEthPair = AssetPair(Waves, eth)
-      dex1.api.getOrderStatus(wavesEthPair, sellOrder1.id()).status shouldBe Status.Accepted
+      dex1.api.orderStatusByAssetPairAndId(wavesEthPair, sellOrder1.id()).status shouldBe Status.Accepted
 
       dex1.api.getOrderBook(wavesEthPair) should matchTo(
         HttpV0OrderBook(

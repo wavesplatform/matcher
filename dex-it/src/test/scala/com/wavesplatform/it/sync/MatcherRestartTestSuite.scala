@@ -47,7 +47,7 @@ class MatcherRestartTestSuite extends MatcherSuiteBase {
 
       // Sell order should be in the dex1.api.orderBook
       print("check Alice's orders history")
-      dex1.api.getOrderHistoryByPublicKey(alice).head.status shouldBe Status.Accepted.name
+      dex1.api.getOrderHistoryByPKWithSig(alice).head.status shouldBe Status.Accepted.name
 
       // Reboot matcher's node
       print("successfully restart matcher")
@@ -55,7 +55,7 @@ class MatcherRestartTestSuite extends MatcherSuiteBase {
 
       print("check Alice's orders")
       dex1.api.waitForOrderStatus(aliceOrder, Status.Accepted)
-      dex1.api.getOrderHistoryByPublicKey(alice).head.status shouldBe Status.Accepted.name
+      dex1.api.getOrderHistoryByPKWithSig(alice).head.status shouldBe Status.Accepted.name
 
       val orders1 = dex1.api.getOrderBook(ethWavesPair)
       orders1.asks.head.amount shouldBe 500
@@ -75,15 +75,15 @@ class MatcherRestartTestSuite extends MatcherSuiteBase {
       orders3.asks.head.amount shouldBe 500
 
       dex1.api.waitForOrderStatus(aliceOrder, Status.Cancelled)
-      dex1.api.getOrderHistoryByPublicKey(alice).head.status shouldBe Status.Accepted.name
+      dex1.api.getOrderHistoryByPKWithSig(alice).head.status shouldBe Status.Accepted.name
 
       print("check Bob's orders")
       bobsOrders.foreach { order =>
-        dex1.api.getOrderStatus(order).status shouldBe HttpOrderStatus.Status.Accepted
+        dex1.api.orderStatusByAssetPairAndId(order).status shouldBe HttpOrderStatus.Status.Accepted
       }
 
-      dex1.api.getOrderStatus(bobsOrderToFulfil).status shouldBe HttpOrderStatus.Status.Filled
-      dex1.api.getOrderStatus(bobsOrderToCancel).status shouldBe HttpOrderStatus.Status.Cancelled
+      dex1.api.orderStatusByAssetPairAndId(bobsOrderToFulfil).status shouldBe HttpOrderStatus.Status.Filled
+      dex1.api.orderStatusByAssetPairAndId(bobsOrderToCancel).status shouldBe HttpOrderStatus.Status.Cancelled
 
     }
   }

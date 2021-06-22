@@ -200,8 +200,8 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
   }
 
   private def clearOrderBook(): Unit = {
-    dex1.api.cancelAll(alice)
-    dex1.api.cancelAll(bob)
+    dex1.api.cancelAllOrdersWithSig(alice)
+    dex1.api.cancelAllOrdersWithSig(bob)
   }
 
   private def makeAndMatchOrders(): Unit =

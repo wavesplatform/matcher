@@ -28,7 +28,7 @@ class GetReservedBalanceSpec extends MatcherSuiteBase with TableDrivenPropertyCh
 
   "GET /matcher/balance/reserved/{publicKey}" - {
     "should return empty object if account doesn't have opened orders" in {
-      validate200Json(dex1.rawApi.getReservedBalance(alice))
+      validate200Json(dex1.rawApi.getReservedBalanceByPK(alice))
     }
 
     "should return non-zero balances for opened orders" in {
@@ -39,7 +39,7 @@ class GetReservedBalanceSpec extends MatcherSuiteBase with TableDrivenPropertyCh
         mkOrder(acc, wavesUsdPair, SELL, 1.waves, 5.usd)
       ).foreach(placeAndAwaitAtDex(_))
 
-      validate200Json(dex1.rawApi.getReservedBalance(acc)) should be(Map(Waves -> 9.009.waves, usd -> 20.usd))
+      validate200Json(dex1.rawApi.getReservedBalanceByPK(acc)) should be(Map(Waves -> 9.009.waves, usd -> 20.usd))
     }
 
     "should return non-zero balances with X-API-KEY" in {
@@ -50,16 +50,16 @@ class GetReservedBalanceSpec extends MatcherSuiteBase with TableDrivenPropertyCh
         mkOrder(acc, wavesUsdPair, SELL, 1.waves, 5.usd)
       ).foreach(placeAndAwaitAtDex(_))
 
-      validate200Json(dex1.rawApi.getReservedBalanceWithApiKey(acc)) should be(Map(Waves -> 9.009.waves, usd -> 20.usd))
+      validate200Json(dex1.rawApi.getReservedBalanceByPK(acc)) should be(Map(Waves -> 9.009.waves, usd -> 20.usd))
     }
 
-    shouldReturnErrorWithoutApiKeyHeader(dex1.rawApi.getReservedBalance(Base58.encode(alice.publicKey), headers = Map.empty))
+    shouldReturnErrorWithoutApiKeyHeader(dex1.rawApi.getReservedBalanceByPK(Base58.encode(alice.publicKey), headers = Map.empty))
 
-    shouldReturnErrorWithIncorrectApiKeyValue(dex1.rawApi.getReservedBalance(Base58.encode(alice.publicKey), incorrectApiKeyHeader))
+    shouldReturnErrorWithIncorrectApiKeyValue(dex1.rawApi.getReservedBalanceByPK(Base58.encode(alice.publicKey), incorrectApiKeyHeader))
 
     "should return an error if publicKey is not correct base58 string" in {
       validateMatcherError(
-        dex1.rawApi.getReservedBalance("null", System.currentTimeMillis, "sign"),
+        dex1.rawApi.getReservedBalanceByPK("null", System.currentTimeMillis, "sign"),
         StatusCode.BadRequest,
         3148801,
         "Provided public key is not correct, reason: Unable to decode base58: requirement failed: Wrong char 'l' in Base58 string 'null'"
@@ -70,18 +70,18 @@ class GetReservedBalanceSpec extends MatcherSuiteBase with TableDrivenPropertyCh
       val ts = System.currentTimeMillis
       val sign = Base58.encode(crypto.sign(alice, alice.publicKey ++ Longs.toByteArray(ts)))
 
-      validateIncorrectSignature(dex1.rawApi.getReservedBalance(Base58.encode(bob.publicKey), ts, sign))
+      validateIncorrectSignature(dex1.rawApi.getReservedBalanceByPK(Base58.encode(bob.publicKey), ts, sign))
     }
 
     "should return an error if timestamp header has the different value of used in signature" in {
       val ts = System.currentTimeMillis
       val sign = Base58.encode(crypto.sign(alice, alice.publicKey ++ Longs.toByteArray(ts)))
 
-      validateIncorrectSignature(dex1.rawApi.getReservedBalance(Base58.encode(alice.publicKey), ts + 1000, sign))
+      validateIncorrectSignature(dex1.rawApi.getReservedBalanceByPK(Base58.encode(alice.publicKey), ts + 1000, sign))
     }
 
     "should return an error with incorrect signature" in {
-      validateIncorrectSignature(dex1.rawApi.getReservedBalance(Base58.encode(alice.publicKey), System.currentTimeMillis, "incorrect"))
+      validateIncorrectSignature(dex1.rawApi.getReservedBalanceByPK(Base58.encode(alice.publicKey), System.currentTimeMillis, "incorrect"))
     }
   }
 }

@@ -104,7 +104,7 @@ class BouncingBalancesTestSuite extends WsSuiteBase {
       )(WsOrder.fromDomain(LimitOrder(bobOrder)))
       wsc.clearMessages()
 
-      dex1.api.getOrderStatus(bobOrder).status shouldBe Status.Accepted
+      dex1.api.orderStatusByAssetPairAndId(bobOrder).status shouldBe Status.Accepted
 
       withClue("After rollback order should not be cancelled and balances should not be decreased\n") {
         wavesNode1.asyncApi.rollback(heightInitial, returnTransactionsToUtx = true) // true as on Node
@@ -116,7 +116,7 @@ class BouncingBalancesTestSuite extends WsSuiteBase {
         wavesNode1.api.waitForHeight(heightSecondTransfer)
         wavesNode1.api.waitForHeightArise() // See WavesFork
         Thread.sleep(3000) // TODO We need an API to see the state on Matcher
-        dex1.api.getOrderStatus(bobOrder).status shouldBe Status.Accepted
+        dex1.api.orderStatusByAssetPairAndId(bobOrder).status shouldBe Status.Accepted
 
         //        wsc.messages.filter {
         //          case _: WsPingOrPong => false
@@ -124,7 +124,7 @@ class BouncingBalancesTestSuite extends WsSuiteBase {
         //        } shouldBe empty
 
         // Relates DEX-1099
-        dex1.api.getTradableBalance(bob, AssetPair(doggyCoin, Waves)) should matchTo(Map[Asset, Long](
+        dex1.api.getTradableBalanceByAssetPairAndAddress(bob, AssetPair(doggyCoin, Waves)) should matchTo(Map[Asset, Long](
           Waves -> 494994999700000L
         ))
       }
@@ -137,8 +137,8 @@ class BouncingBalancesTestSuite extends WsSuiteBase {
       val bobWsc = mkWsAddressConnection(bob, dex1)
 
       val heightInitial = wavesNode1.api.waitForHeightArise()
-      val aliceBalance1 = dex1.api.getTradableBalance(alice, wavesUsdPair)
-      val bobBalance1 = dex1.api.getTradableBalance(bob, wavesUsdPair)
+      val aliceBalance1 = dex1.api.getTradableBalanceByAssetPairAndAddress(alice, wavesUsdPair)
+      val bobBalance1 = dex1.api.getTradableBalanceByAssetPairAndAddress(bob, wavesUsdPair)
 
       val now = System.currentTimeMillis()
       val counterOrders = (1 to 25).map(i => mkOrderDP(alice, wavesUsdPair, OrderType.BUY, 1.waves, 10, ts = now + i))
@@ -169,13 +169,13 @@ class BouncingBalancesTestSuite extends WsSuiteBase {
 
       val finalHeight = wavesNode1.api.waitForHeightArise()
       eventually {
-        val balance = dex1.api.getTradableBalance(alice, wavesUsdPair)
+        val balance = dex1.api.getTradableBalanceByAssetPairAndAddress(alice, wavesUsdPair)
         balance.getOrElse(Waves, 0L) should matchTo(aliceBalance1.getOrElse(Waves, 0L) + 25 * (1.waves - matcherFee))
         balance
       }
 
       val bobBalance2 = eventually {
-        val balance = dex1.api.getTradableBalance(bob, wavesUsdPair)
+        val balance = dex1.api.getTradableBalanceByAssetPairAndAddress(bob, wavesUsdPair)
         balance.getOrElse(usd, 0L) should matchTo(bobBalance1.getOrElse(usd, 0L) + 250.usd)
         balance
       }
@@ -194,7 +194,7 @@ class BouncingBalancesTestSuite extends WsSuiteBase {
 
       // Relates DEX-1099
       eventually {
-        dex1.api.getTradableBalance(bob, wavesUsdPair) should matchTo(bobBalance2)
+        dex1.api.getTradableBalanceByAssetPairAndAddress(bob, wavesUsdPair) should matchTo(bobBalance2)
       }
 
       aliceWsc.close()

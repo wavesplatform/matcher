@@ -70,7 +70,7 @@ class OrderBookSnapshotsTestSuite extends MatcherSuiteBase {
     dex1.restart()
     dex1.api.waitForCurrentOffset(_ == ordersPack1Size + ordersPack2Size - 1)
     ordersPack1.foreach { order =>
-      dex1.api.getOrderStatus(order) should not be HttpOrderStatus.Status.NotFound.name
+      dex1.api.orderStatusByAssetPairAndId(order) should not be HttpOrderStatus.Status.NotFound.name
     }
   }
 }

@@ -24,7 +24,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
     wavesNode1.start()
     broadcastAndAwait(IssueUsdTx, IssueWctTx, IssueEthTx)
     dex1.start()
-    dex1.api.upsertRate(eth, 0.005)
+    dex1.api.upsertAssetRate(eth, 0.005)
   }
 
   implicit class DoubleOps(value: Double) {
@@ -51,7 +51,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
             val order = mkOrder(alice, wctUsdPair, BUY, 1.wct, 1.price, matcherFee = matcherFee, feeAsset = feeAsset, version = version)
             val orderId = order.id()
             dex1.api.place(order)
-            dex1.api.getOrderStatus(order).filledFee shouldBe None
+            dex1.api.orderStatusByAssetPairAndId(order).filledFee shouldBe None
 
             for {
               activeOnly <- List(true, false).map(Option(_))
@@ -90,7 +90,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
 
       waitForOrderAtNode(aliceOrder)
 
-      List(bobOrder, aliceOrder).foreach(order => dex1.api.getOrderStatus(order).filledFee shouldBe Some(matcherFee))
+      List(bobOrder, aliceOrder).foreach(order => dex1.api.orderStatusByAssetPairAndId(order).filledFee shouldBe Some(matcherFee))
 
       orderHistory(alice, wctUsdPair, activeOnly = Some(false)).foreach { orderBookHistory =>
         val item = orderBookHistory.find(_.id == aliceOrderId).get
@@ -122,8 +122,8 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
 
       waitForOrderAtNode(aliceOrder)
 
-      dex1.api.getOrderStatus(aliceOrder).filledFee shouldBe Some(matcherFee / 2)
-      dex1.api.getOrderStatus(bobOrder).filledFee shouldBe Some(matcherFee)
+      dex1.api.orderStatusByAssetPairAndId(aliceOrder).filledFee shouldBe Some(matcherFee / 2)
+      dex1.api.orderStatusByAssetPairAndId(bobOrder).filledFee shouldBe Some(matcherFee)
 
       for {
         activeOnly <- List(true, false).map(Option(_))
@@ -143,8 +143,8 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
       }
 
       dex1.api.cancelOrder(alice, aliceOrder)
-      dex1.api.getOrderStatus(aliceOrder).filledFee shouldBe Some(matcherFee / 2)
-      dex1.api.getOrderStatus(bobOrder).filledFee shouldBe Some(matcherFee)
+      dex1.api.orderStatusByAssetPairAndId(aliceOrder).filledFee shouldBe Some(matcherFee / 2)
+      dex1.api.orderStatusByAssetPairAndId(bobOrder).filledFee shouldBe Some(matcherFee)
 
       orderHistory(alice, wctUsdPair, activeOnly = Some(false)).foreach { orderBookHistory =>
         val item = orderBookHistory.find(_.id == aliceOrderId).get
@@ -169,8 +169,8 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
 
       waitForOrderAtNode(aliceOrder)
 
-      dex1.api.getOrderStatus(aliceOrder).filledFee shouldBe Some(matcherFee / 2)
-      dex1.api.getOrderStatus(bobOrder).filledFee shouldBe Some(matcherFee)
+      dex1.api.orderStatusByAssetPairAndId(aliceOrder).filledFee shouldBe Some(matcherFee / 2)
+      dex1.api.orderStatusByAssetPairAndId(bobOrder).filledFee shouldBe Some(matcherFee)
 
       for {
         activeOnly <- List(true, false).map(Option(_))
@@ -190,8 +190,8 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
       }
 
       dex1.api.cancelOrder(alice, aliceOrder)
-      dex1.api.getOrderStatus(aliceOrder).filledFee shouldBe Some(matcherFee / 2)
-      dex1.api.getOrderStatus(bobOrder).filledFee shouldBe Some(matcherFee)
+      dex1.api.orderStatusByAssetPairAndId(aliceOrder).filledFee shouldBe Some(matcherFee / 2)
+      dex1.api.orderStatusByAssetPairAndId(bobOrder).filledFee shouldBe Some(matcherFee)
 
       orderHistory(alice, wctUsdPair, activeOnly = Some(false)).foreach { orderBookHistory =>
         val item = orderBookHistory.find(_.id == aliceOrderId).get
@@ -213,7 +213,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
       dex1.api.place(mkOrder(bob, wctUsdPair, SELL, 1.wct, 1.price, matcherFee = matcherFee))
 
       waitForOrderAtNode(order)
-      dex1.api.getOrderStatus(order).filledFee shouldBe Some(33333)
+      dex1.api.orderStatusByAssetPairAndId(order).filledFee shouldBe Some(33333)
 
       orderHistory(alice, wctUsdPair, activeOnly = Some(false)).foreach { orderBookHistory =>
         val item = orderBookHistory.find(_.id == orderId).get
@@ -229,11 +229,11 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
       val rate = 0.33333333
       val orderFee = (BigDecimal(rate) * matcherFee).setScale(0, CEILING).toLong
 
-      val ethBalance = dex1.api.getTradableBalance(alice, ethUsdPair)(eth)
+      val ethBalance = dex1.api.getTradableBalanceByAssetPairAndAddress(alice, ethUsdPair)(eth)
 
       broadcastAndAwait(mkTransfer(alice, bob, ethBalance - orderFee, eth))
 
-      dex1.api.upsertRate(feeAsset, rate)
+      dex1.api.upsertAssetRate(feeAsset, rate)
 
       val aliceOrder = mkOrder(alice, ethUsdPair, BUY, 1.eth, 0.5.price, orderFee, feeAsset = feeAsset)
       val aliceOrderId = aliceOrder.id()
@@ -251,7 +251,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
       dex1.api.place(bobOrder)
 
       waitForOrderAtNode(aliceOrder)
-      dex1.api.getOrderStatus(aliceOrder).filledFee shouldBe Some(orderFee)
+      dex1.api.orderStatusByAssetPairAndId(aliceOrder).filledFee shouldBe Some(orderFee)
 
       orderHistory(alice, ethUsdPair, activeOnly = Some(false)).foreach { orderBookHistory =>
         val item = orderBookHistory.find(_.id == aliceOrderId).get
@@ -271,11 +271,11 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
 
   "OrderHistory should" - {
     "correctly save average weighed price and total executed amount of price asset" in {
-      Seq(alice, bob).foreach(dex1.api.cancelAll(_))
+      Seq(alice, bob).foreach(dex1.api.cancelAllOrdersWithSig(_))
 
       def assertAvgWeighedPriceAndExecutedPriceAssets(keyPair: KeyPair, avgWeighedPricesAndPriceAssetAmounts: List[(Long, Long)]): Unit =
         dex1.api
-          .getOrderHistoryByAssetPairAndPublicKey(keyPair, wavesUsdPair, Some(false))
+          .getOrderHistoryByAssetPairAndPKWithSig(keyPair, wavesUsdPair, Some(false))
           .map(item => item.avgWeighedPrice -> item.totalExecutedPriceAssets) should matchTo(avgWeighedPricesAndPriceAssetAmounts)
 
       // checking market and limit orders because
@@ -296,7 +296,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
         assertAvgWeighedPriceAndExecutedPriceAssets(mozart, List(288L -> 260.usd))
         assertAvgWeighedPriceAndExecutedPriceAssets(salieri, List(270L -> 135.usd, 290L -> 29.usd, 320L -> 96.usd))
 
-        Seq(alice, bob, mozart, salieri).foreach(dex1.api.cancelAll(_))
+        Seq(alice, bob, mozart, salieri).foreach(dex1.api.cancelAllOrdersWithSig(_))
       }
     }
 
@@ -318,10 +318,10 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
 
       withClue("default: ") {
         // MatcherApiRoute.getAssetPairAndPublicKeyOrderHistory
-        dex1.api.getOrderHistoryByAssetPairAndPublicKey(carol, wavesUsdPair).map(_.id) should matchTo(all)
+        dex1.api.getOrderHistoryByAssetPairAndPKWithSig(carol, wavesUsdPair).map(_.id) should matchTo(all)
 
         // MatcherApiRoute.getPublicKeyOrderHistory
-        dex1.api.getOrderHistoryByPublicKey(carol).map(_.id) should matchTo(all)
+        dex1.api.getOrderHistoryByPKWithSig(carol).map(_.id) should matchTo(all)
 
         // MatcherApiRoute.getAllOrderHistory
         dex1.api.orderHistoryWithApiKey(carol).map(_.id) should matchTo(activeOnly)
@@ -348,21 +348,21 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
               case OrderListType.ClosedOnly => closedOnly
             }
 
-            dex1.api.getOrderHistoryByAssetPairAndPublicKey(carol, wavesUsdPair, activeOnlyParam, closedOnlyParam).map(_.id) should matchTo(
+            dex1.api.getOrderHistoryByAssetPairAndPKWithSig(carol, wavesUsdPair, activeOnlyParam, closedOnlyParam).map(_.id) should matchTo(
               expected
             )
-            dex1.api.getOrderHistoryByPublicKey(carol, activeOnlyParam, closedOnlyParam).map(_.id) should matchTo(expected)
+            dex1.api.getOrderHistoryByPKWithSig(carol, activeOnlyParam, closedOnlyParam).map(_.id) should matchTo(expected)
             dex1.api.orderHistoryWithApiKey(carol, activeOnlyParam, closedOnlyParam).map(_.id) should matchTo(expected)
           }
       }
 
-      dex1.api.cancelAll(carol)
+      dex1.api.cancelAllOrdersWithSig(carol)
     }
   }
 
   private def orderHistory(account: KeyPair, pair: AssetPair, activeOnly: Option[Boolean]): List[List[HttpOrderBookHistoryItem]] = List(
-    dex1.api.getOrderHistoryByPublicKey(account, activeOnly),
-    dex1.api.getOrderHistoryByAssetPairAndPublicKey(account, pair, activeOnly),
+    dex1.api.getOrderHistoryByPKWithSig(account, activeOnly),
+    dex1.api.getOrderHistoryByAssetPairAndPKWithSig(account, pair, activeOnly),
     dex1.api.orderHistoryWithApiKey(account, activeOnly)
   )
 

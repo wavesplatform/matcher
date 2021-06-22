@@ -59,7 +59,7 @@ case class MatcherApiRouteV1(
       case Left(e) => complete(formatError(e))
     }
 
-  @Path("/orderbook/{amountAsset}/{priceAsset}")
+  @Path("/orderbook/{amountAsset}/{priceAsset}#V1getOrderBook")
   @ApiOperation(
     value = "Get Order Book for a given Asset Pair",
     notes = "Get Order Book for a given Asset Pair",

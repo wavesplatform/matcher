@@ -6,7 +6,7 @@ import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.it.api.RawHttpChecks
 import com.wavesplatform.it.MatcherSuiteBase
 
-class GetRatesSpec extends MatcherSuiteBase with RawHttpChecks {
+class GetAssetRatesSpec extends MatcherSuiteBase with RawHttpChecks {
 
   val defaultRates: HttpRates = Map(Waves -> 1d)
 
@@ -25,12 +25,12 @@ class GetRatesSpec extends MatcherSuiteBase with RawHttpChecks {
   "GET /matcher/settings/rates" - {
 
     "should return default value when rates were not set up" in {
-      validate200Json(dex1.rawApi.getRates) should be(defaultRates)
+      validate200Json(dex1.rawApi.getAssetRates) should be(defaultRates)
     }
 
     "should return actual rates after update" in {
-      validate201Json(dex1.rawApi.upsertRate(usd, 0.01))
-      validate200Json(dex1.rawApi.getRates) should be(defaultRates + (usd -> 0.01))
+      validate201Json(dex1.rawApi.upsertAssetRate(usd, 0.01))
+      validate200Json(dex1.rawApi.getAssetRates) should be(defaultRates + (usd -> 0.01))
     }
 
   }

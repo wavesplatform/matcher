@@ -32,7 +32,7 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
 
   override protected def afterEach(): Unit = {
     super.afterEach()
-    dex1.api.cancelAll(matcher)
+    dex1.api.cancelAllOrdersWithSig(matcher)
   }
 
   "can place if the script returns TRUE" in {
@@ -94,7 +94,7 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     broadcastAndAwait(setAssetScript)
 
     info("a counter order wasn't rejected")
-    dex1.api.getOrderStatus(counter).status shouldBe Status.Accepted
+    dex1.api.orderStatusByAssetPairAndId(counter).status shouldBe Status.Accepted
 
     info("place a submitted order")
     val submitted = mkOrder(matcher, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 2, matcherFee = smartTradeFee)
@@ -121,7 +121,7 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     broadcastAndAwait(setAssetScriptTx)
 
     info("a counter order wasn't rejected")
-    dex1.api.getOrderStatus(counter).status shouldBe Status.Accepted
+    dex1.api.orderStatusByAssetPairAndId(counter).status shouldBe Status.Accepted
 
     info("place a submitted order")
     val submitted = mkOrder(matcher, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 2, matcherFee = twoSmartTradeFee)

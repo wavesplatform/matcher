@@ -154,9 +154,9 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       totalExecutedPriceAssets = 0
     )
 
-  // getMatcherPublicKey
+  // getMatcherPKInBase58
   routePath("/") - {
-    "returns a public key" in test { route =>
+    "returns a public key in base58" in test { route =>
       Get(routePath("/")) ~> route ~> check {
         status shouldEqual StatusCodes.OK
         responseAs[HttpMatcherPublicKey] should matchTo(PublicKey.fromBase58String("J6ghck2hA2GNJTHGSLSeuCjKuLDGz8i83NfCMFVoWhvf").explicitGet())
@@ -164,7 +164,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     }
   }
 
-  // orderBookInfo
+  // getOrderBookRestrictions
   routePath("/orderbook/{amountAsset}/{priceAsset}/info") - {
     "returns an order book information" in test { route =>
       Get(routePath(s"/orderbook/$smartAssetId/WAVES/info")) ~> route ~> check {
@@ -179,9 +179,9 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     }
   }
 
-  // getSettings
+  // getMatcherPublicSettings
   routePath("/matcher/settings") - {
-    "returns matcher's settings" in test { route =>
+    "returns matcher's public settings" in test { route =>
       Get(routePath("/settings")) ~> route ~> check {
         status shouldEqual StatusCodes.OK
         responseAs[HttpMatcherPublicSettings] should matchTo(
@@ -201,9 +201,9 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     }
   }
 
-  // getRates
+  // getAssetRates
   routePath("/settings/rates") - {
-    "returns available rates for fee" in test { route =>
+    "returns available asset rates for fee" in test { route =>
       Get(routePath("/settings/rates")) ~> route ~> check {
         status shouldEqual StatusCodes.OK
         responseAs[HttpRates] should matchTo(Map[Asset, Double](Waves -> 1.0))
@@ -235,7 +235,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     )
   }
 
-  // getConfig
+  // getMatcherConfig
   routePath("/debug/config") - {
     "X-Api-Key is required" in test { route =>
       Get(routePath("/debug/config")) ~> route ~> check {
@@ -310,7 +310,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     }
   }
 
-  // marketStatus
+  // getOrderBookStatus
   routePath("/orderbook/[amountAsset]/[priceAsset]/status") - {
     "returns an order book status" in test { route =>
       Get(routePath(s"/orderbook/$smartAssetId/WAVES/status")) ~> route ~> check {
@@ -397,7 +397,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
 
   private val historyItem: HttpOrderBookHistoryItem = mkHistoryItem(okOrder, OrderStatus.Accepted.name)
 
-  // getAssetPairAndPublicKeyOrderHistory
+  // getOrderHistoryByAssetPairAndPKWithSig
   routePath("/orderbook/{amountAsset}/{priceAsset}/publicKey/{publicKey}") - {
     "returns an order history filtered by asset pair" in test { route =>
       val now = System.currentTimeMillis()
@@ -413,7 +413,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     }
   }
 
-  // getPublicKeyOrderHistory
+  // getOrderHistoryByPKWithSig
   routePath("/orderbook/{publicKey}") - {
     "returns an order history" in test { route =>
       val now = System.currentTimeMillis()
@@ -429,7 +429,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     }
   }
 
-  // getAllOrderHistory
+  // getOrderHistoryByAddressWithKey
   routePath("/orders/{address}") - {
     "returns an order history by api key" in test(
       route =>
@@ -441,7 +441,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     )
   }
 
-  // tradableBalance
+  // getTradableBalanceByAssetPairAndAddress
   routePath("/orderbook/{amountAsset}/{priceAsset}/tradableBalance/{address}") - {
 
     "returns a tradable balance" in test { route =>
@@ -479,7 +479,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     }
   }
 
-  // reservedBalance
+  // getReservedBalanceByPK
   routePath("/balance/reserved/{publicKey}") - {
 
     val publicKey = matcherKeyPair.publicKey
@@ -540,7 +540,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     }
   }
 
-  // orderStatus
+  // orderStatusByAssetPairAndId
   routePath("/orderbook/{amountAsset}/{priceAsset}/{orderId}") - {
     "returns an order status" in test { route =>
       Get(routePath(s"/orderbook/$smartAssetId/WAVES/${okOrder.id()}")) ~> route ~> check {
@@ -550,7 +550,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     }
   }
 
-  // getOrderStatusInfoByIdWithApiKey
+  // getOrderStatusByAddressAndIdWithKey
   routePath("/orders/{address}/{orderId}") - {
 
     val testOrder = orderToCancel
@@ -592,7 +592,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     )
   }
 
-  // getOrderStatusInfoByIdWithSignature
+  // getOrderStatusByPKAndIdWithSig
   routePath("/orderbook/{publicKey}/{orderId}") - {
 
     val testOrder = orderToCancel
@@ -623,7 +623,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     }
   }
 
-  // cancel
+  // cancelOneOrAllInPairOrdersWithSig
   routePath("/orderbook/{amountAsset}/{priceAsset}/cancel") - {
 
     "single cancel" - {
@@ -725,7 +725,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     }
   }
 
-  // cancelAll
+  // cancelAllOrdersWithSig
   routePath("/orderbook/cancel") - {
     "returns canceled orders" in test { route =>
       val unsignedRequest = HttpCancelOrder(
@@ -796,7 +796,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     )
   }
 
-  // orderbooks
+  // getOrderBooks
   routePath("/orderbook") - {
     "returns all order books" in test { route =>
       Get(routePath("/orderbook")) ~> route ~> check {
@@ -823,7 +823,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     }
   }
 
-  // orderBookDelete
+  // deleteOrderBookWithKey
   routePath("/orderbook/{amountAsset}/{priceAsset}") - {
 
     val (someOrder, _) = orderGenerator.sample.get
@@ -848,7 +848,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     )
   }
 
-  // getTransactionsByOrder
+  // getTransactionsByOrderId
   routePath("/transactions/{orderId}") - {
     "returns known transactions with this order" in test { route =>
       Get(routePath(s"/transactions/${okOrder.idStr()}")) ~> route ~> check {
@@ -915,7 +915,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     }
   }
 
-  // upsertRate, deleteRate
+  // upsertAssetRate, deleteAssetRate
   routePath("/settings/rates/{assetId}") - {
 
     val rateCache = RateCache(TestRateDb()).futureValue

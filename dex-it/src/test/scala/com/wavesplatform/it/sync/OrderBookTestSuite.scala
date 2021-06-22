@@ -19,7 +19,7 @@ class OrderBookTestSuite extends MatcherSuiteBase {
   private case class ReservedBalances(wct: Long, usd: Long, waves: Long)
 
   private def reservedBalancesOf(pk: KeyPair): ReservedBalances = {
-    val reservedBalances = dex1.api.getReservedBalance(pk)
+    val reservedBalances = dex1.api.getReservedBalanceByPK(pk)
     ReservedBalances(
       reservedBalances.getOrElse(wct, 0),
       reservedBalances.getOrElse(usd, 0),
@@ -100,8 +100,8 @@ class OrderBookTestSuite extends MatcherSuiteBase {
     }
 
     "it should not affect other pairs and their orders" in {
-      dex1.api.getOrderStatus(buyOrderForAnotherPair).status shouldBe Status.Accepted
-      dex1.api.getOrderStatus(sellOrderForAnotherPair).status shouldBe Status.Accepted
+      dex1.api.orderStatusByAssetPairAndId(buyOrderForAnotherPair).status shouldBe Status.Accepted
+      dex1.api.orderStatusByAssetPairAndId(sellOrderForAnotherPair).status shouldBe Status.Accepted
       dex1.api.place(mkOrder(alice, wctWavesPair, BUY, amount, price))
 
       val orderBook = dex1.api.getOrderBook(wctWavesPair)

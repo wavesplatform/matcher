@@ -96,7 +96,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
         validateHistory("by pair", dex1.api.getOrderHistoryByAssetPairAndPKWithSig(alice, aliceWavesPair))
         validateHistory("full", dex1.api.getOrderHistoryByPKWithSig(alice))
-        validateHistory("admin", dex1.api.getOrderHistoryByAddressWithKey(alice, activeOnly = Some(false)))
+        validateHistory("admin", dex1.api.getOrderHistoryByPKWithSig(alice, activeOnly = Some(false)))
       }
 
       "get opened trading markets" in {
@@ -401,12 +401,12 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       }
 
       "/matcher/orders/{address}" in {
-        dex1.tryApi.getOrderHistoryByAddressWithKey(
+        dex1.tryApi.orderHistoryByAddressWithKey(
           owner = bob,
           xUserPublicKey = Some(alice.publicKey)
         ) should failWith(3148801, "Provided public key is not correct, reason: invalid public key")
 
-        dex1.tryApi.getOrderHistoryByAddressWithKey(
+        dex1.tryApi.orderHistoryByAddressWithKey(
           owner = bob,
           xUserPublicKey = Some(bob.publicKey)
         ) shouldBe Symbol("right")

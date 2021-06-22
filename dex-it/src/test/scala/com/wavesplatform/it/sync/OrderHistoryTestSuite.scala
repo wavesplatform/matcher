@@ -319,7 +319,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
       withClue("default: ") {
         dex1.api.getOrderHistoryByAssetPairAndPKWithSig(carol, wavesUsdPair).map(_.id) should matchTo(all)
         dex1.api.getOrderHistoryByPKWithSig(carol).map(_.id) should matchTo(all)
-        dex1.api.getOrderHistoryByAddressWithKey(carol).map(_.id) should matchTo(activeOnly)
+        dex1.api.getOrderHistoryByPKWithSig(carol).map(_.id) should matchTo(activeOnly)
       }
 
       List(
@@ -347,7 +347,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
               expected
             )
             dex1.api.getOrderHistoryByPKWithSig(carol, activeOnlyParam, closedOnlyParam).map(_.id) should matchTo(expected)
-            dex1.api.getOrderHistoryByAddressWithKey(carol, activeOnlyParam, closedOnlyParam).map(_.id) should matchTo(expected)
+            dex1.api.getOrderHistoryByPKWithSig(carol, activeOnlyParam, closedOnlyParam).map(_.id) should matchTo(expected)
           }
       }
 
@@ -358,7 +358,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
   private def orderHistory(account: KeyPair, pair: AssetPair, activeOnly: Option[Boolean]): List[List[HttpOrderBookHistoryItem]] = List(
     dex1.api.getOrderHistoryByPKWithSig(account, activeOnly),
     dex1.api.getOrderHistoryByAssetPairAndPKWithSig(account, pair, activeOnly),
-    dex1.api.getOrderHistoryByAddressWithKey(account, activeOnly)
+    dex1.api.getOrderHistoryByPKWithSig(account, activeOnly)
   )
 
 }

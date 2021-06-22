@@ -146,7 +146,7 @@ trait DexApi[F[_]] {
   /**
    * param @activeOnly Server treats this parameter as true if it wasn't specified
    */
-  def getOrderHistoryByAddressWithKey(
+  def orderHistoryByAddressWithKey(
     owner: Address,
     activeOnly: Option[Boolean] = None,
     closedOnly: Option[Boolean] = None,

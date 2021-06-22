@@ -28,7 +28,7 @@ class SeveralPartialOrdersTestSuite extends MatcherSuiteBase {
 
       val bobOrder1 = mkOrder(bob, wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
       placeAndAwaitAtDex(bobOrder1)
-      dex1.api.getReservedBalanceByPK(bob)(Waves) shouldBe sellOrderAmount + matcherFee
+      dex1.api.getReservedBalanceWithApiKey(bob)(Waves) shouldBe sellOrderAmount + matcherFee
       dex1.api.getTradableBalanceByAssetPairAndAddress(bob, wavesUsdPair)(Waves) shouldBe bobWavesBalanceBefore - (sellOrderAmount + matcherFee)
 
       val aliceOrder = mkOrder(alice, wavesUsdPair, OrderType.BUY, buyOrderAmount, price)
@@ -43,8 +43,8 @@ class SeveralPartialOrdersTestSuite extends MatcherSuiteBase {
       // Each side get fair amount of assets
       waitForOrderAtNode(bobOrder1)
       eventually {
-        dex1.api.getReservedBalanceByPK(bob) shouldBe empty
-        dex1.api.getReservedBalanceByPK(alice) shouldBe empty
+        dex1.api.getReservedBalanceWithApiKey(bob) shouldBe empty
+        dex1.api.getReservedBalanceWithApiKey(alice) shouldBe empty
       }
 
       // Previously cancelled order should not affect new orders
@@ -62,8 +62,8 @@ class SeveralPartialOrdersTestSuite extends MatcherSuiteBase {
       dex1.api.cancelOrder(bob, bobOrder2)
       dex1.api.waitForOrderStatus(bobOrder2, Status.Cancelled)
 
-      dex1.api.getReservedBalanceByPK(bob) shouldBe empty
-      dex1.api.getReservedBalanceByPK(alice) shouldBe empty
+      dex1.api.getReservedBalanceWithApiKey(bob) shouldBe empty
+      dex1.api.getReservedBalanceWithApiKey(alice) shouldBe empty
     }
 
     "place one submitted orders and two counter" in {
@@ -83,8 +83,8 @@ class SeveralPartialOrdersTestSuite extends MatcherSuiteBase {
       // Each side get fair amount of assets
       waitForOrderAtNode(bobOrder1)
       eventually {
-        dex1.api.getReservedBalanceByPK(bob) shouldBe empty
-        dex1.api.getReservedBalanceByPK(alice) shouldBe empty
+        dex1.api.getReservedBalanceWithApiKey(bob) shouldBe empty
+        dex1.api.getReservedBalanceWithApiKey(alice) shouldBe empty
       }
 
       // Previously cancelled order should not affect new orders

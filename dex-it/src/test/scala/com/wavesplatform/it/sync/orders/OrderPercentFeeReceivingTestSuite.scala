@@ -46,10 +46,10 @@ class OrderPercentFeeReceivingTestSuite extends OrderFeeBaseTestSuite {
       wavesNode1.api.balance(accountSeller, Waves) should be(0L)
       wavesNode1.api.balance(accountSeller, usd) shouldBe fullyAmountUsd
 
-      dex1.api.getReservedBalanceByPK(accountBuyer).getOrElse(Waves, 0L) shouldBe 0L
-      dex1.api.getReservedBalanceByPK(accountBuyer).getOrElse(usd, 0L) shouldBe 0L
-      dex1.api.getReservedBalanceByPK(accountSeller).getOrElse(Waves, 0L) shouldBe 0L
-      dex1.api.getReservedBalanceByPK(accountSeller).getOrElse(usd, 0L) shouldBe 0L
+      dex1.api.getReservedBalanceWithApiKey(accountBuyer).getOrElse(Waves, 0L) shouldBe 0L
+      dex1.api.getReservedBalanceWithApiKey(accountBuyer).getOrElse(usd, 0L) shouldBe 0L
+      dex1.api.getReservedBalanceWithApiKey(accountSeller).getOrElse(Waves, 0L) shouldBe 0L
+      dex1.api.getReservedBalanceWithApiKey(accountSeller).getOrElse(usd, 0L) shouldBe 0L
     }
 
     s"users should pay correct fee when fee asset-type = $assetType and order partially filled" in {
@@ -71,10 +71,10 @@ class OrderPercentFeeReceivingTestSuite extends OrderFeeBaseTestSuite {
       wavesNode1.api.balance(accountSeller, Waves) shouldBe 0L
       wavesNode1.api.balance(accountSeller, usd) shouldBe partiallyAmountUsd
 
-      dex1.api.getReservedBalanceByPK(accountBuyer).getOrElse(Waves, 0L) shouldBe 1.5.waves // 3.75 - 9 / 15 * 3.75
-      dex1.api.getReservedBalanceByPK(accountBuyer).getOrElse(usd, 0L) shouldBe fullyAmountUsd - partiallyAmountUsd
-      dex1.api.getReservedBalanceByPK(accountSeller).getOrElse(Waves, 0L) shouldBe 0L
-      dex1.api.getReservedBalanceByPK(accountSeller).getOrElse(usd, 0L) shouldBe 0L
+      dex1.api.getReservedBalanceWithApiKey(accountBuyer).getOrElse(Waves, 0L) shouldBe 1.5.waves // 3.75 - 9 / 15 * 3.75
+      dex1.api.getReservedBalanceWithApiKey(accountBuyer).getOrElse(usd, 0L) shouldBe fullyAmountUsd - partiallyAmountUsd
+      dex1.api.getReservedBalanceWithApiKey(accountSeller).getOrElse(Waves, 0L) shouldBe 0L
+      dex1.api.getReservedBalanceWithApiKey(accountSeller).getOrElse(usd, 0L) shouldBe 0L
       dex1.api.cancelAllOrdersWithSig(accountBuyer)
     }
 
@@ -92,10 +92,10 @@ class OrderPercentFeeReceivingTestSuite extends OrderFeeBaseTestSuite {
       wavesNode1.api.balance(accountSeller, Waves) should be(0L)
       wavesNode1.api.balance(accountSeller, usd) shouldBe fullyAmountUsd
 
-      dex1.api.getReservedBalanceByPK(accountBuyer).getOrElse(Waves, 0L) shouldBe 0L
-      dex1.api.getReservedBalanceByPK(accountBuyer).getOrElse(usd, 0L) shouldBe 0L
-      dex1.api.getReservedBalanceByPK(accountSeller).getOrElse(Waves, 0L) shouldBe 0L
-      dex1.api.getReservedBalanceByPK(accountSeller).getOrElse(usd, 0L) shouldBe 0L
+      dex1.api.getReservedBalanceWithApiKey(accountBuyer).getOrElse(Waves, 0L) shouldBe 0L
+      dex1.api.getReservedBalanceWithApiKey(accountBuyer).getOrElse(usd, 0L) shouldBe 0L
+      dex1.api.getReservedBalanceWithApiKey(accountSeller).getOrElse(Waves, 0L) shouldBe 0L
+      dex1.api.getReservedBalanceWithApiKey(accountSeller).getOrElse(usd, 0L) shouldBe 0L
     }
 
     s"buy order should be rejected if fee less then minimum possible fee when fee asset-type = $assetType" in {

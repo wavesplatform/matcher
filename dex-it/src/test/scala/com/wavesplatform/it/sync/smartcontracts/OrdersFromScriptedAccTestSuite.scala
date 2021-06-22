@@ -132,7 +132,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
       def validateBalances(dapp: KeyPair, t: Long, r: Map[Asset, Long]): Assertion =
         eventually {
           dex1.api.getTradableBalanceByAssetPairAndAddress(dapp, aliceWavesPair).getOrElse(Waves, 0L) shouldBe t
-          dex1.api.getReservedBalanceByPK(dapp) shouldBe r
+          dex1.api.getReservedBalanceWithApiKey(dapp) shouldBe r
         }
 
       /**

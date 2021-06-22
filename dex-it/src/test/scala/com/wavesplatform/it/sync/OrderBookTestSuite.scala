@@ -19,7 +19,7 @@ class OrderBookTestSuite extends MatcherSuiteBase {
   private case class ReservedBalances(wct: Long, usd: Long, waves: Long)
 
   private def reservedBalancesOf(pk: KeyPair): ReservedBalances = {
-    val reservedBalances = dex1.api.getReservedBalanceByPK(pk)
+    val reservedBalances = dex1.api.getReservedBalanceWithApiKey(pk)
     ReservedBalances(
       reservedBalances.getOrElse(wct, 0),
       reservedBalances.getOrElse(usd, 0),

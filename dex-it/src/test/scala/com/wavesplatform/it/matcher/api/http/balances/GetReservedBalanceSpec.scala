@@ -28,7 +28,7 @@ class GetReservedBalanceSpec extends MatcherSuiteBase with TableDrivenPropertyCh
 
   "GET /matcher/balance/reserved/{publicKey}" - {
     "should return empty object if account doesn't have opened orders" in {
-      validate200Json(dex1.rawApi.getReservedBalanceByPK(alice))
+      validate200Json(dex1.rawApi.getReservedBalanceWithApiKey(alice))
     }
 
     "should return non-zero balances for opened orders" in {
@@ -39,7 +39,7 @@ class GetReservedBalanceSpec extends MatcherSuiteBase with TableDrivenPropertyCh
         mkOrder(acc, wavesUsdPair, SELL, 1.waves, 5.usd)
       ).foreach(placeAndAwaitAtDex(_))
 
-      validate200Json(dex1.rawApi.getReservedBalanceByPK(acc)) should be(Map(Waves -> 9.009.waves, usd -> 20.usd))
+      validate200Json(dex1.rawApi.getReservedBalanceWithApiKey(acc)) should be(Map(Waves -> 9.009.waves, usd -> 20.usd))
     }
 
     "should return non-zero balances with X-API-KEY" in {
@@ -50,7 +50,7 @@ class GetReservedBalanceSpec extends MatcherSuiteBase with TableDrivenPropertyCh
         mkOrder(acc, wavesUsdPair, SELL, 1.waves, 5.usd)
       ).foreach(placeAndAwaitAtDex(_))
 
-      validate200Json(dex1.rawApi.getReservedBalanceByPK(acc)) should be(Map(Waves -> 9.009.waves, usd -> 20.usd))
+      validate200Json(dex1.rawApi.getReservedBalanceWithApiKey(acc)) should be(Map(Waves -> 9.009.waves, usd -> 20.usd))
     }
 
     shouldReturnErrorWithoutApiKeyHeader(dex1.rawApi.getReservedBalanceByPK(Base58.encode(alice.publicKey), headers = Map.empty))

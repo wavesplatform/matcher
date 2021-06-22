@@ -112,13 +112,13 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       }
 
       "frozen amount should be listed via matcherBalance REST endpoint" in {
-        dex1.api.getReservedBalanceByPK(alice) shouldBe Map(Waves -> matcherFee, aliceAsset -> aliceSellAmount)
-        dex1.api.getReservedBalanceByPK(bob) should have size 0
+        dex1.api.getReservedBalanceWithApiKey(alice) shouldBe Map(Waves -> matcherFee, aliceAsset -> aliceSellAmount)
+        dex1.api.getReservedBalanceWithApiKey(bob) should have size 0
       }
 
       "frozen amount should be listed via matcherBalance REST endpoint with Api Key" in {
-        dex1.api.getReservedBalanceByPK(alice) shouldBe Map(Waves -> matcherFee, aliceAsset -> aliceSellAmount)
-        dex1.api.getReservedBalanceByPK(bob) should have size 0
+        dex1.api.getReservedBalanceWithApiKey(alice) shouldBe Map(Waves -> matcherFee, aliceAsset -> aliceSellAmount)
+        dex1.api.getReservedBalanceWithApiKey(bob) should have size 0
       }
 
       "and should be listed by trader's publiс key via REST" in {
@@ -375,11 +375,11 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
     "reject proxy requests if X-User-Public-Key doesn't match query param and process them correctly otherwise " - {
 
       "/matcher/balance/reserved/{publicKey}" in {
-        dex1.tryApi.getReservedBalanceByPK(alice, Some(bob.publicKey)) should failWith(
+        dex1.tryApi.getReservedBalanceWithApiKey(alice, Some(bob.publicKey)) should failWith(
           3148801,
           "Provided public key is not correct, reason: invalid public key"
         )
-        dex1.tryApi.getReservedBalanceByPK(alice, Some(alice.publicKey)) shouldBe Symbol("right")
+        dex1.tryApi.getReservedBalanceWithApiKey(alice, Some(alice.publicKey)) shouldBe Symbol("right")
       }
 
       "/matcher/orders/{address}/cancel" in {

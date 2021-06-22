@@ -150,8 +150,8 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
     // now there are 2 price levels
     dex1.api.getOrderBook(wctUsdPair).bids.map(_.price) shouldBe Seq(7 * price, 5 * price)
 
-    dex1.api.getReservedBalanceByPK(alice)(Waves) shouldBe matcherFee * 3
-    dex1.api.getReservedBalanceByPK(alice)(usd) shouldBe amount * 7 * 3 * price / PriceConstant
+    dex1.api.getReservedBalanceWithApiKey(alice)(Waves) shouldBe matcherFee * 3
+    dex1.api.getReservedBalanceWithApiKey(alice)(usd) shouldBe amount * 7 * 3 * price / PriceConstant
 
     // price level 5 will be deleted after cancelling of buyOrder3
     cancelAndAwait(alice, buyOrder3)
@@ -159,8 +159,8 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
     wavesNode1.api.balance(alice, usd) shouldBe aliceUsdBalance
     wavesNode1.api.balance(alice, wct) shouldBe aliceWctBalance
 
-    dex1.api.getReservedBalanceByPK(alice)(Waves) shouldBe matcherFee * 2
-    dex1.api.getReservedBalanceByPK(alice)(usd) shouldBe amount * 2 * 7 * price / PriceConstant
+    dex1.api.getReservedBalanceWithApiKey(alice)(Waves) shouldBe matcherFee * 2
+    dex1.api.getReservedBalanceWithApiKey(alice)(usd) shouldBe amount * 2 * 7 * price / PriceConstant
 
     dex1.api.getOrderBook(wctUsdPair).bids shouldBe Seq(HttpV0LevelAgg(2 * amount, 7 * price))
     Seq(buyOrder1, buyOrder2).foreach(order => dex1.api.cancelOrder(alice, order))
@@ -231,10 +231,10 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
 
     withClue("partially filled order cancellation") {
       dex1.api.getOrderBook(wctUsdPair).bids shouldBe Seq(HttpV0LevelAgg(amount, 12 * price))
-      dex1.api.getReservedBalanceByPK(alice)(Waves) shouldBe matcherFee / 2
-      dex1.api.getReservedBalanceByPK(alice)(usd) shouldBe 20 * price * amount / PriceConstant
+      dex1.api.getReservedBalanceWithApiKey(alice)(Waves) shouldBe matcherFee / 2
+      dex1.api.getReservedBalanceWithApiKey(alice)(usd) shouldBe 20 * price * amount / PriceConstant
       dex1.api.cancelOrder(alice, buyOrder)
-      dex1.api.getReservedBalanceByPK(alice) shouldBe empty
+      dex1.api.getReservedBalanceWithApiKey(alice) shouldBe empty
       dex1.api.getOrderBook(wctUsdPair).bids shouldBe empty
     }
   }

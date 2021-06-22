@@ -45,7 +45,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
 
   }
 
-  override def getReservedBalanceByPK(of: KeyPair, xUserPublicKey: Option[PublicKey]): R[HttpBalance] = mk {
+  override def getReservedBalanceWithApiKey(of: KeyPair, xUserPublicKey: Option[PublicKey]): R[HttpBalance] = mk {
     basicRequest
       .get(uri"$apiUri/matcher/balance/reserved/${Base58.encode(of.publicKey)}")
       .headers(apiKeyWithUserPublicKeyHeaders(xUserPublicKey))

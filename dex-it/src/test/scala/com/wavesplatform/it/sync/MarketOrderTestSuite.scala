@@ -422,7 +422,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
     val order2 = mkOrderDP(carol, wavesUsdPair, SELL, 9.997.waves, 3.0, ttl = 2.days)
 
     dex1.api.place(order1)
-    dex1.api.getReservedBalanceByPK(carol) should matchTo(Map[Asset, Long](Waves -> 10.waves))
+    dex1.api.getReservedBalanceWithApiKey(carol) should matchTo(Map[Asset, Long](Waves -> 10.waves))
     wavesNode1.api.balance(carol, Waves) shouldBe 10.waves
 
     dex1.tryApi.placeMarket(order2) should failWithBalanceNotEnough()

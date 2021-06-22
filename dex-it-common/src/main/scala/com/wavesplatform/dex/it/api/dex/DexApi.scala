@@ -18,7 +18,7 @@ trait DexApi[F[_]] {
   def getReservedBalanceByPK(publicKey: String, timestamp: Long, signature: String): F[HttpBalance]
   def getReservedBalanceByPK(of: KeyPair, timestamp: Long = System.currentTimeMillis): F[HttpBalance]
   def getReservedBalanceByPK(publicKey: String, headers: Map[String, String]): F[HttpBalance]
-  def getReservedBalanceByPK(of: KeyPair, xUserPublicKey: Option[PublicKey] = None): F[HttpBalance]
+  def getReservedBalanceWithApiKey(of: KeyPair, xUserPublicKey: Option[PublicKey] = None): F[HttpBalance]
 
   def getTradableBalanceByAssetPairAndAddress(address: String, amountAsset: String, priceAsset: String): F[HttpBalance]
   def getTradableBalanceByAssetPairAndAddress(of: KeyPair, assetPair: AssetPair): F[HttpBalance]

@@ -90,7 +90,7 @@ class NetworkAndQueueIssuesTestSuite extends WsSuiteBase with HasWebSockets with
     val sellOrder = mkOrderDP(alice, wavesUsdPair, SELL, 10.waves, 3.0)
     placeAndAwaitAtDex(sellOrder)
 
-    dex1.api.getReservedBalanceByPK(alice) should matchTo(Map[Asset, Long](Waves -> 10.003.waves))
+    dex1.api.getReservedBalanceWithApiKey(alice) should matchTo(Map[Asset, Long](Waves -> 10.003.waves))
 
     assertChanges(wsac)(Map(Waves -> WsBalances(initialWavesBalance - 10.003, 10.003))) {
       WsOrder.fromDomain(LimitOrder(sellOrder))
@@ -104,7 +104,7 @@ class NetworkAndQueueIssuesTestSuite extends WsSuiteBase with HasWebSockets with
     val bigSellOrder = mkOrderDP(alice, wavesUsdPair, SELL, 30.waves, 3.0)
     dex1.tryApi.place(bigSellOrder) shouldBe Symbol("left")
 
-    dex1.api.getReservedBalanceByPK(alice) should matchTo(Map[Asset, Long](Waves -> 10.003.waves))
+    dex1.api.getReservedBalanceWithApiKey(alice) should matchTo(Map[Asset, Long](Waves -> 10.003.waves))
 
     assertChanges(wsac, squash = false)(
       Map(Waves -> WsBalances(initialWavesBalance - 40.006, 40.006)),
@@ -122,7 +122,7 @@ class NetworkAndQueueIssuesTestSuite extends WsSuiteBase with HasWebSockets with
     dex1.api.waitForOrderStatus(sellOrder, Status.Cancelled)
 
     dex1.api.getOrderHistoryByPKWithSig(alice, Some(true)) should have size 0
-    dex1.api.getReservedBalanceByPK(alice) shouldBe empty
+    dex1.api.getReservedBalanceWithApiKey(alice) shouldBe empty
 
     assertChanges(wsac, squash = false)(Map(Waves -> WsBalances(initialWavesBalance, 0))) {
       WsOrder(id = sellOrder.id(), status = OrderStatus.Cancelled.name)
@@ -132,7 +132,7 @@ class NetworkAndQueueIssuesTestSuite extends WsSuiteBase with HasWebSockets with
     dex1.api.waitForOrderStatus(bigSellOrder, Status.Accepted)
 
     dex1.api.getOrderHistoryByPKWithSig(alice, Some(true)) should have size 1
-    dex1.api.getReservedBalanceByPK(alice) should matchTo(Map[Asset, Long](Waves -> 30.003.waves))
+    dex1.api.getReservedBalanceWithApiKey(alice) should matchTo(Map[Asset, Long](Waves -> 30.003.waves))
 
     assertChanges(wsac, squash = false)(Map(Waves -> WsBalances(initialWavesBalance - 30.003, 30.003))) {
       WsOrder.fromDomain(LimitOrder(bigSellOrder))

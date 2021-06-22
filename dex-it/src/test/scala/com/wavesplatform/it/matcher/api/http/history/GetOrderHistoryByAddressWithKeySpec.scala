@@ -28,7 +28,7 @@ class GetOrderHistoryByAddressWithKeySpec extends MatcherSuiteBase with ApiKeyHe
     "should return all order history" in {
 
       withClue("empty history") {
-        validate200Json(dex1.rawApi.getOrderHistoryByAddressWithKey(toAddress(alice).stringRepr)) should have size 0
+        validate200Json(dex1.rawApi.getOrderHistoryByAddressWithKey(alice.stringRepr)) should have size 0
       }
 
       val orders = List(
@@ -45,7 +45,7 @@ class GetOrderHistoryByAddressWithKeySpec extends MatcherSuiteBase with ApiKeyHe
       withClue("active only") {
         validate200Json(
           dex1.rawApi.getOrderHistoryByAddressWithKey(
-            toAddress(alice).stringRepr,
+            alice.stringRepr,
             activeOnly = true,
             closedOnly = false,
             Map("X-API-KEY" -> apiKey)
@@ -54,7 +54,7 @@ class GetOrderHistoryByAddressWithKeySpec extends MatcherSuiteBase with ApiKeyHe
       }
 
       withClue("without params") {
-        validate200Json(dex1.rawApi.getOrderHistoryByAddressWithKey(toAddress(alice).stringRepr)) should matchTo(historyActive)
+        validate200Json(dex1.rawApi.getOrderHistoryByAddressWithKey(alice.stringRepr)) should matchTo(historyActive)
       }
 
       val historyCancelled = orders.map { order =>
@@ -65,7 +65,7 @@ class GetOrderHistoryByAddressWithKeySpec extends MatcherSuiteBase with ApiKeyHe
       withClue("closed only") {
         validate200Json(
           dex1.rawApi.getOrderHistoryByAddressWithKey(
-            toAddress(alice).stringRepr,
+            alice.stringRepr,
             activeOnly = false,
             closedOnly = true,
             Map("X-API-KEY" -> apiKey)
@@ -94,14 +94,14 @@ class GetOrderHistoryByAddressWithKeySpec extends MatcherSuiteBase with ApiKeyHe
     }
 
     shouldReturnErrorWithoutApiKeyHeader(dex1.rawApi.getOrderHistoryByAddressWithKey(
-      toAddress(alice).stringRepr,
+      alice.stringRepr,
       activeOnly = false,
       closedOnly = true,
       Map.empty
     ))
 
     shouldReturnErrorWithIncorrectApiKeyValue(dex1.rawApi.getOrderHistoryByAddressWithKey(
-      toAddress(alice).stringRepr,
+      alice.stringRepr,
       activeOnly = false,
       closedOnly = true,
       incorrectApiKeyHeader

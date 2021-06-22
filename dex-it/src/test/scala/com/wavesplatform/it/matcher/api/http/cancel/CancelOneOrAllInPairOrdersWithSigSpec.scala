@@ -9,7 +9,7 @@ import com.wavesplatform.dex.domain.order.OrderType.BUY
 import com.wavesplatform.dex.it.api.RawHttpChecks
 import com.wavesplatform.it.MatcherSuiteBase
 
-class CancelOrderSpec extends MatcherSuiteBase with RawHttpChecks {
+class CancelOneOrAllInPairOrdersWithSigSpec extends MatcherSuiteBase with RawHttpChecks {
 
   override protected def dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(
@@ -30,7 +30,7 @@ class CancelOrderSpec extends MatcherSuiteBase with RawHttpChecks {
       val o = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 1.usd)
       placeAndAwaitAtDex(o)
 
-      val r = validate200Json(dex1.rawApi.cancelOrder(alice, o))
+      val r = validate200Json(dex1.rawApi.cancelOneOrAllInPairOrdersWithSig(alice, o))
 
       r.orderId should be(o.id())
       r.success should be(true)
@@ -44,13 +44,23 @@ class CancelOrderSpec extends MatcherSuiteBase with RawHttpChecks {
       placeAndAwaitAtDex(o)
 
       cancelAndAwait(alice, o)
-      validateMatcherError(dex1.rawApi.cancelOrder(alice, o), StatusCode.BadRequest, 9437194, s"The order ${o.idStr()} is canceled")
+      validateMatcherError(
+        dex1.rawApi.cancelOneOrAllInPairOrdersWithSig(alice, o),
+        StatusCode.BadRequest,
+        9437194,
+        s"The order ${o.idStr()} is canceled"
+      )
     }
 
     //TODO: DEX-1024
     "should return error when order doesn't exist" in {
       val o = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 1.usd)
-      validateMatcherError(dex1.rawApi.cancelOrder(alice, o), StatusCode.BadRequest, 9437193, s"The order ${o.idStr()} not found")
+      validateMatcherError(
+        dex1.rawApi.cancelOneOrAllInPairOrdersWithSig(alice, o),
+        StatusCode.BadRequest,
+        9437193,
+        s"The order ${o.idStr()} not found"
+      )
     }
 
     "should return an error if publicKey parameter has the different value of used in signature" in {
@@ -59,7 +69,7 @@ class CancelOrderSpec extends MatcherSuiteBase with RawHttpChecks {
       val ts = System.currentTimeMillis
       val sign = crypto.sign(alice, alice.publicKey ++ Longs.toByteArray(ts))
 
-      validateIncorrectSignature(dex1.rawApi.cancelOrder(bob, "WAVES", UsdId.toString, o.idStr(), ts, sign))
+      validateIncorrectSignature(dex1.rawApi.cancelOneOrAllInPairOrdersWithSig(bob, "WAVES", UsdId.toString, o.idStr(), ts, sign))
     }
 
     "should return an error if timestamp header has the different value of used in signature" in {
@@ -68,7 +78,7 @@ class CancelOrderSpec extends MatcherSuiteBase with RawHttpChecks {
       val ts = System.currentTimeMillis
       val sign = crypto.sign(alice, alice.publicKey ++ Longs.toByteArray(ts))
 
-      validateIncorrectSignature(dex1.rawApi.cancelOrder(bob, "WAVES", UsdId.toString, o.idStr(), ts + 1000, sign))
+      validateIncorrectSignature(dex1.rawApi.cancelOneOrAllInPairOrdersWithSig(bob, "WAVES", UsdId.toString, o.idStr(), ts + 1000, sign))
     }
   }
 

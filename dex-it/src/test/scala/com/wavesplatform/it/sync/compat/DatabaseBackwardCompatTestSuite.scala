@@ -47,7 +47,7 @@ class DatabaseBackwardCompatTestSuite extends BackwardCompatSuiteBase {
     markup("cancel one order at DEX2")
     val owner = Gen.oneOf(List(alice, bob)).sample.get
     val orderToCancel = dex2.api.getOrderHistoryByPKWithSig(owner, activeOnly = Some(true)).head
-    dex2.api.cancelOrderById(orderToCancel.id, Some(owner.publicKey))
+    dex2.api.cancelOneOrderWithKey(orderToCancel.id, Some(owner.publicKey))
     dex2.api.waitForOrderStatus(orderToCancel.assetPair, orderToCancel.id, Status.Cancelled)
 
     markup("place order for additional asset pair at DEX2")
@@ -56,7 +56,7 @@ class DatabaseBackwardCompatTestSuite extends BackwardCompatSuiteBase {
     dex2.api.waitForOrder(additionalOrder)(_.status != Status.NotFound)
 
     markup("delete orderbook for additional asset pair at DEX2")
-    dex2.tryApi.deleteOrderBook(additionalAssetPair)
+    dex2.tryApi.deleteOrderBookWithKey(additionalAssetPair)
 
     Thread.sleep(2.minutes.toMillis) // An additional time to wait the concurrent processing
     val state2 = state(dex2.api, orders)

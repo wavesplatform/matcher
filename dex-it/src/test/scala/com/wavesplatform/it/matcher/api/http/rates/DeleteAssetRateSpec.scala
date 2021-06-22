@@ -8,7 +8,7 @@ import com.wavesplatform.dex.it.docker.apiKey
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.matcher.api.http.ApiKeyHeaderChecks
 
-class DeleteAssetRatesSpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
+class DeleteAssetRateSpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
 
   val defaultRates: HttpRates = Map(Waves -> 1d)
 

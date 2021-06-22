@@ -8,12 +8,12 @@ class GetAddressStateSpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
 
   "GET /matcher/debug/address/{address}" - {
     "should return correct state" in {
-      validate200Json(dex1.rawApi.getAddressState(alice.toAddress))
+      validate200Json(dex1.rawApi.getAddressState(alice))
     }
 
-    shouldReturnErrorWithoutApiKeyHeader(dex1.rawApi.getAddressState(toAddress(alice), Map.empty))
+    shouldReturnErrorWithoutApiKeyHeader(dex1.rawApi.getAddressState(alice, Map.empty))
 
-    shouldReturnErrorWithIncorrectApiKeyValue(dex1.rawApi.getAddressState(toAddress(alice), incorrectApiKeyHeader))
+    shouldReturnErrorWithIncorrectApiKeyValue(dex1.rawApi.getAddressState(alice, incorrectApiKeyHeader))
   }
 
 }

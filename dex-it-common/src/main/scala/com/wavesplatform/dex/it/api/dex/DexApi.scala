@@ -29,7 +29,7 @@ trait DexApi[F[_]] {
   def placeMarket(order: JsObject): F[HttpSuccessfulPlace]
   def placeMarket(order: Order): F[HttpSuccessfulPlace]
 
-  def cancelOrder(
+  def cancelOneOrAllInPairOrdersWithSig(
     owner: KeyPair,
     amountAsset: String,
     priceAsset: String,
@@ -38,28 +38,30 @@ trait DexApi[F[_]] {
     signature: ByteStr
   ): F[HttpSuccessfulSingleCancel]
 
-  def cancelOrder(owner: KeyPair, order: Order): F[HttpSuccessfulSingleCancel] = cancelOrder(owner, order.assetPair, order.id())
-  def cancelOrder(owner: KeyPair, assetPair: AssetPair, id: Order.Id): F[HttpSuccessfulSingleCancel]
+  def cancelOneOrAllInPairOrdersWithSig(owner: KeyPair, order: Order): F[HttpSuccessfulSingleCancel] =
+    cancelOneOrAllInPairOrdersWithSig(owner, order.assetPair, order.id())
 
-  def cancelOrderById(id: String, headers: Map[String, String]): F[HttpSuccessfulSingleCancel]
+  def cancelOneOrAllInPairOrdersWithSig(owner: KeyPair, assetPair: AssetPair, id: Order.Id): F[HttpSuccessfulSingleCancel]
+
+  def cancelOneOrderWithKey(id: String, headers: Map[String, String]): F[HttpSuccessfulSingleCancel]
 
   def cancelOrderById(order: Order, xUserPublicKey: Option[PublicKey] = None): F[HttpSuccessfulSingleCancel] =
-    cancelOrderById(order.id(), xUserPublicKey)
+    cancelOneOrderWithKey(order.id(), xUserPublicKey)
 
-  def cancelOrderById(id: Order.Id, xUserPublicKey: Option[PublicKey]): F[HttpSuccessfulSingleCancel]
+  def cancelOneOrderWithKey(id: Order.Id, xUserPublicKey: Option[PublicKey]): F[HttpSuccessfulSingleCancel]
 
   def cancelAllOrdersWithSig(sender: KeyPair, timestamp: Long, signature: ByteStr): F[HttpSuccessfulBatchCancel]
   def cancelAllOrdersWithSig(owner: KeyPair, timestamp: Long = System.currentTimeMillis): F[HttpSuccessfulBatchCancel]
 
-  def cancelAllByPair(
+  def cancelOneOrAllInPairOrdersWithSig(
     owner: KeyPair,
     assetPair: AssetPair,
     timestamp: Long = System.currentTimeMillis
   ): F[HttpSuccessfulBatchCancel]
 
-  def cancelAllByAddressAndIds(address: String, ids: Set[String]): F[HttpSuccessfulBatchCancel]
+  def cancelOrdersByIdsWithKey(address: String, ids: Set[String]): F[HttpSuccessfulBatchCancel]
 
-  def cancelAllByAddressAndIds(address: String, ids: Set[String], headers: Map[String, String]): F[HttpSuccessfulBatchCancel]
+  def cancelOrdersByIdsWithKey(address: String, ids: Set[String], headers: Map[String, String]): F[HttpSuccessfulBatchCancel]
 
   def cancelOrdersByIdsWithKey(
     owner: Address,
@@ -70,11 +72,11 @@ trait DexApi[F[_]] {
   def orderStatusByAssetPairAndId(order: Order): F[HttpOrderStatus] = orderStatusByAssetPairAndId(order.assetPair, order.id())
 
   def orderStatusByAssetPairAndId(assetPair: AssetPair, id: Order.Id): F[HttpOrderStatus] =
-    orderStatusByAssetPairAndId(assetPair.amountAssetStr, assetPair.priceAssetStr, id.toString)
+    getOrderStatusByAssetPairAndId(assetPair.amountAssetStr, assetPair.priceAssetStr, id.toString)
 
-  def orderStatusByAssetPairAndId(amountAsset: String, priceAsset: String, id: String): F[HttpOrderStatus]
+  def getOrderStatusByAssetPairAndId(amountAsset: String, priceAsset: String, id: String): F[HttpOrderStatus]
 
-  def getOrderStatusInfoById(
+  def getOrderStatusByAddressAndIdWithKey(
     address: String,
     orderId: String,
     headers: Map[String, String] = Map.empty
@@ -185,8 +187,8 @@ trait DexApi[F[_]] {
   def getOrderBookStatus(amountAsset: String, priceAsset: String): F[HttpOrderBookStatus]
   def getOrderBookStatus(assetPair: AssetPair): F[HttpOrderBookStatus]
 
-  def deleteOrderBook(amountAsset: String, priceAsset: String, headers: Map[String, String]): F[HttpMessage]
-  def deleteOrderBook(assetPair: AssetPair): F[HttpMessage]
+  def deleteOrderBookWithKey(amountAsset: String, priceAsset: String, headers: Map[String, String]): F[HttpMessage]
+  def deleteOrderBookWithKey(assetPair: AssetPair): F[HttpMessage]
 
   def upsertAssetRate(assetId: String, rate: Double, headers: Map[String, String] = Map.empty): F[HttpMessage]
   def upsertAssetRate(asset: Asset, rate: Double): F[HttpMessage]
@@ -210,7 +212,7 @@ trait DexApi[F[_]] {
   def saveSnapshots(headers: Map[String, String]): F[HttpMessage]
   def saveSnapshots: F[HttpMessage]
 
-  def getMatcherSettings: F[HttpMatcherPublicSettings]
+  def getMatcherPublicSettings: F[HttpMatcherPublicSettings]
   def getMatcherConfig: F[Config]
   def getMatcherConfig(headers: Map[String, String]): F[Config]
 
@@ -219,12 +221,12 @@ trait DexApi[F[_]] {
   def getAddressState(address: Address, headers: Map[String, String]): F[HttpAddressState]
   def getAddressState(address: String, headers: Map[String, String]): F[HttpAddressState]
 
-  def getSystemStatus: F[HttpSystemStatus]
-  def getSystemStatus(headers: Map[String, String]): F[HttpSystemStatus]
+  def getMatcherStatus: F[HttpSystemStatus]
+  def getMatcherStatus(headers: Map[String, String]): F[HttpSystemStatus]
 
   def getMatcherPKInBase58: F[String]
 
-  def print(message: String): F[Unit]
+  def printMessage(message: String): F[Unit]
 
   def wsConnections: F[HttpWebSocketConnections]
   def closeWsConnections(oldestNumber: Int): F[HttpMessage]

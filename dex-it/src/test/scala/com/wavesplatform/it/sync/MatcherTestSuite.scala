@@ -223,7 +223,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
       "order could be canceled and resubmitted again" in {
         // Alice cancels the very first order (100 left)
-        dex1.api.cancelOrder(alice, order1).status shouldBe "OrderCanceled"
+        dex1.api.cancelOneOrAllInPairOrdersWithSig(alice, order1).status shouldBe "OrderCanceled"
 
         // Alice checks that the order book is empty
         val orders1 = dex1.api.getOrderBook(aliceWavesPair)
@@ -592,7 +592,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         )
       )
 
-      dex1.api.deleteOrderBook(ethWavesPair)
+      dex1.api.deleteOrderBookWithKey(ethWavesPair)
       dex1.api.waitForOrderStatus(wavesEthPair, sellOrder1.id(), Status.Cancelled)
 
       placeAndAwaitAtDex(mkOrderDP(alice, wavesEthPair, SELL, 100, 1))

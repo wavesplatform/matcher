@@ -9,7 +9,7 @@ import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.it.api.RawHttpChecks
 import com.wavesplatform.it.MatcherSuiteBase
 
-class CancelAllOrdersSpec extends MatcherSuiteBase with RawHttpChecks {
+class CancelAllOrdersWithSigSpec extends MatcherSuiteBase with RawHttpChecks {
 
   override protected def dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(

@@ -5,7 +5,7 @@ import com.wavesplatform.dex.domain.order.OrderType.BUY
 import com.wavesplatform.dex.it.api.RawHttpChecks
 import com.wavesplatform.it.MatcherSuiteBase
 
-class DeleteOrderFromHistorySpec extends MatcherSuiteBase with RawHttpChecks {
+class DeleteOrderFromHistoryByIdSpec extends MatcherSuiteBase with RawHttpChecks {
 
   override protected def dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(

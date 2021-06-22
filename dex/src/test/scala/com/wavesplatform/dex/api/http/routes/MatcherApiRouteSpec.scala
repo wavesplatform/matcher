@@ -540,7 +540,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     }
   }
 
-  // orderStatusByAssetPairAndId
+  // getOrderStatusByAssetPairAndId
   routePath("/orderbook/{amountAsset}/{priceAsset}/{orderId}") - {
     "returns an order status" in test { route =>
       Get(routePath(s"/orderbook/$smartAssetId/WAVES/${okOrder.id()}")) ~> route ~> check {

@@ -193,7 +193,7 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with
       Future
         .sequence {
           orders.map { order =>
-            dex1.asyncTryApi.cancelOrder(owner, order).map {
+            dex1.asyncTryApi.cancelOneOrAllInPairOrdersWithSig(owner, order).map {
               case Left(x) if x.error != 9437194 => throw new RuntimeException(s"Unexpected error: $x") // OrderCanceled
               case _ => ()
             }
@@ -202,7 +202,7 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with
         .map(_ => ())
 
     def batchCancels(owner: KeyPair, assetPairs: Iterable[AssetPair]): Future[List[HttpSuccessfulBatchCancel]] = Future.sequence {
-      assetPairs.map(dex2.asyncApi.cancelAllByPair(owner, _, System.currentTimeMillis)).toList
+      assetPairs.map(dex2.asyncApi.cancelOneOrAllInPairOrdersWithSig(owner, _, System.currentTimeMillis)).toList
     }
 
     batchCancels(alice, assetPairs)

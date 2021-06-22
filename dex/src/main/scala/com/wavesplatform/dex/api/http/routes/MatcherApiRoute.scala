@@ -126,7 +126,8 @@ class MatcherApiRoute(
   private val orderBookRoutes: Route = pathPrefix("orderbook") {
     matcherStatusBarrier {
       getOrderBookRestrictions ~ getOrderStatusByPKAndIdWithSig ~ getOrderBook ~ getOrderBookStatus ~ placeLimitOrder ~ placeMarketOrder ~
-      getOrderHistoryByAssetPairAndPKWithSig ~ getOrderHistoryByPKWithSig ~ getTradableBalanceByAssetPairAndAddress ~ orderStatusByAssetPairAndId ~ deleteOrderFromHistoryById ~ cancelOneOrAllInPairOrdersWithSig ~
+      getOrderHistoryByAssetPairAndPKWithSig ~ getOrderHistoryByPKWithSig ~
+      getTradableBalanceByAssetPairAndAddress ~ getOrderStatusByAssetPairAndId ~ deleteOrderFromHistoryById ~ cancelOneOrAllInPairOrdersWithSig ~
       cancelAllOrdersWithSig ~ getOrderBooks ~ deleteOrderBookWithKey
     }
   }
@@ -1066,7 +1067,7 @@ class MatcherApiRoute(
     }
   }
 
-  @Path("/orderbook/{amountAsset}/{priceAsset}/{orderId}#orderStatusByAssetPairAndId")
+  @Path("/orderbook/{amountAsset}/{priceAsset}/{orderId}#getOrderStatusByAssetPairAndId")
   @ApiOperation(
     value = "Order Status",
     notes = "Get Order status for a given Asset Pair during the last 30 days",
@@ -1081,8 +1082,8 @@ class MatcherApiRoute(
       new ApiImplicitParam(name = "orderId", value = "Order ID", required = true, dataType = "string", paramType = "path")
     )
   )
-  def orderStatusByAssetPairAndId: Route = (path(AssetPairPM / OrderPM) & get) { (pairOrError, orderIdOrError) =>
-    (measureResponse("orderStatusByAssetPairAndId") & protect) {
+  def getOrderStatusByAssetPairAndId: Route = (path(AssetPairPM / OrderPM) & get) { (pairOrError, orderIdOrError) =>
+    (measureResponse("getOrderStatusByAssetPairAndId") & protect) {
       withOrderId(orderIdOrError) { orderId =>
         withAssetPair(pairOrError, redirectToInverse = true, s"/$orderId") { _ =>
           val future =

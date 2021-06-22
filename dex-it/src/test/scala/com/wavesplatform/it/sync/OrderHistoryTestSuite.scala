@@ -63,7 +63,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
               item.feeAsset shouldBe feeAsset
             }
 
-            dex1.api.cancelOrder(alice, order)
+            dex1.api.cancelOneOrAllInPairOrdersWithSig(alice, order)
 
             orderHistory(alice, wctUsdPair, activeOnly = Some(false)).foreach { orderBookHistory =>
               val item = orderBookHistory.find(_.id == orderId).get
@@ -142,7 +142,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
         item.feeAsset shouldBe Waves
       }
 
-      dex1.api.cancelOrder(alice, aliceOrder)
+      dex1.api.cancelOneOrAllInPairOrdersWithSig(alice, aliceOrder)
       dex1.api.orderStatusByAssetPairAndId(aliceOrder).filledFee shouldBe Some(matcherFee / 2)
       dex1.api.orderStatusByAssetPairAndId(bobOrder).filledFee shouldBe Some(matcherFee)
 
@@ -189,7 +189,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
         item.feeAsset shouldBe Waves
       }
 
-      dex1.api.cancelOrder(alice, aliceOrder)
+      dex1.api.cancelOneOrAllInPairOrdersWithSig(alice, aliceOrder)
       dex1.api.orderStatusByAssetPairAndId(aliceOrder).filledFee shouldBe Some(matcherFee / 2)
       dex1.api.orderStatusByAssetPairAndId(bobOrder).filledFee shouldBe Some(matcherFee)
 
@@ -222,7 +222,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
         item.feeAsset shouldBe feeAsset
       }
 
-      dex1.api.cancelOrder(alice, order)
+      dex1.api.cancelOneOrAllInPairOrdersWithSig(alice, order)
     }
 
     "should save right fee considering the fee rate" in {
@@ -319,7 +319,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
       withClue("default: ") {
         dex1.api.getOrderHistoryByAssetPairAndPKWithSig(carol, wavesUsdPair).map(_.id) should matchTo(all)
         dex1.api.getOrderHistoryByPKWithSig(carol).map(_.id) should matchTo(all)
-        dex1.api.getOrderHistoryByPKWithSig(carol).map(_.id) should matchTo(activeOnly)
+        dex1.api.orderHistoryByAddressWithKey(carol).map(_.id) should matchTo(activeOnly)
       }
 
       List(

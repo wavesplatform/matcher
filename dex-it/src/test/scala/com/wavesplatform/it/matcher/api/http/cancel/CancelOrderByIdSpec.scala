@@ -42,7 +42,7 @@ class CancelOrderByIdSpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
       val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 1.usd)
       placeAndAwaitAtDex(order)
 
-      dex1.api.cancelOrder(alice, order)
+      dex1.api.cancelOneOrAllInPairOrdersWithSig(alice, order)
 
       validateMatcherError(dex1.rawApi.cancelOrderById(order), StatusCode.BadRequest, 9437194, s"The order ${order.idStr()} is canceled")
     }
@@ -56,7 +56,7 @@ class CancelOrderByIdSpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
 
     "should return an error when orderId is not a correct base58 string" in {
       validateMatcherError(
-        dex1.rawApi.cancelOrderById("null", Map("X-API-KEY" -> apiKey)),
+        dex1.rawApi.cancelOneOrderWithKey("null", Map("X-API-KEY" -> apiKey)),
         StatusCode.BadRequest,
         9437185,
         "Provided value is not a correct base58 string, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
@@ -68,7 +68,7 @@ class CancelOrderByIdSpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
       placeAndAwaitAtDex(order)
 
       validateMatcherError(
-        dex1.rawApi.cancelOrderById(order.idStr(), Map("X-API-Key" -> apiKey, "X-User-Public-Key" -> "null")),
+        dex1.rawApi.cancelOneOrderWithKey(order.idStr(), Map("X-API-Key" -> apiKey, "X-User-Public-Key" -> "null")),
         StatusCode.BadRequest,
         3148801,
         "Provided public key is not correct, reason: Unable to decode base58: requirement failed: Wrong char 'l' in Base58 string 'null'"
@@ -81,16 +81,16 @@ class CancelOrderByIdSpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
       placeAndAwaitAtDex(order)
 
       validateMatcherError(
-        dex1.rawApi.cancelOrderById(order.idStr(), Map("X-API-Key" -> apiKey, "X-User-Public-Key" -> bob.publicKey.stringRepr)),
+        dex1.rawApi.cancelOneOrderWithKey(order.idStr(), Map("X-API-Key" -> apiKey, "X-User-Public-Key" -> bob.publicKey.stringRepr)),
         StatusCode.BadRequest,
         9437193,
         s"The order ${order.idStr()} not found"
       )
     }
 
-    shouldReturnErrorWithoutApiKeyHeader(dex1.rawApi.cancelAllByAddressAndIds(alice.toAddress.stringRepr, placeAndGetIds(3), Map.empty))
+    shouldReturnErrorWithoutApiKeyHeader(dex1.rawApi.cancelOrdersByIdsWithKey(alice.toAddress.stringRepr, placeAndGetIds(3), Map.empty))
 
-    shouldReturnErrorWithIncorrectApiKeyValue(dex1.rawApi.cancelAllByAddressAndIds(
+    shouldReturnErrorWithIncorrectApiKeyValue(dex1.rawApi.cancelOrdersByIdsWithKey(
       alice.toAddress.stringRepr,
       placeAndGetIds(3),
       Map("X-API-KEY" -> "incorrect")

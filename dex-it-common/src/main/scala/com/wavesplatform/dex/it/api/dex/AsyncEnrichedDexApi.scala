@@ -90,7 +90,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
     basicRequest.post(uri"$apiUri/matcher/orderbook/market").body(order)
   }
 
-  override def cancelOrder(
+  override def cancelOneOrAllInPairOrdersWithSig(
     owner: KeyPair,
     amountAsset: String,
     priceAsset: String,
@@ -106,7 +106,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .contentType(MediaType.ApplicationJson)
   }
 
-  override def cancelOrder(owner: KeyPair, assetPair: AssetPair, id: Id): R[HttpSuccessfulSingleCancel] = mk {
+  override def cancelOneOrAllInPairOrdersWithSig(owner: KeyPair, assetPair: AssetPair, id: Id): R[HttpSuccessfulSingleCancel] = mk {
     val body = Json.stringify(Json.toJson(cancelRequest(owner, id.toString)))
     basicRequest
       .post(uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/cancel")
@@ -116,14 +116,14 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .contentType(MediaType.ApplicationJson)
   }
 
-  override def cancelOrderById(id: String, headers: Map[String, String]): R[HttpSuccessfulSingleCancel] = mk {
+  override def cancelOneOrderWithKey(id: String, headers: Map[String, String]): R[HttpSuccessfulSingleCancel] = mk {
     basicRequest
       .post(uri"$apiUri/matcher/orders/cancel/$id")
       .headers(headers)
       .contentType(MediaType.ApplicationJson)
   }
 
-  override def cancelOrderById(id: Id, xUserPublicKey: Option[PublicKey]): R[HttpSuccessfulSingleCancel] = mk {
+  override def cancelOneOrderWithKey(id: Id, xUserPublicKey: Option[PublicKey]): R[HttpSuccessfulSingleCancel] = mk {
     basicRequest
       .post(uri"$apiUri/matcher/orders/cancel/${id.toString}")
       .headers(apiKeyWithUserPublicKeyHeaders(xUserPublicKey))
@@ -145,7 +145,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .contentType(MediaType.ApplicationJson)
   }
 
-  override def cancelAllByPair(owner: KeyPair, assetPair: AssetPair, timestamp: Long): R[HttpSuccessfulBatchCancel] = mk {
+  override def cancelOneOrAllInPairOrdersWithSig(owner: KeyPair, assetPair: AssetPair, timestamp: Long): R[HttpSuccessfulBatchCancel] = mk {
     val body = Json.stringify(Json.toJson(batchCancelRequest(owner, timestamp)))
     basicRequest
       .post(uri"$apiUri/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/cancel")
@@ -153,7 +153,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .contentType(MediaType.ApplicationJson)
   }
 
-  def cancelAllByAddressAndIds(
+  def cancelOrdersByIdsWithKey(
     address: String,
     ids: Set[String],
     headers: Map[String, String]
@@ -165,8 +165,8 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .contentType(MediaType.ApplicationJson)
   }
 
-  def cancelAllByAddressAndIds(address: String, ids: Set[String]): R[HttpSuccessfulBatchCancel] =
-    cancelAllByAddressAndIds(address, ids, apiKeyHeaders)
+  def cancelOrdersByIdsWithKey(address: String, ids: Set[String]): R[HttpSuccessfulBatchCancel] =
+    cancelOrdersByIdsWithKey(address, ids, apiKeyHeaders)
 
   def cancelOrdersByIdsWithKey(owner: Address, orderIds: Set[Order.Id], headers: Map[String, String]): R[HttpSuccessfulBatchCancel] = mk {
     basicRequest
@@ -191,14 +191,14 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .contentType(MediaType.ApplicationJson)
   }
 
-  override def orderStatusByAssetPairAndId(amountAsset: String, priceAsset: String, id: String): R[HttpOrderStatus] = mk {
+  override def getOrderStatusByAssetPairAndId(amountAsset: String, priceAsset: String, id: String): R[HttpOrderStatus] = mk {
     basicRequest
       .get(uri"$apiUri/matcher/orderbook/$amountAsset/$priceAsset/$id")
       .readTimeout(3.minutes) // TODO find way to decrease timeout!
       .followRedirects(false)
   }
 
-  override def getOrderStatusInfoById(
+  override def getOrderStatusByAddressAndIdWithKey(
     address: String,
     orderId: String,
     headers: Map[String, String] = Map.empty
@@ -421,10 +421,10 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
     basicRequest.get(uri"$apiUri/matcher/settings/rates").headers(apiKeyHeaders)
   }
 
-  override def deleteOrderBook(assetPair: AssetPair): R[HttpMessage] =
-    deleteOrderBook(assetPair.amountAssetStr, assetPair.priceAssetStr, apiKeyHeaders)
+  override def deleteOrderBookWithKey(assetPair: AssetPair): R[HttpMessage] =
+    deleteOrderBookWithKey(assetPair.amountAssetStr, assetPair.priceAssetStr, apiKeyHeaders)
 
-  override def deleteOrderBook(amountAsset: String, priceAsset: String, headers: Map[String, String]): R[HttpMessage] = mk {
+  override def deleteOrderBookWithKey(amountAsset: String, priceAsset: String, headers: Map[String, String]): R[HttpMessage] = mk {
     basicRequest
       .delete(uri"$apiUri/matcher/orderbook/$amountAsset/$priceAsset")
       .followRedirects(false)
@@ -467,7 +467,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
 
   override def saveSnapshots: R[HttpMessage] = saveSnapshots(apiKeyHeaders)
 
-  override def getMatcherSettings: R[HttpMatcherPublicSettings] = mk {
+  override def getMatcherPublicSettings: R[HttpMatcherPublicSettings] = mk {
     basicRequest
       .get(uri"$apiUri/matcher/settings")
       .headers(apiKeyHeaders)
@@ -493,19 +493,19 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
 
   override def getAddressState(address: String): R[HttpAddressState] = getAddressState(address, apiKeyHeaders)
 
-  override def getSystemStatus(headers: Map[String, String]): R[HttpSystemStatus] = mk {
+  override def getMatcherStatus(headers: Map[String, String]): R[HttpSystemStatus] = mk {
     basicRequest
       .get(uri"$apiUri/matcher/debug/status")
       .headers(headers)
   }
 
-  override def getSystemStatus: R[HttpSystemStatus] = getSystemStatus(apiKeyHeaders)
+  override def getMatcherStatus: R[HttpSystemStatus] = getMatcherStatus(apiKeyHeaders)
 
   override def getMatcherPKInBase58: R[String] = mk {
     basicRequest.get(uri"$apiUri/matcher")
   }
 
-  override def print(message: String): R[Unit] = mkIgnore {
+  override def printMessage(message: String): R[Unit] = mkIgnore {
     basicRequest
       .post(uri"$apiUri/matcher/debug/print")
       .headers(apiKeyHeaders)

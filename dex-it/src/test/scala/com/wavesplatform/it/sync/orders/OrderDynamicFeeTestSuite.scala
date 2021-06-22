@@ -425,7 +425,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
       )
 
       dex1.api.place(order)
-      dex1.api.cancelOrder(bob, order).status shouldBe "OrderCanceled"
+      dex1.api.cancelOneOrAllInPairOrdersWithSig(bob, order).status shouldBe "OrderCanceled"
       dex1.api.getReservedBalanceWithApiKey(bob).keys.size shouldBe 0
       dex1.api.getTradableBalanceByAssetPairAndAddress(bob, wavesBtcPair) shouldEqual bobBalance
       dex1.api.deleteAssetRate(btc)
@@ -460,7 +460,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
 
       dex1.api.place(aliceOrder)
       List(bobOrder, aliceOrder).foreach(waitForOrderAtNode(_))
-      dex1.api.cancelOrder(alice, aliceOrder).status shouldBe "OrderCanceled"
+      dex1.api.cancelOneOrAllInPairOrdersWithSig(alice, aliceOrder).status shouldBe "OrderCanceled"
       dex1.api.getReservedBalanceWithApiKey(alice).keys.size shouldBe 0
       wavesNode1.api.balance(alice, eth) shouldBe (aliceEthBalance - 960L) // 960 = 1920/2
       List(btc, eth).foreach(dex1.api.deleteAssetRate)
@@ -487,7 +487,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
 
     dex1.api.getOrderBook(wavesUsdPair).asks shouldBe List(HttpV0LevelAgg(1.waves, 300))
     dex1.api.getReservedBalanceWithApiKey(bob) shouldBe Map(usd -> 1L, Waves -> 1.waves)
-    dex1.api.cancelOrder(bob, bobOrder)
+    dex1.api.cancelOneOrAllInPairOrdersWithSig(bob, bobOrder)
 
     wavesNode1.api.balance(alice, Waves) shouldBe aliceWavesBalance
     wavesNode1.api.balance(alice, usd) shouldBe aliceUsdBalance
@@ -539,7 +539,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
         wavesNode1.api.balance(bob, usd) shouldBe (bobUsdBalance + 1)
         wavesNode1.api.balance(bob, wct) shouldBe (bobWctBalance - 1)
 
-        dex1.api.cancelOrder(alice, aliceOrderId)
+        dex1.api.cancelOneOrAllInPairOrdersWithSig(alice, aliceOrderId)
       }
 
       withClue("price asset is not fee asset") {
@@ -561,7 +561,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
         wavesNode1.api.balance(bob, Waves) shouldBe (bobWavesBalance - 840337L)
         wavesNode1.api.balance(bob, usd) shouldBe (bobUsdBalance + 1)
 
-        dex1.api.cancelOrder(alice, aliceOrderId)
+        dex1.api.cancelOneOrAllInPairOrdersWithSig(alice, aliceOrderId)
       }
 
       withClue("buy order") {
@@ -587,7 +587,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
         wavesNode1.api.balance(alice, Waves) shouldBe (aliceWavesBalance + 840337L)
         wavesNode1.api.balance(alice, usd) shouldBe (aliceUsdBalance - 2)
 
-        dex1.api.cancelOrder(bob, bobOrderId)
+        dex1.api.cancelOneOrAllInPairOrdersWithSig(bob, bobOrderId)
       }
 
       Seq(wct, btc, usd).foreach(dex1.api.deleteAssetRate)
@@ -788,7 +788,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
           dex1.api.getReservedBalanceWithApiKey(alice) shouldBe Map(eth -> 10, Waves -> 100)
           dex1.api.getReservedBalanceWithApiKey(bob) shouldBe empty
 
-          dex1.api.cancelOrder(alice, aliceOrderId)
+          dex1.api.cancelOneOrAllInPairOrdersWithSig(alice, aliceOrderId)
         }
 
         withClue("place sell order") {
@@ -796,7 +796,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
           dex1.api.place(aliceOrderId)
 
           dex1.api.getReservedBalanceWithApiKey(alice) shouldBe Map(eth -> 110)
-          dex1.api.cancelOrder(alice, aliceOrderId)
+          dex1.api.cancelOneOrAllInPairOrdersWithSig(alice, aliceOrderId)
         }
       }
 
@@ -820,7 +820,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
         dex1.api.place(orderId)
 
         dex1.api.getReservedBalanceWithApiKey(alice) shouldBe Map(Waves -> 200, btc -> 20)
-        dex1.api.cancelOrder(alice, orderId)
+        dex1.api.cancelOneOrAllInPairOrdersWithSig(alice, orderId)
         dex1.api.getReservedBalanceWithApiKey(alice) shouldBe empty
       }
     }

@@ -21,7 +21,7 @@ class GetMatcherPublicSettingsSpec extends MatcherSuiteBase with RawHttpChecks {
   "GET /matcher/settings" - {
 
     "should return correct public settings" in {
-      val settings = validate200Json(dex1.rawApi.getMatcherSettings)
+      val settings = validate200Json(dex1.rawApi.getMatcherPublicSettings)
 
       settings.networkByte should be('Y'.toByte)
       settings.matcherPublicKey should be(matcher.publicKey)

@@ -69,7 +69,7 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
     } yield orderBook.asks should have size 100).futureValue(2.minutes)
 
     orders.foreach(dex1.api.waitForOrderStatus(_, HttpOrderStatus.Status.Accepted))
-    dex1.api.cancelAllByPair(alice, wavesUsdPair)
+    dex1.api.cancelOneOrAllInPairOrdersWithSig(alice, wavesUsdPair)
   }
 
   "DEXClient should obtain balance changes when it reconnects after losing connection: " - {

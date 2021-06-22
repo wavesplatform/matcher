@@ -112,7 +112,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
       dex1.api.getTradableBalanceByAssetPairAndAddress(alice, wavesUsdPair)(Waves) shouldBe wavesNode1.api.balance(alice, Waves)
 
       val order = orderHistory.head
-      dex1.api.cancelOrder(bob, order.assetPair, order.id)
+      dex1.api.cancelOneOrAllInPairOrdersWithSig(bob, order.assetPair, order.id)
       dex1.api.waitForOrderStatus(order.assetPair, order.id, Status.Cancelled)
       dex1.api.getTradableBalanceByAssetPairAndAddress(bob, order.assetPair)(Waves) shouldBe wavesNode1.api.balance(bob, Waves)
     }
@@ -145,7 +145,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
 
       // Each side get fair amount of assets
       waitForOrderAtNode(aliceOrder)
-      dex1.api.cancelOrder(bob, bobOrder1)
+      dex1.api.cancelOneOrAllInPairOrdersWithSig(bob, bobOrder1)
     }
 
   }
@@ -164,7 +164,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
       placeAndAwaitAtDex(aliceOrder, Status.Filled)
 
       waitForOrderAtNode(aliceOrder)
-      dex1.api.cancelOrder(bob, bobOrder)
+      dex1.api.cancelOneOrAllInPairOrdersWithSig(bob, bobOrder)
 
       dex1.api.waitForOrderStatus(bobOrder, Status.Cancelled)
 
@@ -210,7 +210,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
       val expectedReservedWaves = matcherFee - AcceptedOrder.partialFee(matcherFee, wctUsdSellAmount, executedAmount)
       dex1.api.getReservedBalanceWithApiKey(bob)(Waves) shouldBe expectedReservedWaves
 
-      dex1.api.cancelOrder(bob, wctUsdPair, dex1.api.getOrderHistoryByPKWithSig(bob).head.id)
+      dex1.api.cancelOneOrAllInPairOrdersWithSig(bob, wctUsdPair, dex1.api.getOrderHistoryByPKWithSig(bob).head.id)
     }
 
     "reserved balance is empty after the total execution" in {
@@ -275,7 +275,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
       eventually {
         dex1.api.getReservedBalanceWithApiKey(bob) shouldBe empty
       }
-      dex1.api.cancelOrder(alice, counter2)
+      dex1.api.cancelOneOrAllInPairOrdersWithSig(alice, counter2)
     }
   }
 
@@ -302,7 +302,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
       .getOrElse(throw new IllegalStateException(s"Alice should have the ${aliceOrder.id()} order"))
 
     order.status shouldBe Status.Cancelled.name
-    dex1.api.cancelOrder(bob, bobOrder)
+    dex1.api.cancelOneOrAllInPairOrdersWithSig(bob, bobOrder)
   }
 
   private def correctAmount(a: Long, price: Long): Long = {

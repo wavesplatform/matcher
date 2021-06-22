@@ -87,7 +87,7 @@ final case class DexContainer private (override val internalIp: String, underlyi
       .continually {
         Thread.sleep(1000)
         try {
-          val s = api.getSystemStatus
+          val s = api.getMatcherStatus
           s.blockchain.isInstanceOf[Status.Working] && s.service == Working
         } catch {
           case _: Throwable => false
@@ -99,7 +99,7 @@ final case class DexContainer private (override val internalIp: String, underlyi
     if (!r.contains(true)) throw new RuntimeException(s"${underlying.containerId} is not ready, all attempts are out")
   }
 
-  override def printDebugMessage(text: String): Unit = asyncRawApi.print(text)
+  override def printDebugMessage(text: String): Unit = asyncRawApi.printMessage(text)
 }
 
 object DexContainer extends ScorexLogging {

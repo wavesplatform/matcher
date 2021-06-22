@@ -364,7 +364,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
       val wsc2 = mkWsOrderBookConnection(wavesBtcPair, dex1)
       assertUpdateId(wsc2, 0)
 
-      dex1.api.cancelOrder(carol, order)
+      dex1.api.cancelOneOrAllInPairOrdersWithSig(carol, order)
       assertUpdateId(wsc1, 2)
       assertUpdateId(wsc2, 1)
     }
@@ -404,7 +404,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
       val wscs = List(wsc1, wsc2, wsc3)
       wscs.foreach(_.receiveAtLeastN[WsOrderBookChanges](1))
 
-      dex1.tryApi.deleteOrderBook(assetPair)
+      dex1.tryApi.deleteOrderBookWithKey(assetPair)
 
       val expectedMessage = WsError(
         timestamp = 0L, // ignored

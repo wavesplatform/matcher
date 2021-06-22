@@ -93,9 +93,9 @@ class GetOrderStatusByAddressAndIdWithKeySpec extends MatcherSuiteBase with ApiK
       )
     }
 
-    shouldReturnErrorWithoutApiKeyHeader(dex1.rawApi.getOrderStatusInfoById(alice.toAddress.stringRepr, order.idStr(), Map.empty))
+    shouldReturnErrorWithoutApiKeyHeader(dex1.rawApi.getOrderStatusByAddressAndIdWithKey(alice.toAddress.stringRepr, order.idStr(), Map.empty))
 
-    shouldReturnErrorWithIncorrectApiKeyValue(dex1.rawApi.getOrderStatusInfoById(
+    shouldReturnErrorWithIncorrectApiKeyValue(dex1.rawApi.getOrderStatusByAddressAndIdWithKey(
       alice.toAddress.stringRepr,
       order.idStr(),
       Map("X-API-KEY" -> "incorrect")
@@ -114,7 +114,7 @@ class GetOrderStatusByAddressAndIdWithKeySpec extends MatcherSuiteBase with ApiK
     "should return an error when address is not a correct base58 string" in {
       val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd)
       validateMatcherError(
-        dex1.rawApi.getOrderStatusInfoById(
+        dex1.rawApi.getOrderStatusByAddressAndIdWithKey(
           "null",
           order.idStr(),
           Map("X-User-Public-Key" -> Base58.encode(alice.publicKey), "X-API-Key" -> apiKey)
@@ -127,7 +127,7 @@ class GetOrderStatusByAddressAndIdWithKeySpec extends MatcherSuiteBase with ApiK
 
     "should return an error when orderId is not a correct base58 string" in {
       validateMatcherError(
-        dex1.rawApi.getOrderStatusInfoById(
+        dex1.rawApi.getOrderStatusByAddressAndIdWithKey(
           alice.toAddress.stringRepr,
           "null",
           Map("X-User-Public-Key" -> Base58.encode(alice.publicKey), "X-API-Key" -> apiKey)

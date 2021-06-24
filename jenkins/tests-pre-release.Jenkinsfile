@@ -17,6 +17,7 @@ pipeline {
         stage ('Trigger job: Test - Kafka') {
             steps {
                 build job: 'Waves.Exchange/Matcher/Matcher Server - OS - Test - Kafka', propagate: false, wait: false, parameters: [
+                  [$class: 'BooleanParameterValue', name: 'JENKINS_SHOULD_BUILD_DOCKER_IMAGE', value: false],
                   [$class: 'GitParameterValue', name: 'BRANCH', value: "${NEW_BRANCH_OR_TAG}"],
                   [$class: 'StringParameterValue', name: 'LABEL', value: "${NEW_BRANCH_OR_TAG} - PRE RELEASE"]
                 ]
@@ -25,6 +26,7 @@ pipeline {
         stage ('Trigger job: Test - Multiple Versions') {
             steps {
                 build job: 'Waves.Exchange/Matcher/Matcher Server - OS - Test - Multiple Versions', propagate: false, wait: false, parameters: [
+                  [$class: 'BooleanParameterValue', name: 'JENKINS_SHOULD_BUILD_DOCKER_IMAGE', value: false],
                   [$class: 'StringParameterValue', name: 'BRANCH', value: "${PREVIOUS_BRANCH_OR_TAG}"],
                   [$class: 'StringParameterValue', name: 'OTHER_DEX_IMAGE', value: "${params.DEX_NEW_IMAGE}"],
                   [$class: 'StringParameterValue', name: 'OTHER_NODE_IMAGE', value: "${params.NODE_NEW_IMAGE}"],
@@ -35,6 +37,7 @@ pipeline {
         stage ('Trigger job: Test - Version') {
             steps {
                 build job: 'Waves.Exchange/Matcher/Matcher Server - OS - Test - Version', propagate: false, wait: false, parameters: [
+                  [$class: 'BooleanParameterValue', name: 'JENKINS_SHOULD_BUILD_DOCKER_IMAGE', value: false],
                   [$class: 'StringParameterValue', name: 'DEX_IMAGE', value: "${params.DEX_NEW_IMAGE}"],
                   [$class: 'StringParameterValue', name: 'NODE_IMAGE', value: "${params.NODE_NEW_IMAGE}"],
                   [$class: 'StringParameterValue', name: 'BRANCH', value: "${PREVIOUS_BRANCH_OR_TAG}"],
@@ -45,6 +48,7 @@ pipeline {
         stage ('Trigger job: Test - Smoke (old node, new dex)') {
             steps {
                 build job: 'Waves.Exchange/Matcher/Matcher Server - OS - Test - Smoke', propagate: false, wait: false, parameters: [
+                  [$class: 'BooleanParameterValue', name: 'JENKINS_SHOULD_BUILD_DOCKER_IMAGE', value: false],
                   [$class: 'StringParameterValue', name: 'DEX_IMAGE', value: "${params.DEX_NEW_IMAGE}"],
                   [$class: 'StringParameterValue', name: 'NODE_IMAGE', value: "${params.NODE_PREVIOUS_IMAGE}"],
                   [$class: 'StringParameterValue', name: 'BRANCH', value: "${NEW_BRANCH_OR_TAG}"],
@@ -55,6 +59,7 @@ pipeline {
         stage ('Trigger job: Test - Smoke (new node, old dex)') {
             steps {
                 build job: 'Waves.Exchange/Matcher/Matcher Server - OS - Test - Smoke', propagate: false, wait: false, parameters: [
+                  [$class: 'BooleanParameterValue', name: 'JENKINS_SHOULD_BUILD_DOCKER_IMAGE', value: false],
                   [$class: 'StringParameterValue', name: 'DEX_IMAGE', value: "${params.DEX_PREVIOUS_IMAGE}"],
                   [$class: 'StringParameterValue', name: 'NODE_IMAGE', value: "${params.NODE_NEW_IMAGE}"],
                   [$class: 'StringParameterValue', name: 'BRANCH', value: "${NEW_BRANCH_OR_TAG}"],

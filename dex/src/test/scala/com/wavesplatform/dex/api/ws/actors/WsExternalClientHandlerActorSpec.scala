@@ -20,7 +20,7 @@ import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
-import com.wavesplatform.dex.error.{AddressAndPublicKeyAreIncompatible, InvalidJwtPayloadSignature, JwtBroken, JwtCommonError, JwtPayloadBroken, OrderAssetPairReversed, RequestArgumentInvalid, SubscriptionAuthTypeUnsupported, SubscriptionTokenExpired, SubscriptionsLimitReached, TokenNetworkUnexpected}
+import com.wavesplatform.dex.error._
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.AssetPairBuilder
 import com.wavesplatform.dex.settings.SubscriptionsSettings

@@ -9,6 +9,11 @@ pipeline {
         string(name: 'DEX_NEW_IMAGE', defaultValue: 'dex-it:master', description: 'New version of the matcher')
     }
     stages {
+        stage('Build Docker') {
+            steps {
+                sh 'sbt dex-it/docker'
+            }
+        }
         stage ('Trigger job: Test - Kafka') {
             steps {
                 build job: 'Waves.Exchange/Matcher/Matcher Server - OS - Test - Kafka', propagate: false, wait: false, parameters: [

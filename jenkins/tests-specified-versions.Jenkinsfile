@@ -10,6 +10,7 @@ pipeline {
     }
     parameters {
         string(name: 'LABEL', defaultValue: '', description: '')
+        booleanParam(name: 'JENKINS_SHOULD_BUILD_DOCKER_IMAGE', defaultValue: true, description: '')
     }
     environment {
         SBT_HOME = tool name: 'sbt-1.2.6', type: 'org.jvnet.hudson.plugins.SbtPluginBuilder$SbtInstallation'
@@ -37,6 +38,9 @@ pipeline {
             }
         }
         stage('Build Docker') {
+            when {
+                expression { params.JENKINS_SHOULD_BUILD_DOCKER_IMAGE == true }
+            }
             steps {
                 sh 'sbt dex-it/docker'
             }

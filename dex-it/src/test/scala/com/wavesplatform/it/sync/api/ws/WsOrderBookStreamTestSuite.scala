@@ -13,7 +13,7 @@ import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
-import com.wavesplatform.dex.error.SubscriptionsLimitReached
+import com.wavesplatform.dex.error.{OrderAssetPairReversed, OrderBookStopped, SubscriptionsLimitReached}
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, OrderRestrictionsSettings}
 import com.wavesplatform.it.api.MatcherCommand
@@ -89,7 +89,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
       wsc.receiveAtLeastN[WsError](1).head should matchTo(
         WsError(
           timestamp = 0L, // ignored
-          code = 9440771, // OrderAssetPairReversed
+          code = OrderAssetPairReversed.code,
           message = s"The $invalidAssetPair asset pair should be reversed"
         )
       )
@@ -408,7 +408,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
 
       val expectedMessage = WsError(
         timestamp = 0L, // ignored
-        code = 8388624, // OrderBookStopped
+        code = OrderBookStopped.code,
         message = s"The order book for $assetPair is stopped, please contact with the administrator"
       )
 

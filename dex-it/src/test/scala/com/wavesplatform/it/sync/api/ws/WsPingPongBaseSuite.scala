@@ -4,7 +4,7 @@ import akka.http.scaladsl.model.Uri
 import akka.http.scaladsl.model.ws.TextMessage
 import com.wavesplatform.dex.api.ws.connection.WsConnection
 import com.wavesplatform.dex.api.ws.protocol._
-import com.wavesplatform.dex.error.InvalidJson
+import com.wavesplatform.dex.error.{InvalidJson, WsConnectionPongTimeout}
 import com.wavesplatform.it.WsSuiteBase
 import com.wavesplatform.dex.Implicits.durationToScalatestTimeout
 
@@ -19,7 +19,7 @@ abstract class WsPingPongBaseSuite extends WsSuiteBase {
 
   protected val pongTimeoutError: WsError = WsError(
     timestamp = 0L, // ignored
-    code = 109077772, // WsConnectionPongTimeout
+    code = WsConnectionPongTimeout.code,
     message = "WebSocket has reached pong timeout"
   )
 

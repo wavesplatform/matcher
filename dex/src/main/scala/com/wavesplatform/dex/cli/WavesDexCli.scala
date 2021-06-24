@@ -25,7 +25,6 @@ import com.wavesplatform.dex.tool.connectors.SuperConnector
 import monix.eval.Task
 import monix.execution.schedulers.SchedulerService
 import monix.execution.{ExecutionModel, Scheduler}
-import pureconfig.ConfigSource
 import scopt.{OParser, RenderingMode}
 import sttp.client3._
 

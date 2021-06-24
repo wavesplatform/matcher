@@ -6,6 +6,7 @@ import com.wavesplatform.dex.api.http.entities.{HttpAssetInfo, HttpOrderStatus}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.error.BalanceNotEnough
 import com.wavesplatform.dex.model.AcceptedOrder
 import com.wavesplatform.it.MatcherSuiteBase
 
@@ -250,7 +251,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
       broadcastAndAwait(leaseTx)
 
       val bobOrder = mkOrder(bob, wctWavesPair, SELL, wctWavesSellAmount, wctWavesPrice)
-      dex1.tryApi.place(bobOrder) should failWith(3147270) // BalanceNotEnough
+      dex1.tryApi.place(bobOrder) should failWith(BalanceNotEnough.code)
 
       broadcastAndAwait(mkLeaseCancel(bob, leaseTx.id()))
     }

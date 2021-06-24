@@ -8,6 +8,7 @@ import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.Order.PriceConstant
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
+import com.wavesplatform.dex.error.OrderInvalidPriceLevel
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.config.DexTestConfig.createAssetPair
@@ -257,14 +258,14 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
 
   "Placing order on level 0" in {
     dex1.tryApi.place(mkOrder(bob, wctUsdPair, BUY, amount * 100000000L, 1, matcherFee)) should failWith(
-      9441286, // OrderInvalidPriceLevel
+      OrderInvalidPriceLevel.code,
       "The buy order's price 0.00000001 does not meet matcher's requirements: price >= 12 (actual tick size). Orders can not be placed into level with price 0"
     )
   }
 
   "Placing order on level 0 with virgin orderbook" in {
     dex1.tryApi.place(mkOrder(bob, wctWavesPair, BUY, amount * 100000000L, 1 * 1000000L, matcherFee)) should failWith(
-      9441286, // OrderInvalidPriceLevel
+      OrderInvalidPriceLevel.code,
       "The buy order's price 0.00000001 does not meet matcher's requirements: price >= 12 (actual tick size). Orders can not be placed into level with price 0"
     )
   }

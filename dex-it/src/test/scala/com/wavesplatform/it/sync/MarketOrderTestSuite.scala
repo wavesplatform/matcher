@@ -8,6 +8,7 @@ import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.error.InvalidMarketOrderPrice
 import com.wavesplatform.dex.model.AcceptedOrderType
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.sync.MarketOrderTestSuite.FeeMode
@@ -359,7 +360,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
       )
 
       dex1.tryApi.placeMarket(mkOrder(bob, wavesUsdPair, BUY, 3.waves, 2.usd, fixedFee)) should failWith(
-        19927055,
+        InvalidMarketOrderPrice.code,
         tooLowPrice("buy", "2")
       )
     }
@@ -371,7 +372,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
       placeOrders(bob, wavesUsdPair, BUY)(amount -> price)
 
       dex1.tryApi.placeMarket(mkOrder(alice, wavesUsdPair, SELL, amount, marketPrice, fixedFee)) should failWith(
-        19927055,
+        InvalidMarketOrderPrice.code,
         tooHighPrice("sell", "0.5")
       )
     }

@@ -3,6 +3,7 @@ package com.wavesplatform.it.sync.orders
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
+import com.wavesplatform.dex.error.{FeeNotEnough, UnexpectedFeeAsset}
 import com.wavesplatform.dex.settings.AssetType._
 
 class V1OrderPercentFeeAmountTestSuite extends OrderPercentFeeAmountTestSuite(1.toByte)
@@ -20,7 +21,7 @@ class V3OrderPercentFeeAmountTestSuite extends OrderPercentFeeAmountTestSuite(3.
         minimalFeeWaves,
         usd
       )
-    ) should failWith(9441540) // UnexpectedFeeAsset
+    ) should failWith(UnexpectedFeeAsset.code)
   }
 
   s"sell order should be rejected is fee Asset not equal WAVES when fee asset-type = $assetType" in {
@@ -34,7 +35,7 @@ class V3OrderPercentFeeAmountTestSuite extends OrderPercentFeeAmountTestSuite(3.
         minimalFeeWaves,
         usd
       )
-    ) should failWith(9441540) // UnexpectedFeeAsset
+    ) should failWith(UnexpectedFeeAsset.code)
   }
 }
 
@@ -147,7 +148,7 @@ abstract class OrderPercentFeeAmountTestSuite(version: Byte) extends OrderFeeBas
           version = version
         )
       ) should failWith(
-        9441542, // FeeNotEnough
+        FeeNotEnough.code,
         "Required 2.1 WAVES as fee for this order, but given 2.09 WAVES"
       )
     }
@@ -164,7 +165,7 @@ abstract class OrderPercentFeeAmountTestSuite(version: Byte) extends OrderFeeBas
           version = version
         )
       ) should failWith(
-        9441542, // FeeNotEnough
+        FeeNotEnough.code,
         "Required 2.1 WAVES as fee for this order, but given 2.09 WAVES"
       )
     }

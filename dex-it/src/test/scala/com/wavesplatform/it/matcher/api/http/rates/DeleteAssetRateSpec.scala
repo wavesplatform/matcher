@@ -4,6 +4,7 @@ import sttp.model.StatusCode
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpRates
 import com.wavesplatform.dex.domain.asset.Asset.Waves
+import com.wavesplatform.dex.error.{AssetNotFound, InvalidAsset, RateNotFound, WavesImmutableRate}
 import com.wavesplatform.dex.it.docker.apiKey
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.matcher.api.http.ApiKeyHeaderChecks
@@ -32,27 +33,37 @@ class DeleteAssetRateSpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
     }
 
     "should return error when rate was not specified" in {
-      validateMatcherError(dex1.rawApi.deleteAssetRate(usd), StatusCode.NotFound, 20971529, s"The rate for the asset $UsdId was not specified")
+      validateMatcherError(
+        dex1.rawApi.deleteAssetRate(usd),
+        StatusCode.NotFound,
+        RateNotFound.code,
+        s"The rate for the asset $UsdId was not specified"
+      )
     }
 
     "should return an error for unexisted asset" in {
       validateMatcherError(
         dex1.rawApi.deleteAssetRate("AAA", Map("X-API-Key" -> apiKey)),
         StatusCode.NotFound,
-        11534345,
+        AssetNotFound.code,
         "The asset AAA not found"
       )
     }
 
     "should return an error when user try to update Waves rate" in {
-      validateMatcherError(dex1.rawApi.deleteAssetRate(Waves), StatusCode.BadRequest, 20971531, "The rate for WAVES cannot be changed")
+      validateMatcherError(
+        dex1.rawApi.deleteAssetRate(Waves),
+        StatusCode.BadRequest,
+        WavesImmutableRate.code,
+        "The rate for WAVES cannot be changed"
+      )
     }
 
     "should return an error when assetId is not a correct base58 string" in {
       validateMatcherError(
         dex1.rawApi.deleteAssetRate("null", Map("X-API-Key" -> apiKey)),
         StatusCode.BadRequest,
-        11534337,
+        InvalidAsset.code,
         "The asset 'null' is wrong, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )
     }

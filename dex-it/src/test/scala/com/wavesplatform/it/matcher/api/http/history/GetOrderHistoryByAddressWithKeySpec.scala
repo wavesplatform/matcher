@@ -4,6 +4,7 @@ import sttp.model.StatusCode
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.account.KeyPair.toAddress
 import com.wavesplatform.dex.domain.order.OrderType.BUY
+import com.wavesplatform.dex.error.InvalidAddress
 import com.wavesplatform.dex.it.docker.apiKey
 import com.wavesplatform.dex.model.OrderStatus
 import com.wavesplatform.it.MatcherSuiteBase
@@ -79,7 +80,7 @@ class GetOrderHistoryByAddressWithKeySpec extends MatcherSuiteBase with ApiKeyHe
       validateMatcherError(
         dex1.rawApi.getOrderHistoryByAddressWithKey("null"),
         StatusCode.BadRequest,
-        4194304,
+        InvalidAddress.code,
         "Provided address in not correct, reason: Unable to decode base58: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )
     }
@@ -88,7 +89,7 @@ class GetOrderHistoryByAddressWithKeySpec extends MatcherSuiteBase with ApiKeyHe
       validateMatcherError(
         dex1.rawApi.getOrderHistoryByAddressWithKey("AAAAA"),
         StatusCode.BadRequest,
-        4194304,
+        InvalidAddress.code,
         "Provided address in not correct, reason: Wrong addressBytes length: expected: 26, actual: 4"
       )
     }

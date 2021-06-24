@@ -299,7 +299,7 @@ object OrderValidator extends ScorexLogging {
         .ensure(error.OrderVersionDenied(order.version, matcherSettings.allowedOrderVersions))(o =>
           matcherSettings.allowedOrderVersions(o.version)
         )
-      _ <- validateBlacklistedAsset(order.feeAsset, error.FeeAssetBlacklisted)
+      _ <- validateBlacklistedAsset(order.feeAsset, error.FeeAssetBlacklisted(_))
       _ <- validateFeeAsset(order, getActualOrderFeeSettings, rateCache)
       _ <- validateFee(order, getActualOrderFeeSettings, feeDecimals, rateCache)
     } yield order
@@ -402,7 +402,7 @@ object OrderValidator extends ScorexLogging {
         (),
         error.WrongExpiration(time.correctedTime(), MinExpiration, order.expiration)
       )
-      _ <- order.isValid(time.correctedTime()).toEither.leftMap(error.OrderCommonValidationFailed)
+      _ <- order.isValid(time.correctedTime()).toEither.leftMap(error.OrderCommonValidationFailed(_))
     } yield order
 
   private def validateBalance(acceptedOrder: AcceptedOrder, tradableBalance: Asset => Long, orderBookCache: OrderBookAggregatedSnapshot)(implicit

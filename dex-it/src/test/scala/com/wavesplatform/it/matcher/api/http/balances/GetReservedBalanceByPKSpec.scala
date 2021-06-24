@@ -7,6 +7,7 @@ import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
+import com.wavesplatform.dex.error.UserPublicKeyIsNotValid
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.matcher.api.http.ApiKeyHeaderChecks
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -61,7 +62,7 @@ class GetReservedBalanceByPKSpec extends MatcherSuiteBase with TableDrivenProper
       validateMatcherError(
         dex1.rawApi.getReservedBalanceByPK("null", System.currentTimeMillis, "sign"),
         StatusCode.BadRequest,
-        3148801,
+        UserPublicKeyIsNotValid.code,
         "Provided public key is not correct, reason: Unable to decode base58: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )
     }

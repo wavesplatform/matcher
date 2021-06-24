@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.api.http.entities
 
+import com.wavesplatform.dex.error.OrderDuplicate
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
@@ -21,7 +22,7 @@ class HttpErrorSpec extends AnyFreeSpec with Matchers with DiffMatcherWithImplic
       |}""".stripMargin
 
   private val message: HttpError = HttpError(
-    error = 3148040,
+    error = OrderDuplicate.code,
     message = "The order 979P14dmPrcmcYhLeMpJFMuDDchdBeL9ouMPUvvYu1YU has already been placed",
     template = "The order {{id}} has already been placed",
     params = Json.obj("id" -> "979P14dmPrcmcYhLeMpJFMuDDchdBeL9ouMPUvvYu1YU"),

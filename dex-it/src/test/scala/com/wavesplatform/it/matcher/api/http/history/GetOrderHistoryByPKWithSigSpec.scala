@@ -7,6 +7,7 @@ import com.wavesplatform.dex.api.http.entities.HttpOrderBookHistoryItem
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.order.OrderType.BUY
+import com.wavesplatform.dex.error.UserPublicKeyIsNotValid
 import com.wavesplatform.dex.it.api.RawHttpChecks
 import com.wavesplatform.dex.model.OrderStatus
 import com.wavesplatform.it.MatcherSuiteBase
@@ -74,7 +75,7 @@ class GetOrderHistoryByPKWithSigSpec extends MatcherSuiteBase with RawHttpChecks
       validateMatcherError(
         dex1.rawApi.getOrderHistoryByPKWithSig("null", ts, sign),
         StatusCode.BadRequest,
-        3148801,
+        UserPublicKeyIsNotValid.code,
         "Provided public key is not correct, reason: Unable to decode base58: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )
     }

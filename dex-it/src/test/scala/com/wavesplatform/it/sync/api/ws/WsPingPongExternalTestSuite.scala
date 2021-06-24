@@ -4,6 +4,7 @@ import akka.http.scaladsl.model.Uri
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.ws.protocol.WsError
 import com.wavesplatform.dex.Implicits.durationToScalatestTimeout
+import com.wavesplatform.dex.error.WsConnectionMaxLifetimeExceeded
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
@@ -41,7 +42,7 @@ class WsPingPongExternalTestSuite extends WsPingPongBaseSuite {
         List(
           WsError(
             timestamp = 0L, // ignored
-            code = 109077767, // WsConnectionMaxLifetimeExceeded
+            code = WsConnectionMaxLifetimeExceeded.code,
             message = "WebSocket has reached max allowed lifetime"
           )
         )

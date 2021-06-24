@@ -8,6 +8,7 @@ import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
+import com.wavesplatform.dex.error.{InvalidBase58String, OrderNotFound}
 import com.wavesplatform.dex.it.api.RawHttpChecks
 import com.wavesplatform.dex.model.AcceptedOrderType
 import com.wavesplatform.it.MatcherSuiteBase
@@ -125,7 +126,7 @@ class GetOrderStatusByPKAndIdWithSigSpec extends MatcherSuiteBase with TableDriv
       validateMatcherError(
         dex1.rawApi.getOrderStatusByPKAndIdWithSig(alice, order),
         StatusCode.NotFound,
-        9437193,
+        OrderNotFound.code,
         s"The order ${order.idStr()} not found"
       )
     }
@@ -137,7 +138,7 @@ class GetOrderStatusByPKAndIdWithSigSpec extends MatcherSuiteBase with TableDriv
       validateMatcherError(
         dex1.rawApi.getOrderStatusByPKAndIdWithSig("null", "null", ts, sign),
         StatusCode.BadRequest,
-        9437185,
+        InvalidBase58String.code,
         s"Provided value is not a correct base58 string, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )
     }
@@ -151,7 +152,7 @@ class GetOrderStatusByPKAndIdWithSigSpec extends MatcherSuiteBase with TableDriv
       validateMatcherError(
         dex1.rawApi.getOrderStatusByPKAndIdWithSig(Base58.encode(alice.publicKey), "null", ts, sign),
         StatusCode.BadRequest,
-        9437185,
+        InvalidBase58String.code,
         s"Provided value is not a correct base58 string, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )
     }

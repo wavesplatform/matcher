@@ -6,6 +6,7 @@ import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.utils.EitherExt2
+import com.wavesplatform.dex.error.AccountScriptDeniedOrder
 import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import com.wavesplatform.dex.it.test.Scripts
 import com.wavesplatform.it.MatcherSuiteBase
@@ -49,7 +50,7 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
         dex1.tryApi.place(
           mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
         ) should failWith(
-          3147522, // AccountScriptDeniedOrder
+          AccountScriptDeniedOrder.code,
           MatcherError.Params(address = Some(alice.toAddress.stringRepr))
         )
 
@@ -75,7 +76,7 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
         dex1.tryApi.place(
           mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
         ) should failWith(
-          3147522, // AccountScriptDeniedOrder
+          AccountScriptDeniedOrder.code,
           MatcherError.Params(address = Some(alice.toAddress.stringRepr))
         )
 

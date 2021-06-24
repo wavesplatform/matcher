@@ -4,6 +4,7 @@ import com.wavesplatform.dex.Implicits.durationToScalatestTimeout
 import com.wavesplatform.dex.domain.account.{KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.error.OrderNotFound
 import com.wavesplatform.dex.waves.WavesFeeConstants._
 import com.wavesplatform.it.api.MatcherCommand
 import org.scalacheck.Gen
@@ -41,7 +42,7 @@ package object it {
       case MatcherCommand.Place(dex, order, _) => dex.asyncTryApi.placeMarket(order).map(_.fold(_ => 0, _ => 1))
       case MatcherCommand.Cancel(dex, owner, order) =>
         dex.asyncTryApi.cancelOneOrAllInPairOrdersWithSig(owner, order).map(_.fold(
-          e => if (e.error == 9437193) 1 else 0, // OrderNotFound in the order book, but the request is saved
+          e => if (e.error == OrderNotFound.code) 1 else 0, // OrderNotFound in the order book, but the request is saved
           _ => 1
         ))
     } catch {

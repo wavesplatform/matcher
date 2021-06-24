@@ -7,6 +7,7 @@ import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.Order.PriceConstant
 import com.wavesplatform.dex.domain.order.OrderType.BUY
+import com.wavesplatform.dex.error.FeeNotEnough
 import com.wavesplatform.it.MatcherSuiteBase
 
 class RatesTestSuite extends MatcherSuiteBase {
@@ -54,7 +55,7 @@ class RatesTestSuite extends MatcherSuiteBase {
 
     // the same order now is rejected
     dex1.tryApi.place(newOrder) should failWith(
-      9441542, // FeeNotEnough
+      FeeNotEnough.code,
       s"Required 0.0033 $btcStr as fee for this order, but given 0.003 $btcStr"
     )
 
@@ -72,7 +73,7 @@ class RatesTestSuite extends MatcherSuiteBase {
 
     // order with low fee should be rejected
     dex1.tryApi.place(newOrder) should failWith(
-      9441542, // FeeNotEnough
+      FeeNotEnough.code,
       s"Required 0.0033 $btcStr as fee for this order, but given 0.003 $btcStr"
     )
 
@@ -81,7 +82,7 @@ class RatesTestSuite extends MatcherSuiteBase {
 
     // order with low fee should be rejected again
     dex1.tryApi.place(newOrder) should failWith(
-      9441542, // FeeNotEnough
+      FeeNotEnough.code,
       s"Required 0.0033 $btcStr as fee for this order, but given 0.003 $btcStr"
     )
   }

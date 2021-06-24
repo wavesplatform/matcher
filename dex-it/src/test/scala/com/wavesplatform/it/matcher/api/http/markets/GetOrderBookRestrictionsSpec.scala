@@ -4,6 +4,7 @@ import sttp.model.StatusCode
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.{HttpMatchingRules, HttpOrderRestrictions}
 import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.error.{AssetNotFound, InvalidAsset, OrderAssetPairReversed}
 import com.wavesplatform.dex.it.api.RawHttpChecks
 import com.wavesplatform.it.MatcherSuiteBase
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -46,7 +47,7 @@ class GetOrderBookRestrictionsSpec extends MatcherSuiteBase with TableDrivenProp
       validateMatcherError(
         dex1.rawApi.getOrderBookRestrictions("null", "WAVES"),
         StatusCode.BadRequest,
-        11534337,
+        InvalidAsset.code,
         "The asset 'null' is wrong, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )
     }
@@ -55,7 +56,7 @@ class GetOrderBookRestrictionsSpec extends MatcherSuiteBase with TableDrivenProp
       validateMatcherError(
         dex1.rawApi.getOrderBookRestrictions("WAVES", "null"),
         StatusCode.BadRequest,
-        11534337,
+        InvalidAsset.code,
         "The asset 'null' is wrong, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )
     }
@@ -74,8 +75,8 @@ class GetOrderBookRestrictionsSpec extends MatcherSuiteBase with TableDrivenProp
 
     forAll(Table(
       ("Amount", "Price", "Http status", "Error code", "Message"),
-      ("incorrect", "WAVES", StatusCode.NotFound, 11534345, "The asset incorrect not found"),
-      ("WAVES", "incorrect", StatusCode.NotFound, 9440771, "The WAVES-incorrect asset pair should be reversed")
+      ("incorrect", "WAVES", StatusCode.NotFound, AssetNotFound.code, "The asset incorrect not found"),
+      ("WAVES", "incorrect", StatusCode.NotFound, OrderAssetPairReversed.code, "The WAVES-incorrect asset pair should be reversed")
     )) { (a: String, p: String, c: StatusCode, e: Int, m: String) =>
       s"for $a/$p should return (HTTP-$c; [$e: $m]) " in {
         validateMatcherError(dex1.rawApi.getOrderBookRestrictions(AssetPair.createAssetPair(a, p).get), c, e, m)

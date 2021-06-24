@@ -11,6 +11,7 @@ import com.wavesplatform.dex.domain.order.Order.Id
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.effect.Implicits.FutureCompanionOps
+import com.wavesplatform.dex.error.{OrderCanceled, OrderFull, OrderNotFound}
 import com.wavesplatform.dex.it.time.GlobalTimer
 import com.wavesplatform.dex.it.time.GlobalTimer.TimerOpsImplicits
 import com.wavesplatform.it.MatcherSuiteBase
@@ -143,7 +144,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
         val order = mkBobOrder
         placeAndAwaitAtDex(order)
 
-        dex1.tryApi.cancelOneOrderWithKey(order.id(), Some(alice.publicKey)) should failWith(9437193) // OrderNotFound
+        dex1.tryApi.cancelOneOrderWithKey(order.id(), Some(alice.publicKey)) should failWith(OrderNotFound.code)
         dex1.api.cancelOrderById(order)
         dex1.api.waitForOrderStatus(order, Status.Cancelled)
       }
@@ -175,7 +176,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       val order = mkOrder(bob, wavesUsdPair, OrderType.SELL, 100.waves, 800)
       placeAndAwaitAtDex(order)
       cancelAndAwait(bob, order)
-      dex1.tryApi.cancelOneOrAllInPairOrdersWithSig(bob, order) should failWith(9437194) // OrderCanceled
+      dex1.tryApi.cancelOneOrAllInPairOrdersWithSig(bob, order) should failWith(OrderCanceled.code)
     }
 
     "when order is fully filled" in {
@@ -184,7 +185,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       placeAndAwaitAtDex(order)
       placeAndAwaitAtNode(mkOrder(alice, wavesUsdPair, OrderType.BUY, 100.waves, 500))
 
-      dex1.tryApi.cancelOneOrAllInPairOrdersWithSig(bob, order) should failWith(9437191, s"The order ${order.id()} is filled")
+      dex1.tryApi.cancelOneOrAllInPairOrdersWithSig(bob, order) should failWith(OrderFull.code, s"The order ${order.id()} is filled")
     }
 
     "when request sender is not the sender of and order" in {
@@ -193,7 +194,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
 
       val r = dex1.tryApi.cancelOneOrAllInPairOrdersWithSig(matcher, order)
       r shouldBe Symbol("left")
-      r.swap.explicitGet().error shouldBe 9437193 // OrderNotFound
+      r.swap.explicitGet().error shouldBe OrderNotFound.code
 
       // Cleanup
       dex1.api.cancelOneOrAllInPairOrdersWithSig(bob, order)

@@ -120,8 +120,8 @@ object Implicits {
 
   object FormatArg extends Poly1 {
 
-    implicit def mapAt[T: Show: Writes]: Case.Aux[(Symbol, T), (String, String, JsValue)] = at[(Symbol, T)] {
-      case (name, arg) => (name.name, arg.show, implicitly[Writes[T]] writes arg)
+    implicit def mapAt[T: Show: Writes]: Case.Aux[(String, T), (String, String, JsValue)] = at[(String, T)] {
+      case (name, arg) => (name, arg.show, implicitly[Writes[T]] writes arg)
     }
 
   }

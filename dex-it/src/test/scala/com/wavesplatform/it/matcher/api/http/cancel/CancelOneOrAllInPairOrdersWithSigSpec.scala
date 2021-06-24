@@ -6,6 +6,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.order.OrderType.BUY
+import com.wavesplatform.dex.error.{OrderCanceled, OrderNotFound}
 import com.wavesplatform.dex.it.api.RawHttpChecks
 import com.wavesplatform.it.MatcherSuiteBase
 
@@ -47,7 +48,7 @@ class CancelOneOrAllInPairOrdersWithSigSpec extends MatcherSuiteBase with RawHtt
       validateMatcherError(
         dex1.rawApi.cancelOneOrAllInPairOrdersWithSig(alice, o),
         StatusCode.BadRequest,
-        9437194,
+        OrderCanceled.code,
         s"The order ${o.idStr()} is canceled"
       )
     }
@@ -58,7 +59,7 @@ class CancelOneOrAllInPairOrdersWithSigSpec extends MatcherSuiteBase with RawHtt
       validateMatcherError(
         dex1.rawApi.cancelOneOrAllInPairOrdersWithSig(alice, o),
         StatusCode.BadRequest,
-        9437193,
+        OrderNotFound.code,
         s"The order ${o.idStr()} not found"
       )
     }

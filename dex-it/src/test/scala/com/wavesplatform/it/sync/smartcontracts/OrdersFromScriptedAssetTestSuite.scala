@@ -6,6 +6,7 @@ import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.utils.EitherExt2
+import com.wavesplatform.dex.error.AssetScriptDeniedOrder
 import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import com.wavesplatform.dex.it.test.Scripts
 import com.wavesplatform.dex.it.waves.{MkWavesEntities, ToWavesJConversions}
@@ -46,7 +47,7 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     val pair = AssetPair(unscriptedAsset, denyAsset)
     val order = mkOrder(matcher, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, matcherFee = smartTradeFee, version = 2)
     dex1.tryApi.place(order) should failWith(
-      11536130, // AssetScriptDeniedOrder
+      AssetScriptDeniedOrder.code,
       MatcherError.Params(assetId = Some(denyAsset.id.toString))
     )
   }

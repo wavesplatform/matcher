@@ -3,6 +3,7 @@ package com.wavesplatform.it.sync.orders
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
+import com.wavesplatform.dex.error.FeeNotEnough
 import com.wavesplatform.dex.settings.AssetType._
 
 class OrderPercentFeeSpendingTestSuite extends OrderFeeBaseTestSuite {
@@ -136,7 +137,7 @@ class OrderPercentFeeSpendingTestSuite extends OrderFeeBaseTestSuite {
             feeAsset = IssuedAsset(UsdId)
           )
         ) should failWith(
-        9441542, // FeeNotEnough
+        FeeNotEnough.code,
         s"Required 2.52 ${UsdId.toString} as fee for this order, but given 2.51 ${UsdId.toString}"
       )
     }
@@ -154,7 +155,7 @@ class OrderPercentFeeSpendingTestSuite extends OrderFeeBaseTestSuite {
             version = version
           )
         ) should failWith(
-        9441542, // FeeNotEnough
+        FeeNotEnough.code,
         "Required 2.1 WAVES as fee for this order, but given 2.09 WAVES"
       )
     }

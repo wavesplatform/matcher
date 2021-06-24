@@ -4,6 +4,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
+import com.wavesplatform.dex.error.{AssetScriptDeniedOrder, FeeNotEnough}
 import com.wavesplatform.dex.it.test.Scripts
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.it.MatcherSuiteBase
@@ -67,7 +68,7 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
         val invalidFee = expectedFee - 1
 
         dex1.tryApi.place(mkOrder(alice, oneSmartPair, SELL, amount, price, invalidFee, version = 2)) should failWith(
-          9441542, // FeeNotEnough
+          FeeNotEnough.code,
           "Required 0.007 WAVES as fee for this order, but given 0.00699999 WAVES"
         )
 
@@ -105,7 +106,7 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
           val invalidFee = expectedFee - 1
 
           dex1.tryApi.place(mkOrder(alice, bothSmartPair, SELL, amount, price, invalidFee, version = 2)) should failWith(
-            9441542, // FeeNotEnough
+            FeeNotEnough.code,
             "Required 0.015 WAVES as fee for this order, but given 0.01499999 WAVES"
           )
 
@@ -171,7 +172,7 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
         val aliceAssetBalance = wavesNode1.api.balance(alice, assetWith2Dec)
 
         dex1.tryApi.place(mkOrder(bob, asset2WithDecWavesPair, SELL, 10000L, 300.waves * 1000000L, 4, feeAsset = assetWith2Dec)) should failWith(
-          9441542, // FeeNotEnough
+          FeeNotEnough.code,
           s"Required 0.05 $assetWith2DecId as fee for this order, but given 0.04 $assetWith2DecId"
         )
 
@@ -216,7 +217,7 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
     dex1.api.upsertAssetRate(falseFeeAsset, feeAssetRate)
 
     dex1.tryApi.place(mkOrder(bob, oneSmartPair, SELL, amount, price, 550, version = 3, feeAsset = falseFeeAsset)) should failWith(
-      11536130, // AssetScriptDeniedOrder
+      AssetScriptDeniedOrder.code,
       s"The asset's script of $falseFeeAssetId rejected the order"
     )
   }

@@ -1,6 +1,7 @@
 package com.wavesplatform.dex.api.http.entities
 
 import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.error.CanNotPersistEvent
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
@@ -31,7 +32,7 @@ class HttpSuccessfulBatchCancelSpec extends AnyFreeSpec with Matchers with DiffM
       Right(HttpSuccessfulSingleCancel(orderId = ByteStr.decodeBase58("8D36dK4snBwJHH9qfDyGo6xP5C4rCH2JPhPbbaJn5mLK").get)),
       Left(
         HttpError(
-          error = 25601,
+          error = CanNotPersistEvent.code,
           message = "Can not persist command, please retry later or contact with the administrator",
           template = "Can not persist command, please retry later or contact with the administrator",
           status = "OrderCancelRejected"

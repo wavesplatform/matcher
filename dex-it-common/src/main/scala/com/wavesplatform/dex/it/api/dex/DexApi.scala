@@ -15,13 +15,13 @@ import play.api.libs.json.JsObject
 trait DexApi[F[_]] {
   def publicKey: F[HttpMatcherPublicKey]
 
-  def getReservedBalance(publicKey: String, timestamp: Long, signature: String): F[HttpBalance]
-  def getReservedBalance(of: KeyPair, timestamp: Long = System.currentTimeMillis): F[HttpBalance]
-  def getReservedBalance(publicKey: String, headers: Map[String, String]): F[HttpBalance]
+  def getReservedBalanceByPK(publicKey: String, timestamp: Long, signature: String): F[HttpBalance]
+  def getReservedBalanceByPK(of: KeyPair, timestamp: Long = System.currentTimeMillis): F[HttpBalance]
+  def getReservedBalanceByPK(publicKey: String, headers: Map[String, String]): F[HttpBalance]
   def getReservedBalanceWithApiKey(of: KeyPair, xUserPublicKey: Option[PublicKey] = None): F[HttpBalance]
 
-  def getTradableBalance(address: String, amountAsset: String, priceAsset: String): F[HttpBalance]
-  def getTradableBalance(of: KeyPair, assetPair: AssetPair): F[HttpBalance]
+  def getTradableBalanceByAssetPairAndAddress(address: String, amountAsset: String, priceAsset: String): F[HttpBalance]
+  def getTradableBalanceByAssetPairAndAddress(of: KeyPair, assetPair: AssetPair): F[HttpBalance]
 
   def place(order: Order): F[HttpSuccessfulPlace]
   def place(order: JsObject): F[HttpSuccessfulPlace]
@@ -29,7 +29,7 @@ trait DexApi[F[_]] {
   def placeMarket(order: JsObject): F[HttpSuccessfulPlace]
   def placeMarket(order: Order): F[HttpSuccessfulPlace]
 
-  def cancelOrder(
+  def cancelOneOrAllInPairOrdersWithSig(
     owner: KeyPair,
     amountAsset: String,
     priceAsset: String,
@@ -38,96 +38,98 @@ trait DexApi[F[_]] {
     signature: ByteStr
   ): F[HttpSuccessfulSingleCancel]
 
-  def cancelOrder(owner: KeyPair, order: Order): F[HttpSuccessfulSingleCancel] = cancelOrder(owner, order.assetPair, order.id())
-  def cancelOrder(owner: KeyPair, assetPair: AssetPair, id: Order.Id): F[HttpSuccessfulSingleCancel]
+  def cancelOneOrAllInPairOrdersWithSig(owner: KeyPair, order: Order): F[HttpSuccessfulSingleCancel] =
+    cancelOneOrAllInPairOrdersWithSig(owner, order.assetPair, order.id())
 
-  def cancelOrderById(id: String, headers: Map[String, String]): F[HttpSuccessfulSingleCancel]
+  def cancelOneOrAllInPairOrdersWithSig(owner: KeyPair, assetPair: AssetPair, id: Order.Id): F[HttpSuccessfulSingleCancel]
+
+  def cancelOneOrderWithKey(id: String, headers: Map[String, String]): F[HttpSuccessfulSingleCancel]
 
   def cancelOrderById(order: Order, xUserPublicKey: Option[PublicKey] = None): F[HttpSuccessfulSingleCancel] =
-    cancelOrderById(order.id(), xUserPublicKey)
+    cancelOneOrderWithKey(order.id(), xUserPublicKey)
 
-  def cancelOrderById(id: Order.Id, xUserPublicKey: Option[PublicKey]): F[HttpSuccessfulSingleCancel]
+  def cancelOneOrderWithKey(id: Order.Id, xUserPublicKey: Option[PublicKey]): F[HttpSuccessfulSingleCancel]
 
-  def cancelAll(sender: KeyPair, timestamp: Long, signature: ByteStr): F[HttpSuccessfulBatchCancel]
-  def cancelAll(owner: KeyPair, timestamp: Long = System.currentTimeMillis): F[HttpSuccessfulBatchCancel]
+  def cancelAllOrdersWithSig(sender: KeyPair, timestamp: Long, signature: ByteStr): F[HttpSuccessfulBatchCancel]
+  def cancelAllOrdersWithSig(owner: KeyPair, timestamp: Long = System.currentTimeMillis): F[HttpSuccessfulBatchCancel]
 
-  def cancelAllByPair(
+  def cancelOneOrAllInPairOrdersWithSig(
     owner: KeyPair,
     assetPair: AssetPair,
     timestamp: Long = System.currentTimeMillis
   ): F[HttpSuccessfulBatchCancel]
 
-  def cancelAllByAddressAndIds(address: String, ids: Set[String]): F[HttpSuccessfulBatchCancel]
+  def cancelOrdersByIdsWithKey(address: String, ids: Set[String]): F[HttpSuccessfulBatchCancel]
 
-  def cancelAllByAddressAndIds(address: String, ids: Set[String], headers: Map[String, String]): F[HttpSuccessfulBatchCancel]
+  def cancelOrdersByIdsWithKey(address: String, ids: Set[String], headers: Map[String, String]): F[HttpSuccessfulBatchCancel]
 
-  def cancelAllByApiKeyAndIds(
+  def cancelOrdersByIdsWithKey(
     owner: Address,
     orderIds: Set[Order.Id],
     xUserPublicKey: Option[PublicKey] = None
   ): F[HttpSuccessfulBatchCancel]
 
-  def getOrderStatus(order: Order): F[HttpOrderStatus] = getOrderStatus(order.assetPair, order.id())
+  def orderStatusByAssetPairAndId(order: Order): F[HttpOrderStatus] = orderStatusByAssetPairAndId(order.assetPair, order.id())
 
-  def getOrderStatus(assetPair: AssetPair, id: Order.Id): F[HttpOrderStatus] =
-    getOrderStatus(assetPair.amountAssetStr, assetPair.priceAssetStr, id.toString)
+  def orderStatusByAssetPairAndId(assetPair: AssetPair, id: Order.Id): F[HttpOrderStatus] =
+    getOrderStatusByAssetPairAndId(assetPair.amountAssetStr, assetPair.priceAssetStr, id.toString)
 
-  def getOrderStatus(amountAsset: String, priceAsset: String, id: String): F[HttpOrderStatus]
+  def getOrderStatusByAssetPairAndId(amountAsset: String, priceAsset: String, id: String): F[HttpOrderStatus]
 
-  def getOrderStatusInfoById(
+  def getOrderStatusByAddressAndIdWithKey(
     address: String,
     orderId: String,
     headers: Map[String, String] = Map.empty
   ): F[HttpOrderBookHistoryItem]
 
-  def getOrderStatusInfoByIdWithApiKey(
+  def getOrderStatusByAddressAndIdWithKey(
     owner: Address,
     orderId: Order.Id,
     xUserPublicKey: Option[PublicKey]
   ): F[HttpOrderBookHistoryItem]
 
-  def getOrderStatusInfoByIdWithSignature(publicKey: String, orderId: String, timestamp: Long, signature: String): F[HttpOrderBookHistoryItem]
+  def getOrderStatusByPKAndIdWithSig(publicKey: String, orderId: String, timestamp: Long, signature: String): F[HttpOrderBookHistoryItem]
 
-  def getOrderStatusInfoByIdWithSignature(publicKey: String, orderId: String, headers: Map[String, String]): F[HttpOrderBookHistoryItem]
+  def getOrderStatusByPKAndIdWithSig(publicKey: String, orderId: String, headers: Map[String, String]): F[HttpOrderBookHistoryItem]
 
-  def getOrderStatusInfoByIdWithSignature(
+  def getOrderStatusByPKAndIdWithSig(
     owner: KeyPair,
     order: Order,
     timestamp: Long = System.currentTimeMillis
   ): F[HttpOrderBookHistoryItem] =
-    getOrderStatusInfoByIdWithSignature(owner, order.id(), timestamp)
+    getOrderStatusByPKAndIdWithSig(owner, order.id(), timestamp)
 
-  def getOrderStatusInfoByIdWithSignature(
+  def getOrderStatusByPKAndIdWithSig(
     owner: KeyPair,
     orderId: Order.Id,
     timestamp: Long
   ): F[HttpOrderBookHistoryItem]
 
-  def getTransactionsByOrder(orderId: String): F[List[ExchangeTransaction]] = getTransactionsByOrder(orderId)
+  def getTransactionsByOrderId(orderId: String): F[List[ExchangeTransaction]] = getTransactionsByOrderId(orderId)
 
-  def getTransactionsByOrder(order: Order): F[List[ExchangeTransaction]] = getTransactionsByOrder(order.id())
+  def getTransactionsByOrderId(order: Order): F[List[ExchangeTransaction]] = getTransactionsByOrderId(order.id())
 
-  def getTransactionsByOrder(id: Order.Id): F[List[ExchangeTransaction]]
+  def getTransactionsByOrderId(id: Order.Id): F[List[ExchangeTransaction]]
 
-  def deleteHistory(owner: KeyPair, assetPair: AssetPair, orderId: String): F[HttpSuccessfulDeleteHistory]
+  def deleteOrderFromHistoryById(owner: KeyPair, assetPair: AssetPair, orderId: String): F[HttpSuccessfulDeleteHistory]
 
-  def getOrderHistoryByApiKey(publicKey: String, timestamp: Long, signature: String): F[List[HttpOrderBookHistoryItem]]
+  def getOrderHistoryByAddressWithKey(publicKey: String, timestamp: Long, signature: String): F[List[HttpOrderBookHistoryItem]]
 
-  def getOrderHistoryByApiKey(address: String): F[List[HttpOrderBookHistoryItem]]
+  def getOrderHistoryByAddressWithKey(address: String): F[List[HttpOrderBookHistoryItem]]
 
-  def getOrderHistoryByApiKey(
+  def getOrderHistoryByAddressWithKey(
     address: String,
     activeOnly: Boolean,
     closedOnly: Boolean,
     headers: Map[String, String]
   ): F[List[HttpOrderBookHistoryItem]]
 
-  def getOrderHistoryByPublicKey(owner: KeyPair): F[List[HttpOrderBookHistoryItem]]
+  def getOrderHistoryByPKWithSig(owner: KeyPair): F[List[HttpOrderBookHistoryItem]]
 
   /**
    * param @activeOnly Server treats this parameter as false if it wasn't specified
    */
-  def getOrderHistoryByPublicKey(
+  def getOrderHistoryByPKWithSig(
     publicKey: String,
     timestamp: Long,
     signature: String
@@ -136,7 +138,7 @@ trait DexApi[F[_]] {
   /**
    * param @activeOnly Server treats this parameter as false if it wasn't specified
    */
-  def getOrderHistoryByPublicKey(
+  def getOrderHistoryByPKWithSig(
     owner: KeyPair,
     activeOnly: Option[Boolean] = None,
     closedOnly: Option[Boolean] = None,
@@ -146,14 +148,14 @@ trait DexApi[F[_]] {
   /**
    * param @activeOnly Server treats this parameter as true if it wasn't specified
    */
-  def orderHistoryWithApiKey(
+  def orderHistoryByAddressWithKey(
     owner: Address,
     activeOnly: Option[Boolean] = None,
     closedOnly: Option[Boolean] = None,
     xUserPublicKey: Option[PublicKey] = None
   ): F[List[HttpOrderBookHistoryItem]]
 
-  def getOrderHistoryByAssetPairAndPublicKey(
+  def getOrderHistoryByAssetPairAndPKWithSig(
     publicKey: String,
     amountAsset: String,
     priceAsset: String,
@@ -164,7 +166,7 @@ trait DexApi[F[_]] {
   /**
    * param @activeOnly Server treats this parameter as false if it wasn't specified
    */
-  def getOrderHistoryByAssetPairAndPublicKey(
+  def getOrderHistoryByAssetPairAndPKWithSig(
     owner: KeyPair,
     assetPair: AssetPair,
     activeOnly: Option[Boolean] = None,
@@ -179,21 +181,21 @@ trait DexApi[F[_]] {
   def getOrderBook(assetPair: AssetPair, depth: String): F[HttpV0OrderBook]
   def getOrderBook(assetPair: AssetPair, depth: Int): F[HttpV0OrderBook]
 
-  def getOrderBookInfo(assetPair: AssetPair): F[HttpOrderBookInfo]
-  def getOrderBookInfo(amountAsset: String, priceAsset: String): F[HttpOrderBookInfo]
+  def getOrderBookRestrictions(assetPair: AssetPair): F[HttpOrderBookInfo]
+  def getOrderBookRestrictions(amountAsset: String, priceAsset: String): F[HttpOrderBookInfo]
 
   def getOrderBookStatus(amountAsset: String, priceAsset: String): F[HttpOrderBookStatus]
   def getOrderBookStatus(assetPair: AssetPair): F[HttpOrderBookStatus]
 
-  def deleteOrderBook(amountAsset: String, priceAsset: String, headers: Map[String, String]): F[HttpMessage]
-  def deleteOrderBook(assetPair: AssetPair): F[HttpMessage]
+  def deleteOrderBookWithKey(amountAsset: String, priceAsset: String, headers: Map[String, String]): F[HttpMessage]
+  def deleteOrderBookWithKey(assetPair: AssetPair): F[HttpMessage]
 
-  def upsertRate(assetId: String, rate: Double, headers: Map[String, String] = Map.empty): F[HttpMessage]
-  def upsertRate(asset: Asset, rate: Double): F[HttpMessage]
-  def upsertRate(asset: Asset, rate: String): F[HttpMessage]
-  def deleteRate(assetId: String, headers: Map[String, String] = Map.empty): F[HttpMessage]
-  def deleteRate(asset: Asset): F[HttpMessage]
-  def getRates: F[HttpRates]
+  def upsertAssetRate(assetId: String, rate: Double, headers: Map[String, String] = Map.empty): F[HttpMessage]
+  def upsertAssetRate(asset: Asset, rate: Double): F[HttpMessage]
+  def upsertAssetRate(asset: Asset, rate: String): F[HttpMessage]
+  def deleteAssetRate(assetId: String, headers: Map[String, String] = Map.empty): F[HttpMessage]
+  def deleteAssetRate(asset: Asset): F[HttpMessage]
+  def getAssetRates: F[HttpRates]
 
   def getCurrentOffset: F[HttpOffset]
   def getCurrentOffset(headers: Map[String, String]): F[HttpOffset]
@@ -210,7 +212,7 @@ trait DexApi[F[_]] {
   def saveSnapshots(headers: Map[String, String]): F[HttpMessage]
   def saveSnapshots: F[HttpMessage]
 
-  def getMatcherSettings: F[HttpMatcherPublicSettings]
+  def getMatcherPublicSettings: F[HttpMatcherPublicSettings]
   def getMatcherConfig: F[Config]
   def getMatcherConfig(headers: Map[String, String]): F[Config]
 
@@ -219,12 +221,12 @@ trait DexApi[F[_]] {
   def getAddressState(address: Address, headers: Map[String, String]): F[HttpAddressState]
   def getAddressState(address: String, headers: Map[String, String]): F[HttpAddressState]
 
-  def getSystemStatus: F[HttpSystemStatus]
-  def getSystemStatus(headers: Map[String, String]): F[HttpSystemStatus]
+  def getMatcherStatus: F[HttpSystemStatus]
+  def getMatcherStatus(headers: Map[String, String]): F[HttpSystemStatus]
 
-  def getMatcherPublicKey: F[String]
+  def getMatcherPKInBase58: F[String]
 
-  def print(message: String): F[Unit]
+  def printMessage(message: String): F[Unit]
 
   def wsConnections: F[HttpWebSocketConnections]
   def closeWsConnections(oldestNumber: Int): F[HttpMessage]

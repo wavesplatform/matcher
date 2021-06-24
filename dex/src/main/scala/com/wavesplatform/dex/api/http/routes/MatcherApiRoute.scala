@@ -111,32 +111,33 @@ class MatcherApiRoute(
   private val invalidUserPublicKey: StandardRoute = complete(SimpleErrorResponse(StatusCodes.Forbidden, error.UserPublicKeyIsNotValid()))
 
   private val ratesRoutes: Route = pathPrefix("rates") {
-    getRates ~ matcherStatusBarrier(upsertRate ~ deleteRate)
+    getAssetRates ~ matcherStatusBarrier(upsertAssetRate ~ deleteAssetRate)
   }
 
-  private val settingsRoutes: Route = pathPrefix("settings")(getSettings ~ ratesRoutes)
-  private val balanceRoutes: Route = pathPrefix("balance")(reservedBalance)
-  private val transactionsRoutes: Route = pathPrefix("transactions")(getOrderTransactions)
+  private val settingsRoutes: Route = pathPrefix("settings")(getMatcherPublicSettings ~ ratesRoutes)
+  private val balanceRoutes: Route = pathPrefix("balance")(getReservedBalanceByPK)
+  private val transactionsRoutes: Route = pathPrefix("transactions")(getTransactionsByOrderId)
 
   private val debugRoutes: Route = pathPrefix("debug") {
     getMatcherStatus ~ getAddressState ~ getMatcherConfig ~ getCurrentOffset ~ getLastOffset ~
-    getOldestSnapshotOffset ~ getAllSnapshotOffsets ~ saveSnapshots ~ print
+    getOldestSnapshotOffset ~ getAllSnapshotOffsets ~ saveSnapshots ~ printMessage
   }
 
   private val orderBookRoutes: Route = pathPrefix("orderbook") {
     matcherStatusBarrier {
-      getOrderBookInfo ~ getOrderStatusInfoByIdWithSignature ~ getOrderBook ~ getOrderBookStatus ~ placeLimitOrder ~ placeMarketOrder ~
-      getOrderHistoryByAssetPairAndPublicKey ~ getOrderHistoryByPublicKey ~ tradableBalance ~ orderStatus ~ deleteHistory ~ cancel ~
-      cancelAll ~ getOrderBooks ~ deleteOrderBook
+      getOrderBookRestrictions ~ getOrderStatusByPKAndIdWithSig ~ getOrderBook ~ getOrderBookStatus ~ placeLimitOrder ~ placeMarketOrder ~
+      getOrderHistoryByAssetPairAndPKWithSig ~ getOrderHistoryByPKWithSig ~
+      getTradableBalanceByAssetPairAndAddress ~ getOrderStatusByAssetPairAndId ~ deleteOrderFromHistoryById ~ cancelOneOrAllInPairOrdersWithSig ~
+      cancelAllOrdersWithSig ~ getOrderBooks ~ deleteOrderBookWithKey
     }
   }
 
   private val ordersRoutes: Route = pathPrefix("orders") {
-    matcherStatusBarrier(getOrderHistoryByApiKey ~ getOrderStatusInfoByIdWithApiKey ~ cancelAllByApiKeyAndIds ~ cancelByApi)
+    matcherStatusBarrier(getOrderHistoryByAddressWithKey ~ getOrderStatusByAddressAndIdWithKey ~ cancelOrdersByIdsWithKey ~ cancelOneOrderWithKey)
   }
 
   override lazy val route: Route = pathPrefix("matcher") {
-    getMatcherPublicKey ~ settingsRoutes ~ debugRoutes ~ orderBookRoutes ~ ordersRoutes ~ balanceRoutes ~ transactionsRoutes
+    getMatcherPKInBase58 ~ settingsRoutes ~ debugRoutes ~ orderBookRoutes ~ ordersRoutes ~ balanceRoutes ~ transactionsRoutes
   }
 
   private def withAssetPair(
@@ -222,7 +223,7 @@ class MatcherApiRoute(
       }
     }
 
-  @Path("/")
+  @Path("/#getMatcherPKInBase58")
   @ApiOperation(
     value = "Matcher Public Key",
     notes = "Get Matcher Public Key in Base58",
@@ -230,10 +231,10 @@ class MatcherApiRoute(
     tags = Array("info"),
     response = classOf[String]
   )
-  def getMatcherPublicKey: Route =
-    (pathEndOrSingleSlash & get)((measureResponse("getMatcherPublicKey") & protect)(complete(matcherPublicKey.toJson)))
+  def getMatcherPKInBase58: Route =
+    (pathEndOrSingleSlash & get)((measureResponse("getMatcherPKInBase58") & protect)(complete(matcherPublicKey.toJson)))
 
-  @Path("/settings")
+  @Path("/settings#getMatcherPublicSettings")
   @ApiOperation(
     value = "Matcher Settings",
     notes = "Get Matcher Public Settings",
@@ -241,9 +242,9 @@ class MatcherApiRoute(
     tags = Array("info"),
     response = classOf[HttpMatcherPublicSettings]
   )
-  def getSettings: Route =
+  def getMatcherPublicSettings: Route =
     (pathEndOrSingleSlash & get) {
-      measureResponse("getSettings") {
+      measureResponse("getMatcherPublicSettings") {
         complete(
           validatedAllowedOrderVersions() map { allowedOrderVersions =>
             SimpleResponse(
@@ -265,7 +266,7 @@ class MatcherApiRoute(
       }
     }
 
-  @Path("/settings/rates")
+  @Path("/settings/rates#getAssetRates")
   @ApiOperation(
     value = "Asset rates",
     notes = "Get current rates of assets (price of 1 Waves in the specified asset), returns Map[Base58 encoded Asset ID, Double]",
@@ -273,11 +274,11 @@ class MatcherApiRoute(
     tags = Array("rates"),
     response = classOf[HttpRates]
   )
-  def getRates: Route = (pathEndOrSingleSlash & get)(measureResponse("getRates")(complete(rateCache.getAllRates.toJson)))
+  def getAssetRates: Route = (pathEndOrSingleSlash & get)(measureResponse("getAssetRates")(complete(rateCache.getAllRates.toJson)))
 
-  @Path("/settings/rates/{assetId}")
+  @Path("/settings/rates/{assetId}#upsertAssetRate")
   @ApiOperation(
-    value = "Add or update rate for the specified asset",
+    value = "Add or update rate for the specified asset. Requires API Key",
     httpMethod = "PUT",
     authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
     tags = Array("rates"),
@@ -295,9 +296,9 @@ class MatcherApiRoute(
       )
     )
   )
-  def upsertRate: Route =
+  def upsertAssetRate: Route =
     (path(AssetPM) & put) { assetOrError =>
-      (measureResponse("upsertRate") & protect & withAuth) {
+      (measureResponse("upsertAssetRate") & protect & withAuth) {
         entity(as[Double]) { rate =>
           if (rate.isInfinite || rate <= 0)
             complete(RateError(error.InvalidAssetRate))
@@ -321,9 +322,9 @@ class MatcherApiRoute(
       }
     }
 
-  @Path("/settings/rates/{assetId}")
+  @Path("/settings/rates/{assetId}#deleteAssetRate")
   @ApiOperation(
-    value = "Delete rate for the specified asset",
+    value = "Delete rate for the specified asset. Requires API Key",
     httpMethod = "DELETE",
     authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
     tags = Array("rates"),
@@ -334,9 +335,9 @@ class MatcherApiRoute(
       new ApiImplicitParam(name = "assetId", value = "Asset for which rate is deleted", dataType = "string", paramType = "path")
     )
   )
-  def deleteRate: Route =
+  def deleteAssetRate: Route =
     (path(AssetPM) & delete) { assetOrError =>
-      (measureResponse("deleteRate") & protect & withAuth) {
+      (measureResponse("deleteAssetRate") & protect & withAuth) {
         withAsset(assetOrError) { asset =>
           complete(
             if (asset == Waves) RateError(error.WavesImmutableRate)
@@ -354,7 +355,7 @@ class MatcherApiRoute(
       }
     }
 
-  @Path("/orderbook/{amountAsset}/{priceAsset}")
+  @Path("/orderbook/{amountAsset}/{priceAsset}#getOrderBook")
   @ApiOperation(
     value = "Get Order Book for a given Asset Pair",
     notes = "Get Order Book for a given Asset Pair",
@@ -395,7 +396,7 @@ class MatcherApiRoute(
       }
     }
 
-  @Path("/orderbook/{amountAsset}/{priceAsset}/status")
+  @Path("/orderbook/{amountAsset}/{priceAsset}/status#getOrderBookStatus")
   @ApiOperation(
     value = "Get Market Status",
     notes = "Get current market data such as last trade, best bid and ask",
@@ -418,7 +419,7 @@ class MatcherApiRoute(
       }
     }
 
-  @Path("/orderbook/{amountAsset}/{priceAsset}/info")
+  @Path("/orderbook/{amountAsset}/{priceAsset}/info#getOrderBookRestrictions")
   @ApiOperation(
     value = "Get Order Restrictions for the specified Asset Pair",
     httpMethod = "GET",
@@ -431,11 +432,11 @@ class MatcherApiRoute(
       new ApiImplicitParam(name = "priceAsset", value = "Price Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path")
     )
   )
-  def getOrderBookInfo: Route =
+  def getOrderBookRestrictions: Route =
     (path(AssetPairPM / "info") & get) { pairOrError =>
-      (measureResponse("getOrderBookInfo") & protect) {
+      (measureResponse("getOrderBookRestrictions") & protect) {
         withAssetPair(pairOrError, redirectToInverse = true, suffix = "/info") { pair =>
-          complete(getOrderBookInfo(pair).value.map {
+          complete(getOrderBookRestrictions(pair).value.map {
             case Right(x) => SimpleResponse(x)
             case Left(e) => InfoNotFound(e)
           })
@@ -443,14 +444,14 @@ class MatcherApiRoute(
       }
     }
 
-  private def getOrderBookInfo(pair: AssetPair): FutureResult[HttpOrderBookInfo] = getActualTickSize(pair).map { tickSize =>
+  private def getOrderBookRestrictions(pair: AssetPair): FutureResult[HttpOrderBookInfo] = getActualTickSize(pair).map { tickSize =>
     HttpOrderBookInfo(
       restrictions = matcherSettings.orderRestrictions.get(pair).map(HttpOrderRestrictions.fromSettings),
       matchingRules = HttpMatchingRules(tickSize = tickSize.toDouble)
     )
   }
 
-  @Path("/orderbook")
+  @Path("/orderbook#placeLimitOrder")
   @ApiOperation(
     value = "Place Limit Order",
     notes = "Place a new limit order (buy or sell)",
@@ -473,7 +474,7 @@ class MatcherApiRoute(
   )
   def placeLimitOrder: Route = placeOrder(none, isMarket = false)
 
-  @Path("/orderbook/market")
+  @Path("/orderbook/market#placeMarketOrder")
   @ApiOperation(
     value = "Place Market Order",
     notes = "Place a new market order (buy or sell)",
@@ -496,7 +497,7 @@ class MatcherApiRoute(
   )
   def placeMarketOrder: Route = placeOrder(PathMatcher("market").some, isMarket = true)
 
-  @Path("/orderbook")
+  @Path("/orderbook#getOrderBooks")
   @ApiOperation(
     value = "Get the open trading markets",
     notes = "Get the open trading markets along with trading pairs meta data",
@@ -511,7 +512,7 @@ class MatcherApiRoute(
           (matcher ? GetMarkets).mapTo[List[MarketData]].flatMap { markets =>
             markets
               .map { md =>
-                getOrderBookInfo(md.pair)
+                getOrderBookRestrictions(md.pair)
                   .map { meta =>
                     HttpMarketDataWithMeta(
                       md.pair.amountAsset,
@@ -576,7 +577,7 @@ class MatcherApiRoute(
       handleCancelRequestToRoute(assetPair, req.sender, req.orderId, req.timestamp)
     }
 
-  @Path("/orderbook/{amountAsset}/{priceAsset}/cancel")
+  @Path("/orderbook/{amountAsset}/{priceAsset}/cancel#cancelOneOrAllInPairOrdersWithSig")
   @ApiOperation(
     value = "Cancel Order",
     notes = "Cancel previously submitted Order if it's not already filled completely",
@@ -599,9 +600,9 @@ class MatcherApiRoute(
       )
     )
   )
-  def cancel: Route = // DEX-1192 docs/places-and-cancels.md
+  def cancelOneOrAllInPairOrdersWithSig: Route = // DEX-1192 docs/places-and-cancels.md
     (path(AssetPairPM / "cancel") & post) { pairOrError =>
-      (measureResponse("cancel") & protect) {
+      (measureResponse("cancelOneOrAllInPairOrdersWithSig") & protect) {
         withAssetPair(pairOrError, formatError = e => OrderCancelRejected(e)) { pair =>
           handleCancelRequestToRoute(Some(pair))
 
@@ -609,7 +610,7 @@ class MatcherApiRoute(
       }
     }
 
-  @Path("/orderbook/cancel")
+  @Path("/orderbook/cancel#cancelAllOrdersWithSig")
   @ApiOperation(
     value = "Cancel all active orders",
     httpMethod = "POST",
@@ -629,11 +630,12 @@ class MatcherApiRoute(
       )
     )
   )
-  def cancelAll: Route = (path("cancel") & post)((measureResponse("cancelAll") & protect)(handleCancelRequestToRoute(None)))
+  def cancelAllOrdersWithSig: Route =
+    (path("cancel") & post)((measureResponse("cancelAllOrdersWithSig") & protect)(handleCancelRequestToRoute(None)))
 
-  @Path("/orders/{address}/cancel")
+  @Path("/orders/{address}/cancel#cancelOrdersByIdsWithKey")
   @ApiOperation(
-    value = "Cancel active orders by IDs",
+    value = "Cancel active orders by IDs. Requires API Key",
     httpMethod = "POST",
     authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
     produces = "application/json",
@@ -653,7 +655,7 @@ class MatcherApiRoute(
       )
     )
   )
-  def cancelAllByApiKeyAndIds: Route =
+  def cancelOrdersByIdsWithKey: Route =
     (path(AddressPM / "cancel") & post) { addressOrError =>
       (measureResponse("cancelAllByApiKeyAndIds") & protect) {
         (withAuth & withUserPublicKeyOpt) { userPublicKey =>
@@ -674,9 +676,9 @@ class MatcherApiRoute(
       }
     }
 
-  @Path("/orders/cancel/{orderId}")
+  @Path("/orders/cancel/{orderId}#cancelOneOrderWithKey")
   @ApiOperation(
-    value = "Cancel Order by ID without signature",
+    value = "Cancel Order by ID without signature. Requires API Key",
     notes = "Cancel Order by ID without signature",
     httpMethod = "POST",
     authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
@@ -696,9 +698,9 @@ class MatcherApiRoute(
       )
     )
   )
-  def cancelByApi: Route =
+  def cancelOneOrderWithKey: Route =
     (path("cancel" / OrderPM) & post) { orderIdOrError =>
-      (measureResponse("cancelByApi") & protect) {
+      (measureResponse("cancelOneOrderWithKey") & protect) {
         (withAuth & withUserPublicKeyOpt) { maybeUserPublicKey =>
           withOrderId(orderIdOrError) { orderId =>
             complete {
@@ -720,7 +722,7 @@ class MatcherApiRoute(
       }
     }
 
-  @Path("/orderbook/{amountAsset}/{priceAsset}/delete")
+  @Path("/orderbook/{amountAsset}/{priceAsset}/delete#deleteOrderFromHistoryById")
   @Deprecated
   @ApiOperation(
     value = "Delete Order from History by Id",
@@ -744,9 +746,9 @@ class MatcherApiRoute(
       )
     )
   )
-  def deleteHistory: Route =
+  def deleteOrderFromHistoryById: Route =
     path(AssetPairPM / "delete") { _ =>
-      (measureResponse("deleteHistory") & protect) {
+      (measureResponse("deleteOrderFromHistoryById") & protect) {
         post {
           entity(as[HttpCancelOrder]) { req =>
             complete {
@@ -766,7 +768,7 @@ class MatcherApiRoute(
     }
   }
 
-  @Path("/orderbook/{amountAsset}/{priceAsset}/publicKey/{publicKey}")
+  @Path("/orderbook/{amountAsset}/{priceAsset}/publicKey/{publicKey}#getOrderHistoryByAssetPairAndPKWithSig")
   @ApiOperation(
     value = "Order History by Asset Pair and Public Key",
     notes = "Get Order History for a given Asset Pair and Public Key",
@@ -805,9 +807,9 @@ class MatcherApiRoute(
       )
     )
   )
-  def getOrderHistoryByAssetPairAndPublicKey: Route =
+  def getOrderHistoryByAssetPairAndPKWithSig: Route =
     (path(AssetPairPM / "publicKey" / PublicKeyPM) & get) { (pairOrError, publicKeyOrError) =>
-      (measureResponse("getOrderHistoryByAssetPairAndPublicKey") & protect) {
+      (measureResponse("getOrderHistoryByAssetPairAndPKWithSig") & protect) {
         withPublicKey(publicKeyOrError) { publicKey =>
           withAssetPair(pairOrError, redirectToInverse = true, s"/publicKey/$publicKey") { pair =>
             parameters("activeOnly".as[Boolean].?, "closedOnly".as[Boolean].?) { (activeOnly, closedOnly) =>
@@ -820,7 +822,7 @@ class MatcherApiRoute(
       }
     }
 
-  @Path("/orderbook/{publicKey}")
+  @Path("/orderbook/{publicKey}#getOrderHistoryByPKWithSig")
   @ApiOperation(
     value = "Order History by Public Key",
     notes = "Get Order History for a given Public Key",
@@ -857,9 +859,9 @@ class MatcherApiRoute(
       )
     )
   )
-  def getOrderHistoryByPublicKey: Route =
+  def getOrderHistoryByPKWithSig: Route =
     (path(PublicKeyPM) & get) { publicKeyOrError =>
-      (measureResponse("getOrderHistoryByPublicKey") & protect) {
+      (measureResponse("getOrderHistoryByPKWithSig") & protect) {
         parameters("activeOnly".as[Boolean].?, "closedOnly".as[Boolean].?) { (activeOnly, closedOnly) =>
           withPublicKey(publicKeyOrError) { publicKey =>
             signedGet(publicKey) {
@@ -870,9 +872,9 @@ class MatcherApiRoute(
       }
     }
 
-  @Path("/orders/{address}")
+  @Path("/orders/{address}#getOrderHistoryByAddressWithKey")
   @ApiOperation(
-    value = "All Order History by Address",
+    value = "All Order History by Address. Requires API Key",
     notes = "Get All Order History for a given address",
     httpMethod = "GET",
     authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
@@ -900,7 +902,7 @@ class MatcherApiRoute(
       )
     )
   )
-  def getOrderHistoryByApiKey: Route =
+  def getOrderHistoryByAddressWithKey: Route =
     (path(AddressPM) & get) { addressOrError =>
       (measureResponse("getOrderHistoryByApiKey") & protect) {
         (withAuth & withUserPublicKeyOpt) { userPublicKey =>
@@ -926,9 +928,9 @@ class MatcherApiRoute(
     }
   }
 
-  @Path("/orders/{address}/{orderId}")
+  @Path("/orders/{address}/{orderId}#getOrderStatusByAddressAndIdWithKey")
   @ApiOperation(
-    value = "Order Status Info by Address and ID without signature",
+    value = "Order Status Info by Address and ID without signature. Requires API Key",
     notes = "Get Status Info of the specified order for a given address without signature",
     httpMethod = "GET",
     authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
@@ -949,9 +951,9 @@ class MatcherApiRoute(
       )
     )
   )
-  def getOrderStatusInfoByIdWithApiKey: Route =
+  def getOrderStatusByAddressAndIdWithKey: Route =
     (path(AddressPM / OrderPM) & get) { (addressOrError, orderIdOrError) =>
-      (measureResponse("getOrderStatusInfoByIdWithApiKey") & protect) {
+      (measureResponse("getOrderStatusByAddressAndIdWithKey") & protect) {
         (withAuth & withUserPublicKeyOpt) {
           userPublicKey =>
             withAddress(addressOrError) { address =>
@@ -967,12 +969,11 @@ class MatcherApiRoute(
     }
 
   // https://github.com/OAI/OpenAPI-Specification/issues/146#issuecomment-117288707
-  @Path("/orderbook/{publicKey}/{orderId}#getOrderStatusInfoByIdWithSignature")
+  @Path("/orderbook/{publicKey}/{orderId}#getOrderStatusByPKAndIdWithSig")
   @ApiOperation(
     value = "Order Status Info by Public Key and ID",
     notes = "Get Status Info of the specified order for a given public key",
     httpMethod = "GET",
-    authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
     tags = Array("status"),
     response = classOf[HttpOrderBookHistoryItem]
   )
@@ -990,9 +991,9 @@ class MatcherApiRoute(
       )
     )
   )
-  def getOrderStatusInfoByIdWithSignature: Route =
+  def getOrderStatusByPKAndIdWithSig: Route =
     (path(PublicKeyPM / OrderPM) & get) { (publicKeyOrError, orderIdOrError) =>
-      (measureResponse("getOrderStatusInfoByIdWithSignature") & protect) {
+      (measureResponse("getOrderStatusByPKAndIdWithSig") & protect) {
         withOrderId(orderIdOrError) { orderId =>
           withPublicKey(publicKeyOrError) { publicKey =>
             signedGet(publicKey) {
@@ -1003,7 +1004,7 @@ class MatcherApiRoute(
       }
     }
 
-  @Path("/orderbook/{amountAsset}/{priceAsset}/tradableBalance/{address}")
+  @Path("/orderbook/{amountAsset}/{priceAsset}/tradableBalance/{address}#getTradableBalanceByAssetPairAndAddress")
   @ApiOperation(
     value = "Tradable Balance for Asset Pair",
     notes = "Get Tradable Balance for the given Asset Pair, returns Map[Base58 encoded Asset ID, Long]",
@@ -1018,9 +1019,9 @@ class MatcherApiRoute(
       new ApiImplicitParam(name = "address", value = "Account Address", required = true, dataType = "string", paramType = "path")
     )
   )
-  def tradableBalance: Route =
+  def getTradableBalanceByAssetPairAndAddress: Route =
     (path(AssetPairPM / "tradableBalance" / AddressPM) & get) { (pairOrError, addressOrError) =>
-      (measureResponse("tradableBalance") & protect) {
+      (measureResponse("getTradableBalanceByAssetPairAndAddress") & protect) {
         withAddress(addressOrError) { address =>
           withAssetPair(pairOrError, redirectToInverse = true, s"/tradableBalance/$address") { pair =>
             complete {
@@ -1031,9 +1032,9 @@ class MatcherApiRoute(
       }
     }
 
-  @Path("/balance/reserved/{publicKey}")
+  @Path("/balance/reserved/{publicKey}#getReservedBalanceByPK")
   @ApiOperation(
-    value = "Reserved Balance",
+    value = "Reserved Balance. Requires API Key if signature isn't provided",
     notes = "Get non-zero balance of open orders, returns Map[Base58 encoded Asset ID, Long]",
     httpMethod = "GET",
     tags = Array("balances"),
@@ -1052,8 +1053,8 @@ class MatcherApiRoute(
       )
     )
   )
-  def reservedBalance: Route = (path("reserved" / PublicKeyPM) & get) { publicKeyOrError =>
-    (measureResponse("reservedBalance") & protect) {
+  def getReservedBalanceByPK: Route = (path("reserved" / PublicKeyPM) & get) { publicKeyOrError =>
+    (measureResponse("getReservedBalanceByPK") & protect) {
       withPublicKey(publicKeyOrError) { publicKey =>
         (signedGet(publicKey).tmap(_ => Option.empty[PublicKey]) | (withAuth & withUserPublicKeyOpt)) {
           case Some(upk) if upk != publicKey => invalidUserPublicKey
@@ -1066,7 +1067,7 @@ class MatcherApiRoute(
     }
   }
 
-  @Path("/orderbook/{amountAsset}/{priceAsset}/{orderId}")
+  @Path("/orderbook/{amountAsset}/{priceAsset}/{orderId}#getOrderStatusByAssetPairAndId")
   @ApiOperation(
     value = "Order Status",
     notes = "Get Order status for a given Asset Pair during the last 30 days",
@@ -1081,8 +1082,8 @@ class MatcherApiRoute(
       new ApiImplicitParam(name = "orderId", value = "Order ID", required = true, dataType = "string", paramType = "path")
     )
   )
-  def orderStatus: Route = (path(AssetPairPM / OrderPM) & get) { (pairOrError, orderIdOrError) =>
-    (measureResponse("orderStatus") & protect) {
+  def getOrderStatusByAssetPairAndId: Route = (path(AssetPairPM / OrderPM) & get) { (pairOrError, orderIdOrError) =>
+    (measureResponse("getOrderStatusByAssetPairAndId") & protect) {
       withOrderId(orderIdOrError) { orderId =>
         withAssetPair(pairOrError, redirectToInverse = true, s"/$orderId") { _ =>
           val future =
@@ -1114,9 +1115,9 @@ class MatcherApiRoute(
     }
   }
 
-  @Path("/orderbook/{amountAsset}/{priceAsset}")
+  @Path("/orderbook/{amountAsset}/{priceAsset}#deleteOrderBookWithKey")
   @ApiOperation(
-    value = "Remove Order Book for a given Asset Pair",
+    value = "Remove Order Book for a given Asset Pair. Requires API Key",
     notes = "Remove Order Book for a given Asset Pair. Attention! Use this method only when clients can't place orders on this pair!",
     httpMethod = "DELETE",
     authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
@@ -1129,9 +1130,9 @@ class MatcherApiRoute(
       new ApiImplicitParam(name = "priceAsset", value = "Price Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path")
     )
   )
-  def deleteOrderBook: Route =
+  def deleteOrderBookWithKey: Route =
     (path(AssetPairPM) & delete) { pairOrError =>
-      (measureResponse("deleteOrderBook") & protect & withAuth) {
+      (measureResponse("deleteOrderBookWithKey") & protect & withAuth) {
         withAssetPair(pairOrError, validate = false) { pair =>
           orderBook(pair) match {
             case Some(Right(_)) =>
@@ -1152,7 +1153,7 @@ class MatcherApiRoute(
       }
     }
 
-  @Path("/transactions/{orderId}")
+  @Path("/transactions/{orderId}#getTransactionsByOrderId")
   @ApiOperation(
     value = "Get Exchange Transactions by Order",
     notes = "Get all exchange transactions created by DEX on execution of the given order",
@@ -1165,9 +1166,9 @@ class MatcherApiRoute(
       new ApiImplicitParam(name = "orderId", value = "Order ID", dataType = "string", paramType = "path")
     )
   )
-  def getOrderTransactions: Route =
+  def getTransactionsByOrderId: Route =
     (path(OrderPM) & get) { orderIdOrError =>
-      (measureResponse("getOrderTransactions") & protect) {
+      (measureResponse("getTransactionsByOrderId") & protect) {
         withOrderId(orderIdOrError) { orderId =>
           complete {
             orderDb.transactionsByOrder(orderId).map(x => ToResponseMarshallable(Json.toJson(x))).recover {
@@ -1180,9 +1181,9 @@ class MatcherApiRoute(
       }
     }
 
-  @Path("/debug/config")
+  @Path("/debug/config#getMatcherConfig")
   @ApiOperation(
-    value = "Returns current matcher's configuration",
+    value = "Returns current matcher's configuration. Requires API Key",
     httpMethod = "GET",
     authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
     tags = Array("debug"),
@@ -1198,9 +1199,9 @@ class MatcherApiRoute(
       }
     }
 
-  @Path("/debug/currentOffset")
+  @Path("/debug/currentOffset#getCurrentOffset")
   @ApiOperation(
-    value = "Get the current offset in the queue",
+    value = "Get the current offset in the queue. Requires API Key",
     httpMethod = "GET",
     authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
     tags = Array("debug"),
@@ -1213,9 +1214,9 @@ class MatcherApiRoute(
       }
     }
 
-  @Path("/debug/lastOffset")
+  @Path("/debug/lastOffset#getLastOffset")
   @ApiOperation(
-    value = "Get the last offset in the queue",
+    value = "Get the last offset in the queue. Requires API Key",
     httpMethod = "GET",
     authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
     tags = Array("debug"),
@@ -1228,9 +1229,9 @@ class MatcherApiRoute(
       }
     }
 
-  @Path("/debug/oldestSnapshotOffset")
+  @Path("/debug/oldestSnapshotOffset#getOldestSnapshotOffset")
   @ApiOperation(
-    value = "Get the oldest snapshot's offset in the queue",
+    value = "Get the oldest snapshot's offset in the queue. Requires API Key",
     httpMethod = "GET",
     authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
     tags = Array("debug"),
@@ -1248,9 +1249,9 @@ class MatcherApiRoute(
       }
     }
 
-  @Path("/debug/allSnapshotOffsets")
+  @Path("/debug/allSnapshotOffsets#getAllSnapshotOffsets")
   @ApiOperation(
-    value = "Get all snapshots' offsets in the queue",
+    value = "Get all snapshots' offsets in the queue. Requires API Key",
     notes = "Returns Map[Asset Pair, Long]",
     httpMethod = "GET",
     authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
@@ -1268,9 +1269,9 @@ class MatcherApiRoute(
       }
     }
 
-  @Path("/debug/saveSnapshots")
+  @Path("/debug/saveSnapshots#saveSnapshots")
   @ApiOperation(
-    value = "Saves snapshots for all Order Books",
+    value = "Saves snapshots for all Order Books. Requires API Key",
     httpMethod = "POST",
     authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
     tags = Array("debug"),
@@ -1286,9 +1287,9 @@ class MatcherApiRoute(
       }
     }
 
-  @Path("/debug/address/{address}")
+  @Path("/debug/address/{address}#getAddressState")
   @ApiOperation(
-    value = "Get state (balances, placement queue by address)",
+    value = "Get state (balances, placement queue by address). Requires API Key",
     httpMethod = "GET",
     authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
     tags = Array("debug"),
@@ -1312,9 +1313,9 @@ class MatcherApiRoute(
       }
     }
 
-  @Path("/debug/status")
+  @Path("/debug/status#getMatcherStatus")
   @ApiOperation(
-    value = "Returns current matcher's status",
+    value = "Returns current matcher's status. Requires API Key",
     httpMethod = "GET",
     authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
     tags = Array("debug"),
@@ -1328,9 +1329,9 @@ class MatcherApiRoute(
     }
 
   // Hidden
-  def print: Route =
+  def printMessage: Route =
     (path("print") & post) {
-      (measureResponse("print") & withAuth) {
+      (measureResponse("printMessage") & withAuth) {
         entity(as[HttpMessage]) { x =>
           log.warn(x.message)
           complete {

@@ -5,7 +5,7 @@ import com.wavesplatform.dex.domain.order.OrderType.BUY
 import com.wavesplatform.dex.it.api.RawHttpChecks
 import com.wavesplatform.it.MatcherSuiteBase
 
-class DeleteHistorySpec extends MatcherSuiteBase with RawHttpChecks {
+class DeleteOrderFromHistoryByIdSpec extends MatcherSuiteBase with RawHttpChecks {
 
   override protected def dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(
@@ -22,12 +22,12 @@ class DeleteHistorySpec extends MatcherSuiteBase with RawHttpChecks {
 
   "POST /matcher/orderbook/{amountAsset}/{priceAsset}/delete" - {
 
-    "should delete order history" in { // only one positive test because this method is deprecated
+    "should delete order from history" in { // only one positive test because this method is deprecated
 
       val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 1.usd)
       placeAndAwaitAtDex(order)
 
-      val r = validate200Json(dex1.rawApi.deleteHistory(alice, wavesUsdPair, order.idStr()))
+      val r = validate200Json(dex1.rawApi.deleteOrderFromHistoryById(alice, wavesUsdPair, order.idStr()))
 
       r.orderId should be(order.id())
       r.status should be("OrderDeleted")

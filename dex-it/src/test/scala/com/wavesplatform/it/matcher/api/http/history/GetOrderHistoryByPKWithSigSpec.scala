@@ -12,7 +12,7 @@ import com.wavesplatform.dex.model.OrderStatus
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.matcher.api.http.toHttpOrderBookHistoryItem
 
-class GetOrderHistoryByPublicKeySpec extends MatcherSuiteBase with RawHttpChecks {
+class GetOrderHistoryByPKWithSigSpec extends MatcherSuiteBase with RawHttpChecks {
 
   override protected def dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(
@@ -31,7 +31,7 @@ class GetOrderHistoryByPublicKeySpec extends MatcherSuiteBase with RawHttpChecks
     "should return all order history" in {
 
       withClue("empty history") {
-        validate200Json(dex1.rawApi.getOrderHistoryByPublicKey(alice)) should have size 0
+        validate200Json(dex1.rawApi.getOrderHistoryByPKWithSig(alice)) should have size 0
       }
 
       val orders = List(
@@ -47,12 +47,12 @@ class GetOrderHistoryByPublicKeySpec extends MatcherSuiteBase with RawHttpChecks
 
       withClue("active only") {
         validate200Json(
-          dex1.rawApi.getOrderHistoryByPublicKey(alice, Some(true), Some(false))
+          dex1.rawApi.getOrderHistoryByPKWithSig(alice, Some(true), Some(false))
         ) should matchTo(historyActive)
       }
 
       withClue("without params") {
-        validate200Json(dex1.rawApi.getOrderHistoryByPublicKey(alice)) should matchTo(historyActive)
+        validate200Json(dex1.rawApi.getOrderHistoryByPKWithSig(alice)) should matchTo(historyActive)
       }
 
       val historyCancelled = orders.map { order =>
@@ -62,7 +62,7 @@ class GetOrderHistoryByPublicKeySpec extends MatcherSuiteBase with RawHttpChecks
 
       withClue("closed only") {
         validate200Json(
-          dex1.rawApi.getOrderHistoryByPublicKey(alice, Some(false), Some(true))
+          dex1.rawApi.getOrderHistoryByPKWithSig(alice, Some(false), Some(true))
         ) should matchTo(historyCancelled)
       }
     }
@@ -72,7 +72,7 @@ class GetOrderHistoryByPublicKeySpec extends MatcherSuiteBase with RawHttpChecks
       val sign = Base58.encode(crypto.sign(alice, alice.publicKey ++ Longs.toByteArray(ts)))
 
       validateMatcherError(
-        dex1.rawApi.getOrderHistoryByPublicKey("null", ts, sign),
+        dex1.rawApi.getOrderHistoryByPKWithSig("null", ts, sign),
         StatusCode.BadRequest,
         3148801,
         "Provided public key is not correct, reason: Unable to decode base58: requirement failed: Wrong char 'l' in Base58 string 'null'"
@@ -83,18 +83,18 @@ class GetOrderHistoryByPublicKeySpec extends MatcherSuiteBase with RawHttpChecks
       val ts = System.currentTimeMillis
       val sign = Base58.encode(crypto.sign(alice, alice.publicKey ++ Longs.toByteArray(ts)))
 
-      validateIncorrectSignature(dex1.rawApi.getOrderHistoryByPublicKey(Base58.encode(bob.publicKey), ts, sign))
+      validateIncorrectSignature(dex1.rawApi.getOrderHistoryByPKWithSig(Base58.encode(bob.publicKey), ts, sign))
     }
 
     "should return an error if timestamp header has the different value of used in signature" in {
       val ts = System.currentTimeMillis
       val sign = Base58.encode(crypto.sign(alice, alice.publicKey ++ Longs.toByteArray(ts)))
 
-      validateIncorrectSignature(dex1.rawApi.getOrderHistoryByPublicKey(Base58.encode(alice.publicKey), ts + 1000, sign))
+      validateIncorrectSignature(dex1.rawApi.getOrderHistoryByPKWithSig(Base58.encode(alice.publicKey), ts + 1000, sign))
     }
 
     "should return an error with incorrect signature" in {
-      validateIncorrectSignature(dex1.rawApi.getOrderHistoryByPublicKey(Base58.encode(alice.publicKey), System.currentTimeMillis, "incorrect"))
+      validateIncorrectSignature(dex1.rawApi.getOrderHistoryByPKWithSig(Base58.encode(alice.publicKey), System.currentTimeMillis, "incorrect"))
     }
   }
 

@@ -9,7 +9,7 @@ import com.wavesplatform.dex.model.OrderStatus
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.matcher.api.http.{toHttpOrderBookHistoryItem, ApiKeyHeaderChecks}
 
-class GetOrderHistoryByApiKeySpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
+class GetOrderHistoryByAddressWithKeySpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
 
   override protected def dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(
@@ -28,7 +28,7 @@ class GetOrderHistoryByApiKeySpec extends MatcherSuiteBase with ApiKeyHeaderChec
     "should return all order history" in {
 
       withClue("empty history") {
-        validate200Json(dex1.rawApi.getOrderHistoryByApiKey(toAddress(alice).stringRepr)) should have size 0
+        validate200Json(dex1.rawApi.getOrderHistoryByAddressWithKey(alice.stringRepr)) should have size 0
       }
 
       val orders = List(
@@ -44,12 +44,17 @@ class GetOrderHistoryByApiKeySpec extends MatcherSuiteBase with ApiKeyHeaderChec
 
       withClue("active only") {
         validate200Json(
-          dex1.rawApi.getOrderHistoryByApiKey(toAddress(alice).stringRepr, true, false, Map("X-API-KEY" -> apiKey))
+          dex1.rawApi.getOrderHistoryByAddressWithKey(
+            alice.stringRepr,
+            activeOnly = true,
+            closedOnly = false,
+            Map("X-API-KEY" -> apiKey)
+          )
         ) should matchTo(historyActive)
       }
 
       withClue("without params") {
-        validate200Json(dex1.rawApi.getOrderHistoryByApiKey(toAddress(alice).stringRepr)) should matchTo(historyActive)
+        validate200Json(dex1.rawApi.getOrderHistoryByAddressWithKey(alice.stringRepr)) should matchTo(historyActive)
       }
 
       val historyCancelled = orders.map { order =>
@@ -59,7 +64,12 @@ class GetOrderHistoryByApiKeySpec extends MatcherSuiteBase with ApiKeyHeaderChec
 
       withClue("closed only") {
         validate200Json(
-          dex1.rawApi.getOrderHistoryByApiKey(toAddress(alice).stringRepr, false, true, Map("X-API-KEY" -> apiKey))
+          dex1.rawApi.getOrderHistoryByAddressWithKey(
+            alice.stringRepr,
+            activeOnly = false,
+            closedOnly = true,
+            Map("X-API-KEY" -> apiKey)
+          )
         ) should matchTo(historyCancelled)
       }
 
@@ -67,7 +77,7 @@ class GetOrderHistoryByApiKeySpec extends MatcherSuiteBase with ApiKeyHeaderChec
 
     "should return an error if address is not correct base58 string" in {
       validateMatcherError(
-        dex1.rawApi.getOrderHistoryByApiKey("null"),
+        dex1.rawApi.getOrderHistoryByAddressWithKey("null"),
         StatusCode.BadRequest,
         4194304,
         "Provided address in not correct, reason: Unable to decode base58: requirement failed: Wrong char 'l' in Base58 string 'null'"
@@ -76,16 +86,26 @@ class GetOrderHistoryByApiKeySpec extends MatcherSuiteBase with ApiKeyHeaderChec
 
     "should return an error if address has an incorrect length" in {
       validateMatcherError(
-        dex1.rawApi.getOrderHistoryByApiKey("AAAAA"),
+        dex1.rawApi.getOrderHistoryByAddressWithKey("AAAAA"),
         StatusCode.BadRequest,
         4194304,
         "Provided address in not correct, reason: Wrong addressBytes length: expected: 26, actual: 4"
       )
     }
 
-    shouldReturnErrorWithoutApiKeyHeader(dex1.rawApi.getOrderHistoryByApiKey(toAddress(alice).stringRepr, false, true, Map.empty))
+    shouldReturnErrorWithoutApiKeyHeader(dex1.rawApi.getOrderHistoryByAddressWithKey(
+      alice.stringRepr,
+      activeOnly = false,
+      closedOnly = true,
+      Map.empty
+    ))
 
-    shouldReturnErrorWithIncorrectApiKeyValue(dex1.rawApi.getOrderHistoryByApiKey(toAddress(alice).stringRepr, false, true, incorrectApiKeyHeader))
+    shouldReturnErrorWithIncorrectApiKeyValue(dex1.rawApi.getOrderHistoryByAddressWithKey(
+      alice.stringRepr,
+      activeOnly = false,
+      closedOnly = true,
+      incorrectApiKeyHeader
+    ))
   }
 
 }

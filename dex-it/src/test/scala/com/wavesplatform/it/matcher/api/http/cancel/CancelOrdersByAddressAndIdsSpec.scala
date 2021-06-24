@@ -39,7 +39,7 @@ class CancelOrdersByAddressAndIdsSpec extends MatcherSuiteBase with ApiKeyHeader
         o.idStr()
       }
 
-      val r = validate200Json(dex1.rawApi.cancelAllByAddressAndIds(alice.toAddress.stringRepr, ids))
+      val r = validate200Json(dex1.rawApi.cancelOrdersByIdsWithKey(alice.toAddress.stringRepr, ids))
 
       r.success should be(true)
       r.status should be("BatchCancelCompleted")
@@ -56,12 +56,12 @@ class CancelOrdersByAddressAndIdsSpec extends MatcherSuiteBase with ApiKeyHeader
     }
 
     "should return OK if there is nothing to cancel" in {
-      validate200Json(dex1.rawApi.cancelAllByAddressAndIds(alice.toAddress.stringRepr, Set.empty))
+      validate200Json(dex1.rawApi.cancelOrdersByIdsWithKey(alice.stringRepr, Set.empty[String]))
     }
 
     "should return an error when one of ids is not a correct base58 string" in {
       validateMatcherError(
-        dex1.rawApi.cancelAllByAddressAndIds(alice.toAddress.stringRepr, placeAndGetIds(3) + "null"),
+        dex1.rawApi.cancelOrdersByIdsWithKey(alice.stringRepr, placeAndGetIds(3) + "null"),
         StatusCode.BadRequest,
         1048577,
         "The provided JSON contains invalid fields: (3). Check the documentation"
@@ -70,16 +70,16 @@ class CancelOrdersByAddressAndIdsSpec extends MatcherSuiteBase with ApiKeyHeader
 
     "should return an error when address is not a correct base58 string" in {
       validateMatcherError(
-        dex1.rawApi.cancelAllByAddressAndIds("null", placeAndGetIds(3)),
+        dex1.rawApi.cancelOrdersByIdsWithKey("null", placeAndGetIds(3)),
         StatusCode.BadRequest,
         4194304,
         "Provided address in not correct, reason: Unable to decode base58: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )
     }
 
-    shouldReturnErrorWithoutApiKeyHeader(dex1.rawApi.cancelOrderById(order.idStr(), headers = Map.empty))
+    shouldReturnErrorWithoutApiKeyHeader(dex1.rawApi.cancelOneOrderWithKey(order.idStr(), headers = Map.empty))
 
-    shouldReturnErrorWithIncorrectApiKeyValue(dex1.rawApi.cancelOrderById(order.idStr(), incorrectApiKeyHeader))
+    shouldReturnErrorWithIncorrectApiKeyValue(dex1.rawApi.cancelOneOrderWithKey(order.idStr(), incorrectApiKeyHeader))
   }
 
 }

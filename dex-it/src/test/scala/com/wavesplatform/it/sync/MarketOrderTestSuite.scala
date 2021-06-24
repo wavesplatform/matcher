@@ -57,8 +57,8 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
 
   override protected def afterEach(): Unit = {
     super.afterEach()
-    dex1.api.cancelAll(alice)
-    dex1.api.cancelAll(bob)
+    dex1.api.cancelAllOrdersWithSig(alice)
+    dex1.api.cancelAllOrdersWithSig(bob)
   }
 
   def placeOrders(
@@ -128,11 +128,11 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
         orders.head.orderType shouldBe AcceptedOrderType.Market
       }
 
-      validateHistory("by pair", dex1.api.getOrderHistoryByAssetPairAndPublicKey(account2, wavesUsdPair))
-      validateHistory("full", dex1.api.getOrderHistoryByPublicKey(account2))
-      validateHistory("admin", dex1.api.orderHistoryWithApiKey(account2, activeOnly = Some(false)))
+      validateHistory("by pair", dex1.api.getOrderHistoryByAssetPairAndPKWithSig(account2, wavesUsdPair))
+      validateHistory("full", dex1.api.getOrderHistoryByPKWithSig(account2))
+      validateHistory("admin", dex1.api.getOrderHistoryByPKWithSig(account2, activeOnly = Some(false)))
 
-      Seq(account1, account2).foreach(dex1.api.cancelAll(_))
+      Seq(account1, account2).foreach(dex1.api.cancelAllOrdersWithSig(_))
     }
 
     "percent fee mode" - {
@@ -334,7 +334,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
       }
       wavesNode1.api.balance(account, usd) should be(accountUsdBalance - 5 * 0.2.usd - 15 * 0.3.usd - 30 * 0.4.usd - 100 * 0.5.usd)
 
-      dex1.api.cancelAll(account)
+      dex1.api.cancelAllOrdersWithSig(account)
     }
   }
 
@@ -422,7 +422,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
     val order2 = mkOrderDP(carol, wavesUsdPair, SELL, 9.997.waves, 3.0, ttl = 2.days)
 
     dex1.api.place(order1)
-    dex1.api.getReservedBalance(carol) should matchTo(Map[Asset, Long](Waves -> 10.waves))
+    dex1.api.getReservedBalanceWithApiKey(carol) should matchTo(Map[Asset, Long](Waves -> 10.waves))
     wavesNode1.api.balance(carol, Waves) shouldBe 10.waves
 
     dex1.tryApi.placeMarket(order2) should failWithBalanceNotEnough()

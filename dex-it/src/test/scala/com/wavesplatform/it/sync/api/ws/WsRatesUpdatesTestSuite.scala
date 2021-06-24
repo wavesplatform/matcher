@@ -25,7 +25,7 @@ class WsRatesUpdatesTestSuite extends WsSuiteBase {
         .receiveAtLeastN[WsRatesUpdates](expectedRatesUpdates.size)
         .map(r => r.rates -> r.updateId) should matchTo(expectedRatesUpdates)
 
-    dex1.api.upsertRate(btc, 0.00041863)
+    dex1.api.upsertAssetRate(btc, 0.00041863)
 
     val wsc1 = mkWsRatesUpdatesConnection(dex1)
 
@@ -34,11 +34,11 @@ class WsRatesUpdatesTestSuite extends WsSuiteBase {
       wsc1.clearMessages()
     }
 
-    dex1.api.upsertRate(btc, 0.00041864)
+    dex1.api.upsertAssetRate(btc, 0.00041864)
 
     val wsc2 = mkWsRatesUpdatesConnection(dex1)
 
-    dex1.api.upsertRate(usd, 2.76)
+    dex1.api.upsertAssetRate(usd, 2.76)
 
     withClue("Rates update") {
       assertRatesUpdates(wsc1) {
@@ -56,7 +56,7 @@ class WsRatesUpdatesTestSuite extends WsSuiteBase {
       Seq(wsc1, wsc2).foreach(_.clearMessages())
     }
 
-    Seq(btc, usd).foreach(dex1.api.deleteRate)
+    Seq(btc, usd).foreach(dex1.api.deleteAssetRate)
 
     withClue("Rates delete") {
       assertRatesUpdates(wsc1) {
@@ -75,11 +75,11 @@ class WsRatesUpdatesTestSuite extends WsSuiteBase {
     }
 
     withClue("Rates snapshot after deleting") {
-      dex1.api.upsertRate(btc, 0.0099)
+      dex1.api.upsertAssetRate(btc, 0.0099)
       val wsc = mkWsRatesUpdatesConnection(dex1)
       assertRatesUpdates(wsc)(List(Map[Asset, Double](Waves -> 1, btc -> 0.0099) -> 0))
       wsc.close()
-      dex1.api.deleteRate(btc)
+      dex1.api.deleteAssetRate(btc)
     }
 
     Seq(wsc1, wsc2).foreach(_.close())
@@ -112,10 +112,10 @@ class WsRatesUpdatesTestSuite extends WsSuiteBase {
     wsc.send(WsUnsubscribe("ru"))
     Thread.sleep(1000) // No other way to guarantee that the client received and processed WsUnsubscribe
 
-    dex1.api.upsertRate(btc, 100500)
+    dex1.api.upsertAssetRate(btc, 100500)
     wsc.receiveNoMessages()
 
-    dex1.api.deleteRate(btc)
+    dex1.api.deleteAssetRate(btc)
     wsc.close()
   }
 }

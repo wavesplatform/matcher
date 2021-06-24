@@ -4,7 +4,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.it.api.RawHttpChecks
 import com.wavesplatform.it.MatcherSuiteBase
 
-class GetSettingsSpec extends MatcherSuiteBase with RawHttpChecks {
+class GetMatcherPublicSettingsSpec extends MatcherSuiteBase with RawHttpChecks {
 
   override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(
     s"""waves.dex {
@@ -20,8 +20,8 @@ class GetSettingsSpec extends MatcherSuiteBase with RawHttpChecks {
 
   "GET /matcher/settings" - {
 
-    "should return correct settings" in {
-      val settings = validate200Json(dex1.rawApi.getMatcherSettings)
+    "should return correct public settings" in {
+      val settings = validate200Json(dex1.rawApi.getMatcherPublicSettings)
 
       settings.networkByte should be('Y'.toByte)
       settings.matcherPublicKey should be(matcher.publicKey)

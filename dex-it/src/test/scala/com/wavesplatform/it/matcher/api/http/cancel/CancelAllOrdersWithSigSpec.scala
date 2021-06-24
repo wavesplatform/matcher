@@ -9,7 +9,7 @@ import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.it.api.RawHttpChecks
 import com.wavesplatform.it.MatcherSuiteBase
 
-class CancelAllOrdersSpec extends MatcherSuiteBase with RawHttpChecks {
+class CancelAllOrdersWithSigSpec extends MatcherSuiteBase with RawHttpChecks {
 
   override protected def dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(
@@ -35,7 +35,7 @@ class CancelAllOrdersSpec extends MatcherSuiteBase with RawHttpChecks {
 
       orders.foreach(placeAndAwaitAtDex(_))
 
-      val r = validate200Json(dex1.rawApi.cancelAll(alice))
+      val r = validate200Json(dex1.rawApi.cancelAllOrdersWithSig(alice))
 
       r.success should be(true)
       r.status should be("BatchCancelCompleted")
@@ -52,7 +52,7 @@ class CancelAllOrdersSpec extends MatcherSuiteBase with RawHttpChecks {
     }
 
     "should return OK if there is nothing to cancel" in {
-      validate200Json(dex1.rawApi.cancelAll(alice))
+      validate200Json(dex1.rawApi.cancelAllOrdersWithSig(alice))
     }
 
     "should return an error if publicKey parameter has the different value of used in signature" in {
@@ -61,7 +61,7 @@ class CancelAllOrdersSpec extends MatcherSuiteBase with RawHttpChecks {
       val ts = System.currentTimeMillis
       val sign = crypto.sign(alice, alice.publicKey ++ Longs.toByteArray(ts))
 
-      validateIncorrectSignature(dex1.rawApi.cancelAll(bob, ts, sign))
+      validateIncorrectSignature(dex1.rawApi.cancelAllOrdersWithSig(bob, ts, sign))
     }
 
     "should return an error if timestamp header has the different value of used in signature" in {
@@ -70,7 +70,7 @@ class CancelAllOrdersSpec extends MatcherSuiteBase with RawHttpChecks {
       val ts = System.currentTimeMillis
       val sign = crypto.sign(alice, alice.publicKey ++ Longs.toByteArray(ts))
 
-      validateIncorrectSignature(dex1.rawApi.cancelAll(alice, ts + 1000, sign))
+      validateIncorrectSignature(dex1.rawApi.cancelAllOrdersWithSig(alice, ts + 1000, sign))
     }
   }
 

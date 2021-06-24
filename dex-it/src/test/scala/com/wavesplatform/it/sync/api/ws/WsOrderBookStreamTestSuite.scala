@@ -75,7 +75,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
     broadcastAndAwait(IssueBtcTx, IssueUsdTx, IssueEthTx)
     broadcastAndAwait(mkTransfer(alice, carol, 100.waves, Waves), mkTransfer(bob, carol, 1.btc, btc))
     dex1.start()
-    dex1.api.upsertRate(btc, 0.00011167)
+    dex1.api.upsertAssetRate(btc, 0.00011167)
   }
 
   "Order book stream should" - {
@@ -137,7 +137,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
         )
       }
 
-      dex1.api.cancelAll(alice)
+      dex1.api.cancelAllOrdersWithSig(alice)
       wsc.close()
     }
 
@@ -145,7 +145,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
       // Force create an order book to pass a validation in the route
       val firstOrder = mkOrderDP(carol, wavesBtcPair, BUY, 1.05.waves, 0.00011403)
       placeAndAwaitAtDex(firstOrder)
-      dex1.api.cancelAll(carol)
+      dex1.api.cancelAllOrdersWithSig(carol)
       dex1.api.waitForOrderStatus(firstOrder, HttpOrderStatus.Status.Cancelled)
 
       markup("No orders")
@@ -267,7 +267,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
         )
       )
 
-      dex1.api.cancelAll(carol)
+      dex1.api.cancelAllOrdersWithSig(carol)
       Seq(wsc0, wsc1, wsc2, wsc3, wsc4).foreach(_.close())
     }
 
@@ -321,7 +321,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
       }
       wsc.clearMessages()
 
-      dex1.api.cancelAll(carol)
+      dex1.api.cancelAllOrdersWithSig(carol)
       dex1.api.waitForOrderStatus(order, HttpOrderStatus.Status.Cancelled)
 
       eventually {
@@ -364,7 +364,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
       val wsc2 = mkWsOrderBookConnection(wavesBtcPair, dex1)
       assertUpdateId(wsc2, 0)
 
-      dex1.api.cancelOrder(carol, order)
+      dex1.api.cancelOneOrAllInPairOrdersWithSig(carol, order)
       assertUpdateId(wsc1, 2)
       assertUpdateId(wsc2, 1)
     }
@@ -404,7 +404,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
       val wscs = List(wsc1, wsc2, wsc3)
       wscs.foreach(_.receiveAtLeastN[WsOrderBookChanges](1))
 
-      dex1.tryApi.deleteOrderBook(assetPair)
+      dex1.tryApi.deleteOrderBookWithKey(assetPair)
 
       val expectedMessage = WsError(
         timestamp = 0L, // ignored
@@ -440,7 +440,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
         )
       }
 
-      dex1.api.cancelAll(alice)
+      dex1.api.cancelAllOrdersWithSig(alice)
     }
 
     "be opened even if there is no such order book" in {
@@ -479,7 +479,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
         }
       ).filter(l => l == l.sorted && l.size > 1) should have size 0
 
-      dex1.api.cancelAll(alice)
+      dex1.api.cancelAllOrdersWithSig(alice)
       wsc.close()
     }
 
@@ -496,7 +496,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
         }
       ).filter(l => l == l.sorted(Ordering[Double].reverse) && l.size > 1) should have size 0
 
-      dex1.api.cancelAll(alice)
+      dex1.api.cancelAllOrdersWithSig(alice)
       wsc.close()
     }
   }
@@ -512,7 +512,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
       }
 
       Future.traverse(orders)(dex1.asyncApi.place).futureValue
-      dex1.api.cancelAll(carol)
+      dex1.api.cancelAllOrdersWithSig(carol)
 
       Future.traverse(wscs)(wsc => Future(wsc.close())).futureValue
       Thread.sleep(3000)

@@ -11,7 +11,7 @@ import com.wavesplatform.dex.model.OrderStatus
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.matcher.api.http.toHttpOrderBookHistoryItem
 
-class GetOrderHistoryByAssetPairAndPublicKeySpec extends MatcherSuiteBase with RawHttpChecks {
+class GetOrderHistoryByAssetPairAndPKWithSigSpec extends MatcherSuiteBase with RawHttpChecks {
 
   override protected def dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(
@@ -30,7 +30,7 @@ class GetOrderHistoryByAssetPairAndPublicKeySpec extends MatcherSuiteBase with R
     "should return all order history" in {
 
       withClue("empty history") {
-        validate200Json(dex1.rawApi.getOrderHistoryByAssetPairAndPublicKey(alice, wavesUsdPair)) should have size 0
+        validate200Json(dex1.rawApi.getOrderHistoryByAssetPairAndPKWithSig(alice, wavesUsdPair)) should have size 0
       }
 
       val orders = List(
@@ -46,12 +46,12 @@ class GetOrderHistoryByAssetPairAndPublicKeySpec extends MatcherSuiteBase with R
 
       withClue("active only") {
         validate200Json(
-          dex1.rawApi.getOrderHistoryByAssetPairAndPublicKey(alice, wavesUsdPair, Some(true), Some(false))
+          dex1.rawApi.getOrderHistoryByAssetPairAndPKWithSig(alice, wavesUsdPair, Some(true), Some(false))
         ) should matchTo(historyActive)
       }
 
       withClue("without params") {
-        validate200Json(dex1.rawApi.getOrderHistoryByAssetPairAndPublicKey(alice, wavesUsdPair)) should matchTo(historyActive)
+        validate200Json(dex1.rawApi.getOrderHistoryByAssetPairAndPKWithSig(alice, wavesUsdPair)) should matchTo(historyActive)
       }
 
       val historyCancelled = orders.map { order =>
@@ -61,7 +61,7 @@ class GetOrderHistoryByAssetPairAndPublicKeySpec extends MatcherSuiteBase with R
 
       withClue("closed only") {
         validate200Json(
-          dex1.rawApi.getOrderHistoryByAssetPairAndPublicKey(alice, wavesUsdPair, Some(false), Some(true))
+          dex1.rawApi.getOrderHistoryByAssetPairAndPKWithSig(alice, wavesUsdPair, Some(false), Some(true))
         ) should matchTo(historyCancelled)
       }
     }
@@ -71,7 +71,7 @@ class GetOrderHistoryByAssetPairAndPublicKeySpec extends MatcherSuiteBase with R
       val sign = Base58.encode(crypto.sign(alice, alice.publicKey ++ Longs.toByteArray(ts)))
 
       validateMatcherError(
-        dex1.rawApi.getOrderHistoryByAssetPairAndPublicKey("null", "WAVES", UsdId.toString, ts, sign),
+        dex1.rawApi.getOrderHistoryByAssetPairAndPKWithSig("null", "WAVES", UsdId.toString, ts, sign),
         StatusCode.BadRequest,
         3148801,
         "Provided public key is not correct, reason: Unable to decode base58: requirement failed: Wrong char 'l' in Base58 string 'null'"
@@ -83,7 +83,7 @@ class GetOrderHistoryByAssetPairAndPublicKeySpec extends MatcherSuiteBase with R
       val sign = Base58.encode(crypto.sign(alice, alice.publicKey ++ Longs.toByteArray(ts)))
 
       validateMatcherError(
-        dex1.rawApi.getOrderHistoryByAssetPairAndPublicKey(Base58.encode(alice.publicKey), "WAVES", "null", ts, sign),
+        dex1.rawApi.getOrderHistoryByAssetPairAndPKWithSig(Base58.encode(alice.publicKey), "WAVES", "null", ts, sign),
         StatusCode.BadRequest,
         11534337,
         s"The asset 'null' is wrong, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
@@ -95,7 +95,7 @@ class GetOrderHistoryByAssetPairAndPublicKeySpec extends MatcherSuiteBase with R
       val sign = Base58.encode(crypto.sign(alice, alice.publicKey ++ Longs.toByteArray(ts)))
 
       validateMatcherError(
-        dex1.rawApi.getOrderHistoryByAssetPairAndPublicKey(Base58.encode(alice.publicKey), "WAVES", "null", ts, sign),
+        dex1.rawApi.getOrderHistoryByAssetPairAndPKWithSig(Base58.encode(alice.publicKey), "WAVES", "null", ts, sign),
         StatusCode.BadRequest,
         11534337,
         s"The asset 'null' is wrong, reason: requirement failed: Wrong char 'l' in Base58 string 'null'"
@@ -106,7 +106,7 @@ class GetOrderHistoryByAssetPairAndPublicKeySpec extends MatcherSuiteBase with R
       val ts = System.currentTimeMillis
       val sign = Base58.encode(crypto.sign(alice, alice.publicKey ++ Longs.toByteArray(ts)))
 
-      validateIncorrectSignature(dex1.rawApi.getOrderHistoryByAssetPairAndPublicKey(
+      validateIncorrectSignature(dex1.rawApi.getOrderHistoryByAssetPairAndPKWithSig(
         Base58.encode(bob.publicKey),
         "WAVES",
         UsdId.toString,
@@ -119,7 +119,7 @@ class GetOrderHistoryByAssetPairAndPublicKeySpec extends MatcherSuiteBase with R
       val ts = System.currentTimeMillis
       val sign = Base58.encode(crypto.sign(alice, alice.publicKey ++ Longs.toByteArray(ts)))
 
-      validateIncorrectSignature(dex1.rawApi.getOrderHistoryByAssetPairAndPublicKey(
+      validateIncorrectSignature(dex1.rawApi.getOrderHistoryByAssetPairAndPKWithSig(
         Base58.encode(alice.publicKey),
         "WAVES",
         UsdId.toString,
@@ -129,7 +129,7 @@ class GetOrderHistoryByAssetPairAndPublicKeySpec extends MatcherSuiteBase with R
     }
 
     "should return an error with incorrect signature" in {
-      validateIncorrectSignature(dex1.rawApi.getOrderHistoryByAssetPairAndPublicKey(
+      validateIncorrectSignature(dex1.rawApi.getOrderHistoryByAssetPairAndPKWithSig(
         Base58.encode(alice.publicKey),
         "WAVES",
         UsdId.toString,

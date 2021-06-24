@@ -23,22 +23,22 @@ class RestOrderLimitTestSuite extends MatcherSuiteBase {
   )
 
   private def activeOrders: List[Order.Id] = {
-    val activeOrders = dex1.api.getOrderHistoryByPublicKey(alice, activeOnly = Some(true)).map(_.id)
-    dex1.api.orderHistoryWithApiKey(alice, activeOnly = Some(true)).map(_.id) should matchTo(activeOrders)
+    val activeOrders = dex1.api.getOrderHistoryByPKWithSig(alice, activeOnly = Some(true)).map(_.id)
+    dex1.api.getOrderHistoryByPKWithSig(alice, activeOnly = Some(true)).map(_.id) should matchTo(activeOrders)
     activeOrders
   }
 
   private def allOrders: List[Order.Id] = {
-    val allOrders = dex1.api.getOrderHistoryByPublicKey(alice).map(_.id)
-    dex1.api.orderHistoryWithApiKey(alice, activeOnly = Some(false)).map(_.id) should matchTo(allOrders)
+    val allOrders = dex1.api.getOrderHistoryByPKWithSig(alice).map(_.id)
+    dex1.api.getOrderHistoryByPKWithSig(alice, activeOnly = Some(false)).map(_.id) should matchTo(allOrders)
     allOrders
   }
 
   private def activeOrdersBy(pair: AssetPair, n: KeyPair = alice): List[Order.Id] =
-    dex1.api.getOrderHistoryByAssetPairAndPublicKey(n, pair, activeOnly = Some(true)).map(_.id)
+    dex1.api.getOrderHistoryByAssetPairAndPKWithSig(n, pair, activeOnly = Some(true)).map(_.id)
 
   private def allOrdersBy(pair: AssetPair, n: KeyPair = alice): List[Order.Id] =
-    dex1.api.getOrderHistoryByAssetPairAndPublicKey(n, pair).map(_.id)
+    dex1.api.getOrderHistoryByAssetPairAndPKWithSig(n, pair).map(_.id)
 
   markup("""Test suite checks only Alice's OrderHistory.
            |Bob places orders only for matching Alice's orders.""".stripMargin)
@@ -75,8 +75,8 @@ class RestOrderLimitTestSuite extends MatcherSuiteBase {
       mkOrder(bob, bobPair, SELL, 1, 3.waves, ts = now + 12) // part fill partial2
     ).foreach(dex1.api.place)
 
-    dex1.api.cancelOrder(alice, cancelled1)
-    dex1.api.cancelOrder(alice, cancelled2)
+    dex1.api.cancelOneOrAllInPairOrdersWithSig(alice, cancelled1)
+    dex1.api.cancelOneOrAllInPairOrdersWithSig(alice, cancelled2)
     dex1.api.waitForOrderStatus(cancelled2, Status.Cancelled)
 
     val activeOrdersAllFive = List(partial2, active2, partial1, active1, active0).map(_.id())

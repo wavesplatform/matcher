@@ -124,7 +124,7 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProx
 
     // This request creates an actor. Otherwise the further check will fail by another reason:
     //   an actor will stuck during the initialization.
-    dex1.api.getTradableBalance(randomKP, wavesUsdPair) should matchTo(Map.empty[Asset, Long])
+    dex1.api.getTradableBalanceByAssetPairAndAddress(randomKP, wavesUsdPair) should matchTo(Map.empty[Asset, Long])
 
     wavesNode1.disconnectFromNetwork()
 
@@ -137,7 +137,7 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProx
 
     dex1.api.waitForOrderPlacement(order)
     dex1.api.waitForOrderStatus(order, Status.Accepted)
-    dex1.api.getTradableBalance(randomKP, wavesUsdPair) should matchTo(Map.empty[Asset, Long])
+    dex1.api.getTradableBalanceByAssetPairAndAddress(randomKP, wavesUsdPair) should matchTo(Map.empty[Asset, Long])
   }
 
   private def usdBalancesShouldBe(wavesNodeApi: NodeApi[Id], expectedAliceBalance: Long, expectedBobBalance: Long): Unit = {

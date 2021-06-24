@@ -36,7 +36,7 @@ class AutoCancelOrderTestSuite extends MatcherSuiteBase {
   override protected def beforeEach(): Unit = {
     super.beforeEach()
 
-    knownAccounts.foreach(dex1.api.cancelAll(_))
+    knownAccounts.foreach(dex1.api.cancelAllOrdersWithSig(_))
     eventually {
       val orderBook = dex1.api.getOrderBook(wavesUsdPair)
       orderBook.bids shouldBe empty
@@ -67,7 +67,7 @@ class AutoCancelOrderTestSuite extends MatcherSuiteBase {
           val issuedAsset = IssuedAsset(asset.id())
           val assetPair = AssetPair(issuedAsset, Waves)
           eventually {
-            dex1.api.getTradableBalance(account, assetPair) should matchTo(Map[Asset, Long](
+            dex1.api.getTradableBalanceByAssetPairAndAddress(account, assetPair) should matchTo(Map[Asset, Long](
               Waves -> matcherFee,
               issuedAsset -> oneOrderAmount
             ))
@@ -81,7 +81,7 @@ class AutoCancelOrderTestSuite extends MatcherSuiteBase {
       accountsAndAssets.foreach { case (account, asset) =>
         val assetPair = AssetPair(IssuedAsset(asset.id()), Waves)
         eventually {
-          dex1.api.getTradableBalance(account, assetPair) should matchTo(Map.empty[Asset, Long])
+          dex1.api.getTradableBalanceByAssetPairAndAddress(account, assetPair) should matchTo(Map.empty[Asset, Long])
         }
       }
 
@@ -129,7 +129,7 @@ class AutoCancelOrderTestSuite extends MatcherSuiteBase {
         sells.foreach { o =>
           withClue(s"oId=${o.id()}: ") {
             val txs1: List[ExchangeTransaction] = withClue("dex1: ") {
-              val xs = dex1.api.getTransactionsByOrder(o)
+              val xs = dex1.api.getTransactionsByOrderId(o)
               xs should have length submittedOrdersNumber
 
               xs.foreach { tx =>
@@ -143,7 +143,7 @@ class AutoCancelOrderTestSuite extends MatcherSuiteBase {
             }
 
             val txs2: List[ExchangeTransaction] = withClue("dex2: ") {
-              val xs = dex2.api.getTransactionsByOrder(o)
+              val xs = dex2.api.getTransactionsByOrderId(o)
               xs should have length submittedOrdersNumber
               xs
             }

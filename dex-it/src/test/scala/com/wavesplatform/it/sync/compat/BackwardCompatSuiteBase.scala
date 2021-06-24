@@ -45,7 +45,7 @@ trait BackwardCompatSuiteBase extends MatcherSuiteBase with MultipleVersions {
   }
 
   protected def cancelAll(): Unit = {
-    accounts.foreach(dex2.api.cancelAll(_))
+    accounts.foreach(dex2.api.cancelAllOrdersWithSig(_))
     accounts.foreach(dex2.api.waitForOrderHistory(_, activeOnly = Some(true))(_.isEmpty))
   }
 

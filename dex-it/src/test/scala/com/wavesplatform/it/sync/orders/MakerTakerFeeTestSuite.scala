@@ -36,7 +36,7 @@ class MakerTakerFeeTestSuite extends MatcherSuiteBase with TableDrivenPropertyCh
     broadcastAndAwait(mkTransfer(alice, bob, 100.eth, eth))
 
     dex1.start()
-    dex1.api.upsertRate(eth, 0.00567593)
+    dex1.api.upsertAssetRate(eth, 0.00567593)
   }
 
   "DEX with static non-default DynamicSettings" - {
@@ -86,8 +86,8 @@ class MakerTakerFeeTestSuite extends MatcherSuiteBase with TableDrivenPropertyCh
         placeAndAwaitAtDex(makerOrder)
         placeAndAwaitAtNode(takerOrder, isMarketOrder = isTMarket)
 
-        dex1.api.cancelAll(maker)
-        dex1.api.cancelAll(taker)
+        dex1.api.cancelAllOrdersWithSig(maker)
+        dex1.api.cancelAllOrdersWithSig(taker)
 
         def printAmount(value: Long, asset: Asset): String = s"${denormalizeAmountAndFee(value, assetDecimalsMap(asset))} $asset"
 
@@ -179,8 +179,8 @@ class MakerTakerFeeTestSuite extends MatcherSuiteBase with TableDrivenPropertyCh
       tx.sellMatcherFee() shouldBe 0.0006.waves
       tx.buyMatcherFee() shouldBe 0.005.waves
 
-      dex1.api.cancelAll(maker)
-      dex1.api.cancelAll(taker)
+      dex1.api.cancelAllOrdersWithSig(maker)
+      dex1.api.cancelAllOrdersWithSig(taker)
     }
 
     withClue(
@@ -200,8 +200,8 @@ class MakerTakerFeeTestSuite extends MatcherSuiteBase with TableDrivenPropertyCh
       tx.sellMatcherFee() shouldBe 0.00001419.eth
       tx.buyMatcherFee() shouldBe 0.00000567.eth
 
-      dex1.api.cancelAll(maker)
-      dex1.api.cancelAll(taker)
+      dex1.api.cancelAllOrdersWithSig(maker)
+      dex1.api.cancelAllOrdersWithSig(taker)
     }
   }
 }

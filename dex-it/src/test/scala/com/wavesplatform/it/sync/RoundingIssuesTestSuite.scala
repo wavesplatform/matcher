@@ -38,11 +38,11 @@ class RoundingIssuesTestSuite extends MatcherSuiteBase {
 
     Seq(alice -> counter, bob -> submitted).foreach {
       case (owner, ao) =>
-        dex1.api.getOrderStatusInfoByIdWithSignature(owner, ao).totalExecutedPriceAssets shouldBe totalExecutedPriceAssets
+        dex1.api.getOrderStatusByPKAndIdWithSig(owner, ao).totalExecutedPriceAssets shouldBe totalExecutedPriceAssets
     }
 
     val tx = waitForOrderAtNode(counter)
-    dex1.api.cancelOrder(alice, counter)
+    dex1.api.cancelOneOrAllInPairOrdersWithSig(alice, counter)
 
     val exchangeTx = wavesNode1.api.transactionInfo(tx.head.id()) match {
       case r: ExchangeTransaction => r
@@ -72,12 +72,12 @@ class RoundingIssuesTestSuite extends MatcherSuiteBase {
     dex1.api.waitForOrder(submitted)(_ == HttpOrderStatus(Status.Filled, filledAmount = Some(filledAmount), filledFee = Some(299999L)))
     dex1.api.waitForOrder(counter)(_ == HttpOrderStatus(Status.PartiallyFilled, filledAmount = Some(filledAmount), filledFee = Some(72559L)))
 
-    withClue("Alice's reserved balance before cancel")(dex1.api.getReservedBalance(alice) shouldBe empty)
+    withClue("Alice's reserved balance before cancel")(dex1.api.getReservedBalanceWithApiKey(alice) shouldBe empty)
 
     waitForOrderAtNode(counter)
-    dex1.api.cancelOrder(bob, counter)
+    dex1.api.cancelOneOrAllInPairOrdersWithSig(bob, counter)
 
-    withClue("Bob's reserved balance after cancel")(dex1.api.getReservedBalance(bob) shouldBe empty)
+    withClue("Bob's reserved balance after cancel")(dex1.api.getReservedBalanceWithApiKey(bob) shouldBe empty)
   }
 
   "should correctly fill 2 counter orders" in {

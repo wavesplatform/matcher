@@ -31,11 +31,11 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
     wavesNode1.start()
     broadcastAndAwait(IssueBtcTx, IssueUsdTx)
     dex1.start()
-    dex1.api.upsertRate(usd, 2)
-    dex1.api.upsertRate(btc, 0.1)
+    dex1.api.upsertAssetRate(usd, 2)
+    dex1.api.upsertAssetRate(btc, 0.1)
   }
 
-  override def afterEach(): Unit = List(alice, bob).foreach(dex1.api.cancelAll(_))
+  override def afterEach(): Unit = List(alice, bob).foreach(dex1.api.cancelAllOrdersWithSig(_))
 
   private def mkWsInternalConnection(): WsConnection = mkWsInternalConnection(dex1)
 

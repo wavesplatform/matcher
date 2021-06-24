@@ -69,7 +69,7 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with
     val acc = mkAccountWithBalance(10.waves -> Waves)
     dex1.disconnectFromNetwork()
     broadcastAndAwait(mkTransfer(acc, alice.toAddress, 4.waves, Waves, 0.05.waves))
-    dex2.api.getTradableBalance(acc, ethWavesPair)(Waves) shouldBe 5.95.waves
+    dex2.api.getTradableBalanceByAssetPairAndAddress(acc, ethWavesPair)(Waves) shouldBe 5.95.waves
     dex1.connectToNetwork()
   }
 
@@ -177,8 +177,8 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with
 
   "Batch cancel and single cancels simultaneously" in {
 
-    dex1.api.cancelAll(alice)
-    dex1.api.cancelAll(bob)
+    dex1.api.cancelAllOrdersWithSig(alice)
+    dex1.api.cancelAllOrdersWithSig(bob)
 
     val allOrders =
       (Gen.containerOfN[Vector, Order](150, orderGen(matcher, bob, assetPairs, Seq(OrderType.BUY))).sample.get ++
@@ -193,7 +193,7 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with
       Future
         .sequence {
           orders.map { order =>
-            dex1.asyncTryApi.cancelOrder(owner, order).map {
+            dex1.asyncTryApi.cancelOneOrAllInPairOrdersWithSig(owner, order).map {
               case Left(x) if x.error != 9437194 => throw new RuntimeException(s"Unexpected error: $x") // OrderCanceled
               case _ => ()
             }
@@ -202,7 +202,7 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with
         .map(_ => ())
 
     def batchCancels(owner: KeyPair, assetPairs: Iterable[AssetPair]): Future[List[HttpSuccessfulBatchCancel]] = Future.sequence {
-      assetPairs.map(dex2.asyncApi.cancelAllByPair(owner, _, System.currentTimeMillis)).toList
+      assetPairs.map(dex2.asyncApi.cancelOneOrAllInPairOrdersWithSig(owner, _, System.currentTimeMillis)).toList
     }
 
     batchCancels(alice, assetPairs)
@@ -211,8 +211,8 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with
       .zip(batchCancels(bob, assetPairs))
       .futureValue(2.minutes)
 
-    dex1.api.getOrderHistoryByPublicKey(alice, Some(true)) shouldBe empty
-    dex1.api.getOrderHistoryByPublicKey(bob, Some(true)) shouldBe empty
+    dex1.api.getOrderHistoryByPKWithSig(alice, Some(true)) shouldBe empty
+    dex1.api.getOrderHistoryByPKWithSig(bob, Some(true)) shouldBe empty
   }
 
   private def mkOrders(account: KeyPair, number: Int = placesNumber) =

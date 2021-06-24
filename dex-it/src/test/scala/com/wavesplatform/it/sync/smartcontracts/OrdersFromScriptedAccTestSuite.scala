@@ -124,15 +124,15 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
 
       // Alice checks that the order in order book
       dex1.api.waitForOrderStatus(aliceOrder, Status.Filled)
-      dex1.api.getOrderHistoryByPublicKey(alice).head.status shouldBe Status.Filled.name
+      dex1.api.getOrderHistoryByPKWithSig(alice).head.status shouldBe Status.Filled.name
     }
 
     "zero transfers inside dapp shouldn't affect balances" in {
 
       def validateBalances(dapp: KeyPair, t: Long, r: Map[Asset, Long]): Assertion =
         eventually {
-          dex1.api.getTradableBalance(dapp, aliceWavesPair).getOrElse(Waves, 0L) shouldBe t
-          dex1.api.getReservedBalance(dapp) shouldBe r
+          dex1.api.getTradableBalanceByAssetPairAndAddress(dapp, aliceWavesPair).getOrElse(Waves, 0L) shouldBe t
+          dex1.api.getReservedBalanceWithApiKey(dapp) shouldBe r
         }
 
       /**

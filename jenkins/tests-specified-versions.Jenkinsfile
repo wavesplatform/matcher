@@ -21,6 +21,7 @@ pipeline {
         KAFKA_SERVER = "${KAFKA_SERVER}"
         DEX_IMAGE = "${REGISTRY}/waves/dex/${DEX_IMAGE}"
         NODE_IMAGE = "${REGISTRY}/waves/dex/${NODE_IMAGE}"
+        JENKINS_SHOULD_BUILD_DOCKER_IMAGE = "${JENKINS_SHOULD_BUILD_DOCKER_IMAGE}"
     }
     stages {
         stage('Cleanup') {
@@ -39,7 +40,7 @@ pipeline {
         }
         stage('Build Docker') {
             when {
-                expression { params.JENKINS_SHOULD_BUILD_DOCKER_IMAGE == true }
+                expression { JENKINS_SHOULD_BUILD_DOCKER_IMAGE == "true" }
             }
             steps {
                 sh 'sbt dex-it/docker'

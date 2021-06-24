@@ -20,6 +20,7 @@ pipeline {
         SCALATEST_EXCLUDE_TAGS = 'com.wavesplatform.it.tags.DexMultipleVersions'
         SCALATEST_INCLUDE_TAGS = 'com.wavesplatform.it.tags.DexItKafkaRequired com.wavesplatform.it.tags.DexItExternalKafkaRequired'
         KAFKA_SERVER = "${KAFKA_SERVER}"
+        JENKINS_SHOULD_BUILD_DOCKER_IMAGE = "${JENKINS_SHOULD_BUILD_DOCKER_IMAGE}"
     }
     stages {
         stage('Cleanup') {
@@ -37,7 +38,7 @@ pipeline {
         }
         stage('Build Docker') {
             when {
-                expression { params.JENKINS_SHOULD_BUILD_DOCKER_IMAGE == true }
+                expression { JENKINS_SHOULD_BUILD_DOCKER_IMAGE == "true" }
             }
             steps {
                 sh 'sbt dex-it/docker'

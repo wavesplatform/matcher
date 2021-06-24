@@ -15,6 +15,7 @@ import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.error.{AddressAndPublicKeyAreIncompatible, SubscriptionTokenExpired, SubscriptionsLimitReached}
 import com.wavesplatform.dex.it.test.Scripts
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
+import com.wavesplatform.dex.Implicits.releasable
 import com.wavesplatform.dex.model.{LimitOrder, MarketOrder, OrderStatus}
 import com.wavesplatform.it.WsSuiteBase
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -53,25 +54,24 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
       val fooAddress = mkKeyPair("foo").toAddress
       val barKeyPair = mkKeyPair("bar")
 
-      val wsc = mkDexWsConnection(dex1)
-      wsc.send(
-        WsAddressSubscribe(
-          fooAddress,
-          WsAddressSubscribe.defaultAuthType,
-          mkJwt(barKeyPair)
+      Using(mkDexWsConnection(dex1)) { wsc =>
+        wsc.send(
+          WsAddressSubscribe(
+            fooAddress,
+            WsAddressSubscribe.defaultAuthType,
+            mkJwt(barKeyPair)
+          )
         )
-      )
 
-      val errors = wsc.receiveAtLeastN[WsError](1)
-      errors.head should matchTo(
-        WsError(
-          timestamp = 0L, // ignored
-          code = AddressAndPublicKeyAreIncompatible.code,
-          message = "Address 3Q6LEwEVJVAomd4BjjjSPydZuNN4vDo3fSs and public key 54gGdY9o2vFgzkSMLXQ7iReTJMPo2XiGdaBQSsG5U3un are incompatible"
+        val errors = wsc.receiveAtLeastN[WsError](1)
+        errors.head should matchTo(
+          WsError(
+            timestamp = 0L, // ignored
+            code = AddressAndPublicKeyAreIncompatible.code,
+            message = "Address 3Q6LEwEVJVAomd4BjjjSPydZuNN4vDo3fSs and public key 54gGdY9o2vFgzkSMLXQ7iReTJMPo2XiGdaBQSsG5U3un are incompatible"
+          )
         )
-      )
-
-      wsc.close()
+      }
     }
 
     "stop send updates after closing by user and resend after user open it again" in {
@@ -452,11 +452,10 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           }
 
           step("shouldn't be in the filtered address stream")
-          val wsc2 = mkWsAddressFilteredConnection(acc, Set(WsAddressBalancesFilter.ExcludeNft))
-          broadcast(mkIssue(acc, "testAssetNT", 1L, 0))
-          validateBalances(wsc2, WsBalances(8, 0), acc, hasNft = false)
-          wsc2.close()
-
+          Using(mkWsAddressFilteredConnection(acc, Set(WsAddressBalancesFilter.ExcludeNft))) { wsc2 =>
+            broadcast(mkIssue(acc, "testAssetNT", 1L, 0))
+            validateBalances(wsc2, WsBalances(8, 0), acc, hasNft = false)
+          }
         }
       }
 
@@ -644,29 +643,30 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
     "DEX-818" - {
       "Connections can affect each other" in {
-        val wscs = (1 to 10).map(_ => mkWsAddressConnection(bob))
-        Using(mkWsAddressConnection(bob)) { mainWsc =>
+        Using((1 to 10).map(_ => mkWsAddressConnection(bob))) { wscs =>
+          Using(mkWsAddressConnection(bob)) { mainWsc =>
 
-          markup("Multiple orders")
-          val now = System.currentTimeMillis()
-          val orders = (1 to 50).map { i =>
-            mkOrderDP(bob, wavesBtcPair, BUY, 1.waves, 0.00012, ts = now + i)
+            markup("Multiple orders")
+            val now = System.currentTimeMillis()
+            val orders = (1 to 50).map { i =>
+              mkOrderDP(bob, wavesBtcPair, BUY, 1.waves, 0.00012, ts = now + i)
+            }
+
+            Future.traverse(orders)(dex1.asyncApi.place).futureValue
+            dex1.api.cancelAllOrdersWithSig(bob)
+
+            wscs.par.foreach(_.close())
+            Thread.sleep(3000)
+            mainWsc.clearMessages()
+
+            markup("A new order")
+            placeAndAwaitAtDex(mkOrderDP(bob, wavesBtcPair, BUY, 2.waves, 0.00029))
+
+            eventually {
+              mainWsc.receiveAtLeastN[WsAddressChanges](1)
+            }
+            mainWsc.clearMessages()
           }
-
-          Future.traverse(orders)(dex1.asyncApi.place).futureValue
-          dex1.api.cancelAllOrdersWithSig(bob)
-
-          wscs.par.foreach(_.close())
-          Thread.sleep(3000)
-          mainWsc.clearMessages()
-
-          markup("A new order")
-          placeAndAwaitAtDex(mkOrderDP(bob, wavesBtcPair, BUY, 2.waves, 0.00029))
-
-          eventually {
-            mainWsc.receiveAtLeastN[WsAddressChanges](1)
-          }
-          mainWsc.clearMessages()
         }
       }
 

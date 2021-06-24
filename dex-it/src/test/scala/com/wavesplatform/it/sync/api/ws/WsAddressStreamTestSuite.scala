@@ -643,30 +643,30 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
     "DEX-818" - {
       "Connections can affect each other" in {
-        Using((1 to 10).map(_ => mkWsAddressConnection(bob))) { wscs =>
-          Using(mkWsAddressConnection(bob)) { mainWsc =>
+        Using.Manager { use =>
+          val wscs = use((1 to 10).map(_ => mkWsAddressConnection(bob)))
+          val mainWsc = use(mkWsAddressConnection(bob))
 
-            markup("Multiple orders")
-            val now = System.currentTimeMillis()
-            val orders = (1 to 50).map { i =>
-              mkOrderDP(bob, wavesBtcPair, BUY, 1.waves, 0.00012, ts = now + i)
-            }
-
-            Future.traverse(orders)(dex1.asyncApi.place).futureValue
-            dex1.api.cancelAllOrdersWithSig(bob)
-
-            wscs.par.foreach(_.close())
-            Thread.sleep(3000)
-            mainWsc.clearMessages()
-
-            markup("A new order")
-            placeAndAwaitAtDex(mkOrderDP(bob, wavesBtcPair, BUY, 2.waves, 0.00029))
-
-            eventually {
-              mainWsc.receiveAtLeastN[WsAddressChanges](1)
-            }
-            mainWsc.clearMessages()
+          markup("Multiple orders")
+          val now = System.currentTimeMillis()
+          val orders = (1 to 50).map { i =>
+            mkOrderDP(bob, wavesBtcPair, BUY, 1.waves, 0.00012, ts = now + i)
           }
+
+          Future.traverse(orders)(dex1.asyncApi.place).futureValue
+          dex1.api.cancelAllOrdersWithSig(bob)
+
+          wscs.par.foreach(_.close())
+          Thread.sleep(3000)
+          mainWsc.clearMessages()
+
+          markup("A new order")
+          placeAndAwaitAtDex(mkOrderDP(bob, wavesBtcPair, BUY, 2.waves, 0.00029))
+
+          eventually {
+            mainWsc.receiveAtLeastN[WsAddressChanges](1)
+          }
+          mainWsc.clearMessages()
         }
       }
 

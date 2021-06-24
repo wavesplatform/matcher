@@ -84,23 +84,21 @@ class WsConnectionTestSuite extends WsSuiteBase {
             ) ++ additional: _*
           )
       }
+    Using.Manager { use =>
+      val firefoxLinuxWscs = use(mkDexWsConnections(1, os = "Linux 5.2".some, client = "Firefox".some))
+      val unknownOs2Wscs = use(mkDexWsConnections(2, os = "OS/2".some))
+      use(mkDexWsConnections(3, client = "Android 10".some) ++ mkDexWsConnections(4))
 
-    Using(mkDexWsConnections(1, os = "Linux 5.2".some, client = "Firefox".some)) { firefoxLinuxWscs =>
-      Using(mkDexWsConnections(2, os = "OS/2".some)) { unknownOs2Wscs =>
-        Using(mkDexWsConnections(3, client = "Android 10".some) ++ mkDexWsConnections(4)) { otherWscs =>
-          expectClientAndOs(dex1.api.waitForWsConnections(_.connections == 10), 1, 2, 3, 4)
+      expectClientAndOs(dex1.api.waitForWsConnections(_.connections == 10), 1, 2, 3, 4)
 
-          info("Closing all Firefox + Linux 5.2 and one Unknown + OS/2")
-          firefoxLinuxWscs.foreach(_.close())
-          unknownOs2Wscs.head.close()
-          expectClientAndOs(dex1.api.waitForWsConnections(_.connections == 8), 0, 1, 3, 4)
+      info("Closing all Firefox + Linux 5.2 and one Unknown + OS/2")
+      firefoxLinuxWscs.foreach(_.close())
+      unknownOs2Wscs.head.close()
+      expectClientAndOs(dex1.api.waitForWsConnections(_.connections == 8), 0, 1, 3, 4)
 
-          info("Opening a new client")
-          Using(mkDexWsConnection(dex1, os = "Test OS".some, client = "Test Client".some)) { newWs =>
-            expectClientAndOs(dex1.api.waitForWsConnections(_.connections == 9), 0, 1, 3, 4, "Test Client, Test OS" -> 1)
-          }
-        }
-      }
+      info("Opening a new client")
+      use(mkDexWsConnection(dex1, os = "Test OS".some, client = "Test Client".some))
+      expectClientAndOs(dex1.api.waitForWsConnections(_.connections == 9), 0, 1, 3, 4, "Test Client, Test OS" -> 1)
     }
   }
 

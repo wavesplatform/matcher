@@ -134,70 +134,69 @@ class BouncingBalancesTestSuite extends WsSuiteBase {
     }
 
     "multiple orders test" in {
-      Using(mkWsAddressConnection(alice, dex1)) { aliceWsc =>
-        Using(mkWsAddressConnection(bob, dex1)) { bobWsc =>
+      Using.Manager { use =>
+        val aliceWsc = use(mkWsAddressConnection(alice, dex1))
+        val bobWsc = use(mkWsAddressConnection(bob, dex1))
 
-          val heightInitial = wavesNode1.api.waitForHeightArise()
-          val aliceBalance1 = dex1.api.getTradableBalanceByAssetPairAndAddress(alice, wavesUsdPair)
-          val bobBalance1 = dex1.api.getTradableBalanceByAssetPairAndAddress(bob, wavesUsdPair)
+        val heightInitial = wavesNode1.api.waitForHeightArise()
+        val aliceBalance1 = dex1.api.getTradableBalanceByAssetPairAndAddress(alice, wavesUsdPair)
+        val bobBalance1 = dex1.api.getTradableBalanceByAssetPairAndAddress(bob, wavesUsdPair)
 
-          val now = System.currentTimeMillis()
-          val counterOrders = (1 to 25).map(i => mkOrderDP(alice, wavesUsdPair, OrderType.BUY, 1.waves, 10, ts = now + i))
-          val submittedOrders = (1 to 50).map(i => mkOrderDP(bob, wavesUsdPair, OrderType.SELL, 0.5.waves, 10, ts = now + i))
+        val now = System.currentTimeMillis()
+        val counterOrders = (1 to 25).map(i => mkOrderDP(alice, wavesUsdPair, OrderType.BUY, 1.waves, 10, ts = now + i))
+        val submittedOrders = (1 to 50).map(i => mkOrderDP(bob, wavesUsdPair, OrderType.SELL, 0.5.waves, 10, ts = now + i))
 
-          counterOrders.foreach(dex1.api.place)
-          submittedOrders.foreach(dex1.api.place)
+        counterOrders.foreach(dex1.api.place)
+        submittedOrders.foreach(dex1.api.place)
 
-          counterOrders.foreach(dex1.api.waitForOrderStatus(_, Status.Filled))
-          submittedOrders.foreach(dex1.api.waitForOrderStatus(_, Status.Filled))
+        counterOrders.foreach(dex1.api.waitForOrderStatus(_, Status.Filled))
+        submittedOrders.foreach(dex1.api.waitForOrderStatus(_, Status.Filled))
 
-          def checkOrdering(label: String, xs: List[Double])(cmp: (Double, Double) => Assertion): Unit = {
-            val elementsStr = xs.zipWithIndex.map { case (x, i) => s"$i: $x" }.mkString(", ")
-            withClue(s"$label ($elementsStr):\n") {
-              xs.zip(xs.tail).zipWithIndex.foreach {
-                case ((b1, b2), i) => withClue(s"$i: ")(cmp(b1, b2))
-              }
+        def checkOrdering(label: String, xs: List[Double])(cmp: (Double, Double) => Assertion): Unit = {
+          val elementsStr = xs.zipWithIndex.map { case (x, i) => s"$i: $x" }.mkString(", ")
+          withClue(s"$label ($elementsStr):\n") {
+            xs.zip(xs.tail).zipWithIndex.foreach {
+              case ((b1, b2), i) => withClue(s"$i: ")(cmp(b1, b2))
             }
           }
+        }
 
-          val aliceUsdChanges = collectTradableBalanceChanges(aliceWsc, usd)
-          checkOrdering("alice usd", aliceUsdChanges)(_ shouldBe >=(_))
+        val aliceUsdChanges = collectTradableBalanceChanges(aliceWsc, usd)
+        checkOrdering("alice usd", aliceUsdChanges)(_ shouldBe >=(_))
 
-          val bobWavesChanges = collectTradableBalanceChanges(bobWsc, Waves)
-          checkOrdering("bob Waves", bobWavesChanges)(_ shouldBe >=(_))
+        val bobWavesChanges = collectTradableBalanceChanges(bobWsc, Waves)
+        checkOrdering("bob Waves", bobWavesChanges)(_ shouldBe >=(_))
 
-          submittedOrders.foreach(waitForOrderAtNode(_))
+        submittedOrders.foreach(waitForOrderAtNode(_))
 
-          val finalHeight = wavesNode1.api.waitForHeightArise()
-          eventually {
-            val balance = dex1.api.getTradableBalanceByAssetPairAndAddress(alice, wavesUsdPair)
-            balance.getOrElse(Waves, 0L) should matchTo(aliceBalance1.getOrElse(Waves, 0L) + 25 * (1.waves - matcherFee))
-            balance
-          }
+        val finalHeight = wavesNode1.api.waitForHeightArise()
+        eventually {
+          val balance = dex1.api.getTradableBalanceByAssetPairAndAddress(alice, wavesUsdPair)
+          balance.getOrElse(Waves, 0L) should matchTo(aliceBalance1.getOrElse(Waves, 0L) + 25 * (1.waves - matcherFee))
+          balance
+        }
 
-          val bobBalance2 = eventually {
-            val balance = dex1.api.getTradableBalanceByAssetPairAndAddress(bob, wavesUsdPair)
-            balance.getOrElse(usd, 0L) should matchTo(bobBalance1.getOrElse(usd, 0L) + 250.usd)
-            balance
-          }
+        val bobBalance2 = eventually {
+          val balance = dex1.api.getTradableBalanceByAssetPairAndAddress(bob, wavesUsdPair)
+          balance.getOrElse(usd, 0L) should matchTo(bobBalance1.getOrElse(usd, 0L) + 250.usd)
+          balance
+        }
 
-          step("Doing a rollback")
-          wavesNode1.asyncApi.rollback(heightInitial, returnTransactionsToUtx = true) // true as on Node
-          wavesMinerNode.api.rollback(heightInitial, returnTransactionsToUtx = true) // true as on Node
-          eventually {
-            wavesNode1.api.currentHeight shouldBe >=(heightInitial)
-          }
+        step("Doing a rollback")
+        wavesNode1.asyncApi.rollback(heightInitial, returnTransactionsToUtx = true) // true as on Node
+        wavesMinerNode.api.rollback(heightInitial, returnTransactionsToUtx = true) // true as on Node
+        eventually {
+          wavesNode1.api.currentHeight shouldBe >=(heightInitial)
+        }
 
-          step("Wait for a height to be restored")
-          wavesNode1.api.waitForHeight(finalHeight)
-          wavesNode1.api.waitForHeightArise() // See WavesFork
-          Thread.sleep(3000)
+        step("Wait for a height to be restored")
+        wavesNode1.api.waitForHeight(finalHeight)
+        wavesNode1.api.waitForHeightArise() // See WavesFork
+        Thread.sleep(3000)
 
-          // Relates DEX-1099
-          eventually {
-            dex1.api.getTradableBalanceByAssetPairAndAddress(bob, wavesUsdPair) should matchTo(bobBalance2)
-          }
-
+        // Relates DEX-1099
+        eventually {
+          dex1.api.getTradableBalanceByAssetPairAndAddress(bob, wavesUsdPair) should matchTo(bobBalance2)
         }
       }
     }

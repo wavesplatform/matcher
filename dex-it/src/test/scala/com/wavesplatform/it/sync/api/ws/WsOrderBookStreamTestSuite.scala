@@ -17,12 +17,12 @@ import com.wavesplatform.dex.error.{OrderAssetPairReversed, OrderBookStopped, Su
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, OrderRestrictionsSettings}
 import com.wavesplatform.it.api.MatcherCommand
-import com.wavesplatform.it.{executeCommands, WsSuiteBase}
+import com.wavesplatform.it.{WsSuiteBase, executeCommands}
 import play.api.libs.json._
 
 import scala.collection.immutable.TreeMap
 import scala.concurrent.Future
-import scala.util.Random
+import scala.util.{Random, Using}
 
 class WsOrderBookStreamTestSuite extends WsSuiteBase {
 
@@ -100,45 +100,45 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
     "correctly send changed tick-size" in {
       placeAndAwaitAtDex(mkOrderDP(alice, ethWavesPair, SELL, 1.eth, 199))
 
-      val wsc = mkWsOrderBookConnection(ethWavesPair, dex1)
-      val buffer0 = wsc.receiveAtLeastN[WsOrderBookChanges](1)
+      Using(mkWsOrderBookConnection(ethWavesPair, dex1)) { wsc =>
+        val buffer0 = wsc.receiveAtLeastN[WsOrderBookChanges](1)
 
-      buffer0 should have size 1
-      buffer0.squashed.values.head should matchTo(
-        protocol.WsOrderBookChanges(
-          assetPair = ethWavesPair,
-          asks = TreeMap(199d -> 1d),
-          bids = TreeMap.empty,
-          lastTrade = None,
-          updateId = 0,
-          timestamp = buffer0.last.timestamp,
-          settings = WsOrderBookSettings(None, 0.0002.some).some
-        )
-      )
-
-      wsc.clearMessages()
-      placeAndAwaitAtDex(mkOrderDP(alice, ethWavesPair, SELL, 1.eth, 200))
-
-      // An aggregated order book could not be updated
-      eventually {
-        val buffer = wsc.receiveAtLeastN[WsOrderBookChanges](1)
-
-        buffer.size should (be >= 1 and be <= 2)
-        buffer.squashed.values.head should matchTo(
+        buffer0 should have size 1
+        buffer0.squashed.values.head should matchTo(
           protocol.WsOrderBookChanges(
             assetPair = ethWavesPair,
-            asks = TreeMap(200d -> 1d),
+            asks = TreeMap(199d -> 1d),
             bids = TreeMap.empty,
             lastTrade = None,
-            updateId = buffer.last.updateId,
-            timestamp = buffer.last.timestamp,
-            settings = WsOrderBookSettings(None, 0.00000001.some).some
+            updateId = 0,
+            timestamp = buffer0.last.timestamp,
+            settings = WsOrderBookSettings(None, 0.0002.some).some
           )
         )
-      }
 
-      dex1.api.cancelAllOrdersWithSig(alice)
-      wsc.close()
+        wsc.clearMessages()
+        placeAndAwaitAtDex(mkOrderDP(alice, ethWavesPair, SELL, 1.eth, 200))
+
+        // An aggregated order book could not be updated
+        eventually {
+          val buffer = wsc.receiveAtLeastN[WsOrderBookChanges](1)
+
+          buffer.size should (be >= 1 and be <= 2)
+          buffer.squashed.values.head should matchTo(
+            protocol.WsOrderBookChanges(
+              assetPair = ethWavesPair,
+              asks = TreeMap(200d -> 1d),
+              bids = TreeMap.empty,
+              lastTrade = None,
+              updateId = buffer.last.updateId,
+              timestamp = buffer.last.timestamp,
+              settings = WsOrderBookSettings(None, 0.00000001.some).some
+            )
+          )
+        }
+
+        dex1.api.cancelAllOrdersWithSig(alice)
+      }
     }
 
     "should send a full state after connection" in {
@@ -149,10 +149,9 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
       dex1.api.waitForOrderStatus(firstOrder, HttpOrderStatus.Status.Cancelled)
 
       markup("No orders")
-      val wsc0 = mkWsOrderBookConnection(wavesBtcPair, dex1)
-      val buffer0 = wsc0.receiveAtLeastN[WsOrderBookChanges](1)
-      wsc0.close()
-
+      val buffer0 = Using(mkWsOrderBookConnection(wavesBtcPair, dex1)) { wsc =>
+        wsc.receiveAtLeastN[WsOrderBookChanges](1)
+      }.get
       buffer0 should have size 1
       buffer0.squashed.values.head should matchTo(
         protocol.WsOrderBookChanges(
@@ -165,35 +164,33 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
           settings = orderBookSettings
         )
       )
-
       placeAndAwaitAtDex(mkOrderDP(carol, wavesBtcPair, BUY, 1.05.waves, 0.00011403))
 
       markup("One order")
 
-      val wsc1 = mkWsOrderBookConnection(wavesBtcPair, dex1)
-      val buffer1 = wsc1.receiveAtLeastN[WsOrderBookChanges](1)
-      wsc1.close()
-
-      buffer1 should have size 1
-      buffer1.squashed.values.head should matchTo(
-        protocol.WsOrderBookChanges(
-          assetPair = wavesBtcPair,
-          asks = TreeMap.empty,
-          bids = TreeMap(0.00011403d -> 1.05d),
-          lastTrade = None,
-          updateId = 0,
-          timestamp = buffer1.last.timestamp,
-          settings = orderBookSettings
+      val buffer1 = Using(mkWsOrderBookConnection(wavesBtcPair, dex1)) { wsc =>
+        wsc.receiveAtLeastN[WsOrderBookChanges](1)
+      }.get
+        buffer1 should have size 1
+        buffer1.squashed.values.head should matchTo(
+          protocol.WsOrderBookChanges(
+            assetPair = wavesBtcPair,
+            asks = TreeMap.empty,
+            bids = TreeMap(0.00011403d -> 1.05d),
+            lastTrade = None,
+            updateId = 0,
+            timestamp = buffer1.last.timestamp,
+            settings = orderBookSettings
+          )
         )
-      )
 
       markup("Two orders")
 
       placeAndAwaitAtDex(mkOrderDP(carol, wavesBtcPair, SELL, 1.waves, 0.00012))
 
-      val wsc2 = mkWsOrderBookConnection(wavesBtcPair, dex1)
-      val buffer2 = wsc2.receiveAtLeastN[WsOrderBookChanges](1)
-      wsc2.close()
+      val buffer2 = Using(mkWsOrderBookConnection(wavesBtcPair, dex1)) { wsc =>
+        wsc.receiveAtLeastN[WsOrderBookChanges](1)
+      }.get
 
       buffer2 should have size 1
       buffer2.squashed.values.head should matchTo(
@@ -212,9 +209,9 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
 
       placeAndAwaitAtDex(mkOrderDP(carol, wavesBtcPair, BUY, 0.5.waves, 0.00013), HttpOrderStatus.Status.Filled)
 
-      val wsc3 = mkWsOrderBookConnection(wavesBtcPair, dex1)
-      val buffer3 = wsc3.receiveAtLeastN[WsOrderBookChanges](1)
-      wsc3.close()
+      val buffer3 = Using(mkWsOrderBookConnection(wavesBtcPair, dex1)) { wsc =>
+        wsc.receiveAtLeastN[WsOrderBookChanges](1)
+      }.get
 
       buffer3.size should (be >= 1 and be <= 2)
       buffer3.squashed.values.head should matchTo(
@@ -240,9 +237,9 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
         mkOrderDP(carol, wavesBtcPair, BUY, 0.7.waves, 0.000115)
       ).foreach(placeAndAwaitAtDex(_))
 
-      val wsc4 = mkWsOrderBookConnection(wavesBtcPair, dex1)
-      val buffer4 = wsc4.receiveAtLeastN[WsOrderBookChanges](1)
-      wsc4.close()
+      val buffer4 = Using(mkWsOrderBookConnection(wavesBtcPair, dex1)) { wsc =>
+        wsc.receiveAtLeastN[WsOrderBookChanges](1)
+      }.get
 
       buffer4.size should (be >= 1 and be <= 2)
       buffer4.squashed.values.head should matchTo(
@@ -268,80 +265,79 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
       )
 
       dex1.api.cancelAllOrdersWithSig(carol)
-      Seq(wsc0, wsc1, wsc2, wsc3, wsc4).foreach(_.close())
     }
 
     "send updates" in {
-      val wsc = mkWsOrderBookConnection(wavesBtcPair, dex1)
-      wsc.receiveAtLeastN[WsOrderBookChanges](1)
-      wsc.clearMessages()
+      Using(mkWsOrderBookConnection(wavesBtcPair, dex1)) { wsc =>
+        wsc.receiveAtLeastN[WsOrderBookChanges](1)
+        wsc.clearMessages()
 
-      markup("A new order")
-      placeAndAwaitAtDex(mkOrderDP(carol, wavesBtcPair, BUY, 1.waves, 0.00012))
+        markup("A new order")
+        placeAndAwaitAtDex(mkOrderDP(carol, wavesBtcPair, BUY, 1.waves, 0.00012))
 
-      eventually {
-        val buffer = wsc.receiveAtLeastN[WsOrderBookChanges](1)
-        buffer should have size 1
-        buffer.squashed.values.head should matchTo(
-          protocol.WsOrderBookChanges(
-            assetPair = wavesBtcPair,
-            asks = TreeMap.empty,
-            bids = TreeMap(0.00012d -> 1d),
-            lastTrade = None,
-            updateId = 1,
-            timestamp = buffer.last.timestamp,
-            settings = None
+        eventually {
+          val buffer = wsc.receiveAtLeastN[WsOrderBookChanges](1)
+          buffer should have size 1
+          buffer.squashed.values.head should matchTo(
+            protocol.WsOrderBookChanges(
+              assetPair = wavesBtcPair,
+              asks = TreeMap.empty,
+              bids = TreeMap(0.00012d -> 1d),
+              lastTrade = None,
+              updateId = 1,
+              timestamp = buffer.last.timestamp,
+              settings = None
+            )
           )
-        )
-      }
-      wsc.clearMessages()
+        }
+        wsc.clearMessages()
 
-      markup("An execution and adding a new order")
-      val order = mkOrderDP(carol, wavesBtcPair, SELL, 1.5.waves, 0.00012)
-      placeAndAwaitAtDex(order, HttpOrderStatus.Status.PartiallyFilled)
+        markup("An execution and adding a new order")
+        val order = mkOrderDP(carol, wavesBtcPair, SELL, 1.5.waves, 0.00012)
+        placeAndAwaitAtDex(order, HttpOrderStatus.Status.PartiallyFilled)
 
-      eventually {
-        val buffer = wsc.receiveAtLeastN[WsOrderBookChanges](1)
-        buffer.size should (be >= 1 and be <= 2)
-        buffer.squashed.values.head should matchTo(
-          protocol.WsOrderBookChanges(
-            assetPair = wavesBtcPair,
-            asks = TreeMap(0.00012d -> 0.5d),
-            bids = TreeMap(0.00012d -> 0d),
-            lastTrade = WsLastTrade(
-              price = 0.00012d,
-              amount = 1,
-              side = OrderType.SELL
-            ).some,
-            updateId = buffer.last.updateId,
-            timestamp = buffer.last.timestamp,
-            settings = None
+        eventually {
+          val buffer = wsc.receiveAtLeastN[WsOrderBookChanges](1)
+          buffer.size should (be >= 1 and be <= 2)
+          buffer.squashed.values.head should matchTo(
+            protocol.WsOrderBookChanges(
+              assetPair = wavesBtcPair,
+              asks = TreeMap(0.00012d -> 0.5d),
+              bids = TreeMap(0.00012d -> 0d),
+              lastTrade = WsLastTrade(
+                price = 0.00012d,
+                amount = 1,
+                side = OrderType.SELL
+              ).some,
+              updateId = buffer.last.updateId,
+              timestamp = buffer.last.timestamp,
+              settings = None
+            )
           )
-        )
-      }
-      wsc.clearMessages()
+        }
+        wsc.clearMessages()
 
-      dex1.api.cancelAllOrdersWithSig(carol)
-      dex1.api.waitForOrderStatus(order, HttpOrderStatus.Status.Cancelled)
+        dex1.api.cancelAllOrdersWithSig(carol)
+        dex1.api.waitForOrderStatus(order, HttpOrderStatus.Status.Cancelled)
 
-      eventually {
-        val buffer = wsc.receiveAtLeastN[WsOrderBookChanges](1)
-        buffer.size shouldBe 1
-        buffer.squashed.values.head should matchTo(
-          protocol.WsOrderBookChanges(
-            assetPair = wavesBtcPair,
-            asks = TreeMap(0.00012d -> 0d),
-            bids = TreeMap.empty,
-            lastTrade = None,
-            updateId = buffer.last.updateId,
-            timestamp = buffer.last.timestamp,
-            settings = None
+        eventually {
+          val buffer = wsc.receiveAtLeastN[WsOrderBookChanges](1)
+          buffer.size shouldBe 1
+          buffer.squashed.values.head should matchTo(
+            protocol.WsOrderBookChanges(
+              assetPair = wavesBtcPair,
+              asks = TreeMap(0.00012d -> 0d),
+              bids = TreeMap.empty,
+              lastTrade = None,
+              updateId = buffer.last.updateId,
+              timestamp = buffer.last.timestamp,
+              settings = None
+            )
           )
-        )
-      }
-      wsc.clearMessages()
+        }
+        wsc.clearMessages()
 
-      wsc.close()
+      }
     }
 
     "send correct update ids" in {
@@ -355,41 +351,43 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
 
       val order = mkOrderDP(carol, wavesBtcPair, SELL, 1.waves, 0.00005)
 
-      val wsc1 = mkWsOrderBookConnection(wavesBtcPair, dex1)
-      assertUpdateId(wsc1, 0)
+      Using(mkWsOrderBookConnection(wavesBtcPair, dex1)) { wsc1 =>
+        assertUpdateId(wsc1, 0)
 
-      placeAndAwaitAtDex(order)
-      assertUpdateId(wsc1, 1)
+        placeAndAwaitAtDex(order)
+        assertUpdateId(wsc1, 1)
 
-      val wsc2 = mkWsOrderBookConnection(wavesBtcPair, dex1)
-      assertUpdateId(wsc2, 0)
+        Using(mkWsOrderBookConnection(wavesBtcPair, dex1)) { wsc2 =>
+          assertUpdateId(wsc2, 0)
 
-      dex1.api.cancelOneOrAllInPairOrdersWithSig(carol, order)
-      assertUpdateId(wsc1, 2)
-      assertUpdateId(wsc2, 1)
+          dex1.api.cancelOneOrAllInPairOrdersWithSig(carol, order)
+          assertUpdateId(wsc1, 2)
+          assertUpdateId(wsc2, 1)
+        }
+      }
     }
 
     "stop send updates after unsubscribe and receive them again after subscribe" in {
-      val wsc = mkWsOrderBookConnection(wavesBtcPair, dex1)
-      wsc.receiveAtLeastN[WsOrderBookChanges](1)
-      wsc.clearMessages()
+      Using(mkWsOrderBookConnection(wavesBtcPair, dex1)) { wsc =>
+        wsc.receiveAtLeastN[WsOrderBookChanges](1)
+        wsc.clearMessages()
 
-      markup("Unsubscribe")
-      wsc.send(WsUnsubscribe(wavesBtcPair))
-      val order = mkOrderDP(carol, wavesBtcPair, SELL, 1.waves, 0.00005)
-      placeAndAwaitAtDex(order)
-      wsc.receiveNoMessages()
+        markup("Unsubscribe")
+        wsc.send(WsUnsubscribe(wavesBtcPair))
+        val order = mkOrderDP(carol, wavesBtcPair, SELL, 1.waves, 0.00005)
+        placeAndAwaitAtDex(order)
+        wsc.receiveNoMessages()
 
-      markup("Subscribe")
-      wsc.send(WsOrderBookSubscribe(wavesBtcPair, 1))
-      wsc.receiveAtLeastN[WsOrderBookChanges](1)
-      wsc.clearMessages()
+        markup("Subscribe")
+        wsc.send(WsOrderBookSubscribe(wavesBtcPair, 1))
+        wsc.receiveAtLeastN[WsOrderBookChanges](1)
+        wsc.clearMessages()
 
-      markup("Update")
-      cancelAndAwait(carol, order)
-      wsc.receiveAtLeastN[WsOrderBookChanges](1)
+        markup("Update")
+        cancelAndAwait(carol, order)
+        wsc.receiveAtLeastN[WsOrderBookChanges](1)
 
-      wsc.close()
+      }
     }
 
     "close connections when order book is deleted" in {
@@ -449,15 +447,16 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
 
       broadcastAndAwait(issueTx)
 
-      val wsc = mkWsOrderBookConnection(bchUsdPair, dex1)
-      val snapshot = wsc.receiveAtLeastN[WsOrderBookChanges](1).head
+      Using(mkWsOrderBookConnection(bchUsdPair, dex1)) { wsc =>
+        val snapshot = wsc.receiveAtLeastN[WsOrderBookChanges](1).head
 
-      snapshot.asks shouldBe empty
-      snapshot.bids shouldBe empty
-      wsc.clearMessages()
+        snapshot.asks shouldBe empty
+        snapshot.bids shouldBe empty
+        wsc.clearMessages()
 
-      placeAndAwaitAtDex(mkOrderDP(alice, bchUsdPair, SELL, 10.asset8, 231.0))
-      wsc.receiveAtLeastN[WsOrderBookChanges](1).head.asks should matchTo(TreeMap(231.0 -> 10.0))
+        placeAndAwaitAtDex(mkOrderDP(alice, bchUsdPair, SELL, 10.asset8, 231.0))
+        wsc.receiveAtLeastN[WsOrderBookChanges](1).head.asks should matchTo(TreeMap(231.0 -> 10.0))
+      }
     }
 
     def placeOrdersAsync(t: OrderType): Unit = {
@@ -504,38 +503,39 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
   "Bugs" - {
     "DEX-814 Connections can affect each other" in {
       val wscs = (1 to 10).map(_ => mkWsOrderBookConnection(wavesBtcPair, dex1))
-      val mainWsc = mkWsOrderBookConnection(wavesBtcPair, dex1)
+      Using(mkWsOrderBookConnection(wavesBtcPair, dex1)) { mainWsc =>
 
-      markup("Multiple orders")
-      val orders = (1 to 50).map { i =>
-        mkOrderDP(carol, wavesBtcPair, BUY, 1.waves + i, 0.00012 + i / 100000.0d)
-      }
+        markup("Multiple orders")
+        val orders = (1 to 50).map { i =>
+          mkOrderDP(carol, wavesBtcPair, BUY, 1.waves + i, 0.00012 + i / 100000.0d)
+        }
 
-      Future.traverse(orders)(dex1.asyncApi.place).futureValue
-      dex1.api.cancelAllOrdersWithSig(carol)
+        Future.traverse(orders)(dex1.asyncApi.place).futureValue
+        dex1.api.cancelAllOrdersWithSig(carol)
 
-      Future.traverse(wscs)(wsc => Future(wsc.close())).futureValue
-      Thread.sleep(3000)
-      mainWsc.clearMessages()
+        Future.traverse(wscs)(wsc => Future(wsc.close())).futureValue
+        Thread.sleep(3000)
+        mainWsc.clearMessages()
 
-      markup("A new order")
-      placeAndAwaitAtDex(mkOrderDP(carol, wavesBtcPair, BUY, 2.waves, 0.00029))
+        markup("A new order")
+        placeAndAwaitAtDex(mkOrderDP(carol, wavesBtcPair, BUY, 2.waves, 0.00029))
 
-      eventually {
-        val buffer = mainWsc.receiveAtLeastN[WsOrderBookChanges](1)
-        buffer.squashed.values.head.copy(updateId = 0) should matchTo(
-          WsOrderBookChanges(
-            assetPair = wavesBtcPair,
-            asks = TreeMap.empty,
-            bids = TreeMap(0.00029d -> 2d),
-            lastTrade = none,
-            updateId = 0,
-            timestamp = buffer.last.timestamp,
-            settings = none
+        eventually {
+          val buffer = mainWsc.receiveAtLeastN[WsOrderBookChanges](1)
+          buffer.squashed.values.head.copy(updateId = 0) should matchTo(
+            WsOrderBookChanges(
+              assetPair = wavesBtcPair,
+              asks = TreeMap.empty,
+              bids = TreeMap(0.00029d -> 2d),
+              lastTrade = none,
+              updateId = 0,
+              timestamp = buffer.last.timestamp,
+              settings = none
+            )
           )
-        )
+        }
+        mainWsc.clearMessages()
       }
-      mainWsc.clearMessages()
     }
   }
 }

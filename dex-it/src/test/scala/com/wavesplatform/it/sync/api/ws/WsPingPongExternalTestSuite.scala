@@ -7,6 +7,7 @@ import com.wavesplatform.dex.Implicits.durationToScalatestTimeout
 import com.wavesplatform.dex.error.WsConnectionMaxLifetimeExceeded
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
+import scala.util.Using
 
 class WsPingPongExternalTestSuite extends WsPingPongBaseSuite {
 
@@ -30,25 +31,27 @@ class WsPingPongExternalTestSuite extends WsPingPongBaseSuite {
   "Web socket connection should be closed " - {
     s"by max-connection-lifetime = $maxConnectionLifetime" in {
 
-      val wsac = mkWsAddressConnection(alice, dex1)
-      val connectionLifetime = wsac.connectionLifetime.futureValue(maxConnectionLifetime + delta)
-      val (errors, pings) = wsac.receiveAtLeastNErrorsAndPings(1, 5)
+      Using(mkWsAddressConnection(alice, dex1)) { wsac =>
+        val connectionLifetime = wsac.connectionLifetime.futureValue(maxConnectionLifetime + delta)
+        val (errors, pings) = wsac.receiveAtLeastNErrorsAndPings(1, 5)
 
-      connectionLifetime should (be >= maxConnectionLifetime and be <= maxConnectionLifetime + delta)
+        connectionLifetime should (be >= maxConnectionLifetime and be <= maxConnectionLifetime + delta)
 
-      pings.size should (be >= 5 and be <= 6)
+        pings.size should (be >= 5 and be <= 6)
 
-      errors should matchTo {
-        List(
-          WsError(
-            timestamp = 0L, // ignored
-            code = WsConnectionMaxLifetimeExceeded.code,
-            message = "WebSocket has reached max allowed lifetime"
+        errors should matchTo {
+          List(
+            WsError(
+              timestamp = 0L, // ignored
+              code = WsConnectionMaxLifetimeExceeded.code,
+              message = "WebSocket has reached max allowed lifetime"
+            )
           )
-        )
+        }
+
+        wsac.isClosed shouldBe true
       }
 
-      wsac.isClosed shouldBe true
     }
   }
 }

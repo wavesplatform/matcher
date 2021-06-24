@@ -11,6 +11,7 @@ import com.wavesplatform.dex.it.docker.DexContainer
 import com.wavesplatform.it.WsSuiteBase
 
 import scala.concurrent.Future
+import scala.util.Using
 
 class WsConnectionTestSuite extends WsSuiteBase {
 
@@ -84,27 +85,28 @@ class WsConnectionTestSuite extends WsSuiteBase {
           )
       }
 
-    val firefoxLinuxWscs = mkDexWsConnections(1, os = "Linux 5.2".some, client = "Firefox".some)
-    val unknownOs2Wscs = mkDexWsConnections(2, os = "OS/2".some)
+    Using(mkDexWsConnections(1, os = "Linux 5.2".some, client = "Firefox".some)) { firefoxLinuxWscs =>
+      val unknownOs2Wscs = mkDexWsConnections(2, os = "OS/2".some)
 
-    val wscs = firefoxLinuxWscs ++
-      unknownOs2Wscs ++
-      mkDexWsConnections(3, client = "Android 10".some) ++
-      mkDexWsConnections(4)
+      val wscs = firefoxLinuxWscs ++
+        unknownOs2Wscs ++
+        mkDexWsConnections(3, client = "Android 10".some) ++
+        mkDexWsConnections(4)
 
-    expectClientAndOs(dex1.api.waitForWsConnections(_.connections == 10), 1, 2, 3, 4)
+      expectClientAndOs(dex1.api.waitForWsConnections(_.connections == 10), 1, 2, 3, 4)
 
-    info("Closing all Firefox + Linux 5.2 and one Unknown + OS/2")
-    firefoxLinuxWscs.foreach(_.close())
-    unknownOs2Wscs.head.close()
-    expectClientAndOs(dex1.api.waitForWsConnections(_.connections == 8), 0, 1, 3, 4)
+      info("Closing all Firefox + Linux 5.2 and one Unknown + OS/2")
+      firefoxLinuxWscs.foreach(_.close())
+      unknownOs2Wscs.head.close()
+      expectClientAndOs(dex1.api.waitForWsConnections(_.connections == 8), 0, 1, 3, 4)
 
-    info("Opening a new client")
-    val newWs = mkDexWsConnection(dex1, os = "Test OS".some, client = "Test Client".some)
-    expectClientAndOs(dex1.api.waitForWsConnections(_.connections == 9), 0, 1, 3, 4, "Test Client, Test OS" -> 1)
+      info("Opening a new client")
+      val newWs = mkDexWsConnection(dex1, os = "Test OS".some, client = "Test Client".some)
+      expectClientAndOs(dex1.api.waitForWsConnections(_.connections == 9), 0, 1, 3, 4, "Test Client, Test OS" -> 1)
 
-    newWs.close()
-    wscs.foreach(_.close())
+      newWs.close()
+      wscs.foreach(_.close())
+    }
   }
 
   "closeConnection closes N oldest connections" in {

@@ -20,7 +20,9 @@ import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try}
 
-class WsConnection(uri: Uri, keepAlive: Boolean = true)(implicit system: ActorSystem, materializer: Materializer) extends ScorexLogging {
+class WsConnection(uri: Uri, keepAlive: Boolean = true)(implicit system: ActorSystem, materializer: Materializer)
+    extends ScorexLogging
+    with AutoCloseable {
 
   val testId: Int = ThreadLocalRandom.current().nextInt(10000)
 

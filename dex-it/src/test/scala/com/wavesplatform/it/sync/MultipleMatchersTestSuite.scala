@@ -23,7 +23,7 @@ import org.scalacheck.Gen
 
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
-import scala.util.Random
+import scala.util.{Random, Using}
 import scala.util.control.NonFatal
 
 @DexItExternalKafkaRequired
@@ -123,57 +123,54 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with
   "WS Order book state should be the same on two matchers" in {
     val acc = mkAccountWithBalance(100.eth -> eth, 100.waves -> Waves)
 
-    val wsob1 = mkWsOrderBookConnection(ethWavesPair, dex1)
-    val wsob2 = mkWsOrderBookConnection(ethWavesPair, dex2)
+    Using.Manager { use =>
+      val wsob1 = use(mkWsOrderBookConnection(ethWavesPair, dex1))
+      val wsob2 = use(mkWsOrderBookConnection(ethWavesPair, dex2))
 
-    val sell = mkOrder(acc, ethWavesPair, SELL, 10.eth, 1.waves, 0.003.waves)
-    dex1.api.place(sell)
+      val sell = mkOrder(acc, ethWavesPair, SELL, 10.eth, 1.waves, 0.003.waves)
+      dex1.api.place(sell)
 
-    List(
-      mkOrder(alice, ethWavesPair, BUY, 5.eth, 1.waves, 0.003.waves),
-      mkOrder(alice, ethWavesPair, BUY, 3.eth, 1.waves, 0.003.waves),
-      mkOrder(alice, ethWavesPair, BUY, 2.eth, 1.waves, 0.003.waves)
-    ).foreach(dex1.api.place)
+      List(
+        mkOrder(alice, ethWavesPair, BUY, 5.eth, 1.waves, 0.003.waves),
+        mkOrder(alice, ethWavesPair, BUY, 3.eth, 1.waves, 0.003.waves),
+        mkOrder(alice, ethWavesPair, BUY, 2.eth, 1.waves, 0.003.waves)
+      ).foreach(dex1.api.place)
 
-    dex1.api.waitForOrderStatus(sell, Status.Filled)
+      dex1.api.waitForOrderStatus(sell, Status.Filled)
 
-    eventually {
-      val obs1 = wsob1.receiveAtLeastN[WsOrderBookChanges](1).reduce(mergeOrderBookChanges)
-      val obs2 = wsob2.receiveAtLeastN[WsOrderBookChanges](1).reduce(mergeOrderBookChanges)
+      eventually {
+        val obs1 = wsob1.receiveAtLeastN[WsOrderBookChanges](1).reduce(mergeOrderBookChanges)
+        val obs2 = wsob2.receiveAtLeastN[WsOrderBookChanges](1).reduce(mergeOrderBookChanges)
 
-      obs1 should matchTo(obs2)
+        obs1 should matchTo(obs2)
+      }
     }
-
-    wsob1.close()
-    wsob2.close()
   }
 
   "WS Address state should be the same on two matchers" in {
     val acc = mkAccountWithBalance(100.eth -> eth, 100.waves -> Waves)
 
-    val wsau1 = mkWsAddressConnection(acc, dex1)
-    val wsau2 = mkWsAddressConnection(acc, dex2)
+    Using.Manager { use =>
+      val wsau1 = use(mkWsAddressConnection(acc, dex1))
+      val wsau2 = use(mkWsAddressConnection(acc, dex2))
+      val sell = mkOrder(acc, ethWavesPair, SELL, 10.eth, 1.waves, 0.003.waves)
+      dex1.api.place(sell)
 
-    val sell = mkOrder(acc, ethWavesPair, SELL, 10.eth, 1.waves, 0.003.waves)
-    dex1.api.place(sell)
+      List(
+        mkOrder(alice, ethWavesPair, BUY, 5.eth, 1.waves, 0.003.waves),
+        mkOrder(alice, ethWavesPair, BUY, 3.eth, 1.waves, 0.003.waves),
+        mkOrder(alice, ethWavesPair, BUY, 2.eth, 1.waves, 0.003.waves)
+      ).foreach(dex1.api.place)
 
-    List(
-      mkOrder(alice, ethWavesPair, BUY, 5.eth, 1.waves, 0.003.waves),
-      mkOrder(alice, ethWavesPair, BUY, 3.eth, 1.waves, 0.003.waves),
-      mkOrder(alice, ethWavesPair, BUY, 2.eth, 1.waves, 0.003.waves)
-    ).foreach(dex1.api.place)
+      dex1.api.waitForOrderStatus(sell, Status.Filled)
 
-    dex1.api.waitForOrderStatus(sell, Status.Filled)
+      eventually {
+        val aus1 = wsau1.receiveAtLeastN[WsAddressChanges](1).reduce(mergeAddressChanges)
+        val aus2 = wsau2.receiveAtLeastN[WsAddressChanges](1).reduce(mergeAddressChanges)
 
-    eventually {
-      val aus1 = wsau1.receiveAtLeastN[WsAddressChanges](1).reduce(mergeAddressChanges)
-      val aus2 = wsau2.receiveAtLeastN[WsAddressChanges](1).reduce(mergeAddressChanges)
-
-      aus1 should matchTo(aus2)
+        aus1 should matchTo(aus2)
+      }
     }
-
-    wsau1.close()
-    wsau2.close()
   }
 
   "Batch cancel and single cancels simultaneously" in {

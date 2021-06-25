@@ -16,6 +16,8 @@ import com.wavesplatform.dex.model.LimitOrder
 import com.wavesplatform.it.WsSuiteBase
 import org.scalatest.Assertion
 
+import scala.util.Using
+
 class BouncingBalancesTestSuite extends WsSuiteBase {
 
   override protected val dexInitialSuiteConfig: Config =
@@ -52,152 +54,151 @@ class BouncingBalancesTestSuite extends WsSuiteBase {
 
   "Balance should not bounce" - {
     "when a rollback is completed" in {
-      val wsc = mkWsAddressConnection(bob, dex1)
+      Using(mkWsAddressConnection(bob, dex1)) { wsc =>
 
-      withClue("Bob has only Waves on balance\n") {
-        eventually {
-          val initialBobBalance = wsc.balanceChanges
-          initialBobBalance should have size 1
-          initialBobBalance.head should have size 1
-          initialBobBalance.head.head._1 shouldBe Waves
-          wsc.clearMessages()
+        withClue("Bob has only Waves on balance\n") {
+          eventually {
+            val initialBobBalance = wsc.balanceChanges
+            initialBobBalance should have size 1
+            initialBobBalance.head should have size 1
+            initialBobBalance.head.head._1 shouldBe Waves
+            wsc.clearMessages()
+          }
+        }
+
+        val heightInitial = wavesNode1.api.currentHeight
+        val heightIssue = heightInitial + 1
+        val heightFirstTransfer = heightIssue + 1
+        val heightSecondTransfer = heightFirstTransfer + 1
+
+        val doggyUsdPair = AssetPair(doggyCoin, usd)
+
+        implicit val efc: ErrorFormatterContext = ErrorFormatterContext.from(assetDecimalsMap + (doggyCoin -> 8))
+
+        // issue
+        broadcastAndAwait(issueDoggyCoinTx)
+        wavesNode1.api.waitForHeight(heightIssue)
+        wavesNode1.api.currentHeight shouldBe heightIssue
+
+        // first transfer, Bob's doggy balance = 500k
+        broadcastAndAwait(mkTransfer(alice, bob, 500000.asset8, doggyCoin))
+        wavesNode1.api.waitForHeight(heightFirstTransfer)
+        wavesNode1.api.currentHeight shouldBe heightFirstTransfer
+
+        assertChanges(wsc)(Map(doggyCoin -> WsBalances(0.0, 0.0)), Map(doggyCoin -> WsBalances(500000, 0.0)))()
+        wsc.clearMessages()
+
+        // second transfer, Bob's doggy balance = 1m
+        broadcastAndAwait(mkTransfer(alice, bob, 500000.asset8, doggyCoin))
+        wavesNode1.api.waitForHeight(heightSecondTransfer)
+        wavesNode1.api.currentHeight shouldBe heightSecondTransfer
+
+        assertChanges(wsc)(Map(doggyCoin -> WsBalances(1000000, 0.0)))()
+        wsc.clearMessages()
+
+        // Bob sells whole doggy balance = 1m
+        val bobOrder = mkOrderDP(bob, doggyUsdPair, SELL, 1000000.asset8, 0.1)
+        placeAndAwaitAtDex(bobOrder)
+
+        assertChanges(wsc)(
+          Map(Waves -> WsBalances(4949949.997, 0.003)), // Fee for order
+          Map(doggyCoin -> WsBalances(0, 1000000))
+        )(WsOrder.fromDomain(LimitOrder(bobOrder)))
+        wsc.clearMessages()
+
+        dex1.api.orderStatusByAssetPairAndId(bobOrder).status shouldBe Status.Accepted
+
+        withClue("After rollback order should not be cancelled and balances should not be decreased\n") {
+          wavesNode1.asyncApi.rollback(heightInitial, returnTransactionsToUtx = true) // true as on Node
+          wavesMinerNode.api.rollback(heightInitial, returnTransactionsToUtx = true) // true as on Node
+          eventually {
+            wavesNode1.api.currentHeight shouldBe >=(heightInitial)
+          }
+
+          wavesNode1.api.waitForHeight(heightSecondTransfer)
+          wavesNode1.api.waitForHeightArise() // See WavesFork
+
+          dex1.api.waitForOrderStatus(bobOrder, Status.Accepted)
+
+          //        wsc.messages.filter {
+          //          case _: WsPingOrPong => false
+          //          case _ => true
+          //        } shouldBe empty
+
+          // Relates DEX-1099
+          dex1.api.getTradableBalanceByAssetPairAndAddress(bob, AssetPair(doggyCoin, Waves)) should matchTo(Map[Asset, Long](
+            Waves -> 494994999700000L
+          ))
         }
       }
+    }
 
-      val heightInitial = wavesNode1.api.currentHeight
-      val heightIssue = heightInitial + 1
-      val heightFirstTransfer = heightIssue + 1
-      val heightSecondTransfer = heightFirstTransfer + 1
+    "multiple orders test" in {
+      Using.Manager { use =>
+        val aliceWsc = use(mkWsAddressConnection(alice, dex1))
+        val bobWsc = use(mkWsAddressConnection(bob, dex1))
 
-      val doggyUsdPair = AssetPair(doggyCoin, usd)
+        val heightInitial = wavesNode1.api.waitForHeightArise()
+        val aliceBalance1 = dex1.api.getTradableBalanceByAssetPairAndAddress(alice, wavesUsdPair)
+        val bobBalance1 = dex1.api.getTradableBalanceByAssetPairAndAddress(bob, wavesUsdPair)
 
-      implicit val efc: ErrorFormatterContext = ErrorFormatterContext.from(assetDecimalsMap + (doggyCoin -> 8))
+        val now = System.currentTimeMillis()
+        val counterOrders = (1 to 25).map(i => mkOrderDP(alice, wavesUsdPair, OrderType.BUY, 1.waves, 10, ts = now + i))
+        val submittedOrders = (1 to 50).map(i => mkOrderDP(bob, wavesUsdPair, OrderType.SELL, 0.5.waves, 10, ts = now + i))
 
-      // issue
-      broadcastAndAwait(issueDoggyCoinTx)
-      wavesNode1.api.waitForHeight(heightIssue)
-      wavesNode1.api.currentHeight shouldBe heightIssue
+        counterOrders.foreach(dex1.api.place)
+        submittedOrders.foreach(dex1.api.place)
 
-      // first transfer, Bob's doggy balance = 500k
-      broadcastAndAwait(mkTransfer(alice, bob, 500000.asset8, doggyCoin))
-      wavesNode1.api.waitForHeight(heightFirstTransfer)
-      wavesNode1.api.currentHeight shouldBe heightFirstTransfer
+        counterOrders.foreach(dex1.api.waitForOrderStatus(_, Status.Filled))
+        submittedOrders.foreach(dex1.api.waitForOrderStatus(_, Status.Filled))
 
-      assertChanges(wsc)(Map(doggyCoin -> WsBalances(0.0, 0.0)), Map(doggyCoin -> WsBalances(500000, 0.0)))()
-      wsc.clearMessages()
+        def checkOrdering(label: String, xs: List[Double])(cmp: (Double, Double) => Assertion): Unit = {
+          val elementsStr = xs.zipWithIndex.map { case (x, i) => s"$i: $x" }.mkString(", ")
+          withClue(s"$label ($elementsStr):\n") {
+            xs.zip(xs.tail).zipWithIndex.foreach {
+              case ((b1, b2), i) => withClue(s"$i: ")(cmp(b1, b2))
+            }
+          }
+        }
 
-      // second transfer, Bob's doggy balance = 1m
-      broadcastAndAwait(mkTransfer(alice, bob, 500000.asset8, doggyCoin))
-      wavesNode1.api.waitForHeight(heightSecondTransfer)
-      wavesNode1.api.currentHeight shouldBe heightSecondTransfer
+        val aliceUsdChanges = collectTradableBalanceChanges(aliceWsc, usd)
+        checkOrdering("alice usd", aliceUsdChanges)(_ shouldBe >=(_))
 
-      assertChanges(wsc)(Map(doggyCoin -> WsBalances(1000000, 0.0)))()
-      wsc.clearMessages()
+        val bobWavesChanges = collectTradableBalanceChanges(bobWsc, Waves)
+        checkOrdering("bob Waves", bobWavesChanges)(_ shouldBe >=(_))
 
-      // Bob sells whole doggy balance = 1m
-      val bobOrder = mkOrderDP(bob, doggyUsdPair, SELL, 1000000.asset8, 0.1)
-      placeAndAwaitAtDex(bobOrder)
+        submittedOrders.foreach(waitForOrderAtNode(_))
 
-      assertChanges(wsc)(
-        Map(Waves -> WsBalances(4949949.997, 0.003)), // Fee for order
-        Map(doggyCoin -> WsBalances(0, 1000000))
-      )(WsOrder.fromDomain(LimitOrder(bobOrder)))
-      wsc.clearMessages()
+        val finalHeight = wavesNode1.api.waitForHeightArise()
+        eventually {
+          val balance = dex1.api.getTradableBalanceByAssetPairAndAddress(alice, wavesUsdPair)
+          balance.getOrElse(Waves, 0L) should matchTo(aliceBalance1.getOrElse(Waves, 0L) + 25 * (1.waves - matcherFee))
+          balance
+        }
 
-      dex1.api.orderStatusByAssetPairAndId(bobOrder).status shouldBe Status.Accepted
+        val bobBalance2 = eventually {
+          val balance = dex1.api.getTradableBalanceByAssetPairAndAddress(bob, wavesUsdPair)
+          balance.getOrElse(usd, 0L) should matchTo(bobBalance1.getOrElse(usd, 0L) + 250.usd)
+          balance
+        }
 
-      withClue("After rollback order should not be cancelled and balances should not be decreased\n") {
+        step("Doing a rollback")
         wavesNode1.asyncApi.rollback(heightInitial, returnTransactionsToUtx = true) // true as on Node
         wavesMinerNode.api.rollback(heightInitial, returnTransactionsToUtx = true) // true as on Node
         eventually {
           wavesNode1.api.currentHeight shouldBe >=(heightInitial)
         }
 
-        wavesNode1.api.waitForHeight(heightSecondTransfer)
+        step("Wait for a height to be restored")
+        wavesNode1.api.waitForHeight(finalHeight)
         wavesNode1.api.waitForHeightArise() // See WavesFork
-        dex1.api.waitForOrderStatus(bobOrder, Status.Accepted)
-
-        //        wsc.messages.filter {
-        //          case _: WsPingOrPong => false
-        //          case _ => true
-        //        } shouldBe empty
+        Thread.sleep(3000)
 
         // Relates DEX-1099
-        dex1.api.getTradableBalanceByAssetPairAndAddress(bob, AssetPair(doggyCoin, Waves)) should matchTo(Map[Asset, Long](
-          Waves -> 494994999700000L
-        ))
-      }
-
-      wsc.close()
-    }
-
-    "multiple orders test" in {
-      val aliceWsc = mkWsAddressConnection(alice, dex1)
-      val bobWsc = mkWsAddressConnection(bob, dex1)
-
-      val heightInitial = wavesNode1.api.waitForHeightArise()
-      val aliceBalance1 = dex1.api.getTradableBalanceByAssetPairAndAddress(alice, wavesUsdPair)
-      val bobBalance1 = dex1.api.getTradableBalanceByAssetPairAndAddress(bob, wavesUsdPair)
-
-      val now = System.currentTimeMillis()
-      val counterOrders = (1 to 25).map(i => mkOrderDP(alice, wavesUsdPair, OrderType.BUY, 1.waves, 10, ts = now + i))
-      val submittedOrders = (1 to 50).map(i => mkOrderDP(bob, wavesUsdPair, OrderType.SELL, 0.5.waves, 10, ts = now + i))
-
-      counterOrders.foreach(dex1.api.place)
-      submittedOrders.foreach(dex1.api.place)
-
-      counterOrders.foreach(dex1.api.waitForOrderStatus(_, Status.Filled))
-      submittedOrders.foreach(dex1.api.waitForOrderStatus(_, Status.Filled))
-
-      def checkOrdering(label: String, xs: List[Double])(cmp: (Double, Double) => Assertion): Unit = {
-        val elementsStr = xs.zipWithIndex.map { case (x, i) => s"$i: $x" }.mkString(", ")
-        withClue(s"$label ($elementsStr):\n") {
-          xs.zip(xs.tail).zipWithIndex.foreach {
-            case ((b1, b2), i) => withClue(s"$i: ")(cmp(b1, b2))
-          }
+        eventually {
+          dex1.api.getTradableBalanceByAssetPairAndAddress(bob, wavesUsdPair) should matchTo(bobBalance2)
         }
       }
-
-      val aliceUsdChanges = collectTradableBalanceChanges(aliceWsc, usd)
-      checkOrdering("alice usd", aliceUsdChanges)(_ shouldBe >=(_))
-
-      val bobWavesChanges = collectTradableBalanceChanges(bobWsc, Waves)
-      checkOrdering("bob Waves", bobWavesChanges)(_ shouldBe >=(_))
-
-      submittedOrders.foreach(waitForOrderAtNode(_))
-
-      val finalHeight = wavesNode1.api.waitForHeightArise()
-      eventually {
-        val balance = dex1.api.getTradableBalanceByAssetPairAndAddress(alice, wavesUsdPair)
-        balance.getOrElse(Waves, 0L) should matchTo(aliceBalance1.getOrElse(Waves, 0L) + 25 * (1.waves - matcherFee))
-        balance
-      }
-
-      val bobBalance2 = eventually {
-        val balance = dex1.api.getTradableBalanceByAssetPairAndAddress(bob, wavesUsdPair)
-        balance.getOrElse(usd, 0L) should matchTo(bobBalance1.getOrElse(usd, 0L) + 250.usd)
-        balance
-      }
-
-      step("Doing a rollback")
-      wavesNode1.asyncApi.rollback(heightInitial, returnTransactionsToUtx = true) // true as on Node
-      wavesMinerNode.api.rollback(heightInitial, returnTransactionsToUtx = true) // true as on Node
-      eventually {
-        wavesNode1.api.currentHeight shouldBe >=(heightInitial)
-      }
-
-      step("Wait for a height to be restored")
-      wavesNode1.api.waitForHeight(finalHeight)
-      wavesNode1.api.waitForHeightArise() // See WavesFork
-      Thread.sleep(3000)
-
-      // Relates DEX-1099
-      eventually {
-        dex1.api.getTradableBalanceByAssetPairAndAddress(bob, wavesUsdPair) should matchTo(bobBalance2)
-      }
-
-      aliceWsc.close()
-      bobWsc.close()
     }
   }
 

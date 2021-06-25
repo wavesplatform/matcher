@@ -24,7 +24,7 @@ import pureconfig.generic.auto._
 
 import scala.concurrent.duration.DurationInt
 import scala.io.Source
-import scala.util.Try
+import scala.util.{Try, Using}
 
 class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgresJdbcContext with OptionValues {
 
@@ -91,16 +91,15 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
     }
 
     def executeCreateTablesStatement(sqlConnection: Connection): Try[Unit] = Try {
-
       val createTablesDDL = getFileContentStr(orderHistoryDDLFileName)
-      val createTablesStatement = sqlConnection.prepareStatement(createTablesDDL)
-
-      createTablesStatement.executeUpdate()
-      createTablesStatement.close()
+      Using(sqlConnection.prepareStatement(createTablesDDL)) { createTablesStatement =>
+        createTablesStatement.executeUpdate()
+      }
     }
 
-    val sqlConnection = DriverManager.getConnection(postgres.jdbcUrl, postgres.username, postgres.password)
-    executeCreateTablesStatement(sqlConnection).map(_ => sqlConnection.close()).get // Force throw
+    Using(DriverManager.getConnection(postgres.jdbcUrl, postgres.username, postgres.password)) { sqlConnection =>
+      executeCreateTablesStatement(sqlConnection).get // Force throw
+    }
     log.info("Tables created")
   }
 

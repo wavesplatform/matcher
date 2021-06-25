@@ -19,6 +19,7 @@ import eu.rekawek.toxiproxy.model.ToxicDirection
 import scala.collection.immutable.Queue
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{blocking, Future}
+import scala.util.Using
 
 @NetworkTests
 class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
@@ -77,11 +78,9 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
 
     "user has a balances snapshot (got by ws connection)" in {
       val acc = mkAccountWithBalance(100.waves -> Waves)
-      val wsc = mkWsAddressConnection(acc, dex1)
-
-      eventually(wsc.addressStateChanges should have size 1)
-
-      wsc.close()
+      Using(mkWsAddressConnection(acc, dex1)) { wsc =>
+        eventually(wsc.addressStateChanges should have size 1)
+      }
       dex1.disconnectFromNetwork()
 
       broadcastAndAwait(mkTransfer(acc, alice.toAddress, 99.waves, Waves))

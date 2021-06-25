@@ -11,6 +11,7 @@ import java.util.Properties
 import java.util.concurrent.ThreadLocalRandom
 import scala.concurrent.Promise
 import scala.concurrent.duration.DurationInt
+import scala.util.Using
 
 class DeserializationIssuesTestSuite extends MatcherSuiteBase with HasKafka {
 
@@ -36,17 +37,17 @@ class DeserializationIssuesTestSuite extends MatcherSuiteBase with HasKafka {
       props
     }
     val sendResult = Promise[Unit]()
-    val producer = new KafkaProducer[String, String](kafkaProducerProps)
-    producer.send(
-      new ProducerRecord(topicName, "incorrect_key", "incorrect_value"),
-      (_: RecordMetadata, exception: Exception) =>
-        Option(exception) match {
-          case Some(e) => sendResult.failure(e)
-          case None => sendResult.success(())
-        }
-    )
-    sendResult.future.futureValue(10.seconds)
-    producer.close()
+    Using(new KafkaProducer[String, String](kafkaProducerProps)) { producer =>
+      producer.send(
+        new ProducerRecord(topicName, "incorrect_key", "incorrect_value"),
+        (_: RecordMetadata, exception: Exception) =>
+          Option(exception) match {
+            case Some(e) => sendResult.failure(e)
+            case None => sendResult.success(())
+          }
+      )
+      sendResult.future.futureValue(10.seconds)
+    }
     eventually {
       dex1.getState().getExitCodeLong shouldBe QueueMessageDeserializationError.code
     }

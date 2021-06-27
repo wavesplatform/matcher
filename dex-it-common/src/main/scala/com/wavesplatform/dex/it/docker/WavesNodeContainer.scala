@@ -56,7 +56,7 @@ final case class WavesNodeContainer(override val internalIp: String, underlying:
 
   def asyncApi: NodeApi[AsyncUnsafe] = apiFunctorK.mapK(asyncRawApi)(toAsyncUnsafe)
   def asyncTryApi: NodeApi[AsyncTry] = apiFunctorK.mapK(asyncRawApi)(toAsyncTry)
-  def asyncRawApi: AsyncEnrichedNodeApi = new AsyncEnrichedNodeApi(apiKey, cachedRestApiAddress.get())
+  def asyncRawApi: AsyncEnrichedNodeApi = new AsyncEnrichedNodeApi(apiKey, restApiAddress)
 
   override def waitReady(): Unit = {
     val r = Iterator

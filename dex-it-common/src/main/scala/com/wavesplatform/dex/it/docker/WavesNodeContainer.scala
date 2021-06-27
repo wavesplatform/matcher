@@ -28,6 +28,7 @@ final case class WavesNodeContainer(override val internalIp: String, underlying:
 ) extends BaseContainer(WavesNodeContainer.baseContainerPath, underlying) {
 
   override protected val cachedRestApiAddress: CachedData[InetSocketAddress] = CachedData(getExternalAddress(WavesNodeContainer.restApiPort))
+  def restApiAddress: InetSocketAddress = cachedRestApiAddress.get()
 
   private val cachedNetworkAddress = CachedData(getInternalAddress(WavesNodeContainer.networkPort))
   private val cachedMatcherExtGrpcApiAddress = CachedData(getExternalAddress(WavesNodeContainer.matcherGrpcExtensionPort))

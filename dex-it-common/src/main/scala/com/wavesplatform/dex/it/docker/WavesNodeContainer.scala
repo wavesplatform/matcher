@@ -28,6 +28,7 @@ final case class WavesNodeContainer(override val internalIp: String, underlying:
 ) extends BaseContainer(WavesNodeContainer.baseContainerPath, underlying) {
 
   override protected val cachedRestApiAddress: CachedData[InetSocketAddress] = CachedData(getExternalAddress(WavesNodeContainer.restApiPort))
+  def restApiAddress: InetSocketAddress = cachedRestApiAddress.get()
 
   private val cachedNetworkAddress = CachedData(getInternalAddress(WavesNodeContainer.networkPort))
   private val cachedMatcherExtGrpcApiAddress = CachedData(getExternalAddress(WavesNodeContainer.matcherGrpcExtensionPort))
@@ -55,7 +56,7 @@ final case class WavesNodeContainer(override val internalIp: String, underlying:
 
   def asyncApi: NodeApi[AsyncUnsafe] = apiFunctorK.mapK(asyncRawApi)(toAsyncUnsafe)
   def asyncTryApi: NodeApi[AsyncTry] = apiFunctorK.mapK(asyncRawApi)(toAsyncTry)
-  def asyncRawApi: AsyncEnrichedNodeApi = new AsyncEnrichedNodeApi(apiKey, cachedRestApiAddress.get())
+  def asyncRawApi: AsyncEnrichedNodeApi = new AsyncEnrichedNodeApi(apiKey, restApiAddress)
 
   override def waitReady(): Unit = {
     val r = Iterator

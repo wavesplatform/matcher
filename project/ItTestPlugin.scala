@@ -19,8 +19,7 @@ object ItTestPlugin extends AutoPlugin {
       Seq(
         logDirectory := {
           val runId = Option(System.getenv("RUN_ID")).getOrElse {
-            val formatter = DateTimeFormatter.ofPattern("MM-dd--HH_mm_ss")
-            formatter.format(LocalDateTime.now()) // git branch?
+            Option(System.getProperty("RUN_ID")).getOrElse(DateTimeFormatter.ofPattern("MM-dd--HH_mm_ss").format(LocalDateTime.now()))
           }
           val r = (Test / target).value / "logs" / runId
           IO.createDirectory(r)

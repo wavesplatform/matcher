@@ -4,9 +4,7 @@ pipeline {
     }
     options {
         ansiColor('xterm')
-        timeout(time: 70, unit: 'MINUTES')
         timestamps()
-        disableConcurrentBuilds()
     }
     parameters {
         string(name: 'SBT_THREAD_NUMBER', defaultValue: '6', description: 'Number of threads for sbt')
@@ -39,15 +37,14 @@ pipeline {
                 sh 'sbt compile'
                 sh 'sbt dex-it/docker'
                 script {
-                        def tests = [:]
-                        for (int i = 0; i < 6; i++) {
-                            tests["${i}"] = {
-                                stage("Tests ${i}") {
-                                    environment {
-                                        RUN_ID = "${i}"
-                                    }
-                                    sh 'echo $i'
-                                    sh 'sbt "repeat 2 dex-it/testOnly *MatcherTestSuite"'
+                        def tests = [failFast: true]
+                        for (int i = 0; i < 2; i++) {
+                            def runNumber = i
+                            def sleepTime = Math.abs(new Random().nextInt(30))
+                            tests[runNumber] = {
+                                stage("Tests ${runNumber}") {
+                                    sleep time: sleepTime, unit: 'SECONDS'
+                                    sh 'sbt "repeat 2 dex-it/testOnly *MatcherTestSuite" -DRUN_ID=${runNumber} -DTEST_PORT_RANGE=${10000 + runNumber * 50}-${10050 + runNumber * 50}'
                                 }
                             }
                         }

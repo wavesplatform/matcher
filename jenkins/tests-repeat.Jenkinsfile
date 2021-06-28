@@ -40,11 +40,12 @@ pipeline {
                         def tests = [failFast: true]
                         for (int i = 0; i < 2; i++) {
                             def runNumber = i
-                            def sleepTime = Math.abs(new Random().nextInt(30))
+                            def port1 = 10000 + runNumber * 50
+                            def port2 = port1 + 50
+
                             tests[runNumber] = {
                                 stage("Tests ${runNumber}") {
-                                    sleep time: sleepTime, unit: 'SECONDS'
-                                    sh 'sbt "repeat 2 dex-it/testOnly *MatcherTestSuite" -DRUN_ID=${runNumber} -DTEST_PORT_RANGE=${10000 + runNumber * 50}-${10050 + runNumber * 50}'
+                                    sh """sbt "repeat 2 dex-it/testOnly *MatcherTestSuite" -DRUN_ID=${runNumber} -DTEST_PORT_RANGE=${port1}-${port2}"""
                                 }
                             }
                         }

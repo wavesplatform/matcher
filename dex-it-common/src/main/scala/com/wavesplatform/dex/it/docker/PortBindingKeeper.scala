@@ -17,7 +17,12 @@ object PortBindingKeeper extends ScorexLogging {
 
   private val DEFAULT_TEST_PORT_RANGE = 10000 to 10050
 
-  private val portsRange = Option(Option(System.getenv("TEST_PORT_RANGE")).getOrElse(System.getProperty("TEST_PORT_RANGE")))
+  private def getPortsRange(): String = System.getProperty("TEST_PORT_RANGE") match {
+    case x: String => x
+    case _ => System.getenv("TEST_PORT_RANGE")
+  }
+
+  private val portsRange = Option(getPortsRange)
     .map(parsePortRange)
     .getOrElse(DEFAULT_TEST_PORT_RANGE)
 
@@ -45,11 +50,12 @@ object PortBindingKeeper extends ScorexLogging {
       findFreePort() +: acc
     }
 
-  private def findFreePort(): Int =
+  private def findFreePort(): Int = {
     findFreePortIn(currentPosition to portsRange.end).fold(throw AvailablePortsNotFound()) { newPort =>
       currentPosition = (newPort + 1).min(portsRange.end)
       newPort
     }
+  }
 
   private def findFreePortIn(range: Range): Option[Int] =
     range.find { i =>

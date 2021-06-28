@@ -50,6 +50,8 @@ object ItTestPlugin extends AutoPlugin {
         javaOptions := { // TODO Doesn't work because this part of process is not forked
           val resourceDirectoryValue = (Test / resourceDirectory).value
           List(
+            s"-DTEST_PORT_RANGE=${System.getProperty("TEST_PORT_RANGE")}",
+            s"-Djava.util.logging.config.file=${resourceDirectoryValue / "jul.properties"}",
             s"-Djava.util.logging.config.file=${resourceDirectoryValue / "jul.properties"}",
             s"-Dlogback.configurationFile=${resourceDirectoryValue / "logback-test.xml"}",
             "-Dwaves.it.logging.appender=FILE"

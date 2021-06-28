@@ -17,12 +17,7 @@ object PortBindingKeeper extends ScorexLogging {
 
   private val DEFAULT_TEST_PORT_RANGE = 10000 to 10050
 
-  private def getPortsRange(): String = System.getProperty("TEST_PORT_RANGE") match {
-    case x: String => println(s"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! $x");x
-    case _ => println(s"111111111111111111111111111111111111111"); System.getenv("TEST_PORT_RANGE")
-  }
-
-  private val portsRange = Option(getPortsRange)
+  private val portsRange = Option(System.getenv("TEST_PORT_RANGE"))
     .map(parsePortRange)
     .getOrElse(DEFAULT_TEST_PORT_RANGE)
 

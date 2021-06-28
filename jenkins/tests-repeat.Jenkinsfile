@@ -8,14 +8,17 @@ pipeline {
     }
     parameters {
         string(name: 'SBT_THREAD_NUMBER', defaultValue: '6', description: 'Number of threads for sbt')
-        string(name: 'SUITE', defaultValue: 'MatcherTestSuite', description: 'Name of class with test')
-        string(name: 'RUNS', defaultValue: '10', description: 'Number of runs')
+        string(name: 'REPEATED_CI_SUITE', defaultValue: 'MatcherTestSuite', description: 'Name of class with test')
+        string(name: 'REPEATED_CI_RUNS', defaultValue: '10', description: 'Number of runs')
     }
     environment {
         SBT_HOME = tool name: 'sbt-1.2.6', type: 'org.jvnet.hudson.plugins.SbtPluginBuilder$SbtInstallation'
         SBT_THREAD_NUMBER = "${SBT_THREAD_NUMBER}"
         SBT_OPTS = '-Xmx12g -XX:ReservedCodeCacheSize=128m -XX:+CMSClassUnloadingEnabled'
         PATH = "${env.SBT_HOME}/bin:${env.PATH}"
+        REPEATED_CI = "true"
+        REPEATED_CI_RUNS = "${REPEATED_CI_RUNS}"
+        REPEATED_CI_SUITE = "${REPEATED_CI_SUITE}"
     }
 
     stages {
@@ -36,23 +39,8 @@ pipeline {
             steps {
                 sh 'sbt compile'
                 sh 'sbt dex-it/docker'
-                script {
-                        def tests = [failFast: true]
-                        for (int i = 0; i < 2; i++) {
-                            def runNumber = i
-                            def port1 = 10000 + runNumber * 50
-                            def port2 = port1 + 50
-
-                            tests[runNumber] = {
-                                stage("Tests ${runNumber}") {
-                                    sh """sbt "repeat 2 dex-it/testOnly *MatcherTestSuite" -DRUN_ID=${runNumber} -DTEST_PORT_RANGE=${port1}-${port2}"""
-                                }
-                            }
-                        }
-                        parallel tests
-                }
+                sh 'sbt dex-it/test'
             }
-
         }
     }
     post {

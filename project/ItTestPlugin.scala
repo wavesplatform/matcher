@@ -19,7 +19,8 @@ object ItTestPlugin extends AutoPlugin {
       Seq(
         logDirectory := {
           val runId = Option(System.getenv("RUN_ID")).getOrElse {
-            Option(System.getProperty("RUN_ID")).getOrElse(DateTimeFormatter.ofPattern("MM-dd--HH_mm_ss").format(LocalDateTime.now()))
+            val formatter = DateTimeFormatter.ofPattern("MM-dd--HH_mm_ss")
+            formatter.format(LocalDateTime.now()) // git branch?
           }
           val r = (Test / target).value / "logs" / runId
           IO.createDirectory(r)
@@ -49,9 +50,7 @@ object ItTestPlugin extends AutoPlugin {
         parallelExecution := true,
         javaOptions := { // TODO Doesn't work because this part of process is not forked
           val resourceDirectoryValue = (Test / resourceDirectory).value
-          println(s"((((((((((((((((((((((((((((((((((((((((99 ${System.getProperty("TEST_PORT_RANGE")}")
           List(
-            s"-DTEST_PORT_RANGE=${System.getProperty("TEST_PORT_RANGE")}",
             s"-Djava.util.logging.config.file=${resourceDirectoryValue / "jul.properties"}",
             s"-Djava.util.logging.config.file=${resourceDirectoryValue / "jul.properties"}",
             s"-Dlogback.configurationFile=${resourceDirectoryValue / "logback-test.xml"}",
@@ -71,7 +70,14 @@ object ItTestPlugin extends AutoPlugin {
               throw new IllegalArgumentException(s"Illegal port range for tests! First boundary $first is bigger or equals second $second!")
             (first, second)
           }.getOrElse(DEFAULT_PORT_RANGE)
-          val tests = (Test / definedTests).value
+
+          val tests = Option(System.getenv("REPEATED_CI")) match {
+            case None => (Test / definedTests).value
+            case _ =>
+              val runs = Option(System.getenv("REPEATED_CI_RUNS")).getOrElse("0").toInt
+              val suite = System.getenv("REPEATED_CI_SUITE")
+              for (_ <- 0 to runs) yield (Test / definedTests).value.filter(_.name.contains(suite)).head
+          }
 
           // checks that we will not get higher than portRangeHigherBound
           if (tests.size * PORTS_PER_TEST > portRangeHigherBound - portRangeLowerBound)
@@ -85,6 +91,7 @@ object ItTestPlugin extends AutoPlugin {
           tests.zipWithIndex.map { case (suite, i) =>
             val lowerBound = portRangeLowerBound + PORTS_PER_TEST * i
             val higherBound = lowerBound + PORTS_PER_TEST - 1
+
             Group(
               suite.name,
               Seq(suite),
@@ -95,7 +102,7 @@ object ItTestPlugin extends AutoPlugin {
                   bootJars = Vector.empty[java.io.File],
                   workingDirectory = Option((Test / baseDirectory).value),
                   runJVMOptions = Vector(
-                    s"-Dwaves.it.logging.dir=${logDirectoryValue / suite.name.replaceAll("""(\w)\w*\.""", "$1.")}" // foo.bar.Baz -> f.b.Baz
+                    s"-Dwaves.it.logging.dir=${logDirectoryValue / suite.name.replaceAll("""(\w)\w*\.""", "$1.")}-$i" // foo.bar.Baz -> f.b.Baz
                   ) ++ javaOptionsValue,
                   connectInput = false,
                   envVars = envVarsValue + ("TEST_PORT_RANGE" -> s"$lowerBound-$higherBound")

@@ -19,13 +19,14 @@ pipeline {
         REPEATED_CI = "true"
         REPEATED_CI_RUNS = "${REPEATED_CI_RUNS}"
         REPEATED_CI_SUITE = "${REPEATED_CI_SUITE}"
+        REPEATED_MODULE = "${REPEATED_MODULE}"
     }
 
     stages {
         stage('Cleanup') {
             steps {
                 script {
-                    currentBuild.displayName = "*${params.MODULE} x ${params.RUNS}"
+                    currentBuild.displayName = "${BRANCH}: ${REPEATED_MODULE}/*${REPEATED_CI_SUITE} x ${REPEATED_CI_RUNS}"
                 }
                 sh 'git fetch --tags'
                 sh 'docker rmi `docker images --format "{{.Repository}}:{{.Tag}}" | grep "wavesplatform"` || true'
@@ -35,11 +36,13 @@ pipeline {
                 sh 'sbt cleanAll'
             }
         }
+        stage('Build & Compile') {
+            sh 'sbt compile'
+            sh 'sbt dex-it/docker'
+        }
         stage('Run Tests') {
             steps {
-                sh 'sbt compile'
-                sh 'sbt dex-it/docker'
-                sh 'sbt dex-it/test'
+                sh """sbt ${REPEATED_MODULE}/test"""
             }
         }
     }

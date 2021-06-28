@@ -104,7 +104,7 @@ trait ExchangeTransaction extends ByteAndJsonSerializable with Proven {
 
   def toPrettyString: String = json.map(Json.prettyPrint).value()
 
-  def canEqual(other: Any): Boolean = other.isInstanceOf[ExchangeTransaction]
+  override def canEqual(other: Any): Boolean = other.isInstanceOf[ExchangeTransaction]
 
   override def equals(other: Any): Boolean = other match {
     case tx: ExchangeTransaction => tx.canEqual(this) && id() == tx.id()

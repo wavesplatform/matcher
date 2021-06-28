@@ -132,7 +132,7 @@ trait Order extends ByteAndJsonSerializable with Proven {
 
   def jsonStr: String = Json.stringify(json())
 
-  def canEqual(other: Any): Boolean = other.isInstanceOf[Order]
+  override def canEqual(other: Any): Boolean = other.isInstanceOf[Order]
 
   override def equals(obj: Any): Boolean = obj match {
     case o: Order =>

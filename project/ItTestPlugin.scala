@@ -49,6 +49,7 @@ object ItTestPlugin extends AutoPlugin {
         parallelExecution := true,
         javaOptions := { // TODO Doesn't work because this part of process is not forked
           val resourceDirectoryValue = (Test / resourceDirectory).value
+          println(s"((((((((((((((((((((((((((((((((((((((((99 ${System.getProperty("TEST_PORT_RANGE")}")
           List(
             s"-DTEST_PORT_RANGE=${System.getProperty("TEST_PORT_RANGE")}",
             s"-Djava.util.logging.config.file=${resourceDirectoryValue / "jul.properties"}",

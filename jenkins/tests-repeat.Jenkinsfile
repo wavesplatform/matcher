@@ -42,10 +42,12 @@ pipeline {
                         def tests = [:]
                         for (int i = 0; i < 6; i++) {
                             tests["${i}"] = {
-                                node {
-                                    stage("${i}") {
-                                        sh 'sbt "repeat ${params.RUNS} ${params.MODULE}/testOnly *${params.SUITE}"'
+                                stage("Tests ${i}") {
+                                    environment {
+                                        RUN_ID = "${i}"
                                     }
+                                    sh 'echo $i'
+                                    sh 'sbt "repeat 2 dex-it/testOnly *MatcherTestSuite"'
                                 }
                             }
                         }

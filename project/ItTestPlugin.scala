@@ -52,7 +52,6 @@ object ItTestPlugin extends AutoPlugin {
           val resourceDirectoryValue = (Test / resourceDirectory).value
           List(
             s"-Djava.util.logging.config.file=${resourceDirectoryValue / "jul.properties"}",
-            s"-Djava.util.logging.config.file=${resourceDirectoryValue / "jul.properties"}",
             s"-Dlogback.configurationFile=${resourceDirectoryValue / "logback-test.xml"}",
             "-Dwaves.it.logging.appender=FILE"
           ) ++ (Test / javaOptions).value

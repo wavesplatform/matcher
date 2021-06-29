@@ -26,7 +26,7 @@ object DbKeys {
   def order(orderId: ByteStr): Key[Option[Order]] = Key.opt(
     "matcher-order",
     bytes(1, orderId.arr),
-    xs => Order.fromBytes(xs.head, xs.tail),
+    xs => Order.fromBytes(xs.head, xs.tail)._1,
     o => o.version +: o.bytes()
   )
 

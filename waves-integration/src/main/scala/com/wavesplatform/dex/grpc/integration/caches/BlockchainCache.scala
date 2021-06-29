@@ -1,10 +1,9 @@
 package com.wavesplatform.dex.grpc.integration.caches
 
-import java.time.Duration
-
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 
+import java.time.Duration
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 

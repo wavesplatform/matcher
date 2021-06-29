@@ -35,8 +35,8 @@ object Dependencies {
 
     val silencer = "1.7.2"
 
-    val kanela = "1.0.7" // instrumentation
-    val kamon = "2.1.11" // metrics
+    val kanela = "1.0.11"
+    val kamon = "2.2.0"
 
     val wavesProtobufSchemas = "1.3.1"
     val wavesJ = "1.0.1"
@@ -247,6 +247,10 @@ object Dependencies {
       kamonCore,
       kamonModule("influxdb"),
       kamonModule("system-metrics"),
+      kamonModule("status-page"),
+      kamonModule("jaeger"),
+      kamonModule("akka-http"),
+      kamonModule("logback"),
       influxDb,
       commonsNet,
       swaggerUi,
@@ -299,6 +303,7 @@ object Dependencies {
       kamonCore,
       mouse,
       grpcNetty,
+      kamonCore,
       wavesProtobufSchemas,
       akkaActorTyped
     ) ++ testKit ++ silencer ++ Seq(

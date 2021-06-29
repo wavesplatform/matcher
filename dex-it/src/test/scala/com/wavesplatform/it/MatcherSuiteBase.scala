@@ -1,5 +1,6 @@
 package com.wavesplatform.it
 
+import cats.syntax.either._
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.ThreadLocalRandom
 import cats.instances.FutureInstances
@@ -28,7 +29,7 @@ import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}
 
-import scala.concurrent.duration.DurationInt
+import scala.concurrent.duration._
 
 trait MatcherSuiteBase
     extends AnyFreeSpec
@@ -57,6 +58,11 @@ trait MatcherSuiteBase
 
   GenesisConfig.setupAddressScheme()
 
+  private val maybeTraceTickInterval =
+    Option(System.getenv("CONFIG_FORCE_kamon_trace_tick__interval"))
+      .flatMap(x => Either.catchNonFatal(Duration(x)).toOption)
+      .filter(_ => Option(System.getenv("CONFIG_FORCE_kamon_modules_jaeger_enabled")).contains("true"))
+
   implicit val httpV0OrderBookDiff: Derived[Diff[HttpV0OrderBook]] = Derived(Diff.gen[HttpV0OrderBook].ignore[HttpV0OrderBook, Long](_.timestamp))
   implicit val exchangeTransactionDiff: Derived[Diff[ExchangeTransaction]] = Derived(Diff[String].contramap[ExchangeTransaction](_.id().base58))
 
@@ -75,6 +81,7 @@ trait MatcherSuiteBase
 
   override protected def afterAll(): Unit = {
     log.debug(s"Perform afterAll")
+    maybeTraceTickInterval.map(_.toMillis + 2.seconds.toMillis).foreach(Thread.sleep)
     stopBaseContainers()
     super.afterAll()
   }

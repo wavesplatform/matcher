@@ -16,7 +16,7 @@ import akka.util.Timeout
 import akka.{Done, NotUsed}
 import cats.syntax.either._
 import com.wavesplatform.dex.api.http.SwaggerDocService
-import com.wavesplatform.dex.api.http.directives.HttpKamonMetricsDirectives._
+import com.wavesplatform.dex.api.http.directives.HttpKamonDirectives._
 import com.wavesplatform.dex.api.http.entities.{HttpMessage, HttpWebSocketCloseFilter, HttpWebSocketConnections}
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
 import com.wavesplatform.dex.api.ws.actors.{WsExternalClientDirectoryActor, WsExternalClientHandlerActor, WsInternalBroadcastActor, WsInternalClientHandlerActor}
@@ -79,7 +79,7 @@ class MatcherWebSocketRoute(
     response = classOf[HttpWebSocketConnections]
   )
   def connectionsRoute: Route = get {
-    (measureResponse("connectionsRoute") & withAuth) {
+    (withMetricsAndTraces("connectionsRoute") & withAuth) {
       complete {
         externalClientDirectoryRef.ask(WsExternalClientDirectoryActor.Query.GetActiveNumber).mapTo[HttpWebSocketConnections]
       }
@@ -105,7 +105,7 @@ class MatcherWebSocketRoute(
       )
     )
   )
-  def closeConnectionsRoute: Route = (delete & measureResponse("closeConnectionsRoute") & withAuth) {
+  def closeConnectionsRoute: Route = (delete & withMetricsAndTraces("closeConnectionsRoute") & withAuth) {
     entity(as[HttpWebSocketCloseFilter]) { req =>
       externalClientDirectoryRef ! WsExternalClientDirectoryActor.Command.CloseOldest(req.oldest)
       complete {
@@ -114,7 +114,7 @@ class MatcherWebSocketRoute(
     }
   }
 
-  private val commonWsRoute: Route = (pathEnd & get & measureResponse("commonWsRoute") &
+  private val commonWsRoute: Route = (pathEnd & get & withMetricsAndTraces("commonWsRoute") &
     parameters("a_os".withDefault("Unknown OS"), "a_client".withDefault("Unknown Client"))) { (aOs: String, aClient: String) =>
     import matcherSettings.webSockets.externalClientHandler
 
@@ -166,7 +166,7 @@ class MatcherWebSocketRoute(
     handleWebSocketMessages(flow)
   }
 
-  private val internalWsRoute: Route = (path("internal") & get & measureResponse("internalWsRoute")) {
+  private val internalWsRoute: Route = (path("internal") & get & withMetricsAndTraces("internalWsRoute")) {
     import matcherSettings.webSockets.internalClientHandler
 
     val clientId = UUID.randomUUID().toString

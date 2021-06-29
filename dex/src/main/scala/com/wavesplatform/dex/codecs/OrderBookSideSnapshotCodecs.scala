@@ -68,7 +68,7 @@ object OrderBookSideSnapshotCodecs {
     val amount = bb.getLong
     val fee = bb.getLong
     val orderVersion = bb.get
-    val order = Order.fromBytes(orderVersion, bb.getBytes)
+    val order = Order.fromBytes(orderVersion, bb.getBytes)._1
 
     val avgWeighedPriceNominator =
       if (version == 2) new BigInteger(bb.getBytes)

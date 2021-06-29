@@ -34,10 +34,8 @@ class OrderBookAskAdapter(orderBooks: AtomicReference[Map[AssetPair, Either[Unit
   def getHttpView(assetPair: AssetPair, format: DecimalsFormat, depth: Depth): Result[HttpResponse] =
     get[Query.GetHttpView, HttpResponse](assetPair, Query.GetHttpView(format, depth, _))
 
-  private val default = Future.successful(Right(None))
-
   private def get[M <: Query, R: ClassTag](assetPair: AssetPair, message: ActorRef => M): Result[R] = orderBooks.get().get(assetPair) match {
-    case None => default
+    case None => Future.successful(Right(None))
     case Some(ob) =>
       ob match {
         case Left(_) => Future.successful(error.OrderBookBroken(assetPair).asLeft)

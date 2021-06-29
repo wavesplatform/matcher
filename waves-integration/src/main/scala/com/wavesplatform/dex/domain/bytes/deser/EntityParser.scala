@@ -17,14 +17,15 @@ trait EntityParser[E] {
 
   protected def read[R: Stateful]: Stateful[R] = implicitly
 
-  private[domain] def statefulParse: Stateful[E]
+  private[domain] def statefulParse: Stateful[(E, ConsumedBytesOffset)]
 
-  def parseBytes(bytes: Array[Byte]): Try[E] = Try(statefulParse.runA(S(0, bytes)).value)
+  def parseBytes(bytes: Array[Byte]): Try[(E, ConsumedBytesOffset)] = Try(statefulParse.runA(S(0, bytes)).value)
 }
 
 object EntityParser {
 
   final private[domain] case class S(offset: Int, bytes: Array[Byte])
+  final case class ConsumedBytesOffset(value: Int) extends AnyVal
 
   type Stateful[T] = State[S, T]
   type Signature = ByteStr
@@ -38,6 +39,10 @@ object EntityParser {
   implicit val readLong: Stateful[Long] = standardRead(Longs.fromByteArray, 8)
   implicit val readPublicKey: Stateful[PublicKey] = standardRead(PublicKey.apply, KeyLength)
   implicit val readSignature: Stateful[Signature] = standardRead(ByteStr.apply, SignatureLength)
+
+  implicit val readConsumedBytesOffset: Stateful[ConsumedBytesOffset] = State[S, ConsumedBytesOffset] { s =>
+    s -> ConsumedBytesOffset(s.offset)
+  }
 
   implicit val readProofs: Stateful[Proofs] = State[S, Proofs] { s =>
     val (proofs, length) = Proofs.fromBytes(s.bytes drop s.offset).explicitGet()

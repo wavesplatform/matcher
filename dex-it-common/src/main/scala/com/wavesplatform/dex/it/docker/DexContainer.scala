@@ -24,6 +24,8 @@ import java.nio.file.{Path, Paths}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
+import scala.jdk.CollectionConverters._
+
 final case class DexContainer private (override val internalIp: String, underlying: GenericContainer)(
   implicit
   tryHttpBackend: LoggingSttpBackend[Try, Any],
@@ -158,27 +160,31 @@ object DexContainer extends ScorexLogging {
     DexContainer(internalIp, underlying)
   }
 
-  private def getEnv(containerName: String): Map[String, String] = Map(
-    "BRIEF_LOG_PATH" -> s"$containerLogsPath/container-$containerName.log",
-    "DETAILED_LOG_PATH" -> s"$containerLogsPath/container-$containerName.detailed.log",
-    "WAVES_DEX_CONFIGPATH" -> s"$baseContainerPath/$containerName.conf",
-    "WAVES_DEX_DETAILED_LOG_PATH" -> s"$containerLogsPath/container-$containerName.detailed.log", // Backward compatibility for v2.0.3
-    "WAVES_DEX_OPTS" -> List(
-      "-J-Xmx1024M",
-      s"-Djava.util.logging.config.file=$baseContainerPath/jul.properties",
-      "-Dlogback.stdout.enabled=false",
-      "-Dlogback.file.enabled=false",
-      s"-Dlogback.configurationFile=$baseContainerPath/doc/logback.xml",
-      s"-Dlogback.include.file=$baseContainerPath/doc/logback-container.xml",
-      s"-Dlogback.brief.fullPath=$containerLogsPath/container-$containerName.log",
-      s"-Dlogback.detailed.fullPath=$containerLogsPath/container-$containerName.detailed.log"
-    ).prependIf(isProfilingEnabled) {
-      // https://www.yourkit.com/docs/java/help/startup_options.jsp
-      s"-J-agentpath:/usr/local/YourKit-JavaProfiler-2019.8/bin/linux-x86-64/libyjpagent.so=port=10001,listen=all" +
-      s",sampling,monitors,sessionname=prof-$containerName,snapshot_name_format={sessionname}," +
-      s"dir=$containerLogsPath,logdir=$containerLogsPath,onexit=snapshot"
-    }.mkString(" ", " ", " ")
-  )
+  private def getEnv(containerName: String): Map[String, String] = {
+    val configOverrides = System.getenv.asScala.view.filterKeys(_.startsWith("CONFIG_FORCE_")).toMap
+    Map(
+      "BRIEF_LOG_PATH" -> s"$containerLogsPath/container-$containerName.log",
+      "DETAILED_LOG_PATH" -> s"$containerLogsPath/container-$containerName.detailed.log",
+      "WAVES_DEX_CONFIGPATH" -> s"$baseContainerPath/$containerName.conf",
+      "WAVES_DEX_DETAILED_LOG_PATH" -> s"$containerLogsPath/container-$containerName.detailed.log", // Backward compatibility for v2.0.3
+      "WAVES_DEX_OPTS" -> List(
+        "-J-Xmx1024M",
+        s"-Djava.util.logging.config.file=$baseContainerPath/jul.properties",
+        "-Dlogback.stdout.enabled=false",
+        "-Dlogback.file.enabled=false",
+        "-Dconfig.override_with_env_vars=true",
+        s"-Dlogback.configurationFile=$baseContainerPath/doc/logback.xml",
+        s"-Dlogback.include.file=$baseContainerPath/doc/logback-container.xml",
+        s"-Dlogback.brief.fullPath=$containerLogsPath/container-$containerName.log",
+        s"-Dlogback.detailed.fullPath=$containerLogsPath/container-$containerName.detailed.log"
+      ).prependIf(isProfilingEnabled) {
+        // https://www.yourkit.com/docs/java/help/startup_options.jsp
+        s"-J-agentpath:/usr/local/YourKit-JavaProfiler-2019.8/bin/linux-x86-64/libyjpagent.so=port=10001,listen=all" +
+        s",sampling,monitors,sessionname=prof-$containerName,snapshot_name_format={sessionname}," +
+        s"dir=$containerLogsPath,logdir=$containerLogsPath,onexit=snapshot"
+      }.mkString(" ", " ", " ")
+    ) ++ configOverrides
+  }
 
   /**
    * @param resolve A relate to the base directory path of application

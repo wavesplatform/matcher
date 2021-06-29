@@ -14,7 +14,7 @@ trait AddressOrAlias {
   def canEqual(other: Any): Boolean = other.isInstanceOf[AddressOrAlias]
 
   override def equals(obj: Any): Boolean = obj match {
-    case a: AddressOrAlias => a.canEqual(this) && bytes == a.bytes
+    case a: AddressOrAlias => a.canEqual(this) && bytes == a.bytes && stringRepr.equals(a.stringRepr)
     case _ => false
   }
 

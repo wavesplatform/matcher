@@ -143,9 +143,13 @@ trait Order extends ByteAndJsonSerializable with Proven {
         orderType == o.orderType &&
         price == o.price &&
         amount == o.amount &&
+        timestamp == o.timestamp &&
         expiration == o.expiration &&
         matcherFee == o.matcherFee &&
-        (signature sameElements o.signature)
+        proofs == o.proofs &&
+        version == o.version &&
+        java.util.Arrays.equals(signature, o.signature) &&
+        assets.equals(o.assets)
     case _ => false
   }
 

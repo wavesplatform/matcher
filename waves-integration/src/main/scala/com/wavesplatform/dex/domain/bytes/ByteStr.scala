@@ -42,7 +42,13 @@ final case class ByteStr(arr: Array[Byte]) {
   def canEqual(other: Any): Boolean = other.isInstanceOf[ByteStr]
 
   override def equals(a: Any): Boolean = a match {
-    case other: ByteStr => other.canEqual(this) && java.util.Arrays.equals(arr, other.arr)
+    case other: ByteStr =>
+      other.canEqual(this) &&
+        java.util.Arrays.equals(arr, other.arr) &&
+        this.base58.equals(other.base58) &&
+        this.base64Raw.equals(other.base64Raw) &&
+        this.base64.equals(other.base64) &&
+        this.trim.equals(other.trim)
     case _ => false
   }
 

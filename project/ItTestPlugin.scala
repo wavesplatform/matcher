@@ -1,6 +1,7 @@
+import org.scalatest.TestSuite
+
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
-
 import sbt.Keys._
 import sbt.Tests.Group
 import sbt._
@@ -76,7 +77,7 @@ object ItTestPlugin extends AutoPlugin {
               val runs = Option(System.getenv("REPEATED_CI_RUNS")).getOrElse("0").toInt
               val suiteName =
                 Option(System.getenv("REPEATED_CI_SUITE")).getOrElse(throw new IllegalArgumentException("Specify REPEATED_CI_SUITE"))
-              val suite = (Test / definedTests).value.find(_.name.contains(suite)).getOrElse(throw new IllegalArgumentException(
+              val suite: TestDefinition = (Test / definedTests).value.find(_.name.contains(suite)).getOrElse(throw new IllegalArgumentException(
                 s"Can't find test *$suiteName*"
               ))
               List.fill(runs)(suite)

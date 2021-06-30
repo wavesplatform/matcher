@@ -13,7 +13,7 @@ trait Key[V] {
   def canEqual(other: Any): Boolean = other.isInstanceOf[Key[V]]
 
   override def equals(obj: scala.Any): Boolean = obj match {
-    case that: Key[V] => that.canEqual(this) && java.util.Arrays.equals(this.keyBytes, that.keyBytes) && this.name.equals(that.name)
+    case that: Key[V] => that.canEqual(this) && java.util.Arrays.equals(this.keyBytes, that.keyBytes) && name == that.name
     case _ => false
   }
 

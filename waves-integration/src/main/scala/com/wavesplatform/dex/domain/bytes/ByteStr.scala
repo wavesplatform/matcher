@@ -47,8 +47,7 @@ final case class ByteStr(arr: Array[Byte]) {
         java.util.Arrays.equals(arr, other.arr) &&
         this.base58.equals(other.base58) &&
         this.base64Raw.equals(other.base64Raw) &&
-        this.base64.equals(other.base64) &&
-        this.trim.equals(other.trim)
+        this.base64.equals(other.base64)
     case _ => false
   }
 

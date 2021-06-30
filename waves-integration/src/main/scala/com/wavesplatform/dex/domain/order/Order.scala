@@ -149,7 +149,7 @@ trait Order extends ByteAndJsonSerializable with Proven {
         proofs == o.proofs &&
         version == o.version &&
         java.util.Arrays.equals(signature, o.signature) &&
-        assets.equals(o.assets)
+        feeAsset.equals(o.feeAsset)
     case _ => false
   }
 

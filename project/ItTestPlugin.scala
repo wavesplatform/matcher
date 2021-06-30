@@ -74,10 +74,14 @@ object ItTestPlugin extends AutoPlugin {
             case None => (Test / definedTests).value
             case _ =>
               val runs = Option(System.getenv("REPEATED_CI_RUNS")).getOrElse("0").toInt
-              val suite = System.getenv("REPEATED_CI_SUITE")
-              for (_ <- 0 to runs) yield (Test / definedTests).value.filter(_.name.contains(suite)).head
+              val suiteName =
+                Option(System.getenv("REPEATED_CI_SUITE")).getOrElse(throw new IllegalArgumentException("Specify REPEATED_CI_SUITE"))
+              val suite = (Test / definedTests).value.find(_.name.contains(suite)).getOrElse(throw new IllegalArgumentException(
+                s"Can't find test *$suiteName*"
+              ))
+              List.fill(runs)(suite)
           }
-
+          val x = List.fill(3)("foo")
           // checks that we will not get higher than portRangeHigherBound
           if (tests.size * PORTS_PER_TEST > portRangeHigherBound - portRangeLowerBound)
             throw new RuntimeException(

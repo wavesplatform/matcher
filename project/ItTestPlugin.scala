@@ -82,7 +82,7 @@ object ItTestPlugin extends AutoPlugin {
               ))
               List.fill(runs)(suite)
           }
-          val x = List.fill(3)("foo")
+          
           // checks that we will not get higher than portRangeHigherBound
           if (tests.size * PORTS_PER_TEST > portRangeHigherBound - portRangeLowerBound)
             throw new RuntimeException(

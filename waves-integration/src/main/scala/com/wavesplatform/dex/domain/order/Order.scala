@@ -132,17 +132,24 @@ trait Order extends ByteAndJsonSerializable with Proven {
 
   def jsonStr: String = Json.stringify(json())
 
+  def canEqual(other: Any): Boolean = other.isInstanceOf[Order]
+
   override def equals(obj: Any): Boolean = obj match {
     case o: Order =>
-      senderPublicKey == o.senderPublicKey &&
+      o.canEqual(this) &&
+        senderPublicKey == o.senderPublicKey &&
         matcherPublicKey == o.matcherPublicKey &&
         assetPair == o.assetPair &&
         orderType == o.orderType &&
         price == o.price &&
         amount == o.amount &&
+        timestamp == o.timestamp &&
         expiration == o.expiration &&
         matcherFee == o.matcherFee &&
-        (signature sameElements o.signature)
+        proofs == o.proofs &&
+        version == o.version &&
+        java.util.Arrays.equals(signature, o.signature) &&
+        feeAsset == o.feeAsset
     case _ => false
   }
 

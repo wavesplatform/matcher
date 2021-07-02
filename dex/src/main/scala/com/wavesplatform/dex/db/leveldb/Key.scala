@@ -10,8 +10,10 @@ trait Key[V] {
 
   override lazy val toString: String = BigInt(keyBytes).toString(16)
 
+  def canEqual(other: Any): Boolean = other.isInstanceOf[Key[V]]
+
   override def equals(obj: scala.Any): Boolean = obj match {
-    case that: Key[V] => java.util.Arrays.equals(this.keyBytes, that.keyBytes)
+    case that: Key[V] => that.canEqual(this) && java.util.Arrays.equals(this.keyBytes, that.keyBytes)
     case _ => false
   }
 

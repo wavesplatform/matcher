@@ -1,6 +1,7 @@
+import org.scalatest.TestSuite
+
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
-
 import sbt.Keys._
 import sbt.Tests.Group
 import sbt._
@@ -69,7 +70,18 @@ object ItTestPlugin extends AutoPlugin {
               throw new IllegalArgumentException(s"Illegal port range for tests! First boundary $first is bigger or equals second $second!")
             (first, second)
           }.getOrElse(DEFAULT_PORT_RANGE)
-          val tests = (Test / definedTests).value
+
+          val tests = Option(System.getenv("REPEATED_CI")) match {
+            case None => (Test / definedTests).value
+            case _ =>
+              val runs = Option(System.getenv("REPEATED_CI_RUNS")).getOrElse("0").toInt
+              val suiteName =
+                Option(System.getenv("REPEATED_CI_SUITE")).getOrElse(throw new IllegalArgumentException("Specify REPEATED_CI_SUITE"))
+              val suite = (Test / definedTests).value.find(_.name.contains(suiteName)).getOrElse(throw new IllegalArgumentException(
+                s"Can't find test *$suiteName*"
+              ))
+              List.fill(runs)(suite)
+          }
 
           // checks that we will not get higher than portRangeHigherBound
           if (tests.size * PORTS_PER_TEST > portRangeHigherBound - portRangeLowerBound)
@@ -83,6 +95,7 @@ object ItTestPlugin extends AutoPlugin {
           tests.zipWithIndex.map { case (suite, i) =>
             val lowerBound = portRangeLowerBound + PORTS_PER_TEST * i
             val higherBound = lowerBound + PORTS_PER_TEST - 1
+
             Group(
               suite.name,
               Seq(suite),
@@ -93,7 +106,7 @@ object ItTestPlugin extends AutoPlugin {
                   bootJars = Vector.empty[java.io.File],
                   workingDirectory = Option((Test / baseDirectory).value),
                   runJVMOptions = Vector(
-                    s"-Dwaves.it.logging.dir=${logDirectoryValue / suite.name.replaceAll("""(\w)\w*\.""", "$1.")}" // foo.bar.Baz -> f.b.Baz
+                    s"-Dwaves.it.logging.dir=${logDirectoryValue / suite.name.replaceAll("""(\w)\w*\.""", "$1.")}-$i" // foo.bar.Baz -> f.b.Baz
                   ) ++ javaOptionsValue,
                   connectInput = false,
                   envVars = envVarsValue + ("TEST_PORT_RANGE" -> s"$lowerBound-$higherBound")

@@ -6,6 +6,4 @@ import play.api.libs.json.JsObject
 trait ByteAndJsonSerializable {
   val bytes: Coeval[Array[Byte]]
   val json: Coeval[JsObject]
-
-  def canEqual(other: Any): Boolean = other.isInstanceOf[ByteAndJsonSerializable]
 }

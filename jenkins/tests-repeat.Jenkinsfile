@@ -37,8 +37,10 @@ pipeline {
             }
         }
         stage('Build & Compile') {
-            sh 'sbt compile'
-            sh 'sbt dex-it/docker'
+            steps {
+                sh 'sbt compile'
+                sh 'sbt dex-it/docker'
+            }
         }
         stage('Run Tests') {
             steps {

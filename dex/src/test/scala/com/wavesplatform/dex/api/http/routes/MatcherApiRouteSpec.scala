@@ -1271,8 +1271,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         .explicitGet()
     )
 
-    val orderBooks = new AtomicReference(Map(smartWavesPair -> orderBookActor.ref.asRight[Unit]))
-
     val testKit = ActorTestKit()
 
     val pairBuilder = new AssetPairBuilder(

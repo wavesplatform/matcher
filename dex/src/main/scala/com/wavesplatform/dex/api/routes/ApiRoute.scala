@@ -124,7 +124,6 @@ trait ApiRoute extends Directives with ApiMarshallers with ScorexLogging {
         TimedOut
       }
 
-  @inline
   protected def askAddressActor(addressActor: ActorRef, sender: Address, msg: AddressActor.Message)(handleResponse: LogicResponseHandler)(
     implicit
     executionContext: ExecutionContext,

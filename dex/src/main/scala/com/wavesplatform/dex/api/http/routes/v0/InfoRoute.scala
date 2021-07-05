@@ -2,7 +2,6 @@ package com.wavesplatform.dex.api.http.routes.v0
 
 import akka.http.scaladsl.server.Route
 import akka.stream.Materializer
-import akka.util.Timeout
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.api.http.HasStatusBarrier
 import com.wavesplatform.dex.api.http.directives.HttpKamonDirectives._
@@ -38,7 +37,6 @@ class InfoRoute(
     with ScorexLogging {
 
   implicit private val executionContext: ExecutionContext = mat.executionContext
-  implicit private val timeout: Timeout = matcherSettings.actorResponseTimeout
 
   override def route: Route =
     pathPrefix("matcher")(pathPrefix("settings")(getMatcherPublicSettings) ~ pathPrefix("matcher")(getMatcherPKInBase58))

@@ -3,7 +3,6 @@ package com.wavesplatform.dex.api.http.routes.v0
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server._
 import akka.stream.Materializer
-import akka.util.Timeout
 import com.wavesplatform.dex.api.http.directives.HttpKamonDirectives._
 import com.wavesplatform.dex.api.http.directives.ProtectDirective
 import com.wavesplatform.dex.api.http.{HasStatusBarrier, _}
@@ -35,7 +34,6 @@ class TransactionsRoute(
     with ScorexLogging {
 
   implicit private val executionContext: ExecutionContext = mat.executionContext
-  implicit private val timeout: Timeout = matcherSettings.actorResponseTimeout
 
   override lazy val route: Route = pathPrefix("matcher") {
     pathPrefix("transactions")(getTransactionsByOrderId)

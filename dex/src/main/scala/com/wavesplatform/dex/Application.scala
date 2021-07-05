@@ -2,10 +2,10 @@ package com.wavesplatform.dex
 
 import akka.Done
 import akka.actor.typed.scaladsl.adapter._
-import akka.actor.{ActorRef, ActorSystem, CoordinatedShutdown, Props, typed}
+import akka.actor.{typed, ActorRef, ActorSystem, CoordinatedShutdown, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Directives.respondWithHeader
-import akka.pattern.{CircuitBreaker, ask, gracefulStop}
+import akka.pattern.{ask, gracefulStop, CircuitBreaker}
 import akka.stream.Materializer
 import akka.util.Timeout
 import cats.data.EitherT
@@ -34,12 +34,12 @@ import com.wavesplatform.dex.api.ws.routes.MatcherWebSocketRoute
 import com.wavesplatform.dex.app._
 import com.wavesplatform.dex.caches.{MatchingRulesCache, OrderFeeSettingsCache, RateCache}
 import com.wavesplatform.dex.db._
-import com.wavesplatform.dex.db.leveldb.{LevelDb, openDb}
+import com.wavesplatform.dex.db.leveldb.{openDb, LevelDb}
 import com.wavesplatform.dex.domain.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.utils.{EitherExt2, LoggerFacade, ScorexLogging}
-import com.wavesplatform.dex.effect.{FutureResult, liftValueAsync}
+import com.wavesplatform.dex.effect.{liftValueAsync, FutureResult}
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.grpc.integration.clients.MatcherExtensionAssetsCachingClient
 import com.wavesplatform.dex.grpc.integration.clients.combined.{AkkaCombinedStream, CombinedWavesBlockchainClient}
@@ -66,7 +66,7 @@ import java.util.concurrent.ThreadLocalRandom
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future, Promise, blocking}
+import scala.concurrent.{blocking, Await, Future, Promise}
 import scala.jdk.CollectionConverters._
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
@@ -383,7 +383,8 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     () => orderFeeSettingsCache.getSettingsForOffset(lastProcessedOffset + 1)
   )
 
-  private val v1OrderBookRoute = OrderBookRoute(pairBuilder, orderBookHttpInfo, () => status, maybeApiKeyHash)
+  private val v0HttpRoute = Seq(placeRoute, cancelRoute, debugRoute, infoRoute, ratesRoute, historyRoute, statusRoute, transactionsRoute, balancesRoute, marketsRoute)
+  private val v1HttpRoute = Seq(OrderBookRoute(pairBuilder, orderBookHttpInfo, () => status, maybeApiKeyHash))
 
   private val wsApiRoute = new MatcherWebSocketRoute(
     wsInternalBroadcastRef,
@@ -400,21 +401,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
   cs.addTask(CoordinatedShutdown.PhaseBeforeServiceUnbind, "WebSockets")(() => wsApiRoute.gracefulShutdown().map(_ => Done))
 
-  private val matcherApiRoutes: Seq[ApiRoute] =
-    Seq(
-      v1OrderBookRoute,
-      wsApiRoute,
-      placeRoute,
-      cancelRoute,
-      ratesRoute,
-      infoRoute,
-      marketsRoute,
-      historyRoute,
-      statusRoute,
-      balancesRoute,
-      transactionsRoute,
-      debugRoute
-    )
+  private val matcherApiRoutes: Seq[ApiRoute] = v0HttpRoute ++ v1HttpRoute
 
   private val matcherApiTypes: Set[Class[_]] = matcherApiRoutes.map(_.getClass).toSet
 

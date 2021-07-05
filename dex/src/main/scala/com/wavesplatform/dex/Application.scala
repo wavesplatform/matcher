@@ -333,7 +333,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   private val historyRoute = new HistoryRoute(pairBuilder, addressDirectoryRef, () => status, maybeApiKeyHash, settings)
   private val statusRoute = new StatusRoute(pairBuilder, addressDirectoryRef, () => status, orderDb, maybeApiKeyHash, settings)
   private val balancesRoute = new BalancesRoute(pairBuilder, addressDirectoryRef, () => status, maybeApiKeyHash, settings)
-  private val transactionsRoute = new TransactionsRoute(() => status, orderDb, maybeApiKeyHash, settings)
+  private val transactionsRoute = new TransactionsRoute(() => status, orderDb, maybeApiKeyHash)
 
   private val debugRoute = new DebugRoute(
     config,

@@ -1308,7 +1308,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     val historyRoute = new HistoryRoute(pairBuilder, addressActor.ref, () => MatcherStatus.Working, Some(crypto secureHash apiKey), settings)
     val statusRoute = new StatusRoute(pairBuilder, addressActor.ref, () => MatcherStatus.Working, odb, Some(crypto secureHash apiKey), settings)
     val balancesRoute = new BalancesRoute(pairBuilder, addressActor.ref, () => MatcherStatus.Working, Some(crypto secureHash apiKey), settings)
-    val transactionsRoute = new TransactionsRoute(() => MatcherStatus.Working, odb, Some(crypto secureHash apiKey), settings)
+    val transactionsRoute = new TransactionsRoute(() => MatcherStatus.Working, odb, Some(crypto secureHash apiKey))
 
     val routes = Set(
       placeRoute.route,

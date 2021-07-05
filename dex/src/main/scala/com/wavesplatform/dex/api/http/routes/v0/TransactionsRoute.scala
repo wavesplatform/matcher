@@ -12,7 +12,6 @@ import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.db.OrderDb
 import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV2
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.settings.MatcherSettings
 import io.swagger.annotations._
 import play.api.libs.json._
 
@@ -24,8 +23,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class TransactionsRoute(
   override val matcherStatus: () => MatcherStatus,
   orderDb: OrderDb[Future],
-  override val apiKeyHash: Option[Array[Byte]],
-  matcherSettings: MatcherSettings
+  override val apiKeyHash: Option[Array[Byte]]
 )(implicit mat: Materializer)
     extends ApiRoute
     with ProtectDirective
@@ -35,7 +33,7 @@ class TransactionsRoute(
 
   implicit private val executionContext: ExecutionContext = mat.executionContext
 
-  override lazy val route: Route = pathPrefix("matcher") {
+  override def route: Route = pathPrefix("matcher") {
     pathPrefix("transactions")(getTransactionsByOrderId)
   }
 

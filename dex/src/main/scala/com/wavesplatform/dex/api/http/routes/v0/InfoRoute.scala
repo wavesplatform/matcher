@@ -50,7 +50,9 @@ class InfoRoute(
     response = classOf[String]
   )
   def getMatcherPKInBase58: Route =
-    (pathEndOrSingleSlash & get)((withMetricsAndTraces("getMatcherPKInBase58") & protect)(complete(matcherPublicKey.toJson)))
+    (pathEndOrSingleSlash & get)((withMetricsAndTraces("getMatcherPKInBase58") & protect)(
+      complete(matcherPublicKey.toJson)
+    ))
 
   @Path("/settings#getMatcherPublicSettings")
   @ApiOperation(

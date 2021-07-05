@@ -383,7 +383,9 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     () => orderFeeSettingsCache.getSettingsForOffset(lastProcessedOffset + 1)
   )
 
-  private val v0HttpRoute = Seq(placeRoute, cancelRoute, debugRoute, infoRoute, ratesRoute, historyRoute, statusRoute, transactionsRoute, balancesRoute, marketsRoute)
+  private val v0HttpRoute =
+    Seq(placeRoute, cancelRoute, debugRoute, infoRoute, ratesRoute, historyRoute, statusRoute, transactionsRoute, balancesRoute, marketsRoute)
+
   private val v1HttpRoute = Seq(OrderBookRoute(pairBuilder, orderBookHttpInfo, () => status, maybeApiKeyHash))
 
   private val wsApiRoute = new MatcherWebSocketRoute(

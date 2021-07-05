@@ -4,6 +4,7 @@ import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import akka.actor.{ActorRef, Status}
 import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse, StatusCodes}
+import akka.http.scaladsl.server.Directives.pathPrefix
 import akka.http.scaladsl.server.Route
 import akka.testkit.{TestActor, TestProbe}
 import cats.instances.future._
@@ -23,9 +24,10 @@ import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.MarketSta
 import com.wavesplatform.dex.api.RouteSpec
 import com.wavesplatform.dex.api.http.ApiMarshallers._
 import com.wavesplatform.dex.api.http.entities._
-import com.wavesplatform.dex.api.http.headers.{`X-Api-Key`, CustomContentTypes}
+import com.wavesplatform.dex.api.http.headers.{CustomContentTypes, `X-Api-Key`}
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
-import com.wavesplatform.dex.api.http.{entities, OrderBookHttpInfo}
+import com.wavesplatform.dex.api.http.routes.v0.{BalancesRoute, CancelRoute, HistoryRoute, PlaceRoute, RatesRoute, StatusRoute, TransactionsRoute}
+import com.wavesplatform.dex.api.http.{OrderBookHttpInfo, entities}
 import com.wavesplatform.dex.api.ws.actors.WsExternalClientDirectoryActor
 import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.caches.RateCache
@@ -1284,55 +1286,54 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
 
     val testKit = ActorTestKit()
 
-    val route =
-      new MatcherApiRoute(
-        assetPairBuilder = new AssetPairBuilder(
-          settings,
-          {
-            case `smartAsset` => liftValueAsync[BriefAssetDescription](smartAssetDesc)
-            case x if x == okOrder.assetPair.amountAsset || x == badOrder.assetPair.amountAsset || x == unknownAsset =>
-              liftValueAsync[BriefAssetDescription](amountAssetDesc)
-            case x if x == okOrder.assetPair.priceAsset || x == badOrder.assetPair.priceAsset =>
-              liftValueAsync[BriefAssetDescription](priceAssetDesc)
-            case x => liftErrorAsync[BriefAssetDescription](error.AssetNotFound(x))
-          },
-          Set.empty
-        ),
-        matcherPublicKey = matcherKeyPair.publicKey,
-        safeConfig = ConfigFactory.load().atKey("waves.dex"),
-        matcher = orderBookDirectoryActor.ref,
-        addressActor = addressActor.ref,
-        CombinedStream.Status.Working(10),
-        storeCommand = {
-          case ValidatedCommand.DeleteOrderBook(pair, _) if pair == okOrder.assetPair =>
-            Future.successful(ValidatedCommandWithMeta(1L, System.currentTimeMillis, ValidatedCommand.DeleteOrderBook(pair)).some)
-          case _ => Future.failed(new NotImplementedError("Storing is not implemented"))
-        },
-        orderBook = {
-          case x if x == okOrder.assetPair || x == badOrder.assetPair => Some(Right(orderBookActor.ref))
-          case _ => None
-        },
-        orderBookHttpInfo = orderBookHttpInfo,
-        getActualTickSize = _ => liftValueAsync(BigDecimal(0.1)),
-        orderValidator = {
-          case x if x == okOrder || x == badOrder => liftValueAsync(x)
-          case _ => liftErrorAsync(error.FeatureNotImplemented)
-        },
-        matcherSettings = settings,
-        matcherStatus = () => MatcherStatus.Working,
-        orderDb = odb,
-        currentOffset = () => 0L,
-        lastOffset = () => Future.successful(0L),
-        matcherAccountFee = 300000L,
-        apiKeyHash = Some(crypto secureHash apiKey),
-        rateCache = rateCache,
-        validatedAllowedOrderVersions = () => Future.successful(Set(1, 2, 3)),
-        () => DynamicSettings.symmetric(matcherFee),
-        externalClientDirectoryRef = testKit.spawn(WsExternalClientDirectoryActor(), s"ws-external-cd-${Random.nextInt(Int.MaxValue)}"),
-        getAssetDescription = _ => liftValueAsync(BriefAssetDescription("test", 8, hasScript = false, isNft = false))
-      )
+    val pairBuilder = new AssetPairBuilder(
+      settings,
+      {
+        case `smartAsset` => liftValueAsync[BriefAssetDescription](smartAssetDesc)
+        case x if x == okOrder.assetPair.amountAsset || x == badOrder.assetPair.amountAsset || x == unknownAsset =>
+          liftValueAsync[BriefAssetDescription](amountAssetDesc)
+        case x if x == okOrder.assetPair.priceAsset || x == badOrder.assetPair.priceAsset =>
+          liftValueAsync[BriefAssetDescription](priceAssetDesc)
+        case x => liftErrorAsync[BriefAssetDescription](error.AssetNotFound(x))
+      },
+      Set.empty
+    )
 
-    f(route.route)
+    val placeRoute = new PlaceRoute(
+      pairBuilder,
+      addressActor.ref,
+      orderValidator = {
+        case x if x == okOrder || x == badOrder => liftValueAsync(x)
+        case _ => liftErrorAsync(error.FeatureNotImplemented)
+      },
+      settings,
+      () => MatcherStatus.Working,
+      Some(crypto secureHash apiKey)
+    )
+    val cancelRoute = new CancelRoute(pairBuilder, addressActor.ref, () => MatcherStatus.Working, odb, Some(crypto secureHash apiKey), settings)
+    val ratesRoute = new RatesRoute(
+      pairBuilder,
+      () => MatcherStatus.Working,
+      Some(crypto secureHash apiKey),
+      rateCache,
+      testKit.spawn(WsExternalClientDirectoryActor(), s"ws-external-cd-${Random.nextInt(Int.MaxValue)}")
+    )
+    val historyRoute = new HistoryRoute(pairBuilder, addressActor.ref, () => MatcherStatus.Working, Some(crypto secureHash apiKey), settings)
+    val statusRoute = new StatusRoute(pairBuilder, addressActor.ref, () => MatcherStatus.Working, odb, Some(crypto secureHash apiKey), settings)
+    val balancesRoute = new BalancesRoute(pairBuilder, addressActor.ref, () => MatcherStatus.Working, Some(crypto secureHash apiKey), settings)
+    val transactionsRoute = new TransactionsRoute(() => MatcherStatus.Working, odb, Some(crypto secureHash apiKey), settings)
+
+    val routes = Set(
+      placeRoute.route,
+      cancelRoute.route,
+      ratesRoute.route,
+      historyRoute.route,
+      statusRoute.route,
+      balancesRoute.route,
+      transactionsRoute.route
+    )
+
+    f(placeRoute.concat(placeRoute.route, routes))
   }
 
 }

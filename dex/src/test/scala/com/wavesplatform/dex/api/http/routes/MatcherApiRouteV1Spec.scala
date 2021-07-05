@@ -13,7 +13,8 @@ import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor
 import com.wavesplatform.dex.api.RouteSpec
 import com.wavesplatform.dex.api.http.ApiMarshallers._
 import com.wavesplatform.dex.api.http.entities.{HttpOrderBook, HttpV1LevelAgg, HttpV1OrderBook}
-import com.wavesplatform.dex.api.http.{entities, OrderBookHttpInfo}
+import com.wavesplatform.dex.api.http.routes.v1.OrderBookRoute
+import com.wavesplatform.dex.api.http.{OrderBookHttpInfo, entities}
 import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.db.WithDb
 import com.wavesplatform.dex.domain.asset.Asset.Waves
@@ -104,7 +105,7 @@ class MatcherApiRouteV1Spec extends RouteSpec("/api/v1") with MatcherSpecBase wi
       )
 
     val route =
-      MatcherApiRouteV1(
+      OrderBookRoute(
         assetPairBuilder = new AssetPairBuilder(
           settings,
           {

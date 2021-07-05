@@ -1274,16 +1274,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     val orderBooks = new AtomicReference(Map(smartWavesPair -> orderBookActor.ref.asRight[Unit]))
     val orderBookAskAdapter = new OrderBookAskAdapter(orderBooks, 5.seconds)
 
-    val orderBookHttpInfo =
-      new OrderBookHttpInfo(
-        settings = settings.orderBookHttp,
-        askAdapter = orderBookAskAdapter,
-        time = time,
-        assetDecimals = x =>
-          if (x == smartAsset) liftValueAsync(smartAssetDesc.decimals)
-          else liftFutureAsync(Future.failed(new IllegalArgumentException(s"No information about $x")))
-      )
-
     val testKit = ActorTestKit()
 
     val pairBuilder = new AssetPairBuilder(

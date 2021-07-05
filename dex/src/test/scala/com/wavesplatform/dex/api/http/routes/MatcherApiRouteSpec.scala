@@ -4,7 +4,6 @@ import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import akka.actor.{ActorRef, Status}
 import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse, StatusCodes}
-import akka.http.scaladsl.server.Directives.pathPrefix
 import akka.http.scaladsl.server.Route
 import akka.testkit.{TestActor, TestProbe}
 import cats.instances.future._
@@ -26,7 +25,7 @@ import com.wavesplatform.dex.api.http.ApiMarshallers._
 import com.wavesplatform.dex.api.http.entities._
 import com.wavesplatform.dex.api.http.headers.{`X-Api-Key`, CustomContentTypes}
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
-import com.wavesplatform.dex.api.http.routes.v0.{BalancesRoute, CancelRoute, HistoryRoute, PlaceRoute, RatesRoute, StatusRoute, TransactionsRoute}
+import com.wavesplatform.dex.api.http.routes.v0._
 import com.wavesplatform.dex.api.http.{entities, OrderBookHttpInfo}
 import com.wavesplatform.dex.api.ws.actors.WsExternalClientDirectoryActor
 import com.wavesplatform.dex.app.MatcherStatus
@@ -1272,6 +1271,18 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     )
 
     val testKit = ActorTestKit()
+    val orderBooks = new AtomicReference(Map(smartWavesPair -> orderBookActor.ref.asRight[Unit]))
+    val orderBookAskAdapter = new OrderBookAskAdapter(orderBooks, 5.seconds)
+
+    val orderBookHttpInfo =
+      new OrderBookHttpInfo(
+        settings = settings.orderBookHttp,
+        askAdapter = orderBookAskAdapter,
+        time = time,
+        assetDecimals = x =>
+          if (x == smartAsset) liftValueAsync(smartAssetDesc.decimals)
+          else liftFutureAsync(Future.failed(new IllegalArgumentException(s"No information about $x")))
+      )
 
     val pairBuilder = new AssetPairBuilder(
       settings,
@@ -1309,15 +1320,58 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     val statusRoute = new StatusRoute(pairBuilder, addressActor.ref, () => MatcherStatus.Working, odb, Some(crypto secureHash apiKey), settings)
     val balancesRoute = new BalancesRoute(pairBuilder, addressActor.ref, () => MatcherStatus.Working, Some(crypto secureHash apiKey), settings)
     val transactionsRoute = new TransactionsRoute(() => MatcherStatus.Working, odb, Some(crypto secureHash apiKey))
+    val debugRoute = new DebugRoute(
+      ConfigFactory.load().atKey("waves.dex"),
+      orderBookDirectoryActor.ref,
+      addressActor.ref,
+      CombinedStream.Status.Working(10),
+      () => MatcherStatus.Working,
+      () => 0L,
+      () => Future.successful(0L),
+      Some(crypto secureHash apiKey),
+      settings
+    )
+
+    val marketsRoute = new MarketsRoute(
+      pairBuilder,
+      matcherKeyPair.publicKey,
+      orderBookDirectoryActor.ref,
+      {
+        case ValidatedCommand.DeleteOrderBook(pair, _) if pair == okOrder.assetPair =>
+          Future.successful(ValidatedCommandWithMeta(1L, System.currentTimeMillis, ValidatedCommand.DeleteOrderBook(pair)).some)
+        case _ => Future.failed(new NotImplementedError("Storing is not implemented"))
+      },
+      {
+        case x if x == okOrder.assetPair || x == badOrder.assetPair => Some(Right(orderBookActor.ref))
+        case _ => None
+      },
+      orderBookHttpInfo,
+      _ => liftValueAsync(BigDecimal(0.1)),
+      settings,
+      () => MatcherStatus.Working,
+      Some(crypto secureHash apiKey)
+    )
+    val infoRoute = new InfoRoute(
+      matcherKeyPair.publicKey,
+      settings,
+      () => MatcherStatus.Working,
+      300000L,
+      Some(crypto secureHash apiKey),
+      rateCache,
+      () => Future.successful(Set(1, 2, 3)),
+      () => DynamicSettings.symmetric(matcherFee)
+    )
 
     val routes = Set(
-      placeRoute.route,
       cancelRoute.route,
       ratesRoute.route,
       historyRoute.route,
       statusRoute.route,
       balancesRoute.route,
-      transactionsRoute.route
+      transactionsRoute.route,
+      debugRoute.route,
+      marketsRoute.route,
+      infoRoute.route
     )
 
     f(placeRoute.concat(placeRoute.route, routes))

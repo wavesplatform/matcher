@@ -47,13 +47,12 @@ class CancelRoute(
   implicit private val executionContext: ExecutionContext = mat.executionContext
   implicit private val timeout: Timeout = matcherSettings.actorResponseTimeout
 
-  override def route: Route =
+  override lazy val route: Route =
     pathPrefix("matcher") {
       pathPrefix("orderbook") {
         matcherStatusBarrier(cancelOneOrAllInPairOrdersWithSig ~ cancelAllOrdersWithSig)
-      } ~
-      pathPrefix("orderbook") {
-        matcherStatusBarrier(cancelOneOrAllInPairOrdersWithSig ~ cancelAllOrdersWithSig)
+      } ~ pathPrefix("orders") {
+        matcherStatusBarrier(cancelOrdersByIdsWithKey ~ cancelOneOrderWithKey)
       }
     }
 

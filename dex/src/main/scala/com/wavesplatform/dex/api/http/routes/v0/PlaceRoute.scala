@@ -46,7 +46,7 @@ class PlaceRoute(
   implicit private val executionContext: ExecutionContext = mat.executionContext
   implicit private val timeout: Timeout = matcherSettings.actorResponseTimeout
 
-  override def route: Route = pathPrefix("matcher")(pathPrefix("orderbook")(placeLimitOrder ~ placeMarketOrder))
+  override lazy val route: Route = pathPrefix("matcher" / "orderbook")(placeLimitOrder ~ placeMarketOrder)
 
   // DEX-1192 docs/places-and-cancels.md
   private def placeOrder(endpoint: Option[PathMatcher[Unit]], isMarket: Boolean): Route = {

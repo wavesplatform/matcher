@@ -36,10 +36,8 @@ class RatesRoute(
     with AuthRoute
     with ScorexLogging {
 
-  override def route: Route = pathPrefix("matcher") {
-    pathPrefix("rates") {
-      getAssetRates ~ matcherStatusBarrier(upsertAssetRate ~ deleteAssetRate)
-    }
+  override lazy val route: Route = pathPrefix("matcher" / "settings" / "rates") {
+    getAssetRates ~ matcherStatusBarrier(upsertAssetRate ~ deleteAssetRate)
   }
 
   @Path("/settings/rates#getAssetRates")

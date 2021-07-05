@@ -38,8 +38,8 @@ class InfoRoute(
 
   implicit private val executionContext: ExecutionContext = mat.executionContext
 
-  override def route: Route =
-    pathPrefix("matcher")(pathPrefix("settings")(getMatcherPublicSettings) ~ pathPrefix("matcher")(getMatcherPKInBase58))
+  override lazy val route: Route =
+    pathPrefix("matcher")(pathPrefix("settings")(getMatcherPublicSettings) ~ getMatcherPKInBase58)
 
   @Path("/#getMatcherPKInBase58")
   @ApiOperation(

@@ -45,7 +45,7 @@ class HistoryRoute(
   implicit private val executionContext: ExecutionContext = mat.executionContext
   implicit private val timeout: Timeout = matcherSettings.actorResponseTimeout
 
-  override def route: Route = pathPrefix("matcher") {
+  override lazy val route: Route = pathPrefix("matcher") {
     pathPrefix("orderbook") {
       matcherStatusBarrier {
         getOrderHistoryByAssetPairAndPKWithSig ~ getOrderHistoryByPKWithSig ~ deleteOrderFromHistoryById

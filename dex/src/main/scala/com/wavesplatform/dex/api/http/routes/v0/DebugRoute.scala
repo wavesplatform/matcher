@@ -50,11 +50,9 @@ class DebugRoute(
   implicit private val executionContext: ExecutionContext = mat.executionContext
   implicit private val timeout: Timeout = matcherSettings.actorResponseTimeout
 
-  override lazy val route: Route = pathPrefix("matcher") {
-    pathPrefix("debug") {
-      getMatcherStatus ~ getAddressState ~ getMatcherConfig ~ getCurrentOffset ~ getLastOffset ~
-      getOldestSnapshotOffset ~ getAllSnapshotOffsets ~ saveSnapshots ~ printMessage
-    }
+  override lazy val route: Route = pathPrefix("matcher" / "debug") {
+    getMatcherStatus ~ getAddressState ~ getMatcherConfig ~ getCurrentOffset ~ getLastOffset ~
+    getOldestSnapshotOffset ~ getAllSnapshotOffsets ~ saveSnapshots ~ printMessage
   }
 
   // Hidden

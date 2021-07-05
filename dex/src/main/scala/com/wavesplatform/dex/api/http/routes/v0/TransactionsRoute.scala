@@ -33,9 +33,7 @@ class TransactionsRoute(
 
   implicit private val executionContext: ExecutionContext = mat.executionContext
 
-  override def route: Route = pathPrefix("matcher") {
-    pathPrefix("transactions")(getTransactionsByOrderId)
-  }
+  override lazy val route: Route = pathPrefix("matcher" / "transactions")(getTransactionsByOrderId)
 
   @Path("/transactions/{orderId}#getTransactionsByOrderId")
   @ApiOperation(

@@ -1373,6 +1373,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       marketsRoute.route,
       historyRoute.route,
       statusRoute.route,
+      marketsRoute.getOrderBookRoute,
       placeRoute.route,
       cancelRoute.route,
       balancesRoute.route,

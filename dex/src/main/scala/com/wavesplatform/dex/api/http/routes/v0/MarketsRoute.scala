@@ -57,7 +57,14 @@ class MarketsRoute(
   override lazy val route: Route =
     pathPrefix("matcher" / "orderbook") {
       matcherStatusBarrier {
-        getOrderBookRestrictions ~ getOrderBook ~ getOrderBookStatus ~ getOrderBooks ~ deleteOrderBookWithKey
+        getOrderBookRestrictions ~ getOrderBookStatus ~ getOrderBooks ~ deleteOrderBookWithKey
+      }
+    }
+
+  lazy val getOrderBookRoute: Route =
+    pathPrefix("matcher" / "orderbook") {
+      matcherStatusBarrier {
+        getOrderBook
       }
     }
 

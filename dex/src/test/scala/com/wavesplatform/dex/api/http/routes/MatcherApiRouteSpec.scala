@@ -1319,7 +1319,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       testKit.spawn(WsExternalClientDirectoryActor(), s"ws-external-cd-${Random.nextInt(Int.MaxValue)}")
     )
     val historyRoute = new HistoryRoute(pairBuilder, addressActor.ref, () => MatcherStatus.Working, Some(crypto secureHash apiKey), settings)
-    val statusRoute = new StatusRoute(pairBuilder, addressActor.ref, () => MatcherStatus.Working, odb, Some(crypto secureHash apiKey), settings)
     val balancesRoute = new BalancesRoute(pairBuilder, addressActor.ref, () => MatcherStatus.Working, Some(crypto secureHash apiKey), settings)
     val transactionsRoute = new TransactionsRoute(() => MatcherStatus.Working, odb, Some(crypto secureHash apiKey))
     val debugRoute = new DebugRoute(
@@ -1334,7 +1333,9 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       settings
     )
 
-    val marketsRoute = new MarketsRoute(
+    val marketsRoute = new MarketRoute(
+      addressActor.ref,
+      odb,
       pairBuilder,
       matcherKeyPair.publicKey,
       orderBookDirectoryActor.ref,
@@ -1353,7 +1354,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       () => MatcherStatus.Working,
       Some(crypto secureHash apiKey)
     )
-    val infoRoute = new InfoRoute(
+    val infoRoute = new MatcherInfoRoute(
       matcherKeyPair.publicKey,
       settings,
       () => MatcherStatus.Working,
@@ -1370,7 +1371,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       debugRoute.route,
       marketsRoute.route,
       historyRoute.route,
-      statusRoute.route,
       marketsRoute.getOrderBookRoute,
       placeRoute.route,
       cancelRoute.route,

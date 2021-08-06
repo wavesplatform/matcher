@@ -20,7 +20,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 @Path("/matcher")
 @Api()
-class InfoRoute(
+class MatcherInfoRoute(
   matcherPublicKey: PublicKey,
   matcherSettings: MatcherSettings,
   override val matcherStatus: () => MatcherStatus,

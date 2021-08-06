@@ -26,7 +26,7 @@ import com.wavesplatform.dex.actors.tx.{ExchangeTransactionBroadcastActor, Write
 import com.wavesplatform.dex.actors.{OrderBookAskAdapter, OrderBookDirectoryActor, RootActorSystem}
 import com.wavesplatform.dex.api.http.headers.{CustomMediaTypes, MatcherHttpServer}
 import com.wavesplatform.dex.api.http.routes.v1.OrderBookRoute
-import com.wavesplatform.dex.api.http.routes.v0.{BalancesRoute, CancelRoute, DebugRoute, HistoryRoute, InfoRoute, MarketsRoute, PlaceRoute, RatesRoute, StatusRoute, TransactionsRoute}
+import com.wavesplatform.dex.api.http.routes.v0.{BalancesRoute, CancelRoute, DebugRoute, HistoryRoute, MatcherInfoRoute, MarketRoute, PlaceRoute, RatesRoute, TransactionsRoute}
 import com.wavesplatform.dex.api.http.{CompositeHttpService, MetricHttpFlow, OrderBookHttpInfo}
 import com.wavesplatform.dex.api.routes.ApiRoute
 import com.wavesplatform.dex.api.ws.actors.{WsExternalClientDirectoryActor, WsInternalBroadcastActor}
@@ -331,7 +331,6 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   private val cancelRoute = new CancelRoute(pairBuilder, addressDirectoryRef, () => status, orderDb, maybeApiKeyHash, settings)
   private val ratesRoute = new RatesRoute(pairBuilder, () => status, maybeApiKeyHash, rateCache, externalClientDirectoryRef)
   private val historyRoute = new HistoryRoute(pairBuilder, addressDirectoryRef, () => status, maybeApiKeyHash, settings)
-  private val statusRoute = new StatusRoute(pairBuilder, addressDirectoryRef, () => status, orderDb, maybeApiKeyHash, settings)
   private val balancesRoute = new BalancesRoute(pairBuilder, addressDirectoryRef, () => status, maybeApiKeyHash, settings)
   private val transactionsRoute = new TransactionsRoute(() => status, orderDb, maybeApiKeyHash)
 
@@ -347,7 +346,9 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     settings
   )
 
-  private val marketsRoute = new MarketsRoute(
+  private val marketsRoute = new MarketRoute(
+    addressDirectoryRef,
+    orderDb,
     pairBuilder,
     matcherPublicKey,
     orderBookDirectoryActorRef,
@@ -366,7 +367,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     maybeApiKeyHash
   )
 
-  private val infoRoute = new InfoRoute(
+  private val infoRoute = new MatcherInfoRoute(
     matcherPublicKey,
     settings,
     () => status,
@@ -384,7 +385,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   )
 
   private val v0HttpRoute =
-    Seq(infoRoute, ratesRoute, debugRoute, marketsRoute, historyRoute, statusRoute, placeRoute, cancelRoute, balancesRoute, transactionsRoute)
+    Seq(infoRoute, ratesRoute, debugRoute, marketsRoute, historyRoute, placeRoute, cancelRoute, balancesRoute, transactionsRoute)
 
   private val v1HttpRoute = Seq(OrderBookRoute(pairBuilder, orderBookHttpInfo, () => status, maybeApiKeyHash))
 

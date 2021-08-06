@@ -1377,7 +1377,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       placeRoute.route,
       cancelRoute.route,
       balancesRoute.route,
-      transactionsRoute.route,
+      transactionsRoute.route
     )
 
     f(concat(routes: _*))

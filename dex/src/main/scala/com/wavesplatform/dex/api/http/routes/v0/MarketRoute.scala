@@ -65,7 +65,7 @@ class MarketRoute(
     pathPrefix("matcher") {
       pathPrefix("orderbook") {
         matcherStatusBarrier {
-          getOrderBookRestrictions ~ getOrderStatusByPKAndIdWithSig ~ getOrderBookStatus ~ getOrderBooks ~ deleteOrderBookWithKey ~ getOrderStatusByAssetPairAndId
+          getOrderBookRestrictions ~ getOrderStatusByPKAndIdWithSig ~ getOrderBooks ~ getOrderBookStatus  ~ deleteOrderBookWithKey ~ getOrderStatusByAssetPairAndId
         }
       } ~ pathPrefix("orders") {
         matcherStatusBarrier(getOrderStatusByAddressAndIdWithKey)

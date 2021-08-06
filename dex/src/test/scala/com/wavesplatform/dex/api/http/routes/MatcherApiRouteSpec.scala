@@ -3,6 +3,7 @@ package com.wavesplatform.dex.api.http.routes
 import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import akka.actor.{ActorRef, Status}
 import akka.http.scaladsl.model.headers.RawHeader
+import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.Route
 import akka.testkit.{TestActor, TestProbe}
@@ -1365,19 +1366,20 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       () => DynamicSettings.symmetric(matcherFee)
     )
 
-    val routes = Set(
+    val routes = Seq(
       infoRoute.route,
       ratesRoute.route,
       debugRoute.route,
-      historyRoute.route,
       marketsRoute.route,
+      historyRoute.route,
       statusRoute.route,
+      placeRoute.route,
       cancelRoute.route,
       balancesRoute.route,
       transactionsRoute.route,
     )
 
-    f(placeRoute.concat(placeRoute.route, routes))
+    f(concat(routes: _*))
   }
 
 }

@@ -384,7 +384,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   )
 
   private val v0HttpRoute =
-    Seq(placeRoute, cancelRoute, debugRoute, infoRoute, ratesRoute, historyRoute, statusRoute, transactionsRoute, balancesRoute, marketsRoute)
+    Seq(infoRoute, ratesRoute, debugRoute, marketsRoute, historyRoute, statusRoute, placeRoute, cancelRoute, balancesRoute, transactionsRoute)
 
   private val v1HttpRoute = Seq(OrderBookRoute(pairBuilder, orderBookHttpInfo, () => status, maybeApiKeyHash))
 
@@ -406,6 +406,8 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   private val matcherApiRoutes: Seq[ApiRoute] = v0HttpRoute ++ v1HttpRoute
 
   private val matcherApiTypes: Set[Class[_]] = matcherApiRoutes.map(_.getClass).toSet
+
+  println(matcherApiRoutes)
 
   private val startGuard = for {
     (_, http) <- {

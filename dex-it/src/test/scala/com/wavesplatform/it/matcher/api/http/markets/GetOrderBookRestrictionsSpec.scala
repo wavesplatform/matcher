@@ -62,7 +62,7 @@ class GetOrderBookRestrictionsSpec extends MatcherSuiteBase with TableDrivenProp
     }
 
     "should return correct matching rules" in {
-      validate200Json(dex1.rawApi.getOrderBookRestrictions(wavesUsdPair)).matchingRules should be(HttpMatchingRules(0.01))
+      validate200Json(dex1.rawApi.getOrderBookRestrictions("WAVES", UsdId.toString)).matchingRules should be(HttpMatchingRules(0.01))
     }
 
     "should return correct restrictions when it is in config" in {

@@ -324,9 +324,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
 
     "returns OK even there is no such order book" in test { route =>
       Get(routePath(s"/orderbook/$unknownAssetId/WAVES/status")) ~> route ~> check {
-
-        val r = responseAs[String]
-
         status shouldEqual StatusCodes.OK
         responseAs[HttpOrderBookStatus] should matchTo(HttpOrderBookStatus(None, None, None, None, None, None, None))
       }

@@ -23,10 +23,10 @@ import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.MarketSta
 import com.wavesplatform.dex.api.RouteSpec
 import com.wavesplatform.dex.api.http.ApiMarshallers._
 import com.wavesplatform.dex.api.http.entities._
-import com.wavesplatform.dex.api.http.headers.{CustomContentTypes, `X-Api-Key`}
+import com.wavesplatform.dex.api.http.headers.{`X-Api-Key`, CustomContentTypes}
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
 import com.wavesplatform.dex.api.http.routes.v0._
-import com.wavesplatform.dex.api.http.{OrderBookHttpInfo, entities}
+import com.wavesplatform.dex.api.http.{entities, OrderBookHttpInfo}
 import com.wavesplatform.dex.api.ws.actors.WsExternalClientDirectoryActor
 import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.caches.RateCache
@@ -171,7 +171,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     "returns an order book information" in test { route =>
       Get(routePath(s"/orderbook/$smartAssetId/WAVES/info")) ~> route ~> check {
         status shouldEqual StatusCodes.OK
-
 
         val r = responseAs[String]
         println(r)
@@ -330,7 +329,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       Get(routePath(s"/orderbook/$unknownAssetId/WAVES/status")) ~> route ~> check {
 
         val r = responseAs[String]
-
 
         status shouldEqual StatusCodes.OK
         responseAs[HttpOrderBookStatus] should matchTo(HttpOrderBookStatus(None, None, None, None, None, None, None))

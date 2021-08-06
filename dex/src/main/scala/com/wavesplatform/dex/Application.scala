@@ -407,8 +407,6 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
   private val matcherApiTypes: Set[Class[_]] = matcherApiRoutes.map(_.getClass).toSet
 
-  println(matcherApiRoutes)
-
   private val startGuard = for {
     (_, http) <- {
       log.info("Checking matcher's account script ...")

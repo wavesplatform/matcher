@@ -171,10 +171,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     "returns an order book information" in test { route =>
       Get(routePath(s"/orderbook/$smartAssetId/WAVES/info")) ~> route ~> check {
         status shouldEqual StatusCodes.OK
-
-        val r = responseAs[String]
-        println(r)
-
         responseAs[HttpOrderBookInfo] should matchTo(
           HttpOrderBookInfo(
             restrictions = Some(HttpOrderRestrictions.fromSettings(orderRestrictions)),
@@ -1370,15 +1366,15 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     )
 
     val routes = Set(
-      cancelRoute.route,
+      infoRoute.route,
       ratesRoute.route,
-      historyRoute.route,
-      statusRoute.route,
-      balancesRoute.route,
-      transactionsRoute.route,
       debugRoute.route,
       marketsRoute.route,
-      infoRoute.route
+      historyRoute.route,
+      statusRoute.route,
+      cancelRoute.route,
+      balancesRoute.route,
+      transactionsRoute.route,
     )
 
     f(placeRoute.concat(placeRoute.route, routes))

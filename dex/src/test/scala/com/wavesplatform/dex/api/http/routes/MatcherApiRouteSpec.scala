@@ -121,7 +121,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     bestAsk = Some(LevelAgg(3333, 4444))
   )
 
-  val Array((okOrder, okOrderSenderPrivateKey), (badOrder, badOrderSenderPrivateKey)) = Gen.listOfN(2, orderGenerator).sample.get.toArray
+  private val (okOrder, okOrderSenderPrivateKey) = orderGenerator.sample.get
+  private val (badOrder, badOrderSenderPrivateKey) = orderGenerator.sample.get
 
   private val amountAssetDesc = BriefAssetDescription("AmountAsset", 8, hasScript = false, isNft = false)
   private val priceAssetDesc = BriefAssetDescription("PriceAsset", 8, hasScript = false, isNft = false)

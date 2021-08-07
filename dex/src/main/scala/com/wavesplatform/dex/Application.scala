@@ -404,7 +404,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
   cs.addTask(CoordinatedShutdown.PhaseBeforeServiceUnbind, "WebSockets")(() => wsApiRoute.gracefulShutdown().map(_ => Done))
 
-  private val matcherApiRoutes: Seq[ApiRoute] = v0HttpRoute ++ v1HttpRoute
+  private val matcherApiRoutes: Seq[ApiRoute] = v0HttpRoute ++ v1HttpRoute ++ Seq(wsApiRoute)
 
   private val matcherApiTypes: Set[Class[_]] = matcherApiRoutes.map(_.getClass).toSet
 

@@ -65,17 +65,10 @@ class MarketRoute(
     pathPrefix("matcher") {
       pathPrefix("orderbook") {
         matcherStatusBarrier {
-          getOrderBookRestrictions ~ getOrderStatusByPKAndIdWithSig ~ getOrderBooks ~ getOrderBookStatus ~ deleteOrderBookWithKey ~ getOrderStatusByAssetPairAndId
+          getOrderBookRestrictions ~ getOrderStatusByPKAndIdWithSig ~ getOrderBook ~ getOrderBooks ~ getOrderBookStatus ~ deleteOrderBookWithKey ~ getOrderStatusByAssetPairAndId
         }
       } ~ pathPrefix("orders") {
         matcherStatusBarrier(getOrderStatusByAddressAndIdWithKey)
-      }
-    }
-
-  lazy val getOrderBookRoute: Route =
-    pathPrefix("matcher" / "orderbook") {
-      matcherStatusBarrier {
-        getOrderBook
       }
     }
 

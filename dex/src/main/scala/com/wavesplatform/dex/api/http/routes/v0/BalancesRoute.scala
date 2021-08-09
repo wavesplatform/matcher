@@ -15,20 +15,20 @@ import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.model.AssetPairBuilder
-import com.wavesplatform.dex.settings.MatcherSettings
 import io.swagger.annotations.{Api, _}
 
 import javax.ws.rs.Path
 import scala.concurrent.ExecutionContext
+import scala.concurrent.duration.FiniteDuration
 
 @Path("/matcher")
 @Api()
 class BalancesRoute(
+  responseTimeout: FiniteDuration,
   assetPairBuilder: AssetPairBuilder,
   addressActor: ActorRef,
   override val matcherStatus: () => MatcherStatus,
-  override val apiKeyHash: Option[Array[Byte]],
-  matcherSettings: MatcherSettings
+  override val apiKeyHash: Option[Array[Byte]]
 )(implicit mat: Materializer)
     extends ApiRoute
     with ProtectDirective
@@ -37,7 +37,7 @@ class BalancesRoute(
     with ScorexLogging {
 
   implicit private val executionContext: ExecutionContext = mat.executionContext
-  implicit private val timeout: Timeout = matcherSettings.actorResponseTimeout
+  implicit private val timeout: Timeout = responseTimeout
 
   override lazy val route: Route =
     pathPrefix("matcher") {

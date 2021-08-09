@@ -54,7 +54,6 @@ import com.wavesplatform.dex.model.{LimitOrder, OrderInfo, OrderStatus, _}
 import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import com.wavesplatform.dex.settings.OrderFeeSettings.DynamicSettings
 import com.wavesplatform.dex.settings.{MatcherSettings, OrderRestrictionsSettings}
-import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 import play.api.libs.json.{JsArray, JsString, Json, JsonFacade => _}
@@ -1300,17 +1299,18 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     )
 
     val placeRoute = new PlaceRoute(
+      settings.actorResponseTimeout,
       pairBuilder,
       addressActor.ref,
       orderValidator = {
         case x if x == okOrder || x == badOrder => liftValueAsync(x)
         case _ => liftErrorAsync(error.FeatureNotImplemented)
       },
-      settings,
       () => MatcherStatus.Working,
       Some(crypto secureHash apiKey)
     )
-    val cancelRoute = new CancelRoute(pairBuilder, addressActor.ref, () => MatcherStatus.Working, odb, Some(crypto secureHash apiKey), settings)
+    val cancelRoute = new CancelRoute(
+      settings.actorResponseTimeout,pairBuilder, addressActor.ref, () => MatcherStatus.Working, odb, Some(crypto secureHash apiKey))
     val ratesRoute = new RatesRoute(
       pairBuilder,
       () => MatcherStatus.Working,
@@ -1318,10 +1318,13 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       rateCache,
       testKit.spawn(WsExternalClientDirectoryActor(), s"ws-external-cd-${Random.nextInt(Int.MaxValue)}")
     )
-    val historyRoute = new HistoryRoute(pairBuilder, addressActor.ref, () => MatcherStatus.Working, Some(crypto secureHash apiKey), settings)
-    val balancesRoute = new BalancesRoute(pairBuilder, addressActor.ref, () => MatcherStatus.Working, Some(crypto secureHash apiKey), settings)
+    val historyRoute = new HistoryRoute(
+      settings.actorResponseTimeout,pairBuilder, addressActor.ref, () => MatcherStatus.Working, Some(crypto secureHash apiKey))
+    val balancesRoute = new BalancesRoute(
+      settings.actorResponseTimeout,pairBuilder, addressActor.ref, () => MatcherStatus.Working, Some(crypto secureHash apiKey))
     val transactionsRoute = new TransactionsRoute(() => MatcherStatus.Working, odb, Some(crypto secureHash apiKey))
     val debugRoute = new DebugRoute(
+      settings.actorResponseTimeout,
       ConfigFactory.load().atKey("waves.dex"),
       orderBookDirectoryActor.ref,
       addressActor.ref,
@@ -1329,8 +1332,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       () => MatcherStatus.Working,
       () => 0L,
       () => Future.successful(0L),
-      Some(crypto secureHash apiKey),
-      settings
+      Some(crypto secureHash apiKey)
     )
 
     val marketsRoute = new MarketRoute(

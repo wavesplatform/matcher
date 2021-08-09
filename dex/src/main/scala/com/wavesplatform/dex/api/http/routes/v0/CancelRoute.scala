@@ -22,21 +22,21 @@ import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.model.AssetPairBuilder
-import com.wavesplatform.dex.settings.MatcherSettings
 import io.swagger.annotations._
 
 import javax.ws.rs.Path
+import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
 
 @Path("/matcher")
 @Api()
 class CancelRoute(
+  responseTimeout: FiniteDuration,
   assetPairBuilder: AssetPairBuilder,
   addressActor: ActorRef,
   override val matcherStatus: () => MatcherStatus,
   orderDb: OrderDb[Future],
-  override val apiKeyHash: Option[Array[Byte]],
-  matcherSettings: MatcherSettings
+  override val apiKeyHash: Option[Array[Byte]]
 )(implicit mat: Materializer)
     extends ApiRoute
     with ProtectDirective
@@ -45,7 +45,7 @@ class CancelRoute(
     with ScorexLogging {
 
   implicit private val executionContext: ExecutionContext = mat.executionContext
-  implicit private val timeout: Timeout = matcherSettings.actorResponseTimeout
+  implicit private val timeout: Timeout = responseTimeout
 
   override lazy val route: Route =
     pathPrefix("matcher") {

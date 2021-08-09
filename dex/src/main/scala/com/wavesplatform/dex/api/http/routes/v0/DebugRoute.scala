@@ -21,16 +21,17 @@ import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedStream
 import com.wavesplatform.dex.queue.ValidatedCommandWithMeta
-import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
 import io.swagger.annotations._
 
 import javax.ws.rs.Path
+import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
 
 @Path("/matcher")
 @Api()
 class DebugRoute(
+  responseTimeout: FiniteDuration,
   safeConfig: Config,
   matcher: ActorRef,
   addressActor: ActorRef,
@@ -38,8 +39,7 @@ class DebugRoute(
   override val matcherStatus: () => MatcherStatus,
   currentOffset: () => ValidatedCommandWithMeta.Offset,
   lastOffset: () => Future[ValidatedCommandWithMeta.Offset],
-  override val apiKeyHash: Option[Array[Byte]],
-  matcherSettings: MatcherSettings
+  override val apiKeyHash: Option[Array[Byte]]
 )(implicit mat: Materializer)
     extends ApiRoute
     with ProtectDirective
@@ -48,7 +48,7 @@ class DebugRoute(
     with ScorexLogging {
 
   implicit private val executionContext: ExecutionContext = mat.executionContext
-  implicit private val timeout: Timeout = matcherSettings.actorResponseTimeout
+  implicit private val timeout: Timeout = responseTimeout
 
   override lazy val route: Route = pathPrefix("matcher" / "debug") {
     getMatcherStatus ~ getAddressState ~ getMatcherConfig ~ getCurrentOffset ~ getLastOffset ~

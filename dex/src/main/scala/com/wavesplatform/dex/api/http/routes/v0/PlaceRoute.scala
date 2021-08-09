@@ -21,19 +21,19 @@ import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model.AssetPairBuilder
-import com.wavesplatform.dex.settings.MatcherSettings
 import io.swagger.annotations.{Api, _}
 
 import javax.ws.rs.Path
+import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
 
 @Path("/matcher")
 @Api()
 class PlaceRoute(
+  responseTimeout: FiniteDuration,
   assetPairBuilder: AssetPairBuilder,
   addressActor: ActorRef,
   orderValidator: Order => FutureResult[Order],
-  matcherSettings: MatcherSettings,
   override val matcherStatus: () => MatcherStatus,
   override val apiKeyHash: Option[Array[Byte]]
 )(implicit mat: Materializer)
@@ -44,7 +44,7 @@ class PlaceRoute(
     with ScorexLogging {
 
   implicit private val executionContext: ExecutionContext = mat.executionContext
-  implicit private val timeout: Timeout = matcherSettings.actorResponseTimeout
+  implicit private val timeout: Timeout = responseTimeout
 
   override lazy val route: Route = pathPrefix("matcher" / "orderbook")(placeLimitOrder ~ placeMarketOrder)
 

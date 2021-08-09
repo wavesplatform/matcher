@@ -325,16 +325,19 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       blacklistedAddresses,
       hasMatcherAccountScript
     )(_)
-    new PlaceRoute(pairBuilder, addressDirectoryRef, orderValidation, settings, () => status, maybeApiKeyHash)
+    new PlaceRoute(settings.actorResponseTimeout, pairBuilder, addressDirectoryRef, orderValidation, () => status, maybeApiKeyHash)
   }
 
-  private val cancelRoute = new CancelRoute(pairBuilder, addressDirectoryRef, () => status, orderDb, maybeApiKeyHash, settings)
+  private val cancelRoute =
+    new CancelRoute(settings.actorResponseTimeout, pairBuilder, addressDirectoryRef, () => status, orderDb, maybeApiKeyHash)
+
   private val ratesRoute = new RatesRoute(pairBuilder, () => status, maybeApiKeyHash, rateCache, externalClientDirectoryRef)
-  private val historyRoute = new HistoryRoute(pairBuilder, addressDirectoryRef, () => status, maybeApiKeyHash, settings)
-  private val balancesRoute = new BalancesRoute(pairBuilder, addressDirectoryRef, () => status, maybeApiKeyHash, settings)
+  private val historyRoute = new HistoryRoute(settings.actorResponseTimeout, pairBuilder, addressDirectoryRef, () => status, maybeApiKeyHash)
+  private val balancesRoute = new BalancesRoute(settings.actorResponseTimeout, pairBuilder, addressDirectoryRef, () => status, maybeApiKeyHash)
   private val transactionsRoute = new TransactionsRoute(() => status, orderDb, maybeApiKeyHash)
 
   private val debugRoute = new DebugRoute(
+    settings.actorResponseTimeout,
     config,
     orderBookDirectoryActorRef,
     addressDirectoryRef,
@@ -342,8 +345,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     () => status,
     () => lastProcessedOffset,
     () => matcherQueue.lastOffset,
-    maybeApiKeyHash,
-    settings
+    maybeApiKeyHash
   )
 
   private val marketsRoute = new MarketRoute(

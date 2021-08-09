@@ -61,21 +61,15 @@ class MarketRoute(
   implicit private val executionContext: ExecutionContext = mat.executionContext
   implicit private val timeout: Timeout = matcherSettings.actorResponseTimeout
 
+  // NOTE: routes here must not change its places (especially getOrderBookRestrictions ~ getOrderStatusByPKAndIdWithSig ~ getOrderBook)
   override lazy val route: Route =
     pathPrefix("matcher") {
       pathPrefix("orderbook") {
         matcherStatusBarrier {
-          getOrderBookRestrictions ~ getOrderStatusByPKAndIdWithSig ~ getOrderBookStatus ~ getOrderBooks ~ deleteOrderBookWithKey ~ getOrderStatusByAssetPairAndId
+          getOrderBookRestrictions ~ getOrderStatusByPKAndIdWithSig ~ getOrderBook ~ getOrderBooks ~ getOrderBookStatus ~ deleteOrderBookWithKey ~ getOrderStatusByAssetPairAndId
         }
       } ~ pathPrefix("orders") {
         matcherStatusBarrier(getOrderStatusByAddressAndIdWithKey)
-      }
-    }
-
-  lazy val getOrderBookRoute: Route =
-    pathPrefix("matcher" / "orderbook") {
-      matcherStatusBarrier {
-        getOrderBook
       }
     }
 

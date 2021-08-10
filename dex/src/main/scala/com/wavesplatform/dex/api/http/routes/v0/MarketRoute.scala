@@ -30,21 +30,26 @@ import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.model.{AssetPairBuilder, _}
 import com.wavesplatform.dex.queue.MatcherQueue.StoreValidatedCommand
 import com.wavesplatform.dex.queue.ValidatedCommand
-import com.wavesplatform.dex.settings.MatcherSettings
+import com.wavesplatform.dex.settings.{OrderRestrictionsSettings}
 import io.swagger.annotations._
 
 import javax.ws.rs.Path
 import scala.concurrent.{ExecutionContext, Future}
 
-case class Settings(settings: MatcherSettings, getActualTickSize: AssetPair => FutureResult[BigDecimal]) {
-  val timeout = settings.actorResponseTimeout
-  val orderRestrictions = settings.orderRestrictions
+object MarketRoute {
+
+  case class Settings(
+    timeout: Timeout,
+    getActualTickSize: AssetPair => FutureResult[BigDecimal],
+    orderRestrictions: Map[AssetPair, OrderRestrictionsSettings]
+  )
+
 }
 
 @Path("/matcher")
 @Api()
 class MarketRoute(
-  settings: Settings,
+  settings: MarketRoute.Settings,
   addressActor: ActorRef,
   orderDb: OrderDb[Future],
   assetPairBuilder: AssetPairBuilder,

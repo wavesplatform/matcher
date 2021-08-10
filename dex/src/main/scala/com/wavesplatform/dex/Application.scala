@@ -26,7 +26,7 @@ import com.wavesplatform.dex.actors.tx.{ExchangeTransactionBroadcastActor, Write
 import com.wavesplatform.dex.actors.{OrderBookAskAdapter, OrderBookDirectoryActor, RootActorSystem}
 import com.wavesplatform.dex.api.http.headers.{CustomMediaTypes, MatcherHttpServer}
 import com.wavesplatform.dex.api.http.routes.v1.OrderBookRoute
-import com.wavesplatform.dex.api.http.routes.v0.{BalancesRoute, CancelRoute, DebugRoute, HistoryRoute, MarketRoute, MatcherInfoRoute, PlaceRoute, RatesRoute, Settings, TransactionsRoute}
+import com.wavesplatform.dex.api.http.routes.v0.{BalancesRoute, CancelRoute, DebugRoute, HistoryRoute, MarketRoute, MatcherInfoRoute, PlaceRoute, RatesRoute, TransactionsRoute}
 import com.wavesplatform.dex.api.http.{CompositeHttpService, MetricHttpFlow, OrderBookHttpInfo}
 import com.wavesplatform.dex.api.routes.ApiRoute
 import com.wavesplatform.dex.api.ws.actors.{WsExternalClientDirectoryActor, WsInternalBroadcastActor}
@@ -349,14 +349,15 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   )
 
   private val marketsRoute = new MarketRoute(
-    Settings(
-      settings,
+    MarketRoute.Settings(
+      settings.actorResponseTimeout,
       assetPair =>
         getAndCacheDecimals(assetPair.amountAsset)
           .product(getAndCacheDecimals(assetPair.priceAsset))
           .map { case (amountAssetDecimals, priceAssetDecimals) =>
             matchingRulesCache.getDenormalizedRuleForNextOrder(assetPair, lastProcessedOffset, amountAssetDecimals, priceAssetDecimals).tickSize
-          }
+          },
+      settings.orderRestrictions
     ),
     addressDirectoryRef,
     orderDb,

@@ -1310,7 +1310,13 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       Some(crypto secureHash apiKey)
     )
     val cancelRoute = new CancelRoute(
-      settings.actorResponseTimeout,pairBuilder, addressActor.ref, () => MatcherStatus.Working, odb, Some(crypto secureHash apiKey))
+      settings.actorResponseTimeout,
+      pairBuilder,
+      addressActor.ref,
+      () => MatcherStatus.Working,
+      odb,
+      Some(crypto secureHash apiKey)
+    )
     val ratesRoute = new RatesRoute(
       pairBuilder,
       () => MatcherStatus.Working,
@@ -1319,9 +1325,19 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       testKit.spawn(WsExternalClientDirectoryActor(), s"ws-external-cd-${Random.nextInt(Int.MaxValue)}")
     )
     val historyRoute = new HistoryRoute(
-      settings.actorResponseTimeout,pairBuilder, addressActor.ref, () => MatcherStatus.Working, Some(crypto secureHash apiKey))
+      settings.actorResponseTimeout,
+      pairBuilder,
+      addressActor.ref,
+      () => MatcherStatus.Working,
+      Some(crypto secureHash apiKey)
+    )
     val balancesRoute = new BalancesRoute(
-      settings.actorResponseTimeout,pairBuilder, addressActor.ref, () => MatcherStatus.Working, Some(crypto secureHash apiKey))
+      settings.actorResponseTimeout,
+      pairBuilder,
+      addressActor.ref,
+      () => MatcherStatus.Working,
+      Some(crypto secureHash apiKey)
+    )
     val transactionsRoute = new TransactionsRoute(() => MatcherStatus.Working, odb, Some(crypto secureHash apiKey))
     val debugRoute = new DebugRoute(
       settings.actorResponseTimeout,

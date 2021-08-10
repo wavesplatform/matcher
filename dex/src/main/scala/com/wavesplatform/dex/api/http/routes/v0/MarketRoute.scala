@@ -36,9 +36,15 @@ import io.swagger.annotations._
 import javax.ws.rs.Path
 import scala.concurrent.{ExecutionContext, Future}
 
+case class Settings(settings: MatcherSettings, getActualTickSize: AssetPair => FutureResult[BigDecimal]) {
+  val timeout = settings.actorResponseTimeout
+  val orderRestrictions = settings.orderRestrictions
+}
+
 @Path("/matcher")
 @Api()
 class MarketRoute(
+  settings: Settings,
   addressActor: ActorRef,
   orderDb: OrderDb[Future],
   assetPairBuilder: AssetPairBuilder,
@@ -47,8 +53,6 @@ class MarketRoute(
   storeCommand: StoreValidatedCommand,
   orderBook: AssetPair => Option[Either[Unit, ActorRef]],
   orderBookHttpInfo: OrderBookHttpInfo,
-  getActualTickSize: AssetPair => FutureResult[BigDecimal],
-  matcherSettings: MatcherSettings,
   override val matcherStatus: () => MatcherStatus,
   override val apiKeyHash: Option[Array[Byte]]
 )(implicit mat: Materializer)
@@ -59,7 +63,7 @@ class MarketRoute(
     with ScorexLogging {
 
   implicit private val executionContext: ExecutionContext = mat.executionContext
-  implicit private val timeout: Timeout = matcherSettings.actorResponseTimeout
+  implicit private val timeout: Timeout = settings.timeout
 
   // NOTE: routes here must not change its places (especially getOrderBookRestrictions ~ getOrderStatusByPKAndIdWithSig ~ getOrderBook)
   override lazy val route: Route =
@@ -73,9 +77,9 @@ class MarketRoute(
       }
     }
 
-  private def getOrderBookRestrictions(pair: AssetPair): FutureResult[HttpOrderBookInfo] = getActualTickSize(pair).map { tickSize =>
+  private def getOrderBookRestrictions(pair: AssetPair): FutureResult[HttpOrderBookInfo] = settings.getActualTickSize(pair).map { tickSize =>
     HttpOrderBookInfo(
-      restrictions = matcherSettings.orderRestrictions.get(pair).map(HttpOrderRestrictions.fromSettings),
+      restrictions = settings.orderRestrictions.get(pair).map(HttpOrderRestrictions.fromSettings),
       matchingRules = HttpMatchingRules(tickSize = tickSize.toDouble)
     )
   }

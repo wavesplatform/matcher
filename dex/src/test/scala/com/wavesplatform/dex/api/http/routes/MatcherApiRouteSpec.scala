@@ -1352,6 +1352,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     )
 
     val marketsRoute = new MarketRoute(
+      Settings(settings, _ => liftValueAsync(BigDecimal(0.1))),
       addressActor.ref,
       odb,
       pairBuilder,
@@ -1367,8 +1368,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         case _ => None
       },
       orderBookHttpInfo,
-      _ => liftValueAsync(BigDecimal(0.1)),
-      settings,
       () => MatcherStatus.Working,
       Some(crypto secureHash apiKey)
     )

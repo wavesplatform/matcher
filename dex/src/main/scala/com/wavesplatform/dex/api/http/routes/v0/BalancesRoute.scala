@@ -23,7 +23,7 @@ import scala.concurrent.duration.FiniteDuration
 
 @Path("/matcher")
 @Api()
-class BalancesRoute(
+final class BalancesRoute(
   responseTimeout: FiniteDuration,
   assetPairBuilder: AssetPairBuilder,
   addressActor: ActorRef,

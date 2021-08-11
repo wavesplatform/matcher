@@ -23,7 +23,7 @@ import javax.ws.rs.Path
 
 @Path("/matcher")
 @Api()
-class RatesRoute(
+final class RatesRoute(
   assetPairBuilder: AssetPairBuilder,
   override val matcherStatus: () => MatcherStatus,
   override val apiKeyHash: Option[Array[Byte]],

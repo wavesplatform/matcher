@@ -30,7 +30,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 @Path("/matcher")
 @Api()
-class CancelRoute(
+final class CancelRoute(
   responseTimeout: FiniteDuration,
   assetPairBuilder: AssetPairBuilder,
   addressActor: ActorRef,
@@ -54,47 +54,6 @@ class CancelRoute(
       } ~ pathPrefix("orders") {
         matcherStatusBarrier(cancelOrdersByIdsWithKey ~ cancelOneOrderWithKey)
       }
-    }
-
-  private def handleCancelRequestToRoute(assetPair: Option[AssetPair], sender: Address, orderId: Option[ByteStr], timestamp: Option[Long]): Route =
-    complete(handleCancelRequestToFuture(assetPair, sender, orderId, timestamp): Future[ToResponseMarshallable])
-
-  private def handleCancelRequestToRoute(assetPair: Option[AssetPair]): Route =
-    withCancelRequest { req =>
-      handleCancelRequestToRoute(assetPair, req.sender, req.orderId, req.timestamp)
-    }
-
-  private val handleBatchCancelResponse: LogicResponseHandler = {
-    case AddressActor.Event.BatchCancelCompleted(xs) =>
-      HttpSuccessfulBatchCancel(
-        xs.map {
-          case (id, Right(_)) => Right(HttpSuccessfulSingleCancel(id))
-          case (_, Left(e)) => Left(HttpError.from(e, "OrderCancelRejected"))
-        }.toList
-      )
-    case x: error.MatcherError => StatusCodes.ServiceUnavailable -> HttpError.from(x, "BatchCancelRejected")
-  }
-
-  private def handleCancelRequestToFuture(
-    assetPair: Option[AssetPair],
-    sender: Address,
-    orderId: Option[ByteStr],
-    timestamp: Option[Long]
-  ): Future[ToResponseMarshallable] =
-    (timestamp, orderId) match {
-      case (Some(ts), None) =>
-        askAddressActor(addressActor, sender, AddressActor.Command.CancelAllOrders(assetPair, ts, AddressActor.Command.Source.Request))(
-          handleBatchCancelResponse
-        )
-      case (None, Some(oid)) =>
-        askAddressActor(addressActor, sender, AddressActor.Command.CancelOrder(oid, AddressActor.Command.Source.Request)) {
-          case AddressActor.Event.OrderCanceled(x) => SimpleResponse(HttpSuccessfulSingleCancel(x))
-          case x: error.MatcherError =>
-            if (x == error.CanNotPersistEvent) StatusCodes.ServiceUnavailable -> HttpError.from(x, "WavesNodeUnavailable")
-            else StatusCodes.BadRequest -> HttpError.from(x, "OrderCancelRejected")
-        }
-      case _ =>
-        Future.successful(StatusCodes.BadRequest -> HttpError.from(error.CancelRequestIsIncomplete, "OrderCancelRejected"))
     }
 
   @Path("/orderbook/{amountAsset}/{priceAsset}/cancel#cancelOneOrAllInPairOrdersWithSig")
@@ -240,6 +199,47 @@ class CancelRoute(
           }
         }
       }
+    }
+
+  private def handleCancelRequestToRoute(assetPair: Option[AssetPair], sender: Address, orderId: Option[ByteStr], timestamp: Option[Long]): Route =
+    complete(handleCancelRequestToFuture(assetPair, sender, orderId, timestamp): Future[ToResponseMarshallable])
+
+  private def handleCancelRequestToRoute(assetPair: Option[AssetPair]): Route =
+    withCancelRequest { req =>
+      handleCancelRequestToRoute(assetPair, req.sender, req.orderId, req.timestamp)
+    }
+
+  private val handleBatchCancelResponse: LogicResponseHandler = {
+    case AddressActor.Event.BatchCancelCompleted(xs) =>
+      HttpSuccessfulBatchCancel(
+        xs.map {
+          case (id, Right(_)) => Right(HttpSuccessfulSingleCancel(id))
+          case (_, Left(e)) => Left(HttpError.from(e, "OrderCancelRejected"))
+        }.toList
+      )
+    case x: error.MatcherError => StatusCodes.ServiceUnavailable -> HttpError.from(x, "BatchCancelRejected")
+  }
+
+  private def handleCancelRequestToFuture(
+    assetPair: Option[AssetPair],
+    sender: Address,
+    orderId: Option[ByteStr],
+    timestamp: Option[Long]
+  ): Future[ToResponseMarshallable] =
+    (timestamp, orderId) match {
+      case (Some(ts), None) =>
+        askAddressActor(addressActor, sender, AddressActor.Command.CancelAllOrders(assetPair, ts, AddressActor.Command.Source.Request))(
+          handleBatchCancelResponse
+        )
+      case (None, Some(oid)) =>
+        askAddressActor(addressActor, sender, AddressActor.Command.CancelOrder(oid, AddressActor.Command.Source.Request)) {
+          case AddressActor.Event.OrderCanceled(x) => SimpleResponse(HttpSuccessfulSingleCancel(x))
+          case x: error.MatcherError =>
+            if (x == error.CanNotPersistEvent) StatusCodes.ServiceUnavailable -> HttpError.from(x, "WavesNodeUnavailable")
+            else StatusCodes.BadRequest -> HttpError.from(x, "OrderCancelRejected")
+        }
+      case _ =>
+        Future.successful(StatusCodes.BadRequest -> HttpError.from(error.CancelRequestIsIncomplete, "OrderCancelRejected"))
     }
 
 }

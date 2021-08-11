@@ -20,7 +20,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 @Path("/matcher")
 @Api()
-class TransactionsRoute(
+final class TransactionsRoute(
   override val matcherStatus: () => MatcherStatus,
   orderDb: OrderDb[Future],
   override val apiKeyHash: Option[Array[Byte]]

@@ -26,7 +26,7 @@ import com.wavesplatform.dex.api.http.ApiMarshallers._
 import com.wavesplatform.dex.api.http.entities._
 import com.wavesplatform.dex.api.http.headers.{`X-Api-Key`, CustomContentTypes}
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
-import com.wavesplatform.dex.api.http.routes.v0.MarketRoute.Settings
+import com.wavesplatform.dex.api.http.routes.v0.MarketsRoute.Settings
 import com.wavesplatform.dex.api.http.routes.v0._
 import com.wavesplatform.dex.api.http.{entities, OrderBookHttpInfo}
 import com.wavesplatform.dex.api.ws.actors.WsExternalClientDirectoryActor
@@ -1352,7 +1352,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       Some(crypto secureHash apiKey)
     )
 
-    val marketsRoute = new MarketRoute(
+    val marketsRoute = new MarketsRoute(
       Settings(settings.actorResponseTimeout, _ => liftValueAsync(BigDecimal(0.1)), settings.orderRestrictions),
       addressActor.ref,
       odb,

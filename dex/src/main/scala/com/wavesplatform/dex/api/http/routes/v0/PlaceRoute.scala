@@ -29,7 +29,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 @Path("/matcher")
 @Api()
-class PlaceRoute(
+final class PlaceRoute(
   responseTimeout: FiniteDuration,
   assetPairBuilder: AssetPairBuilder,
   addressActor: ActorRef,
@@ -47,34 +47,6 @@ class PlaceRoute(
   implicit private val timeout: Timeout = responseTimeout
 
   override lazy val route: Route = pathPrefix("matcher" / "orderbook")(placeLimitOrder ~ placeMarketOrder)
-
-  // DEX-1192 docs/places-and-cancels.md
-  private def placeOrder(endpoint: Option[PathMatcher[Unit]], isMarket: Boolean): Route = {
-    val orderType = if (isMarket) "Market" else "Limit"
-    val route = (pathEndOrSingleSlash & post & withMetricsAndTraces(s"place${orderType}Order") & protect & entity(as[Order])) { order =>
-      withAssetPair(assetPairBuilder, Right(order.assetPair), formatError = e => StatusCodes.BadRequest -> HttpError.from(e, "OrderRejected")) {
-        _ =>
-          complete(
-            placeTimer.measureFuture {
-              orderValidator(order).value flatMap {
-                case Right(o) =>
-                  placeTimer.measureFuture {
-                    askAddressActor(addressActor, o.sender, AddressActor.Command.PlaceOrder(o, isMarket)) {
-                      case AddressActor.Event.OrderAccepted(x) => SimpleResponse(HttpSuccessfulPlace(x))
-                      case x: error.MatcherError =>
-                        if (x == error.CanNotPersistEvent) StatusCodes.ServiceUnavailable -> HttpError.from(x, "WavesNodeUnavailable")
-                        else StatusCodes.BadRequest -> HttpError.from(x, "OrderRejected")
-                    }
-                  }
-                case Left(e) => Future.successful[ToResponseMarshallable](StatusCodes.BadRequest -> HttpError.from(e, "OrderRejected"))
-              }
-            }
-          )
-      }
-    }
-
-    endpoint.fold(route)(path(_)(route))
-  }
 
   @Path("/orderbook#placeLimitOrder")
   @ApiOperation(
@@ -121,5 +93,33 @@ class PlaceRoute(
     )
   )
   def placeMarketOrder: Route = placeOrder(PathMatcher("market").some, isMarket = true)
+
+  // DEX-1192 docs/places-and-cancels.md
+  private def placeOrder(endpoint: Option[PathMatcher[Unit]], isMarket: Boolean): Route = {
+    val orderType = if (isMarket) "Market" else "Limit"
+    val route = (pathEndOrSingleSlash & post & withMetricsAndTraces(s"place${orderType}Order") & protect & entity(as[Order])) { order =>
+      withAssetPair(assetPairBuilder, Right(order.assetPair), formatError = e => StatusCodes.BadRequest -> HttpError.from(e, "OrderRejected")) {
+        _ =>
+          complete(
+            placeTimer.measureFuture {
+              orderValidator(order).value flatMap {
+                case Right(o) =>
+                  placeTimer.measureFuture {
+                    askAddressActor(addressActor, o.sender, AddressActor.Command.PlaceOrder(o, isMarket)) {
+                      case AddressActor.Event.OrderAccepted(x) => SimpleResponse(HttpSuccessfulPlace(x))
+                      case x: error.MatcherError =>
+                        if (x == error.CanNotPersistEvent) StatusCodes.ServiceUnavailable -> HttpError.from(x, "WavesNodeUnavailable")
+                        else StatusCodes.BadRequest -> HttpError.from(x, "OrderRejected")
+                    }
+                  }
+                case Left(e) => Future.successful[ToResponseMarshallable](StatusCodes.BadRequest -> HttpError.from(e, "OrderRejected"))
+              }
+            }
+          )
+      }
+    }
+
+    endpoint.fold(route)(path(_)(route))
+  }
 
 }

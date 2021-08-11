@@ -38,11 +38,6 @@ trait ApiRoute extends Directives with ApiMarshallers with ScorexLogging {
 
   def route: Route
 
-  def concat(route: Route, rl: Set[Route]): Route =
-    rl.fold(route) { (z, i) =>
-      z ~ i
-    }
-
   protected val invalidUserPublicKey: StandardRoute = complete(SimpleErrorResponse(StatusCodes.Forbidden, error.UserPublicKeyIsNotValid()))
 
   protected def signedGet(publicKey: PublicKey): Directive0 =

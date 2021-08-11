@@ -30,7 +30,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 @Path("/matcher")
 @Api()
-class DebugRoute(
+final class DebugRoute(
   responseTimeout: FiniteDuration,
   safeConfig: Config,
   matcher: ActorRef,

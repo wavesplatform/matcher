@@ -36,7 +36,7 @@ import io.swagger.annotations._
 import javax.ws.rs.Path
 import scala.concurrent.{ExecutionContext, Future}
 
-object MarketRoute {
+object MarketsRoute {
 
   case class Settings(
     timeout: Timeout,
@@ -48,8 +48,8 @@ object MarketRoute {
 
 @Path("/matcher")
 @Api()
-class MarketRoute(
-  settings: MarketRoute.Settings,
+class MarketsRoute(
+  settings: MarketsRoute.Settings,
   addressActor: ActorRef,
   orderDb: OrderDb[Future],
   assetPairBuilder: AssetPairBuilder,
@@ -70,7 +70,7 @@ class MarketRoute(
   implicit private val executionContext: ExecutionContext = mat.executionContext
   implicit private val timeout: Timeout = settings.timeout
 
-  // NOTE: routes here must not change its places (especially getOrderBookRestrictions ~ getOrderStatusByPKAndIdWithSig ~ getOrderBook)
+  // NOTE: routes here must not change their places (especially getOrderBookRestrictions ~ getOrderStatusByPKAndIdWithSig ~ getOrderBook)
   override lazy val route: Route =
     pathPrefix("matcher") {
       pathPrefix("orderbook") {
@@ -81,22 +81,6 @@ class MarketRoute(
         matcherStatusBarrier(getOrderStatusByAddressAndIdWithKey)
       }
     }
-
-  private def getOrderBookRestrictions(pair: AssetPair): FutureResult[HttpOrderBookInfo] = settings.getActualTickSize(pair).map { tickSize =>
-    HttpOrderBookInfo(
-      restrictions = settings.orderRestrictions.get(pair).map(HttpOrderRestrictions.fromSettings),
-      matchingRules = HttpMatchingRules(tickSize = tickSize.toDouble)
-    )
-  }
-
-  private def getOrderStatusInfo(id: Order.Id, address: Address): StandardRoute = complete {
-    askMapAddressActor[AddressActor.Reply.GetOrdersStatusInfo](addressActor, address, AddressActor.Query.GetOrderStatusInfo(id)) {
-      _.maybeOrderStatusInfo match {
-        case Some(oi) => SimpleResponse(HttpOrderBookHistoryItem.fromOrderInfo(id, oi))
-        case None => InfoNotFound(error.OrderNotFound(id))
-      }
-    }
-  }
 
   @Path("/orderbook/{amountAsset}/{priceAsset}#getOrderBook")
   @ApiOperation(
@@ -388,5 +372,21 @@ class MarketRoute(
         }
       }
     }
+
+  private def getOrderBookRestrictions(pair: AssetPair): FutureResult[HttpOrderBookInfo] = settings.getActualTickSize(pair).map { tickSize =>
+    HttpOrderBookInfo(
+      restrictions = settings.orderRestrictions.get(pair).map(HttpOrderRestrictions.fromSettings),
+      matchingRules = HttpMatchingRules(tickSize = tickSize.toDouble)
+    )
+  }
+
+  private def getOrderStatusInfo(id: Order.Id, address: Address): StandardRoute = complete {
+    askMapAddressActor[AddressActor.Reply.GetOrdersStatusInfo](addressActor, address, AddressActor.Query.GetOrderStatusInfo(id)) {
+      _.maybeOrderStatusInfo match {
+        case Some(oi) => SimpleResponse(HttpOrderBookHistoryItem.fromOrderInfo(id, oi))
+        case None => InfoNotFound(error.OrderNotFound(id))
+      }
+    }
+  }
 
 }

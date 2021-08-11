@@ -29,7 +29,7 @@ import scala.concurrent.duration.FiniteDuration
 
 @Path("/matcher")
 @Api()
-class HistoryRoute(
+final class HistoryRoute(
   responseTimeout: FiniteDuration,
   assetPairBuilder: AssetPairBuilder,
   addressActor: ActorRef,
@@ -54,26 +54,6 @@ class HistoryRoute(
       matcherStatusBarrier(getOrderHistoryByAddressWithKey)
     }
   }
-
-  private val tupledOrderBookHistoryItem: ((Id, OrderInfo[OrderStatus])) => HttpOrderBookHistoryItem =
-    Function.tupled(HttpOrderBookHistoryItem.fromOrderInfo)
-
-  private def loadOrders(address: Address, pair: Option[AssetPair], orderListType: OrderListType): Route = complete {
-    askMapAddressActor[AddressActor.Reply.GetOrderStatuses](addressActor, address, AddressActor.Query.GetOrdersStatuses(pair, orderListType)) {
-      reply =>
-        reply.xs.map(tupledOrderBookHistoryItem)
-    }
-  }
-
-  private def getOrderListType(activeOnly: Option[Boolean], closedOnly: Option[Boolean], default: OrderListType): OrderListType =
-    if (activeOnly.isEmpty && closedOnly.isEmpty) default
-    else
-      (activeOnly.getOrElse(false), closedOnly.getOrElse(false)) match {
-        case (true, true) => OrderListType.Empty
-        case (false, true) => OrderListType.ClosedOnly
-        case (true, false) => OrderListType.ActiveOnly
-        case (false, false) => OrderListType.All
-      }
 
   @Path("/orderbook/{amountAsset}/{priceAsset}/delete#deleteOrderFromHistoryById")
   @Deprecated
@@ -262,5 +242,25 @@ class HistoryRoute(
         }
       }
     }
+
+  private val tupledOrderBookHistoryItem: ((Id, OrderInfo[OrderStatus])) => HttpOrderBookHistoryItem =
+    Function.tupled(HttpOrderBookHistoryItem.fromOrderInfo)
+
+  private def loadOrders(address: Address, pair: Option[AssetPair], orderListType: OrderListType): Route = complete {
+    askMapAddressActor[AddressActor.Reply.GetOrderStatuses](addressActor, address, AddressActor.Query.GetOrdersStatuses(pair, orderListType)) {
+      reply =>
+        reply.xs.map(tupledOrderBookHistoryItem)
+    }
+  }
+
+  private def getOrderListType(activeOnly: Option[Boolean], closedOnly: Option[Boolean], default: OrderListType): OrderListType =
+    if (activeOnly.isEmpty && closedOnly.isEmpty) default
+    else
+      (activeOnly.getOrElse(false), closedOnly.getOrElse(false)) match {
+        case (true, true) => OrderListType.Empty
+        case (false, true) => OrderListType.ClosedOnly
+        case (true, false) => OrderListType.ActiveOnly
+        case (false, false) => OrderListType.All
+      }
 
 }

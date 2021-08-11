@@ -325,8 +325,8 @@ class WsMatchTxTestSuite extends WsSuiteBase with TableDrivenPropertyChecks {
 
           assertChanges(wsc)(
             (wavesNode1.api.assetsBalance(a).balances.map(b => assetBalance(b.assetId, b.balance.toDouble))
-              ++ Map(Waves -> wb)
-              ++ nftMap).toMap
+            ++ Map(Waves -> wb)
+            ++ nftMap).toMap
           )()
         }
 

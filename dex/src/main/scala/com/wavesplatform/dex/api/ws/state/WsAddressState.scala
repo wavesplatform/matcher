@@ -73,7 +73,7 @@ case class WsAddressState(
       .longValue()
 
     def mkMatchTxInfo(): Option[WsMatchTransactionInfo] = maybeMatchTx.map { matchTx =>
-    ao.amountOfPriceAsset
+      ao.amountOfPriceAsset
       WsMatchTransactionInfo(
         txId = matchTx.id(),
         timestamp = matchTx.timestamp,

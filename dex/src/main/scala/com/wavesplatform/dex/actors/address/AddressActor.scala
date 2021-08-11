@@ -1,8 +1,8 @@
 package com.wavesplatform.dex.actors.address
 
 import akka.actor.typed.scaladsl.adapter._
-import akka.actor.{Actor, ActorRef, Cancellable, Props, Stash, Status, typed}
-import akka.pattern.{CircuitBreakerOpenException, pipe}
+import akka.actor.{typed, Actor, ActorRef, Cancellable, Props, Stash, Status}
+import akka.pattern.{pipe, CircuitBreakerOpenException}
 import akka.{actor => classic}
 import cats.instances.list._
 import cats.instances.long._
@@ -144,7 +144,9 @@ class AddressActor(
 
     case command: Command.ApplyOrderBookExecuted =>
       val ownerRemainingOrders = List(command.event.counterRemaining, command.event.submittedRemaining).filter(_.order.sender.toAddress == owner)
-      log.debug(s"OrderExecuted(${ownerRemainingOrders.map(o => s"${o.id} -> ${o.status}").mkString(", ")}, tx=${command.expectedTx.transaction.id()}")
+      log.debug(
+        s"OrderExecuted(${ownerRemainingOrders.map(o => s"${o.id} -> ${o.status}").mkString(", ")}, tx=${command.expectedTx.transaction.id()}"
+      )
 
       val cumulativeDiff = ownerRemainingOrders
         .foldMap { remaining =>
@@ -844,7 +846,9 @@ object AddressActor {
       override def affectedOrders: List[AcceptedOrder] = List(event.order)
     }
 
-    case class ApplyOrderBookExecuted(event: Events.OrderExecuted, expectedTx: ExchangeTransactionResult[ExchangeTransactionV2]) extends Command with HasOrderBookEvent {
+    case class ApplyOrderBookExecuted(event: Events.OrderExecuted, expectedTx: ExchangeTransactionResult[ExchangeTransactionV2])
+        extends Command
+        with HasOrderBookEvent {
       override def affectedOrders: List[AcceptedOrder] = List(event.counter, event.submitted)
     }
 

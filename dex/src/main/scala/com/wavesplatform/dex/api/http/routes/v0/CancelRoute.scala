@@ -84,7 +84,6 @@ final class CancelRoute(
       (withMetricsAndTraces("cancelOneOrAllInPairOrdersWithSig") & protect) {
         withAssetPair(assetPairBuilder, pairOrError, formatError = e => OrderCancelRejected(e)) { pair =>
           handleCancelRequestToRoute(Some(pair))
-
         }
       }
     }

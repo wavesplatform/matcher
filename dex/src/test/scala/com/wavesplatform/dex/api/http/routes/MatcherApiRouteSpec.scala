@@ -1268,8 +1268,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
           okOrder.matcherFee,
           0.003.waves,
           System.currentTimeMillis
-        )
-        .explicitGet()
+        ).transaction
     )
 
     val testKit = ActorTestKit()

@@ -2,15 +2,18 @@ package com.wavesplatform.dex.api.ws.state
 
 import akka.actor.typed.ActorRef
 import cats.syntax.option._
-import com.wavesplatform.dex.api.ws.entities.{WsAddressBalancesFilter, WsAssetInfo, WsBalances, WsOrder}
+import com.wavesplatform.dex.api.ws.entities.{WsAddressBalancesFilter, WsAssetInfo, WsBalances, WsMatchTransactionInfo, WsOrder}
 import com.wavesplatform.dex.api.ws.protocol.WsAddressChanges
 import com.wavesplatform.dex.api.ws.state.WsAddressState.Subscription
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.model.Denormalization._
 import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.model.{AcceptedOrder, OrderStatus}
+
+import java.math.{BigDecimal, RoundingMode}
 
 case class WsAddressState(
   address: Address,
@@ -54,11 +57,31 @@ case class WsAddressState(
       update = ordersChanges.getOrElse(id, WsOrder(id)).copy(status = newStatus.name.some)
     )
 
-  def putOrderFillingInfoAndStatusNameUpdate(ao: AcceptedOrder, newStatus: OrderStatus)(implicit efc: ErrorFormatterContext): WsAddressState = {
-
+  def putOrderFillingInfoAndStatusNameUpdate(
+    ao: AcceptedOrder,
+    newStatus: OrderStatus,
+    maybeMatchTx: Option[ExchangeTransaction] = None
+  )(implicit efc: ErrorFormatterContext): WsAddressState = {
     val ad = efc.unsafeAssetDecimals(ao.order.assetPair.amountAsset)
     val pd = efc.unsafeAssetDecimals(ao.order.assetPair.priceAsset)
     val fd = efc.unsafeAssetDecimals(ao.feeAsset)
+
+    def calcAmountOfPriceAssets(amount: Long, price: Long): Long = BigDecimal.valueOf(amount)
+      .multiply(BigDecimal.valueOf(price))
+      .scaleByPowerOfTen(-Order.PriceConstantExponent)
+      .setScale(0, RoundingMode.FLOOR)
+      .longValue()
+
+    def mkMatchTxInfo(): Option[WsMatchTransactionInfo] = maybeMatchTx.map { matchTx =>
+    ao.amountOfPriceAsset
+      WsMatchTransactionInfo(
+        txId = matchTx.id(),
+        timestamp = matchTx.timestamp,
+        price = denormalizePrice(matchTx.price, ad, pd).toDouble,
+        executedAmountAssets = denormalizeAmountAndFee(matchTx.amount, ad).toDouble,
+        executedPriceAssets = denormalizeAmountAndFee(calcAmountOfPriceAssets(matchTx.amount, matchTx.price), pd).toDouble
+      )
+    }
 
     putOrderUpdate(
       id = ao.id,
@@ -69,7 +92,8 @@ case class WsAddressState(
           filledAmount = ao.fillingInfo.filledAmount.some.map(denormalizeAmountAndFee(_, ad).toDouble),
           filledFee = ao.fillingInfo.filledFee.some.map(denormalizeAmountAndFee(_, fd).toDouble),
           avgWeighedPrice = ao.fillingInfo.avgWeighedPrice.some.map(denormalizePrice(_, ad, pd).toDouble),
-          totalExecutedPriceAssets = ao.fillingInfo.totalExecutedPriceAssets.some.map(denormalizePrice(_, ad, pd).toDouble)
+          totalExecutedPriceAssets = ao.fillingInfo.totalExecutedPriceAssets.some.map(denormalizePrice(_, ad, pd).toDouble),
+          matchTxInfo = mkMatchTxInfo()
         )
     )
   }

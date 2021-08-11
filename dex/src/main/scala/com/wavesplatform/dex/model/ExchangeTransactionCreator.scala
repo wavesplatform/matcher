@@ -3,9 +3,8 @@ package com.wavesplatform.dex.model
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
-import com.wavesplatform.dex.domain.error.ValidationError
 import com.wavesplatform.dex.domain.order.Order
-import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionV2}
+import com.wavesplatform.dex.domain.transaction.{ExchangeTransactionResult, ExchangeTransactionV2}
 import com.wavesplatform.dex.model.Events.OrderExecuted
 import com.wavesplatform.dex.model.ExchangeTransactionCreator._
 
@@ -16,7 +15,7 @@ class ExchangeTransactionCreator(
   hasAssetScript: IssuedAsset => Boolean
 ) {
 
-  def createTransaction(orderExecutedEvent: OrderExecuted): Either[ValidationError, ExchangeTransaction] = {
+  def createTransaction(orderExecutedEvent: OrderExecuted): ExchangeTransactionResult[ExchangeTransactionV2] = {
     import orderExecutedEvent.{counter, executedAmount, submitted, timestamp}
     val (buy, sell) = Order.splitByType(submitted.order, counter.order)
 
@@ -46,7 +45,7 @@ class ExchangeTransactionCreator(
 
 object ExchangeTransactionCreator {
 
-  type CreateTransaction = OrderExecuted => Either[ValidationError, ExchangeTransaction]
+  type CreateTransaction = OrderExecuted => ExchangeTransactionResult[ExchangeTransactionV2]
 
   /**
    * This function is used for the following purposes:

@@ -10,7 +10,6 @@ import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.model.Normalization
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionV2}
-import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.it.config.GenesisConfig
 import com.wavesplatform.dex.it.config.PredefinedAccounts.matcher
 import com.wavesplatform.dex.it.waves.Implicits._
@@ -268,8 +267,7 @@ trait MkWavesEntities {
         sellMatcherFee = sellOrder.matcherFee,
         fee = matcherFee,
         timestamp = timestamp
-      )
-      .explicitGet()
+      ).transaction
   }
 
   def mkBurn(

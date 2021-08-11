@@ -6,7 +6,6 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.deser.EntityParser.{ConsumedBytesOffset, Stateful}
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.crypto.Proofs
-import com.wavesplatform.dex.domain.error.ValidationError
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction._
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
@@ -65,8 +64,8 @@ object ExchangeTransactionV2 extends ExchangeTransactionParser[ExchangeTransacti
     sellMatcherFee: Long,
     fee: Long,
     timestamp: Long
-  ): Either[ValidationError, ExchangeTransactionV2] =
-    create(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, Proofs.empty).map { unverified =>
+  ): ExchangeTransactionResult[ExchangeTransactionV2] =
+    create(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, Proofs.empty).transformTx { unverified =>
       unverified.copy(proofs = Proofs(List(ByteStr(crypto.sign(matcher, unverified.bodyBytes())))))
     }
 
@@ -80,19 +79,20 @@ object ExchangeTransactionV2 extends ExchangeTransactionParser[ExchangeTransacti
     fee: Long,
     timestamp: Long,
     proofs: Proofs
-  ): Either[ValidationError, ExchangeTransactionV2] =
-    validateExchangeParams(
-      buyOrder,
-      sellOrder,
-      amount,
-      price,
-      buyMatcherFee,
-      sellMatcherFee,
-      fee,
-      timestamp
-    ).map { _ =>
+  ): ExchangeTransactionResult[ExchangeTransactionV2] =
+    ExchangeTransactionResult.fromEither(
+      validateExchangeParams(
+        buyOrder,
+        sellOrder,
+        amount,
+        price,
+        buyMatcherFee,
+        sellMatcherFee,
+        fee,
+        timestamp
+      ),
       ExchangeTransactionV2(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, proofs)
-    }
+    )
 
   override protected def parseHeader(bytes: Array[Byte]): Try[Int] = Try {
 

@@ -7,7 +7,6 @@ import com.wavesplatform.dex.domain.crypto.Proofs
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.OrderOps._
 import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV2
-import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
@@ -44,7 +43,7 @@ class ExchangeTransactionCreatorSpecification
             val tc = getExchangeTransactionCreator()
             val oe = mkOrderExecutedRaw(submitted, counter)
 
-            tc.createTransaction(oe).explicitGet() shouldBe a[ExchangeTransactionV2]
+            tc.createTransaction(oe).transaction shouldBe a[ExchangeTransactionV2]
           }
         case _ => throw new RuntimeException("Unexpected list")
       }
@@ -72,7 +71,7 @@ class ExchangeTransactionCreatorSpecification
         case (buyOrder, sellOrder) =>
           val tc = getExchangeTransactionCreator()
           val oe = mkOrderExecutedRaw(buyOrder, sellOrder)
-          val tx = tc.createTransaction(oe).explicitGet()
+          val tx = tc.createTransaction(oe).transaction
 
           tx.buyMatcherFee shouldBe oe.submittedExecutedFee
           tx.sellMatcherFee shouldBe oe.counterExecutedFee

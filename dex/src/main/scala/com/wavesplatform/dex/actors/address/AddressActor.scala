@@ -1,12 +1,13 @@
 package com.wavesplatform.dex.actors.address
 
 import akka.actor.typed.scaladsl.adapter._
-import akka.actor.{typed, Actor, ActorRef, Cancellable, Props, Stash, Status}
-import akka.pattern.{pipe, CircuitBreakerOpenException}
+import akka.actor.{Actor, ActorRef, Cancellable, Props, Stash, Status, typed}
+import akka.pattern.{CircuitBreakerOpenException, pipe}
 import akka.{actor => classic}
 import cats.instances.list._
-import cats.instances.long.catsKernelStdGroupForLong
+import cats.instances.long._
 import cats.syntax.either._
+import cats.syntax.option._
 import cats.syntax.foldable._
 import cats.syntax.group.catsSyntaxGroup
 import com.wavesplatform.dex.actors.address.AddressActor.Settings.default
@@ -23,7 +24,7 @@ import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.model.Denormalization.denormalizeAmountAndFee
 import com.wavesplatform.dex.domain.order.Order
-import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
+import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionResult, ExchangeTransactionV2}
 import com.wavesplatform.dex.domain.utils.{LoggerFacade, ScorexLogging}
 import com.wavesplatform.dex.effect.Implicits.FutureOps
 import com.wavesplatform.dex.error
@@ -134,7 +135,7 @@ class AddressActor(
       }
 
       scheduleExpiration(order.order)
-      scheduleOrderWs(order, order.status, unmatchable = false)
+      scheduleOrderWs(order, order.status, unmatchable = false, maybeMatchTx = None)
 
       if (isWorking) pendingCommands.remove(order.id).foreach { command =>
         log.trace(s"Confirming placement for ${order.id}")
@@ -143,11 +144,12 @@ class AddressActor(
 
     case command: Command.ApplyOrderBookExecuted =>
       val ownerRemainingOrders = List(command.event.counterRemaining, command.event.submittedRemaining).filter(_.order.sender.toAddress == owner)
-      log.debug(s"OrderExecuted(${ownerRemainingOrders.map(o => s"${o.id} -> ${o.status}").mkString(", ")}, tx=${command.expectedTx.map(_.id())}")
+      log.debug(s"OrderExecuted(${ownerRemainingOrders.map(o => s"${o.id} -> ${o.status}").mkString(", ")}, tx=${command.expectedTx.transaction.id()}")
 
       val cumulativeDiff = ownerRemainingOrders
         .foldMap { remaining =>
-          scheduleOrderWs(remaining, remaining.status, unmatchable = false)
+          log.info(s"Got expectedTx ${command.expectedTx}")
+          scheduleOrderWs(remaining, remaining.status, unmatchable = false, maybeMatchTx = command.expectedTx.transaction.some)
 
           remaining.status match {
             case status: OrderStatus.Final =>
@@ -172,7 +174,7 @@ class AddressActor(
         }
         .filterNot(_._2 == 0) // Fee could be 0 if an order executed by a small amount
 
-      val (updated, changedAssets) = balances.withExecuted(command.expectedTx.map(_.id()), NegativeMap(cumulativeDiff))
+      val (updated, changedAssets) = balances.withExecuted(command.expectedTx.toOptionTx.map(_.id()), NegativeMap(cumulativeDiff))
       balances = updated
       scheduleWs(wsAddressState.putChangedAssets(changedAssets))
 
@@ -211,7 +213,7 @@ class AddressActor(
           scheduleWs(wsAddressState.putChangedAssets(orderReserve.keySet))
           log.info(s"[Balance] 2. 💵: ${format(balances.tradableBalance(orderReserve.keySet).xs)}; ov Δ: ${format(orderReserve)}")
 
-          scheduleOrderWs(acceptedOrder, orderStatus, unmatchable)
+          scheduleOrderWs(acceptedOrder, orderStatus, unmatchable, maybeMatchTx = None)
       }
 
       if (isWorking) pendingCommands.remove(id).foreach { pc =>
@@ -624,14 +626,19 @@ class AddressActor(
       order.id() -> context.system.scheduler.scheduleOnce(timeToExpiration.millis, self, CancelExpiredOrder(order.id()))
   }
 
-  private def scheduleOrderWs(remaining: AcceptedOrder, status: OrderStatus, unmatchable: Boolean): Unit = scheduleWs {
+  private def scheduleOrderWs(
+    remaining: AcceptedOrder,
+    status: OrderStatus,
+    unmatchable: Boolean,
+    maybeMatchTx: Option[ExchangeTransaction]
+  ): Unit = scheduleWs {
     status match {
       case OrderStatus.Accepted => wsAddressState.putOrderUpdate(remaining.id, WsOrder.fromDomain(remaining, status))
       case _: OrderStatus.Cancelled => wsAddressState.putOrderStatusNameUpdate(remaining.id, status)
       case _ =>
         // unmatchable can be only if OrderStatus.Filled
         if (unmatchable) wsAddressState.putOrderStatusNameUpdate(remaining.id, status)
-        else wsAddressState.putOrderFillingInfoAndStatusNameUpdate(remaining, status)
+        else wsAddressState.putOrderFillingInfoAndStatusNameUpdate(remaining, status, maybeMatchTx)
     }
   }
 
@@ -837,9 +844,7 @@ object AddressActor {
       override def affectedOrders: List[AcceptedOrder] = List(event.order)
     }
 
-    case class ApplyOrderBookExecuted(event: Events.OrderExecuted, expectedTx: Option[ExchangeTransaction])
-        extends Command
-        with HasOrderBookEvent {
+    case class ApplyOrderBookExecuted(event: Events.OrderExecuted, expectedTx: ExchangeTransactionResult[ExchangeTransactionV2]) extends Command with HasOrderBookEvent {
       override def affectedOrders: List[AcceptedOrder] = List(event.counter, event.submitted)
     }
 

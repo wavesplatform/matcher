@@ -4,8 +4,9 @@ import cats.syntax.either._
 import com.softwaremill.diffx.{Derived, Diff}
 import com.wavesplatform.dex.api.ws.connection.WsConnection
 import com.wavesplatform.dex.api.ws.connection.WsConnection.WsRawMessage
-import com.wavesplatform.dex.api.ws.entities.WsFullOrder
+import com.wavesplatform.dex.api.ws.entities.{WsFullOrder, WsMatchTransactionInfo}
 import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsError, WsOrderBookChanges, WsPingOrPong, WsServerMessage}
+import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.it.api.websockets.HasWebSockets
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 
@@ -20,6 +21,12 @@ trait WsSuiteBase extends MatcherSuiteBase with HasWebSockets with DiffMatcherWi
     Diff.gen[WsAddressChanges].value
       .ignore[WsAddressChanges, Long](_.timestamp)
       .ignore[WsAddressChanges, Long](_.updateId)
+  )
+
+  implicit protected val wsMatchTransactionInfoDiff: Derived[Diff[WsMatchTransactionInfo]] = Derived(
+    Diff.gen[WsMatchTransactionInfo].value
+      .ignore[WsMatchTransactionInfo, ByteStr](_.txId)
+      .ignore[WsMatchTransactionInfo, Long](_.timestamp)
   )
 
   implicit protected val wsOrderBookChangesDiff: Derived[Diff[WsOrderBookChanges]] =

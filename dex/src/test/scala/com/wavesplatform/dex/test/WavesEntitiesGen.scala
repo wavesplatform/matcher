@@ -6,7 +6,6 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionV2}
-import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.gen._
 import org.scalacheck.Gen
 import org.scalatest.enablers.Emptiness
@@ -135,8 +134,7 @@ trait WavesEntitiesGen {
           sellMatcherFee = sellOrder.matcherFee,
           fee = fee,
           timestamp = timestamp
-        )
-        .explicitGet()
+        ).transaction
     }
   }
 
@@ -173,8 +171,7 @@ trait WavesEntitiesGen {
         sellMatcherFee = sellOrder.matcherFee,
         fee = defaultWavesFee,
         timestamp = timestamp
-      )
-      .explicitGet()
+      ).transaction
   }
 
 }

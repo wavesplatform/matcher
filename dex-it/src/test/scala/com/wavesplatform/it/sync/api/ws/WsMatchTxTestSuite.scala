@@ -2,10 +2,9 @@ package com.wavesplatform.it.sync.api.ws
 
 import cats.syntax.option._
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.Implicits.releasable
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus
 import com.wavesplatform.dex.api.ws.connection.WsConnection
-import com.wavesplatform.dex.api.ws.entities.{WsAddressBalancesFilter, WsBalances, WsMatchTransactionInfo, WsOrder}
+import com.wavesplatform.dex.api.ws.entities.{WsAddressBalancesFilter, WsBalances, WsOrder}
 import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsAddressSubscribe, WsError, WsUnsubscribe}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.account.KeyPair.toAddress
@@ -16,8 +15,8 @@ import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.error.{AddressAndPublicKeyAreIncompatible, SubscriptionTokenExpired, SubscriptionsLimitReached}
 import com.wavesplatform.dex.it.test.Scripts
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
+import com.wavesplatform.dex.Implicits.releasable
 import com.wavesplatform.dex.model.{LimitOrder, MarketOrder, OrderStatus}
-import com.wavesplatform.dex.tool.Using._
 import com.wavesplatform.it.WsSuiteBase
 import org.scalatest.prop.TableDrivenPropertyChecks
 
@@ -26,28 +25,22 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.Using
 
-class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChecks {
+class WsMatchTxTestSuite extends WsSuiteBase with TableDrivenPropertyChecks {
 
   override protected val dexInitialSuiteConfig: Config = ConfigFactory
     .parseString(s"""waves.dex {
-                    |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
-                    |  web-sockets.external-client-handler.subscriptions.max-address-number = 3
+                    |  price-assets = [ "$UsdId", "WAVES" ]
                     |}""".stripMargin)
     .withFallback(jwtPublicKeyConfig)
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
-    broadcastAndAwait(IssueBtcTx, IssueUsdTx)
+    broadcastAndAwait(IssueUsdTx)
     dex1.start()
     dex1.api.upsertAssetRate(usd, 1)
   }
 
   override def afterEach(): Unit = dex1.api.cancelAllOrdersWithSig(alice)
-
-  private def mkWsAddressConnection(account: KeyPair): WsConnection = mkWsAddressConnection(account, dex1)
-
-  private def mkWsAddressFilteredConnection(account: KeyPair, filters: Set[WsAddressBalancesFilter] = Set.empty): WsConnection =
-    mkWsAddressConnection(account, dex1, filters = filters)
 
   "Address stream should" - {
 
@@ -55,7 +48,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
       val fooAddress = mkKeyPair("foo").toAddress
       val barKeyPair = mkKeyPair("bar")
 
-      Using.resource(mkDexWsConnection(dex1)) { wsc =>
+      Using(mkDexWsConnection(dex1)) { wsc =>
         wsc.send(
           WsAddressSubscribe(
             fooAddress,
@@ -78,14 +71,14 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
     "stop send updates after closing by user and resend after user open it again" in {
       val acc = mkAccountWithBalance(10.waves -> Waves)
       val wsc = mkWsAddressConnection(acc, dex1)
-      Using.resource(wsc) { wsc =>
+      Using(wsc) { wsc =>
         eventually(wsc.balanceChanges should have size 1)
       }
 
       broadcastAndAwait(mkTransfer(alice, acc.toAddress, 2.usd, usd, feeAmount = 1.waves))
       wsc.balanceChanges should have size 1
 
-      Using.resource(mkWsAddressConnection(acc, dex1)) { wsc2 =>
+      Using(mkWsAddressConnection(acc, dex1)) { wsc2 =>
         eventually(wsc2.balanceChanges should have size 1)
       }
     }
@@ -93,7 +86,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
     "stop send updates after unsubscribe and receive them again after subscribe" in {
       val acc = mkAccountWithBalance(10.waves -> Waves)
 
-      Using.resource(mkWsAddressConnection(acc, dex1)) { wsc =>
+      Using(mkWsAddressConnection(acc, dex1)) { wsc =>
         wsc.receiveAtLeastN[WsAddressChanges](1)
         wsc.clearMessages()
 
@@ -117,7 +110,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
       "when account is empty" in {
         val account = mkKeyPair("Test")
-        Using.resource(mkWsAddressConnection(account)) { wsac =>
+        Using(mkWsAddressConnection(account)) { wsac =>
           val addressState = wsac.receiveAtLeastN[WsAddressChanges](1).head
           addressState.address shouldBe account.toAddress
           assertChanges(wsac, squash = false)()()
@@ -128,7 +121,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
         val acc = mkAccountWithBalance(150.usd -> usd, 10.waves -> Waves)
 
-        Using.resource(mkWsAddressConnection(acc)) { wsc =>
+        Using(mkWsAddressConnection(acc)) { wsc =>
           assertChanges(wsc, squash = false)(Map(Waves -> WsBalances(10, 0), usd -> WsBalances(150.0, 0.0)))()
 
           val bo1 = mkOrderDP(acc, wavesUsdPair, BUY, 100.waves, 1.0)
@@ -160,7 +153,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
         val tradableBalance: Map[Asset, Long] = Map(Waves -> 51.003.waves)
         val acc = mkAccountWithBalance(tradableBalance(Waves) -> Waves)
-        Using.resource(mkWsAddressConnection(acc)) { wsc =>
+        Using(mkWsAddressConnection(acc)) { wsc =>
           val smo = mkOrderDP(acc, wavesUsdPair, SELL, 50.waves, 1.0)
           val mo = MarketOrder(smo, tradableBalance.apply _)
 
@@ -215,7 +208,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
       "when user's order is fully filled with another one" in {
 
         val acc = mkAccountWithBalance(10.usd -> usd, 10.waves -> Waves)
-        Using.resource(mkWsAddressConnection(acc)) { wsc =>
+        Using(mkWsAddressConnection(acc)) { wsc =>
 
           assertChanges(wsc, squash = false)(Map(Waves -> WsBalances(10, 0), usd -> WsBalances(10, 0)))()
 
@@ -248,7 +241,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
       "when user's order is partially filled with another one" in {
 
         val acc = mkAccountWithBalance(10.usd -> usd, 10.waves -> Waves)
-        Using.resource(mkWsAddressConnection(acc)) { wsc =>
+        Using(mkWsAddressConnection(acc)) { wsc =>
           assertChanges(wsc, squash = false)(Map(Waves -> WsBalances(10, 0), usd -> WsBalances(10, 0)))()
 
           val bo = mkOrderDP(acc, wavesUsdPair, BUY, 10.waves, 1.0)
@@ -299,7 +292,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
       "when user make a transfer" in {
 
         val acc = mkAccountWithBalance(10.waves -> Waves, 10.usd -> usd)
-        Using.resource(mkWsAddressConnection(acc)) { wsc =>
+        Using(mkWsAddressConnection(acc)) { wsc =>
           assertChanges(wsc, squash = false)(Map(Waves -> WsBalances(10, 0), usd -> WsBalances(10, 0)))()
           broadcastAndAwait(mkTransfer(acc, alice.toAddress, 2.usd, usd, feeAmount = 1.waves))
           assertChanges(wsc)(Map(Waves -> WsBalances(9, 0), usd -> WsBalances(8, 0)))()
@@ -310,7 +303,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
       "user issued a new asset after establishing the connection" in {
 
         val acc = mkAccountWithBalance(10.waves -> Waves)
-        Using.resource(mkWsAddressConnection(acc)) { wsc =>
+        Using(mkWsAddressConnection(acc)) { wsc =>
 
           assertChanges(wsc, squash = false)(Map(Waves -> WsBalances(10, 0)))()
           val IssueResults(txIssue, _, issuedAsset) = mkIssueExtended(acc, "testAsset", 1000.asset8)
@@ -332,8 +325,8 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
           assertChanges(wsc)(
             (wavesNode1.api.assetsBalance(a).balances.map(b => assetBalance(b.assetId, b.balance.toDouble))
-            ++ Map(Waves -> wb)
-            ++ nftMap).toMap
+              ++ Map(Waves -> wb)
+              ++ nftMap).toMap
           )()
         }
 
@@ -344,12 +337,12 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           broadcastAndAwait(mkIssue(acc, "testAssetNT", 1L, 0))
 
           step("should be in the address stream")
-          Using.resource(mkWsAddressConnection(acc)) { wsc =>
+          Using(mkWsAddressConnection(acc)) { wsc =>
             validateBalances(wsc, WsBalances(9, 0), acc)
           }
 
           step("shouldn't be in the filtered address stream")
-          Using.resource(mkWsAddressFilteredConnection(acc, Set(WsAddressBalancesFilter.ExcludeNft))) { wsc =>
+          Using(mkWsAddressFilteredConnection(acc, Set(WsAddressBalancesFilter.ExcludeNft))) { wsc =>
             validateBalances(wsc, WsBalances(9, 0), acc, hasNft = false)
           }
 
@@ -387,12 +380,12 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           broadcastAndAwait(mkInvokeScript(alice, dapp, fee = 1.005.waves))
 
           step("should be in the address stream")
-          Using.resource(mkWsAddressConnection(dapp)) { wsc =>
+          Using(mkWsAddressConnection(dapp)) { wsc =>
             validateBalances(wsc, WsBalances(100, 0), dapp)
           }
 
           step("shouldn't be in the filtered address stream")
-          Using.resource(mkWsAddressFilteredConnection(dapp, Set(WsAddressBalancesFilter.ExcludeNft))) { wsc =>
+          Using(mkWsAddressFilteredConnection(dapp, Set(WsAddressBalancesFilter.ExcludeNft))) { wsc =>
             validateBalances(wsc, WsBalances(100, 0), dapp, hasNft = false)
           }
         }
@@ -432,12 +425,12 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           broadcastAndAwait(mkInvokeScript(acc, dapp, fee = 1.005.waves))
 
           step("should be in the address stream")
-          Using.resource(mkWsAddressConnection(acc)) { wsc =>
+          Using(mkWsAddressConnection(acc)) { wsc =>
             validateBalances(wsc, WsBalances(8.995, 0), acc)
           }
 
           step("shouldn't be in the filtered address stream")
-          Using.resource(mkWsAddressFilteredConnection(acc, Set(WsAddressBalancesFilter.ExcludeNft))) { wsc =>
+          Using(mkWsAddressFilteredConnection(acc, Set(WsAddressBalancesFilter.ExcludeNft))) { wsc =>
             validateBalances(wsc, WsBalances(8.995, 0), acc, hasNft = false)
           }
         }
@@ -447,13 +440,13 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           val acc = mkAccountWithBalance(10.waves -> Waves)
 
           step("should be in the address stream")
-          Using.resource(mkWsAddressConnection(acc)) { wsc =>
+          Using(mkWsAddressConnection(acc)) { wsc =>
             broadcast(mkIssue(acc, "testAssetNT", 1L, 0))
             validateBalances(wsc, WsBalances(9, 0), acc)
           }
 
           step("shouldn't be in the filtered address stream")
-          Using.resource(mkWsAddressFilteredConnection(acc, Set(WsAddressBalancesFilter.ExcludeNft))) { wsc2 =>
+          Using(mkWsAddressFilteredConnection(acc, Set(WsAddressBalancesFilter.ExcludeNft))) { wsc2 =>
             broadcast(mkIssue(acc, "testAssetNT", 1L, 0))
             validateBalances(wsc2, WsBalances(8, 0), acc, hasNft = false)
           }
@@ -467,7 +460,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
         broadcastAndAwait(txIssue)
 
-        Using.resource(mkWsAddressConnection(acc)) { wsc =>
+        Using(mkWsAddressConnection(acc)) { wsc =>
           assertChanges(wsc)(
             Map(Waves -> WsBalances(9, 0)),
             Map(issuedAsset -> WsBalances(1000, 0))
@@ -478,7 +471,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
       "user burnt part of the asset amount" in {
 
         val acc = mkAccountWithBalance(10.waves -> Waves, 20.usd -> usd)
-        Using.resource(mkWsAddressConnection(acc)) { wsc =>
+        Using(mkWsAddressConnection(acc)) { wsc =>
           assertChanges(wsc, squash = false)(Map(Waves -> WsBalances(10, 0), usd -> WsBalances(20, 0)))()
           broadcastAndAwait(mkBurn(acc, usd, 10.usd))
 
@@ -492,7 +485,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
       "user burnt all of the asset amount" in {
 
         val acc = mkAccountWithBalance(10.waves -> Waves, 20.usd -> usd)
-        Using.resource(mkWsAddressConnection(acc)) { wsc =>
+        Using(mkWsAddressConnection(acc)) { wsc =>
           assertChanges(wsc, squash = false)(Map(Waves -> WsBalances(10, 0), usd -> WsBalances(20, 0)))()
           broadcastAndAwait(mkBurn(acc, usd, 20.usd))
 
@@ -503,32 +496,12 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
         }
       }
     }
-
-    "send matchTxInfo on order executions" - {
-
-      "when order partially filled" in {
-        val acc = mkAccountWithBalance(100.usd -> usd, 50.waves -> Waves)
-        Using(mkWsAddressConnection(acc)) { wsc =>
-          assertChanges(wsc, squash = false)(Map(Waves -> WsBalances(50, 0), usd -> WsBalances(100, 0)))()
-
-          val order = mkOrder(acc, wavesUsdPair, OrderType.SELL, 10.usd, 1.waves)
-          placeAndAwaitAtDex(order)
-
-          assertChanges(wsc)(Map(usd -> WsBalances(90, 10), Waves -> WsBalances(9.997, 0.003)))(WsOrder.fromDomain(LimitOrder(order)))
-
-          val firstCounterOrder = mkOrder(alice, wavesUsdPair, OrderType.BUY, 4.5.usd, 1.waves)
-          placeAndAwaitAtDex(firstCounterOrder, Status.Filled)
-
-          assertChanges(wsc)(Map.empty)(WsOrder(order.id()).copy(matchTxInfo = WsMatchTransactionInfo(ByteStr.empty, 0L, 1, 4.5, 4.5).some))
-        }
-      }
-    }
   }
 
   "Second connection should get the actual data" in {
 
     val acc = mkAccountWithBalance(500.usd -> usd, 10.waves -> Waves)
-    Using.resource(mkWsAddressConnection(acc, dex1)) { wsc1 =>
+    Using(mkWsAddressConnection(acc, dex1)) { wsc1 =>
       assertChanges(wsc1, squash = false)(Map(Waves -> WsBalances(10, 0), usd -> WsBalances(500, 0)))()
 
       val now = System.currentTimeMillis()
@@ -549,7 +522,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
         WsOrder.fromDomain(LimitOrder(bo2))
       )
 
-      Using.resource(mkWsAddressConnection(acc, dex1)) { wsc2 =>
+      Using(mkWsAddressConnection(acc, dex1)) { wsc2 =>
         assertChanges(wsc2)(Map(Waves -> WsBalances(9.994, 0.006), usd -> WsBalances(300, 200)))(
           WsOrder.fromDomain(LimitOrder(bo1)),
           WsOrder.fromDomain(LimitOrder(bo2))
@@ -561,22 +534,22 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
   "Zero balances should not be in initial message" in {
     val acc = mkAccountWithBalance(10.waves -> Waves, 10.usd -> usd)
-    Using.resource(mkWsAddressConnection(acc)) { wsc =>
+    Using(mkWsAddressConnection(acc)) { wsc =>
       assertChanges(wsc, squash = false)(Map(Waves -> WsBalances(10, 0), usd -> WsBalances(10, 0)))()
     }
 
-    broadcastAndAwait(mkBurn(acc, usd, 10.usd))
-    Using.resource(mkWsAddressConnection(acc)) { wsc =>
+    Using(mkWsAddressConnection(acc)) { wsc =>
+      broadcastAndAwait(mkBurn(acc, usd, 10.usd))
       assertChanges(wsc, squash = false)(Map(Waves -> WsBalances(9, 0)))()
     }
 
-    broadcastAndAwait(mkTransfer(alice, acc, 5.usd, usd, 1.waves))
-    Using.resource(mkWsAddressConnection(acc)) { wsc =>
+    Using(mkWsAddressConnection(acc)) { wsc =>
+      broadcastAndAwait(mkTransfer(alice, acc, 5.usd, usd, 1.waves))
       assertChanges(wsc, squash = false)(Map(Waves -> WsBalances(9, 0), usd -> WsBalances(5, 0)))()
     }
 
-    broadcastAndAwait(mkTransfer(acc, alice, 5.usd, usd, 1.waves))
-    Using.resource(mkWsAddressConnection(acc)) { wsc =>
+    Using(mkWsAddressConnection(acc)) { wsc =>
+      broadcastAndAwait(mkTransfer(acc, alice, 5.usd, usd, 1.waves))
       assertChanges(wsc, squash = false)(Map(Waves -> WsBalances(8, 0)))()
     }
   }
@@ -584,7 +557,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
   "Subscription should be cancelled after jwt expiration" in {
 
     val acc = mkAccountWithBalance(10.waves -> Waves)
-    Using.resource(mkWsAddressConnection(acc, dex1, subscriptionLifetime = 3.seconds)) { wsc =>
+    Using(mkWsAddressConnection(acc, dex1, subscriptionLifetime = 3.seconds)) { wsc =>
       wsc.receiveAtLeastN[WsAddressChanges](1) // snapshot
       wsc.receiveAtLeastN[WsError](1).head should matchTo(
         WsError(
@@ -664,7 +637,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
     "DEX-818" - {
       "Connections can affect each other" in {
-        Using.Manager.unsafe { use =>
+        Using.Manager { use =>
           val wscs = use((1 to 10).map(_ => mkWsAddressConnection(bob)))
           val mainWsc = use(mkWsAddressConnection(bob))
 
@@ -693,7 +666,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
       "Negative balances" in {
         val carol = mkAccountWithBalance(5.waves -> Waves)
-        Using.resource(mkWsAddressConnection(carol)) { wsc =>
+        Using(mkWsAddressConnection(carol)) { wsc =>
           val now = System.currentTimeMillis()
           val txs = (1 to 2).map { i =>
             mkTransfer(carol, alice, 5.waves - minFee, Waves, minFee, timestamp = now + i)
@@ -719,7 +692,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
     "DEX-827 Wrong balance" in {
       val btcBalance = 461
       val carol = mkAccountWithBalance(25.waves -> Waves, btcBalance.btc -> btc)
-      Using.resource(mkWsAddressConnection(carol)) { wsc =>
+      Using(mkWsAddressConnection(carol)) { wsc =>
 
         val now = System.currentTimeMillis()
         val order1 = mkOrderDP(carol, wavesBtcPair, BUY, 4.7.waves, 6, matcherFee = 0.003.waves, ts = now + 1)
@@ -779,7 +752,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
     "DEX-1082 Balances not updated" in {
       val acc = mkAccountWithBalance(10.waves -> Waves)
-      Using.resource(mkWsAddressConnection(acc, dex1)) { wsc =>
+      Using(mkWsAddressConnection(acc, dex1)) { wsc =>
 
         eventually(wsc.balanceChanges should have size 1)
 
@@ -795,7 +768,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
       broadcastAndAwait(mkTransfer(acc, alice, 2.usd, usd, feeAmount = 1.waves))
       Thread.sleep(1000)
 
-      Using.resource(mkWsAddressConnection(acc, dex1)) { wsc =>
+      Using(mkWsAddressConnection(acc, dex1)) { wsc =>
         eventually {
           wsc.balanceChanges should matchTo(List(Map[Asset, WsBalances](
             Waves -> WsBalances(9.0, 0.0)

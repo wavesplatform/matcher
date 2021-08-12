@@ -84,7 +84,7 @@ class WsConnectionTestSuite extends WsSuiteBase {
             ) ++ additional: _*
           )
       }
-    Using.Manager { use =>
+    Using.Manager.unsafe { use =>
       val firefoxLinuxWscs = use(mkDexWsConnections(1, os = "Linux 5.2".some, client = "Firefox".some))
       val unknownOs2Wscs = use(mkDexWsConnections(2, os = "OS/2".some))
       use(mkDexWsConnections(3, client = "Android 10".some) ++ mkDexWsConnections(4))

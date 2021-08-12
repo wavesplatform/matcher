@@ -1,6 +1,7 @@
 package com.wavesplatform.it
 
 import cats.syntax.either._
+
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.ThreadLocalRandom
 import cats.instances.FutureInstances
@@ -30,6 +31,7 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}
 
 import scala.concurrent.duration._
+import scala.util.Using
 
 trait MatcherSuiteBase
     extends AnyFreeSpec
@@ -110,5 +112,12 @@ trait MatcherSuiteBase
       placeAndAwaitAtDex(o)
       o.idStr()
     }.toSet
+
+  implicit final class UsingManagerOps(manager: Using.Manager.type) {
+
+    def unsafe[A](f: Using.Manager => A): A =
+      manager.apply(f).get
+
+  }
 
 }

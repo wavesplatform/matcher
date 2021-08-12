@@ -134,7 +134,7 @@ class BouncingBalancesTestSuite extends WsSuiteBase {
     }
 
     "multiple orders test" in {
-      Using.Manager { use =>
+      Using.Manager.unsafe { use =>
         val aliceWsc = use(mkWsAddressConnection(alice, dex1))
         val bobWsc = use(mkWsAddressConnection(bob, dex1))
 

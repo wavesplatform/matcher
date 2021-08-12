@@ -643,7 +643,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
     "DEX-818" - {
       "Connections can affect each other" in {
-        Using.Manager { use =>
+        Using.Manager.unsafe { use =>
           val wscs = use((1 to 10).map(_ => mkWsAddressConnection(bob)))
           val mainWsc = use(mkWsAddressConnection(bob))
 

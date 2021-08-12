@@ -501,7 +501,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
 
   "Bugs" - {
     "DEX-814 Connections can affect each other" in {
-      Using.Manager { use =>
+      Using.Manager.unsafe { use =>
         val wscs = use((1 to 10).map(_ => mkWsOrderBookConnection(wavesBtcPair, dex1)))
         val mainWsc = use(mkWsOrderBookConnection(wavesBtcPair, dex1))
 

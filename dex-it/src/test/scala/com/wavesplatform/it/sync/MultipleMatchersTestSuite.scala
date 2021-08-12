@@ -123,7 +123,7 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with
   "WS Order book state should be the same on two matchers" in {
     val acc = mkAccountWithBalance(100.eth -> eth, 100.waves -> Waves)
 
-    Using.Manager { use =>
+    Using.Manager.unsafe { use =>
       val wsob1 = use(mkWsOrderBookConnection(ethWavesPair, dex1))
       val wsob2 = use(mkWsOrderBookConnection(ethWavesPair, dex2))
 
@@ -150,7 +150,7 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with
   "WS Address state should be the same on two matchers" in {
     val acc = mkAccountWithBalance(100.eth -> eth, 100.waves -> Waves)
 
-    Using.Manager { use =>
+    Using.Manager.unsafe { use =>
       val wsau1 = use(mkWsAddressConnection(acc, dex1))
       val wsau2 = use(mkWsAddressConnection(acc, dex2))
       val sell = mkOrder(acc, ethWavesPair, SELL, 10.eth, 1.waves, 0.003.waves)

@@ -13,6 +13,7 @@ import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.it.docker.WavesNodeContainer
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.model.LimitOrder
+import com.wavesplatform.dex.tool.Using._
 import com.wavesplatform.it.WsSuiteBase
 import org.scalatest.Assertion
 

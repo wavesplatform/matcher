@@ -2,6 +2,7 @@ package com.wavesplatform.it.sync.api.ws
 
 import cats.syntax.option._
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.Implicits.releasable
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.api.ws.connection.WsConnection
@@ -15,8 +16,8 @@ import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.error.{OrderAssetPairReversed, OrderBookStopped, SubscriptionsLimitReached}
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
-import com.wavesplatform.dex.Implicits.releasable
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, OrderRestrictionsSettings}
+import com.wavesplatform.dex.tool.Using._
 import com.wavesplatform.it.api.MatcherCommand
 import com.wavesplatform.it.{executeCommands, WsSuiteBase}
 import play.api.libs.json._

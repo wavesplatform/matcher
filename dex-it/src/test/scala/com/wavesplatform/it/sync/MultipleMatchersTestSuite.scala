@@ -15,6 +15,7 @@ import com.wavesplatform.dex.error.OrderCanceled
 import com.wavesplatform.dex.it.api.dex.DexApi
 import com.wavesplatform.dex.it.api.websockets.HasWebSockets
 import com.wavesplatform.dex.it.docker.DexContainer
+import com.wavesplatform.dex.tool.Using._
 import com.wavesplatform.it._
 import com.wavesplatform.it.api.{MatcherCommand, MatcherState}
 import com.wavesplatform.it.config.DexTestConfig.createAssetPair
@@ -23,8 +24,8 @@ import org.scalacheck.Gen
 
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
-import scala.util.{Random, Using}
 import scala.util.control.NonFatal
+import scala.util.{Random, Using}
 
 @DexItExternalKafkaRequired
 class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with WsSuiteBase {

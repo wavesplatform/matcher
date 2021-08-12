@@ -36,19 +36,9 @@ import io.swagger.annotations._
 import javax.ws.rs.Path
 import scala.concurrent.{ExecutionContext, Future}
 
-object MarketsRoute {
-
-  case class Settings(
-    timeout: Timeout,
-    getActualTickSize: AssetPair => FutureResult[BigDecimal],
-    orderRestrictions: Map[AssetPair, OrderRestrictionsSettings]
-  )
-
-}
-
 @Path("/matcher")
 @Api()
-class MarketsRoute(
+final class MarketsRoute(
   settings: MarketsRoute.Settings,
   addressActor: ActorRef,
   orderDb: OrderDb[Future],
@@ -388,5 +378,15 @@ class MarketsRoute(
       }
     }
   }
+
+}
+
+final object MarketsRoute {
+
+  final case class Settings(
+    timeout: Timeout,
+    getActualTickSize: AssetPair => FutureResult[BigDecimal],
+    orderRestrictions: Map[AssetPair, OrderRestrictionsSettings]
+  )
 
 }

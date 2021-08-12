@@ -9,13 +9,13 @@ import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor
 import com.wavesplatform.dex.actors.tx.ExchangeTransactionBroadcastActor
 import com.wavesplatform.dex.actors.tx.ExchangeTransactionBroadcastActor.Command.Broadcast
 import com.wavesplatform.dex.collections.{FifoSet, PositiveMap}
-import com.wavesplatform.dex.domain.account.{Address, PublicKey}
+import com.wavesplatform.dex.domain.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.crypto.Proofs
 import com.wavesplatform.dex.domain.error.ValidationError
-import com.wavesplatform.dex.domain.order.{OrderType, OrderV1}
+import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV1}
 import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionResult, ExchangeTransactionV2}
 import com.wavesplatform.dex.grpc.integration.clients.domain.{AddressBalanceUpdates, TransactionWithChanges, WavesNodeUpdates}
 import com.wavesplatform.dex.grpc.integration.protobuf.DexToPbConversions._
@@ -107,6 +107,7 @@ class OrderEventsCoordinatorActorSpec extends ScalaTestWithActorTestKit() with M
       }
 
       "OrderExecuted" - {
+        val expiration = nowTs + 10.days.toMillis
         "if is able to create a tx" - {
           val addressDirectory = classic.TestProbe()
           val broadcastActor = TestProbe[ExchangeTransactionBroadcastActor.Command]()
@@ -145,6 +146,34 @@ class OrderEventsCoordinatorActorSpec extends ScalaTestWithActorTestKit() with M
             val actual = addressDirectory.expectMsgType[AddressActor.Command.ApplyOrderBookExecuted]
             actual should matchTo(AddressActor.Command.ApplyOrderBookExecuted(validEvent, ExchangeTransactionResult(validTx)))
           }
+        }
+
+        "if is not able to create a tx - passes an event without a tx" in {
+          val buyOrder = Order.buy(
+            sender = KeyPair(Array.emptyByteArray),
+            matcher = KeyPair(Array.emptyByteArray),
+            pair = assetPair,
+            amount = 100,
+            price = 6000000L,
+            timestamp = nowTs,
+            expiration = expiration,
+            matcherFee = 300000L
+          )
+          val sellOrder = Order.sell(
+            sender = KeyPair(Array.emptyByteArray),
+            matcher = KeyPair(Array.emptyByteArray),
+            pair = assetPair,
+            amount = 100,
+            price = 6000000L,
+            timestamp = nowTs,
+            expiration = expiration,
+            matcherFee = 300000L
+          )
+          val event = Events.OrderExecuted(LimitOrder(buyOrder), LimitOrder(sellOrder), nowTs, 300000L, 300000L)
+          passToAddressDirectoryTest(
+            OrderEventsCoordinatorActor.Command.Process(event),
+            AddressActor.Command.ApplyOrderBookExecuted(event, ExchangeTransactionResult(validTx, ValidationError.GenericError("test").some))
+          )
         }
       }
     }

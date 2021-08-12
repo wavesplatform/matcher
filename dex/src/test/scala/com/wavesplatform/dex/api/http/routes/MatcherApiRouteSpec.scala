@@ -3,6 +3,7 @@ package com.wavesplatform.dex.api.http.routes
 import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import akka.actor.{ActorRef, Status}
 import akka.http.scaladsl.model.headers.RawHeader
+import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.Route
 import akka.testkit.{TestActor, TestProbe}
@@ -25,6 +26,8 @@ import com.wavesplatform.dex.api.http.ApiMarshallers._
 import com.wavesplatform.dex.api.http.entities._
 import com.wavesplatform.dex.api.http.headers.{`X-Api-Key`, CustomContentTypes}
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
+import com.wavesplatform.dex.api.http.routes.v0.MarketsRoute.Settings
+import com.wavesplatform.dex.api.http.routes.v0._
 import com.wavesplatform.dex.api.http.{entities, OrderBookHttpInfo}
 import com.wavesplatform.dex.api.ws.actors.WsExternalClientDirectoryActor
 import com.wavesplatform.dex.app.MatcherStatus
@@ -1269,6 +1272,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         .explicitGet()
     )
 
+    val testKit = ActorTestKit()
     val orderBooks = new AtomicReference(Map(smartWavesPair -> orderBookActor.ref.asRight[Unit]))
     val orderBookAskAdapter = new OrderBookAskAdapter(orderBooks, 5.seconds)
 
@@ -1282,57 +1286,116 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
           else liftFutureAsync(Future.failed(new IllegalArgumentException(s"No information about $x")))
       )
 
-    val testKit = ActorTestKit()
+    val pairBuilder = new AssetPairBuilder(
+      settings,
+      {
+        case `smartAsset` => liftValueAsync[BriefAssetDescription](smartAssetDesc)
+        case x if x == okOrder.assetPair.amountAsset || x == badOrder.assetPair.amountAsset || x == unknownAsset =>
+          liftValueAsync[BriefAssetDescription](amountAssetDesc)
+        case x if x == okOrder.assetPair.priceAsset || x == badOrder.assetPair.priceAsset =>
+          liftValueAsync[BriefAssetDescription](priceAssetDesc)
+        case x => liftErrorAsync[BriefAssetDescription](error.AssetNotFound(x))
+      },
+      Set.empty
+    )
 
-    val route =
-      new MatcherApiRoute(
-        assetPairBuilder = new AssetPairBuilder(
-          settings,
-          {
-            case `smartAsset` => liftValueAsync[BriefAssetDescription](smartAssetDesc)
-            case x if x == okOrder.assetPair.amountAsset || x == badOrder.assetPair.amountAsset || x == unknownAsset =>
-              liftValueAsync[BriefAssetDescription](amountAssetDesc)
-            case x if x == okOrder.assetPair.priceAsset || x == badOrder.assetPair.priceAsset =>
-              liftValueAsync[BriefAssetDescription](priceAssetDesc)
-            case x => liftErrorAsync[BriefAssetDescription](error.AssetNotFound(x))
-          },
-          Set.empty
-        ),
-        matcherPublicKey = matcherKeyPair.publicKey,
-        safeConfig = ConfigFactory.load().atKey("waves.dex"),
-        matcher = orderBookDirectoryActor.ref,
-        addressActor = addressActor.ref,
-        CombinedStream.Status.Working(10),
-        storeCommand = {
-          case ValidatedCommand.DeleteOrderBook(pair, _) if pair == okOrder.assetPair =>
-            Future.successful(ValidatedCommandWithMeta(1L, System.currentTimeMillis, ValidatedCommand.DeleteOrderBook(pair)).some)
-          case _ => Future.failed(new NotImplementedError("Storing is not implemented"))
-        },
-        orderBook = {
-          case x if x == okOrder.assetPair || x == badOrder.assetPair => Some(Right(orderBookActor.ref))
-          case _ => None
-        },
-        orderBookHttpInfo = orderBookHttpInfo,
-        getActualTickSize = _ => liftValueAsync(BigDecimal(0.1)),
-        orderValidator = {
-          case x if x == okOrder || x == badOrder => liftValueAsync(x)
-          case _ => liftErrorAsync(error.FeatureNotImplemented)
-        },
-        matcherSettings = settings,
-        matcherStatus = () => MatcherStatus.Working,
-        orderDb = odb,
-        currentOffset = () => 0L,
-        lastOffset = () => Future.successful(0L),
-        matcherAccountFee = 300000L,
-        apiKeyHash = Some(crypto secureHash apiKey),
-        rateCache = rateCache,
-        validatedAllowedOrderVersions = () => Future.successful(Set(1, 2, 3)),
-        () => DynamicSettings.symmetric(matcherFee),
-        externalClientDirectoryRef = testKit.spawn(WsExternalClientDirectoryActor(), s"ws-external-cd-${Random.nextInt(Int.MaxValue)}"),
-        getAssetDescription = _ => liftValueAsync(BriefAssetDescription("test", 8, hasScript = false, isNft = false))
-      )
+    val placeRoute = new PlaceRoute(
+      settings.actorResponseTimeout,
+      pairBuilder,
+      addressActor.ref,
+      orderValidator = {
+        case x if x == okOrder || x == badOrder => liftValueAsync(x)
+        case _ => liftErrorAsync(error.FeatureNotImplemented)
+      },
+      () => MatcherStatus.Working,
+      Some(crypto secureHash apiKey)
+    )
+    val cancelRoute = new CancelRoute(
+      settings.actorResponseTimeout,
+      pairBuilder,
+      addressActor.ref,
+      () => MatcherStatus.Working,
+      odb,
+      Some(crypto secureHash apiKey)
+    )
+    val ratesRoute = new RatesRoute(
+      pairBuilder,
+      () => MatcherStatus.Working,
+      Some(crypto secureHash apiKey),
+      rateCache,
+      testKit.spawn(WsExternalClientDirectoryActor(), s"ws-external-cd-${Random.nextInt(Int.MaxValue)}")
+    )
+    val historyRoute = new HistoryRoute(
+      settings.actorResponseTimeout,
+      pairBuilder,
+      addressActor.ref,
+      () => MatcherStatus.Working,
+      Some(crypto secureHash apiKey)
+    )
+    val balancesRoute = new BalancesRoute(
+      settings.actorResponseTimeout,
+      pairBuilder,
+      addressActor.ref,
+      () => MatcherStatus.Working,
+      Some(crypto secureHash apiKey)
+    )
+    val transactionsRoute = new TransactionsRoute(() => MatcherStatus.Working, odb, Some(crypto secureHash apiKey))
+    val debugRoute = new DebugRoute(
+      settings.actorResponseTimeout,
+      ConfigFactory.load().atKey("waves.dex"),
+      orderBookDirectoryActor.ref,
+      addressActor.ref,
+      CombinedStream.Status.Working(10),
+      () => MatcherStatus.Working,
+      () => 0L,
+      () => Future.successful(0L),
+      Some(crypto secureHash apiKey)
+    )
 
-    f(route.route)
+    val marketsRoute = new MarketsRoute(
+      Settings(settings.actorResponseTimeout, _ => liftValueAsync(BigDecimal(0.1)), settings.orderRestrictions),
+      addressActor.ref,
+      odb,
+      pairBuilder,
+      matcherKeyPair.publicKey,
+      orderBookDirectoryActor.ref,
+      {
+        case ValidatedCommand.DeleteOrderBook(pair, _) if pair == okOrder.assetPair =>
+          Future.successful(ValidatedCommandWithMeta(1L, System.currentTimeMillis, ValidatedCommand.DeleteOrderBook(pair)).some)
+        case _ => Future.failed(new NotImplementedError("Storing is not implemented"))
+      },
+      {
+        case x if x == okOrder.assetPair || x == badOrder.assetPair => Some(Right(orderBookActor.ref))
+        case _ => None
+      },
+      orderBookHttpInfo,
+      () => MatcherStatus.Working,
+      Some(crypto secureHash apiKey)
+    )
+    val infoRoute = new MatcherInfoRoute(
+      matcherKeyPair.publicKey,
+      settings,
+      () => MatcherStatus.Working,
+      300000L,
+      Some(crypto secureHash apiKey),
+      rateCache,
+      () => Future.successful(Set(1, 2, 3)),
+      () => DynamicSettings.symmetric(matcherFee)
+    )
+
+    val routes = Seq(
+      infoRoute.route,
+      ratesRoute.route,
+      debugRoute.route,
+      marketsRoute.route,
+      historyRoute.route,
+      placeRoute.route,
+      cancelRoute.route,
+      balancesRoute.route,
+      transactionsRoute.route
+    )
+
+    f(concat(routes: _*))
   }
 
 }

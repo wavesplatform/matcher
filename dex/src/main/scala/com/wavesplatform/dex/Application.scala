@@ -25,7 +25,8 @@ import com.wavesplatform.dex.actors.orderbook.{AggregatedOrderBookActor, OrderBo
 import com.wavesplatform.dex.actors.tx.{ExchangeTransactionBroadcastActor, WriteExchangeTransactionActor}
 import com.wavesplatform.dex.actors.{OrderBookAskAdapter, OrderBookDirectoryActor, RootActorSystem}
 import com.wavesplatform.dex.api.http.headers.{CustomMediaTypes, MatcherHttpServer}
-import com.wavesplatform.dex.api.http.routes.{MatcherApiRoute, MatcherApiRouteV1}
+import com.wavesplatform.dex.api.http.routes.v1.OrderBookRoute
+import com.wavesplatform.dex.api.http.routes.v0.{BalancesRoute, CancelRoute, DebugRoute, HistoryRoute, MarketsRoute, MatcherInfoRoute, PlaceRoute, RatesRoute, TransactionsRoute}
 import com.wavesplatform.dex.api.http.{CompositeHttpService, MetricHttpFlow, OrderBookHttpInfo}
 import com.wavesplatform.dex.api.routes.ApiRoute
 import com.wavesplatform.dex.api.ws.actors.{WsExternalClientDirectoryActor, WsInternalBroadcastActor}
@@ -156,7 +157,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   private val wavesBlockchainAsyncClient = new MatcherExtensionAssetsCachingClient(
     underlying = CombinedWavesBlockchainClient(
       settings.wavesBlockchainClient,
-      matcherPublicKey,
+      matcherPublicKey = matcherPublicKey,
       monixScheduler = monixScheduler,
       grpcExecutionContext = grpcEc,
       mkCombinedStream = (meClient, buClient) =>
@@ -245,7 +246,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   private def mkAddressActorProps(address: Address, recovered: Boolean): Props = AddressActor.props(
     address,
     time,
-    orderDb,
+    orderDb = orderDb,
     ValidationStages.mkSecond(wavesBlockchainAsyncClient, orderBookAskAdapter),
     storeCommand,
     recovered,
@@ -308,81 +309,149 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     gracefulStop(orderBookDirectoryActorRef, 3.seconds, OrderBookDirectoryActor.Shutdown).map(_ => Done)
   }
 
-  private val httpApiRouteV0: MatcherApiRoute = {
-
+  private val placeRoute: PlaceRoute = {
     val orderValidation = ValidationStages.mkFirst(
-      settings,
-      matcherPublicKey,
-      orderFeeSettingsCache,
-      matchingRulesCache,
-      rateCache,
-      getAndCacheDescription,
-      wavesBlockchainAsyncClient,
-      transactionCreator,
-      time,
-      orderBookAskAdapter,
-      lastProcessedOffset,
-      blacklistedAddresses,
-      hasMatcherAccountScript
+      settings = settings,
+      matcherPublicKey = matcherPublicKey,
+      orderFeeSettingsCache = orderFeeSettingsCache,
+      matchingRulesCache = matchingRulesCache,
+      rateCache = rateCache,
+      assetsDescription = getAndCacheDescription,
+      blockchain = wavesBlockchainAsyncClient,
+      transactionCreator = transactionCreator,
+      time = time,
+      orderBookAskAdapter = orderBookAskAdapter,
+      lastProcessedOffset = lastProcessedOffset,
+      blacklistedAddresses = blacklistedAddresses,
+      hasMatcherAccountScript = hasMatcherAccountScript
     )(_)
+    new PlaceRoute(
+      responseTimeout = settings.actorResponseTimeout,
+      assetPairBuilder = pairBuilder,
+      addressActor = addressDirectoryRef,
+      orderValidation,
+      () => status,
+      maybeApiKeyHash
+    )
+  }
 
-    new MatcherApiRoute(
-      pairBuilder,
-      matcherPublicKey,
-      config,
-      orderBookDirectoryActorRef,
-      addressDirectoryRef,
-      wavesBlockchainAsyncClient.status(),
-      matcherQueue.store,
-      p => Option(orderBooks.get()) flatMap (_ get p),
-      orderBookHttpInfo,
-      getActualTickSize = { assetPair =>
+  private val cancelRoute =
+    new CancelRoute(
+      responseTimeout = settings.actorResponseTimeout,
+      assetPairBuilder = pairBuilder,
+      addressActor = addressDirectoryRef,
+      matcherStatus = () => status,
+      orderDb = orderDb,
+      apiKeyHash = maybeApiKeyHash
+    )
+
+  private val ratesRoute = new RatesRoute(
+    assetPairBuilder = pairBuilder,
+    matcherStatus = () => status,
+    apiKeyHash = maybeApiKeyHash,
+    rateCache = rateCache,
+    externalClientDirectoryRef = externalClientDirectoryRef
+  )
+
+  private val historyRoute =
+    new HistoryRoute(
+      responseTimeout = settings.actorResponseTimeout,
+      assetPairBuilder = pairBuilder,
+      addressActor = addressDirectoryRef,
+      matcherStatus = () => status,
+      apiKeyHash = maybeApiKeyHash
+    )
+
+  private val balancesRoute =
+    new BalancesRoute(
+      responseTimeout = settings.actorResponseTimeout,
+      assetPairBuilder = pairBuilder,
+      addressActor = addressDirectoryRef,
+      matcherStatus = () => status,
+      apiKeyHash = maybeApiKeyHash
+    )
+
+  private val transactionsRoute = new TransactionsRoute(matcherStatus = () => status, orderDb = orderDb, apiKeyHash = maybeApiKeyHash)
+
+  private val debugRoute = new DebugRoute(
+    responseTimeout = settings.actorResponseTimeout,
+    safeConfig = config,
+    matcher = orderBookDirectoryActorRef,
+    addressActor = addressDirectoryRef,
+    wavesBlockchainAsyncClient.status(),
+    matcherStatus = () => status,
+    currentOffset = () => lastProcessedOffset,
+    lastOffset = () => matcherQueue.lastOffset,
+    maybeApiKeyHash
+  )
+
+  private val marketsRoute = new MarketsRoute(
+    settings = MarketsRoute.Settings(
+      settings.actorResponseTimeout,
+      assetPair =>
         getAndCacheDecimals(assetPair.amountAsset)
           .product(getAndCacheDecimals(assetPair.priceAsset))
           .map { case (amountAssetDecimals, priceAssetDecimals) =>
             matchingRulesCache.getDenormalizedRuleForNextOrder(assetPair, lastProcessedOffset, amountAssetDecimals, priceAssetDecimals).tickSize
-          }
-      },
-      orderValidation,
-      settings,
-      () => status,
-      orderDb,
-      () => lastProcessedOffset,
-      () => matcherQueue.lastOffset,
-      ExchangeTransactionCreator.getAdditionalFeeForScript(hasMatcherAccountScript),
-      maybeApiKeyHash,
-      rateCache,
-      validatedAllowedOrderVersions = () => {
-        Future
-          .sequence {
-            settings.allowedOrderVersions.map(OrderValidator.checkOrderVersion(_, wavesBlockchainAsyncClient.isFeatureActivated).value)
-          }
-          .map(_.collect { case Right(version) => version })
-      },
-      () => orderFeeSettingsCache.getSettingsForOffset(lastProcessedOffset + 1),
-      externalClientDirectoryRef,
-      getAndCacheDescription
-    )
-  }
+          },
+      settings.orderRestrictions
+    ),
+    addressActor = addressDirectoryRef,
+    orderDb = orderDb,
+    assetPairBuilder = pairBuilder,
+    matcherPublicKey = matcherPublicKey,
+    matcher = orderBookDirectoryActorRef,
+    storeCommand = matcherQueue.store,
+    orderBook = p => Option(orderBooks.get()) flatMap (_ get p),
+    orderBookHttpInfo = orderBookHttpInfo,
+    matcherStatus = () => status,
+    apiKeyHash = maybeApiKeyHash
+  )
 
-  private val httpApiRouteV1 = MatcherApiRouteV1(pairBuilder, orderBookHttpInfo, () => status, maybeApiKeyHash)
+  private val infoRoute = new MatcherInfoRoute(
+    matcherPublicKey = matcherPublicKey,
+    matcherSettings = settings,
+    matcherStatus = () => status,
+    matcherAccountFee = ExchangeTransactionCreator.getAdditionalFeeForScript(hasMatcherAccountScript),
+    apiKeyHash = maybeApiKeyHash,
+    rateCache = rateCache,
+    validatedAllowedOrderVersions = () => {
+      Future
+        .sequence {
+          settings.allowedOrderVersions.map(OrderValidator.checkOrderVersion(_, wavesBlockchainAsyncClient.isFeatureActivated).value)
+        }
+        .map(_.collect { case Right(version) => version })
+    },
+    getActualOrderFeeSettings = () => orderFeeSettingsCache.getSettingsForOffset(lastProcessedOffset + 1)
+  )
+
+  private val v0HttpRoute =
+    Seq(infoRoute, ratesRoute, debugRoute, marketsRoute, historyRoute, placeRoute, cancelRoute, balancesRoute, transactionsRoute)
+
+  private val v1HttpRoute = Seq(OrderBookRoute(
+    assetPairBuilder = pairBuilder,
+    orderBookHttpInfo = orderBookHttpInfo,
+    matcherStatus = () => status,
+    apiKeyHash = maybeApiKeyHash
+  ))
 
   private val wsApiRoute = new MatcherWebSocketRoute(
-    wsInternalBroadcastRef,
-    externalClientDirectoryRef,
-    addressDirectoryRef,
-    orderBookDirectoryActorRef,
-    time,
-    pairBuilder,
-    maybeApiKeyHash,
-    settings,
-    () => status,
-    () => rateCache.getAllRates
+    wsInternalBroadcastRef = wsInternalBroadcastRef,
+    externalClientDirectoryRef = externalClientDirectoryRef,
+    addressDirectory = addressDirectoryRef,
+    matcher = orderBookDirectoryActorRef,
+    time = time,
+    assetPairBuilder = pairBuilder,
+    apiKeyHash = maybeApiKeyHash,
+    matcherSettings = settings,
+    matcherStatus = () => status,
+    getRatesSnapshot = () => rateCache.getAllRates
   )
 
   cs.addTask(CoordinatedShutdown.PhaseBeforeServiceUnbind, "WebSockets")(() => wsApiRoute.gracefulShutdown().map(_ => Done))
 
-  private val matcherApiRoutes: Seq[ApiRoute] = Seq(httpApiRouteV0, httpApiRouteV1, wsApiRoute)
+  private val matcherApiRoutes: Seq[ApiRoute] = v0HttpRoute ++ v1HttpRoute ++ Seq(wsApiRoute)
+
   private val matcherApiTypes: Set[Class[_]] = matcherApiRoutes.map(_.getClass).toSet
 
   private val startGuard = for {

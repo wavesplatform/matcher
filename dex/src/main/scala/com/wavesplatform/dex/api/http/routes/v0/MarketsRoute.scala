@@ -381,9 +381,9 @@ final class MarketsRoute(
 
 }
 
-final object MarketsRoute {
+object MarketsRoute {
 
-  final case class Settings(
+  case class Settings(
     timeout: Timeout,
     getActualTickSize: AssetPair => FutureResult[BigDecimal],
     orderRestrictions: Map[AssetPair, OrderRestrictionsSettings]

@@ -4,9 +4,8 @@ import cats.syntax.either._
 import com.softwaremill.diffx.{Derived, Diff}
 import com.wavesplatform.dex.api.ws.connection.WsConnection
 import com.wavesplatform.dex.api.ws.connection.WsConnection.WsRawMessage
-import com.wavesplatform.dex.api.ws.entities.{WsFullOrder, WsMatchTransactionInfo}
+import com.wavesplatform.dex.api.ws.entities.WsFullOrder
 import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsError, WsOrderBookChanges, WsPingOrPong, WsServerMessage}
-import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.it.api.websockets.HasWebSockets
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 
@@ -16,12 +15,6 @@ import scala.reflect.ClassTag
 trait WsSuiteBase extends MatcherSuiteBase with HasWebSockets with DiffMatcherWithImplicits {
 
   implicit protected val wsErrorDiff: Derived[Diff[WsError]] = Derived(Diff.gen[WsError].value.ignore[WsError, Long](_.timestamp))
-
-  implicit protected val wsMatchTransactionInfoDiff: Derived[Diff[WsMatchTransactionInfo]] = Derived(
-    Diff.gen[WsMatchTransactionInfo].value
-      .ignore[WsMatchTransactionInfo, ByteStr](_.txId)
-      .ignore[WsMatchTransactionInfo, Long](_.timestamp)
-  )
 
   implicit protected val wsAddressChangesDiff: Derived[Diff[WsAddressChanges]] = Derived(
     Diff.gen[WsAddressChanges].value

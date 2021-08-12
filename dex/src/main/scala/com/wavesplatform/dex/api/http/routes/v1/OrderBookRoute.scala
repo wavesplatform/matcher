@@ -16,7 +16,7 @@ import scala.concurrent.ExecutionContext
 
 @Path("/api/v1")
 @Api(value = "/api v1/")
-case class OrderBookRoute(
+final case class OrderBookRoute(
   assetPairBuilder: AssetPairBuilder,
   orderBookHttpInfo: OrderBookHttpInfo,
   matcherStatus: () => MatcherStatus,

@@ -29,7 +29,7 @@ class BouncingBalancesTestSuite extends WsSuiteBase {
   override def wavesNodeInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.miner.enable = false""".stripMargin)
 
   private val minerNodeSuiteConfig: Config = ConfigFactory.parseString(
-    s""" |waves.miner {
+    s"""waves.miner {
        |  enable = true
        |  micro-block-interval = 1s
        |  min-micro-block-age = 1s

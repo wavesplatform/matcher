@@ -29,7 +29,7 @@ class WsRatesUpdatesTestSuite extends WsSuiteBase {
 
     dex1.api.upsertAssetRate(btc, 0.00041863)
 
-    Using(mkWsRatesUpdatesConnection(dex1)) { wsc1 =>
+    Using.resource(mkWsRatesUpdatesConnection(dex1)) { wsc1 =>
 
       withClue("Rates snapshot") {
         assertRatesUpdates(wsc1)(List((Map(Waves -> 1, btc -> 0.00041863), 0)))
@@ -38,7 +38,7 @@ class WsRatesUpdatesTestSuite extends WsSuiteBase {
 
       dex1.api.upsertAssetRate(btc, 0.00041864)
 
-      Using(mkWsRatesUpdatesConnection(dex1)) { wsc2 =>
+      Using.resource(mkWsRatesUpdatesConnection(dex1)) { wsc2 =>
 
         dex1.api.upsertAssetRate(usd, 2.76)
 
@@ -78,7 +78,7 @@ class WsRatesUpdatesTestSuite extends WsSuiteBase {
 
         withClue("Rates snapshot after deleting") {
           dex1.api.upsertAssetRate(btc, 0.0099)
-          Using(mkWsRatesUpdatesConnection(dex1)) { wsc =>
+          Using.resource(mkWsRatesUpdatesConnection(dex1)) { wsc =>
             assertRatesUpdates(wsc)(List(Map[Asset, Double](Waves -> 1, btc -> 0.0099) -> 0))
           }
           dex1.api.deleteAssetRate(btc)
@@ -88,7 +88,7 @@ class WsRatesUpdatesTestSuite extends WsSuiteBase {
   }
 
   "Few subscription won't make effect" in {
-    Using(mkDexWsConnection(dex1)) { wsc =>
+    Using.resource(mkDexWsConnection(dex1)) { wsc =>
       (1 to 10).foreach { _ =>
         wsc.send(WsRatesUpdatesSubscribe())
       }
@@ -98,14 +98,14 @@ class WsRatesUpdatesTestSuite extends WsSuiteBase {
   }
 
   "Incorrect subscription id will cause error" in {
-    Using(mkDexWsConnection(dex1)) { wsc =>
+    Using.resource(mkDexWsConnection(dex1)) { wsc =>
       wsc.send(WsRatesUpdatesSubscribe("ur"))
       wsc.receiveAtLeastN[WsError](1)
     }
   }
 
   "Clients won't receive updates after unsubscribe" in {
-    Using(mkWsRatesUpdatesConnection(dex1)) { wsc =>
+    Using.resource(mkWsRatesUpdatesConnection(dex1)) { wsc =>
       wsc.receiveAtLeastN[WsRatesUpdates](1)
 
       wsc.send(WsUnsubscribe("ur"))

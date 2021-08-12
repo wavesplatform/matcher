@@ -29,12 +29,12 @@ object WsAccumulateChanges {
   }
 
   private def readLastAccountLines(feederFile: File, accountsNumber: Int): Seq[String] =
-    Using(Source.fromFile(feederFile)) { source =>
+    Using.resource(Source.fromFile(feederFile)) { source =>
       source.getLines().toList.takeRight(accountsNumber)
-    }.get
+    }
 
   private def readRandomAccountLines(feederFile: File, accountsNumber: Int): Seq[String] =
-    Using(Source.fromFile(feederFile)) { source =>
+    Using.resource(Source.fromFile(feederFile)) { source =>
       val lines = source.getLines()
       val r = lines.take(accountsNumber).toArray
       lines.foreach { line =>
@@ -42,6 +42,6 @@ object WsAccumulateChanges {
         if (Random.nextDouble() < 0.3) r.update(Random.nextInt(accountsNumber), line)
       }
       r.toSeq
-    }.get
+    }
 
 }

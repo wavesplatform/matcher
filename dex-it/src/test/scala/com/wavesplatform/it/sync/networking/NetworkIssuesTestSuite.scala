@@ -78,7 +78,7 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
 
     "user has a balances snapshot (got by ws connection)" in {
       val acc = mkAccountWithBalance(100.waves -> Waves)
-      Using(mkWsAddressConnection(acc, dex1)) { wsc =>
+      Using.resource(mkWsAddressConnection(acc, dex1)) { wsc =>
         eventually(wsc.addressStateChanges should have size 1)
       }
       dex1.disconnectFromNetwork()

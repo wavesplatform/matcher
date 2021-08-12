@@ -54,7 +54,7 @@ class BouncingBalancesTestSuite extends WsSuiteBase {
 
   "Balance should not bounce" - {
     "when a rollback is completed" in {
-      Using(mkWsAddressConnection(bob, dex1)) { wsc =>
+      Using.resource(mkWsAddressConnection(bob, dex1)) { wsc =>
 
         withClue("Bob has only Waves on balance\n") {
           eventually {

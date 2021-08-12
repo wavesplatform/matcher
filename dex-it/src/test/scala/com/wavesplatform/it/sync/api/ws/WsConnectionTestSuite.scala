@@ -27,7 +27,7 @@ class WsConnectionTestSuite extends WsSuiteBase {
   }
 
   "Updates both from address and order book" in {
-    Using(mkDexWsConnection(dex1)) { wsc =>
+    Using.resource(mkDexWsConnection(dex1)) { wsc =>
 
       markup("Subscribe to an order book updates")
       wsc.send(WsOrderBookSubscribe(wavesBtcPair, 1))
@@ -103,7 +103,7 @@ class WsConnectionTestSuite extends WsSuiteBase {
   }
 
   "closeConnection closes N oldest connections" in {
-    Using(mkDexWsConnections(10)) { wscs =>
+    Using.resource(mkDexWsConnections(10)) { wscs =>
       dex1.api.waitForWsConnections(_.connections == 10)
 
       dex1.api.closeWsConnections(3)

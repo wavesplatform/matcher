@@ -42,7 +42,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
 
   "Internal stream should" - {
     "not send message if there is no matches or cancels" in {
-      Using(mkWsInternalConnection()) { wsc =>
+      Using.resource(mkWsInternalConnection()) { wsc =>
         wsc.receiveNoMessages()
       }
     }
@@ -52,7 +52,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
         val order1 = mkOrderDP(bob, wavesUsdPair, OrderType.SELL, 5.waves, 3, matcherFee = 0.004.btc, feeAsset = btc)
         val order2 = mkOrderDP(alice, wavesUsdPair, OrderType.BUY, 1.waves, 4)
 
-        Using(mkWsInternalConnection()) { wsc =>
+        Using.resource(mkWsInternalConnection()) { wsc =>
 
           List(order1, order2).foreach(dex1.api.place)
           dex1.api.waitForOrderStatus(order2, Status.Filled)
@@ -101,7 +101,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
         val order2 = mkOrderDP(bob, wavesUsdPair, OrderType.SELL, 2.waves, 3)
         val order3 = mkOrderDP(alice, wavesUsdPair, OrderType.BUY, 3.waves, 4)
 
-        Using(mkWsInternalConnection()) { wsc =>
+        Using.resource(mkWsInternalConnection()) { wsc =>
 
           List(order1, order2).foreach(dex1.api.place)
           placeAndAwaitAtDex(order3, Status.Filled, isMarketOrder = true)
@@ -171,7 +171,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
 
       "one cancel" in {
         val order = mkOrderDP(bob, wavesUsdPair, OrderType.SELL, 5.waves, 3, matcherFee = 0.004.btc, feeAsset = btc)
-        Using(mkWsInternalConnection()) { wsc =>
+        Using.resource(mkWsInternalConnection()) { wsc =>
 
           placeAndAwaitAtDex(order)
           cancelAndAwait(bob, order)
@@ -201,7 +201,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
         val order3 = mkOrderDP(alice, wavesUsdPair, OrderType.BUY, 4.waves, 4, matcherFee = 0.003.waves, feeAsset = Waves)
         val orders = List(order1, order2, order3)
 
-        Using(mkWsInternalConnection()) { wsc =>
+        Using.resource(mkWsInternalConnection()) { wsc =>
           orders.foreach(dex1.api.place)
           orders.foreach(dex1.api.waitForOrderStatus(_, Status.Filled))
 
@@ -275,7 +275,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
         val order4 = mkOrderDP(bob, wavesBtcPair, OrderType.BUY, 4.waves, 0.005, matcherFee = 0.004.btc, feeAsset = btc)
         val orders = List(order1, order2, order3, order4)
 
-        Using(mkWsInternalConnection()) { wsc =>
+        Using.resource(mkWsInternalConnection()) { wsc =>
 
           orders.foreach(dex1.api.place)
           List(order1, order2).foreach(dex1.api.waitForOrderStatus(_, Status.Filled))

@@ -51,11 +51,11 @@ object GatlingFeeder {
     )}"}"""
 
   private def mkObsStrings(pairsFile: File, numberPerClient: Int): String =
-    Using(Source.fromFile(pairsFile)) { source =>
+    Using.resource(Source.fromFile(pairsFile)) { source =>
       val pairs = Random.shuffle(source.getLines().toVector)
       require(numberPerClient <= pairs.size, "numberPerClient > available asset pairs in file")
       pairs.take(numberPerClient).map(x => s"""{"T":"obs","S":"$x","d":100}""").mkString(";")
-    }.get
+    }
 
   def mkFile(
     accountsNumber: Int,

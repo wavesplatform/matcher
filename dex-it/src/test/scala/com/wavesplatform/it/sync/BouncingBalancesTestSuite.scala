@@ -28,11 +28,13 @@ class BouncingBalancesTestSuite extends WsSuiteBase {
 
   override def wavesNodeInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.miner.enable = false""".stripMargin)
 
-  private val minerNodeSuiteConfig: Config = ConfigFactory.parseString("""waves.miner {
-  enable = true
-  micro-block-interval = 1s
-  min-micro-block-age = 1s
-}""")
+  private val minerNodeSuiteConfig: Config = ConfigFactory.parseString(
+    s""" |waves.miner {
+       |  enable = true
+       |  micro-block-interval = 1s
+       |  min-micro-block-age = 1s
+       |}""".stripMargin
+  )
 
   lazy val wavesMinerNode: WavesNodeContainer = createWavesNode("waves-2", suiteInitialConfig = minerNodeSuiteConfig, netAlias = None)
 

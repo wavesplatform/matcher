@@ -613,6 +613,15 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
       }
 
       "when trading with itself" in {
+        def copyWithCommonPart(wsOrder: WsOrder): WsOrder = wsOrder.copy(
+          status = OrderStatus.Filled.name.some,
+          filledAmount = 10.0.some,
+          filledFee = 0.003.some,
+          avgWeighedPrice = 1.0.some,
+          totalExecutedPriceAssets = 10.0.some,
+          matchInfo = Seq(WsMatchTransactionInfo(ByteStr.empty, 0L, 1, 10.0, 10.0))
+        )
+
         val acc = mkAccountWithBalance(100.usd -> usd, 50.waves -> Waves)
         Using(mkWsAddressConnection(acc)) { wsc =>
           val order1 = mkOrder(acc, wavesUsdPair, OrderType.SELL, 10.waves, 1.usd)
@@ -624,24 +633,10 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           eventually {
             val orderChanges = wsc.orderChanges.squashed
             orderChanges(order1.id()) should matchTo(
-              WsOrder.fromDomain(LimitOrder(order1)).copy(
-                status = OrderStatus.Filled.name.some,
-                filledAmount = 10.0.some,
-                filledFee = 0.003.some,
-                avgWeighedPrice = 1.0.some,
-                totalExecutedPriceAssets = 10.0.some,
-                matchInfo = Seq(WsMatchTransactionInfo(ByteStr.empty, 0L, 1, 10.0, 10.0))
-              )
+              copyWithCommonPart(WsOrder.fromDomain(LimitOrder(order1)))
             )
             orderChanges(order2.id()) should matchTo(
-              WsOrder.fromDomain(LimitOrder(order2)).copy(
-                status = OrderStatus.Filled.name.some,
-                filledAmount = 10.0.some,
-                filledFee = 0.003.some,
-                avgWeighedPrice = 1.0.some,
-                totalExecutedPriceAssets = 10.0.some,
-                matchInfo = Seq(WsMatchTransactionInfo(ByteStr.empty, 0L, 1, 10.0, 10.0))
-              )
+              copyWithCommonPart(WsOrder.fromDomain(LimitOrder(order2)))
             )
 
             orderChanges(order1.id()).matchInfo.head.txId shouldBe orderChanges(order2.id()).matchInfo.head.txId

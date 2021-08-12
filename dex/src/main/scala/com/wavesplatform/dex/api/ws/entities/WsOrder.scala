@@ -28,7 +28,7 @@ case class WsOrder(
   filledFee: Option[Double] = None,
   avgWeighedPrice: Option[Double] = None,
   totalExecutedPriceAssets: Option[Double] = None,
-  matchTxInfo: Seq[WsMatchTransactionInfo] = Seq.empty
+  matchInfo: Seq[WsMatchTransactionInfo] = Seq.empty
 )
 
 object WsOrder {
@@ -66,11 +66,11 @@ object WsOrder {
 
   def apply(
     id: Order.Id,
-    matchTxInfo: WsMatchTransactionInfo
+    matchInfo: WsMatchTransactionInfo
   ): WsOrder =
     WsOrder(
       id,
-      matchTxInfo = Seq(matchTxInfo)
+      matchInfo = Seq(matchInfo)
     )
 
   def apply(
@@ -97,7 +97,7 @@ object WsOrder {
     filledFee: Double,
     avgWeighedPrice: Double,
     totalExecutedPriceAssets: Double,
-    matchTxInfo: WsMatchTransactionInfo
+    matchInfo: WsMatchTransactionInfo
   ): WsOrder =
     WsOrder(
       id,
@@ -106,7 +106,7 @@ object WsOrder {
       filledFee = filledFee.some,
       avgWeighedPrice = avgWeighedPrice.some,
       totalExecutedPriceAssets = totalExecutedPriceAssets.some,
-      matchTxInfo = Seq(matchTxInfo)
+      matchInfo = Seq(matchInfo)
     )
 
   def apply(id: Order.Id, status: String): WsOrder = WsOrder(id, status = status.some)

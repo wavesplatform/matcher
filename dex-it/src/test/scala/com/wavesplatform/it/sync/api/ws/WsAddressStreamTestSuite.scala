@@ -562,7 +562,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           aliceOrders.foreach(order => dex1.api.waitForOrderStatus(order, Status.Accepted))
 
           assertChanges(wsc, squash = false)(Map.empty)(WsOrder.fromDomain(MarketOrder(accountsOrder, Long.MaxValue))
-            .copy(matchTxInfo = Seq(
+            .copy(matchInfo = Seq(
               WsMatchTransactionInfo(ByteStr.empty, 0L, 1.1, 20.0, 22.0),
               WsMatchTransactionInfo(ByteStr.empty, 0L, 1.2, 10.0, 12.0),
               WsMatchTransactionInfo(ByteStr.empty, 0L, 1.3, 20.0, 26.0)
@@ -584,7 +584,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
           assertChanges(wsc, squash = false)(Map.empty)(WsOrder(
             order1.id(),
-            matchTxInfo = Seq(WsMatchTransactionInfo(ByteStr.empty, 0L, 1, 10.0, 10.0), WsMatchTransactionInfo(ByteStr.empty, 0L, 1, 10.0, 10.0))
+            matchInfo = Seq(WsMatchTransactionInfo(ByteStr.empty, 0L, 1, 10.0, 10.0), WsMatchTransactionInfo(ByteStr.empty, 0L, 1, 10.0, 10.0))
           ))
         }
       }

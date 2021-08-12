@@ -4,6 +4,7 @@ import cats.syntax.option._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.Implicits.releasable
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus
+import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.api.ws.connection.WsConnection
 import com.wavesplatform.dex.api.ws.entities.{WsAddressBalancesFilter, WsBalances, WsMatchTransactionInfo, WsOrder}
 import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsAddressSubscribe, WsError, WsUnsubscribe}
@@ -11,7 +12,9 @@ import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.account.KeyPair.toAddress
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
+import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.model.Denormalization
+import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.error.{AddressAndPublicKeyAreIncompatible, SubscriptionTokenExpired, SubscriptionsLimitReached}
 import com.wavesplatform.dex.it.test.Scripts
@@ -72,7 +75,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
             message = "Address 3Q6LEwEVJVAomd4BjjjSPydZuNN4vDo3fSs and public key 54gGdY9o2vFgzkSMLXQ7iReTJMPo2XiGdaBQSsG5U3un are incompatible"
           )
         )
-      }.get
+      }
     }
 
     "stop send updates after closing by user and resend after user open it again" in {
@@ -80,14 +83,14 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
       val wsc = mkWsAddressConnection(acc, dex1)
       Using.resource(wsc) { wsc =>
         eventually(wsc.balanceChanges should have size 1)
-      }.get
+      }
 
       broadcastAndAwait(mkTransfer(alice, acc.toAddress, 2.usd, usd, feeAmount = 1.waves))
       wsc.balanceChanges should have size 1
 
       Using.resource(mkWsAddressConnection(acc, dex1)) { wsc2 =>
         eventually(wsc2.balanceChanges should have size 1)
-      }.get
+      }
     }
 
     "stop send updates after unsubscribe and receive them again after subscribe" in {
@@ -110,7 +113,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
         markup("Update")
         broadcastAndAwait(mkTransfer(alice, acc.toAddress, 2.usd, usd, feeAmount = 1.waves))
         wsc.receiveAtLeastN[WsAddressChanges](1)
-      }.get
+      }
     }
 
     "send account updates to authenticated user" - {
@@ -121,7 +124,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           val addressState = wsac.receiveAtLeastN[WsAddressChanges](1).head
           addressState.address shouldBe account.toAddress
           assertChanges(wsac, squash = false)()()
-        }.get
+        }
       }
 
       "when user places and cancels limit orders" in {
@@ -153,7 +156,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           assertChanges(wsc, squash = false)(Map(usd -> WsBalances(150, 0)))(
             WsOrder(bo2.id(), OrderStatus.Cancelled.name)
           )
-        }.get
+        }
       }
 
       "when user places market order and it is filled" in {
@@ -211,7 +214,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
               matchInfo = WsMatchTransactionInfo(ByteStr.empty, 0L, 1.0, 10.0, 10.0)
             )
           )
-        }.get
+        }
         dex1.api.cancelAllOrdersWithSig(alice)
       }
 
@@ -244,7 +247,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
               matchInfo = WsMatchTransactionInfo(ByteStr.empty, 0L, 1.0, 10.0, 10.0)
             )
           )
-        }.get
+        }
 
         dex1.api.cancelAllOrdersWithSig(acc)
       }
@@ -298,7 +301,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
               Map(limitOrder.id -> WsOrder(bo.id(), status = OrderStatus.Cancelled.name))
             )
           }
-        }.get
+        }
       }
 
       "when user make a transfer" in {
@@ -308,7 +311,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           assertChanges(wsc, squash = false)(Map(Waves -> WsBalances(10, 0), usd -> WsBalances(10, 0)))()
           broadcastAndAwait(mkTransfer(acc, alice.toAddress, 2.usd, usd, feeAmount = 1.waves))
           assertChanges(wsc)(Map(Waves -> WsBalances(9, 0), usd -> WsBalances(8, 0)))()
-        }.get
+        }
       }
 
       "user issued a new asset after establishing the connection" in {
@@ -324,7 +327,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
             Map(Waves -> WsBalances(9, 0)),
             Map(issuedAsset -> WsBalances(1000, 0))
           )()
-        }.get
+        }
       }
 
       "NTF asset" - {
@@ -350,12 +353,12 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           step("should be in the address stream")
           Using.resource(mkWsAddressConnection(acc)) { wsc =>
             validateBalances(wsc, WsBalances(9, 0), acc)
-          }.get
+          }
 
           step("shouldn't be in the filtered address stream")
           Using.resource(mkWsAddressFilteredConnection(acc, Set(WsAddressBalancesFilter.ExcludeNft))) { wsc =>
             validateBalances(wsc, WsBalances(9, 0), acc, hasNft = false)
-          }.get
+          }
 
         }
 
@@ -393,12 +396,12 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           step("should be in the address stream")
           Using.resource(mkWsAddressConnection(dapp)) { wsc =>
             validateBalances(wsc, WsBalances(100, 0), dapp)
-          }.get
+          }
 
           step("shouldn't be in the filtered address stream")
           Using.resource(mkWsAddressFilteredConnection(dapp, Set(WsAddressBalancesFilter.ExcludeNft))) { wsc =>
             validateBalances(wsc, WsBalances(100, 0), dapp, hasNft = false)
-          }.get
+          }
         }
 
         "issued via InvokeTx and then transferred by the script should be in the recipient's address stream" in {
@@ -438,12 +441,12 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           step("should be in the address stream")
           Using.resource(mkWsAddressConnection(acc)) { wsc =>
             validateBalances(wsc, WsBalances(8.995, 0), acc)
-          }.get
+          }
 
           step("shouldn't be in the filtered address stream")
           Using.resource(mkWsAddressFilteredConnection(acc, Set(WsAddressBalancesFilter.ExcludeNft))) { wsc =>
             validateBalances(wsc, WsBalances(8.995, 0), acc, hasNft = false)
-          }.get
+          }
         }
 
         "issued after connection has been established" in {
@@ -454,13 +457,13 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           Using.resource(mkWsAddressConnection(acc)) { wsc =>
             broadcast(mkIssue(acc, "testAssetNT", 1L, 0))
             validateBalances(wsc, WsBalances(9, 0), acc)
-          }.get
+          }
 
           step("shouldn't be in the filtered address stream")
           Using.resource(mkWsAddressFilteredConnection(acc, Set(WsAddressBalancesFilter.ExcludeNft))) { wsc2 =>
             broadcast(mkIssue(acc, "testAssetNT", 1L, 0))
             validateBalances(wsc2, WsBalances(8, 0), acc, hasNft = false)
-          }.get
+          }
         }
       }
 
@@ -476,7 +479,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
             Map(Waves -> WsBalances(9, 0)),
             Map(issuedAsset -> WsBalances(1000, 0))
           )()
-        }.get
+        }
       }
 
       "user burnt part of the asset amount" in {
@@ -490,7 +493,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
             Map(Waves -> WsBalances(9, 0)),
             Map(usd -> WsBalances(10, 0))
           )()
-        }.get
+        }
       }
 
       "user burnt all of the asset amount" in {
@@ -504,7 +507,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
             Map(Waves -> WsBalances(9, 0)),
             Map(usd -> WsBalances(0, 0))
           )()
-        }.get
+        }
       }
     }
 
@@ -547,7 +550,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
             totalExecutedPriceAssets = 8.5,
             WsMatchTransactionInfo(ByteStr.empty, 0L, 1, 4.0, 4.0)
           ))))
-        }.get
+        }
         dex1.api.cancelAllOrdersWithSig(acc)
       }
 
@@ -572,7 +575,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
             totalExecutedPriceAssets = 10.0,
             WsMatchTransactionInfo(ByteStr.empty, 0L, 1, 10.0, 10.0)
           ))))
-        }.get
+        }
         dex1.api.cancelAllOrdersWithSig(acc)
       }
 
@@ -606,7 +609,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
               WsMatchTransactionInfo(ByteStr.empty, 0L, 1.3, 20.0, 26.0)
             )
           )))
-        }.get
+        }
       }
 
       "when trading with itself" in {
@@ -643,7 +646,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
             orderChanges(order1.id()).matchInfo.head.txId shouldBe orderChanges(order2.id()).matchInfo.head.txId
           }
-        }.get
+        }
       }
     }
   }
@@ -677,31 +680,31 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           WsOrder.fromDomain(LimitOrder(bo1)),
           WsOrder.fromDomain(LimitOrder(bo2))
         )
-      }.get
-    }.get
+      }
+    }
     dex1.api.cancelAllOrdersWithSig(acc)
   }
 
-  "Zero balances should not be in initial message" ignore {
+  "Zero balances should not be in initial message" in {
     val acc = mkAccountWithBalance(10.waves -> Waves, 10.usd -> usd)
     Using.resource(mkWsAddressConnection(acc)) { wsc =>
       assertChanges(wsc, squash = false)(Map(Waves -> WsBalances(10, 0), usd -> WsBalances(10, 0)))()
-    }.get
+    }
 
     broadcastAndAwait(mkBurn(acc, usd, 10.usd))
     Using.resource(mkWsAddressConnection(acc)) { wsc =>
       assertChanges(wsc, squash = false)(Map(Waves -> WsBalances(9, 0)))()
-    }.get
+    }
 
     broadcastAndAwait(mkTransfer(alice, acc, 5.usd, usd, 1.waves))
     Using.resource(mkWsAddressConnection(acc)) { wsc =>
       assertChanges(wsc, squash = false)(Map(Waves -> WsBalances(9, 0), usd -> WsBalances(5, 0)))()
-    }.get
+    }
 
     broadcastAndAwait(mkTransfer(acc, alice, 5.usd, usd, 1.waves))
     Using.resource(mkWsAddressConnection(acc)) { wsc =>
       assertChanges(wsc, squash = false)(Map(Waves -> WsBalances(8, 0)))()
-    }.get
+    }
   }
 
   "Subscription should be cancelled after jwt expiration" in {
@@ -725,7 +728,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
       wsc.receiveAtLeastN[WsAddressChanges](1) // snapshot
       wsc.receiveNoMessagesOf[WsAddressChanges](3.5.seconds)
-    }.get
+    }
   }
 
   "Connection should close old address subscriptions when address subscriptions limit has been reached" in {
@@ -810,7 +813,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
             mainWsc.receiveAtLeastN[WsAddressChanges](1)
           }
           mainWsc.clearMessages()
-        }.get
+        }
       }
 
       "Negative balances" in {
@@ -834,7 +837,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
                   }
               }
           }
-        }.get
+        }
       }
     }
 
@@ -878,7 +881,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
             btc -> WsBalances(btcBalance, 0)
           )
         )
-      }.get
+      }
     }
 
     "DEX-828 Excess data in snapshots" in {
@@ -911,7 +914,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
             usd -> WsBalances(2.0, 0.0)
           ))
         }
-      }.get
+      }
       Thread.sleep(1000)
 
       broadcastAndAwait(mkTransfer(acc, alice, 2.usd, usd, feeAmount = 1.waves))
@@ -931,7 +934,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
             usd -> WsBalances(2.0, 0.0)
           ))
         }
-      }.get
+      }
     }
   }
 }

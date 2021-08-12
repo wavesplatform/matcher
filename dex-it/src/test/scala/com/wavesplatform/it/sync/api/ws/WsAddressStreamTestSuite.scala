@@ -545,18 +545,18 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
       assertChanges(wsc, squash = false)(Map(Waves -> WsBalances(10, 0), usd -> WsBalances(10, 0)))()
     }
 
+    broadcastAndAwait(mkBurn(acc, usd, 10.usd))
     Using.resource(mkWsAddressConnection(acc)) { wsc =>
-      broadcastAndAwait(mkBurn(acc, usd, 10.usd))
       assertChanges(wsc, squash = false)(Map(Waves -> WsBalances(9, 0)))()
     }
 
+    broadcastAndAwait(mkTransfer(alice, acc, 5.usd, usd, 1.waves))
     Using.resource(mkWsAddressConnection(acc)) { wsc =>
-      broadcastAndAwait(mkTransfer(alice, acc, 5.usd, usd, 1.waves))
       assertChanges(wsc, squash = false)(Map(Waves -> WsBalances(9, 0), usd -> WsBalances(5, 0)))()
     }
 
+    broadcastAndAwait(mkTransfer(acc, alice, 5.usd, usd, 1.waves))
     Using.resource(mkWsAddressConnection(acc)) { wsc =>
-      broadcastAndAwait(mkTransfer(acc, alice, 5.usd, usd, 1.waves))
       assertChanges(wsc, squash = false)(Map(Waves -> WsBalances(8, 0)))()
     }
   }

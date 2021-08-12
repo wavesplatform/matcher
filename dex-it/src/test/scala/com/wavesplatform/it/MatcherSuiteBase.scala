@@ -1,9 +1,7 @@
 package com.wavesplatform.it
 
-import cats.syntax.either._
-import java.nio.charset.StandardCharsets
-import java.util.concurrent.ThreadLocalRandom
 import cats.instances.FutureInstances
+import cats.syntax.either._
 import com.softwaremill.diffx.{Derived, Diff}
 import com.wavesplatform.dex.api.http.entities.HttpV0OrderBook
 import com.wavesplatform.dex.asset.DoubleOps
@@ -29,6 +27,8 @@ import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}
 
+import java.nio.charset.StandardCharsets
+import java.util.concurrent.ThreadLocalRandom
 import scala.concurrent.duration._
 
 trait MatcherSuiteBase

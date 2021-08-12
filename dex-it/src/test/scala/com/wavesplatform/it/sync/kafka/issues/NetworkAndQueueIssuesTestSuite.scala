@@ -84,7 +84,7 @@ class NetworkAndQueueIssuesTestSuite extends WsSuiteBase with HasWebSockets with
     val initialWavesBalance: Double = denormalizeWavesAmount(wavesNode1.api.balance(alice, Waves)).toDouble
     val initialUsdBalance: Double = denormalizeAmountAndFee(wavesNode1.api.balance(alice, usd), 2).toDouble
 
-    Using(mkWsAddressConnection(alice, dex1)) { wsac =>
+    Using.resource(mkWsAddressConnection(alice, dex1)) { wsac =>
 
       assertChanges(wsac, squash = false)(Map(Waves -> WsBalances(initialWavesBalance, 0), usd -> WsBalances(initialUsdBalance, 0)))()
 

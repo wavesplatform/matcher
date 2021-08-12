@@ -15,6 +15,7 @@ import com.wavesplatform.dex.error.OrderCanceled
 import com.wavesplatform.dex.it.api.dex.DexApi
 import com.wavesplatform.dex.it.api.websockets.HasWebSockets
 import com.wavesplatform.dex.it.docker.DexContainer
+import com.wavesplatform.dex.tool.Using._
 import com.wavesplatform.it._
 import com.wavesplatform.it.api.{MatcherCommand, MatcherState}
 import com.wavesplatform.it.config.DexTestConfig.createAssetPair
@@ -23,8 +24,8 @@ import org.scalacheck.Gen
 
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
-import scala.util.{Random, Using}
 import scala.util.control.NonFatal
+import scala.util.{Random, Using}
 
 @DexItExternalKafkaRequired
 class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with WsSuiteBase {
@@ -123,7 +124,7 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with
   "WS Order book state should be the same on two matchers" in {
     val acc = mkAccountWithBalance(100.eth -> eth, 100.waves -> Waves)
 
-    Using.Manager { use =>
+    Using.Manager.unsafe { use =>
       val wsob1 = use(mkWsOrderBookConnection(ethWavesPair, dex1))
       val wsob2 = use(mkWsOrderBookConnection(ethWavesPair, dex2))
 
@@ -150,7 +151,7 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with
   "WS Address state should be the same on two matchers" in {
     val acc = mkAccountWithBalance(100.eth -> eth, 100.waves -> Waves)
 
-    Using.Manager { use =>
+    Using.Manager.unsafe { use =>
       val wsau1 = use(mkWsAddressConnection(acc, dex1))
       val wsau2 = use(mkWsAddressConnection(acc, dex2))
       val sell = mkOrder(acc, ethWavesPair, SELL, 10.eth, 1.waves, 0.003.waves)

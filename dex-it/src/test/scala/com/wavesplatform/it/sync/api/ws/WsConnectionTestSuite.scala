@@ -2,13 +2,14 @@ package com.wavesplatform.it.sync.api.ws
 
 import cats.implicits.catsSyntaxOptionId
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.Implicits.releasable
 import com.wavesplatform.dex.api.http.entities.HttpWebSocketConnections
 import com.wavesplatform.dex.api.ws.connection.WsConnection
 import com.wavesplatform.dex.api.ws.protocol._
 import com.wavesplatform.dex.domain.order.OrderType.SELL
 import com.wavesplatform.dex.fp.MapImplicits.MapNumericOps
-import com.wavesplatform.dex.Implicits.releasable
 import com.wavesplatform.dex.it.docker.DexContainer
+import com.wavesplatform.dex.tool.Using._
 import com.wavesplatform.it.WsSuiteBase
 
 import scala.concurrent.Future
@@ -27,7 +28,7 @@ class WsConnectionTestSuite extends WsSuiteBase {
   }
 
   "Updates both from address and order book" in {
-    Using(mkDexWsConnection(dex1)) { wsc =>
+    Using.resource(mkDexWsConnection(dex1)) { wsc =>
 
       markup("Subscribe to an order book updates")
       wsc.send(WsOrderBookSubscribe(wavesBtcPair, 1))
@@ -84,7 +85,7 @@ class WsConnectionTestSuite extends WsSuiteBase {
             ) ++ additional: _*
           )
       }
-    Using.Manager { use =>
+    Using.Manager.unsafe { use =>
       val firefoxLinuxWscs = use(mkDexWsConnections(1, os = "Linux 5.2".some, client = "Firefox".some))
       val unknownOs2Wscs = use(mkDexWsConnections(2, os = "OS/2".some))
       use(mkDexWsConnections(3, client = "Android 10".some) ++ mkDexWsConnections(4))
@@ -103,7 +104,7 @@ class WsConnectionTestSuite extends WsSuiteBase {
   }
 
   "closeConnection closes N oldest connections" in {
-    Using(mkDexWsConnections(10)) { wscs =>
+    Using.resource(mkDexWsConnections(10)) { wscs =>
       dex1.api.waitForWsConnections(_.connections == 10)
 
       dex1.api.closeWsConnections(3)

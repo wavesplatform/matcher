@@ -37,7 +37,7 @@ class DeserializationIssuesTestSuite extends MatcherSuiteBase with HasKafka {
       props
     }
     val sendResult = Promise[Unit]()
-    Using(new KafkaProducer[String, String](kafkaProducerProps)) { producer =>
+    Using.resource(new KafkaProducer[String, String](kafkaProducerProps)) { producer =>
       producer.send(
         new ProducerRecord(topicName, "incorrect_key", "incorrect_value"),
         (_: RecordMetadata, exception: Exception) =>

@@ -415,9 +415,9 @@ object WavesDexCli extends ScoptImplicits {
     else snapshot.toVector.sortBy(_._1).map { case (price, os) => s"$price: ${os.mkString(", ")}" }.mkString("  ", "\n  ", "")
 
   def withLevelDb[T](dataDirectory: String)(f: LevelDb[Id] => T): T =
-    Using(openDb(dataDirectory)) { db =>
+    Using.resource(openDb(dataDirectory)) { db =>
       f(LevelDb.sync(db))
-    }.get
+    }
 
   // todo commands:
   // get account by seed [and nonce]

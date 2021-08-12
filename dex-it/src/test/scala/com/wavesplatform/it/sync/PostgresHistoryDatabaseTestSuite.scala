@@ -92,12 +92,12 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
 
     def executeCreateTablesStatement(sqlConnection: Connection): Try[Unit] = Try {
       val createTablesDDL = getFileContentStr(orderHistoryDDLFileName)
-      Using(sqlConnection.prepareStatement(createTablesDDL)) { createTablesStatement =>
+      Using.resource(sqlConnection.prepareStatement(createTablesDDL)) { createTablesStatement =>
         createTablesStatement.executeUpdate()
       }
     }
 
-    Using(DriverManager.getConnection(postgres.jdbcUrl, postgres.username, postgres.password)) { sqlConnection =>
+    Using.resource(DriverManager.getConnection(postgres.jdbcUrl, postgres.username, postgres.password)) { sqlConnection =>
       executeCreateTablesStatement(sqlConnection).get // Force throw
     }
     log.info("Tables created")

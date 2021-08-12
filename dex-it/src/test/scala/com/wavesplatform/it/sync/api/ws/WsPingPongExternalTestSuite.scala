@@ -31,7 +31,7 @@ class WsPingPongExternalTestSuite extends WsPingPongBaseSuite {
   "Web socket connection should be closed " - {
     s"by max-connection-lifetime = $maxConnectionLifetime" in {
 
-      Using(mkWsAddressConnection(alice, dex1)) { wsac =>
+      Using.resource(mkWsAddressConnection(alice, dex1)) { wsac =>
         val connectionLifetime = wsac.connectionLifetime.futureValue(maxConnectionLifetime + delta)
         val (errors, pings) = wsac.receiveAtLeastNErrorsAndPings(1, 5)
 

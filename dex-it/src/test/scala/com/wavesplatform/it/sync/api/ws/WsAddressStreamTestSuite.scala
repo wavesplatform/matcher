@@ -519,7 +519,73 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           val firstCounterOrder = mkOrder(alice, wavesUsdPair, OrderType.BUY, 4.5.usd, 1.waves)
           placeAndAwaitAtDex(firstCounterOrder, Status.Filled)
 
-          assertChanges(wsc)(Map.empty)(WsOrder(order.id()).copy(matchTxInfo = WsMatchTransactionInfo(ByteStr.empty, 0L, 1, 4.5, 4.5).some))
+          assertChanges(wsc, squash = false)(Map.empty)(WsOrder(order.id(), WsMatchTransactionInfo(ByteStr.empty, 0L, 1, 4.5, 4.5)))
+
+          val secondCounterOrder = mkOrder(alice, wavesUsdPair, OrderType.BUY, 4.usd, 1.waves)
+          placeAndAwaitAtDex(secondCounterOrder, Status.Filled)
+
+          assertChanges(wsc, squash = false)(Map.empty)(WsOrder(order.id(), WsMatchTransactionInfo(ByteStr.empty, 0L, 1, 4.0, 4.0)))
+        }
+      }
+
+      "when order filled" in {
+        val acc = mkAccountWithBalance(100.usd -> usd, 50.waves -> Waves)
+        Using(mkWsAddressConnection(acc)) { wsc =>
+          assertChanges(wsc, squash = false)(Map(Waves -> WsBalances(50, 0), usd -> WsBalances(100, 0)))()
+
+          val order = mkOrder(acc, wavesUsdPair, OrderType.SELL, 10.usd, 1.waves)
+          placeAndAwaitAtDex(order)
+
+          assertChanges(wsc)(Map(usd -> WsBalances(90, 10), Waves -> WsBalances(9.997, 0.003)))(WsOrder.fromDomain(LimitOrder(order)))
+
+          val counterOrder = mkOrder(alice, wavesUsdPair, OrderType.BUY, 10.usd, 1.waves)
+          placeAndAwaitAtDex(counterOrder, Status.Filled)
+
+          assertChanges(wsc, squash = false)(Map.empty)(WsOrder(order.id(), WsMatchTransactionInfo(ByteStr.empty, 0L, 1, 10.0, 10.0)))
+        }
+      }
+
+      "when filling market order" in {
+        val acc = mkAccountWithBalance(100.usd -> usd, 50.waves -> Waves)
+        Using(mkWsAddressConnection(acc)) { wsc =>
+          assertChanges(wsc, squash = false)(Map(Waves -> WsBalances(50, 0), usd -> WsBalances(100, 0)))()
+
+          val aliceOrders = Seq(
+            mkOrder(acc, wavesUsdPair, OrderType.SELL, 10.usd, 1.2.waves),
+            mkOrder(acc, wavesUsdPair, OrderType.SELL, 20.usd, 1.1.waves),
+            mkOrder(acc, wavesUsdPair, OrderType.SELL, 30.usd, 1.3.waves)
+          )
+          val accountsOrder = mkOrder(acc, wavesUsdPair, OrderType.BUY, 10.usd, 1.waves)
+
+          aliceOrders.foreach(dex1.api.place)
+          dex1.api.placeMarket(accountsOrder)
+          aliceOrders.foreach(order => dex1.api.waitForOrderStatus(order, Status.Accepted))
+
+          assertChanges(wsc, squash = false)(Map.empty)(WsOrder.fromDomain(MarketOrder(accountsOrder, Long.MaxValue))
+            .copy(matchTxInfo = Seq(
+              WsMatchTransactionInfo(ByteStr.empty, 0L, 1.1, 20.0, 22.0),
+              WsMatchTransactionInfo(ByteStr.empty, 0L, 1.2, 10.0, 12.0),
+              WsMatchTransactionInfo(ByteStr.empty, 0L, 1.3, 20.0, 26.0)
+            )))
+        }
+      }
+
+      "when trading with itself" in {
+        val acc = mkAccountWithBalance(100.usd -> usd, 50.waves -> Waves)
+        Using(mkWsAddressConnection(acc)) { wsc =>
+          assertChanges(wsc, squash = false)(Map(Waves -> WsBalances(50, 0), usd -> WsBalances(100, 0)))()
+
+          val order1 = mkOrder(acc, wavesUsdPair, OrderType.SELL, 10.usd, 1.waves)
+          placeAndAwaitAtDex(order1)
+          assertChanges(wsc)(Map(usd -> WsBalances(90, 10), Waves -> WsBalances(9.997, 0.003)))(WsOrder.fromDomain(LimitOrder(order1)))
+
+          val order2 = mkOrder(acc, wavesUsdPair, OrderType.BUY, 10.usd, 1.waves)
+          placeAndAwaitAtDex(order2, Status.Filled)
+
+          assertChanges(wsc, squash = false)(Map.empty)(WsOrder(
+            order1.id(),
+            matchTxInfo = Seq(WsMatchTransactionInfo(ByteStr.empty, 0L, 1, 10.0, 10.0), WsMatchTransactionInfo(ByteStr.empty, 0L, 1, 10.0, 10.0))
+          ))
         }
       }
     }

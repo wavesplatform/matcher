@@ -7,13 +7,12 @@ import cats.syntax.option._
 import com.wavesplatform.dex.MatcherSpecBase
 import com.wavesplatform.dex.actors.address.AddressActor.BlockchainInteraction
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
-import com.wavesplatform.dex.api.ws.entities.{WsBalances, WsMatchTransactionInfo, WsOrder}
+import com.wavesplatform.dex.api.ws.entities.{WsBalances, WsOrder}
 import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsMessage}
 import com.wavesplatform.dex.db.EmptyOrderDb
 import com.wavesplatform.dex.domain.account.{Address, KeyPair}
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.crypto.Proofs
 import com.wavesplatform.dex.domain.error.ValidationError
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
@@ -272,7 +271,7 @@ class ActorsWebSocketInteractionsSpecification
                   filledFee = 0.0015.some,
                   avgWeighedPrice = 3.0.some,
                   totalExecutedPriceAssets = 15.0.some,
-                  matchTxInfo = WsMatchTransactionInfo(ByteStr.empty, 0L, 3.0, 5.0, 15.0).some
+                  matchTxInfo = mkSeqWsMatchTxInfo(3.0, 5.0)
                 )
               ),
               3
@@ -356,7 +355,7 @@ class ActorsWebSocketInteractionsSpecification
                   filledFee = 0.2.some,
                   avgWeighedPrice = 3.0.some,
                   totalExecutedPriceAssets = 30.0.some,
-                  matchTxInfo = WsMatchTransactionInfo(ByteStr.empty, 0L, 3.0, 10.0, 30.0).some
+                  matchTxInfo = mkSeqWsMatchTxInfo(3.0, 10.0)
                 )
               ),
               2
@@ -376,7 +375,7 @@ class ActorsWebSocketInteractionsSpecification
                   filledFee = 0.5.some,
                   avgWeighedPrice = 3.0.some,
                   totalExecutedPriceAssets = 75.0.some,
-                  matchTxInfo = WsMatchTransactionInfo(ByteStr.empty, 0L, 3.0, 15.0, 45.0).some
+                  matchTxInfo = mkSeqWsMatchTxInfo(3.0, 15.0)
                 )
               ),
               3
@@ -396,7 +395,7 @@ class ActorsWebSocketInteractionsSpecification
                   filledFee = 0.6.some,
                   avgWeighedPrice = 3.0.some,
                   totalExecutedPriceAssets = 90.0.some,
-                  matchTxInfo = WsMatchTransactionInfo(ByteStr.empty, 0L, 3.0, 5.0, 15.0).some
+                  matchTxInfo = mkSeqWsMatchTxInfo(3.0, 5.0)
                 )
               ),
               4
@@ -580,8 +579,8 @@ class ActorsWebSocketInteractionsSpecification
           .expectWsBalancesAndOrders(
             Map(Waves -> WsBalances(100, 0), btc -> WsBalances(1, 0)),
             Seq(
-              WsOrder.fromDomain(oe.counterRemaining).copy(matchTxInfo = WsMatchTransactionInfo(ByteStr.empty, 0L, 3.0, 5.0, 15.0).some),
-              WsOrder.fromDomain(oe.submittedRemaining).copy(matchTxInfo = WsMatchTransactionInfo(ByteStr.empty, 0L, 3.0, 5.0, 15.0).some)
+              WsOrder.fromDomain(oe.counterRemaining).copy(matchTxInfo = mkSeqWsMatchTxInfo(3.0, 5.0)),
+              WsOrder.fromDomain(oe.submittedRemaining).copy(matchTxInfo = mkSeqWsMatchTxInfo(3.0, 5.0))
             ),
             1
           )
@@ -632,7 +631,7 @@ class ActorsWebSocketInteractionsSpecification
                 filledFee = 0.003.some,
                 avgWeighedPrice = 3.0.some,
                 totalExecutedPriceAssets = 15.0.some,
-                matchTxInfo = WsMatchTransactionInfo(ByteStr.empty, 0L, 3.0, 5.0, 15.0).some
+                matchTxInfo = mkSeqWsMatchTxInfo(3.0, 5.0)
               )
             ),
             4
@@ -654,7 +653,7 @@ class ActorsWebSocketInteractionsSpecification
                 filledFee = 0.003.some,
                 avgWeighedPrice = 3.1.some,
                 totalExecutedPriceAssets = 15.5.some,
-                matchTxInfo = WsMatchTransactionInfo(ByteStr.empty, 0L, 3.1, 5.0, 15.5).some
+                matchTxInfo = mkSeqWsMatchTxInfo(3.1, 5.0)
               )
             ),
             5
@@ -677,7 +676,7 @@ class ActorsWebSocketInteractionsSpecification
                 filledFee = 0.0012.some,
                 avgWeighedPrice = 3.2.some,
                 totalExecutedPriceAssets = 6.4.some,
-                matchTxInfo = WsMatchTransactionInfo(ByteStr.empty, 0L, 3.2, 2, 6.4).some
+                matchTxInfo = mkSeqWsMatchTxInfo(3.2, 2)
               )
             ),
             6
@@ -737,7 +736,7 @@ class ActorsWebSocketInteractionsSpecification
                 filledFee = 0.00125.some,
                 avgWeighedPrice = 3.0.some,
                 totalExecutedPriceAssets = 15.0.some,
-                matchTxInfo = WsMatchTransactionInfo(ByteStr.empty, 0L, 3.0, 5.0, 15.0).some
+                matchTxInfo = mkSeqWsMatchTxInfo(3.0, 5.0)
               )
             ),
             2
@@ -757,7 +756,7 @@ class ActorsWebSocketInteractionsSpecification
                 filledFee = 0.0025.some,
                 avgWeighedPrice = 3.05.some,
                 totalExecutedPriceAssets = 30.5.some,
-                matchTxInfo = WsMatchTransactionInfo(ByteStr.empty, 0L, 3.1, 5, 15.5).some
+                matchTxInfo = mkSeqWsMatchTxInfo(3.1, 5)
               )
             ),
             3
@@ -777,7 +776,7 @@ class ActorsWebSocketInteractionsSpecification
                 filledFee = 0.003.some,
                 avgWeighedPrice = 3.07.some,
                 totalExecutedPriceAssets = 36.9.some,
-                matchTxInfo = WsMatchTransactionInfo(ByteStr.empty, 0L, 3.2, 2, 6.4).some
+                matchTxInfo = mkSeqWsMatchTxInfo(3.2, 2)
               )
             ),
             4
@@ -824,7 +823,7 @@ class ActorsWebSocketInteractionsSpecification
               filledFee = 0.0015,
               avgWeighedPrice = 1.0,
               totalExecutedPriceAssets = 5.0,
-              WsMatchTransactionInfo(ByteStr.empty, 0L, 1.0, 5.0, 5.0)
+              mkWsMatchTxInfo(1.0, 5.0)
             )
           ),
           2

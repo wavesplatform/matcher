@@ -83,18 +83,17 @@ case class WsAddressState(
       )
     }
 
+    val prevChange = ordersChanges.getOrElse(ao.id, WsOrder(ao.id))
     putOrderUpdate(
       id = ao.id,
-      update = ordersChanges
-        .getOrElse(ao.id, WsOrder(ao.id))
-        .copy(
-          status = newStatus.name.some,
-          filledAmount = ao.fillingInfo.filledAmount.some.map(denormalizeAmountAndFee(_, ad).toDouble),
-          filledFee = ao.fillingInfo.filledFee.some.map(denormalizeAmountAndFee(_, fd).toDouble),
-          avgWeighedPrice = ao.fillingInfo.avgWeighedPrice.some.map(denormalizePrice(_, ad, pd).toDouble),
-          totalExecutedPriceAssets = ao.fillingInfo.totalExecutedPriceAssets.some.map(denormalizePrice(_, ad, pd).toDouble),
-          matchTxInfo = mkMatchTxInfo()
-        )
+      update = prevChange.copy(
+        status = newStatus.name.some,
+        filledAmount = ao.fillingInfo.filledAmount.some.map(denormalizeAmountAndFee(_, ad).toDouble),
+        filledFee = ao.fillingInfo.filledFee.some.map(denormalizeAmountAndFee(_, fd).toDouble),
+        avgWeighedPrice = ao.fillingInfo.avgWeighedPrice.some.map(denormalizePrice(_, ad, pd).toDouble),
+        totalExecutedPriceAssets = ao.fillingInfo.totalExecutedPriceAssets.some.map(denormalizePrice(_, ad, pd).toDouble),
+        matchTxInfo = mkMatchTxInfo().fold(prevChange.matchTxInfo)(_ +: prevChange.matchTxInfo)
+      )
     )
   }
 

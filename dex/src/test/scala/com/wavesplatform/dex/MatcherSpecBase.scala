@@ -531,6 +531,11 @@ trait MatcherSpecBase
   protected def privateKey(seed: String): KeyPair = KeyPair(seed.getBytes("utf-8"))
   protected def nowTs: Long = System.currentTimeMillis()
 
+  protected def mkExchangeTx(oe: OrderExecuted): ExchangeTransactionResult[ExchangeTransactionV2] = {
+    val (sellOrder, buyOrder) = if (oe.counter.isSellOrder) (oe.counter, oe.submitted) else (oe.submitted, oe.counter)
+    mkExchangeTx(buyOrder.order, sellOrder.order)
+  }
+
   protected def mkExchangeTx(buyOrder: Order, sellOrder: Order): ExchangeTransactionResult[ExchangeTransactionV2] = ExchangeTransactionV2
     .create(
       buyOrder = buyOrder,
@@ -544,9 +549,10 @@ trait MatcherSpecBase
       proofs = Proofs.empty
     )
 
-  protected def mkExchangeTx(oe: OrderExecuted): ExchangeTransactionResult[ExchangeTransactionV2] = {
-    val (sellOrder, buyOrder) = if (oe.counter.isSellOrder) (oe.counter, oe.submitted) else (oe.submitted, oe.counter)
-    mkExchangeTx(buyOrder.order, sellOrder.order)
-  }
+  protected def mkSeqWsMatchTxInfo(price: Double, amount: Double): Seq[WsMatchTransactionInfo] =
+    Seq(mkWsMatchTxInfo(price, amount))
+
+  protected def mkWsMatchTxInfo(price: Double, amount: Double): WsMatchTransactionInfo =
+    WsMatchTransactionInfo(ByteStr.empty, 0L, price, amount, amount * price)
 
 }

@@ -150,7 +150,6 @@ class AddressActor(
 
       val cumulativeDiff = ownerRemainingOrders
         .foldMap { remaining =>
-          log.info(s"Got expectedTx ${command.expectedTx}")
           scheduleOrderWs(remaining, remaining.status, unmatchable = false, maybeMatchTx = command.expectedTx.transaction.some)
 
           remaining.status match {

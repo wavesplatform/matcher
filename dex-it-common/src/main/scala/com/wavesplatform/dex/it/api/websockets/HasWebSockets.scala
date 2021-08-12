@@ -126,7 +126,8 @@ trait HasWebSockets extends BeforeAndAfterAll with BeforeAndAfterEach with HasJw
     filledAmount = diff.filledAmount.orElse(orig.filledAmount),
     filledFee = diff.filledFee.orElse(orig.filledFee),
     avgWeighedPrice = diff.avgWeighedPrice.orElse(orig.avgWeighedPrice),
-    totalExecutedPriceAssets = diff.totalExecutedPriceAssets.orElse(orig.totalExecutedPriceAssets)
+    totalExecutedPriceAssets = diff.totalExecutedPriceAssets.orElse(orig.totalExecutedPriceAssets),
+    matchInfo = (orig.matchInfo ++ diff.matchInfo).distinct
   )
 
   protected def mergeAddressChanges(orig: WsAddressChanges, diff: WsAddressChanges): WsAddressChanges = WsAddressChanges(

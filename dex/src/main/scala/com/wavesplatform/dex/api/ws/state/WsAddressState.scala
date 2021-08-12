@@ -13,8 +13,6 @@ import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.model.{AcceptedOrder, OrderStatus}
 
-import java.math.{BigDecimal, RoundingMode}
-
 case class WsAddressState(
   address: Address,
   activeSubscription: Map[ActorRef[WsAddressChanges], Subscription],
@@ -66,20 +64,13 @@ case class WsAddressState(
     val pd = efc.unsafeAssetDecimals(ao.order.assetPair.priceAsset)
     val fd = efc.unsafeAssetDecimals(ao.feeAsset)
 
-    def calcAmountOfPriceAssets(amount: Long, price: Long): Long = BigDecimal.valueOf(amount)
-      .multiply(BigDecimal.valueOf(price))
-      .scaleByPowerOfTen(-Order.PriceConstantExponent)
-      .setScale(0, RoundingMode.FLOOR)
-      .longValue()
-
     def mkMatchTxInfo(): Option[WsMatchTransactionInfo] = maybeMatchTx.map { matchTx =>
-      ao.amountOfPriceAsset
-      WsMatchTransactionInfo(
+      WsMatchTransactionInfo.normalized(
+        ao.order.assetPair,
         txId = matchTx.id(),
         timestamp = matchTx.timestamp,
-        price = denormalizePrice(matchTx.price, ad, pd).toDouble,
-        executedAmountAssets = denormalizeAmountAndFee(matchTx.amount, ad).toDouble,
-        executedPriceAssets = denormalizeAmountAndFee(calcAmountOfPriceAssets(matchTx.amount, matchTx.price), pd).toDouble
+        price = matchTx.price,
+        executedAmountAssets = matchTx.amount
       )
     }
 

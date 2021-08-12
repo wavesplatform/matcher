@@ -3,7 +3,7 @@ package com.wavesplatform.dex.api.ws
 import com.softwaremill.diffx.Diff
 import com.wavesplatform.dex.MatcherSpecBase
 import com.wavesplatform.dex.api.http.PlayJsonException
-import com.wavesplatform.dex.api.ws.entities.{WsBalances, WsLastTrade, WsOrder, WsOrderBookSettings}
+import com.wavesplatform.dex.api.ws.entities.{WsBalances, WsLastTrade, WsMatchTransactionInfo, WsOrder, WsOrderBookSettings}
 import com.wavesplatform.dex.api.ws.protocol.WsOrderBookChanges.WsSide
 import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsOrderBookChanges, WsRatesUpdates}
 import com.wavesplatform.dex.domain.account.KeyPair
@@ -51,7 +51,15 @@ class WsMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDrivenProp
       case (false, false) => LimitOrder(order).partial(partialAmount, partialFee, BigInteger.valueOf(order.price))
     }
 
-    val result = WsOrder.fromDomain(ao)
+    val result = WsOrder.fromDomain(ao).copy(matchInfo =
+      Seq(WsMatchTransactionInfo.normalized(
+        ao.order.assetPair,
+        ByteStr.empty,
+        System.currentTimeMillis(),
+        ao.price,
+        partialAmount
+      ))
+    )
 
     if (isNew) result
     else

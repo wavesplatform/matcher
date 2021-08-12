@@ -19,16 +19,18 @@ trait WsMessageOps {
         .groupBy(_.id)
         .map {
           case (id, orderChanges) =>
-            id -> orderChanges.foldLeft(orderChanges.head) {
+            val change = orderChanges.foldLeft(orderChanges.head) {
               case (acc, oc) =>
                 acc.copy(
                   status = oc.status,
                   filledAmount = oc.filledAmount,
                   filledFee = oc.filledFee,
                   avgWeighedPrice = oc.avgWeighedPrice,
-                  totalExecutedPriceAssets = oc.totalExecutedPriceAssets
+                  totalExecutedPriceAssets = oc.totalExecutedPriceAssets,
+                  matchInfo = acc.matchInfo ++ oc.matchInfo
                 )
             }
+            id -> change.copy(matchInfo = change.matchInfo.distinct)
         }
 
   }

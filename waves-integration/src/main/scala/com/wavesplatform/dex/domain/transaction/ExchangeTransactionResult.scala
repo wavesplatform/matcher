@@ -8,7 +8,7 @@ final case class ExchangeTransactionResult[A <: ExchangeTransaction](transaction
 
   def toEither: Either[ValidationError, A] = error.fold(transaction.asRight[ValidationError])(_.asLeft)
 
-  def toOptionTx: Option[A] = toEither.toOption
+  def toOptionTx: Option[A] = error.fold(transaction.some)(_ => None)
 
   def transformTx[B <: ExchangeTransaction](f: A => B): ExchangeTransactionResult[B] =
     copy(transaction = f(transaction))
@@ -18,9 +18,6 @@ final case class ExchangeTransactionResult[A <: ExchangeTransaction](transaction
 object ExchangeTransactionResult {
 
   def fromEither[A <: ExchangeTransaction](maybeError: Either[ValidationError, Unit], tx: A): ExchangeTransactionResult[A] =
-    maybeError match {
-      case Left(value) => ExchangeTransactionResult(tx, value.some)
-      case Right(_) => ExchangeTransactionResult(tx, None)
-    }
+    ExchangeTransactionResult(tx, maybeError.left.toOption)
 
 }

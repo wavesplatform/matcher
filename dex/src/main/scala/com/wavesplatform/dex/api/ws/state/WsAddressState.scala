@@ -83,7 +83,7 @@ case class WsAddressState(
         filledFee = ao.fillingInfo.filledFee.some.map(denormalizeAmountAndFee(_, fd).toDouble),
         avgWeighedPrice = ao.fillingInfo.avgWeighedPrice.some.map(denormalizePrice(_, ad, pd).toDouble),
         totalExecutedPriceAssets = ao.fillingInfo.totalExecutedPriceAssets.some.map(denormalizePrice(_, ad, pd).toDouble),
-        matchInfo = mkMatchTxInfo().fold(prevChange.matchInfo)(_ +: prevChange.matchInfo)
+        matchInfo = mkMatchTxInfo().fold(prevChange.matchInfo)(newMatchInfo => prevChange.matchInfo :+ newMatchInfo)
       )
     )
   }

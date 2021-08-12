@@ -87,11 +87,7 @@ sealed trait AcceptedOrder {
   def availableBalanceBySpendableAssets(tradableBalance: Asset => Long): Map[Asset, Long] =
     Set(spentAsset, feeAsset).map(asset => asset -> tradableBalance(asset)).toMap
 
-  lazy val amountOfPriceAsset: Long = BigDecimal.valueOf(amount)
-    .multiply(BigDecimal.valueOf(price))
-    .scaleByPowerOfTen(-Order.PriceConstantExponent)
-    .setScale(0, RoundingMode.FLOOR)
-    .longValue()
+  lazy val amountOfPriceAsset: Long = AcceptedOrder.calcAmountOfPriceAsset(amount, price)
 
   lazy val amountOfAmountAsset: Long = correctedAmountOfAmountAsset(amount, price)
 
@@ -140,6 +136,12 @@ object AcceptedOrder {
     // Should not round! It could lead to forks. See ExchangeTransactionDiff
     (BigInt(matcherFee) * partialAmount / totalAmount).toLong
   }
+
+  def calcAmountOfPriceAsset(amount: Long, price: Long): Long = BigDecimal.valueOf(amount)
+    .multiply(BigDecimal.valueOf(price))
+    .scaleByPowerOfTen(-Order.PriceConstantExponent)
+    .setScale(0, RoundingMode.FLOOR)
+    .longValue()
 
   /**
    * Returns executed amount obtained as a result of the match of submitted and counter orders

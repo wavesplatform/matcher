@@ -144,13 +144,16 @@ class AddressActor(
 
     case command: Command.ApplyOrderBookExecuted =>
       val ownerRemainingOrders = List(command.event.counterRemaining, command.event.submittedRemaining).filter(_.order.sender.toAddress == owner)
+      val txResult = command.expectedTx
       log.debug(
-        s"OrderExecuted(${ownerRemainingOrders.map(o => s"${o.id} -> ${o.status}").mkString(", ")}, tx=${command.expectedTx.transaction.id()}"
+        s"OrderExecuted(${ownerRemainingOrders.map(o => s"${o.id} -> ${o.status}").mkString(
+          ", "
+        )}, tx=${txResult.transaction.id()}${txResult.error.fold("")(e => s", e=$e")}"
       )
 
       val cumulativeDiff = ownerRemainingOrders
         .foldMap { remaining =>
-          scheduleOrderWs(remaining, remaining.status, unmatchable = false, maybeMatchTx = command.expectedTx.transaction.some)
+          scheduleOrderWs(remaining, remaining.status, unmatchable = false, maybeMatchTx = txResult.transaction.some)
 
           remaining.status match {
             case status: OrderStatus.Final =>
@@ -175,7 +178,7 @@ class AddressActor(
         }
         .filterNot(_._2 == 0) // Fee could be 0 if an order executed by a small amount
 
-      val (updated, changedAssets) = balances.withExecuted(command.expectedTx.toOptionTx.map(_.id()), NegativeMap(cumulativeDiff))
+      val (updated, changedAssets) = balances.withExecuted(txResult.toOptionTx.map(_.id()), NegativeMap(cumulativeDiff))
       balances = updated
       scheduleWs(wsAddressState.putChangedAssets(changedAssets))
 

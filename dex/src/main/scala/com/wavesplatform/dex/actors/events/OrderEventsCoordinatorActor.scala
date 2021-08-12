@@ -74,8 +74,8 @@ object OrderEventsCoordinatorActor {
             case event: Events.OrderExecuted =>
               // If we here, AddressActor is guaranteed to be created, because this happens only after Events.OrderAdded
               val createTxResult = createTransaction(event)
-              createTxResult match {
-                case ExchangeTransactionResult(tx, None) =>
+              createTxResult.toEither match {
+                case Right(tx) =>
                   val txCreated = ExchangeTransactionCreated(createTxResult.transaction)
                   context.log.info(s"Created ${createTxResult.transaction.json()}")
                   dbWriterRef ! txCreated
@@ -86,7 +86,7 @@ object OrderEventsCoordinatorActor {
 
                   broadcasterRef ! Broadcaster.Broadcast(broadcastAdapter, addressSpendings, tx)
 
-                case ExchangeTransactionResult(_, Some(e)) =>
+                case Left(e) =>
                   // We don't touch a state, because this transaction neither created, nor appeared on Node
                   import event._
                   context.log.warn(

@@ -4,12 +4,10 @@ import com.wavesplatform.dex.api.ws._
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.model.Denormalization.{denormalizeAmountAndFee, denormalizePrice}
-import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.error.ErrorFormatterContext
+import com.wavesplatform.dex.model.AcceptedOrder
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
-
-import java.math.{BigDecimal, RoundingMode}
 
 final case class WsMatchTransactionInfo(
   txId: ByteStr,
@@ -28,18 +26,12 @@ object WsMatchTransactionInfo {
     val ad = efc.unsafeAssetDecimals(assetPair.amountAsset)
     val pd = efc.unsafeAssetDecimals(assetPair.priceAsset)
 
-    def calcAmountOfPriceAssets(): Long = BigDecimal.valueOf(executedAmountAssets)
-      .multiply(BigDecimal.valueOf(price))
-      .scaleByPowerOfTen(-Order.PriceConstantExponent)
-      .setScale(0, RoundingMode.FLOOR)
-      .longValue()
-
     WsMatchTransactionInfo(
       txId,
       timestamp,
       price = denormalizePrice(price, ad, pd).toDouble,
       executedAmountAssets = denormalizeAmountAndFee(executedAmountAssets, ad).toDouble,
-      executedPriceAssets = denormalizeAmountAndFee(calcAmountOfPriceAssets(), pd).toDouble
+      executedPriceAssets = denormalizeAmountAndFee(AcceptedOrder.calcAmountOfPriceAsset(executedAmountAssets, price), pd).toDouble
     )
   }
 

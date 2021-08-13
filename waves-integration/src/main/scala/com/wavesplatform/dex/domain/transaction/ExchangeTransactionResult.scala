@@ -4,13 +4,17 @@ import cats.syntax.either._
 import cats.syntax.option._
 import com.wavesplatform.dex.domain.error.ValidationError
 
+// contains transaction and possible validation error
 final case class ExchangeTransactionResult[A <: ExchangeTransaction](transaction: A, error: Option[ValidationError] = None) {
 
+  // returns Right only if there is no error
   def toEither: Either[ValidationError, A] = error.fold(transaction.asRight[ValidationError])(_.asLeft)
 
-  def toOptionTx: Option[A] = error.fold(transaction.some)(_ => None)
+  // returns Some only if there is no error
+  def toOption: Option[A] = error.fold(transaction.some)(_ => None)
 
-  def transformTx[B <: ExchangeTransaction](f: A => B): ExchangeTransactionResult[B] =
+  // works always, because we always have a transaction
+  def map[B <: ExchangeTransaction](f: A => B): ExchangeTransactionResult[B] =
     copy(transaction = f(transaction))
 
 }

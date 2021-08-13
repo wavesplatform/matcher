@@ -17,9 +17,9 @@ trait WsMessageOps {
     def squashed: Map[Order.Id, WsOrder] =
       self
         .groupBy(_.id)
-        .map {
+        .flatMap {
           case (id, orderChanges) =>
-            val change = orderChanges.foldLeft(orderChanges.head) {
+            orderChanges.reduceLeftOption {
               case (acc, oc) =>
                 acc.copy(
                   status = oc.status,
@@ -29,8 +29,7 @@ trait WsMessageOps {
                   totalExecutedPriceAssets = oc.totalExecutedPriceAssets,
                   matchInfo = acc.matchInfo ++ oc.matchInfo
                 )
-            }
-            id -> change.copy(matchInfo = change.matchInfo.distinct)
+            }.map(c => id -> c.copy(matchInfo = c.matchInfo.distinct))
         }
 
   }

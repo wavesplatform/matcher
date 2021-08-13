@@ -65,7 +65,7 @@ object ExchangeTransactionV2 extends ExchangeTransactionParser[ExchangeTransacti
     fee: Long,
     timestamp: Long
   ): ExchangeTransactionResult[ExchangeTransactionV2] =
-    create(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, Proofs.empty).transformTx { unverified =>
+    create(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, Proofs.empty).map { unverified =>
       unverified.copy(proofs = Proofs(List(ByteStr(crypto.sign(matcher, unverified.bodyBytes())))))
     }
 

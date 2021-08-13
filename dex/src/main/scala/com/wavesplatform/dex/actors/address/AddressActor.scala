@@ -178,7 +178,7 @@ class AddressActor(
         }
         .filterNot(_._2 == 0) // Fee could be 0 if an order executed by a small amount
 
-      val (updated, changedAssets) = balances.withExecuted(txResult.toOptionTx.map(_.id()), NegativeMap(cumulativeDiff))
+      val (updated, changedAssets) = balances.withExecuted(txResult.toOption.map(_.id()), NegativeMap(cumulativeDiff))
       balances = updated
       scheduleWs(wsAddressState.putChangedAssets(changedAssets))
 

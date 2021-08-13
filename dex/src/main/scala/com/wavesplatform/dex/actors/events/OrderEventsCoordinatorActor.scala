@@ -13,7 +13,7 @@ import com.wavesplatform.dex.actors.tx.ExchangeTransactionBroadcastActor.{Observ
 import com.wavesplatform.dex.collections.{FifoSet, PositiveMap}
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
-import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionResult}
+import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeUpdates
 import com.wavesplatform.dex.model.Events
 import com.wavesplatform.dex.model.Events.ExchangeTransactionCreated

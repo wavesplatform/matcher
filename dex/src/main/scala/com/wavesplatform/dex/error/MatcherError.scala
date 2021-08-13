@@ -14,12 +14,19 @@ import com.wavesplatform.dex.error.Implicits._
 import com.wavesplatform.dex.settings.{DeviationsSettings, OrderRestrictionsSettings}
 import play.api.libs.json.{JsObject, Json, OWrites}
 
-//helper for companion objects of MatcherError children in order to reduce boilerplate
-sealed abstract class MatcherErrorCodeProvider(obj: Entity, part: Entity, cls: Class) {
-  final val code = MatcherError.mkCode(obj, part, cls)
+sealed trait HasErrorCode {
+  val code: Int
 }
 
-sealed abstract class MatcherError(val code: Int, val message: MatcherErrorMessage) extends Product with Serializable {
+//helper for companion objects of MatcherError children in order to reduce boilerplate
+sealed abstract class MatcherErrorCodeProvider(obj: Entity, part: Entity, cls: Class) extends HasErrorCode {
+  final override val code = MatcherError.mkCode(obj, part, cls)
+}
+
+sealed abstract class MatcherError(override val code: Int, val message: MatcherErrorMessage)
+    extends Product
+    with Serializable
+    with HasErrorCode {
   def this(obj: Entity, part: Entity, cls: Class, message: MatcherErrorMessage) = this(
     MatcherError.mkCode(obj, part, cls),
     message

@@ -19,7 +19,7 @@ trait WsMessageOps {
         .groupBy(_.id)
         .flatMap {
           case (id, orderChanges) =>
-            orderChanges.reduceLeftOption {
+            orderChanges.reduceLeftOption[WsOrder] {
               case (acc, oc) =>
                 acc.copy(
                   status = oc.status,

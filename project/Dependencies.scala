@@ -11,9 +11,9 @@ object Dependencies {
     val akka = "2.6.12"
     val akkaHttp = "10.2.3"
 
-    val scalaTest = "3.2.3"
-    val scalaCheck = "1.15.2"
-    val scalaTestPlusCheck = "3.2.3.0"
+    val scalaTest = "3.2.9"
+    val scalaCheck = "1.15.4"
+    val scalaTestPlusCheck = "3.2.9.0"
     val scalaMock = "5.1.0"
     val diffx = "0.3.29" // Can't update to 0.3.30, we have an issue with child traits of AcceptedOrder
 
@@ -33,7 +33,7 @@ object Dependencies {
     val janino = "3.1.3"
     val logbackJsonEncoder = "6.6"
 
-    val silencer = "1.7.2"
+    val silencer = "1.7.5"
 
     val kanela = "1.0.11"
     val kamon = "2.2.0"
@@ -44,9 +44,9 @@ object Dependencies {
     val postgresql = "42.2.18"
     val quillJdbc = "3.6.0"
 
-    val sttpClient = "3.2.3"
+    val sttpClient = "3.3.13"
 
-    val testContainers = "0.39.3"
+    val testContainers = "0.39.5"
     val testContainersPostgres = "1.15.2"
     val testContainersKafka = "1.15.2"
     val testContainersToxiProxy = "1.15.2"
@@ -77,7 +77,7 @@ object Dependencies {
     val jwt = "5.0.0"
 
     val pureConfig = "0.14.0"
-    val allureScalaTest = "2.13.8"
+    val allureScalaTest = "2.13.9"
     val enumeratum = "1.6.1"
 
     val scalaPbJson = "0.9.3"
@@ -105,7 +105,7 @@ object Dependencies {
   private val diffx = "com.softwaremill.diffx" %% "diffx-scalatest" % Version.diffx
   private val catsCore = catsModule("core")
   private val catsTaglessMacros = "org.typelevel" %% "cats-tagless-macros" % Version.catsTaglessMacros
-  private val kindProjector = compilerPlugin("org.typelevel" %% "kind-projector" % "0.11.3" cross CrossVersion.full)
+  private val kindProjector = compilerPlugin("org.typelevel" %% "kind-projector" % "0.13.0" cross CrossVersion.full)
   private val betterMonadicFor = compilerPlugin("com.olegpy" %% "better-monadic-for" % Version.betterMonadicFor)
   private val mouse = "org.typelevel" %% "mouse" % Version.mouse
   private val shapeless = "com.chuusai" %% "shapeless" % Version.shapeless

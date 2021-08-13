@@ -4,8 +4,6 @@ import sbt.Keys._
 import sbt._
 import sbt.internal.inc.ReflectUtilities
 
-Global / resolvers += Resolver.bintrayRepo("ethereum", "maven") // JNI LevelDB
-
 // Scalafix
 scalafixDependencies in ThisBuild ++= List(
   "org.scalatest" %% "autofix" % "3.1.0.0",
@@ -100,7 +98,7 @@ lazy val root = (project in file("."))
 
 inScope(Global)(
   Seq(
-    scalaVersion := "2.13.4",
+    scalaVersion := "2.13.6",
     semanticdbEnabled := true,
     semanticdbVersion := scalafixSemanticdb.revision,
     organization := "com.wavesplatform",

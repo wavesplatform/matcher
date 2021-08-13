@@ -6,7 +6,7 @@ object Dependencies {
 
   object Version {
 
-    val parCollections = "1.0.0"
+    val parCollections = "1.0.3"
 
     val akka = "2.6.15"
     val akkaHttp = "10.2.6"
@@ -17,7 +17,8 @@ object Dependencies {
     val scalaMock = "5.1.0"
     val diffx = "0.3.29" // Can't update to 0.3.30, we have an issue with child traits of AcceptedOrder
 
-    val cats = "2.1.1"
+    val cats = "2.6.1"
+    val catsMacros = "2.1.1"
     val catsTaglessMacros = "0.12"
     val kindProjector = "0.9.10"
     val betterMonadicFor = "0.3.1"
@@ -36,13 +37,13 @@ object Dependencies {
     val silencer = "1.7.5"
 
     val kanela = "1.0.11"
-    val kamon = "2.2.0"
+    val kamon = "2.2.3"
 
     val wavesProtobufSchemas = "1.3.1"
     val wavesJ = "1.0.1"
 
     val postgresql = "42.2.18"
-    val quillJdbc = "3.6.0"
+    val quillJdbc = "3.9.0"
 
     val sttpClient = "3.3.13"
 
@@ -63,7 +64,7 @@ object Dependencies {
 
     val scorexCrypto = "2.1.10"
 
-    val monix = "3.3.0"
+    val monix = "3.4.0"
 
     val supertagged = "1.5"
 
@@ -213,7 +214,7 @@ object Dependencies {
       scalaModule("scala-library", scalaVersion.value),
       scalaModule("scala-reflect", scalaVersion.value),
       catsModule("kernel"),
-      catsModule("macros"),
+      "org.typelevel" %% s"cats-macros" % Version.catsMacros,
       catsCore,
       alleyCatsCore,
       shapeless,

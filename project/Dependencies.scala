@@ -8,8 +8,8 @@ object Dependencies {
 
     val parCollections = "1.0.0"
 
-    val akka = "2.6.12"
-    val akkaHttp = "10.2.3"
+    val akka = "2.6.15"
+    val akkaHttp = "10.2.6"
 
     val scalaTest = "3.2.9"
     val scalaCheck = "1.15.4"
@@ -21,12 +21,12 @@ object Dependencies {
     val catsTaglessMacros = "0.12"
     val kindProjector = "0.9.10"
     val betterMonadicFor = "0.3.1"
-    val mouse = "0.26.2"
-    val shapeless = "2.3.3"
+    val mouse = "1.0.4"
+    val shapeless = "2.3.7"
     val monocle = "2.1.0"
 
     val typesafeConfig = "1.4.1"
-    val scopt = "4.0.0"
+    val scopt = "4.0.1"
 
     val logback = "1.2.3"
     val slf4j = "1.7.30"
@@ -76,9 +76,9 @@ object Dependencies {
     val nettyCodec = "4.1.33.Final"
     val jwt = "5.0.0"
 
-    val pureConfig = "0.14.0"
+    val pureConfig = "0.16.0"
     val allureScalaTest = "2.13.9"
-    val enumeratum = "1.6.1"
+    val enumeratum = "1.7.0"
 
     val scalaPbJson = "0.9.3"
   }

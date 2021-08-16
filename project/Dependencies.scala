@@ -81,7 +81,7 @@ object Dependencies {
     val allureScalaTest = "2.13.9"
     val enumeratum = "1.7.0"
 
-    val scalaPbJson = "0.12.0"
+    val scalaPbJson = "0.9.3"
   }
 
   private def akkaModule(module: String, version: String): ModuleID = "com.typesafe.akka" %% module % version

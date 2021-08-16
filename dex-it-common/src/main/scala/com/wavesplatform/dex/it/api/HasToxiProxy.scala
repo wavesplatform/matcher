@@ -27,7 +27,7 @@ trait HasToxiProxy { self: BaseContainersKit =>
 
   protected def getInnerToxiProxyPort(proxy: ContainerProxy): Int =
     toxiContainer.getContainerInfo.getNetworkSettings.getPorts.getBindings.asScala
-      .find { case (_, bindings) => bindings.head.getHostPortSpec == proxy.proxyPort.toString }
+      .find { case (_, bindings) => Option(bindings).flatMap(_.headOption).exists(_.getHostPortSpec == proxy.proxyPort.toString) }
       .map(_._1.getPort)
       .getOrElse(throw new IllegalStateException(s"There is no inner port for proxied one: ${proxy.proxyPort}"))
 
@@ -46,7 +46,7 @@ trait HasToxiProxy { self: BaseContainersKit =>
       .getBindings
       .asScala
       .flatMap { case (exposedPort, portBindings) =>
-        portBindings.headOption.map { containerPort =>
+        Option(portBindings).flatMap(_.headOption).map { containerPort =>
           s"${exposedPort.getPort} -> ${containerPort.getHostPortSpec}/${exposedPort.getProtocol}"
         }
       }

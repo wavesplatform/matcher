@@ -39,6 +39,7 @@ abstract class BaseContainer(protected val baseContainerPath: String, private va
         .getBindings
         .asScala
         .get(new ExposedPort(internalPort))
+        .flatMap(v => Option(v))
 
     val externalPort =
       maybeBindings
@@ -193,7 +194,7 @@ abstract class BaseContainer(protected val baseContainerPath: String, private va
       .getBindings
       .asScala
       .flatMap { case (exposedPort, portBindings) =>
-        portBindings.headOption.map { containerPort =>
+        Option(portBindings).flatMap(_.headOption).map { containerPort =>
           s"${exposedPort.getPort} -> ${containerPort.getHostPortSpec}/${exposedPort.getProtocol}"
         }
       }

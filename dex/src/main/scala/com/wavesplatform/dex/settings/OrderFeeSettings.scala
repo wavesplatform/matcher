@@ -1,6 +1,7 @@
 package com.wavesplatform.dex.settings
 
 import cats.implicits.{catsSyntaxOptionId, none}
+import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.settings.utils.ConfigReaderOps.Implicits
 import com.wavesplatform.dex.settings.utils._
@@ -11,17 +12,24 @@ sealed trait OrderFeeSettings extends Product with Serializable
 
 object OrderFeeSettings {
 
-  final case class DynamicSettings(baseMakerFee: Long, baseTakerFee: Long) extends OrderFeeSettings {
+  final case class DynamicSettings(baseMakerFee: Long, baseTakerFee: Long, zeroFeeAccounts: Set[PublicKey]) extends OrderFeeSettings {
     val maxBaseFee: Long = math.max(baseMakerFee, baseTakerFee)
     val makerRatio = BigDecimal(baseMakerFee) / maxBaseFee
     val takerRatio = BigDecimal(baseTakerFee) / maxBaseFee
   }
 
-  object DynamicSettings {
+  object DynamicSettings extends ConfigReaders {
 
-    val empty: DynamicSettings = DynamicSettings(1L, 1L)
+    val empty: DynamicSettings = DynamicSettings(1L, 1L, Set.empty)
 
-    def symmetric(baseFee: Long): DynamicSettings = DynamicSettings(baseFee, baseFee)
+    def apply(baseMakerFee: Long, baseTakerFee: Long): DynamicSettings =
+      DynamicSettings(baseMakerFee, baseTakerFee, Set.empty)
+
+    def symmetric(baseFee: Long, zeroFeeAccounts: Set[PublicKey]): DynamicSettings =
+      DynamicSettings(baseFee, baseFee, zeroFeeAccounts)
+
+    def symmetric(baseFee: Long): DynamicSettings =
+      symmetric(baseFee, Set.empty)
 
     implicit val dynamicConfigReader = semiauto
       .deriveReader[DynamicSettings]

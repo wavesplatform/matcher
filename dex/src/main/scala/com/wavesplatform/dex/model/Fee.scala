@@ -50,10 +50,16 @@ object Fee {
         if (c.isBuyOrder) (buyExecutedFee, sellExecutedFee)
         else (sellExecutedFee, buyExecutedFee)
 
-      case settings: DynamicSettings =>
-        absoluteFee(
-          totalCounterFee = multiplyFeeByBigDecimal(c.matcherFee, settings.makerRatio),
-          totalSubmittedFee = multiplyFeeByBigDecimal(s.matcherFee, settings.takerRatio)
+      case settings @ DynamicSettings(_, _, zeroFeeAccounts) =>
+        val (counterFee, submittedFee) =
+          absoluteFee(
+            totalCounterFee = multiplyFeeByBigDecimal(c.matcherFee, settings.makerRatio),
+            totalSubmittedFee = multiplyFeeByBigDecimal(s.matcherFee, settings.takerRatio)
+          )
+
+        (
+          if (zeroFeeAccounts.contains(c.order.sender)) 0L else counterFee,
+          if (zeroFeeAccounts.contains(s.order.sender)) 0L else submittedFee
         )
 
       case _: FixedSettings =>

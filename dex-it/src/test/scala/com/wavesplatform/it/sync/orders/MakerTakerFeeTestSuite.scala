@@ -135,6 +135,7 @@ class MakerTakerFeeTestSuite extends MatcherSuiteBase with TableDrivenPropertyCh
            |      dynamic {
            |        base-maker-fee = ${0.003.waves}
            |        base-taker-fee = ${0.003.waves}
+           |        zero-fee-accounts = []
            |      }
            |    }
            |    $offset0: {
@@ -142,6 +143,7 @@ class MakerTakerFeeTestSuite extends MatcherSuiteBase with TableDrivenPropertyCh
            |      dynamic {
            |        base-maker-fee = ${0.003.waves}
            |        base-taker-fee = ${0.003.waves}
+           |        zero-fee-accounts = []
            |      }
            |    }
            |    $offset1: {
@@ -149,6 +151,7 @@ class MakerTakerFeeTestSuite extends MatcherSuiteBase with TableDrivenPropertyCh
            |      dynamic {
            |        base-maker-fee = ${0.001.waves}
            |        base-taker-fee = ${0.005.waves}
+           |        zero-fee-accounts = []
            |      }
            |    }
            |    $offset3: {
@@ -156,6 +159,7 @@ class MakerTakerFeeTestSuite extends MatcherSuiteBase with TableDrivenPropertyCh
            |      dynamic {
            |        base-maker-fee = ${0.002.waves}
            |        base-taker-fee = ${0.004.waves}
+           |        zero-fee-accounts = []
            |      }
            |    }
            |  }

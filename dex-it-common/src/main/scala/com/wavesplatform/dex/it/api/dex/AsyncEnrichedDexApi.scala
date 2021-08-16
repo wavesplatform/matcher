@@ -14,7 +14,7 @@ import com.wavesplatform.dex.domain.order.Order.Id
 import com.wavesplatform.dex.it.api._
 import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import com.wavesplatform.dex.it.json._
-import im.mak.waves.transactions.ExchangeTransaction
+import com.wavesplatform.transactions.ExchangeTransaction
 import play.api.libs.json.{JsObject, Json}
 import sttp.client3._
 import sttp.client3.playJson._

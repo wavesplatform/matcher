@@ -15,7 +15,7 @@ import com.wavesplatform.dex.error.{OrderCanceled, OrderFull, OrderNotFound}
 import com.wavesplatform.dex.it.time.GlobalTimer
 import com.wavesplatform.dex.it.time.GlobalTimer.TimerOpsImplicits
 import com.wavesplatform.it.MatcherSuiteBase
-import im.mak.waves.transactions.mass.Transfer
+import com.wavesplatform.transactions.mass.Transfer
 import org.scalatest.Assertion
 
 import java.util.concurrent.ThreadLocalRandom

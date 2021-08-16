@@ -12,7 +12,7 @@ import com.wavesplatform.dex.it.api.dex.DexApi
 import com.wavesplatform.dex.it.api.node.{NodeApi, NodeApiExtensions}
 import com.wavesplatform.dex.it.docker.DexContainer
 import com.wavesplatform.it.{api, MatcherSuiteBase}
-import im.mak.waves.transactions.ExchangeTransaction
+import com.wavesplatform.transactions.ExchangeTransaction
 import mouse.any._
 
 import scala.collection.immutable.TreeMap

@@ -11,7 +11,7 @@ import com.wavesplatform.dex.domain.order.Order.Id
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.it.MatcherSuiteBase
-import im.mak.waves.transactions.mass.Transfer
+import com.wavesplatform.transactions.mass.Transfer
 
 import java.nio.charset.StandardCharsets
 import scala.concurrent.Future

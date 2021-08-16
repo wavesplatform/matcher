@@ -10,8 +10,8 @@ import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.it.api.responses.node.ActivationStatusResponse
 import com.wavesplatform.dex.it.fp.{CanRepeat, RepeatRequestOptions}
-import im.mak.waves.transactions.Transaction
-import im.mak.waves.transactions.common.Id
+import com.wavesplatform.transactions.Transaction
+import com.wavesplatform.transactions.common.Id
 
 import scala.concurrent.duration.DurationInt
 

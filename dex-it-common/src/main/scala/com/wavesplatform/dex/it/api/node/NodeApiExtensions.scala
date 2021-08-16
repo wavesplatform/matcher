@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.it.api.node
 
 import cats.Id
-import im.mak.waves.transactions.Transaction
+import com.wavesplatform.transactions.Transaction
 
 trait NodeApiExtensions {
 

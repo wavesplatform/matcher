@@ -6,8 +6,8 @@ import cats.tagless.{autoFunctorK, finalAlg}
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.it.api.responses.node._
-import im.mak.waves.transactions.Transaction
-import im.mak.waves.transactions.common.Id
+import com.wavesplatform.transactions.Transaction
+import com.wavesplatform.transactions.common.Id
 
 @finalAlg
 @autoFunctorK

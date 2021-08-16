@@ -15,10 +15,10 @@ import com.wavesplatform.dex.it.config.PredefinedAccounts.matcher
 import com.wavesplatform.dex.it.waves.Implicits._
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.waves.WavesFeeConstants._
-import im.mak.waves.transactions.common.{Amount, Base64String}
-import im.mak.waves.transactions.invocation.Function
-import im.mak.waves.transactions.mass.Transfer
-import im.mak.waves.transactions.{ExchangeTransaction => JExchangeTransaction, _}
+import com.wavesplatform.transactions.common.{Amount, Base64String}
+import com.wavesplatform.transactions.invocation.Function
+import com.wavesplatform.transactions.mass.Transfer
+import com.wavesplatform.transactions.{ExchangeTransaction => JExchangeTransaction, _}
 
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.ThreadLocalRandom

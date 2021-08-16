@@ -58,7 +58,7 @@ object Dependencies {
     val googleGuava = "28.2-jre"
     val kafka = "2.8.0"
 
-    val swagger = "2.4.2"
+    val swagger = "1.4.0"
     val swaggerUi = "3.51.2"
     val jaxbApi = "2.3.1"
 

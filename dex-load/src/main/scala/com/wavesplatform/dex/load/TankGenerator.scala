@@ -8,11 +8,11 @@ import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.load.request._
 import com.wavesplatform.dex.load.utils._
 import com.wavesplatform.dex.model.AssetPairBuilder.assetIdOrdering._
-import im.mak.waves.transactions.account.{PrivateKey => JPrivateKey, PublicKey => JPublicKey}
-import im.mak.waves.transactions.common.{Amount, AssetId}
-import im.mak.waves.transactions.exchange.{AssetPair, Order, OrderType}
-import im.mak.waves.transactions.mass.Transfer
-import im.mak.waves.transactions.{MassTransferTransaction, TransferTransaction, WavesConfig}
+import com.wavesplatform.transactions.account.{PrivateKey => JPrivateKey, PublicKey => JPublicKey}
+import com.wavesplatform.transactions.common.{Amount, AssetId}
+import com.wavesplatform.transactions.exchange.{AssetPair, Order, OrderType}
+import com.wavesplatform.transactions.mass.Transfer
+import com.wavesplatform.transactions.{MassTransferTransaction, TransferTransaction, WavesConfig}
 import org.apache.http.HttpResponse
 import org.apache.http.client.config.{CookieSpecs, RequestConfig}
 import org.apache.http.client.methods.RequestBuilder

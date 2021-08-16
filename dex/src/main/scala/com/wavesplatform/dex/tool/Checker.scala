@@ -19,8 +19,8 @@ import com.wavesplatform.dex.model.OrderStatus
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.dex.tool.connectors.DexExtensionGrpcConnector.DetailedBalance
 import com.wavesplatform.dex.tool.connectors.SuperConnector
-import im.mak.waves.transactions.IssueTransaction
-import im.mak.waves.transactions.account.PrivateKey
+import com.wavesplatform.transactions.IssueTransaction
+import com.wavesplatform.transactions.account.PrivateKey
 import play.api.libs.json.JsValue
 
 import scala.Ordered._

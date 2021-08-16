@@ -7,7 +7,7 @@ import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.it.config.PredefinedAccounts._
 import com.wavesplatform.dex.it.waves.Implicits._
 import com.wavesplatform.dex.it.waves.MkWavesEntities.mkIssue
-import im.mak.waves.transactions.IssueTransaction
+import com.wavesplatform.transactions.IssueTransaction
 
 trait PredefinedAssets extends ScorexLogging {
 

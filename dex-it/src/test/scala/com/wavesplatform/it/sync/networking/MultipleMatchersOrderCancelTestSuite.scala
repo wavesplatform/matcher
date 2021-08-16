@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync.networking
 
+import com.github.dockerjava.api.command.CreateNetworkResponse
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset.Waves
@@ -8,19 +9,54 @@ import com.wavesplatform.dex.it.docker.DexContainer
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.tags.DexItExternalKafkaRequired
 
+import java.util.concurrent.ThreadLocalRandom
+import scala.jdk.CollectionConverters.MapHasAsScala
+import scala.util.Using
+import scala.util.Using.Releasable
+
 @DexItExternalKafkaRequired
 class MultipleMatchersOrderCancelTestSuite extends MatcherSuiteBase {
 
-  override protected def dexInitialSuiteConfig: Config =
-    ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "WAVES" ]""".stripMargin)
+  override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(
+    s"""waves.dex {
+       |  price-assets = [ "$UsdId", "WAVES" ]
+       |}""".stripMargin
+  )
 
   protected lazy val dex2: DexContainer = createDex("dex-2")
+
+  private lazy val internalNetwork = dex1.dockerClient
+    .createNetworkCmd()
+    .withDriver("bridge")
+    .withName(s"MultipleMatchersOrderCancelTestSuite${ThreadLocalRandom.current().nextInt()}")
+    .withInternal(true) // Disable internet, thus break Kafka connection
+    .exec()
+
+  private lazy val containers = List(wavesNode1.container, dex1.container, dex2.container)
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
     broadcastAndAwait(IssueUsdTx, IssueEthTx)
     dex1.start()
     dex2.start()
+    containers.foreach { container =>
+      dex1.dockerClient
+        .connectToNetworkCmd()
+        .withContainerId(container.getContainerId)
+        .withNetworkId(internalNetwork.getId)
+        .exec()
+    }
+  }
+
+  override protected def afterAll(): Unit = {
+    containers.foreach { container =>
+      dex1.dockerClient
+        .disconnectFromNetworkCmd()
+        .withContainerId(container.getContainerId)
+        .withNetworkId(internalNetwork.getId)
+        .exec()
+    }
+    super.afterAll()
   }
 
   /**
@@ -35,10 +71,10 @@ class MultipleMatchersOrderCancelTestSuite extends MatcherSuiteBase {
 
     val acc1 = mkAccountWithBalance(15.015.waves -> Waves)
     val acc2 = mkAccountWithBalance(0.015.waves -> Waves, 15.usd -> usd)
-    val acc3 = mkAccountWithBalance(1.waves -> Waves, 10.eth -> eth) // Account for fake orders
 
     val ts = System.currentTimeMillis()
-    val sellOrders = (1 to 5).map { amt =>
+    val sellOrders = (0 to 4).map { i =>
+      val amt = i + 1
       mkOrderDP(acc1, wavesUsdPair, OrderType.SELL, amt.waves, amt, ts = ts + amt) // To cancel latest first
     }
 
@@ -48,27 +84,59 @@ class MultipleMatchersOrderCancelTestSuite extends MatcherSuiteBase {
     // will cancel remained orders due to balance changes
     // (which were caused by exchange transactions from DEX-2)
 
-    dex1.api.saveSnapshots
-    dex1.restartWithNewSuiteConfig(ConfigFactory.parseString(s"waves.dex.events-queue.type = local").withFallback(dexInitialSuiteConfig))
-    // HACK: Because we switched the queue, we need to place 5 orders to move offset of queue.
-    // If we don't do this, internal cancels will be ignored by order books.
-    (1 to 5).foreach { _ =>
-      dex1.api.place(mkOrderDP(acc3, ethWavesPair, OrderType.SELL, 1.eth, 1))
-    }
+    val inspect = dex1.dockerClient
+      .inspectContainerCmd(dex1.containerId)
+      .exec()
 
-    val submittedOrders = (1 to 3).map { amt =>
+    val (defaultNetworkName, defaultNetworkId) = inspect.getNetworkSettings.getNetworks.asScala
+      .collectFirst {
+        case (name, network) if name.startsWith("waves-") => (name, network.getNetworkID)
+      }
+      .getOrElse(throw new RuntimeException("Can't find network"))
+
+    step(s"dex1: disconnecting from $defaultNetworkName")
+
+    dex1.dockerClient
+      .disconnectFromNetworkCmd()
+      .withContainerId(dex1.container.getContainerId)
+      .withNetworkId(defaultNetworkId)
+      .exec()
+
+    Iterator
+      .continually {
+        Thread.sleep(1000)
+        log.info(s"dex1: checking disconnected from $defaultNetworkName/$defaultNetworkId")
+        dex1.dockerClient
+          .inspectContainerCmd(dex1.containerId)
+          .exec()
+      }
+      .dropWhile(_.getNetworkSettings.getNetworks.containsKey(defaultNetworkName))
+      .take(1)
+      .foreach { _ =>
+        step("dex1: isolated")
+      }
+
+    val submittedOrders = (0 to 2).map { i =>
+      val amt = i + 1
       mkOrderDP(acc2, wavesUsdPair, OrderType.BUY, amt.waves, amt)
     }
     submittedOrders.foreach(placeAndAwaitAtDex(_, Status.Filled, dex2))
     submittedOrders.foreach(waitForOrderAtNode(_, dex2.api))
 
+    step("Orders placed")
+
+    // Enough to find exchange transactions in UTX and cancel orders #3-4
+    Thread.sleep(5000)
+
     (0 to 2).foreach { i =>
-      dex1.api.waitForOrderStatus(sellOrders(i), Status.Accepted)
+      dex2.api.orderStatusByAssetPairAndId(sellOrders(i)).status shouldBe Status.Filled
     }
 
-    // Matcher should prevent sell orders from cancelling!
-    (3 to 4).foreach { i =>
-      dex1.api.waitForOrderStatus(sellOrders(i), Status.Accepted)
+    // Matcher should not cancel rest orders!
+    withClue("Matcher should not cancel rest orders: ") {
+      (3 to 4).foreach { i =>
+        dex2.api.orderStatusByAssetPairAndId(sellOrders(i)).status shouldBe Status.Accepted
+      }
     }
   }
 }

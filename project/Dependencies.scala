@@ -68,6 +68,7 @@ object Dependencies {
 
     val supertagged = "1.5"
 
+    val javaLevelDb = "0.12"
     val iq80levelDb = "0.12"
     val influxDb = "2.21"
     val levelDbVersion = "1.23.0"
@@ -140,6 +141,7 @@ object Dependencies {
   private val jsonScalaPb = "com.thesamet.scalapb" %% "scalapb-json4s" % Version.scalaPbJson
   private val monixReactive = monixModule("reactive")
   private val supertagged = "org.rudogma" %% "supertagged" % Version.supertagged
+  private val javaLevelDb = "org.iq80.leveldb" % "leveldb" % Version.javaLevelDb
   private val influxDb = "org.influxdb" % "influxdb-java" % Version.influxDb
   private val commonsNet = "commons-net" % "commons-net" % Version.commonsNet
   private val sttpClient = sttpClientModule("core")
@@ -154,7 +156,6 @@ object Dependencies {
       "com.wavesplatform.leveldb-jna" % "leveldb-jna-native" % levelDbVersion
     )
 
-//"org.iq80.leveldb" % s"leveldb${if (module.nonEmpty) "-" else ""}$module" % "0.12"
   private val pureConfig: Seq[ModuleID] =
     Seq("pureconfig", "pureconfig-cats", "pureconfig-enumeratum").map("com.github.pureconfig" %% _ % Version.pureConfig)
 
@@ -186,6 +187,7 @@ object Dependencies {
     scalaCheck,
     scalaTestPlusCheck,
     scalaMock,
+    javaLevelDb.exclude("com.google.guava", "guava"),
     allureScalaTest,
     diffx
   ).map(_ % Test) ++ silencer

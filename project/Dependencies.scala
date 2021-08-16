@@ -19,7 +19,7 @@ object Dependencies {
 
     val cats = "2.6.1"
     val catsMacros = "2.1.1"
-    val catsTaglessMacros = "0.12"
+    val catsTaglessMacros = "0.14.0"
     val kindProjector = "0.9.10"
     val betterMonadicFor = "0.3.1"
     val mouse = "1.0.4"
@@ -29,9 +29,9 @@ object Dependencies {
     val typesafeConfig = "1.4.1"
     val scopt = "4.0.1"
 
-    val logback = "1.2.3"
-    val slf4j = "1.7.30"
-    val janino = "3.1.3"
+    val logback = "1.2.5"
+    val slf4j = "1.7.32"
+    val janino = "3.1.6"
     val logbackJsonEncoder = "6.6"
 
     val silencer = "1.7.5"
@@ -40,26 +40,26 @@ object Dependencies {
     val kamon = "2.2.3"
 
     val wavesProtobufSchemas = "1.3.1"
-    val wavesJ = "1.0.1"
+    val wavesJ = "1.2.2"
 
-    val postgresql = "42.2.18"
+    val postgresql = "42.2.23"
     val quillJdbc = "3.9.0"
 
     val sttpClient = "3.3.13"
 
     val testContainers = "0.39.5"
-    val testContainersPostgres = "1.15.2"
-    val testContainersKafka = "1.15.2"
-    val testContainersToxiProxy = "1.15.2"
+    val testContainersPostgres = "1.16.0"
+    val testContainersKafka = "1.16.0"
+    val testContainersToxiProxy = "1.16.0"
 
     val jackson = "2.10.0"
     val playJson = "2.9.2"
 
     val googleGuava = "28.2-jre"
-    val kafka = "2.7.0"
+    val kafka = "2.8.0"
 
-    val swagger = "1.1.2"
-    val swaggerUi = "3.32.5"
+    val swagger = "2.4.2"
+    val swaggerUi = "3.51.2"
     val jaxbApi = "2.3.1"
 
     val scorexCrypto = "2.1.10"
@@ -71,9 +71,9 @@ object Dependencies {
     val javaLevelDb = "0.12"
     val iq80levelDb = "0.12"
     val influxDb = "2.21"
-    val levelDbVersion = "1.22.1"
+    val levelDbVersion = "1.23.0"
 
-    val commonsNet = "3.7.2"
+    val commonsNet = "3.8.0"
     val nettyCodec = "4.1.33.Final"
     val jwt = "5.0.0"
 
@@ -81,7 +81,7 @@ object Dependencies {
     val allureScalaTest = "2.13.9"
     val enumeratum = "1.7.0"
 
-    val scalaPbJson = "0.9.3"
+    val scalaPbJson = "0.12.0"
   }
 
   private def akkaModule(module: String, version: String): ModuleID = "com.typesafe.akka" %% module % version
@@ -152,9 +152,7 @@ object Dependencies {
   private[this] val levelDBJNA =
     Seq(
       "com.wavesplatform.leveldb-jna" % "leveldb-jna-core" % levelDbVersion,
-      "com.wavesplatform.leveldb-jna" % "leveldb-jna-native" % levelDbVersion classifier "linux-x86_64",
-      "com.wavesplatform.leveldb-jna" % "leveldb-jna-native" % levelDbVersion classifier "windows-x86_64",
-      "com.wavesplatform.leveldb-jna" % "leveldb-jna-native" % levelDbVersion classifier "osx"
+      "com.wavesplatform.leveldb-jna" % "leveldb-jna-native" % levelDbVersion
     )
 
   private val pureConfig: Seq[ModuleID] =

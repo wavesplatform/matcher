@@ -29,7 +29,7 @@ trait WsMessageOps {
                   totalExecutedPriceAssets = oc.totalExecutedPriceAssets,
                   matchInfo = acc.matchInfo ++ oc.matchInfo
                 )
-            }.map(c => id -> c.copy(matchInfo = c.matchInfo.distinct))
+            }.map(c => id -> c)
         }
 
   }

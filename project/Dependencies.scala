@@ -105,6 +105,7 @@ object Dependencies {
   private val scalaMock = "org.scalamock" %% "scalamock" % Version.scalaMock
   private val diffx = "com.softwaremill.diffx" %% "diffx-scalatest" % Version.diffx
   private val catsCore = catsModule("core")
+  private val catsMacros = "org.typelevel" %% s"cats-macros" % Version.catsMacros
   private val catsTaglessMacros = "org.typelevel" %% "cats-tagless-macros" % Version.catsTaglessMacros
   private val kindProjector = compilerPlugin("org.typelevel" %% "kind-projector" % "0.13.0" cross CrossVersion.full)
   private val betterMonadicFor = compilerPlugin("com.olegpy" %% "better-monadic-for" % Version.betterMonadicFor)
@@ -212,7 +213,7 @@ object Dependencies {
       scalaModule("scala-library", scalaVersion.value),
       scalaModule("scala-reflect", scalaVersion.value),
       catsModule("kernel"),
-      "org.typelevel" %% s"cats-macros" % Version.catsMacros,
+      catsMacros,
       catsCore,
       alleyCatsCore,
       shapeless,

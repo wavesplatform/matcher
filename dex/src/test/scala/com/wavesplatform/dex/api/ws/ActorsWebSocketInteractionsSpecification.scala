@@ -13,8 +13,11 @@ import com.wavesplatform.dex.db.EmptyOrderDb
 import com.wavesplatform.dex.domain.account.{Address, KeyPair}
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.crypto.Proofs
+import com.wavesplatform.dex.domain.error.ValidationError
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.state.{LeaseBalance, Portfolio}
+import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV2
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
@@ -128,7 +131,20 @@ class ActorsWebSocketInteractionsSpecification
     def executeOrder(s: AcceptedOrder, c: LimitOrder): OrderExecuted = {
       val (counterExecutedFee, submittedExecutedFee) = Fee.getMakerTakerFee(DynamicSettings.symmetric(0.003.waves))(s, c)
       val oe = OrderExecuted(s, c, System.currentTimeMillis, counterExecutedFee, submittedExecutedFee)
-      addressDir ! AddressActor.Command.ApplyOrderBookExecuted(oe, none) // TODO
+      val (sellOrder, buyOrder) = if (oe.counter.isSellOrder) (oe.counter, oe.submitted) else (oe.submitted, oe.counter)
+      val tx = ExchangeTransactionV2
+        .create(
+          buyOrder = buyOrder.order,
+          sellOrder = sellOrder.order,
+          amount = oe.executedAmount,
+          price = oe.executedPrice,
+          buyMatcherFee = buyOrder.matcherFee,
+          sellMatcherFee = sellOrder.matcherFee,
+          fee = 300000L,
+          timestamp = nowTs,
+          proofs = Proofs.empty
+        ).copy(error = ValidationError.GenericError("Some error").some)
+      addressDir ! AddressActor.Command.ApplyOrderBookExecuted(oe, tx) // TODO
       oe
     }
 
@@ -254,7 +270,8 @@ class ActorsWebSocketInteractionsSpecification
                   filledAmount = 5.0.some,
                   filledFee = 0.0015.some,
                   avgWeighedPrice = 3.0.some,
-                  totalExecutedPriceAssets = 15.0.some
+                  totalExecutedPriceAssets = 15.0.some,
+                  matchInfo = mkSeqWsMatchTxInfo(3.0, 5.0)
                 )
               ),
               3
@@ -274,7 +291,7 @@ class ActorsWebSocketInteractionsSpecification
 
         withClue("Cancelling remaining of the counter order\n") {
           env
-            .cancelOrder(oe.counterRemaining, false)
+            .cancelOrder(oe.counterRemaining, unmatchable = false)
             .expectWsBalancesAndOrders(
               Map(
                 usd -> WsBalances(285, 0),
@@ -337,7 +354,8 @@ class ActorsWebSocketInteractionsSpecification
                   filledAmount = 10.0.some,
                   filledFee = 0.2.some,
                   avgWeighedPrice = 3.0.some,
-                  totalExecutedPriceAssets = 30.0.some
+                  totalExecutedPriceAssets = 30.0.some,
+                  matchInfo = mkSeqWsMatchTxInfo(3.0, 10.0)
                 )
               ),
               2
@@ -356,7 +374,8 @@ class ActorsWebSocketInteractionsSpecification
                   filledAmount = 25.0.some,
                   filledFee = 0.5.some,
                   avgWeighedPrice = 3.0.some,
-                  totalExecutedPriceAssets = 75.0.some
+                  totalExecutedPriceAssets = 75.0.some,
+                  matchInfo = mkSeqWsMatchTxInfo(3.0, 15.0)
                 )
               ),
               3
@@ -375,7 +394,8 @@ class ActorsWebSocketInteractionsSpecification
                   filledAmount = 30.0.some,
                   filledFee = 0.6.some,
                   avgWeighedPrice = 3.0.some,
-                  totalExecutedPriceAssets = 90.0.some
+                  totalExecutedPriceAssets = 90.0.some,
+                  matchInfo = mkSeqWsMatchTxInfo(3.0, 5.0)
                 )
               ),
               4
@@ -384,7 +404,7 @@ class ActorsWebSocketInteractionsSpecification
 
         withClue("System cancel of the market order remaining\n") {
           env
-            .cancelOrder(mo, true)
+            .cancelOrder(mo, unmatchable = true)
             .expectWsBalancesAndOrders(
               Map(usd -> WsBalances(300, 0), eth -> WsBalances(3, 0)),
               Seq(
@@ -553,12 +573,15 @@ class ActorsWebSocketInteractionsSpecification
         env.addressDir ! AddressActor.Command.ApplyOrderBookAdded(OrderAdded(submitted, OrderAddedReason.RequestExecuted, now))
 
         val oe = OrderExecuted(submitted, counter, System.currentTimeMillis, counter.matcherFee, submitted.matcherFee)
-        env.addressDir ! AddressActor.Command.ApplyOrderBookExecuted(oe, none)
+        env.addressDir ! AddressActor.Command.ApplyOrderBookExecuted(oe, mkExchangeTx(oe).copy(error = ValidationError.GenericError("test").some))
 
         env
           .expectWsBalancesAndOrders(
             Map(Waves -> WsBalances(100, 0), btc -> WsBalances(1, 0)),
-            Seq(WsOrder.fromDomain(oe.counterRemaining), WsOrder.fromDomain(oe.submittedRemaining)),
+            Seq(
+              WsOrder.fromDomain(oe.counterRemaining).copy(matchInfo = mkSeqWsMatchTxInfo(3.0, 5.0)),
+              WsOrder.fromDomain(oe.submittedRemaining).copy(matchInfo = mkSeqWsMatchTxInfo(3.0, 5.0))
+            ),
             1
           )
           .kill()
@@ -607,7 +630,8 @@ class ActorsWebSocketInteractionsSpecification
                 filledAmount = 5.0.some,
                 filledFee = 0.003.some,
                 avgWeighedPrice = 3.0.some,
-                totalExecutedPriceAssets = 15.0.some
+                totalExecutedPriceAssets = 15.0.some,
+                matchInfo = mkSeqWsMatchTxInfo(3.0, 5.0)
               )
             ),
             4
@@ -628,7 +652,8 @@ class ActorsWebSocketInteractionsSpecification
                 filledAmount = 5.0.some,
                 filledFee = 0.003.some,
                 avgWeighedPrice = 3.1.some,
-                totalExecutedPriceAssets = 15.5.some
+                totalExecutedPriceAssets = 15.5.some,
+                matchInfo = mkSeqWsMatchTxInfo(3.1, 5.0)
               )
             ),
             5
@@ -650,12 +675,13 @@ class ActorsWebSocketInteractionsSpecification
                 filledAmount = 2.0.some,
                 filledFee = 0.0012.some,
                 avgWeighedPrice = 3.2.some,
-                totalExecutedPriceAssets = 6.4.some
+                totalExecutedPriceAssets = 6.4.some,
+                matchInfo = mkSeqWsMatchTxInfo(3.2, 2)
               )
             ),
             6
           )
-          .cancelOrder(counter3Remaining, false)
+          .cancelOrder(counter3Remaining, unmatchable = false)
           .expectWsBalancesAndOrders(
             Map(usd -> WsBalances(70, 0), Waves -> WsBalances(100, 0)),
             Seq(WsOrder(id = counter3.id, status = OrderStatus.Cancelled.name.some)),
@@ -709,7 +735,8 @@ class ActorsWebSocketInteractionsSpecification
                 filledAmount = 5.0.some,
                 filledFee = 0.00125.some,
                 avgWeighedPrice = 3.0.some,
-                totalExecutedPriceAssets = 15.0.some
+                totalExecutedPriceAssets = 15.0.some,
+                matchInfo = mkSeqWsMatchTxInfo(3.0, 5.0)
               )
             ),
             2
@@ -728,7 +755,8 @@ class ActorsWebSocketInteractionsSpecification
                 filledAmount = 10.0.some,
                 filledFee = 0.0025.some,
                 avgWeighedPrice = 3.05.some,
-                totalExecutedPriceAssets = 30.5.some
+                totalExecutedPriceAssets = 30.5.some,
+                matchInfo = mkSeqWsMatchTxInfo(3.1, 5)
               )
             ),
             3
@@ -747,7 +775,8 @@ class ActorsWebSocketInteractionsSpecification
                 filledAmount = 12.0.some,
                 filledFee = 0.003.some,
                 avgWeighedPrice = 3.07.some,
-                totalExecutedPriceAssets = 36.9.some
+                totalExecutedPriceAssets = 36.9.some,
+                matchInfo = mkSeqWsMatchTxInfo(3.2, 2)
               )
             ),
             4
@@ -793,7 +822,8 @@ class ActorsWebSocketInteractionsSpecification
               filledAmount = 5.0,
               filledFee = 0.0015,
               avgWeighedPrice = 1.0,
-              totalExecutedPriceAssets = 5.0
+              totalExecutedPriceAssets = 5.0,
+              mkWsMatchTxInfo(1.0, 5.0)
             )
           ),
           2
@@ -804,7 +834,7 @@ class ActorsWebSocketInteractionsSpecification
           Seq.empty,
           3
         )
-        .cancelOrder(oe.counterRemaining, false)
+        .cancelOrder(oe.counterRemaining, unmatchable = false)
         .expectWsBalancesAndOrders(
           Map(usd -> WsBalances(5, 0), Waves -> WsBalances(14.9985, 0)),
           Seq(WsOrder(id = bo.id, status = OrderStatus.Cancelled.name.some)),

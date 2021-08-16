@@ -73,10 +73,11 @@ object OrderEventsCoordinatorActor {
 
             case event: Events.OrderExecuted =>
               // If we here, AddressActor is guaranteed to be created, because this happens only after Events.OrderAdded
-              val expectedTx = createTransaction(event) match {
+              val createTxResult = createTransaction(event)
+              createTxResult.toEither match {
                 case Right(tx) =>
-                  val txCreated = ExchangeTransactionCreated(tx)
-                  context.log.info(s"Created ${tx.json()}")
+                  val txCreated = ExchangeTransactionCreated(createTxResult.transaction)
+                  context.log.info(s"Created ${createTxResult.transaction.json()}")
                   dbWriterRef ! txCreated
 
                   val addressSpendings =
@@ -84,7 +85,6 @@ object OrderEventsCoordinatorActor {
                     Map(event.submitted.order.sender.toAddress -> PositiveMap(event.submittedExecutedSpending))
 
                   broadcasterRef ! Broadcaster.Broadcast(broadcastAdapter, addressSpendings, tx)
-                  tx.some
 
                 case Left(e) =>
                   // We don't touch a state, because this transaction neither created, nor appeared on Node
@@ -94,9 +94,8 @@ object OrderEventsCoordinatorActor {
                        |o1: (amount=${submitted.amount}, fee=${submitted.fee}): ${Json.prettyPrint(submitted.order.json())}
                        |o2: (amount=${counter.amount}, fee=${counter.fee}): ${Json.prettyPrint(counter.order.json())}""".stripMargin
                   )
-                  none
               }
-              addressDirectoryRef ! AddressActor.Command.ApplyOrderBookExecuted(event, expectedTx)
+              addressDirectoryRef ! AddressActor.Command.ApplyOrderBookExecuted(event, createTxResult)
               Behaviors.same // We don't update "observedTxIds" here, because expectedTx relates to "createdTxs"
 
             case event: Events.OrderCanceled =>

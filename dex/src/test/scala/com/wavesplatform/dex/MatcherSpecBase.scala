@@ -4,6 +4,7 @@ import com.google.common.base.Charsets
 import com.google.common.primitives.{Bytes, Ints}
 import com.softwaremill.diffx.{Derived, Diff}
 import com.wavesplatform.dex.api.ws.protocol.WsError
+import com.wavesplatform.dex.api.ws.entities.WsMatchTransactionInfo
 import com.wavesplatform.dex.asset.DoubleOps
 import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.db.TestRateDb
@@ -11,9 +12,11 @@ import com.wavesplatform.dex.domain.account.{Address, KeyPair}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.crypto.Proofs
 import com.wavesplatform.dex.domain.model.{Normalization, Price}
 import com.wavesplatform.dex.domain.order.OrderOps._
 import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV3}
+import com.wavesplatform.dex.domain.transaction.{ExchangeTransactionResult, ExchangeTransactionV2}
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.domain.{crypto => wcrypto}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
@@ -51,6 +54,12 @@ trait MatcherSpecBase
   _: Suite =>
 
   implicit override def patienceConfig: PatienceConfig = PatienceConfig(2.seconds, 5.millis)
+
+  implicit protected val wsMatchTransactionInfoDiff: Derived[Diff[WsMatchTransactionInfo]] = Derived(
+    Diff.gen[WsMatchTransactionInfo].value
+      .ignore[WsMatchTransactionInfo, ByteStr](_.txId)
+      .ignore[WsMatchTransactionInfo, Long](_.timestamp)
+  )
 
   implicit protected def wsErrorDiff: Derived[Diff[WsError]] = Derived(Diff.gen[WsError].ignore[WsError, Long](_.timestamp))
 
@@ -521,5 +530,29 @@ trait MatcherSpecBase
   protected def addr(seed: String): Address = privateKey(seed).toAddress
   protected def privateKey(seed: String): KeyPair = KeyPair(seed.getBytes("utf-8"))
   protected def nowTs: Long = System.currentTimeMillis()
+
+  protected def mkExchangeTx(oe: OrderExecuted): ExchangeTransactionResult[ExchangeTransactionV2] = {
+    val (sellOrder, buyOrder) = if (oe.counter.isSellOrder) (oe.counter, oe.submitted) else (oe.submitted, oe.counter)
+    mkExchangeTx(buyOrder.order, sellOrder.order)
+  }
+
+  protected def mkExchangeTx(buyOrder: Order, sellOrder: Order): ExchangeTransactionResult[ExchangeTransactionV2] = ExchangeTransactionV2
+    .create(
+      buyOrder = buyOrder,
+      sellOrder = sellOrder,
+      amount = sellOrder.amount,
+      price = sellOrder.price,
+      buyMatcherFee = buyOrder.matcherFee,
+      sellMatcherFee = sellOrder.matcherFee,
+      fee = 300000L,
+      timestamp = nowTs,
+      proofs = Proofs.empty
+    )
+
+  protected def mkSeqWsMatchTxInfo(price: Double, amount: Double): Seq[WsMatchTransactionInfo] =
+    Seq(mkWsMatchTxInfo(price, amount))
+
+  protected def mkWsMatchTxInfo(price: Double, amount: Double): WsMatchTransactionInfo =
+    WsMatchTransactionInfo(ByteStr.empty, 0L, price, amount, amount * price)
 
 }

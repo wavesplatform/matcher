@@ -17,18 +17,19 @@ trait WsMessageOps {
     def squashed: Map[Order.Id, WsOrder] =
       self
         .groupBy(_.id)
-        .map {
+        .flatMap {
           case (id, orderChanges) =>
-            id -> orderChanges.foldLeft(orderChanges.head) {
+            orderChanges.reduceLeftOption[WsOrder] {
               case (acc, oc) =>
                 acc.copy(
                   status = oc.status,
                   filledAmount = oc.filledAmount,
                   filledFee = oc.filledFee,
                   avgWeighedPrice = oc.avgWeighedPrice,
-                  totalExecutedPriceAssets = oc.totalExecutedPriceAssets
+                  totalExecutedPriceAssets = oc.totalExecutedPriceAssets,
+                  matchInfo = acc.matchInfo ++ oc.matchInfo
                 )
-            }
+            }.map(c => id -> c)
         }
 
   }

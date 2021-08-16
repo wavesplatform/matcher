@@ -4,14 +4,17 @@ import cats.syntax.option._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.Implicits.releasable
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus
+import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.api.ws.connection.WsConnection
-import com.wavesplatform.dex.api.ws.entities.{WsAddressBalancesFilter, WsBalances, WsOrder}
+import com.wavesplatform.dex.api.ws.entities.{WsAddressBalancesFilter, WsBalances, WsMatchTransactionInfo, WsOrder}
 import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsAddressSubscribe, WsError, WsUnsubscribe}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.account.KeyPair.toAddress
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
+import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.model.Denormalization
+import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.error.{AddressAndPublicKeyAreIncompatible, SubscriptionTokenExpired, SubscriptionsLimitReached}
 import com.wavesplatform.dex.it.test.Scripts
@@ -189,7 +192,8 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
               filledAmount = 15.0,
               filledFee = 0.0009,
               avgWeighedPrice = 1.2,
-              totalExecutedPriceAssets = 18
+              totalExecutedPriceAssets = 18,
+              matchInfo = WsMatchTransactionInfo(ByteStr.empty, 0L, 1.2, 15.0, 18.0)
             ),
             WsOrder(
               mo.id,
@@ -197,7 +201,8 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
               filledAmount = 40.0,
               filledFee = 0.0024,
               avgWeighedPrice = 1.1375,
-              totalExecutedPriceAssets = 45.5
+              totalExecutedPriceAssets = 45.5,
+              matchInfo = WsMatchTransactionInfo(ByteStr.empty, 0L, 1.1, 25.0, 27.5)
             ),
             WsOrder(
               mo.id,
@@ -205,7 +210,8 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
               filledAmount = 50.0,
               filledFee = 0.003,
               avgWeighedPrice = 1.11,
-              totalExecutedPriceAssets = 55.5
+              totalExecutedPriceAssets = 55.5,
+              matchInfo = WsMatchTransactionInfo(ByteStr.empty, 0L, 1.0, 10.0, 10.0)
             )
           )
         }
@@ -237,7 +243,8 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
               filledAmount = 10.0,
               filledFee = 0.003,
               avgWeighedPrice = 1.0,
-              totalExecutedPriceAssets = 10
+              totalExecutedPriceAssets = 10,
+              matchInfo = WsMatchTransactionInfo(ByteStr.empty, 0L, 1.0, 10.0, 10.0)
             )
           )
         }
@@ -278,7 +285,8 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
                     filledAmount = 5.0.some,
                     filledFee = 0.0015.some,
                     avgWeighedPrice = 1.0.some,
-                    totalExecutedPriceAssets = 5.0.some
+                    totalExecutedPriceAssets = 5.0.some,
+                    matchInfo = Seq(WsMatchTransactionInfo(ByteStr.empty, 0L, 1.0, 5.0, 5.0))
                   )
               )
             )
@@ -303,7 +311,6 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           assertChanges(wsc, squash = false)(Map(Waves -> WsBalances(10, 0), usd -> WsBalances(10, 0)))()
           broadcastAndAwait(mkTransfer(acc, alice.toAddress, 2.usd, usd, feeAmount = 1.waves))
           assertChanges(wsc)(Map(Waves -> WsBalances(9, 0), usd -> WsBalances(8, 0)))()
-
         }
       }
 
@@ -503,6 +510,140 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
         }
       }
     }
+
+    "send matchTxInfo on order executions" - {
+
+      "when order partially filled" in {
+        val acc = mkAccountWithBalance(100.waves -> Waves, 50.usd -> usd)
+        Using(mkWsAddressConnection(acc)) { wsc =>
+          assertChanges(wsc, squash = false)(Map(usd -> WsBalances(50, 0), Waves -> WsBalances(100, 0)))()
+
+          val order = mkOrder(acc, wavesUsdPair, OrderType.SELL, 10.waves, 1.usd)
+          placeAndAwaitAtDex(order)
+
+          val firstCounterOrder = mkOrder(alice, wavesUsdPair, OrderType.BUY, 4.5.waves, 1.usd)
+          placeAndAwaitAtDex(firstCounterOrder, Status.Filled)
+
+          eventually(wsc.orderChanges should matchTo(List(
+            WsOrder.fromDomain(LimitOrder(order)),
+            WsOrder(
+              order.id(),
+              status = OrderStatus.PartiallyFilled.name,
+              filledAmount = 4.5,
+              filledFee = 0.00135,
+              avgWeighedPrice = 1.0,
+              totalExecutedPriceAssets = 4.5,
+              matchInfo = WsMatchTransactionInfo(ByteStr.empty, 0L, 1.0, 4.5, 4.5)
+            )
+          )))
+          wsc.clearMessages()
+
+          val secondCounterOrder = mkOrder(alice, wavesUsdPair, OrderType.BUY, 4.waves, 1.usd)
+          placeAndAwaitAtDex(secondCounterOrder, Status.Filled)
+
+          eventually(wsc.orderChanges should matchTo(List(WsOrder(
+            order.id(),
+            status = OrderStatus.PartiallyFilled.name,
+            filledAmount = 8.5,
+            filledFee = 0.00255,
+            avgWeighedPrice = 1.0,
+            totalExecutedPriceAssets = 8.5,
+            WsMatchTransactionInfo(ByteStr.empty, 0L, 1, 4.0, 4.0)
+          ))))
+        }
+        dex1.api.cancelAllOrdersWithSig(acc)
+      }
+
+      "when order filled" in {
+        val acc = mkAccountWithBalance(100.waves -> Waves, 50.usd -> usd)
+        Using(mkWsAddressConnection(acc)) { wsc =>
+          val order = mkOrder(acc, wavesUsdPair, OrderType.SELL, 10.waves, 1.usd)
+          placeAndAwaitAtDex(order)
+
+          eventually(wsc.orderChanges should matchTo(List(WsOrder.fromDomain(LimitOrder(order)))))
+          wsc.clearMessages()
+
+          val counterOrder = mkOrder(alice, wavesUsdPair, OrderType.BUY, 10.waves, 1.usd)
+          placeAndAwaitAtDex(counterOrder, Status.Filled)
+
+          eventually(wsc.orderChanges should matchTo(List(WsOrder(
+            order.id(),
+            status = OrderStatus.Filled.name,
+            filledAmount = 10.0,
+            filledFee = 0.003,
+            avgWeighedPrice = 1.0,
+            totalExecutedPriceAssets = 10.0,
+            WsMatchTransactionInfo(ByteStr.empty, 0L, 1, 10.0, 10.0)
+          ))))
+        }
+        dex1.api.cancelAllOrdersWithSig(acc)
+      }
+
+      "when filling market order" in {
+        val acc = mkAccountWithBalance(100.waves -> Waves, 150.usd -> usd)
+        Using(mkWsAddressConnection(acc)) { wsc =>
+          val aliceOrders = Seq(
+            mkOrder(acc, wavesUsdPair, OrderType.SELL, 10.waves, 1.2.usd),
+            mkOrder(acc, wavesUsdPair, OrderType.SELL, 20.waves, 1.1.usd),
+            mkOrder(acc, wavesUsdPair, OrderType.SELL, 30.waves, 1.3.usd)
+          )
+          val accountsOrder = mkOrder(acc, wavesUsdPair, OrderType.BUY, 50.waves, 1.3.usd)
+
+          aliceOrders.foreach(dex1.api.place)
+          aliceOrders.foreach(order => dex1.api.waitForOrderStatus(order, Status.Accepted))
+          dex1.api.placeMarket(accountsOrder)
+          dex1.api.waitForOrderStatus(accountsOrder, Status.Filled)
+
+          eventually(wsc.orderChanges.squashed(accountsOrder.id()) should matchTo(WsOrder.fromDomain(MarketOrder(
+            accountsOrder,
+            Long.MaxValue
+          )).copy(
+            status = OrderStatus.Filled.name.some,
+            filledAmount = 50.0.some,
+            filledFee = 0.003.some,
+            avgWeighedPrice = 1.2.some,
+            totalExecutedPriceAssets = 60.0.some,
+            matchInfo = Seq(
+              WsMatchTransactionInfo(ByteStr.empty, 0L, 1.1, 20.0, 22.0),
+              WsMatchTransactionInfo(ByteStr.empty, 0L, 1.2, 10.0, 12.0),
+              WsMatchTransactionInfo(ByteStr.empty, 0L, 1.3, 20.0, 26.0)
+            )
+          )))
+        }
+      }
+
+      "when trading with itself" in {
+        def copyWithCommonPart(wsOrder: WsOrder): WsOrder = wsOrder.copy(
+          status = OrderStatus.Filled.name.some,
+          filledAmount = 10.0.some,
+          filledFee = 0.003.some,
+          avgWeighedPrice = 1.0.some,
+          totalExecutedPriceAssets = 10.0.some,
+          matchInfo = Seq(WsMatchTransactionInfo(ByteStr.empty, 0L, 1, 10.0, 10.0))
+        )
+
+        val acc = mkAccountWithBalance(100.usd -> usd, 50.waves -> Waves)
+        Using(mkWsAddressConnection(acc)) { wsc =>
+          val order1 = mkOrder(acc, wavesUsdPair, OrderType.SELL, 10.waves, 1.usd)
+          placeAndAwaitAtDex(order1)
+
+          val order2 = mkOrder(acc, wavesUsdPair, OrderType.BUY, 10.waves, 1.usd)
+          placeAndAwaitAtDex(order2, Status.Filled)
+
+          eventually {
+            val orderChanges = wsc.orderChanges.squashed
+            orderChanges(order1.id()) should matchTo(
+              copyWithCommonPart(WsOrder.fromDomain(LimitOrder(order1)))
+            )
+            orderChanges(order2.id()) should matchTo(
+              copyWithCommonPart(WsOrder.fromDomain(LimitOrder(order2)))
+            )
+
+            orderChanges(order1.id()).matchInfo.head.txId shouldBe orderChanges(order2.id()).matchInfo.head.txId
+          }
+        }
+      }
+    }
   }
 
   "Second connection should get the actual data" in {
@@ -562,7 +703,6 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
   }
 
   "Subscription should be cancelled after jwt expiration" in {
-
     val acc = mkAccountWithBalance(10.waves -> Waves)
     Using.resource(mkWsAddressConnection(acc, dex1, subscriptionLifetime = 3.seconds)) { wsc =>
       wsc.receiveAtLeastN[WsAddressChanges](1) // snapshot

@@ -3,11 +3,13 @@ package com.wavesplatform.dex.it.api.websockets
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.Uri
 import akka.stream.Materializer
+import com.softwaremill.diffx.{Derived, Diff}
 import com.wavesplatform.dex.api.ws.connection.{WsConnection, WsConnectionOps}
-import com.wavesplatform.dex.api.ws.entities.{WsAddressBalancesFilter, WsBalances, WsOrder}
+import com.wavesplatform.dex.api.ws.entities.{WsAddressBalancesFilter, WsBalances, WsMatchTransactionInfo, WsOrder}
 import com.wavesplatform.dex.api.ws.protocol._
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.fp.MapImplicits.MapOps
 import com.wavesplatform.dex.it.config.PredefinedAssets
@@ -28,6 +30,12 @@ trait HasWebSockets extends BeforeAndAfterAll with BeforeAndAfterEach with HasJw
   implicit protected val system: ActorSystem = ActorSystem()
   implicit protected val materializer: Materializer = Materializer.matFromSystem(system)
   implicit protected val efc: ErrorFormatterContext = ErrorFormatterContext.from(assetDecimalsMap)
+
+  implicit protected val wsMatchTransactionInfoDiff: Derived[Diff[WsMatchTransactionInfo]] = Derived(
+    Diff.gen[WsMatchTransactionInfo].value
+      .ignore[WsMatchTransactionInfo, ByteStr](_.txId)
+      .ignore[WsMatchTransactionInfo, Long](_.timestamp)
+  )
 
   protected def getWsStreamUri(dex: DexContainer, query: Map[String, String] = Map.empty): Uri =
     Uri
@@ -126,7 +134,8 @@ trait HasWebSockets extends BeforeAndAfterAll with BeforeAndAfterEach with HasJw
     filledAmount = diff.filledAmount.orElse(orig.filledAmount),
     filledFee = diff.filledFee.orElse(orig.filledFee),
     avgWeighedPrice = diff.avgWeighedPrice.orElse(orig.avgWeighedPrice),
-    totalExecutedPriceAssets = diff.totalExecutedPriceAssets.orElse(orig.totalExecutedPriceAssets)
+    totalExecutedPriceAssets = diff.totalExecutedPriceAssets.orElse(orig.totalExecutedPriceAssets),
+    matchInfo = (orig.matchInfo ++ diff.matchInfo).distinct
   )
 
   protected def mergeAddressChanges(orig: WsAddressChanges, diff: WsAddressChanges): WsAddressChanges = WsAddressChanges(

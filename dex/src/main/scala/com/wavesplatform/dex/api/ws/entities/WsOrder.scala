@@ -27,7 +27,8 @@ case class WsOrder(
   filledAmount: Option[Double] = None,
   filledFee: Option[Double] = None,
   avgWeighedPrice: Option[Double] = None,
-  totalExecutedPriceAssets: Option[Double] = None
+  totalExecutedPriceAssets: Option[Double] = None,
+  matchInfo: Seq[WsMatchTransactionInfo] = Seq.empty
 )
 
 object WsOrder {
@@ -65,6 +66,15 @@ object WsOrder {
 
   def apply(
     id: Order.Id,
+    matchInfo: WsMatchTransactionInfo
+  ): WsOrder =
+    WsOrder(
+      id,
+      matchInfo = Seq(matchInfo)
+    )
+
+  def apply(
+    id: Order.Id,
     status: String,
     filledAmount: Double,
     filledFee: Double,
@@ -78,6 +88,25 @@ object WsOrder {
       filledFee = filledFee.some,
       avgWeighedPrice = avgWeighedPrice.some,
       totalExecutedPriceAssets = totalExecutedPriceAssets.some
+    )
+
+  def apply(
+    id: Order.Id,
+    status: String,
+    filledAmount: Double,
+    filledFee: Double,
+    avgWeighedPrice: Double,
+    totalExecutedPriceAssets: Double,
+    matchInfo: WsMatchTransactionInfo
+  ): WsOrder =
+    WsOrder(
+      id,
+      status = status.some,
+      filledAmount = filledAmount.some,
+      filledFee = filledFee.some,
+      avgWeighedPrice = avgWeighedPrice.some,
+      totalExecutedPriceAssets = totalExecutedPriceAssets.some,
+      matchInfo = Seq(matchInfo)
     )
 
   def apply(id: Order.Id, status: String): WsOrder = WsOrder(id, status = status.some)
@@ -119,7 +148,8 @@ object WsOrder {
         (__ \ "q").formatNullable[Double](doubleAsStringFormat) and // filled amount
         (__ \ "Q").formatNullable[Double](doubleAsStringFormat) and // filled fee
         (__ \ "r").formatNullable[Double](doubleAsStringFormat) and // average weighed price among all trades
-        (__ \ "E").formatNullable[Double](doubleAsStringFormat) // total executed price assets
+        (__ \ "E").formatNullable[Double](doubleAsStringFormat) and // total executed price assets
+        (__ \ "m").format[Seq[WsMatchTransactionInfo]] // match transaction information (such as executed asset amount and etc)
     )(WsOrder.apply, unlift(WsOrder.unapply))
 
 }

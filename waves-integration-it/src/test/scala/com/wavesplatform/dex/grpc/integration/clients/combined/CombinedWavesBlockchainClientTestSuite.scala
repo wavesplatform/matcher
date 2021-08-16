@@ -10,7 +10,6 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionV2}
-import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.grpc.integration.IntegrationSuiteBase
 import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
 import com.wavesplatform.dex.grpc.integration.clients.domain.portfolio.SynchronizedPessimisticPortfolios
@@ -212,8 +211,7 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
             sellMatcherFee = matcherFee,
             fee = matcherFee,
             timestamp = now
-          )
-          .explicitGet()
+          ).transaction
 
       client.broadcastTx(exchangeTx).futureValue shouldBe a[BroadcastResult.Failed]
     }

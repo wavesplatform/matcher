@@ -176,7 +176,7 @@ object OrderValidator extends ScorexLogging {
       lazy val exchangeTx: Result[ExchangeTransaction] = {
         val fakeOrder: Order = order.updateType(order.orderType.opposite)
         val oe: OrderExecuted = OrderExecuted(LimitOrder(fakeOrder), LimitOrder(order), time.correctedTime(), order.matcherFee, order.matcherFee)
-        transactionCreator(oe) leftMap (txValidationError => error.CanNotCreateExchangeTransaction(txValidationError.toString))
+        transactionCreator(oe).toEither leftMap (txValidationError => error.CanNotCreateExchangeTransaction(txValidationError.toString))
       }
 
       def verifyAssetScript(assetId: Asset): FutureResult[Unit] = assetId.fold(successAsync) { assetId =>

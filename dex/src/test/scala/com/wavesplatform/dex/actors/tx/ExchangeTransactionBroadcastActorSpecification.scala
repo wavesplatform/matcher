@@ -9,7 +9,6 @@ import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.crypto.Proofs
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionV2}
-import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.grpc.integration.clients.CheckedBroadcastResult
 import com.wavesplatform.dex.time.{TestTime, Time}
 import org.scalamock.scalatest.PathMockFactory
@@ -300,8 +299,7 @@ class ExchangeTransactionBroadcastActorSpecification
           fee = 300000L,
           timestamp = createdTs,
           proofs = Proofs.empty
-        )
-        .explicitGet()
+        ).transaction
     )
   }
 

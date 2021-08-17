@@ -1,18 +1,18 @@
 package com.wavesplatform.it.sync.networking
 
-import com.github.dockerjava.api.command.CreateNetworkResponse
+import com.github.dockerjava.api.command.CreateNetworkCmd
+import com.github.dockerjava.api.model.ContainerNetwork
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType
-import com.wavesplatform.dex.it.docker.DexContainer
+import com.wavesplatform.dex.it.docker.{DexContainer, WavesNodeContainer}
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.tags.DexItExternalKafkaRequired
+import org.testcontainers.containers.Network
 
 import java.util.concurrent.ThreadLocalRandom
 import scala.jdk.CollectionConverters.MapHasAsScala
-import scala.util.Using
-import scala.util.Using.Releasable
 
 @DexItExternalKafkaRequired
 class MultipleMatchersOrderCancelTestSuite extends MatcherSuiteBase {
@@ -23,40 +23,47 @@ class MultipleMatchersOrderCancelTestSuite extends MatcherSuiteBase {
        |}""".stripMargin
   )
 
+  private lazy val internalNetwork =
+    Network
+      .builder()
+      .createNetworkCmdModifier { cmd: CreateNetworkCmd =>
+        cmd
+          .withName(s"MultipleMatchersOrderCancelTestSuite${ThreadLocalRandom.current().nextInt()}")
+          .withInternal(true) // Disable internet, thus break Kafka connection
+      }
+      .build()
+
+  // Matchers will connect to this Node through the internalNetwork
+  override protected lazy val wavesNode1: WavesNodeContainer = createWavesNode("waves-1", netAlias = None)
   protected lazy val dex2: DexContainer = createDex("dex-2")
-
-  private lazy val internalNetwork = dex1.dockerClient
-    .createNetworkCmd()
-    .withDriver("bridge")
-    .withName(s"MultipleMatchersOrderCancelTestSuite${ThreadLocalRandom.current().nextInt()}")
-    .withInternal(true) // Disable internet, thus break Kafka connection
-    .exec()
-
-  private lazy val containers = List(wavesNode1.container, dex1.container, dex2.container)
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
-    broadcastAndAwait(IssueUsdTx, IssueEthTx)
-    dex1.start()
-    dex2.start()
-    containers.foreach { container =>
-      dex1.dockerClient
-        .connectToNetworkCmd()
-        .withContainerId(container.getContainerId)
-        .withNetworkId(internalNetwork.getId)
-        .exec()
-    }
-  }
+    val containerNetwork = new ContainerNetwork().withNetworkID(internalNetwork.getId).withAliases(WavesNodeContainer.wavesNodeNetAlias)
 
-  override protected def afterAll(): Unit = {
-    containers.foreach { container =>
-      dex1.dockerClient
-        .disconnectFromNetworkCmd()
-        .withContainerId(container.getContainerId)
-        .withNetworkId(internalNetwork.getId)
-        .exec()
-    }
-    super.afterAll()
+    dex1.dockerClient
+      .connectToNetworkCmd()
+      .withContainerId(wavesNode1.containerId)
+      .withContainerNetwork(containerNetwork)
+      .exec()
+
+    broadcastAndAwait(IssueUsdTx, IssueEthTx)
+
+    dex1.beginStart()
+    dex1.dockerClient
+      .connectToNetworkCmd()
+      .withContainerId(dex1.containerId)
+      .withContainerNetwork(new ContainerNetwork().withNetworkID(internalNetwork.getId))
+      .exec()
+    dex1.endStart()
+
+    dex2.beginStart()
+    dex2.dockerClient
+      .connectToNetworkCmd()
+      .withContainerId(dex2.containerId)
+      .withContainerNetwork(new ContainerNetwork().withNetworkID(internalNetwork.getId))
+      .exec()
+    dex2.endStart()
   }
 
   /**
@@ -113,7 +120,7 @@ class MultipleMatchersOrderCancelTestSuite extends MatcherSuiteBase {
       .dropWhile(_.getNetworkSettings.getNetworks.containsKey(defaultNetworkName))
       .take(1)
       .foreach { _ =>
-        step("dex1: isolated")
+        step("dex1: disconnected")
       }
 
     val submittedOrders = (0 to 2).map { i =>

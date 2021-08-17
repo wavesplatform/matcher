@@ -1,6 +1,18 @@
 package com.wavesplatform.dex.it.api
 
 import cats.implicits.catsStdInstancesForTry
+import cats.instances.future._
+import com.github.dockerjava.api.command.CreateNetworkCmd
+import com.github.dockerjava.api.model.Network.Ipam
+import com.google.common.primitives.Ints.toByteArray
+import com.google.common.util.concurrent.ThreadFactoryBuilder
+import com.wavesplatform.dex.domain.utils.ScorexLogging
+import com.wavesplatform.dex.it.docker.BaseContainer
+import com.wavesplatform.dex.it.sttp.LoggingSttpBackend
+import org.asynchttpclient.DefaultAsyncHttpClientConfig
+import org.testcontainers.containers.Network
+import sttp.client3._
+import sttp.client3.asynchttpclient.future.AsyncHttpClientFutureBackend
 
 import java.net.InetAddress
 import java.nio.file.{Files, Path, Paths}
@@ -8,22 +20,8 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicReference
-import com.github.dockerjava.api.command.CreateNetworkCmd
-import com.github.dockerjava.api.model.Network.Ipam
-import com.google.common.primitives.Ints.toByteArray
-import com.google.common.util.concurrent.ThreadFactoryBuilder
-import sttp.client3._
-import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.it.docker.BaseContainer
-import com.wavesplatform.dex.it.sttp.LoggingSttpBackend
-import mouse.any._
-import org.asynchttpclient.DefaultAsyncHttpClientConfig
-import org.testcontainers.containers.Network
-import org.testcontainers.containers.Network.NetworkImpl
-import sttp.client3.asynchttpclient.future.AsyncHttpClientFutureBackend
-import cats.instances.future._
-
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.chaining._
 import scala.util.{Random, Try}
 
 trait BaseContainersKit extends ScorexLogging {
@@ -36,7 +34,7 @@ trait BaseContainersKit extends ScorexLogging {
 
   protected val networkName = s"waves-${Random.nextInt(Int.MaxValue)}"
 
-  protected val network: NetworkImpl =
+  protected val network: Network =
     Network
       .builder()
       .createNetworkCmdModifier { cmd: CreateNetworkCmd =>
@@ -110,7 +108,7 @@ trait BaseContainersKit extends ScorexLogging {
     Option(System.getProperty("waves.it.logging.dir"))
       .map(Paths get _)
       .getOrElse(defaultDir)
-      .unsafeTap(Files.createDirectories(_))
+      .tap(Files.createDirectories(_))
   }
 
   protected def stopBaseContainers(): Unit = {

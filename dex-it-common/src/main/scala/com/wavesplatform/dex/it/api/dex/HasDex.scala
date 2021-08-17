@@ -46,7 +46,7 @@ trait HasDex { self: BaseContainersKit =>
   ): DexContainer =
     DexContainer(name, networkName, network, getIp(name), runConfig, suiteInitialConfig, localLogsDir, image) unsafeTap addKnownContainer
 
-  lazy val dex1: DexContainer = createDex("dex-1")
+  protected lazy val dex1: DexContainer = createDex("dex-1")
 
   protected def createKafkaTopic(name: String, server: Option[String] = kafkaServer): Unit = server.foreach { server =>
     val adminClient = mkKafkaAdminClient(server)

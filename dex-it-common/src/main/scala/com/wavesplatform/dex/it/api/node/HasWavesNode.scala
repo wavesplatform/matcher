@@ -38,5 +38,5 @@ trait HasWavesNode { self: BaseContainersKit =>
       netAlias
     ) unsafeTap addKnownContainer
 
-  lazy val wavesNode1: WavesNodeContainer = createWavesNode("waves-1")
+  protected lazy val wavesNode1: WavesNodeContainer = createWavesNode("waves-1")
 }

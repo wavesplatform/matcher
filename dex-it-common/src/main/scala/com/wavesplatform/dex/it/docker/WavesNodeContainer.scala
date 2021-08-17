@@ -1,7 +1,5 @@
 package com.wavesplatform.dex.it.docker
 
-import java.net.InetSocketAddress
-import java.nio.file.{Path, Paths}
 import cats.tagless.FunctorK
 import com.dimafeng.testcontainers.GenericContainer
 import com.typesafe.config.Config
@@ -13,10 +11,11 @@ import com.wavesplatform.dex.it.cache.CachedData
 import com.wavesplatform.dex.it.resources.getRawContentFromResource
 import com.wavesplatform.dex.it.sttp.LoggingSttpBackend
 import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
-import org.testcontainers.containers.BindMode
-import org.testcontainers.containers.Network.NetworkImpl
+import org.testcontainers.containers.{BindMode, Network}
 import sttp.model.StatusCode
 
+import java.net.InetSocketAddress
+import java.nio.file.{Path, Paths}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
@@ -100,7 +99,7 @@ object WavesNodeContainer extends ScorexLogging {
   def apply(
     name: String,
     networkName: String,
-    network: NetworkImpl,
+    network: Network,
     internalIp: String,
     runConfig: Config,
     suiteInitialConfig: Config,

@@ -49,7 +49,7 @@ class NTP(ntpServer: String) extends Time with ScorexLogging with AutoCloseable 
         case _: SocketTimeoutException =>
           None
         case t: Throwable =>
-          log.warn("Problems with NTP: ", t)
+          log.warn(s"Problems with NTP: ${Option(t.getMessage).getOrElse(t.getClass.getName)}")
           None
       }
     }

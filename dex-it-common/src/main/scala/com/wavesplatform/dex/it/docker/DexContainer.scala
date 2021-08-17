@@ -16,15 +16,13 @@ import com.wavesplatform.dex.it.fp.CanRepeat
 import com.wavesplatform.dex.it.resources.getRawContentFromResource
 import com.wavesplatform.dex.it.sttp.LoggingSttpBackend
 import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
-import org.testcontainers.containers.BindMode
-import org.testcontainers.containers.Network.NetworkImpl
+import org.testcontainers.containers.{BindMode, Network}
 
 import java.net.InetSocketAddress
 import java.nio.file.{Path, Paths}
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.Try
-
 import scala.jdk.CollectionConverters._
+import scala.util.Try
 
 final case class DexContainer private (override val internalIp: String, underlying: GenericContainer)(
   implicit
@@ -116,7 +114,7 @@ object DexContainer extends ScorexLogging {
   def apply(
     name: String,
     networkName: String,
-    network: NetworkImpl,
+    network: Network,
     internalIp: String,
     runConfig: Config,
     suiteInitialConfig: Config,

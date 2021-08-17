@@ -22,20 +22,21 @@ trait HasDex { self: BaseContainersKit =>
 
   protected def dexInitialSuiteConfig: Config = ConfigFactory.empty()
 
-  protected lazy val dexRunConfig: Config = dexQueueConfig(ThreadLocalRandom.current.nextInt(0, Int.MaxValue))
+  protected val kafkaTopicName = s"dex-${ThreadLocalRandom.current.nextInt(0, Int.MaxValue)}"
+
+  protected lazy val dexRunConfig: Config = kafkaServer.fold(ConfigFactory.empty())(dexQueueConfig(_, kafkaTopicName))
 
   protected def kafkaServer: Option[String] = Option(System.getenv("KAFKA_SERVER"))
 
-  protected def dexQueueConfig(queueId: Int): Config =
-    kafkaServer.fold(ConfigFactory.empty()) { kafkaServer =>
-      ConfigFactory.parseString(s"""waves.dex.events-queue {
-                                   |  type = kafka
-                                   |  kafka {
-                                   |    servers = "$kafkaServer"
-                                   |    topic = "dex-$queueId"
-                                   |  }
-                                   |}""".stripMargin)
-    }
+  protected def dexQueueConfig(kafkaServer: String, topicName: String): Config = ConfigFactory.parseString(
+    s"""waves.dex.events-queue {
+       |  type = kafka
+       |  kafka {
+       |    servers = "$kafkaServer"
+       |    topic = "$topicName"
+       |  }
+       |}""".stripMargin
+  )
 
   protected def createDex(
     name: String,
@@ -45,7 +46,7 @@ trait HasDex { self: BaseContainersKit =>
   ): DexContainer =
     DexContainer(name, networkName, network, getIp(name), runConfig, suiteInitialConfig, localLogsDir, image) unsafeTap addKnownContainer
 
-  lazy val dex1: DexContainer = createDex("dex-1")
+  protected lazy val dex1: DexContainer = createDex("dex-1")
 
   protected def createKafkaTopic(name: String, server: Option[String] = kafkaServer): Unit = server.foreach { server =>
     val adminClient = mkKafkaAdminClient(server)

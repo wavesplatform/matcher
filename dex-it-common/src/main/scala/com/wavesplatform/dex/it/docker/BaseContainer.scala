@@ -157,6 +157,11 @@ abstract class BaseContainer(protected val baseContainerPath: String, private va
   }
 
   override def start(): Unit = {
+    beginStart()
+    endStart()
+  }
+
+  def beginStart(): Unit = {
     Option(underlying.containerId).fold(super.start())(_ => sendStartCmd())
 
     Iterator
@@ -167,7 +172,9 @@ abstract class BaseContainer(protected val baseContainerPath: String, private va
       .zipWithIndex
       .find { case (state, attempt) => state.getRunning || attempt == 20 }
       .fold(log.warn(s"Can't start ${underlying.containerId}"))(_ => ())
+  }
 
+  def endStart(): Unit = {
     invalidateCaches()
     logExposedPortsInfo("Started container ")
     waitReady()

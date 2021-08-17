@@ -1,46 +1,33 @@
 package com.wavesplatform.dex.settings
 
+import cats.syntax.option._
 import com.wavesplatform.dex.cli.WavesDexCli.Args
 
 import scala.concurrent.duration.FiniteDuration
-import scala.util.chaining._
 
 final case class CliSettings(
   ignoreUnusedProperties: Seq[String],
-  argsOverrides: ArgsOverrides
+  defaultArgs: DefaultArgs
 )
 
-final case class ArgsOverrides(
-  addressSchemeByte: Option[Char],
-  dexRestApi: Option[String],
+final case class DefaultArgs(
+  addressSchemeByte: Char,
+  dexRestApi: String,
   nodeRestApi: Option[String],
   authServiceRestApi: Option[String],
-  timeout: Option[FiniteDuration]
+  timeout: FiniteDuration
 ) {
 
   // noinspection ScalaStyle
-  def updateArgs(args: Args): Args = {
-    val overrideAddressSchemeByte = addressSchemeByte
-      .tap(_.foreach(x => println(s"overriding address scheme byte with [$x]")))
-      .orElse(args.addressSchemeByte)
-    val overrideDexRestApi = dexRestApi
-      .filterNot(_.isEmpty)
-      .tap(_.foreach(x => println(s"overriding dex rest api with [$x]")))
-      .getOrElse(args.dexRestApi)
-    val overrideNodeRestApi = nodeRestApi
-      .filterNot(_.isEmpty)
-      .tap(_.foreach(x => println(s"overriding node rest api with [$x]")))
-      .getOrElse(args.nodeRestApi)
-    val overrideAuthServiceRestApi = authServiceRestApi
-      .filterNot(_.isEmpty)
-      .tap(_.foreach(x => println(s"overriding auth service rest api with [$x]")))
-      .orElse(args.authServiceRestApi)
-    val overrideTimeout = timeout
-      .tap(_.foreach(x => println(s"overriding timeout with [$x]")))
-      .getOrElse(args.timeout)
+  def coverEmptyValues(args: Args): Args = {
+    val overrideAddressSchemeByte = args.addressSchemeByte.getOrElse(addressSchemeByte)
+    val overrideDexRestApi = if (args.dexRestApi.isEmpty) dexRestApi else args.dexRestApi
+    val overrideNodeRestApi = if (args.nodeRestApi.isEmpty) nodeRestApi.getOrElse("") else args.nodeRestApi
+    val overrideAuthServiceRestApi = if (args.authServiceRestApi.isEmpty) authServiceRestApi else args.authServiceRestApi
+    val overrideTimeout = if (args.timeout.length == 0) args.timeout else args.timeout
 
     args.copy(
-      addressSchemeByte = overrideAddressSchemeByte,
+      addressSchemeByte = overrideAddressSchemeByte.some,
       dexRestApi = overrideDexRestApi,
       nodeRestApi = overrideNodeRestApi,
       authServiceRestApi = overrideAuthServiceRestApi,

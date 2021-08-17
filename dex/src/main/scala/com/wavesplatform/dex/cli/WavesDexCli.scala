@@ -4,12 +4,12 @@ import cats.Id
 import cats.instances.either._
 import cats.syntax.either._
 import cats.syntax.option._
-import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory.parseFile
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex._
-import com.wavesplatform.dex.app.{forceStopApplication, MatcherStateCheckingFailedError}
-import com.wavesplatform.dex.db.leveldb.{openDb, LevelDb}
+import com.wavesplatform.dex.app.{MatcherStateCheckingFailedError, forceStopApplication}
 import com.wavesplatform.dex.db._
+import com.wavesplatform.dex.db.leveldb.{LevelDb, openDb}
 import com.wavesplatform.dex.doc.MatcherErrorDoc
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair}
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
@@ -19,7 +19,7 @@ import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.error.Implicits.ThrowableOps
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.OrderBookSideSnapshot
-import com.wavesplatform.dex.settings.{loadMatcherSettings, MatcherSettings}
+import com.wavesplatform.dex.settings.{MatcherSettings, loadMatcherSettings}
 import com.wavesplatform.dex.tool._
 import com.wavesplatform.dex.tool.connectors.SuperConnector
 import monix.eval.Task
@@ -434,6 +434,11 @@ object WavesDexCli extends ScoptImplicits {
           .text("The network byte as char. By default it is the testnet: 'T'")
           .valueName("<one char>")
           .action((x, s) => s.copy(addressSchemeByte = x.some)),
+        opt[String]("dex-config")
+          .abbr("dc")
+          .text("DEX config path")
+          .valueName("<raw-string>")
+          .action((x, s) => s.copy(configPath = x)),
         cmd(Command.GenerateAccountSeed.name)
           .action((_, s) => s.copy(command = Command.GenerateAccountSeed.some))
           .text("Generates an account seed from base seed and nonce")
@@ -714,35 +719,44 @@ object WavesDexCli extends ScoptImplicits {
       }.fold(error => throw new RuntimeException(error), identity)
 
     // noinspection ScalaStyle
-    OParser.parse(parser, rawArgs, Args()).foreach { args =>
-      lazy val (config, matcherSettings) = loadAllConfigsUnsafe(args.configPath)
-      val argsOverrides = matcherSettings.cli.argsOverrides
-      val updatedArgs = argsOverrides.updateArgs(args)
-      updatedArgs.command match {
-        case None => println(OParser.usage(parser, RenderingMode.TwoColumns))
-        case Some(command) =>
-          println(s"Running '${command.name}' command")
-          AddressScheme.current = new AddressScheme { override val chainId: Byte = updatedArgs.addressSchemeByte.getOrElse('T').toByte }
-          command match {
-            case Command.GenerateAccountSeed => generateAccountSeed(updatedArgs)
-            case Command.CreateAccountStorage => createAccountStorage(updatedArgs)
-            case Command.CreateDocumentation => createDocumentation(updatedArgs)
-            case Command.CreateApiKey => createApiKey(updatedArgs)
-            case Command.CheckServer => checkServer(updatedArgs, config, matcherSettings)
-            case Command.RunComparison => runComparison(updatedArgs)
-            case Command.MakeOrderbookSnapshots => makeSnapshots(updatedArgs)
-            case Command.CheckConfigFile => checkConfig(updatedArgs)
-            case Command.CleanAssets => cleanAssets(updatedArgs, matcherSettings)
-            case Command.InspectAsset => inspectAsset(updatedArgs, matcherSettings)
-            case Command.SetAsset => setAsset(updatedArgs, matcherSettings)
-            case Command.ListAssetPairs => listAssetPairs(updatedArgs, matcherSettings)
-            case Command.InspectOrderBook => inspectOrderBook(updatedArgs, matcherSettings)
-            case Command.DeleteOrderBook => deleteOrderBook(updatedArgs, matcherSettings)
-            case Command.InspectOrder => inspectOrder(updatedArgs, matcherSettings)
-          }
-          println("Done")
+    OParser.parse(parser, rawArgs, Args())
+      .map { args =>
+        args.configPath match {
+          case "" => (args, ConfigFactory.empty(), none[MatcherSettings])
+          case configPath =>
+            lazy val (config, matcherSettings) = loadAllConfigsUnsafe(configPath)
+            val updatedArgs = matcherSettings.cli.defaultArgs.coverEmptyValues(args)
+            (updatedArgs, config, matcherSettings.some)
+        }
       }
-    }
+      .foreach { case (args, config, mayBeMatcherSettings) =>
+        lazy val matcherSettings = mayBeMatcherSettings.getOrElse(throw new RuntimeException("config-path is required"))
+        args.command match {
+          case None => println(OParser.usage(parser, RenderingMode.TwoColumns))
+          case Some(command) =>
+            println(s"Running '${command.name}' command")
+            AddressScheme.current = new AddressScheme { override val chainId: Byte = args.addressSchemeByte.getOrElse('T').toByte }
+            println(s"Current chain id: ${AddressScheme.current.chainId.toChar}")
+            command match {
+              case Command.GenerateAccountSeed => generateAccountSeed(args)
+              case Command.CreateAccountStorage => createAccountStorage(args)
+              case Command.CreateDocumentation => createDocumentation(args)
+              case Command.CreateApiKey => createApiKey(args)
+              case Command.CheckServer => checkServer(args, config, matcherSettings)
+              case Command.RunComparison => runComparison(args)
+              case Command.MakeOrderbookSnapshots => makeSnapshots(args)
+              case Command.CheckConfigFile => checkConfig(args)
+              case Command.CleanAssets => cleanAssets(args, matcherSettings)
+              case Command.InspectAsset => inspectAsset(args, matcherSettings)
+              case Command.SetAsset => setAsset(args, matcherSettings)
+              case Command.ListAssetPairs => listAssetPairs(args, matcherSettings)
+              case Command.InspectOrderBook => inspectOrderBook(args, matcherSettings)
+              case Command.DeleteOrderBook => deleteOrderBook(args, matcherSettings)
+              case Command.InspectOrder => inspectOrder(args, matcherSettings)
+            }
+            println("Done")
+        }
+      }
   }
 
   sealed trait Command {
@@ -852,7 +866,7 @@ object WavesDexCli extends ScoptImplicits {
     orderId: String = "",
     authServiceRestApi: Option[String] = None,
     accountSeed: Option[String] = None,
-    timeout: FiniteDuration = 30 seconds
+    timeout: FiniteDuration = 0 seconds
   )
 
   // noinspection ScalaStyle

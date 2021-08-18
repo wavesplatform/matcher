@@ -8,10 +8,10 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.wavesj.Node
-import im.mak.waves.transactions.IssueTransaction
-import im.mak.waves.transactions.account.{PrivateKey, PublicKey}
-import im.mak.waves.transactions.common.{Amount, AssetId}
-import im.mak.waves.transactions.exchange.{AssetPair, Order, OrderType}
+import com.wavesplatform.transactions.IssueTransaction
+import com.wavesplatform.transactions.account.{PrivateKey, PublicKey}
+import com.wavesplatform.transactions.common.{Amount, AssetId}
+import com.wavesplatform.transactions.exchange.{AssetPair, Order, OrderType}
 import play.api.libs.json.{JsValue, Json}
 import pureconfig.ConfigSource
 import pureconfig.generic.auto._

@@ -10,8 +10,8 @@ import com.wavesplatform.dex.effect.Implicits.FutureCompanionOps
 import com.wavesplatform.dex.it.docker.DexContainer
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.tags.DexItExternalKafkaRequired
-import im.mak.waves.transactions.ExchangeTransaction
-import im.mak.waves.transactions.mass.Transfer
+import com.wavesplatform.transactions.ExchangeTransaction
+import com.wavesplatform.transactions.mass.Transfer
 
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt

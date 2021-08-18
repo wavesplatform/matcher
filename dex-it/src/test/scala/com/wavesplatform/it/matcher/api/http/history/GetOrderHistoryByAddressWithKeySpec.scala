@@ -2,6 +2,7 @@ package com.wavesplatform.it.matcher.api.http.history
 
 import sttp.model.StatusCode
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.api.http.entities.HttpOrderBookHistoryItem
 import com.wavesplatform.dex.domain.account.KeyPair.toAddress
 import com.wavesplatform.dex.domain.order.OrderType.BUY
 import com.wavesplatform.dex.error.InvalidAddress
@@ -41,7 +42,7 @@ class GetOrderHistoryByAddressWithKeySpec extends MatcherSuiteBase with ApiKeyHe
       val historyActive = orders.map { order =>
         placeAndAwaitAtDex(order)
         toHttpOrderBookHistoryItem(order, OrderStatus.Accepted)
-      }.reverse
+      }.sorted(HttpOrderBookHistoryItem.httpOrderBookHistoryItemOrdering)
 
       withClue("active only") {
         validate200Json(
@@ -61,7 +62,7 @@ class GetOrderHistoryByAddressWithKeySpec extends MatcherSuiteBase with ApiKeyHe
       val historyCancelled = orders.map { order =>
         cancelAndAwait(alice, order)
         toHttpOrderBookHistoryItem(order, OrderStatus.Cancelled(0, 0))
-      }.reverse
+      }.sorted(HttpOrderBookHistoryItem.httpOrderBookHistoryItemOrdering)
 
       withClue("closed only") {
         validate200Json(

@@ -7,7 +7,7 @@ import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.error.{AssetNotFound, InvalidAsset}
 import com.wavesplatform.dex.it.api.RawHttpChecks
 import com.wavesplatform.it.MatcherSuiteBase
-import im.mak.waves.transactions.IssueTransaction
+import com.wavesplatform.transactions.IssueTransaction
 import org.scalatest.prop.TableDrivenPropertyChecks
 
 class OrderStatusByAssetPairAndIdSpec extends MatcherSuiteBase with TableDrivenPropertyChecks with RawHttpChecks {

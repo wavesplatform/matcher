@@ -6,10 +6,10 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.it.config.GenesisConfig
-import im.mak.waves.transactions.account.{Address => JAddress, PrivateKey => JPrivateKey, PublicKey => JPublicKey}
-import im.mak.waves.transactions.common.{Amount, AssetId, Id, Proof => JProof}
-import im.mak.waves.transactions.exchange.{Order => JOrder, OrderType => JOrderType}
-import im.mak.waves.transactions.{ExchangeTransaction => JExchangeTransaction}
+import com.wavesplatform.transactions.account.{Address => JAddress, PrivateKey => JPrivateKey, PublicKey => JPublicKey}
+import com.wavesplatform.transactions.common.{Amount, AssetId, Id, Proof => JProof}
+import com.wavesplatform.transactions.exchange.{Order => JOrder, OrderType => JOrderType}
+import com.wavesplatform.transactions.{ExchangeTransaction => JExchangeTransaction}
 
 trait ToWavesJConversions {
 

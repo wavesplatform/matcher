@@ -9,7 +9,7 @@ import com.wavesplatform.dex.it.waves.Implicits._
 import com.wavesplatform.dex.it.waves.MkWavesEntities._
 import com.wavesplatform.dex.model.AssetPairBuilder
 import com.wavesplatform.dex.waves.WavesFeeConstants._
-import im.mak.waves.transactions.IssueTransaction
+import com.wavesplatform.transactions.IssueTransaction
 
 import scala.util.Random
 

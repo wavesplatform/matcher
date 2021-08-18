@@ -11,7 +11,7 @@ import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import com.wavesplatform.dex.it.test.Scripts
 import com.wavesplatform.dex.it.waves.{MkWavesEntities, ToWavesJConversions}
 import com.wavesplatform.it.MatcherSuiteBase
-import im.mak.waves.transactions.IssueTransaction
+import com.wavesplatform.transactions.IssueTransaction
 
 /**
  * Rules:

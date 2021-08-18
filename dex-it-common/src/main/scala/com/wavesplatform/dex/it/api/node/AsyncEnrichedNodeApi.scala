@@ -5,8 +5,8 @@ import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.it.api.responses.node._
 import com.wavesplatform.dex.it.api.{AsyncEnrichedApi, EnrichedResponse}
-import im.mak.waves.transactions.Transaction
-import im.mak.waves.transactions.common.Id
+import com.wavesplatform.transactions.Transaction
+import com.wavesplatform.transactions.common.Id
 import play.api.libs.json._
 import sttp.client3._
 import sttp.model._

@@ -26,7 +26,6 @@ object Implicits {
   implicit val byteShow = cats.instances.byte.catsStdShowForByte
   implicit val intShow = cats.instances.int.catsStdShowForInt
   implicit val longShow = cats.instances.long.catsStdShowForLong
-  implicit val stringShow = cats.instances.string.catsStdShowForString
 
   implicit val doubleShow = show[Double](d => formatValue(d))
   implicit val byteStrShow = show[ByteStr](_.toString)

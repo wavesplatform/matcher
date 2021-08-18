@@ -4,7 +4,7 @@ import cats.syntax.either._
 import com.wavesplatform.dex.cli.ErrorOr
 import com.wavesplatform.dex.tool.connectors.Connector.RepeatRequestOptions
 import com.wavesplatform.dex.tool.connectors.RestConnector.ErrorOrJsonResponse
-import im.mak.waves.transactions.Transaction
+import com.wavesplatform.transactions.Transaction
 import play.api.libs.json.JsValue
 import sttp.client3._
 import sttp.model.MediaType

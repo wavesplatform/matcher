@@ -15,7 +15,7 @@ import com.wavesplatform.dex.grpc.integration.tool.RestartableManagedChannel
 import com.wavesplatform.dex.it.api.HasToxiProxy
 import com.wavesplatform.dex.it.docker.WavesNodeContainer
 import com.wavesplatform.dex.it.test.NoStackTraceCancelAfterFailure
-import im.mak.waves.transactions.Transaction
+import com.wavesplatform.transactions.Transaction
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.nio.NioSocketChannel
 import monix.eval.Task

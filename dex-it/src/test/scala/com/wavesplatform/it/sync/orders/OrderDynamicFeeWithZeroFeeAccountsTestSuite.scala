@@ -97,7 +97,7 @@ final class OrderDynamicFeeWithZeroFeeAccountsTestSuite extends MatcherSuiteBase
       }
     }
 
-    "should match several several orders with large market order placed by zero fee account" in test { ib =>
+    "should match several orders with large market order placed by zero fee account" in test { ib =>
       List(mkBobOrder(10.waves, 1.usd, OrderType.SELL), mkBobOrder(10.waves, 1.usd, OrderType.SELL))
         .foreach(placeAndAwaitAtDex(_))
       placeAndAwaitAtDex(mkAliceOrder(20.waves, 1.usd, OrderType.BUY), Status.Filled, isMarketOrder = true)

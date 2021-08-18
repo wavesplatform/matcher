@@ -491,7 +491,7 @@ trait MatcherSpecBase
               rateCache
             ).explicitGet()
           }
-      case (_, ds @ DynamicSettings(_, _)) =>
+      case (_, ds @ DynamicSettings(_, _, _)) =>
         order
           .updateFeeAsset(matcherFeeAssetForDynamicSettings getOrElse Waves)
           .updateFee(

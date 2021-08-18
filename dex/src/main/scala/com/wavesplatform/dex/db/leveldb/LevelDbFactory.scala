@@ -12,7 +12,6 @@ object LevelDbFactory extends ScorexLogging {
 
   lazy val factory: DBFactory = {
     val isTesting = sys.props.get("sbt-testing").isDefined
-    log.info(s"isTesting $isTesting")
     val nativeFactories = if (isTesting) List.empty else List(jnaFactory, jniFactory)
     val allFactories = nativeFactories :+ javaFactory
 

@@ -81,7 +81,7 @@ object Dependencies {
     val allureScalaTest = "2.13.9"
     val enumeratum = "1.7.0"
 
-    val scalaPbJson = "0.9.3"
+    val scalaPbJson = "0.9.3" // updating causes scalapb version conflicts in waves-integration-it tests (class scalapb/Message not found)
   }
 
   private def akkaModule(module: String, version: String): ModuleID = "com.typesafe.akka" %% module % version
@@ -285,7 +285,7 @@ object Dependencies {
 
     lazy val dexTestCommon: Seq[ModuleID] = Seq(diffx, scalaTest, scalaCheck, scalaTestPlusCheck, allureScalaTest)
 
-    lazy val wavesExt: Seq[ModuleID] = Seq.empty
+    lazy val wavesExt: Seq[ModuleID] = Seq.empty // may be a conflict with node's code if using wavesj
 
     lazy val wavesGrpc: Seq[ModuleID] = Seq(wavesProtobufSchemas, grpcScalaPb) ++ silencer
 

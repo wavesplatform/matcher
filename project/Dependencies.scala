@@ -187,7 +187,7 @@ object Dependencies {
     scalaCheck,
     scalaTestPlusCheck,
     scalaMock,
-    javaLevelDb.exclude("com.google.guava", "guava"),
+    javaLevelDb,
     allureScalaTest,
     diffx
   ).map(_ % Test) ++ silencer

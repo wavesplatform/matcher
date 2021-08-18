@@ -39,7 +39,7 @@ abstract class BaseContainer(protected val baseContainerPath: String, private va
         .getBindings
         .asScala
         .get(new ExposedPort(internalPort))
-        .flatMap(v => Option(v))
+        .flatMap(Option(_))
 
     val externalPort =
       maybeBindings

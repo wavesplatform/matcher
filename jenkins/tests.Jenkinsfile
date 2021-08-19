@@ -15,7 +15,7 @@ pipeline {
         PATH = "${env.SBT_HOME}/bin:${env.PATH}"
         SCALATEST_EXCLUDE_TAGS = 'com.wavesplatform.it.tags.DexItKafkaRequired com.wavesplatform.it.tags.DexItExternalKafkaRequired com.wavesplatform.it.tags.DexMultipleVersions'
 
-        // usually don't need in tests; saving as config example
+        // usually is not needed in tests; saving as a config example
         // CONFIG_FORCE_kamon_jaeger_http__url = "${DEX_JAEGER_HOST}"
         // CONFIG_FORCE_kamon_modules_jaeger_enabled = "true"
         // CONFIG_FORCE_kamon_enable = "true"

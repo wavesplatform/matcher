@@ -66,6 +66,8 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProx
     }
   }
 
+  // may fail
+  // wait for a task NODE-2309 and node release 1.3.7 for possible solution
   "DEXClient should switch nodes if connection to one of them was lost due to node shutdown" in {
 
     // also works for the cases when nodes are disconnected from the network (not stopped),

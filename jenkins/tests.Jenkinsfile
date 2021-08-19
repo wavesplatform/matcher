@@ -14,11 +14,13 @@ pipeline {
         SBT_OPTS = '-Xmx12g -XX:ReservedCodeCacheSize=128m -XX:+CMSClassUnloadingEnabled'
         PATH = "${env.SBT_HOME}/bin:${env.PATH}"
         SCALATEST_EXCLUDE_TAGS = 'com.wavesplatform.it.tags.DexItKafkaRequired com.wavesplatform.it.tags.DexItExternalKafkaRequired com.wavesplatform.it.tags.DexMultipleVersions'
-        CONFIG_FORCE_kamon_jaeger_http__url = "${DEX_JAEGER_HOST}"
-        CONFIG_FORCE_kamon_modules_jaeger_enabled = "true"
-        CONFIG_FORCE_kamon_enable = "true"
-        CONFIG_FORCE_kamon_trace_tick__interval = "10.seconds"
-        CONFIG_FORCE_kamon_trace_adaptive__sampler_throughput = "600"
+
+        // usually is not needed in tests; saving as a config example
+        // CONFIG_FORCE_kamon_jaeger_http__url = "${DEX_JAEGER_HOST}"
+        // CONFIG_FORCE_kamon_modules_jaeger_enabled = "true"
+        // CONFIG_FORCE_kamon_enable = "true"
+        // CONFIG_FORCE_kamon_trace_tick__interval = "10.seconds"
+        // CONFIG_FORCE_kamon_trace_adaptive__sampler_throughput = "600"
     }
     stages {
         stage('Cleanup') {

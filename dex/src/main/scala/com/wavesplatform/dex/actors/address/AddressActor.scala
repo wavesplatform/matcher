@@ -178,7 +178,11 @@ class AddressActor(
         }
         .filterNot(_._2 == 0) // Fee could be 0 if an order executed by a small amount
 
-      val (updated, changedAssets) = balances.withExecuted(txResult.toOption.map(_.id()), NegativeMap(cumulativeDiff))
+      val (updated, changedAssets) =
+        balances.withExecuted(
+          txResult.toOption.map(_.id()),
+          AddressBalance.NotObservedTxData(ownerRemainingOrders.map(_.id).toSet, NegativeMap(cumulativeDiff))
+        )
       balances = updated
       scheduleWs(wsAddressState.putChangedAssets(changedAssets))
 
@@ -551,15 +555,18 @@ class AddressActor(
     } else log.info(s"[Balance] 7. 💵: ${format(balances.tradableBalance(updates.changedAssets).xs)}; u: ${format(updates)}")
   }
 
-  private def markTxsObserved(txs: Map[ExchangeTransaction.Id, PositiveMap[Asset, Long]]): Unit = {
+  private def markTxsObserved(txs: Map[ExchangeTransaction.Id, AddressBalance.NotCreatedTxData]): Unit = {
     log.info(
-      s"Observed: ${txs.map { case (id, v) => s"$id ${if (balances.notObservedTxs.contains(id)) "(wasn't before) " else ""}-> ${format(v.xs)}" }.mkString(", ")}"
+      s"Observed: ${txs.map { case (id, v) =>
+        s"$id ${if (balances.notObservedTxs.contains(id)) "(wasn't before) " else ""}-> ${format(v.pessimisticChanges.xs)}"
+      }.mkString(", ")}"
     )
     val (updated, changedAssets) = txs.toList.foldl((balances, Set.empty[Asset])) {
       case ((r, _), (id, v)) => r.withObserved(id, v)
     }
     balances = updated
-    if (changedAssets.isEmpty) log.info(s"[Balance] 8. au 💵: ${format(balances.balanceForAudit(txs.values.flatMap(_.keySet).toSet))}")
+    if (changedAssets.isEmpty)
+      log.info(s"[Balance] 8. au 💵: ${format(balances.balanceForAudit(txs.values.flatMap(_.pessimisticChanges.keySet).toSet))}")
     else {
       log.info(s"[Balance] 9. otx 💵: ${format(balances.tradableBalance(changedAssets).xs)}")
       scheduleWs(wsAddressState.putChangedAssets(changedAssets))
@@ -837,7 +844,7 @@ object AddressActor {
     case class ApplyBatch(markTxsObserved: MarkTxsObserved, changedBalances: ChangeBalances) extends Command
 
     case class ChangeBalances(updates: AddressBalanceUpdates) extends Command
-    case class MarkTxsObserved(txsWithSpending: Map[ExchangeTransaction.Id, PositiveMap[Asset, Long]]) extends Command
+    case class MarkTxsObserved(txsWithSpending: Map[ExchangeTransaction.Id, AddressBalance.NotCreatedTxData]) extends Command
 
     sealed trait HasOrderBookEvent {
       def event: Events.Event

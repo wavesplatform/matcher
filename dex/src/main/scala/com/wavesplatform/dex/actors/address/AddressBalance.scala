@@ -4,8 +4,10 @@ import alleycats.std.set.alleyCatsStdSetMonad
 import cats.instances.long._
 import cats.syntax.functor._
 import cats.syntax.group._
+import com.wavesplatform.dex.actors.address.AddressBalance._
 import com.wavesplatform.dex.collections.{NegativeMap, NonNegativeMap, NonPositiveMap, PositiveMap}
 import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.fp.MapImplicits.group
 import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
@@ -30,13 +32,13 @@ import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdat
  *
  * @see /docs/order-auto-canceling.md
  */
-case class AddressBalance(
+final case class AddressBalance(
   regular: NonNegativeMap[Asset, Long],
   outgoingLeasing: Option[Long],
   reserved: PositiveMap[Asset, Long],
   unconfirmed: NonPositiveMap[Asset, Long],
-  notObservedTxs: Map[ExchangeTransaction.Id, NegativeMap[Asset, Long]],
-  notCreatedTxs: Map[ExchangeTransaction.Id, PositiveMap[Asset, Long]]
+  notObservedTxs: Map[ExchangeTransaction.Id, NotObservedTxData],
+  notCreatedTxs: Map[ExchangeTransaction.Id, NotCreatedTxData]
 ) {
 
   // We count only regular, because openVolume is created from orders and
@@ -57,14 +59,16 @@ case class AddressBalance(
     nodeBalanceBy(asset) +
     // Compensate notCreatedTxs until they are observed
     // TODO DEX-1068 Could be slow for a lot of items in Set[Asset]
-    notCreatedTxs.valuesIterator.map(_.xs.getOrElse(asset, 0L)).sum
+    notCreatedTxs.valuesIterator.map(_.pessimisticChanges.xs.getOrElse(asset, 0L)).sum
 
   private def nodeBalanceBy(asset: Asset): Long =
     // getOrElse is allowed here, because we fetch this information at start
     regular.getOrElse(asset, 0L) -
     (if (asset == Asset.Waves) outgoingLeasing.getOrElse(0L) else 0L) +
     unconfirmed.getOrElse(asset, 0L) +
-    notObservedTxs.valuesIterator.map(_.xs.getOrElse(asset, 0L)).sum // TODO DEX-1068 Could be slow for a lot of items in Set[Asset]
+    notObservedTxs.valuesIterator.map(
+      _.executionTotalVolumeDiff.xs.getOrElse(asset, 0L)
+    ).sum // TODO DEX-1068 Could be slow for a lot of items in Set[Asset]
 
   def withInit(snapshot: AddressBalanceUpdates): AddressBalance =
     // The original data have a higher precedence, because we receive it from the stream
@@ -83,28 +87,32 @@ case class AddressBalance(
       unconfirmed = NonPositiveMap(unconfirmed.xs ++ updates.pessimisticCorrection)
     )
 
-  def reserve(diff: PositiveMap[Asset, Long]): AddressBalance = copy(reserved = reserved |+| diff)
+  def reserve(diff: PositiveMap[Asset, Long]): AddressBalance =
+    copy(reserved = reserved |+| diff)
 
-  def fixReservation(diff: NegativeMap[Asset, Long]): AddressBalance = copy(reserved = PositiveMap((reserved.xs |+| diff.xs).filter(_._2 != 0)))
+  def fixReservation(diff: NegativeMap[Asset, Long]): AddressBalance =
+    copy(reserved = PositiveMap((reserved.xs |+| diff.xs).filter(_._2 != 0)))
 
   def cancelReservation(diff: PositiveMap[Asset, Long]): AddressBalance =
     copy(reserved = PositiveMap((reserved.xs |-| diff.xs).filter(_._2 != 0)))
 
   /**
    * @param expectedTxId Could be None if a transaction wasn't created or has been already created (see OrderEventsCoordinatorActor)
-   * @param executionTotalVolumeDiff An order's executed volume diff or a sum of two. We require a negative diff,
-   *                                 because reservation is decreased each time we execute an order.
    * @return (updated, affected assets)
    */
-  def withExecuted(expectedTxId: Option[ExchangeTransaction.Id], executionTotalVolumeDiff: NegativeMap[Asset, Long]): (AddressBalance, Set[Asset]) = {
-    val updated = fixReservation(executionTotalVolumeDiff)
+  def withExecuted(
+    expectedTxId: Option[ExchangeTransaction.Id],
+    notObservedTxData: NotObservedTxData
+  ): (AddressBalance, Set[Asset]) = {
+    val updated = fixReservation(notObservedTxData.executionTotalVolumeDiff)
     expectedTxId match {
-      case None => (updated, executionTotalVolumeDiff.keySet) // Won't expect withObserved with this txId
+      case None => (updated, notObservedTxData.executionTotalVolumeDiff.keySet) // Won't expect withObserved with this txId
       case Some(txId) =>
         if (notObservedTxs.contains(txId)) throw new RuntimeException(s"$txId executed twice!")
-        else if (notCreatedTxs.contains(txId)) (updated.copy(notCreatedTxs = notCreatedTxs - txId), executionTotalVolumeDiff.keySet)
+        else if (notCreatedTxs.contains(txId))
+          (updated.copy(notCreatedTxs = notCreatedTxs - txId), notObservedTxData.executionTotalVolumeDiff.keySet)
         else (
-          updated.copy(notObservedTxs = notObservedTxs.updated(txId, executionTotalVolumeDiff)),
+          updated.copy(notObservedTxs = notObservedTxs.updated(txId, notObservedTxData)),
           Set.empty // Because notObservedTxs compensates updatedOpenVolume
         )
     }
@@ -116,14 +124,26 @@ case class AddressBalance(
    * But OrderEventsCoordinatorActor has a deduplication logic.
    * Even this happen, we just have a hanging txId in notCreatedTxs, which won't affect the process, only consumes small amount of memory.
    */
-  def withObserved(txId: ExchangeTransaction.Id, pessimisticChanges: PositiveMap[Asset, Long]): (AddressBalance, Set[Asset]) =
+  def withObserved(
+    txId: ExchangeTransaction.Id,
+    notCreatedTxData: NotCreatedTxData
+  ): (AddressBalance, Set[Asset]) =
     notObservedTxs.get(txId) match {
-      case Some(v) => (copy(notObservedTxs = notObservedTxs.removed(txId)), v.keySet)
-      case None => (copy(notCreatedTxs = notCreatedTxs.updated(txId, pessimisticChanges)), Set.empty)
+      case Some(v) => (copy(notObservedTxs = notObservedTxs.removed(txId)), v.executionTotalVolumeDiff.keySet)
+      case None => (copy(notCreatedTxs = notCreatedTxs.updated(txId, notCreatedTxData)), Set.empty)
     }
 
 }
 
 object AddressBalance {
+
+  /**
+   * @param executionTotalVolumeDiff An order's executed volume diff or a sum of two. We require a negative diff,
+   *                                 because reservation is decreased each time we execute an order.
+   */
+  final case class NotObservedTxData(orders: Set[Order.Id], executionTotalVolumeDiff: NegativeMap[Asset, Long])
+
+  final case class NotCreatedTxData(orders: Set[Order.Id], pessimisticChanges: PositiveMap[Asset, Long])
+
   val empty = AddressBalance(NonNegativeMap.empty, None, PositiveMap.empty, NonPositiveMap.empty, Map.empty, Map.empty)
 }

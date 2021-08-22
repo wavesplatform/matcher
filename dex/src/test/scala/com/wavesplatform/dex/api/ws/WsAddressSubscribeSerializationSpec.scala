@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.api.ws
 
 import com.wavesplatform.dex.MatcherSpecBase
-import com.wavesplatform.dex.api.ws.entities.WsAddressBalancesFilter.ExcludeNft
+import com.wavesplatform.dex.api.ws.entities.WsAddressFlag.ExcludeNft
 import com.wavesplatform.dex.api.ws.protocol.WsAddressSubscribe
 import com.wavesplatform.dex.api.ws.protocol.WsAddressSubscribe.wsAddressSubscribeFormat
 import com.wavesplatform.dex.domain.account.Address
@@ -33,7 +33,7 @@ class WsAddressSubscribeSerializationSpec extends AnyWordSpec with Matchers with
            |}
            |""".stripMargin
 
-      wsAddressSubscribeFormat.reads(Json.parse(jsonMessage)).get shouldBe baseWsSubscribe.copy(filters = Set(ExcludeNft))
+      wsAddressSubscribeFormat.reads(Json.parse(jsonMessage)).get shouldBe baseWsSubscribe.copy(flags = Set(ExcludeNft))
     }
 
     "accept WsAddressSubscribe with empty filters" in {

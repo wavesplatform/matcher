@@ -14,7 +14,7 @@ import com.wavesplatform.dex.actors.address.AddressActor.Settings.default
 import com.wavesplatform.dex.actors.address.AddressActor._
 import com.wavesplatform.dex.actors.address.BalancesFormatter.format
 import com.wavesplatform.dex.api.http.entities.MatcherResponse
-import com.wavesplatform.dex.api.ws.entities.{WsAddressBalancesFilter, WsAssetInfo, WsBalances, WsOrder}
+import com.wavesplatform.dex.api.ws.entities.{WsAddressFlag, WsAssetInfo, WsBalances, WsOrder}
 import com.wavesplatform.dex.api.ws.protocol.WsAddressChanges
 import com.wavesplatform.dex.api.ws.state.WsAddressState
 import com.wavesplatform.dex.collections.{NegativeMap, PositiveMap}
@@ -184,7 +184,7 @@ class AddressActor(
           AddressBalance.NotObservedTxData(ownerRemainingOrders.map(_.id), NegativeMap(cumulativeDiff))
         )
       balances = updated
-      scheduleWs(wsAddressState.putChangedAssets(changedAssets))
+      scheduleWs(wsAddressState.putChangedAssets(changedAssets).putNotObservedTxs(balances.notObservedTxs))
 
       val reservedAssets = ownerRemainingOrders.flatMap(_.requiredBalance.keys).toSet
       val newReserved = balances.reserved.filter { case (asset, _) => reservedAssets.contains(asset) }
@@ -924,7 +924,7 @@ object AddressActor {
   sealed trait WsCommand extends Message
 
   object WsCommand {
-    case class AddWsSubscription(client: typed.ActorRef[WsAddressChanges], options: Set[WsAddressBalancesFilter] = Set.empty) extends WsCommand
+    case class AddWsSubscription(client: typed.ActorRef[WsAddressChanges], options: Set[WsAddressFlag] = Set.empty) extends WsCommand
     case class RemoveWsSubscription(client: typed.ActorRef[WsAddressChanges]) extends WsCommand
     private[AddressActor] case object SendDiff extends WsCommand
   }

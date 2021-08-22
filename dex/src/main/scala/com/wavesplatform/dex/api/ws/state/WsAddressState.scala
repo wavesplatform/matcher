@@ -2,7 +2,8 @@ package com.wavesplatform.dex.api.ws.state
 
 import akka.actor.typed.ActorRef
 import cats.syntax.option._
-import com.wavesplatform.dex.api.ws.entities.{WsAddressBalancesFilter, WsAssetInfo, WsBalances, WsMatchTransactionInfo, WsOrder}
+import com.wavesplatform.dex.actors.address.AddressBalance
+import com.wavesplatform.dex.api.ws.entities.{WsAddressFlag, WsAssetInfo, WsBalances, WsMatchTransactionInfo, WsOrder}
 import com.wavesplatform.dex.api.ws.protocol.WsAddressChanges
 import com.wavesplatform.dex.api.ws.state.WsAddressState.Subscription
 import com.wavesplatform.dex.domain.account.Address
@@ -13,12 +14,16 @@ import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.model.{AcceptedOrder, OrderStatus}
 
-case class WsAddressState(
+final case class WsAddressState(
   address: Address,
   activeSubscription: Map[ActorRef[WsAddressChanges], Subscription],
   changedAssets: Set[Asset],
   ordersChanges: Map[Order.Id, WsOrder],
-  previousBalanceChanges: Map[Asset, WsBalances]
+  previousBalanceChanges: Map[Asset, WsBalances],
+  notObservedTxs: Map[ExchangeTransaction.Id, AddressBalance.NotObservedTxData],
+  notObservedTxsDiff: Set[ExchangeTransaction.Id],
+  notCreatedTxs: Map[ExchangeTransaction.Id, AddressBalance.NotCreatedTxData],
+  notCreatedTxsDiff: Set[ExchangeTransaction.Id]
 ) { // TODO Probably use an ordered Map and pass it to WsAddressChanges
 
   val hasActiveSubscriptions: Boolean = activeSubscription.nonEmpty
@@ -30,7 +35,7 @@ case class WsAddressState(
     subscriber: ActorRef[WsAddressChanges],
     assetInfo: Map[Asset, WsAssetInfo],
     orders: Seq[WsOrder],
-    options: Set[WsAddressBalancesFilter]
+    options: Set[WsAddressFlag]
   ): WsAddressState = {
     val balances = mkBalancesMap(assetInfo.filter {
       case (_: Asset, info) => checkOptions(info, options)
@@ -45,7 +50,18 @@ case class WsAddressState(
     else updated
   }
 
-  def putChangedAssets(diff: Set[Asset]): WsAddressState = copy(changedAssets = changedAssets ++ diff)
+  def putChangedAssets(diff: Set[Asset]): WsAddressState =
+    copy(changedAssets = changedAssets ++ diff)
+
+  def putNotObservedTxs(update: Map[ExchangeTransaction.Id, AddressBalance.NotObservedTxData]): WsAddressState = {
+    val diff = notObservedTxs.keySet -- update.keySet
+    copy(notObservedTxs = update, notObservedTxsDiff = diff)
+  }
+
+  def putNotCreatedTxs(update: Map[ExchangeTransaction.Id, AddressBalance.NotCreatedTxData]): WsAddressState = {
+    val diff = notCreatedTxs.keySet -- update.keySet
+    copy(notCreatedTxs = update, notCreatedTxsDiff = diff)
+  }
 
   def putOrderUpdate(id: Order.Id, update: WsOrder): WsAddressState = copy(ordersChanges = ordersChanges + (id -> update))
 
@@ -105,8 +121,8 @@ case class WsAddressState(
 
   def clean(): WsAddressState = copy(changedAssets = Set.empty, ordersChanges = Map.empty)
 
-  def checkOptions(assetInfo: WsAssetInfo, options: Set[WsAddressBalancesFilter]): Boolean =
-    if (options.contains(WsAddressBalancesFilter.ExcludeNft))
+  def checkOptions(assetInfo: WsAssetInfo, options: Set[WsAddressFlag]): Boolean =
+    if (options.contains(WsAddressFlag.ExcludeNft))
       !assetInfo.isNft
     else true
 
@@ -120,9 +136,11 @@ case class WsAddressState(
 
 object WsAddressState {
 
-  case class Subscription(updateId: Long, options: Set[WsAddressBalancesFilter])
+  case class Subscription(updateId: Long, options: Set[WsAddressFlag])
 
-  def empty(address: Address): WsAddressState = WsAddressState(address, Map.empty, Set.empty, Map.empty, Map.empty)
+  def empty(address: Address): WsAddressState =
+    WsAddressState(address, Map.empty, Set.empty, Map.empty, Map.empty, Map.empty, Seq.empty, Map.empty, Seq.empty)
+
   val numberMaxSafeInteger = 9007199254740991L
 
   def getNextUpdateId(currentUpdateId: Long): Long = if (currentUpdateId == numberMaxSafeInteger) 1 else currentUpdateId + 1

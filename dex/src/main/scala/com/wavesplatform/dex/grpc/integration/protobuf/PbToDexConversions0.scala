@@ -10,8 +10,8 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.error.ValidationError
 import com.wavesplatform.dex.domain.error.ValidationError.GenericError
-import com.wavesplatform.dex.domain.order.{OrderType, Order => DexOrder}
-import com.wavesplatform.protobuf.order.Order
+import com.wavesplatform.dex.domain.order.{OrderType => DexOrderType, Order => DexOrder}
+import com.wavesplatform.protobuf.order.{Order => PbOrder}
 import com.wavesplatform.protobuf.transaction.{ExchangeTransactionData, SignedTransaction, Transaction}
 
 //'0' suffix in order to prevent naming overlapping
@@ -31,14 +31,14 @@ object PbToDexConversions0 {
 
   }
 
-  implicit final class PbOrderOps(val order: Order) extends AnyVal {
+  implicit final class PbOrderOps(val order: PbOrder) extends AnyVal {
 
     def toVanilla: Either[ValidationError, DexOrder] =
       for {
         orderType <- order.orderSide match {
-          case Order.Side.BUY => Right(OrderType.BUY)
-          case Order.Side.SELL => Right(OrderType.SELL)
-          case Order.Side.Unrecognized(v) => Left(GenericError(s"Unknown order type: $v"))
+          case PbOrder.Side.BUY => Right(DexOrderType.BUY)
+          case PbOrder.Side.SELL => Right(DexOrderType.SELL)
+          case PbOrder.Side.Unrecognized(v) => Left(GenericError(s"Unknown order type: $v"))
         }
         matcherFee <- {
           order.matcherFee.map(_.amount) match {

@@ -7,8 +7,9 @@ import akka.{actor => classic}
 import cats.instances.long._
 import cats.instances.map._
 import cats.syntax.option._
+import cats.syntax.either._
 import cats.syntax.semigroup._
-import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
+import com.wavesplatform.dex.actors.address.{AddressActor, AddressBalance, AddressDirectoryActor}
 import com.wavesplatform.dex.actors.tx.ExchangeTransactionBroadcastActor.{Observed, Command => Broadcaster}
 import com.wavesplatform.dex.collections.{FifoSet, PositiveMap}
 import com.wavesplatform.dex.domain.account.Address
@@ -18,6 +19,7 @@ import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeUpdates
 import com.wavesplatform.dex.model.Events
 import com.wavesplatform.dex.model.Events.ExchangeTransactionCreated
 import com.wavesplatform.dex.model.ExchangeTransactionCreator.CreateTransaction
+import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions0._
 import play.api.libs.json.Json
 
 object OrderEventsCoordinatorActor {
@@ -117,8 +119,24 @@ object OrderEventsCoordinatorActor {
               val markObservedCommand =
                 if (observedTxs.isEmpty) none
                 else {
-                  val xs = observedTxs.view.mapValues(xs => PositiveMap(xs.view.mapValues(-_).toMap)).toMap
-                  AddressActor.Command.MarkTxsObserved(xs).some
+                  val txsWithSpending = observedTxs
+                    .view
+                    .flatMap { case (id, xs) =>
+                      for {
+                        txWithChanges <- updates.observedTxs.get(id)
+                        notCreatedTxData <-
+                          txWithChanges.tx
+                            .getOrdersVanilla
+                            .leftMap(err => context.log.warn(s"tx parsing error $err"))
+                            .map { orders =>
+                              AddressBalance.NotCreatedTxData(orders.map(_.id()), PositiveMap(xs.view.mapValues(-_).toMap))
+                            }
+                            .toOption
+                      } yield id -> notCreatedTxData
+                    }
+                    .toMap
+
+                  AddressActor.Command.MarkTxsObserved(txsWithSpending).some
                 }
               val changeBalanceCommand = if (balanceUpdates.isEmpty) none else AddressActor.Command.ChangeBalances(balanceUpdates).some
               val message = (markObservedCommand, changeBalanceCommand) match {
@@ -135,8 +153,10 @@ object OrderEventsCoordinatorActor {
           val (updatedKnownTxIds, added) = observedTxIds.append(txId)
           if (added) {
             command.tx.traders.foreach { address =>
-              val x = AddressActor.Command.MarkTxsObserved(Map(txId -> command.addressSpending.getOrElse(address, PositiveMap.empty)))
-              addressDirectoryRef ! AddressDirectoryActor.Command.ForwardMessage(address, x)
+              val orderIds = List(command.tx.buyOrder, command.tx.sellOrder).filter(_.sender.toAddress == address).map(_.id())
+              val notCreatedTxData = AddressBalance.NotCreatedTxData(orderIds, command.addressSpending.getOrElse(address, PositiveMap.empty))
+              val cmd = AddressActor.Command.MarkTxsObserved(Map(txId -> notCreatedTxData))
+              addressDirectoryRef ! AddressDirectoryActor.Command.ForwardMessage(address, cmd)
             }
             default(updatedKnownTxIds)
           } else Behaviors.same

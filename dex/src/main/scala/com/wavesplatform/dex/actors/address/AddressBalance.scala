@@ -141,9 +141,9 @@ object AddressBalance {
    * @param executionTotalVolumeDiff An order's executed volume diff or a sum of two. We require a negative diff,
    *                                 because reservation is decreased each time we execute an order.
    */
-  final case class NotObservedTxData(orders: Set[Order.Id], executionTotalVolumeDiff: NegativeMap[Asset, Long])
+  final case class NotObservedTxData(orderIds: Seq[Order.Id], executionTotalVolumeDiff: NegativeMap[Asset, Long])
 
-  final case class NotCreatedTxData(orders: Set[Order.Id], pessimisticChanges: PositiveMap[Asset, Long])
+  final case class NotCreatedTxData(orderIds: Seq[Order.Id], pessimisticChanges: PositiveMap[Asset, Long])
 
   val empty = AddressBalance(NonNegativeMap.empty, None, PositiveMap.empty, NonPositiveMap.empty, Map.empty, Map.empty)
 }

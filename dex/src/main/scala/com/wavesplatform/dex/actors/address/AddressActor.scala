@@ -181,7 +181,7 @@ class AddressActor(
       val (updated, changedAssets) =
         balances.withExecuted(
           txResult.toOption.map(_.id()),
-          AddressBalance.NotObservedTxData(ownerRemainingOrders.map(_.id).toSet, NegativeMap(cumulativeDiff))
+          AddressBalance.NotObservedTxData(ownerRemainingOrders.map(_.id), NegativeMap(cumulativeDiff))
         )
       balances = updated
       scheduleWs(wsAddressState.putChangedAssets(changedAssets))

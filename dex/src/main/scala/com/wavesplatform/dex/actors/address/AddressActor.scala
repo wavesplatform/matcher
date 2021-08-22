@@ -184,7 +184,7 @@ class AddressActor(
           AddressBalance.NotObservedTxData(ownerRemainingOrders.map(_.id), NegativeMap(cumulativeDiff))
         )
       balances = updated
-      scheduleWs(wsAddressState.putChangedAssets(changedAssets).putNotObservedTxs(balances.notObservedTxs))
+      scheduleWs(wsAddressState.putChangedAssets(changedAssets))
 
       val reservedAssets = ownerRemainingOrders.flatMap(_.requiredBalance.keys).toSet
       val newReserved = balances.reserved.filter { case (asset, _) => reservedAssets.contains(asset) }

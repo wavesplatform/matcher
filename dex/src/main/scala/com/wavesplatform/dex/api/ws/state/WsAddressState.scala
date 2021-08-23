@@ -53,16 +53,16 @@ final case class WsAddressState(
     copy(changedAssets = changedAssets ++ diff)
 
   def putTxsUpdate(
-    notObservedTxs: Map[ExchangeTransaction.Id, Seq[Order.Id]],
-    notCreatedTxs: Map[ExchangeTransaction.Id, Seq[Order.Id]]
+    notObservedTxsDiff: Map[ExchangeTransaction.Id, Seq[Order.Id]],
+    notCreatedTxsDiff: Map[ExchangeTransaction.Id, Seq[Order.Id]]
   ): WsAddressState = {
-    val removedNotObservedTxs = this.notObservedTxs.keySet -- notObservedTxs.keySet
-    val removedNotCreatedTxs = this.notCreatedTxs.keySet -- notCreatedTxs.keySet
+    val removedNotObservedTxsDiff = notObservedTxs.keySet -- notObservedTxsDiff.keySet
+    val removedNotCreatedTxsDiff = notCreatedTxs.keySet -- notCreatedTxsDiff.keySet
     copy(
       notObservedTxs = notObservedTxs,
-      removedNotObservedTxs = removedNotObservedTxs,
+      removedNotObservedTxs = removedNotObservedTxs ++ removedNotObservedTxsDiff,
       notCreatedTxs = notCreatedTxs,
-      removedNotCreatedTxs = removedNotCreatedTxs
+      removedNotCreatedTxs = removedNotCreatedTxs ++ removedNotCreatedTxsDiff
     )
   }
 
@@ -122,7 +122,12 @@ final case class WsAddressState(
     previousBalanceChanges = mkBalancesMap(assetInfo)
   )
 
-  def clean(): WsAddressState = copy(changedAssets = Set.empty, ordersChanges = Map.empty)
+  def clean(): WsAddressState = copy(
+    changedAssets = Set.empty,
+    ordersChanges = Map.empty,
+    removedNotCreatedTxs = Set.empty,
+    removedNotObservedTxs = Set.empty
+  )
 
   def checkOptions(assetInfo: WsAssetInfo, options: Set[WsAddressFlag]): Boolean =
     if (options.contains(WsAddressFlag.ExcludeNft))

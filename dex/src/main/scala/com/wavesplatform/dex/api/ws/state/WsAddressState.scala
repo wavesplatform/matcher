@@ -139,6 +139,8 @@ final case class WsAddressState(
     if (flags.contains(WsAddressFlag.ImaginaryTxs) && isSnapshot)
       (Some(WsTxsData(notObservedTxs, Set.empty)), Some(WsTxsData(notCreatedTxs, Set.empty)))
     else if (flags.contains(WsAddressFlag.ImaginaryTxs))
+      //removedNotObservedTxs, removedNotCreatedTxs can contain obsolete txs
+      //in case when subscription was created during the WS batch
       (Some(WsTxsData(notObservedTxs, removedNotObservedTxs)), Some(WsTxsData(notCreatedTxs, removedNotCreatedTxs)))
     else
       (None, None)

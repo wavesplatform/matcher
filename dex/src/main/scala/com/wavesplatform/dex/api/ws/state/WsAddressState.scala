@@ -21,9 +21,9 @@ final case class WsAddressState(
   ordersChanges: Map[Order.Id, WsOrder],
   previousBalanceChanges: Map[Asset, WsBalances],
   notObservedTxs: Map[ExchangeTransaction.Id, AddressBalance.NotObservedTxData],
-  notObservedTxsDiff: Set[ExchangeTransaction.Id],
+  removedNotObservedTxs: Set[ExchangeTransaction.Id],
   notCreatedTxs: Map[ExchangeTransaction.Id, AddressBalance.NotCreatedTxData],
-  notCreatedTxsDiff: Set[ExchangeTransaction.Id]
+  removedNotCreatedTxs: Set[ExchangeTransaction.Id]
 ) { // TODO Probably use an ordered Map and pass it to WsAddressChanges
 
   val hasActiveSubscriptions: Boolean = activeSubscription.nonEmpty
@@ -57,13 +57,13 @@ final case class WsAddressState(
     notObservedTxs: Map[ExchangeTransaction.Id, AddressBalance.NotObservedTxData],
     notCreatedTxs: Map[ExchangeTransaction.Id, AddressBalance.NotCreatedTxData]
   ): WsAddressState = {
-    val notObservedTxsDiff = this.notObservedTxs.keySet -- notObservedTxs.keySet
-    val notCreatedTxsDiff = this.notCreatedTxs.keySet -- notCreatedTxs.keySet
+    val removedNotObservedTxs = this.notObservedTxs.keySet -- notObservedTxs.keySet
+    val removedNotCreatedTxs = this.notCreatedTxs.keySet -- notCreatedTxs.keySet
     copy(
       notObservedTxs = notObservedTxs,
-      notObservedTxsDiff = notObservedTxsDiff,
+      removedNotObservedTxs = removedNotObservedTxs,
       notCreatedTxs = notCreatedTxs,
-      notCreatedTxsDiff = notCreatedTxsDiff
+      removedNotCreatedTxs = removedNotCreatedTxs
     )
   }
 

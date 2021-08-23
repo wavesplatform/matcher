@@ -85,7 +85,7 @@ class WsMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDrivenProp
     orders <- Gen.listOfN(orderChanges, wsOrderGen)
     updateId <- Gen.choose(0L, Long.MaxValue)
     ts <- Gen.choose(0L, Long.MaxValue)
-  } yield WsAddressChanges(account.toAddress, (assets zip balances).toMap, orders, updateId, ts)
+  } yield WsAddressChanges(account.toAddress, (assets zip balances).toMap, orders, None, None, updateId, ts)
 
   private val askPricesMin = 1000L * Order.PriceConstant
   private val askPricesMax = 2000L * Order.PriceConstant

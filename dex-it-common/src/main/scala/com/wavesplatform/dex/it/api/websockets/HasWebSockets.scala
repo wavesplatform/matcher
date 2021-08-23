@@ -147,6 +147,8 @@ trait HasWebSockets extends BeforeAndAfterAll with BeforeAndAfterEach with HasJw
         if (index < 0) x +: r
         else r.updated(index, mergeWsOrder(r(index), x))
     },
+    maybeNotObservedTxs = diff.maybeNotObservedTxs,
+    maybeNotCreatedTxs = diff.maybeNotCreatedTxs,
     updateId = diff.updateId,
     timestamp = diff.timestamp
   )

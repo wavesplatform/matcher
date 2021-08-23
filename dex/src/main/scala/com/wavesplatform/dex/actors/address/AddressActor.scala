@@ -10,6 +10,7 @@ import cats.syntax.either._
 import cats.syntax.option._
 import cats.syntax.foldable._
 import cats.syntax.group.catsSyntaxGroup
+import com.wavesplatform.dex.actors.address.AddressActor.Command.ObservedTxData
 import com.wavesplatform.dex.actors.address.AddressActor.Settings.default
 import com.wavesplatform.dex.actors.address.AddressActor._
 import com.wavesplatform.dex.actors.address.BalancesFormatter.format
@@ -562,14 +563,17 @@ class AddressActor(
     } else log.info(s"[Balance] 7. 💵: ${format(balances.tradableBalance(updates.changedAssets).xs)}; u: ${format(updates)}")
   }
 
-  private def markTxsObserved(txs: Map[ExchangeTransaction.Id, AddressBalance.NotCreatedTxData]): Unit = {
+  private def markTxsObserved(txs: Map[ExchangeTransaction.Id, ObservedTxData]): Unit = {
     log.info(
       s"Observed: ${txs.map { case (id, v) =>
         s"$id ${if (balances.notObservedTxs.contains(id)) "(wasn't before) " else ""}-> ${format(v.pessimisticChanges.xs)}"
       }.mkString(", ")}"
     )
     val (updated, changedAssets) = txs.toList.foldl((balances, Set.empty[Asset])) {
-      case ((r, _), (id, v)) => r.withObserved(id, v)
+      case ((r, _), (id, v)) =>
+        val orderIds = v.orders.filter(_.sender.toAddress == owner).map(_.id())
+        val notCreatedTxData = AddressBalance.NotCreatedTxData(orderIds, v.pessimisticChanges)
+        r.withObserved(id, notCreatedTxData)
     }
     balances = updated
     log.info(
@@ -857,7 +861,9 @@ object AddressActor {
     case class ApplyBatch(markTxsObserved: MarkTxsObserved, changedBalances: ChangeBalances) extends Command
 
     case class ChangeBalances(updates: AddressBalanceUpdates) extends Command
-    case class MarkTxsObserved(txsWithSpending: Map[ExchangeTransaction.Id, AddressBalance.NotCreatedTxData]) extends Command
+
+    case class ObservedTxData(orders: Seq[Order], pessimisticChanges: PositiveMap[Asset, Long])
+    case class MarkTxsObserved(txsWithSpending: Map[ExchangeTransaction.Id, ObservedTxData]) extends Command
 
     sealed trait HasOrderBookEvent {
       def event: Events.Event

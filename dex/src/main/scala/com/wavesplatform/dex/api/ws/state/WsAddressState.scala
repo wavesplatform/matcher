@@ -2,8 +2,7 @@ package com.wavesplatform.dex.api.ws.state
 
 import akka.actor.typed.ActorRef
 import cats.syntax.option._
-import com.wavesplatform.dex.actors.address.AddressBalance
-import com.wavesplatform.dex.api.ws.entities.{WsAddressFlag, WsAssetInfo, WsBalances, WsMatchTransactionInfo, WsOrder}
+import com.wavesplatform.dex.api.ws.entities._
 import com.wavesplatform.dex.api.ws.protocol.WsAddressChanges
 import com.wavesplatform.dex.api.ws.state.WsAddressState.Subscription
 import com.wavesplatform.dex.domain.account.Address
@@ -20,9 +19,9 @@ final case class WsAddressState(
   changedAssets: Set[Asset],
   ordersChanges: Map[Order.Id, WsOrder],
   previousBalanceChanges: Map[Asset, WsBalances],
-  notObservedTxs: Map[ExchangeTransaction.Id, AddressBalance.NotObservedTxData],
+  notObservedTxs: Map[ExchangeTransaction.Id, Seq[Order.Id]],
   removedNotObservedTxs: Set[ExchangeTransaction.Id],
-  notCreatedTxs: Map[ExchangeTransaction.Id, AddressBalance.NotCreatedTxData],
+  notCreatedTxs: Map[ExchangeTransaction.Id, Seq[Order.Id]],
   removedNotCreatedTxs: Set[ExchangeTransaction.Id]
 ) { // TODO Probably use an ordered Map and pass it to WsAddressChanges
 
@@ -54,8 +53,8 @@ final case class WsAddressState(
     copy(changedAssets = changedAssets ++ diff)
 
   def putTxsUpdate(
-    notObservedTxs: Map[ExchangeTransaction.Id, AddressBalance.NotObservedTxData],
-    notCreatedTxs: Map[ExchangeTransaction.Id, AddressBalance.NotCreatedTxData]
+    notObservedTxs: Map[ExchangeTransaction.Id, Seq[Order.Id]],
+    notCreatedTxs: Map[ExchangeTransaction.Id, Seq[Order.Id]]
   ): WsAddressState = {
     val removedNotObservedTxs = this.notObservedTxs.keySet -- notObservedTxs.keySet
     val removedNotCreatedTxs = this.notCreatedTxs.keySet -- notCreatedTxs.keySet

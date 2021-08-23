@@ -8,10 +8,12 @@ sealed abstract class WsAddressFlag(key: String) extends Product with Serializab
 
 object WsAddressFlag {
   case object ExcludeNft extends WsAddressFlag("-nft")
+  case object ImaginaryTxs extends WsAddressFlag("+imaginary-txs")
 
   implicit val format: Format[WsAddressFlag] = Format(
     Reads.StringReads.map {
       case "-nft" => ExcludeNft
+      case "+imaginary-txs" => ImaginaryTxs
       case x => throw new IllegalArgumentException(s"Can't parse '$x' as WsAddressBalancesFilter")
     },
     Writes.StringWrites.contramap(_.value)

@@ -135,15 +135,15 @@ final case class WsAddressState(
       !assetInfo.isNft
     else true
 
-  private def mkImaginaryTxsData(flags: Set[WsAddressFlag], isSnapshot: Boolean): (Option[WsTxsData], Option[WsTxsData]) =
-    if (flags.contains(WsAddressFlag.ImaginaryTxs) && isSnapshot)
-      (Some(WsTxsData(Some(notObservedTxs), None)), Some(WsTxsData(Some(notCreatedTxs), None)))
-    else if (flags.contains(WsAddressFlag.ImaginaryTxs))
-      //removedNotObservedTxs, removedNotCreatedTxs can contain obsolete txs
-      //in case when subscription was created during the WS batch
-      (Some(WsTxsData(Some(notObservedTxs), Some(removedNotObservedTxs))), Some(WsTxsData(Some(notCreatedTxs), Some(removedNotCreatedTxs))))
-    else
-      (None, None)
+  private def mkImaginaryTxsData(flags: Set[WsAddressFlag], isSnapshot: Boolean): (Option[WsTxsData], Option[WsTxsData]) = {
+    def mkWsTxsData(txsData: Map[ExchangeTransaction.Id, Seq[Order.Id]], removed: Set[ExchangeTransaction.Id]): Option[WsTxsData] = {
+      val maybeTxsData = Option(txsData).filter(_.nonEmpty && flags.contains(WsAddressFlag.ImaginaryTxs))
+      val maybeRemoved = Option(removed).filter(_.nonEmpty && flags.contains(WsAddressFlag.ImaginaryTxs) && !isSnapshot)
+      Option(WsTxsData(maybeTxsData, maybeRemoved)).filter(x => x.txsData.nonEmpty || x.removedTxs.nonEmpty)
+    }
+
+    (mkWsTxsData(notObservedTxs, removedNotObservedTxs), mkWsTxsData(notCreatedTxs, removedNotCreatedTxs))
+  }
 
   private def sameAsInPrevious(asset: Asset, wsBalances: WsBalances): Boolean = previousBalanceChanges.get(asset).contains(wsBalances)
 

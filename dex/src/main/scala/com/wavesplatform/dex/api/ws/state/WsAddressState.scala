@@ -143,7 +143,7 @@ object WsAddressState {
   case class Subscription(updateId: Long, options: Set[WsAddressFlag])
 
   def empty(address: Address): WsAddressState =
-    WsAddressState(address, Map.empty, Set.empty, Map.empty, Map.empty, Map.empty, Seq.empty, Map.empty, Seq.empty)
+    WsAddressState(address, Map.empty, Set.empty, Map.empty, Map.empty, Map.empty, Set.empty, Map.empty, Set.empty)
 
   val numberMaxSafeInteger = 9007199254740991L
 

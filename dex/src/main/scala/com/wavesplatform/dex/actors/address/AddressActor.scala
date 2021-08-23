@@ -565,10 +565,10 @@ class AddressActor(
       case ((r, _), (id, v)) => r.withObserved(id, v)
     }
     balances = updated
-    log.info {
+    log.info(
       s"[Balance] 8. au 💵: ${format(balances.balanceForAudit(txs.values.flatMap(_.pessimisticChanges.keySet).toSet))}" +
       s" otx 💵: ${format(balances.tradableBalance(changedAssets).xs)}"
-    }
+    )
     scheduleWs(wsAddressState.putChangedAssets(changedAssets).putTxsUpdate(balances.notObservedTxs, balances.notCreatedTxs))
   }
 

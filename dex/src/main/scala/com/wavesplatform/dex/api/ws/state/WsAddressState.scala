@@ -53,14 +53,18 @@ final case class WsAddressState(
   def putChangedAssets(diff: Set[Asset]): WsAddressState =
     copy(changedAssets = changedAssets ++ diff)
 
-  def putNotObservedTxs(update: Map[ExchangeTransaction.Id, AddressBalance.NotObservedTxData]): WsAddressState = {
-    val diff = notObservedTxs.keySet -- update.keySet
-    copy(notObservedTxs = update, notObservedTxsDiff = diff)
-  }
-
-  def putNotCreatedTxs(update: Map[ExchangeTransaction.Id, AddressBalance.NotCreatedTxData]): WsAddressState = {
-    val diff = notCreatedTxs.keySet -- update.keySet
-    copy(notCreatedTxs = update, notCreatedTxsDiff = diff)
+  def putTxsUpdate(
+    notObservedTxs: Map[ExchangeTransaction.Id, AddressBalance.NotObservedTxData],
+    notCreatedTxs: Map[ExchangeTransaction.Id, AddressBalance.NotCreatedTxData]
+  ): WsAddressState = {
+    val notObservedTxsDiff = this.notObservedTxs.keySet -- notObservedTxs.keySet
+    val notCreatedTxsDiff = this.notCreatedTxs.keySet -- notCreatedTxs.keySet
+    copy(
+      notObservedTxs = notObservedTxs,
+      notObservedTxsDiff = notObservedTxsDiff,
+      notCreatedTxs = notCreatedTxs,
+      notCreatedTxsDiff = notCreatedTxsDiff
+    )
   }
 
   def putOrderUpdate(id: Order.Id, update: WsOrder): WsAddressState = copy(ordersChanges = ordersChanges + (id -> update))

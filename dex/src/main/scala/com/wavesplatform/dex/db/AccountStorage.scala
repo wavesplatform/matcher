@@ -38,7 +38,7 @@ object AccountStorage {
 
   def load(settings: Settings): Either[String, AccountStorage] = settings match {
     case Settings.InMem(seed) => Right(AccountStorage(KeyPair(seed)))
-    case Settings.EncryptedFile(file, password) => SecuredFileStorage(file.getAbsolutePath, password).load
+    case Settings.EncryptedFile(file, password) => SecuredFileStorage(file.getAbsolutePath, password).load()
   }
 
   def save(seed: ByteStr, to: EncryptedFile): Unit = SecuredFileStorage(to.path.getAbsolutePath, to.password).save(seed)

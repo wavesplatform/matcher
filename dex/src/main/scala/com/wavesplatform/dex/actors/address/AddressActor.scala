@@ -7,9 +7,9 @@ import akka.{actor => classic}
 import cats.instances.list._
 import cats.instances.long._
 import cats.syntax.either._
-import cats.syntax.option._
 import cats.syntax.foldable._
 import cats.syntax.group.catsSyntaxGroup
+import cats.syntax.option._
 import com.wavesplatform.dex.actors.address.AddressActor.Command.ObservedTxData
 import com.wavesplatform.dex.actors.address.AddressActor.Settings.default
 import com.wavesplatform.dex.actors.address.AddressActor._
@@ -592,7 +592,10 @@ class AddressActor(
 
   /** Schedules next balances and order changes sending only if it wasn't scheduled before */
   private def scheduleNextDiffSending(): Unit =
-    if (wsSendSchedule.isCancelled) wsSendSchedule = context.system.scheduler.scheduleOnce(settings.wsMessagesInterval, self, WsCommand.SendDiff)
+    if (settings.wsMessagesInterval.toMillis == 0) //only for testing purposes
+      self ! WsCommand.SendDiff
+    else if (wsSendSchedule.isCancelled)
+      wsSendSchedule = context.system.scheduler.scheduleOnce(settings.wsMessagesInterval, self, WsCommand.SendDiff)
 
   private def mkWsBalances(forAssets: Set[Asset], includeEmpty: Boolean): Map[Asset, WsAssetInfo] = forAssets
     .flatMap { asset =>

@@ -66,7 +66,7 @@ final class WsImaginaryTransactionsTestSuite extends WsSuiteBase {
     .parseString(
       s"""waves.dex {
          |  price-assets = [ "$UsdId", "WAVES" ]
-         |  web-sockets.external-client-handler.messages-interval = 1ms
+         |  web-sockets.external-client-handler.messages-interval = 0ms
          |}""".stripMargin
     )
     .withFallback(jwtPublicKeyConfig)

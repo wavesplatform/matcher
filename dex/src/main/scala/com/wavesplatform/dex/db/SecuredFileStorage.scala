@@ -9,7 +9,7 @@ import java.io.{File, FileInputStream, FileOutputStream}
 import java.nio.file.Files
 import scala.collection.mutable.ArrayBuffer
 
-final private case class SecuredFileStorage(path: String, password: String) {
+final case class SecuredFileStorage(path: String, password: String) {
 
   val file = new File(path)
 

@@ -36,12 +36,12 @@ final class WsImaginaryTransactionsTestSuite extends WsSuiteBase {
             )
           )
 
-          val bid = mkOrder(alice, wavesUsdPair, OrderType.BUY, 1.waves, 10.usd)
+          val bid = mkOrder(alice, wavesUsdPair, OrderType.BUY, 5.waves, 10.usd)
           dex1.api.place(bid)
 
-          1 to 2 foreach { i =>
+          1 to 5 foreach { i =>
             withClue(s"iteration $i") {
-              val ask = mkOrder(account, wavesUsdPair, OrderType.SELL, 0.5.waves, 10.usd, ts = System.currentTimeMillis() + i)
+              val ask = mkOrder(account, wavesUsdPair, OrderType.SELL, 1.waves, 10.usd, ts = System.currentTimeMillis() + i)
               placeAndAwaitAtDex(ask, HttpOrderStatus.Status.Filled)
               val txId = ByteStr(dex1.api.getTransactionsByOrderId(ask).head.id().bytes())
               eventually {
@@ -51,10 +51,9 @@ final class WsImaginaryTransactionsTestSuite extends WsSuiteBase {
                 messages1(1).txsData shouldBe empty
                 messages1(1).removedTxs.value shouldBe Set(txId)
               }
+              wsc1.clearMessages()
               val messages2 = wsc2.collectMessages[WsAddressChanges].flatMap(_.maybeNotObservedTxs)
               messages2 shouldBe empty
-              wsc1.clearMessages()
-              wsc2.clearMessages()
             }
           }
         }

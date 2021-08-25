@@ -82,6 +82,15 @@ final class WsImaginaryTransactionsTestSuite extends WsSuiteBase with HasKafka {
         }
       }
     }
+
+    "should send tx updates only for exchange transactions" in test { account =>
+      Using.resource(mkWsAddressConnection(account, dex1, flags = Set(WsAddressFlag.ImaginaryTxs))) { wsc =>
+        broadcastAndAwait(mkTransfer(matcher, account, 1.waves, Waves))
+        Thread.sleep(5.seconds.toMillis)
+        wsc.collectMessages[WsAddressChanges].flatMap(_.maybeNotObservedTxs) shouldBe empty
+        wsc.collectMessages[WsAddressChanges].flatMap(_.maybeNotCreatedTxs) shouldBe empty
+      }
+    }
   }
 
   override protected lazy val dexRunConfig: Config = dexKafkaConfig().withFallback(jwtPublicKeyConfig)

@@ -95,6 +95,15 @@ final class WsImaginaryTransactionsTestSuite extends WsSuiteBase with HasKafka {
   private def getAggregatedRemovedTxs(data: List[WsTxsData]): Seq[Id] =
     data.flatMap(_.removedTxs).flatten
 
+  private def test[A](f: KeyPair => A): Unit = {
+    val account = mkKeyPair(Random.alphanumeric.take(10).mkString(""))
+    broadcastAndAwait(
+      mkTransfer(alice, account, 100.waves, Waves),
+      mkTransfer(alice, account, 100.usd, usd)
+    )
+    f(account)
+  }
+
   override protected lazy val dexRunConfig: Config = dexKafkaConfig().withFallback(jwtPublicKeyConfig)
 
   override protected val dexInitialSuiteConfig: Config = ConfigFactory
@@ -114,15 +123,6 @@ final class WsImaginaryTransactionsTestSuite extends WsSuiteBase with HasKafka {
     broadcastAndAwait(IssueUsdTx)
     dex1.start()
     dex2.start()
-  }
-
-  def test[A](f: KeyPair => A): Unit = {
-    val account = mkKeyPair(Random.alphanumeric.take(10).mkString(""))
-    broadcastAndAwait(
-      mkTransfer(alice, account, 100.waves, Waves),
-      mkTransfer(alice, account, 100.usd, usd)
-    )
-    f(account)
   }
 
 }

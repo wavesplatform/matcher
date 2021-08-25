@@ -46,7 +46,8 @@ final case class WsAddressState(
 
   def removeSubscription(subscriber: ActorRef[WsAddressChanges]): WsAddressState = {
     val updated = copy(activeSubscription = activeSubscription - subscriber)
-    if (updated.activeSubscription.isEmpty) updated.clean().copy(previousBalanceChanges = Map.empty)
+    if (updated.activeSubscription.isEmpty)
+      updated.clean().copy(previousBalanceChanges = Map.empty, notObservedTxs = Map.empty, notCreatedTxs = Map.empty)
     else updated
   }
 

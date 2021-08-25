@@ -62,10 +62,10 @@ final case class WsAddressState(
     val removedNotObservedTxsDiff = lastNotObservedTxs.keySet -- notObservedTxsDiff.keySet
     val removedNotCreatedTxsDiff = lastNotCreatedTxs.keySet -- notCreatedTxsDiff.keySet
     copy(
-      notObservedTxs = notObservedTxsDiff,
+      notObservedTxs = notObservedTxs ++ notObservedTxsDiff,
       lastNotObservedTxs = notObservedTxsDiff,
       removedNotObservedTxs = removedNotObservedTxs ++ removedNotObservedTxsDiff,
-      notCreatedTxs = notCreatedTxsDiff,
+      notCreatedTxs = notCreatedTxs ++ notCreatedTxsDiff,
       lastNotCreatedTxs = notCreatedTxsDiff,
       removedNotCreatedTxs = removedNotCreatedTxs ++ removedNotCreatedTxsDiff
     )

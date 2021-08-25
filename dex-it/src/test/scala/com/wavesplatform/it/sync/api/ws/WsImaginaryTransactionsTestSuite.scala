@@ -2,12 +2,13 @@ package com.wavesplatform.it.sync.api.ws
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus
-import com.wavesplatform.dex.api.ws.entities.WsAddressFlag
+import com.wavesplatform.dex.api.ws.entities.{WsAddressFlag, WsTxsData}
 import com.wavesplatform.dex.api.ws.protocol.WsAddressChanges
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.OrderType
+import com.wavesplatform.dex.domain.transaction.ExchangeTransaction.Id
 import com.wavesplatform.dex.it.api.HasKafka
 import com.wavesplatform.dex.it.docker.DexContainer
 import com.wavesplatform.it.WsSuiteBase
@@ -32,8 +33,8 @@ final class WsImaginaryTransactionsTestSuite extends WsSuiteBase with HasKafka {
             eventually {
               val notObservedTxs = wsc1.collectMessages[WsAddressChanges].flatMap(_.maybeNotObservedTxs)
               withClue(s"it=$i, txId=$txId, askId=${ask.id()}, not=$notObservedTxs") {
-                notObservedTxs.flatMap(_.txsData).flatten.toMap shouldBe Map(txId -> List(ask.id()))
-                notObservedTxs.flatMap(_.removedTxs).flatten shouldBe Seq(txId)
+                getAggregatedWsTxsData(notObservedTxs) shouldBe Map(txId -> List(ask.id()))
+                getAggregatedRemovedTxs(notObservedTxs) shouldBe Seq(txId)
               }
             }
             wsc1.clearMessages()
@@ -56,19 +57,19 @@ final class WsImaginaryTransactionsTestSuite extends WsSuiteBase with HasKafka {
           eventually {
             val notCreatedTxs = wsc1.collectMessages[WsAddressChanges].flatMap(_.maybeNotCreatedTxs)
             withClue(s"txId=$txId, askId=${ask.id()}, nct=$notCreatedTxs") {
-              notCreatedTxs.flatMap(_.txsData).flatten.toMap shouldBe Map(txId -> List(ask.id()))
-              notCreatedTxs.flatMap(_.removedTxs).flatten shouldBe empty
+              getAggregatedWsTxsData(notCreatedTxs) shouldBe Map(txId -> List(ask.id()))
+              getAggregatedRemovedTxs(notCreatedTxs) shouldBe empty
             }
           }
 
           Thread.sleep(5.seconds.toMillis)
-          val removedNct = wsc1.collectMessages[WsAddressChanges].flatMap(_.maybeNotCreatedTxs).flatMap(_.removedTxs).flatten
+          val removedNct = getAggregatedRemovedTxs(wsc1.collectMessages[WsAddressChanges].flatMap(_.maybeNotCreatedTxs))
           removedNct shouldBe empty
 
           dex1.unblockKafkaTraffic()
 
           eventually {
-            val removedNct = wsc1.collectMessages[WsAddressChanges].flatMap(_.maybeNotCreatedTxs).flatMap(_.removedTxs).flatten
+            val removedNct = getAggregatedRemovedTxs(wsc1.collectMessages[WsAddressChanges].flatMap(_.maybeNotCreatedTxs))
             withClue(s"txId=$txId, askId=${ask.id()}, removedNct=$removedNct") {
               removedNct shouldBe List(txId)
             }
@@ -88,6 +89,12 @@ final class WsImaginaryTransactionsTestSuite extends WsSuiteBase with HasKafka {
     }
   }
 
+  private def getAggregatedWsTxsData(data: List[WsTxsData]): Map[Id, Seq[Id]] =
+    data.flatMap(_.txsData).flatten.toMap
+
+  private def getAggregatedRemovedTxs(data: List[WsTxsData]): Seq[Id] =
+    data.flatMap(_.removedTxs).flatten
+
   override protected lazy val dexRunConfig: Config = dexKafkaConfig().withFallback(jwtPublicKeyConfig)
 
   override protected val dexInitialSuiteConfig: Config = ConfigFactory
@@ -99,7 +106,7 @@ final class WsImaginaryTransactionsTestSuite extends WsSuiteBase with HasKafka {
     )
     .withFallback(jwtPublicKeyConfig)
 
-  protected lazy val dex2: DexContainer = createDex("dex-2")
+  private lazy val dex2: DexContainer = createDex("dex-2")
 
   override protected def beforeAll(): Unit = {
     kafka.start()

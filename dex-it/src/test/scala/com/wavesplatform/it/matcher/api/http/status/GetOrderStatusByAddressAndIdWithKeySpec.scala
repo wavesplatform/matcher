@@ -122,7 +122,7 @@ class GetOrderStatusByAddressAndIdWithKeySpec extends MatcherSuiteBase with ApiK
         ),
         StatusCode.BadRequest,
         InvalidAddress.code,
-        "Provided address in not correct, reason: Unable to decode base58: requirement failed: Wrong char 'l' in Base58 string 'null'"
+        "Provided address is not correct, reason: Unable to decode base58: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )
     }
 

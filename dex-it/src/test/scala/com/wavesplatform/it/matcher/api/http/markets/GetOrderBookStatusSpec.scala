@@ -123,7 +123,7 @@ class GetOrderBookStatusSpec extends MatcherSuiteBase with TableDrivenPropertyCh
     forAll(Table(
       ("Amount", "Price", "Http status", "Error code", "Message"),
       ("incorrect", "WAVES", StatusCode.NotFound, AssetNotFound.code, "The asset incorrect not found"),
-      ("WAVES", "incorrect", StatusCode.NotFound, OrderAssetPairReversed.code, "The WAVES-incorrect asset pair should be reversed")
+      ("WAVES", "incorrect", StatusCode.BadRequest, OrderAssetPairReversed.code, "The WAVES-incorrect asset pair should be reversed")
     )) { (a: String, p: String, c: StatusCode, e: Int, m: String) =>
       s"for $a/$p should return (HTTP-$c; [$e: $m]) " in {
         validateMatcherError(dex1.rawApi.getOrderBookStatus(AssetPair.createAssetPair(a, p).get), c, e, m)

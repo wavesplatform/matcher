@@ -58,7 +58,7 @@ class CancelOneOrAllInPairOrdersWithSigSpec extends MatcherSuiteBase with RawHtt
       val o = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 1.usd)
       validateMatcherError(
         dex1.rawApi.cancelOneOrAllInPairOrdersWithSig(alice, o),
-        StatusCode.BadRequest,
+        StatusCode.NotFound,
         OrderNotFound.code,
         s"The order ${o.idStr()} not found"
       )

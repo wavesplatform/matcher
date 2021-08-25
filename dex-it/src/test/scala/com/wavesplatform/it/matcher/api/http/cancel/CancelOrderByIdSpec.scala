@@ -57,7 +57,7 @@ class CancelOrderByIdSpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
     "should return error doesn't exist" in {
       val order = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 1.usd)
 
-      validateMatcherError(dex1.rawApi.cancelOrderById(order), StatusCode.BadRequest, OrderNotFound.code, s"The order ${order.idStr()} not found")
+      validateMatcherError(dex1.rawApi.cancelOrderById(order), StatusCode.NotFound, OrderNotFound.code, s"The order ${order.idStr()} not found")
     }
 
     "should return an error when orderId is not a correct base58 string" in {
@@ -88,7 +88,7 @@ class CancelOrderByIdSpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
 
       validateMatcherError(
         dex1.rawApi.cancelOneOrderWithKey(order.idStr(), Map("X-API-Key" -> apiKey, "X-User-Public-Key" -> bob.publicKey.stringRepr)),
-        StatusCode.BadRequest,
+        StatusCode.NotFound,
         OrderNotFound.code,
         s"The order ${order.idStr()} not found"
       )

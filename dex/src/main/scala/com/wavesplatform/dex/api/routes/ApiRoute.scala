@@ -38,7 +38,7 @@ trait ApiRoute extends Directives with ApiMarshallers with ScorexLogging {
 
   def route: Route
 
-  protected val invalidUserPublicKey: StandardRoute = complete(SimpleErrorResponse(StatusCodes.Forbidden, error.UserPublicKeyIsNotValid()))
+  protected val invalidUserPublicKey: StandardRoute = complete(SimpleErrorResponse(error.UserPublicKeyIsNotValid()))
 
   protected def signedGet(publicKey: PublicKey): Directive0 =
     (headerValueByName("Timestamp") & headerValueByName("Signature")).tflatMap { case (timestamp, sig) =>

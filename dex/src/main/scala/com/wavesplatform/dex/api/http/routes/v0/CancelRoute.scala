@@ -216,7 +216,7 @@ final class CancelRoute(
           case (_, Left(e)) => Left(HttpError.from(e, "OrderCancelRejected"))
         }.toList
       )
-    case x: error.MatcherError => StatusCodes.ServiceUnavailable -> HttpError.from(x, "BatchCancelRejected")
+    case x: error.MatcherError => x.httpCode -> HttpError.from(x, "BatchCancelRejected")
   }
 
   private def handleCancelRequestToFuture(
@@ -234,11 +234,11 @@ final class CancelRoute(
         askAddressActor(addressActor, sender, AddressActor.Command.CancelOrder(oid, AddressActor.Command.Source.Request)) {
           case AddressActor.Event.OrderCanceled(x) => SimpleResponse(HttpSuccessfulSingleCancel(x))
           case x: error.MatcherError =>
-            if (x == error.CanNotPersistEvent) StatusCodes.ServiceUnavailable -> HttpError.from(x, "WavesNodeUnavailable")
-            else StatusCodes.BadRequest -> HttpError.from(x, "OrderCancelRejected")
+            if (x == error.CanNotPersistEvent) x.httpCode -> HttpError.from(x, "WavesNodeUnavailable")
+            else x.httpCode -> HttpError.from(x, "OrderCancelRejected")
         }
       case _ =>
-        Future.successful(StatusCodes.BadRequest -> HttpError.from(error.CancelRequestIsIncomplete, "OrderCancelRejected"))
+        Future.successful(error.CancelRequestIsIncomplete.httpCode -> HttpError.from(error.CancelRequestIsIncomplete, "OrderCancelRejected"))
     }
 
 }

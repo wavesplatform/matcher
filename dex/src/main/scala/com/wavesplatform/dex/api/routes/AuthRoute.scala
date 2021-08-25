@@ -1,7 +1,6 @@
 package com.wavesplatform.dex.api.routes
 
 import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
-import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import akka.http.scaladsl.server.{Directive0, Directive1}
 import com.wavesplatform.dex.api.http.entities.{MatcherResponse, SimpleErrorResponse}
 import com.wavesplatform.dex.api.http.headers.{`X-Api-Key`, `X-User-Public-Key`, api_key}
@@ -16,17 +15,17 @@ trait AuthRoute { this: ApiRoute =>
 
   def withAuth(implicit matcherResponseTrm: ToResponseMarshaller[MatcherResponse]): Directive0 = {
 
-    def correctResponse(statusCode: StatusCode, matcherError: MatcherError): ToResponseMarshallable = this match {
-      case _: MatcherWebSocketRoute => matcherError.toWsHttpResponse(statusCode)
-      case _ => SimpleErrorResponse(statusCode, matcherError)
+    def correctResponse(matcherError: MatcherError): ToResponseMarshallable = this match {
+      case _: MatcherWebSocketRoute => matcherError.toWsHttpResponse
+      case _ => SimpleErrorResponse(matcherError)
     }
-    apiKeyHash.fold[Directive0](complete(SimpleErrorResponse(StatusCodes.InternalServerError, ApiKeyIsNotProvided))) { hashFromSettings =>
+    apiKeyHash.fold[Directive0](complete(SimpleErrorResponse(ApiKeyIsNotProvided))) { hashFromSettings =>
       optionalHeaderValueByType(`X-Api-Key`).flatMap {
         case Some(key) if java.util.Arrays.equals(crypto secureHash key.value, hashFromSettings) => pass
         case _ =>
           optionalHeaderValueByType(api_key).flatMap {
             case Some(key) if java.util.Arrays.equals(crypto secureHash key.value, hashFromSettings) => pass
-            case _ => complete(correctResponse(StatusCodes.Forbidden, ApiKeyIsNotValid))
+            case _ => complete(correctResponse(ApiKeyIsNotValid))
           }
       }
     }
@@ -37,7 +36,7 @@ trait AuthRoute { this: ApiRoute =>
       case None => provide(None)
       case Some(rawPublicKey) =>
         PublicKey.fromBase58String(rawPublicKey.value) match {
-          case Left(e) => complete(SimpleErrorResponse(StatusCodes.BadRequest, UserPublicKeyIsNotValid(e.reason)))
+          case Left(e) => complete(SimpleErrorResponse(UserPublicKeyIsNotValid(e.reason)))
           case Right(x) => provide[Option[PublicKey]](Some(PublicKey(x)))
         }
     }

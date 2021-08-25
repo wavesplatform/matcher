@@ -50,7 +50,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
   private def mkWsAddressConnection(account: KeyPair): WsConnection = mkWsAddressConnection(account, dex1)
 
   private def mkWsAddressFilteredConnection(account: KeyPair, filters: Set[WsAddressFlag] = Set.empty): WsConnection =
-    mkWsAddressConnection(account, dex1, filters = filters)
+    mkWsAddressConnection(account, dex1, flags = filters)
 
   "Address stream should" - {
 

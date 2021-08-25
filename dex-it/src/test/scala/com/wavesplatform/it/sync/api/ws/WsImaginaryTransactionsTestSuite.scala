@@ -32,11 +32,8 @@ final class WsImaginaryTransactionsTestSuite extends WsSuiteBase with HasKafka {
             eventually {
               val notObservedTxs = wsc1.collectMessages[WsAddressChanges].flatMap(_.maybeNotObservedTxs)
               withClue(s"it=$i, txId=$txId, askId=${ask.id()}, not=$notObservedTxs") {
-                notObservedTxs.size shouldBe 2
-                notObservedTxs.head.txsData.value shouldBe Map(txId -> List(ask.id()))
-                notObservedTxs.head.removedTxs shouldBe empty
-                notObservedTxs(1).txsData shouldBe empty
-                notObservedTxs(1).removedTxs.value shouldBe Set(txId)
+                notObservedTxs.flatMap(_.txsData).flatten.toMap shouldBe Map(txId -> List(ask.id()))
+                notObservedTxs.flatMap(_.removedTxs).flatten shouldBe Seq(txId)
               }
             }
             wsc1.clearMessages()
@@ -59,9 +56,8 @@ final class WsImaginaryTransactionsTestSuite extends WsSuiteBase with HasKafka {
           eventually {
             val notCreatedTxs = wsc1.collectMessages[WsAddressChanges].flatMap(_.maybeNotCreatedTxs)
             withClue(s"txId=$txId, askId=${ask.id()}, nct=$notCreatedTxs") {
-              notCreatedTxs.size shouldBe 1
-              notCreatedTxs.head.txsData.value shouldBe Map(txId -> List(ask.id()))
-              notCreatedTxs.head.removedTxs shouldBe empty
+              notCreatedTxs.flatMap(_.txsData).flatten.toMap shouldBe Map(txId -> List(ask.id()))
+              notCreatedTxs.flatMap(_.removedTxs).flatten shouldBe empty
             }
           }
 
@@ -74,7 +70,6 @@ final class WsImaginaryTransactionsTestSuite extends WsSuiteBase with HasKafka {
           eventually {
             val removedNct = wsc1.collectMessages[WsAddressChanges].flatMap(_.maybeNotCreatedTxs).flatMap(_.removedTxs).flatten
             withClue(s"txId=$txId, askId=${ask.id()}, removedNct=$removedNct") {
-              removedNct.size shouldBe 1
               removedNct shouldBe List(txId)
             }
           }
@@ -99,7 +94,7 @@ final class WsImaginaryTransactionsTestSuite extends WsSuiteBase with HasKafka {
     .parseString(
       s"""waves.dex {
          |  price-assets = [ "$UsdId", "WAVES" ]
-         |  web-sockets.external-client-handler.messages-interval = 0ms
+         |  web-sockets.external-client-handler.messages-interval = 1ms
          |}""".stripMargin
     )
     .withFallback(jwtPublicKeyConfig)

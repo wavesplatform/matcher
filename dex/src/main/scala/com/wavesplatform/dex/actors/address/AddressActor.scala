@@ -592,9 +592,7 @@ class AddressActor(
 
   /** Schedules next balances and order changes sending only if it wasn't scheduled before */
   private def scheduleNextDiffSending(): Unit =
-    if (settings.wsMessagesInterval.toMillis == 0) //only for testing purposes
-      self ! WsCommand.SendDiff
-    else if (wsSendSchedule.isCancelled)
+    if (wsSendSchedule.isCancelled)
       wsSendSchedule = context.system.scheduler.scheduleOnce(settings.wsMessagesInterval, self, WsCommand.SendDiff)
 
   private def mkWsBalances(forAssets: Set[Asset], includeEmpty: Boolean): Map[Asset, WsAssetInfo] = forAssets

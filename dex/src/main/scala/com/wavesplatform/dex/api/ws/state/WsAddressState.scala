@@ -20,10 +20,10 @@ final case class WsAddressState(
   ordersChanges: Map[Order.Id, WsOrder],
   previousBalanceChanges: Map[Asset, WsBalances],
   notObservedTxs: Map[ExchangeTransaction.Id, Seq[Order.Id]],
-  lastNotObservedTxs: Map[ExchangeTransaction.Id, Seq[Order.Id]],
+  lastNotObservedTxsDiff: Map[ExchangeTransaction.Id, Seq[Order.Id]],
   removedNotObservedTxs: Set[ExchangeTransaction.Id],
   notCreatedTxs: Map[ExchangeTransaction.Id, Seq[Order.Id]],
-  lastNotCreatedTxs: Map[ExchangeTransaction.Id, Seq[Order.Id]],
+  lastNotCreatedTxsDiff: Map[ExchangeTransaction.Id, Seq[Order.Id]],
   removedNotCreatedTxs: Set[ExchangeTransaction.Id]
 ) { // TODO Probably use an ordered Map and pass it to WsAddressChanges
 
@@ -59,14 +59,14 @@ final case class WsAddressState(
     notObservedTxsDiff: Map[ExchangeTransaction.Id, Seq[Order.Id]],
     notCreatedTxsDiff: Map[ExchangeTransaction.Id, Seq[Order.Id]]
   ): WsAddressState = {
-    val removedNotObservedTxsDiff = lastNotObservedTxs.keySet -- notObservedTxsDiff.keySet
-    val removedNotCreatedTxsDiff = lastNotCreatedTxs.keySet -- notCreatedTxsDiff.keySet
+    val removedNotObservedTxsDiff = lastNotObservedTxsDiff.keySet -- notObservedTxsDiff.keySet
+    val removedNotCreatedTxsDiff = lastNotCreatedTxsDiff.keySet -- notCreatedTxsDiff.keySet
     copy(
       notObservedTxs = notObservedTxs ++ notObservedTxsDiff,
-      lastNotObservedTxs = notObservedTxsDiff,
+      lastNotObservedTxsDiff = notObservedTxsDiff,
       removedNotObservedTxs = removedNotObservedTxs ++ removedNotObservedTxsDiff,
       notCreatedTxs = notCreatedTxs ++ notCreatedTxsDiff,
-      lastNotCreatedTxs = notCreatedTxsDiff,
+      lastNotCreatedTxsDiff = notCreatedTxsDiff,
       removedNotCreatedTxs = removedNotCreatedTxs ++ removedNotCreatedTxsDiff
     )
   }

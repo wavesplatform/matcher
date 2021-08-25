@@ -40,8 +40,7 @@ final class WsImaginaryTransactionsTestSuite extends WsSuiteBase with HasKafka {
               }
             }
             wsc1.clearMessages()
-            val messages2 = wsc2.collectMessages[WsAddressChanges].flatMap(_.maybeNotObservedTxs)
-            messages2 shouldBe empty
+            wsc2.collectMessages[WsAddressChanges].flatMap(_.maybeNotObservedTxs) shouldBe empty
           }
         }
       }
@@ -49,34 +48,37 @@ final class WsImaginaryTransactionsTestSuite extends WsSuiteBase with HasKafka {
 
     "should send 'nct' (not created txs) events" in test { account =>
       Using.resource(mkWsAddressConnection(account, dex1, flags = Set(WsAddressFlag.ImaginaryTxs))) { wsc1 =>
-        dex1.blockKafkaTraffic()
+        Using.resource(mkWsAddressConnection(account, dex1)) { wsc2 =>
+          dex1.blockKafkaTraffic()
 
-        val bid = mkOrder(alice, wavesUsdPair, OrderType.BUY, 5.waves, 10.usd)
-        dex2.api.place(bid)
-        val ask = mkOrder(account, wavesUsdPair, OrderType.SELL, 5.waves, 10.usd)
-        placeAndAwaitAtDex(ask, HttpOrderStatus.Status.Filled, dex2)
-        val txId = ByteStr(dex2.api.getTransactionsByOrderId(ask).head.id().bytes())
-        eventually {
-          val notCreatedTxs = wsc1.collectMessages[WsAddressChanges].flatMap(_.maybeNotCreatedTxs)
-          withClue(s"txId=$txId, askId=${ask.id()}, nct=$notCreatedTxs") {
-            notCreatedTxs.size shouldBe 1
-            notCreatedTxs.head.txsData.value shouldBe Map(txId -> List(ask.id()))
-            notCreatedTxs.head.removedTxs shouldBe empty
+          val bid = mkOrder(alice, wavesUsdPair, OrderType.BUY, 5.waves, 10.usd)
+          dex2.api.place(bid)
+          val ask = mkOrder(account, wavesUsdPair, OrderType.SELL, 5.waves, 10.usd)
+          placeAndAwaitAtDex(ask, HttpOrderStatus.Status.Filled, dex2)
+          val txId = ByteStr(dex2.api.getTransactionsByOrderId(ask).head.id().bytes())
+          eventually {
+            val notCreatedTxs = wsc1.collectMessages[WsAddressChanges].flatMap(_.maybeNotCreatedTxs)
+            withClue(s"txId=$txId, askId=${ask.id()}, nct=$notCreatedTxs") {
+              notCreatedTxs.size shouldBe 1
+              notCreatedTxs.head.txsData.value shouldBe Map(txId -> List(ask.id()))
+              notCreatedTxs.head.removedTxs shouldBe empty
+            }
           }
-        }
 
-        Thread.sleep(5.seconds.toMillis)
-        val removedNct = wsc1.collectMessages[WsAddressChanges].flatMap(_.maybeNotCreatedTxs).flatMap(_.removedTxs).flatten
-        removedNct shouldBe empty
-
-        dex1.unblockKafkaTraffic()
-
-        eventually {
+          Thread.sleep(5.seconds.toMillis)
           val removedNct = wsc1.collectMessages[WsAddressChanges].flatMap(_.maybeNotCreatedTxs).flatMap(_.removedTxs).flatten
-          withClue(s"txId=$txId, askId=${ask.id()}, removedNct=$removedNct") {
-            removedNct.size shouldBe 1
-            removedNct shouldBe List(txId)
+          removedNct shouldBe empty
+
+          dex1.unblockKafkaTraffic()
+
+          eventually {
+            val removedNct = wsc1.collectMessages[WsAddressChanges].flatMap(_.maybeNotCreatedTxs).flatMap(_.removedTxs).flatten
+            withClue(s"txId=$txId, askId=${ask.id()}, removedNct=$removedNct") {
+              removedNct.size shouldBe 1
+              removedNct shouldBe List(txId)
+            }
           }
+          wsc2.collectMessages[WsAddressChanges].flatMap(_.maybeNotCreatedTxs) shouldBe empty
         }
       }
     }

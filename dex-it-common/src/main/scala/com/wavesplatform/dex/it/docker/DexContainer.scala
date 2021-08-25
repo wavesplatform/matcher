@@ -3,6 +3,7 @@ package com.wavesplatform.dex.it.docker
 import cats.Functor
 import cats.tagless.FunctorK
 import com.dimafeng.testcontainers.GenericContainer
+import com.github.dockerjava.api.model.Capability
 import com.typesafe.config.Config
 import com.wavesplatform.dex.app.MatcherStatus.Working
 import com.wavesplatform.dex.domain.utils.ScorexLogging
@@ -75,6 +76,17 @@ final case class DexContainer private (override val internalIp: String, underlyi
     super.restartWithNewSuiteConfig(newSuiteConfig)
   }
 
+  def switchOutgoingTrafficOnPort(port: Int, block: Boolean): Unit = {
+    val shouldBlock = if (block) "-A" else "-D"
+    underlying.container.execInContainer(List("iptables-legacy", shouldBlock, "OUTPUT", "-p", "tcp", "--dport", s"$port", "-j", "DROP"): _*)
+  }
+
+  def blockKafkaTraffic(kafkaPort: Int = 9092): Unit =
+    switchOutgoingTrafficOnPort(kafkaPort, block = true)
+
+  def unblockKafkaTraffic(kafkaPort: Int = 9092): Unit =
+    switchOutgoingTrafficOnPort(kafkaPort, block = false)
+
   /**
    * This method could affect an execution of orders. If you provide such settings, use safe.
    * Use on your risk.
@@ -136,7 +148,9 @@ object DexContainer extends ScorexLogging {
       c.withCreateContainerCmdModifier { cmd =>
         cmd.withName(s"$networkName-$name") // network.getName returns random id
           .withIpv4Address(internalIp)
-        cmd.getHostConfig.withPortBindings(PortBindingKeeper.getBindings(cmd, exposedPorts))
+        cmd.getHostConfig
+          .withPortBindings(PortBindingKeeper.getBindings(cmd, exposedPorts))
+          .withCapAdd(Capability.NET_ADMIN, Capability.NET_RAW) //for iptables
       }
 
       // Copy files to container

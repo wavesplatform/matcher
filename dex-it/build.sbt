@@ -49,7 +49,13 @@ inTask(docker)(
         case (src, dest) => add(src, dest, chown = "waves-dex:waves-dex")
       }
 
-      runShell("chmod", "+x", entryPointSh)
+      runShell(
+        List(
+          List("apt", "update", "&&"),
+          List("apt", "install", "iptables", "--yes", "&&"),
+          List("chmod", "+x", entryPointSh)
+        ).flatten: _*
+      )
       entryPoint(entryPointSh)
       expose(10001) // Profiler
     },

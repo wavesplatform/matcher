@@ -20,8 +20,10 @@ final case class WsAddressState(
   ordersChanges: Map[Order.Id, WsOrder],
   previousBalanceChanges: Map[Asset, WsBalances],
   notObservedTxs: Map[ExchangeTransaction.Id, Seq[Order.Id]],
+  lastNotObservedTxs: Map[ExchangeTransaction.Id, Seq[Order.Id]],
   removedNotObservedTxs: Set[ExchangeTransaction.Id],
   notCreatedTxs: Map[ExchangeTransaction.Id, Seq[Order.Id]],
+  lastNotCreatedTxs: Map[ExchangeTransaction.Id, Seq[Order.Id]],
   removedNotCreatedTxs: Set[ExchangeTransaction.Id]
 ) { // TODO Probably use an ordered Map and pass it to WsAddressChanges
 
@@ -46,8 +48,7 @@ final case class WsAddressState(
 
   def removeSubscription(subscriber: ActorRef[WsAddressChanges]): WsAddressState = {
     val updated = copy(activeSubscription = activeSubscription - subscriber)
-    if (updated.activeSubscription.isEmpty)
-      updated.clean().copy(previousBalanceChanges = Map.empty, notObservedTxs = Map.empty, notCreatedTxs = Map.empty)
+    if (updated.activeSubscription.isEmpty) updated.clean().copy(previousBalanceChanges = Map.empty)
     else updated
   }
 
@@ -58,12 +59,14 @@ final case class WsAddressState(
     notObservedTxsDiff: Map[ExchangeTransaction.Id, Seq[Order.Id]],
     notCreatedTxsDiff: Map[ExchangeTransaction.Id, Seq[Order.Id]]
   ): WsAddressState = {
-    val removedNotObservedTxsDiff = notObservedTxs.keySet -- notObservedTxsDiff.keySet
-    val removedNotCreatedTxsDiff = notCreatedTxs.keySet -- notCreatedTxsDiff.keySet
+    val removedNotObservedTxsDiff = lastNotObservedTxs.keySet -- notObservedTxsDiff.keySet
+    val removedNotCreatedTxsDiff = lastNotCreatedTxs.keySet -- notCreatedTxsDiff.keySet
     copy(
       notObservedTxs = notObservedTxsDiff,
+      lastNotObservedTxs = notObservedTxsDiff,
       removedNotObservedTxs = removedNotObservedTxs ++ removedNotObservedTxsDiff,
       notCreatedTxs = notCreatedTxsDiff,
+      lastNotCreatedTxs = notCreatedTxsDiff,
       removedNotCreatedTxs = removedNotCreatedTxs ++ removedNotCreatedTxsDiff
     )
   }
@@ -128,7 +131,9 @@ final case class WsAddressState(
     changedAssets = Set.empty,
     ordersChanges = Map.empty,
     removedNotCreatedTxs = Set.empty,
-    removedNotObservedTxs = Set.empty
+    removedNotObservedTxs = Set.empty,
+    notObservedTxs = Map.empty,
+    notCreatedTxs = Map.empty
   )
 
   private def nftFilteringPredicate(assetInfo: WsAssetInfo, flags: Set[WsAddressFlag]): Boolean =
@@ -159,7 +164,7 @@ object WsAddressState {
   case class Subscription(updateId: Long, flags: Set[WsAddressFlag])
 
   def empty(address: Address): WsAddressState =
-    WsAddressState(address, Map.empty, Set.empty, Map.empty, Map.empty, Map.empty, Set.empty, Map.empty, Set.empty)
+    WsAddressState(address, Map.empty, Set.empty, Map.empty, Map.empty, Map.empty, Map.empty, Set.empty, Map.empty, Map.empty, Set.empty)
 
   val numberMaxSafeInteger = 9007199254740991L
 

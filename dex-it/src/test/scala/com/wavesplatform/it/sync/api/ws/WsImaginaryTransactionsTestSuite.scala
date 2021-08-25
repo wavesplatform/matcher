@@ -31,7 +31,7 @@ final class WsImaginaryTransactionsTestSuite extends WsSuiteBase with HasKafka {
             val txId = ByteStr(dex1.api.getTransactionsByOrderId(ask).head.id().bytes())
             eventually {
               val notObservedTxs = wsc1.collectMessages[WsAddressChanges].flatMap(_.maybeNotObservedTxs)
-              withClue(s"it=$i, txId=$txId, askId=${ask.id()}, messages1=$notObservedTxs") {
+              withClue(s"it=$i, txId=$txId, askId=${ask.id()}, not=$notObservedTxs") {
                 notObservedTxs.size shouldBe 2
                 notObservedTxs.head.txsData.value shouldBe Map(txId -> List(ask.id()))
                 notObservedTxs.head.removedTxs shouldBe empty
@@ -58,7 +58,7 @@ final class WsImaginaryTransactionsTestSuite extends WsSuiteBase with HasKafka {
         val txId = ByteStr(dex2.api.getTransactionsByOrderId(ask).head.id().bytes())
         eventually {
           val notCreatedTxs = wsc1.collectMessages[WsAddressChanges].flatMap(_.maybeNotCreatedTxs)
-          withClue(s"txId=$txId, askId=${ask.id()}, messages1=$notCreatedTxs") {
+          withClue(s"txId=$txId, askId=${ask.id()}, nct=$notCreatedTxs") {
             notCreatedTxs.size shouldBe 1
             notCreatedTxs.head.txsData.value shouldBe Map(txId -> List(ask.id()))
             notCreatedTxs.head.removedTxs shouldBe empty

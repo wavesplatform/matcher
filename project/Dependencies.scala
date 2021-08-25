@@ -43,7 +43,7 @@ object Dependencies {
     val wavesJ = "1.2.2"
 
     val postgresql = "42.2.23"
-    val quillJdbc = "3.9.0"
+    val quillJdbc = "3.8.0"
 
     val sttpClient = "3.3.13"
 

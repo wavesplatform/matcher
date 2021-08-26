@@ -7,15 +7,18 @@ import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
 final case class WsTxsData(
-  txsData: Option[Map[ExchangeTransaction.Id, Seq[Order.Id]]],
-  removedTxs: Option[Set[ExchangeTransaction.Id]]
+  txsData: Map[ExchangeTransaction.Id, Seq[Order.Id]],
+  removedTxs: Set[ExchangeTransaction.Id]
 )
 
 object WsTxsData {
 
   implicit val formats: Format[WsTxsData] = (
-    (__ \ "+").formatNullable[Map[ExchangeTransaction.Id, Seq[Order.Id]]] and
-      (__ \ "-").formatNullable[Set[ExchangeTransaction.Id]]
-  )(WsTxsData.apply, unlift(WsTxsData.unapply))
+    (__ \ "+").formatNullableWithDefault[Map[ExchangeTransaction.Id, Seq[Order.Id]]](None) and
+      (__ \ "-").formatNullableWithDefault[Set[ExchangeTransaction.Id]](None)
+  )(
+    (txsData, removedTxs) => WsTxsData(txsData.getOrElse(Map.empty), removedTxs.getOrElse(Set.empty)),
+    wsTxsData => (Option(wsTxsData.txsData).filter(_.nonEmpty), Option(wsTxsData.removedTxs).filter(_.nonEmpty))
+  )
 
 }

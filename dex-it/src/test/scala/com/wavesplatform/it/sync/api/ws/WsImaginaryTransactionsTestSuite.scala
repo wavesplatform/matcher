@@ -92,10 +92,10 @@ final class WsImaginaryTransactionsTestSuite extends WsSuiteBase with HasKafka {
   }
 
   private def getAggregatedWsTxsData(data: List[WsTxsData]): Map[Id, Seq[Id]] =
-    data.flatMap(_.txsData).flatten.toMap
+    data.flatMap(_.txsData).toMap
 
   private def getAggregatedRemovedTxs(data: List[WsTxsData]): Seq[Id] =
-    data.flatMap(_.removedTxs).flatten
+    data.flatMap(_.removedTxs)
 
   private def test[A](f: KeyPair => A): Unit = {
     val account = mkKeyPair(Random.alphanumeric.take(10).mkString(""))

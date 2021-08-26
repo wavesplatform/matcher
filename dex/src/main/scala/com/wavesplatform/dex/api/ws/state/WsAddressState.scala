@@ -142,13 +142,19 @@ final case class WsAddressState(
     else true
 
   private def mkImaginaryTxsData(flags: Set[WsAddressFlag], isSnapshot: Boolean): (Option[WsTxsData], Option[WsTxsData]) = {
-    def mkWsTxsData(txsData: Map[ExchangeTransaction.Id, Seq[Order.Id]], removed: Set[ExchangeTransaction.Id]): Option[WsTxsData] = {
-      val maybeTxsData = Option(txsData).filter(_.nonEmpty && flags.contains(WsAddressFlag.ImaginaryTxs))
-      val maybeRemoved = Option(removed).filter(_.nonEmpty && flags.contains(WsAddressFlag.ImaginaryTxs) && !isSnapshot)
-      Option(WsTxsData(maybeTxsData, maybeRemoved)).filter(x => x.txsData.nonEmpty || x.removedTxs.nonEmpty)
+    def mkMaybeWsTxsData(txsData: Map[ExchangeTransaction.Id, Seq[Order.Id]], removed: Set[ExchangeTransaction.Id]): Option[WsTxsData] = {
+      val wsTxsData =
+        if (flags.contains(WsAddressFlag.ImaginaryTxs) && isSnapshot)
+          WsTxsData(txsData, Set.empty)
+        else if (flags.contains(WsAddressFlag.ImaginaryTxs))
+          WsTxsData(txsData, removed)
+        else
+          WsTxsData(Map.empty, Set.empty)
+
+      Option(wsTxsData).filter(x => x.txsData.nonEmpty || x.removedTxs.nonEmpty)
     }
 
-    (mkWsTxsData(notObservedTxs, removedNotObservedTxs), mkWsTxsData(notCreatedTxs, removedNotCreatedTxs))
+    (mkMaybeWsTxsData(notObservedTxs, removedNotObservedTxs), mkMaybeWsTxsData(notCreatedTxs, removedNotCreatedTxs))
   }
 
   private def sameAsInPrevious(asset: Asset, wsBalances: WsBalances): Boolean = previousBalanceChanges.get(asset).contains(wsBalances)

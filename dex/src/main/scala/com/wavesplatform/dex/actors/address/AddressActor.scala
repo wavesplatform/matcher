@@ -576,18 +576,26 @@ class AddressActor(
         r.withObserved(id, notCreatedTxData)
     }
     balances = updated
-    log.info(
-      s"[Balance] 8. au 💵: ${format(balances.balanceForAudit(txs.values.flatMap(_.pessimisticChanges.keySet).toSet))}" +
-      s" otx 💵: ${format(balances.tradableBalance(changedAssets).xs)}"
-    )
-    scheduleWs(
-      wsAddressState
-        .putChangedAssets(changedAssets)
-        .putTxsUpdate(
-          balances.notObservedTxs.view.mapValues(_.orderIds).toMap,
-          balances.notCreatedTxs.view.mapValues(_.orderIds).toMap
-        )
-    )
+    if (changedAssets.isEmpty) {
+      log.info(s"[Balance] 8. au 💵: ${format(balances.balanceForAudit(txs.values.flatMap(_.pessimisticChanges.keySet).toSet))}")
+      scheduleWs(
+        wsAddressState
+          .putTxsUpdate(
+            balances.notObservedTxs.view.mapValues(_.orderIds).toMap,
+            balances.notCreatedTxs.view.mapValues(_.orderIds).toMap
+          )
+      )
+    } else {
+      log.info(s"[Balance] 9. otx 💵: ${format(balances.tradableBalance(changedAssets).xs)}")
+      scheduleWs(
+        wsAddressState
+          .putChangedAssets(changedAssets)
+          .putTxsUpdate(
+            balances.notObservedTxs.view.mapValues(_.orderIds).toMap,
+            balances.notCreatedTxs.view.mapValues(_.orderIds).toMap
+          )
+      )
+    }
   }
 
   /** Schedules next balances and order changes sending only if it wasn't scheduled before */
@@ -707,7 +715,7 @@ class AddressActor(
     val reservableBalance = ao.reservableBalance
 
     balances = balances.reserve(PositiveMap(reservableBalance))
-    log.info(s"[Balance] 9. o=${ao.id}; 💵: ${format(balances.tradableBalance(reservableBalance.keySet).xs)}; ov Δ: ${format(reservableBalance)}")
+    log.info(s"[Balance] 10. o=${ao.id}; 💵: ${format(balances.tradableBalance(reservableBalance.keySet).xs)}; ov Δ: ${format(reservableBalance)}")
     scheduleWs(wsAddressState.putChangedAssets(reservableBalance.keySet))
 
     storeCommand(ao.id)(

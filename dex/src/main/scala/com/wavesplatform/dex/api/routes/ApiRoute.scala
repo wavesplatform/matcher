@@ -5,13 +5,13 @@ import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshal
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.directives.FutureDirectives
 import akka.http.scaladsl.server.{Directive1, Directives, Route, _}
-import akka.pattern.{ask, AskTimeoutException}
+import akka.pattern.{AskTimeoutException, ask}
 import com.google.common.primitives.Longs
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.api.http.entities.{InfoNotFound, InvalidAddress, InvalidAsset, InvalidBase58String, InvalidPublicKey, InvalidSignature, MatcherResponse, TimedOut, _}
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
-import com.wavesplatform.dex.api.http.{entities, ApiMarshallers}
+import com.wavesplatform.dex.api.http.{ApiMarshallers, entities}
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -19,7 +19,7 @@ import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.error.ValidationError
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.error.MatcherError
+import com.wavesplatform.dex.error.{MatcherError, OrderAssetPairReversed}
 import com.wavesplatform.dex.model.AssetPairBuilder
 import kamon.Kamon
 
@@ -64,7 +64,7 @@ trait ApiRoute extends Directives with ApiMarshallers with ScorexLogging {
         if (validate)
           FutureDirectives.onSuccess(assetPairBuilder.validateAssetPair(p).value) flatMap {
             case Right(_) => provide(p)
-            case Left(e) if redirectToInverse =>
+            case Left(e: OrderAssetPairReversed) if redirectToInverse =>
               FutureDirectives.onSuccess(assetPairBuilder.validateAssetPair(p.reverse).value) flatMap {
                 case Right(_) => redirect(s"/matcher/orderbook/${p.priceAssetStr}/${p.amountAssetStr}$suffix", StatusCodes.MovedPermanently)
                 case Left(_) => complete(formatError(e))

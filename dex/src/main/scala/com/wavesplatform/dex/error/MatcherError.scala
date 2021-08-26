@@ -738,7 +738,7 @@ final case class TokenNetworkUnexpected(required: Byte, given: Byte)
       TokenNetworkUnexpected.httpCode
     )
 
-object TokenNetworkUnexpected extends MatcherErrorCodeProvider(token, network, unexpected, C.InternalServerError)
+object TokenNetworkUnexpected extends MatcherErrorCodeProvider(token, network, unexpected, C.Forbidden)
 
 final case class SubscriptionsLimitReached(limit: Int, id: String)
     extends MatcherError(
@@ -747,7 +747,7 @@ final case class SubscriptionsLimitReached(limit: Int, id: String)
       SubscriptionsLimitReached.httpCode
     )
 
-object SubscriptionsLimitReached extends MatcherErrorCodeProvider(webSocket, subscription, limitReached, C.InternalServerError)
+object SubscriptionsLimitReached extends MatcherErrorCodeProvider(webSocket, subscription, limitReached, C.BadRequest)
 
 final case class InvalidAddress(reason: String)
     extends MatcherError(InvalidAddress.code, e"Provided address is not correct, reason: ${"reason" -> reason}", InvalidAddress.httpCode)

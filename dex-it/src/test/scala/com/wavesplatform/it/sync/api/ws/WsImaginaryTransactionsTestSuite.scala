@@ -53,13 +53,19 @@ final class WsImaginaryTransactionsTestSuite extends WsSuiteBase with HasKafka {
 
           val bid = mkOrder(alice, wavesUsdPair, OrderType.BUY, 5.waves, 10.usd)
           dex2.api.place(bid)
-          val ask = mkOrder(account, wavesUsdPair, OrderType.SELL, 5.waves, 10.usd)
-          placeAndAwaitAtDex(ask, HttpOrderStatus.Status.Filled, dex2)
-          val txId = ByteStr(dex2.api.getTransactionsByOrderId(ask).head.id().bytes())
+
+          val ts = new AtomicLong(System.currentTimeMillis())
+          val txToOrderId =
+            (1 to 5).map { _ =>
+              val ask = mkOrder(account, wavesUsdPair, OrderType.SELL, 1.waves, 10.usd, ts = ts.incrementAndGet())
+              placeAndAwaitAtDex(ask, HttpOrderStatus.Status.Filled, dex2)
+              ByteStr(dex2.api.getTransactionsByOrderId(ask).head.id().bytes()) -> Seq(ask.id())
+            }.toMap
+
           eventually {
             val notCreatedTxs = wsc1.collectMessages[WsAddressChanges].flatMap(_.maybeNotCreatedTxs)
-            withClue(s"txId=$txId, askId=${ask.id()}, nct=$notCreatedTxs") {
-              getAggregatedWsTxsData(notCreatedTxs) shouldBe Map(txId -> List(ask.id()))
+            withClue(s"txToOrderId=$txToOrderId, nct=$notCreatedTxs") {
+              getAggregatedWsTxsData(notCreatedTxs) shouldBe txToOrderId
               getAggregatedRemovedTxs(notCreatedTxs) shouldBe empty
             }
           }
@@ -71,9 +77,10 @@ final class WsImaginaryTransactionsTestSuite extends WsSuiteBase with HasKafka {
           dex1.unblockKafkaTraffic()
 
           eventually {
-            val removedNct = getAggregatedRemovedTxs(wsc1.collectMessages[WsAddressChanges].flatMap(_.maybeNotCreatedTxs))
-            withClue(s"txId=$txId, askId=${ask.id()}, removedNct=$removedNct") {
-              removedNct shouldBe List(txId)
+            val removedNct = getAggregatedRemovedTxs(wsc1.collectMessages[WsAddressChanges].flatMap(_.maybeNotCreatedTxs)).sorted
+            val txIds = txToOrderId.keys.toSeq.sorted
+            withClue(s"txIds=$txIds, removedNct=$removedNct") {
+              removedNct shouldBe txIds
             }
           }
           wsc2.collectMessages[WsAddressChanges].flatMap(_.maybeNotCreatedTxs) shouldBe empty

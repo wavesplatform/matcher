@@ -128,7 +128,7 @@ object OrderEventsCoordinatorActor {
                         observedTxData <-
                           txWithChanges.tx
                             .getOrdersVanilla
-                            .leftMap(err => context.log.warn(s"tx parsing error $err"))
+                            .leftMap(err => context.log.error(s"tx parsing error $err for tx ${txWithChanges.txId}"))
                             .map(ObservedTxData(_, PositiveMap(xs.view.mapValues(-_).toMap)))
                             .toOption
                       } yield id -> observedTxData

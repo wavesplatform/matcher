@@ -20,10 +20,10 @@ final case class WsAddressState(
   ordersChanges: Map[Order.Id, WsOrder],
   previousBalanceChanges: Map[Asset, WsBalances],
   notObservedTxs: Map[ExchangeTransaction.Id, Seq[Order.Id]],
-  lastNotObservedTxsDiff: Map[ExchangeTransaction.Id, Seq[Order.Id]],
+  lastNotObservedTxs: Map[ExchangeTransaction.Id, Seq[Order.Id]],
   removedNotObservedTxs: Set[ExchangeTransaction.Id],
   notCreatedTxs: Map[ExchangeTransaction.Id, Seq[Order.Id]],
-  lastNotCreatedTxsDiff: Map[ExchangeTransaction.Id, Seq[Order.Id]],
+  lastNotCreatedTxs: Map[ExchangeTransaction.Id, Seq[Order.Id]],
   removedNotCreatedTxs: Set[ExchangeTransaction.Id]
 ) { // TODO Probably use an ordered Map and pass it to WsAddressChanges
 
@@ -56,17 +56,17 @@ final case class WsAddressState(
     copy(changedAssets = changedAssets ++ diff)
 
   def putTxsUpdate(
-    notObservedTxsDiff: Map[ExchangeTransaction.Id, Seq[Order.Id]],
-    notCreatedTxsDiff: Map[ExchangeTransaction.Id, Seq[Order.Id]]
+    currentNotObservedTxs: Map[ExchangeTransaction.Id, Seq[Order.Id]],
+    currentNotCreatedTxs: Map[ExchangeTransaction.Id, Seq[Order.Id]]
   ): WsAddressState = {
-    val removedNotObservedTxsDiff = lastNotObservedTxsDiff.keySet -- notObservedTxsDiff.keySet
-    val removedNotCreatedTxsDiff = lastNotCreatedTxsDiff.keySet -- notCreatedTxsDiff.keySet
+    val removedNotObservedTxsDiff = lastNotObservedTxs.keySet -- currentNotObservedTxs.keySet
+    val removedNotCreatedTxsDiff = lastNotCreatedTxs.keySet -- currentNotCreatedTxs.keySet
     copy(
-      notObservedTxs = notObservedTxs ++ notObservedTxsDiff,
-      lastNotObservedTxsDiff = notObservedTxsDiff,
+      notObservedTxs = notObservedTxs ++ currentNotObservedTxs,
+      lastNotObservedTxs = currentNotObservedTxs,
       removedNotObservedTxs = removedNotObservedTxs ++ removedNotObservedTxsDiff,
-      notCreatedTxs = notCreatedTxs ++ notCreatedTxsDiff,
-      lastNotCreatedTxsDiff = notCreatedTxsDiff,
+      notCreatedTxs = notCreatedTxs ++ currentNotCreatedTxs,
+      lastNotCreatedTxs = currentNotCreatedTxs,
       removedNotCreatedTxs = removedNotCreatedTxs ++ removedNotCreatedTxsDiff
     )
   }

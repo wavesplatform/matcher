@@ -122,7 +122,6 @@ final class WsImaginaryTransactionsTestSuite extends WsSuiteBase with HasKafka {
          |  web-sockets.external-client-handler.messages-interval = 1ms
          |}""".stripMargin
     )
-    .withFallback(jwtPublicKeyConfig)
 
   private lazy val dex2: DexContainer = createDex("dex-2")
 

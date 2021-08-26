@@ -40,8 +40,9 @@ final class WsImaginaryTransactionsTestSuite extends WsSuiteBase with HasKafka {
               }
             }
             wsc1.clearMessages()
-            wsc2.collectMessages[WsAddressChanges].flatMap(_.maybeNotObservedTxs) shouldBe empty
           }
+
+          wsc2.collectMessages[WsAddressChanges].flatMap(_.maybeNotObservedTxs) shouldBe empty
         }
       }
     }

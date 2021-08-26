@@ -43,7 +43,7 @@ class HttpV1OrderBookSpec extends AnyFreeSpec with Matchers with DiffMatcherWith
       Json.parse(json).as[HttpV1OrderBook] should matchTo(orderBookV1)
     }
 
-    "serialization" ignore {
+    "serialization" in {
       Json.prettyPrint(Json.parse(HttpOrderBook toJson orderBookResult)) should matchTo(json)
     }
   }

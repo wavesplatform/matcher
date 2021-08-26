@@ -60,7 +60,7 @@ class HttpSuccessfulPlaceSpec extends AnyFreeSpec with Matchers with DiffMatcher
       Json.parse(json).as[HttpSuccessfulPlace] should matchTo(message)
     }
 
-    "serialization" ignore {
+    "serialization" in {
       Json.prettyPrint(Json.toJson(message)) should matchTo(json)
     }
   }

@@ -1,6 +1,7 @@
 package com.wavesplatform.dex
 
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.settings.formatValue
 import play.api.libs.json._
 
@@ -32,6 +33,15 @@ package object json {
   )
 
   implicit val assetDoubleMapFormat: Format[Map[Asset, Double]] = assetMapFormat[Double]
+
+  implicit def byteStr58MapFormat[V: Format]: Format[Map[ByteStr, V]] = mapFormat[ByteStr, V](
+    stringifyKey = _.base58,
+    parseKey = x =>
+      ByteStr.decodeBase58(x).fold[JsResult[ByteStr]](
+        err => JsError(s"Can't parse '$x' as ByteStr, expected base58 string, error $err"),
+        JsSuccess(_)
+      )
+  )
 
   implicit def assetMapFormat[V: Format]: Format[Map[Asset, V]] = mapFormat[Asset, V](
     stringifyKey = _.toString,

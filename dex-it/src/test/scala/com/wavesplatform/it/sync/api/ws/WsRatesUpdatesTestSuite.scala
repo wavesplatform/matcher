@@ -22,68 +22,47 @@ class WsRatesUpdatesTestSuite extends WsSuiteBase {
 
   "Matcher should send rates snapshot after subscription and rates updates" in {
 
-    def assertRatesUpdates(wsc: WsConnection)(expectedRatesUpdates: List[(Map[Asset, Double], Long)]): Unit =
-      wsc
-        .receiveAtLeastN[WsRatesUpdates](expectedRatesUpdates.size)
-        .map(r => r.rates -> r.updateId) should matchTo(expectedRatesUpdates)
+    def assertRatesUpdates(wsc: WsConnection)(expectedRatesUpdates: (Asset, Double)*): Unit =
+      eventually {
+        val messages = wsc.collectMessages[WsRatesUpdates]
+        messages.flatMap(_.rates).toMap shouldBe expectedRatesUpdates.toMap
+      }
 
     dex1.api.upsertAssetRate(btc, 0.00041863)
 
     Using.resource(mkWsRatesUpdatesConnection(dex1)) { wsc1 =>
 
       withClue("Rates snapshot") {
-        assertRatesUpdates(wsc1)(List((Map(Waves -> 1, btc -> 0.00041863), 0)))
+        assertRatesUpdates(wsc1)(Waves -> 1, btc -> 0.00041863)
         wsc1.clearMessages()
       }
 
       dex1.api.upsertAssetRate(btc, 0.00041864)
+      dex1.api.upsertAssetRate(usd, 2.76)
 
-      Using.resource(mkWsRatesUpdatesConnection(dex1)) { wsc2 =>
-
-        dex1.api.upsertAssetRate(usd, 2.76)
-
-        withClue("Rates update") {
-          assertRatesUpdates(wsc1) {
-            List(
-              Map[Asset, Double](btc -> 0.00041864) -> 1L,
-              Map[Asset, Double](usd -> 2.76) -> 2L
-            )
-          }
-          assertRatesUpdates(wsc2) {
-            List(
-              Map[Asset, Double](Waves -> 1, btc -> 0.00041864) -> 0L,
-              Map[Asset, Double](usd -> 2.76) -> 1L
-            )
-          }
-          Seq(wsc1, wsc2).foreach(_.clearMessages())
-        }
-
-        Seq(btc, usd).foreach(dex1.api.deleteAssetRate)
-
-        withClue("Rates delete") {
-          assertRatesUpdates(wsc1) {
-            List(
-              Map[Asset, Double](btc -> -1) -> 3L,
-              Map[Asset, Double](usd -> -1) -> 4L
-            )
-          }
-          assertRatesUpdates(wsc2) {
-            List(
-              Map[Asset, Double](btc -> -1) -> 2L,
-              Map[Asset, Double](usd -> -1) -> 3L
-            )
-          }
-          Seq(wsc1, wsc2).foreach(_.clearMessages())
-        }
-
-        withClue("Rates snapshot after deleting") {
-          dex1.api.upsertAssetRate(btc, 0.0099)
-          Using.resource(mkWsRatesUpdatesConnection(dex1)) { wsc =>
-            assertRatesUpdates(wsc)(List(Map[Asset, Double](Waves -> 1, btc -> 0.0099) -> 0))
-          }
-          dex1.api.deleteAssetRate(btc)
-        }
+      withClue("Rates update") {
+        assertRatesUpdates(wsc1)(btc -> 0.00041864, usd -> 2.76)
+        wsc1.clearMessages()
       }
+
+      Seq(btc, usd).foreach(dex1.api.deleteAssetRate)
+
+      withClue("Rates delete") {
+        assertRatesUpdates(wsc1)(
+          btc -> -1,
+          usd -> -1
+        )
+        wsc1.clearMessages()
+      }
+
+      withClue("Rates snapshot after deleting") {
+        dex1.api.upsertAssetRate(btc, 0.0099)
+        Using.resource(mkWsRatesUpdatesConnection(dex1)) { wsc =>
+          assertRatesUpdates(wsc)(Waves -> 1, btc -> 0.0099)
+        }
+        dex1.api.deleteAssetRate(btc)
+      }
+
     }
   }
 

@@ -13,6 +13,7 @@ import com.wavesplatform.dex.it.api.HasKafka
 import com.wavesplatform.dex.it.docker.DexContainer
 import com.wavesplatform.it.WsSuiteBase
 
+import java.util.concurrent.atomic.AtomicLong
 import scala.concurrent.duration._
 import scala.util.{Random, Using}
 
@@ -26,8 +27,9 @@ final class WsImaginaryTransactionsTestSuite extends WsSuiteBase with HasKafka {
           val bid = mkOrder(alice, wavesUsdPair, OrderType.BUY, 5.waves, 10.usd)
           dex1.api.place(bid)
 
+          val ts = new AtomicLong(System.currentTimeMillis())
           1 to 5 foreach { i =>
-            val ask = mkOrder(account, wavesUsdPair, OrderType.SELL, 1.waves, 10.usd, ts = System.currentTimeMillis() + i)
+            val ask = mkOrder(account, wavesUsdPair, OrderType.SELL, 1.waves, 10.usd, ts = ts.incrementAndGet())
             placeAndAwaitAtDex(ask, HttpOrderStatus.Status.Filled)
             val txId = ByteStr(dex1.api.getTransactionsByOrderId(ask).head.id().bytes())
             eventually {

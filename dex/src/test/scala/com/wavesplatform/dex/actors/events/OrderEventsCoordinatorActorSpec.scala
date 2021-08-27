@@ -5,10 +5,12 @@ import akka.actor.typed.ActorRef
 import akka.{testkit => classic}
 import cats.syntax.option._
 import com.softwaremill.diffx.{Derived, Diff}
+import com.wavesplatform.dex.actors.address.AddressActor.Command.ObservedTxData
+import com.wavesplatform.dex.actors.address.AddressBalance.{NotCreatedTxData, NotObservedTxData}
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.actors.tx.ExchangeTransactionBroadcastActor
 import com.wavesplatform.dex.actors.tx.ExchangeTransactionBroadcastActor.Command.Broadcast
-import com.wavesplatform.dex.collections.{FifoSet, PositiveMap}
+import com.wavesplatform.dex.collections.{FifoSet, NegativeMap, PositiveMap}
 import com.wavesplatform.dex.domain.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -258,7 +260,7 @@ class OrderEventsCoordinatorActorSpec extends ScalaTestWithActorTestKit() with M
           actual1 should matchTo(AddressDirectoryActor.Command.ForwardMessage(
             validCounter.sender.toAddress,
             AddressActor.Command.MarkTxsObserved(Map(
-              validTx.id() -> PositiveMap(validEvent.counterExecutedSpending)
+              validTx.id() -> mkObservedTxData(PositiveMap(validEvent.counterExecutedSpending))
             ))
           ))
 
@@ -266,7 +268,7 @@ class OrderEventsCoordinatorActorSpec extends ScalaTestWithActorTestKit() with M
           actual2 should matchTo(AddressDirectoryActor.Command.ForwardMessage(
             validSubmitted.sender.toAddress,
             AddressActor.Command.MarkTxsObserved(Map(
-              validTx.id() -> PositiveMap(validEvent.submittedExecutedSpending)
+              validTx.id() -> mkObservedTxData(PositiveMap(validEvent.submittedExecutedSpending))
             ))
           ))
         }
@@ -321,7 +323,7 @@ class OrderEventsCoordinatorActorSpec extends ScalaTestWithActorTestKit() with M
             validCounter.sender.toAddress,
             AddressActor.Command.ApplyBatch(
               AddressActor.Command.MarkTxsObserved(Map(
-                validTx.id() -> PositiveMap(validEvent.counterExecutedSpending)
+                validTx.id() -> mkObservedTxData(PositiveMap(validEvent.counterExecutedSpending))
               )),
               AddressActor.Command.ChangeBalances(addressBalanceUpdates)
             )
@@ -360,7 +362,7 @@ class OrderEventsCoordinatorActorSpec extends ScalaTestWithActorTestKit() with M
           actual1 should matchTo(AddressDirectoryActor.Command.ForwardMessage(
             validCounter.sender.toAddress,
             AddressActor.Command.MarkTxsObserved(Map(
-              validTx.id() -> PositiveMap(validEvent.counterExecutedSpending)
+              validTx.id() -> mkObservedTxData(PositiveMap(validEvent.counterExecutedSpending))
             ))
           ))
 
@@ -368,7 +370,7 @@ class OrderEventsCoordinatorActorSpec extends ScalaTestWithActorTestKit() with M
           actual2 should matchTo(AddressDirectoryActor.Command.ForwardMessage(
             validSubmitted.sender.toAddress,
             AddressActor.Command.MarkTxsObserved(Map(
-              validTx.id() -> PositiveMap(validEvent.submittedExecutedSpending)
+              validTx.id() -> mkObservedTxData(PositiveMap(validEvent.submittedExecutedSpending))
             ))
           ))
         }
@@ -391,6 +393,9 @@ class OrderEventsCoordinatorActorSpec extends ScalaTestWithActorTestKit() with M
       }
     }
   }
+
+  private def mkObservedTxData(pessimisticChanges: PositiveMap[Asset, Long]): ObservedTxData =
+    ObservedTxData(Seq(validCounter, validSubmitted), pessimisticChanges)
 
   private def passToAddressDirectoryTest[T: ClassTag: Diff](command: OrderEventsCoordinatorActor.Command, expected: T): Unit =
     passToAddressDirectoryTest(command) { ad =>

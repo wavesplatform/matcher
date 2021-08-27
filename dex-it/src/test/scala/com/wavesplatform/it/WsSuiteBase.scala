@@ -33,8 +33,10 @@ trait WsSuiteBase extends MatcherSuiteBase with HasWebSockets with DiffMatcherWi
     def receiveAtLeastN[T <: WsServerMessage: ClassTag](n: Int): List[T] = {
       val r = eventually {
         val xs = self.collectMessages[T]
-        xs.size should be >= n
-        xs
+        withClue(s"last receiveAtLeastN: $xs") {
+          xs.size should be >= n
+          xs
+        }
       }
       Thread.sleep(200) // Waiting for additional messages
       r
@@ -43,8 +45,10 @@ trait WsSuiteBase extends MatcherSuiteBase with HasWebSockets with DiffMatcherWi
     def receiveAtLeastNRaw(n: Int): List[WsRawMessage] = {
       val r = eventually {
         val xs = self.rawMessages
-        xs.size should be >= n
-        xs
+        withClue(s"last receiveAtLeastNRaw: $xs") {
+          xs.size should be >= n
+          xs
+        }
       }
       Thread.sleep(200) // Waiting for additional messages
       r

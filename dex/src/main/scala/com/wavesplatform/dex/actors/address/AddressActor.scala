@@ -7,14 +7,16 @@ import akka.{actor => classic}
 import cats.instances.list._
 import cats.instances.long._
 import cats.syntax.either._
-import cats.syntax.option._
 import cats.syntax.foldable._
 import cats.syntax.group.catsSyntaxGroup
+import cats.syntax.option._
+import cats.syntax.semigroup._
+import com.wavesplatform.dex.actors.address.AddressActor.Command.ObservedTxData
 import com.wavesplatform.dex.actors.address.AddressActor.Settings.default
 import com.wavesplatform.dex.actors.address.AddressActor._
 import com.wavesplatform.dex.actors.address.BalancesFormatter.format
 import com.wavesplatform.dex.api.http.entities.MatcherResponse
-import com.wavesplatform.dex.api.ws.entities.{WsAddressBalancesFilter, WsAssetInfo, WsBalances, WsOrder}
+import com.wavesplatform.dex.api.ws.entities.{WsAddressFlag, WsAssetInfo, WsBalances, WsOrder}
 import com.wavesplatform.dex.api.ws.protocol.WsAddressChanges
 import com.wavesplatform.dex.api.ws.state.WsAddressState
 import com.wavesplatform.dex.collections.{NegativeMap, PositiveMap}
@@ -178,9 +180,22 @@ class AddressActor(
         }
         .filterNot(_._2 == 0) // Fee could be 0 if an order executed by a small amount
 
-      val (updated, changedAssets) = balances.withExecuted(txResult.toOption.map(_.id()), NegativeMap(cumulativeDiff))
+      val (updated, changes) =
+        balances.withExecuted(
+          txResult.toOption.map(_.id()),
+          AddressBalance.NotObservedTxData(ownerRemainingOrders.map(_.id), NegativeMap(cumulativeDiff))
+        )
       balances = updated
-      scheduleWs(wsAddressState.putChangedAssets(changedAssets))
+      scheduleWs(
+        wsAddressState
+          .putChangedAssets(changes.changedAssets)
+          .putTxsUpdate(
+            changes.addedNotObservedTxs,
+            changes.removedNotObservedTxs,
+            changes.addedNotCreatedTxs,
+            changes.removedNotCreatedTxs
+          )
+      )
 
       val reservedAssets = ownerRemainingOrders.flatMap(_.requiredBalance.keys).toSet
       val newReserved = balances.reserved.filter { case (asset, _) => reservedAssets.contains(asset) }
@@ -488,13 +503,15 @@ class AddressActor(
         } else log.warn(s"Received stale $event for $orderId")
       }
 
-    case WsCommand.AddWsSubscription(client, options) =>
+    case WsCommand.AddWsSubscription(client, flags) =>
       log.trace(s"[c=${client.path.name}] Added WebSocket subscription")
       wsAddressState = wsAddressState.addSubscription(
         client,
         mkWsBalances(balances.allAssets, includeEmpty = false),
         activeOrders.values.map(WsOrder.fromDomain(_)).to(Seq),
-        options
+        balances.notObservedTxs.view.mapValues(_.orderIds).toMap,
+        balances.notCreatedTxs.view.mapValues(_.orderIds).toMap,
+        flags
       )
       context.watch(client)
 
@@ -551,24 +568,50 @@ class AddressActor(
     } else log.info(s"[Balance] 7. 💵: ${format(balances.tradableBalance(updates.changedAssets).xs)}; u: ${format(updates)}")
   }
 
-  private def markTxsObserved(txs: Map[ExchangeTransaction.Id, PositiveMap[Asset, Long]]): Unit = {
+  private def markTxsObserved(txs: Map[ExchangeTransaction.Id, ObservedTxData]): Unit = {
     log.info(
-      s"Observed: ${txs.map { case (id, v) => s"$id ${if (balances.notObservedTxs.contains(id)) "(wasn't before) " else ""}-> ${format(v.xs)}" }.mkString(", ")}"
+      s"Observed: ${txs.map { case (id, v) =>
+        s"$id ${if (balances.notObservedTxs.contains(id)) "(wasn't before) " else ""}-> ${format(v.pessimisticChanges.xs)}"
+      }.mkString(", ")}"
     )
-    val (updated, changedAssets) = txs.toList.foldl((balances, Set.empty[Asset])) {
-      case ((r, _), (id, v)) => r.withObserved(id, v)
+    val (updated, changes) = txs.toList.foldl((balances, AddressBalance.Changes.empty)) {
+      case ((r, prevChanges), (id, v)) =>
+        val orderIds = v.orders.filter(_.sender.toAddress == owner).map(_.id())
+        val notCreatedTxData = AddressBalance.NotCreatedTxData(orderIds, v.pessimisticChanges)
+        val (b, changes) = r.withObserved(id, notCreatedTxData)
+        (b, prevChanges |+| changes)
     }
     balances = updated
-    if (changedAssets.isEmpty) log.info(s"[Balance] 8. au 💵: ${format(balances.balanceForAudit(txs.values.flatMap(_.keySet).toSet))}")
-    else {
-      log.info(s"[Balance] 9. otx 💵: ${format(balances.tradableBalance(changedAssets).xs)}")
-      scheduleWs(wsAddressState.putChangedAssets(changedAssets))
+    if (changes.changedAssets.isEmpty) {
+      log.info(s"[Balance] 8. au 💵: ${format(balances.balanceForAudit(txs.values.flatMap(_.pessimisticChanges.keySet).toSet))}")
+      scheduleWs(
+        wsAddressState
+          .putTxsUpdate(
+            changes.addedNotObservedTxs,
+            changes.removedNotObservedTxs,
+            changes.addedNotCreatedTxs,
+            changes.removedNotCreatedTxs
+          )
+      )
+    } else {
+      log.info(s"[Balance] 9. otx 💵: ${format(balances.tradableBalance(changes.changedAssets).xs)}")
+      scheduleWs(
+        wsAddressState
+          .putChangedAssets(changes.changedAssets)
+          .putTxsUpdate(
+            changes.addedNotObservedTxs,
+            changes.removedNotObservedTxs,
+            changes.addedNotCreatedTxs,
+            changes.removedNotCreatedTxs
+          )
+      )
     }
   }
 
   /** Schedules next balances and order changes sending only if it wasn't scheduled before */
   private def scheduleNextDiffSending(): Unit =
-    if (wsSendSchedule.isCancelled) wsSendSchedule = context.system.scheduler.scheduleOnce(settings.wsMessagesInterval, self, WsCommand.SendDiff)
+    if (wsSendSchedule.isCancelled)
+      wsSendSchedule = context.system.scheduler.scheduleOnce(settings.wsMessagesInterval, self, WsCommand.SendDiff)
 
   private def mkWsBalances(forAssets: Set[Asset], includeEmpty: Boolean): Map[Asset, WsAssetInfo] = forAssets
     .flatMap { asset =>
@@ -837,7 +880,9 @@ object AddressActor {
     case class ApplyBatch(markTxsObserved: MarkTxsObserved, changedBalances: ChangeBalances) extends Command
 
     case class ChangeBalances(updates: AddressBalanceUpdates) extends Command
-    case class MarkTxsObserved(txsWithSpending: Map[ExchangeTransaction.Id, PositiveMap[Asset, Long]]) extends Command
+
+    case class ObservedTxData(orders: Seq[Order], pessimisticChanges: PositiveMap[Asset, Long])
+    case class MarkTxsObserved(txsWithSpending: Map[ExchangeTransaction.Id, ObservedTxData]) extends Command
 
     sealed trait HasOrderBookEvent {
       def event: Events.Event
@@ -917,7 +962,7 @@ object AddressActor {
   sealed trait WsCommand extends Message
 
   object WsCommand {
-    case class AddWsSubscription(client: typed.ActorRef[WsAddressChanges], options: Set[WsAddressBalancesFilter] = Set.empty) extends WsCommand
+    case class AddWsSubscription(client: typed.ActorRef[WsAddressChanges], flags: Set[WsAddressFlag] = Set.empty) extends WsCommand
     case class RemoveWsSubscription(client: typed.ActorRef[WsAddressChanges]) extends WsCommand
     private[AddressActor] case object SendDiff extends WsCommand
   }

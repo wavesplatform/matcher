@@ -19,7 +19,9 @@ class WsCollectChangesClient(apiUri: String, address: String, aus: String, obs: 
 
   private val log = LoggerFactory.getLogger(s"WsApiClient[$address]")
 
-  private val emptyWsAddressState: WsAddressChanges = WsAddressChanges(Address.fromString(address).explicitGet(), Map.empty, Seq.empty, 0L)
+  private val emptyWsAddressState: WsAddressChanges =
+    WsAddressChanges(Address.fromString(address).explicitGet(), Map.empty, Seq.empty, None, None, 0L)
+
   @volatile private var accountUpdates = emptyWsAddressState
   private val orderBookUpdates = mutable.AnyRefMap.empty[AssetPair, WsOrderBookChanges]
   val addressUpdateLeaps = scala.collection.mutable.ArrayBuffer.empty[String]
@@ -56,6 +58,8 @@ class WsCollectChangesClient(apiUri: String, address: String, aus: String, obs: 
         if (index < 0) x +: r
         else r.updated(index, merge(r(index), x))
     },
+    maybeNotObservedTxs = None,
+    maybeNotCreatedTxs = None,
     updateId = diff.updateId,
     timestamp = diff.timestamp
   )

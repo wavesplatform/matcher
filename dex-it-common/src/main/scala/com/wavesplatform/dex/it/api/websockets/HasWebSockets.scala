@@ -5,7 +5,7 @@ import akka.http.scaladsl.model.Uri
 import akka.stream.Materializer
 import com.softwaremill.diffx.{Derived, Diff}
 import com.wavesplatform.dex.api.ws.connection.{WsConnection, WsConnectionOps}
-import com.wavesplatform.dex.api.ws.entities.{WsAddressBalancesFilter, WsBalances, WsMatchTransactionInfo, WsOrder}
+import com.wavesplatform.dex.api.ws.entities.{WsAddressFlag, WsBalances, WsMatchTransactionInfo, WsOrder}
 import com.wavesplatform.dex.api.ws.protocol._
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -55,11 +55,11 @@ trait HasWebSockets extends BeforeAndAfterAll with BeforeAndAfterEach with HasJw
     dex: DexContainer,
     keepAlive: Boolean = true,
     subscriptionLifetime: FiniteDuration = 1.hour,
-    filters: Set[WsAddressBalancesFilter] = Set.empty
+    flags: Set[WsAddressFlag] = Set.empty
   ): WsConnection = {
     val jwt = mkJwt(client, lifetime = subscriptionLifetime)
-    val connection = mkDexWsConnection(dex, keepAlive = keepAlive, filters = filters)
-    connection.send(WsAddressSubscribe(client.toAddress, WsAddressSubscribe.defaultAuthType, jwt, filters))
+    val connection = mkDexWsConnection(dex, keepAlive = keepAlive)
+    connection.send(WsAddressSubscribe(client.toAddress, WsAddressSubscribe.defaultAuthType, jwt, flags))
     connection
   }
 
@@ -82,8 +82,7 @@ trait HasWebSockets extends BeforeAndAfterAll with BeforeAndAfterEach with HasJw
     dex: DexContainer,
     os: Option[String] = None,
     client: Option[String] = None,
-    keepAlive: Boolean = true,
-    filters: Set[WsAddressBalancesFilter] = Set.empty
+    keepAlive: Boolean = true
   ): WsConnection = {
     val query: Map[String, String] = Map
       .empty[String, String]
@@ -147,6 +146,8 @@ trait HasWebSockets extends BeforeAndAfterAll with BeforeAndAfterEach with HasJw
         if (index < 0) x +: r
         else r.updated(index, mergeWsOrder(r(index), x))
     },
+    maybeNotObservedTxs = diff.maybeNotObservedTxs,
+    maybeNotCreatedTxs = diff.maybeNotCreatedTxs,
     updateId = diff.updateId,
     timestamp = diff.timestamp
   )

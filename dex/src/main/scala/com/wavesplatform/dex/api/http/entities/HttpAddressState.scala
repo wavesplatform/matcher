@@ -27,8 +27,8 @@ object HttpAddressState {
     s.balances.allTradableBalance.xs,
     s.balances.unconfirmed.xs,
     s.balances.outgoingLeasing.getOrElse(0L),
-    s.balances.notCreatedTxs map { case (k, v) => (k.toString, v.xs) },
-    s.balances.notObservedTxs map { case (k, v) => (k.toString, v.xs) },
+    s.balances.notCreatedTxs map { case (k, v) => (k.toString, v.pessimisticChanges.xs) },
+    s.balances.notObservedTxs map { case (k, v) => (k.toString, v.executionTotalVolumeDiff.xs) },
     s.placementQueue.toList
   )
 

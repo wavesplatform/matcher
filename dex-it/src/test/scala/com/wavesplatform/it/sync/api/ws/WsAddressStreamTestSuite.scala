@@ -6,7 +6,7 @@ import com.wavesplatform.dex.Implicits.releasable
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.api.ws.connection.WsConnection
-import com.wavesplatform.dex.api.ws.entities.{WsAddressBalancesFilter, WsBalances, WsMatchTransactionInfo, WsOrder}
+import com.wavesplatform.dex.api.ws.entities.{WsAddressFlag, WsBalances, WsMatchTransactionInfo, WsOrder}
 import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsAddressSubscribe, WsError, WsUnsubscribe}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.account.KeyPair.toAddress
@@ -49,8 +49,8 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
   private def mkWsAddressConnection(account: KeyPair): WsConnection = mkWsAddressConnection(account, dex1)
 
-  private def mkWsAddressFilteredConnection(account: KeyPair, filters: Set[WsAddressBalancesFilter] = Set.empty): WsConnection =
-    mkWsAddressConnection(account, dex1, filters = filters)
+  private def mkWsAddressFilteredConnection(account: KeyPair, filters: Set[WsAddressFlag] = Set.empty): WsConnection =
+    mkWsAddressConnection(account, dex1, flags = filters)
 
   "Address stream should" - {
 
@@ -356,7 +356,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           }
 
           step("shouldn't be in the filtered address stream")
-          Using.resource(mkWsAddressFilteredConnection(acc, Set(WsAddressBalancesFilter.ExcludeNft))) { wsc =>
+          Using.resource(mkWsAddressFilteredConnection(acc, Set(WsAddressFlag.ExcludeNft))) { wsc =>
             validateBalances(wsc, WsBalances(9, 0), acc, hasNft = false)
           }
 
@@ -399,7 +399,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           }
 
           step("shouldn't be in the filtered address stream")
-          Using.resource(mkWsAddressFilteredConnection(dapp, Set(WsAddressBalancesFilter.ExcludeNft))) { wsc =>
+          Using.resource(mkWsAddressFilteredConnection(dapp, Set(WsAddressFlag.ExcludeNft))) { wsc =>
             validateBalances(wsc, WsBalances(100, 0), dapp, hasNft = false)
           }
         }
@@ -444,7 +444,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           }
 
           step("shouldn't be in the filtered address stream")
-          Using.resource(mkWsAddressFilteredConnection(acc, Set(WsAddressBalancesFilter.ExcludeNft))) { wsc =>
+          Using.resource(mkWsAddressFilteredConnection(acc, Set(WsAddressFlag.ExcludeNft))) { wsc =>
             validateBalances(wsc, WsBalances(8.995, 0), acc, hasNft = false)
           }
         }
@@ -460,7 +460,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           }
 
           step("shouldn't be in the filtered address stream")
-          Using.resource(mkWsAddressFilteredConnection(acc, Set(WsAddressBalancesFilter.ExcludeNft))) { wsc2 =>
+          Using.resource(mkWsAddressFilteredConnection(acc, Set(WsAddressFlag.ExcludeNft))) { wsc2 =>
             broadcast(mkIssue(acc, "testAssetNT", 1L, 0))
             validateBalances(wsc2, WsBalances(8, 0), acc, hasNft = false)
           }

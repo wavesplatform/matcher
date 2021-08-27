@@ -19,7 +19,7 @@ import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.error.ValidationError
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.error.MatcherError
+import com.wavesplatform.dex.error.{MatcherError, OrderAssetPairReversed}
 import com.wavesplatform.dex.model.AssetPairBuilder
 import kamon.Kamon
 
@@ -38,7 +38,7 @@ trait ApiRoute extends Directives with ApiMarshallers with ScorexLogging {
 
   def route: Route
 
-  protected val invalidUserPublicKey: StandardRoute = complete(SimpleErrorResponse(StatusCodes.Forbidden, error.UserPublicKeyIsNotValid()))
+  protected val invalidUserPublicKey: StandardRoute = complete(SimpleErrorResponse(error.UserPublicKeyIsNotValid()))
 
   protected def signedGet(publicKey: PublicKey): Directive0 =
     (headerValueByName("Timestamp") & headerValueByName("Signature")).tflatMap { case (timestamp, sig) =>
@@ -64,7 +64,7 @@ trait ApiRoute extends Directives with ApiMarshallers with ScorexLogging {
         if (validate)
           FutureDirectives.onSuccess(assetPairBuilder.validateAssetPair(p).value) flatMap {
             case Right(_) => provide(p)
-            case Left(e) if redirectToInverse =>
+            case Left(e: OrderAssetPairReversed) if redirectToInverse =>
               FutureDirectives.onSuccess(assetPairBuilder.validateAssetPair(p.reverse).value) flatMap {
                 case Right(_) => redirect(s"/matcher/orderbook/${p.priceAssetStr}/${p.amountAssetStr}$suffix", StatusCodes.MovedPermanently)
                 case Left(_) => complete(formatError(e))

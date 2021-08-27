@@ -2,7 +2,6 @@ package com.wavesplatform.dex.api.http.routes.v0
 
 import akka.actor.ActorRef
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
-import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.{PathMatcher, Route}
 import akka.stream.Materializer
 import akka.util.Timeout
@@ -98,7 +97,7 @@ final class PlaceRoute(
   private def placeOrder(endpoint: Option[PathMatcher[Unit]], isMarket: Boolean): Route = {
     val orderType = if (isMarket) "Market" else "Limit"
     val route = (pathEndOrSingleSlash & post & withMetricsAndTraces(s"place${orderType}Order") & protect & entity(as[Order])) { order =>
-      withAssetPair(assetPairBuilder, Right(order.assetPair), formatError = e => StatusCodes.BadRequest -> HttpError.from(e, "OrderRejected")) {
+      withAssetPair(assetPairBuilder, Right(order.assetPair), formatError = e => e.httpCode -> HttpError.from(e, "OrderRejected")) {
         _ =>
           complete(
             placeTimer.measureFuture {
@@ -108,11 +107,11 @@ final class PlaceRoute(
                     askAddressActor(addressActor, o.sender, AddressActor.Command.PlaceOrder(o, isMarket)) {
                       case AddressActor.Event.OrderAccepted(x) => SimpleResponse(HttpSuccessfulPlace(x))
                       case x: error.MatcherError =>
-                        if (x == error.CanNotPersistEvent) StatusCodes.ServiceUnavailable -> HttpError.from(x, "WavesNodeUnavailable")
-                        else StatusCodes.BadRequest -> HttpError.from(x, "OrderRejected")
+                        if (x == error.CanNotPersistEvent) x.httpCode -> HttpError.from(x, "WavesNodeUnavailable")
+                        else x.httpCode -> HttpError.from(x, "OrderRejected")
                     }
                   }
-                case Left(e) => Future.successful[ToResponseMarshallable](StatusCodes.BadRequest -> HttpError.from(e, "OrderRejected"))
+                case Left(e) => Future.successful[ToResponseMarshallable](e.httpCode -> HttpError.from(e, "OrderRejected"))
               }
             }
           )

@@ -118,7 +118,7 @@ final class RatesRoute(
             else {
               val assetStr = asset.toString
               val response = rateCache.deleteRate(asset) match {
-                case None => RateError(error.RateNotFound(asset), StatusCodes.NotFound)
+                case None => RateError(error.RateNotFound(asset))
                 case Some(pv) => SimpleResponse(StatusCodes.OK, s"The rate for the asset $assetStr deleted, old value = $pv")
               }
               externalClientDirectoryRef ! WsExternalClientDirectoryActor.Command.BroadcastRatesUpdates(Map(asset -> -1))

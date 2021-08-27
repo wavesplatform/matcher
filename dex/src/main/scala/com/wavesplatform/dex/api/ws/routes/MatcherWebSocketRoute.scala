@@ -6,7 +6,6 @@ import akka.actor.typed.Scheduler
 import akka.actor.typed.scaladsl.AskPattern._
 import akka.actor.typed.scaladsl.adapter._
 import akka.actor.{typed, ActorRef}
-import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import akka.http.scaladsl.server.{Directive0, Route}
 import akka.stream.scaladsl.{Flow, Sink, Source}
@@ -269,8 +268,8 @@ class MatcherWebSocketRoute(
 
   private def matcherStatusBarrier: Directive0 = matcherStatus() match {
     case MatcherStatus.Working => pass
-    case MatcherStatus.Starting => complete(error.MatcherIsStarting.toWsHttpResponse(StatusCodes.ServiceUnavailable))
-    case MatcherStatus.Stopping => complete(error.MatcherIsStopping.toWsHttpResponse(StatusCodes.ServiceUnavailable))
+    case MatcherStatus.Starting => complete(error.MatcherIsStarting.toWsHttpResponse)
+    case MatcherStatus.Stopping => complete(error.MatcherIsStopping.toWsHttpResponse)
   }
 
 }

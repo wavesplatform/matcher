@@ -74,7 +74,7 @@ class CancelOrdersByAddressAndIdsSpec extends MatcherSuiteBase with ApiKeyHeader
         dex1.rawApi.cancelOrdersByIdsWithKey("null", placeAndGetIds(3)),
         StatusCode.BadRequest,
         InvalidAddress.code,
-        "Provided address in not correct, reason: Unable to decode base58: requirement failed: Wrong char 'l' in Base58 string 'null'"
+        "Provided address is not correct, reason: Unable to decode base58: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )
     }
 

@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.api.http
 
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse, StatusCodes}
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
 import cats.instances.future._
 import cats.syntax.semigroupal._
 import com.wavesplatform.dex.actors.OrderBookAskAdapter
@@ -56,7 +56,7 @@ class OrderBookHttpInfo(
           )
         )
 
-      case Left(e) => toHttpResponse(SimpleErrorResponse(StatusCodes.BadRequest, e))
+      case Left(e) => toHttpResponse(SimpleErrorResponse(e))
     }
 
   private def assetPairDecimals(assetPair: AssetPair, format: DecimalsFormat): FutureResult[Option[(Depth, Depth)]] = format match {

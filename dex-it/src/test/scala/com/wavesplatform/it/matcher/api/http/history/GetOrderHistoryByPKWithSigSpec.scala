@@ -74,7 +74,7 @@ class GetOrderHistoryByPKWithSigSpec extends MatcherSuiteBase with RawHttpChecks
 
       validateMatcherError(
         dex1.rawApi.getOrderHistoryByPKWithSig("null", ts, sign),
-        StatusCode.BadRequest,
+        StatusCode.Forbidden,
         UserPublicKeyIsNotValid.code,
         "Provided public key is not correct, reason: Unable to decode base58: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )

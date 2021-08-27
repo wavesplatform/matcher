@@ -61,7 +61,7 @@ class GetReservedBalanceByPKSpec extends MatcherSuiteBase with TableDrivenProper
     "should return an error if publicKey is not correct base58 string" in {
       validateMatcherError(
         dex1.rawApi.getReservedBalanceByPK("null", System.currentTimeMillis, "sign"),
-        StatusCode.BadRequest,
+        StatusCode.Forbidden,
         UserPublicKeyIsNotValid.code,
         "Provided public key is not correct, reason: Unable to decode base58: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )

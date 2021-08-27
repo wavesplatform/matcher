@@ -74,7 +74,7 @@ class GetOrderHistoryByAssetPairAndPKWithSigSpec extends MatcherSuiteBase with R
 
       validateMatcherError(
         dex1.rawApi.getOrderHistoryByAssetPairAndPKWithSig("null", "WAVES", UsdId.toString, ts, sign),
-        StatusCode.BadRequest,
+        StatusCode.Forbidden,
         UserPublicKeyIsNotValid.code,
         "Provided public key is not correct, reason: Unable to decode base58: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )

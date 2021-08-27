@@ -60,10 +60,10 @@ class GetOrderBookSpec extends MatcherSuiteBase with TableDrivenPropertyChecks w
 
     forAll(Table(
       ("Value", "Title", "Error message"),
-      ("2147483648", "More than Int.Max", "Provided depth in not correct, reason: Depth value '2147483648' must be an Integer"),
-      ("100.0", "Double", "Provided depth in not correct, reason: Depth value '100.0' must be an Integer"),
-      ("incorrect", "Alphabetical", "Provided depth in not correct, reason: Depth value 'incorrect' must be an Integer"),
-      ("-1", "Less than zero", "Provided depth in not correct, reason: Depth value '-1' must be non-negative")
+      ("2147483648", "More than Int.Max", "Provided depth is not correct, reason: Depth value '2147483648' must be an Integer"),
+      ("100.0", "Double", "Provided depth is not correct, reason: Depth value '100.0' must be an Integer"),
+      ("incorrect", "Alphabetical", "Provided depth is not correct, reason: Depth value 'incorrect' must be an Integer"),
+      ("-1", "Less than zero", "Provided depth is not correct, reason: Depth value '-1' must be non-negative")
     )) { (v: String, t: String, m: String) =>
       s"for depth = $v ($t) should return exception" in {
         validateMatcherError(
@@ -78,7 +78,7 @@ class GetOrderBookSpec extends MatcherSuiteBase with TableDrivenPropertyChecks w
     forAll(Table(
       ("Amount", "Price", "Http status", "Error code", "Message"),
       ("incorrect", "WAVES", StatusCode.NotFound, AssetNotFound.code, "The asset incorrect not found"),
-      ("WAVES", "incorrect", StatusCode.NotFound, OrderAssetPairReversed.code, "The WAVES-incorrect asset pair should be reversed")
+      ("WAVES", "incorrect", StatusCode.BadRequest, OrderAssetPairReversed.code, "The WAVES-incorrect asset pair should be reversed")
     )) { (a: String, p: String, c: StatusCode, e: Int, m: String) =>
       s"for $a/$p should return (HTTP-$c; [$e: $m]) " in {
         validateMatcherError(dex1.rawApi.getOrderBook(AssetPair.createAssetPair(a, p).get), c, e, m)

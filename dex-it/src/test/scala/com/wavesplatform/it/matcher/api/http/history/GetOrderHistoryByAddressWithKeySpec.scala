@@ -82,7 +82,7 @@ class GetOrderHistoryByAddressWithKeySpec extends MatcherSuiteBase with ApiKeyHe
         dex1.rawApi.getOrderHistoryByAddressWithKey("null"),
         StatusCode.BadRequest,
         InvalidAddress.code,
-        "Provided address in not correct, reason: Unable to decode base58: requirement failed: Wrong char 'l' in Base58 string 'null'"
+        "Provided address is not correct, reason: Unable to decode base58: requirement failed: Wrong char 'l' in Base58 string 'null'"
       )
     }
 
@@ -91,7 +91,7 @@ class GetOrderHistoryByAddressWithKeySpec extends MatcherSuiteBase with ApiKeyHe
         dex1.rawApi.getOrderHistoryByAddressWithKey("AAAAA"),
         StatusCode.BadRequest,
         InvalidAddress.code,
-        "Provided address in not correct, reason: Wrong addressBytes length: expected: 26, actual: 4"
+        "Provided address is not correct, reason: Wrong addressBytes length: expected: 26, actual: 4"
       )
     }
 

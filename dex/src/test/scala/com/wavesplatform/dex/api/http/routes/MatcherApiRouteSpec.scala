@@ -473,8 +473,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         responseAs[HttpError] should matchTo(
           HttpError(
             error = InvalidAddress.code,
-            message = s"Provided address in not correct, reason: Data from other network: expected: $currentNetwork, actual: $otherNetwork",
-            template = "Provided address in not correct, reason: {{reason}}",
+            message = s"Provided address is not correct, reason: Data from other network: expected: $currentNetwork, actual: $otherNetwork",
+            template = "Provided address is not correct, reason: {{reason}}",
             params = Json.obj("reason" -> s"Data from other network: expected: $currentNetwork, actual: $otherNetwork"),
             status = "InvalidAddress"
           )
@@ -654,7 +654,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
           routePath(s"/orderbook/${badOrder.assetPair.amountAssetStr}/${badOrder.assetPair.priceAssetStr}/cancel"),
           signedRequest
         ) ~> route ~> check {
-          status shouldEqual StatusCodes.BadRequest
+          status shouldEqual StatusCodes.NotFound
           responseAs[HttpError] should matchTo(
             HttpError(
               error = OrderNotFound.code,
@@ -714,7 +714,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
           routePath(s"/orderbook/${badOrder.assetPair.amountAssetStr}/${badOrder.assetPair.priceAssetStr}/cancel"),
           signedRequest
         ) ~> route ~> check {
-          status shouldEqual StatusCodes.ServiceUnavailable
+          status shouldEqual StatusCodes.BadRequest
           responseAs[HttpError] should matchTo(
             HttpError(
               error = AddressIsBlacklisted.code,
@@ -885,7 +885,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         route =>
           Post(routePath(s"/orders/cancel/${okOrder.id()}"))
             .withHeaders(apiKeyHeader, RawHeader("X-User-Public-Key", matcherKeyPair.publicKey.base58)) ~> route ~> check {
-            status shouldEqual StatusCodes.BadRequest
+            status shouldEqual StatusCodes.NotFound // because matcher doesn't have this order
           },
         apiKey
       )
@@ -893,7 +893,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       "returns an error" in test(
         route =>
           Post(routePath(s"/orders/cancel/${badOrder.id()}")).withHeaders(apiKeyHeader) ~> route ~> check {
-            status shouldEqual StatusCodes.BadRequest
+            status shouldEqual StatusCodes.NotFound
             responseAs[HttpError] should matchTo(
               HttpError(
                 error = OrderNotFound.code,

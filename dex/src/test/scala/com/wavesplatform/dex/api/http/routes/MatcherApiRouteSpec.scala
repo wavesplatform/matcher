@@ -714,7 +714,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
           routePath(s"/orderbook/${badOrder.assetPair.amountAssetStr}/${badOrder.assetPair.priceAssetStr}/cancel"),
           signedRequest
         ) ~> route ~> check {
-          status shouldEqual StatusCodes.NotFound
+          status shouldEqual StatusCodes.BadRequest
           responseAs[HttpError] should matchTo(
             HttpError(
               error = AddressIsBlacklisted.code,

@@ -233,27 +233,27 @@ object InvalidAsset extends MatcherErrorCodeProvider(asset, commonEntity, broken
 final case class AssetBlacklisted(asset: IssuedAsset)
     extends MatcherError(AssetBlacklisted.code, e"The asset ${"assetId" -> asset} is blacklisted", AssetBlacklisted.httpCode)
 
-object AssetBlacklisted extends MatcherErrorCodeProvider(asset, commonEntity, blacklisted, C.NotFound)
+object AssetBlacklisted extends MatcherErrorCodeProvider(asset, commonEntity, blacklisted, C.BadRequest)
 
 final case class AmountAssetBlacklisted(asset: IssuedAsset)
     extends MatcherError(AmountAssetBlacklisted.code, e"The amount asset ${"assetId" -> asset} is blacklisted", AmountAssetBlacklisted.httpCode)
 
-object AmountAssetBlacklisted extends MatcherErrorCodeProvider(asset, amount, blacklisted, C.NotFound)
+object AmountAssetBlacklisted extends MatcherErrorCodeProvider(asset, amount, blacklisted, C.BadRequest)
 
 final case class PriceAssetBlacklisted(asset: IssuedAsset)
     extends MatcherError(PriceAssetBlacklisted.code, e"The price asset ${"assetId" -> asset} is blacklisted", PriceAssetBlacklisted.httpCode)
 
-object PriceAssetBlacklisted extends MatcherErrorCodeProvider(asset, price, blacklisted, C.NotFound)
+object PriceAssetBlacklisted extends MatcherErrorCodeProvider(asset, price, blacklisted, C.BadRequest)
 
 final case class FeeAssetBlacklisted(asset: IssuedAsset)
     extends MatcherError(FeeAssetBlacklisted.code, e"The fee asset ${"assetId" -> asset} is blacklisted", FeeAssetBlacklisted.httpCode)
 
-object FeeAssetBlacklisted extends MatcherErrorCodeProvider(asset, fee, blacklisted, C.NotFound)
+object FeeAssetBlacklisted extends MatcherErrorCodeProvider(asset, fee, blacklisted, C.BadRequest)
 
 final case class AddressIsBlacklisted(address: Address)
     extends MatcherError(AddressIsBlacklisted.code, e"The account ${"address" -> address} is blacklisted", AddressIsBlacklisted.httpCode)
 
-object AddressIsBlacklisted extends MatcherErrorCodeProvider(account, commonEntity, blacklisted, C.NotFound)
+object AddressIsBlacklisted extends MatcherErrorCodeProvider(account, commonEntity, blacklisted, C.BadRequest)
 
 final case class BalanceNotEnough(required: List[Amount], actual: List[Amount])
     extends MatcherError(

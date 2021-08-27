@@ -714,11 +714,11 @@ object SubscriptionAuthTypeUnsupported extends MatcherErrorCodeProvider(auth, tp
 final case class JwtCommonError(text: String)
     extends MatcherError(JwtCommonError.code, e"JWT parsing and validation failed: ${"message" -> text}", JwtCommonError.httpCode)
 
-object JwtCommonError extends MatcherErrorCodeProvider(token, commonEntity, commonClass, C.Forbidden)
+object JwtCommonError extends MatcherErrorCodeProvider(token, commonEntity, commonClass, C.BadRequest)
 
-case object JwtBroken extends MatcherError(token, commonEntity, broken, e"JWT has invalid format", C.Forbidden)
+case object JwtBroken extends MatcherError(token, commonEntity, broken, e"JWT has invalid format", C.BadRequest)
 
-case object JwtPayloadBroken extends MatcherError(token, payload, broken, e"JWT payload has not expected fields", C.Forbidden)
+case object JwtPayloadBroken extends MatcherError(token, payload, broken, e"JWT payload has not expected fields", C.BadRequest)
 
 case object InvalidJwtPayloadSignature extends MatcherError(token, signature, broken, e"The token payload signature is invalid", C.Forbidden)
 

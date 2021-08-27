@@ -581,6 +581,7 @@ class AddressActor(
         val (b, changes) = r.withObserved(id, notCreatedTxData)
         (b, prevChanges |+| changes)
     }
+    log.info("****************************"+changes)
     balances = updated
     if (changes.changedAssets.isEmpty) {
       log.info(s"[Balance] 8. au 💵: ${format(balances.balanceForAudit(txs.values.flatMap(_.pessimisticChanges.keySet).toSet))}")

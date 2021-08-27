@@ -150,8 +150,6 @@ final case class WsAddressState(
     def mkMaybeWsTxsData(txsData: Map[ExchangeTransaction.Id, Seq[Order.Id]], removed: Set[ExchangeTransaction.Id]): Option[WsTxsData] = {
       val wsTxsData =
         if (flags.contains(WsAddressFlag.ImaginaryTxs))
-          WsTxsData(txsData, Set.empty)
-        else if (flags.contains(WsAddressFlag.ImaginaryTxs))
           WsTxsData(txsData, removed)
         else
           WsTxsData(Map.empty, Set.empty)

@@ -2,6 +2,7 @@ package com.wavesplatform.dex.actors.address
 
 import alleycats.std.set.alleyCatsStdSetMonad
 import cats.instances.long._
+import cats.kernel.Monoid
 import cats.syntax.functor._
 import cats.syntax.group._
 import com.wavesplatform.dex.actors.address.AddressBalance._
@@ -103,17 +104,35 @@ final case class AddressBalance(
   def withExecuted(
     expectedTxId: Option[ExchangeTransaction.Id],
     notObservedTxData: NotObservedTxData
-  ): (AddressBalance, Set[Asset]) = {
+  ): (AddressBalance, AddressBalance.Changes) = {
     val updated = fixReservation(notObservedTxData.executionTotalVolumeDiff)
     expectedTxId match {
-      case None => (updated, notObservedTxData.executionTotalVolumeDiff.keySet) // Won't expect withObserved with this txId
+      case None =>
+        // Won't expect withObserved with this txId
+        (
+          updated,
+          AddressBalance.Changes.empty
+            .copy(
+              changedAssets = notObservedTxData.executionTotalVolumeDiff.keySet
+            )
+        )
       case Some(txId) =>
         if (notObservedTxs.contains(txId)) throw new RuntimeException(s"$txId executed twice!")
         else if (notCreatedTxs.contains(txId))
-          (updated.copy(notCreatedTxs = notCreatedTxs - txId), notObservedTxData.executionTotalVolumeDiff.keySet)
+          (
+            updated.copy(notCreatedTxs = notCreatedTxs - txId),
+            AddressBalance.Changes.empty
+              .copy(
+                changedAssets = notObservedTxData.executionTotalVolumeDiff.keySet,
+                removedNotCreatedTxs = Set(txId)
+              )
+          )
         else (
           updated.copy(notObservedTxs = notObservedTxs.updated(txId, notObservedTxData)),
-          Set.empty // Because notObservedTxs compensates updatedOpenVolume
+          AddressBalance.Changes.empty.copy(
+            // "changedAssets" are empty because notObservedTxs compensates updatedOpenVolume
+            addedNotObservedTxs = Map(txId -> notObservedTxData.orderIds)
+          )
         )
     }
   }
@@ -127,10 +146,24 @@ final case class AddressBalance(
   def withObserved(
     txId: ExchangeTransaction.Id,
     notCreatedTxData: NotCreatedTxData
-  ): (AddressBalance, Set[Asset]) =
+  ): (AddressBalance, AddressBalance.Changes) =
     notObservedTxs.get(txId) match {
-      case Some(v) => (copy(notObservedTxs = notObservedTxs.removed(txId)), v.executionTotalVolumeDiff.keySet)
-      case None => (copy(notCreatedTxs = notCreatedTxs.updated(txId, notCreatedTxData)), Set.empty)
+      case Some(v) =>
+        (
+          copy(notObservedTxs = notObservedTxs.removed(txId)),
+          AddressBalance.Changes.empty
+            .copy(
+              changedAssets = v.executionTotalVolumeDiff.keySet,
+              removedNotObservedTxs = Set(txId)
+            )
+        )
+      case None => (
+          copy(notCreatedTxs = notCreatedTxs.updated(txId, notCreatedTxData)),
+          AddressBalance.Changes.empty
+            .copy(
+              addedNotCreatedTxs = Map(txId -> notCreatedTxData.orderIds)
+            )
+        )
     }
 
 }
@@ -145,5 +178,32 @@ object AddressBalance {
 
   final case class NotCreatedTxData(orderIds: Seq[Order.Id], pessimisticChanges: PositiveMap[Asset, Long])
 
-  val empty = AddressBalance(NonNegativeMap.empty, None, PositiveMap.empty, NonPositiveMap.empty, Map.empty, Map.empty)
+  final case class Changes(
+    changedAssets: Set[Asset],
+    addedNotObservedTxs: Map[ExchangeTransaction.Id, Seq[Order.Id]],
+    removedNotObservedTxs: Set[ExchangeTransaction.Id],
+    addedNotCreatedTxs: Map[ExchangeTransaction.Id, Seq[Order.Id]],
+    removedNotCreatedTxs: Set[ExchangeTransaction.Id]
+  )
+
+  object Changes {
+    val empty: Changes = Changes(Set.empty, Map.empty, Set.empty, Map.empty, Set.empty)
+
+    implicit val monoid: Monoid[Changes] = new Monoid[Changes] {
+      override def empty: Changes = Changes.empty
+
+      override def combine(x: Changes, y: Changes): Changes =
+        Changes(
+          x.changedAssets ++ y.changedAssets,
+          x.addedNotObservedTxs ++ y.addedNotObservedTxs,
+          x.removedNotObservedTxs ++ y.removedNotObservedTxs,
+          x.addedNotCreatedTxs ++ y.addedNotCreatedTxs,
+          x.removedNotCreatedTxs ++ x.removedNotCreatedTxs
+        )
+
+    }
+
+  }
+
+  val empty: AddressBalance = AddressBalance(NonNegativeMap.empty, None, PositiveMap.empty, NonPositiveMap.empty, Map.empty, Map.empty)
 }

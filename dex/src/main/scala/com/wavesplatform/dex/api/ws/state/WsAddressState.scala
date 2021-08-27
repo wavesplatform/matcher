@@ -19,11 +19,9 @@ final case class WsAddressState(
   changedAssets: Set[Asset],
   ordersChanges: Map[Order.Id, WsOrder],
   previousBalanceChanges: Map[Asset, WsBalances],
-  notObservedTxs: Map[ExchangeTransaction.Id, Seq[Order.Id]],
-  lastNotObservedTxs: Map[ExchangeTransaction.Id, Seq[Order.Id]],
+  addedNotObservedTxs: Map[ExchangeTransaction.Id, Seq[Order.Id]],
   removedNotObservedTxs: Set[ExchangeTransaction.Id],
-  notCreatedTxs: Map[ExchangeTransaction.Id, Seq[Order.Id]],
-  lastNotCreatedTxs: Map[ExchangeTransaction.Id, Seq[Order.Id]],
+  addedNotCreatedTxs: Map[ExchangeTransaction.Id, Seq[Order.Id]],
   removedNotCreatedTxs: Set[ExchangeTransaction.Id]
 ) { // TODO Probably use an ordered Map and pass it to WsAddressChanges
 
@@ -36,12 +34,15 @@ final case class WsAddressState(
     subscriber: ActorRef[WsAddressChanges],
     assetInfo: Map[Asset, WsAssetInfo],
     orders: Seq[WsOrder],
+    notObservedTxs: Map[ExchangeTransaction.Id, Seq[Order.Id]],
+    notCreatedTxs: Map[ExchangeTransaction.Id, Seq[Order.Id]],
     flags: Set[WsAddressFlag]
   ): WsAddressState = {
     val balances = mkBalancesMap(assetInfo.filter {
       case (_: Asset, info) => nftFilteringPredicate(info, flags)
     })
-    val (maybeNotObservedTxsData, maybeNotCreatedTxsData) = mkImaginaryTxsData(flags, isSnapshot = true)
+    val (maybeNotObservedTxsData, maybeNotCreatedTxsData) =
+      mkImaginaryTxsData(notObservedTxs, Set.empty, notCreatedTxs, Set.empty, flags)
     subscriber ! WsAddressChanges(address, balances, orders, maybeNotObservedTxsData, maybeNotCreatedTxsData, 0)
     copy(activeSubscription = activeSubscription.updated(subscriber, Subscription(0, flags)))
   }
@@ -56,20 +57,17 @@ final case class WsAddressState(
     copy(changedAssets = changedAssets ++ diff)
 
   def putTxsUpdate(
-    currentNotObservedTxs: Map[ExchangeTransaction.Id, Seq[Order.Id]],
-    currentNotCreatedTxs: Map[ExchangeTransaction.Id, Seq[Order.Id]]
-  ): WsAddressState = {
-    val removedNotObservedTxsDiff = lastNotObservedTxs.keySet -- currentNotObservedTxs.keySet
-    val removedNotCreatedTxsDiff = lastNotCreatedTxs.keySet -- currentNotCreatedTxs.keySet
+    addedNotObservedTxs: Map[ExchangeTransaction.Id, Seq[Order.Id]],
+    removedNotObservedTxs: Set[ExchangeTransaction.Id],
+    addedNotCreatedTxs: Map[ExchangeTransaction.Id, Seq[Order.Id]],
+    removedNotCreatedTxs: Set[ExchangeTransaction.Id]
+  ): WsAddressState =
     copy(
-      notObservedTxs = notObservedTxs ++ currentNotObservedTxs,
-      lastNotObservedTxs = currentNotObservedTxs,
-      removedNotObservedTxs = removedNotObservedTxs ++ removedNotObservedTxsDiff,
-      notCreatedTxs = notCreatedTxs ++ currentNotCreatedTxs,
-      lastNotCreatedTxs = currentNotCreatedTxs,
-      removedNotCreatedTxs = removedNotCreatedTxs ++ removedNotCreatedTxsDiff
+      addedNotObservedTxs = this.addedNotObservedTxs ++ addedNotObservedTxs,
+      removedNotObservedTxs = this.removedNotObservedTxs ++ removedNotObservedTxs,
+      addedNotCreatedTxs = this.addedNotCreatedTxs ++ addedNotCreatedTxs,
+      removedNotCreatedTxs = this.removedNotCreatedTxs ++ removedNotCreatedTxs
     )
-  }
 
   def putOrderUpdate(id: Order.Id, update: WsOrder): WsAddressState = copy(ordersChanges = ordersChanges + (id -> update))
 
@@ -120,7 +118,8 @@ final case class WsAddressState(
           .filter { case (asset, info) =>
             !sameAsInPrevious(asset, info.balances) && nftFilteringPredicate(info, subscription.flags)
           }
-        val (maybeNotObservedTxsData, maybeNotCreatedTxsData) = mkImaginaryTxsData(subscription.flags, isSnapshot = false)
+        val (maybeNotObservedTxsData, maybeNotCreatedTxsData) =
+          mkImaginaryTxsData(addedNotObservedTxs, removedNotObservedTxs, addedNotCreatedTxs, removedNotCreatedTxs, subscription.flags)
         conn ! WsAddressChanges(address, mkBalancesMap(preparedAssetInfo), orders, maybeNotObservedTxsData, maybeNotCreatedTxsData, newUpdateId)
         conn -> subscription.copy(updateId = newUpdateId)
     },
@@ -130,10 +129,10 @@ final case class WsAddressState(
   def clean(): WsAddressState = copy(
     changedAssets = Set.empty,
     ordersChanges = Map.empty,
-    removedNotCreatedTxs = Set.empty,
+    addedNotObservedTxs = Map.empty,
     removedNotObservedTxs = Set.empty,
-    notObservedTxs = Map.empty,
-    notCreatedTxs = Map.empty
+    addedNotCreatedTxs = Map.empty,
+    removedNotCreatedTxs = Set.empty
   )
 
   private def nftFilteringPredicate(assetInfo: WsAssetInfo, flags: Set[WsAddressFlag]): Boolean =
@@ -141,10 +140,16 @@ final case class WsAddressState(
       !assetInfo.isNft
     else true
 
-  private def mkImaginaryTxsData(flags: Set[WsAddressFlag], isSnapshot: Boolean): (Option[WsTxsData], Option[WsTxsData]) = {
+  private def mkImaginaryTxsData(
+    notObservedTxs: Map[ExchangeTransaction.Id, Seq[Order.Id]],
+    removedNotObservedTxs: Set[ExchangeTransaction.Id],
+    notCreatedTxs: Map[ExchangeTransaction.Id, Seq[Order.Id]],
+    removedNotCreatedTxs: Set[ExchangeTransaction.Id],
+    flags: Set[WsAddressFlag]
+  ): (Option[WsTxsData], Option[WsTxsData]) = {
     def mkMaybeWsTxsData(txsData: Map[ExchangeTransaction.Id, Seq[Order.Id]], removed: Set[ExchangeTransaction.Id]): Option[WsTxsData] = {
       val wsTxsData =
-        if (flags.contains(WsAddressFlag.ImaginaryTxs) && isSnapshot)
+        if (flags.contains(WsAddressFlag.ImaginaryTxs))
           WsTxsData(txsData, Set.empty)
         else if (flags.contains(WsAddressFlag.ImaginaryTxs))
           WsTxsData(txsData, removed)
@@ -170,7 +175,7 @@ object WsAddressState {
   case class Subscription(updateId: Long, flags: Set[WsAddressFlag])
 
   def empty(address: Address): WsAddressState =
-    WsAddressState(address, Map.empty, Set.empty, Map.empty, Map.empty, Map.empty, Map.empty, Set.empty, Map.empty, Map.empty, Set.empty)
+    WsAddressState(address, Map.empty, Set.empty, Map.empty, Map.empty, Map.empty, Set.empty, Map.empty, Set.empty)
 
   val numberMaxSafeInteger = 9007199254740991L
 

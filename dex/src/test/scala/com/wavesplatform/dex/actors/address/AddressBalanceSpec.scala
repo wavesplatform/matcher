@@ -87,7 +87,7 @@ class AddressBalanceSpec
           val (updated2, diff) =
             if (executedIsFirst) updated1.withObserved(txId, mkNotCreatedTxData(PositiveMap(txReserve)))
             else updated1.withExecuted(txId.some, mkNotObservedTxData(txExecutedDiff))
-          val actual = updated2.allTradableBalance.filter { case (asset, _) => diff.contains(asset) }
+          val actual = updated2.allTradableBalance.filter { case (asset, _) => diff.changedAssets.contains(asset) }
 
           val expected = orig.tradableBalance(txReserve.keySet).xs |+| txReserve
           actual should matchTo(expected)
@@ -105,14 +105,14 @@ class AddressBalanceSpec
           actual should matchTo(expected)
         }
 
-        affected should matchTo(txReserve.keySet)
+        affected.changedAssets should matchTo(txReserve.keySet)
       }
 
       "either" - {
         "if a tx isn't expected - does nothing" in forAll(balanceAndTxGen) { case (orig, _, txReserve) =>
           val (updated, affected) = orig.withExecuted(none, mkNotObservedTxData(NegativeMap(txReserve.inverse())))
           updated.copy(reserved = orig.reserved) should matchTo(orig)
-          affected should matchTo(txReserve.keySet)
+          affected.changedAssets should matchTo(txReserve.keySet)
         }
 
         "if a tx is expected, either" - {
@@ -122,13 +122,13 @@ class AddressBalanceSpec
               .withExecuted(txId.some, mkNotObservedTxData(NegativeMap(txReserve.inverse())))
             updated.notCreatedTxs shouldNot contain(txId)
             updated.notObservedTxs.keySet shouldNot contain(txId)
-            affected should matchTo(txReserve.keySet)
+            affected.changedAssets should matchTo(txReserve.keySet)
           }
 
           "adds it to notObservedTxs" in forAll(balanceAndTxGen) { case (orig, txId, txReserve) =>
             val (updated, affected) = orig.withExecuted(txId.some, mkNotObservedTxData(NegativeMap(txReserve.inverse())))
             updated.notObservedTxs.keySet should contain(txId)
-            affected shouldBe empty
+            affected.changedAssets shouldBe empty
           }
         }
       }
@@ -141,13 +141,13 @@ class AddressBalanceSpec
           .withObserved(txId, mkNotCreatedTxData(PositiveMap(txReserve)))
         updated.notCreatedTxs shouldNot contain(txId)
         updated.notObservedTxs.keySet shouldNot contain(txId)
-        affected should matchTo(txReserve.keySet)
+        affected.changedAssets should matchTo(txReserve.keySet)
       }
 
       "adds a tx to futureTxIds" in forAll(balanceAndTxGen) { case (orig, txId, txReserve) =>
         val (updated, affected) = orig.withObserved(txId, mkNotCreatedTxData(PositiveMap(txReserve)))
         updated.notCreatedTxs.keySet should contain(txId)
-        affected shouldBe empty
+        affected.changedAssets shouldBe empty
       }
     }
   }

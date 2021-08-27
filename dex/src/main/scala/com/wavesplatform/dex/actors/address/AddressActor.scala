@@ -10,6 +10,7 @@ import cats.syntax.either._
 import cats.syntax.foldable._
 import cats.syntax.group.catsSyntaxGroup
 import cats.syntax.option._
+import cats.syntax.semigroup._
 import com.wavesplatform.dex.actors.address.AddressActor.Command.ObservedTxData
 import com.wavesplatform.dex.actors.address.AddressActor.Settings.default
 import com.wavesplatform.dex.actors.address.AddressActor._
@@ -179,7 +180,7 @@ class AddressActor(
         }
         .filterNot(_._2 == 0) // Fee could be 0 if an order executed by a small amount
 
-      val (updated, changedAssets) =
+      val (updated, changes) =
         balances.withExecuted(
           txResult.toOption.map(_.id()),
           AddressBalance.NotObservedTxData(ownerRemainingOrders.map(_.id), NegativeMap(cumulativeDiff))
@@ -187,10 +188,12 @@ class AddressActor(
       balances = updated
       scheduleWs(
         wsAddressState
-          .putChangedAssets(changedAssets)
+          .putChangedAssets(changes.changedAssets)
           .putTxsUpdate(
-            balances.notObservedTxs.view.mapValues(_.orderIds).toMap,
-            balances.notCreatedTxs.view.mapValues(_.orderIds).toMap
+            changes.addedNotObservedTxs,
+            changes.removedNotObservedTxs,
+            changes.addedNotCreatedTxs,
+            changes.removedNotCreatedTxs
           )
       )
 
@@ -506,6 +509,8 @@ class AddressActor(
         client,
         mkWsBalances(balances.allAssets, includeEmpty = false),
         activeOrders.values.map(WsOrder.fromDomain(_)).to(Seq),
+        balances.notObservedTxs.view.mapValues(_.orderIds).toMap,
+        balances.notCreatedTxs.view.mapValues(_.orderIds).toMap,
         flags
       )
       context.watch(client)
@@ -569,30 +574,35 @@ class AddressActor(
         s"$id ${if (balances.notObservedTxs.contains(id)) "(wasn't before) " else ""}-> ${format(v.pessimisticChanges.xs)}"
       }.mkString(", ")}"
     )
-    val (updated, changedAssets) = txs.toList.foldl((balances, Set.empty[Asset])) {
-      case ((r, _), (id, v)) =>
+    val (updated, changes) = txs.toList.foldl((balances, AddressBalance.Changes.empty)) {
+      case ((r, prevChanges), (id, v)) =>
         val orderIds = v.orders.filter(_.sender.toAddress == owner).map(_.id())
         val notCreatedTxData = AddressBalance.NotCreatedTxData(orderIds, v.pessimisticChanges)
-        r.withObserved(id, notCreatedTxData)
+        val (b, changes) = r.withObserved(id, notCreatedTxData)
+        (b, prevChanges |+| changes)
     }
     balances = updated
-    if (changedAssets.isEmpty) {
+    if (changes.changedAssets.isEmpty) {
       log.info(s"[Balance] 8. au 💵: ${format(balances.balanceForAudit(txs.values.flatMap(_.pessimisticChanges.keySet).toSet))}")
       scheduleWs(
         wsAddressState
           .putTxsUpdate(
-            balances.notObservedTxs.view.mapValues(_.orderIds).toMap,
-            balances.notCreatedTxs.view.mapValues(_.orderIds).toMap
+            changes.addedNotObservedTxs,
+            changes.removedNotObservedTxs,
+            changes.addedNotCreatedTxs,
+            changes.removedNotCreatedTxs
           )
       )
     } else {
-      log.info(s"[Balance] 9. otx 💵: ${format(balances.tradableBalance(changedAssets).xs)}")
+      log.info(s"[Balance] 9. otx 💵: ${format(balances.tradableBalance(changes.changedAssets).xs)}")
       scheduleWs(
         wsAddressState
-          .putChangedAssets(changedAssets)
+          .putChangedAssets(changes.changedAssets)
           .putTxsUpdate(
-            balances.notObservedTxs.view.mapValues(_.orderIds).toMap,
-            balances.notCreatedTxs.view.mapValues(_.orderIds).toMap
+            changes.addedNotObservedTxs,
+            changes.removedNotObservedTxs,
+            changes.addedNotCreatedTxs,
+            changes.removedNotCreatedTxs
           )
       )
     }

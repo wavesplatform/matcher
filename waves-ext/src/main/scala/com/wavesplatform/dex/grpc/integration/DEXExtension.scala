@@ -32,7 +32,10 @@ class DEXExtension(context: ExtensionContext) extends Extension with ScorexLoggi
 
   implicit val byteStrValueReader: ValueReader[ByteStr] = (config: Config, path: String) => {
     val str = config.as[String](path)
-    ByteStr.decodeBase58(str).fold(th => throw new ConfigException.WrongType(config.origin(), path, "ByteStr in base58", str, th), identity)
+    ByteStr.decodeBase58(str).fold(
+      th => throw new ConfigException.WrongType(config.origin(), s"string $str cannot be decoded in base58", th),
+      identity
+    )
   }
 
   override def start(): Unit = {

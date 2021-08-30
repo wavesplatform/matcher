@@ -271,7 +271,7 @@ class ActorsWebSocketInteractionsSpecification
                   filledFee = 0.0015.some,
                   avgWeighedPrice = 3.0.some,
                   totalExecutedPriceAssets = 15.0.some,
-                  matchInfo = Some(mkSeqWsMatchTxInfo(3.0, 5.0)),
+                  matchInfo = Some(mkSeqWsMatchTxInfo(3.0, 5.0))
                 )
               ),
               3

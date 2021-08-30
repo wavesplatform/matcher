@@ -27,7 +27,8 @@ trait WsMessageOps {
                   filledFee = oc.filledFee,
                   avgWeighedPrice = oc.avgWeighedPrice,
                   totalExecutedPriceAssets = oc.totalExecutedPriceAssets,
-                  matchInfo = Some(acc.matchInfo.getOrElse(Seq.empty[WsMatchTransactionInfo]) ++ oc.matchInfo.getOrElse(Seq.empty[WsMatchTransactionInfo]))
+                  matchInfo =
+                    Some(acc.matchInfo.getOrElse(Seq.empty[WsMatchTransactionInfo]) ++ oc.matchInfo.getOrElse(Seq.empty[WsMatchTransactionInfo]))
                 )
             }.map(c => id -> c)
         }

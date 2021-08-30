@@ -6,9 +6,11 @@ import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.OrderType
-import com.wavesplatform.dex.error.AccountScriptReturnedError
+import com.wavesplatform.dex.error.{AccountScriptDeniedOrder, AccountScriptReturnedError}
 import com.wavesplatform.dex.it.test.Scripts
 import com.wavesplatform.it.MatcherSuiteBase
+
+import scala.concurrent.duration._
 
 final class AllowedBlockchainStateAccountsTestSuite extends MatcherSuiteBase {
 
@@ -31,9 +33,30 @@ final class AllowedBlockchainStateAccountsTestSuite extends MatcherSuiteBase {
       placeAndAwaitAtDex(aliceOrder, HttpOrderStatus.Status.Filled)
       val txId = ByteStr(dex1.api.getTransactionsByOrderId(carolOrder).head.id().bytes())
       eventually {
-        val txInfo = wavesNode1.api.transactionInfo(txId)
-        ByteStr(txInfo.id().bytes()) shouldBe txId
+        wavesNode1.tryApi.transactionInfo(txId).isRight shouldBe true
       }
+    }
+
+    "transaction should be rejected by a new script which will be set after placing an order" in {
+      updateAccountScript(carol, script1)
+      val carolOrder = mkOrder(carol, wavesUsdPair, OrderType.SELL, 10.waves, 1, version = 2)
+      dex1.api.place(carolOrder)
+      updateAccountScript(carol, script2)
+      val aliceOrder = mkOrder(alice, wavesUsdPair, OrderType.BUY, 10.waves, 1, version = 2)
+      placeAndAwaitAtDex(aliceOrder, HttpOrderStatus.Status.Filled)
+      val txId = ByteStr(dex1.api.getTransactionsByOrderId(carolOrder).head.id().bytes())
+      Thread.sleep(5.seconds.toMillis)
+      wavesNode1.tryApi.transactionInfo(txId).isLeft shouldBe true
+    }
+
+    "order should be rejected by script" in {
+      updateAccountScript(carol, script2)
+      val carolOrder = mkOrder(carol, wavesUsdPair, OrderType.SELL, 10.waves, 1, version = 2)
+      val placeResult = dex1.tryApi.place(carolOrder)
+      placeResult should failWith(
+        AccountScriptDeniedOrder.code,
+        "The account's script of 3Q97CnwDv7pE9wkYhEAq3juftoJiH1eaHGk rejected the order"
+      )
     }
   }
 
@@ -59,19 +82,37 @@ final class AllowedBlockchainStateAccountsTestSuite extends MatcherSuiteBase {
     )
 
   /*
-        {-# STDLIB_VERSION 5 #-}
-        {-# CONTENT_TYPE EXPRESSION #-}
-        {-# SCRIPT_TYPE ACCOUNT #-}
-        match tx {
-           case eTx: Order  => sigVerify(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey) && height > 1
-           case _ => false
-        }
+  {-# STDLIB_VERSION 5 #-}
+  {-# CONTENT_TYPE EXPRESSION #-}
+  {-# SCRIPT_TYPE ACCOUNT #-}
+  match tx {
+    case _: SetScriptTransaction => true
+    case _: Order  => sigVerify(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey) && height > 1
+    case _ => false
+  }
    */
   private lazy val script1 =
     Scripts.fromBase64(
-      "BQQAAAAHJG1hdGNoMAUAAAACdHgDCQAAAQAAAAIFAAAAByRtYXRjaDACAAAABU9yZGVyBAAAAANlVHgFAAAABy" +
-      "RtYXRjaDADCQAB9AAAAAMIBQAAAAJ0eAAAAAlib2R5Qnl0ZXMJAAGRAAAAAggFAAAAAnR4AAAABnByb29mcwAAAAAAAAAAAA" +
-      "gFAAAAAnR4AAAAD3NlbmRlclB1YmxpY0tleQkAAGYAAAACBQAAAAZoZWlnaHQAAAAAAAAAAAEHB2WKqtA="
+      "BQQAAAAHJG1hdGNoMAUAAAACdHgDCQAAAQAAAAIFAAAAByRtYXRjaDACAAAAFFNldFNjcmlwdFRyYW5zYWN0aW9uBgMJAAAB" +
+      "AAAAAgUAAAAHJG1hdGNoMAIAAAAFT3JkZXIDCQAB9AAAAAMIBQAAAAJ0eAAAAAlib2R5Qnl0ZXMJAAGRAAAAAggFAAAAAnR4" +
+      "AAAABnByb29mcwAAAAAAAAAAAAgFAAAAAnR4AAAAD3NlbmRlclB1YmxpY0tleQkAAGYAAAACBQAAAAZoZWlnaHQAAAAAAAAAAAEHB7W9pT4="
+    )
+
+  /*
+  {-# STDLIB_VERSION 5 #-}
+  {-# CONTENT_TYPE EXPRESSION #-}
+  {-# SCRIPT_TYPE ACCOUNT #-}
+  match tx {
+    case _: SetScriptTransaction => true
+    case _: Order  => sigVerify(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey) && height > 1000
+    case _ => false
+  }
+   */
+  private lazy val script2 =
+    Scripts.fromBase64(
+      "BQQAAAAHJG1hdGNoMAUAAAACdHgDCQAAAQAAAAIFAAAAByRtYXRjaDACAAAAFFNldFNjcmlwdFRyYW5zYWN0aW9uBgMJAAABAAA" +
+      "AAgUAAAAHJG1hdGNoMAIAAAAFT3JkZXIDCQAB9AAAAAMIBQAAAAJ0eAAAAAlib2R5Qnl0ZXMJAAGRAAAAAggFAAAAAnR4AAAABnBy" +
+      "b29mcwAAAAAAAAAAAAgFAAAAAnR4AAAAD3NlbmRlclB1YmxpY0tleQkAAGYAAAACBQAAAAZoZWlnaHQAAAAAAAAAA+gHB4Yt2cc="
     )
 
   private def updateAccountScript(account: KeyPair, script: ByteStr): Unit =

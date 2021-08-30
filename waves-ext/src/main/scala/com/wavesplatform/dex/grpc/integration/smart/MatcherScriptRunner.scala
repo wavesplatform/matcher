@@ -21,10 +21,15 @@ import scala.util.control.NoStackTrace
 
 object MatcherScriptRunner {
 
-  def apply(script: Script, order: Order, isSynchronousCallsActivated: Boolean): Either[ExecutionError, EVALUATED] =
+  def apply(
+    script: Script,
+    order: Order,
+    blockchain: Blockchain,
+    isSynchronousCallsActivated: Boolean
+  ): Either[ExecutionError, EVALUATED] =
     ScriptRunnerFixed.applyGeneric(
       in = Coproduct[ScriptRunnerFixed.TxOrd](order),
-      blockchain = deniedBlockchain,
+      blockchain = blockchain,
       script = script,
       isAssetScript = false,
       scriptContainerAddress = Coproduct[Environment.Tthis](Recipient.Address(ByteStr(order.senderPublicKey.toAddress.bytes))),
@@ -40,7 +45,7 @@ object MatcherScriptRunner {
 
   private def kill(methodName: String) = throw new Denied(methodName)
 
-  private val deniedBlockchain = new Blockchain {
+  val deniedBlockchain: Blockchain = new Blockchain {
 
     override def hasData(address: Address): Boolean = kill("hasData")
 

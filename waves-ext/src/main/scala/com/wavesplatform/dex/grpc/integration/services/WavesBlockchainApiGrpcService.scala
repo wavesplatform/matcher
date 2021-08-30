@@ -13,6 +13,7 @@ import com.wavesplatform.dex.grpc.integration.protobuf.EitherVEExt
 import com.wavesplatform.dex.grpc.integration.protobuf.PbToWavesConversions._
 import com.wavesplatform.dex.grpc.integration.protobuf.WavesToPbConversions._
 import com.wavesplatform.dex.grpc.integration.smart.MatcherScriptRunner
+import com.wavesplatform.dex.grpc.integration.smart.MatcherScriptRunner.deniedBlockchain
 import com.wavesplatform.events.UtxEvent.{TxAdded, TxRemoved}
 import com.wavesplatform.extensions.{Context => ExtensionContext}
 import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures}
@@ -44,7 +45,7 @@ import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 import scala.util.control.NonFatal
 
-class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Scheduler)
+class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchainStateAccounts: Set[ByteStr])(implicit sc: Scheduler)
     extends WavesBlockchainApiGrpc.WavesBlockchainApi
     with ScorexLogging {
 
@@ -297,7 +298,10 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
       case Some(scriptInfo) =>
         val order = request.order.map(_.toVanilla).getOrElse(throwInvalidArgument("Expected an order"))
         val isSynchronousCallsActivated = context.blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
-        parseScriptResult(MatcherScriptRunner(scriptInfo.script, order, isSynchronousCallsActivated))
+        if (allowedBlockchainStateAccounts.contains(order.senderPublicKey))
+          parseScriptResult(MatcherScriptRunner(scriptInfo.script, order, context.blockchain, isSynchronousCallsActivated))
+        else
+          parseScriptResult(MatcherScriptRunner(scriptInfo.script, order, deniedBlockchain, isSynchronousCallsActivated))
     }
 
     RunScriptResponse(r)

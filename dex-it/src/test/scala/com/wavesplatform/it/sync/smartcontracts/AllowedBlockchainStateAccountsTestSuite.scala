@@ -14,7 +14,7 @@ final class AllowedBlockchainStateAccountsTestSuite extends MatcherSuiteBase {
 
   "AllowedBlockchainStateAccountsTestSuite" - {
 
-    "should fail while accessing the blockchain state from usual accounts" in {
+    "should fail while accessing blockchain state from usual accounts" in {
       updateAccountScript(bob, script1)
       val order = mkOrder(bob, wavesUsdPair, OrderType.SELL, 10.waves, 1, version = 2)
       dex1.tryApi.place(order) should failWith(
@@ -23,7 +23,7 @@ final class AllowedBlockchainStateAccountsTestSuite extends MatcherSuiteBase {
       )
     }
 
-    "should succeed while accessing the blockchain state from custom accounts" in {
+    "should succeed while accessing blockchain state from custom accounts" in {
       updateAccountScript(carol, script1)
       val carolOrder = mkOrder(carol, wavesUsdPair, OrderType.SELL, 10.waves, 1, version = 2)
       dex1.api.place(carolOrder)

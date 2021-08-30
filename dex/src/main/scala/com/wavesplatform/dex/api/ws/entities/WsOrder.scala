@@ -70,7 +70,7 @@ object WsOrder {
   ): WsOrder =
     WsOrder(
       id,
-      matchInfo = matchInfo
+      matchInfo = Seq(matchInfo)
     )
 
   def apply(

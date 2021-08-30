@@ -52,13 +52,13 @@ class WsMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDrivenProp
     }
 
     val result = WsOrder.fromDomain(ao).copy(matchInfo =
-      Seq(WsMatchTransactionInfo.normalized(
+      Some(Seq(WsMatchTransactionInfo.normalized(
         ao.order.assetPair,
         ByteStr.empty,
         System.currentTimeMillis(),
         ao.price,
         partialAmount
-      ))
+      )))
     )
 
     if (isNew) result

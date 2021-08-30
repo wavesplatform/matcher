@@ -108,7 +108,7 @@ final case class DexContainer private (override val internalIp: String, underlyi
       .take(60)
       .find(_ == true)
 
-    if (!r.contains(true)) throw new RuntimeException(s"${underlying.containerId} is not ready, all attempts are out")
+//    if (!r.contains(true)) throw new RuntimeException(s"${underlying.containerId} is not ready, all attempts are out")
   }
 
   override def printDebugMessage(text: String): Unit = asyncRawApi.printMessage(text)

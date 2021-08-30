@@ -271,7 +271,7 @@ class ActorsWebSocketInteractionsSpecification
                   filledFee = 0.0015.some,
                   avgWeighedPrice = 3.0.some,
                   totalExecutedPriceAssets = 15.0.some,
-                  matchInfo = mkSeqWsMatchTxInfo(3.0, 5.0)
+                  matchInfo = Some(mkSeqWsMatchTxInfo(3.0, 5.0)),
                 )
               ),
               3
@@ -355,7 +355,7 @@ class ActorsWebSocketInteractionsSpecification
                   filledFee = 0.2.some,
                   avgWeighedPrice = 3.0.some,
                   totalExecutedPriceAssets = 30.0.some,
-                  matchInfo = mkSeqWsMatchTxInfo(3.0, 10.0)
+                  matchInfo = Some(mkSeqWsMatchTxInfo(3.0, 10.0))
                 )
               ),
               2
@@ -375,7 +375,7 @@ class ActorsWebSocketInteractionsSpecification
                   filledFee = 0.5.some,
                   avgWeighedPrice = 3.0.some,
                   totalExecutedPriceAssets = 75.0.some,
-                  matchInfo = mkSeqWsMatchTxInfo(3.0, 15.0)
+                  matchInfo = Some(mkSeqWsMatchTxInfo(3.0, 15.0))
                 )
               ),
               3
@@ -395,7 +395,7 @@ class ActorsWebSocketInteractionsSpecification
                   filledFee = 0.6.some,
                   avgWeighedPrice = 3.0.some,
                   totalExecutedPriceAssets = 90.0.some,
-                  matchInfo = mkSeqWsMatchTxInfo(3.0, 5.0)
+                  matchInfo = Some(mkSeqWsMatchTxInfo(3.0, 5.0))
                 )
               ),
               4
@@ -579,8 +579,8 @@ class ActorsWebSocketInteractionsSpecification
           .expectWsBalancesAndOrders(
             Map(Waves -> WsBalances(100, 0), btc -> WsBalances(1, 0)),
             Seq(
-              WsOrder.fromDomain(oe.counterRemaining).copy(matchInfo = mkSeqWsMatchTxInfo(3.0, 5.0)),
-              WsOrder.fromDomain(oe.submittedRemaining).copy(matchInfo = mkSeqWsMatchTxInfo(3.0, 5.0))
+              WsOrder.fromDomain(oe.counterRemaining).copy(matchInfo = Some(mkSeqWsMatchTxInfo(3.0, 5.0))),
+              WsOrder.fromDomain(oe.submittedRemaining).copy(matchInfo = Some(mkSeqWsMatchTxInfo(3.0, 5.0)))
             ),
             1
           )
@@ -631,7 +631,7 @@ class ActorsWebSocketInteractionsSpecification
                 filledFee = 0.003.some,
                 avgWeighedPrice = 3.0.some,
                 totalExecutedPriceAssets = 15.0.some,
-                matchInfo = mkSeqWsMatchTxInfo(3.0, 5.0)
+                matchInfo = Some(mkSeqWsMatchTxInfo(3.0, 5.0))
               )
             ),
             4
@@ -653,7 +653,7 @@ class ActorsWebSocketInteractionsSpecification
                 filledFee = 0.003.some,
                 avgWeighedPrice = 3.1.some,
                 totalExecutedPriceAssets = 15.5.some,
-                matchInfo = mkSeqWsMatchTxInfo(3.1, 5.0)
+                matchInfo = Some(mkSeqWsMatchTxInfo(3.1, 5.0))
               )
             ),
             5
@@ -676,7 +676,7 @@ class ActorsWebSocketInteractionsSpecification
                 filledFee = 0.0012.some,
                 avgWeighedPrice = 3.2.some,
                 totalExecutedPriceAssets = 6.4.some,
-                matchInfo = mkSeqWsMatchTxInfo(3.2, 2)
+                matchInfo = Some(mkSeqWsMatchTxInfo(3.2, 2))
               )
             ),
             6
@@ -736,7 +736,7 @@ class ActorsWebSocketInteractionsSpecification
                 filledFee = 0.00125.some,
                 avgWeighedPrice = 3.0.some,
                 totalExecutedPriceAssets = 15.0.some,
-                matchInfo = mkSeqWsMatchTxInfo(3.0, 5.0)
+                matchInfo = Some(mkSeqWsMatchTxInfo(3.0, 5.0))
               )
             ),
             2
@@ -756,7 +756,7 @@ class ActorsWebSocketInteractionsSpecification
                 filledFee = 0.0025.some,
                 avgWeighedPrice = 3.05.some,
                 totalExecutedPriceAssets = 30.5.some,
-                matchInfo = mkSeqWsMatchTxInfo(3.1, 5)
+                matchInfo = Some(mkSeqWsMatchTxInfo(3.1, 5))
               )
             ),
             3
@@ -776,7 +776,7 @@ class ActorsWebSocketInteractionsSpecification
                 filledFee = 0.003.some,
                 avgWeighedPrice = 3.07.some,
                 totalExecutedPriceAssets = 36.9.some,
-                matchInfo = mkSeqWsMatchTxInfo(3.2, 2)
+                matchInfo = Some(mkSeqWsMatchTxInfo(3.2, 2))
               )
             ),
             4

@@ -28,7 +28,7 @@ case class WsOrder(
   filledFee: Option[Double] = None,
   avgWeighedPrice: Option[Double] = None,
   totalExecutedPriceAssets: Option[Double] = None,
-  matchInfo: Seq[WsMatchTransactionInfo] = Seq.empty
+  matchInfo: Option[Seq[WsMatchTransactionInfo]] = None
 )
 
 object WsOrder {
@@ -70,7 +70,7 @@ object WsOrder {
   ): WsOrder =
     WsOrder(
       id,
-      matchInfo = Seq(matchInfo)
+      matchInfo = Seq(matchInfo).some
     )
 
   def apply(
@@ -106,7 +106,7 @@ object WsOrder {
       filledFee = filledFee.some,
       avgWeighedPrice = avgWeighedPrice.some,
       totalExecutedPriceAssets = totalExecutedPriceAssets.some,
-      matchInfo = Seq(matchInfo)
+      matchInfo = Seq(matchInfo).some
     )
 
   def apply(id: Order.Id, status: String): WsOrder = WsOrder(id, status = status.some)
@@ -149,7 +149,7 @@ object WsOrder {
         (__ \ "Q").formatNullable[Double](doubleAsStringFormat) and // filled fee
         (__ \ "r").formatNullable[Double](doubleAsStringFormat) and // average weighed price among all trades
         (__ \ "E").formatNullable[Double](doubleAsStringFormat) and // total executed price assets
-        (__ \ "m").format[Seq[WsMatchTransactionInfo]] // match transaction information (such as executed asset amount and etc)
+        (__ \ "m").formatNullable[Seq[WsMatchTransactionInfo]] // match transaction information (such as executed asset amount and etc)
     )(WsOrder.apply, unlift(WsOrder.unapply))
 
 }

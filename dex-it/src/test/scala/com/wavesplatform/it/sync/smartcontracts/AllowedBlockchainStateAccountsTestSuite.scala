@@ -16,8 +16,10 @@ final class AllowedBlockchainStateAccountsTestSuite extends MatcherSuiteBase {
 
   "AllowedBlockchainStateAccountsTestSuite" - {
 
+    val allowedAcc = carol
+
     "should fail while accessing blockchain state from usual accounts" in {
-      updateAccountScript(bob, script1)
+      setAccountScript(bob, scriptHeightGt1)
       val order = mkOrder(bob, wavesUsdPair, OrderType.SELL, 10.waves, 1, version = 2)
       dex1.tryApi.place(order) should failWith(
         AccountScriptReturnedError.code,
@@ -25,34 +27,30 @@ final class AllowedBlockchainStateAccountsTestSuite extends MatcherSuiteBase {
       )
     }
 
-    "should succeed while accessing blockchain state from custom accounts" in {
-      updateAccountScript(carol, script1)
-      val carolOrder = mkOrder(carol, wavesUsdPair, OrderType.SELL, 10.waves, 1, version = 2)
-      dex1.api.place(carolOrder)
+    "should succeed while accessing blockchain state from allowed accounts" in {
+      setAccountScript(allowedAcc, scriptHeightGt1)
+      val allowedAccOrder = mkOrder(allowedAcc, wavesUsdPair, OrderType.SELL, 10.waves, 1, version = 2)
+      dex1.api.place(allowedAccOrder)
       val aliceOrder = mkOrder(alice, wavesUsdPair, OrderType.BUY, 10.waves, 1, version = 2)
-      placeAndAwaitAtDex(aliceOrder, HttpOrderStatus.Status.Filled)
-      val txId = ByteStr(dex1.api.getTransactionsByOrderId(carolOrder).head.id().bytes())
-      eventually {
-        wavesNode1.tryApi.transactionInfo(txId).isRight shouldBe true
-      }
+      placeAndAwaitAtNode(aliceOrder)
     }
 
     "transaction should be rejected by a new script which will be set after placing an order" in {
-      updateAccountScript(carol, script1)
-      val carolOrder = mkOrder(carol, wavesUsdPair, OrderType.SELL, 10.waves, 1, version = 2)
-      dex1.api.place(carolOrder)
-      updateAccountScript(carol, script2)
+      setAccountScript(allowedAcc, scriptHeightGt1)
+      val allowedAccOrder = mkOrder(allowedAcc, wavesUsdPair, OrderType.SELL, 10.waves, 1, version = 2)
+      dex1.api.place(allowedAccOrder)
+      setAccountScript(allowedAcc, scriptHeightGt1000)
       val aliceOrder = mkOrder(alice, wavesUsdPair, OrderType.BUY, 10.waves, 1, version = 2)
       placeAndAwaitAtDex(aliceOrder, HttpOrderStatus.Status.Filled)
-      val txId = ByteStr(dex1.api.getTransactionsByOrderId(carolOrder).head.id().bytes())
+      val txId = ByteStr(dex1.api.getTransactionsByOrderId(allowedAccOrder).head.id().bytes())
       Thread.sleep(5.seconds.toMillis)
       wavesNode1.tryApi.transactionInfo(txId).isLeft shouldBe true
     }
 
     "order should be rejected by script" in {
-      updateAccountScript(carol, script2)
-      val carolOrder = mkOrder(carol, wavesUsdPair, OrderType.SELL, 10.waves, 1, version = 2)
-      val placeResult = dex1.tryApi.place(carolOrder)
+      setAccountScript(allowedAcc, scriptHeightGt1000)
+      val allowedAccOrder = mkOrder(allowedAcc, wavesUsdPair, OrderType.SELL, 10.waves, 1, version = 2)
+      val placeResult = dex1.tryApi.place(allowedAccOrder)
       placeResult should failWith(
         AccountScriptDeniedOrder.code,
         "The account's script of 3Q97CnwDv7pE9wkYhEAq3juftoJiH1eaHGk rejected the order"
@@ -91,7 +89,7 @@ final class AllowedBlockchainStateAccountsTestSuite extends MatcherSuiteBase {
     case _ => false
   }
    */
-  private lazy val script1 =
+  private lazy val scriptHeightGt1 =
     Scripts.fromBase64(
       "BQQAAAAHJG1hdGNoMAUAAAACdHgDCQAAAQAAAAIFAAAAByRtYXRjaDACAAAAFFNldFNjcmlwdFRyYW5zYWN0aW9uBgMJAAAB" +
       "AAAAAgUAAAAHJG1hdGNoMAIAAAAFT3JkZXIDCQAB9AAAAAMIBQAAAAJ0eAAAAAlib2R5Qnl0ZXMJAAGRAAAAAggFAAAAAnR4" +
@@ -108,14 +106,14 @@ final class AllowedBlockchainStateAccountsTestSuite extends MatcherSuiteBase {
     case _ => false
   }
    */
-  private lazy val script2 =
+  private lazy val scriptHeightGt1000 =
     Scripts.fromBase64(
       "BQQAAAAHJG1hdGNoMAUAAAACdHgDCQAAAQAAAAIFAAAAByRtYXRjaDACAAAAFFNldFNjcmlwdFRyYW5zYWN0aW9uBgMJAAABAAA" +
       "AAgUAAAAHJG1hdGNoMAIAAAAFT3JkZXIDCQAB9AAAAAMIBQAAAAJ0eAAAAAlib2R5Qnl0ZXMJAAGRAAAAAggFAAAAAnR4AAAABnBy" +
       "b29mcwAAAAAAAAAAAAgFAAAAAnR4AAAAD3NlbmRlclB1YmxpY0tleQkAAGYAAAACBQAAAAZoZWlnaHQAAAAAAAAAA+gHB4Yt2cc="
     )
 
-  private def updateAccountScript(account: KeyPair, script: ByteStr): Unit =
+  private def setAccountScript(account: KeyPair, script: ByteStr): Unit =
     broadcastAndAwait(mkSetAccountMayBeScript(account, Some(script), fee = setScriptFee + smartFee))
 
   private lazy val carol = mkKeyPair("carol")

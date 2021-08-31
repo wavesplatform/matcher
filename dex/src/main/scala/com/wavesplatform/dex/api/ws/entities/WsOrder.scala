@@ -149,7 +149,10 @@ object WsOrder {
         (__ \ "Q").formatNullable[Double](doubleAsStringFormat) and // filled fee
         (__ \ "r").formatNullable[Double](doubleAsStringFormat) and // average weighed price among all trades
         (__ \ "E").formatNullable[Double](doubleAsStringFormat) and // total executed price assets
-        (__ \ "m").format[Seq[WsMatchTransactionInfo]] // match transaction information (such as executed asset amount and etc)
+        (__ \ "m").formatNullable[Seq[WsMatchTransactionInfo]].inmap[Seq[WsMatchTransactionInfo]](
+          o => o.getOrElse(Seq.empty[WsMatchTransactionInfo]),
+          s => if (s.isEmpty) None else Some(s)
+        ) // match transaction information (such as executed asset amount and etc)
     )(WsOrder.apply, unlift(WsOrder.unapply))
 
 }

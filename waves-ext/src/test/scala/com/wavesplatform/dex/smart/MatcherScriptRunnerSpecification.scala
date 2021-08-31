@@ -7,6 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.WavesExtSuiteBase
 import com.wavesplatform.dex.grpc.integration.smart.MatcherScriptRunner
+import com.wavesplatform.dex.grpc.integration.smart.MatcherScriptRunner.deniedBlockchain
 import com.wavesplatform.dex.test.matchers.ProduceError.produce
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms
@@ -31,7 +32,7 @@ class MatcherScriptRunnerSpecification extends WavesExtSuiteBase {
   )
 
   private def run(script: Script, isSynchronousCallsActivated: Boolean): Either[String, Terms.EVALUATED] =
-    MatcherScriptRunner(script, sampleOrder, isSynchronousCallsActivated)
+    MatcherScriptRunner(script, sampleOrder, deniedBlockchain, isSynchronousCallsActivated)
 
   "dApp sunny day" in {
     List(false, true).foreach { isSynchronousCallsActivated =>

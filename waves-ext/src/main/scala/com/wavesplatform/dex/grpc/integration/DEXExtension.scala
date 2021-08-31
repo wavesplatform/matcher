@@ -1,5 +1,8 @@
 package com.wavesplatform.dex.grpc.integration
 
+import com.typesafe.config.{Config, ConfigException}
+import com.wavesplatform.common.state.ByteStr
+
 import java.net.InetSocketAddress
 import java.util.concurrent.TimeUnit
 import com.wavesplatform.dex.grpc.integration.services._
@@ -9,7 +12,7 @@ import io.grpc.Server
 import io.grpc.netty.{InternalNettyServerBuilder, NettyServerBuilder}
 import monix.execution.{ExecutionModel, Scheduler}
 import net.ceedubs.ficus.Ficus._
-import net.ceedubs.ficus.readers.NameMapper
+import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
 
 import scala.concurrent.Future
 
@@ -27,13 +30,23 @@ class DEXExtension(context: ExtensionContext) extends Extension with ScorexLoggi
     executionModel = ExecutionModel.AlwaysAsyncExecution
   )
 
+  implicit val byteStrValueReader: ValueReader[ByteStr] = (config: Config, path: String) => {
+    val str = config.as[String](path)
+    ByteStr.decodeBase58(str).fold(
+      th => throw new ConfigException.WrongType(config.origin(), s"string $str cannot be decoded in base58", th),
+      identity
+    )
+  }
+
   override def start(): Unit = {
 
     val host: String = context.settings.config.as[String]("waves.dex.grpc.integration.host")
     val port: Int = context.settings.config.as[Int]("waves.dex.grpc.integration.port")
+    val allowedBlockchainStateAccounts: Set[ByteStr] =
+      context.settings.config.as[Set[ByteStr]]("waves.dex.order-script-validation.allowed-blockchain-state-accounts")
 
     val bindAddress = new InetSocketAddress(host, port)
-    apiService = new WavesBlockchainApiGrpcService(context)
+    apiService = new WavesBlockchainApiGrpcService(context, allowedBlockchainStateAccounts)
 
     val builder = NettyServerBuilder
       .forAddress(bindAddress)

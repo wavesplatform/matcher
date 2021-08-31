@@ -145,16 +145,16 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
        *  @Callable(i)
        *  func default() = {
        *    [
-       *      ScriptTransfer(Address(base58'3Q6WsHs7d2EndK5DBcFPRioRSkUyzWq2Bfo'), 0, base58'WAVES'),
-       *      ScriptTransfer(Address(base58'3Q93DhCrhAJ58jTRJkpYaQcCC5MXwCJBZcs'), 0, base58'WAVES'),
-       *      ScriptTransfer(Address(base58'3Ptyk3pMcDqD74rjCgowy7cdHmaDnru8yra'), 0, base58'WAVES'),
-       *      ScriptTransfer(Address(base58'3Q6WsHs7d2EndK5DBcFPRioRSkUyzWq2Bfo'), 0, base58'WAVES'),
-       *      ScriptTransfer(Address(base58'3Q93DhCrhAJ58jTRJkpYaQcCC5MXwCJBZcs'), 0, base58'WAVES'),
-       *      ScriptTransfer(Address(base58'3Ptyk3pMcDqD74rjCgowy7cdHmaDnru8yra'), 0, base58'WAVES'),
-       *      ScriptTransfer(Address(base58'3Q6WsHs7d2EndK5DBcFPRioRSkUyzWq2Bfo'), 0, base58'WAVES'),
-       *      ScriptTransfer(Address(base58'3Q93DhCrhAJ58jTRJkpYaQcCC5MXwCJBZcs'), 0, base58'WAVES'),
-       *      ScriptTransfer(Address(base58'3Ptyk3pMcDqD74rjCgowy7cdHmaDnru8yra'), 0, base58'WAVES'),
-       *      ScriptTransfer(Address(base58'3Q6WsHs7d2EndK5DBcFPRioRSkUyzWq2Bfo'), 0, base58'WAVES')
+       *      ScriptTransfer(Address(base58'3Q6WsHs7d2EndK5DBcFPRioRSkUyzWq2Bfo'), 0, unit),
+       *      ScriptTransfer(Address(base58'3Q93DhCrhAJ58jTRJkpYaQcCC5MXwCJBZcs'), 0, unit),
+       *      ScriptTransfer(Address(base58'3Ptyk3pMcDqD74rjCgowy7cdHmaDnru8yra'), 0, unit),
+       *      ScriptTransfer(Address(base58'3Q6WsHs7d2EndK5DBcFPRioRSkUyzWq2Bfo'), 0, unit),
+       *      ScriptTransfer(Address(base58'3Q93DhCrhAJ58jTRJkpYaQcCC5MXwCJBZcs'), 0, unit),
+       *      ScriptTransfer(Address(base58'3Ptyk3pMcDqD74rjCgowy7cdHmaDnru8yra'), 0, unit),
+       *      ScriptTransfer(Address(base58'3Q6WsHs7d2EndK5DBcFPRioRSkUyzWq2Bfo'), 0, unit),
+       *      ScriptTransfer(Address(base58'3Q93DhCrhAJ58jTRJkpYaQcCC5MXwCJBZcs'), 0, unit),
+       *      ScriptTransfer(Address(base58'3Ptyk3pMcDqD74rjCgowy7cdHmaDnru8yra'), 0, unit),
+       *      ScriptTransfer(Address(base58'3Q6WsHs7d2EndK5DBcFPRioRSkUyzWq2Bfo'), 0, unit)
        *    ]
        *  }
        *
@@ -164,23 +164,25 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
       val dapp = mkAccountWithBalance(100.waves + setScriptFee + smartFee -> Waves)
 
       val script =
-        "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"
+        "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"
 
       broadcastAndAwait(mkSetAccountMayBeScript(dapp, Some(Scripts.fromBase64(script)), fee = setScriptFee + smartFee))
 

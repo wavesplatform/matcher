@@ -34,7 +34,6 @@ final class ReBroadcastingFailedByScriptTxsTestSuite extends MatcherSuiteBase {
     wavesNode1.start()
     broadcastAndAwait(IssueUsdTx)
     broadcastAndAwait(mkTransfer(alice, carol, 1000.waves, Waves))
-    broadcastAndAwait(mkTransfer(alice, carol, 10000.usd, usd))
     dex1.start()
   }
 

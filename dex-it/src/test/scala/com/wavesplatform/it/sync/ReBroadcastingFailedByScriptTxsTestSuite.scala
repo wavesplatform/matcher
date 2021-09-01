@@ -1,16 +1,65 @@
 package com.wavesplatform.it.sync
 
+import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.api.http.entities.HttpOrderStatus
+import com.wavesplatform.dex.domain.account.KeyPair
+import com.wavesplatform.dex.domain.asset.Asset.Waves
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.it.test.Scripts
 import com.wavesplatform.it.MatcherSuiteBase
+
+import scala.concurrent.duration._
 
 final class ReBroadcastingFailedByScriptTxsTestSuite extends MatcherSuiteBase {
 
   "ReBroadcastingFailedByScriptTxsTestSuite" - {
 
     "should not rebroadcast transactions failed by account script" in {
-
+      val carolOrder = mkOrder(carol, wavesUsdPair, OrderType.SELL, 10.waves, 10.usd, version = 2)
+      dex1.api.place(carolOrder)
+      setAccountScript(carol, scriptHeightGt1000)
+      val aliceOrder = mkOrder(alice, wavesUsdPair, OrderType.BUY, 10.waves, 10.usd, version = 2)
+      placeAndAwaitAtDex(aliceOrder, HttpOrderStatus.Status.Filled)
+      Thread.sleep(5.seconds.toMillis)
+      val txId = ByteStr(dex1.api.getTransactionsByOrderId(carolOrder).head.id().bytes())
+      wavesNode1.tryApi.transactionInfo(txId).isLeft shouldBe true
+      setAccountScript(carol, defaultScript)
+      Thread.sleep(5.seconds.toMillis)
+      wavesNode1.tryApi.transactionInfo(txId).isLeft shouldBe true
     }
   }
+
+  override protected def beforeAll(): Unit = {
+    wavesNode1.start()
+    broadcastAndAwait(IssueUsdTx)
+    broadcastAndAwait(mkTransfer(alice, carol, 1000.waves, Waves))
+    broadcastAndAwait(mkTransfer(alice, carol, 10000.usd, usd))
+    dex1.start()
+  }
+
+  override protected val dexInitialSuiteConfig: Config = ConfigFactory
+    .parseString(
+      s"""waves.dex {
+         |  price-assets = [ "$UsdId", "WAVES" ]
+         |  exchange-transaction-broadcast {
+         |    interval = 1 second
+         |    max-pending-time = 15 minutes
+         |  }
+         |}""".stripMargin
+    )
+
+  override protected def wavesNodeInitialSuiteConfig: Config = ConfigFactory
+    .parseString(
+      s"""
+         |waves.dex.order-script-validation.allowed-blockchain-state-accounts=["${carol.publicKey.base58}"]
+         |""".stripMargin
+    )
+
+  private def setAccountScript(account: KeyPair, script: ByteStr): Unit =
+    broadcastAndAwait(mkSetAccountMayBeScript(account, Some(script), fee = setScriptFee + smartFee))
+
+  private lazy val carol = mkKeyPair("carol")
 
   /*
   {-# STDLIB_VERSION 5 #-}

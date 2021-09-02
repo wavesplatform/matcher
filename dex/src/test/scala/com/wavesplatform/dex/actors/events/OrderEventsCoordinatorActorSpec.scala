@@ -6,11 +6,10 @@ import akka.{testkit => classic}
 import cats.syntax.option._
 import com.softwaremill.diffx.{Derived, Diff}
 import com.wavesplatform.dex.actors.address.AddressActor.Command.ObservedTxData
-import com.wavesplatform.dex.actors.address.AddressBalance.{NotCreatedTxData, NotObservedTxData}
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.actors.tx.ExchangeTransactionBroadcastActor
 import com.wavesplatform.dex.actors.tx.ExchangeTransactionBroadcastActor.Command.Broadcast
-import com.wavesplatform.dex.collections.{FifoSet, NegativeMap, PositiveMap}
+import com.wavesplatform.dex.collections.{FifoSet, PositiveMap}
 import com.wavesplatform.dex.domain.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}

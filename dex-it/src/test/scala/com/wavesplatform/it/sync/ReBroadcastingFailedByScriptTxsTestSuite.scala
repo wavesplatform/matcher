@@ -17,7 +17,7 @@ final class ReBroadcastingFailedByScriptTxsTestSuite extends MatcherSuiteBase {
 
     "should not rebroadcast transactions failed by account script" in {
       val carolOrder = mkOrder(carol, wavesUsdPair, OrderType.SELL, 10.waves, 10.usd, version = 2)
-      dex1.api.place(carolOrder)
+      placeAndAwaitAtDex(carolOrder)
       setAccountScript(carol, scriptHeightGt1000)
       val aliceOrder = mkOrder(alice, wavesUsdPair, OrderType.BUY, 10.waves, 10.usd, version = 2)
       placeAndAwaitAtDex(aliceOrder, HttpOrderStatus.Status.Filled)

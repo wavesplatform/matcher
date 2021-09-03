@@ -225,14 +225,20 @@ class OrderBookDirectoryActor(
       else log.info(s"$ref is terminated")
 
     case evt @ OrderBookRecovered(assetPair, eventNr) =>
-      if (orderBooks.get().contains(assetPair))
-        snapshotsState = snapshotsState.updated(assetPair, eventNr, lastProcessedNr, settings.snapshotsInterval)
-      else log.warn(s"Got $evt")
+      snapshotsState =
+        if (orderBooks.get().contains(assetPair)) snapshotsState.updated(assetPair, eventNr, lastProcessedNr, settings.snapshotsInterval)
+        else {
+          log.warn(s"Got $evt")
+          snapshotsState.without(assetPair)
+        }
 
     case evt @ OrderBookSnapshotUpdateCompleted(assetPair, currentOffset) =>
-      if (orderBooks.get().contains(assetPair))
-        snapshotsState = snapshotsState.updated(assetPair, currentOffset, lastProcessedNr, settings.snapshotsInterval)
-      else log.warn(s"Got $evt")
+      snapshotsState =
+        if (orderBooks.get().contains(assetPair)) snapshotsState.updated(assetPair, currentOffset, lastProcessedNr, settings.snapshotsInterval)
+        else {
+          log.warn(s"Got $evt")
+          snapshotsState.without(assetPair)
+        }
 
     case PingAll(xs) =>
       val workers = xs.flatMap(pair => context.child(pair.key))

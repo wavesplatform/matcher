@@ -142,7 +142,8 @@ class ExchangeTransactionMinimumFeeTestSuite extends IntegrationSuiteBase {
         1.usd,
         matcher = scriptedAccount,
         sellOrderFeeAsset = scriptedAmount,
-        buyOrderFeeAsset = scriptedPrice
+        buyOrderFeeAsset = scriptedPrice,
+        matcherFee = 0.015.waves
       ),
       0.015.waves
     )

@@ -32,12 +32,10 @@ class WsAddressStreamRealTimeTestSuite extends WsSuiteBase {
     dex1.start()
   }
 
-  private def mkWsAddressConnection(account: KeyPair): WsConnection = mkWsAddressConnection(account, dex1)
-
   "Address stream should" - {
 
     "send correct updates when account added to address-actor.realtime-ws-accounts" in {
-      Using.resource(mkWsAddressConnection(account)) { wsc =>
+      Using.resource(mkWsAddressConnection(account, dex1)) { wsc =>
 
         broadcastAndAwait(mkTransfer(account, alice, 2.waves, Waves))
         placeAndAwaitAtDex(mkOrder(alice, wavesUsdPair, BUY, 10.waves, 1.usd))

@@ -278,10 +278,10 @@ trait MkWavesEntities {
         sellOrder = sellOrder,
         amount = amount,
         price = price,
-        buyMatcherFee = buyOrder.matcherFee,
-        sellMatcherFee = sellOrder.matcherFee,
-        fee = matcherFee,
-        timestamp = timestamp
+        buyOrder.matcherFee,
+        sellOrder.matcherFee,
+        matcherFee,
+        timestamp
       ).transaction
   }
 

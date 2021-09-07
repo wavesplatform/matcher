@@ -249,8 +249,8 @@ trait MkWavesEntities {
       amount,
       price,
       matcherFee,
-      timestamp = timestamp,
-      matcher = matcher,
+      timestamp,
+      matcher,
       buyOrderFeeAsset,
       sellOrderFeeAsset
     ).toWavesJ(chainId)

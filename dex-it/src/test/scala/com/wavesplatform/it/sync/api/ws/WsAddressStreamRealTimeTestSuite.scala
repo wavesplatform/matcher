@@ -37,7 +37,6 @@ class WsAddressStreamRealTimeTestSuite extends WsSuiteBase {
 
         broadcastAndAwait(mkTransfer(account, alice, 2.waves, Waves))
         placeAndAwaitAtDex(mkOrder(alice, wavesUsdPair, BUY, 10.waves, 1.usd))
-
         placeAndAwaitAtNode(mkOrder(account, wavesUsdPair, SELL, 10.waves, 1.usd))
 
         eventually {

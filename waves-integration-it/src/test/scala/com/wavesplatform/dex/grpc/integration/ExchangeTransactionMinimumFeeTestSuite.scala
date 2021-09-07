@@ -16,6 +16,20 @@ class ExchangeTransactionMinimumFeeTestSuite extends IntegrationSuiteBase {
    *      {-# SCRIPT_TYPE ACCOUNT #-}
    *
    *      match tx {
+   *          case _: ExchangeTransaction | Order => getInteger(tx.sender, "1").valueOrElse(1) > 0
+   *          case _ => true
+   *      }
+   */
+  val accountScriptLess200 = "BAQAAAAHJG1hdGNoMAUAAAACdHgDAwkAAAEAAAACBQAAAAckbWF0Y2gwAgAAAAVPcmR" +
+    "lcgYJAAABAAAAAgUAAAAHJG1hdGNoMAIAAAATRXhjaGFuZ2VUcmFuc2FjdGlvbgkAAGYAAAACCQEAAAALdmFsdWVPckV" +
+    "sc2UAAAACCQAEGgAAAAIIBQAAAAJ0eAAAAAZzZW5kZXICAAAAATEAAAAAAAAAAAEAAAAAAAAAAAAG3a1chA=="
+
+  /**
+   *      {-# STDLIB_VERSION 4 #-}
+   *      {-# CONTENT_TYPE EXPRESSION #-}
+   *      {-# SCRIPT_TYPE ACCOUNT #-}
+   *
+   *      match tx {
    *          case _: ExchangeTransaction | Order =>
    *              getInteger(tx.sender, "1").valueOrElse(1) > 0 &&
    *              getInteger(tx.sender, "2").valueOrElse(1) > 0 &&
@@ -87,6 +101,7 @@ class ExchangeTransactionMinimumFeeTestSuite extends IntegrationSuiteBase {
     "AAAAAAAAABAAAAAAAAAAAABwaOhypm"
 
   val scriptedAccount = generateNewAccount("scripted".getBytes(StandardCharsets.UTF_8), 0)
+  val scriptedAccountLess200 = generateNewAccount("scripted".getBytes(StandardCharsets.UTF_8), 1)
 
   val issueScriptedAmountTx: IssueTransaction =
     mkIssue(alice, "scriptedAmount", defaultAssetQuantity, script = Some(Scripts.fromBase64(assetScript)))
@@ -133,6 +148,16 @@ class ExchangeTransactionMinimumFeeTestSuite extends IntegrationSuiteBase {
       0.003.waves
     )
 
+    "matcher account is scripted (more than 200 complexity)" in broadcastAndValidate(
+      mkExchange(alice, bob, wavesUsdPair, 10.waves, 1.usd, matcher = scriptedAccount, matcherFee = 0.007.waves),
+      0.007.waves
+    )
+
+    "matcher account is scripted (less than 200 complexity)" in broadcastAndValidate(
+      mkExchange(alice, bob, wavesUsdPair, 10.waves, 1.usd, matcher = scriptedAccountLess200, matcherFee = 0.007.waves),
+      0.007.waves
+    )
+
     "buy and sell orders owners, amount and price assets, matcher and fee assets of both orders are scripted" in broadcastAndValidate(
       mkExchange(
         scriptedAccount,
@@ -159,16 +184,18 @@ class ExchangeTransactionMinimumFeeTestSuite extends IntegrationSuiteBase {
     broadcastAndAwait(IssueUsdTx, IssueBtcTx, issueScriptedAmountTx, issueScriptedPriceTx)
 
     broadcastAndAwait(
-      mkTransfer(alice, scriptedAccount.toAddress, 100.usd, usd),
-      mkTransfer(bob, alice.toAddress, 100.btc, btc),
-      mkTransfer(bob, scriptedAccount.toAddress, 100.btc, btc),
-      mkTransfer(alice, scriptedAccount.toAddress, 1000.waves, Waves),
-      mkTransfer(alice, scriptedAccount.toAddress, 1000.waves, scriptedAmount, 0.007.waves),
-      mkTransfer(alice, scriptedAccount.toAddress, 1000.waves, scriptedPrice, 0.007.waves)
+      mkTransfer(alice, scriptedAccount, 100.usd, usd),
+      mkTransfer(bob, alice, 100.btc, btc),
+      mkTransfer(bob, scriptedAccount, 100.btc, btc),
+      mkTransfer(alice, scriptedAccountLess200, 1000.waves, Waves),
+      mkTransfer(alice, scriptedAccount, 1000.waves, Waves),
+      mkTransfer(alice, scriptedAccount, 1000.waves, scriptedAmount, 0.007.waves),
+      mkTransfer(alice, scriptedAccount, 1000.waves, scriptedPrice, 0.007.waves)
     )
 
     broadcastAndAwait(
-      mkSetAccountScript(scriptedAccount, Scripts.fromBase64(accountScript))
+      mkSetAccountScript(scriptedAccount, Scripts.fromBase64(accountScript)),
+      mkSetAccountScript(scriptedAccountLess200, Scripts.fromBase64(accountScriptLess200))
     )
 
   }

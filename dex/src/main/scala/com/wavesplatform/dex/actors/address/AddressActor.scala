@@ -22,7 +22,7 @@ import com.wavesplatform.dex.api.ws.state.WsAddressState
 import com.wavesplatform.dex.collections.{NegativeMap, PositiveMap}
 import com.wavesplatform.dex.db.OrderDb
 import com.wavesplatform.dex.db.OrderDb.orderInfoOrdering
-import com.wavesplatform.dex.domain.account.Address
+import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.model.Denormalization.denormalizeAmountAndFee
 import com.wavesplatform.dex.domain.order.Order
@@ -73,6 +73,8 @@ class AddressActor(
 
   override protected lazy val log = LoggerFacade(LoggerFactory.getLogger(s"AddressActor[$owner]"))
   private val ignoreRef = context.system.toTyped.ignoreRef.toClassic
+
+  private val enableRealtimeWs = settings.realtimeWsAddresses.contains(owner)
 
   private var isWorking = false
 
@@ -611,7 +613,8 @@ class AddressActor(
   /** Schedules next balances and order changes sending only if it wasn't scheduled before */
   private def scheduleNextDiffSending(): Unit =
     if (wsSendSchedule.isCancelled)
-      wsSendSchedule = context.system.scheduler.scheduleOnce(settings.wsMessagesInterval, self, WsCommand.SendDiff)
+      if (enableRealtimeWs) self ! WsCommand.SendDiff
+      else wsSendSchedule = context.system.scheduler.scheduleOnce(settings.wsMessagesInterval, self, WsCommand.SendDiff)
 
   private def mkWsBalances(forAssets: Set[Asset], includeEmpty: Boolean): Map[Asset, WsAssetInfo] = forAssets
     .flatMap { asset =>
@@ -984,11 +987,14 @@ object AddressActor {
   final case class Settings(
     wsMessagesInterval: FiniteDuration = default.wsMessagesInterval,
     batchCancelTimeout: FiniteDuration = default.batchCancelTimeout,
-    maxActiveOrders: Int = default.maxActiveOrders
-  )
+    maxActiveOrders: Int = default.maxActiveOrders,
+    realtimeWsAccounts: Set[PublicKey] = default.realtimeWsAccounts
+  ) {
+    lazy val realtimeWsAddresses = realtimeWsAccounts.map(_.toAddress)
+  }
 
   object Settings {
-    val default: Settings = Settings(100.milliseconds, 20.seconds, 200)
+    val default: Settings = Settings(100.milliseconds, 20.seconds, 200, Set.empty[PublicKey])
   }
 
   sealed trait OrderRefreshResult extends Product with Serializable

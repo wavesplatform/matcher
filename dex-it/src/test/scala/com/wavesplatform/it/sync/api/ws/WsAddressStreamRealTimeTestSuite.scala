@@ -32,7 +32,7 @@ class WsAddressStreamRealTimeTestSuite extends WsSuiteBase {
 
   "Address stream should" - {
 
-    "send correct updates when account added to address-actor.realtime-ws-accounts" in {
+    "send correct updates when account added to address-actor.realtime-ws-accounts without waiting ws-messages-interval" in {
       Using.resource(mkWsAddressConnection(account, dex1)) { wsc =>
 
         broadcastAndAwait(mkTransfer(account, alice, 2.waves, Waves))

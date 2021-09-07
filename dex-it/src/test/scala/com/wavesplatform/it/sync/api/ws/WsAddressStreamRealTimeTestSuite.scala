@@ -2,26 +2,26 @@ package com.wavesplatform.it.sync.api.ws
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.ws.connection.WsConnection
-import com.wavesplatform.dex.api.ws.entities.{WsBalances, WsMatchTransactionInfo, WsOrder}
+import com.wavesplatform.dex.api.ws.entities.WsBalances
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.account.KeyPair.toAddress
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
-import com.wavesplatform.dex.model.OrderStatus
 import com.wavesplatform.it.WsSuiteBase
-import org.scalatest.prop.TableDrivenPropertyChecks
 
 import scala.util.Using
 
-class WsAddressStreamRealTimeTestSuite extends WsSuiteBase with TableDrivenPropertyChecks {
+class WsAddressStreamRealTimeTestSuite extends WsSuiteBase {
 
   val account = mkKeyPair("Test")
 
   override protected val dexInitialSuiteConfig: Config = ConfigFactory
     .parseString(s"""waves.dex {
                     |  price-assets = [ "$UsdId", "WAVES" ]
-                    |  web-sockets.external-client-handler.subscriptions.max-address-number = 3
-                    |  address-actor.realtime-ws-accounts = [${account.publicKey}]
+                    |  address-actor {
+                    |    realtime-ws-accounts = [${account.publicKey}]
+                    |    ws-messages-interval = 1 hour
+                    |  }
                     |}""".stripMargin)
     .withFallback(jwtPublicKeyConfig)
 

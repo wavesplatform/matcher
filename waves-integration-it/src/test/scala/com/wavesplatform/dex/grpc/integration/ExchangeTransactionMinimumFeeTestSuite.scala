@@ -11,7 +11,7 @@ import java.nio.charset.StandardCharsets
 class ExchangeTransactionMinimumFeeTestSuite extends IntegrationSuiteBase {
 
   /**
-   *      {-# STDLIB_VERSION 4 #-}
+   *      {-# STDLIB_VERSION 5 #-}
    *      {-# CONTENT_TYPE EXPRESSION #-}
    *      {-# SCRIPT_TYPE ACCOUNT #-}
    *
@@ -20,9 +20,9 @@ class ExchangeTransactionMinimumFeeTestSuite extends IntegrationSuiteBase {
    *          case _ => true
    *      }
    */
-  val accountScriptLess200 = "BAQAAAAHJG1hdGNoMAUAAAACdHgDAwkAAAEAAAACBQAAAAckbWF0Y2gwAgAAAAVPcmR" +
-    "lcgYJAAABAAAAAgUAAAAHJG1hdGNoMAIAAAATRXhjaGFuZ2VUcmFuc2FjdGlvbgkAAGYAAAACCQEAAAALdmFsdWVPckV" +
-    "sc2UAAAACCQAEGgAAAAIIBQAAAAJ0eAAAAAZzZW5kZXICAAAAATEAAAAAAAAAAAEAAAAAAAAAAAAG3a1chA=="
+  val accountScriptLess200 = "BQQAAAAHJG1hdGNoMAUAAAACdHgDAwkAAAEAAAACBQAAAAckbWF0Y2gwAgAAAAVPc" +
+  "mRlcgYJAAABAAAAAgUAAAAHJG1hdGNoMAIAAAATRXhjaGFuZ2VUcmFuc2FjdGlvbgkAAGYAAAACCQEAAAALdmFsdWVPc" +
+  "kVsc2UAAAACCQAEGgAAAAIIBQAAAAJ0eAAAAAZzZW5kZXICAAAAATEAAAAAAAAAAAEAAAAAAAAAAAAGpMemwQ=="
 
   /**
    *      {-# STDLIB_VERSION 4 #-}
@@ -154,8 +154,8 @@ class ExchangeTransactionMinimumFeeTestSuite extends IntegrationSuiteBase {
     )
 
     "matcher account is scripted (less than 200 complexity)" in broadcastAndValidate(
-      mkExchange(alice, bob, wavesUsdPair, 10.waves, 1.usd, matcher = scriptedAccountLess200, matcherFee = 0.007.waves),
-      0.007.waves
+      mkExchange(alice, bob, wavesUsdPair, 10.waves, 1.usd, matcher = scriptedAccountLess200, matcherFee = 0.003.waves),
+      0.003.waves
     )
 
     "buy and sell orders owners, amount and price assets, matcher and fee assets of both orders are scripted" in broadcastAndValidate(

@@ -61,7 +61,7 @@ class WsConnection(uri: Uri, keepAlive: Boolean = true)(implicit system: ActorSy
     case tm: TextMessage =>
       for {
         strictText <- tm.toStrict(1.second).map(_.getStrictText)
-        clientMessage <- {
+        _ <- {
           log.debug(s"Got $strictText")
           rawMessagesBuffer.add(WsRawMessage(strictText, System.currentTimeMillis()))
           Try(Json.parse(strictText).as[WsServerMessage]) match {
@@ -75,7 +75,7 @@ class WsConnection(uri: Uri, keepAlive: Boolean = true)(implicit system: ActorSy
               Future.successful(x)
           }
         }
-      } yield clientMessage
+      } yield ()
 
     case bm: BinaryMessage =>
       bm.dataStream.runWith(Sink.ignore)

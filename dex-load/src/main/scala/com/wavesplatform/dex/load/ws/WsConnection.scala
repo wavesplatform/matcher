@@ -48,14 +48,14 @@ class WsConnection(uri: String, receive: WsServerMessage => Option[WsClientMessa
     case tm: TextMessage => // TODO move to tests
       for {
         strictText <- tm.toStrict(1.second).map(_.getStrictText)
-        clientMessage <- {
+        _ <- {
           log.trace(s"Got $strictText")
           Try(Json.parse(strictText).as[WsServerMessage]) match {
             case Failure(exception) => Future.failed(exception)
             case Success(x) => Future.successful(receive(x).foreach(wsHandlerRef ! _))
           }
         }
-      } yield clientMessage
+      } yield ()
 
     case bm: BinaryMessage =>
       bm.dataStream.runWith(Sink.ignore)

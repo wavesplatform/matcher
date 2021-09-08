@@ -74,7 +74,7 @@ class AddressActor(
   override protected lazy val log = LoggerFacade(LoggerFactory.getLogger(s"AddressActor[$owner]"))
   private val ignoreRef = context.system.toTyped.ignoreRef.toClassic
 
-  private val enableRealtimeWs = settings.realtimeWsAddresses.contains(owner)
+  private val enableRealtimeWs = settings.realtimeWsAddresses.contains(owner) || settings.wsMessagesInterval.length == 0
 
   private var isWorking = false
 

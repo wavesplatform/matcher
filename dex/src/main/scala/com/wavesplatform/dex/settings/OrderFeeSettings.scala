@@ -12,7 +12,7 @@ sealed trait OrderFeeSettings extends Product with Serializable
 
 object OrderFeeSettings {
 
-  final case class DynamicSettings(baseMakerFee: Long, baseTakerFee: Long, zeroFeeAccounts: Set[PublicKey]) extends OrderFeeSettings {
+  final case class DynamicSettings(baseMakerFee: Long, baseTakerFee: Long, zeroFeeAccounts: Set[PublicKey] = Set.empty) extends OrderFeeSettings {
     val maxBaseFee: Long = math.max(baseMakerFee, baseTakerFee)
     val makerRatio = BigDecimal(baseMakerFee) / maxBaseFee
     val takerRatio = BigDecimal(baseTakerFee) / maxBaseFee

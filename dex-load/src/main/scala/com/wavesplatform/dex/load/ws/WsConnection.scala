@@ -55,7 +55,7 @@ class WsConnection(uri: String, receive: WsServerMessage => Option[WsClientMessa
             case Success(x) => Future.successful(receive(x).foreach(wsHandlerRef ! _))
           }
         }
-      } yield ()
+      } yield Done
 
     case bm: BinaryMessage =>
       bm.dataStream.runWith(Sink.ignore)

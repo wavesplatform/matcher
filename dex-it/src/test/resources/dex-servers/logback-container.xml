@@ -44,6 +44,11 @@
         <appender-ref ref="DETAILED"/>
     </logger>
 
+    <!-- gRPC -->
+    <logger name="com.wavesplatform.dex.grpc.integration.clients.matcherext.MatcherExtensionGrpcAsyncClient" level="TRACE" additivity="false">
+        <appender-ref ref="DETAILED"/>
+    </logger>
+
     <!-- Queue -->
     <logger name="org.apache.kafka" level="DEBUG" additivity="false">
         <appender-ref ref="DETAILED"/>

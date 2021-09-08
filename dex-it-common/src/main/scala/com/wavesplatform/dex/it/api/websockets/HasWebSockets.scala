@@ -10,6 +10,7 @@ import com.wavesplatform.dex.api.ws.protocol._
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.fp.MapImplicits.MapOps
 import com.wavesplatform.dex.it.config.PredefinedAssets
@@ -105,13 +106,23 @@ trait HasWebSockets extends BeforeAndAfterAll with BeforeAndAfterEach with HasJw
     c: WsConnection,
     squash: Boolean = true
   )(expBs: Map[Asset, WsBalances]*)(expOs: WsOrder*): Unit = {
+    val (expBsSquashed, expOsSquashed) =
+      if (squash) {
+        val bs = expBs.toList.squashed
+        val os = expOs.toList.squashed
+        log.info(s"Expecting balance changes: $bs, order changes: $os")
+        (bs, os)
+      } else (Map.empty[Asset, WsBalances], Map.empty[Order.Id, WsOrder])
+
     eventually {
       if (squash) {
-        c.balanceChanges.squashed should matchTo(expBs.toList.squashed)
-        c.orderChanges.squashed should matchTo(expOs.toList.squashed)
+        val bs = c.balanceChanges.squashed
+        val os = c.orderChanges.squashed
+        withClue(s"balanceChanges(squashed: $bs): ")(bs should matchTo(expBsSquashed))
+        withClue(s"orderChanges(squashed: $os): ")(os should matchTo(expOsSquashed))
       } else {
-        c.balanceChanges should matchTo(expBs)
-        c.orderChanges should matchTo(expOs)
+        withClue("balanceChanges: ")(c.balanceChanges should matchTo(expBs))
+        withClue("orderChanges: ")(c.orderChanges should matchTo(expOs))
       }
     }
 

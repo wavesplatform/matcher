@@ -57,11 +57,11 @@ class WsConnection(uri: Uri, keepAlive: Boolean = true)(implicit system: ActorSy
   private val messagesBuffer: ConcurrentLinkedQueue[WsServerMessage] = new ConcurrentLinkedQueue[WsServerMessage]()
 
   // From server to test
-  private val sink: Sink[Message, Future[Done]] = Sink.foreach {
+  private val sink: Sink[Message, Future[Done]] = Sink.foreachAsync(1) {
     case tm: TextMessage =>
       for {
         strictText <- tm.toStrict(1.second).map(_.getStrictText)
-        clientMessage <- {
+        _ <- {
           log.debug(s"Got $strictText")
           rawMessagesBuffer.add(WsRawMessage(strictText, System.currentTimeMillis()))
           Try(Json.parse(strictText).as[WsServerMessage]) match {
@@ -75,7 +75,7 @@ class WsConnection(uri: Uri, keepAlive: Boolean = true)(implicit system: ActorSy
               Future.successful(x)
           }
         }
-      } yield clientMessage
+      } yield ()
 
     case bm: BinaryMessage =>
       bm.dataStream.runWith(Sink.ignore)

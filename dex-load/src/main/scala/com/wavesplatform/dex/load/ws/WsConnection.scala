@@ -44,7 +44,7 @@ class WsConnection(uri: String, receive: WsServerMessage => Option[WsClientMessa
   }
 
   // To client
-  private val sink: Sink[Message, Future[Done]] = Sink.foreach {
+  private val sink: Sink[Message, Future[Done]] = Sink.foreachAsync(1) {
     case tm: TextMessage => // TODO move to tests
       for {
         strictText <- tm.toStrict(1.second).map(_.getStrictText)

@@ -57,7 +57,7 @@ class WsConnection(uri: Uri, keepAlive: Boolean = true)(implicit system: ActorSy
   private val messagesBuffer: ConcurrentLinkedQueue[WsServerMessage] = new ConcurrentLinkedQueue[WsServerMessage]()
 
   // From server to test
-  private val sink: Sink[Message, Future[Done]] = Sink.foreach {
+  private val sink: Sink[Message, Future[Done]] = Sink.foreachAsync(1) {
     case tm: TextMessage =>
       for {
         strictText <- tm.toStrict(1.second).map(_.getStrictText)

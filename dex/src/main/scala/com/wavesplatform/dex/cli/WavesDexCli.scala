@@ -882,7 +882,7 @@ object WavesDexCli extends ScoptImplicits {
             System.err.println(s"Can't parse the seed in the base64 format, try again, $e"); readSeedFromFromStdIn(prompt, format)
         }
       case SeedFormat.Base58 =>
-        Base58.tryDecodeWithLimit(rawSeed) match {
+        Base58.tryDecode(rawSeed) match {
           case Success(r) => r
           case Failure(_) => System.err.println("Can't parse the seed in the base58 format, try again"); readSeedFromFromStdIn(prompt, format)
         }

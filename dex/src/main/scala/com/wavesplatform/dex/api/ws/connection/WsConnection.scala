@@ -75,7 +75,7 @@ class WsConnection(uri: Uri, keepAlive: Boolean = true)(implicit system: ActorSy
               Future.successful(x)
           }
         }
-      } yield ()
+      } yield Done
 
     case bm: BinaryMessage =>
       bm.dataStream.runWith(Sink.ignore)

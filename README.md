@@ -356,7 +356,7 @@ waves-dex-cli create-account-storage --address-scheme W --seed-format base64 --a
 # With Docker (an image is not available on Docker Hub, you should built it yourself):
 docker run --rm --name matcher-cli -it -e MATCHER_HEAP_SIZE=512M -v ${PWD}/files:/var/lib/waves-dex/files \
 --entrypoint /usr/share/waves-dex/bin/waves-dex-cli wavesplatform/matcher-server:latest \
-create-account-storage --address-scheme W --seed-format base64 --account-nonce 3 --output-directory /var/lib/waves-dex /var/lib/waves-dex/files
+create-account-storage --address-scheme W --seed-format base64 --account-nonce 3 --output-directory /var/lib/waves-dex/files
 ```
 
 here:

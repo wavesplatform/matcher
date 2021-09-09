@@ -2,7 +2,6 @@ package com.wavesplatform.dex.api.http.routes.v0
 
 import akka.actor.ActorRef
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
-import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server._
 import akka.stream.Materializer
 import akka.util.Timeout

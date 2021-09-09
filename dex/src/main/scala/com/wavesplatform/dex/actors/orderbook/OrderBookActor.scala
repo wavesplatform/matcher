@@ -164,7 +164,7 @@ class OrderBookActor(
     case classic.Terminated(ref) =>
       log.error(s"Terminated actor: $ref")
       // If this happens the issue is critical and should not be handled. The order book will be stopped, see OrderBookDirectoryActor
-      if (ref == aggregatedRef) throw new RuntimeException("Aggregated order book was terminated")
+      if (ref.path == aggregatedRef.path) throw new RuntimeException("Aggregated order book was terminated")
   }
 
   private def process(timestamp: Long, result: OrderBookUpdates): Unit = {

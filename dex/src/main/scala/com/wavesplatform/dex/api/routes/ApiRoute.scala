@@ -44,17 +44,10 @@ trait ApiRoute extends Directives with ApiMarshallers with ScorexLogging {
   protected def signedGetByAddress(addressOrError: Either[ValidationError.InvalidAddress, Address]): Directive0 =
     addressOrError match {
       case Left(ia) => complete(SimpleErrorResponse(error.InvalidAddress(ia.reason)))
-      case Right(address) =>
-        (headerValueByName(`X-User-Public-Key`.headerName) & headerValueByName("Timestamp") & headerValueByName("Signature")).tflatMap {
-          case (publicKey, timestamp, sig) =>
-            val pk = PublicKey.fromBase58String(publicKey).getOrElse(PublicKey.empty)
-            if (pk.toAddress != address) complete(InvalidSignature)
-            else
-              Base58.tryDecodeWithLimit(sig).map(crypto.verify(_, pk ++ Longs.toByteArray(timestamp.toLong), pk)) match {
-                case Success(true) => pass
-                case _ => complete(InvalidSignature)
-              }
-        }
+      case Right(_) =>
+        headerValueByName(`X-User-Public-Key`.headerName).tflatMap(publicKey =>
+          signedGet(PublicKey.fromBase58String(publicKey._1).getOrElse(PublicKey.empty))
+        )
     }
 
   protected def signedGet(publicKey: PublicKey): Directive0 =

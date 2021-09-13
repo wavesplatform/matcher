@@ -1,18 +1,18 @@
 package com.wavesplatform.it.matcher.api.http.cancel
 
 import com.google.common.primitives.Longs
-import sttp.model.StatusCode
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
-import com.wavesplatform.dex.api.http.entities.HttpSuccessfulSingleCancel
+import com.wavesplatform.dex.api.http.entities.{HttpError, HttpSuccessfulSingleCancel}
 import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.OrderType.BUY
-import com.wavesplatform.dex.error.{InvalidAddress, InvalidJson}
+import com.wavesplatform.dex.error.{InvalidAddress, InvalidJson, OrderNotFound}
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.matcher.api.http.ApiKeyHeaderChecks
+import sttp.model.StatusCode
 
 class CancelOrdersByAddressAndIdsSpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
 
@@ -111,15 +111,20 @@ class CancelOrdersByAddressAndIdsSpec extends MatcherSuiteBase with ApiKeyHeader
       )
     }
 
-    "should return an error if publicKey parameter has the different value of used in signature" in {
+    "should return order not found if address path parameter and publicKey header are from different accounts" in {
       val o = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd)
       placeAndAwaitAtDex(o)
       val ts = System.currentTimeMillis
       val sign = crypto.sign(alice, alice.publicKey ++ Longs.toByteArray(ts))
 
-      validateIncorrectSignature(
-        dex1.rawApi.cancelOrdersByIdsWithKeyOrSignature(bob.stringRepr, Set(o.idStr()), mkHeaders(alice.publicKey, ts, sign))
-      )
+      val r =
+        validate200Json(dex1.rawApi.cancelOrdersByIdsWithKeyOrSignature(bob.stringRepr, Set(o.idStr()), mkHeaders(alice.publicKey, ts, sign)))
+
+      r.message.head should have size 1
+      r.message.head.foreach {
+        case util.Left(HttpError(e, m, _, _, _, _)) => e shouldBe OrderNotFound.code; m shouldBe s"The order ${o.idStr()} not found"
+        case _ => fail(s"Unexpected response $r")
+      }
     }
 
     "should return an error if timestamp header has the different value of used in signature" in {

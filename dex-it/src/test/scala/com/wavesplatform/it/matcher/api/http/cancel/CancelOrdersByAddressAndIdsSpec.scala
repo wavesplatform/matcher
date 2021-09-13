@@ -128,7 +128,11 @@ class CancelOrdersByAddressAndIdsSpec extends MatcherSuiteBase with ApiKeyHeader
       val ts = System.currentTimeMillis
       val sign = crypto.sign(alice, alice.publicKey ++ Longs.toByteArray(ts))
 
-      validateIncorrectSignature(dex1.rawApi.cancelOrdersByIdsWithKeyOrSignature(bob.stringRepr, Set(o.idStr()), mkHeaders(alice.publicKey, ts + 1000, sign)))
+      validateIncorrectSignature(dex1.rawApi.cancelOrdersByIdsWithKeyOrSignature(
+        bob.stringRepr,
+        Set(o.idStr()),
+        mkHeaders(alice.publicKey, ts + 1000, sign)
+      ))
     }
   }
 

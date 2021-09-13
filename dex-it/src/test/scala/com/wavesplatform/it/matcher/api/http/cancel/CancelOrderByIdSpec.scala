@@ -94,7 +94,11 @@ class CancelOrderByIdSpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
       )
     }
 
-    shouldReturnErrorWithoutApiKeyHeader(dex1.rawApi.cancelOrdersByIdsWithKeyOrSignature(alice.stringRepr, placeAndGetIds(3), Map.empty[String, String]))
+    shouldReturnErrorWithoutApiKeyHeader(dex1.rawApi.cancelOrdersByIdsWithKeyOrSignature(
+      alice.stringRepr,
+      placeAndGetIds(3),
+      Map.empty[String, String]
+    ))
 
     shouldReturnErrorWithIncorrectApiKeyValue(dex1.rawApi.cancelOrdersByIdsWithKeyOrSignature(
       alice.toAddress.stringRepr,

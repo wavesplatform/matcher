@@ -135,7 +135,7 @@ final class CancelRoute(
   def cancelOrdersByIdsWithKeyOrSignature: Route =
     (path(AddressPM / "cancel") & post) { addressOrError =>
       (withMetricsAndTraces("cancelAllByApiKeyAndIds") & protect) {
-        (signedGetByAddress(addressOrError).tmap(_ => Option.empty[PublicKey]) | (withAuth & withUserPublicKeyOpt)){ userPublicKey =>
+        (signedGetByAddress(addressOrError).tmap(_ => Option.empty[PublicKey]) | (withAuth & withUserPublicKeyOpt)) { userPublicKey =>
           withAddress(addressOrError) { address =>
             userPublicKey match {
               case Some(upk) if upk.toAddress != address => invalidUserPublicKey

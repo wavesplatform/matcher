@@ -45,7 +45,7 @@ class CancelOrdersByAddressAndIdsSpec extends MatcherSuiteBase with ApiKeyHeader
     Map("X-User-Public-Key" -> pk.toString, "Timestamp" -> ts.toString, "Signature" -> sign.toString)
 
   "POST /matcher/orders/{address}/cancel" - {
-    "should cancel orders by ids" in {
+    "should cancel orders by api key" in {
 
       val orders = placeOrders()
       val r = validate200Json(dex1.rawApi.cancelOrdersByIdsWithKeyOrSignature(alice.toAddress.stringRepr, orders.map(_.idStr())))

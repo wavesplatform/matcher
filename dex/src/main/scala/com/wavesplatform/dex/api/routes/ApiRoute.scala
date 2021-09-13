@@ -44,7 +44,7 @@ trait ApiRoute extends Directives with ApiMarshallers with ScorexLogging {
   protected def signedGetByAddress(addressOrError: Either[ValidationError.InvalidAddress, Address]): Directive0 =
     addressOrError match {
       case Left(ia) => complete(SimpleErrorResponse(error.InvalidAddress(ia.reason)))
-      case Right(_) =>
+      case _ =>
         headerValueByName(`X-User-Public-Key`.headerName).tflatMap(publicKey =>
           signedGet(PublicKey.fromBase58String(publicKey._1).getOrElse(PublicKey.empty))
         )

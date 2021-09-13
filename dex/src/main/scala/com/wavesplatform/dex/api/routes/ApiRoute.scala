@@ -10,6 +10,7 @@ import com.google.common.primitives.Longs
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.api.http.entities.{InfoNotFound, InvalidAddress, InvalidAsset, InvalidBase58String, InvalidPublicKey, InvalidSignature, MatcherResponse, TimedOut, _}
+import com.wavesplatform.dex.api.http.headers.`X-User-Public-Key`
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
 import com.wavesplatform.dex.api.http.{entities, ApiMarshallers}
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
@@ -39,6 +40,22 @@ trait ApiRoute extends Directives with ApiMarshallers with ScorexLogging {
   def route: Route
 
   protected val invalidUserPublicKey: StandardRoute = complete(SimpleErrorResponse(error.UserPublicKeyIsNotValid()))
+
+  protected def signedGetByAddress(addressOrError: Either[ValidationError.InvalidAddress, Address]): Directive0 =
+    addressOrError match {
+      case Left(ia) => complete(SimpleErrorResponse(error.InvalidAddress(ia.reason)))
+      case Right(address) =>
+        (headerValueByName(`X-User-Public-Key`.headerName) & headerValueByName("Timestamp") & headerValueByName("Signature")).tflatMap {
+          case (publicKey, timestamp, sig) =>
+            val pk = PublicKey.fromBase58String(publicKey).getOrElse(PublicKey.empty)
+            if (pk.toAddress != address) complete(InvalidSignature)
+            else
+              Base58.tryDecodeWithLimit(sig).map(crypto.verify(_, pk ++ Longs.toByteArray(timestamp.toLong), pk)) match {
+                case Success(true) => pass
+                case _ => complete(InvalidSignature)
+              }
+        }
+    }
 
   protected def signedGet(publicKey: PublicKey): Directive0 =
     (headerValueByName("Timestamp") & headerValueByName("Signature")).tflatMap { case (timestamp, sig) =>

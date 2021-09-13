@@ -151,7 +151,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .contentType(MediaType.ApplicationJson)
   }
 
-  def cancelOrdersByIdsWithKey(
+  def cancelOrdersByIdsWithKeyOrSignature(
     address: String,
     ids: Set[String],
     headers: Map[String, String]
@@ -163,10 +163,10 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .contentType(MediaType.ApplicationJson)
   }
 
-  def cancelOrdersByIdsWithKey(address: String, ids: Set[String]): R[HttpSuccessfulBatchCancel] =
-    cancelOrdersByIdsWithKey(address, ids, apiKeyHeaders)
+  def cancelOrdersByIdsWithKeyOrSignature(address: String, ids: Set[String]): R[HttpSuccessfulBatchCancel] =
+    cancelOrdersByIdsWithKeyOrSignature(address, ids, apiKeyHeaders)
 
-  def cancelOrdersByIdsWithKey(owner: Address, orderIds: Set[Order.Id], headers: Map[String, String]): R[HttpSuccessfulBatchCancel] = mk {
+  def cancelOrdersByIdsWithKeyOrSignature(owner: Address, orderIds: Set[Order.Id], headers: Map[String, String]): R[HttpSuccessfulBatchCancel] = mk {
     basicRequest
       .post(uri"$apiUri/matcher/orders/$owner/cancel")
       .headers(headers)
@@ -174,10 +174,10 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .contentType(MediaType.ApplicationJson)
   }
 
-  def cancelOrdersByIdsWithKey(owner: Address, orderIds: Set[Order.Id]): R[HttpSuccessfulBatchCancel] =
-    cancelOrdersByIdsWithKey(owner, orderIds, apiKeyHeaders)
+  def cancelOrdersByIdsWithKeyOrSignature(owner: Address, orderIds: Set[Order.Id]): R[HttpSuccessfulBatchCancel] =
+    cancelOrdersByIdsWithKeyOrSignature(owner, orderIds, apiKeyHeaders)
 
-  override def cancelOrdersByIdsWithKey(
+  override def cancelOrdersByIdsWithKeyOrSignature(
     owner: Address,
     orderIds: Set[Id],
     xUserPublicKey: Option[PublicKey] = None

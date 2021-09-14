@@ -139,12 +139,12 @@ class ExchangeTransactionMinimumFeeTestSuite extends IntegrationSuiteBase {
     )
 
     "sell order owners' account is scripted" in broadcastAndValidate(
-      mkExchange(alice, scriptedAccount, wavesUsdPair, 10.waves, 1.usd, matcher = alice),
+      mkExchange(alice, scriptedAccount, wavesUsdPair, 10.waves, 1.usd, matcher = alice, buyOrderVersion = 3.toByte, sellOrderVersion = 3.toByte),
       0.003.waves
     )
 
     "buy order owners' account is scripted" in broadcastAndValidate(
-      mkExchange(scriptedAccount, alice, wavesUsdPair, 10.waves, 1.usd, matcher = alice),
+      mkExchange(scriptedAccount, alice, wavesUsdPair, 10.waves, 1.usd, matcher = alice, buyOrderVersion = 3.toByte, sellOrderVersion = 3.toByte),
       0.003.waves
     )
 

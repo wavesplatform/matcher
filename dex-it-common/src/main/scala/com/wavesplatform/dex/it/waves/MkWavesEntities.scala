@@ -241,8 +241,8 @@ trait MkWavesEntities {
     chainId: Byte = GenesisConfig.chainId,
     buyOrderFeeAsset: Asset = Waves,
     sellOrderFeeAsset: Asset = Waves,
-    buyOrderVersion: Byte = 3,
-    sellOrderVersion: Byte = 3
+    buyOrderVersion: Byte = orderVersion,
+    sellOrderVersion: Byte = orderVersion
   ): JExchangeTransaction =
     mkDomainExchange(
       buyOrderOwner,
@@ -270,8 +270,8 @@ trait MkWavesEntities {
     matcher: KeyPair,
     buyOrderFeeAsset: Asset = Waves,
     sellOrderFeeAsset: Asset = Waves,
-    buyOrderVersion: Byte = 3,
-    sellOrderVersion: Byte = 3
+    buyOrderVersion: Byte = orderVersion,
+    sellOrderVersion: Byte = orderVersion
   ): ExchangeTransaction = {
 
     val buyOrder = mkOrder(

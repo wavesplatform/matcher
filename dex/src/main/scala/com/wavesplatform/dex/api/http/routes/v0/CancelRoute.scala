@@ -140,7 +140,7 @@ final class CancelRoute(
             userPublicKey match {
               case Some(upk) if upk.toAddress != address => invalidUserPublicKey
               case _ =>
-                entity(as[Set[ByteStr]]) { xs =>
+                entity(as[List[ByteStr]]) { xs =>
                   complete {
                     askAddressActor(addressActor, address, AddressActor.Command.CancelOrders(xs, AddressActor.Command.Source.Request))(
                       handleBatchCancelResponse

@@ -29,18 +29,17 @@ class CancelOrdersByAddressAndIdsSpec extends MatcherSuiteBase with ApiKeyHeader
   "POST /matcher/orders/{address}/cancel" - {
     "should cancel orders by ids" in {
 
-      val orders = Set(
-        mkOrder(alice, wavesUsdPair, BUY, 10.waves, 1.usd),
-        mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd),
-        mkOrder(alice, wavesUsdPair, BUY, 10.waves, 3.usd)
-      )
+      val ts = System.currentTimeMillis()
+      val orders = for {
+        i <- 1 to 10
+      } yield mkOrder(alice, wavesUsdPair, BUY, 10.waves, 1.usd, ts = ts + i)
 
       val ids = orders.map { o =>
         placeAndAwaitAtDex(o)
         o.idStr()
       }
 
-      val r = validate200Json(dex1.rawApi.cancelOrdersByIdsWithKey(alice.toAddress.stringRepr, ids))
+      val r = validate200Json(dex1.rawApi.cancelOrdersByIdsWithKey(alice.toAddress.stringRepr, ids.toSet))
 
       r.success should be(true)
       r.status should be("BatchCancelCompleted")

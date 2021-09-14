@@ -9,31 +9,31 @@ import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.error
 
+import scala.collection.immutable.ListMap
 import scala.concurrent.duration.FiniteDuration
 
 class BatchOrderCancelActor private (
-  orderIds: Set[Order.Id],
+  orderIds: ListMap[Order.Id, OrderCancelResult],
   source: Command.Source,
   processorActor: ActorRef,
   clientActor: ActorRef,
-  timeout: FiniteDuration,
-  initResponse: Map[Order.Id, OrderCancelResult]
+  timeout: FiniteDuration
 ) extends Actor
     with ScorexLogging {
 
   import BatchOrderCancelActor._
   import context.dispatcher
 
-  orderIds.foreach(processorActor ! CancelOrder(_, source))
+  orderIds.filter(_._2.isRight).foreach(o => processorActor ! CancelOrder(o._1, source))
 
-  override def receive: Receive = state(orderIds, initResponse, context.system.scheduler.scheduleOnce(timeout, self, TimedOut))
+  override def receive: Receive = state(orderIds.keySet, orderIds, context.system.scheduler.scheduleOnce(timeout, self, TimedOut))
 
   private def state(restOrderIds: Set[Order.Id], response: Map[Order.Id, OrderCancelResult], timer: Cancellable): Receive = {
     case CancelResponse(id, x) =>
       val updatedRestOrderIds = restOrderIds - id
       val updatedResponse = response.updated(id, x)
 
-      if (updatedRestOrderIds.isEmpty) stop(Event.BatchCancelCompleted(updatedResponse), timer)
+      if (updatedRestOrderIds.isEmpty) stop(Event.BatchCancelCompleted(response), timer)
       else context.become(state(restOrderIds - id, updatedResponse, timer))
 
     // case Terminated(ref) => // Can't terminate before processorActor, because processorActor is a parent
@@ -54,15 +54,14 @@ class BatchOrderCancelActor private (
 object BatchOrderCancelActor {
 
   def props(
-    orderIds: Set[Order.Id],
+    response: ListMap[Order.Id, OrderCancelResult],
     source: Command.Source,
     processorActor: ActorRef,
     clientActor: ActorRef,
-    timeout: FiniteDuration,
-    initResponse: Map[Order.Id, OrderCancelResult] = Map.empty
+    timeout: FiniteDuration
   ): Props = {
-    require(orderIds.nonEmpty, "orderIds is empty")
-    Props(new BatchOrderCancelActor(orderIds, source, processorActor, clientActor, timeout, initResponse))
+    require(response.nonEmpty, "orderIds is empty")
+    Props(new BatchOrderCancelActor(response, source, processorActor, clientActor, timeout))
   }
 
   object CancelResponse {

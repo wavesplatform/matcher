@@ -171,7 +171,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       basicRequest
         .post(uri"$apiUri/matcher/orders/$owner/cancel")
         .headers(headers)
-        .body(Json.stringify(Json.toJson(orderIds)))
+        .body(orderIds)
         .contentType(MediaType.ApplicationJson)
     }
 
@@ -186,7 +186,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
     basicRequest
       .post(uri"$apiUri/matcher/orders/$owner/cancel")
       .headers(apiKeyWithUserPublicKeyHeaders(xUserPublicKey))
-      .body(Json.stringify(Json.toJson(orderIds)))
+      .body(orderIds)
       .contentType(MediaType.ApplicationJson)
   }
 

@@ -56,7 +56,9 @@ class CancelOrdersByAddressAndIdsSpec extends MatcherSuiteBase with ApiKeyHeader
 
       r.message.foreach { m =>
         m.foreach {
-          case util.Right(HttpSuccessfulSingleCancel(_, success, status)) => success should be(true); status should be("OrderCanceled")
+          case util.Right(HttpSuccessfulSingleCancel(_, success, status)) =>
+            success should be(true)
+            status should be("OrderCanceled")
           case _ => fail(s"Unexpected response $r")
         }
       }
@@ -82,7 +84,9 @@ class CancelOrdersByAddressAndIdsSpec extends MatcherSuiteBase with ApiKeyHeader
 
       r.message.foreach { m =>
         m.foreach {
-          case util.Right(HttpSuccessfulSingleCancel(_, success, status)) => success should be(true); status should be("OrderCanceled")
+          case util.Right(HttpSuccessfulSingleCancel(_, success, status)) =>
+            success should be(true)
+            status should be("OrderCanceled")
           case _ => fail(s"Unexpected response $r")
         }
       }
@@ -122,7 +126,9 @@ class CancelOrdersByAddressAndIdsSpec extends MatcherSuiteBase with ApiKeyHeader
 
       r.message.head should have size 1
       r.message.head.foreach {
-        case util.Left(HttpError(e, m, _, _, _, _)) => e shouldBe OrderNotFound.code; m shouldBe s"The order ${o.idStr()} not found"
+        case util.Left(HttpError(e, m, _, _, _, _)) =>
+          e shouldBe OrderNotFound.code
+          m shouldBe s"The order ${o.idStr()} not found"
         case _ => fail(s"Unexpected response $r")
       }
     }

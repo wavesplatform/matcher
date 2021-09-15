@@ -43,7 +43,9 @@ class CancelAllOrdersWithSigSpec extends MatcherSuiteBase with RawHttpChecks {
 
       r.message.foreach { m =>
         m.foreach {
-          case util.Right(HttpSuccessfulSingleCancel(_, success, status)) => success should be(true); status should be("OrderCanceled")
+          case util.Right(HttpSuccessfulSingleCancel(_, success, status)) =>
+            success should be(true)
+            status should be("OrderCanceled")
           case _ => fail(s"Unexpected response $r")
         }
       }

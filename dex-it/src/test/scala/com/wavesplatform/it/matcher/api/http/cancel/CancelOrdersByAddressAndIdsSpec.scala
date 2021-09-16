@@ -30,22 +30,13 @@ class CancelOrdersByAddressAndIdsSpec extends MatcherSuiteBase with ApiKeyHeader
 
   "POST /matcher/orders/{address}/cancel" - {
     "should cancel orders by ids" in {
-
-      val ts = System.currentTimeMillis()
-      val orders = for {
-        i <- 1 to 10
-      } yield mkOrder(alice, wavesUsdPair, BUY, 10.waves, 1.usd, ts = ts + i)
-
-      val ids = Random.shuffle(orders.map { o =>
-        placeAndAwaitAtDex(o)
-        o.idStr()
-      }.toList)
+      val ids = Random.shuffle(placeAndGetIds(10))
 
       val r = validate200Json(dex1.rawApi.cancelOrdersByIdsWithKey(alice.toAddress.stringRepr, ids))
 
       r.success should be(true)
       r.status should be("BatchCancelCompleted")
-      r.message.head should have size orders.size
+      r.message.head should have size ids.size
 
       r.message.head.zipWithIndex.foreach { case (m, i) =>
         m match {
@@ -53,11 +44,10 @@ class CancelOrdersByAddressAndIdsSpec extends MatcherSuiteBase with ApiKeyHeader
             id.toString should be(ids(i))
             success should be(true)
             status should be("OrderCanceled")
+            dex1.api.waitForOrderStatus(wavesUsdPair, id, Status.Cancelled)
           case _ => fail(s"Unexpected response $r")
         }
       }
-
-      orders.foreach(dex1.api.waitForOrderStatus(_, Status.Cancelled))
     }
 
     "should return OK if there is nothing to cancel" in {

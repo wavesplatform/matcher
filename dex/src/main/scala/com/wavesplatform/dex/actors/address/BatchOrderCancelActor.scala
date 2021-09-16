@@ -33,7 +33,7 @@ class BatchOrderCancelActor private (
       val updatedRestOrderIds = restOrderIds - id
       val updatedResponse = response.updated(id, x)
 
-      if (updatedRestOrderIds.isEmpty) stop(Event.BatchCancelCompleted(response), timer)
+      if (updatedRestOrderIds.isEmpty) stop(Event.BatchCancelCompleted(updatedResponse), timer)
       else context.become(state(restOrderIds - id, updatedResponse, timer))
 
     // case Terminated(ref) => // Can't terminate before processorActor, because processorActor is a parent

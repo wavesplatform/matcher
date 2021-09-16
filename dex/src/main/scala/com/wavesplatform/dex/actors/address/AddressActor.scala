@@ -390,10 +390,8 @@ class AddressActor(
       val toCancelIds = command.orderIds.filter(allActiveOrderIds.contains)
 
       val response = command.orderIds.map { id =>
-        if (toCancelIds.contains(id))
-          id -> AddressActor.Event.OrderCanceled(id).asRight
-        else
-          id -> error.OrderNotFound(id).asLeft[AddressActor.Event.OrderCanceled]
+        id -> (if (toCancelIds.contains(id)) AddressActor.Event.OrderCanceled(id).asRight
+               else error.OrderNotFound(id).asLeft[AddressActor.Event.OrderCanceled])
       }.to(ListMap)
 
       if (toCancelIds.isEmpty)

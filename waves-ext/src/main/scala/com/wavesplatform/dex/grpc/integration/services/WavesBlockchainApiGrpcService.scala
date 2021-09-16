@@ -9,12 +9,13 @@ import com.wavesplatform.api.grpc._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.collections.Implicits.ListOps
 import com.wavesplatform.dex.grpc.integration._
+import com.wavesplatform.dex.grpc.integration.error.canRetry
 import com.wavesplatform.dex.grpc.integration.protobuf.EitherVEExt
 import com.wavesplatform.dex.grpc.integration.protobuf.PbToWavesConversions._
 import com.wavesplatform.dex.grpc.integration.protobuf.WavesToPbConversions._
 import com.wavesplatform.dex.grpc.integration.smart.MatcherScriptRunner
 import com.wavesplatform.dex.grpc.integration.smart.MatcherScriptRunner.deniedBlockchain
-import com.wavesplatform.events.UtxEvent.{TxAdded, TxRemoved}
+import com.wavesplatform.dex.grpc.integration.utx.UtxState
 import com.wavesplatform.extensions.{Context => ExtensionContext}
 import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures}
 import com.wavesplatform.lang.v1.compiler.Terms
@@ -22,28 +23,27 @@ import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.{ExecutionError, ValidationError}
 import com.wavesplatform.protobuf.Amount
-import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
+import com.wavesplatform.state.reader.CompositeBlockchain
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.exchange
 import com.wavesplatform.transaction.smart.script.ScriptRunnerFixed
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.{Asset, TxValidationError}
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.stub.{ServerCallStreamObserver, StreamObserver}
 import io.grpc.{Metadata, Status, StatusRuntimeException}
 import monix.eval.Task
 import monix.execution.Scheduler
+import monix.execution.atomic.Atomic
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 import shapeless.Coproduct
 
 import java.util.concurrent.ConcurrentHashMap
-import scala.annotation.tailrec
-import scala.collection.concurrent.TrieMap
 import scala.concurrent.Future
-import scala.util.{Failure, Success, Try}
 import scala.util.control.NonFatal
+import scala.util.{Failure, Success, Try}
 
 class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchainStateAccounts: Set[ByteStr])(implicit sc: Scheduler)
     extends WavesBlockchainApiGrpc.WavesBlockchainApi
@@ -51,7 +51,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
 
   private val descKey = Metadata.Key.of("desc", Metadata.ASCII_STRING_MARSHALLER)
 
-  private val utxState = new TrieMap[ByteStr, UtxTransaction]()
+  private val utxState = Atomic(UtxState())
 
   private val empty = Empty()
 
@@ -71,9 +71,6 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
     utxChangesSubscribers.clear()
   }
 
-  // TODO DEX-994
-  private def getSimpleName(x: Any): String = x.getClass.getName.replaceAll(".*?(\\w+)\\$?$", "$1")
-
   private val utxEvents = Observable(
     initialEvents.map(_.asLeft[com.wavesplatform.events.UtxEvent]),
     context.utxEvents.map(_.asRight[(StreamObserver[UtxEvent], UtxEvent)])
@@ -85,50 +82,9 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
       case Left((observer, evt)) => observer.onNext(evt) // See getUtxEvents
 
       case Right(evt) =>
-        evt match {
-          case TxAdded(tx, diff) =>
-            val utxTransaction = UtxTransaction(
-              id = tx.id().toPB,
-              transaction = tx.toPB.some,
-              diff = diff.toPB.some
-            )
-
-            utxState.put(tx.id(), utxTransaction)
-
-            val event = UtxEvent(
-              UtxEvent.Type.Update(
-                UtxEvent.Update(
-                  added = List(UtxEvent.Update.Added(utxTransaction.some))
-                )
-              )
-            )
-
-            withUtxChangesSubscribers("send next", _.onNext(event))
-
-          case TxRemoved(tx, reason) =>
-            utxState.remove(tx.id()) match {
-              case None => log.debug(s"Can't find removed ${tx.id()} with reason: $reason")
-              case Some(_) if reason.exists(validationError => canRetry(validationError)) =>
-                log.debug(s"${tx.id} failed by a false-positive reason: $reason")
-              case utxTransaction =>
-                val gReason = reason.map { x =>
-                  UtxEvent.Update.Removed.Reason(
-                    name = getSimpleName(x),
-                    message = x.toString
-                  )
-                }
-
-                val event = UtxEvent(
-                  UtxEvent.Type.Update(
-                    UtxEvent.Update(
-                      removed = List(UtxEvent.Update.Removed(utxTransaction, gReason))
-                    )
-                  )
-                )
-
-                withUtxChangesSubscribers("send next", _.onNext(event))
-            }
-        }
+        utxState
+          .transformAndExtract(_.handleEvent(evt))
+          .foreach(event => withUtxChangesSubscribers("send next", _.onNext(event)))
     }
 
   override def getStatuses(request: TransactionsByIdRequest): Future[TransactionsStatusesResponse] = Future {
@@ -184,7 +140,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
         case e: Throwable =>
           log.error("Broadcast failed", e)
           val message = Option(e.getMessage).getOrElse(e.getClass.getName)
-          CheckedBroadcastResponse(CheckedBroadcastResponse.Result.Failed(CheckedBroadcastResponse.Failure(message, canRetry = false)))
+          CheckedBroadcastResponse(CheckedBroadcastResponse.Result.Failed(CheckedBroadcastResponse.Failure(message)))
       }
 
   private def handleTxInUtx(tx: exchange.ExchangeTransaction): Future[CheckedBroadcastResponse.Result] =
@@ -202,31 +158,6 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
       case Success(r) => log.info(s"Broadcast ${tx.id()}: ${r.resultE}")
       case Failure(e) => log.warn(s"Can't broadcast ${tx.id()}", e)
     }
-
-  @tailrec
-  private def canRetry(x: ValidationError): Boolean = x match {
-    case x: GenericError
-        if x.err == "Transaction pool bytes size limit is reached"
-          || x.err == "Transaction pool size limit is reached" => true
-
-    // Could happen when:
-    // 1. One transaction is sent multiple times in parallel
-    // 2. There are two exchanges tx1 and tx2 those fill the order:
-    // 2.1. tx1 is mined and still present in UTX pool (race condition on NODE), thus the order considered as partially filled by tx1 * 2
-    // 2.2. tx2 fails for some reason
-
-    //error message was taken from:
-    //https://github.com/wavesplatform/Waves/blob/master/node/src/main/scala/com/wavesplatform/state/diffs/ExchangeTransactionDiff.scala#L169-L171
-    case x: TxValidationError.OrderValidationError if x.err.startsWith("Too much") => true
-
-    //error message was taken from:
-    //https://github.com/wavesplatform/Waves/blob/master/node/src/main/scala/com/wavesplatform/state/diffs/BalanceDiffValidation.scala#L49
-    case TxValidationError.AccountBalanceError(errs) if errs.values.exists(_.startsWith("negative asset balance")) => true
-
-    case TransactionValidationError(cause, _) => canRetry(cause)
-
-    case _ => false
-  }
 
   override def isFeatureActivated(request: IsFeatureActivatedRequest): Future[IsFeatureActivatedResponse] = Future {
     IsFeatureActivatedResponse(
@@ -267,10 +198,11 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
           .getOrElse(throwInvalidArgument("Expected a transaction"))
           .toVanilla
           .getOrElse(throwInvalidArgument("Can't parse the transaction"))
+
         parseScriptResult(
           ScriptRunnerFixed(
             in = Coproduct(tx),
-            blockchain = context.blockchain,
+            blockchain = CompositeBlockchain(context.blockchain, utxState.get().getCombinedDiff),
             script = info.script,
             isAssetScript = true,
             scriptContainerAddress = Coproduct[Environment.Tthis](Environment.AssetId(asset.byteRepr))
@@ -298,9 +230,10 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
       case Some(scriptInfo) =>
         val order = request.order.map(_.toVanilla).getOrElse(throwInvalidArgument("Expected an order"))
         val isSynchronousCallsActivated = context.blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
-        if (allowedBlockchainStateAccounts.contains(order.senderPublicKey))
-          parseScriptResult(MatcherScriptRunner(scriptInfo.script, order, context.blockchain, isSynchronousCallsActivated))
-        else
+        if (allowedBlockchainStateAccounts.contains(order.senderPublicKey)) {
+          val blockchain = CompositeBlockchain(context.blockchain, utxState.get().getCombinedDiff)
+          parseScriptResult(MatcherScriptRunner(scriptInfo.script, order, blockchain, isSynchronousCallsActivated))
+        } else
           parseScriptResult(MatcherScriptRunner(scriptInfo.script, order, deniedBlockchain, isSynchronousCallsActivated))
     }
 
@@ -392,7 +325,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
             initialEvents.onNext(responseObserver -> UtxEvent(
               UtxEvent.Type.Switch(
                 UtxEvent.Switch(
-                  utxState.values.toSeq
+                  utxState.get().getUtxTransactions
                 )
               )
             ))

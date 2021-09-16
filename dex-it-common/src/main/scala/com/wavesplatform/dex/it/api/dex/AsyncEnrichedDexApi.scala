@@ -153,7 +153,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
 
   def cancelOrdersByIdsWithKey(
     address: String,
-    ids: Set[String],
+    ids: Seq[String],
     headers: Map[String, String]
   ): R[HttpSuccessfulBatchCancel] = mk {
     basicRequest
@@ -163,10 +163,10 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .contentType(MediaType.ApplicationJson)
   }
 
-  def cancelOrdersByIdsWithKey(address: String, ids: Set[String]): R[HttpSuccessfulBatchCancel] =
+  def cancelOrdersByIdsWithKey(address: String, ids: Seq[String]): R[HttpSuccessfulBatchCancel] =
     cancelOrdersByIdsWithKey(address, ids, apiKeyHeaders)
 
-  def cancelOrdersByIdsWithKey(owner: Address, orderIds: Set[Order.Id], headers: Map[String, String]): R[HttpSuccessfulBatchCancel] = mk {
+  def cancelOrdersByIdsWithKey(owner: Address, orderIds: Seq[Order.Id], headers: Map[String, String]): R[HttpSuccessfulBatchCancel] = mk {
     basicRequest
       .post(uri"$apiUri/matcher/orders/$owner/cancel")
       .headers(headers)
@@ -174,12 +174,12 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .contentType(MediaType.ApplicationJson)
   }
 
-  def cancelOrdersByIdsWithKey(owner: Address, orderIds: Set[Order.Id]): R[HttpSuccessfulBatchCancel] =
+  def cancelOrdersByIdsWithKey(owner: Address, orderIds: Seq[Order.Id]): R[HttpSuccessfulBatchCancel] =
     cancelOrdersByIdsWithKey(owner, orderIds, apiKeyHeaders)
 
   override def cancelOrdersByIdsWithKey(
     owner: Address,
-    orderIds: Set[Id],
+    orderIds: Seq[Id],
     xUserPublicKey: Option[PublicKey] = None
   ): R[HttpSuccessfulBatchCancel] = mk {
     basicRequest

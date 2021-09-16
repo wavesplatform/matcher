@@ -9,6 +9,8 @@ import com.wavesplatform.dex.error.{InvalidAddress, InvalidJson}
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.matcher.api.http.ApiKeyHeaderChecks
 
+import scala.util.Random
+
 class CancelOrdersByAddressAndIdsSpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
 
   override protected def dexInitialSuiteConfig: Config =
@@ -34,20 +36,23 @@ class CancelOrdersByAddressAndIdsSpec extends MatcherSuiteBase with ApiKeyHeader
         i <- 1 to 10
       } yield mkOrder(alice, wavesUsdPair, BUY, 10.waves, 1.usd, ts = ts + i)
 
-      val ids = orders.map { o =>
+      val ids = Random.shuffle(orders.map { o =>
         placeAndAwaitAtDex(o)
         o.idStr()
-      }
+      }.toList)
 
-      val r = validate200Json(dex1.rawApi.cancelOrdersByIdsWithKey(alice.toAddress.stringRepr, ids.toSet))
+      val r = validate200Json(dex1.rawApi.cancelOrdersByIdsWithKey(alice.toAddress.stringRepr, ids))
 
       r.success should be(true)
       r.status should be("BatchCancelCompleted")
       r.message.head should have size orders.size
 
-      r.message.foreach { m =>
-        m.foreach {
-          case util.Right(HttpSuccessfulSingleCancel(_, success, status)) => success should be(true); status should be("OrderCanceled")
+      r.message.head.zipWithIndex.foreach { case (m, i) =>
+        m match {
+          case util.Right(HttpSuccessfulSingleCancel(id, success, status)) =>
+            id.toString should be(ids(i))
+            success should be(true)
+            status should be("OrderCanceled")
           case _ => fail(s"Unexpected response $r")
         }
       }
@@ -56,12 +61,12 @@ class CancelOrdersByAddressAndIdsSpec extends MatcherSuiteBase with ApiKeyHeader
     }
 
     "should return OK if there is nothing to cancel" in {
-      validate200Json(dex1.rawApi.cancelOrdersByIdsWithKey(alice.stringRepr, Set.empty[String]))
+      validate200Json(dex1.rawApi.cancelOrdersByIdsWithKey(alice.stringRepr, Seq.empty[String]))
     }
 
     "should return an error when one of ids is not a correct base58 string" in {
       validateMatcherError(
-        dex1.rawApi.cancelOrdersByIdsWithKey(alice.stringRepr, placeAndGetIds(3) + "null"),
+        dex1.rawApi.cancelOrdersByIdsWithKey(alice.stringRepr, placeAndGetIds(3) :+ "null"),
         StatusCode.BadRequest,
         InvalidJson.code,
         "The provided JSON contains invalid fields: (3). Check the documentation"

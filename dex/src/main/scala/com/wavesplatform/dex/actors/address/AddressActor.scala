@@ -388,7 +388,6 @@ class AddressActor(
     case command: Command.CancelOrders =>
       val allActiveOrderIds = getActiveLimitOrders(None).map(_.order.id()).toSet
       val toCancelIds = command.orderIds.filter(allActiveOrderIds.contains)
-      val unknownOrderIds = command.orderIds.filterNot(allActiveOrderIds.contains)
 
       val response = command.orderIds.map { id =>
         if (toCancelIds.contains(id))

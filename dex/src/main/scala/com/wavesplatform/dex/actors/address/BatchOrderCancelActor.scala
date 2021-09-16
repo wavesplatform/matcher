@@ -13,7 +13,7 @@ import scala.collection.immutable.ListMap
 import scala.concurrent.duration.FiniteDuration
 
 class BatchOrderCancelActor private (
-  orderIds: ListMap[Order.Id, OrderCancelResult],
+  initialResponse: ListMap[Order.Id, OrderCancelResult],
   source: Command.Source,
   processorActor: ActorRef,
   clientActor: ActorRef,
@@ -24,9 +24,9 @@ class BatchOrderCancelActor private (
   import BatchOrderCancelActor._
   import context.dispatcher
 
-  orderIds.filter(_._2.isRight).foreach(o => processorActor ! CancelOrder(o._1, source))
+  initialResponse.filter(_._2.isRight).foreach(o => processorActor ! CancelOrder(o._1, source))
 
-  override def receive: Receive = state(orderIds.keySet, orderIds, context.system.scheduler.scheduleOnce(timeout, self, TimedOut))
+  override def receive: Receive = state(initialResponse.keySet, initialResponse, context.system.scheduler.scheduleOnce(timeout, self, TimedOut))
 
   private def state(restOrderIds: Set[Order.Id], response: Map[Order.Id, OrderCancelResult], timer: Cancellable): Receive = {
     case CancelResponse(id, x) =>
@@ -54,14 +54,14 @@ class BatchOrderCancelActor private (
 object BatchOrderCancelActor {
 
   def props(
-    response: ListMap[Order.Id, OrderCancelResult],
+    initialResponse: ListMap[Order.Id, OrderCancelResult],
     source: Command.Source,
     processorActor: ActorRef,
     clientActor: ActorRef,
     timeout: FiniteDuration
   ): Props = {
-    require(response.nonEmpty, "orderIds is empty")
-    Props(new BatchOrderCancelActor(response, source, processorActor, clientActor, timeout))
+    require(initialResponse.nonEmpty, "orderIds is empty")
+    Props(new BatchOrderCancelActor(initialResponse, source, processorActor, clientActor, timeout))
   }
 
   object CancelResponse {

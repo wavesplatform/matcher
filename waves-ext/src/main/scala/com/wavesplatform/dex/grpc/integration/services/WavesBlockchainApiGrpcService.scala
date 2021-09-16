@@ -4,7 +4,7 @@ import cats.implicits.catsSyntaxOptionId
 import cats.syntax.either._
 import cats.syntax.option._
 import com.google.protobuf.empty.Empty
-import com.wavesplatform.account.Address
+import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.grpc._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.collections.Implicits.ListOps
@@ -51,7 +51,9 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
 
   private val descKey = Metadata.Key.of("desc", Metadata.ASCII_STRING_MARSHALLER)
 
-  private val utxState = Atomic(UtxState())
+  private val utxState = Atomic(UtxState(accounts = allowedBlockchainStateAccounts.map { publicKey =>
+    PublicKey(publicKey).toAddress(context.settings.blockchainSettings.addressSchemeCharacter.toByte)
+  }))
 
   private val empty = Empty()
 
@@ -202,7 +204,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
         parseScriptResult(
           ScriptRunnerFixed(
             in = Coproduct(tx),
-            blockchain = CompositeBlockchain(context.blockchain, utxState.get().getCombinedDiff),
+            blockchain = CompositeBlockchain(context.blockchain, utxState.get().getAccountsDiff),
             script = info.script,
             isAssetScript = true,
             scriptContainerAddress = Coproduct[Environment.Tthis](Environment.AssetId(asset.byteRepr))
@@ -231,7 +233,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
         val order = request.order.map(_.toVanilla).getOrElse(throwInvalidArgument("Expected an order"))
         val isSynchronousCallsActivated = context.blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
         if (allowedBlockchainStateAccounts.contains(order.senderPublicKey)) {
-          val blockchain = CompositeBlockchain(context.blockchain, utxState.get().getCombinedDiff)
+          val blockchain = CompositeBlockchain(context.blockchain, utxState.get().getAccountsDiff)
           parseScriptResult(MatcherScriptRunner(scriptInfo.script, order, blockchain, isSynchronousCallsActivated))
         } else
           parseScriptResult(MatcherScriptRunner(scriptInfo.script, order, deniedBlockchain, isSynchronousCallsActivated))

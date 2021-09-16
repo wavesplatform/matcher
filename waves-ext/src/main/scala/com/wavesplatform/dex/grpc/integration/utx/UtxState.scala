@@ -2,6 +2,7 @@ package com.wavesplatform.dex.grpc.integration.utx
 
 import cats.implicits.{catsSyntaxOptionId, catsSyntaxSemigroup}
 import cats.syntax.option.none
+import com.wavesplatform.account.Address
 import com.wavesplatform.api.grpc._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.grpc.integration.error._
@@ -14,8 +15,19 @@ import com.wavesplatform.state.Diff
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.ScorexLogging
 
-case class UtxState(transactions: Map[ByteStr, (UtxTransaction, Diff)] = Map(), combinedDiff: Diff = Diff.empty) extends ScorexLogging {
-  def getCombinedDiff: Diff = combinedDiff
+/**
+ * *
+ * Handles utx events, stores current utx transactions + utx diff relevant for specified accounts
+ * @param accounts set of addresses for which combined diff will be kept
+ * @param accountsDiff combined diff of currently unconfirmed transactions relevant for specified accounts
+ * @param transactions list of all transactions which still not confirmed yet
+ */
+case class UtxState(
+  accounts: Set[Address] = Set.empty,
+  accountsDiff: Diff = Diff.empty,
+  transactions: Map[ByteStr, (UtxTransaction, Diff)] = Map()
+) extends ScorexLogging {
+  def getAccountsDiff: Diff = accountsDiff
 
   def getUtxTransactions: List[UtxTransaction] = transactions.values.map(_._1).toList
 
@@ -30,6 +42,11 @@ case class UtxState(transactions: Map[ByteStr, (UtxTransaction, Diff)] = Map(), 
 
   private def getSimpleName(x: Any): String = x.getClass.getName.replaceAll(".*?(\\w+)\\$?$", "$1")
 
+  private def relevantDiff(diff: Diff): Boolean =
+    diff.transactions.values.exists { txInfo =>
+      txInfo.affected.intersect(accounts).nonEmpty
+    }
+
   private def add(tx: Transaction, diff: Diff): (Option[UtxEvent], UtxState) = {
     val utx = UtxTransaction(
       id = tx.id().toPB,
@@ -37,9 +54,17 @@ case class UtxState(transactions: Map[ByteStr, (UtxTransaction, Diff)] = Map(), 
       diff = diff.toPB.some
     )
 
+    val nextTransactions = transactions + (tx.id() -> ((utx, diff)))
+
+    val nextAccountDiff =
+      if (relevantDiff(diff))
+        accountsDiff |+| diff
+      else
+        accountsDiff
+
     val state = copy(
-      transactions = transactions + (tx.id() -> ((utx, diff))),
-      combinedDiff = combinedDiff |+| diff
+      transactions = nextTransactions,
+      accountsDiff = nextAccountDiff
     )
 
     val event = UtxEvent(
@@ -59,13 +84,23 @@ case class UtxState(transactions: Map[ByteStr, (UtxTransaction, Diff)] = Map(), 
         log.debug(s"Can't find removed ${tx.id()} with reason: $reason")
         (none, this)
 
-      case Some((utx, _)) =>
-        val txs = transactions - tx.id()
-        val diff = txs.foldLeft(Diff.empty) { case (acc, (_, (_, d))) => acc |+| d }
+      case Some((utx, diff)) =>
+        val nextTransactions = transactions - tx.id()
+
+        val nextAccountsDiff =
+          if (relevantDiff(diff))
+            nextTransactions.foldLeft(Diff.empty) { case (acc, (_, (_, d))) =>
+              if (relevantDiff(d))
+                acc |+| d
+              else
+                acc
+            }
+          else
+            accountsDiff
 
         val state = copy(
-          transactions = txs,
-          combinedDiff = diff
+          transactions = nextTransactions,
+          accountsDiff = nextAccountsDiff
         )
 
         val event = UtxEvent(UtxEvent.Type.Update(UtxEvent.Update(

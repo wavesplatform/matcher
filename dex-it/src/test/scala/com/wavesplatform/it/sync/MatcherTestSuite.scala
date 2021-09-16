@@ -382,6 +382,24 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         dex1.tryApi.getReservedBalanceWithApiKey(alice, Some(alice.publicKey)) shouldBe Symbol("right")
       }
 
+      "/matcher/orders/{address}/cancel" in {
+
+        val now = System.currentTimeMillis
+
+        val o1 = mkOrderDP(bob, wavesUsdPair, SELL, 1.waves, 3000.0, ts = now)
+        val o2 = mkOrderDP(bob, wavesUsdPair, SELL, 1.waves, 3000.0, ts = now + 100)
+
+        val orderIds = Seq(o1.id(), o2.id())
+
+        Seq(o1, o2).foreach(dex1.api.place)
+
+        dex1.tryApi.cancelOrdersByIdsWithKey(bob, orderIds, Some(alice.publicKey)) should failWith(
+          UserPublicKeyIsNotValid.code,
+          "Provided public key is not correct, reason: invalid public key"
+        )
+        dex1.tryApi.cancelOrdersByIdsWithKey(bob, orderIds, Some(bob.publicKey)) shouldBe Symbol("right")
+      }
+
       "/matcher/orders/{address}" in {
         dex1.tryApi.orderHistoryByAddressWithKey(
           owner = bob,

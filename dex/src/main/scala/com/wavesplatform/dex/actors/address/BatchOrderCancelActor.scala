@@ -24,7 +24,11 @@ class BatchOrderCancelActor private (
   import BatchOrderCancelActor._
   import context.dispatcher
 
-  initialResponse.filter(_._2.isRight).foreach(o => processorActor ! CancelOrder(o._1, source))
+  initialResponse.filter {
+    case (_, result) => result.isRight
+  }.foreach {
+    case (id, _) => processorActor ! CancelOrder(id, source)
+  }
 
   override def receive: Receive = state(initialResponse.keySet, initialResponse, context.system.scheduler.scheduleOnce(timeout, self, TimedOut))
 

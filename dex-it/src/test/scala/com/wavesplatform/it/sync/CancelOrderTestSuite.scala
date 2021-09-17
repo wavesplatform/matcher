@@ -76,7 +76,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
         o.id.value()
       }
 
-      dex1.api.cancelOrdersByIdsWithKey(acc, ids.toSet)
+      dex1.api.cancelOrdersByIdsWithKeyOrSignature(acc, ids.toSet)
 
       ids.map(dex1.api.waitForOrderStatus(wavesUsdPair, _, Status.Cancelled))
 
@@ -102,7 +102,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
 
       val allIds = ids :+ o.id()
 
-      dex1.api.cancelOrdersByIdsWithKey(acc, allIds.toSet)
+      dex1.api.cancelOrdersByIdsWithKeyOrSignature(acc, allIds.toSet)
 
       dex1.api.waitForOrderStatus(o, Status.Accepted)
       ids.map(dex1.api.waitForOrderStatus(wavesUsdPair, _, Status.Cancelled))
@@ -235,7 +235,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       orders.foreach(dex1.api.place)
       orders.foreach(dex1.api.waitForOrderStatus(_, Status.Accepted))
 
-      dex1.api.cancelOrdersByIdsWithKey(bob, orders.map(_.id()).toSet)
+      dex1.api.cancelOrdersByIdsWithKeyOrSignature(bob, orders.map(_.id()).toSet)
 
       orders.foreach(dex1.api.waitForOrderStatus(_, Status.Cancelled))
     }
@@ -246,7 +246,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       orders.foreach(dex1.api.place)
       orders.foreach(dex1.api.waitForOrderStatus(_, Status.Accepted))
 
-      dex1.api.cancelOrdersByIdsWithKey(alice, orders.map(_.id()).toSet)
+      dex1.api.cancelOrdersByIdsWithKeyOrSignature(alice, orders.map(_.id()).toSet)
       // here is validation
     }
   }

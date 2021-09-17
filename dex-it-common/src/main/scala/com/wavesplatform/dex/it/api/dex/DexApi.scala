@@ -59,11 +59,11 @@ trait DexApi[F[_]] {
     timestamp: Long = System.currentTimeMillis
   ): F[HttpSuccessfulBatchCancel]
 
-  def cancelOrdersByIdsWithKey(address: String, ids: Set[String]): F[HttpSuccessfulBatchCancel]
+  def cancelOrdersByIdsWithKeyOrSignature(address: String, ids: Set[String]): F[HttpSuccessfulBatchCancel]
 
-  def cancelOrdersByIdsWithKey(address: String, ids: Set[String], headers: Map[String, String]): F[HttpSuccessfulBatchCancel]
+  def cancelOrdersByIdsWithKeyOrSignature(address: String, ids: Set[String], headers: Map[String, String]): F[HttpSuccessfulBatchCancel]
 
-  def cancelOrdersByIdsWithKey(
+  def cancelOrdersByIdsWithKeyOrSignature(
     owner: Address,
     orderIds: Set[Order.Id],
     xUserPublicKey: Option[PublicKey] = None

@@ -16,7 +16,7 @@ import com.wavesplatform.dex.api.routes.PathMatchers.{AddressPM, AssetPairPM, Or
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
 import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.db.OrderDb
-import com.wavesplatform.dex.domain.account.Address
+import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.utils.ScorexLogging
@@ -51,7 +51,7 @@ final class CancelRoute(
       pathPrefix("orderbook") {
         matcherStatusBarrier(cancelOneOrAllInPairOrdersWithSig ~ cancelAllOrdersWithSig)
       } ~ pathPrefix("orders") {
-        matcherStatusBarrier(cancelOrdersByIdsWithKey ~ cancelOneOrderWithKey)
+        matcherStatusBarrier(cancelOrdersByIdsWithKeyOrSignature ~ cancelOneOrderWithKey)
       }
     }
 
@@ -132,10 +132,10 @@ final class CancelRoute(
       )
     )
   )
-  def cancelOrdersByIdsWithKey: Route =
+  def cancelOrdersByIdsWithKeyOrSignature: Route =
     (path(AddressPM / "cancel") & post) { addressOrError =>
       (withMetricsAndTraces("cancelAllByApiKeyAndIds") & protect) {
-        (withAuth & withUserPublicKeyOpt) { userPublicKey =>
+        (signedGetByAddress(addressOrError).tmap(_ => Option.empty[PublicKey]) | (withAuth & withUserPublicKeyOpt)) { userPublicKey =>
           withAddress(addressOrError) { address =>
             userPublicKey match {
               case Some(upk) if upk.toAddress != address => invalidUserPublicKey

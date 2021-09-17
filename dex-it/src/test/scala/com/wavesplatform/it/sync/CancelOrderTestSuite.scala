@@ -247,7 +247,6 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       orders.foreach(dex1.api.waitForOrderStatus(_, Status.Accepted))
 
       dex1.api.cancelOrdersByIdsWithKey(alice, orders.map(_.id()))
-      // here is validation
     }
   }
 

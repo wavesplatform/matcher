@@ -393,11 +393,11 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
         Seq(o1, o2).foreach(dex1.api.place)
 
-        dex1.tryApi.cancelOrdersByIdsWithKey(bob, orderIds, Some(alice.publicKey)) should failWith(
+        dex1.tryApi.cancelOrdersByIdsWithKeyOrSignature(bob, orderIds, Some(alice.publicKey)) should failWith(
           UserPublicKeyIsNotValid.code,
           "Provided public key is not correct, reason: invalid public key"
         )
-        dex1.tryApi.cancelOrdersByIdsWithKey(bob, orderIds, Some(bob.publicKey)) shouldBe Symbol("right")
+        dex1.tryApi.cancelOrdersByIdsWithKeyOrSignature(bob, orderIds, Some(bob.publicKey)) shouldBe Symbol("right")
       }
 
       "/matcher/orders/{address}" in {

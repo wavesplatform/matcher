@@ -63,7 +63,7 @@ trait DexApi[F[_]] {
 
   def cancelOrdersByIdsWithKey(address: String, ids: Seq[String], headers: Map[String, String]): F[HttpSuccessfulBatchCancel]
 
-  def cancelOrdersByIdsWithKey(
+  def cancelOrdersByIdsWithKeyOrSignature(
     owner: Address,
     orderIds: Seq[Order.Id],
     xUserPublicKey: Option[PublicKey] = None

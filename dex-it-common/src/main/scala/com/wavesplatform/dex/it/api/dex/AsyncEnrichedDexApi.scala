@@ -151,7 +151,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .contentType(MediaType.ApplicationJson)
   }
 
-  def cancelOrdersByIdsWithKey(
+  def cancelOrdersByIdsWithKeyOrSignature(
     address: String,
     ids: Seq[String],
     headers: Map[String, String]
@@ -177,7 +177,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
   def cancelOrdersByIdsWithKey(owner: Address, orderIds: Seq[Order.Id]): R[HttpSuccessfulBatchCancel] =
     cancelOrdersByIdsWithKey(owner, orderIds, apiKeyHeaders)
 
-  override def cancelOrdersByIdsWithKey(
+  override def cancelOrdersByIdsWithKeyOrSignature(
     owner: Address,
     orderIds: Seq[Id],
     xUserPublicKey: Option[PublicKey] = None
@@ -185,7 +185,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
     basicRequest
       .post(uri"$apiUri/matcher/orders/$owner/cancel")
       .headers(apiKeyWithUserPublicKeyHeaders(xUserPublicKey))
-      .body(Json.stringify(Json.toJson(orderIds)))
+      .body(orderIds)
       .contentType(MediaType.ApplicationJson)
   }
 

@@ -84,7 +84,7 @@ class CancelOrdersByAddressAndIdsSpec extends MatcherSuiteBase with ApiKeyHeader
 
     "should return an error when one of ids is not a correct base58 string" in {
       validateMatcherError(
-        dex1.rawApi.cancelOrdersByIdsWithKey(placeAndGetIds(3).map(_.toString) :+ "null", alice),
+        dex1.rawApi.cancelOrdersByIdsWithKey(placeAndGetIds(3).map(_.toString) :+ "null", alice.stringRepr),
         StatusCode.BadRequest,
         InvalidJson.code,
         "The provided JSON contains invalid fields: (3). Check the documentation"
@@ -93,7 +93,7 @@ class CancelOrdersByAddressAndIdsSpec extends MatcherSuiteBase with ApiKeyHeader
 
     "should return an error when address is not a correct base58 string" in {
       validateMatcherError(
-        dex1.rawApi.cancelOrdersByIdsWithKey(null, placeAndGetIds(3)),
+        dex1.rawApi.cancelOrdersByIdsWithKey(placeAndGetIds(3).map(_.toString), "null"),
         StatusCode.BadRequest,
         InvalidAddress.code,
         "Provided address is not correct, reason: Unable to decode base58: requirement failed: Wrong char 'l' in Base58 string 'null'"

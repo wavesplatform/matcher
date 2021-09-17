@@ -174,7 +174,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .contentType(MediaType.ApplicationJson)
   }
 
-  def cancelOrdersByIdsWithKey(ids: Seq[String], address: Address): R[HttpSuccessfulBatchCancel] = mk {
+  def cancelOrdersByIdsWithKey(ids: Seq[String], address: String): R[HttpSuccessfulBatchCancel] = mk {
     basicRequest
       .post(uri"$apiUri/matcher/orders/$address/cancel")
       .headers(apiKeyHeaders)

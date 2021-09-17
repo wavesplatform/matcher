@@ -73,7 +73,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       val ids = for { i <- 1 to 10 } yield {
         val o = mkOrder(acc, wavesUsdPair, OrderType.SELL, i.waves, 100 + i)
         placeAndAwaitAtDex(o)
-        o.id.value()
+        o.id()
       }
 
       dex1.api.cancelOrdersByIdsWithKey(acc, ids)
@@ -100,9 +100,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
         o.id()
       }
 
-      val allIds = ids :+ o.id()
-
-      dex1.api.cancelOrdersByIdsWithKey(acc, allIds)
+      dex1.api.cancelOrdersByIdsWithKey(acc, ids :+ o.id())
 
       dex1.api.waitForOrderStatus(o, Status.Accepted)
       ids.map(dex1.api.waitForOrderStatus(wavesUsdPair, _, Status.Cancelled))

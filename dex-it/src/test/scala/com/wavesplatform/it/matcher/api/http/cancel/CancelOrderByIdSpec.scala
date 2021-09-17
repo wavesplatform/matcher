@@ -93,18 +93,5 @@ class CancelOrderByIdSpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
         s"The order ${order.idStr()} not found"
       )
     }
-
-    shouldReturnErrorWithoutApiKeyHeader(dex1.rawApi.cancelOrdersByIdsWithKeyOrSignature(
-      alice.stringRepr,
-      placeAndGetIds(3),
-      Map.empty[String, String]
-    ))
-
-    shouldReturnErrorWithIncorrectApiKeyValue(dex1.rawApi.cancelOrdersByIdsWithKeyOrSignature(
-      alice.toAddress.stringRepr,
-      placeAndGetIds(3),
-      Map("X-API-KEY" -> "incorrect")
-    ))
-
   }
 }

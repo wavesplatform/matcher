@@ -4,6 +4,7 @@ import sttp.model.StatusCode
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.api.http.entities.HttpSuccessfulSingleCancel
+import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.error.{InvalidAddress, InvalidJson}
 import com.wavesplatform.it.MatcherSuiteBase
@@ -32,7 +33,7 @@ class CancelOrdersByAddressAndIdsSpec extends MatcherSuiteBase with ApiKeyHeader
     "should cancel orders by ids" in {
       val ids = Random.shuffle(placeAndGetIds(10))
 
-      val r = validate200Json(dex1.rawApi.cancelOrdersByIdsWithKey(alice.toAddress.stringRepr, ids))
+      val r = validate200Json(dex1.rawApi.cancelOrdersByIdsWithKey(alice, ids))
 
       r.success should be(true)
       r.status should be("BatchCancelCompleted")
@@ -41,7 +42,7 @@ class CancelOrdersByAddressAndIdsSpec extends MatcherSuiteBase with ApiKeyHeader
       r.message.head.zipWithIndex.foreach { case (m, i) =>
         m match {
           case util.Right(HttpSuccessfulSingleCancel(id, success, status)) =>
-            id.toString should be(ids(i))
+            id should be(ids(i))
             success should be(true)
             status should be("OrderCanceled")
             dex1.api.waitForOrderStatus(wavesUsdPair, id, Status.Cancelled)
@@ -63,9 +64,9 @@ class CancelOrdersByAddressAndIdsSpec extends MatcherSuiteBase with ApiKeyHeader
       placeAndAwaitAtNode(partiallyFilled)
       dex1.api.cancelOrderById(cancelled)
 
-      val uniqueIds = Seq(accepted, filled, partiallyFilled, notFound, cancelled).map(o => o.idStr())
+      val uniqueIds = Seq(accepted, filled, partiallyFilled, notFound, cancelled).map(o => o.id())
 
-      val r = validate200Json(dex1.rawApi.cancelOrdersByIdsWithKey(alice.toAddress.stringRepr, Random.shuffle(uniqueIds ++ uniqueIds)))
+      val r = validate200Json(dex1.rawApi.cancelOrdersByIdsWithKey(alice, Random.shuffle(uniqueIds ++ uniqueIds)))
       r.success should be(true)
       r.status should be("BatchCancelCompleted")
       r.message.head should have size uniqueIds.size
@@ -78,12 +79,12 @@ class CancelOrdersByAddressAndIdsSpec extends MatcherSuiteBase with ApiKeyHeader
     }
 
     "should return OK if there is nothing to cancel" in {
-      validate200Json(dex1.rawApi.cancelOrdersByIdsWithKey(alice.stringRepr, Seq.empty[String]))
+      validate200Json(dex1.rawApi.cancelOrdersByIdsWithKey(alice, Seq.empty[Order.Id]))
     }
 
     "should return an error when one of ids is not a correct base58 string" in {
       validateMatcherError(
-        dex1.rawApi.cancelOrdersByIdsWithKey(alice.stringRepr, placeAndGetIds(3) :+ "null"),
+        dex1.rawApi.cancelOrdersByIdsWithKey(alice, placeAndGetIds(3) :+ "null".getBytes()),
         StatusCode.BadRequest,
         InvalidJson.code,
         "The provided JSON contains invalid fields: (3). Check the documentation"
@@ -92,7 +93,7 @@ class CancelOrdersByAddressAndIdsSpec extends MatcherSuiteBase with ApiKeyHeader
 
     "should return an error when address is not a correct base58 string" in {
       validateMatcherError(
-        dex1.rawApi.cancelOrdersByIdsWithKey("null", placeAndGetIds(3)),
+        dex1.rawApi.cancelOrdersByIdsWithKey(null, placeAndGetIds(3)),
         StatusCode.BadRequest,
         InvalidAddress.code,
         "Provided address is not correct, reason: Unable to decode base58: requirement failed: Wrong char 'l' in Base58 string 'null'"

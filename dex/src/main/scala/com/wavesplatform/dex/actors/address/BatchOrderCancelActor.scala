@@ -13,7 +13,7 @@ import scala.collection.immutable.ListMap
 import scala.concurrent.duration.FiniteDuration
 
 class BatchOrderCancelActor private (
-  initialResponse: ListMap[Order.Id, OrderCancelResult],
+  orderIds: List[Order.Id],
   source: Command.Source,
   processorActor: ActorRef,
   clientActor: ActorRef,
@@ -24,26 +24,32 @@ class BatchOrderCancelActor private (
   import BatchOrderCancelActor._
   import context.dispatcher
 
-  initialResponse.foreach {
-    case (id, result) => if (result.isRight) processorActor ! CancelOrder(id, source)
-  }
+  final private val uniqueOrderIds: Set[Order.Id] = orderIds.toSet
+  uniqueOrderIds.foreach(id => processorActor ! CancelOrder(id, source))
 
-  override def receive: Receive = state(initialResponse.keySet, initialResponse, context.system.scheduler.scheduleOnce(timeout, self, TimedOut))
+  override def receive: Receive = state(uniqueOrderIds, Map.empty, context.system.scheduler.scheduleOnce(timeout, self, TimedOut))
 
   private def state(restOrderIds: Set[Order.Id], response: Map[Order.Id, OrderCancelResult], timer: Cancellable): Receive = {
+
     case CancelResponse(id, x) =>
       val updatedRestOrderIds = restOrderIds - id
       val updatedResponse = response.updated(id, x)
 
-      if (updatedRestOrderIds.isEmpty) stop(Event.BatchCancelCompleted(updatedResponse), timer)
+      if (updatedRestOrderIds.isEmpty)
+        stop(Event.BatchCancelCompleted(mkSortedResponse(updatedResponse)), timer)
       else context.become(state(restOrderIds - id, updatedResponse, timer))
 
     // case Terminated(ref) => // Can't terminate before processorActor, because processorActor is a parent
 
     case TimedOut =>
       log.error(s"CancelOrder is timed out for orders: ${restOrderIds.mkString(", ")}")
-      stop(Event.BatchCancelCompleted(response), timer)
+      stop(Event.BatchCancelCompleted(mkSortedResponse(response)), timer)
   }
+
+  private def mkSortedResponse(response: Map[Order.Id, OrderCancelResult]): ListMap[Order.Id, OrderCancelResult] = (for {
+    id <- orderIds
+    response <- response.get(id)
+  } yield id -> response).to(ListMap)
 
   private def stop(response: Event.BatchCancelCompleted, timer: Cancellable): Unit = {
     timer.cancel()
@@ -56,15 +62,13 @@ class BatchOrderCancelActor private (
 object BatchOrderCancelActor {
 
   def props(
-    initialResponse: ListMap[Order.Id, OrderCancelResult],
+    orderIds: List[Order.Id],
     source: Command.Source,
     processorActor: ActorRef,
     clientActor: ActorRef,
     timeout: FiniteDuration
-  ): Props = {
-    require(initialResponse.nonEmpty, "orderIds is empty")
-    Props(new BatchOrderCancelActor(initialResponse, source, processorActor, clientActor, timeout))
-  }
+  ): Props =
+    Props(new BatchOrderCancelActor(orderIds, source, processorActor, clientActor, timeout))
 
   object CancelResponse {
 

@@ -6,7 +6,6 @@ import akka.pattern.{pipe, CircuitBreakerOpenException}
 import akka.{actor => classic}
 import cats.instances.list._
 import cats.instances.long._
-import cats.syntax.either._
 import cats.syntax.foldable._
 import cats.syntax.group.catsSyntaxGroup
 import cats.syntax.option._
@@ -47,7 +46,7 @@ import kamon.trace.Span
 import org.slf4j.LoggerFactory
 
 import java.time.{Instant, Duration => JDuration}
-import scala.collection.immutable.{ListMap, Queue}
+import scala.collection.immutable.Queue
 import scala.collection.mutable.{AnyRefMap => MutableMap, HashSet => MutableSet}
 import scala.concurrent.duration._
 import scala.concurrent.{Future, TimeoutException}
@@ -376,7 +375,7 @@ class AddressActor(
         log.debug(s"$command, to cancel: ${toCancelIds.mkString(", ")}")
         runWithIgnoredSpan {
           context.actorOf(BatchOrderCancelActor.props(
-            toCancelIds.map(id => id -> AddressActor.Event.OrderCanceled(id).asRight).to(ListMap),
+            toCancelIds.toList,
             command.source,
             self,
             sender(),
@@ -386,22 +385,13 @@ class AddressActor(
       }
 
     case command: Command.CancelOrders =>
-      val allActiveOrderIds = getActiveLimitOrders(None).map(_.order.id()).toSet
-      val toCancelIds = command.orderIds.filter(allActiveOrderIds.contains)
-
-      val response = command.orderIds.map { id =>
-        id -> (if (toCancelIds.contains(id)) AddressActor.Event.OrderCanceled(id).asRight
-               else error.OrderNotFound(id).asLeft[AddressActor.Event.OrderCanceled])
-      }.to(ListMap)
-
-      if (toCancelIds.isEmpty)
-        sender() ! Event.BatchCancelCompleted(command.orderIds.map(id =>
-          id -> error.OrderNotFound(id).asLeft[AddressActor.Event.OrderCanceled]
-        ).toMap)
-      else
-        runWithIgnoredSpan {
-          context.actorOf(BatchOrderCancelActor.props(response, command.source, self, sender(), settings.batchCancelTimeout))
-        }
+      runWithIgnoredSpan(context.actorOf(BatchOrderCancelActor.props(
+        command.orderIds,
+        command.source,
+        self,
+        sender(),
+        settings.batchCancelTimeout
+      )))
 
     case command @ CancelExpiredOrder(id) =>
       expiration.remove(id)

@@ -4,7 +4,7 @@ import sttp.model.StatusCode
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.api.http.entities.HttpSuccessfulSingleCancel
-import com.wavesplatform.dex.domain.order.OrderType.BUY
+import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.error.{InvalidAddress, InvalidJson}
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.matcher.api.http.ApiKeyHeaderChecks
@@ -48,6 +48,33 @@ class CancelOrdersByAddressAndIdsSpec extends MatcherSuiteBase with ApiKeyHeader
           case _ => fail(s"Unexpected response $r")
         }
       }
+    }
+
+    "should cancel correct orders even if there are incorrect in list" in {
+      val accepted = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 1.usd)
+      val filled = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd)
+      val partiallyFilled = mkOrder(alice, wavesUsdPair, BUY, 8.waves, 2.usd)
+      val notFound = mkOrder(bob, wavesUsdPair, SELL, 17.waves, 2.usd)
+      val cancelled = mkOrder(alice, wavesUsdPair, BUY, 14.waves, 1.usd)
+
+      Set(accepted, filled).foreach(placeAndAwaitAtDex(_))
+      placeAndAwaitAtDex(cancelled)
+      placeAndAwaitAtNode(notFound)
+      placeAndAwaitAtNode(partiallyFilled)
+      dex1.api.cancelOrderById(cancelled)
+
+      val uniqueIds = Seq(accepted, filled, partiallyFilled, notFound, cancelled).map(o => o.idStr())
+
+      val r = validate200Json(dex1.rawApi.cancelOrdersByIdsWithKey(alice.toAddress.stringRepr, Random.shuffle(uniqueIds ++ uniqueIds)))
+      r.success should be(true)
+      r.status should be("BatchCancelCompleted")
+      r.message.head should have size uniqueIds.size
+
+      dex1.api.waitForOrderStatus(accepted, Status.Cancelled)
+      dex1.api.waitForOrderStatus(filled, Status.Filled)
+      dex1.api.waitForOrderStatus(partiallyFilled, Status.Cancelled)
+      dex1.api.waitForOrderStatus(notFound, Status.Filled)
+      dex1.api.waitForOrderStatus(cancelled, Status.Cancelled)
     }
 
     "should return OK if there is nothing to cancel" in {

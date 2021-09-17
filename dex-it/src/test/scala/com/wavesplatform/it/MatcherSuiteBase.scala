@@ -105,11 +105,13 @@ trait MatcherSuiteBase
     account
   }
 
-  protected def placeAndGetIds(count: Int): Seq[String] =
+  protected def placeAndGetIds(count: Int): Seq[String] = {
+    val ts = System.currentTimeMillis()
     (1 to count).map { i =>
-      val o = mkOrder(alice, wavesUsdPair, BUY, 10.waves, i.usd)
+      val o = mkOrder(alice, wavesUsdPair, BUY, 10.waves, i.usd, ts = ts + i)
       placeAndAwaitAtDex(o)
       o.idStr()
     }
+  }
 
 }

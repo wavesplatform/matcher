@@ -53,29 +53,27 @@ class CancelOrdersByAddressAndIdsSpec extends MatcherSuiteBase with ApiKeyHeader
 
     "should cancel correct orders even if there are incorrect in list" in {
       val accepted = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 1.usd)
-      val filled = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd)
+      val filledAlice = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 2.usd)
       val partiallyFilled = mkOrder(alice, wavesUsdPair, BUY, 8.waves, 2.usd)
-      val notFound = mkOrder(bob, wavesUsdPair, SELL, 17.waves, 2.usd)
+      val filledBob = mkOrder(bob, wavesUsdPair, SELL, 17.waves, 2.usd)
       val cancelled = mkOrder(alice, wavesUsdPair, BUY, 14.waves, 1.usd)
 
-      Set(accepted, filled).foreach(placeAndAwaitAtDex(_))
+      Set(accepted, filledAlice).foreach(placeAndAwaitAtDex(_))
       placeAndAwaitAtDex(cancelled)
-      placeAndAwaitAtNode(notFound)
+      placeAndAwaitAtNode(filledBob)
       placeAndAwaitAtNode(partiallyFilled)
       dex1.api.cancelOrderById(cancelled)
 
-      val uniqueIds = Seq(accepted, filled, partiallyFilled, notFound, cancelled).map(o => o.id())
+      val uniqueIds = Seq(accepted, filledAlice, partiallyFilled, filledBob, cancelled).map(o => o.id())
 
       val r = validate200Json(dex1.rawApi.cancelOrdersByIdsWithKey(alice, Random.shuffle(uniqueIds ++ uniqueIds)))
       r.success should be(true)
       r.status should be("BatchCancelCompleted")
       r.message.head should have size uniqueIds.size
 
-      dex1.api.waitForOrderStatus(accepted, Status.Cancelled)
-      dex1.api.waitForOrderStatus(filled, Status.Filled)
-      dex1.api.waitForOrderStatus(partiallyFilled, Status.Cancelled)
-      dex1.api.waitForOrderStatus(notFound, Status.Filled)
-      dex1.api.waitForOrderStatus(cancelled, Status.Cancelled)
+      dex1.api.waitForOrderStatus(filledAlice, Status.Filled)
+      dex1.api.waitForOrderStatus(filledBob, Status.Filled)
+      Seq(accepted, partiallyFilled, cancelled).foreach(dex1.api.waitForOrderStatus(_, Status.Cancelled))
     }
 
     "should return OK if there is nothing to cancel" in {

@@ -385,6 +385,7 @@ class AddressActor(
       }
 
     case command: Command.CancelOrders =>
+      log.debug("{}", command)
       runWithIgnoredSpan(context.actorOf(BatchOrderCancelActor.props(
         command.orderIds,
         command.source,

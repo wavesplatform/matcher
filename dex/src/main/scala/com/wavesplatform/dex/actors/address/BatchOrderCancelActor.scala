@@ -24,7 +24,7 @@ class BatchOrderCancelActor private (
   import BatchOrderCancelActor._
   import context.dispatcher
 
-  final private val uniqueOrderIds: Set[Order.Id] = orderIds.toSet
+  private val uniqueOrderIds: Set[Order.Id] = orderIds.toSet
   uniqueOrderIds.foreach(id => processorActor ! CancelOrder(id, source))
 
   override def receive: Receive = state(uniqueOrderIds, Map.empty, context.system.scheduler.scheduleOnce(timeout, self, TimedOut))
@@ -36,17 +36,17 @@ class BatchOrderCancelActor private (
       val updatedResponse = response.updated(id, x)
 
       if (updatedRestOrderIds.isEmpty)
-        stop(Event.BatchCancelCompleted(mkSortedResponse(updatedResponse)), timer)
+        stop(Event.BatchCancelCompleted(mkOrderedResponse(updatedResponse)), timer)
       else context.become(state(restOrderIds - id, updatedResponse, timer))
 
     // case Terminated(ref) => // Can't terminate before processorActor, because processorActor is a parent
 
     case TimedOut =>
       log.error(s"CancelOrder is timed out for orders: ${restOrderIds.mkString(", ")}")
-      stop(Event.BatchCancelCompleted(mkSortedResponse(response)), timer)
+      stop(Event.BatchCancelCompleted(mkOrderedResponse(response)), timer)
   }
 
-  private def mkSortedResponse(response: Map[Order.Id, OrderCancelResult]): ListMap[Order.Id, OrderCancelResult] = (for {
+  private def mkOrderedResponse(response: Map[Order.Id, OrderCancelResult]): ListMap[Order.Id, OrderCancelResult] = (for {
     id <- orderIds
     response <- response.get(id)
   } yield id -> response).to(ListMap)

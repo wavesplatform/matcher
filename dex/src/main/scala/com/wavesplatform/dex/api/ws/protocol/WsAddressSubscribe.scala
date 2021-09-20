@@ -19,11 +19,11 @@ final case class WsAddressSubscribe(private val key: Address, authType: String, 
     extends WsClientMessage {
   override val tpe: String = WsAddressSubscribe.tpe
 
-  private def maybeWithDebug(payload: JwtPayload): Either[MatcherError, JwtPayload] =
+  private def maybeWithDebug(payload: JwtPayload): JwtPayload =
     if (crypto.verify(payload.signature, ByteStr(payload.toSign), payload.publicKey))
-      Right(payload)
+      payload
     else
-      Right(payload.copy(
+      payload.copy(
         signature = payload.signature,
         publicKey = payload.publicKey,
         networkByte = payload.networkByte,
@@ -32,7 +32,7 @@ final case class WsAddressSubscribe(private val key: Address, authType: String, 
         activeTokenExpirationInSeconds = payload.activeTokenExpirationInSeconds,
         scope = payload.scope,
         debug = true
-      ))
+      )
 
   def validate(jwtPublicKey: String, networkByte: Byte): Either[MatcherError, JwtPayload] =
     for {
@@ -52,7 +52,7 @@ final case class WsAddressSubscribe(private val key: Address, authType: String, 
         val given = payload.networkByte.head.toByte
         Either.cond(given == networkByte, (), error.TokenNetworkUnexpected(networkByte, given))
       }
-      payload <- maybeWithDebug(payload)
+      payload <- Right(maybeWithDebug(payload))
       _ <- Either.cond(payload.publicKey.toAddress == key, (), error.AddressAndPublicKeyAreIncompatible(key, payload.publicKey))
     } yield payload
 

@@ -346,7 +346,7 @@ final class MarketsRoute(
     (path(AssetPairPM) & delete) { pairOrError =>
       (withMetricsAndTraces("deleteOrderBookWithKey") & protect & withAuth) {
         withAssetPair(assetPairBuilder, pairOrError, validate = false) { pair =>
-          withOnlyBlacklistedAssets (pair) {
+          withOnlyBlacklistedAssets(pair) {
             orderBook(pair) match {
               case Some(Right(_)) =>
                 complete(
@@ -369,12 +369,12 @@ final class MarketsRoute(
 
   private def withOnlyBlacklistedAssets(assetPair: AssetPair): Directive0 = FutureDirectives.onSuccess(
     (for {
-     _ <- assetPairBuilder.validateAssetIdBlacklisted(assetPair.amountAsset)
-     _ <- assetPairBuilder.validateAssetIdBlacklisted(assetPair.priceAsset)
+      _ <- assetPairBuilder.validateAssetIdBlacklisted(assetPair.amountAsset)
+      _ <- assetPairBuilder.validateAssetIdBlacklisted(assetPair.priceAsset)
     } yield ()).value
   ).flatMap {
-      case Right(_) => pass
-      case Left(e) => complete(InfoNotFound(e))
+    case Right(_) => pass
+    case Left(e) => complete(InfoNotFound(e))
   }
 
   private def getOrderBookRestrictions(pair: AssetPair): FutureResult[HttpOrderBookInfo] = settings.getActualTickSize(pair).map { tickSize =>

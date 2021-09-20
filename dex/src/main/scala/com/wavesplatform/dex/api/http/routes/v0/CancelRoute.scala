@@ -113,6 +113,7 @@ final class CancelRoute(
   @Path("/orders/{address}/cancel#cancelOrdersByIdsWithKey")
   @ApiOperation(
     value = "Cancel active orders by IDs. Requires API Key",
+    notes = "A response has the same order of ids as in a request. Duplicates are removed",
     httpMethod = "POST",
     authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
     produces = "application/json",

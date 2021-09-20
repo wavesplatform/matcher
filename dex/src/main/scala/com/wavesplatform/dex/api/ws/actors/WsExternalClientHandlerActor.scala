@@ -12,7 +12,7 @@ import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor
 import com.wavesplatform.dex.api.ws.actors.WsExternalClientHandlerActor.Command.CancelAddressSubscription
 import com.wavesplatform.dex.api.ws.protocol._
 import com.wavesplatform.dex.api.ws.state.WsAddressState
-import com.wavesplatform.dex.domain.account.{Address, AddressScheme}
+import com.wavesplatform.dex.domain.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error.{MatcherError, SubscriptionsLimitReached, WsConnectionMaxLifetimeExceeded, WsConnectionPongTimeout}
@@ -170,26 +170,28 @@ object WsExternalClientHandlerActor {
                   Behaviors.same
 
                 case subscribe: WsAddressSubscribe =>
-                  val address = subscribe.key
                   val authType = subscribe.authType
 
                   subscribe.validate(settings.jwtPublicKey, AddressScheme.current.chainId) match {
                     case Left(e) =>
-                      context.log.debug(s"WsAddressSubscribe(k=$address, t=$authType) failed with ${e.message.text}")
+                      context.log.debug(
+                        s"WsAddressSubscribe(k=${PublicKey.fromBase58String(settings.jwtPublicKey).getOrElse(PublicKey.empty).toAddress}, t=$authType) failed with ${e.message.text}"
+                      )
                       clientRef ! WsError.from(e, matcherTime)
                       Behaviors.same
                     case Right(jwtPayload) =>
                       if (jwtPayload.debug)
                         context.log.debug(s"${jwtPayload.publicKey} is connecting with debug token")
 
+                      val address = jwtPayload.publicKey.toAddress
                       val subscriptionLifetime = (jwtPayload.activeTokenExpirationInSeconds * 1000 - time.correctedTime()).millis
                       val expiration = scheduleOnce(subscriptionLifetime, CancelAddressSubscription(address))
 
                       addressSubscriptions
-                        .find(_._1 == subscribe.key)
+                        .find(_._1 == address)
                         .fold {
                           addressRef ! AddressDirectoryActor.Command.ForwardMessage(
-                            subscribe.key,
+                            address,
                             AddressActor.WsCommand.AddWsSubscription(clientRef, subscribe.flags)
                           )
                           context.log.debug(s"WsAddressSubscribe(k=$address, t=$authType) is successful, will expire in $subscriptionLifetime")

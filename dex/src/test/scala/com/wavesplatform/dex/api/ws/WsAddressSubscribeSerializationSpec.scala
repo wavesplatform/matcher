@@ -26,7 +26,7 @@ class WsAddressSubscribeSerializationSpec extends AnyWordSpec with Matchers with
         s"""
            |{
            |  "T": "aus",
-           |  "S": "${baseWsSubscribe.key.stringRepr}",
+           |  "S": "${address.stringRepr}",
            |  "t": "${baseWsSubscribe.authType}",
            |  "j": "${baseWsSubscribe.jwt}",
            |  "b": {

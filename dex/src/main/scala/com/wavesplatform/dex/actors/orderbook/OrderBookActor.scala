@@ -138,8 +138,7 @@ class OrderBookActor(
             case x: ValidatedCommand.CancelOrder => onCancelOrder(request, x)
             case _: ValidatedCommand.DeleteOrderBook =>
               process(request.timestamp, orderBook.cancelAll(request.timestamp, OrderCanceledReason.OrderBookDeleted))
-              // We don't delete the snapshot, because it could be required after restart
-              // snapshotStore ! OrderBookSnapshotStoreActor.Message.Delete(assetPair)
+              saveSnapshotAt(request.offset)
               aggregatedRef ! AggregatedOrderBookActor.Command.Stop(self, error.OrderBookStopped(assetPair))
           }
       }

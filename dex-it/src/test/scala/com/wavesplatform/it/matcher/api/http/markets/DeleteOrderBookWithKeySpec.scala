@@ -29,9 +29,18 @@ class DeleteOrderBookWithKeySpec extends MatcherSuiteBase with ApiKeyHeaderCheck
       val order = mkOrder(alice, wavesUsdPair, SELL, 10.waves, 1.usd)
       placeAndAwaitAtDex(order)
 
+      dex1.restartWithNewSuiteConfig(ConfigFactory.parseString(
+        s"""waves.dex {
+           |  price-assets = [ "$UsdId", "WAVES" ]
+           |  blacklisted-assets  = [$UsdId]
+           |}""".stripMargin
+      ))
+
       validate202Json(dex1.rawApi.deleteOrderBookWithKey(wavesUsdPair)).message should be("Deleting order book")
 
       eventually {
+
+        // todo: now it responds that asset is blacklisted
         dex1.api.waitForOrderStatus(order, Status.Cancelled)
       }
     }

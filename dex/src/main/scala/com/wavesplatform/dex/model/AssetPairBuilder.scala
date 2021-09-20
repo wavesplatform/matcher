@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.model
 
+import cats.data.EitherT
 import cats.instances.future.catsStdInstancesForFuture
 import cats.syntax.either._
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
@@ -14,7 +15,7 @@ import com.wavesplatform.dex.model.AssetPairBuilder.AssetSide
 import com.wavesplatform.dex.settings.MatcherSettings
 import kamon.Kamon
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 
 class AssetPairBuilder(
   settings: MatcherSettings,
@@ -42,6 +43,13 @@ class AssetPairBuilder(
     settings.blacklistedNames.exists(_.findFirstIn(desc.name).nonEmpty)
 
   def validateAssetId(asset: Asset): FutureResult[Asset] = validateAssetId(asset, AssetSide.Unknown)
+
+  def validateAssetIdBlacklisted(asset: Asset): EitherT[Future, MatcherError, Asset] =
+    validateAssetId(asset, AssetSide.Unknown).transform {
+      case Left(error.AssetBlacklisted(_)) => Right(asset)
+      case Left(err) => Left(err)
+      case Right(asset) => asset.fold[Either[MatcherError, Asset]](Right(Waves))(issuedAsset => Left(error.AssetNotBlacklisted(issuedAsset)))
+    }
 
   private def validateAssetId(asset: Asset, side: AssetSide): FutureResult[Asset] =
     asset.fold[FutureResult[Asset]](liftValueAsync(Waves)) { asset =>

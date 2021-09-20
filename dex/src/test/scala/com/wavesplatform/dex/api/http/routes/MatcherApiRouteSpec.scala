@@ -128,6 +128,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
 
   private val (okOrder, okOrderSenderPrivateKey) = orderGenerator.sample.get
   private val (badOrder, badOrderSenderPrivateKey) = orderGenerator.sample.get
+  private val (blackListedOrder, _) = orderGenerator.sample.get
 
   private val amountAssetDesc = BriefAssetDescription("AmountAsset", 8, hasScript = false, isNft = false)
   private val priceAssetDesc = BriefAssetDescription("PriceAsset", 8, hasScript = false, isNft = false)
@@ -843,19 +844,28 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
 
     val (someOrder, _) = orderGenerator.sample.get
 
-    "returns an error if there is no such order book" in test(
+    "returns an error if there is no such order book" ignore test(
       route =>
         Delete(routePath(s"/orderbook/${someOrder.assetPair.amountAssetStr}/${someOrder.assetPair.priceAssetStr}"))
           .withHeaders(apiKeyHeader()) ~> route ~> check {
-          status shouldEqual StatusCodes.ServiceUnavailable
+          status shouldEqual StatusCodes.NotFound
         },
       apiKeys
     )
 
-    "returns success message if order book exists" in test(
+    "returns failure if assets aren't blacklisted" ignore test(
       route =>
         Delete(routePath(s"/orderbook/${okOrder.assetPair.amountAssetStr}/${okOrder.assetPair.priceAssetStr}"))
           .withHeaders(apiKeyHeader()) ~> route ~> check {
+          status shouldEqual StatusCodes.BadRequest
+        },
+      apiKey
+    )
+
+    "returns success if assets are blacklisted" in test(
+      route =>
+        Delete(routePath(s"/orderbook/${blackListedOrder.assetPair.amountAssetStr}/${blackListedOrder.assetPair.priceAssetStr}"))
+          .withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldEqual StatusCodes.Accepted
           responseAs[HttpMessage] should matchTo(HttpMessage("Deleting order book"))
         },
@@ -1298,17 +1308,25 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
           else liftFutureAsync(Future.failed(new IllegalArgumentException(s"No information about $x")))
       )
 
+    val blacklisted =
+      Set(blackListedOrder.assetPair.amountAsset, blackListedOrder.assetPair.priceAsset).foldLeft(Set.empty[IssuedAsset]) { (acc, elem) =>
+        elem match {
+          case asset: IssuedAsset => acc + asset
+          case Asset.Waves => acc
+        }
+      }
     val pairBuilder = new AssetPairBuilder(
       settings,
       {
         case `smartAsset` => liftValueAsync[BriefAssetDescription](smartAssetDesc)
-        case x if x == okOrder.assetPair.amountAsset || x == badOrder.assetPair.amountAsset || x == unknownAsset =>
+        case x
+            if x == okOrder.assetPair.amountAsset || x == badOrder.assetPair.amountAsset || x == unknownAsset || x == blackListedOrder.assetPair.amountAsset =>
           liftValueAsync[BriefAssetDescription](amountAssetDesc)
-        case x if x == okOrder.assetPair.priceAsset || x == badOrder.assetPair.priceAsset =>
+        case x if x == okOrder.assetPair.priceAsset || x == badOrder.assetPair.priceAsset || x == blackListedOrder.assetPair.priceAsset =>
           liftValueAsync[BriefAssetDescription](priceAssetDesc)
         case x => liftErrorAsync[BriefAssetDescription](error.AssetNotFound(x))
       },
-      Set.empty
+      blacklisted
     )
 
     val placeRoute = new PlaceRoute(
@@ -1372,12 +1390,12 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       matcherKeyPair.publicKey,
       orderBookDirectoryActor.ref,
       {
-        case ValidatedCommand.DeleteOrderBook(pair, _) if pair == okOrder.assetPair =>
+        case ValidatedCommand.DeleteOrderBook(pair, _) if pair == okOrder.assetPair || pair == blackListedOrder.assetPair =>
           Future.successful(ValidatedCommandWithMeta(1L, System.currentTimeMillis, ValidatedCommand.DeleteOrderBook(pair)).some)
         case _ => Future.failed(new NotImplementedError("Storing is not implemented"))
       },
       {
-        case x if x == okOrder.assetPair || x == badOrder.assetPair => Some(Right(orderBookActor.ref))
+        case x if x == okOrder.assetPair || x == badOrder.assetPair || x == blackListedOrder.assetPair => Some(Right(orderBookActor.ref))
         case _ => None
       },
       orderBookHttpInfo,

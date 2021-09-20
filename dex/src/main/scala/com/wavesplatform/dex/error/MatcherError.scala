@@ -245,6 +245,11 @@ final case class PriceAssetBlacklisted(asset: IssuedAsset)
 
 object PriceAssetBlacklisted extends MatcherErrorCodeProvider(asset, price, blacklisted, C.BadRequest)
 
+final case class AssetNotBlacklisted(asset: IssuedAsset)
+  extends MatcherError(AssetNotBlacklisted.code, e"The asset ${"assetId" -> asset} is not blacklisted", PriceAssetBlacklisted.httpCode)
+
+object AssetNotBlacklisted extends MatcherErrorCodeProvider(asset, commonEntity, notBlacklisted, C.BadRequest)
+
 final case class FeeAssetBlacklisted(asset: IssuedAsset)
     extends MatcherError(FeeAssetBlacklisted.code, e"The fee asset ${"assetId" -> asset} is blacklisted", FeeAssetBlacklisted.httpCode)
 
@@ -826,4 +831,5 @@ object Class {
   object notProvided extends Class(17)
   object optimization extends Class(18)
   object pending extends Class(19)
+  object notBlacklisted extends Class(20)
 }

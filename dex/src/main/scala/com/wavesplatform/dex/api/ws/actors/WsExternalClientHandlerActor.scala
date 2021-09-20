@@ -179,6 +179,9 @@ object WsExternalClientHandlerActor {
                       clientRef ! WsError.from(e, matcherTime)
                       Behaviors.same
                     case Right(jwtPayload) =>
+                      if (jwtPayload.debug)
+                        context.log.debug(s"${jwtPayload.publicKey} is connecting with debug token")
+
                       val subscriptionLifetime = (jwtPayload.activeTokenExpirationInSeconds * 1000 - time.correctedTime()).millis
                       val expiration = scheduleOnce(subscriptionLifetime, CancelAddressSubscription(address))
 

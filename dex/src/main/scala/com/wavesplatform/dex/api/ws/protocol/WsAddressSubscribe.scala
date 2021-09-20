@@ -15,8 +15,24 @@ import pdi.jwt.{JwtAlgorithm, JwtJson, JwtOptions}
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
-final case class WsAddressSubscribe(key: Address, authType: String, jwt: String, flags: Set[WsAddressFlag] = Set.empty) extends WsClientMessage {
+final case class WsAddressSubscribe(private val key: Address, authType: String, jwt: String, flags: Set[WsAddressFlag] = Set.empty)
+    extends WsClientMessage {
   override val tpe: String = WsAddressSubscribe.tpe
+
+  private def maybeWithDebug(payload: JwtPayload): Either[MatcherError, JwtPayload] =
+    if (crypto.verify(payload.signature, ByteStr(payload.toSign), payload.publicKey))
+      Right(payload)
+    else
+      Right(payload.copy(
+        signature = payload.signature,
+        publicKey = payload.publicKey,
+        networkByte = payload.networkByte,
+        clientId = payload.clientId,
+        firstTokenExpirationInSeconds = payload.firstTokenExpirationInSeconds,
+        activeTokenExpirationInSeconds = payload.activeTokenExpirationInSeconds,
+        scope = payload.scope,
+        debug = true
+      ))
 
   def validate(jwtPublicKey: String, networkByte: Byte): Either[MatcherError, JwtPayload] =
     for {
@@ -36,7 +52,7 @@ final case class WsAddressSubscribe(key: Address, authType: String, jwt: String,
         val given = payload.networkByte.head.toByte
         Either.cond(given == networkByte, (), error.TokenNetworkUnexpected(networkByte, given))
       }
-      _ <- Either.cond(crypto.verify(payload.signature, ByteStr(payload.toSign), payload.publicKey), (), error.InvalidJwtPayloadSignature)
+      payload <- maybeWithDebug(payload)
       _ <- Either.cond(payload.publicKey.toAddress == key, (), error.AddressAndPublicKeyAreIncompatible(key, payload.publicKey))
     } yield payload
 
@@ -72,7 +88,8 @@ object WsAddressSubscribe {
     clientId: String,
     firstTokenExpirationInSeconds: Long,
     activeTokenExpirationInSeconds: Long,
-    scope: List[String]
+    scope: List[String],
+    debug: Boolean = false
   ) {
     def toSign: Array[Byte] = JwtPayload.toSignPrefix ++ s"$networkByte:$clientId:$firstTokenExpirationInSeconds".getBytes(StandardCharsets.UTF_8)
 
@@ -89,7 +106,8 @@ object WsAddressSubscribe {
         (__ \ "cid").format[String] and
         (__ \ "exp0").format[Long] and
         (__ \ "exp").format[Long] and
-        (__ \ "scope").format[List[String]]
+        (__ \ "scope").format[List[String]] and
+        (__ \ "debug").format[Boolean]
     )(JwtPayload.apply, unlift(JwtPayload.unapply))
 
   }

@@ -159,15 +159,6 @@ class WsExternalClientHandlerActorSpec extends AnyFreeSpecLike with Matchers wit
           )
         )
 
-        "invalid signature" in failTest(
-          mkJwt(mkJwtNotSignedPayload(clientKeyPair)),
-          WsError(
-            timestamp = 0L, // ignored
-            code = InvalidJwtPayloadSignature.code,
-            message = "The token payload signature is invalid"
-          )
-        )
-
         "address doesn't fit public key" in failTest(
           WsAddressSubscribe(KeyPair(ByteStr("other-client".getBytes(StandardCharsets.UTF_8))), "jwt", mkJwt(mkJwtSignedPayload(clientKeyPair))),
           WsError(

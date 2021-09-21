@@ -206,7 +206,7 @@ class WsMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDrivenProp
       "Some(true) equals true" in test(_ + ("d" -> JsBoolean(true)))(_ shouldBe true)
 
       "Doesn't appear in JSON if false" in forAll(wsAddressChangesGen, oneTimeGenerateConfig) { original =>
-        val json = WsAddressChanges.wsAddressChangesFormat.writes(original.copy(isDebug = true))
+        val json = WsAddressChanges.wsAddressChangesFormat.writes(original.copy(isDebug = false))
         json.value.get("d") shouldBe empty // contain doesn't work here
       }
     }

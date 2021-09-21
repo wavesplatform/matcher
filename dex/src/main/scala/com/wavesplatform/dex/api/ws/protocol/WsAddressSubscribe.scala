@@ -53,7 +53,11 @@ final case class WsAddressSubscribe(private val key: Address, authType: String, 
         Either.cond(given == networkByte, (), error.TokenNetworkUnexpected(networkByte, given))
       }
       maybeWithDebugPayload = maybeWithDebug(payload)
-      _ <- Either.cond(maybeWithDebugPayload.publicKey.toAddress == key, (), error.AddressAndPublicKeyAreIncompatible(key, maybeWithDebugPayload.publicKey))
+      _ <- Either.cond(
+        maybeWithDebugPayload.publicKey.toAddress == key,
+        (),
+        error.AddressAndPublicKeyAreIncompatible(key, maybeWithDebugPayload.publicKey)
+      )
     } yield maybeWithDebugPayload
 
 }

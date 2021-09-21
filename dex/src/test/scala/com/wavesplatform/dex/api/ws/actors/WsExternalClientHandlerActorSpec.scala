@@ -169,6 +169,20 @@ class WsExternalClientHandlerActorSpec extends AnyFreeSpecLike with Matchers wit
         )
       }
 
+      "jwt is debug" - {
+        "when invalid signature" in test { t =>
+          t.wsHandlerRef ! ProcessClientMessage(WsAddressSubscribe(
+            clientKeyPair,
+            WsAddressSubscribe.defaultAuthType,
+            mkJwt(mkJwtNotSignedPayload(clientKeyPair))
+          ))
+          t.addressProbe.expectMsgType[AddressDirectoryActor.Command.ForwardMessage].message match {
+            case x: AddressActor.WsCommand.AddWsSubscription => x.isDebug shouldBe true
+            case x => fail(s"Unexpected message: $x")
+          }
+        }
+      }
+
       "should be cancelled after jwt expiration" in test { t =>
         val jwtPayload = mkJwtSignedPayload(clientKeyPair, lifetime = 1.second)
 

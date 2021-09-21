@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync
 
+import cats.syntax.either._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpMessage
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
@@ -7,6 +8,7 @@ import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.Order.PriceConstant
 import com.wavesplatform.dex.domain.order.OrderType._
+import com.wavesplatform.dex.error.PriceAssetBlacklisted
 import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import com.wavesplatform.it.MatcherSuiteBase
 
@@ -14,7 +16,8 @@ import scala.concurrent.Future
 
 class OrderBookTestSuite extends MatcherSuiteBase {
 
-  override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "WAVES" ]""")
+  override protected def dexInitialSuiteConfig: Config =
+    ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "$UsdnId", "WAVES" ]""")
 
   private case class ReservedBalances(wct: Long, usd: Long, waves: Long)
 
@@ -42,7 +45,7 @@ class OrderBookTestSuite extends MatcherSuiteBase {
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
-    broadcastAndAwait(IssueUsdTx, IssueWctTx)
+    broadcastAndAwait(IssueUsdTx, IssueWctTx, IssueUsdnTx)
     dex1.start()
   }
 
@@ -75,16 +78,15 @@ class OrderBookTestSuite extends MatcherSuiteBase {
 
   "When delete order book" - {
     "orders by the pair should be canceled" in {
-      dex1.api.waitForOrderStatus(buyOrder, Status.Cancelled)
-      dex1.api.waitForOrderStatus(anotherBuyOrder, Status.Cancelled)
-      dex1.api.waitForOrderStatus(sellOrder, Status.Cancelled)
+      eventually {
+        dex1.api.getOrderHistoryByPKWithSig(alice, activeOnly = Some(true)).count(_.assetPair == wctUsdPair) shouldBe 0
+        dex1.api.getOrderHistoryByPKWithSig(bob, activeOnly = Some(true)).count(_.assetPair == wctUsdPair) shouldBe 0
+      }
     }
 
     "the order book was deleted" in {
       withClue("orderBook") {
-        val orderBook = dex1.api.getOrderBook(wctUsdPair)
-        orderBook.bids shouldBe empty
-        orderBook.asks shouldBe empty
+        dex1.tryApi.getOrderBook(wctUsdPair).leftMap(_.error) shouldBe Left(PriceAssetBlacklisted.code)
       }
 
       withClue("tradingMarkets") {
@@ -106,13 +108,10 @@ class OrderBookTestSuite extends MatcherSuiteBase {
     }
 
     "it should not affect other pairs and their orders" in {
-      dex1.api.orderStatusByAssetPairAndId(buyOrderForAnotherPair).status shouldBe Status.Accepted
-      dex1.api.orderStatusByAssetPairAndId(sellOrderForAnotherPair).status shouldBe Status.Accepted
-      dex1.api.place(mkOrder(alice, wctWavesPair, BUY, amount, price))
+      dex1.api.place(mkOrder(alice, wavesUsdnPair, BUY, amount, price))
 
-      val orderBook = dex1.api.getOrderBook(wctWavesPair)
+      val orderBook = dex1.api.getOrderBook(wavesUsdnPair)
       orderBook.bids shouldNot be(empty)
-      orderBook.asks shouldNot be(empty)
     }
 
     "matcher can start after multiple delete events" in {

@@ -14,12 +14,12 @@ import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
-import com.wavesplatform.dex.error.{OrderAssetPairReversed, OrderBookStopped, SubscriptionsLimitReached}
+import com.wavesplatform.dex.error.{AmountAssetBlacklisted, MatcherIsStopping, OrderAssetPairReversed, SubscriptionsLimitReached}
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, OrderRestrictionsSettings}
 import com.wavesplatform.dex.tool.Using._
 import com.wavesplatform.it.api.MatcherCommand
-import com.wavesplatform.it.{executeCommands, WsSuiteBase}
+import com.wavesplatform.it.{WsSuiteBase, executeCommands}
 import play.api.libs.json._
 
 import scala.collection.immutable.TreeMap
@@ -411,8 +411,20 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
 
         val expectedMessage = WsError(
           timestamp = 0L, // ignored
-          code = OrderBookStopped.code,
-          message = s"The order book for $assetPair is stopped, please contact with the administrator"
+          code = MatcherIsStopping.code,
+          message = MatcherIsStopping.message.text
+        )
+
+        wscs.foreach { wsc =>
+          wsc.receiveAtLeastN[WsError](1).head should matchTo(expectedMessage)
+        }
+      }
+
+      Using.resource((1 to 3).map(_ => mkWsOrderBookConnection(assetPair, dex1))) { wscs =>
+        val expectedMessage = WsError(
+          timestamp = 0L, // ignored
+          code = AmountAssetBlacklisted.code,
+          message = AmountAssetBlacklisted(asset).message.text
         )
 
         wscs.foreach { wsc =>

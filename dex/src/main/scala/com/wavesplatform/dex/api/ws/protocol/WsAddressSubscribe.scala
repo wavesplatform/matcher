@@ -52,9 +52,9 @@ final case class WsAddressSubscribe(private val key: Address, authType: String, 
         val given = payload.networkByte.head.toByte
         Either.cond(given == networkByte, (), error.TokenNetworkUnexpected(networkByte, given))
       }
-      payload <- Right(maybeWithDebug(payload))
-      _ <- Either.cond(payload.publicKey.toAddress == key, (), error.AddressAndPublicKeyAreIncompatible(key, payload.publicKey))
-    } yield payload
+      maybeWithDebugPayload = maybeWithDebug(payload)
+      _ <- Either.cond(maybeWithDebugPayload.publicKey.toAddress == key, (), error.AddressAndPublicKeyAreIncompatible(key, maybeWithDebugPayload.publicKey))
+    } yield maybeWithDebugPayload
 
 }
 

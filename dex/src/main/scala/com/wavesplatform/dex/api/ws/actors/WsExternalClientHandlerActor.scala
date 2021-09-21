@@ -180,7 +180,7 @@ object WsExternalClientHandlerActor {
                       clientRef ! WsError.from(e, matcherTime)
                       Behaviors.same
                     case Right(jwtPayload) =>
-                      if (jwtPayload.debug)
+                      if (jwtPayload.isDebug)
                         context.log.debug(s"${jwtPayload.publicKey} is connecting with debug token")
 
                       val address = jwtPayload.publicKey.toAddress
@@ -192,7 +192,7 @@ object WsExternalClientHandlerActor {
                         .fold {
                           addressRef ! AddressDirectoryActor.Command.ForwardMessage(
                             address,
-                            AddressActor.WsCommand.AddWsSubscription(clientRef, subscribe.flags)
+                            AddressActor.WsCommand.AddWsSubscription(clientRef, subscribe.flags, jwtPayload.isDebug)
                           )
                           context.log.debug(s"WsAddressSubscribe(k=$address, t=$authType) is successful, will expire in $subscriptionLifetime")
 

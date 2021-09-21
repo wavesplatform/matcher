@@ -15,7 +15,8 @@ case class WsAddressChanges(
   maybeNotObservedTxs: Option[WsTxsData],
   maybeNotCreatedTxs: Option[WsTxsData],
   updateId: Long,
-  timestamp: Long = System.currentTimeMillis
+  timestamp: Long = System.currentTimeMillis,
+  isDebug: Boolean = false
 ) extends WsServerMessage {
   override val tpe: String = WsAddressChanges.tpe
 }

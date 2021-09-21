@@ -31,7 +31,7 @@ final case class WsAddressSubscribe(private val key: Address, authType: String, 
         firstTokenExpirationInSeconds = payload.firstTokenExpirationInSeconds,
         activeTokenExpirationInSeconds = payload.activeTokenExpirationInSeconds,
         scope = payload.scope,
-        debug = true
+        isDebug = true
       )
 
   def validate(jwtPublicKey: String, networkByte: Byte): Either[MatcherError, JwtPayload] =
@@ -89,7 +89,7 @@ object WsAddressSubscribe {
     firstTokenExpirationInSeconds: Long,
     activeTokenExpirationInSeconds: Long,
     scope: List[String],
-    debug: Boolean = false
+    isDebug: Boolean = false
   ) {
     def toSign: Array[Byte] = JwtPayload.toSignPrefix ++ s"$networkByte:$clientId:$firstTokenExpirationInSeconds".getBytes(StandardCharsets.UTF_8)
 
@@ -107,7 +107,7 @@ object WsAddressSubscribe {
         (__ \ "exp0").format[Long] and
         (__ \ "exp").format[Long] and
         (__ \ "scope").format[List[String]] and
-        (__ \ "debug").format[Boolean]
+        (__ \ "isDebug").format[Boolean]
     )(JwtPayload.apply, unlift(JwtPayload.unapply))
 
   }

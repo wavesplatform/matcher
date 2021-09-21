@@ -19,7 +19,7 @@ import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, OrderRestrictionsSettings}
 import com.wavesplatform.dex.tool.Using._
 import com.wavesplatform.it.api.MatcherCommand
-import com.wavesplatform.it.{WsSuiteBase, executeCommands}
+import com.wavesplatform.it.{executeCommands, WsSuiteBase}
 import play.api.libs.json._
 
 import scala.collection.immutable.TreeMap

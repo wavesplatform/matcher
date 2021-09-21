@@ -37,7 +37,7 @@ final case class WsAddressState(
     notObservedTxs: Map[ExchangeTransaction.Id, Seq[Order.Id]],
     notCreatedTxs: Map[ExchangeTransaction.Id, Seq[Order.Id]],
     flags: Set[WsAddressFlag],
-    isDebug: Boolean
+    isDebug: Boolean = false
   ): WsAddressState = {
     val balances = mkBalancesMap(assetInfo.filter {
       case (_: Asset, info) => nftFilteringPredicate(info, flags)

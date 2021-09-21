@@ -389,7 +389,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         val o1 = mkOrderDP(bob, wavesUsdPair, SELL, 1.waves, 3000.0, ts = now)
         val o2 = mkOrderDP(bob, wavesUsdPair, SELL, 1.waves, 3000.0, ts = now + 100)
 
-        val orderIds = Set(o1.id(), o2.id())
+        val orderIds = Seq(o1.id(), o2.id())
 
         Seq(o1, o2).foreach(dex1.api.place)
 

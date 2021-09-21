@@ -153,7 +153,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
 
   def cancelOrdersByIdsWithKeyOrSignature(
     address: String,
-    ids: Set[String],
+    ids: Seq[String],
     headers: Map[String, String]
   ): R[HttpSuccessfulBatchCancel] = mk {
     basicRequest
@@ -163,24 +163,28 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .contentType(MediaType.ApplicationJson)
   }
 
-  def cancelOrdersByIdsWithKeyOrSignature(address: String, ids: Set[String]): R[HttpSuccessfulBatchCancel] =
-    cancelOrdersByIdsWithKeyOrSignature(address, ids, apiKeyHeaders)
+  def cancelOrdersByIdsWithKey(address: Address, ids: Seq[Order.Id]): R[HttpSuccessfulBatchCancel] =
+    cancelOrdersByIdsWithKey(address, ids, apiKeyHeaders)
 
-  def cancelOrdersByIdsWithKeyOrSignature(owner: Address, orderIds: Set[Order.Id], headers: Map[String, String]): R[HttpSuccessfulBatchCancel] =
-    mk {
-      basicRequest
-        .post(uri"$apiUri/matcher/orders/$owner/cancel")
-        .headers(headers)
-        .body(orderIds)
-        .contentType(MediaType.ApplicationJson)
-    }
+  def cancelOrdersByIdsWithKey(address: Address, ids: Seq[Order.Id], headers: Map[String, String]): R[HttpSuccessfulBatchCancel] = mk {
+    basicRequest
+      .post(uri"$apiUri/matcher/orders/$address/cancel")
+      .headers(headers)
+      .body(ids)
+      .contentType(MediaType.ApplicationJson)
+  }
 
-  def cancelOrdersByIdsWithKeyOrSignature(owner: Address, orderIds: Set[Order.Id]): R[HttpSuccessfulBatchCancel] =
-    cancelOrdersByIdsWithKeyOrSignature(owner, orderIds, apiKeyHeaders)
+  def cancelOrdersByIdsWithKey(ids: Seq[String], address: String): R[HttpSuccessfulBatchCancel] = mk {
+    basicRequest
+      .post(uri"$apiUri/matcher/orders/$address/cancel")
+      .headers(apiKeyHeaders)
+      .body(ids)
+      .contentType(MediaType.ApplicationJson)
+  }
 
   override def cancelOrdersByIdsWithKeyOrSignature(
     owner: Address,
-    orderIds: Set[Id],
+    orderIds: Seq[Id],
     xUserPublicKey: Option[PublicKey] = None
   ): R[HttpSuccessfulBatchCancel] = mk {
     basicRequest

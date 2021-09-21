@@ -113,6 +113,7 @@ final class CancelRoute(
   @Path("/orders/{address}/cancel#cancelOrdersByIdsWithKey")
   @ApiOperation(
     value = "Cancel active orders by IDs. Requires API Key",
+    notes = "A response has the same order of ids as in a request. Duplicates are removed",
     httpMethod = "POST",
     authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
     produces = "application/json",
@@ -140,7 +141,7 @@ final class CancelRoute(
             userPublicKey match {
               case Some(upk) if upk.toAddress != address => invalidUserPublicKey
               case _ =>
-                entity(as[Set[ByteStr]]) { xs =>
+                entity(as[List[ByteStr]]) { xs =>
                   complete {
                     askAddressActor(addressActor, address, AddressActor.Command.CancelOrders(xs, AddressActor.Command.Source.Request))(
                       handleBatchCancelResponse

@@ -6,7 +6,6 @@ import akka.pattern.{pipe, CircuitBreakerOpenException}
 import akka.{actor => classic}
 import cats.instances.list._
 import cats.instances.long._
-import cats.syntax.either._
 import cats.syntax.foldable._
 import cats.syntax.group.catsSyntaxGroup
 import cats.syntax.option._
@@ -375,26 +374,25 @@ class AddressActor(
       } else {
         log.debug(s"$command, to cancel: ${toCancelIds.mkString(", ")}")
         runWithIgnoredSpan {
-          context.actorOf(BatchOrderCancelActor.props(toCancelIds.toSet, command.source, self, sender(), settings.batchCancelTimeout))
+          context.actorOf(BatchOrderCancelActor.props(
+            toCancelIds.toList,
+            command.source,
+            self,
+            sender(),
+            settings.batchCancelTimeout
+          ))
         }
       }
 
     case command: Command.CancelOrders =>
-      val allActiveOrderIds = getActiveLimitOrders(None).map(_.order.id()).toSet
-      val toCancelIds = allActiveOrderIds.intersect(command.orderIds)
-      val unknownIds = command.orderIds -- allActiveOrderIds
-
-      log.debug(
-        s"$command, total orders: ${allActiveOrderIds.size}, to cancel (${toCancelIds.size}): ${toCancelIds
-          .mkString(", ")}, unknown ids (${unknownIds.size}): ${unknownIds.mkString(", ")}"
-      )
-
-      val initResponse = unknownIds.map(id => id -> error.OrderNotFound(id).asLeft[AddressActor.Event.OrderCanceled]).toMap
-      if (toCancelIds.isEmpty) sender() ! Event.BatchCancelCompleted(initResponse)
-      else
-        runWithIgnoredSpan {
-          context.actorOf(BatchOrderCancelActor.props(toCancelIds, command.source, self, sender(), settings.batchCancelTimeout, initResponse))
-        }
+      log.debug("{}", command)
+      runWithIgnoredSpan(context.actorOf(BatchOrderCancelActor.props(
+        command.orderIds,
+        command.source,
+        self,
+        sender(),
+        settings.batchCancelTimeout
+      )))
 
     case command @ CancelExpiredOrder(id) =>
       expiration.remove(id)
@@ -926,7 +924,7 @@ object AddressActor {
     }
 
     case class CancelOrder(orderId: Order.Id, source: Source) extends OneOrderCommand
-    case class CancelOrders(orderIds: Set[Order.Id], source: Source) extends Command
+    case class CancelOrders(orderIds: List[Order.Id], source: Source) extends Command
     case class CancelAllOrders(pair: Option[AssetPair], timestamp: Long, source: Source) extends Command
 
     sealed trait Source extends Product with Serializable

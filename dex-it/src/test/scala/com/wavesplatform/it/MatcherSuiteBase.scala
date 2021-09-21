@@ -8,6 +8,7 @@ import com.wavesplatform.dex.asset.DoubleOps
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.OrderType.BUY
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.it.api.BaseContainersKit
@@ -105,11 +106,11 @@ trait MatcherSuiteBase
     account
   }
 
-  protected def placeAndGetIds(count: Int): Set[String] =
+  protected def placeAndGetIds(count: Int): Seq[Order.Id] =
     (1 to count).map { i =>
       val o = mkOrder(alice, wavesUsdPair, BUY, 10.waves, i.usd)
       placeAndAwaitAtDex(o)
-      o.idStr()
-    }.toSet
+      o.id()
+    }
 
 }

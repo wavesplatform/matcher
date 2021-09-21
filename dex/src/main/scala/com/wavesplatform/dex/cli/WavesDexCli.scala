@@ -183,6 +183,9 @@ object WavesDexCli extends ScoptImplicits {
          |""".stripMargin
     )
 
+    lazy val (_, matcherSettings) = loadAllConfigsUnsafe(args.configPath)
+    val updatedArgs = matcherSettings.cli.defaultArgs.coverEmptyValues(args)
+
     implicit val scheduler: SchedulerService = Scheduler.singleThread(
       name = "time-impl",
       daemonic = true,
@@ -196,8 +199,8 @@ object WavesDexCli extends ScoptImplicits {
       val r = basicRequest.headers(Map("X-API-KEY" -> key))
 
       val body = method match {
-        case "post" => r.post(uri"${args.dexRestApi}/matcher/debug/$urlPart").send(backend).body
-        case _ => r.get(uri"${args.dexRestApi}/matcher/debug/$urlPart").send(backend).body
+        case "post" => r.post(uri"${updatedArgs.dexRestApi}/matcher/debug/$urlPart").send(backend).body
+        case _ => r.get(uri"${updatedArgs.dexRestApi}/matcher/debug/$urlPart").send(backend).body
       }
 
       body match {
@@ -213,10 +216,10 @@ object WavesDexCli extends ScoptImplicits {
       .delayExecution(1.second)
       .onErrorRestart(Long.MaxValue)
       .restartUntil(_ == true)
-      .timeout(args.timeout)
+      .timeout(updatedArgs.timeout)
       .runToFuture
 
-    Try(Await.ready(validation, args.timeout)) match {
+    Try(Await.ready(validation, updatedArgs.timeout)) match {
       case Success(_) => println(s"Success!")
       case Failure(e) =>
         e match {
@@ -418,6 +421,14 @@ object WavesDexCli extends ScoptImplicits {
     Using.resource(openDb(dataDirectory)) { db =>
       f(LevelDb.sync(db))
     }
+
+  private def loadAllConfigsUnsafe(path: String): (Config, MatcherSettings) =
+    cli.wrapByLogs("  Loading Matcher settings... ") {
+      for {
+        config <- Try(parseFile(new File(path))).toEither.leftMap(th => s"Cannot load config at path $path: ${th.getWithStackTrace}")
+        matcherSettings <- loadMatcherSettings(config)
+      } yield config -> matcherSettings
+    }.fold(error => throw new RuntimeException(error), identity)
 
   // todo commands:
   // get account by seed [and nonce]
@@ -709,14 +720,6 @@ object WavesDexCli extends ScoptImplicits {
           )
       )
     }
-
-    def loadAllConfigsUnsafe(path: String): (Config, MatcherSettings) =
-      cli.wrapByLogs("  Loading Matcher settings... ") {
-        for {
-          config <- Try(parseFile(new File(path))).toEither.leftMap(th => s"Cannot load config at path $path: ${th.getWithStackTrace}")
-          matcherSettings <- loadMatcherSettings(config)
-        } yield config -> matcherSettings
-      }.fold(error => throw new RuntimeException(error), identity)
 
     // noinspection ScalaStyle
     OParser.parse(parser, rawArgs, Args())

@@ -182,9 +182,11 @@ class WsMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDrivenProp
   "WsOrder" in serdeTest(wsOrderGen)
 
   "WsAddressChanges" - {
+    val oneTimeGenerateConfig = MinSuccessful(1)
+
     "default" in serdeTest(wsAddressChangesGen)
     "isDebug" - {
-      def test(transform: JsObject => JsObject)(check: Boolean => Any): Any = forAll(wsAddressChangesGen) { original =>
+      def test(transform: JsObject => JsObject)(check: Boolean => Any): Any = forAll(wsAddressChangesGen, oneTimeGenerateConfig) { original =>
         val json = transform(WsAddressChanges.wsAddressChangesFormat.writes(original))
         val restored =
           WsAddressChanges.wsAddressChangesFormat
@@ -202,6 +204,11 @@ class WsMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDrivenProp
       "Some(false) equals false" in test(_ + ("d" -> JsBoolean(false)))(_ shouldBe false)
 
       "Some(true) equals true" in test(_ + ("d" -> JsBoolean(true)))(_ shouldBe true)
+
+      "Doesn't appear in JSON if false" in forAll(wsAddressChangesGen, oneTimeGenerateConfig) { original =>
+        val json = WsAddressChanges.wsAddressChangesFormat.writes(original.copy(isDebug = true))
+        json.value.get("d") shouldBe empty // contain doesn't work here
+      }
     }
   }
 

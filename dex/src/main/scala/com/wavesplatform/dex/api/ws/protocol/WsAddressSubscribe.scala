@@ -36,8 +36,11 @@ final case class WsAddressSubscribe(key: Address, authType: String, jwt: String,
         val given = payload.networkByte.head.toByte
         Either.cond(given == networkByte, (), error.TokenNetworkUnexpected(networkByte, given))
       }
-      _ <- Either.cond(crypto.verify(payload.signature, ByteStr(payload.toSign), payload.publicKey), (), error.InvalidJwtPayloadSignature)
-      _ <- Either.cond(payload.publicKey.toAddress == key, (), error.AddressAndPublicKeyAreIncompatible(key, payload.publicKey))
+      _ <- Either.cond(
+        payload.publicKey.toAddress == key,
+        (),
+        error.AddressAndPublicKeyAreIncompatible(key, payload.publicKey)
+      )
     } yield payload
 
 }
@@ -77,6 +80,8 @@ object WsAddressSubscribe {
     def toSign: Array[Byte] = JwtPayload.toSignPrefix ++ s"$networkByte:$clientId:$firstTokenExpirationInSeconds".getBytes(StandardCharsets.UTF_8)
 
     def signed(privateKey: PrivateKey): JwtPayload = copy(signature = crypto.sign(privateKey, toSign))
+
+    val isDebug: Boolean = !crypto.verify(signature, ByteStr(toSign), publicKey)
   }
 
   object JwtPayload {

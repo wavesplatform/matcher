@@ -36,14 +36,15 @@ final case class WsAddressState(
     orders: Seq[WsOrder],
     notObservedTxs: Map[ExchangeTransaction.Id, Seq[Order.Id]],
     notCreatedTxs: Map[ExchangeTransaction.Id, Seq[Order.Id]],
-    flags: Set[WsAddressFlag]
+    flags: Set[WsAddressFlag],
+    isDebug: Boolean = false
   ): WsAddressState = {
     val balances = mkBalancesMap(assetInfo.filter {
       case (_: Asset, info) => nftFilteringPredicate(info, flags)
     })
     val (maybeNotObservedTxsData, maybeNotCreatedTxsData) =
       mkImaginaryTxsData(notObservedTxs, Set.empty, notCreatedTxs, Set.empty, flags)
-    subscriber ! WsAddressChanges(address, balances, orders, maybeNotObservedTxsData, maybeNotCreatedTxsData, 0)
+    subscriber ! WsAddressChanges(address, balances, orders, maybeNotObservedTxsData, maybeNotCreatedTxsData, 0, isDebug = isDebug)
     copy(activeSubscription = activeSubscription.updated(subscriber, Subscription(0, flags)))
   }
 

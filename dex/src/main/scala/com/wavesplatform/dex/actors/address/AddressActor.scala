@@ -503,15 +503,16 @@ class AddressActor(
         } else log.warn(s"Received stale $event for $orderId")
       }
 
-    case WsCommand.AddWsSubscription(client, flags) =>
-      log.trace(s"[c=${client.path.name}] Added WebSocket subscription")
+    case WsCommand.AddWsSubscription(client, flags, isDebug) =>
+      log.trace(s"[c=${client.path.name}] Added WebSocket subscription (debug = $isDebug)")
       wsAddressState = wsAddressState.addSubscription(
         client,
         mkWsBalances(balances.allAssets, includeEmpty = false),
         activeOrders.values.map(WsOrder.fromDomain(_)).to(Seq),
         balances.notObservedTxs.view.mapValues(_.orderIds).toMap,
         balances.notCreatedTxs.view.mapValues(_.orderIds).toMap,
-        flags
+        flags,
+        isDebug
       )
       context.watch(client)
 
@@ -963,7 +964,10 @@ object AddressActor {
   sealed trait WsCommand extends Message
 
   object WsCommand {
-    case class AddWsSubscription(client: typed.ActorRef[WsAddressChanges], flags: Set[WsAddressFlag] = Set.empty) extends WsCommand
+
+    case class AddWsSubscription(client: typed.ActorRef[WsAddressChanges], flags: Set[WsAddressFlag] = Set.empty, isDebug: Boolean = false)
+        extends WsCommand
+
     case class RemoveWsSubscription(client: typed.ActorRef[WsAddressChanges]) extends WsCommand
     private[AddressActor] case object SendDiff extends WsCommand
   }

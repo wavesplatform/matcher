@@ -159,15 +159,6 @@ class WsExternalClientHandlerActorSpec extends AnyFreeSpecLike with Matchers wit
           )
         )
 
-        "invalid signature" in failTest(
-          mkJwt(mkJwtNotSignedPayload(clientKeyPair)),
-          WsError(
-            timestamp = 0L, // ignored
-            code = InvalidJwtPayloadSignature.code,
-            message = "The token payload signature is invalid"
-          )
-        )
-
         "address doesn't fit public key" in failTest(
           WsAddressSubscribe(KeyPair(ByteStr("other-client".getBytes(StandardCharsets.UTF_8))), "jwt", mkJwt(mkJwtSignedPayload(clientKeyPair))),
           WsError(
@@ -176,6 +167,20 @@ class WsExternalClientHandlerActorSpec extends AnyFreeSpecLike with Matchers wit
             message = "Address 3N7nTwcKubzsH6X1uWerLoYFGX1pTKSbhUu and public key D6HmGZqpXCyAqpz8mCAfWijYDWsPKncKe5v3jq1nTpf5 are incompatible"
           )
         )
+      }
+
+      "jwt is debug" - {
+        "when invalid signature" in test { t =>
+          t.wsHandlerRef ! ProcessClientMessage(WsAddressSubscribe(
+            clientKeyPair,
+            WsAddressSubscribe.defaultAuthType,
+            mkJwt(mkJwtNotSignedPayload(clientKeyPair))
+          ))
+          t.addressProbe.expectMsgType[AddressDirectoryActor.Command.ForwardMessage].message match {
+            case x: AddressActor.WsCommand.AddWsSubscription => x.isDebug shouldBe true
+            case x => fail(s"Unexpected message: $x")
+          }
+        }
       }
 
       "should be cancelled after jwt expiration" in test { t =>

@@ -173,18 +173,18 @@ object WavesDexCli extends ScoptImplicits {
 
   // noinspection ScalaStyle
   def makeSnapshots(args: Args): Unit = {
+    lazy val (_, matcherSettings) = loadAllConfigsUnsafe(args.configPath)
+    val updatedArgs = matcherSettings.cli.defaultArgs.coverEmptyValues(args)
+
     cli.log(
       s"""
-         |Passed arguments:
-         |  DEX config path : ${args.configPath}
-         |  DEX REST API    : ${args.dexRestApi}
-         |  Timeout         : ${args.timeout}
+         |Parameters:
+         |  DEX config path : ${updatedArgs.configPath}
+         |  DEX REST API    : ${updatedArgs.dexRestApi}
+         |  Timeout         : ${updatedArgs.timeout}
          |Running in background
          |""".stripMargin
     )
-
-    lazy val (_, matcherSettings) = loadAllConfigsUnsafe(args.configPath)
-    val updatedArgs = matcherSettings.cli.defaultArgs.coverEmptyValues(args)
 
     implicit val scheduler: SchedulerService = Scheduler.singleThread(
       name = "time-impl",

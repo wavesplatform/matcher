@@ -64,6 +64,12 @@ class OrderBookTestSuite extends MatcherSuiteBase {
     aliceRBForBothPairs = reservedBalancesOf(alice)
     bobRBForBothPairs = reservedBalancesOf(bob)
 
+    dex1.restartWithNewSuiteConfig(ConfigFactory.parseString(
+      s"""waves.dex {
+         |  blacklisted-assets  = [$UsdId, $WctId]
+         |}""".stripMargin
+    ).withFallback(dexInitialSuiteConfig))
+
     dex1.tryApi.deleteOrderBookWithKey(wctUsdPair) shouldBe Symbol("right")
   }
 

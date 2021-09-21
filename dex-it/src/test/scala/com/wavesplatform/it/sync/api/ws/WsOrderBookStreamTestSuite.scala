@@ -402,6 +402,11 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
       Using.resource((1 to 3).map(_ => mkWsOrderBookConnection(assetPair, dex1))) { wscs =>
         wscs.foreach(_.receiveAtLeastN[WsOrderBookChanges](1))
 
+        dex1.restartWithNewSuiteConfig(ConfigFactory.parseString(
+          s"""waves.dex {
+             |  blacklisted-assets  = [${assetPair.amountAsset}]
+             |}""".stripMargin
+        ).withFallback(dexInitialSuiteConfig))
         dex1.tryApi.deleteOrderBookWithKey(assetPair)
 
         val expectedMessage = WsError(

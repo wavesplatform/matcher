@@ -560,42 +560,5 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       dex1.api.deleteAssetRate(usdn)
     }
 
-    "delete order books if their asset pair became invalid" in {
-
-      val sellOrder1 = mkOrderDP(alice, ethWavesPair, SELL, 1, 135)
-      placeAndAwaitAtDex(sellOrder1)
-
-      val ob = dex1.api.getOrderBook(ethWavesPair)
-      ob.asks should have size 1
-      ob.bids should have size 0
-
-      // Before: [ "$UsdnId", "$BtcId", "$UsdId", "WAVES", $EthId ]
-      dex1.restartWithNewSuiteConfig(
-        ConfigFactory
-          .parseString(s"""waves.dex.price-assets = [ "$UsdnId", "$BtcId", "$UsdId", $EthId, "WAVES"]""".stripMargin)
-          .withFallback(dexInitialSuiteConfig)
-      )
-
-      withClue("The old order book is not available") {
-        dex1.httpApi.getOrderBook(ethWavesPair).code shouldBe StatusCode.MovedPermanently
-      }
-
-      val wavesEthPair = AssetPair(Waves, eth)
-      dex1.api.orderStatusByAssetPairAndId(wavesEthPair, sellOrder1.id()).status shouldBe Status.Accepted
-
-      dex1.api.getOrderBook(wavesEthPair) should matchTo(
-        HttpV0OrderBook(
-          timestamp = 0,
-          pair = wavesEthPair,
-          bids = List.empty,
-          asks = List.empty
-        )
-      )
-
-      dex1.api.deleteOrderBookWithKey(ethWavesPair)
-      dex1.api.waitForOrderStatus(wavesEthPair, sellOrder1.id(), Status.Cancelled)
-
-      placeAndAwaitAtDex(mkOrderDP(alice, wavesEthPair, SELL, 100, 1))
-    }
   }
 }

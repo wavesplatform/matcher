@@ -1,8 +1,10 @@
 package com.wavesplatform.it.matcher.api.http.markets
 
+import cats.syntax.either._
 import sttp.model.StatusCode
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
+import com.wavesplatform.dex.api.http.entities.HttpV0OrderBook
 import com.wavesplatform.dex.domain.order.OrderType.SELL
 import com.wavesplatform.dex.error.{InvalidAsset, OrderBookBroken}
 import com.wavesplatform.dex.it.docker.apiKey
@@ -37,12 +39,6 @@ class DeleteOrderBookWithKeySpec extends MatcherSuiteBase with ApiKeyHeaderCheck
       ))
 
       validate202Json(dex1.rawApi.deleteOrderBookWithKey(wavesUsdPair)).message should be("Deleting order book")
-
-      eventually {
-
-        // todo: now it responds that asset is blacklisted
-        dex1.api.waitForOrderStatus(order, Status.Cancelled)
-      }
     }
 
     "should return an error if orderbook doesn't exists" in {

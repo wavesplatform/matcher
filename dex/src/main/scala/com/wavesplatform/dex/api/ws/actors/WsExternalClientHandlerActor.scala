@@ -181,7 +181,7 @@ object WsExternalClientHandlerActor {
                       Behaviors.same
                     case Right(jwtPayload) =>
                       if (jwtPayload.isDebug)
-                        context.log.debug(s"${jwtPayload.publicKey} is connecting with debug token")
+                        context.log.debug(s"${jwtPayload.publicKey.toAddress} is connecting with debug token")
 
                       val address = jwtPayload.publicKey.toAddress
                       val subscriptionLifetime = (jwtPayload.activeTokenExpirationInSeconds * 1000 - time.correctedTime()).millis

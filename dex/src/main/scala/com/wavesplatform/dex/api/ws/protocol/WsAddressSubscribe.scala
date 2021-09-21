@@ -19,21 +19,6 @@ final case class WsAddressSubscribe(private val key: Address, authType: String, 
     extends WsClientMessage {
   override val tpe: String = WsAddressSubscribe.tpe
 
-  private def maybeWithDebug(payload: JwtPayload): JwtPayload =
-    if (crypto.verify(payload.signature, ByteStr(payload.toSign), payload.publicKey))
-      payload
-    else
-      payload.copy(
-        signature = payload.signature,
-        publicKey = payload.publicKey,
-        networkByte = payload.networkByte,
-        clientId = payload.clientId,
-        firstTokenExpirationInSeconds = payload.firstTokenExpirationInSeconds,
-        activeTokenExpirationInSeconds = payload.activeTokenExpirationInSeconds,
-        scope = payload.scope,
-        isDebug = true
-      )
-
   def validate(jwtPublicKey: String, networkByte: Byte): Either[MatcherError, JwtPayload] =
     for {
       _ <- Either.cond(supportedAuthTypes.contains(authType), (), error.SubscriptionAuthTypeUnsupported(supportedAuthTypes, authType))
@@ -52,13 +37,12 @@ final case class WsAddressSubscribe(private val key: Address, authType: String, 
         val given = payload.networkByte.head.toByte
         Either.cond(given == networkByte, (), error.TokenNetworkUnexpected(networkByte, given))
       }
-      maybeWithDebugPayload = maybeWithDebug(payload)
       _ <- Either.cond(
-        maybeWithDebugPayload.publicKey.toAddress == key,
+        payload.publicKey.toAddress == key,
         (),
-        error.AddressAndPublicKeyAreIncompatible(key, maybeWithDebugPayload.publicKey)
+        error.AddressAndPublicKeyAreIncompatible(key, payload.publicKey)
       )
-    } yield maybeWithDebugPayload
+    } yield payload
 
 }
 
@@ -92,12 +76,13 @@ object WsAddressSubscribe {
     clientId: String,
     firstTokenExpirationInSeconds: Long,
     activeTokenExpirationInSeconds: Long,
-    scope: List[String],
-    isDebug: Boolean = false
+    scope: List[String]
   ) {
     def toSign: Array[Byte] = JwtPayload.toSignPrefix ++ s"$networkByte:$clientId:$firstTokenExpirationInSeconds".getBytes(StandardCharsets.UTF_8)
 
     def signed(privateKey: PrivateKey): JwtPayload = copy(signature = crypto.sign(privateKey, toSign))
+
+    val isDebug: Boolean = !crypto.verify(signature, ByteStr(toSign), publicKey)
   }
 
   object JwtPayload {
@@ -110,8 +95,7 @@ object WsAddressSubscribe {
         (__ \ "cid").format[String] and
         (__ \ "exp0").format[Long] and
         (__ \ "exp").format[Long] and
-        (__ \ "scope").format[List[String]] and
-        (__ \ "isDebug").format[Boolean]
+        (__ \ "scope").format[List[String]]
     )(JwtPayload.apply, unlift(JwtPayload.unapply))
 
   }

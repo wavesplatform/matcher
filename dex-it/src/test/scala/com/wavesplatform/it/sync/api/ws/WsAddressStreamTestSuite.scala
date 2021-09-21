@@ -745,6 +745,23 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
     }
   }
 
+  "should send updates without 2nd step (waves's) signature in jwt" in {
+    val acc = mkAccountWithBalance(10.waves -> Waves)
+
+    Using.resource(mkDexWsConnection(dex1)) { wsc =>
+      wsc.send(
+        WsAddressSubscribe(
+          acc,
+          WsAddressSubscribe.defaultAuthType,
+          mkJwt(mkJwtNotSignedPayload(acc))
+        )
+      )
+
+      eventually(wsc.balanceChanges should have size 1)
+    }
+
+  }
+
   "Bugs" - {
     "DEX-816 Failure of AddressActor" in {
       dex1.stopWithoutRemove()

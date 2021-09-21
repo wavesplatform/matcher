@@ -758,7 +758,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
       )
 
       eventually(
-        wsc.addressStateChanges.head.isDebug should be (true)
+        wsc.addressStateChanges.head.isDebug should be(true)
       )
     }
 

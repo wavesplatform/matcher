@@ -170,18 +170,17 @@ object WsExternalClientHandlerActor {
                   Behaviors.same
 
                 case subscribe: WsAddressSubscribe =>
+                  val address = subscribe.key
                   val authType = subscribe.authType
 
                   subscribe.validate(settings.jwtPublicKey, AddressScheme.current.chainId) match {
                     case Left(e) =>
                       context.log.debug(
-                        s"WsAddressSubscribe(k=${PublicKey.fromBase58String(settings.jwtPublicKey).getOrElse(PublicKey.empty).toAddress}, t=$authType) failed with ${e.message.text}"
+                        s"WsAddressSubscribe(k=$address, t=$authType) failed with ${e.message.text}"
                       )
                       clientRef ! WsError.from(e, matcherTime)
                       Behaviors.same
                     case Right(jwtPayload) =>
-                      val address = jwtPayload.publicKey.toAddress
-
                       if (jwtPayload.isDebug)
                         context.log.debug(s"$address is connecting with debug token")
 
@@ -189,10 +188,10 @@ object WsExternalClientHandlerActor {
                       val expiration = scheduleOnce(subscriptionLifetime, CancelAddressSubscription(address))
 
                       addressSubscriptions
-                        .find(_._1 == address)
+                        .find(_._1 == subscribe.key)
                         .fold {
                           addressRef ! AddressDirectoryActor.Command.ForwardMessage(
-                            address,
+                            subscribe.key,
                             AddressActor.WsCommand.AddWsSubscription(clientRef, subscribe.flags, jwtPayload.isDebug)
                           )
                           context.log.debug(s"WsAddressSubscribe(k=$address, t=$authType) is successful, will expire in $subscriptionLifetime")

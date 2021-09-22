@@ -137,9 +137,15 @@ class OrderBookActor(
           aggregatedRef ! AggregatedOrderBookActor.Command.Stop(self, error.OrderBookStopped(assetPair))
 
         case (Some(lastProcessed), _) if request.offset <= lastProcessed => // Already processed
-        case (_, ValidatedCommand.PlaceOrder(limitOrder, _)) => onAddOrder(request, limitOrder)
-        case (_, ValidatedCommand.PlaceMarketOrder(marketOrder, _)) => onAddOrder(request, marketOrder)
-        case (_, x: ValidatedCommand.CancelOrder) => onCancelOrder(request, x)
+        case (_, ValidatedCommand.PlaceOrder(limitOrder, _)) =>
+          lastProcessedOffset = Some(request.offset)
+          onAddOrder(request, limitOrder)
+        case (_, ValidatedCommand.PlaceMarketOrder(marketOrder, _)) =>
+          lastProcessedOffset = Some(request.offset)
+          onAddOrder(request, marketOrder)
+        case (_, x: ValidatedCommand.CancelOrder) =>
+          lastProcessedOffset = Some(request.offset)
+          onCancelOrder(request, x)
 
       }
 

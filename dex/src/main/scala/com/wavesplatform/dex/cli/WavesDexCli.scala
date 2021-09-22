@@ -148,7 +148,7 @@ object WavesDexCli extends ScoptImplicits {
         checkResult <- new Checker(superConnector).checkState(args.version, args.accountSeed, config, matcherSettings)
         _ <- cli.lift(superConnector.close())
       } yield checkResult
-    ) match {
+      ) match {
       case Right(diagnosticNotes) => println(s"$diagnosticNotes\nCongratulations! All checks passed!")
       case Left(error) => println(error); forceStopApplication(MatcherStateCheckingFailedError)
     }
@@ -173,15 +173,12 @@ object WavesDexCli extends ScoptImplicits {
 
   // noinspection ScalaStyle
   def makeSnapshots(args: Args): Unit = {
-    lazy val (_, matcherSettings) = loadAllConfigsUnsafe(args.configPath)
-    val updatedArgs = matcherSettings.cli.defaultArgs.coverEmptyValues(args)
-
     cli.log(
       s"""
-         |Parameters:
-         |  DEX config path : ${updatedArgs.configPath}
-         |  DEX REST API    : ${updatedArgs.dexRestApi}
-         |  Timeout         : ${updatedArgs.timeout}
+         |Passed arguments:
+         |  DEX config path : ${args.configPath}
+         |  DEX REST API    : ${args.dexRestApi}
+         |  Timeout         : ${args.timeout}
          |Running in background
          |""".stripMargin
     )
@@ -199,8 +196,8 @@ object WavesDexCli extends ScoptImplicits {
       val r = basicRequest.headers(Map("X-API-KEY" -> key))
 
       val body = method match {
-        case "post" => r.post(uri"${updatedArgs.dexRestApi}/matcher/debug/$urlPart").send(backend).body
-        case _ => r.get(uri"${updatedArgs.dexRestApi}/matcher/debug/$urlPart").send(backend).body
+        case "post" => r.post(uri"${args.dexRestApi}/matcher/debug/$urlPart").send(backend).body
+        case _ => r.get(uri"${args.dexRestApi}/matcher/debug/$urlPart").send(backend).body
       }
 
       body match {
@@ -216,10 +213,10 @@ object WavesDexCli extends ScoptImplicits {
       .delayExecution(1.second)
       .onErrorRestart(Long.MaxValue)
       .restartUntil(_ == true)
-      .timeout(updatedArgs.timeout)
+      .timeout(args.timeout)
       .runToFuture
 
-    Try(Await.ready(validation, updatedArgs.timeout)) match {
+    Try(Await.ready(validation, args.timeout)) match {
       case Success(_) => println(s"Success!")
       case Failure(e) =>
         e match {
@@ -421,14 +418,6 @@ object WavesDexCli extends ScoptImplicits {
     Using.resource(openDb(dataDirectory)) { db =>
       f(LevelDb.sync(db))
     }
-
-  private def loadAllConfigsUnsafe(path: String): (Config, MatcherSettings) =
-    cli.wrapByLogs("  Loading Matcher settings... ") {
-      for {
-        config <- Try(parseFile(new File(path))).toEither.leftMap(th => s"Cannot load config at path $path: ${th.getWithStackTrace}")
-        matcherSettings <- loadMatcherSettings(config)
-      } yield config -> matcherSettings
-    }.fold(error => throw new RuntimeException(error), identity)
 
   // todo commands:
   // get account by seed [and nonce]
@@ -721,6 +710,14 @@ object WavesDexCli extends ScoptImplicits {
       )
     }
 
+    def loadAllConfigsUnsafe(path: String): (Config, MatcherSettings) =
+      cli.wrapByLogs("  Loading Matcher settings... ") {
+        for {
+          config <- Try(parseFile(new File(path))).toEither.leftMap(th => s"Cannot load config at path $path: ${th.getWithStackTrace}")
+          matcherSettings <- loadMatcherSettings(config)
+        } yield config -> matcherSettings
+      }.fold(error => throw new RuntimeException(error), identity)
+
     // noinspection ScalaStyle
     OParser.parse(parser, rawArgs, Args())
       .map { args =>
@@ -850,27 +847,27 @@ object WavesDexCli extends ScoptImplicits {
   private val defaultFile = new File(".")
 
   final case class Args(
-    addressSchemeByte: Option[Char] = None,
-    seedFormat: SeedFormat = SeedFormat.RawString,
-    accountNonce: Option[Int] = None,
-    command: Option[Command] = None,
-    outputDirectory: File = defaultFile,
-    apiKey: String = "",
-    dexRestApi: String = "",
-    nodeRestApi: String = "",
-    version: String = "",
-    configPath: String = "",
-    assetPair: String = "",
-    assetId: String = "",
-    name: String = "",
-    decimals: Int = 8,
-    hasScript: Boolean = false,
-    isNft: Boolean = false,
-    orderId: String = "",
-    authServiceRestApi: Option[String] = None,
-    accountSeed: Option[String] = None,
-    timeout: FiniteDuration = 0 seconds
-  )
+                         addressSchemeByte: Option[Char] = None,
+                         seedFormat: SeedFormat = SeedFormat.RawString,
+                         accountNonce: Option[Int] = None,
+                         command: Option[Command] = None,
+                         outputDirectory: File = defaultFile,
+                         apiKey: String = "",
+                         dexRestApi: String = "",
+                         nodeRestApi: String = "",
+                         version: String = "",
+                         configPath: String = "",
+                         assetPair: String = "",
+                         assetId: String = "",
+                         name: String = "",
+                         decimals: Int = 8,
+                         hasScript: Boolean = false,
+                         isNft: Boolean = false,
+                         orderId: String = "",
+                         authServiceRestApi: Option[String] = None,
+                         accountSeed: Option[String] = None,
+                         timeout: FiniteDuration = 0 seconds
+                       )
 
   // noinspection ScalaStyle
   @scala.annotation.tailrec

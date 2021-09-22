@@ -24,7 +24,7 @@ final case class DefaultArgs(
     val overrideDexRestApi = if (args.dexRestApi.isEmpty) dexRestApi else args.dexRestApi
     val overrideNodeRestApi = if (args.nodeRestApi.isEmpty) nodeRestApi.getOrElse("") else args.nodeRestApi
     val overrideAuthServiceRestApi = if (args.authServiceRestApi.isEmpty) authServiceRestApi else args.authServiceRestApi
-    val overrideTimeout = if (args.timeout.length == 0) args.timeout else args.timeout
+    val overrideTimeout = if (args.timeout.length == 0) timeout else args.timeout
 
     args.copy(
       addressSchemeByte = overrideAddressSchemeByte.some,

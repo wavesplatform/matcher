@@ -28,6 +28,7 @@ import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.effect.FutureResult
+import com.wavesplatform.dex.error.{AssetPairNotBlacklisted, Blacklisted, MatcherError}
 import com.wavesplatform.dex.model.{AssetPairBuilder, _}
 import com.wavesplatform.dex.queue.MatcherQueue.StoreValidatedCommand
 import com.wavesplatform.dex.queue.ValidatedCommand
@@ -367,13 +368,11 @@ final class MarketsRoute(
     }
 
   private def withOnlyBlacklistedAssets(assetPair: AssetPair): Directive0 = FutureDirectives.onSuccess(
-    (for {
-      _ <- assetPairBuilder.validateAssetIdBlacklisted(assetPair.amountAsset)
-      _ <- assetPairBuilder.validateAssetIdBlacklisted(assetPair.priceAsset)
-    } yield ()).value
+    assetPairBuilder.validateAssetPair(assetPair).value
   ).flatMap {
-    case Right(_) => pass
+    case e @ Left(_: MatcherError with Blacklisted) => pass
     case Left(e) => complete(InfoNotFound(e))
+    case Right(value) => complete(InfoNotFound(error.AssetPairNotBlacklisted(assetPair)))
   }
 
   private def getOrderBookRestrictions(pair: AssetPair): FutureResult[HttpOrderBookInfo] = settings.getActualTickSize(pair).map { tickSize =>

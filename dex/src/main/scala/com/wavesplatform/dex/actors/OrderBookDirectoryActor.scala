@@ -182,8 +182,8 @@ class OrderBookDirectoryActor(
         case ValidatedCommand.DeleteOrderBook(assetPair, _) =>
           // autoCreate = false for case, when multiple OrderBookDeleted(A1-A2) events happen one after another
           runFor(request.command.assetPair, Some(currentLastProcessedNr), autoCreate = false) { (sender, ref) =>
-            ref.tell(request, sender)
             orderBooks.getAndUpdate(_.filterNot(_._2.exists(_ == ref)))
+            ref.tell(request, sender)
             snapshotsState = snapshotsState.without(assetPair)
             tradedPairs -= assetPair
             assetPairsDb

@@ -128,18 +128,19 @@ class OrderBookActor(
     // DEX-1192 docs/places-and-cancels.md
     case request: ValidatedCommandWithMeta =>
       actualizeRules(request.offset)
-      lastProcessedOffset match {
-        case Some(lastProcessed) if request.offset <= lastProcessed => // Already processed
-        case _ =>
-          lastProcessedOffset = Some(request.offset)
-          request.command match {
-            case ValidatedCommand.PlaceOrder(limitOrder, _) => onAddOrder(request, limitOrder)
-            case ValidatedCommand.PlaceMarketOrder(marketOrder, _) => onAddOrder(request, marketOrder)
-            case x: ValidatedCommand.CancelOrder => onCancelOrder(request, x)
-            case _: ValidatedCommand.DeleteOrderBook =>
-              process(request.timestamp, orderBook.cancelAll(request.timestamp, OrderCanceledReason.OrderBookDeleted))
-              aggregatedRef ! AggregatedOrderBookActor.Command.Stop(self, error.OrderBookStopped(assetPair))
-          }
+      (lastProcessedOffset, request.command) match {
+        case (_, ValidatedCommand.DeleteOrderBook(_, _)) => // maybe, already processed, but for consistent state need to always process it
+          if (lastProcessedOffset.exists(_ < request.offset) || lastProcessedOffset.isEmpty)
+            lastProcessedOffset = Some(request.offset)
+          process(request.timestamp, orderBook.cancelAll(request.timestamp, OrderCanceledReason.OrderBookDeleted))
+          saveSnapshotAt(request.offset - 1)
+          aggregatedRef ! AggregatedOrderBookActor.Command.Stop(self, error.OrderBookStopped(assetPair))
+
+        case (Some(lastProcessed), _) if request.offset <= lastProcessed => // Already processed
+        case (_, ValidatedCommand.PlaceOrder(limitOrder, _)) => onAddOrder(request, limitOrder)
+        case (_, ValidatedCommand.PlaceMarketOrder(marketOrder, _)) => onAddOrder(request, marketOrder)
+        case (_, x: ValidatedCommand.CancelOrder) => onCancelOrder(request, x)
+
       }
 
     case AggregatedOrderBookActor.Event.Stopped => context.stop(self)

@@ -129,6 +129,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
   private val (okOrder, okOrderSenderPrivateKey) = orderGenerator.sample.get
   private val (badOrder, badOrderSenderPrivateKey) = orderGenerator.sample.get
   private val (blackListedOrder, _) = orderGenerator.sample.get
+  private val (someOrder, _) = orderGenerator.sample.get
 
   private val amountAssetDesc = BriefAssetDescription("AmountAsset", 8, hasScript = false, isNft = false)
   private val priceAssetDesc = BriefAssetDescription("PriceAsset", 8, hasScript = false, isNft = false)
@@ -138,7 +139,14 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     .at("waves.dex")
     .loadOrThrow[MatcherSettings]
     .copy(
-      priceAssets = Seq(badOrder.assetPair.priceAsset, okOrder.assetPair.priceAsset, priceAsset, Waves),
+      priceAssets = Seq(
+        blackListedOrder.assetPair.priceAsset,
+        badOrder.assetPair.priceAsset,
+        someOrder.assetPair.priceAsset,
+        okOrder.assetPair.priceAsset,
+        priceAsset,
+        Waves
+      ),
       orderRestrictions = Map(smartWavesPair -> orderRestrictions)
     )
 
@@ -198,7 +206,14 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
           HttpMatcherPublicSettings(
             matcherPublicKey = matcherKeyPair.publicKey,
             matcherVersion = Version.VersionString,
-            priceAssets = List(badOrder.assetPair.priceAsset, okOrder.assetPair.priceAsset, priceAsset, Waves),
+            priceAssets = List(
+              blackListedOrder.assetPair.priceAsset,
+              badOrder.assetPair.priceAsset,
+              someOrder.assetPair.priceAsset,
+              okOrder.assetPair.priceAsset,
+              priceAsset,
+              Waves
+            ),
             orderFee = HttpOrderFeeMode.FeeModeDynamic(
               baseFee = 600000,
               rates = Map(Waves -> 1.0)
@@ -842,20 +857,19 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
   // deleteOrderBookWithKey
   routePath("/orderbook/{amountAsset}/{priceAsset}") - {
 
-    val (someOrder, _) = orderGenerator.sample.get
-
-    "returns an error if there is no such order book" ignore test(
+    "returns an error if there is no such order book" in test(
       route =>
         Delete(routePath(s"/orderbook/${someOrder.assetPair.amountAssetStr}/${someOrder.assetPair.priceAssetStr}"))
           .withHeaders(apiKeyHeader()) ~> route ~> check {
           status shouldEqual StatusCodes.NotFound
+          println(responseEntity)
         },
       apiKeys
     )
 
-    "returns failure if assets aren't blacklisted" ignore test(
+    "returns failure if assets aren't blacklisted" in test(
       route =>
-        Delete(routePath(s"/orderbook/${okOrder.assetPair.amountAssetStr}/${okOrder.assetPair.priceAssetStr}"))
+        Delete(routePath(s"/orderbook/${okOrder.assetPair.amountAssetStr}/${okOrder.assetPair.priceAsset}"))
           .withHeaders(apiKeyHeader()) ~> route ~> check {
           status shouldEqual StatusCodes.BadRequest
         },
@@ -1308,13 +1322,17 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
           else liftFutureAsync(Future.failed(new IllegalArgumentException(s"No information about $x")))
       )
 
-    val blacklisted =
+    val blacklistedAssets =
       Set(blackListedOrder.assetPair.amountAsset, blackListedOrder.assetPair.priceAsset).foldLeft(Set.empty[IssuedAsset]) { (acc, elem) =>
         elem match {
           case asset: IssuedAsset => acc + asset
           case Asset.Waves => acc
         }
       }
+    val blacklistedPriceAsset = blackListedOrder.assetPair.priceAsset match {
+      case priceAsset: IssuedAsset => Some(priceAsset)
+      case Asset.Waves => None
+    }
     val pairBuilder = new AssetPairBuilder(
       settings,
       {
@@ -1322,11 +1340,11 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         case x
             if x == okOrder.assetPair.amountAsset || x == badOrder.assetPair.amountAsset || x == unknownAsset || x == blackListedOrder.assetPair.amountAsset =>
           liftValueAsync[BriefAssetDescription](amountAssetDesc)
-        case x if x == okOrder.assetPair.priceAsset || x == badOrder.assetPair.priceAsset || x == blackListedOrder.assetPair.priceAsset =>
+        case x if x == okOrder.assetPair.priceAsset || x == badOrder.assetPair.priceAsset || blacklistedPriceAsset.contains(x) =>
           liftValueAsync[BriefAssetDescription](priceAssetDesc)
         case x => liftErrorAsync[BriefAssetDescription](error.AssetNotFound(x))
       },
-      blacklisted
+      blacklistedAssets
     )
 
     val placeRoute = new PlaceRoute(
@@ -1392,7 +1410,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       {
         case ValidatedCommand.DeleteOrderBook(pair, _) if pair == okOrder.assetPair || pair == blackListedOrder.assetPair =>
           Future.successful(ValidatedCommandWithMeta(1L, System.currentTimeMillis, ValidatedCommand.DeleteOrderBook(pair)).some)
-        case _ => Future.failed(new NotImplementedError("Storing is not implemented"))
+        case _ =>
+          Future.failed(new NotImplementedError("Storing is not implemented"))
       },
       {
         case x if x == okOrder.assetPair || x == badOrder.assetPair || x == blackListedOrder.assetPair => Some(Right(orderBookActor.ref))

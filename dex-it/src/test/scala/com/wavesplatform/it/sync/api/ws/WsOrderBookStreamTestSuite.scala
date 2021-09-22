@@ -14,7 +14,7 @@ import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
-import com.wavesplatform.dex.error.{AmountAssetBlacklisted, MatcherIsStopping, OrderAssetPairReversed, SubscriptionsLimitReached}
+import com.wavesplatform.dex.error.{AmountAssetBlacklisted, MatcherIsStopping, OrderAssetPairReversed, OrderBookStopped, SubscriptionsLimitReached}
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, OrderRestrictionsSettings}
 import com.wavesplatform.dex.tool.Using._
@@ -391,7 +391,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
       }
     }
 
-    "close connections when order book is deleted" in {
+    "close a subscription when an order book is blacklisted" ignore { // TODO: DEX-1402
       val seller = mkAccountWithBalance(100.waves -> Waves)
       val IssueResults(issueTx, _, asset) = mkIssueExtended(seller, "cJIoHoxpeH", 1000.asset8)
       val assetPair = AssetPair(asset, Waves)
@@ -402,34 +402,44 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
       Using.resource((1 to 3).map(_ => mkWsOrderBookConnection(assetPair, dex1))) { wscs =>
         wscs.foreach(_.receiveAtLeastN[WsOrderBookChanges](1))
 
-        dex1.restartWithNewSuiteConfig(ConfigFactory.parseString(
-          s"""waves.dex {
-             |  blacklisted-assets  = [${assetPair.amountAsset}]
-             |}""".stripMargin
-        ).withFallback(dexInitialSuiteConfig))
         dex1.tryApi.deleteOrderBookWithKey(assetPair)
 
         val expectedMessage = WsError(
           timestamp = 0L, // ignored
-          code = MatcherIsStopping.code,
-          message = MatcherIsStopping.message.text
+          code = OrderBookStopped.code,
+          message = s"The order book for $assetPair is stopped, please contact with the administrator"
         )
 
         wscs.foreach { wsc =>
           wsc.receiveAtLeastN[WsError](1).head should matchTo(expectedMessage)
         }
       }
+    }
 
-      Using.resource((1 to 3).map(_ => mkWsOrderBookConnection(assetPair, dex1))) { wscs =>
+    "get an error when subscribing to deleted orderbook" in {
+      val seller = mkAccountWithBalance(100.waves -> Waves)
+      val IssueResults(issueTx, _, asset) = mkIssueExtended(seller, "new asset", 1000.asset8)
+      val assetPair = AssetPair(asset, Waves)
+
+      broadcastAndAwait(issueTx)
+      dex1.api.place(mkOrderDP(seller, assetPair, SELL, 100.asset8, 5.0))
+      dex1.tryApi.deleteOrderBookWithKey(assetPair)
+
+      dex1.restartWithNewSuiteConfig(ConfigFactory.parseString(
+        s"""waves.dex {
+           |  blacklisted-assets  = [${asset.id}]
+           |}""".stripMargin
+      ).withFallback(dexInitialSuiteConfig))
+
+      Using.resource(mkWsOrderBookConnection(assetPair, dex1)) { wsc =>
         val expectedMessage = WsError(
           timestamp = 0L, // ignored
           code = AmountAssetBlacklisted.code,
           message = AmountAssetBlacklisted(asset).message.text
         )
 
-        wscs.foreach { wsc =>
-          wsc.receiveAtLeastN[WsError](1).head should matchTo(expectedMessage)
-        }
+        wsc.receiveAtLeastN[WsError](1).head should matchTo(expectedMessage)
+
       }
     }
 

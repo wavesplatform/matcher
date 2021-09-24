@@ -594,7 +594,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
       dex1.restartWithNewSuiteConfig(ConfigFactory.parseString(
         s"""waves.dex {
-           |  price-assets = [ "$UsdnId", "$BtcId", "$UsdId", $EthId, "WAVES" ]
+           |  price-assets = [ "$UsdnId", "$BtcId", "$UsdId", "WAVES", $EthId]
            |  blacklisted-assets  = [$EthId]
            |}""".stripMargin
       ))

@@ -28,7 +28,7 @@ import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.effect.FutureResult
-import com.wavesplatform.dex.error.{AssetPairNotBlacklisted, Blacklisted, MatcherError}
+import com.wavesplatform.dex.error.{Blacklisted, MatcherError}
 import com.wavesplatform.dex.model.{AssetPairBuilder, _}
 import com.wavesplatform.dex.queue.MatcherQueue.StoreValidatedCommand
 import com.wavesplatform.dex.queue.ValidatedCommand
@@ -346,7 +346,7 @@ final class MarketsRoute(
     (path(AssetPairPM) & delete) { pairOrError =>
       (withMetricsAndTraces("deleteOrderBookWithKey") & protect & withAuth) {
         withAssetPair(assetPairBuilder, pairOrError, validate = false) { pair =>
-          withOnlyBlacklistedAssets(pair) {
+          withOnlyBlacklistedAssetPair(pair) {
             orderBook(pair) match {
               case Some(Right(_)) =>
                 complete(
@@ -367,12 +367,12 @@ final class MarketsRoute(
       }
     }
 
-  private def withOnlyBlacklistedAssets(assetPair: AssetPair): Directive0 = FutureDirectives.onSuccess(
+  private def withOnlyBlacklistedAssetPair(assetPair: AssetPair): Directive0 = FutureDirectives.onSuccess(
     assetPairBuilder.validateAssetPair(assetPair).value
   ).flatMap {
-    case e @ Left(_: MatcherError with Blacklisted) => pass
+    case Left(_: MatcherError with Blacklisted) => pass
     case Left(e) => complete(InfoNotFound(e))
-    case Right(value) => complete(InfoNotFound(error.AssetPairNotBlacklisted(assetPair)))
+    case Right(_) => complete(InfoNotFound(error.AssetPairNotBlacklisted(assetPair)))
   }
 
   private def getOrderBookRestrictions(pair: AssetPair): FutureResult[HttpOrderBookInfo] = settings.getActualTickSize(pair).map { tickSize =>

@@ -15,7 +15,7 @@ import scala.concurrent.Future
 class OrderBookTestSuite extends MatcherSuiteBase {
 
   override protected def dexInitialSuiteConfig: Config =
-    ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "$UsdnId", "WAVES" ]""")
+    ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "WAVES" ]""")
 
   private case class ReservedBalances(wct: Long, usd: Long, waves: Long)
 
@@ -43,7 +43,7 @@ class OrderBookTestSuite extends MatcherSuiteBase {
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
-    broadcastAndAwait(IssueUsdTx, IssueWctTx, IssueUsdnTx)
+    broadcastAndAwait(IssueUsdTx, IssueWctTx)
     dex1.start()
   }
 
@@ -67,7 +67,7 @@ class OrderBookTestSuite extends MatcherSuiteBase {
 
     dex1.restartWithNewSuiteConfig(ConfigFactory.parseString(
       s"""waves.dex {
-         |  blacklisted-assets  = [$UsdId, $WctId]
+         |  blacklisted-assets  = [$WctId]
          |}""".stripMargin
     ).withFallback(dexInitialSuiteConfig))
 

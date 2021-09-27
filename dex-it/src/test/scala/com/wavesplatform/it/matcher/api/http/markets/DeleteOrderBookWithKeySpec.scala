@@ -37,6 +37,7 @@ class DeleteOrderBookWithKeySpec extends MatcherSuiteBase with ApiKeyHeaderCheck
 
       validate202Json(dex1.rawApi.deleteOrderBookWithKey(wavesUsdPair)).message should be("Deleting order book")
       eventually(dex1.api.getOrderHistoryByPKWithSig(alice, activeOnly = Some(true)).size shouldBe 0)
+      dex1.api.getOrderHistoryByPKWithSig(alice, activeOnly = Some(false)).find(_.id == order.id()).value.status shouldBe "Cancelled"
     }
 
     "should return an error if orderbook doesn't exists" in {

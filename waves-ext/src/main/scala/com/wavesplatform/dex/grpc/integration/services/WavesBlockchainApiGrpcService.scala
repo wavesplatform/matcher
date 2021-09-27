@@ -15,7 +15,7 @@ import com.wavesplatform.dex.grpc.integration.protobuf.PbToWavesConversions._
 import com.wavesplatform.dex.grpc.integration.protobuf.WavesToPbConversions._
 import com.wavesplatform.dex.grpc.integration.smart.MatcherScriptRunner
 import com.wavesplatform.dex.grpc.integration.smart.MatcherScriptRunner.deniedBlockchain
-import com.wavesplatform.dex.grpc.integration.utx.UtxState
+import com.wavesplatform.dex.grpc.integration.utx.{Broadcast, Notify, UtxState}
 import com.wavesplatform.extensions.{Context => ExtensionContext}
 import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures}
 import com.wavesplatform.lang.v1.compiler.Terms
@@ -86,7 +86,10 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
       case Right(evt) =>
         utxState
           .transformAndExtract(_.handleEvent(evt))
-          .foreach(event => withUtxChangesSubscribers("send next", _.onNext(event)))
+          .foreach {
+            case Notify(event) => withUtxChangesSubscribers("send next", _.onNext(event))
+            case Broadcast(tx) => context.broadcastTransaction(tx)
+          }
     }
 
   override def getStatuses(request: TransactionsByIdRequest): Future[TransactionsStatusesResponse] = Future {
@@ -123,10 +126,11 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
         tx <- grpcTx.toVanilla
         isConfirmed <- context.transactionsApi.transactionById(tx.id()).fold(false)(_ => true).asRight
         isInUtx <- context.transactionsApi.unconfirmedTransactionById(tx.id()).fold(false)(_ => true).asRight
-      } yield (tx, isConfirmed, isInUtx)
+        maybeTxToBroadcast = utxState.transformAndExtract(_.putInQueueIfRelevantOrReturn(tx))
+      } yield (maybeTxToBroadcast, isConfirmed, isInUtx)
     }
       .flatMap {
-        case Right((tx, isConfirmed, isInUtx)) =>
+        case Right((Some(tx), isConfirmed, isInUtx)) =>
           if (isConfirmed) Future.successful(CheckedBroadcastResponse.Result.Confirmed(empty))
           else if (isInUtx) handleTxInUtx(tx)
           else broadcastTransaction(tx).map {
@@ -135,6 +139,9 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
               case Left(e) => CheckedBroadcastResponse.Result.Failed(CheckedBroadcastResponse.Failure(e.toString, canRetry(e)))
             }
           }
+
+        case Right((None, _, _)) => Future.successful(CheckedBroadcastResponse.Result.Unconfirmed(true))
+
         case Left(e) => Future.successful(CheckedBroadcastResponse.Result.Failed(CheckedBroadcastResponse.Failure(e.toString, canRetry(e))))
       }
       .map(CheckedBroadcastResponse(_))

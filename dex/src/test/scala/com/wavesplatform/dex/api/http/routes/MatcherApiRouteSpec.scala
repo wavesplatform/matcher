@@ -862,7 +862,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         Delete(routePath(s"/orderbook/${someOrder.assetPair.amountAssetStr}/${someOrder.assetPair.priceAssetStr}"))
           .withHeaders(apiKeyHeader()) ~> route ~> check {
           status shouldEqual StatusCodes.NotFound
-          println(responseEntity)
         },
       apiKeys
     )

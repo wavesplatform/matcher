@@ -14,25 +14,6 @@ import java.util.concurrent.ThreadLocalRandom
 final class MultipleMatchersTxTsTestSuite extends MatcherSuiteBase with HasKafka {
 
   private val topicName = s"test-${ThreadLocalRandom.current.nextInt(0, Int.MaxValue)}"
-  override protected lazy val dexRunConfig = dexKafkaConfig(topicName)
-
-  override protected def dexInitialSuiteConfig: Config =
-    dexRunConfig.withFallback(ConfigFactory.parseString(
-      s"""|waves.dex {
-          |  price-assets = [ "$UsdId", "WAVES" ]
-          |  exchange-tx-ts-start-offset = -1
-          |}""".stripMargin
-    ))
-
-  protected lazy val dex2: DexContainer = createDex("dex-2", suiteInitialConfig = dexInitialSuiteConfig)
-
-  override protected def beforeAll(): Unit = {
-    wavesNode1.start()
-    broadcastAndAwait(IssueUsdTx)
-    kafka.start()
-    dex1.start()
-    dex2.start()
-  }
 
   "Multiple matchers orderBook" - {
     "should produce the same transactions" in {
@@ -78,6 +59,26 @@ final class MultipleMatchersTxTsTestSuite extends MatcherSuiteBase with HasKafka
     placeAndAwaitAtDex(counterOrder, Status.Filled, isMarketOrder = true)
     dex1.api.waitForTransactionsByOrder(counterOrder, 1)
     counterOrder
+  }
+
+  override protected lazy val dexRunConfig = dexKafkaConfig(topicName)
+
+  override protected def dexInitialSuiteConfig: Config =
+    dexRunConfig.withFallback(ConfigFactory.parseString(
+      s"""|waves.dex {
+          |  price-assets = [ "$UsdId", "WAVES" ]
+          |  exchange-tx-ts-start-offset = -1
+          |}""".stripMargin
+    ))
+
+  protected lazy val dex2: DexContainer = createDex("dex-2", suiteInitialConfig = dexInitialSuiteConfig)
+
+  override protected def beforeAll(): Unit = {
+    wavesNode1.start()
+    broadcastAndAwait(IssueUsdTx)
+    kafka.start()
+    dex1.start()
+    dex2.start()
   }
 
 }

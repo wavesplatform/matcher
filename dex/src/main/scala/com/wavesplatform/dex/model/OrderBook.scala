@@ -12,7 +12,13 @@ import com.wavesplatform.dex.settings.MatchingRule
 
 import scala.collection.immutable.{HashMap, Queue, TreeMap}
 
-case class OrderBook private (bids: Side, asks: Side, lastTrade: Option[LastTrade], orderIds: HashMap[Order.Id, (OrderType, Price)], nextTxTimestamp: Long) {
+case class OrderBook private (
+  bids: Side,
+  asks: Side,
+  lastTrade: Option[LastTrade],
+  orderIds: HashMap[Order.Id, (OrderType, Price)],
+  nextTxTimestamp: Long
+) {
   import OrderBook._
 
   def bestBid: Option[LevelAgg] = bids.bestLevel

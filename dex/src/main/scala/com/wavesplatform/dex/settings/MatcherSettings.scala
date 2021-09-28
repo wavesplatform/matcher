@@ -32,6 +32,7 @@ case class MatcherSettings(
   ntpServer: String,
   restApi: RestAPISettings,
   exchangeTxBaseFee: Long,
+  exchangeTxTsStartOffset: Long,
   actorResponseTimeout: FiniteDuration,
   dataDirectory: String,
   snapshotsInterval: Int,

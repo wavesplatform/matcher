@@ -109,6 +109,7 @@ class AggregatedOrderBookActorSpec
               _ => (),
               raw => MatchingRule(raw.startOffset, (raw.tickSize * BigDecimal(10).pow(8)).toLongExact),
               _ => (t, m) => m.matcherFee -> t.matcherFee,
+              _ => (eventTs, _) => eventTs,
               None
             )
           )

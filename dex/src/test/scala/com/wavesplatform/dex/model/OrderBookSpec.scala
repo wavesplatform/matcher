@@ -62,7 +62,7 @@ class OrderBookSpec
     "OrderExecuted: submitted.spent == counter.receive && counter.spent == submitted.receive" in forAll(coinsInvariantPropGen) {
       case (askOrders, bidOrders, newOrder) =>
         val ob = mkOrderBook(askOrders, bidOrders)
-        val OrderBookUpdates(_, events, _, _) = ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee))
+        val OrderBookUpdates(_, events, _, _) = ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee), (eventTs, _) => eventTs)
         val clue =
           s"""Events:
 ${formatEvents(events)}
@@ -98,7 +98,7 @@ ${formatEvents(events)}
         val balancesBefore = balancesBy(ob) |+| balancesBy(newOrder)
         val coinsBefore = Monoid.combineAll(balancesBefore.values)
 
-        val OrderBookUpdates(updatedOb, events, _, _) = ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee))
+        val OrderBookUpdates(updatedOb, events, _, _) = ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee), (eventTs, _) => eventTs)
 
         val balancesAfter = events.foldLeft(balancesBefore) {
           case (r, evt: Events.OrderExecuted) =>
@@ -161,7 +161,7 @@ ${diff.mkString("\n")}
     "order book invariant" in forAll(coinsInvariantPropGen) {
       case (askOrders, bidOrders, newOrder) =>
         val ob = mkOrderBook(askOrders, bidOrders)
-        val OrderBookUpdates(updatedOb, events, _, _) = ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee))
+        val OrderBookUpdates(updatedOb, events, _, _) = ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee), (eventTs, _) => eventTs)
 
         val clue =
           s"""
@@ -193,7 +193,7 @@ ${formatEvents(events)}
         val snapshot = ob.aggregatedSnapshot
 
         val OrderBookUpdates(updatedOb, events, levelChanges, _) =
-          ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee))
+          ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee), (eventTs, _) => eventTs)
         val updatedSnapshot = updatedOb.aggregatedSnapshot
 
         val actualLevelChanges = filterNonEmpty(levelChanges)

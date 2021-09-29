@@ -6,11 +6,7 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.it.api.HasKafka
 import com.wavesplatform.dex.it.docker.DexContainer
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.it.tags.DexItExternalKafkaRequired
 
-import java.util.concurrent.ThreadLocalRandom
-
-@DexItExternalKafkaRequired
 final class MultipleMatchersTxTsTestSuite extends MatcherSuiteBase with HasKafka {
 
   "Multiple matchers orderBook" - {

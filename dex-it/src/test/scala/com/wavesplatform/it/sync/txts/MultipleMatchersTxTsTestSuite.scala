@@ -13,8 +13,6 @@ import java.util.concurrent.ThreadLocalRandom
 @DexItExternalKafkaRequired
 final class MultipleMatchersTxTsTestSuite extends MatcherSuiteBase with HasKafka {
 
-  private val topicName = s"test-${ThreadLocalRandom.current.nextInt(0, Int.MaxValue)}"
-
   "Multiple matchers orderBook" - {
     "should produce the same transactions" in {
       val co1 = placeOrderAndCounterOrder()
@@ -26,7 +24,7 @@ final class MultipleMatchersTxTsTestSuite extends MatcherSuiteBase with HasKafka
 
       dex2.connectToNetwork()
 
-      Thread.sleep(1000L)
+      Seq(co1, co2, co3).map(order => waitForOrderAtNode(order.id(), dex2.api, wavesNode1.api))
 
       val aliceBalance1 = dex1.api.getReservedBalanceByPK(alice)
       val bobBalance1 = dex1.api.getReservedBalanceByPK(bob)
@@ -61,7 +59,7 @@ final class MultipleMatchersTxTsTestSuite extends MatcherSuiteBase with HasKafka
     counterOrder
   }
 
-  override protected lazy val dexRunConfig = dexKafkaConfig(topicName)
+  override protected lazy val dexRunConfig = dexKafkaConfig()
 
   override protected def dexInitialSuiteConfig: Config =
     dexRunConfig.withFallback(ConfigFactory.parseString(

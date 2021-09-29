@@ -8,7 +8,7 @@ import com.wavesplatform.it.MatcherSuiteBase
 final class NewOrderBookTxTsTest extends MatcherSuiteBase {
 
   "New orderBook" - {
-    "should create tx with same ts if feature start offset isn't reached" in {
+    "should create tx with different ts if feature turned on from start" in {
       val orders = Seq(
         mkOrder(alice, wavesUsdPair, OrderType.BUY, 10.waves, 5.usd),
         mkOrder(alice, wavesUsdPair, OrderType.BUY, 15.waves, 9.usd),

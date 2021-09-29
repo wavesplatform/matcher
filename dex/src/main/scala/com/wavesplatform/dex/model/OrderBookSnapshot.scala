@@ -34,7 +34,7 @@ object OrderBookSnapshot {
       case x => throw new RuntimeException(s"Can't deserialize Option as $x")
     }
     val ts =
-      if (bb.hasRemaining) bb.getLong
+      if (bb.hasRemaining) bb.getLong // TODO: remove checking hasRemaining when all snapshots will have ts
       else 0L
     OrderBookSnapshot(bids, asks, lastTrade, ts)
   }

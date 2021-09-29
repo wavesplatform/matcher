@@ -47,44 +47,47 @@ final class WsImaginaryTransactionsTestSuite extends WsSuiteBase with HasKafka {
       }
     }
 
-    "should send 'nct' (not created txs) events" in test { account =>
-      Using.resource(mkWsAddressConnection(account, dex1, flags = Set(WsAddressFlag.ImaginaryTxs))) { wsc1 =>
-        Using.resource(mkWsAddressConnection(account, dex1)) { wsc2 =>
-          dex1.blockKafkaTraffic()
+    "should send 'nct' (not created txs) events" in {
+      dex2.start()
+      test { account =>
+        Using.resource(mkWsAddressConnection(account, dex1, flags = Set(WsAddressFlag.ImaginaryTxs))) { wsc1 =>
+          Using.resource(mkWsAddressConnection(account, dex1)) { wsc2 =>
+            dex1.blockKafkaTraffic()
 
-          val bid = mkOrder(alice, wavesUsdPair, OrderType.BUY, 5.waves, 10.usd)
-          dex2.api.place(bid)
+            val bid = mkOrder(alice, wavesUsdPair, OrderType.BUY, 5.waves, 10.usd)
+            dex2.api.place(bid)
 
-          val ts = new AtomicLong(System.currentTimeMillis())
-          val txToOrderId =
-            (1 to 5).map { _ =>
-              val ask = mkOrder(account, wavesUsdPair, OrderType.SELL, 1.waves, 10.usd, ts = ts.incrementAndGet())
-              placeAndAwaitAtDex(ask, HttpOrderStatus.Status.Filled, dex2)
-              ByteStr(dex2.api.getTransactionsByOrderId(ask).head.id().bytes()) -> Seq(ask.id())
-            }.toMap
+            val ts = new AtomicLong(System.currentTimeMillis())
+            val txToOrderId =
+              (1 to 5).map { _ =>
+                val ask = mkOrder(account, wavesUsdPair, OrderType.SELL, 1.waves, 10.usd, ts = ts.incrementAndGet())
+                placeAndAwaitAtDex(ask, HttpOrderStatus.Status.Filled, dex2)
+                ByteStr(dex2.api.getTransactionsByOrderId(ask).head.id().bytes()) -> Seq(ask.id())
+              }.toMap
 
-          eventually {
-            val notCreatedTxs = wsc1.collectMessages[WsAddressChanges].flatMap(_.maybeNotCreatedTxs)
-            withClue(s"txToOrderId=$txToOrderId, nct=$notCreatedTxs") {
-              getAggregatedWsTxsData(notCreatedTxs) shouldBe txToOrderId
-              getAggregatedRemovedTxs(notCreatedTxs) shouldBe empty
+            eventually {
+              val notCreatedTxs = wsc1.collectMessages[WsAddressChanges].flatMap(_.maybeNotCreatedTxs)
+              withClue(s"txToOrderId=$txToOrderId, nct=$notCreatedTxs") {
+                getAggregatedWsTxsData(notCreatedTxs) shouldBe txToOrderId
+                getAggregatedRemovedTxs(notCreatedTxs) shouldBe empty
+              }
             }
-          }
 
-          Thread.sleep(5.seconds.toMillis)
-          val removedNct = getAggregatedRemovedTxs(wsc1.collectMessages[WsAddressChanges].flatMap(_.maybeNotCreatedTxs))
-          removedNct shouldBe empty
+            Thread.sleep(5.seconds.toMillis)
+            val removedNct = getAggregatedRemovedTxs(wsc1.collectMessages[WsAddressChanges].flatMap(_.maybeNotCreatedTxs))
+            removedNct shouldBe empty
 
-          dex1.unblockKafkaTraffic()
+            dex1.unblockKafkaTraffic()
 
-          eventually {
-            val removedNct = getAggregatedRemovedTxs(wsc1.collectMessages[WsAddressChanges].flatMap(_.maybeNotCreatedTxs)).sorted
-            val txIds = txToOrderId.keys.toSeq.sorted
-            withClue(s"txIds=$txIds, removedNct=$removedNct") {
-              removedNct shouldBe txIds
+            eventually {
+              val removedNct = getAggregatedRemovedTxs(wsc1.collectMessages[WsAddressChanges].flatMap(_.maybeNotCreatedTxs)).sorted
+              val txIds = txToOrderId.keys.toSeq.sorted
+              withClue(s"txIds=$txIds, removedNct=$removedNct") {
+                removedNct shouldBe txIds
+              }
             }
+            wsc2.collectMessages[WsAddressChanges].flatMap(_.maybeNotCreatedTxs) shouldBe empty
           }
-          wsc2.collectMessages[WsAddressChanges].flatMap(_.maybeNotCreatedTxs) shouldBe empty
         }
       }
     }
@@ -131,7 +134,6 @@ final class WsImaginaryTransactionsTestSuite extends WsSuiteBase with HasKafka {
     wavesNode1.start()
     broadcastAndAwait(IssueUsdTx)
     dex1.start()
-    dex2.start()
   }
 
 }

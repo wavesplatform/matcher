@@ -100,6 +100,7 @@ class OrderBookActorSpecification
         _ => (),
         raw => MatchingRule(raw.startOffset, (raw.tickSize * BigDecimal(10).pow(8)).toLongExact),
         makerTakerFeeAtOffset,
+        _ => (eventTs, _) => eventTs,
         None
       ) with RestartableActor
     })
@@ -129,7 +130,7 @@ class OrderBookActorSpecification
     "recovery - notify address actor about orders" in obcTestWithPrepare { (obsdb, p) =>
       val ord = buy(p, 10 * Order.PriceConstant, 100)
       val ob = OrderBook.empty
-      val OrderBookUpdates(updatedOb, _, _, _) = ob.add(LimitOrder(ord), ord.timestamp, makerTakerPartialFee)
+      val OrderBookUpdates(updatedOb, _, _, _) = ob.add(LimitOrder(ord), ord.timestamp, makerTakerPartialFee, (eventTs, _) => eventTs)
       obsdb.update(p, 50L, Some(updatedOb.snapshot))
     } { (pair, _, tp) =>
       tp.expectOecProcess[OrderAdded]

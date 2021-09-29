@@ -42,6 +42,7 @@ class OrderBookActor(
   updateCurrentMatchingRules: DenormalizedMatchingRule => Unit,
   normalizeMatchingRule: DenormalizedMatchingRule => MatchingRule,
   getMakerTakerFeeByOffset: Long => (AcceptedOrder, LimitOrder) => (Long, Long),
+  getOrderExecutedTs: Long => (Long, Long) => Long,
   restrictions: Option[OrderRestrictionsSettings]
 )(implicit ec: ExecutionContext, efc: ErrorFormatterContext)
     extends classic.Actor
@@ -227,7 +228,13 @@ class OrderBookActor(
     log.trace(s"Applied $command, trying to match ...")
     process(
       command.timestamp,
-      orderBook.add(acceptedOrder, command.timestamp, getMakerTakerFeeByOffset(command.offset), actualRule.tickSize)
+      orderBook.add(
+        acceptedOrder,
+        command.timestamp,
+        getMakerTakerFeeByOffset(command.offset),
+        getOrderExecutedTs(command.offset),
+        actualRule.tickSize
+      )
     )
   }
 
@@ -270,6 +277,7 @@ object OrderBookActor {
     updateCurrentMatchingRules: DenormalizedMatchingRule => Unit,
     normalizeMatchingRule: DenormalizedMatchingRule => MatchingRule,
     getMakerTakerFeeByOffset: Long => (AcceptedOrder, LimitOrder) => (Long, Long),
+    getOrderExecutedTs: Long => (Long, Long) => Long,
     restrictions: Option[OrderRestrictionsSettings]
   )(implicit ec: ExecutionContext, efc: ErrorFormatterContext): classic.Props =
     classic.Props(
@@ -285,6 +293,7 @@ object OrderBookActor {
         updateCurrentMatchingRules,
         normalizeMatchingRule,
         getMakerTakerFeeByOffset,
+        getOrderExecutedTs,
         restrictions
       )
     )

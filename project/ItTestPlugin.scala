@@ -1,5 +1,3 @@
-import org.scalatest.TestSuite
-
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import sbt.Keys._

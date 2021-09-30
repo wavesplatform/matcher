@@ -3,6 +3,7 @@ package com.wavesplatform.dex.actors.tx
 import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
 import akka.actor.typed.{ActorRef, Behavior}
 import cats.syntax.option._
+import com.wavesplatform.dex.actors.tx.ExchangeTransactionBroadcastActor.Command.Broadcast
 import com.wavesplatform.dex.collections.PositiveMap
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
@@ -10,6 +11,7 @@ import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.grpc.integration.clients.CheckedBroadcastResult
 import com.wavesplatform.dex.time.Time
 
+import scala.collection.immutable.Queue
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
@@ -77,7 +79,7 @@ object ExchangeTransactionBroadcastActor {
 
     def reply(item: InProgressItem): Unit = item.clientRef.foreach(_ ! Observed(item.tx, item.addressSpendings))
 
-    def default(inProgress: Map[ExchangeTransaction.Id, InProgressItem]): Behavior[Message] =
+    def default(inProgress: Map[ExchangeTransaction.Id, InProgressItem], pending: Queue[Broadcast]): Behavior[Message] =
       Behaviors.receive[Message] { (context, message) =>
         message match {
           case message: Command.Broadcast =>
@@ -85,13 +87,17 @@ object ExchangeTransactionBroadcastActor {
             if (isExpired(message.tx)) {
               message.clientRef ! Observed(message.tx, message.addressSpendings)
               Behaviors.same
-            } else {
+            } else if (pending.isEmpty) {
               broadcast(context, message.tx)
-              default(inProgress.updated(
-                message.tx.id(),
-                InProgressItem(message.tx, defaultAttempts, message.clientRef.some, message.addressSpendings)
-              ))
-            }
+              default(
+                inProgress.updated(
+                  message.tx.id(),
+                  InProgressItem(message.tx, defaultAttempts, message.clientRef.some, message.addressSpendings)
+                ),
+                pending
+              )
+            } else
+              default(inProgress, pending.enqueue(message))
 
           case Command.Tick =>
             val updatedInProgress = inProgress.view.mapValues(_.decreasedAttempts)
@@ -108,7 +114,7 @@ object ExchangeTransactionBroadcastActor {
                   }
               }
               .toMap
-            default(updatedInProgress)
+            default(updatedInProgress, pending)
 
           case message: Event.Broadcasted =>
             val txId = message.tx.id()
@@ -141,11 +147,29 @@ object ExchangeTransactionBroadcastActor {
                   case _ => true
                 }
 
+                val (maybeBroadcast, updatedPending) = pending
+                  .dequeueOption.fold((none[Broadcast], pending)) { case (m, q) => (Some(m), q) }
+
+                val updatedInProgress0 = maybeBroadcast.flatMap { message =>
+                  // It would be better to just send the tx, but we can overload the node
+                  if (isExpired(message.tx)) {
+                    message.clientRef ! Observed(message.tx, message.addressSpendings)
+                    none
+                  } else {
+                    broadcast(context, message.tx)
+
+                    inProgress.updated(
+                      message.tx.id(),
+                      InProgressItem(message.tx, defaultAttempts, message.clientRef.some, message.addressSpendings)
+                    ).some
+                  }
+                }.getOrElse(inProgress)
+
                 val updatedInProgress1 =
                   if (canRetry) {
                     if (!timer.isTimerActive(timerKey)) timer.startSingleTimer(timerKey, Command.Tick, settings.interval)
-                    inProgress
-                  } else inProgress - txId
+                    updatedInProgress0
+                  } else updatedInProgress0 - txId
 
                 // About AA - it breaks some rules, but this is measured
                 val sendReply = message.result match {
@@ -175,12 +199,12 @@ object ExchangeTransactionBroadcastActor {
                     else updatedInProgress1 // Already removed
                   } else updatedInProgress1
 
-                default(updatedInProgress2)
+                default(updatedInProgress2, updatedPending)
             }
         }
       }
 
-    default(Map.empty)
+    default(Map.empty, Queue.empty)
   }
 
   private case class InProgressItem(

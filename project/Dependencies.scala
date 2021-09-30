@@ -39,7 +39,7 @@ object Dependencies {
     val kanela = "1.0.11"
     val kamon = "2.2.3"
 
-    val wavesProtobufSchemas = "1.3.1"
+    val wavesProtobufSchemas = "1.3.2"
     val wavesJ = "1.2.2"
 
     val postgresql = "42.2.23"
@@ -121,7 +121,8 @@ object Dependencies {
   private val kamonCore = kamonModule("core")
   private val iq80leveldb = "org.iq80.leveldb" % "leveldb-api" % Version.iq80levelDb
 
-  private val wavesProtobufSchemas = ("com.wavesplatform" % "protobuf-schemas" % Version.wavesProtobufSchemas classifier "proto") % "protobuf"
+  private val wavesProtobufSchemas =
+    ("com.wavesplatform" % "protobuf-schemas" % Version.wavesProtobufSchemas classifier "protobuf-src") % "protobuf"
 
   private val wavesJ = "com.wavesplatform" % "wavesj" % Version.wavesJ excludeAll (
     // Conflicts with specified gRPC. This is the problem for waves-integration-it.

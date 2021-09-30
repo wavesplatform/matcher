@@ -87,20 +87,34 @@ object ExchangeTransactionBroadcastActor {
             if (isExpired(message.tx)) {
               message.clientRef ! Observed(message.tx, message.addressSpendings)
               Behaviors.same
-            } else if (pending.isEmpty) {
+            } else if (pending.isEmpty && inProgress.isEmpty) {
               broadcast(context, message.tx)
               default(
                 inProgress.updated(
                   message.tx.id(),
                   InProgressItem(message.tx, defaultAttempts, message.clientRef.some, message.addressSpendings)
                 ),
-                pending.enqueue(message)
+                pending
               )
             } else
               default(inProgress, pending.enqueue(message))
 
           case Command.Tick =>
-            val updatedInProgress = inProgress.view.mapValues(_.decreasedAttempts)
+            val (maybeBroadcast, updatedPending) = pending
+              .dequeueOption.fold((none[Broadcast], pending)) { case (m, q) => (Some(m), q) }
+
+            val updatedInProgress0 = maybeBroadcast.flatMap { message =>
+              if (isExpired(message.tx)) {
+                message.clientRef ! Observed(message.tx, message.addressSpendings)
+                none
+              } else
+                inProgress.updated(
+                  message.tx.id(),
+                  InProgressItem(message.tx, defaultAttempts, message.clientRef.some, message.addressSpendings)
+                ).some
+            }.getOrElse(inProgress)
+
+            val updatedInProgress1 = updatedInProgress0.view.mapValues(_.decreasedAttempts)
               .filter {
                 case (txId, x) =>
                   val valid = x.isValid // This could be in Event.Broadcasted
@@ -114,9 +128,28 @@ object ExchangeTransactionBroadcastActor {
                   }
               }
               .toMap
-            default(updatedInProgress, pending)
+
+            default(updatedInProgress1, updatedPending)
 
           case message: Event.Broadcasted =>
+            val (maybeBroadcast, updatedPending) = pending
+              .dequeueOption.fold((none[Broadcast], pending)) { case (m, q) => (Some(m), q) }
+
+            val updatedInProgress0 = maybeBroadcast.flatMap { message =>
+              // It would be better to just send the tx, but we can overload the node
+              if (isExpired(message.tx)) {
+                message.clientRef ! Observed(message.tx, message.addressSpendings)
+                none
+              } else {
+                broadcast(context, message.tx)
+
+                inProgress.updated(
+                  message.tx.id(),
+                  InProgressItem(message.tx, defaultAttempts, message.clientRef.some, message.addressSpendings)
+                ).some
+              }
+            }.getOrElse(inProgress)
+
             val txId = message.tx.id()
             val item = inProgress.get(txId)
             val isInProgress = item.nonEmpty
@@ -146,24 +179,6 @@ object ExchangeTransactionBroadcastActor {
                   case Success(CheckedBroadcastResult.Failed(_, canRetry)) => canRetry
                   case _ => true
                 }
-
-                val (maybeBroadcast, updatedPending) = pending
-                  .dequeueOption.fold((none[Broadcast], pending)) { case (m, q) => (Some(m), q) }
-
-                val updatedInProgress0 = maybeBroadcast.flatMap { message =>
-                  // It would be better to just send the tx, but we can overload the node
-                  if (isExpired(message.tx)) {
-                    message.clientRef ! Observed(message.tx, message.addressSpendings)
-                    none
-                  } else {
-                    broadcast(context, message.tx)
-
-                    inProgress.updated(
-                      message.tx.id(),
-                      InProgressItem(message.tx, defaultAttempts, message.clientRef.some, message.addressSpendings)
-                    ).some
-                  }
-                }.getOrElse(inProgress)
 
                 val updatedInProgress1 =
                   if (canRetry) {

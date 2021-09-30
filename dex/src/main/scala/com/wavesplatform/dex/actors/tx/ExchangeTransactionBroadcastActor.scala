@@ -94,7 +94,7 @@ object ExchangeTransactionBroadcastActor {
                   message.tx.id(),
                   InProgressItem(message.tx, defaultAttempts, message.clientRef.some, message.addressSpendings)
                 ),
-                pending
+                pending.enqueue(message)
               )
             } else
               default(inProgress, pending.enqueue(message))

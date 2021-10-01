@@ -100,21 +100,7 @@ object ExchangeTransactionBroadcastActor {
               default(inProgress, pending.enqueue(message))
 
           case Command.Tick =>
-            val (maybeBroadcast, updatedPending) = pending
-              .dequeueOption.fold((none[Broadcast], pending)) { case (m, q) => (Some(m), q) }
-
-            val updatedInProgress0 = maybeBroadcast.flatMap { message =>
-              if (isExpired(message.tx)) {
-                message.clientRef ! Observed(message.tx, message.addressSpendings)
-                none
-              } else
-                inProgress.updated(
-                  message.tx.id(),
-                  InProgressItem(message.tx, defaultAttempts, message.clientRef.some, message.addressSpendings)
-                ).some
-            }.getOrElse(inProgress)
-
-            val updatedInProgress1 = updatedInProgress0.view.mapValues(_.decreasedAttempts)
+            val updatedInProgress = inProgress.view.mapValues(_.decreasedAttempts)
               .filter {
                 case (txId, x) =>
                   val valid = x.isValid // This could be in Event.Broadcasted
@@ -129,25 +115,29 @@ object ExchangeTransactionBroadcastActor {
               }
               .toMap
 
-            default(updatedInProgress1, updatedPending)
+            default(updatedInProgress, pending)
 
           case message: Event.Broadcasted =>
-            val (maybeBroadcast, updatedPending) = pending
-              .dequeueOption.fold((none[Broadcast], pending)) { case (m, q) => (Some(m), q) }
+            val (maybeBroadcast, updatedPending) = pending.foldLeft((none[Broadcast], Queue.empty[Broadcast])) {
+              // just push message to queue, if we've already selected message to broadcast
+              case ((t @ Some(_), q), m) => (t, q enqueue m)
+              case (acc @ (_, q), m) =>
+                if (isExpired(m.tx)) {
+                  // notify client about expired tx, and go to next message
+                  m.clientRef ! Observed(m.tx, m.addressSpendings)
+                  acc
+                } else
+                  // select message to broadcast, and don't push it to queue
+                  (m.some, q)
+            }
 
             val updatedInProgress0 = maybeBroadcast.flatMap { message =>
-              // It would be better to just send the tx, but we can overload the node
-              if (isExpired(message.tx)) {
-                message.clientRef ! Observed(message.tx, message.addressSpendings)
-                none
-              } else {
-                broadcast(context, message.tx)
+              broadcast(context, message.tx)
 
-                inProgress.updated(
-                  message.tx.id(),
-                  InProgressItem(message.tx, defaultAttempts, message.clientRef.some, message.addressSpendings)
-                ).some
-              }
+              inProgress.updated(
+                message.tx.id(),
+                InProgressItem(message.tx, defaultAttempts, message.clientRef.some, message.addressSpendings)
+              ).some
             }.getOrElse(inProgress)
 
             val txId = message.tx.id()

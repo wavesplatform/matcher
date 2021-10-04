@@ -119,16 +119,16 @@ object ExchangeTransactionBroadcastActor {
 
           case message: Event.Broadcasted =>
             val (maybeBroadcast, updatedPending) = pending.foldLeft((none[Broadcast], Queue.empty[Broadcast])) {
-              // just push message to queue, if we've already selected message to broadcast
-              case ((t @ Some(_), q), m) => (t, q enqueue m)
-              case (acc @ (_, q), m) =>
-                if (isExpired(m.tx)) {
-                  // notify client about expired tx, and go to next message
-                  m.clientRef ! Observed(m.tx, m.addressSpendings)
-                  acc
-                } else
-                  // select message to broadcast, and don't push it to queue
-                  (m.some, q)
+              // notify client about expired tx, and remove it from queue
+              case (acc, m) if isExpired(m.tx) =>
+                m.clientRef ! Observed(m.tx, m.addressSpendings)
+                acc
+
+              // if `maybeBroadcast` is already selected, just push next message to queue
+              case ((t, q), m) if t.isDefined => (t, q enqueue m)
+
+              // select message to broadcast
+              case ((_, q), m) => (m.some, q)
             }
 
             val updatedInProgress0 = maybeBroadcast.flatMap { message =>

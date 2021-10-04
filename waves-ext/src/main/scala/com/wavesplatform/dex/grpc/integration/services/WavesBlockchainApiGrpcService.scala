@@ -204,7 +204,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
         parseScriptResult(
           ScriptRunnerFixed(
             in = Coproduct(tx),
-            blockchain = CompositeBlockchain(context.blockchain, utxState.get().getAccountsDiff),
+            blockchain = CompositeBlockchain(context.blockchain, utxState.get().getAccountsDiff(context.blockchain)),
             script = info.script,
             isAssetScript = true,
             scriptContainerAddress = Coproduct[Environment.Tthis](Environment.AssetId(asset.byteRepr))
@@ -233,7 +233,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
         val order = request.order.map(_.toVanilla).getOrElse(throwInvalidArgument("Expected an order"))
         val isSynchronousCallsActivated = context.blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
         if (allowedBlockchainStateAccounts.contains(order.senderPublicKey)) {
-          val blockchain = CompositeBlockchain(context.blockchain, utxState.get().getAccountsDiff)
+          val blockchain = CompositeBlockchain(context.blockchain, utxState.get().getAccountsDiff(context.blockchain))
           parseScriptResult(MatcherScriptRunner(scriptInfo.script, order, blockchain, isSynchronousCallsActivated))
         } else
           parseScriptResult(MatcherScriptRunner(scriptInfo.script, order, deniedBlockchain, isSynchronousCallsActivated))

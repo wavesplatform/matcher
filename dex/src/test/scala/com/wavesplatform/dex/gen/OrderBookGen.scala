@@ -36,7 +36,8 @@ trait OrderBookGen {
       OrderBookSnapshot(
         asks = askOrders.groupBy(_.order.price),
         bids = bidOrders.groupBy(_.order.price),
-        lastTrade = None
+        lastTrade = None,
+        nextTxTimestamp = 0L
       )
     )
 

@@ -64,7 +64,8 @@ class OrderBookSnapshotDbSpec extends AnyFreeSpec with Matchers with WithDb with
     asks <- asksGen
     bids <- bidsGen
     lastTrade <- Gen.option(lastTradeGen)
-  } yield OrderBookSnapshot(bids, asks, lastTrade)
+    matchTs <- Gen.choose(0L, System.currentTimeMillis())
+  } yield OrderBookSnapshot(bids, asks, lastTrade, matchTs)
 
   private lazy val gen = for {
     snapshot <- snapshotGen

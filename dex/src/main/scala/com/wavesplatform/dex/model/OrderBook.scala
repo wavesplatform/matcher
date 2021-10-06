@@ -12,7 +12,13 @@ import com.wavesplatform.dex.settings.MatchingRule
 
 import scala.collection.immutable.{HashMap, Queue, TreeMap}
 
-case class OrderBook private (bids: Side, asks: Side, lastTrade: Option[LastTrade], orderIds: HashMap[Order.Id, (OrderType, Price)]) {
+case class OrderBook private (
+  bids: Side,
+  asks: Side,
+  lastTrade: Option[LastTrade],
+  orderIds: HashMap[Order.Id, (OrderType, Price)],
+  nextTxTimestamp: Long
+) {
   import OrderBook._
 
   def bestBid: Option[LevelAgg] = bids.bestLevel
@@ -59,14 +65,15 @@ case class OrderBook private (bids: Side, asks: Side, lastTrade: Option[LastTrad
     submitted: AcceptedOrder,
     eventTs: Long,
     getMakerTakerFee: (AcceptedOrder, LimitOrder) => (Long, Long),
+    getOrderExecutedTs: (Long, Long) => Long,
     tickSize: Long = MatchingRule.DefaultRule.tickSize
   ): OrderBookUpdates = {
     val events = Queue(OrderAdded(submitted, OrderAddedReason.RequestExecuted, eventTs))
-    if (submitted.order.isValid(eventTs)) doMatch(eventTs, tickSize, getMakerTakerFee, submitted, events, this)
+    if (submitted.order.isValid(eventTs)) doMatch(eventTs, tickSize, getMakerTakerFee, submitted, events, this, getOrderExecutedTs)
     else OrderBookUpdates(this, events.enqueue(OrderCanceled(submitted, OrderCanceledReason.BecameInvalid, eventTs)), LevelAmounts.empty, None)
   }
 
-  def snapshot: OrderBookSnapshot = OrderBookSnapshot(bids, asks, lastTrade)
+  def snapshot: OrderBookSnapshot = OrderBookSnapshot(bids, asks, lastTrade, nextTxTimestamp)
   def aggregatedSnapshot: OrderBookAggregatedSnapshot = OrderBookAggregatedSnapshot(bids.aggregated.toSeq, asks.aggregated.toSeq)
 
   override def toString: String = s"""{"bids":${formatSide(bids)},"asks":${formatSide(asks)}}"""
@@ -126,7 +133,8 @@ object OrderBook {
     getMakerTakerMaxFee: (AcceptedOrder, LimitOrder) => (Long, Long),
     submitted: AcceptedOrder,
     events: Queue[Event],
-    orderBook: OrderBook
+    orderBook: OrderBook,
+    getOrderExecutedTs: (Long, Long) => Long
   ): OrderBookUpdates = {
 
     def unmatchable(ao: AcceptedOrder): OrderCanceled = OrderCanceled(ao, OrderCanceledReason.BecameUnmatchable, eventTs)
@@ -139,7 +147,8 @@ object OrderBook {
           else if (counter.order.isValid(eventTs)) {
 
             val (counterExecutedFee, submittedExecutedFee) = getMakerTakerMaxFee(submitted, counter)
-            val orderExecutedEvent = OrderExecuted(submitted, counter, eventTs, counterExecutedFee, submittedExecutedFee)
+            val orderExecutedTs = getOrderExecutedTs(eventTs, currentUpdates.orderBook.nextTxTimestamp)
+            val orderExecutedEvent = OrderExecuted(submitted, counter, orderExecutedTs, counterExecutedFee, submittedExecutedFee)
 
             if (orderExecutedEvent.executedAmount == 0) currentUpdates.copy(events = currentUpdates.events enqueue unmatchable(submitted))
             else {
@@ -152,7 +161,7 @@ object OrderBook {
 
               val (updatedOrderBook, updatedLevelChanges) = {
                 val updatedLevelChanges = currentUpdates.levelChanges.subtract(levelPrice, orderExecutedEvent)
-                val ob = currentUpdates.orderBook.copy(lastTrade = lastTrade)
+                val ob = currentUpdates.orderBook.copy(lastTrade = lastTrade, nextTxTimestamp = orderExecutedTs + 1)
 
                 if (counterRemaining.isValid) (ob.unsafeUpdateBest(counterRemaining), updatedLevelChanges)
                 else
@@ -220,7 +229,7 @@ object OrderBook {
   val bidsOrdering: Ordering[Long] = asksOrdering.reverse
   val bidsDenormalizedOrdering: Ordering[Double] = asksDenormalizedOrdering.reverse
 
-  val empty: OrderBook = new OrderBook(TreeMap.empty(bidsOrdering), TreeMap.empty(asksOrdering), None, HashMap.empty)
+  val empty: OrderBook = new OrderBook(TreeMap.empty(bidsOrdering), TreeMap.empty(asksOrdering), None, HashMap.empty, 0L)
 
   private def transformSide(side: OrderBookSideSnapshot, expectedSide: OrderType, ordering: Ordering[Long]): Side = {
     var bidMap = TreeMap.empty[Price, Level](ordering)
@@ -242,7 +251,8 @@ object OrderBook {
     transformSide(snapshot.bids, OrderType.BUY, bidsOrdering),
     transformSide(snapshot.asks, OrderType.SELL, asksOrdering),
     snapshot.lastTrade,
-    orderIds(snapshot.asks, snapshot.bids)
+    orderIds(snapshot.asks, snapshot.bids),
+    snapshot.nextTxTimestamp
   )
 
   def orderIds(asks: OrderBookSideSnapshot, bids: OrderBookSideSnapshot): HashMap[Order.Id, (OrderType, Price)] = {

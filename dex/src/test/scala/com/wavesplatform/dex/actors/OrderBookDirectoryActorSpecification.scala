@@ -440,6 +440,7 @@ class OrderBookDirectoryActorSpecification
             _ => {},
             _ => MatchingRule.DefaultRule,
             _ => makerTakerPartialFee,
+            _ => (eventTs, _) => eventTs,
             None
           ),
         assetsCache,
@@ -477,6 +478,7 @@ class OrderBookDirectoryActorSpecification
             _ => {},
             _ => MatchingRule.DefaultRule,
             _ => makerTakerPartialFee,
+            _ => (eventTs, _) => eventTs,
             None
           ),
         assetsCache,

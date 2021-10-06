@@ -40,7 +40,7 @@ class OrderBookTestSuite
   implicit class OrderBookOps(ob: OrderBook) {
 
     def append(ao: AcceptedOrder, ts: Long, tickSize: Long = MatchingRule.DefaultRule.tickSize): OrderBookUpdates =
-      ob.add(ao, ts, (t, m) => getDefaultMakerTakerFee(t, m), tickSize)
+      ob.add(ao, ts, (t, m) => getDefaultMakerTakerFee(t, m), (eventTs, _) => eventTs, tickSize)
 
     def appendLimit(o: Order, ts: Long, tickSize: Long = MatchingRule.DefaultRule.tickSize): OrderBookUpdates =
       append(LimitOrder(o), ts, tickSize)
@@ -497,7 +497,7 @@ class OrderBookTestSuite
       val gmtf = Fee.getMakerTakerFee(ofs)(_, _)
 
       // Ignore first two OrderAdded, take next OrderExecuted, other events aren't interesting
-      val evt = OrderBook.empty.appendAll(List(maker, taker))(_.add(_, nowTs, gmtf)).events.drop(2).head
+      val evt = OrderBook.empty.appendAll(List(maker, taker))(_.add(_, nowTs, gmtf, (eventTs, _) => eventTs)).events.drop(2).head
 
       evt shouldBe a[OrderExecuted]
       val oe = evt.asInstanceOf[OrderExecuted]
@@ -537,7 +537,7 @@ class OrderBookTestSuite
       val sell3 = LimitOrder(createOrder(wavesUsdPair, SELL, 110.waves, 3.0))
 
       val OrderBookUpdates(_, events, _, _) = ob.appendAll(Seq(sell1, sell2, sell3, buy).zipWithIndex) {
-        case (ob, (order, timeOffset)) => ob.add(order, ts + timeOffset, getDefaultMakerTakerFee)
+        case (ob, (order, timeOffset)) => ob.add(order, ts + timeOffset, getDefaultMakerTakerFee, (eventTs, _) => eventTs)
       }
 
       events should have size (if (buy.isLimit) 7 else 8)
@@ -618,7 +618,8 @@ class OrderBookTestSuite
     asks <- asksGen
     bids <- bidsGen
     lastTrade <- Gen.option(lastTradeGen)
-  } yield OrderBookSnapshot(bids, asks, lastTrade)
+    matchTs <- Gen.choose(0L, System.currentTimeMillis())
+  } yield OrderBookSnapshot(bids, asks, lastTrade, matchTs)
 
   private lazy val sideSnapshotSerGen: Gen[OrderBookSideSnapshot] = Gen.oneOf(asksGen, bidsGen)
 }

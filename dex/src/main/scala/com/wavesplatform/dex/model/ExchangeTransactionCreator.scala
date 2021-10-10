@@ -3,10 +3,14 @@ package com.wavesplatform.dex.model
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
-import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.crypto.Proofs
+import com.wavesplatform.dex.domain.order.{Order, OrderV3}
 import com.wavesplatform.dex.domain.transaction.{ExchangeTransactionResult, ExchangeTransactionV2}
 import com.wavesplatform.dex.model.Events.OrderExecuted
 import com.wavesplatform.dex.model.ExchangeTransactionCreator._
+
+import java.io.ByteArrayOutputStream
 
 class ExchangeTransactionCreator(
   matcherPrivateKey: KeyPair,
@@ -23,6 +27,11 @@ class ExchangeTransactionCreator(
       if (orderExecutedEvent.submitted.isBuyOrder) (orderExecutedEvent.submittedExecutedFee, orderExecutedEvent.counterExecutedFee)
       else (orderExecutedEvent.counterExecutedFee, orderExecutedEvent.submittedExecutedFee)
 
+    // HACK for LP
+    val buyWithExecutionInfo = fillMatchInfoInProofs(buy, orderExecutedEvent.executedAmount, orderExecutedEvent.executedPrice, isLp = buyFee == 0)
+    val sellWithExecutionInfo = fillMatchInfoInProofs(sell, orderExecutedEvent.executedAmount, orderExecutedEvent.executedPrice, isLp = sellFee == 0)
+    // end HACK for LP
+
     // matcher always pays fee to the miners in Waves
     val txFee = minFee(exchangeTxBaseFee, hasMatcherAccountScript, counter.order.assetPair, hasAssetScript) +
       // TODO This will be fixed in NODE 1.2.8+, see NODE-2183
@@ -30,8 +39,8 @@ class ExchangeTransactionCreator(
         .count(_.fold(false)(hasAssetScript)) * OrderValidator.ScriptExtraFee
     ExchangeTransactionV2.create(
       matcherPrivateKey,
-      buy,
-      sell,
+      buyWithExecutionInfo,
+      sellWithExecutionInfo,
       executedAmount,
       orderExecutedEvent.executedPrice,
       buyFee,
@@ -64,4 +73,28 @@ object ExchangeTransactionCreator {
   }
 
   def getAdditionalFeeForScript(hasScript: Boolean): Long = if (hasScript) OrderValidator.ScriptExtraFee else 0L
+
+  // HACK for LP
+  // TODO move to another place
+
+  // see com.wavesplatform.lang.utils.Serialize.ByteArrayOutputStreamOps
+  private def encodeToBytes(n: Long, byteCount: Int): ByteStr = {
+    val s = new ByteArrayOutputStream(byteCount)
+    (byteCount - 1 to 0 by -1).foreach { i =>
+      s.write((n >> (8 * i) & 0xffL).toInt)
+    }
+    ByteStr(s.toByteArray)
+  }
+
+  def updateProofs(proofs: Proofs, executedAmount: Long, executedPrice: Long): Proofs =
+    proofs.proofs ++ List(encodeToBytes(executedAmount, 8), encodeToBytes(executedPrice, 8))
+
+  def fillMatchInfoInProofs(order: Order, executedAmount: Long, executedPrice: Long): Order =
+    order match {
+      case order: OrderV3 => order.copy(proofs = updateProofs(order.proofs, executedAmount, executedPrice))
+      case _ => order // HACK
+    }
+
+  def fillMatchInfoInProofs(order: Order, executedAmount: Long, executedPrice: Long, isLp: Boolean): Order = if (isLp) fillMatchInfoInProofs(order, executedAmount, executedPrice) else order
+  // end HACK for LP
 }

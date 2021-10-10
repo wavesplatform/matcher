@@ -24,10 +24,11 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.{ExecutionError, ValidationError}
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.{Asset, Proofs}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.exchange
+import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.smart.script.ScriptRunnerFixed
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.utils.ScorexLogging
@@ -40,6 +41,7 @@ import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 import shapeless.Coproduct
 
+import java.io.ByteArrayOutputStream
 import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.Future
 import scala.util.control.NonFatal
@@ -233,8 +235,9 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
         val order = request.order.map(_.toVanilla).getOrElse(throwInvalidArgument("Expected an order"))
         val isSynchronousCallsActivated = context.blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
         if (allowedBlockchainStateAccounts.contains(order.senderPublicKey)) {
+          val fixedOrder = WavesBlockchainApiGrpcService.fillMatchInfoInProofs(order, order.amount, order.price, isLp = true)
           val blockchain = CompositeBlockchain(context.blockchain, utxState.get().getAccountsDiff(context.blockchain))
-          parseScriptResult(MatcherScriptRunner(scriptInfo.script, order, blockchain, isSynchronousCallsActivated))
+          parseScriptResult(MatcherScriptRunner(scriptInfo.script, fixedOrder, blockchain, isSynchronousCallsActivated))
         } else
           parseScriptResult(MatcherScriptRunner(scriptInfo.script, order, deniedBlockchain, isSynchronousCallsActivated))
     }
@@ -379,4 +382,26 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
       catch { case e: Throwable => log.warn(s"$subscriber: can't $label", e) }
     }
 
+}
+
+object WavesBlockchainApiGrpcService {
+  // HACK for LP
+
+  // see com.wavesplatform.lang.utils.Serialize.ByteArrayOutputStreamOps
+  private def encodeToBytes(n: Long, byteCount: Int): ByteStr = {
+    val s = new ByteArrayOutputStream(byteCount)
+    (byteCount - 1 to 0 by -1).foreach { i =>
+      s.write((n >> (8 * i) & 0xffL).toInt)
+    }
+    ByteStr(s.toByteArray)
+  }
+
+  def updateProofs(proofs: Proofs, executedAmount: Long, executedPrice: Long): Proofs =
+    proofs.proofs ++ List(encodeToBytes(executedAmount, 8), encodeToBytes(executedPrice, 8))
+
+  def fillMatchInfoInProofs(order: Order, executedAmount: Long, executedPrice: Long): Order =
+    order.copy(proofs = updateProofs(order.proofs, executedAmount, executedPrice))
+
+  def fillMatchInfoInProofs(order: Order, executedAmount: Long, executedPrice: Long, isLp: Boolean): Order = if (isLp) fillMatchInfoInProofs(order, executedAmount, executedPrice) else order
+  // end HACK for LP
 }

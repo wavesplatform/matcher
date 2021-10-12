@@ -71,7 +71,7 @@ object Dependencies {
     val javaLevelDb = "0.12"
     val iq80levelDb = "0.12"
     val influxDb = "2.21"
-    val levelDbVersion = "1.23.0"
+    val levelDbVersion = "1.23.1"
 
     val commonsNet = "3.8.0"
     val nettyCodec = "4.1.33.Final"

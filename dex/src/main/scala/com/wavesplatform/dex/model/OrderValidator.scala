@@ -61,8 +61,8 @@ object OrderValidator extends ScorexLogging {
       )
   }
 
-  private def verifyOrderByAccountScript(blockchain: WavesBlockchainClient, address: Address, order: Order)(implicit
-    ec: ExecutionContext
+  private def verifyOrderByAccountScript(blockchain: WavesBlockchainClient, address: Address, order: Order, handleProofs: Order => Order)(
+    implicit ec: ExecutionContext
   ): FutureResult[Unit] = {
 
     lazy val verifyAddressScript: FutureResult[Unit] = {
@@ -70,7 +70,7 @@ object OrderValidator extends ScorexLogging {
       lazy val verifyScript: FutureResult[Unit] = {
         if (order.version <= 1) liftErrorAsync[Unit](error.AccountNotSupportOrderVersion(address, 2, order.version))
         else
-          liftFutureAsync(blockchain.runScript(address, order)) subflatMap {
+          liftFutureAsync(blockchain.runScript(address, handleProofs(order))) subflatMap {
             case RunScriptResult.ScriptError(execError) => error.AccountScriptReturnedError(address, execError).asLeft
             case RunScriptResult.Denied => error.AccountScriptDeniedOrder(address).asLeft
             case RunScriptResult.Allowed => success
@@ -162,7 +162,8 @@ object OrderValidator extends ScorexLogging {
     orderRestrictions: Option[OrderRestrictionsSettings],
     assetDescriptions: Asset => BriefAssetDescription,
     rateCache: RateCache,
-    hasMatcherAccountScript: Boolean
+    hasMatcherAccountScript: Boolean,
+    handleProofs: Order => Order
   )(order: Order)(implicit ec: ExecutionContext, efc: ErrorFormatterContext): FutureResult[Order] =
     timer.measure {
 
@@ -211,7 +212,7 @@ object OrderValidator extends ScorexLogging {
         _ <- validateOrderFeeByTransactionRequirements
         decimalsPair <- validateDecimals(assetDescriptions(_).decimals, order)
         _ <- validateAmountAndPrice(order, decimalsPair, orderRestrictions)
-        _ <- verifyOrderByAccountScript(blockchain, order.sender, order)
+        _ <- verifyOrderByAccountScript(blockchain, order.sender, order, handleProofs)
         _ <- verifyAssetScript(amountAsset)
         _ <- verifyAssetScript(priceAsset)
         _ <- verifyMatcherFeeAssetScript

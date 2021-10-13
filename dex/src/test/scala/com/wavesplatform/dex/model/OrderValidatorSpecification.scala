@@ -1002,7 +1002,8 @@ class OrderValidatorSpecification
       matcherSettings.orderRestrictions.get(order.assetPair),
       assetDescriptions,
       rateCache,
-      hasMatcherAccountScript = false
+      hasMatcherAccountScript = false,
+      order => order
     )(order)
   }
 
@@ -1121,7 +1122,8 @@ class OrderValidatorSpecification
         orderRestrictions.get(order.assetPair),
         assetDescriptions = assetsDescriptions,
         rateCache,
-        matcherAccountScript.nonEmpty
+        matcherAccountScript.nonEmpty,
+        order => order
       )(order)
   }
 

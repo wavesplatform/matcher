@@ -70,8 +70,7 @@ object ValidationStages {
     }
 
     /** Needs additional asynchronous access to the blockchain */
-    def asyncValidation(orderAssetsDescriptions: Asset => BriefAssetDescription): FutureResult[Order] = {
-      val orderWithProofs = handleProofs(o) // to add amount & price info for script validation
+    def asyncValidation(orderAssetsDescriptions: Asset => BriefAssetDescription): FutureResult[Order] =
       blockchainAware(
         blockchain,
         transactionCreator.createTransaction,
@@ -80,9 +79,9 @@ object ValidationStages {
         settings.orderRestrictions.get(o.assetPair),
         orderAssetsDescriptions,
         rateCache,
-        hasMatcherAccountScript
-      )(orderWithProofs)
-    }
+        hasMatcherAccountScript,
+        handleProofs
+      )(o)
 
     def knownAssets: FutureResult[Map[Asset, BriefAssetDescription]] = o.assets
       .map(asset => assetsDescription(asset).map(x => asset -> x))

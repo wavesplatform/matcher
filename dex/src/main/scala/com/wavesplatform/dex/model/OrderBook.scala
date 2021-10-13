@@ -8,6 +8,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.model.Price
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.model.Events._
+import com.wavesplatform.dex.queue.ValidatedCommandWithMeta
 import com.wavesplatform.dex.settings.MatchingRule
 
 import scala.collection.immutable.{HashMap, Queue, TreeMap}
@@ -66,10 +67,11 @@ case class OrderBook private (
     eventTs: Long,
     getMakerTakerFee: (AcceptedOrder, LimitOrder) => (Long, Long),
     getOrderExecutedTs: (Long, Long) => Long,
+    submittedOffset: ValidatedCommandWithMeta.Offset,
     tickSize: Long = MatchingRule.DefaultRule.tickSize
   ): OrderBookUpdates = {
     val events = Queue(OrderAdded(submitted, OrderAddedReason.RequestExecuted, eventTs))
-    if (submitted.order.isValid(eventTs)) doMatch(eventTs, tickSize, getMakerTakerFee, submitted, events, this, getOrderExecutedTs)
+    if (submitted.order.isValid(eventTs)) doMatch(eventTs, tickSize, getMakerTakerFee, submitted, events, this, getOrderExecutedTs, submittedOffset)
     else OrderBookUpdates(this, events.enqueue(OrderCanceled(submitted, OrderCanceledReason.BecameInvalid, eventTs)), LevelAmounts.empty, None)
   }
 
@@ -134,7 +136,8 @@ object OrderBook {
     submitted: AcceptedOrder,
     events: Queue[Event],
     orderBook: OrderBook,
-    getOrderExecutedTs: (Long, Long) => Long
+    getOrderExecutedTs: (Long, Long) => Long,
+    submittedOffset: ValidatedCommandWithMeta.Offset
   ): OrderBookUpdates = {
 
     def unmatchable(ao: AcceptedOrder): OrderCanceled = OrderCanceled(ao, OrderCanceledReason.BecameUnmatchable, eventTs)
@@ -148,7 +151,7 @@ object OrderBook {
 
             val (counterExecutedFee, submittedExecutedFee) = getMakerTakerMaxFee(submitted, counter)
             val orderExecutedTs = getOrderExecutedTs(eventTs, currentUpdates.orderBook.nextTxTimestamp)
-            val orderExecutedEvent = OrderExecuted(submitted, counter, orderExecutedTs, counterExecutedFee, submittedExecutedFee)
+            val orderExecutedEvent = OrderExecuted(submitted, counter, orderExecutedTs, counterExecutedFee, submittedExecutedFee, submittedOffset)
 
             if (orderExecutedEvent.executedAmount == 0) currentUpdates.copy(events = currentUpdates.events enqueue unmatchable(submitted))
             else {

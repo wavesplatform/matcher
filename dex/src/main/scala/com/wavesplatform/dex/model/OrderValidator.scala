@@ -175,7 +175,15 @@ object OrderValidator extends ScorexLogging {
 
       lazy val exchangeTx: Result[ExchangeTransaction] = {
         val fakeOrder: Order = order.updateType(order.orderType.opposite)
-        val oe: OrderExecuted = OrderExecuted(LimitOrder(fakeOrder), LimitOrder(order), time.correctedTime(), order.matcherFee, order.matcherFee)
+        val oe: OrderExecuted =
+          OrderExecuted(
+            LimitOrder(fakeOrder),
+            LimitOrder(order),
+            time.correctedTime(),
+            order.matcherFee,
+            order.matcherFee,
+            None // don't need it at validation level
+          )
         transactionCreator(oe).toEither leftMap (txValidationError => error.CanNotCreateExchangeTransaction(txValidationError.toString))
       }
 

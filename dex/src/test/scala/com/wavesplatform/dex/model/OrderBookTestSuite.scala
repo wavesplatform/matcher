@@ -184,7 +184,7 @@ class OrderBookTestSuite
         Queue[Event](
           OrderAdded(counterSellOrder, OrderAddedReason.RequestExecuted, ts),
           OrderAdded(submittedBuyOrder, OrderAddedReason.RequestExecuted, ts + 1),
-          OrderExecuted(submittedBuyOrder, counterSellOrder, ts + 1, counterSellOrder.matcherFee, submittedBuyOrder.matcherFee)
+          OrderExecuted(submittedBuyOrder, counterSellOrder, ts + 1, counterSellOrder.matcherFee, submittedBuyOrder.matcherFee, 0L)
         )
       )
 
@@ -230,7 +230,7 @@ class OrderBookTestSuite
       events2 should matchTo(
         Queue[Event](
           OrderAdded(submitted, OrderAddedReason.RequestExecuted, submittedTs),
-          OrderExecuted(submitted, counter, submittedTs, submitted.matcherFee, counter.matcherFee)
+          OrderExecuted(submitted, counter, submittedTs, submitted.matcherFee, counter.matcherFee, 0L)
         )
       )
 
@@ -497,7 +497,7 @@ class OrderBookTestSuite
       val gmtf = Fee.getMakerTakerFee(ofs)(_, _)
 
       // Ignore first two OrderAdded, take next OrderExecuted, other events aren't interesting
-      val evt = OrderBook.empty.appendAll(List(maker, taker))(_.add(_, nowTs, gmtf, (eventTs, _) => eventTs)).events.drop(2).head
+      val evt = OrderBook.empty.appendAll(List(maker, taker))(_.add(_, nowTs, gmtf, (eventTs, _) => eventTs, 0L)).events.drop(2).head
 
       evt shouldBe a[OrderExecuted]
       val oe = evt.asInstanceOf[OrderExecuted]
@@ -537,7 +537,7 @@ class OrderBookTestSuite
       val sell3 = LimitOrder(createOrder(wavesUsdPair, SELL, 110.waves, 3.0))
 
       val OrderBookUpdates(_, events, _, _) = ob.appendAll(Seq(sell1, sell2, sell3, buy).zipWithIndex) {
-        case (ob, (order, timeOffset)) => ob.add(order, ts + timeOffset, getDefaultMakerTakerFee, (eventTs, _) => eventTs)
+        case (ob, (order, timeOffset)) => ob.add(order, ts + timeOffset, getDefaultMakerTakerFee, (eventTs, _) => eventTs, submittedOffset = 0L)
       }
 
       events should have size (if (buy.isLimit) 7 else 8)

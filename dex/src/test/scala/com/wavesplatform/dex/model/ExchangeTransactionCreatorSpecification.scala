@@ -30,7 +30,7 @@ class ExchangeTransactionCreatorSpecification
     hasMatcherScript: Boolean = false,
     hasAssetScripts: Asset => Boolean = _ => false
   ): ExchangeTransactionCreator =
-    new ExchangeTransactionCreator(MatcherAccount, matcherSettings.exchangeTxBaseFee, hasMatcherScript, hasAssetScripts)
+    new ExchangeTransactionCreator(MatcherAccount, matcherSettings.exchangeTxBaseFee, hasMatcherScript, hasAssetScripts, (_, _) => false)
 
   "ExchangeTransactionCreator" should {
     "create an ExchangeTransactionV2" when {

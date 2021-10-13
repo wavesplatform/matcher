@@ -70,7 +70,7 @@ class FeeSpecification
                   else sellMatcherFee shouldBe expectedMatcherFee
                 }
 
-                OrderExecuted(submitted, counter, submitted.order.timestamp, makerFee, takerFee).submittedRemaining
+                OrderExecuted(submitted, counter, submitted.order.timestamp, makerFee, takerFee, 0L).submittedRemaining
             }
         }
       }

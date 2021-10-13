@@ -233,6 +233,7 @@ class OrderBookActor(
         command.timestamp,
         getMakerTakerFeeByOffset(command.offset),
         getOrderExecutedTs(command.offset),
+        command.offset,
         actualRule.tickSize
       )
     )

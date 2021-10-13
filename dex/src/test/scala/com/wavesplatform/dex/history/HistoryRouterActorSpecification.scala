@@ -77,7 +77,7 @@ class HistoryRouterActorSpecification
     OrderCanceled(submitted, OrderCanceledReason.RequestExecuted, time.getTimestamp())
 
   def orderExecuted(submitted: AcceptedOrder, counter: LimitOrder): OrderExecuted =
-    OrderExecuted(submitted, counter, time.getTimestamp(), counter.matcherFee, submitted.matcherFee)
+    OrderExecuted(submitted, counter, time.getTimestamp(), counter.matcherFee, submitted.matcherFee, 0L)
 
   // don't need to use blockchain in order to find out asset decimals, therefore pair parameter isn't used
   def denormalizeAmountAndFee(value: Long, asset: Asset): BigDecimal = Denormalization.denormalizeAmountAndFee(value, wavesDecimals)

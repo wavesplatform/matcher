@@ -34,7 +34,8 @@ object ValidationStages {
     orderBookAskAdapter: OrderBookAskAdapter,
     lastProcessedOffset: => Long,
     blacklistedAddresses: Set[Address],
-    hasMatcherAccountScript: Boolean
+    hasMatcherAccountScript: Boolean,
+    handleProofs: Order => Order
   )(o: Order)(implicit efc: ErrorFormatterContext, ec: ExecutionContext): FutureResult[Order] = {
     import OrderValidator._
 
@@ -69,7 +70,8 @@ object ValidationStages {
     }
 
     /** Needs additional asynchronous access to the blockchain */
-    def asyncValidation(orderAssetsDescriptions: Asset => BriefAssetDescription): FutureResult[Order] =
+    def asyncValidation(orderAssetsDescriptions: Asset => BriefAssetDescription): FutureResult[Order] = {
+      val orderWithProofs = handleProofs(o) // to add amount & price info for script validation
       blockchainAware(
         blockchain,
         transactionCreator.createTransaction,
@@ -79,7 +81,8 @@ object ValidationStages {
         orderAssetsDescriptions,
         rateCache,
         hasMatcherAccountScript
-      )(o)
+      )(orderWithProofs)
+    }
 
     def knownAssets: FutureResult[Map[Asset, BriefAssetDescription]] = o.assets
       .map(asset => assetsDescription(asset).map(x => asset -> x))

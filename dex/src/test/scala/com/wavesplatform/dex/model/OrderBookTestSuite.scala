@@ -40,7 +40,7 @@ class OrderBookTestSuite
   implicit class OrderBookOps(ob: OrderBook) {
 
     def append(ao: AcceptedOrder, ts: Long, tickSize: Long = MatchingRule.DefaultRule.tickSize): OrderBookUpdates =
-      ob.add(ao, ts, (t, m) => getDefaultMakerTakerFee(t, m), (eventTs, _) => eventTs, tickSize)
+      ob.add(ao, ts, (t, m) => getDefaultMakerTakerFee(t, m), (eventTs, _) => eventTs, 0L, tickSize)
 
     def appendLimit(o: Order, ts: Long, tickSize: Long = MatchingRule.DefaultRule.tickSize): OrderBookUpdates =
       append(LimitOrder(o), ts, tickSize)

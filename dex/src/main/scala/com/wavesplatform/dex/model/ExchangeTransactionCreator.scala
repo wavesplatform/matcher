@@ -14,7 +14,7 @@ class ExchangeTransactionCreator(
   exchangeTxBaseFee: Long,
   hasMatcherAccountScript: => Boolean,
   hasAssetScript: IssuedAsset => Boolean,
-  ifAddMatchProofs: (Option[ValidatedCommandWithMeta.Offset], PublicKey) => Boolean
+  shouldPassExecParams: (Option[ValidatedCommandWithMeta.Offset], PublicKey) => Boolean
 ) {
 
   def createTransaction(orderExecutedEvent: OrderExecuted): ExchangeTransactionResult[ExchangeTransactionV2] = {
@@ -25,22 +25,20 @@ class ExchangeTransactionCreator(
       if (orderExecutedEvent.submitted.isBuyOrder) (orderExecutedEvent.submittedExecutedFee, orderExecutedEvent.counterExecutedFee)
       else (orderExecutedEvent.counterExecutedFee, orderExecutedEvent.submittedExecutedFee)
 
-    // HACK for LP
     val buyWithExecutionInfo =
-      ProofsLpHack.fillMatchInfoInProofs(
+      ExecutionParamsInProofs.fillMatchInfoInProofs(
         buy,
         orderExecutedEvent.executedAmount,
         orderExecutedEvent.executedPrice,
-        isLp = ifAddMatchProofs(orderExecutedEvent.commandOffset, buy.sender)
+        shouldPassExecParams(orderExecutedEvent.commandOffset, buy.sender)
       )
     val sellWithExecutionInfo =
-      ProofsLpHack.fillMatchInfoInProofs(
+      ExecutionParamsInProofs.fillMatchInfoInProofs(
         sell,
         orderExecutedEvent.executedAmount,
         orderExecutedEvent.executedPrice,
-        isLp = ifAddMatchProofs(orderExecutedEvent.commandOffset, sell.sender)
+        shouldPassExecParams(orderExecutedEvent.commandOffset, sell.sender)
       )
-    // end HACK for LP
 
     // matcher always pays fee to the miners in Waves
     val txFee = minFee(exchangeTxBaseFee, hasMatcherAccountScript, counter.order.assetPair, hasAssetScript) +

@@ -7,7 +7,9 @@ import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.error.AccountScriptReturnedError
 import com.wavesplatform.dex.it.test.Scripts
+import com.wavesplatform.dex.model.ExecutionParamsInProofs
 import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.transactions.common.Proof
 import com.wavesplatform.transactions.exchange
 
 import scala.jdk.CollectionConverters._
@@ -31,6 +33,8 @@ final class OrderExecutedDataInProofsTestSuite extends MatcherSuiteBase {
       val orders = txs.head.orders()
       orders.size() shouldBe 2
       orders.asScala.foreach(_.proofs().size() shouldBe 1)
+
+      wavesNode1.api.waitForHeightArise()
     }
 
     "add extra data for old order if offset is right" in {
@@ -46,6 +50,8 @@ final class OrderExecutedDataInProofsTestSuite extends MatcherSuiteBase {
       orders1.size() shouldBe 2
       orders1.asScala.foreach(_.proofs().size() shouldBe 1)
 
+      wavesNode1.api.waitForHeightArise()
+
       broadcastAndAwait(
         mkSetAccountMayBeScript(alice, Some(script), fee = setScriptFee + smartFee),
         mkSetAccountMayBeScript(bob, Some(script), fee = setScriptFee + smartFee)
@@ -58,7 +64,7 @@ final class OrderExecutedDataInProofsTestSuite extends MatcherSuiteBase {
       txs2.size shouldBe 1
       val orders2 = txs2.head.orders()
       orders2.size() shouldBe 2
-      orders2.asScala.foreach(_.proofs().size() shouldBe 3)
+      orders2.asScala.foreach(order => checkProofs(order.proofs.asScala.toList, 0.7.waves, 2.usdn))
     }
 
     "after offset add extra data only for account from config" in {
@@ -75,7 +81,7 @@ final class OrderExecutedDataInProofsTestSuite extends MatcherSuiteBase {
       orders.size() shouldBe 2
       orders.asScala.foreach { order =>
         if (order.`type`() == exchange.OrderType.BUY) order.proofs().size() shouldBe 1
-        else order.proofs().size() shouldBe 3
+        else checkProofs(order.proofs.asScala.toList, 1.waves, 2.usdn)
       }
     }
 
@@ -91,7 +97,7 @@ final class OrderExecutedDataInProofsTestSuite extends MatcherSuiteBase {
       txs.size shouldBe 1
       val orders = txs.head.orders()
       orders.size() shouldBe 2
-      orders.asScala.foreach(_.proofs().size() shouldBe 3)
+      orders.asScala.foreach(order => checkProofs(order.proofs.asScala.toList, 5.waves, 2.usdn))
     }
 
     "with script" - {
@@ -109,6 +115,16 @@ final class OrderExecutedDataInProofsTestSuite extends MatcherSuiteBase {
   }
 
   protected val carol = mkKeyPair("carol")
+
+  private def checkProofs(proofs: List[Proof], execAmount: Long, execPrice: Long): Unit = {
+    proofs.size shouldBe 3
+
+    val amountProof = ExecutionParamsInProofs.encodeToBytes(execAmount, 8)
+    val priceProof = ExecutionParamsInProofs.encodeToBytes(execPrice, 8)
+
+    proofs(1).encoded() shouldBe amountProof.base58
+    proofs(2).encoded() shouldBe priceProof.base58
+  }
 
   override def beforeAll(): Unit = {
     wavesNode1.start()

@@ -21,6 +21,10 @@ itArtifactDescriptions := {
     ArtifactDescription(
       downloadUrl = "https://search.maven.org/remotecontent?filepath=org/aspectj/aspectjweaver/1.9.1/aspectjweaver-1.9.1.jar",
       name = Some("aspectjweaver.jar")
+    ),
+    ArtifactDescription(
+      downloadUrl = s"https://www.yourkit.com/download/docker/$yourKitArchive",
+      additionalScript = Some(s"unzip $cachedDir/$yourKitArchive -d $cachedDir/yourKit")
     )
   )
 }
@@ -39,7 +43,9 @@ inTask(docker)(
       List(
         (Test / sourceDirectory).value / "container" / "start-matcher-server-it.sh" -> s"$appPath/bin/", // entry point
         (Test / resourceDirectory).value / "dex-servers" / "logback-container.xml" -> s"$appPath/doc/", // logs management
-        itArtifactsCacheDir.value / "aspectjweaver.jar" -> s"$appPath/lib"
+        itArtifactsCacheDir.value / "aspectjweaver.jar" -> s"$appPath/lib", // profiler, see https://www.yourkit.com/docs/java/help/docker.jsp
+        itArtifactsCacheDir.value / "yourKit" -> "/usr/local" // profiler archive
+          itArtifactsCacheDir.value / "aspectjweaver.jar" -> s"$appPath/lib"
       ).foreach {
         case (src, dest) => add(src, dest, chown = "waves-dex:waves-dex")
       }

@@ -152,7 +152,8 @@ object OrderBook {
 
             val (counterExecutedFee, submittedExecutedFee) = getMakerTakerMaxFee(submitted, counter)
             val orderExecutedTs = getOrderExecutedTs(eventTs, currentUpdates.orderBook.nextTxTimestamp)
-            val orderExecutedEvent = OrderExecuted(submitted, counter, orderExecutedTs, counterExecutedFee, submittedExecutedFee, submittedOffset)
+            val orderExecutedEvent =
+              OrderExecuted(submitted, counter, orderExecutedTs, counterExecutedFee, submittedExecutedFee, submittedOffset)
 
             if (orderExecutedEvent.executedAmount == 0) currentUpdates.copy(events = currentUpdates.events enqueue unmatchable(submitted))
             else {

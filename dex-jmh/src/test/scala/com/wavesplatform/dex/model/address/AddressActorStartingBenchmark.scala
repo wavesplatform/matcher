@@ -151,7 +151,8 @@ object AddressActorStartingBenchmark {
       counter,
       System.currentTimeMillis(),
       counter.matcherFee,
-      ao.matcherFee
+      ao.matcherFee,
+      None
     )
 
   }

@@ -71,7 +71,8 @@ case class OrderBook private (
     tickSize: Long = MatchingRule.DefaultRule.tickSize
   ): OrderBookUpdates = {
     val events = Queue(OrderAdded(submitted, OrderAddedReason.RequestExecuted, eventTs))
-    if (submitted.order.isValid(eventTs)) doMatch(eventTs, tickSize, getMakerTakerFee, submitted, events, this, getOrderExecutedTs, submittedOffset)
+    if (submitted.order.isValid(eventTs))
+      doMatch(eventTs, tickSize, getMakerTakerFee, submitted, events, this, getOrderExecutedTs, submittedOffset)
     else OrderBookUpdates(this, events.enqueue(OrderCanceled(submitted, OrderCanceledReason.BecameInvalid, eventTs)), LevelAmounts.empty, None)
   }
 

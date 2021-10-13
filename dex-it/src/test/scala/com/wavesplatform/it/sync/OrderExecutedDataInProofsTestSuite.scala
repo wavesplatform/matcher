@@ -18,7 +18,6 @@ final class OrderExecutedDataInProofsTestSuite extends MatcherSuiteBase {
 
   "OrderExecutedDataInProofs" - {
 
-    // п.4
     "before offset don't add extra data for any account" in {
       val aliceOrder = mkOrder(alice, wavesUsdnPair, OrderType.SELL, 1.waves, 2.usdn, version = orderVersion)
       dex1.api.place(aliceOrder)
@@ -47,14 +46,10 @@ final class OrderExecutedDataInProofsTestSuite extends MatcherSuiteBase {
       orders1.size() shouldBe 2
       orders1.asScala.foreach(_.proofs().size() shouldBe 1)
 
-      wavesNode1.api.waitForHeightArise()
-
       broadcastAndAwait(
         mkSetAccountMayBeScript(alice, Some(script), fee = setScriptFee + smartFee),
         mkSetAccountMayBeScript(bob, Some(script), fee = setScriptFee + smartFee)
       )
-
-      wavesNode1.api.waitForHeightArise()
 
       val aliceOrder2 = mkOrder(alice, wavesUsdnPair, OrderType.SELL, 0.7.waves, 1.3.usdn, version = orderVersion)
       dex1.api.place(aliceOrder2)

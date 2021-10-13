@@ -45,7 +45,6 @@ inTask(docker)(
         (Test / resourceDirectory).value / "dex-servers" / "logback-container.xml" -> s"$appPath/doc/", // logs management
         itArtifactsCacheDir.value / "aspectjweaver.jar" -> s"$appPath/lib", // profiler, see https://www.yourkit.com/docs/java/help/docker.jsp
         itArtifactsCacheDir.value / "yourKit" -> "/usr/local" // profiler archive
-          itArtifactsCacheDir.value / "aspectjweaver.jar" -> s"$appPath/lib"
       ).foreach {
         case (src, dest) => add(src, dest, chown = "waves-dex:waves-dex")
       }

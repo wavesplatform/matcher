@@ -130,7 +130,7 @@ class ActorsWebSocketInteractionsSpecification
 
     def executeOrder(s: AcceptedOrder, c: LimitOrder): OrderExecuted = {
       val (counterExecutedFee, submittedExecutedFee) = Fee.getMakerTakerFee(DynamicSettings.symmetric(0.003.waves))(s, c)
-      val oe = OrderExecuted(s, c, System.currentTimeMillis, counterExecutedFee, submittedExecutedFee)
+      val oe = OrderExecuted(s, c, System.currentTimeMillis, counterExecutedFee, submittedExecutedFee, 0L)
       val (sellOrder, buyOrder) = if (oe.counter.isSellOrder) (oe.counter, oe.submitted) else (oe.submitted, oe.counter)
       val tx = ExchangeTransactionV2
         .create(
@@ -535,7 +535,7 @@ class ActorsWebSocketInteractionsSpecification
         env.commandsProbe.expectMsg(ValidatedCommand.PlaceOrder(submitted))
         env.addressDir ! OrderAdded(submitted, OrderAddedReason.RequestExecuted, now)
 
-        val oe = OrderExecuted(submitted, counter, System.currentTimeMillis, submitted.matcherFee, counter.matcherFee)
+        val oe = OrderExecuted(submitted, counter, System.currentTimeMillis, submitted.matcherFee, counter.matcherFee, 0L)
 
         env.addressDir ! oe
 
@@ -572,7 +572,7 @@ class ActorsWebSocketInteractionsSpecification
         env.commandsProbe.expectMsg(ValidatedCommand.PlaceOrder(submitted))
         env.addressDir ! AddressActor.Command.ApplyOrderBookAdded(OrderAdded(submitted, OrderAddedReason.RequestExecuted, now))
 
-        val oe = OrderExecuted(submitted, counter, System.currentTimeMillis, counter.matcherFee, submitted.matcherFee)
+        val oe = OrderExecuted(submitted, counter, System.currentTimeMillis, counter.matcherFee, submitted.matcherFee, 0L)
         env.addressDir ! AddressActor.Command.ApplyOrderBookExecuted(oe, mkExchangeTx(oe).copy(error = ValidationError.GenericError("test").some))
 
         env

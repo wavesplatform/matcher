@@ -52,7 +52,8 @@ trait Generators extends WavesEntitiesGen {
       counter = LimitOrder(counter),
       timestamp = submitted.timestamp,
       counterExecutedFee = counter.matcherFee,
-      submittedExecutedFee = submitted.matcherFee
+      submittedExecutedFee = submitted.matcherFee,
+      commandOffset = 0L
     )
 
   protected def canceledEventGen(senderGen: Gen[KeyPair] = keyPairGen): Gen[Events.OrderCanceled] =

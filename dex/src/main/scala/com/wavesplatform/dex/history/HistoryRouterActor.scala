@@ -81,7 +81,7 @@ object HistoryRouterActor {
         this.event match {
           case _: OrderAdded => Set.empty[EventRecord]
 
-          case e @ OrderExecuted(submitted, counter, timestamp, _, _) =>
+          case e @ OrderExecuted(submitted, counter, timestamp, _, _, _) =>
             val assetPair = submitted.order.assetPair
 
             Set(
@@ -247,7 +247,7 @@ class HistoryRouterActor(assetDecimals: Asset => Int, postgresConnection: Postgr
 
     val ids2ts = event match {
       case OrderCanceled(ao, _, timestamp) => Map(ao.id -> timestamp)
-      case e @ OrderExecuted(_, _, timestamp, _, _) => // looking for filled orders
+      case e @ OrderExecuted(_, _, timestamp, _, _, _) => // looking for filled orders
         Seq(e.submittedRemaining, e.counterRemaining).foldLeft(Map.empty[Order.Id, Long]) {
           case (result, ao) => if (ao.isFilled) result + (ao.id -> timestamp) else result
         }

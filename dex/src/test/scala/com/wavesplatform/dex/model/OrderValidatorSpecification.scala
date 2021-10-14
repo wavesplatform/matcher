@@ -34,6 +34,7 @@ import org.scalatest._
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import play.api.libs.json.Json
 
@@ -1001,7 +1002,8 @@ class OrderValidatorSpecification
       matcherSettings.orderRestrictions.get(order.assetPair),
       assetDescriptions,
       rateCache,
-      hasMatcherAccountScript = false
+      hasMatcherAccountScript = false,
+      order => order
     )(order)
   }
 
@@ -1011,7 +1013,7 @@ class OrderValidatorSpecification
     hasMatcherAccountScript: Boolean = false,
     hasAssetScript: Asset => Boolean = getDefaultAssetDescriptions(_).hasScript
   ) =
-    new ExchangeTransactionCreator(MatcherAccount, matcherSettings.exchangeTxBaseFee, hasMatcherAccountScript, hasAssetScript)
+    new ExchangeTransactionCreator(MatcherAccount, matcherSettings.exchangeTxBaseFee, hasMatcherAccountScript, hasAssetScript, (_, _) => false)
 
   private def asa[A](
     p: Portfolio = defaultPortfolio,
@@ -1120,7 +1122,8 @@ class OrderValidatorSpecification
         orderRestrictions.get(order.assetPair),
         assetDescriptions = assetsDescriptions,
         rateCache,
-        matcherAccountScript.nonEmpty
+        matcherAccountScript.nonEmpty,
+        order => order
       )(order)
   }
 

@@ -42,7 +42,7 @@ class OrderEventsCoordinatorActorSpec extends ScalaTestWithActorTestKit() with M
 
   private val validCounter = buy(wavesBtcPair, 100000, 0.0008, matcherFee = Some(2000L))
   private val validSubmitted = sell(wavesBtcPair, 100000, 0.0007, matcherFee = Some(1000L))
-  private val validEvent = Events.OrderExecuted(LimitOrder(validSubmitted), LimitOrder(validCounter), nowTs, 2000L, 1000L)
+  private val validEvent = Events.OrderExecuted(LimitOrder(validSubmitted), LimitOrder(validCounter), nowTs, 2000L, 1000L, 0L)
 
   private val validTx = ExchangeTransactionV2
     .create(
@@ -170,7 +170,7 @@ class OrderEventsCoordinatorActorSpec extends ScalaTestWithActorTestKit() with M
             expiration = expiration,
             matcherFee = 300000L
           )
-          val event = Events.OrderExecuted(LimitOrder(buyOrder), LimitOrder(sellOrder), nowTs, 300000L, 300000L)
+          val event = Events.OrderExecuted(LimitOrder(buyOrder), LimitOrder(sellOrder), nowTs, 300000L, 300000L, 0L)
           passToAddressDirectoryTest(
             OrderEventsCoordinatorActor.Command.Process(event),
             AddressActor.Command.ApplyOrderBookExecuted(event, ExchangeTransactionResult(validTx, ValidationError.GenericError("test").some))

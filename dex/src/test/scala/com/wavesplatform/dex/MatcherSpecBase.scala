@@ -516,7 +516,7 @@ trait MatcherSpecBase
 
   protected def mkOrderExecuted(submittedAo: AcceptedOrder, counterLo: LimitOrder, timestamp: Long): OrderExecuted = {
     val (counterExecutedFee, submittedExecutedFee) = makerTakerPartialFee(submittedAo, counterLo)
-    OrderExecuted(submittedAo, counterLo, timestamp, counterExecutedFee, submittedExecutedFee)
+    OrderExecuted(submittedAo, counterLo, timestamp, counterExecutedFee, submittedExecutedFee, 0L)
   }
 
   protected def makerTakerPartialFee(submittedAo: AcceptedOrder, counterLo: LimitOrder): (Long, Long) = {

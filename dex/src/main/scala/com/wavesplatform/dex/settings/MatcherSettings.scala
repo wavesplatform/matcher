@@ -31,6 +31,7 @@ case class MatcherSettings(
   wavesBlockchainClient: WavesBlockchainClientSettings,
   ntpServer: String,
   restApi: RestAPISettings,
+  passExecutionParameters: PassExecutionParamsSettings,
   exchangeTxBaseFee: Long,
   exchangeTxTsStartOffset: Long,
   actorResponseTimeout: FiniteDuration,

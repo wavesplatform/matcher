@@ -38,6 +38,7 @@ import com.wavesplatform.dex.db.leveldb.{openDb, LevelDb}
 import com.wavesplatform.dex.domain.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.codec.Base58
+import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.utils.{EitherExt2, LoggerFacade, ScorexLogging}
 import com.wavesplatform.dex.effect.{liftValueAsync, FutureResult}
 import com.wavesplatform.dex.error.ErrorFormatterContext
@@ -47,7 +48,7 @@ import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdat
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.history.HistoryRouterActor
 import com.wavesplatform.dex.logs.SystemInformationReporter
-import com.wavesplatform.dex.model.{AssetPairBuilder, ExchangeTransactionCreator, Fee, MatchTimestamp, OrderValidator, ValidationStages}
+import com.wavesplatform.dex.model.{AssetPairBuilder, ExchangeTransactionCreator, ExecutionParamsInProofs, Fee, MatchTimestamp, OrderValidator, ValidationStages}
 import com.wavesplatform.dex.queue.ValidatedCommandWithMeta.Offset
 import com.wavesplatform.dex.queue._
 import com.wavesplatform.dex.settings.MatcherSettings
@@ -151,7 +152,9 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     matcherKeyPair,
     settings.exchangeTxBaseFee,
     hasMatcherAccountScript,
-    assetsCache.cached.unsafeGetHasScript // Should be in the cache, because assets decimals are required during an order book creation
+    assetsCache.cached.unsafeGetHasScript, // Should be in the cache, because assets decimals are required during an order book creation
+    (offsetOpt, sender) =>
+      offsetOpt.exists(_ > settings.passExecutionParameters.sinceOffset) && settings.passExecutionParameters.forAccounts.contains(sender)
   )
 
   private val wavesBlockchainAsyncClient = new MatcherExtensionAssetsCachingClient(
@@ -324,7 +327,14 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       orderBookAskAdapter = orderBookAskAdapter,
       lastProcessedOffset = lastProcessedOffset,
       blacklistedAddresses = blacklistedAddresses,
-      hasMatcherAccountScript = hasMatcherAccountScript
+      hasMatcherAccountScript = hasMatcherAccountScript,
+      order =>
+        ExecutionParamsInProofs.fillMatchInfoInProofs(
+          order,
+          order.amount,
+          order.price,
+          settings.passExecutionParameters.forAccounts.contains(order.sender)
+        )
     )(_)
     new PlaceRoute(
       responseTimeout = settings.actorResponseTimeout,

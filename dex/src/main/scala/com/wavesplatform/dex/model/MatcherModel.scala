@@ -1,7 +1,6 @@
 package com.wavesplatform.dex.model
 
 import java.math.{BigDecimal, BigInteger, RoundingMode}
-
 import cats.instances.long.catsKernelStdGroupForLong
 import cats.syntax.group._
 import com.wavesplatform.dex.domain.account.Address
@@ -13,6 +12,7 @@ import com.wavesplatform.dex.error
 import com.wavesplatform.dex.fp.MapImplicits.cleaningGroup
 import com.wavesplatform.dex.model.AcceptedOrder.FillingInfo
 import com.wavesplatform.dex.model.Events.OrderCanceledReason
+import com.wavesplatform.dex.queue.ValidatedCommandWithMeta
 
 object MatcherModel {
 
@@ -411,8 +411,14 @@ object Events {
     def reason: EventReason
   }
 
-  case class OrderExecuted(submitted: AcceptedOrder, counter: LimitOrder, timestamp: Long, counterExecutedFee: Long, submittedExecutedFee: Long)
-      extends Event {
+  case class OrderExecuted(
+    submitted: AcceptedOrder,
+    counter: LimitOrder,
+    timestamp: Long,
+    counterExecutedFee: Long,
+    submittedExecutedFee: Long,
+    commandOffset: Option[ValidatedCommandWithMeta.Offset]
+  ) extends Event {
 
     def executedPrice: Long = counter.price
     lazy val executedAmount: Long = AcceptedOrder.executedAmount(submitted, counter)
@@ -468,6 +474,19 @@ object Events {
     def traders: Set[Address] = Set(counter.order.senderPublicKey.toAddress, submitted.order.senderPublicKey.toAddress)
 
     override def reason: EventReason = OrderExecutedReason
+  }
+
+  object OrderExecuted {
+
+    def apply(
+      submitted: AcceptedOrder,
+      counter: LimitOrder,
+      timestamp: Long,
+      counterExecutedFee: Long,
+      submittedExecutedFee: Long,
+      commandOffset: ValidatedCommandWithMeta.Offset
+    ): OrderExecuted = OrderExecuted(submitted, counter, timestamp, counterExecutedFee, submittedExecutedFee, Some(commandOffset))
+
   }
 
   case object OrderExecutedReason extends EventReason

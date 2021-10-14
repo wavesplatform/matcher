@@ -34,7 +34,8 @@ object ValidationStages {
     orderBookAskAdapter: OrderBookAskAdapter,
     lastProcessedOffset: => Long,
     blacklistedAddresses: Set[Address],
-    hasMatcherAccountScript: Boolean
+    hasMatcherAccountScript: Boolean,
+    handleProofs: Order => Order
   )(o: Order)(implicit efc: ErrorFormatterContext, ec: ExecutionContext): FutureResult[Order] = {
     import OrderValidator._
 
@@ -78,7 +79,8 @@ object ValidationStages {
         settings.orderRestrictions.get(o.assetPair),
         orderAssetsDescriptions,
         rateCache,
-        hasMatcherAccountScript
+        hasMatcherAccountScript,
+        handleProofs
       )(o)
 
     def knownAssets: FutureResult[Map[Asset, BriefAssetDescription]] = o.assets

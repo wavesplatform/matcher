@@ -1,18 +1,20 @@
 package com.wavesplatform.dex.model
 
-import com.wavesplatform.dex.domain.account.KeyPair
+import com.wavesplatform.dex.domain.account.{KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.{ExchangeTransactionResult, ExchangeTransactionV2}
 import com.wavesplatform.dex.model.Events.OrderExecuted
+import com.wavesplatform.dex.queue.ValidatedCommandWithMeta
 import com.wavesplatform.dex.model.ExchangeTransactionCreator._
 
 class ExchangeTransactionCreator(
   matcherPrivateKey: KeyPair,
   exchangeTxBaseFee: Long,
   hasMatcherAccountScript: => Boolean,
-  hasAssetScript: IssuedAsset => Boolean
+  hasAssetScript: IssuedAsset => Boolean,
+  shouldPassExecParams: (Option[ValidatedCommandWithMeta.Offset], PublicKey) => Boolean
 ) {
 
   def createTransaction(orderExecutedEvent: OrderExecuted): ExchangeTransactionResult[ExchangeTransactionV2] = {
@@ -23,6 +25,21 @@ class ExchangeTransactionCreator(
       if (orderExecutedEvent.submitted.isBuyOrder) (orderExecutedEvent.submittedExecutedFee, orderExecutedEvent.counterExecutedFee)
       else (orderExecutedEvent.counterExecutedFee, orderExecutedEvent.submittedExecutedFee)
 
+    val buyWithExecutionInfo =
+      ExecutionParamsInProofs.fillMatchInfoInProofs(
+        buy,
+        orderExecutedEvent.executedAmount,
+        orderExecutedEvent.executedPrice,
+        shouldPassExecParams(orderExecutedEvent.commandOffset, buy.sender)
+      )
+    val sellWithExecutionInfo =
+      ExecutionParamsInProofs.fillMatchInfoInProofs(
+        sell,
+        orderExecutedEvent.executedAmount,
+        orderExecutedEvent.executedPrice,
+        shouldPassExecParams(orderExecutedEvent.commandOffset, sell.sender)
+      )
+
     // matcher always pays fee to the miners in Waves
     val txFee = minFee(exchangeTxBaseFee, hasMatcherAccountScript, counter.order.assetPair, hasAssetScript) +
       // TODO This will be fixed in NODE 1.2.8+, see NODE-2183
@@ -30,8 +47,8 @@ class ExchangeTransactionCreator(
         .count(_.fold(false)(hasAssetScript)) * OrderValidator.ScriptExtraFee
     ExchangeTransactionV2.create(
       matcherPrivateKey,
-      buy,
-      sell,
+      buyWithExecutionInfo,
+      sellWithExecutionInfo,
       executedAmount,
       orderExecutedEvent.executedPrice,
       buyFee,
@@ -64,4 +81,5 @@ object ExchangeTransactionCreator {
   }
 
   def getAdditionalFeeForScript(hasScript: Boolean): Long = if (hasScript) OrderValidator.ScriptExtraFee else 0L
+
 }

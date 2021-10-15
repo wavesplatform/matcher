@@ -331,7 +331,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       order =>
         ExecutionParamsInProofs.fillMatchInfoInProofs(
           order,
-          order.amount,
+          Order.correctAmount(order),
           order.price,
           settings.passExecutionParameters.forAccounts.contains(order.sender)
         )

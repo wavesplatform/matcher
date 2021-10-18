@@ -21,7 +21,8 @@ package object error {
   def canRetry(x: ValidationError): Boolean = x match {
     case x: GenericError
         if x.err == "Transaction pool bytes size limit is reached"
-          || x.err == "Transaction pool size limit is reached" => true
+          || x.err == "Transaction pool size limit is reached"
+          || x.err.startsWith("There are not enough connections with peers") => true
 
     // Could happen when:
     // 1. One transaction is sent multiple times in parallel

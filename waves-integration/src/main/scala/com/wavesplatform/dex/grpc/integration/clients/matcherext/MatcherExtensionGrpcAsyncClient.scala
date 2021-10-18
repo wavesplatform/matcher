@@ -151,8 +151,6 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
         case Result.Empty => CheckedBroadcastResult.Failed("Unexpected response on client: Result.Empty", canRetry = false)
         case Result.Unconfirmed(isNew) => CheckedBroadcastResult.Unconfirmed(isNew)
         case Result.Confirmed(_) => CheckedBroadcastResult.Confirmed
-        case Result.Failed(failure) if failure.message.contains("There are not enough connections with peers") =>
-          CheckedBroadcastResult.Failed(failure.message, canRetry = true)
         case Result.Failed(failure) => CheckedBroadcastResult.Failed(failure.message, failure.canRetry)
       }
     }

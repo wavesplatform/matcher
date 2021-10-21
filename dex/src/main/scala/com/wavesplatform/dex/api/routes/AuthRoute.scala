@@ -22,11 +22,12 @@ trait AuthRoute { this: ApiRoute =>
       case _ => SimpleErrorResponse(matcherError)
     }
 
-    optionalHeaderValueByType(`X-Api-Key`).flatMap {
-      case Some(key) if apiKeyValid(crypto.secureHash(key.value)) => pass
+    if (apiKeyHashes.isEmpty) complete(SimpleErrorResponse(ApiKeyIsNotProvided))
+    else optionalHeaderValueByType(`X-Api-Key`).flatMap {
+      case Some(key) if apiKeyValid(key.value) => pass
       case _ =>
         optionalHeaderValueByType(api_key).flatMap {
-          case Some(key) if apiKeyValid(crypto.secureHash(key.value)) => pass
+          case Some(key) if apiKeyValid(key.value) => pass
           case _ => complete(correctResponse(ApiKeyIsNotValid))
         }
     }
@@ -42,7 +43,7 @@ trait AuthRoute { this: ApiRoute =>
         }
     }
 
-  private def apiKeyValid(key: Array[Byte]): Boolean =
+  private def apiKeyValid(key: String): Boolean =
     apiKeyHashes.exists(hash => MessageDigest.isEqual(crypto secureHash key, hash))
 
 }

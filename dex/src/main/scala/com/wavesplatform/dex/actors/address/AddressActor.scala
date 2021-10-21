@@ -48,7 +48,7 @@ import org.slf4j.LoggerFactory
 import java.time.{Instant, Duration => JDuration}
 import java.util.concurrent.ConcurrentLinkedQueue
 import scala.collection.immutable.Queue
-import scala.collection.mutable.{AnyRefMap => MutableMap, HashSet => MutableSet}
+import scala.collection.mutable.{ListBuffer, AnyRefMap => MutableMap, HashSet => MutableSet}
 import scala.concurrent.duration._
 import scala.concurrent.{Future, TimeoutException}
 import scala.util.{Failure, Success, Try}
@@ -143,13 +143,11 @@ class AddressActor(
       scheduleExpiration(order.order)
       scheduleOrderWs(order, order.status, unmatchable = false, maybeMatchTx = None)
 
-      if (isWorking) {
+      if (isWorking)
         pendingCommands.remove(order.id).foreach { command =>
           log.trace(s"Confirming placement for ${order.id}")
           command.client ! Event.OrderAccepted(order.order)
         }
-        pendingSavingOrders.remove(order.id)
-      }
 
     case command: Command.ApplyOrderBookExecuted =>
       val ownerRemainingOrders = List(command.event.counterRemaining, command.event.submittedRemaining).filter(_.order.sender.toAddress == owner)

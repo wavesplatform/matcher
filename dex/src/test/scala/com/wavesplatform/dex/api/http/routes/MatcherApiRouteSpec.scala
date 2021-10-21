@@ -1307,7 +1307,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         case _ => liftErrorAsync(error.FeatureNotImplemented)
       },
       () => MatcherStatus.Working,
-      Some(crypto secureHash apiKey)
+      List(crypto secureHash apiKey)
     )
     val cancelRoute = new CancelRoute(
       settings.actorResponseTimeout,
@@ -1315,12 +1315,12 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       addressActor.ref,
       () => MatcherStatus.Working,
       odb,
-      Some(crypto secureHash apiKey)
+      List(crypto secureHash apiKey)
     )
     val ratesRoute = new RatesRoute(
       pairBuilder,
       () => MatcherStatus.Working,
-      Some(crypto secureHash apiKey),
+      List(crypto secureHash apiKey),
       rateCache,
       testKit.spawn(WsExternalClientDirectoryActor(), s"ws-external-cd-${Random.nextInt(Int.MaxValue)}")
     )
@@ -1329,16 +1329,16 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       pairBuilder,
       addressActor.ref,
       () => MatcherStatus.Working,
-      Some(crypto secureHash apiKey)
+      List(crypto secureHash apiKey)
     )
     val balancesRoute = new BalancesRoute(
       settings.actorResponseTimeout,
       pairBuilder,
       addressActor.ref,
       () => MatcherStatus.Working,
-      Some(crypto secureHash apiKey)
+      List(crypto secureHash apiKey)
     )
-    val transactionsRoute = new TransactionsRoute(() => MatcherStatus.Working, odb, Some(crypto secureHash apiKey))
+    val transactionsRoute = new TransactionsRoute(() => MatcherStatus.Working, odb, List(crypto secureHash apiKey))
     val debugRoute = new DebugRoute(
       settings.actorResponseTimeout,
       ConfigFactory.load().atKey("waves.dex"),
@@ -1348,7 +1348,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       () => MatcherStatus.Working,
       () => 0L,
       () => Future.successful(0L),
-      Some(crypto secureHash apiKey)
+      List(crypto secureHash apiKey)
     )
 
     val marketsRoute = new MarketsRoute(
@@ -1369,14 +1369,14 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       },
       orderBookHttpInfo,
       () => MatcherStatus.Working,
-      Some(crypto secureHash apiKey)
+      List(crypto secureHash apiKey)
     )
     val infoRoute = new MatcherInfoRoute(
       matcherKeyPair.publicKey,
       settings,
       () => MatcherStatus.Working,
       300000L,
-      Some(crypto secureHash apiKey),
+      List(crypto secureHash apiKey),
       rateCache,
       () => Future.successful(Set(1, 2, 3)),
       () => DynamicSettings.symmetric(matcherFee)

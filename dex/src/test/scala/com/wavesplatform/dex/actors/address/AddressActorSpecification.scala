@@ -131,7 +131,7 @@ class AddressActorSpecification
     }
 
     "cancel orders" when {
-      "asset balance changed" in test { (_, commandsProbe, addOrder, _, updatePortfolio) =>
+      "asset balance changed" in test { (_, commandsProbe, addOrder, updatePortfolio) =>
         val initPortfolio = sellToken1Portfolio
         updatePortfolio(initPortfolio)
 
@@ -150,7 +150,7 @@ class AddressActorSpecification
         "there are waves for fee" in wavesBalanceTest(restWaves = matcherFee)
         "there are no waves at all" in wavesBalanceTest(restWaves = 0L)
 
-        def wavesBalanceTest(restWaves: Long): Unit = test { (_, commandsProbe, addOrder, _, updatePortfolio) =>
+        def wavesBalanceTest(restWaves: Long): Unit = test { (_, commandsProbe, addOrder, updatePortfolio) =>
           val initPortfolio = sellWavesPortfolio
           updatePortfolio(initPortfolio)
 
@@ -170,7 +170,7 @@ class AddressActorSpecification
         "there are waves for fee" in leaseTest(_ => matcherFee)
         "there are no waves at all" in leaseTest(_.spendableBalance)
 
-        def leaseTest(leasedWaves: Portfolio => Long): Unit = test { (_, commandsProbe, addOrder, _, updatePortfolio) =>
+        def leaseTest(leasedWaves: Portfolio => Long): Unit = test { (_, commandsProbe, addOrder, updatePortfolio) =>
           val initPortfolio = sellWavesPortfolio
           updatePortfolio(initPortfolio)
 
@@ -188,7 +188,7 @@ class AddressActorSpecification
     }
 
     "return tradable balance" that {
-      "without excess assets" in test { (ref, _, addOrder, _, updatePortfolio) =>
+      "without excess assets" in test { (ref, _, addOrder, updatePortfolio) =>
         updatePortfolio(sellToken1Portfolio.copy(balance = sellToken1Portfolio.balance + 1L))
 
         addOrder(LimitOrder(sellTokenOrder1))
@@ -199,7 +199,7 @@ class AddressActorSpecification
         } should matchTo(GetBalance(Map[Asset, Long](Waves -> 1L)))
       }
 
-      "without zero assets" in test { (ref, _, addOrder, _, updatePortfolio) =>
+      "without zero assets" in test { (ref, _, addOrder, updatePortfolio) =>
         updatePortfolio(sellToken1Portfolio)
 
         addOrder(LimitOrder(sellTokenOrder1))
@@ -211,7 +211,7 @@ class AddressActorSpecification
       }
     }
 
-    "return reservable balance without excess assets" in test { (ref, _, addOrder, _, updatePortfolio) =>
+    "return reservable balance without excess assets" in test { (ref, _, addOrder, updatePortfolio) =>
       updatePortfolio(sellToken1Portfolio.copy(balance = sellToken1Portfolio.balance + 1L))
 
       addOrder(LimitOrder(sellTokenOrder1))
@@ -226,7 +226,7 @@ class AddressActorSpecification
     }
 
     "track canceled orders and don't cancel more on same BalanceUpdated message" in test {
-      (_, commandsProbe, addOrder, _, updatePortfolio) =>
+      (_, commandsProbe, addOrder, updatePortfolio) =>
         val initPortfolio = Monoid.combine(sellToken1Portfolio, sellToken2Portfolio)
         updatePortfolio(initPortfolio)
 
@@ -245,7 +245,7 @@ class AddressActorSpecification
         commandsProbe.expectNoMessage()
     }
 
-    "cancel multiple orders" in test { (_, commandsProbe, addOrder, _, updatePortfolio) =>
+    "cancel multiple orders" in test { (_, commandsProbe, addOrder, updatePortfolio) =>
       val initPortfolio = Monoid.combineAll(Seq(sellToken1Portfolio, sellToken2Portfolio, sellWavesPortfolio))
       updatePortfolio(initPortfolio)
 
@@ -267,7 +267,7 @@ class AddressActorSpecification
       ))
     }
 
-    "cancel only orders, those aren't fit" in test { (_, commandsProbe, addOrder, _, updatePortfolio) =>
+    "cancel only orders, those aren't fit" in test { (_, commandsProbe, addOrder, updatePortfolio) =>
       val initPortfolio = Monoid.combineAll(Seq(sellToken1Portfolio, sellToken2Portfolio, sellWavesPortfolio))
       updatePortfolio(initPortfolio)
 
@@ -288,7 +288,7 @@ class AddressActorSpecification
       ))
     }
 
-    "cancel expired orders" in test { (_, commandsProbe, addOrder, _, updatePortfolio) =>
+    "cancel expired orders" in test { (_, commandsProbe, addOrder, updatePortfolio) =>
       val initPortfolio = sellToken1Portfolio
       updatePortfolio(initPortfolio)
 
@@ -312,7 +312,7 @@ class AddressActorSpecification
       )
     }
 
-    "should not send a message multiple times" in test { (ref, _, addOrder, _, updatePortfolio) =>
+    "should not send a message multiple times" in test { (ref, _, addOrder, updatePortfolio) =>
       val initPortfolio = sellToken1Portfolio
       updatePortfolio(initPortfolio)
       addOrder(LimitOrder(sellTokenOrder1))
@@ -340,7 +340,7 @@ class AddressActorSpecification
       subscription2.receiveMessage()
     }
 
-    "return state" in test { (ref, _, addOrder, _, updatePortfolio) =>
+    "return state" in test { (ref, _, addOrder, updatePortfolio) =>
       updatePortfolio(sellToken1Portfolio.copy(balance = sellToken1Portfolio.balance + 1L))
 
       addOrder(LimitOrder(sellTokenOrder1))
@@ -358,7 +358,7 @@ class AddressActorSpecification
       val orderDb = TestOrderDb(100)
       orderDb.saveOrder(sellTokenOrder1).futureValue
       test(
-        { (ref, commandsProbe, _, _, updatePortfolio) =>
+        { (ref, commandsProbe, _, updatePortfolio) =>
           updatePortfolio(sellToken1Portfolio)
           val lo = LimitOrder(sellTokenOrder1)
           val probe = TestProbe()
@@ -372,7 +372,7 @@ class AddressActorSpecification
       )
     }
 
-    "forward OrderCancelFailed (owner is non empty) to AddressActor" in test { (ref, commandsProbe, _, _, updatePortfolio) =>
+    "forward OrderCancelFailed (owner is non empty) to AddressActor" in test { (ref, commandsProbe, _, updatePortfolio) =>
       updatePortfolio(sellToken1Portfolio)
       val lo = LimitOrder(sellTokenOrder1)
       val probe = TestProbe()
@@ -384,7 +384,7 @@ class AddressActorSpecification
     }
 
     "Bug DEX-1435" in test(
-      { (ref, commandsProbe, addOrder, _, updatePortfolio) =>
+      { (ref, commandsProbe, addOrder, updatePortfolio) =>
         updatePortfolio(sellToken1Portfolio.copy(balance = sellToken1Portfolio.balance + 1L))
 
         val copyOrder = sellTokenOrder1
@@ -436,7 +436,7 @@ class AddressActorSpecification
    * (updatedPortfolio: Portfolio, sendBalanceChanged: Boolean) => Unit
    */
   private def test(
-    f: (ActorRef, TestProbe, AcceptedOrder => Unit, ActorRef, Portfolio => Unit) => Unit,
+    f: (ActorRef, TestProbe, AcceptedOrder => Unit, Portfolio => Unit) => Unit,
     orderDb: OrderDb[Future] = EmptyOrderDb()
   ): Unit = {
     val commandsProbe = TestProbe()
@@ -486,7 +486,6 @@ class AddressActorSpecification
       addressDir,
       commandsProbe,
       addOrder,
-      addressDir,
       updatedPortfolio => {
         val prevPortfolioOption = Option(currentPortfolio.getAndSet(updatedPortfolio))
         val prevPortfolio = prevPortfolioOption.getOrElse(Portfolio.empty)

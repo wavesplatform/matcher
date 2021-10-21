@@ -48,7 +48,7 @@ import org.slf4j.LoggerFactory
 import java.time.{Instant, Duration => JDuration}
 import java.util.concurrent.ConcurrentLinkedQueue
 import scala.collection.immutable.Queue
-import scala.collection.mutable.{ListBuffer, AnyRefMap => MutableMap, HashSet => MutableSet}
+import scala.collection.mutable.{AnyRefMap => MutableMap, HashSet => MutableSet}
 import scala.concurrent.duration._
 import scala.concurrent.{Future, TimeoutException}
 import scala.util.{Failure, Success, Try}

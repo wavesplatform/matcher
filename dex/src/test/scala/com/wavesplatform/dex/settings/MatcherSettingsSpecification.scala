@@ -41,7 +41,7 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
     settings.restApi shouldBe RestAPISettings(
       address = "127.1.2.3",
       port = 6880,
-      apiKeyHash = "foobarhash",
+      apiKeyHashes = List("foobarhash"),
       cors = false,
       apiKeyDifferentHost = false
     )

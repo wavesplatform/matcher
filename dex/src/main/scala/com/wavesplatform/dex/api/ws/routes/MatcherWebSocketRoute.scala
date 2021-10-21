@@ -49,7 +49,7 @@ class MatcherWebSocketRoute(
   matcher: ActorRef,
   time: Time,
   assetPairBuilder: AssetPairBuilder,
-  override val apiKeyHash: Option[Array[Byte]],
+  override val apiKeyHashes: List[Array[Byte]],
   matcherSettings: MatcherSettings,
   matcherStatus: () => MatcherStatus,
   getRatesSnapshot: () => Map[Asset, Double]

@@ -98,7 +98,7 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |    rest-api {
          |      address = 127.1.2.3
          |      port = 6880
-         |      api-key-hash = foobarhash
+         |      api-key-hashes = [ foobarhash ]
          |      cors = no
          |      api-key-different-host = no
          |    }

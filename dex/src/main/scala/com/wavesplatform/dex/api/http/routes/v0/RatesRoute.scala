@@ -26,7 +26,7 @@ import javax.ws.rs.Path
 final class RatesRoute(
   assetPairBuilder: AssetPairBuilder,
   override val matcherStatus: () => MatcherStatus,
-  override val apiKeyHash: Option[Array[Byte]],
+  override val apiKeyHashes: List[Array[Byte]],
   rateCache: RateCache,
   externalClientDirectoryRef: typed.ActorRef[WsExternalClientDirectoryActor.Message]
 )(implicit mat: Materializer)

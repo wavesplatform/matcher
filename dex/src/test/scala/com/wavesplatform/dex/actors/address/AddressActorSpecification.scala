@@ -384,10 +384,10 @@ class AddressActorSpecification
     }
 
     "Bug DEX-1435" in test(
-      { (ref, commandsProbe, addOrder, updatePortfolio) =>
+      { (ref, _, addOrder, updatePortfolio) =>
         updatePortfolio(sellToken1Portfolio.copy(balance = sellToken1Portfolio.balance + 1L))
 
-        val copyOrder = sellTokenOrder1
+        val duplicatedOrder = sellTokenOrder1
         val counterOrder = OrderV1(
           sender = privateKey("test1"),
           matcher = PublicKey("matcher".getBytes("utf-8")),
@@ -399,14 +399,14 @@ class AddressActorSpecification
           expiration = System.currentTimeMillis() + 5.days.toMillis,
           matcherFee = matcherFee
         )
-        val copyOrderMarket = MarketOrder(copyOrder, sellTokenOrder1.amount)
+        val duplicatedMarketOrder = MarketOrder(duplicatedOrder, duplicatedOrder.amount)
 
-        addOrder(LimitOrder(sellTokenOrder1))
+        addOrder(LimitOrder(duplicatedOrder))
         val matchTx = ExchangeTransactionV2(
-          copyOrderMarket.order,
+          duplicatedMarketOrder.order,
           counterOrder,
-          copyOrderMarket.amount,
-          copyOrderMarket.price,
+          duplicatedMarketOrder.amount,
+          duplicatedMarketOrder.price,
           0L,
           0L,
           0L,
@@ -414,19 +414,19 @@ class AddressActorSpecification
           Proofs(List.empty)
         )
         ref ! AddressActor.Command.ApplyOrderBookExecuted(
-          OrderExecuted(copyOrderMarket, LimitOrder(counterOrder), System.currentTimeMillis, 0L, 0L, 0L),
+          OrderExecuted(duplicatedMarketOrder, LimitOrder(counterOrder), System.currentTimeMillis, 0L, 0L, 0L),
           ExchangeTransactionResult.fromEither(Right(()), matchTx)
         )
 
-        (0 to 3).foreach { _ =>
+        (0 to 2).foreach { _ =>
           val probe = TestProbe()
-          val msg = AddressActor.Command.PlaceOrder(copyOrder, isMarket = true)
-          ref.tell(AddressDirectoryActor.Command.ForwardMessage(copyOrder.sender, msg), probe.ref)
-          probe.expectMsg[MatcherError](OrderDuplicate(copyOrder.id()))
+          val msg = AddressActor.Command.PlaceOrder(duplicatedOrder, isMarket = true)
+          ref.tell(AddressDirectoryActor.Command.ForwardMessage(duplicatedOrder.sender, msg), probe.ref)
+          probe.expectMsg[MatcherError](OrderDuplicate(duplicatedOrder.id()))
           Thread.sleep(1100L)
         }
       },
-      orderDb = WaitingOrderDb(system.dispatcher)
+      orderDb = WaitingOrderDb(3.seconds)(system.dispatcher)
     )
   }
 

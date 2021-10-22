@@ -25,6 +25,7 @@ import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.model.Denormalization.denormalizeAmountAndFee
 import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.domain.order.Order.Id
 import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionResult, ExchangeTransactionV2}
 import com.wavesplatform.dex.domain.utils.{LoggerFacade, ScorexLogging}
 import com.wavesplatform.dex.effect.Implicits.FutureOps
@@ -45,8 +46,9 @@ import kamon.Kamon
 import kamon.trace.Span
 import org.slf4j.LoggerFactory
 
+import java.lang
 import java.time.{Instant, Duration => JDuration}
-import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.{ConcurrentHashMap, ConcurrentLinkedQueue}
 import scala.collection.immutable.Queue
 import scala.collection.mutable.{AnyRefMap => MutableMap, HashSet => MutableSet}
 import scala.concurrent.duration._
@@ -83,7 +85,9 @@ class AddressActor(
   private var placementQueue = Queue.empty[EnqueuedOrder]
   private val pendingCommands = MutableMap.empty[Order.Id, PendingCommand]
 
-  private val pendingSavingOrders = new ConcurrentLinkedQueue[Order.Id]()
+  // orders that in process of adding, but may not be present in leveldb or in pendingCommands and activeOrders
+  // See DEX-1435
+  private val processingOrders = ConcurrentHashMap.newKeySet[Order.Id]()
 
   private val activeOrders = MutableMap.empty[Order.Id, AcceptedOrder]
   private val expiration = MutableMap.empty[Order.Id, Cancellable]
@@ -166,11 +170,11 @@ class AddressActor(
             case status: OrderStatus.Final =>
               expiration.remove(remaining.id).foreach(_.cancel())
               orderDb.saveOrderInfo(remaining.id, owner, OrderInfo.v6(remaining, status)).onComplete {
-                case Success(_) => pendingSavingOrders.remove(remaining.id)
+                case Success(_) => processingOrders.remove(remaining.id)
                 case Failure(th) =>
                   //TODO probably inconsistent state can be introduced
                   log.error("error while saving order info", th)
-                  pendingSavingOrders.remove(remaining.id)
+                  processingOrders.remove(remaining.id)
               }
               activeOrders.remove(remaining.id) match {
                 case Some(origActiveOrder) => origActiveOrder.reservableBalance.inverse()
@@ -246,7 +250,7 @@ class AddressActor(
           log.trace(s"Confirming cancellation for $id")
           pc.client ! Event.OrderCanceled(id)
         }
-        pendingSavingOrders.remove(id)
+        processingOrders.remove(id)
       }
 
     case command: Command.ChangeBalances => changeBalances(command.updates)
@@ -268,7 +272,7 @@ class AddressActor(
             log.trace(s"$command, sending a response to a client")
             pc.client ! reason
         }
-        pendingSavingOrders.remove(id)
+        processingOrders.remove(id)
       }
   }
 
@@ -309,10 +313,10 @@ class AddressActor(
       log.debug(s"$command")
       val orderId = command.order.id()
       if (totalActiveOrders >= settings.maxActiveOrders) sender() ! error.ActiveOrdersLimitReached(settings.maxActiveOrders)
-      else if (failedPlacements.contains(orderId) || pendingSavingOrders.contains(orderId)) sender() ! error.OrderDuplicate(orderId)
+      else if (failedPlacements.contains(orderId) || processingOrders.contains(orderId)) sender() ! error.OrderDuplicate(orderId)
       else {
         val origSender = sender()
-        pendingSavingOrders.add(orderId)
+        processingOrders.add(orderId)
         orderDb.containsInfo(orderId).onComplete {
           case Success(containsInfo) =>
             self.tell(Command.PlaceOrderFinalized(command, containsInfo), origSender)
@@ -481,7 +485,7 @@ class AddressActor(
 
     case Event.StoreFailed(orderId, reason, queueEvent) =>
       failedPlacements.add(orderId)
-      pendingSavingOrders.remove(orderId)
+      processingOrders.remove(orderId)
       pendingCommands.remove(orderId).foreach { command =>
         command.client ! reason
         queueEvent match {
@@ -509,7 +513,7 @@ class AddressActor(
                 log.trace(s"Confirming command for $orderId")
                 command.client ! reason
               }
-              pendingSavingOrders.remove(orderId)
+              processingOrders.remove(orderId)
           }
 
           placementQueue = restQueue

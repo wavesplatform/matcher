@@ -11,31 +11,30 @@ import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.model.OrderInfo.FinalOrderInfo
 import com.wavesplatform.dex.model.{OrderInfo, OrderStatus}
 
-import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.ConcurrentHashMap
+import scala.concurrent.duration.Duration
 import scala.concurrent.{ExecutionContext, Future}
 
-final class WaitingOrderDb private (implicit ex: ExecutionContext) extends OrderDb[Future] {
+final class WaitingOrderDb private (waitingTime: Duration)(implicit ex: ExecutionContext) extends OrderDb[Future] {
 
-  private val waitingTime = 5000L
-
-  private val ordersSaved = new ConcurrentLinkedQueue[Order.Id]()
-  private val orderInfoSaved = new ConcurrentLinkedQueue[Order.Id]()
+  private val ordersSaved = ConcurrentHashMap.newKeySet[Order.Id]()
+  private val savedOrderInfo = ConcurrentHashMap.newKeySet[Order.Id]()
 
   override def containsInfo(id: Order.Id): Future[Boolean] = Future {
-    orderInfoSaved.contains(id)
+    savedOrderInfo.contains(id)
   }
 
   override def status(id: Order.Id): Future[OrderStatus.Final] = Future.successful[OrderStatus.Final](OrderStatus.NotFound)
   override def get(id: Order.Id): Future[Option[Order]] = Future.successful(None)
 
   override def saveOrderInfo(id: Order.Id, sender: Address, oi: OrderInfo[OrderStatus.Final]): Future[Unit] = Future {
-    Thread.sleep(waitingTime)
-    orderInfoSaved.add(id)
+    sleep()
+    savedOrderInfo.add(id)
     ()
   }
 
   override def saveOrder(o: Order): Future[Unit] = Future {
-    Thread.sleep(waitingTime)
+    sleep()
     ordersSaved.add(o.id())
     ()
   }
@@ -46,11 +45,13 @@ final class WaitingOrderDb private (implicit ex: ExecutionContext) extends Order
   override def getOrderInfo(id: Id): Future[Option[FinalOrderInfo]] = None.pure[Future].widen
   override def transactionsByOrder(orderId: Id): Future[Seq[ExchangeTransaction]] = Seq.empty.pure[Future].widen
 
+  private def sleep(): Unit = Thread.sleep(waitingTime.toMillis)
+
 }
 
 object WaitingOrderDb {
 
-  def apply(implicit ec: ExecutionContext): WaitingOrderDb =
-    new WaitingOrderDb()
+  def apply(waitingTime: Duration)(implicit ec: ExecutionContext): WaitingOrderDb =
+    new WaitingOrderDb(waitingTime)
 
 }

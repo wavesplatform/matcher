@@ -383,51 +383,61 @@ class AddressActorSpecification
       probe.expectMsg[MatcherError](UnexpectedError)
     }
 
-    "Bug DEX-1435" in test(
-      { (ref, _, addOrder, updatePortfolio) =>
-        updatePortfolio(sellToken1Portfolio.copy(balance = sellToken1Portfolio.balance + 1L))
+    "Bug DEX-1435" in {
+      val waitingOrderDb = WaitingOrderDb(system.dispatcher)
+      test(
+        { (ref, _, addOrder, updatePortfolio) =>
+          updatePortfolio(sellToken1Portfolio.copy(balance = sellToken1Portfolio.balance + 1L))
 
-        val duplicatedOrder = sellTokenOrder1
-        val counterOrder = OrderV1(
-          sender = privateKey("test1"),
-          matcher = PublicKey("matcher".getBytes("utf-8")),
-          pair = AssetPair(Waves, IssuedAsset(assetId)),
-          orderType = OrderType.SELL,
-          price = 100000000L,
-          amount = 250L,
-          timestamp = System.currentTimeMillis(),
-          expiration = System.currentTimeMillis() + 5.days.toMillis,
-          matcherFee = matcherFee
-        )
-        val duplicatedMarketOrder = MarketOrder(duplicatedOrder, duplicatedOrder.amount)
+          val duplicatedOrder = sellTokenOrder1
+          val counterOrder = OrderV1(
+            sender = privateKey("test1"),
+            matcher = PublicKey("matcher".getBytes("utf-8")),
+            pair = AssetPair(Waves, IssuedAsset(assetId)),
+            orderType = OrderType.SELL,
+            price = 100000000L,
+            amount = 250L,
+            timestamp = System.currentTimeMillis(),
+            expiration = System.currentTimeMillis() + 5.days.toMillis,
+            matcherFee = matcherFee
+          )
+          val duplicatedMarketOrder = MarketOrder(duplicatedOrder, duplicatedOrder.amount)
 
-        addOrder(LimitOrder(duplicatedOrder))
-        val matchTx = ExchangeTransactionV2(
-          duplicatedMarketOrder.order,
-          counterOrder,
-          duplicatedMarketOrder.amount,
-          duplicatedMarketOrder.price,
-          0L,
-          0L,
-          0L,
-          System.currentTimeMillis,
-          Proofs(List.empty)
-        )
-        ref ! AddressActor.Command.ApplyOrderBookExecuted(
-          OrderExecuted(duplicatedMarketOrder, LimitOrder(counterOrder), System.currentTimeMillis, 0L, 0L, 0L),
-          ExchangeTransactionResult.fromEither(Right(()), matchTx)
-        )
+          addOrder(LimitOrder(duplicatedOrder))
+          val matchTx = ExchangeTransactionV2(
+            duplicatedMarketOrder.order,
+            counterOrder,
+            duplicatedMarketOrder.amount,
+            duplicatedMarketOrder.price,
+            0L,
+            0L,
+            0L,
+            System.currentTimeMillis,
+            Proofs(List.empty)
+          )
+          ref ! AddressActor.Command.ApplyOrderBookExecuted(
+            OrderExecuted(duplicatedMarketOrder, LimitOrder(counterOrder), System.currentTimeMillis, 0L, 0L, 0L),
+            ExchangeTransactionResult.fromEither(Right(()), matchTx)
+          )
 
-        (0 to 2).foreach { _ =>
           val probe = TestProbe()
           val msg = AddressActor.Command.PlaceOrder(duplicatedOrder, isMarket = true)
           ref.tell(AddressDirectoryActor.Command.ForwardMessage(duplicatedOrder.sender, msg), probe.ref)
           probe.expectMsg[MatcherError](OrderDuplicate(duplicatedOrder.id()))
-          Thread.sleep(1100L)
-        }
-      },
-      orderDb = WaitingOrderDb(3.seconds)(system.dispatcher)
-    )
+
+          waitingOrderDb.saveOrderLatch.countDown()
+
+          ref.tell(AddressDirectoryActor.Command.ForwardMessage(duplicatedOrder.sender, msg), probe.ref)
+          probe.expectMsg[MatcherError](OrderDuplicate(duplicatedOrder.id()))
+
+          waitingOrderDb.saveOrderInfoLatch.countDown()
+
+          ref.tell(AddressDirectoryActor.Command.ForwardMessage(duplicatedOrder.sender, msg), probe.ref)
+          probe.expectMsg[MatcherError](OrderDuplicate(duplicatedOrder.id()))
+        },
+        orderDb = waitingOrderDb
+      )
+    }
   }
 
   private val testAddress = addr("test")

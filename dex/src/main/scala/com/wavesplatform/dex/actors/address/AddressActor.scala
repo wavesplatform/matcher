@@ -25,7 +25,6 @@ import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.model.Denormalization.denormalizeAmountAndFee
 import com.wavesplatform.dex.domain.order.Order
-import com.wavesplatform.dex.domain.order.Order.Id
 import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionResult, ExchangeTransactionV2}
 import com.wavesplatform.dex.domain.utils.{LoggerFacade, ScorexLogging}
 import com.wavesplatform.dex.effect.Implicits.FutureOps
@@ -46,9 +45,8 @@ import kamon.Kamon
 import kamon.trace.Span
 import org.slf4j.LoggerFactory
 
-import java.lang
 import java.time.{Instant, Duration => JDuration}
-import java.util.concurrent.{ConcurrentHashMap, ConcurrentLinkedQueue}
+import java.util.concurrent.ConcurrentHashMap
 import scala.collection.immutable.Queue
 import scala.collection.mutable.{AnyRefMap => MutableMap, HashSet => MutableSet}
 import scala.concurrent.duration._
@@ -485,7 +483,6 @@ class AddressActor(
 
     case Event.StoreFailed(orderId, reason, queueEvent) =>
       failedPlacements.add(orderId)
-      processingOrders.remove(orderId)
       pendingCommands.remove(orderId).foreach { command =>
         command.client ! reason
         queueEvent match {
@@ -499,6 +496,7 @@ class AddressActor(
           case _ =>
         }
       }
+      processingOrders.remove(orderId)
 
     case _: Event.StoreSucceeded => if (failedPlacements.nonEmpty) failedPlacements.clear()
 

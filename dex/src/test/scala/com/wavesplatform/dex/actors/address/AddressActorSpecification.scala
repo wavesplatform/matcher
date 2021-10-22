@@ -11,21 +11,23 @@ import com.wavesplatform.dex.actors.address.AddressActor.Command.Source
 import com.wavesplatform.dex.actors.address.AddressActor.Query.{GetCurrentState, GetReservedBalance, GetTradableBalance}
 import com.wavesplatform.dex.actors.address.AddressActor.Reply.{GetBalance, GetState}
 import com.wavesplatform.dex.api.ws.protocol.WsAddressChanges
-import com.wavesplatform.dex.db.{EmptyOrderDb, OrderDb, TestOrderDb}
+import com.wavesplatform.dex.db.{EmptyOrderDb, OrderDb, TestOrderDb, WaitingOrderDb}
 import com.wavesplatform.dex.domain.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.crypto.Proofs
 import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV1}
 import com.wavesplatform.dex.domain.state.{LeaseBalance, Portfolio}
-import com.wavesplatform.dex.error.{MatcherError, UnexpectedError}
+import com.wavesplatform.dex.domain.transaction.{ExchangeTransactionResult, ExchangeTransactionV2}
+import com.wavesplatform.dex.error.{MatcherError, OrderDuplicate, UnexpectedError}
 import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
-import com.wavesplatform.dex.model.Events.{OrderAdded, OrderAddedReason, OrderCancelFailed}
+import com.wavesplatform.dex.model.Events.{OrderAdded, OrderAddedReason, OrderCancelFailed, OrderExecuted}
 import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder, MarketOrder}
 import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
-import org.scalatest.BeforeAndAfterAll
+import org.scalatest.{BeforeAndAfterAll, EitherValues}
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
@@ -44,7 +46,8 @@ class AddressActorSpecification
     with ImplicitSender
     with DiffMatcherWithImplicits
     with MatcherSpecBase
-    with Eventually {
+    with Eventually
+    with EitherValues {
 
   implicit private val typedSystem = system.toTyped
 
@@ -222,23 +225,24 @@ class AddressActorSpecification
       )))
     }
 
-    "track canceled orders and don't cancel more on same BalanceUpdated message" in test { (_, commandsProbe, addOrder, updatePortfolio) =>
-      val initPortfolio = Monoid.combine(sellToken1Portfolio, sellToken2Portfolio)
-      updatePortfolio(initPortfolio)
+    "track canceled orders and don't cancel more on same BalanceUpdated message" in test {
+      (_, commandsProbe, addOrder, updatePortfolio) =>
+        val initPortfolio = Monoid.combine(sellToken1Portfolio, sellToken2Portfolio)
+        updatePortfolio(initPortfolio)
 
-      addOrder(LimitOrder(sellTokenOrder1))
-      addOrder(LimitOrder(sellTokenOrder2))
+        addOrder(LimitOrder(sellTokenOrder1))
+        addOrder(LimitOrder(sellTokenOrder2))
 
-      updatePortfolio(sellToken1Portfolio)
-      commandsProbe.expectMsg(ValidatedCommand.CancelOrder(
-        sellTokenOrder2.assetPair,
-        sellTokenOrder2.id(),
-        Source.BalanceTracking,
-        Some(sellTokenOrder2.sender.toAddress)
-      ))
+        updatePortfolio(sellToken1Portfolio)
+        commandsProbe.expectMsg(ValidatedCommand.CancelOrder(
+          sellTokenOrder2.assetPair,
+          sellTokenOrder2.id(),
+          Source.BalanceTracking,
+          Some(sellTokenOrder2.sender.toAddress)
+        ))
 
-      updatePortfolio(sellToken1Portfolio) // same event
-      commandsProbe.expectNoMessage()
+        updatePortfolio(sellToken1Portfolio) // same event
+        commandsProbe.expectNoMessage()
     }
 
     "cancel multiple orders" in test { (_, commandsProbe, addOrder, updatePortfolio) =>
@@ -378,6 +382,62 @@ class AddressActorSpecification
       ref ! OrderCancelFailed(sellTokenOrder1.id(), UnexpectedError, Some(sellTokenOrder1.sender.toAddress))
       probe.expectMsg[MatcherError](UnexpectedError)
     }
+
+    "Bug DEX-1435" in {
+      val waitingOrderDb = WaitingOrderDb(system.dispatcher)
+      test(
+        { (ref, _, addOrder, updatePortfolio) =>
+          updatePortfolio(sellToken1Portfolio.copy(balance = sellToken1Portfolio.balance + 1L))
+
+          val duplicatedOrder = sellTokenOrder1
+          val counterOrder = OrderV1(
+            sender = privateKey("test1"),
+            matcher = PublicKey("matcher".getBytes("utf-8")),
+            pair = AssetPair(Waves, IssuedAsset(assetId)),
+            orderType = OrderType.SELL,
+            price = 100000000L,
+            amount = 250L,
+            timestamp = System.currentTimeMillis(),
+            expiration = System.currentTimeMillis() + 5.days.toMillis,
+            matcherFee = matcherFee
+          )
+          val duplicatedMarketOrder = MarketOrder(duplicatedOrder, duplicatedOrder.amount)
+
+          addOrder(LimitOrder(duplicatedOrder))
+          val matchTx = ExchangeTransactionV2(
+            duplicatedMarketOrder.order,
+            counterOrder,
+            duplicatedMarketOrder.amount,
+            duplicatedMarketOrder.price,
+            0L,
+            0L,
+            0L,
+            System.currentTimeMillis,
+            Proofs(List.empty)
+          )
+          ref ! AddressActor.Command.ApplyOrderBookExecuted(
+            OrderExecuted(duplicatedMarketOrder, LimitOrder(counterOrder), System.currentTimeMillis, 0L, 0L, 0L),
+            ExchangeTransactionResult.fromEither(Right(()), matchTx)
+          )
+
+          val probe = TestProbe()
+          val msg = AddressActor.Command.PlaceOrder(duplicatedOrder, isMarket = true)
+          ref.tell(AddressDirectoryActor.Command.ForwardMessage(duplicatedOrder.sender, msg), probe.ref)
+          probe.expectMsg[MatcherError](OrderDuplicate(duplicatedOrder.id()))
+
+          waitingOrderDb.saveOrderLatch.countDown()
+
+          ref.tell(AddressDirectoryActor.Command.ForwardMessage(duplicatedOrder.sender, msg), probe.ref)
+          probe.expectMsg[MatcherError](OrderDuplicate(duplicatedOrder.id()))
+
+          waitingOrderDb.saveOrderInfoLatch.countDown()
+
+          ref.tell(AddressDirectoryActor.Command.ForwardMessage(duplicatedOrder.sender, msg), probe.ref)
+          probe.expectMsg[MatcherError](OrderDuplicate(duplicatedOrder.id()))
+        },
+        orderDb = waitingOrderDb
+      )
+    }
   }
 
   private val testAddress = addr("test")
@@ -385,7 +445,10 @@ class AddressActorSpecification
   /**
    * (updatedPortfolio: Portfolio, sendBalanceChanged: Boolean) => Unit
    */
-  private def test(f: (ActorRef, TestProbe, AcceptedOrder => Unit, Portfolio => Unit) => Unit, orderDb: OrderDb[Future] = EmptyOrderDb()): Unit = {
+  private def test(
+    f: (ActorRef, TestProbe, AcceptedOrder => Unit, Portfolio => Unit) => Unit,
+    orderDb: OrderDb[Future] = EmptyOrderDb()
+  ): Unit = {
     val commandsProbe = TestProbe()
     val currentPortfolio = new AtomicReference[Portfolio]()
 

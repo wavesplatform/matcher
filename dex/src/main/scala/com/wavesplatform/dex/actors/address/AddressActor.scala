@@ -46,6 +46,7 @@ import kamon.trace.Span
 import org.slf4j.LoggerFactory
 
 import java.time.{Instant, Duration => JDuration}
+import java.util.concurrent.ConcurrentHashMap
 import scala.collection.immutable.Queue
 import scala.collection.mutable.{AnyRefMap => MutableMap, HashSet => MutableSet}
 import scala.concurrent.duration._
@@ -81,6 +82,10 @@ class AddressActor(
   //  placing an order may affect following places.
   private var placementQueue = Queue.empty[EnqueuedOrder]
   private val pendingCommands = MutableMap.empty[Order.Id, PendingCommand]
+
+  // orders that in process of adding, but may not be present in leveldb or in pendingCommands and activeOrders
+  // See DEX-1435
+  private val processingOrders = ConcurrentHashMap.newKeySet[Order.Id]()
 
   private val activeOrders = MutableMap.empty[Order.Id, AcceptedOrder]
   private val expiration = MutableMap.empty[Order.Id, Cancellable]
@@ -140,10 +145,11 @@ class AddressActor(
       scheduleExpiration(order.order)
       scheduleOrderWs(order, order.status, unmatchable = false, maybeMatchTx = None)
 
-      if (isWorking) pendingCommands.remove(order.id).foreach { command =>
-        log.trace(s"Confirming placement for ${order.id}")
-        command.client ! Event.OrderAccepted(order.order)
-      }
+      if (isWorking)
+        pendingCommands.remove(order.id).foreach { command =>
+          log.trace(s"Confirming placement for ${order.id}")
+          command.client ! Event.OrderAccepted(order.order)
+        }
 
     case command: Command.ApplyOrderBookExecuted =>
       val ownerRemainingOrders = List(command.event.counterRemaining, command.event.submittedRemaining).filter(_.order.sender.toAddress == owner)
@@ -162,10 +168,11 @@ class AddressActor(
             case status: OrderStatus.Final =>
               expiration.remove(remaining.id).foreach(_.cancel())
               orderDb.saveOrderInfo(remaining.id, owner, OrderInfo.v6(remaining, status)).onComplete {
-                case Success(_) =>
+                case Success(_) => processingOrders.remove(remaining.id)
                 case Failure(th) =>
                   //TODO probably inconsistent state can be introduced
                   log.error("error while saving order info", th)
+                  processingOrders.remove(remaining.id)
               }
               activeOrders.remove(remaining.id) match {
                 case Some(origActiveOrder) => origActiveOrder.reservableBalance.inverse()
@@ -236,9 +243,12 @@ class AddressActor(
           scheduleOrderWs(acceptedOrder, orderStatus, unmatchable, maybeMatchTx = None)
       }
 
-      if (isWorking) pendingCommands.remove(id).foreach { pc =>
-        log.trace(s"Confirming cancellation for $id")
-        pc.client ! Event.OrderCanceled(id)
+      if (isWorking) {
+        pendingCommands.remove(id).foreach { pc =>
+          log.trace(s"Confirming cancellation for $id")
+          pc.client ! Event.OrderCanceled(id)
+        }
+        processingOrders.remove(id)
       }
 
     case command: Command.ChangeBalances => changeBalances(command.updates)
@@ -253,11 +263,14 @@ class AddressActor(
     case command: Command.MarkTxsObserved => markTxsObserved(command.txsWithSpending)
 
     case command @ OrderCancelFailed(id, reason, _) =>
-      if (isWorking) pendingCommands.remove(id) match {
-        case None => // Ok on secondary matcher
-        case Some(pc) =>
-          log.trace(s"$command, sending a response to a client")
-          pc.client ! reason
+      if (isWorking) {
+        pendingCommands.remove(id) match {
+          case None => // Ok on secondary matcher
+          case Some(pc) =>
+            log.trace(s"$command, sending a response to a client")
+            pc.client ! reason
+        }
+        processingOrders.remove(id)
       }
   }
 
@@ -298,9 +311,10 @@ class AddressActor(
       log.debug(s"$command")
       val orderId = command.order.id()
       if (totalActiveOrders >= settings.maxActiveOrders) sender() ! error.ActiveOrdersLimitReached(settings.maxActiveOrders)
-      else if (failedPlacements.contains(orderId)) sender() ! error.OrderDuplicate(orderId)
+      else if (failedPlacements.contains(orderId) || processingOrders.contains(orderId)) sender() ! error.OrderDuplicate(orderId)
       else {
         val origSender = sender()
+        processingOrders.add(orderId)
         orderDb.containsInfo(orderId).onComplete {
           case Success(containsInfo) =>
             self.tell(Command.PlaceOrderFinalized(command, containsInfo), origSender)
@@ -482,6 +496,7 @@ class AddressActor(
           case _ =>
         }
       }
+      processingOrders.remove(orderId)
 
     case _: Event.StoreSucceeded => if (failedPlacements.nonEmpty) failedPlacements.clear()
 
@@ -496,6 +511,7 @@ class AddressActor(
                 log.trace(s"Confirming command for $orderId")
                 command.client ! reason
               }
+              processingOrders.remove(orderId)
           }
 
           placementQueue = restQueue

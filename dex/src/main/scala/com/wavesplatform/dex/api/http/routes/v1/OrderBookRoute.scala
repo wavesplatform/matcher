@@ -20,7 +20,7 @@ final case class OrderBookRoute(
   assetPairBuilder: AssetPairBuilder,
   orderBookHttpInfo: OrderBookHttpInfo,
   matcherStatus: () => MatcherStatus,
-  apiKeyHash: Option[Array[Byte]]
+  apiKeyHashes: List[Array[Byte]]
 )(implicit val errorContext: ErrorFormatterContext, ex: ExecutionContext)
     extends ApiRoute
     with AuthRoute

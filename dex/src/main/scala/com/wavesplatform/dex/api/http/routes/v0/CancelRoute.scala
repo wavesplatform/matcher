@@ -35,7 +35,7 @@ final class CancelRoute(
   addressActor: ActorRef,
   override val matcherStatus: () => MatcherStatus,
   orderDb: OrderDb[Future],
-  override val apiKeyHash: Option[Array[Byte]]
+  override val apiKeyHashes: List[Array[Byte]]
 )(implicit mat: Materializer)
     extends ApiRoute
     with ProtectDirective

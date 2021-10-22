@@ -25,7 +25,7 @@ final class MatcherInfoRoute(
   matcherSettings: MatcherSettings,
   override val matcherStatus: () => MatcherStatus,
   matcherAccountFee: Long,
-  override val apiKeyHash: Option[Array[Byte]],
+  override val apiKeyHashes: List[Array[Byte]],
   rateCache: RateCache,
   validatedAllowedOrderVersions: () => Future[Set[Byte]],
   getActualOrderFeeSettings: () => OrderFeeSettings

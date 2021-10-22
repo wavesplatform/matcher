@@ -90,7 +90,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   private val matchingRulesCache = new MatchingRulesCache(settings)
   private val orderFeeSettingsCache = new OrderFeeSettingsCache(settings.orderFee)
 
-  private val maybeApiKeyHash: Option[Array[Byte]] = Option(settings.restApi.apiKeyHash) filter (_.nonEmpty) map Base58.decode
+  private val apiKeyHashes: List[Array[Byte]] = settings.restApi.apiKeyHashes filter (_.nonEmpty) map Base58.decode
   private val processConsumedTimeout = new Timeout(settings.processConsumedTimeout * 2)
 
   private val matcherKeyPair = AccountStorage.load(settings.accountStorage).map(_.keyPair).explicitGet().unsafeTap { x =>
@@ -342,7 +342,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       addressActor = addressDirectoryRef,
       orderValidation,
       () => status,
-      maybeApiKeyHash
+      apiKeyHashes
     )
   }
 
@@ -353,13 +353,13 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       addressActor = addressDirectoryRef,
       matcherStatus = () => status,
       orderDb = orderDb,
-      apiKeyHash = maybeApiKeyHash
+      apiKeyHashes = apiKeyHashes
     )
 
   private val ratesRoute = new RatesRoute(
     assetPairBuilder = pairBuilder,
     matcherStatus = () => status,
-    apiKeyHash = maybeApiKeyHash,
+    apiKeyHashes = apiKeyHashes,
     rateCache = rateCache,
     externalClientDirectoryRef = externalClientDirectoryRef
   )
@@ -370,7 +370,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       assetPairBuilder = pairBuilder,
       addressActor = addressDirectoryRef,
       matcherStatus = () => status,
-      apiKeyHash = maybeApiKeyHash
+      apiKeyHashes = apiKeyHashes
     )
 
   private val balancesRoute =
@@ -379,10 +379,10 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       assetPairBuilder = pairBuilder,
       addressActor = addressDirectoryRef,
       matcherStatus = () => status,
-      apiKeyHash = maybeApiKeyHash
+      apiKeyHashes = apiKeyHashes
     )
 
-  private val transactionsRoute = new TransactionsRoute(matcherStatus = () => status, orderDb = orderDb, apiKeyHash = maybeApiKeyHash)
+  private val transactionsRoute = new TransactionsRoute(matcherStatus = () => status, orderDb = orderDb, apiKeyHashes = apiKeyHashes)
 
   private val debugRoute = new DebugRoute(
     responseTimeout = settings.actorResponseTimeout,
@@ -393,7 +393,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     matcherStatus = () => status,
     currentOffset = () => lastProcessedOffset,
     lastOffset = () => matcherQueue.lastOffset,
-    maybeApiKeyHash
+    apiKeyHashes
   )
 
   private val marketsRoute = new MarketsRoute(
@@ -416,7 +416,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     orderBook = p => Option(orderBooks.get()) flatMap (_ get p),
     orderBookHttpInfo = orderBookHttpInfo,
     matcherStatus = () => status,
-    apiKeyHash = maybeApiKeyHash
+    apiKeyHashes = apiKeyHashes
   )
 
   private val infoRoute = new MatcherInfoRoute(
@@ -424,7 +424,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     matcherSettings = settings,
     matcherStatus = () => status,
     matcherAccountFee = ExchangeTransactionCreator.getAdditionalFeeForScript(hasMatcherAccountScript),
-    apiKeyHash = maybeApiKeyHash,
+    apiKeyHashes = apiKeyHashes,
     rateCache = rateCache,
     validatedAllowedOrderVersions = () => {
       Future
@@ -443,7 +443,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     assetPairBuilder = pairBuilder,
     orderBookHttpInfo = orderBookHttpInfo,
     matcherStatus = () => status,
-    apiKeyHash = maybeApiKeyHash
+    apiKeyHashes = apiKeyHashes
   ))
 
   private val wsApiRoute = new MatcherWebSocketRoute(
@@ -453,7 +453,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     matcher = orderBookDirectoryActorRef,
     time = time,
     assetPairBuilder = pairBuilder,
-    apiKeyHash = maybeApiKeyHash,
+    apiKeyHashes = apiKeyHashes,
     matcherSettings = settings,
     matcherStatus = () => status,
     getRatesSnapshot = () => rateCache.getAllRates

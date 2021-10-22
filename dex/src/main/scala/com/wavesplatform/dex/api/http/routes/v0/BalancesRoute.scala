@@ -28,7 +28,7 @@ final class BalancesRoute(
   assetPairBuilder: AssetPairBuilder,
   addressActor: ActorRef,
   override val matcherStatus: () => MatcherStatus,
-  override val apiKeyHash: Option[Array[Byte]]
+  override val apiKeyHashes: List[Array[Byte]]
 )(implicit mat: Materializer)
     extends ApiRoute
     with ProtectDirective

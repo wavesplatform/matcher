@@ -78,7 +78,7 @@ class MatcherWebSocketRouteSpec extends RouteSpec("/ws/v0") with MatcherSpecBase
           x => liftErrorAsync[BriefAssetDescription](error.AssetNotFound(x)),
           Set.empty
         ),
-        apiKeyHash = Some(crypto secureHash apiKey),
+        apiKeyHashes = List(crypto secureHash apiKey),
         matcherSettings = settings,
         matcherStatus = () => MatcherStatus.Working,
         () => rateCache.getAllRates

@@ -9,9 +9,11 @@ import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.error.{ApiKeyIsNotProvided, ApiKeyIsNotValid, MatcherError, UserPublicKeyIsNotValid}
 
+import java.security.MessageDigest
+
 trait AuthRoute { this: ApiRoute =>
 
-  protected val apiKeyHash: Option[Array[Byte]]
+  protected val apiKeyHashes: List[Array[Byte]]
 
   def withAuth(implicit matcherResponseTrm: ToResponseMarshaller[MatcherResponse]): Directive0 = {
 
@@ -19,15 +21,15 @@ trait AuthRoute { this: ApiRoute =>
       case _: MatcherWebSocketRoute => matcherError.toWsHttpResponse
       case _ => SimpleErrorResponse(matcherError)
     }
-    apiKeyHash.fold[Directive0](complete(SimpleErrorResponse(ApiKeyIsNotProvided))) { hashFromSettings =>
-      optionalHeaderValueByType(`X-Api-Key`).flatMap {
-        case Some(key) if java.util.Arrays.equals(crypto secureHash key.value, hashFromSettings) => pass
-        case _ =>
-          optionalHeaderValueByType(api_key).flatMap {
-            case Some(key) if java.util.Arrays.equals(crypto secureHash key.value, hashFromSettings) => pass
-            case _ => complete(correctResponse(ApiKeyIsNotValid))
-          }
-      }
+
+    if (apiKeyHashes.isEmpty) complete(SimpleErrorResponse(ApiKeyIsNotProvided))
+    else optionalHeaderValueByType(`X-Api-Key`).flatMap {
+      case Some(key) if apiKeyValid(key.value) => pass
+      case _ =>
+        optionalHeaderValueByType(api_key).flatMap {
+          case Some(key) if apiKeyValid(key.value) => pass
+          case _ => complete(correctResponse(ApiKeyIsNotValid))
+        }
     }
   }
 
@@ -40,5 +42,8 @@ trait AuthRoute { this: ApiRoute =>
           case Right(x) => provide[Option[PublicKey]](Some(PublicKey(x)))
         }
     }
+
+  private def apiKeyValid(key: String): Boolean =
+    apiKeyHashes.exists(hash => MessageDigest.isEqual(crypto secureHash key, hash))
 
 }

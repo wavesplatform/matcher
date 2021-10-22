@@ -116,7 +116,7 @@ class v1OrderBookRouteSpec extends RouteSpec("/api/v1") with MatcherSpecBase wit
         ),
         orderBookHttpInfo = orderBookHttpInfo,
         matcherStatus = () => MatcherStatus.Working,
-        apiKeyHash = Some(crypto secureHash apiKey)
+        apiKeyHashes = List(crypto secureHash apiKey)
       )
 
     f(route.route)

@@ -878,7 +878,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     "returns success if assets are blacklisted" in test(
       route =>
         Delete(routePath(s"/orderbook/${blackListedOrder.assetPair.amountAssetStr}/${blackListedOrder.assetPair.priceAssetStr}"))
-          .withHeaders(apiKeyHeader) ~> route ~> check {
+          .withHeaders(apiKeyHeader()) ~> route ~> check {
           status shouldEqual StatusCodes.Accepted
           responseAs[HttpMessage] should matchTo(HttpMessage("Deleting order book"))
         },

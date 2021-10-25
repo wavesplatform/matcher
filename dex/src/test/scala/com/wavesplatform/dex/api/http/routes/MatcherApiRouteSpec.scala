@@ -872,7 +872,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
           .withHeaders(apiKeyHeader()) ~> route ~> check {
           status shouldEqual StatusCodes.BadRequest
         },
-      apiKey
+      apiKeys
     )
 
     "returns success if assets are blacklisted" in test(

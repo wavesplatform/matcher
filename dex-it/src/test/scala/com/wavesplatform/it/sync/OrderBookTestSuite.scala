@@ -14,7 +14,8 @@ import scala.concurrent.Future
 
 class OrderBookTestSuite extends MatcherSuiteBase {
 
-  override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "WAVES" ]""")
+  override protected def dexInitialSuiteConfig: Config =
+    ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "WAVES" ]""")
 
   private case class ReservedBalances(wct: Long, usd: Long, waves: Long)
 
@@ -64,11 +65,24 @@ class OrderBookTestSuite extends MatcherSuiteBase {
     aliceRBForBothPairs = reservedBalancesOf(alice)
     bobRBForBothPairs = reservedBalancesOf(bob)
 
+    dex1.restartWithNewSuiteConfig(ConfigFactory.parseString(
+      s"""waves.dex {
+         |  blacklisted-assets  = [$WctId]
+         |}""".stripMargin
+    ).withFallback(dexInitialSuiteConfig))
+
     dex1.tryApi.deleteOrderBookWithKey(wctUsdPair) shouldBe Symbol("right")
   }
 
   "When delete order book" - {
+
     "orders by the pair should be canceled" in {
+      dex1.restartWithNewSuiteConfig(ConfigFactory.parseString(
+        s"""waves.dex {
+           |  blacklisted-assets  = []
+           |}""".stripMargin
+      ).withFallback(dexInitialSuiteConfig))
+
       dex1.api.waitForOrderStatus(buyOrder, Status.Cancelled)
       dex1.api.waitForOrderStatus(anotherBuyOrder, Status.Cancelled)
       dex1.api.waitForOrderStatus(sellOrder, Status.Cancelled)
@@ -111,6 +125,13 @@ class OrderBookTestSuite extends MatcherSuiteBase {
 
     "matcher can start after multiple delete events" in {
       def deleteWctWaves(): Future[Either[MatcherError, HttpMessage]] = dex1.asyncTryApi.deleteOrderBookWithKey(wctWavesPair)
+
+      dex1.restartWithNewSuiteConfig(ConfigFactory.parseString(
+        s"""waves.dex {
+           |  blacklisted-assets  = [$WctId]
+           |}""".stripMargin
+      ).withFallback(dexInitialSuiteConfig))
+
       val deleteMultipleTimes = deleteWctWaves()
         .zip(deleteWctWaves())
         .map(_ => ())
@@ -119,5 +140,6 @@ class OrderBookTestSuite extends MatcherSuiteBase {
       deleteMultipleTimes.futureValue
       dex1.restart()
     }
+
   }
 }

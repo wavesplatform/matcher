@@ -592,8 +592,24 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         )
       )
 
+      dex1.restartWithNewSuiteConfig(ConfigFactory.parseString(
+        s"""waves.dex {
+           |  price-assets = [ "$UsdnId", "$BtcId", "$UsdId", "WAVES", $EthId]
+           |  blacklisted-assets  = [$EthId]
+           |}""".stripMargin
+      ))
+
       dex1.api.deleteOrderBookWithKey(ethWavesPair)
-      dex1.api.waitForOrderStatus(wavesEthPair, sellOrder1.id(), Status.Cancelled)
+      eventually {
+        dex1.api.getOrderHistoryByPKWithSig(alice, activeOnly = Some(false)).find(_.id == sellOrder1.id()).value.status shouldBe "Cancelled"
+      }
+
+      dex1.restartWithNewSuiteConfig(ConfigFactory.parseString(
+        s"""waves.dex {
+           |  price-assets = [ "$UsdnId", "$BtcId", "$UsdId", $EthId, "WAVES" ]
+           |  blacklisted-assets  = []
+           |}""".stripMargin
+      ))
 
       placeAndAwaitAtDex(mkOrderDP(alice, wavesEthPair, SELL, 100, 1))
     }

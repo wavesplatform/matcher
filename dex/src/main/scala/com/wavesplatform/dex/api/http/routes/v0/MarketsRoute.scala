@@ -2,7 +2,8 @@ package com.wavesplatform.dex.api.http.routes.v0
 
 import akka.actor.ActorRef
 import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.server._
+import akka.http.scaladsl.server.directives.FutureDirectives
+import akka.http.scaladsl.server.{Route, _}
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.pattern.ask
 import akka.stream.Materializer
@@ -27,10 +28,11 @@ import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.effect.FutureResult
+import com.wavesplatform.dex.error.{Blacklisted, MatcherError}
 import com.wavesplatform.dex.model.{AssetPairBuilder, _}
 import com.wavesplatform.dex.queue.MatcherQueue.StoreValidatedCommand
 import com.wavesplatform.dex.queue.ValidatedCommand
-import com.wavesplatform.dex.settings.{OrderRestrictionsSettings}
+import com.wavesplatform.dex.settings.OrderRestrictionsSettings
 import io.swagger.annotations._
 
 import javax.ws.rs.Path
@@ -344,24 +346,34 @@ final class MarketsRoute(
     (path(AssetPairPM) & delete) { pairOrError =>
       (withMetricsAndTraces("deleteOrderBookWithKey") & protect & withAuth) {
         withAssetPair(assetPairBuilder, pairOrError, validate = false) { pair =>
-          orderBook(pair) match {
-            case Some(Right(_)) =>
-              complete(
-                storeCommand(ValidatedCommand.DeleteOrderBook(pair))
-                  .map {
-                    case None => NotImplemented(error.FeatureDisabled)
-                    case _ => SimpleResponse(StatusCodes.Accepted, "Deleting order book")
-                  }
-                  .recover { case e: Throwable =>
-                    log.error("Can not persist event", e)
-                    CanNotPersist(error.CanNotPersistEvent)
-                  }
-              )
-            case _ => complete(OrderBookUnavailable(error.OrderBookBroken(pair)))
+          withOnlyBlacklistedAssetPair(pair) {
+            orderBook(pair) match {
+              case Some(Right(_)) =>
+                complete(
+                  storeCommand(ValidatedCommand.DeleteOrderBook(pair))
+                    .map {
+                      case None => NotImplemented(error.FeatureDisabled)
+                      case _ => SimpleResponse(StatusCodes.Accepted, "Deleting order book")
+                    }
+                    .recover { case e: Throwable =>
+                      log.error("Can not persist event", e)
+                      CanNotPersist(error.CanNotPersistEvent)
+                    }
+                )
+              case _ => complete(OrderBookUnavailable(error.OrderBookBroken(pair)))
+            }
           }
         }
       }
     }
+
+  private def withOnlyBlacklistedAssetPair(assetPair: AssetPair): Directive0 = FutureDirectives.onSuccess(
+    assetPairBuilder.validateAssetPair(assetPair).value
+  ).flatMap {
+    case Left(_: MatcherError with Blacklisted) => pass
+    case Left(e) => complete(InfoNotFound(e))
+    case Right(_) => complete(InfoNotFound(error.AssetPairNotBlacklisted(assetPair)))
+  }
 
   private def getOrderBookRestrictions(pair: AssetPair): FutureResult[HttpOrderBookInfo] = settings.getActualTickSize(pair).map { tickSize =>
     HttpOrderBookInfo(

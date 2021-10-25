@@ -37,6 +37,8 @@ sealed abstract class MatcherError(override val code: Int, val message: MatcherE
   override def toString: String = s"${getClass.getCanonicalName}(error=$code,message=${message.text})"
 }
 
+sealed trait Blacklisted
+
 object MatcherError {
 
   private[error] def mkCode(obj: Entity, part: Entity, cls: Class): Int =
@@ -232,26 +234,41 @@ object InvalidAsset extends MatcherErrorCodeProvider(asset, commonEntity, broken
 
 final case class AssetBlacklisted(asset: IssuedAsset)
     extends MatcherError(AssetBlacklisted.code, e"The asset ${"assetId" -> asset} is blacklisted", AssetBlacklisted.httpCode)
+    with Blacklisted
 
 object AssetBlacklisted extends MatcherErrorCodeProvider(asset, commonEntity, blacklisted, C.BadRequest)
 
 final case class AmountAssetBlacklisted(asset: IssuedAsset)
     extends MatcherError(AmountAssetBlacklisted.code, e"The amount asset ${"assetId" -> asset} is blacklisted", AmountAssetBlacklisted.httpCode)
+    with Blacklisted
 
 object AmountAssetBlacklisted extends MatcherErrorCodeProvider(asset, amount, blacklisted, C.BadRequest)
 
 final case class PriceAssetBlacklisted(asset: IssuedAsset)
     extends MatcherError(PriceAssetBlacklisted.code, e"The price asset ${"assetId" -> asset} is blacklisted", PriceAssetBlacklisted.httpCode)
+    with Blacklisted
 
 object PriceAssetBlacklisted extends MatcherErrorCodeProvider(asset, price, blacklisted, C.BadRequest)
 
+final case class AssetPairNotBlacklisted(assetPair: AssetPair)
+    extends MatcherError(
+      AssetPairNotBlacklisted.code,
+      e"The asset pair ${"assetPair" -> assetPair} is not blacklisted",
+      AssetPairNotBlacklisted.httpCode
+    )
+    with Blacklisted
+
+object AssetPairNotBlacklisted extends MatcherErrorCodeProvider(asset, commonEntity, notBlacklisted, C.BadRequest)
+
 final case class FeeAssetBlacklisted(asset: IssuedAsset)
     extends MatcherError(FeeAssetBlacklisted.code, e"The fee asset ${"assetId" -> asset} is blacklisted", FeeAssetBlacklisted.httpCode)
+    with Blacklisted
 
 object FeeAssetBlacklisted extends MatcherErrorCodeProvider(asset, fee, blacklisted, C.BadRequest)
 
 final case class AddressIsBlacklisted(address: Address)
     extends MatcherError(AddressIsBlacklisted.code, e"The account ${"address" -> address} is blacklisted", AddressIsBlacklisted.httpCode)
+    with Blacklisted
 
 object AddressIsBlacklisted extends MatcherErrorCodeProvider(account, commonEntity, blacklisted, C.BadRequest)
 
@@ -490,6 +507,7 @@ object AssetPairSameAssets extends MatcherErrorCodeProvider(order, assetPair, du
 
 final case class AssetPairIsDenied(assetPair: AssetPair)
     extends MatcherError(AssetPairIsDenied.code, e"Trading is denied for the ${"assetPair" -> assetPair} asset pair", AssetPairIsDenied.httpCode)
+    with Blacklisted
 
 object AssetPairIsDenied extends MatcherErrorCodeProvider(order, assetPair, denied, C.BadRequest)
 
@@ -826,4 +844,5 @@ object Class {
   object notProvided extends Class(17)
   object optimization extends Class(18)
   object pending extends Class(19)
+  object notBlacklisted extends Class(20)
 }

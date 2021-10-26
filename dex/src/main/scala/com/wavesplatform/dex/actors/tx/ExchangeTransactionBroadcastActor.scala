@@ -79,7 +79,7 @@ object ExchangeTransactionBroadcastActor {
 
     def reply(item: InProgressItem): Unit = item.clientRef.foreach(_ ! Observed(item.tx, item.addressSpendings))
 
-    def default(inProgress: Map[ExchangeTransaction.Id, InProgressItem], pending: Queue[Broadcast]): Behavior[Message] =
+    def default(inProgress: Map[ExchangeTransaction.Id, InProgressItem], pending: Queue[Broadcast], isBroadcasting: Boolean): Behavior[Message] =
       Behaviors.receive[Message] { (context, message) =>
         message match {
           case message: Command.Broadcast =>
@@ -87,17 +87,18 @@ object ExchangeTransactionBroadcastActor {
             if (isExpired(message.tx)) {
               message.clientRef ! Observed(message.tx, message.addressSpendings)
               Behaviors.same
-            } else if (pending.isEmpty && inProgress.isEmpty) {
+            } else if (pending.isEmpty && !isBroadcasting) {
               broadcast(context, message.tx)
               default(
                 inProgress.updated(
                   message.tx.id(),
                   InProgressItem(message.tx, defaultAttempts, message.clientRef.some, message.addressSpendings)
                 ),
-                pending
+                pending,
+                isBroadcasting = true
               )
             } else
-              default(inProgress, pending.enqueue(message))
+              default(inProgress, pending.enqueue(message), isBroadcasting)
 
           case Command.Tick =>
             val updatedInProgress = inProgress.view.mapValues(_.decreasedAttempts)
@@ -115,7 +116,7 @@ object ExchangeTransactionBroadcastActor {
               }
               .toMap
 
-            default(updatedInProgress, pending)
+            default(updatedInProgress, pending, isBroadcasting)
 
           case message: Event.Broadcasted =>
             val (maybeBroadcast, updatedPending) = pending.foldLeft((none[Broadcast], Queue.empty[Broadcast])) {
@@ -204,12 +205,12 @@ object ExchangeTransactionBroadcastActor {
                     else updatedInProgress1 // Already removed
                   } else updatedInProgress1
 
-                default(updatedInProgress2, updatedPending)
+                default(updatedInProgress2, updatedPending, isBroadcasting = maybeBroadcast.nonEmpty)
             }
         }
       }
 
-    default(Map.empty, Queue.empty)
+    default(Map.empty, Queue.empty, isBroadcasting = false)
   }
 
   private case class InProgressItem(

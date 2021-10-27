@@ -79,7 +79,11 @@ object ExchangeTransactionBroadcastActor {
 
     def reply(item: InProgressItem): Unit = item.clientRef.foreach(_ ! Observed(item.tx, item.addressSpendings))
 
-    def default(inProgress: Map[ExchangeTransaction.Id, InProgressItem], pending: Queue[Broadcast], isBroadcasting: Boolean): Behavior[Message] =
+    def default(
+      inProgress: Map[ExchangeTransaction.Id, InProgressItem],
+      pending: Queue[Broadcast],
+      isBroadcasting: List[ExchangeTransaction.Id]
+    ): Behavior[Message] =
       Behaviors.receive[Message] { (context, message) =>
         message match {
           case message: Command.Broadcast =>
@@ -87,7 +91,7 @@ object ExchangeTransactionBroadcastActor {
             if (isExpired(message.tx)) {
               message.clientRef ! Observed(message.tx, message.addressSpendings)
               Behaviors.same
-            } else if (pending.isEmpty && !isBroadcasting) {
+            } else if (pending.isEmpty && isBroadcasting.isEmpty) {
               broadcast(context, message.tx)
               default(
                 inProgress.updated(
@@ -95,7 +99,7 @@ object ExchangeTransactionBroadcastActor {
                   InProgressItem(message.tx, defaultAttempts, message.clientRef.some, message.addressSpendings)
                 ),
                 pending,
-                isBroadcasting = true
+                isBroadcasting = message.tx.id() +: isBroadcasting
               )
             } else
               default(inProgress, pending.enqueue(message), isBroadcasting)
@@ -116,7 +120,7 @@ object ExchangeTransactionBroadcastActor {
               }
               .toMap
 
-            default(updatedInProgress, pending, isBroadcasting)
+            default(updatedInProgress, pending, isBroadcasting = isBroadcasting ++ updatedInProgress.keySet)
 
           case message: Event.Broadcasted =>
             val (maybeBroadcast, updatedPending) = pending.foldLeft((none[Broadcast], Queue.empty[Broadcast])) {
@@ -205,12 +209,17 @@ object ExchangeTransactionBroadcastActor {
                     else updatedInProgress1 // Already removed
                   } else updatedInProgress1
 
-                default(updatedInProgress2, updatedPending, isBroadcasting = maybeBroadcast.nonEmpty)
+                val newIsBroadcasting = isBroadcasting.filterNot(_ == txId)
+                default(
+                  updatedInProgress2,
+                  updatedPending,
+                  isBroadcasting = maybeBroadcast.fold(newIsBroadcasting)(_.tx.id() +: newIsBroadcasting)
+                )
             }
         }
       }
 
-    default(Map.empty, Queue.empty, isBroadcasting = false)
+    default(Map.empty, Queue.empty, isBroadcasting = List.empty)
   }
 
   private case class InProgressItem(

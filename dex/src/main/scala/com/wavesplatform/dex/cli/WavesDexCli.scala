@@ -738,6 +738,17 @@ object WavesDexCli extends ScoptImplicits {
               .valueName("<order-id-in-base58>")
               .required()
               .action((x, s) => s.copy(orderId = x))
+          ),
+        cmd(Command.CopySnapshots.name)
+          .action((_, s) => s.copy(command = Command.CopySnapshots.some))
+          .text("Copy snapshots")
+          .children(
+            opt[String]("dex-config")
+              .abbr("dc")
+              .text("DEX config path")
+              .valueName("<raw-string>")
+              .required()
+              .action((x, s) => s.copy(configPath = x))
           )
       )
     }
@@ -785,6 +796,7 @@ object WavesDexCli extends ScoptImplicits {
               case Command.InspectOrderBook => inspectOrderBook(args, matcherSettings)
               case Command.DeleteOrderBook => deleteOrderBook(args, matcherSettings)
               case Command.InspectOrder => inspectOrder(args, matcherSettings)
+              case Command.CopySnapshots => copySnapshots(matcherSettings)
             }
             println("Done")
         }
@@ -855,6 +867,10 @@ object WavesDexCli extends ScoptImplicits {
 
     case object InspectOrder extends Command {
       override def name: String = "inspect-order"
+    }
+
+    case object CopySnapshots extends Command {
+      override def name: String = "copy-snapshots"
     }
 
   }

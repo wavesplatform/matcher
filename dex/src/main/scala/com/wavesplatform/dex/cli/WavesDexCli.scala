@@ -410,6 +410,34 @@ object WavesDexCli extends ScoptImplicits {
       println(orderInfo.fold("  not found")(_.toString))
     }
 
+  def copyOrderBookSnapshotDb(matcherSettings: MatcherSettings): Unit =
+    for {
+      _ <- cli.log(
+        s"""
+           |Running copyOrderBookSnapshotDb:
+           |dataDirectory=${matcherSettings.dataDirectory}
+           |""".stripMargin
+      )
+      copyPath = readFromStdIn("Enter path for copy:")
+    } yield {
+      val f = new File(copyPath)
+      if (!f.isDirectory && !f.isFile && !copyPath.contains(matcherSettings.dataDirectory))
+        println(s"Copy dir should be empty & should be different than dataDirectory")
+      else withLevelDb(matcherSettings.dataDirectory) { originalDb =>
+        val originalSnapshotDb = OrderBookSnapshotDb.levelDb(originalDb)
+        val originalAssetPairsDb = AssetPairsDb.levelDb(originalDb)
+        withLevelDb(copyPath) { copyDb =>
+          val copySnapshotDb = OrderBookSnapshotDb.levelDb(copyDb)
+          originalAssetPairsDb.all().foreach { pair =>
+            originalSnapshotDb.get(pair).foreach { case (offset, snapshot) =>
+              copySnapshotDb.update(pair, offset, snapshot.some)
+            }
+          }
+          println("Finished")
+        }
+      }
+    }
+
   private def snapshotToStr(snapshot: OrderBookSideSnapshot): String =
     if (snapshot.isEmpty) "empty"
     else snapshot.toVector.sortBy(_._1).map { case (price, os) => s"$price: ${os.mkString(", ")}" }.mkString("  ", "\n  ", "")
@@ -903,6 +931,12 @@ object WavesDexCli extends ScoptImplicits {
       System.err.println("Please enter a non-empty password")
       readSecretFromStdIn(prompt)
     } else r
+  }
+
+  private def readFromStdIn(prompt: String): String = {
+    System.out.print(prompt)
+    val scanner = new Scanner(System.in, StandardCharsets.UTF_8.name())
+    if (scanner.hasNextLine) scanner.nextLine() else ""
   }
 
 }

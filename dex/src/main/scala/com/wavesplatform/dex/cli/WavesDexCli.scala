@@ -430,8 +430,9 @@ object WavesDexCli extends ScoptImplicits {
         withLevelDb(copyPath) { copyDb =>
           val copyAssetPairsDb = AssetPairsDb.levelDb(copyDb)
           val copySnapshotsDb = OrderBookSnapshotDb.levelDb(copyDb)
-
-          originalAssetPairsDb.all().foreach { pair =>
+          val assetPairs = originalAssetPairsDb.all()
+          println(s"asset pairs size ${assetPairs.size}")
+          assetPairs.foreach { pair =>
             copyAssetPairsDb.add(pair)
             originalSnapshotsDb.get(pair).foreach { case (offset, snapshot) =>
               copySnapshotsDb.update(pair, offset, snapshot.some)

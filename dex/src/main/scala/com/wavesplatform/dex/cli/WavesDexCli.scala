@@ -410,11 +410,11 @@ object WavesDexCli extends ScoptImplicits {
       println(orderInfo.fold("  not found")(_.toString))
     }
 
-  def copyOrderBookSnapshotDb(matcherSettings: MatcherSettings): Unit =
+  def copySnapshots(matcherSettings: MatcherSettings): Unit =
     for {
       _ <- cli.log(
         s"""
-           |Running copyOrderBookSnapshotDb:
+           |Running copySnapshots:
            |dataDirectory=${matcherSettings.dataDirectory}
            |""".stripMargin
       )
@@ -424,13 +424,13 @@ object WavesDexCli extends ScoptImplicits {
       if (!f.isDirectory && !f.isFile && !copyPath.contains(matcherSettings.dataDirectory))
         println(s"Copy dir should be empty & should be different than dataDirectory")
       else withLevelDb(matcherSettings.dataDirectory) { originalDb =>
-        val originalSnapshotDb = OrderBookSnapshotDb.levelDb(originalDb)
+        val originalSnapshotsDb = OrderBookSnapshotDb.levelDb(originalDb)
         val originalAssetPairsDb = AssetPairsDb.levelDb(originalDb)
         withLevelDb(copyPath) { copyDb =>
-          val copySnapshotDb = OrderBookSnapshotDb.levelDb(copyDb)
+          val copySnapshotsDb = OrderBookSnapshotDb.levelDb(copyDb)
           originalAssetPairsDb.all().foreach { pair =>
-            originalSnapshotDb.get(pair).foreach { case (offset, snapshot) =>
-              copySnapshotDb.update(pair, offset, snapshot.some)
+            originalSnapshotsDb.get(pair).foreach { case (offset, snapshot) =>
+              copySnapshotsDb.update(pair, offset, snapshot.some)
             }
           }
           println("Finished")

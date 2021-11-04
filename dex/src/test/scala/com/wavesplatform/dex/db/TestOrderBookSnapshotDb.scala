@@ -1,9 +1,9 @@
 package com.wavesplatform.dex.db
 
 import cats.Applicative
-import cats.instances.future._
 import cats.syntax.applicative._
 import cats.syntax.functor._
+import cats.instances.future._
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.model.OrderBookSnapshot
 import com.wavesplatform.dex.queue.ValidatedCommandWithMeta.Offset
@@ -23,10 +23,6 @@ class TestOrderBookSnapshotDb[F[_]: Applicative] private () extends OrderBookSna
 
   override def delete(assetPair: AssetPair): F[Unit] =
     storage.remove(assetPair).pure[F].void
-
-  override def iterateOffsets(): F[Map[AssetPair, Offset]] = ???
-
-  override def iterateSnapshots(): F[Map[AssetPair, OrderBookSnapshot]] = ???
 
 }
 

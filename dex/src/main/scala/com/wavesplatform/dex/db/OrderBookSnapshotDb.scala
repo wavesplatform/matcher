@@ -2,17 +2,12 @@ package com.wavesplatform.dex.db
 
 import cats.instances.option.catsStdInstancesForOption
 import cats.syntax.apply.catsSyntaxTuple2Semigroupal
-import com.google.common.primitives.Longs
 import com.wavesplatform.dex.db.leveldb.{Key, LevelDb}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.model.OrderBookSnapshot
 import com.wavesplatform.dex.queue.ValidatedCommandWithMeta.Offset
 
-import java.nio.ByteBuffer
-
 trait OrderBookSnapshotDb[F[_]] {
-  def iterateOffsets(): F[Map[AssetPair, Offset]]
-  def iterateSnapshots(): F[Map[AssetPair, OrderBookSnapshot]]
   def get(assetPair: AssetPair): F[Option[(Offset, OrderBookSnapshot)]]
   def update(assetPair: AssetPair, offset: Offset, newSnapshot: Option[OrderBookSnapshot]): F[Unit]
   def delete(assetPair: AssetPair): F[Unit]
@@ -21,22 +16,6 @@ trait OrderBookSnapshotDb[F[_]] {
 object OrderBookSnapshotDb {
 
   def levelDb[F[_]](levelDb: LevelDb[F]): OrderBookSnapshotDb[F] = new OrderBookSnapshotDb[F] {
-
-    def iterateOffsets(): F[Map[AssetPair, Offset]] = levelDb.readOnly { ro =>
-      val m = Map.newBuilder[AssetPair, Offset]
-      ro.iterateOver(DbKeys.OrderBookSnapshotOffsetPrefix) { entry =>
-        m.addOne(AssetPair.fromBytes(entry.getKey.drop(2))._1 -> Longs.fromByteArray(entry.getValue))
-      }
-      m.result()
-    }
-
-    def iterateSnapshots(): F[Map[AssetPair, OrderBookSnapshot]] = levelDb.readOnly { ro =>
-      val m = Map.newBuilder[AssetPair, OrderBookSnapshot]
-      ro.iterateOver(DbKeys.OrderBookSnapshotPrefix) { entry =>
-        m.addOne(AssetPair.fromBytes(entry.getKey.drop(2))._1 -> OrderBookSnapshot.fromBytes(ByteBuffer.wrap(entry.getValue)))
-      }
-      m.result()
-    }
 
     override def get(assetPair: AssetPair): F[Option[(Offset, OrderBookSnapshot)]] = levelDb.readOnly { ro =>
       val (obOffsetKey, obKey) = keys(assetPair)

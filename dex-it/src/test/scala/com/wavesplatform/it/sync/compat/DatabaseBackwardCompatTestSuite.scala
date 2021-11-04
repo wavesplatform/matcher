@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync.compat
 
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.it.api.MatcherCommand
@@ -61,7 +62,11 @@ class DatabaseBackwardCompatTestSuite extends BackwardCompatSuiteBase {
     dex2.api.waitForOrder(additionalOrder)(_.status != Status.NotFound)
 
     markup("delete orderbook for additional asset pair at DEX2")
+    dex2.restartWithNewSuiteConfig(
+      dexInitialSuiteConfig.withFallback(ConfigFactory.parseString(s""" waves.dex.blacklisted-assets=["$UsdId"] """))
+    )
     dex2.tryApi.deleteOrderBookWithKey(additionalAssetPair)
+    dex2.restartWithNewSuiteConfig(dexInitialSuiteConfig)
 
     eventually {
       dex2.api.getAllSnapshotOffsets.get(additionalAssetPair) should be(empty)

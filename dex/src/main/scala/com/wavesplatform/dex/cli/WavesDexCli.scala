@@ -421,7 +421,10 @@ object WavesDexCli extends ScoptImplicits {
       copyPath = readFromStdIn("Enter path for copy:")
     } yield {
       val f = new File(copyPath)
-      if (f.isDirectory || f.isFile || copyPath.contains(matcherSettings.dataDirectory))
+      val hasCommonPrefix = matcherSettings.dataDirectory.split("/")
+        .zip(copyPath.split("/"))
+        .forall { case (p1, p2) => p1 == p2 }
+      if (f.isDirectory || f.isFile || hasCommonPrefix)
         println(s"Copy dir should be empty & should be different than dataDirectory")
       else withLevelDb(matcherSettings.dataDirectory) { originalDb =>
         val originalSnapshotsDb = OrderBookSnapshotDb.levelDb(originalDb)

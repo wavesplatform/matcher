@@ -24,6 +24,9 @@ class TestOrderBookSnapshotDb[F[_]: Applicative] private () extends OrderBookSna
   override def delete(assetPair: AssetPair): F[Unit] =
     storage.remove(assetPair).pure[F].void
 
+  override def iterateOffsets(): F[Map[AssetPair, Offset]] = ???
+
+  override def iterateSnapshots(): F[Map[AssetPair, OrderBookSnapshot]] = ???
 }
 
 object TestOrderBookSnapshotDb {

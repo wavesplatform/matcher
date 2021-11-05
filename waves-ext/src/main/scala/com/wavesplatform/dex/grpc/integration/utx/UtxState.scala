@@ -44,11 +44,12 @@ case class UtxState(
 
   def handleEvent(evt: events.UtxEvent): (Option[UtxEvent], UtxState) =
     evt match {
-      case TxRemoved(tx, Some(reason)) if canRetry(reason) =>
-        log.debug(s"${tx.id()} failed by a false-positive reason: $reason")
-        (none, this)
-      case TxRemoved(tx, reason) => remove(tx, reason)
-      case TxAdded(tx, diff) => add(tx, diff)
+      case TxRemoved(tx, reason) =>
+        log.debug(s"${tx.id()} removed due to: $reason (canRetry = ${reason.fold("?")(canRetry(_).toString)}")
+        remove(tx, reason)
+      case TxAdded(tx, diff) =>
+        log.debug(s"tx ${tx.id()} added")
+        add(tx, diff)
     }
 
   private def getSimpleName(x: Any): String = x.getClass.getName.replaceAll(".*?(\\w+)\\$?$", "$1")

@@ -270,7 +270,11 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   )
 
   private val orderBookDirectoryActorRef: ActorRef = {
-    def mkOrderBookProps(assetPair: AssetPair, orderBookDirectoryActor: ActorRef): Props = {
+    def mkOrderBookProps(
+      assetPair: AssetPair,
+      maybeSnapshot: Option[OrderBookActor.Snapshot],
+      orderBookDirectoryActor: ActorRef
+    ): Props = {
       // Safe here, because we receive this information during OrderBookDirectoryActor starting, placing or consuming
       val amountAssetDecimals = errorContext.unsafeAssetDecimals(assetPair.amountAsset)
       val priceAssetDecimals = errorContext.unsafeAssetDecimals(assetPair.priceAsset)
@@ -282,6 +286,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
         orderBookSnapshotStoreRef,
         wsInternalBroadcastRef,
         assetPair,
+        maybeSnapshot,
         time,
         matchingRules = matchingRulesCache.getMatchingRules(assetPair, amountAssetDecimals, priceAssetDecimals),
         updateCurrentMatchingRules = actualMatchingRule => matchingRulesCache.updateCurrentMatchingRule(assetPair, actualMatchingRule),
@@ -296,6 +301,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       OrderBookDirectoryActor.props(
         settings,
         assetPairsDb,
+        orderBookSnapshotDb,
         {
           case Right(startOffset) => snapshotsRestored.success(startOffset)
           case Left(msg) => snapshotsRestored.failure(RecoveryError(msg))

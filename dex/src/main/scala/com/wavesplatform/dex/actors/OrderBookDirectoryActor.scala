@@ -317,7 +317,7 @@ class OrderBookDirectoryActor(
 
   // Init
 
-  val assetPairsInit: Future[Map[AssetPair, Option[(EventOffset, OrderBookSnapshot)]]] =
+  val assetPairsInit: Future[Map[AssetPair, OrderBookActor.Snapshot]] =
     for {
       assetPairs <- assetPairsDb.all()
       _ = log.info(s"Total asset pairs: ${assetPairs.size}")
@@ -372,7 +372,7 @@ object OrderBookDirectoryActor {
 
   private case class ShutdownStatus(initiated: Boolean, oldMessagesDeleted: Boolean, oldSnapshotsDeleted: Boolean, onComplete: () => Unit)
 
-  private case class Start(assetPairs: Map[AssetPair, Option[(EventOffset, OrderBookSnapshot)]])
+  private case class Start(assetPairs: Map[AssetPair, OrderBookActor.Snapshot])
 
   case object ForceSaveSnapshots
   case class SaveSnapshot(globalEventNr: EventOffset)

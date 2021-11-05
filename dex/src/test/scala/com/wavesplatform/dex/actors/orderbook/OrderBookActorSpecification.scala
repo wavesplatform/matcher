@@ -95,6 +95,7 @@ class OrderBookActorSpecification
         system.actorOf(OrderBookSnapshotStoreActor.props(obsdb)),
         system.toTyped.ignoreRef,
         pair,
+        None, //TODO add a test where we pass a snapshot here and verify that the snapshot was applied & there were no interactions with OrderBookSnapshotDb
         time,
         matchingRules,
         _ => (),

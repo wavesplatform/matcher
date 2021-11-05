@@ -15,7 +15,6 @@ import com.wavesplatform.dex.effect.Implicits.FutureCompanionOps
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
-import com.wavesplatform.dex.model.OrderBookSnapshot
 import com.wavesplatform.dex.queue.ValidatedCommandWithMeta.{Offset => EventOffset}
 import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import com.wavesplatform.dex.settings.MatcherSettings

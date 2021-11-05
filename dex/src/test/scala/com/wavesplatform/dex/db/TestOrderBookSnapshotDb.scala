@@ -11,6 +11,8 @@ import com.wavesplatform.dex.queue.ValidatedCommandWithMeta.Offset
 import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.{ExecutionContext, Future}
 
+import scala.jdk.CollectionConverters._
+
 class TestOrderBookSnapshotDb[F[_]: Applicative] private () extends OrderBookSnapshotDb[F] {
 
   private val storage = new ConcurrentHashMap[AssetPair, (Offset, OrderBookSnapshot)]()
@@ -24,9 +26,12 @@ class TestOrderBookSnapshotDb[F[_]: Applicative] private () extends OrderBookSna
   override def delete(assetPair: AssetPair): F[Unit] =
     storage.remove(assetPair).pure[F].void
 
-  override def iterateOffsets(): F[Map[AssetPair, Offset]] = ???
+  override def iterateOffsets(): F[Map[AssetPair, Offset]] =
+    storage.asScala.toMap.view.mapValues(_._1).toMap.pure[F]
 
-  override def iterateSnapshots(): F[Map[AssetPair, OrderBookSnapshot]] = ???
+  override def iterateSnapshots(): F[Map[AssetPair, OrderBookSnapshot]] =
+    storage.asScala.toMap.view.mapValues(_._2).toMap.pure[F]
+
 }
 
 object TestOrderBookSnapshotDb {

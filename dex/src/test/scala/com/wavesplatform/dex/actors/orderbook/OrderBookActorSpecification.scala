@@ -74,7 +74,8 @@ class OrderBookActorSpecification
   private def obcTestWithPrepare(
     prepare: (OrderBookSnapshotDb[Future], AssetPair) => Unit,
     matchingRules: NonEmptyList[DenormalizedMatchingRule] = NonEmptyList.one(DenormalizedMatchingRule(0, 0.00000001)),
-    makerTakerFeeAtOffset: Long => (AcceptedOrder, LimitOrder) => (Long, Long) = _ => makerTakerPartialFee
+    makerTakerFeeAtOffset: Long => (AcceptedOrder, LimitOrder) => (Long, Long) = _ => makerTakerPartialFee,
+    snapshot: Option[OrderBookActor.Snapshot] = None
   )(f: (AssetPair, ActorRef, TestProbe) => Unit): Unit = {
 
     md.clear()
@@ -95,7 +96,7 @@ class OrderBookActorSpecification
         system.actorOf(OrderBookSnapshotStoreActor.props(obsdb)),
         system.toTyped.ignoreRef,
         pair,
-        None,
+        snapshot,
         time,
         matchingRules,
         _ => (),
@@ -119,6 +120,13 @@ class OrderBookActorSpecification
     "recover from snapshot - 2" in obcTestWithPrepare { (obsdb, p) =>
       obsdb.update(p, 50L, Some(OrderBookSnapshot.empty))
     } { (pair, _, tp) =>
+      tp.expectMsg(OrderBookRecovered(pair, Some(50)))
+    }
+
+    "recover from snapshot - 3 (without interaction with obsdb, just using initial snapshot)" in obcTestWithPrepare(
+      (_, _) => (),
+      snapshot = Some(Some((50L, OrderBookSnapshot.empty)))
+    ) { (pair, _, tp) =>
       tp.expectMsg(OrderBookRecovered(pair, Some(50)))
     }
 

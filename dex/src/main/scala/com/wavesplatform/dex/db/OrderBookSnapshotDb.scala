@@ -14,8 +14,8 @@ trait OrderBookSnapshotDb[F[_]] {
   def get(assetPair: AssetPair): F[Option[(Offset, OrderBookSnapshot)]]
   def update(assetPair: AssetPair, offset: Offset, newSnapshot: Option[OrderBookSnapshot]): F[Unit]
   def delete(assetPair: AssetPair): F[Unit]
-  def iterateOffsets(): F[Map[AssetPair, Offset]]
-  def iterateSnapshots(): F[Map[AssetPair, OrderBookSnapshot]]
+  def iterateOffsets(pred: AssetPair => Boolean): F[Map[AssetPair, Offset]]
+  def iterateSnapshots(pred: AssetPair => Boolean): F[Map[AssetPair, OrderBookSnapshot]]
 }
 
 object OrderBookSnapshotDb {
@@ -39,18 +39,22 @@ object OrderBookSnapshotDb {
       rw.delete(obKey)
     }
 
-    def iterateOffsets(): F[Map[AssetPair, Offset]] = levelDb.readOnly { ro =>
+    def iterateOffsets(pred: AssetPair => Boolean): F[Map[AssetPair, Offset]] = levelDb.readOnly { ro =>
       val m = Map.newBuilder[AssetPair, Offset]
       ro.iterateOver(DbKeys.OrderBookSnapshotOffsetPrefix) { entry =>
-        m.addOne(AssetPair.fromBytes(entry.getKey.drop(2))._1 -> Longs.fromByteArray(entry.getValue))
+        val pair = AssetPair.fromBytes(entry.getKey.drop(2))._1
+        if (pred(pair))
+          m.addOne(pair -> Longs.fromByteArray(entry.getValue))
       }
       m.result()
     }
 
-    def iterateSnapshots(): F[Map[AssetPair, OrderBookSnapshot]] = levelDb.readOnly { ro =>
+    def iterateSnapshots(pred: AssetPair => Boolean): F[Map[AssetPair, OrderBookSnapshot]] = levelDb.readOnly { ro =>
       val m = Map.newBuilder[AssetPair, OrderBookSnapshot]
       ro.iterateOver(DbKeys.OrderBookSnapshotPrefix) { entry =>
-        m.addOne(AssetPair.fromBytes(entry.getKey.drop(2))._1 -> OrderBookSnapshot.fromBytes(ByteBuffer.wrap(entry.getValue)))
+        val pair = AssetPair.fromBytes(entry.getKey.drop(2))._1
+        if (pred(pair))
+          m.addOne(pair -> OrderBookSnapshot.fromBytes(ByteBuffer.wrap(entry.getValue)))
       }
       m.result()
     }

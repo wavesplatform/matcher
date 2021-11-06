@@ -34,18 +34,53 @@ class OrderBookSnapshotDbSpec extends AnyFreeSpec with Matchers with WithDb with
       }
     }
 
-    "iterate over snapshots & offsets" in {
+    "iterate over snapshots & offsets (1)" in {
       forAll(genSeq) { v =>
         test { obsdb =>
           v.foreach { case (snapshot, assetPair, offset) =>
             obsdb.update(assetPair, offset, Some(snapshot))
           }
-          val snapshots = obsdb.iterateSnapshots()
-          val offsets = obsdb.iterateOffsets()
+          val snapshots = obsdb.iterateSnapshots(_ => true)
+          val offsets = obsdb.iterateOffsets(_ => true)
+
           val expected = v.map(_._2).toSet.map { pair: AssetPair =>
             pair -> offsets.get(pair).zip(snapshots.get(pair))
           }.toMap
+
           val actual = v.map { case (snapshot, assetPair, offset) =>
+            assetPair -> Some((offset, snapshot))
+          }.toMap
+
+          actual shouldBe expected
+        }
+      }
+    }
+
+    "iterate over snapshots & offsets (2)" in {
+      val genSeqWithIgnored =
+        for {
+          v <- genSeq
+          ignored <- Gen.pick(v.size / 2, v)
+        } yield (v, ignored.map(_._2))
+
+      forAll(genSeqWithIgnored) { case (v, ignoredPairs) =>
+        test { obsdb =>
+          v.foreach { case (snapshot, assetPair, offset) =>
+            obsdb.update(assetPair, offset, Some(snapshot))
+          }
+
+          val filteredV = v.filterNot { case (_, pair, _) => ignoredPairs.contains(pair) }
+          val snapshots = obsdb.iterateSnapshots(!ignoredPairs.contains(_))
+          val offsets = obsdb.iterateOffsets(!ignoredPairs.contains(_))
+
+          filteredV.size shouldBe snapshots.size
+          filteredV.size shouldBe offsets.size
+
+          val expected = filteredV.map(_._2).toSet.map { pair: AssetPair =>
+            pair -> offsets.get(pair).zip(snapshots.get(pair))
+          }.toMap
+
+          val actual = filteredV.map { case (snapshot, assetPair, offset) =>
             assetPair -> Some((offset, snapshot))
           }.toMap
 

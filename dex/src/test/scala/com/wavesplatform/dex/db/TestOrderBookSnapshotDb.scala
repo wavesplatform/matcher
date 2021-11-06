@@ -26,11 +26,11 @@ class TestOrderBookSnapshotDb[F[_]: Applicative] private () extends OrderBookSna
   override def delete(assetPair: AssetPair): F[Unit] =
     storage.remove(assetPair).pure[F].void
 
-  override def iterateOffsets(): F[Map[AssetPair, Offset]] =
-    storage.asScala.toMap.view.mapValues(_._1).toMap.pure[F]
+  override def iterateOffsets(pred: AssetPair => Boolean): F[Map[AssetPair, Offset]] =
+    storage.asScala.toMap.view.filterKeys(pred).mapValues(_._1).toMap.pure[F]
 
-  override def iterateSnapshots(): F[Map[AssetPair, OrderBookSnapshot]] =
-    storage.asScala.toMap.view.mapValues(_._2).toMap.pure[F]
+  override def iterateSnapshots(pred: AssetPair => Boolean): F[Map[AssetPair, OrderBookSnapshot]] =
+    storage.asScala.toMap.view.filterKeys(pred).mapValues(_._2).toMap.pure[F]
 
 }
 

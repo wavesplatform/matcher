@@ -2,6 +2,7 @@ package com.wavesplatform.dex.db
 
 import cats.Id
 import com.wavesplatform.dex.domain.asset.Asset.Waves
+import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.model.{BuyLimitOrder, LastTrade, OrderBookSideSnapshot, OrderBookSnapshot, SellLimitOrder}
 import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
 import org.scalacheck.Gen
@@ -29,6 +30,26 @@ class OrderBookSnapshotDbSpec extends AnyFreeSpec with Matchers with WithDb with
           obsdb.update(assetPair, offset, Some(snapshot))
           obsdb.delete(assetPair)
           obsdb.get(assetPair) shouldBe empty
+        }
+      }
+    }
+
+    "iterate over snapshots & offsets" in {
+      forAll(genSeq) { v =>
+        test { obsdb =>
+          v.foreach { case (snapshot, assetPair, offset) =>
+            obsdb.update(assetPair, offset, Some(snapshot))
+          }
+          val snapshots = obsdb.iterateSnapshots()
+          val offsets = obsdb.iterateOffsets()
+          val expected = v.map(_._2).toSet.map { pair: AssetPair =>
+            pair -> offsets.get(pair).zip(snapshots.get(pair))
+          }.toMap
+          val actual = v.map { case (snapshot, assetPair, offset) =>
+            assetPair -> Some((offset, snapshot))
+          }.toMap
+
+          actual shouldBe expected
         }
       }
     }
@@ -72,5 +93,10 @@ class OrderBookSnapshotDbSpec extends AnyFreeSpec with Matchers with WithDb with
     assetPair <- fixedAssetPairGen
     offset <- Gen.choose(0L, Long.MaxValue)
   } yield (snapshot, assetPair, offset)
+
+  private lazy val genSeq = for {
+    n <- Gen.choose(0, 10)
+    v <- Gen.containerOfN[Vector, (OrderBookSnapshot, AssetPair, Long)](n, gen)
+  } yield v
 
 }

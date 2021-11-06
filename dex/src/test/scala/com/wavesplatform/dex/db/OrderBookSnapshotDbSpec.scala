@@ -57,13 +57,13 @@ class OrderBookSnapshotDbSpec extends AnyFreeSpec with Matchers with WithDb with
     }
 
     "iterate over snapshots & offsets (2)" in {
-      val genSeqWithIgnored =
+      val genSeqWithIgnoredPairs =
         for {
           v <- genSeq
-          ignored <- Gen.pick(v.size / 2, v)
-        } yield (v, ignored.map(_._2))
+          ignoredPairs <- Gen.pick(v.size / 2, v).map(_.map(_._2))
+        } yield (v, ignoredPairs)
 
-      forAll(genSeqWithIgnored) { case (v, ignoredPairs) =>
+      forAll(genSeqWithIgnoredPairs) { case (v, ignoredPairs) =>
         test { obsdb =>
           v.foreach { case (snapshot, assetPair, offset) =>
             obsdb.update(assetPair, offset, Some(snapshot))

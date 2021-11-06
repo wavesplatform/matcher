@@ -60,7 +60,7 @@ class OrderBookSnapshotDbSpec extends AnyFreeSpec with Matchers with WithDb with
       val genSeqWithIgnoredPairs =
         for {
           v <- genSeq
-          ignoredPairs <- Gen.pick(v.size / 2, v).map(_.map(_._2))
+          ignoredPairs <- Gen.pick(v.size / 2, v).map(_.map(_._2).toSet)
         } yield (v, ignoredPairs)
 
       forAll(genSeqWithIgnoredPairs) { case (v, ignoredPairs) =>

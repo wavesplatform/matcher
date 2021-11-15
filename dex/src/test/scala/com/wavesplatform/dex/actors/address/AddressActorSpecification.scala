@@ -107,20 +107,18 @@ class AddressActorSpecification
       @volatile var requested = false
 
       def createAddressActor(address: Address, recovered: Boolean): Props =
-        Props(
-          new AddressActor(
-            address,
-            time,
-            EmptyOrderDb(),
-            (_, _) => Future.successful(Right(())),
-            _ => failed,
-            recovered,
-            (_: Address, _: Set[Asset]) => {
-              requested = true
-              failed
-            },
-            getAssetDescription = assetBriefInfo
-          )
+        AddressActor.props(
+          address,
+          time,
+          EmptyOrderDb(),
+          (_, _) => Future.successful(Right(())),
+          _ => failed,
+          recovered,
+          (_: Address, _: Set[Asset]) => {
+            requested = true
+            failed
+          },
+          getAssetDescription = assetBriefInfo
         )
 
       val addressDir = system.actorOf(Props(new AddressDirectoryActor(EmptyOrderDb(), createAddressActor, None, recovered = false)))
@@ -464,20 +462,18 @@ class AddressActorSpecification
     }
 
     def createAddressActor(address: Address, recovered: Boolean): Props =
-      Props(
-        new AddressActor(
-          address,
-          time,
-          orderDb,
-          (_, _) => Future.successful(Right(())),
-          command => {
-            commandsProbe.ref ! command
-            Future.successful(Some(ValidatedCommandWithMeta(0L, 0L, command)))
-          },
-          recovered,
-          blockchainInteraction,
-          getAssetDescription = assetBriefInfo
-        )
+      AddressActor.props(
+        address,
+        time,
+        orderDb,
+        (_, _) => Future.successful(Right(())),
+        command => {
+          commandsProbe.ref ! command
+          Future.successful(Some(ValidatedCommandWithMeta(0L, 0L, command)))
+        },
+        recovered,
+        blockchainInteraction,
+        getAssetDescription = assetBriefInfo
       )
 
     lazy val addressDir = system.actorOf(Props(new AddressDirectoryActor(orderDb, createAddressActor, None, recovered = true)))

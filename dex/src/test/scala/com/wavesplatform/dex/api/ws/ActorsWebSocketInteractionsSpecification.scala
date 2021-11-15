@@ -68,20 +68,18 @@ class ActorsWebSocketInteractionsSpecification
     }
 
     def createAddressActor(address: Address, recovered: Boolean): Props =
-      Props(
-        new AddressActor(
-          address,
-          Time.system,
-          EmptyOrderDb(),
-          (_, _) => Future.successful(Right(())),
-          command => {
-            commandsProbe.ref ! command
-            Future.successful(Some(ValidatedCommandWithMeta(0L, 0L, command)))
-          },
-          recovered,
-          blockchainInteraction,
-          getAssetDescription = getDefaultAssetDescriptions
-        )
+      AddressActor.props(
+        address,
+        Time.system,
+        EmptyOrderDb(),
+        (_, _) => Future.successful(Right(())),
+        command => {
+          commandsProbe.ref ! command
+          Future.successful(Some(ValidatedCommandWithMeta(0L, 0L, command)))
+        },
+        recovered,
+        blockchainInteraction,
+        getAssetDescription = getDefaultAssetDescriptions
       )
 
     val addressDir = system.actorOf(Props(new AddressDirectoryActor(EmptyOrderDb(), createAddressActor, None, recovered = true)))

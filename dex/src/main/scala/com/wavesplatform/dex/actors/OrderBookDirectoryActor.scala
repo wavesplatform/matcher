@@ -2,6 +2,7 @@ package com.wavesplatform.dex.actors
 
 import akka.actor.{Actor, ActorRef, Props, Stash, SupervisorStrategy, Terminated}
 import cats.implicits.catsSyntaxEitherId
+import com.wavesplatform.dex.actors.address.AddressActor
 import com.wavesplatform.dex.actors.orderbook.OrderBookActor.{OrderBookRecovered, OrderBookSnapshotUpdateCompleted}
 import com.wavesplatform.dex.actors.orderbook.{AggregatedOrderBookActor, OrderBookActor}
 import com.wavesplatform.dex.api.http.entities.OrderBookUnavailable
@@ -9,7 +10,7 @@ import com.wavesplatform.dex.app.{forceStopApplication, StartingMatcherError}
 import com.wavesplatform.dex.db.{AssetPairsDb, AssetsCache}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
-import com.wavesplatform.dex.domain.utils.ScorexLogging
+import com.wavesplatform.dex.domain.utils.{LoggerFacade, ScorexLogging}
 import com.wavesplatform.dex.effect.Implicits.FutureCompanionOps
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error.MatcherError
@@ -18,6 +19,7 @@ import com.wavesplatform.dex.queue.ValidatedCommandWithMeta.{Offset => EventOffs
 import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import com.wavesplatform.dex.settings.MatcherSettings
 import kamon.Kamon
+import org.slf4j.LoggerFactory
 import scorex.utils._
 
 import java.util.concurrent.atomic.AtomicReference

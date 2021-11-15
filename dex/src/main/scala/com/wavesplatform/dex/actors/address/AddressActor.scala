@@ -71,7 +71,6 @@ class AddressActor(
 
   implicit val efc = ErrorFormatterContext.from(a => getAssetDescription(a).decimals)
 
-  private val loggerPrefix = s"AddressActor[$owner]"
   private val ignoreRef = context.system.toTyped.ignoreRef.toClassic
 
   private val enableRealtimeWs = settings.realtimeWsAddresses.contains(owner) || settings.wsMessagesInterval.length == 0
@@ -111,14 +110,14 @@ class AddressActor(
       //  - for slave DEX it is a new order and we have to send balance changes via WS API
       val origActiveOrder = activeOrders.get(order.id)
       log.debug(
-        s"$loggerPrefix OrderAdded(${order.id}, ${event.reason}, ${event.timestamp}), isNew=${origActiveOrder.isEmpty}, status: ${order.status}"
+        s"OrderAdded(${order.id}, ${event.reason}, ${event.timestamp}), isNew=${origActiveOrder.isEmpty}, status: ${order.status}"
       )
       activeOrders.put(order.id, order)
 
       def reserve(xs: Map[Asset, Long]): Unit = {
         balances = balances.reserve(PositiveMap(xs))
         scheduleWs(wsAddressState.putChangedAssets(xs.keySet))
-        log.info(s"$loggerPrefix [Balance] 0. 💵: ${format(balances.tradableBalance(xs.keySet).xs)}; ov Δ: ${format(xs)}")
+        log.info(s"[Balance] 0. 💵: ${format(balances.tradableBalance(xs.keySet).xs)}; ov Δ: ${format(xs)}")
       }
 
       lazy val orderReserve = order.reservableBalance
@@ -128,7 +127,7 @@ class AddressActor(
             case Success(_) =>
             case Failure(th) =>
               //TODO probably inconsistent state can be introduced
-              log.error(s"$loggerPrefix error while saving order", th)
+              log.error("error while saving order", th)
           }
 
           origActiveOrder match {
@@ -149,7 +148,7 @@ class AddressActor(
 
       if (isWorking)
         pendingCommands.remove(order.id).foreach { command =>
-          log.trace(s"$loggerPrefix Confirming placement for ${order.id}")
+          log.trace(s"Confirming placement for ${order.id}")
           command.client ! Event.OrderAccepted(order.order)
         }
 
@@ -157,7 +156,7 @@ class AddressActor(
       val ownerRemainingOrders = List(command.event.counterRemaining, command.event.submittedRemaining).filter(_.order.sender.toAddress == owner)
       val txResult = command.expectedTx
       log.debug(
-        s"$loggerPrefix OrderExecuted(${ownerRemainingOrders.map(o => s"${o.id} -> ${o.status}").mkString(
+        s"OrderExecuted(${ownerRemainingOrders.map(o => s"${o.id} -> ${o.status}").mkString(
           ", "
         )}, tx=${txResult.transaction.id()}${txResult.error.fold("")(e => s", e=$e")}"
       )
@@ -173,7 +172,7 @@ class AddressActor(
                 case Success(_) => processingOrders.remove(remaining.id)
                 case Failure(th) =>
                   //TODO probably inconsistent state can be introduced
-                  log.error(s"$loggerPrefix error while saving order info", th)
+                  log.error("error while saving order info", th)
                   processingOrders.remove(remaining.id)
               }
               activeOrders.remove(remaining.id) match {
@@ -210,7 +209,7 @@ class AddressActor(
       val reservedAssets = ownerRemainingOrders.flatMap(_.requiredBalance.keys).toSet
       val newReserved = balances.reserved.filter { case (asset, _) => reservedAssets.contains(asset) }
       log.info(
-        s"$loggerPrefix [Balance] 1. 💵: ${format(balances.tradableBalance(cumulativeDiff.keySet).xs)}; e: ${format(cumulativeDiff)}, ov: ${format(newReserved)}"
+        s"[Balance] 1. 💵: ${format(balances.tradableBalance(cumulativeDiff.keySet).xs)}; e: ${format(cumulativeDiff)}, ov: ${format(newReserved)}"
       )
 
     case command: Command.ApplyOrderBookCanceled =>
@@ -222,7 +221,7 @@ class AddressActor(
       val origActiveOrder = activeOrders.remove(id)
 
       log.debug(
-        s"$loggerPrefix OrderCanceled($id, $reason, $timestamp, isActive=${origActiveOrder.nonEmpty}), s: ${acceptedOrder.status} -> $orderStatus, un: $unmatchable"
+        s"OrderCanceled($id, $reason, $timestamp, isActive=${origActiveOrder.nonEmpty}), s: ${acceptedOrder.status} -> $orderStatus, un: $unmatchable"
       )
 
       origActiveOrder match {
@@ -233,21 +232,21 @@ class AddressActor(
             case Success(_) =>
             case Failure(th) =>
               //TODO probably inconsistent state can be introduced
-              log.error(s"$loggerPrefix error while saving order info", th)
+              log.error("error while saving order info", th)
           }
 
           val orderReserve = origActiveOrder.reservableBalance
 
           balances = balances.cancelReservation(PositiveMap(orderReserve))
           scheduleWs(wsAddressState.putChangedAssets(orderReserve.keySet))
-          log.info(s"$loggerPrefix [Balance] 2. 💵: ${format(balances.tradableBalance(orderReserve.keySet).xs)}; ov Δ: ${format(orderReserve)}")
+          log.info(s"[Balance] 2. 💵: ${format(balances.tradableBalance(orderReserve.keySet).xs)}; ov Δ: ${format(orderReserve)}")
 
           scheduleOrderWs(acceptedOrder, orderStatus, unmatchable, maybeMatchTx = None)
       }
 
       if (isWorking) {
         pendingCommands.remove(id).foreach { pc =>
-          log.trace(s"$loggerPrefix Confirming cancellation for $id")
+          log.trace(s"Confirming cancellation for $id")
           pc.client ! Event.OrderCanceled(id)
         }
         processingOrders.remove(id)
@@ -256,11 +255,11 @@ class AddressActor(
     case command: Command.ChangeBalances => changeBalances(command.updates)
 
     case command: Command.ApplyBatch =>
-      log.info(s"$loggerPrefix ApplyBatch")
+      log.info("ApplyBatch")
       // Do not change an order of these operation, otherwise some orders can be canceled
       markTxsObserved(command.markTxsObserved.txsWithSpending)
       changeBalances(command.changedBalances.updates)
-      log.info(s"$loggerPrefix ApplyBatch applied")
+      log.info("ApplyBatch applied")
 
     case command: Command.MarkTxsObserved => markTxsObserved(command.txsWithSpending)
 
@@ -269,14 +268,14 @@ class AddressActor(
         pendingCommands.remove(id) match {
           case None => // Ok on secondary matcher
           case Some(pc) =>
-            log.trace(s"$loggerPrefix $command, sending a response to a client")
+            log.trace(s"$command, sending a response to a client")
             pc.client ! reason
         }
         processingOrders.remove(id)
       }
   }
 
-  private val failuresProcessing: Receive = { case Status.Failure(e) => log.error(s"$loggerPrefix $e", e) }
+  private val failuresProcessing: Receive = { case Status.Failure(e) => log.error(s"$e", e) }
 
   private def starting(recovered: Boolean, gotBalances: Boolean): Receive = eventsProcessing orElse failuresProcessing orElse {
     case Command.CompleteRecovering => if (gotBalances) becomeWorking() else context.become(starting(recovered = true, gotBalances))
@@ -285,14 +284,14 @@ class AddressActor(
       command.snapshot match {
         case Failure(_) =>
           askFullBalances(command.attempt + 1)
-          val message = s"$loggerPrefix Can't receive initial balances (${command.attempt})"
+          val message = s"Can't receive initial balances (${command.attempt})"
           if (command.attempt < 5) log.debug(message)
           else if (command.attempt < 10) log.warn(message)
           else log.error(message)
 
         case Success(x) =>
           balances = balances.withInit(x)
-          log.info(s"$loggerPrefix [Balance] 3. 💵: ${format(balances.allTradableBalance.xs)}; i: ${format(x)}")
+          log.info(s"[Balance] 3. 💵: ${format(balances.allTradableBalance.xs)}; i: ${format(x)}")
           if (recovered) becomeWorking() else context.become(starting(recovered, gotBalances = true))
       }
 
@@ -310,7 +309,7 @@ class AddressActor(
   private def working: Receive = eventsProcessing orElse failuresProcessing orElse {
     // DEX-1192 docs/places-and-cancels.md
     case command: Command.PlaceOrder =>
-      log.debug(s"$loggerPrefix $command")
+      log.debug(s"$command")
       val orderId = command.order.id()
       if (totalActiveOrders >= settings.maxActiveOrders) sender() ! error.ActiveOrdersLimitReached(settings.maxActiveOrders)
       else if (failedPlacements.contains(orderId) || processingOrders.contains(orderId)) sender() ! error.OrderDuplicate(orderId)
@@ -321,13 +320,13 @@ class AddressActor(
           case Success(containsInfo) =>
             self.tell(Command.PlaceOrderFinalized(command, containsInfo), origSender)
           case Failure(th) =>
-            log.error(s"$loggerPrefix error while retrieving order info", th)
+            log.error("error while retrieving order info", th)
             origSender ! UnexpectedError
         }
       }
 
     case command: Command.PlaceOrderFinalized =>
-      log.debug(s"$loggerPrefix $command")
+      log.debug(s"$command")
       val placeOrder = command.placeOrder
       val orderId = placeOrder.order.id()
       if (command.containsInfo || activeOrders.contains(orderId) || pendingCommands.contains(orderId))
@@ -337,13 +336,13 @@ class AddressActor(
         placementQueue = placementQueue.enqueue(EnqueuedOrder(orderId, Kamon.currentSpan()))
         pendingCommands.put(orderId, PendingCommand(placeOrder, sender()))
         if (shouldProcess) processNextPlacement()
-        else log.trace(s"$loggerPrefix ${placementQueue.headOption} is processing, moving $orderId to the queue")
+        else log.trace(s"${placementQueue.headOption} is processing, moving $orderId to the queue")
       }
 
     // DEX-1192 docs/places-and-cancels.md
     case command: Command.CancelOrder =>
       import command.orderId
-      log.debug(s"$loggerPrefix $command")
+      log.debug(s"$command")
       pendingCommands.get(orderId) match {
         case Some(pc) =>
           sender() ! {
@@ -353,7 +352,7 @@ class AddressActor(
               case _: Command.CancelOrder =>
                 error.OrderCanceled(orderId)
               case x =>
-                log.error(s"$loggerPrefix found unexpected command '$x' while cancelling order")
+                log.error(s"found unexpected command '$x' while cancelling order")
                 error.UnexpectedError
             }
           }
@@ -369,7 +368,7 @@ class AddressActor(
                 case _: OrderStatus.Filled =>
                   error.OrderFull(orderId)
               }.recover { case th =>
-                log.error(s"$loggerPrefix error while retrieving order status", th)
+                log.error("error while retrieving order status", th)
                 UnexpectedError
               }.pipeTo(sender())
 
@@ -385,10 +384,10 @@ class AddressActor(
     case command: Command.CancelAllOrders =>
       val toCancelIds = getActiveLimitOrders(command.pair).map(_.id)
       if (toCancelIds.isEmpty) {
-        log.debug(s"$loggerPrefix $command, nothing to cancel")
+        log.debug(s"$command, nothing to cancel")
         sender() ! Event.BatchCancelCompleted(Map.empty)
       } else {
-        log.debug(s"$loggerPrefix $command, to cancel: ${toCancelIds.mkString(", ")}")
+        log.debug(s"$command, to cancel: ${toCancelIds.mkString(", ")}")
         runWithIgnoredSpan {
           context.actorOf(BatchOrderCancelActor.props(
             toCancelIds.toList,
@@ -401,7 +400,7 @@ class AddressActor(
       }
 
     case command: Command.CancelOrders =>
-      log.debug(s"$loggerPrefix {}", command)
+      log.debug("{}", command)
       runWithIgnoredSpan(context.actorOf(BatchOrderCancelActor.props(
         command.orderIds,
         command.source,
@@ -414,17 +413,17 @@ class AddressActor(
       expiration.remove(id)
       val prefix = s"$command"
       activeOrders.get(id) match {
-        case None => log.debug(s"$loggerPrefix $prefix for a not active order")
+        case None => log.debug(s"$prefix for a not active order")
         case Some(ao) =>
           if ((ao.order.expiration - time.correctedTime()).max(0L).millis <= ExpirationThreshold) {
-            log.debug(s"$loggerPrefix $prefix, storing cancel event")
+            log.debug(s"$prefix, storing cancel event")
             pendingCommands.put(
               id,
               PendingCommand(Command.CancelOrder(id, Command.Source.Expiration), ignoreRef)
             ) // To prevent orders being cancelled twice
             cancel(ao.order, Command.Source.Expiration)
           } else {
-            log.trace(s"$loggerPrefix $prefix, can't find an active order")
+            log.trace(s"$prefix, can't find an active order")
             scheduleExpiration(ao.order)
           }
       }
@@ -443,7 +442,7 @@ class AddressActor(
           orderDb.status(orderId)
             .map(Reply.GetOrderStatus(_))
             .recover { case th =>
-              log.error(s"$loggerPrefix error while retrieving order status", th)
+              log.error("error while retrieving order status", th)
               UnexpectedError
             }
             .pipeTo(sender())
@@ -457,7 +456,7 @@ class AddressActor(
           orderDb.getOrderInfo(orderId)
             .map(Reply.GetOrdersStatusInfo(_))
             .recover { case th =>
-              log.error(s"$loggerPrefix error while retrieving order info", th)
+              log.error("error while retrieving order info", th)
               UnexpectedError
             }
             .pipeTo(sender())
@@ -479,7 +478,7 @@ class AddressActor(
       matchingClosedOrders
         .map(x => Reply.GetOrderStatuses(matchingActiveOrders ++ x))
         .recover { case th =>
-          log.error(s"$loggerPrefix error while retrieving finalized orders", th)
+          log.error("error while retrieving finalized orders", th)
           UnexpectedError
         }.pipeTo(sender())
 
@@ -493,7 +492,7 @@ class AddressActor(
               val reservableBalance = ao.reservableBalance
               balances = balances.cancelReservation(PositiveMap(reservableBalance))
               log.info(
-                s"$loggerPrefix [Balance] 4. 💵: ${format(balances.tradableBalance(reservableBalance.keySet).xs)}; ov -Δ: ${format(reservableBalance)}"
+                s"[Balance] 4. 💵: ${format(balances.tradableBalance(reservableBalance.keySet).xs)}; ov -Δ: ${format(reservableBalance)}"
               )
               scheduleWs(wsAddressState.putChangedAssets(ao.reservableBalance.keySet))
             }
@@ -505,14 +504,14 @@ class AddressActor(
     case _: Event.StoreSucceeded => if (failedPlacements.nonEmpty) failedPlacements.clear()
 
     case event: ValidationEvent =>
-      log.trace(s"$loggerPrefix $event")
+      log.trace(s"$event")
       placementQueue.dequeueOption.foreach { case (EnqueuedOrder(orderId, _), restQueue) =>
         if (orderId == event.orderId) { // TODO Could this really happen?
           event match {
             case Event.ValidationPassed(ao) => pendingCommands.get(ao.id).foreach(_ => place(ao))
             case Event.ValidationFailed(_, reason) =>
               pendingCommands.remove(orderId).foreach { command =>
-                log.trace(s"$loggerPrefix Confirming command for $orderId")
+                log.trace(s"Confirming command for $orderId")
                 command.client ! reason
               }
               processingOrders.remove(orderId)
@@ -520,11 +519,11 @@ class AddressActor(
 
           placementQueue = restQueue
           processNextPlacement()
-        } else log.warn(s"$loggerPrefix Received stale $event for $orderId")
+        } else log.warn(s"Received stale $event for $orderId")
       }
 
     case WsCommand.AddWsSubscription(client, flags, isDebug) =>
-      log.trace(s"$loggerPrefix [c=${client.path.name}] Added WebSocket subscription (debug = $isDebug)")
+      log.trace(s"[c=${client.path.name}] Added WebSocket subscription (debug = $isDebug)")
       wsAddressState = wsAddressState.addSubscription(
         client,
         mkWsBalances(balances.allAssets, includeEmpty = false),
@@ -537,7 +536,7 @@ class AddressActor(
       context.watch(client)
 
     case WsCommand.RemoveWsSubscription(client) =>
-      log.trace(s"$loggerPrefix [c=${client.path.name}] Removed WebSocket subscription")
+      log.trace(s"[c=${client.path.name}] Removed WebSocket subscription")
       wsAddressState = wsAddressState.removeSubscription(client)
       context.unwatch(client)
 
@@ -572,14 +571,14 @@ class AddressActor(
       val changesForAudit = after.collect { case (asset, v) if before.getOrElse(asset, 0L) > v => asset -> math.max(0, v) }
       val toCancel = getOrdersToCancel(changesForAudit).filterNot(x => isCancelling(x.order.id))
       if (toCancel.isEmpty)
-        log.info(s"$loggerPrefix [Balance] 5. 💵: ${format(balances.tradableBalance(updates.changedAssets).xs)}; u: ${format(updates)}")
+        log.info(s"[Balance] 5. 💵: ${format(balances.tradableBalance(updates.changedAssets).xs)}; u: ${format(updates)}")
       else {
         log.info(
-          s"$loggerPrefix [Balance] 6. 💵: ${format(balances.tradableBalance(updates.changedAssets).xs)}; u: ${format(updates)}; au: ${format(after)}"
+          s"[Balance] 6. 💵: ${format(balances.tradableBalance(updates.changedAssets).xs)}; u: ${format(updates)}; au: ${format(after)}"
         )
         val cancelledText =
           toCancel.map(x => s"${x.insufficientAmount} ${x.assetId} for ${x.order.id} (r: ${format(x.order.requiredBalance)})").mkString(", ")
-        log.debug(s"$loggerPrefix Canceling ${toCancel.size}/${activeOrders.size}: doesn't have $cancelledText")
+        log.debug(s"Canceling ${toCancel.size}/${activeOrders.size}: doesn't have $cancelledText")
         toCancel.foreach { x =>
           val id = x.order.id
           pendingCommands.put(
@@ -589,12 +588,12 @@ class AddressActor(
           cancel(x.order.order, Command.Source.BalanceTracking)
         }
       }
-    } else log.info(s"$loggerPrefix [Balance] 7. 💵: ${format(balances.tradableBalance(updates.changedAssets).xs)}; u: ${format(updates)}")
+    } else log.info(s"[Balance] 7. 💵: ${format(balances.tradableBalance(updates.changedAssets).xs)}; u: ${format(updates)}")
   }
 
   private def markTxsObserved(txs: Map[ExchangeTransaction.Id, ObservedTxData]): Unit = {
     log.info(
-      s"$loggerPrefix Observed: ${txs.map { case (id, v) =>
+      s"Observed: ${txs.map { case (id, v) =>
         s"$id ${if (balances.notObservedTxs.contains(id)) "(wasn't before) " else ""}-> ${format(v.pessimisticChanges.xs)}"
       }.mkString(", ")}"
     )
@@ -607,7 +606,7 @@ class AddressActor(
     }
     balances = updated
     if (changes.changedAssets.isEmpty) {
-      log.info(s"$loggerPrefix [Balance] 8. au 💵: ${format(balances.balanceForAudit(txs.values.flatMap(_.pessimisticChanges.keySet).toSet))}")
+      log.info(s"[Balance] 8. au 💵: ${format(balances.balanceForAudit(txs.values.flatMap(_.pessimisticChanges.keySet).toSet))}")
       scheduleWs(
         wsAddressState
           .putTxsUpdate(
@@ -618,7 +617,7 @@ class AddressActor(
           )
       )
     } else {
-      log.info(s"$loggerPrefix [Balance] 9. otx 💵: ${format(balances.tradableBalance(changes.changedAssets).xs)}")
+      log.info(s"[Balance] 9. otx 💵: ${format(balances.tradableBalance(changes.changedAssets).xs)}")
       scheduleWs(
         wsAddressState
           .putChangedAssets(changes.changedAssets)
@@ -677,10 +676,10 @@ class AddressActor(
                   }
                   .recover {
                     case ex: WavesNodeConnectionLostException =>
-                      log.error(s"$loggerPrefix Waves Node connection lost", ex)
+                      log.error("Waves Node connection lost", ex)
                       Event.ValidationFailed(command.order.id(), WavesNodeConnectionBroken)
                     case ex =>
-                      log.error(s"$loggerPrefix An unexpected error occurred", ex)
+                      log.error("An unexpected error occurred", ex)
                       Event.ValidationFailed(command.order.id(), UnexpectedError)
                   }
                   .pipeTo(self)
@@ -694,7 +693,7 @@ class AddressActor(
   private def scheduleExpiration(order: Order): Unit = if (!expiration.contains(order.id())) {
     val timeToExpiration = (order.expiration - time.correctedTime()).max(0L)
     log.trace(
-      s"$loggerPrefix Order ${order.id()} will expire in ${JDuration.ofMillis(timeToExpiration)}, at ${Instant.ofEpochMilli(order.expiration)}"
+      s"Order ${order.id()} will expire in ${JDuration.ofMillis(timeToExpiration)}, at ${Instant.ofEpochMilli(order.expiration)}"
     )
     expiration +=
       order.id() -> context.system.scheduler.scheduleOnce(timeToExpiration.millis, self, CancelExpiredOrder(order.id()))
@@ -753,7 +752,7 @@ class AddressActor(
 
     balances = balances.reserve(PositiveMap(reservableBalance))
     log.info(
-      s"$loggerPrefix [Balance] 10. o=${ao.id}; 💵: ${format(balances.tradableBalance(reservableBalance.keySet).xs)}; ov Δ: ${format(reservableBalance)}"
+      s"[Balance] 10. o=${ao.id}; 💵: ${format(balances.tradableBalance(reservableBalance.keySet).xs)}; ov Δ: ${format(reservableBalance)}"
     )
     scheduleWs(wsAddressState.putChangedAssets(reservableBalance.keySet))
 
@@ -775,7 +774,7 @@ class AddressActor(
         case Success(None) => Success(Some(error.FeatureDisabled))
         case Success(_) => Success(None)
         case Failure(e) =>
-          val prefix = s"$loggerPrefix Store failed for $orderId, $command"
+          val prefix = s"Store failed for $orderId, $command"
           log.warn(
             e match {
               case _: TimeoutException => s"$prefix: timeout during storing $command for $orderId"
@@ -788,7 +787,7 @@ class AddressActor(
       }
       .onComplete {
         case Success(Some(error)) => self ! Event.StoreFailed(orderId, error, command)
-        case Success(None) => self ! Event.StoreSucceeded(orderId, command); log.trace(s"$loggerPrefix $command saved")
+        case Success(None) => self ! Event.StoreSucceeded(orderId, command); log.trace(s"$command saved")
         case _ => throw new IllegalStateException("Impossibru")
       }
 
@@ -817,7 +816,7 @@ class AddressActor(
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
-    log.error(s"$loggerPrefix Failed on $message", reason)
+    log.error(s"Failed on $message", reason)
     super.preRestart(reason, message)
   }
 
@@ -856,7 +855,7 @@ object AddressActor {
       blockchain,
       settings,
       getAssetDescription,
-      logger
+      logger.copy(prefix = s"AddressActor[$owner]")
     )
   )
 

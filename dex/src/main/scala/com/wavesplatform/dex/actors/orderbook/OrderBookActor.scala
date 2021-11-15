@@ -15,7 +15,7 @@ import com.wavesplatform.dex.actors.{orderbook, OrderBookDirectoryActor}
 import com.wavesplatform.dex.api.ws.actors.WsInternalBroadcastActor
 import com.wavesplatform.dex.api.ws.protocol.WsOrdersUpdate
 import com.wavesplatform.dex.domain.asset.AssetPair
-import com.wavesplatform.dex.domain.utils.{LoggerFacade, ScorexLogging}
+import com.wavesplatform.dex.domain.utils.LoggerFacade
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.metrics.TimerExt
@@ -55,7 +55,6 @@ class OrderBookActor(
   private var lastSavedSnapshotOffset = Option.empty[ValidatedCommandWithMeta.Offset]
   private var lastProcessedOffset = Option.empty[ValidatedCommandWithMeta.Offset]
 
-  private val loggingPrefix = s"OrderBookActor[$assetPair]"
   private val addTimer = Kamon.timer("matcher.orderbook.add").withTag("pair", assetPair.toString)
   private val cancelTimer = Kamon.timer("matcher.orderbook.cancel").withTag("pair", assetPair.toString)
   private var orderBook = OrderBook.empty
@@ -89,11 +88,10 @@ class OrderBookActor(
       lastSavedSnapshotOffset = result.map(_._1)
       lastProcessedOffset = lastSavedSnapshotOffset
 
-      log.debug(loggingPrefix +
-      (lastSavedSnapshotOffset match {
+      log.debug(lastSavedSnapshotOffset match {
         case None => "Recovery completed"
         case Some(x) => s"Recovery completed at $x: $orderBook"
-      }))
+      })
 
       lastProcessedOffset foreach actualizeRules
 
@@ -146,7 +144,7 @@ class OrderBookActor(
     case OrderBookDirectoryActor.Ping => sender() ! OrderBookDirectoryActor.Pong
 
     case OrderBookSnapshotStoreActor.Response.Updated(offset) =>
-      log.info(s"$loggingPrefix Snapshot has been saved at offset $offset")
+      log.info(s"Snapshot has been saved at offset $offset")
       lastSavedSnapshotOffset = Some(offset)
       owner ! OrderBookSnapshotUpdateCompleted(assetPair, lastSavedSnapshotOffset)
       savingSnapshot = None
@@ -160,7 +158,7 @@ class OrderBookActor(
     case x: AggregatedOrderBookActor.InputMessage => aggregatedRef.tell(x)
 
     case classic.Terminated(ref) =>
-      log.error(s"$loggingPrefix Terminated actor: $ref")
+      log.error(s"Terminated actor: $ref")
       // If this happens the issue is critical and should not be handled. The order book will be stopped, see OrderBookDirectoryActor
       if (ref.path == aggregatedRef.path) throw new RuntimeException("Aggregated order book was terminated")
   }
@@ -188,23 +186,23 @@ class OrderBookActor(
   private def logEvent(e: Event): Unit = log.info {
     import Events._
     e match {
-      case e: OrderAdded => s"$loggingPrefix OrderAdded(${e.order.order.id()}, amount=${e.order.amount})"
-      case e: OrderCanceled => s"$loggingPrefix OrderCanceled(${e.acceptedOrder.order.id()}, ${e.reason})"
+      case e: OrderAdded => s"OrderAdded(${e.order.order.id()}, amount=${e.order.amount})"
+      case e: OrderCanceled => s"OrderCanceled(${e.acceptedOrder.order.id()}, ${e.reason})"
       case e: OrderExecuted =>
-        s"$loggingPrefix OrderExecuted(s=${e.submitted.order.id()}, c=${e.counter.order.id()}, amount=${e.executedAmount}, ts=${e.timestamp})"
+        s"OrderExecuted(s=${e.submitted.order.id()}, c=${e.counter.order.id()}, amount=${e.executedAmount}, ts=${e.timestamp})"
     }
   }
 
   private def onCancelOrder(command: ValidatedCommandWithMeta, cancelCommand: ValidatedCommand.CancelOrder): Unit = cancelTimer.measure {
     orderBook.cancel(cancelCommand.orderId, toReason(cancelCommand.source), command.timestamp) match {
       case (updatedOrderBook, Some(cancelEvent), levelChanges) =>
-        log.trace(s"$loggingPrefix Applied $command")
+        log.trace(s"Applied $command")
         // TODO replace by process() in Scala 2.13
         orderBook = updatedOrderBook
         aggregatedRef ! AggregatedOrderBookActor.Command.ApplyChanges(levelChanges, None, None, cancelEvent.timestamp)
         processEvents(cancelEvent.timestamp, List(cancelEvent))
       case _ =>
-        log.warn(s"$loggingPrefix Can't apply $command: order not found")
+        log.warn(s"Can't apply $command: order not found")
         eventsCoordinatorRef ! OrderEventsCoordinatorActor.Command.ProcessError(
           OrderCancelFailed(cancelCommand.orderId, error.OrderNotFound(cancelCommand.orderId), cancelCommand.maybeOwner)
         )
@@ -222,7 +220,7 @@ class OrderBookActor(
   }
 
   private def onAddOrder(command: ValidatedCommandWithMeta, acceptedOrder: AcceptedOrder): Unit = addTimer.measure {
-    log.trace(s"$loggingPrefix Applied $command, trying to match ...")
+    log.trace(s"Applied $command, trying to match ...")
     process(
       command.timestamp,
       orderBook.add(
@@ -237,7 +235,7 @@ class OrderBookActor(
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
-    log.warn(s"$loggingPrefix Restarting actor because of $message", reason)
+    log.warn(s"Restarting actor because of $message", reason)
     super.preRestart(reason, message)
   }
 
@@ -246,12 +244,12 @@ class OrderBookActor(
     val toSave = if (saveSnapshot) Some(orderBook.snapshot) else None
 
     if (saveSnapshot) {
-      log.trace(s"$loggingPrefix About to save snapshot $orderBook")
+      log.trace(s"About to save snapshot $orderBook")
       log.debug(
-        s"$loggingPrefix Saving both offset and snapshot. Global seqNr=$globalEventNr, local seqNr=$lastProcessedOffset, current offset = $lastSavedSnapshotOffset"
+        s"Saving both offset and snapshot. Global seqNr=$globalEventNr, local seqNr=$lastProcessedOffset, current offset = $lastSavedSnapshotOffset"
       )
     } else
-      log.debug(s"$loggingPrefix Saving offset only. Global seqNr=$globalEventNr, local seqNr=$lastProcessedOffset, current offset = $lastSavedSnapshotOffset")
+      log.debug(s"Saving offset only. Global seqNr=$globalEventNr, local seqNr=$lastProcessedOffset, current offset = $lastSavedSnapshotOffset")
 
     snapshotStore ! OrderBookSnapshotStoreActor.Message.Update(assetPair, globalEventNr, toSave)
   }
@@ -295,7 +293,7 @@ object OrderBookActor {
         getMakerTakerFeeByOffset,
         getOrderExecutedTs,
         restrictions,
-        logger
+        logger.copy(prefix = s"OrderBookActor[$assetPair]")
       )
     )
 

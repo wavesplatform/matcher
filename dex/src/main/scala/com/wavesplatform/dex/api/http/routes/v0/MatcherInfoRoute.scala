@@ -11,6 +11,8 @@ import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
 import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.domain.account.PublicKey
+import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.settings.{MatcherSettings, OrderFeeSettings}
 import io.swagger.annotations._
@@ -71,7 +73,8 @@ final class MatcherInfoRoute(
               HttpMatcherPublicSettings(
                 matcherPublicKey = matcherPublicKey,
                 matcherVersion = Version.VersionString,
-                priceAssets = matcherSettings.priceAssets,
+                priceAssets =
+                  matcherSettings.priceAssets.filterNot(a => matcherSettings.blacklistedAssets.contains(IssuedAsset(a.compatId.orNull))),
                 orderFee = HttpOrderFeeMode.fromSettings(
                   settings = getActualOrderFeeSettings(),
                   matcherAccountFee = matcherAccountFee,

@@ -11,8 +11,7 @@ import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
 import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.domain.account.PublicKey
-import com.wavesplatform.dex.domain.asset.Asset
-import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.settings.{MatcherSettings, OrderFeeSettings}
 import io.swagger.annotations._

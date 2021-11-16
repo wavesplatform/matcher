@@ -100,17 +100,15 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
     asset => BriefAssetDescription(asset.toString, 2, hasScript = false, isNft = false)
 
   private def createAddressActor(address: Address, recovered: Boolean): Props =
-    Props(
-      new AddressActor(
-        address,
-        time,
-        TestOrderDb(100),
-        (_, _) => Future.successful(Right(())),
-        _ => Future.failed(new IllegalStateException("Should not be used in the test")),
-        recovered,
-        blockchainInteraction,
-        getAssetDescription = assetBriefInfo
-      )
+    AddressActor.props(
+      address,
+      time,
+      TestOrderDb(100),
+      (_, _) => Future.successful(Right(())),
+      _ => Future.failed(new IllegalStateException("Should not be used in the test")),
+      recovered,
+      blockchainInteraction,
+      getAssetDescription = assetBriefInfo
     )
 
   private def minAmountFor(price: Long, amountDecimals: Int = 8): Long = { BigDecimal(Math.pow(10, amountDecimals)) / BigDecimal(price) }
@@ -485,20 +483,18 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
     }
 
     def createAddressActor(address: Address, recovered: Boolean): Props =
-      Props(
-        new AddressActor(
-          owner = address,
-          time = time,
-          orderDb = TestOrderDb(100),
-          (_, _) => Future.successful(Right(())),
-          store = command => {
-            testProbe.ref ! command
-            Future.successful(Some(ValidatedCommandWithMeta(0L, System.currentTimeMillis, command)))
-          },
-          recovered,
-          blockchainInteraction,
-          getAssetDescription = assetBriefInfo
-        )
+      AddressActor.props(
+        owner = address,
+        time = time,
+        orderDb = TestOrderDb(100),
+        (_, _) => Future.successful(Right(())),
+        store = command => {
+          testProbe.ref ! command
+          Future.successful(Some(ValidatedCommandWithMeta(0L, System.currentTimeMillis, command)))
+        },
+        recovered,
+        blockchainInteraction,
+        getAssetDescription = assetBriefInfo
       )
 
     val addressDir = system.actorOf(

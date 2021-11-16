@@ -15,7 +15,7 @@ import com.wavesplatform.dex.actors.{orderbook, OrderBookDirectoryActor}
 import com.wavesplatform.dex.api.ws.actors.WsInternalBroadcastActor
 import com.wavesplatform.dex.api.ws.protocol.WsOrdersUpdate
 import com.wavesplatform.dex.domain.asset.AssetPair
-import com.wavesplatform.dex.domain.utils.{LoggerFacade, ScorexLogging}
+import com.wavesplatform.dex.domain.utils.LoggerFacade
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.metrics.TimerExt
@@ -43,13 +43,11 @@ class OrderBookActor(
   normalizeMatchingRule: DenormalizedMatchingRule => MatchingRule,
   getMakerTakerFeeByOffset: Long => (AcceptedOrder, LimitOrder) => (Long, Long),
   getOrderExecutedTs: Long => (Long, Long) => Long,
-  restrictions: Option[OrderRestrictionsSettings]
+  restrictions: Option[OrderRestrictionsSettings],
+  log: LoggerFacade
 )(implicit ec: ExecutionContext, efc: ErrorFormatterContext)
     extends classic.Actor
-    with Stash
-    with ScorexLogging {
-
-  override protected lazy val log = LoggerFacade(LoggerFactory.getLogger(s"OrderBookActor[$assetPair]"))
+    with Stash {
 
   private var aggregatedRef: typed.ActorRef[AggregatedOrderBookActor.InputMessage] = _
 
@@ -90,12 +88,10 @@ class OrderBookActor(
       lastSavedSnapshotOffset = result.map(_._1)
       lastProcessedOffset = lastSavedSnapshotOffset
 
-      log.debug(
-        lastSavedSnapshotOffset match {
-          case None => "Recovery completed"
-          case Some(x) => s"Recovery completed at $x: $orderBook"
-        }
-      )
+      log.debug(lastSavedSnapshotOffset match {
+        case None => "Recovery completed"
+        case Some(x) => s"Recovery completed at $x: $orderBook"
+      })
 
       lastProcessedOffset foreach actualizeRules
 
@@ -265,6 +261,8 @@ object OrderBookActor {
 
   case class Settings(aggregated: AggregatedOrderBookActor.Settings)
 
+  private val logger = LoggerFacade(LoggerFactory.getLogger(OrderBookActor.getClass))
+
   def props(
     settings: Settings,
     parent: classic.ActorRef,
@@ -294,7 +292,8 @@ object OrderBookActor {
         normalizeMatchingRule,
         getMakerTakerFeeByOffset,
         getOrderExecutedTs,
-        restrictions
+        restrictions,
+        logger.copy(prefix = s"OrderBookActor[$assetPair]")
       )
     )
 

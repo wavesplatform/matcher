@@ -26,7 +26,7 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.model.Denormalization.denormalizeAmountAndFee
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionResult, ExchangeTransactionV2}
-import com.wavesplatform.dex.domain.utils.{LoggerFacade, ScorexLogging}
+import com.wavesplatform.dex.domain.utils.LoggerFacade
 import com.wavesplatform.dex.effect.Implicits.FutureOps
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError, UnexpectedError, WavesNodeConnectionBroken}
@@ -62,16 +62,15 @@ class AddressActor(
   recovered: Boolean,
   blockchain: BlockchainInteraction,
   settings: AddressActor.Settings = AddressActor.Settings.default,
-  getAssetDescription: Asset => BriefAssetDescription
+  getAssetDescription: Asset => BriefAssetDescription,
+  log: LoggerFacade
 ) extends Actor
-    with Stash
-    with ScorexLogging {
+    with Stash {
 
   import context.dispatcher
 
   implicit val efc = ErrorFormatterContext.from(a => getAssetDescription(a).decimals)
 
-  override protected lazy val log = LoggerFacade(LoggerFactory.getLogger(s"AddressActor[$owner]"))
   private val ignoreRef = context.system.toTyped.ignoreRef.toClassic
 
   private val enableRealtimeWs = settings.realtimeWsAddresses.contains(owner) || settings.wsMessagesInterval.length == 0
@@ -110,7 +109,9 @@ class AddressActor(
       //    but anyway saved to a queue and processed
       //  - for slave DEX it is a new order and we have to send balance changes via WS API
       val origActiveOrder = activeOrders.get(order.id)
-      log.debug(s"OrderAdded(${order.id}, ${event.reason}, ${event.timestamp}), isNew=${origActiveOrder.isEmpty}, status: ${order.status}")
+      log.debug(
+        s"OrderAdded(${order.id}, ${event.reason}, ${event.timestamp}), isNew=${origActiveOrder.isEmpty}, status: ${order.status}"
+      )
       activeOrders.put(order.id, order)
 
       def reserve(xs: Map[Asset, Long]): Unit = {
@@ -367,7 +368,7 @@ class AddressActor(
                 case _: OrderStatus.Filled =>
                   error.OrderFull(orderId)
               }.recover { case th =>
-                log.error(s"error while retrieving order status", th)
+                log.error("error while retrieving order status", th)
                 UnexpectedError
               }.pipeTo(sender())
 
@@ -490,7 +491,9 @@ class AddressActor(
             activeOrders.remove(orderId).foreach { ao =>
               val reservableBalance = ao.reservableBalance
               balances = balances.cancelReservation(PositiveMap(reservableBalance))
-              log.info(s"[Balance] 4. 💵: ${format(balances.tradableBalance(reservableBalance.keySet).xs)}; ov -Δ: ${format(reservableBalance)}")
+              log.info(
+                s"[Balance] 4. 💵: ${format(balances.tradableBalance(reservableBalance.keySet).xs)}; ov -Δ: ${format(reservableBalance)}"
+              )
               scheduleWs(wsAddressState.putChangedAssets(ao.reservableBalance.keySet))
             }
           case _ =>
@@ -567,9 +570,12 @@ class AddressActor(
       val after = balances.balanceForAudit(changedAssets)
       val changesForAudit = after.collect { case (asset, v) if before.getOrElse(asset, 0L) > v => asset -> math.max(0, v) }
       val toCancel = getOrdersToCancel(changesForAudit).filterNot(x => isCancelling(x.order.id))
-      if (toCancel.isEmpty) log.info(s"[Balance] 5. 💵: ${format(balances.tradableBalance(updates.changedAssets).xs)}; u: ${format(updates)}")
+      if (toCancel.isEmpty)
+        log.info(s"[Balance] 5. 💵: ${format(balances.tradableBalance(updates.changedAssets).xs)}; u: ${format(updates)}")
       else {
-        log.info(s"[Balance] 6. 💵: ${format(balances.tradableBalance(updates.changedAssets).xs)}; u: ${format(updates)}; au: ${format(after)}")
+        log.info(
+          s"[Balance] 6. 💵: ${format(balances.tradableBalance(updates.changedAssets).xs)}; u: ${format(updates)}; au: ${format(after)}"
+        )
         val cancelledText =
           toCancel.map(x => s"${x.insufficientAmount} ${x.assetId} for ${x.order.id} (r: ${format(x.order.requiredBalance)})").mkString(", ")
         log.debug(s"Canceling ${toCancel.size}/${activeOrders.size}: doesn't have $cancelledText")
@@ -686,7 +692,9 @@ class AddressActor(
 
   private def scheduleExpiration(order: Order): Unit = if (!expiration.contains(order.id())) {
     val timeToExpiration = (order.expiration - time.correctedTime()).max(0L)
-    log.trace(s"Order ${order.id()} will expire in ${JDuration.ofMillis(timeToExpiration)}, at ${Instant.ofEpochMilli(order.expiration)}")
+    log.trace(
+      s"Order ${order.id()} will expire in ${JDuration.ofMillis(timeToExpiration)}, at ${Instant.ofEpochMilli(order.expiration)}"
+    )
     expiration +=
       order.id() -> context.system.scheduler.scheduleOnce(timeToExpiration.millis, self, CancelExpiredOrder(order.id()))
   }
@@ -743,7 +751,9 @@ class AddressActor(
     val reservableBalance = ao.reservableBalance
 
     balances = balances.reserve(PositiveMap(reservableBalance))
-    log.info(s"[Balance] 10. o=${ao.id}; 💵: ${format(balances.tradableBalance(reservableBalance.keySet).xs)}; ov Δ: ${format(reservableBalance)}")
+    log.info(
+      s"[Balance] 10. o=${ao.id}; 💵: ${format(balances.tradableBalance(reservableBalance.keySet).xs)}; ov Δ: ${format(reservableBalance)}"
+    )
     scheduleWs(wsAddressState.putChangedAssets(reservableBalance.keySet))
 
     storeCommand(ao.id)(
@@ -822,6 +832,7 @@ object AddressActor {
   type Resp = MatcherResponse
 
   private val ExpirationThreshold = 50.millis
+  private val logger = LoggerFacade(LoggerFactory.getLogger(AddressActor.getClass))
 
   def props(
     owner: Address,
@@ -833,7 +844,7 @@ object AddressActor {
     blockchain: BlockchainInteraction,
     settings: AddressActor.Settings = AddressActor.Settings.default,
     getAssetDescription: Asset => BriefAssetDescription
-  )(implicit efc: ErrorFormatterContext): Props = Props(
+  ): Props = Props(
     new AddressActor(
       owner,
       time,
@@ -843,7 +854,8 @@ object AddressActor {
       recovered,
       blockchain,
       settings,
-      getAssetDescription
+      getAssetDescription,
+      logger.copy(prefix = s"AddressActor[$owner]")
     )
   )
 

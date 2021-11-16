@@ -33,18 +33,16 @@ class OrderHistoryStub(system: ActorSystem, time: Time, maxActiveOrders: Int, ma
     asset => BriefAssetDescription(asset.toString, 2, hasScript = false, isNft = false)
 
   def createAddressActor(address: Address, recovered: Boolean): Props =
-    Props(
-      new AddressActor(
-        address,
-        time,
-        TestOrderDb(maxFinalizedOrders),
-        (_, _) => Future.successful(Right(())),
-        e => Future.successful(Some(ValidatedCommandWithMeta(0L, 0, e))),
-        recovered,
-        blockchainInteraction,
-        AddressActor.Settings.default.copy(maxActiveOrders = maxActiveOrders),
-        assetBriefInfo
-      )
+    AddressActor.props(
+      address,
+      time,
+      TestOrderDb(maxFinalizedOrders),
+      (_, _) => Future.successful(Right(())),
+      e => Future.successful(Some(ValidatedCommandWithMeta(0L, 0, e))),
+      recovered,
+      blockchainInteraction,
+      AddressActor.Settings.default.copy(maxActiveOrders = maxActiveOrders),
+      assetBriefInfo
     )
 
   private def actorFor(ao: AcceptedOrder): ActorRef = actorForAddress(ao.order.sender)

@@ -6,6 +6,7 @@ import com.wavesplatform.dex.domain.utils.ScorexLogging
 import java.time.Duration
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
+import scala.util.chaining._
 
 /**
  * Common logic for caching of the blockchain access results
@@ -28,18 +29,21 @@ abstract class BlockchainCache[K <: AnyRef, V <: AnyRef](
       .fold(builder)(builder.expireAfterWrite)
       .build {
         new CacheLoader[K, Future[V]] {
-          override def load(key: K): Future[V] = loader(key) andThen {
-            case Success(value) if invalidationPredicate(value) =>
-              cache.invalidate(
-                key
-              ) // value may persist for a little longer than expected due to the fact that all the threads in the EC may be busy
-            case Failure(exception) => log.error(s"Error while value loading occurred: ", exception); cache.invalidate(key)
-          }
+          override def load(key: K): Future[V] = loader(key)
         }
       }
   }
 
-  def get(key: K): Future[V] = cache.get(key)
+  def get(key: K): Future[V] = {
+    val value = cache.get(key)
+    value.tap(_.andThen {
+      case Success(value) if invalidationPredicate(value) =>
+        cache.invalidate(
+          key
+        ) // value may persist for a little longer than expected due to the fact that all the threads in the EC may be busy
+      case Failure(exception) => log.error(s"Error while value loading occurred: ", exception); cache.invalidate(key)
+    })
+  }
 
   def put(key: K, value: Future[V]): Unit = cache.put(key, value)
 }

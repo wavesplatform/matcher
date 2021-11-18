@@ -60,7 +60,7 @@ class BlockchainCacheSpecification extends WavesIntegrationSuiteBase with Before
       }.futureValue
 
       keyAccessMap.get(goodKey) shouldBe 1
-      keyAccessMap.get(badKey) should be > 1
+      keyAccessMap.get(badKey) shouldBe badKeyAccessCount
     }
 
     "not keep values according to the predicate" in {
@@ -84,7 +84,7 @@ class BlockchainCacheSpecification extends WavesIntegrationSuiteBase with Before
       }.futureValue
 
       keyAccessMap.get(goodKey) shouldBe 1
-      keyAccessMap.get(badKey) should be > 1
+      keyAccessMap.get(badKey) shouldBe 10
     }
   }
 }

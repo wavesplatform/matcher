@@ -14,7 +14,7 @@ import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
-import com.wavesplatform.dex.error.{AmountAssetBlacklisted, MatcherIsStopping, OrderAssetPairReversed, OrderBookStopped, SubscriptionsLimitReached}
+import com.wavesplatform.dex.error.{AmountAssetBlacklisted, OrderAssetPairReversed, OrderBookStopped, SubscriptionsLimitReached}
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, OrderRestrictionsSettings}
 import com.wavesplatform.dex.tool.Using._

@@ -707,10 +707,10 @@ class AddressActor(
   ): Unit = scheduleWs {
     status match {
       case OrderStatus.Accepted => wsAddressState.putOrderUpdate(remaining.id, WsOrder.fromDomain(remaining, status))
-      case _: OrderStatus.Cancelled => wsAddressState.putOrderStatusNameUpdate(remaining.id, status)
+      case _: OrderStatus.Cancelled => wsAddressState.putOrderStatusNameUpdate(remaining.order, status)
       case _ =>
         // unmatchable can be only if OrderStatus.Filled
-        if (unmatchable) wsAddressState.putOrderStatusNameUpdate(remaining.id, status)
+        if (unmatchable) wsAddressState.putOrderStatusNameUpdate(remaining.order, status)
         else wsAddressState.putOrderFillingInfoAndStatusNameUpdate(remaining, status, maybeMatchTx)
     }
   }

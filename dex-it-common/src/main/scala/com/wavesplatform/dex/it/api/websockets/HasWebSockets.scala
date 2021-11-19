@@ -132,9 +132,9 @@ trait HasWebSockets extends BeforeAndAfterAll with BeforeAndAfterEach with HasJw
   protected def mergeWsOrder(orig: WsOrder, diff: WsOrder): WsOrder = WsOrder(
     id = orig.id,
     timestamp = diff.timestamp.orElse(orig.timestamp),
-    amountAsset = orig.amountAsset.orElse(diff.amountAsset),
-    priceAsset = orig.priceAsset.orElse(diff.priceAsset),
-    side = orig.side.orElse(diff.side),
+    amountAsset = orig.amountAsset,
+    priceAsset = orig.priceAsset,
+    side = orig.side,
     isMarket = orig.isMarket.orElse(diff.isMarket),
     price = orig.price.orElse(diff.price),
     amount = orig.amount.orElse(diff.amount),

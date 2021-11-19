@@ -14,21 +14,21 @@ import play.api.libs.json._
 
 case class WsOrder(
   id: Order.Id,
-  timestamp: Option[Long] = None,
-  amountAsset: Option[Asset] = None,
-  priceAsset: Option[Asset] = None,
-  side: Option[OrderType] = None,
-  isMarket: Option[Boolean] = None,
-  price: Option[Double] = None,
-  amount: Option[Double] = None,
-  fee: Option[Double] = None,
-  feeAsset: Option[Asset] = None,
-  status: Option[String] = None,
-  filledAmount: Option[Double] = None,
-  filledFee: Option[Double] = None,
-  avgWeighedPrice: Option[Double] = None,
-  totalExecutedPriceAssets: Option[Double] = None,
-  matchInfo: Seq[WsMatchTransactionInfo] = Seq.empty
+  timestamp: Option[Long],
+  amountAsset: Asset,
+  priceAsset: Asset,
+  side: OrderType,
+  isMarket: Option[Boolean],
+  price: Option[Double],
+  amount: Option[Double],
+  fee: Option[Double],
+  feeAsset: Option[Asset],
+  status: Option[String],
+  filledAmount: Option[Double],
+  filledFee: Option[Double],
+  avgWeighedPrice: Option[Double],
+  totalExecutedPriceAssets: Option[Double],
+  matchInfo: Seq[WsMatchTransactionInfo]
 )
 
 object WsOrder {
@@ -48,9 +48,9 @@ object WsOrder {
     WsOrder(
       ao.id,
       ao.order.timestamp.some,
-      ao.order.assetPair.amountAsset.some,
-      ao.order.assetPair.priceAsset.some,
-      ao.order.orderType.some,
+      ao.order.assetPair.amountAsset,
+      ao.order.assetPair.priceAsset,
+      ao.order.orderType,
       ao.isMarket.some,
       ao.price.some.map(denormalizePrice),
       ao.order.amount.some.map(denormalizeAmount),
@@ -66,50 +66,72 @@ object WsOrder {
 
   def apply(
     id: Order.Id,
-    matchInfo: WsMatchTransactionInfo
-  ): WsOrder =
-    WsOrder(
-      id,
-      matchInfo = Seq(matchInfo)
-    )
+    timestamp: Option[Long] = None,
+    priceAsset: Asset,
+    amountAsset: Asset,
+    side: OrderType,
+    isMarket: Option[Boolean] = None,
+    price: Option[Double] = None,
+    amount: Option[Double] = None,
+    fee: Option[Double] = None,
+    feeAsset: Option[Asset] = None,
+    status: Option[String] = None,
+    filledAmount: Option[Double] = None,
+    filledFee: Option[Double] = None,
+    avgWeighedPrice: Option[Double] = None,
+    totalExecutedPriceAssets: Option[Double] = None,
+    matchInfo: Seq[WsMatchTransactionInfo] = Seq.empty
+  ): WsOrder = new WsOrder(
+    id = id,
+    priceAsset = priceAsset,
+    amountAsset = amountAsset,
+    side = side,
+    timestamp = timestamp,
+    isMarket = isMarket,
+    price = price,
+    amount = amount,
+    fee = fee,
+    feeAsset = feeAsset,
+    status = status,
+    filledAmount = filledAmount,
+    filledFee = filledFee,
+    avgWeighedPrice = avgWeighedPrice,
+    totalExecutedPriceAssets = totalExecutedPriceAssets,
+    matchInfo = matchInfo
+  )
 
-  def apply(
-    id: Order.Id,
-    status: String,
-    filledAmount: Double,
-    filledFee: Double,
-    avgWeighedPrice: Double,
-    totalExecutedPriceAssets: Double
-  ): WsOrder =
-    WsOrder(
-      id,
-      status = status.some,
-      filledAmount = filledAmount.some,
-      filledFee = filledFee.some,
-      avgWeighedPrice = avgWeighedPrice.some,
-      totalExecutedPriceAssets = totalExecutedPriceAssets.some
-    )
-
-  def apply(
-    id: Order.Id,
-    status: String,
-    filledAmount: Double,
-    filledFee: Double,
-    avgWeighedPrice: Double,
-    totalExecutedPriceAssets: Double,
-    matchInfo: WsMatchTransactionInfo
-  ): WsOrder =
-    WsOrder(
-      id,
-      status = status.some,
-      filledAmount = filledAmount.some,
-      filledFee = filledFee.some,
-      avgWeighedPrice = avgWeighedPrice.some,
-      totalExecutedPriceAssets = totalExecutedPriceAssets.some,
-      matchInfo = Seq(matchInfo)
-    )
-
-  def apply(id: Order.Id, status: String): WsOrder = WsOrder(id, status = status.some)
+  def fromOrder(
+    order: Order,
+    timestamp: Option[Long] = None,
+    isMarket: Option[Boolean] = None,
+    price: Option[Double] = None,
+    amount: Option[Double] = None,
+    fee: Option[Double] = None,
+    feeAsset: Option[Asset] = None,
+    status: Option[String] = None,
+    filledAmount: Option[Double] = None,
+    filledFee: Option[Double] = None,
+    avgWeighedPrice: Option[Double] = None,
+    totalExecutedPriceAssets: Option[Double] = None,
+    matchInfo: Seq[WsMatchTransactionInfo] = Seq.empty
+  ): WsOrder = WsOrder(
+    id = order.id(),
+    priceAsset = order.assetPair.priceAsset,
+    amountAsset = order.assetPair.amountAsset,
+    side = order.orderType,
+    timestamp = timestamp,
+    isMarket = isMarket,
+    price = price,
+    amount = amount,
+    fee = fee,
+    feeAsset = feeAsset,
+    status = status,
+    filledAmount = filledAmount,
+    filledFee = filledFee,
+    avgWeighedPrice = avgWeighedPrice,
+    totalExecutedPriceAssets = totalExecutedPriceAssets,
+    matchInfo = matchInfo
+  )
 
   val isMarketFormat: Format[Boolean] = AcceptedOrderType.acceptedOrderTypeFormat.coerce[Boolean](
     { case AcceptedOrderType.Market => true; case _ => false },
@@ -118,7 +140,7 @@ object WsOrder {
 
   implicit class JsPathOps(private val path: JsPath) {
 
-    val formatAsset: OFormat[Option[Asset]] = OFormat(
+    val formatOptAsset: OFormat[Option[Asset]] = OFormat(
       Reads[Option[Asset]] { json =>
         path.asSingleJson(json) match {
           case JsDefined(JsNull) => JsSuccess(Waves.some)
@@ -130,6 +152,17 @@ object WsOrder {
       Writes.nullable[Asset](path)(Asset.assetFormat.writes _)
     )
 
+    val formatAsset: OFormat[Asset] = OFormat(
+      Reads[Asset] { json =>
+        path.asSingleJson(json) match {
+          case JsDefined(JsNull) => JsSuccess(Waves)
+          case JsDefined(value) => Asset.assetFormat.reads(value)
+          case _ => throw new IllegalArgumentException(s"Can't process json=$json")
+        }
+      },
+      Writes.at[Asset](path)(Asset.assetFormat.writes _)
+    )
+
   }
 
   implicit val wsOrderFormat: Format[WsOrder] =
@@ -138,12 +171,12 @@ object WsOrder {
         (__ \ "t").formatNullable[Long] and // timestamp
         (__ \ "A").formatAsset and // amount asset
         (__ \ "P").formatAsset and // price asset
-        (__ \ "S").formatNullable[OrderType] and // side: buy or sell
+        (__ \ "S").format[OrderType] and // side: buy or sell
         (__ \ "T").formatNullable[Boolean](isMarketFormat) and // type: market or limit
         (__ \ "p").formatNullable[Double](doubleAsStringFormat) and // price
         (__ \ "a").formatNullable[Double](doubleAsStringFormat) and // amount
         (__ \ "f").formatNullable[Double](doubleAsStringFormat) and // fee
-        (__ \ "F").formatAsset and // fee asset
+        (__ \ "F").formatOptAsset and // fee asset
         (__ \ "s").formatNullable[String] and // status: Accepted or Filled or PartiallyFilled or Cancelled
         (__ \ "q").formatNullable[Double](doubleAsStringFormat) and // filled amount
         (__ \ "Q").formatNullable[Double](doubleAsStringFormat) and // filled fee

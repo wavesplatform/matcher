@@ -67,8 +67,8 @@ object WsOrder {
   def apply(
     id: Order.Id,
     timestamp: Option[Long] = None,
-    priceAsset: Asset,
     amountAsset: Asset,
+    priceAsset: Asset,
     side: OrderType,
     isMarket: Option[Boolean] = None,
     price: Option[Double] = None,
@@ -116,8 +116,8 @@ object WsOrder {
     matchInfo: Seq[WsMatchTransactionInfo] = Seq.empty
   ): WsOrder = WsOrder(
     id = order.id(),
-    priceAsset = order.assetPair.priceAsset,
     amountAsset = order.assetPair.amountAsset,
+    priceAsset = order.assetPair.priceAsset,
     side = order.orderType,
     timestamp = timestamp,
     isMarket = isMarket,

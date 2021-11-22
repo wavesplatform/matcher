@@ -48,8 +48,8 @@ object WsOrder {
     WsOrder(
       ao.id,
       ao.order.timestamp.some,
-      ao.order.assetPair.amountAsset,
-      ao.order.assetPair.priceAsset,
+      amountAsset = ao.order.assetPair.amountAsset,
+      priceAsset = ao.order.assetPair.priceAsset,
       ao.order.orderType,
       ao.isMarket.some,
       ao.price.some.map(denormalizePrice),
@@ -83,8 +83,8 @@ object WsOrder {
     matchInfo: Seq[WsMatchTransactionInfo] = Seq.empty
   ): WsOrder = new WsOrder(
     id = id,
-    priceAsset = priceAsset,
     amountAsset = amountAsset,
+    priceAsset = priceAsset,
     side = side,
     timestamp = timestamp,
     isMarket = isMarket,

@@ -175,8 +175,9 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase with HasWebSockets with
       eventually {
         val aus1 = wsau1.receiveAtLeastN[WsAddressChanges](1).reduce(mergeAddressChanges)
         val aus2 = wsau2.receiveAtLeastN[WsAddressChanges](1).reduce(mergeAddressChanges)
-
-        aus1 should matchTo(aus2)
+        withClue(s"$aus1 $aus2") {
+          aus1 should matchTo(aus2)
+        }
       }
     }
   }

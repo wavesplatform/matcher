@@ -48,8 +48,8 @@ object WsOrder {
     WsOrder(
       ao.id,
       ao.order.timestamp.some,
-      amountAsset = ao.order.assetPair.amountAsset,
-      priceAsset = ao.order.assetPair.priceAsset,
+      ao.order.assetPair.amountAsset,
+      ao.order.assetPair.priceAsset,
       ao.order.orderType,
       ao.isMarket.some,
       ao.price.some.map(denormalizePrice),

@@ -22,6 +22,7 @@ import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model.Events._
 import com.wavesplatform.dex.model.OrderBook.OrderBookUpdates
 import com.wavesplatform.dex.model._
+import com.wavesplatform.dex.queue.ValidatedCommandWithMeta.Offset
 import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatchingRule, OrderRestrictionsSettings}
 import com.wavesplatform.dex.time.Time
@@ -37,6 +38,7 @@ class OrderBookActor(
   snapshotStore: classic.ActorRef,
   wsInternalHandlerDirectoryRef: typed.ActorRef[WsInternalBroadcastActor.Command],
   assetPair: AssetPair,
+  maybeSnapshot: Option[OrderBookActor.Snapshot],
   time: Time,
   var matchingRules: NonEmptyList[DenormalizedMatchingRule],
   updateCurrentMatchingRules: DenormalizedMatchingRule => Unit,
@@ -254,10 +256,17 @@ class OrderBookActor(
     snapshotStore ! OrderBookSnapshotStoreActor.Message.Update(assetPair, globalEventNr, toSave)
   }
 
-  snapshotStore ! OrderBookSnapshotStoreActor.Message.GetSnapshot(assetPair)
+  maybeSnapshot match {
+    case Some(snapshot) =>
+      self ! OrderBookSnapshotStoreActor.Response.GetSnapshot(snapshot)
+    case None =>
+      snapshotStore ! OrderBookSnapshotStoreActor.Message.GetSnapshot(assetPair)
+  }
 }
 
 object OrderBookActor {
+
+  type Snapshot = Option[(Offset, OrderBookSnapshot)]
 
   case class Settings(aggregated: AggregatedOrderBookActor.Settings)
 
@@ -270,6 +279,7 @@ object OrderBookActor {
     snapshotStore: classic.ActorRef,
     wsInternalHandlerDirectoryRef: typed.ActorRef[WsInternalBroadcastActor.Command],
     assetPair: AssetPair,
+    maybeSnapshot: Option[Snapshot],
     time: Time,
     matchingRules: NonEmptyList[DenormalizedMatchingRule],
     updateCurrentMatchingRules: DenormalizedMatchingRule => Unit,
@@ -286,6 +296,7 @@ object OrderBookActor {
         snapshotStore,
         wsInternalHandlerDirectoryRef,
         assetPair,
+        maybeSnapshot,
         time,
         matchingRules,
         updateCurrentMatchingRules,
@@ -298,8 +309,6 @@ object OrderBookActor {
     )
 
   def name(assetPair: AssetPair): String = assetPair.toString
-
-  case class Snapshot(eventNr: Option[Long], orderBook: OrderBookSnapshot)
 
   // Internal messages
   case class OrderBookRecovered(assetPair: AssetPair, eventNr: Option[Long])

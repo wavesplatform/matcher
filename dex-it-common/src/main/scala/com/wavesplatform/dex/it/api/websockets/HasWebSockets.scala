@@ -129,24 +129,31 @@ trait HasWebSockets extends BeforeAndAfterAll with BeforeAndAfterEach with HasJw
     c.clearMessages()
   }
 
-  protected def mergeWsOrder(orig: WsOrder, diff: WsOrder): WsOrder = WsOrder(
-    id = orig.id,
-    timestamp = diff.timestamp.orElse(orig.timestamp),
-    amountAsset = orig.amountAsset,
-    priceAsset = orig.priceAsset,
-    side = orig.side,
-    isMarket = orig.isMarket.orElse(diff.isMarket),
-    price = orig.price.orElse(diff.price),
-    amount = orig.amount.orElse(diff.amount),
-    fee = orig.fee.orElse(diff.fee),
-    feeAsset = orig.feeAsset.orElse(diff.feeAsset),
-    status = diff.status.orElse(orig.status),
-    filledAmount = diff.filledAmount.orElse(orig.filledAmount),
-    filledFee = diff.filledFee.orElse(orig.filledFee),
-    avgWeighedPrice = diff.avgWeighedPrice.orElse(orig.avgWeighedPrice),
-    totalExecutedPriceAssets = diff.totalExecutedPriceAssets.orElse(orig.totalExecutedPriceAssets),
-    matchInfo = (orig.matchInfo ++ diff.matchInfo).distinct
-  )
+  protected def mergeWsOrder(orig: WsOrder, diff: WsOrder): WsOrder = {
+    orig.id shouldBe diff.id
+    orig.amountAsset shouldBe diff.amountAsset
+    orig.priceAsset shouldBe diff.priceAsset
+    orig.side shouldBe diff.side
+    orig.feeAsset shouldBe diff.feeAsset
+    WsOrder(
+      orig.id,
+      diff.timestamp.orElse(orig.timestamp),
+      amountAsset = orig.amountAsset,
+      priceAsset = orig.priceAsset,
+      side = orig.side,
+      isMarket = orig.isMarket.orElse(diff.isMarket),
+      price = orig.price.orElse(diff.price),
+      amount = orig.amount.orElse(diff.amount),
+      fee = orig.fee.orElse(diff.fee),
+      feeAsset = orig.feeAsset,
+      status = diff.status.orElse(orig.status),
+      filledAmount = diff.filledAmount.orElse(orig.filledAmount),
+      filledFee = diff.filledFee.orElse(orig.filledFee),
+      avgWeighedPrice = diff.avgWeighedPrice.orElse(orig.avgWeighedPrice),
+      totalExecutedPriceAssets = diff.totalExecutedPriceAssets.orElse(orig.totalExecutedPriceAssets),
+      matchInfo = (orig.matchInfo ++ diff.matchInfo).distinct
+    )
+  }
 
   protected def mergeAddressChanges(orig: WsAddressChanges, diff: WsAddressChanges): WsAddressChanges = WsAddressChanges(
     address = diff.address,

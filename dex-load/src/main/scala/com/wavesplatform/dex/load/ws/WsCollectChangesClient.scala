@@ -74,7 +74,7 @@ class WsCollectChangesClient(apiUri: String, address: String, aus: String, obs: 
     price = orig.price.orElse(diff.price),
     amount = orig.amount.orElse(diff.amount),
     fee = orig.fee.orElse(diff.fee),
-    feeAsset = orig.feeAsset.orElse(diff.feeAsset),
+    feeAsset = orig.feeAsset,
     status = diff.status.orElse(orig.status),
     filledAmount = diff.filledAmount.orElse(orig.filledAmount),
     filledFee = diff.filledFee.orElse(orig.filledFee),

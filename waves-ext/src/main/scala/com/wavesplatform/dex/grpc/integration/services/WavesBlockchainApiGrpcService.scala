@@ -92,7 +92,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
   override def getStatuses(request: TransactionsByIdRequest): Future[TransactionsStatusesResponse] = Future {
     val statuses = request.transactionIds.map { txId =>
       context.blockchain.transactionInfo(txId.toVanilla).map(_._1) match {
-        case Some(height) => TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, height)
+        case Some(meta) => TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, meta.height)
         case None =>
           context.utx.transactionById(txId.toVanilla) match {
             case Some(_) => TransactionStatus(txId, TransactionStatus.Status.UNCONFIRMED)

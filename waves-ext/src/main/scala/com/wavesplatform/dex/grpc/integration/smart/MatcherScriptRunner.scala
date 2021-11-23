@@ -10,11 +10,11 @@ import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.lang.{ExecutionError, ValidationError}
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain, DataEntry, LeaseBalance, VolumeAndFee}
+import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain, DataEntry, LeaseBalance, TxMeta, VolumeAndFee}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.smart.script.ScriptRunnerFixed
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 import shapeless.Coproduct
 
 import scala.util.control.NoStackTrace
@@ -76,6 +76,7 @@ object MatcherScriptRunner {
     override def accountData(acc: Address, key: String): Option[DataEntry[_]] = kill("accountData")
     override def leaseBalance(address: Address): LeaseBalance = kill("leaseBalance")
     override def balance(address: Address, mayBeAssetId: Asset): Long = kill("balance")
+    override def resolveERC20Address(address: ERC20Address): Option[Asset.IssuedAsset] = kill("resolveERC20Address")
 
     override def transferById(id: BlockId): Option[(Int, TransferTransaction)] = kill("transferById")
 
@@ -84,7 +85,7 @@ object MatcherScriptRunner {
     override def blockRewardVotes(height: Int): Seq[Long] = kill("blockRewardVotes")
     override def wavesAmount(height: Int): BigInt = kill("wavesAmount")
 
-    override def transactionMeta(id: BlockId): Option[(Int, Boolean)] = kill("transactionMeta")
+    override def transactionMeta(id: ByteStr): Option[TxMeta] = kill("transactionMeta")
     override def balanceAtHeight(address: Address, height: Int, assetId: Asset): Option[(Int, Long)] = kill("balanceAtHeight")
     override def assetScript(id: Asset.IssuedAsset): Option[AssetScriptInfo] = kill("assetScript")
   }

@@ -72,7 +72,7 @@ class WsMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDrivenProp
         price = None,
         amount = None,
         fee = None,
-        feeAsset = None
+        feeAsset = ao.feeAsset
       )
   }
 

@@ -149,12 +149,12 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
           cancelAndAwait(acc, bo1)
           assertChanges(wsc, squash = false)(Map(usd -> WsBalances(139.70, 10.30), Waves -> WsBalances(10, 0)))(
-            WsOrder(bo1.id(), OrderStatus.Cancelled.name)
+            WsOrder.fromOrder(bo1, status = OrderStatus.Cancelled.name.some)
           )
 
           cancelAndAwait(acc, bo2)
           assertChanges(wsc, squash = false)(Map(usd -> WsBalances(150, 0)))(
-            WsOrder(bo2.id(), OrderStatus.Cancelled.name)
+            WsOrder.fromOrder(bo2, status = OrderStatus.Cancelled.name.some)
           )
         }
       }
@@ -186,32 +186,32 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
             Map(usd -> WsBalances(55.5, 0))
           )(
             WsOrder.fromDomain(mo),
-            WsOrder(
-              mo.id,
-              status = OrderStatus.PartiallyFilled.name,
-              filledAmount = 15.0,
-              filledFee = 0.0009,
-              avgWeighedPrice = 1.2,
-              totalExecutedPriceAssets = 18,
-              matchInfo = WsMatchTransactionInfo(ByteStr.empty, 0L, 1.2, 15.0, 18.0)
+            WsOrder.fromOrder(
+              mo.order,
+              status = OrderStatus.PartiallyFilled.name.some,
+              filledAmount = 15.0.some,
+              filledFee = 0.0009.some,
+              avgWeighedPrice = 1.2.some,
+              totalExecutedPriceAssets = 18.0.some,
+              matchInfo = Seq(WsMatchTransactionInfo(ByteStr.empty, 0L, 1.2, 15.0, 18.0))
             ),
-            WsOrder(
-              mo.id,
-              status = OrderStatus.PartiallyFilled.name,
-              filledAmount = 40.0,
-              filledFee = 0.0024,
-              avgWeighedPrice = 1.1375,
-              totalExecutedPriceAssets = 45.5,
-              matchInfo = WsMatchTransactionInfo(ByteStr.empty, 0L, 1.1, 25.0, 27.5)
+            WsOrder.fromOrder(
+              mo.order,
+              status = OrderStatus.PartiallyFilled.name.some,
+              filledAmount = 40.0.some,
+              filledFee = 0.0024.some,
+              avgWeighedPrice = 1.1375.some,
+              totalExecutedPriceAssets = 45.5.some,
+              matchInfo = Seq(WsMatchTransactionInfo(ByteStr.empty, 0L, 1.1, 25.0, 27.5))
             ),
-            WsOrder(
-              mo.id,
-              status = OrderStatus.Filled.name,
-              filledAmount = 50.0,
-              filledFee = 0.003,
-              avgWeighedPrice = 1.11,
-              totalExecutedPriceAssets = 55.5,
-              matchInfo = WsMatchTransactionInfo(ByteStr.empty, 0L, 1.0, 10.0, 10.0)
+            WsOrder.fromOrder(
+              mo.order,
+              status = OrderStatus.Filled.name.some,
+              filledAmount = 50.0.some,
+              filledFee = 0.003.some,
+              avgWeighedPrice = 1.11.some,
+              totalExecutedPriceAssets = 55.5.some,
+              matchInfo = Seq(WsMatchTransactionInfo(ByteStr.empty, 0L, 1.0, 10.0, 10.0))
             )
           )
         }
@@ -237,14 +237,14 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
             Map(Waves -> WsBalances(19.997, 0))
           )(
             WsOrder.fromDomain(LimitOrder(bo)),
-            WsOrder(
-              bo.id(),
-              status = OrderStatus.Filled.name,
-              filledAmount = 10.0,
-              filledFee = 0.003,
-              avgWeighedPrice = 1.0,
-              totalExecutedPriceAssets = 10,
-              matchInfo = WsMatchTransactionInfo(ByteStr.empty, 0L, 1.0, 10.0, 10.0)
+            WsOrder.fromOrder(
+              bo,
+              status = OrderStatus.Filled.name.some,
+              filledAmount = 10.0.some,
+              filledFee = 0.003.some,
+              avgWeighedPrice = 1.0.some,
+              totalExecutedPriceAssets = 10.0.some,
+              matchInfo = Seq(WsMatchTransactionInfo(ByteStr.empty, 0L, 1.0, 10.0, 10.0))
             )
           )
         }
@@ -298,7 +298,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           eventually {
             wsc.balanceChanges.squashed should matchTo(Map(usd -> WsBalances(5, 0), Waves -> WsBalances(14.9985, 0)))
             wsc.orderChanges.squashed should matchTo(
-              Map(limitOrder.id -> WsOrder(bo.id(), status = OrderStatus.Cancelled.name))
+              Map(limitOrder.id -> WsOrder.fromOrder(bo, status = OrderStatus.Cancelled.name.some))
             )
           }
         }
@@ -526,14 +526,14 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
           eventually(wsc.orderChanges should matchTo(List(
             WsOrder.fromDomain(LimitOrder(order)),
-            WsOrder(
-              order.id(),
-              status = OrderStatus.PartiallyFilled.name,
-              filledAmount = 4.5,
-              filledFee = 0.00135,
-              avgWeighedPrice = 1.0,
-              totalExecutedPriceAssets = 4.5,
-              matchInfo = WsMatchTransactionInfo(ByteStr.empty, 0L, 1.0, 4.5, 4.5)
+            WsOrder.fromOrder(
+              order,
+              status = OrderStatus.PartiallyFilled.name.some,
+              filledAmount = 4.5.some,
+              filledFee = 0.00135.some,
+              avgWeighedPrice = 1.0.some,
+              totalExecutedPriceAssets = 4.5.some,
+              matchInfo = Seq(WsMatchTransactionInfo(ByteStr.empty, 0L, 1.0, 4.5, 4.5))
             )
           )))
           wsc.clearMessages()
@@ -541,14 +541,14 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           val secondCounterOrder = mkOrder(alice, wavesUsdPair, OrderType.BUY, 4.waves, 1.usd)
           placeAndAwaitAtDex(secondCounterOrder, Status.Filled)
 
-          eventually(wsc.orderChanges should matchTo(List(WsOrder(
-            order.id(),
-            status = OrderStatus.PartiallyFilled.name,
-            filledAmount = 8.5,
-            filledFee = 0.00255,
-            avgWeighedPrice = 1.0,
-            totalExecutedPriceAssets = 8.5,
-            WsMatchTransactionInfo(ByteStr.empty, 0L, 1, 4.0, 4.0)
+          eventually(wsc.orderChanges should matchTo(List(WsOrder.fromOrder(
+            order,
+            status = OrderStatus.PartiallyFilled.name.some,
+            filledAmount = 8.5.some,
+            filledFee = 0.00255.some,
+            avgWeighedPrice = 1.0.some,
+            totalExecutedPriceAssets = 8.5.some,
+            matchInfo = Seq(WsMatchTransactionInfo(ByteStr.empty, 0L, 1, 4.0, 4.0))
           ))))
         }
         dex1.api.cancelAllOrdersWithSig(acc)
@@ -566,14 +566,14 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           val counterOrder = mkOrder(alice, wavesUsdPair, OrderType.BUY, 10.waves, 1.usd)
           placeAndAwaitAtDex(counterOrder, Status.Filled)
 
-          eventually(wsc.orderChanges should matchTo(List(WsOrder(
-            order.id(),
-            status = OrderStatus.Filled.name,
-            filledAmount = 10.0,
-            filledFee = 0.003,
-            avgWeighedPrice = 1.0,
-            totalExecutedPriceAssets = 10.0,
-            WsMatchTransactionInfo(ByteStr.empty, 0L, 1, 10.0, 10.0)
+          eventually(wsc.orderChanges should matchTo(List(WsOrder.fromOrder(
+            order,
+            status = OrderStatus.Filled.name.some,
+            filledAmount = 10.0.some,
+            filledFee = 0.003.some,
+            avgWeighedPrice = 1.0.some,
+            totalExecutedPriceAssets = 10.0.some,
+            matchInfo = Seq(WsMatchTransactionInfo(ByteStr.empty, 0L, 1, 10.0, 10.0))
           ))))
         }
         dex1.api.cancelAllOrdersWithSig(acc)

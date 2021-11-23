@@ -126,7 +126,7 @@ class NetworkAndQueueIssuesTestSuite extends WsSuiteBase with HasWebSockets with
       dex1.api.getReservedBalanceWithApiKey(alice) shouldBe empty
 
       assertChanges(wsac, squash = false)(Map(Waves -> WsBalances(initialWavesBalance, 0))) {
-        WsOrder(id = sellOrder.id(), status = OrderStatus.Cancelled.name)
+        WsOrder.fromOrder(sellOrder, status = OrderStatus.Cancelled.name.some)
       }
 
       dex1.tryApi.place(bigSellOrder) shouldBe Symbol("right")

@@ -65,14 +65,14 @@ class WsMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDrivenProp
     else
       result.copy(
         timestamp = None, // simulate partly filling of an already tracked order
-        amountAsset = None,
-        priceAsset = None,
-        side = None,
+        amountAsset = ao.order.assetPair.amountAsset,
+        priceAsset = ao.order.assetPair.priceAsset,
+        side = ao.order.orderType,
         isMarket = None,
         price = None,
         amount = None,
         fee = None,
-        feeAsset = None
+        feeAsset = ao.feeAsset
       )
   }
 

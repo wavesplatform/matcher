@@ -206,10 +206,10 @@ class ActorsWebSocketInteractionsSpecification
             Seq(WsOrder.fromDomain(lo)),
             1
           )
-          .cancelOrder(lo, false)
+          .cancelOrder(lo, unmatchable = false)
           .expectWsBalancesAndOrders(
             Map(usd -> WsBalances(300, 0), Waves -> WsBalances(100, 0)),
-            Seq(WsOrder(lo.id, status = OrderStatus.Cancelled.name.some)),
+            Seq(WsOrder.fromOrder(lo.order, status = OrderStatus.Cancelled.name.some)),
             2
           )
           .kill()
@@ -262,8 +262,8 @@ class ActorsWebSocketInteractionsSpecification
               // The half of order is still available
               Map(usd -> WsBalances(285, 15), Waves -> WsBalances(99.9985, 0.0015)),
               Seq(
-                WsOrder(
-                  id = buyOrder.id,
+                WsOrder.fromOrder(
+                  buyOrder.order,
                   status = OrderStatus.PartiallyFilled.name.some,
                   filledAmount = 5.0.some,
                   filledFee = 0.0015.some,
@@ -296,8 +296,8 @@ class ActorsWebSocketInteractionsSpecification
                 Waves -> WsBalances(104.9985, 0)
               ),
               Seq(
-                WsOrder(
-                  id = buyOrder.id,
+                WsOrder.fromOrder(
+                  buyOrder.order,
                   status = OrderStatus.Cancelled.name.some
                 )
               ),
@@ -346,8 +346,8 @@ class ActorsWebSocketInteractionsSpecification
               // tradable = total - reserved, so 180 = 300 - 120 USD, 2.2 = 3 - 0.8 ETH
               Map(usd -> WsBalances(180, 120), eth -> WsBalances(2.2, 0.8)),
               Seq(
-                WsOrder(
-                  id = mo.id,
+                WsOrder.fromOrder(
+                  mo.order,
                   status = OrderStatus.PartiallyFilled.name.some,
                   filledAmount = 10.0.some,
                   filledFee = 0.2.some,
@@ -366,8 +366,8 @@ class ActorsWebSocketInteractionsSpecification
             .expectWsBalancesAndOrders(
               Map(usd -> WsBalances(225, 75), eth -> WsBalances(2.5, 0.5)),
               Seq(
-                WsOrder(
-                  id = mo.id,
+                WsOrder.fromOrder(
+                  mo.order,
                   status = OrderStatus.PartiallyFilled.name.some,
                   filledAmount = 25.0.some,
                   filledFee = 0.5.some,
@@ -386,8 +386,8 @@ class ActorsWebSocketInteractionsSpecification
             .expectWsBalancesAndOrders(
               Map(usd -> WsBalances(240, 60), eth -> WsBalances(2.6, 0.4)),
               Seq(
-                WsOrder(
-                  id = mo.id,
+                WsOrder.fromOrder(
+                  mo.order,
                   status = OrderStatus.PartiallyFilled.name.some,
                   filledAmount = 30.0.some,
                   filledFee = 0.6.some,
@@ -406,8 +406,8 @@ class ActorsWebSocketInteractionsSpecification
             .expectWsBalancesAndOrders(
               Map(usd -> WsBalances(300, 0), eth -> WsBalances(3, 0)),
               Seq(
-                WsOrder(
-                  id = mo.id,
+                WsOrder.fromOrder(
+                  mo.order,
                   status = OrderStatus.Filled.name.some
                 )
               ),
@@ -622,8 +622,8 @@ class ActorsWebSocketInteractionsSpecification
               Waves -> WsBalances(99.994, 0.006) // 0.006 is a commission for counter2 + counter3, 99.994 = 100 - 0.006
             ),
             Seq(
-              WsOrder(
-                id = counter1.id,
+              WsOrder.fromOrder(
+                counter1.order,
                 status = OrderStatus.Filled.name.some,
                 filledAmount = 5.0.some,
                 filledFee = 0.003.some,
@@ -644,8 +644,8 @@ class ActorsWebSocketInteractionsSpecification
               Waves -> WsBalances(99.997, 0.003)
             ),
             Seq(
-              WsOrder(
-                id = counter2.id,
+              WsOrder.fromOrder(
+                counter2.order,
                 status = OrderStatus.Filled.name.some,
                 filledAmount = 5.0.some,
                 filledFee = 0.003.some,
@@ -667,8 +667,8 @@ class ActorsWebSocketInteractionsSpecification
               Waves -> WsBalances(99.9982, 0.0018) // executed_fee = 0.0012 = 0.003 * 2 / 5
             ),
             Seq(
-              WsOrder(
-                id = counter3.id,
+              WsOrder.fromOrder(
+                counter3.order,
                 status = OrderStatus.PartiallyFilled.name.some,
                 filledAmount = 2.0.some,
                 filledFee = 0.0012.some,
@@ -682,7 +682,7 @@ class ActorsWebSocketInteractionsSpecification
           .cancelOrder(counter3Remaining, unmatchable = false)
           .expectWsBalancesAndOrders(
             Map(usd -> WsBalances(70, 0), Waves -> WsBalances(100, 0)),
-            Seq(WsOrder(id = counter3.id, status = OrderStatus.Cancelled.name.some)),
+            Seq(WsOrder.fromOrder(counter3.order, status = OrderStatus.Cancelled.name.some)),
             7
           )
           .updateBalances(Map(usd -> 33.1.usd, Waves -> 111.9928.waves))
@@ -727,8 +727,8 @@ class ActorsWebSocketInteractionsSpecification
             // executed = 5, executed_fee = 0.003 * 5 / 12 = 0.00125, reserved = 7.00175 = 12.003 - 5 - 0.00125, tradable = 92.99825 = 100 - 7.00175
             Map(Waves -> WsBalances(92.99825, 7.00175)),
             Seq(
-              WsOrder(
-                id = mo.id,
+              WsOrder.fromOrder(
+                mo.order,
                 status = OrderStatus.PartiallyFilled.name.some,
                 filledAmount = 5.0.some,
                 filledFee = 0.00125.some,
@@ -747,8 +747,8 @@ class ActorsWebSocketInteractionsSpecification
             // executed = 5, executed_fee = 0.003 * 5 / 12 = 0.00125, reserved = 2.0005 = 7.00175 - 5 - 0.00125, tradable = 97.9995 = 100 - 2.0005
             Map(Waves -> WsBalances(97.9995, 2.0005)),
             Seq(
-              WsOrder(
-                id = mo.id,
+              WsOrder.fromOrder(
+                mo.order,
                 status = OrderStatus.PartiallyFilled.name.some,
                 filledAmount = 10.0.some,
                 filledFee = 0.0025.some,
@@ -767,8 +767,8 @@ class ActorsWebSocketInteractionsSpecification
             // executed = 2, executed_fee = 0.003 * 2 / 12 = 0.0005, reserved = 0 = 2.0005 - 2 - 0.0005, tradable = 100
             Map(Waves -> WsBalances(100, 0)),
             Seq(
-              WsOrder(
-                id = mo.id,
+              WsOrder.fromOrder(
+                mo.order,
                 status = OrderStatus.Filled.name.some,
                 filledAmount = 12.0.some,
                 filledFee = 0.003.some,
@@ -814,14 +814,14 @@ class ActorsWebSocketInteractionsSpecification
         .expectWsBalancesAndOrders(
           Map(usd -> WsBalances(5, 5), Waves -> WsBalances(9.9985, 0.0015)),
           Seq(
-            WsOrder(
-              id = bo.id,
-              status = OrderStatus.PartiallyFilled.name,
-              filledAmount = 5.0,
-              filledFee = 0.0015,
-              avgWeighedPrice = 1.0,
-              totalExecutedPriceAssets = 5.0,
-              mkWsMatchTxInfo(1.0, 5.0)
+            WsOrder.fromOrder(
+              bo.order,
+              status = OrderStatus.PartiallyFilled.name.some,
+              filledAmount = 5.0.some,
+              filledFee = 0.0015.some,
+              avgWeighedPrice = 1.0.some,
+              totalExecutedPriceAssets = 5.0.some,
+              matchInfo = Seq(mkWsMatchTxInfo(1.0, 5.0))
             )
           ),
           2
@@ -835,7 +835,7 @@ class ActorsWebSocketInteractionsSpecification
         .cancelOrder(oe.counterRemaining, unmatchable = false)
         .expectWsBalancesAndOrders(
           Map(usd -> WsBalances(5, 0), Waves -> WsBalances(14.9985, 0)),
-          Seq(WsOrder(id = bo.id, status = OrderStatus.Cancelled.name.some)),
+          Seq(WsOrder.fromOrder(bo.order, status = OrderStatus.Cancelled.name.some)),
           4
         )
         .kill()

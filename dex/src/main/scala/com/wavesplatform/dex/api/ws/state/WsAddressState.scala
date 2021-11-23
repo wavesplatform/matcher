@@ -72,10 +72,10 @@ final case class WsAddressState(
 
   def putOrderUpdate(id: Order.Id, update: WsOrder): WsAddressState = copy(ordersChanges = ordersChanges + (id -> update))
 
-  def putOrderStatusNameUpdate(id: Order.Id, newStatus: OrderStatus): WsAddressState =
+  def putOrderStatusNameUpdate(order: Order, newStatus: OrderStatus): WsAddressState =
     putOrderUpdate(
-      id = id,
-      update = ordersChanges.getOrElse(id, WsOrder(id)).copy(status = newStatus.name.some)
+      id = order.id(),
+      update = ordersChanges.getOrElse(order.id(), WsOrder.fromOrder(order, status = newStatus.name.some))
     )
 
   def putOrderFillingInfoAndStatusNameUpdate(
@@ -97,7 +97,7 @@ final case class WsAddressState(
       )
     }
 
-    val prevChange = ordersChanges.getOrElse(ao.id, WsOrder(ao.id))
+    val prevChange = ordersChanges.getOrElse(ao.id, WsOrder.fromOrder(ao.order))
     putOrderUpdate(
       id = ao.id,
       update = prevChange.copy(

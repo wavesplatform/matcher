@@ -23,6 +23,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.{ExecutionError, ValidationError}
 import com.wavesplatform.protobuf.Amount
+import com.wavesplatform.state.TxMeta
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -91,8 +92,8 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
 
   override def getStatuses(request: TransactionsByIdRequest): Future[TransactionsStatusesResponse] = Future {
     val statuses = request.transactionIds.map { txId =>
-      context.blockchain.transactionInfo(txId.toVanilla).map(_._1) match {
-        case Some(height) => TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, height)
+      context.blockchain.transactionInfo(txId.toVanilla) match {
+        case Some((TxMeta(height, _, _), _)) => TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, height)
         case None =>
           context.utx.transactionById(txId.toVanilla) match {
             case Some(_) => TransactionStatus(txId, TransactionStatus.Status.UNCONFIRMED)
@@ -232,11 +233,12 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
       case Some(scriptInfo) =>
         val order = request.order.map(_.toVanilla).getOrElse(throwInvalidArgument("Expected an order"))
         val isSynchronousCallsActivated = context.blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
+        val useNewPowPrecision = context.blockchain.height > context.blockchain.settings.functionalitySettings.syncDAppCheckPaymentsHeight
         if (allowedBlockchainStateAccounts.contains(order.senderPublicKey)) {
           val blockchain = CompositeBlockchain(context.blockchain, utxState.get().getAccountsDiff(context.blockchain))
-          parseScriptResult(MatcherScriptRunner(scriptInfo.script, order, blockchain, isSynchronousCallsActivated))
+          parseScriptResult(MatcherScriptRunner(scriptInfo.script, order, blockchain, isSynchronousCallsActivated, useNewPowPrecision))
         } else
-          parseScriptResult(MatcherScriptRunner(scriptInfo.script, order, deniedBlockchain, isSynchronousCallsActivated))
+          parseScriptResult(MatcherScriptRunner(scriptInfo.script, order, deniedBlockchain, isSynchronousCallsActivated, useNewPowPrecision))
     }
 
     RunScriptResponse(r)

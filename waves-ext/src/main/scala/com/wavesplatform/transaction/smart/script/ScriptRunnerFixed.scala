@@ -80,7 +80,7 @@ object ScriptRunnerFixed {
               scriptContainerAddress,
               txId,
               fixUnicodeFunctions,
-              blockchain.height >= blockchain.settings.functionalitySettings.syncDAppCheckPaymentsHeight
+              useNewPowPrecision
             )
         } yield (ds, ctx)
 

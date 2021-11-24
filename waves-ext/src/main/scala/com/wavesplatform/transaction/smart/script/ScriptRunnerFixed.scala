@@ -42,7 +42,8 @@ object ScriptRunnerFixed {
       complexityLimit,
       default,
       blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls),
-      blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
+      blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls),
+      blockchain.height >= blockchain.settings.functionalitySettings.syncDAppCheckPaymentsHeight
     )
 
   def applyGeneric(
@@ -54,7 +55,8 @@ object ScriptRunnerFixed {
     complexityLimit: Int,
     default: EVALUATED,
     useCorrectScriptVersion: Boolean,
-    fixUnicodeFunctions: Boolean
+    fixUnicodeFunctions: Boolean,
+    useNewPowPrecision: Boolean
   ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) = {
 
     def evalVerifier(
@@ -77,7 +79,8 @@ object ScriptRunnerFixed {
               isContract,
               scriptContainerAddress,
               txId,
-              fixUnicodeFunctions
+              fixUnicodeFunctions,
+              blockchain.height >= blockchain.settings.functionalitySettings.syncDAppCheckPaymentsHeight
             )
         } yield (ds, ctx)
 

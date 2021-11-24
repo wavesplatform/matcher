@@ -31,21 +31,23 @@ class MatcherScriptRunnerSpecification extends WavesExtSuiteBase {
     matcherFee = 30000L
   )
 
-  private def run(script: Script, isSynchronousCallsActivated: Boolean): Either[String, Terms.EVALUATED] =
-    MatcherScriptRunner(script, sampleOrder, deniedBlockchain, isSynchronousCallsActivated)
+  private def run(script: Script, isSynchronousCallsActivated: Boolean, useNewPowPrecision: Boolean): Either[String, Terms.EVALUATED] =
+    MatcherScriptRunner(script, sampleOrder, deniedBlockchain, isSynchronousCallsActivated, useNewPowPrecision)
 
   "dApp sunny day" in {
-    List(false, true).foreach { isSynchronousCallsActivated =>
-      run(dAppScriptSunny, isSynchronousCallsActivated).explicitGet() shouldBe Terms.FALSE
-    }
+    for {
+      isSynchronousCallsActivated <- List(false, true)
+      useNewPowPrecision <- List(false, true)
+    } yield run(dAppScriptSunny, isSynchronousCallsActivated, useNewPowPrecision).explicitGet() shouldBe Terms.FALSE
   }
 
   "Blockchain functions are disabled in dApp (isSynchronousCallsActivated = false)" in {
-    List(false, true).foreach { isSynchronousCallsActivated =>
-      run(dAppScriptBlockchain, isSynchronousCallsActivated) should produce(
-        "An access to <getBoolean(addressOrAlias: Address|Alias, key: String): Boolean|Unit> is denied"
-      )
-    }
+    for {
+      isSynchronousCallsActivated <- List(false, true)
+      useNewPowPrecision <- List(false, true)
+    } yield run(dAppScriptBlockchain, isSynchronousCallsActivated, useNewPowPrecision) should produce(
+      "An access to <getBoolean(addressOrAlias: Address|Alias, key: String): Boolean|Unit> is denied"
+    )
   }
 
   private def dAppScriptSunny: Script =

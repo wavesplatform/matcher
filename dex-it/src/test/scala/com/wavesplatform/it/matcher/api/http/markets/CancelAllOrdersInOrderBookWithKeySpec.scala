@@ -29,7 +29,7 @@ class CancelAllOrdersInOrderBookWithKeySpec extends MatcherSuiteBase with ApiKey
       }
 
       val bobOrders = eventually {
-        dex1.api.orderHistoryByAddressWithKey(alice).map(_.id).tap(_.size shouldBe 10)
+        dex1.api.orderHistoryByAddressWithKey(bob).map(_.id).tap(_.size shouldBe 10)
       }
 
       dex1.api.cancelAllInOrderBookWithKey(wavesUsdPair)

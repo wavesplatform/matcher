@@ -434,7 +434,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
     headers: Map[String, String]
   ): AsyncEnrichedDexApi.R[HttpMessage] = mk {
     basicRequest
-      .post(uri"$apiUri/matcher/orderbook/$amountAsset/$priceAsset/cancel")
+      .post(uri"$apiUri/matcher/orderbook/$amountAsset/$priceAsset/cancelAll")
       .followRedirects(false)
       .headers(headers)
   }

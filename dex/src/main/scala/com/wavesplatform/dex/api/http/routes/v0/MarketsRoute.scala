@@ -368,7 +368,7 @@ final class MarketsRoute(
       }
     }
 
-  @Path("/orderbook/{amountAsset}/{priceAsset}/cancel#cancelAllInOrderBookWithKey")
+  @Path("/orderbook/{amountAsset}/{priceAsset}/cancelAll#cancelAllInOrderBookWithKey")
   @ApiOperation(
     value = "Cancel all orders in Order Book for a given Asset Pair. Requires API Key",
     notes = "Cancel all orders in Order Book for a given Asset Pair. Requires API Key",
@@ -384,7 +384,7 @@ final class MarketsRoute(
     )
   )
   def cancelAllInOrderBookWithKey: Route =
-    (path(AssetPairPM / "cancel") & post) { pairOrError =>
+    (path(AssetPairPM / "cancelAll") & post) { pairOrError =>
       (withMetricsAndTraces("cancelAllInOrderBookWithKey") & protect & withAuth) {
         withAssetPair(assetPairBuilder, pairOrError) { pair =>
           orderBook(pair) match {
@@ -393,7 +393,7 @@ final class MarketsRoute(
                 storeCommand(ValidatedCommand.CancelAllOrders(pair))
                   .map {
                     case None => NotImplemented(error.FeatureDisabled)
-                    case _ => SimpleResponse(StatusCodes.Accepted, "Canceling orders")
+                    case _ => SimpleResponse(StatusCodes.Accepted, "Canceling all orders in order book")
                   }
                   .recover { case e: Throwable =>
                     log.error("Can not persist event", e)

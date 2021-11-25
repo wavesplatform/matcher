@@ -43,6 +43,10 @@ class CancelAllOrdersInOrderBookWithKeySpec extends MatcherSuiteBase with ApiKey
         }
       }
     }
+
+    shouldReturnErrorWithoutApiKeyHeader(
+      dex1.rawApi.cancelAllInOrderBookWithKey(wavesUsdPair.amountAssetStr, wavesUsdPair.priceAssetStr, headers = Map.empty)
+    )
   }
 
   override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(

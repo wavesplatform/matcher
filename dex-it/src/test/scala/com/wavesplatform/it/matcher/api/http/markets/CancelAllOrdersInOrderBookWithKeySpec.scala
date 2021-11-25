@@ -35,10 +35,7 @@ class CancelAllOrdersInOrderBookWithKeySpec extends MatcherSuiteBase with ApiKey
       dex1.api.cancelAllInOrderBookWithKey(wavesUsdPair)
 
       eventually {
-        aliceOrders.foreach { oid =>
-          dex1.api.orderStatusByAssetPairAndId(wavesUsdPair, oid).status shouldBe HttpOrderStatus.Status.Cancelled
-        }
-        bobOrders.foreach { oid =>
+        (aliceOrders ++ bobOrders).foreach { oid =>
           dex1.api.orderStatusByAssetPairAndId(wavesUsdPair, oid).status shouldBe HttpOrderStatus.Status.Cancelled
         }
       }

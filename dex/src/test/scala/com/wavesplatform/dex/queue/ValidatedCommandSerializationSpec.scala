@@ -10,7 +10,7 @@ import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.{OrderType, OrderV1}
 import com.wavesplatform.dex.model.{LimitOrder, MarketOrder}
-import com.wavesplatform.dex.queue.ValidatedCommand.{CancelOrder, DeleteOrderBook, PlaceMarketOrder, PlaceOrder}
+import com.wavesplatform.dex.queue.ValidatedCommand.{CancelAllOrders, CancelOrder, DeleteOrderBook, PlaceMarketOrder, PlaceOrder}
 import kamon.Kamon
 import kamon.context.Context
 import kamon.tag.{Tag, TagSet}
@@ -60,6 +60,14 @@ final class ValidatedCommandSerializationSpec extends MatcherSpec with MatcherSp
 
     "write & read delete order book (2)" in test {
       DeleteOrderBook(order.assetPair, None)
+    }
+
+    "write & read cancel all in order book (1)" in test {
+      CancelAllOrders(order.assetPair, None)
+    }
+
+    "write & read cancel all in order book (2)" in test {
+      CancelAllOrders(order.assetPair, Some(Kamon.currentContext()))
     }
 
   }

@@ -67,7 +67,8 @@ final class MarketsRoute(
     pathPrefix("matcher") {
       pathPrefix("orderbook") {
         matcherStatusBarrier {
-          getOrderBookRestrictions ~ getOrderStatusByPKAndIdWithSig ~ getOrderBook ~ getOrderBooks ~ getOrderBookStatus ~ deleteOrderBookWithKey ~ getOrderStatusByAssetPairAndId
+          getOrderBookRestrictions ~ getOrderStatusByPKAndIdWithSig ~ getOrderBook ~ getOrderBooks ~
+          getOrderBookStatus ~ deleteOrderBookWithKey ~ getOrderStatusByAssetPairAndId ~ cancelAllInOrderBookWithKey
         }
       } ~ pathPrefix("orders") {
         matcherStatusBarrier(getOrderStatusByAddressAndIdWithKey)
@@ -362,6 +363,44 @@ final class MarketsRoute(
                 )
               case _ => complete(OrderBookUnavailable(error.OrderBookBroken(pair)))
             }
+          }
+        }
+      }
+    }
+
+  @Path("/orderbook/{amountAsset}/{priceAsset}/cancelAll#cancelAllInOrderBookWithKey")
+  @ApiOperation(
+    value = "Cancel all orders in Order Book for a given Asset Pair. Requires API Key",
+    notes = "Cancel all orders in Order Book for a given Asset Pair. Requires API Key",
+    httpMethod = "POST",
+    authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
+    tags = Array("markets"),
+    response = classOf[HttpMessage]
+  )
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "amountAsset", value = "Amount Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "priceAsset", value = "Price Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path")
+    )
+  )
+  def cancelAllInOrderBookWithKey: Route =
+    (path(AssetPairPM / "cancelAll") & post) { pairOrError =>
+      (withMetricsAndTraces("cancelAllInOrderBookWithKey") & protect & withAuth) {
+        withAssetPair(assetPairBuilder, pairOrError) { pair =>
+          orderBook(pair) match {
+            case Some(Right(_)) =>
+              complete(
+                storeCommand(ValidatedCommand.CancelAllOrders(pair))
+                  .map {
+                    case None => NotImplemented(error.FeatureDisabled)
+                    case _ => SimpleResponse(StatusCodes.Accepted, "Canceling all orders in order book")
+                  }
+                  .recover { case e: Throwable =>
+                    log.error("Can not persist event", e)
+                    CanNotPersist(error.CanNotPersistEvent)
+                  }
+              )
+            case _ => complete(OrderBookUnavailable(error.OrderBookBroken(pair)))
           }
         }
       }

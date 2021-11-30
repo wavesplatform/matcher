@@ -83,6 +83,18 @@ object ValidatedCommand {
 
   }
 
+  final case class CancelAllOrders(assetPair: AssetPair, maybeCtx: Option[Context] = Some(Kamon.currentContext())) extends ValidatedCommand {
+    override def toString: String = s"CancelAllOrders(${assetPair.key})"
+    override def hashCode(): Int = productHash(Tuple1(assetPair))
+
+    override def equals(obj: Any): Boolean = obj match {
+      case that: CancelAllOrders =>
+        assetPair == that.assetPair
+      case _ => false
+    }
+
+  }
+
   implicit final class ValidatedCommandOps(val self: ValidatedCommand) extends AnyVal {
 
     def assets: Set[Asset] = self match {
@@ -90,6 +102,7 @@ object ValidatedCommand {
       case x: PlaceMarketOrder => x.assetPair.assets + x.marketOrder.order.feeAsset
       case x: CancelOrder => x.assetPair.assets
       case x: DeleteOrderBook => x.assetPair.assets
+      case x: CancelAllOrders => x.assetPair.assets
     }
 
   }
@@ -104,6 +117,8 @@ object ValidatedCommand {
         (3: Byte) +: Array.concat(assetPair.bytes, writeMaybeCtx(ctx))
       case PlaceMarketOrder(mo, ctx) =>
         (4: Byte) +: Array.concat(Longs.toByteArray(mo.availableForSpending), Array(mo.order.version), mo.order.bytes(), writeMaybeCtx(ctx))
+      case CancelAllOrders(assetPair, ctx) =>
+        (5: Byte) +: Array.concat(assetPair.bytes, writeMaybeCtx(ctx))
     }
 
   def fromBytes(xs: Array[Byte]): ValidatedCommand =
@@ -134,6 +149,11 @@ object ValidatedCommand {
         val (order, offset) = Order.fromBytes(bodyBytes(8), bodyBytes.slice(9, Int.MaxValue))
         val maybeCtx = readMaybeCtx(bodyBytes.drop(8 + offset.value + 1))
         PlaceMarketOrder(MarketOrder(order, afs), maybeCtx)
+      case 5 =>
+        val bodyBytes = xs.tail
+        val (assetPair, offset) = AssetPair.fromBytes(bodyBytes)
+        val maybeCtx = readMaybeCtx(bodyBytes.drop(offset))
+        CancelAllOrders(assetPair, maybeCtx)
       case x =>
         throw new IllegalArgumentException(s"Unknown command type: $x")
     }

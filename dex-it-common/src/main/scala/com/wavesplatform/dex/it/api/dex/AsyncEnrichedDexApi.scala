@@ -425,6 +425,20 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
   override def deleteOrderBookWithKey(assetPair: AssetPair): R[HttpMessage] =
     deleteOrderBookWithKey(assetPair.amountAssetStr, assetPair.priceAssetStr, apiKeyHeaders)
 
+  override def cancelAllInOrderBookWithKey(assetPair: AssetPair): AsyncEnrichedDexApi.R[HttpMessage] =
+    cancelAllInOrderBookWithKey(assetPair.amountAssetStr, assetPair.priceAssetStr, apiKeyHeaders)
+
+  override def cancelAllInOrderBookWithKey(
+    amountAsset: String,
+    priceAsset: String,
+    headers: Map[String, String]
+  ): AsyncEnrichedDexApi.R[HttpMessage] = mk {
+    basicRequest
+      .post(uri"$apiUri/matcher/orderbook/$amountAsset/$priceAsset/cancelAll")
+      .followRedirects(false)
+      .headers(headers)
+  }
+
   override def deleteOrderBookWithKey(amountAsset: String, priceAsset: String, headers: Map[String, String]): R[HttpMessage] = mk {
     basicRequest
       .delete(uri"$apiUri/matcher/orderbook/$amountAsset/$priceAsset")

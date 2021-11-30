@@ -886,6 +886,48 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     )
   }
 
+  //cancelAllInOrderBookWithKey
+  routePath("/orderbook/{amountAsset}/{priceAsset}/cancelAll") - {
+
+    "return success if api key provided & order book exists" in {
+      test(
+        route =>
+          Post(routePath(s"/orderbook/${okOrder.assetPair.amountAssetStr}/${okOrder.assetPair.priceAssetStr}/cancelAll"))
+            .withHeaders(apiKeyHeader()) ~> route ~> check {
+            status shouldEqual StatusCodes.Accepted
+            responseAs[HttpMessage] should matchTo(HttpMessage("Canceling all orders in order book"))
+          },
+        apiKeys
+      )
+    }
+
+    "returns an error if assets are blacklisted" in test(
+      route =>
+        Post(routePath(s"/orderbook/${blackListedOrder.assetPair.amountAssetStr}/${blackListedOrder.assetPair.priceAssetStr}/cancelAll"))
+          .withHeaders(apiKeyHeader()) ~> route ~> check {
+          status shouldEqual StatusCodes.BadRequest
+        },
+      apiKeys
+    )
+
+    "returns an error if there is no such order book" in test(
+      route =>
+        Post(routePath(s"/orderbook/${someOrder.assetPair.amountAssetStr}/${someOrder.assetPair.priceAssetStr}/cancelAll"))
+          .withHeaders(apiKeyHeader()) ~> route ~> check {
+          status shouldEqual StatusCodes.NotFound
+        },
+      apiKeys
+    )
+
+    "returns an error if api key is not provided" in test(
+      route =>
+        Post(routePath(s"/orderbook/${someOrder.assetPair.amountAssetStr}/${someOrder.assetPair.priceAssetStr}/cancelAll")) ~> route ~> check {
+          status shouldEqual StatusCodes.Forbidden
+        },
+      apiKeys
+    )
+  }
+
   // getTransactionsByOrderId
   routePath("/transactions/{orderId}") - {
     "returns known transactions with this order" in test { route =>
@@ -1409,6 +1451,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       {
         case ValidatedCommand.DeleteOrderBook(pair, _) if pair == okOrder.assetPair || pair == blackListedOrder.assetPair =>
           Future.successful(ValidatedCommandWithMeta(1L, System.currentTimeMillis, ValidatedCommand.DeleteOrderBook(pair)).some)
+        case ValidatedCommand.CancelAllOrders(pair, _) if pair == okOrder.assetPair || pair == blackListedOrder.assetPair =>
+          Future.successful(ValidatedCommandWithMeta(1L, System.currentTimeMillis, ValidatedCommand.CancelAllOrders(pair)).some)
         case _ =>
           Future.failed(new NotImplementedError("Storing is not implemented"))
       },

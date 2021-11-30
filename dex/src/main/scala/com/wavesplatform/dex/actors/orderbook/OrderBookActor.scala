@@ -138,6 +138,9 @@ class OrderBookActor(
               process(request.timestamp, orderBook.cancelAll(request.timestamp, OrderCanceledReason.OrderBookDeleted))
               saveSnapshotAt(request.offset - 1)
               aggregatedRef ! AggregatedOrderBookActor.Command.Stop(self, error.OrderBookStopped(assetPair))
+            case _: ValidatedCommand.CancelAllOrders =>
+              log.trace(s"Applied $request")
+              process(request.timestamp, orderBook.cancelAll(request.timestamp, OrderCanceledReason.RequestExecuted))
           }
       }
 

@@ -1,12 +1,13 @@
 package com.wavesplatform.dex.actors
 
 import akka.actor.{Actor, ActorRef, Props, Stash, SupervisorStrategy, Terminated}
-import cats.implicits.catsSyntaxEitherId
+import cats.syntax.either._
+import cats.syntax.option._
 import com.wavesplatform.dex.actors.orderbook.OrderBookActor.{OrderBookRecovered, OrderBookSnapshotUpdateCompleted}
 import com.wavesplatform.dex.actors.orderbook.{AggregatedOrderBookActor, OrderBookActor}
 import com.wavesplatform.dex.api.http.entities.OrderBookUnavailable
 import com.wavesplatform.dex.app.{forceStopApplication, StartingMatcherError}
-import com.wavesplatform.dex.db.{AssetPairsDb, AssetsCache}
+import com.wavesplatform.dex.db.{AssetPairsDb, AssetsCache, OrderBookSnapshotDb}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.utils.ScorexLogging
@@ -27,9 +28,10 @@ import scala.util.{Failure, Success}
 class OrderBookDirectoryActor(
   settings: MatcherSettings,
   assetPairsDb: AssetPairsDb[Future],
+  orderBookSnapshotDb: OrderBookSnapshotDb[Future],
   recoveryCompletedWithEventNr: Either[String, Long] => Unit,
   orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
-  orderBookActorProps: (AssetPair, ActorRef) => Props,
+  orderBookActorProps: (AssetPair, Option[OrderBookActor.Snapshot], ActorRef) => Props,
   assetsCache: AssetsCache,
   validateAssetPair: AssetPair => Either[MatcherError, AssetPair]
 ) extends Actor
@@ -54,24 +56,17 @@ class OrderBookDirectoryActor(
 
   override val receive: Receive = {
     case Start(assetPairs) =>
-      val (errors, validAssetPairs) = assetPairs.partitionMap { assetPair =>
-        validateAssetPair(assetPair) match {
-          case Left(e) => s"$assetPair: ${e.message.text}".asLeft
-          case Right(x) => x.asRight
-        }
-      }
-
-      if (errors.nonEmpty) log.warn(s"Invalid asset pairs:\n${errors.mkString("\n")}")
-
       val nextState =
-        if (validAssetPairs.isEmpty) {
+        if (assetPairs.isEmpty) {
           log.info("Recovery completed!")
           recoveryCompletedWithEventNr(-1L asRight)
           working
         } else {
-          log.info(s"Recovery completed, waiting ${validAssetPairs.size} order books to restore")
-          validAssetPairs.foreach(createOrderBook)
-          collectOrderBooks(validAssetPairs.size, None, -1L, Map.empty)
+          log.info(s"Recovery completed, waiting ${assetPairs.size} order books to restore")
+          assetPairs.foreach { case (pair, snapshot) =>
+            createOrderBook(pair, snapshot.some)
+          }
+          collectOrderBooks(assetPairs.size, None, -1L, Map.empty)
         }
 
       unstashAll()
@@ -108,9 +103,9 @@ class OrderBookDirectoryActor(
     )
   }
 
-  private def createOrderBook(pair: AssetPair): ActorRef = {
+  private def createOrderBook(pair: AssetPair, maybeSnapshot: Option[OrderBookActor.Snapshot]): ActorRef = {
     log.info(s"Creating order book for $pair")
-    val orderBook = context.watch(context.actorOf(orderBookActorProps(pair, self), OrderBookActor.name(pair)))
+    val orderBook = context.watch(context.actorOf(orderBookActorProps(pair, maybeSnapshot, self), OrderBookActor.name(pair)))
     orderBooks.updateAndGet(_ + (pair -> Right(orderBook)))
     tradedPairs += pair -> createMarketData(pair)
     orderBook
@@ -133,7 +128,7 @@ class OrderBookDirectoryActor(
           log.error(s"OrderBook for $assetPair is stopped, but it is not observed in orderBook")
           s ! OrderBookUnavailable(error.OrderBookUnexpectedState(assetPair))
         } else if (autoCreate) {
-          val ob = createOrderBook(assetPair)
+          val ob = createOrderBook(assetPair, none)
           assetPairsDb
             .add(assetPair)
             .onComplete {
@@ -321,11 +316,23 @@ class OrderBookDirectoryActor(
 
   // Init
 
-  val assetPairsInit = for {
-    assetPairs <- assetPairsDb.all()
-    // We need to do this, because assets must be cached before order books created
-    _ <- Future.inSeries(assetPairs.flatMap(_.assets))(assetsCache.get)
-  } yield assetPairs
+  val assetPairsInit: Future[Map[AssetPair, OrderBookActor.Snapshot]] =
+    for {
+      assetPairs <- assetPairsDb.all()
+      _ = log.info(s"Total asset pairs: ${assetPairs.size}")
+
+      // We need to do this, because assets must be cached before order books created
+      _ <- Future.inSeries(assetPairs.flatMap(_.assets))(assetsCache.get)
+
+      validAssetPairs = assetPairs.flatMap(validateAssetPair(_).toOption)
+      _ = log.info(s"Valid asset pairs: ${validAssetPairs.size}, invalid asset pairs: ${assetPairs.size - validAssetPairs.size}")
+      snapshots <- orderBookSnapshotDb.iterateSnapshots(validAssetPairs.contains)
+      offsets <- orderBookSnapshotDb.iterateOffsets(validAssetPairs.contains)
+      result = validAssetPairs.map { pair =>
+        pair -> offsets.get(pair).zip(snapshots.get(pair))
+      }.toMap
+      _ = log.info(s"Snapshots: ${snapshots.size}, offsets: ${offsets.size}, result: ${result.size}")
+    } yield result
 
   assetPairsInit.onComplete {
     case Success(xs) => self ! Start(xs)
@@ -343,15 +350,17 @@ object OrderBookDirectoryActor {
   def props(
     matcherSettings: MatcherSettings,
     assetPairsDB: AssetPairsDb[Future],
+    orderBookSnapshotDb: OrderBookSnapshotDb[Future],
     recoveryCompletedWithEventNr: Either[String, Long] => Unit,
     orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
-    orderBookProps: (AssetPair, ActorRef) => Props,
+    orderBookProps: (AssetPair, Option[OrderBookActor.Snapshot], ActorRef) => Props,
     assetsCache: AssetsCache,
     validateAssetPair: AssetPair => Either[MatcherError, AssetPair]
   ): Props = Props(
     new OrderBookDirectoryActor(
       matcherSettings,
       assetPairsDB,
+      orderBookSnapshotDb,
       recoveryCompletedWithEventNr,
       orderBooks,
       orderBookProps,
@@ -362,7 +371,7 @@ object OrderBookDirectoryActor {
 
   private case class ShutdownStatus(initiated: Boolean, oldMessagesDeleted: Boolean, oldSnapshotsDeleted: Boolean, onComplete: () => Unit)
 
-  private case class Start(knownAssetPairs: Set[AssetPair])
+  private case class Start(assetPairs: Map[AssetPair, OrderBookActor.Snapshot])
 
   case object ForceSaveSnapshots
   case class SaveSnapshot(globalEventNr: EventOffset)

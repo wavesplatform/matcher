@@ -2,6 +2,7 @@ package com.wavesplatform.dex.db
 
 import cats.Id
 import com.wavesplatform.dex.domain.asset.Asset.Waves
+import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.model.{BuyLimitOrder, LastTrade, OrderBookSideSnapshot, OrderBookSnapshot, SellLimitOrder}
 import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
 import org.scalacheck.Gen
@@ -29,6 +30,61 @@ class OrderBookSnapshotDbSpec extends AnyFreeSpec with Matchers with WithDb with
           obsdb.update(assetPair, offset, Some(snapshot))
           obsdb.delete(assetPair)
           obsdb.get(assetPair) shouldBe empty
+        }
+      }
+    }
+
+    "iterate over snapshots & offsets (1)" in {
+      forAll(genSeq) { v =>
+        test { obsdb =>
+          v.foreach { case (snapshot, assetPair, offset) =>
+            obsdb.update(assetPair, offset, Some(snapshot))
+          }
+          val snapshots = obsdb.iterateSnapshots(_ => true)
+          val offsets = obsdb.iterateOffsets(_ => true)
+
+          val expected = v.map(_._2).toSet.map { pair: AssetPair =>
+            pair -> offsets.get(pair).zip(snapshots.get(pair))
+          }.toMap
+
+          val actual = v.map { case (snapshot, assetPair, offset) =>
+            assetPair -> Some((offset, snapshot))
+          }.toMap
+
+          actual shouldBe expected
+        }
+      }
+    }
+
+    "iterate over snapshots & offsets (2)" in {
+      val genSeqWithIgnoredPairs =
+        for {
+          v <- genSeq
+          ignoredPairs <- Gen.pick(v.size / 2, v).map(_.map(_._2).toSet)
+        } yield (v, ignoredPairs)
+
+      forAll(genSeqWithIgnoredPairs) { case (v, ignoredPairs) =>
+        test { obsdb =>
+          v.foreach { case (snapshot, assetPair, offset) =>
+            obsdb.update(assetPair, offset, Some(snapshot))
+          }
+
+          val filteredV = v.filterNot { case (_, pair, _) => ignoredPairs.contains(pair) }
+          val snapshots = obsdb.iterateSnapshots(!ignoredPairs.contains(_))
+          val offsets = obsdb.iterateOffsets(!ignoredPairs.contains(_))
+
+          filteredV.size shouldBe snapshots.size
+          filteredV.size shouldBe offsets.size
+
+          val expected = filteredV.map(_._2).toSet.map { pair: AssetPair =>
+            pair -> offsets.get(pair).zip(snapshots.get(pair))
+          }.toMap
+
+          val actual = filteredV.map { case (snapshot, assetPair, offset) =>
+            assetPair -> Some((offset, snapshot))
+          }.toMap
+
+          actual shouldBe expected
         }
       }
     }
@@ -72,5 +128,10 @@ class OrderBookSnapshotDbSpec extends AnyFreeSpec with Matchers with WithDb with
     assetPair <- fixedAssetPairGen
     offset <- Gen.choose(0L, Long.MaxValue)
   } yield (snapshot, assetPair, offset)
+
+  private lazy val genSeq = for {
+    n <- Gen.choose(0, 10)
+    v <- Gen.containerOfN[Vector, (OrderBookSnapshot, AssetPair, Long)](n, gen)
+  } yield v
 
 }

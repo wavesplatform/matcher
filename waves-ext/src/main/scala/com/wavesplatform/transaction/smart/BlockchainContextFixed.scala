@@ -55,7 +55,7 @@ object BlockchainContextFixed {
         cache.computeIfAbsent(
           (ds.stdLibVersion, fixUnicodeFunctions, ds),
           _ =>
-            PureContext.build(ds.stdLibVersion, fixUnicodeFunctions, useNewPowPrecision).withEnvironment[Environment] |+|
+            PureContext.build(ds.stdLibVersion, fixUnicodeFunctions).withEnvironment[Environment] |+|
             CryptoContext.build(Global, ds.stdLibVersion).withEnvironment[Environment] |+|
             WavesContext.build(Global, ds)
         )

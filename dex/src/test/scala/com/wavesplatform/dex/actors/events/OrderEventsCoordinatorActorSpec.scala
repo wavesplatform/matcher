@@ -24,7 +24,9 @@ import com.wavesplatform.dex.model.Events.ExchangeTransactionCreated
 import com.wavesplatform.dex.model.{Events, LimitOrder}
 import com.wavesplatform.dex.{error, MatcherSpecBase}
 import com.wavesplatform.events.protobuf.StateUpdate
+import com.wavesplatform.protobuf.transaction.SignedTransaction.Transaction.WavesTransaction
 import com.wavesplatform.protobuf.transaction.{SignedTransaction, Transaction}
+import org.scalatest.OptionValues
 import org.scalatest.freespec.AnyFreeSpecLike
 import org.scalatest.matchers.should.Matchers
 
@@ -32,7 +34,12 @@ import java.nio.charset.StandardCharsets
 import scala.concurrent.duration.DurationInt
 import scala.reflect.ClassTag
 
-class OrderEventsCoordinatorActorSpec extends ScalaTestWithActorTestKit() with MatcherSpecBase with AnyFreeSpecLike with Matchers {
+class OrderEventsCoordinatorActorSpec
+    extends ScalaTestWithActorTestKit()
+    with MatcherSpecBase
+    with AnyFreeSpecLike
+    with Matchers
+    with OptionValues {
 
   implicit private val actorSystem = testKit.internalSystem
   implicit private val classicActorSystem = actorSystem.classicSystem
@@ -189,16 +196,17 @@ class OrderEventsCoordinatorActorSpec extends ScalaTestWithActorTestKit() with M
       val validTxWithChanges = TransactionWithChanges(
         validTx.id().toPB,
         tx = SignedTransaction(
-          transaction = validTx.toPB.transaction.map { tx =>
-            Transaction(
-              chainId = tx.chainId,
-              senderPublicKey = tx.senderPublicKey,
-              fee = tx.fee,
-              timestamp = tx.timestamp,
-              version = tx.version,
-              data = com.wavesplatform.protobuf.transaction.Transaction.Data.Exchange(tx.getExchange)
-            )
-          }
+          transaction =
+            WavesTransaction(validTx.toPB.transaction.map { tx =>
+              Transaction(
+                chainId = tx.chainId,
+                senderPublicKey = tx.senderPublicKey,
+                fee = tx.fee,
+                timestamp = tx.timestamp,
+                version = tx.version,
+                data = com.wavesplatform.protobuf.transaction.Transaction.Data.Exchange(tx.getExchange)
+              )
+            }.value)
         ),
         changes = StateUpdate()
       )

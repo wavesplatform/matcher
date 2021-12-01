@@ -8,9 +8,9 @@ object SignedTransactionOps {
 
   implicit final class Implicits(val self: SignedTransaction) extends AnyVal {
 
-    def isExchangeTransaction: Boolean = self.transaction.exists(_.data.isExchange)
+    def isExchangeTransaction: Boolean = self.transaction.wavesTransaction.exists(_.data.isExchange)
 
-    def exchangeTransactionTraders: Set[Address] = self.transaction.flatMap(_.data.exchange).to(Set).flatMap { data =>
+    def exchangeTransactionTraders: Set[Address] = self.transaction.wavesTransaction.flatMap(_.data.exchange).to(Set).flatMap { data =>
       data.orders.map(_.senderPublicKey.toVanillaPublicKey.toAddress)
     }
 

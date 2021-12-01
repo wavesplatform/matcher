@@ -90,14 +90,13 @@ object ScriptRunnerFixed {
     def evaluate(ctx: EvaluationContext[Environment, Id], expr: EXPR): (Log[Id], Int, Either[ExecutionError, EVALUATED]) = {
       val (log, unusedComplexity, result) =
         if (complexityLimit == Int.MaxValue)
-          EvaluatorV2.applyCompleted(ctx, expr, script.stdLibVersion, blockchain.isFeatureActivated(BlockchainFeatures.RideV6))
+          EvaluatorV2.applyCompleted(ctx, expr, script.stdLibVersion)
         else
           EvaluatorV2.applyOrDefault(
             ctx,
             expr,
             script.stdLibVersion,
             complexityLimit,
-            blockchain.isFeatureActivated(BlockchainFeatures.RideV6),
             _ => Right(default)
           )
       (log, complexityLimit - unusedComplexity, result)

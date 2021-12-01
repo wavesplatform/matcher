@@ -29,7 +29,7 @@ import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions._
 import com.wavesplatform.dex.grpc.integration.services.UtxTransaction
 import com.wavesplatform.dex.grpc.integration.settings.WavesBlockchainClientSettings
 import com.wavesplatform.dex.grpc.integration.tool.RestartableManagedChannel
-import com.wavesplatform.protobuf.transaction.SignedTransaction
+import com.wavesplatform.protobuf.transaction.{SignedTransaction, Transaction}
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.nio.NioSocketChannel
 import monix.eval.Task
@@ -160,8 +160,8 @@ class CombinedWavesBlockchainClient(
       }
 
   private def isExchangeTxFromMatcher(tx: SignedTransaction): Boolean =
-    tx.transaction.exists { tx =>
-      tx.data.isExchange && ByteString.unsignedLexicographicalComparator().compare(tx.senderPublicKey, pbMatcherPublicKey) == 0
+    tx.transaction.wavesTransaction.exists { a =>
+      a.data.isExchange && ByteString.unsignedLexicographicalComparator().compare(a.senderPublicKey, pbMatcherPublicKey) == 0
     }
 
   private def isExchangeTxFromMatcher(tx: UtxTransaction): Boolean = tx.transaction.exists(isExchangeTxFromMatcher)

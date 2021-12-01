@@ -55,7 +55,7 @@ object WavesNodeUpdates {
         val pp = tx.pessimisticPortfolios
 
         val addresses = for {
-          tx <- tx.tx.transaction.toSeq
+          tx <- tx.tx.transaction.wavesTransaction.toSeq
           order <- tx.getExchange.orders
         } yield order.senderPublicKey.toVanillaPublicKey.toAddress
 

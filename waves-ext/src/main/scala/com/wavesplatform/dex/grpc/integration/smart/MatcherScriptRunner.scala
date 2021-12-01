@@ -14,7 +14,7 @@ import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain, D
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.smart.script.ScriptRunnerFixed
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 import shapeless.Coproduct
 
 import scala.util.control.NoStackTrace
@@ -57,6 +57,7 @@ object MatcherScriptRunner {
     override def hitSource(height: Int) = kill("hitSource")
     override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]) = kill("balanceSnapshots")
     override def hasAccountScript(address: Address) = kill("hasAccountScript")
+    override def resolveERC20Address(address: ERC20Address): Option[com.wavesplatform.transaction.Asset.IssuedAsset] = kill("resolveERC20Address")
 
     override def settings: BlockchainSettings = kill("settings")
     override def height: Int = kill("height")

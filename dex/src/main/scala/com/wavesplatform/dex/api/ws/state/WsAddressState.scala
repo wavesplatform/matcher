@@ -75,7 +75,7 @@ final case class WsAddressState(
   def putOrderStatusNameUpdate(order: Order, newStatus: OrderStatus): WsAddressState =
     putOrderUpdate(
       id = order.id(),
-      update = ordersChanges.getOrElse(order.id(), WsOrder.fromOrder(order, status = newStatus.name.some))
+      update = ordersChanges.getOrElse(order.id(), WsOrder.fromOrder(order)).copy(status = newStatus.name.some)
     )
 
   def putOrderFillingInfoAndStatusNameUpdate(

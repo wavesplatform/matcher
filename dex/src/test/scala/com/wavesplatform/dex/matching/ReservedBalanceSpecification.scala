@@ -3,6 +3,7 @@ package com.wavesplatform.dex.matching
 import akka.actor.{ActorRef, Props}
 import akka.pattern.ask
 import akka.testkit.TestProbe
+import cats.data.NonEmptyList
 import com.wavesplatform.dex.MatcherSpecBase
 import com.wavesplatform.dex.actors.MatcherSpecLike
 import com.wavesplatform.dex.actors.address.AddressActor.BlockchainInteraction
@@ -130,7 +131,10 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
     addressDir ! AddressActor.Command.ApplyOrderBookAdded(OrderAdded(LimitOrder(counter), OrderAddedReason.RequestExecuted, now))
     addressDir ! AddressActor.Command.ApplyOrderBookAdded(OrderAdded(LimitOrder(submitted), OrderAddedReason.RequestExecuted, now))
     val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter), submitted.timestamp, counter.matcherFee, submitted.matcherFee, 0L)
-    addressDir ! AddressActor.Command.OrderBookExecutedEvent(exec, mkExchangeTx(exec))
+    addressDir ! AddressActor.Command.ApplyOrderBookExecutedList(NonEmptyList.one(AddressActor.Command.OrderBookExecutedEvent(
+      exec,
+      mkExchangeTx(exec)
+    )))
     exec
   }
 
@@ -529,7 +533,10 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
       OrderAddedReason.RequestExecuted,
       time.getTimestamp()
     ))
-    addressDirWithOrderBookCache ! AddressActor.Command.OrderBookExecutedEvent(executionEvent, mkExchangeTx(executionEvent))
+    addressDirWithOrderBookCache ! AddressActor.Command.ApplyOrderBookExecutedList(NonEmptyList.one(AddressActor.Command.OrderBookExecutedEvent(
+      executionEvent,
+      mkExchangeTx(executionEvent)
+    )))
 
     executionEvent
   }

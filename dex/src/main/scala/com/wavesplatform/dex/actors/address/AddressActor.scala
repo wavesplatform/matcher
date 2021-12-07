@@ -529,7 +529,7 @@ class AddressActor(
       }
 
     case WsCommand.AddWsSubscription(client, flags, isDebug) =>
-      log.trace(s"[c=${client.path.name}] Added WebSocket subscription (debug = $isDebug)")
+      println(s"[c=${client.path.name}] Added WebSocket subscription (debug = $isDebug)")
       wsAddressState = wsAddressState.addSubscription(
         client,
         mkWsBalances(balances.allAssets, includeEmpty = false),

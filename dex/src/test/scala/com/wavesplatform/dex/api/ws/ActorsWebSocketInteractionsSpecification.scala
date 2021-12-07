@@ -3,6 +3,7 @@ package com.wavesplatform.dex.api.ws
 import akka.actor.testkit.typed.scaladsl.{ActorTestKit, TestProbe => TypedTestProbe}
 import akka.actor.{ActorSystem, PoisonPill, Props}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
+import cats.data.NonEmptyList
 import cats.syntax.option._
 import com.wavesplatform.dex.MatcherSpecBase
 import com.wavesplatform.dex.actors.address.AddressActor.BlockchainInteraction
@@ -142,7 +143,7 @@ class ActorsWebSocketInteractionsSpecification
           timestamp = nowTs,
           proofs = Proofs.empty
         ).copy(error = ValidationError.GenericError("Some error").some)
-      addressDir ! AddressActor.Command.OrderBookExecutedEvent(oe, tx) // TODO
+      addressDir ! AddressActor.Command.ApplyOrderBookExecutedList(NonEmptyList.one(AddressActor.Command.OrderBookExecutedEvent(oe, tx)))
       oe
     }
 
@@ -571,7 +572,10 @@ class ActorsWebSocketInteractionsSpecification
         env.addressDir ! AddressActor.Command.ApplyOrderBookAdded(OrderAdded(submitted, OrderAddedReason.RequestExecuted, now))
 
         val oe = OrderExecuted(submitted, counter, System.currentTimeMillis, counter.matcherFee, submitted.matcherFee, 0L)
-        env.addressDir ! AddressActor.Command.OrderBookExecutedEvent(oe, mkExchangeTx(oe).copy(error = ValidationError.GenericError("test").some))
+        env.addressDir ! AddressActor.Command.ApplyOrderBookExecutedList(NonEmptyList.one(AddressActor.Command.OrderBookExecutedEvent(
+          oe,
+          mkExchangeTx(oe).copy(error = ValidationError.GenericError("test").some)
+        )))
 
         env
           .expectWsBalancesAndOrders(

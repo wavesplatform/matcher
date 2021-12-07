@@ -166,8 +166,6 @@ class AddressActor(
 
           val cumulativeDiff = ownerRemainingOrders
             .foldMap { remaining =>
-              //scheduleOrderWs(remaining, remaining.status, unmatchable = false, maybeMatchTx = txResult.transaction.some)
-
               remaining.status match {
                 case status: OrderStatus.Final =>
                   expiration.remove(remaining.id).foreach(_.cancel())
@@ -219,67 +217,6 @@ class AddressActor(
           )
       )
       scheduleOrdersWs(orderExecutedUpdates.ownerRemainingOrders)
-
-    case command: Command.ApplyOrderBookExecuted =>
-      val ownerRemainingOrders = List(command.event.counterRemaining, command.event.submittedRemaining).filter(_.order.sender.toAddress == owner)
-      val txResult = command.expectedTx
-      log.debug(
-        s"OrderExecuted(${ownerRemainingOrders.map(o => s"${o.id} -> ${o.status}").mkString(
-          ", "
-        )}, tx=${txResult.transaction.id()}${txResult.error.fold("")(e => s", e=$e")}"
-      )
-
-      val cumulativeDiff = ownerRemainingOrders
-        .foldMap { remaining =>
-          // todo: need to squash all order updates
-          scheduleOrderWs(remaining, remaining.status, unmatchable = false, maybeMatchTx = txResult.transaction.some)
-
-          remaining.status match {
-            case status: OrderStatus.Final =>
-              expiration.remove(remaining.id).foreach(_.cancel())
-              orderDb.saveOrderInfo(remaining.id, owner, OrderInfo.v6(remaining, status)).onComplete {
-                case Success(_) => processingOrders.remove(remaining.id)
-                case Failure(th) =>
-                  //TODO probably inconsistent state can be introduced
-                  log.error("error while saving order info", th)
-                  processingOrders.remove(remaining.id)
-              }
-              activeOrders.remove(remaining.id) match {
-                case Some(origActiveOrder) => origActiveOrder.reservableBalance.inverse()
-                case None => throw new IllegalStateException(s"Can't find order ${remaining.id} during finalization")
-              }
-
-            case _ =>
-              activeOrders.put(remaining.id, remaining) match {
-                case Some(origActiveOrder) => (remaining.reservableBalance |-| origActiveOrder.reservableBalance).filterNot(_._2 == 0)
-                case None => throw new IllegalStateException(s"Can't find order ${remaining.id}")
-              }
-          }
-        }
-        .filterNot(_._2 == 0) // Fee could be 0 if an order executed by a small amount
-
-      val (updated, changes) =
-        balances.withExecuted(
-          txResult.toOption.map(_.id()),
-          AddressBalance.NotObservedTxData(ownerRemainingOrders.map(_.id), NegativeMap(cumulativeDiff))
-        )
-      balances = updated
-      scheduleWs(
-        wsAddressState
-          .putChangedAssets(changes.changedAssets)
-          .putTxsUpdate(
-            changes.addedNotObservedTxs,
-            changes.removedNotObservedTxs,
-            changes.addedNotCreatedTxs,
-            changes.removedNotCreatedTxs
-          )
-      )
-
-      val reservedAssets = ownerRemainingOrders.flatMap(_.requiredBalance.keys).toSet
-      val newReserved = balances.reserved.filter { case (asset, _) => reservedAssets.contains(asset) }
-      log.info(
-        s"[Balance] 1. 💵: ${format(balances.tradableBalance(cumulativeDiff.keySet).xs)}; e: ${format(cumulativeDiff)}, ov: ${format(newReserved)}"
-      )
 
     case command: Command.ApplyOrderBookCanceled =>
       import command.event._
@@ -1019,13 +956,12 @@ object AddressActor {
       override def affectedOrders: List[AcceptedOrder] = List(event.order)
     }
 
-    case class ApplyOrderBookExecuted(event: Events.OrderExecuted, expectedTx: ExchangeTransactionResult[ExchangeTransactionV2])
-        extends Command
-        with HasOrderBookEvent {
+    case class OrderBookExecutedEvent(event: Events.OrderExecuted, expectedTx: ExchangeTransactionResult[ExchangeTransactionV2])
+        extends HasOrderBookEvent {
       override def affectedOrders: List[AcceptedOrder] = List(event.counter, event.submitted)
     }
 
-    case class ApplyOrderBookExecutedList(events: NonEmptyList[ApplyOrderBookExecuted]) extends Command with HasOrderBookEvent {
+    case class ApplyOrderBookExecutedList(events: NonEmptyList[OrderBookExecutedEvent]) extends Command with HasOrderBookEvent {
       override def event: Events.Event = events.head.event
 
       override def affectedOrders: List[AcceptedOrder] = events.toList.flatMap(_.affectedOrders)

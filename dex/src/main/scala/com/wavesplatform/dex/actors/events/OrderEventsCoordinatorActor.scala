@@ -70,8 +70,8 @@ object OrderEventsCoordinatorActor {
       message match {
         // DEX-1192 docs/places-and-cancels.md
         case Command.Process(events) =>
-          val orderExecutedEvents: List[AddressActor.Command.ApplyOrderBookExecuted] =
-            events.foldLeft(List.empty[AddressActor.Command.ApplyOrderBookExecuted]) { case (acc, event) =>
+          val orderExecutedEvents: List[AddressActor.Command.OrderBookExecutedEvent] =
+            events.foldLeft(List.empty[AddressActor.Command.OrderBookExecutedEvent]) { case (acc, event) =>
               event match {
                 case event: Events.OrderAdded =>
                   addressDirectoryRef ! AddressActor.Command.ApplyOrderBookAdded(event)
@@ -102,7 +102,7 @@ object OrderEventsCoordinatorActor {
                       )
                   }
                   // We don't update "observedTxIds" here, because expectedTx relates to "createdTxs"
-                  acc :+ AddressActor.Command.ApplyOrderBookExecuted(event, createTxResult)
+                  acc :+ AddressActor.Command.OrderBookExecutedEvent(event, createTxResult)
 
                 case event: Events.OrderCanceled =>
                   // If we here, AddressActor is guaranteed to be created, because this happens only after Events.OrderAdded

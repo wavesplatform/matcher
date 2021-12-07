@@ -130,7 +130,7 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
     addressDir ! AddressActor.Command.ApplyOrderBookAdded(OrderAdded(LimitOrder(counter), OrderAddedReason.RequestExecuted, now))
     addressDir ! AddressActor.Command.ApplyOrderBookAdded(OrderAdded(LimitOrder(submitted), OrderAddedReason.RequestExecuted, now))
     val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter), submitted.timestamp, counter.matcherFee, submitted.matcherFee, 0L)
-    addressDir ! AddressActor.Command.ApplyOrderBookExecuted(exec, mkExchangeTx(exec))
+    addressDir ! AddressActor.Command.OrderBookExecutedEvent(exec, mkExchangeTx(exec))
     exec
   }
 
@@ -529,7 +529,7 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
       OrderAddedReason.RequestExecuted,
       time.getTimestamp()
     ))
-    addressDirWithOrderBookCache ! AddressActor.Command.ApplyOrderBookExecuted(executionEvent, mkExchangeTx(executionEvent))
+    addressDirWithOrderBookCache ! AddressActor.Command.OrderBookExecutedEvent(executionEvent, mkExchangeTx(executionEvent))
 
     executionEvent
   }

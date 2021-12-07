@@ -240,7 +240,7 @@ class OrderBookActorSpecification
       actor ! wrapLimitOrder(ord2)
       actor ! wrapLimitOrder(ord3)
       actor ! wrapLimitOrder(ord4)
-      val a = tp.receiveN(4)
+      tp.receiveN(4)
 
       actor ! SaveSnapshot(Long.MaxValue)
       tp.expectMsgType[OrderBookSnapshotUpdateCompleted]

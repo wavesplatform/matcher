@@ -413,7 +413,7 @@ class AddressActorSpecification
             System.currentTimeMillis,
             Proofs(List.empty)
           )
-          ref ! AddressActor.Command.ApplyOrderBookExecuted(
+          ref ! AddressActor.Command.OrderBookExecutedEvent(
             OrderExecuted(duplicatedMarketOrder, LimitOrder(counterOrder), System.currentTimeMillis, 0L, 0L, 0L),
             ExchangeTransactionResult.fromEither(Right(()), matchTx)
           )

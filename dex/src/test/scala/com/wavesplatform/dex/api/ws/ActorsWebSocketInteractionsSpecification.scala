@@ -142,7 +142,7 @@ class ActorsWebSocketInteractionsSpecification
           timestamp = nowTs,
           proofs = Proofs.empty
         ).copy(error = ValidationError.GenericError("Some error").some)
-      addressDir ! AddressActor.Command.ApplyOrderBookExecuted(oe, tx) // TODO
+      addressDir ! AddressActor.Command.OrderBookExecutedEvent(oe, tx) // TODO
       oe
     }
 
@@ -571,7 +571,7 @@ class ActorsWebSocketInteractionsSpecification
         env.addressDir ! AddressActor.Command.ApplyOrderBookAdded(OrderAdded(submitted, OrderAddedReason.RequestExecuted, now))
 
         val oe = OrderExecuted(submitted, counter, System.currentTimeMillis, counter.matcherFee, submitted.matcherFee, 0L)
-        env.addressDir ! AddressActor.Command.ApplyOrderBookExecuted(oe, mkExchangeTx(oe).copy(error = ValidationError.GenericError("test").some))
+        env.addressDir ! AddressActor.Command.OrderBookExecutedEvent(oe, mkExchangeTx(oe).copy(error = ValidationError.GenericError("test").some))
 
         env
           .expectWsBalancesAndOrders(

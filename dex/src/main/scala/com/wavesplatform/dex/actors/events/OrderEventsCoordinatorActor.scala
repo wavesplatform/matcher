@@ -4,6 +4,7 @@ import akka.actor.typed
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, Behavior}
 import akka.{actor => classic}
+import cats.data.NonEmptyList
 import cats.instances.long._
 import cats.instances.map._
 import cats.syntax.either._
@@ -32,7 +33,7 @@ object OrderEventsCoordinatorActor {
   sealed trait Command extends Message
 
   object Command {
-    case class Process(event: Events.Event) extends Command
+    case class Process(events: NonEmptyList[Events.Event]) extends Command
     case class ProcessError(event: Events.OrderCancelFailed) extends Command
     case class ApplyNodeUpdates(updates: WavesNodeUpdates) extends Command
 
@@ -68,44 +69,50 @@ object OrderEventsCoordinatorActor {
     def default(observedTxIds: FifoSet[ExchangeTransaction.Id]): Behaviors.Receive[Message] = Behaviors.receive[Message] { (context, message) =>
       message match {
         // DEX-1192 docs/places-and-cancels.md
-        case Command.Process(event) =>
-          event match {
-            case event: Events.OrderAdded =>
-              addressDirectoryRef ! AddressActor.Command.ApplyOrderBookAdded(event)
-              Behaviors.same
+        case Command.Process(events) =>
+          val orderExecutedEvents: List[AddressActor.Command.ApplyOrderBookExecuted] =
+            events.foldLeft(List.empty[AddressActor.Command.ApplyOrderBookExecuted]) { case (acc, event) =>
+              event match {
+                case event: Events.OrderAdded =>
+                  addressDirectoryRef ! AddressActor.Command.ApplyOrderBookAdded(event)
+                  acc
 
-            case event: Events.OrderExecuted =>
-              // If we here, AddressActor is guaranteed to be created, because this happens only after Events.OrderAdded
-              val createTxResult = createTransaction(event)
-              createTxResult.toEither match {
-                case Right(tx) =>
-                  val txCreated = ExchangeTransactionCreated(createTxResult.transaction)
-                  context.log.info(s"Created ${createTxResult.transaction.json()}")
-                  dbWriterRef ! txCreated
+                case event: Events.OrderExecuted =>
+                  // If we here, AddressActor is guaranteed to be created, because this happens only after Events.OrderAdded
+                  val createTxResult = createTransaction(event)
+                  createTxResult.toEither match {
+                    case Right(tx) =>
+                      val txCreated = ExchangeTransactionCreated(createTxResult.transaction)
+                      context.log.info(s"Created ${createTxResult.transaction.json()}")
+                      dbWriterRef ! txCreated
 
-                  val addressSpendings =
-                    Map(event.counter.order.sender.toAddress -> PositiveMap(event.counterExecutedSpending)) |+|
-                    Map(event.submitted.order.sender.toAddress -> PositiveMap(event.submittedExecutedSpending))
+                      val addressSpendings =
+                        Map(event.counter.order.sender.toAddress -> PositiveMap(event.counterExecutedSpending)) |+|
+                        Map(event.submitted.order.sender.toAddress -> PositiveMap(event.submittedExecutedSpending))
 
-                  broadcasterRef ! Broadcaster.Broadcast(broadcastAdapter, addressSpendings, tx)
+                      broadcasterRef ! Broadcaster.Broadcast(broadcastAdapter, addressSpendings, tx)
 
-                case Left(e) =>
-                  // We don't touch a state, because this transaction neither created, nor appeared on Node
-                  import event._
-                  context.log.warn(
-                    s"""Can't create tx: $e
-                       |o1: (amount=${submitted.amount}, fee=${submitted.fee}): ${Json.prettyPrint(submitted.order.json())}
-                       |o2: (amount=${counter.amount}, fee=${counter.fee}): ${Json.prettyPrint(counter.order.json())}""".stripMargin
-                  )
+                    case Left(e) =>
+                      // We don't touch a state, because this transaction neither created, nor appeared on Node
+                      import event._
+                      context.log.warn(
+                        s"""Can't create tx: $e
+                           |o1: (amount=${submitted.amount}, fee=${submitted.fee}): ${Json.prettyPrint(submitted.order.json())}
+                           |o2: (amount=${counter.amount}, fee=${counter.fee}): ${Json.prettyPrint(counter.order.json())}""".stripMargin
+                      )
+                  }
+                  // We don't update "observedTxIds" here, because expectedTx relates to "createdTxs"
+                  acc :+ AddressActor.Command.ApplyOrderBookExecuted(event, createTxResult)
+
+                case event: Events.OrderCanceled =>
+                  // If we here, AddressActor is guaranteed to be created, because this happens only after Events.OrderAdded
+                  addressDirectoryRef ! AddressActor.Command.ApplyOrderBookCanceled(event)
+                  acc
+
               }
-              addressDirectoryRef ! AddressActor.Command.ApplyOrderBookExecuted(event, createTxResult)
-              Behaviors.same // We don't update "observedTxIds" here, because expectedTx relates to "createdTxs"
-
-            case event: Events.OrderCanceled =>
-              // If we here, AddressActor is guaranteed to be created, because this happens only after Events.OrderAdded
-              addressDirectoryRef ! AddressActor.Command.ApplyOrderBookCanceled(event)
-              Behaviors.same
-          }
+            }
+          NonEmptyList.fromList(orderExecutedEvents).map(AddressActor.Command.ApplyOrderBookExecutedList).foreach(addressDirectoryRef ! _)
+          Behaviors.same
 
         case Command.ApplyNodeUpdates(updates) =>
           val (updatedKnownTxIds, oldTxIds) = updates.observedTxs.keys.foldLeft((observedTxIds, List.empty[ExchangeTransaction.Id])) {

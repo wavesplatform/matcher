@@ -4,6 +4,7 @@ import akka.actor.typed.scaladsl.adapter._
 import akka.actor.{typed, Actor, ActorRef, Cancellable, Props, Stash, Status}
 import akka.pattern.{pipe, CircuitBreakerOpenException}
 import akka.{actor => classic}
+import cats.data.NonEmptyList
 import cats.instances.list._
 import cats.instances.long._
 import cats.syntax.foldable._
@@ -152,6 +153,73 @@ class AddressActor(
           command.client ! Event.OrderAccepted(order.order)
         }
 
+    case command: Command.ApplyOrderBookExecutedList =>
+      val orderExecutedUpdates = command.events.foldLeft(WsOrderExecutedUpdates()) {
+        case (acc, event) =>
+          val ownerRemainingOrders = List(event.event.counterRemaining, event.event.submittedRemaining).filter(_.order.sender.toAddress == owner)
+          val txResult = event.expectedTx
+          log.debug(
+            s"OrderExecuted(${ownerRemainingOrders.map(o => s"${o.id} -> ${o.status}").mkString(
+              ", "
+            )}, tx=${txResult.transaction.id()}${txResult.error.fold("")(e => s", e=$e")}"
+          )
+
+          val cumulativeDiff = ownerRemainingOrders
+            .foldMap { remaining =>
+              //scheduleOrderWs(remaining, remaining.status, unmatchable = false, maybeMatchTx = txResult.transaction.some)
+
+              remaining.status match {
+                case status: OrderStatus.Final =>
+                  expiration.remove(remaining.id).foreach(_.cancel())
+                  orderDb.saveOrderInfo(remaining.id, owner, OrderInfo.v6(remaining, status)).onComplete {
+                    case Success(_) => processingOrders.remove(remaining.id)
+                    case Failure(th) =>
+                      //TODO probably inconsistent state can be introduced
+                      log.error("error while saving order info", th)
+                      processingOrders.remove(remaining.id)
+                  }
+                  activeOrders.remove(remaining.id) match {
+                    case Some(origActiveOrder) => origActiveOrder.reservableBalance.inverse()
+                    case None => throw new IllegalStateException(s"Can't find order ${remaining.id} during finalization")
+                  }
+
+                case _ =>
+                  activeOrders.put(remaining.id, remaining) match {
+                    case Some(origActiveOrder) => (remaining.reservableBalance |-| origActiveOrder.reservableBalance).filterNot(_._2 == 0)
+                    case None => throw new IllegalStateException(s"Can't find order ${remaining.id}")
+                  }
+              }
+            }
+            .filterNot(_._2 == 0) // Fee could be 0 if an order executed by a small amount
+
+          val (updated, changes: AddressBalance.Changes) =
+            balances.withExecuted(
+              txResult.toOption.map(_.id()),
+              AddressBalance.NotObservedTxData(ownerRemainingOrders.map(_.id), NegativeMap(cumulativeDiff))
+            )
+          balances = updated
+
+          val reservedAssets = ownerRemainingOrders.flatMap(_.requiredBalance.keys).toSet
+          val newReserved = balances.reserved.filter { case (asset, _) => reservedAssets.contains(asset) }
+          log.info(
+            s"[Balance] 1. 💵: ${format(balances.tradableBalance(cumulativeDiff.keySet).xs)}; e: ${format(cumulativeDiff)}, ov: ${format(newReserved)}"
+          )
+          val currentUpdate = WsOrderExecutedUpdates(ownerRemainingOrders.map(k => AcceptedOrderWithTx(k, txResult)), changes)
+          acc.squash(currentUpdate)
+      }
+
+      scheduleWs(
+        wsAddressState
+          .putChangedAssets(orderExecutedUpdates.changedAssets.changedAssets)
+          .putTxsUpdate(
+            orderExecutedUpdates.changedAssets.addedNotObservedTxs,
+            orderExecutedUpdates.changedAssets.removedNotObservedTxs,
+            orderExecutedUpdates.changedAssets.addedNotCreatedTxs,
+            orderExecutedUpdates.changedAssets.removedNotCreatedTxs
+          )
+      )
+      scheduleOrdersWs(orderExecutedUpdates.ownerRemainingOrders)
+
     case command: Command.ApplyOrderBookExecuted =>
       val ownerRemainingOrders = List(command.event.counterRemaining, command.event.submittedRemaining).filter(_.order.sender.toAddress == owner)
       val txResult = command.expectedTx
@@ -163,6 +231,7 @@ class AddressActor(
 
       val cumulativeDiff = ownerRemainingOrders
         .foldMap { remaining =>
+          // todo: need to squash all order updates
           scheduleOrderWs(remaining, remaining.status, unmatchable = false, maybeMatchTx = txResult.transaction.some)
 
           remaining.status match {
@@ -715,6 +784,18 @@ class AddressActor(
     }
   }
 
+  private def scheduleOrdersWs(
+    remaining: List[AcceptedOrderWithTx]
+  ): Unit = scheduleWs {
+    remaining.foldLeft(wsAddressState) { case (addressState, aoWtx) =>
+      aoWtx.order.status match {
+        case OrderStatus.Accepted => addressState.putOrderUpdate(aoWtx.order.id, WsOrder.fromDomain(aoWtx.order, aoWtx.order.status))
+        case _: OrderStatus.Cancelled => addressState.putOrderStatusNameUpdate(aoWtx.order.order, aoWtx.order.status)
+        case _ => addressState.putOrderFillingInfoAndStatusNameUpdate(aoWtx.order, aoWtx.order.status, aoWtx.tx.transaction.some)
+      }
+    }
+  }
+
   private def getOrdersToCancel(actualNodeBalance: Map[Asset, Long]): Queue[InsufficientBalanceOrder] = {
     val inProgress = pendingCancels
     // Now a user can have 100 active transaction maximum - easy to traverse.
@@ -877,6 +958,21 @@ object AddressActor {
     override def toString: String = orderId.toString
   }
 
+  private case class AcceptedOrderWithTx(order: AcceptedOrder, tx: ExchangeTransactionResult[ExchangeTransactionV2])
+
+  private case class WsOrderExecutedUpdates(
+    ownerRemainingOrders: List[AcceptedOrderWithTx] = List.empty,
+    changedAssets: AddressBalance.Changes = AddressBalance.Changes.empty
+  ) {
+
+    def squash(other: WsOrderExecutedUpdates): WsOrderExecutedUpdates = {
+      val changes = changedAssets |+| other.changedAssets
+      val orders = ownerRemainingOrders ++ other.ownerRemainingOrders
+      WsOrderExecutedUpdates(orders, changes)
+    }
+
+  }
+
   sealed trait Message
 
   sealed trait Query extends Message
@@ -927,6 +1023,12 @@ object AddressActor {
         extends Command
         with HasOrderBookEvent {
       override def affectedOrders: List[AcceptedOrder] = List(event.counter, event.submitted)
+    }
+
+    case class ApplyOrderBookExecutedList(events: NonEmptyList[ApplyOrderBookExecuted]) extends Command with HasOrderBookEvent {
+      override def event: Events.Event = events.head.event
+
+      override def affectedOrders: List[AcceptedOrder] = events.toList.flatMap(_.affectedOrders)
     }
 
     case class ApplyOrderBookCanceled(event: Events.OrderCanceled) extends Command with HasOrderBookEvent {

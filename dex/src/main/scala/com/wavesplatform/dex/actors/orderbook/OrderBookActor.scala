@@ -174,19 +174,21 @@ class OrderBookActor(
     processEvents(timestamp, result.events)
   }
 
-  private def processEvents(timestamp: Long, events: IterableOnce[Event]): Unit =
-    events.iterator.foreach { event =>
+  private def processEvents(timestamp: Long, events: IterableOnce[Event]): Unit = {
+    val eventsSeq = events.iterator.toList
+    val changes = eventsSeq.flatMap { event =>
       logEvent(event)
       // DEX-1192 docs/places-and-cancels.md
-      eventsCoordinatorRef ! OrderEventsCoordinatorActor.Command.Process(event)
-
-      val changes = event match {
+      event match {
         case event: Events.OrderExecuted => WsOrdersUpdate.from(event, timestamp).some
         case event: Events.OrderCanceled => WsOrdersUpdate.from(event).some
         case _ => none
       }
-      changes.map(WsInternalBroadcastActor.Command.Collect).foreach(wsInternalHandlerDirectoryRef ! _)
     }
+    NonEmptyList.fromList(eventsSeq).foreach(eventsCoordinatorRef ! OrderEventsCoordinatorActor.Command.Process(_))
+
+    changes.map(WsInternalBroadcastActor.Command.Collect).foreach(wsInternalHandlerDirectoryRef ! _)
+  }
 
   private def logEvent(e: Event): Unit = log.info {
     import Events._

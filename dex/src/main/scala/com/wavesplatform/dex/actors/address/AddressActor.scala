@@ -11,7 +11,7 @@ import cats.syntax.foldable._
 import cats.syntax.group.catsSyntaxGroup
 import cats.syntax.option._
 import cats.syntax.semigroup._
-import com.wavesplatform.dex.actors.address.AddressActor.Command.ObservedTxData
+import com.wavesplatform.dex.actors.address.AddressActor.Command.{HasOrderBookEvents, ObservedTxData}
 import com.wavesplatform.dex.actors.address.AddressActor.Settings.default
 import com.wavesplatform.dex.actors.address.AddressActor._
 import com.wavesplatform.dex.actors.address.BalancesFormatter.format
@@ -153,8 +153,8 @@ class AddressActor(
           command.client ! Event.OrderAccepted(order.order)
         }
 
-    case command: Command.ApplyOrderBookExecutedList =>
-      val orderExecutedUpdates = command.events.foldLeft(WsOrderExecutedUpdates()) {
+    case command: Command.ApplyOrderBookExecuted =>
+      val orderExecutedUpdates = command.nonEmptyEvents.foldLeft(WsOrderExecutedUpdates()) {
         case (acc, event) =>
           val ownerRemainingOrders = List(event.event.counterRemaining, event.event.submittedRemaining).filter(_.order.sender.toAddress == owner)
           val txResult = event.expectedTx
@@ -910,6 +910,12 @@ object AddressActor {
 
   }
 
+  case class OrderBookExecutedEvent(event: Events.OrderExecuted, expectedTx: ExchangeTransactionResult[ExchangeTransactionV2])
+      extends HasOrderBookEvents {
+    override def events: Seq[Events.Event] = List(event)
+    override def affectedOrders: List[AcceptedOrder] = List(event.counter, event.submitted)
+  }
+
   sealed trait Message
 
   sealed trait Query extends Message
@@ -947,28 +953,30 @@ object AddressActor {
     case class ObservedTxData(orders: Seq[Order], pessimisticChanges: PositiveMap[Asset, Long])
     case class MarkTxsObserved(txsWithSpending: Map[ExchangeTransaction.Id, ObservedTxData]) extends Command
 
-    sealed trait HasOrderBookEvent {
-      def event: Events.Event
+    sealed trait HasOrderBookEvents {
+      def events: Iterable[Events.Event]
       def affectedOrders: List[AcceptedOrder]
     }
 
-    case class ApplyOrderBookAdded(event: Events.OrderAdded) extends Command with HasOrderBookEvent {
+    case class ApplyOrderBookAdded(event: Events.OrderAdded) extends Command with HasOrderBookEvents {
       override def affectedOrders: List[AcceptedOrder] = List(event.order)
+
+      override def events: Seq[Events.Event] = List(event)
     }
 
-    case class OrderBookExecutedEvent(event: Events.OrderExecuted, expectedTx: ExchangeTransactionResult[ExchangeTransactionV2])
-        extends HasOrderBookEvent {
-      override def affectedOrders: List[AcceptedOrder] = List(event.counter, event.submitted)
+    case class ApplyOrderBookExecuted(nonEmptyEvents: NonEmptyList[OrderBookExecutedEvent]) extends Command with HasOrderBookEvents {
+      override def affectedOrders: List[AcceptedOrder] = nonEmptyEvents.toList.flatMap(_.affectedOrders)
+
+      override def events: Iterable[Events.Event] = nonEmptyEvents.toList.map(_.event)
     }
 
-    case class ApplyOrderBookExecutedList(events: NonEmptyList[OrderBookExecutedEvent]) extends Command with HasOrderBookEvent {
-      override def event: Events.Event = events.head.event
-
-      override def affectedOrders: List[AcceptedOrder] = events.toList.flatMap(_.affectedOrders)
+    object ApplyOrderBookExecuted {
+      def apply(event: OrderBookExecutedEvent): ApplyOrderBookExecuted = ApplyOrderBookExecuted(nonEmptyEvents = NonEmptyList.one(event))
     }
 
-    case class ApplyOrderBookCanceled(event: Events.OrderCanceled) extends Command with HasOrderBookEvent {
+    case class ApplyOrderBookCanceled(event: Events.OrderCanceled) extends Command with HasOrderBookEvents {
       override def affectedOrders: List[AcceptedOrder] = List(event.acceptedOrder)
+      override def events: Seq[Events.Event] = List(event)
     }
 
     case class PlaceOrder(order: Order, isMarket: Boolean) extends OneOrderCommand {

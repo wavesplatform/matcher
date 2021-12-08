@@ -145,11 +145,11 @@ class OrderEventsCoordinatorActorSpec extends ScalaTestWithActorTestKit() with M
           }
 
           "passes an event with a tx" in {
-            val actual = addressDirectory.expectMsgType[AddressActor.Command.ApplyOrderBookExecutedList]
-            actual should matchTo(AddressActor.Command.ApplyOrderBookExecutedList(NonEmptyList.one(AddressActor.Command.OrderBookExecutedEvent(
+            val actual = addressDirectory.expectMsgType[AddressActor.Command.ApplyOrderBookExecuted]
+            actual should matchTo(AddressActor.Command.ApplyOrderBookExecuted(AddressActor.OrderBookExecutedEvent(
               validEvent,
               ExchangeTransactionResult(validTx)
-            ))))
+            )))
           }
         }
 
@@ -177,10 +177,10 @@ class OrderEventsCoordinatorActorSpec extends ScalaTestWithActorTestKit() with M
           val event = Events.OrderExecuted(LimitOrder(buyOrder), LimitOrder(sellOrder), nowTs, 300000L, 300000L, 0L)
           passToAddressDirectoryTest(
             OrderEventsCoordinatorActor.Command.Process(NonEmptyList.one(event)),
-            AddressActor.Command.ApplyOrderBookExecutedList(NonEmptyList.one(AddressActor.Command.OrderBookExecutedEvent(
+            AddressActor.Command.ApplyOrderBookExecuted(AddressActor.OrderBookExecutedEvent(
               event,
               ExchangeTransactionResult(validTx, ValidationError.GenericError("test").some)
-            )))
+            ))
           )
         }
       }

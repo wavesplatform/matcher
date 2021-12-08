@@ -77,7 +77,7 @@ class OrderHistoryStub(system: ActorSystem, time: Time, maxActiveOrders: Int, ma
       orders += ox.submitted.order.id() -> ox.submitted.order.sender
       orders += ox.counter.order.id() -> ox.counter.order.sender
       val command =
-        AddressActor.Command.ApplyOrderBookExecutedList(NonEmptyList.one(AddressActor.Command.OrderBookExecutedEvent(ox, mkExchangeTx(ox))))
+        AddressActor.Command.ApplyOrderBookExecuted(AddressActor.OrderBookExecutedEvent(ox, mkExchangeTx(ox)))
       List(ox.counter, ox.submitted).map(_.order.sender.toAddress).toSet.map(actorForAddress).foreach(_ ! command)
 
     case oc: Events.OrderCanceled =>

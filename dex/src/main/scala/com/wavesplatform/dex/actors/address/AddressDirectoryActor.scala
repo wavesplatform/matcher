@@ -44,7 +44,7 @@ class AddressDirectoryActor(
       // DEX-1192 docs/places-and-cancels.md
       forward(address, message)
 
-    case command: AddressActor.Command.HasOrderBookEvent =>
+    case command: AddressActor.Command.HasOrderBookEvents =>
       sendEventToHistoryRouter(command)
       command.affectedOrders.map(_.order.sender.toAddress).toSet // Could be one trader
         .foreach(forward(_, command))
@@ -81,7 +81,7 @@ class AddressDirectoryActor(
       context.children.foreach(_ ! AddressActor.Command.CompleteRecovering)
   }
 
-  private def sendEventToHistoryRouter(command: AddressActor.Command.HasOrderBookEvent): Unit = sendEventToHistoryRouter(command.event)
+  private def sendEventToHistoryRouter(command: AddressActor.Command.HasOrderBookEvents): Unit = command.events.foreach(sendEventToHistoryRouter)
 
   private def sendEventToHistoryRouter(event: Events.Event): Unit = historyRouterRef.foreach { historyRouterRef =>
     val msg = event match {

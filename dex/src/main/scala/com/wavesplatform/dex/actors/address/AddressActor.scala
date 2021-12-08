@@ -204,7 +204,7 @@ class AddressActor(
             s"[Balance] 1. 💵: ${format(balances.tradableBalance(cumulativeDiff.keySet).xs)}; e: ${format(cumulativeDiff)}, ov: ${format(newReserved)}"
           )
           val currentUpdate = WsOrderExecutedUpdates(ownerRemainingOrders.map(k => AcceptedOrderWithTx(k, txResult)), changes)
-          acc |+| currentUpdate
+          acc squash currentUpdate
       }
 
       scheduleWs(
@@ -901,13 +901,10 @@ object AddressActor {
   private case class WsOrderExecutedUpdates(
     ownerRemainingOrders: List[AcceptedOrderWithTx] = List.empty,
     changedAssets: AddressBalance.Changes = AddressBalance.Changes.empty
-  )
+  ) {
 
-  implicit val wsOrderExecutedUpdatesMonoid: Monoid[WsOrderExecutedUpdates] = new Monoid[WsOrderExecutedUpdates] {
-    override def empty: WsOrderExecutedUpdates = WsOrderExecutedUpdates()
-
-    override def combine(x: WsOrderExecutedUpdates, y: WsOrderExecutedUpdates): WsOrderExecutedUpdates =
-      WsOrderExecutedUpdates(x.ownerRemainingOrders ++ y.ownerRemainingOrders, x.changedAssets |+| y.changedAssets)
+    def squash(other: WsOrderExecutedUpdates): WsOrderExecutedUpdates =
+      WsOrderExecutedUpdates(ownerRemainingOrders ++ other.ownerRemainingOrders, changedAssets |+| other.changedAssets)
 
   }
 

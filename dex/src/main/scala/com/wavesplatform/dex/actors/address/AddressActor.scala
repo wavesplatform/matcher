@@ -675,6 +675,7 @@ class AddressActor(
             nextCommand.command match {
               case command: Command.PlaceOrder =>
                 val tradableBalances = balances.tradableBalance(Set(command.order.getSpendAssetId, command.order.feeAsset))
+                log.info(s"Tradable balance $tradableBalances")
                 val ao = command.toAcceptedOrder(tradableBalances.xs)
                 validate(ao, tradableBalances.xs)
                   .map {

@@ -1,6 +1,7 @@
 package com.wavesplatform.dex.model
 
 import akka.actor.{ActorRef, ActorSystem, Props}
+import cats.data.NonEmptyList
 import com.wavesplatform.dex.actors.address.AddressActor.BlockchainInteraction
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.db.{EmptyOrderDb, TestOrderDb}
@@ -75,7 +76,8 @@ class OrderHistoryStub(system: ActorSystem, time: Time, maxActiveOrders: Int, ma
     case ox: Events.OrderExecuted =>
       orders += ox.submitted.order.id() -> ox.submitted.order.sender
       orders += ox.counter.order.id() -> ox.counter.order.sender
-      val command = AddressActor.Command.OrderBookExecutedEvent(ox, mkExchangeTx(ox))
+      val command =
+        AddressActor.Command.ApplyOrderBookExecutedList(NonEmptyList.one(AddressActor.Command.OrderBookExecutedEvent(ox, mkExchangeTx(ox))))
       List(ox.counter, ox.submitted).map(_.order.sender.toAddress).toSet.map(actorForAddress).foreach(_ ! command)
 
     case oc: Events.OrderCanceled =>

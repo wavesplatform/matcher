@@ -162,7 +162,7 @@ class OrderBookActorSpecification
       tp.expectMsgType[OrderBookSnapshotUpdateCompleted]
       orderBook ! RestartActor
 
-      val events = tp.expectOecProcess[OrderAdded]
+      val events = tp.expectMsgType[Process].events
       events.head should matchTo(OrderAdded(LimitOrder(ord1), OrderAddedReason.OrderBookRecovered, ord1.timestamp))
       events.toList(1) should matchTo(OrderAdded(LimitOrder(ord2), OrderAddedReason.OrderBookRecovered, ord2.timestamp))
       tp.expectMsgType[OrderBookRecovered]
@@ -571,7 +571,7 @@ class OrderBookActorSpecification
 
         withClue("Stop condition - no counter orders:") {
           orderBook ! wrapMarketOrder(marketOrder)
-          val events = tp.expectOecProcess[Events.Event]
+          val events = tp.expectMsgType[Process].events
           events.head shouldBe a[OrderAdded]
           val oc = events.collect { case v: OrderCanceled => v }.last
 
@@ -587,7 +587,7 @@ class OrderBookActorSpecification
           tp.expectOecProcess[OrderAdded]
 
           orderBook ! wrapMarketOrder(marketOrder)
-          val events = tp.expectOecProcess[Events.Event]
+          val events = tp.expectMsgType[Process].events
           events.head shouldBe a[OrderAdded]
           val oe = events.collect { case a: OrderExecuted => a }.last
           oe.submitted shouldBe marketOrder
@@ -649,7 +649,7 @@ class OrderBookActorSpecification
 
           orderBook ! wrapMarketOrder(marketOrder)
 
-          val events = tp.expectOecProcess[Events.Event]
+          val events = tp.expectMsgType[Process].events
           events.head shouldBe a[OrderAdded]
           val oe = events.collect {
             case a: OrderExecuted => a
@@ -719,7 +719,7 @@ class OrderBookActorSpecification
       tp.expectOecProcess[OrderAdded]
 
       orderBook ! wrapLimitOrder(submittedOrder)
-      val events = tp.expectOecProcess[Events.Event]
+      val events = tp.expectMsgType[Process].events
       events.size shouldBe 2
       events.head shouldBe a[OrderAdded]
       events.last shouldBe a[OrderCanceled]

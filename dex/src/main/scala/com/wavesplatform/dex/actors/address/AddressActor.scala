@@ -4,6 +4,7 @@ import akka.actor.typed.scaladsl.adapter._
 import akka.actor.{typed, Actor, ActorRef, Cancellable, Props, Stash, Status}
 import akka.pattern.{pipe, CircuitBreakerOpenException}
 import akka.{actor => classic}
+import cats.Monoid
 import cats.data.NonEmptyList
 import cats.instances.list._
 import cats.instances.long._
@@ -203,7 +204,7 @@ class AddressActor(
             s"[Balance] 1. 💵: ${format(balances.tradableBalance(cumulativeDiff.keySet).xs)}; e: ${format(cumulativeDiff)}, ov: ${format(newReserved)}"
           )
           val currentUpdate = WsOrderExecutedUpdates(ownerRemainingOrders.map(k => AcceptedOrderWithTx(k, txResult)), changes)
-          acc.squash(currentUpdate)
+          acc |+| currentUpdate
       }
 
       scheduleWs(
@@ -529,7 +530,7 @@ class AddressActor(
       }
 
     case WsCommand.AddWsSubscription(client, flags, isDebug) =>
-      println(s"[c=${client.path.name}] Added WebSocket subscription (debug = $isDebug)")
+      log.trace(s"[c=${client.path.name}] Added WebSocket subscription (debug = $isDebug)")
       wsAddressState = wsAddressState.addSubscription(
         client,
         mkWsBalances(balances.allAssets, includeEmpty = false),
@@ -900,13 +901,13 @@ object AddressActor {
   private case class WsOrderExecutedUpdates(
     ownerRemainingOrders: List[AcceptedOrderWithTx] = List.empty,
     changedAssets: AddressBalance.Changes = AddressBalance.Changes.empty
-  ) {
+  )
 
-    def squash(other: WsOrderExecutedUpdates): WsOrderExecutedUpdates = {
-      val changes = changedAssets |+| other.changedAssets
-      val orders = ownerRemainingOrders ++ other.ownerRemainingOrders
-      WsOrderExecutedUpdates(orders, changes)
-    }
+  implicit val wsOrderExecutedUpdatesMonoid: Monoid[WsOrderExecutedUpdates] = new Monoid[WsOrderExecutedUpdates] {
+    override def empty: WsOrderExecutedUpdates = WsOrderExecutedUpdates()
+
+    override def combine(x: WsOrderExecutedUpdates, y: WsOrderExecutedUpdates): WsOrderExecutedUpdates =
+      WsOrderExecutedUpdates(x.ownerRemainingOrders ++ y.ownerRemainingOrders, x.changedAssets |+| y.changedAssets)
 
   }
 

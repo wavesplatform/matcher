@@ -163,8 +163,8 @@ class OrderBookActorSpecification
       orderBook ! RestartActor
 
       val events = tp.expectMsgType[Process].events
-      events.head should matchTo(OrderAdded(LimitOrder(ord1), OrderAddedReason.OrderBookRecovered, ord1.timestamp))
-      events.toList(1) should matchTo(OrderAdded(LimitOrder(ord2), OrderAddedReason.OrderBookRecovered, ord2.timestamp))
+      events.head should be(OrderAdded(LimitOrder(ord1), OrderAddedReason.OrderBookRecovered, ord1.timestamp))
+      events.toList(1) should be(OrderAdded(LimitOrder(ord2), OrderAddedReason.OrderBookRecovered, ord2.timestamp))
       tp.expectMsgType[OrderBookRecovered]
     }
 

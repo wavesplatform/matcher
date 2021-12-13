@@ -122,8 +122,8 @@ object DexContainer extends ScorexLogging {
   private val containerLogsPath: String = s"$baseContainerPath/logs"
 
   private val restApiPort: Int = 6886 // application.conf waves.dex.rest-api.port
-  private val exposedPorts = Seq(6886)
   private val prometheusPort = 9095
+  private val exposedPorts = Seq(restApiPort, prometheusPort)
 
   def apply(
     name: String,
@@ -151,10 +151,8 @@ object DexContainer extends ScorexLogging {
         cmd.withName(s"$networkName-$name") // network.getName returns random id
           .withIpv4Address(internalIp)
 
-        val portBindings = PortBindingKeeper.getBindings(cmd, exposedPorts).asScala :+
-          new PortBinding(Binding.bindPort(prometheusPort), new ExposedPort(prometheusPort)) // to publish 9095 for prometheus metrics
         cmd.getHostConfig
-          .withPortBindings(portBindings.asJava)
+          .withPortBindings(PortBindingKeeper.getBindings(cmd, exposedPorts))
           .withCapAdd(Capability.NET_ADMIN, Capability.NET_RAW) //for iptables
       }
 

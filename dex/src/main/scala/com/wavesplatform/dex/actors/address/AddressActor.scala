@@ -4,7 +4,6 @@ import akka.actor.typed.scaladsl.adapter._
 import akka.actor.{typed, Actor, ActorRef, Cancellable, Props, Stash, Status}
 import akka.pattern.{pipe, CircuitBreakerOpenException}
 import akka.{actor => classic}
-import cats.Monoid
 import cats.data.NonEmptyList
 import cats.instances.list._
 import cats.instances.long._
@@ -191,7 +190,7 @@ class AddressActor(
             }
             .filterNot(_._2 == 0) // Fee could be 0 if an order executed by a small amount
 
-          val (updated, changes: AddressBalance.Changes) =
+          val (updated, changes) =
             balances.withExecuted(
               txResult.toOption.map(_.id()),
               AddressBalance.NotObservedTxData(ownerRemainingOrders.map(_.id), NegativeMap(cumulativeDiff))
@@ -203,8 +202,8 @@ class AddressActor(
           log.info(
             s"[Balance] 1. 💵: ${format(balances.tradableBalance(cumulativeDiff.keySet).xs)}; e: ${format(cumulativeDiff)}, ov: ${format(newReserved)}"
           )
-          val currentUpdate = WsOrderExecutedUpdates(ownerRemainingOrders.map(k => AcceptedOrderWithTx(k, txResult)), changes)
-          acc squash currentUpdate
+          val currentUpdate = WsOrderExecutedUpdates(ownerRemainingOrders.map(AcceptedOrderWithTx(_, txResult)), changes)
+          acc merge currentUpdate
       }
 
       scheduleWs(
@@ -723,9 +722,9 @@ class AddressActor(
   }
 
   private def scheduleOrdersWs(
-    remaining: List[AcceptedOrderWithTx]
+    orders: List[AcceptedOrderWithTx]
   ): Unit = scheduleWs {
-    remaining.foldLeft(wsAddressState) { case (addressState, aoWtx) =>
+    orders.foldLeft(wsAddressState) { case (addressState, aoWtx) =>
       aoWtx.order.status match {
         case OrderStatus.Accepted => addressState.putOrderUpdate(aoWtx.order.id, WsOrder.fromDomain(aoWtx.order, aoWtx.order.status))
         case _: OrderStatus.Cancelled => addressState.putOrderStatusNameUpdate(aoWtx.order.order, aoWtx.order.status)
@@ -903,7 +902,7 @@ object AddressActor {
     changedAssets: AddressBalance.Changes = AddressBalance.Changes.empty
   ) {
 
-    def squash(other: WsOrderExecutedUpdates): WsOrderExecutedUpdates =
+    def merge(other: WsOrderExecutedUpdates): WsOrderExecutedUpdates =
       WsOrderExecutedUpdates(ownerRemainingOrders ++ other.ownerRemainingOrders, changedAssets |+| other.changedAssets)
 
   }

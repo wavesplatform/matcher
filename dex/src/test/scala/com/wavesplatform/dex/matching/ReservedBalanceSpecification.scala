@@ -3,7 +3,6 @@ package com.wavesplatform.dex.matching
 import akka.actor.{ActorRef, Props}
 import akka.pattern.ask
 import akka.testkit.TestProbe
-import cats.data.NonEmptyList
 import com.wavesplatform.dex.MatcherSpecBase
 import com.wavesplatform.dex.actors.MatcherSpecLike
 import com.wavesplatform.dex.actors.address.AddressActor.BlockchainInteraction

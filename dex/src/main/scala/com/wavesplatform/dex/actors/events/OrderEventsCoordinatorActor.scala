@@ -71,7 +71,7 @@ object OrderEventsCoordinatorActor {
         // DEX-1192 docs/places-and-cancels.md
         case Command.Process(events) =>
           val orderExecutedEvents =
-            events.foldLeft(List.empty[AddressActor.OrderBookExecutedEvent]) { case (acc, event) =>
+            events.foldLeft(Vector.empty[AddressActor.OrderBookExecutedEvent]) { case (acc, event) =>
               event match {
                 case event: Events.OrderAdded =>
                   addressDirectoryRef ! AddressActor.Command.ApplyOrderBookAdded(event)
@@ -111,7 +111,7 @@ object OrderEventsCoordinatorActor {
 
               }
             }
-          NonEmptyList.fromList(orderExecutedEvents).map(nel => AddressActor.Command.ApplyOrderBookExecuted(nel)).foreach(addressDirectoryRef ! _)
+          NonEmptyList.fromList(orderExecutedEvents.toList).map(AddressActor.Command.ApplyOrderBookExecuted(_)).foreach(addressDirectoryRef ! _)
           Behaviors.same
 
         case Command.ApplyNodeUpdates(updates) =>

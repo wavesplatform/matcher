@@ -4,7 +4,6 @@ import akka.actor.testkit.typed.{scaladsl => typed}
 import akka.actor.typed.scaladsl.adapter._
 import akka.actor.{ActorRef, ActorSystem, PoisonPill, Props}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
-import cats.data.NonEmptyList
 import cats.kernel.Monoid
 import com.wavesplatform.dex.MatcherSpecBase
 import com.wavesplatform.dex.actors.address.AddressActor.BlockchainInteraction

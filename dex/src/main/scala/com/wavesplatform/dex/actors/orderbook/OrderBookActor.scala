@@ -113,7 +113,10 @@ class OrderBookActor(
       context.watch(aggregatedRef)
 
       // Timestamp here doesn't matter
-      processEvents(time.getTimestamp(), orderBook.allOrders.map(lo => OrderAdded(lo, OrderAddedReason.OrderBookRecovered, lo.order.timestamp)))
+      processEvents(
+        time.getTimestamp(),
+        orderBook.allOrders.map(lo => OrderAdded(lo, OrderAddedReason.OrderBookRecovered, lo.order.timestamp)).toList
+      )
 
       owner ! OrderBookRecovered(assetPair, lastSavedSnapshotOffset)
       context.become(working)
@@ -171,12 +174,11 @@ class OrderBookActor(
   private def process(timestamp: Long, result: OrderBookUpdates): Unit = {
     orderBook = result.orderBook
     aggregatedRef ! AggregatedOrderBookActor.Command.ApplyChanges(result.levelChanges, result.lastTrade, None, timestamp)
-    processEvents(timestamp, result.events)
+    processEvents(timestamp, result.events.toList)
   }
 
-  private def processEvents(timestamp: Long, events: IterableOnce[Event]): Unit = {
-    val eventsSeq = events.iterator.toList
-    val changes = eventsSeq.flatMap { event =>
+  private def processEvents(timestamp: Long, events: List[Event]): Unit = {
+    val changes = events.flatMap { event =>
       logEvent(event)
       // DEX-1192 docs/places-and-cancels.md
       event match {
@@ -185,7 +187,7 @@ class OrderBookActor(
         case _ => none
       }
     }
-    NonEmptyList.fromList(eventsSeq).foreach(eventsCoordinatorRef ! OrderEventsCoordinatorActor.Command.Process(_))
+    NonEmptyList.fromList(events).foreach(eventsCoordinatorRef ! OrderEventsCoordinatorActor.Command.Process(_))
 
     changes.map(WsInternalBroadcastActor.Command.Collect).foreach(wsInternalHandlerDirectoryRef ! _)
   }

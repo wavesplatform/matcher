@@ -3,7 +3,8 @@ package com.wavesplatform.dex.it.docker
 import cats.Functor
 import cats.tagless.FunctorK
 import com.dimafeng.testcontainers.GenericContainer
-import com.github.dockerjava.api.model.Capability
+import com.github.dockerjava.api.model.Ports.Binding
+import com.github.dockerjava.api.model.{Capability, ExposedPort, PortBinding}
 import com.typesafe.config.Config
 import com.wavesplatform.dex.app.MatcherStatus.Working
 import com.wavesplatform.dex.domain.utils.ScorexLogging
@@ -121,7 +122,8 @@ object DexContainer extends ScorexLogging {
   private val containerLogsPath: String = s"$baseContainerPath/logs"
 
   private val restApiPort: Int = 6886 // application.conf waves.dex.rest-api.port
-  private val exposedPorts = Seq(6886)
+  private val prometheusPort = 9095
+  private val exposedPorts = Seq(restApiPort, prometheusPort)
 
   def apply(
     name: String,
@@ -148,6 +150,7 @@ object DexContainer extends ScorexLogging {
       c.withCreateContainerCmdModifier { cmd =>
         cmd.withName(s"$networkName-$name") // network.getName returns random id
           .withIpv4Address(internalIp)
+
         cmd.getHostConfig
           .withPortBindings(PortBindingKeeper.getBindings(cmd, exposedPorts))
           .withCapAdd(Capability.NET_ADMIN, Capability.NET_RAW) //for iptables

@@ -70,7 +70,6 @@ object Dependencies {
 
     val javaLevelDb = "0.12"
     val iq80levelDb = "0.12"
-    val influxDb = "2.21"
     val levelDbVersion = "1.23.1"
 
     val commonsNet = "3.8.0"
@@ -143,7 +142,6 @@ object Dependencies {
   private val monixReactive = monixModule("reactive")
   private val supertagged = "org.rudogma" %% "supertagged" % Version.supertagged
   private val javaLevelDb = "org.iq80.leveldb" % "leveldb" % Version.javaLevelDb
-  private val influxDb = "org.influxdb" % "influxdb-java" % Version.influxDb
   private val commonsNet = "commons-net" % "commons-net" % Version.commonsNet
   private val sttpClient = sttpClientModule("core")
   private val sttpPlayJson = sttpClientModule("play-json")
@@ -246,13 +244,12 @@ object Dependencies {
       kafka,
       janino,
       kamonCore,
-      kamonModule("influxdb"),
+      kamonModule("prometheus"),
       kamonModule("system-metrics"),
       kamonModule("status-page"),
       kamonModule("jaeger"),
       kamonModule("akka-http"),
       kamonModule("logback"),
-      influxDb,
       commonsNet,
       swaggerUi,
       jaxbApi, // Required for Swagger UI in JRE 11 because of javax/xml/bind/annotation/XmlRootElement

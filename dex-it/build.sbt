@@ -57,6 +57,7 @@ inTask(docker)(
         ).flatten: _*
       )
       entryPoint(entryPointSh)
+      expose(9095) // prometheus metrics
       expose(10001) // Profiler
     },
     buildOptions := BuildOptions(removeIntermediateContainers = BuildOptions.Remove.OnSuccess)

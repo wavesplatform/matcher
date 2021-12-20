@@ -4,13 +4,14 @@ import akka.actor.typed.scaladsl.adapter._
 import akka.actor.{typed, Actor, ActorRef, Cancellable, Props, Stash, Status}
 import akka.pattern.{pipe, CircuitBreakerOpenException}
 import akka.{actor => classic}
+import cats.data.NonEmptyList
 import cats.instances.list._
 import cats.instances.long._
 import cats.syntax.foldable._
 import cats.syntax.group.catsSyntaxGroup
 import cats.syntax.option._
 import cats.syntax.semigroup._
-import com.wavesplatform.dex.actors.address.AddressActor.Command.ObservedTxData
+import com.wavesplatform.dex.actors.address.AddressActor.Command.{HasOrderBookEvents, ObservedTxData}
 import com.wavesplatform.dex.actors.address.AddressActor.Settings.default
 import com.wavesplatform.dex.actors.address.AddressActor._
 import com.wavesplatform.dex.actors.address.BalancesFormatter.format
@@ -153,64 +154,69 @@ class AddressActor(
         }
 
     case command: Command.ApplyOrderBookExecuted =>
-      val ownerRemainingOrders = List(command.event.counterRemaining, command.event.submittedRemaining).filter(_.order.sender.toAddress == owner)
-      val txResult = command.expectedTx
-      log.debug(
-        s"OrderExecuted(${ownerRemainingOrders.map(o => s"${o.id} -> ${o.status}").mkString(
-          ", "
-        )}, tx=${txResult.transaction.id()}${txResult.error.fold("")(e => s", e=$e")}"
-      )
+      val orderExecutedUpdates = command.nonEmptyEvents.foldLeft(WsOrderExecutedUpdates()) {
+        case (acc, event) =>
+          val ownerRemainingOrders = List(event.event.counterRemaining, event.event.submittedRemaining).filter(_.order.sender.toAddress == owner)
+          val txResult = event.expectedTx
+          log.debug(
+            s"OrderExecuted(${ownerRemainingOrders.map(o => s"${o.id} -> ${o.status}").mkString(
+              ", "
+            )}, tx=${txResult.transaction.id()}${txResult.error.fold("")(e => s", e=$e")}"
+          )
 
-      val cumulativeDiff = ownerRemainingOrders
-        .foldMap { remaining =>
-          scheduleOrderWs(remaining, remaining.status, unmatchable = false, maybeMatchTx = txResult.transaction.some)
+          val cumulativeDiff = ownerRemainingOrders
+            .foldMap { remaining =>
+              remaining.status match {
+                case status: OrderStatus.Final =>
+                  expiration.remove(remaining.id).foreach(_.cancel())
+                  orderDb.saveOrderInfo(remaining.id, owner, OrderInfo.v6(remaining, status)).onComplete {
+                    case Success(_) => processingOrders.remove(remaining.id)
+                    case Failure(th) =>
+                      //TODO probably inconsistent state can be introduced
+                      log.error("error while saving order info", th)
+                      processingOrders.remove(remaining.id)
+                  }
+                  activeOrders.remove(remaining.id) match {
+                    case Some(origActiveOrder) => origActiveOrder.reservableBalance.inverse()
+                    case None => throw new IllegalStateException(s"Can't find order ${remaining.id} during finalization")
+                  }
 
-          remaining.status match {
-            case status: OrderStatus.Final =>
-              expiration.remove(remaining.id).foreach(_.cancel())
-              orderDb.saveOrderInfo(remaining.id, owner, OrderInfo.v6(remaining, status)).onComplete {
-                case Success(_) => processingOrders.remove(remaining.id)
-                case Failure(th) =>
-                  //TODO probably inconsistent state can be introduced
-                  log.error("error while saving order info", th)
-                  processingOrders.remove(remaining.id)
+                case _ =>
+                  activeOrders.put(remaining.id, remaining) match {
+                    case Some(origActiveOrder) => (remaining.reservableBalance |-| origActiveOrder.reservableBalance).filterNot(_._2 == 0)
+                    case None => throw new IllegalStateException(s"Can't find order ${remaining.id}")
+                  }
               }
-              activeOrders.remove(remaining.id) match {
-                case Some(origActiveOrder) => origActiveOrder.reservableBalance.inverse()
-                case None => throw new IllegalStateException(s"Can't find order ${remaining.id} during finalization")
-              }
+            }
+            .filterNot(_._2 == 0) // Fee could be 0 if an order executed by a small amount
 
-            case _ =>
-              activeOrders.put(remaining.id, remaining) match {
-                case Some(origActiveOrder) => (remaining.reservableBalance |-| origActiveOrder.reservableBalance).filterNot(_._2 == 0)
-                case None => throw new IllegalStateException(s"Can't find order ${remaining.id}")
-              }
-          }
-        }
-        .filterNot(_._2 == 0) // Fee could be 0 if an order executed by a small amount
+          val (updated, changes) =
+            balances.withExecuted(
+              txResult.toOption.map(_.id()),
+              AddressBalance.NotObservedTxData(ownerRemainingOrders.map(_.id), NegativeMap(cumulativeDiff))
+            )
+          balances = updated
 
-      val (updated, changes) =
-        balances.withExecuted(
-          txResult.toOption.map(_.id()),
-          AddressBalance.NotObservedTxData(ownerRemainingOrders.map(_.id), NegativeMap(cumulativeDiff))
-        )
-      balances = updated
+          val reservedAssets = ownerRemainingOrders.flatMap(_.requiredBalance.keys).toSet
+          val newReserved = balances.reserved.filter { case (asset, _) => reservedAssets.contains(asset) }
+          log.info(
+            s"[Balance] 1. 💵: ${format(balances.tradableBalance(cumulativeDiff.keySet).xs)}; e: ${format(cumulativeDiff)}, ov: ${format(newReserved)}"
+          )
+          val currentUpdate = WsOrderExecutedUpdates(ownerRemainingOrders.map(AcceptedOrderWithTx(_, txResult)), changes)
+          acc merge currentUpdate
+      }
+
       scheduleWs(
         wsAddressState
-          .putChangedAssets(changes.changedAssets)
+          .putChangedAssets(orderExecutedUpdates.changedAssets.changedAssets)
           .putTxsUpdate(
-            changes.addedNotObservedTxs,
-            changes.removedNotObservedTxs,
-            changes.addedNotCreatedTxs,
-            changes.removedNotCreatedTxs
+            orderExecutedUpdates.changedAssets.addedNotObservedTxs,
+            orderExecutedUpdates.changedAssets.removedNotObservedTxs,
+            orderExecutedUpdates.changedAssets.addedNotCreatedTxs,
+            orderExecutedUpdates.changedAssets.removedNotCreatedTxs
           )
       )
-
-      val reservedAssets = ownerRemainingOrders.flatMap(_.requiredBalance.keys).toSet
-      val newReserved = balances.reserved.filter { case (asset, _) => reservedAssets.contains(asset) }
-      log.info(
-        s"[Balance] 1. 💵: ${format(balances.tradableBalance(cumulativeDiff.keySet).xs)}; e: ${format(cumulativeDiff)}, ov: ${format(newReserved)}"
-      )
+      scheduleOrdersWs(orderExecutedUpdates.ownerRemainingOrders)
 
     case command: Command.ApplyOrderBookCanceled =>
       import command.event._
@@ -715,6 +721,18 @@ class AddressActor(
     }
   }
 
+  private def scheduleOrdersWs(
+    orders: List[AcceptedOrderWithTx]
+  ): Unit = scheduleWs {
+    orders.foldLeft(wsAddressState) { case (addressState, aoWtx) =>
+      aoWtx.order.status match {
+        case OrderStatus.Accepted => addressState.putOrderUpdate(aoWtx.order.id, WsOrder.fromDomain(aoWtx.order, aoWtx.order.status))
+        case _: OrderStatus.Cancelled => addressState.putOrderStatusNameUpdate(aoWtx.order.order, aoWtx.order.status)
+        case _ => addressState.putOrderFillingInfoAndStatusNameUpdate(aoWtx.order, aoWtx.order.status, aoWtx.tx.transaction.some)
+      }
+    }
+  }
+
   private def getOrdersToCancel(actualNodeBalance: Map[Asset, Long]): Queue[InsufficientBalanceOrder] = {
     val inProgress = pendingCancels
     // Now a user can have 100 active transaction maximum - easy to traverse.
@@ -877,6 +895,24 @@ object AddressActor {
     override def toString: String = orderId.toString
   }
 
+  private case class AcceptedOrderWithTx(order: AcceptedOrder, tx: ExchangeTransactionResult[ExchangeTransactionV2])
+
+  private case class WsOrderExecutedUpdates(
+    ownerRemainingOrders: List[AcceptedOrderWithTx] = List.empty,
+    changedAssets: AddressBalance.Changes = AddressBalance.Changes.empty
+  ) {
+
+    def merge(other: WsOrderExecutedUpdates): WsOrderExecutedUpdates =
+      WsOrderExecutedUpdates(ownerRemainingOrders ++ other.ownerRemainingOrders, changedAssets |+| other.changedAssets)
+
+  }
+
+  case class OrderBookExecutedEvent(event: Events.OrderExecuted, expectedTx: ExchangeTransactionResult[ExchangeTransactionV2])
+      extends HasOrderBookEvents {
+    override def events: Seq[Events.Event] = List(event)
+    override def affectedOrders: List[AcceptedOrder] = List(event.counter, event.submitted)
+  }
+
   sealed trait Message
 
   sealed trait Query extends Message
@@ -914,23 +950,30 @@ object AddressActor {
     case class ObservedTxData(orders: Seq[Order], pessimisticChanges: PositiveMap[Asset, Long])
     case class MarkTxsObserved(txsWithSpending: Map[ExchangeTransaction.Id, ObservedTxData]) extends Command
 
-    sealed trait HasOrderBookEvent {
-      def event: Events.Event
+    sealed trait HasOrderBookEvents {
+      def events: Iterable[Events.Event]
       def affectedOrders: List[AcceptedOrder]
     }
 
-    case class ApplyOrderBookAdded(event: Events.OrderAdded) extends Command with HasOrderBookEvent {
+    case class ApplyOrderBookAdded(event: Events.OrderAdded) extends Command with HasOrderBookEvents {
       override def affectedOrders: List[AcceptedOrder] = List(event.order)
+
+      override def events: Seq[Events.Event] = List(event)
     }
 
-    case class ApplyOrderBookExecuted(event: Events.OrderExecuted, expectedTx: ExchangeTransactionResult[ExchangeTransactionV2])
-        extends Command
-        with HasOrderBookEvent {
-      override def affectedOrders: List[AcceptedOrder] = List(event.counter, event.submitted)
+    case class ApplyOrderBookExecuted(nonEmptyEvents: NonEmptyList[OrderBookExecutedEvent]) extends Command with HasOrderBookEvents {
+      override def affectedOrders: List[AcceptedOrder] = nonEmptyEvents.toList.flatMap(_.affectedOrders)
+
+      override def events: Iterable[Events.Event] = nonEmptyEvents.toList.map(_.event)
     }
 
-    case class ApplyOrderBookCanceled(event: Events.OrderCanceled) extends Command with HasOrderBookEvent {
+    object ApplyOrderBookExecuted {
+      def apply(event: OrderBookExecutedEvent): ApplyOrderBookExecuted = ApplyOrderBookExecuted(nonEmptyEvents = NonEmptyList.one(event))
+    }
+
+    case class ApplyOrderBookCanceled(event: Events.OrderCanceled) extends Command with HasOrderBookEvents {
       override def affectedOrders: List[AcceptedOrder] = List(event.acceptedOrder)
+      override def events: Seq[Events.Event] = List(event)
     }
 
     case class PlaceOrder(order: Order, isMarket: Boolean) extends OneOrderCommand {

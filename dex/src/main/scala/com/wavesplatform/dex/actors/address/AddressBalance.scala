@@ -198,7 +198,7 @@ object AddressBalance {
           x.addedNotObservedTxs ++ y.addedNotObservedTxs,
           x.removedNotObservedTxs ++ y.removedNotObservedTxs,
           x.addedNotCreatedTxs ++ y.addedNotCreatedTxs,
-          x.removedNotCreatedTxs ++ x.removedNotCreatedTxs
+          x.removedNotCreatedTxs ++ y.removedNotCreatedTxs
         )
 
     }

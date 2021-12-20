@@ -413,10 +413,10 @@ class AddressActorSpecification
             System.currentTimeMillis,
             Proofs(List.empty)
           )
-          ref ! AddressActor.Command.ApplyOrderBookExecuted(
+          ref ! AddressActor.Command.ApplyOrderBookExecuted(AddressActor.OrderBookExecutedEvent(
             OrderExecuted(duplicatedMarketOrder, LimitOrder(counterOrder), System.currentTimeMillis, 0L, 0L, 0L),
             ExchangeTransactionResult.fromEither(Right(()), matchTx)
-          )
+          ))
 
           val probe = TestProbe()
           val msg = AddressActor.Command.PlaceOrder(duplicatedOrder, isMarket = true)

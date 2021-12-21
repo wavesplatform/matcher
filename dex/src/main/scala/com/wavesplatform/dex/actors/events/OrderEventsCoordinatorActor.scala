@@ -32,8 +32,8 @@ object OrderEventsCoordinatorActor {
     cancelled: Vector[AddressActor.Command.ApplyOrderBookCanceled] = Vector.empty
   ) {
     def add(event: AddressActor.Command.ApplyOrderBookAdded): SortedEvents = copy(added = added :+ event)
-    def execute(event: AddressActor.OrderBookExecutedEvent): SortedEvents = copy(executed = executed :+ event)
-    def cancel(event: AddressActor.Command.ApplyOrderBookCanceled): SortedEvents = copy(cancelled = cancelled :+ event)
+    def add(event: AddressActor.OrderBookExecutedEvent): SortedEvents = copy(executed = executed :+ event)
+    def add(event: AddressActor.Command.ApplyOrderBookCanceled): SortedEvents = copy(cancelled = cancelled :+ event)
   }
 
   case class Settings(exchangeTransactionCacheSize: Int)
@@ -111,11 +111,11 @@ object OrderEventsCoordinatorActor {
                       )
                   }
                   // We don't update "observedTxIds" here, because expectedTx relates to "createdTxs"
-                  acc.execute(AddressActor.OrderBookExecutedEvent(event, createTxResult))
+                  acc.add(AddressActor.OrderBookExecutedEvent(event, createTxResult))
 
                 case event: Events.OrderCanceled =>
                   // If we here, AddressActor is guaranteed to be created, because this happens only after Events.OrderAdded
-                  acc.cancel(AddressActor.Command.ApplyOrderBookCanceled(event))
+                  acc.add(AddressActor.Command.ApplyOrderBookCanceled(event))
 
               }
             }

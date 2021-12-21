@@ -26,14 +26,14 @@ import play.api.libs.json.Json
 
 object OrderEventsCoordinatorActor {
 
-  final private case class SortedEvents(
+  final private case class AddressActorCommands(
     added: Vector[AddressActor.Command.ApplyOrderBookAdded] = Vector.empty,
     executed: Vector[AddressActor.OrderBookExecutedEvent] = Vector.empty,
     cancelled: Vector[AddressActor.Command.ApplyOrderBookCanceled] = Vector.empty
   ) {
-    def add(event: AddressActor.Command.ApplyOrderBookAdded): SortedEvents = copy(added = added :+ event)
-    def add(event: AddressActor.OrderBookExecutedEvent): SortedEvents = copy(executed = executed :+ event)
-    def add(event: AddressActor.Command.ApplyOrderBookCanceled): SortedEvents = copy(cancelled = cancelled :+ event)
+    def add(event: AddressActor.Command.ApplyOrderBookAdded): AddressActorCommands = copy(added = added :+ event)
+    def add(event: AddressActor.OrderBookExecutedEvent): AddressActorCommands = copy(executed = executed :+ event)
+    def add(event: AddressActor.Command.ApplyOrderBookCanceled): AddressActorCommands = copy(cancelled = cancelled :+ event)
   }
 
   case class Settings(exchangeTransactionCacheSize: Int)
@@ -81,7 +81,7 @@ object OrderEventsCoordinatorActor {
         // DEX-1192 docs/places-and-cancels.md
         case Command.Process(events) =>
           val addressActorCommands =
-            events.foldLeft(SortedEvents()) { case (acc, event) =>
+            events.foldLeft(AddressActorCommands()) { case (acc, event) =>
               event match {
                 case event: Events.OrderAdded =>
                   acc.add(AddressActor.Command.ApplyOrderBookAdded(event))

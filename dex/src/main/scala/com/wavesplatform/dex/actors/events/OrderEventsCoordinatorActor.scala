@@ -27,9 +27,9 @@ import play.api.libs.json.Json
 object OrderEventsCoordinatorActor {
 
   final private case class SortedEvents(
-    added: Seq[AddressActor.Command.ApplyOrderBookAdded] = Seq.empty,
-    executed: Seq[AddressActor.OrderBookExecutedEvent] = Seq.empty,
-    cancelled: Seq[AddressActor.Command.ApplyOrderBookCanceled] = Seq.empty
+    added: Vector[AddressActor.Command.ApplyOrderBookAdded] = Vector.empty,
+    executed: Vector[AddressActor.OrderBookExecutedEvent] = Vector.empty,
+    cancelled: Vector[AddressActor.Command.ApplyOrderBookCanceled] = Vector.empty
   ) {
     def add(event: AddressActor.Command.ApplyOrderBookAdded): SortedEvents = copy(added = added :+ event)
     def execute(event: AddressActor.OrderBookExecutedEvent): SortedEvents = copy(executed = executed :+ event)

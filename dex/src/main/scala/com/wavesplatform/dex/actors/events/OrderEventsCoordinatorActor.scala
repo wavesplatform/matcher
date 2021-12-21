@@ -26,6 +26,16 @@ import play.api.libs.json.Json
 
 object OrderEventsCoordinatorActor {
 
+  final private case class SortedEvents(
+    added: Seq[AddressActor.Command.ApplyOrderBookAdded] = Seq.empty,
+    executed: Seq[AddressActor.OrderBookExecutedEvent] = Seq.empty,
+    cancelled: Seq[AddressActor.Command.ApplyOrderBookCanceled] = Seq.empty
+  ) {
+    def add(event: AddressActor.Command.ApplyOrderBookAdded): SortedEvents = copy(added = added :+ event)
+    def execute(event: AddressActor.OrderBookExecutedEvent): SortedEvents = copy(executed = executed :+ event)
+    def cancel(event: AddressActor.Command.ApplyOrderBookCanceled): SortedEvents = copy(cancelled = cancelled :+ event)
+  }
+
   case class Settings(exchangeTransactionCacheSize: Int)
 
   sealed trait Message extends Product with Serializable
@@ -70,12 +80,11 @@ object OrderEventsCoordinatorActor {
       message match {
         // DEX-1192 docs/places-and-cancels.md
         case Command.Process(events) =>
-          val orderExecutedEvents =
-            events.foldLeft(Vector.empty[AddressActor.OrderBookExecutedEvent]) { case (acc, event) =>
+          val addressActorCommands =
+            events.foldLeft(SortedEvents()) { case (acc, event) =>
               event match {
                 case event: Events.OrderAdded =>
-                  addressDirectoryRef ! AddressActor.Command.ApplyOrderBookAdded(event)
-                  acc
+                  acc.add(AddressActor.Command.ApplyOrderBookAdded(event))
 
                 case event: Events.OrderExecuted =>
                   // If we here, AddressActor is guaranteed to be created, because this happens only after Events.OrderAdded
@@ -102,16 +111,19 @@ object OrderEventsCoordinatorActor {
                       )
                   }
                   // We don't update "observedTxIds" here, because expectedTx relates to "createdTxs"
-                  acc :+ AddressActor.OrderBookExecutedEvent(event, createTxResult)
+                  acc.execute(AddressActor.OrderBookExecutedEvent(event, createTxResult))
 
                 case event: Events.OrderCanceled =>
                   // If we here, AddressActor is guaranteed to be created, because this happens only after Events.OrderAdded
-                  addressDirectoryRef ! AddressActor.Command.ApplyOrderBookCanceled(event)
-                  acc
+                  acc.cancel(AddressActor.Command.ApplyOrderBookCanceled(event))
 
               }
             }
-          NonEmptyList.fromList(orderExecutedEvents.toList).map(AddressActor.Command.ApplyOrderBookExecuted(_)).foreach(addressDirectoryRef ! _)
+          addressActorCommands.added.foreach(addressDirectoryRef ! _)
+          NonEmptyList.fromList(addressActorCommands.executed.toList).map(AddressActor.Command.ApplyOrderBookExecuted(_)).foreach(
+            addressDirectoryRef ! _
+          )
+          addressActorCommands.cancelled.foreach(addressDirectoryRef ! _)
           Behaviors.same
 
         case Command.ApplyNodeUpdates(updates) =>

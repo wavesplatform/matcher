@@ -518,27 +518,19 @@ class OrderBookActorSpecification
         val events = tp.expectMsgType[Process].events.toList
         events.size shouldBe 4
         events.head shouldBe a[OrderAdded]
-        val oe1 = events(1) match {
-          case oe: OrderExecuted =>
-            oe.submitted shouldBe marketOrder
-            oe.counter shouldBe LimitOrder(counterOrder1)
-            oe.executedAmount shouldBe counterOrder1.amount
-            oe
-          case e => fail(s"OrderEvent is $e, but expected OrderExecuted")
-        }
+        val oe1 = events(1).asInstanceOf[OrderExecuted]
+        oe1.submitted shouldBe marketOrder
+        oe1.counter shouldBe LimitOrder(counterOrder1)
+        oe1.executedAmount shouldBe counterOrder1.amount
 
-        val oe2 = events(2) match {
-          case oe: OrderExecuted =>
-            val marketOrderRemaining1 = oe1.submittedMarketRemaining(marketOrder)
-            oe.submitted shouldBe marketOrderRemaining1
-            oe.counter shouldBe LimitOrder(counterOrder2)
-            oe.executedAmount shouldBe counterOrder2.amount
-            oe
-          case e => fail(s"OrderEvent is $e, but expected OrderExecuted")
-        }
+        val oe2 = events(2).asInstanceOf[OrderExecuted]
+        val marketOrderRemaining1 = oe1.submittedMarketRemaining(marketOrder)
+        oe2.submitted shouldBe marketOrderRemaining1
+        oe2.counter shouldBe LimitOrder(counterOrder2)
+        oe2.executedAmount shouldBe counterOrder2.amount
 
-        val oe3 = events.collect { case a: OrderExecuted => a }(2)
-        val marketOrderRemaining2 = oe2.submittedMarketRemaining(oe1.submittedMarketRemaining(marketOrder))
+        val oe3 = events(3).asInstanceOf[OrderExecuted]
+        val marketOrderRemaining2 = oe2.submittedMarketRemaining(marketOrderRemaining1)
         oe3.submitted shouldBe marketOrderRemaining2
         oe3.counter shouldBe LimitOrder(counterOrder3)
         oe3.executedAmount shouldBe toNormalized(1)
@@ -589,10 +581,7 @@ class OrderBookActorSpecification
           val events = tp.expectMsgType[Process].events
           events.size shouldBe 2
           events.head shouldBe a[OrderAdded]
-          val oc = events.last match {
-            case x: OrderCanceled => x
-            case e => fail(s"Expected OrderCanceled, but got $e")
-          }
+          val oc = events.last.asInstanceOf[OrderCanceled]
 
           oc.acceptedOrder shouldBe marketOrder
           oc.reason shouldBe Events.OrderCanceledReason.BecameUnmatchable
@@ -614,10 +603,7 @@ class OrderBookActorSpecification
           oe.counter shouldBe LimitOrder(counterOrder)
           oe.executedAmount shouldBe counterOrder.amount
 
-          val oc2 = events.last match {
-            case ex: OrderCanceled => ex
-            case e => fail(s"Expected OrderCanceled, but got $e")
-          }
+          val oc2 = events.last.asInstanceOf[OrderCanceled]
 
           oc2.acceptedOrder shouldBe oe.submittedMarketRemaining(marketOrder)
           oc2.reason shouldBe Events.OrderCanceledReason.BecameUnmatchable

@@ -84,7 +84,7 @@ class AddressActor(
   private val pendingCommands = MutableMap.empty[Order.Id, PendingCommand]
 
   // orders that in process of adding, but may not be present in leveldb or in pendingCommands and activeOrders
-  // See DEX-1435
+  // See DEX-1435, DEX-1511
   private val processingOrders = ConcurrentHashMap.newKeySet[Order.Id]()
 
   private val activeOrders = MutableMap.empty[Order.Id, AcceptedOrder]
@@ -169,12 +169,10 @@ class AddressActor(
               remaining.status match {
                 case status: OrderStatus.Final =>
                   expiration.remove(remaining.id).foreach(_.cancel())
-                  orderDb.saveOrderInfo(remaining.id, owner, OrderInfo.v6(remaining, status)).onComplete {
-                    case Success(_) => processingOrders.remove(remaining.id)
-                    case Failure(th) =>
-                      //TODO probably inconsistent state can be introduced
-                      log.error("error while saving order info", th)
-                      processingOrders.remove(remaining.id)
+                  orderDb.saveOrderInfo(remaining.id, owner, OrderInfo.v6(remaining, status)).onComplete { t =>
+                    //TODO probably inconsistent state can be introduced
+                    t.failed.foreach(log.error("error while saving order info", _))
+                    processingOrders.remove(remaining.id)
                   }
                   activeOrders.remove(remaining.id) match {
                     case Some(origActiveOrder) => origActiveOrder.reservableBalance.inverse()
@@ -234,11 +232,10 @@ class AddressActor(
         case None => // Can be received twice, because multiple matchers can cancel same order
         case Some(origActiveOrder) =>
           expiration.remove(acceptedOrder.id).foreach(_.cancel())
-          orderDb.saveOrderInfo(acceptedOrder.id, owner, OrderInfo.v6(acceptedOrder, orderStatus)).onComplete {
-            case Success(_) =>
-            case Failure(th) =>
-              //TODO probably inconsistent state can be introduced
-              log.error("error while saving order info", th)
+          orderDb.saveOrderInfo(acceptedOrder.id, owner, OrderInfo.v6(acceptedOrder, orderStatus)).onComplete { t =>
+            //TODO probably inconsistent state can be introduced
+            t.failed.foreach(log.error("error while saving order info", _))
+            processingOrders.remove(id)
           }
 
           val orderReserve = origActiveOrder.reservableBalance
@@ -250,13 +247,11 @@ class AddressActor(
           scheduleOrderWs(acceptedOrder, orderStatus, unmatchable, maybeMatchTx = None)
       }
 
-      if (isWorking) {
+      if (isWorking)
         pendingCommands.remove(id).foreach { pc =>
           log.trace(s"Confirming cancellation for $id")
           pc.client ! Event.OrderCanceled(id)
         }
-        processingOrders.remove(id)
-      }
 
     case command: Command.ChangeBalances => changeBalances(command.updates)
 

@@ -595,10 +595,10 @@ class OrderBookActorSpecification
           tp.expectOecProcess[OrderAdded]
 
           orderBook ! wrapMarketOrder(marketOrder)
-          val events = tp.expectMsgType[Process].events
+          val events = tp.expectMsgType[Process].events.toList
           events.size shouldBe 3
           events.head shouldBe a[OrderAdded]
-          val oe = events.collect { case a: OrderExecuted => a }.last
+          val oe = events(1).asInstanceOf[OrderExecuted]
           oe.submitted shouldBe marketOrder
           oe.counter shouldBe LimitOrder(counterOrder)
           oe.executedAmount shouldBe counterOrder.amount
@@ -658,12 +658,10 @@ class OrderBookActorSpecification
 
           orderBook ! wrapMarketOrder(marketOrder)
 
-          val events = tp.expectMsgType[Process].events
+          val events = tp.expectMsgType[Process].events.toList
           events.size shouldBe 3
           events.head shouldBe a[OrderAdded]
-          val oe = events.collect {
-            case a: OrderExecuted => a
-          }.last
+          val oe = events(1).asInstanceOf[OrderExecuted]
           oe.submitted shouldBe marketOrder
           oe.counter shouldBe LimitOrder(counterOrder)
 
@@ -683,9 +681,7 @@ class OrderBookActorSpecification
               MatcherModel.getCost(oe.executedAmount + 1, marketOrder.price) should be > marketOrder.availableForSpending
           }
 
-          val oc = events.collect {
-            case e: OrderCanceled => e
-          }.last
+          val oc = events.last.asInstanceOf[OrderCanceled]
 
           oc.acceptedOrder shouldBe oe.submittedMarketRemaining(marketOrder)
           oc.reason shouldBe Events.OrderCanceledReason.BecameUnmatchable

@@ -55,8 +55,9 @@ class WsAddressStreamRealTimeTestSuite extends WsSuiteBase {
     "send only one update for multiple matches for one order" in
     Using.resource(mkWsAddressConnection(account, dex1)) { wsc =>
 
+      val ts = System.currentTimeMillis()
       val smallOrders = (1 to 5).map { i =>
-        mkOrder(alice, wavesUsdPair, OrderType.SELL, 2.waves, (1 + (i / 10)).usd, ts = System.currentTimeMillis() + (i * 200))
+        mkOrder(alice, wavesUsdPair, OrderType.SELL, 2.waves, (1 + (i / 10)).usd, ts = ts + (i * 200))
       }
       smallOrders.foreach(dex1.api.place)
 
@@ -69,7 +70,7 @@ class WsAddressStreamRealTimeTestSuite extends WsSuiteBase {
 
       val updates = wsc.orderChanges.filter(_.id == bigOrder.id())
 
-      updates.size shouldBe 2 // one for creating and one for five matches
+      updates.size should (be > 0 and be <= 2) // one for creating and one for five matches, or just one update
       updates.last.matchInfo.size shouldBe 5
     }
 

@@ -34,7 +34,7 @@ import java.nio.file.Files
 import java.util.concurrent.atomic.AtomicLong
 import java.util.{Base64, Scanner}
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
-import scala.concurrent.{Await, TimeoutException}
+import scala.concurrent.{blocking, Await, Future, TimeoutException}
 import scala.util.{Failure, Success, Try, Using}
 
 object WavesDexCli extends ScoptImplicits {
@@ -371,6 +371,49 @@ object WavesDexCli extends ScoptImplicits {
       }
     }
 
+  def testBloomFilter(matcherSettings: MatcherSettings): Unit = {
+
+    def readFromStdIn(prompt: String): String = {
+      System.out.print(prompt)
+      val scanner = new Scanner(System.in, StandardCharsets.UTF_8.name())
+      if (scanner.hasNextLine) scanner.nextLine() else ""
+    }
+
+    def withAsyncLevelDb[T](dataDirectory: String)(f: LevelDb[Future] => T): T =
+      Using.resource(openDb(dataDirectory)) { db =>
+        import scala.concurrent.ExecutionContext.Implicits.global
+        f(LevelDb.async(db))
+      }
+
+    for {
+      _ <- cli.log(
+        s"""
+           |Running testSnapshots:
+           |dataDirectory=${matcherSettings.dataDirectory}
+           |""".stripMargin
+      )
+      _ = readFromStdIn("Pause 1")
+    } yield withAsyncLevelDb(matcherSettings.dataDirectory) { db =>
+      import cats.instances.future._
+      import scala.concurrent.ExecutionContext.Implicits.global
+      import com.google.common.hash.{BloomFilter, Funnels}
+
+      val ldb = OrderDb.levelDb(matcherSettings.orderDb, db)
+      val bloomFilter: BloomFilter[Array[Byte]] = BloomFilter.create(Funnels.byteArrayFunnel(), 10000 * 10000)
+      var cnt = 0L
+      val ts1 = System.currentTimeMillis()
+      ldb.iterateOrderInfoKeys { orderId =>
+        bloomFilter.put(orderId)
+        cnt += 1
+      }
+      val diff = System.currentTimeMillis() - ts1
+      println(s"********** TOTAL RECORDS = $cnt")
+      println(s"********** TIME = $diff")
+    }
+
+    readFromStdIn("Pause 2")
+  }
+
   // noinspection ScalaStyle
   def deleteOrderBook(args: Args, matcherSettings: MatcherSettings): Unit =
     for {
@@ -706,6 +749,17 @@ object WavesDexCli extends ScoptImplicits {
               .valueName("<order-id-in-base58>")
               .required()
               .action((x, s) => s.copy(orderId = x))
+          ),
+        cmd(Command.TestBloomFilter.name)
+          .action((_, s) => s.copy(command = Command.TestBloomFilter.some))
+          .text("Test bloom filter")
+          .children(
+            opt[String]("dex-config")
+              .abbr("dc")
+              .text("DEX config path")
+              .valueName("<raw-string>")
+              .required()
+              .action((x, s) => s.copy(configPath = x))
           )
       )
     }
@@ -753,6 +807,7 @@ object WavesDexCli extends ScoptImplicits {
               case Command.InspectOrderBook => inspectOrderBook(args, matcherSettings)
               case Command.DeleteOrderBook => deleteOrderBook(args, matcherSettings)
               case Command.InspectOrder => inspectOrder(args, matcherSettings)
+              case Command.TestBloomFilter => testBloomFilter(matcherSettings)
             }
             println("Done")
         }
@@ -823,6 +878,10 @@ object WavesDexCli extends ScoptImplicits {
 
     case object InspectOrder extends Command {
       override def name: String = "inspect-order"
+    }
+
+    case object TestBloomFilter extends Command {
+      override def name: String = "test-bloom-filter"
     }
 
   }

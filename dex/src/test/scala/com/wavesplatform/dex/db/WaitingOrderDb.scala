@@ -47,6 +47,7 @@ final class WaitingOrderDb private (implicit ex: ExecutionContext) extends Order
   override def getOrderInfo(id: Id): Future[Option[FinalOrderInfo]] = None.pure[Future].widen
   override def transactionsByOrder(orderId: Id): Future[Seq[ExchangeTransaction]] = Seq.empty.pure[Future].widen
 
+  override def iterateOrderInfoKeys(f: Id => Unit): Future[Unit] = ???
 }
 
 object WaitingOrderDb {

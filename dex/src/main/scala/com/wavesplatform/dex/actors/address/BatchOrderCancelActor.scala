@@ -8,6 +8,7 @@ import com.wavesplatform.dex.actors.address.BatchOrderCancelActor.CancelResponse
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.error
+import com.wavesplatform.dex.error.RequestTimeout
 
 import scala.collection.immutable.ListMap
 import scala.concurrent.duration.FiniteDuration
@@ -46,10 +47,12 @@ class BatchOrderCancelActor private (
       stop(Event.BatchCancelCompleted(mkOrderedResponse(response)), timer)
   }
 
-  private def mkOrderedResponse(response: Map[Order.Id, OrderCancelResult]): ListMap[Order.Id, OrderCancelResult] = (for {
-    id <- orderIds
-    response <- response.get(id)
-  } yield id -> response).to(ListMap)
+  private def mkOrderedResponse(response: Map[Order.Id, OrderCancelResult]): ListMap[Order.Id, OrderCancelResult] =
+    orderIds
+      .foldLeft(ListMap.newBuilder[Order.Id, OrderCancelResult]) { (acc, id) =>
+        val result = response.getOrElse(id, Left(RequestTimeout))
+        acc.addOne((id, result))
+      }.result()
 
   private def stop(response: Event.BatchCancelCompleted, timer: Cancellable): Unit = {
     timer.cancel()

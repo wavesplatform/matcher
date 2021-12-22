@@ -231,8 +231,8 @@ class AddressActor(
       origActiveOrder match {
         case None => // Can be received twice, because multiple matchers can cancel same order
         case Some(origActiveOrder) =>
-          expiration.remove(acceptedOrder.id).foreach(_.cancel())
-          orderDb.saveOrderInfo(acceptedOrder.id, owner, OrderInfo.v6(acceptedOrder, orderStatus)).onComplete { t =>
+          expiration.remove(id).foreach(_.cancel())
+          orderDb.saveOrderInfo(id, owner, OrderInfo.v6(acceptedOrder, orderStatus)).onComplete { t =>
             //TODO probably inconsistent state can be introduced
             t.failed.foreach(log.error("error while saving order info", _))
             processingOrders.remove(id)

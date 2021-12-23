@@ -96,7 +96,7 @@ object OrderDb {
     }
 
     override def iterateOrderInfoKeys(f: Order.Id => Unit): F[Unit] = levelDb.readOnly { ro =>
-      ro.iterateOver(2) { entry =>
+      ro.iterateOver(26) { entry => //2
         f(ByteStr(entry.getKey.drop(2)))
       }
     }

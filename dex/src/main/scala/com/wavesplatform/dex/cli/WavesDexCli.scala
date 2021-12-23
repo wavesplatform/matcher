@@ -399,10 +399,10 @@ object WavesDexCli extends ScoptImplicits {
       import com.google.common.hash.{BloomFilter, Funnels}
 
       val ldb = OrderDb.levelDb(matcherSettings.orderDb, db)
-//      val bloomFilter: BloomFilter[Array[Byte]] = BloomFilter.create(Funnels.byteArrayFunnel(), 10000 * 10000)
+      val bloomFilter: BloomFilter[Array[Byte]] = BloomFilter.create(Funnels.byteArrayFunnel(), 10000 * 10000)
       val cnt = new AtomicLong(0L)
       val ts1 = System.currentTimeMillis()
-      ldb.iterateOrderInfoKeys { orderId =>
+      ldb.iterateOrderInfoKeys { _ =>
 //        bloomFilter.put(orderId)
         cnt.incrementAndGet()
       }

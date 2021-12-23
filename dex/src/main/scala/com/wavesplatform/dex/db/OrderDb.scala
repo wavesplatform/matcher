@@ -95,11 +95,10 @@ object OrderDb {
       } yield tx
     }
 
-    override def iterateOrderInfoKeys(f: Order.Id => Unit): F[Unit] = levelDb.readOnly { ro =>
-      ro.iterateOver(2) { entry =>
-        f(ByteStr(entry.getKey.drop(1)))
+    override def iterateOrderInfoKeys(f: Order.Id => Unit): F[Unit] =
+      levelDb.iterateOver(Array(2.toByte)) { entry =>
+        f(entry.getKey.drop(1))
       }
-    }
 
   }
 

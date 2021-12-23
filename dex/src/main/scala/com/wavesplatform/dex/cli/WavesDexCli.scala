@@ -33,7 +33,7 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.util.concurrent.atomic.AtomicLong
 import java.util.{Base64, Scanner}
-import scala.concurrent.duration.{DurationInt, FiniteDuration}
+import scala.concurrent.duration.{Duration, DurationInt, FiniteDuration}
 import scala.concurrent.{blocking, Await, Future, TimeoutException}
 import scala.util.{Failure, Success, Try, Using}
 
@@ -402,10 +402,11 @@ object WavesDexCli extends ScoptImplicits {
       val bloomFilter: BloomFilter[Array[Byte]] = BloomFilter.create(Funnels.byteArrayFunnel(), 10000 * 10000)
       val cnt = new AtomicLong(0L)
       val ts1 = System.currentTimeMillis()
-      ldb.iterateOrderInfoKeys { _ =>
-//        bloomFilter.put(orderId)
+      val f = ldb.iterateOrderInfoKeys { _ =>
+        //bloomFilter.put(orderId)
         cnt.incrementAndGet()
       }
+      Await.result(f, Duration.Inf)
       val diff = System.currentTimeMillis() - ts1
       println(s"********** TOTAL RECORDS = ${cnt.get()}")
       println(s"********** TIME = $diff")

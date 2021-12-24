@@ -18,7 +18,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.error.Implicits.ThrowableOps
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
-import com.wavesplatform.dex.model.OrderBookSideSnapshot
+import com.wavesplatform.dex.model.{OrderBookSideSnapshot, OrderInfo}
 import com.wavesplatform.dex.settings.{loadMatcherSettings, MatcherSettings}
 import com.wavesplatform.dex.tool._
 import com.wavesplatform.dex.tool.connectors.SuperConnector
@@ -31,7 +31,7 @@ import sttp.client3._
 import java.io.{File, PrintWriter}
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
-import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.{AtomicLong, AtomicReference}
 import java.util.{Base64, Scanner}
 import scala.concurrent.duration.{Duration, DurationInt, FiniteDuration}
 import scala.concurrent.{blocking, Await, Future, TimeoutException}
@@ -399,17 +399,17 @@ object WavesDexCli extends ScoptImplicits {
       import com.google.common.hash.{BloomFilter, Funnels}
 
       val ldb = OrderDb.levelDb(matcherSettings.orderDb, db)
-      val bloomFilter: BloomFilter[Array[Byte]] = BloomFilter.create(Funnels.byteArrayFunnel(), 10000 * 10000)
-      val cnt = new AtomicLong(0L)
-      val ts1 = System.currentTimeMillis()
-      val f = ldb.iterateOrderInfoKeys { _ =>
-        //bloomFilter.put(orderId)
-        cnt.incrementAndGet()
+//      val bloomFilter: BloomFilter[Array[Byte]] = BloomFilter.create(Funnels.byteArrayFunnel(), 10000 * 10000)
+      val prev = new AtomicReference[Option[OrderInfo.FinalOrderInfo]](None)
+      val f = ldb.iterateOrderInfo { (_, oi) =>
+        val p = prev.getAndSet(Some(oi))
+        if (p.exists(poi => oi.timestamp + 60 * 1000L - poi.timestamp < 0)) {
+          println("********** fail")
+          System.exit(-1)
+        }
       }
+      println("********** finished")
       Await.result(f, Duration.Inf)
-      val diff = System.currentTimeMillis() - ts1
-      println(s"********** TOTAL RECORDS = ${cnt.get()}")
-      println(s"********** TIME = $diff")
     }
 
     readFromStdIn("Pause 2")

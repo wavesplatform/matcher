@@ -24,7 +24,7 @@ trait OrderDb[F[_]] {
   def getFinalizedOrders(owner: Address, maybePair: Option[AssetPair]): F[Seq[(Order.Id, OrderInfo[OrderStatus])]]
   def getOrderInfo(id: Order.Id): F[Option[FinalOrderInfo]]
   def transactionsByOrder(orderId: ByteStr): F[Seq[ExchangeTransaction]]
-  def iterateOrderInfoKeys(f: Order.Id => Unit): F[Unit]
+  def iterateOrderInfo(f: (Order.Id, FinalOrderInfo) => Unit): F[Unit]
 }
 
 object OrderDb {
@@ -95,9 +95,9 @@ object OrderDb {
       } yield tx
     }
 
-    override def iterateOrderInfoKeys(f: Order.Id => Unit): F[Unit] = levelDb.readOnly { ro =>
+    override def iterateOrderInfo(f: (Order.Id, FinalOrderInfo) => Unit): F[Unit] = levelDb.readOnly { ro =>
       ro.iterateOver(2) { entry =>
-        f(ByteStr(entry.getKey.drop(2)))
+        f(ByteStr(entry.getKey.drop(2)), OrderInfo.decode(entry.getValue))
       }
     }
 

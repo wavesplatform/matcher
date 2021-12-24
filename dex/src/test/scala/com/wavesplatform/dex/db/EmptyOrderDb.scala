@@ -28,7 +28,7 @@ class EmptyOrderDb[F[_]: Applicative] private () extends OrderDb[F] {
   override def getOrderInfo(id: Id): F[Option[FinalOrderInfo]] = None.pure[F].widen
   override def transactionsByOrder(orderId: Id): F[Seq[ExchangeTransaction]] = Seq.empty.pure[F].widen
 
-  override def iterateOrderInfoKeys(f: Id => Unit): F[Unit] = ???
+  override def iterateOrderInfo(f: (Id, FinalOrderInfo) => Unit): F[Unit] = ???
 }
 
 object EmptyOrderDb {

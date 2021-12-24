@@ -404,7 +404,7 @@ object WavesDexCli extends ScoptImplicits {
       val f = ldb.iterateOrderInfo { (_, oi) =>
         val p = prev.getAndSet(Some(oi))
         if (p.exists(poi => oi.timestamp + 60 * 1000L - poi.timestamp < 0)) {
-          println("********** fail")
+          println(s"********** fail $p $oi")
           System.exit(-1)
         }
       }

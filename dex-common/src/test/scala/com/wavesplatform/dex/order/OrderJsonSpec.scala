@@ -1,16 +1,20 @@
-package com.wavesplatform.dex.domain.order
+package com.wavesplatform.dex.order
 
 import cats.syntax.option._
-import com.wavesplatform.dex.WavesIntegrationSuiteBase
+import com.wavesplatform.dex.Diffs
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV3}
 import com.wavesplatform.dex.domain.order.OrderJson.orderFormat
 import com.wavesplatform.dex.domain.order.OrderOps._
+import io.qameta.allure.scalatest.AllureScalatestContext
+import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.freespec.AnyFreeSpecLike
 import org.scalatest.matchers.should.Matchers
 import play.api.libs.json.Json
 
-class OrderJsonSpec extends WavesIntegrationSuiteBase with Matchers {
+class OrderJsonSpec extends AnyFreeSpecLike with AllureScalatestContext with ScalaFutures with Diffs with Matchers {
 
   private val usd: IssuedAsset = IssuedAsset("USDN".getBytes)
   private val wavesUsdPair: AssetPair = AssetPair(Waves, usd)

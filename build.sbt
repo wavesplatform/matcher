@@ -15,6 +15,11 @@ lazy val commonOwaspSettings = Seq(
   dependencyCheckAssemblyAnalyzerEnabled := Some(false)
 )
 
+
+lazy val `dex-common` = project
+  .settings(commonOwaspSettings)
+  .dependsOn(`waves-grpc`)
+
 // Used in unit and integration tests
 lazy val `dex-test-common` = project.settings(commonOwaspSettings).dependsOn(`waves-integration`)
 
@@ -22,6 +27,7 @@ lazy val dex = project
   .settings(commonOwaspSettings)
   .dependsOn(
     `waves-integration`,
+    `dex-common`,
     `dex-test-common` % "test->compile"
   )
 
@@ -53,10 +59,11 @@ lazy val `waves-ext` = project
   .settings(commonOwaspSettings)
   .dependsOn(
     `waves-grpc`,
+    `dex-common`,
     `dex-test-common` % "test->compile"
   )
 
-lazy val `waves-integration` = project.settings(commonOwaspSettings).dependsOn(`waves-grpc`)
+lazy val `waves-integration` = project.settings(commonOwaspSettings).dependsOn(`waves-grpc`, `dex-common`)
 
 lazy val `waves-integration-it` = project
   .settings(commonOwaspSettings)

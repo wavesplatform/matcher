@@ -20,8 +20,7 @@ import org.scalatest.matchers.{MatchResult, Matcher}
 import scala.collection.immutable.Vector
 import scala.concurrent.duration._
 
-// TODO DEX-994
-trait WavesIntegrationSuiteBase extends AnyFreeSpecLike with Matchers with AllureScalatestContext with ScalaFutures {
+trait WavesIntegrationSuiteBase extends AnyFreeSpecLike with Matchers with AllureScalatestContext with ScalaFutures with Diffs {
 
   implicit override def patienceConfig = PatienceConfig(5.seconds)
 
@@ -29,37 +28,9 @@ trait WavesIntegrationSuiteBase extends AnyFreeSpecLike with Matchers with Allur
 
   implicit val optionEmptiness: Emptiness[Option[Any]] = (thing: Option[Any]) => thing.isEmpty
 
-  // diffx
-  val byteStringDiff: Diff[ByteString] = Diff[String].contramap[ByteString](xs => Base58.encode(xs.toByteArray))
-
-  implicit val derivedByteStringDiff: Derived[Diff[ByteString]] = Derived(byteStringDiff)
-  implicit val derivedUtxTransactionDiff: Derived[Diff[UtxTransaction]] = Derived(byteStringDiff.contramap[UtxTransaction](_.id))
-
-  implicit val addressDiff: Diff[Address] = Diff[String].contramap[Address](_.stringRepr)
-
-  // TODO Duplicate
-  implicit val issuedAssetDiff: Diff[IssuedAsset] = { (left: IssuedAsset, right: IssuedAsset, _: List[FieldPath]) =>
-    if (left.id == right.id) Identical(left) else DiffResultValue(left, right)
-  }
-
-  // TODO Duplicate
-  implicit val assetDiff: Diff[Asset] = { (left: Asset, right: Asset, _: List[FieldPath]) =>
-    if (left == right) Identical(left) else DiffResultValue(left, right)
-  }
-
-  // TODO Duplicate
-  implicit val issuedAssetDerivedDiff: Derived[Diff[IssuedAsset]] = Derived(issuedAssetDiff)
-
-  // TODO Duplicate
-  implicit val assetDerivedDiff: Derived[Diff[Asset]] = Derived(assetDiff)
-
   // Fixes "Class too large" compiler issue
   implicit val derivedSignedTransactionDiff: Derived[Diff[TransactionWithChanges]] =
     Derived(byteStringDiff.contramap[TransactionWithChanges](_.txId))
-
-  def getDiff[T](comparison: (T, T) => Boolean): Diff[T] = { (left: T, right: T, _: List[FieldPath]) =>
-    if (comparison(left, right)) Identical(left) else DiffResultValue(left, right)
-  }
 
   def matchTo[A: Diff](right: A)(implicit c: ConsoleColorConfig): Matcher[A] = { left =>
     Diff[A].apply(left, right) match {

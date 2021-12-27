@@ -55,6 +55,7 @@ object Dependencies {
     val jackson = "2.10.0"
     val playJson = "2.9.2"
 
+    val googleProtobuf = "3.17.2"
     val googleGuava = "28.2-jre"
     val kafka = "2.8.0"
 
@@ -148,6 +149,7 @@ object Dependencies {
   private val sttpAsyncHttpClient = sttpClientModule("async-http-client-backend-future")
   private val allureScalaTest = "io.qameta.allure" %% "allure-scalatest" % Version.allureScalaTest
   private val jaxbApi = "javax.xml.bind" % "jaxb-api" % Version.jaxbApi
+  private val googleProtobuf = "com.google.protobuf" % "protobuf-java" % Version.googleProtobuf
 
   private[this] val levelDBJNA =
     Seq(
@@ -226,6 +228,9 @@ object Dependencies {
   )
 
   object Module {
+
+    lazy val dexCommon: Seq[ModuleID] =
+      Seq(catsCore, betterMonadicFor, scorexCrypto, supertagged, monixReactive, swagger, playJson, googleProtobuf, allureScalaTest % Test, diffx % Test, scalaCheck % Test, scalaTest % Test)
 
     lazy val dex: Seq[ModuleID] = Seq(
       akkaActor,

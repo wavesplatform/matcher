@@ -230,7 +230,20 @@ object Dependencies {
   object Module {
 
     lazy val dexCommon: Seq[ModuleID] =
-      Seq(catsCore, betterMonadicFor, scorexCrypto, supertagged, monixReactive, swagger, playJson, googleProtobuf, allureScalaTest % Test, diffx % Test, scalaCheck % Test, scalaTest % Test)
+      Seq(
+        catsCore,
+        betterMonadicFor,
+        scorexCrypto,
+        supertagged,
+        monixReactive,
+        swagger,
+        playJson,
+        googleProtobuf,
+        allureScalaTest % Test,
+        diffx % Test,
+        scalaCheck % Test,
+        scalaTest % Test
+      )
 
     lazy val dex: Seq[ModuleID] = Seq(
       akkaActor,

@@ -15,7 +15,6 @@ lazy val commonOwaspSettings = Seq(
   dependencyCheckAssemblyAnalyzerEnabled := Some(false)
 )
 
-
 lazy val `dex-common` = project
   .settings(commonOwaspSettings)
   .dependsOn(`waves-grpc`)

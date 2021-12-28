@@ -219,6 +219,7 @@ object OrderValidator extends ScorexLogging {
       } yield order
     }
 
+  @tailrec
   private[dex] def getValidFeeAssetForSettings(order: Order, orderFeeSettings: OrderFeeSettings, rateCache: RateCache): Set[Asset] =
     orderFeeSettings match {
       case _: DynamicSettings => rateCache.getAllRates.keySet
@@ -232,6 +233,8 @@ object OrderValidator extends ScorexLogging {
             case AssetType.Spending => order.getSpendAssetId
           }
         )
+      case cs: CompositeSettings =>
+        getValidFeeAssetForSettings(order, cs.getForAssetPair(order.assetPair), rateCache)
     }
 
   /** Converts fee in waves to fee in the specified asset, taking into account correction by the asset decimals */
@@ -266,6 +269,7 @@ object OrderValidator extends ScorexLogging {
    * @param orderFeeSettings matcher settings for the fee of orders
    * @param rateCache        assets rate cache
    */
+  @tailrec
   private[dex] def getMinValidFeeForSettings(
     order: Order,
     orderFeeSettings: OrderFeeSettings,
@@ -275,6 +279,7 @@ object OrderValidator extends ScorexLogging {
     case FixedSettings(_, fixedMinFee) => lift(fixedMinFee)
     case ps: PercentSettings => lift(getMinValidFeeForPercentFeeSettings(order, ps, order.price))
     case ds: DynamicSettings => convertFeeByAssetRate(ds.maxBaseFee, order.feeAsset, feeDecimals, rateCache)
+    case cs: CompositeSettings => getMinValidFeeForSettings(order, cs.getForAssetPair(order.assetPair), feeDecimals, rateCache)
   }
 
   private def validateFeeAsset(order: Order, orderFeeSettings: OrderFeeSettings, rateCache: RateCache): Result[Order] = {

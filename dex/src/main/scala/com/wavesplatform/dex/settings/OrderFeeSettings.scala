@@ -1,11 +1,15 @@
 package com.wavesplatform.dex.settings
 
-import cats.implicits.{catsSyntaxOptionId, none}
+import cats.syntax.option._
 import com.wavesplatform.dex.domain.account.PublicKey
-import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.settings.MatcherSettings.assetPairKeyParser
 import com.wavesplatform.dex.settings.utils.ConfigReaderOps.Implicits
 import com.wavesplatform.dex.settings.utils._
+import pureconfig.ConfigReader
 import pureconfig.generic.auto._
+import pureconfig.configurable.genericMapReader
+import pureconfig.error.CannotConvert
 import pureconfig.generic.semiauto
 
 sealed trait OrderFeeSettings extends Product with Serializable
@@ -20,8 +24,6 @@ object OrderFeeSettings {
   }
 
   object DynamicSettings extends ConfigReaders {
-
-    val empty: DynamicSettings = DynamicSettings(1L, 1L, Set.empty)
 
     def apply(baseMakerFee: Long, baseTakerFee: Long): DynamicSettings =
       DynamicSettings(baseMakerFee, baseTakerFee, Set.empty)
@@ -45,8 +47,6 @@ object OrderFeeSettings {
 
   object FixedSettings extends ConfigReaders {
 
-    val empty: FixedSettings = FixedSettings(Asset.Waves, 0L)
-
     implicit val fixedConfigReader = semiauto
       .deriveReader[FixedSettings]
       .validatedField(validationOf.field[FixedSettings, "minFee"].mk(x => rules.gtEq0(x.minFee)))
@@ -57,13 +57,54 @@ object OrderFeeSettings {
 
   object PercentSettings {
 
-    val empty: PercentSettings = PercentSettings(AssetType.Amount, 0d)
-
     implicit val percentConfigReader = semiauto
       .deriveReader[PercentSettings]
       .validatedField(validationOf.field[PercentSettings, "minFee"].mk { x =>
         if (0 < x.minFee && x.minFee <= 100) none else s"${x.minFee} ∈ (0; 100]".some
       })
+
+  }
+
+  final case class CompositeSettings(
+    custom: Map[AssetPair, OrderFeeSettings],
+    default: OrderFeeSettings,
+    zeroFeeAccounts: Set[PublicKey]
+  ) extends OrderFeeSettings {
+
+    def getForAssetPair(assetPair: AssetPair): OrderFeeSettings =
+      custom.getOrElse(assetPair, default)
+
+  }
+
+  object CompositeSettings extends ConfigReaders {
+
+    implicit val compositeConfigReader = ConfigReader.fromCursor[CompositeSettings] { cursor =>
+      val feeSettingsReader = ConfigReader.fromCursor[OrderFeeSettings] { cursor =>
+        for {
+          objCur <- cursor.asObjectCursor
+          modeCur <- objCur.atKey("mode")
+          modeStr <- modeCur.asString
+          feeSettings <-
+            modeStr match {
+              case "dynamic" => DynamicSettings.dynamicConfigReader.from(objCur.atKeyOrUndefined("dynamic"))
+              case "percent" => PercentSettings.percentConfigReader.from(objCur.atKeyOrUndefined("percent"))
+              case "fixed" => FixedSettings.fixedConfigReader.from(objCur.atKeyOrUndefined("fixed"))
+              case m =>
+                objCur.failed(CannotConvert(objCur.objValue.toString, "OrderFeeSettings", s"unexpected mode type $m"))
+            }
+        } yield feeSettings
+      }
+
+      for {
+        objCur <- cursor.asObjectCursor
+        customCur = objCur.withoutKey("default").withoutKey("zero-fee-accounts")
+        customRes <- genericMapReader[AssetPair, OrderFeeSettings](assetPairKeyParser)(feeSettingsReader).from(customCur)
+        defaultCur <- objCur.atKey("default")
+        defaultRes <- ConfigReader[OrderFeeSettings](feeSettingsReader).from(defaultCur)
+        zeroFeeAccountsCur <- objCur.atKey("zero-fee-accounts")
+        zeroFeeAccountsRes <- ConfigReader[Set[PublicKey]].from(zeroFeeAccountsCur)
+      } yield CompositeSettings(customRes, defaultRes, zeroFeeAccountsRes)
+    }
 
   }
 

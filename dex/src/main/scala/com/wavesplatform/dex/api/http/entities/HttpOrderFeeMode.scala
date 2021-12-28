@@ -90,6 +90,7 @@ object HttpOrderFeeMode {
     case x: OrderFeeSettings.DynamicSettings => FeeModeDynamic(x.maxBaseFee + matcherAccountFee, allRates)
     case OrderFeeSettings.FixedSettings(assetId, minFee) => FeeModeFixed(assetId, minFee)
     case OrderFeeSettings.PercentSettings(assetType, minFee) => FeeModePercent(assetType, minFee)
+    case OrderFeeSettings.CompositeSettings(_, _, _) => ??? //TODO
   }
 
 }

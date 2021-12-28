@@ -68,7 +68,7 @@ object OrderFeeSettings {
   final case class CompositeSettings(
     custom: Map[AssetPair, OrderFeeSettings],
     default: OrderFeeSettings,
-    zeroFeeAccounts: Set[PublicKey]
+    zeroFeeAccounts: Set[PublicKey] = Set.empty
   ) extends OrderFeeSettings {
 
     def getForAssetPair(assetPair: AssetPair): OrderFeeSettings =
@@ -101,9 +101,9 @@ object OrderFeeSettings {
         customRes <- genericMapReader[AssetPair, OrderFeeSettings](assetPairKeyParser)(feeSettingsReader).from(customCur)
         defaultCur <- objCur.atKey("default")
         defaultRes <- ConfigReader[OrderFeeSettings](feeSettingsReader).from(defaultCur)
-        zeroFeeAccountsCur <- objCur.atKey("zero-fee-accounts")
-        zeroFeeAccountsRes <- ConfigReader[Set[PublicKey]].from(zeroFeeAccountsCur)
-      } yield CompositeSettings(customRes, defaultRes, zeroFeeAccountsRes)
+        zeroFeeAccountsCur = objCur.atKeyOrUndefined("zero-fee-accounts")
+        zeroFeeAccountsRes <- ConfigReader[Option[Set[PublicKey]]].from(zeroFeeAccountsCur)
+      } yield CompositeSettings(customRes, defaultRes, zeroFeeAccountsRes.getOrElse(Set.empty))
     }
 
   }

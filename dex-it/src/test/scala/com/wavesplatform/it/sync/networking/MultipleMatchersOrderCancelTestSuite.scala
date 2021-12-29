@@ -6,7 +6,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType
-import com.wavesplatform.dex.it.docker.{DexContainer, WavesNodeContainer}
+import com.wavesplatform.dex.it.containers.{DexContainer, WavesNodeContainer}
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.tags.DexItExternalKafkaRequired
 import org.testcontainers.containers.Network

@@ -1,9 +1,6 @@
 package com.wavesplatform.dex.api.ws
 
 import com.wavesplatform.dex.MatcherSpecBase
-import com.wavesplatform.dex.api.ws.entities.WsAddressFlag.ExcludeNft
-import com.wavesplatform.dex.api.ws.protocol.WsAddressSubscribe
-import com.wavesplatform.dex.api.ws.protocol.WsAddressSubscribe.wsAddressSubscribeFormat
 import com.wavesplatform.dex.domain.account.Address
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec

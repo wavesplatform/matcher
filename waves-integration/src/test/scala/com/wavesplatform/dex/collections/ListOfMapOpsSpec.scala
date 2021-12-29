@@ -1,7 +1,8 @@
 package com.wavesplatform.dex.collections
 
 import com.wavesplatform.dex.collections.ListOps.ListOfMapsOps
-import com.wavesplatform.dex.{NoShrink, WavesIntegrationSuiteBase}
+import com.wavesplatform.dex.WavesIntegrationSuiteBase
+import com.wavesplatform.dex.util.NoShrink
 import org.scalacheck.Gen
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks

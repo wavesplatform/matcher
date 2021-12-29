@@ -21,7 +21,6 @@ import com.wavesplatform.dex.api.http.headers.`X-User-Public-Key`
 import com.wavesplatform.dex.api.http.{HasStatusBarrier, OrderBookHttpInfo, _}
 import com.wavesplatform.dex.api.routes.PathMatchers.{AddressPM, AssetPairPM, OrderPM, PublicKeyPM}
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
-import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.db.OrderDb
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -33,6 +32,7 @@ import com.wavesplatform.dex.model.{AssetPairBuilder, _}
 import com.wavesplatform.dex.queue.MatcherQueue.StoreValidatedCommand
 import com.wavesplatform.dex.queue.ValidatedCommand
 import com.wavesplatform.dex.settings.OrderRestrictionsSettings
+import com.wavesplatform.dex.statuses.MatcherStatus
 import io.swagger.annotations._
 
 import javax.ws.rs.Path

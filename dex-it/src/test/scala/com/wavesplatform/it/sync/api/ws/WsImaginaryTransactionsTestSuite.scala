@@ -3,14 +3,12 @@ package com.wavesplatform.it.sync.api.ws
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus
 import com.wavesplatform.dex.api.ws.entities.{WsAddressFlag, WsTxsData}
-import com.wavesplatform.dex.api.ws.protocol.WsAddressChanges
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction.Id
-import com.wavesplatform.dex.it.api.HasKafka
-import com.wavesplatform.dex.it.docker.DexContainer
+import com.wavesplatform.dex.it.containers.{DexContainer, HasKafka}
 import com.wavesplatform.it.WsSuiteBase
 
 import java.util.concurrent.atomic.AtomicLong

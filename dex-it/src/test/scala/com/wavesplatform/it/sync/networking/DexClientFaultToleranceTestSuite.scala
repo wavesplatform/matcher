@@ -6,9 +6,8 @@ import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.error.WavesNodeConnectionBroken
-import com.wavesplatform.dex.it.api.HasToxiProxy
 import com.wavesplatform.dex.it.api.node.NodeApi
-import com.wavesplatform.dex.it.docker.WavesNodeContainer
+import com.wavesplatform.dex.it.containers.{HasToxiProxy, WavesNodeContainer}
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.tags.NetworkTests
 

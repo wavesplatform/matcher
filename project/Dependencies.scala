@@ -231,7 +231,12 @@ object Dependencies {
 
     lazy val dexCommon: Seq[ModuleID] =
       Seq(
+        sttpClient,
+        sttpPlayJson,
+        sttpAsyncHttpClient,
         catsCore,
+        shapeless,
+        catsTaglessMacros,
         betterMonadicFor,
         scorexCrypto,
         supertagged,
@@ -239,11 +244,13 @@ object Dependencies {
         swagger,
         playJson,
         googleProtobuf,
+        toxiProxy % Test,
+        kafka % Test,
         allureScalaTest % Test,
         diffx % Test,
         scalaCheck % Test,
         scalaTest % Test
-      )
+      ) ++ testContainers
 
     lazy val dex: Seq[ModuleID] = Seq(
       akkaActor,

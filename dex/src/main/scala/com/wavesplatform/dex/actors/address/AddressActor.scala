@@ -1,8 +1,8 @@
 package com.wavesplatform.dex.actors.address
 
 import akka.actor.typed.scaladsl.adapter._
-import akka.actor.{typed, Actor, ActorRef, Cancellable, Props, Stash, Status}
-import akka.pattern.{pipe, CircuitBreakerOpenException}
+import akka.actor.{Actor, ActorRef, Cancellable, Props, Stash, Status, typed}
+import akka.pattern.{CircuitBreakerOpenException, pipe}
 import akka.{actor => classic}
 import cats.data.NonEmptyList
 import cats.instances.list._
@@ -17,7 +17,6 @@ import com.wavesplatform.dex.actors.address.AddressActor._
 import com.wavesplatform.dex.actors.address.BalancesFormatter.format
 import com.wavesplatform.dex.api.http.entities.MatcherResponse
 import com.wavesplatform.dex.api.ws.entities.{WsAddressFlag, WsAssetInfo, WsBalances, WsOrder}
-import com.wavesplatform.dex.api.ws.protocol.WsAddressChanges
 import com.wavesplatform.dex.api.ws.state.WsAddressState
 import com.wavesplatform.dex.collections.{NegativeMap, PositiveMap}
 import com.wavesplatform.dex.db.OrderDb

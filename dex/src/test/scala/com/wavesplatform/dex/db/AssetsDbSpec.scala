@@ -2,8 +2,8 @@ package com.wavesplatform.dex.db
 
 import cats.Id
 import cats.syntax.option._
-import com.wavesplatform.dex.NoShrink
 import com.wavesplatform.dex.gen.AssetDescriptionGen
+import com.wavesplatform.dex.util.NoShrink
 import org.scalacheck.Gen
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers

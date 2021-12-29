@@ -8,7 +8,8 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.grpc.integration.clients.domain.portfolio.Implicits.StateUpdateOps
 import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions._
-import com.wavesplatform.dex.{NoShrink, WavesIntegrationSuiteBase}
+import com.wavesplatform.dex.WavesIntegrationSuiteBase
+import com.wavesplatform.dex.util.NoShrink
 import com.wavesplatform.events.protobuf.StateUpdate
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.transaction.Transaction

@@ -3,8 +3,8 @@ package com.wavesplatform.dex.api.http.entities
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.model.Denormalization
 import com.wavesplatform.dex.error.ErrorFormatterContext
-import com.wavesplatform.dex.json
 import com.wavesplatform.dex.model.LevelAgg
+import com.wavesplatform.dex.utils.json
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{Format, JsArray, _}
 

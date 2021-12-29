@@ -3,7 +3,6 @@ package com.wavesplatform.dex.api.ws.state
 import akka.actor.typed.ActorRef
 import cats.syntax.option._
 import com.wavesplatform.dex.api.ws.entities._
-import com.wavesplatform.dex.api.ws.protocol.WsAddressChanges
 import com.wavesplatform.dex.api.ws.state.WsAddressState.Subscription
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset

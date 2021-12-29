@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.kafka.issues
 
 import com.wavesplatform.dex.Implicits.durationToScalatestTimeout
 import com.wavesplatform.dex.app.QueueMessageDeserializationError
-import com.wavesplatform.dex.it.api.HasKafka
+import com.wavesplatform.dex.it.containers.HasKafka
 import com.wavesplatform.it.MatcherSuiteBase
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord, RecordMetadata}
 import org.apache.kafka.common.serialization.StringSerializer

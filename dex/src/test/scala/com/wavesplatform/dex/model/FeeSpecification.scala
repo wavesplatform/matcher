@@ -6,7 +6,8 @@ import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.model.Events.OrderExecuted
 import com.wavesplatform.dex.settings.OrderFeeSettings
 import com.wavesplatform.dex.settings.OrderFeeSettings.DynamicSettings
-import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
+import com.wavesplatform.dex.MatcherSpecBase
+import com.wavesplatform.dex.util.NoShrink
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers

@@ -4,8 +4,6 @@ import com.softwaremill.diffx.Diff
 import com.wavesplatform.dex.MatcherSpecBase
 import com.wavesplatform.dex.api.http.PlayJsonException
 import com.wavesplatform.dex.api.ws.entities._
-import com.wavesplatform.dex.api.ws.protocol.WsOrderBookChanges.WsSide
-import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsOrderBookChanges, WsRatesUpdates}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.model.Denormalization

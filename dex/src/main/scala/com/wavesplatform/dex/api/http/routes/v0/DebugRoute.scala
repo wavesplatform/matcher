@@ -17,11 +17,11 @@ import com.wavesplatform.dex.api.http.headers.CustomContentTypes
 import com.wavesplatform.dex.api.http.{HasStatusBarrier, _}
 import com.wavesplatform.dex.api.routes.PathMatchers.AddressPM
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
-import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedStream
 import com.wavesplatform.dex.queue.ValidatedCommandWithMeta
-import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
+import com.wavesplatform.dex.settings.ConfigOps.ConfigOps
+import com.wavesplatform.dex.statuses.MatcherStatus
 import io.swagger.annotations._
 
 import javax.ws.rs.Path

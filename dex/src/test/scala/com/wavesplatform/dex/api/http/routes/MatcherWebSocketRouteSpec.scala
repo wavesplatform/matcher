@@ -13,13 +13,13 @@ import com.wavesplatform.dex.api.http.entities._
 import com.wavesplatform.dex.api.http.headers.`X-Api-Key`
 import com.wavesplatform.dex.api.ws.actors.{WsExternalClientDirectoryActor, WsInternalBroadcastActor}
 import com.wavesplatform.dex.api.ws.routes.MatcherWebSocketRoute
-import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.settings.MatcherSettings
+import com.wavesplatform.dex.statuses.MatcherStatus
 import com.wavesplatform.dex.time.TestTime
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually

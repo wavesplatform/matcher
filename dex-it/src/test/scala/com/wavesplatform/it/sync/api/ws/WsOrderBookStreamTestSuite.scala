@@ -5,10 +5,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.Implicits.releasable
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
-import com.wavesplatform.dex.api.ws.connection.WsConnection
 import com.wavesplatform.dex.api.ws.entities.{WsLastTrade, WsOrderBookSettings}
-import com.wavesplatform.dex.api.ws.protocol
-import com.wavesplatform.dex.api.ws.protocol.{WsError, WsOrderBookChanges, WsOrderBookSubscribe, WsUnsubscribe}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -19,7 +16,7 @@ import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, OrderRestrictionsSettings}
 import com.wavesplatform.dex.tool.Using._
 import com.wavesplatform.it.api.MatcherCommand
-import com.wavesplatform.it.{executeCommands, WsSuiteBase}
+import com.wavesplatform.it.{WsSuiteBase, executeCommands}
 import play.api.libs.json._
 
 import scala.collection.immutable.TreeMap

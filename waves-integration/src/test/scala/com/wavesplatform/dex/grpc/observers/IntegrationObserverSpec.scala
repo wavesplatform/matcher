@@ -1,6 +1,7 @@
 package com.wavesplatform.dex.grpc.observers
 
-import com.wavesplatform.dex.{NoShrink, WavesIntegrationSuiteBase}
+import com.wavesplatform.dex.WavesIntegrationSuiteBase
+import com.wavesplatform.dex.util.NoShrink
 import monix.execution.UncaughtExceptionReporter
 import monix.reactive.Observer
 import org.scalacheck.Gen

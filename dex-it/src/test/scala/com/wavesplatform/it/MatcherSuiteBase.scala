@@ -11,14 +11,13 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.OrderType.BUY
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.it.api.BaseContainersKit
-import com.wavesplatform.dex.it.api.dex.HasDex
-import com.wavesplatform.dex.it.api.node.HasWavesNode
-import com.wavesplatform.dex.it.config.{GenesisConfig, PredefinedAccounts, PredefinedAssets}
+import com.wavesplatform.dex.it.config.GenesisConfig
+import com.wavesplatform.dex.it.containers.{BaseContainersKit, HasDex, HasWavesNode}
 import com.wavesplatform.dex.it.matchers.ItMatchers
+import com.wavesplatform.dex.it.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.it.test.{InformativeTestStart, NoStackTraceCancelAfterFailure}
 import com.wavesplatform.dex.it.waves.{MkWavesEntities, ToWavesJConversions}
-import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
+import com.wavesplatform.dex.predefined.{PredefinedAccounts, PredefinedAssets}
 import com.wavesplatform.dex.waves.WavesFeeConstants
 import com.wavesplatform.it.api.ApiExtensions
 import com.wavesplatform.transactions.ExchangeTransaction

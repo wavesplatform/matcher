@@ -1,9 +1,9 @@
 package com.wavesplatform.dex.actors
 
-import com.wavesplatform.dex.NoShrink
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.util.NoShrink
 import org.scalacheck.Gen
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.propspec.AnyPropSpecLike

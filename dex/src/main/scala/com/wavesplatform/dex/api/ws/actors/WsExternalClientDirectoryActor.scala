@@ -3,7 +3,6 @@ package com.wavesplatform.dex.api.ws.actors
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, Behavior, Terminated}
 import com.wavesplatform.dex.api.http.entities.HttpWebSocketConnections
-import com.wavesplatform.dex.api.ws.protocol.WsRatesUpdates
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.error
 

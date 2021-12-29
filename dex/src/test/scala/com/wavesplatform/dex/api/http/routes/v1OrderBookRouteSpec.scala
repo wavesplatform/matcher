@@ -14,8 +14,7 @@ import com.wavesplatform.dex.api.RouteSpec
 import com.wavesplatform.dex.api.http.ApiMarshallers._
 import com.wavesplatform.dex.api.http.entities.{HttpOrderBook, HttpV1LevelAgg, HttpV1OrderBook}
 import com.wavesplatform.dex.api.http.routes.v1.OrderBookRoute
-import com.wavesplatform.dex.api.http.{entities, OrderBookHttpInfo}
-import com.wavesplatform.dex.app.MatcherStatus
+import com.wavesplatform.dex.api.http.{OrderBookHttpInfo, entities}
 import com.wavesplatform.dex.db.WithDb
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.crypto
@@ -24,6 +23,7 @@ import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.{AssetPairBuilder, LevelAgg, OrderBookAggregatedSnapshot}
 import com.wavesplatform.dex.settings.MatcherSettings
+import com.wavesplatform.dex.statuses.MatcherStatus
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 import pureconfig.ConfigSource

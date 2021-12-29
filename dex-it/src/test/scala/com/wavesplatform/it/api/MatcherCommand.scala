@@ -2,7 +2,7 @@ package com.wavesplatform.it.api
 
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.order.Order
-import com.wavesplatform.dex.it.docker.DexContainer
+import com.wavesplatform.dex.it.containers.DexContainer
 
 sealed trait MatcherCommand extends Product with Serializable
 

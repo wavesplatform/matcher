@@ -8,6 +8,7 @@ import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.grpc.integration.clients.domain.{TransactionWithChanges, WavesBlock, WavesChain}
 import com.wavesplatform.dex.grpc.integration.services.UtxTransaction
+import com.wavesplatform.dex.util.Diffs
 import com.wavesplatform.events.protobuf.StateUpdate
 import com.wavesplatform.protobuf.transaction.SignedTransaction
 import io.qameta.allure.scalatest.AllureScalatestContext

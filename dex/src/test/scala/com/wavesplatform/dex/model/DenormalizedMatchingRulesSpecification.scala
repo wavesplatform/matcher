@@ -2,7 +2,8 @@ package com.wavesplatform.dex.model
 
 import cats.data.NonEmptyList
 import com.wavesplatform.dex.settings.DenormalizedMatchingRule
-import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
+import com.wavesplatform.dex.MatcherSpecBase
+import com.wavesplatform.dex.util.NoShrink
 import org.scalacheck.Gen
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.propspec.AnyPropSpec

@@ -1,7 +1,7 @@
 package com.wavesplatform.it.matcher.api.http.debug
 
-import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedStream
+import com.wavesplatform.dex.statuses.MatcherStatus
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.matcher.api.http.ApiKeyHeaderChecks
 

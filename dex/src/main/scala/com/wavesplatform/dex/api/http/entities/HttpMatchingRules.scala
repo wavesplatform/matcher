@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.api.http.entities
 
-import com.wavesplatform.dex.json
+import com.wavesplatform.dex.utils.json
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{Format, Json, OFormat}
 

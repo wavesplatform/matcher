@@ -15,12 +15,12 @@ import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
 import com.wavesplatform.dex.api.http.{HasStatusBarrier, _}
 import com.wavesplatform.dex.api.routes.PathMatchers.{AddressPM, AssetPairPM, PublicKeyPM}
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
-import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.Order.Id
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.model.{AssetPairBuilder, OrderInfo, OrderStatus}
+import com.wavesplatform.dex.statuses.MatcherStatus
 import io.swagger.annotations._
 
 import javax.ws.rs.Path

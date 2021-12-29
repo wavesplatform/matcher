@@ -12,7 +12,6 @@ import com.wavesplatform.dex.api.http.directives.HttpKamonDirectives.withMetrics
 import com.wavesplatform.dex.api.http.directives.ProtectDirective
 import com.wavesplatform.dex.api.http.entities.{HttpError, HttpSuccessfulPlace, SimpleResponse}
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
-import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.OrderJson.orderFormat
 import com.wavesplatform.dex.domain.utils.ScorexLogging
@@ -20,6 +19,7 @@ import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model.AssetPairBuilder
+import com.wavesplatform.dex.statuses.MatcherStatus
 import io.swagger.annotations.{Api, _}
 
 import javax.ws.rs.Path

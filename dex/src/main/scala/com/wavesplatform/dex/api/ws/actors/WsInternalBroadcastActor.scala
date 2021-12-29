@@ -4,7 +4,6 @@ import akka.actor.Cancellable
 import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
 import akka.actor.typed.{ActorRef, Behavior, Terminated}
 import cats.syntax.option._
-import com.wavesplatform.dex.api.ws.protocol.WsOrdersUpdate
 
 import scala.concurrent.duration.FiniteDuration
 

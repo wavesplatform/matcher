@@ -4,7 +4,6 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.model.ws.{InvalidUpgradeResponse, ValidUpgrade}
 import cats.syntax.option._
 import com.wavesplatform.dex.api.ws.entities.WsOrder
-import com.wavesplatform.dex.api.ws.protocol._
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.utils.EitherExt2

@@ -2,7 +2,6 @@ package com.wavesplatform.dex.model
 
 import java.math.BigInteger
 import java.nio.ByteBuffer
-
 import cats.syntax.semigroup._
 import com.wavesplatform.dex.codecs.OrderBookSideSnapshotCodecs
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
@@ -16,7 +15,8 @@ import com.wavesplatform.dex.model.OrderBook.OrderBookUpdates
 import com.wavesplatform.dex.settings.OrderFeeSettings.DynamicSettings
 import com.wavesplatform.dex.settings.{MatchingRule, OrderFeeSettings}
 import com.wavesplatform.dex.time.SystemTime
-import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
+import com.wavesplatform.dex.MatcherSpecBase
+import com.wavesplatform.dex.util.NoShrink
 import org.scalacheck.Gen
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers

@@ -6,7 +6,6 @@ import akka.actor.typed.{ActorRef, Behavior, Terminated}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
 import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.State._
 import com.wavesplatform.dex.api.http.entities.HttpOrderBook
-import com.wavesplatform.dex.api.ws.protocol.{WsError, WsOrderBookChanges, WsServerMessage}
 import com.wavesplatform.dex.api.ws.state.WsOrderBookState
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.model.{Amount, Price}

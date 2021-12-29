@@ -1,10 +1,10 @@
 package com.wavesplatform.dex.tool
 
 import com.wavesplatform.dex.domain.asset.Asset
+
 import java.io.File
 import java.util.{Timer, TimerTask}
 import java.util.concurrent.{Executors, TimeUnit}
-
 import cats.data.NonEmptyList
 import cats.syntax.either._
 import com.google.common.util.concurrent.ThreadFactoryBuilder
@@ -14,10 +14,10 @@ import com.wavesplatform.dex.cli.ErrorOr
 import com.wavesplatform.dex.domain.account.{AddressScheme, PublicKey}
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.error.Implicits.ThrowableOps
-import com.wavesplatform.dex.json
-import com.wavesplatform.dex.settings.{loadConfig, MatcherSettings}
+import com.wavesplatform.dex.settings.{MatcherSettings, loadConfig}
 import com.wavesplatform.dex.tool.ComparisonTool._
 import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.utils.json
 import play.api.libs.json.Json
 import pureconfig.ConfigSource
 import sttp.client3.asynchttpclient.future.AsyncHttpClientFutureBackend

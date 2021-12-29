@@ -8,8 +8,8 @@ import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.model.Denormalization._
 import com.wavesplatform.dex.domain.order.OrderType.SELL
-import com.wavesplatform.dex.it.api.HasKafka
 import com.wavesplatform.dex.it.api.websockets.HasWebSockets
+import com.wavesplatform.dex.it.containers.HasKafka
 import com.wavesplatform.dex.model.{LimitOrder, OrderStatus}
 import com.wavesplatform.it.WsSuiteBase
 

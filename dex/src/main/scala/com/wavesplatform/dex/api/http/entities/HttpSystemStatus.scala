@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.api.http.entities
 
-import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedStream
+import com.wavesplatform.dex.statuses.MatcherStatus
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{Format, Json}
 

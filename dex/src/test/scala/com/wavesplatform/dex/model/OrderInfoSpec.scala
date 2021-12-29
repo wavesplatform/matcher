@@ -1,10 +1,10 @@
 package com.wavesplatform.dex.model
 
 import java.math.BigInteger
-
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.model.OrderInfoSpec.OrderExt
-import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
+import com.wavesplatform.dex.MatcherSpecBase
+import com.wavesplatform.dex.util.NoShrink
 import org.scalacheck.Gen
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers

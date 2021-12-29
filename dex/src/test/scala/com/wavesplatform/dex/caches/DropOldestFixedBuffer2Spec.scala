@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.caches
 
-import com.wavesplatform.dex.NoShrink
+import com.wavesplatform.dex.util.NoShrink
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.freespec.AnyFreeSpecLike
 import org.scalatest.matchers.should.Matchers

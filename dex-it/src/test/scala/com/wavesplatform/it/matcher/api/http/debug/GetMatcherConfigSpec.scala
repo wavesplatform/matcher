@@ -1,6 +1,6 @@
 package com.wavesplatform.it.matcher.api.http.debug
 
-import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
+import com.wavesplatform.dex.settings.ConfigOps.ConfigOps
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.matcher.api.http.ApiKeyHeaderChecks
 

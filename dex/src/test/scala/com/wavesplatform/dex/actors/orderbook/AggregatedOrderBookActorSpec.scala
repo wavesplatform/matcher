@@ -8,12 +8,10 @@ import akka.actor.typed.scaladsl.adapter._
 import akka.http.scaladsl.model.HttpResponse
 import akka.testkit.TestProbe
 import cats.data.NonEmptyList
-import com.wavesplatform.dex.NoShrink
 import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.{Command, InputMessage, MarketStatus, Query}
 import com.wavesplatform.dex.actors.{MatcherSpecLike, OrderBookAskAdapter, OrderBookDirectoryActor}
 import com.wavesplatform.dex.api.http.entities.{HttpV0LevelAgg, HttpV0OrderBook}
 import com.wavesplatform.dex.api.ws.entities.WsOrderBookSettings
-import com.wavesplatform.dex.api.ws.protocol.{WsMessage, WsOrderBookChanges}
 import com.wavesplatform.dex.db.TestOrderBookSnapshotDb
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -22,10 +20,11 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.gen.OrderBookGen
+import com.wavesplatform.dex.it.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatchingRule, OrderRestrictionsSettings}
-import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.time.{SystemTime, Time}
+import com.wavesplatform.dex.util.NoShrink
 import org.scalacheck.Gen
 import org.scalatest.concurrent.Eventually
 import org.scalatest.freespec.AnyFreeSpec

@@ -84,7 +84,7 @@ object Fee {
         )
 
       case cs: CompositeSettings =>
-        getMakerTakerFee(cs.getForAssetPair(s.order.assetPair), cs.zeroFeeAccounts)(s, c)
+        getMakerTakerFee(cs.getOrderFeeSettings(s.order.assetPair), zeroFeeAccounts ++ cs.zeroFeeAccounts)(s, c)
     }
   }
 

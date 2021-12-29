@@ -71,7 +71,7 @@ object OrderFeeSettings {
     zeroFeeAccounts: Set[PublicKey] = Set.empty
   ) extends OrderFeeSettings {
 
-    def getForAssetPair(assetPair: AssetPair): OrderFeeSettings =
+    def getOrderFeeSettings(assetPair: AssetPair): OrderFeeSettings =
       custom.getOrElse(assetPair, default)
 
   }

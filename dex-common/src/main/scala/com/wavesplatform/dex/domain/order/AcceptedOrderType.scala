@@ -1,4 +1,4 @@
-package com.wavesplatform.dex.model
+package com.wavesplatform.dex.domain.order
 
 import play.api.libs.json._
 

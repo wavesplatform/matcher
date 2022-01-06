@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.model
 
 import java.math.BigInteger
-import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.domain.order.{AcceptedOrderType, Order}
 import com.wavesplatform.dex.model.OrderInfoSpec.OrderExt
 import com.wavesplatform.dex.MatcherSpecBase
 import com.wavesplatform.dex.util.NoShrink

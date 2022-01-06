@@ -4,12 +4,14 @@ import java.nio.charset.StandardCharsets
 import cats.syntax.either._
 import cats.syntax.option._
 import com.wavesplatform.dex.api.ws.entities.WsAddressFlag
-import com.wavesplatform.dex.api.ws.protocol.WsAddressSubscribe.{JwtPayload, supportedAuthTypes}
+import com.wavesplatform.dex.api.ws.protocol.WsAddressSubscribe.{leewayInSeconds, supportedAuthTypes, toMatcherError, JwtPayload}
 import com.wavesplatform.dex.domain.account.{Address, PrivateKey, PublicKey}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error.MatcherError
+import pdi.jwt.exceptions.{JwtExpirationException, JwtLengthException}
+import pdi.jwt.{JwtAlgorithm, JwtJson, JwtOptions}
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 

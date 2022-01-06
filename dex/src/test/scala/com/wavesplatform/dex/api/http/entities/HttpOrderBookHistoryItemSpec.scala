@@ -5,7 +5,7 @@ import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.it.test.matchers.DiffMatcherWithImplicits
-import com.wavesplatform.dex.model.{AcceptedOrderType, OrderStatus}
+import com.wavesplatform.dex.model.OrderStatus
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import play.api.libs.json.Json

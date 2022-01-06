@@ -7,9 +7,7 @@ import com.wavesplatform.dex.api.ws.doubleAsStringFormat
 import WsFullOrder.WsExecutionInfo
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
-import com.wavesplatform.dex.domain.model.Denormalization
-import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.error.ErrorFormatterContext
+import com.wavesplatform.dex.domain.order.{Order, OrderStatusNames, OrderType}
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
@@ -141,15 +139,15 @@ object WsFullOrder {
 
   private val orderStatusFormat: Format[String] = Format(
     {
-      case JsString(s) if s == Status.Filled.toString => JsSuccess(OrderStatus.Filled.name)
-      case JsString(s) if s == Status.PartiallyFilled.toString => JsSuccess(OrderStatus.PartiallyFilled.name)
-      case JsString(s) if s == Status.Cancelled.toString => JsSuccess(OrderStatus.Cancelled.name)
+      case JsString(s) if s == Status.Filled.toString => JsSuccess(OrderStatusNames.FILLED)
+      case JsString(s) if s == Status.PartiallyFilled.toString => JsSuccess(OrderStatusNames.PARTIALLY_FILLED)
+      case JsString(s) if s == Status.Cancelled.toString => JsSuccess(OrderStatusNames.CANCELLED)
       case _ => JsError("Cannot parse order status")
     },
     {
-      case OrderStatus.Filled.name => JsString(Status.Filled.toString)
-      case OrderStatus.PartiallyFilled.name => JsString(Status.PartiallyFilled.toString)
-      case OrderStatus.Cancelled.name => JsString(Status.Cancelled.toString)
+      case OrderStatusNames.FILLED => JsString(Status.Filled.toString)
+      case OrderStatusNames.PARTIALLY_FILLED => JsString(Status.PartiallyFilled.toString)
+      case OrderStatusNames.CANCELLED => JsString(Status.Cancelled.toString)
       case _ => throw new IllegalArgumentException("Cannot parse order status")
     }
   )

@@ -7,9 +7,8 @@ import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
-import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.domain.order.{AcceptedOrderType, Order, OrderType}
 import com.wavesplatform.dex.error.InvalidMarketOrderPrice
-import com.wavesplatform.dex.model.AcceptedOrderType
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.sync.MarketOrderTestSuite.FeeMode
 

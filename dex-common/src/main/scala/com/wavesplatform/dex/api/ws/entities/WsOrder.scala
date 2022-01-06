@@ -1,12 +1,9 @@
 package com.wavesplatform.dex.api.ws.entities
 
-import cats.syntax.option._
 import com.wavesplatform.dex.api.ws.doubleAsStringFormat
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
-import com.wavesplatform.dex.domain.model.Denormalization
-import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.error.ErrorFormatterContext
+import com.wavesplatform.dex.domain.order.{AcceptedOrderType, Order, OrderType}
 import com.wavesplatform.dex.utils.JsonImplicits._
 import play.api.libs.functional.syntax._
 import play.api.libs.json._

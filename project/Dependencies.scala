@@ -234,6 +234,8 @@ object Dependencies {
         sttpClient,
         sttpPlayJson,
         sttpAsyncHttpClient,
+        jwtModule("core"),
+        jwtModule("play-json"),
         catsCore,
         shapeless,
         catsTaglessMacros,

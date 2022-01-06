@@ -2,8 +2,8 @@ package com.wavesplatform.dex.api.http.entities
 
 import com.wavesplatform.dex.db.OrderDb.orderIdOrdering
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
-import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.model.{AcceptedOrderType, OrderInfo, OrderStatus}
+import com.wavesplatform.dex.domain.order.{AcceptedOrderType, Order, OrderType}
+import com.wavesplatform.dex.model.{OrderInfo, OrderStatus}
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{Json, OFormat}
 

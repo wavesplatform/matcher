@@ -1,10 +1,15 @@
 package com.wavesplatform.dex.it.api.dex
 
 import cats.Functor
+import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status._
+import com.wavesplatform.dex.api.http.entities._
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.Order
-import com.wavesplatform.dex.it.fp.CanRepeat
+import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
+import com.wavesplatform.dex.it.fp.{CanRepeat, RepeatRequestOptions}
+
+import scala.concurrent.duration._
 
 object DexApiSyntax {
 

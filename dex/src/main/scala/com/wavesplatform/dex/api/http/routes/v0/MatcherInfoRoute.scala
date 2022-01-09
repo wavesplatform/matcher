@@ -4,6 +4,7 @@ import akka.http.scaladsl.server.Route
 import akka.stream.Materializer
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.api.http.HasStatusBarrier
+import com.wavesplatform.dex.api.http.converters.HttpOrderFeeConverter
 import com.wavesplatform.dex.api.http.directives.HttpKamonDirectives._
 import com.wavesplatform.dex.api.http.directives.ProtectDirective
 import com.wavesplatform.dex.api.http.entities._
@@ -74,7 +75,7 @@ final class MatcherInfoRoute(
                 matcherVersion = Version.VersionString,
                 priceAssets =
                   matcherSettings.priceAssets.filterNot(a => matcherSettings.blacklistedAssets.contains(IssuedAsset(a.compatId.orNull))),
-                orderFee = HttpOrderFeeMode.fromSettings(
+                orderFee = HttpOrderFeeConverter.fromSettings(
                   settings = getActualOrderFeeSettings(),
                   matcherAccountFee = matcherAccountFee,
                   allRates = rateCache.getAllRates

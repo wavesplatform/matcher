@@ -1,7 +1,6 @@
 package com.wavesplatform.dex.api.http.entities
 
-import com.wavesplatform.dex.settings.OrderRestrictionsSettings
-import com.wavesplatform.dex.utils.json
+import com.wavesplatform.dex.utils.JsonImplicits
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{Format, Json, OFormat}
 
@@ -16,17 +15,7 @@ case class HttpOrderRestrictions(
 
 object HttpOrderRestrictions {
 
-  implicit val doubleFormat: Format[Double] = json.stringAsDoubleFormat
+  implicit val doubleFormat: Format[Double] = JsonImplicits.stringAsDoubleFormat
   implicit val httpOrderRestrictionsFormat: OFormat[HttpOrderRestrictions] = Json.format[HttpOrderRestrictions]
-
-  def fromSettings(settings: OrderRestrictionsSettings): HttpOrderRestrictions =
-    HttpOrderRestrictions(
-      stepAmount = settings.stepAmount,
-      minAmount = settings.minAmount,
-      maxAmount = settings.maxAmount,
-      stepPrice = settings.stepPrice,
-      minPrice = settings.minPrice,
-      maxPrice = settings.maxPrice
-    )
 
 }

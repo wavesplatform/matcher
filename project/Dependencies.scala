@@ -236,6 +236,7 @@ object Dependencies {
         sttpAsyncHttpClient,
         jwtModule("core"),
         jwtModule("play-json"),
+        kindProjector,
         catsCore,
         shapeless,
         catsTaglessMacros,
@@ -252,7 +253,7 @@ object Dependencies {
         diffx % Test,
         scalaCheck % Test,
         scalaTest % Test
-      ) ++ testContainers
+      ) ++ testContainers ++ enumeratum ++ pureConfig.map(_ % Test)
 
     lazy val dex: Seq[ModuleID] = Seq(
       akkaActor,

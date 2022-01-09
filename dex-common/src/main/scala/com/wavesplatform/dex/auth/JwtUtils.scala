@@ -1,7 +1,8 @@
 package com.wavesplatform.dex.auth
 
-import java.security
+import com.wavesplatform.dex.api.ws.protocol.WsAddressSubscribe.JwtPayload
 
+import java.security
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import pdi.jwt.{JwtAlgorithm, JwtJson}

@@ -1,8 +1,6 @@
 package com.wavesplatform.dex.api.http.entities
 
-import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.MarketStatus
 import com.wavesplatform.dex.domain.order.OrderType
-import com.wavesplatform.dex.model.{LastTrade, LevelAgg}
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{Json, OFormat}
 
@@ -22,32 +20,32 @@ case class HttpOrderBookStatus(
 ) {
 
   @ApiModelProperty(hidden = true)
-  val lastTrade: Option[LastTrade] =
+  val lastTrade: Option[HttpLastTrade] =
     for {
       lp <- lastPrice
       la <- lastAmount
       ls <- lastSide
-    } yield LastTrade(lp, la, ls)
+    } yield HttpLastTrade(lp, la, ls)
 
   @ApiModelProperty(hidden = true)
-  val bestBid: Option[LevelAgg] =
+  val bestBid: Option[HttpLevelAgg] =
     for {
       bba <- bidAmount
       bbp <- bid
-    } yield LevelAgg(bba, bbp)
+    } yield HttpLevelAgg(bba, bbp)
 
   @ApiModelProperty(hidden = true)
-  val bestAsk: Option[LevelAgg] =
+  val bestAsk: Option[HttpLevelAgg] =
     for {
       baa <- askAmount
       bap <- ask
-    } yield LevelAgg(baa, bap)
+    } yield HttpLevelAgg(baa, bap)
 
 }
 
 object HttpOrderBookStatus {
 
-  def fromMarketStatus(ms: MarketStatus): HttpOrderBookStatus =
+  def fromMarketStatus(ms: HttpMarketStatus): HttpOrderBookStatus =
     HttpOrderBookStatus(
       lastPrice = ms.lastTrade.map(_.price),
       lastAmount = ms.lastTrade.map(_.amount),

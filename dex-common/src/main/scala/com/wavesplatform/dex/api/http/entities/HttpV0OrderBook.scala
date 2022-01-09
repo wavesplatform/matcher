@@ -1,11 +1,11 @@
 package com.wavesplatform.dex.api.http.entities
 
-import java.nio.charset.StandardCharsets
-
 import akka.http.scaladsl.model.{HttpEntity, HttpResponse}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{Json, Reads}
+
+import java.nio.charset.StandardCharsets
 
 case class HttpV0OrderBook(
   @ApiModelProperty(value = "Timestamp of the last Order Book update") timestamp: Long,

@@ -5,10 +5,13 @@ import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
 import akka.actor.typed.{ActorRef, Behavior, Terminated}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
 import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.State._
-import com.wavesplatform.dex.api.http.entities.HttpOrderBook
+import com.wavesplatform.dex.api.http.entities.{HttpLevelAgg, HttpOrderBook}
+import com.wavesplatform.dex.api.ws.converters.{WsLastTradeConverter, WsLevelAggregationConverter, WsOrderRestrictionsConverter}
+import com.wavesplatform.dex.api.ws.protocol.{WsError, WsOrderBookChanges, WsServerMessage}
 import com.wavesplatform.dex.api.ws.state.WsOrderBookState
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.model.{Amount, Price}
+import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.model.MatcherModel.{DecimalsFormat, Denormalized}
 import com.wavesplatform.dex.model.{LastTrade, LevelAgg, LevelAmounts, OrderBook, OrderBookAggregatedSnapshot, Side}
@@ -108,11 +111,11 @@ object AggregatedOrderBookActor {
                 assetPair = assetPair,
                 amountDecimals = amountDecimals,
                 priceDecimals = priceDecimals,
-                asks = ob.asks,
-                bids = ob.bids,
-                lt = state.lastTrade,
+                asks = ob.asks.map(WsLevelAggregationConverter.toWs(OrderType.SELL)),
+                bids = ob.bids.map(WsLevelAggregationConverter.toWs(OrderType.BUY)),
+                lt = state.lastTrade.map(WsLastTradeConverter.toWs),
                 updateId = 0L,
-                restrictions = restrictions,
+                restrictions = restrictions.map(WsOrderRestrictionsConverter.toWs),
                 tickSize = tickSize
               )
 
@@ -169,8 +172,8 @@ object AggregatedOrderBookActor {
       HttpOrderBook(
         state.lastUpdateTs,
         assetPair,
-        state.bids.take(depth).map { case (price, amount) => LevelAgg(amount, price) }.toList,
-        state.asks.take(depth).map { case (price, amount) => LevelAgg(amount, price) }.toList,
+        state.bids.take(depth).map { case (price, amount) => HttpLevelAgg(amount, price) }.toList,
+        state.asks.take(depth).map { case (price, amount) => HttpLevelAgg(amount, price) }.toList,
         assetPairDecimals
       )
 

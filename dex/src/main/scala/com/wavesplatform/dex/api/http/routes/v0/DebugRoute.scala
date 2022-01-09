@@ -18,10 +18,9 @@ import com.wavesplatform.dex.api.http.{HasStatusBarrier, _}
 import com.wavesplatform.dex.api.routes.PathMatchers.AddressPM
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedStream
 import com.wavesplatform.dex.queue.ValidatedCommandWithMeta
 import com.wavesplatform.dex.settings.ConfigOps.ConfigOps
-import com.wavesplatform.dex.statuses.MatcherStatus
+import com.wavesplatform.dex.statuses.{CombinedStreamStatus, MatcherStatus}
 import io.swagger.annotations._
 
 import javax.ws.rs.Path
@@ -35,7 +34,7 @@ final class DebugRoute(
   safeConfig: Config,
   matcher: ActorRef,
   addressActor: ActorRef,
-  blockchainStatus: => CombinedStream.Status,
+  blockchainStatus: => CombinedStreamStatus,
   override val matcherStatus: () => MatcherStatus,
   currentOffset: () => ValidatedCommandWithMeta.Offset,
   lastOffset: () => Future[ValidatedCommandWithMeta.Offset],
@@ -192,8 +191,17 @@ final class DebugRoute(
       (withMetricsAndTraces("getAddressState") & withAuth) {
         withAddress(addressOrError) { address =>
           complete {
-            askMapAddressActor[GetState](addressActor, address, GetCurrentState) {
-              HttpAddressState(_)
+            askMapAddressActor[GetState](addressActor, address, GetCurrentState) { reply =>
+              HttpAddressState(
+                reply.balances.regular.xs,
+                reply.balances.reserved.xs,
+                reply.balances.allTradableBalance.xs,
+                reply.balances.unconfirmed.xs,
+                reply.balances.outgoingLeasing.getOrElse(0L),
+                reply.balances.notCreatedTxs map { case (k, v) => (k.toString, v.pessimisticChanges.xs) },
+                reply.balances.notObservedTxs map { case (k, v) => (k.toString, v.executionTotalVolumeDiff.xs) },
+                reply.placementQueue.toList
+              )
             }
           }
         }

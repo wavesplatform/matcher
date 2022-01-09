@@ -6,9 +6,9 @@ import cats.syntax.semigroupal._
 import com.wavesplatform.dex.actors.OrderBookAskAdapter
 import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.{Depth, MarketStatus}
 import com.wavesplatform.dex.api.http.entities.MatcherResponse.toHttpResponse
-import com.wavesplatform.dex.api.http.entities.{HttpOrderBook, HttpOrderBookStatus, OrderBookUnavailable, SimpleErrorResponse, SimpleResponse}
+import com.wavesplatform.dex.api.http.entities.{HttpLastTrade, HttpLevelAgg, HttpMarketStatus, HttpOrderBook, HttpOrderBookStatus, OrderBookUnavailable, SimpleErrorResponse, SimpleResponse}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
-import com.wavesplatform.dex.effect.{liftValueAsync, FutureResult}
+import com.wavesplatform.dex.effect.{FutureResult, liftValueAsync}
 import com.wavesplatform.dex.model.MatcherModel.{DecimalsFormat, Denormalized}
 import com.wavesplatform.dex.time.Time
 
@@ -36,7 +36,17 @@ class OrderBookHttpInfo(
         }
     }
 
-  private def toHttpMarketStatusResponse(ms: MarketStatus): HttpResponse = toHttpResponse(SimpleResponse(HttpOrderBookStatus fromMarketStatus ms))
+  private def toHttpMarketStatusResponse(ms: MarketStatus): HttpResponse = toHttpResponse(
+    SimpleResponse(
+      HttpOrderBookStatus.fromMarketStatus(
+        HttpMarketStatus(
+          ms.lastTrade.map(lt => HttpLastTrade(lt.price, lt.amount, lt.side)),
+          bestBid = ms.bestBid.map(bb => HttpLevelAgg(bb.amount, bb.price)),
+          bestAsk = ms.bestAsk.map(ba => HttpLevelAgg(ba.amount, ba.price))
+        )
+      )
+    )
+  )
 
   def getHttpView(assetPair: AssetPair, format: DecimalsFormat, depth: Option[Depth]): Future[HttpResponse] =
     askAdapter.getHttpView(assetPair, format, settings.nearestBigger(depth)).flatMap {

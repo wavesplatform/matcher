@@ -128,11 +128,12 @@ object OrderValidator extends ScorexLogging {
       def normalizePrice(prc: Double): Long = Normalization.normalizePrice(prc, amountAssetDecimals, priceAssetDecimals)
 
       liftValueAsync(order)
-        .ensure(error.OrderInvalidAmount(order, restrictions)) { o =>
-          normalizeAmount(restrictions.minAmount) <= o.amount && o.amount <= normalizeAmount(restrictions.maxAmount) &&
-          o.amount % normalizeAmount(restrictions.stepAmount).max(1) == 0
+        .ensure(error.OrderInvalidAmount(order, OrderRestriction(restrictions.minAmount, restrictions.maxAmount, restrictions.stepAmount))) {
+          o =>
+            normalizeAmount(restrictions.minAmount) <= o.amount && o.amount <= normalizeAmount(restrictions.maxAmount) &&
+            o.amount % normalizeAmount(restrictions.stepAmount).max(1) == 0
         }
-        .ensure(error.OrderInvalidPrice(order, restrictions)) { o =>
+        .ensure(error.OrderInvalidPrice(order, OrderRestriction(restrictions.minPrice, restrictions.maxPrice, restrictions.stepPrice))) { o =>
           normalizePrice(restrictions.minPrice) <= o.price && o.price <= normalizePrice(restrictions.maxPrice) &&
           o.price % normalizePrice(restrictions.stepPrice).max(1) == 0
         }
@@ -327,7 +328,7 @@ object OrderValidator extends ScorexLogging {
    *   best bid = highest price of buy
    *   best ask = lowest price of sell
    */
-  private def validatePriceDeviation(order: Order, deviationSettings: DeviationsSettings, marketStatus: Option[MarketStatus])(implicit
+  private def validatePriceDeviation(order: Order, deviations: Deviations, marketStatus: Option[MarketStatus])(implicit
     efc: ErrorFormatterContext
   ): Result[Order] = {
 
@@ -343,9 +344,9 @@ object OrderValidator extends ScorexLogging {
       isPriceHigherThanMinDeviation && isPriceLessThanMaxDeviation
     }
 
-    lift(order).ensure(error.DeviantOrderPrice(order, deviationSettings)) { _ =>
-      if (order.orderType == OrderType.BUY) isPriceInDeviationBounds(deviationSettings.maxPriceProfit, deviationSettings.maxPriceLoss)
-      else isPriceInDeviationBounds(deviationSettings.maxPriceLoss, deviationSettings.maxPriceProfit)
+    lift(order).ensure(error.DeviantOrderPrice(order, deviations)) { _ =>
+      if (order.orderType == OrderType.BUY) isPriceInDeviationBounds(deviations.maxPriceProfit, deviations.maxPriceLoss)
+      else isPriceInDeviationBounds(deviations.maxPriceLoss, deviations.maxPriceProfit)
     }
   }
 
@@ -365,7 +366,7 @@ object OrderValidator extends ScorexLogging {
    */
   private def validateFeeDeviation(
     order: Order,
-    deviationSettings: DeviationsSettings,
+    deviations: Deviations,
     orderFeeSettings: OrderFeeSettings,
     marketStatus: Option[MarketStatus]
   )(implicit efc: ErrorFormatterContext): Result[Order] = {
@@ -375,7 +376,7 @@ object OrderValidator extends ScorexLogging {
         order.matcherFee >=
           getMinValidFeeForPercentFeeSettings(
             order,
-            PercentSettings(assetType, minFee * (1 - (deviationSettings.maxFeeDeviation / 100))),
+            PercentSettings(assetType, minFee * (1 - (deviations.maxFeeDeviation / 100))),
             matchedPrice
           )
       case _ => true
@@ -391,18 +392,19 @@ object OrderValidator extends ScorexLogging {
       }
     }
 
-    Either.cond(isFeeInDeviationBounds, order, error.DeviantOrderMatcherFee(order, deviationSettings))
+    Either.cond(isFeeInDeviationBounds, order, error.DeviantOrderMatcherFee(order, deviations))
   }
 
   def marketAware(orderFeeSettings: OrderFeeSettings, deviationSettings: DeviationsSettings, marketStatus: Option[MarketStatus])(
     order: Order
   )(implicit efc: ErrorFormatterContext): Result[Order] =
-    if (deviationSettings.enable)
+    if (deviationSettings.enable) {
+      val deviations = Deviations(deviationSettings.maxPriceProfit, deviationSettings.maxPriceLoss, deviationSettings.maxFeeDeviation)
       for {
-        _ <- validatePriceDeviation(order, deviationSettings, marketStatus)
-        _ <- validateFeeDeviation(order, deviationSettings, orderFeeSettings, marketStatus)
+        _ <- validatePriceDeviation(order, deviations, marketStatus)
+        _ <- validateFeeDeviation(order, deviations, orderFeeSettings, marketStatus)
       } yield order
-    else lift(order)
+    } else lift(order)
 
   def timeAware(time: Time)(order: Order): Result[Order] =
     for {

@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.it.api.responses
 
-import com.wavesplatform.transactions.Transaction
+import com.wavesplatform.
 import play.api.libs.json.{JsSuccess, Reads}
 
 package object node {

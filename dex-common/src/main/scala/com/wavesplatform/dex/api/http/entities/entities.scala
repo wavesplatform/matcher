@@ -2,15 +2,14 @@ package com.wavesplatform.dex.api.http
 
 import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
-import com.wavesplatform.dex.json.{assetDoubleMapFormat, assetMapFormat, assetPairMapFormat}
-import com.wavesplatform.dex.queue.ValidatedCommandWithMeta
+import com.wavesplatform.dex.utils.JsonImplicits.{assetDoubleMapFormat, assetMapFormat, assetPairMapFormat}
 import play.api.libs.json.{Format, JsValue, Writes}
 
 package object entities {
 
   type HttpMatcherPublicKey = PublicKey
   type HttpRates = Map[Asset, Double]
-  type HttpOffset = ValidatedCommandWithMeta.Offset
+  type HttpOffset =  Long // as ValidatedCommandWithMeta.Offset
   type HttpSnapshotOffsets = Map[AssetPair, HttpOffset]
   type HttpBalance = Map[Asset, Long]
 

@@ -5,13 +5,18 @@ import cats.tagless.FunctorK
 import com.dimafeng.testcontainers.GenericContainer
 import com.github.dockerjava.api.model.Capability
 import com.typesafe.config.Config
+import com.wavesplatform.dex.it.api.Transformations
 import com.wavesplatform.dex.collections.Implicits.ListOps
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.it.api._
 import com.wavesplatform.dex.it.api.dex.{AsyncEnrichedDexApi, DexApi, DexApiSyntax}
 import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import com.wavesplatform.dex.it.cache.CachedData
+import com.wavesplatform.dex.it.docker.{MountableFileOps, PortBindingKeeper, apiKey, ignoreWaitStrategy}
+import com.wavesplatform.dex.it.fp.CanRepeat
+import com.wavesplatform.dex.it.resources.getRawContentFromResource
 import com.wavesplatform.dex.it.sttp.LoggingSttpBackend
+import com.wavesplatform.dex.settings.ConfigOps.ConfigOps
 import com.wavesplatform.dex.statuses.CombinedStreamStatus
 import com.wavesplatform.dex.statuses.MatcherStatus.Working
 import org.testcontainers.containers.{BindMode, Network}

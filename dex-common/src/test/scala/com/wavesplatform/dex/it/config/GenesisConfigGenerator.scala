@@ -4,8 +4,11 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.account.{Address, AddressScheme, KeyPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.crypto
+import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.it.config.genesis._
 import com.wavesplatform.dex.predefined.PredefinedAccounts
+import pureconfig.ConfigSource
+import pureconfig.generic.auto._
 
 import scala.concurrent.duration.FiniteDuration
 

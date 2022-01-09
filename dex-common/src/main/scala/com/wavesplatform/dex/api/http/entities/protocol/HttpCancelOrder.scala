@@ -1,4 +1,4 @@
-package com.wavesplatform.dex.api.http.protocol
+package com.wavesplatform.dex.api.http.entities.protocol
 
 import com.google.common.primitives.Longs
 import com.wavesplatform.dex.domain.account.PublicKey

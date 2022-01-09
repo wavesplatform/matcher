@@ -4,9 +4,10 @@ import cats.syntax.option._
 import com.wavesplatform.dex.api.ws.entities.WsFullOrder
 import com.wavesplatform.dex.api.ws.entities.WsFullOrder.WsExecutionInfo
 import com.wavesplatform.dex.domain.model.Denormalization
+import com.wavesplatform.dex.domain.order.OrderStatusNames
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.model.Events.{OrderCanceled, OrderExecuted}
-import com.wavesplatform.dex.model.{AcceptedOrder, OrderStatus}
+import com.wavesplatform.dex.model.AcceptedOrder
 
 object WsFullOrderConverter {
 
@@ -34,7 +35,7 @@ object WsFullOrderConverter {
       amount = denormalizeAmount(ao.order.amount),
       fee = denormalizeFee(ao.order.matcherFee),
       feeAsset = ao.order.feeAsset,
-      status = OrderStatus.Cancelled.name,
+      status = OrderStatusNames.CANCELLED,
       filledAmount = denormalizeAmount(fillingInfo.filledAmount),
       filledFee = denormalizeFee(fillingInfo.filledFee),
       avgWeighedPrice = denormalizePrice(fillingInfo.avgWeighedPrice),

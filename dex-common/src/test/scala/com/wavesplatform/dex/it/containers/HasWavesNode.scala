@@ -2,9 +2,11 @@ package com.wavesplatform.dex.it.containers
 
 import cats.{FlatMap, Functor}
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.it.api.NodeApiSyntax
 import com.wavesplatform.dex.it.api.node.{NodeApi, NodeApiSyntax}
+import com.wavesplatform.dex.it.config.GenesisConfig
 import com.wavesplatform.dex.it.fp.CanRepeat
+
+import scala.util.chaining._
 
 trait HasWavesNode { self: BaseContainersKit =>
   protected val defaultNodeImage = "wavesplatform/waves-integration-it:latest"

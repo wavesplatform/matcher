@@ -14,6 +14,7 @@ import cats.syntax.traverse._
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.actors.OrderBookDirectoryActor._
 import com.wavesplatform.dex.actors.address.AddressActor
+import com.wavesplatform.dex.api.http.converters.{HttpAssetInfoConverter, HttpOrderBookHistoryItemConverter, HttpOrderStatusConverter}
 import com.wavesplatform.dex.api.http.directives.HttpKamonDirectives._
 import com.wavesplatform.dex.api.http.directives.ProtectDirective
 import com.wavesplatform.dex.api.http.entities._
@@ -267,12 +268,12 @@ final class MarketsRoute(
                   case Some(order) =>
                     askMapAddressActor[AddressActor.Reply.GetOrderStatus](addressActor, order.sender, AddressActor.Query.GetOrderStatus(orderId)) {
                       r =>
-                        HttpOrderStatus.from(r.x)
+                        HttpOrderStatusConverter.from(r.x)
                     }
                   case None =>
                     orderDb
                       .getOrderInfo(orderId)
-                      .map(_.fold(HttpOrderStatus.from(OrderStatus.NotFound))(x => HttpOrderStatus.from(x.status)))
+                      .map(_.fold(HttpOrderStatusConverter.from(OrderStatus.NotFound))(x => HttpOrderStatusConverter.from(x.status)))
                       .map(ToResponseMarshallable(_))
                 }
               }
@@ -303,16 +304,16 @@ final class MarketsRoute(
         complete(
           (matcher ? GetMarkets).mapTo[List[MarketData]].flatMap { markets =>
             markets
-              .map { md =>
+              .map { md: MarketData =>
                 getOrderBookRestrictions(md.pair)
                   .map { meta =>
                     HttpMarketDataWithMeta(
                       md.pair.amountAsset,
                       md.amountAssetName,
-                      md.amountAssetInfo.map(HttpAssetInfo.fromAssetInfo),
+                      md.amountAssetInfo.map(HttpAssetInfoConverter.fromAssetInfo),
                       md.pair.priceAsset,
                       md.priceAssetName,
-                      md.priceAssetInfo.map(HttpAssetInfo.fromAssetInfo),
+                      md.priceAssetInfo.map(HttpAssetInfoConverter.fromAssetInfo),
                       md.created,
                       meta.restrictions,
                       meta.matchingRules
@@ -416,7 +417,14 @@ final class MarketsRoute(
 
   private def getOrderBookRestrictions(pair: AssetPair): FutureResult[HttpOrderBookInfo] = settings.getActualTickSize(pair).map { tickSize =>
     HttpOrderBookInfo(
-      restrictions = settings.orderRestrictions.get(pair).map(HttpOrderRestrictions.fromSettings),
+      restrictions = settings.orderRestrictions.get(pair).map(s => HttpOrderRestrictions(
+        stepAmount = s.stepAmount,
+        minAmount = s.minAmount,
+        maxAmount = s.maxAmount,
+        stepPrice = s.stepPrice,
+        minPrice = s.minPrice,
+        maxPrice = s.maxPrice
+      )),
       matchingRules = HttpMatchingRules(tickSize = tickSize.toDouble)
     )
   }
@@ -424,7 +432,7 @@ final class MarketsRoute(
   private def getOrderStatusInfo(id: Order.Id, address: Address): StandardRoute = complete {
     askMapAddressActor[AddressActor.Reply.GetOrdersStatusInfo](addressActor, address, AddressActor.Query.GetOrderStatusInfo(id)) {
       _.maybeOrderStatusInfo match {
-        case Some(oi) => SimpleResponse(HttpOrderBookHistoryItem.fromOrderInfo(id, oi))
+        case Some(oi) => SimpleResponse(HttpOrderBookHistoryItemConverter.fromOrderInfo(id, oi))
         case None => InfoNotFound(error.OrderNotFound(id))
       }
     }

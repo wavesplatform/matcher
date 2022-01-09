@@ -17,7 +17,7 @@ import com.wavesplatform.dex.error.Implicits.ThrowableOps
 import com.wavesplatform.dex.settings.{MatcherSettings, loadConfig}
 import com.wavesplatform.dex.tool.ComparisonTool._
 import com.wavesplatform.dex.domain.asset.AssetPair
-import com.wavesplatform.dex.utils.json
+import com.wavesplatform.dex.utils.JsonImplicits
 import play.api.libs.json.Json
 import pureconfig.ConfigSource
 import sttp.client3.asynchttpclient.future.AsyncHttpClientFutureBackend
@@ -102,7 +102,7 @@ class ComparisonTool(settings: Settings) extends ScorexLogging {
   private def parse(response: Response[Either[String, String]]): TradableBalanceCheckResponse =
     response.body match {
       case Left(_) => TradableBalanceCheckResponse.Failed(response.code.code)
-      case Right(body) => TradableBalanceCheckResponse.Parsed(Json.parse(body).as[Map[Asset, Long]](json.assetMapFormat[Long]))
+      case Right(body) => TradableBalanceCheckResponse.Parsed(Json.parse(body).as[Map[Asset, Long]](JsonImplicits.assetMapFormat[Long]))
     }
 
 }

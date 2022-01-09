@@ -1,9 +1,7 @@
 package com.wavesplatform.dex.api.http.entities
 
-import com.wavesplatform.dex.db.OrderDb.orderIdOrdering
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.{AcceptedOrderType, Order, OrderType}
-import com.wavesplatform.dex.model.{OrderInfo, OrderStatus}
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{Json, OFormat}
 
@@ -52,24 +50,6 @@ object HttpOrderBookHistoryItem {
 
   implicit val httpOrderBookHistoryItemFormat: OFormat[HttpOrderBookHistoryItem] = Json.format
 
-  val httpOrderBookHistoryItemOrdering: Ordering[HttpOrderBookHistoryItem] = orderIdOrdering.on(item => (item.id, item.timestamp))
-
-  def fromOrderInfo(id: Order.Id, info: OrderInfo[OrderStatus]): HttpOrderBookHistoryItem = HttpOrderBookHistoryItem(
-    id = id,
-    `type` = info.side,
-    orderType = info.orderType,
-    amount = info.amount,
-    filled = info.status.filledAmount,
-    price = info.price,
-    fee = info.matcherFee,
-    filledFee = info.status.filledFee,
-    feeAsset = info.feeAsset,
-    timestamp = info.timestamp,
-    status = info.status.name,
-    assetPair = info.assetPair,
-    avgWeighedPrice = info.avgWeighedPrice,
-    version = info.orderVersion,
-    totalExecutedPriceAssets = info.totalExecutedPriceAssets
-  )
+  val httpOrderBookHistoryItemOrdering: Ordering[HttpOrderBookHistoryItem] = Order.orderIdOrdering.on(item => (item.id, item.timestamp))
 
 }

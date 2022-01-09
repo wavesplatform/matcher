@@ -6,14 +6,16 @@ import cats.syntax.either._
 import cats.syntax.option._
 import cats.syntax.traverse._
 import com.typesafe.config.Config
+import com.wavesplatform.dex.api.http.converters.HttpOrderStatusConverter
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus
+import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsOrderBookChanges}
 import com.wavesplatform.dex.cli._
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.model.{Denormalization, Normalization}
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
-import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV3}
+import com.wavesplatform.dex.domain.order.{Order, OrderStatusNames, OrderType, OrderV3}
 import com.wavesplatform.dex.model.OrderStatus
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.dex.tool.connectors.DexExtensionGrpcConnector.DetailedBalance
@@ -129,7 +131,7 @@ class Checker(superConnector: SuperConnector) {
         v.foreach { o =>
           val id = (o \ "id").as[ByteStr]
           dexRest.cancelOrder(id, assetPairInfo.assetPair, env.matcherKeyPair)
-          dexRest.waitForOrderStatus(id, assetPairInfo.assetPair, OrderStatus.Cancelled.name)
+          dexRest.waitForOrderStatus(id, assetPairInfo.assetPair, OrderStatusNames.CANCELLED)
         }
         dexRest.getActiveOrdersByPair(env.matcherKeyPair, assetPairInfo.assetPair) match {
           case Left(x) => Left(x)
@@ -144,7 +146,7 @@ class Checker(superConnector: SuperConnector) {
     for {
       activeOrders <- dexRest.getActiveOrdersByPair(env.matcherKeyPair, assetPair).map(_.map(j => (j \ "id").as[ByteStr]).toList)
       _ <- activeOrders.traverse(id => dexRest.cancelOrder(id, assetPair, env.matcherKeyPair))
-      _ <- activeOrders.traverse(id => dexRest.waitForOrderStatus(id, assetPair, OrderStatus.Cancelled.name))
+      _ <- activeOrders.traverse(id => dexRest.waitForOrderStatus(id, assetPair, OrderStatusNames.CANCELLED))
     } yield
       if (activeOrders.isEmpty) (assetPairInfo, s"Matcher didn't have any active orders on a test asset pair ${assetPair.toString}")
       else (assetPairInfo, s"Matcher had active orders on a test asset pair ${assetPair.toString}: ${activeOrders.mkString(", ")} cancelled")
@@ -162,7 +164,7 @@ class Checker(superConnector: SuperConnector) {
   private def checkCancellation(order: Order): CheckLoggedResult[Order] =
     for {
       _ <- dexRest.cancelOrder(order, env.matcherKeyPair)
-      _ <- dexRest.waitForOrderStatus(order, OrderStatus.Cancelled.name)
+      _ <- dexRest.waitForOrderStatus(order, OrderStatusNames.CANCELLED)
     } yield order -> s"Order with id ${order.id()} cancelled"
 
   private def checkExecution(assetPairInfo: AssetPairInfo): ErrorOr[String] = {
@@ -175,7 +177,7 @@ class Checker(superConnector: SuperConnector) {
 
       lazy val expectedFilledStatus = {
         val orderStatus = OrderStatus.Filled(submitted.amount, submitted.matcherFee)
-        HttpOrderStatus.httpOrderStatusFormat.writes(HttpOrderStatus from orderStatus).toString
+        HttpOrderStatus.httpOrderStatusFormat.writes(HttpOrderStatusConverter from orderStatus).toString
       }
 
       (
@@ -198,7 +200,7 @@ class Checker(superConnector: SuperConnector) {
       _ <- dexRest.placeOrder(counter)
       counterStatus <- dexRest.waitForOrderStatus(counter, OrderStatus.Accepted.name)
       _ <- dexRest.placeOrder(submitted)
-      submittedStatus <- dexRest.waitForOrderStatus(submitted, OrderStatus.Filled.name)
+      submittedStatus <- dexRest.waitForOrderStatus(submitted, OrderStatusNames.FILLED)
       _ <- checkFillingAtDex(submittedStatus)
       txs <- awaitSubmittedOrderAtNode
     } yield {

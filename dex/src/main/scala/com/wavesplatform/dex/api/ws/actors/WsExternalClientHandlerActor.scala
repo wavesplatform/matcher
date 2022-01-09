@@ -10,11 +10,12 @@ import com.wavesplatform.dex.actors.OrderBookDirectoryActor
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor
 import com.wavesplatform.dex.api.ws.actors.WsExternalClientHandlerActor.Command.CancelAddressSubscription
+import com.wavesplatform.dex.api.ws.protocol._
 import com.wavesplatform.dex.api.ws.state.WsAddressState
 import com.wavesplatform.dex.domain.account.{Address, AddressScheme}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.error
-import com.wavesplatform.dex.error.{MatcherError, SubscriptionsLimitReached, WsConnectionMaxLifetimeExceeded, WsConnectionPongTimeout}
+import com.wavesplatform.dex.error._
 import com.wavesplatform.dex.model.AssetPairBuilder
 import com.wavesplatform.dex.settings.SubscriptionsSettings
 import com.wavesplatform.dex.time.Time

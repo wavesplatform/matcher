@@ -24,8 +24,8 @@ import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.MarketSta
 import com.wavesplatform.dex.api.RouteSpec
 import com.wavesplatform.dex.api.http.ApiMarshallers._
 import com.wavesplatform.dex.api.http.entities._
+import com.wavesplatform.dex.api.http.entities.protocol.HttpCancelOrder
 import com.wavesplatform.dex.api.http.headers.{CustomContentTypes, `X-Api-Key`}
-import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
 import com.wavesplatform.dex.api.http.routes.v0.MarketsRoute.Settings
 import com.wavesplatform.dex.api.http.routes.v0._
 import com.wavesplatform.dex.api.http.{OrderBookHttpInfo, entities}
@@ -41,7 +41,7 @@ import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.order.OrderJson._
 import com.wavesplatform.dex.domain.order.OrderOps._
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
-import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.domain.order.{AcceptedOrderType, Order, OrderType}
 import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV2
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.effect._
@@ -54,7 +54,7 @@ import com.wavesplatform.dex.model.{LimitOrder, OrderInfo, OrderStatus, _}
 import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import com.wavesplatform.dex.settings.OrderFeeSettings.DynamicSettings
 import com.wavesplatform.dex.settings.{MatcherSettings, OrderRestrictionsSettings}
-import com.wavesplatform.dex.statuses.MatcherStatus
+import com.wavesplatform.dex.statuses.{CombinedStreamStatus, MatcherStatus}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 import play.api.libs.json.{JsArray, JsString, Json, JsonFacade => _}
@@ -189,7 +189,14 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         status shouldEqual StatusCodes.OK
         responseAs[HttpOrderBookInfo] should matchTo(
           HttpOrderBookInfo(
-            restrictions = Some(HttpOrderRestrictions.fromSettings(orderRestrictions)),
+            restrictions = Some(HttpOrderRestrictions(
+              stepAmount = orderRestrictions.stepAmount,
+              minAmount = orderRestrictions.minAmount,
+              maxAmount = orderRestrictions.maxAmount,
+              stepPrice = orderRestrictions.stepPrice,
+              minPrice = orderRestrictions.minPrice,
+              maxPrice = orderRestrictions.maxPrice
+            )),
             matchingRules = HttpMatchingRules(0.1)
           )
         )
@@ -1434,7 +1441,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       ConfigFactory.load().atKey("waves.dex"),
       orderBookDirectoryActor.ref,
       addressActor.ref,
-      CombinedStream.Status.Working(10),
+      CombinedStreamStatus.Working(10),
       () => MatcherStatus.Working,
       () => 0L,
       () => Future.successful(0L),

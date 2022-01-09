@@ -2,6 +2,8 @@ package com.wavesplatform.dex.it.api.dex
 
 import com.google.common.primitives.Longs
 import com.typesafe.config.Config
+import com.wavesplatform.dex.api.http.entities._
+import com.wavesplatform.dex.api.http.entities.protocol.HttpCancelOrder
 import com.wavesplatform.dex.domain.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -9,6 +11,7 @@ import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.Order.Id
+import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import com.wavesplatform.dex.it.api.{AsyncEnrichedApi, EnrichedResponse}
 import play.api.libs.json.{JsObject, Json}

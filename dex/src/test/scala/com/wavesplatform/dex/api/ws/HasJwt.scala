@@ -3,7 +3,6 @@ package com.wavesplatform.dex.api.ws
 import java.security
 import java.security.KeyPairGenerator
 
-import com.wavesplatform.dex.auth.JwtUtils
 import play.api.libs.json.{JsObject, Json}
 
 trait HasJwt extends JwtUtils {

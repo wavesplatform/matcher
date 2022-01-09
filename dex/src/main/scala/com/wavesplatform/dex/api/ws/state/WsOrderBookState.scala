@@ -3,6 +3,7 @@ package com.wavesplatform.dex.api.ws.state
 import akka.actor.typed.ActorRef
 import cats.syntax.option._
 import com.wavesplatform.dex.api.ws.entities.{WsLastTrade, WsOrderBookSettings}
+import com.wavesplatform.dex.api.ws.protocol.WsOrderBookChanges
 import com.wavesplatform.dex.api.ws.state.WsAddressState.getNextUpdateId
 import com.wavesplatform.dex.api.ws.state.WsOrderBookState._
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -56,7 +57,7 @@ case class WsOrderBookState(
     wsConnections =
       if (hasChanges) {
         val changes =
-          protocol.WsOrderBookChanges(
+          WsOrderBookChanges(
             assetPair = assetPair,
             asks = denormalized(amountDecimals, priceDecimals, take(asks, changedAsks), OrderBook.asksDenormalizedOrdering),
             bids = denormalized(amountDecimals, priceDecimals, take(bids, changedBids), OrderBook.bidsDenormalizedOrdering),

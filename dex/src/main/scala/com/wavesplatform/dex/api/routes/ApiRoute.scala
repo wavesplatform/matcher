@@ -5,14 +5,14 @@ import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshal
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.directives.FutureDirectives
 import akka.http.scaladsl.server.{Directive1, Directives, Route, _}
-import akka.pattern.{ask, AskTimeoutException}
+import akka.pattern.{AskTimeoutException, ask}
 import com.google.common.primitives.Longs
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
+import com.wavesplatform.dex.api.http.entities.protocol.HttpCancelOrder
 import com.wavesplatform.dex.api.http.entities.{InfoNotFound, InvalidAddress, InvalidAsset, InvalidBase58String, InvalidPublicKey, InvalidSignature, MatcherResponse, TimedOut, _}
 import com.wavesplatform.dex.api.http.headers.`X-User-Public-Key`
-import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
-import com.wavesplatform.dex.api.http.{entities, ApiMarshallers}
+import com.wavesplatform.dex.api.http.{ApiMarshallers, entities}
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr

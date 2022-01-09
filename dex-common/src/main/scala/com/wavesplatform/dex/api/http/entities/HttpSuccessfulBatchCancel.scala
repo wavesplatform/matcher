@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.api.http.entities
 
+import com.wavesplatform.dex.utils.JsonImplicits
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json.{Format, Json}
 
@@ -24,7 +25,7 @@ object HttpSuccessfulBatchCancel {
   implicit val httpSuccessfulBatchCancelFormat: Format[HttpSuccessfulBatchCancel] = {
 
     implicit val ef: Format[Either[HttpError, HttpSuccessfulSingleCancel]] =
-      com.wavesplatform.dex.json.eitherFormat[HttpError, HttpSuccessfulSingleCancel]
+      JsonImplicits.eitherFormat[HttpError, HttpSuccessfulSingleCancel]
 
     Json.format
   }

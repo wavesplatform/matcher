@@ -2,7 +2,7 @@ package com.wavesplatform.dex.api.http.entities
 
 import com.wavesplatform.dex.api.http.entities.HttpOrderFeeMode.{FeeModeDynamic, FeeModeFixed, FeeModePercent}
 import com.wavesplatform.dex.domain.asset.Asset
-import com.wavesplatform.dex.settings.{AssetType, OrderFeeSettings}
+import com.wavesplatform.dex.settings.AssetType
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json._
 
@@ -85,11 +85,5 @@ object HttpOrderFeeMode {
   )
 
   private def toJson[T](key: String, x: T)(implicit w: Writes[T]): JsObject = Json.obj(key -> w.writes(x))
-
-  def fromSettings(settings: OrderFeeSettings, matcherAccountFee: Long, allRates: Map[Asset, Double]): HttpOrderFeeMode = settings match {
-    case x: OrderFeeSettings.DynamicSettings => FeeModeDynamic(x.maxBaseFee + matcherAccountFee, allRates)
-    case OrderFeeSettings.FixedSettings(assetId, minFee) => FeeModeFixed(assetId, minFee)
-    case OrderFeeSettings.PercentSettings(assetType, minFee) => FeeModePercent(assetType, minFee)
-  }
 
 }

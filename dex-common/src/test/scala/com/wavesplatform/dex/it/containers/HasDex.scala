@@ -2,7 +2,6 @@ package com.wavesplatform.dex.it.containers
 
 import cats.Functor
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.it.api.DexApiSyntax
 import com.wavesplatform.dex.it.api.dex.{DexApi, DexApiSyntax}
 import com.wavesplatform.dex.it.fp.CanRepeat
 import org.apache.kafka.clients.admin.{AdminClient, NewTopic}

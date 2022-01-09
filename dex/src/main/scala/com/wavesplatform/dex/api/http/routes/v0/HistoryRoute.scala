@@ -8,10 +8,11 @@ import akka.util.Timeout
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.actors.address.AddressActor
 import com.wavesplatform.dex.actors.address.AddressActor.OrderListType
+import com.wavesplatform.dex.api.http.converters.HttpOrderBookHistoryItemConverter
 import com.wavesplatform.dex.api.http.directives.HttpKamonDirectives._
 import com.wavesplatform.dex.api.http.directives.ProtectDirective
 import com.wavesplatform.dex.api.http.entities._
-import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
+import com.wavesplatform.dex.api.http.entities.protocol.HttpCancelOrder
 import com.wavesplatform.dex.api.http.{HasStatusBarrier, _}
 import com.wavesplatform.dex.api.routes.PathMatchers.{AddressPM, AssetPairPM, PublicKeyPM}
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
@@ -244,7 +245,7 @@ final class HistoryRoute(
     }
 
   private val tupledOrderBookHistoryItem: ((Id, OrderInfo[OrderStatus])) => HttpOrderBookHistoryItem =
-    Function.tupled(HttpOrderBookHistoryItem.fromOrderInfo)
+    Function.tupled(HttpOrderBookHistoryItemConverter.fromOrderInfo)
 
   private def loadOrders(address: Address, pair: Option[AssetPair], orderListType: OrderListType): Route = complete {
     askMapAddressActor[AddressActor.Reply.GetOrderStatuses](addressActor, address, AddressActor.Query.GetOrdersStatuses(pair, orderListType)) {

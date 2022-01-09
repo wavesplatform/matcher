@@ -306,4 +306,6 @@ object Order extends EntityParser[Order] {
         ep.statefulParse.widen[(Order, ConsumedBytesOffset)]
       }
 
+  val orderIdOrdering: Ordering[(Order.Id, Long)] = Ordering.by { case (id, ts) => (-ts, id) }
+
 }

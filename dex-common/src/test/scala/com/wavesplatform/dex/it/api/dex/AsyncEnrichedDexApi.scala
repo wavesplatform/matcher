@@ -12,7 +12,7 @@ import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.Order.Id
-import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
+import com.wavesplatform.transactions.ExchangeTransaction
 import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import com.wavesplatform.dex.it.api.{AsyncEnrichedApi, EnrichedResponse}
 import play.api.libs.json.{JsObject, Json}

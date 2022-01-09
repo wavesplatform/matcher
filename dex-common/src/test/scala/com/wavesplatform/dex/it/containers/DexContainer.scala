@@ -39,6 +39,7 @@ final case class DexContainer private (override val internalIp: String, underlyi
   private val apiFunctorK: FunctorK[DexApi] = FunctorK[DexApi] // IntelliJ FIX
 
   val tf = new Transformations[MatcherError]
+  import tf._
 
   /*
   Which api to use? Consider a lesser power principle:

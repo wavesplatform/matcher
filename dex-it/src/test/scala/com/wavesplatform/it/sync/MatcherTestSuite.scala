@@ -13,7 +13,6 @@ import com.wavesplatform.dex.domain.order.OrderType._
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.error.{AssetNotFound, BalanceNotEnough, OrderNotFound, PriceLastDecimalsMustBeZero, UserPublicKeyIsNotValid}
 import com.wavesplatform.dex.it.api.responses.dex._
-import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.model.OrderStatus
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.config.DexTestConfig.issueAssetPair

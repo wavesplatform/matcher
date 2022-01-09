@@ -4,6 +4,9 @@ import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.utils.ScorexLogging
+import com.wavesplatform.dex.it.waves.MkWavesEntities.mkIssue
+import com.wavesplatform.dex.predefined.PredefinedAccounts._
+import com.wavesplatform.transactions.IssueTransaction
 
 trait PredefinedAssets extends ScorexLogging {
 

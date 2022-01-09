@@ -1,4 +1,4 @@
-package com.wavesplatform.dex.asset
+package com.wavesplatform.dex.util
 
 import com.wavesplatform.dex.domain.model.Normalization
 

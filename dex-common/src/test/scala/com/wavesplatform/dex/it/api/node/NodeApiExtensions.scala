@@ -2,7 +2,7 @@ package com.wavesplatform.dex.it.api.node
 
 import cats.Id
 import com.wavesplatform.dex.it.containers.HasWavesNode
-import com.wavesplatform.protobuf.transaction.Transaction
+import com.wavesplatform.transactions.Transaction
 
 trait NodeApiExtensions {
 

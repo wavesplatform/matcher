@@ -41,6 +41,7 @@ object Dependencies {
 
     val wavesProtobufSchemas = "1.3.2"
     val wavesJ = "1.2.2"
+    val wavesTransactions = "1.0.8"
 
     val postgresql = "42.2.23"
     val quillJdbc = "3.8.0"
@@ -150,6 +151,7 @@ object Dependencies {
   private val allureScalaTest = "io.qameta.allure" %% "allure-scalatest" % Version.allureScalaTest
   private val jaxbApi = "javax.xml.bind" % "jaxb-api" % Version.jaxbApi
   private val googleProtobuf = "com.google.protobuf" % "protobuf-java" % Version.googleProtobuf
+  private val wavesTransaction = "com.wavesplatform" % "waves-transactions" % Version.wavesTransactions
 
   private[this] val levelDBJNA =
     Seq(
@@ -233,6 +235,7 @@ object Dependencies {
       Seq(
         sttpClient,
         sttpPlayJson,
+        wavesTransaction,
         sttpAsyncHttpClient,
         jwtModule("core"),
         jwtModule("play-json"),

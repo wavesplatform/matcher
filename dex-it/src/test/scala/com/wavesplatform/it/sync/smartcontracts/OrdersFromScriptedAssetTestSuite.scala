@@ -9,7 +9,6 @@ import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.error.AssetScriptDeniedOrder
 import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import com.wavesplatform.dex.it.test.Scripts
-import com.wavesplatform.dex.it.waves.{MkWavesEntities, ToWavesJConversions}
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.transactions.IssueTransaction
 
@@ -142,7 +141,6 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
 object OrdersFromScriptedAssetTestSuite extends ToWavesJConversions {
 
   import com.wavesplatform.dex.it.config.PredefinedAccounts.matcher
-  import com.wavesplatform.dex.waves.WavesFeeConstants.smartIssueFee
 
   private def mkAllow(id: Int): IssueTransaction =
     MkWavesEntities.mkIssue(matcher, s"AllowAsset-$id", Int.MaxValue / 3, 0, smartIssueFee, Some(Scripts.alwaysTrue))

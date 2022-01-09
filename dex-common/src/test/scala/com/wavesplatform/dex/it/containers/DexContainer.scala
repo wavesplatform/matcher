@@ -8,7 +8,6 @@ import com.typesafe.config.Config
 import com.wavesplatform.dex.it.api.Transformations
 import com.wavesplatform.dex.collections.Implicits.ListOps
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.it.api._
 import com.wavesplatform.dex.it.api.dex.{AsyncEnrichedDexApi, DexApi, DexApiSyntax}
 import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import com.wavesplatform.dex.it.cache.CachedData

@@ -16,7 +16,6 @@ import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.error.{AddressAndPublicKeyAreIncompatible, SubscriptionTokenExpired, SubscriptionsLimitReached}
 import com.wavesplatform.dex.it.test.Scripts
-import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.model.{LimitOrder, MarketOrder, OrderStatus}
 import com.wavesplatform.dex.tool.Using._
 import com.wavesplatform.it.WsSuiteBase

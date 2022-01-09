@@ -4,7 +4,8 @@ import cats.tagless.{autoFunctorK, finalAlg}
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.it.api.responses.node._
-import com.wavesplatform.protobuf.transaction.Transaction
+import com.wavesplatform.transactions.Transaction
+import com.wavesplatform.transactions.common.Id
 
 import java.net.InetSocketAddress
 

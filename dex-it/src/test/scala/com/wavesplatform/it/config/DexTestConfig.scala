@@ -5,10 +5,7 @@ import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
-import com.wavesplatform.dex.it.waves.Implicits._
-import com.wavesplatform.dex.it.waves.MkWavesEntities._
 import com.wavesplatform.dex.model.AssetPairBuilder
-import com.wavesplatform.dex.waves.WavesFeeConstants._
 import com.wavesplatform.transactions.IssueTransaction
 
 import scala.util.Random

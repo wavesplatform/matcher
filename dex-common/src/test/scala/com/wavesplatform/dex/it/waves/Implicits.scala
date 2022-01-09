@@ -4,8 +4,8 @@ import com.wavesplatform.dex.domain.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.it.config.GenesisConfig
+import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.transactions.account.{Address => JAddress, PrivateKey => JPrivateKey, PublicKey => JPublicKey}
 import com.wavesplatform.transactions.common.{Amount, AssetId, Id, Proof => JProof}
 import com.wavesplatform.transactions.exchange.{Order => JOrder, OrderType => JOrderType}

@@ -11,7 +11,7 @@ import com.wavesplatform.dex.domain.model.Normalization
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionV2}
 import com.wavesplatform.dex.it.config.GenesisConfig
-import com.wavesplatform.dex.it.config.PredefinedAccounts.matcher
+import com.wavesplatform.dex.predefined.PredefinedAccounts.matcher
 import com.wavesplatform.dex.it.waves.Implicits._
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.waves.WavesFeeConstants._

@@ -9,7 +9,6 @@ import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.SELL
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.it.containers.WavesNodeContainer
-import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.model.LimitOrder
 import com.wavesplatform.dex.tool.Using._
 import com.wavesplatform.it.WsSuiteBase

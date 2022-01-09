@@ -3,6 +3,7 @@ package com.wavesplatform.dex.it.api.dex
 import com.google.common.primitives.Longs
 import com.typesafe.config.Config
 import com.wavesplatform.dex.api.http.entities._
+import com.wavesplatform.dex.utils.JsonImplicits.{orderWrites, exchangeTxReads}
 import com.wavesplatform.dex.api.http.entities.protocol.HttpCancelOrder
 import com.wavesplatform.dex.domain.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}

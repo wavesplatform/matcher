@@ -4,7 +4,6 @@ import com.google.common.base.Charsets
 import com.google.common.primitives.{Bytes, Ints}
 import com.softwaremill.diffx.{Derived, Diff}
 import com.wavesplatform.dex.api.ws.entities.WsMatchTransactionInfo
-import com.wavesplatform.dex.asset.DoubleOps
 import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.db.TestRateDb
 import com.wavesplatform.dex.domain.account.{Address, KeyPair}
@@ -27,7 +26,7 @@ import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import com.wavesplatform.dex.settings.OrderFeeSettings._
 import com.wavesplatform.dex.settings.{AssetType, MatcherSettings, OrderFeeSettings, loadConfig}
 import com.wavesplatform.dex.time.SystemTime
-import com.wavesplatform.dex.waves.WavesFeeConstants
+import com.wavesplatform.dex.util.DoubleOps
 import io.qameta.allure.scalatest.AllureScalatestContext
 import kamon.context.Context
 import mouse.any._

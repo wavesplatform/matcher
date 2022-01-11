@@ -1,6 +1,8 @@
 package com.wavesplatform.it.sync.api.ws
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.api.ws.connection.WsConnection
+import com.wavesplatform.dex.api.ws.protocol._
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.it.WsSuiteBase

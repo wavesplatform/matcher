@@ -5,6 +5,8 @@ import akka.http.scaladsl.model.ws.TextMessage
 import com.wavesplatform.dex.error.{InvalidJson, WsConnectionPongTimeout}
 import com.wavesplatform.it.WsSuiteBase
 import com.wavesplatform.dex.Implicits.durationToScalatestTimeout
+import com.wavesplatform.dex.api.ws.connection.WsConnection
+import com.wavesplatform.dex.api.ws.protocol._
 
 import scala.concurrent.duration._
 

@@ -5,6 +5,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.Implicits.durationToScalatestTimeout
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.api.http.entities.HttpSuccessfulBatchCancel
+import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsOrderBookChanges}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair

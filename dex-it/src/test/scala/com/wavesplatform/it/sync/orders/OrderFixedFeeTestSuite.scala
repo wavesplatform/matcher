@@ -8,6 +8,7 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.error.FeeNotEnough
 import com.wavesplatform.dex.it.test.Scripts
+import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 
 class OrderFixedFeeTestSuite extends OrderFeeBaseTestSuite {
   private val minMatcherFee = 200000L

@@ -1,7 +1,7 @@
 package com.wavesplatform.it.matcher.api
 
 import com.wavesplatform.dex.api.http.entities.HttpOrderBookHistoryItem
-import com.wavesplatform.dex.asset.DoubleOps.NumericOps
+import com.wavesplatform.dex.util.DoubleOps.NumericOps
 import com.wavesplatform.dex.domain.order.{AcceptedOrderType, Order}
 import com.wavesplatform.dex.model.OrderStatus
 

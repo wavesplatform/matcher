@@ -8,7 +8,6 @@ import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.it.api.dex.DexApi
-import com.wavesplatform.dex.it.api.NodeApi
 import com.wavesplatform.dex.it.api.node.{NodeApi, NodeApiExtensions}
 import com.wavesplatform.dex.it.containers.DexContainer
 import com.wavesplatform.it.{MatcherSuiteBase, api}

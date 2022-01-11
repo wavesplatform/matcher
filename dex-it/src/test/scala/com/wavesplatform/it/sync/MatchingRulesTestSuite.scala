@@ -9,6 +9,7 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.Order.PriceConstant
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.error.OrderInvalidPriceLevel
+import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.config.DexTestConfig.createAssetPair
 

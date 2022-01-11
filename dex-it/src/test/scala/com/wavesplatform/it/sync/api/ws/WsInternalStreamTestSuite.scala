@@ -3,7 +3,10 @@ package com.wavesplatform.it.sync.api.ws
 import cats.syntax.option._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
+import com.wavesplatform.dex.api.ws.connection.WsConnection
 import com.wavesplatform.dex.api.ws.entities.WsFullOrder
+import com.wavesplatform.dex.api.ws.entities.WsFullOrder.WsExecutionInfo
+import com.wavesplatform.dex.api.ws.protocol._
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.model.Denormalization
 import com.wavesplatform.dex.domain.order.{Order, OrderType}

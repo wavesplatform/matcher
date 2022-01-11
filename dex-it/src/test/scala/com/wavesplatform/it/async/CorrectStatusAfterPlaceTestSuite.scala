@@ -9,6 +9,7 @@ import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.Order.Id
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.transactions.mass.Transfer
 

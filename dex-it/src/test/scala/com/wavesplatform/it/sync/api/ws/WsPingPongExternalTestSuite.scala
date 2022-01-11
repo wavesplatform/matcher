@@ -3,6 +3,7 @@ package com.wavesplatform.it.sync.api.ws
 import akka.http.scaladsl.model.Uri
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.Implicits.durationToScalatestTimeout
+import com.wavesplatform.dex.api.ws.protocol.WsError
 import com.wavesplatform.dex.error.WsConnectionMaxLifetimeExceeded
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}

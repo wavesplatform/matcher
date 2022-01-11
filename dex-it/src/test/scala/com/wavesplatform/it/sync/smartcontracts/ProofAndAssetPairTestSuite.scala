@@ -12,6 +12,7 @@ import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.error.{AccountScriptDeniedOrder, AccountScriptReturnedError}
 import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import com.wavesplatform.dex.it.test.Scripts
+import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.it.MatcherSuiteBase
 
 import scala.concurrent.duration._

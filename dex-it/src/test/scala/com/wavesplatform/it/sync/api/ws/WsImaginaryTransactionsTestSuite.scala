@@ -3,6 +3,7 @@ package com.wavesplatform.it.sync.api.ws
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus
 import com.wavesplatform.dex.api.ws.entities.{WsAddressFlag, WsTxsData}
+import com.wavesplatform.dex.api.ws.protocol.WsAddressChanges
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.bytes.ByteStr

@@ -58,7 +58,7 @@ lazy val `waves-ext` = project
   .settings(commonOwaspSettings)
   .dependsOn(
     `waves-grpc`,
-    `dex-common`,
+    `dex-common` % "compile->compile;test->test",
     `dex-test-common` % "test->compile"
   )
 
@@ -67,6 +67,7 @@ lazy val `waves-integration` = project.settings(commonOwaspSettings).dependsOn(`
 lazy val `waves-integration-it` = project
   .settings(commonOwaspSettings)
   .dependsOn(
+    `dex-common` % "compile->compile;test->test",
     `waves-integration`,
     `dex-it-common`
   )

@@ -6,6 +6,7 @@ import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.error.{AssetScriptDeniedOrder, FeeNotEnough}
 import com.wavesplatform.dex.it.test.Scripts
+import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.config.DexTestConfig._
 

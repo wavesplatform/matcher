@@ -10,9 +10,7 @@ import scala.util.Try
 
 package object settings {
 
-
   implicit def toConfigOps(config: Config): ConfigOps = new ConfigOps(config)
-
 
   def loadMatcherSettings(config: Config): Either[String, MatcherSettings] =
     Try(ConfigSource.fromConfig(loadConfig(config)).at("waves.dex").loadOrThrow[MatcherSettings])
@@ -30,6 +28,5 @@ package object settings {
       .withFallback(ConfigFactory.defaultReference())
       .resolve()
   }
-
 
 }

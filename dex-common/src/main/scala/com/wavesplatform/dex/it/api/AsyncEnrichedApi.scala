@@ -14,7 +14,7 @@ abstract class AsyncEnrichedApi[ErrorT: Reads](host: => InetSocketAddress)(impli
 
   type R[EntityT] = Future[EnrichedResponse[ErrorT, EntityT]]
 
-  def mk[EntityT: Reads](req: Request[Either[String, String], Any]): R[EntityT] = {
+  def mk[EntityT: Reads](req: Request[Either[String, String], Any]): R[EntityT] =
     //val traceId = generateTraceId()
     req
       //.tag("traceId", traceId)
@@ -22,25 +22,22 @@ abstract class AsyncEnrichedApi[ErrorT: Reads](host: => InetSocketAddress)(impli
       .contentType("application/json")
       .send(httpBackend)
       .map(EnrichedResponse(_, new EnrichedResponse.AsJson[ErrorT, EntityT]))
-  }
 
-  def mkHocon[EntityT](req: Request[Either[String, String], Any]): R[Config] = {
-   // val traceId = generateTraceId()
+  def mkHocon[EntityT](req: Request[Either[String, String], Any]): R[Config] =
+    // val traceId = generateTraceId()
     req
       //.tag("traceId", traceId)
-     // .header("x-trace-id", traceId)
+      // .header("x-trace-id", traceId)
       .send(httpBackend)
       .map(EnrichedResponse(_, new EnrichedResponse.AsHocon[ErrorT]))
-  }
 
-  def mkIgnore(req: Request[Either[String, String], Any]): R[Unit] = {
+  def mkIgnore(req: Request[Either[String, String], Any]): R[Unit] =
     //val traceId = generateTraceId()
     req
       //.tag("traceId", traceId)
-     // .header("x-trace-id", traceId)
+      // .header("x-trace-id", traceId)
       .send(httpBackend)
       .map(EnrichedResponse(_, new EnrichedResponse.Ignore[ErrorT]))
-  }
 
   def apiUri: String = {
     val savedHost = host
@@ -48,6 +45,6 @@ abstract class AsyncEnrichedApi[ErrorT: Reads](host: => InetSocketAddress)(impli
   }
 
   //private def generateTraceId(): String =
-    //Identifier.Factory.EightBytesIdentifier.generate().string
+  //Identifier.Factory.EightBytesIdentifier.generate().string
 
 }

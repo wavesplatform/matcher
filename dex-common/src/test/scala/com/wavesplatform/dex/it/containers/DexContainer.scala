@@ -11,7 +11,7 @@ import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.it.api.dex.{AsyncEnrichedDexApi, DexApi, DexApiSyntax}
 import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import com.wavesplatform.dex.it.cache.CachedData
-import com.wavesplatform.dex.it.docker.{MountableFileOps, PortBindingKeeper, apiKey, ignoreWaitStrategy}
+import com.wavesplatform.dex.it.docker.{apiKey, ignoreWaitStrategy, MountableFileOps, PortBindingKeeper}
 import com.wavesplatform.dex.it.fp.CanRepeat
 import com.wavesplatform.dex.it.resources.getRawContentFromResource
 import com.wavesplatform.dex.it.sttp.LoggingSttpBackend

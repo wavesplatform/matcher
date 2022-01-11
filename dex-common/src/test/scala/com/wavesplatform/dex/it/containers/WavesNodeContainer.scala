@@ -8,7 +8,7 @@ import com.wavesplatform.dex.it.api.Transformations
 import com.wavesplatform.dex.it.api.node.{AsyncEnrichedNodeApi, NodeApi}
 import com.wavesplatform.dex.it.api.responses.node.ErrorResponse
 import com.wavesplatform.dex.it.cache.CachedData
-import com.wavesplatform.dex.it.docker.{MountableFileOps, PortBindingKeeper, apiKey, ignoreWaitStrategy}
+import com.wavesplatform.dex.it.docker.{apiKey, ignoreWaitStrategy, MountableFileOps, PortBindingKeeper}
 import com.wavesplatform.dex.it.resources.getRawContentFromResource
 import com.wavesplatform.dex.it.sttp.LoggingSttpBackend
 import com.wavesplatform.dex.settings.ConfigOps.ConfigOps

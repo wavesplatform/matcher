@@ -9,7 +9,7 @@ package object entities {
 
   type HttpMatcherPublicKey = PublicKey
   type HttpRates = Map[Asset, Double]
-  type HttpOffset =  Long // as ValidatedCommandWithMeta.Offset
+  type HttpOffset = Long // as ValidatedCommandWithMeta.Offset
   type HttpSnapshotOffsets = Map[AssetPair, HttpOffset]
   type HttpBalance = Map[Asset, Long]
 

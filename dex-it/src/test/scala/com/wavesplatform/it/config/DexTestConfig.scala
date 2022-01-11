@@ -5,7 +5,7 @@ import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
-import com.wavesplatform.dex.it.waves.MkWavesEntities.{IssueResults, mkIssue, mkIssueExtended}
+import com.wavesplatform.dex.it.waves.MkWavesEntities.{mkIssue, mkIssueExtended, IssueResults}
 import com.wavesplatform.dex.model.AssetPairBuilder
 import com.wavesplatform.dex.waves.WavesFeeConstants.{issueFee, someAssetAmount}
 import com.wavesplatform.transactions.IssueTransaction

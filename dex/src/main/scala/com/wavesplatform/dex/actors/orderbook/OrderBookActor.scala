@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.actors.orderbook
 
 import akka.actor.typed.scaladsl.adapter._
-import akka.actor.{Stash, typed}
+import akka.actor.{typed, Stash}
 import akka.{actor => classic}
 import cats.data.NonEmptyList
 import cats.instances.option.catsStdInstancesForOption
@@ -11,7 +11,7 @@ import com.wavesplatform.dex.actors.OrderBookDirectoryActor.SaveSnapshot
 import com.wavesplatform.dex.actors.address.AddressActor
 import com.wavesplatform.dex.actors.events.OrderEventsCoordinatorActor
 import com.wavesplatform.dex.actors.orderbook.OrderBookActor._
-import com.wavesplatform.dex.actors.{OrderBookDirectoryActor, orderbook}
+import com.wavesplatform.dex.actors.{orderbook, OrderBookDirectoryActor}
 import com.wavesplatform.dex.api.ws.actors.WsInternalBroadcastActor
 import com.wavesplatform.dex.api.ws.converters.WsOrderUpdateConverter
 import com.wavesplatform.dex.domain.asset.AssetPair

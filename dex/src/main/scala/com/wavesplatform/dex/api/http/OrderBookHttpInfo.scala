@@ -8,7 +8,7 @@ import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.{Depth, M
 import com.wavesplatform.dex.api.http.entities.MatcherResponse.toHttpResponse
 import com.wavesplatform.dex.api.http.entities.{HttpLastTrade, HttpLevelAgg, HttpMarketStatus, HttpOrderBook, HttpOrderBookStatus, OrderBookUnavailable, SimpleErrorResponse, SimpleResponse}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
-import com.wavesplatform.dex.effect.{FutureResult, liftValueAsync}
+import com.wavesplatform.dex.effect.{liftValueAsync, FutureResult}
 import com.wavesplatform.dex.model.MatcherModel.{DecimalsFormat, Denormalized}
 import com.wavesplatform.dex.time.Time
 

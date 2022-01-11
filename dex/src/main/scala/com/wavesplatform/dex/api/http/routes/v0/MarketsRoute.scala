@@ -417,14 +417,16 @@ final class MarketsRoute(
 
   private def getOrderBookRestrictions(pair: AssetPair): FutureResult[HttpOrderBookInfo] = settings.getActualTickSize(pair).map { tickSize =>
     HttpOrderBookInfo(
-      restrictions = settings.orderRestrictions.get(pair).map(s => HttpOrderRestrictions(
-        stepAmount = s.stepAmount,
-        minAmount = s.minAmount,
-        maxAmount = s.maxAmount,
-        stepPrice = s.stepPrice,
-        minPrice = s.minPrice,
-        maxPrice = s.maxPrice
-      )),
+      restrictions = settings.orderRestrictions.get(pair).map(s =>
+        HttpOrderRestrictions(
+          stepAmount = s.stepAmount,
+          minAmount = s.minAmount,
+          maxAmount = s.maxAmount,
+          stepPrice = s.stepPrice,
+          minPrice = s.minPrice,
+          maxPrice = s.maxPrice
+        )
+      ),
       matchingRules = HttpMatchingRules(tickSize = tickSize.toDouble)
     )
   }

@@ -37,7 +37,8 @@ class HttpV1OrderBookSpec extends AnyFreeSpec with Matchers with DiffMatcherWith
       asks = asks.map(la => HttpV1LevelAggConverter.fromLevelAgg(la, wavesUsdPair))
     )
 
-  private val orderBookResult = HttpOrderBook(0, wavesUsdPair, bids.map(v => HttpLevelAgg(v.amount, v.price)), asks.map(v => HttpLevelAgg(v.amount, v.price)), Some(8 -> 2))
+  private val orderBookResult =
+    HttpOrderBook(0, wavesUsdPair, bids.map(v => HttpLevelAgg(v.amount, v.price)), asks.map(v => HttpLevelAgg(v.amount, v.price)), Some(8 -> 2))
 
   "backward JSON compatibility" - {
     "deserialization" in {

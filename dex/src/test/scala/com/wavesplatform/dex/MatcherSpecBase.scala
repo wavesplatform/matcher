@@ -24,7 +24,7 @@ import com.wavesplatform.dex.model.{BuyLimitOrder, LimitOrder, OrderValidator, S
 import com.wavesplatform.dex.queue.ValidatedCommand.{CancelOrder, DeleteOrderBook, PlaceMarketOrder, PlaceOrder}
 import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import com.wavesplatform.dex.settings.OrderFeeSettings._
-import com.wavesplatform.dex.settings.{AssetType, MatcherSettings, OrderFeeSettings, loadConfig}
+import com.wavesplatform.dex.settings.{loadConfig, AssetType, MatcherSettings, OrderFeeSettings}
 import com.wavesplatform.dex.time.SystemTime
 import com.wavesplatform.dex.util.DoubleOps
 import com.wavesplatform.dex.utils.DiffMatcherWithImplicits

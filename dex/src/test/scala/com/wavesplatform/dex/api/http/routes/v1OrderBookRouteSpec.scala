@@ -16,7 +16,7 @@ import com.wavesplatform.dex.api.http.converters.HttpV1LevelAggConverter
 import com.wavesplatform.dex.api.http.entities.{HttpOrderBook, HttpV1OrderBook}
 import com.wavesplatform.dex.api.http.entities.HttpLevelAgg
 import com.wavesplatform.dex.api.http.routes.v1.OrderBookRoute
-import com.wavesplatform.dex.api.http.{OrderBookHttpInfo, entities}
+import com.wavesplatform.dex.api.http.{entities, OrderBookHttpInfo}
 import com.wavesplatform.dex.db.WithDb
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.crypto

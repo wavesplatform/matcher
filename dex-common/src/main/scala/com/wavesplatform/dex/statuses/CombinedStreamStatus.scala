@@ -42,5 +42,5 @@ object CombinedStreamStatus {
       case x: Working => JsObject(Map("status" -> JsString("Working"), "height" -> JsNumber(x.height)))
     }
   )
-}
 
+}

@@ -14,7 +14,7 @@ import com.wavesplatform.dex.cli.ErrorOr
 import com.wavesplatform.dex.domain.account.{AddressScheme, PublicKey}
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.error.Implicits.ThrowableOps
-import com.wavesplatform.dex.settings.{MatcherSettings, loadConfig}
+import com.wavesplatform.dex.settings.{loadConfig, MatcherSettings}
 import com.wavesplatform.dex.tool.ComparisonTool._
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.utils.JsonImplicits

@@ -2,7 +2,6 @@ package com.wavesplatform.dex.api.http.entities
 
 import com.wavesplatform.dex.api.http.entities.HttpOrderFeeMode.{FeeModeDynamic, FeeModeFixed, FeeModePercent}
 import com.wavesplatform.dex.domain.asset.Asset
-import com.wavesplatform.dex.settings.AssetType
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json._
 
@@ -59,7 +58,7 @@ object HttpOrderFeeMode {
       dataType = "string",
       allowableValues = "amount, price, spending, receiving",
       example = "price"
-    ) `type`: AssetType,
+    ) `type`: HttpAssetType,
     @ApiModelProperty(
       value = "Min fee in percents",
       dataType = "number",

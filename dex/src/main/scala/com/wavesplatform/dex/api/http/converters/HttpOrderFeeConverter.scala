@@ -10,7 +10,7 @@ object HttpOrderFeeConverter {
   def fromSettings(settings: OrderFeeSettings, matcherAccountFee: Long, allRates: Map[Asset, Double]): HttpOrderFeeMode = settings match {
     case x: OrderFeeSettings.DynamicSettings => FeeModeDynamic(x.maxBaseFee + matcherAccountFee, allRates)
     case OrderFeeSettings.FixedSettings(assetId, minFee) => FeeModeFixed(assetId, minFee)
-    case OrderFeeSettings.PercentSettings(assetType, minFee) => FeeModePercent(assetType, minFee)
+    case OrderFeeSettings.PercentSettings(assetType, minFee) => FeeModePercent(HttpAssetTypeConverter.toHttp(assetType), minFee)
   }
 
 }

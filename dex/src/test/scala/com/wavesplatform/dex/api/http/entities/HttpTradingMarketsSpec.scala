@@ -86,12 +86,7 @@ class HttpTradingMarketsSpec extends AnyFreeSpec with Matchers with DiffMatcherW
       }
 
       "serialization" in {
-        val a = Json.prettyPrint(Json.toJson(tradingMarkets))
-        println(a)
-        println(tradingMarketsJson)
-        val b = implicitly[Diff[String]].apply(a, tradingMarketsJson)
-        a should matchTo(tradingMarketsJson)
-        println(b)
+        Json.prettyPrint(Json.toJson(tradingMarkets)) should matchTo(tradingMarketsJson)
       }
     }
   }

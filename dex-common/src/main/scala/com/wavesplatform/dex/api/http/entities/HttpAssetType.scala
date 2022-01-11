@@ -7,12 +7,12 @@ sealed trait HttpAssetType extends EnumEntry
 object HttpAssetType extends Enum[HttpAssetType] with PlayLowercaseJsonEnum[HttpAssetType] {
   override val values = findValues
 
-  case object HttpAmount extends HttpAssetType
+  case object Amount extends HttpAssetType
 
-  case object HttpPrice extends HttpAssetType
+  case object Price extends HttpAssetType
 
-  case object HttpSpending extends HttpAssetType
+  case object Spending extends HttpAssetType
 
-  case object HttpReceiving extends HttpAssetType
+  case object Receiving extends HttpAssetType
 
 }

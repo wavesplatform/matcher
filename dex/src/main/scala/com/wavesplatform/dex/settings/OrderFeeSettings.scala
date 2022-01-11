@@ -66,8 +66,8 @@ object OrderFeeSettings {
   }
 
   final case class CompositeSettings(
-    custom: Map[AssetPair, OrderFeeSettings],
     default: OrderFeeSettings,
+    custom: Map[AssetPair, OrderFeeSettings] = Map.empty,
     zeroFeeAccounts: Set[PublicKey] = Set.empty
   ) extends OrderFeeSettings {
 

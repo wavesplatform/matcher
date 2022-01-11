@@ -343,11 +343,13 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |    -4: {
          |      mode = "composite"
          |      composite {
-         |        DWgwcZTMhSvnyYCoWLRUXXSH1RSkzThXLJhww9gwkqdn-25FEqEjRkqK6yCkiT7Lz6SAYz7gUFCtxfCChnrVFD5AT {
-         |          mode = "percent"
-         |          percent {
-         |            asset-type = "amount"
-         |            min-fee = 0.1
+         |        custom {
+         |          DWgwcZTMhSvnyYCoWLRUXXSH1RSkzThXLJhww9gwkqdn-25FEqEjRkqK6yCkiT7Lz6SAYz7gUFCtxfCChnrVFD5AT {
+         |            mode = "percent"
+         |            percent {
+         |              asset-type = "amount"
+         |              min-fee = 0.1
+         |            }
          |          }
          |        }
          |

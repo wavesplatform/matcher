@@ -169,10 +169,9 @@ sealed trait ConfigWriters {
     ConfigValueFactory.fromMap(
       Map(
         "default" -> orderFeeWriter.to(settings.default),
+        "custom" -> genericMapWriter[AssetPair, OrderFeeSettings](assetPairToString).to(settings.custom),
         "zero-fee-accounts" -> implicitly[ConfigWriter[Set[PublicKey]]].to(settings.zeroFeeAccounts)
       ).asJava
-    ).withFallback(
-      genericMapWriter[AssetPair, OrderFeeSettings](assetPairToString).to(settings.custom)
     )
   }
 

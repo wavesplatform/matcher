@@ -78,33 +78,27 @@ object OrderFeeSettings {
 
   object CompositeSettings extends ConfigReaders {
 
-    implicit val compositeConfigReader = ConfigReader.fromCursor[CompositeSettings] { cursor =>
-      val feeSettingsReader = ConfigReader.fromCursor[OrderFeeSettings] { cursor =>
-        for {
-          objCur <- cursor.asObjectCursor
-          modeCur <- objCur.atKey("mode")
-          modeStr <- modeCur.asString
-          feeSettings <-
-            modeStr match {
-              case "dynamic" => DynamicSettings.dynamicConfigReader.from(objCur.atKeyOrUndefined("dynamic"))
-              case "percent" => PercentSettings.percentConfigReader.from(objCur.atKeyOrUndefined("percent"))
-              case "fixed" => FixedSettings.fixedConfigReader.from(objCur.atKeyOrUndefined("fixed"))
-              case m =>
-                objCur.failed(CannotConvert(objCur.objValue.toString, "OrderFeeSettings", s"unexpected mode type $m"))
-            }
-        } yield feeSettings
-      }
-
+    implicit private val feeSettingsReader: ConfigReader[OrderFeeSettings] = ConfigReader.fromCursor[OrderFeeSettings] { cursor =>
       for {
         objCur <- cursor.asObjectCursor
-        customCur = objCur.withoutKey("default").withoutKey("zero-fee-accounts")
-        customRes <- genericMapReader[AssetPair, OrderFeeSettings](assetPairKeyParser)(feeSettingsReader).from(customCur)
-        defaultCur <- objCur.atKey("default")
-        defaultRes <- ConfigReader[OrderFeeSettings](feeSettingsReader).from(defaultCur)
-        zeroFeeAccountsCur = objCur.atKeyOrUndefined("zero-fee-accounts")
-        zeroFeeAccountsRes <- ConfigReader[Option[Set[PublicKey]]].from(zeroFeeAccountsCur)
-      } yield CompositeSettings(customRes, defaultRes, zeroFeeAccountsRes.getOrElse(Set.empty))
+        modeCur <- objCur.atKey("mode")
+        modeStr <- modeCur.asString
+        feeSettings <-
+          modeStr match {
+            case "dynamic" => DynamicSettings.dynamicConfigReader.from(objCur.atKeyOrUndefined("dynamic"))
+            case "percent" => PercentSettings.percentConfigReader.from(objCur.atKeyOrUndefined("percent"))
+            case "fixed" => FixedSettings.fixedConfigReader.from(objCur.atKeyOrUndefined("fixed"))
+            case m =>
+              objCur.failed(CannotConvert(objCur.objValue.toString, "OrderFeeSettings", s"unexpected mode type $m"))
+          }
+      } yield feeSettings
     }
+
+    implicit private val feeSettingsMapReader =
+      genericMapReader[AssetPair, OrderFeeSettings](assetPairKeyParser)(feeSettingsReader)
+
+    implicit val compositeConfigReader =
+      semiauto.deriveReader[CompositeSettings]
 
   }
 

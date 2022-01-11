@@ -15,7 +15,7 @@ import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.fp.MapImplicits.MapOps
 import com.wavesplatform.dex.it.containers.DexContainer
 import com.wavesplatform.dex.predefined.PredefinedAssets
-import com.wavesplatform.dex.it.test.matchers.DiffMatcherWithImplicits
+import com.wavesplatform.dex.utils.DiffMatcherWithImplicits
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Suite}

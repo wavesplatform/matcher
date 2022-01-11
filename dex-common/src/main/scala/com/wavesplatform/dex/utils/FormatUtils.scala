@@ -1,10 +1,10 @@
-package com.wavesplatform.dex
+package com.wavesplatform.dex.utils
 
 import com.wavesplatform.dex.tool.LocaleUtils
 
 import java.text.DecimalFormat
 
-package object settings {
+object FormatUtils {
 
   private val format = new DecimalFormat("#.################", LocaleUtils.symbols)
 

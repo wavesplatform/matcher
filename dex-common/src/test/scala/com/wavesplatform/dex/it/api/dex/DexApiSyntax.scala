@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.it.api.dex
 
+import cats.syntax.functor._
 import cats.Functor
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status._
 import com.wavesplatform.dex.api.http.entities._

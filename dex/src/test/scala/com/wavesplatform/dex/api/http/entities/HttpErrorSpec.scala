@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.api.http.entities
 
 import com.wavesplatform.dex.error.OrderDuplicate
-import com.wavesplatform.dex.it.test.matchers.DiffMatcherWithImplicits
+import com.wavesplatform.dex.utils.DiffMatcherWithImplicits
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import play.api.libs.json.Json

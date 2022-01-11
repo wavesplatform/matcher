@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.it.matchers
 
+import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import com.wavesplatform.dex.it.api.responses.dex.MatcherError.Params
 import org.scalatest.matchers.{MatchResult, Matcher}
 

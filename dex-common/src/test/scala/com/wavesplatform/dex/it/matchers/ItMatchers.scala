@@ -3,6 +3,7 @@ package com.wavesplatform.dex.it.matchers
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.model.Denormalization
 import com.wavesplatform.dex.error.BalanceNotEnough
+import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import org.scalatest.matchers.Matcher
 
 import scala.Ordered._

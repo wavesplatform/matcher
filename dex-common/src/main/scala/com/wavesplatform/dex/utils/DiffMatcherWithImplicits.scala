@@ -1,10 +1,9 @@
-package com.wavesplatform.dex.it.test.matchers
+package com.wavesplatform.dex.utils
 
 import com.softwaremill.diffx.scalatest.DiffMatcher
 import com.softwaremill.diffx.{Derived, Diff, DiffResultValue, FieldPath, Identical}
 import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.bytes.ByteStr
-import com.wavesplatform.dex.util.Diffs
 
 trait DiffMatcherWithImplicits extends DiffMatcher with Diffs {
 

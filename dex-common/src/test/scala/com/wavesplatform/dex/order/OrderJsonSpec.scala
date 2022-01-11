@@ -7,7 +7,7 @@ import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV3}
 import com.wavesplatform.dex.domain.order.OrderJson.orderFormat
 import com.wavesplatform.dex.domain.order.OrderOps._
-import com.wavesplatform.dex.util.Diffs
+import com.wavesplatform.dex.utils.Diffs
 import io.qameta.allure.scalatest.AllureScalatestContext
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AnyFreeSpecLike

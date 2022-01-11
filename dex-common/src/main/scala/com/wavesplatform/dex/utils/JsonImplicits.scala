@@ -4,7 +4,7 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.fp.MayBeEmpty
-import com.wavesplatform.dex.settings.formatValue
+import com.wavesplatform.dex.utils.FormatUtils.formatValue
 import com.wavesplatform.transactions.{ExchangeTransaction, Transaction}
 import play.api.libs.functional.syntax._
 import play.api.libs.json._

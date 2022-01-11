@@ -1,5 +1,7 @@
 package com.wavesplatform.dex.load
 
+import com.wavesplatform.dex.api.ws.protocol.WsAddressSubscribe.JwtPayload
+import com.wavesplatform.dex.auth.JwtUtils
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import play.api.libs.json.Json

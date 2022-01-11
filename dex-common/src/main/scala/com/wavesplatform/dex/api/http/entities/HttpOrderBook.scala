@@ -17,7 +17,13 @@ import com.wavesplatform.dex.tool.LocaleUtils
 import java.text.DecimalFormat
 
 @JsonSerialize(using = classOf[HttpOrderBook.Serializer])
-case class HttpOrderBook(timestamp: Long, pair: AssetPair, bids: Seq[HttpLevelAgg], asks: Seq[HttpLevelAgg], assetPairDecimals: Option[(Int, Int)] = None)
+case class HttpOrderBook(
+  timestamp: Long,
+  pair: AssetPair,
+  bids: Seq[HttpLevelAgg],
+  asks: Seq[HttpLevelAgg],
+  assetPairDecimals: Option[(Int, Int)] = None
+)
 
 object HttpOrderBook {
 

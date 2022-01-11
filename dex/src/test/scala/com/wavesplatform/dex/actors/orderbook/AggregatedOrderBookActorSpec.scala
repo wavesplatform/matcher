@@ -10,8 +10,11 @@ import akka.testkit.TestProbe
 import cats.data.NonEmptyList
 import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.{Command, InputMessage, MarketStatus, Query}
 import com.wavesplatform.dex.actors.{MatcherSpecLike, OrderBookAskAdapter, OrderBookDirectoryActor}
+import com.wavesplatform.dex.api.http.converters.HttpV0LevelAggConverter
 import com.wavesplatform.dex.api.http.entities.{HttpV0LevelAgg, HttpV0OrderBook}
+import com.wavesplatform.dex.api.ws.converters.WsOrderRestrictionsConverter
 import com.wavesplatform.dex.api.ws.entities.WsOrderBookSettings
+import com.wavesplatform.dex.api.ws.protocol.{WsMessage, WsOrderBookChanges}
 import com.wavesplatform.dex.db.TestOrderBookSnapshotDb
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -20,11 +23,11 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.gen.OrderBookGen
-import com.wavesplatform.dex.it.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatchingRule, OrderRestrictionsSettings}
 import com.wavesplatform.dex.time.{SystemTime, Time}
 import com.wavesplatform.dex.util.NoShrink
+import com.wavesplatform.dex.utils.DiffMatcherWithImplicits
 import org.scalacheck.Gen
 import org.scalatest.concurrent.Eventually
 import org.scalatest.freespec.AnyFreeSpec
@@ -375,7 +378,10 @@ class AggregatedOrderBookActorSpec
           snapshot.asks shouldBe empty
           snapshot.bids shouldBe empty
           snapshot.lastTrade shouldBe None
-          snapshot.settings should matchTo(Option(WsOrderBookSettings(maybeRestrictions, Some(tickSize))))
+          snapshot.settings should matchTo(Option(WsOrderBookSettings(
+            maybeRestrictions.map(v => WsOrderRestrictionsConverter.toWs(v)),
+            Some(tickSize)
+          )))
         }
 
         def mkAoba(maybeRestrictions: Option[OrderRestrictionsSettings], tickSize: Double): ActorRef[InputMessage] =
@@ -420,7 +426,7 @@ class AggregatedOrderBookActorSpec
   private def levelAggsFromSide(side: Side): List[HttpV0LevelAgg] =
     AggregatedOrderBookActor
       .aggregateByPrice(side)
-      .map(pa => HttpV0LevelAgg.fromLevelAgg(AggregatedOrderBookActor.toLevelAgg(pa)))
+      .map(pa => HttpV0LevelAggConverter.fromLevelAgg(AggregatedOrderBookActor.toLevelAgg(pa)))
       .toList
       .sortBy(_.price)(side.ordering)
 

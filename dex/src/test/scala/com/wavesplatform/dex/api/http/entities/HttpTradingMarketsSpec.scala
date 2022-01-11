@@ -1,10 +1,11 @@
 package com.wavesplatform.dex.api.http.entities
 
 import cats.syntax.option._
+import com.softwaremill.diffx.Diff
 import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.utils.EitherExt2
-import com.wavesplatform.dex.it.test.matchers.DiffMatcherWithImplicits
+import com.wavesplatform.dex.utils.DiffMatcherWithImplicits
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import play.api.libs.json.Json
@@ -85,7 +86,12 @@ class HttpTradingMarketsSpec extends AnyFreeSpec with Matchers with DiffMatcherW
       }
 
       "serialization" in {
-        Json.prettyPrint(Json.toJson(tradingMarkets)) should matchTo(tradingMarketsJson)
+        val a = Json.prettyPrint(Json.toJson(tradingMarkets))
+        println(a)
+        println(tradingMarketsJson)
+        val b = implicitly[Diff[String]].apply(a, tradingMarketsJson)
+        a should matchTo(tradingMarketsJson)
+        println(b)
       }
     }
   }

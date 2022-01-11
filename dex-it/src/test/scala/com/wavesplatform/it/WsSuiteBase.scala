@@ -4,7 +4,7 @@ import cats.syntax.either._
 import com.softwaremill.diffx.{Derived, Diff}
 import com.wavesplatform.dex.api.ws.entities.WsFullOrder
 import com.wavesplatform.dex.it.api.websockets.HasWebSockets
-import com.wavesplatform.dex.it.test.matchers.DiffMatcherWithImplicits
+import com.wavesplatform.dex.utils.DiffMatcherWithImplicits
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.reflect.ClassTag

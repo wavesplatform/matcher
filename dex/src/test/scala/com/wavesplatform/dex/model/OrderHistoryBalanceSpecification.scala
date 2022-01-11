@@ -13,9 +13,9 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.Order.Id
-import com.wavesplatform.dex.it.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderAddedReason, OrderCanceled}
 import com.wavesplatform.dex.time.SystemTime
+import com.wavesplatform.dex.utils.DiffMatcherWithImplicits
 import org.scalactic.source
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.concurrent.Eventually

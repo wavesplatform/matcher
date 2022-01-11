@@ -253,7 +253,7 @@ object Dependencies {
         toxiProxy % Test,
         kafka % Test,
         allureScalaTest % Test,
-        diffx % Test,
+        diffx,
         scalaCheck % Test,
         scalaTest % Test
       ) ++ testContainers ++ enumeratum ++ pureConfig.map(_ % Test)

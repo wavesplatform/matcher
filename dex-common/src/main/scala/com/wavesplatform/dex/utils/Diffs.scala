@@ -1,4 +1,4 @@
-package com.wavesplatform.dex.util
+package com.wavesplatform.dex.utils
 
 import com.google.protobuf.ByteString
 import com.softwaremill.diffx.{Derived, Diff, DiffResultValue, FieldPath, Identical}

@@ -12,11 +12,10 @@ import com.wavesplatform.dex.domain.order.OrderType.BUY
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.it.config.GenesisConfig
 import com.wavesplatform.dex.it.containers.{BaseContainersKit, HasDex, HasWavesNode}
-import com.wavesplatform.dex.it.matchers.ItMatchers
-import com.wavesplatform.dex.it.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.it.test.{InformativeTestStart, NoStackTraceCancelAfterFailure}
 import com.wavesplatform.dex.predefined.{PredefinedAccounts, PredefinedAssets}
 import com.wavesplatform.dex.util.DoubleOps
+import com.wavesplatform.dex.utils.DiffMatcherWithImplicits
 import com.wavesplatform.it.api.ApiExtensions
 import com.wavesplatform.transactions.ExchangeTransaction
 import io.qameta.allure.scalatest.AllureScalatestContext

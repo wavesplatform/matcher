@@ -10,6 +10,7 @@ import com.wavesplatform.dex.actors.address.AddressActor.BlockchainInteraction
 import com.wavesplatform.dex.actors.address.AddressActor.Command.Source
 import com.wavesplatform.dex.actors.address.AddressActor.Query.{GetCurrentState, GetReservedBalance, GetTradableBalance}
 import com.wavesplatform.dex.actors.address.AddressActor.Reply.{GetBalance, GetState}
+import com.wavesplatform.dex.api.ws.protocol.WsAddressChanges
 import com.wavesplatform.dex.db.{EmptyOrderDb, OrderDb, TestOrderDb, WaitingOrderDb}
 import com.wavesplatform.dex.domain.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
@@ -22,10 +23,10 @@ import com.wavesplatform.dex.domain.transaction.{ExchangeTransactionResult, Exch
 import com.wavesplatform.dex.error.{MatcherError, OrderDuplicate, UnexpectedError}
 import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
-import com.wavesplatform.dex.it.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderAddedReason, OrderCancelFailed, OrderExecuted}
 import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder, MarketOrder}
 import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
+import com.wavesplatform.dex.utils.DiffMatcherWithImplicits
 import org.scalatest.{BeforeAndAfterAll, EitherValues}
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should.Matchers

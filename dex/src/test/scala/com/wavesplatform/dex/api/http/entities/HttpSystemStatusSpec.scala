@@ -1,7 +1,8 @@
 package com.wavesplatform.dex.api.http.entities
 
-import com.wavesplatform.dex.it.test.matchers.DiffMatcherWithImplicits
+import com.wavesplatform.dex.api.http.converters.HttpOrderStatusConverter
 import com.wavesplatform.dex.model.OrderStatus
+import com.wavesplatform.dex.utils.DiffMatcherWithImplicits
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import play.api.libs.json.Json
@@ -17,7 +18,7 @@ class HttpOrderStatusSpec extends AnyFreeSpec with Matchers with DiffMatcherWith
       OrderStatus.Cancelled(202, 12) -> """{"status":"Cancelled","filledAmount":202,"filledFee":12}"""
     ).foreach {
       case (status, json) =>
-        val apiStatus = HttpOrderStatus.from(status)
+        val apiStatus = HttpOrderStatusConverter.from(status)
 
         status.name - {
           "deserialization" in {

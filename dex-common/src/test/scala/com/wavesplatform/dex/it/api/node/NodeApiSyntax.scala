@@ -1,5 +1,7 @@
 package com.wavesplatform.dex.it.api.node
 
+import cats.syntax.flatMap._
+import cats.syntax.functor._
 import cats.{FlatMap, Functor}
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
@@ -9,7 +11,7 @@ import com.wavesplatform.dex.it.fp.{CanRepeat, RepeatRequestOptions}
 import com.wavesplatform.transactions.Transaction
 import com.wavesplatform.transactions.common.Id
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.DurationInt
 import java.net.InetSocketAddress
 
 object NodeApiSyntax {

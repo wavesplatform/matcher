@@ -1,11 +1,12 @@
 package com.wavesplatform.dex.api.http.entities
 
 import cats.syntax.option._
+import com.wavesplatform.dex.api.http.converters.HttpV1LevelAggConverter
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.error.ErrorFormatterContext
-import com.wavesplatform.dex.it.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.model.LevelAgg
+import com.wavesplatform.dex.utils.DiffMatcherWithImplicits
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import play.api.libs.json.Json
@@ -32,11 +33,11 @@ class HttpV1OrderBookSpec extends AnyFreeSpec with Matchers with DiffMatcherWith
   private val orderBookV1 =
     HttpV1OrderBook(
       timestamp = 0,
-      bids = bids.map(la => HttpV1LevelAgg.fromLevelAgg(la, wavesUsdPair)),
-      asks = asks.map(la => HttpV1LevelAgg.fromLevelAgg(la, wavesUsdPair))
+      bids = bids.map(la => HttpV1LevelAggConverter.fromLevelAgg(la, wavesUsdPair)),
+      asks = asks.map(la => HttpV1LevelAggConverter.fromLevelAgg(la, wavesUsdPair))
     )
 
-  private val orderBookResult = HttpOrderBook(0, wavesUsdPair, bids, asks, Some(8 -> 2))
+  private val orderBookResult = HttpOrderBook(0, wavesUsdPair, bids.map(v => HttpLevelAgg(v.amount, v.price)), asks.map(v => HttpLevelAgg(v.amount, v.price)), Some(8 -> 2))
 
   "backward JSON compatibility" - {
     "deserialization" in {

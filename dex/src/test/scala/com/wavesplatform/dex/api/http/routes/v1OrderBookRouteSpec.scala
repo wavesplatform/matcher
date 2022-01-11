@@ -12,7 +12,9 @@ import com.wavesplatform.dex.actors.OrderBookAskAdapter
 import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor
 import com.wavesplatform.dex.api.RouteSpec
 import com.wavesplatform.dex.api.http.ApiMarshallers._
-import com.wavesplatform.dex.api.http.entities.{HttpOrderBook, HttpV1LevelAgg, HttpV1OrderBook}
+import com.wavesplatform.dex.api.http.converters.HttpV1LevelAggConverter
+import com.wavesplatform.dex.api.http.entities.{HttpOrderBook, HttpV1OrderBook}
+import com.wavesplatform.dex.api.http.entities.HttpLevelAgg
 import com.wavesplatform.dex.api.http.routes.v1.OrderBookRoute
 import com.wavesplatform.dex.api.http.{OrderBookHttpInfo, entities}
 import com.wavesplatform.dex.db.WithDb
@@ -65,8 +67,8 @@ class v1OrderBookRouteSpec extends RouteSpec("/api/v1") with MatcherSpecBase wit
             HttpOrderBook(
               0L,
               wavesUsdPair,
-              wavesUsdAggregatedSnapshot.bids,
-              wavesUsdAggregatedSnapshot.asks,
+              wavesUsdAggregatedSnapshot.bids.map(v => HttpLevelAgg(v.amount, v.price)),
+              wavesUsdAggregatedSnapshot.asks.map(v => HttpLevelAgg(v.amount, v.price)),
               Some(8 -> 2)
             )
 
@@ -130,8 +132,8 @@ class v1OrderBookRouteSpec extends RouteSpec("/api/v1") with MatcherSpecBase wit
         responseAs[HttpV1OrderBook] should matchTo(
           entities.HttpV1OrderBook(
             timestamp = 0L,
-            bids = wavesUsdAggregatedSnapshot.bids.toList.map(HttpV1LevelAgg.fromLevelAgg(_, wavesUsdPair)),
-            asks = wavesUsdAggregatedSnapshot.asks.toList.map(HttpV1LevelAgg.fromLevelAgg(_, wavesUsdPair))
+            bids = wavesUsdAggregatedSnapshot.bids.toList.map(HttpV1LevelAggConverter.fromLevelAgg(_, wavesUsdPair)),
+            asks = wavesUsdAggregatedSnapshot.asks.toList.map(HttpV1LevelAggConverter.fromLevelAgg(_, wavesUsdPair))
           )
         )
       }

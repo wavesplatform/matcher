@@ -9,8 +9,8 @@ import com.wavesplatform.dex.actors.address.AddressBalance.{NotCreatedTxData, No
 import com.wavesplatform.dex.collections.{NegativeMap, NonNegativeMap, NonPositiveMap, PositiveMap}
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.fp.MapImplicits.group
-import com.wavesplatform.dex.it.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.util.NoShrink
+import com.wavesplatform.dex.utils.DiffMatcherWithImplicits
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.freespec.AnyFreeSpecLike
 import org.scalatest.matchers.should.Matchers

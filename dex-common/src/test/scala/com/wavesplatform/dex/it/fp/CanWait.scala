@@ -1,8 +1,6 @@
 package com.wavesplatform.dex.it.fp
 
 import cats.Id
-import com.wavesplatform.dex.it.time.GlobalTimer
-import com.wavesplatform.dex.it.time.GlobalTimer._
 
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration

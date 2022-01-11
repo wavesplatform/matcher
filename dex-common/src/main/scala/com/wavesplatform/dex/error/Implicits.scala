@@ -14,7 +14,7 @@ import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.feature.BlockchainFeature
-import com.wavesplatform.dex.settings.formatValue
+import com.wavesplatform.dex.utils.FormatUtils.formatValue
 import play.api.libs.json.{JsObject, JsValue, Json, Writes}
 import shapeless.ops.hlist.{Mapper, ToList}
 import shapeless.{HList, Id, Poly1, ProductArgs}

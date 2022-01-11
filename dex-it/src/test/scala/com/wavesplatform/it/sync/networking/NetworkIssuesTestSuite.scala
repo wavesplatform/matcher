@@ -17,7 +17,7 @@ import eu.rekawek.toxiproxy.model.ToxicDirection
 
 import scala.collection.immutable.Queue
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.{Future, blocking}
+import scala.concurrent.{blocking, Future}
 import scala.util.Using
 
 @NetworkTests

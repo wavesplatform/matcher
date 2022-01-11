@@ -2,12 +2,11 @@ package com.wavesplatform.it.matcher.api.http.markets
 
 import sttp.model.StatusCode
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.api.http.entities.HttpOrderBookStatus
+import com.wavesplatform.dex.api.http.entities.{HttpLastTrade, HttpLevelAgg, HttpOrderBookStatus}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.error.{AssetNotFound, InvalidAsset, OrderAssetPairReversed}
 import com.wavesplatform.dex.it.api.RawHttpChecks
-import com.wavesplatform.dex.model.{LastTrade, LevelAgg}
 import com.wavesplatform.it.MatcherSuiteBase
 import org.scalatest.prop.TableDrivenPropertyChecks
 
@@ -73,9 +72,9 @@ class GetOrderBookStatusSpec extends MatcherSuiteBase with TableDrivenPropertyCh
           Some(1.waves)
         ))
 
-        status.lastTrade.get should be(LastTrade(1.9.usd, 1.waves, BUY))
-        status.bestBid.get should be(LevelAgg(10.waves, 1.1.usd))
-        status.bestAsk.get should be(LevelAgg(1.waves, 1.9.usd))
+        status.lastTrade.get should be(HttpLastTrade(1.9.usd, 1.waves, BUY))
+        status.bestBid.get should be(HttpLevelAgg(10.waves, 1.1.usd))
+        status.bestAsk.get should be(HttpLevelAgg(1.waves, 1.9.usd))
       }
 
       withClue("- trade (best sell order fully filled)") {
@@ -92,9 +91,9 @@ class GetOrderBookStatusSpec extends MatcherSuiteBase with TableDrivenPropertyCh
           Some(4.waves)
         ))
 
-        status.lastTrade.get should be(LastTrade(1.9.usd, 1.waves, BUY))
-        status.bestBid.get should be(LevelAgg(10.waves, 1.1.usd))
-        status.bestAsk.get should be(LevelAgg(4.waves, 2.usd))
+        status.lastTrade.get should be(HttpLastTrade(1.9.usd, 1.waves, BUY))
+        status.bestBid.get should be(HttpLevelAgg(10.waves, 1.1.usd))
+        status.bestAsk.get should be(HttpLevelAgg(4.waves, 2.usd))
       }
     }
 

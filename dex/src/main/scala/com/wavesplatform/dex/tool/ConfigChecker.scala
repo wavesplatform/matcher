@@ -165,6 +165,17 @@ sealed trait ConfigWriters {
   implicit val matcherSettingsConfigWriter: ConfigWriter[MatcherSettings] =
     semiauto.deriveWriter[MatcherSettings]
 
+  implicit val compositeSettingsConfigWriter: ConfigWriter[CompositeSettings] = ConfigWriter.fromFunction { settings =>
+    ConfigValueFactory.fromMap(
+      Map(
+        "default" -> orderFeeWriter.to(settings.default),
+        "zero-fee-accounts" -> implicitly[ConfigWriter[Set[PublicKey]]].to(settings.zeroFeeAccounts)
+      ).asJava
+    ).withFallback(
+      genericMapWriter[AssetPair, OrderFeeSettings](assetPairToString).to(settings.custom)
+    )
+  }
+
   private def assetToString(asset: Asset): String =
     asset match {
       case Asset.Waves => Asset.WavesName

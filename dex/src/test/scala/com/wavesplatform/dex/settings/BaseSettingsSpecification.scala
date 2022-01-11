@@ -320,18 +320,46 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |  exchange-tx-base-fee = 300000
          |  order-fee {
          |    -1: {
-         |      mode = "dynamic" # | "fixed" | "percent"
+         |      mode = "dynamic"
          |      dynamic {
          |        base-maker-fee = 300000
          |        base-taker-fee = 300000
          |      }
+         |    }
+         |    -2: {
+         |      mode = "fixed"
          |      fixed {
-         |        asset = "WAVES" # | "some issued asset (base58)"
+         |        asset = "WAVES"
          |        min-fee = 300000
          |      }
+         |    }
+         |    -3: {
+         |      mode = "percent"
          |      percent {
-         |        asset-type = "amount" # | "price" | "spending" | "receiving"
+         |        asset-type = "amount"
          |        min-fee = 0.1
+         |      }
+         |    }
+         |    -4: {
+         |      mode = "composite"
+         |      composite {
+         |        DWgwcZTMhSvnyYCoWLRUXXSH1RSkzThXLJhww9gwkqdn-25FEqEjRkqK6yCkiT7Lz6SAYz7gUFCtxfCChnrVFD5AT {
+         |          mode = "percent"
+         |          percent {
+         |            asset-type = "amount"
+         |            min-fee = 0.1
+         |          }
+         |        }
+         |
+         |        default {
+         |          mode = "dynamic"
+         |          dynamic {
+         |            base-maker-fee = 300000
+         |            base-taker-fee = 300000
+         |          }
+         |        }
+         |
+         |        zero-fee-accounts = []
          |      }
          |    }
          |  }

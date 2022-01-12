@@ -78,8 +78,8 @@ final class OrderCompositeFeeTestSuite extends OrderFeeBaseTestSuite {
       val aliceBalance2 = wavesNode1.api.wavesBalance(alice)
       val bobBalance2 = wavesNode1.api.wavesBalance(bob)
 
-      aliceBalance2 - aliceBalance1 shouldBe (5.waves - baseFee / 2)
-      bobBalance2 - bobBalance1 shouldBe -(5.waves + baseFee)
+      aliceBalance2 - aliceBalance1 shouldBe 5.waves - baseFee / 2
+      bobBalance2 - bobBalance1 shouldBe -5.waves - baseFee
     }
   }
 

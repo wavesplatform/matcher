@@ -41,6 +41,7 @@ object Dependencies {
 
     val wavesProtobufSchemas = "1.3.2"
     val wavesJ = "1.2.2"
+    val wavesTransactions = "1.0.8"
 
     val postgresql = "42.2.23"
     val quillJdbc = "3.8.0"
@@ -55,6 +56,7 @@ object Dependencies {
     val jackson = "2.10.0"
     val playJson = "2.9.2"
 
+    val googleProtobuf = "3.17.2"
     val googleGuava = "28.2-jre"
     val kafka = "2.8.0"
 
@@ -148,6 +150,8 @@ object Dependencies {
   private val sttpAsyncHttpClient = sttpClientModule("async-http-client-backend-future")
   private val allureScalaTest = "io.qameta.allure" %% "allure-scalatest" % Version.allureScalaTest
   private val jaxbApi = "javax.xml.bind" % "jaxb-api" % Version.jaxbApi
+  private val googleProtobuf = "com.google.protobuf" % "protobuf-java" % Version.googleProtobuf
+  private val wavesTransaction = "com.wavesplatform" % "waves-transactions" % Version.wavesTransactions
 
   private[this] val levelDBJNA =
     Seq(
@@ -226,6 +230,33 @@ object Dependencies {
   )
 
   object Module {
+
+    lazy val dexCommon: Seq[ModuleID] =
+      Seq(
+        sttpClient,
+        sttpPlayJson,
+        wavesTransaction,
+        sttpAsyncHttpClient,
+        jwtModule("core"),
+        jwtModule("play-json"),
+        kindProjector,
+        catsCore,
+        shapeless,
+        catsTaglessMacros,
+        betterMonadicFor,
+        scorexCrypto,
+        supertagged,
+        monixReactive,
+        swagger,
+        playJson,
+        googleProtobuf,
+        toxiProxy % Test,
+        kafka % Test,
+        allureScalaTest % Test,
+        diffx,
+        scalaCheck % Test,
+        scalaTest % Test
+      ) ++ testContainers ++ enumeratum ++ pureConfig.map(_ % Test)
 
     lazy val dex: Seq[ModuleID] = Seq(
       akkaActor,

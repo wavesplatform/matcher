@@ -9,9 +9,8 @@ import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.SELL
 import com.wavesplatform.dex.effect.Implicits.FutureCompanionOps
 import com.wavesplatform.dex.error.BalanceNotEnough
-import com.wavesplatform.dex.it.api.HasToxiProxy
 import com.wavesplatform.dex.it.api.responses.dex.MatcherError
-import com.wavesplatform.dex.it.docker.WavesNodeContainer
+import com.wavesplatform.dex.it.containers.{HasToxiProxy, WavesNodeContainer}
 import com.wavesplatform.it.WsSuiteBase
 import com.wavesplatform.it.tags.NetworkTests
 import eu.rekawek.toxiproxy.model.ToxicDirection

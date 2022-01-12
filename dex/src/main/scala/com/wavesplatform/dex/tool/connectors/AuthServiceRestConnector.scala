@@ -1,9 +1,9 @@
 package com.wavesplatform.dex.tool.connectors
 
+import com.wavesplatform.dex.auth.JwtUtils
+
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.ThreadLocalRandom
-
-import com.wavesplatform.dex.auth.JwtUtils
 import com.wavesplatform.dex.cli.ErrorOr
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.crypto

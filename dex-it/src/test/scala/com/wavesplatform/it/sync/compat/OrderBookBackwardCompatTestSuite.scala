@@ -4,7 +4,7 @@ import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.it.api.HasKafka
+import com.wavesplatform.dex.it.containers.HasKafka
 import com.wavesplatform.it.orderGen
 import com.wavesplatform.it.tags.{DexItExternalKafkaRequired, DexMultipleVersions}
 import org.scalacheck.Gen

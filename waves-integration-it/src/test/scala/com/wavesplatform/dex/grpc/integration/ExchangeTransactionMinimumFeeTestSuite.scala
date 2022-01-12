@@ -2,7 +2,7 @@ package com.wavesplatform.dex.grpc.integration
 
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
-import com.wavesplatform.dex.it.config.PredefinedAccounts.generateNewAccount
+import com.wavesplatform.dex.predefined.PredefinedAccounts.generateNewAccount
 import com.wavesplatform.dex.it.test.Scripts
 import com.wavesplatform.transactions.{IssueTransaction, Transaction}
 

@@ -26,7 +26,7 @@ import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderAddedReason, OrderCancelFailed, OrderExecuted}
 import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder, MarketOrder}
 import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
-import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
+import com.wavesplatform.dex.utils.DiffMatcherWithImplicits
 import org.scalatest.{BeforeAndAfterAll, EitherValues}
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should.Matchers

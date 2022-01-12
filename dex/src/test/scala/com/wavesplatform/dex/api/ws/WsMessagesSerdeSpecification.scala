@@ -3,6 +3,7 @@ package com.wavesplatform.dex.api.ws
 import com.softwaremill.diffx.Diff
 import com.wavesplatform.dex.MatcherSpecBase
 import com.wavesplatform.dex.api.http.PlayJsonException
+import com.wavesplatform.dex.api.ws.converters.{WsMatchTxInfoConverter, WsOrderConverter}
 import com.wavesplatform.dex.api.ws.entities._
 import com.wavesplatform.dex.api.ws.protocol.WsOrderBookChanges.WsSide
 import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsOrderBookChanges, WsRatesUpdates}
@@ -12,7 +13,6 @@ import com.wavesplatform.dex.domain.model.Denormalization
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.model.{LimitOrder, MarketOrder, OrderBook}
-import com.wavesplatform.dex.settings.OrderRestrictionsSettings
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
@@ -51,8 +51,8 @@ class WsMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDrivenProp
       case (false, false) => LimitOrder(order).partial(partialAmount, partialFee, BigInteger.valueOf(order.price))
     }
 
-    val result = WsOrder.fromDomain(ao).copy(matchInfo =
-      Seq(WsMatchTransactionInfo.normalized(
+    val result = WsOrderConverter.fromDomain(ao).copy(matchInfo =
+      Seq(WsMatchTxInfoConverter.toWs(
         ao.order.assetPair,
         ByteStr.empty,
         System.currentTimeMillis(),
@@ -114,7 +114,7 @@ class WsMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDrivenProp
         stepPrice <- getDenormalizedValueInRange(1, 10)
         minPrice <- getDenormalizedValueInRange(1, 10)
         maxPrice <- getDenormalizedValueInRange(1 * Order.PriceConstant, 10 * Order.PriceConstant)
-      } yield OrderRestrictionsSettings(stepAmount, minAmount, maxAmount, stepPrice, minPrice, maxPrice)
+      } yield WsOrderBookRestrictions(stepAmount, minAmount, maxAmount, stepPrice, minPrice, maxPrice)
 
     val tickSizeGen = getDenormalizedValueInRange(10, 50)
 

@@ -16,8 +16,6 @@ import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.clients._
 import com.wavesplatform.dex.grpc.integration.clients.blockchainupdates.{BlockchainUpdatesClient, DefaultBlockchainUpdatesClient}
-import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedStream.Status
-import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedStream.Status.Starting
 import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedWavesBlockchainClient.Settings
 import com.wavesplatform.dex.grpc.integration.clients.domain.StatusUpdate.LastBlockHeight
 import com.wavesplatform.dex.grpc.integration.clients.domain._
@@ -29,6 +27,7 @@ import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions._
 import com.wavesplatform.dex.grpc.integration.services.UtxTransaction
 import com.wavesplatform.dex.grpc.integration.settings.WavesBlockchainClientSettings
 import com.wavesplatform.dex.grpc.integration.tool.RestartableManagedChannel
+import com.wavesplatform.dex.statuses.CombinedStreamStatus
 import com.wavesplatform.protobuf.transaction.SignedTransaction
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.nio.NioSocketChannel
@@ -54,9 +53,9 @@ class CombinedWavesBlockchainClient(
   type Balances = Map[Address, Map[Asset, Long]]
   type Leases = Map[Address, Long]
 
-  @volatile private var blockchainStatus: Status = Starting()
+  @volatile private var blockchainStatus: CombinedStreamStatus = CombinedStreamStatus.Starting()
 
-  override def status(): Status = blockchainStatus
+  override def status(): CombinedStreamStatus = blockchainStatus
 
   private val pbMatcherPublicKey = matcherPublicKey.toPB
 

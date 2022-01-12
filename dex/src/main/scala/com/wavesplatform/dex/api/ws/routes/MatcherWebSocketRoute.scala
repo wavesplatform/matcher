@@ -21,7 +21,6 @@ import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
 import com.wavesplatform.dex.api.ws.actors.{WsExternalClientDirectoryActor, WsExternalClientHandlerActor, WsInternalBroadcastActor, WsInternalClientHandlerActor}
 import com.wavesplatform.dex.api.ws.protocol._
 import com.wavesplatform.dex.api.ws.routes.MatcherWebSocketRoute.CloseHandler
-import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.error
@@ -29,6 +28,7 @@ import com.wavesplatform.dex.error.{InvalidJson, MatcherIsStopping}
 import com.wavesplatform.dex.exceptions.BinaryMessagesNotSupportedException
 import com.wavesplatform.dex.model.AssetPairBuilder
 import com.wavesplatform.dex.settings.MatcherSettings
+import com.wavesplatform.dex.statuses.MatcherStatus
 import com.wavesplatform.dex.time.Time
 import io.swagger.annotations._
 

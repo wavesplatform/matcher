@@ -16,7 +16,8 @@ import com.wavesplatform.dex.actors.address.AddressActor.Settings.default
 import com.wavesplatform.dex.actors.address.AddressActor._
 import com.wavesplatform.dex.actors.address.BalancesFormatter.format
 import com.wavesplatform.dex.api.http.entities.MatcherResponse
-import com.wavesplatform.dex.api.ws.entities.{WsAddressFlag, WsAssetInfo, WsBalances, WsOrder}
+import com.wavesplatform.dex.api.ws.converters.WsOrderConverter
+import com.wavesplatform.dex.api.ws.entities.{WsAddressFlag, WsAssetInfo, WsBalances}
 import com.wavesplatform.dex.api.ws.protocol.WsAddressChanges
 import com.wavesplatform.dex.api.ws.state.WsAddressState
 import com.wavesplatform.dex.collections.{NegativeMap, PositiveMap}
@@ -528,7 +529,7 @@ class AddressActor(
       wsAddressState = wsAddressState.addSubscription(
         client,
         mkWsBalances(balances.allAssets, includeEmpty = false),
-        activeOrders.values.map(WsOrder.fromDomain(_)).to(Seq),
+        activeOrders.values.map(WsOrderConverter.fromDomain(_)).to(Seq),
         balances.notObservedTxs.view.mapValues(_.orderIds).toMap,
         balances.notCreatedTxs.view.mapValues(_.orderIds).toMap,
         flags,
@@ -707,7 +708,7 @@ class AddressActor(
     maybeMatchTx: Option[ExchangeTransaction]
   ): Unit = scheduleWs {
     status match {
-      case OrderStatus.Accepted => wsAddressState.putOrderUpdate(remaining.id, WsOrder.fromDomain(remaining, status))
+      case OrderStatus.Accepted => wsAddressState.putOrderUpdate(remaining.id, WsOrderConverter.fromDomain(remaining, status))
       case _: OrderStatus.Cancelled => wsAddressState.putOrderStatusNameUpdate(remaining.order, status)
       case _ =>
         // unmatchable can be only if OrderStatus.Filled
@@ -721,7 +722,7 @@ class AddressActor(
   ): Unit = scheduleWs {
     orders.foldLeft(wsAddressState) { case (addressState, aoWtx) =>
       aoWtx.order.status match {
-        case OrderStatus.Accepted => addressState.putOrderUpdate(aoWtx.order.id, WsOrder.fromDomain(aoWtx.order, aoWtx.order.status))
+        case OrderStatus.Accepted => addressState.putOrderUpdate(aoWtx.order.id, WsOrderConverter.fromDomain(aoWtx.order, aoWtx.order.status))
         case _: OrderStatus.Cancelled => addressState.putOrderStatusNameUpdate(aoWtx.order.order, aoWtx.order.status)
         case _ => addressState.putOrderFillingInfoAndStatusNameUpdate(aoWtx.order, aoWtx.order.status, aoWtx.tx.transaction.some)
       }

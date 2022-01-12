@@ -1,7 +1,6 @@
 package com.wavesplatform.dex.load.ws
 
 import java.util.concurrent.ThreadLocalRandom
-
 import akka.Done
 import akka.actor.{ActorRef, ActorSystem, Status}
 import akka.http.scaladsl.Http

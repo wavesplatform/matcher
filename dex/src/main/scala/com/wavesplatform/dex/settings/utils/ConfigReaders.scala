@@ -20,6 +20,7 @@ trait ConfigReaders {
   implicit val publicKeyReader = byteStr58ConfigReader.map(PublicKey(_))
 
   implicit val uriReader = ConfigReader.fromString(x => Uri.parse(x).left.map(e => CannotConvert(x, "Uri", e)))
+
 }
 
 object ConfigReaders extends ConfigReaders

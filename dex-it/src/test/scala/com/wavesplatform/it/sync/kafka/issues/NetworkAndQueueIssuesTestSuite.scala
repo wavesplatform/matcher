@@ -3,14 +3,16 @@ package com.wavesplatform.it.sync.kafka.issues
 import cats.implicits.catsSyntaxOptionId
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
+import com.wavesplatform.dex.api.ws.converters.WsOrderConverter
 import com.wavesplatform.dex.api.ws.entities.{WsBalances, WsOrder}
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.model.Denormalization._
+import com.wavesplatform.dex.domain.order.OrderStatusNames
 import com.wavesplatform.dex.domain.order.OrderType.SELL
-import com.wavesplatform.dex.it.api.HasKafka
 import com.wavesplatform.dex.it.api.websockets.HasWebSockets
-import com.wavesplatform.dex.model.{LimitOrder, OrderStatus}
+import com.wavesplatform.dex.it.containers.HasKafka
+import com.wavesplatform.dex.model.LimitOrder
 import com.wavesplatform.it.WsSuiteBase
 
 import java.util.concurrent.ThreadLocalRandom
@@ -94,7 +96,7 @@ class NetworkAndQueueIssuesTestSuite extends WsSuiteBase with HasWebSockets with
       dex1.api.getReservedBalanceWithApiKey(alice) should matchTo(Map[Asset, Long](Waves -> 10.003.waves))
 
       assertChanges(wsac)(Map(Waves -> WsBalances(initialWavesBalance - 10.003, 10.003))) {
-        WsOrder.fromDomain(LimitOrder(sellOrder))
+        WsOrderConverter.fromDomain(LimitOrder(sellOrder))
       }
 
       disconnectKafkaFromNetwork()
@@ -126,7 +128,7 @@ class NetworkAndQueueIssuesTestSuite extends WsSuiteBase with HasWebSockets with
       dex1.api.getReservedBalanceWithApiKey(alice) shouldBe empty
 
       assertChanges(wsac, squash = false)(Map(Waves -> WsBalances(initialWavesBalance, 0))) {
-        WsOrder.fromOrder(sellOrder, status = OrderStatus.Cancelled.name.some)
+        WsOrder.fromOrder(sellOrder, status = OrderStatusNames.CANCELLED.some)
       }
 
       dex1.tryApi.place(bigSellOrder) shouldBe Symbol("right")
@@ -136,7 +138,7 @@ class NetworkAndQueueIssuesTestSuite extends WsSuiteBase with HasWebSockets with
       dex1.api.getReservedBalanceWithApiKey(alice) should matchTo(Map[Asset, Long](Waves -> 30.003.waves))
 
       assertChanges(wsac, squash = false)(Map(Waves -> WsBalances(initialWavesBalance - 30.003, 30.003))) {
-        WsOrder.fromDomain(LimitOrder(bigSellOrder))
+        WsOrderConverter.fromDomain(LimitOrder(bigSellOrder))
       }
 
       dex1.api.cancelAllOrdersWithSig(alice)

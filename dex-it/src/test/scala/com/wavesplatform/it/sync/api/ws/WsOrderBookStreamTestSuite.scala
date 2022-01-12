@@ -6,9 +6,8 @@ import com.wavesplatform.dex.Implicits.releasable
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.api.ws.connection.WsConnection
-import com.wavesplatform.dex.api.ws.entities.{WsLastTrade, WsOrderBookSettings}
-import com.wavesplatform.dex.api.ws.protocol
-import com.wavesplatform.dex.api.ws.protocol.{WsError, WsOrderBookChanges, WsOrderBookSubscribe, WsUnsubscribe}
+import com.wavesplatform.dex.api.ws.entities.{WsLastTrade, WsOrderBookRestrictions, WsOrderBookSettings}
+import com.wavesplatform.dex.api.ws.protocol._
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -16,7 +15,7 @@ import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.error.{AmountAssetBlacklisted, OrderAssetPairReversed, OrderBookStopped, SubscriptionsLimitReached}
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
-import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, OrderRestrictionsSettings}
+import com.wavesplatform.dex.settings.DenormalizedMatchingRule
 import com.wavesplatform.dex.tool.Using._
 import com.wavesplatform.it.api.MatcherCommand
 import com.wavesplatform.it.{executeCommands, WsSuiteBase}
@@ -31,7 +30,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
   private val carol: KeyPair = mkKeyPair("carol")
 
   private val orderBookSettings: Option[WsOrderBookSettings] = WsOrderBookSettings(
-    OrderRestrictionsSettings(
+    WsOrderBookRestrictions(
       stepAmount = 0.00000001,
       minAmount = 0.0000001,
       maxAmount = 200000000,
@@ -106,7 +105,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
 
         buffer0 should have size 1
         buffer0.squashed.values.head should matchTo(
-          protocol.WsOrderBookChanges(
+          WsOrderBookChanges(
             assetPair = ethWavesPair,
             asks = TreeMap(199d -> 1d),
             bids = TreeMap.empty,
@@ -126,7 +125,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
 
           buffer.size should (be >= 1 and be <= 2)
           buffer.squashed.values.head should matchTo(
-            protocol.WsOrderBookChanges(
+            WsOrderBookChanges(
               assetPair = ethWavesPair,
               asks = TreeMap(200d -> 1d),
               bids = TreeMap.empty,
@@ -155,7 +154,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
       }
       buffer0 should have size 1
       buffer0.squashed.values.head should matchTo(
-        protocol.WsOrderBookChanges(
+        WsOrderBookChanges(
           assetPair = wavesBtcPair,
           asks = TreeMap.empty,
           bids = TreeMap.empty,
@@ -174,7 +173,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
       }
       buffer1 should have size 1
       buffer1.squashed.values.head should matchTo(
-        protocol.WsOrderBookChanges(
+        WsOrderBookChanges(
           assetPair = wavesBtcPair,
           asks = TreeMap.empty,
           bids = TreeMap(0.00011403d -> 1.05d),
@@ -195,7 +194,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
 
       buffer2 should have size 1
       buffer2.squashed.values.head should matchTo(
-        protocol.WsOrderBookChanges(
+        WsOrderBookChanges(
           assetPair = wavesBtcPair,
           asks = TreeMap(0.00012d -> 1d),
           bids = TreeMap(0.00011403d -> 1.05d),
@@ -216,7 +215,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
 
       buffer3.size should (be >= 1 and be <= 2)
       buffer3.squashed.values.head should matchTo(
-        protocol.WsOrderBookChanges(
+        WsOrderBookChanges(
           assetPair = wavesBtcPair,
           asks = TreeMap(0.00012d -> 0.5d),
           bids = TreeMap(0.00011403d -> 1.05d),
@@ -244,7 +243,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
 
       buffer4.size should (be >= 1 and be <= 2)
       buffer4.squashed.values.head should matchTo(
-        protocol.WsOrderBookChanges(
+        WsOrderBookChanges(
           assetPair = wavesBtcPair,
           asks = TreeMap(
             0.00012d -> 0.5d,
@@ -280,7 +279,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
           val buffer = wsc.receiveAtLeastN[WsOrderBookChanges](1)
           buffer should have size 1
           buffer.squashed.values.head should matchTo(
-            protocol.WsOrderBookChanges(
+            WsOrderBookChanges(
               assetPair = wavesBtcPair,
               asks = TreeMap.empty,
               bids = TreeMap(0.00012d -> 1d),
@@ -301,7 +300,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
           val buffer = wsc.receiveAtLeastN[WsOrderBookChanges](1)
           buffer.size should (be >= 1 and be <= 2)
           buffer.squashed.values.head should matchTo(
-            protocol.WsOrderBookChanges(
+            WsOrderBookChanges(
               assetPair = wavesBtcPair,
               asks = TreeMap(0.00012d -> 0.5d),
               bids = TreeMap(0.00012d -> 0d),
@@ -325,7 +324,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
           val buffer = wsc.receiveAtLeastN[WsOrderBookChanges](1)
           buffer.size shouldBe 1
           buffer.squashed.values.head should matchTo(
-            protocol.WsOrderBookChanges(
+            WsOrderBookChanges(
               assetPair = wavesBtcPair,
               asks = TreeMap(0.00012d -> 0d),
               bids = TreeMap.empty,

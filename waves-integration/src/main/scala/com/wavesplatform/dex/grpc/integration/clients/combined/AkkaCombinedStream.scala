@@ -4,9 +4,10 @@ import akka.actor.ActorSystem
 import akka.actor.typed.scaladsl.adapter._
 import com.wavesplatform.dex.grpc.integration.clients.blockchainupdates.BlockchainUpdatesControlledStream
 import com.wavesplatform.dex.grpc.integration.clients.combined
-import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedStream.{Settings, Status}
+import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedStream.Settings
 import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeEvent
 import com.wavesplatform.dex.grpc.integration.clients.matcherext.UtxEventsControlledStream
+import com.wavesplatform.dex.statuses.CombinedStreamStatus
 import monix.eval.Task
 import monix.execution.Scheduler
 import monix.reactive.Observable
@@ -22,8 +23,8 @@ class AkkaCombinedStream(settings: Settings, blockchainUpdates: BlockchainUpdate
 
   private val processedHeight = new AtomicInteger(0)
 
-  private val statusStream = ConcurrentSubject.publish[Status]
-  @volatile private var lastStatus: Status = Status.Starting()
+  private val statusStream = ConcurrentSubject.publish[CombinedStreamStatus]
+  @volatile private var lastStatus: CombinedStreamStatus = CombinedStreamStatus.Starting()
   statusStream.doOnNext(x => Task { lastStatus = x }).lastL.runToFuture
 
   private val outputStream = ConcurrentSubject.publish[WavesNodeEvent]
@@ -37,7 +38,7 @@ class AkkaCombinedStream(settings: Settings, blockchainUpdates: BlockchainUpdate
 
   override def restart(): Unit = ref ! CombinedStreamActor.Command.Restart
 
-  override def currentStatus: CombinedStream.Status = lastStatus
+  override def currentStatus: CombinedStreamStatus = lastStatus
 
   override def updateProcessedHeight(height: Int): Unit = ref ! CombinedStreamActor.Command.UpdateProcessedHeight(height)
 

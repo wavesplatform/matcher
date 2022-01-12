@@ -2,7 +2,7 @@ package com.wavesplatform.dex.fp
 
 import cats.instances.long.catsKernelStdGroupForLong
 import cats.syntax.group._
-import com.wavesplatform.dex.NoShrink
+import com.wavesplatform.dex.util.NoShrink
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.propspec.AnyPropSpec

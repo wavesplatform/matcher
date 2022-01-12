@@ -7,6 +7,7 @@ import cats.syntax.option._
 import com.wavesplatform.dex.MatcherSpecBase
 import com.wavesplatform.dex.actors.address.AddressActor.BlockchainInteraction
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
+import com.wavesplatform.dex.api.ws.converters.WsOrderConverter
 import com.wavesplatform.dex.api.ws.entities.{WsBalances, WsOrder}
 import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsMessage}
 import com.wavesplatform.dex.db.EmptyOrderDb
@@ -15,6 +16,7 @@ import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.crypto.Proofs
 import com.wavesplatform.dex.domain.error.ValidationError
+import com.wavesplatform.dex.domain.order.OrderStatusNames
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.state.{LeaseBalance, Portfolio}
 import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV2
@@ -203,13 +205,13 @@ class ActorsWebSocketInteractionsSpecification
           .placeOrder(lo)
           .expectWsBalancesAndOrders(
             Map(usd -> WsBalances(285, 15), Waves -> WsBalances(99.997, 0.003)),
-            Seq(WsOrder.fromDomain(lo)),
+            Seq(WsOrderConverter.fromDomain(lo)),
             1
           )
           .cancelOrder(lo, unmatchable = false)
           .expectWsBalancesAndOrders(
             Map(usd -> WsBalances(300, 0), Waves -> WsBalances(100, 0)),
-            Seq(WsOrder.fromOrder(lo.order, status = OrderStatus.Cancelled.name.some)),
+            Seq(WsOrder.fromOrder(lo.order, status = OrderStatusNames.CANCELLED.some)),
             2
           )
           .kill()
@@ -237,7 +239,7 @@ class ActorsWebSocketInteractionsSpecification
             .placeOrder(buyOrder)
             .expectWsBalancesAndOrders(
               Map(usd -> WsBalances(270, 30), Waves -> WsBalances(99.997, 0.003)),
-              Seq(WsOrder.fromDomain(buyOrder)),
+              Seq(WsOrderConverter.fromDomain(buyOrder)),
               1
             )
         }
@@ -264,7 +266,7 @@ class ActorsWebSocketInteractionsSpecification
               Seq(
                 WsOrder.fromOrder(
                   buyOrder.order,
-                  status = OrderStatus.PartiallyFilled.name.some,
+                  status = OrderStatusNames.PARTIALLY_FILLED.some,
                   filledAmount = 5.0.some,
                   filledFee = 0.0015.some,
                   avgWeighedPrice = 3.0.some,
@@ -298,7 +300,7 @@ class ActorsWebSocketInteractionsSpecification
               Seq(
                 WsOrder.fromOrder(
                   buyOrder.order,
-                  status = OrderStatus.Cancelled.name.some
+                  status = OrderStatusNames.CANCELLED.some
                 )
               ),
               5
@@ -334,7 +336,7 @@ class ActorsWebSocketInteractionsSpecification
             .placeOrder(mo)
             .expectWsBalancesAndOrders(
               Map(usd -> WsBalances(150, 150), eth -> WsBalances(2, 1)),
-              Seq(WsOrder.fromDomain(mo)),
+              Seq(WsOrderConverter.fromDomain(mo)),
               1
             )
         }
@@ -348,7 +350,7 @@ class ActorsWebSocketInteractionsSpecification
               Seq(
                 WsOrder.fromOrder(
                   mo.order,
-                  status = OrderStatus.PartiallyFilled.name.some,
+                  status = OrderStatusNames.PARTIALLY_FILLED.some,
                   filledAmount = 10.0.some,
                   filledFee = 0.2.some,
                   avgWeighedPrice = 3.0.some,
@@ -368,7 +370,7 @@ class ActorsWebSocketInteractionsSpecification
               Seq(
                 WsOrder.fromOrder(
                   mo.order,
-                  status = OrderStatus.PartiallyFilled.name.some,
+                  status = OrderStatusNames.PARTIALLY_FILLED.some,
                   filledAmount = 25.0.some,
                   filledFee = 0.5.some,
                   avgWeighedPrice = 3.0.some,
@@ -388,7 +390,7 @@ class ActorsWebSocketInteractionsSpecification
               Seq(
                 WsOrder.fromOrder(
                   mo.order,
-                  status = OrderStatus.PartiallyFilled.name.some,
+                  status = OrderStatusNames.PARTIALLY_FILLED.some,
                   filledAmount = 30.0.some,
                   filledFee = 0.6.some,
                   avgWeighedPrice = 3.0.some,
@@ -408,7 +410,7 @@ class ActorsWebSocketInteractionsSpecification
               Seq(
                 WsOrder.fromOrder(
                   mo.order,
-                  status = OrderStatus.Filled.name.some
+                  status = OrderStatusNames.FILLED.some
                 )
               ),
               5
@@ -486,7 +488,7 @@ class ActorsWebSocketInteractionsSpecification
           .subscribeAddress()
           .expectWsBalancesAndOrders(
             Map(Waves -> WsBalances(114.997, 0.003), usd -> WsBalances(297, 3), eth -> WsBalances(5, 0)),
-            Seq(WsOrder.fromDomain(lo)),
+            Seq(WsOrderConverter.fromDomain(lo)),
             0
           )
           .kill()
@@ -502,7 +504,7 @@ class ActorsWebSocketInteractionsSpecification
           .subscribeAddress()
           .expectWsBalancesAndOrders(
             Map(Waves -> WsBalances(99.997, 0.003), btc -> WsBalances(0, 1)),
-            Seq(WsOrder.fromDomain(lo)),
+            Seq(WsOrderConverter.fromDomain(lo)),
             0
           )
           .kill()
@@ -540,7 +542,7 @@ class ActorsWebSocketInteractionsSpecification
         env
           .expectWsBalancesAndOrders(
             Map(Waves -> WsBalances(100, 0)),
-            Seq(WsOrder.fromDomain(oe.submittedRemaining)),
+            Seq(WsOrderConverter.fromDomain(oe.submittedRemaining)),
             1
           )
           .kill()
@@ -580,8 +582,8 @@ class ActorsWebSocketInteractionsSpecification
           .expectWsBalancesAndOrders(
             Map(Waves -> WsBalances(100, 0), btc -> WsBalances(1, 0)),
             Seq(
-              WsOrder.fromDomain(oe.counterRemaining).copy(matchInfo = mkSeqWsMatchTxInfo(3.0, 5.0)),
-              WsOrder.fromDomain(oe.submittedRemaining).copy(matchInfo = mkSeqWsMatchTxInfo(3.0, 5.0))
+              WsOrderConverter.fromDomain(oe.counterRemaining).copy(matchInfo = mkSeqWsMatchTxInfo(3.0, 5.0)),
+              WsOrderConverter.fromDomain(oe.submittedRemaining).copy(matchInfo = mkSeqWsMatchTxInfo(3.0, 5.0))
             ),
             1
           )
@@ -609,11 +611,23 @@ class ActorsWebSocketInteractionsSpecification
             0
           )
           .placeOrder(counter1)
-          .expectWsBalancesAndOrders(Map(usd -> WsBalances(55, 15), Waves -> WsBalances(99.997, 0.003)), Seq(WsOrder.fromDomain(counter1)), 1)
+          .expectWsBalancesAndOrders(
+            Map(usd -> WsBalances(55, 15), Waves -> WsBalances(99.997, 0.003)),
+            Seq(WsOrderConverter.fromDomain(counter1)),
+            1
+          )
           .placeOrder(counter2)
-          .expectWsBalancesAndOrders(Map(usd -> WsBalances(39.5, 30.5), Waves -> WsBalances(99.994, 0.006)), Seq(WsOrder.fromDomain(counter2)), 2)
+          .expectWsBalancesAndOrders(
+            Map(usd -> WsBalances(39.5, 30.5), Waves -> WsBalances(99.994, 0.006)),
+            Seq(WsOrderConverter.fromDomain(counter2)),
+            2
+          )
           .placeOrder(counter3)
-          .expectWsBalancesAndOrders(Map(usd -> WsBalances(23.5, 46.5), Waves -> WsBalances(99.991, 0.009)), Seq(WsOrder.fromDomain(counter3)), 3)
+          .expectWsBalancesAndOrders(
+            Map(usd -> WsBalances(23.5, 46.5), Waves -> WsBalances(99.991, 0.009)),
+            Seq(WsOrderConverter.fromDomain(counter3)),
+            3
+          )
 
         mo = matchOrders(mo, counter1)._1
 
@@ -627,7 +641,7 @@ class ActorsWebSocketInteractionsSpecification
             Seq(
               WsOrder.fromOrder(
                 counter1.order,
-                status = OrderStatus.Filled.name.some,
+                status = OrderStatusNames.FILLED.some,
                 filledAmount = 5.0.some,
                 filledFee = 0.003.some,
                 avgWeighedPrice = 3.0.some,
@@ -649,7 +663,7 @@ class ActorsWebSocketInteractionsSpecification
             Seq(
               WsOrder.fromOrder(
                 counter2.order,
-                status = OrderStatus.Filled.name.some,
+                status = OrderStatusNames.FILLED.some,
                 filledAmount = 5.0.some,
                 filledFee = 0.003.some,
                 avgWeighedPrice = 3.1.some,
@@ -672,7 +686,7 @@ class ActorsWebSocketInteractionsSpecification
             Seq(
               WsOrder.fromOrder(
                 counter3.order,
-                status = OrderStatus.PartiallyFilled.name.some,
+                status = OrderStatusNames.PARTIALLY_FILLED.some,
                 filledAmount = 2.0.some,
                 filledFee = 0.0012.some,
                 avgWeighedPrice = 3.2.some,
@@ -685,7 +699,7 @@ class ActorsWebSocketInteractionsSpecification
           .cancelOrder(counter3Remaining, unmatchable = false)
           .expectWsBalancesAndOrders(
             Map(usd -> WsBalances(70, 0), Waves -> WsBalances(100, 0)),
-            Seq(WsOrder.fromOrder(counter3.order, status = OrderStatus.Cancelled.name.some)),
+            Seq(WsOrder.fromOrder(counter3.order, status = OrderStatusNames.CANCELLED.some)),
             7
           )
           .updateBalances(Map(usd -> 33.1.usd, Waves -> 111.9928.waves))
@@ -719,7 +733,7 @@ class ActorsWebSocketInteractionsSpecification
           .placeOrder(mo)
           .expectWsBalancesAndOrders(
             Map(Waves -> WsBalances(87.997, 12.003)),
-            Seq(WsOrder.fromDomain(mo)),
+            Seq(WsOrderConverter.fromDomain(mo)),
             1
           )
 
@@ -732,7 +746,7 @@ class ActorsWebSocketInteractionsSpecification
             Seq(
               WsOrder.fromOrder(
                 mo.order,
-                status = OrderStatus.PartiallyFilled.name.some,
+                status = OrderStatusNames.PARTIALLY_FILLED.some,
                 filledAmount = 5.0.some,
                 filledFee = 0.00125.some,
                 avgWeighedPrice = 3.0.some,
@@ -752,7 +766,7 @@ class ActorsWebSocketInteractionsSpecification
             Seq(
               WsOrder.fromOrder(
                 mo.order,
-                status = OrderStatus.PartiallyFilled.name.some,
+                status = OrderStatusNames.PARTIALLY_FILLED.some,
                 filledAmount = 10.0.some,
                 filledFee = 0.0025.some,
                 avgWeighedPrice = 3.05.some,
@@ -772,7 +786,7 @@ class ActorsWebSocketInteractionsSpecification
             Seq(
               WsOrder.fromOrder(
                 mo.order,
-                status = OrderStatus.Filled.name.some,
+                status = OrderStatusNames.FILLED.some,
                 filledAmount = 12.0.some,
                 filledFee = 0.003.some,
                 avgWeighedPrice = 3.07.some,
@@ -807,7 +821,7 @@ class ActorsWebSocketInteractionsSpecification
         .placeOrder(bo)
         .expectWsBalancesAndOrders(
           Map(usd -> WsBalances(0, 10), Waves -> WsBalances(9.997, 0.003)),
-          Seq(WsOrder.fromDomain(bo)),
+          Seq(WsOrderConverter.fromDomain(bo)),
           1
         )
 
@@ -819,7 +833,7 @@ class ActorsWebSocketInteractionsSpecification
           Seq(
             WsOrder.fromOrder(
               bo.order,
-              status = OrderStatus.PartiallyFilled.name.some,
+              status = OrderStatusNames.PARTIALLY_FILLED.some,
               filledAmount = 5.0.some,
               filledFee = 0.0015.some,
               avgWeighedPrice = 1.0.some,
@@ -838,7 +852,7 @@ class ActorsWebSocketInteractionsSpecification
         .cancelOrder(oe.counterRemaining, unmatchable = false)
         .expectWsBalancesAndOrders(
           Map(usd -> WsBalances(5, 0), Waves -> WsBalances(14.9985, 0)),
-          Seq(WsOrder.fromOrder(bo.order, status = OrderStatus.Cancelled.name.some)),
+          Seq(WsOrder.fromOrder(bo.order, status = OrderStatusNames.CANCELLED.some)),
           4
         )
         .kill()

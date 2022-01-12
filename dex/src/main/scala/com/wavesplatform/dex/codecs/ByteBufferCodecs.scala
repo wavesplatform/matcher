@@ -1,11 +1,11 @@
 package com.wavesplatform.dex.codecs
 
 import java.nio.ByteBuffer
-
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.bytes.ByteStr
-import com.wavesplatform.dex.model.{AcceptedOrderType, OrderStatus}
+import com.wavesplatform.dex.domain.order.AcceptedOrderType
+import com.wavesplatform.dex.model.OrderStatus
 
 object ByteBufferCodecs {
 

@@ -5,10 +5,10 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.Implicits.releasable
 import com.wavesplatform.dex.api.http.entities.HttpWebSocketConnections
 import com.wavesplatform.dex.api.ws.connection.WsConnection
-import com.wavesplatform.dex.api.ws.protocol._
+import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsAddressSubscribe, WsOrderBookChanges, WsOrderBookSubscribe, WsUnsubscribe}
 import com.wavesplatform.dex.domain.order.OrderType.SELL
 import com.wavesplatform.dex.fp.MapImplicits.MapNumericOps
-import com.wavesplatform.dex.it.docker.DexContainer
+import com.wavesplatform.dex.it.containers.DexContainer
 import com.wavesplatform.dex.tool.Using._
 import com.wavesplatform.it.WsSuiteBase
 

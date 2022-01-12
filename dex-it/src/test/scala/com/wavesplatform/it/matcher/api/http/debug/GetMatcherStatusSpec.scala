@@ -1,7 +1,6 @@
 package com.wavesplatform.it.matcher.api.http.debug
 
-import com.wavesplatform.dex.app.MatcherStatus
-import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedStream
+import com.wavesplatform.dex.statuses.{CombinedStreamStatus, MatcherStatus}
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.matcher.api.http.ApiKeyHeaderChecks
 
@@ -11,7 +10,7 @@ class GetMatcherStatusSpec extends MatcherSuiteBase with ApiKeyHeaderChecks {
     "should return matcher status" in {
       eventually {
         val httpSystemStatus = validate200Json(dex1.rawApi.getMatcherStatus)
-        httpSystemStatus.blockchain shouldBe a[CombinedStream.Status.Working]
+        httpSystemStatus.blockchain shouldBe a[CombinedStreamStatus.Working]
         httpSystemStatus.service shouldBe MatcherStatus.Working
       }
     }

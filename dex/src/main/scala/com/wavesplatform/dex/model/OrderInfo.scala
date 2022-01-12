@@ -2,12 +2,11 @@ package com.wavesplatform.dex.model
 
 import java.math.BigInteger
 import java.nio.ByteBuffer
-
 import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.dex.codecs.ByteBufferCodecs.ByteBufferExt
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
-import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.domain.order.{AcceptedOrderType, Order, OrderType}
 
 sealed trait OrderInfo[+S <: OrderStatus] {
 

@@ -1,13 +1,14 @@
 package com.wavesplatform.dex.grpc.integration
 
-import com.wavesplatform.dex.asset.DoubleOps
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.it.api.BaseContainersKit
-import com.wavesplatform.dex.it.api.node.{HasWavesNode, NodeApiExtensions}
-import com.wavesplatform.dex.it.config.{GenesisConfig, PredefinedAccounts, PredefinedAssets}
+import com.wavesplatform.dex.it.api.node.NodeApiExtensions
+import com.wavesplatform.dex.it.config.GenesisConfig
+import com.wavesplatform.dex.it.containers.{BaseContainersKit, HasWavesNode}
 import com.wavesplatform.dex.it.test.InformativeTestStart
 import com.wavesplatform.dex.it.waves.{MkWavesEntities, ToWavesJConversions}
-import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
+import com.wavesplatform.dex.predefined.{PredefinedAccounts, PredefinedAssets}
+import com.wavesplatform.dex.util.DoubleOps
+import com.wavesplatform.dex.utils.DiffMatcherWithImplicits
 import com.wavesplatform.dex.waves.WavesFeeConstants
 import io.qameta.allure.scalatest.AllureScalatestContext
 import org.scalatest.concurrent.{Eventually, ScalaFutures}

@@ -8,10 +8,11 @@ import com.wavesplatform.dex.fp.PartialFunctionOps
 import com.wavesplatform.dex.fp.PartialFunctionOps.Implicits
 import com.wavesplatform.dex.grpc.integration.clients.ControlledStream.SystemEvent
 import com.wavesplatform.dex.grpc.integration.clients.blockchainupdates.{BlockchainUpdatesControlledStream, BlockchainUpdatesConversions}
-import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedStream.{Settings, Status}
+import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedStream.Settings
 import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeEvent
 import com.wavesplatform.dex.grpc.integration.clients.matcherext.{UtxEventConversions, UtxEventsControlledStream}
 import com.wavesplatform.dex.grpc.integration.services.UtxEvent
+import com.wavesplatform.dex.statuses.CombinedStreamStatus
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import monix.execution.Scheduler
 import monix.reactive.subjects.ConcurrentSubject
@@ -45,7 +46,7 @@ object CombinedStreamActor {
     processedHeight: AtomicInteger,
     blockchainUpdates: BlockchainUpdatesControlledStream,
     utxEvents: UtxEventsControlledStream,
-    status: ConcurrentSubject[Status, Status],
+    status: ConcurrentSubject[CombinedStreamStatus, CombinedStreamStatus],
     output: ConcurrentSubject[WavesNodeEvent, WavesNodeEvent]
   )(implicit monixScheduler: Scheduler): Behavior[Command] = Behaviors.setup[Command] { context =>
     // Subscribe on events
@@ -76,13 +77,13 @@ object CombinedStreamActor {
 
     def closed: Behavior[Command] = {
       context.log.info("Status: closed")
-      status.onNext(Status.Closing(blockchainUpdates = true, utxEvents = true))
+      status.onNext(CombinedStreamStatus.Closing(blockchainUpdates = true, utxEvents = true))
       Behaviors.receiveMessage[Command](x => logAndKeepBehavior(s"Unexpected $x"))
     }
 
     def closing(utxEventsClosed: Boolean, blockchainUpdatesClosed: Boolean): Behavior[Command] = {
       context.log.info(s"Status: closing(utx=$utxEventsClosed, bu=$blockchainUpdatesClosed)")
-      status.onNext(Status.Closing(blockchainUpdates = blockchainUpdatesClosed, utxEvents = utxEventsClosed))
+      status.onNext(CombinedStreamStatus.Closing(blockchainUpdates = blockchainUpdatesClosed, utxEvents = utxEventsClosed))
       Behaviors.receiveMessage[Command] {
         case Command.ProcessUtxSystemEvent(SystemEvent.Closed) =>
           if (utxEventsClosed)
@@ -153,7 +154,7 @@ object CombinedStreamActor {
 
     def starting(utxEventsStarted: Boolean, blockchainUpdatesStarted: Boolean): Behavior[Command] = {
       context.log.info(s"Status: starting(utx=$utxEventsStarted, bu=$blockchainUpdatesStarted)")
-      status.onNext(Status.Starting(blockchainUpdates = blockchainUpdatesStarted, utxEvents = utxEventsStarted))
+      status.onNext(CombinedStreamStatus.Starting(blockchainUpdates = blockchainUpdatesStarted, utxEvents = utxEventsStarted))
       Behaviors.stashWithCtxPropagation[Command](Int.MaxValue) { stash =>
         Behaviors.receiveMessagePartial[Command] {
           mkPartial {
@@ -196,7 +197,7 @@ object CombinedStreamActor {
 
     def working: Behavior[Command] = {
       context.log.info("Status: working")
-      status.onNext(Status.Working(processedHeight.get()))
+      status.onNext(CombinedStreamStatus.Working(processedHeight.get()))
       Behaviors.receiveMessagePartial[Command] {
         mkPartial {
           case Command.ProcessUtxSystemEvent(SystemEvent.Stopped) =>
@@ -225,7 +226,7 @@ object CombinedStreamActor {
 
           case Command.UpdateProcessedHeight(x) =>
             processedHeight.set(x)
-            status.onNext(Status.Working(processedHeight.get()))
+            status.onNext(CombinedStreamStatus.Working(processedHeight.get()))
             Behaviors.same
         }.orElse(onClosedOrRestart)
       }
@@ -235,7 +236,7 @@ object CombinedStreamActor {
 
     def stopping(utxEventsStopped: Boolean, blockchainUpdatesStopped: Boolean): Behavior[Command] = {
       context.log.info(s"Status: stopping(utx=$utxEventsStopped, bu=$blockchainUpdatesStopped)")
-      status.onNext(Status.Stopping(blockchainUpdates = blockchainUpdatesStopped, utxEvents = utxEventsStopped))
+      status.onNext(CombinedStreamStatus.Stopping(blockchainUpdates = blockchainUpdatesStopped, utxEvents = utxEventsStopped))
       Behaviors.receiveMessagePartial[Command] {
         mkPartial {
           case Command.ProcessUtxSystemEvent(SystemEvent.Stopped) =>

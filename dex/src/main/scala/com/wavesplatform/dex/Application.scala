@@ -52,7 +52,8 @@ import com.wavesplatform.dex.model.{AssetPairBuilder, ExchangeTransactionCreator
 import com.wavesplatform.dex.queue.ValidatedCommandWithMeta.Offset
 import com.wavesplatform.dex.queue._
 import com.wavesplatform.dex.settings.MatcherSettings
-import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
+import com.wavesplatform.dex.settings.ConfigOps.ConfigOps
+import com.wavesplatform.dex.statuses.MatcherStatus
 import com.wavesplatform.dex.time.NTP
 import com.wavesplatform.dex.tool.{KamonTraceUtils, WaitOffsetTool}
 import kamon.Kamon
@@ -726,7 +727,7 @@ object Application {
   private def loadApplicationConfig(external: Option[File]): (Config, MatcherSettings) = {
 
     import com.wavesplatform.dex.settings.loadConfig
-    import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
+    import com.wavesplatform.dex.settings.ConfigOps.ConfigOps
 
     val config = loadConfig(external map ConfigFactory.parseFile)
     val scalaContextPath = "scala.concurrent.context"

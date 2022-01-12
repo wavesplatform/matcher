@@ -6,7 +6,7 @@ import cats.syntax.group._
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.model.Price
-import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.domain.order.{AcceptedOrderType, Order, OrderStatusNames, OrderType}
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.fp.MapImplicits.cleaningGroup
@@ -356,41 +356,29 @@ object OrderStatus {
   sealed trait Final extends OrderStatus
 
   case object Accepted extends OrderStatus {
-    val name = "Accepted"
+    val name = OrderStatusNames.ACCEPTED
 
     override def filledAmount: Long = 0
     override def filledFee: Long = 0
   }
 
   case object NotFound extends Final {
-    val name = "NotFound"
+    val name = OrderStatusNames.NOT_FOUND
 
     override def filledAmount: Long = 0
     override def filledFee: Long = 0
   }
 
   case class PartiallyFilled(filledAmount: Long, filledFee: Long) extends OrderStatus {
-    val name = PartiallyFilled.name
-  }
-
-  object PartiallyFilled {
-    val name = "PartiallyFilled"
+    val name = OrderStatusNames.PARTIALLY_FILLED
   }
 
   case class Filled(filledAmount: Long, filledFee: Long) extends Final {
-    val name = Filled.name
-  }
-
-  object Filled {
-    val name = "Filled"
+    val name = OrderStatusNames.FILLED
   }
 
   case class Cancelled(filledAmount: Long, filledFee: Long) extends Final {
-    val name = Cancelled.name
-  }
-
-  object Cancelled {
-    val name = "Cancelled"
+    val name = OrderStatusNames.CANCELLED
   }
 
   def finalCancelStatus(ao: AcceptedOrder, reason: OrderCanceledReason): Final = {

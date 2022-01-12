@@ -2,6 +2,7 @@ package com.wavesplatform.dex.api.ws.state
 
 import akka.actor.typed.ActorRef
 import cats.syntax.option._
+import com.wavesplatform.dex.api.ws.converters.WsMatchTxInfoConverter
 import com.wavesplatform.dex.api.ws.entities._
 import com.wavesplatform.dex.api.ws.protocol.WsAddressChanges
 import com.wavesplatform.dex.api.ws.state.WsAddressState.Subscription
@@ -88,7 +89,7 @@ final case class WsAddressState(
     val fd = efc.unsafeAssetDecimals(ao.feeAsset)
 
     def mkMatchTxInfo(): Option[WsMatchTransactionInfo] = maybeMatchTx.map { matchTx =>
-      WsMatchTransactionInfo.normalized(
+      WsMatchTxInfoConverter.toWs(
         ao.order.assetPair,
         txId = matchTx.id(),
         timestamp = matchTx.timestamp,

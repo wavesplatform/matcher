@@ -23,14 +23,14 @@ import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor
 import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.MarketStatus
 import com.wavesplatform.dex.api.RouteSpec
 import com.wavesplatform.dex.api.http.ApiMarshallers._
+import com.wavesplatform.dex.api.http.converters.HttpV0LevelAggConverter
 import com.wavesplatform.dex.api.http.entities._
+import com.wavesplatform.dex.api.http.entities.protocol.HttpCancelOrder
 import com.wavesplatform.dex.api.http.headers.{`X-Api-Key`, CustomContentTypes}
-import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
 import com.wavesplatform.dex.api.http.routes.v0.MarketsRoute.Settings
 import com.wavesplatform.dex.api.http.routes.v0._
 import com.wavesplatform.dex.api.http.{entities, OrderBookHttpInfo}
 import com.wavesplatform.dex.api.ws.actors.WsExternalClientDirectoryActor
-import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.db._
 import com.wavesplatform.dex.domain.account.{Address, AddressScheme, KeyPair, PublicKey}
@@ -42,19 +42,19 @@ import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.order.OrderJson._
 import com.wavesplatform.dex.domain.order.OrderOps._
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
-import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.domain.order.{AcceptedOrderType, Order, OrderType}
 import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV2
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.error.{AddressIsBlacklisted, CanNotPersistEvent, InvalidAddress, InvalidJson, OrderDuplicate, OrderNotFound, RequestInvalidSignature, UnsupportedContentType, UserPublicKeyIsNotValid}
 import com.wavesplatform.dex.gen.issuedAssetIdGen
-import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedStream
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.MatcherModel.Denormalized
 import com.wavesplatform.dex.model.{LimitOrder, OrderInfo, OrderStatus, _}
 import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import com.wavesplatform.dex.settings.OrderFeeSettings.DynamicSettings
 import com.wavesplatform.dex.settings.{MatcherSettings, OrderRestrictionsSettings}
+import com.wavesplatform.dex.statuses.{CombinedStreamStatus, MatcherStatus}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 import play.api.libs.json.{JsArray, JsString, Json, JsonFacade => _}
@@ -189,7 +189,14 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         status shouldEqual StatusCodes.OK
         responseAs[HttpOrderBookInfo] should matchTo(
           HttpOrderBookInfo(
-            restrictions = Some(HttpOrderRestrictions.fromSettings(orderRestrictions)),
+            restrictions = Some(HttpOrderRestrictions(
+              stepAmount = orderRestrictions.stepAmount,
+              minAmount = orderRestrictions.minAmount,
+              maxAmount = orderRestrictions.maxAmount,
+              stepPrice = orderRestrictions.stepPrice,
+              minPrice = orderRestrictions.minPrice,
+              maxPrice = orderRestrictions.maxPrice
+            )),
             matchingRules = HttpMatchingRules(0.1)
           )
         )
@@ -329,8 +336,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
           HttpV0OrderBook(
             timestamp = 0L,
             pair = smartWavesPair,
-            bids = smartWavesAggregatedSnapshot.bids.toList.map(HttpV0LevelAgg.fromLevelAgg),
-            asks = smartWavesAggregatedSnapshot.asks.toList.map(HttpV0LevelAgg.fromLevelAgg)
+            bids = smartWavesAggregatedSnapshot.bids.toList.map(HttpV0LevelAggConverter.fromLevelAgg),
+            asks = smartWavesAggregatedSnapshot.asks.toList.map(HttpV0LevelAggConverter.fromLevelAgg)
           )
         )
       }
@@ -342,7 +349,13 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     "returns an order book status" in test { route =>
       Get(routePath(s"/orderbook/$smartAssetId/WAVES/status")) ~> route ~> check {
         status shouldEqual StatusCodes.OK
-        responseAs[HttpOrderBookStatus] should matchTo(HttpOrderBookStatus fromMarketStatus smartWavesMarketStatus)
+        responseAs[HttpOrderBookStatus] should matchTo(HttpOrderBookStatus.fromMarketStatus(
+          HttpMarketStatus(
+            smartWavesMarketStatus.lastTrade.map(lt => HttpLastTrade(lt.price, lt.amount, lt.side)),
+            bestBid = smartWavesMarketStatus.bestBid.map(bb => HttpLevelAgg(bb.amount, bb.price)),
+            bestAsk = smartWavesMarketStatus.bestAsk.map(ba => HttpLevelAgg(ba.amount, ba.price))
+          )
+        ))
       }
     }
 
@@ -1311,8 +1324,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
             HttpOrderBook(
               0L,
               smartWavesPair,
-              smartWavesAggregatedSnapshot.bids,
-              smartWavesAggregatedSnapshot.asks,
+              smartWavesAggregatedSnapshot.bids.map(v => HttpLevelAgg(v.amount, v.price)),
+              smartWavesAggregatedSnapshot.asks.map(v => HttpLevelAgg(v.amount, v.price)),
               assetPairDecimals
             )
 
@@ -1434,7 +1447,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       ConfigFactory.load().atKey("waves.dex"),
       orderBookDirectoryActor.ref,
       addressActor.ref,
-      CombinedStream.Status.Working(10),
+      CombinedStreamStatus.Working(10),
       () => MatcherStatus.Working,
       () => 0L,
       () => Future.successful(0L),

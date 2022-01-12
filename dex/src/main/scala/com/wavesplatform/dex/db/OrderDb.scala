@@ -96,9 +96,7 @@ object OrderDb {
 
   }
 
-  val orderIdOrdering: Ordering[(Order.Id, Long)] = Ordering.by { case (id, ts) => (-ts, id) }
-
-  def orderInfoOrdering: Ordering[(ByteStr, OrderInfo[OrderStatus])] = orderIdOrdering.on {
+  def orderInfoOrdering: Ordering[(ByteStr, OrderInfo[OrderStatus])] = Order.orderIdOrdering.on {
     case (id, orderInfo) => (id, orderInfo.timestamp)
   }
 

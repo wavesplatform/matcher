@@ -1,7 +1,6 @@
 package com.wavesplatform.it.api
 
 import java.util.concurrent.ThreadLocalRandom
-
 import cats.Id
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.api.http.entities.{HttpOrderBookHistoryItem, HttpOrderStatus}
@@ -10,7 +9,7 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.it.api.dex.DexApi
 import com.wavesplatform.dex.it.api.node.{NodeApi, NodeApiExtensions}
-import com.wavesplatform.dex.it.docker.DexContainer
+import com.wavesplatform.dex.it.containers.DexContainer
 import com.wavesplatform.it.{api, MatcherSuiteBase}
 import com.wavesplatform.transactions.ExchangeTransaction
 import mouse.any._

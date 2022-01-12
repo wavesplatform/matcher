@@ -16,8 +16,7 @@ import com.wavesplatform.dex.grpc.integration.clients.domain.portfolio.Synchroni
 import com.wavesplatform.dex.grpc.integration.clients.{BroadcastResult, RunScriptResult}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.settings.{GrpcClientSettings, WavesBlockchainClientSettings}
-import com.wavesplatform.dex.it.api.HasToxiProxy
-import com.wavesplatform.dex.it.docker.WavesNodeContainer
+import com.wavesplatform.dex.it.containers.{HasToxiProxy, WavesNodeContainer}
 import com.wavesplatform.dex.it.test.{NoStackTraceCancelAfterFailure, Scripts}
 import monix.execution.Scheduler
 

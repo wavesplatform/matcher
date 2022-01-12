@@ -11,10 +11,10 @@ import com.wavesplatform.dex.api.http.directives.ProtectDirective
 import com.wavesplatform.dex.api.http.entities._
 import com.wavesplatform.dex.api.routes.PathMatchers.{AddressPM, AssetPairPM, PublicKeyPM}
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
-import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.model.AssetPairBuilder
+import com.wavesplatform.dex.statuses.MatcherStatus
 import io.swagger.annotations.{Api, _}
 
 import javax.ws.rs.Path

@@ -14,13 +14,13 @@ import com.wavesplatform.dex.api.http.headers.`X-User-Public-Key`
 import com.wavesplatform.dex.api.http.{HasStatusBarrier, _}
 import com.wavesplatform.dex.api.routes.PathMatchers.{AddressPM, AssetPairPM, OrderPM}
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
-import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.db.OrderDb
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.model.AssetPairBuilder
+import com.wavesplatform.dex.statuses.MatcherStatus
 import io.swagger.annotations._
 
 import javax.ws.rs.Path

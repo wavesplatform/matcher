@@ -4,7 +4,7 @@ import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.utils.EitherExt2
-import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
+import com.wavesplatform.dex.utils.DiffMatcherWithImplicits
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import play.api.libs.json.Json

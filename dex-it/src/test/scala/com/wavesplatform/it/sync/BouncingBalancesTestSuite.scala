@@ -3,14 +3,15 @@ package com.wavesplatform.it.sync
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.api.ws.connection.WsConnection
-import com.wavesplatform.dex.api.ws.entities.{WsBalances, WsOrder}
+import com.wavesplatform.dex.api.ws.converters.WsOrderConverter
+import com.wavesplatform.dex.api.ws.entities.WsBalances
 import com.wavesplatform.dex.api.ws.protocol.WsAddressChanges
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.SELL
 import com.wavesplatform.dex.error.ErrorFormatterContext
-import com.wavesplatform.dex.it.docker.WavesNodeContainer
+import com.wavesplatform.dex.it.containers.WavesNodeContainer
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.model.LimitOrder
 import com.wavesplatform.dex.tool.Using._
@@ -106,7 +107,7 @@ class BouncingBalancesTestSuite extends WsSuiteBase {
         assertChanges(wsc)(
           Map(Waves -> WsBalances(4949949.997, 0.003)), // Fee for order
           Map(doggyCoin -> WsBalances(0, 1000000))
-        )(WsOrder.fromDomain(LimitOrder(bobOrder)))
+        )(WsOrderConverter.fromDomain(LimitOrder(bobOrder)))
         wsc.clearMessages()
 
         dex1.api.orderStatusByAssetPairAndId(bobOrder).status shouldBe Status.Accepted

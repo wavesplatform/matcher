@@ -8,9 +8,9 @@ import com.wavesplatform.dex.WavesIntegrationSuiteBase
 import com.wavesplatform.dex.grpc.integration.clients.ControlledStream.SystemEvent
 import com.wavesplatform.dex.grpc.integration.clients.blockchainupdates.BlockchainUpdatesControlledStream
 import com.wavesplatform.dex.grpc.integration.clients.combined.AkkaCombinedStreamTestSuite._
-import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedStream.Status
 import com.wavesplatform.dex.grpc.integration.clients.matcherext.UtxEventsControlledStream
 import com.wavesplatform.dex.grpc.integration.services.UtxEvent
+import com.wavesplatform.dex.statuses.CombinedStreamStatus
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import monix.execution.{ExecutionModel, Scheduler}
 import monix.reactive.Observable
@@ -88,7 +88,7 @@ class AkkaCombinedStreamTestSuite extends WavesIntegrationSuiteBase with TestKit
         val t = mk()
         t.cs.startFrom(10)
         eventually {
-          t.cs.currentStatus shouldBe Status.Working(9)
+          t.cs.currentStatus shouldBe CombinedStreamStatus.Working(9)
         }
       }
 
@@ -96,7 +96,7 @@ class AkkaCombinedStreamTestSuite extends WavesIntegrationSuiteBase with TestKit
         val t = mkEventuallyWorking()
         t.cs.updateProcessedHeight(10)
         eventually {
-          t.cs.currentStatus shouldBe Status.Working(10)
+          t.cs.currentStatus shouldBe CombinedStreamStatus.Working(10)
         }
       }
     }
@@ -137,7 +137,7 @@ class AkkaCombinedStreamTestSuite extends WavesIntegrationSuiteBase with TestKit
           val t = mk()
           t.blockchainUpdates.systemStream.onNext(SystemEvent.BecameReady)
           logged(t.utxEvents.systemStream)(_.lastOption shouldBe empty)
-          t.cs.currentStatus shouldBe Status.Starting()
+          t.cs.currentStatus shouldBe CombinedStreamStatus.Starting()
         }
 
         "Stopped" - {
@@ -156,7 +156,7 @@ class AkkaCombinedStreamTestSuite extends WavesIntegrationSuiteBase with TestKit
               t.cs.currentProcessedHeight shouldBe -1
             }
             eventually {
-              t.cs.currentStatus should matchTo[Status](Status.Working(-1))
+              t.cs.currentStatus should matchTo[CombinedStreamStatus](CombinedStreamStatus.Working(-1))
             }
           }
         }
@@ -172,7 +172,7 @@ class AkkaCombinedStreamTestSuite extends WavesIntegrationSuiteBase with TestKit
             val t = mkEventuallyWorking()
             t.blockchainUpdates.close()
             eventually {
-              t.cs.currentStatus should matchTo[Status](Status.Closing(
+              t.cs.currentStatus should matchTo[CombinedStreamStatus](CombinedStreamStatus.Closing(
                 blockchainUpdates = true,
                 utxEvents = true
               ))
@@ -186,7 +186,7 @@ class AkkaCombinedStreamTestSuite extends WavesIntegrationSuiteBase with TestKit
           val t = mk()
           t.utxEvents.systemStream.onNext(SystemEvent.BecameReady)
           logged(t.blockchainUpdates.systemStream)(_.headOption shouldBe empty)
-          t.cs.currentStatus shouldBe Status.Starting()
+          t.cs.currentStatus shouldBe CombinedStreamStatus.Starting()
         }
 
         "Stopped" - {
@@ -216,7 +216,7 @@ class AkkaCombinedStreamTestSuite extends WavesIntegrationSuiteBase with TestKit
               t.cs.currentProcessedHeight shouldBe -1
             }
             eventually {
-              t.cs.currentStatus should matchTo[Status](Status.Working(-1))
+              t.cs.currentStatus should matchTo[CombinedStreamStatus](CombinedStreamStatus.Working(-1))
             }
           }
         }
@@ -232,7 +232,7 @@ class AkkaCombinedStreamTestSuite extends WavesIntegrationSuiteBase with TestKit
             val t = mkEventuallyWorking()
             t.utxEvents.close()
             eventually {
-              t.cs.currentStatus should matchTo[Status](Status.Closing(
+              t.cs.currentStatus should matchTo[CombinedStreamStatus](CombinedStreamStatus.Closing(
                 blockchainUpdates = true,
                 utxEvents = true
               ))
@@ -262,7 +262,7 @@ class AkkaCombinedStreamTestSuite extends WavesIntegrationSuiteBase with TestKit
   private def mkEventuallyWorking(): TestClasses = mk().tap { x =>
     x.cs.startFrom(1)
     eventually {
-      x.cs.currentStatus shouldBe Status.Working(0)
+      x.cs.currentStatus shouldBe CombinedStreamStatus.Working(0)
     }
   }
 

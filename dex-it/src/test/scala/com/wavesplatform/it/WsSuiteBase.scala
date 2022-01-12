@@ -5,9 +5,9 @@ import com.softwaremill.diffx.{Derived, Diff}
 import com.wavesplatform.dex.api.ws.connection.WsConnection
 import com.wavesplatform.dex.api.ws.connection.WsConnection.WsRawMessage
 import com.wavesplatform.dex.api.ws.entities.WsFullOrder
-import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsError, WsOrderBookChanges, WsPingOrPong, WsServerMessage}
+import com.wavesplatform.dex.api.ws.protocol._
 import com.wavesplatform.dex.it.api.websockets.HasWebSockets
-import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
+import com.wavesplatform.dex.utils.DiffMatcherWithImplicits
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.reflect.ClassTag

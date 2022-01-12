@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.settings
 
-import cats.implicits.catsSyntaxEitherId
+import cats.syntax.either._
 import com.wavesplatform.dex.settings.utils.RawFailureReason
 import enumeratum.{Enum, EnumEntry, PlayLowercaseJsonEnum}
 import pureconfig.ConfigReader

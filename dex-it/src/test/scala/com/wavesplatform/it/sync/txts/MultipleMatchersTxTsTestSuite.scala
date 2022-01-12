@@ -3,8 +3,7 @@ package com.wavesplatform.it.sync.txts
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.it.api.HasKafka
-import com.wavesplatform.dex.it.docker.DexContainer
+import com.wavesplatform.dex.it.containers.{DexContainer, HasKafka}
 import com.wavesplatform.it.MatcherSuiteBase
 
 final class MultipleMatchersTxTsTestSuite extends MatcherSuiteBase with HasKafka {

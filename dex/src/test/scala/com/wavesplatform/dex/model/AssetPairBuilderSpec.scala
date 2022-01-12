@@ -8,7 +8,7 @@ import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.settings.{loadConfig, MatcherSettings}
-import com.wavesplatform.dex.test.matchers.ProduceError.produce
+import com.wavesplatform.dex.it.test.matchers.ProduceError.produce
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AnyFreeSpec

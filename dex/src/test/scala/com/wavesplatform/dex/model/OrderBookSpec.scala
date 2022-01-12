@@ -1,11 +1,9 @@
 package com.wavesplatform.dex.model
 
 import java.nio.charset.StandardCharsets
-
 import cats.instances.long.catsKernelStdGroupForLong
 import cats.kernel.{Group, Monoid}
 import cats.syntax.group._
-import com.wavesplatform.dex.NoShrink
 import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -15,7 +13,8 @@ import com.wavesplatform.dex.fp.MapImplicits.group
 import com.wavesplatform.dex.gen.OrderBookGen
 import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model.OrderBook.OrderBookUpdates
-import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
+import com.wavesplatform.dex.util.NoShrink
+import com.wavesplatform.dex.utils.DiffMatcherWithImplicits
 import org.scalacheck.Gen
 import org.scalatest.freespec.AnyFreeSpecLike
 import org.scalatest.matchers.should.Matchers

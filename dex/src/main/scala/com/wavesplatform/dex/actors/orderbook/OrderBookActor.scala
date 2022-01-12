@@ -13,7 +13,7 @@ import com.wavesplatform.dex.actors.events.OrderEventsCoordinatorActor
 import com.wavesplatform.dex.actors.orderbook.OrderBookActor._
 import com.wavesplatform.dex.actors.{orderbook, OrderBookDirectoryActor}
 import com.wavesplatform.dex.api.ws.actors.WsInternalBroadcastActor
-import com.wavesplatform.dex.api.ws.protocol.WsOrdersUpdate
+import com.wavesplatform.dex.api.ws.converters.WsOrderUpdateConverter
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.utils.LoggerFacade
 import com.wavesplatform.dex.error
@@ -182,8 +182,8 @@ class OrderBookActor(
       logEvent(event)
       // DEX-1192 docs/places-and-cancels.md
       event match {
-        case event: Events.OrderExecuted => WsOrdersUpdate.from(event, timestamp).some
-        case event: Events.OrderCanceled => WsOrdersUpdate.from(event).some
+        case event: Events.OrderExecuted => WsOrderUpdateConverter.toWs(event, timestamp).some
+        case event: Events.OrderCanceled => WsOrderUpdateConverter.toWs(event).some
         case _ => none
       }
     }

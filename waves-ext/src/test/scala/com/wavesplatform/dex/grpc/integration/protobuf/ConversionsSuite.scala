@@ -3,7 +3,8 @@ package com.wavesplatform.dex.grpc.integration.protobuf
 import com.wavesplatform.dex.grpc.integration.protobuf.PbToWavesConversions._
 import com.wavesplatform.dex.grpc.integration.protobuf.WavesToPbConversions._
 import com.wavesplatform.dex.test.WavesEntitiesGen
-import com.wavesplatform.dex.{NoShrink, WavesExtSuiteBase}
+import com.wavesplatform.dex.WavesExtSuiteBase
+import com.wavesplatform.dex.util.NoShrink
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
 class ConversionsSuite extends WavesExtSuiteBase with ScalaCheckDrivenPropertyChecks with WavesEntitiesGen with NoShrink {

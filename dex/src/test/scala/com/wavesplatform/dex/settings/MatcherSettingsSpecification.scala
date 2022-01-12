@@ -20,9 +20,9 @@ import com.wavesplatform.dex.model.Implicits.AssetPairOps
 import com.wavesplatform.dex.queue.LocalMatcherQueue
 import com.wavesplatform.dex.settings.EventsQueueSettings.CircuitBreakerSettings
 import com.wavesplatform.dex.settings.OrderFeeSettings.PercentSettings
-import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
-import com.wavesplatform.dex.test.matchers.ProduceError.produce
+import com.wavesplatform.dex.it.test.matchers.ProduceError.produce
 import com.wavesplatform.dex.tool.ComparisonTool
+import com.wavesplatform.dex.utils.DiffMatcherWithImplicits
 import org.scalatest.matchers.should.Matchers
 import pureconfig.ConfigSource
 import sttp.client3.UriContext

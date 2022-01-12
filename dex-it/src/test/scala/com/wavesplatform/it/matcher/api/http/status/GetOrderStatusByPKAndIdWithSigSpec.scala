@@ -7,10 +7,10 @@ import com.wavesplatform.dex.api.http.entities.HttpOrderBookHistoryItem
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
+import com.wavesplatform.dex.domain.order.AcceptedOrderType
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.error.{InvalidBase58String, OrderNotFound}
 import com.wavesplatform.dex.it.api.RawHttpChecks
-import com.wavesplatform.dex.model.AcceptedOrderType
 import com.wavesplatform.it.MatcherSuiteBase
 import org.scalatest.prop.TableDrivenPropertyChecks
 

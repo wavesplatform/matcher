@@ -12,10 +12,11 @@ import com.wavesplatform.dex.actors.OrderBookAskAdapter
 import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor
 import com.wavesplatform.dex.api.RouteSpec
 import com.wavesplatform.dex.api.http.ApiMarshallers._
-import com.wavesplatform.dex.api.http.entities.{HttpOrderBook, HttpV1LevelAgg, HttpV1OrderBook}
+import com.wavesplatform.dex.api.http.converters.HttpV1LevelAggConverter
+import com.wavesplatform.dex.api.http.entities.{HttpOrderBook, HttpV1OrderBook}
+import com.wavesplatform.dex.api.http.entities.HttpLevelAgg
 import com.wavesplatform.dex.api.http.routes.v1.OrderBookRoute
 import com.wavesplatform.dex.api.http.{entities, OrderBookHttpInfo}
-import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.db.WithDb
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.crypto
@@ -24,6 +25,7 @@ import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.{AssetPairBuilder, LevelAgg, OrderBookAggregatedSnapshot}
 import com.wavesplatform.dex.settings.MatcherSettings
+import com.wavesplatform.dex.statuses.MatcherStatus
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 import pureconfig.ConfigSource
@@ -65,8 +67,8 @@ class v1OrderBookRouteSpec extends RouteSpec("/api/v1") with MatcherSpecBase wit
             HttpOrderBook(
               0L,
               wavesUsdPair,
-              wavesUsdAggregatedSnapshot.bids,
-              wavesUsdAggregatedSnapshot.asks,
+              wavesUsdAggregatedSnapshot.bids.map(v => HttpLevelAgg(v.amount, v.price)),
+              wavesUsdAggregatedSnapshot.asks.map(v => HttpLevelAgg(v.amount, v.price)),
               Some(8 -> 2)
             )
 
@@ -130,8 +132,8 @@ class v1OrderBookRouteSpec extends RouteSpec("/api/v1") with MatcherSpecBase wit
         responseAs[HttpV1OrderBook] should matchTo(
           entities.HttpV1OrderBook(
             timestamp = 0L,
-            bids = wavesUsdAggregatedSnapshot.bids.toList.map(HttpV1LevelAgg.fromLevelAgg(_, wavesUsdPair)),
-            asks = wavesUsdAggregatedSnapshot.asks.toList.map(HttpV1LevelAgg.fromLevelAgg(_, wavesUsdPair))
+            bids = wavesUsdAggregatedSnapshot.bids.toList.map(HttpV1LevelAggConverter.fromLevelAgg(_, wavesUsdPair)),
+            asks = wavesUsdAggregatedSnapshot.asks.toList.map(HttpV1LevelAggConverter.fromLevelAgg(_, wavesUsdPair))
           )
         )
       }

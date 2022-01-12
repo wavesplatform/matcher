@@ -1,0 +1,42 @@
+package com.wavesplatform.dex.it.containers
+
+import cats.{FlatMap, Functor}
+import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.it.api.node.{NodeApi, NodeApiSyntax}
+import com.wavesplatform.dex.it.config.GenesisConfig
+import com.wavesplatform.dex.it.fp.CanRepeat
+
+import scala.util.chaining._
+
+trait HasWavesNode { self: BaseContainersKit =>
+  protected val defaultNodeImage = "wavesplatform/waves-integration-it:latest"
+  private val nodeImage = Option(System.getenv("NODE_IMAGE")).getOrElse(defaultNodeImage)
+
+  implicit protected def toNodeApiSyntax[F[_]: Functor: FlatMap: CanRepeat](self: NodeApi[F]): NodeApiSyntax.Ops[F] =
+    new NodeApiSyntax.Ops[F](self)
+
+  protected def wavesNodeInitialSuiteConfig: Config = ConfigFactory.empty()
+
+  protected lazy val wavesNodeRunConfig: Config = GenesisConfig.config
+
+  protected def createWavesNode(
+    name: String,
+    runConfig: Config = wavesNodeRunConfig,
+    suiteInitialConfig: Config = wavesNodeInitialSuiteConfig,
+    image: String = nodeImage,
+    netAlias: Option[String] = Some(WavesNodeContainer.wavesNodeNetAlias)
+  ): WavesNodeContainer =
+    WavesNodeContainer(
+      name,
+      networkName,
+      network,
+      getIp(name),
+      runConfig,
+      suiteInitialConfig,
+      localLogsDir,
+      image,
+      netAlias
+    ) tap addKnownContainer
+
+  protected lazy val wavesNode1: WavesNodeContainer = createWavesNode("waves-1")
+}

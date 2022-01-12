@@ -15,7 +15,7 @@ import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor
 import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.Command
 import com.wavesplatform.dex.api.ws.HasJwt
 import com.wavesplatform.dex.api.ws.actors.WsExternalClientHandlerActor.Command.ProcessClientMessage
-import com.wavesplatform.dex.api.ws.protocol._
+import com.wavesplatform.dex.api.ws.protocol.{WsAddressSubscribe, WsError, WsInitial, WsMessage, WsOrderBookSubscribe}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair

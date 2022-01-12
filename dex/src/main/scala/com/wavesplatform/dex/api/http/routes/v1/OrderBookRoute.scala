@@ -5,10 +5,10 @@ import com.wavesplatform.dex.api.http.directives.HttpKamonDirectives.withMetrics
 import com.wavesplatform.dex.api.http.entities.HttpV1OrderBook
 import com.wavesplatform.dex.api.http.{HasStatusBarrier, OrderBookHttpInfo}
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute, PathMatchers}
-import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.model.{AssetPairBuilder, MatcherModel}
+import com.wavesplatform.dex.statuses.MatcherStatus
 import io.swagger.annotations.{Api, ApiImplicitParam, ApiImplicitParams, ApiOperation}
 
 import javax.ws.rs.Path

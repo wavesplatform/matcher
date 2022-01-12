@@ -1,7 +1,6 @@
 package com.wavesplatform.dex.grpc.integration.clients.domain
 
 import java.nio.charset.StandardCharsets
-
 import cats.Monoid
 import cats.syntax.either._
 import cats.syntax.option._
@@ -11,7 +10,8 @@ import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.test.matchers.ProduceError.produce
-import com.wavesplatform.dex.{NoShrink, WavesIntegrationSuiteBase}
+import com.wavesplatform.dex.WavesIntegrationSuiteBase
+import com.wavesplatform.dex.util.NoShrink
 import org.scalacheck.Gen
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 

@@ -10,15 +10,15 @@ import cats.syntax.either._
 import cats.syntax.option._
 import cats.{catsInstancesForId, Id}
 import com.softwaremill.diffx._
-import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsOrderBookChanges}
 import com.wavesplatform.dex.cli.ScoptImplicits
 import com.wavesplatform.dex.domain.account.AddressScheme
 import com.wavesplatform.dex.error.Implicits.ThrowableOps
 import com.wavesplatform.dex.it.time.GlobalTimer
-import com.wavesplatform.dex.it.time.GlobalTimer.TimerOpsImplicits
+import com.wavesplatform.dex.it.time.GlobalTimer._
 import com.wavesplatform.dex.load.WavesDexLoadCli.WsCheckType.{CheckLeaps, CheckUpdates}
+import com.wavesplatform.dex.api.ws.protocol._
 import com.wavesplatform.dex.load.ws.WsCollectChangesClient
-import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
+import com.wavesplatform.dex.utils.DiffMatcherWithImplicits
 import com.wavesplatform.dex.{cli, Version}
 import scopt.{OParser, RenderingMode}
 

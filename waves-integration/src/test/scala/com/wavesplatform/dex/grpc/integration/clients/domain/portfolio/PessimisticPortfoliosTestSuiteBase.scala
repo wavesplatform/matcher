@@ -7,7 +7,8 @@ import cats.kernel.Monoid
 import cats.syntax.foldable._
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
-import com.wavesplatform.dex.{NoShrink, WavesIntegrationSuiteBase}
+import com.wavesplatform.dex.WavesIntegrationSuiteBase
+import com.wavesplatform.dex.util.NoShrink
 import org.scalacheck.Gen
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 

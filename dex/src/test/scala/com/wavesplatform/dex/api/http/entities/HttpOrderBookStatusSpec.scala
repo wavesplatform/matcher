@@ -2,7 +2,7 @@ package com.wavesplatform.dex.api.http.entities
 
 import cats.syntax.option._
 import com.wavesplatform.dex.domain.order.OrderType
-import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
+import com.wavesplatform.dex.utils.DiffMatcherWithImplicits
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import play.api.libs.json.{JsBoolean, JsString, Json}

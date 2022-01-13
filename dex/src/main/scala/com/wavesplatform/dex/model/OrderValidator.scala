@@ -19,7 +19,7 @@ import com.wavesplatform.dex.domain.model.Normalization._
 import com.wavesplatform.dex.domain.order.OrderOps._
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
-import com.wavesplatform.dex.domain.utils.{EitherExt2, ScorexLogging}
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error._
@@ -245,18 +245,25 @@ object OrderValidator extends ScorexLogging {
       } toRight error.RateNotFound(asset)
     }
 
-  private[dex] def getMinValidFeeForPercentFeeSettings(order: Order, percentSettings: PercentSettings, matchPrice: Long): Long = {
-    lazy val receiveAmount = order.getReceiveAmount(order.amount, matchPrice).explicitGet()
-    lazy val spentAmount = order.getSpendAmount(order.amount, matchPrice).explicitGet()
-
-    val amount = percentSettings.assetType match {
+  private[dex] def getMinValidFeeForPercentFeeSettings(
+    order: Order,
+    percentSettings: PercentSettings,
+    matchPrice: Long,
+    assetDecimals: Int,
+    rateCache: RateCache
+  ): Result[Long] = for {
+    receiveAmount <- order.getReceiveAmount(order.amount, matchPrice).leftMap(ve => OrderCommonValidationFailed(ve.toString))
+    spentAmount <- order.getSpendAmount(order.amount, matchPrice).leftMap(ve => OrderCommonValidationFailed(ve.toString))
+    amount = percentSettings.assetType match {
       case AssetType.Amount => order.amount
       case AssetType.Price => if (order.orderType == OrderType.BUY) spentAmount else receiveAmount
       case AssetType.Receiving => receiveAmount
       case AssetType.Spending => spentAmount
     }
-
-    multiplyAmountByDouble(amount, percentSettings.minFee / 100)
+    convertedAmount <- convertFeeByAssetRate(amount, order.feeAsset, assetDecimals, rateCache)
+  } yield {
+    print(s"a = $amount, ca = $convertedAmount  |")
+    multiplyAmountByDouble(convertedAmount, percentSettings.minFee / 100)
   }
 
   /**
@@ -273,7 +280,7 @@ object OrderValidator extends ScorexLogging {
     rateCache: RateCache
   ): Result[Long] = orderFeeSettings match {
     case FixedSettings(_, fixedMinFee) => lift(fixedMinFee)
-    case ps: PercentSettings => lift(getMinValidFeeForPercentFeeSettings(order, ps, order.price))
+    case ps: PercentSettings => getMinValidFeeForPercentFeeSettings(order, ps, order.price, feeDecimals, rateCache)
     case ds: DynamicSettings => convertFeeByAssetRate(ds.maxBaseFee, order.feeAsset, feeDecimals, rateCache)
   }
 
@@ -367,40 +374,54 @@ object OrderValidator extends ScorexLogging {
     order: Order,
     deviationSettings: DeviationsSettings,
     orderFeeSettings: OrderFeeSettings,
-    marketStatus: Option[MarketStatus]
+    marketStatus: Option[MarketStatus],
+    feeDecimals: Int,
+    rateCache: RateCache
   )(implicit efc: ErrorFormatterContext): Result[Order] = {
 
-    def isFeeInDeviationBoundsForMatchedPrice(matchedPrice: Long): Boolean = orderFeeSettings match {
+    def isFeeInDeviationBoundsForMatchedPrice(matchedPrice: Long): Result[Boolean] = orderFeeSettings match {
       case PercentSettings(assetType, minFee) =>
-        order.matcherFee >=
-          getMinValidFeeForPercentFeeSettings(
-            order,
-            PercentSettings(assetType, minFee * (1 - (deviationSettings.maxFeeDeviation / 100))),
-            matchedPrice
-          )
-      case _ => true
+        getMinValidFeeForPercentFeeSettings(
+          order,
+          PercentSettings(assetType, minFee * (1 - (deviationSettings.maxFeeDeviation / 100))),
+          matchedPrice,
+          feeDecimals,
+          rateCache
+        ).map(order.matcherFee >= _)
+      case _ => lift(true)
     }
 
-    val isFeeInDeviationBounds = marketStatus forall { ms =>
-      (order.orderType, ms.bestAsk.isDefined, ms.bestBid.isDefined) match {
-        case (OrderType.BUY, true, _) =>
-          isFeeInDeviationBoundsForMatchedPrice(ms.bestAsk.get.price) // validate fee for the best (lowest) sell price
-        case (OrderType.SELL, _, true) =>
-          isFeeInDeviationBoundsForMatchedPrice(ms.bestBid.get.price) // validate fee for the best (highest) buy price
-        case _ => true
+    val isFeeInDeviationBounds = marketStatus.foldLeft(true.asRight[MatcherError]) { (acc, ms) =>
+      acc match {
+        case Left(_) => acc
+        case Right(false) => acc
+        case Right(true) =>
+          (order.orderType, ms.bestAsk.isDefined, ms.bestBid.isDefined) match {
+            case (OrderType.BUY, true, _) =>
+              isFeeInDeviationBoundsForMatchedPrice(ms.bestAsk.get.price) // validate fee for the best (lowest) sell price
+            case (OrderType.SELL, _, true) =>
+              isFeeInDeviationBoundsForMatchedPrice(ms.bestBid.get.price) // validate fee for the best (highest) buy price
+            case _ => lift(true)
+          }
       }
     }
 
-    Either.cond(isFeeInDeviationBounds, order, error.DeviantOrderMatcherFee(order, deviationSettings))
+    isFeeInDeviationBounds.flatMap(Either.cond(_, order, error.DeviantOrderMatcherFee(order, deviationSettings)))
   }
 
-  def marketAware(orderFeeSettings: OrderFeeSettings, deviationSettings: DeviationsSettings, marketStatus: Option[MarketStatus])(
+  def marketAware(
+    orderFeeSettings: OrderFeeSettings,
+    deviationSettings: DeviationsSettings,
+    marketStatus: Option[MarketStatus],
+    feeDecimals: Int,
+    rateCache: RateCache
+  )(
     order: Order
   )(implicit efc: ErrorFormatterContext): Result[Order] =
     if (deviationSettings.enable)
       for {
         _ <- validatePriceDeviation(order, deviationSettings, marketStatus)
-        _ <- validateFeeDeviation(order, deviationSettings, orderFeeSettings, marketStatus)
+        _ <- validateFeeDeviation(order, deviationSettings, orderFeeSettings, marketStatus, feeDecimals, rateCache)
       } yield order
     else lift(order)
 

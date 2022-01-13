@@ -53,19 +53,23 @@ object ValidationStages {
         )
         .tickSize
 
+      val feeDecimals = orderAssetsDecimals(o.feeAsset)
+
       for {
         _ <- matcherSettingsAware(
           matcherPublicKey,
           blacklistedAddresses,
           settings,
-          orderAssetsDecimals(o.feeAsset),
+          feeDecimals,
           rateCache,
           actualOrderFeeSettings
         )(o)
         _ <- timeAware(time)(o)
         _ <- tickSizeAware(actualTickSize)(o)
         _ <-
-          if (settings.maxPriceDeviations.enable) marketAware(actualOrderFeeSettings, settings.maxPriceDeviations, marketStatus)(o) else success
+          if (settings.maxPriceDeviations.enable)
+            marketAware(actualOrderFeeSettings, settings.maxPriceDeviations, marketStatus, feeDecimals, rateCache)(o)
+          else success
       } yield o
     }
 

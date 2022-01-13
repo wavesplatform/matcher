@@ -230,11 +230,11 @@ class OrderValidatorSpecification
           }
         }
 
-        withClue("PRICE/SPENDING asset type, min fee = 0.3%, fee should be >= 0.00016743.btc\n") {
-          val order = createOrder(wavesBtcPair, OrderType.BUY, 500.waves, price = 0.00011162, matcherFee = 0.00016743.btc, feeAsset = btc)
+        withClue("PRICE/SPENDING asset type, min fee = 0.3%, fee should be >= 0.00000002.btc\n") {
+          val order = createOrder(wavesBtcPair, OrderType.BUY, 500.waves, price = 0.00011162, matcherFee = 0.00000002.btc, feeAsset = btc)
           Seq(AssetType.Price, AssetType.Spending).foreach { assetType =>
             validateByPercentSettings(assetType)(order) shouldBe Symbol("right")
-            validateByPercentSettings(assetType)(order.updateFee(0.00016742.btc)) should produce("FeeNotEnough")
+            validateByPercentSettings(assetType)(order.updateFee(0.00000001.btc)) should produce("FeeNotEnough")
           }
         }
       }
@@ -359,6 +359,7 @@ class OrderValidatorSpecification
       }
 
       "order's price is out of deviation bounds (market aware)" in {
+        val rateCache: RateCache = RateCache(TestRateDb()).futureValue
         val deviationSettings = DeviationsSettings(enable = true, maxPriceProfit = 50, maxPriceLoss = 70, maxFeeDeviation = 50)
         val orderFeeSettings = DynamicSettings.symmetric(0.003.waves)
 
@@ -390,7 +391,8 @@ class OrderValidatorSpecification
         val highBuyOrderPrices = Array(0.00018840, 0.00018841, 0.00037678, 0.00123456, 0.01951753, 0.98745612, 1, 1.12345678, 5000.12341234,
           100000.1, 100000.1234, 100000.1234789, 12345678.12347894)
 
-        val priceValidationWithNoBounds = OrderValidator.marketAware(orderFeeSettings, deviationSettings, Some(MarketStatus(None, None, None))) _
+        val priceValidationWithNoBounds =
+          OrderValidator.marketAware(orderFeeSettings, deviationSettings, Some(MarketStatus(None, None, None)), 8, rateCache) _
 
         withClue("order price can be any if bids & asks don't exist") {
           for (order <- Array(buyOrder, sellOrder)) {
@@ -401,7 +403,7 @@ class OrderValidatorSpecification
         }
 
         val priceValidationWithLowerBound =
-          OrderValidator.marketAware(orderFeeSettings, deviationSettings, Some(MarketStatus(None, Some(bestBid), None))) _
+          OrderValidator.marketAware(orderFeeSettings, deviationSettings, Some(MarketStatus(None, Some(bestBid), None)), 8, rateCache) _
 
         withClue("order price has only lower bound if there are no asks") {
           priceValidationWithNoBounds(buyOrder) shouldBe Symbol("right")
@@ -420,7 +422,7 @@ class OrderValidatorSpecification
         }
 
         val priceValidationWithUpperBound =
-          OrderValidator.marketAware(orderFeeSettings, deviationSettings, Some(MarketStatus(None, None, Some(bestAsk)))) _
+          OrderValidator.marketAware(orderFeeSettings, deviationSettings, Some(MarketStatus(None, None, Some(bestAsk))), 8, rateCache) _
 
         withClue("order price has only upper bound if there are no bids") {
           priceValidationWithNoBounds(buyOrder) shouldBe Symbol("right")
@@ -437,7 +439,7 @@ class OrderValidatorSpecification
         }
 
         val nonEmptyMarketStatus = MarketStatus(None, Some(bestBid), Some(bestAsk))
-        val priceValidation = OrderValidator.marketAware(orderFeeSettings, deviationSettings, Some(nonEmptyMarketStatus)) _
+        val priceValidation = OrderValidator.marketAware(orderFeeSettings, deviationSettings, Some(nonEmptyMarketStatus), 8, rateCache) _
 
         priceValidation(buyOrder) shouldBe Symbol("right")
 
@@ -489,16 +491,18 @@ class OrderValidatorSpecification
 
         val nonEmptyMarketStatus = MarketStatus(None, Some(bestBid), Some(bestAsk))
 
-        val feeValidation = OrderValidator.marketAware(percentSettings, deviationSettings, Some(nonEmptyMarketStatus)) _
+        val feeValidation = OrderValidator.marketAware(percentSettings, deviationSettings, Some(nonEmptyMarketStatus), 8, rateCache) _
         val feeValidationWithoutAsks =
-          OrderValidator.marketAware(percentSettings, deviationSettings, Some(MarketStatus(None, Some(bestBid), None))) _
+          OrderValidator.marketAware(percentSettings, deviationSettings, Some(MarketStatus(None, Some(bestBid), None)), 8, rateCache) _
         val feeValidationWithoutBids =
-          OrderValidator.marketAware(percentSettings, deviationSettings, Some(MarketStatus(None, None, Some(bestAsk)))) _
-        val feeValidationWithoutBounds = OrderValidator.marketAware(percentSettings, deviationSettings, Some(MarketStatus(None, None, None))) _
+          OrderValidator.marketAware(percentSettings, deviationSettings, Some(MarketStatus(None, None, Some(bestAsk))), 8, rateCache) _
+        val feeValidationWithoutBounds =
+          OrderValidator.marketAware(percentSettings, deviationSettings, Some(MarketStatus(None, None, None)), 8, rateCache) _
 
-        // matherFee = 1% of (amount * price) = 0.000277025 => 0.00027702
-        val buyOrder = createOrder(wavesBtcPair, OrderType.BUY, 250.waves, 0.00011081, 0.00027702.btc, feeAsset = btc)
-        val sellOrder = createOrder(wavesBtcPair, OrderType.SELL, 250.waves, 0.00011081, 0.00027702.btc, feeAsset = btc)
+        // matcherFee = 1% of (amount * price) * rate = 0.000277025 => 0.00027702
+        val amount = 2238739.waves
+        val buyOrder = createOrder(wavesBtcPair, OrderType.BUY, amount, 0.00011081, 0.00027702.btc, feeAsset = btc)
+        val sellOrder = createOrder(wavesBtcPair, OrderType.SELL, amount, 0.00011081, 0.00027702.btc, feeAsset = btc)
 
         val lowBuyOrdersFees = Array(0, 0.00000001, 0.00001, 0.0001, 0.00012467, 0.00019999, 0.00023999, 0.00024899, 0.00024929, 0.00024934)
         val validBuyOrdersFees = Array(0.00024935, 0.00024936, 0.0002494, 0.00025001, 0.0003, 0.00123123, 1.1231231, 123123.1, 123123.12312312)

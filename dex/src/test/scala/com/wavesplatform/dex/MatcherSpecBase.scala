@@ -474,7 +474,7 @@ trait MatcherSpecBase
     matcherFeeAssetForDynamicSettings: Option[Asset] = None,
     rateForDynamicSettings: Option[Double] = None
   ): Order = {
-
+    rateCache.upsertRate(order.feeAsset, 1)
     val correctedOrder = (order.version, orderFeeSettings) match {
       case (3, FixedSettings(defaultAssetId, minFee)) =>
         order

@@ -1,17 +1,19 @@
 package com.wavesplatform.dex.api.http.entities
 
-import com.wavesplatform.dex.api.http.entities.HttpOrderFeeMode.{FeeModeDynamic, FeeModeFixed, FeeModePercent}
-import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.api.http.entities.HttpOrderFeeMode.{FeeModeComposite, FeeModeDynamic, FeeModeFixed, FeeModePercent}
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.settings.{AssetType, OrderFeeSettings}
+import com.wavesplatform.dex.json.assetPairMapFormat
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json._
 
 @ApiModel(
-  description = "Order Fee Mode. Can be one of: FeeModeDynamic, FeeModeFixed, FeeModePercent",
+  description = "Order Fee Mode. Can be one of: FeeModeDynamic, FeeModeFixed, FeeModePercent, FeeModeComposite",
   subTypes = Array(
     classOf[FeeModeDynamic],
     classOf[FeeModeFixed],
-    classOf[FeeModePercent]
+    classOf[FeeModePercent],
+    classOf[FeeModeComposite]
   )
 )
 sealed trait HttpOrderFeeMode extends Product with Serializable
@@ -71,16 +73,30 @@ object HttpOrderFeeMode {
     implicit val percentFormat: Format[FeeModePercent] = Json.format[FeeModePercent]
   }
 
+  @ApiModel(description = "Mode with various fee settings for different asset pairs")
+  case class FeeModeComposite(
+    @ApiModelProperty(value = "Default fee mode for all asset pairs except the custom ones")
+    default: HttpOrderFeeMode,
+    @ApiModelProperty(value = "Custom fee modes for specific asset pairs")
+    custom: Map[AssetPair, HttpOrderFeeMode]
+  ) extends HttpOrderFeeMode
+
+  object FeeModeComposite {
+    implicit val compositeFormat: Format[FeeModeComposite] = Json.format[FeeModeComposite]
+  }
+
   implicit val httpOrderFeeModeFormat: Format[HttpOrderFeeMode] = Format(
     fjs = Reads { json =>
       val r =
-        (json \ "dynamic").asOpt[FeeModeDynamic] orElse (json \ "fixed").asOpt[FeeModeFixed] orElse (json \ "percent").asOpt[FeeModePercent]
+        (json \ "dynamic").asOpt[FeeModeDynamic] orElse (json \ "fixed").asOpt[FeeModeFixed] orElse
+        (json \ "percent").asOpt[FeeModePercent] orElse (json \ "composite").asOpt[FeeModeComposite]
       r.fold[JsResult[HttpOrderFeeMode]](JsError(s"Can't parse as HttpOrderFeeMode: ${Json.stringify(json)}"))(JsSuccess(_))
     },
     tjs = Writes {
       case x: FeeModeDynamic => toJson("dynamic", x)(FeeModeDynamic.dynamicFormat)
       case x: FeeModeFixed => toJson("fixed", x)(FeeModeFixed.fixedFormat)
       case x: FeeModePercent => toJson("percent", x)(FeeModePercent.percentFormat)
+      case x: FeeModeComposite => toJson("composite", x)(FeeModeComposite.compositeFormat)
     }
   )
 
@@ -90,6 +106,11 @@ object HttpOrderFeeMode {
     case x: OrderFeeSettings.DynamicSettings => FeeModeDynamic(x.maxBaseFee + matcherAccountFee, allRates)
     case OrderFeeSettings.FixedSettings(assetId, minFee) => FeeModeFixed(assetId, minFee)
     case OrderFeeSettings.PercentSettings(assetType, minFee) => FeeModePercent(assetType, minFee)
+    case OrderFeeSettings.CompositeSettings(default, custom, _) =>
+      FeeModeComposite(
+        fromSettings(default, matcherAccountFee, allRates),
+        custom.view.mapValues(fromSettings(_, matcherAccountFee, allRates)).toMap
+      )
   }
 
 }

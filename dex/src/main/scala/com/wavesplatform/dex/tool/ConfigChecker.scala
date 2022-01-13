@@ -5,23 +5,23 @@ import cats.data.NonEmptyList
 import cats.syntax.either._
 import com.typesafe.config.ConfigFactory.parseFile
 import com.typesafe.config._
-import com.wavesplatform.dex.settings._
 import com.wavesplatform.dex.cli.ErrorOr
-import com.wavesplatform.dex.error.Implicits.ThrowableOps
 import com.wavesplatform.dex.db.AccountStorage
 import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.error.Implicits.ThrowableOps
 import com.wavesplatform.dex.settings.OrderFeeSettings._
+import com.wavesplatform.dex.settings._
 import pureconfig.ConfigWriter
-import pureconfig.generic.auto._
 import pureconfig.configurable.genericMapWriter
+import pureconfig.generic.auto._
 import pureconfig.generic.semiauto
 import pureconfig.module.cats.nonEmptyListWriter
 import sttp.model.Uri
 
-import scala.jdk.CollectionConverters._
 import java.io.File
+import scala.jdk.CollectionConverters._
 
 object ConfigChecker extends ConfigWriters {
 
@@ -102,23 +102,24 @@ sealed trait ConfigWriters {
     ConfigWriter.fromFunction {
       case a: DynamicSettings =>
         allOrderFeeSettingsWriter.to(
-          AllOrderFeeSettings(
-            "dynamic",
-            a,
-            PercentSettings.empty,
-            FixedSettings.empty
-          )
+          AllOrderFeeSettings("dynamic", Some(a), None, None, None)
         )
 
       case a: PercentSettings =>
         allOrderFeeSettingsWriter.to(
-          AllOrderFeeSettings("percent", DynamicSettings.empty, a, FixedSettings.empty)
+          AllOrderFeeSettings("percent", None, Some(a), None, None)
         )
 
       case a: FixedSettings =>
         allOrderFeeSettingsWriter.to(
-          AllOrderFeeSettings("fixed", DynamicSettings.empty, PercentSettings.empty, a)
+          AllOrderFeeSettings("fixed", None, None, Some(a), None)
         )
+
+      case a: CompositeSettings =>
+        allOrderFeeSettingsWriter.to(
+          AllOrderFeeSettings("composite", None, None, None, Some(a))
+        )
+
     }
 
   implicit val allAccStorageSettingsWriter: ConfigWriter[AllAccountStorageSettings] =
@@ -147,6 +148,9 @@ sealed trait ConfigWriters {
 
   implicit val longOrderFeeConfigWriter: ConfigWriter[Map[Long, OrderFeeSettings]] = genericMapWriter(_.toString)
 
+  implicit val assetPairOrderFeeSettingsConfigWriter: ConfigWriter[Map[AssetPair, OrderFeeSettings]] =
+    genericMapWriter(assetPairToString)
+
   implicit val assetPairOrderRestrictionsConfigWriter: ConfigWriter[Map[AssetPair, OrderRestrictionsSettings]] =
     genericMapWriter(assetPairToString)
 
@@ -160,6 +164,16 @@ sealed trait ConfigWriters {
 
   implicit val matcherSettingsConfigWriter: ConfigWriter[MatcherSettings] =
     semiauto.deriveWriter[MatcherSettings]
+
+  implicit val compositeSettingsConfigWriter: ConfigWriter[CompositeSettings] = ConfigWriter.fromFunction { settings =>
+    ConfigValueFactory.fromMap(
+      Map(
+        "default" -> orderFeeWriter.to(settings.default),
+        "custom" -> genericMapWriter[AssetPair, OrderFeeSettings](assetPairToString).to(settings.custom),
+        "zero-fee-accounts" -> implicitly[ConfigWriter[Set[PublicKey]]].to(settings.zeroFeeAccounts)
+      ).asJava
+    )
+  }
 
   private def assetToString(asset: Asset): String =
     asset match {
@@ -177,9 +191,10 @@ sealed trait ConfigWriters {
 
 case class AllOrderFeeSettings(
   mode: String,
-  dynamic: DynamicSettings,
-  percent: PercentSettings,
-  fixed: FixedSettings
+  dynamic: Option[DynamicSettings],
+  percent: Option[PercentSettings],
+  fixed: Option[FixedSettings],
+  composite: Option[CompositeSettings]
 )
 
 case class AllAccountStorageSettings(

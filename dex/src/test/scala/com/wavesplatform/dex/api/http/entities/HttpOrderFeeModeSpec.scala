@@ -6,21 +6,22 @@ import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.settings.AssetType
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
+import org.scalatest.TryValues
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import play.api.libs.json.Json
 
-class HttpOrderFeeModeSpec extends AnyFreeSpec with Matchers with DiffMatcherWithImplicits {
+class HttpOrderFeeModeSpec extends AnyFreeSpec with Matchers with DiffMatcherWithImplicits with TryValues {
 
   private val assetPair1 = AssetPair.createAssetPair(
     "DWgwcZTMhSvnyYCoWLRUXXSH1RSkzThXLJhww9gwkqdn",
     "25FEqEjRkqK6yCkiT7Lz6SAYz7gUFCtxfCChnrVFD5AT"
-  ).get
+  ).success.value
 
   private val assetPair2 = AssetPair.createAssetPair(
     "FWgwcZTMhSvnyYCoWLRUXXSH1RSkzThXLJhww9gwkqdn",
     "25FEqEjRkqK6yCkiT7Lz6SAYz7gUFCtxfCChnrVFD5AT"
-  ).get
+  ).success.value
 
   private val fixedModeJson: String = """{
                                         |  "fixed" : {

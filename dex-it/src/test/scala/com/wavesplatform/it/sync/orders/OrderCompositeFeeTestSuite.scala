@@ -14,7 +14,7 @@ final class OrderCompositeFeeTestSuite extends OrderFeeBaseTestSuite {
 
   "OrderCompositeFeeTestSuite" - {
 
-    "should be able to place order for pair with dynamic fee settings" in {
+    "should be able to place order for pair with default (dynamic) fee settings" in {
       placeAndAwaitAtDex(
         mkOrder(alice, wavesUsdPair, OrderType.BUY, 10.waves, 1.usd, baseFee)
       ).status shouldBe HttpOrderStatus.Status.Accepted
@@ -29,7 +29,7 @@ final class OrderCompositeFeeTestSuite extends OrderFeeBaseTestSuite {
       dex1.api.cancelAllInOrderBookWithKey(wavesUsdPair)
     }
 
-    "should be able to place order for pair with percent fee settings" in {
+    "should be able to place order for pair with custom (percent) fee settings" in {
       val requiredFee = multiplyAmountByDouble(10.waves, 0.02)
       placeAndAwaitAtDex(
         mkOrder(alice, wavesBtcPair, OrderType.BUY, 10.waves, 1.btc, requiredFee)
@@ -45,7 +45,7 @@ final class OrderCompositeFeeTestSuite extends OrderFeeBaseTestSuite {
       dex1.api.cancelAllInOrderBookWithKey(wavesBtcPair)
     }
 
-    "percent fee after match should be calculated properly" in {
+    "custom (percent) fee after match should be calculated properly" in {
       val aliceBalance1 = wavesNode1.api.wavesBalance(alice)
       val bobBalance1 = wavesNode1.api.wavesBalance(bob)
 
@@ -65,7 +65,7 @@ final class OrderCompositeFeeTestSuite extends OrderFeeBaseTestSuite {
       dex1.api.cancelAllInOrderBookWithKey(wavesBtcPair)
     }
 
-    "dynamic fee after match should be calculated properly" in {
+    "default (dynamic) fee after match should be calculated properly" in {
       val aliceBalance1 = wavesNode1.api.wavesBalance(alice)
       val bobBalance1 = wavesNode1.api.wavesBalance(bob)
 

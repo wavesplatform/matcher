@@ -71,7 +71,7 @@ object HttpOrderFeeMode {
       value = "Min fee in waves",
       dataType = "number",
       example = "300000"
-    ) minFeeInWaves: Double
+    ) minFeeInWaves: Long
   ) extends HttpOrderFeeMode
 
   object FeeModePercent {

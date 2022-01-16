@@ -34,7 +34,6 @@ import org.scalatest._
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-import scala.concurrent.duration._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import play.api.libs.json.Json
@@ -342,11 +341,14 @@ class OrderValidatorSpecification
         case (order, _, orderFeeSettings) =>
           val trueScript = RunScriptResult.Allowed
 
+          val rateCache = RateCache(TestRateDb()).futureValue
+            .unsafeTap(_.upsertRate(order.feeAsset, 1.0))
+
           def setAssetsAndMatcherAccountScriptsAndValidate(
             amountAssetScript: Option[RunScriptResult],
             priceAssetScript: Option[RunScriptResult],
             matcherAccountScript: Option[RunScriptResult]
-          ): Result[Order] = {
+          ): Result[Order] =
             validateByBlockchain(orderFeeSettings)(
               amountAssetScript,
               priceAssetScript,
@@ -354,7 +356,6 @@ class OrderValidatorSpecification
               matcherAccountScript,
               rateCache = rateCache
             )(order).value.futureValue
-          }
 
           orderFeeSettings match {
             case _: DynamicSettings =>

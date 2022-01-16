@@ -51,6 +51,7 @@ abstract class OrderPercentFeeAmountTestSuite(version: Byte) extends OrderFeeBas
          |    percent {
          |      asset-type = amount
          |      min-fee = $percentFee
+         |      min-fee-in-waves = $percentMinFeeInWaves
          |    }
          |  }
          |  price-assets = [ "$UsdId" ]
@@ -61,6 +62,7 @@ abstract class OrderPercentFeeAmountTestSuite(version: Byte) extends OrderFeeBas
     wavesNode1.start()
     broadcastAndAwait(IssueUsdTx)
     dex1.start()
+    upsertAssetRate(usd -> usdRate)
   }
 
   s"V$version orders (fee asset type: $assetType) & fees processing" - {

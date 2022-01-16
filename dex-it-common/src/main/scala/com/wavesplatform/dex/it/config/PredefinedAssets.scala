@@ -14,7 +14,8 @@ trait PredefinedAssets extends ScorexLogging {
   val defaultAssetQuantity: Long = 999999999999L
 
   val usdAssetName: String = "USD-X"
-  val IssueUsdTx: IssueTransaction = mkIssue(alice, usdAssetName, defaultAssetQuantity, 2)
+  val usdAssetDecimals: Int = 2
+  val IssueUsdTx: IssueTransaction = mkIssue(alice, usdAssetName, defaultAssetQuantity, usdAssetDecimals)
   val UsdId: ByteStr = IssueUsdTx.id()
   val usd: IssuedAsset = IssuedAsset(UsdId)
 

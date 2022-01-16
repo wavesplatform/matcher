@@ -50,6 +50,7 @@ class OrderValidatorSpecification
     with NoShrink {
 
   private val defaultPortfolio = Portfolio(0, LeaseBalance.empty, Map(btc -> 10.btc))
+  private val defaultWavesFee = 300000L
 
   implicit private val errorContext: ErrorFormatterContext = ErrorFormatterContext.from(_ => defaultAssetDescription.decimals)
 
@@ -220,7 +221,7 @@ class OrderValidatorSpecification
 
       "matcherFee is not enough (percent mode)" in {
         def validateByPercentSettings(assetType: AssetType): Order => Result[Order] =
-          validateByMatcherSettings(PercentSettings(assetType, 0.3))
+          validateByMatcherSettings(PercentSettings(assetType, 0.3, defaultWavesFee))
 
         withClue("AMOUNT/RECEIVING asset type, min fee = 0.3%, fee should be >= 1.5.waves\n") {
           val order = createOrder(wavesBtcPair, OrderType.BUY, 500.waves, price = 0.00011162, matcherFee = 1.5.waves, feeAsset = Waves)
@@ -325,8 +326,14 @@ class OrderValidatorSpecification
           validateByMatcherSettings(FixedSettings(usd, 0.01.usd))(orderOfVersion(version)) should produce("UnexpectedFeeAsset")
           validateByMatcherSettings(FixedSettings(Waves, 0.003.waves))(orderOfVersion(version)) shouldBe Symbol("right")
 
-          validateByMatcherSettings(PercentSettings(AssetType.Price, 0.003))(orderOfVersion(version)) should produce("UnexpectedFeeAsset")
-          validateByMatcherSettings(PercentSettings(AssetType.Amount, 0.003))(orderOfVersion(version)) shouldBe Symbol("right")
+          validateByMatcherSettings(PercentSettings(AssetType.Price, 0.003, defaultWavesFee))(orderOfVersion(version)) should produce(
+            "UnexpectedFeeAsset"
+          )
+          validateByMatcherSettings(PercentSettings(AssetType.Price, 0.003, defaultWavesFee))(orderOfVersion(version)) should produce(
+            "UnexpectedFeeAsset"
+          )
+          validateByMatcherSettings(PercentSettings(AssetType.Amount, 0.003, defaultWavesFee))(orderOfVersion(version)) shouldBe Symbol("right")
+          validateByMatcherSettings(PercentSettings(AssetType.Amount, 0.003, defaultWavesFee))(orderOfVersion(version)) shouldBe Symbol("right")
         }
       }
 
@@ -484,7 +491,7 @@ class OrderValidatorSpecification
         val bestAsk = LevelAgg(amount = 800.waves, price = 0.00011082.btc)
         val bestBid = LevelAgg(amount = 600.waves, price = 0.00011080.btc)
 
-        val percentSettings = PercentSettings(AssetType.Price, 1) // matcher fee = 1% of the deal
+        val percentSettings = PercentSettings(AssetType.Price, 1, defaultWavesFee) // matcher fee = 1% of the deal
         val deviationSettings = DeviationsSettings(enable = true, 100, 100, maxFeeDeviation = 10) // fee deviation = 10%
 
         val nonEmptyMarketStatus = MarketStatus(None, Some(bestBid), Some(bestAsk))

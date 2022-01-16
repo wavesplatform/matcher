@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync.orders
 
 import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.dex.domain.asset.Asset
 
 class OrderFeeBaseTestSuite extends MatcherSuiteBase {
   val percentFee = 14
@@ -18,4 +19,11 @@ class OrderFeeBaseTestSuite extends MatcherSuiteBase {
   val tooLowFeeWaves = 2.09.waves
   val tooHighFeeWaves = 15.00001.waves
   val partiallyFeeWaves = 2.25.waves
+  val percentMinFeeInWaves = 0.003.waves
+  val usdRate = 10
+
+  def upsertAssetRate(pairs: (Asset.IssuedAsset, Double)*): Unit = pairs.foreach {
+    case (asset, rate) => withClue(s"$asset")(dex1.api.upsertAssetRate(asset, rate))
+  }
+
 }

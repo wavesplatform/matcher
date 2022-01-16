@@ -66,7 +66,12 @@ object HttpOrderFeeMode {
       value = "Min fee in percents",
       dataType = "number",
       example = "1.5"
-    ) minFee: Double
+    ) minFee: Double,
+    @ApiModelProperty(
+      value = "Min fee in waves",
+      dataType = "number",
+      example = "300000"
+    ) minFeeInWaves: Double
   ) extends HttpOrderFeeMode
 
   object FeeModePercent {
@@ -105,7 +110,7 @@ object HttpOrderFeeMode {
   def fromSettings(settings: OrderFeeSettings, matcherAccountFee: Long, allRates: Map[Asset, Double]): HttpOrderFeeMode = settings match {
     case x: OrderFeeSettings.DynamicSettings => FeeModeDynamic(x.maxBaseFee + matcherAccountFee, allRates)
     case OrderFeeSettings.FixedSettings(assetId, minFee) => FeeModeFixed(assetId, minFee)
-    case OrderFeeSettings.PercentSettings(assetType, minFee) => FeeModePercent(assetType, minFee)
+    case OrderFeeSettings.PercentSettings(assetType, minFee, minFeeInWaves) => FeeModePercent(assetType, minFee, minFeeInWaves)
     case OrderFeeSettings.CompositeSettings(default, custom, _) =>
       FeeModeComposite(
         fromSettings(default, matcherAccountFee, allRates),

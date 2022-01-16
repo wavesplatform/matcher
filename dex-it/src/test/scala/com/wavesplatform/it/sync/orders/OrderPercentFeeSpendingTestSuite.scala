@@ -5,6 +5,8 @@ import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.error.FeeNotEnough
 import com.wavesplatform.dex.settings.AssetType._
+import com.wavesplatform.dex.model.MatcherModel
+import scala.math.BigDecimal.RoundingMode
 
 class OrderPercentFeeSpendingTestSuite extends OrderFeeBaseTestSuite {
 
@@ -21,6 +23,7 @@ class OrderPercentFeeSpendingTestSuite extends OrderFeeBaseTestSuite {
        |    percent {
        |      asset-type = spending
        |      min-fee = $percentFee
+       |      min-fee-in-waves = $percentMinFeeInWaves
        |    }
        |  }
        |}""".stripMargin
@@ -30,6 +33,7 @@ class OrderPercentFeeSpendingTestSuite extends OrderFeeBaseTestSuite {
     wavesNode1.start()
     broadcastAndAwait(IssueUsdTx, IssueBtcTx)
     dex1.start()
+    upsertAssetRate(usd -> usdRate)
   }
 
   s"V$version orders (fee asset type: $assetType) & fees processing" - {
@@ -159,5 +163,48 @@ class OrderPercentFeeSpendingTestSuite extends OrderFeeBaseTestSuite {
         "Required 2.1 WAVES as fee for this order, but given 2.09 WAVES"
       )
     }
+  }
+
+  s"buy order should be rejected if fee less then min-fee-in-waves when fee asset-type = $assetType" in {
+    val correctRate = MatcherModel.correctRateByAssetDecimals(usdRate, usdAssetDecimals)
+
+    val minFeeInUsd = (BigDecimal(percentMinFeeInWaves) * correctRate)
+      .setScale(0, RoundingMode.CEILING)
+      .toLong
+
+    dex1.tryApi
+      .place(
+        mkOrder(
+          mkAccountWithBalance(fullyAmountUsd + minimalFee -> IssuedAsset(UsdId)),
+          wavesUsdPair,
+          BUY,
+          percentMinFeeInWaves * 10,
+          price,
+          minFeeInUsd - 1,
+          version = version,
+          feeAsset = IssuedAsset(UsdId)
+        )
+      ) should failWith(
+      FeeNotEnough.code,
+      s"Required 0.03 ${UsdId.toString} as fee for this order, but given 0.02 ${UsdId.toString}"
+    )
+  }
+
+  s"sell order should be rejected if fee less then min-fee-in-waves when fee asset-type = $assetType" in {
+    dex1.tryApi
+      .place(
+        mkOrder(
+          mkAccountWithBalance(fullyAmountWaves + tooHighFeeWaves -> Waves),
+          wavesUsdPair,
+          SELL,
+          percentMinFeeInWaves * 5,
+          price,
+          percentMinFeeInWaves - 1,
+          version = version
+        )
+      ) should failWith(
+      FeeNotEnough.code,
+      "Required 0.003 WAVES as fee for this order, but given 0.00299999 WAVES"
+    )
   }
 }

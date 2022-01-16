@@ -431,9 +431,10 @@ trait MatcherSpecBase
 
   protected val percentSettingsGenerator: Gen[PercentSettings] =
     for {
-      assetType <- Gen.oneOf(AssetType.values.toSeq)
+      assetType <- Gen.oneOf(AssetType.values)
       minFee <- Gen.choose(0.01, 100.0)
-    } yield PercentSettings(assetType, minFee)
+      minFeeInWaves <- Gen.choose(1, 100000000)
+    } yield PercentSettings(assetType, minFee, minFeeInWaves)
 
   protected def fixedSettingsGenerator(defaultAsset: Asset, lowerMinFeeBound: Long = 1, upperMinFeeBound: Long = 1000000L): Gen[FixedSettings] =
     for { minFee <- Gen.choose(lowerMinFeeBound, upperMinFeeBound) } yield FixedSettings(defaultAsset, minFee)

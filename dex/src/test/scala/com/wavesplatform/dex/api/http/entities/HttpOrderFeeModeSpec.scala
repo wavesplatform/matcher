@@ -43,7 +43,7 @@ class HttpOrderFeeModeSpec extends AnyFreeSpec with Matchers with DiffMatcherWit
                                           |  "percent" : {
                                           |    "type" : "price",
                                           |    "minFee" : 0.14,
-                                          |    "minFeeInWaves" : 400000
+                                          |    "minFeeInWaves" : 300000
                                           |  }
                                           |}""".stripMargin
 
@@ -69,7 +69,7 @@ class HttpOrderFeeModeSpec extends AnyFreeSpec with Matchers with DiffMatcherWit
       |        "percent" : {
       |          "type" : "price",
       |          "minFee" : 0.14,
-      |          "minFeeInWaves" : 400000
+      |          "minFeeInWaves" : 300000
       |        }
       |      }
       |    }

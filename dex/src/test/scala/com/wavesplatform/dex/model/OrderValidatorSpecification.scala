@@ -34,6 +34,7 @@ import org.scalatest._
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import scala.concurrent.duration._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import play.api.libs.json.Json
@@ -345,8 +346,15 @@ class OrderValidatorSpecification
             amountAssetScript: Option[RunScriptResult],
             priceAssetScript: Option[RunScriptResult],
             matcherAccountScript: Option[RunScriptResult]
-          ): Result[Order] =
-            validateByBlockchain(orderFeeSettings)(amountAssetScript, priceAssetScript, None, matcherAccountScript)(order).value.futureValue
+          ): Result[Order] = {
+            validateByBlockchain(orderFeeSettings)(
+              amountAssetScript,
+              priceAssetScript,
+              None,
+              matcherAccountScript,
+              rateCache = rateCache
+            )(order).value.futureValue
+          }
 
           orderFeeSettings match {
             case _: DynamicSettings =>
@@ -815,7 +823,13 @@ class OrderValidatorSpecification
     "verify script of feeAsset" in {
       forAll(orderV3WithFeeSettingsGenerator) { case (order, orderFeeSettings) =>
         def setFeeAssetScriptAndValidate(matcherFeeAssetScript: Option[RunScriptResult]): Result[Order] =
-          validateByBlockchain(orderFeeSettings)(None, None, matcherFeeAssetScript, None)(order).value.futureValue
+          validateByBlockchain(orderFeeSettings)(
+            None,
+            None,
+            matcherFeeAssetScript,
+            None,
+            rateCache = rateCache
+          )(order).value.futureValue
 
         if (order.feeAsset != Waves) {
           setFeeAssetScriptAndValidate(Some(RunScriptResult.ScriptError("Some error"))) should produce("AssetScriptReturnedError")

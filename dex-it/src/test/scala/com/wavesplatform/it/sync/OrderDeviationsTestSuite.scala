@@ -69,6 +69,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
        |    percent {
        |      asset-type = "price"
        |      min-fee = 0.1
+       |      min-fee-in-waves = 300000
        |    }
        |  }
        |}
@@ -87,6 +88,12 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
     broadcastAndAwait(mkTransfer(bob, alice, defaultAssetQuantity / 2, btc, 0.005.waves))
 
     dex1.start()
+
+    dex1.api.upsertAssetRate(eth, 0.00567593)
+    dex1.api.upsertAssetRate(btc, 0.00009855)
+    dex1.api.upsertAssetRate(usd, 0.5)
+    dex1.api.upsertAssetRate(scriptAsset, 0.3)
+    dex1.api.upsertAssetRate(anotherScriptAsset, 0.8)
   }
 
   def orderIsOutOfDeviationBounds(price: String, orderType: OrderType): String = {

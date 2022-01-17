@@ -19,7 +19,7 @@ class OrderPercentFeePriceTestSuite extends OrderFeeBaseTestSuite {
        |    percent {
        |      asset-type = price
        |      min-fee = $percentFee
-       |      min-fee-in-waves = 300000
+       |      min-fee-in-waves = $percentMinFeeInWaves
        |    }
        |  }
        |}""".stripMargin

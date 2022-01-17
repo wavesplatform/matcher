@@ -69,7 +69,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
        |    percent {
        |      asset-type = "price"
        |      min-fee = 0.1
-       |      min-fee-in-waves = 300000
+       |      min-fee-in-waves = $percentMinFeeInWaves
        |    }
        |  }
        |}

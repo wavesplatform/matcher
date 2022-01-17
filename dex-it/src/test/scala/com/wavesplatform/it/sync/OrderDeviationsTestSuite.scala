@@ -40,6 +40,8 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
   val deviationLoss = 60
   val deviationFee = 40
 
+  val percentMinFeeInWaves = 300000
+
   val IssueResults(scriptAssetTx, _, scriptAsset) =
     mkIssueExtended(alice, "asset1", defaultAssetQuantity, fee = smartIssueFee, script = Some(Scripts.alwaysTrue))
 

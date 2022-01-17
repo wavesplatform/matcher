@@ -431,9 +431,10 @@ trait MatcherSpecBase
 
   protected val percentSettingsGenerator: Gen[PercentSettings] =
     for {
-      assetType <- Gen.oneOf(AssetType.values.toSeq)
+      assetType <- Gen.oneOf(AssetType.values)
       minFee <- Gen.choose(0.01, 100.0)
-    } yield PercentSettings(assetType, minFee)
+      minFeeInWaves <- Gen.choose(1, 100000000)
+    } yield PercentSettings(assetType, minFee, minFeeInWaves)
 
   protected def fixedSettingsGenerator(defaultAsset: Asset, lowerMinFeeBound: Long = 1, upperMinFeeBound: Long = 1000000L): Gen[FixedSettings] =
     for { minFee <- Gen.choose(lowerMinFeeBound, upperMinFeeBound) } yield FixedSettings(defaultAsset, minFee)
@@ -472,6 +473,7 @@ trait MatcherSpecBase
     sender: KeyPair,
     orderFeeSettings: OrderFeeSettings,
     matcherFeeAssetForDynamicSettings: Option[Asset] = None,
+    rateForPercentSettings: Option[Double] = Some(1.0),
     rateForDynamicSettings: Option[Double] = None
   ): Order = {
 
@@ -484,6 +486,8 @@ trait MatcherSpecBase
         order
           .updateFeeAsset(OrderValidator.getValidFeeAssetForSettings(order, percentSettings, rateCache).head)
           .updateFee {
+            rateForPercentSettings.foreach(rateCache.upsertRate(order.feeAsset, _))
+
             OrderValidator.getMinValidFeeForSettings(
               order,
               percentSettings,

@@ -100,6 +100,7 @@ final class OrderCompositeFeeTestSuite extends OrderFeeBaseTestSuite {
        |          percent {
        |            asset-type = "amount"
        |            min-fee = 2
+       |            min-fee-in-waves = $percentMinFeeInWaves
        |          }
        |        }
        |      }

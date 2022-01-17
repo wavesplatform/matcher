@@ -53,12 +53,13 @@ object OrderFeeSettings {
 
   }
 
-  final case class PercentSettings(assetType: AssetType, minFee: Double) extends OrderFeeSettings
+  final case class PercentSettings(assetType: AssetType, minFee: Double, minFeeInWaves: Long) extends OrderFeeSettings
 
   object PercentSettings {
 
     implicit val percentConfigReader = semiauto
       .deriveReader[PercentSettings]
+      .validatedField(validationOf.field[PercentSettings, "minFeeInWaves"].mk(x => rules.gt0(x.minFeeInWaves)))
       .validatedField(validationOf.field[PercentSettings, "minFee"].mk { x =>
         if (0 < x.minFee && x.minFee <= 100) none else s"${x.minFee} ∈ (0; 100]".some
       })

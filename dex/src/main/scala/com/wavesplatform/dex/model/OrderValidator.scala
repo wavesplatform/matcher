@@ -224,7 +224,7 @@ object OrderValidator extends ScorexLogging {
     orderFeeSettings match {
       case _: DynamicSettings => rateCache.getAllRates.keySet
       case FixedSettings(assetId, _) => Set(assetId)
-      case PercentSettings(assetType, _) =>
+      case PercentSettings(assetType, _, _) =>
         Set(
           assetType match {
             case AssetType.Amount => order.assetPair.amountAsset
@@ -277,9 +277,15 @@ object OrderValidator extends ScorexLogging {
     rateCache: RateCache
   ): Result[Long] = orderFeeSettings match {
     case FixedSettings(_, fixedMinFee) => lift(fixedMinFee)
-    case ps: PercentSettings => lift(getMinValidFeeForPercentFeeSettings(order, ps, order.price))
-    case ds: DynamicSettings => convertFeeByAssetRate(ds.maxBaseFee, order.feeAsset, feeDecimals, rateCache)
     case cs: CompositeSettings => getMinValidFeeForSettings(order, cs.getOrderFeeSettings(order.assetPair), feeDecimals, rateCache)
+    case ds: DynamicSettings => convertFeeByAssetRate(ds.maxBaseFee, order.feeAsset, feeDecimals, rateCache)
+    case ps: PercentSettings =>
+      convertFeeByAssetRate(ps.minFeeInWaves, order.feeAsset, feeDecimals, rateCache)
+        .map { constMinValidFee =>
+          val orderMinValidFee = getMinValidFeeForPercentFeeSettings(order, ps, order.price)
+
+          orderMinValidFee max constMinValidFee
+        }
   }
 
   private def validateFeeAsset(order: Order, orderFeeSettings: OrderFeeSettings, rateCache: RateCache): Result[Order] = {
@@ -376,11 +382,11 @@ object OrderValidator extends ScorexLogging {
   )(implicit efc: ErrorFormatterContext): Result[Order] = {
 
     def isFeeInDeviationBoundsForMatchedPrice(matchedPrice: Long): Boolean = orderFeeSettings match {
-      case PercentSettings(assetType, minFee) =>
+      case PercentSettings(assetType, minFee, minFeeInWaves) =>
         order.matcherFee >=
           getMinValidFeeForPercentFeeSettings(
             order,
-            PercentSettings(assetType, minFee * (1 - (deviationSettings.maxFeeDeviation / 100))),
+            PercentSettings(assetType, minFee * (1 - (deviationSettings.maxFeeDeviation / 100)), minFeeInWaves),
             matchedPrice
           )
       case _ => true

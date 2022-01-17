@@ -19,6 +19,7 @@ class OrderPercentFeePriceTestSuite extends OrderFeeBaseTestSuite {
        |    percent {
        |      asset-type = price
        |      min-fee = $percentFee
+       |      min-fee-in-waves = $percentMinFeeInWaves
        |    }
        |  }
        |}""".stripMargin
@@ -28,6 +29,7 @@ class OrderPercentFeePriceTestSuite extends OrderFeeBaseTestSuite {
     wavesNode1.start()
     broadcastAndAwait(IssueUsdTx, IssueBtcTx)
     dex1.start()
+    upsertAssetRate(usd -> usdRate)
   }
 
   s"V$version orders (fee asset type: $assetType) & fees processing" - {

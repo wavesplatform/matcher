@@ -30,6 +30,7 @@ class BaseSettingsSpecification extends AnyFlatSpec {
        |    percent {
        |      asset-type = amount
        |      min-fee = 0.1
+       |      min-fee-in-waves = 300000
        |    }
        |  }
        |}
@@ -338,6 +339,7 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |      percent {
          |        asset-type = "amount"
          |        min-fee = 0.1
+         |        min-fee-in-waves = 300000
          |      }
          |    }
          |    -4: {
@@ -349,6 +351,7 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |            percent {
          |              asset-type = "amount"
          |              min-fee = 0.1
+         |              min-fee-in-waves = 300000
          |            }
          |          }
          |        }

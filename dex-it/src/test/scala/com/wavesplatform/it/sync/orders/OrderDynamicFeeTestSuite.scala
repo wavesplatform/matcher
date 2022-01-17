@@ -4,7 +4,7 @@ import sttp.model.StatusCode
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.api.http.entities.HttpV0LevelAgg
-import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.error.{BalanceNotEnough, FeeNotEnough, UnexpectedFeeAsset}
 
@@ -27,6 +27,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
        |    percent {
        |      asset-type = amount
        |      min-fee = 10
+       |      min-fee-in-waves = $percentMinFeeInWaves
        |    }
        |    fixed {
        |      asset = $EthId
@@ -64,10 +65,6 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
     version = 3,
     feeAsset = eth
   )
-
-  def upsertAssetRate(pairs: (IssuedAsset, Double)*): Unit = pairs.foreach {
-    case (asset, rate) => withClue(s"$asset")(dex1.api.upsertAssetRate(asset, rate))
-  }
 
   "supported non-waves order fee" - {
     val btcRate = 0.0005
@@ -707,6 +704,9 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
     }
 
     "percent & fixed fee modes" in {
+      val ethRate = 0.000032
+
+      upsertAssetRate(eth -> ethRate)
 
       def check(): Unit = {
         withClue("buy order") {

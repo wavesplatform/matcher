@@ -42,7 +42,8 @@ class HttpOrderFeeModeSpec extends AnyFreeSpec with Matchers with DiffMatcherWit
   private val percentModeJson: String = """{
                                           |  "percent" : {
                                           |    "type" : "price",
-                                          |    "minFee" : 0.14
+                                          |    "minFee" : 0.14,
+                                          |    "minFeeInWaves" : 300000
                                           |  }
                                           |}""".stripMargin
 
@@ -67,14 +68,15 @@ class HttpOrderFeeModeSpec extends AnyFreeSpec with Matchers with DiffMatcherWit
       |      "FWgwcZTMhSvnyYCoWLRUXXSH1RSkzThXLJhww9gwkqdn-25FEqEjRkqK6yCkiT7Lz6SAYz7gUFCtxfCChnrVFD5AT" : {
       |        "percent" : {
       |          "type" : "price",
-      |          "minFee" : 0.14
+      |          "minFee" : 0.14,
+      |          "minFeeInWaves" : 300000
       |        }
       |      }
       |    }
       |  }
       |}""".stripMargin
 
-  private val percentMode: HttpOrderFeeMode = FeeModePercent(AssetType.Price, 0.14)
+  private val percentMode: HttpOrderFeeMode = FeeModePercent(AssetType.Price, 0.14, 300000)
 
   private val dynamicMode: HttpOrderFeeMode = FeeModeDynamic(600000, Map(Waves -> 1))
 

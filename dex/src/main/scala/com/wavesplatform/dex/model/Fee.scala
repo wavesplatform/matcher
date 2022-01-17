@@ -40,7 +40,7 @@ object Fee {
     }
 
     ofs match {
-      case PercentSettings(assetType, _) =>
+      case PercentSettings(assetType, _, _) =>
         val (buy, sell) = Order.splitByType(s.order, c.order)
 
         val (buyAmt, sellAmt) = assetType match {

@@ -3,7 +3,7 @@ package com.wavesplatform.it.sync.orders
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
-import com.wavesplatform.dex.error.FeeNotEnough
+import com.wavesplatform.dex.error.{FeeNotEnough, UnexpectedFeeAsset}
 import com.wavesplatform.dex.settings.AssetType._
 
 class OrderPercentFeeReceivingTestSuite extends OrderFeeBaseTestSuite {
@@ -11,19 +11,20 @@ class OrderPercentFeeReceivingTestSuite extends OrderFeeBaseTestSuite {
   val version = 3.toByte
   val assetType = Receiving
 
-  override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""
-                                                                                      |waves.dex {
-                                                                                      |  allowed-order-versions = [1, 2, 3]
-                                                                                      |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
-                                                                                      |  order-fee.-1 {
-                                                                                      |    mode = percent
-                                                                                      |    percent {
-                                                                                      |      asset-type = receiving
-                                                                                      |      min-fee = $percentFee
-                                                                                      |      min-fee-in-waves = $percentMinFeeInWaves
-                                                                                      |    }
-                                                                                      |  }
-                                                                                      |}""".stripMargin)
+  override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(
+    s"""waves.dex {
+       |  allowed-order-versions = [1, 2, 3]
+       |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
+       |  order-fee.-1 {
+       |    mode = percent
+       |    percent {
+       |      asset-type = receiving
+       |      min-fee = $percentFee
+       |      min-fee-in-waves = $percentMinFeeInWaves
+       |    }
+       |  }
+       |}""".stripMargin
+  )
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
@@ -33,6 +34,48 @@ class OrderPercentFeeReceivingTestSuite extends OrderFeeBaseTestSuite {
   }
 
   s"V$version orders (fee asset type: $assetType) & fees processing" - {
+
+    s"order should be rejected if fee Asset not in asset pair when fee asset-type = $assetType" in {
+      dex1.tryApi.place(
+        mkOrder(
+          mkAccountWithBalance(fullyAmountUsd + minimalFeeWaves -> usd, minimalFeeWaves -> Waves),
+          wavesUsdPair,
+          BUY,
+          fullyAmountWaves,
+          price,
+          minimalFeeWaves,
+          btc
+        )
+      ) should failWith(UnexpectedFeeAsset.code)
+    }
+
+    s"buy order should be rejected if fee Asset not equal Waves when fee asset-type = $assetType" in {
+      dex1.tryApi.place(
+        mkOrder(
+          mkAccountWithBalance(fullyAmountUsd + minimalFeeWaves -> usd, minimalFeeWaves -> Waves),
+          wavesUsdPair,
+          BUY,
+          fullyAmountWaves,
+          price,
+          minimalFeeWaves,
+          usd
+        )
+      ) should failWith(UnexpectedFeeAsset.code)
+    }
+
+    s"sell order should be rejected if fee Asset not equal USD when fee asset-type = $assetType" in {
+      dex1.tryApi.place(
+        mkOrder(
+          mkAccountWithBalance(fullyAmountUsd + minimalFeeWaves -> usd, minimalFeeWaves -> Waves),
+          wavesUsdPair,
+          SELL,
+          fullyAmountWaves,
+          price,
+          minimalFeeWaves,
+          Waves
+        )
+      ) should failWith(UnexpectedFeeAsset.code)
+    }
 
     s"users should pay correct fee when fee asset-type = $assetType and order fully filled" in {
 

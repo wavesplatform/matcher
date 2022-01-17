@@ -3,7 +3,7 @@ package com.wavesplatform.it.sync.orders
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
-import com.wavesplatform.dex.error.FeeNotEnough
+import com.wavesplatform.dex.error.{FeeNotEnough, UnexpectedFeeAsset}
 import com.wavesplatform.dex.settings.AssetType._
 
 class OrderPercentFeePriceTestSuite extends OrderFeeBaseTestSuite {
@@ -33,6 +33,35 @@ class OrderPercentFeePriceTestSuite extends OrderFeeBaseTestSuite {
   }
 
   s"V$version orders (fee asset type: $assetType) & fees processing" - {
+
+    s"order should be rejected if fee Asset not in asset pair when fee asset-type = $assetType" in {
+      dex1.tryApi.place(
+        mkOrder(
+          mkAccountWithBalance(fullyAmountUsd + minimalFeeWaves -> usd, minimalFeeWaves -> Waves),
+          wavesUsdPair,
+          BUY,
+          fullyAmountWaves,
+          price,
+          minimalFeeWaves,
+          btc
+        )
+      ) should failWith(UnexpectedFeeAsset.code)
+    }
+
+    s"order should be rejected if fee Asset not equal price asset" in {
+      dex1.tryApi.place(
+        mkOrder(
+          mkAccountWithBalance(fullyAmountUsd + minimalFeeWaves -> usd, minimalFeeWaves -> Waves),
+          wavesUsdPair,
+          BUY,
+          fullyAmountWaves,
+          price,
+          minimalFeeWaves,
+          Waves
+        )
+      ) should failWith(UnexpectedFeeAsset.code)
+    }
+
     s"users should pay correct fee when fee asset-type = $assetType and order fully filled " in {
       val accountBuyer = mkAccountWithBalance(fullyAmountUsd + minimalFee -> usd)
       val accountSeller = mkAccountWithBalance(minimalFee -> usd, fullyAmountWaves -> Waves)
@@ -116,7 +145,7 @@ class OrderPercentFeePriceTestSuite extends OrderFeeBaseTestSuite {
       dex1.api.cancelAllOrdersWithSig(accountBuyer)
     }
 
-    s"order should be processed if amount less then fee when fee asset-type = $assetType" in {
+    s"order should be processed if amount less than fee when fee asset-type = $assetType" in {
       val accountBuyer = mkAccountWithBalance(fullyAmountUsd + minimalFee -> usd)
       val accountSeller = mkAccountWithBalance(fullyAmountWaves -> Waves, tooHighFee -> usd)
 

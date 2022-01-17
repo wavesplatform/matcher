@@ -828,8 +828,7 @@ class OrderValidatorSpecification
             None,
             None,
             matcherFeeAssetScript,
-            None,
-            rateCache = rateCache
+            None
           )(order).value.futureValue
 
         if (order.feeAsset != Waves) {

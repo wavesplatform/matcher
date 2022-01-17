@@ -473,6 +473,7 @@ trait MatcherSpecBase
     sender: KeyPair,
     orderFeeSettings: OrderFeeSettings,
     matcherFeeAssetForDynamicSettings: Option[Asset] = None,
+    rateForPercentSettings: Option[Double] = Some(1.0),
     rateForDynamicSettings: Option[Double] = None
   ): Order = {
 
@@ -485,6 +486,8 @@ trait MatcherSpecBase
         order
           .updateFeeAsset(OrderValidator.getValidFeeAssetForSettings(order, percentSettings, rateCache).head)
           .updateFee {
+            rateForPercentSettings.foreach(rateCache.upsertRate(order.feeAsset, _))
+
             OrderValidator.getMinValidFeeForSettings(
               order,
               percentSettings,

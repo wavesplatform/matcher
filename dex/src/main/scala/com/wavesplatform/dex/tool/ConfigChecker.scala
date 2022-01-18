@@ -165,6 +165,7 @@ sealed trait ConfigWriters {
   implicit val matcherSettingsConfigWriter: ConfigWriter[MatcherSettings] =
     semiauto.deriveWriter[MatcherSettings]
 
+  //TODO
   implicit val compositeSettingsConfigWriter: ConfigWriter[CompositeSettings] = ConfigWriter.fromFunction { settings =>
     ConfigValueFactory.fromMap(
       Map(

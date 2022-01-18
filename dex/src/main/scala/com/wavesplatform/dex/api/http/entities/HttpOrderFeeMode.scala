@@ -4,6 +4,7 @@ import com.wavesplatform.dex.api.http.entities.HttpOrderFeeMode.{FeeModeComposit
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.settings.{AssetType, OrderFeeSettings}
 import com.wavesplatform.dex.json.assetPairMapFormat
+import com.wavesplatform.dex.settings.OrderFeeSettings.CompositeSettings
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json._
 
@@ -83,7 +84,8 @@ object HttpOrderFeeMode {
     @ApiModelProperty(value = "Default fee mode for all asset pairs except the custom ones")
     default: HttpOrderFeeMode,
     @ApiModelProperty(value = "Custom fee modes for specific asset pairs")
-    custom: Map[AssetPair, HttpOrderFeeMode]
+    custom: Map[AssetPair, HttpOrderFeeMode],
+    discountAsset: Option[CompositeSettings.DiscountAsset]
   ) extends HttpOrderFeeMode
 
   object FeeModeComposite {
@@ -111,10 +113,11 @@ object HttpOrderFeeMode {
     case x: OrderFeeSettings.DynamicSettings => FeeModeDynamic(x.maxBaseFee + matcherAccountFee, allRates)
     case OrderFeeSettings.FixedSettings(assetId, minFee) => FeeModeFixed(assetId, minFee)
     case OrderFeeSettings.PercentSettings(assetType, minFee, minFeeInWaves) => FeeModePercent(assetType, minFee, minFeeInWaves)
-    case OrderFeeSettings.CompositeSettings(default, custom, _) =>
+    case OrderFeeSettings.CompositeSettings(default, custom, discountAsset, _) =>
       FeeModeComposite(
         fromSettings(default, matcherAccountFee, allRates),
-        custom.view.mapValues(fromSettings(_, matcherAccountFee, allRates)).toMap
+        custom.view.mapValues(fromSettings(_, matcherAccountFee, allRates)).toMap,
+        discountAsset
       )
   }
 

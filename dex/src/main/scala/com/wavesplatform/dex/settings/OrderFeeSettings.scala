@@ -6,6 +6,7 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.settings.MatcherSettings.assetPairKeyParser
 import com.wavesplatform.dex.settings.utils.ConfigReaderOps.Implicits
 import com.wavesplatform.dex.settings.utils._
+import play.api.libs.json.{Format, Json}
 import pureconfig.ConfigReader
 import pureconfig.generic.auto._
 import pureconfig.configurable.genericMapReader
@@ -69,6 +70,7 @@ object OrderFeeSettings {
   final case class CompositeSettings(
     default: OrderFeeSettings,
     custom: Map[AssetPair, OrderFeeSettings] = Map.empty,
+    discountAsset: Option[CompositeSettings.DiscountAsset] = None,
     zeroFeeAccounts: Set[PublicKey] = Set.empty
   ) extends OrderFeeSettings {
 
@@ -78,6 +80,20 @@ object OrderFeeSettings {
   }
 
   object CompositeSettings extends ConfigReaders {
+
+    final case class DiscountAsset(asset: Asset, discount: BigDecimal)
+
+    object DiscountAsset {
+
+      implicit val discountAssetFormat: Format[DiscountAsset] = Json.format[DiscountAsset]
+
+      implicit val discountAssetConfigReader = semiauto
+        .deriveReader[DiscountAsset]
+        .validatedField(validationOf.field[DiscountAsset, "discount"].mk { x =>
+          if (0 < x.discount && x.discount <= 100) none else s"${x.discount} ∈ (0; 100]".some
+        })
+
+    }
 
     implicit private val feeSettingsReader: ConfigReader[OrderFeeSettings] = ConfigReader.fromCursor[OrderFeeSettings] { cursor =>
       for {

@@ -51,6 +51,7 @@ object OrderValidator extends ScorexLogging {
   private[dex] def multiplyAmountByDouble(a: Long, d: Double): Long = (BigDecimal(a) * d).setScale(0, RoundingMode.HALF_UP).toLong
   private[dex] def multiplyPriceByDouble(p: Long, d: Double): Long = (BigDecimal(p) * d).setScale(0, RoundingMode.HALF_UP).toLong
   private[dex] def multiplyFeeByBigDecimal(f: Long, d: BigDecimal): Long = (BigDecimal(f) * d).setScale(0, RoundingMode.CEILING).toLong
+  private[dex] def multiplyByDiscount(a: Long, d: BigDecimal): Long = (BigDecimal(a) * d).setScale(0, RoundingMode.CEILING).toLong
 
   private def verifySignature(order: Order): FutureResult[Unit] = liftAsync {
     Verifier
@@ -274,15 +275,30 @@ object OrderValidator extends ScorexLogging {
     order: Order,
     orderFeeSettings: OrderFeeSettings,
     feeDecimals: Int,
-    rateCache: RateCache
+    rateCache: RateCache,
+    maybeDiscount: Option[BigDecimal] = None
   ): Result[Long] = orderFeeSettings match {
     case FixedSettings(_, fixedMinFee) => lift(fixedMinFee)
-    case cs: CompositeSettings => getMinValidFeeForSettings(order, cs.getOrderFeeSettings(order.assetPair), feeDecimals, rateCache)
-    case ds: DynamicSettings => convertFeeByAssetRate(ds.maxBaseFee, order.feeAsset, feeDecimals, rateCache)
+    case cs: CompositeSettings =>
+      val maybeDiscount =
+        cs.discountAsset.flatMap { case CompositeSettings.DiscountAsset(asset, discount) =>
+          if (asset == order.feeAsset)
+            Some(1 - (discount / 100))
+          else
+            None
+        }
+      getMinValidFeeForSettings(order, cs.getOrderFeeSettings(order.assetPair), feeDecimals, rateCache, maybeDiscount)
+    case ds: DynamicSettings =>
+      convertFeeByAssetRate(ds.maxBaseFee, order.feeAsset, feeDecimals, rateCache).map { fee =>
+        maybeDiscount.fold(fee)(multiplyByDiscount(fee, _))
+      }
     case ps: PercentSettings =>
       convertFeeByAssetRate(ps.minFeeInWaves, order.feeAsset, feeDecimals, rateCache)
         .map { constMinValidFee =>
-          val orderMinValidFee = getMinValidFeeForPercentFeeSettings(order, ps, order.price)
+          val orderMinValidFee = {
+            val fee = getMinValidFeeForPercentFeeSettings(order, ps, order.price)
+            maybeDiscount.fold(fee)(multiplyByDiscount(fee, _))
+          }
 
           orderMinValidFee max constMinValidFee
         }

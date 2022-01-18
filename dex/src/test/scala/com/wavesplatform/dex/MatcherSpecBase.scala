@@ -484,7 +484,7 @@ trait MatcherSpecBase
           .updateFee(minFee)
       case (3, percentSettings: PercentSettings) =>
         order
-          .updateFeeAsset(OrderValidator.getValidFeeAssetForSettings(order, percentSettings, rateCache).head)
+          .updateFeeAsset(OrderValidator.getValidFeeAssetForSettings(order, percentSettings).head)
           .updateFee {
             rateForPercentSettings.foreach(rateCache.upsertRate(order.feeAsset, _))
 

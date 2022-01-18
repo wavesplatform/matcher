@@ -93,7 +93,7 @@ class HttpOrderFeeModeSpec extends AnyFreeSpec with Matchers with DiffMatcherWit
       assetPair1 -> fixedMode,
       assetPair2 -> percentMode
     ),
-    Some(CompositeSettings.DiscountAsset(IssuedAsset(Base58.decode("6suw3ZHbyk6jrM19n7Pvaih3zSPsAt3gKcY8AZPxQYQf")), 2))
+    Some(CompositeSettings.DiscountAssetSettings(IssuedAsset(Base58.decode("6suw3ZHbyk6jrM19n7Pvaih3zSPsAt3gKcY8AZPxQYQf")), 2))
   )
 
   "ApiOrderFeeMode" - {

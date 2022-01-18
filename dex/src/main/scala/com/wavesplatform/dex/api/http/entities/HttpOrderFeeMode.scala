@@ -85,7 +85,8 @@ object HttpOrderFeeMode {
     default: HttpOrderFeeMode,
     @ApiModelProperty(value = "Custom fee modes for specific asset pairs")
     custom: Map[AssetPair, HttpOrderFeeMode],
-    discountAsset: Option[CompositeSettings.DiscountAsset]
+    @ApiModelProperty(value = "Discount asset settings")
+    discountAsset: Option[CompositeSettings.DiscountAssetSettings]
   ) extends HttpOrderFeeMode
 
   object FeeModeComposite {

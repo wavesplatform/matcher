@@ -216,7 +216,7 @@ trait MatcherSpecBase
     version: Byte,
     timestamp: Option[Long],
     feeAsset: Asset,
-    expiration: Gen[Long] = maxTimeGen
+    expiration: Gen[Long]
   ): Gen[(Order, KeyPair)] =
     for {
       sender: KeyPair <- sender.map(Gen.const).getOrElse(accountGen)
@@ -234,7 +234,7 @@ trait MatcherSpecBase
     timestamp: Option[Price],
     version: Byte,
     feeAsset: Asset,
-    expiration: Gen[Long] = maxTimeGen
+    expiration: Gen[Long]
   ): Gen[(Order, KeyPair)] =
     for {
       sender: KeyPair <- sender.map(Gen.const).getOrElse(accountGen)
@@ -293,7 +293,7 @@ trait MatcherSpecBase
     feeAsset: Asset = Waves,
     expiration: Gen[Long] = maxTimeGen
   ): Order =
-    valueFromGen(sellGenerator(pair, amount, price, sender, matcherFee, ts, version, feeAsset))._1
+    valueFromGen(sellGenerator(pair, amount, price, sender, matcherFee, ts, version, feeAsset, expiration))._1
 
   protected val orderTypeGenerator: Gen[OrderType] = Gen.oneOf(OrderType.BUY, OrderType.SELL)
 

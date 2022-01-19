@@ -50,8 +50,8 @@ object OrderValidator extends ScorexLogging {
 
   private[dex] def multiplyAmountByDouble(a: Long, d: Double): Long = (BigDecimal(a) * d).setScale(0, RoundingMode.HALF_UP).toLong
   private[dex] def multiplyPriceByDouble(p: Long, d: Double): Long = (BigDecimal(p) * d).setScale(0, RoundingMode.HALF_UP).toLong
-  private[dex] def multiplyFeeByBigDecimal(f: Long, d: BigDecimal): Long = (BigDecimal(f) * d).setScale(0, RoundingMode.CEILING).toLong
-  private[dex] def multiplyByDiscount(a: Long, d: BigDecimal): Long = (BigDecimal(a) * d).setScale(0, RoundingMode.CEILING).toLong
+  private[dex] def multiplyFeeByBigDecimal(f: Long, d: BigDecimal): Long = roundFee(BigDecimal(f) * d)
+  private[dex] def roundFee(fee: BigDecimal): Long = fee.setScale(0, RoundingMode.CEILING).toLong
 
   private def verifySignature(order: Order): FutureResult[Unit] = liftAsync {
     Verifier
@@ -242,17 +242,6 @@ object OrderValidator extends ScorexLogging {
         getValidFeeAssetForSettings(order, cs.getOrderFeeSettings(order.assetPair), cs.discount.map(_.asset))
     }
 
-  /** Converts fee in waves to fee in the specified asset, taking into account correction by the asset decimals */
-  private[dex] def convertFeeByAssetRate(feeInWaves: Long, asset: Asset, assetDecimals: Int, rateCache: RateCache): Result[Long] =
-    asset.fold(lift(feeInWaves)) { issuedAsset =>
-      rateCache.getRate(issuedAsset) map { assetRate =>
-        multiplyFeeByBigDecimal(
-          feeInWaves,
-          MatcherModel.correctRateByAssetDecimals(assetRate, assetDecimals)
-        )
-      } toRight error.RateNotFound(asset)
-    }
-
   private[dex] def getMinValidFeeForPercentFeeSettings(order: Order, percentSettings: PercentSettings, matchPrice: Long): Long = {
     lazy val receiveAmount = order.getReceiveAmount(order.amount, matchPrice).explicitGet()
     lazy val spentAmount = order.getSpendAmount(order.amount, matchPrice).explicitGet()
@@ -282,37 +271,47 @@ object OrderValidator extends ScorexLogging {
     rateCache: RateCache,
     extraFeeInWaves: Long = 0L,
     maybeDiscount: Option[BigDecimal] = None
-  ): Result[Long] = orderFeeSettings match {
-    case FixedSettings(_, fixedMinFee) => lift(fixedMinFee)
-    case cs: CompositeSettings =>
-      val maybeDiscount =
-        cs.discount.flatMap { case CompositeSettings.DiscountAssetSettings(asset, value) =>
-          if (asset == order.feeAsset)
-            Some(1 - (value / 100))
-          else
-            None
-        }
-      getMinValidFeeForSettings(order, cs.getOrderFeeSettings(order.assetPair), feeDecimals, rateCache, extraFeeInWaves, maybeDiscount)
-    case ds: DynamicSettings =>
-      for {
-        extraFee <- convertFeeByAssetRate(extraFeeInWaves, order.feeAsset, feeDecimals, rateCache)
-        fee <- convertFeeByAssetRate(ds.maxBaseFee, order.feeAsset, feeDecimals, rateCache).map { fee =>
-          maybeDiscount.fold(fee)(multiplyByDiscount(fee, _))
-        }
-      } yield fee + extraFee
-    case ps: PercentSettings =>
-      for {
-        extraFee <- convertFeeByAssetRate(extraFeeInWaves, order.feeAsset, feeDecimals, rateCache)
-        fee <- convertFeeByAssetRate(ps.minFeeInWaves, order.feeAsset, feeDecimals, rateCache)
-          .map { constMinValidFee =>
-            val orderMinValidFee = {
-              val fee = getMinValidFeeForPercentFeeSettings(order, ps, order.price)
-              maybeDiscount.fold(fee)(multiplyByDiscount(fee, _))
-            }
+  ): Result[Long] = {
 
-            orderMinValidFee max constMinValidFee
+    def convertFeeByAssetRate(feeInWaves: Long): Result[BigDecimal] =
+      order.feeAsset.fold(lift(BigDecimal(feeInWaves))) { issuedAsset =>
+        rateCache.getRate(issuedAsset).map { rate =>
+          feeInWaves * BigDecimal(MatcherModel.correctRateByAssetDecimals(rate, feeDecimals))
+        }.toRight(error.RateNotFound(order.feeAsset))
+      }
+
+    orderFeeSettings match {
+      case FixedSettings(_, fixedMinFee) => lift(fixedMinFee)
+      case cs: CompositeSettings =>
+        val maybeDiscount =
+          cs.discount.flatMap { case CompositeSettings.DiscountAssetSettings(asset, value) =>
+            if (asset == order.feeAsset)
+              Some(1 - (value / 100))
+            else
+              None
           }
-      } yield fee + extraFee
+        getMinValidFeeForSettings(order, cs.getOrderFeeSettings(order.assetPair), feeDecimals, rateCache, extraFeeInWaves, maybeDiscount)
+      case ds: DynamicSettings =>
+        for {
+          fee <- convertFeeByAssetRate(ds.maxBaseFee).map { fee =>
+            maybeDiscount.fold(fee)(_ * fee)
+          }
+          extraFee <- convertFeeByAssetRate(extraFeeInWaves)
+        } yield roundFee(fee + extraFee)
+      case ps: PercentSettings =>
+        for {
+          fee <- convertFeeByAssetRate(ps.minFeeInWaves)
+            .map { constMinValidFee =>
+              val orderMinValidFee = {
+                val fee = getMinValidFeeForPercentFeeSettings(order, ps, order.price)
+                maybeDiscount.fold(BigDecimal(fee))(_ * fee)
+              }
+
+              orderMinValidFee max constMinValidFee
+            }
+          extraFee <- convertFeeByAssetRate(extraFeeInWaves)
+        } yield roundFee(fee + extraFee)
+    }
   }
 
   private def validateFeeAsset(order: Order, orderFeeSettings: OrderFeeSettings): Result[Order] = {

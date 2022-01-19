@@ -62,7 +62,7 @@ object OrderFeeSettings {
       .deriveReader[PercentSettings]
       .validatedField(validationOf.field[PercentSettings, "minFeeInWaves"].mk(x => rules.gt0(x.minFeeInWaves)))
       .validatedField(validationOf.field[PercentSettings, "minFee"].mk { x =>
-        if (0 < x.minFee && x.minFee <= 100) none else s"${x.minFee} ∈ (0; 100]".some
+        if (x.minFee > 0 && x.minFee <= 100) none else s"${x.minFee} ∈ (0; 100]".some
       })
 
   }
@@ -90,7 +90,7 @@ object OrderFeeSettings {
       implicit val discountAssetSettingsConfigReader = semiauto
         .deriveReader[DiscountAssetSettings]
         .validatedField(validationOf.field[DiscountAssetSettings, "value"].mk { x =>
-          if (0 < x.value && x.value <= 100) none else s"${x.value} ∈ (0; 100]".some
+          if (x.value > 0 && x.value <= 100) none else s"${x.value} ∈ (0; 100]".some
         })
 
     }

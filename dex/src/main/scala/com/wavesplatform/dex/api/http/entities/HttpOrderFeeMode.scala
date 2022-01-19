@@ -86,7 +86,7 @@ object HttpOrderFeeMode {
     @ApiModelProperty(value = "Custom fee modes for specific asset pairs")
     custom: Map[AssetPair, HttpOrderFeeMode],
     @ApiModelProperty(value = "Discount asset settings")
-    discountAsset: Option[CompositeSettings.DiscountAssetSettings]
+    discount: Option[CompositeSettings.DiscountAssetSettings]
   ) extends HttpOrderFeeMode
 
   object FeeModeComposite {
@@ -114,11 +114,11 @@ object HttpOrderFeeMode {
     case x: OrderFeeSettings.DynamicSettings => FeeModeDynamic(x.maxBaseFee + matcherAccountFee, allRates)
     case OrderFeeSettings.FixedSettings(assetId, minFee) => FeeModeFixed(assetId, minFee)
     case OrderFeeSettings.PercentSettings(assetType, minFee, minFeeInWaves) => FeeModePercent(assetType, minFee, minFeeInWaves)
-    case OrderFeeSettings.CompositeSettings(default, custom, discountAsset, _) =>
+    case OrderFeeSettings.CompositeSettings(default, custom, discount, _) =>
       FeeModeComposite(
         fromSettings(default, matcherAccountFee, allRates),
         custom.view.mapValues(fromSettings(_, matcherAccountFee, allRates)).toMap,
-        discountAsset
+        discount
       )
   }
 

@@ -70,7 +70,7 @@ object OrderFeeSettings {
   final case class CompositeSettings(
     default: OrderFeeSettings,
     custom: Map[AssetPair, OrderFeeSettings] = Map.empty,
-    discountAsset: Option[CompositeSettings.DiscountAssetSettings] = None,
+    discount: Option[CompositeSettings.DiscountAssetSettings] = None,
     zeroFeeAccounts: Set[PublicKey] = Set.empty
   ) extends OrderFeeSettings {
 
@@ -81,7 +81,7 @@ object OrderFeeSettings {
 
   object CompositeSettings extends ConfigReaders {
 
-    final case class DiscountAssetSettings(asset: Asset, discount: BigDecimal)
+    final case class DiscountAssetSettings(asset: Asset, value: BigDecimal)
 
     object DiscountAssetSettings {
 
@@ -89,8 +89,8 @@ object OrderFeeSettings {
 
       implicit val discountAssetSettingsConfigReader = semiauto
         .deriveReader[DiscountAssetSettings]
-        .validatedField(validationOf.field[DiscountAssetSettings, "discount"].mk { x =>
-          if (0 < x.discount && x.discount <= 100) none else s"${x.discount} ∈ (0; 100]".some
+        .validatedField(validationOf.field[DiscountAssetSettings, "value"].mk { x =>
+          if (0 < x.value && x.value <= 100) none else s"${x.value} ∈ (0; 100]".some
         })
 
     }

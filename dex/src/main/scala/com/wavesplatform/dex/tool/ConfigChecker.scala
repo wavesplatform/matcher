@@ -174,7 +174,7 @@ sealed trait ConfigWriters {
         "default" -> orderFeeWriter.to(settings.default),
         "custom" -> genericMapWriter[AssetPair, OrderFeeSettings](assetPairToString).to(settings.custom),
         "zero-fee-accounts" -> implicitly[ConfigWriter[Set[PublicKey]]].to(settings.zeroFeeAccounts),
-        "discount-asset" -> implicitly[ConfigWriter[Option[CompositeSettings.DiscountAssetSettings]]].to(settings.discountAsset)
+        "discount" -> implicitly[ConfigWriter[Option[CompositeSettings.DiscountAssetSettings]]].to(settings.discount)
       ).asJava
     )
   }

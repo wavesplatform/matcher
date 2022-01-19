@@ -286,9 +286,9 @@ object OrderValidator extends ScorexLogging {
     case FixedSettings(_, fixedMinFee) => lift(fixedMinFee)
     case cs: CompositeSettings =>
       val maybeDiscount =
-        cs.discount.flatMap { case CompositeSettings.DiscountAssetSettings(asset, discount) =>
+        cs.discount.flatMap { case CompositeSettings.DiscountAssetSettings(asset, value) =>
           if (asset == order.feeAsset)
-            Some(1 - (discount / 100))
+            Some(1 - (value / 100))
           else
             None
         }

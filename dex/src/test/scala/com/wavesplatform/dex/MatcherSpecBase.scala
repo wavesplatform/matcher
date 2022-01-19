@@ -461,12 +461,11 @@ trait MatcherSpecBase
     }
   }
 
-  protected def orderV3WithFeeSettingsGenerator(extraFee: Long): Gen[(Order, OrderFeeSettings)] = {
+  protected def orderV3WithFeeSettingsGenerator(extraFee: Long): Gen[(Order, OrderFeeSettings)] =
     for {
       (sender, order) <- orderV3WithPredefinedFeeAssetGenerator()
       orderFeeSettings <- orderFeeSettingsGenerator(Some(order.feeAsset))
     } yield correctOrderByFeeSettings(order, sender, orderFeeSettings, extraFee = extraFee) -> orderFeeSettings
-  }
 
   private def correctOrderByFeeSettings(
     order: Order,

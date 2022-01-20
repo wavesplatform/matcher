@@ -361,7 +361,7 @@ class OrderValidatorSpecification
             )(order).value.futureValue
 
           orderFeeSettings match {
-            case _: DynamicSettings | _: PercentSettings =>
+            case _: DynamicSettings =>
               setAssetsAndMatcherAccountScriptsAndValidate(Some(trueScript), None, None) should produce("FeeNotEnough")
               setAssetsAndMatcherAccountScriptsAndValidate(None, Some(trueScript), None) should produce("FeeNotEnough")
               setAssetsAndMatcherAccountScriptsAndValidate(None, None, Some(trueScript)) should produce("FeeNotEnough")

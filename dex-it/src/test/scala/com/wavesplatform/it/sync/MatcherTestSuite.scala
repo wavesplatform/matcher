@@ -43,6 +43,22 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
     s"""waves.dex {
        |  price-assets = [ "$UsdnId", "$BtcId", "$UsdId", "WAVES", $EthId ]
        |  order-db.max-orders = $maxOrders
+       |  order-fee.-1 {
+       |    mode = composite
+       |    composite {
+       |      default {
+       |        mode = dynamic
+       |        dynamic {
+       |          base-maker-fee = ${0.003.waves}
+       |          base-taker-fee = ${0.003.waves}
+       |        }
+       |      }
+       |      discount {
+       |        asset = "$UsdnId"
+       |        value = 0
+       |      }
+       |    }
+       |  }
        |}""".stripMargin
   )
 

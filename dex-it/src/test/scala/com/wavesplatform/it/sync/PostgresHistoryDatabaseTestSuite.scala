@@ -44,7 +44,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
 
   private val maxOrders = 99
 
-  override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(
+  private val baseConf = ConfigFactory.parseString(
     s"""
        |waves.dex {
        |  price-assets = [ "$UsdId", "$BtcId", "WAVES", "$EthId", "$WctId" ]
@@ -54,6 +54,8 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
        |}
     """.stripMargin
   )
+
+  override protected val dexInitialSuiteConfig: Config = baseConf.withFallback(mkCompositeDynamicFeeSettings(BtcId))
 
   private def getPostgresConnectionCfgString(serverName: String, port: Int, appName: String): String =
     s"""
@@ -111,6 +113,11 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
     wavesNode1.start()
 
     broadcastAndAwait(IssueUsdTx, IssueWctTx, IssueEthTx, IssueBtcTx)
+    broadcastAndAwait(
+      mkTransfer(bob, alice, 100.btc, btc),
+      mkTransfer(alice, bob, 100.usd, usd),
+      mkTransfer(alice, bob, 100.eth, eth)
+    )
 
     dex1.start()
 
@@ -311,7 +318,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
   "Postgres order history should correctly save events: 1 big counter and 2 small submitted" in {
 
     def sellOrder: Order = mkOrderDP(bob, wctUsdPair, SELL, 100.wct, 0.35, matcherFee = 0.00000030.btc, feeAsset = btc)
-    val buyOrder = mkOrderDP(alice, wctUsdPair, BUY, 300.wct, 0.35, matcherFee = 0.00001703.eth, feeAsset = eth)
+    val buyOrder = mkOrderDP(alice, wctUsdPair, BUY, 300.wct, 0.35, matcherFee = 0.00000030.btc, feeAsset = btc)
 
     dex1.api.place(buyOrder)
 
@@ -368,10 +375,10 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
               buySide,
               wct.toString,
               usd.toString,
-              eth.toString,
+              btc.toString,
               300,
               0.35,
-              0.00001703,
+              0.00000030,
               finalizeTimestamp
             )
           )
@@ -379,9 +386,9 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
 
         getEventsInfoByOrderId(buyOrder.id()) should matchTo(
           List(
-            EventBriefInfo(buyOrder.idStr(), eventTrade, 100, 100, 0.00000567, 0.00000567, statusPartiallyFilled, OrderExecutedReason),
-            EventBriefInfo(buyOrder.idStr(), eventTrade, 100, 200, 0.00000567, 0.00001134, statusPartiallyFilled, OrderExecutedReason),
-            EventBriefInfo(buyOrder.idStr(), eventCancel, 0, 200, 0, 0.00001134, statusCancelled, OrderCanceledReason.RequestExecuted)
+            EventBriefInfo(buyOrder.idStr(), eventTrade, 100, 100, 0.0000001, 0.0000001, statusPartiallyFilled, OrderExecutedReason),
+            EventBriefInfo(buyOrder.idStr(), eventTrade, 100, 200, 0.0000001, 0.0000002, statusPartiallyFilled, OrderExecutedReason),
+            EventBriefInfo(buyOrder.idStr(), eventCancel, 0, 200, 0, 0.0000002, statusCancelled, OrderCanceledReason.RequestExecuted)
           )
         )
       }
@@ -389,6 +396,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
   }
 
   "Postgres order history should correctly save events with Waves as amount and fee" in {
+    dex1.restartWithNewSuiteConfig(baseConf.withFallback(mkCompositeDynamicFeeSettings(UsdId)))
     val buyOrder = mkOrderDP(alice, wavesUsdPair, BUY, 300.waves, 0.35, matcherFee = 0.00370300.waves, feeAsset = Waves)
     val sellOrder = mkOrderDP(bob, wavesUsdPair, SELL, 300.waves, 0.35, matcherFee = 0.30.usd, feeAsset = usd)
 
@@ -449,9 +457,9 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
   }
 
   "Postgres order history should correctly save events: 1 small counter and 1 big submitted" in {
-
+    dex1.restartWithNewSuiteConfig(baseConf.withFallback(mkCompositeDynamicFeeSettings(EthId)))
     val smallBuyOrder = mkOrderDP(alice, wctUsdPair, BUY, 300.wct, 0.35, 0.00001703.eth, feeAsset = eth)
-    val bigSellOrder = mkOrderDP(bob, wctUsdPair, SELL, 900.wct, 0.35, 0.00000030.btc, feeAsset = btc)
+    val bigSellOrder = mkOrderDP(bob, wctUsdPair, SELL, 900.wct, 0.35, 0.00001704.eth, feeAsset = eth)
 
     dex1.api.place(smallBuyOrder)
     dex1.api.place(bigSellOrder)
@@ -494,16 +502,16 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
             sellSide,
             wct.toString,
             usd.toString,
-            btc.toString,
+            eth.toString,
             900,
             0.35,
-            0.00000030,
+            0.00001704,
             None
           )
         )
 
         getEventsInfoByOrderId(bigSellOrder.id()) should matchTo(
-          List(EventBriefInfo(bigSellOrder.idStr(), eventTrade, 300, 300, 0.00000010, 0.00000010, statusPartiallyFilled, OrderExecutedReason))
+          List(EventBriefInfo(bigSellOrder.idStr(), eventTrade, 300, 300, 0.00000568, 0.00000568, statusPartiallyFilled, OrderExecutedReason))
         )
       }
     }

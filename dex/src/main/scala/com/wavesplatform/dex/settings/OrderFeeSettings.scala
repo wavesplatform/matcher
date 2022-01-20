@@ -90,7 +90,7 @@ object OrderFeeSettings {
       implicit val discountAssetSettingsConfigReader = semiauto
         .deriveReader[DiscountAssetSettings]
         .validatedField(validationOf.field[DiscountAssetSettings, "value"].mk { x =>
-          if (x.value > 0 && x.value <= 100) none else s"${x.value} ∈ (0; 100]".some
+          if (x.value >= 0 && x.value <= 100) none else s"${x.value} ∈ [0; 100]".some
         })
 
     }

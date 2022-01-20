@@ -20,10 +20,19 @@ class MakerTakerFeeTestSuite extends MatcherSuiteBase with TableDrivenPropertyCh
        |waves.dex {
        |  price-assets = [ "$UsdId", "WAVES" ]
        |  order-fee.-1 {
-       |    mode = dynamic
-       |    dynamic {
-       |      base-maker-fee = ${0.001.waves}
-       |      base-taker-fee = ${0.005.waves}
+       |    mode = composite
+       |    composite {
+       |      default {
+       |        mode = dynamic
+       |        dynamic {
+       |          base-maker-fee = ${0.001.waves}
+       |          base-taker-fee = ${0.005.waves}
+       |        }
+       |      }
+       |      discount {
+       |        asset = "$EthId"
+       |        value = 0
+       |      }
        |    }
        |  }
        |}
@@ -131,35 +140,67 @@ class MakerTakerFeeTestSuite extends MatcherSuiteBase with TableDrivenPropertyCh
            |  price-assets = [ "$UsdId", "WAVES" ]
            |  order-fee {
            |    -1: {
-           |      mode = dynamic
-           |      dynamic {
-           |        base-maker-fee = ${0.003.waves}
-           |        base-taker-fee = ${0.003.waves}
-           |        zero-fee-accounts = []
+           |      mode = composite
+           |      composite {
+           |        default {
+           |          mode = "dynamic"
+           |          dynamic {
+           |            base-maker-fee = ${0.003.waves}
+           |            base-taker-fee = ${0.003.waves}
+           |          }
+           |        }
+           |        discount {
+           |          asset = "$EthId"
+           |          value = 0
+           |        }
            |      }
            |    }
            |    $offset0: {
-           |      mode = dynamic
-           |      dynamic {
-           |        base-maker-fee = ${0.003.waves}
-           |        base-taker-fee = ${0.003.waves}
-           |        zero-fee-accounts = []
+           |      mode = composite
+           |      composite {
+           |        default {
+           |          mode = "dynamic"
+           |          dynamic {
+           |            base-maker-fee = ${0.003.waves}
+           |            base-taker-fee = ${0.003.waves}
+           |          }
+           |        }
+           |        discount {
+           |          asset = "$EthId"
+           |          value = 0
+           |        }
            |      }
            |    }
            |    $offset1: {
-           |      mode = dynamic
-           |      dynamic {
-           |        base-maker-fee = ${0.001.waves}
-           |        base-taker-fee = ${0.005.waves}
-           |        zero-fee-accounts = []
+           |      mode = composite
+           |      composite {
+           |        default {
+           |          mode = "dynamic"
+           |          dynamic {
+           |            base-maker-fee = ${0.001.waves}
+           |            base-taker-fee = ${0.005.waves}
+           |          }
+           |        }
+           |        discount {
+           |          asset = "$EthId"
+           |          value = 0
+           |        }
            |      }
            |    }
            |    $offset3: {
-           |      mode = dynamic
-           |      dynamic {
-           |        base-maker-fee = ${0.002.waves}
-           |        base-taker-fee = ${0.004.waves}
-           |        zero-fee-accounts = []
+           |      mode = composite
+           |      composite {
+           |        default {
+           |          mode = "dynamic"
+           |          dynamic {
+           |            base-maker-fee = ${0.002.waves}
+           |            base-taker-fee = ${0.004.waves}
+           |          }
+           |        }
+           |        discount {
+           |          asset = "$EthId"
+           |          value = 0
+           |        }
            |      }
            |    }
            |  }

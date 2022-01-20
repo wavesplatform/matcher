@@ -49,7 +49,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
 
     "send messages" - {
       "one match" in {
-        val order1 = mkOrderDP(bob, wavesUsdPair, OrderType.SELL, 5.waves, 3, matcherFee = 0.004.btc, feeAsset = btc)
+        val order1 = mkOrderDP(bob, wavesUsdPair, OrderType.SELL, 5.waves, 3)
         val order2 = mkOrderDP(alice, wavesUsdPair, OrderType.BUY, 1.waves, 4)
 
         Using.resource(mkWsInternalConnection()) { wsc =>
@@ -67,10 +67,10 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
             List(
               mkExecutedFullOrder(
                 order1,
-                OrderStatus.PartiallyFilled(1.waves, 0.0008.btc),
+                OrderStatus.PartiallyFilled(1.waves, 0.0006.waves),
                 avgWeighedPrice = 3,
                 executedAmount = 1,
-                executedFee = 0.0008,
+                executedFee = 0.0006,
                 executedPrice = 3,
                 totalExecutedPriceAssets = 3,
                 isMarket = false
@@ -97,7 +97,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
       }
 
       "market order match" in {
-        val order1 = mkOrderDP(bob, wavesUsdPair, OrderType.SELL, 1.waves, 3, matcherFee = 0.004.btc, feeAsset = btc)
+        val order1 = mkOrderDP(bob, wavesUsdPair, OrderType.SELL, 1.waves, 3)
         val order2 = mkOrderDP(bob, wavesUsdPair, OrderType.SELL, 2.waves, 3)
         val order3 = mkOrderDP(alice, wavesUsdPair, OrderType.BUY, 3.waves, 4)
 
@@ -116,10 +116,10 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
             List(
               mkExecutedFullOrder(
                 order1,
-                OrderStatus.Filled(1.waves, 0.004.btc),
+                OrderStatus.Filled(1.waves, 0.003.waves),
                 avgWeighedPrice = 3,
                 executedAmount = 1,
-                executedFee = 0.004,
+                executedFee = 0.003,
                 executedPrice = 3,
                 totalExecutedPriceAssets = 3,
                 isMarket = false
@@ -170,7 +170,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
       }
 
       "one cancel" in {
-        val order = mkOrderDP(bob, wavesUsdPair, OrderType.SELL, 5.waves, 3, matcherFee = 0.004.btc, feeAsset = btc)
+        val order = mkOrderDP(bob, wavesUsdPair, OrderType.SELL, 5.waves, 3)
         Using.resource(mkWsInternalConnection()) { wsc =>
 
           placeAndAwaitAtDex(order)
@@ -196,9 +196,9 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
       }
 
       "multiple matches" in {
-        val order1 = mkOrderDP(bob, wavesUsdPair, OrderType.SELL, 2.waves, 3, matcherFee = 0.004.btc, feeAsset = btc)
-        val order2 = mkOrderDP(bob, wavesUsdPair, OrderType.SELL, 2.waves, 2, matcherFee = 0.003.waves, feeAsset = Waves)
-        val order3 = mkOrderDP(alice, wavesUsdPair, OrderType.BUY, 4.waves, 4, matcherFee = 0.003.waves, feeAsset = Waves)
+        val order1 = mkOrderDP(bob, wavesUsdPair, OrderType.SELL, 2.waves, 3)
+        val order2 = mkOrderDP(bob, wavesUsdPair, OrderType.SELL, 2.waves, 2)
+        val order3 = mkOrderDP(alice, wavesUsdPair, OrderType.BUY, 4.waves, 4)
         val orders = List(order1, order2, order3)
 
         Using.resource(mkWsInternalConnection()) { wsc =>
@@ -213,10 +213,10 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
             List(
               mkExecutedFullOrder(
                 order1,
-                OrderStatus.Filled(2.waves, 0.004.btc),
+                OrderStatus.Filled(2.waves, 0.003.waves),
                 avgWeighedPrice = 3,
                 executedAmount = 2,
-                executedFee = 0.004,
+                executedFee = 0.003,
                 executedPrice = 3,
                 totalExecutedPriceAssets = 6,
                 isMarket = false
@@ -269,10 +269,10 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
       }
 
       "multiple matches and cancel on two asset pairs" in {
-        val order1 = mkOrderDP(bob, wavesUsdPair, OrderType.SELL, 2.waves, 3, matcherFee = 0.003.waves, feeAsset = Waves)
-        val order2 = mkOrderDP(alice, wavesBtcPair, OrderType.SELL, 1.waves, 0.005, matcherFee = 0.003.waves, feeAsset = Waves)
-        val order3 = mkOrderDP(alice, wavesUsdPair, OrderType.BUY, 3.waves, 4, matcherFee = 6.usd, feeAsset = usd)
-        val order4 = mkOrderDP(bob, wavesBtcPair, OrderType.BUY, 4.waves, 0.005, matcherFee = 0.004.btc, feeAsset = btc)
+        val order1 = mkOrderDP(bob, wavesUsdPair, OrderType.SELL, 2.waves, 3)
+        val order2 = mkOrderDP(alice, wavesBtcPair, OrderType.SELL, 1.waves, 0.005)
+        val order3 = mkOrderDP(alice, wavesUsdPair, OrderType.BUY, 3.waves, 4)
+        val order4 = mkOrderDP(bob, wavesBtcPair, OrderType.BUY, 4.waves, 0.005)
         val orders = List(order1, order2, order3, order4)
 
         Using.resource(mkWsInternalConnection()) { wsc =>
@@ -321,15 +321,15 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
             List(
               mkFullOrder(
                 order3,
-                OrderStatus.Cancelled(2.waves, 4.usd),
+                OrderStatus.Cancelled(2.waves, 0.002.waves),
                 avgWeighedPrice = 3
               ),
               mkExecutedFullOrder(
                 order3,
-                OrderStatus.PartiallyFilled(2.waves, 4.usd),
+                OrderStatus.PartiallyFilled(2.waves, 0.002.waves),
                 avgWeighedPrice = 3,
                 executedAmount = 2,
-                executedFee = 4,
+                executedFee = 0.002,
                 executedPrice = 3,
                 totalExecutedPriceAssets = 6,
                 isMarket = false
@@ -341,10 +341,10 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
             List(
               mkExecutedFullOrder(
                 order4,
-                OrderStatus.PartiallyFilled(1.waves, 0.001.btc),
+                OrderStatus.PartiallyFilled(1.waves, 0.00075.waves),
                 avgWeighedPrice = 0.005,
                 executedAmount = 1,
-                executedFee = 0.001,
+                executedFee = 0.00075,
                 executedPrice = 0.005,
                 totalExecutedPriceAssets = 0.005,
                 isMarket = false

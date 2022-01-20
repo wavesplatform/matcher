@@ -115,13 +115,26 @@ trait MatcherSuiteBase
     }
 
   protected def mkCompositeDynamicFeeSettings(
-    discountAssetId: ByteStr,
+    discountAssetId: ByteStr = ByteStr.empty,
     zeroFeeAccounts: Set[ByteStr] = Set.empty,
     offset: Long = -1,
     makerFee: Long = matcherFee,
     takerFee: Long = matcherFee,
     discountAssetValue: Long = 0L
-  ): Config =
+  ): Config = {
+    val discountCfg =
+      if (!discountAssetId.isEmpty)
+        ConfigFactory.parseString(
+          s"""
+             |waves.dex.order-fee.$offset.composite.discount {
+             |  asset = "${discountAssetId.base58}"
+             |  value = $discountAssetValue
+             |}
+             |""".stripMargin
+        )
+      else
+        ConfigFactory.empty()
+
     ConfigFactory.parseString(
       s"""waves.dex.order-fee.$offset {
          |  mode = composite
@@ -134,13 +147,10 @@ trait MatcherSuiteBase
          |        zero-fee-accounts = [${zeroFeeAccounts.map(x => s""" "${x.base58}" """.trim).mkString(",")}]
          |      }
          |    }
-         |    discount {
-         |      asset = "${discountAssetId.base58}"
-         |      value = $discountAssetValue
-         |    }
          |  }
          |}
        """.stripMargin
-    )
+    ).withFallback(discountCfg)
+  }
 
 }

@@ -221,8 +221,39 @@ class OrderBookDirectoryActorSpecification
       }
     }
 
-    "delete order books" is pending
-    "forward new orders to order books" is pending
+    "delete order books" in {
+      val apdb = mkAssetPairsDB
+      val obsdb = mkOrderBookSnapshotDb
+      val pair = AssetPair(randomAssetId, randomAssetId)
+
+      matcherHadOrderBooksBefore(apdb, obsdb, pair -> 9L)
+      val ob = emptyOrderBookRefs
+      val actor = system.actorOf(
+        OrderBookDirectoryActor.props(
+          matcherSettings,
+          apdb,
+          obsdb,
+          doNothingOnRecovery,
+          ob,
+          (assetPair, _, matcher) => Props(new DeletingActor(matcher, assetPair, Some(9L))),
+          assetsCache,
+          _.asRight
+        )
+      )
+
+      val probe = TestProbe()
+      probe.send(actor, ValidatedCommandWithMeta(10L, 0L, ValidatedCommand.DeleteOrderBook(pair)))
+
+      eventually {
+        probe.send(actor, GetMarkets)
+        probe.expectMsgPF() { case xs @ Seq() =>
+          xs.size shouldBe 0
+        }
+
+        probe.send(actor, OrderBookDirectoryActor.GetSnapshotOffsets)
+        probe.expectMsg(OrderBookDirectoryActor.SnapshotOffsetsResponse(Map.empty))
+      }
+    }
 
     // snapshotOffset == 17
     val pair23 = AssetPair(IssuedAsset(ByteStr(Array(1))), IssuedAsset(ByteStr(Array(2)))) // key = 2-3, snapshot offset = 9: 9, 26, 43, ...

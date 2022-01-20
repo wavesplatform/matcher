@@ -215,12 +215,13 @@ trait MatcherSpecBase
     matcherFee: Option[Long],
     version: Byte,
     timestamp: Option[Long],
-    feeAsset: Asset
+    feeAsset: Asset,
+    expiration: Gen[Long]
   ): Gen[(Order, KeyPair)] =
     for {
       sender: KeyPair <- sender.map(Gen.const).getOrElse(accountGen)
       timestamp: Long <- timestamp.map(Gen.const).getOrElse(createdTimeGen)
-      expiration: Long <- maxTimeGen
+      expiration: Long <- expiration
       matcherFee: Long <- matcherFee.map(Gen.const).getOrElse(maxWavesAmountGen)
     } yield (Order.buy(sender, MatcherAccount, pair, amount, price, timestamp, expiration, matcherFee, version, feeAsset), sender)
 
@@ -232,12 +233,13 @@ trait MatcherSpecBase
     matcherFee: Option[Price],
     timestamp: Option[Price],
     version: Byte,
-    feeAsset: Asset
+    feeAsset: Asset,
+    expiration: Gen[Long]
   ): Gen[(Order, KeyPair)] =
     for {
       sender: KeyPair <- sender.map(Gen.const).getOrElse(accountGen)
       timestamp: Long <- timestamp.map(Gen.const).getOrElse(createdTimeGen)
-      expiration: Long <- maxTimeGen
+      expiration: Long <- expiration
       matcherFee: Long <- matcherFee.map(Gen.const).getOrElse(maxWavesAmountGen)
     } yield (Order.sell(sender, MatcherAccount, pair, amount, price, timestamp, expiration, matcherFee, version, feeAsset), sender)
 
@@ -249,9 +251,10 @@ trait MatcherSpecBase
     matcherFee: Option[Long] = None,
     ts: Option[Long] = None,
     version: Byte = 1,
-    feeAsset: Asset = Waves
+    feeAsset: Asset = Waves,
+    expiration: Gen[Long] = maxTimeGen
   ): Order =
-    rawBuy(pair, amount, (price * Order.PriceConstant).toLong, sender, matcherFee, ts, version, feeAsset)
+    rawBuy(pair, amount, (price * Order.PriceConstant).toLong, sender, matcherFee, ts, version, feeAsset, expiration)
 
   protected def rawBuy(
     pair: AssetPair,
@@ -261,9 +264,10 @@ trait MatcherSpecBase
     matcherFee: Option[Long] = None,
     ts: Option[Long] = None,
     version: Byte = 1,
-    feeAsset: Asset = Waves
+    feeAsset: Asset = Waves,
+    expiration: Gen[Long] = maxTimeGen
   ): Order =
-    valueFromGen(buyGenerator(pair, amount, price, sender, matcherFee, version, ts, feeAsset))._1
+    valueFromGen(buyGenerator(pair, amount, price, sender, matcherFee, version, ts, feeAsset, expiration))._1
 
   protected def sell(
     pair: AssetPair,
@@ -273,9 +277,10 @@ trait MatcherSpecBase
     matcherFee: Option[Long] = None,
     ts: Option[Long] = None,
     version: Byte = 1,
-    feeAsset: Asset = Waves
+    feeAsset: Asset = Waves,
+    expiration: Gen[Long] = maxTimeGen
   ): Order =
-    rawSell(pair, amount, (price * Order.PriceConstant).toLong, sender, matcherFee, ts, version, feeAsset)
+    rawSell(pair, amount, (price * Order.PriceConstant).toLong, sender, matcherFee, ts, version, feeAsset, expiration)
 
   protected def rawSell(
     pair: AssetPair,
@@ -285,9 +290,10 @@ trait MatcherSpecBase
     matcherFee: Option[Long] = None,
     ts: Option[Long] = None,
     version: Byte = 1,
-    feeAsset: Asset = Waves
+    feeAsset: Asset = Waves,
+    expiration: Gen[Long] = maxTimeGen
   ): Order =
-    valueFromGen(sellGenerator(pair, amount, price, sender, matcherFee, ts, version, feeAsset))._1
+    valueFromGen(sellGenerator(pair, amount, price, sender, matcherFee, ts, version, feeAsset, expiration))._1
 
   protected val orderTypeGenerator: Gen[OrderType] = Gen.oneOf(OrderType.BUY, OrderType.SELL)
 

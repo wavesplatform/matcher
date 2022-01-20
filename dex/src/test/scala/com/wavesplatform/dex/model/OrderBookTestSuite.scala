@@ -2,7 +2,6 @@ package com.wavesplatform.dex.model
 
 import java.math.BigInteger
 import java.nio.ByteBuffer
-
 import cats.syntax.semigroup._
 import com.wavesplatform.dex.codecs.OrderBookSideSnapshotCodecs
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
@@ -370,15 +369,31 @@ class OrderBookTestSuite
   }
 
   "cleanup expired buy orders" in {
-    pending
+    val pair = AssetPair(IssuedAsset(ByteStr("BTC".getBytes)), IssuedAsset(ByteStr("USD".getBytes)))
+    val sellOrder = LimitOrder(sell(pair, 1000, 2000, ts = Some(nowTs)))
+    val buyOrder = LimitOrder(buy(pair, 1000, 2000, ts = Some(nowTs), expiration = 500))
+
+    val OrderBookUpdates(ob, _, _, _) =
+      OrderBook.empty
+        .append(sellOrder, nowTs)
+        .orderBook
+        .append(buyOrder, nowTs + 500)
+
+    ob.bids should have size 0
   }
 
   "cleanup expired sell orders" in {
-    pending
-  }
+    val pair = AssetPair(IssuedAsset(ByteStr("BTC".getBytes)), IssuedAsset(ByteStr("USD".getBytes)))
+    val sellOrder = LimitOrder(sell(pair, 1000, 2000, ts = Some(nowTs), expiration = 500))
+    val buyOrder = LimitOrder(buy(pair, 1000, 2000, ts = Some(nowTs)))
 
-  "aggregate levels for snapshot, preserving order" in {
-    pending
+    val OrderBookUpdates(ob, _, _, _) =
+      OrderBook.empty
+        .append(buyOrder, nowTs)
+        .orderBook
+        .append(sellOrder, nowTs + 500)
+
+    ob.asks should have size 0
   }
 
   "LimitOrder serialization" in forAll(limitOrderGenerator) { x =>

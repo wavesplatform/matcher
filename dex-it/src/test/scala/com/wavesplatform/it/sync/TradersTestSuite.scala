@@ -258,33 +258,6 @@ class TradersTestSuite extends MatcherSuiteBase {
             broadcastAndAwait(mkTransfer(alice, bob, transferAmount, Waves, matcherFee))
           }
         }
-
-        "moved feeAsset, fee asset doesn't take part in trading pair" in {
-
-          val bobAssetQuantity = 10000
-
-          val newFeeAssetTx = mkIssue(bob, "FeeCoin", bobAssetQuantity, 2, issueFee)
-          val newFeeAsset = IssuedAsset(newFeeAssetTx.id())
-
-          broadcastAndAwait(newFeeAssetTx)
-          dex1.api.upsertAssetRate(newFeeAsset, 2)
-
-          val bobOrder = mkOrder(bob, wctUsdPair, SELL, 400L, 2 * 100000000L, matcherFee = 1, feeAsset = newFeeAsset)
-
-          dex1.api.place(bobOrder)
-          dex1.api.getReservedBalanceWithApiKey(bob) shouldBe Map(wct -> 400, newFeeAsset -> 1)
-
-          broadcastAndAwait(mkTransfer(bob, alice, bobAssetQuantity, newFeeAsset, matcherFee))
-          val currHeight = wavesNode1.api.currentHeight
-
-          withClue(s"The order '${bobOrder.idStr()}' was cancelled") {
-            dex1.api.waitForOrderStatus(bobOrder, Status.Cancelled)
-          }
-
-          dex1.api.cancelAllOrdersWithSig(alice)
-          dex1.api.cancelAllOrdersWithSig(bob)
-          wavesNode1.api.waitForHeight(currHeight + 1)
-        }
       }
     }
 

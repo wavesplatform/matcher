@@ -461,11 +461,11 @@ trait MatcherSpecBase
     }
   }
 
-  protected def orderV3WithFeeSettingsGenerator(extraFee: Long): Gen[(Order, OrderFeeSettings)] =
+  protected val orderV3WithFeeSettingsGenerator: Gen[(Order, OrderFeeSettings)] =
     for {
       (sender, order) <- orderV3WithPredefinedFeeAssetGenerator()
       orderFeeSettings <- orderFeeSettingsGenerator(Some(order.feeAsset))
-    } yield correctOrderByFeeSettings(order, sender, orderFeeSettings, extraFee = extraFee) -> orderFeeSettings
+    } yield correctOrderByFeeSettings(order, sender, orderFeeSettings) -> orderFeeSettings
 
   private def correctOrderByFeeSettings(
     order: Order,
@@ -473,8 +473,7 @@ trait MatcherSpecBase
     orderFeeSettings: OrderFeeSettings,
     matcherFeeAssetForDynamicSettings: Option[Asset] = None,
     rateForPercentSettings: Option[Double] = Some(1.0),
-    rateForDynamicSettings: Option[Double] = None,
-    extraFee: Long = 0L
+    rateForDynamicSettings: Option[Double] = None
   ): Order = {
 
     val correctedOrder = (order.version, orderFeeSettings) match {
@@ -493,7 +492,7 @@ trait MatcherSpecBase
               percentSettings,
               getDefaultAssetDescriptions(order.feeAsset).decimals,
               rateCache
-            ).explicitGet() + extraFee
+            ).explicitGet()
           }
       case (_, ds @ DynamicSettings(_, _, _)) =>
         order

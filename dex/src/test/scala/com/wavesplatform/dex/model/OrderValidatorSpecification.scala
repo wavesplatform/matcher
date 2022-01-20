@@ -842,7 +842,7 @@ class OrderValidatorSpecification
     }
 
     "verify script of feeAsset" in {
-      forAll(orderV3WithFeeSettingsGenerator(smartFee)) { case (order, orderFeeSettings) =>
+      forAll(orderV3WithFeeSettingsGenerator) { case (order, orderFeeSettings) =>
         def setFeeAssetScriptAndValidate(matcherFeeAssetScript: Option[RunScriptResult]): Result[Order] = {
           rateCache.upsertRate(order.feeAsset, 1.0)
           validateByBlockchain(orderFeeSettings)(

@@ -116,11 +116,11 @@ trait MatcherSuiteBase
 
   protected def mkCompositeDynamicFeeSettings(
     discountAssetId: ByteStr = ByteStr.empty,
+    discountAssetValue: Long = 0L,
     zeroFeeAccounts: Set[ByteStr] = Set.empty,
     offset: Long = -1,
     makerFee: Long = matcherFee,
-    takerFee: Long = matcherFee,
-    discountAssetValue: Long = 0L
+    takerFee: Long = matcherFee
   ): Config = {
     val discountCfg =
       if (!discountAssetId.isEmpty)

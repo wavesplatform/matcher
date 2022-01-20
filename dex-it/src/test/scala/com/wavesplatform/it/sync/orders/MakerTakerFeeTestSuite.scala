@@ -16,28 +16,8 @@ class MakerTakerFeeTestSuite extends MatcherSuiteBase with TableDrivenPropertyCh
   private val taker = alice
 
   override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(
-    s"""
-       |waves.dex {
-       |  price-assets = [ "$UsdId", "WAVES" ]
-       |  order-fee.-1 {
-       |    mode = composite
-       |    composite {
-       |      default {
-       |        mode = dynamic
-       |        dynamic {
-       |          base-maker-fee = ${0.001.waves}
-       |          base-taker-fee = ${0.005.waves}
-       |        }
-       |      }
-       |      discount {
-       |        asset = "$EthId"
-       |        value = 0
-       |      }
-       |    }
-       |  }
-       |}
-       """.stripMargin
-  )
+    s"""waves.dex.price-assets = [ "$UsdId", "WAVES" ]""".stripMargin
+  ).withFallback(mkCompositeDynamicFeeSettings(EthId, offset = -1, makerFee = 0.001.waves, takerFee = 0.005.waves))
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
@@ -135,78 +115,12 @@ class MakerTakerFeeTestSuite extends MatcherSuiteBase with TableDrivenPropertyCh
 
     dex1.safeRestartWithNewSuiteConfig(
       ConfigFactory.parseString(
-        s"""
-           |waves.dex {
-           |  price-assets = [ "$UsdId", "WAVES" ]
-           |  order-fee {
-           |    -1: {
-           |      mode = composite
-           |      composite {
-           |        default {
-           |          mode = "dynamic"
-           |          dynamic {
-           |            base-maker-fee = ${0.003.waves}
-           |            base-taker-fee = ${0.003.waves}
-           |          }
-           |        }
-           |        discount {
-           |          asset = "$EthId"
-           |          value = 0
-           |        }
-           |      }
-           |    }
-           |    $offset0: {
-           |      mode = composite
-           |      composite {
-           |        default {
-           |          mode = "dynamic"
-           |          dynamic {
-           |            base-maker-fee = ${0.003.waves}
-           |            base-taker-fee = ${0.003.waves}
-           |          }
-           |        }
-           |        discount {
-           |          asset = "$EthId"
-           |          value = 0
-           |        }
-           |      }
-           |    }
-           |    $offset1: {
-           |      mode = composite
-           |      composite {
-           |        default {
-           |          mode = "dynamic"
-           |          dynamic {
-           |            base-maker-fee = ${0.001.waves}
-           |            base-taker-fee = ${0.005.waves}
-           |          }
-           |        }
-           |        discount {
-           |          asset = "$EthId"
-           |          value = 0
-           |        }
-           |      }
-           |    }
-           |    $offset3: {
-           |      mode = composite
-           |      composite {
-           |        default {
-           |          mode = "dynamic"
-           |          dynamic {
-           |            base-maker-fee = ${0.002.waves}
-           |            base-taker-fee = ${0.004.waves}
-           |          }
-           |        }
-           |        discount {
-           |          asset = "$EthId"
-           |          value = 0
-           |        }
-           |      }
-           |    }
-           |  }
-           |}
-       """.stripMargin
+        s""" waves.dex.price-assets = [ "$UsdId", "WAVES" ] """.stripMargin
       )
+        .withFallback(mkCompositeDynamicFeeSettings(EthId, offset = -1, makerFee = 0.003.waves, takerFee = 0.003.waves))
+        .withFallback(mkCompositeDynamicFeeSettings(EthId, offset = offset0, makerFee = 0.003.waves, takerFee = 0.003.waves))
+        .withFallback(mkCompositeDynamicFeeSettings(EthId, offset = offset1, makerFee = 0.001.waves, takerFee = 0.005.waves))
+        .withFallback(mkCompositeDynamicFeeSettings(EthId, offset = offset3, makerFee = 0.002.waves, takerFee = 0.004.waves))
     )
 
     withClue("maker - DynamicSettings(0.003.waves, 0.003.waves), taker - DynamicSettings(0.001.waves, 0.005.waves), fee in Waves") {

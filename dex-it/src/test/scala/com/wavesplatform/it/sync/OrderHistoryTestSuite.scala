@@ -19,25 +19,8 @@ import scala.math.BigDecimal.RoundingMode.CEILING
 class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
   override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(
-    s"""waves.dex {
-       |price-assets = [ "$UsdId" ]
-       |order-fee.-1 {
-       |  mode = composite
-       |  composite {
-       |    default {
-       |      mode = dynamic
-       |      dynamic {
-       |        base-maker-fee = ${0.003.waves}
-       |        base-taker-fee = ${0.003.waves}
-       |      }
-       |    }
-       |    discount {
-       |      asset = "$EthId"
-       |      value = 0
-       |    }
-       |  }
-       |}}""".stripMargin
-  )
+    s"""waves.dex.price-assets = [ "$UsdId" ]""".stripMargin
+  ).withFallback(mkCompositeDynamicFeeSettings(EthId))
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()

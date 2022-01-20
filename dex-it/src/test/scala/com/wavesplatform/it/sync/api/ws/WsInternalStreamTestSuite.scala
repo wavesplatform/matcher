@@ -22,27 +22,14 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
   private val messagesInterval = 100.millis
 
   override protected val dexInitialSuiteConfig: Config = ConfigFactory
-    .parseString(s"""waves.dex {
-                    |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
-                    |  web-sockets.internal-broadcast.messages-interval = $messagesInterval
-                    |  order-fee.-1 {
-                    |    mode = composite
-                    |    composite {
-                    |      default {
-                    |        mode = "dynamic"
-                    |        dynamic {
-                    |          base-maker-fee = ${0.003.waves}
-                    |          base-taker-fee = ${0.003.waves}
-                    |        }
-                    |      }
-                    |      discount {
-                    |        asset = "$BtcId"
-                    |        value = 0
-                    |      }
-                    |    }
-                    |  }
-                    |}""".stripMargin)
+    .parseString(
+      s"""waves.dex {
+         |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
+         |  web-sockets.internal-broadcast.messages-interval = $messagesInterval
+         |}""".stripMargin
+    )
     .withFallback(jwtPublicKeyConfig)
+    .withFallback(mkCompositeDynamicFeeSettings(BtcId))
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()

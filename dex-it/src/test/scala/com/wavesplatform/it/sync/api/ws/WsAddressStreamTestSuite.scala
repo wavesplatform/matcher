@@ -35,6 +35,22 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
     .parseString(s"""waves.dex {
                     |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
                     |  web-sockets.external-client-handler.subscriptions.max-address-number = 3
+                    |  order-fee.-1 {
+                    |    mode = composite
+                    |    composite {
+                    |      default {
+                    |        mode = dynamic
+                    |        dynamic {
+                    |          base-maker-fee = ${0.003.waves}
+                    |          base-taker-fee = ${0.003.waves}
+                    |        }
+                    |      }
+                    |      discount {
+                    |        asset = "$UsdId"
+                    |        value = 0
+                    |      }
+                    |    }
+                    |  }
                     |}""".stripMargin)
     .withFallback(jwtPublicKeyConfig)
 

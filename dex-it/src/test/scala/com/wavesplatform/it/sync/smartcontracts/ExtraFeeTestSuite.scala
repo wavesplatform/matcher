@@ -153,7 +153,7 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
 
       withClue("with asset pair with different decimals count") {
 
-        dex1.restartWithNewSuiteConfig(mkCompositeDynamicFeeSettings(assetWith2DecTx.id()))
+        dex1.safeRestartWithNewSuiteConfig(mkCompositeDynamicFeeSettings(assetWith2DecTx.id()))
 
         dex1.api.upsertAssetRate(assetWith2Dec, 4)
 
@@ -204,7 +204,7 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
   }
 
   "with asset fee assigned false script" in {
-    dex1.restartWithNewSuiteConfig(mkCompositeDynamicFeeSettings(falseFeeAssetTx.id()))
+    dex1.safeRestartWithNewSuiteConfig(mkCompositeDynamicFeeSettings(falseFeeAssetTx.id()))
 
     val oneSmartPair = createAssetPair(asset0, asset1)
     val feeAssetRate = 0.0005

@@ -396,7 +396,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
   }
 
   "Postgres order history should correctly save events with Waves as amount and fee" in {
-    dex1.restartWithNewSuiteConfig(baseConf.withFallback(mkCompositeDynamicFeeSettings(UsdId)))
+    dex1.safeRestartWithNewSuiteConfig(baseConf.withFallback(mkCompositeDynamicFeeSettings(UsdId)))
     val buyOrder = mkOrderDP(alice, wavesUsdPair, BUY, 300.waves, 0.35, matcherFee = 0.00370300.waves, feeAsset = Waves)
     val sellOrder = mkOrderDP(bob, wavesUsdPair, SELL, 300.waves, 0.35, matcherFee = 0.30.usd, feeAsset = usd)
 
@@ -457,7 +457,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase with HasPostgres
   }
 
   "Postgres order history should correctly save events: 1 small counter and 1 big submitted" in {
-    dex1.restartWithNewSuiteConfig(baseConf.withFallback(mkCompositeDynamicFeeSettings(EthId)))
+    dex1.safeRestartWithNewSuiteConfig(baseConf.withFallback(mkCompositeDynamicFeeSettings(EthId)))
     val smallBuyOrder = mkOrderDP(alice, wctUsdPair, BUY, 300.wct, 0.35, 0.00001703.eth, feeAsset = eth)
     val bigSellOrder = mkOrderDP(bob, wctUsdPair, SELL, 900.wct, 0.35, 0.00001704.eth, feeAsset = eth)
 

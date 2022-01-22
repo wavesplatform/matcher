@@ -391,54 +391,8 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
 
       dex1.api.cancelAllOrdersWithSig(alice)
     }
-
-//    "are partial filled both" in {
-//      val params = Map(9.waves -> 213L, 1900.waves -> 1L, 2000.waves -> 1L)
-//      for ((aliceOrderAmount, aliceBalanceDiff) <- params) {
-//
-//        val bobBtcBalance = wavesNode1.api.balance(bob, btc)
-//        val bobWavesBalance = wavesNode1.api.balance(bob, Waves)
-//
-//        val aliceWavesBalance = wavesNode1.api.balance(alice, Waves)
-//        val aliceBtcBalance = wavesNode1.api.balance(alice, btc)
-//        val aliceEthBalance = wavesNode1.api.balance(alice, eth)
-//
-//        val matcherEthBalance = wavesNode1.api.balance(matcher, eth)
-//
-//        upsertAssetRate(btc -> btcRate, eth -> ethRate)
-//        val bobOrder = mkBobOrder
-//        placeAndAwaitAtDex(bobOrder)
-//        dex1.api.getReservedBalanceWithApiKey(bob).keys should not contain Waves
-//
-//        val aliceOrder = mkOrder(
-//          owner = alice,
-//          pair = wavesBtcPair,
-//          orderType = OrderType.SELL,
-//          amount = aliceOrderAmount,
-//          price = 50000L,
-//          matcherFee = 1920L,
-//          feeAsset = eth
-//        )
-//        dex1.api.place(aliceOrder)
-//
-//        Map(bobOrder -> Status.Filled, aliceOrder -> Status.PartiallyFilled).foreach(Function.tupled(dex1.api.waitForOrderStatus))
-//        List(bobOrder, aliceOrder).foreach(waitForOrderAtNode(_))
-//
-//        eventually {
-//          wavesNode1.api.balance(bob, btc) shouldBe (bobBtcBalance - 50150L)
-//          wavesNode1.api.balance(alice, btc) shouldBe (aliceBtcBalance + 50000L)
-//          wavesNode1.api.balance(alice, eth) shouldBe (aliceEthBalance - aliceBalanceDiff)
-//          wavesNode1.api.balance(matcher, eth) shouldBe (matcherEthBalance + aliceBalanceDiff)
-//          wavesNode1.api.balance(bob, Waves) shouldBe (bobWavesBalance + 1.waves)
-//          wavesNode1.api.balance(alice, Waves) shouldBe (aliceWavesBalance - 1.waves)
-//        }
-//
-//        dex1.api.cancelAllOrdersWithSig(alice)
-//        List(btc, eth).foreach(dex1.api.deleteAssetRate)
-//      }
-//    }
   }
-//
+
 //  "cancellation of" - {
 //
 //    val btcRate = 0.0005

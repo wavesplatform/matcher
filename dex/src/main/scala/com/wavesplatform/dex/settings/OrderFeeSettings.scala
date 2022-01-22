@@ -57,7 +57,7 @@ object OrderFeeSettings {
 
   final case class PercentSettings(assetType: AssetType, minFee: Double, minFeeInWaves: Long) extends OrderFeeSettings {
 
-    def getValidFeeAsset(order: Order): Asset =
+    def getFeeAsset(order: Order): Asset =
       assetType match {
         case AssetType.Amount => order.assetPair.amountAsset
         case AssetType.Price => order.assetPair.priceAsset

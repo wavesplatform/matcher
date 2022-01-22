@@ -229,7 +229,7 @@ object OrderValidator extends ScorexLogging {
     orderFeeSettings match {
       case _: DynamicSettings => Set(Waves) ++ maybeDiscountAsset
       case FixedSettings(assetId, _) => Set(assetId)
-      case ps: PercentSettings => Set(ps.getValidFeeAsset(order)) ++ maybeDiscountAsset
+      case ps: PercentSettings => Set(ps.getFeeAsset(order)) ++ maybeDiscountAsset
       case cs: CompositeSettings =>
         getValidFeeAssetForSettings(order, cs.getOrderFeeSettings(order.assetPair), cs.discount.map(_.asset))
     }
@@ -278,9 +278,9 @@ object OrderValidator extends ScorexLogging {
     case FixedSettings(_, fixedMinFee) => lift(fixedMinFee)
     case cs: CompositeSettings =>
       val maybeDiscount =
-        cs.discount.flatMap { case CompositeSettings.DiscountAssetSettings(asset, value) =>
-          if (asset == order.feeAsset)
-            Some(1 - (value / 100))
+        cs.discount.flatMap { case CompositeSettings.DiscountAssetSettings(discountAsset, discountValue) =>
+          if (discountAsset == order.feeAsset)
+            Some(1 - (discountValue / 100))
           else
             None
         }
@@ -291,11 +291,11 @@ object OrderValidator extends ScorexLogging {
     case ps: PercentSettings =>
       convertFeeByAssetRate(ps.minFeeInWaves, order.feeAsset, feeDecimals, rateCache)
         .map { constMinValidFee =>
-          val validFeeAsset = ps.getValidFeeAsset(order)
+          val psFeeAsset = ps.getFeeAsset(order)
           val orderMinValidFee = {
             val fee1 = getMinValidFeeForPercentFeeSettings(order, ps, order.price)
             val fee2 = maybeDiscount.fold(fee1)(multiplyByDiscount(fee1, _))
-            if (validFeeAsset == order.feeAsset)
+            if (psFeeAsset == order.feeAsset)
               fee2
             else
               ??? //TODO

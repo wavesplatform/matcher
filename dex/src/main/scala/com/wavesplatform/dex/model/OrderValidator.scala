@@ -229,15 +229,7 @@ object OrderValidator extends ScorexLogging {
     orderFeeSettings match {
       case _: DynamicSettings => Set(Waves) ++ maybeDiscountAsset
       case FixedSettings(assetId, _) => Set(assetId)
-      case PercentSettings(assetType, _, _) =>
-        Set(
-          assetType match {
-            case AssetType.Amount => order.assetPair.amountAsset
-            case AssetType.Price => order.assetPair.priceAsset
-            case AssetType.Receiving => order.getReceiveAssetId
-            case AssetType.Spending => order.getSpendAssetId
-          }
-        ) ++ maybeDiscountAsset
+      case ps: PercentSettings => Set(ps.getValidFeeAsset(order)) ++ maybeDiscountAsset
       case cs: CompositeSettings =>
         getValidFeeAssetForSettings(order, cs.getOrderFeeSettings(order.assetPair), cs.discount.map(_.asset))
     }
@@ -299,9 +291,14 @@ object OrderValidator extends ScorexLogging {
     case ps: PercentSettings =>
       convertFeeByAssetRate(ps.minFeeInWaves, order.feeAsset, feeDecimals, rateCache)
         .map { constMinValidFee =>
+          val validFeeAsset = ps.getValidFeeAsset(order)
           val orderMinValidFee = {
-            val fee = getMinValidFeeForPercentFeeSettings(order, ps, order.price)
-            maybeDiscount.fold(fee)(multiplyByDiscount(fee, _))
+            val fee1 = getMinValidFeeForPercentFeeSettings(order, ps, order.price)
+            val fee2 = maybeDiscount.fold(fee1)(multiplyByDiscount(fee1, _))
+            if (validFeeAsset == order.feeAsset)
+              fee2
+            else
+              ??? //TODO
           }
 
           orderMinValidFee max constMinValidFee

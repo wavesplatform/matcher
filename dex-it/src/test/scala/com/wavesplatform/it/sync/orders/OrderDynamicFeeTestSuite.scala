@@ -314,83 +314,84 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
       waitForOrderAtNode(bobOrder)
 
       eventually(wavesNode1.api.balance(bob, eth) shouldBe bobEthBalance - 3000L)
-
-      upsertAssetRate(eth -> ethRate)
     }
   }
 
-//  "orders with non-waves asset fee" - {
-//    val btcRate = 0.0005
-//    val ethRate = 0.0064
-//
-//    "are full filled" in {
-//      val bobBtcBalance = wavesNode1.api.balance(bob, btc)
-//      val aliceBtcBalance = wavesNode1.api.balance(alice, btc)
-//      val aliceEthBalance = wavesNode1.api.balance(alice, eth)
-//      val matcherEthBalance = wavesNode1.api.balance(matcher, eth)
-//      val matcherBtcBalance = wavesNode1.api.balance(matcher, btc)
-//      val bobWavesBalance = wavesNode1.api.balance(bob, Waves)
-//      val aliceWavesBalance = wavesNode1.api.balance(alice, Waves)
-//
-//      upsertAssetRate(btc -> btcRate, eth -> ethRate)
-//      val bobOrder = mkBobOrder
-//      placeAndAwaitAtDex(bobOrder)
-//      dex1.api.getReservedBalanceWithApiKey(bob).keys should not contain Waves
-//
-//      val aliceOrder = mkAliceOrder
-//      dex1.api.place(aliceOrder)
-//
-//      List(bobOrder, aliceOrder).foreach(dex1.api.waitForOrderStatus(_, Status.Filled))
-//      List(bobOrder, aliceOrder).foreach(waitForOrderAtNode(_))
-//
-//      eventually {
-//        wavesNode1.api.balance(bob, btc) shouldBe (bobBtcBalance - 50150L)
-//        wavesNode1.api.balance(alice, btc) shouldBe (aliceBtcBalance + 50000L)
-//        wavesNode1.api.balance(alice, eth) shouldBe (aliceEthBalance - 1920L)
-//        wavesNode1.api.balance(matcher, eth) shouldBe (matcherEthBalance + 1920L)
-//        wavesNode1.api.balance(matcher, btc) shouldBe (matcherBtcBalance + 150L)
-//        wavesNode1.api.balance(bob, Waves) shouldBe (bobWavesBalance + 1.waves)
-//        wavesNode1.api.balance(alice, Waves) shouldBe (aliceWavesBalance - 1.waves)
-//      }
-//
-//      List(btc, eth).foreach(dex1.api.deleteAssetRate)
-//    }
-//
-//    "are partial filled" in {
-//      val bobBtcBalance = wavesNode1.api.balance(bob, btc)
-//      val aliceBtcBalance = wavesNode1.api.balance(alice, btc)
-//      val aliceEthBalance = wavesNode1.api.balance(alice, eth)
-//      val matcherEthBalance = wavesNode1.api.balance(matcher, eth)
-//
-//      upsertAssetRate(btc -> btcRate, eth -> ethRate)
-//      val bobOrder = mkBobOrder
-//      dex1.api.place(bobOrder)
-//
-//      val aliceOrder = mkOrder(
-//        owner = alice,
-//        pair = wavesBtcPair,
-//        orderType = OrderType.SELL,
-//        amount = 2.waves,
-//        price = 50000L,
-//        matcherFee = 1920L,
-//        feeAsset = eth
-//      )
-//      dex1.api.place(aliceOrder)
-//
-//      Map(bobOrder -> Status.Filled, aliceOrder -> Status.PartiallyFilled).foreach(Function.tupled(dex1.api.waitForOrderStatus))
-//      List(bobOrder, aliceOrder).foreach(waitForOrderAtNode(_))
-//
-//      eventually {
-//        wavesNode1.api.balance(bob, btc) shouldBe (bobBtcBalance - 50150L)
-//        wavesNode1.api.balance(alice, btc) shouldBe (aliceBtcBalance + 50000L)
-//        wavesNode1.api.balance(alice, eth) shouldBe (aliceEthBalance - 960L)
-//        wavesNode1.api.balance(matcher, eth) shouldBe (matcherEthBalance + 960L)
-//      }
-//
-//      dex1.api.cancelAllOrdersWithSig(alice)
-//      List(btc, eth).foreach(dex1.api.deleteAssetRate)
-//    }
-//
+  "orders with non-waves asset fee" - {
+    val btcRate = 0.001
+    val ethRate = 0.01
+
+    "are full filled" in {
+      upsertAssetRate(btc -> btcRate, eth -> ethRate)
+
+      val bobBtcBalance = wavesNode1.api.balance(bob, btc)
+      val bobWavesBalance = wavesNode1.api.balance(bob, Waves)
+      val bobEthBalance = wavesNode1.api.balance(bob, eth)
+      val aliceBtcBalance = wavesNode1.api.balance(alice, btc)
+      val aliceWavesBalance = wavesNode1.api.balance(alice, Waves)
+      val aliceEthBalance = wavesNode1.api.balance(alice, eth)
+      val matcherEthBalance = wavesNode1.api.balance(matcher, eth)
+
+      val bobOrder = mkBobOrder(eth, 3000L)
+      placeAndAwaitAtDex(bobOrder)
+      dex1.api.getReservedBalanceWithApiKey(bob).keys should not contain Waves
+
+      val aliceOrder = mkAliceOrder(eth, 3000L)
+      dex1.api.place(aliceOrder)
+
+      List(bobOrder, aliceOrder).foreach(dex1.api.waitForOrderStatus(_, Status.Filled))
+      List(bobOrder, aliceOrder).foreach(waitForOrderAtNode(_))
+
+      eventually {
+        wavesNode1.api.balance(bob, btc) shouldBe (bobBtcBalance - AcceptedOrder.calcAmountOfPriceAsset(1.waves, 50000L))
+        wavesNode1.api.balance(bob, Waves) shouldBe (bobWavesBalance + AcceptedOrder.correctedAmountOfAmountAsset(1.waves, 50000L))
+        wavesNode1.api.balance(bob, eth) shouldBe (bobEthBalance - 3000L)
+        wavesNode1.api.balance(alice, btc) shouldBe (aliceBtcBalance + AcceptedOrder.calcAmountOfPriceAsset(1.waves, 50000L))
+        wavesNode1.api.balance(alice, Waves) shouldBe (aliceWavesBalance - AcceptedOrder.correctedAmountOfAmountAsset(1.waves, 50000L))
+        wavesNode1.api.balance(alice, eth) shouldBe (aliceEthBalance - 3000L)
+        wavesNode1.api.balance(matcher, eth) shouldBe (matcherEthBalance + 2 * 3000L)
+      }
+    }
+
+    "are partially filled" in {
+      val bobBtcBalance = wavesNode1.api.balance(bob, btc)
+      val bobWavesBalance = wavesNode1.api.balance(bob, Waves)
+      val bobEthBalance = wavesNode1.api.balance(bob, eth)
+      val aliceBtcBalance = wavesNode1.api.balance(alice, btc)
+      val aliceWavesBalance = wavesNode1.api.balance(alice, Waves)
+      val aliceEthBalance = wavesNode1.api.balance(alice, eth)
+      val matcherEthBalance = wavesNode1.api.balance(matcher, eth)
+
+      val bobOrder = mkBobOrder(eth, 3000L)
+      dex1.api.place(bobOrder)
+
+      val aliceOrder = mkOrder(
+        owner = alice,
+        pair = wavesBtcPair,
+        orderType = OrderType.SELL,
+        amount = 2.waves,
+        price = 50000L,
+        matcherFee = 3000L,
+        feeAsset = eth
+      )
+      dex1.api.place(aliceOrder)
+
+      Map(bobOrder -> Status.Filled, aliceOrder -> Status.PartiallyFilled).foreach(Function.tupled(dex1.api.waitForOrderStatus))
+      List(bobOrder, aliceOrder).foreach(waitForOrderAtNode(_))
+
+      eventually {
+        wavesNode1.api.balance(bob, btc) shouldBe (bobBtcBalance - AcceptedOrder.calcAmountOfPriceAsset(1.waves, 50000L))
+        wavesNode1.api.balance(bob, Waves) shouldBe (bobWavesBalance + AcceptedOrder.correctedAmountOfAmountAsset(1.waves, 50000L))
+        wavesNode1.api.balance(bob, eth) shouldBe (bobEthBalance - 3000L)
+        wavesNode1.api.balance(alice, btc) shouldBe (aliceBtcBalance + AcceptedOrder.calcAmountOfPriceAsset(1.waves, 50000L))
+        wavesNode1.api.balance(alice, Waves) shouldBe (aliceWavesBalance - AcceptedOrder.correctedAmountOfAmountAsset(1.waves, 50000L))
+        wavesNode1.api.balance(alice, eth) shouldBe (aliceEthBalance - 1500L)
+        wavesNode1.api.balance(matcher, eth) shouldBe (matcherEthBalance + 3000L + 1500L)
+      }
+
+      dex1.api.cancelAllOrdersWithSig(alice)
+    }
+
 //    "are partial filled both" in {
 //      val params = Map(9.waves -> 213L, 1900.waves -> 1L, 2000.waves -> 1L)
 //      for ((aliceOrderAmount, aliceBalanceDiff) <- params) {
@@ -436,7 +437,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
 //        List(btc, eth).foreach(dex1.api.deleteAssetRate)
 //      }
 //    }
-//  }
+  }
 //
 //  "cancellation of" - {
 //

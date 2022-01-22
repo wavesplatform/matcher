@@ -217,11 +217,6 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
     val ethRate = 0.01
 
     "only waves, eth (as discount asset) are allowed" in {
-      dex1.safeRestartWithNewSuiteConfig(
-        ConfigFactory.parseString(
-          s""" waves.dex.order-fee.-1.composite.discount.asset="$EthId" """
-        ).withFallback(dexInitialSuiteConfig)
-      )
       upsertAssetRate(btc -> btcRate, eth -> ethRate)
 
       dex1.tryApi.place(mkBobOrder(btc, 300L)) should failWith(
@@ -496,7 +491,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
 
         dex1.safeRestartWithNewSuiteConfig(
           ConfigFactory.parseString(
-            s""" waves.dex.order-fee.-1.composite.discount.asset="$wct" """
+            s""" waves.dex.order-fee.-1.composite.discount.asset="$WctId" """
           ).withFallback(dexInitialSuiteConfig)
         )
 
@@ -520,6 +515,31 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
         wavesNode1.api.balance(bob, wct) shouldBe (bobWctBalance - 1)
 
         dex1.api.cancelOneOrAllInPairOrdersWithSig(alice, aliceOrderId)
+      }
+
+      withClue("buy order") {
+        broadcastAndAwait(mkTransfer(bob, alice, 1, wct, 0.001.waves))
+
+        val aliceWctBalance = wavesNode1.api.balance(alice, wct)
+        val aliceWavesBalance = wavesNode1.api.balance(alice, Waves)
+        val aliceUsdBalance = wavesNode1.api.balance(alice, usd)
+
+        val aliceOrderId = mkOrder(alice, wavesUsdPair, OrderType.BUY, 851064L, 238, 1, feeAsset = wct)
+        val bobOrderId = mkOrder(bob, wavesUsdPair, OrderType.SELL, 1.waves, 238, matcherFee, version = 3)
+
+        dex1.api.place(aliceOrderId)
+        dex1.api.place(bobOrderId)
+
+        dex1.api.waitForOrderStatus(aliceOrderId, Status.Filled)
+        dex1.api.waitForOrderStatus(bobOrderId, Status.PartiallyFilled)
+
+        waitForOrderAtNode(aliceOrderId)
+
+        wavesNode1.api.balance(alice, wct) shouldBe (aliceWctBalance - 1)
+        wavesNode1.api.balance(alice, Waves) shouldBe (aliceWavesBalance + 840337L)
+        wavesNode1.api.balance(alice, usd) shouldBe (aliceUsdBalance - 2)
+
+        dex1.api.cancelOneOrAllInPairOrdersWithSig(bob, bobOrderId)
       }
 
       withClue("price asset is not fee asset") {
@@ -548,38 +568,6 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
         wavesNode1.api.balance(bob, usd) shouldBe (bobUsdBalance + 1)
 
         dex1.api.cancelOneOrAllInPairOrdersWithSig(alice, aliceOrderId)
-      }
-
-      withClue("buy order") {
-
-        dex1.safeRestartWithNewSuiteConfig(
-          ConfigFactory.parseString(
-            s""" waves.dex.order-fee.-1.composite.discount.asset="$wct" """
-          ).withFallback(dexInitialSuiteConfig)
-        )
-
-        broadcastAndAwait(mkTransfer(bob, alice, 1, wct, 0.001.waves))
-
-        val aliceWctBalance = wavesNode1.api.balance(alice, wct)
-        val aliceWavesBalance = wavesNode1.api.balance(alice, Waves)
-        val aliceUsdBalance = wavesNode1.api.balance(alice, usd)
-
-        val aliceOrderId = mkOrder(alice, wavesUsdPair, OrderType.BUY, 851064L, 238, 1, feeAsset = wct)
-        val bobOrderId = mkOrder(bob, wavesUsdPair, OrderType.SELL, 1.waves, 238, matcherFee, version = 3)
-
-        dex1.api.place(aliceOrderId)
-        dex1.api.place(bobOrderId)
-
-        dex1.api.waitForOrderStatus(aliceOrderId, Status.Filled)
-        dex1.api.waitForOrderStatus(bobOrderId, Status.PartiallyFilled)
-
-        waitForOrderAtNode(aliceOrderId)
-
-        wavesNode1.api.balance(alice, wct) shouldBe (aliceWctBalance - 1)
-        wavesNode1.api.balance(alice, Waves) shouldBe (aliceWavesBalance + 840337L)
-        wavesNode1.api.balance(alice, usd) shouldBe (aliceUsdBalance - 2)
-
-        dex1.api.cancelOneOrAllInPairOrdersWithSig(bob, bobOrderId)
       }
 
       Seq(wct, btc, usd).foreach(dex1.api.deleteAssetRate)
@@ -635,7 +623,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
 
       dex1.safeRestartWithNewSuiteConfig(
         ConfigFactory.parseString(
-          s""" waves.dex.order-fee.-1.composite.discount.asset="$btc" """
+          s""" waves.dex.order-fee.-1.composite.discount.asset="$BtcId" """
         ).withFallback(dexInitialSuiteConfig)
       )
 
@@ -672,7 +660,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
 
         dex1.safeRestartWithNewSuiteConfig(
           ConfigFactory.parseString(
-            s""" waves.dex.order-fee.-1.composite.discount.asset="$usd" """
+            s""" waves.dex.order-fee.-1.composite.discount.asset="$UsdId" """
           ).withFallback(dexInitialSuiteConfig)
         )
 

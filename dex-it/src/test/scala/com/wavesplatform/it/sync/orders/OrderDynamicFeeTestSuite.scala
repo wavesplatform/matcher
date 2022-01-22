@@ -215,7 +215,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
     val btcRate = 0.001
     val ethRate = 0.01
 
-    "only waves, eth (as discount asset) are supported" in {
+    "only waves, eth (as discount asset) are allowed" in {
       dex1.safeRestartWithNewSuiteConfig(
         ConfigFactory.parseString(
           s""" waves.dex.order-fee.-1.composite.discount.asset="$EthId" """
@@ -248,7 +248,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
     }
 
     "asset became not supported after order was partially filled" in {
-      upsertAssetRate(btc -> btcRate, eth -> ethRate)
+      upsertAssetRate(eth -> ethRate)
 
       val bobEthBalance = wavesNode1.api.balance(bob, eth)
       val bobWavesBalance = wavesNode1.api.balance(bob, Waves)
@@ -298,24 +298,25 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
       }
     }
 
-//    "rates of asset pair was changed while order is placed" in {
-//      val bobBtcBalance = wavesNode1.api.balance(bob, btc)
-//      val bobOrder = mkBobOrder
-//
-//      dex1.api.place(bobOrder)
-//
-//      val newBtcRate = btcRate * 2
-//
-//      dex1.httpApi.upsertAssetRate(btc, newBtcRate).code shouldBe StatusCode.Ok
-//      dex1.api.getReservedBalanceWithApiKey(bob)(btc) shouldBe 50150L
-//      dex1.api.place(mkAliceOrder)
-//
-//      waitForOrderAtNode(bobOrder)
-//
-//      eventually(wavesNode1.api.balance(bob, btc) shouldBe (bobBtcBalance - 50150L))
-//
-//      List(btc, eth).foreach(dex1.api.deleteAssetRate)
-//    }
+    "rates of asset pair was changed while order is placed (reserved balance should stay the same)" in {
+      upsertAssetRate(eth -> ethRate)
+      val bobEthBalance = wavesNode1.api.balance(bob, eth)
+      val bobOrder = mkBobOrder(eth, 3000L)
+      dex1.api.place(bobOrder)
+
+      dex1.api.getReservedBalanceWithApiKey(bob)(eth) shouldBe 3000L
+
+      upsertAssetRate(eth -> ethRate * 2)
+
+      dex1.api.getReservedBalanceWithApiKey(bob)(eth) shouldBe 3000L
+      dex1.api.place(mkAliceOrder(eth, 3000L))
+
+      waitForOrderAtNode(bobOrder)
+
+      eventually(wavesNode1.api.balance(bob, eth) shouldBe bobEthBalance - 3000L)
+
+      upsertAssetRate(eth -> ethRate)
+    }
   }
 
 //  "orders with non-waves asset fee" - {

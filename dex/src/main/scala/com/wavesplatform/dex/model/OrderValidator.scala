@@ -297,13 +297,13 @@ object OrderValidator extends ScorexLogging {
             val fee2 = maybeDiscount.fold(fee1)(multiplyByDiscount(fee1, _))
             if (psFeeAsset == order.feeAsset)
               Right(fee2)
-            else {
+            else
               for {
-                psFeeAssetRate <- rateCache.getRate(psFeeAsset).map(BigDecimal(_)).toRight(error.RateNotFound(psFeeAsset))
-                feeAssetRate <- rateCache.getRate(order.feeAsset).map(BigDecimal(_)).toRight(error.RateNotFound(order.feeAsset))
-              } yield ()
-              ??? //TODO
-            }
+                psFeeAssetRate <- rateCache.getRate(psFeeAsset).toRight(error.RateNotFound(psFeeAsset))
+                feeAssetRate <- rateCache.getRate(order.feeAsset).toRight(error.RateNotFound(order.feeAsset))
+                psFeeAssetRateCorrected = BigDecimal(MatcherModel.correctRateByAssetDecimals(psFeeAssetRate, assetDecimals(psFeeAsset)))
+                feeAssetRateCorrected = BigDecimal(MatcherModel.correctRateByAssetDecimals(feeAssetRate, assetDecimals(order.feeAsset)))
+              } yield multiplyFeeByBigDecimal(fee2, feeAssetRateCorrected / psFeeAssetRateCorrected)
           }
 
           orderMinValidFee.map(_ max constMinValidFee)

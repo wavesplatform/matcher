@@ -344,8 +344,14 @@ class OrderValidatorSpecification
         case (order, _, orderFeeSettings) =>
           val trueScript = RunScriptResult.Allowed
 
+          val maybePsAsset = orderFeeSettings match {
+            case s: PercentSettings => Some(s.getFeeAsset(order))
+            case _ => None
+          }
+
           val rateCache = RateCache(TestRateDb()).futureValue
             .unsafeTap(_.upsertRate(order.feeAsset, 1.0))
+            .unsafeTap(rc => maybePsAsset.foreach(rc.upsertRate(_, 1.0)))
 
           def setAssetsAndMatcherAccountScriptsAndValidate(
             amountAssetScript: Option[RunScriptResult],

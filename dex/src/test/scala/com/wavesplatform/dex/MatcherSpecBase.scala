@@ -486,6 +486,7 @@ trait MatcherSpecBase
           .updateFeeAsset(OrderValidator.getValidFeeAssetForSettings(order, percentSettings).head)
           .updateFee {
             rateForPercentSettings.foreach(rateCache.upsertRate(order.feeAsset, _))
+            rateForPercentSettings.foreach(rateCache.upsertRate(percentSettings.getFeeAsset(order), _))
 
             OrderValidator.getMinValidFeeForSettings(
               order,

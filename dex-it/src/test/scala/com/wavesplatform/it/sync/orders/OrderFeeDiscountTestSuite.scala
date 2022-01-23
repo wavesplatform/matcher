@@ -8,6 +8,7 @@ final class OrderFeeDiscountTestSuite extends OrderFeeBaseTestSuite {
 
   "OrderFeeDiscountTestSuite" - {
     val btcRate = 0.001
+    val usdRate = 0.02
 
     "(dynamic settings) should work without discount" in {
       upsertAssetRate(btc -> btcRate)
@@ -104,9 +105,67 @@ final class OrderFeeDiscountTestSuite extends OrderFeeBaseTestSuite {
       wavesNode1.api.balance(alice, btc) shouldBe aliceBtcBalance - 0.0015.btc
     }
 
-    "(percent settings [price]) should work without discount" in {}
+    "(percent settings [price]) should work without discount" in {
+      upsertAssetRate(btc -> btcRate, usd -> usdRate)
+      dex1.restartWithNewSuiteConfig(
+        ConfigFactory.parseString(
+          """
+            |waves.dex.order-fee.-1.composite {
+            |  default {
+            |    mode = percent
+            |    percent.asset-type = price
+            |  }
+            |  discount.value = 0
+            |}
+            |""".stripMargin
+        ).withFallback(dexInitialSuiteConfig)
+      )
 
-    "(percent settings [price]) should apply discount" in {}
+      dex1.tryApi.place(
+        mkOrder(alice, wavesUsdPair, OrderType.BUY, 100.waves, 1.usd, matcherFee = 0.14.btc, feeAsset = btc)
+      ) should failWith(
+        FeeNotEnough.code,
+        s"Required 0.15 $BtcId as fee for this order, but given 0.14 $BtcId"
+      )
+
+      val aliceBtcBalance = wavesNode1.api.balance(alice, btc)
+      val aliceOrder = mkOrder(alice, wavesUsdPair, OrderType.BUY, 100.waves, 1.usd, matcherFee = 0.15.btc, feeAsset = btc)
+      dex1.api.place(aliceOrder)
+      dex1.api.place(mkOrder(bob, wavesUsdPair, OrderType.SELL, 100.waves, 1.usd, matcherFee = 0.15.btc, feeAsset = btc))
+      waitForOrderAtNode(aliceOrder)
+      wavesNode1.api.balance(alice, btc) shouldBe aliceBtcBalance - 0.15.btc
+    }
+
+    "(percent settings [price]) should apply discount" in {
+      upsertAssetRate(btc -> btcRate, usd -> usdRate)
+      dex1.restartWithNewSuiteConfig(
+        ConfigFactory.parseString(
+          """
+            |waves.dex.order-fee.-1.composite {
+            |  default {
+            |    mode = percent
+            |    percent.asset-type = price
+            |  }
+            |  discount.value = 50
+            |}
+            |""".stripMargin
+        ).withFallback(dexInitialSuiteConfig)
+      )
+
+      dex1.tryApi.place(
+        mkOrder(alice, wavesUsdPair, OrderType.BUY, 100.waves, 1.usd, matcherFee = 0.074.btc, feeAsset = btc)
+      ) should failWith(
+        FeeNotEnough.code,
+        s"Required 0.075 $BtcId as fee for this order, but given 0.074 $BtcId"
+      )
+
+      val aliceBtcBalance = wavesNode1.api.balance(alice, btc)
+      val aliceOrder = mkOrder(alice, wavesUsdPair, OrderType.BUY, 100.waves, 1.usd, matcherFee = 0.075.btc, feeAsset = btc)
+      dex1.api.place(aliceOrder)
+      dex1.api.place(mkOrder(bob, wavesUsdPair, OrderType.SELL, 100.waves, 1.usd, matcherFee = 0.075.btc, feeAsset = btc))
+      waitForOrderAtNode(aliceOrder)
+      wavesNode1.api.balance(alice, btc) shouldBe aliceBtcBalance - 0.075.btc
+    }
   }
 
   override protected def beforeAll(): Unit = {

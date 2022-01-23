@@ -53,8 +53,10 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
     broadcastAndAwait(IssueWctTx, IssueUsdTx, IssueEthTx, IssueBtcTx)
-    broadcastAndAwait(mkTransfer(bob, alice, 100.btc, btc))
-    broadcastAndAwait(mkTransfer(alice, bob, 100.eth, eth))
+    broadcastAndAwait(
+      mkTransfer(bob, alice, 100.btc, btc),
+      mkTransfer(alice, bob, 100.eth, eth)
+    )
     dex1.start()
   }
 

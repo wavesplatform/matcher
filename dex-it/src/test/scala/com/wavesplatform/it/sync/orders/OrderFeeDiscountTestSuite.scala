@@ -48,7 +48,7 @@ final class OrderFeeDiscountTestSuite extends OrderFeeBaseTestSuite {
       wavesNode1.api.balance(alice, btc) shouldBe aliceBtcBalance - 0.0000015.btc
     }
 
-    "(percent settings) should work without discount" in {
+    "(percent settings [amount]) should work without discount" in {
       upsertAssetRate(btc -> btcRate)
       dex1.restartWithNewSuiteConfig(
         ConfigFactory.parseString(
@@ -76,7 +76,7 @@ final class OrderFeeDiscountTestSuite extends OrderFeeBaseTestSuite {
       wavesNode1.api.balance(alice, btc) shouldBe aliceBtcBalance - 0.003.btc
     }
 
-    "(percent settings) should apply discount" in {
+    "(percent settings [amount]) should apply discount" in {
       upsertAssetRate(btc -> btcRate)
       dex1.restartWithNewSuiteConfig(
         ConfigFactory.parseString(
@@ -103,6 +103,10 @@ final class OrderFeeDiscountTestSuite extends OrderFeeBaseTestSuite {
       waitForOrderAtNode(aliceOrder)
       wavesNode1.api.balance(alice, btc) shouldBe aliceBtcBalance - 0.0015.btc
     }
+
+    "(percent settings [price]) should work without discount" in {}
+
+    "(percent settings [price]) should apply discount" in {}
   }
 
   override protected def beforeAll(): Unit = {

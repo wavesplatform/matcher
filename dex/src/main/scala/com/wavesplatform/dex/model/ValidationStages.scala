@@ -58,7 +58,7 @@ object ValidationStages {
           matcherPublicKey,
           blacklistedAddresses,
           settings,
-          orderAssetsDecimals(o.feeAsset),
+          orderAssetsDecimals,
           rateCache,
           actualOrderFeeSettings
         )(o)

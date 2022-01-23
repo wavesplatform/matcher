@@ -490,7 +490,7 @@ trait MatcherSpecBase
             OrderValidator.getMinValidFeeForSettings(
               order,
               percentSettings,
-              getDefaultAssetDescriptions(order.feeAsset).decimals,
+              getDefaultAssetDescriptions(_).decimals,
               rateCache
             ).explicitGet()
           }

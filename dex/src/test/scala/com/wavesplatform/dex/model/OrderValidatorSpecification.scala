@@ -1080,7 +1080,7 @@ class OrderValidatorSpecification
       o.matcherPublicKey,
       ba,
       matcherSettings,
-      getDefaultAssetDescriptions(o.feeAsset).decimals,
+      getDefaultAssetDescriptions(_).decimals,
       rateCache,
       DynamicSettings.symmetric(matcherFee)
     )
@@ -1099,7 +1099,7 @@ class OrderValidatorSpecification
         Set.empty,
         matcherSettings
           .copy(allowedAssetPairs = allowedAssetPairs, allowedOrderVersions = allowedOrderVersions, blacklistedAssets = blacklistedAssets),
-        assetDecimals(order.feeAsset),
+        assetDecimals,
         rateCache,
         orderFeeSettings
       )(order)

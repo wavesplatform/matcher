@@ -300,10 +300,10 @@ object OrderValidator extends ScorexLogging {
             else
               for {
                 psFeeAssetRate <- rateCache.getRate(psFeeAsset).toRight(error.RateNotFound(psFeeAsset))
-                feeAssetRate <- rateCache.getRate(order.feeAsset).toRight(error.RateNotFound(order.feeAsset))
+                discountAssetRate <- rateCache.getRate(order.feeAsset).toRight(error.RateNotFound(order.feeAsset))
                 psFeeAssetRateCorrected = BigDecimal(MatcherModel.correctRateByAssetDecimals(psFeeAssetRate, assetDecimals(psFeeAsset)))
-                feeAssetRateCorrected = BigDecimal(MatcherModel.correctRateByAssetDecimals(feeAssetRate, assetDecimals(order.feeAsset)))
-              } yield multiplyFeeByBigDecimal(fee2, feeAssetRateCorrected / psFeeAssetRateCorrected)
+                discountAssetRateCorrected = BigDecimal(MatcherModel.correctRateByAssetDecimals(discountAssetRate, assetDecimals(order.feeAsset)))
+              } yield multiplyFeeByBigDecimal(fee2, discountAssetRateCorrected / psFeeAssetRateCorrected)
           }
 
           orderMinValidFee.map(_ max constMinValidFee)

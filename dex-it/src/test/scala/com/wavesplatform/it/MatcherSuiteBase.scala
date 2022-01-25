@@ -3,6 +3,7 @@ package com.wavesplatform.it
 import cats.instances.FutureInstances
 import cats.syntax.either._
 import com.softwaremill.diffx.{Derived, Diff}
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpV0OrderBook
 import com.wavesplatform.dex.asset.DoubleOps
 import com.wavesplatform.dex.domain.account.KeyPair
@@ -112,5 +113,44 @@ trait MatcherSuiteBase
       placeAndAwaitAtDex(o)
       o.id()
     }
+
+  protected def mkCompositeDynamicFeeSettings(
+    discountAssetId: ByteStr = ByteStr.empty,
+    discountAssetValue: Long = 0L,
+    zeroFeeAccounts: Set[ByteStr] = Set.empty,
+    offset: Long = -1,
+    makerFee: Long = matcherFee,
+    takerFee: Long = matcherFee
+  ): Config = {
+    val discountCfg =
+      if (!discountAssetId.isEmpty)
+        ConfigFactory.parseString(
+          s"""
+             |waves.dex.order-fee.$offset.composite.discount {
+             |  asset = "${discountAssetId.base58}"
+             |  value = $discountAssetValue
+             |}
+             |""".stripMargin
+        )
+      else
+        ConfigFactory.empty()
+
+    ConfigFactory.parseString(
+      s"""waves.dex.order-fee.$offset {
+         |  mode = composite
+         |  composite {
+         |    default {
+         |      mode = "dynamic"
+         |      dynamic {
+         |        base-maker-fee = $makerFee
+         |        base-taker-fee = $takerFee
+         |        zero-fee-accounts = [${zeroFeeAccounts.map(x => s""" "${x.base58}" """.trim).mkString(",")}]
+         |      }
+         |    }
+         |  }
+         |}
+       """.stripMargin
+    ).withFallback(discountCfg)
+  }
 
 }

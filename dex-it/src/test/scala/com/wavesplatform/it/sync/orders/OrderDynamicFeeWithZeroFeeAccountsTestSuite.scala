@@ -171,16 +171,10 @@ final class OrderDynamicFeeWithZeroFeeAccountsTestSuite extends MatcherSuiteBase
          |waves.dex {
          |  price-assets = [ "$UsdId", "WAVES" ]
          |  allowed-order-versions = [1, 2, 3]
-         |  order-fee.-1 {
-         |    mode = dynamic
-         |    dynamic {
-         |      base-maker-fee = $matcherFee
-         |      base-taker-fee = $matcherFee
-         |      zero-fee-accounts = ["${carol.publicKey.base58}"]
-         |    }
-         |  }
          |}
        """.stripMargin
+    ).withFallback(
+      mkCompositeDynamicFeeSettings(UsdId, zeroFeeAccounts = Set(carol.publicKey))
     )
 
   private def test[A](f: InitialBalances => A): Unit = {

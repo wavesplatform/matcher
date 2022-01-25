@@ -22,15 +22,19 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
   private val messagesInterval = 100.millis
 
   override protected val dexInitialSuiteConfig: Config = ConfigFactory
-    .parseString(s"""waves.dex {
-                    |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
-                    |  web-sockets.internal-broadcast.messages-interval = $messagesInterval
-                    |}""".stripMargin)
+    .parseString(
+      s"""waves.dex {
+         |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
+         |  web-sockets.internal-broadcast.messages-interval = $messagesInterval
+         |}""".stripMargin
+    )
     .withFallback(jwtPublicKeyConfig)
+    .withFallback(mkCompositeDynamicFeeSettings(BtcId))
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
     broadcastAndAwait(IssueBtcTx, IssueUsdTx)
+    broadcastAndAwait(mkTransfer(bob, alice, 100.btc, btc))
     dex1.start()
     dex1.api.upsertAssetRate(usd, 2)
     dex1.api.upsertAssetRate(btc, 0.1)
@@ -271,7 +275,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
       "multiple matches and cancel on two asset pairs" in {
         val order1 = mkOrderDP(bob, wavesUsdPair, OrderType.SELL, 2.waves, 3, matcherFee = 0.003.waves, feeAsset = Waves)
         val order2 = mkOrderDP(alice, wavesBtcPair, OrderType.SELL, 1.waves, 0.005, matcherFee = 0.003.waves, feeAsset = Waves)
-        val order3 = mkOrderDP(alice, wavesUsdPair, OrderType.BUY, 3.waves, 4, matcherFee = 6.usd, feeAsset = usd)
+        val order3 = mkOrderDP(alice, wavesUsdPair, OrderType.BUY, 3.waves, 3, matcherFee = 0.004.btc, feeAsset = btc)
         val order4 = mkOrderDP(bob, wavesBtcPair, OrderType.BUY, 4.waves, 0.005, matcherFee = 0.004.btc, feeAsset = btc)
         val orders = List(order1, order2, order3, order4)
 
@@ -321,15 +325,15 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
             List(
               mkFullOrder(
                 order3,
-                OrderStatus.Cancelled(2.waves, 4.usd),
+                OrderStatus.Cancelled(2.waves, 0.00266666.btc),
                 avgWeighedPrice = 3
               ),
               mkExecutedFullOrder(
                 order3,
-                OrderStatus.PartiallyFilled(2.waves, 4.usd),
+                OrderStatus.PartiallyFilled(2.waves, 0.00266666.btc),
                 avgWeighedPrice = 3,
                 executedAmount = 2,
-                executedFee = 4,
+                executedFee = 0.00266666,
                 executedPrice = 3,
                 totalExecutedPriceAssets = 6,
                 isMarket = false

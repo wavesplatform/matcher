@@ -122,6 +122,9 @@ sealed trait ConfigWriters {
 
     }
 
+  implicit val discountAssetSettingsWriter: ConfigWriter[CompositeSettings.DiscountAssetSettings] =
+    semiauto.deriveWriter[CompositeSettings.DiscountAssetSettings]
+
   implicit val allAccStorageSettingsWriter: ConfigWriter[AllAccountStorageSettings] =
     semiauto.deriveWriter[AllAccountStorageSettings]
 
@@ -170,7 +173,8 @@ sealed trait ConfigWriters {
       Map(
         "default" -> orderFeeWriter.to(settings.default),
         "custom" -> genericMapWriter[AssetPair, OrderFeeSettings](assetPairToString).to(settings.custom),
-        "zero-fee-accounts" -> implicitly[ConfigWriter[Set[PublicKey]]].to(settings.zeroFeeAccounts)
+        "zero-fee-accounts" -> implicitly[ConfigWriter[Set[PublicKey]]].to(settings.zeroFeeAccounts),
+        "discount" -> implicitly[ConfigWriter[Option[CompositeSettings.DiscountAssetSettings]]].to(settings.discount)
       ).asJava
     )
   }

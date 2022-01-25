@@ -37,6 +37,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
                     |  web-sockets.external-client-handler.subscriptions.max-address-number = 3
                     |}""".stripMargin)
     .withFallback(jwtPublicKeyConfig)
+    .withFallback(mkCompositeDynamicFeeSettings(UsdId))
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()

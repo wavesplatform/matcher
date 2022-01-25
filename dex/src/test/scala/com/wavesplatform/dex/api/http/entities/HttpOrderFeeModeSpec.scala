@@ -5,13 +5,14 @@ import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.settings.AssetType
+import com.wavesplatform.dex.settings.OrderFeeSettings.CompositeSettings
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
-import org.scalatest.TryValues
+import org.scalatest.{OptionValues, TryValues}
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import play.api.libs.json.Json
 
-class HttpOrderFeeModeSpec extends AnyFreeSpec with Matchers with DiffMatcherWithImplicits with TryValues {
+class HttpOrderFeeModeSpec extends AnyFreeSpec with Matchers with DiffMatcherWithImplicits with TryValues with OptionValues {
 
   private val assetPair1 = AssetPair.createAssetPair(
     "DWgwcZTMhSvnyYCoWLRUXXSH1RSkzThXLJhww9gwkqdn",
@@ -72,6 +73,10 @@ class HttpOrderFeeModeSpec extends AnyFreeSpec with Matchers with DiffMatcherWit
       |          "minFeeInWaves" : 300000
       |        }
       |      }
+      |    },
+      |    "discount" : {
+      |      "asset" : "6suw3ZHbyk6jrM19n7Pvaih3zSPsAt3gKcY8AZPxQYQf",
+      |      "value" : 2
       |    }
       |  }
       |}""".stripMargin
@@ -87,7 +92,8 @@ class HttpOrderFeeModeSpec extends AnyFreeSpec with Matchers with DiffMatcherWit
     Map(
       assetPair1 -> fixedMode,
       assetPair2 -> percentMode
-    )
+    ),
+    Some(CompositeSettings.DiscountAssetSettings(IssuedAsset(Base58.decode("6suw3ZHbyk6jrM19n7Pvaih3zSPsAt3gKcY8AZPxQYQf")), 2))
   )
 
   "ApiOrderFeeMode" - {

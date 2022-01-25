@@ -1,6 +1,6 @@
 package com.wavesplatform.it.sync.smartcontracts
 
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.Config
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
@@ -13,16 +13,7 @@ import com.wavesplatform.it.config.DexTestConfig._
 class ExtraFeeTestSuite extends MatcherSuiteBase {
 
   override protected def dexInitialSuiteConfig: Config =
-    ConfigFactory.parseString(
-      s"""waves.dex.order-fee.-1 {
-         |  mode = dynamic
-         |  dynamic {
-         |    base-maker-fee = $tradeFee
-         |    base-taker-fee = $tradeFee
-         |  }
-         |}
-       """.stripMargin
-    )
+    mkCompositeDynamicFeeSettings(feeAssetTx.id())
 
   private val trueScript = Option(Scripts.alwaysTrue)
   private val falseScript = Option(Scripts.alwaysFalse)
@@ -162,6 +153,8 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
 
       withClue("with asset pair with different decimals count") {
 
+        dex1.safeRestartWithNewSuiteConfig(mkCompositeDynamicFeeSettings(assetWith2DecTx.id()))
+
         dex1.api.upsertAssetRate(assetWith2Dec, 4)
 
         val asset2WithDecWavesPair = createAssetPair(assetWith2Dec, Waves)
@@ -211,6 +204,8 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
   }
 
   "with asset fee assigned false script" in {
+    dex1.safeRestartWithNewSuiteConfig(mkCompositeDynamicFeeSettings(falseFeeAssetTx.id()))
+
     val oneSmartPair = createAssetPair(asset0, asset1)
     val feeAssetRate = 0.0005
 

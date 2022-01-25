@@ -365,6 +365,11 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |        }
          |
          |        zero-fee-accounts = []
+         |
+         |        discount {
+         |          asset = "FWgwcZTMhSvnyYCoWLRUXXSH1RSkzThXLJhww9gwkqdn"
+         |          value = 0.1
+         |        }
          |      }
          |    }
          |  }

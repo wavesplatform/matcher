@@ -18,7 +18,9 @@ import scala.math.BigDecimal.RoundingMode.CEILING
 
 class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
-  override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId" ]""")
+  override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(
+    s"""waves.dex.price-assets = [ "$UsdId" ]""".stripMargin
+  ).withFallback(mkCompositeDynamicFeeSettings(EthId))
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()

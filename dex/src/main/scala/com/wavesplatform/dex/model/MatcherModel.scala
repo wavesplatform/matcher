@@ -89,9 +89,9 @@ sealed trait AcceptedOrder {
 
   lazy val amountOfPriceAsset: Long = AcceptedOrder.calcAmountOfPriceAsset(amount, price)
 
-  lazy val amountOfAmountAsset: Long = correctedAmountOfAmountAsset(amount, price)
+  lazy val amountOfAmountAsset: Long = AcceptedOrder.correctedAmountOfAmountAsset(amount, price)
 
-  protected def executionAmount(counterPrice: Price): Long = correctedAmountOfAmountAsset(amount, counterPrice)
+  protected def executionAmount(counterPrice: Price): Long = AcceptedOrder.correctedAmountOfAmountAsset(amount, counterPrice)
 
   lazy val isValid: Boolean = isValid(price)
   lazy val isFilled: Boolean = !isValid
@@ -101,20 +101,6 @@ sealed trait AcceptedOrder {
 
   protected def minimalAmountOfAmountAssetByPrice(p: Long): Long =
     Order.PriceConstantDecimal.divide(BigDecimal.valueOf(p), 0, RoundingMode.CEILING).longValue()
-
-  protected def correctedAmountOfAmountAsset(a: Long, p: Long): Long = correctedAmountOfAmountAsset(BigDecimal.valueOf(a), BigDecimal.valueOf(p))
-
-  protected def correctedAmountOfAmountAsset(a: BigDecimal, p: BigDecimal): Long = {
-    val settledTotal = a
-      .multiply(p)
-      .scaleByPowerOfTen(-Order.PriceConstantExponent)
-      .setScale(0, RoundingMode.FLOOR)
-
-    settledTotal
-      .scaleByPowerOfTen(Order.PriceConstantExponent)
-      .divide(p, 0, RoundingMode.CEILING)
-      .longValue()
-  }
 
   def isFirstMatch: Boolean = amount == order.amount
 
@@ -142,6 +128,21 @@ object AcceptedOrder {
     .scaleByPowerOfTen(-Order.PriceConstantExponent)
     .setScale(0, RoundingMode.FLOOR)
     .longValue()
+
+  def correctedAmountOfAmountAsset(a: BigDecimal, p: BigDecimal): Long = {
+    val settledTotal = a
+      .multiply(p)
+      .scaleByPowerOfTen(-Order.PriceConstantExponent)
+      .setScale(0, RoundingMode.FLOOR)
+
+    settledTotal
+      .scaleByPowerOfTen(Order.PriceConstantExponent)
+      .divide(p, 0, RoundingMode.CEILING)
+      .longValue()
+  }
+
+  def correctedAmountOfAmountAsset(a: Long, p: Long): Long =
+    correctedAmountOfAmountAsset(BigDecimal.valueOf(a), BigDecimal.valueOf(p))
 
   /**
    * Returns executed amount obtained as a result of the match of submitted and counter orders
@@ -198,7 +199,7 @@ object AcceptedOrder {
     lazy val counterPrice = BigDecimal.valueOf(counter.price)
 
     def minBetweenMatchedAmountAnd(value: Long): Long = math.min(matchedAmount, value)
-    def correctByCounterPrice(value: java.math.BigDecimal): Long = submitted.correctedAmountOfAmountAsset(value, counterPrice)
+    def correctByCounterPrice(value: java.math.BigDecimal): Long = AcceptedOrder.correctedAmountOfAmountAsset(value, counterPrice)
 
     submitted match {
       case _: LimitOrder => matchedAmount

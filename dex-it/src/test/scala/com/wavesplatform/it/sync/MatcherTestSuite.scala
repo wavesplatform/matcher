@@ -44,7 +44,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
        |  price-assets = [ "$UsdnId", "$BtcId", "$UsdId", "WAVES", $EthId ]
        |  order-db.max-orders = $maxOrders
        |}""".stripMargin
-  )
+  ).withFallback(mkCompositeDynamicFeeSettings(UsdnId))
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()

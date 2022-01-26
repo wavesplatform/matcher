@@ -85,7 +85,14 @@ trait Order extends ByteAndJsonSerializable with Proven {
   def getSpendAssetId: Asset = Order.getSpendAssetId(assetPair, orderType)
 
   def getSpendAmount(matchAmount: Long, matchPrice: Long): Either[ValidationError, Long] =
-    Order.getSpendAmount(assetPair, orderType, matcherFee, matchAmount, matchPrice)
+    Order.getSpendAmountUnsafe(
+      orderType,
+      matchAmount,
+      matchPrice,
+      spend =>
+        if (getSpendAssetId == Waves && !(spend + matcherFee).isValidLong)
+          throw new ArithmeticException("BigInteger out of long range")
+    )
 
   def getReceiveAmount(matchAmount: Long, matchPrice: Long): Either[ValidationError, Long] =
     Order.getReceiveAmount(orderType, matchAmount, matchPrice)
@@ -289,21 +296,19 @@ object Order extends EntityParser[Order] {
     case OrderType.SELL => assetPair.amountAsset
   }
 
-  def getSpendAmount(
-    assetPair: AssetPair,
+  def getSpendAmountUnsafe(
     orderType: OrderType,
-    matcherFee: Long,
     matchAmount: Long,
-    matchPrice: Long
+    matchPrice: Long,
+    validateSpendAmount: BigInt => Unit = (_: BigInt) => ()
   ): Either[ValidationError, Long] =
     Try {
       // We should not correct amount here, because it could lead to fork. See ExchangeTransactionDiff
       if (orderType == OrderType.SELL) matchAmount
       else {
         val spend = BigInt(matchAmount) * matchPrice / PriceConstant
-        if (Order.getSpendAssetId(assetPair, orderType) == Waves && !(spend + matcherFee).isValidLong)
-          throw new ArithmeticException("BigInteger out of long range")
-        else spend.bigInteger.longValueExact()
+        validateSpendAmount(spend)
+        spend.bigInteger.longValueExact()
       }
     }.toEither.left.map(x => GenericError(x.getMessage))
 

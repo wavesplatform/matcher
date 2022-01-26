@@ -21,7 +21,6 @@ import io.swagger.annotations.ApiModelProperty
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
-import scala.math.BigDecimal.RoundingMode
 import scala.util.Try
 
 /**
@@ -191,13 +190,6 @@ object Order extends EntityParser[Order] {
     case 3 => OrderV3(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, feeAsset, proofs)
     case _ => throw new IllegalArgumentException(s"Invalid order version: $version")
   }
-
-  def correctAmount(a: Long, price: Long): Long = {
-    val settledTotal = (BigDecimal(price) * a / Order.PriceConstant).setScale(0, RoundingMode.FLOOR).toLong
-    (BigDecimal(settledTotal) / price * Order.PriceConstant).setScale(0, RoundingMode.CEILING).toLong
-  }
-
-  def correctAmount(o: Order): Long = correctAmount(o.amount, o.price)
 
   def buy(
     sender: KeyPair,

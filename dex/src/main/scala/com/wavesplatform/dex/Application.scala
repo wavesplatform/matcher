@@ -25,8 +25,8 @@ import com.wavesplatform.dex.actors.orderbook.{AggregatedOrderBookActor, OrderBo
 import com.wavesplatform.dex.actors.tx.{ExchangeTransactionBroadcastActor, WriteExchangeTransactionActor}
 import com.wavesplatform.dex.actors.{OrderBookAskAdapter, OrderBookDirectoryActor, RootActorSystem}
 import com.wavesplatform.dex.api.http.headers.{CustomMediaTypes, MatcherHttpServer}
+import com.wavesplatform.dex.api.http.routes.v0._
 import com.wavesplatform.dex.api.http.routes.v1.OrderBookRoute
-import com.wavesplatform.dex.api.http.routes.v0.{BalancesRoute, CancelRoute, DebugRoute, HistoryRoute, MarketsRoute, MatcherInfoRoute, PlaceRoute, RatesRoute, TransactionsRoute}
 import com.wavesplatform.dex.api.http.{CompositeHttpService, MetricHttpFlow, OrderBookHttpInfo}
 import com.wavesplatform.dex.api.routes.ApiRoute
 import com.wavesplatform.dex.api.ws.actors.{WsExternalClientDirectoryActor, WsInternalBroadcastActor}
@@ -38,7 +38,6 @@ import com.wavesplatform.dex.db.leveldb.{openDb, LevelDb}
 import com.wavesplatform.dex.domain.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.codec.Base58
-import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.utils.{EitherExt2, LoggerFacade, ScorexLogging}
 import com.wavesplatform.dex.effect.{liftValueAsync, FutureResult}
 import com.wavesplatform.dex.error.ErrorFormatterContext
@@ -48,7 +47,7 @@ import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdat
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.history.HistoryRouterActor
 import com.wavesplatform.dex.logs.SystemInformationReporter
-import com.wavesplatform.dex.model.{AssetPairBuilder, ExchangeTransactionCreator, ExecutionParamsInProofs, Fee, MatchTimestamp, OrderValidator, ValidationStages}
+import com.wavesplatform.dex.model.{AcceptedOrder, AssetPairBuilder, ExchangeTransactionCreator, ExecutionParamsInProofs, Fee, MatchTimestamp, OrderValidator, ValidationStages}
 import com.wavesplatform.dex.queue.ValidatedCommandWithMeta.Offset
 import com.wavesplatform.dex.queue._
 import com.wavesplatform.dex.settings.MatcherSettings
@@ -337,7 +336,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       order =>
         ExecutionParamsInProofs.fillMatchInfoInProofs(
           order,
-          Order.correctAmount(order),
+          AcceptedOrder.correctedAmountOfAmountAsset(order.amount, order.price),
           order.price,
           settings.passExecutionParameters.forAccounts.contains(order.sender)
         )

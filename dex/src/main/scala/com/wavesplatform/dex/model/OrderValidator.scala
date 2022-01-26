@@ -223,8 +223,17 @@ object OrderValidator extends ScorexLogging {
       } yield order
     }
 
+  private[dex] def isDiscountAsset(
+    asset: Asset,
+    orderFeeSettings: OrderFeeSettings
+  ): Boolean =
+    orderFeeSettings match {
+      case cs: CompositeSettings => cs.discount.exists(_.asset == asset)
+      case _ => false
+    }
+
   @tailrec
-  private[dex] def getValidFeeAssetForSettings(
+  private[dex] def getValidFeeAssetsForSettings(
     assetPair: AssetPair,
     orderType: OrderType,
     orderFeeSettings: OrderFeeSettings,
@@ -235,7 +244,7 @@ object OrderValidator extends ScorexLogging {
       case FixedSettings(assetId, _) => Set(assetId)
       case ps: PercentSettings => Set(ps.getFeeAsset(assetPair, orderType)) ++ maybeDiscountAsset
       case cs: CompositeSettings =>
-        getValidFeeAssetForSettings(assetPair, orderType, cs.getOrderFeeSettings(assetPair), cs.discount.map(_.asset))
+        getValidFeeAssetsForSettings(assetPair, orderType, cs.getOrderFeeSettings(assetPair), cs.discount.map(_.asset))
     }
 
   /** Converts fee in waves to fee in the specified asset, taking into account correction by the asset decimals */
@@ -340,7 +349,7 @@ object OrderValidator extends ScorexLogging {
   }
 
   private def validateFeeAsset(order: Order, orderFeeSettings: OrderFeeSettings): Result[Order] = {
-    val requiredFeeAssets = getValidFeeAssetForSettings(order.assetPair, order.orderType, orderFeeSettings)
+    val requiredFeeAssets = getValidFeeAssetsForSettings(order.assetPair, order.orderType, orderFeeSettings)
     cond(requiredFeeAssets contains order.feeAsset, order, error.UnexpectedFeeAsset(requiredFeeAssets, order.feeAsset))
   }
 

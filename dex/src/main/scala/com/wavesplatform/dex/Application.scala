@@ -421,6 +421,16 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     storeCommand = matcherQueue.store,
     orderBook = p => Option(orderBooks.get()) flatMap (_ get p),
     orderBookHttpInfo = orderBookHttpInfo,
+    isDiscountAsset = asset => {
+      OrderValidator.isDiscountAsset(asset, orderFeeSettingsCache.getSettingsForOffset(lastProcessedOffset + 1))
+    },
+    getValidFeeAssets = (assetPair, orderType) => {
+      OrderValidator.getValidFeeAssetsForSettings(
+        assetPair,
+        orderType,
+        orderFeeSettingsCache.getSettingsForOffset(lastProcessedOffset + 1)
+      )
+    },
     getMinValidTxFee = orderParams => {
       def knownAssets: FutureResult[Map[Asset, BriefAssetDescription]] =
         Set(

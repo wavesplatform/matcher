@@ -1461,6 +1461,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         case _ => None
       },
       orderBookHttpInfo,
+      _ => false,
+      (_, _) => Set.empty,
       _ => Future.successful(Right(300_000L)),
       () => MatcherStatus.Working,
       apiKeys map crypto.secureHash

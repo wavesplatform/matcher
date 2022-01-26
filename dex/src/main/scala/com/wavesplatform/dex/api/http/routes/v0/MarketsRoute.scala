@@ -1,10 +1,10 @@
 package com.wavesplatform.dex.api.http.routes.v0
 
 import akka.actor.ActorRef
+import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.directives.FutureDirectives
 import akka.http.scaladsl.server.{Route, _}
-import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.pattern.ask
 import akka.stream.Materializer
 import akka.util.Timeout
@@ -24,8 +24,8 @@ import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
 import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.db.OrderDb
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
-import com.wavesplatform.dex.domain.asset.AssetPair
-import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.error.{Blacklisted, MatcherError}
@@ -50,6 +50,8 @@ final class MarketsRoute(
   storeCommand: StoreValidatedCommand,
   orderBook: AssetPair => Option[Either[Unit, ActorRef]],
   orderBookHttpInfo: OrderBookHttpInfo,
+  isDiscountAsset: Asset => Boolean,
+  getValidFeeAssets: (AssetPair, OrderType) => Set[Asset],
   getMinValidTxFee: OrderValidator.OrderParams => Future[Either[MatcherError, Long]],
   override val matcherStatus: () => MatcherStatus,
   override val apiKeyHashes: List[Array[Byte]]
@@ -404,6 +406,13 @@ final class MarketsRoute(
             case _ => complete(OrderBookUnavailable(error.OrderBookBroken(pair)))
           }
         }
+      }
+    }
+
+  def getMinValidTxFee: Route =
+    (path(AssetPairPM / "calculateFee") & post & entity(as[HttpCalculateFeeRequest])) { (pairOrError, _) =>
+      withAssetPair(assetPairBuilder, pairOrError) { _ =>
+        ???
       }
     }
 

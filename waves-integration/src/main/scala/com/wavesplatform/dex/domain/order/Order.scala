@@ -79,35 +79,16 @@ trait Order extends ByteAndJsonSerializable with Proven {
   val idStr: Coeval[String] = Coeval.evalOnce(id().base58)
 
   @ApiModelProperty(hidden = true)
-  def getReceiveAssetId: Asset = orderType match {
-    case OrderType.BUY => assetPair.amountAsset
-    case OrderType.SELL => assetPair.priceAsset
-  }
+  def getReceiveAssetId: Asset = Order.getReceiveAssetId(assetPair, orderType)
 
   @ApiModelProperty(hidden = true)
-  def getSpendAssetId: Asset = orderType match {
-    case OrderType.BUY => assetPair.priceAsset
-    case OrderType.SELL => assetPair.amountAsset
-  }
+  def getSpendAssetId: Asset = Order.getSpendAssetId(assetPair, orderType)
 
   def getSpendAmount(matchAmount: Long, matchPrice: Long): Either[ValidationError, Long] =
-    Try {
-      // We should not correct amount here, because it could lead to fork. See ExchangeTransactionDiff
-      if (orderType == OrderType.SELL) matchAmount
-      else {
-        val spend = BigInt(matchAmount) * matchPrice / PriceConstant
-        if (getSpendAssetId == Waves && !(spend + matcherFee).isValidLong)
-          throw new ArithmeticException("BigInteger out of long range")
-        else spend.bigInteger.longValueExact()
-      }
-    }.toEither.left.map(x => GenericError(x.getMessage))
+    Order.getSpendAmount(assetPair, orderType, matcherFee, matchAmount, matchPrice)
 
   def getReceiveAmount(matchAmount: Long, matchPrice: Long): Either[ValidationError, Long] =
-    Try {
-      if (orderType == OrderType.BUY) matchAmount
-      else
-        (BigInt(matchAmount) * matchPrice / PriceConstant).bigInteger.longValueExact()
-    }.toEither.left.map(x => GenericError(x.getMessage))
+    Order.getReceiveAmount(orderType, matchAmount, matchPrice)
 
   @ApiModelProperty(hidden = true)
   override val json: Coeval[JsObject] = Coeval.evalOnce {
@@ -297,5 +278,44 @@ object Order extends EntityParser[Order] {
         }
         ep.statefulParse.widen[(Order, ConsumedBytesOffset)]
       }
+
+  def getReceiveAssetId(assetPair: AssetPair, orderType: OrderType): Asset = orderType match {
+    case OrderType.BUY => assetPair.amountAsset
+    case OrderType.SELL => assetPair.priceAsset
+  }
+
+  def getSpendAssetId(assetPair: AssetPair, orderType: OrderType): Asset = orderType match {
+    case OrderType.BUY => assetPair.priceAsset
+    case OrderType.SELL => assetPair.amountAsset
+  }
+
+  def getSpendAmount(
+    assetPair: AssetPair,
+    orderType: OrderType,
+    matcherFee: Long,
+    matchAmount: Long,
+    matchPrice: Long
+  ): Either[ValidationError, Long] =
+    Try {
+      // We should not correct amount here, because it could lead to fork. See ExchangeTransactionDiff
+      if (orderType == OrderType.SELL) matchAmount
+      else {
+        val spend = BigInt(matchAmount) * matchPrice / PriceConstant
+        if (Order.getSpendAssetId(assetPair, orderType) == Waves && !(spend + matcherFee).isValidLong)
+          throw new ArithmeticException("BigInteger out of long range")
+        else spend.bigInteger.longValueExact()
+      }
+    }.toEither.left.map(x => GenericError(x.getMessage))
+
+  def getReceiveAmount(
+    orderType: OrderType,
+    matchAmount: Long,
+    matchPrice: Long
+  ): Either[ValidationError, Long] =
+    Try {
+      if (orderType == OrderType.BUY) matchAmount
+      else
+        (BigInt(matchAmount) * matchPrice / PriceConstant).bigInteger.longValueExact()
+    }.toEither.left.map(x => GenericError(x.getMessage))
 
 }

@@ -50,6 +50,7 @@ final class MarketsRoute(
   storeCommand: StoreValidatedCommand,
   orderBook: AssetPair => Option[Either[Unit, ActorRef]],
   orderBookHttpInfo: OrderBookHttpInfo,
+  getMinValidTxFee: OrderValidator.OrderParams => Future[Either[MatcherError, Long]],
   override val matcherStatus: () => MatcherStatus,
   override val apiKeyHashes: List[Array[Byte]]
 )(implicit mat: Materializer)

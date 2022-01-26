@@ -421,6 +421,28 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     storeCommand = matcherQueue.store,
     orderBook = p => Option(orderBooks.get()) flatMap (_ get p),
     orderBookHttpInfo = orderBookHttpInfo,
+    getMinValidTxFee = orderParams => {
+      def knownAssets: FutureResult[Map[Asset, BriefAssetDescription]] =
+        Set(
+          orderParams.assetPair.amountAsset,
+          orderParams.assetPair.priceAsset,
+          orderParams.feeAsset
+        ).map(asset => getAndCacheDescription(asset).map(asset -> _)).sequence.map(_.toMap)
+
+      def mkGetAssetDescFn(xs: Map[Asset, BriefAssetDescription])(asset: Asset): BriefAssetDescription =
+        xs.getOrElse(asset, throw new IllegalStateException(s"Impossible case. Unknown asset: $asset"))
+
+      (for {
+        getAssetDesc <- knownAssets.map(mkGetAssetDescFn)
+        minTxFee <- OrderValidator.liftAsync(OrderValidator.getMinValidTxFeeForSettings(
+          orderParams,
+          orderFeeSettingsCache.getSettingsForOffset(lastProcessedOffset + 1),
+          hasMatcherAccountScript,
+          getAssetDesc,
+          rateCache
+        ))
+      } yield minTxFee).value
+    },
     matcherStatus = () => status,
     apiKeyHashes = apiKeyHashes
   )
@@ -449,29 +471,6 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     assetPairBuilder = pairBuilder,
     orderBookHttpInfo = orderBookHttpInfo,
     matcherStatus = () => status,
-    getMinValidTxFee = orderParams => {
-
-      def knownAssets: FutureResult[Map[Asset, BriefAssetDescription]] =
-        Set(
-          orderParams.assetPair.amountAsset,
-          orderParams.assetPair.priceAsset,
-          orderParams.feeAsset
-        ).map(asset => getAndCacheDescription(asset).map(asset -> _)).sequence.map(_.toMap)
-
-      def mkGetAssetDescFn(xs: Map[Asset, BriefAssetDescription])(asset: Asset): BriefAssetDescription =
-        xs.getOrElse(asset, throw new IllegalStateException(s"Impossible case. Unknown asset: $asset"))
-
-      (for {
-        getAssetDesc <- knownAssets.map(mkGetAssetDescFn)
-        minTxFee <- OrderValidator.liftAsync(OrderValidator.getMinValidTxFeeForSettings(
-          orderParams,
-          orderFeeSettingsCache.getSettingsForOffset(lastProcessedOffset + 1),
-          hasMatcherAccountScript,
-          getAssetDesc,
-          rateCache
-        ))
-      } yield minTxFee).value
-    },
     apiKeyHashes = apiKeyHashes
   ))
 

@@ -116,6 +116,7 @@ class v1OrderBookRouteSpec extends RouteSpec("/api/v1") with MatcherSpecBase wit
         ),
         orderBookHttpInfo = orderBookHttpInfo,
         matcherStatus = () => MatcherStatus.Working,
+        getMinValidTxFee = _ => Future.successful(Right(300_000L)),
         apiKeyHashes = List(crypto secureHash apiKey)
       )
 

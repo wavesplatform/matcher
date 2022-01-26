@@ -7,12 +7,12 @@ import com.wavesplatform.dex.api.http.{HasStatusBarrier, OrderBookHttpInfo}
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute, PathMatchers}
 import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.error.ErrorFormatterContext
-import com.wavesplatform.dex.model.{AssetPairBuilder, MatcherModel}
+import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
+import com.wavesplatform.dex.model.{AssetPairBuilder, MatcherModel, OrderValidator}
 import io.swagger.annotations.{Api, ApiImplicitParam, ApiImplicitParams, ApiOperation}
 
 import javax.ws.rs.Path
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 
 @Path("/api/v1")
 @Api(value = "/api v1/")
@@ -20,6 +20,7 @@ final case class OrderBookRoute(
   assetPairBuilder: AssetPairBuilder,
   orderBookHttpInfo: OrderBookHttpInfo,
   matcherStatus: () => MatcherStatus,
+  getMinValidTxFee: OrderValidator.OrderParams => Future[Either[MatcherError, Long]],
   apiKeyHashes: List[Array[Byte]]
 )(implicit val errorContext: ErrorFormatterContext, ex: ExecutionContext)
     extends ApiRoute

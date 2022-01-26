@@ -84,9 +84,7 @@ object ValidationStages {
       )(o)
 
     def knownAssets: FutureResult[Map[Asset, BriefAssetDescription]] = o.assets
-      .map(asset => assetsDescription(asset).map(x => asset -> x))
-      .sequence
-      .map(_.toMap)
+      .map(asset => assetsDescription(asset).map(asset -> _)).sequence.map(_.toMap)
 
     def mkGetAssetDescFn(xs: Map[Asset, BriefAssetDescription])(asset: Asset): BriefAssetDescription =
       xs.getOrElse(asset, throw new IllegalStateException(s"Impossible case. Unknown asset: $asset"))

@@ -3,7 +3,7 @@ package com.wavesplatform.dex.settings
 import cats.syntax.option._
 import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
-import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.settings.MatcherSettings.assetPairKeyParser
 import com.wavesplatform.dex.settings.utils.ConfigReaderOps.Implicits
 import com.wavesplatform.dex.settings.utils._
@@ -58,11 +58,14 @@ object OrderFeeSettings {
   final case class PercentSettings(assetType: AssetType, minFee: Double, minFeeInWaves: Long) extends OrderFeeSettings {
 
     def getFeeAsset(order: Order): Asset =
+      getFeeAsset(order.assetPair, order.orderType)
+
+    def getFeeAsset(assetPair: AssetPair, orderType: OrderType): Asset =
       assetType match {
-        case AssetType.Amount => order.assetPair.amountAsset
-        case AssetType.Price => order.assetPair.priceAsset
-        case AssetType.Receiving => order.getReceiveAssetId
-        case AssetType.Spending => order.getSpendAssetId
+        case AssetType.Amount => assetPair.amountAsset
+        case AssetType.Price => assetPair.priceAsset
+        case AssetType.Receiving => Order.getReceiveAssetId(assetPair, orderType)
+        case AssetType.Spending => Order.getSpendAssetId(assetPair, orderType)
       }
 
   }

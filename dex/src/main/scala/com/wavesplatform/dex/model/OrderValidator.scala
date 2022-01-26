@@ -10,8 +10,8 @@ import cats.syntax.semigroup.catsSyntaxSemigroup
 import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.MarketStatus
 import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
-import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.crypto.Verifier
 import com.wavesplatform.dex.domain.feature.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.dex.domain.model.Normalization

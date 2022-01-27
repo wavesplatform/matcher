@@ -8,8 +8,10 @@ import akka.http.scaladsl.server.{Route, _}
 import akka.pattern.ask
 import akka.stream.Materializer
 import akka.util.Timeout
+import alleycats.std.all.alleyCatsSetTraverse
 import cats.instances.future._
 import cats.instances.list._
+import cats.syntax.option._
 import cats.syntax.traverse._
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.actors.OrderBookDirectoryActor._
@@ -71,7 +73,7 @@ final class MarketsRoute(
       pathPrefix("orderbook") {
         matcherStatusBarrier {
           getOrderBookRestrictions ~ getOrderStatusByPKAndIdWithSig ~ getOrderBook ~ getOrderBooks ~
-          getOrderBookStatus ~ deleteOrderBookWithKey ~ getOrderStatusByAssetPairAndId ~ cancelAllInOrderBookWithKey
+          getOrderBookStatus ~ deleteOrderBookWithKey ~ getOrderStatusByAssetPairAndId ~ cancelAllInOrderBookWithKey ~ getMinValidTxFeeRoute
         }
       } ~ pathPrefix("orders") {
         matcherStatusBarrier(getOrderStatusByAddressAndIdWithKey)
@@ -409,10 +411,46 @@ final class MarketsRoute(
       }
     }
 
-  def getMinValidTxFee: Route =
-    (path(AssetPairPM / "calculateFee") & post & entity(as[HttpCalculateFeeRequest])) { (pairOrError, _) =>
-      withAssetPair(assetPairBuilder, pairOrError) { _ =>
-        ???
+  @Path("/orderbook/{amountAsset}/{priceAsset}/calculateFee#calculateFeeByAssetPairAndOrderParams")
+  @ApiOperation(
+    value = "Calculates fee for a given Asset Pair and Order Params",
+    notes = "Calculates fee for a given Asset Pair and Order Params",
+    httpMethod = "POST",
+    tags = Array("markets"),
+    response = classOf[HttpCalculatedFeeResponse]
+  )
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "amountAsset", value = "Amount Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "priceAsset", value = "Price Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path")
+    )
+  )
+  def getMinValidTxFeeRoute: Route =
+    (path(AssetPairPM / "calculateFee") & post & entity(as[HttpCalculateFeeRequest])) { (pairOrError, calcFeeRequest) =>
+      withMetricsAndTraces("calculateFeeByAssetPairAndOrderParams") {
+        withAssetPair(assetPairBuilder, pairOrError) { pair =>
+          val feeAssets = getValidFeeAssets(pair, calcFeeRequest.orderType)
+          val assetsMinTxFee: Future[Either[MatcherError, Set[(Asset, HttpOffset)]]] =
+            feeAssets.map { asset =>
+              val minTxFee = getMinValidTxFee(
+                OrderValidator.OrderParams(pair, calcFeeRequest.orderType, asset, calcFeeRequest.amount, calcFeeRequest.price)
+              )
+              minTxFee.map(_.map(asset -> _))
+            }.sequence.map(_.sequence)
+
+          complete {
+            assetsMinTxFee.map[ToResponseMarshallable] {
+              case Left(matcherError) => SimpleErrorResponse(matcherError)
+              case Right(assetsMinTxFee) =>
+                assetsMinTxFee.foldLeft(HttpCalculatedFeeResponse(none, none)) { case (response, (asset, fee)) =>
+                  if (isDiscountAsset(asset))
+                    response.copy(discount = HttpCalculatedFeeResponse.CalculatedFee(asset, fee).some)
+                  else
+                    response.copy(base = HttpCalculatedFeeResponse.CalculatedFee(asset, fee).some)
+                }
+            }
+          }
+        }
       }
     }
 

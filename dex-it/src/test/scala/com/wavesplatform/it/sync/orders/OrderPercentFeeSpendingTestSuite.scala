@@ -109,6 +109,46 @@ class OrderPercentFeeSpendingTestSuite extends OrderFeeBaseTestSuite {
       dex1.api.getReservedBalanceWithApiKey(accountSeller).getOrElse(IssuedAsset(UsdId), 0L) shouldBe 0L
     }
 
+    s"taker should pay correct fee when fee asset-type = $assetType and order fully filled and execution price is less than placement price" in {
+      val accountBuyer = mkAccountWithBalance(fullyAmountUsd * 2 + 5.04.usd -> IssuedAsset(UsdId))
+      val accountSeller = mkAccountWithBalance(fullyAmountWaves + 2.1.waves -> Waves)
+
+      placeAndAwaitAtDex(
+        mkOrder(
+          accountSeller,
+          wavesUsdPair,
+          SELL,
+          fullyAmountWaves,
+          price,
+          matcherFee = 2.1.waves,
+          version = version
+        )
+      )
+
+      placeAndAwaitAtNode(
+        mkOrder(
+          accountBuyer,
+          wavesUsdPair,
+          BUY,
+          fullyAmountWaves,
+          price * 2,
+          matcherFee = 5.04.usd,
+          feeAsset = IssuedAsset(UsdId),
+          version = version
+        )
+      )
+
+      wavesNode1.api.balance(accountBuyer, Waves) should be(fullyAmountWaves)
+      wavesNode1.api.balance(accountBuyer, IssuedAsset(UsdId)) shouldBe (fullyAmountUsd + 2.52.usd)
+      wavesNode1.api.balance(accountSeller, Waves) should be(0L)
+      wavesNode1.api.balance(accountSeller, IssuedAsset(UsdId)) shouldBe fullyAmountUsd
+
+      dex1.api.getReservedBalanceWithApiKey(accountBuyer).getOrElse(Waves, 0L) shouldBe 0L
+      dex1.api.getReservedBalanceWithApiKey(accountBuyer).getOrElse(IssuedAsset(UsdId), 0L) shouldBe 0L
+      dex1.api.getReservedBalanceWithApiKey(accountSeller).getOrElse(Waves, 0L) shouldBe 0L
+      dex1.api.getReservedBalanceWithApiKey(accountSeller).getOrElse(IssuedAsset(UsdId), 0L) shouldBe 0L
+    }
+
     s"users should pay correct fee when fee asset-type = $assetType and order partially filled" in {
       val accountBuyer = mkAccountWithBalance(fullyAmountUsd + minimalFee -> IssuedAsset(UsdId))
       val accountSeller = mkAccountWithBalance(partiallyAmountWaves + minimalFeeWaves -> Waves)

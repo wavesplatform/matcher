@@ -53,20 +53,19 @@ object Fee {
           case AssetType.Price => (
               buy.getSpendAmount _,
               sell.getReceiveAmount _,
-              scaleFeeByPriceDiff(s.price, executedPrice) _
+              identity[Long] _
             )
 
           case AssetType.Receiving => (
               buy.getReceiveAmount _,
               sell.getReceiveAmount _,
-              if (s.isBuyOrder) scaleFeeByPriceDiff(s.price, executedPrice) _
-              else identity[Long] _
+              identity[Long] _
             )
 
           case AssetType.Spending => (
               buy.getSpendAmount _,
               sell.getSpendAmount _,
-              if (s.isSellOrder) scaleFeeByPriceDiff(s.price, executedPrice) _
+              if (s.isBuyOrder) scaleFeeByPriceDiff(s.price, executedPrice) _
               else identity[Long] _
             )
         }

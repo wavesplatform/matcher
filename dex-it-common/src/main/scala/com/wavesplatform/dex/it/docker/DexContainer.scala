@@ -3,8 +3,7 @@ package com.wavesplatform.dex.it.docker
 import cats.Functor
 import cats.tagless.FunctorK
 import com.dimafeng.testcontainers.GenericContainer
-import com.github.dockerjava.api.model.Ports.Binding
-import com.github.dockerjava.api.model.{Capability, ExposedPort, PortBinding}
+import com.github.dockerjava.api.model.Capability
 import com.typesafe.config.Config
 import com.wavesplatform.dex.app.MatcherStatus.Working
 import com.wavesplatform.dex.domain.utils.ScorexLogging

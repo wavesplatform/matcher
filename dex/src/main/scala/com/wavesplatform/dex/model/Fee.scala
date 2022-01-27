@@ -43,11 +43,32 @@ object Fee {
       case PercentSettings(assetType, _, _) =>
         val (buy, sell) = Order.splitByType(s.order, c.order)
 
-        val (buyAmt, sellAmt) = assetType match {
-          case AssetType.Amount => buy.getReceiveAmount _ -> sell.getSpendAmount _
-          case AssetType.Price => buy.getSpendAmount _ -> sell.getReceiveAmount _
-          case AssetType.Receiving => buy.getReceiveAmount _ -> sell.getReceiveAmount _
-          case AssetType.Spending => buy.getSpendAmount _ -> sell.getSpendAmount _
+        val (buyAmt, sellAmt, priceFeeCorrection) = assetType match {
+          case AssetType.Amount => (
+              buy.getReceiveAmount _,
+              sell.getSpendAmount _,
+              identity[Long] _
+            )
+
+          case AssetType.Price => (
+              buy.getSpendAmount _,
+              sell.getReceiveAmount _,
+              scaleFeeByPriceDiff(s.price, executedPrice) _
+            )
+
+          case AssetType.Receiving => (
+              buy.getReceiveAmount _,
+              sell.getReceiveAmount _,
+              if (s.isBuyOrder) scaleFeeByPriceDiff(s.price, executedPrice) _
+              else identity[Long] _
+            )
+
+          case AssetType.Spending => (
+              buy.getSpendAmount _,
+              sell.getSpendAmount _,
+              if (s.isSellOrder) scaleFeeByPriceDiff(s.price, executedPrice) _
+              else identity[Long] _
+            )
         }
 
         def buySellFee(buyAmount: Long, buyPrice: Long, sellAmount: Long, sellPrice: Long): (Long, Long) =
@@ -60,8 +81,8 @@ object Fee {
         val sellExecutedFee = partialFee(sell.matcherFee, sellAmountTotal, sellAmountExecuted)
 
         withZeroFee(
-          if (c.isBuyOrder) (buyExecutedFee, sellExecutedFee)
-          else (sellExecutedFee, buyExecutedFee),
+          if (c.isBuyOrder) (buyExecutedFee, priceFeeCorrection(sellExecutedFee))
+          else (sellExecutedFee, priceFeeCorrection(buyExecutedFee)),
           zeroFeeAccounts
         )
 
@@ -87,5 +108,8 @@ object Fee {
         getMakerTakerFee(cs.getOrderFeeSettings(s.order.assetPair), zeroFeeAccounts ++ cs.zeroFeeAccounts)(s, c)
     }
   }
+
+  def scaleFeeByPriceDiff(placementPrice: Long, executionPrice: Long)(fee: Long): Long =
+    multiplyFeeByBigDecimal(fee, BigDecimal(executionPrice) / BigDecimal(placementPrice))
 
 }

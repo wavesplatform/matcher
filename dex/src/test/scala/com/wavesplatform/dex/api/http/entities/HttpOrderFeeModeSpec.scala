@@ -74,7 +74,7 @@ class HttpOrderFeeModeSpec extends AnyFreeSpec with Matchers with DiffMatcherWit
       |      }
       |    },
       |    "discount" : {
-      |      "asset" : "6suw3ZHbyk6jrM19n7Pvaih3zSPsAt3gKcY8AZPxQYQf",
+      |      "assetId" : "6suw3ZHbyk6jrM19n7Pvaih3zSPsAt3gKcY8AZPxQYQf",
       |      "value" : 2
       |    }
       |  }

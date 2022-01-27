@@ -93,8 +93,14 @@ object HttpOrderFeeMode {
     implicit val compositeFormat: Format[FeeModeComposite] = Json.format[FeeModeComposite]
   }
 
+  @ApiModel(description = "Discount settings")
   final case class HttpDiscount(
-    asset: Asset,
+    @ApiModelProperty(
+      value = "Base58 encoded accepted Asset ID",
+      dataType = "string",
+      example = "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS"
+    )
+    assetId: Asset,
     value: BigDecimal
   )
 

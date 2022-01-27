@@ -7,7 +7,6 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.settings.MatcherSettings.assetPairKeyParser
 import com.wavesplatform.dex.settings.utils.ConfigReaderOps.Implicits
 import com.wavesplatform.dex.settings.utils._
-import play.api.libs.json.{Format, Json}
 import pureconfig.ConfigReader
 import pureconfig.generic.auto._
 import pureconfig.configurable.genericMapReader
@@ -98,8 +97,6 @@ object OrderFeeSettings {
     final case class DiscountAssetSettings(asset: Asset, value: BigDecimal)
 
     object DiscountAssetSettings {
-
-      implicit val discountAssetSettingsFormat: Format[DiscountAssetSettings] = Json.format[DiscountAssetSettings]
 
       implicit val discountAssetSettingsConfigReader = semiauto
         .deriveReader[DiscountAssetSettings]

@@ -73,7 +73,7 @@ final class MarketsRoute(
       pathPrefix("orderbook") {
         matcherStatusBarrier {
           getOrderBookRestrictions ~ getOrderStatusByPKAndIdWithSig ~ getOrderBook ~ getOrderBooks ~
-          getOrderBookStatus ~ deleteOrderBookWithKey ~ getOrderStatusByAssetPairAndId ~ cancelAllInOrderBookWithKey ~ getMinValidTxFeeRoute
+          getOrderBookStatus ~ deleteOrderBookWithKey ~ getOrderStatusByAssetPairAndId ~ cancelAllInOrderBookWithKey ~ calculateFeeByAssetPairAndOrderParams
         }
       } ~ pathPrefix("orders") {
         matcherStatusBarrier(getOrderStatusByAddressAndIdWithKey)
@@ -422,10 +422,17 @@ final class MarketsRoute(
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "amountAsset", value = "Amount Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
-      new ApiImplicitParam(name = "priceAsset", value = "Price Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path")
+      new ApiImplicitParam(name = "priceAsset", value = "Price Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
+      new ApiImplicitParam(
+        name = "body",
+        value = "Json with data",
+        required = true,
+        paramType = "body",
+        dataType = "com.wavesplatform.dex.api.http.entities.HttpCalculateFeeRequest"
+      )
     )
   )
-  def getMinValidTxFeeRoute: Route =
+  def calculateFeeByAssetPairAndOrderParams: Route =
     (path(AssetPairPM / "calculateFee") & post & entity(as[HttpCalculateFeeRequest])) { (pairOrError, calcFeeRequest) =>
       withMetricsAndTraces("calculateFeeByAssetPairAndOrderParams") {
         withAssetPair(assetPairBuilder, pairOrError) { pair =>

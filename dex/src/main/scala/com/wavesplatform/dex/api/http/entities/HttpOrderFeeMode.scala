@@ -86,11 +86,24 @@ object HttpOrderFeeMode {
     @ApiModelProperty(value = "Custom fee modes for specific asset pairs")
     custom: Map[AssetPair, HttpOrderFeeMode],
     @ApiModelProperty(value = "Discount asset settings")
-    discount: Option[CompositeSettings.DiscountAssetSettings]
+    discount: Option[HttpDiscount]
   ) extends HttpOrderFeeMode
 
   object FeeModeComposite {
     implicit val compositeFormat: Format[FeeModeComposite] = Json.format[FeeModeComposite]
+  }
+
+  final case class HttpDiscount(
+    asset: Asset,
+    value: BigDecimal
+  )
+
+  object HttpDiscount {
+    implicit val discountFormat: OFormat[HttpDiscount] = Json.format[HttpDiscount]
+
+    def fromDiscountSettings(settings: CompositeSettings.DiscountAssetSettings): HttpDiscount =
+      HttpDiscount(settings.asset, settings.value)
+
   }
 
   implicit val httpOrderFeeModeFormat: Format[HttpOrderFeeMode] = Format(
@@ -118,7 +131,7 @@ object HttpOrderFeeMode {
       FeeModeComposite(
         fromSettings(default, matcherAccountFee, allRates),
         custom.view.mapValues(fromSettings(_, matcherAccountFee, allRates)).toMap,
-        discount
+        discount.map(HttpDiscount.fromDiscountSettings)
       )
   }
 

@@ -197,6 +197,18 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     }
   }
 
+  // calculateFeeByAssetPairAndOrderParams
+  routePath("/orderbook/{amountAsset}/{priceAsset}/calculateFee") - {
+    "returns fee" in test { route =>
+      Post(
+        routePath(s"/orderbook/$smartAssetId/WAVES/calculateFee"),
+        HttpCalculateFeeRequest(OrderType.BUY, 100.waves, 1.usd)
+      ) ~> route ~> check {
+        status shouldEqual StatusCodes.OK
+      }
+    }
+  }
+
   // getMatcherPublicSettings
   routePath("/matcher/settings") - {
     "returns matcher's public settings" in test { route =>

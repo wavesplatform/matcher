@@ -9,7 +9,7 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
-import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.order.Order.Id
 import com.wavesplatform.dex.it.api._
 import com.wavesplatform.dex.it.api.responses.dex.MatcherError
@@ -425,7 +425,7 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
   override def deleteOrderBookWithKey(assetPair: AssetPair): R[HttpMessage] =
     deleteOrderBookWithKey(assetPair.amountAssetStr, assetPair.priceAssetStr, apiKeyHeaders)
 
-  override def cancelAllInOrderBookWithKey(assetPair: AssetPair): AsyncEnrichedDexApi.R[HttpMessage] =
+  override def cancelAllInOrderBookWithKey(assetPair: AssetPair): R[HttpMessage] =
     cancelAllInOrderBookWithKey(assetPair.amountAssetStr, assetPair.priceAssetStr, apiKeyHeaders)
 
   override def cancelAllInOrderBookWithKey(
@@ -445,6 +445,22 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .followRedirects(false)
       .headers(headers)
   }
+
+  override def calculateFee(
+    amountAsset: String,
+    priceAsset: String,
+    orderType: OrderType,
+    amount: Long,
+    price: Long
+  ): R[HttpCalculatedFeeResponse] = mk {
+    basicRequest
+      .post(uri"$apiUri/matcher/orderbook/$amountAsset/$priceAsset/calculateFee")
+      .followRedirects(false)
+      .body(HttpCalculateFeeRequest(orderType, amount, price))
+  }
+
+  override def calculateFee(assetPair: AssetPair, orderType: OrderType, amount: Long, price: Long): R[HttpCalculatedFeeResponse] =
+    calculateFee(assetPair.amountAssetStr, assetPair.priceAssetStr, orderType, amount, price)
 
   override def getCurrentOffset(headers: Map[String, String]): R[HttpOffset] = mk {
     basicRequest

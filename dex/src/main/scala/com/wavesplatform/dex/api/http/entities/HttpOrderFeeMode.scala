@@ -26,11 +26,7 @@ object HttpOrderFeeMode {
     @ApiModelProperty(
       value = "Base fee in Wavelets",
       example = "300000"
-    ) baseFee: Long,
-    @ApiModelProperty(
-      value = "Asset Rates as Map[Base58 encoded Asset ID, Long]",
-      dataType = "Map[string,number]"
-    ) rates: Map[Asset, Double]
+    ) baseFee: Long
   ) extends HttpOrderFeeMode
 
   object FeeModeDynamic {

@@ -26,11 +26,7 @@ object HttpOrderFeeMode {
     @ApiModelProperty(
       value = "Base fee in Wavelets",
       example = "300000"
-    ) baseFee: Long,
-    @ApiModelProperty(
-      value = "Asset Rates as Map[Base58 encoded Asset ID, Long]",
-      dataType = "Map[string,number]"
-    ) rates: Map[Asset, Double]
+    ) baseFee: Long
   ) extends HttpOrderFeeMode
 
   object FeeModeDynamic {
@@ -129,14 +125,14 @@ object HttpOrderFeeMode {
 
   private def toJson[T](key: String, x: T)(implicit w: Writes[T]): JsObject = Json.obj(key -> w.writes(x))
 
-  def fromSettings(settings: OrderFeeSettings, matcherAccountFee: Long, allRates: Map[Asset, Double]): HttpOrderFeeMode = settings match {
-    case x: OrderFeeSettings.DynamicSettings => FeeModeDynamic(x.maxBaseFee + matcherAccountFee, allRates)
+  def fromSettings(settings: OrderFeeSettings, matcherAccountFee: Long): HttpOrderFeeMode = settings match {
+    case x: OrderFeeSettings.DynamicSettings => FeeModeDynamic(x.maxBaseFee + matcherAccountFee)
     case OrderFeeSettings.FixedSettings(assetId, minFee) => FeeModeFixed(assetId, minFee)
     case OrderFeeSettings.PercentSettings(assetType, minFee, minFeeInWaves) => FeeModePercent(assetType, minFee, minFeeInWaves)
     case OrderFeeSettings.CompositeSettings(default, custom, discount, _) =>
       FeeModeComposite(
-        fromSettings(default, matcherAccountFee, allRates),
-        custom.view.mapValues(fromSettings(_, matcherAccountFee, allRates)).toMap,
+        fromSettings(default, matcherAccountFee),
+        custom.view.mapValues(fromSettings(_, matcherAccountFee)).toMap,
         discount.map(HttpDiscount.fromDiscountSettings)
       )
   }

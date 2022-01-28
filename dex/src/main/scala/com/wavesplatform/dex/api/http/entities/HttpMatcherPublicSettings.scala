@@ -20,6 +20,10 @@ case class HttpMatcherPublicSettings(
     dataType = "List[string]"
   ) priceAssets: Seq[Asset],
   @ApiModelProperty(
+    value = "Asset Rates as Map[Base58 encoded Asset ID, Long]",
+    dataType = "Map[string,number]"
+  ) rates: Map[Asset, Double],
+  @ApiModelProperty(
     value = "Order Fee Mode, possible modes: FeeModeDynamic, FeeModeFixed, FeeModePercent"
   ) orderFee: HttpOrderFeeMode,
   @ApiModelProperty(

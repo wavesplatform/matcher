@@ -227,9 +227,9 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
               Waves
             ),
             orderFee = HttpOrderFeeMode.FeeModeDynamic(
-              baseFee = 600000,
-              rates = Map(Waves -> 1.0)
+              baseFee = 600000
             ),
+            rates = Map(Waves -> 1.0),
             orderVersions = List[Byte](1, 2, 3),
             networkByte = AddressScheme.current.chainId.toInt
           )

@@ -76,9 +76,9 @@ final class MatcherInfoRoute(
                   matcherSettings.priceAssets.filterNot(a => matcherSettings.blacklistedAssets.contains(IssuedAsset(a.compatId.orNull))),
                 orderFee = HttpOrderFeeMode.fromSettings(
                   settings = getActualOrderFeeSettings(),
-                  matcherAccountFee = matcherAccountFee,
-                  allRates = rateCache.getAllRates
+                  matcherAccountFee = matcherAccountFee
                 ),
+                rates = rateCache.getAllRates,
                 orderVersions = allowedOrderVersions.toSeq.sorted,
                 networkByte = matcherSettings.addressSchemeCharacter.toInt
               )

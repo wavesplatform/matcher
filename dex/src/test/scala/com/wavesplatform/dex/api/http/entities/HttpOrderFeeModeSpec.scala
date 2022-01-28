@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.api.http.entities
 
 import com.wavesplatform.dex.api.http.entities.HttpOrderFeeMode.{FeeModeComposite, FeeModeDynamic, FeeModeFixed, FeeModePercent, HttpDiscount}
-import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.settings.AssetType
@@ -32,10 +32,7 @@ class HttpOrderFeeModeSpec extends AnyFreeSpec with Matchers with DiffMatcherWit
 
   private val dynamicModeJson: String = """{
                                           |  "dynamic" : {
-                                          |    "baseFee" : 600000,
-                                          |    "rates" : {
-                                          |      "WAVES" : 1
-                                          |    }
+                                          |    "baseFee" : 600000
                                           |  }
                                           |}""".stripMargin
 
@@ -52,10 +49,7 @@ class HttpOrderFeeModeSpec extends AnyFreeSpec with Matchers with DiffMatcherWit
       |  "composite" : {
       |    "default" : {
       |      "dynamic" : {
-      |        "baseFee" : 600000,
-      |        "rates" : {
-      |          "WAVES" : 1
-      |        }
+      |        "baseFee" : 600000
       |      }
       |    },
       |    "custom" : {
@@ -82,7 +76,7 @@ class HttpOrderFeeModeSpec extends AnyFreeSpec with Matchers with DiffMatcherWit
 
   private val percentMode: HttpOrderFeeMode = FeeModePercent(AssetType.Price, 0.14, 300000)
 
-  private val dynamicMode: HttpOrderFeeMode = FeeModeDynamic(600000, Map(Waves -> 1))
+  private val dynamicMode: HttpOrderFeeMode = FeeModeDynamic(600000)
 
   private val fixedMode: HttpOrderFeeMode = FeeModeFixed(IssuedAsset(Base58.decode("6suw3ZHbyk6jrM19n7Pvaih3zSPsAt3gKcY8AZPxQYQf")), 1)
 

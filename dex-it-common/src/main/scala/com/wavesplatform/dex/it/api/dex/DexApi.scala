@@ -6,7 +6,7 @@ import com.wavesplatform.dex.api.http.entities._
 import com.wavesplatform.dex.domain.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
-import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.transactions.ExchangeTransaction
 import play.api.libs.json.JsObject
 
@@ -182,6 +182,9 @@ trait DexApi[F[_]] {
   def getOrderBook(assetPair: AssetPair): F[HttpV0OrderBook]
   def getOrderBook(assetPair: AssetPair, depth: String): F[HttpV0OrderBook]
   def getOrderBook(assetPair: AssetPair, depth: Int): F[HttpV0OrderBook]
+
+  def calculateFee(amountAsset: String, priceAsset: String, orderType: OrderType, amount: Long, price: Long): F[HttpCalculatedFeeResponse]
+  def calculateFee(assetPair: AssetPair, orderType: OrderType, amount: Long, price: Long): F[HttpCalculatedFeeResponse]
 
   def getOrderBookRestrictions(assetPair: AssetPair): F[HttpOrderBookInfo]
   def getOrderBookRestrictions(amountAsset: String, priceAsset: String): F[HttpOrderBookInfo]

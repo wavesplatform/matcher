@@ -414,7 +414,7 @@ trait MatcherSpecBase
         MatcherAccount,
         pair,
         OrderType.BUY,
-        Order.correctAmount(amount, price),
+        AcceptedOrder.correctedAmountOfAmountAsset(amount, price),
         price,
         timestampBuy,
         expirationBuy,
@@ -426,7 +426,7 @@ trait MatcherSpecBase
         MatcherAccount,
         pair,
         OrderType.SELL,
-        Order.correctAmount(amount, price),
+        AcceptedOrder.correctedAmountOfAmountAsset(amount, price),
         price,
         timestampSell,
         expirationSell,
@@ -489,13 +489,13 @@ trait MatcherSpecBase
           .updateFee(minFee)
       case (_, percentSettings: PercentSettings) =>
         order
-          .updateFeeAsset(OrderValidator.getValidFeeAssetForSettings(order, percentSettings).head)
+          .updateFeeAsset(OrderValidator.getValidFeeAssetsForSettings(order.assetPair, order.orderType, percentSettings).head)
           .updateFee {
             rateForPercentSettings.foreach(rateCache.upsertRate(order.feeAsset, _))
             rateForPercentSettings.foreach(rateCache.upsertRate(percentSettings.getFeeAsset(order), _))
 
             OrderValidator.getMinValidFeeForSettings(
-              order,
+              OrderValidator.OrderParams.fromOrder(order),
               percentSettings,
               getDefaultAssetDescriptions(_).decimals,
               rateCache

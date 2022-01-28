@@ -1,15 +1,17 @@
 package com.wavesplatform.dex.api.http.routes.v0
 
 import akka.actor.ActorRef
+import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.directives.FutureDirectives
 import akka.http.scaladsl.server.{Route, _}
-import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.pattern.ask
 import akka.stream.Materializer
 import akka.util.Timeout
+import alleycats.std.all.alleyCatsSetTraverse
 import cats.instances.future._
 import cats.instances.list._
+import cats.syntax.option._
 import cats.syntax.traverse._
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.actors.OrderBookDirectoryActor._
@@ -24,8 +26,8 @@ import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
 import com.wavesplatform.dex.app.MatcherStatus
 import com.wavesplatform.dex.db.OrderDb
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
-import com.wavesplatform.dex.domain.asset.AssetPair
-import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.error.{Blacklisted, MatcherError}
@@ -50,6 +52,9 @@ final class MarketsRoute(
   storeCommand: StoreValidatedCommand,
   orderBook: AssetPair => Option[Either[Unit, ActorRef]],
   orderBookHttpInfo: OrderBookHttpInfo,
+  isDiscountAsset: Asset => Boolean,
+  getValidFeeAssets: (AssetPair, OrderType) => Set[Asset],
+  getMinValidTxFee: OrderValidator.OrderParams => Future[Either[MatcherError, Long]],
   override val matcherStatus: () => MatcherStatus,
   override val apiKeyHashes: List[Array[Byte]]
 )(implicit mat: Materializer)
@@ -68,7 +73,7 @@ final class MarketsRoute(
       pathPrefix("orderbook") {
         matcherStatusBarrier {
           getOrderBookRestrictions ~ getOrderStatusByPKAndIdWithSig ~ getOrderBook ~ getOrderBooks ~
-          getOrderBookStatus ~ deleteOrderBookWithKey ~ getOrderStatusByAssetPairAndId ~ cancelAllInOrderBookWithKey
+          getOrderBookStatus ~ deleteOrderBookWithKey ~ getOrderStatusByAssetPairAndId ~ cancelAllInOrderBookWithKey ~ calculateFeeByAssetPairAndOrderParams
         }
       } ~ pathPrefix("orders") {
         matcherStatusBarrier(getOrderStatusByAddressAndIdWithKey)
@@ -401,6 +406,56 @@ final class MarketsRoute(
                   }
               )
             case _ => complete(OrderBookUnavailable(error.OrderBookBroken(pair)))
+          }
+        }
+      }
+    }
+
+  @Path("/orderbook/{amountAsset}/{priceAsset}/calculateFee#calculateFeeByAssetPairAndOrderParams")
+  @ApiOperation(
+    value = "Calculates fee for a given Asset Pair and Order Params",
+    notes = "Calculates fee for a given Asset Pair and Order Params",
+    httpMethod = "POST",
+    tags = Array("markets"),
+    response = classOf[HttpCalculatedFeeResponse]
+  )
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "amountAsset", value = "Amount Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "priceAsset", value = "Price Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
+      new ApiImplicitParam(
+        name = "body",
+        value = "Json with data",
+        required = true,
+        paramType = "body",
+        dataType = "com.wavesplatform.dex.api.http.entities.HttpCalculateFeeRequest"
+      )
+    )
+  )
+  def calculateFeeByAssetPairAndOrderParams: Route =
+    (path(AssetPairPM / "calculateFee") & post & entity(as[HttpCalculateFeeRequest])) { (pairOrError, calcFeeRequest) =>
+      withMetricsAndTraces("calculateFeeByAssetPairAndOrderParams") {
+        withAssetPair(assetPairBuilder, pairOrError) { pair =>
+          val feeAssets = getValidFeeAssets(pair, calcFeeRequest.orderType)
+          val assetsMinTxFee: Future[Either[MatcherError, Set[(Asset, HttpOffset)]]] =
+            feeAssets.map { asset =>
+              val minTxFee = getMinValidTxFee(
+                OrderValidator.OrderParams(pair, calcFeeRequest.orderType, asset, calcFeeRequest.amount, calcFeeRequest.price)
+              )
+              minTxFee.map(_.map(asset -> _))
+            }.sequence.map(_.sequence)
+
+          complete {
+            assetsMinTxFee.map[ToResponseMarshallable] {
+              case Left(matcherError) => SimpleErrorResponse(matcherError)
+              case Right(assetsMinTxFee) =>
+                assetsMinTxFee.foldLeft(HttpCalculatedFeeResponse(none, none)) { case (response, (asset, fee)) =>
+                  if (isDiscountAsset(asset))
+                    response.copy(discount = HttpCalculatedFeeResponse.CalculatedFee(asset, fee).some)
+                  else
+                    response.copy(base = HttpCalculatedFeeResponse.CalculatedFee(asset, fee).some)
+                }
+            }
           }
         }
       }

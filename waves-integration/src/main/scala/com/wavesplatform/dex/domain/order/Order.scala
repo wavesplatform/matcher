@@ -21,7 +21,6 @@ import io.swagger.annotations.ApiModelProperty
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
-import scala.math.BigDecimal.RoundingMode
 import scala.util.Try
 
 /**
@@ -80,35 +79,23 @@ trait Order extends ByteAndJsonSerializable with Proven {
   val idStr: Coeval[String] = Coeval.evalOnce(id().base58)
 
   @ApiModelProperty(hidden = true)
-  def getReceiveAssetId: Asset = orderType match {
-    case OrderType.BUY => assetPair.amountAsset
-    case OrderType.SELL => assetPair.priceAsset
-  }
+  def getReceiveAssetId: Asset = Order.getReceiveAssetId(assetPair, orderType)
 
   @ApiModelProperty(hidden = true)
-  def getSpendAssetId: Asset = orderType match {
-    case OrderType.BUY => assetPair.priceAsset
-    case OrderType.SELL => assetPair.amountAsset
-  }
+  def getSpendAssetId: Asset = Order.getSpendAssetId(assetPair, orderType)
 
   def getSpendAmount(matchAmount: Long, matchPrice: Long): Either[ValidationError, Long] =
-    Try {
-      // We should not correct amount here, because it could lead to fork. See ExchangeTransactionDiff
-      if (orderType == OrderType.SELL) matchAmount
-      else {
-        val spend = BigInt(matchAmount) * matchPrice / PriceConstant
+    Order.getSpendAmountUnsafe(
+      orderType,
+      matchAmount,
+      matchPrice,
+      spend =>
         if (getSpendAssetId == Waves && !(spend + matcherFee).isValidLong)
           throw new ArithmeticException("BigInteger out of long range")
-        else spend.bigInteger.longValueExact()
-      }
-    }.toEither.left.map(x => GenericError(x.getMessage))
+    )
 
   def getReceiveAmount(matchAmount: Long, matchPrice: Long): Either[ValidationError, Long] =
-    Try {
-      if (orderType == OrderType.BUY) matchAmount
-      else
-        (BigInt(matchAmount) * matchPrice / PriceConstant).bigInteger.longValueExact()
-    }.toEither.left.map(x => GenericError(x.getMessage))
+    Order.getReceiveAmount(orderType, matchAmount, matchPrice)
 
   @ApiModelProperty(hidden = true)
   override val json: Coeval[JsObject] = Coeval.evalOnce {
@@ -191,13 +178,6 @@ object Order extends EntityParser[Order] {
     case 3 => OrderV3(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, feeAsset, proofs)
     case _ => throw new IllegalArgumentException(s"Invalid order version: $version")
   }
-
-  def correctAmount(a: Long, price: Long): Long = {
-    val settledTotal = (BigDecimal(price) * a / Order.PriceConstant).setScale(0, RoundingMode.FLOOR).toLong
-    (BigDecimal(settledTotal) / price * Order.PriceConstant).setScale(0, RoundingMode.CEILING).toLong
-  }
-
-  def correctAmount(o: Order): Long = correctAmount(o.amount, o.price)
 
   def buy(
     sender: KeyPair,
@@ -305,5 +285,42 @@ object Order extends EntityParser[Order] {
         }
         ep.statefulParse.widen[(Order, ConsumedBytesOffset)]
       }
+
+  def getReceiveAssetId(assetPair: AssetPair, orderType: OrderType): Asset = orderType match {
+    case OrderType.BUY => assetPair.amountAsset
+    case OrderType.SELL => assetPair.priceAsset
+  }
+
+  def getSpendAssetId(assetPair: AssetPair, orderType: OrderType): Asset = orderType match {
+    case OrderType.BUY => assetPair.priceAsset
+    case OrderType.SELL => assetPair.amountAsset
+  }
+
+  def getSpendAmountUnsafe(
+    orderType: OrderType,
+    matchAmount: Long,
+    matchPrice: Long,
+    validateSpendAmount: BigInt => Unit = (_: BigInt) => ()
+  ): Either[ValidationError, Long] =
+    Try {
+      // We should not correct amount here, because it could lead to fork. See ExchangeTransactionDiff
+      if (orderType == OrderType.SELL) matchAmount
+      else {
+        val spend = BigInt(matchAmount) * matchPrice / PriceConstant
+        validateSpendAmount(spend)
+        spend.bigInteger.longValueExact()
+      }
+    }.toEither.left.map(x => GenericError(x.getMessage))
+
+  def getReceiveAmount(
+    orderType: OrderType,
+    matchAmount: Long,
+    matchPrice: Long
+  ): Either[ValidationError, Long] =
+    Try {
+      if (orderType == OrderType.BUY) matchAmount
+      else
+        (BigInt(matchAmount) * matchPrice / PriceConstant).bigInteger.longValueExact()
+    }.toEither.left.map(x => GenericError(x.getMessage))
 
 }

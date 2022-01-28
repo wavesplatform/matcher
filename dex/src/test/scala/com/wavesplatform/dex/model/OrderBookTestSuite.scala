@@ -331,9 +331,9 @@ class OrderBookTestSuite
 
     val OrderBookUpdates(ob, _, _, _) = OrderBook.empty.appendAllAccepted(List(ord1, ord2, ord3).map(LimitOrder(_)), nowTs)
 
-    val corrected1 = Order.correctAmount(ord2.amount, ord2.price)
+    val corrected1 = AcceptedOrder.correctedAmountOfAmountAsset(ord2.amount, ord2.price)
     val leftovers1 = ord3.amount - corrected1
-    val corrected2 = Order.correctAmount(leftovers1, ord1.price)
+    val corrected2 = AcceptedOrder.correctedAmountOfAmountAsset(leftovers1, ord1.price)
     val restAmount = ord1.amount - corrected2
     // See OrderExecuted.submittedRemainingFee
     val restFee = ord1.matcherFee - AcceptedOrder.partialFee(ord1.matcherFee, ord1.amount, corrected2)
@@ -362,7 +362,7 @@ class OrderBookTestSuite
 
     val OrderBookUpdates(ob, _, _, _) = OrderBook.empty.appendAllLimit(List(s, b), nowTs)
 
-    val restSAmount = Order.correctAmount(700000L, 280)
+    val restSAmount = AcceptedOrder.correctedAmountOfAmountAsset(700000L, 280)
     val restAmount = 30000000000L - restSAmount
     val restFee = s.matcherFee - AcceptedOrder.partialFee(s.matcherFee, s.amount, restSAmount)
     ob.allOrders.toList should matchTo(List[LimitOrder](SellLimitOrder(restAmount, restFee, s, (BigInt(restSAmount) * 280).bigInteger)))

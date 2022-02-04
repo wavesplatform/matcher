@@ -21,6 +21,8 @@ class OrderFeeBaseTestSuite extends MatcherSuiteBase {
   val partiallyFeeWaves = 2.25.waves
   val percentMinFeeInWaves = 0.003.waves
   val usdRate = 10
+  val wctRate = 15
+  val discount = 50.0
 
   def upsertAssetRate(pairs: (Asset.IssuedAsset, Double)*): Unit = pairs.foreach {
     case (asset, rate) => withClue(s"$asset")(dex1.api.upsertAssetRate(asset, rate))

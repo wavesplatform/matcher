@@ -250,7 +250,7 @@ object OrderValidator extends ScorexLogging {
   /** Converts fee in waves to fee in the specified asset, taking into account correction by the asset decimals */
   private[dex] def convertFeeByAssetRate(feeInWaves: Long, asset: Asset, assetDecimals: Int, rateCache: RateCache): Result[Long] =
     asset.fold(lift(feeInWaves)) { issuedAsset =>
-      rateCache.getRate(issuedAsset) map { assetRate =>
+      rateCache.getLeastRate(issuedAsset) map { assetRate =>
         multiplyFeeByBigDecimal(
           feeInWaves,
           MatcherModel.correctRateByAssetDecimals(assetRate, assetDecimals)
@@ -333,8 +333,8 @@ object OrderValidator extends ScorexLogging {
               Right(fee)
             else
               for {
-                psFeeAssetRate <- rateCache.getRate(psFeeAsset).toRight(error.RateNotFound(psFeeAsset))
-                discountAssetRate <- rateCache.getRate(orderParams.feeAsset).toRight(error.RateNotFound(orderParams.feeAsset))
+                psFeeAssetRate <- rateCache.getMostRate(psFeeAsset).toRight(error.RateNotFound(psFeeAsset))
+                discountAssetRate <- rateCache.getLeastRate(orderParams.feeAsset).toRight(error.RateNotFound(orderParams.feeAsset))
                 psFeeAssetRateCorrected = BigDecimal(MatcherModel.correctRateByAssetDecimals(psFeeAssetRate, assetDecimals(psFeeAsset)))
                 discountAssetRateCorrected =
                   BigDecimal(MatcherModel.correctRateByAssetDecimals(discountAssetRate, assetDecimals(orderParams.feeAsset)))

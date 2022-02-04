@@ -15,7 +15,9 @@ trait RateCache {
   /** Adds or updates asset rate, returns previous rate value if there was one */
   def upsertRate(asset: Asset, value: Double): Option[Double]
 
-  def getRate(asset: Asset): Option[Double]
+  def getLeastRate(asset: Asset): Option[Double]
+
+  def getMostRate(asset: Asset): Option[Double]
 
   def getAllRates: Map[Asset, Double]
 
@@ -51,9 +53,14 @@ object RateCache {
           }
 
         /**
-         * @return The least rate, because a client could not update the rate in time, which leads to rejection
+         * @return The least rate to be used in multiplication, because a client could not update the rate in time, which leads to rejection
          */
-        def getRate(asset: Asset): Option[Double] = asset.fold(WavesRateOpt)(xs.get.least)
+        def getLeastRate(asset: Asset): Option[Double] = asset.fold(WavesRateOpt)(xs.get.least)
+
+        /**
+         * @return The most rate to be used in division, because a client could not update the rate in time, which leads to rejection
+         */
+        def getMostRate(asset: Asset): Option[Double] = asset.fold(WavesRateOpt)(xs.get.most)
 
         def getAllRates: Map[Asset, Double] = xs.get.latest
 
@@ -89,6 +96,7 @@ object RateCache {
 
     def delete(asset: Asset): RateCacheMaps = RateCacheMaps(latest - asset, lastTwo - asset)
     def least(asset: Asset): Option[Double] = lastTwo.get(asset).map(_.min)
+    def most(asset: Asset): Option[Double] = lastTwo.get(asset).map(_.max)
 
   }
 

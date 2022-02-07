@@ -19,7 +19,7 @@ import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.metrics.TimerExt
-import com.wavesplatform.dex.model.AssetPairBuilder
+import com.wavesplatform.dex.model.{AssetPairBuilder, OrderValidator}
 import io.swagger.annotations.{Api, _}
 
 import javax.ws.rs.Path
@@ -32,7 +32,7 @@ final class PlaceRoute(
   responseTimeout: FiniteDuration,
   assetPairBuilder: AssetPairBuilder,
   addressActor: ActorRef,
-  orderValidator: Order => FutureResult[Order],
+  orderValidator: Order => FutureResult[OrderValidator.ValidatedOrder],
   override val matcherStatus: () => MatcherStatus,
   override val apiKeyHashes: List[Array[Byte]]
 )(implicit mat: Materializer)
@@ -101,10 +101,10 @@ final class PlaceRoute(
         _ =>
           complete(
             placeTimer.measureFuture {
-              orderValidator(order).value flatMap {
+              orderValidator(order).value.flatMap {
                 case Right(o) =>
                   placeTimer.measureFuture {
-                    askAddressActor(addressActor, o.sender, AddressActor.Command.PlaceOrder(o, isMarket)) {
+                    askAddressActor(addressActor, o.order.sender, AddressActor.Command.PlaceOrder(o, isMarket)) {
                       case AddressActor.Event.OrderAccepted(x) => SimpleResponse(HttpSuccessfulPlace(x))
                       case x: error.MatcherError =>
                         if (x == error.CanNotPersistEvent) x.httpCode -> HttpError.from(x, "WavesNodeUnavailable")

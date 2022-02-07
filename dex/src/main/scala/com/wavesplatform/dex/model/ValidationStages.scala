@@ -36,13 +36,13 @@ object ValidationStages {
     blacklistedAddresses: Set[Address],
     hasMatcherAccountScript: Boolean,
     handleProofs: Order => Order
-  )(o: Order)(implicit efc: ErrorFormatterContext, ec: ExecutionContext): FutureResult[Order] = {
+  )(o: Order)(implicit efc: ErrorFormatterContext, ec: ExecutionContext): FutureResult[OrderValidator.ValidatedOrder] = {
     import OrderValidator._
 
     def actualOrderFeeSettings: OrderFeeSettings = orderFeeSettingsCache.getSettingsForOffset(lastProcessedOffset + 1)
 
     /** Does not need additional access to the blockchain via gRPC */
-    def syncValidation(marketStatus: Option[MarketStatus], orderAssetsDecimals: Asset => Int): Either[MatcherError, Order] = {
+    def syncValidation(marketStatus: Option[MarketStatus], orderAssetsDecimals: Asset => Int): Either[MatcherError, ValidatedOrder] = {
 
       lazy val actualTickSize = matchingRulesCache
         .getNormalizedRuleForNextOrder(
@@ -54,7 +54,7 @@ object ValidationStages {
         .tickSize
 
       for {
-        _ <- matcherSettingsAware(
+        validatedOrder <- matcherSettingsAware(
           matcherPublicKey,
           blacklistedAddresses,
           settings,
@@ -66,7 +66,7 @@ object ValidationStages {
         _ <- tickSizeAware(actualTickSize)(o)
         _ <-
           if (settings.maxPriceDeviations.enable) marketAware(actualOrderFeeSettings, settings.maxPriceDeviations, marketStatus)(o) else success
-      } yield o
+      } yield validatedOrder
     }
 
     /** Needs additional asynchronous access to the blockchain */
@@ -95,9 +95,9 @@ object ValidationStages {
         if (settings.maxPriceDeviations.enable) EitherT(orderBookAskAdapter.getMarketStatus(o.assetPair))
         else liftValueAsync(Option.empty[MarketStatus])
       }
-      _ <- liftAsync(syncValidation(marketStatus, getAssetDesc(_).decimals))
+      validatedOrder <- liftAsync(syncValidation(marketStatus, getAssetDesc(_).decimals))
       _ <- asyncValidation(getAssetDesc)
-    } yield o
+    } yield validatedOrder
   }
 
   def mkSecond(

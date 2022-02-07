@@ -40,11 +40,13 @@ class FeeSpecification
             matcherFee = submittedFee,
             feeAsset = mkAssetId("Very expensive asset"),
             version = orderVersion.toByte
-          )
+          ),
+          None,
+          None
         )
 
         val counterOrders = countersAmounts.map { amount =>
-          LimitOrder(createOrder(wavesBtcPair, submittedType.opposite, amount, 0.00011131))
+          LimitOrder(createOrder(wavesBtcPair, submittedType.opposite, amount, 0.00011131), None, None)
         }
 
         val submittedDenormalizedAmount = Denormalization.denormalizeAmountAndFee(submittedOrder.amount, 8)
@@ -112,8 +114,13 @@ class FeeSpecification
     "submitted order v3 " when List(1, 2).foreach { counterVersion =>
       s"counter order v$counterVersion" in {
         val counter =
-          LimitOrder(createOrder(wavesUsdPair, BUY, amount = 88947718687647L, price = 934300L, matcherFee = 300000L, version = 2.toByte))
-        val submitted = LimitOrder(createOrder(wavesUsdPair, SELL, amount = 50000000L, price = 932500L, matcherFee = 300000L, version = 3.toByte))
+          LimitOrder(
+            createOrder(wavesUsdPair, BUY, amount = 88947718687647L, price = 934300L, matcherFee = 300000L, version = 2.toByte),
+            None,
+            None
+          )
+        val submitted =
+          LimitOrder(createOrder(wavesUsdPair, SELL, amount = 50000000L, price = 932500L, matcherFee = 300000L, version = 3.toByte), None, None)
 
         val feeSettings = DynamicSettings.symmetric(300000L)
         val (makerFee, takerFee) = Fee.getMakerTakerFee(feeSettings)(submitted, counter)

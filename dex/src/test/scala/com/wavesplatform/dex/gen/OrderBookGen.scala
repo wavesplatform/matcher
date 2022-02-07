@@ -72,8 +72,8 @@ trait OrderBookGen {
     } yield {
       val restFee = AcceptedOrder.partialFee(order.matcherFee, order.amount, restAmount)
       order.orderType match {
-        case OrderType.SELL => SellLimitOrder(restAmount, restFee, order, BigInteger.valueOf(order.price))
-        case OrderType.BUY => BuyLimitOrder(restAmount, restFee, order, BigInteger.valueOf(order.price))
+        case OrderType.SELL => SellLimitOrder(restAmount, restFee, order, BigInteger.valueOf(order.price), None, None)
+        case OrderType.BUY => BuyLimitOrder(restAmount, restFee, order, BigInteger.valueOf(order.price), None, None)
       }
     }
 
@@ -82,8 +82,10 @@ trait OrderBookGen {
       order <- orderGen
       availableForSpending <- Gen.choose(minAmount(order.price), order.amount)
     } yield order.orderType match {
-      case OrderType.SELL => SellMarketOrder(order.amount, order.matcherFee, order, availableForSpending, BigInteger.valueOf(order.price))
-      case OrderType.BUY => BuyMarketOrder(order.amount, order.matcherFee, order, availableForSpending, BigInteger.valueOf(order.price))
+      case OrderType.SELL =>
+        SellMarketOrder(order.amount, order.matcherFee, order, availableForSpending, BigInteger.valueOf(order.price), None, None)
+      case OrderType.BUY =>
+        BuyMarketOrder(order.amount, order.matcherFee, order, availableForSpending, BigInteger.valueOf(order.price), None, None)
     }
 
   /**

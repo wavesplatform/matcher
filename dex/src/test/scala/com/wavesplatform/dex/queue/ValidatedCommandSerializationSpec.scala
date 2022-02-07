@@ -39,19 +39,19 @@ final class ValidatedCommandSerializationSpec extends MatcherSpec with MatcherSp
     }
 
     "write & read place order (1)" in test {
-      PlaceOrder(LimitOrder(order), Some(Kamon.currentContext()))
+      PlaceOrder(LimitOrder(order, Some(123L), Some(456)), Some(Kamon.currentContext()))
     }
 
     "write & read place order (2)" in test {
-      PlaceOrder(LimitOrder(order), None)
+      PlaceOrder(LimitOrder(order, Some(123L), Some(456)), None)
     }
 
     "write & read place market order (1)" in test {
-      PlaceMarketOrder(MarketOrder(order, 123L), Some(Kamon.currentContext()))
+      PlaceMarketOrder(MarketOrder(order, 123L, Some(123L), Some(456)), Some(Kamon.currentContext()))
     }
 
     "write & read place market order (2)" in test {
-      PlaceMarketOrder(MarketOrder(order, 123L), None)
+      PlaceMarketOrder(MarketOrder(order, 123L, Some(123L), Some(456)), None)
     }
 
     "write & read delete order book (1)" in test {

@@ -43,7 +43,9 @@ class OrderEventsCoordinatorActorSpec extends ScalaTestWithActorTestKit() with M
 
   private val validCounter = buy(wavesBtcPair, 100000, 0.0008, matcherFee = Some(2000L))
   private val validSubmitted = sell(wavesBtcPair, 100000, 0.0007, matcherFee = Some(1000L))
-  private val validEvent = Events.OrderExecuted(LimitOrder(validSubmitted), LimitOrder(validCounter), nowTs, 2000L, 1000L, 0L)
+
+  private val validEvent =
+    Events.OrderExecuted(LimitOrder(validSubmitted, None, None), LimitOrder(validCounter, None, None), nowTs, 2000L, 1000L, 0L)
 
   private val validTx = ExchangeTransactionV2
     .create(
@@ -67,17 +69,21 @@ class OrderEventsCoordinatorActorSpec extends ScalaTestWithActorTestKit() with M
     "Process" - {
       "OrderAdded - passes" in {
         val event = Events.OrderAdded(
-          LimitOrder(OrderV1(
-            sender = privateKey("test"),
-            matcher = PublicKey("matcher".getBytes("utf-8")),
-            pair = assetPair,
-            orderType = OrderType.BUY,
-            price = 100000000L,
-            amount = 100L,
-            timestamp = nowTs,
-            expiration = nowTs + 5.days.toMillis,
-            matcherFee = matcherFee
-          )),
+          LimitOrder(
+            OrderV1(
+              sender = privateKey("test"),
+              matcher = PublicKey("matcher".getBytes("utf-8")),
+              pair = assetPair,
+              orderType = OrderType.BUY,
+              price = 100000000L,
+              amount = 100L,
+              timestamp = nowTs,
+              expiration = nowTs + 5.days.toMillis,
+              matcherFee = matcherFee
+            ),
+            None,
+            None
+          ),
           Events.OrderAddedReason.RequestExecuted,
           nowTs
         )
@@ -88,17 +94,21 @@ class OrderEventsCoordinatorActorSpec extends ScalaTestWithActorTestKit() with M
 
       "OrderCanceled - passes" in {
         val event = Events.OrderCanceled(
-          LimitOrder(OrderV1(
-            sender = privateKey("test"),
-            matcher = PublicKey("matcher".getBytes("utf-8")),
-            pair = assetPair,
-            orderType = OrderType.BUY,
-            price = 100000000L,
-            amount = 100L,
-            timestamp = nowTs,
-            expiration = nowTs + 5.days.toMillis,
-            matcherFee = matcherFee
-          )),
+          LimitOrder(
+            OrderV1(
+              sender = privateKey("test"),
+              matcher = PublicKey("matcher".getBytes("utf-8")),
+              pair = assetPair,
+              orderType = OrderType.BUY,
+              price = 100000000L,
+              amount = 100L,
+              timestamp = nowTs,
+              expiration = nowTs + 5.days.toMillis,
+              matcherFee = matcherFee
+            ),
+            None,
+            None
+          ),
           Events.OrderCanceledReason.RequestExecuted,
           nowTs
         )
@@ -174,7 +184,7 @@ class OrderEventsCoordinatorActorSpec extends ScalaTestWithActorTestKit() with M
             expiration = expiration,
             matcherFee = 300000L
           )
-          val event = Events.OrderExecuted(LimitOrder(buyOrder), LimitOrder(sellOrder), nowTs, 300000L, 300000L, 0L)
+          val event = Events.OrderExecuted(LimitOrder(buyOrder, None, None), LimitOrder(sellOrder, None, None), nowTs, 300000L, 300000L, 0L)
           passToAddressDirectoryTest(
             OrderEventsCoordinatorActor.Command.Process(NonEmptyList.one(event)),
             AddressActor.Command.ApplyOrderBookExecuted(AddressActor.OrderBookExecutedEvent(

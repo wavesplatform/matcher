@@ -124,13 +124,13 @@ trait MatcherSpecBase
   protected def wrapLimitOrder(x: Order): ValidatedCommandWithMeta = wrapLimitOrder(seqNr.incrementAndGet(), x)
 
   protected def wrapLimitOrder(n: Long, x: Order): ValidatedCommandWithMeta =
-    wrapCommand(n, ValidatedCommand.PlaceOrder(LimitOrder(x)))
+    wrapCommand(n, ValidatedCommand.PlaceOrder(LimitOrder(x, None, None)))
 
   protected def wrapMarketOrder(mo: MarketOrder): ValidatedCommandWithMeta =
     wrapCommand(ValidatedCommand.PlaceMarketOrder(mo))
 
   protected def getSpentAmountWithFee(order: Order): Long = {
-    val lo = LimitOrder(order)
+    val lo = LimitOrder(order, None, None)
     lo.spentAmount + (if (order.getSpendAssetId == order.feeAsset) lo.fee else 0)
   }
 
@@ -329,11 +329,15 @@ trait MatcherSpecBase
       expiration: Long <- maxTimeGen
       matcherFee: Long <- maxWavesAmountGen
       orderVersion: Byte <- Gen.oneOf(1: Byte, 2: Byte)
+      percentMinFee: Option[Long] <- Gen.option(maxWavesAmountGen)
+      percentConstMinFee: Option[Long] <- Gen.option(maxWavesAmountGen)
     } yield BuyLimitOrder(
       amount,
       matcherFee,
       Order.buy(sender, MatcherAccount, pair, amount, price, timestamp, expiration, matcherFee, orderVersion),
-      BigInteger.ZERO
+      BigInteger.ZERO,
+      percentMinFee,
+      percentConstMinFee
     )
 
   protected val sellLimitOrderGenerator: Gen[SellLimitOrder] =
@@ -346,11 +350,15 @@ trait MatcherSpecBase
       expiration: Long <- maxTimeGen
       matcherFee: Long <- maxWavesAmountGen
       orderVersion: Byte <- Gen.oneOf(1: Byte, 2: Byte)
+      percentMinFee: Option[Long] <- Gen.option(maxWavesAmountGen)
+      percentConstMinFee: Option[Long] <- Gen.option(maxWavesAmountGen)
     } yield SellLimitOrder(
       amount,
       matcherFee,
       Order.sell(sender, MatcherAccount, pair, amount, price, timestamp, expiration, matcherFee, orderVersion),
-      BigInteger.ZERO
+      BigInteger.ZERO,
+      percentMinFee,
+      percentConstMinFee
     )
 
   protected val limitOrderGenerator: Gen[LimitOrder] = Gen.oneOf(sellLimitOrderGenerator, buyLimitOrderGenerator)
@@ -499,7 +507,7 @@ trait MatcherSpecBase
               percentSettings,
               getDefaultAssetDescriptions(_).decimals,
               rateCache
-            ).explicitGet()
+            ).explicitGet().minFee
           }
       case (_, ds @ DynamicSettings(_, _, _)) =>
         order
@@ -516,10 +524,10 @@ trait MatcherSpecBase
   }
 
   protected def mkOrderExecutedRaw(submitted: Order, counter: Order): OrderExecuted =
-    mkOrderExecuted(LimitOrder(submitted), LimitOrder(counter), submitted.timestamp)
+    mkOrderExecuted(LimitOrder(submitted, None, None), LimitOrder(counter, None, None), submitted.timestamp)
 
   protected def mkOrderExecutedRaw(submitted: Order, counter: Order, timestamp: Long): OrderExecuted =
-    mkOrderExecuted(LimitOrder(submitted), LimitOrder(counter), timestamp)
+    mkOrderExecuted(LimitOrder(submitted, None, None), LimitOrder(counter, None, None), timestamp)
 
   protected def mkOrderExecuted(submittedAo: AcceptedOrder, counterLo: LimitOrder): OrderExecuted =
     mkOrderExecuted(submittedAo, counterLo, submittedAo.order.timestamp)

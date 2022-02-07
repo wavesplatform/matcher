@@ -2,7 +2,7 @@ package com.wavesplatform.dex.model
 
 import com.wavesplatform.dex.caches.OrderFeeSettingsCache
 import com.wavesplatform.dex.domain.account.PublicKey
-import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.model.AcceptedOrder.partialFee
 import com.wavesplatform.dex.model.OrderValidator.multiplyFeeByBigDecimal
@@ -11,6 +11,8 @@ import com.wavesplatform.dex.settings.{AssetType, OrderFeeSettings}
 
 import scala.annotation.tailrec
 
+//counter = maker
+//submitter = taker
 object Fee {
 
   def getMakerTakerFeeByOffset(ofsc: OrderFeeSettingsCache)(offset: Long)(s: AcceptedOrder, c: LimitOrder): (Long, Long) =
@@ -41,47 +43,56 @@ object Fee {
 
     ofs match {
       case PercentSettings(assetType, _, _) =>
-        val (buy, sell) = Order.splitByType(s.order, c.order)
+        val (buy, sell) = splitByType(s, c)
 
-        val (buyAmt, sellAmt, priceFeeCorrection) = assetType match {
+        val (buyAmt, sellAmt) = assetType match {
           case AssetType.Amount => (
-              buy.getReceiveAmount _,
-              sell.getSpendAmount _,
-              identity[Long] _
+              buy.order.getReceiveAmount _,
+              sell.order.getSpendAmount _
             )
 
           case AssetType.Price => (
-              buy.getSpendAmount _,
-              sell.getReceiveAmount _,
-              identity[Long] _
+              buy.order.getSpendAmount _,
+              sell.order.getReceiveAmount _
             )
 
           case AssetType.Receiving => (
-              buy.getReceiveAmount _,
-              sell.getReceiveAmount _,
-              identity[Long] _
+              buy.order.getReceiveAmount _,
+              sell.order.getReceiveAmount _
             )
 
           case AssetType.Spending => (
-              buy.getSpendAmount _,
-              sell.getSpendAmount _,
-              if (s.isBuyOrder) scaleFeeByPriceDiff(s.price, executedPrice) _
-              else identity[Long] _
+              buy.order.getSpendAmount _,
+              sell.order.getSpendAmount _
             )
         }
 
         def buySellFee(buyAmount: Long, buyPrice: Long, sellAmount: Long, sellPrice: Long): (Long, Long) =
           buyAmt(buyAmount, buyPrice).explicitGet() -> sellAmt(sellAmount, sellPrice).explicitGet()
 
-        val (buyAmountExecuted, sellAmountExecuted) = buySellFee(executedAmount, executedPrice, executedAmount, executedPrice)
-        val (buyAmountTotal, sellAmountTotal) = buySellFee(buy.amount, executedPrice, sell.amount, executedPrice)
+        def executedFee(o: AcceptedOrder, amountTotal: Long, amountExecuted: Long) = {
+          val fee = o.percentMinFee.getOrElse(o.order.matcherFee)
+          val correctedFee = {
+            val isTaker = o.order.orderType == s.order.orderType
+            if (isTaker && o.isBuyOrder && assetType == AssetType.Spending)
+              scaleFeeByPriceDiff(s.price, executedPrice)(fee)
+            else
+              fee
+          }
+          partialFee(o.percentConstMinFee.getOrElse(correctedFee).max(correctedFee), amountTotal, amountExecuted)
+        }
 
-        val buyExecutedFee = partialFee(buy.matcherFee, buyAmountTotal, buyAmountExecuted)
-        val sellExecutedFee = partialFee(sell.matcherFee, sellAmountTotal, sellAmountExecuted)
+        val (buyAmountExecuted, sellAmountExecuted) = buySellFee(executedAmount, executedPrice, executedAmount, executedPrice)
+        val (buyAmountTotal, sellAmountTotal) = buySellFee(buy.order.amount, executedPrice, sell.order.amount, executedPrice)
+
+        val buyExecutedFee = executedFee(buy, buyAmountTotal, buyAmountExecuted)
+        val sellExecutedFee = executedFee(sell, sellAmountTotal, sellAmountExecuted)
 
         withZeroFee(
-          if (c.isBuyOrder) (buyExecutedFee, priceFeeCorrection(sellExecutedFee))
-          else (sellExecutedFee, priceFeeCorrection(buyExecutedFee)),
+          if (c.isBuyOrder)
+            (buyExecutedFee, sellExecutedFee)
+          else
+            (sellExecutedFee, buyExecutedFee),
           zeroFeeAccounts
         )
 
@@ -108,7 +119,12 @@ object Fee {
     }
   }
 
-  def scaleFeeByPriceDiff(placementPrice: Long, executionPrice: Long)(fee: Long): Long =
+  private def scaleFeeByPriceDiff(placementPrice: Long, executionPrice: Long)(fee: Long): Long =
     multiplyFeeByBigDecimal(fee, BigDecimal(executionPrice) / BigDecimal(placementPrice))
+
+  private def splitByType(o1: AcceptedOrder, o2: AcceptedOrder): (AcceptedOrder, AcceptedOrder) = {
+    require(o1.order.orderType != o2.order.orderType)
+    if (o1.order.orderType == OrderType.BUY) (o1, o2) else (o2, o1)
+  }
 
 }

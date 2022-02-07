@@ -102,7 +102,10 @@ class ActorsWebSocketInteractionsSpecification
     }
 
     def placeOrder(ao: AcceptedOrder): WebSocketTestEnvironment = {
-      addressDir ! AddressDirectoryActor.Command.ForwardMessage(address, AddressActor.Command.PlaceOrder(ao.order, ao.isMarket))
+      addressDir ! AddressDirectoryActor.Command.ForwardMessage(
+        address,
+        AddressActor.Command.PlaceOrder(OrderValidator.ValidatedOrder(ao.order, None, None), ao.isMarket)
+      )
       commandsProbe.expectMsg(ao match {
         case lo: LimitOrder => ValidatedCommand.PlaceOrder(lo); case mo: MarketOrder => ValidatedCommand.PlaceMarketOrder(mo)
       })
@@ -190,7 +193,7 @@ class ActorsWebSocketInteractionsSpecification
 
       "sender places order and then cancel it" in {
         val env = new WebSocketTestEnvironment()
-        val lo = LimitOrder(createOrder(wavesUsdPair, BUY, 5.waves, 3.0, sender = env.address))
+        val lo = LimitOrder(createOrder(wavesUsdPair, BUY, 5.waves, 3.0, sender = env.address), None, None)
 
         env
           .updateBalances(Map(Waves -> 100.waves, usd -> 300.usd))
@@ -218,8 +221,8 @@ class ActorsWebSocketInteractionsSpecification
       // DEX-989
       "sender places order, receives updates by third asset, partly fills order and then cancels remaining" in {
         val env = new WebSocketTestEnvironment()
-        val buyOrder = LimitOrder(createOrder(wavesUsdPair, BUY, 10.waves, 3.0, sender = env.address))
-        val sellOrder = LimitOrder(createOrder(wavesUsdPair, SELL, 5.waves, 3.0))
+        val buyOrder = LimitOrder(createOrder(wavesUsdPair, BUY, 10.waves, 3.0, sender = env.address), None, None)
+        val sellOrder = LimitOrder(createOrder(wavesUsdPair, SELL, 5.waves, 3.0), None, None)
 
         withClue("Sender has 100 Waves and 300 USD, requests snapshot\n") {
           env
@@ -312,9 +315,10 @@ class ActorsWebSocketInteractionsSpecification
         val env = new WebSocketTestEnvironment()
 
         def matchOrders(submittedMarket: MarketOrder, counterAmount: Long): MarketOrder =
-          env.executeOrder(submittedMarket, LimitOrder(createOrder(wavesUsdPair, SELL, counterAmount, 3.0))).submittedMarketRemaining(
-            submittedMarket
-          )
+          env.executeOrder(submittedMarket, LimitOrder(createOrder(wavesUsdPair, SELL, counterAmount, 3.0), None, None))
+            .submittedMarketRemaining(
+              submittedMarket
+            )
 
         val tradableBalance = Map(Waves -> 100.waves, usd -> 300.usd, eth -> 3.eth)
 
@@ -327,7 +331,8 @@ class ActorsWebSocketInteractionsSpecification
             0
           )
 
-        var mo = MarketOrder(createOrder(wavesUsdPair, BUY, 50.waves, 3.0, 1.eth, feeAsset = eth, sender = env.address), tradableBalance)
+        var mo =
+          MarketOrder(createOrder(wavesUsdPair, BUY, 50.waves, 3.0, 1.eth, feeAsset = eth, sender = env.address), tradableBalance, None, None)
 
         withClue("Placing market order, reserves: 150 USD and 1 ETH\n") {
           env
@@ -456,7 +461,7 @@ class ActorsWebSocketInteractionsSpecification
         subscribe(mobileSubscription)
         expectWsBalance(mobileSubscription, Map(Waves -> WsBalances(100, 0), usd -> WsBalances(300, 0), eth -> WsBalances(5, 0)), 0)
 
-        val order = LimitOrder(createOrder(wavesUsdPair, BUY, 1.waves, 3.0, sender = env.address))
+        val order = LimitOrder(createOrder(wavesUsdPair, BUY, 1.waves, 3.0, sender = env.address), None, None)
 
         env.placeOrder(order)
         expectWsBalance(webSubscription, Map(usd -> WsBalances(297, 3), Waves -> WsBalances(99.997, 0.003)), 2)
@@ -476,7 +481,7 @@ class ActorsWebSocketInteractionsSpecification
 
       "so far unsubscribed address made some actions and then subscribes" in {
         val env = new WebSocketTestEnvironment()
-        val lo = LimitOrder(createOrder(wavesUsdPair, BUY, 1.waves, 3.0, sender = env.address))
+        val lo = LimitOrder(createOrder(wavesUsdPair, BUY, 1.waves, 3.0, sender = env.address), None, None)
 
         env
           .updateBalances(Map(Waves -> 100.waves, usd -> 300.usd, eth -> 2.eth))
@@ -494,7 +499,7 @@ class ActorsWebSocketInteractionsSpecification
 
       "spendable balance is equal to reserved" in {
         val env = new WebSocketTestEnvironment()
-        val lo = LimitOrder(createOrder(btcUsdPair, SELL, 1.btc, 8776.0, sender = env.address))
+        val lo = LimitOrder(createOrder(btcUsdPair, SELL, 1.btc, 8776.0, sender = env.address), None, None)
 
         env
           .updateBalances(Map(Waves -> 100.waves, btc -> 1.btc))
@@ -511,8 +516,8 @@ class ActorsWebSocketInteractionsSpecification
       // DEX-989
       "order executes right after it was placed" ignore {
         val env = new WebSocketTestEnvironment()
-        val counter = LimitOrder(createOrder(wavesUsdPair, BUY, 5.waves, 3.0))
-        val submitted = LimitOrder(createOrder(wavesUsdPair, SELL, 5.waves, 3.0, sender = env.address))
+        val counter = LimitOrder(createOrder(wavesUsdPair, BUY, 5.waves, 3.0), None, None)
+        val submitted = LimitOrder(createOrder(wavesUsdPair, SELL, 5.waves, 3.0, sender = env.address), None, None)
 
         env
           .updateBalances(Map(Waves -> 100.waves, btc -> 1.btc))
@@ -528,7 +533,7 @@ class ActorsWebSocketInteractionsSpecification
         env.addressDir ! OrderAdded(counter, OrderAddedReason.RequestExecuted, now)
         env.addressDir ! AddressDirectoryActor.Command.ForwardMessage(
           env.address,
-          AddressActor.Command.PlaceOrder(submitted.order, submitted.isMarket)
+          AddressActor.Command.PlaceOrder(OrderValidator.ValidatedOrder(submitted.order, None, None), submitted.isMarket)
         )
         env.commandsProbe.expectMsg(ValidatedCommand.PlaceOrder(submitted))
         env.addressDir ! OrderAdded(submitted, OrderAddedReason.RequestExecuted, now)
@@ -548,8 +553,8 @@ class ActorsWebSocketInteractionsSpecification
 
       "trade with itself" in {
         val env = new WebSocketTestEnvironment()
-        val counter = LimitOrder(createOrder(wavesBtcPair, BUY, 5.waves, 3.0, sender = env.address))
-        val submitted = LimitOrder(createOrder(wavesBtcPair, SELL, 5.waves, 3.0, sender = env.address))
+        val counter = LimitOrder(createOrder(wavesBtcPair, BUY, 5.waves, 3.0, sender = env.address), None, None)
+        val submitted = LimitOrder(createOrder(wavesBtcPair, SELL, 5.waves, 3.0, sender = env.address), None, None)
 
         env
           .updateBalances(Map(Waves -> 100.waves, btc -> 1.btc))
@@ -565,7 +570,7 @@ class ActorsWebSocketInteractionsSpecification
 
         env.addressDir ! AddressDirectoryActor.Command.ForwardMessage(
           env.address,
-          AddressActor.Command.PlaceOrder(submitted.order, submitted.isMarket)
+          AddressActor.Command.PlaceOrder(OrderValidator.ValidatedOrder(submitted.order, None, None), submitted.isMarket)
         )
         env.commandsProbe.expectMsg(ValidatedCommand.PlaceOrder(submitted))
         env.addressDir ! AddressActor.Command.ApplyOrderBookAdded(OrderAdded(submitted, OrderAddedReason.RequestExecuted, now))
@@ -590,10 +595,10 @@ class ActorsWebSocketInteractionsSpecification
 
       "market order executes (address is sender of counters)" in {
         val env = new WebSocketTestEnvironment()
-        val counter1 = LimitOrder(createOrder(wavesUsdPair, BUY, 5.waves, 3.0, sender = env.address))
-        val counter2 = LimitOrder(createOrder(wavesUsdPair, BUY, 5.waves, 3.1, sender = env.address))
-        val counter3 = LimitOrder(createOrder(wavesUsdPair, BUY, 5.waves, 3.2, sender = env.address))
-        var mo = MarketOrder(createOrder(wavesUsdPair, SELL, 12.waves, 3.0), _ => Long.MaxValue)
+        val counter1 = LimitOrder(createOrder(wavesUsdPair, BUY, 5.waves, 3.0, sender = env.address), None, None)
+        val counter2 = LimitOrder(createOrder(wavesUsdPair, BUY, 5.waves, 3.1, sender = env.address), None, None)
+        val counter3 = LimitOrder(createOrder(wavesUsdPair, BUY, 5.waves, 3.2, sender = env.address), None, None)
+        var mo = MarketOrder(createOrder(wavesUsdPair, SELL, 12.waves, 3.0), _ => Long.MaxValue, None, None)
 
         def matchOrders(submittedMarket: MarketOrder, counter: LimitOrder): (MarketOrder, LimitOrder) = {
           val oe = env.executeOrder(submittedMarket, counter)
@@ -700,10 +705,10 @@ class ActorsWebSocketInteractionsSpecification
       // DEX-989
       "market order executes (address is sender of market)" ignore {
         val env = new WebSocketTestEnvironment()
-        val counter1 = LimitOrder(createOrder(wavesUsdPair, BUY, 5.waves, 3.0))
-        val counter2 = LimitOrder(createOrder(wavesUsdPair, BUY, 5.waves, 3.1))
-        val counter3 = LimitOrder(createOrder(wavesUsdPair, BUY, 5.waves, 3.2))
-        var mo = MarketOrder(createOrder(wavesUsdPair, SELL, 12.waves, 3.0, sender = env.address), _ => Long.MaxValue)
+        val counter1 = LimitOrder(createOrder(wavesUsdPair, BUY, 5.waves, 3.0), None, None)
+        val counter2 = LimitOrder(createOrder(wavesUsdPair, BUY, 5.waves, 3.1), None, None)
+        val counter3 = LimitOrder(createOrder(wavesUsdPair, BUY, 5.waves, 3.2), None, None)
+        var mo = MarketOrder(createOrder(wavesUsdPair, SELL, 12.waves, 3.0, sender = env.address), _ => Long.MaxValue, None, None)
 
         def matchOrders(submittedMarket: MarketOrder, counter: LimitOrder): MarketOrder =
           env.executeOrder(submittedMarket, counter).submittedMarketRemaining(submittedMarket)
@@ -794,7 +799,7 @@ class ActorsWebSocketInteractionsSpecification
 
     "correctly process order partially filling" in {
       val env = new WebSocketTestEnvironment()
-      val bo = LimitOrder(createOrder(wavesUsdPair, BUY, 10.waves, 1.0, sender = env.address))
+      val bo = LimitOrder(createOrder(wavesUsdPair, BUY, 10.waves, 1.0, sender = env.address), None, None)
 
       env
         .updateBalances(Map(usd -> 10.usd, Waves -> 10.waves))
@@ -811,7 +816,7 @@ class ActorsWebSocketInteractionsSpecification
           1
         )
 
-      val oe = env.executeOrder(LimitOrder(createOrder(wavesUsdPair, SELL, 5.waves, 1.0)), bo)
+      val oe = env.executeOrder(LimitOrder(createOrder(wavesUsdPair, SELL, 5.waves, 1.0), None, None), bo)
 
       env
         .expectWsBalancesAndOrders(

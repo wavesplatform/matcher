@@ -102,10 +102,18 @@ abstract class OrderPercentFeeAmountTestSuite(version: Byte) extends OrderFeeBas
 
     s"users should pay correct fee when fee asset-type = $assetType and order partially filled" in {
       val accountBuyer = mkAccountWithBalance(fullyAmountUsd -> IssuedAsset(UsdId), minimalFeeWaves -> Waves)
-      val accountSeller = mkAccountWithBalance(partiallyAmountWaves + minimalFeeWaves -> Waves)
+      val accountSeller = mkAccountWithBalance(partiallyAmountWaves + partialMinimalFeeWaves -> Waves)
 
       placeAndAwaitAtDex(mkOrder(accountBuyer, wavesUsdPair, BUY, fullyAmountWaves, price, matcherFee = minimalFeeWaves, version = version))
-      placeAndAwaitAtNode(mkOrder(accountSeller, wavesUsdPair, SELL, partiallyAmountWaves, price, matcherFee = minimalFeeWaves, version = version))
+      placeAndAwaitAtNode(mkOrder(
+        accountSeller,
+        wavesUsdPair,
+        SELL,
+        partiallyAmountWaves,
+        price,
+        matcherFee = partialMinimalFeeWaves,
+        version = version
+      ))
 
       wavesNode1.api.balance(accountBuyer, Waves) shouldBe partiallyAmountWaves - partiallyFeeWaves + minimalFeeWaves
       wavesNode1.api.balance(accountBuyer, IssuedAsset(UsdId)) shouldBe fullyAmountUsd - partiallyAmountUsd
@@ -121,7 +129,7 @@ abstract class OrderPercentFeeAmountTestSuite(version: Byte) extends OrderFeeBas
       dex1.api.cancelAllOrdersWithSig(accountBuyer)
     }
 
-    s"order should be processed if amount less than fee when fee asset-type = $assetType" in {
+    s"order should be processed and only the required fee should be taken even if a user tries to pay more fee for asset-type = $assetType" in {
       val accountBuyer = mkAccountWithBalance(fullyAmountUsd -> IssuedAsset(UsdId), minimalFeeWaves -> Waves)
       val accountSeller = mkAccountWithBalance(fullyAmountWaves + tooHighFeeWaves -> Waves)
 
@@ -130,7 +138,7 @@ abstract class OrderPercentFeeAmountTestSuite(version: Byte) extends OrderFeeBas
 
       wavesNode1.api.balance(accountBuyer, Waves) should be(fullyAmountWaves)
       wavesNode1.api.balance(accountBuyer, IssuedAsset(UsdId)) shouldBe 0L
-      wavesNode1.api.balance(accountSeller, Waves) should be(0L)
+      wavesNode1.api.balance(accountSeller, Waves) shouldBe tooHighFeeWaves - minimalFeeWaves
       wavesNode1.api.balance(accountSeller, IssuedAsset(UsdId)) shouldBe fullyAmountUsd
 
       dex1.api.getReservedBalanceWithApiKey(accountBuyer).getOrElse(Waves, 0L) shouldBe 0L
@@ -150,7 +158,7 @@ abstract class OrderPercentFeeAmountTestSuite(version: Byte) extends OrderFeeBas
           minimalFeeWaves,
           version = version
         )
-      ) should failWithBalanceNotEnough(required = Map(Waves -> 3.75.waves, usd -> 18.usd), available = Map(Waves -> 0.waves, usd -> 18.usd))
+      ) should failWithBalanceNotEnough(required = Map(Waves -> 2.1.waves, usd -> 18.usd), available = Map(Waves -> 0.waves, usd -> 18.usd))
     }
 
     s"buy order should be rejected if fee less then minimum possible fee when fee asset-type = $assetType" in {

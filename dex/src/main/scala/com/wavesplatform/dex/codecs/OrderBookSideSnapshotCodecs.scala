@@ -1,14 +1,14 @@
 package com.wavesplatform.dex.codecs
 
-import java.math.BigInteger
-import java.nio.ByteBuffer
-
+import cats.syntax.option._
 import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.dex.codecs.ByteBufferCodecs.ByteBufferExt
 import com.wavesplatform.dex.domain.model.Price
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.model.{BuyLimitOrder, LimitOrder, OrderBookSideSnapshot, SellLimitOrder}
 
+import java.math.BigInteger
+import java.nio.ByteBuffer
 import scala.collection.mutable
 
 object OrderBookSideSnapshotCodecs {
@@ -19,7 +19,7 @@ object OrderBookSideSnapshotCodecs {
       case (price, xs) =>
         dest ++= Longs.toByteArray(price)
         dest ++= Ints.toByteArray(xs.size)
-        xs.foreach(encodeLoV2(dest, _))
+        xs.foreach(encodeLoV3(dest, _))
     }
   }
 
@@ -35,7 +35,8 @@ object OrderBookSideSnapshotCodecs {
     r.result()
   }
 
-  def encodeLoV1(dest: mutable.ArrayBuilder[Byte], lo: LimitOrder): Unit = {
+  def encodeLoV3(dest: mutable.ArrayBuilder[Byte], lo: LimitOrder): Unit = {
+    dest += 3 //version
 
     dest ++= lo.order.orderType.bytes
     dest ++= Longs.toByteArray(lo.amount)
@@ -46,23 +47,30 @@ object OrderBookSideSnapshotCodecs {
 
     dest ++= Ints.toByteArray(orderBytes.length)
     dest ++= orderBytes
-  }
 
-  def encodeLoV2(dest: mutable.ArrayBuilder[Byte], lo: LimitOrder): Unit = {
     val avgWeighedPriceNominatorBytes = lo.avgWeighedPriceNominator.toByteArray
-
-    dest += 2
-
-    encodeLoV1(dest, lo)
-
     dest ++= Ints.toByteArray(avgWeighedPriceNominatorBytes.length)
     dest ++= avgWeighedPriceNominatorBytes
+
+    val (mfLen, mf) = lo.percentMinFee.map { mf =>
+      val mfBytes = Longs.toByteArray(mf)
+      Ints.toByteArray(mfBytes.length) -> mfBytes
+    }.getOrElse(Ints.toByteArray(0) -> Array.emptyByteArray)
+    dest ++= mfLen
+    dest ++= mf
+
+    val (cmfLen, cmf) = lo.percentConstMinFee.map { cmf =>
+      val cmfBytes = Longs.toByteArray(cmf)
+      Ints.toByteArray(cmfBytes.length) -> cmfBytes
+    }.getOrElse(Ints.toByteArray(0) -> Array.emptyByteArray)
+    dest ++= cmfLen
+    dest ++= cmf
   }
 
   def decodeLo(bb: ByteBuffer): LimitOrder = {
-
+    //!!! pay attention that v1 order doesn't have first byte with version
     val header = bb.get
-    val version = if (header == 2) 2 else 1
+    val version = if (header == 0 || header == 1) 1 else header.toInt
     val orderType = if (version == 1) header else bb.get
 
     val amount = bb.getLong
@@ -71,15 +79,27 @@ object OrderBookSideSnapshotCodecs {
     val order = Order.fromBytes(orderVersion, bb.getBytes)._1
 
     val avgWeighedPriceNominator =
-      if (version == 2) new BigInteger(bb.getBytes)
-      else {
+      if (version == 1) {
         val filledAmount = order.amount - amount
         (BigInt(order.price) * filledAmount).bigInteger
-      }
+      } else
+        new BigInteger(bb.getBytes)
+
+    val (percentMinFee, percentConstMinFee) =
+      if (version >= 3) {
+        val mfBytes = bb.getBytes
+        val mf =
+          if (mfBytes.nonEmpty) Longs.fromByteArray(mfBytes).some else None
+        val cmfBytes = bb.getBytes
+        val cmf =
+          if (cmfBytes.nonEmpty) Longs.fromByteArray(cmfBytes).some else None
+        mf -> cmf
+      } else
+        None -> None
 
     OrderType(orderType) match {
-      case OrderType.SELL => SellLimitOrder(amount, fee, order, avgWeighedPriceNominator)
-      case OrderType.BUY => BuyLimitOrder(amount, fee, order, avgWeighedPriceNominator)
+      case OrderType.SELL => SellLimitOrder(amount, fee, order, avgWeighedPriceNominator, percentMinFee, percentConstMinFee)
+      case OrderType.BUY => BuyLimitOrder(amount, fee, order, avgWeighedPriceNominator, percentMinFee, percentConstMinFee)
     }
   }
 

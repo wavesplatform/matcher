@@ -9,7 +9,8 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.crypto.DigestSize
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.model.{LimitOrder, MarketOrder}
-import com.wavesplatform.dex.tool.KamonTraceUtils.{readCtx, writeCtx}
+import com.wavesplatform.dex.protobuf.order.{ValidatedCommand => PbValidatedCommand}
+import com.wavesplatform.dex.tool.KamonTraceUtils
 import kamon.Kamon
 import kamon.context.Context
 
@@ -22,7 +23,10 @@ sealed trait ValidatedCommand extends Product with Serializable {
 
 object ValidatedCommand {
 
-  final case class PlaceOrder(limitOrder: LimitOrder, maybeCtx: Option[Context] = Some(Kamon.currentContext())) extends ValidatedCommand {
+  final case class PlaceOrder(
+    limitOrder: LimitOrder,
+    maybeCtx: Option[Context] = Some(Kamon.currentContext())
+  ) extends ValidatedCommand {
     override def assetPair: AssetPair = limitOrder.order.assetPair
     override def toString: String = s"PlaceOrder(${limitOrder.order.idStr()})"
     override def hashCode(): Int = productHash(Tuple1(limitOrder))
@@ -35,8 +39,10 @@ object ValidatedCommand {
 
   }
 
-  final case class PlaceMarketOrder(marketOrder: MarketOrder, maybeCtx: Option[Context] = Some(Kamon.currentContext()))
-      extends ValidatedCommand {
+  final case class PlaceMarketOrder(
+    marketOrder: MarketOrder,
+    maybeCtx: Option[Context] = Some(Kamon.currentContext())
+  ) extends ValidatedCommand {
     override def assetPair: AssetPair = marketOrder.order.assetPair
 
     override def toString: String =
@@ -108,18 +114,7 @@ object ValidatedCommand {
   }
 
   def toBytes(x: ValidatedCommand): Array[Byte] =
-    x match {
-      case PlaceOrder(lo, maybeCtx) =>
-        (1: Byte) +: Array.concat(Array(lo.order.version), lo.order.bytes(), writeMaybeCtx(maybeCtx))
-      case CancelOrder(assetPair, orderId, source, maybeOwner, maybeCtx) =>
-        (2: Byte) +: Array.concat(assetPair.bytes, orderId.arr, sourceToBytes(source), writeMaybeAddress(maybeOwner), writeMaybeCtx(maybeCtx))
-      case DeleteOrderBook(assetPair, ctx) =>
-        (3: Byte) +: Array.concat(assetPair.bytes, writeMaybeCtx(ctx))
-      case PlaceMarketOrder(mo, ctx) =>
-        (4: Byte) +: Array.concat(Longs.toByteArray(mo.availableForSpending), Array(mo.order.version), mo.order.bytes(), writeMaybeCtx(ctx))
-      case CancelAllOrders(assetPair, ctx) =>
-        (5: Byte) +: Array.concat(assetPair.bytes, writeMaybeCtx(ctx))
-    }
+    6 +: ValidatedCommandPbConversions.toPb(x).toByteArray
 
   def fromBytes(xs: Array[Byte]): ValidatedCommand =
     xs.head match {
@@ -127,7 +122,7 @@ object ValidatedCommand {
         val bodyBytes = xs.tail
         val (order, offset) = Order.fromBytes(bodyBytes(0), bodyBytes.slice(1, Int.MaxValue))
         val maybeCtx = readMaybeCtx(bodyBytes.drop(offset.value + 1))
-        PlaceOrder(LimitOrder(order), maybeCtx)
+        PlaceOrder(LimitOrder(order, None, None), maybeCtx)
       case 2 =>
         val bodyBytes = xs.tail
         val (assetPair, offset1) = AssetPair.fromBytes(bodyBytes)
@@ -148,32 +143,21 @@ object ValidatedCommand {
         val afs = Longs.fromByteArray(bodyBytes.slice(0, 8))
         val (order, offset) = Order.fromBytes(bodyBytes(8), bodyBytes.slice(9, Int.MaxValue))
         val maybeCtx = readMaybeCtx(bodyBytes.drop(8 + offset.value + 1))
-        PlaceMarketOrder(MarketOrder(order, afs), maybeCtx)
+        PlaceMarketOrder(MarketOrder(order, afs, None, None), maybeCtx)
       case 5 =>
         val bodyBytes = xs.tail
         val (assetPair, offset) = AssetPair.fromBytes(bodyBytes)
         val maybeCtx = readMaybeCtx(bodyBytes.drop(offset))
         CancelAllOrders(assetPair, maybeCtx)
+      case 6 =>
+        ValidatedCommandPbConversions.fromPb(PbValidatedCommand.parseFrom(xs.tail))
+          .fold(x => throw new RuntimeException(s"Impossible read validated command error: ${x.message}"), identity)
       case x =>
         throw new IllegalArgumentException(s"Unknown command type: $x")
     }
 
-  // Pre-allocated
-  private val sourceToBytes: Map[Source, Array[Byte]] = Map(
-    Source.NotTracked -> Array.emptyByteArray,
-    Source.Request -> Array(1),
-    Source.Expiration -> Array(2),
-    Source.BalanceTracking -> Array(3)
-  )
-
-  private def writeMaybeCtx(maybeCtx: Option[Context]): Array[Byte] =
-    maybeCtx.map(writeCtx).getOrElse(Array.emptyByteArray)
-
   private def readMaybeCtx(bytes: Array[Byte]): Option[Context] =
-    Either.catchNonFatal(readCtx(bytes)).toOption
-
-  private def writeMaybeAddress(maybeAddress: Option[Address]): Array[Byte] =
-    maybeAddress.map(_.bytes.arr).getOrElse(Array.emptyByteArray)
+    Either.catchNonFatal(KamonTraceUtils.readCtx(bytes)).toOption
 
   private def readMaybeAddress(bytes: Array[Byte]): Option[Address] =
     Address.fromBytes(bytes).toOption

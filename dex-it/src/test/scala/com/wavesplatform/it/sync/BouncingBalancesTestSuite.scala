@@ -106,7 +106,7 @@ class BouncingBalancesTestSuite extends WsSuiteBase {
         assertChanges(wsc)(
           Map(Waves -> WsBalances(4949949.997, 0.003)), // Fee for order
           Map(doggyCoin -> WsBalances(0, 1000000))
-        )(WsOrder.fromDomain(LimitOrder(bobOrder)))
+        )(WsOrder.fromDomain(LimitOrder(bobOrder, None, None)))
         wsc.clearMessages()
 
         dex1.api.orderStatusByAssetPairAndId(bobOrder).status shouldBe Status.Accepted

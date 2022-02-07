@@ -48,8 +48,8 @@ trait Generators extends WavesEntitiesGen {
         timestampGen = now
       )
     } yield Events.OrderExecuted(
-      submitted = LimitOrder(submitted),
-      counter = LimitOrder(counter),
+      submitted = LimitOrder(submitted, None, None),
+      counter = LimitOrder(counter, None, None),
       timestamp = submitted.timestamp,
       counterExecutedFee = counter.matcherFee,
       submittedExecutedFee = submitted.matcherFee,
@@ -60,7 +60,7 @@ trait Generators extends WavesEntitiesGen {
     for {
       (order, _) <- orderAndSenderGen(senderGen = senderGen, matcherGen = toPublicKey(matcher))
     } yield Events.OrderCanceled(
-      acceptedOrder = LimitOrder(order),
+      acceptedOrder = LimitOrder(order, None, None),
       reason = OrderCanceledReason.BecameInvalid,
       timestamp = order.timestamp
     )

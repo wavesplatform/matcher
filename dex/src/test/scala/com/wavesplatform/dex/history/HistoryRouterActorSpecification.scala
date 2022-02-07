@@ -68,7 +68,9 @@ class HistoryRouterActorSpecification
         timestamp = timestamp,
         expiration = 1000L,
         matcherFee = matcherFee
-      )
+      ),
+      None,
+      None
     )
 
   def orderAdded(submitted: LimitOrder): OrderAdded = OrderAdded(submitted, OrderAddedReason.RequestExecuted, time.getTimestamp())

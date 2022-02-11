@@ -42,7 +42,9 @@ object ScriptRunnerFixed {
       complexityLimit,
       default,
       blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls),
-      blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
+      blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls),
+      blockchain.height >= blockchain.settings.functionalitySettings.syncDAppCheckPaymentsHeight,
+      blockchain.height > blockchain.settings.functionalitySettings.estimatorSumOverflowFixHeight
     )
 
   def applyGeneric(
@@ -54,7 +56,9 @@ object ScriptRunnerFixed {
     complexityLimit: Int,
     default: EVALUATED,
     useCorrectScriptVersion: Boolean,
-    fixUnicodeFunctions: Boolean
+    fixUnicodeFunctions: Boolean,
+    useNewPowPrecision: Boolean,
+    correctFunctionCallScope: Boolean
   ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) = {
 
     def evalVerifier(
@@ -77,7 +81,8 @@ object ScriptRunnerFixed {
               isContract,
               scriptContainerAddress,
               txId,
-              fixUnicodeFunctions
+              fixUnicodeFunctions,
+              useNewPowPrecision
             )
         } yield (ds, ctx)
 
@@ -87,9 +92,9 @@ object ScriptRunnerFixed {
     def evaluate(ctx: EvaluationContext[Environment, Id], expr: EXPR): (Log[Id], Int, Either[ExecutionError, EVALUATED]) = {
       val (log, unusedComplexity, result) =
         if (complexityLimit == Int.MaxValue)
-          EvaluatorV2.applyCompleted(ctx, expr, script.stdLibVersion)
+          EvaluatorV2.applyCompleted(ctx, expr, script.stdLibVersion, correctFunctionCallScope)
         else
-          EvaluatorV2.applyOrDefault(ctx, expr, script.stdLibVersion, complexityLimit, _ => Right(default))
+          EvaluatorV2.applyOrDefault(ctx, expr, script.stdLibVersion, complexityLimit, correctFunctionCallScope, _ => Right(default))
       (log, complexityLimit - unusedComplexity, result)
     }
 
@@ -100,7 +105,7 @@ object ScriptRunnerFixed {
       case ContractScript.ContractScriptImpl(_, DApp(_, decls, _, Some(vf))) =>
         val partialEvaluate: (DirectiveSet, EvaluationContext[Environment, Id]) => (Log[Id], Int, Either[ExecutionError, EVALUATED]) = {
           (directives, ctx) =>
-            val verify = ContractEvaluator.verify(decls, vf, ctx, evaluate, _)
+            val verify = ContractEvaluator.verify(decls, vf, evaluate(ctx, _), _)
             val bindingsVersion =
               if (useCorrectScriptVersion)
                 directives.stdLibVersion

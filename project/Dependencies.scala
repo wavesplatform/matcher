@@ -39,7 +39,7 @@ object Dependencies {
     val kanela = "1.0.11"
     val kamon = "2.2.3"
 
-    val wavesProtobufSchemas = "1.3.2"
+    val wavesProtobufSchemas = "1.3.3"
     val wavesJ = "1.2.2"
 
     val postgresql = "42.2.23"

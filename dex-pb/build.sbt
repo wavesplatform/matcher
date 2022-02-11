@@ -1,4 +1,4 @@
-description := "Proto files and generated gRPC entities for DEX-KAFKA interaction"
+description := "Proto entities for DEX-KAFKA interaction"
 
 libraryDependencies ++= Dependencies.Module.dexGrpc
 

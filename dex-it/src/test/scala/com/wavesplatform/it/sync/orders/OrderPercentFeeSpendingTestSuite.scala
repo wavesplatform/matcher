@@ -2,10 +2,12 @@ package com.wavesplatform.it.sync.orders
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.order.Order.PriceConstant
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.error.{FeeNotEnough, UnexpectedFeeAsset}
 import com.wavesplatform.dex.settings.AssetType._
 import com.wavesplatform.dex.model.MatcherModel
+
 import scala.math.BigDecimal.RoundingMode
 
 class OrderPercentFeeSpendingTestSuite extends OrderFeeBaseTestSuite {
@@ -19,11 +21,21 @@ class OrderPercentFeeSpendingTestSuite extends OrderFeeBaseTestSuite {
        |  allowed-order-versions = [1, 2, 3]
        |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
        |  order-fee.-1 {
-       |    mode = percent
-       |    percent {
-       |      asset-type = spending
-       |      min-fee = $percentFee
-       |      min-fee-in-waves = $percentMinFeeInWaves
+       |    mode = composite
+       |    composite {
+       |      default {
+       |        mode = percent
+       |        percent {
+       |          asset-type = spending
+       |          min-fee = $percentFee
+       |          min-fee-in-waves = $percentMinFeeInWaves
+       |        }
+       |      }
+       |      
+       |      discount {
+       |        asset = "${wct.id}"
+       |        value = $discount
+       |      }
        |    }
        |  }
        |}""".stripMargin
@@ -31,7 +43,7 @@ class OrderPercentFeeSpendingTestSuite extends OrderFeeBaseTestSuite {
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
-    broadcastAndAwait(IssueUsdTx, IssueBtcTx)
+    broadcastAndAwait(IssueUsdTx, IssueBtcTx, IssueWctTx)
     dex1.start()
     upsertAssetRate(usd -> usdRate)
   }
@@ -94,6 +106,56 @@ class OrderPercentFeeSpendingTestSuite extends OrderFeeBaseTestSuite {
           matcherFee = minimalFee,
           version = version,
           feeAsset = IssuedAsset(UsdId)
+        )
+      )
+      placeAndAwaitAtNode(mkOrder(accountSeller, wavesUsdPair, SELL, fullyAmountWaves, price, matcherFee = minimalFeeWaves, version = version))
+
+      wavesNode1.api.balance(accountBuyer, Waves) should be(fullyAmountWaves)
+      wavesNode1.api.balance(accountBuyer, IssuedAsset(UsdId)) shouldBe 0L
+      wavesNode1.api.balance(accountSeller, Waves) should be(0L)
+      wavesNode1.api.balance(accountSeller, IssuedAsset(UsdId)) shouldBe fullyAmountUsd
+
+      dex1.api.getReservedBalanceWithApiKey(accountBuyer).getOrElse(Waves, 0L) shouldBe 0L
+      dex1.api.getReservedBalanceWithApiKey(accountBuyer).getOrElse(IssuedAsset(UsdId), 0L) shouldBe 0L
+      dex1.api.getReservedBalanceWithApiKey(accountSeller).getOrElse(Waves, 0L) shouldBe 0L
+      dex1.api.getReservedBalanceWithApiKey(accountSeller).getOrElse(IssuedAsset(UsdId), 0L) shouldBe 0L
+    }
+
+    // in this suite we're increasing usd rate, decreasing wctRate, and checking that
+    // correct values used in order fee calculation
+    // matcher should use least wctRate and most usdRate
+    s"users should pay correct fee when fee asset-type = $assetType, " +
+    s"order fully filled, " +
+    s"rate recently changed and " +
+    s"fee payed in discount asset" in {
+      val correctUsdRate = MatcherModel.correctRateByAssetDecimals(usdRate * 2, assetDecimalsMap(usd))
+      val correctWctRate = MatcherModel.correctRateByAssetDecimals(wctRate / 2, assetDecimalsMap(wct))
+
+      dex1.api.upsertAssetRate(wct, wctRate / 2)
+      dex1.api.upsertAssetRate(usd, usdRate * 2)
+
+      val feeInUsd = BigDecimal(fullyAmountWaves * price / PriceConstant * percentFee / 100)
+        .bigDecimal
+        .setScale(0, RoundingMode.CEILING)
+        .longValue
+
+      val feeInWct = (BigDecimal(feeInUsd * discount / 100) * correctWctRate / correctUsdRate)
+        .setScale(0, RoundingMode.CEILING)
+        .toLong
+
+      val accountBuyer = mkAccountWithBalance(fullyAmountUsd -> usd, feeInWct -> wct)
+      val accountSeller = mkAccountWithBalance(fullyAmountWaves + minimalFeeWaves -> Waves)
+
+      placeAndAwaitAtDex(
+        mkOrder(
+          accountBuyer,
+          wavesUsdPair,
+          BUY,
+          fullyAmountWaves,
+          price,
+          matcherFee = feeInWct,
+          version = version,
+          feeAsset = wct
         )
       )
       placeAndAwaitAtNode(mkOrder(accountSeller, wavesUsdPair, SELL, fullyAmountWaves, price, matcherFee = minimalFeeWaves, version = version))

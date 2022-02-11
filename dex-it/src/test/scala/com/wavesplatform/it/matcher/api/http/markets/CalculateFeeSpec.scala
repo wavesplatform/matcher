@@ -3,9 +3,13 @@ package com.wavesplatform.it.matcher.api.http.markets
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.order.Order.PriceConstant
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.it.api.RawHttpChecks
+import com.wavesplatform.dex.model.MatcherModel
 import com.wavesplatform.it.MatcherSuiteBase
+
+import scala.math.BigDecimal.RoundingMode
 
 final class CalculateFeeSpec extends MatcherSuiteBase with RawHttpChecks {
 
@@ -40,11 +44,53 @@ final class CalculateFeeSpec extends MatcherSuiteBase with RawHttpChecks {
       calculatedFee.discount.value.feeAssetId shouldBe btc
       calculatedFee.discount.value.matcherFee shouldBe (100.waves * percentFeeFactor * btcRate * (1 - discountFactor)).longValue()
     }
+
+    "POST /matcher/orderbook/{amountAsset}/{priceAsset}/calculateFee should calculate fee based on " +
+    "percent fee settings " +
+    "with asset type 'spending' " +
+    "with correct rates (least btcRate and most usdRate)" in {
+      val correctedBtcRate = MatcherModel.correctRateByAssetDecimals(btcRate / 2, assetDecimalsMap(btc))
+      val correctedUsdRate = MatcherModel.correctRateByAssetDecimals(usdRate * 2, assetDecimalsMap(usd))
+
+      dex1.api.upsertAssetRate(btc, btcRate)
+      dex1.api.upsertAssetRate(btc, btcRate / 2)
+
+      dex1.api.upsertAssetRate(usd, usdRate)
+      dex1.api.upsertAssetRate(usd, usdRate * 2)
+
+      dex1.restartWithNewSuiteConfig(
+        ConfigFactory.parseString(
+          s"""
+             |waves.dex.order-fee.-1.composite.default {
+             |  mode = percent
+             |  percent {
+             |    asset-type = spending
+             |    min-fee = ${(percentFeeFactor * 100).longValue()}
+             |    min-fee-in-waves = $matcherFee
+             |  }
+             |}
+          """.stripMargin
+        ).withFallback(dexInitialSuiteConfig)
+      )
+
+      val price = 1.usd
+      val amount = 100.eth
+
+      val calculatedFee = dex1.api.calculateFee(AssetPair(eth, usd), OrderType.BUY, amount, price)
+
+      val expectedBaseFee = BigDecimal(amount * price) / PriceConstant * percentFeeFactor
+      val expectedDiscountFee = expectedBaseFee * correctedBtcRate / correctedUsdRate * (1 - discountFactor)
+
+      calculatedFee.base.value.feeAssetId shouldBe usd
+      calculatedFee.base.value.matcherFee shouldBe expectedBaseFee.setScale(0, RoundingMode.CEILING).longValue
+      calculatedFee.discount.value.feeAssetId shouldBe btc
+      calculatedFee.discount.value.matcherFee shouldBe expectedDiscountFee.setScale(0, RoundingMode.CEILING).longValue
+    }
   }
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
-    broadcastAndAwait(IssueBtcTx, IssueUsdTx)
+    broadcastAndAwait(IssueBtcTx, IssueUsdTx, IssueEthTx)
     dex1.start()
   }
 

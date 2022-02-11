@@ -379,7 +379,13 @@ object OrderValidator extends ScorexLogging {
           order.matcherFee >= minFee,
           ValidatedOrder(
             order,
-            minFee.some.filter(_ => orderFeeSettings.isInstanceOf[PercentSettings]),
+            minFee.some.filter { _ =>
+              orderFeeSettings match {
+                case _: PercentSettings => true
+                case cs: CompositeSettings if cs.getOrderFeeSettings(order.assetPair).isInstanceOf[PercentSettings] => true
+                case _ => false
+              }
+            },
             percentConstMinFee
           ),
           error.FeeNotEnough(minFee, order.matcherFee, order.feeAsset)

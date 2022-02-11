@@ -1,6 +1,6 @@
 description := "Proto entities for DEX-KAFKA interaction"
 
-libraryDependencies ++= Dependencies.Module.dexGrpc
+libraryDependencies ++= Dependencies.Module.dexPb
 
 scalacOptions += "-P:silencer:pathFilters=FileOptions;Endpoint;MetricDescriptor"
 

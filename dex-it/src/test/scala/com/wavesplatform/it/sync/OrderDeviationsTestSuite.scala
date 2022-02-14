@@ -132,7 +132,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
         val feeAsset = assetPair.priceAsset
 
-        val bestAskOrder = mkOrder(alice, assetPair, SELL, 2000.waves, 500000, 4 * matcherFee, feeAsset)
+        val bestAskOrder = mkOrder(alice, assetPair, SELL, 2000.waves, 500000, 1000_000L, feeAsset)
         val bestBidOrder = mkOrder(bob, assetPair, BUY, 2000.waves, 300000, 2 * matcherFee, feeAsset)
 
         placeAndAwaitAtDex(bestAskOrder)
@@ -146,7 +146,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
         waitForOrderAtNode(bestAskOrder)
 
-        dex1.api.getReservedBalanceWithApiKey(alice) should matchTo(Map(assetPair.amountAsset -> 100000000000L, feeAsset -> 2 * matcherFee))
+        dex1.api.getReservedBalanceWithApiKey(alice) should matchTo(Map(assetPair.amountAsset -> 100000000000L, feeAsset -> 500_000L))
         dex1.api.getReservedBalanceWithApiKey(bob) should matchTo(Map(assetPair.priceAsset -> 691500000L))
 
         cancelAll(alice, bob)
@@ -155,7 +155,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
       s"$wavesUsdPair" in {
 
         val feeAsset = wavesUsdPair.priceAsset
-        val bestAskOrder = mkOrder(bob, wavesUsdPair, SELL, 2000.waves, 500, 4 * 300, feeAsset)
+        val bestAskOrder = mkOrder(bob, wavesUsdPair, SELL, 2000.waves, 500, 1000L, feeAsset)
         val bestBidOrder = mkOrder(alice, wavesUsdPair, BUY, 2000.waves, 300, 2 * 300, feeAsset)
 
         placeAndAwaitAtDex(bestAskOrder, Status.Accepted)
@@ -169,7 +169,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
         waitForOrderAtNode(bestAskOrder)
 
-        dex1.api.getReservedBalanceWithApiKey(bob) should matchTo(Map(wavesUsdPair.amountAsset -> 100000000000L, feeAsset -> 600L))
+        dex1.api.getReservedBalanceWithApiKey(bob) should matchTo(Map(wavesUsdPair.amountAsset -> 100000000000L, feeAsset -> 500L))
         dex1.api.getReservedBalanceWithApiKey(alice) should matchTo(Map(wavesUsdPair.priceAsset -> 691500L))
 
         cancelAll(alice, bob)

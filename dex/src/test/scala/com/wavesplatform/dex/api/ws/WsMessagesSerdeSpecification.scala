@@ -44,11 +44,11 @@ class WsMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDrivenProp
     lazy val partialFee: Long = (order.matcherFee * filledPercent).toLong
 
     val ao = (isNew, isMarket) match {
-      case (true, true) => MarketOrder(order, _ => Long.MaxValue)
-      case (true, false) => LimitOrder(order)
+      case (true, true) => MarketOrder(order, _ => Long.MaxValue, None, None)
+      case (true, false) => LimitOrder(order, None, None)
       case (false, true) =>
-        MarketOrder(order, _ => Long.MaxValue).partial(partialAmount, partialFee, Long.MaxValue, BigInteger.valueOf(order.price))
-      case (false, false) => LimitOrder(order).partial(partialAmount, partialFee, BigInteger.valueOf(order.price))
+        MarketOrder(order, _ => Long.MaxValue, None, None).partial(partialAmount, partialFee, Long.MaxValue, BigInteger.valueOf(order.price))
+      case (false, false) => LimitOrder(order, None, None).partial(partialAmount, partialFee, BigInteger.valueOf(order.price))
     }
 
     val result = WsOrder.fromDomain(ao).copy(matchInfo =

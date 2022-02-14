@@ -6,6 +6,7 @@ import cats.instances.long.catsKernelStdGroupForLong
 import cats.instances.map.catsKernelStdCommutativeMonoidForMap
 import cats.syntax.either._
 import cats.syntax.flatMap._
+import cats.syntax.option._
 import cats.syntax.semigroup.catsSyntaxSemigroup
 import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.MarketStatus
 import com.wavesplatform.dex.caches.RateCache
@@ -177,8 +178,8 @@ object OrderValidator extends ScorexLogging {
         val fakeOrder: Order = order.updateType(order.orderType.opposite)
         val oe: OrderExecuted =
           OrderExecuted(
-            LimitOrder(fakeOrder),
-            LimitOrder(order),
+            LimitOrder(fakeOrder, None, None),
+            LimitOrder(order, None, None),
             time.correctedTime(),
             order.matcherFee,
             order.matcherFee,
@@ -196,20 +197,29 @@ object OrderValidator extends ScorexLogging {
       }
 
       /** Checks whether order fee is enough to cover matcher's expenses for the Exchange transaction issue */
-      lazy val validateOrderFeeByTransactionRequirements: FutureResult[Order] =
+      lazy val validateOrderFeeByTransactionRequirements: FutureResult[Order] = {
+        lazy val validatedOrder = for {
+          minFee <-
+            getMinValidTxFeeForSettings(
+              OrderParams.fromOrder(order),
+              orderFeeSettings,
+              hasMatcherAccountScript,
+              assetDescriptions,
+              rateCache
+            )
+          _ <- cond(order.matcherFee >= minFee, order, error.FeeNotEnough(minFee, order.matcherFee, feeAsset))
+        } yield order
+
         liftAsync {
-          for {
-            minFee <-
-              getMinValidTxFeeForSettings(
-                OrderParams.fromOrder(order),
-                orderFeeSettings,
-                hasMatcherAccountScript,
-                assetDescriptions,
-                rateCache
-              )
-            _ <- cond(order.matcherFee >= minFee, order, error.FeeNotEnough(minFee, order.matcherFee, feeAsset))
-          } yield order
+          orderFeeSettings match {
+            case _: DynamicSettings => validatedOrder
+            case cs: CompositeSettings if cs.getOrderFeeSettings(order.assetPair).isInstanceOf[DynamicSettings] =>
+              validatedOrder
+            case _ =>
+              lift(order)
+          }
         }
+      }
 
       for {
         _ <- checkOrderVersion(order.version, blockchain.isFeatureActivated)
@@ -291,7 +301,7 @@ object OrderValidator extends ScorexLogging {
       assetDescriptions(_).decimals,
       rateCache,
       extraFeeInWaves = extraFee
-    )
+    ).map(_.minFee)
   }
 
   @tailrec
@@ -302,8 +312,8 @@ object OrderValidator extends ScorexLogging {
     rateCache: RateCache,
     extraFeeInWaves: Long = 0L,
     maybeDiscount: Option[BigDecimal] = None
-  ): Result[Long] = orderFeeSettings match {
-    case FixedSettings(_, fixedMinFee) => lift(fixedMinFee)
+  ): Result[GetMinFeeResult] = orderFeeSettings match {
+    case FixedSettings(_, fixedMinFee) => lift(GetMinFeeResult(fixedMinFee, None))
     case cs: CompositeSettings =>
       val maybeDiscount =
         cs.discount.flatMap { discountAssetSettings =>
@@ -323,6 +333,7 @@ object OrderValidator extends ScorexLogging {
     case ds: DynamicSettings =>
       val fee = maybeDiscount.fold(ds.maxBaseFee)(multiplyByDiscount(ds.maxBaseFee, _))
       convertFeeByAssetRate(fee + extraFeeInWaves, orderParams.feeAsset, assetDecimals(orderParams.feeAsset), rateCache)
+        .map(GetMinFeeResult(_, None))
     case ps: PercentSettings =>
       convertFeeByAssetRate(ps.minFeeInWaves, orderParams.feeAsset, assetDecimals(orderParams.feeAsset), rateCache)
         .flatMap { constMinValidFee =>
@@ -342,8 +353,9 @@ object OrderValidator extends ScorexLogging {
           }
 
           orderMinValidFee.map { minValidFee =>
-            val fee = minValidFee max constMinValidFee
-            maybeDiscount.fold(fee)(multiplyByDiscount(fee, _))
+            val mf = maybeDiscount.fold(minValidFee)(multiplyByDiscount(minValidFee, _))
+            val cmf = maybeDiscount.fold(constMinValidFee)(multiplyByDiscount(constMinValidFee, _))
+            GetMinFeeResult(mf max cmf, cmf.some)
           }
         }
   }
@@ -360,9 +372,24 @@ object OrderValidator extends ScorexLogging {
     rateCache: RateCache
   )(implicit
     efc: ErrorFormatterContext
-  ): Result[Order] =
-    getMinValidFeeForSettings(OrderParams.fromOrder(order), orderFeeSettings, assetDecimals, rateCache) flatMap { requiredFee =>
-      cond(order.matcherFee >= requiredFee, order, error.FeeNotEnough(requiredFee, order.matcherFee, order.feeAsset))
+  ): Result[ValidatedOrder] =
+    getMinValidFeeForSettings(OrderParams.fromOrder(order), orderFeeSettings, assetDecimals, rateCache).flatMap {
+      case GetMinFeeResult(minFee, percentConstMinFee) =>
+        cond(
+          order.matcherFee >= minFee,
+          ValidatedOrder(
+            order,
+            minFee.some.filter { _ =>
+              orderFeeSettings match {
+                case _: PercentSettings => true
+                case cs: CompositeSettings if cs.getOrderFeeSettings(order.assetPair).isInstanceOf[PercentSettings] => true
+                case _ => false
+              }
+            },
+            percentConstMinFee
+          ),
+          error.FeeNotEnough(minFee, order.matcherFee, order.feeAsset)
+        )
     }
 
   def matcherSettingsAware(
@@ -372,7 +399,7 @@ object OrderValidator extends ScorexLogging {
     assetDecimals: Asset => Int,
     rateCache: RateCache,
     getActualOrderFeeSettings: => OrderFeeSettings
-  )(order: Order)(implicit efc: ErrorFormatterContext): Result[Order] = {
+  )(order: Order)(implicit efc: ErrorFormatterContext): Result[ValidatedOrder] = {
 
     def validateBlacklistedAsset(asset: Asset, e: IssuedAsset => MatcherError): Result[Unit] =
       asset.fold(success)(issuedAsset => cond(!matcherSettings.blacklistedAssets.contains(issuedAsset), (), e(issuedAsset)))
@@ -386,8 +413,8 @@ object OrderValidator extends ScorexLogging {
         )
       _ <- validateBlacklistedAsset(order.feeAsset, error.FeeAssetBlacklisted(_))
       _ <- validateFeeAsset(order, getActualOrderFeeSettings)
-      _ <- validateFee(order, getActualOrderFeeSettings, assetDecimals, rateCache)
-    } yield order
+      validatedOrder <- validateFee(order, getActualOrderFeeSettings, assetDecimals, rateCache)
+    } yield validatedOrder
   }
 
   /**
@@ -580,5 +607,16 @@ object OrderValidator extends ScorexLogging {
       OrderParams(order.assetPair, order.orderType, order.feeAsset, order.amount, order.price)
 
   }
+
+  final case class GetMinFeeResult(
+    minFee: Long,
+    percentConstMinFee: Option[Long]
+  )
+
+  final case class ValidatedOrder(
+    order: Order,
+    percentMinFee: Option[Long],
+    percentConstMinFee: Option[Long]
+  )
 
 }

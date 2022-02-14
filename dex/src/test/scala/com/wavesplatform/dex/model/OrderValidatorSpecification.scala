@@ -137,7 +137,7 @@ class OrderValidatorSpecification
         val pk = KeyPair(randomBytes())
         val ov = OrderValidator.accountStateAware(defaultPortfolio.balanceOf, orderExists = true, OrderBookAggregatedSnapshot.empty)(_)
 
-        ov(LimitOrder(newBuyOrder(pk, 1000))) should produce("OrderDuplicate")
+        ov(LimitOrder(newBuyOrder(pk, 1000), None, None)) should produce("OrderDuplicate")
       }
 
       "order price has invalid non-zero trailing decimals" in forAll(issuedAssetGen(1), accountGen, Gen.choose(1, 7)) {
@@ -1069,7 +1069,7 @@ class OrderValidatorSpecification
     hasOrder: Boolean,
     o: Order = newBuyOrder
   )(f: OrderValidator.Result[AcceptedOrder] => A): A =
-    f(OrderValidator.accountStateAware(tradableBalance(p), hasOrder, OrderBookAggregatedSnapshot.empty)(LimitOrder(o)))
+    f(OrderValidator.accountStateAware(tradableBalance(p), hasOrder, OrderBookAggregatedSnapshot.empty)(LimitOrder(o, None, None)))
 
   private def validateMarketOrderByAccountStateAware(
     aggregatedSnapshot: OrderBookAggregatedSnapshot
@@ -1078,7 +1078,7 @@ class OrderValidatorSpecification
       tradableBalance = b.withDefaultValue(0L).apply,
       orderExists = false,
       orderBookCache = aggregatedSnapshot
-    )(MarketOrder(order, b.apply _))
+    )(MarketOrder(order, b.apply _, None, None))
   }
 
   private def msa(ba: Set[Address], o: Order): Order => Result[Order] =
@@ -1089,7 +1089,7 @@ class OrderValidatorSpecification
       getDefaultAssetDescriptions(_).decimals,
       rateCache,
       DynamicSettings.symmetric(matcherFee)
-    )
+    )(_).map(_.order)
 
   private def validateByMatcherSettings(
     orderFeeSettings: OrderFeeSettings,
@@ -1108,7 +1108,7 @@ class OrderValidatorSpecification
         assetDecimals,
         rateCache,
         orderFeeSettings
-      )(order)
+      )(order).map(_.order)
   }
 
   private def validateByBlockchain(

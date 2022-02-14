@@ -1228,10 +1228,11 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         case AddressDirectoryActor.Command.ForwardMessage(forwardAddress, msg) =>
           msg match {
             case AddressActor.Query.GetReservedBalance => AddressActor.Reply.GetBalance(Map(Waves -> 350L))
-            case PlaceOrder(x, _) => if (x.id() == okOrder.id()) AddressActor.Event.OrderAccepted(x) else error.OrderDuplicate(x.id())
+            case PlaceOrder(x, _) =>
+              if (x.order.id() == okOrder.id()) AddressActor.Event.OrderAccepted(x.order) else error.OrderDuplicate(x.order.id())
 
             case AddressActor.Query.GetOrdersStatuses(_, _) =>
-              AddressActor.Reply.GetOrderStatuses(List(okOrder.id() -> OrderInfo.v5(LimitOrder(okOrder), OrderStatus.Accepted)))
+              AddressActor.Reply.GetOrderStatuses(List(okOrder.id() -> OrderInfo.v5(LimitOrder(okOrder, None, None), OrderStatus.Accepted)))
 
             case AddressActor.Query.GetOrderStatus(orderId) =>
               if (orderId == okOrder.id()) AddressActor.Reply.GetOrderStatus(OrderStatus.Accepted)
@@ -1269,7 +1270,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
             case GetTradableBalance(xs) => AddressActor.Reply.GetBalance(xs.map(_ -> 100L).toMap)
 
             case _: AddressActor.Query.GetOrderStatusInfo =>
-              AddressActor.Reply.GetOrdersStatusInfo(OrderInfo.v5(LimitOrder(orderToCancel), OrderStatus.Accepted).some)
+              AddressActor.Reply.GetOrdersStatusInfo(OrderInfo.v5(LimitOrder(orderToCancel, None, None), OrderStatus.Accepted).some)
 
             case x => Status.Failure(new RuntimeException(s"Unknown command: $x"))
           }
@@ -1405,7 +1406,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       pairBuilder,
       addressActor.ref,
       orderValidator = {
-        case x if x == okOrder || x == badOrder => liftValueAsync(x)
+        case x if x == okOrder || x == badOrder => liftValueAsync(OrderValidator.ValidatedOrder(x, None, None))
         case _ => liftErrorAsync(error.FeatureNotImplemented)
       },
       () => MatcherStatus.Working,

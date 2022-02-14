@@ -52,7 +52,7 @@ object AddressActorStartingBenchmark {
     val askGen: Gen[Order] = orderGen(owner, priceGen, OrderType.SELL)
     val bidGen: Gen[Order] = orderGen(owner, priceGen, OrderType.BUY)
     val orderGen: Gen[Order] = Gen.oneOf(askGen, bidGen)
-    val limitOrderGen: Gen[LimitOrder] = orderGen.map(LimitOrder(_))
+    val limitOrderGen: Gen[LimitOrder] = orderGen.map(LimitOrder(_, None, None))
 
     val orderAddedGen: Gen[Seq[Events.Event]] = limitOrderGen.map { ao =>
       Seq(getOrderAddedEvent(ao))
@@ -133,7 +133,7 @@ object AddressActorStartingBenchmark {
         orderSides <- Gen.listOfN(orderNumber, orderSideGen)
         orders <- Gen.sequence[List[LimitOrder], LimitOrder] {
           orderSides.map { side =>
-            (if (side == OrderType.SELL) askGen else bidGen).map(LimitOrder.apply)
+            (if (side == OrderType.SELL) askGen else bidGen).map(LimitOrder(_, None, None))
           }
         }
       } yield orders
@@ -144,7 +144,8 @@ object AddressActorStartingBenchmark {
     def getOrderCancelledEvent(ao: AcceptedOrder): Events.OrderCanceled =
       Events.OrderCanceled(ao, Events.OrderCanceledReason.RequestExecuted, System.currentTimeMillis())
 
-    def getCounter(ao: AcceptedOrder, amount: Long): LimitOrder = LimitOrder(ao.order.updateAmount(amount).updateSender(counterOrderOwner))
+    def getCounter(ao: AcceptedOrder, amount: Long): LimitOrder =
+      LimitOrder(ao.order.updateAmount(amount).updateSender(counterOrderOwner), None, None)
 
     def getOrderExecutedEvent(ao: AcceptedOrder, counter: LimitOrder): Events.OrderExecuted = Events.OrderExecuted(
       ao,

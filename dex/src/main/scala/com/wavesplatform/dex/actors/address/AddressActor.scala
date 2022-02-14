@@ -311,7 +311,7 @@ class AddressActor(
     // DEX-1192 docs/places-and-cancels.md
     case command: Command.PlaceOrder =>
       log.debug(s"$command")
-      val orderId = command.order.id()
+      val orderId = command.validatedOrder.order.id()
       if (totalActiveOrders >= settings.maxActiveOrders) sender() ! error.ActiveOrdersLimitReached(settings.maxActiveOrders)
       else if (failedPlacements.contains(orderId) || processingOrders.contains(orderId)) sender() ! error.OrderDuplicate(orderId)
       else {
@@ -329,7 +329,7 @@ class AddressActor(
     case command: Command.PlaceOrderFinalized =>
       log.debug(s"$command")
       val placeOrder = command.placeOrder
-      val orderId = placeOrder.order.id()
+      val orderId = placeOrder.validatedOrder.order.id()
       if (command.containsInfo || activeOrders.contains(orderId) || pendingCommands.contains(orderId))
         sender() ! error.OrderDuplicate(orderId)
       else {
@@ -668,20 +668,21 @@ class AddressActor(
           case Some(nextCommand) =>
             nextCommand.command match {
               case command: Command.PlaceOrder =>
-                val tradableBalances = balances.tradableBalance(Set(command.order.getSpendAssetId, command.order.feeAsset))
+                val tradableBalances =
+                  balances.tradableBalance(Set(command.validatedOrder.order.getSpendAssetId, command.validatedOrder.order.feeAsset))
                 val ao = command.toAcceptedOrder(tradableBalances.xs)
                 validate(ao, tradableBalances.xs)
                   .map {
-                    case Left(error) => Event.ValidationFailed(command.order.id(), error)
+                    case Left(error) => Event.ValidationFailed(command.validatedOrder.order.id(), error)
                     case Right(_) => Event.ValidationPassed(ao)
                   }
                   .recover {
                     case ex: WavesNodeConnectionLostException =>
                       log.error("Waves Node connection lost", ex)
-                      Event.ValidationFailed(command.order.id(), WavesNodeConnectionBroken)
+                      Event.ValidationFailed(command.validatedOrder.order.id(), WavesNodeConnectionBroken)
                     case ex =>
                       log.error("An unexpected error occurred", ex)
-                      Event.ValidationFailed(command.order.id(), UnexpectedError)
+                      Event.ValidationFailed(command.validatedOrder.order.id(), UnexpectedError)
                   }
                   .pipeTo(self)
 
@@ -971,13 +972,17 @@ object AddressActor {
       override def events: Seq[Events.Event] = List(event)
     }
 
-    case class PlaceOrder(order: Order, isMarket: Boolean) extends OneOrderCommand {
+    case class PlaceOrder(validatedOrder: OrderValidator.ValidatedOrder, isMarket: Boolean) extends OneOrderCommand {
 
       override lazy val toString =
-        s"PlaceOrder(${if (isMarket) "market" else "limit"},id=${order.id()},js=${order.jsonStr})"
+        s"PlaceOrder(${if (isMarket) "market" else "limit"}," +
+        s"id=${validatedOrder.order.id()}," +
+        s"pmf=${validatedOrder.percentMinFee.getOrElse("none")}," +
+        s"pcmf=${validatedOrder.percentConstMinFee.getOrElse("none")}," +
+        s"js=${validatedOrder.order.jsonStr})"
 
       def toAcceptedOrder(tradableBalance: Map[Asset, Long]): AcceptedOrder =
-        if (isMarket) MarketOrder(order, tradableBalance) else LimitOrder(order)
+        if (isMarket) MarketOrder(validatedOrder, tradableBalance) else LimitOrder(validatedOrder)
 
     }
 
@@ -986,7 +991,12 @@ object AddressActor {
       import placeOrder._
 
       override lazy val toString =
-        s"PlaceOrderFinalized(${if (isMarket) "market" else "limit"},id=${order.id()},js=${order.jsonStr},containsInfo=$containsInfo)"
+        s"PlaceOrderFinalized(${if (isMarket) "market" else "limit"}," +
+        s"id=${validatedOrder.order.id()}," +
+        s"pmf=${validatedOrder.percentMinFee.getOrElse("none")}," +
+        s"pcmf=${validatedOrder.percentConstMinFee.getOrElse("none")}," +
+        s"containsInfo=$containsInfo" +
+        s"js=${validatedOrder.order.jsonStr})"
 
     }
 

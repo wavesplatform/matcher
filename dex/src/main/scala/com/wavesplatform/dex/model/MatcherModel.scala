@@ -39,6 +39,9 @@ sealed trait AcceptedOrder {
   def fee: Long // same
   def order: Order
 
+  def percentMinFee: Option[Long]
+  def percentConstMinFee: Option[Long]
+
   lazy val id: Order.Id = order.id()
 
   def price: Price = order.price
@@ -266,14 +269,25 @@ sealed trait LimitOrder extends AcceptedOrder {
 
 object LimitOrder {
 
-  def apply(o: Order): LimitOrder = o.orderType match {
-    case OrderType.BUY => BuyLimitOrder(o.amount, o.matcherFee, o, BigInteger.ZERO)
-    case OrderType.SELL => SellLimitOrder(o.amount, o.matcherFee, o, BigInteger.ZERO)
+  def apply(o: Order, percentMinFee: Option[Long], percentConstMinFee: Option[Long]): LimitOrder = o.orderType match {
+    case OrderType.BUY => BuyLimitOrder(o.amount, o.matcherFee, o, BigInteger.ZERO, percentMinFee, percentConstMinFee)
+    case OrderType.SELL => SellLimitOrder(o.amount, o.matcherFee, o, BigInteger.ZERO, percentMinFee, percentConstMinFee)
   }
+
+  def apply(o: OrderValidator.ValidatedOrder): LimitOrder =
+    apply(o.order, o.percentMinFee, o.percentConstMinFee)
 
 }
 
-case class BuyLimitOrder(amount: Long, fee: Long, order: Order, avgWeighedPriceNominator: BigInteger) extends BuyOrder with LimitOrder {
+case class BuyLimitOrder(
+  amount: Long,
+  fee: Long,
+  order: Order,
+  avgWeighedPriceNominator: BigInteger,
+  percentMinFee: Option[Long],
+  percentConstMinFee: Option[Long]
+) extends BuyOrder
+    with LimitOrder {
   override def toString: String = s"BuyLimitOrder($amount,$fee,$id,$avgWeighedPriceNominator,o=${order.sender.toAddress})"
 
   def partial(amount: Long, fee: Long, avgWeighedPriceNominator: BigInteger): BuyLimitOrder =
@@ -281,7 +295,15 @@ case class BuyLimitOrder(amount: Long, fee: Long, order: Order, avgWeighedPriceN
 
 }
 
-case class SellLimitOrder(amount: Long, fee: Long, order: Order, avgWeighedPriceNominator: BigInteger) extends SellOrder with LimitOrder {
+case class SellLimitOrder(
+  amount: Long,
+  fee: Long,
+  order: Order,
+  avgWeighedPriceNominator: BigInteger,
+  percentMinFee: Option[Long],
+  percentConstMinFee: Option[Long]
+) extends SellOrder
+    with LimitOrder {
   override def toString: String = s"SellLimitOrder($amount,$fee,$id,$avgWeighedPriceNominator,o=${order.sender.toAddress})"
 
   def partial(amount: Long, fee: Long, avgWeighedPriceNominator: BigInteger): SellLimitOrder =
@@ -309,22 +331,40 @@ sealed trait MarketOrder extends AcceptedOrder {
 
 object MarketOrder {
 
-  private def create(order: Order, availableForSpending: Long): MarketOrder = order.orderType match {
-    case OrderType.BUY => BuyMarketOrder(order.amount, order.matcherFee, order, availableForSpending, BigInteger.ZERO)
-    case OrderType.SELL => SellMarketOrder(order.amount, order.matcherFee, order, availableForSpending, BigInteger.ZERO)
+  private def create(order: Order, availableForSpending: Long, percentMinFee: Option[Long], percentConstMinFee: Option[Long]): MarketOrder =
+    order.orderType match {
+      case OrderType.BUY =>
+        BuyMarketOrder(order.amount, order.matcherFee, order, availableForSpending, BigInteger.ZERO, percentMinFee, percentConstMinFee)
+      case OrderType.SELL =>
+        SellMarketOrder(order.amount, order.matcherFee, order, availableForSpending, BigInteger.ZERO, percentMinFee, percentConstMinFee)
+    }
+
+  def apply(o: OrderValidator.ValidatedOrder, availableForSpending: Long): MarketOrder =
+    apply(o.order, availableForSpending, o.percentMinFee, o.percentConstMinFee)
+
+  def apply(o: Order, availableForSpending: Long, percentMinFee: Option[Long], percentConstMinFee: Option[Long]): MarketOrder =
+    create(o, availableForSpending, percentMinFee, percentConstMinFee)
+
+  def apply(o: Order, tradableBalance: Asset => Long, percentMinFee: Option[Long], percentConstMinFee: Option[Long]): MarketOrder = {
+    val availableForSpending =
+      math.min(tradableBalance(o.getSpendAssetId), LimitOrder(o, percentMinFee, percentConstMinFee).requiredBalance(o.getSpendAssetId))
+    create(o, availableForSpending, percentMinFee, percentConstMinFee)
   }
 
-  def apply(o: Order, availableForSpending: Long): MarketOrder = create(o, availableForSpending)
-
-  def apply(o: Order, tradableBalance: Asset => Long): MarketOrder = {
-    val availableForSpending = math.min(tradableBalance(o.getSpendAssetId), LimitOrder(o).requiredBalance(o.getSpendAssetId))
-    create(o, availableForSpending)
-  }
+  def apply(o: OrderValidator.ValidatedOrder, tradableBalance: Asset => Long): MarketOrder =
+    apply(o.order, tradableBalance, o.percentMinFee, o.percentConstMinFee)
 
 }
 
-case class BuyMarketOrder(amount: Long, fee: Long, order: Order, availableForSpending: Long, avgWeighedPriceNominator: BigInteger)
-    extends BuyOrder
+case class BuyMarketOrder(
+  amount: Long,
+  fee: Long,
+  order: Order,
+  availableForSpending: Long,
+  avgWeighedPriceNominator: BigInteger,
+  percentMinFee: Option[Long],
+  percentConstMinFee: Option[Long]
+) extends BuyOrder
     with MarketOrder {
 
   override def toString: String = s"BuyMarketOrder($amount,$fee,$id,$availableForSpending,$avgWeighedPriceNominator)"
@@ -334,8 +374,15 @@ case class BuyMarketOrder(amount: Long, fee: Long, order: Order, availableForSpe
 
 }
 
-case class SellMarketOrder(amount: Long, fee: Long, order: Order, availableForSpending: Long, avgWeighedPriceNominator: BigInteger)
-    extends SellOrder
+case class SellMarketOrder(
+  amount: Long,
+  fee: Long,
+  order: Order,
+  availableForSpending: Long,
+  avgWeighedPriceNominator: BigInteger,
+  percentMinFee: Option[Long],
+  percentConstMinFee: Option[Long]
+) extends SellOrder
     with MarketOrder {
 
   override def toString: String = s"SellMarketOrder($amount,$fee,$id,$availableForSpending,$avgWeighedPriceNominator)"

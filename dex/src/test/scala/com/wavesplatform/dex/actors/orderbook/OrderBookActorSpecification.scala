@@ -143,7 +143,8 @@ class OrderBookActorSpecification
     "recovery - notify address actor about orders" in obcTestWithPrepare { (obsdb, p) =>
       val ord = buy(p, 10 * Order.PriceConstant, 100)
       val ob = OrderBook.empty
-      val OrderBookUpdates(updatedOb, _, _, _) = ob.add(LimitOrder(ord), ord.timestamp, makerTakerPartialFee, (eventTs, _) => eventTs, 0L)
+      val OrderBookUpdates(updatedOb, _, _, _) =
+        ob.add(LimitOrder(ord, None, None), ord.timestamp, makerTakerPartialFee, (eventTs, _) => eventTs, 0L)
       obsdb.update(p, 50L, Some(updatedOb.snapshot))
     } { (pair, _, tp) =>
       tp.expectOecProcess[OrderAdded]
@@ -164,8 +165,8 @@ class OrderBookActorSpecification
 
       val events = tp.expectMsgType[Process].events.toList
       events.size shouldBe 2
-      events.head should be(OrderAdded(LimitOrder(ord1), OrderAddedReason.OrderBookRecovered, ord1.timestamp))
-      events.last should be(OrderAdded(LimitOrder(ord2), OrderAddedReason.OrderBookRecovered, ord2.timestamp))
+      events.head should be(OrderAdded(LimitOrder(ord1, None, None), OrderAddedReason.OrderBookRecovered, ord1.timestamp))
+      events.last should be(OrderAdded(LimitOrder(ord2, None, None), OrderAddedReason.OrderBookRecovered, ord2.timestamp))
       tp.expectMsgType[OrderBookRecovered]
     }
 
@@ -192,7 +193,9 @@ class OrderBookActorSpecification
             ord2.amount - ord1.amount,
             ord2.matcherFee - AcceptedOrder.partialFee(ord2.matcherFee, ord2.amount, ord1.amount),
             ord2,
-            (BigInt(10) * Order.PriceConstant * 100 * Order.PriceConstant).bigInteger
+            (BigInt(10) * Order.PriceConstant * 100 * Order.PriceConstant).bigInteger,
+            None,
+            None
           ),
           OrderAddedReason.OrderBookRecovered,
           ord2.timestamp
@@ -222,7 +225,9 @@ class OrderBookActorSpecification
             restAmount,
             ord2.matcherFee - AcceptedOrder.partialFee(ord2.matcherFee, ord2.amount, ord2.amount - restAmount),
             ord2,
-            (BigInt(2) * Order.PriceConstant * 100 * Order.PriceConstant).bigInteger
+            (BigInt(2) * Order.PriceConstant * 100 * Order.PriceConstant).bigInteger,
+            None,
+            None
           ),
           OrderAddedReason.OrderBookRecovered,
           ord2.timestamp
@@ -254,7 +259,9 @@ class OrderBookActorSpecification
             restAmount,
             ord2.matcherFee - AcceptedOrder.partialFee(ord2.matcherFee, ord2.amount, ord2.amount - restAmount),
             ord2,
-            (BigInt(4) * Order.PriceConstant * 100 * Order.PriceConstant).bigInteger
+            (BigInt(4) * Order.PriceConstant * 100 * Order.PriceConstant).bigInteger,
+            None,
+            None
           ),
           OrderAddedReason.OrderBookRecovered,
           ord2.timestamp
@@ -491,7 +498,7 @@ class OrderBookActorSpecification
         val (counterOrder1, counterOrder2, counterOrder3, marketOrder) = marketOrderType match {
           case OrderType.BUY =>
             val buyOrder = buy(wctWavesPair, amount = marketOrderAmount, price = 110, matcherFee = smallFee, version = 3, feeAsset = feeAsset)
-            val marketBuyOrder = MarketOrder(buyOrder, availableForSpending = getSpentAmountWithFee(buyOrder))
+            val marketBuyOrder = MarketOrder(buyOrder, getSpentAmountWithFee(buyOrder), None, None)
             (
               sell(wctWavesPair, amount = counterOrder1Amount, price = 105),
               sell(wctWavesPair, amount = counterOrder2Amount, price = 110),
@@ -500,7 +507,7 @@ class OrderBookActorSpecification
             )
           case OrderType.SELL =>
             val sellOrder = sell(wctWavesPair, amount = marketOrderAmount, price = 95, matcherFee = smallFee, version = 3, feeAsset = feeAsset)
-            val marketSellOrder = MarketOrder(sellOrder, availableForSpending = getSpentAmountWithFee(sellOrder))
+            val marketSellOrder = MarketOrder(sellOrder, getSpentAmountWithFee(sellOrder), None, None)
             (
               buy(wctWavesPair, amount = counterOrder1Amount, price = 110),
               buy(wctWavesPair, amount = counterOrder2Amount, price = 105),
@@ -520,19 +527,19 @@ class OrderBookActorSpecification
         events.head shouldBe a[OrderAdded]
         val oe1 = events(1).asInstanceOf[OrderExecuted]
         oe1.submitted shouldBe marketOrder
-        oe1.counter shouldBe LimitOrder(counterOrder1)
+        oe1.counter shouldBe LimitOrder(counterOrder1, None, None)
         oe1.executedAmount shouldBe counterOrder1.amount
 
         val oe2 = events(2).asInstanceOf[OrderExecuted]
         val marketOrderRemaining1 = oe1.submittedMarketRemaining(marketOrder)
         oe2.submitted shouldBe marketOrderRemaining1
-        oe2.counter shouldBe LimitOrder(counterOrder2)
+        oe2.counter shouldBe LimitOrder(counterOrder2, None, None)
         oe2.executedAmount shouldBe counterOrder2.amount
 
         val oe3 = events(3).asInstanceOf[OrderExecuted]
         val marketOrderRemaining2 = oe2.submittedMarketRemaining(marketOrderRemaining1)
         oe3.submitted shouldBe marketOrderRemaining2
-        oe3.counter shouldBe LimitOrder(counterOrder3)
+        oe3.counter shouldBe LimitOrder(counterOrder3, None, None)
         oe3.executedAmount shouldBe toNormalized(1)
 
         tp.receiveN(0)
@@ -562,14 +569,14 @@ class OrderBookActorSpecification
         val (counterOrder, marketOrder) = marketOrderType match {
           case OrderType.SELL =>
             val sellOrder = sell(wctWavesPair, amount = marketOrderAmount, price = 90, matcherFee = smallFee, version = 3, feeAsset = feeAsset)
-            val marketSellOrder = MarketOrder(sellOrder, availableForSpending = getSpentAmountWithFee(sellOrder))
+            val marketSellOrder = MarketOrder(sellOrder, getSpentAmountWithFee(sellOrder), None, None)
             (
               buy(wctWavesPair, amount = counterOrderAmount, price = 100, matcherFee = smallFee, version = 3),
               marketSellOrder
             )
           case OrderType.BUY =>
             val buyOrder = buy(wctWavesPair, amount = marketOrderAmount, price = 100, matcherFee = smallFee, version = 3, feeAsset = feeAsset)
-            val marketBuyOrder = MarketOrder(buyOrder, availableForSpending = getSpentAmountWithFee(buyOrder))
+            val marketBuyOrder = MarketOrder(buyOrder, getSpentAmountWithFee(buyOrder), None, None)
             (
               sell(wctWavesPair, amount = counterOrderAmount, price = 90, matcherFee = smallFee, version = 3),
               marketBuyOrder
@@ -600,7 +607,7 @@ class OrderBookActorSpecification
           events.head shouldBe a[OrderAdded]
           val oe = events(1).asInstanceOf[OrderExecuted]
           oe.submitted shouldBe marketOrder
-          oe.counter shouldBe LimitOrder(counterOrder)
+          oe.counter shouldBe LimitOrder(counterOrder, None, None)
           oe.executedAmount shouldBe counterOrder.amount
 
           val oc2 = events.last.asInstanceOf[OrderCanceled]
@@ -640,7 +647,9 @@ class OrderBookActorSpecification
               val marketSellOrder =
                 MarketOrder(
                   buyOrder.updateType(OrderType.SELL).updateFeeAsset(feeAsset),
-                  availableForSpending = availableForSpending
+                  availableForSpending,
+                  None,
+                  None
                 )
               buyOrder -> marketSellOrder
             case OrderType.BUY =>
@@ -648,7 +657,9 @@ class OrderBookActorSpecification
               val marketBuyOrder =
                 MarketOrder(
                   sellOrder.updateType(OrderType.BUY).updateFeeAsset(feeAsset),
-                  availableForSpending = availableForSpending
+                  availableForSpending,
+                  None,
+                  None
                 )
               sellOrder -> marketBuyOrder
           }
@@ -663,7 +674,7 @@ class OrderBookActorSpecification
           events.head shouldBe a[OrderAdded]
           val oe = events(1).asInstanceOf[OrderExecuted]
           oe.submitted shouldBe marketOrder
-          oe.counter shouldBe LimitOrder(counterOrder)
+          oe.counter shouldBe LimitOrder(counterOrder, None, None)
 
           (marketOrderType, isFeeConsideredInExecutionAmount) match {
             case (OrderType.SELL, true) => oe.executedAmount + oe.submittedExecutedFee shouldBe marketOrder.availableForSpending

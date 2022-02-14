@@ -287,6 +287,8 @@ object Dependencies {
 
     lazy val wavesGrpc: Seq[ModuleID] = Seq(wavesProtobufSchemas, grpcScalaPb) ++ silencer
 
+    lazy val dexPb: Seq[ModuleID] = Seq(grpcScalaPb, grpcScalaPb % "protobuf") ++ silencer
+
     lazy val wavesIntegration: Seq[ModuleID] = Seq(
       julToSlf4j,
       logback,

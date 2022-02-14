@@ -24,7 +24,7 @@ import com.wavesplatform.dex.error.{MatcherError, OrderDuplicate, UnexpectedErro
 import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderAddedReason, OrderCancelFailed, OrderExecuted}
-import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder, MarketOrder}
+import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder, MarketOrder, OrderValidator}
 import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import org.scalatest.{BeforeAndAfterAll, EitherValues}
@@ -133,7 +133,7 @@ class AddressActorSpecification
         val initPortfolio = sellToken1Portfolio
         updatePortfolio(initPortfolio)
 
-        addOrder(LimitOrder(sellTokenOrder1))
+        addOrder(LimitOrder(sellTokenOrder1, None, None))
 
         updatePortfolio(initPortfolio.copy(assets = Map.empty))
         commandsProbe.expectMsg(ValidatedCommand.CancelOrder(
@@ -152,7 +152,7 @@ class AddressActorSpecification
           val initPortfolio = sellWavesPortfolio
           updatePortfolio(initPortfolio)
 
-          addOrder(LimitOrder(sellWavesOrder))
+          addOrder(LimitOrder(sellWavesOrder, None, None))
 
           updatePortfolio(initPortfolio.copy(balance = restWaves))
           commandsProbe.expectMsg(ValidatedCommand.CancelOrder(
@@ -172,7 +172,7 @@ class AddressActorSpecification
           val initPortfolio = sellWavesPortfolio
           updatePortfolio(initPortfolio)
 
-          addOrder(LimitOrder(sellWavesOrder))
+          addOrder(LimitOrder(sellWavesOrder, None, None))
 
           updatePortfolio(initPortfolio.copy(lease = LeaseBalance(0, leasedWaves(initPortfolio))))
           commandsProbe.expectMsg(ValidatedCommand.CancelOrder(
@@ -189,7 +189,7 @@ class AddressActorSpecification
       "without excess assets" in test { (ref, _, addOrder, updatePortfolio) =>
         updatePortfolio(sellToken1Portfolio.copy(balance = sellToken1Portfolio.balance + 1L))
 
-        addOrder(LimitOrder(sellTokenOrder1))
+        addOrder(LimitOrder(sellTokenOrder1, None, None))
 
         ref ! AddressDirectoryActor.Command.ForwardMessage(sellTokenOrder1.sender, GetTradableBalance(Set(Waves)))
         fishForSpecificMessage[GetBalance](hint = "Balance") {
@@ -200,7 +200,7 @@ class AddressActorSpecification
       "without zero assets" in test { (ref, _, addOrder, updatePortfolio) =>
         updatePortfolio(sellToken1Portfolio)
 
-        addOrder(LimitOrder(sellTokenOrder1))
+        addOrder(LimitOrder(sellTokenOrder1, None, None))
 
         ref ! AddressDirectoryActor.Command.ForwardMessage(sellTokenOrder1.sender, GetTradableBalance(Set(Waves)))
         fishForSpecificMessage[GetBalance](hint = "Balance") {
@@ -212,7 +212,7 @@ class AddressActorSpecification
     "return reservable balance without excess assets" in test { (ref, _, addOrder, updatePortfolio) =>
       updatePortfolio(sellToken1Portfolio.copy(balance = sellToken1Portfolio.balance + 1L))
 
-      addOrder(LimitOrder(sellTokenOrder1))
+      addOrder(LimitOrder(sellTokenOrder1, None, None))
 
       ref ! AddressDirectoryActor.Command.ForwardMessage(sellTokenOrder1.sender, GetReservedBalance)
       fishForSpecificMessage[GetBalance](hint = "Balance") {
@@ -228,8 +228,8 @@ class AddressActorSpecification
         val initPortfolio = Monoid.combine(sellToken1Portfolio, sellToken2Portfolio)
         updatePortfolio(initPortfolio)
 
-        addOrder(LimitOrder(sellTokenOrder1))
-        addOrder(LimitOrder(sellTokenOrder2))
+        addOrder(LimitOrder(sellTokenOrder1, None, None))
+        addOrder(LimitOrder(sellTokenOrder2, None, None))
 
         updatePortfolio(sellToken1Portfolio)
         commandsProbe.expectMsg(ValidatedCommand.CancelOrder(
@@ -247,8 +247,8 @@ class AddressActorSpecification
       val initPortfolio = Monoid.combineAll(Seq(sellToken1Portfolio, sellToken2Portfolio, sellWavesPortfolio))
       updatePortfolio(initPortfolio)
 
-      addOrder(LimitOrder(sellTokenOrder1))
-      addOrder(LimitOrder(sellTokenOrder2))
+      addOrder(LimitOrder(sellTokenOrder1, None, None))
+      addOrder(LimitOrder(sellTokenOrder2, None, None))
 
       updatePortfolio(sellWavesPortfolio)
       commandsProbe.expectMsg(ValidatedCommand.CancelOrder(
@@ -269,7 +269,7 @@ class AddressActorSpecification
       val initPortfolio = Monoid.combineAll(Seq(sellToken1Portfolio, sellToken2Portfolio, sellWavesPortfolio))
       updatePortfolio(initPortfolio)
 
-      Seq(sellTokenOrder1, sellWavesOrder, sellTokenOrder2).foreach(o => addOrder(LimitOrder(o)))
+      Seq(sellTokenOrder1, sellWavesOrder, sellTokenOrder2).foreach(o => addOrder(LimitOrder(o, None, None)))
 
       updatePortfolio(sellWavesPortfolio)
       commandsProbe.expectMsg(ValidatedCommand.CancelOrder(
@@ -301,7 +301,9 @@ class AddressActorSpecification
           timestamp = System.currentTimeMillis(),
           expiration = System.currentTimeMillis() + 100L,
           matcherFee = matcherFee
-        )
+        ),
+        None,
+        None
       )
       addOrder(lo)
 
@@ -313,7 +315,7 @@ class AddressActorSpecification
     "should not send a message multiple times" in test { (ref, _, addOrder, updatePortfolio) =>
       val initPortfolio = sellToken1Portfolio
       updatePortfolio(initPortfolio)
-      addOrder(LimitOrder(sellTokenOrder1))
+      addOrder(LimitOrder(sellTokenOrder1, None, None))
 
       val subscription1 = typed.TestProbe[WsAddressChanges]("probe-1")
       ref ! AddressDirectoryActor.Command.ForwardMessage(
@@ -341,7 +343,7 @@ class AddressActorSpecification
     "return state" in test { (ref, _, addOrder, updatePortfolio) =>
       updatePortfolio(sellToken1Portfolio.copy(balance = sellToken1Portfolio.balance + 1L))
 
-      addOrder(LimitOrder(sellTokenOrder1))
+      addOrder(LimitOrder(sellTokenOrder1, None, None))
 
       ref ! AddressDirectoryActor.Command.ForwardMessage(sellTokenOrder1.sender, GetCurrentState)
       val res = fishForSpecificMessage[GetState](hint = "State") {
@@ -358,9 +360,12 @@ class AddressActorSpecification
       test(
         { (ref, commandsProbe, _, updatePortfolio) =>
           updatePortfolio(sellToken1Portfolio)
-          val lo = LimitOrder(sellTokenOrder1)
+          val lo = LimitOrder(sellTokenOrder1, None, None)
           val probe = TestProbe()
-          val msg = AddressDirectoryActor.Command.ForwardMessage(testAddress, AddressActor.Command.PlaceOrder(lo.order, lo.isMarket))
+          val msg = AddressDirectoryActor.Command.ForwardMessage(
+            testAddress,
+            AddressActor.Command.PlaceOrder(OrderValidator.ValidatedOrder(lo.order, None, None), lo.isMarket)
+          )
           ref.tell(msg, probe.ref)
           commandsProbe.expectMsg(ValidatedCommand.PlaceOrder(lo))
           ref ! OrderCancelFailed(sellTokenOrder1.id(), UnexpectedError, None)
@@ -372,9 +377,12 @@ class AddressActorSpecification
 
     "forward OrderCancelFailed (owner is non empty) to AddressActor" in test { (ref, commandsProbe, _, updatePortfolio) =>
       updatePortfolio(sellToken1Portfolio)
-      val lo = LimitOrder(sellTokenOrder1)
+      val lo = LimitOrder(sellTokenOrder1, None, None)
       val probe = TestProbe()
-      val msg = AddressDirectoryActor.Command.ForwardMessage(testAddress, AddressActor.Command.PlaceOrder(lo.order, lo.isMarket))
+      val msg = AddressDirectoryActor.Command.ForwardMessage(
+        testAddress,
+        AddressActor.Command.PlaceOrder(OrderValidator.ValidatedOrder(lo.order, None, None), lo.isMarket)
+      )
       ref.tell(msg, probe.ref)
       commandsProbe.expectMsg(ValidatedCommand.PlaceOrder(lo))
       ref ! OrderCancelFailed(sellTokenOrder1.id(), UnexpectedError, Some(sellTokenOrder1.sender.toAddress))
@@ -399,9 +407,9 @@ class AddressActorSpecification
             expiration = System.currentTimeMillis() + 5.days.toMillis,
             matcherFee = matcherFee
           )
-          val duplicatedMarketOrder = MarketOrder(duplicatedOrder, duplicatedOrder.amount)
+          val duplicatedMarketOrder = MarketOrder(duplicatedOrder, duplicatedOrder.amount, None, None)
 
-          addOrder(LimitOrder(duplicatedOrder))
+          addOrder(LimitOrder(duplicatedOrder, None, None))
           val matchTx = ExchangeTransactionV2(
             duplicatedMarketOrder.order,
             counterOrder,
@@ -414,12 +422,12 @@ class AddressActorSpecification
             Proofs(List.empty)
           )
           ref ! AddressActor.Command.ApplyOrderBookExecuted(AddressActor.OrderBookExecutedEvent(
-            OrderExecuted(duplicatedMarketOrder, LimitOrder(counterOrder), System.currentTimeMillis, 0L, 0L, 0L),
+            OrderExecuted(duplicatedMarketOrder, LimitOrder(counterOrder, None, None), System.currentTimeMillis, 0L, 0L, 0L),
             ExchangeTransactionResult.fromEither(Right(()), matchTx)
           ))
 
           val probe = TestProbe()
-          val msg = AddressActor.Command.PlaceOrder(duplicatedOrder, isMarket = true)
+          val msg = AddressActor.Command.PlaceOrder(OrderValidator.ValidatedOrder(duplicatedOrder, None, None), isMarket = true)
           ref.tell(AddressDirectoryActor.Command.ForwardMessage(duplicatedOrder.sender, msg), probe.ref)
           probe.expectMsg[MatcherError](OrderDuplicate(duplicatedOrder.id()))
 
@@ -479,7 +487,10 @@ class AddressActorSpecification
     lazy val addressDir = system.actorOf(Props(new AddressDirectoryActor(orderDb, createAddressActor, None, recovered = true)))
 
     def addOrder(ao: AcceptedOrder): Unit = {
-      addressDir ! AddressDirectoryActor.Command.ForwardMessage(testAddress, AddressActor.Command.PlaceOrder(ao.order, ao.isMarket))
+      addressDir ! AddressDirectoryActor.Command.ForwardMessage(
+        testAddress,
+        AddressActor.Command.PlaceOrder(OrderValidator.ValidatedOrder(ao.order, None, None), ao.isMarket)
+      )
       ao match {
         case lo: LimitOrder =>
           commandsProbe.expectMsg(ValidatedCommand.PlaceOrder(lo))
@@ -521,7 +532,7 @@ class AddressActorSpecification
   }
 
   private def requiredPortfolio(order: Order): Portfolio = {
-    val b = LimitOrder(order).requiredBalance
+    val b = LimitOrder(order, None, None).requiredBalance
     Portfolio(b.getOrElse(Waves, 0L), LeaseBalance.empty, b.collect { case (id @ IssuedAsset(_), v) => id -> v })
   }
 

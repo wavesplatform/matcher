@@ -1,0 +1,75 @@
+syntax = "proto3";
+
+package waves.dex;
+option java_package = "com.wavesplatform.dex.protobuf.order";
+
+import "google/protobuf/empty.proto";
+
+message AssetPair {
+    bytes amount_asset_id = 1;
+    bytes price_asset_id = 2;
+};
+
+message Order {
+    enum Side {
+        BUY = 0;
+        SELL = 1;
+    };
+
+    int32 chain_id = 1;
+    bytes sender_public_key = 2;
+    bytes matcher_public_key = 3;
+    AssetPair asset_pair = 4;
+    Side order_side = 5;
+    int64 amount = 6;
+    int64 price = 7;
+    int64 timestamp = 8;
+    int64 expiration = 9;
+    bytes fee_asset_id = 10;
+    int64 matcher_fee = 11;
+    int32 version = 12;
+    repeated bytes proofs = 13;
+};
+
+//hack for optional int64
+message I64 {
+    int64 value = 1;
+}
+
+message PlaceLimitOrder {
+    Order order = 1;
+    I64 percent_min_fee = 2; //calculated minimal order fee for percent settings
+    I64 percent_const_min_fee = 3; //minimal fee in waves for percent setting with rate & discount applied
+};
+
+message PlaceMarketOrder {
+    Order order = 1;
+    int64 available_for_spending = 2;
+    I64 percent_min_fee = 3; //calculated minimal order fee for percent settings
+    I64 percent_const_min_fee = 4; //minimal fee in waves for percent setting with rate & discount applied
+};
+
+message CancelOrder {
+    enum Source {
+        NOT_TRACKED = 0;
+        REQUEST = 1;
+        EXPIRATION = 2;
+        BALANCE_TRACKING = 3;
+    };
+
+    bytes order_id = 1;
+    Source source = 2;
+    bytes owner = 3;
+};
+
+message ValidatedCommand {
+    AssetPair asset_pair = 1;
+    bytes kamon_ctx = 2;
+    oneof command {
+        PlaceLimitOrder place_limit_order = 3;
+        PlaceMarketOrder place_market_order = 4;
+        CancelOrder cancel_order = 5;
+        google.protobuf.Empty cancel_all_orders = 6;
+        google.protobuf.Empty delete_order_book = 7;
+    }
+};

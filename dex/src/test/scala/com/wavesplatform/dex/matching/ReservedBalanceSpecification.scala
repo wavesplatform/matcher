@@ -18,7 +18,7 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderAddedReason, OrderCanceled, OrderExecuted}
-import com.wavesplatform.dex.model.{Events, LimitOrder, MarketOrder}
+import com.wavesplatform.dex.model.{Events, LimitOrder, MarketOrder, OrderValidator}
 import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.propspec.AnyPropSpecLike
@@ -127,9 +127,16 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
   def execute(counter: Order, submitted: Order): OrderExecuted = {
     val now = time.getTimestamp()
 
-    addressDir ! AddressActor.Command.ApplyOrderBookAdded(OrderAdded(LimitOrder(counter), OrderAddedReason.RequestExecuted, now))
-    addressDir ! AddressActor.Command.ApplyOrderBookAdded(OrderAdded(LimitOrder(submitted), OrderAddedReason.RequestExecuted, now))
-    val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter), submitted.timestamp, counter.matcherFee, submitted.matcherFee, 0L)
+    addressDir ! AddressActor.Command.ApplyOrderBookAdded(OrderAdded(LimitOrder(counter, None, None), OrderAddedReason.RequestExecuted, now))
+    addressDir ! AddressActor.Command.ApplyOrderBookAdded(OrderAdded(LimitOrder(submitted, None, None), OrderAddedReason.RequestExecuted, now))
+    val exec = OrderExecuted(
+      LimitOrder(submitted, None, None),
+      LimitOrder(counter, None, None),
+      submitted.timestamp,
+      counter.matcherFee,
+      submitted.matcherFee,
+      0L
+    )
     addressDir ! AddressActor.Command.ApplyOrderBookExecuted(AddressActor.OrderBookExecutedEvent(
       exec,
       mkExchangeTx(exec)
@@ -515,7 +522,13 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
   }
 
   private def placeMarketOrder(tp: TestProbe, addressDir: ActorRef, marketOrder: MarketOrder): Unit =
-    tp.send(addressDir, ForwardMessage(marketOrder.order.senderPublicKey, PlaceOrder(marketOrder.order, isMarket = true)))
+    tp.send(
+      addressDir,
+      ForwardMessage(
+        marketOrder.order.senderPublicKey,
+        PlaceOrder(OrderValidator.ValidatedOrder(marketOrder.order, None, None), isMarket = true)
+      )
+    )
 
   private def systemCancelMarketOrder(addressDir: ActorRef, marketOrder: MarketOrder): Unit =
     addressDir ! AddressActor.Command.ApplyOrderBookCanceled(OrderCanceled(
@@ -598,7 +611,7 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
 
       def reservedBalanceBy(asset: Asset): Long = openVolume(order.senderPublicKey, asset, addressDir)
 
-      val marketOrder = MarketOrder(order, balance)
+      val marketOrder = MarketOrder(order, balance, None, None)
       val expectedSpentAssetReserve = reserves(marketOrder.spentAsset)
       val expectedReceiveAssetReserve = reserves(marketOrder.rcvAsset)
       val expectedFeeAssetReserve = reserves(marketOrder.feeAsset)
@@ -723,12 +736,12 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
 
         def reservedBalanceBy(asset: Asset): Long = openVolume(order.senderPublicKey, asset, addressDir)
 
-        val marketOrder = MarketOrder(order, balance)
+        val marketOrder = MarketOrder(order, balance, None, None)
 
         placeMarketOrder(tp, addressDir, marketOrder)
         tp.expectMsgType[ValidatedCommand.PlaceMarketOrder]
 
-        val orderExecutedEvent = executeMarketOrder(addressDir, marketOrder, LimitOrder(counter))
+        val orderExecutedEvent = executeMarketOrder(addressDir, marketOrder, LimitOrder(counter, None, None))
 
         val expectedSpentAssetReserve = reserves(marketOrder.spentAsset)
         val expectedReceiveAssetReserve = reserves(marketOrder.rcvAsset)

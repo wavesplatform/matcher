@@ -69,7 +69,7 @@ class DatabaseBackwardCompatTestSuite extends BackwardCompatSuiteBase {
     dex2.restartWithNewSuiteConfig(dexInitialSuiteConfig)
 
     eventually {
-      dex2.api.getAllSnapshotOffsets.contains(additionalAssetPair) shouldBe true
+      dex2.api.getAllSnapshotOffsets.get(additionalAssetPair) should be(empty)
     }
     Thread.sleep(1.minute.toMillis) // An additional time to wait the concurrent processing
 
@@ -88,7 +88,7 @@ class DatabaseBackwardCompatTestSuite extends BackwardCompatSuiteBase {
     }
 
     eventually {
-      dex1.api.getAllSnapshotOffsets.contains(additionalAssetPair) shouldBe false
+      dex1.api.getAllSnapshotOffsets.get(additionalAssetPair) should be(empty)
     }
     Thread.sleep(1.minute.toMillis) // An additional time to wait the concurrent processing
 

@@ -327,7 +327,8 @@ object Order extends EntityParser[Order] {
     matchAmount: Long,
     matchPrice: Long
   ): BigDecimal =
-    if (orderType == OrderType.BUY) BigDecimal(matchAmount)
+    if (orderType == OrderType.BUY)
+      BigDecimal(matchAmount)
     else
       BigDecimal(matchAmount) * matchPrice / PriceConstant
 

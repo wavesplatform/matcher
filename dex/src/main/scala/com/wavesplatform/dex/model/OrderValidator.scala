@@ -336,29 +336,28 @@ object OrderValidator extends ScorexLogging {
       case ds: DynamicSettings =>
         multiplyByRate(multiplyByDiscount(ds.maxBaseFee) + extraFeeInWaves).map(fee => GetMinFeeResult(round(fee), None))
       case ps: PercentSettings =>
-        multiplyByRate(ps.minFeeInWaves)
-          .flatMap { constMinValidFee =>
-            val psFeeAsset = ps.getFeeAsset(orderParams.assetPair, orderParams.orderType)
-            val orderMinValidFee = {
-              val fee = getMinValidFeeForPercentFeeSettings(orderParams.orderType, orderParams.amount, ps, orderParams.price)
-              if (psFeeAsset == orderParams.feeAsset)
-                Right(fee)
-              else
-                for {
-                  psFeeAssetRate <- rateCache.getMostRate(psFeeAsset).toRight(error.RateNotFound(psFeeAsset))
-                  discountAssetRate <- rateCache.getLeastRate(orderParams.feeAsset).toRight(error.RateNotFound(orderParams.feeAsset))
-                  psFeeAssetRateCorrected = BigDecimal(MatcherModel.correctRateByAssetDecimals(psFeeAssetRate, assetDecimals(psFeeAsset)))
-                  discountAssetRateCorrected =
-                    BigDecimal(MatcherModel.correctRateByAssetDecimals(discountAssetRate, assetDecimals(orderParams.feeAsset)))
-                } yield fee * discountAssetRateCorrected / psFeeAssetRateCorrected
-            }
-
-            orderMinValidFee.map { minValidFee =>
-              val mf = multiplyByDiscount(minValidFee)
-              val cmf = multiplyByDiscount(constMinValidFee)
-              GetMinFeeResult(round(mf max cmf), round(cmf).some)
-            }
+        multiplyByRate(ps.minFeeInWaves).flatMap { constMinValidFee =>
+          val psFeeAsset = ps.getFeeAsset(orderParams.assetPair, orderParams.orderType)
+          val orderMinValidFee = {
+            val fee = getMinValidFeeForPercentFeeSettings(orderParams.orderType, orderParams.amount, ps, orderParams.price)
+            if (psFeeAsset == orderParams.feeAsset)
+              Right(fee)
+            else
+              for {
+                psFeeAssetRate <- rateCache.getMostRate(psFeeAsset).toRight(error.RateNotFound(psFeeAsset))
+                discountAssetRate <- rateCache.getLeastRate(orderParams.feeAsset).toRight(error.RateNotFound(orderParams.feeAsset))
+                psFeeAssetRateCorrected = BigDecimal(MatcherModel.correctRateByAssetDecimals(psFeeAssetRate, assetDecimals(psFeeAsset)))
+                discountAssetRateCorrected =
+                  BigDecimal(MatcherModel.correctRateByAssetDecimals(discountAssetRate, assetDecimals(orderParams.feeAsset)))
+              } yield fee * discountAssetRateCorrected / psFeeAssetRateCorrected
           }
+
+          orderMinValidFee.map { minValidFee =>
+            val mf = multiplyByDiscount(minValidFee)
+            val cmf = multiplyByDiscount(constMinValidFee)
+            GetMinFeeResult(round(mf max cmf), round(cmf).some)
+          }
+        }
     }
   }
 

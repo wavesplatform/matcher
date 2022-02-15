@@ -38,14 +38,14 @@ message I64 {
 
 message PlaceLimitOrder {
     Order order = 1;
-    I64 percent_min_fee = 2; //calculated minimal order fee for percent settings & discount applied
+    I64 percent_min_fee = 2; //calculated minimal order fee for percent settings with discount applied
     I64 percent_const_min_fee = 3; //minimal fee in waves for percent setting with rate & discount applied
 };
 
 message PlaceMarketOrder {
     Order order = 1;
     int64 available_for_spending = 2;
-    I64 percent_min_fee = 3; //calculated minimal order fee for percent settings & discount applied
+    I64 percent_min_fee = 3; //calculated minimal order fee for percent settings with discount applied
     I64 percent_const_min_fee = 4; //minimal fee in waves for percent setting with rate & discount applied
 };
 

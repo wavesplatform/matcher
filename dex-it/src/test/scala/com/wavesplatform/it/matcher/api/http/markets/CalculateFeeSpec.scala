@@ -110,7 +110,6 @@ final class CalculateFeeSpec extends MatcherSuiteBase with RawHttpChecks {
       )
 
       dex1.api.deleteAssetRate(btc)
-      dex1.api.deleteAssetRate(usdn)
       dex1.api.upsertAssetRate(btc, 8.155223)
       dex1.api.upsertAssetRate(usdn, 20.08102)
 

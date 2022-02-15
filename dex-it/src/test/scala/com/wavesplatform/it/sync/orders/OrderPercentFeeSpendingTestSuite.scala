@@ -287,7 +287,7 @@ class OrderPercentFeeSpendingTestSuite extends OrderFeeBaseTestSuite {
       //usd rate = 10
       //usd rate corrected = 0.00001
       //buyer price = 10^8
-      //min fee = 60 * 10^8 / 10^8 * 0.14 = 8.4 -> 8
+      //min fee = 60 * 10^8 / 10^8 * 0.14 = 8.4 -> 9
       //const min fee = 300000 * 0.00001 = 3
 
       //exec price = 10^7
@@ -303,7 +303,7 @@ class OrderPercentFeeSpendingTestSuite extends OrderFeeBaseTestSuite {
           BUY,
           60L,
           10000_0000L,
-          matcherFee = 8,
+          matcherFee = 9,
           version = version,
           feeAsset = usd
         )
@@ -337,7 +337,7 @@ class OrderPercentFeeSpendingTestSuite extends OrderFeeBaseTestSuite {
           BUY,
           60L,
           10000_0000L,
-          matcherFee = 8,
+          matcherFee = 9,
           version = version,
           feeAsset = usd
         )
@@ -348,7 +348,7 @@ class OrderPercentFeeSpendingTestSuite extends OrderFeeBaseTestSuite {
 
       val pa = AcceptedOrder.calcAmountOfPriceAsset(60L, 10000_0000L)
       wavesNode1.api.balance(accountBuyer, Waves) should be(60L)
-      wavesNode1.api.balance(accountBuyer, usd) shouldBe fullyAmountUsd - pa - 8
+      wavesNode1.api.balance(accountBuyer, usd) shouldBe fullyAmountUsd - pa - 9
       wavesNode1.api.balance(accountSeller, Waves) shouldBe fullyAmountWaves - 60 - percentMinFeeInWaves
       wavesNode1.api.balance(accountSeller, usd) shouldBe pa
 

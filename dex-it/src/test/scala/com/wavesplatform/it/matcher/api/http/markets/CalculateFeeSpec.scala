@@ -86,11 +86,45 @@ final class CalculateFeeSpec extends MatcherSuiteBase with RawHttpChecks {
       calculatedFee.discount.value.feeAssetId shouldBe btc
       calculatedFee.discount.value.matcherFee shouldBe expectedDiscountFee.setScale(0, RoundingMode.CEILING).longValue
     }
+
+    "DEX-1553 test" in {
+      dex1.restartWithNewSuiteConfig(
+        ConfigFactory.parseString(
+          s"""
+             |waves.dex.order-fee.-1.composite {
+             |  default {
+             |    mode = percent
+             |    percent {
+             |      asset-type = spending
+             |      min-fee = 0.1
+             |      min-fee-in-waves = 1000000
+             |    }
+             |  }
+             |  discount {
+             |    asset = "$BtcId"
+             |    value = 50
+             |  }
+             |}
+          """.stripMargin
+        ).withFallback(dexInitialSuiteConfig)
+      )
+
+      dex1.api.deleteAssetRate(btc)
+      dex1.api.deleteAssetRate(usdn)
+      dex1.api.upsertAssetRate(btc, 8.155223)
+      dex1.api.upsertAssetRate(usdn, 20.08102)
+
+      val calculatedFee = dex1.api.calculateFee(AssetPair(btc, usdn), OrderType.BUY, 439246858068L, 1.usdn)
+      calculatedFee.discount.value.matcherFee shouldBe 89192583
+      calculatedFee.discount.value.feeAssetId shouldBe btc
+      calculatedFee.base.value.matcherFee shouldBe 4392469
+      calculatedFee.base.value.feeAssetId shouldBe usdn
+    }
   }
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
-    broadcastAndAwait(IssueBtcTx, IssueUsdTx, IssueEthTx)
+    broadcastAndAwait(IssueBtcTx, IssueUsdTx, IssueUsdnTx, IssueEthTx)
     dex1.start()
   }
 
@@ -98,7 +132,7 @@ final class CalculateFeeSpec extends MatcherSuiteBase with RawHttpChecks {
     ConfigFactory.parseString(
       s"""
          |waves.dex {
-         |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
+         |  price-assets = [ "$UsdId", "$UsdnId", "$BtcId", "WAVES" ]
          |  allowed-order-versions = [1, 2, 3]
          |  order-fee.-1 {
          |    mode = composite

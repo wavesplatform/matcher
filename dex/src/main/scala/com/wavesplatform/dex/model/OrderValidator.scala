@@ -302,17 +302,17 @@ object OrderValidator extends ScorexLogging {
     maybeDiscount: Option[BigDecimal] = None
   ): Result[GetMinFeeResult] = {
 
-    def multiplyByRate(feeInWaves: BigDecimal): Result[BigDecimal] =
+    def multiplyFeeByRate(feeInWaves: BigDecimal): Result[BigDecimal] =
       orderParams.feeAsset.fold(lift(feeInWaves)) { issuedAsset =>
         rateCache.getLeastRate(issuedAsset).map { assetRate =>
           feeInWaves * MatcherModel.correctRateByAssetDecimals(assetRate, assetDecimals(orderParams.feeAsset))
         }.toRight(error.RateNotFound(orderParams.feeAsset))
       }
 
-    def multiplyByDiscount(fee: BigDecimal): BigDecimal =
+    def multiplyFeeByDiscount(fee: BigDecimal): BigDecimal =
       maybeDiscount.fold(fee)(_ * fee)
 
-    def round(fee: BigDecimal): Long =
+    def roundFee(fee: BigDecimal): Long =
       fee.setScale(0, RoundingMode.CEILING).toLong
 
     orderFeeSettings match {
@@ -334,9 +334,9 @@ object OrderValidator extends ScorexLogging {
           maybeDiscount
         )
       case ds: DynamicSettings =>
-        multiplyByRate(multiplyByDiscount(ds.maxBaseFee) + extraFeeInWaves).map(fee => GetMinFeeResult(round(fee), None))
+        multiplyFeeByRate(multiplyFeeByDiscount(ds.maxBaseFee) + extraFeeInWaves).map(fee => GetMinFeeResult(roundFee(fee), None))
       case ps: PercentSettings =>
-        multiplyByRate(ps.minFeeInWaves).flatMap { constMinValidFee =>
+        multiplyFeeByRate(ps.minFeeInWaves).flatMap { constMinValidFee =>
           val psFeeAsset = ps.getFeeAsset(orderParams.assetPair, orderParams.orderType)
           val orderMinValidFee = {
             val fee = getMinValidFeeForPercentFeeSettings(orderParams.orderType, orderParams.amount, ps, orderParams.price)
@@ -353,9 +353,9 @@ object OrderValidator extends ScorexLogging {
           }
 
           orderMinValidFee.map { minValidFee =>
-            val mf = multiplyByDiscount(minValidFee)
-            val cmf = multiplyByDiscount(constMinValidFee)
-            GetMinFeeResult(round(mf max cmf), round(cmf).some)
+            val mf = multiplyFeeByDiscount(minValidFee)
+            val cmf = multiplyFeeByDiscount(constMinValidFee)
+            GetMinFeeResult(roundFee(mf max cmf), roundFee(cmf).some)
           }
         }
     }

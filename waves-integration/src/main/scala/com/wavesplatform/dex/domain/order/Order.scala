@@ -296,6 +296,16 @@ object Order extends EntityParser[Order] {
     case OrderType.SELL => assetPair.amountAsset
   }
 
+  def getSpendAmountUnsafeD(
+    orderType: OrderType,
+    matchAmount: Long,
+    matchPrice: Long
+  ): BigDecimal =
+    if (orderType == OrderType.SELL)
+      BigDecimal(matchAmount)
+    else
+      BigDecimal(matchAmount) * matchPrice / PriceConstant
+
   def getSpendAmountUnsafe(
     orderType: OrderType,
     matchAmount: Long,
@@ -311,6 +321,16 @@ object Order extends EntityParser[Order] {
         spend.bigInteger.longValueExact()
       }
     }.toEither.left.map(x => GenericError(x.getMessage))
+
+  def getReceiveAmountD(
+    orderType: OrderType,
+    matchAmount: Long,
+    matchPrice: Long
+  ): BigDecimal =
+    if (orderType == OrderType.BUY)
+      BigDecimal(matchAmount)
+    else
+      BigDecimal(matchAmount) * matchPrice / PriceConstant
 
   def getReceiveAmount(
     orderType: OrderType,

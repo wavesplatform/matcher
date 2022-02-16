@@ -67,7 +67,7 @@ object Fee {
             )
         }
 
-        def buySellFee(buyAmount: Long, buyPrice: Long, sellAmount: Long, sellPrice: Long): (Long, Long) =
+        def buySellAmt(buyAmount: Long, buyPrice: Long, sellAmount: Long, sellPrice: Long): (Long, Long) =
           buyAmt(buyAmount, buyPrice).explicitGet() -> sellAmt(sellAmount, sellPrice).explicitGet()
 
         def executedFee(o: AcceptedOrder, amountTotal: Long, amountExecuted: Long) = {
@@ -82,8 +82,8 @@ object Fee {
           partialFee(o.percentConstMinFee.getOrElse(correctedFee).max(correctedFee), amountTotal, amountExecuted)
         }
 
-        val (buyAmountExecuted, sellAmountExecuted) = buySellFee(executedAmount, executedPrice, executedAmount, executedPrice)
-        val (buyAmountTotal, sellAmountTotal) = buySellFee(buy.order.amount, executedPrice, sell.order.amount, executedPrice)
+        val (buyAmountExecuted, sellAmountExecuted) = buySellAmt(executedAmount, executedPrice, executedAmount, executedPrice)
+        val (buyAmountTotal, sellAmountTotal) = buySellAmt(buy.order.amount, executedPrice, sell.order.amount, executedPrice)
 
         val buyExecutedFee = executedFee(buy, buyAmountTotal, buyAmountExecuted)
         val sellExecutedFee = executedFee(sell, sellAmountTotal, sellAmountExecuted)

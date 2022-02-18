@@ -286,7 +286,7 @@ object Checker {
 
   private val checkLeftIndent = 35
   private val issueTxFee = 1.waves
-  private val matcherOrderFee = 0.003.waves
+  private val matcherOrderFee = 0.01.waves
 
   private val minMatcherValidBalance = 3.waves
 

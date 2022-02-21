@@ -36,24 +36,6 @@ class WsAddressStreamRealTimeTestSuite extends WsSuiteBase {
 
   "Address stream should" - {
 
-    val ts = new AtomicLong(System.currentTimeMillis())
-
-    "should receive only one imaginary tx update" in {
-      Using.resource(mkWsAddressConnection(account, dex1, flags = Set(WsAddressFlag.ImaginaryTxs))) { wsc =>
-        val order = mkOrder(account, wavesUsdPair, SELL, 2.waves, 2.usd)
-        placeAndAwaitAtDex(order)
-        placeAndAwaitAtDex(mkOrder(bob, wavesUsdPair, SELL, 2.waves, 2.usd))
-        val tx = placeAndAwaitAtNode(mkOrder(alice, wavesUsdPair, BUY, 4.waves, 2.usd)).head
-        eventually {
-          val changes = wsc.collectMessages[WsAddressChanges].flatMap(_.maybeNotObservedTxs)
-          withClue(s"changes: $changes") {
-            changes.flatMap(_.txsData).toMap shouldBe Map(ByteStr(tx.id().bytes()) -> List(order.id()))
-            changes.flatMap(_.removedTxs) should contain(ByteStr(tx.id().bytes()))
-          }
-        }
-      }
-    }
-
     "send correct updates when account added to address-actor.realtime-ws-accounts without waiting ws-messages-interval" in {
       Using.resource(mkWsAddressConnection(account, dex1)) { wsc =>
 
@@ -75,6 +57,7 @@ class WsAddressStreamRealTimeTestSuite extends WsSuiteBase {
     "send only one update for multiple matches for one order" in
     Using.resource(mkWsAddressConnection(account, dex1)) { wsc =>
 
+      val ts = new AtomicLong(System.currentTimeMillis())
       val smallOrders = (1 to 5).map { i =>
         mkOrder(alice, wavesUsdPair, SELL, 2.waves, (1 + (i / 10)).usd, ts = ts.incrementAndGet())
       }
@@ -91,6 +74,22 @@ class WsAddressStreamRealTimeTestSuite extends WsSuiteBase {
 
       updates.size should (be > 0 and be <= 2) // one for creating and one for five matches, or just one update
       updates.last.matchInfo.size shouldBe 5
+    }
+
+    "should receive only one imaginary tx update" in {
+      Using.resource(mkWsAddressConnection(account, dex1, flags = Set(WsAddressFlag.ImaginaryTxs))) { wsc =>
+        val order = mkOrder(account, wavesUsdPair, SELL, 2.waves, 2.usd)
+        placeAndAwaitAtDex(order)
+        placeAndAwaitAtDex(mkOrder(bob, wavesUsdPair, SELL, 2.waves, 2.usd))
+        val tx = placeAndAwaitAtNode(mkOrder(alice, wavesUsdPair, BUY, 4.waves, 2.usd)).head
+        eventually {
+          val changes = wsc.collectMessages[WsAddressChanges].flatMap(_.maybeNotObservedTxs)
+          withClue(s"changes: $changes") {
+            changes.flatMap(_.txsData).toMap shouldBe Map(ByteStr(tx.id().bytes()) -> List(order.id()))
+            changes.flatMap(_.removedTxs) should contain(ByteStr(tx.id().bytes()))
+          }
+        }
+      }
     }
 
   }

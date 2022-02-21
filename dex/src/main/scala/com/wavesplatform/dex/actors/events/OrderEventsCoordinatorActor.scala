@@ -124,7 +124,7 @@ object OrderEventsCoordinatorActor {
           addressActorCommands.added.foreach(addressDirectoryRef ! _)
 
           addressActorCommands.executed.foldMap { event =>
-            event.affectedAddresses.map(_ -> Set(event)).toMap
+            event.affectedAddresses.map(_ -> Vector(event)).toMap //should be vector, cuz we need to persist the ordering here
           }.foreach { case (adr, events) =>
             NonEmptyList
               .fromList(events.toList)

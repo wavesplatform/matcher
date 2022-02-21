@@ -2,13 +2,14 @@ package com.wavesplatform.it.sync.api.ws
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus
-import com.wavesplatform.dex.api.ws.entities.WsBalances
+import com.wavesplatform.dex.api.ws.entities.{WsAddressFlag, WsBalances}
+import com.wavesplatform.dex.api.ws.protocol.WsAddressChanges
 import com.wavesplatform.dex.domain.account.KeyPair.toAddress
 import com.wavesplatform.dex.domain.asset.Asset.Waves
-import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.it.WsSuiteBase
 
+import java.util.concurrent.atomic.AtomicLong
 import scala.util.Using
 
 class WsAddressStreamRealTimeTestSuite extends WsSuiteBase {
@@ -34,6 +35,25 @@ class WsAddressStreamRealTimeTestSuite extends WsSuiteBase {
 
   "Address stream should" - {
 
+    val ts = new AtomicLong(System.currentTimeMillis())
+
+    "should receive only one imaginary tx update" in {
+      Using.resource(mkWsAddressConnection(account, dex1, flags = Set(WsAddressFlag.ImaginaryTxs))) { wsc =>
+        val order = mkOrder(account, wavesUsdPair, SELL, 2.waves, 2.usd)
+        placeAndAwaitAtDex(order)
+        placeAndAwaitAtDex(mkOrder(bob, wavesUsdPair, SELL, 2.waves, 2.usd))
+        val tx = placeAndAwaitAtNode(mkOrder(alice, wavesUsdPair, BUY, 4.waves, 2.usd)).head
+        eventually {
+          val changes = wsc.collectMessages[WsAddressChanges].flatMap(_.maybeNotObservedTxs)
+          withClue(s"changes: $changes") {
+            changes.size shouldBe 1
+            changes.head.txsData should contain(tx.id())
+            changes.head.removedTxs should contain(tx.id())
+          }
+        }
+      }
+    }
+
     "send correct updates when account added to address-actor.realtime-ws-accounts without waiting ws-messages-interval" in {
       Using.resource(mkWsAddressConnection(account, dex1)) { wsc =>
 
@@ -55,15 +75,14 @@ class WsAddressStreamRealTimeTestSuite extends WsSuiteBase {
     "send only one update for multiple matches for one order" in
     Using.resource(mkWsAddressConnection(account, dex1)) { wsc =>
 
-      val ts = System.currentTimeMillis()
       val smallOrders = (1 to 5).map { i =>
-        mkOrder(alice, wavesUsdPair, OrderType.SELL, 2.waves, (1 + (i / 10)).usd, ts = ts + (i * 200))
+        mkOrder(alice, wavesUsdPair, SELL, 2.waves, (1 + (i / 10)).usd, ts = ts.incrementAndGet())
       }
       smallOrders.foreach(dex1.api.place)
 
       wsc.clearMessages()
 
-      val bigOrder = mkOrder(account, wavesUsdPair, OrderType.BUY, 15.waves, 1.2.usd)
+      val bigOrder = mkOrder(account, wavesUsdPair, BUY, 15.waves, 1.2.usd)
 
       dex1.api.place(bigOrder)
       smallOrders.foreach(order => dex1.api.waitForOrderStatus(order, HttpOrderStatus.Status.Filled))

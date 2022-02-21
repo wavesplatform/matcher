@@ -125,7 +125,7 @@ object OrderEventsCoordinatorActor {
 
           addressActorCommands.executed.foldMap { cmd =>
             val affectedAddresses = cmd.affectedOrders.map(_.order.sender.toAddress).toSet
-            affectedAddresses.map(_ -> Set(cmd)).toMap
+            affectedAddresses.map(_ -> Vector(cmd)).toMap
           }.values.flatMap { executedEvents =>
             NonEmptyList
               .fromList(executedEvents.toList)

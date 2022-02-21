@@ -120,6 +120,7 @@ object OrderEventsCoordinatorActor {
 
               }
             }
+
           addressActorCommands.added.foreach(addressDirectoryRef ! _)
 
           addressActorCommands.executed.foldMap { cmd =>
@@ -132,6 +133,7 @@ object OrderEventsCoordinatorActor {
           }.foreach(addressDirectoryRef ! _)
 
           addressActorCommands.cancelled.foreach(addressDirectoryRef ! _)
+
           Behaviors.same
 
         case Command.ApplyNodeUpdates(updates) =>

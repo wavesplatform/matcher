@@ -8,7 +8,6 @@ import cats.data.NonEmptyList
 import cats.instances.long._
 import cats.instances.map._
 import cats.syntax.either._
-import cats.syntax.foldable._
 import cats.syntax.option._
 import cats.syntax.semigroup._
 import com.wavesplatform.dex.actors.address.AddressActor.Command.ObservedTxData
@@ -120,20 +119,11 @@ object OrderEventsCoordinatorActor {
 
               }
             }
-
           addressActorCommands.added.foreach(addressDirectoryRef ! _)
-
-          addressActorCommands.executed.foldMap { cmd =>
-            val affectedAddresses = cmd.affectedOrders.map(_.order.sender.toAddress).toSet
-            affectedAddresses.map(_ -> Vector(cmd)).toMap
-          }.values.flatMap { executedEvents =>
-            NonEmptyList
-              .fromList(executedEvents.toList)
-              .map(AddressActor.Command.ApplyOrderBookExecuted(_))
-          }.foreach(addressDirectoryRef ! _)
-
+          NonEmptyList.fromList(addressActorCommands.executed.toList).map(AddressActor.Command.ApplyOrderBookExecuted(_)).foreach(
+            addressDirectoryRef ! _
+          )
           addressActorCommands.cancelled.foreach(addressDirectoryRef ! _)
-
           Behaviors.same
 
         case Command.ApplyNodeUpdates(updates) =>

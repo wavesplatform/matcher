@@ -906,7 +906,7 @@ object AddressActor {
   case class OrderBookExecutedEvent(event: Events.OrderExecuted, expectedTx: ExchangeTransactionResult[ExchangeTransactionV2])
       extends HasOrderBookEvents {
     override def events: Seq[Events.Event] = List(event)
-    override def affectedAddresses: Set[Address] = getAffectedAddressesByOrders(event.counter, event.submitted)
+    override def affectedAddresses: Set[Address] = getAffectedAddresses(event.counter, event.submitted)
   }
 
   sealed trait Message
@@ -950,12 +950,12 @@ object AddressActor {
       def events: Iterable[Events.Event]
       def affectedAddresses: Set[Address]
 
-      final protected def getAffectedAddressesByOrders(h: AcceptedOrder, t: AcceptedOrder*): Set[Address] =
+      final protected def getAffectedAddresses(h: AcceptedOrder, t: AcceptedOrder*): Set[Address] =
         (h +: t).map(_.order.sender.toAddress).toSet // Could be one trader
     }
 
     case class ApplyOrderBookAdded(event: Events.OrderAdded) extends Command with HasOrderBookEvents {
-      override def affectedAddresses: Set[Address] = getAffectedAddressesByOrders(event.order)
+      override def affectedAddresses: Set[Address] = getAffectedAddresses(event.order)
       override def events: Seq[Events.Event] = List(event)
     }
 
@@ -976,7 +976,7 @@ object AddressActor {
     }
 
     case class ApplyOrderBookCanceled(event: Events.OrderCanceled) extends Command with HasOrderBookEvents {
-      override def affectedAddresses: Set[Address] = getAffectedAddressesByOrders(event.acceptedOrder)
+      override def affectedAddresses: Set[Address] = getAffectedAddresses(event.acceptedOrder)
       override def events: Seq[Events.Event] = List(event)
     }
 

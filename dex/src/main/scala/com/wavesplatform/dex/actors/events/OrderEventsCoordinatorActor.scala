@@ -8,7 +8,6 @@ import cats.data.NonEmptyList
 import cats.instances.long._
 import cats.instances.map._
 import cats.syntax.either._
-import cats.syntax.foldable._
 import cats.syntax.option._
 import cats.syntax.semigroup._
 import com.wavesplatform.dex.actors.address.AddressActor.Command.ObservedTxData
@@ -122,16 +121,17 @@ object OrderEventsCoordinatorActor {
             }
 
           addressActorCommands.added.foreach(addressDirectoryRef ! _)
-
-          addressActorCommands.executed.foldMap { event =>
-            event.affectedAddresses.map(_ -> Vector(event)).toMap //should be vector, cuz we need to persist the ordering here
+          addressActorCommands.executed.foldLeft(Map.empty[Address, Vector[AddressActor.OrderBookExecutedEvent]]) { case (acc, event) =>
+            event.affectedAddresses.foldLeft(acc) { case (acc, adr) =>
+              acc.updated(adr, acc.getOrElse(adr, Vector.empty) :+ event)
+            }
           }.foreach { case (adr, events) =>
             NonEmptyList
               .fromList(events.toList)
               .foreach(addressDirectoryRef ! AddressActor.Command.ApplyOrderBookExecuted(adr, _))
           }
-
           addressActorCommands.cancelled.foreach(addressDirectoryRef ! _)
+
           Behaviors.same
 
         case Command.ApplyNodeUpdates(updates) =>

@@ -950,7 +950,7 @@ object AddressActor {
       def events: Iterable[Events.Event]
       def affectedAddresses: Set[Address]
 
-      protected def getAffectedAddressesByOrders(h: AcceptedOrder, t: AcceptedOrder*): Set[Address] =
+      final protected def getAffectedAddressesByOrders(h: AcceptedOrder, t: AcceptedOrder*): Set[Address] =
         (h +: t).map(_.order.sender.toAddress).toSet // Could be one trader
     }
 

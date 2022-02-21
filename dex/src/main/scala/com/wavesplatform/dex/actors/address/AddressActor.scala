@@ -906,7 +906,7 @@ object AddressActor {
   case class OrderBookExecutedEvent(event: Events.OrderExecuted, expectedTx: ExchangeTransactionResult[ExchangeTransactionV2])
       extends HasOrderBookEvents {
     override def events: Seq[Events.Event] = List(event)
-    override def affectedOrders: List[AcceptedOrder] = List(event.counter, event.submitted)
+    override def affectedAddresses: Set[Address] = getAffectedAddressesByOrders(event.counter, event.submitted)
   }
 
   sealed trait Message
@@ -948,27 +948,35 @@ object AddressActor {
 
     sealed trait HasOrderBookEvents {
       def events: Iterable[Events.Event]
-      def affectedOrders: List[AcceptedOrder]
+      def affectedAddresses: Set[Address]
+
+      protected def getAffectedAddressesByOrders(h: AcceptedOrder, t: AcceptedOrder*): Set[Address] =
+        (h +: t).map(_.order.sender.toAddress).toSet // Could be one trader
     }
 
     case class ApplyOrderBookAdded(event: Events.OrderAdded) extends Command with HasOrderBookEvents {
-      override def affectedOrders: List[AcceptedOrder] = List(event.order)
-
+      override def affectedAddresses: Set[Address] = getAffectedAddressesByOrders(event.order)
       override def events: Seq[Events.Event] = List(event)
     }
 
-    case class ApplyOrderBookExecuted(nonEmptyEvents: NonEmptyList[OrderBookExecutedEvent]) extends Command with HasOrderBookEvents {
-      override def affectedOrders: List[AcceptedOrder] = nonEmptyEvents.toList.flatMap(_.affectedOrders)
-
+    case class ApplyOrderBookExecuted(affectedAddresses: Set[Address], nonEmptyEvents: NonEmptyList[OrderBookExecutedEvent])
+        extends Command
+        with HasOrderBookEvents {
       override def events: Iterable[Events.Event] = nonEmptyEvents.toList.map(_.event)
     }
 
     object ApplyOrderBookExecuted {
-      def apply(event: OrderBookExecutedEvent): ApplyOrderBookExecuted = ApplyOrderBookExecuted(nonEmptyEvents = NonEmptyList.one(event))
+
+      def apply(event: OrderBookExecutedEvent): ApplyOrderBookExecuted =
+        ApplyOrderBookExecuted(event.affectedAddresses, NonEmptyList.one(event))
+
+      def apply(affectedAddress: Address, nonEmptyEvents: NonEmptyList[OrderBookExecutedEvent]): ApplyOrderBookExecuted =
+        ApplyOrderBookExecuted(Set(affectedAddress), nonEmptyEvents)
+
     }
 
     case class ApplyOrderBookCanceled(event: Events.OrderCanceled) extends Command with HasOrderBookEvents {
-      override def affectedOrders: List[AcceptedOrder] = List(event.acceptedOrder)
+      override def affectedAddresses: Set[Address] = getAffectedAddressesByOrders(event.acceptedOrder)
       override def events: Seq[Events.Event] = List(event)
     }
 

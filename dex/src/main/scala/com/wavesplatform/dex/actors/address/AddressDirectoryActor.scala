@@ -46,8 +46,7 @@ class AddressDirectoryActor(
 
     case command: AddressActor.Command.HasOrderBookEvents =>
       sendEventToHistoryRouter(command)
-      command.affectedOrders.map(_.order.sender.toAddress).toSet // Could be one trader
-        .foreach(forward(_, command))
+      command.affectedAddresses.foreach(forward(_, command))
 
     case e: OrderCancelFailed =>
       // We save an order when accept it in AddressActor

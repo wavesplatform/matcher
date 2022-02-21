@@ -6,6 +6,7 @@ import com.wavesplatform.dex.api.ws.entities.{WsAddressFlag, WsBalances}
 import com.wavesplatform.dex.api.ws.protocol.WsAddressChanges
 import com.wavesplatform.dex.domain.account.KeyPair.toAddress
 import com.wavesplatform.dex.domain.asset.Asset.Waves
+import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.it.WsSuiteBase
 
@@ -46,9 +47,8 @@ class WsAddressStreamRealTimeTestSuite extends WsSuiteBase {
         eventually {
           val changes = wsc.collectMessages[WsAddressChanges].flatMap(_.maybeNotObservedTxs)
           withClue(s"changes: $changes") {
-            changes.size shouldBe 1
-            changes.head.txsData should contain(tx.id())
-            changes.head.removedTxs should contain(tx.id())
+            changes.flatMap(_.txsData).toMap shouldBe Map(ByteStr(tx.id().bytes()) -> List(order.id()))
+            changes.flatMap(_.removedTxs) should contain(ByteStr(tx.id().bytes()))
           }
         }
       }

@@ -155,11 +155,18 @@ class OrderEventsCoordinatorActorSpec extends ScalaTestWithActorTestKit() with M
           }
 
           "passes an event with a tx" in {
-            val actual = addressDirectory.expectMsgType[AddressActor.Command.ApplyOrderBookExecuted]
-            actual should matchTo(AddressActor.Command.ApplyOrderBookExecuted(AddressActor.OrderBookExecutedEvent(
+            val counterEvt = addressDirectory.expectMsgType[AddressActor.Command.ApplyOrderBookExecuted]
+            val submittedEvt = addressDirectory.expectMsgType[AddressActor.Command.ApplyOrderBookExecuted]
+            val events = NonEmptyList.one(AddressActor.OrderBookExecutedEvent(
               validEvent,
               ExchangeTransactionResult(validTx)
-            )))
+            ))
+            counterEvt should matchTo(
+              AddressActor.Command.ApplyOrderBookExecuted(validCounter.sender.toAddress, events)
+            )
+            submittedEvt should matchTo(
+              AddressActor.Command.ApplyOrderBookExecuted(validSubmitted.sender.toAddress, events)
+            )
           }
         }
 

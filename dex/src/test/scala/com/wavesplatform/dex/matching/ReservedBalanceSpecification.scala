@@ -84,7 +84,6 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
       new AddressDirectoryActor(
         EmptyOrderDb(),
         createAddressActor,
-        None,
         recovered = true
       )
     )
@@ -512,7 +511,6 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
         new AddressDirectoryActor(
           TestOrderDb(100),
           createAddressActor,
-          None,
           recovered = true
         )
       )

@@ -905,7 +905,6 @@ object AddressActor {
 
   case class OrderBookExecutedEvent(event: Events.OrderExecuted, expectedTx: ExchangeTransactionResult[ExchangeTransactionV2])
       extends HasOrderBookEvents {
-    override def events: Seq[Events.Event] = List(event)
     override def affectedAddresses: Set[Address] = getAffectedAddresses(event.counter, event.submitted)
   }
 
@@ -947,7 +946,6 @@ object AddressActor {
     case class MarkTxsObserved(txsWithSpending: Map[ExchangeTransaction.Id, ObservedTxData]) extends Command
 
     sealed trait HasOrderBookEvents {
-      def events: Iterable[Events.Event]
       def affectedAddresses: Set[Address]
 
       final protected def getAffectedAddresses(h: AcceptedOrder, t: AcceptedOrder*): Set[Address] =
@@ -956,14 +954,11 @@ object AddressActor {
 
     case class ApplyOrderBookAdded(event: Events.OrderAdded) extends Command with HasOrderBookEvents {
       override def affectedAddresses: Set[Address] = getAffectedAddresses(event.order)
-      override def events: Seq[Events.Event] = List(event)
     }
 
     case class ApplyOrderBookExecuted(affectedAddresses: Set[Address], nonEmptyEvents: NonEmptyList[OrderBookExecutedEvent])
         extends Command
-        with HasOrderBookEvents {
-      override def events: Iterable[Events.Event] = nonEmptyEvents.toList.map(_.event)
-    }
+        with HasOrderBookEvents
 
     object ApplyOrderBookExecuted {
 
@@ -977,7 +972,6 @@ object AddressActor {
 
     case class ApplyOrderBookCanceled(event: Events.OrderCanceled) extends Command with HasOrderBookEvents {
       override def affectedAddresses: Set[Address] = getAffectedAddresses(event.acceptedOrder)
-      override def events: Seq[Events.Event] = List(event)
     }
 
     case class PlaceOrder(validatedOrder: OrderValidator.ValidatedOrder, isMarket: Boolean) extends OneOrderCommand {

@@ -129,7 +129,8 @@ class OrderEventsCoordinatorActorSpec extends ScalaTestWithActorTestKit() with M
             addressDirectory.ref,
             dbWriter.ref,
             broadcastActor.ref,
-            _ => ExchangeTransactionResult(validTx)
+            _ => ExchangeTransactionResult(validTx),
+            None
           ))
           oecRef ! OrderEventsCoordinatorActor.Command.Process(NonEmptyList.one(validEvent))
 
@@ -155,11 +156,18 @@ class OrderEventsCoordinatorActorSpec extends ScalaTestWithActorTestKit() with M
           }
 
           "passes an event with a tx" in {
-            val actual = addressDirectory.expectMsgType[AddressActor.Command.ApplyOrderBookExecuted]
-            actual should matchTo(AddressActor.Command.ApplyOrderBookExecuted(AddressActor.OrderBookExecutedEvent(
+            val counterEvt = addressDirectory.expectMsgType[AddressActor.Command.ApplyOrderBookExecuted]
+            val submittedEvt = addressDirectory.expectMsgType[AddressActor.Command.ApplyOrderBookExecuted]
+            val events = NonEmptyList.one(AddressActor.OrderBookExecutedEvent(
               validEvent,
               ExchangeTransactionResult(validTx)
-            )))
+            ))
+            counterEvt should matchTo(
+              AddressActor.Command.ApplyOrderBookExecuted(validCounter.sender.toAddress, events)
+            )
+            submittedEvt should matchTo(
+              AddressActor.Command.ApplyOrderBookExecuted(validSubmitted.sender.toAddress, events)
+            )
           }
         }
 
@@ -227,7 +235,8 @@ class OrderEventsCoordinatorActorSpec extends ScalaTestWithActorTestKit() with M
           classic.TestProbe().ref,
           TestProbe[ExchangeTransactionBroadcastActor.Command]().ref,
           _ => ExchangeTransactionResult(validTx, ValidationError.GenericError("test").some),
-          FifoSet.limited[ExchangeTransaction.Id](10).append(validTx.id())._1
+          FifoSet.limited[ExchangeTransaction.Id](10).append(validTx.id())._1,
+          None
         ))
         oecRef ! OrderEventsCoordinatorActor.Command.ApplyNodeUpdates(WavesNodeUpdates(
           balanceUpdates = Map.empty,
@@ -243,7 +252,8 @@ class OrderEventsCoordinatorActorSpec extends ScalaTestWithActorTestKit() with M
           addressDirectory.ref,
           classic.TestProbe().ref,
           TestProbe[ExchangeTransactionBroadcastActor.Command]().ref,
-          _ => ExchangeTransactionResult(validTx, ValidationError.GenericError("test").some)
+          _ => ExchangeTransactionResult(validTx, ValidationError.GenericError("test").some),
+          None
         ))
         oecRef ! OrderEventsCoordinatorActor.Command.ApplyNodeUpdates(WavesNodeUpdates(
           balanceUpdates = Map.empty,
@@ -265,7 +275,8 @@ class OrderEventsCoordinatorActorSpec extends ScalaTestWithActorTestKit() with M
             addressDirectory.ref,
             classic.TestProbe().ref,
             TestProbe[ExchangeTransactionBroadcastActor.Command]().ref,
-            _ => ExchangeTransactionResult(validTx, ValidationError.GenericError("test").some)
+            _ => ExchangeTransactionResult(validTx, ValidationError.GenericError("test").some),
+            None
           ))
           oecRef ! OrderEventsCoordinatorActor.Command.ApplyNodeUpdates(WavesNodeUpdates(
             balanceUpdates = Map.empty,
@@ -296,7 +307,8 @@ class OrderEventsCoordinatorActorSpec extends ScalaTestWithActorTestKit() with M
             addressDirectory.ref,
             classic.TestProbe().ref,
             TestProbe[ExchangeTransactionBroadcastActor.Command]().ref,
-            _ => ExchangeTransactionResult(validTx, ValidationError.GenericError("test").some)
+            _ => ExchangeTransactionResult(validTx, ValidationError.GenericError("test").some),
+            None
           ))
           val addressBalanceUpdates = AddressBalanceUpdates(
             regular = Map(Waves -> 10L),
@@ -322,7 +334,8 @@ class OrderEventsCoordinatorActorSpec extends ScalaTestWithActorTestKit() with M
             addressDirectory.ref,
             classic.TestProbe().ref,
             TestProbe[ExchangeTransactionBroadcastActor.Command]().ref,
-            _ => ExchangeTransactionResult(validTx, ValidationError.GenericError("test").some)
+            _ => ExchangeTransactionResult(validTx, ValidationError.GenericError("test").some),
+            None
           ))
           val addressBalanceUpdates = AddressBalanceUpdates(
             regular = Map(Waves -> 10L),
@@ -356,7 +369,8 @@ class OrderEventsCoordinatorActorSpec extends ScalaTestWithActorTestKit() with M
           classic.TestProbe().ref,
           TestProbe[ExchangeTransactionBroadcastActor.Command]().ref,
           _ => ExchangeTransactionResult(validTx, ValidationError.GenericError("test").some),
-          FifoSet.limited[ExchangeTransaction.Id](10).append(validTx.id())._1
+          FifoSet.limited[ExchangeTransaction.Id](10).append(validTx.id())._1,
+          None
         ))
         oecRef ! OrderEventsCoordinatorActor.Command.ApplyObservedByBroadcaster(validTx, Map.empty)
         addressDirectory.expectNoMessage()
@@ -370,7 +384,8 @@ class OrderEventsCoordinatorActorSpec extends ScalaTestWithActorTestKit() with M
             addressDirectory.ref,
             classic.TestProbe().ref,
             TestProbe[ExchangeTransactionBroadcastActor.Command]().ref,
-            _ => ExchangeTransactionResult(validTx, ValidationError.GenericError("test").some)
+            _ => ExchangeTransactionResult(validTx, ValidationError.GenericError("test").some),
+            None
           ))
           oecRef ! OrderEventsCoordinatorActor.Command.ApplyObservedByBroadcaster(validTx, validTxSpendings)
 
@@ -398,7 +413,8 @@ class OrderEventsCoordinatorActorSpec extends ScalaTestWithActorTestKit() with M
             addressDirectory.ref,
             classic.TestProbe().ref,
             TestProbe[ExchangeTransactionBroadcastActor.Command]().ref,
-            _ => ExchangeTransactionResult(validTx, ValidationError.GenericError("test").some)
+            _ => ExchangeTransactionResult(validTx, ValidationError.GenericError("test").some),
+            None
           ))
           oecRef ! OrderEventsCoordinatorActor.Command.ApplyObservedByBroadcaster(validTx, validTxSpendings)
           (1 to 2).foreach(_ => addressDirectory.expectMsgType[AddressDirectoryActor.Command.ForwardMessage]) // Ignore messages
@@ -426,7 +442,8 @@ class OrderEventsCoordinatorActorSpec extends ScalaTestWithActorTestKit() with M
       addressDirectory.ref,
       classic.TestProbe().ref,
       TestProbe[ExchangeTransactionBroadcastActor.Command]().ref,
-      _ => ExchangeTransactionResult(validTx, ValidationError.GenericError("test").some)
+      _ => ExchangeTransactionResult(validTx, ValidationError.GenericError("test").some),
+      None
     ))
 
     oecRef ! command

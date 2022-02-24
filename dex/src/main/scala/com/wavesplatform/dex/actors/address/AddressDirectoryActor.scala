@@ -4,8 +4,6 @@ import akka.actor.{Actor, ActorRef, Props, SupervisorStrategy, Terminated}
 import com.wavesplatform.dex.db.OrderDb
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.utils.{EitherExt2, ScorexLogging}
-import com.wavesplatform.dex.history.HistoryRouterActor._
-import com.wavesplatform.dex.model.Events
 import com.wavesplatform.dex.model.Events.{OrderCancelFailed, OrderCancelFailedFinalized}
 import kamon.Kamon
 
@@ -16,7 +14,6 @@ import scala.util.{Failure, Success}
 class AddressDirectoryActor(
   orderDb: OrderDb[Future],
   mkAddressActorProps: (Address, Boolean) => Props,
-  historyRouterRef: Option[ActorRef],
   var recovered: Boolean = false
 ) extends Actor
     with ScorexLogging {
@@ -45,9 +42,7 @@ class AddressDirectoryActor(
       forward(address, message)
 
     case command: AddressActor.Command.HasOrderBookEvents =>
-      sendEventToHistoryRouter(command)
-      command.affectedOrders.map(_.order.sender.toAddress).toSet // Could be one trader
-        .foreach(forward(_, command))
+      command.affectedAddresses.foreach(forward(_, command))
 
     case e: OrderCancelFailed =>
       // We save an order when accept it in AddressActor
@@ -81,28 +76,15 @@ class AddressDirectoryActor(
       context.children.foreach(_ ! AddressActor.Command.CompleteRecovering)
   }
 
-  private def sendEventToHistoryRouter(command: AddressActor.Command.HasOrderBookEvents): Unit = command.events.foreach(sendEventToHistoryRouter)
-
-  private def sendEventToHistoryRouter(event: Events.Event): Unit = historyRouterRef.foreach { historyRouterRef =>
-    val msg = event match {
-      case Events.OrderAdded(lo, _, timestamp) => HistoryInsertMsg.SaveOrder(lo, timestamp)
-      case e: Events.OrderExecuted => HistoryInsertMsg.SaveEvent(e)
-      case e: Events.OrderCanceled => HistoryInsertMsg.SaveEvent(e)
-    }
-
-    historyRouterRef ! msg
-  }
-
 }
 
 object AddressDirectoryActor {
   val name = "addresses"
 
-  def props(orderDB: OrderDb[Future], mkAddressActorProps: (Address, Boolean) => Props, historyRouterRef: Option[ActorRef]): Props = Props(
+  def props(orderDB: OrderDb[Future], mkAddressActorProps: (Address, Boolean) => Props): Props = Props(
     new AddressDirectoryActor(
       orderDB,
       mkAddressActorProps,
-      historyRouterRef,
       recovered = false
     )
   )

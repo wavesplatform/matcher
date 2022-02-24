@@ -19,6 +19,7 @@ import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeUpdates
 import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions0._
+import com.wavesplatform.dex.history.HistoryRouterActor.HistoryInsertMsg
 import com.wavesplatform.dex.model.Events
 import com.wavesplatform.dex.model.Events.ExchangeTransactionCreated
 import com.wavesplatform.dex.model.ExchangeTransactionCreator.CreateTransaction
@@ -56,13 +57,15 @@ object OrderEventsCoordinatorActor {
     addressDirectoryRef: classic.ActorRef,
     dbWriterRef: classic.ActorRef,
     broadcasterRef: typed.ActorRef[Broadcaster],
-    createTransaction: CreateTransaction
+    createTransaction: CreateTransaction,
+    historyRouterRef: Option[classic.ActorRef]
   ): Behavior[Message] = apply(
     addressDirectoryRef,
     dbWriterRef,
     broadcasterRef,
     createTransaction,
-    FifoSet.limited[ExchangeTransaction.Id](settings.exchangeTransactionCacheSize)
+    FifoSet.limited[ExchangeTransaction.Id](settings.exchangeTransactionCacheSize),
+    historyRouterRef: Option[classic.ActorRef]
   )
 
   def apply(
@@ -70,10 +73,20 @@ object OrderEventsCoordinatorActor {
     dbWriterRef: classic.ActorRef,
     broadcasterRef: typed.ActorRef[Broadcaster],
     createTransaction: CreateTransaction,
-    initObservedTxIds: FifoSet[ExchangeTransaction.Id]
+    initObservedTxIds: FifoSet[ExchangeTransaction.Id],
+    historyRouterRef: Option[classic.ActorRef]
   ): Behavior[Message] = Behaviors.setup { context =>
     val broadcastAdapter: ActorRef[Observed] = context.messageAdapter[Observed] {
       case Observed(tx, addressSpending) => Command.ApplyObservedByBroadcaster(tx, addressSpending)
+    }
+
+    def sendEventToHistoryRouter(event: Events.Event): Unit = historyRouterRef.foreach { historyRouterRef =>
+      val msg = event match {
+        case Events.OrderAdded(lo, _, timestamp) => HistoryInsertMsg.SaveOrder(lo, timestamp)
+        case e: Events.OrderExecuted => HistoryInsertMsg.SaveEvent(e)
+        case e: Events.OrderCanceled => HistoryInsertMsg.SaveEvent(e)
+      }
+      historyRouterRef ! msg
     }
 
     def default(observedTxIds: FifoSet[ExchangeTransaction.Id]): Behaviors.Receive[Message] = Behaviors.receive[Message] { (context, message) =>
@@ -119,11 +132,26 @@ object OrderEventsCoordinatorActor {
 
               }
             }
-          addressActorCommands.added.foreach(addressDirectoryRef ! _)
-          NonEmptyList.fromList(addressActorCommands.executed.toList).map(AddressActor.Command.ApplyOrderBookExecuted(_)).foreach(
-            addressDirectoryRef ! _
-          )
-          addressActorCommands.cancelled.foreach(addressDirectoryRef ! _)
+
+          addressActorCommands.added.foreach { event =>
+            sendEventToHistoryRouter(event.event)
+            addressDirectoryRef ! event
+          }
+          addressActorCommands.executed.foldLeft(Map.empty[Address, Vector[AddressActor.OrderBookExecutedEvent]]) { case (acc, event) =>
+            sendEventToHistoryRouter(event.event)
+            event.affectedAddresses.foldLeft(acc) { case (acc, adr) =>
+              acc.updated(adr, acc.getOrElse(adr, Vector.empty) :+ event)
+            }
+          }.foreach { case (adr, events) =>
+            NonEmptyList
+              .fromList(events.toList)
+              .foreach(addressDirectoryRef ! AddressActor.Command.ApplyOrderBookExecuted(adr, _))
+          }
+          addressActorCommands.cancelled.foreach { event =>
+            sendEventToHistoryRouter(event.event)
+            addressDirectoryRef ! event
+          }
+
           Behaviors.same
 
         case Command.ApplyNodeUpdates(updates) =>

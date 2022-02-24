@@ -121,7 +121,7 @@ class AddressActorSpecification
           getAssetDescription = assetBriefInfo
         )
 
-      val addressDir = system.actorOf(Props(new AddressDirectoryActor(EmptyOrderDb(), createAddressActor, None, recovered = false)))
+      val addressDir = system.actorOf(Props(new AddressDirectoryActor(EmptyOrderDb(), createAddressActor, recovered = false)))
       addressDir ! AddressDirectoryActor.Command.ForwardMessage(kp, AddressActor.Query.GetReservedBalance) // Creating an actor with kp's address
       eventually {
         requested shouldBe true
@@ -484,7 +484,7 @@ class AddressActorSpecification
         getAssetDescription = assetBriefInfo
       )
 
-    lazy val addressDir = system.actorOf(Props(new AddressDirectoryActor(orderDb, createAddressActor, None, recovered = true)))
+    lazy val addressDir = system.actorOf(Props(new AddressDirectoryActor(orderDb, createAddressActor, recovered = true)))
 
     def addOrder(ao: AcceptedOrder): Unit = {
       addressDir ! AddressDirectoryActor.Command.ForwardMessage(

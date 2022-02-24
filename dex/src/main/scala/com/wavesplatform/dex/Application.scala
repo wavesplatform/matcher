@@ -234,7 +234,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   }
 
   private val addressDirectoryRef =
-    actorSystem.actorOf(AddressDirectoryActor.props(orderDb, mkAddressActorProps, historyRouterRef), AddressDirectoryActor.name)
+    actorSystem.actorOf(AddressDirectoryActor.props(orderDb, mkAddressActorProps), AddressDirectoryActor.name)
 
   private val storeBreaker = new CircuitBreaker(
     actorSystem.scheduler,
@@ -264,7 +264,8 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       addressDirectoryRef = addressDirectoryRef,
       dbWriterRef = txWriterRef,
       broadcasterRef = wavesNetTxBroadcasterRef,
-      createTransaction = transactionCreator.createTransaction
+      createTransaction = transactionCreator.createTransaction,
+      historyRouterRef = historyRouterRef
     ),
     name = "events-coordinator"
   )

@@ -82,7 +82,7 @@ class ActorsWebSocketInteractionsSpecification
         getAssetDescription = getDefaultAssetDescriptions
       )
 
-    val addressDir = system.actorOf(Props(new AddressDirectoryActor(EmptyOrderDb(), createAddressActor, None, recovered = true)))
+    val addressDir = system.actorOf(Props(new AddressDirectoryActor(EmptyOrderDb(), createAddressActor, recovered = true)))
 
     def subscribeAddress(): WebSocketTestEnvironment = {
       addressDir ! AddressDirectoryActor.Command.ForwardMessage(address, AddressActor.WsCommand.AddWsSubscription(wsEventsProbe.ref))

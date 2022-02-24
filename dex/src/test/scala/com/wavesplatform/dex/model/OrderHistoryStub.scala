@@ -58,7 +58,6 @@ class OrderHistoryStub(system: ActorSystem, time: Time, maxActiveOrders: Int, ma
       new AddressDirectoryActor(
         EmptyOrderDb(),
         createAddressActor,
-        None,
         recovered = true
       )
     )

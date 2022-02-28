@@ -5,7 +5,7 @@ import cats.instances.either._
 import cats.syntax.either._
 import cats.syntax.option._
 import com.typesafe.config.ConfigFactory.parseFile
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.app.{forceStopApplication, MatcherStateCheckingFailedError}
 import com.wavesplatform.dex.db._
@@ -410,6 +410,38 @@ object WavesDexCli extends ScoptImplicits {
       println(orderInfo.fold("  not found")(_.toString))
     }
 
+  // noinspection ScalaStyle
+  def generateFeeSettings(args: Args): Unit = {
+    val pairs = for {
+      aa <- args.amountAssets
+      pa <- args.priceAssets
+    } yield s"$aa-$pa"
+
+    val config = pairs.foldLeft(ConfigFactory.empty()) { (cfg, pair) =>
+      cfg.withFallback(ConfigFactory.parseString(
+        s"""
+           |$pair: {
+           |  mode = percent
+           |  percent {
+           |    asset-type = spending
+           |    min-fee = ${args.minFee}
+           |    min-fee-in-waves = ${args.minFeeInWaves}
+           |  }
+           |}
+           |""".stripMargin
+      ))
+    }
+
+    val options = ConfigRenderOptions
+      .defaults()
+      .setComments(false)
+      .setOriginComments(false)
+      .setFormatted(true)
+      .setJson(false)
+
+    print(config.root().render(options))
+  }
+
   private def snapshotToStr(snapshot: OrderBookSideSnapshot): String =
     if (snapshot.isEmpty) "empty"
     else snapshot.toVector.sortBy(_._1).map { case (price, os) => s"$price: ${os.mkString(", ")}" }.mkString("  ", "\n  ", "")
@@ -706,6 +738,27 @@ object WavesDexCli extends ScoptImplicits {
               .valueName("<order-id-in-base58>")
               .required()
               .action((x, s) => s.copy(orderId = x))
+          ),
+        cmd(Command.GenerateFeeSettings.name)
+          .action((_, s) => s.copy(command = Command.GenerateFeeSettings.some))
+          .text("Generate fee settings")
+          .children(
+            opt[Seq[String]]("amount-assets")
+              .valueName("<list of base58-encoded asset ids>")
+              .required()
+              .action((x, s) => s.copy(amountAssets = x)),
+            opt[Seq[String]]("price-assets")
+              .valueName("<list of base58-encoded asset ids>")
+              .required()
+              .action((x, s) => s.copy(priceAssets = x)),
+            opt[Double]("min-fee")
+              .valueName("<double value>")
+              .required()
+              .action((x, s) => s.copy(minFee = x)),
+            opt[Long]("min-fee-in-waves")
+              .valueName("<long value>")
+              .required()
+              .action((x, s) => s.copy(minFeeInWaves = x))
           )
       )
     }
@@ -753,6 +806,7 @@ object WavesDexCli extends ScoptImplicits {
               case Command.InspectOrderBook => inspectOrderBook(args, matcherSettings)
               case Command.DeleteOrderBook => deleteOrderBook(args, matcherSettings)
               case Command.InspectOrder => inspectOrder(args, matcherSettings)
+              case Command.GenerateFeeSettings => generateFeeSettings(args)
             }
             println("Done")
         }
@@ -825,6 +879,10 @@ object WavesDexCli extends ScoptImplicits {
       override def name: String = "inspect-order"
     }
 
+    case object GenerateFeeSettings extends Command {
+      override def name: String = "generate-fee-settings"
+    }
+
   }
 
   sealed trait SeedFormat
@@ -866,7 +924,11 @@ object WavesDexCli extends ScoptImplicits {
     orderId: String = "",
     authServiceRestApi: Option[String] = None,
     accountSeed: Option[String] = None,
-    timeout: FiniteDuration = 0 seconds
+    timeout: FiniteDuration = 0 seconds,
+    amountAssets: Seq[String] = Seq.empty,
+    priceAssets: Seq[String] = Seq.empty,
+    minFee: Double = 0.01,
+    minFeeInWaves: Long = 1000000
   )
 
   // noinspection ScalaStyle

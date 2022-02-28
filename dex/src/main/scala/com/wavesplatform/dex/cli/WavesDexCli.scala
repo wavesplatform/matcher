@@ -743,14 +743,14 @@ object WavesDexCli extends ScoptImplicits {
           .action((_, s) => s.copy(command = Command.GenerateFeeSettings.some))
           .text("Generate fee settings")
           .children(
-            opt[Seq[String]]("price-assets")
-              .valueName("<list of base58-encoded asset ids>")
-              .required()
-              .action((x, s) => s.copy(priceAssets = x)),
             opt[Seq[String]]("amount-assets")
               .valueName("<list of base58-encoded asset ids>")
               .required()
               .action((x, s) => s.copy(amountAssets = x)),
+            opt[Seq[String]]("price-assets")
+              .valueName("<list of base58-encoded asset ids>")
+              .required()
+              .action((x, s) => s.copy(priceAssets = x)),
             opt[Double]("min-fee")
               .valueName("<double value>")
               .required()
@@ -925,8 +925,8 @@ object WavesDexCli extends ScoptImplicits {
     authServiceRestApi: Option[String] = None,
     accountSeed: Option[String] = None,
     timeout: FiniteDuration = 0 seconds,
-    priceAssets: Seq[String] = Seq(),
-    amountAssets: Seq[String] = Seq(),
+    amountAssets: Seq[String] = Seq.empty,
+    priceAssets: Seq[String] = Seq.empty,
     minFee: Double = 0.01,
     minFeeInWaves: Long = 1000000
   )

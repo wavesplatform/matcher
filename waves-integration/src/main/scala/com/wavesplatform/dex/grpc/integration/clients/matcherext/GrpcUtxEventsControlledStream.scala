@@ -78,7 +78,7 @@ class GrpcUtxEventsControlledStream(channel: ManagedChannel)(implicit scheduler:
       }
     }
 
-    override def onError(e: Throwable): Unit = if (!isClosed) {
+    override def onError(e: Throwable): Unit = {
       log.warn(s"$logPrefix Got an error in utx events", e)
       internalSystemStream.onNext(SystemEvent.Stopped)
     }

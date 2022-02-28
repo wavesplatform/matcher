@@ -102,8 +102,10 @@ class GrpcBlockchainUpdatesControlledStream(channel: RestartableManagedChannel, 
     }
 
     override def onError(e: Throwable): Unit = {
-      if (isClosed) log.trace(s"$logPrefix Got an expected error during closing: ${Option(e.getMessage).getOrElse("null")}")
-      else {
+      if (isClosed) {
+        log.trace(s"$logPrefix Got an expected error during closing: ${Option(e.getMessage).getOrElse("null")}")
+        internalSystemStream.onNext(SystemEvent.Stopped)
+      } else {
         log.warn(s"$logPrefix Got an error in blockchain events", e)
         internalSystemStream.onNext(SystemEvent.Stopped)
       }

@@ -119,11 +119,11 @@ sealed trait AcceptedOrder {
 
 object AcceptedOrder {
 
-  def partialFee(matcherFee: Long, totalAmount: Long, partialAmount: Long): Long = {
+  def partialFee(matcherFee: Long, totalAmount: scala.BigDecimal, partialAmount: scala.BigDecimal): Long = {
     if (partialAmount > totalAmount)
       throw new IllegalArgumentException(s"partialAmount: $partialAmount should be less or equal to totalAmount: $totalAmount")
     // Should not round! It could lead to forks. See ExchangeTransactionDiff
-    (BigInt(matcherFee) * partialAmount / totalAmount).toLong
+    (scala.BigDecimal(matcherFee) * partialAmount / totalAmount).toLong
   }
 
   def calcAmountOfPriceAsset(amount: Long, price: Long): Long = BigDecimal.valueOf(amount)

@@ -94,8 +94,14 @@ trait Order extends ByteAndJsonSerializable with Proven {
           throw new ArithmeticException("BigInteger out of long range")
     )
 
+  def getSpendAmountUnsafeD(matchAmount: Long, matchPrice: Long): BigDecimal =
+    Order.getSpendAmountUnsafeD(orderType, matchAmount, matchPrice)
+
   def getReceiveAmount(matchAmount: Long, matchPrice: Long): Either[ValidationError, Long] =
     Order.getReceiveAmount(orderType, matchAmount, matchPrice)
+
+  def getReceiveAmountD(matchAmount: Long, matchPrice: Long): BigDecimal =
+    Order.getReceiveAmountD(orderType, matchAmount, matchPrice)
 
   @ApiModelProperty(hidden = true)
   override val json: Coeval[JsObject] = Coeval.evalOnce {

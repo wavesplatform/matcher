@@ -5,7 +5,8 @@ import org.scalacheck.Gen
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-
+import cats.implicits._
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 class RateDbSpecification extends AnyWordSpecLike with Matchers with WithDb with MatcherSpecBase with PropertyChecks with NoShrink {

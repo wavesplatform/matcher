@@ -56,6 +56,16 @@ package object leveldb extends ScorexLogging {
 
     def iterateOver(prefix: Short)(f: DBEntry => Unit): Unit = iterateOver(Shorts.toByteArray(prefix))(f)
 
+    def scanOver[R](prefix: Array[Byte])(acc: R)(f: (R, DBEntry) => R): R = {
+      var result = acc
+
+      db.iterateOver(prefix) { entry =>
+        result = f(result, entry)
+      }
+
+      result
+    }
+
     def iterateOver(prefix: Array[Byte])(f: DBEntry => Unit): Unit = {
       val iterator = db.iterator()
       try {

@@ -32,11 +32,10 @@ object OrderDb {
   def levelDb[F[_]: Functor](settings: Settings, levelDb: LevelDb[F]): OrderDb[F] = new OrderDb[F] {
 
     override def containsInfo(id: Order.Id): F[Boolean] =
-      levelDb.readOnly(_.has(DbKeys.orderInfo(id)))
+      levelDb.has(DbKeys.orderInfo(id))
 
-    override def status(id: Order.Id): F[OrderStatus.Final] = levelDb.readOnly { ro =>
-      ro.get(DbKeys.orderInfo(id)).fold[OrderStatus.Final](OrderStatus.NotFound)(_.status)
-    }
+    override def status(id: Order.Id): F[OrderStatus.Final] =
+      levelDb.get(DbKeys.orderInfo(id)).map(_.fold[OrderStatus.Final](OrderStatus.NotFound)(_.status))
 
     override def saveOrder(o: Order): F[Unit] = levelDb.readWrite { rw =>
       val k = DbKeys.order(o.id())
@@ -44,7 +43,7 @@ object OrderDb {
         rw.put(k, Some(o))
     }
 
-    override def get(id: Order.Id): F[Option[Order]] = levelDb.readOnly(_.get(DbKeys.order(id)))
+    override def get(id: Order.Id): F[Option[Order]] = levelDb.get(DbKeys.order(id))
 
     override def saveOrderInfo(id: Order.Id, sender: Address, oi: FinalOrderInfo): F[Unit] = {
       val orderInfoKey = DbKeys.orderInfo(id)
@@ -84,7 +83,7 @@ object OrderDb {
       }.map(_.sorted(orderInfoOrdering))
 
     override def getOrderInfo(id: Id): F[Option[FinalOrderInfo]] =
-      levelDb.readOnly(_.get(DbKeys.orderInfo(id)))
+      levelDb.get(DbKeys.orderInfo(id))
 
     override def transactionsByOrder(orderId: Id): F[Seq[ExchangeTransaction]] = levelDb.readOnly { ro =>
       for {

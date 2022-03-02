@@ -1,5 +1,7 @@
 package com.wavesplatform.dex.db
 
+import cats.Monad
+import cats.implicits._
 import com.google.common.primitives.{Longs, Shorts}
 import com.wavesplatform.dex.db.DbKeys._
 import com.wavesplatform.dex.db.leveldb.{LevelDb, ReadOnlyDb}
@@ -24,14 +26,14 @@ trait LocalQueueStore[F[_]] {
 
 object LocalQueueStore {
 
-  def levelDb[F[_]](levelDb: LevelDb[F]): LocalQueueStore[F] = new LevelDbLocalQueueStore(levelDb)
+  def levelDb[F[_]: Monad](levelDb: LevelDb[F]): LocalQueueStore[F] = new LevelDbLocalQueueStore(levelDb)
 
 }
 
 /**
  * Note, this works only for single thread pool!
  */
-class LevelDbLocalQueueStore[F[_]](levelDb: LevelDb[F]) extends LocalQueueStore[F] {
+class LevelDbLocalQueueStore[F[_]: Monad](levelDb: LevelDb[F]) extends LocalQueueStore[F] {
 
   private val inMemQueue = new ConcurrentLinkedQueue[ValidatedCommandWithMeta]
   private val startInMemOffset = new AtomicReference[Option[ValidatedCommandWithMeta.Offset]](None)
@@ -84,10 +86,12 @@ class LevelDbLocalQueueStore[F[_]](levelDb: LevelDb[F]) extends LocalQueueStore[
         .headOption
     }
 
-  override def newestOffset: F[Option[ValidatedCommandWithMeta.Offset]] = levelDb.readOnly { ro =>
-    val eventKey = lpqElement(getNewestIdx(ro))
-    ro.get(eventKey).map(_.offset)
-  }
+  override def newestOffset: F[Option[ValidatedCommandWithMeta.Offset]] =
+    for {
+      id <- getNewestIdx
+      eventKey = lpqElement(id)
+      cmd <- levelDb.get(eventKey)
+    } yield cmd.map(_.offset)
 
   override def dropUntil(offset: ValidatedCommandWithMeta.Offset): F[Unit] =
     levelDb.readWrite { rw =>
@@ -99,8 +103,8 @@ class LevelDbLocalQueueStore[F[_]](levelDb: LevelDb[F]) extends LocalQueueStore[
       rw.put(lqOldestIdx, offset)
     }
 
-  private def getNewestIdx(ro: ReadOnlyDb): Long = ro.get(lqNewestIdx)
+  private def getNewestIdx: F[Long] = levelDb.get(lqNewestIdx)
 
-  private def getAndIncrementNewestIdx(ro: ReadOnlyDb): Long = getNewestIdx(ro) + 1
+  private def getAndIncrementNewestIdx(ro: ReadOnlyDb): Long = ro.get(lqNewestIdx) + 1
 
 }

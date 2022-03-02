@@ -76,7 +76,8 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
   private val monixScheduler = monix.execution.Scheduler.Implicits.global.withExecutionModel(ExecutionModel.AlwaysAsyncExecution)
   private val grpcEc = actorSystem.dispatchers.lookup("akka.actor.grpc-dispatcher")
-  private val levelDbEc = actorSystem.dispatchers.lookup("akka.actor.leveldb-dispatcher")
+  private val levelDbMTEx = actorSystem.dispatchers.lookup("akka.actor.leveldb-dispatcher")
+  private val levelDbSTEx = actorSystem.dispatchers.lookup("akka.actor.leveldb-single-thread-dispatcher")
 
   private val cs = CoordinatedShutdown(actorSystem)
 
@@ -113,7 +114,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   }
 
   private val db = openDb(settings.dataDirectory)
-  private val asyncLevelDb = LevelDb.async(db)(levelDbEc)
+  private val asyncLevelDb = LevelDb.async(db, levelDbMTEx, levelDbSTEx)
 
   cs.addTask(CoordinatedShutdown.PhaseActorSystemTerminate, "DB") { () =>
     Future { blocking(db.close()); Done }

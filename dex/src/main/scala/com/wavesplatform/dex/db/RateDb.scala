@@ -1,10 +1,10 @@
 package com.wavesplatform.dex.db
 
+import cats.Functor
+import cats.syntax.functor._
 import com.wavesplatform.dex.db.leveldb.LevelDb
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.bytes.ByteStr
-
-import scala.collection.mutable.ListBuffer
 
 trait RateDb[F[_]] {
 
@@ -17,22 +17,20 @@ trait RateDb[F[_]] {
 
 object RateDb {
 
-  def apply[F[_]](levelDb: LevelDb[F]): RateDb[F] = new RateDb[F] {
+  def apply[F[_]: Functor](levelDb: LevelDb[F]): RateDb[F] = new RateDb[F] {
 
-    def upsertRate(asset: IssuedAsset, value: Double): F[Unit] = levelDb.readWrite(_.put(DbKeys.rate(asset), value))
+    def upsertRate(asset: IssuedAsset, value: Double): F[Unit] = levelDb.put(DbKeys.rate(asset), value)
 
     def getAllRates: F[Map[IssuedAsset, Double]] =
-      levelDb.readOnly { ro =>
-        val ratesListBuffer = ListBuffer[(IssuedAsset, Double)]()
-        ro.iterateOver(DbKeys.ratePrefix) { dbEntry =>
-          val asset = IssuedAsset(ByteStr(dbEntry.getKey.drop(2)))
-          val value = DbKeys.rate(asset).parse(dbEntry.getValue)
-          ratesListBuffer.append(asset -> value)
-        }
-        ratesListBuffer.toMap
-      }
+      levelDb.scanOver(DbKeys.ratePrefix)(Map.newBuilder[IssuedAsset, Double]) { (ratesListBuffer, entry) =>
+        val asset = IssuedAsset(ByteStr(entry.getKey.drop(2)))
+        val value = DbKeys.rate(asset).parse(entry.getValue)
 
-    def deleteRate(asset: IssuedAsset): F[Unit] = levelDb.readWrite(_.delete(DbKeys.rate(asset)))
+        ratesListBuffer += (asset -> value)
+        ratesListBuffer
+      }.map(_.result())
+
+    def deleteRate(asset: IssuedAsset): F[Unit] = levelDb.delete(DbKeys.rate(asset))
   }
 
 }

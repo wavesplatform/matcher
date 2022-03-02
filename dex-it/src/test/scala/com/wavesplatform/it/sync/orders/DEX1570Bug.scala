@@ -3,6 +3,7 @@ package com.wavesplatform.it.sync.orders
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType
+import com.wavesplatform.dex.model.AcceptedOrder
 
 import java.util.concurrent.atomic.AtomicLong
 
@@ -22,18 +23,17 @@ class DEX1570Bug extends OrderFeeBaseTestSuite {
       }
 
       val ts = new AtomicLong(System.currentTimeMillis())
-      val bid =
-        mkOrder(
-          buyer,
-          wavesBtcPair,
-          OrderType.BUY,
-          993423494,
-          32661,
-          matcherFee = 5230125,
-          feeAsset = eth,
-          version = 3,
-          ts = ts.incrementAndGet()
-        )
+      val bid = mkOrder(
+        buyer,
+        wavesBtcPair,
+        OrderType.BUY,
+        993423494,
+        32661,
+        matcherFee = 5230125,
+        feeAsset = eth,
+        version = 3,
+        ts = ts.incrementAndGet()
+      )
       val ask1 = mkOrder(
         seller,
         wavesBtcPair,
@@ -61,6 +61,25 @@ class DEX1570Bug extends OrderFeeBaseTestSuite {
       val txs = placeAndAwaitAtNode(bid)
 
       txs.size shouldBe 2
+      val ca = AcceptedOrder.correctedAmountOfAmountAsset(708279445, 32499)
+      val a =
+        ca + AcceptedOrder.correctedAmountOfAmountAsset(
+          993423494 - ca,
+          32500
+        )
+      val b = {
+        val cb = AcceptedOrder.calcAmountOfPriceAsset(708279445, 32499)
+        cb + AcceptedOrder.calcAmountOfPriceAsset(
+          993423494 - ca,
+          32500
+        )
+      }
+      wavesNode1.api.balance(buyer, Waves) shouldBe 100.waves + a
+      wavesNode1.api.balance(buyer, btc) shouldBe 100.btc - b
+      wavesNode1.api.balance(buyer, eth) shouldBe 100.eth - 5230115
+      wavesNode1.api.balance(seller, Waves) shouldBe 100.waves - a
+      wavesNode1.api.balance(seller, btc) shouldBe 100.btc + b
+      wavesNode1.api.balance(seller, eth) shouldBe 100.eth - 6721449
     }
   }
 

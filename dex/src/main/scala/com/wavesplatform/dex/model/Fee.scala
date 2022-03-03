@@ -3,7 +3,6 @@ package com.wavesplatform.dex.model
 import com.wavesplatform.dex.caches.OrderFeeSettingsCache
 import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.order.OrderType
-import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.model.AcceptedOrder.partialFee
 import com.wavesplatform.dex.model.OrderValidator.multiplyFeeByBigDecimal
 import com.wavesplatform.dex.settings.OrderFeeSettings.{CompositeSettings, DynamicSettings, FixedSettings, PercentSettings}
@@ -47,30 +46,30 @@ object Fee {
 
         val (buyAmt, sellAmt) = assetType match {
           case AssetType.Amount => (
-              buy.order.getReceiveAmount _,
-              sell.order.getSpendAmount _
+              buy.order.getReceiveAmountD _,
+              sell.order.getSpendAmountUnsafeD _
             )
 
           case AssetType.Price => (
-              buy.order.getSpendAmount _,
-              sell.order.getReceiveAmount _
+              buy.order.getSpendAmountUnsafeD _,
+              sell.order.getReceiveAmountD _
             )
 
           case AssetType.Receiving => (
-              buy.order.getReceiveAmount _,
-              sell.order.getReceiveAmount _
+              buy.order.getReceiveAmountD _,
+              sell.order.getReceiveAmountD _
             )
 
           case AssetType.Spending => (
-              buy.order.getSpendAmount _,
-              sell.order.getSpendAmount _
+              buy.order.getSpendAmountUnsafeD _,
+              sell.order.getSpendAmountUnsafeD _
             )
         }
 
-        def buySellAmt(buyAmount: Long, buyPrice: Long, sellAmount: Long, sellPrice: Long): (Long, Long) =
-          buyAmt(buyAmount, buyPrice).explicitGet() -> sellAmt(sellAmount, sellPrice).explicitGet()
+        def buySellAmt(buyAmount: Long, buyPrice: Long, sellAmount: Long, sellPrice: Long): (BigDecimal, BigDecimal) =
+          buyAmt(buyAmount, buyPrice) -> sellAmt(sellAmount, sellPrice)
 
-        def executedFee(o: AcceptedOrder, amountTotal: Long, amountExecuted: Long) = {
+        def executedFee(o: AcceptedOrder, amountTotal: BigDecimal, amountExecuted: BigDecimal) = {
           val fee = o.percentMinFee.getOrElse(o.order.matcherFee)
           val correctedFee = {
             val isTaker = o.order.orderType == s.order.orderType

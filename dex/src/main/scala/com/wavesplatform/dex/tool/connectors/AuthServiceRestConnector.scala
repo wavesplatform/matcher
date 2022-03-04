@@ -11,7 +11,7 @@ import java.util.concurrent.ThreadLocalRandom
 
 case class AuthServiceRestConnector(target: String, chainId: Byte) extends RestConnector with JwtUtils {
 
-  private def mkAuthTokenRequestParams(keyPair: KeyPair): Map[String, String] = {
+  private def mkAuthTokenRequestBody(keyPair: KeyPair): Map[String, String] = {
     val jwtPayload = mkJwtSignedPayload(keyPair, networkByte = chainId)
     Map(
       "grant_type" -> "password",
@@ -25,9 +25,9 @@ case class AuthServiceRestConnector(target: String, chainId: Byte) extends RestC
   def getAuthCredentials(maybeSeed: Option[String]): ErrorOr[AuthCredentials] = {
     val seed = maybeSeed getOrElse s"minion${ThreadLocalRandom.current.nextInt}"
     val keyPair = KeyPair(crypto secureHash (seed getBytes StandardCharsets.UTF_8))
-    val requestParams = mkAuthTokenRequestParams(keyPair)
+    val body = mkAuthTokenRequestBody(keyPair)
 
-    mkResponse(_.post(targetUri).body(requestParams)).map { j =>
+    mkResponse(_.post(targetUri).body(body)).map { j =>
       AuthCredentials(
         keyPair = keyPair,
         token = (j \ "access_token").as[String],

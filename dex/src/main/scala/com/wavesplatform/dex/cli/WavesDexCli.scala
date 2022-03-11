@@ -8,9 +8,9 @@ import cats.syntax.option._
 import com.typesafe.config.ConfigFactory.parseFile
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
 import com.wavesplatform.dex._
-import com.wavesplatform.dex.app.{MatcherStateCheckingFailedError, forceStopApplication}
+import com.wavesplatform.dex.app.{forceStopApplication, MatcherStateCheckingFailedError}
 import com.wavesplatform.dex.db._
-import com.wavesplatform.dex.db.leveldb.{LevelDb, openDb}
+import com.wavesplatform.dex.db.leveldb.{openDb, LevelDb}
 import com.wavesplatform.dex.doc.MatcherErrorDoc
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair}
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
@@ -21,7 +21,7 @@ import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.error.Implicits.ThrowableOps
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.OrderBookSideSnapshot
-import com.wavesplatform.dex.settings.{MatcherSettings, loadMatcherSettings}
+import com.wavesplatform.dex.settings.{loadMatcherSettings, MatcherSettings}
 import com.wavesplatform.dex.tool._
 import com.wavesplatform.dex.tool.connectors.SuperConnector
 import monix.eval.Task
@@ -460,18 +460,19 @@ object WavesDexCli extends ScoptImplicits {
       implicit val actorSystem = ActorSystem()
 
       val orderBookSnapshotDb = OrderBookSnapshotDb.levelDb(db)
+      val orderDb = OrderDb.levelDb(
+        matcherSettings.orderDb,
+        LevelDb.async(openDb(matcherSettings.dataDirectory))(actorSystem.dispatchers.lookup("akka.actor.leveldb-dispatcher"))
+      )
 
-      val orders = scala.util.Random.shuffle(orderBookSnapshotDb.get(assetPair).map { snapshot =>
-        snapshot._2.asks.values.flatten.map(_.order.id()).toList ++ snapshot._2.bids.values.flatten.map(_.order.id()).toList
+      val ids = scala.util.Random.shuffle(orderBookSnapshotDb.get(assetPair).map { snapshot =>
+        def extractIds(snapshot: OrderBookSideSnapshot): List[Order.Id] = snapshot.values.flatten.map(_.order.id()).toList
+        extractIds(snapshot._2.asks) ++ extractIds(snapshot._2.bids)
       }.getOrElse(List.empty[Order.Id]))
 
-      val levelDbEc = actorSystem.dispatchers.lookup("akka.actor.leveldb-dispatcher")
-      val db1 = openDb(matcherSettings.dataDirectory)
-      val asyncLevelDb = LevelDb.async(db1)(levelDbEc)
-      val orderDb = OrderDb.levelDb(matcherSettings.orderDb, asyncLevelDb)
-
+      println(s"Keys count: ${ids.size}")
       val before = System.currentTimeMillis()
-      Try(Await.result(Future.sequence(orders.map(id => orderDb.get(id))), 60 seconds)) match {
+      Try(Await.result(Future.sequence(ids.map(id => orderDb.get(id))), 5 minutes)) match {
         case Success(_) => _
         case Failure(ex) => throw ex
       }

@@ -470,13 +470,13 @@ object WavesDexCli extends ScoptImplicits {
         extractIds(snapshot._2.asks) ++ extractIds(snapshot._2.bids)
       }.getOrElse(List.empty[Order.Id]))
 
-      println(s"Keys count: ${ids.size}")
       val before = System.currentTimeMillis()
       Try(Await.result(Future.sequence(ids.map(id => orderDb.get(id))), 5 minutes)) match {
-        case Success(_) => _
-        case Failure(ex) => throw ex
+        case Failure(ex) => new RuntimeException(ex)
+        case _ =>
+          println(s"Processed ${ids.size} keys, spent ${System.currentTimeMillis() - before} ms")
       }
-      println(s"Time spent: ${System.currentTimeMillis() - before} ms")
+      println("Done")
     }
 
   private def snapshotToStr(snapshot: OrderBookSideSnapshot): String =

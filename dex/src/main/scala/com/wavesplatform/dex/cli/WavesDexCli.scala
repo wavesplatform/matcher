@@ -456,26 +456,34 @@ object WavesDexCli extends ScoptImplicits {
            |""".stripMargin
       )
       assetPair <- AssetPair.extractAssetPair(args.assetPair).toEither
-    } yield withLevelDb(matcherSettings.dataDirectory) { db =>
+    } yield {
       implicit val actorSystem = ActorSystem()
 
-      val orderBookSnapshotDb = OrderBookSnapshotDb.levelDb(db)
-      val orderDb = OrderDb.levelDb(
-        matcherSettings.orderDb,
-        LevelDb.async(openDb(matcherSettings.dataDirectory))(actorSystem.dispatchers.lookup("akka.actor.leveldb-dispatcher"))
-      )
+      val levelDbEc = actorSystem.dispatchers.lookup("akka.actor.leveldb-dispatcher")
+      val db = openDb(matcherSettings.dataDirectory)
+      val asyncLevelDb = LevelDb.async(db)(levelDbEc)
+      val orderBookSnapshotDb = OrderBookSnapshotDb.levelDb(asyncLevelDb)
+      val orderDb = OrderDb.levelDb(matcherSettings.orderDb, asyncLevelDb)
 
-      val ids = scala.util.Random.shuffle(orderBookSnapshotDb.get(assetPair).map { snapshot =>
-        def extractIds(snapshot: OrderBookSideSnapshot): List[Order.Id] = snapshot.values.flatten.map(_.order.id()).toList
-        extractIds(snapshot._2.asks) ++ extractIds(snapshot._2.bids)
-      }.getOrElse(List.empty[Order.Id]))
-
-      val before = System.currentTimeMillis()
-      Try(Await.result(Future.sequence(ids.map(id => orderDb.get(id))), 5 minutes)) match {
-        case Failure(ex) => new RuntimeException(ex)
-        case _ =>
-          println(s"Processed ${ids.size} keys, spent ${System.currentTimeMillis() - before} ms")
+      val ids = orderBookSnapshotDb.get(assetPair).map { snapshot =>
+        snapshot.foldLeft(List[Order.Id]())((a, o) => {
+          a
+            .appendedAll(o._2.asks.values.flatten.map(_.order.id()))
+            .appendedAll(o._2.bids.values.flatten.map(_.order.id()))
+        })
       }
+
+      ids.onComplete({
+        case Success(value) =>
+          val before = System.currentTimeMillis()
+          Try(Await.result(Future.sequence(value.map(id => orderDb.get(id))), 5 minutes)) match {
+            case Failure(ex) => new RuntimeException(ex)
+            case _ =>
+              println(s"Processed ${value.size} keys, spent ${System.currentTimeMillis() - before} ms")
+          }
+      })
+
+      Await.ready(ids, 5 minutes)
       println("Done")
     }
 

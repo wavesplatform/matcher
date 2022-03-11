@@ -465,6 +465,7 @@ object WavesDexCli extends ScoptImplicits {
       val orderBookSnapshotDb = OrderBookSnapshotDb.levelDb(asyncLevelDb)
       val orderDb = OrderDb.levelDb(matcherSettings.orderDb, asyncLevelDb)
 
+      print("Collecting order ids...")
       val ids = orderBookSnapshotDb.get(assetPair).map { snapshot =>
         snapshot.foldLeft(List[Order.Id]())((a, o) => {
           a
@@ -473,17 +474,18 @@ object WavesDexCli extends ScoptImplicits {
         })
       }
 
-      ids.onComplete({
-        case Success(value) =>
+      Try(Await.result(ids, 5 minutes)) match {
+        case Success(res) =>
+          println(" Done")
           val before = System.currentTimeMillis()
-          Try(Await.result(Future.sequence(value.map(id => orderDb.get(id))), 5 minutes)) match {
+          Try(Await.result(Future.sequence(res.map(id => orderDb.get(id))), 5 minutes)) match {
             case Failure(ex) => new RuntimeException(ex)
             case _ =>
-              println(s"Processed ${value.size} keys, spent ${System.currentTimeMillis() - before} ms")
+              println(s"Processed ${res.size} keys, spent ${System.currentTimeMillis() - before} ms")
           }
-      })
+        case Failure(ex) => new RuntimeException(ex)
+      }
 
-      Await.ready(ids, 5 minutes)
       println("Done")
     }
 

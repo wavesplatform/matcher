@@ -467,21 +467,25 @@ object WavesDexCli extends ScoptImplicits {
 
       print("Collecting order ids...")
       val ids = orderBookSnapshotDb.get(assetPair).map { snapshot =>
-        snapshot.foldLeft(List[Order.Id]())((a, o) => {
+        snapshot.foldLeft(List[Order.Id]()) { (a, o) =>
           a
             .appendedAll(o._2.asks.values.flatten.map(_.order.id()))
             .appendedAll(o._2.bids.values.flatten.map(_.order.id()))
-        })
+        }
       }
 
       Try(Await.result(ids, 5 minutes)) match {
         case Success(res) =>
           println(" Done")
           val before = System.currentTimeMillis()
-          Try(Await.result(Future.sequence(res.map(id => orderDb.get(id))), 5 minutes)) match {
+
+          res.foreach(println)
+          val orderIds = scala.util.Random.shuffle(List.fill(1000000 / res.size)(res)).take(1000000)
+
+          Try(Await.result(Future.sequence(orderIds.flatten.map(id => orderDb.get(id))), 5 minutes)) match {
             case Failure(ex) => new RuntimeException(ex)
-            case _ =>
-              println(s"Processed ${res.size} keys, spent ${System.currentTimeMillis() - before} ms")
+            case Success(value) =>
+              println(s"Processed ${value.size} keys, spent ${System.currentTimeMillis() - before} ms")
           }
         case Failure(ex) => new RuntimeException(ex)
       }

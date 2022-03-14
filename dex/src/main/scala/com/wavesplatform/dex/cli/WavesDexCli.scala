@@ -490,6 +490,7 @@ object WavesDexCli extends ScoptImplicits {
         case Failure(ex) => new RuntimeException(ex)
       }
 
+      actorSystem.terminate()
       println("Done")
     }
 

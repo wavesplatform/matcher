@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.cli
 
+import akka.actor.ActorSystem
 import cats.Id
 import cats.instances.either._
 import cats.syntax.either._
@@ -16,6 +17,7 @@ import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
+import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.error.Implicits.ThrowableOps
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.OrderBookSideSnapshot
@@ -33,8 +35,9 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.util.concurrent.atomic.AtomicLong
 import java.util.{Base64, Scanner}
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
-import scala.concurrent.{Await, TimeoutException}
+import scala.concurrent.{Await, Future, TimeoutException}
 import scala.util.{Failure, Success, Try, Using}
 
 object WavesDexCli extends ScoptImplicits {
@@ -442,6 +445,54 @@ object WavesDexCli extends ScoptImplicits {
     print(config.root().render(options))
   }
 
+  // noinspection ScalaStyle
+  def levelDbTest(args: Args, matcherSettings: MatcherSettings): Unit =
+    for {
+      _ <- cli.log(
+        s"""
+           |Passed arguments:
+           |  DEX config path : ${args.configPath}
+           |  Asset pair      : ${args.assetPair}
+           |""".stripMargin
+      )
+      assetPair <- AssetPair.extractAssetPair(args.assetPair).toEither
+    } yield {
+      implicit val actorSystem = ActorSystem()
+
+      val levelDbEc = actorSystem.dispatchers.lookup("akka.actor.leveldb-dispatcher")
+      val db = openDb(matcherSettings.dataDirectory)
+      val asyncLevelDb = LevelDb.async(db)(levelDbEc)
+      val orderBookSnapshotDb = OrderBookSnapshotDb.levelDb(asyncLevelDb)
+      val orderDb = OrderDb.levelDb(matcherSettings.orderDb, asyncLevelDb)
+
+      print("Collecting order ids...")
+      val ids = orderBookSnapshotDb.get(assetPair).map { snapshot =>
+        snapshot.foldLeft(List[Order.Id]()) { (a, o) =>
+          a
+            .appendedAll(o._2.asks.values.flatten.map(_.order.id()))
+            .appendedAll(o._2.bids.values.flatten.map(_.order.id()))
+        }
+      }
+
+      Try(Await.result(ids, 5 minutes)) match {
+        case Success(res) =>
+          if (res.isEmpty) throw new RuntimeException(s"There are no orders in $assetPair snapshot")
+          println(" Done")
+          val orderIds = scala.util.Random.shuffle(List.fill(1000000 / res.size)(res)).take(1000000)
+          val before = System.currentTimeMillis()
+
+          Try(Await.result(Future.sequence(orderIds.flatten.map(id => orderDb.get(id))), 5 minutes)) match {
+            case Failure(ex) => throw new RuntimeException(ex)
+            case Success(value) =>
+              println(s"Processed ${value.size} keys, spent ${System.currentTimeMillis() - before} ms")
+          }
+        case Failure(ex) => throw new RuntimeException(ex)
+      }
+
+      actorSystem.terminate()
+      println("Done")
+    }
+
   private def snapshotToStr(snapshot: OrderBookSideSnapshot): String =
     if (snapshot.isEmpty) "empty"
     else snapshot.toVector.sortBy(_._1).map { case (price, os) => s"$price: ${os.mkString(", ")}" }.mkString("  ", "\n  ", "")
@@ -759,6 +810,17 @@ object WavesDexCli extends ScoptImplicits {
               .valueName("<long value>")
               .required()
               .action((x, s) => s.copy(minFeeInWaves = x))
+          ),
+        cmd(Command.LevelDbTest.name)
+          .action((_, s) => s.copy(command = Command.LevelDbTest.some))
+          .text("LevelDB Test")
+          .children(
+            opt[String]("asset-pair")
+              .abbr("ap")
+              .text("An asset pair of order book")
+              .valueName("<amount-asset-id-in-base58>-<price-asset-id-in-base58>")
+              .required()
+              .action((x, s) => s.copy(assetPair = x))
           )
       )
     }
@@ -807,6 +869,7 @@ object WavesDexCli extends ScoptImplicits {
               case Command.DeleteOrderBook => deleteOrderBook(args, matcherSettings)
               case Command.InspectOrder => inspectOrder(args, matcherSettings)
               case Command.GenerateFeeSettings => generateFeeSettings(args)
+              case Command.LevelDbTest => levelDbTest(args, matcherSettings)
             }
             println("Done")
         }
@@ -881,6 +944,10 @@ object WavesDexCli extends ScoptImplicits {
 
     case object GenerateFeeSettings extends Command {
       override def name: String = "generate-fee-settings"
+    }
+
+    case object LevelDbTest extends Command {
+      override def name: String = "leveldb-test"
     }
 
   }

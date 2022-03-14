@@ -459,28 +459,36 @@ object WavesDexCli extends ScoptImplicits {
     } yield {
       implicit val actorSystem = ActorSystem()
 
-      val levelDbEc = actorSystem.dispatchers.lookup("akka.actor.leveldb-dispatcher")
+      val levelDbMTEx = actorSystem.dispatchers.lookup("akka.actor.leveldb-dispatcher")
+      val levelDbSTEx = actorSystem.dispatchers.lookup("akka.actor.leveldb-single-thread-dispatcher")
       val db = openDb(matcherSettings.dataDirectory)
-      val asyncLevelDb = LevelDb.async(db)(levelDbEc)
+      val asyncLevelDb = LevelDb.async(db, levelDbMTEx, levelDbSTEx)
       val orderBookSnapshotDb = OrderBookSnapshotDb.levelDb(asyncLevelDb)
       val orderDb = OrderDb.levelDb(matcherSettings.orderDb, asyncLevelDb)
 
       print("Collecting order ids...")
-      val ids = orderBookSnapshotDb.get(assetPair) match {
-        case Left(value) => value
-        case Right(value) =>
-          value.get._2.asks.values.flatten.map(_.order.id()) ++ value.get._2.bids.values.flatten.map(_.order.id())
+      val ids = orderBookSnapshotDb.get(assetPair).map { snapshot =>
+        snapshot.foldLeft(List[Order.Id]()) { (a, o) =>
+          a
+            .appendedAll(o._2.asks.values.flatten.map(_.order.id()))
+            .appendedAll(o._2.bids.values.flatten.map(_.order.id()))
+        }
       }
 
-      if (ids.isEmpty) throw new RuntimeException(s"There are no orders in $assetPair snapshot")
-      println(" Done")
+      Try(Await.result(ids, 5 minutes)) match {
+        case Success(res) =>
+          if (res.isEmpty) throw new RuntimeException(s"There are no orders in $assetPair snapshot")
+          println(" Done")
+          val orderIds = scala.util.Random.shuffle(List.fill(1000000 / res.size)(res)).take(1000000)
+          val before = System.currentTimeMillis()
 
-      val orderIds = scala.util.Random.shuffle(List.fill(1000000 / ids.size)(ids)).take(1000000)
-      val before = System.currentTimeMillis()
-      val maybeOrders = orderIds.flatMap(_.map(orderDb.get))
-      println(
-        s"Processed ${maybeOrders.size} keys, spent ${System.currentTimeMillis() - before} ms, found  ${maybeOrders.count(_.isRight)} orders"
-      )
+          Try(Await.result(Future.sequence(orderIds.flatten.map(id => orderDb.get(id))), 5 minutes)) match {
+            case Failure(ex) => throw new RuntimeException(ex)
+            case Success(value) =>
+              println(s"Processed ${value.size} keys, spent ${System.currentTimeMillis() - before} ms")
+          }
+        case Failure(ex) => throw new RuntimeException(ex)
+      }
 
       actorSystem.terminate()
       println("Done")

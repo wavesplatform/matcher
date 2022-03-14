@@ -475,19 +475,17 @@ object WavesDexCli extends ScoptImplicits {
       }
 
       Try(Await.result(ids, 5 minutes)) match {
-        case Success(res) =>
+        case Success(res) => if (res.isEmpty) throw new RuntimeException(s"There are no orders in $assetPair snapshot")
           println(" Done")
           val before = System.currentTimeMillis()
-
-          res.foreach(println)
           val orderIds = scala.util.Random.shuffle(List.fill(1000000 / res.size)(res)).take(1000000)
 
           Try(Await.result(Future.sequence(orderIds.flatten.map(id => orderDb.get(id))), 5 minutes)) match {
-            case Failure(ex) => new RuntimeException(ex)
+            case Failure(ex) => throw new RuntimeException(ex)
             case Success(value) =>
               println(s"Processed ${value.size} keys, spent ${System.currentTimeMillis() - before} ms")
           }
-        case Failure(ex) => new RuntimeException(ex)
+        case Failure(ex) => throw new RuntimeException(ex)
       }
 
       actorSystem.terminate()

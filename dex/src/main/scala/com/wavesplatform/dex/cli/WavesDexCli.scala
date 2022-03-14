@@ -151,7 +151,7 @@ object WavesDexCli extends ScoptImplicits {
         checkResult <- new Checker(superConnector).checkState(args.version, args.accountSeed, config, matcherSettings)
         _ <- cli.lift(superConnector.close())
       } yield checkResult
-    ) match {
+      ) match {
       case Right(diagnosticNotes) => println(s"$diagnosticNotes\nCongratulations! All checks passed!")
       case Left(error) => println(error); forceStopApplication(MatcherStateCheckingFailedError)
     }
@@ -972,31 +972,31 @@ object WavesDexCli extends ScoptImplicits {
   private val defaultFile = new File(".")
 
   final case class Args(
-    addressSchemeByte: Option[Char] = None,
-    seedFormat: SeedFormat = SeedFormat.RawString,
-    accountNonce: Option[Int] = None,
-    command: Option[Command] = None,
-    outputDirectory: File = defaultFile,
-    apiKey: String = "",
-    dexRestApi: String = "",
-    nodeRestApi: String = "",
-    version: String = "",
-    configPath: String = "",
-    assetPair: String = "",
-    assetId: String = "",
-    name: String = "",
-    decimals: Int = 8,
-    hasScript: Boolean = false,
-    isNft: Boolean = false,
-    orderId: String = "",
-    authServiceRestApi: Option[String] = None,
-    accountSeed: Option[String] = None,
-    timeout: FiniteDuration = 0 seconds,
-    amountAssets: Seq[String] = Seq.empty,
-    priceAssets: Seq[String] = Seq.empty,
-    minFee: Double = 0.01,
-    minFeeInWaves: Long = 1000000
-  )
+                         addressSchemeByte: Option[Char] = None,
+                         seedFormat: SeedFormat = SeedFormat.RawString,
+                         accountNonce: Option[Int] = None,
+                         command: Option[Command] = None,
+                         outputDirectory: File = defaultFile,
+                         apiKey: String = "",
+                         dexRestApi: String = "",
+                         nodeRestApi: String = "",
+                         version: String = "",
+                         configPath: String = "",
+                         assetPair: String = "",
+                         assetId: String = "",
+                         name: String = "",
+                         decimals: Int = 8,
+                         hasScript: Boolean = false,
+                         isNft: Boolean = false,
+                         orderId: String = "",
+                         authServiceRestApi: Option[String] = None,
+                         accountSeed: Option[String] = None,
+                         timeout: FiniteDuration = 0 seconds,
+                         amountAssets: Seq[String] = Seq.empty,
+                         priceAssets: Seq[String] = Seq.empty,
+                         minFee: Double = 0.01,
+                         minFeeInWaves: Long = 1000000
+                       )
 
   // noinspection ScalaStyle
   @scala.annotation.tailrec

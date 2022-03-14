@@ -151,7 +151,7 @@ object WavesDexCli extends ScoptImplicits {
         checkResult <- new Checker(superConnector).checkState(args.version, args.accountSeed, config, matcherSettings)
         _ <- cli.lift(superConnector.close())
       } yield checkResult
-      ) match {
+    ) match {
       case Right(diagnosticNotes) => println(s"$diagnosticNotes\nCongratulations! All checks passed!")
       case Left(error) => println(error); forceStopApplication(MatcherStateCheckingFailedError)
     }
@@ -466,28 +466,21 @@ object WavesDexCli extends ScoptImplicits {
       val orderDb = OrderDb.levelDb(matcherSettings.orderDb, asyncLevelDb)
 
       print("Collecting order ids...")
-      val ids = orderBookSnapshotDb.get(assetPair).map { snapshot =>
-        snapshot.foldLeft(List[Order.Id]()) { (a, o) =>
-          a
-            .appendedAll(o._2.asks.values.flatten.map(_.order.id()))
-            .appendedAll(o._2.bids.values.flatten.map(_.order.id()))
-        }
+      val ids = orderBookSnapshotDb.get(assetPair) match {
+        case Left(value) => value
+        case Right(value) =>
+          value.get._2.asks.values.flatten.map(_.order.id()) ++ value.get._2.bids.values.flatten.map(_.order.id())
       }
 
-      Try(Await.result(ids, 5 minutes)) match {
-        case Success(res) =>
-          if (res.isEmpty) throw new RuntimeException(s"There are no orders in $assetPair snapshot")
-          println(" Done")
-          val orderIds = scala.util.Random.shuffle(List.fill(1000000 / res.size)(res)).take(1000000)
-          val before = System.currentTimeMillis()
+      if (ids.isEmpty) throw new RuntimeException(s"There are no orders in $assetPair snapshot")
+      println(" Done")
 
-          Try(Await.result(Future.sequence(orderIds.flatten.map(id => orderDb.get(id))), 5 minutes)) match {
-            case Failure(ex) => throw new RuntimeException(ex)
-            case Success(value) =>
-              println(s"Processed ${value.size} keys, spent ${System.currentTimeMillis() - before} ms")
-          }
-        case Failure(ex) => throw new RuntimeException(ex)
-      }
+      val orderIds = scala.util.Random.shuffle(List.fill(1000000 / ids.size)(ids)).take(1000000)
+      val before = System.currentTimeMillis()
+      val maybeOrders = orderIds.flatMap(_.map(orderDb.get))
+      println(
+        s"Processed ${maybeOrders.size} keys, spent ${System.currentTimeMillis() - before} ms, found  ${maybeOrders.count(_.isRight)} orders"
+      )
 
       actorSystem.terminate()
       println("Done")
@@ -972,31 +965,31 @@ object WavesDexCli extends ScoptImplicits {
   private val defaultFile = new File(".")
 
   final case class Args(
-                         addressSchemeByte: Option[Char] = None,
-                         seedFormat: SeedFormat = SeedFormat.RawString,
-                         accountNonce: Option[Int] = None,
-                         command: Option[Command] = None,
-                         outputDirectory: File = defaultFile,
-                         apiKey: String = "",
-                         dexRestApi: String = "",
-                         nodeRestApi: String = "",
-                         version: String = "",
-                         configPath: String = "",
-                         assetPair: String = "",
-                         assetId: String = "",
-                         name: String = "",
-                         decimals: Int = 8,
-                         hasScript: Boolean = false,
-                         isNft: Boolean = false,
-                         orderId: String = "",
-                         authServiceRestApi: Option[String] = None,
-                         accountSeed: Option[String] = None,
-                         timeout: FiniteDuration = 0 seconds,
-                         amountAssets: Seq[String] = Seq.empty,
-                         priceAssets: Seq[String] = Seq.empty,
-                         minFee: Double = 0.01,
-                         minFeeInWaves: Long = 1000000
-                       )
+    addressSchemeByte: Option[Char] = None,
+    seedFormat: SeedFormat = SeedFormat.RawString,
+    accountNonce: Option[Int] = None,
+    command: Option[Command] = None,
+    outputDirectory: File = defaultFile,
+    apiKey: String = "",
+    dexRestApi: String = "",
+    nodeRestApi: String = "",
+    version: String = "",
+    configPath: String = "",
+    assetPair: String = "",
+    assetId: String = "",
+    name: String = "",
+    decimals: Int = 8,
+    hasScript: Boolean = false,
+    isNft: Boolean = false,
+    orderId: String = "",
+    authServiceRestApi: Option[String] = None,
+    accountSeed: Option[String] = None,
+    timeout: FiniteDuration = 0 seconds,
+    amountAssets: Seq[String] = Seq.empty,
+    priceAssets: Seq[String] = Seq.empty,
+    minFee: Double = 0.01,
+    minFeeInWaves: Long = 1000000
+  )
 
   // noinspection ScalaStyle
   @scala.annotation.tailrec

@@ -87,6 +87,9 @@ final case class DexContainer private (override val internalIp: String, underlyi
   def unblockKafkaTraffic(kafkaPort: Int = 9092): Unit =
     switchOutgoingTrafficOnPort(kafkaPort, block = false)
 
+  def switchPort(port: Int, block: Boolean): Unit =
+    switchOutgoingTrafficOnPort(port, block)
+
   /**
    * This method could affect an execution of orders. If you provide such settings, use safe.
    * Use on your risk.

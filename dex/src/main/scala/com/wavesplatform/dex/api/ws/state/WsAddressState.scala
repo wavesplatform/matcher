@@ -46,7 +46,10 @@ final case class WsAddressState(
     val (maybeNotObservedTxsData, maybeNotCreatedTxsData) =
       mkImaginaryTxsData(notObservedTxs, Set.empty, notCreatedTxs, Set.empty, flags)
     subscriber ! WsAddressChanges(address, balances, orders, maybeNotObservedTxsData, maybeNotCreatedTxsData, 0, isDebug = isDebug)
-    copy(activeSubscription = activeSubscription.updated(subscriber, Subscription(0, flags)), previousBalanceChanges = assetInfo.map(v => (v._1, v._2.balances)))
+    copy(
+      activeSubscription = activeSubscription.updated(subscriber, Subscription(0, flags)),
+      previousBalanceChanges = assetInfo.map(v => (v._1, v._2.balances))
+    )
   }
 
   def removeSubscription(subscriber: ActorRef[WsAddressChanges]): WsAddressState = {

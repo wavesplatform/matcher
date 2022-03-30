@@ -34,7 +34,7 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.util.concurrent.atomic.AtomicLong
 import java.util.{Base64, Scanner}
-import scala.concurrent.duration.{DurationInt, FiniteDuration}
+import scala.concurrent.duration.{Duration, DurationInt, FiniteDuration}
 import scala.concurrent.{Await, Future, TimeoutException}
 import scala.util.{Failure, Success, Try, Using}
 
@@ -85,7 +85,7 @@ object WavesDexCli extends ScoptImplicits {
         }
 
         println("Collecting order ids...")
-        val orders = orderDb.iterateOrderIds(10)
+        val orders = Await.result(orderDb.iterateOrderIds(10), Duration.Inf)
         println(s"orders=$orders")
       }
       actorSystem.terminate()

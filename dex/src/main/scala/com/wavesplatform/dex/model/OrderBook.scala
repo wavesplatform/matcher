@@ -7,13 +7,11 @@ import cats.syntax.group._
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.model.Price
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.model.Events._
 import com.wavesplatform.dex.queue.ValidatedCommandWithMeta
 import com.wavesplatform.dex.settings.MatchingRule
 
 import scala.collection.immutable.{HashMap, Queue, TreeMap}
-import scala.util.chaining._
 
 case class OrderBook private (
   bids: Side,
@@ -21,7 +19,7 @@ case class OrderBook private (
   lastTrade: Option[LastTrade],
   orderIds: HashMap[Order.Id, (OrderType, Price)],
   nextTxTimestamp: Long
-) extends ScorexLogging {
+) {
   import OrderBook._
 
   def bestBid: Option[LevelAgg] = bids.bestLevel
@@ -74,7 +72,7 @@ case class OrderBook private (
   ): OrderBookUpdates = {
     val events = Queue(OrderAdded(submitted, OrderAddedReason.RequestExecuted, eventTs))
     if (submitted.order.isValid(eventTs))
-      doMatch(eventTs, tickSize, getMakerTakerFee, submitted, events, this, getOrderExecutedTs, submittedOffset).tap(v => log.info(s"doMatch $v"))
+      doMatch(eventTs, tickSize, getMakerTakerFee, submitted, events, this, getOrderExecutedTs, submittedOffset)
     else OrderBookUpdates(this, events.enqueue(OrderCanceled(submitted, OrderCanceledReason.BecameInvalid, eventTs)), LevelAmounts.empty, None)
   }
 
@@ -115,7 +113,7 @@ case class OrderBook private (
 
 }
 
-object OrderBook extends ScorexLogging{
+object OrderBook {
 
   /**
    * Corrects order price by the tick size in favor of the client.
@@ -179,7 +177,6 @@ object OrderBook extends ScorexLogging{
               }
 
               val newUpdates = currentUpdates.copy(updatedOrderBook, updatedEvents, updatedLevelChanges, lastTrade)
-              log.info(s"LT = $lastTrade")
 
               if (submittedRemaining.isValid)
                 if (counterRemaining.isValid)

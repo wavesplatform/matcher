@@ -15,7 +15,8 @@ class WsZeroUpdatesTestSuite extends WsSuiteBase {
     s"""waves.dex {
        |  price-assets = [ "$UsdnId", "WAVES" ]
        |  web-sockets.external-client-handler.messages-interval = 2s
-       |}""".stripMargin).withFallback(jwtPublicKeyConfig)
+       |}""".stripMargin
+  ).withFallback(jwtPublicKeyConfig)
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
@@ -42,7 +43,7 @@ class WsZeroUpdatesTestSuite extends WsSuiteBase {
         dex1.api.place(order1)
         dex1.api.place(order2)
         waitForOrderAtNode(order2)
-        Thread.sleep(4000L)
+        Thread.sleep(1000L)
 
         val wacs = wsc.receiveAtLeastN[WsAddressChanges](1)
         val wobcs = wsc.receiveAtLeastN[WsOrderBookChanges](1)
@@ -51,7 +52,6 @@ class WsZeroUpdatesTestSuite extends WsSuiteBase {
           wac.balances(Waves).tradable shouldBe (4_949_950d - 0.003 * 2 - 1) // two orders + issue fee 1.waves
         }
         wobcs.foreach { wobc =>
-        println(wobc)
           wobc.asks.isEmpty shouldBe true
           wobc.bids.isEmpty shouldBe true
           wobc.lastTrade.value shouldBe WsLastTrade(20.0, 50.0, OrderType.SELL)

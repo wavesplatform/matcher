@@ -1,24 +1,19 @@
 package com.wavesplatform.dex.api.ws.state
 
 import akka.actor.typed.ActorRef
-import cats.syntax.monoid._
-import cats.instances.map._
 import cats.syntax.option._
 import com.wavesplatform.dex.api.ws.entities.{WsLastTrade, WsOrderBookSettings}
 import com.wavesplatform.dex.api.ws.protocol
 import com.wavesplatform.dex.api.ws.protocol.WsOrderBookChanges
-import com.wavesplatform.dex.api.ws.protocol.WsOrderBookChanges.WsSide
 import com.wavesplatform.dex.api.ws.state.WsAddressState.getNextUpdateId
 import com.wavesplatform.dex.api.ws.state.WsOrderBookState._
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.model.Denormalization.{denormalizeAmountAndFee, denormalizePrice}
 import com.wavesplatform.dex.domain.model.{Amount, Price}
-import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.model.{LastTrade, LevelAmounts, OrderBook}
 import monocle.macros.GenLens
 
 import scala.collection.immutable.TreeMap
-import scala.util.chaining._
 
 case class WsOrderBookState(
   wsConnections: Map[ActorRef[WsOrderBookChanges], Long],
@@ -27,7 +22,7 @@ case class WsOrderBookState(
   lastTrade: Option[LastTrade],
   changedTickSize: Option[Double],
   prevTickState: WsState
-) extends ScorexLogging {
+) {
 
   def addSubscription(x: ActorRef[WsOrderBookChanges]): WsOrderBookState = copy(wsConnections = wsConnections.updated(x, 0L))
 
@@ -94,16 +89,12 @@ case class WsOrderBookState(
   def updateTickState(asks: Map[Price, Amount], bids: Map[Price, Amount]): WsState = updateTickState(asks, bids, lastTrade, changedTickSize)
 
   def updateTickState(asks: Map[Price, Amount], bids: Map[Price, Amount], lt: Option[LastTrade], lc: Option[Double]): WsState =
-    prevTickState.tap { v =>
-      log.info(s"PrevTick is $v; asks $asks bids $bids")
-    }.copy(
+    prevTickState.copy(
       asks = plusMaps(prevTickState.asks, asks),
       bids = plusMaps(prevTickState.bids, bids),
       lastTrade = if (lt.isEmpty) prevTickState.lastTrade else lt,
       tickSize = if (lc.isEmpty) prevTickState.tickSize else lc
-    ).tap { v =>
-      log.info(s"PrevTick is $v")
-    }
+    )
 
   def plusMaps(m1: TreeMap[Price, Amount], m2: Map[Price, Amount]): TreeMap[Price, Amount] = (m1 ++ m2.map {
     case (pr, am) =>

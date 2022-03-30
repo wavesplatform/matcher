@@ -173,7 +173,6 @@ class OrderBookActor(
 
   private def process(timestamp: Long, result: OrderBookUpdates): Unit = {
     orderBook = result.orderBook
-    log.info(s"Result is ${result.levelChanges}")
     aggregatedRef ! AggregatedOrderBookActor.Command.ApplyChanges(result.levelChanges, result.lastTrade, None, timestamp)
     processEvents(timestamp, result.events.toList)
   }

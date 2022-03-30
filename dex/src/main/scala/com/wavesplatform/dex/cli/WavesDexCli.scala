@@ -79,14 +79,15 @@ object WavesDexCli extends ScoptImplicits {
     } yield {
       implicit val actorSystem = ActorSystem()
       withAsyncLevelDb(dataDirectory, actorSystem) { levelDb =>
-        val orderDb = {
-          implicit val ec = scala.concurrent.ExecutionContext.Implicits.global
-          OrderDb.levelDb(OrderDb.Settings(100), levelDb)
-        }
+        implicit val ec = scala.concurrent.ExecutionContext.Implicits.global
+        val orderDb = OrderDb.levelDb(OrderDb.Settings(100), levelDb)
 
         println("Collecting order ids...")
         val orders = Await.result(orderDb.iterateOrderIds(10), Duration.Inf)
-        println(s"orders=$orders")
+        println(s"orders=${orders.map(_.base58)}")
+
+        val statuses = Await.result(Future.sequence(orders.map(orderDb.status)), Duration.Inf)
+        println(s"statuses=$statuses")
       }
       actorSystem.terminate()
     }

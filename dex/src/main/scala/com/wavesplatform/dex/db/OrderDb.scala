@@ -103,7 +103,7 @@ object OrderDb {
         val ab = Shorts.toByteArray(2)
         iterator.seek(ab)
         while (iterator.hasNext && iterator.peekNext().getKey.startsWith(ab) && seq.knownSize < n)
-          seq.addOne(iterator.next().getKey.drop(2))
+          seq.addOne(ByteStr(iterator.next().getKey.drop(2)))
       } finally iterator.close()
 
       seq.result()

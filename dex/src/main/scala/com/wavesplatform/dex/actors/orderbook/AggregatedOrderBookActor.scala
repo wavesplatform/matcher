@@ -6,6 +6,7 @@ import akka.actor.typed.{ActorRef, Behavior, Terminated}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
 import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.State._
 import com.wavesplatform.dex.api.http.entities.HttpOrderBook
+import com.wavesplatform.dex.api.ws.protocol.WsOrderBookChanges.asksOrdering
 import com.wavesplatform.dex.api.ws.protocol.{WsError, WsOrderBookChanges, WsServerMessage}
 import com.wavesplatform.dex.api.ws.state.WsOrderBookState
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -96,6 +97,7 @@ object AggregatedOrderBookActor {
 
             case Command.ApplyChanges(levelChanges, lastTrade, tickSize, ts) =>
               default {
+                context.log.info(s"last trade $lastTrade, $levelChanges")
                 state
                   .flushed(levelChanges, lastTrade, ts)
                   .modifyWs(_.accumulateChanges(levelChanges, lastTrade, tickSize))
@@ -103,15 +105,16 @@ object AggregatedOrderBookActor {
               }
 
             case Command.AddWsSubscription(client) =>
-              val ob = state.toOrderBookAggregatedSnapshot
+              val asks = state.ws.prevTickState.asks.map(toLevelAgg).toSeq
+              val bids = state.ws.prevTickState.bids.map(toLevelAgg).toSeq
 
               client ! WsOrderBookChanges.from(
                 assetPair = assetPair,
                 amountDecimals = amountDecimals,
                 priceDecimals = priceDecimals,
-                asks = ob.asks,
-                bids = ob.bids,
-                lt = state.lastTrade,
+                asks = asks,
+                bids = bids,
+                lt = state.ws.prevTickState.lastTrade,
                 updateId = 0L,
                 restrictions = restrictions,
                 tickSize = tickSize
@@ -238,7 +241,7 @@ object AggregatedOrderBookActor {
         lastTrade = None,
         lastUpdateTs = 0,
         compiledHttpView = Map.empty,
-        ws = WsOrderBookState(Map.empty, Set.empty, Set.empty, lastTrade = None, changedTickSize = None),
+        ws = WsOrderBookState.empty,
         wsSendSchedule = Cancellable.alreadyCancelled
       )
 
@@ -246,14 +249,32 @@ object AggregatedOrderBookActor {
     val compiledHttpViewLens = genLens(_.compiledHttpView)
     val wsLens = genLens(_.ws)
 
-    def fromOrderBook(ob: OrderBook): State = State(
+    def apply(
+      asks: TreeMap[Price, Amount],
+      bids: TreeMap[Price, Amount],
+      lastTrade: Option[LastTrade],
+      lastUpdateTs: Long,
+      compiledHttpView: Map[(DecimalsFormat, Depth), HttpResponse],
+      wsSendSchedule: Cancellable,
+      tickSize: Double
+    ): State = State(
+      asks = asks, // ++ to preserve an order
+      bids = bids,
+      lastTrade = lastTrade,
+      lastUpdateTs = lastUpdateTs, // DEX-642
+      compiledHttpView = compiledHttpView,
+      ws = WsOrderBookState.withPrevTickState(asks, bids, lastTrade, Some(tickSize)),
+      wsSendSchedule = wsSendSchedule
+    )
+
+    def fromOrderBook(ob: OrderBook, tickSize: Double): State = State(
       asks = empty.asks ++ aggregateByPrice(ob.asks), // ++ to preserve an order
       bids = empty.bids ++ aggregateByPrice(ob.bids),
       lastTrade = ob.lastTrade,
       lastUpdateTs = System.currentTimeMillis(), // DEX-642
       compiledHttpView = Map.empty,
-      ws = empty.ws,
-      wsSendSchedule = Cancellable.alreadyCancelled
+      wsSendSchedule = Cancellable.alreadyCancelled,
+      tickSize
     )
 
   }

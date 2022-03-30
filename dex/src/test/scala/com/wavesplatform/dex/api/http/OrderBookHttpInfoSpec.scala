@@ -149,7 +149,7 @@ object OrderBookHttpInfoSpec {
         None,
         DenormalizedMatchingRule.DefaultTickSize.toDouble,
         Time.zero,
-        AggregatedOrderBookActor.State.fromOrderBook(OrderBook.empty)
+        AggregatedOrderBookActor.State.fromOrderBook(OrderBook.empty, DenormalizedMatchingRule.DefaultTickSize.toDouble)
       ),
       "aggregated"
     )

@@ -105,17 +105,19 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
         val buffer0 = wsc.receiveAtLeastN[WsOrderBookChanges](1)
 
         buffer0 should have size 1
-        buffer0.squashed.values.head should matchTo(
-          protocol.WsOrderBookChanges(
-            assetPair = ethWavesPair,
-            asks = TreeMap(199d -> 1d),
-            bids = TreeMap.empty,
-            lastTrade = None,
-            updateId = 0,
-            timestamp = buffer0.last.timestamp,
-            settings = WsOrderBookSettings(None, 0.0002.some).some
+        withClue(s"$buffer0") {
+          buffer0.squashed.values.head should matchTo(
+            protocol.WsOrderBookChanges(
+              assetPair = ethWavesPair,
+              asks = TreeMap(199d -> 1d),
+              bids = TreeMap.empty,
+              lastTrade = None,
+              updateId = 0,
+              timestamp = buffer0.last.timestamp,
+              settings = WsOrderBookSettings(None, 0.0002.some).some
+            )
           )
-        )
+        }
 
         wsc.clearMessages()
         placeAndAwaitAtDex(mkOrderDP(alice, ethWavesPair, SELL, 1.eth, 200))
@@ -154,17 +156,19 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
         wsc.receiveAtLeastN[WsOrderBookChanges](1)
       }
       buffer0 should have size 1
-      buffer0.squashed.values.head should matchTo(
-        protocol.WsOrderBookChanges(
-          assetPair = wavesBtcPair,
-          asks = TreeMap.empty,
-          bids = TreeMap.empty,
-          lastTrade = None,
-          updateId = 0,
-          timestamp = buffer0.last.timestamp,
-          settings = orderBookSettings
+      withClue(s"buff $buffer0") {
+        buffer0.squashed.values.head should matchTo(
+          protocol.WsOrderBookChanges(
+            assetPair = wavesBtcPair,
+            asks = TreeMap.empty,
+            bids = TreeMap.empty,
+            lastTrade = None,
+            updateId = 0,
+            timestamp = buffer0.last.timestamp,
+            settings = orderBookSettings
+          )
         )
-      )
+      }
       placeAndAwaitAtDex(mkOrderDP(carol, wavesBtcPair, BUY, 1.05.waves, 0.00011403))
 
       markup("One order")

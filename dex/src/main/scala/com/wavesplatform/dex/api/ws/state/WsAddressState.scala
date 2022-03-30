@@ -10,6 +10,7 @@ import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.model.Denormalization._
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.model.{AcceptedOrder, OrderStatus}
 
@@ -23,7 +24,7 @@ final case class WsAddressState(
   removedNotObservedTxs: Set[ExchangeTransaction.Id],
   addedNotCreatedTxs: Map[ExchangeTransaction.Id, Seq[Order.Id]],
   removedNotCreatedTxs: Set[ExchangeTransaction.Id]
-) { // TODO Probably use an ordered Map and pass it to WsAddressChanges
+) extends ScorexLogging { // TODO Probably use an ordered Map and pass it to WsAddressChanges
 
   val hasActiveSubscriptions: Boolean = activeSubscription.nonEmpty
   val hasChanges: Boolean = changedAssets.nonEmpty || ordersChanges.nonEmpty
@@ -45,7 +46,7 @@ final case class WsAddressState(
     val (maybeNotObservedTxsData, maybeNotCreatedTxsData) =
       mkImaginaryTxsData(notObservedTxs, Set.empty, notCreatedTxs, Set.empty, flags)
     subscriber ! WsAddressChanges(address, balances, orders, maybeNotObservedTxsData, maybeNotCreatedTxsData, 0, isDebug = isDebug)
-    copy(activeSubscription = activeSubscription.updated(subscriber, Subscription(0, flags)))
+    copy(activeSubscription = activeSubscription.updated(subscriber, Subscription(0, flags)), previousBalanceChanges = assetInfo.map(v => (v._1, v._2.balances)))
   }
 
   def removeSubscription(subscriber: ActorRef[WsAddressChanges]): WsAddressState = {
@@ -161,7 +162,11 @@ final case class WsAddressState(
     (mkMaybeWsTxsData(notObservedTxs, removedNotObservedTxs), mkMaybeWsTxsData(notCreatedTxs, removedNotCreatedTxs))
   }
 
-  private def sameAsInPrevious(asset: Asset, wsBalances: WsBalances): Boolean = previousBalanceChanges.get(asset).contains(wsBalances)
+  private def sameAsInPrevious(asset: Asset, wsBalances: WsBalances): Boolean = {
+    val a = previousBalanceChanges.get(asset)
+    log.info(s"balance $wsBalances in $a")
+    a.contains(wsBalances)
+  }
 
   private def mkBalancesMap(assetInfo: Map[Asset, WsAssetInfo]): Map[Asset, WsBalances] = assetInfo.map { case (asset, info) =>
     (asset, info.balances)

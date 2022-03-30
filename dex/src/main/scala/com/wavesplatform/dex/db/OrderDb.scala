@@ -2,6 +2,7 @@ package com.wavesplatform.dex.db
 
 import cats.Functor
 import cats.syntax.functor._
+import com.google.common.primitives.Shorts
 import com.wavesplatform.dex.db.leveldb.LevelDb
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -97,7 +98,14 @@ object OrderDb {
 
     override def iterateOrderIds(n: Int): F[Seq[Id]] = levelDb.readOnly { ro =>
       val seq = Seq.newBuilder[Id]
-      ro.iterateOver(2)(entry => seq.addOne(entry.getKey.drop(2)))
+      val iterator = ro.iterator
+      try {
+        val ab = Shorts.toByteArray(2)
+        iterator.seek(ab)
+        while (iterator.hasNext && iterator.peekNext().getKey.startsWith(ab) && seq.knownSize < n)
+          seq.addOne(iterator.next().getKey.drop(2))
+      } finally iterator.close()
+
       seq.result()
     }
 

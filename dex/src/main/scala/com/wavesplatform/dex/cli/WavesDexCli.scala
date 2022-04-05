@@ -84,7 +84,7 @@ object WavesDexCli extends ScoptImplicits {
         val orderDb = OrderDb.levelDb(OrderDb.Settings(100), levelDb)
 
         println("Collecting order ids...")
-        val orders = scala.util.Random.shuffle(Await.result(orderDb.iterateOrderIds(10 * 1000), Duration.Inf))
+        val orders = scala.util.Random.shuffle(Await.result(orderDb.iterateOrderIds(100 * 1000), Duration.Inf))
         println(s"orders size ${orders.size}")
 
         if (flag.contains("true")) {

@@ -19,7 +19,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.error.Implicits.ThrowableOps
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
-import com.wavesplatform.dex.model.OrderBookSideSnapshot
+import com.wavesplatform.dex.model.{OrderBookSideSnapshot, OrderStatus}
 import com.wavesplatform.dex.settings.{loadMatcherSettings, MatcherSettings}
 import com.wavesplatform.dex.tool._
 import com.wavesplatform.dex.tool.connectors.SuperConnector
@@ -76,6 +76,7 @@ object WavesDexCli extends ScoptImplicits {
            |""".stripMargin
       )
       dataDirectory = readFromStdIn("Enter data directory:")
+      flag = readFromStdIn("Enter flag")
     } yield {
       implicit val actorSystem = ActorSystem()
       withAsyncLevelDb(dataDirectory, actorSystem) { levelDb =>
@@ -83,11 +84,18 @@ object WavesDexCli extends ScoptImplicits {
         val orderDb = OrderDb.levelDb(OrderDb.Settings(100), levelDb)
 
         println("Collecting order ids...")
-        val orders = Await.result(orderDb.iterateOrderIds(10), Duration.Inf)
-        println(s"orders=${orders.map(_.base58)}")
+        val orders = scala.util.Random.shuffle(Await.result(orderDb.iterateOrderIds(10 * 1000), Duration.Inf))
+        println(s"orders size ${orders.size}")
 
-        val statuses = Await.result(Future.sequence(orders.map(orderDb.status)), Duration.Inf)
-        println(s"statuses=$statuses")
+        if (flag.contains("true")) {
+          println(s"requesting order statuses")
+          Future.sequence(orders.init.map(orderDb.status)).map(_ => ())
+        }
+
+        val t1 = System.currentTimeMillis()
+        Await.result(orderDb.status(orders.last), Duration.Inf)
+        val t2 = System.currentTimeMillis()
+        println("time=" + (t2 - t1))
       }
       actorSystem.terminate()
     }

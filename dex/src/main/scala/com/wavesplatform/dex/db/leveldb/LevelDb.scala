@@ -1,7 +1,6 @@
 package com.wavesplatform.dex.db.leveldb
 
 import cats.Id
-import com.google.common.primitives.Shorts
 import org.iq80.leveldb.DB
 
 import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
@@ -23,8 +22,6 @@ trait LevelDb[F[_]] {
   def put[A](key: Key[A], value: A): F[Unit]
   def delete[A](key: Key[A]): F[Unit]
   def has(key: Key[_]): F[Boolean]
-  def iterateOver(prefix: Short)(f: DBEntry => Unit): F[Unit] = iterateOver(Shorts.toByteArray(prefix))(f)
-  def iterateOver(prefix: Array[Byte])(f: DBEntry => Unit): F[Unit]
 }
 
 object LevelDb {
@@ -66,9 +63,6 @@ object LevelDb {
     override def has(key: Key[_]): Future[Boolean] =
       Future(readLock(db.has(key)))
 
-    override def iterateOver(prefix: Array[Byte])(f: DBEntry => Unit): Future[Unit] =
-      Future(readLock(db.iterateOver(prefix)(f)))
-
   }
 
   def sync(db: DB): LevelDb[Id] = new LevelDb[Id] {
@@ -78,7 +72,6 @@ object LevelDb {
     override def put[A](key: Key[A], value: A): Unit = db.put(key.keyBytes, key.encode(value))
     override def delete[A](key: Key[A]): Unit = db.delete(key.keyBytes)
     override def has(key: Key[_]): Boolean = db.has(key)
-    override def iterateOver(prefix: Array[Byte])(f: DBEntry => Unit): Unit = db.iterateOver(prefix)(f)
   }
 
 }

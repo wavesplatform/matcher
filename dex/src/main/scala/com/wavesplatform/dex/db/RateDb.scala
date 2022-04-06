@@ -19,7 +19,7 @@ object RateDb {
 
   def apply[F[_]](levelDb: LevelDb[F]): RateDb[F] = new RateDb[F] {
 
-    def upsertRate(asset: IssuedAsset, value: Double): F[Unit] = levelDb.readWrite(_.put(DbKeys.rate(asset), value))
+    def upsertRate(asset: IssuedAsset, value: Double): F[Unit] = levelDb.put(DbKeys.rate(asset), value)
 
     def getAllRates: F[Map[IssuedAsset, Double]] =
       levelDb.readOnly { ro =>
@@ -32,7 +32,7 @@ object RateDb {
         ratesListBuffer.toMap
       }
 
-    def deleteRate(asset: IssuedAsset): F[Unit] = levelDb.readWrite(_.delete(DbKeys.rate(asset)))
+    def deleteRate(asset: IssuedAsset): F[Unit] = levelDb.delete(DbKeys.rate(asset))
   }
 
 }

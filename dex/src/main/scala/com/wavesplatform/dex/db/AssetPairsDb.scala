@@ -13,8 +13,8 @@ object AssetPairsDb {
 
   def levelDb[F[_]](levelDb: LevelDb[F]): AssetPairsDb[F] = new AssetPairsDb[F] {
 
-    def add(pair: AssetPair): F[Unit] = levelDb.readWrite(_.put(DbKeys.assetPair(pair), ()))
-    def remove(pair: AssetPair): F[Unit] = levelDb.readWrite(_.delete(DbKeys.assetPair(pair)))
+    def add(pair: AssetPair): F[Unit] = levelDb.put(DbKeys.assetPair(pair), ())
+    def remove(pair: AssetPair): F[Unit] = levelDb.delete(DbKeys.assetPair(pair))
 
     def all(): F[Set[AssetPair]] = levelDb.readOnly { ro =>
       val r = Set.newBuilder[AssetPair]

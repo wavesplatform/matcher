@@ -2,6 +2,7 @@ package com.wavesplatform.dex.db
 
 import cats.Functor
 import cats.syntax.functor._
+import com.google.common.primitives.Shorts
 import com.wavesplatform.dex.db.leveldb.LevelDb
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -24,6 +25,7 @@ trait OrderDb[F[_]] {
   def getFinalizedOrders(owner: Address, maybePair: Option[AssetPair]): F[Seq[(Order.Id, OrderInfo[OrderStatus])]]
   def getOrderInfo(id: Order.Id): F[Option[FinalOrderInfo]]
   def transactionsByOrder(orderId: ByteStr): F[Seq[ExchangeTransaction]]
+  def iterateOrderIds(n: Int): F[Seq[Order.Id]]
 }
 
 object OrderDb {
@@ -91,6 +93,19 @@ object OrderDb {
         txId = ro.get(DbKeys.orderTxId(orderId, seqNr))
         tx <- ro.get(DbKeys.exchangeTransaction(txId))
       } yield tx
+    }
+
+    override def iterateOrderIds(n: Int): F[Seq[Id]] = levelDb.readOnly { ro =>
+      val seq = Seq.newBuilder[Id]
+      val iterator = ro.iterator
+      try {
+        val ab = Shorts.toByteArray(2)
+        iterator.seek(ab)
+        while (iterator.hasNext && iterator.peekNext().getKey.startsWith(ab) && seq.knownSize < n)
+          seq.addOne(ByteStr(iterator.next().getKey.drop(2)))
+      } finally iterator.close()
+
+      seq.result()
     }
 
   }

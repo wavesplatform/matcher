@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.cli
 
+import akka.actor.ActorSystem
 import cats.Id
 import cats.instances.either._
 import cats.syntax.either._
@@ -33,8 +34,8 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.util.concurrent.atomic.AtomicLong
 import java.util.{Base64, Scanner}
-import scala.concurrent.duration.{DurationInt, FiniteDuration}
-import scala.concurrent.{Await, TimeoutException}
+import scala.concurrent.duration.{Duration, DurationInt, FiniteDuration}
+import scala.concurrent.{Await, Future, TimeoutException}
 import scala.util.{Failure, Success, Try, Using}
 
 object WavesDexCli extends ScoptImplicits {
@@ -65,6 +66,39 @@ object WavesDexCli extends ScoptImplicits {
                |Base58 format: ${Base58.encode(accountSeed.publicKey.toAddress.bytes)}
                |""".stripMargin)
   }
+
+  // noinspection ScalaStyle
+  def levelDbTest(): Unit =
+    for {
+      _ <- cli.log(
+        s"""
+           |Level db test
+           |""".stripMargin
+      )
+      dataDirectory = readFromStdIn("Enter data directory:")
+      flag = readFromStdIn("Enter flag")
+    } yield {
+      implicit val actorSystem = ActorSystem()
+      withAsyncLevelDb(dataDirectory, actorSystem) { levelDb =>
+        implicit val ec = scala.concurrent.ExecutionContext.Implicits.global
+        val orderDb = OrderDb.levelDb(OrderDb.Settings(100), levelDb)
+
+        println("Collecting order ids...")
+        val orders = scala.util.Random.shuffle(Await.result(orderDb.iterateOrderIds(100 * 1000), Duration.Inf))
+        println(s"orders size ${orders.size}")
+
+        if (flag.contains("true")) {
+          println(s"requesting order statuses")
+          Future.sequence(orders.init.map(orderDb.status)).map(_ => ())
+        }
+
+        val t1 = System.currentTimeMillis()
+        Await.result(orderDb.status(orders.last), Duration.Inf)
+        val t2 = System.currentTimeMillis()
+        println("time=" + (t2 - t1))
+      }
+      actorSystem.terminate()
+    }
 
   // noinspection ScalaStyle
   def createAccountStorage(args: Args): Unit = {
@@ -451,6 +485,13 @@ object WavesDexCli extends ScoptImplicits {
       f(LevelDb.sync(db))
     }
 
+  def withAsyncLevelDb[T](dataDirectory: String, actorSystem: ActorSystem)(f: LevelDb[Future] => T): T =
+    Using.resource(openDb(dataDirectory)) { db =>
+      val stex = actorSystem.dispatchers.lookup("akka.actor.leveldb-single-thread-dispatcher")
+      val mtex = actorSystem.dispatchers.lookup("akka.actor.leveldb-dispatcher")
+      f(LevelDb.async(db, mtex, stex))
+    }
+
   // todo commands:
   // get account by seed [and nonce]
   def main(rawArgs: Array[String]): Unit = {
@@ -759,7 +800,10 @@ object WavesDexCli extends ScoptImplicits {
               .valueName("<long value>")
               .required()
               .action((x, s) => s.copy(minFeeInWaves = x))
-          )
+          ),
+        cmd(Command.LevelDbTest.name)
+          .action((_, s) => s.copy(command = Command.LevelDbTest.some))
+          .text("LevelDB Test")
       )
     }
 
@@ -807,6 +851,7 @@ object WavesDexCli extends ScoptImplicits {
               case Command.DeleteOrderBook => deleteOrderBook(args, matcherSettings)
               case Command.InspectOrder => inspectOrder(args, matcherSettings)
               case Command.GenerateFeeSettings => generateFeeSettings(args)
+              case Command.LevelDbTest => levelDbTest()
             }
             println("Done")
         }
@@ -881,6 +926,10 @@ object WavesDexCli extends ScoptImplicits {
 
     case object GenerateFeeSettings extends Command {
       override def name: String = "generate-fee-settings"
+    }
+
+    case object LevelDbTest extends Command {
+      override def name: String = "leveldb-test"
     }
 
   }
@@ -965,6 +1014,12 @@ object WavesDexCli extends ScoptImplicits {
       System.err.println("Please enter a non-empty password")
       readSecretFromStdIn(prompt)
     } else r
+  }
+
+  private def readFromStdIn(prompt: String): String = {
+    System.out.print(prompt)
+    val scanner = new Scanner(System.in, StandardCharsets.UTF_8.name())
+    if (scanner.hasNextLine) scanner.nextLine() else ""
   }
 
 }

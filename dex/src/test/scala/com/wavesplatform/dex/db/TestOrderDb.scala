@@ -58,6 +58,7 @@ class TestOrderDb[F[_]: Applicative] private (maxFinalizedOrders: Int) extends O
   override def transactionsByOrder(orderId: Id): F[Seq[ExchangeTransaction]] =
     synchronized(txsByOrder.getOrElse(orderId, Seq.empty)).pure[F]
 
+  override def iterateOrderIds(n: Int): F[Seq[Id]] = ???
 }
 
 object TestOrderDb {

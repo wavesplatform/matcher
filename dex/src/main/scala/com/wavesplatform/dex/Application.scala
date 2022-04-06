@@ -756,7 +756,7 @@ object Application {
     }
   }
 
-  private def loadApplicationConfig(external: Option[File]): (Config, MatcherSettings) = {
+  def loadApplicationConfig(external: Option[File]): (Config, MatcherSettings) = {
 
     import com.wavesplatform.dex.settings.loadConfig
     import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps

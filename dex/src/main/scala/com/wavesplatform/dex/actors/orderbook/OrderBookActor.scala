@@ -263,12 +263,7 @@ class OrderBookActor(
     snapshotStore ! OrderBookSnapshotStoreActor.Message.Update(assetPair, globalEventNr, toSave)
   }
 
-  maybeSnapshot match {
-    case Some(snapshot) =>
-      self ! OrderBookSnapshotStoreActor.Response.GetSnapshot(snapshot)
-    case None =>
-      snapshotStore ! OrderBookSnapshotStoreActor.Message.GetSnapshot(assetPair)
-  }
+  snapshotStore ! OrderBookSnapshotStoreActor.Message.GetSnapshot(assetPair)
 }
 
 object OrderBookActor {

@@ -1,25 +1,31 @@
 package com.wavesplatform.dex.cli
 
+import akka.actor.{ActorRef, ActorSystem, Props}
 import cats.Id
 import cats.instances.either._
 import cats.syntax.either._
 import cats.syntax.option._
 import com.typesafe.config.ConfigFactory.parseFile
-import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex._
-import com.wavesplatform.dex.app.{forceStopApplication, MatcherStateCheckingFailedError}
+import com.wavesplatform.dex.actors.OrderBookDirectoryActor
+import com.wavesplatform.dex.actors.orderbook.{AggregatedOrderBookActor, OrderBookActor, OrderBookSnapshotStoreActor}
+import com.wavesplatform.dex.app.{forceStopApplication, MatcherStateCheckingFailedError, RecoveryError}
+import com.wavesplatform.dex.caches.MatchingRulesCache
 import com.wavesplatform.dex.db._
 import com.wavesplatform.dex.db.leveldb.{openDb, LevelDb}
 import com.wavesplatform.dex.doc.MatcherErrorDoc
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair}
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
-import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
+import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.error.Implicits.ThrowableOps
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.OrderBookSideSnapshot
 import com.wavesplatform.dex.settings.{loadMatcherSettings, MatcherSettings}
+import com.wavesplatform.dex.time.NTP
 import com.wavesplatform.dex.tool._
 import com.wavesplatform.dex.tool.connectors.SuperConnector
 import monix.eval.Task
@@ -31,10 +37,10 @@ import sttp.client3._
 import java.io.{File, PrintWriter}
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
-import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.{AtomicLong, AtomicReference}
 import java.util.{Base64, Scanner}
-import scala.concurrent.duration.{DurationInt, FiniteDuration}
-import scala.concurrent.{Await, TimeoutException}
+import scala.concurrent.duration.{Duration, DurationInt, FiniteDuration}
+import scala.concurrent.{Await, Future, Promise, TimeoutException}
 import scala.util.{Failure, Success, Try, Using}
 
 object WavesDexCli extends ScoptImplicits {
@@ -410,36 +416,92 @@ object WavesDexCli extends ScoptImplicits {
       println(orderInfo.fold("  not found")(_.toString))
     }
 
-  // noinspection ScalaStyle
-  def generateFeeSettings(args: Args): Unit = {
-    val pairs = for {
-      aa <- args.amountAssets
-      pa <- args.priceAssets
-    } yield s"$aa-$pa"
+  def testSnapshots(): Unit = {
+    import akka.actor.typed.scaladsl.adapter._
 
-    val config = pairs.foldLeft(ConfigFactory.empty()) { (cfg, pair) =>
-      cfg.withFallback(ConfigFactory.parseString(
+    val actorSystem = ActorSystem()
+    val (_, ms) = Application.loadApplicationConfig(None)
+    for {
+      _ <- cli.log(
         s"""
-           |$pair: {
-           |  mode = percent
-           |  percent {
-           |    asset-type = spending
-           |    min-fee = ${args.minFee}
-           |    min-fee-in-waves = ${args.minFeeInWaves}
-           |  }
-           |}
+           |Running testSnapshots:
            |""".stripMargin
-      ))
+      )
+      dataDirectory = readFromStdIn("dataDirectory ")
+      _ = readFromStdIn("Pause ")
+    } yield withAsyncLevelDb(dataDirectory, actorSystem) { originalDb =>
+      import scala.concurrent.ExecutionContext.Implicits.global
+
+      val typedActorSystem = actorSystem.toTyped
+
+      val snapshotsDb = OrderBookSnapshotDb.levelDb(originalDb)
+      val assetPairsDb = AssetPairsDb.levelDb(originalDb)
+      val assetsDb = AssetsDb.levelDb(originalDb)
+      val assetsCache = AssetsCache.from(assetsDb)
+      val snapshotsRestored = Promise[Long]()
+      val orderBooks = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
+
+      val orderBookSnapshotStoreRef: ActorRef = actorSystem.actorOf(
+        OrderBookSnapshotStoreActor.props(snapshotsDb),
+        "order-book-snapshot-store"
+      )
+
+      val matchingRulesCache = new MatchingRulesCache(ms)
+      val time = new NTP("pool.ntp.org")
+
+      implicit val errorContext: ErrorFormatterContext =
+        ErrorFormatterContext.fromOptional(assetsCache.cached.get(_: Asset).map(_.decimals))
+
+      def mkOrderBookProps(
+        assetPair: AssetPair,
+        maybeSnapshot: Option[OrderBookActor.Snapshot],
+        orderBookDirectoryActor: ActorRef
+      ): Props = {
+        val amountAssetDecimals = errorContext.unsafeAssetDecimals(assetPair.amountAsset)
+        val priceAssetDecimals = errorContext.unsafeAssetDecimals(assetPair.priceAsset)
+
+        OrderBookActor.props(
+          OrderBookActor.Settings(AggregatedOrderBookActor.Settings(10.seconds)),
+          orderBookDirectoryActor,
+          typedActorSystem.ignoreRef,
+          orderBookSnapshotStoreRef,
+          typedActorSystem.ignoreRef,
+          assetPair,
+          maybeSnapshot,
+          time,
+          matchingRules = matchingRulesCache.getMatchingRules(assetPair, amountAssetDecimals, priceAssetDecimals),
+          updateCurrentMatchingRules = _ => (),
+          normalizeMatchingRule = denormalizedMatchingRule => denormalizedMatchingRule.normalize(amountAssetDecimals, priceAssetDecimals),
+          getMakerTakerFeeByOffset = _ => (_, _) => (1L, 1L),
+          getOrderExecutedTs = _ => (_, _) => 1L,
+          restrictions = None
+        )
+      }
+
+      val props =
+        OrderBookDirectoryActor.props(
+          ms,
+          assetPairsDb,
+          snapshotsDb,
+          {
+            case Right(startOffset) => snapshotsRestored.success(startOffset)
+            case Left(msg) => snapshotsRestored.failure(RecoveryError(msg))
+          },
+          orderBooks,
+          mkOrderBookProps,
+          assetsCache,
+          x => Right(x)
+        )
+
+      actorSystem.actorOf(props)
+
+      val t1 = System.currentTimeMillis()
+      println(">>started")
+      val res = Await.result(snapshotsRestored.future, Duration.Inf)
+      val t2 = System.currentTimeMillis()
+      println(s">>finished: $res ||| ${t2 - t1}")
+      actorSystem.terminate()
     }
-
-    val options = ConfigRenderOptions
-      .defaults()
-      .setComments(false)
-      .setOriginComments(false)
-      .setFormatted(true)
-      .setJson(false)
-
-    print(config.root().render(options))
   }
 
   private def snapshotToStr(snapshot: OrderBookSideSnapshot): String =
@@ -449,6 +511,12 @@ object WavesDexCli extends ScoptImplicits {
   def withLevelDb[T](dataDirectory: String)(f: LevelDb[Id] => T): T =
     Using.resource(openDb(dataDirectory)) { db =>
       f(LevelDb.sync(db))
+    }
+
+  def withAsyncLevelDb[T](dataDirectory: String, actorSystem: ActorSystem)(f: LevelDb[Future] => T): T =
+    Using.resource(openDb(dataDirectory)) { db =>
+      val levelDbEc = actorSystem.dispatchers.lookup("akka.actor.leveldb-dispatcher")
+      f(LevelDb.async(db)(levelDbEc))
     }
 
   // todo commands:
@@ -739,27 +807,9 @@ object WavesDexCli extends ScoptImplicits {
               .required()
               .action((x, s) => s.copy(orderId = x))
           ),
-        cmd(Command.GenerateFeeSettings.name)
-          .action((_, s) => s.copy(command = Command.GenerateFeeSettings.some))
-          .text("Generate fee settings")
-          .children(
-            opt[Seq[String]]("amount-assets")
-              .valueName("<list of base58-encoded asset ids>")
-              .required()
-              .action((x, s) => s.copy(amountAssets = x)),
-            opt[Seq[String]]("price-assets")
-              .valueName("<list of base58-encoded asset ids>")
-              .required()
-              .action((x, s) => s.copy(priceAssets = x)),
-            opt[Double]("min-fee")
-              .valueName("<double value>")
-              .required()
-              .action((x, s) => s.copy(minFee = x)),
-            opt[Long]("min-fee-in-waves")
-              .valueName("<long value>")
-              .required()
-              .action((x, s) => s.copy(minFeeInWaves = x))
-          )
+        cmd(Command.TestSnapshots.name)
+          .action((_, s) => s.copy(command = Command.TestSnapshots.some))
+          .text("Test snapshots")
       )
     }
 
@@ -806,7 +856,7 @@ object WavesDexCli extends ScoptImplicits {
               case Command.InspectOrderBook => inspectOrderBook(args, matcherSettings)
               case Command.DeleteOrderBook => deleteOrderBook(args, matcherSettings)
               case Command.InspectOrder => inspectOrder(args, matcherSettings)
-              case Command.GenerateFeeSettings => generateFeeSettings(args)
+              case Command.TestSnapshots => testSnapshots()
             }
             println("Done")
         }
@@ -879,8 +929,8 @@ object WavesDexCli extends ScoptImplicits {
       override def name: String = "inspect-order"
     }
 
-    case object GenerateFeeSettings extends Command {
-      override def name: String = "generate-fee-settings"
+    case object TestSnapshots extends Command {
+      override def name: String = "test-snapshots"
     }
 
   }
@@ -924,11 +974,7 @@ object WavesDexCli extends ScoptImplicits {
     orderId: String = "",
     authServiceRestApi: Option[String] = None,
     accountSeed: Option[String] = None,
-    timeout: FiniteDuration = 0 seconds,
-    amountAssets: Seq[String] = Seq.empty,
-    priceAssets: Seq[String] = Seq.empty,
-    minFee: Double = 0.01,
-    minFeeInWaves: Long = 1000000
+    timeout: FiniteDuration = 0 seconds
   )
 
   // noinspection ScalaStyle
@@ -965,6 +1011,12 @@ object WavesDexCli extends ScoptImplicits {
       System.err.println("Please enter a non-empty password")
       readSecretFromStdIn(prompt)
     } else r
+  }
+
+  private def readFromStdIn(prompt: String): String = {
+    System.out.print(prompt)
+    val scanner = new Scanner(System.in, StandardCharsets.UTF_8.name())
+    if (scanner.hasNextLine) scanner.nextLine() else ""
   }
 
 }

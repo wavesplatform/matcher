@@ -516,7 +516,7 @@ object WavesDexCli extends ScoptImplicits {
   def withAsyncLevelDb[T](dataDirectory: String, actorSystem: ActorSystem)(f: LevelDb[Future] => T): T =
     Using.resource(openDb(dataDirectory)) { db =>
       val levelDbEc = actorSystem.dispatchers.lookup("akka.actor.leveldb-dispatcher")
-      f(LevelDb.async(db))
+      f(LevelDb.async(db)(levelDbEc))
     }
 
   // todo commands:

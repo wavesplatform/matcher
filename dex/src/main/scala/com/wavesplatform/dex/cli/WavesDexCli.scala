@@ -806,7 +806,10 @@ object WavesDexCli extends ScoptImplicits {
               .valueName("<order-id-in-base58>")
               .required()
               .action((x, s) => s.copy(orderId = x))
-          )
+          ),
+        cmd(Command.TestSnapshots.name)
+          .action((_, s) => s.copy(command = Command.TestSnapshots.some))
+          .text("Test snapshots")
       )
     }
 

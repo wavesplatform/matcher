@@ -24,7 +24,7 @@ trait WithDb extends BeforeAndAfterEach { this: Suite =>
   private var currentDBInstance: DB = _
 
   def db: DB = currentDBInstance
-  def asyncLevelDb: LevelDb[Future] = LevelDb.async(db)
+  def asyncLevelDb: LevelDb[Future] = LevelDb.async(db, ec, ec)
 
   protected val ignoreSpendableBalanceChanged: Subject[(Address, Asset), (Address, Asset)] = Subject.empty
 

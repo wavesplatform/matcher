@@ -3,7 +3,6 @@ package com.wavesplatform.dex.db.leveldb
 import cats.Id
 import org.iq80.leveldb.DB
 
-import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
 import scala.concurrent.{ExecutionContext, Future}
 
 /**
@@ -26,42 +25,31 @@ trait LevelDb[F[_]] {
 
 object LevelDb {
 
-  def async(db: DB)(implicit ec: ExecutionContext): LevelDb[Future] = new LevelDb[Future] {
-
-    private val lock = new ReentrantReadWriteLock()
-
-    private def inLock[A](l: Lock, f: => A): A = {
-      l.lockInterruptibly()
-      try f
-      finally l.unlock()
-    }
-
-    private def writeLock[A](f: => A): A = inLock(lock.writeLock(), f)
-    private def readLock[A](f: => A): A = inLock(lock.readLock(), f)
+  def async(db: DB, writeEc: ExecutionContext, readEc: ExecutionContext): LevelDb[Future] = new LevelDb[Future] {
 
     /**
      * Do not chain with map/flatMap/etc. See above
      */
     override def readOnly[A](f: ReadOnlyDb => A): Future[A] =
-      Future(readLock(db.readOnly(f)))
+      Future(db.readOnly(f))(readEc)
 
     /**
      * Do not chain with map/flatMap/etc. See above
      */
     override def readWrite[A](f: ReadWriteDb => A): Future[A] =
-      Future(writeLock(db.readWrite(f)))
+      Future(db.readWrite(f))(writeEc)
 
     override def get[A](key: Key[A]): Future[A] =
-      Future(readLock(db.get(key)))
+      Future(db.get(key))(readEc)
 
     override def put[A](key: Key[A], value: A): Future[Unit] =
-      Future(writeLock(db.put(key.keyBytes, key.encode(value))))
+      Future(db.put(key.keyBytes, key.encode(value)))(writeEc)
 
     override def delete[A](key: Key[A]): Future[Unit] =
-      Future(writeLock(db.delete(key.keyBytes)))
+      Future(db.delete(key.keyBytes))(writeEc)
 
     override def has(key: Key[_]): Future[Boolean] =
-      Future(readLock(db.has(key)))
+      Future(db.has(key))(readEc)
 
   }
 

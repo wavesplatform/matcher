@@ -28,7 +28,7 @@ object LevelDb {
 
   def async(db: DB)(implicit ec: ExecutionContext): LevelDb[Future] = new LevelDb[Future] {
 
-    private val lock = new ReentrantReadWriteLock(true)
+    private val lock = new ReentrantReadWriteLock()
 
     private def inLock[A](l: Lock, f: => A): A = {
       l.lockInterruptibly()

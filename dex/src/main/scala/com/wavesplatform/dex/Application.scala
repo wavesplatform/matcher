@@ -18,6 +18,7 @@ import cats.syntax.option._
 import cats.syntax.semigroupal._
 import cats.syntax.traverse._
 import ch.qos.logback.classic.LoggerContext
+import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.typesafe.config._
 import com.wavesplatform.dex.actors.ActorSystemOps.ImplicitOps
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
@@ -63,11 +64,11 @@ import pureconfig.ConfigSource
 
 import java.io.File
 import java.security.Security
-import java.util.concurrent.ThreadLocalRandom
+import java.util.concurrent.{Executors, ThreadLocalRandom}
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{blocking, Await, Future, Promise}
+import scala.concurrent.{blocking, Await, ExecutionContext, Future, Promise}
 import scala.jdk.CollectionConverters._
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
@@ -131,7 +132,10 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   private val matcherQueue: MatcherQueue = settings.eventsQueue.`type` match {
     case "local" =>
       log.info("Commands will be stored locally")
-      new LocalMatcherQueue(settings.eventsQueue.local, LocalQueueStore.levelDb(asyncLevelDb), time)
+      val stex = ExecutionContext.fromExecutor(
+        Executors.newSingleThreadExecutor(new ThreadFactoryBuilder().setDaemon(false).setNameFormat("local-queue-kafka-consumer-%d").build())
+      )
+      new LocalMatcherQueue(settings.eventsQueue.local, LocalQueueStore.levelDb(LevelDb.async(db)(stex)), time)
 
     case "kafka" =>
       log.info("Commands will be stored in Kafka")

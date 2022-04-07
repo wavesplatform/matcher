@@ -35,6 +35,12 @@ pipeline {
         NODE = "${NODE}"
         MATCHER = "${MATCHER}"
         AIM = "${AIM}"
+        HISTORY_PAIR = "${HISTORY_PAIR}"
+        STATUS = "${STATUS}"
+        TRADABLE = "${TRADABLE}"
+        PLACE = "${PLACE}"
+        HISTORY_PAIR_KEY = "${HISTORY_PAIR_KEY}"
+        CANCEL = "${CANCEL}"
     }
     stages {
         stage('Cleanup') {

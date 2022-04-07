@@ -15,6 +15,12 @@ pipeline {
         string(name: 'RT', defaultValue: '6', description: 'Generation type')
         string(name: 'AS', defaultValue: 'D', description: 'Chain ID')
         string(name: 'LABEL', defaultValue: '', description: 'Label')
+        string(name: 'HISTORY_PAIR', defaultValue: '0.65', description: 'distribution percentage')
+        string(name: 'STATUS', defaultValue: '0.15', description: 'distribution percentage')
+        string(name: 'TRADABLE', defaultValue: '0.101', description: 'distribution percentage')
+        string(name: 'PLACE', defaultValue: '0.33', description: 'distribution percentage')
+        string(name: 'HISTORY_PAIR_KEY', defaultValue: '0.33', description: 'distribution percentage')
+        string(name: 'CANCEL', defaultValue: '0.33', description: 'distribution percentage')
     }
     environment {
         SBT_HOME = tool name: 'sbt-1.2.6', type: 'org.jvnet.hudson.plugins.SbtPluginBuilder$SbtInstallation'

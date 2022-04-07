@@ -16,12 +16,12 @@ case class Defaults(
 case class Hosts(node: String, matcher: String, shooted: String)
 
 case class Distribution(
-  orderBookByPair: Double,
-  orderStatus: Double,
-  orderBookByPairAndKey: Double,
-  tradableBalance: Double,
-  placeOrder: Double,
-  cancelOrder: Double
+  orderBookByPair: Double = 0.65,
+  orderStatus: Double = 0.15,
+  orderBookByPairAndKey: Double = 0.33,
+  tradableBalance: Double = 0.101,
+  placeOrder: Double = 0.33,
+  cancelOrder: Double = 0.33
 )
 
 case class Settings(

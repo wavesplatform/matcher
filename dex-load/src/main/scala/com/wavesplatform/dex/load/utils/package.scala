@@ -57,7 +57,7 @@ package object utils {
   def waitForHeightArise(): Unit = {
     val toHeight = node.getHeight + 1
     print(s"\tWaiting for the next ($toHeight) block... ")
-    while (node.getHeight < toHeight) Thread.sleep(5000)
+    while (node.getHeight < toHeight) Thread.sleep(10000)
     println("Done")
   }
 

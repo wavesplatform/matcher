@@ -4,13 +4,13 @@ import cats.syntax.either._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus
 import com.wavesplatform.dex.domain.asset.Asset.Waves
-import com.wavesplatform.dex.domain.order.OrderType
+import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.error.AccountScriptReturnedError
 import com.wavesplatform.dex.it.test.Scripts
 import com.wavesplatform.dex.model.ExecutionParamsInProofs
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.transactions.common.Proof
-import com.wavesplatform.transactions.exchange
+import com.wavesplatform.transactions.{exchange, ExchangeTransaction}
 
 import scala.jdk.CollectionConverters._
 
@@ -28,9 +28,7 @@ final class OrderExecutedDataInProofsTestSuite extends MatcherSuiteBase {
 
       dex1.api.waitForOrderStatus(carolOrder, HttpOrderStatus.Status.Filled)
 
-      val txs = dex1.api.getTransactionsByOrderId(carolOrder)
-      txs.size shouldBe 1
-      val orders = txs.head.orders()
+      val orders = getTxByOrder(carolOrder).orders()
       orders.size() shouldBe 2
       orders.asScala.foreach(_.proofs().size() shouldBe 1)
 
@@ -44,9 +42,7 @@ final class OrderExecutedDataInProofsTestSuite extends MatcherSuiteBase {
       val aliceOrder1 = mkOrder(alice, wavesUsdnPair, OrderType.SELL, 4.3.waves, 2.usdn, version = orderVersion)
       dex1.api.place(aliceOrder1)
 
-      val txs1 = dex1.api.getTransactionsByOrderId(aliceOrder1)
-      txs1.size shouldBe 1
-      val orders1 = txs1.head.orders()
+      val orders1 = getTxByOrder(aliceOrder1).orders()
       orders1.size() shouldBe 2
       orders1.asScala.foreach(_.proofs().size() shouldBe 1)
 
@@ -60,9 +56,7 @@ final class OrderExecutedDataInProofsTestSuite extends MatcherSuiteBase {
       val aliceOrder2 = mkOrder(alice, wavesUsdnPair, OrderType.SELL, 0.7.waves, 1.3.usdn, version = orderVersion)
       dex1.api.place(aliceOrder2)
 
-      val txs2 = dex1.api.getTransactionsByOrderId(aliceOrder2)
-      txs2.size shouldBe 1
-      val orders2 = txs2.head.orders()
+      val orders2 = getTxByOrder(aliceOrder2).orders()
       orders2.size() shouldBe 2
       orders2.asScala.foreach(order => checkProofs(order.proofs.asScala.toList, 0.7.waves, 2.usdn))
     }
@@ -75,9 +69,7 @@ final class OrderExecutedDataInProofsTestSuite extends MatcherSuiteBase {
 
       dex1.api.waitForOrderStatus(carolOrder, HttpOrderStatus.Status.Filled)
 
-      val txs = dex1.api.getTransactionsByOrderId(carolOrder)
-      txs.size shouldBe 1
-      val orders = txs.head.orders()
+      val orders = getTxByOrder(carolOrder).orders()
       orders.size() shouldBe 2
       orders.asScala.foreach { order =>
         if (order.`type`() == exchange.OrderType.BUY) order.proofs().size() shouldBe 1
@@ -93,9 +85,7 @@ final class OrderExecutedDataInProofsTestSuite extends MatcherSuiteBase {
 
       dex1.api.waitForOrderStatus(bobOrder, HttpOrderStatus.Status.Filled)
 
-      val txs = dex1.api.getTransactionsByOrderId(bobOrder)
-      txs.size shouldBe 1
-      val orders = txs.head.orders()
+      val orders = getTxByOrder(bobOrder).orders()
       orders.size() shouldBe 2
       orders.asScala.foreach(order => checkProofs(order.proofs.asScala.toList, 5.waves, 2.usdn))
     }
@@ -112,6 +102,12 @@ final class OrderExecutedDataInProofsTestSuite extends MatcherSuiteBase {
       }
     }
 
+  }
+
+  private def getTxByOrder(order: Order): ExchangeTransaction = eventually {
+    val tx = dex1.api.getTransactionsByOrderId(order)
+    tx.size shouldBe 1
+    tx.head
   }
 
   protected val carol = mkKeyPair("carol")

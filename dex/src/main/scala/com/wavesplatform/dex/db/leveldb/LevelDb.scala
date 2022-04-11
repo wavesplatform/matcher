@@ -25,31 +25,31 @@ trait LevelDb[F[_]] {
 
 object LevelDb {
 
-  def async(db: DB, writeEc: ExecutionContext, readEc: ExecutionContext): LevelDb[Future] = new LevelDb[Future] {
+  def async(db: DB, mtex: ExecutionContext, stex: ExecutionContext): LevelDb[Future] = new LevelDb[Future] {
 
     /**
      * Do not chain with map/flatMap/etc. See above
      */
     override def readOnly[A](f: ReadOnlyDb => A): Future[A] =
-      Future(db.readOnly(f))(readEc)
+      Future(db.readOnly(f))(mtex)
 
     /**
      * Do not chain with map/flatMap/etc. See above
      */
     override def readWrite[A](f: ReadWriteDb => A): Future[A] =
-      Future(db.readWrite(f))(writeEc)
+      Future(db.readWrite(f))(stex)
 
     override def get[A](key: Key[A]): Future[A] =
-      Future(db.get(key))(readEc)
+      Future(db.get(key))(mtex)
 
     override def put[A](key: Key[A], value: A): Future[Unit] =
-      Future(db.put(key.keyBytes, key.encode(value)))(writeEc)
+      Future(db.put(key.keyBytes, key.encode(value)))(mtex)
 
     override def delete[A](key: Key[A]): Future[Unit] =
-      Future(db.delete(key.keyBytes))(writeEc)
+      Future(db.delete(key.keyBytes))(mtex)
 
     override def has(key: Key[_]): Future[Boolean] =
-      Future(db.has(key))(readEc)
+      Future(db.has(key))(mtex)
 
   }
 

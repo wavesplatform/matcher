@@ -104,7 +104,6 @@ case class WsOrderBookState(
   def take(xs: TreeMap[Price, Amount], levels: Set[Price], prevChanges: TreeMap[Price, Amount]): TreeMap[Price, Amount] = {
     // 1. Levels will be always smaller, than xs
     // 2. A level could gone from xs
-    //log.info(s"xs: $xs levels: $levels prev: $prevChanges")
     val r = TreeMap.newBuilder[Price, Amount](xs.ordering)
     levels.foreach { level =>
       xs.get(level).fold {

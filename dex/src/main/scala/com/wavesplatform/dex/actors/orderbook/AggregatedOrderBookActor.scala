@@ -256,7 +256,7 @@ object AggregatedOrderBookActor {
       wsSendSchedule: Cancellable,
       tickSize: Double
     ): State = State(
-      asks = asks, // ++ to preserve an order
+      asks = asks,
       bids = bids,
       lastTrade = lastTrade,
       lastUpdateTs = lastUpdateTs, // DEX-642

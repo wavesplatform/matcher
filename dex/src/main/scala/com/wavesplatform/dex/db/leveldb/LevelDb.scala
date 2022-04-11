@@ -43,10 +43,10 @@ object LevelDb {
       Future(db.get(key))(mtex)
 
     override def put[A](key: Key[A], value: A): Future[Unit] =
-      Future(db.put(key.keyBytes, key.encode(value)))(stex)
+      Future(db.put(key.keyBytes, key.encode(value)))(mtex)
 
     override def delete[A](key: Key[A]): Future[Unit] =
-      Future(db.delete(key.keyBytes))(stex)
+      Future(db.delete(key.keyBytes))(mtex)
 
     override def has(key: Key[_]): Future[Boolean] =
       Future(db.has(key))(mtex)

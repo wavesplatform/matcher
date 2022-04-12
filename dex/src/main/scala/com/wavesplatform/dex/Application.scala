@@ -76,7 +76,9 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
   private val monixScheduler = monix.execution.Scheduler.Implicits.global.withExecutionModel(ExecutionModel.AlwaysAsyncExecution)
   private val grpcEc = actorSystem.dispatchers.lookup("akka.actor.grpc-dispatcher")
-  private val levelDbEc = actorSystem.dispatchers.lookup("akka.actor.leveldb-dispatcher")
+  private val levelDbCommonEc = actorSystem.dispatchers.lookup("akka.actor.leveldb-common-dispatcher")
+  private val levelDbSnapshotsEc = actorSystem.dispatchers.lookup("akka.actor.leveldb-snapshots-dispatcher")
+  private val levelDbRatesEc = actorSystem.dispatchers.lookup("akka.actor.leveldb-rates-dispatcher")
 
   private val cs = CoordinatedShutdown(actorSystem)
 
@@ -113,17 +115,19 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   }
 
   private val db = openDb(settings.dataDirectory)
-  private val asyncLevelDb = LevelDb.async(db)(levelDbEc)
+  private val commonLevelDb = LevelDb.async(db)(levelDbCommonEc)
+  private val ratesLevelDb = LevelDb.async(db)(levelDbRatesEc)
+  private val snapshotsLevelDb = LevelDb.async(db)(levelDbSnapshotsEc)
 
   cs.addTask(CoordinatedShutdown.PhaseActorSystemTerminate, "DB") { () =>
     Future { blocking(db.close()); Done }
   }
 
-  private val assetPairsDb = AssetPairsDb.levelDb(asyncLevelDb)
-  private val orderBookSnapshotDb = OrderBookSnapshotDb.levelDb(asyncLevelDb)
-  private val orderDb = OrderDb.levelDb(settings.orderDb, asyncLevelDb)
+  private val assetPairsDb = AssetPairsDb.levelDb(commonLevelDb)
+  private val orderBookSnapshotDb = OrderBookSnapshotDb.levelDb(snapshotsLevelDb)
+  private val orderDb = OrderDb.levelDb(settings.orderDb, commonLevelDb)
 
-  private val assetsCache = AssetsCache.from(AssetsDb.levelDb(asyncLevelDb))
+  private val assetsCache = AssetsCache.from(AssetsDb.levelDb(commonLevelDb))
 
   implicit private val errorContext: ErrorFormatterContext =
     ErrorFormatterContext.fromOptional(assetsCache.cached.get(_: Asset).map(_.decimals))
@@ -131,7 +135,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   private val matcherQueue: MatcherQueue = settings.eventsQueue.`type` match {
     case "local" =>
       log.info("Commands will be stored locally")
-      new LocalMatcherQueue(settings.eventsQueue.local, LocalQueueStore.levelDb(asyncLevelDb), time)
+      new LocalMatcherQueue(settings.eventsQueue.local, LocalQueueStore.levelDb(commonLevelDb), time)
 
     case "kafka" =>
       log.info("Commands will be stored in Kafka")
@@ -179,7 +183,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
   log.info("Loading known assets ...")
   private val allKnownAssetsFuture = loadAllKnownAssets()
-  private val rateCacheFuture = RateCache(asyncLevelDb)
+  private val rateCacheFuture = RateCache(ratesLevelDb)
 
   private val cacheAndAssetFutures = for {
     _ <- allKnownAssetsFuture
@@ -191,7 +195,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   private val pairBuilder = new AssetPairBuilder(settings, getAndCacheDescription, settings.blacklistedAssets)
 
   private val txWriterRef =
-    actorSystem.actorOf(WriteExchangeTransactionActor.props(ExchangeTxStorage.levelDB(asyncLevelDb)), WriteExchangeTransactionActor.name)
+    actorSystem.actorOf(WriteExchangeTransactionActor.props(ExchangeTxStorage.levelDB(commonLevelDb)), WriteExchangeTransactionActor.name)
 
   private val wavesNetTxBroadcasterRef = actorSystem.spawn(
     ExchangeTransactionBroadcastActor(

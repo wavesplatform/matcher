@@ -14,7 +14,7 @@ Test / scalacOptions ++= List(
 // Additional files required for dex-it image
 itArtifactDescriptions := {
 
-  val yourKitArchive = "YourKit-JavaProfiler-2019.8-docker.zip"
+  val yourKitArchive = "YourKit-JavaProfiler-2022.3-docker.zip"
   val cachedDir = itArtifactsCacheDir.value
 
   Seq(

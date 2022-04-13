@@ -14,7 +14,7 @@ class WsZeroUpdatesTestSuite extends WsSuiteBase {
   override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(
     s"""waves.dex {
        |  price-assets = [ "$UsdnId", "WAVES" ]
-       |  web-sockets.external-client-handler.messages-interval = 2s
+       |  web-sockets.external-client-handler.messages-interval = 1s
        |}""".stripMargin
   ).withFallback(jwtPublicKeyConfig)
 
@@ -43,7 +43,6 @@ class WsZeroUpdatesTestSuite extends WsSuiteBase {
         dex1.api.place(order1)
         dex1.api.place(order2)
         waitForOrderAtNode(order2)
-        Thread.sleep(1000L)
 
         val wacs = wsc.receiveAtLeastN[WsAddressChanges](1)
         val wobcs = wsc.receiveAtLeastN[WsOrderBookChanges](1)

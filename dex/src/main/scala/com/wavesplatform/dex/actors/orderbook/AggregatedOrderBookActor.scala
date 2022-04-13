@@ -247,33 +247,19 @@ object AggregatedOrderBookActor {
     val compiledHttpViewLens = genLens(_.compiledHttpView)
     val wsLens = genLens(_.ws)
 
-    def apply(
-      asks: TreeMap[Price, Amount],
-      bids: TreeMap[Price, Amount],
-      lastTrade: Option[LastTrade],
-      lastUpdateTs: Long,
-      compiledHttpView: Map[(DecimalsFormat, Depth), HttpResponse],
-      wsSendSchedule: Cancellable,
-      tickSize: Double
-    ): State = State(
-      asks = asks,
-      bids = bids,
-      lastTrade = lastTrade,
-      lastUpdateTs = lastUpdateTs, // DEX-642
-      compiledHttpView = compiledHttpView,
-      ws = WsOrderBookState.withPrevTickState(asks, bids, lastTrade, Some(tickSize)),
-      wsSendSchedule = wsSendSchedule
-    )
-
-    def fromOrderBook(ob: OrderBook, tickSize: Double): State = State(
-      asks = empty.asks ++ aggregateByPrice(ob.asks), // ++ to preserve an order
-      bids = empty.bids ++ aggregateByPrice(ob.bids),
-      lastTrade = ob.lastTrade,
-      lastUpdateTs = System.currentTimeMillis(), // DEX-642
-      compiledHttpView = Map.empty,
-      wsSendSchedule = Cancellable.alreadyCancelled,
-      tickSize
-    )
+    def fromOrderBook(ob: OrderBook, tickSize: Double): State = {
+      val aggregatedAsks = empty.asks ++ aggregateByPrice(ob.asks) // ++ to preserve an order
+      val aggregatedBids = empty.bids ++ aggregateByPrice(ob.bids) // ++ to preserve an order
+      State(
+        asks = aggregatedAsks,
+        bids = aggregatedBids,
+        lastTrade = ob.lastTrade,
+        lastUpdateTs = System.currentTimeMillis(), // DEX-642
+        compiledHttpView = Map.empty,
+        ws = WsOrderBookState.withPrevTickState(aggregatedAsks, aggregatedBids, ob.lastTrade, Some(tickSize)),
+        wsSendSchedule = Cancellable.alreadyCancelled
+      )
+    }
 
   }
 

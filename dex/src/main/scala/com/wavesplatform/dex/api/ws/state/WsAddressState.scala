@@ -47,7 +47,7 @@ final case class WsAddressState(
     subscriber ! WsAddressChanges(address, balances, orders, maybeNotObservedTxsData, maybeNotCreatedTxsData, 0, isDebug = isDebug)
     copy(
       activeSubscription = activeSubscription.updated(subscriber, Subscription(0, flags)),
-      previousBalanceChanges = assetInfo.map(v => (v._1, v._2.balances))
+      previousBalanceChanges = balances
     )
   }
 

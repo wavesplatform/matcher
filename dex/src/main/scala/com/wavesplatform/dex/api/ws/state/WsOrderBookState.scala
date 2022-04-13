@@ -34,8 +34,6 @@ case class WsOrderBookState(
 
   def hasSubscriptions: Boolean = wsConnections.nonEmpty
 
-  def hasChanges: Boolean = lastTrade.nonEmpty || changedTickSize.nonEmpty
-
   def denormalized(amountDecimals: Int, priceDecimals: Int, xs: TreeMap[Price, Amount], ordering: Ordering[Double]): TreeMap[Double, Double] =
     xs.map {
       case (price, amount) =>
@@ -60,7 +58,7 @@ case class WsOrderBookState(
       val preparedAsks = take(asks, changedAsks, prevTickState.asks)
       val preparedBids = take(bids, changedBids, prevTickState.bids)
 
-      if (hasChanges || preparedBids.nonEmpty || preparedAsks.nonEmpty) {
+      if (lastTrade.nonEmpty || changedTickSize.nonEmpty || preparedBids.nonEmpty || preparedAsks.nonEmpty) {
         val changes =
           protocol.WsOrderBookChanges(
             assetPair = assetPair,
@@ -83,20 +81,18 @@ case class WsOrderBookState(
     changedBids = Set.empty,
     lastTrade = None,
     changedTickSize = None,
-    prevTickState = updateTickState(asks, bids)
+    prevTickState = updatePrevTickState(asks, bids, lastTrade, changedTickSize)
   )
 
-  def updateTickState(asks: Map[Price, Amount], bids: Map[Price, Amount]): WsState = updateTickState(asks, bids, lastTrade, changedTickSize)
-
-  def updateTickState(asks: Map[Price, Amount], bids: Map[Price, Amount], lt: Option[LastTrade], lc: Option[Double]): WsState =
+  def updatePrevTickState(asks: Map[Price, Amount], bids: Map[Price, Amount], lt: Option[LastTrade], lc: Option[Double]): WsState =
     prevTickState.copy(
-      asks = plusMaps(prevTickState.asks, asks),
-      bids = plusMaps(prevTickState.bids, bids),
+      asks = applyLevelChanges(prevTickState.asks, asks),
+      bids = applyLevelChanges(prevTickState.bids, bids),
       lastTrade = if (lt.isEmpty) prevTickState.lastTrade else lt,
       tickSize = if (lc.isEmpty) prevTickState.tickSize else lc
     )
 
-  def plusMaps(m1: TreeMap[Price, Amount], m2: Map[Price, Amount]): TreeMap[Price, Amount] = (m1 ++ m2.map {
+  def applyLevelChanges(m1: TreeMap[Price, Amount], m2: Map[Price, Amount]): TreeMap[Price, Amount] = (m1 ++ m2.map {
     case (pr, am) =>
       (pr, m1.get(pr).fold(am)(_ + am))
   }).filter(_._2 != 0)
@@ -107,10 +103,7 @@ case class WsOrderBookState(
     val r = TreeMap.newBuilder[Price, Amount](xs.ordering)
     levels.foreach { level =>
       xs.get(level).fold {
-        prevChanges.get(level) match {
-          case Some(_) => r += level -> 0L // level was removed
-          case None =>
-        }
+        prevChanges.get(level).foreach(_ => r += level -> 0L) // means that level was removed
       } { v =>
         if (!prevChanges.get(level).contains(v)) // if there was no changes to this level, then don't send it
           r += level -> v
@@ -130,7 +123,7 @@ case class WsOrderBookState(
       )(this)
     else
       copy(
-        prevTickState = updateTickState(lc.asks, lc.bids, lt, ts)
+        prevTickState = updatePrevTickState(lc.asks, lc.bids, lt, ts)
       )
 
 }

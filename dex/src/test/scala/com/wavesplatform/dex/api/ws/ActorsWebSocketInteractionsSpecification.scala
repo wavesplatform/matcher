@@ -583,7 +583,7 @@ class ActorsWebSocketInteractionsSpecification
 
         env
           .expectWsBalancesAndOrders(
-            Map(Waves -> WsBalances(100, 0), btc -> WsBalances(1, 0)),
+            Map.empty, //because no balance was changed
             Seq(
               WsOrder.fromDomain(oe.counterRemaining).copy(matchInfo = mkSeqWsMatchTxInfo(3.0, 5.0)),
               WsOrder.fromDomain(oe.submittedRemaining).copy(matchInfo = mkSeqWsMatchTxInfo(3.0, 5.0))

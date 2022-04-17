@@ -69,7 +69,10 @@ class MatcherWebSocketRouteSpec extends RouteSpec("/ws/v0") with MatcherSpecBase
     val route =
       new MatcherWebSocketRoute(
         wsInternalBroadcastRef = vsInternalBroadcastRef.ref,
-        externalClientDirectoryRef = testKit.spawn(WsExternalClientDirectoryActor(), s"ws-external-cd-${Random.nextInt(Int.MaxValue)}"),
+        externalClientDirectoryRef = testKit.spawn(
+          WsExternalClientDirectoryActor(settings),
+          s"ws-external-cd-${Random.nextInt(Int.MaxValue)}"
+        ),
         addressDirectory = ActorRef.noSender,
         matcher = ActorRef.noSender,
         time = time,

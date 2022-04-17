@@ -215,7 +215,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   )
 
   private val externalClientDirectoryRef: typed.ActorRef[WsExternalClientDirectoryActor.Message] =
-    actorSystem.spawn(WsExternalClientDirectoryActor(), s"ws-external-cd-${ThreadLocalRandom.current().nextInt(Int.MaxValue)}")
+    actorSystem.spawn(WsExternalClientDirectoryActor(settings), s"ws-external-cd-${ThreadLocalRandom.current().nextInt(Int.MaxValue)}")
 
   private val orderBookSnapshotStoreRef: ActorRef = actorSystem.actorOf(
     OrderBookSnapshotStoreActor.props(orderBookSnapshotDb),

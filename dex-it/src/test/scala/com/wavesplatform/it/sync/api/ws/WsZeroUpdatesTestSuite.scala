@@ -14,7 +14,7 @@ class WsZeroUpdatesTestSuite extends WsSuiteBase {
   override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(
     s"""waves.dex {
        |  price-assets = [ "$UsdnId", "WAVES" ]
-       |  web-sockets.external-client-handler.messages-interval = 1s
+       |  web-sockets.external-client-handler.messages-interval = 3s
        |}""".stripMargin
   ).withFallback(jwtPublicKeyConfig)
 

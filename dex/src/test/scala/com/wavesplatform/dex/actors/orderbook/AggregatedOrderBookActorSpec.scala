@@ -38,7 +38,7 @@ import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.duration._
 
 class AggregatedOrderBookActorSpec
-  extends AnyFreeSpec
+    extends AnyFreeSpec
     with Matchers
     with SystemTime
     with ScalaCheckPropertyChecks
@@ -431,10 +431,10 @@ class AggregatedOrderBookActorSpec
     }.toList
 
   private def mk(
-                  ob: OrderBook,
-                  restrictions: Option[OrderRestrictionsSettings] = None,
-                  tickSize: Double = DenormalizedMatchingRule.DefaultTickSize.toDouble
-                ): ActorRef[InputMessage] = system.spawn(
+    ob: OrderBook,
+    restrictions: Option[OrderRestrictionsSettings] = None,
+    tickSize: Double = DenormalizedMatchingRule.DefaultTickSize.toDouble
+  ): ActorRef[InputMessage] = system.spawn(
     AggregatedOrderBookActor(
       AggregatedOrderBookActor.Settings(100.millis),
       pair,

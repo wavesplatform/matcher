@@ -32,23 +32,23 @@ import org.slf4j.LoggerFactory
 import scala.concurrent.ExecutionContext
 
 class OrderBookActor(
-                      settings: Settings,
-                      owner: classic.ActorRef,
-                      eventsCoordinatorRef: typed.ActorRef[OrderEventsCoordinatorActor.Message],
-                      snapshotStore: classic.ActorRef,
-                      wsInternalHandlerDirectoryRef: typed.ActorRef[WsInternalBroadcastActor.Command],
-                      assetPair: AssetPair,
-                      maybeSnapshot: Option[OrderBookActor.Snapshot],
-                      time: Time,
-                      var matchingRules: NonEmptyList[DenormalizedMatchingRule],
-                      updateCurrentMatchingRules: DenormalizedMatchingRule => Unit,
-                      normalizeMatchingRule: DenormalizedMatchingRule => MatchingRule,
-                      getMakerTakerFeeByOffset: Long => (AcceptedOrder, LimitOrder) => (Long, Long),
-                      getOrderExecutedTs: Long => (Long, Long) => Long,
-                      restrictions: Option[OrderRestrictionsSettings],
-                      log: LoggerFacade
-                    )(implicit ec: ExecutionContext, efc: ErrorFormatterContext)
-  extends classic.Actor
+  settings: Settings,
+  owner: classic.ActorRef,
+  eventsCoordinatorRef: typed.ActorRef[OrderEventsCoordinatorActor.Message],
+  snapshotStore: classic.ActorRef,
+  wsInternalHandlerDirectoryRef: typed.ActorRef[WsInternalBroadcastActor.Command],
+  assetPair: AssetPair,
+  maybeSnapshot: Option[OrderBookActor.Snapshot],
+  time: Time,
+  var matchingRules: NonEmptyList[DenormalizedMatchingRule],
+  updateCurrentMatchingRules: DenormalizedMatchingRule => Unit,
+  normalizeMatchingRule: DenormalizedMatchingRule => MatchingRule,
+  getMakerTakerFeeByOffset: Long => (AcceptedOrder, LimitOrder) => (Long, Long),
+  getOrderExecutedTs: Long => (Long, Long) => Long,
+  restrictions: Option[OrderRestrictionsSettings],
+  log: LoggerFacade
+)(implicit ec: ExecutionContext, efc: ErrorFormatterContext)
+    extends classic.Actor
     with Stash {
 
   private var aggregatedRef: typed.ActorRef[AggregatedOrderBookActor.InputMessage] = _
@@ -280,21 +280,21 @@ object OrderBookActor {
   private val logger = LoggerFacade(LoggerFactory.getLogger(OrderBookActor.getClass))
 
   def props(
-             settings: Settings,
-             parent: classic.ActorRef,
-             eventsCoordinatorRef: typed.ActorRef[OrderEventsCoordinatorActor.Message],
-             snapshotStore: classic.ActorRef,
-             wsInternalHandlerDirectoryRef: typed.ActorRef[WsInternalBroadcastActor.Command],
-             assetPair: AssetPair,
-             maybeSnapshot: Option[Snapshot],
-             time: Time,
-             matchingRules: NonEmptyList[DenormalizedMatchingRule],
-             updateCurrentMatchingRules: DenormalizedMatchingRule => Unit,
-             normalizeMatchingRule: DenormalizedMatchingRule => MatchingRule,
-             getMakerTakerFeeByOffset: Long => (AcceptedOrder, LimitOrder) => (Long, Long),
-             getOrderExecutedTs: Long => (Long, Long) => Long,
-             restrictions: Option[OrderRestrictionsSettings]
-           )(implicit ec: ExecutionContext, efc: ErrorFormatterContext): classic.Props =
+    settings: Settings,
+    parent: classic.ActorRef,
+    eventsCoordinatorRef: typed.ActorRef[OrderEventsCoordinatorActor.Message],
+    snapshotStore: classic.ActorRef,
+    wsInternalHandlerDirectoryRef: typed.ActorRef[WsInternalBroadcastActor.Command],
+    assetPair: AssetPair,
+    maybeSnapshot: Option[Snapshot],
+    time: Time,
+    matchingRules: NonEmptyList[DenormalizedMatchingRule],
+    updateCurrentMatchingRules: DenormalizedMatchingRule => Unit,
+    normalizeMatchingRule: DenormalizedMatchingRule => MatchingRule,
+    getMakerTakerFeeByOffset: Long => (AcceptedOrder, LimitOrder) => (Long, Long),
+    getOrderExecutedTs: Long => (Long, Long) => Long,
+    restrictions: Option[OrderRestrictionsSettings]
+  )(implicit ec: ExecutionContext, efc: ErrorFormatterContext): classic.Props =
     classic.Props(
       new OrderBookActor(
         settings,

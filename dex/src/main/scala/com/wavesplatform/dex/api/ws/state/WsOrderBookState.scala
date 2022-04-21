@@ -16,12 +16,12 @@ import monocle.macros.GenLens
 import scala.collection.immutable.TreeMap
 
 case class WsOrderBookState(
-                             wsConnections: Map[ActorRef[WsOrderBookChanges], Long],
-                             changedAsks: Set[Price],
-                             changedBids: Set[Price],
-                             lastTrade: Option[LastTrade],
-                             changedTickSize: Option[Double]
-                           ) {
+  wsConnections: Map[ActorRef[WsOrderBookChanges], Long],
+  changedAsks: Set[Price],
+  changedBids: Set[Price],
+  lastTrade: Option[LastTrade],
+  changedTickSize: Option[Double]
+) {
 
   def addSubscription(x: ActorRef[WsOrderBookChanges]): WsOrderBookState = copy(wsConnections = wsConnections.updated(x, 0L))
 
@@ -48,13 +48,13 @@ case class WsOrderBookState(
   )
 
   def flushed(
-               assetPair: AssetPair,
-               amountDecimals: Int,
-               priceDecimals: Int,
-               asks: TreeMap[Price, Amount],
-               bids: TreeMap[Price, Amount],
-               timestamp: Long
-             ): WsOrderBookState = copy(
+    assetPair: AssetPair,
+    amountDecimals: Int,
+    priceDecimals: Int,
+    asks: TreeMap[Price, Amount],
+    bids: TreeMap[Price, Amount],
+    timestamp: Long
+  ): WsOrderBookState = copy(
     wsConnections =
       if (hasChanges) {
         val changes =
@@ -95,10 +95,10 @@ case class WsOrderBookState(
     if (hasSubscriptions)
       (
         changedAsksLens.modify(_ ++ lc.asks.keySet) andThen
-          changedBidsLens.modify(_ ++ lc.bids.keySet) andThen
-          lastTradeLens.modify(if (lt.isEmpty) _ else lt) andThen
-          changedTickSizeLens.modify(if (ts.isEmpty) _ else ts)
-        )(this)
+        changedBidsLens.modify(_ ++ lc.bids.keySet) andThen
+        lastTradeLens.modify(if (lt.isEmpty) _ else lt) andThen
+        changedTickSizeLens.modify(if (ts.isEmpty) _ else ts)
+      )(this)
     else this
 
 }

@@ -54,15 +54,15 @@ object AggregatedOrderBookActor {
   case class Settings(wsMessagesInterval: FiniteDuration)
 
   def apply(
-             settings: Settings,
-             assetPair: AssetPair,
-             amountDecimals: Int,
-             priceDecimals: Int,
-             restrictions: Option[OrderRestrictionsSettings],
-             tickSize: Double,
-             time: Time,
-             init: State
-           ): Behavior[InputMessage] =
+    settings: Settings,
+    assetPair: AssetPair,
+    amountDecimals: Int,
+    priceDecimals: Int,
+    restrictions: Option[OrderRestrictionsSettings],
+    tickSize: Double,
+    time: Time,
+    init: State
+  ): Behavior[InputMessage] =
     Behaviors.setup { context =>
       context.setLoggerName(s"AggregatedOrderBookActor[p=${assetPair.key}]")
       val compile = mkCompile(assetPair, amountDecimals, priceDecimals)(_, _, _)
@@ -132,7 +132,7 @@ object AggregatedOrderBookActor {
                   if (state.ws.hasSubscriptions)
                     state.modifyWs(_.flushed(assetPair, amountDecimals, priceDecimals, state.asks, state.bids, state.lastUpdateTs))
                   else state
-                  ).withCompletedSchedule
+                ).withCompletedSchedule
               )
 
             case Command.Stop(sender, reason) =>
@@ -157,10 +157,10 @@ object AggregatedOrderBookActor {
     }
 
   def mkCompile(
-                 assetPair: AssetPair,
-                 amountDecimals: Int,
-                 priceDecimals: Int
-               )(state: State, format: DecimalsFormat, depth: Depth): HttpResponse = {
+    assetPair: AssetPair,
+    amountDecimals: Int,
+    priceDecimals: Int
+  )(state: State, format: DecimalsFormat, depth: Depth): HttpResponse = {
     val assetPairDecimals = format match {
       case Denormalized => Some(amountDecimals -> priceDecimals)
       case _ => None
@@ -184,14 +184,14 @@ object AggregatedOrderBookActor {
   }
 
   case class State private (
-                             asks: TreeMap[Price, Amount],
-                             bids: TreeMap[Price, Amount],
-                             lastTrade: Option[LastTrade],
-                             lastUpdateTs: Long,
-                             compiledHttpView: Map[(DecimalsFormat, Depth), HttpResponse],
-                             ws: WsOrderBookState,
-                             wsSendSchedule: Cancellable
-                           ) {
+    asks: TreeMap[Price, Amount],
+    bids: TreeMap[Price, Amount],
+    lastTrade: Option[LastTrade],
+    lastUpdateTs: Long,
+    compiledHttpView: Map[(DecimalsFormat, Depth), HttpResponse],
+    ws: WsOrderBookState,
+    wsSendSchedule: Cancellable
+  ) {
 
     val genLens: GenLens[State] = GenLens[State]
 
@@ -259,10 +259,10 @@ object AggregatedOrderBookActor {
   }
 
   case class MarketStatus(
-                           lastTrade: Option[LastTrade],
-                           bestBid: Option[LevelAgg],
-                           bestAsk: Option[LevelAgg]
-                         )
+    lastTrade: Option[LastTrade],
+    bestBid: Option[LevelAgg],
+    bestAsk: Option[LevelAgg]
+  )
 
   def toLevelAgg(x: (Price, Amount)): LevelAgg = LevelAgg(x._2, x._1)
 

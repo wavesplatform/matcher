@@ -54,15 +54,15 @@ object AggregatedOrderBookActor {
   case class Settings(wsMessagesInterval: FiniteDuration)
 
   def apply(
-    settings: Settings,
-    assetPair: AssetPair,
-    amountDecimals: Int,
-    priceDecimals: Int,
-    restrictions: Option[OrderRestrictionsSettings],
-    tickSize: Double,
-    time: Time,
-    init: State
-  ): Behavior[InputMessage] =
+             settings: Settings,
+             assetPair: AssetPair,
+             amountDecimals: Int,
+             priceDecimals: Int,
+             restrictions: Option[OrderRestrictionsSettings],
+             tickSize: Double,
+             time: Time,
+             init: State
+           ): Behavior[InputMessage] =
     Behaviors.setup { context =>
       context.setLoggerName(s"AggregatedOrderBookActor[p=${assetPair.key}]")
       val compile = mkCompile(assetPair, amountDecimals, priceDecimals)(_, _, _)
@@ -103,16 +103,15 @@ object AggregatedOrderBookActor {
               }
 
             case Command.AddWsSubscription(client) =>
-              val asks = state.ws.prevTickState.asks.map(toLevelAgg).toSeq
-              val bids = state.ws.prevTickState.bids.map(toLevelAgg).toSeq
+              val ob = state.toOrderBookAggregatedSnapshot
 
               client ! WsOrderBookChanges.from(
                 assetPair = assetPair,
                 amountDecimals = amountDecimals,
                 priceDecimals = priceDecimals,
-                asks = asks,
-                bids = bids,
-                lt = state.ws.prevTickState.lastTrade,
+                asks = ob.asks,
+                bids = ob.bids,
+                lt = state.lastTrade,
                 updateId = 0L,
                 restrictions = restrictions,
                 tickSize = tickSize
@@ -133,7 +132,7 @@ object AggregatedOrderBookActor {
                   if (state.ws.hasSubscriptions)
                     state.modifyWs(_.flushed(assetPair, amountDecimals, priceDecimals, state.asks, state.bids, state.lastUpdateTs))
                   else state
-                ).withCompletedSchedule
+                  ).withCompletedSchedule
               )
 
             case Command.Stop(sender, reason) =>
@@ -158,10 +157,10 @@ object AggregatedOrderBookActor {
     }
 
   def mkCompile(
-    assetPair: AssetPair,
-    amountDecimals: Int,
-    priceDecimals: Int
-  )(state: State, format: DecimalsFormat, depth: Depth): HttpResponse = {
+                 assetPair: AssetPair,
+                 amountDecimals: Int,
+                 priceDecimals: Int
+               )(state: State, format: DecimalsFormat, depth: Depth): HttpResponse = {
     val assetPairDecimals = format match {
       case Denormalized => Some(amountDecimals -> priceDecimals)
       case _ => None
@@ -185,14 +184,14 @@ object AggregatedOrderBookActor {
   }
 
   case class State private (
-    asks: TreeMap[Price, Amount],
-    bids: TreeMap[Price, Amount],
-    lastTrade: Option[LastTrade],
-    lastUpdateTs: Long,
-    compiledHttpView: Map[(DecimalsFormat, Depth), HttpResponse],
-    ws: WsOrderBookState,
-    wsSendSchedule: Cancellable
-  ) {
+                             asks: TreeMap[Price, Amount],
+                             bids: TreeMap[Price, Amount],
+                             lastTrade: Option[LastTrade],
+                             lastUpdateTs: Long,
+                             compiledHttpView: Map[(DecimalsFormat, Depth), HttpResponse],
+                             ws: WsOrderBookState,
+                             wsSendSchedule: Cancellable
+                           ) {
 
     val genLens: GenLens[State] = GenLens[State]
 
@@ -239,7 +238,7 @@ object AggregatedOrderBookActor {
         lastTrade = None,
         lastUpdateTs = 0,
         compiledHttpView = Map.empty,
-        ws = WsOrderBookState.empty,
+        ws = WsOrderBookState(Map.empty, Set.empty, Set.empty, lastTrade = None, changedTickSize = None),
         wsSendSchedule = Cancellable.alreadyCancelled
       )
 
@@ -247,27 +246,23 @@ object AggregatedOrderBookActor {
     val compiledHttpViewLens = genLens(_.compiledHttpView)
     val wsLens = genLens(_.ws)
 
-    def fromOrderBook(ob: OrderBook, tickSize: Double): State = {
-      val aggregatedAsks = empty.asks ++ aggregateByPrice(ob.asks) // ++ to preserve an order
-      val aggregatedBids = empty.bids ++ aggregateByPrice(ob.bids) // ++ to preserve an order
-      State(
-        asks = aggregatedAsks,
-        bids = aggregatedBids,
-        lastTrade = ob.lastTrade,
-        lastUpdateTs = System.currentTimeMillis(), // DEX-642
-        compiledHttpView = Map.empty,
-        ws = WsOrderBookState.withPrevTickState(aggregatedAsks, aggregatedBids, ob.lastTrade, Some(tickSize)),
-        wsSendSchedule = Cancellable.alreadyCancelled
-      )
-    }
+    def fromOrderBook(ob: OrderBook): State = State(
+      asks = empty.asks ++ aggregateByPrice(ob.asks), // ++ to preserve an order
+      bids = empty.bids ++ aggregateByPrice(ob.bids),
+      lastTrade = ob.lastTrade,
+      lastUpdateTs = System.currentTimeMillis(), // DEX-642
+      compiledHttpView = Map.empty,
+      ws = empty.ws,
+      wsSendSchedule = Cancellable.alreadyCancelled
+    )
 
   }
 
   case class MarketStatus(
-    lastTrade: Option[LastTrade],
-    bestBid: Option[LevelAgg],
-    bestAsk: Option[LevelAgg]
-  )
+                           lastTrade: Option[LastTrade],
+                           bestBid: Option[LevelAgg],
+                           bestAsk: Option[LevelAgg]
+                         )
 
   def toLevelAgg(x: (Price, Amount)): LevelAgg = LevelAgg(x._2, x._1)
 

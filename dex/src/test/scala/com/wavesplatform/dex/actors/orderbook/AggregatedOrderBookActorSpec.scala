@@ -443,7 +443,7 @@ class AggregatedOrderBookActorSpec
       restrictions,
       tickSize,
       Time.zero,
-      AggregatedOrderBookActor.State.fromOrderBook(ob, tickSize)
+      AggregatedOrderBookActor.State.fromOrderBook(ob)
     ),
     s"aggregated-${ThreadLocalRandom.current().nextInt()}"
   )

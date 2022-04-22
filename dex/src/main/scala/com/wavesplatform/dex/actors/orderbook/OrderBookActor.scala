@@ -106,7 +106,7 @@ class OrderBookActor(
           restrictions,
           matchingRules.head.tickSize.toDouble,
           time,
-          AggregatedOrderBookActor.State.fromOrderBook(orderBook, matchingRules.head.tickSize.toDouble)
+          AggregatedOrderBookActor.State.fromOrderBook(orderBook)
         ),
         "aggregated"
       )

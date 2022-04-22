@@ -103,16 +103,15 @@ object AggregatedOrderBookActor {
               }
 
             case Command.AddWsSubscription(client) =>
-              val asks = state.ws.prevTickState.asks.map(toLevelAgg).toSeq
-              val bids = state.ws.prevTickState.bids.map(toLevelAgg).toSeq
+              val ob = state.toOrderBookAggregatedSnapshot
 
               client ! WsOrderBookChanges.from(
                 assetPair = assetPair,
                 amountDecimals = amountDecimals,
                 priceDecimals = priceDecimals,
-                asks = asks,
-                bids = bids,
-                lt = state.ws.prevTickState.lastTrade,
+                asks = ob.asks,
+                bids = ob.bids,
+                lt = state.lastTrade,
                 updateId = 0L,
                 restrictions = restrictions,
                 tickSize = tickSize
@@ -239,7 +238,7 @@ object AggregatedOrderBookActor {
         lastTrade = None,
         lastUpdateTs = 0,
         compiledHttpView = Map.empty,
-        ws = WsOrderBookState.empty,
+        ws = WsOrderBookState(Map.empty, Set.empty, Set.empty, lastTrade = None, changedTickSize = None),
         wsSendSchedule = Cancellable.alreadyCancelled
       )
 
@@ -247,19 +246,15 @@ object AggregatedOrderBookActor {
     val compiledHttpViewLens = genLens(_.compiledHttpView)
     val wsLens = genLens(_.ws)
 
-    def fromOrderBook(ob: OrderBook, tickSize: Double): State = {
-      val aggregatedAsks = empty.asks ++ aggregateByPrice(ob.asks) // ++ to preserve an order
-      val aggregatedBids = empty.bids ++ aggregateByPrice(ob.bids) // ++ to preserve an order
-      State(
-        asks = aggregatedAsks,
-        bids = aggregatedBids,
-        lastTrade = ob.lastTrade,
-        lastUpdateTs = System.currentTimeMillis(), // DEX-642
-        compiledHttpView = Map.empty,
-        ws = WsOrderBookState.withPrevTickState(aggregatedAsks, aggregatedBids, ob.lastTrade, Some(tickSize)),
-        wsSendSchedule = Cancellable.alreadyCancelled
-      )
-    }
+    def fromOrderBook(ob: OrderBook): State = State(
+      asks = empty.asks ++ aggregateByPrice(ob.asks), // ++ to preserve an order
+      bids = empty.bids ++ aggregateByPrice(ob.bids),
+      lastTrade = ob.lastTrade,
+      lastUpdateTs = System.currentTimeMillis(), // DEX-642
+      compiledHttpView = Map.empty,
+      ws = empty.ws,
+      wsSendSchedule = Cancellable.alreadyCancelled
+    )
 
   }
 

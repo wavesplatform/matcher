@@ -500,6 +500,21 @@ object WavesDexCli extends ScoptImplicits {
       val res = Await.result(snapshotsRestored.future, Duration.Inf)
       val t2 = System.currentTimeMillis()
       println(s">>finished: $res ||| ${t2 - t1}")
+      val s =
+        Seq(
+          "DG2xFkPdDwKUoBkzGAhQtLpSGzfXLiCYPEzeKH2Ad24p-5NmV5VAhkqormdwvaQjE54yPEkNwSRtcXxhLkJbVQqkN",
+          "DG2xFkPdDwKUoBkzGAhQtLpSGzfXLiCYPEzeKH2Ad24p-9LNqjybyCX1oexCub4yY7hdJf6aeP4HeV5LpsjcNHwRR",
+          "DG2xFkPdDwKUoBkzGAhQtLpSGzfXLiCYPEzeKH2Ad24p-8inca5fv4xr6KZtRMRPYr7vADfk8fd6G2z1gMoRkbUYS",
+          "DG2xFkPdDwKUoBkzGAhQtLpSGzfXLiCYPEzeKH2Ad24p-eWeMD5KNeuRaALCAb4uuJKtAvon2JcTyXQyoBMhuN2X",
+          "DG2xFkPdDwKUoBkzGAhQtLpSGzfXLiCYPEzeKH2Ad24p-8zKqZF6asB6yiK8rv9nMUkJ7wAVBJndSmkC7SXJhRrM3",
+          "DG2xFkPdDwKUoBkzGAhQtLpSGzfXLiCYPEzeKH2Ad24p-DxFwXxS1r3uZ2QEiSqhe6uoXMJBsz4ShLtHvr4HDzNri",
+          "DG2xFkPdDwKUoBkzGAhQtLpSGzfXLiCYPEzeKH2Ad24p-DGbqkzM6Ds5NAF2B3GHYfyZRmWKt7xLYRYcwpMm7D6V4"
+        )
+
+      s.map(_.split("-")).foreach { x =>
+        val ap = AssetPair.createAssetPair(x.head, x.tail.head).get
+        println(s"ap=$ap, res=${orderBooks.get().get(ap)}")
+      }
       actorSystem.terminate()
     }
   }

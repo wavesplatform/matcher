@@ -238,7 +238,7 @@ object AggregatedOrderBookActor {
         lastTrade = None,
         lastUpdateTs = 0,
         compiledHttpView = Map.empty,
-        ws = WsOrderBookState(Map.empty, Set.empty, Set.empty, lastTrade = None, changedTickSize = None),
+        ws = WsOrderBookState.empty,
         wsSendSchedule = Cancellable.alreadyCancelled
       )
 

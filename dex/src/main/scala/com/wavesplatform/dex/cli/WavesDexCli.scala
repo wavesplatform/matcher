@@ -389,7 +389,7 @@ object WavesDexCli extends ScoptImplicits {
       AssetPairsDb.levelDb(db).remove(assetPair)
     }
 
-  def lowestOffset(args: Args, matcherSettings: MatcherSettings): Unit = {
+  def lowestSnapshotsOffset(args: Args, matcherSettings: MatcherSettings): Unit = {
     import scala.concurrent.ExecutionContext.Implicits.global
 
     for {
@@ -749,6 +749,17 @@ object WavesDexCli extends ScoptImplicits {
               .required()
               .action((x, s) => s.copy(assetPair = x))
           ),
+        cmd(Command.LowestSnapshotsOffset.name)
+          .action((_, s) => s.copy(command = Command.LowestSnapshotsOffset.some))
+          .text("Finds lowest snapshots offset")
+          .children(
+            opt[String]("dex-config")
+              .abbr("dc")
+              .text("DEX config path")
+              .valueName("<raw-string>")
+              .required()
+              .action((x, s) => s.copy(configPath = x))
+          ),
         cmd(Command.InspectOrder.name)
           .action((_, s) => s.copy(command = Command.InspectOrder.some))
           .text("Inspect an order")
@@ -832,6 +843,7 @@ object WavesDexCli extends ScoptImplicits {
               case Command.ListAssetPairs => listAssetPairs(args, matcherSettings)
               case Command.InspectOrderBook => inspectOrderBook(args, matcherSettings)
               case Command.DeleteOrderBook => deleteOrderBook(args, matcherSettings)
+              case Command.LowestSnapshotsOffset => lowestSnapshotsOffset(args, matcherSettings)
               case Command.InspectOrder => inspectOrder(args, matcherSettings)
               case Command.GenerateFeeSettings => generateFeeSettings(args)
             }
@@ -900,6 +912,10 @@ object WavesDexCli extends ScoptImplicits {
 
     case object DeleteOrderBook extends Command {
       override def name: String = "delete-orderbook"
+    }
+
+    case object LowestSnapshotsOffset extends Command {
+      override def name: String = "lowest-snapshots-offset"
     }
 
     case object InspectOrder extends Command {

@@ -411,7 +411,7 @@ object WavesDexCli extends ScoptImplicits {
       val result = validPairs.map { pair =>
         pair -> offsets.get(pair).zip(snapshots.get(pair))
       }.toMap
-      val lowestOffset = result.values.flatMap(_.map(_._1)).toList.sorted.headOption.getOrElse(-1L)
+      val lowestOffset = result.flatMap(x => x._2.map(s => x._1 -> s._1)).toList.sortBy(_._2).headOption
       println(s"Lowest offset: $lowestOffset")
     }
   }

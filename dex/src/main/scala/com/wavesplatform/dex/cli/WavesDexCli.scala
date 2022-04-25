@@ -18,7 +18,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.error.Implicits.ThrowableOps
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
-import com.wavesplatform.dex.model.OrderBookSideSnapshot
+import com.wavesplatform.dex.model.{AssetPairBuilder, OrderBookSideSnapshot}
 import com.wavesplatform.dex.settings.{loadMatcherSettings, MatcherSettings}
 import com.wavesplatform.dex.tool._
 import com.wavesplatform.dex.tool.connectors.SuperConnector
@@ -389,6 +389,33 @@ object WavesDexCli extends ScoptImplicits {
       AssetPairsDb.levelDb(db).remove(assetPair)
     }
 
+  def lowestSnapshotsOffset(args: Args, matcherSettings: MatcherSettings): Unit = {
+    import scala.concurrent.ExecutionContext.Implicits.global
+
+    for {
+      _ <- cli.log(
+        s"""
+           |Passed arguments:
+           |  DEX config path : ${args.configPath}
+           |""".stripMargin
+      )
+    } yield withLevelDb(matcherSettings.dataDirectory) { db =>
+      val apdb = AssetPairsDb.levelDb(db)
+      val obdb = OrderBookSnapshotDb.levelDb(db)
+      val apb = new AssetPairBuilder(matcherSettings, null, matcherSettings.blacklistedAssets)
+
+      val pairs = apdb.all()
+      val validPairs = pairs.flatMap(apb.quickValidateAssetPair(_).toOption)
+      val snapshots = obdb.iterateSnapshots(validPairs.contains)
+      val offsets = obdb.iterateOffsets(validPairs.contains)
+      val result = validPairs.map { pair =>
+        pair -> offsets.get(pair).zip(snapshots.get(pair))
+      }.toMap
+      val lowestOffset = result.flatMap(x => x._2.map(s => x._1 -> s._1)).toList.sortBy(_._2).headOption
+      println(s"Lowest offset: $lowestOffset")
+    }
+  }
+
   // noinspection ScalaStyle
   def inspectOrder(args: Args, matcherSettings: MatcherSettings): Unit =
     for {
@@ -722,6 +749,17 @@ object WavesDexCli extends ScoptImplicits {
               .required()
               .action((x, s) => s.copy(assetPair = x))
           ),
+        cmd(Command.LowestSnapshotsOffset.name)
+          .action((_, s) => s.copy(command = Command.LowestSnapshotsOffset.some))
+          .text("Finds lowest snapshots offset")
+          .children(
+            opt[String]("dex-config")
+              .abbr("dc")
+              .text("DEX config path")
+              .valueName("<raw-string>")
+              .required()
+              .action((x, s) => s.copy(configPath = x))
+          ),
         cmd(Command.InspectOrder.name)
           .action((_, s) => s.copy(command = Command.InspectOrder.some))
           .text("Inspect an order")
@@ -805,6 +843,7 @@ object WavesDexCli extends ScoptImplicits {
               case Command.ListAssetPairs => listAssetPairs(args, matcherSettings)
               case Command.InspectOrderBook => inspectOrderBook(args, matcherSettings)
               case Command.DeleteOrderBook => deleteOrderBook(args, matcherSettings)
+              case Command.LowestSnapshotsOffset => lowestSnapshotsOffset(args, matcherSettings)
               case Command.InspectOrder => inspectOrder(args, matcherSettings)
               case Command.GenerateFeeSettings => generateFeeSettings(args)
             }
@@ -873,6 +912,10 @@ object WavesDexCli extends ScoptImplicits {
 
     case object DeleteOrderBook extends Command {
       override def name: String = "delete-orderbook"
+    }
+
+    case object LowestSnapshotsOffset extends Command {
+      override def name: String = "lowest-snapshots-offset"
     }
 
     case object InspectOrder extends Command {

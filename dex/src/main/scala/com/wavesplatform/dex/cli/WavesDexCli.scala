@@ -18,7 +18,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.error.Implicits.ThrowableOps
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
-import com.wavesplatform.dex.model.OrderBookSideSnapshot
+import com.wavesplatform.dex.model.{AssetPairBuilder, OrderBookSideSnapshot}
 import com.wavesplatform.dex.settings.{loadMatcherSettings, MatcherSettings}
 import com.wavesplatform.dex.tool._
 import com.wavesplatform.dex.tool.connectors.SuperConnector
@@ -388,6 +388,33 @@ object WavesDexCli extends ScoptImplicits {
       println("Removing from known asset pairs...")
       AssetPairsDb.levelDb(db).remove(assetPair)
     }
+
+  def lowestOffset(args: Args, matcherSettings: MatcherSettings): Unit = {
+    import scala.concurrent.ExecutionContext.Implicits.global
+
+    for {
+      _ <- cli.log(
+        s"""
+           |Passed arguments:
+           |  DEX config path : ${args.configPath}
+           |""".stripMargin
+      )
+    } yield withLevelDb(matcherSettings.dataDirectory) { db =>
+      val apdb = AssetPairsDb.levelDb(db)
+      val obdb = OrderBookSnapshotDb.levelDb(db)
+      val apb = new AssetPairBuilder(matcherSettings, null, matcherSettings.blacklistedAssets)
+
+      val pairs = apdb.all()
+      val validPairs = pairs.flatMap(apb.quickValidateAssetPair(_).toOption)
+      val snapshots = obdb.iterateSnapshots(validPairs.contains)
+      val offsets = obdb.iterateOffsets(validPairs.contains)
+      val result = validPairs.map { pair =>
+        pair -> offsets.get(pair).zip(snapshots.get(pair))
+      }.toMap
+      val lowestOffset = result.values.flatMap(_.map(_._1)).toList.sorted.headOption.getOrElse(-1L)
+      println(s"Lowest offset: $lowestOffset")
+    }
+  }
 
   // noinspection ScalaStyle
   def inspectOrder(args: Args, matcherSettings: MatcherSettings): Unit =

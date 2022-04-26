@@ -58,7 +58,7 @@ pipeline {
                 ]
             }
         }
-        stage ('Trigger job: Test - Kafka') {
+        stage ('Trigger job: Test - Bot') {
             steps {
                 build job: 'Waves.Exchange/Matcher/Trading Bot - Test', propagate: false, wait: false, parameters: [
                   [$class: 'GitParameterValue', name: 'BRANCH_DEX', value: "${NEW_BRANCH_OR_TAG}"],

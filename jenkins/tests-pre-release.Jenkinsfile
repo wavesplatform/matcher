@@ -58,11 +58,11 @@ pipeline {
                 ]
             }
         }
-        stage ('Trigger job: Test - Bot') {
+        stage ('Trigger job: Test - LP Bot') {
             steps {
                 build job: 'Waves.Exchange/Matcher/Trading Bot - Test', propagate: false, wait: false, parameters: [
                   [$class: 'GitParameterValue', name: 'BRANCH_DEX', value: "${NEW_BRANCH_OR_TAG}"],
-                  [$class: 'GitParameterValue', name: 'BRANCH_BOT', value: "${NEW_BRANCH_OR_TAG}"],
+                  [$class: 'GitParameterValue', name: 'BRANCH_BOT', value: "${BRANCH_BOT}"],
                   [$class: 'StringParameterValue', name: 'LABEL', value: "PRE RELEASE"]
                 ]
             }

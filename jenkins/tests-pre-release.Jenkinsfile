@@ -64,6 +64,7 @@ pipeline {
                 kafkaBuildNumber = Jenkins.instance.getItemByFullName('Waves.Exchange/Matcher/Matcher Server - OS - Test - Kafka').getLastBuild().getNumber() + 1
                 multipleBuildNumber = Jenkins.instance.getItemByFullName('Waves.Exchange/Matcher/Matcher Server - OS - Test - Multiple Versions').getLastBuild().getNumber() + 1
                 versionBuildNumber = Jenkins.instance.getItemByFullName('Waves.Exchange/Matcher/Matcher Server - OS - Test - Version').getLastBuild().getNumber() + 1
+                botBuildNumber = Jenkins.instance.getItemByFullName('Waves.Exchange/Matcher/Trading Bot - Test').getLastBuild().getNumber() + 1
                 smokeMBuildNumber = Jenkins.instance.getItemByFullName('Waves.Exchange/Matcher/Matcher Server - OS - Test - Smoke').getLastBuild().getNumber() + 1
                 smokeNBuildNumber = smokeMBuildNumber + 1
 
@@ -72,9 +73,10 @@ pipeline {
                 versionBuild = "<a href='/job/Waves.Exchange/job/Matcher/job/Matcher Server - OS - Test - Version/${versionBuildNumber}'>Version</a>"
                 smokeNBuild = "<a href='/job/Waves.Exchange/job/Matcher/job/Matcher Server - OS - Test - Smoke/${smokeMBuildNumber}'>Smoke (old node, new dex)</a>"
                 smokeMBuild = "<a href='/job/Waves.Exchange/job/Matcher/job/Matcher Server - OS - Test - Smoke/${smokeNBuildNumber}'>Smoke (new node, old dex)</a>"
+                botBuild = "<a href='/job/Waves.Exchange/job/Matcher/job/Trading Bot - Test/${botBuildNumber}'>Trading Bot</a>"
 
                 currentBuild.displayName = "${NEW_BRANCH_OR_TAG}"
-                currentBuild.description = "${kafkaBuild} <br/> ${multipleBuild} <br/> ${versionBuild} <br/> ${smokeMBuild} <br/> ${smokeNBuild}"
+                currentBuild.description = "${kafkaBuild} <br/> ${multipleBuild} <br/> ${versionBuild} <br/> ${smokeMBuild} <br/> ${smokeNBuild} <br/> ${botBuild}"
             }
         }
         cleanup {

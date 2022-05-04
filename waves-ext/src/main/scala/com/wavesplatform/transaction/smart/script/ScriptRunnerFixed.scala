@@ -43,7 +43,6 @@ object ScriptRunnerFixed {
       default,
       blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls),
       blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls),
-      blockchain.height >= blockchain.settings.functionalitySettings.syncDAppCheckPaymentsHeight,
       blockchain.height > blockchain.settings.functionalitySettings.estimatorSumOverflowFixHeight
     )
 
@@ -133,7 +132,7 @@ object ScriptRunnerFixed {
         (Nil, 0, Verifier.verifyAsEllipticCurveSignature(proven).bimap(_.err, _ => TRUE))
 
       case other =>
-        (Nil, 0, AlwaysRejectError(s"$other: Unsupported script version").asLeft[EVALUATED])
+        (Nil, 0, CommonError(s"$other: Unsupported script version").asLeft[EVALUATED])
     }
   }
 

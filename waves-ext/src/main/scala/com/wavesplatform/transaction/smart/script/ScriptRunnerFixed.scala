@@ -56,7 +56,6 @@ object ScriptRunnerFixed {
     complexityLimit: Int,
     default: EVALUATED,
     useCorrectScriptVersion: Boolean,
-    fixUnicodeFunctions: Boolean,
     useNewPowPrecision: Boolean,
     correctFunctionCallScope: Boolean
   ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) = {
@@ -81,7 +80,6 @@ object ScriptRunnerFixed {
               isContract,
               scriptContainerAddress,
               txId,
-              fixUnicodeFunctions,
               useNewPowPrecision
             )
         } yield (ds, ctx)
@@ -135,7 +133,7 @@ object ScriptRunnerFixed {
         (Nil, 0, Verifier.verifyAsEllipticCurveSignature(proven).bimap(_.err, _ => TRUE))
 
       case other =>
-        (Nil, 0, s"$other: Unsupported script version".asLeft[EVALUATED])
+        (Nil, 0, AlwaysRejectError(s"$other: Unsupported script version").asLeft[EVALUATED])
     }
   }
 

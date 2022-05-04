@@ -374,7 +374,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
   private def parseScriptResult(raw: => Either[ExecutionError, Terms.EVALUATED]): RunScriptResponse.Result = {
     import RunScriptResponse.Result
     try raw match {
-      case Left(execError) => Result.ScriptError(execError)
+      case Left(execError) => Result.ScriptError(execError.message)
       case Right(FALSE) => Result.Denied(Empty())
       case Right(TRUE) => Result.Empty
       case Right(x) => Result.UnexpectedResult(x.toString)

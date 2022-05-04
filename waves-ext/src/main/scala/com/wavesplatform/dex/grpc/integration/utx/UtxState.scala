@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.grpc.integration.utx
 
-import cats.implicits.{catsSyntaxOptionId, catsSyntaxSemigroup}
+import cats.implicits.catsSyntaxOptionId
 import cats.syntax.option.none
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.grpc._
@@ -34,7 +34,7 @@ case class UtxState(
 
     transactions.foldLeft(Diff.empty) { case (acc, (_, (_, tx, d))) =>
       if (relevantDiff(d) && !blockchain.containsTransaction(tx))
-        acc |+| d
+        acc.unsafeCombine(d)
       else
         acc
     }

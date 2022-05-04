@@ -1,7 +1,6 @@
 package com.wavesplatform.dex.grpc.integration.protobuf
 
 import java.nio.charset.StandardCharsets
-
 import cats.syntax.either._
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
@@ -15,7 +14,8 @@ import com.wavesplatform.protobuf.order.Order
 import com.wavesplatform.protobuf.transaction.ExchangeTransactionData
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.exchange
-import com.wavesplatform.transaction.{Asset, Proofs}
+import com.wavesplatform.transaction.assets.exchange.OrderAuthentication
+import com.wavesplatform.transaction.{Asset, Proofs, TxExchangeAmount, TxMatcherFee, TxOrderPrice}
 
 object PbToWavesConversions {
 
@@ -56,7 +56,10 @@ object PbToWavesConversions {
 
     def toVanilla: exchange.Order =
       exchange.Order(
-        senderPublicKey = PublicKey(order.senderPublicKey.toVanilla),
+        orderAuthentication = OrderAuthentication.OrderProofs(
+          key = PublicKey(order.senderPublicKey.toVanilla),
+          proofs = order.proofs.map(_.toVanilla)
+        ),
         matcherPublicKey = PublicKey(order.matcherPublicKey.toVanilla),
         assetPair = exchange.AssetPair(order.getAssetPair.amountAssetId.toVanillaAsset, order.getAssetPair.priceAssetId.toVanillaAsset),
         orderType = order.orderSide match {
@@ -64,15 +67,19 @@ object PbToWavesConversions {
           case Order.Side.SELL => exchange.OrderType.SELL
           case Order.Side.Unrecognized(v) => throw new IllegalArgumentException(s"Unknown order type: $v")
         },
-        amount = order.amount,
-        price = order.price,
+        amount = TxExchangeAmount.from(order.amount)
+          .fold(s => throw new IllegalArgumentException(s"Invalid order amount ${order.amount}, error: $s"), identity),
+        price = TxOrderPrice.from(order.price)
+          .fold(s => throw new IllegalArgumentException(s"Invalid order price ${order.price}, error: $s"), identity),
         timestamp = order.timestamp,
         expiration = order.expiration,
         matcherFee = order.matcherFee.map(_.amount) match {
           case None => throw new IllegalArgumentException("The matcherFee must be specified")
-          case Some(x) => x
+          case Some(x) => TxMatcherFee.from(x).fold(
+              s => throw new IllegalArgumentException(s"Invalid order fee $x, error: $s"),
+              identity
+            )
         },
-        proofs = order.proofs.map(_.toVanilla),
         version = order.version.toByte,
         matcherFeeAssetId = order.matcherFee.map(_.assetId) match {
           case None => throw new IllegalArgumentException("The matcherFeeAssetId must be specified")

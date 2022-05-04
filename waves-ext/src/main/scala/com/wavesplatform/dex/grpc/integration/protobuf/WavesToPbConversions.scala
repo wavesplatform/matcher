@@ -33,8 +33,8 @@ object WavesToPbConversions {
             version = tx.version,
             data = ExchangeTransaction.Data.Exchange(
               ExchangeTransactionData(
-                amount = tx.amount,
-                price = tx.price,
+                amount = tx.amount.value,
+                price = tx.price.value,
                 buyMatcherFee = tx.buyMatcherFee,
                 sellMatcherFee = tx.sellMatcherFee,
                 orders = Seq(tx.buyOrder.toPB, tx.sellOrder.toPB)
@@ -72,11 +72,11 @@ object WavesToPbConversions {
           case ve.OrderType.BUY => Order.Side.BUY
           case ve.OrderType.SELL => Order.Side.SELL
         },
-        amount = order.amount,
-        price = order.price,
+        amount = order.amount.value,
+        price = order.price.value,
         timestamp = order.timestamp,
         expiration = order.expiration,
-        matcherFee = Some(Amount(order.matcherFeeAssetId.toPB, order.matcherFee)),
+        matcherFee = Some(Amount(order.matcherFeeAssetId.toPB, order.matcherFee.value)),
         version = order.version,
         proofs = order.proofs.map(_.toPB)
       )

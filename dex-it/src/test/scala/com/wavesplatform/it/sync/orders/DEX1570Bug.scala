@@ -58,9 +58,11 @@ class DEX1570Bug extends OrderFeeBaseTestSuite {
       )
       placeAndAwaitAtDex(ask1)
       placeAndAwaitAtDex(ask2)
-      val txs = placeAndAwaitAtNode(bid)
-
-      txs.size shouldBe 2
+      dex1.api.place(bid)
+      eventually {
+        val txs = waitForOrderAtNode(bid)
+        txs.size shouldBe 2
+      }
       val ca = AcceptedOrder.correctedAmountOfAmountAsset(708279445, 32499)
       val a =
         ca + AcceptedOrder.correctedAmountOfAmountAsset(

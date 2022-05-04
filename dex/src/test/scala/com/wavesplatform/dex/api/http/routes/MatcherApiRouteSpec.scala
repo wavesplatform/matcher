@@ -1425,7 +1425,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       () => MatcherStatus.Working,
       apiKeys map crypto.secureHash,
       rateCache,
-      testKit.spawn(WsExternalClientDirectoryActor(), s"ws-external-cd-${Random.nextInt(Int.MaxValue)}")
+      testKit.spawn(WsExternalClientDirectoryActor(settings), s"ws-external-cd-${Random.nextInt(Int.MaxValue)}")
     )
     val historyRoute = new HistoryRoute(
       settings.actorResponseTimeout,

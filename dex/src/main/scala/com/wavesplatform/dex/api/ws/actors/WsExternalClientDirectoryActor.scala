@@ -6,6 +6,9 @@ import com.wavesplatform.dex.api.http.entities.HttpWebSocketConnections
 import com.wavesplatform.dex.api.ws.protocol.WsRatesUpdates
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.error
+import com.wavesplatform.dex.settings.MatcherSettings
+import kamon.Kamon
+import kamon.metric.Gauge
 
 import scala.collection.immutable.{HashMap, TreeMap}
 
@@ -30,7 +33,7 @@ object WsExternalClientDirectoryActor {
     case class GetActiveNumber(client: ActorRef[HttpWebSocketConnections]) extends Query
   }
 
-  def apply(): Behavior[Message] =
+  def apply(settings: MatcherSettings): Behavior[Message] =
     Behaviors.setup[Message] { context =>
       context.system.eventStream
 
@@ -64,19 +67,21 @@ object WsExternalClientDirectoryActor {
               }
           }
 
-      default(State(0, HashMap.empty, TreeMap.empty))
+      default(State(0, HashMap.empty, TreeMap.empty, Kamon.gauge("matcher.ws.connections.count").withTag("node", settings.id)))
     }
 
   private type TargetActor = ActorRef[WsExternalClientHandlerActor.Message]
   private type Index = Int
 
-  private case class State(currentIndex: Index, all: Map[TargetActor, ConnectionInfo], infoMap: Map[String, Int]) {
+  private case class State(currentIndex: Index, all: Map[TargetActor, ConnectionInfo], infoMap: Map[String, Int], activeConnections: Gauge) {
 
     def withActor(x: TargetActor, os: String, client: String): State = {
       val info = ConnectionInfo(currentIndex, os, client)
+      val updatedAll = all.updated(x, info)
+      activeConnections.update(updatedAll.size)
       copy(
         currentIndex = currentIndex + 1,
-        all = all.updated(x, info),
+        all = updatedAll,
         infoMap = infoMap.updated(info.clientAndOs, infoMap.getOrElse(info.clientAndOs, 0) + 1)
       )
     }
@@ -88,8 +93,10 @@ object WsExternalClientDirectoryActor {
         val updatedInfoMap =
           if (updatedNumber == 0) infoMap.removed(info.clientAndOs)
           else infoMap.updated(info.clientAndOs, updatedNumber)
+        val updatedAll = all.removed(x)
+        activeConnections.update(updatedAll.size)
         copy(
-          all = all.removed(x),
+          all = updatedAll,
           infoMap = updatedInfoMap
         )
     }
@@ -107,7 +114,9 @@ object WsExternalClientDirectoryActor {
       }
 
       val oldestActors = oldest.map(_._1)
-      (copy(all = all -- oldestActors, infoMap = updatedInfoMap), oldestActors)
+      val updatedAll = all -- oldestActors
+      activeConnections.update(updatedAll.size)
+      (copy(all = updatedAll, infoMap = updatedInfoMap), oldestActors)
     }
 
   }

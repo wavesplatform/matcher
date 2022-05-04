@@ -26,6 +26,7 @@ case class GrpcClientSettings(
       .keepAliveWithoutCalls(keepAliveWithoutCalls)
       .keepAliveTime(keepAliveTime.length, keepAliveTime.unit)
       .keepAliveTimeout(keepAliveTimeout.length, keepAliveTimeout.unit)
+      .maxInboundMessageSize(4 * 1024 * 1024 * 5) //5 times bigger than default
       .idleTimeout(idleTimeout.length, idleTimeout.unit)
       .withOption[Integer](ChannelOption.CONNECT_TIMEOUT_MILLIS, channelOptions.connectTimeout.toMillis.toInt)
     InternalNettyChannelBuilder.setStatsEnabled(r, false)

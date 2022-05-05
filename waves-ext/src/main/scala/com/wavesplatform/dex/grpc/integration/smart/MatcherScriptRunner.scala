@@ -14,7 +14,7 @@ import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain, D
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.smart.script.ScriptRunnerFixed
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 import shapeless.Coproduct
 
 import scala.util.control.NoStackTrace
@@ -27,7 +27,9 @@ object MatcherScriptRunner {
     blockchain: Blockchain,
     isSynchronousCallsActivated: Boolean,
     useNewPowPrecision: Boolean,
-    correctFunctionCallScope: Boolean
+    correctFunctionCallScope: Boolean,
+    newMode: Boolean,
+    checkWeakPk: Boolean
   ): Either[ExecutionError, EVALUATED] =
     ScriptRunnerFixed.applyGeneric(
       in = Coproduct[ScriptRunnerFixed.TxOrd](order),
@@ -38,9 +40,10 @@ object MatcherScriptRunner {
       complexityLimit = Int.MaxValue,
       default = TRUE,
       isSynchronousCallsActivated,
-      isSynchronousCallsActivated,
       useNewPowPrecision,
-      correctFunctionCallScope
+      correctFunctionCallScope,
+      newMode,
+      checkWeakPk
     )._3
 
   private class Denied(methodName: String)
@@ -91,6 +94,8 @@ object MatcherScriptRunner {
     override def transactionMeta(id: BlockId): Option[TxMeta] = kill("transactionMeta")
     override def balanceAtHeight(address: Address, height: Int, assetId: Asset): Option[(Int, Long)] = kill("balanceAtHeight")
     override def assetScript(id: Asset.IssuedAsset): Option[AssetScriptInfo] = kill("assetScript")
+
+    override def resolveERC20Address(address: ERC20Address): Option[Asset.IssuedAsset] = kill("resolveERC20Address")
   }
 
 }

@@ -233,9 +233,10 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
       case Some(scriptInfo) =>
         val order = request.order.map(_.toVanilla).getOrElse(throwInvalidArgument("Expected an order"))
         val isSynchronousCallsActivated = context.blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
-        val useNewPowPrecision = context.blockchain.height > context.blockchain.settings.functionalitySettings.syncDAppCheckPaymentsHeight
+        val useNewPowPrecision = context.blockchain.height > context.blockchain.settings.functionalitySettings.enforceTransferValidationAfter
         val correctFunctionCallScope =
           context.blockchain.height > context.blockchain.settings.functionalitySettings.estimatorSumOverflowFixHeight
+        val rideActivated = context.blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
         if (allowedBlockchainStateAccounts.contains(order.senderPublicKey)) {
           val blockchain = CompositeBlockchain(context.blockchain, utxState.get().getAccountsDiff(context.blockchain))
           parseScriptResult(MatcherScriptRunner(
@@ -244,7 +245,9 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
             blockchain,
             isSynchronousCallsActivated,
             useNewPowPrecision,
-            correctFunctionCallScope
+            correctFunctionCallScope,
+            rideActivated,
+            rideActivated
           ))
         } else
           parseScriptResult(MatcherScriptRunner(
@@ -253,7 +256,9 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
             deniedBlockchain,
             isSynchronousCallsActivated,
             useNewPowPrecision,
-            correctFunctionCallScope
+            correctFunctionCallScope,
+            rideActivated,
+            rideActivated
           ))
     }
 

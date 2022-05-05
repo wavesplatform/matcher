@@ -63,7 +63,7 @@ trait WavesEntitiesGen {
       val order =
         if (tpe == OrderType.BUY) Order.buy(fixedVersion, sender, matcher, assetPair, amount, price, timestamp, expiration, fee, feeAsset)
         else Order.sell(fixedVersion, sender, matcher, assetPair, amount, price, timestamp, expiration, fee, feeAsset)
-      (order, sender)
+      (order.getOrElse(throw new RuntimeException), sender)
     }
 
   val exchangeTransactionGen: Gen[ExchangeTransaction] = {
@@ -86,7 +86,7 @@ trait WavesEntitiesGen {
       }
       (sellOrder, _) <- {
         val sideGen = Gen.const(OrderType.SELL)
-        val priceGen = Gen.choose(1L, buyOrder.price)
+        val priceGen = Gen.choose(1L, buyOrder.price.value)
         val assetPairGen = Gen.const(buyOrder.assetPair)
         if (version == 1)
           orderAndSenderGen(
@@ -108,7 +108,7 @@ trait WavesEntitiesGen {
       }
       fee <- orderFeeGen
     } yield {
-      val amount = math.min(buyOrder.amount, sellOrder.amount)
+      val amount = math.min(buyOrder.amount.value, sellOrder.amount.value)
       val price = buyOrder.price
       val fixedVersion =
         if (buyOrder.matcherFeeAssetId == Waves && sellOrder.matcherFeeAssetId == Waves) version else math.max(version, 2).toByte
@@ -118,9 +118,9 @@ trait WavesEntitiesGen {
           order1 = buyOrder,
           order2 = sellOrder,
           amount = amount,
-          price = price,
-          buyMatcherFee = buyOrder.matcherFee,
-          sellMatcherFee = sellOrder.matcherFee,
+          price = price.value,
+          buyMatcherFee = buyOrder.matcherFee.value,
+          sellMatcherFee = sellOrder.matcherFee.value,
           fee = fee,
           timestamp = timestamp
         )

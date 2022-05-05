@@ -43,7 +43,9 @@ object ScriptRunnerFixed {
       default,
       blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls),
       blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls),
-      blockchain.height > blockchain.settings.functionalitySettings.estimatorSumOverflowFixHeight
+      blockchain.height > blockchain.settings.functionalitySettings.estimatorSumOverflowFixHeight,
+      blockchain.isFeatureActivated(BlockchainFeatures.RideV6),
+      blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
     )
 
   def applyGeneric(
@@ -56,7 +58,9 @@ object ScriptRunnerFixed {
     default: EVALUATED,
     useCorrectScriptVersion: Boolean,
     useNewPowPrecision: Boolean,
-    correctFunctionCallScope: Boolean
+    correctFunctionCallScope: Boolean,
+    newMode: Boolean,
+    checkWeakPk: Boolean
   ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) = {
 
     def evalVerifier(
@@ -89,9 +93,9 @@ object ScriptRunnerFixed {
     def evaluate(ctx: EvaluationContext[Environment, Id], expr: EXPR): (Log[Id], Int, Either[ExecutionError, EVALUATED]) = {
       val (log, unusedComplexity, result) =
         if (complexityLimit == Int.MaxValue)
-          EvaluatorV2.applyCompleted(ctx, expr, script.stdLibVersion, correctFunctionCallScope)
+          EvaluatorV2.applyCompleted(ctx, expr, script.stdLibVersion, correctFunctionCallScope, newMode)
         else
-          EvaluatorV2.applyOrDefault(ctx, expr, script.stdLibVersion, complexityLimit, correctFunctionCallScope, _ => Right(default))
+          EvaluatorV2.applyOrDefault(ctx, expr, script.stdLibVersion, complexityLimit, correctFunctionCallScope, newMode, _ => Right(default))
       (log, complexityLimit - unusedComplexity, result)
     }
 
@@ -129,7 +133,7 @@ object ScriptRunnerFixed {
               _ => ???
             )
           )
-        (Nil, 0, Verifier.verifyAsEllipticCurveSignature(proven).bimap(_.err, _ => TRUE))
+        (Nil, 0, Verifier.verifyAsEllipticCurveSignature(proven, checkWeakPk).bimap(_.err, _ => TRUE))
 
       case other =>
         (Nil, 0, CommonError(s"$other: Unsupported script version").asLeft[EVALUATED])

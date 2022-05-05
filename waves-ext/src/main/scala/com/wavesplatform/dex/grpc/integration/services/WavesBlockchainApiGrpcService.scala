@@ -233,20 +233,28 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
       case Some(scriptInfo) =>
         val order = request.order.map(_.toVanilla).getOrElse(throwInvalidArgument("Expected an order"))
         val isSynchronousCallsActivated = context.blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
+        val fixUnicodeFunctions = context.blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
+        val useNewPowPrecision = context.blockchain.isFeatureActivated(
+          BlockchainFeatures.SynchronousCalls
+        ) && context.blockchain.height > context.blockchain.settings.functionalitySettings.enforceTransferValidationAfter
         if (allowedBlockchainStateAccounts.contains(order.senderPublicKey)) {
           val blockchain = CompositeBlockchain(context.blockchain, utxState.get().getAccountsDiff(context.blockchain))
           parseScriptResult(MatcherScriptRunner(
             scriptInfo.script,
             order,
             blockchain,
-            isSynchronousCallsActivated
+            isSynchronousCallsActivated,
+            fixUnicodeFunctions,
+            useNewPowPrecision
           ))
         } else
           parseScriptResult(MatcherScriptRunner(
             scriptInfo.script,
             order,
             deniedBlockchain,
-            isSynchronousCallsActivated
+            isSynchronousCallsActivated,
+            fixUnicodeFunctions,
+            useNewPowPrecision
           ))
     }
 

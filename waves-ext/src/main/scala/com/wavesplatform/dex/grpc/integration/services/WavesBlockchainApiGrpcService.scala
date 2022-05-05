@@ -28,7 +28,6 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.exchange
-import com.wavesplatform.transaction.smart.script.ScriptRunnerFixed
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.stub.{ServerCallStreamObserver, StreamObserver}
@@ -45,6 +44,7 @@ import scala.concurrent.Future
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 import com.wavesplatform.state.TxMeta
+import com.wavesplatform.transaction.smart.script.ScriptRunner
 
 class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchainStateAccounts: Set[ByteStr])(implicit sc: Scheduler)
     extends WavesBlockchainApiGrpc.WavesBlockchainApi
@@ -203,7 +203,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
           .getOrElse(throwInvalidArgument("Can't parse the transaction"))
 
         parseScriptResult(
-          ScriptRunnerFixed(
+          ScriptRunner(
             in = Coproduct(tx),
             blockchain = CompositeBlockchain(context.blockchain, utxState.get().getAccountsDiff(context.blockchain)),
             script = info.script,
@@ -233,32 +233,20 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
       case Some(scriptInfo) =>
         val order = request.order.map(_.toVanilla).getOrElse(throwInvalidArgument("Expected an order"))
         val isSynchronousCallsActivated = context.blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
-        val useNewPowPrecision = context.blockchain.height > context.blockchain.settings.functionalitySettings.enforceTransferValidationAfter
-        val correctFunctionCallScope =
-          context.blockchain.height > context.blockchain.settings.functionalitySettings.estimatorSumOverflowFixHeight
-        val rideActivated = context.blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
         if (allowedBlockchainStateAccounts.contains(order.senderPublicKey)) {
           val blockchain = CompositeBlockchain(context.blockchain, utxState.get().getAccountsDiff(context.blockchain))
           parseScriptResult(MatcherScriptRunner(
             scriptInfo.script,
             order,
             blockchain,
-            isSynchronousCallsActivated,
-            useNewPowPrecision,
-            correctFunctionCallScope,
-            rideActivated,
-            rideActivated
+            isSynchronousCallsActivated
           ))
         } else
           parseScriptResult(MatcherScriptRunner(
             scriptInfo.script,
             order,
             deniedBlockchain,
-            isSynchronousCallsActivated,
-            useNewPowPrecision,
-            correctFunctionCallScope,
-            rideActivated,
-            rideActivated
+            isSynchronousCallsActivated
           ))
     }
 

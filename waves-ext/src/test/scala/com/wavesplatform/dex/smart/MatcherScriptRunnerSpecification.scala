@@ -35,41 +35,19 @@ class MatcherScriptRunnerSpecification extends WavesExtSuiteBase with EitherValu
 
   private def run(
     script: Script,
-    isSynchronousCallsActivated: Boolean,
-    useNewPowPrecision: Boolean,
-    correctFunctionCallScope: Boolean,
-    newMode: Boolean,
-    checkWeakPk: Boolean
+    isSynchronousCallsActivated: Boolean
   ): Either[String, Terms.EVALUATED] =
-    MatcherScriptRunner(
-      script,
-      sampleOrder,
-      deniedBlockchain,
-      isSynchronousCallsActivated,
-      useNewPowPrecision,
-      correctFunctionCallScope,
-      newMode,
-      checkWeakPk
-    ).leftMap(_.message)
+    MatcherScriptRunner(script, sampleOrder, deniedBlockchain, isSynchronousCallsActivated).leftMap(_.message)
 
   "dApp sunny day" in {
-    List(false, true).combinations(5).foreach { params =>
-      val List(isSynchronousCallsActivated, useNewPowPrecision, correctFunctionCallScope, newMode, checkWeakPk) = params: @unchecked
-      run(
-        dAppScriptSunny,
-        isSynchronousCallsActivated,
-        useNewPowPrecision,
-        correctFunctionCallScope,
-        newMode,
-        checkWeakPk
-      ).explicitGet() shouldBe Terms.FALSE
+    List(false, true).foreach { isSynchronousCallsActivated =>
+      run(dAppScriptSunny, isSynchronousCallsActivated).explicitGet() shouldBe Terms.FALSE
     }
   }
 
   "Blockchain functions are disabled in dApp (isSynchronousCallsActivated = false)" in {
-    List(false, true).combinations(5).foreach { params =>
-      val List(isSynchronousCallsActivated, useNewPowPrecision, correctFunctionCallScope, newMode, checkWeakPk) = params: @unchecked
-      run(dAppScriptBlockchain, isSynchronousCallsActivated, useNewPowPrecision, correctFunctionCallScope, newMode, checkWeakPk) should produce(
+    List(false, true).foreach { isSynchronousCallsActivated =>
+      run(dAppScriptBlockchain, isSynchronousCallsActivated) should produce(
         "An access to <getBoolean(addressOrAlias: Address|Alias, key: String): Boolean|Unit> is denied"
       )
     }

@@ -44,7 +44,7 @@ import scala.concurrent.Future
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 import com.wavesplatform.state.TxMeta
-import com.wavesplatform.transaction.smart.script.ScriptRunner
+import com.wavesplatform.transaction.smart.script.ScriptRunnerFixed
 
 class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchainStateAccounts: Set[ByteStr])(implicit sc: Scheduler)
     extends WavesBlockchainApiGrpc.WavesBlockchainApi
@@ -203,7 +203,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
           .getOrElse(throwInvalidArgument("Can't parse the transaction"))
 
         parseScriptResult(
-          ScriptRunner(
+          ScriptRunnerFixed(
             in = Coproduct(tx),
             blockchain = CompositeBlockchain(context.blockchain, utxState.get().getAccountsDiff(context.blockchain)),
             script = info.script,

@@ -1,7 +1,6 @@
 package com.wavesplatform.dex.smart
 
 import cats.syntax.either._
-import java.nio.charset.StandardCharsets
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -16,6 +15,8 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.EitherValues
+
+import java.nio.charset.StandardCharsets
 
 class MatcherScriptRunnerSpecification extends WavesExtSuiteBase with EitherValues {
 
@@ -34,24 +35,51 @@ class MatcherScriptRunnerSpecification extends WavesExtSuiteBase with EitherValu
 
   private def run(
     script: Script,
-    isSynchronousCallsActivated: Boolean,
+    useCorrectScriptVersion: Boolean,
+    fixUnicodeFunctions: Boolean,
     useNewPowPrecision: Boolean,
-    correctFunctionCallScope: Boolean
+    checkEstimatorSumOverflow: Boolean,
+    newEvaluatorMode: Boolean
   ): Either[String, Terms.EVALUATED] =
-    MatcherScriptRunner(script, sampleOrder, deniedBlockchain, isSynchronousCallsActivated, useNewPowPrecision, correctFunctionCallScope)
+    MatcherScriptRunner(
+      script,
+      sampleOrder,
+      deniedBlockchain,
+      useCorrectScriptVersion,
+      fixUnicodeFunctions,
+      useNewPowPrecision,
+      checkEstimatorSumOverflow,
+      newEvaluatorMode
+    )
       .leftMap(_.message)
 
   "dApp sunny day" in {
-    List(false, true).combinations(3).foreach { params =>
-      val List(isSynchronousCallsActivated, useNewPowPrecision, correctFunctionCallScope) = params: @unchecked
-      run(dAppScriptSunny, isSynchronousCallsActivated, useNewPowPrecision, correctFunctionCallScope).explicitGet() shouldBe Terms.FALSE
+    List(false, true).combinations(5).foreach { params =>
+      val List(useCorrectScriptVersion, fixUnicodeFunctions, useNewPowPrecision, checkEstimatorSumOverflow, newEvaluatorMode) =
+        params: @unchecked
+      run(
+        dAppScriptSunny,
+        useCorrectScriptVersion,
+        fixUnicodeFunctions,
+        useNewPowPrecision,
+        checkEstimatorSumOverflow,
+        newEvaluatorMode
+      ).explicitGet() shouldBe Terms.FALSE
     }
   }
 
   "Blockchain functions are disabled in dApp (isSynchronousCallsActivated = false)" in {
     List(false, true).combinations(3).foreach { params =>
-      val List(isSynchronousCallsActivated, useNewPowPrecision, correctFunctionCallScope) = params: @unchecked
-      run(dAppScriptBlockchain, isSynchronousCallsActivated, useNewPowPrecision, correctFunctionCallScope) should produce(
+      val List(useCorrectScriptVersion, fixUnicodeFunctions, useNewPowPrecision, checkEstimatorSumOverflow, newEvaluatorMode) =
+        params: @unchecked
+      run(
+        dAppScriptBlockchain,
+        useCorrectScriptVersion,
+        fixUnicodeFunctions,
+        useNewPowPrecision,
+        checkEstimatorSumOverflow,
+        newEvaluatorMode
+      ) should produce(
         "An access to <getBoolean(addressOrAlias: Address|Alias, key: String): Boolean|Unit> is denied"
       )
     }

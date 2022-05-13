@@ -17,6 +17,8 @@ import com.wavesplatform.dex.grpc.integration.smart.MatcherScriptRunner
 import com.wavesplatform.dex.grpc.integration.smart.MatcherScriptRunner.deniedBlockchain
 import com.wavesplatform.dex.grpc.integration.utx.UtxState
 import com.wavesplatform.extensions.{Context => ExtensionContext}
+import com.wavesplatform.features.EstimatorProvider.EstimatorBlockchainExt
+import com.wavesplatform.features.EvaluatorFixProvider.CorrectFunctionCallScopeExt
 import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures}
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}
@@ -29,7 +31,7 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.exchange
-import com.wavesplatform.transaction.smart.script.ScriptRunnerFixed
+import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.stub.{ServerCallStreamObserver, StreamObserver}
@@ -203,7 +205,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
           .getOrElse(throwInvalidArgument("Can't parse the transaction"))
 
         parseScriptResult(
-          ScriptRunnerFixed(
+          ScriptRunner(
             in = Coproduct(tx),
             blockchain = CompositeBlockchain(context.blockchain, utxState.get().getAccountsDiff(context.blockchain)),
             script = info.script,
@@ -232,29 +234,35 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
       case None => Result.Empty
       case Some(scriptInfo) =>
         val order = request.order.map(_.toVanilla).getOrElse(throwInvalidArgument("Expected an order"))
-        val isSynchronousCallsActivated = context.blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
+        val useCorrectScriptVersion = context.blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
         val fixUnicodeFunctions = context.blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
-        val useNewPowPrecision = context.blockchain.isFeatureActivated(
-          BlockchainFeatures.SynchronousCalls
-        ) && context.blockchain.height > context.blockchain.settings.functionalitySettings.enforceTransferValidationAfter
+        val useNewPowPrecision = context.blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls) &&
+          context.blockchain.height > context.blockchain.settings.functionalitySettings.enforceTransferValidationAfter
+        val checkEstimatorSumOverflow = context.blockchain.checkEstimatorSumOverflow
+        val newEvaluatorMode = context.blockchain.newEvaluatorMode
+
         if (allowedBlockchainStateAccounts.contains(order.senderPublicKey)) {
           val blockchain = CompositeBlockchain(context.blockchain, utxState.get().getAccountsDiff(context.blockchain))
           parseScriptResult(MatcherScriptRunner(
             scriptInfo.script,
             order,
             blockchain,
-            isSynchronousCallsActivated,
+            useCorrectScriptVersion,
             fixUnicodeFunctions,
-            useNewPowPrecision
+            useNewPowPrecision,
+            checkEstimatorSumOverflow,
+            newEvaluatorMode
           ))
         } else
           parseScriptResult(MatcherScriptRunner(
             scriptInfo.script,
             order,
             deniedBlockchain,
-            isSynchronousCallsActivated,
+            useCorrectScriptVersion,
             fixUnicodeFunctions,
-            useNewPowPrecision
+            useNewPowPrecision,
+            checkEstimatorSumOverflow,
+            newEvaluatorMode
           ))
     }
 

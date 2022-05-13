@@ -34,7 +34,7 @@ case class UtxState(
 
     transactions.foldLeft(Diff.empty) { case (acc, (_, (_, tx, d))) =>
       if (relevantDiff(d) && !blockchain.containsTransaction(tx))
-        acc.unsafeCombine(d)
+        acc.combineF(d).toOption.getOrElse(acc)
       else
         acc
     }

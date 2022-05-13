@@ -12,7 +12,7 @@ import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain, DataEntry, LeaseBalance, TxMeta, VolumeAndFee}
 import com.wavesplatform.transaction.assets.exchange.Order
-import com.wavesplatform.transaction.smart.script.ScriptRunnerFixed
+import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 import shapeless.Coproduct
@@ -25,21 +25,25 @@ object MatcherScriptRunner {
     script: Script,
     order: Order,
     blockchain: Blockchain,
-    isSynchronousCallsActivated: Boolean,
+    useCorrectScriptVersion: Boolean,
     fixUnicodeFunctions: Boolean,
-    useNewPowPrecision: Boolean
+    useNewPowPrecision: Boolean,
+    checkEstimatorSumOverflow: Boolean,
+    newEvaluatorMode: Boolean
   ): Either[ExecutionError, EVALUATED] =
-    ScriptRunnerFixed.applyGeneric(
-      in = Coproduct[ScriptRunnerFixed.TxOrd](order),
+    ScriptRunner.applyGeneric(
+      in = Coproduct[ScriptRunner.TxOrd](order),
       blockchain = blockchain,
       script = script,
       isAssetScript = false,
       scriptContainerAddress = Coproduct[Environment.Tthis](Recipient.Address(ByteStr(order.senderPublicKey.toAddress.bytes))),
       defaultLimit = Int.MaxValue,
       default = TRUE,
-      isSynchronousCallsActivated,
+      useCorrectScriptVersion,
       fixUnicodeFunctions,
-      useNewPowPrecision
+      useNewPowPrecision,
+      checkEstimatorSumOverflow,
+      newEvaluatorMode
     )._3
 
   private class Denied(methodName: String)

@@ -295,7 +295,7 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
       withClue("run script") {
         val now = System.currentTimeMillis()
         val pair = AssetPair.createAssetPair(UsdId.toString, "WAVES").get
-        val buy = Order.buy(bob, matcher, pair, 1L, 2 * Order.PriceConstant, now, now + 1.day.toMillis, 0)
+        val buy = Order.buy(bob, matcher, pair, 1L, 2 * Order.PriceConstant, now, now + 1.day.toMillis, 1)
 
         client.runScript(receiver, buy).futureValue shouldBe RunScriptResult.Allowed
       }

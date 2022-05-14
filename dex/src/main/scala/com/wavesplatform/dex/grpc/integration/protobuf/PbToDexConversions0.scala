@@ -22,7 +22,7 @@ object PbToDexConversions0 {
     def getOrdersVanilla: Either[ValidationError, Seq[DexOrder]] =
       for {
         tx <-
-          signedTx.transaction
+          signedTx.transaction.wavesTransaction
             .fold[Either[ValidationError, Transaction]](GenericError("The transaction must be specified").asLeft)(_.asRight)
         data <- tx.data.exchange
           .fold[Either[ValidationError, ExchangeTransactionData]](GenericError("The transaction's data must be specified").asLeft)(_.asRight)
@@ -53,7 +53,7 @@ object PbToDexConversions0 {
           }
         }
       } yield DexOrder(
-        senderPublicKey = PublicKey(order.senderPublicKey.toVanilla),
+        senderPublicKey = PublicKey(order.getSenderPublicKey.toVanilla),
         matcherPublicKey = PublicKey(order.matcherPublicKey.toVanilla),
         assetPair = AssetPair(order.getAssetPair.amountAssetId.toVanillaAsset, order.getAssetPair.priceAssetId.toVanillaAsset),
         orderType = orderType,

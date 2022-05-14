@@ -57,7 +57,7 @@ object PbToWavesConversions {
     def toVanilla: exchange.Order =
       exchange.Order(
         orderAuthentication = OrderAuthentication.OrderProofs(
-          key = PublicKey(order.senderPublicKey.toVanilla),
+          key = PublicKey(order.getSenderPublicKey.toVanilla),
           proofs = order.proofs.map(_.toVanilla)
         ),
         matcherPublicKey = PublicKey(order.matcherPublicKey.toVanilla),

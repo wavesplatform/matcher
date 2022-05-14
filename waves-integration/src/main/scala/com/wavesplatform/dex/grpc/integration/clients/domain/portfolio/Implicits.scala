@@ -23,13 +23,13 @@ object Implicits {
   implicit final class UtxTransactionOps(val self: UtxTransaction) extends AnyVal {
 
     def pessimisticPortfolios: AddressAssets = self.diff.flatMap(_.stateUpdate).fold(Map.empty: AddressAssets) {
-      _.pessimisticPortfolios(self.transaction.flatMap(_.transaction))
+      _.pessimisticPortfolios(self.transaction.flatMap(_.transaction.wavesTransaction))
     }
 
   }
 
   implicit final class TransactionWithChangesOps(val self: TransactionWithChanges) extends AnyVal {
-    def pessimisticPortfolios: AddressAssets = self.changes.pessimisticPortfolios(self.tx.transaction)
+    def pessimisticPortfolios: AddressAssets = self.changes.pessimisticPortfolios(self.tx.transaction.wavesTransaction)
   }
 
   // Probably we need to move ByteString -> Address conversion further
@@ -71,7 +71,7 @@ object Implicits {
   }
 
   def exchangeTransactionPessimisticPortfolios(tx: ExchangeTransactionData): AddressAssets = tx.orders.toList.foldMap { o =>
-    val sender = o.senderPublicKey.toVanillaPublicKey.toAddress
+    val sender = o.getSenderPublicKey.toVanillaPublicKey.toAddress
 
     val feeSpending = o.matcherFee.fold(Map.empty[Asset, Long]) { x =>
       val amount = if (o.orderSide.isSell) tx.sellMatcherFee else tx.buyMatcherFee

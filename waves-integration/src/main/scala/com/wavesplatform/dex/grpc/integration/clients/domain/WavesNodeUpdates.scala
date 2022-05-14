@@ -55,9 +55,9 @@ object WavesNodeUpdates {
         val pp = tx.pessimisticPortfolios
 
         val addresses = for {
-          tx <- tx.tx.transaction.toSeq
+          tx <- tx.tx.transaction.wavesTransaction.toSeq
           order <- tx.getExchange.orders
-        } yield order.senderPublicKey.toVanillaPublicKey.toAddress
+        } yield order.getSenderPublicKey.toVanillaPublicKey.toAddress
 
         addresses.toSet // maker and taker could be the same
           .foldLeft(r) { case (r, address) => r.updated(address, r(address).updated(txId, pp.getOrElse(address, Map.empty))) }

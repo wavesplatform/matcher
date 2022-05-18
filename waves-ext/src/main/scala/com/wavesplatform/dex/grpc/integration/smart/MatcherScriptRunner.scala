@@ -12,7 +12,7 @@ import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain, DataEntry, LeaseBalance, TxMeta, VolumeAndFee}
 import com.wavesplatform.transaction.assets.exchange.Order
-import com.wavesplatform.transaction.smart.script.ScriptRunner
+import com.wavesplatform.transaction.smart.script.ScriptRunnerFixed
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 import shapeless.Coproduct
@@ -29,10 +29,11 @@ object MatcherScriptRunner {
     fixUnicodeFunctions: Boolean,
     useNewPowPrecision: Boolean,
     checkEstimatorSumOverflow: Boolean,
-    newEvaluatorMode: Boolean
+    newEvaluatorMode: Boolean,
+    checkWeakPk: Boolean
   ): Either[ExecutionError, EVALUATED] =
-    ScriptRunner.applyGeneric(
-      in = Coproduct[ScriptRunner.TxOrd](order),
+    ScriptRunnerFixed.applyGeneric(
+      in = Coproduct[ScriptRunnerFixed.TxOrd](order),
       blockchain = blockchain,
       script = script,
       isAssetScript = false,
@@ -43,7 +44,8 @@ object MatcherScriptRunner {
       fixUnicodeFunctions,
       useNewPowPrecision,
       checkEstimatorSumOverflow,
-      newEvaluatorMode
+      newEvaluatorMode,
+      checkWeakPk
     )._3
 
   private class Denied(methodName: String)

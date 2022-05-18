@@ -240,6 +240,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
           context.blockchain.height > context.blockchain.settings.functionalitySettings.enforceTransferValidationAfter
         val checkEstimatorSumOverflow = context.blockchain.checkEstimatorSumOverflow
         val newEvaluatorMode = context.blockchain.newEvaluatorMode
+        val checkWeakPk = context.blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
 
         if (allowedBlockchainStateAccounts.contains(order.senderPublicKey)) {
           val blockchain = CompositeBlockchain(context.blockchain, utxState.get().getAccountsDiff(context.blockchain))
@@ -251,7 +252,8 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
             fixUnicodeFunctions,
             useNewPowPrecision,
             checkEstimatorSumOverflow,
-            newEvaluatorMode
+            newEvaluatorMode,
+            checkWeakPk
           ))
         } else
           parseScriptResult(MatcherScriptRunner(
@@ -262,7 +264,8 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
             fixUnicodeFunctions,
             useNewPowPrecision,
             checkEstimatorSumOverflow,
-            newEvaluatorMode
+            newEvaluatorMode,
+            checkWeakPk
           ))
     }
 

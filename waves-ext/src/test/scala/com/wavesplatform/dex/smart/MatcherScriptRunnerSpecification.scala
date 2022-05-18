@@ -39,7 +39,8 @@ class MatcherScriptRunnerSpecification extends WavesExtSuiteBase with EitherValu
     fixUnicodeFunctions: Boolean,
     useNewPowPrecision: Boolean,
     checkEstimatorSumOverflow: Boolean,
-    newEvaluatorMode: Boolean
+    newEvaluatorMode: Boolean,
+    checkWeakPk: Boolean
   ): Either[String, Terms.EVALUATED] =
     MatcherScriptRunner(
       script,
@@ -49,13 +50,14 @@ class MatcherScriptRunnerSpecification extends WavesExtSuiteBase with EitherValu
       fixUnicodeFunctions,
       useNewPowPrecision,
       checkEstimatorSumOverflow,
-      newEvaluatorMode
+      newEvaluatorMode,
+      checkWeakPk
     )
       .leftMap(_.message)
 
   "dApp sunny day" in {
-    List(false, true).combinations(5).foreach { params =>
-      val List(useCorrectScriptVersion, fixUnicodeFunctions, useNewPowPrecision, checkEstimatorSumOverflow, newEvaluatorMode) =
+    List(false, true).combinations(6).foreach { params =>
+      val List(useCorrectScriptVersion, fixUnicodeFunctions, useNewPowPrecision, checkEstimatorSumOverflow, newEvaluatorMode, checkWeakPk) =
         params: @unchecked
       run(
         dAppScriptSunny,
@@ -63,14 +65,15 @@ class MatcherScriptRunnerSpecification extends WavesExtSuiteBase with EitherValu
         fixUnicodeFunctions,
         useNewPowPrecision,
         checkEstimatorSumOverflow,
-        newEvaluatorMode
+        newEvaluatorMode,
+        checkWeakPk
       ).explicitGet() shouldBe Terms.FALSE
     }
   }
 
   "Blockchain functions are disabled in dApp (isSynchronousCallsActivated = false)" in {
     List(false, true).combinations(3).foreach { params =>
-      val List(useCorrectScriptVersion, fixUnicodeFunctions, useNewPowPrecision, checkEstimatorSumOverflow, newEvaluatorMode) =
+      val List(useCorrectScriptVersion, fixUnicodeFunctions, useNewPowPrecision, checkEstimatorSumOverflow, newEvaluatorMode, checkWeakPk) =
         params: @unchecked
       run(
         dAppScriptBlockchain,
@@ -78,7 +81,8 @@ class MatcherScriptRunnerSpecification extends WavesExtSuiteBase with EitherValu
         fixUnicodeFunctions,
         useNewPowPrecision,
         checkEstimatorSumOverflow,
-        newEvaluatorMode
+        newEvaluatorMode,
+        checkWeakPk
       ) should produce(
         "An access to <getBoolean(addressOrAlias: Address|Alias, key: String): Boolean|Unit> is denied"
       )

@@ -26,9 +26,8 @@ class EthereumTransactionTestSuite extends MatcherSuiteBase {
         )
       wavesNode1.api.broadcastEth(txData)
 
-      //TODO waitForTransaction can replace eventually here
-      //but it doesn't work with eth transactions
-      //need to wait wavej update
+      //TODO "waitForTransaction" can replace "eventually" here
+      //but currently wavej doesn't support eth transactions
 
       eventually {
         val aliceState2 = dex1.api.getAddressState(aliceEthWavesAdr)

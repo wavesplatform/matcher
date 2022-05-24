@@ -81,6 +81,8 @@ object Dependencies {
     val enumeratum = "1.7.0"
 
     val scalaPbJson = "0.9.3" // updating causes scalapb version conflicts in waves-integration-it tests (class scalapb/Message not found)
+
+    val web3jCore = "4.9.2"
   }
 
   private def akkaModule(module: String, version: String): ModuleID = "com.typesafe.akka" %% module % version
@@ -128,6 +130,8 @@ object Dependencies {
     // Also, wavesj doesn't use gRPC, so it is safe.
     ExclusionRule(organization = "io.grpc")
   )
+
+  private val web3jCore = "org.web3j" % "core" % Version.web3jCore
 
   private val toxiProxy = "org.testcontainers" % "toxiproxy" % Version.testContainersToxiProxy
   private val googleGuava = "com.google.guava" % "guava" % Version.googleGuava
@@ -191,7 +195,7 @@ object Dependencies {
     diffx
   ).map(_ % Test) ++ silencer
 
-  private val integrationTestKit: Seq[ModuleID] = Seq(wavesJ, logback % Test) ++ testKit
+  private val integrationTestKit: Seq[ModuleID] = Seq(wavesJ, web3jCore, logback % Test) ++ testKit
 
   val kanela = "io.kamon" % "kanela-agent" % Version.kanela
 
@@ -259,6 +263,7 @@ object Dependencies {
       sttpPlayJson,
       sttpAsyncHttpClient,
       wavesJ,
+      web3jCore,
       betterMonadicFor,
       iq80leveldb
     ) ++ pureConfig ++ enumeratum ++ testKit ++ quill ++ monocle ++ levelDBJNA
@@ -277,6 +282,7 @@ object Dependencies {
       scalaTest,
       toxiProxy,
       wavesJ,
+      web3jCore,
       sttpClient,
       sttpPlayJson
     ) ++ testContainers

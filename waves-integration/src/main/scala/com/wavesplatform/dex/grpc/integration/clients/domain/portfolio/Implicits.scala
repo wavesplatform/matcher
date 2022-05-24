@@ -36,7 +36,7 @@ object Implicits {
   implicit final class StateUpdateOps(val self: StateUpdate) extends AnyVal {
 
     def pessimisticPortfolios(tx: Option[Transaction]): AddressAssets = tx.flatMap(_.data.exchange) match {
-      case Some(x) => exchangeTransactionPessimisticPortfolios(x)
+//      case Some(x) => exchangeTransactionPessimisticPortfolios(x)
       case _ => genericPessimisticPortfolios
     }
 

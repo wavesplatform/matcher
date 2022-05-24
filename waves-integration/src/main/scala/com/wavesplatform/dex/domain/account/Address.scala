@@ -1,9 +1,9 @@
 package com.wavesplatform.dex.domain.account
 
 import java.nio.ByteBuffer
-
 import cats.syntax.either._
 import com.google.common.cache.{Cache, CacheBuilder}
+import com.google.common.primitives.Bytes
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
@@ -37,6 +37,13 @@ object Address extends ScorexLogging {
     .softValues()
     .maximumSize(200000)
     .build()
+
+  def fromPublicKeyHash(publicKeyHash: Array[Byte], chainId: Byte = scheme.chainId): Address = {
+    require(publicKeyHash.length == HashLength, "Public key hash should be 20 bytes long")
+    val checksumPayload = Bytes.concat(Array(1.toByte, AddressScheme.current.chainId), publicKeyHash)
+    val checksum = crypto.secureHash(checksumPayload)
+    createUnsafe(Bytes.concat(Array(1.toByte, chainId), publicKeyHash, checksum.take(4)))
+  }
 
   def fromPublicKey(publicKey: PublicKey, chainId: Byte = scheme.chainId): Address =
     publicKeyBytesCache.get(

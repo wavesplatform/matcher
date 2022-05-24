@@ -85,6 +85,23 @@ class AsyncEnrichedNodeApi(apiKey: String, host: => InetSocketAddress)(implicit 
       .header("X-API-Key", apiKey)
   }
 
+  override def broadcastEth(ethTx: Array[Byte]): R[Unit] = mkIgnore {
+    basicRequest
+      .post(uri"$apiUri/eth")
+      .body(
+        Json.toJson(
+          JsObject(
+            Map(
+              "id" -> JsString("test"),
+              "params" -> JsArray(Seq(JsString(org.web3j.utils.Numeric.toHexString(ethTx)))),
+              "method" -> JsString("eth_sendRawTransaction")
+            )
+          )
+        )
+      )
+      .contentType(MediaType.ApplicationJson)
+  }
+
 }
 
 object AsyncEnrichedNodeApi {

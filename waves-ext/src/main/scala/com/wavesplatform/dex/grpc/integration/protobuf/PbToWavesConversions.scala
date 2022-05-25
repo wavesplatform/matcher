@@ -56,10 +56,15 @@ object PbToWavesConversions {
 
     def toVanilla: exchange.Order =
       exchange.Order(
-        orderAuthentication = OrderAuthentication.OrderProofs(
-          key = PublicKey(order.getSenderPublicKey.toVanilla),
-          proofs = order.proofs.map(_.toVanilla)
-        ),
+        orderAuthentication =
+          order.sender.eip712Signature.map { eip =>
+            OrderAuthentication.Eip712Signature(eip.toVanilla)
+          }.getOrElse {
+            OrderAuthentication.OrderProofs(
+              key = PublicKey(order.getSenderPublicKey.toVanilla),
+              proofs = order.proofs.map(_.toVanilla)
+            )
+          },
         matcherPublicKey = PublicKey(order.matcherPublicKey.toVanilla),
         assetPair = exchange.AssetPair(order.getAssetPair.amountAssetId.toVanillaAsset, order.getAssetPair.priceAssetId.toVanillaAsset),
         orderType = order.orderSide match {

@@ -4,6 +4,7 @@ import cats.syntax.option._
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.google.protobuf.ByteString
 import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.grpc.integration.IntegrationSuiteBase
 import com.wavesplatform.dex.grpc.integration.clients.ControlledStream.SystemEvent
 import com.wavesplatform.dex.grpc.integration.clients.blockchainupdates.{BlockchainUpdatesConversions, DefaultBlockchainUpdatesClient}
@@ -15,6 +16,7 @@ import com.wavesplatform.dex.grpc.integration.tool.RestartableManagedChannel
 import com.wavesplatform.dex.it.api.HasToxiProxy
 import com.wavesplatform.dex.it.docker.WavesNodeContainer
 import com.wavesplatform.dex.it.test.NoStackTraceCancelAfterFailure
+import com.wavesplatform.dex.model.AcceptedOrder
 import com.wavesplatform.transactions.Transaction
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.nio.NioSocketChannel
@@ -75,20 +77,57 @@ class BlockchainUpdatesClientTestSuite extends IntegrationSuiteBase with HasToxi
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    broadcastAndAwait(IssueUsdTx)
+    broadcastAndAwait(IssueUsdTx, IssueBtcTx)
   }
 
   "StateUpdate.pessimisticPortfolio" - {
-    "ExchangeTransaction with one trader - returns an expected value" in {
-      val priceCoef = BigInt(10).pow(8 + IssueUsdTx.decimals() - 8).toLong
-      val exchangeTx = mkExchange(alice, alice, wavesUsdPair, 3_00000000, 2 * priceCoef, matcher = matcher)
+    "Exchange with one trader" in {
+      val exchangeTx = mkExchange(alice, alice, wavesUsdPair, 100.waves, 2.usd, matcher = matcher, matcherFee = matcherFee)
 
       val pp = sendAndWaitTxFromStream(exchangeTx).pessimisticPortfolios
       withClue(s"pp: ${pp.mkString(", ")}: ") {
         pp should matchTo(Map(
           alice.toAddress -> Map[Asset, Long](
-            Asset.Waves -> -(3_00000000 + 2 * matcherFee), // sell 3 WAVES and spend fees for both orders
-            usd -> -3 * 200 // buy 3 WAVES for 200 cents each
+            Asset.Waves -> -(2 * matcherFee)
+          )
+        ))
+      }
+    }
+
+    "Exchange with two traders" in {
+      val ex = mkExchange(bob, alice, wavesBtcPair, 100000, 80000L, matcher = matcher, matcherFee = matcherFee)
+      val pp = sendAndWaitTxFromStream(ex).pessimisticPortfolios
+      withClue(s"pp: ${pp.mkString(", ")}: ") {
+        pp should matchTo(Map(
+          alice.toAddress -> Map[Asset, Long](
+            Asset.Waves -> -(matcherFee + 100000) //required matcherFee + sell amount
+          ),
+          bob.toAddress -> Map[Asset, Long](
+            Asset.Waves -> -(matcherFee - 100000), //required matcher fee - amount that will be acquired
+            btc -> -AcceptedOrder.calcAmountOfPriceAsset(100000, 80000L)
+          )
+        ))
+      }
+    }
+
+    "Transfer waves" in {
+      val pp = sendAndWaitTxFromStream(mkTransfer(alice, bob, 15.waves, Waves, feeAmount = minFee)).pessimisticPortfolios
+      withClue(s"pp: ${pp.mkString(", ")}: ") {
+        pp should matchTo(Map(
+          alice.toAddress -> Map[Asset, Long](
+            Asset.Waves -> -(15.waves + minFee)
+          )
+        ))
+      }
+    }
+
+    "Transfer usd" in {
+      val pp = sendAndWaitTxFromStream(mkTransfer(alice, bob, 7.usd, usd, feeAmount = minFee)).pessimisticPortfolios
+      withClue(s"pp: ${pp.mkString(", ")}: ") {
+        pp should matchTo(Map(
+          alice.toAddress -> Map[Asset, Long](
+            usd -> -7.usd,
+            Asset.Waves -> -minFee
           )
         ))
       }

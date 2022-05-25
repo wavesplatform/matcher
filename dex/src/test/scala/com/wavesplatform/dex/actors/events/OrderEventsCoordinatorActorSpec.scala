@@ -22,11 +22,10 @@ import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTr
 import com.wavesplatform.dex.grpc.integration.clients.domain.{AddressBalanceUpdates, TransactionWithChanges, WavesNodeUpdates}
 import com.wavesplatform.dex.grpc.integration.protobuf.DexToPbConversions._
 import com.wavesplatform.dex.model.Events.ExchangeTransactionCreated
-import com.wavesplatform.dex.model.{Events, LimitOrder}
+import com.wavesplatform.dex.model.{AcceptedOrder, Events, LimitOrder}
 import com.wavesplatform.dex.{error, MatcherSpecBase}
 import com.wavesplatform.events.protobuf.StateUpdate
 import com.wavesplatform.protobuf.transaction.{SignedTransaction, Transaction}
-import org.scalatest.OptionValues
 import org.scalatest.freespec.AnyFreeSpecLike
 import org.scalatest.matchers.should.Matchers
 
@@ -34,12 +33,7 @@ import java.nio.charset.StandardCharsets
 import scala.concurrent.duration.DurationInt
 import scala.reflect.ClassTag
 
-class OrderEventsCoordinatorActorSpec
-    extends ScalaTestWithActorTestKit()
-    with MatcherSpecBase
-    with AnyFreeSpecLike
-    with Matchers
-    with OptionValues {
+class OrderEventsCoordinatorActorSpec extends ScalaTestWithActorTestKit() with MatcherSpecBase with AnyFreeSpecLike with Matchers {
 
   implicit private val actorSystem = testKit.internalSystem
   implicit private val classicActorSystem = actorSystem.classicSystem
@@ -217,11 +211,11 @@ class OrderEventsCoordinatorActorSpec
     }
 
     "ApplyNodeUpdates" - {
+
       val validTxWithChanges = TransactionWithChanges(
         validTx.id().toPB,
         tx = SignedTransaction(
-          SignedTransaction.Transaction.WavesTransaction {
-            val tx = validTx.toPB.transaction.value
+          transaction = validTx.toPB.transaction.map { tx =>
             Transaction(
               chainId = tx.chainId,
               senderPublicKey = tx.senderPublicKey,
@@ -232,7 +226,33 @@ class OrderEventsCoordinatorActorSpec
             )
           }
         ),
-        changes = StateUpdate()
+        changes = {
+          val priceAssetAmount = AcceptedOrder.calcAmountOfPriceAsset(100000L, 80000L)
+          StateUpdate(
+            balances = Seq(
+              StateUpdate.BalanceUpdate(
+                validCounter.sender.toAddress.toPB,
+                amountAfter = Some(com.wavesplatform.protobuf.Amount(Waves.toPB, 100000L)),
+                amountBefore = 2000L //2000L required fee
+              ),
+              StateUpdate.BalanceUpdate(
+                validCounter.sender.toAddress.toPB,
+                amountAfter = Some(com.wavesplatform.protobuf.Amount(btc.toPB, amount = 0)),
+                amountBefore = priceAssetAmount
+              ),
+              StateUpdate.BalanceUpdate(
+                validSubmitted.sender.toAddress.toPB,
+                amountAfter = Some(com.wavesplatform.protobuf.Amount(Waves.toPB, amount = 0)),
+                amountBefore = 100000L + 1000L //1000L - fee
+              ),
+              StateUpdate.BalanceUpdate(
+                validSubmitted.sender.toAddress.toPB,
+                amountAfter = Some(com.wavesplatform.protobuf.Amount(btc.toPB, amount = priceAssetAmount)),
+                amountBefore = 0
+              )
+            )
+          )
+        }
       )
 
       "if a transaction is already observed - ignores it" in {
@@ -294,7 +314,7 @@ class OrderEventsCoordinatorActorSpec
           actual1 should matchTo(AddressDirectoryActor.Command.ForwardMessage(
             validCounter.sender.toAddress,
             AddressActor.Command.MarkTxsObserved(Map(
-              validTx.id() -> mkObservedTxData(PositiveMap(validEvent.counterExecutedSpending))
+              validTx.id() -> mkObservedTxData(PositiveMap(Map(btc -> 80)))
             ))
           ))
 
@@ -302,7 +322,7 @@ class OrderEventsCoordinatorActorSpec
           actual2 should matchTo(AddressDirectoryActor.Command.ForwardMessage(
             validSubmitted.sender.toAddress,
             AddressActor.Command.MarkTxsObserved(Map(
-              validTx.id() -> mkObservedTxData(PositiveMap(validEvent.submittedExecutedSpending))
+              validTx.id() -> mkObservedTxData(PositiveMap(Map(Waves -> 101000)))
             ))
           ))
         }
@@ -359,7 +379,7 @@ class OrderEventsCoordinatorActorSpec
             validCounter.sender.toAddress,
             AddressActor.Command.ApplyBatch(
               AddressActor.Command.MarkTxsObserved(Map(
-                validTx.id() -> mkObservedTxData(PositiveMap(validEvent.counterExecutedSpending))
+                validTx.id() -> mkObservedTxData(PositiveMap(Map(btc -> 80)))
               )),
               AddressActor.Command.ChangeBalances(addressBalanceUpdates)
             )

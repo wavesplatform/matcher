@@ -65,7 +65,9 @@ object WavesToPbConversions {
     def toPB: Order =
       Order(
         chainId = va.AddressScheme.current.chainId.toInt,
-        sender = Order.Sender.SenderPublicKey(order.senderPublicKey.toPB),
+        sender = order.eip712Signature.map { eip =>
+          Order.Sender.Eip712Signature(eip.toPB)
+        }.getOrElse(Order.Sender.SenderPublicKey(order.senderPublicKey.toPB)),
         matcherPublicKey = order.matcherPublicKey.toPB,
         assetPair = Some(AssetPair(order.assetPair.amountAsset.toPB, order.assetPair.priceAsset.toPB)),
         orderSide = order.orderType match {

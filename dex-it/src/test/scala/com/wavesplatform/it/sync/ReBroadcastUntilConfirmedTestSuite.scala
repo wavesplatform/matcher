@@ -47,8 +47,10 @@ class ReBroadcastUntilConfirmedTestSuite extends MatcherSuiteBase with EitherVal
 
     // We expect here, that a broadcaster will send a tx again and it will be broadcasted
     markup("Check that transaction is confirmed")
-    wavesNode2.tryApi.transactionInfo(exchangeTxId).isRight shouldBe true
-    wavesNode1.tryApi.transactionInfo(exchangeTxId).isRight shouldBe true
+    eventually {
+      wavesNode2.tryApi.transactionInfo(exchangeTxId).isRight shouldBe true
+      wavesNode1.tryApi.transactionInfo(exchangeTxId).isRight shouldBe true
+    }
   }
 
   override protected def beforeAll(): Unit = {

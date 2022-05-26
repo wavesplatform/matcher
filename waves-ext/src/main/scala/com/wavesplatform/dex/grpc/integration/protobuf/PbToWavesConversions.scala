@@ -1,6 +1,5 @@
 package com.wavesplatform.dex.grpc.integration.protobuf
 
-import java.nio.charset.StandardCharsets
 import cats.syntax.either._
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
@@ -14,8 +13,9 @@ import com.wavesplatform.protobuf.order.Order
 import com.wavesplatform.protobuf.transaction.ExchangeTransactionData
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.exchange
-import com.wavesplatform.transaction.assets.exchange.{OrderAuthentication, OrderPriceMode}
 import com.wavesplatform.transaction.{Asset, Proofs, TxExchangeAmount, TxMatcherFee, TxOrderPrice}
+
+import java.nio.charset.StandardCharsets
 
 object PbToWavesConversions {
 
@@ -58,12 +58,12 @@ object PbToWavesConversions {
       exchange.Order(
         orderAuthentication = order.sender match {
           case Order.Sender.SenderPublicKey(key) =>
-            OrderAuthentication.OrderProofs(
+            exchange.OrderAuthentication.OrderProofs(
               PublicKey(key.toVanilla),
               order.proofs.map(_.toVanilla)
             )
           case Order.Sender.Eip712Signature(sig) =>
-            OrderAuthentication.Eip712Signature(sig.toVanilla)
+            exchange.OrderAuthentication.Eip712Signature(sig.toVanilla)
           case Order.Sender.Empty =>
             throw new IllegalArgumentException("Order should have either senderPublicKey or eip712Signature")
         },
@@ -88,9 +88,9 @@ object PbToWavesConversions {
             )
         },
         priceMode = order.priceMode match {
-          case Order.PriceMode.ASSET_DECIMALS => OrderPriceMode.AssetDecimals
-          case Order.PriceMode.FIXED_DECIMALS => OrderPriceMode.FixedDecimals
-          case Order.PriceMode.DEFAULT => OrderPriceMode.Default
+          case Order.PriceMode.ASSET_DECIMALS => exchange.OrderPriceMode.AssetDecimals
+          case Order.PriceMode.FIXED_DECIMALS => exchange.OrderPriceMode.FixedDecimals
+          case Order.PriceMode.DEFAULT => exchange.OrderPriceMode.Default
           case Order.PriceMode.Unrecognized(v) => throw new IllegalArgumentException(s"Unknown order price mode: $v")
         },
         version = order.version.toByte,

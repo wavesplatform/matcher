@@ -13,7 +13,6 @@ import com.wavesplatform.protobuf.transaction.{ExchangeTransactionData, PBTransa
 import com.wavesplatform.state.{Diff, Portfolio}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.exchange.{OrderAuthentication, OrderPriceMode}
 import com.wavesplatform.transaction.assets.{exchange => ve}
 import com.wavesplatform.{account => va}
 
@@ -67,9 +66,9 @@ object WavesToPbConversions {
       Order(
         chainId = va.AddressScheme.current.chainId.toInt,
         sender = order.orderAuthentication match {
-          case OrderAuthentication.Eip712Signature(sig) =>
+          case ve.OrderAuthentication.Eip712Signature(sig) =>
             Order.Sender.Eip712Signature(sig.toPB)
-          case OrderAuthentication.OrderProofs(key, _) =>
+          case ve.OrderAuthentication.OrderProofs(key, _) =>
             Order.Sender.SenderPublicKey(key.toPB)
         },
         matcherPublicKey = order.matcherPublicKey.toPB,
@@ -79,9 +78,9 @@ object WavesToPbConversions {
           case ve.OrderType.SELL => Order.Side.SELL
         },
         priceMode = order.priceMode match {
-          case OrderPriceMode.AssetDecimals => Order.PriceMode.ASSET_DECIMALS
-          case OrderPriceMode.FixedDecimals => Order.PriceMode.FIXED_DECIMALS
-          case OrderPriceMode.Default => Order.PriceMode.DEFAULT
+          case ve.OrderPriceMode.AssetDecimals => Order.PriceMode.ASSET_DECIMALS
+          case ve.OrderPriceMode.FixedDecimals => Order.PriceMode.FIXED_DECIMALS
+          case ve.OrderPriceMode.Default => Order.PriceMode.DEFAULT
         },
         amount = order.amount.value,
         price = order.price.value,

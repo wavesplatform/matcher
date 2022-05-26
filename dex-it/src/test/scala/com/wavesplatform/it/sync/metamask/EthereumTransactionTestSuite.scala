@@ -25,15 +25,33 @@ class EthereumTransactionTestSuite extends MatcherSuiteBase {
           0.005.waves
         )
       wavesNode1.api.broadcastEth(txData)
-
-      //TODO "waitForTransaction" can replace "eventually" here
-      //but currently wavej doesn't support eth transactions
-
       eventually {
         val aliceState2 = dex1.api.getAddressState(aliceEthWavesAdr)
         aliceState2.regular(Waves) shouldBe aliceState1.regular(Waves) - 5.waves - 0.005.waves
         val bobState2 = dex1.api.getAddressState(bob)
         bobState2.regular(Waves) shouldBe bobState1.regular(Waves) + 5.waves
+      }
+    }
+
+    "should do usd transfer & update address balance properly" in {
+      val aliceState1 = dex1.api.getAddressState(aliceEthWavesAdr)
+      val bobState1 = dex1.api.getAddressState(bob)
+      val (_, txData) =
+        EthTransactionsHelper.generateEthTransfer(
+          GenesisConfig.chainId,
+          aliceEthKeyPair,
+          bob,
+          12.usd,
+          usd,
+          0.005.waves
+        )
+      wavesNode1.api.broadcastEth(txData)
+      eventually {
+        val aliceState2 = dex1.api.getAddressState(aliceEthWavesAdr)
+        aliceState2.regular(Waves) shouldBe aliceState1.regular(Waves) - 0.005.waves
+        aliceState2.regular(usd) shouldBe aliceState1.regular(usd) - 12.usd
+        val bobState2 = dex1.api.getAddressState(bob)
+        bobState2.regular(usd) shouldBe bobState1.regular.getOrElse(usd, 0L) + 12.usd
       }
     }
   }
@@ -47,9 +65,10 @@ class EthereumTransactionTestSuite extends MatcherSuiteBase {
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
+    broadcastAndAwait(IssueUsdTx)
     broadcastAndAwait(
-      IssueUsdTx,
-      mkTransfer(alice, aliceEthWavesAdr, 15.waves, Waves)
+      mkTransfer(alice, aliceEthWavesAdr, 15.waves, Waves),
+      mkTransfer(alice, aliceEthWavesAdr, 15.usd, usd)
     )
     dex1.start()
   }

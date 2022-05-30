@@ -14,7 +14,7 @@ final class EthereumTransactionTestSuite extends MatcherSuiteBase {
 
   "EthereumTransactionTestSuite" - {
 
-    "should do waves transfer" in {
+    "waves transfer" in {
       val aliceState1 = dex1.api.getAddressState(aliceEthWavesAdr)
       val bobState1 = dex1.api.getAddressState(bob)
       val (_, txData) =
@@ -35,7 +35,7 @@ final class EthereumTransactionTestSuite extends MatcherSuiteBase {
       }
     }
 
-    "should do usd transfer" in {
+    "usd transfer" in {
       val aliceState1 = dex1.api.getAddressState(aliceEthWavesAdr)
       val bobState1 = dex1.api.getAddressState(bob)
       val (_, txData) =
@@ -57,7 +57,7 @@ final class EthereumTransactionTestSuite extends MatcherSuiteBase {
       }
     }
 
-    "should do invoke with waves" in {
+    "invoke with waves" in {
       val aliceState1 = dex1.api.getAddressState(aliceEthWavesAdr)
       val bobState1 = dex1.api.getAddressState(bob)
       val (_, txData) =
@@ -79,7 +79,7 @@ final class EthereumTransactionTestSuite extends MatcherSuiteBase {
       }
     }
 
-    "should do invoke with usd" in {
+    "invoke with usd" in {
       val aliceState1 = dex1.api.getAddressState(aliceEthWavesAdr)
       val bobState1 = dex1.api.getAddressState(bob)
       val (_, txData) =
@@ -102,7 +102,7 @@ final class EthereumTransactionTestSuite extends MatcherSuiteBase {
       }
     }
 
-    "should do invoke with payment" in {
+    "invoke with payment" in {
       val aliceState1 = dex1.api.getAddressState(aliceEthWavesAdr)
       val bobState1 = dex1.api.getAddressState(bob)
       val (_, txData) =

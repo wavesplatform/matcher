@@ -6,6 +6,7 @@ import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.it.api.responses.node._
 import com.wavesplatform.transactions.Transaction
 import com.wavesplatform.transactions.common.Id
+import play.api.libs.json.JsValue
 
 import java.net.InetSocketAddress
 
@@ -35,6 +36,9 @@ trait NodeApi[F[_]] {
   def rollback(toHeight: Int, returnTransactionsToUtx: Boolean): F[Unit]
 
   def print(message: String): F[Unit]
+
+  //TODO should be removed after wavesj update
+  def broadcastRaw(js: JsValue): F[Unit]
 }
 
 object NodeApi {} // ClassNotFound NodeApi$ without this line

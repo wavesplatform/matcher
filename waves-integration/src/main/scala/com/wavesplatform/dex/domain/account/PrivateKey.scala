@@ -3,6 +3,7 @@ package com.wavesplatform.dex.domain.account
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import play.api.libs.json.{Format, Writes}
 import supertagged._
+import supertagged.postfix._
 
 object PrivateKey extends TaggedType[ByteStr] {
 

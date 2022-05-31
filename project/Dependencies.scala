@@ -141,10 +141,11 @@ object Dependencies {
   private val swaggerUi = "org.webjars" % "swagger-ui" % Version.swaggerUi
   private val playJson = "com.typesafe.play" %% "play-json" % Version.playJson
   private val scorexCrypto = "org.scorexfoundation" %% "scrypto" % Version.scorexCrypto
+  val bouncyCastleProvider = "org.bouncycastle" % s"bcprov-jdk15on" % "1.70"
   private val grpcScalaPb = "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion
   private val jsonScalaPb = "com.thesamet.scalapb" %% "scalapb-json4s" % Version.scalaPbJson
   private val monixReactive = monixModule("reactive")
-  private val supertagged = "org.rudogma" %% "supertagged" % Version.supertagged
+  private val supertagged = ("org.rudogma" %% "supertagged" % "2.0-RC2").exclude("org.scala-js", "scalajs-library_2.13")
   private val javaLevelDb = "org.iq80.leveldb" % "leveldb" % Version.javaLevelDb
   private val commonsNet = "commons-net" % "commons-net" % Version.commonsNet
   private val sttpClient = sttpClientModule("core")
@@ -301,6 +302,7 @@ object Dependencies {
       swagger,
       playJson,
       scorexCrypto,
+      bouncyCastleProvider,
       catsCore,
       alleyCatsCore,
       supertagged,

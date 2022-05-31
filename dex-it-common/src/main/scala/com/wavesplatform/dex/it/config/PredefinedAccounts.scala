@@ -1,16 +1,16 @@
 package com.wavesplatform.dex.it.config
 
 import java.nio.charset.StandardCharsets
-
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.dex.domain.account.KeyPair
-import com.wavesplatform.dex.domain.crypto
+import com.wavesplatform.dex.domain.{Blake2b256, Keccak256}
 import com.wavesplatform.dex.it.config.GenesisConfig.generatorConfig
 
 import scala.jdk.CollectionConverters._
 
 object PredefinedAccounts extends PredefinedAccounts {
-  def generateNewAccount(seed: Array[Byte], nonce: Int): KeyPair = KeyPair(crypto.secureHash(Bytes.concat(Ints.toByteArray(nonce), seed)))
+  def secureHash(m: Array[Byte]): Array[Byte] = Keccak256.hash(Blake2b256.hash(m))
+  def generateNewAccount(seed: Array[Byte], nonce: Int): KeyPair = KeyPair(secureHash(Bytes.concat(Ints.toByteArray(nonce), seed)))
 }
 
 trait PredefinedAccounts {

@@ -3,7 +3,7 @@ package com.wavesplatform.dex.domain.account
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.ByteStr._
 import com.wavesplatform.dex.domain.bytes.codec.Base58
-import com.wavesplatform.dex.domain.crypto
+import com.wavesplatform.dex.domain.{Curve25519}
 import com.wavesplatform.dex.domain.error.ValidationError.GenericError
 import play.api.libs.json.{Format, Json, Writes}
 
@@ -11,7 +11,7 @@ import scala.util.{Failure, Success}
 
 final case class KeyPair(seed: ByteStr) {
 
-  lazy val (privateKey, publicKey) = crypto.createKeyPair(seed) match {
+  lazy val (privateKey, publicKey) = Curve25519.createKeyPair(seed) match {
     case (PrivateKey(privateKey), PublicKey(publicKey)) => (privateKey, publicKey)
     case _ => throw new IllegalArgumentException(s"Can't create key pair by provided seed=$seed")
   }

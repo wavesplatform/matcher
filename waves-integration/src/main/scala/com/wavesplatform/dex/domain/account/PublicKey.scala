@@ -9,6 +9,7 @@ import com.wavesplatform.dex.domain.error.ValidationError.InvalidPublicKey
 import com.wavesplatform.dex.domain.utils.base58Length
 import play.api.libs.json.{Format, Writes}
 import supertagged._
+import supertagged.postfix._
 
 object PublicKey extends TaggedType[ByteStr] {
 

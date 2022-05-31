@@ -55,6 +55,7 @@ lazy val `dex-pb` = project.settings(commonOwaspSettings)
 lazy val `waves-ext` = project
   .settings(commonOwaspSettings)
   .dependsOn(
+    `dex-it`,
     `waves-grpc`,
     `dex-test-common` % "test->compile"
   )

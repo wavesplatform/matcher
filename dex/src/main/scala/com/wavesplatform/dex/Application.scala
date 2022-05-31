@@ -736,7 +736,7 @@ object Application {
       log.info("Enabled kamon metrics")
     }
 
-    log.info("Starting...")
+    log.info(s"Starting... ${settings.restApi.apiKeyHashes}")
 
     RootActorSystem.start("wavesplatform", config) { implicit actorSystem =>
       log.info(s"${s"DEX v${Version.VersionString}"} Blockchain Id: ${settings.addressSchemeCharacter}")

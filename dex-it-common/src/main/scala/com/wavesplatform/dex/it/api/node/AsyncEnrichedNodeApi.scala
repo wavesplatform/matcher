@@ -102,6 +102,10 @@ class AsyncEnrichedNodeApi(apiKey: String, host: => InetSocketAddress)(implicit 
       .contentType(MediaType.ApplicationJson)
   }
 
+  override def broadcastRaw(js: JsValue): AsyncEnrichedNodeApi.R[Unit] = mkIgnore {
+    basicRequest.post(uri"$apiUri/transactions/broadcast").body(js).contentType(MediaType.ApplicationJson)
+  }
+
 }
 
 object AsyncEnrichedNodeApi {

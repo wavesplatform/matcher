@@ -53,7 +53,7 @@ object DexToPbConversions {
     def toPB: PbOrder =
       PbOrder(
         chainId = VAddressScheme.current.chainId.toInt,
-        senderPublicKey = order.senderPublicKey.toPB,
+        sender = PbOrder.Sender.SenderPublicKey(order.senderPublicKey.toPB),
         matcherPublicKey = order.matcherPublicKey.toPB,
         assetPair = Some(PbAssetPair(order.assetPair.amountAsset.toPB, order.assetPair.priceAsset.toPB)),
         orderSide = order.orderType match {

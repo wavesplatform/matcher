@@ -12,9 +12,9 @@ import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain, DataEntry, LeaseBalance, TxMeta, VolumeAndFee}
 import com.wavesplatform.transaction.assets.exchange.Order
-import com.wavesplatform.transaction.smart.script.ScriptRunnerFixed
+import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 import shapeless.Coproduct
 
 import scala.util.control.NoStackTrace
@@ -25,22 +25,27 @@ object MatcherScriptRunner {
     script: Script,
     order: Order,
     blockchain: Blockchain,
-    isSynchronousCallsActivated: Boolean,
+    useCorrectScriptVersion: Boolean,
+    fixUnicodeFunctions: Boolean,
     useNewPowPrecision: Boolean,
-    correctFunctionCallScope: Boolean
+    checkEstimatorSumOverflow: Boolean,
+    newEvaluatorMode: Boolean,
+    checkWeakPk: Boolean
   ): Either[ExecutionError, EVALUATED] =
-    ScriptRunnerFixed.applyGeneric(
-      in = Coproduct[ScriptRunnerFixed.TxOrd](order),
+    ScriptRunner.applyGeneric(
+      in = Coproduct[ScriptRunner.TxOrd](order),
       blockchain = blockchain,
       script = script,
       isAssetScript = false,
       scriptContainerAddress = Coproduct[Environment.Tthis](Recipient.Address(ByteStr(order.senderPublicKey.toAddress.bytes))),
-      complexityLimit = Int.MaxValue,
+      defaultLimit = Int.MaxValue,
       default = TRUE,
-      isSynchronousCallsActivated,
-      isSynchronousCallsActivated,
+      useCorrectScriptVersion,
+      fixUnicodeFunctions,
       useNewPowPrecision,
-      correctFunctionCallScope
+      checkEstimatorSumOverflow,
+      newEvaluatorMode,
+      checkWeakPk
     )._3
 
   private class Denied(methodName: String)
@@ -91,6 +96,8 @@ object MatcherScriptRunner {
     override def transactionMeta(id: BlockId): Option[TxMeta] = kill("transactionMeta")
     override def balanceAtHeight(address: Address, height: Int, assetId: Asset): Option[(Int, Long)] = kill("balanceAtHeight")
     override def assetScript(id: Asset.IssuedAsset): Option[AssetScriptInfo] = kill("assetScript")
+
+    override def resolveERC20Address(address: ERC20Address): Option[Asset.IssuedAsset] = kill("resolveERC20Address")
   }
 
 }

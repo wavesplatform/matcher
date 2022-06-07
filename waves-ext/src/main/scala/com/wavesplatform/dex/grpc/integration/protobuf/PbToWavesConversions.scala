@@ -1,7 +1,5 @@
 package com.wavesplatform.dex.grpc.integration.protobuf
 
-import java.nio.charset.StandardCharsets
-
 import cats.syntax.either._
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
@@ -15,7 +13,9 @@ import com.wavesplatform.protobuf.order.Order
 import com.wavesplatform.protobuf.transaction.ExchangeTransactionData
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.exchange
-import com.wavesplatform.transaction.{Asset, Proofs}
+import com.wavesplatform.transaction.{Asset, Proofs, TxExchangeAmount, TxMatcherFee, TxOrderPrice}
+
+import java.nio.charset.StandardCharsets
 
 object PbToWavesConversions {
 
@@ -31,7 +31,7 @@ object PbToWavesConversions {
         r <- {
           val proofs = Proofs(self.proofs.map(_.toVanilla))
           tx.version match {
-            case 1 | 2 =>
+            case 1 | 2 | 3 =>
               exchange.ExchangeTransaction.create(
                 version = tx.version.toByte,
                 order1 = data.orders.head.toVanilla,
@@ -56,7 +56,17 @@ object PbToWavesConversions {
 
     def toVanilla: exchange.Order =
       exchange.Order(
-        senderPublicKey = PublicKey(order.senderPublicKey.toVanilla),
+        orderAuthentication = order.sender match {
+          case Order.Sender.SenderPublicKey(key) =>
+            exchange.OrderAuthentication.OrderProofs(
+              PublicKey(key.toVanilla),
+              order.proofs.map(_.toVanilla)
+            )
+          case Order.Sender.Eip712Signature(sig) =>
+            exchange.OrderAuthentication.Eip712Signature(sig.toVanilla)
+          case Order.Sender.Empty =>
+            throw new IllegalArgumentException("Order should have either senderPublicKey or eip712Signature")
+        },
         matcherPublicKey = PublicKey(order.matcherPublicKey.toVanilla),
         assetPair = exchange.AssetPair(order.getAssetPair.amountAssetId.toVanillaAsset, order.getAssetPair.priceAssetId.toVanillaAsset),
         orderType = order.orderSide match {
@@ -64,15 +74,25 @@ object PbToWavesConversions {
           case Order.Side.SELL => exchange.OrderType.SELL
           case Order.Side.Unrecognized(v) => throw new IllegalArgumentException(s"Unknown order type: $v")
         },
-        amount = order.amount,
-        price = order.price,
+        amount = TxExchangeAmount.from(order.amount)
+          .fold(s => throw new IllegalArgumentException(s"Invalid order amount ${order.amount}, error: $s"), identity),
+        price = TxOrderPrice.from(order.price)
+          .fold(s => throw new IllegalArgumentException(s"Invalid order price ${order.price}, error: $s"), identity),
         timestamp = order.timestamp,
         expiration = order.expiration,
         matcherFee = order.matcherFee.map(_.amount) match {
           case None => throw new IllegalArgumentException("The matcherFee must be specified")
-          case Some(x) => x
+          case Some(x) => TxMatcherFee.from(x).fold(
+              s => throw new IllegalArgumentException(s"Invalid order fee $x, error: $s"),
+              identity
+            )
         },
-        proofs = order.proofs.map(_.toVanilla),
+        priceMode = order.priceMode match {
+          case Order.PriceMode.ASSET_DECIMALS => exchange.OrderPriceMode.AssetDecimals
+          case Order.PriceMode.FIXED_DECIMALS => exchange.OrderPriceMode.FixedDecimals
+          case Order.PriceMode.DEFAULT => exchange.OrderPriceMode.Default
+          case Order.PriceMode.Unrecognized(v) => throw new IllegalArgumentException(s"Unknown order price mode: $v")
+        },
         version = order.version.toByte,
         matcherFeeAssetId = order.matcherFee.map(_.assetId) match {
           case None => throw new IllegalArgumentException("The matcherFeeAssetId must be specified")

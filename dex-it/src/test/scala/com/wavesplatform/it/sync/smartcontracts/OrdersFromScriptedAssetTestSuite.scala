@@ -108,7 +108,7 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     val txs = dex1.api.waitForTransactionsByOrder(submitted, 1)
     val r = wavesNode1.tryApi.broadcast(txs.head)
     r shouldBe Symbol("left")
-    r.swap.explicitGet().error shouldBe 308 // node's ApiError TransactionNotAllowedByAssetScript.Id
+    r.swap.explicitGet().error shouldBe 306 // node's ApiError ScriptExecutionError
   }
 
   "can't execute against scripted, if one script returns FALSE" in {
@@ -135,7 +135,7 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     val txs = dex1.api.waitForTransactionsByOrder(submitted, 1)
     val r = wavesNode1.tryApi.broadcast(txs.head)
     r shouldBe Symbol("left")
-    r.swap.explicitGet().error shouldBe 308 // node's ApiError TransactionNotAllowedByAssetScript.Id
+    r.swap.explicitGet().error shouldBe 306 // node's ApiError ScriptExecutionError
   }
 }
 

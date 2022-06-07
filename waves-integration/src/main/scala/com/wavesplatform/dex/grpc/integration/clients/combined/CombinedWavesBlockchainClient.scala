@@ -160,7 +160,7 @@ class CombinedWavesBlockchainClient(
       }
 
   private def isExchangeTxFromMatcher(tx: SignedTransaction): Boolean =
-    tx.transaction.exists { tx =>
+    tx.transaction.wavesTransaction.exists { tx =>
       tx.data.isExchange && ByteString.unsignedLexicographicalComparator().compare(tx.senderPublicKey, pbMatcherPublicKey) == 0
     }
 

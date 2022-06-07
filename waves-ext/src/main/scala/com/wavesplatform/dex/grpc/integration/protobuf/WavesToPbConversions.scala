@@ -33,8 +33,8 @@ object WavesToPbConversions {
             version = tx.version,
             data = ExchangeTransaction.Data.Exchange(
               ExchangeTransactionData(
-                amount = tx.amount,
-                price = tx.price,
+                amount = tx.amount.value,
+                price = tx.price.value,
                 buyMatcherFee = tx.buyMatcherFee,
                 sellMatcherFee = tx.sellMatcherFee,
                 orders = Seq(tx.buyOrder.toPB, tx.sellOrder.toPB)
@@ -65,18 +65,28 @@ object WavesToPbConversions {
     def toPB: Order =
       Order(
         chainId = va.AddressScheme.current.chainId.toInt,
-        senderPublicKey = order.senderPublicKey.toPB,
+        sender = order.orderAuthentication match {
+          case ve.OrderAuthentication.Eip712Signature(sig) =>
+            Order.Sender.Eip712Signature(sig.toPB)
+          case ve.OrderAuthentication.OrderProofs(key, _) =>
+            Order.Sender.SenderPublicKey(key.toPB)
+        },
         matcherPublicKey = order.matcherPublicKey.toPB,
         assetPair = Some(AssetPair(order.assetPair.amountAsset.toPB, order.assetPair.priceAsset.toPB)),
         orderSide = order.orderType match {
           case ve.OrderType.BUY => Order.Side.BUY
           case ve.OrderType.SELL => Order.Side.SELL
         },
-        amount = order.amount,
-        price = order.price,
+        priceMode = order.priceMode match {
+          case ve.OrderPriceMode.AssetDecimals => Order.PriceMode.ASSET_DECIMALS
+          case ve.OrderPriceMode.FixedDecimals => Order.PriceMode.FIXED_DECIMALS
+          case ve.OrderPriceMode.Default => Order.PriceMode.DEFAULT
+        },
+        amount = order.amount.value,
+        price = order.price.value,
         timestamp = order.timestamp,
         expiration = order.expiration,
-        matcherFee = Some(Amount(order.matcherFeeAssetId.toPB, order.matcherFee)),
+        matcherFee = Some(Amount(order.matcherFeeAssetId.toPB, order.matcherFee.value)),
         version = order.version,
         proofs = order.proofs.map(_.toPB)
       )

@@ -138,16 +138,20 @@ class BouncingBalancesTestSuite extends WsSuiteBase {
 
     "multiple orders test" in {
       Using.Manager.unsafe { use =>
-        val aliceWsc = use(mkWsAddressConnection(alice, dex1))
-        val bobWsc = use(mkWsAddressConnection(bob, dex1))
+
+        val alice1 = mkAccountWithBalance(100000.waves -> Waves, 100000.usd -> usd)
+        val bob1 = mkAccountWithBalance(100000.waves -> Waves, 100000.usd -> usd)
+
+        val aliceWsc = use(mkWsAddressConnection(alice1, dex1))
+        val bobWsc = use(mkWsAddressConnection(bob1, dex1))
 
         val heightInitial = wavesNode1.api.waitForHeightArise()
-        val aliceBalance1 = dex1.api.getTradableBalanceByAssetPairAndAddress(alice, wavesUsdPair)
-        val bobBalance1 = dex1.api.getTradableBalanceByAssetPairAndAddress(bob, wavesUsdPair)
+        val aliceBalance1 = dex1.api.getTradableBalanceByAssetPairAndAddress(alice1, wavesUsdPair)
+        val bobBalance1 = dex1.api.getTradableBalanceByAssetPairAndAddress(bob1, wavesUsdPair)
 
         val now = System.currentTimeMillis()
-        val counterOrders = (1 to 25).map(i => mkOrderDP(alice, wavesUsdPair, OrderType.BUY, 1.waves, 10, ts = now + i))
-        val submittedOrders = (1 to 50).map(i => mkOrderDP(bob, wavesUsdPair, OrderType.SELL, 0.5.waves, 10, ts = now + i))
+        val counterOrders = (1 to 25).map(i => mkOrderDP(alice1, wavesUsdPair, OrderType.BUY, 1.waves, 10, ts = now + i))
+        val submittedOrders = (1 to 50).map(i => mkOrderDP(bob1, wavesUsdPair, OrderType.SELL, 0.5.waves, 10, ts = now + i))
 
         counterOrders.foreach(dex1.api.place)
         submittedOrders.foreach(dex1.api.place)
@@ -174,13 +178,13 @@ class BouncingBalancesTestSuite extends WsSuiteBase {
 
         val finalHeight = wavesNode1.api.waitForHeightArise()
         eventually {
-          val balance = dex1.api.getTradableBalanceByAssetPairAndAddress(alice, wavesUsdPair)
+          val balance = dex1.api.getTradableBalanceByAssetPairAndAddress(alice1, wavesUsdPair)
           balance.getOrElse(Waves, 0L) should matchTo(aliceBalance1.getOrElse(Waves, 0L) + 25 * (1.waves - matcherFee))
           balance
         }
 
         val bobBalance2 = eventually {
-          val balance = dex1.api.getTradableBalanceByAssetPairAndAddress(bob, wavesUsdPair)
+          val balance = dex1.api.getTradableBalanceByAssetPairAndAddress(bob1, wavesUsdPair)
           balance.getOrElse(usd, 0L) should matchTo(bobBalance1.getOrElse(usd, 0L) + 250.usd)
           balance
         }
@@ -199,7 +203,7 @@ class BouncingBalancesTestSuite extends WsSuiteBase {
 
         // Relates DEX-1099
         eventually {
-          dex1.api.getTradableBalanceByAssetPairAndAddress(bob, wavesUsdPair) should matchTo(bobBalance2)
+          dex1.api.getTradableBalanceByAssetPairAndAddress(bob1, wavesUsdPair) should matchTo(bobBalance2)
         }
       }
     }

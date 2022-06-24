@@ -45,7 +45,7 @@ class BlockchainUpdatesClientTestSuite extends IntegrationSuiteBase with HasToxi
 
   private lazy val eventLoopGroup = new NioEventLoopGroup
 
-  private val keepAliveTime = 2.seconds
+  private val keepAliveTime = 10.seconds
   private val keepAliveTimeout = 5.seconds
 
   private val grpcSettings = GrpcClientSettings(
@@ -171,7 +171,7 @@ class BlockchainUpdatesClientTestSuite extends IntegrationSuiteBase with HasToxi
       val transfer2 = mkTransfer(bob, matcher, 1, Asset.Waves)
       broadcastAndAwait(transfer2)
 
-      Thread.sleep((keepAliveTime + keepAliveTimeout + 3.seconds).toMillis)
+      Thread.sleep((keepAliveTime + keepAliveTimeout + 2.seconds).toMillis)
 
       step("Enable connection to gRPC extension")
       blockchainUpdatesProxy.setConnectionCut(false)

@@ -53,7 +53,7 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
           maxHedgedAttempts = 9,
           maxRetryAttempts = 13,
           keepAliveWithoutCalls = false,
-          keepAliveTime = 8.seconds,
+          keepAliveTime = 10.seconds,
           keepAliveTimeout = 11.seconds,
           idleTimeout = 20.seconds,
           channelOptions = GrpcClientSettings.ChannelOptionsSettings(
@@ -66,7 +66,7 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
           maxHedgedAttempts = 10,
           maxRetryAttempts = 14,
           keepAliveWithoutCalls = true,
-          keepAliveTime = 9.seconds,
+          keepAliveTime = 11.seconds,
           keepAliveTimeout = 12.seconds,
           idleTimeout = 21.seconds,
           channelOptions = GrpcClientSettings.ChannelOptionsSettings(

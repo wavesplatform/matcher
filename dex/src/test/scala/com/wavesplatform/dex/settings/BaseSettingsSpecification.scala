@@ -109,7 +109,7 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |        max-hedged-attempts = 9
          |        max-retry-attempts = 13
          |        keep-alive-without-calls = false
-         |        keep-alive-time = 8s
+         |        keep-alive-time = 10s
          |        keep-alive-timeout = 11s
          |        idle-timeout = 20s
          |        channel-options {
@@ -122,7 +122,7 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |        max-hedged-attempts = 10
          |        max-retry-attempts = 14
          |        keep-alive-without-calls = true
-         |        keep-alive-time = 9s
+         |        keep-alive-time = 11s
          |        keep-alive-timeout = 12s
          |        idle-timeout = 21s
          |        channel-options {

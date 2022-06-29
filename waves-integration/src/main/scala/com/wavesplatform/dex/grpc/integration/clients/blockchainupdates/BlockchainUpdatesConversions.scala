@@ -3,6 +3,7 @@ package com.wavesplatform.dex.grpc.integration.clients.blockchainupdates
 import cats.syntax.option._
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.clients.domain._
 import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions._
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
@@ -12,7 +13,7 @@ import com.wavesplatform.events.protobuf.{BlockchainUpdated, StateUpdate}
 
 import scala.collection.View
 
-object BlockchainUpdatesConversions {
+object BlockchainUpdatesConversions extends ScorexLogging {
   type Balances = Map[Address, Map[Asset, Long]]
   type Leases = Map[Address, Long]
 
@@ -42,6 +43,14 @@ object BlockchainUpdatesConversions {
         }
 
         blockInfo.map { case (tpe, reference, transactionBodies) =>
+          val txIdSize = updates.transactionIds.size
+          val stateUpdateSize = updates.transactionStateUpdates.size
+          val txBodiesSize = transactionBodies.size
+
+          if (txIdSize != stateUpdateSize || stateUpdateSize != txBodiesSize)
+            log.error(s"Sizes are different! txIdSize=$txIdSize stateUpdateSize=$stateUpdateSize txBodiesSize=$txBodiesSize;" +
+            s"ids = ${updates.transactionIds.map(_.toVanilla).mkString(", ")}")
+
           val block = WavesBlock(
             ref = blockRef,
             reference = reference,

@@ -43,14 +43,6 @@ object BlockchainUpdatesConversions extends ScorexLogging {
         }
 
         blockInfo.map { case (tpe, reference, transactionBodies) =>
-          val txIdSize = updates.transactionIds.size
-          val stateUpdateSize = updates.transactionStateUpdates.size
-          val txBodiesSize = transactionBodies.size
-
-          if (txIdSize != stateUpdateSize || stateUpdateSize != txBodiesSize)
-            log.error(s"Sizes are different! txIdSize=$txIdSize stateUpdateSize=$stateUpdateSize txBodiesSize=$txBodiesSize;" +
-            s"ids = ${updates.transactionIds.map(_.toVanilla).mkString(", ")}")
-
           val block = WavesBlock(
             ref = blockRef,
             reference = reference,

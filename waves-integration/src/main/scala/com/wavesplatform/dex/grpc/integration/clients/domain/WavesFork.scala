@@ -4,11 +4,13 @@ import cats.instances.list._
 import cats.instances.tuple._
 import cats.syntax.foldable._
 import com.google.protobuf.ByteString
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.clients.domain.WavesFork.Status
+import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions._
 
 // TODO DEX-1009 Unit test
 // TODO DEX-1011 This class is too slow for his purposes
-case class WavesFork private[domain] (origChain: WavesChain, forkChain: WavesChain) {
+case class WavesFork private[domain] (origChain: WavesChain, forkChain: WavesChain) extends ScorexLogging {
 
   // TODO DEX-1009 Move to tests in the end
 
@@ -34,6 +36,8 @@ case class WavesFork private[domain] (origChain: WavesChain, forkChain: WavesCha
 
         val origForkDiffIndex = origDropped.foldMap(_.diffIndex)
         val (updatedForkAllChanges, updatedForkDiffIndex) = forkDropped.foldMap(block => (block.changes, block.diffIndex))
+
+        log.info(s"origTxs=${origTxs.keySet.map(_.toVanilla)}; forkTxs=${forkTxs.keySet.map(_.toVanilla)}")
 
         Status.Resolved(
           activeChain = updatedForkChain,

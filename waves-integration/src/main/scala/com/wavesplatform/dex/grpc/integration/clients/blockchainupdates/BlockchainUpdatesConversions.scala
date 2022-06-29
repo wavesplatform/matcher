@@ -3,7 +3,6 @@ package com.wavesplatform.dex.grpc.integration.clients.blockchainupdates
 import cats.syntax.option._
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
-import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.clients.domain._
 import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions._
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
@@ -13,7 +12,7 @@ import com.wavesplatform.events.protobuf.{BlockchainUpdated, StateUpdate}
 
 import scala.collection.View
 
-object BlockchainUpdatesConversions extends ScorexLogging {
+object BlockchainUpdatesConversions {
   type Balances = Map[Address, Map[Asset, Long]]
   type Leases = Map[Address, Long]
 

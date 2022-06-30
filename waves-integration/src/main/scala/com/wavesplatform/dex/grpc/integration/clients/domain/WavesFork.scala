@@ -73,7 +73,13 @@ object WavesFork {
       lostTxIds: Map[ByteString, TransactionWithChanges], // Will be used in the future
       newConfirmedTxs: Map[ByteString, TransactionWithChanges],
       commonTxIds: Set[ByteString]
-    ) extends Status
+    ) extends Status {
+
+      override def toString: String = s"Resolved(ac=$activeChain, newChanges=$newChanges, lostDiffIndex=$lostDiffIndex, " +
+        s"lostTxs=${lostTxIds.map(_._1.toVanilla)}, newConfirmedTxs=${newConfirmedTxs.map(_._1.toVanilla)}, " +
+        s"commonTxs=${commonTxIds.map(_.toVanilla)})"
+
+    }
 
     case class NotResolved(updatedFork: WavesFork) extends Status
     case class Failed(reason: String) extends Status

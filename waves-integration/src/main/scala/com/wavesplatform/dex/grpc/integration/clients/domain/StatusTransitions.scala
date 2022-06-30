@@ -75,6 +75,7 @@ object StatusTransitions extends ScorexLogging {
           case Appended(block) =>
             origStatus.fork.withBlock(block) match {
               case resolved: Status.Resolved =>
+                log.info(s"Rollback resolved $resolved")
                 val finalUtxUpdate = {
                   val x = origStatus.utxUpdate |+| UtxUpdate(
                     confirmedTxs = resolved.newConfirmedTxs,

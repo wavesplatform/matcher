@@ -194,7 +194,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
               filledFee = 0.0009.some,
               avgWeighedPrice = 1.2.some,
               totalExecutedPriceAssets = 18.0.some,
-              matchInfo = Seq(WsMatchTransactionInfo(ByteStr.empty, 0L, 1.2, 15.0, 18.0))
+              matchInfo = Seq(WsMatchTransactionInfo(ByteStr.empty, 0L, 1.2, 15.0, 18.0, isTaker = true))
             ),
             WsOrder.fromOrder(
               mo.order,
@@ -203,7 +203,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
               filledFee = 0.0024.some,
               avgWeighedPrice = 1.1375.some,
               totalExecutedPriceAssets = 45.5.some,
-              matchInfo = Seq(WsMatchTransactionInfo(ByteStr.empty, 0L, 1.1, 25.0, 27.5))
+              matchInfo = Seq(WsMatchTransactionInfo(ByteStr.empty, 0L, 1.1, 25.0, 27.5, isTaker = true))
             ),
             WsOrder.fromOrder(
               mo.order,
@@ -212,7 +212,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
               filledFee = 0.003.some,
               avgWeighedPrice = 1.11.some,
               totalExecutedPriceAssets = 55.5.some,
-              matchInfo = Seq(WsMatchTransactionInfo(ByteStr.empty, 0L, 1.0, 10.0, 10.0))
+              matchInfo = Seq(WsMatchTransactionInfo(ByteStr.empty, 0L, 1.0, 10.0, 10.0, isTaker = true))
             )
           )
         }
@@ -245,7 +245,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
               filledFee = 0.003.some,
               avgWeighedPrice = 1.0.some,
               totalExecutedPriceAssets = 10.0.some,
-              matchInfo = Seq(WsMatchTransactionInfo(ByteStr.empty, 0L, 1.0, 10.0, 10.0))
+              matchInfo = Seq(WsMatchTransactionInfo(ByteStr.empty, 0L, 1.0, 10.0, 10.0, isTaker = false))
             )
           )
         }
@@ -287,7 +287,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
                     filledFee = 0.0015.some,
                     avgWeighedPrice = 1.0.some,
                     totalExecutedPriceAssets = 5.0.some,
-                    matchInfo = Seq(WsMatchTransactionInfo(ByteStr.empty, 0L, 1.0, 5.0, 5.0))
+                    matchInfo = Seq(WsMatchTransactionInfo(ByteStr.empty, 0L, 1.0, 5.0, 5.0, isTaker = false))
                   )
               )
             )
@@ -534,7 +534,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
               filledFee = 0.00135.some,
               avgWeighedPrice = 1.0.some,
               totalExecutedPriceAssets = 4.5.some,
-              matchInfo = Seq(WsMatchTransactionInfo(ByteStr.empty, 0L, 1.0, 4.5, 4.5))
+              matchInfo = Seq(WsMatchTransactionInfo(ByteStr.empty, 0L, 1.0, 4.5, 4.5, isTaker = false))
             )
           )))
           wsc.clearMessages()
@@ -549,7 +549,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
             filledFee = 0.00255.some,
             avgWeighedPrice = 1.0.some,
             totalExecutedPriceAssets = 8.5.some,
-            matchInfo = Seq(WsMatchTransactionInfo(ByteStr.empty, 0L, 1, 4.0, 4.0))
+            matchInfo = Seq(WsMatchTransactionInfo(ByteStr.empty, 0L, 1, 4.0, 4.0, isTaker = false))
           ))))
         }
         dex1.api.cancelAllOrdersWithSig(acc)
@@ -574,7 +574,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
             filledFee = 0.003.some,
             avgWeighedPrice = 1.0.some,
             totalExecutedPriceAssets = 10.0.some,
-            matchInfo = Seq(WsMatchTransactionInfo(ByteStr.empty, 0L, 1, 10.0, 10.0))
+            matchInfo = Seq(WsMatchTransactionInfo(ByteStr.empty, 0L, 1, 10.0, 10.0, isTaker = false))
           ))))
         }
         dex1.api.cancelAllOrdersWithSig(acc)
@@ -607,22 +607,22 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
             avgWeighedPrice = 1.2.some,
             totalExecutedPriceAssets = 60.0.some,
             matchInfo = Seq(
-              WsMatchTransactionInfo(ByteStr.empty, 0L, 1.1, 20.0, 22.0),
-              WsMatchTransactionInfo(ByteStr.empty, 0L, 1.2, 10.0, 12.0),
-              WsMatchTransactionInfo(ByteStr.empty, 0L, 1.3, 20.0, 26.0)
+              WsMatchTransactionInfo(ByteStr.empty, 0L, 1.1, 20.0, 22.0, isTaker = true),
+              WsMatchTransactionInfo(ByteStr.empty, 0L, 1.2, 10.0, 12.0, isTaker = true),
+              WsMatchTransactionInfo(ByteStr.empty, 0L, 1.3, 20.0, 26.0, isTaker = true)
             )
           )))
         }
       }
 
       "when trading with itself" in {
-        def copyWithCommonPart(wsOrder: WsOrder): WsOrder = wsOrder.copy(
+        def copyWithCommonPart(wsOrder: WsOrder, isTaker: Boolean): WsOrder = wsOrder.copy(
           status = OrderStatus.Filled.name.some,
           filledAmount = 10.0.some,
           filledFee = 0.003.some,
           avgWeighedPrice = 1.0.some,
           totalExecutedPriceAssets = 10.0.some,
-          matchInfo = Seq(WsMatchTransactionInfo(ByteStr.empty, 0L, 1, 10.0, 10.0))
+          matchInfo = Seq(WsMatchTransactionInfo(ByteStr.empty, 0L, 1, 10.0, 10.0, isTaker))
         )
 
         val acc = mkAccountWithBalance(100.usd -> usd, 50.waves -> Waves)
@@ -636,10 +636,10 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           eventually {
             val orderChanges = wsc.orderChanges.squashed
             orderChanges(order1.id()) should matchTo(
-              copyWithCommonPart(WsOrder.fromDomain(LimitOrder(order1, None, None)))
+              copyWithCommonPart(WsOrder.fromDomain(LimitOrder(order1, None, None)), isTaker = false)
             )
             orderChanges(order2.id()) should matchTo(
-              copyWithCommonPart(WsOrder.fromDomain(LimitOrder(order2, None, None)))
+              copyWithCommonPart(WsOrder.fromDomain(LimitOrder(order2, None, None)), isTaker = false)
             )
 
             orderChanges(order1.id()).matchInfo.head.txId shouldBe orderChanges(order2.id()).matchInfo.head.txId

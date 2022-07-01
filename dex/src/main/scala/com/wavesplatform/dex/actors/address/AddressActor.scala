@@ -1,8 +1,8 @@
 package com.wavesplatform.dex.actors.address
 
 import akka.actor.typed.scaladsl.adapter._
-import akka.actor.{Actor, ActorRef, Cancellable, Props, Stash, Status, typed}
-import akka.pattern.{CircuitBreakerOpenException, pipe}
+import akka.actor.{typed, Actor, ActorRef, Cancellable, Props, Stash, Status}
+import akka.pattern.{pipe, CircuitBreakerOpenException}
 import akka.{actor => classic}
 import cats.data.NonEmptyList
 import cats.instances.list._
@@ -726,7 +726,11 @@ class AddressActor(
       aoWtx.order.status match {
         case OrderStatus.Accepted => addressState.putOrderUpdate(aoWtx.order.id, WsOrder.fromDomain(aoWtx.order, aoWtx.order.status))
         case _: OrderStatus.Cancelled => addressState.putOrderStatusNameUpdate(aoWtx.order.order, aoWtx.order.status)
-        case _ => addressState.putOrderFillingInfoAndStatusNameUpdate(aoWtx.order, aoWtx.order.status, FullMatchTxInfo(aoWtx.isTaker, aoWtx.tx.transaction).some)
+        case _ => addressState.putOrderFillingInfoAndStatusNameUpdate(
+            aoWtx.order,
+            aoWtx.order.status,
+            FullMatchTxInfo(aoWtx.isTaker, aoWtx.tx.transaction).some
+          )
       }
     }
   }

@@ -353,21 +353,17 @@ final class MarketsRoute(
       (withMetricsAndTraces("deleteOrderBookWithKey") & protect & withAuth) {
         withAssetPair(assetPairBuilder, pairOrError, validate = false) { pair =>
           withOnlyBlacklistedAssetPair(pair) {
-            orderBook(pair) match {
-              case Some(Right(_)) =>
-                complete(
-                  storeCommand(ValidatedCommand.DeleteOrderBook(pair))
-                    .map {
-                      case None => NotImplemented(error.FeatureDisabled)
-                      case _ => SimpleResponse(StatusCodes.Accepted, "Deleting order book")
-                    }
-                    .recover { case e: Throwable =>
-                      log.error("Can not persist event", e)
-                      CanNotPersist(error.CanNotPersistEvent)
-                    }
-                )
-              case _ => complete(OrderBookUnavailable(error.OrderBookBroken(pair)))
-            }
+            complete(
+              storeCommand(ValidatedCommand.DeleteOrderBook(pair))
+                .map {
+                  case None => NotImplemented(error.FeatureDisabled)
+                  case _ => SimpleResponse(StatusCodes.Accepted, "Deleting order book")
+                }
+                .recover { case e: Throwable =>
+                  log.error("Can not persist event", e)
+                  CanNotPersist(error.CanNotPersistEvent)
+                }
+            )
           }
         }
       }

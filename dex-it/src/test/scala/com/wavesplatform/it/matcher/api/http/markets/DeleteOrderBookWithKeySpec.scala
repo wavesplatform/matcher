@@ -3,7 +3,7 @@ package com.wavesplatform.it.matcher.api.http.markets
 import sttp.model.StatusCode
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.order.OrderType.SELL
-import com.wavesplatform.dex.error.{InvalidAsset, OrderBookBroken}
+import com.wavesplatform.dex.error.InvalidAsset
 import com.wavesplatform.dex.it.docker.apiKey
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.matcher.api.http.ApiKeyHeaderChecks
@@ -40,13 +40,8 @@ class DeleteOrderBookWithKeySpec extends MatcherSuiteBase with ApiKeyHeaderCheck
       dex1.api.getOrderHistoryByPKWithSig(alice, activeOnly = Some(false)).find(_.id == order.id()).value.status shouldBe "Cancelled"
     }
 
-    "should return an error if orderbook doesn't exists" in {
-      validateMatcherError(
-        dex1.rawApi.deleteOrderBookWithKey(wavesUsdPair),
-        StatusCode.ServiceUnavailable,
-        OrderBookBroken.code,
-        s"The order book for WAVES-$UsdId is unavailable, please contact with the administrator"
-      )
+    "should return success if orderbook doesn't exists" in { // see DEX-1602
+      validate202Json(dex1.rawApi.deleteOrderBookWithKey(wavesUsdPair)).message should be("Deleting order book")
     }
 
     "should return an error exception when the amount asset is not correct base58 string" in {

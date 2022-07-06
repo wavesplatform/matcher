@@ -3,10 +3,10 @@ package com.wavesplatform.dex.cli
 import cats.Id
 import cats.instances.either._
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
-import com.wavesplatform.dex.app.{MatcherStateCheckingFailedError, forceStopApplication}
+import com.wavesplatform.dex.app.{forceStopApplication, MatcherStateCheckingFailedError}
 import com.wavesplatform.dex.cli.WavesDexCli.Args
 import com.wavesplatform.dex.db.{AccountStorage, AssetPairsDb, AssetsDb, DbKeys, OrderBookSnapshotDb, OrderDb}
-import com.wavesplatform.dex.db.leveldb.{LevelDb, openDb}
+import com.wavesplatform.dex.db.leveldb.{openDb, LevelDb}
 import com.wavesplatform.dex.doc.MatcherErrorDoc
 import com.wavesplatform.dex.{cli, domain}
 import com.wavesplatform.dex.domain.account.KeyPair
@@ -79,7 +79,7 @@ object Actions {
     sendRequest(s"${args.dexRestApi}/matcher/orderbook/${args.assetPair.replace('-', '/')}", key, "delete")
     sendRequest(s"${args.dexRestApi}/matcher/debug/currentOffset", key, "post")
 
-    val validation = Task(sendRequest(args.dexRestApi,"oldestSnapshotOffset", key).toInt <= currentOffset)
+    val validation = Task(sendRequest(args.dexRestApi, "oldestSnapshotOffset", key).toInt <= currentOffset)
       .delayExecution(1.second)
       .onErrorRestart(Long.MaxValue)
       .restartUntil(_ == true)
@@ -204,7 +204,7 @@ object Actions {
         checkResult <- new Checker(superConnector).checkState(args.version, args.accountSeed, config, matcherSettings)
         _ <- cli.lift(superConnector.close())
       } yield checkResult
-      ) match {
+    ) match {
       case Right(diagnosticNotes) => println(s"$diagnosticNotes\nCongratulations! All checks passed!")
       case Left(error) => println(error); forceStopApplication(MatcherStateCheckingFailedError)
     }
@@ -250,7 +250,7 @@ object Actions {
     val currentOffset = sendRequest(s"${args.dexRestApi}/matcher/debug/currentOffset", key).toInt
     sendRequest(s"${args.dexRestApi}/matcher/debug/currentOffset", key, "post")
 
-    val validation = Task(sendRequest(args.dexRestApi,"oldestSnapshotOffset", key).toInt <= currentOffset)
+    val validation = Task(sendRequest(args.dexRestApi, "oldestSnapshotOffset", key).toInt <= currentOffset)
       .delayExecution(1.second)
       .onErrorRestart(Long.MaxValue)
       .restartUntil(_ == true)

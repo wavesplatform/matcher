@@ -29,12 +29,10 @@ class DeleteOrderBookKafkaTestSuite extends MatcherSuiteBase with ApiKeyHeaderCh
       val order = mkOrder(alice, wavesUsdPair, SELL, 10.waves, 1.usd)
       placeAndAwaitAtDex(order)
 
-      //добавляем ордеров в другой паре
       0 until 10 foreach { _ =>
-        //сдвигаем другой парой глобальный офсет
         placeAndAwaitAtDex(mkOrder(bob, btcUsdnPair, SELL, 10.waves, 1.usdn))
       }
-      dex1.api.saveSnapshots //обновляем глобальный офсет во всех парах в том числе waves/usd
+      dex1.api.saveSnapshots
       Thread.sleep(5000L)
 
       dex1.restartWithNewSuiteConfig(ConfigFactory.parseString(

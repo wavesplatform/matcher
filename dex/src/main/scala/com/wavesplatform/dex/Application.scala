@@ -2,10 +2,10 @@ package com.wavesplatform.dex
 
 import akka.Done
 import akka.actor.typed.scaladsl.adapter._
-import akka.actor.{typed, ActorRef, ActorSystem, CoordinatedShutdown, Props}
+import akka.actor.{ActorRef, ActorSystem, CoordinatedShutdown, Props, typed}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Directives.respondWithHeader
-import akka.pattern.{ask, gracefulStop, CircuitBreaker}
+import akka.pattern.{CircuitBreaker, ask, gracefulStop}
 import akka.stream.Materializer
 import akka.util.Timeout
 import alleycats.std.all.alleyCatsSetTraverse
@@ -35,12 +35,12 @@ import com.wavesplatform.dex.api.ws.routes.MatcherWebSocketRoute
 import com.wavesplatform.dex.app._
 import com.wavesplatform.dex.caches.{MatchingRulesCache, OrderFeeSettingsCache, RateCache}
 import com.wavesplatform.dex.db._
-import com.wavesplatform.dex.db.leveldb.{openDb, LevelDb}
+import com.wavesplatform.dex.db.leveldb.{LevelDb, openDb}
 import com.wavesplatform.dex.domain.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.utils.{EitherExt2, LoggerFacade, ScorexLogging}
-import com.wavesplatform.dex.effect.{liftValueAsync, FutureResult}
+import com.wavesplatform.dex.effect.{FutureResult, liftValueAsync}
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.grpc.integration.clients.MatcherExtensionAssetsCachingClient
 import com.wavesplatform.dex.grpc.integration.clients.combined.{AkkaCombinedStream, CombinedWavesBlockchainClient}
@@ -65,9 +65,10 @@ import java.io.File
 import java.security.Security
 import java.util.concurrent.ThreadLocalRandom
 import java.util.concurrent.atomic.AtomicReference
+import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{blocking, Await, Future, Promise}
+import scala.concurrent.{Await, Future, Promise, blocking}
 import scala.jdk.CollectionConverters._
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
@@ -120,7 +121,21 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   private val snapshotsLevelDb = LevelDb.async(db)(levelDbSnapshotsEc)
 
   cs.addTask(CoordinatedShutdown.PhaseActorSystemTerminate, "DB") { () =>
-    Future { blocking(db.close()); Done }
+    Future {
+      blocking {
+        var levelDbThreads: mutable.Set[Thread] = mutable.Set.empty
+        do {
+          if (levelDbThreads.nonEmpty)
+            log.warn(s"Has unfinished level db threads ${levelDbThreads.map(_.getName)}; can't stop now")
+          Thread.sleep(500L)
+          levelDbThreads = Thread.getAllStackTraces.keySet().asScala.filter(t =>
+            t.getName.toLowerCase.contains("leveldb") || t.getThreadGroup.getName.toLowerCase.contains("leveldb")
+          )
+        } while (levelDbThreads.nonEmpty)
+        db.close()
+      }
+      Done
+    }
   }
 
   private val assetPairsDb = AssetPairsDb.levelDb(commonLevelDb)

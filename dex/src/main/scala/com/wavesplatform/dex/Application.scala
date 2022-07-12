@@ -130,12 +130,12 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       blocking {
         var levelDbThreads: mutable.Set[Thread] = mutable.Set.empty
         do {
-          if (levelDbThreads.nonEmpty)
-            log.warn(s"Has unfinished level db threads ${levelDbThreads.map(_.getName)}; can't stop now")
           Thread.sleep(500L)
           levelDbThreads = Thread.getAllStackTraces.keySet().asScala.filter(t =>
             t.getName.toLowerCase.contains("leveldb") || t.getThreadGroup.getName.toLowerCase.contains("leveldb")
           )
+          if (levelDbThreads.nonEmpty)
+            log.warn(s"Has unfinished level db threads ${levelDbThreads.map(_.getName)}; can't stop now")
         } while (levelDbThreads.nonEmpty)
         db.close()
       }

@@ -8,7 +8,7 @@ resolvers ++= Seq(
 Seq(
   "com.thesamet" %% "sbt-protoc" % "1.0.6", // Have to wait NODE: https://github.com/wavesplatform/Waves/blob/master/project/plugins.sbt#L7
   "org.jetbrains" % "sbt-ide-settings" % "1.0.0",
-  "com.typesafe.sbt" % "sbt-native-packager" % "1.4.1",
+  "com.github.sbt" % "sbt-native-packager" % "1.9.9",
   "pl.project13.scala" % "sbt-jmh" % "0.3.7",
   "org.scalastyle" %% "scalastyle-sbt-plugin" % "1.0.0",
   "org.scoverage" % "sbt-scoverage" % "1.5.1",
@@ -31,7 +31,7 @@ Seq(
 ).map(addSbtPlugin)
 
 libraryDependencies ++= Seq(
-  "org.vafer" % "jdeb" % "1.5" artifacts Artifact("jdeb", "jar", "jar"), // Required for "release" task
+  "org.vafer" % "jdeb" % "1.10" artifacts Artifact("jdeb", "jar", "jar"), // Required for "release" task
   // Have to wait NODE: https://github.com/wavesplatform/Waves/blob/master/project/plugins.sbt , also don't forget to update our jsonScalaPb
   "com.thesamet.scalapb" %% "compilerplugin" % "0.11.6",
   "commons-codec" % "commons-codec" % "1.14"

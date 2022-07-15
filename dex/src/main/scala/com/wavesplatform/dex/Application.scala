@@ -120,11 +120,6 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   private val ratesLevelDb = LevelDb.async(db)(levelDbRatesEc)
   private val snapshotsLevelDb = LevelDb.async(db)(levelDbSnapshotsEc)
 
-  private val dbExecutors = Seq(levelDbCommonEc, levelDbRatesEc, levelDbSnapshotsEc)
-  dbExecutors.foreach { ex =>
-    log.info(s"EX TASK 1 ${ex.id}")
-  }
-
   cs.addTask(CoordinatedShutdown.PhaseActorSystemTerminate, "DB") { () =>
     Future {
       blocking {

@@ -206,10 +206,10 @@ object WavesDexCli extends ScoptImplicits {
       }
     }
 
-    val currentOffset = sendRequest("currentOffset", key).toInt
+    val currentOffset = sendRequest("currentOffset", key).toLong
     sendRequest("saveSnapshots", key, "post")
 
-    val validation = Task(sendRequest("oldestSnapshotOffset", key).toInt <= currentOffset)
+    val validation = Task(sendRequest("oldestSnapshotOffset", key).toLong <= currentOffset)
       .delayExecution(1.second)
       .onErrorRestart(Long.MaxValue)
       .restartUntil(_ == true)

@@ -56,6 +56,7 @@ import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
 import com.wavesplatform.dex.time.NTP
 import com.wavesplatform.dex.tool.{KamonTraceUtils, WaitOffsetTool}
 import kamon.Kamon
+import kamon.instrumentation.executor.ExecutorInstrumentation
 import monix.execution.ExecutionModel
 import mouse.any.anySyntaxMouse
 import org.slf4j.LoggerFactory
@@ -63,12 +64,11 @@ import pureconfig.ConfigSource
 
 import java.io.File
 import java.security.Security
-import java.util.concurrent.ThreadLocalRandom
+import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
 import java.util.concurrent.atomic.AtomicReference
-import scala.collection.mutable
+import scala.concurrent.{blocking, Await, Future, Promise}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{blocking, Await, Future, Promise}
 import scala.jdk.CollectionConverters._
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
@@ -77,9 +77,9 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
   private val monixScheduler = monix.execution.Scheduler.Implicits.global.withExecutionModel(ExecutionModel.AlwaysAsyncExecution)
   private val grpcEc = actorSystem.dispatchers.lookup("akka.actor.grpc-dispatcher")
-  private val levelDbCommonEc = actorSystem.dispatchers.lookup("akka.actor.leveldb-common-dispatcher")
-  private val levelDbSnapshotsEc = actorSystem.dispatchers.lookup("akka.actor.leveldb-snapshots-dispatcher")
-  private val levelDbRatesEc = actorSystem.dispatchers.lookup("akka.actor.leveldb-rates-dispatcher")
+  private val levelDbCommonEc = lookupByNameAndWrap(actorSystem, "akka.actor.leveldb-common-dispatcher")
+  private val levelDbSnapshotsEc = lookupByNameAndWrap(actorSystem, "akka.actor.leveldb-snapshots-dispatcher")
+  private val levelDbRatesEc = lookupByNameAndWrap(actorSystem, "akka.actor.leveldb-rates-dispatcher")
 
   private val cs = CoordinatedShutdown(actorSystem)
 
@@ -123,15 +123,11 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   cs.addTask(CoordinatedShutdown.PhaseActorSystemTerminate, "DB") { () =>
     Future {
       blocking {
-        var levelDbThreads: mutable.Set[Thread] = mutable.Set.empty
-        do {
-          Thread.sleep(500L)
-          levelDbThreads = Thread.getAllStackTraces.keySet().asScala.filter(t =>
-            t.getName.toLowerCase.contains("leveldb") || t.getThreadGroup.getName.toLowerCase.contains("leveldb")
-          )
-          if (levelDbThreads.nonEmpty)
-            log.warn(s"Has unfinished level db threads ${levelDbThreads.map(_.getName)}; can't stop now")
-        } while (levelDbThreads.nonEmpty)
+        val levelDbEcs = Set(levelDbCommonEc, levelDbRatesEc, levelDbSnapshotsEc).flatMap(_.underlyingExecutor)
+        levelDbEcs.foreach { ec =>
+          ec.shutdown()
+          ec.awaitTermination(5, TimeUnit.SECONDS)
+        }
         db.close()
       }
       Done
@@ -627,6 +623,9 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       log.error(s"Can't start matcher: ${e.getMessage}", e)
       forceStopApplication(StartingMatcherError)
   }
+
+  private def lookupByNameAndWrap(actorSystem: ActorSystem, name: String) =
+    ExecutorInstrumentation.instrumentExecutionContext(actorSystem.dispatchers.lookup(name), name)
 
   private def loadAllKnownAssets(): Future[Unit] =
     assetPairsDb.all().map(_.flatMap(_.assets) ++ settings.mentionedAssets).flatMap { assetsToLoad =>

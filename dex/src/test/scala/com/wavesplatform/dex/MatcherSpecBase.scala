@@ -567,10 +567,10 @@ trait MatcherSpecBase
       proofs = Proofs.empty
     )
 
-  protected def mkSeqWsMatchTxInfo(price: Double, amount: Double): Seq[WsMatchTransactionInfo] =
-    Seq(mkWsMatchTxInfo(price, amount))
+  protected def mkSeqWsMatchTxInfo(price: Double, amount: Double, isTaker: Boolean): Seq[WsMatchTransactionInfo] =
+    Seq(mkWsMatchTxInfo(price, amount, isTaker))
 
-  protected def mkWsMatchTxInfo(price: Double, amount: Double): WsMatchTransactionInfo =
-    WsMatchTransactionInfo(ByteStr.empty, 0L, price, amount, amount * price)
+  protected def mkWsMatchTxInfo(price: Double, amount: Double, isTaker: Boolean): WsMatchTransactionInfo =
+    WsMatchTransactionInfo(ByteStr.empty, 0L, price, amount, amount * price, isTaker)
 
 }

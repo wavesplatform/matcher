@@ -14,12 +14,13 @@ final case class WsMatchTransactionInfo(
   timestamp: Long,
   price: Double,
   executedAmountAssets: Double,
-  executedPriceAssets: Double
+  executedPriceAssets: Double,
+  isTaker: Boolean
 )
 
 object WsMatchTransactionInfo {
 
-  def normalized(assetPair: AssetPair, txId: ByteStr, timestamp: Long, price: Long, executedAmountAssets: Long)(implicit
+  def normalized(assetPair: AssetPair, isTaker: Boolean, txId: ByteStr, timestamp: Long, price: Long, executedAmountAssets: Long)(implicit
     efc: ErrorFormatterContext
   ): WsMatchTransactionInfo = {
 
@@ -31,9 +32,22 @@ object WsMatchTransactionInfo {
       timestamp,
       price = denormalizePrice(price, ad, pd).toDouble,
       executedAmountAssets = denormalizeAmountAndFee(executedAmountAssets, ad).toDouble,
-      executedPriceAssets = denormalizeAmountAndFee(AcceptedOrder.calcAmountOfPriceAsset(executedAmountAssets, price), pd).toDouble
+      executedPriceAssets = denormalizeAmountAndFee(AcceptedOrder.calcAmountOfPriceAsset(executedAmountAssets, price), pd).toDouble,
+      isTaker
     )
   }
+
+  private val makerTakerFormat: Format[Boolean] = Format(
+    {
+      case JsString("m") => JsSuccess(false)
+      case JsString("t") => JsSuccess(true)
+      case _ => JsError("Cannot parse maker taker info")
+    },
+    {
+      case false => JsString("m")
+      case true => JsString("t")
+    }
+  )
 
   implicit val wsMatchTransactionFormat: Format[WsMatchTransactionInfo] =
     (
@@ -41,7 +55,8 @@ object WsMatchTransactionInfo {
         (__ \ "t").format[Long] and // timestamp
         (__ \ "p").format[Double](doubleAsStringFormat) and // match execution price
         (__ \ "A").format[Double](doubleAsStringFormat) and // amount asset quantity executed in match
-        (__ \ "P").format[Double](doubleAsStringFormat) // price asset quantity executed in match
+        (__ \ "P").format[Double](doubleAsStringFormat) and // price asset quantity executed in match
+        (__ \ "mt").format[Boolean](makerTakerFormat)
     )(WsMatchTransactionInfo.apply, unlift(WsMatchTransactionInfo.unapply))
 
 }

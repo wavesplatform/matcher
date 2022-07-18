@@ -4,7 +4,7 @@ import akka.actor.typed.ActorRef
 import cats.syntax.option._
 import com.wavesplatform.dex.api.ws.entities._
 import com.wavesplatform.dex.api.ws.protocol.WsAddressChanges
-import com.wavesplatform.dex.api.ws.state.WsAddressState.Subscription
+import com.wavesplatform.dex.api.ws.state.WsAddressState.{FullMatchTxInfo, Subscription}
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.model.Denormalization._
@@ -84,20 +84,22 @@ final case class WsAddressState(
   def putOrderFillingInfoAndStatusNameUpdate(
     ao: AcceptedOrder,
     newStatus: OrderStatus,
-    maybeMatchTx: Option[ExchangeTransaction] = None
+    maybeMatchTx: Option[FullMatchTxInfo] = None
   )(implicit efc: ErrorFormatterContext): WsAddressState = {
     val ad = efc.unsafeAssetDecimals(ao.order.assetPair.amountAsset)
     val pd = efc.unsafeAssetDecimals(ao.order.assetPair.priceAsset)
     val fd = efc.unsafeAssetDecimals(ao.feeAsset)
 
-    def mkMatchTxInfo(): Option[WsMatchTransactionInfo] = maybeMatchTx.map { matchTx =>
-      WsMatchTransactionInfo.normalized(
-        ao.order.assetPair,
-        txId = matchTx.id(),
-        timestamp = matchTx.timestamp,
-        price = matchTx.price,
-        executedAmountAssets = matchTx.amount
-      )
+    def mkMatchTxInfo(): Option[WsMatchTransactionInfo] = maybeMatchTx.map {
+      case FullMatchTxInfo(isTaker, matchTx) =>
+        WsMatchTransactionInfo.normalized(
+          ao.order.assetPair,
+          isTaker = isTaker,
+          txId = matchTx.id(),
+          timestamp = matchTx.timestamp,
+          price = matchTx.price,
+          executedAmountAssets = matchTx.amount
+        )
     }
 
     val prevChange = ordersChanges.getOrElse(ao.id, WsOrder.fromOrder(ao.order))
@@ -175,6 +177,8 @@ final case class WsAddressState(
 object WsAddressState {
 
   case class Subscription(updateId: Long, flags: Set[WsAddressFlag])
+
+  final case class FullMatchTxInfo(isTaker: Boolean, matchTx: ExchangeTransaction)
 
   def empty(address: Address): WsAddressState =
     WsAddressState(address, Map.empty, Set.empty, Map.empty, Map.empty, Map.empty, Set.empty, Map.empty, Set.empty)

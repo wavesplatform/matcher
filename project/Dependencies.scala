@@ -285,7 +285,7 @@ object Dependencies {
       web3jCore,
       sttpClient,
       sttpPlayJson
-    ) ++ testContainers
+    ) ++ testContainers ++ silencer
 
     lazy val dexTestCommon: Seq[ModuleID] = Seq(diffx, scalaTest, scalaCheck, scalaTestPlusCheck, allureScalaTest)
 

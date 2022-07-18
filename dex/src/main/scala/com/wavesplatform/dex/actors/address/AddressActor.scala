@@ -19,6 +19,7 @@ import com.wavesplatform.dex.api.http.entities.MatcherResponse
 import com.wavesplatform.dex.api.ws.entities.{WsAddressFlag, WsAssetInfo, WsBalances, WsOrder}
 import com.wavesplatform.dex.api.ws.protocol.WsAddressChanges
 import com.wavesplatform.dex.api.ws.state.WsAddressState
+import com.wavesplatform.dex.api.ws.state.WsAddressState.FullMatchTxInfo
 import com.wavesplatform.dex.collections.{NegativeMap, PositiveMap}
 import com.wavesplatform.dex.db.OrderDb
 import com.wavesplatform.dex.db.OrderDb.orderInfoOrdering
@@ -145,7 +146,7 @@ class AddressActor(
       }
 
       scheduleExpiration(order.order)
-      scheduleOrderWs(order, order.status, unmatchable = false, maybeMatchTx = None)
+      scheduleOrderWs(order, order.status, unmatchable = false)
 
       if (isWorking)
         pendingCommands.remove(order.id).foreach { command =>
@@ -156,6 +157,7 @@ class AddressActor(
     case command: Command.ApplyOrderBookExecuted =>
       val orderExecutedUpdates = command.nonEmptyEvents.foldLeft(WsOrderExecutedUpdates()) {
         case (acc, event) =>
+          val takerOrderId = event.event.submittedRemaining.id
           val ownerRemainingOrders = List(event.event.counterRemaining, event.event.submittedRemaining).filter(_.order.sender.toAddress == owner)
           val txResult = event.expectedTx
           log.debug(
@@ -200,7 +202,8 @@ class AddressActor(
           log.info(
             s"[Balance] 1. 💵: ${format(balances.tradableBalance(cumulativeDiff.keySet).xs)}; e: ${format(cumulativeDiff)}, ov: ${format(newReserved)}"
           )
-          val currentUpdate = WsOrderExecutedUpdates(ownerRemainingOrders.map(AcceptedOrderWithTx(_, txResult)), changes)
+          val ordersPrepared = ownerRemainingOrders.map(order => AcceptedOrderWithTx(order, txResult, order.id == takerOrderId))
+          val currentUpdate = WsOrderExecutedUpdates(ordersPrepared, changes)
           acc merge currentUpdate
       }
 
@@ -244,7 +247,7 @@ class AddressActor(
           scheduleWs(wsAddressState.putChangedAssets(orderReserve.keySet))
           log.info(s"[Balance] 2. 💵: ${format(balances.tradableBalance(orderReserve.keySet).xs)}; ov Δ: ${format(orderReserve)}")
 
-          scheduleOrderWs(acceptedOrder, orderStatus, unmatchable, maybeMatchTx = None)
+          scheduleOrderWs(acceptedOrder, orderStatus, unmatchable)
       }
 
       if (isWorking)
@@ -704,8 +707,7 @@ class AddressActor(
   private def scheduleOrderWs(
     remaining: AcceptedOrder,
     status: OrderStatus,
-    unmatchable: Boolean,
-    maybeMatchTx: Option[ExchangeTransaction]
+    unmatchable: Boolean
   ): Unit = scheduleWs {
     status match {
       case OrderStatus.Accepted => wsAddressState.putOrderUpdate(remaining.id, WsOrder.fromDomain(remaining, status))
@@ -713,7 +715,7 @@ class AddressActor(
       case _ =>
         // unmatchable can be only if OrderStatus.Filled
         if (unmatchable) wsAddressState.putOrderStatusNameUpdate(remaining.order, status)
-        else wsAddressState.putOrderFillingInfoAndStatusNameUpdate(remaining, status, maybeMatchTx)
+        else wsAddressState.putOrderFillingInfoAndStatusNameUpdate(remaining, status)
     }
   }
 
@@ -724,7 +726,11 @@ class AddressActor(
       aoWtx.order.status match {
         case OrderStatus.Accepted => addressState.putOrderUpdate(aoWtx.order.id, WsOrder.fromDomain(aoWtx.order, aoWtx.order.status))
         case _: OrderStatus.Cancelled => addressState.putOrderStatusNameUpdate(aoWtx.order.order, aoWtx.order.status)
-        case _ => addressState.putOrderFillingInfoAndStatusNameUpdate(aoWtx.order, aoWtx.order.status, aoWtx.tx.transaction.some)
+        case _ => addressState.putOrderFillingInfoAndStatusNameUpdate(
+            aoWtx.order,
+            aoWtx.order.status,
+            FullMatchTxInfo(aoWtx.isTaker, aoWtx.tx.transaction).some
+          )
       }
     }
   }
@@ -891,7 +897,7 @@ object AddressActor {
     override def toString: String = orderId.toString
   }
 
-  private case class AcceptedOrderWithTx(order: AcceptedOrder, tx: ExchangeTransactionResult[ExchangeTransactionV2])
+  private case class AcceptedOrderWithTx(order: AcceptedOrder, tx: ExchangeTransactionResult[ExchangeTransactionV2], isTaker: Boolean)
 
   private case class WsOrderExecutedUpdates(
     ownerRemainingOrders: List[AcceptedOrderWithTx] = List.empty,

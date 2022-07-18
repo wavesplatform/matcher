@@ -38,6 +38,7 @@ class WsMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDrivenProp
     isMarket <- Gen.oneOf(true, false)
     isNew <- Gen.oneOf(true, false)
     filledPercent <- Gen.choose(0d, 1d)
+    isTaker <- Gen.oneOf(true, false)
   } yield {
 
     lazy val partialAmount: Long = (order.amount * filledPercent).toLong
@@ -54,6 +55,7 @@ class WsMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDrivenProp
     val result = WsOrder.fromDomain(ao).copy(matchInfo =
       Seq(WsMatchTransactionInfo.normalized(
         ao.order.assetPair,
+        isTaker,
         ByteStr.empty,
         System.currentTimeMillis(),
         ao.price,

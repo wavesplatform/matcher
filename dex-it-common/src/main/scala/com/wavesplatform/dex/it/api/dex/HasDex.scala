@@ -2,9 +2,9 @@ package com.wavesplatform.dex.it.api.dex
 
 import java.util.Properties
 import java.util.concurrent.ThreadLocalRandom
-
 import cats.Functor
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.Version.VersionString
 import com.wavesplatform.dex.it.api.BaseContainersKit
 import com.wavesplatform.dex.it.docker.DexContainer
 import com.wavesplatform.dex.it.fp.CanRepeat
@@ -37,6 +37,8 @@ trait HasDex { self: BaseContainersKit =>
        |  }
        |}""".stripMargin
   )
+
+  protected def dexVersion: String = if (dexImage == defaultDexImage) VersionString else dexImage
 
   protected def createDex(
     name: String,

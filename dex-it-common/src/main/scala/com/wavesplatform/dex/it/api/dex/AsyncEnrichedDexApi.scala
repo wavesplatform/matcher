@@ -264,6 +264,11 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .headers(Map("timestamp" -> timestamp.toString, "signature" -> signature))
   }
 
+  override def apiDocs(): R[JsObject] = mk {
+    basicRequest
+      .get(uri"$apiUri/api-docs/swagger.json")
+  }
+
   override def getOrderHistoryByAddressWithKey(publicKey: String, timestamp: Long, signature: String): R[List[HttpOrderBookHistoryItem]] = mk {
     basicRequest
       .get(uri"$apiUri/matcher/orders/$publicKey")

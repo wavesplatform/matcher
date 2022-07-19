@@ -5,7 +5,6 @@ import cats.tagless.FunctorK
 import com.dimafeng.testcontainers.GenericContainer
 import com.github.dockerjava.api.model.Capability
 import com.typesafe.config.Config
-import com.wavesplatform.dex.Version.VersionString
 import com.wavesplatform.dex.app.MatcherStatus.Working
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedStream.Status

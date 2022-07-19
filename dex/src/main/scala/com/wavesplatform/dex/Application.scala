@@ -77,9 +77,9 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
   private val monixScheduler = monix.execution.Scheduler.Implicits.global.withExecutionModel(ExecutionModel.AlwaysAsyncExecution)
   private val grpcEc = actorSystem.dispatchers.lookup("akka.actor.grpc-dispatcher")
-  private val levelDbCommonEc = getLevelDBExecutor("leveldb-common-dispatcher")
-  private val levelDbSnapshotsEc = getLevelDBExecutor("leveldb-snapshots-dispatcher")
-  private val levelDbRatesEc = getLevelDBExecutor("leveldb-rates-dispatcher")
+  private val levelDbCommonEc = mkLevelDbEc("leveldb-common-dispatcher")
+  private val levelDbSnapshotsEc = mkLevelDbEc("leveldb-snapshots-dispatcher")
+  private val levelDbRatesEc = mkLevelDbEc("leveldb-rates-dispatcher")
 
   private val cs = CoordinatedShutdown(actorSystem)
 
@@ -123,10 +123,10 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   cs.addTask(CoordinatedShutdown.PhaseActorSystemTerminate, "DB") { () =>
     Future {
       blocking {
-        val levelDbEcs = Set(levelDbCommonEc, levelDbRatesEc, levelDbSnapshotsEc)
+        val levelDbEcs = List(levelDbCommonEc, levelDbRatesEc, levelDbSnapshotsEc)
         levelDbEcs.foreach { ec =>
           ec.shutdown()
-          ec.awaitTermination(5, TimeUnit.SECONDS)
+          ec.awaitTermination(60, TimeUnit.SECONDS)
         }
         db.close()
       }
@@ -624,7 +624,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       forceStopApplication(StartingMatcherError)
   }
 
-  private def getLevelDBExecutor(name: String) = {
+  private def mkLevelDbEc(name: String) = {
     val se = ExecutorInstrumentation.instrument(Executors.newSingleThreadExecutor(), name)
     ExecutionContext.fromExecutorService(se)
   }

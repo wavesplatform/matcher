@@ -2,15 +2,8 @@ package com.wavesplatform.it.matcher.api.http.swagger
 
 import com.wavesplatform.dex.it.api.RawHttpChecks
 import com.wavesplatform.it.MatcherSuiteBase
-import org.scalatest.prop.TableDrivenPropertyChecks
 
-class SwaggerSpec extends MatcherSuiteBase with TableDrivenPropertyChecks with RawHttpChecks {
-
-  override protected def beforeAll(): Unit = {
-    wavesNode1.start()
-    broadcastAndAwait(IssueBtcTx, IssueUsdTx)
-    dex1.start()
-  }
+class SwaggerSpec extends MatcherSuiteBase with RawHttpChecks {
 
   "GET /api-docs/swagger.json " - {
 

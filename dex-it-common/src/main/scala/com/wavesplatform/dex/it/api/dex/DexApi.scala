@@ -71,6 +71,8 @@ trait DexApi[F[_]] {
     xUserPublicKey: Option[PublicKey] = None
   ): F[HttpSuccessfulBatchCancel]
 
+  def apiDocs(): F[JsObject]
+
   def orderStatusByAssetPairAndId(order: Order): F[HttpOrderStatus] = orderStatusByAssetPairAndId(order.assetPair, order.id())
 
   def orderStatusByAssetPairAndId(assetPair: AssetPair, id: Order.Id): F[HttpOrderStatus] =

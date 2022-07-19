@@ -310,7 +310,6 @@ object Dependencies {
       kamonCore,
       mouse,
       grpcNetty,
-      kamonCore,
       wavesProtobufSchemas,
       akkaActorTyped
     ) ++ testKit ++ silencer ++ Seq(

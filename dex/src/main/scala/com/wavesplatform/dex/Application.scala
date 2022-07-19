@@ -77,9 +77,9 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
   private val monixScheduler = monix.execution.Scheduler.Implicits.global.withExecutionModel(ExecutionModel.AlwaysAsyncExecution)
   private val grpcEc = actorSystem.dispatchers.lookup("akka.actor.grpc-dispatcher")
-  private val levelDbCommonEc = mkLevelDbEc("leveldb-common-dispatcher")
-  private val levelDbSnapshotsEc = mkLevelDbEc("leveldb-snapshots-dispatcher")
-  private val levelDbRatesEc = mkLevelDbEc("leveldb-rates-dispatcher")
+  private val levelDbCommonEc = mkLevelDbEc("leveldb-common-ec")
+  private val levelDbSnapshotsEc = mkLevelDbEc("leveldb-snapshots-ec")
+  private val levelDbRatesEc = mkLevelDbEc("leveldb-rates-ec")
 
   private val cs = CoordinatedShutdown(actorSystem)
 

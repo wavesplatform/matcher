@@ -64,9 +64,9 @@ import pureconfig.ConfigSource
 
 import java.io.File
 import java.security.Security
-import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
+import java.util.concurrent.{Executors, ThreadLocalRandom, TimeUnit}
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.{blocking, Await, Future, Promise}
+import scala.concurrent.{blocking, Await, ExecutionContext, Future, Promise}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
@@ -77,9 +77,9 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
   private val monixScheduler = monix.execution.Scheduler.Implicits.global.withExecutionModel(ExecutionModel.AlwaysAsyncExecution)
   private val grpcEc = actorSystem.dispatchers.lookup("akka.actor.grpc-dispatcher")
-  private val levelDbCommonEc = lookupByNameAndWrap(actorSystem, "akka.actor.leveldb-common-dispatcher")
-  private val levelDbSnapshotsEc = lookupByNameAndWrap(actorSystem, "akka.actor.leveldb-snapshots-dispatcher")
-  private val levelDbRatesEc = lookupByNameAndWrap(actorSystem, "akka.actor.leveldb-rates-dispatcher")
+  private val levelDbCommonEc = getLevelDBExecutor("leveldb-common-dispatcher")
+  private val levelDbSnapshotsEc = getLevelDBExecutor("leveldb-snapshots-dispatcher")
+  private val levelDbRatesEc = getLevelDBExecutor("leveldb-rates-dispatcher")
 
   private val cs = CoordinatedShutdown(actorSystem)
 
@@ -123,7 +123,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   cs.addTask(CoordinatedShutdown.PhaseActorSystemTerminate, "DB") { () =>
     Future {
       blocking {
-        val levelDbEcs = Set(levelDbCommonEc, levelDbRatesEc, levelDbSnapshotsEc).flatMap(_.underlyingExecutor)
+        val levelDbEcs = Set(levelDbCommonEc, levelDbRatesEc, levelDbSnapshotsEc)
         levelDbEcs.foreach { ec =>
           ec.shutdown()
           ec.awaitTermination(5, TimeUnit.SECONDS)
@@ -624,8 +624,10 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       forceStopApplication(StartingMatcherError)
   }
 
-  private def lookupByNameAndWrap(actorSystem: ActorSystem, name: String) =
-    ExecutorInstrumentation.instrumentExecutionContext(actorSystem.dispatchers.lookup(name), name)
+  private def getLevelDBExecutor(name: String) = {
+    val se = ExecutorInstrumentation.instrument(Executors.newSingleThreadExecutor(), name)
+    ExecutionContext.fromExecutorService(se)
+  }
 
   private def loadAllKnownAssets(): Future[Unit] =
     assetPairsDb.all().map(_.flatMap(_.assets) ++ settings.mentionedAssets).flatMap { assetsToLoad =>

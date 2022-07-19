@@ -37,7 +37,7 @@ object Dependencies {
     val silencer = "1.7.5"
 
     val kanela = "1.0.11"
-    val kamon = "2.2.3"
+    val kamon = "2.5.4"
 
     val wavesProtobufSchemas = "1.4.3"
     val wavesJ = "1.2.2"
@@ -254,6 +254,7 @@ object Dependencies {
       kamonModule("jaeger"),
       kamonModule("akka-http"),
       kamonModule("logback"),
+      kamonModule("executors"),
       commonsNet,
       swaggerUi,
       jaxbApi, // Required for Swagger UI in JRE 11 because of javax/xml/bind/annotation/XmlRootElement

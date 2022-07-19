@@ -624,12 +624,10 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       forceStopApplication(StartingMatcherError)
   }
 
-  private def mkLevelDbEc(name: String): ExecutionContextExecutorService =
-    if (config.getBoolean("kamon.enable")) {
-      val se = ExecutorInstrumentation.instrument(Executors.newSingleThreadExecutor(), name)
-      ExecutionContext.fromExecutorService(se)
-    } else
-      ExecutionContext.fromExecutorService(Executors.newSingleThreadExecutor())
+  private def mkLevelDbEc(name: String): ExecutionContextExecutorService = {
+    val se = ExecutorInstrumentation.instrument(Executors.newSingleThreadExecutor(), name)
+    ExecutionContext.fromExecutorService(se)
+  }
 
   private def loadAllKnownAssets(): Future[Unit] =
     assetPairsDb.all().map(_.flatMap(_.assets) ++ settings.mentionedAssets).flatMap { assetsToLoad =>

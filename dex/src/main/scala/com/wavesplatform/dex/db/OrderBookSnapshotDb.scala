@@ -30,7 +30,11 @@ object OrderBookSnapshotDb {
     override def update(assetPair: AssetPair, offset: Offset, newSnapshot: Option[OrderBookSnapshot]): F[Unit] = levelDb.readWrite { rw =>
       val (obOffsetKey, obKey) = keys(assetPair)
       rw.put(obOffsetKey, Some(offset))
-      newSnapshot.foreach(x => rw.put(obKey, Some(x)))
+      newSnapshot.foreach(x => {
+        println(s"SAVE ${assetPair}")
+        Thread.sleep(10000)
+        rw.put(obKey, Some(x))
+      })
     }
 
     override def delete(assetPair: AssetPair): F[Unit] = levelDb.readWrite { rw =>

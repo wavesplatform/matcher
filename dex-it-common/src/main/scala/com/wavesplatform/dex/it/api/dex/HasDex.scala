@@ -38,7 +38,7 @@ trait HasDex { self: BaseContainersKit =>
        |}""".stripMargin
   )
 
-  protected def dexVersion: String = if (dexImage == defaultDexImage) VersionString else defaultDexImage
+  protected def dexVersion: String = if (dexImage == defaultDexImage) VersionString else dexImage
 
   protected def createDex(
     name: String,

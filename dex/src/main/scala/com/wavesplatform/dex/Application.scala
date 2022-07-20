@@ -56,6 +56,7 @@ import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
 import com.wavesplatform.dex.time.NTP
 import com.wavesplatform.dex.tool.{KamonTraceUtils, WaitOffsetTool}
 import kamon.Kamon
+import kamon.instrumentation.executor.ExecutorInstrumentation
 import monix.execution.ExecutionModel
 import mouse.any.anySyntaxMouse
 import org.slf4j.LoggerFactory
@@ -63,11 +64,11 @@ import pureconfig.ConfigSource
 
 import java.io.File
 import java.security.Security
-import java.util.concurrent.ThreadLocalRandom
+import java.util.concurrent.{Executors, ThreadLocalRandom, TimeUnit}
 import java.util.concurrent.atomic.AtomicReference
+import scala.concurrent.{blocking, Await, ExecutionContext, ExecutionContextExecutorService, Future, Promise}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{blocking, Await, Future, Promise}
 import scala.jdk.CollectionConverters._
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
@@ -76,9 +77,9 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
   private val monixScheduler = monix.execution.Scheduler.Implicits.global.withExecutionModel(ExecutionModel.AlwaysAsyncExecution)
   private val grpcEc = actorSystem.dispatchers.lookup("akka.actor.grpc-dispatcher")
-  private val levelDbCommonEc = actorSystem.dispatchers.lookup("akka.actor.leveldb-common-dispatcher")
-  private val levelDbSnapshotsEc = actorSystem.dispatchers.lookup("akka.actor.leveldb-snapshots-dispatcher")
-  private val levelDbRatesEc = actorSystem.dispatchers.lookup("akka.actor.leveldb-rates-dispatcher")
+  private val levelDbCommonEc = mkLevelDbEc("leveldb-common-ec")
+  private val levelDbSnapshotsEc = mkLevelDbEc("leveldb-snapshots-ec")
+  private val levelDbRatesEc = mkLevelDbEc("leveldb-rates-ec")
 
   private val cs = CoordinatedShutdown(actorSystem)
 
@@ -120,7 +121,17 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   private val snapshotsLevelDb = LevelDb.async(db)(levelDbSnapshotsEc)
 
   cs.addTask(CoordinatedShutdown.PhaseActorSystemTerminate, "DB") { () =>
-    Future { blocking(db.close()); Done }
+    Future {
+      blocking {
+        val levelDbEcs = List(levelDbCommonEc, levelDbRatesEc, levelDbSnapshotsEc)
+        levelDbEcs.foreach { ec =>
+          ec.shutdown()
+          ec.awaitTermination(60, TimeUnit.SECONDS)
+        }
+        db.close()
+      }
+      Done
+    }
   }
 
   private val assetPairsDb = AssetPairsDb.levelDb(commonLevelDb)
@@ -611,6 +622,11 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     case Failure(e) =>
       log.error(s"Can't start matcher: ${e.getMessage}", e)
       forceStopApplication(StartingMatcherError)
+  }
+
+  private def mkLevelDbEc(name: String): ExecutionContextExecutorService = {
+    val se = ExecutorInstrumentation.instrument(Executors.newSingleThreadExecutor(), name)
+    ExecutionContext.fromExecutorService(se)
   }
 
   private def loadAllKnownAssets(): Future[Unit] =

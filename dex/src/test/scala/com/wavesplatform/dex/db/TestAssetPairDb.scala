@@ -17,6 +17,8 @@ class TestAssetPairDb[F[_]: Applicative] private () extends AssetPairsDb[F] {
   override def add(pair: AssetPair): F[Unit] = storage.add(pair).pure[F].void
   override def remove(pair: AssetPair): F[Unit] = storage.remove(pair).pure[F].void
   override def all(): F[Set[AssetPair]] = storage.iterator().asScala.toSet.pure[F]
+
+  override def contains(pair: AssetPair): F[Boolean] = storage.contains(pair).pure[F]
 }
 
 object TestAssetPairDb {

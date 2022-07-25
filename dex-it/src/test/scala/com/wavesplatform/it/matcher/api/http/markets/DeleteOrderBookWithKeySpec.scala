@@ -18,7 +18,7 @@ class DeleteOrderBookWithKeySpec extends MatcherSuiteBase with ApiKeyHeaderCheck
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
-    broadcastAndAwait(IssueUsdTx, IssueBtcTx)
+    broadcastAndAwait(IssueUsdTx)
     dex1.start()
   }
 

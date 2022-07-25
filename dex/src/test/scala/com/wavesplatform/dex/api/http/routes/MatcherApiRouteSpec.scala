@@ -1222,6 +1222,9 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     val odb = OrderDb.levelDb(settings.orderDb, asyncLevelDb)
     odb.saveOrder(orderToCancel).futureValue
 
+    val apdb = AssetPairsDb.levelDb(asyncLevelDb)
+    apdb.add(blackListedOrder.assetPair)
+
     val addressActor = TestProbe("address")
     addressActor.setAutoPilot { (sender: ActorRef, msg: Any) =>
       val response = msg match {
@@ -1458,6 +1461,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       Settings(settings.actorResponseTimeout, _ => liftValueAsync(BigDecimal(0.1)), settings.orderRestrictions),
       addressActor.ref,
       odb,
+      apdb,
       pairBuilder,
       matcherKeyPair.publicKey,
       orderBookDirectoryActor.ref,

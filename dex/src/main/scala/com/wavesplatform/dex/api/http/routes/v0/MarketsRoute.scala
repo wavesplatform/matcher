@@ -354,8 +354,8 @@ final class MarketsRoute(
       (withMetricsAndTraces("deleteOrderBookWithKey") & protect & withAuth) {
         withAssetPair(assetPairBuilder, pairOrError, validate = false) { pair =>
           withOnlyBlacklistedAssetPair(pair) {
-            complete(assetPairsDb.all().flatMap { pairs =>
-              if (pairs.contains(pair))
+            complete(assetPairsDb.contains(pair).flatMap { contains =>
+              if (contains)
                 storeCommand(ValidatedCommand.DeleteOrderBook(pair))
                   .map {
                     case None => NotImplemented(error.FeatureDisabled)

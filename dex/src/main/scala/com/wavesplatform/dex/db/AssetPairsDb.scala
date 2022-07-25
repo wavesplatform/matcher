@@ -7,6 +7,7 @@ trait AssetPairsDb[F[_]] {
   def add(pair: AssetPair): F[Unit]
   def remove(pair: AssetPair): F[Unit]
   def all(): F[Set[AssetPair]]
+  def contains(pair: AssetPair): F[Boolean]
 }
 
 object AssetPairsDb {
@@ -25,6 +26,9 @@ object AssetPairsDb {
 
       r.result()
     }
+
+    def contains(pair: AssetPair): F[Boolean] =
+      levelDb.has(DbKeys.assetPair(pair))
 
   }
 

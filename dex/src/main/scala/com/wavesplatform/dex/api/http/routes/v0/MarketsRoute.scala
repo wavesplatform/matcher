@@ -365,7 +365,7 @@ final class MarketsRoute(
                     log.error("Can not persist event", e)
                     CanNotPersist(error.CanNotPersistEvent)
                   }
-              else Future.successful(OrderBookUnavailable(error.OrderBookUnexpectedState(pair)))
+              else Future.successful(OrderBookUnavailable(error.OrderBookBroken(pair)))
             })
           }
         }

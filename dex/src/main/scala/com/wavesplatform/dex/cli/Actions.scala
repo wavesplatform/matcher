@@ -75,11 +75,11 @@ object Actions {
 
     val key = readSecretFromStdIn("Enter X-API-KEY: ")
 
-    val currentOffset = sendRequest(s"${args.dexRestApi}/matcher/debug/currentOffset", key).toInt
+    val currentOffset = sendRequest(s"${args.dexRestApi}/matcher/debug/currentOffset", key).toLong
     sendRequest(s"${args.dexRestApi}/matcher/orderbook/${args.assetPair.replace('-', '/')}", key, "delete")
     sendRequest(s"${args.dexRestApi}/matcher/debug/currentOffset", key, "post")
 
-    val validation = Task(sendRequest(args.dexRestApi, "oldestSnapshotOffset", key).toInt <= currentOffset)
+    val validation = Task(sendRequest(args.dexRestApi, "oldestSnapshotOffset", key).toLong <= currentOffset)
       .delayExecution(1.second)
       .onErrorRestart(Long.MaxValue)
       .restartUntil(_ == true)
@@ -99,8 +99,7 @@ object Actions {
 
   // noinspection ScalaStyle
   def generateAccountSeed(args: Args): Unit = {
-    val seedPromptText = s"Enter the${if (args.accountNonce.isEmpty) " seed of DEX's account" else " base seed"}: "
-    val rawSeed = readSeedFromFromStdIn(seedPromptText, args.seedFormat)
+    val rawSeed = readSeedFromFromStdIn(seedPromptText(args.accountNonce), args.seedFormat)
     val accountSeed = KeyPair(args.accountNonce.fold(rawSeed)(AccountStorage.getAccountSeed(rawSeed, _)))
 
     println(s"""Do not share this information with others!
@@ -131,8 +130,7 @@ object Actions {
       System.exit(1)
     }
 
-    val seedPromptText = s"Enter the${if (args.accountNonce.isEmpty) " seed of DEX's account" else " base seed"}: "
-    val rawSeed = readSeedFromFromStdIn(seedPromptText, args.seedFormat)
+    val rawSeed = readSeedFromFromStdIn(seedPromptText(args.accountNonce), args.seedFormat)
     val password = readSecretFromStdIn("Enter the password for file: ")
     val accountSeed = args.accountNonce.fold(rawSeed)(AccountStorage.getAccountSeed(rawSeed, _))
 
@@ -247,10 +245,10 @@ object Actions {
 
     val key = readSecretFromStdIn("Enter X-API-KEY: ")
 
-    val currentOffset = sendRequest(s"${args.dexRestApi}/matcher/debug/currentOffset", key).toInt
+    val currentOffset = sendRequest(s"${args.dexRestApi}/matcher/debug/currentOffset", key).toLong
     sendRequest(s"${args.dexRestApi}/matcher/debug/currentOffset", key, "post")
 
-    val validation = Task(sendRequest(args.dexRestApi, "oldestSnapshotOffset", key).toInt <= currentOffset)
+    val validation = Task(sendRequest(args.dexRestApi, "oldestSnapshotOffset", key).toLong <= currentOffset)
       .delayExecution(1.second)
       .onErrorRestart(Long.MaxValue)
       .restartUntil(_ == true)
@@ -449,10 +447,13 @@ object Actions {
       val validPairs = pairs.flatMap(apb.quickValidateAssetPair(_).toOption)
       val snapshots = obdb.iterateSnapshots(validPairs.contains)
       val offsets = obdb.iterateOffsets(validPairs.contains)
-      val result = validPairs.map { pair =>
+      val lowestOffset = validPairs.map { pair =>
         pair -> offsets.get(pair).zip(snapshots.get(pair))
       }.toMap
-      val lowestOffset = result.flatMap(x => x._2.map(s => x._1 -> s._1)).toList.sortBy(_._2).headOption
+        .flatMap(x => x._2.map(s => x._1 -> s._1))
+        .toList
+        .sortBy(_._2)
+        .headOption
       println(s"Lowest offset: $lowestOffset")
     }
   }
@@ -509,6 +510,9 @@ object Actions {
 
     print(config.root().render(options))
   }
+
+  private def seedPromptText(accountNonce: Option[Int]): String =
+    s"Enter the${if (accountNonce.isEmpty) " seed of DEX's account" else " base seed"}: "
 
   private def snapshotToStr(snapshot: OrderBookSideSnapshot): String =
     if (snapshot.isEmpty) "empty"

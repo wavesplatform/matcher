@@ -24,7 +24,7 @@ import com.wavesplatform.dex.api.http.{HasStatusBarrier, OrderBookHttpInfo, _}
 import com.wavesplatform.dex.api.routes.PathMatchers.{AddressPM, AssetPairPM, OrderPM, PublicKeyPM}
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
 import com.wavesplatform.dex.app.MatcherStatus
-import com.wavesplatform.dex.db.OrderDb
+import com.wavesplatform.dex.db.{AssetPairsDb, OrderDb}
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
@@ -46,6 +46,7 @@ final class MarketsRoute(
   settings: MarketsRoute.Settings,
   addressActor: ActorRef,
   orderDb: OrderDb[Future],
+  assetPairsDb: AssetPairsDb[Future],
   assetPairBuilder: AssetPairBuilder,
   matcherPublicKey: PublicKey,
   matcher: ActorRef,
@@ -353,21 +354,19 @@ final class MarketsRoute(
       (withMetricsAndTraces("deleteOrderBookWithKey") & protect & withAuth) {
         withAssetPair(assetPairBuilder, pairOrError, validate = false) { pair =>
           withOnlyBlacklistedAssetPair(pair) {
-            orderBook(pair) match {
-              case Some(Right(_)) =>
-                complete(
-                  storeCommand(ValidatedCommand.DeleteOrderBook(pair))
-                    .map {
-                      case None => NotImplemented(error.FeatureDisabled)
-                      case _ => SimpleResponse(StatusCodes.Accepted, "Deleting order book")
-                    }
-                    .recover { case e: Throwable =>
-                      log.error("Can not persist event", e)
-                      CanNotPersist(error.CanNotPersistEvent)
-                    }
-                )
-              case _ => complete(OrderBookUnavailable(error.OrderBookBroken(pair)))
-            }
+            complete(assetPairsDb.contains(pair).flatMap { contains =>
+              if (contains)
+                storeCommand(ValidatedCommand.DeleteOrderBook(pair))
+                  .map {
+                    case None => NotImplemented(error.FeatureDisabled)
+                    case _ => SimpleResponse(StatusCodes.Accepted, "Deleting order book")
+                  }
+                  .recover { case e: Throwable =>
+                    log.error("Can not persist event", e)
+                    CanNotPersist(error.CanNotPersistEvent)
+                  }
+              else Future.successful(OrderBookUnavailable(error.OrderBookBroken(pair)))
+            })
           }
         }
       }

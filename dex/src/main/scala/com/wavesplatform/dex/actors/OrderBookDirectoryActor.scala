@@ -175,19 +175,20 @@ class OrderBookDirectoryActor(
       val currentLastProcessedNr = math.max(request.offset, lastProcessedNr)
       request.command match {
         case ValidatedCommand.DeleteOrderBook(assetPair, _) =>
+          snapshotsState = snapshotsState.without(assetPair)
+          tradedPairs -= assetPair
+          assetPairsDb
+            .remove(assetPair)
+            .onComplete {
+              case Failure(e) => log.error(s"Can't remove $assetPair", e)
+              case _ =>
+            }
           // autoCreate = false for case, when multiple OrderBookDeleted(A1-A2) events happen one after another
           runFor(request.command.assetPair, Some(currentLastProcessedNr), autoCreate = false) { (sender, ref) =>
             orderBooks.getAndUpdate(_.filterNot(_._2.exists(_ == ref)))
             ref.tell(request, sender)
-            snapshotsState = snapshotsState.without(assetPair)
-            tradedPairs -= assetPair
-            assetPairsDb
-              .remove(assetPair)
-              .onComplete {
-                case Failure(e) => log.error(s"Can't remove $assetPair", e)
-                case _ =>
-              }
           }
+          self ! ForceSaveSnapshots
 
         case _ => runFor(request.command.assetPair, Some(currentLastProcessedNr))((sender, orderBook) => orderBook.tell(request, sender))
       }

@@ -431,6 +431,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     ),
     addressActor = addressDirectoryRef,
     orderDb = orderDb,
+    assetPairsDb = assetPairsDb,
     assetPairBuilder = pairBuilder,
     matcherPublicKey = matcherPublicKey,
     matcher = orderBookDirectoryActorRef,

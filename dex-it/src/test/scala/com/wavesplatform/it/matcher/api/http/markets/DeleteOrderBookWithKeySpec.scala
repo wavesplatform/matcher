@@ -40,7 +40,7 @@ class DeleteOrderBookWithKeySpec extends MatcherSuiteBase with ApiKeyHeaderCheck
       dex1.api.getOrderHistoryByPKWithSig(alice, activeOnly = Some(false)).find(_.id == order.id()).value.status shouldBe "Cancelled"
     }
 
-    "should return success if orderbook doesn't exists" in { // see DEX-1602
+    "should return an error if orderbook doesn't exists" in {
       validateMatcherError(
         dex1.rawApi.deleteOrderBookWithKey(wavesUsdPair),
         StatusCode.ServiceUnavailable,

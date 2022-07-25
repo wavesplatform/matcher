@@ -41,15 +41,11 @@ class DeleteOrderBookWithKeySpec extends MatcherSuiteBase with ApiKeyHeaderCheck
     }
 
     "should return success if orderbook doesn't exists" in { // see DEX-1602
-      validate202Json(dex1.rawApi.deleteOrderBookWithKey(wavesUsdPair)).message should be("Deleting order book")
-    }
-
-    "should return an error if asset pair doesn't exists" in {
       validateMatcherError(
-        dex1.rawApi.deleteOrderBookWithKey(wavesBtcPair),
+        dex1.rawApi.deleteOrderBookWithKey(wavesUsdPair),
         StatusCode.ServiceUnavailable,
         OrderBookBroken.code,
-        s"The order book for WAVES-$BtcId is unavailable, please contact with the administrator"
+        s"The order book for WAVES-$UsdId is unavailable, please contact with the administrator"
       )
     }
 

@@ -705,7 +705,7 @@ object InvalidBase58String extends MatcherErrorCodeProvider(order, commonEntity,
 final case class RequestAndJwtAddressesAreDifferent(requestAddress: Address, jwtAddress: Address)
     extends MatcherError(
       RequestAndJwtAddressesAreDifferent.code,
-      e"Request address ${"requestAddress" -> requestAddress} and public key ${"jwtAddress" -> jwtAddress} are different",
+      e"Request address ${"requestAddress" -> requestAddress} and jwt address ${"jwtAddress" -> jwtAddress} are different",
       RequestAndJwtAddressesAreDifferent.httpCode
     )
 

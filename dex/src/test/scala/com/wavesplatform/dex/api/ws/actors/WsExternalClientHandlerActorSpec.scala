@@ -163,7 +163,7 @@ class WsExternalClientHandlerActorSpec extends AnyFreeSpecLike with Matchers wit
           WsAddressSubscribe(KeyPair(ByteStr("other-client".getBytes(StandardCharsets.UTF_8))), "jwt", mkJwt(mkJwtSignedPayload(clientKeyPair))),
           WsError(
             timestamp = 0L, // ignored
-            code = AddressAndPublicKeyAreIncompatible.code,
+            code = RequestAndJwtAddressesAreDifferent.code,
             message = "Address 3N7nTwcKubzsH6X1uWerLoYFGX1pTKSbhUu and public key D6HmGZqpXCyAqpz8mCAfWijYDWsPKncKe5v3jq1nTpf5 are incompatible"
           )
         )

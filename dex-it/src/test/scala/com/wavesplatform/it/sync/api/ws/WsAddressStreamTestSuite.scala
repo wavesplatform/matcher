@@ -16,7 +16,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.model.Denormalization
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
-import com.wavesplatform.dex.error.{AddressAndPublicKeyAreIncompatible, SubscriptionTokenExpired, SubscriptionsLimitReached}
+import com.wavesplatform.dex.error.{RequestAndJwtAddressesAreDifferent, SubscriptionTokenExpired, SubscriptionsLimitReached}
 import com.wavesplatform.dex.it.test.Scripts
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.model.{LimitOrder, MarketOrder, OrderStatus}
@@ -72,7 +72,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
         errors.head should matchTo(
           WsError(
             timestamp = 0L, // ignored
-            code = AddressAndPublicKeyAreIncompatible.code,
+            code = RequestAndJwtAddressesAreDifferent.code,
             message = "Address 3Q6LEwEVJVAomd4BjjjSPydZuNN4vDo3fSs and public key 54gGdY9o2vFgzkSMLXQ7iReTJMPo2XiGdaBQSsG5U3un are incompatible"
           )
         )

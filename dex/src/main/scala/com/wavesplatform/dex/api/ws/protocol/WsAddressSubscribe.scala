@@ -1,11 +1,10 @@
 package com.wavesplatform.dex.api.ws.protocol
 
-import java.nio.charset.StandardCharsets
 import cats.syntax.either._
 import cats.syntax.option._
 import com.wavesplatform.dex.api.ws.entities.WsAddressFlag
 import com.wavesplatform.dex.api.ws.protocol.WsAddressSubscribe._
-import com.wavesplatform.dex.domain.account.{Address, PrivateKey, PublicKey}
+import com.wavesplatform.dex.domain.account.{Address, PrivateKey}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.error
@@ -14,6 +13,8 @@ import pdi.jwt.exceptions.{JwtExpirationException, JwtLengthException}
 import pdi.jwt.{JwtAlgorithm, JwtJson, JwtOptions}
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
+
+import java.nio.charset.StandardCharsets
 
 final case class WsAddressSubscribe(key: Address, authType: String, jwt: String, flags: Set[WsAddressFlag] = Set.empty) extends WsClientMessage {
   override val tpe: String = WsAddressSubscribe.tpe
@@ -37,9 +38,9 @@ final case class WsAddressSubscribe(key: Address, authType: String, jwt: String,
         Either.cond(given == networkByte, (), error.TokenNetworkUnexpected(networkByte, given))
       }
       _ <- Either.cond(
-        payload.publicKey.toAddress == key,
+        payload.address == key,
         (),
-        error.AddressAndPublicKeyAreIncompatible(key, payload.publicKey)
+        error.RequestAndJwtAddressesAreDifferent(key, payload.address)
       )
     } yield payload
 
@@ -70,7 +71,7 @@ object WsAddressSubscribe {
 
   case class JwtPayload(
     signature: ByteStr,
-    publicKey: PublicKey,
+    address: Address,
     networkByte: String,
     clientId: String,
     firstTokenExpirationInSeconds: Long,
@@ -87,7 +88,7 @@ object WsAddressSubscribe {
 
     implicit val jwtPayloadFormat: OFormat[JwtPayload] = (
       (__ \ "sig").format[ByteStr] and
-        (__ \ "pk").format[PublicKey] and
+        (__ \ "a").format[Address] and
         (__ \ "nb").format[String] and
         (__ \ "cid").format[String] and
         (__ \ "exp0").format[Long] and

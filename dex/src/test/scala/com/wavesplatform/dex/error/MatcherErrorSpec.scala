@@ -80,7 +80,7 @@ class MatcherErrorSpec extends AnyFreeSpec with Matchers {
       WavesNodeConnectionBroken.code shouldBe 105906177
       ApiKeyIsNotValid.code shouldBe 106954752
       ApiKeyIsNotProvided.code shouldBe 106954769
-      AddressAndPublicKeyAreIncompatible.code shouldBe 106957828
+      RequestAndJwtAddressesAreDifferent.code shouldBe 106957828
       SubscriptionAuthTypeUnsupported.code shouldBe 106960131
       AuthIsRequired.code shouldBe 106981137
       Balancing.code shouldBe 109051922

@@ -16,7 +16,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.model.Denormalization
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
-import com.wavesplatform.dex.error.{AddressAndPublicKeyAreIncompatible, SubscriptionTokenExpired, SubscriptionsLimitReached}
+import com.wavesplatform.dex.error.{RequestAndJwtAddressesAreDifferent, SubscriptionTokenExpired, SubscriptionsLimitReached}
 import com.wavesplatform.dex.it.test.Scripts
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.model.{LimitOrder, MarketOrder, OrderStatus}
@@ -72,8 +72,8 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
         errors.head should matchTo(
           WsError(
             timestamp = 0L, // ignored
-            code = AddressAndPublicKeyAreIncompatible.code,
-            message = "Address 3Q6LEwEVJVAomd4BjjjSPydZuNN4vDo3fSs and public key 54gGdY9o2vFgzkSMLXQ7iReTJMPo2XiGdaBQSsG5U3un are incompatible"
+            code = RequestAndJwtAddressesAreDifferent.code,
+            message = "Request address 3Q6LEwEVJVAomd4BjjjSPydZuNN4vDo3fSs and jwt address 3PzSgWRCfMssrD9Fq8mxDyAQWZ2f5MhoBnk are different"
           )
         )
       }
@@ -746,25 +746,6 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
         WsError.from(SubscriptionsLimitReached(3, bob.toAddress.toString), 0L)
       )
     }
-  }
-
-  "should send updates without 2nd step (waves's) signature in jwt" in {
-    val acc = mkAccountWithBalance(10.waves -> Waves)
-
-    Using.resource(mkDexWsConnection(dex1)) { wsc =>
-      wsc.send(
-        WsAddressSubscribe(
-          acc,
-          WsAddressSubscribe.defaultAuthType,
-          mkJwt(mkJwtNotSignedPayload(acc))
-        )
-      )
-
-      eventually(
-        wsc.addressStateChanges.head.isDebug should be(true)
-      )
-    }
-
   }
 
   "Bugs" - {

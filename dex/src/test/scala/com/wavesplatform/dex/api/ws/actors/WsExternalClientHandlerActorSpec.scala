@@ -163,24 +163,10 @@ class WsExternalClientHandlerActorSpec extends AnyFreeSpecLike with Matchers wit
           WsAddressSubscribe(KeyPair(ByteStr("other-client".getBytes(StandardCharsets.UTF_8))), "jwt", mkJwt(mkJwtSignedPayload(clientKeyPair))),
           WsError(
             timestamp = 0L, // ignored
-            code = AddressAndPublicKeyAreIncompatible.code,
-            message = "Address 3N7nTwcKubzsH6X1uWerLoYFGX1pTKSbhUu and public key D6HmGZqpXCyAqpz8mCAfWijYDWsPKncKe5v3jq1nTpf5 are incompatible"
+            code = RequestAndJwtAddressesAreDifferent.code,
+            message = "Request address 3N7nTwcKubzsH6X1uWerLoYFGX1pTKSbhUu and jwt address 3Myss6gmMckKYtka3cKCM563TBJofnxvfD7 are different"
           )
         )
-      }
-
-      "jwt is debug" - {
-        "when invalid signature" in test { t =>
-          t.wsHandlerRef ! ProcessClientMessage(WsAddressSubscribe(
-            clientKeyPair,
-            WsAddressSubscribe.defaultAuthType,
-            mkJwt(mkJwtNotSignedPayload(clientKeyPair))
-          ))
-          t.addressProbe.expectMsgType[AddressDirectoryActor.Command.ForwardMessage].message match {
-            case x: AddressActor.WsCommand.AddWsSubscription => x.isDebug shouldBe true
-            case x => fail(s"Unexpected message: $x")
-          }
-        }
       }
 
       "should be cancelled after jwt expiration" in test { t =>

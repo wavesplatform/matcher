@@ -15,8 +15,7 @@ case class WsAddressChanges(
   maybeNotObservedTxs: Option[WsTxsData],
   maybeNotCreatedTxs: Option[WsTxsData],
   updateId: Long,
-  timestamp: Long = System.currentTimeMillis,
-  isDebug: Boolean = false
+  timestamp: Long = System.currentTimeMillis
 ) extends WsServerMessage {
   override val tpe: String = WsAddressChanges.tpe
 }
@@ -27,7 +26,7 @@ object WsAddressChanges {
 
   def wsUnapply(
     arg: WsAddressChanges
-  ): Option[(String, Long, Long, Address, Map[Asset, WsBalances], Seq[WsOrder], Option[WsTxsData], Option[WsTxsData], Option[Boolean])] =
+  ): Option[(String, Long, Long, Address, Map[Asset, WsBalances], Seq[WsOrder], Option[WsTxsData], Option[WsTxsData])] =
     (
       arg.tpe,
       arg.timestamp,
@@ -36,8 +35,7 @@ object WsAddressChanges {
       arg.balances,
       arg.orders,
       arg.maybeNotObservedTxs,
-      arg.maybeNotCreatedTxs,
-      Option(arg.isDebug).filter(_ == true)
+      arg.maybeNotCreatedTxs
     ).some
 
   implicit val balancesMapFormat: Format[Map[Asset, WsBalances]] = json.assetMapFormat[WsBalances]
@@ -50,10 +48,9 @@ object WsAddressChanges {
       (__ \ "b").formatNullable[Map[Asset, WsBalances]](balancesMapFormat) and
       (__ \ "o").formatNullable[Seq[WsOrder]] and
       (__ \ "not").formatNullable[WsTxsData] and
-      (__ \ "nct").formatNullable[WsTxsData] and
-      (__ \ "d").formatNullable[Boolean]
+      (__ \ "nct").formatNullable[WsTxsData]
   )(
-    (_, ts, uid, address, maybeBalances, maybeOrders, maybeNotObservedTxs, maybeNotCreatedTxs, isDebug) =>
+    (_, ts, uid, address, maybeBalances, maybeOrders, maybeNotObservedTxs, maybeNotCreatedTxs) =>
       WsAddressChanges(
         address = address,
         balances = maybeBalances getOrElse Map.empty,
@@ -61,12 +58,11 @@ object WsAddressChanges {
         maybeNotObservedTxs = maybeNotObservedTxs,
         maybeNotCreatedTxs = maybeNotCreatedTxs,
         updateId = uid,
-        timestamp = ts,
-        isDebug = isDebug.getOrElse(false)
+        timestamp = ts
       ),
     unlift(WsAddressChanges.wsUnapply) andThen {
-      case (tpe, ts, uid, addr, bs, os, not, nct, d) =>
-        (tpe, ts, uid, addr, Option(bs).filter(_.nonEmpty), Option(os).filter(_.nonEmpty), not, nct, d)
+      case (tpe, ts, uid, addr, bs, os, not, nct) =>
+        (tpe, ts, uid, addr, Option(bs).filter(_.nonEmpty), Option(os).filter(_.nonEmpty), not, nct)
     }
   )
 

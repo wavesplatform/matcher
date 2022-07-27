@@ -1,13 +1,12 @@
 package com.wavesplatform.dex.auth
 
-import java.security
-
 import com.wavesplatform.dex.api.ws.protocol.WsAddressSubscribe.JwtPayload
-import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair, PublicKey}
+import com.wavesplatform.dex.domain.account.{Address, AddressScheme, KeyPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import pdi.jwt.{JwtAlgorithm, JwtJson}
 import play.api.libs.json.{JsObject, Json}
 
+import java.security
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
 trait JwtUtils {
@@ -28,14 +27,14 @@ trait JwtUtils {
     mkJwtNotSignedPayload(clientKeyPair, networkByte, lifetime).signed(clientKeyPair)
 
   def mkJwtNotSignedPayload(
-    clientPublicKey: PublicKey,
+    address: Address,
     networkByte: Byte = AddressScheme.current.chainId,
     lifetime: FiniteDuration = 1.hour
   ): JwtPayload = {
     val exp = System.currentTimeMillis() / 1000 + lifetime.toSeconds
     JwtPayload(
       signature = ByteStr(Array.emptyByteArray),
-      publicKey = clientPublicKey,
+      address = address,
       networkByte = networkByte.toChar.toString,
       clientId = "test",
       firstTokenExpirationInSeconds = exp,

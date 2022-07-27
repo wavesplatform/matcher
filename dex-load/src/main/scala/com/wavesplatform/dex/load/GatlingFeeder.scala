@@ -35,7 +35,7 @@ object GatlingFeeder {
     val exp = System.currentTimeMillis() / 1000 + 24.hour.toSeconds
     JwtPayload(
       signature = ByteStr(Array.emptyByteArray),
-      publicKey = a.publicKey,
+      address = a.toAddress,
       networkByte = AddressScheme.current.chainId.toChar.toString,
       clientId = "test",
       firstTokenExpirationInSeconds = exp,

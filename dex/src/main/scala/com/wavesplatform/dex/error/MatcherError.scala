@@ -702,14 +702,14 @@ final case class InvalidBase58String(reason: String)
 
 object InvalidBase58String extends MatcherErrorCodeProvider(order, commonEntity, broken, C.BadRequest)
 
-final case class AddressAndPublicKeyAreIncompatible(address: Address, publicKey: PublicKey)
+final case class RequestAndJwtAddressesAreDifferent(requestAddress: Address, jwtAddress: Address)
     extends MatcherError(
-      AddressAndPublicKeyAreIncompatible.code,
-      e"Address ${"address" -> address} and public key ${"publicKey" -> publicKey} are incompatible",
-      AddressAndPublicKeyAreIncompatible.httpCode
+      RequestAndJwtAddressesAreDifferent.code,
+      e"Request address ${"requestAddress" -> requestAddress} and jwt address ${"jwtAddress" -> jwtAddress} are different",
+      RequestAndJwtAddressesAreDifferent.httpCode
     )
 
-object AddressAndPublicKeyAreIncompatible extends MatcherErrorCodeProvider(auth, pubKey, unexpected, C.BadRequest)
+object RequestAndJwtAddressesAreDifferent extends MatcherErrorCodeProvider(auth, pubKey, unexpected, C.BadRequest)
 
 case object AuthIsRequired
     extends MatcherError(auth, params, notProvided, e"The authentication is required. Please read the documentation", C.Forbidden)

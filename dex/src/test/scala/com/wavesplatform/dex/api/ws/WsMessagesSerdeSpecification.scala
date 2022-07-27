@@ -13,11 +13,11 @@ import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.model.{LimitOrder, MarketOrder, OrderBook}
 import com.wavesplatform.dex.settings.OrderRestrictionsSettings
-import org.scalacheck.{Arbitrary, Gen}
+import org.scalacheck.Gen
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
-import play.api.libs.json.{Format, JsBoolean, JsObject, Json}
+import play.api.libs.json.{Format, Json}
 
 import java.math.BigInteger
 import java.nio.charset.StandardCharsets
@@ -87,8 +87,7 @@ class WsMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDrivenProp
     orders <- Gen.listOfN(orderChanges, wsOrderGen)
     updateId <- Gen.choose(0L, Long.MaxValue)
     ts <- Gen.choose(0L, Long.MaxValue)
-    d <- Arbitrary.arbBool.arbitrary
-  } yield WsAddressChanges(account.toAddress, (assets zip balances).toMap, orders, None, None, updateId, ts, d)
+  } yield WsAddressChanges(account.toAddress, (assets zip balances).toMap, orders, None, None, updateId, ts)
 
   private val askPricesMin = 1000L * Order.PriceConstant
   private val askPricesMax = 2000L * Order.PriceConstant
@@ -183,36 +182,7 @@ class WsMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDrivenProp
 
   "WsOrder" in serdeTest(wsOrderGen)
 
-  "WsAddressChanges" - {
-    val oneTimeGenerateConfig = MinSuccessful(1)
-
-    "default" in serdeTest(wsAddressChangesGen)
-    "isDebug" - {
-      def test(transform: JsObject => JsObject)(check: Boolean => Any): Any = forAll(wsAddressChangesGen, oneTimeGenerateConfig) { original =>
-        val json = transform(WsAddressChanges.wsAddressChangesFormat.writes(original))
-        val restored =
-          WsAddressChanges.wsAddressChangesFormat
-            .reads(json)
-            .fold(
-              e => throw PlayJsonException(None, e.map { case (jp, errorsSeq) => jp -> errorsSeq.to(Seq) } to Seq),
-              identity
-            )
-        check(restored.isDebug)
-      }
-
-      // Without "d" flag which is same as "None"
-      "None equals false" in test(_ - "d")(_ shouldBe false)
-
-      "Some(false) equals false" in test(_ + ("d" -> JsBoolean(false)))(_ shouldBe false)
-
-      "Some(true) equals true" in test(_ + ("d" -> JsBoolean(true)))(_ shouldBe true)
-
-      "Doesn't appear in JSON if false" in forAll(wsAddressChangesGen, oneTimeGenerateConfig) { original =>
-        val json = WsAddressChanges.wsAddressChangesFormat.writes(original.copy(isDebug = false))
-        json.value.get("d") shouldBe empty // contain doesn't work here
-      }
-    }
-  }
+  "WsAddressChanges" in serdeTest(wsAddressChangesGen)
 
   "WsOrderBookChanges" in serdeTest(wsOrderBookChangesGen)
 

@@ -15,7 +15,7 @@ case class AuthServiceRestConnector(target: String, chainId: Byte) extends RestC
     val jwtPayload = mkJwtSignedPayload(keyPair, networkByte = chainId)
     Map(
       "grant_type" -> "password",
-      "username" -> jwtPayload.address.stringRepr,
+      "username" -> keyPair.publicKey.base58,
       "password" -> s"${jwtPayload.firstTokenExpirationInSeconds}:${jwtPayload.signature}",
       "scope" -> jwtPayload.scope.head,
       "client_id" -> jwtPayload.clientId

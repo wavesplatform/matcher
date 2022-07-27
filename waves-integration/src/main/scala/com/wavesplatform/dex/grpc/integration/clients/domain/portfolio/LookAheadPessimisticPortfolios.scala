@@ -15,46 +15,36 @@ import scala.util.chaining._
  */
 class LookAheadPessimisticPortfolios(orig: PessimisticPortfolios, maxConfirmedTransactions: Int) extends PessimisticPortfolios {
 
-  // TODO FifoSet
-  private val confirmedTxsEvictionQueue = new mutable.Queue[ByteString](maxConfirmedTransactions)
-  private val confirmedTxs = new mutable.HashSet[ByteString]
+  private val confirmedTxs = new mutable.LinkedHashSet[ByteString]
 
   override def getAggregated(address: Address): Map[Asset, Long] = orig.getAggregated(address)
 
   override def replaceWith(setTxs: Seq[PessimisticTransaction]): Set[Address] = {
     confirmedTxs.clear()
-    confirmedTxsEvictionQueue.clear()
     orig.replaceWith(setTxs)
   }
 
-  override def addPending(txs: Iterable[PessimisticTransaction]): Set[Address] =
-    orig.addPending(txs.filterNot(remove)) // Without unknown
+  override def addPending(txs: Iterable[PessimisticTransaction]): Set[Address] = {
+    val newTxs = txs.filterNot(tx => confirmedTxs.contains(tx.txId))
+    orig.addPending(newTxs) // Without unknown
+  }
 
   /**
    * @return (affected addresses, unknown transactions)
    */
-  override def processConfirmed(txIds: Iterable[ByteString]): (Set[Address], List[ByteString]) =
+  override def processConfirmed(txIds: Iterable[ByteString]): (Set[Address], List[ByteString]) = {
     // We don't filter, because a transaction can't be forged twice
-    orig.processConfirmed(txIds).tap { case (_, unknownTxIds) =>
-      unknownTxIds.foreach(put)
-    }
+    txIds.foreach(put)
+    orig.processConfirmed(txIds)
+  }
 
   override def removeFailed(txIds: Iterable[ByteString]): Set[Address] =
-    // txIds.foreach(remove) // a transaction can't be forged and failed both.
     orig.removeFailed(txIds)
 
   private def put(txId: ByteString): Unit = confirmedTxs.add(txId).tap { added =>
-    if (added) {
-      if (confirmedTxsEvictionQueue.size == maxConfirmedTransactions)
-        confirmedTxsEvictionQueue.removeHeadOption().foreach(confirmedTxs.remove)
-      confirmedTxsEvictionQueue.enqueue(txId)
-    }
-  }
-
-  private def remove(tx: PessimisticTransaction): Boolean = remove(tx.txId)
-
-  private def remove(id: ByteString): Boolean = confirmedTxs.remove(id).tap { had =>
-    if (had) confirmedTxsEvictionQueue.removeFirst(_ == id)
+    if (added)
+      if (confirmedTxs.size > maxConfirmedTransactions)
+        confirmedTxs.headOption.map(confirmedTxs.remove)
   }
 
 }

@@ -73,7 +73,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           WsError(
             timestamp = 0L, // ignored
             code = RequestAndJwtAddressesAreDifferent.code,
-            message = "Address 3Q6LEwEVJVAomd4BjjjSPydZuNN4vDo3fSs and public key 54gGdY9o2vFgzkSMLXQ7iReTJMPo2XiGdaBQSsG5U3un are incompatible"
+            message = "Request address 3Q6LEwEVJVAomd4BjjjSPydZuNN4vDo3fSs and jwt address 3PzSgWRCfMssrD9Fq8mxDyAQWZ2f5MhoBnk are different"
           )
         )
       }

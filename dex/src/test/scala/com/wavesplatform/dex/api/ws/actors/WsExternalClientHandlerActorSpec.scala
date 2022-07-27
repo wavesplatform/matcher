@@ -164,7 +164,7 @@ class WsExternalClientHandlerActorSpec extends AnyFreeSpecLike with Matchers wit
           WsError(
             timestamp = 0L, // ignored
             code = RequestAndJwtAddressesAreDifferent.code,
-            message = "Address 3N7nTwcKubzsH6X1uWerLoYFGX1pTKSbhUu and public key D6HmGZqpXCyAqpz8mCAfWijYDWsPKncKe5v3jq1nTpf5 are incompatible"
+            message = "Request address 3N7nTwcKubzsH6X1uWerLoYFGX1pTKSbhUu and jwt address 3Myss6gmMckKYtka3cKCM563TBJofnxvfD7 are different"
           )
         )
       }

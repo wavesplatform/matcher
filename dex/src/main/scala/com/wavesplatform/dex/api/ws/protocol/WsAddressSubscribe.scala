@@ -80,8 +80,6 @@ object WsAddressSubscribe {
     def toSign: Array[Byte] = JwtPayload.toSignPrefix ++ s"$networkByte:$clientId:$firstTokenExpirationInSeconds".getBytes(StandardCharsets.UTF_8)
 
     def signed(privateKey: PrivateKey): JwtPayload = copy(signature = crypto.sign(privateKey, toSign))
-
-    val isDebug: Boolean = !crypto.verify(signature, ByteStr(toSign), publicKey)
   }
 
   object JwtPayload {

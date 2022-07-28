@@ -5,7 +5,6 @@ import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 
 import scala.collection.mutable
-import scala.util.chaining._
 
 /**
  * Caches unknown forged transactions and don't add them in pending.
@@ -41,10 +40,10 @@ class LookAheadPessimisticPortfolios(orig: PessimisticPortfolios, maxConfirmedTr
   override def removeFailed(txIds: Iterable[ByteString]): Set[Address] =
     orig.removeFailed(txIds)
 
-  private def put(txId: ByteString): Unit = confirmedTxs.add(txId).tap { added =>
-    if (added)
-      if (confirmedTxs.size > maxConfirmedTransactions)
-        confirmedTxs.headOption.map(confirmedTxs.remove)
+  private def put(txId: ByteString): Unit = {
+    confirmedTxs.add(txId)
+    if (confirmedTxs.size > maxConfirmedTransactions)
+      confirmedTxs.headOption.map(confirmedTxs.remove)
   }
 
 }

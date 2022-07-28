@@ -57,21 +57,41 @@ class LookAheadPessimisticPortfoliosTestSuite extends PessimisticPortfoliosTestS
           getState(pp) should matchTo(before)
         }
 
-        "are limited by maxConfirmedTransactions" in forAll(testGen, pessimisticTransactionGen) { case ((pp, unknownTx1), unknownTx2) =>
-          val before = getState(pp)
+        "addPending, processConfirmed and addPending same tx again" in forAll(testGen) { case (pp, unknownTx) =>
+          val prevState = getState(pp)
 
-          // unknownTx1 is removed from the cache, because maxConfirmedTransactions = 1
-          pp.processConfirmed(List(unknownTx1.txId, unknownTx2.txId))
-          pp.addPending(List(unknownTx1, unknownTx2))
+          pp.addPending(List(unknownTx))
+          pp.processConfirmed(List(unknownTx.txId))
+          pp.addPending(List(unknownTx))
 
-          // so only unknownTx1 affects the state
-          getState(pp) should matchTo(combine(before, unknownTx1.pessimisticPortfolio))
+          val newState = getState(pp)
+
+          newState.foreach { case (address, changes) =>
+            changes.foreach {
+              case (asset, change) =>
+                // because tx was in portfolio and now, when it's gone, it must be prevValue from state, or 0
+                val prevValue = prevState.get(address).flatMap(_.get(asset)).getOrElse(0)
+                change shouldBe prevValue
+            }
+          }
+        }
+
+        "are limited by maxConfirmedTransactions" in forAll(testGen, pessimisticTransactionGen, pessimisticTransactionGen) {
+          case ((pp, unknownTx1), unknownTx2, unknownTx3) =>
+            val before = getState(pp)
+
+            // unknownTx1 is removed from the cache, because maxConfirmedTransactions = 2
+            pp.processConfirmed(List(unknownTx1.txId, unknownTx2.txId, unknownTx3.txId))
+            pp.addPending(List(unknownTx1, unknownTx2, unknownTx3))
+
+            // so only unknownTx1 affects the state
+            getState(pp) should matchTo(combine(before, unknownTx1.pessimisticPortfolio))
         }
       }
     }
   }
 
-  override def mkPessimisticPortfolios(initialTxs: List[PessimisticTransaction]) = mkPessimisticPortfolios(initialTxs, 1)
+  override def mkPessimisticPortfolios(initialTxs: List[PessimisticTransaction]) = mkPessimisticPortfolios(initialTxs, 2)
 
   private def mkPessimisticPortfolios(initialTxs: List[PessimisticTransaction], maxConfirmedTransactions: Int) =
     new LookAheadPessimisticPortfolios(

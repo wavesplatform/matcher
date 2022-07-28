@@ -264,12 +264,14 @@ class OrderEventsCoordinatorActorSpec
 
       "if a transaction is already observed - ignores it" in {
         val addressDirectory = classic.TestProbe()
+        val initObservedTxs = FifoSet.limited[ExchangeTransaction.Id](10)
+        initObservedTxs.append(validTx.id())
         val oecRef = testKit.spawn(OrderEventsCoordinatorActor(
           addressDirectory.ref,
           classic.TestProbe().ref,
           TestProbe[ExchangeTransactionBroadcastActor.Command]().ref,
           _ => ExchangeTransactionResult(validTx, ValidationError.GenericError("test").some),
-          FifoSet.limited[ExchangeTransaction.Id](10).append(validTx.id())._1,
+          initObservedTxs,
           None
         ))
         oecRef ! OrderEventsCoordinatorActor.Command.ApplyNodeUpdates(WavesNodeUpdates(
@@ -398,12 +400,14 @@ class OrderEventsCoordinatorActorSpec
     "ApplyObservedByBroadcaster" - {
       "if a transaction is already observed - ignores it" in {
         val addressDirectory = classic.TestProbe()
+        val initObservedTxs = FifoSet.limited[ExchangeTransaction.Id](10)
+        initObservedTxs.append(validTx.id())
         val oecRef = testKit.spawn(OrderEventsCoordinatorActor(
           addressDirectory.ref,
           classic.TestProbe().ref,
           TestProbe[ExchangeTransactionBroadcastActor.Command]().ref,
           _ => ExchangeTransactionResult(validTx, ValidationError.GenericError("test").some),
-          FifoSet.limited[ExchangeTransaction.Id](10).append(validTx.id())._1,
+          initObservedTxs,
           None
         ))
         oecRef ! OrderEventsCoordinatorActor.Command.ApplyObservedByBroadcaster(validTx, Map.empty)

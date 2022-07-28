@@ -1,10 +1,9 @@
 package com.wavesplatform.dex.grpc.integration.clients.domain.portfolio
 
 import com.google.protobuf.ByteString
+import com.wavesplatform.dex.collections.FifoSet
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
-
-import scala.collection.mutable
 
 /**
  * Caches unknown forged transactions and don't add them in pending.
@@ -14,7 +13,7 @@ import scala.collection.mutable
  */
 class LookAheadPessimisticPortfolios(orig: PessimisticPortfolios, maxConfirmedTransactions: Int) extends PessimisticPortfolios {
 
-  private val confirmedTxs = new mutable.LinkedHashSet[ByteString]
+  private val confirmedTxs = FifoSet.limited[ByteString](maxConfirmedTransactions)
 
   override def getAggregated(address: Address): Map[Asset, Long] = orig.getAggregated(address)
 
@@ -33,17 +32,11 @@ class LookAheadPessimisticPortfolios(orig: PessimisticPortfolios, maxConfirmedTr
    */
   override def processConfirmed(txIds: Iterable[ByteString]): (Set[Address], List[ByteString]) = {
     // We don't filter, because a transaction can't be forged twice
-    txIds.foreach(put)
+    txIds.foreach(confirmedTxs.append)
     orig.processConfirmed(txIds)
   }
 
   override def removeFailed(txIds: Iterable[ByteString]): Set[Address] =
     orig.removeFailed(txIds)
-
-  private def put(txId: ByteString): Unit = {
-    confirmedTxs.add(txId)
-    if (confirmedTxs.size > maxConfirmedTransactions)
-      confirmedTxs.headOption.map(confirmedTxs.remove)
-  }
 
 }

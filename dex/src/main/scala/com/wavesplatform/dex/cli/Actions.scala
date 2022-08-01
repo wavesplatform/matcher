@@ -77,7 +77,6 @@ object Actions {
 
     val currentOffset = sendRequest(s"${args.dexRestApi}/matcher/debug/currentOffset", key).toLong
     sendRequest(s"${args.dexRestApi}/matcher/orderbook/${args.assetPair.replace('-', '/')}", key, "delete")
-    sendRequest(s"${args.dexRestApi}/matcher/debug/currentOffset", key, "post")
 
     val validation = Task(sendRequest(args.dexRestApi, "oldestSnapshotOffset", key).toLong <= currentOffset)
       .delayExecution(1.second)
@@ -246,7 +245,6 @@ object Actions {
     val key = readSecretFromStdIn("Enter X-API-KEY: ")
 
     val currentOffset = sendRequest(s"${args.dexRestApi}/matcher/debug/currentOffset", key).toLong
-    sendRequest(s"${args.dexRestApi}/matcher/debug/currentOffset", key, "post")
 
     val validation = Task(sendRequest(args.dexRestApi, "oldestSnapshotOffset", key).toLong <= currentOffset)
       .delayExecution(1.second)

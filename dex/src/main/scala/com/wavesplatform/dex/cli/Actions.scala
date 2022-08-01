@@ -75,10 +75,10 @@ object Actions {
 
     val key = readSecretFromStdIn("Enter X-API-KEY: ")
 
-    val currentOffset = sendRequest(s"${args.dexRestApi}/matcher/debug/currentOffset", key).toLong
-    sendRequest(s"${args.dexRestApi}/matcher/orderbook/${args.assetPair.replace('-', '/')}", key, "delete")
+    val currentOffset = sendRequest(s"${args.dexRestApi}/matcher/debug/currentOffset", apiKey = key).toLong
+    sendRequest(s"${args.dexRestApi}/matcher/orderbook/${args.assetPair.replace('-', '/')}", apiKey = key, "delete")
 
-    val validation = Task(sendRequest(args.dexRestApi, "oldestSnapshotOffset", key).toLong <= currentOffset)
+    val validation = Task(sendRequest(s"${args.dexRestApi}/matcher/debug/oldestSnapshotOffset", apiKey = key).toLong <= currentOffset)
       .delayExecution(1.second)
       .onErrorRestart(Long.MaxValue)
       .restartUntil(_ == true)
@@ -244,10 +244,10 @@ object Actions {
 
     val key = readSecretFromStdIn("Enter X-API-KEY: ")
 
-    val currentOffset = sendRequest(s"${args.dexRestApi}/matcher/debug/currentOffset", key).toLong
-    sendRequest(s"${args.dexRestApi}/matcher/debug/saveSnapshots", key, "post")
+    val currentOffset = sendRequest(s"${args.dexRestApi}/matcher/debug/currentOffset", apiKey = key).toLong
+    sendRequest(s"${args.dexRestApi}/matcher/debug/saveSnapshots", apiKey = key, "post")
 
-    val validation = Task(sendRequest(args.dexRestApi, "oldestSnapshotOffset", key).toLong <= currentOffset)
+    val validation = Task(sendRequest(s"${args.dexRestApi}/matcher/debug/oldestSnapshotOffset", apiKey = key).toLong <= currentOffset)
       .delayExecution(1.second)
       .onErrorRestart(Long.MaxValue)
       .restartUntil(_ == true)
@@ -522,9 +522,9 @@ object Actions {
       f(LevelDb.sync(db))
     }
 
-  private def sendRequest(url: String, key: String, method: String = "get"): String = {
+  private def sendRequest(url: String, apiKey: String, method: String = "get"): String = {
     print(s"Sending ${method.toUpperCase} $url... Response: ")
-    val r = basicRequest.headers(Map("X-API-KEY" -> key))
+    val r = basicRequest.headers(Map("X-API-KEY" -> apiKey))
 
     val body = method match {
       case "post" => r.post(uri"$url").send(backend).body

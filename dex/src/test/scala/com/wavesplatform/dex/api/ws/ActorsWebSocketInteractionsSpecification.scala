@@ -17,7 +17,7 @@ import com.wavesplatform.dex.domain.crypto.Proofs
 import com.wavesplatform.dex.domain.error.ValidationError
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.state.{LeaseBalance, Portfolio}
-import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV2
+import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV3
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
@@ -26,7 +26,7 @@ import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder, MarketOrder, _}
 import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import com.wavesplatform.dex.settings.OrderFeeSettings.DynamicSettings
 import com.wavesplatform.dex.time.Time
-import org.scalatest.BeforeAndAfterAll
+import org.scalatest.{BeforeAndAfterAll, OptionValues}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 
@@ -40,7 +40,8 @@ class ActorsWebSocketInteractionsSpecification
     with Matchers
     with BeforeAndAfterAll
     with ImplicitSender
-    with MatcherSpecBase {
+    with MatcherSpecBase
+    with OptionValues {
 
   private val testKit = ActorTestKit()
 
@@ -133,12 +134,17 @@ class ActorsWebSocketInteractionsSpecification
       val (counterExecutedFee, submittedExecutedFee) = Fee.getMakerTakerFee(DynamicSettings.symmetric(0.003.waves))(s, c)
       val oe = OrderExecuted(s, c, System.currentTimeMillis, counterExecutedFee, submittedExecutedFee, 0L)
       val (sellOrder, buyOrder) = if (oe.counter.isSellOrder) (oe.counter, oe.submitted) else (oe.submitted, oe.counter)
-      val tx = ExchangeTransactionV2
+      val price = ExchangeTransactionCreator.priceToFixedDecimals(
+        oe.executedPrice,
+        defaultAssetDescriptionsMap(buyOrder.order.assetPair.amountAsset).decimals,
+        defaultAssetDescriptionsMap(buyOrder.order.assetPair.priceAsset).decimals
+      )
+      val tx = ExchangeTransactionV3
         .create(
           buyOrder = buyOrder.order,
           sellOrder = sellOrder.order,
           amount = oe.executedAmount,
-          price = oe.executedPrice,
+          price = price,
           buyMatcherFee = buyOrder.matcherFee,
           sellMatcherFee = sellOrder.matcherFee,
           fee = 300000L,

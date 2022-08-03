@@ -16,7 +16,7 @@ import com.wavesplatform.dex.domain.crypto.Proofs
 import com.wavesplatform.dex.domain.model.{Normalization, Price}
 import com.wavesplatform.dex.domain.order.OrderOps._
 import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV3}
-import com.wavesplatform.dex.domain.transaction.{ExchangeTransactionResult, ExchangeTransactionV2}
+import com.wavesplatform.dex.domain.transaction.{ExchangeTransactionResult, ExchangeTransactionV3}
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.domain.{crypto => wcrypto}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
@@ -33,7 +33,7 @@ import io.qameta.allure.scalatest.AllureScalatestContext
 import kamon.context.Context
 import mouse.any._
 import org.scalacheck.{Arbitrary, Gen}
-import org.scalatest.Suite
+import org.scalatest.{OptionValues, Suite}
 import org.scalatest.concurrent.ScalaFutures
 import pureconfig.ConfigSource
 
@@ -50,7 +50,8 @@ trait MatcherSpecBase
     with DoubleOps
     with WavesFeeConstants
     with AllureScalatestContext
-    with ScalaFutures {
+    with ScalaFutures
+    with OptionValues {
   _: Suite =>
 
   implicit override def patienceConfig: PatienceConfig = PatienceConfig(2.seconds, 5.millis)
@@ -549,23 +550,30 @@ trait MatcherSpecBase
   protected def privateKey(seed: String): KeyPair = KeyPair(seed.getBytes("utf-8"))
   protected def nowTs: Long = System.currentTimeMillis()
 
-  protected def mkExchangeTx(oe: OrderExecuted): ExchangeTransactionResult[ExchangeTransactionV2] = {
+  protected def mkExchangeTx(oe: OrderExecuted): ExchangeTransactionResult[ExchangeTransactionV3] = {
     val (sellOrder, buyOrder) = if (oe.counter.isSellOrder) (oe.counter, oe.submitted) else (oe.submitted, oe.counter)
     mkExchangeTx(buyOrder.order, sellOrder.order)
   }
 
-  protected def mkExchangeTx(buyOrder: Order, sellOrder: Order): ExchangeTransactionResult[ExchangeTransactionV2] = ExchangeTransactionV2
-    .create(
-      buyOrder = buyOrder,
-      sellOrder = sellOrder,
-      amount = sellOrder.amount,
-      price = sellOrder.price,
-      buyMatcherFee = buyOrder.matcherFee,
-      sellMatcherFee = sellOrder.matcherFee,
-      fee = 300000L,
-      timestamp = nowTs,
-      proofs = Proofs.empty
+  protected def mkExchangeTx(buyOrder: Order, sellOrder: Order): ExchangeTransactionResult[ExchangeTransactionV3] = {
+    val price = ExchangeTransactionCreator.priceToFixedDecimals(
+      sellOrder.price,
+      defaultAssetDescriptionsMap(sellOrder.assetPair.amountAsset).decimals,
+      defaultAssetDescriptionsMap(sellOrder.assetPair.priceAsset).decimals
     )
+    ExchangeTransactionV3
+      .create(
+        buyOrder = buyOrder,
+        sellOrder = sellOrder,
+        amount = sellOrder.amount,
+        price = price,
+        buyMatcherFee = buyOrder.matcherFee,
+        sellMatcherFee = sellOrder.matcherFee,
+        fee = 300000L,
+        timestamp = nowTs,
+        proofs = Proofs.empty
+      )
+  }
 
   protected def mkSeqWsMatchTxInfo(price: Double, amount: Double, isTaker: Boolean): Seq[WsMatchTransactionInfo] =
     Seq(mkWsMatchTxInfo(price, amount, isTaker))

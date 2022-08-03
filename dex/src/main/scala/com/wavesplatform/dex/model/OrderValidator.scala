@@ -184,7 +184,11 @@ object OrderValidator extends ScorexLogging {
             order.matcherFee,
             None // don't need it at validation level
           )
-        transactionCreator(oe).toEither leftMap (txValidationError => error.CanNotCreateExchangeTransaction(txValidationError.toString))
+        transactionCreator(oe).map(
+          _.toEither leftMap (txValidationError => error.CanNotCreateExchangeTransaction(txValidationError.toString))
+        ).getOrElse(
+          error.CanNotCreateExchangeTransaction(s"Didn't find decimals for pair $assetPair to create transaction").asLeft
+        )
       }
 
       def verifyAssetScript(assetId: Asset): FutureResult[Unit] = assetId.fold(successAsync) { assetId =>

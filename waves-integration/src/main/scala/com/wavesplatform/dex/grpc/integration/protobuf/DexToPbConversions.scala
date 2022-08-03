@@ -8,7 +8,8 @@ import com.wavesplatform.dex.domain.order.{Order => VOrder, OrderType => VOrderT
 import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction => VExchangeTransaction}
 import com.wavesplatform.dex.grpc.integration.services.{ExchangeTransaction, SignedExchangeTransaction}
 import com.wavesplatform.protobuf.order.{AssetPair => PbAssetPair, Order => PbOrder}
-import com.wavesplatform.protobuf.transaction.{ExchangeTransactionData => PbExchangeTransactionData}
+import com.wavesplatform.protobuf.transaction.Transaction.Data
+import com.wavesplatform.protobuf.transaction.{SignedTransaction, Transaction, ExchangeTransactionData => PbExchangeTransactionData}
 import com.wavesplatform.protobuf.{Amount => PbAmount}
 
 object DexToPbConversions {
@@ -37,6 +38,22 @@ object DexToPbConversions {
         ),
         proofs = tx.proofs.proofs.map(_.toPB)
       )
+
+    def toPBSigned: SignedTransaction = {
+      val chainId = tx.chainByte.getOrElse(VAddressScheme.current.chainId).toInt
+      val data = PbExchangeTransactionData(
+        tx.amount,
+        tx.price,
+        tx.buyMatcherFee,
+        tx.sellMatcherFee,
+        Seq(tx.buyOrder, tx.buyOrder).map(_.toPB)
+      )
+      new SignedTransaction(
+        SignedTransaction.Transaction
+          .WavesTransaction(Transaction(chainId, tx.sender.toPB, Some(PbAmount(tx.feeAssetId.toPB, tx.fee)), tx.timestamp, tx.version, Data.Exchange(data))),
+        tx.proofs.map(bs => PbByteString.copyFrom(bs.arr))
+      )
+    }
 
   }
 

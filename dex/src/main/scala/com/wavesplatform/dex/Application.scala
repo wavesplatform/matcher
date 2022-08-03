@@ -169,7 +169,8 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     hasMatcherAccountScript,
     assetsCache.cached.unsafeGetHasScript, // Should be in the cache, because assets decimals are required during an order book creation
     (offsetOpt, sender) =>
-      offsetOpt.exists(_ > settings.passExecutionParameters.sinceOffset) && settings.passExecutionParameters.forAccounts.contains(sender)
+      offsetOpt.exists(_ > settings.passExecutionParameters.sinceOffset) && settings.passExecutionParameters.forAccounts.contains(sender),
+    errorContext // to get asset decimals
   )
 
   private val wavesBlockchainAsyncClient = new MatcherExtensionAssetsCachingClient(

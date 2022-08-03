@@ -4,7 +4,8 @@ import com.wavesplatform.dex.domain.account.{KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.Order
-import com.wavesplatform.dex.domain.transaction.{ExchangeTransactionResult, ExchangeTransactionV2}
+import com.wavesplatform.dex.domain.transaction.{ExchangeTransactionResult, ExchangeTransactionV3}
+import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.model.Events.OrderExecuted
 import com.wavesplatform.dex.queue.ValidatedCommandWithMeta
 import com.wavesplatform.dex.model.ExchangeTransactionCreator._
@@ -14,11 +15,12 @@ class ExchangeTransactionCreator(
   exchangeTxBaseFee: Long,
   hasMatcherAccountScript: => Boolean,
   hasAssetScript: IssuedAsset => Boolean,
-  shouldPassExecParams: (Option[ValidatedCommandWithMeta.Offset], PublicKey) => Boolean
+  shouldPassExecParams: (Option[ValidatedCommandWithMeta.Offset], PublicKey) => Boolean,
+  efc: ErrorFormatterContext
 ) {
 
-  def createTransaction(orderExecutedEvent: OrderExecuted): ExchangeTransactionResult[ExchangeTransactionV2] = {
-    import orderExecutedEvent.{counter, executedAmount, submitted, timestamp}
+  def createTransaction(orderExecutedEvent: OrderExecuted): Option[ExchangeTransactionResult[ExchangeTransactionV3]] = {
+    import orderExecutedEvent.{counter, submitted}
     val (buy, sell) = Order.splitByType(submitted.order, counter.order)
 
     val (buyFee, sellFee) =
@@ -45,24 +47,31 @@ class ExchangeTransactionCreator(
       // TODO This will be fixed in NODE 1.2.8+, see NODE-2183
       List(orderExecutedEvent.counter.feeAsset, orderExecutedEvent.submitted.feeAsset)
         .count(_.fold(false)(hasAssetScript)) * OrderValidator.ScriptExtraFee
-    ExchangeTransactionV2.create(
-      matcherPrivateKey,
-      buyWithExecutionInfo,
-      sellWithExecutionInfo,
-      executedAmount,
-      orderExecutedEvent.executedPrice,
-      buyFee,
-      sellFee,
-      txFee,
-      timestamp
-    )
+
+    for {
+      ad <- efc.assetDecimals(submitted.order.assetPair.amountAsset)
+      pd <- efc.assetDecimals(submitted.order.assetPair.priceAsset)
+    } yield {
+      val fixedDecimalsPrice = priceToFixedDecimals(orderExecutedEvent.executedPrice, ad, pd)
+      ExchangeTransactionV3.create(
+        matcherPrivateKey,
+        buyWithExecutionInfo,
+        sellWithExecutionInfo,
+        orderExecutedEvent.executedAmount,
+        fixedDecimalsPrice,
+        buyFee,
+        sellFee,
+        txFee,
+        orderExecutedEvent.timestamp
+      )
+    }
   }
 
 }
 
 object ExchangeTransactionCreator {
 
-  type CreateTransaction = OrderExecuted => ExchangeTransactionResult[ExchangeTransactionV2]
+  type CreateTransaction = OrderExecuted => Option[ExchangeTransactionResult[ExchangeTransactionV3]] //need to calculate
 
   /**
    * This function is used for the following purposes:
@@ -81,5 +90,10 @@ object ExchangeTransactionCreator {
   }
 
   def getAdditionalFeeForScript(hasScript: Boolean): Long = if (hasScript) OrderValidator.ScriptExtraFee else 0L
+
+  def priceToFixedDecimals(price: Long, amountDecimals: Int, priceDecimals: Int): Long =
+    (BigDecimal(price) / BigDecimal(10).pow(
+      priceDecimals - amountDecimals
+    )).toBigInt.bigInteger.longValueExact() //assume it was validated before
 
 }

@@ -16,6 +16,7 @@ import com.wavesplatform.dex.actors.tx.ExchangeTransactionBroadcastActor.{Observ
 import com.wavesplatform.dex.collections.{FifoSet, PositiveMap}
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.error.ValidationError
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeUpdates
 import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions0._
@@ -24,6 +25,8 @@ import com.wavesplatform.dex.model.Events
 import com.wavesplatform.dex.model.Events.ExchangeTransactionCreated
 import com.wavesplatform.dex.model.ExchangeTransactionCreator.CreateTransaction
 import play.api.libs.json.Json
+
+import scala.util.Try
 
 object OrderEventsCoordinatorActor {
 
@@ -102,10 +105,13 @@ object OrderEventsCoordinatorActor {
                 case event: Events.OrderExecuted =>
                   // If we here, AddressActor is guaranteed to be created, because this happens only after Events.OrderAdded
                   val createTxResult = createTransaction(event)
-                  createTxResult.toEither match {
+                  val createTxResultEither = createTxResult.map(_.toEither).getOrElse(
+                    ValidationError.GenericError(s"Couldn't get decimals for pair ${event.submitted.order.assetPair}").asLeft
+                  )
+                  createTxResultEither match {
                     case Right(tx) =>
-                      val txCreated = ExchangeTransactionCreated(createTxResult.transaction)
-                      context.log.info(s"Created ${createTxResult.transaction.json()}")
+                      val txCreated = ExchangeTransactionCreated(tx)
+                      context.log.info(s"Created ${tx.json()}")
                       dbWriterRef ! txCreated
 
                       val addressSpendings =
@@ -124,7 +130,10 @@ object OrderEventsCoordinatorActor {
                       )
                   }
                   // We don't update "observedTxIds" here, because expectedTx relates to "createdTxs"
-                  acc.add(AddressActor.OrderBookExecutedEvent(event, createTxResult))
+                  createTxResult.fold {
+                    context.log.error("Couldn't find asset decimals for pair {} to create tx ", event.submitted.order.assetPair)
+                    acc
+                  }(result => acc.add(AddressActor.OrderBookExecutedEvent(event, result)))
 
                 case event: Events.OrderCanceled =>
                   // If we here, AddressActor is guaranteed to be created, because this happens only after Events.OrderAdded
@@ -214,6 +223,10 @@ object OrderEventsCoordinatorActor {
     }
 
     default()
+  }
+
+  def priceToFixedDecimals(price: Long, amountDecimals: Int, priceDecimals: Int) = Try {
+    (BigDecimal(price) / BigDecimal(10).pow(priceDecimals - amountDecimals)).toBigInt.bigInteger.longValueExact()
   }
 
 }

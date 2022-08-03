@@ -469,6 +469,7 @@ object Events {
   ) extends Event {
 
     def executedPrice: Long = counter.price
+
     lazy val executedAmount: Long = AcceptedOrder.executedAmount(submitted, counter)
     lazy val executedAmountOfPriceAsset: Long = MatcherModel.getCost(executedAmount, executedPrice)
 

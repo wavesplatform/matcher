@@ -19,12 +19,12 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.crypto.Proofs
 import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV1}
 import com.wavesplatform.dex.domain.state.{LeaseBalance, Portfolio}
-import com.wavesplatform.dex.domain.transaction.{ExchangeTransactionResult, ExchangeTransactionV2}
+import com.wavesplatform.dex.domain.transaction.{ExchangeTransactionResult, ExchangeTransactionV3}
 import com.wavesplatform.dex.error.{MatcherError, OrderDuplicate, UnexpectedError}
 import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderAddedReason, OrderCancelFailed, OrderExecuted}
-import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder, MarketOrder, OrderValidator}
+import com.wavesplatform.dex.model.{AcceptedOrder, ExchangeTransactionCreator, LimitOrder, MarketOrder, OrderValidator}
 import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import org.scalatest.{BeforeAndAfterAll, EitherValues}
@@ -410,11 +410,15 @@ class AddressActorSpecification
           val duplicatedMarketOrder = MarketOrder(duplicatedOrder, duplicatedOrder.amount, None, None)
 
           addOrder(LimitOrder(duplicatedOrder, None, None))
-          val matchTx = ExchangeTransactionV2(
+          val matchTx = ExchangeTransactionV3(
             duplicatedMarketOrder.order,
             counterOrder,
             duplicatedMarketOrder.amount,
-            duplicatedMarketOrder.price,
+            ExchangeTransactionCreator.priceToFixedDecimals(
+              duplicatedMarketOrder.price,
+              assetBriefInfo(duplicatedMarketOrder.order.assetPair.amountAsset).decimals,
+              assetBriefInfo(duplicatedMarketOrder.order.assetPair.priceAsset).decimals
+            ),
             0L,
             0L,
             0L,

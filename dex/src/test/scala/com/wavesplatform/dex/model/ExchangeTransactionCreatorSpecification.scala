@@ -6,14 +6,14 @@ import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.crypto.Proofs
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.OrderOps._
-import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV2
+import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV3
 import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
-import org.scalatest.{Assertion, BeforeAndAfterAll}
+import org.scalatest.{Assertion, BeforeAndAfterAll, OptionValues}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class ExchangeTransactionCreatorSpecification
@@ -24,16 +24,24 @@ class ExchangeTransactionCreatorSpecification
     with PathMockFactory
     with PropertyChecks
     with NoShrink
-    with TableDrivenPropertyChecks {
+    with TableDrivenPropertyChecks
+    with OptionValues {
 
   private def getExchangeTransactionCreator(
     hasMatcherScript: Boolean = false,
     hasAssetScripts: Asset => Boolean = _ => false
   ): ExchangeTransactionCreator =
-    new ExchangeTransactionCreator(MatcherAccount, matcherSettings.exchangeTxBaseFee, hasMatcherScript, hasAssetScripts, (_, _) => false)
+    new ExchangeTransactionCreator(
+      MatcherAccount,
+      matcherSettings.exchangeTxBaseFee,
+      hasMatcherScript,
+      hasAssetScripts,
+      (_, _) => false,
+      asset => Some(defaultAssetDescriptionsMap(asset).decimals)
+    )
 
   "ExchangeTransactionCreator" should {
-    "create an ExchangeTransactionV2" when {
+    "create an ExchangeTransactionV3" when {
       (List(1, 2, 3) ++ List(1, 2, 3)).combinations(2).foreach {
         case List(counterVersion, submittedVersion) =>
           s"counterVersion=$counterVersion, submittedVersion=$submittedVersion" in {
@@ -42,8 +50,9 @@ class ExchangeTransactionCreatorSpecification
 
             val tc = getExchangeTransactionCreator()
             val oe = mkOrderExecutedRaw(submitted, counter)
+            println(oe.submitted.order.assetPair)
 
-            tc.createTransaction(oe).transaction shouldBe a[ExchangeTransactionV2]
+            tc.createTransaction(oe).value.transaction shouldBe a[ExchangeTransactionV3]
           }
         case _ => throw new RuntimeException("Unexpected list")
       }
@@ -71,7 +80,7 @@ class ExchangeTransactionCreatorSpecification
         case (buyOrder, sellOrder) =>
           val tc = getExchangeTransactionCreator()
           val oe = mkOrderExecutedRaw(buyOrder, sellOrder)
-          val tx = tc.createTransaction(oe).transaction
+          val tx = tc.createTransaction(oe).value.transaction
 
           tx.buyMatcherFee shouldBe oe.submittedExecutedFee
           tx.sellMatcherFee shouldBe oe.counterExecutedFee

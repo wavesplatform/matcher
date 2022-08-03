@@ -23,7 +23,7 @@ import com.wavesplatform.dex.grpc.integration.clients.domain.{AddressBalanceUpda
 import com.wavesplatform.dex.grpc.integration.protobuf.DexToPbConversions._
 import com.wavesplatform.dex.model.Events.ExchangeTransactionCreated
 import com.wavesplatform.dex.model.{AcceptedOrder, Events, LimitOrder}
-import com.wavesplatform.dex.{MatcherSpecBase, error}
+import com.wavesplatform.dex.{error, MatcherSpecBase}
 import com.wavesplatform.events.protobuf.StateUpdate
 import com.wavesplatform.protobuf.transaction.{SignedTransaction, Transaction}
 import org.scalatest.OptionValues

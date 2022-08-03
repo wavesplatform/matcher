@@ -1062,7 +1062,14 @@ class OrderValidatorSpecification
     hasMatcherAccountScript: Boolean = false,
     hasAssetScript: Asset => Boolean = getDefaultAssetDescriptions(_).hasScript
   ) =
-    new ExchangeTransactionCreator(MatcherAccount, matcherSettings.exchangeTxBaseFee, hasMatcherAccountScript, hasAssetScript, (_, _) => false, errorContext)
+    new ExchangeTransactionCreator(
+      MatcherAccount,
+      matcherSettings.exchangeTxBaseFee,
+      hasMatcherAccountScript,
+      hasAssetScript,
+      (_, _) => false,
+      errorContext
+    )
 
   private def asa[A](
     p: Portfolio = defaultPortfolio,

@@ -10,7 +10,7 @@ import scala.util.control.NonFatal
 object PBUtils {
 
   def encodeDeterministic(msg: GeneratedMessage): Array[Byte] = {
-    val outArray     = new Array[Byte](msg.serializedSize)
+    val outArray = new Array[Byte](msg.serializedSize)
     val outputStream = CodedOutputStream.newInstance(outArray)
 
     outputStream.useDeterministicSerialization() // Adds this
@@ -32,4 +32,5 @@ object PBUtils {
       .adaptErr {
         case err => new RuntimeException(s"Error deserializing PB message: $cmp (bytes = ${ByteStr(msg)})", err)
       }
+
 }

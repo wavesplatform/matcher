@@ -50,7 +50,14 @@ object DexToPbConversions {
       )
       new SignedTransaction(
         SignedTransaction.Transaction
-          .WavesTransaction(Transaction(chainId, tx.sender.toPB, Some(PbAmount(tx.feeAssetId.toPB, tx.fee)), tx.timestamp, tx.version, Data.Exchange(data))),
+          .WavesTransaction(Transaction(
+            chainId,
+            tx.sender.toPB,
+            Some(PbAmount(tx.feeAssetId.toPB, tx.fee)),
+            tx.timestamp,
+            tx.version,
+            Data.Exchange(data)
+          )),
         tx.proofs.map(bs => PbByteString.copyFrom(bs.arr))
       )
     }

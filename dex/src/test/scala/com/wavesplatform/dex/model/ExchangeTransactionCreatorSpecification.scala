@@ -13,7 +13,7 @@ import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
-import org.scalatest.{Assertion, BeforeAndAfterAll, OptionValues}
+import org.scalatest.{Assertion, BeforeAndAfterAll}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class ExchangeTransactionCreatorSpecification
@@ -24,8 +24,7 @@ class ExchangeTransactionCreatorSpecification
     with PathMockFactory
     with PropertyChecks
     with NoShrink
-    with TableDrivenPropertyChecks
-    with OptionValues {
+    with TableDrivenPropertyChecks {
 
   private def getExchangeTransactionCreator(
     hasMatcherScript: Boolean = false,
@@ -52,7 +51,7 @@ class ExchangeTransactionCreatorSpecification
             val oe = mkOrderExecutedRaw(submitted, counter)
             println(oe.submitted.order.assetPair)
 
-            tc.createTransaction(oe).value.transaction shouldBe a[ExchangeTransactionV3]
+            tc.createTransaction(oe).transaction shouldBe a[ExchangeTransactionV3]
           }
         case _ => throw new RuntimeException("Unexpected list")
       }
@@ -80,7 +79,7 @@ class ExchangeTransactionCreatorSpecification
         case (buyOrder, sellOrder) =>
           val tc = getExchangeTransactionCreator()
           val oe = mkOrderExecutedRaw(buyOrder, sellOrder)
-          val tx = tc.createTransaction(oe).value.transaction
+          val tx = tc.createTransaction(oe).transaction
 
           tx.buyMatcherFee shouldBe oe.submittedExecutedFee
           tx.sellMatcherFee shouldBe oe.counterExecutedFee

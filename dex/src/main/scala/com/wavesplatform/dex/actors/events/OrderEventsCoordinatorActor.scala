@@ -16,7 +16,6 @@ import com.wavesplatform.dex.actors.tx.ExchangeTransactionBroadcastActor.{Observ
 import com.wavesplatform.dex.collections.{FifoSet, PositiveMap}
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
-import com.wavesplatform.dex.domain.error.ValidationError
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeUpdates
 import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions0._
@@ -105,13 +104,10 @@ object OrderEventsCoordinatorActor {
                 case event: Events.OrderExecuted =>
                   // If we here, AddressActor is guaranteed to be created, because this happens only after Events.OrderAdded
                   val createTxResult = createTransaction(event)
-                  val createTxResultEither = createTxResult.map(_.toEither).getOrElse(
-                    ValidationError.GenericError(s"Couldn't get decimals for pair ${event.submitted.order.assetPair}").asLeft
-                  )
-                  createTxResultEither match {
+                  createTxResult.toEither match {
                     case Right(tx) =>
-                      val txCreated = ExchangeTransactionCreated(tx)
-                      context.log.info(s"Created ${tx.json()}")
+                      val txCreated = ExchangeTransactionCreated(createTxResult.transaction)
+                      context.log.info(s"Created ${createTxResult.transaction.json()}")
                       dbWriterRef ! txCreated
 
                       val addressSpendings =
@@ -130,10 +126,7 @@ object OrderEventsCoordinatorActor {
                       )
                   }
                   // We don't update "observedTxIds" here, because expectedTx relates to "createdTxs"
-                  createTxResult.fold {
-                    context.log.error("Couldn't find asset decimals for pair {} to create tx ", event.submitted.order.assetPair)
-                    acc
-                  }(result => acc.add(AddressActor.OrderBookExecutedEvent(event, result)))
+                  acc.add(AddressActor.OrderBookExecutedEvent(event, createTxResult))
 
                 case event: Events.OrderCanceled =>
                   // If we here, AddressActor is guaranteed to be created, because this happens only after Events.OrderAdded

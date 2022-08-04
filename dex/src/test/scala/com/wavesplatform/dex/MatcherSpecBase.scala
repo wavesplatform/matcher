@@ -566,12 +566,13 @@ trait MatcherSpecBase
         buyOrder = buyOrder,
         sellOrder = sellOrder,
         amount = sellOrder.amount,
-        price = price,
+        price = sellOrder.price,
         buyMatcherFee = buyOrder.matcherFee,
         sellMatcherFee = sellOrder.matcherFee,
         fee = 300000L,
         timestamp = nowTs,
-        proofs = Proofs.empty
+        proofs = Proofs.empty,
+        fixedDecimalsPrice = price
       )
   }
 

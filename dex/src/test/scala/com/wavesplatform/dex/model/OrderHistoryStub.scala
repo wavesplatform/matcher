@@ -86,7 +86,7 @@ class OrderHistoryStub(system: ActorSystem, time: Time, maxActiveOrders: Int, ma
 
   private def mkExchangeTx(oe: OrderExecuted): ExchangeTransactionResult[ExchangeTransactionV3] = {
     val (sellOrder, buyOrder) = if (oe.counter.isSellOrder) (oe.counter, oe.submitted) else (oe.submitted, oe.counter)
-    val price = ExchangeTransactionCreator.priceToFixedDecimals(
+    val fixedDecimalPrice = ExchangeTransactionCreator.priceToFixedDecimals(
       sellOrder.price,
       assetBriefInfo(oe.submitted.order.assetPair.amountAsset).decimals,
       assetBriefInfo(oe.submitted.order.assetPair.priceAsset).decimals
@@ -96,12 +96,13 @@ class OrderHistoryStub(system: ActorSystem, time: Time, maxActiveOrders: Int, ma
         buyOrder = buyOrder.order,
         sellOrder = sellOrder.order,
         amount = sellOrder.amount,
-        price = price,
+        price = sellOrder.price,
         buyMatcherFee = buyOrder.matcherFee,
         sellMatcherFee = sellOrder.matcherFee,
         fee = 300000L,
         timestamp = System.currentTimeMillis(),
-        proofs = Proofs.empty
+        proofs = Proofs.empty,
+        fixedDecimalPrice
       )
   }
 

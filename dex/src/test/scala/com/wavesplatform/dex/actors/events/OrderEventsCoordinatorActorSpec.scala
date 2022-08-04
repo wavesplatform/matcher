@@ -63,7 +63,8 @@ class OrderEventsCoordinatorActorSpec
       sellMatcherFee = 1000L,
       fee = 300000L,
       timestamp = nowTs,
-      proofs = Proofs.empty
+      proofs = Proofs.empty,
+      fixedDecimalsPrice = 80000L
     ).transaction
 
   private val validTxSpendings = Map[Address, PositiveMap[Asset, Long]](
@@ -135,7 +136,7 @@ class OrderEventsCoordinatorActorSpec
             addressDirectory.ref,
             dbWriter.ref,
             broadcastActor.ref,
-            _ => ExchangeTransactionResult(validTx).some,
+            _ => ExchangeTransactionResult(validTx),
             None
           ))
           oecRef ! OrderEventsCoordinatorActor.Command.Process(NonEmptyList.one(validEvent))
@@ -270,7 +271,7 @@ class OrderEventsCoordinatorActorSpec
           addressDirectory.ref,
           classic.TestProbe().ref,
           TestProbe[ExchangeTransactionBroadcastActor.Command]().ref,
-          _ => ExchangeTransactionResult(validTx, ValidationError.GenericError("test").some).some,
+          _ => ExchangeTransactionResult(validTx, ValidationError.GenericError("test").some),
           initObservedTxs,
           None
         ))
@@ -288,7 +289,7 @@ class OrderEventsCoordinatorActorSpec
           addressDirectory.ref,
           classic.TestProbe().ref,
           TestProbe[ExchangeTransactionBroadcastActor.Command]().ref,
-          _ => ExchangeTransactionResult(validTx, ValidationError.GenericError("test").some).some,
+          _ => ExchangeTransactionResult(validTx, ValidationError.GenericError("test").some),
           None
         ))
         oecRef ! OrderEventsCoordinatorActor.Command.ApplyNodeUpdates(WavesNodeUpdates(
@@ -311,7 +312,7 @@ class OrderEventsCoordinatorActorSpec
             addressDirectory.ref,
             classic.TestProbe().ref,
             TestProbe[ExchangeTransactionBroadcastActor.Command]().ref,
-            _ => ExchangeTransactionResult(validTx, ValidationError.GenericError("test").some).some,
+            _ => ExchangeTransactionResult(validTx, ValidationError.GenericError("test").some),
             None
           ))
           oecRef ! OrderEventsCoordinatorActor.Command.ApplyNodeUpdates(WavesNodeUpdates(
@@ -343,7 +344,7 @@ class OrderEventsCoordinatorActorSpec
             addressDirectory.ref,
             classic.TestProbe().ref,
             TestProbe[ExchangeTransactionBroadcastActor.Command]().ref,
-            _ => ExchangeTransactionResult(validTx, ValidationError.GenericError("test").some).some,
+            _ => ExchangeTransactionResult(validTx, ValidationError.GenericError("test").some),
             None
           ))
           val addressBalanceUpdates = AddressBalanceUpdates(
@@ -370,7 +371,7 @@ class OrderEventsCoordinatorActorSpec
             addressDirectory.ref,
             classic.TestProbe().ref,
             TestProbe[ExchangeTransactionBroadcastActor.Command]().ref,
-            _ => ExchangeTransactionResult(validTx, ValidationError.GenericError("test").some).some,
+            _ => ExchangeTransactionResult(validTx, ValidationError.GenericError("test").some),
             None
           ))
           val addressBalanceUpdates = AddressBalanceUpdates(
@@ -406,7 +407,7 @@ class OrderEventsCoordinatorActorSpec
           addressDirectory.ref,
           classic.TestProbe().ref,
           TestProbe[ExchangeTransactionBroadcastActor.Command]().ref,
-          _ => ExchangeTransactionResult(validTx, ValidationError.GenericError("test").some).some,
+          _ => ExchangeTransactionResult(validTx, ValidationError.GenericError("test").some),
           initObservedTxs,
           None
         ))
@@ -422,7 +423,7 @@ class OrderEventsCoordinatorActorSpec
             addressDirectory.ref,
             classic.TestProbe().ref,
             TestProbe[ExchangeTransactionBroadcastActor.Command]().ref,
-            _ => ExchangeTransactionResult(validTx, ValidationError.GenericError("test").some).some,
+            _ => ExchangeTransactionResult(validTx, ValidationError.GenericError("test").some),
             None
           ))
           oecRef ! OrderEventsCoordinatorActor.Command.ApplyObservedByBroadcaster(validTx, validTxSpendings)
@@ -451,7 +452,7 @@ class OrderEventsCoordinatorActorSpec
             addressDirectory.ref,
             classic.TestProbe().ref,
             TestProbe[ExchangeTransactionBroadcastActor.Command]().ref,
-            _ => ExchangeTransactionResult(validTx, ValidationError.GenericError("test").some).some,
+            _ => ExchangeTransactionResult(validTx, ValidationError.GenericError("test").some),
             None
           ))
           oecRef ! OrderEventsCoordinatorActor.Command.ApplyObservedByBroadcaster(validTx, validTxSpendings)
@@ -480,7 +481,7 @@ class OrderEventsCoordinatorActorSpec
       addressDirectory.ref,
       classic.TestProbe().ref,
       TestProbe[ExchangeTransactionBroadcastActor.Command]().ref,
-      _ => ExchangeTransactionResult(validTx, ValidationError.GenericError("test").some).some,
+      _ => ExchangeTransactionResult(validTx, ValidationError.GenericError("test").some),
       None
     ))
 

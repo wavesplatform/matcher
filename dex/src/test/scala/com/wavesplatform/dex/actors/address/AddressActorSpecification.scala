@@ -414,16 +414,17 @@ class AddressActorSpecification
             duplicatedMarketOrder.order,
             counterOrder,
             duplicatedMarketOrder.amount,
-            ExchangeTransactionCreator.priceToFixedDecimals(
-              duplicatedMarketOrder.price,
-              assetBriefInfo(duplicatedMarketOrder.order.assetPair.amountAsset).decimals,
-              assetBriefInfo(duplicatedMarketOrder.order.assetPair.priceAsset).decimals
-            ),
+            duplicatedMarketOrder.price,
             0L,
             0L,
             0L,
             System.currentTimeMillis,
-            Proofs(List.empty)
+            Proofs(List.empty),
+            ExchangeTransactionCreator.priceToFixedDecimals(
+              duplicatedMarketOrder.price,
+              assetBriefInfo(duplicatedMarketOrder.order.assetPair.amountAsset).decimals,
+              assetBriefInfo(duplicatedMarketOrder.order.assetPair.priceAsset).decimals
+            )
           )
           ref ! AddressActor.Command.ApplyOrderBookExecuted(AddressActor.OrderBookExecutedEvent(
             OrderExecuted(duplicatedMarketOrder, LimitOrder(counterOrder, None, None), System.currentTimeMillis, 0L, 0L, 0L),

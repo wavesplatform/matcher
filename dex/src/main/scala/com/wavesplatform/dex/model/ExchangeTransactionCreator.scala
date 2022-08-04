@@ -19,7 +19,7 @@ class ExchangeTransactionCreator(
   efc: ErrorFormatterContext
 ) {
 
-  def createTransaction(orderExecutedEvent: OrderExecuted): Option[ExchangeTransactionResult[ExchangeTransactionV3]] = {
+  def createTransaction(orderExecutedEvent: OrderExecuted): ExchangeTransactionResult[ExchangeTransactionV3] = {
     import orderExecutedEvent.{counter, submitted}
     val (buy, sell) = Order.splitByType(submitted.order, counter.order)
 
@@ -47,31 +47,31 @@ class ExchangeTransactionCreator(
       // TODO This will be fixed in NODE 1.2.8+, see NODE-2183
       List(orderExecutedEvent.counter.feeAsset, orderExecutedEvent.submitted.feeAsset)
         .count(_.fold(false)(hasAssetScript)) * OrderValidator.ScriptExtraFee
-
-    for {
-      ad <- efc.assetDecimals(submitted.order.assetPair.amountAsset)
-      pd <- efc.assetDecimals(submitted.order.assetPair.priceAsset)
-    } yield {
-      val fixedDecimalsPrice = priceToFixedDecimals(orderExecutedEvent.executedPrice, ad, pd)
-      ExchangeTransactionV3.create(
-        matcherPrivateKey,
-        buyWithExecutionInfo,
-        sellWithExecutionInfo,
-        orderExecutedEvent.executedAmount,
-        fixedDecimalsPrice,
-        buyFee,
-        sellFee,
-        txFee,
-        orderExecutedEvent.timestamp
-      )
-    }
+    val assetPair = orderExecutedEvent.submitted.order.assetPair
+    val fixedDecimalsPrice = priceToFixedDecimals(
+      orderExecutedEvent.executedPrice,
+      efc.unsafeAssetDecimals(assetPair.amountAsset),
+      efc.unsafeAssetDecimals(assetPair.priceAsset)
+    )
+    ExchangeTransactionV3.create(
+      matcherPrivateKey,
+      buyWithExecutionInfo,
+      sellWithExecutionInfo,
+      orderExecutedEvent.executedAmount,
+      orderExecutedEvent.executedPrice,
+      buyFee,
+      sellFee,
+      txFee,
+      orderExecutedEvent.timestamp,
+      fixedDecimalsPrice
+    )
   }
 
 }
 
 object ExchangeTransactionCreator {
 
-  type CreateTransaction = OrderExecuted => Option[ExchangeTransactionResult[ExchangeTransactionV3]] //need to calculate
+  type CreateTransaction = OrderExecuted => ExchangeTransactionResult[ExchangeTransactionV3]
 
   /**
    * This function is used for the following purposes:
@@ -94,6 +94,6 @@ object ExchangeTransactionCreator {
   def priceToFixedDecimals(price: Long, amountDecimals: Int, priceDecimals: Int): Long =
     (BigDecimal(price) / BigDecimal(10).pow(
       priceDecimals - amountDecimals
-    )).toBigInt.bigInteger.longValueExact() //assume it was validated before
+    )).toBigInt.bigInteger.longValueExact()
 
 }

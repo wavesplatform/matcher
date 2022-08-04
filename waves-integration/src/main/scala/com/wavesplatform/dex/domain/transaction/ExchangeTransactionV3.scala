@@ -27,7 +27,8 @@ case class ExchangeTransactionV3(
   @ApiModelProperty(
     value = "Exchange Transaction proofs as Base58 encoded signatures list",
     dataType = "List[string]"
-  ) proofs: Proofs
+  ) proofs: Proofs,
+  fixedDecimalsPrice: Long
 ) extends ExchangeTransaction {
 
   @ApiModelProperty(dataType = "integer", example = "3", allowableValues = "1, 2, 3")
@@ -36,12 +37,12 @@ case class ExchangeTransactionV3(
   @ApiModelProperty(hidden = true)
   override val bodyBytes: Coeval[Array[Byte]] =
     Coeval.evalOnce(
-      PBUtils.encodeDeterministic(this.toPBSigned.getWavesTransaction) // according to node
+      PBUtils.encodeDeterministic(this.copy(price = fixedDecimalsPrice).toPBSigned.getWavesTransaction) // according to node
     )
 
   @ApiModelProperty(hidden = true)
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(
-    PBUtils.encodeDeterministic(this.toPBSigned)
+    PBUtils.encodeDeterministic(this.copy(price = fixedDecimalsPrice).toPBSigned)
   )
 
 }
@@ -57,9 +58,21 @@ object ExchangeTransactionV3 extends ExchangeTransactionParser[ExchangeTransacti
     buyMatcherFee: Long,
     sellMatcherFee: Long,
     fee: Long,
-    timestamp: Long
+    timestamp: Long,
+    fixedDecimalsPrice: Long
   ): ExchangeTransactionResult[ExchangeTransactionV3] =
-    create(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, Proofs.empty).map { unverified =>
+    create(
+      buyOrder,
+      sellOrder,
+      amount,
+      price,
+      buyMatcherFee,
+      sellMatcherFee,
+      fee,
+      timestamp,
+      Proofs.empty,
+      fixedDecimalsPrice
+    ).map { unverified =>
       unverified.copy(proofs = Proofs(List(ByteStr(crypto.sign(matcher, unverified.bodyBytes())))))
     }
 
@@ -72,7 +85,8 @@ object ExchangeTransactionV3 extends ExchangeTransactionParser[ExchangeTransacti
     sellMatcherFee: Long,
     fee: Long,
     timestamp: Long,
-    proofs: Proofs
+    proofs: Proofs,
+    fixedDecimalsPrice: Long
   ): ExchangeTransactionResult[ExchangeTransactionV3] =
     ExchangeTransactionResult.fromEither(
       validateExchangeParams(
@@ -85,7 +99,18 @@ object ExchangeTransactionV3 extends ExchangeTransactionParser[ExchangeTransacti
         fee,
         timestamp
       ),
-      ExchangeTransactionV3(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, proofs)
+      ExchangeTransactionV3(
+        buyOrder,
+        sellOrder,
+        amount,
+        price,
+        buyMatcherFee,
+        sellMatcherFee,
+        fee,
+        timestamp,
+        proofs,
+        fixedDecimalsPrice
+      )
     )
 
   override protected def parseHeader(bytes: Array[Byte]): Try[Int] = Try {
@@ -97,7 +122,7 @@ object ExchangeTransactionV3 extends ExchangeTransactionParser[ExchangeTransacti
       case _ => throw new IllegalArgumentException(s"Can't parse header=$bytes")
     }
 
-    if (parsedMark != 0) throw new IllegalArgumentException(s"Expected the '0' byte, but got '$parsedMark'")
+    if (parsedMark != 2) throw new IllegalArgumentException(s"Expected the '2' byte, but got '$parsedMark'")
     if (parsedTypeId != typeId) throw new IllegalArgumentException(s"Expected type of transaction '$typeId', but got '$parsedTypeId'")
     if (parsedVersion != 3) throw new IllegalArgumentException(s"Expected version of transaction 3, but got '$parsedVersion'")
 
@@ -118,6 +143,7 @@ object ExchangeTransactionV3 extends ExchangeTransactionParser[ExchangeTransacti
       timestamp <- read[Long]
       proofs <- read[Proofs]
       offset <- read[ConsumedBytesOffset]
-    } yield ExchangeTransactionV3(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, proofs) -> offset
+      fixedDecimalsPrice <- read[Long]
+    } yield ExchangeTransactionV3(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, proofs, fixedDecimalsPrice) -> offset
 
 }

@@ -123,7 +123,11 @@ object ExchangeTransaction {
   def parse(bytes: Array[Byte]): Try[ExchangeTransaction] =
     bytes.headOption
       .fold(Failure(new Exception("Empty array")): Try[ExchangeTransaction]) { b =>
-        val etp = if (b == 0) ExchangeTransactionV2 else ExchangeTransactionV1
+        val etp = b match {
+          case 0 => ExchangeTransactionV2
+          case 1 => ExchangeTransactionV1
+          case 2 => ExchangeTransactionV3
+        }
         etp.parseBytes(bytes).map(_._1).flatMap(validateExchangeParams(_).foldToTry)
       }
 

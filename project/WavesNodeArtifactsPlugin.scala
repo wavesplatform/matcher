@@ -37,11 +37,6 @@ object WavesNodeArtifactsPlugin extends AutoPlugin {
           }
         )
 
-        filesToRemove.foreach { x =>
-          if (x.isDirectory) FileUtils.deleteDirectory(x)
-          else x.delete()
-        }
-
         filesToRemove
       } else List.empty
     },
@@ -99,7 +94,6 @@ object WavesNodeArtifactsPlugin extends AutoPlugin {
             orig -> targetDir / orig.name
           }
         )
-        FileUtils.deleteDirectory(grpcServerDir)
 
         // Write version file to prevent rewrites on each compilation
         val versionFile = unmanagedBase.value / "version"

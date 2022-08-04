@@ -144,6 +144,17 @@ object ExchangeTransactionV3 extends ExchangeTransactionParser[ExchangeTransacti
       proofs <- read[Proofs]
       offset <- read[ConsumedBytesOffset]
       fixedDecimalsPrice <- read[Long]
-    } yield ExchangeTransactionV3(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, proofs, fixedDecimalsPrice) -> offset
+    } yield ExchangeTransactionV3(
+      buyOrder,
+      sellOrder,
+      amount,
+      price,
+      buyMatcherFee,
+      sellMatcherFee,
+      fee,
+      timestamp,
+      proofs,
+      fixedDecimalsPrice
+    ) -> offset
 
 }

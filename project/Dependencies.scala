@@ -311,7 +311,8 @@ object Dependencies {
       mouse,
       grpcNetty,
       wavesProtobufSchemas,
-      akkaActorTyped
+      akkaActorTyped,
+      web3jCore
     ) ++ testKit ++ silencer ++ Seq(
       jsonScalaPb % Test // for testing purposes
     )

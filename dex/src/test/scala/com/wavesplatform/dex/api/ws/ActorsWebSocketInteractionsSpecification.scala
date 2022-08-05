@@ -144,13 +144,13 @@ class ActorsWebSocketInteractionsSpecification
           buyOrder = buyOrder.order,
           sellOrder = sellOrder.order,
           amount = oe.executedAmount,
-          price = oe.executedPrice,
+          price = price,
           buyMatcherFee = buyOrder.matcherFee,
           sellMatcherFee = sellOrder.matcherFee,
           fee = 300000L,
           timestamp = nowTs,
           proofs = Proofs.empty,
-          price
+          oe.executedPrice
         ).copy(error = ValidationError.GenericError("Some error").some)
       addressDir ! AddressActor.Command.ApplyOrderBookExecuted(AddressActor.OrderBookExecutedEvent(oe, tx))
       oe

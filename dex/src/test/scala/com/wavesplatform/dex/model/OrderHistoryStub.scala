@@ -96,13 +96,13 @@ class OrderHistoryStub(system: ActorSystem, time: Time, maxActiveOrders: Int, ma
         buyOrder = buyOrder.order,
         sellOrder = sellOrder.order,
         amount = sellOrder.amount,
-        price = sellOrder.price,
+        price = fixedDecimalPrice,
         buyMatcherFee = buyOrder.matcherFee,
         sellMatcherFee = sellOrder.matcherFee,
         fee = 300000L,
         timestamp = System.currentTimeMillis(),
         proofs = Proofs.empty,
-        fixedDecimalPrice
+        sellOrder.price
       )
   }
 

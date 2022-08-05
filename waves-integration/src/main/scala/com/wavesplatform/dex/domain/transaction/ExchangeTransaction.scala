@@ -112,6 +112,8 @@ trait ExchangeTransaction extends ByteAndJsonSerializable with Proven {
   }
 
   override def hashCode(): Int = id().hashCode
+
+  val bytesForLevelDB: Coeval[Array[Byte]]
 }
 
 object ExchangeTransaction {
@@ -131,8 +133,13 @@ object ExchangeTransaction {
         etp.parseBytes(bytes).map(_._1).flatMap(validateExchangeParams(_).foldToTry)
       }
 
-  def validateExchangeParams(tx: ExchangeTransaction): Either[ValidationError, ExchangeTransaction] =
-    validateExchangeParams(tx.buyOrder, tx.sellOrder, tx.amount, tx.price, tx.buyMatcherFee, tx.sellMatcherFee, tx.fee, tx.timestamp).map(_ => tx)
+  def validateExchangeParams(tx: ExchangeTransaction): Either[ValidationError, ExchangeTransaction] = {
+    val price = tx match {
+      case v3: ExchangeTransactionV3 => v3.assetDecimalsPrice
+      case _ => tx.price
+    }
+    validateExchangeParams(tx.buyOrder, tx.sellOrder, tx.amount, price, tx.buyMatcherFee, tx.sellMatcherFee, tx.fee, tx.timestamp).map(_ => tx)
+  }
 
   def validateExchangeParams(
     buyOrder: Order,

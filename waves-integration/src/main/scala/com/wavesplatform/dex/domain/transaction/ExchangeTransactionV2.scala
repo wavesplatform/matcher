@@ -48,6 +48,8 @@ case class ExchangeTransactionV2(
   @ApiModelProperty(hidden = true)
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(bodyBytes() ++ proofs.bytes())
 
+  override val bytesForLevelDB: Coeval[Array[Byte]] = bytes
+
 }
 
 object ExchangeTransactionV2 extends ExchangeTransactionParser[ExchangeTransactionV2] {

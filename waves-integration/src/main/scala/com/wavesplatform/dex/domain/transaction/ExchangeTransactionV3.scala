@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.domain.transaction
 
+import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.dex.PBUtils
 import com.wavesplatform.dex.domain.account.PrivateKey
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -28,8 +29,9 @@ case class ExchangeTransactionV3(
     value = "Exchange Transaction proofs as Base58 encoded signatures list",
     dataType = "List[string]"
   ) proofs: Proofs,
-  fixedDecimalsPrice: Long
+  assetDecimalsPrice: Long
 ) extends ExchangeTransaction {
+  import ExchangeTransactionV3._
 
   @ApiModelProperty(dataType = "integer", example = "3", allowableValues = "1, 2, 3")
   override val version: Byte = 3
@@ -37,17 +39,28 @@ case class ExchangeTransactionV3(
   @ApiModelProperty(hidden = true)
   override val bodyBytes: Coeval[Array[Byte]] =
     Coeval.evalOnce(
-      PBUtils.encodeDeterministic(this.copy(price = fixedDecimalsPrice).toPBSigned.getWavesTransaction) // according to node
+      PBUtils.encodeDeterministic(this.toPBSigned.getWavesTransaction) // according to node
     )
 
   @ApiModelProperty(hidden = true)
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(
-    PBUtils.encodeDeterministic(this.copy(price = fixedDecimalsPrice).toPBSigned)
+    PBUtils.encodeDeterministic(this.toPBSigned)
+  )
+
+  override val bytesForLevelDB: Coeval[Array[Byte]] = Coeval.evalOnce(
+    Array(2: Byte, ExchangeTransaction.typeId, version) ++
+    Ints.toByteArray(buyOrder.bytes().length) ++ orderMark(buyOrder.version) ++ buyOrder.bytes() ++
+    Ints.toByteArray(sellOrder.bytes().length) ++ orderMark(sellOrder.version) ++ sellOrder.bytes() ++
+    Longs.toByteArray(price) ++ Longs.toByteArray(amount) ++
+    Longs.toByteArray(buyMatcherFee) ++ Longs.toByteArray(sellMatcherFee) ++ Longs.toByteArray(fee) ++
+    Longs.toByteArray(timestamp) ++ proofs.bytes() ++ Longs.toByteArray(assetDecimalsPrice)
   )
 
 }
 
 object ExchangeTransactionV3 extends ExchangeTransactionParser[ExchangeTransactionV3] {
+
+  private def orderMark(version: Byte): Array[Byte] = if (version == 1) Array(1: Byte) else Array()
 
   def create(
     matcher: PrivateKey,
@@ -59,7 +72,7 @@ object ExchangeTransactionV3 extends ExchangeTransactionParser[ExchangeTransacti
     sellMatcherFee: Long,
     fee: Long,
     timestamp: Long,
-    fixedDecimalsPrice: Long
+    assetDecimalsPrice: Long
   ): ExchangeTransactionResult[ExchangeTransactionV3] =
     create(
       buyOrder,
@@ -71,7 +84,7 @@ object ExchangeTransactionV3 extends ExchangeTransactionParser[ExchangeTransacti
       fee,
       timestamp,
       Proofs.empty,
-      fixedDecimalsPrice
+      assetDecimalsPrice
     ).map { unverified =>
       unverified.copy(proofs = Proofs(List(ByteStr(crypto.sign(matcher, unverified.bodyBytes())))))
     }
@@ -86,14 +99,14 @@ object ExchangeTransactionV3 extends ExchangeTransactionParser[ExchangeTransacti
     fee: Long,
     timestamp: Long,
     proofs: Proofs,
-    fixedDecimalsPrice: Long
+    assetDecimalsPrice: Long
   ): ExchangeTransactionResult[ExchangeTransactionV3] =
     ExchangeTransactionResult.fromEither(
       validateExchangeParams(
         buyOrder,
         sellOrder,
         amount,
-        price,
+        assetDecimalsPrice,
         buyMatcherFee,
         sellMatcherFee,
         fee,
@@ -109,7 +122,7 @@ object ExchangeTransactionV3 extends ExchangeTransactionParser[ExchangeTransacti
         fee,
         timestamp,
         proofs,
-        fixedDecimalsPrice
+        assetDecimalsPrice
       )
     )
 
@@ -142,8 +155,8 @@ object ExchangeTransactionV3 extends ExchangeTransactionParser[ExchangeTransacti
       fee <- read[Long]
       timestamp <- read[Long]
       proofs <- read[Proofs]
-      offset <- read[ConsumedBytesOffset]
       fixedDecimalsPrice <- read[Long]
+      offset <- read[ConsumedBytesOffset]
     } yield ExchangeTransactionV3(
       buyOrder,
       sellOrder,

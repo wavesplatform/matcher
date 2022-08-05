@@ -64,7 +64,7 @@ class OrderEventsCoordinatorActorSpec
       fee = 300000L,
       timestamp = nowTs,
       proofs = Proofs.empty,
-      fixedDecimalsPrice = 80000L
+      assetDecimalsPrice = 80000L
     ).transaction
 
   private val validTxSpendings = Map[Address, PositiveMap[Asset, Long]](

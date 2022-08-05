@@ -572,7 +572,7 @@ trait MatcherSpecBase
         fee = 300000L,
         timestamp = nowTs,
         proofs = Proofs.empty,
-        fixedDecimalsPrice = price
+        assetDecimalsPrice = price
       )
   }
 

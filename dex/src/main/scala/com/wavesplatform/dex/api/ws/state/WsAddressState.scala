@@ -9,7 +9,7 @@ import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.model.Denormalization._
 import com.wavesplatform.dex.domain.order.Order
-import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
+import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionV3}
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.model.{AcceptedOrder, OrderStatus}
 
@@ -90,6 +90,15 @@ final case class WsAddressState(
     val fd = efc.unsafeAssetDecimals(ao.feeAsset)
 
     def mkMatchTxInfo(): Option[WsMatchTransactionInfo] = maybeMatchTx.map {
+      case FullMatchTxInfo(isTaker, matchTx: ExchangeTransactionV3) =>
+        WsMatchTransactionInfo.normalized(
+          ao.order.assetPair,
+          isTaker = isTaker,
+          txId = matchTx.id(),
+          timestamp = matchTx.timestamp,
+          price = matchTx.assetDecimalsPrice,
+          executedAmountAssets = matchTx.amount
+        )
       case FullMatchTxInfo(isTaker, matchTx) =>
         WsMatchTransactionInfo.normalized(
           ao.order.assetPair,

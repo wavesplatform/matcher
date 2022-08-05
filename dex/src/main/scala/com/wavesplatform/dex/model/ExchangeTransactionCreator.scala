@@ -58,12 +58,12 @@ class ExchangeTransactionCreator(
       buyWithExecutionInfo,
       sellWithExecutionInfo,
       orderExecutedEvent.executedAmount,
-      orderExecutedEvent.executedPrice,
+      fixedDecimalsPrice,
       buyFee,
       sellFee,
       txFee,
       orderExecutedEvent.timestamp,
-      fixedDecimalsPrice
+      orderExecutedEvent.executedPrice
     )
   }
 

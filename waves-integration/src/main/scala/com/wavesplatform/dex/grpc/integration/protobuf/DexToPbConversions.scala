@@ -7,6 +7,7 @@ import com.wavesplatform.dex.domain.bytes.{ByteStr => VByteStr}
 import com.wavesplatform.dex.domain.order.{Order => VOrder, OrderType => VOrderType}
 import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction => VExchangeTransaction}
 import com.wavesplatform.dex.grpc.integration.services.{ExchangeTransaction, SignedExchangeTransaction}
+import com.wavesplatform.protobuf.order.Order.PriceMode
 import com.wavesplatform.protobuf.order.{AssetPair => PbAssetPair, Order => PbOrder}
 import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.protobuf.transaction.{SignedTransaction, Transaction, ExchangeTransactionData => PbExchangeTransactionData}
@@ -90,7 +91,8 @@ object DexToPbConversions {
         expiration = order.expiration,
         matcherFee = Some(PbAmount(order.feeAsset.toPB, order.matcherFee)),
         version = order.version,
-        proofs = order.proofs.map(_.toPB)
+        proofs = order.proofs.map(_.toPB),
+        priceMode = PriceMode.DEFAULT
       )
 
   }

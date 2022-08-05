@@ -51,6 +51,7 @@ case class ExchangeTransactionV1(
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(bodyBytes() ++ signature.arr)
 
+  override val bytesForLevelDB: Coeval[Array[Byte]] = bytes
 }
 
 object ExchangeTransactionV1 extends ExchangeTransactionParser[ExchangeTransactionV1] {

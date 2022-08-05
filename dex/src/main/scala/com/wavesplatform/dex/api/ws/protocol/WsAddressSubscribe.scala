@@ -4,7 +4,7 @@ import cats.syntax.either._
 import cats.syntax.option._
 import com.wavesplatform.dex.api.ws.entities.WsAddressFlag
 import com.wavesplatform.dex.api.ws.protocol.WsAddressSubscribe._
-import com.wavesplatform.dex.domain.account.{Address, PrivateKey}
+import com.wavesplatform.dex.domain.account.{Address, PrivateKey, PublicKey}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.error
@@ -32,17 +32,21 @@ final case class WsAddressSubscribe(key: Address, authType: String, jwt: String,
         .toEither
         .left
         .map(toMatcherError(_, key))
-      payload <- rawJsonPayload.validate[JwtPayload].asEither.leftMap(_ => error.JwtPayloadBroken)
+      payload <- rawJsonPayload.validate[JwtPayload2].asEither.leftMap(_ => error.JwtPayloadBroken)
+      addr = payload.address.orElse(payload.publicKey.map(_.toAddress)).getOrElse(throw new RuntimeException)
       _ <- {
         val given = payload.networkByte.head.toByte
         Either.cond(given == networkByte, (), error.TokenNetworkUnexpected(networkByte, given))
       }
       _ <- Either.cond(
-        payload.address == key,
+        addr == key,
         (),
-        error.RequestAndJwtAddressesAreDifferent(key, payload.address)
+        error.RequestAndJwtAddressesAreDifferent(key, addr)
       )
-    } yield payload
+    } yield payload match {
+      case x: JwtPayload2 =>
+        JwtPayload.apply(x.signature, addr, x.networkByte, x.clientId, x.firstTokenExpirationInSeconds, x.activeTokenExpirationInSeconds, x.scope)
+    }
 
 }
 
@@ -95,6 +99,32 @@ object WsAddressSubscribe {
         (__ \ "exp").format[Long] and
         (__ \ "scope").format[List[String]]
     )(JwtPayload.apply, unlift(JwtPayload.unapply))
+
+  }
+
+  case class JwtPayload2(
+    signature: ByteStr,
+    address: Option[Address],
+    publicKey: Option[PublicKey],
+    networkByte: String,
+    clientId: String,
+    firstTokenExpirationInSeconds: Long,
+    activeTokenExpirationInSeconds: Long,
+    scope: List[String]
+  )
+
+  object JwtPayload2 {
+
+    implicit val jwtPayload2Format: OFormat[JwtPayload2] = (
+      (__ \ "sig").format[ByteStr] and
+        (__ \ "a").formatNullable[Address] and
+        (__ \ "pk").formatNullable[PublicKey] and
+        (__ \ "nb").format[String] and
+        (__ \ "cid").format[String] and
+        (__ \ "exp0").format[Long] and
+        (__ \ "exp").format[Long] and
+        (__ \ "scope").format[List[String]]
+    )(JwtPayload2.apply, unlift(JwtPayload2.unapply))
 
   }
 

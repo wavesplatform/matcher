@@ -47,7 +47,7 @@ object DexToPbConversions {
         tx.price,
         tx.buyMatcherFee,
         tx.sellMatcherFee,
-        Seq(tx.buyOrder, tx.buyOrder).map(_.toPB)
+        Seq(tx.sellOrder, tx.buyOrder).map(_.toPB)
       )
       new SignedTransaction(
         SignedTransaction.Transaction

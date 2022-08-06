@@ -1,23 +1,21 @@
 package com.wavesplatform.dex.grpc.integration.protobuf
 
 import com.google.common.primitives.{Bytes, Ints}
-import com.wavesplatform.account.{Address, AddressScheme, KeyPair, PublicKey}
+import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.WavesExtSuiteBase
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.it.api.BaseContainersKit
 import com.wavesplatform.dex.it.api.dex.HasDex
 import com.wavesplatform.dex.it.api.node.HasWavesNode
-import com.wavesplatform.dex.it.config.GenesisConfig
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.EthOrders.toEip712Json
 import com.wavesplatform.transaction.assets.exchange._
-import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.serialization.impl.ExchangeTxSerializer
 import com.wavesplatform.transaction.{Asset, Proofs, TxVersion}
 import org.scalatest.BeforeAndAfterAll
 import org.web3j.crypto._
-import org.web3j.utils.Numeric
 
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
@@ -30,20 +28,6 @@ final class EthOrdersTestSuite extends WavesExtSuiteBase with BaseContainersKit 
       println(alice)
     }
   }
-
-  private lazy val aliceEthKeyPair = Bip32ECKeyPair.generateKeyPair(alice.seed)
-
-  private lazy val aliceEthWavesAdr = Address(
-    Numeric.hexStringToByteArray(Keys.getAddress(aliceEthKeyPair)),
-    GenesisConfig.chainId
-  )
-
-  private lazy val bobEthKeyPair = Bip32ECKeyPair.generateKeyPair(bob.seed)
-
-  private lazy val bobEthWavesAdr = Address(
-    Numeric.hexStringToByteArray(Keys.getAddress(bobEthKeyPair)),
-    GenesisConfig.chainId
-  )
 
   private lazy val alice = KeyPair(
     crypto.secureHash(
@@ -72,19 +56,6 @@ final class EthOrdersTestSuite extends WavesExtSuiteBase with BaseContainersKit 
     }
     wavesNode1.start()
     dex1.start()
-    val tr1 =
-      TransferTransaction.selfSigned(
-        TxVersion.V3,
-        alice,
-        aliceEthWavesAdr,
-        Waves,
-        15 * t8,
-        Waves,
-        300_000,
-        ByteStr.empty,
-        System.currentTimeMillis(),
-        'Y'
-      ).toOption.get
 
     val issue = IssueTransaction.selfSigned(
       TxVersion.V3,
@@ -100,42 +71,15 @@ final class EthOrdersTestSuite extends WavesExtSuiteBase with BaseContainersKit 
     ).fold(x => throw new RuntimeException(x.toString), identity)
     val assetId = issue.asset.id
 
-    val tr2 =
-      TransferTransaction.selfSigned(
-        TxVersion.V3,
-        bob,
-        bobEthWavesAdr,
-        Asset.IssuedAsset(assetId),
-        15 * t6,
-        Waves,
-        300_000,
-        ByteStr.empty,
-        System.currentTimeMillis(),
-        'Y'
-      ).toOption.get
-
-    val tr3 =
-      TransferTransaction.selfSigned(
-        TxVersion.V3,
-        bob,
-        bobEthWavesAdr,
-        Waves,
-        15 * t8,
-        Waves,
-        300_000,
-        ByteStr.empty,
-        System.currentTimeMillis(),
-        'Y'
-      ).toOption.get
-
-    println(assetId)
-    val ap = AssetPair(Waves, Asset.IssuedAsset(assetId))
+    val ap = AssetPair(Waves, Asset.IssuedAsset(assetId)) //8 6
+    //10^6
 
     import com.wavesplatform.transaction
-    val order1 = signOrder(
+
+    val order1 = Order.sign(
       Order(
-        Order.V4,
-        OrderAuthentication.OrderProofs(PublicKey(new Array[Byte](32)), Proofs.empty),
+        Order.V3,
+        OrderAuthentication.OrderProofs(alice.publicKey, Proofs.empty),
         matcher.publicKey,
         ap,
         OrderType.SELL,
@@ -147,13 +91,13 @@ final class EthOrdersTestSuite extends WavesExtSuiteBase with BaseContainersKit 
         Waves,
         OrderPriceMode.Default
       ),
-      aliceEthKeyPair
+      alice.privateKey
     )
 
-    val order2: Order = signOrder(
+    val order2: Order = Order.sign(
       Order(
-        Order.V4,
-        OrderAuthentication.OrderProofs(PublicKey(new Array[Byte](32)), Proofs.empty),
+        Order.V3,
+        OrderAuthentication.OrderProofs(bob.publicKey, Proofs.empty),
         matcher.publicKey,
         ap,
         OrderType.BUY,
@@ -165,7 +109,7 @@ final class EthOrdersTestSuite extends WavesExtSuiteBase with BaseContainersKit 
         Waves,
         OrderPriceMode.Default
       ),
-      bobEthKeyPair
+      bob.privateKey
     )
 
     val exchange = ExchangeTransaction.signed(
@@ -174,7 +118,7 @@ final class EthOrdersTestSuite extends WavesExtSuiteBase with BaseContainersKit 
       order1,
       order2,
       5 * t8,
-      100 * t6,
+      convertPrice(100 * t6, 8, 6),
       300_000L,
       300_000L,
       300_000L,
@@ -186,15 +130,14 @@ final class EthOrdersTestSuite extends WavesExtSuiteBase with BaseContainersKit 
 
     wavesNode1.api.broadcastRaw(issue.json())
     Thread.sleep(3000L)
-    wavesNode1.api.broadcastRaw(tr1.json())
-    Thread.sleep(3000L)
-    wavesNode1.api.broadcastRaw(tr2.json())
-    Thread.sleep(3000L)
-    wavesNode1.api.broadcastRaw(tr3.json())
-    Thread.sleep(3000L)
     wavesNode1.api.broadcastRaw(exchange.json())
     Thread.sleep(3000L)
+    ExchangeTxSerializer
+    println(wavesNode1)
   }
+
+  def convertPrice(price: Long, amountDecimals: Int, priceDecimals: Int): Long =
+    (BigDecimal(price) / BigDecimal(10).pow(priceDecimals - amountDecimals)).toBigInt.bigInteger.longValueExact()
 
   def hashOrderStruct(order: Order): Array[Byte] = {
     val json = toEip712Json(order)

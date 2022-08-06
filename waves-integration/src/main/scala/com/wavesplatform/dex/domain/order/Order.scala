@@ -171,7 +171,7 @@ trait Order extends Proven with Authorized {
   override def hashCode(): Int = idStr.hashCode()
 
   override def toString: String = {
-    val feeAssetStr = if (version == 3) s" feeAsset=${feeAsset.toString}" else ""
+    val feeAssetStr = if (version >= 3) s" feeAsset=${feeAsset.toString}" else ""
     s"OrderV$version(id=${idStr()}, sender=$senderPublicKey, matcher=$matcherPublicKey, pair=$assetPair, type=$orderType, amount=$amount, " +
     s"price=$price, ts=$timestamp, exp=$expiration, fee=$matcherFee,$feeAssetStr, eip712Signature=$eip712Signature, proofs=$proofs)"
   }

@@ -18,7 +18,7 @@ import com.wavesplatform.dex.domain.feature.{BlockchainFeature, BlockchainFeatur
 import com.wavesplatform.dex.domain.model.Normalization
 import com.wavesplatform.dex.domain.model.Normalization._
 import com.wavesplatform.dex.domain.order.OrderOps._
-import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.domain.order.{EthOrders, Order, OrderType}
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.effect._
@@ -54,12 +54,22 @@ object OrderValidator extends ScorexLogging {
   private[dex] def multiplyFeeByBigDecimal(f: Long, d: BigDecimal): Long = (BigDecimal(f) * d).setScale(0, RoundingMode.CEILING).toLong
 
   private def verifySignature(order: Order): FutureResult[Unit] = liftAsync {
-    Verifier
-      .verifyAsEllipticCurveSignature(order)
-      .bimap(
-        e => error.OrderInvalidSignature(order.id(), e.toString),
-        _ => ()
-      )
+    order.eip712Signature match {
+      case Some(es) =>
+        val signerKey = EthOrders.recoverEthSignerKey(order, es.arr)
+        Either.cond(
+          signerKey == order.senderPublicKey,
+          (),
+          error.OrderInvalidSignature(order.id(), "Ethereum signature invalid")
+        )
+      case None =>
+        Verifier
+          .verifyAsEllipticCurveSignature(order)
+          .bimap(
+            e => error.OrderInvalidSignature(order.id(), e.toString),
+            _ => ()
+          )
+    }
   }
 
   private def verifyOrderByAccountScript(blockchain: WavesBlockchainClient, address: Address, order: Order, handleProofs: Order => Order)(

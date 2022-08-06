@@ -14,7 +14,7 @@ import com.wavesplatform.dex.domain.model.Normalization
 import com.wavesplatform.dex.domain.order.OrderJson.orderFormat
 import com.wavesplatform.dex.domain.order.OrderOps._
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
-import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV1, OrderV2}
+import com.wavesplatform.dex.domain.order.{Order, OrderAuthentication, OrderType, OrderV1, OrderV2}
 import com.wavesplatform.dex.domain.state.{LeaseBalance, Portfolio}
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.effect.FutureResult
@@ -124,8 +124,12 @@ class OrderValidatorSpecification
         assignNoScript(bc, pk.toAddress)
 
         val order = newBuyOrder(pk) match {
-          case x: OrderV1 => x.copy(proofs = Proofs(Seq(ByteStr(Array.emptyByteArray))))
-          case x: OrderV2 => x.copy(proofs = Proofs(Seq(ByteStr(Array.emptyByteArray))))
+          case x: OrderV1 =>
+            val oa = x.orderAuthentication.copy(proofs = Proofs(Seq(ByteStr(Array.emptyByteArray))))
+            x.copy(orderAuthentication = oa)
+          case x: OrderV2 =>
+            val oa = x.orderAuthentication.copy(proofs = Proofs(Seq(ByteStr(Array.emptyByteArray))))
+            x.copy(orderAuthentication = oa)
           case x => throw new RuntimeException(s"Unexpected order: $x")
         }
 
@@ -1001,7 +1005,7 @@ class OrderValidatorSpecification
 
     val order =
       OrderV2(
-        senderPublicKey = pk,
+        orderAuthentication = OrderAuthentication.OrderProofs(pk, proofs),
         matcherPublicKey = MatcherAccount,
         assetPair = wavesBtcPair,
         amount = 100.waves,
@@ -1009,8 +1013,7 @@ class OrderValidatorSpecification
         timestamp = System.currentTimeMillis(),
         expiration = System.currentTimeMillis() + 60 * 60 * 1000L,
         matcherFee = 0.003.waves,
-        orderType = OrderType.BUY,
-        proofs = proofs
+        orderType = OrderType.BUY
       )
 
     val tc = exchangeTransactionCreator()

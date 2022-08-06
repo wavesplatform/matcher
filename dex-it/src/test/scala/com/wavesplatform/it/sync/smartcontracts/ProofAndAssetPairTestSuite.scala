@@ -7,7 +7,7 @@ import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.crypto.Proofs
-import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV2}
+import com.wavesplatform.dex.domain.order.{Order, OrderAuthentication, OrderType, OrderV2}
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.error.{AccountScriptDeniedOrder, AccountScriptReturnedError}
 import com.wavesplatform.dex.it.api.responses.dex.MatcherError
@@ -234,9 +234,10 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
 
           val currTime = System.currentTimeMillis()
 
+          val oa = OrderAuthentication.OrderProofs(alice, Proofs.empty)
           val unsigned =
             OrderV2(
-              alice,
+              oa,
               matcher,
               predefAssetPair,
               OrderType.BUY,
@@ -244,14 +245,13 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
               2.waves * Order.PriceConstant,
               currTime,
               (30.days - 1.seconds).toMillis + currTime,
-              smartMatcherFee,
-              Proofs.empty
+              smartMatcherFee
             )
 
           val sigAlice = ByteStr(crypto.sign(alice, unsigned.bodyBytes()))
           val sigBob = ByteStr(crypto.sign(bob, unsigned.bodyBytes()))
 
-          val signed = unsigned.copy(proofs = Proofs(Seq(sigAlice, sigBob)))
+          val signed = unsigned.copy(orderAuthentication = oa.updateProofs(Proofs(Seq(sigAlice, sigBob))))
           placeAndAwaitAtDex(signed)
 
           dex1.api.cancelOneOrAllInPairOrdersWithSig(alice, signed)
@@ -302,9 +302,10 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
           for (assetP <- Seq(predefAssetPair, aliceWavesPair)) {
             val currTime = System.currentTimeMillis()
 
+            val oa = OrderAuthentication.OrderProofs(alice, Proofs.empty)
             val unsigned =
               OrderV2(
-                alice,
+                oa,
                 matcher,
                 assetP,
                 OrderType.BUY,
@@ -312,13 +313,12 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
                 2.waves * Order.PriceConstant,
                 currTime,
                 (30.days - 1.seconds).toMillis + currTime,
-                smartMatcherFee,
-                Proofs.empty
+                smartMatcherFee
               )
 
             val sigAlice = ByteStr(crypto.sign(alice, unsigned.bodyBytes()))
             val sigMat = ByteStr(crypto.sign(matcher.privateKey, unsigned.bodyBytes()))
-            placeAndAwaitAtDex(unsigned.copy(proofs = Proofs(Seq(sigAlice, ByteStr.empty, sigMat))))
+            placeAndAwaitAtDex(unsigned.copy(orderAuthentication = oa.updateProofs(Proofs(Seq(sigAlice, ByteStr.empty, sigMat)))))
           }
 
           setAliceScript(sc)

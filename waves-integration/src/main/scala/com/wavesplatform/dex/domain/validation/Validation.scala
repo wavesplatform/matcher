@@ -8,7 +8,7 @@ case class Validation(status: Boolean, labels: Set[String] = Set.empty) {
   def &&(r: => Validation): Validation =
     if (!this.status) this
     else if (!r.status) r
-    else Validation(true)
+    else Validation(status = true)
 
   def :|(l: String): Validation = if (!this.status) copy(labels = labels + l) else this
 
@@ -29,5 +29,9 @@ case object Validation {
     case Left(err) => Validation(status = false, Set(err))
     case Right(_) => Validation(status = true)
   }
+
+  val success: Validation = Validation(status = true)
+  val failure: Validation = Validation(status = false)
+  def failure(l: String): Validation = Validation(status = false, Set(l))
 
 }

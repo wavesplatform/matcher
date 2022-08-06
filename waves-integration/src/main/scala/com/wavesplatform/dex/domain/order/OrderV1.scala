@@ -11,7 +11,7 @@ import com.wavesplatform.dex.domain.crypto._
 import monix.eval.Coeval
 
 case class OrderV1(
-  senderPublicKey: PublicKey,
+  orderAuthentication: OrderAuthentication.OrderProofs,
   matcherPublicKey: PublicKey,
   assetPair: AssetPair,
   orderType: OrderType,
@@ -19,16 +19,12 @@ case class OrderV1(
   price: Long,
   timestamp: Long,
   expiration: Long,
-  matcherFee: Long,
-  proofs: Proofs
-) extends Order
-    with Authorized {
+  matcherFee: Long
+) extends Order {
 
   override def version: Byte = 1
 
-  override def signature: Array[Byte] = proofs.proofs.head.arr
-
-  val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
+  override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
     senderPublicKey ++ matcherPublicKey ++
     assetPair.bytes ++ orderType.bytes ++
     Longs.toByteArray(price) ++ Longs.toByteArray(amount) ++
@@ -54,7 +50,7 @@ object OrderV1 extends EntityParser[OrderV1] {
     signature: Array[Byte]
   ): OrderV1 =
     OrderV1(
-      senderPublicKey,
+      OrderAuthentication.OrderProofs(senderPublicKey, Proofs(List(ByteStr(signature)))),
       matcherPublicKey,
       assetPair,
       orderType,
@@ -62,22 +58,43 @@ object OrderV1 extends EntityParser[OrderV1] {
       price,
       timestamp,
       expiration,
-      matcherFee,
-      Proofs(List(ByteStr(signature)))
+      matcherFee
     )
 
   def buy(sender: KeyPair, matcher: PublicKey, pair: AssetPair, amount: Long, price: Long, timestamp: Long, expiration: Long, matcherFee: Long)
     : OrderV1 = {
-    val unsigned = OrderV1(sender, matcher, pair, OrderType.BUY, amount, price, timestamp, expiration, matcherFee, Proofs.empty)
+    val oa = OrderAuthentication.OrderProofs(sender, Proofs.empty)
+    val unsigned = OrderV1(
+      oa,
+      matcher,
+      pair,
+      OrderType.BUY,
+      amount,
+      price,
+      timestamp,
+      expiration,
+      matcherFee
+    )
     val sig = crypto.sign(sender, unsigned.bodyBytes())
-    unsigned.copy(proofs = Proofs(List(ByteStr(sig))))
+    unsigned.copy(orderAuthentication = oa.copy(proofs = Proofs(List(ByteStr(sig)))))
   }
 
   def sell(sender: KeyPair, matcher: PublicKey, pair: AssetPair, amount: Long, price: Long, timestamp: Long, expiration: Long, matcherFee: Long)
     : OrderV1 = {
-    val unsigned = OrderV1(sender, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, Proofs.empty)
+    val oa = OrderAuthentication.OrderProofs(sender, Proofs.empty)
+    val unsigned = OrderV1(
+      oa,
+      matcher,
+      pair,
+      OrderType.SELL,
+      amount,
+      price,
+      timestamp,
+      expiration,
+      matcherFee
+    )
     val sig = crypto.sign(sender, unsigned.bodyBytes())
-    unsigned.copy(proofs = Proofs(List(ByteStr(sig))))
+    unsigned.copy(orderAuthentication = oa.copy(proofs = Proofs(List(ByteStr(sig)))))
   }
 
   def apply(
@@ -91,9 +108,20 @@ object OrderV1 extends EntityParser[OrderV1] {
     expiration: Long,
     matcherFee: Long
   ): OrderV1 = {
-    val unsigned = OrderV1(sender, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee, Proofs.empty)
+    val oa = OrderAuthentication.OrderProofs(sender, Proofs.empty)
+    val unsigned = OrderV1(
+      oa,
+      matcher,
+      pair,
+      orderType,
+      amount,
+      price,
+      timestamp,
+      expiration,
+      matcherFee
+    )
     val sig = crypto.sign(sender, unsigned.bodyBytes())
-    unsigned.copy(proofs = Proofs(List(ByteStr(sig))))
+    unsigned.copy(orderAuthentication = oa.copy(proofs = Proofs(List(ByteStr(sig)))))
   }
 
   override def statefulParse: Stateful[(OrderV1, ConsumedBytesOffset)] =

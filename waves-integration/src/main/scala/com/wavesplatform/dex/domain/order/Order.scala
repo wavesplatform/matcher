@@ -123,9 +123,9 @@ trait Order extends Proven with Authorized {
     Json.obj(
       "version" -> version,
       "id" -> idStr(),
-      "sender" -> senderPublicKey.stringRepr,
-      "senderPublicKey" -> senderPublicKey.stringRepr,
-      "matcherPublicKey" -> matcherPublicKey.stringRepr,
+      "sender" -> Base58.encode(senderPublicKey),
+      "senderPublicKey" -> Base58.encode(senderPublicKey),
+      "matcherPublicKey" -> Base58.encode(matcherPublicKey),
       "assetPair" -> Json.toJsObject(assetPair),
       "orderType" -> orderType.toString,
       "amount" -> amount,
@@ -135,7 +135,7 @@ trait Order extends Proven with Authorized {
       "matcherFee" -> matcherFee,
       "signature" -> Base58.encode(signature),
       "proofs" -> proofs.proofs
-    ) ++ (if (version >= 3) Json.obj("matcherFeeAssetId" -> feeAsset) else JsObject.empty) ++
+    ) ++ (if (version >= 3) Json.obj("matcherFeeAssetId" -> feeAsset.maybeBase58Repr) else JsObject.empty) ++
     (if (version >= 4)
        Json.obj(
          "eip712Signature" -> eip712Signature.map(bs => org.web3j.utils.Numeric.toHexString(bs.arr)),
@@ -163,7 +163,8 @@ trait Order extends Proven with Authorized {
         proofs == o.proofs &&
         version == o.version &&
         java.util.Arrays.equals(signature, o.signature) &&
-        feeAsset == o.feeAsset
+        feeAsset == o.feeAsset &&
+        java.util.Arrays.equals(eip712Signature.getOrElse(ByteStr.empty), o.eip712Signature.getOrElse(ByteStr.empty))
     case _ => false
   }
 

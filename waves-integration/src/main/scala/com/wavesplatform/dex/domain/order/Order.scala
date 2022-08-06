@@ -123,7 +123,7 @@ trait Order extends Proven with Authorized {
     Json.obj(
       "version" -> version,
       "id" -> idStr(),
-      "sender" -> Base58.encode(senderPublicKey),
+      "sender" -> senderPublicKey.stringRepr,
       "senderPublicKey" -> Base58.encode(senderPublicKey),
       "matcherPublicKey" -> Base58.encode(matcherPublicKey),
       "assetPair" -> Json.toJsObject(assetPair),

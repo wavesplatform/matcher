@@ -19,7 +19,7 @@ import com.wavesplatform.dex.domain.model.Normalization
 import com.wavesplatform.dex.domain.model.Normalization._
 import com.wavesplatform.dex.domain.order.OrderOps._
 import com.wavesplatform.dex.domain.order.{EthOrders, Order, OrderType}
-import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
+import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionV3}
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.error
@@ -423,6 +423,11 @@ object OrderValidator extends ScorexLogging {
           matcherSettings.allowedOrderVersions(o.version)
         )
       _ <- validateBlacklistedAsset(order.feeAsset, error.FeeAssetBlacklisted(_))
+      _ <- ExchangeTransactionV3.convertPrice(
+        order.price,
+        efc.unsafeAssetDecimals(order.assetPair.amountAsset),
+        efc.unsafeAssetDecimals(order.assetPair.priceAsset)
+      ).fold(_ => OrderPriceOutOfBound.asLeft, _ => ().asRight)
       _ <- validateFeeAsset(order, getActualOrderFeeSettings)
       validatedOrder <- validateFee(order, getActualOrderFeeSettings, assetDecimals, rateCache)
     } yield validatedOrder

@@ -5,7 +5,6 @@ import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionV2}
 import com.wavesplatform.dex.gen._
 import org.scalacheck.Gen
 import org.scalatest.enablers.Emptiness
@@ -78,100 +77,5 @@ trait WavesEntitiesGen {
         else Order.sell(sender, matcher, assetPair, amount, price, timestamp, expiration, fee, fixedVersion, feeAsset)
       (order, sender)
     }
-
-  val exchangeTransactionGen: Gen[ExchangeTransaction] = {
-    for {
-      version <- Gen.oneOf(1: Byte, 2: Byte)
-      matcher <- keyPairGen
-      matcherPublicKeyGen = Gen.const(matcher.publicKey)
-      timestamp <- timestampGen
-      orderTimestampGen = Gen.choose(1, 1000L).map(_ + timestamp)
-      (buyOrder, _) <- {
-        val sideGen = Gen.const(OrderType.BUY)
-        if (version == 1)
-          orderAndSenderGen(
-            sideGen = sideGen,
-            matcherGen = matcherPublicKeyGen,
-            versionGen = Gen.const(1: Byte),
-            timestampGen = orderTimestampGen
-          )
-        else orderAndSenderGen(sideGen = sideGen, matcherGen = matcherPublicKeyGen, timestampGen = orderTimestampGen)
-      }
-      (sellOrder, _) <- {
-        val sideGen = Gen.const(OrderType.SELL)
-        val priceGen = Gen.choose(1L, buyOrder.price)
-        val assetPairGen = Gen.const(buyOrder.assetPair)
-        if (version == 1)
-          orderAndSenderGen(
-            sideGen = sideGen,
-            matcherGen = matcherPublicKeyGen,
-            assetPairGen = assetPairGen,
-            priceGen = priceGen,
-            versionGen = Gen.const(1: Byte),
-            timestampGen = orderTimestampGen
-          )
-        else
-          orderAndSenderGen(
-            sideGen = sideGen,
-            matcherGen = matcherPublicKeyGen,
-            assetPairGen = assetPairGen,
-            priceGen = priceGen,
-            timestampGen = orderTimestampGen
-          )
-      }
-      fee <- orderFeeGen
-    } yield {
-      val amount = math.min(buyOrder.amount, sellOrder.amount)
-      val price = buyOrder.price
-      ExchangeTransactionV2
-        .create(
-          matcher = matcher,
-          buyOrder = buyOrder,
-          sellOrder = sellOrder,
-          amount = amount,
-          price = price,
-          buyMatcherFee = buyOrder.matcherFee,
-          sellMatcherFee = sellOrder.matcherFee,
-          fee = fee,
-          timestamp = timestamp
-        ).transaction
-    }
-  }
-
-  protected def exchangeTransactionBuyerSellerGen(buyerGen: Gen[KeyPair], sellerGen: Gen[KeyPair]): Gen[ExchangeTransactionV2] = for {
-    matcher <- keyPairGen
-    matcherPublicKeyGen = Gen.const(matcher.publicKey)
-    timestamp <- timestampGen
-    orderTimestampGen = Gen.choose(1, 1000L).map(_ + timestamp)
-    (buyOrder, _) <- orderAndSenderGen(
-      sideGen = Gen.const(OrderType.BUY),
-      senderGen = buyerGen,
-      matcherGen = matcherPublicKeyGen,
-      timestampGen = orderTimestampGen
-    )
-    (sellOrder, _) <- orderAndSenderGen(
-      sideGen = Gen.const(OrderType.SELL),
-      senderGen = sellerGen,
-      matcherGen = matcherPublicKeyGen,
-      assetPairGen = Gen.const(buyOrder.assetPair),
-      priceGen = Gen.choose(1L, buyOrder.price),
-      timestampGen = orderTimestampGen
-    )
-  } yield {
-    val amount = math.min(buyOrder.amount, sellOrder.amount)
-    val price = buyOrder.price
-    ExchangeTransactionV2
-      .create(
-        matcher = matcher,
-        buyOrder = buyOrder,
-        sellOrder = sellOrder,
-        amount = amount,
-        price = price,
-        buyMatcherFee = buyOrder.matcherFee,
-        sellMatcherFee = sellOrder.matcherFee,
-        fee = defaultWavesFee,
-        timestamp = timestamp
-      ).transaction
-  }
 
 }

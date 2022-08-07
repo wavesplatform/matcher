@@ -11,7 +11,6 @@ import com.wavesplatform.dex.domain.error.ValidationError
 import com.wavesplatform.dex.domain.error.ValidationError._
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.serialization.ByteAndJsonSerializable
-import com.wavesplatform.dex.domain.utils._
 import io.swagger.annotations.ApiModelProperty
 import monix.eval.Coeval
 import play.api.libs.json._
@@ -122,13 +121,14 @@ object ExchangeTransaction {
 
   def parse(bytes: Array[Byte]): Try[ExchangeTransaction] =
     bytes.headOption
-      .fold(Failure(new Exception("Empty array")): Try[ExchangeTransaction]) { b =>
-        val etp = if (b == 0) ExchangeTransactionV2 else ExchangeTransactionV1
-        etp.parseBytes(bytes).map(_._1).flatMap(validateExchangeParams(_).foldToTry)
+      .fold(Failure(new Exception("Empty array")): Try[ExchangeTransaction]) { firstByte =>
+        if (firstByte == 0)
+          ExchangeTransactionV2.parseBytes(bytes).map(_._1)
+        else if (firstByte == 7)
+          ExchangeTransactionV1.parseBytes(bytes).map(_._1)
+        else //firstByte = 3
+          ExchangeTransactionV3.parseBytes(bytes).map(_._1)
       }
-
-  def validateExchangeParams(tx: ExchangeTransaction): Either[ValidationError, ExchangeTransaction] =
-    validateExchangeParams(tx.buyOrder, tx.sellOrder, tx.amount, tx.price, tx.buyMatcherFee, tx.sellMatcherFee, tx.fee, tx.timestamp).map(_ => tx)
 
   def validateExchangeParams(
     buyOrder: Order,

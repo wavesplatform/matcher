@@ -1,12 +1,9 @@
 package com.wavesplatform.dex.domain.transaction
 
 import com.google.common.primitives.{Ints, Longs}
-import com.wavesplatform.dex.domain.account.PrivateKey
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.deser.EntityParser.{ConsumedBytesOffset, Signature, Stateful}
-import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.crypto.{Authorized, Proofs}
-import com.wavesplatform.dex.domain.error.ValidationError
 import com.wavesplatform.dex.domain.order.OrderV1
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction._
 import com.wavesplatform.dex.domain.utils._
@@ -54,45 +51,6 @@ case class ExchangeTransactionV1(
 }
 
 object ExchangeTransactionV1 extends ExchangeTransactionParser[ExchangeTransactionV1] {
-
-  def create(
-    matcher: PrivateKey,
-    buyOrder: OrderV1,
-    sellOrder: OrderV1,
-    amount: Long,
-    price: Long,
-    buyMatcherFee: Long,
-    sellMatcherFee: Long,
-    fee: Long,
-    timestamp: Long
-  ): Either[ValidationError, ExchangeTransactionV1] =
-    create(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, ByteStr.empty).map { unverified =>
-      unverified.copy(signature = ByteStr(crypto.sign(matcher, unverified.bodyBytes())))
-    }
-
-  def create(
-    buyOrder: OrderV1,
-    sellOrder: OrderV1,
-    amount: Long,
-    price: Long,
-    buyMatcherFee: Long,
-    sellMatcherFee: Long,
-    fee: Long,
-    timestamp: Long,
-    signature: ByteStr
-  ): Either[ValidationError, ExchangeTransactionV1] =
-    validateExchangeParams(
-      buyOrder,
-      sellOrder,
-      amount,
-      price,
-      buyMatcherFee,
-      sellMatcherFee,
-      fee,
-      timestamp
-    ).map { _ =>
-      ExchangeTransactionV1(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, signature)
-    }
 
   override protected def parseHeader(bytes: Array[Byte]): Try[Int] = Try {
     if (bytes.length < 1) throw new IllegalArgumentException(s"The buffer is too small, it has ${bytes.length} elements")

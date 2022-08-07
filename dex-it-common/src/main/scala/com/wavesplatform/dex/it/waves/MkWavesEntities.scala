@@ -9,7 +9,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.model.Normalization
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionV2}
+import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionV3}
 import com.wavesplatform.dex.it.config.GenesisConfig
 import com.wavesplatform.dex.it.config.PredefinedAccounts.matcher
 import com.wavesplatform.dex.it.waves.Implicits._
@@ -243,7 +243,7 @@ trait MkWavesEntities {
     sellOrderFeeAsset: Asset = Waves,
     buyOrderVersion: Byte = orderVersion,
     sellOrderVersion: Byte = orderVersion
-  ): JExchangeTransaction =
+  )(implicit assetDecimals: Map[Asset, Int]): JExchangeTransaction =
     mkDomainExchange(
       buyOrderOwner,
       sellOrderOwner,
@@ -272,7 +272,7 @@ trait MkWavesEntities {
     sellOrderFeeAsset: Asset = Waves,
     buyOrderVersion: Byte = orderVersion,
     sellOrderVersion: Byte = orderVersion
-  ): ExchangeTransaction = {
+  )(implicit assetDecimals: Map[Asset, Int]): ExchangeTransaction = {
 
     val buyOrder = mkOrder(
       buyOrderOwner,
@@ -297,8 +297,10 @@ trait MkWavesEntities {
       version = sellOrderVersion
     )
 
-    ExchangeTransactionV2
-      .create(
+    ExchangeTransactionV3
+      .createUnsafe(
+        amountAssetDecimals = assetDecimals(buyOrder.assetPair.amountAsset),
+        priceAssetDecimals = assetDecimals(buyOrder.assetPair.priceAsset),
         matcher = matcher,
         buyOrder = buyOrder,
         sellOrder = sellOrder,

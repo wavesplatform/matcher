@@ -16,7 +16,7 @@ import com.wavesplatform.dex.domain.crypto.Proofs
 import com.wavesplatform.dex.domain.model.{Normalization, Price}
 import com.wavesplatform.dex.domain.order.OrderOps._
 import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV3}
-import com.wavesplatform.dex.domain.transaction.{ExchangeTransactionResult, ExchangeTransactionV2}
+import com.wavesplatform.dex.domain.transaction.{ExchangeTransactionResult, ExchangeTransactionV3}
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.domain.{crypto => wcrypto}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
@@ -549,13 +549,17 @@ trait MatcherSpecBase
   protected def privateKey(seed: String): KeyPair = KeyPair(seed.getBytes("utf-8"))
   protected def nowTs: Long = System.currentTimeMillis()
 
-  protected def mkExchangeTx(oe: OrderExecuted): ExchangeTransactionResult[ExchangeTransactionV2] = {
+  protected def mkExchangeTx(oe: OrderExecuted)(implicit assetDecimals: Map[Asset, Int]): ExchangeTransactionResult[ExchangeTransactionV3] = {
     val (sellOrder, buyOrder) = if (oe.counter.isSellOrder) (oe.counter, oe.submitted) else (oe.submitted, oe.counter)
     mkExchangeTx(buyOrder.order, sellOrder.order)
   }
 
-  protected def mkExchangeTx(buyOrder: Order, sellOrder: Order): ExchangeTransactionResult[ExchangeTransactionV2] = ExchangeTransactionV2
-    .create(
+  protected def mkExchangeTx(buyOrder: Order, sellOrder: Order)(implicit
+    assetDecimals: Map[Asset, Int]
+  ): ExchangeTransactionResult[ExchangeTransactionV3] =
+    ExchangeTransactionV3.createUnsafe(
+      amountAssetDecimals = assetDecimals(buyOrder.assetPair.amountAsset),
+      priceAssetDecimals = assetDecimals(buyOrder.assetPair.priceAsset),
       buyOrder = buyOrder,
       sellOrder = sellOrder,
       amount = sellOrder.amount,

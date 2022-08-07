@@ -1,10 +1,7 @@
 package com.wavesplatform.dex.domain.transaction
 
 import com.google.common.primitives.{Ints, Longs}
-import com.wavesplatform.dex.domain.account.PrivateKey
-import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.deser.EntityParser.{ConsumedBytesOffset, Stateful}
-import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.crypto.Proofs
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction._
@@ -44,47 +41,7 @@ case class ExchangeTransactionV2(
 
 object ExchangeTransactionV2 extends ExchangeTransactionParser[ExchangeTransactionV2] {
 
-  private def orderMark(version: Byte): Array[Byte] = if (version == 1) Array(1: Byte) else Array()
-
-  def create(
-    matcher: PrivateKey,
-    buyOrder: Order,
-    sellOrder: Order,
-    amount: Long,
-    price: Long,
-    buyMatcherFee: Long,
-    sellMatcherFee: Long,
-    fee: Long,
-    timestamp: Long
-  ): ExchangeTransactionResult[ExchangeTransactionV2] =
-    create(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, Proofs.empty).map { unverified =>
-      unverified.copy(proofs = Proofs(List(ByteStr(crypto.sign(matcher, unverified.bodyBytes())))))
-    }
-
-  def create(
-    buyOrder: Order,
-    sellOrder: Order,
-    amount: Long,
-    price: Long,
-    buyMatcherFee: Long,
-    sellMatcherFee: Long,
-    fee: Long,
-    timestamp: Long,
-    proofs: Proofs
-  ): ExchangeTransactionResult[ExchangeTransactionV2] =
-    ExchangeTransactionResult.fromEither(
-      validateExchangeParams(
-        buyOrder,
-        sellOrder,
-        amount,
-        price,
-        buyMatcherFee,
-        sellMatcherFee,
-        fee,
-        timestamp
-      ),
-      ExchangeTransactionV2(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, proofs)
-    )
+  private def orderMark(version: Byte): Array[Byte] = if (version == 1) Array(1: Byte) else Array.emptyByteArray
 
   override protected def parseHeader(bytes: Array[Byte]): Try[Int] = Try {
 

@@ -1,7 +1,5 @@
 package com.wavesplatform.dex.api.ws.actors
 
-import java.nio.charset.StandardCharsets
-import java.util.{Base64, UUID}
 import akka.actor.testkit.typed.scaladsl.{ActorTestKit, TestProbe => TypedTestProbe}
 import akka.actor.typed.ActorRef
 import akka.actor.typed.scaladsl.adapter._
@@ -26,8 +24,9 @@ import com.wavesplatform.dex.model.AssetPairBuilder
 import com.wavesplatform.dex.settings.SubscriptionsSettings
 import org.scalatest.freespec.AnyFreeSpecLike
 import org.scalatest.matchers.should.Matchers
-import play.api.libs.json.Json
 
+import java.nio.charset.StandardCharsets
+import java.util.{Base64, UUID}
 import scala.concurrent.duration._
 
 class WsExternalClientHandlerActorSpec extends AnyFreeSpecLike with Matchers with MatcherSpecBase with HasJwt {
@@ -137,18 +136,6 @@ class WsExternalClientHandlerActorSpec extends AnyFreeSpecLike with Matchers wit
               "JWT parsing and validation failed: Unrecognized token 'test': was expecting (JSON String, Number, Array, Object or token 'null', 'true' or 'false')  at [Source: (String)\"test\"; line: 1, column: 9]"
           )
         )
-
-        "wrong payload" in {
-          val jwtPayload = Json.toJsObject(mkJwtSignedPayload(clientKeyPair)) - "scope"
-          failTest(
-            mkJwt(jwtPayload),
-            WsError(
-              timestamp = 0L, // ignored
-              code = JwtPayloadBroken.code,
-              message = "JWT payload has not expected fields"
-            )
-          )
-        }
 
         "wrong network" in failTest(
           mkJwt(mkJwtSignedPayload(clientKeyPair, networkByte = 0)),

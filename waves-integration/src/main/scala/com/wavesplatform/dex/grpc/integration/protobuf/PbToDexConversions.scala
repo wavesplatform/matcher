@@ -5,7 +5,7 @@ import cats.syntax.either._
 import cats.syntax.traverse._
 import com.google.protobuf.{ByteString => PbByteString}
 import com.wavesplatform.dex.domain.account.{Address => DexAddress, PublicKey => DexPublicKey}
-import com.wavesplatform.dex.domain.asset.{AssetPair => DexAssetPair, Asset => DexAsset}
+import com.wavesplatform.dex.domain.asset.{Asset => DexAsset, AssetPair => DexAssetPair}
 import com.wavesplatform.dex.domain.bytes.{ByteStr => DexByteStr}
 import com.wavesplatform.dex.domain.error.ValidationError
 import com.wavesplatform.dex.domain.error.ValidationError.GenericError

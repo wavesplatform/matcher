@@ -587,7 +587,7 @@ object OrderInvalidPrice extends MatcherErrorCodeProvider(order, price, denied, 
 
 }
 
-case object OrderPriceOutOfBound extends MatcherError(order, price, outOfBound, e"The order's price is out of bound", C.BadRequest)
+case object OrderPriceOutOfBound extends MatcherError(order, price, commonClass, e"The order's price is out of bound", C.BadRequest)
 
 final case class MarketOrderCancel(id: Order.Id)
     extends MatcherError(MarketOrderCancel.code, e"The market order ${"id" -> id} cannot be cancelled manually", MarketOrderCancel.httpCode)

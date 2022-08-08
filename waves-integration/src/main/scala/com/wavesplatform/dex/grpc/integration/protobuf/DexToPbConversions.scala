@@ -26,13 +26,7 @@ object DexToPbConversions {
             fee = Some(PbAmount(assetId = tx.assetFee._1.toPB, amount = tx.assetFee._2)),
             timestamp = tx.timestamp,
             version = tx.version,
-            data = PbDexExchangeTransaction.Data.Exchange(PbExchangeTransactionData(
-              amount = tx.amount,
-              price = tx.withFixedPriceUnsafe.price,
-              buyMatcherFee = tx.buyMatcherFee,
-              sellMatcherFee = tx.sellMatcherFee,
-              orders = Seq(tx.buyOrder.toPB, tx.sellOrder.toPB)
-            ))
+            data = PbDexExchangeTransaction.Data.Exchange(mkPbExchangeTxData(tx))
           )
         ),
         proofs = tx.proofs.proofs.map(_.toPB)
@@ -48,16 +42,19 @@ object DexToPbConversions {
               fee = Some(PbAmount(assetId = tx.assetFee._1.toPB, amount = tx.assetFee._2)),
               timestamp = tx.timestamp,
               version = tx.version,
-              data = PbTransaction.Data.Exchange(PbExchangeTransactionData(
-                amount = tx.amount,
-                price = tx.price,
-                buyMatcherFee = tx.buyMatcherFee,
-                sellMatcherFee = tx.sellMatcherFee,
-                orders = Seq(tx.buyOrder.toPB, tx.sellOrder.toPB)
-              ))
+              data = PbTransaction.Data.Exchange(mkPbExchangeTxData(tx))
             )
           ),
         proofs = tx.proofs.proofs.map(_.toPB)
+      )
+
+    private def mkPbExchangeTxData(tx: DexExchangeTransaction): PbExchangeTransactionData =
+      PbExchangeTransactionData(
+        amount = tx.amount,
+        price = tx.price,
+        buyMatcherFee = tx.buyMatcherFee,
+        sellMatcherFee = tx.sellMatcherFee,
+        orders = Seq(tx.buyOrder.toPB, tx.sellOrder.toPB)
       )
 
   }

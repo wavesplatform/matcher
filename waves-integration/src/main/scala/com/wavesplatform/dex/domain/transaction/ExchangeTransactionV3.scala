@@ -1,16 +1,16 @@
 package com.wavesplatform.dex.domain.transaction
 
-import cats.data.State
 import cats.syntax.either._
+import com.google.common.primitives.Longs
 import com.wavesplatform.dex.domain.account.PrivateKey
 import com.wavesplatform.dex.domain.bytes.ByteStr
-import com.wavesplatform.dex.domain.bytes.deser.EntityParser
-import com.wavesplatform.dex.domain.bytes.deser.EntityParser.ConsumedBytesOffset
+import com.wavesplatform.dex.domain.bytes.deser.EntityParser.{ConsumedBytesOffset, Stateful}
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.crypto.Proofs
 import com.wavesplatform.dex.domain.error.ValidationError
 import com.wavesplatform.dex.domain.error.ValidationError._
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.domain.transaction.ExchangeTransaction._
 import com.wavesplatform.dex.domain.utils.PBUtils
 import com.wavesplatform.dex.grpc.integration.protobuf.DexToPbConversions._
 import monix.eval.Coeval
@@ -18,26 +18,32 @@ import monix.eval.Coeval
 import scala.util.Try
 
 case class ExchangeTransactionV3(
-  amountAssetDecimals: Int,
-  priceAssetDecimals: Int,
   buyOrder: Order,
   sellOrder: Order,
   amount: Long,
   price: Long,
+  assetDecimalsPrice: Long,
   buyMatcherFee: Long,
   sellMatcherFee: Long,
   fee: Long,
   timestamp: Long,
   proofs: Proofs
 ) extends ExchangeTransaction {
-  override def version: Byte = 3
-  override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(PBUtils.encodeDeterministic(this.toPBWaves.getWavesTransaction))
-  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(PBUtils.encodeDeterministic(this.toPBWaves))
 
-  def withFixedPrice: Either[ValidationError, ExchangeTransactionV3] =
-    ExchangeTransactionV3.convertPrice(price, amountAssetDecimals, priceAssetDecimals).map { fixedPrice =>
-      copy(price = fixedPrice)
-    }
+  override val version: Byte = 3
+
+  override val bodyBytes: Coeval[Array[Byte]] =
+    Coeval.evalOnce(PBUtils.encodeDeterministic(this.toPBWaves.getWavesTransaction))
+
+  override val bytes: Coeval[Array[Byte]] =
+    Coeval.evalOnce(
+      Array(version) ++
+      orderMark(buyOrder.version) ++ buyOrder.bytes() ++
+      orderMark(sellOrder.version) ++ sellOrder.bytes() ++
+      Longs.toByteArray(price) ++ Longs.toByteArray(assetDecimalsPrice) ++ Longs.toByteArray(amount) ++
+      Longs.toByteArray(buyMatcherFee) ++ Longs.toByteArray(sellMatcherFee) ++ Longs.toByteArray(fee) ++
+      Longs.toByteArray(timestamp) ++ proofs.bytes()
+    )
 
 }
 
@@ -75,8 +81,11 @@ object ExchangeTransactionV3 extends ExchangeTransactionParser[ExchangeTransacti
       timestamp,
       Proofs.empty
     ).map { unverified =>
-      unverified.withFixedPrice
-        .map(u => u.copy(proofs = Proofs(List(ByteStr(crypto.sign(matcher, u.bodyBytes()))))))
+      convertPrice(price, amountAssetDecimals, priceAssetDecimals)
+        .map { fixedPrice =>
+          val ufp = unverified.copy(price = fixedPrice)
+          ufp.copy(proofs = Proofs(List(ByteStr(crypto.sign(matcher, ufp.bodyBytes())))))
+        }
         .getOrElse(unverified)
     }
 
@@ -107,11 +116,10 @@ object ExchangeTransactionV3 extends ExchangeTransactionParser[ExchangeTransacti
         timestamp
       ),
       ExchangeTransactionV3(
-        amountAssetDecimals,
-        priceAssetDecimals,
         buyOrder,
         sellOrder,
         amount,
+        price,
         price,
         buyMatcherFee,
         sellMatcherFee,
@@ -163,8 +171,30 @@ object ExchangeTransactionV3 extends ExchangeTransactionParser[ExchangeTransacti
     1
   }
 
-  override private[domain] def statefulParse = State[EntityParser.S, (ExchangeTransactionV3, ConsumedBytesOffset)] { s =>
-    ???
-  }
+  override private[domain] def statefulParse: Stateful[(ExchangeTransactionV3, ConsumedBytesOffset)] =
+    for {
+      (buyOrder, _) <- Order.statefulParse
+      (sellOrder, _) <- Order.statefulParse
+      price <- read[Long]
+      assetDecimalsPrice <- read[Long]
+      amount <- read[Long]
+      buyMatcherFee <- read[Long]
+      sellMatcherFee <- read[Long]
+      fee <- read[Long]
+      timestamp <- read[Long]
+      proofs <- read[Proofs]
+      offset <- read[ConsumedBytesOffset]
+    } yield ExchangeTransactionV3(
+      buyOrder,
+      sellOrder,
+      amount,
+      price,
+      assetDecimalsPrice,
+      buyMatcherFee,
+      sellMatcherFee,
+      fee,
+      timestamp,
+      proofs
+    ) -> offset
 
 }

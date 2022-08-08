@@ -96,7 +96,7 @@ final case class WsAddressState(
           isTaker = isTaker,
           txId = matchTx.id(),
           timestamp = matchTx.timestamp,
-          price = matchTx.price,
+          price = matchTx.assetDecimalsPrice,
           executedAmountAssets = matchTx.amount
         )
     }

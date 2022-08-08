@@ -7,7 +7,6 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.crypto.Proven
-import com.wavesplatform.dex.domain.error.ValidationError
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.serialization.ByteAndJsonSerializable
 import io.swagger.annotations.ApiModelProperty
@@ -22,15 +21,12 @@ trait ExchangeTransaction extends ByteAndJsonSerializable with Proven {
   def sellOrder: Order
   def amount: Long
   def price: Long
+  def assetDecimalsPrice: Long
   def buyMatcherFee: Long
   def sellMatcherFee: Long
   def fee: Long
   def timestamp: Long
   def version: Byte
-  def withFixedPrice: Either[ValidationError, ExchangeTransaction]
-
-  def withFixedPriceUnsafe: ExchangeTransaction =
-    withFixedPrice.fold(err => throw new RuntimeException(err.message), identity)
 
   // Set, because is could be one trader
   def traders: Set[Address] = Set(buyOrder.senderPublicKey.toAddress, sellOrder.senderPublicKey.toAddress)
@@ -97,6 +93,7 @@ trait ExchangeTransaction extends ByteAndJsonSerializable with Proven {
       "order2" -> sellOrder.json(),
       "amount" -> amount,
       "price" -> price,
+      "assetDecimalsPrice" -> assetDecimalsPrice,
       "buyMatcherFee" -> buyMatcherFee,
       "sellMatcherFee" -> sellMatcherFee
     )
@@ -121,6 +118,9 @@ object ExchangeTransaction {
   type Id = ByteStr
 
   val typeId: Byte = 7
+
+  private[transaction] def orderMark(version: Byte): Array[Byte] =
+    if (version == 1) Array(1: Byte) else Array.emptyByteArray
 
   def parse(bytes: Array[Byte]): Try[ExchangeTransaction] =
     bytes.headOption

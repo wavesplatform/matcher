@@ -44,7 +44,7 @@ object DbKeys {
   def orderTxId(orderId: ByteStr, seqNr: Int): Key[ByteStr] = Key("matcher-order-tx-id", hBytes(10, seqNr, orderId.arr), ByteStr(_), _.arr)
 
   def exchangeTransaction(txId: ByteStr): Key[Option[ExchangeTransaction]] =
-    Key.opt("matcher-exchange-transaction", bytes(11, txId.arr), ExchangeTransaction.parse(_).get, x => x.version +: x.bytes())
+    Key.opt("matcher-exchange-transaction", bytes(11, txId.arr), ExchangeTransaction.parse(_).get, _.bytes())
 
   // activeOrdersSize = 12
   // activeOrdersSeqNr = 13

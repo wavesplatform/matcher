@@ -3,7 +3,6 @@ package com.wavesplatform.dex.domain.transaction
 import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.dex.domain.bytes.deser.EntityParser.{ConsumedBytesOffset, Stateful}
 import com.wavesplatform.dex.domain.crypto.Proofs
-import com.wavesplatform.dex.domain.error.ValidationError
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction._
 import monix.eval.Coeval
@@ -22,8 +21,6 @@ case class ExchangeTransactionV2(
   proofs: Proofs
 ) extends ExchangeTransaction {
 
-  import ExchangeTransactionV2._
-
   override val version: Byte = 2
 
   override val bodyBytes: Coeval[Array[Byte]] =
@@ -38,12 +35,10 @@ case class ExchangeTransactionV2(
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(bodyBytes() ++ proofs.bytes())
 
-  def withFixedPrice: Either[ValidationError, ExchangeTransaction] = Right(this)
+  override val assetDecimalsPrice: Long = price
 }
 
 object ExchangeTransactionV2 extends ExchangeTransactionParser[ExchangeTransactionV2] {
-
-  private def orderMark(version: Byte): Array[Byte] = if (version == 1) Array(1: Byte) else Array.emptyByteArray
 
   override protected def parseHeader(bytes: Array[Byte]): Try[Int] = Try {
 
@@ -51,7 +46,7 @@ object ExchangeTransactionV2 extends ExchangeTransactionParser[ExchangeTransacti
 
     val (parsedMark, parsedTypeId, parsedVersion) = bytes.take(3) match {
       case Array(parsedMark, parsedTypeId, parsedVersion) => (parsedMark, parsedTypeId, parsedVersion)
-      case _ => throw new IllegalArgumentException(s"Can't parse header=$bytes")
+      case _ => throw new IllegalArgumentException(s"Can't parse header=${bytes.mkString("Array(", ", ", ")")}")
     }
 
     if (parsedMark != 0) throw new IllegalArgumentException(s"Expected the '0' byte, but got '$parsedMark'")

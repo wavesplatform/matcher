@@ -4,7 +4,6 @@ import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.deser.EntityParser.{ConsumedBytesOffset, Signature, Stateful}
 import com.wavesplatform.dex.domain.crypto.{Authorized, Proofs}
-import com.wavesplatform.dex.domain.error.ValidationError
 import com.wavesplatform.dex.domain.order.OrderV1
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction._
 import com.wavesplatform.dex.domain.utils._
@@ -49,7 +48,7 @@ case class ExchangeTransactionV1(
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(bodyBytes() ++ signature.arr)
 
-  def withFixedPrice: Either[ValidationError, ExchangeTransaction] = Right(this)
+  override val assetDecimalsPrice: Long = price
 }
 
 object ExchangeTransactionV1 extends ExchangeTransactionParser[ExchangeTransactionV1] {

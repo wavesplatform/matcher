@@ -129,7 +129,7 @@ object HttpOrderFeeMode {
     case x: OrderFeeSettings.DynamicSettings => FeeModeDynamic(x.maxBaseFee + matcherAccountFee)
     case OrderFeeSettings.FixedSettings(assetId, minFee) => FeeModeFixed(assetId, minFee)
     case OrderFeeSettings.PercentSettings(assetType, minFee, minFeeInWaves) => FeeModePercent(assetType, minFee, minFeeInWaves)
-    case OrderFeeSettings.CompositeSettings(default, custom, discount, _) =>
+    case OrderFeeSettings.CompositeSettings(default, custom, customAssets, discount, _) => //todo: return customAssets
       FeeModeComposite(
         fromSettings(default, matcherAccountFee),
         custom.view.mapValues(fromSettings(_, matcherAccountFee)).toMap,

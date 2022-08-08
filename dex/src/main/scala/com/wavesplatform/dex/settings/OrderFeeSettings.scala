@@ -83,16 +83,29 @@ object OrderFeeSettings {
   final case class CompositeSettings(
     default: OrderFeeSettings,
     custom: Map[AssetPair, OrderFeeSettings] = Map.empty,
+    customAssets: Option[CompositeSettings.CustomAssetsSettings] = None,
     discount: Option[CompositeSettings.DiscountAssetSettings] = None,
     zeroFeeAccounts: Set[PublicKey] = Set.empty
   ) extends OrderFeeSettings {
 
+    // don't think about order;
+    // we'll have here all possible combinations like btc/usdn and usdn/btc, just it won't be used
+    private lazy val customAssetPairs = customAssets.map(v => v.assets.foldLeft(Set.empty[AssetPair]){
+      case (acc, elem) =>
+        acc ++ v.assets.map(asset => AssetPair(asset, elem))
+    }).getOrElse(Set.empty).filterNot(ap => ap.amountAsset == ap.priceAsset)
+
     def getOrderFeeSettings(assetPair: AssetPair): OrderFeeSettings =
-      custom.getOrElse(assetPair, default)
+      custom.get(assetPair).orElse {
+        if (customAssetPairs.contains(assetPair)) customAssets.map(_.settings)
+        else None
+      }.getOrElse(default)
 
   }
 
   object CompositeSettings extends ConfigReaders {
+
+    final case class CustomAssetsSettings(assets: Set[Asset], settings: OrderFeeSettings)
 
     final case class DiscountAssetSettings(asset: Asset, value: BigDecimal)
 

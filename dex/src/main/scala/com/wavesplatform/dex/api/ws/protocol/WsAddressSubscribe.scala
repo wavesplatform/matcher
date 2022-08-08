@@ -19,7 +19,7 @@ import java.nio.charset.StandardCharsets
 final case class WsAddressSubscribe(key: Address, authType: String, jwt: String, flags: Set[WsAddressFlag] = Set.empty) extends WsClientMessage {
   override val tpe: String = WsAddressSubscribe.tpe
 
-  def validate(jwtPublicKey: String, networkByte: Byte): Either[MatcherError, JwtPayload] =
+  def validate(jwtPublicKey: String, networkByte: Byte): Either[MatcherError, JwtPayloadResponse] =
     for {
       _ <- Either.cond(supportedAuthTypes.contains(authType), (), error.SubscriptionAuthTypeUnsupported(supportedAuthTypes, authType))
       rawJsonPayload <- JwtJson
@@ -32,7 +32,7 @@ final case class WsAddressSubscribe(key: Address, authType: String, jwt: String,
         .toEither
         .left
         .map(toMatcherError(_, key))
-      payload <- rawJsonPayload.validate[JwtPayload].asEither.leftMap(_ => error.JwtPayloadBroken)
+      payload <- rawJsonPayload.validate[JwtPayloadResponse].asEither.leftMap(_ => error.JwtPayloadBroken)
       _ <- {
         val given = payload.networkByte.head.toByte
         Either.cond(given == networkByte, (), error.TokenNetworkUnexpected(networkByte, given))
@@ -68,6 +68,22 @@ object WsAddressSubscribe {
     (_, key, authType, jwt, flags) => WsAddressSubscribe(key, authType, jwt, flags.flatten.getOrElse(Set.empty)),
     unlift(WsAddressSubscribe.wsUnapply)
   )
+
+  case class JwtPayloadResponse(
+    address: Address,
+    networkByte: String,
+    activeTokenExpirationInSeconds: Long
+  )
+
+  object JwtPayloadResponse {
+
+    implicit val jwtPayloadResponseFormat: OFormat[JwtPayloadResponse] = (
+      (__ \ "a").format[Address] and
+        (__ \ "nb").format[String] and
+        (__ \ "exp").format[Long]
+    )(JwtPayloadResponse.apply, unlift(JwtPayloadResponse.unapply))
+
+  }
 
   case class JwtPayload(
     signature: ByteStr,

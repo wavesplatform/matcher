@@ -10,7 +10,7 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.error.ValidationError
 import com.wavesplatform.dex.domain.error.ValidationError.GenericError
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions0.PbByteStringOps
+import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions.PbByteStringOps
 import com.wavesplatform.dex.model.{LimitOrder, MarketOrder}
 import kamon.context.Context
 // format: off

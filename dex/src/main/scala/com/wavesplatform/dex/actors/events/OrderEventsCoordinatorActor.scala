@@ -18,7 +18,7 @@ import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeUpdates
-import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions0._
+import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions._
 import com.wavesplatform.dex.history.HistoryRouterActor.HistoryInsertMsg
 import com.wavesplatform.dex.model.Events
 import com.wavesplatform.dex.model.Events.ExchangeTransactionCreated

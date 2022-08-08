@@ -111,8 +111,7 @@ object ExchangeTransactionV3 extends ExchangeTransactionParser[ExchangeTransacti
   }
 
   override private[domain] def statefulParse = State[EntityParser.S, (ExchangeTransactionV3, ConsumedBytesOffset)] { s =>
-    PbSignedTransaction.parseFrom(s.bytes)
-    s.copy(offset = s.bytes.length) -> res
+    ???
   }
 
 }

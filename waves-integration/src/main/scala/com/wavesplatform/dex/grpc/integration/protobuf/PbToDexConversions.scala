@@ -14,21 +14,21 @@ import com.wavesplatform.dex.domain.utils._
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.services.AssetDescriptionResponse.MaybeDescription
 import com.wavesplatform.protobuf.order.{Order => PbOrder}
-import com.wavesplatform.protobuf.transaction.{ExchangeTransactionData, SignedTransaction, Transaction}
+import com.wavesplatform.protobuf.transaction.{ExchangeTransactionData => PbExchangeTransactionData, SignedTransaction => PbSignedTransaction, Transaction => PbTransaction}
 
 import java.nio.charset.StandardCharsets
 
 object PbToDexConversions {
 
-  implicit final class PbSignedExchangeTransactionOps(val signedTx: SignedTransaction) extends AnyVal {
+  implicit final class PbSignedExchangeTransactionOps(val signedTx: PbSignedTransaction) extends AnyVal {
 
     def getOrdersVanilla: Either[ValidationError, Seq[DexOrder]] =
       for {
         tx <-
           signedTx.transaction.wavesTransaction
-            .fold[Either[ValidationError, Transaction]](GenericError("The transaction must be specified").asLeft)(_.asRight)
+            .fold[Either[ValidationError, PbTransaction]](GenericError("The transaction must be specified").asLeft)(_.asRight)
         data <- tx.data.exchange
-          .fold[Either[ValidationError, ExchangeTransactionData]](GenericError("The transaction's data must be specified").asLeft)(_.asRight)
+          .fold[Either[ValidationError, PbExchangeTransactionData]](GenericError("The transaction's data must be specified").asLeft)(_.asRight)
         orders <- data.orders.toList.traverse(_.toVanilla)
       } yield orders
 

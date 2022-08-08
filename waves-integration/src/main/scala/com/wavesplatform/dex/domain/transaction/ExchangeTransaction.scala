@@ -8,8 +8,7 @@ import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.crypto.Proven
 import com.wavesplatform.dex.domain.error.ValidationError
-import com.wavesplatform.dex.domain.error.ValidationError._
-import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.serialization.ByteAndJsonSerializable
 import io.swagger.annotations.ApiModelProperty
 import monix.eval.Coeval
@@ -28,6 +27,10 @@ trait ExchangeTransaction extends ByteAndJsonSerializable with Proven {
   def fee: Long
   def timestamp: Long
   def version: Byte
+  def withFixedPrice: Either[ValidationError, ExchangeTransaction]
+
+  def withFixedPriceUnsafe: ExchangeTransaction =
+    withFixedPrice.fold(err => throw new RuntimeException(err.message), identity)
 
   // Set, because is could be one trader
   def traders: Set[Address] = Set(buyOrder.senderPublicKey.toAddress, sellOrder.senderPublicKey.toAddress)
@@ -129,37 +132,5 @@ object ExchangeTransaction {
         else //firstByte = 3
           ExchangeTransactionV3.parseBytes(bytes).map(_._1)
       }
-
-  def validateExchangeParams(
-    buyOrder: Order,
-    sellOrder: Order,
-    amount: Long,
-    price: Long,
-    buyMatcherFee: Long,
-    sellMatcherFee: Long,
-    fee: Long,
-    timestamp: Long
-  ): Either[ValidationError, Unit] =
-    for {
-      _ <- Either.cond(fee > 0, (), InsufficientFee())
-      _ <- Either.cond(amount > 0, (), NonPositiveAmount(amount, "assets"))
-      _ <- Either.cond(amount <= Order.MaxAmount, (), GenericError("amount too large"))
-      _ <- Either.cond(price > 0, (), GenericError("price should be > 0"))
-      _ <- Either.cond(price <= Order.MaxAmount, (), GenericError("price too large"))
-      _ <- Either.cond(sellMatcherFee <= Order.MaxAmount, (), GenericError("sellMatcherFee too large"))
-      _ <- Either.cond(buyMatcherFee <= Order.MaxAmount, (), GenericError("buyMatcherFee too large"))
-      _ <- Either.cond(fee <= Order.MaxAmount, (), GenericError("fee too large"))
-      _ <- Either.cond(buyOrder.orderType == OrderType.BUY, (), GenericError("buyOrder should has OrderType.BUY"))
-      _ <- Either.cond(sellOrder.orderType == OrderType.SELL, (), GenericError("sellOrder should has OrderType.SELL"))
-      _ <- Either.cond(
-        buyOrder.matcherPublicKey == sellOrder.matcherPublicKey,
-        (),
-        GenericError("buyOrder.matcher should be the same as sellOrder.matcher")
-      )
-      _ <- Either.cond(buyOrder.assetPair == sellOrder.assetPair, (), GenericError("Both orders should have same AssetPair"))
-      _ <- Either.cond(buyOrder.isValid(timestamp), (), OrderValidationError(buyOrder, buyOrder.isValid(timestamp).messages()))
-      _ <- Either.cond(sellOrder.isValid(timestamp), (), OrderValidationError(sellOrder, sellOrder.isValid(timestamp).labels.mkString("\n")))
-      _ <- Either.cond(price <= buyOrder.price && price >= sellOrder.price, (), GenericError("priceIsValid"))
-    } yield ()
 
 }

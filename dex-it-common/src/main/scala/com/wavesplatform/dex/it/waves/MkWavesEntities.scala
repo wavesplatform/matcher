@@ -298,7 +298,7 @@ trait MkWavesEntities {
     )
 
     ExchangeTransactionV3
-      .createUnsafe(
+      .mk(
         amountAssetDecimals = assetDecimals(buyOrder.assetPair.amountAsset),
         priceAssetDecimals = assetDecimals(buyOrder.assetPair.priceAsset),
         matcher = matcher,

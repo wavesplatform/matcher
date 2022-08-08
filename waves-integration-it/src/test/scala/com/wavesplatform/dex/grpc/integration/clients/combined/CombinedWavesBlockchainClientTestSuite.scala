@@ -201,7 +201,7 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
 
       val exchangeTx =
         ExchangeTransactionV3
-          .createUnsafe(
+          .mk(
             amountAssetDecimals = 2,
             priceAssetDecimals = 8,
             matcher = matcher,

@@ -46,7 +46,7 @@ class ExchangeTransactionCreator(
       // TODO This will be fixed in NODE 1.2.8+, see NODE-2183
       List(orderExecutedEvent.counter.feeAsset, orderExecutedEvent.submitted.feeAsset)
         .count(_.fold(false)(hasAssetScript)) * OrderValidator.ScriptExtraFee
-    ExchangeTransactionV3.createUnsafe(
+    ExchangeTransactionV3.mk(
       efc.unsafeAssetDecimals(buy.assetPair.amountAsset),
       efc.unsafeAssetDecimals(buy.assetPair.priceAsset),
       matcherPrivateKey,

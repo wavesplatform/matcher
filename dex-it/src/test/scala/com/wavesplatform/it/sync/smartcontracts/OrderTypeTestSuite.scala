@@ -44,11 +44,11 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
       "set contracts with only BUY type and then place order" in {
         setAliceScriptText(sco1)
 
-        val aliceOrd1 = mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2 * Order.PriceConstant, smartMatcherFee, version = 2)
+        val aliceOrd1 = mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.usd * Order.PriceConstant, smartMatcherFee, version = 2)
         placeAndAwaitAtDex(aliceOrd1)
 
         dex1.tryApi.place(
-          mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2 * Order.PriceConstant, smartMatcherFee, version = 2)
+          mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
         ) should failWith(
           AccountScriptDeniedOrder.code,
           MatcherError.Params(address = Some(alice.toAddress.stringRepr))
@@ -74,13 +74,13 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
         )
 
         dex1.tryApi.place(
-          mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2 * Order.PriceConstant, smartMatcherFee, version = 2)
+          mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.usd * Order.PriceConstant, smartMatcherFee, version = 2)
         ) should failWith(
           AccountScriptDeniedOrder.code,
           MatcherError.Params(address = Some(alice.toAddress.stringRepr))
         )
 
-        val aliceOrd2 = mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2 * Order.PriceConstant, smartMatcherFee, version = 2)
+        val aliceOrd2 = mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
         placeAndAwaitAtDex(aliceOrd2)
 
         dex1.api.cancelOneOrAllInPairOrdersWithSig(alice, aliceOrd2).status shouldBe "OrderCanceled"
@@ -102,10 +102,10 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
           "ABRTZXRTY3JpcHRUcmFuc2FjdGlvbgQAAAABcwUAAAAHJG1hdGNoMAYJAQAAAAV0aHJvdwAAAAAeB1+u"
         )
 
-        val aliceOrd1 = mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2 * Order.PriceConstant, smartMatcherFee, version = 2)
+        val aliceOrd1 = mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.usd * Order.PriceConstant, smartMatcherFee, version = 2)
         placeAndAwaitAtDex(aliceOrd1)
 
-        val aliceOrd2 = mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2 * Order.PriceConstant, smartMatcherFee, version = 2)
+        val aliceOrd2 = mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
         placeAndAwaitAtDex(aliceOrd2)
 
         dex1.api.cancelOneOrAllInPairOrdersWithSig(alice, aliceOrd1).status shouldBe "OrderCanceled"
@@ -114,18 +114,18 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
       }
 
       "place order and then set contract on BUY type" in {
-        val aliceOrd1 = mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2 * Order.PriceConstant, smartMatcherFee, version = 2)
+        val aliceOrd1 = mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.usd * Order.PriceConstant, smartMatcherFee, version = 2)
         placeAndAwaitAtDex(aliceOrd1)
 
-        val aliceOrd2 = mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2 * Order.PriceConstant, smartMatcherFee, version = 2)
+        val aliceOrd2 = mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
         placeAndAwaitAtDex(aliceOrd2)
 
         setAliceScriptText(sco1)
 
-        val bobOrd1 = mkOrder(bob, predefAssetPair, OrderType.SELL, 500, 2 * Order.PriceConstant, smartMatcherFee, version = 1)
+        val bobOrd1 = mkOrder(bob, predefAssetPair, OrderType.SELL, 500, 2.usd * Order.PriceConstant, smartMatcherFee, version = 1)
         dex1.api.place(bobOrd1)
 
-        val bobOrd2 = mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2 * Order.PriceConstant, smartMatcherFee, version = 1)
+        val bobOrd2 = mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 1)
         dex1.api.place(bobOrd2)
 
         dex1.api.waitForOrderStatus(aliceOrd1, Status.Filled)

@@ -416,6 +416,8 @@ object OrderValidator extends ScorexLogging {
       asset.fold(success)(issuedAsset => cond(!matcherSettings.blacklistedAssets.contains(issuedAsset), (), e(issuedAsset)))
 
     for {
+      _ <- Either.catchNonFatal(order.sender)
+        .leftMap(_ => error.OrderInvalidSignature(order.id(), "Ethereum signature invalid"))
       _ <- lift(order)
         .ensure(error.UnexpectedMatcherPublicKey(matcherPublicKey, order.matcherPublicKey))(_.matcherPublicKey == matcherPublicKey)
         .ensure(error.AddressIsBlacklisted(order.sender))(o => !blacklistedAddresses.contains(o.sender.toAddress))

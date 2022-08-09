@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.domain.transaction
 
-import com.wavesplatform.dex.domain.account.{Address, PublicKey}
+import com.wavesplatform.dex.domain.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -77,6 +77,7 @@ trait ExchangeTransaction extends ByteAndJsonSerializable with Proven {
   protected def jsonBase(): JsObject =
     Json.obj(
       "type" -> typeId,
+      "chainId" -> AddressScheme.current.chainId,
       "id" -> id().base58,
       "sender" -> senderAddress.stringRepr,
       "senderPublicKey" -> Base58.encode(sender),

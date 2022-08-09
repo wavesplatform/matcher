@@ -27,7 +27,7 @@ import io.qameta.allure.scalatest.AllureScalatestContext
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
-import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, OptionValues}
+import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, EitherValues, OptionValues}
 
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.ThreadLocalRandom
@@ -56,6 +56,7 @@ trait MatcherSuiteBase
     with FutureInstances
     with ScalaFutures
     with OptionValues
+    with EitherValues
     with ToWavesJConversions
     with ScorexLogging {
 

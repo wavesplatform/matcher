@@ -6,6 +6,7 @@ import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.api.http.entities.{HttpOrderStatus, HttpV0LevelAgg}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType
+import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV3
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.transactions.ExchangeTransaction
 
@@ -49,7 +50,7 @@ class RoundingIssuesTestSuite extends MatcherSuiteBase {
       case x => throw new RuntimeException(s"Expected ExchangeTransaction, but got $x")
     }
 
-    exchangeTx.price() shouldBe counter.price
+    exchangeTx.price() shouldBe ExchangeTransactionV3.convertPrice(counter.price, assetDecimalsMap(Waves), assetDecimalsMap(usd)).value
     exchangeTx.amount() shouldBe filledAmount
     exchangeTx.buyMatcherFee() shouldBe 40L
     exchangeTx.sellMatcherFee() shouldBe 296219L

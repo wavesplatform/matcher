@@ -13,6 +13,7 @@ import com.wavesplatform.dex.domain.crypto.{Authorized, Proofs, Proven}
 import com.wavesplatform.dex.domain.error.ValidationError
 import com.wavesplatform.dex.domain.error.ValidationError.GenericError
 import com.wavesplatform.dex.domain.order.OrderOps._
+import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV3
 import com.wavesplatform.dex.domain.validation.Validation
 import com.wavesplatform.dex.domain.validation.Validation.booleanOperators
 import io.swagger.annotations.ApiModelProperty
@@ -61,25 +62,33 @@ trait Order extends Proven with Authorized {
     case OrderAuthentication.Eip712Signature(sig) => Some(sig)
   }
 
+  def isExecutable(amountAssetDecimals: Int, priceAssetDecimals: Int): Validation =
+    ExchangeTransactionV3.convertPrice(
+      price,
+      amountAssetDecimals,
+      priceAssetDecimals
+    ).isRight :| "Price is not convertible to fixed decimals format" &&
+    eip712SignatureValid
+
   def isValid(atTime: Long): Validation =
-    isValidAmount(amount, price) &&
+    (amount > 0) :| "amount should be > 0" &&
+    (price > 0) :| "price should be > 0" &&
+    (amount < MaxAmount) :| "amount too large" &&
+    getSpendAmount(amount, price).isRight :| "SpendAmount too large" &&
+    (getSpendAmount(amount, price).getOrElse(0L) > 0) :| "SpendAmount should be > 0" &&
+    getReceiveAmount(amount, price).isRight :| "ReceiveAmount too large" &&
+    (getReceiveAmount(amount, price).getOrElse(0L) > 0) :| "ReceiveAmount should be > 0" &&
     assetPair.isValid &&
     (matcherFee > 0) :| "matcherFee should be > 0" &&
     (matcherFee < MaxAmount) :| "matcherFee too large" &&
     (timestamp > 0) :| "timestamp should be > 0" &&
     (expiration - atTime <= MaxLiveTime) :| "expiration should be earlier than 30 days" &&
     (expiration >= atTime) :| "expiration should be > currentTime" &&
+    eip712SignatureValid
+
+  private val eip712SignatureValid: Validation =
     (eip712Signature.isEmpty || version >= 4) :| "eip712Signature available only in V4" &&
     eip712Signature.forall(es => es.size == 65 || es.size == 129) :| "eip712Signature should be of length 65 or 129"
-
-  def isValidAmount(matchAmount: Long, matchPrice: Long): Validation =
-    (matchAmount > 0) :| "amount should be > 0" &&
-    (matchPrice > 0) :| "price should be > 0" &&
-    (matchAmount < MaxAmount) :| "amount too large" &&
-    getSpendAmount(matchAmount, matchPrice).isRight :| "SpendAmount too large" &&
-    (getSpendAmount(matchAmount, matchPrice).getOrElse(0L) > 0) :| "SpendAmount should be > 0" &&
-    getReceiveAmount(matchAmount, matchPrice).isRight :| "ReceiveAmount too large" &&
-    (getReceiveAmount(matchAmount, matchPrice).getOrElse(0L) > 0) :| "ReceiveAmount should be > 0"
 
   @ApiModelProperty(hidden = true)
   val bodyBytes: Coeval[Array[Byte]]

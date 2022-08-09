@@ -54,6 +54,7 @@ object ValidationStages {
         .tickSize
 
       for {
+        _ <- isExecutable(o)
         validatedOrder <- matcherSettingsAware(
           matcherPublicKey,
           blacklistedAddresses,

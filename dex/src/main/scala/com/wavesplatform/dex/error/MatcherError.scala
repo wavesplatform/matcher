@@ -470,7 +470,7 @@ final case class DeviantOrderPrice(orderType: OrderType, orderPrice: Price, devi
       DeviantOrderPrice.httpCode
     )
 
-object DeviantOrderPrice extends MatcherErrorCodeProvider(order, price, commonClass, C.BadRequest) {
+object DeviantOrderPrice extends MatcherErrorCodeProvider(order, price, outOfBound, C.BadRequest) {
 
   def apply(ord: Order, deviationSettings: DeviationsSettings)(implicit efc: ErrorFormatterContext): DeviantOrderPrice =
     DeviantOrderPrice(ord.orderType, Price(ord.assetPair, ord.price), deviationSettings)
@@ -586,8 +586,6 @@ object OrderInvalidPrice extends MatcherErrorCodeProvider(order, price, denied, 
     OrderInvalidPrice(Price(ord.assetPair, ord.price), prcSettings)
 
 }
-
-case object OrderPriceOutOfBound extends MatcherError(order, price, outOfBound, e"The order's price is out of bound", C.BadRequest)
 
 final case class MarketOrderCancel(id: Order.Id)
     extends MatcherError(MarketOrderCancel.code, e"The market order ${"id" -> id} cannot be cancelled manually", MarketOrderCancel.httpCode)

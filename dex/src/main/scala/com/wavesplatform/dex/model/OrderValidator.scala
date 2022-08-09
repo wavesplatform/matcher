@@ -19,7 +19,7 @@ import com.wavesplatform.dex.domain.model.Normalization
 import com.wavesplatform.dex.domain.model.Normalization._
 import com.wavesplatform.dex.domain.order.OrderOps._
 import com.wavesplatform.dex.domain.order.{EthOrders, Order, OrderType}
-import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionV3}
+import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.error
@@ -416,8 +416,6 @@ object OrderValidator extends ScorexLogging {
       asset.fold(success)(issuedAsset => cond(!matcherSettings.blacklistedAssets.contains(issuedAsset), (), e(issuedAsset)))
 
     for {
-      _ <- Either.catchNonFatal(order.sender)
-        .leftMap(_ => error.OrderInvalidSignature(order.id(), "Ethereum signature invalid"))
       _ <- lift(order)
         .ensure(error.UnexpectedMatcherPublicKey(matcherPublicKey, order.matcherPublicKey))(_.matcherPublicKey == matcherPublicKey)
         .ensure(error.AddressIsBlacklisted(order.sender))(o => !blacklistedAddresses.contains(o.sender.toAddress))
@@ -425,11 +423,6 @@ object OrderValidator extends ScorexLogging {
           matcherSettings.allowedOrderVersions(o.version)
         )
       _ <- validateBlacklistedAsset(order.feeAsset, error.FeeAssetBlacklisted(_))
-      _ <- ExchangeTransactionV3.convertPrice(
-        order.price,
-        efc.unsafeAssetDecimals(order.assetPair.amountAsset),
-        efc.unsafeAssetDecimals(order.assetPair.priceAsset)
-      ).fold(_ => OrderPriceOutOfBound.asLeft, _ => ().asRight)
       _ <- validateFeeAsset(order, getActualOrderFeeSettings)
       validatedOrder <- validateFee(order, getActualOrderFeeSettings, assetDecimals, rateCache)
     } yield validatedOrder
@@ -526,7 +519,11 @@ object OrderValidator extends ScorexLogging {
       } yield order
     else lift(order)
 
-  def timeAware(time: Time)(order: Order): Result[Order] =
+  def isExecutable(o: Order)(implicit efc: ErrorFormatterContext): Result[Unit] =
+    o.isExecutable(efc.unsafeAssetDecimals(o.assetPair.amountAsset), efc.unsafeAssetDecimals(o.assetPair.priceAsset))
+      .toEither.leftMap(error.OrderCommonValidationFailed(_))
+
+  def timeAware(time: Time)(order: Order): Result[Unit] =
     for {
       _ <- cond(
         order.expiration > time.correctedTime() + MinExpiration,
@@ -534,7 +531,7 @@ object OrderValidator extends ScorexLogging {
         error.WrongExpiration(time.correctedTime(), MinExpiration, order.expiration)
       )
       _ <- order.isValid(time.correctedTime()).toEither.leftMap(error.OrderCommonValidationFailed(_))
-    } yield order
+    } yield ()
 
   private def validateBalance(acceptedOrder: AcceptedOrder, tradableBalance: Asset => Long, orderBookCache: OrderBookAggregatedSnapshot)(implicit
     efc: ErrorFormatterContext

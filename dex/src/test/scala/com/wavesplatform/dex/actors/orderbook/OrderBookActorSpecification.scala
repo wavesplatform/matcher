@@ -458,7 +458,8 @@ class OrderBookActorSpecification
           Map(
             0L -> DynamicSettings(0.001.waves, 0.003.waves),
             1L -> DynamicSettings(0.001.waves, 0.005.waves)
-          )
+          ),
+          _ => true
         )
       ) _
 

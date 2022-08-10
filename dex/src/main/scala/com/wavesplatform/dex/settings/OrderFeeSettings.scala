@@ -88,24 +88,53 @@ object OrderFeeSettings {
     zeroFeeAccounts: Set[PublicKey] = Set.empty
   ) extends OrderFeeSettings {
 
-    // don't think about order;
-    // we'll have here all possible combinations like btc/usdn and usdn/btc, just it won't be used
-    private lazy val customAssetPairs = customAssets.map(v => v.assets.foldLeft(Set.empty[AssetPair]){
-      case (acc, elem) =>
-        acc ++ v.assets.map(asset => AssetPair(asset, elem))
-    }).getOrElse(Set.empty).filterNot(ap => ap.amountAsset == ap.priceAsset)
+    def filterPairs(pairChecker: AssetPair => Boolean): CompositeSettings =
+      customAssets match {
+        case Some(value) => copy(customAssets = Some(value.filterCustomPairs(pairChecker)))
+        case None => this
+      }
 
     def getOrderFeeSettings(assetPair: AssetPair): OrderFeeSettings =
       custom.get(assetPair).orElse {
-        if (customAssetPairs.contains(assetPair)) customAssets.map(_.settings)
-        else None
+        customAssets.flatMap(_.getSettings(assetPair))
       }.getOrElse(default)
+
+    def getAllPairs: Map[AssetPair, OrderFeeSettings] =
+      custom ++ customAssets.fold(Map.empty[AssetPair, OrderFeeSettings])(_.settingsMap)
 
   }
 
   object CompositeSettings extends ConfigReaders {
 
-    final case class CustomAssetsSettings(assets: Set[Asset], settings: OrderFeeSettings)
+    final case class CustomAssetsSettings(assets: Set[Asset], settings: OrderFeeSettings, customPairs: Set[AssetPair]) {
+
+      lazy val settingsMap = customPairs.map(p => (p, settings)).toMap
+
+      def filterCustomPairs(pred: AssetPair => Boolean): CustomAssetsSettings = copy(customPairs = customPairs.filter(pred))
+
+      def getSettings(assetPair: AssetPair): Option[OrderFeeSettings] =
+        settingsMap.get(assetPair)
+
+    }
+
+    object CustomAssetsSettings {
+
+      def apply(assets: Set[Asset], settings: OrderFeeSettings): CustomAssetsSettings = {
+        val customPairs =
+          assets.foldLeft(Set.empty[AssetPair]) {
+            case (acc, elem) =>
+              acc ++ assets.map(asset => AssetPair(asset, elem))
+          }
+        CustomAssetsSettings(assets, settings, customPairs)
+      }
+
+/*      implicit val customAssetsSettingsReader =
+        ConfigReader.forProduct2[CustomAssetsSettings, Set[Asset], OrderFeeSettings]("assets", "settings") {
+          case (assets, settings) =>
+            CustomAssetsSettings(assets, settings) // to explicitly call a constructor with 2 args
+        }*/
+
+    }
 
     final case class DiscountAssetSettings(asset: Asset, value: BigDecimal)
 

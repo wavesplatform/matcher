@@ -100,7 +100,7 @@ object OrderFeeSettings {
       }.getOrElse(default)
 
     def getAllPairs: Map[AssetPair, OrderFeeSettings] =
-      custom ++ customAssets.fold(Map.empty[AssetPair, OrderFeeSettings])(_.settingsMap)
+      customAssets.fold(Map.empty[AssetPair, OrderFeeSettings])(_.settingsMap) ++ custom // custom must override any values from customAssets
 
   }
 

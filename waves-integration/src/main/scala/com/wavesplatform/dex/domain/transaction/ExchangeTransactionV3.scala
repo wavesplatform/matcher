@@ -80,13 +80,8 @@ object ExchangeTransactionV3 extends ExchangeTransactionParser[ExchangeTransacti
       fee,
       timestamp,
       Proofs.empty
-    ).map { unverified =>
-      convertPrice(price, amountAssetDecimals, priceAssetDecimals)
-        .map { fixedPrice =>
-          val ufp = unverified.copy(price = fixedPrice)
-          ufp.copy(proofs = Proofs(List(ByteStr(crypto.sign(matcher, ufp.bodyBytes())))))
-        }
-        .getOrElse(unverified)
+    ).map { tx =>
+      tx.copy(proofs = Proofs(List(ByteStr(crypto.sign(matcher, tx.bodyBytes())))))
     }
 
   def mkUnsigned(
@@ -127,7 +122,11 @@ object ExchangeTransactionV3 extends ExchangeTransactionParser[ExchangeTransacti
         timestamp,
         proofs
       )
-    )
+    ).map { tx =>
+      convertPrice(price, amountAssetDecimals, priceAssetDecimals).map { fixedPrice =>
+        tx.copy(price = fixedPrice)
+      }.getOrElse(tx)
+    }
 
   private def validateExchangeParams(
     amountAssetDecimals: Int,

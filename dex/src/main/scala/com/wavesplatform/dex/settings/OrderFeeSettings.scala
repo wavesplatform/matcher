@@ -128,11 +128,11 @@ object OrderFeeSettings {
         CustomAssetsSettings(assets, settings, customPairs)
       }
 
-/*      implicit val customAssetsSettingsReader =
+      implicit val customAssetsSettingsReader =
         ConfigReader.forProduct2[CustomAssetsSettings, Set[Asset], OrderFeeSettings]("assets", "settings") {
           case (assets, settings) =>
             CustomAssetsSettings(assets, settings) // to explicitly call a constructor with 2 args
-        }*/
+        }
 
     }
 

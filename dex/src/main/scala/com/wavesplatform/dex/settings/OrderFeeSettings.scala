@@ -89,10 +89,7 @@ object OrderFeeSettings {
   ) extends OrderFeeSettings {
 
     def filterPairs(pairChecker: AssetPair => Boolean): CompositeSettings =
-      customAssets match {
-        case Some(value) => copy(customAssets = Some(value.filterCustomPairs(pairChecker)))
-        case None => this
-      }
+      customAssets.fold(this)(v => copy(customAssets = Some(v.filterCustomPairs(pairChecker))))
 
     def getOrderFeeSettings(assetPair: AssetPair): OrderFeeSettings =
       custom.get(assetPair).orElse {

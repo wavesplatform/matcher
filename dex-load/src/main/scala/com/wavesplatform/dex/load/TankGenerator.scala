@@ -467,7 +467,7 @@ object TankGenerator {
           .getSignedWith(account)
 
       placeOrder(order).recover {
-        case e: Throwable => println(e.getMessage); ()
+        case e: Throwable => println(e.getMessage); null
       }
     }
 

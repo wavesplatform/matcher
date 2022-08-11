@@ -557,7 +557,7 @@ trait MatcherSpecBase
   protected def mkExchangeTx(buyOrder: Order, sellOrder: Order)(implicit
     assetDecimals: Map[Asset, Int]
   ): ExchangeTransactionResult[ExchangeTransactionV3] =
-    ExchangeTransactionV3.mkUnsigned(
+    ExchangeTransactionV3.mk(
       amountAssetDecimals = assetDecimals(buyOrder.assetPair.amountAsset),
       priceAssetDecimals = assetDecimals(buyOrder.assetPair.priceAsset),
       buyOrder = buyOrder,

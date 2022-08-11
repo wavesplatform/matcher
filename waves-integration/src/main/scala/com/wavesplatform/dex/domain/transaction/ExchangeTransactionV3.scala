@@ -55,7 +55,7 @@ object ExchangeTransactionV3 extends ExchangeTransactionParser[ExchangeTransacti
       (BigDecimal(price) / BigDecimal(10).pow(priceAssetDecimals - amountAssetDecimals)).toBigInt.bigInteger.longValueExact()
     }.leftMap(_ => GenericError(s"price is not convertible to fixed_decimals $price, $amountAssetDecimals, $priceAssetDecimals"))
 
-  def mk(
+  def mkSigned(
     amountAssetDecimals: Int,
     priceAssetDecimals: Int,
     matcher: PrivateKey,
@@ -68,7 +68,7 @@ object ExchangeTransactionV3 extends ExchangeTransactionParser[ExchangeTransacti
     fee: Long,
     timestamp: Long
   ): ExchangeTransactionResult[ExchangeTransactionV3] =
-    mkUnsigned(
+    mk(
       amountAssetDecimals,
       priceAssetDecimals,
       buyOrder,
@@ -84,7 +84,7 @@ object ExchangeTransactionV3 extends ExchangeTransactionParser[ExchangeTransacti
       tx.copy(proofs = Proofs(List(ByteStr(crypto.sign(matcher, tx.bodyBytes())))))
     }
 
-  def mkUnsigned(
+  def mk(
     amountAssetDecimals: Int,
     priceAssetDecimals: Int,
     buyOrder: Order,

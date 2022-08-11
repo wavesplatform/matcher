@@ -140,7 +140,7 @@ object TankGenerator {
     println(s"\t -- WAVES to matcher")
     node.broadcast(new Transfer(
       JPrivateKey.as(KeyPair(ByteStr.fromByteArray(settings.matcherSeed.getBytes(StandardCharsets.UTF_8))).privateKey.arr).address(),
-      minimumNeededAssetBalance
+      10000000000L // 100 Waves
     ))
 
     assets.foreach { asset =>

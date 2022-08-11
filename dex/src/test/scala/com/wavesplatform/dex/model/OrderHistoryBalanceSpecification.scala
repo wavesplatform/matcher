@@ -39,7 +39,7 @@ class OrderHistoryBalanceSpecification
 
   import OrderHistoryBalanceSpecification._
 
-  implicit override def patienceConfig: PatienceConfig = PatienceConfig(2.seconds, 5.millis)
+  implicit override def patienceConfig: PatienceConfig = PatienceConfig(pc.timeout, pc.interval)
 
   private val WctBtc = AssetPair(mkAssetId("WCT"), mkAssetId("BTC"))
   private val WavesBtc = AssetPair(Waves, mkAssetId("BTC"))
@@ -883,12 +883,14 @@ private object OrderHistoryBalanceSpecification {
 
   implicit val askTimeout: Timeout = 5.seconds
 
-  private def askAddressActor[A: ClassTag](ref: ActorRef, msg: Any)(implicit pc: PatienceConfig, pos: source.Position) =
+  implicit val pc: PatienceConfig = PatienceConfig(2.seconds, 5.millis)
+
+  private def askAddressActor[A: ClassTag](ref: ActorRef, msg: Any)(implicit pos: source.Position) =
     (ref ? msg).mapTo[A].futureValue(pc, pos)
 
   implicit private class AddressActorExt(val ref: ActorRef) extends AnyVal {
 
-    def orderIds(assetPair: Option[AssetPair], orderListType: OrderListType): Vector[Order.Id] =
+    def orderIds(assetPair: Option[AssetPair], orderListType: OrderListType)(implicit pos: source.Position): Vector[Order.Id] =
       askAddressActor[AddressActor.Reply.GetOrderStatuses](ref, AddressActor.Query.GetOrdersStatuses(assetPair, orderListType))
         .xs
         .map(_._1).toVector
@@ -901,10 +903,10 @@ private object OrderHistoryBalanceSpecification {
 
     def allOrderIdsByPair(pair: AssetPair): Vector[Order.Id] = orderIds(Some(pair), OrderListType.All)
 
-    def openVolume(asset: Asset): Long =
+    def openVolume(asset: Asset)(implicit pos: source.Position): Long =
       askAddressActor[AddressActor.Reply.GetBalance](ref, AddressActor.Query.GetReservedBalance).balance.getOrElse(asset, 0L)
 
-    def orderStatus(orderId: ByteStr): OrderStatus =
+    def orderStatus(orderId: ByteStr)(implicit pos: source.Position): OrderStatus =
       askAddressActor[AddressActor.Reply.GetOrderStatus](ref, AddressActor.Query.GetOrderStatus(orderId)).x
 
   }

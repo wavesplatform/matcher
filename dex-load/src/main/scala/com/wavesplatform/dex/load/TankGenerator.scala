@@ -137,6 +137,12 @@ object TankGenerator {
 
     val now = System.currentTimeMillis()
 
+    println(s"\t -- WAVES to matcher")
+    node.broadcast(new Transfer(
+      JPrivateKey.as(KeyPair(ByteStr.fromByteArray(settings.matcherSeed.getBytes(StandardCharsets.UTF_8))).privateKey.arr).address(),
+      minimumNeededAssetBalance
+    ))
+
     assets.foreach { asset =>
       println(s"\t -- $asset")
       val futures = accounts
@@ -152,7 +158,7 @@ object TankGenerator {
       Await.result(Future.sequence(futures), requestsAwaitingTime)
     }
 
-    println(s"\t -- WAVES")
+    println(s"\t -- WAVES to addresses")
 
     accounts
       .map(account => new Transfer(account.address(), settings.defaults.wavesPerAccount))
@@ -454,11 +460,11 @@ object TankGenerator {
           .getSignedWith(account)
 
       placeOrder(order).recover {
-        case e: Throwable => println(e.getMessage); null
+        case e: Throwable => println(e.getMessage); ()
       }
     }
 
-    val requestsAwaitingTime = (requestsCount / threadCount).seconds
+    val requestsAwaitingTime = (futures.size * 2 / threadCount).seconds
     print(
       s"Awaiting place orders requests, requests count = $requestsCount, treads count = $threadCount, waiting at most $requestsAwaitingTime... "
     )

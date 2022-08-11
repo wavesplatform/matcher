@@ -29,6 +29,7 @@ case class Settings(
   richAccount: String,
   dexRestApiKey: String,
   matcherPublicKey: String,
+  matcherSeed: String,
   assets: Asset,
   distribution: Distribution,
   defaults: Defaults,

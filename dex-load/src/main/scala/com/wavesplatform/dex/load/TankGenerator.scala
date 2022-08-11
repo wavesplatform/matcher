@@ -9,7 +9,7 @@ import com.wavesplatform.dex.load.request._
 import com.wavesplatform.dex.load.utils._
 import com.wavesplatform.dex.model.AssetPairBuilder.assetIdOrdering._
 import com.wavesplatform.transactions.account.{PrivateKey => JPrivateKey, PublicKey => JPublicKey}
-import com.wavesplatform.transactions.common.{Amount, AssetId}
+import com.wavesplatform.transactions.common.{Amount, AssetId, Recipient}
 import com.wavesplatform.transactions.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.transactions.mass.Transfer
 import com.wavesplatform.transactions.{MassTransferTransaction, TransferTransaction, WavesConfig}
@@ -119,6 +119,12 @@ object TankGenerator {
     savePairs(randomAssetPairs)
   }
 
+  private def mkTransfer(recipient: Recipient, amount: Amount): TransferTransaction =
+    TransferTransaction
+      .builder(recipient, amount)
+      .fee(settings.defaults.massTransferFee)
+      .getSignedWith(issuer)
+
   private def mkMassTransfer(transfers: List[Transfer], asset: AssetId, ts: Long): MassTransferTransaction =
     MassTransferTransaction
       .builder(transfers.asJava)
@@ -137,6 +143,13 @@ object TankGenerator {
 
     val now = System.currentTimeMillis()
 
+    println(s"\t -- WAVES to matcher")
+
+    node.broadcast(mkTransfer(
+      JPrivateKey.as(KeyPair(ByteStr.fromByteArray(settings.matcherSeed.getBytes(StandardCharsets.UTF_8))).privateKey.arr).address(),
+      Amount.of(10000000000L)
+    ))
+
     assets.foreach { asset =>
       println(s"\t -- $asset")
       val futures = accounts
@@ -152,7 +165,7 @@ object TankGenerator {
       Await.result(Future.sequence(futures), requestsAwaitingTime)
     }
 
-    println(s"\t -- WAVES")
+    println(s"\t -- WAVES to addresses")
 
     accounts
       .map(account => new Transfer(account.address(), settings.defaults.wavesPerAccount))
@@ -458,7 +471,7 @@ object TankGenerator {
       }
     }
 
-    val requestsAwaitingTime = (requestsCount / threadCount).seconds
+    val requestsAwaitingTime = (futures.size * 2 / threadCount).seconds
     print(
       s"Awaiting place orders requests, requests count = $requestsCount, treads count = $threadCount, waiting at most $requestsAwaitingTime... "
     )

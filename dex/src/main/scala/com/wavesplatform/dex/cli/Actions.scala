@@ -2,8 +2,10 @@ package com.wavesplatform.dex.cli
 
 import cats.Id
 import cats.instances.either._
+import cats.syntax.option._
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
 import com.wavesplatform.dex.app.{forceStopApplication, MatcherStateCheckingFailedError}
+import com.wavesplatform.dex.cli.Actions.withLevelDb
 import com.wavesplatform.dex.cli.WavesDexCli.Args
 import com.wavesplatform.dex.db.{AccountStorage, AssetPairsDb, AssetsDb, DbKeys, OrderBookSnapshotDb, OrderDb}
 import com.wavesplatform.dex.db.leveldb.{openDb, LevelDb}
@@ -11,7 +13,7 @@ import com.wavesplatform.dex.doc.MatcherErrorDoc
 import com.wavesplatform.dex.{cli, domain}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
-import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
@@ -53,6 +55,59 @@ object Actions {
   }
 
   private val backend = HttpURLConnectionBackend()
+
+  // noinspection ScalaStyle
+  def checkOrdersAgainstTxV3(args: Args, matcherSettings: MatcherSettings) = {
+    import scala.concurrent.ExecutionContext.Implicits.global
+
+    def checkPrice(price: Long, amountDecimals: Int, priceDecimals: Int): Try[Long] =
+      Try {
+        (BigDecimal(price) / BigDecimal(10).pow(priceDecimals - amountDecimals)).toBigInt.bigInteger.longValueExact()
+      }
+
+    def getAssetDecimalsOpt(assetsDb: AssetsDb[Id], asset: Asset): Option[Int] =
+      assetsDb.get(asset) match {
+        case Some(value) => value.decimals.some
+        case None =>
+          println(s"Error! Couldn't find asset decimals for asset $asset!")
+          None
+      }
+
+    cli.log(
+      s"""
+         |Passed arguments:
+         |  DEX config path : ${args.configPath}
+         |""".stripMargin
+    )
+
+    withLevelDb(matcherSettings.dataDirectory) { db =>
+      val apdb = AssetPairsDb.levelDb(db)
+      val obdb = OrderBookSnapshotDb.levelDb(db)
+      val apb = new AssetPairBuilder(matcherSettings, null, matcherSettings.blacklistedAssets)
+      val assetsDB = AssetsDb.levelDb(db)
+
+      val pairs = apdb.all()
+      val validPairs = pairs.flatMap(apb.quickValidateAssetPair(_).toOption)
+      validPairs.foreach { validPair =>
+        val result =
+          for {
+            (_, snapshot) <- obdb.get(validPair)
+            amountAssetDecimals <- getAssetDecimalsOpt(assetsDB, validPair.amountAsset)
+            priceAssetDecimals <- getAssetDecimalsOpt(assetsDB, validPair.priceAsset)
+          } yield snapshot.bids.values.flatten.foreach { limitOrder =>
+            checkPrice(limitOrder.price, amountAssetDecimals, priceAssetDecimals) match {
+              case Failure(_) => println(s"pair: ${validPair.key}  oId: ${limitOrder.order.id()}  ts: ${limitOrder.order.timestamp}")
+              case Success(_) => // do nothing
+            }
+          }
+
+        result.getOrElse {
+          println(s"Couldn't check pair ${validPair.key}; no snapshot or assets decimals found")
+          ()
+        }
+      }
+    }
+  }
 
   // noinspection ScalaStyle
   def deleteOrderBook(args: Args): Unit = {

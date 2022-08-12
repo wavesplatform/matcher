@@ -94,7 +94,7 @@ object Actions {
             (_, snapshot) <- obdb.get(validPair)
             amountAssetDecimals <- getAssetDecimalsOpt(assetsDB, validPair.amountAsset)
             priceAssetDecimals <- getAssetDecimalsOpt(assetsDB, validPair.priceAsset)
-          } yield snapshot.bids.values.flatten.foreach { limitOrder =>
+          } yield (snapshot.bids.values ++ snapshot.asks.values).flatten.foreach { limitOrder =>
             checkPrice(limitOrder.price, amountAssetDecimals, priceAssetDecimals) match {
               case Failure(_) => println(s"pair: ${validPair.key}  oId: ${limitOrder.order.id()}  ts: ${limitOrder.order.timestamp}")
               case Success(_) => // do nothing

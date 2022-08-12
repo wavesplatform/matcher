@@ -8,6 +8,7 @@ sealed trait OrderAuthentication {
   def updateProofs(proofs: Proofs): OrderAuthentication
   def updateSender(sender: PublicKey): OrderAuthentication
   def updateEip712Signature(signature: ByteStr): OrderAuthentication
+  def withoutProofs(): OrderAuthentication
 }
 
 object OrderAuthentication {
@@ -16,12 +17,14 @@ object OrderAuthentication {
     override def updateProofs(proofs: Proofs): OrderProofs = copy(proofs = proofs)
     override def updateSender(sender: PublicKey): OrderProofs = copy(key = sender)
     override def updateEip712Signature(signature: ByteStr): OrderProofs = this
+    override def withoutProofs(): OrderAuthentication = copy(proofs = Proofs.empty)
   }
 
   final case class Eip712Signature(signature: ByteStr) extends OrderAuthentication {
     override def updateProofs(proofs: Proofs): Eip712Signature = this
     override def updateSender(sender: PublicKey): Eip712Signature = this
     override def updateEip712Signature(sig: ByteStr): Eip712Signature = copy(signature = sig)
+    override def withoutProofs(): OrderAuthentication = this
   }
 
 }

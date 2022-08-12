@@ -22,7 +22,7 @@ case class OrderV1(
   matcherFee: Long
 ) extends Order {
 
-  override def version: Byte = 1
+  override val version: Byte = 1
 
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
     senderPublicKey ++ matcherPublicKey ++

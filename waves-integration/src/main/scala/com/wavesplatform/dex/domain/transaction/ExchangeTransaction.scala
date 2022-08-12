@@ -130,7 +130,7 @@ object ExchangeTransaction {
           ExchangeTransactionV2.parseBytes(bytes).map(_._1)
         else if (firstByte == 7)
           ExchangeTransactionV1.parseBytes(bytes).map(_._1)
-        else //firstByte = 3
+        else //firstByte = 1
           ExchangeTransactionV3.parseBytes(bytes).map(_._1)
       }
 

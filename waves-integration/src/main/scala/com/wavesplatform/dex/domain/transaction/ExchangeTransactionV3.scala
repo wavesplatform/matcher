@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.domain.transaction
 
 import cats.syntax.either._
-import com.google.common.primitives.Longs
+import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.dex.domain.account.PrivateKey
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.deser.EntityParser.{ConsumedBytesOffset, Stateful}
@@ -10,9 +10,10 @@ import com.wavesplatform.dex.domain.crypto.Proofs
 import com.wavesplatform.dex.domain.error.ValidationError
 import com.wavesplatform.dex.domain.error.ValidationError._
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.domain.transaction.ExchangeTransaction._
 import com.wavesplatform.dex.domain.utils.PBUtils
 import com.wavesplatform.dex.grpc.integration.protobuf.DexToPbConversions._
+import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions._
+import com.wavesplatform.protobuf.transaction.{SignedTransaction => PbSignedTransaction}
 import monix.eval.Coeval
 
 import scala.util.Try
@@ -36,14 +37,10 @@ case class ExchangeTransactionV3(
     Coeval.evalOnce(PBUtils.encodeDeterministic(this.toPBWaves.getWavesTransaction))
 
   override val bytes: Coeval[Array[Byte]] =
-    Coeval.evalOnce(
-      Array(version) ++
-      orderMark(buyOrder.version) ++ buyOrder.bytes() ++
-      orderMark(sellOrder.version) ++ sellOrder.bytes() ++
-      Longs.toByteArray(price) ++ Longs.toByteArray(assetDecimalsPrice) ++ Longs.toByteArray(amount) ++
-      Longs.toByteArray(buyMatcherFee) ++ Longs.toByteArray(sellMatcherFee) ++ Longs.toByteArray(fee) ++
-      Longs.toByteArray(timestamp) ++ proofs.bytes()
-    )
+    Coeval.evalOnce {
+      val txBytes = PBUtils.encodeDeterministic(this.toPBWaves)
+      Array(1: Byte) ++ Longs.toByteArray(assetDecimalsPrice) ++ Ints.toByteArray(txBytes.length) ++ txBytes
+    }
 
 }
 
@@ -165,35 +162,23 @@ object ExchangeTransactionV3 extends ExchangeTransactionParser[ExchangeTransacti
 
   override protected def parseHeader(bytes: Array[Byte]): Try[Int] = Try {
     if (bytes.length < 1) throw new IllegalArgumentException(s"The buffer is too small, it has ${bytes.length} elements")
-    val version = bytes.head
-    if (version != 3) throw new IllegalArgumentException(s"Expected version of transaction 3, but got '$version'")
+    val parsedMark = bytes.head
+    if (parsedMark != 1) throw new IllegalArgumentException(s"Expected mark of transaction 1, but got '$parsedMark'")
     1
   }
 
-  override private[domain] def statefulParse: Stateful[(ExchangeTransactionV3, ConsumedBytesOffset)] =
+  override private[domain] def statefulParse: Stateful[(ExchangeTransactionV3, ConsumedBytesOffset)] = {
+    def readRawPbUnsafe(assetDecimalsPrice: Long, bytes: Array[Byte]) =
+      PBUtils.decode(bytes, PbSignedTransaction)
+        .flatMap(_.getExchangeTxV3(assetDecimalsPrice).leftMap(err => new RuntimeException(err.message)))
+        .fold(throw _, identity)
+
     for {
-      (buyOrder, _) <- Order.statefulParse
-      (sellOrder, _) <- Order.statefulParse
-      price <- read[Long]
       assetDecimalsPrice <- read[Long]
-      amount <- read[Long]
-      buyMatcherFee <- read[Long]
-      sellMatcherFee <- read[Long]
-      fee <- read[Long]
-      timestamp <- read[Long]
-      proofs <- read[Proofs]
+      pbLen <- read[Int]
+      tx <- read[ExchangeTransactionV3](readRawPbUnsafe(assetDecimalsPrice, _), pbLen)
       offset <- read[ConsumedBytesOffset]
-    } yield ExchangeTransactionV3(
-      buyOrder,
-      sellOrder,
-      amount,
-      price,
-      assetDecimalsPrice,
-      buyMatcherFee,
-      sellMatcherFee,
-      fee,
-      timestamp,
-      proofs
-    ) -> offset
+    } yield tx -> offset
+  }
 
 }

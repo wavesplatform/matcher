@@ -63,7 +63,7 @@ trait Order extends Proven with Authorized {
   }
 
   def isExecutable(amountAssetDecimals: Int, priceAssetDecimals: Int): Validation =
-    (eip712Signature.nonEmpty && proofs.nonEmpty) :| "Eip712Signature and Proofs cannot be set together" &&
+    (eip712Signature.isEmpty || proofs.isEmpty) :| "Eip712Signature and Proofs cannot be set together" &&
     ExchangeTransactionV3.convertPrice(
       price,
       amountAssetDecimals,

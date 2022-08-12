@@ -10,6 +10,7 @@ import com.wavesplatform.dex.domain.bytes.{ByteStr => DexByteStr}
 import com.wavesplatform.dex.domain.error.ValidationError
 import com.wavesplatform.dex.domain.error.ValidationError.GenericError
 import com.wavesplatform.dex.domain.order.{Order => DexOrder, OrderType => DexOrderType}
+import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV3
 import com.wavesplatform.dex.domain.utils._
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.services.AssetDescriptionResponse.MaybeDescription
@@ -31,6 +32,30 @@ object PbToDexConversions {
           .fold[Either[ValidationError, PbExchangeTransactionData]](GenericError("The transaction's data must be specified").asLeft)(_.asRight)
         orders <- data.orders.toList.traverse(_.toVanilla)
       } yield orders
+
+    def getExchangeTxV3(assetDecimalsPrice: Long): Either[ValidationError, ExchangeTransactionV3] =
+      for {
+        tx <- signedTx.transaction.wavesTransaction
+          .fold[Either[ValidationError, PbTransaction]](GenericError("The transaction must be specified").asLeft)(_.asRight)
+        _ <- Either.cond[ValidationError, Unit](tx.version == 3, (), GenericError("The transaction version must be 3"))
+        fee <- tx.fee.map(_.amount).toRight(GenericError("The transaction fee is empty"))
+        data <- tx.data.exchange
+          .fold[Either[ValidationError, PbExchangeTransactionData]](GenericError("The transaction's data must be specified").asLeft)(_.asRight)
+        orders <- data.orders.toList.traverse(_.toVanilla)
+        (buy, sell) <- Either.catchNonFatal(DexOrder.splitByType(orders.head, orders(1)))
+          .leftMap(_ => GenericError("The transaction orders is corrupted"))
+      } yield ExchangeTransactionV3(
+        buy,
+        sell,
+        data.amount,
+        data.price,
+        assetDecimalsPrice,
+        data.buyMatcherFee,
+        data.sellMatcherFee,
+        fee,
+        tx.timestamp,
+        signedTx.proofs.map(_.toVanilla)
+      )
 
   }
 

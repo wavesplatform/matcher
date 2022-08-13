@@ -1,9 +1,15 @@
 package com.wavesplatform.dex.domain.order
 
+import cats.syntax.either._
+
 import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.bytes.deser.EntityParser
+import com.wavesplatform.dex.domain.bytes.deser.EntityParser.{ConsumedBytesOffset, Stateful}
 import com.wavesplatform.dex.domain.utils.PBUtils
 import com.wavesplatform.dex.grpc.integration.protobuf.DexToPbConversions._
+import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions._
+import com.wavesplatform.protobuf.order.{Order => PbOrder}
 import monix.eval.Coeval
 
 case class OrderV4(
@@ -24,5 +30,25 @@ case class OrderV4(
   override val bodyBytes: Coeval[Array[Byte]] =
     Coeval.evalOnce(PBUtils.encodeDeterministic(copy(orderAuthentication = orderAuthentication.withoutProofs()).toPB))
 
-  override val bytes: Coeval[Array[Byte]] = ???
+  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(PBUtils.encodeDeterministic(this.toPB))
+
+}
+
+object OrderV4 extends EntityParser[OrderV4] {
+
+  override private[domain] def statefulParse: Stateful[(OrderV4, ConsumedBytesOffset)] =
+    for {
+      order <- readRemaining[OrderV4] {
+        PBUtils.decode(_, PbOrder)
+          .flatMap {
+            _.toVanilla
+              .leftMap(err => new RuntimeException(err.message))
+              .ensure(new RuntimeException("Unexpected order version"))(_.version == 4)
+              .map(_.asInstanceOf[OrderV4])
+          }
+          .fold(throw _, identity)
+      }
+      offset <- read[ConsumedBytesOffset]
+    } yield order -> offset
+
 }

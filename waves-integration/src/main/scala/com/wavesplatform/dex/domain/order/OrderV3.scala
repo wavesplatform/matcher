@@ -11,7 +11,7 @@ import com.wavesplatform.dex.domain.crypto.Proofs
 import monix.eval.Coeval
 
 case class OrderV3(
-  orderAuthentication: OrderAuthentication.OrderProofs,
+  orderAuthentication: OrderAuthentication,
   matcherPublicKey: PublicKey,
   assetPair: AssetPair,
   orderType: OrderType,

@@ -14,7 +14,7 @@ import monix.eval.Coeval
  * Order to matcher service for asset exchange
  */
 case class OrderV2(
-  orderAuthentication: OrderAuthentication.OrderProofs,
+  orderAuthentication: OrderAuthentication,
   matcherPublicKey: PublicKey,
   assetPair: AssetPair,
   orderType: OrderType,

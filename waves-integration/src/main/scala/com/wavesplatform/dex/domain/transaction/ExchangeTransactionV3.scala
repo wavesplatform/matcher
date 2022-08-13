@@ -1,6 +1,8 @@
 package com.wavesplatform.dex.domain.transaction
 
+import cats.instances.list._
 import cats.syntax.either._
+import cats.syntax.traverse._
 import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.dex.domain.account.PrivateKey
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -168,15 +170,36 @@ object ExchangeTransactionV3 extends ExchangeTransactionParser[ExchangeTransacti
   }
 
   override private[domain] def statefulParse: Stateful[(ExchangeTransactionV3, ConsumedBytesOffset)] = {
-    def readRawPbUnsafe(assetDecimalsPrice: Long, bytes: Array[Byte]) =
-      PBUtils.decode(bytes, PbSignedTransaction)
-        .flatMap(_.getExchangeTxV3(assetDecimalsPrice).leftMap(err => new RuntimeException(err.message)))
-        .fold(throw _, identity)
+    def readTx(signedTx: PbSignedTransaction, assetDecimalsPrice: Long) =
+      for {
+        tx <- signedTx.transaction.wavesTransaction.toRight(new RuntimeException("The transaction must be specified"))
+        _ <- Either.cond(tx.version == 3, Right(()), new RuntimeException("The transaction's version must be 3"))
+        fee <- tx.fee.map(_.amount).toRight(new RuntimeException("The transaction's fee must be specified"))
+        data <- tx.data.exchange.toRight(new RuntimeException("The transaction's data must be specified"))
+        orders <- data.orders.toList.traverse(_.toVanilla).leftMap(err => new RuntimeException(err.message))
+        (buy, sell) <- Either.catchNonFatal(Order.splitByType(orders.head, orders(1)))
+          .leftMap(_ => new RuntimeException("The transaction's orders is corrupted"))
+      } yield ExchangeTransactionV3(
+        buy,
+        sell,
+        data.amount,
+        data.price,
+        assetDecimalsPrice,
+        data.buyMatcherFee,
+        data.sellMatcherFee,
+        fee,
+        tx.timestamp,
+        signedTx.proofs.map(_.toVanilla)
+      )
 
     for {
       assetDecimalsPrice <- read[Long]
       pbLen <- read[Int]
-      tx <- read[ExchangeTransactionV3](readRawPbUnsafe(assetDecimalsPrice, _), pbLen)
+      tx <- read[ExchangeTransactionV3](pbLen) {
+        PBUtils.decode(_, PbSignedTransaction)
+          .flatMap(readTx(_, assetDecimalsPrice))
+          .fold(throw _, identity)
+      }
       offset <- read[ConsumedBytesOffset]
     } yield tx -> offset
   }

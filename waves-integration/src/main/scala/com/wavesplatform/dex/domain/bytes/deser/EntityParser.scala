@@ -16,7 +16,15 @@ trait EntityParser[E] {
   import EntityParser._
 
   protected def read[R: Stateful]: Stateful[R] = implicitly
-  protected def read[R](f: Array[Byte] => R, size: Int): Stateful[R] = standardRead(f, size)
+  protected def read[R](size: Int)(f: Array[Byte] => R): Stateful[R] = standardRead(f, size)
+
+  protected def readRemaining[R](f: Array[Byte] => R): Stateful[R] =
+    for {
+      remaining <- State[S, Int] { s =>
+        s -> (s.bytes.length - s.offset)
+      }
+      res <- standardRead(f, remaining)
+    } yield res
 
   private[domain] def statefulParse: Stateful[(E, ConsumedBytesOffset)]
 

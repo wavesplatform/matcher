@@ -125,10 +125,10 @@ class OrderValidatorSpecification
 
         val order = newBuyOrder(pk) match {
           case x: OrderV1 =>
-            val oa = x.orderAuthentication.copy(proofs = Proofs(Seq(ByteStr(Array.emptyByteArray))))
+            val oa = x.orderAuthentication.updateProofs(Proofs(Seq(ByteStr(Array.emptyByteArray))))
             x.copy(orderAuthentication = oa)
           case x: OrderV2 =>
-            val oa = x.orderAuthentication.copy(proofs = Proofs(Seq(ByteStr(Array.emptyByteArray))))
+            val oa = x.orderAuthentication.updateProofs(Proofs(Seq(ByteStr(Array.emptyByteArray))))
             x.copy(orderAuthentication = oa)
           case x => throw new RuntimeException(s"Unexpected order: $x")
         }

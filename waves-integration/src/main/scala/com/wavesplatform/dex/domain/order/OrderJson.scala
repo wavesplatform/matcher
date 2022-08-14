@@ -14,6 +14,8 @@ import scala.util.{Failure, Success}
 
 object OrderJson {
 
+  final class OrderParsingException(msg: String) extends RuntimeException(msg)
+
   implicit val byteArrayReads: Reads[Array[Byte]] = {
     case JsString(s) =>
       Base58.tryDecodeWithLimit(s) match {
@@ -56,7 +58,6 @@ object OrderJson {
     proofs: Option[Array[Array[Byte]]],
     version: Option[Byte]
   ): Order = {
-
     val eproofs =
       proofs
         .map(p => Proofs(p.map(ByteStr.apply).toList))
@@ -64,8 +65,10 @@ object OrderJson {
         .getOrElse(Proofs.empty)
 
     val vrsn: Byte = version.getOrElse(if (eproofs.proofs.size == 1 && eproofs.proofs.head.arr.length == SignatureLength) 1 else 2)
+    val oa = OrderAuthentication.OrderProofs(sender, eproofs)
+
     Order(
-      sender,
+      oa,
       matcher,
       assetPair,
       orderType,
@@ -74,7 +77,6 @@ object OrderJson {
       timestamp,
       expiration,
       matcherFee,
-      eproofs,
       vrsn
     )
   }
@@ -94,15 +96,16 @@ object OrderJson {
     version: Byte,
     matcherFeeAssetId: Asset
   ): Order = {
-
     val eproofs =
       proofs
         .map(p => Proofs(p.map(ByteStr.apply).toIndexedSeq))
         .orElse(signature.map(s => Proofs(Seq(ByteStr(s)))))
         .getOrElse(Proofs.empty)
 
+    val oa = OrderAuthentication.OrderProofs(sender, eproofs)
+
     Order(
-      sender,
+      oa,
       matcher,
       assetPair,
       orderType,
@@ -111,7 +114,53 @@ object OrderJson {
       timestamp,
       expiration,
       matcherFee,
-      eproofs,
+      version,
+      matcherFeeAssetId
+    )
+  }
+
+  def readOrderV4(
+    sender: Option[PublicKey],
+    matcher: PublicKey,
+    assetPair: AssetPair,
+    orderType: OrderType,
+    amount: Long,
+    price: Long,
+    timestamp: Long,
+    expiration: Long,
+    matcherFee: Long,
+    signature: Option[Array[Byte]],
+    proofs: Option[Array[Array[Byte]]],
+    eip712Signature: Option[ByteStr],
+    version: Byte,
+    matcherFeeAssetId: Asset
+  ): Order = {
+    val eproofs =
+      proofs
+        .map(p => Proofs(p.map(ByteStr.apply).toIndexedSeq))
+        .orElse(signature.map(s => Proofs(Seq(ByteStr(s)))))
+        .getOrElse(Proofs.empty)
+
+    val oa =
+      (eip712Signature, sender) match {
+        case (Some(sig), _) =>
+          OrderAuthentication.Eip712Signature(sig)
+        case (None, Some(sender)) =>
+          OrderAuthentication.OrderProofs(sender, eproofs)
+        case _ =>
+          throw new OrderParsingException("Either Eip712Signature or Proofs must be specified")
+      }
+
+    Order(
+      oa,
+      matcher,
+      assetPair,
+      orderType,
+      amount,
+      price,
+      timestamp,
+      expiration,
+      matcherFee,
       version,
       matcherFeeAssetId
     )

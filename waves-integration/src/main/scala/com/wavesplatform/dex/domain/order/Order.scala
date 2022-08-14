@@ -63,7 +63,6 @@ trait Order extends Proven with Authorized {
   }
 
   def isExecutable(amountAssetDecimals: Int, priceAssetDecimals: Int): Validation =
-    (eip712Signature.isEmpty || proofs.isEmpty) :| "Eip712Signature and Proofs cannot be set together" &&
     ExchangeTransactionV3.convertPrice(
       price,
       amountAssetDecimals,
@@ -199,7 +198,7 @@ object Order extends EntityParser[Order] {
   val MaxAmount: Long = 100 * PriceConstant * PriceConstant
 
   def apply(
-    senderPublicKey: PublicKey,
+    orderAuthentication: OrderAuthentication,
     matcherPublicKey: PublicKey,
     assetPair: AssetPair,
     orderType: OrderType,
@@ -208,22 +207,21 @@ object Order extends EntityParser[Order] {
     timestamp: Long,
     expiration: Long,
     matcherFee: Long,
-    proofs: Proofs,
     version: Byte = 1,
     feeAsset: Asset = Asset.Waves
-  ): Order = {
-    val oa = OrderAuthentication.OrderProofs(senderPublicKey, proofs)
+  ): Order =
     version match {
       case 1 =>
-        OrderV1(oa, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee)
+        OrderV1(orderAuthentication, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee)
       case 2 =>
-        OrderV2(oa, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee)
+        OrderV2(orderAuthentication, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee)
       case 3 =>
-        OrderV3(oa, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, feeAsset)
+        OrderV3(orderAuthentication, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, feeAsset)
+      case 4 =>
+        OrderV4(orderAuthentication, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, feeAsset)
       case _ =>
         throw new IllegalArgumentException(s"Invalid order version: $version")
     }
-  }
 
   def buy(
     sender: KeyPair,
@@ -237,9 +235,10 @@ object Order extends EntityParser[Order] {
     version: Byte = 1,
     feeAsset: Asset = Waves
   ): Order = {
+    val oa = OrderAuthentication.OrderProofs(sender, Proofs.empty)
     val unsigned = version match {
-      case 3 => Order(sender, matcher, pair, OrderType.BUY, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version, feeAsset)
-      case _ => Order(sender, matcher, pair, OrderType.BUY, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version)
+      case 3 | 4 => Order(oa, matcher, pair, OrderType.BUY, amount, price, timestamp, expiration, matcherFee, version, feeAsset)
+      case _ => Order(oa, matcher, pair, OrderType.BUY, amount, price, timestamp, expiration, matcherFee, version)
     }
     sign(unsigned, sender)
   }
@@ -256,9 +255,10 @@ object Order extends EntityParser[Order] {
     version: Byte = 1,
     feeAsset: Asset = Waves
   ): Order = {
+    val oa = OrderAuthentication.OrderProofs(sender, Proofs.empty)
     val unsigned = version match {
-      case 3 => Order(sender, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version, feeAsset)
-      case _ => Order(sender, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version)
+      case 3 | 4 => Order(oa, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, version, feeAsset)
+      case _ => Order(oa, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, version)
     }
     sign(unsigned, sender)
   }
@@ -275,7 +275,8 @@ object Order extends EntityParser[Order] {
     matcherFee: Long,
     version: Byte
   ): Order = {
-    val unsigned = Order(sender, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version)
+    val oa = OrderAuthentication.OrderProofs(sender, Proofs.empty)
+    val unsigned = Order(oa, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee, version)
     sign(unsigned, sender)
   }
 
@@ -292,7 +293,8 @@ object Order extends EntityParser[Order] {
     version: Byte,
     feeAsset: Asset
   ): Order = {
-    val unsigned = Order(sender, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version, feeAsset)
+    val oa = OrderAuthentication.OrderProofs(sender, Proofs.empty)
+    val unsigned = Order(oa, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee, version, feeAsset)
     sign(unsigned, sender)
   }
 

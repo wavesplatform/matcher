@@ -8,7 +8,7 @@ import com.wavesplatform.dex.domain.asset.{Asset => DexAsset, AssetPair => DexAs
 import com.wavesplatform.dex.domain.bytes.{ByteStr => DexByteStr}
 import com.wavesplatform.dex.domain.error.ValidationError
 import com.wavesplatform.dex.domain.error.ValidationError.GenericError
-import com.wavesplatform.dex.domain.order.{Order => DexOrder, OrderType => DexOrderType}
+import com.wavesplatform.dex.domain.order.{OrderAuthentication, Order => DexOrder, OrderType => DexOrderType}
 import com.wavesplatform.dex.domain.utils._
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.services.AssetDescriptionResponse.MaybeDescription
@@ -52,8 +52,16 @@ object PbToDexConversions {
             case Some(asset) => Right(asset.toVanillaAsset)
           }
         }
+        oa <- order.sender match {
+          case PbOrder.Sender.SenderPublicKey(key) =>
+            Right(OrderAuthentication.OrderProofs(DexPublicKey(key.toVanilla), order.proofs.map(_.toVanilla)))
+          case PbOrder.Sender.Eip712Signature(eip) =>
+            Right(OrderAuthentication.Eip712Signature(eip.toVanilla))
+          case _ =>
+            Left(GenericError("Order authentication must be specified"))
+        }
       } yield DexOrder(
-        senderPublicKey = DexPublicKey(order.getSenderPublicKey.toVanilla),
+        orderAuthentication = oa,
         matcherPublicKey = DexPublicKey(order.matcherPublicKey.toVanilla),
         assetPair = DexAssetPair(order.getAssetPair.amountAssetId.toVanillaAsset, order.getAssetPair.priceAssetId.toVanillaAsset),
         orderType = orderType,
@@ -62,7 +70,6 @@ object PbToDexConversions {
         timestamp = order.timestamp,
         expiration = order.expiration,
         matcherFee = matcherFee,
-        proofs = order.proofs.map(_.toVanilla),
         version = order.version.toByte,
         feeAsset = feeAsset
       )

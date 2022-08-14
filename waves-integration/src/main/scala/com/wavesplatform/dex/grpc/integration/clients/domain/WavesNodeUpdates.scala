@@ -3,9 +3,11 @@ package com.wavesplatform.dex.grpc.integration.clients.domain
 import cats.Monoid
 import cats.instances.map._
 import cats.syntax.monoid._
+import cats.syntax.either._
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.clients.domain.WavesNodeUpdates.addressTxOf
 import com.wavesplatform.dex.grpc.integration.clients.domain.portfolio.Implicits._
 import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions._
@@ -37,7 +39,7 @@ case class WavesNodeUpdates(
 
 }
 
-object WavesNodeUpdates {
+object WavesNodeUpdates extends ScorexLogging {
 
   implicit val updatesMonoid: Monoid[WavesNodeUpdates] = new Monoid[WavesNodeUpdates] {
     override val empty: WavesNodeUpdates = WavesNodeUpdates(Map.empty, Map.empty)
@@ -56,8 +58,10 @@ object WavesNodeUpdates {
 
         val addresses = for {
           tx <- tx.tx.transaction.wavesTransaction.toSeq
-          order <- tx.getExchange.orders
-        } yield order.getSenderPublicKey.toVanillaPublicKey.toAddress
+          order <- tx.getExchange
+            .orders
+            .flatMap(_.toVanilla.leftMap(err => log.error(s"Error while parsing orders ${err.message}")).toOption)
+        } yield order.senderPublicKey
 
         addresses.toSet // maker and taker could be the same
           .foldLeft(r) { case (r, address) => r.updated(address, r(address).updated(txId, pp.getOrElse(address, Map.empty))) }

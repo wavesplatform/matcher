@@ -73,7 +73,7 @@ object DexToPbConversions {
       PbOrder(
         chainId = DexAddressScheme.current.chainId.toInt,
         sender = order.orderAuthentication match {
-          case DexOrderAuthentication.OrderProofs(sender, _) => PbOrder.Sender.SenderPublicKey(sender.toPB)
+          case DexOrderAuthentication.OrderProofs(key, _) => PbOrder.Sender.SenderPublicKey(key.toPB)
           case DexOrderAuthentication.Eip712Signature(sig) => PbOrder.Sender.Eip712Signature(sig.toPB)
         },
         matcherPublicKey = order.matcherPublicKey.toPB,

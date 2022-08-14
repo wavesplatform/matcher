@@ -26,9 +26,9 @@ final class OrderOps(val o: Order) extends AnyVal {
 
   @inline def updateEip712Signature(sig: ByteStr): Order =
     copy(
-      x => x.copy(orderAuthentication = x.orderAuthentication.updateEip712Signature(sig)),
-      x => x.copy(orderAuthentication = x.orderAuthentication.updateEip712Signature(sig)),
-      x => x.copy(orderAuthentication = x.orderAuthentication.updateEip712Signature(sig)),
+      identity,
+      identity,
+      identity,
       x => x.copy(orderAuthentication = x.orderAuthentication.updateEip712Signature(sig))
     )
 

@@ -1,6 +1,5 @@
 package com.wavesplatform.dex.domain.order
 
-import cats.syntax.either._
 import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -14,8 +13,6 @@ import play.api.libs.json._
 import scala.util.{Failure, Success}
 
 object OrderJson {
-
-  final class OrderParsingException(msg: String) extends RuntimeException(msg)
 
   implicit val byteArrayReads: Reads[Array[Byte]] = {
     case JsString(s) =>
@@ -135,36 +132,38 @@ object OrderJson {
     eip712Signature: Option[Array[Byte]],
     version: Byte,
     matcherFeeAssetId: Asset
-  ): Order = {
+  ): JsResult[Order] = {
     val eproofs =
       proofs
         .map(p => Proofs(p.map(ByteStr.apply).toIndexedSeq))
         .orElse(signature.map(s => Proofs(Seq(ByteStr(s)))))
         .getOrElse(Proofs.empty)
 
-    val oa =
+    val maybeOa =
       (eip712Signature, sender) match {
         case (Some(sig), _) =>
-          OrderAuthentication.Eip712Signature(sig)
+          JsSuccess(OrderAuthentication.Eip712Signature(sig))
         case (None, Some(sender)) =>
-          OrderAuthentication.OrderProofs(sender, eproofs)
+          JsSuccess(OrderAuthentication.OrderProofs(sender, eproofs))
         case _ =>
-          throw new OrderParsingException("Either Eip712Signature or Proofs must be specified")
+          JsError("Either Eip712Signature or Proofs must be specified")
       }
 
-    Order(
-      oa,
-      matcher,
-      assetPair,
-      orderType,
-      amount,
-      price,
-      timestamp,
-      expiration,
-      matcherFee,
-      version,
-      matcherFeeAssetId
-    )
+    maybeOa.map { oa =>
+      Order(
+        oa,
+        matcher,
+        assetPair,
+        orderType,
+        amount,
+        price,
+        timestamp,
+        expiration,
+        matcherFee,
+        version,
+        matcherFeeAssetId
+      )
+    }
   }
 
   private val orderV1V2Reads: Reads[Order] = {
@@ -218,19 +217,15 @@ object OrderJson {
       (JsPath \ "eip712Signature").readNullable[Array[Byte]] and
       (JsPath \ "version").read[Byte] and
       (JsPath \ "matcherFeeAssetId").readWithDefault[Asset](Waves)
-    r(readOrderV4 _)
+
+    r(readOrderV4 _).flatMapResult(identity)
   }
 
   implicit val orderReads: Reads[Order] = {
     case jsOrder @ JsObject(map) =>
       map.getOrElse("version", JsNumber(1)) match {
         case JsNumber(x) if x.byteValue == 3 => orderV3Reads.reads(jsOrder)
-        case JsNumber(x) if x.byteValue == 4 =>
-          Either.catchNonFatal(orderV4Reads.reads(jsOrder))
-            .recover {
-              case err: OrderParsingException =>
-                JsError(err.getMessage)
-            }.fold(throw _, identity)
+        case JsNumber(x) if x.byteValue == 4 => orderV4Reads.reads(jsOrder)
         case _ => orderV1V2Reads.reads(jsOrder)
       }
     case invalidOrder => JsError(s"Can't parse invalid order $invalidOrder")

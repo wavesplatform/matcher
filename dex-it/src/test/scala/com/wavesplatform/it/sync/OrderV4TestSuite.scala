@@ -17,7 +17,7 @@ import scala.concurrent.duration._
 
 class OrderV4TestSuite extends MatcherSuiteBase {
 
-  //will be same for waves & usd, see rate
+  //will be the same for waves & usd, see rate
   private val fee = 300_000L
 
   private val aliceEth = Bip32ECKeyPair.generateKeyPair(alice.seed)

@@ -7,6 +7,7 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.crypto.Proofs
 import com.wavesplatform.dex.domain.order.{EthOrders, Order, OrderAuthentication, OrderType}
+import com.wavesplatform.dex.it.config.GenesisConfig
 import com.wavesplatform.dex.model.AcceptedOrder
 import com.wavesplatform.it.MatcherSuiteBase
 import org.web3j.crypto.{Bip32ECKeyPair, ECKeyPair, Keys}
@@ -22,13 +23,15 @@ class OrderV4TestSuite extends MatcherSuiteBase {
   private val aliceEth = Bip32ECKeyPair.generateKeyPair(alice.seed)
 
   private val aliceEthAdr = Address.fromPublicKeyHash(
-    Numeric.hexStringToByteArray(Keys.getAddress(aliceEth))
+    Numeric.hexStringToByteArray(Keys.getAddress(aliceEth)),
+    GenesisConfig.chainId
   )
 
   private val bobEth = Bip32ECKeyPair.generateKeyPair(bob.seed)
 
   private val bobEthAdr = Address.fromPublicKeyHash(
-    Numeric.hexStringToByteArray(Keys.getAddress(bobEth))
+    Numeric.hexStringToByteArray(Keys.getAddress(bobEth)),
+    GenesisConfig.chainId
   )
 
   "OrderV4TestSuite" - {

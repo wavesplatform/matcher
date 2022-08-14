@@ -132,7 +132,6 @@ object ValidatedCommandPbConversions {
   private def writeToPbOrder(order: Order): PbOrder =
     PbOrder(
       chainId = AddressScheme.current.chainId.toInt,
-      senderPublicKey = PbByteString.copyFrom(order.senderPublicKey),
       sender = order.orderAuthentication match {
         case OrderAuthentication.OrderProofs(key, _) =>
           PbOrder.Sender.SenderPublicKey0(PbByteString.copyFrom(key))

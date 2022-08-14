@@ -5,13 +5,25 @@ import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import org.web3j.crypto.Sign.SignatureData
-import org.web3j.crypto.{ECDSASignature, Sign, StructuredDataEncoder}
+import org.web3j.crypto.{ECDSASignature, ECKeyPair, Sign, StructuredDataEncoder}
 import play.api.libs.json.{JsObject, Json}
+import com.wavesplatform.dex.domain.order.OrderOps._
 
 import java.math.BigInteger
 import java.nio.ByteBuffer
 
 object EthOrders {
+
+  def signOrder(order: Order, key: ECKeyPair): Order = {
+    val message = hashOrderStruct(order)
+    val signature = Sign.signMessage(message, key, false)
+    val buffer = ByteBuffer.allocate(signature.getR.length + signature.getS.length + signature.getV.length)
+    buffer.put(signature.getR)
+    buffer.put(signature.getS)
+    buffer.put(signature.getV)
+    val sig = buffer.array()
+    order.updateEip712Signature(sig)
+  }
 
   def recoverEthSignerKey(order: Order, signature: Array[Byte]): PublicKey = {
     val bytes = hashOrderStruct(order)

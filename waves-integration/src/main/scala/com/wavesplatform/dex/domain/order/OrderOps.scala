@@ -2,9 +2,10 @@ package com.wavesplatform.dex.domain.order
 
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.crypto.Proofs
 
-class OrderOps(val o: Order) extends AnyVal {
+final class OrderOps(val o: Order) extends AnyVal {
 
   @inline def copy(withV1: OrderV1 => OrderV1, withV2: OrderV2 => OrderV2, withV3: OrderV3 => OrderV3, withV4: OrderV4 => OrderV4): Order =
     o match {
@@ -21,6 +22,14 @@ class OrderOps(val o: Order) extends AnyVal {
       x => x.copy(orderAuthentication = x.orderAuthentication.updateProofs(p)),
       x => x.copy(orderAuthentication = x.orderAuthentication.updateProofs(p)),
       x => x.copy(orderAuthentication = x.orderAuthentication.updateProofs(p))
+    )
+
+  @inline def updateEip712Signature(sig: ByteStr): Order =
+    copy(
+      x => x.copy(orderAuthentication = x.orderAuthentication.updateEip712Signature(sig)),
+      x => x.copy(orderAuthentication = x.orderAuthentication.updateEip712Signature(sig)),
+      x => x.copy(orderAuthentication = x.orderAuthentication.updateEip712Signature(sig)),
+      x => x.copy(orderAuthentication = x.orderAuthentication.updateEip712Signature(sig))
     )
 
   @inline def updateExpiration(expiration: Long): Order =

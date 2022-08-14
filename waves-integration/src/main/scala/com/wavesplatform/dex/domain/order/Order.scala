@@ -314,6 +314,7 @@ object Order extends EntityParser[Order] {
       case 1 => OrderV1
       case 2 => OrderV2
       case 3 => OrderV3
+      case 4 => OrderV4
       case unexpected =>
         throw new RuntimeException(s"unexpected order version $unexpected")
     }
@@ -329,6 +330,7 @@ object Order extends EntityParser[Order] {
           case 1 => OrderV1
           case 2 => OrderV2
           case 3 => OrderV3
+          case 4 => OrderV4
           case other => throw new IllegalArgumentException(s"Unexpected order version: $other")
         }
         ep.statefulParse.widen[(Order, ConsumedBytesOffset)]

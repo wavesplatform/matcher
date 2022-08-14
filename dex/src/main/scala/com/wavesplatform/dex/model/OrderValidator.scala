@@ -161,6 +161,7 @@ object OrderValidator extends ScorexLogging {
       case 1 => liftValueAsync(version)
       case 2 => checkFeatureSupport(BlockchainFeatures.SmartAccountTrading)
       case 3 => checkFeatureSupport(BlockchainFeatures.OrderV3)
+      case 4 => checkFeatureSupport(BlockchainFeatures.RideV6)
       case _ => liftErrorAsync(error.UnsupportedOrderVersion(version))
     }
   }

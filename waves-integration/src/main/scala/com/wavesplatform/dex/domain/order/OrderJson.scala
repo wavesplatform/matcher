@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.domain.order
 
+import cats.syntax.either._
 import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -131,7 +132,7 @@ object OrderJson {
     matcherFee: Long,
     signature: Option[Array[Byte]],
     proofs: Option[Array[Array[Byte]]],
-    eip712Signature: Option[ByteStr],
+    eip712Signature: Option[Array[Byte]],
     version: Byte,
     matcherFeeAssetId: Asset
   ): Order = {
@@ -201,10 +202,35 @@ object OrderJson {
     r(readOrderV3 _)
   }
 
+  private val orderV4Reads: Reads[Order] = {
+    val r =
+      (JsPath \ "senderPublicKey").readNullable[PublicKey](accountPublicKeyReads) and
+      (JsPath \ "matcherPublicKey").read[PublicKey](accountPublicKeyReads) and
+      (JsPath \ "assetPair").read[AssetPair] and
+      (JsPath \ "orderType").read[OrderType] and
+      (JsPath \ "amount").read[Long] and
+      (JsPath \ "price").read[Long] and
+      (JsPath \ "timestamp").read[Long] and
+      (JsPath \ "expiration").read[Long] and
+      (JsPath \ "matcherFee").read[Long] and
+      (JsPath \ "signature").readNullable[Array[Byte]] and
+      (JsPath \ "proofs").readNullable[Array[Array[Byte]]] and
+      (JsPath \ "eip712Signature").readNullable[Array[Byte]] and
+      (JsPath \ "version").read[Byte] and
+      (JsPath \ "matcherFeeAssetId").readWithDefault[Asset](Waves)
+    r(readOrderV4 _)
+  }
+
   implicit val orderReads: Reads[Order] = {
     case jsOrder @ JsObject(map) =>
       map.getOrElse("version", JsNumber(1)) match {
         case JsNumber(x) if x.byteValue == 3 => orderV3Reads.reads(jsOrder)
+        case JsNumber(x) if x.byteValue == 4 =>
+          Either.catchNonFatal(orderV4Reads.reads(jsOrder))
+            .recover {
+              case err: OrderParsingException =>
+                JsError(err.getMessage)
+            }.fold(throw _, identity)
         case _ => orderV1V2Reads.reads(jsOrder)
       }
     case invalidOrder => JsError(s"Can't parse invalid order $invalidOrder")

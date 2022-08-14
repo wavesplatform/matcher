@@ -36,7 +36,7 @@ object OrderJson {
   implicit lazy val accountPublicKeyReads: Reads[PublicKey] = Reads {
     case JsString(s) =>
       Base58.tryDecodeWithLimit(s) match {
-        case Success(bytes) if bytes.length == 32 => JsSuccess(PublicKey(bytes))
+        case Success(bytes) if PublicKey.isValidSize(bytes.length) => JsSuccess(PublicKey(bytes))
         case _ => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.incorrectAccount"))))
       }
     case _ => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.expected.jsstring"))))
@@ -214,7 +214,7 @@ object OrderJson {
       (JsPath \ "matcherFee").read[Long] and
       (JsPath \ "signature").readNullable[Array[Byte]] and
       (JsPath \ "proofs").readNullable[Array[Array[Byte]]] and
-      (JsPath \ "eip712Signature").readNullable[Array[Byte]] and
+      (JsPath \ "eip712Signature").readNullable[String].map(_.map(org.web3j.utils.Numeric.hexStringToByteArray)) and
       (JsPath \ "version").read[Byte] and
       (JsPath \ "matcherFeeAssetId").readWithDefault[Asset](Waves)
 

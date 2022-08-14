@@ -1,9 +1,7 @@
 package com.wavesplatform.it.sync
 
-import org.web3j.utils.Numeric
-import com.wavesplatform.dex.domain.account.Address
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.domain.account.KeyPair
+import com.wavesplatform.dex.domain.account.{Address, KeyPair}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -12,6 +10,7 @@ import com.wavesplatform.dex.domain.order.{EthOrders, Order, OrderAuthentication
 import com.wavesplatform.dex.model.AcceptedOrder
 import com.wavesplatform.it.MatcherSuiteBase
 import org.web3j.crypto.{Bip32ECKeyPair, ECKeyPair, Keys}
+import org.web3j.utils.Numeric
 
 import scala.concurrent.duration._
 

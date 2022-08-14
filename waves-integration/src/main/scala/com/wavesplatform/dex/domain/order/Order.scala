@@ -87,7 +87,7 @@ trait Order extends Proven with Authorized {
     eip712SignatureValid
 
   private val eip712SignatureValid: Validation =
-    (eip712Signature.isEmpty || version >= 4) :| "eip712Signature available only in V4" &&
+    (eip712Signature.isEmpty || version >= 4) :| "eip712Signature available only since V4" &&
     eip712Signature.forall(es => es.size == 65 || es.size == 129) :| "eip712Signature should be of length 65 or 129"
 
   @ApiModelProperty(hidden = true)

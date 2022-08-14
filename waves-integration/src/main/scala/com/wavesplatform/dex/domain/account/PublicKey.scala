@@ -14,6 +14,8 @@ object PublicKey extends TaggedType[ByteStr] {
 
   private[this] val interner = Interners.newWeakInterner[PublicKey]()
 
+  def isValidSize(length: Int): Boolean = length == KeyLength || length == EthereumKeyLength
+
   val KeyStringLength: Int = base58Length(KeyLength)
 
   val empty: PublicKey = apply(ByteStr.empty)

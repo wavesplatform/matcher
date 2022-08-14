@@ -50,14 +50,14 @@ trait Order extends Proven with Authorized {
   @ApiModelProperty(hidden = true)
   lazy val sender: PublicKey = senderPublicKey
 
-  val proofs: Proofs = orderAuthentication match {
+  lazy val proofs: Proofs = orderAuthentication match {
     case OrderAuthentication.OrderProofs(_, proofs) => proofs
     case OrderAuthentication.Eip712Signature(_) => Proofs.empty
   }
 
-  val signature: ByteStr = proofs.toSignature
+  lazy val signature: ByteStr = proofs.toSignature
 
-  val eip712Signature: Option[ByteStr] = orderAuthentication match {
+  lazy val eip712Signature: Option[ByteStr] = orderAuthentication match {
     case OrderAuthentication.OrderProofs(_, _) => None
     case OrderAuthentication.Eip712Signature(sig) => Some(sig)
   }
@@ -86,7 +86,7 @@ trait Order extends Proven with Authorized {
     (expiration >= atTime) :| "expiration should be > currentTime" &&
     eip712SignatureValid
 
-  private val eip712SignatureValid: Validation =
+  private lazy val eip712SignatureValid: Validation =
     (eip712Signature.isEmpty || version >= 4) :| "eip712Signature available only since V4" &&
     eip712Signature.forall(es => es.size == 65 || es.size == 129) :| "eip712Signature should be of length 65 or 129"
 

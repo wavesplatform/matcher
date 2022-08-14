@@ -44,7 +44,7 @@ trait ExchangeTransaction extends ByteAndJsonSerializable with Proven {
     dataType = "string",
     example = "HBqhfdFASRQ5eBBpu2y6c6KKi1az6bMx8v1JxX4iW1Q8"
   )
-  override val sender: PublicKey = buyOrder.matcherPublicKey
+  override lazy val sender: PublicKey = buyOrder.matcherPublicKey
 
   @ApiModelProperty(
     name = "sender",
@@ -52,7 +52,7 @@ trait ExchangeTransaction extends ByteAndJsonSerializable with Proven {
     dataType = "string",
     example = "w8NXgupYEEkif24kbhnV3PEjHv3JGjcWNoG"
   )
-  val senderAddress: Address = sender.toAddress
+  lazy val senderAddress: Address = sender.toAddress
 
   @ApiModelProperty(
     name = "type",

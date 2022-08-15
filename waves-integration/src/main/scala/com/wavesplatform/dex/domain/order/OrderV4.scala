@@ -14,8 +14,9 @@ import monix.eval.Coeval
 
 @ApiModel(value = "Order")
 case class OrderV4(
-  @ApiModelProperty(hidden = true)
-  orderAuthentication: OrderAuthentication,
+  @ApiModelProperty(
+    hidden = true
+  ) orderAuthentication: OrderAuthentication,
   @ApiModelProperty(
     value = "Base58 encoded Matcher Public Key",
     dataType = "string",
@@ -40,8 +41,7 @@ case class OrderV4(
     dataType = "string",
     example = "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS",
     required = false
-  )
-  override val feeAsset: Asset
+  ) override val feeAsset: Asset
 ) extends Order {
 
   @ApiModelProperty(

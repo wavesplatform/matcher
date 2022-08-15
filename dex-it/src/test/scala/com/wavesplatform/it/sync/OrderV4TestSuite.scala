@@ -58,10 +58,7 @@ class OrderV4TestSuite extends MatcherSuiteBase {
       val buyJson = buy.json() ++ Json.obj(
         "eip712Signature" -> JsString(eip712SignatureSample)
       )
-      dex1.tryApi.place(buyJson) should failWith(
-        OrderInvalidSignature.code,
-        s"The signature of order ${buy.id()} is invalid: Ethereum signature is invalid"
-      )
+      dex1.tryApi.place(buyJson) should failWith(OrderInvalidSignature.code)
     }
   }
 

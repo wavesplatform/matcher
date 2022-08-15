@@ -54,36 +54,36 @@ class OrderV4TestSuite extends MatcherSuiteBase {
     }
 
     "should reject invalid eip712Signature" in {
-      val buy = signEth(aliceEth, mkOrderV4(wavesUsdPair, OrderType.BUY, 10.waves, 5.usd, Waves))
-      val buyJson = buy.json() ++ Json.obj(
+      val order = signEth(aliceEth, mkOrderV4(wavesUsdPair, OrderType.BUY, 10.waves, 5.usd, Waves))
+      val orderJson = order.json() ++ Json.obj(
         "eip712Signature" -> JsString(eip712SignatureSample)
       )
-      dex1.tryApi.place(buyJson) should failWith(OrderInvalidSignature.code)
+      dex1.tryApi.place(orderJson) should failWith(OrderInvalidSignature.code)
     }
 
     "should reject corrupted eip712Signature" in {
-      val buy = signEth(aliceEth, mkOrderV4(wavesUsdPair, OrderType.BUY, 10.waves, 5.usd, Waves))
-      val buyJson = buy.json() ++ Json.obj(
+      val order = signEth(aliceEth, mkOrderV4(wavesUsdPair, OrderType.BUY, 10.waves, 5.usd, Waves))
+      val orderJson = order.json() ++ Json.obj(
         "eip712Signature" -> JsString("corrupted")
       )
-      dex1.tryApi.place(buyJson) should failWith(OrderInvalidSignature.code)
+      dex1.tryApi.place(orderJson) should failWith(OrderInvalidSignature.code)
     }
 
     "should reject order with price that doesn't fit into FIXED_DECIMALS" in {
       val price = 2L * Order.PriceConstant * Order.PriceConstant
-      val buy = sign(alice, mkOrderV4(wavesUsdPair, OrderType.BUY, 10.waves, price, Waves))
-      dex1.tryApi.place(buy) should failWith(
+      val order = sign(alice, mkOrderV4(wavesUsdPair, OrderType.BUY, 10.waves, price, Waves))
+      dex1.tryApi.place(order) should failWith(
         OrderCommonValidationFailed.code,
         "The order is invalid: Price is not convertible to fixed decimals format"
       )
     }
 
     "should reject order without sender, proofs and eip712Signature" in {
-      val buy = sign(alice, mkOrderV4(wavesUsdPair, OrderType.BUY, 10.waves, 5.usd, Waves))
-      val buyJson = {
-        buy.json() - "eip712Signature" - "sender" - "senderPublicKey" - "proofs" - "signature"
+      val order = sign(alice, mkOrderV4(wavesUsdPair, OrderType.BUY, 10.waves, 5.usd, Waves))
+      val orderJson = {
+        order.json() - "eip712Signature" - "sender" - "senderPublicKey" - "proofs" - "signature"
       }
-      dex1.tryApi.place(buyJson) should failWith(InvalidJson.code)
+      dex1.tryApi.place(orderJson) should failWith(InvalidJson.code)
     }
   }
 

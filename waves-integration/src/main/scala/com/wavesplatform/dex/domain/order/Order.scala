@@ -75,7 +75,6 @@ trait Order extends Proven with Authorized {
   lazy val signature: ByteStr = proofs.toSignature
 
   @ApiModelProperty(
-    name = "eip712Signature",
     value = "Hex encoded eip712Signature. Required only for Metamask Authentication.",
     dataType = "string",
     example =

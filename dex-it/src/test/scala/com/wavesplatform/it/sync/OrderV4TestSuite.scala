@@ -7,7 +7,7 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.crypto.Proofs
 import com.wavesplatform.dex.domain.order.{EthOrders, Order, OrderAuthentication, OrderType}
-import com.wavesplatform.dex.error.OrderInvalidSignature
+import com.wavesplatform.dex.error.{OrderCommonValidationFailed, OrderInvalidSignature}
 import com.wavesplatform.dex.it.config.GenesisConfig
 import com.wavesplatform.dex.model.AcceptedOrder
 import com.wavesplatform.it.MatcherSuiteBase
@@ -59,6 +59,23 @@ class OrderV4TestSuite extends MatcherSuiteBase {
         "eip712Signature" -> JsString(eip712SignatureSample)
       )
       dex1.tryApi.place(buyJson) should failWith(OrderInvalidSignature.code)
+    }
+
+    "should reject corrupted eip712Signature" in {
+      val buy = signEth(aliceEth, mkOrderV4(wavesUsdPair, OrderType.BUY, 10.waves, 5.usd, Waves))
+      val buyJson = buy.json() ++ Json.obj(
+        "eip712Signature" -> JsString("corrupted")
+      )
+      dex1.tryApi.place(buyJson) should failWith(OrderInvalidSignature.code)
+    }
+
+    "should reject order with price that doesn't fit into FIXED_DECIMALS" in {
+      val price = 2L * Order.PriceConstant * Order.PriceConstant
+      val buy = sign(alice, mkOrderV4(wavesUsdPair, OrderType.BUY, 10.waves, price, Waves))
+      dex1.tryApi.place(buy) should failWith(
+        OrderCommonValidationFailed.code,
+        "The order is invalid: Price is not convertible to fixed decimals format"
+      )
     }
   }
 

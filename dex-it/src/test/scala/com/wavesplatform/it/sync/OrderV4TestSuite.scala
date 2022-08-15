@@ -7,7 +7,7 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.crypto.Proofs
 import com.wavesplatform.dex.domain.order.{EthOrders, Order, OrderAuthentication, OrderType}
-import com.wavesplatform.dex.error.{OrderCommonValidationFailed, OrderInvalidSignature}
+import com.wavesplatform.dex.error.{InvalidJson, OrderCommonValidationFailed, OrderInvalidSignature}
 import com.wavesplatform.dex.it.config.GenesisConfig
 import com.wavesplatform.dex.model.AcceptedOrder
 import com.wavesplatform.it.MatcherSuiteBase
@@ -76,6 +76,14 @@ class OrderV4TestSuite extends MatcherSuiteBase {
         OrderCommonValidationFailed.code,
         "The order is invalid: Price is not convertible to fixed decimals format"
       )
+    }
+
+    "should reject order without sender, proofs and eip712Signature" in {
+      val buy = sign(alice, mkOrderV4(wavesUsdPair, OrderType.BUY, 10.waves, 5.usd, Waves))
+      val buyJson = {
+        buy.json() - "eip712Signature" - "sender" - "senderPublicKey" - "proofs" - "signature"
+      }
+      dex1.tryApi.place(buyJson) should failWith(InvalidJson.code)
     }
   }
 

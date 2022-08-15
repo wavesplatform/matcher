@@ -42,21 +42,46 @@ trait Order extends Proven with Authorized {
 
   import Order._
 
+  @ApiModelProperty(hidden = true)
   lazy val senderPublicKey: PublicKey = orderAuthentication match {
     case OrderAuthentication.OrderProofs(key, _) => key
     case OrderAuthentication.Eip712Signature(sig) => EthOrders.recoverEthSignerKey(this, sig)
   }
 
-  @ApiModelProperty(hidden = true)
+  @ApiModelProperty(
+    name = "senderPublicKey",
+    value = "Base58 encoded Sender Public Key. Required only for Proofs Authentication.",
+    dataType = "string",
+    example = "HBqhfdFASRQ5eBBpu2y6c6KKi1az6bMx8v1JxX4iW1Q8",
+    required = false
+  )
   lazy val sender: PublicKey = senderPublicKey
 
+  @ApiModelProperty(
+    value = "Order proofs as Base58 encoded signatures list. Required only for Proofs Authentication.",
+    dataType = "List[string]",
+    required = false
+  )
   lazy val proofs: Proofs = orderAuthentication match {
     case OrderAuthentication.OrderProofs(_, proofs) => proofs
     case OrderAuthentication.Eip712Signature(_) => Proofs.empty
   }
 
+  @ApiModelProperty(
+    value = "The way to set a single Order proof. Can be used as a replacement of 'proofs'. Required only for Proofs Authentication.",
+    dataType = "string",
+    required = false
+  )
   lazy val signature: ByteStr = proofs.toSignature
 
+  @ApiModelProperty(
+    name = "eip712Signature",
+    value = "Hex encoded eip712Signature. Required only for Metamask Authentication.",
+    dataType = "string",
+    example =
+      "0x9dfd57cfdb30d4a0fa9a6853f29c6e010e24c425fce228a5c3316596d7f88eea5a8fc8278d2c13f28df913b723ac07d82dce0d74121da042f7ec4275d301df2a1b",
+    required = false
+  )
   lazy val eip712Signature: Option[ByteStr] = orderAuthentication match {
     case OrderAuthentication.OrderProofs(_, _) => None
     case OrderAuthentication.Eip712Signature(sig) => Some(sig)
@@ -321,7 +346,7 @@ object Order extends EntityParser[Order] {
     order.parseBytes(bytes).get
   }
 
-  /** Can be used whenever Order V1 is serialized with prepended version, see [[com.wavesplatform.dex.domain.transaction.ExchangeTransactionV2]] */
+  /** Can be used whenever Order V1 is serialized with prepended version, see [[com.wavesplatform.dex.domain.transaction.ExchangeTransactionV3]] */
   override def statefulParse: Stateful[(Order, ConsumedBytesOffset)] =
     read[Byte]
       .transform { case (s, v) => s.copy(offset = s.offset - (if (v == 1) 0 else 1)) -> v }

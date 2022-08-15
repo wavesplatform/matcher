@@ -37,7 +37,7 @@ class ExchangeTransactionCreatorSpecification
     new ExchangeTransactionCreator(MatcherAccount, matcherSettings.exchangeTxBaseFee, hasMatcherScript, hasAssetScripts, (_, _) => false)
 
   "ExchangeTransactionCreator" should {
-    "create an ExchangeTransactionV2" when {
+    "create an ExchangeTransactionV3" when {
       (List(1, 2, 3) ++ List(1, 2, 3)).combinations(2).foreach {
         case List(counterVersion, submittedVersion) =>
           s"counterVersion=$counterVersion, submittedVersion=$submittedVersion" in {

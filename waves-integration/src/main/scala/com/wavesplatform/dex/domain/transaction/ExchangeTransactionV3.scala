@@ -16,28 +16,36 @@ import com.wavesplatform.dex.domain.utils.PBUtils
 import com.wavesplatform.dex.grpc.integration.protobuf.DexToPbConversions._
 import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions._
 import com.wavesplatform.protobuf.transaction.{SignedTransaction => PbSignedTransaction}
+import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import monix.eval.Coeval
 
 import scala.util.Try
 
+@ApiModel(value = "ExchangeTransaction")
 case class ExchangeTransactionV3(
-  buyOrder: Order,
-  sellOrder: Order,
-  amount: Long,
-  price: Long,
-  assetDecimalsPrice: Long,
-  buyMatcherFee: Long,
-  sellMatcherFee: Long,
-  fee: Long,
-  timestamp: Long,
-  proofs: Proofs
+  @ApiModelProperty(name = "order1", dataType = "com.wavesplatform.dex.domain.order.OrderV4") buyOrder: Order,
+  @ApiModelProperty(name = "order2", dataType = "com.wavesplatform.dex.domain.order.OrderV4") sellOrder: Order,
+  @ApiModelProperty() amount: Long,
+  @ApiModelProperty() price: Long,
+  @ApiModelProperty() assetDecimalsPrice: Long,
+  @ApiModelProperty() buyMatcherFee: Long,
+  @ApiModelProperty() sellMatcherFee: Long,
+  @ApiModelProperty() fee: Long,
+  @ApiModelProperty() timestamp: Long,
+  @ApiModelProperty(
+    value = "Exchange Transaction proofs as Base58 encoded signatures list",
+    dataType = "List[string]"
+  ) proofs: Proofs
 ) extends ExchangeTransaction {
 
+  @ApiModelProperty(dataType = "integer", example = "3", allowableValues = "1, 2, 3")
   override val version: Byte = 3
 
+  @ApiModelProperty(hidden = true)
   override val bodyBytes: Coeval[Array[Byte]] =
     Coeval.evalOnce(PBUtils.encodeDeterministic(this.toPBWaves.getWavesTransaction))
 
+  @ApiModelProperty(hidden = true)
   override val bytes: Coeval[Array[Byte]] =
     Coeval.evalOnce {
       val txBytes = PBUtils.encodeDeterministic(this.toPBWaves)

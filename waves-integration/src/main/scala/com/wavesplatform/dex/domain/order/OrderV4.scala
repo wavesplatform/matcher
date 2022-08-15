@@ -1,7 +1,6 @@
 package com.wavesplatform.dex.domain.order
 
 import cats.syntax.either._
-
 import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.deser.EntityParser
@@ -10,26 +9,54 @@ import com.wavesplatform.dex.domain.utils.PBUtils
 import com.wavesplatform.dex.grpc.integration.protobuf.DexToPbConversions._
 import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions._
 import com.wavesplatform.protobuf.order.{Order => PbOrder}
+import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import monix.eval.Coeval
 
+@ApiModel(value = "Order")
 case class OrderV4(
+  @ApiModelProperty(hidden = true)
   orderAuthentication: OrderAuthentication,
-  matcherPublicKey: PublicKey,
+  @ApiModelProperty(
+    value = "Base58 encoded Matcher Public Key",
+    dataType = "string",
+    example = "HBqhfdFASRQ5eBBpu2y6c6KKi1az6bMx8v1JxX4iW1Q8",
+    required = true
+  ) matcherPublicKey: PublicKey,
   assetPair: AssetPair,
-  orderType: OrderType,
-  amount: Long,
-  price: Long,
-  timestamp: Long,
-  expiration: Long,
-  matcherFee: Long,
+  @ApiModelProperty(
+    value = "Order type (sell or buy)",
+    dataType = "string",
+    example = "sell",
+    required = true
+  ) orderType: OrderType,
+  @ApiModelProperty() amount: Long,
+  @ApiModelProperty() price: Long,
+  @ApiModelProperty() timestamp: Long,
+  @ApiModelProperty() expiration: Long,
+  @ApiModelProperty() matcherFee: Long,
+  @ApiModelProperty(
+    name = "matcherFeeAssetId",
+    value = "Base58 encoded Matcher fee asset ID. Waves is used if field isn't specified",
+    dataType = "string",
+    example = "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS",
+    required = false
+  )
   override val feeAsset: Asset
 ) extends Order {
 
+  @ApiModelProperty(
+    value = "Order version, equals to 4",
+    dataType = "integer",
+    example = "4",
+    required = true
+  )
   override val version: Byte = 4
 
+  @ApiModelProperty(hidden = true)
   override val bodyBytes: Coeval[Array[Byte]] =
     Coeval.evalOnce(PBUtils.encodeDeterministic(copy(orderAuthentication = orderAuthentication.withoutProofs()).toPB))
 
+  @ApiModelProperty(hidden = true)
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(PBUtils.encodeDeterministic(this.toPB))
 
 }

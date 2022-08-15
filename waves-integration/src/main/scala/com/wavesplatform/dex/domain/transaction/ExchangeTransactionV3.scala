@@ -52,7 +52,7 @@ object ExchangeTransactionV3 extends ExchangeTransactionParser[ExchangeTransacti
   def convertPrice(price: Long, amountAssetDecimals: Int, priceAssetDecimals: Int): Either[GenericError, Long] =
     Either.catchNonFatal {
       (BigDecimal(price) / BigDecimal(10).pow(priceAssetDecimals - amountAssetDecimals)).toBigInt.bigInteger.longValueExact()
-    }.leftMap(_ => GenericError(s"price is not convertible to FIXED_DECIMALS $price, $amountAssetDecimals, $priceAssetDecimals"))
+    }.leftMap(_ => GenericError(s"price is not convertible to FIXED_DECIMALS: $price, $amountAssetDecimals, $priceAssetDecimals"))
 
   def mkSigned(
     amountAssetDecimals: Int,

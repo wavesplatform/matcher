@@ -29,6 +29,7 @@ trait Order extends Proven with Authorized {
 
   @ApiModelProperty(hidden = true)
   def orderAuthentication: OrderAuthentication
+
   def matcherPublicKey: PublicKey
   def assetPair: AssetPair
   def orderType: OrderType

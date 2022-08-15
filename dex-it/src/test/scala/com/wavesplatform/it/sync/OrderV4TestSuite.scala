@@ -7,11 +7,13 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.crypto.Proofs
 import com.wavesplatform.dex.domain.order.{EthOrders, Order, OrderAuthentication, OrderType}
+import com.wavesplatform.dex.error.OrderInvalidSignature
 import com.wavesplatform.dex.it.config.GenesisConfig
 import com.wavesplatform.dex.model.AcceptedOrder
 import com.wavesplatform.it.MatcherSuiteBase
 import org.web3j.crypto.{Bip32ECKeyPair, ECKeyPair, Keys}
 import org.web3j.utils.Numeric
+import play.api.libs.json.{JsString, Json}
 
 import scala.concurrent.duration._
 
@@ -19,6 +21,9 @@ class OrderV4TestSuite extends MatcherSuiteBase {
 
   //will be the same for waves & usd, see rate
   private val fee = 300_000L
+
+  private val eip712SignatureSample =
+    "0x9dfd57cfdb30d4a0fa9a6853f29c6e010e24c425fce228a5c3316596d7f88eea5a8fc8278d2c13f28df913b723ac07d82dce0d74121da042f7ec4275d301df2a1b"
 
   private val aliceEth = Bip32ECKeyPair.generateKeyPair(alice.seed)
 
@@ -44,6 +49,20 @@ class OrderV4TestSuite extends MatcherSuiteBase {
       test(aliceEthAdr, bobEthAdr, f => signEth(aliceEth, f), f => signEth(bobEth, f))
     }
 
+    "should work with mixed authentication" in {
+      test(alice, bobEthAdr, f => sign(alice, f), f => signEth(bobEth, f))
+    }
+
+    "should reject invalid eip712Signature" in {
+      val buy = signEth(aliceEth, mkOrderV4(wavesUsdPair, OrderType.BUY, 10.waves, 5.usd, Waves))
+      val buyJson = buy.json() ++ Json.obj(
+        "eip712Signature" -> JsString(eip712SignatureSample)
+      )
+      dex1.tryApi.place(buyJson) should failWith(
+        OrderInvalidSignature.code,
+        s"The signature of order ${buy.id()} is invalid: Ethereum signature is invalid"
+      )
+    }
   }
 
   private def test(
@@ -76,8 +95,8 @@ class OrderV4TestSuite extends MatcherSuiteBase {
   }
 
   private def signEth(signer: ECKeyPair, f: OrderAuthentication => Order): Order = {
-    val proofs = OrderAuthentication.Eip712Signature(ByteStr.empty)
-    EthOrders.signOrder(f(proofs), signer)
+    val sig = OrderAuthentication.Eip712Signature(ByteStr.empty)
+    EthOrders.signOrder(f(sig), signer)
   }
 
   private def mkOrderV4(

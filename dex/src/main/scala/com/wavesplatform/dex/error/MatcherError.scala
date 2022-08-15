@@ -162,7 +162,12 @@ final case class OrderInvalidSignature(orderId: Order.Id, details: String)
       OrderInvalidSignature.httpCode
     )
 
-object OrderInvalidSignature extends MatcherErrorCodeProvider(order, signature, commonClass, C.BadRequest)
+object OrderInvalidSignature extends MatcherErrorCodeProvider(order, signature, commonClass, C.BadRequest) {
+
+  def eth(orderId: Order.Id): OrderInvalidSignature =
+    OrderInvalidSignature(orderId, "Ethereum signature is invalid")
+
+}
 
 final case class UnexpectedFeeAsset(required: Set[Asset], given: Asset)
     extends MatcherError(

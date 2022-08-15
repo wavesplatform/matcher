@@ -4,6 +4,7 @@ import cats.data.EitherT
 import cats.implicits.catsStdInstancesForFuture
 import cats.instances.long.catsKernelStdGroupForLong
 import cats.instances.map.catsKernelStdCommutativeMonoidForMap
+import cats.syntax.apply._
 import cats.syntax.either._
 import cats.syntax.flatMap._
 import cats.syntax.option._
@@ -60,7 +61,7 @@ object OrderValidator extends ScorexLogging {
         Either.cond(
           signerKey == order.senderPublicKey,
           (),
-          error.OrderInvalidSignature(order.id(), "Ethereum signature invalid")
+          error.OrderInvalidSignature.eth(order.id())
         )
       case None =>
         Verifier
@@ -521,8 +522,10 @@ object OrderValidator extends ScorexLogging {
     else lift(order)
 
   def isExecutable(o: Order)(implicit efc: ErrorFormatterContext): Result[Unit] =
-    o.isExecutable(efc.unsafeAssetDecimals(o.assetPair.amountAsset), efc.unsafeAssetDecimals(o.assetPair.priceAsset))
-      .toEither.leftMap(error.OrderCommonValidationFailed(_))
+    Either.catchNonFatal(o.senderPublicKey) //can throw exception while recovering eth sender
+      .leftMap[MatcherError](_ => error.OrderInvalidSignature.eth(o.id())) *>
+    o.isExecutable(efc.unsafeAssetDecimals(o.assetPair.amountAsset), efc.unsafeAssetDecimals(o.assetPair.priceAsset)).toEither
+      .leftMap[MatcherError](error.OrderCommonValidationFailed(_))
 
   def timeAware(time: Time)(order: Order): Result[Unit] =
     for {

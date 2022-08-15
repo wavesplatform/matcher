@@ -125,7 +125,7 @@ object ExchangeTransaction {
 
   def parse(bytes: Array[Byte]): Try[ExchangeTransaction] =
     bytes.headOption
-      .fold(Failure(new Exception("Empty array")): Try[ExchangeTransaction]) { firstByte =>
+      .fold[Try[ExchangeTransaction]](Failure(new Exception("Empty array"))) { firstByte =>
         if (firstByte == 0)
           ExchangeTransactionV2.parseBytes(bytes).map(_._1)
         else if (firstByte == 7)

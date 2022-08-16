@@ -25,9 +25,9 @@ object PbToWavesConversions {
         data <- tx.data.exchange.toRight(GenericError("The transaction's data must be specified"))
         fee <- tx.fee.toRight(GenericError("The transaction's fee must be specified"))
         o1 <- Either.catchNonFatal(data.orders.head.toVanilla)
-          .leftMap(th => GenericError(s"Transaction's orders is corrupted: ${th.getMessage}"))
+          .leftMap(th => GenericError(s"Transaction's orders are corrupted: ${th.getMessage}"))
         o2 <- Either.catchNonFatal(data.orders.last.toVanilla)
-          .leftMap(th => GenericError(s"Transaction's orders is corrupted: ${th.getMessage}"))
+          .leftMap(th => GenericError(s"Transaction's orders are corrupted: ${th.getMessage}"))
         r <- {
           val proofs = Proofs(self.proofs.map(_.toVanilla))
           tx.version match {

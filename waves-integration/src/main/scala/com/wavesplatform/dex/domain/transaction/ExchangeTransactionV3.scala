@@ -186,7 +186,7 @@ object ExchangeTransactionV3 extends ExchangeTransactionParser[ExchangeTransacti
         data <- tx.data.exchange.toRight(new RuntimeException("The transaction's data must be specified"))
         orders <- data.orders.toList.traverse(_.toVanilla).leftMap(err => new RuntimeException(err.message))
         (buy, sell) <- Either.catchNonFatal(Order.splitByType(orders.head, orders(1)))
-          .leftMap(_ => new RuntimeException("The transaction's orders is corrupted"))
+          .leftMap(_ => new RuntimeException("The transaction's orders are corrupted"))
       } yield ExchangeTransactionV3(
         buy,
         sell,

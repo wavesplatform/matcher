@@ -88,6 +88,10 @@ trait Order extends Proven with Authorized {
     case OrderAuthentication.Eip712Signature(sig) => Some(sig)
   }
 
+  @ApiModelProperty(hidden = true)
+  lazy val eip712SignatureStr: Option[String] =
+    eip712Signature.map(bs => org.web3j.utils.Numeric.toHexString(bs.arr))
+
   def isExecutable(amountAssetDecimals: Int, priceAssetDecimals: Int): Validation =
     ExchangeTransactionV3.convertPrice(
       price,
@@ -173,7 +177,7 @@ trait Order extends Proven with Authorized {
     ) ++ (if (version >= 3) Json.obj("matcherFeeAssetId" -> feeAsset.maybeBase58Repr) else JsObject.empty) ++
     (if (version >= 4)
        Json.obj(
-         "eip712Signature" -> eip712Signature.map(bs => org.web3j.utils.Numeric.toHexString(bs.arr)),
+         "eip712Signature" -> eip712SignatureStr,
          "priceMode" -> "assetDecimals"
        )
      else JsObject.empty)
@@ -205,11 +209,10 @@ trait Order extends Proven with Authorized {
 
   override def hashCode(): Int = idStr.hashCode()
 
-  override def toString: String = {
-    val feeAssetStr = if (version >= 3) s" feeAsset=${feeAsset.toString}" else ""
-    s"OrderV$version(id=${idStr()}, sender=$senderPublicKey, matcher=$matcherPublicKey, pair=$assetPair, type=$orderType, amount=$amount, " +
-    s"price=$price, ts=$timestamp, exp=$expiration, fee=$matcherFee,$feeAssetStr, eip712Signature=$eip712Signature, proofs=$proofs)"
-  }
+  override def toString: String =
+    s"OrderV$version(id=${idStr()}, sender=$senderPublicKey, matcher=$matcherPublicKey, pair=$assetPair, type=$orderType, " +
+    s"amount=$amount, price=$price, ts=$timestamp, exp=$expiration, fee=$matcherFee, " +
+    s"feeAsset=${feeAsset.toString}, eip=Eip712Signature(${eip712SignatureStr.getOrElse("")}), proofs=$proofs)"
 
 }
 

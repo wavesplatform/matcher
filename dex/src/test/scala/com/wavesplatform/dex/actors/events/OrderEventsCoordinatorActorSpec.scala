@@ -18,7 +18,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.crypto.Proofs
 import com.wavesplatform.dex.domain.error.ValidationError
 import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV1}
-import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionResult, ExchangeTransactionV2}
+import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionResult, ExchangeTransactionV3}
 import com.wavesplatform.dex.grpc.integration.clients.domain.{AddressBalanceUpdates, TransactionWithChanges, WavesNodeUpdates}
 import com.wavesplatform.dex.grpc.integration.protobuf.DexToPbConversions._
 import com.wavesplatform.dex.model.Events.ExchangeTransactionCreated
@@ -53,18 +53,25 @@ class OrderEventsCoordinatorActorSpec
   private val validEvent =
     Events.OrderExecuted(LimitOrder(validSubmitted, None, None), LimitOrder(validCounter, None, None), nowTs, 2000L, 1000L, 0L)
 
-  private val validTx = ExchangeTransactionV2
-    .create(
-      buyOrder = validCounter,
-      sellOrder = validSubmitted,
-      amount = 100000,
-      price = 80000L,
-      buyMatcherFee = 2000L,
-      sellMatcherFee = 1000L,
-      fee = 300000L,
-      timestamp = nowTs,
-      proofs = Proofs.empty
-    ).transaction
+  private val validTx = {
+    val tx =
+      ExchangeTransactionV3
+        .mk(
+          amountAssetDecimals = 8,
+          priceAssetDecimals = defaultAssetDescriptionsMap(btc).decimals,
+          buyOrder = validCounter,
+          sellOrder = validSubmitted,
+          amount = 100000,
+          price = 80000L,
+          buyMatcherFee = 2000L,
+          sellMatcherFee = 1000L,
+          fee = 300000L,
+          timestamp = nowTs,
+          proofs = Proofs.empty
+        )
+    tx.toOption should not be empty
+    tx.transaction
+  }
 
   private val validTxSpendings = Map[Address, PositiveMap[Asset, Long]](
     validCounter.sender.toAddress -> PositiveMap(validEvent.counterExecutedSpending),

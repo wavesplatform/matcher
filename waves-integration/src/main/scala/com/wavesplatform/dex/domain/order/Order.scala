@@ -5,16 +5,15 @@ import com.wavesplatform.dex.domain.account.{KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
-import com.wavesplatform.dex.domain.bytes.ByteStr.byteStrFormat
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.bytes.deser.EntityParser
 import com.wavesplatform.dex.domain.bytes.deser.EntityParser.{ConsumedBytesOffset, Stateful}
 import com.wavesplatform.dex.domain.crypto
-import com.wavesplatform.dex.domain.crypto.{Proofs, Proven}
+import com.wavesplatform.dex.domain.crypto.{Authorized, Proofs, Proven}
 import com.wavesplatform.dex.domain.error.ValidationError
 import com.wavesplatform.dex.domain.error.ValidationError.GenericError
 import com.wavesplatform.dex.domain.order.OrderOps._
-import com.wavesplatform.dex.domain.serialization.ByteAndJsonSerializable
+import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV3
 import com.wavesplatform.dex.domain.validation.Validation
 import com.wavesplatform.dex.domain.validation.Validation.booleanOperators
 import io.swagger.annotations.ApiModelProperty
@@ -26,9 +25,11 @@ import scala.util.Try
 /**
  * Order to matcher service for asset exchange
  */
-trait Order extends ByteAndJsonSerializable with Proven {
+trait Order extends Proven with Authorized {
 
-  def senderPublicKey: PublicKey
+  @ApiModelProperty(hidden = true)
+  def orderAuthentication: OrderAuthentication
+
   def matcherPublicKey: PublicKey
   def assetPair: AssetPair
   def orderType: OrderType
@@ -37,34 +38,87 @@ trait Order extends ByteAndJsonSerializable with Proven {
   def timestamp: Long
   def expiration: Long
   def matcherFee: Long
-  def proofs: Proofs
   def version: Byte
-  def signature: Array[Byte] = proofs.toSignature
   def feeAsset: Asset = Waves
   def assets: Set[Asset] = Set(assetPair.amountAsset, assetPair.priceAsset, feeAsset)
 
   import Order._
 
   @ApiModelProperty(hidden = true)
-  val sender: PublicKey = senderPublicKey
+  lazy val senderPublicKey: PublicKey = orderAuthentication match {
+    case OrderAuthentication.OrderProofs(key, _) => key
+    case OrderAuthentication.Eip712Signature(sig) => EthOrders.recoverEthSignerKey(this, sig)
+  }
+
+  @ApiModelProperty(
+    name = "senderPublicKey",
+    value = "Base58 encoded Sender Public Key. Required only for Proofs Authentication.",
+    dataType = "string",
+    example = "HBqhfdFASRQ5eBBpu2y6c6KKi1az6bMx8v1JxX4iW1Q8",
+    required = false
+  )
+  lazy val sender: PublicKey = senderPublicKey
+
+  @ApiModelProperty(
+    value = "Order proofs as Base58 encoded signatures list. Required only for Proofs Authentication.",
+    dataType = "List[string]",
+    required = false
+  )
+  lazy val proofs: Proofs = orderAuthentication match {
+    case OrderAuthentication.OrderProofs(_, proofs) => proofs
+    case OrderAuthentication.Eip712Signature(_) => Proofs.empty
+  }
+
+  @ApiModelProperty(
+    value = "The way to set a single Order proof. Can be used as a replacement of 'proofs'. Required only for Proofs Authentication.",
+    dataType = "string",
+    required = false
+  )
+  lazy val signature: ByteStr = proofs.toSignature
+
+  @ApiModelProperty(
+    value = "Hex encoded eip712Signature. Required only for Metamask Authentication.",
+    dataType = "string",
+    example =
+      "0x9dfd57cfdb30d4a0fa9a6853f29c6e010e24c425fce228a5c3316596d7f88eea5a8fc8278d2c13f28df913b723ac07d82dce0d74121da042f7ec4275d301df2a1b",
+    required = false
+  )
+  lazy val eip712Signature: Option[ByteStr] = orderAuthentication match {
+    case OrderAuthentication.OrderProofs(_, _) => None
+    case OrderAuthentication.Eip712Signature(sig) => Some(sig)
+  }
+
+  @ApiModelProperty(hidden = true)
+  lazy val eip712SignatureStr: Option[String] =
+    eip712Signature.map(bs => org.web3j.utils.Numeric.toHexString(bs.arr))
+
+  def isExecutable(amountAssetDecimals: Int, priceAssetDecimals: Int): Validation =
+    ExchangeTransactionV3.convertPrice(
+      price,
+      amountAssetDecimals,
+      priceAssetDecimals
+    ).isRight :| "Price is not convertible to fixed decimals format" &&
+    eip712SignatureValid
 
   def isValid(atTime: Long): Validation =
-    isValidAmount(amount, price) &&
+    (amount > 0) :| "amount should be > 0" &&
+    (price > 0) :| "price should be > 0" &&
+    (amount < MaxAmount) :| "amount too large" &&
+    getSpendAmount(amount, price).isRight :| "SpendAmount too large" &&
+    (getSpendAmount(amount, price).getOrElse(0L) > 0) :| "SpendAmount should be > 0" &&
+    getReceiveAmount(amount, price).isRight :| "ReceiveAmount too large" &&
+    (getReceiveAmount(amount, price).getOrElse(0L) > 0) :| "ReceiveAmount should be > 0" &&
     assetPair.isValid &&
     (matcherFee > 0) :| "matcherFee should be > 0" &&
     (matcherFee < MaxAmount) :| "matcherFee too large" &&
     (timestamp > 0) :| "timestamp should be > 0" &&
     (expiration - atTime <= MaxLiveTime) :| "expiration should be earlier than 30 days" &&
-    (expiration >= atTime) :| "expiration should be > currentTime"
+    (expiration >= atTime) :| "expiration should be > currentTime" &&
+    eip712SignatureValid
 
-  def isValidAmount(matchAmount: Long, matchPrice: Long): Validation =
-    (matchAmount > 0) :| "amount should be > 0" &&
-    (matchPrice > 0) :| "price should be > 0" &&
-    (matchAmount < MaxAmount) :| "amount too large" &&
-    getSpendAmount(matchAmount, matchPrice).isRight :| "SpendAmount too large" &&
-    (getSpendAmount(matchAmount, matchPrice).getOrElse(0L) > 0) :| "SpendAmount should be > 0" &&
-    getReceiveAmount(matchAmount, matchPrice).isRight :| "ReceiveAmount too large" &&
-    (getReceiveAmount(matchAmount, matchPrice).getOrElse(0L) > 0) :| "ReceiveAmount should be > 0"
+  private lazy val eip712SignatureValid: Validation =
+    (eip712Signature.isEmpty || version >= 4) :| "eip712Signature available only since V4" &&
+    eip712Signature.forall(es => es.size == 65 || es.size == 129) :| "eip712Signature should be of length 65 or 129"
 
   @ApiModelProperty(hidden = true)
   val bodyBytes: Coeval[Array[Byte]]
@@ -104,7 +158,7 @@ trait Order extends ByteAndJsonSerializable with Proven {
     Order.getReceiveAmountD(orderType, matchAmount, matchPrice)
 
   @ApiModelProperty(hidden = true)
-  override val json: Coeval[JsObject] = Coeval.evalOnce {
+  val json: Coeval[JsObject] = Coeval.evalOnce {
     Json.obj(
       "version" -> version,
       "id" -> idStr(),
@@ -120,7 +174,13 @@ trait Order extends ByteAndJsonSerializable with Proven {
       "matcherFee" -> matcherFee,
       "signature" -> Base58.encode(signature),
       "proofs" -> proofs.proofs
-    )
+    ) ++ (if (version >= 3) Json.obj("matcherFeeAssetId" -> feeAsset.maybeBase58Repr) else JsObject.empty) ++
+    (if (version >= 4)
+       Json.obj(
+         "eip712Signature" -> eip712SignatureStr,
+         "priceMode" -> "assetDecimals"
+       )
+     else JsObject.empty)
   }
 
   def jsonStr: String = Json.stringify(json())
@@ -142,16 +202,17 @@ trait Order extends ByteAndJsonSerializable with Proven {
         proofs == o.proofs &&
         version == o.version &&
         java.util.Arrays.equals(signature, o.signature) &&
-        feeAsset == o.feeAsset
+        feeAsset == o.feeAsset &&
+        java.util.Arrays.equals(eip712Signature.getOrElse(ByteStr.empty), o.eip712Signature.getOrElse(ByteStr.empty))
     case _ => false
   }
 
   override def hashCode(): Int = idStr.hashCode()
 
-  override def toString: String = {
-    val feeAssetStr = if (version == 3) s" feeAsset=${feeAsset.toString}," else ""
-    s"OrderV$version(id=${idStr()}, sender=$senderPublicKey, matcher=$matcherPublicKey, pair=$assetPair, tpe=$orderType, amount=$amount, price=$price, ts=$timestamp, exp=$expiration, fee=$matcherFee,$feeAssetStr proofs=$proofs)"
-  }
+  override def toString: String =
+    s"OrderV$version(id=${idStr()}, sender=$senderPublicKey, matcher=$matcherPublicKey, pair=$assetPair, type=$orderType, " +
+    s"amount=$amount, price=$price, ts=$timestamp, exp=$expiration, fee=$matcherFee, " +
+    s"feeAsset=${feeAsset.toString}, eip=Eip712Signature(${eip712SignatureStr.getOrElse("")}), proofs=$proofs)"
 
 }
 
@@ -166,7 +227,7 @@ object Order extends EntityParser[Order] {
   val MaxAmount: Long = 100 * PriceConstant * PriceConstant
 
   def apply(
-    senderPublicKey: PublicKey,
+    orderAuthentication: OrderAuthentication,
     matcherPublicKey: PublicKey,
     assetPair: AssetPair,
     orderType: OrderType,
@@ -175,15 +236,21 @@ object Order extends EntityParser[Order] {
     timestamp: Long,
     expiration: Long,
     matcherFee: Long,
-    proofs: Proofs,
     version: Byte = 1,
     feeAsset: Asset = Asset.Waves
-  ): Order = version match {
-    case 1 => OrderV1(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, proofs)
-    case 2 => OrderV2(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, proofs)
-    case 3 => OrderV3(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, feeAsset, proofs)
-    case _ => throw new IllegalArgumentException(s"Invalid order version: $version")
-  }
+  ): Order =
+    version match {
+      case 1 =>
+        OrderV1(orderAuthentication, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee)
+      case 2 =>
+        OrderV2(orderAuthentication, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee)
+      case 3 =>
+        OrderV3(orderAuthentication, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, feeAsset)
+      case 4 =>
+        OrderV4(orderAuthentication, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, feeAsset)
+      case _ =>
+        throw new IllegalArgumentException(s"Invalid order version: $version")
+    }
 
   def buy(
     sender: KeyPair,
@@ -197,9 +264,10 @@ object Order extends EntityParser[Order] {
     version: Byte = 1,
     feeAsset: Asset = Waves
   ): Order = {
+    val oa = OrderAuthentication.OrderProofs(sender, Proofs.empty)
     val unsigned = version match {
-      case 3 => Order(sender, matcher, pair, OrderType.BUY, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version, feeAsset)
-      case _ => Order(sender, matcher, pair, OrderType.BUY, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version)
+      case 3 | 4 => Order(oa, matcher, pair, OrderType.BUY, amount, price, timestamp, expiration, matcherFee, version, feeAsset)
+      case _ => Order(oa, matcher, pair, OrderType.BUY, amount, price, timestamp, expiration, matcherFee, version)
     }
     sign(unsigned, sender)
   }
@@ -216,9 +284,10 @@ object Order extends EntityParser[Order] {
     version: Byte = 1,
     feeAsset: Asset = Waves
   ): Order = {
+    val oa = OrderAuthentication.OrderProofs(sender, Proofs.empty)
     val unsigned = version match {
-      case 3 => Order(sender, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version, feeAsset)
-      case _ => Order(sender, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version)
+      case 3 | 4 => Order(oa, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, version, feeAsset)
+      case _ => Order(oa, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, version)
     }
     sign(unsigned, sender)
   }
@@ -235,7 +304,8 @@ object Order extends EntityParser[Order] {
     matcherFee: Long,
     version: Byte
   ): Order = {
-    val unsigned = Order(sender, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version)
+    val oa = OrderAuthentication.OrderProofs(sender, Proofs.empty)
+    val unsigned = Order(oa, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee, version)
     sign(unsigned, sender)
   }
 
@@ -252,7 +322,8 @@ object Order extends EntityParser[Order] {
     version: Byte,
     feeAsset: Asset
   ): Order = {
-    val unsigned = Order(sender, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version, feeAsset)
+    val oa = OrderAuthentication.OrderProofs(sender, Proofs.empty)
+    val unsigned = Order(oa, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee, version, feeAsset)
     sign(unsigned, sender)
   }
 
@@ -272,13 +343,14 @@ object Order extends EntityParser[Order] {
       case 1 => OrderV1
       case 2 => OrderV2
       case 3 => OrderV3
+      case 4 => OrderV4
       case unexpected =>
         throw new RuntimeException(s"unexpected order version $unexpected")
     }
     order.parseBytes(bytes).get
   }
 
-  /** Can be used whenever Order V1 is serialized with prepended version, see [[com.wavesplatform.dex.domain.transaction.ExchangeTransactionV2]] */
+  /** Can be used whenever Order V1 is serialized with prepended version, see [[com.wavesplatform.dex.domain.transaction.ExchangeTransactionV3]] */
   override def statefulParse: Stateful[(Order, ConsumedBytesOffset)] =
     read[Byte]
       .transform { case (s, v) => s.copy(offset = s.offset - (if (v == 1) 0 else 1)) -> v }
@@ -287,6 +359,7 @@ object Order extends EntityParser[Order] {
           case 1 => OrderV1
           case 2 => OrderV2
           case 3 => OrderV3
+          case 4 => OrderV4
           case other => throw new IllegalArgumentException(s"Unexpected order version: $other")
         }
         ep.statefulParse.widen[(Order, ConsumedBytesOffset)]

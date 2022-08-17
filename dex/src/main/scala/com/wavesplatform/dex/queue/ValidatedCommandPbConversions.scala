@@ -9,8 +9,8 @@ import com.wavesplatform.dex.domain.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.error.ValidationError
 import com.wavesplatform.dex.domain.error.ValidationError.GenericError
-import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions0.PbByteStringOps
+import com.wavesplatform.dex.domain.order.{Order, OrderAuthentication, OrderType}
+import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions.PbByteStringOps
 import com.wavesplatform.dex.model.{LimitOrder, MarketOrder}
 import kamon.context.Context
 // format: off
@@ -133,6 +133,12 @@ object ValidatedCommandPbConversions {
     PbOrder(
       chainId = AddressScheme.current.chainId.toInt,
       senderPublicKey = PbByteString.copyFrom(order.senderPublicKey),
+      sender = order.orderAuthentication match {
+        case OrderAuthentication.OrderProofs(key, _) =>
+          PbOrder.Sender.SenderPublicKey0(PbByteString.copyFrom(key))
+        case OrderAuthentication.Eip712Signature(sig) =>
+          PbOrder.Sender.Eip712Signature(PbByteString.copyFrom(sig))
+      },
       matcherPublicKey = PbByteString.copyFrom(order.matcherPublicKey),
       assetPair = writeToPbAssetPair(order.assetPair).some,
       orderSide =
@@ -159,8 +165,16 @@ object ValidatedCommandPbConversions {
         case PbOrder.Side.SELL => Right(OrderType.SELL)
         case PbOrder.Side.Unrecognized(v) => Left(GenericError(s"Unknown order type: $v"))
       }
+      oa = pbOrder.sender match {
+        case PbOrder.Sender.Empty => //for backward compat
+          OrderAuthentication.OrderProofs(PublicKey(pbOrder.senderPublicKey.toVanilla), pbOrder.proofs.map(_.toVanilla))
+        case PbOrder.Sender.SenderPublicKey0(key) =>
+          OrderAuthentication.OrderProofs(PublicKey(key.toVanilla), pbOrder.proofs.map(_.toVanilla))
+        case PbOrder.Sender.Eip712Signature(sig) =>
+          OrderAuthentication.Eip712Signature(sig.toVanilla)
+      }
     } yield Order(
-      senderPublicKey = PublicKey(pbOrder.senderPublicKey.toVanilla),
+      orderAuthentication = oa,
       matcherPublicKey = PublicKey(pbOrder.matcherPublicKey.toVanilla),
       assetPair = assetPair,
       orderType = orderType,
@@ -170,7 +184,6 @@ object ValidatedCommandPbConversions {
       expiration = pbOrder.expiration,
       feeAsset = pbOrder.feeAssetId.toVanillaAsset,
       matcherFee = pbOrder.matcherFee,
-      proofs = pbOrder.proofs.map(_.toVanilla),
       version = pbOrder.version.toByte
     )
 

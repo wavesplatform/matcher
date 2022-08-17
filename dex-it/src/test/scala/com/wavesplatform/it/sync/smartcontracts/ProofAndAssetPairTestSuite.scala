@@ -7,7 +7,8 @@ import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.crypto.Proofs
-import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV2}
+import com.wavesplatform.dex.domain.model.Normalization
+import com.wavesplatform.dex.domain.order.{Order, OrderAuthentication, OrderType, OrderV2}
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.error.{AccountScriptDeniedOrder, AccountScriptReturnedError}
 import com.wavesplatform.dex.it.api.responses.dex.MatcherError
@@ -214,7 +215,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
           log.debug(s"contract: $sc")
           setAliceScript(sc)
 
-          val aliceOrd1 = mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
+          val aliceOrd1 = mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.usd * Order.PriceConstant, smartMatcherFee, version = 2)
           placeAndAwaitAtDex(aliceOrd1)
 
           val aliceOrd2 = mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
@@ -234,24 +235,24 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
 
           val currTime = System.currentTimeMillis()
 
+          val oa = OrderAuthentication.OrderProofs(alice, Proofs.empty)
           val unsigned =
             OrderV2(
-              alice,
+              oa,
               matcher,
               predefAssetPair,
               OrderType.BUY,
               500,
-              2.waves * Order.PriceConstant,
+              2.usd * Order.PriceConstant,
               currTime,
               (30.days - 1.seconds).toMillis + currTime,
-              smartMatcherFee,
-              Proofs.empty
+              smartMatcherFee
             )
 
           val sigAlice = ByteStr(crypto.sign(alice, unsigned.bodyBytes()))
           val sigBob = ByteStr(crypto.sign(bob, unsigned.bodyBytes()))
 
-          val signed = unsigned.copy(proofs = Proofs(Seq(sigAlice, sigBob)))
+          val signed = unsigned.copy(orderAuthentication = oa.updateProofs(Proofs(Seq(sigAlice, sigBob))))
           placeAndAwaitAtDex(signed)
 
           dex1.api.cancelOneOrAllInPairOrdersWithSig(alice, signed)
@@ -264,7 +265,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
       "place order and then set contract on AssetPairs/true/all fields/one proof" - {
         for ((sc, i) <- Seq(sc1, sc3, sc4, sc5).zip(Seq(1, 3, 4, 5))) s"$i" in {
           val aliceOrd1 =
-            mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, matcherFee = smartMatcherFee, version = 2)
+            mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.usd * Order.PriceConstant, matcherFee = smartMatcherFee, version = 2)
           placeAndAwaitAtDex(aliceOrd1)
 
           val aliceOrd2 =
@@ -274,7 +275,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
           setAliceScript(sc)
 
           val bobOrd1 =
-            mkOrder(bob, predefAssetPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, matcherFee = smartMatcherFee, version = 2)
+            mkOrder(bob, predefAssetPair, OrderType.SELL, 500, 2.usd * Order.PriceConstant, matcherFee = smartMatcherFee, version = 2)
           dex1.api.place(bobOrd1)
 
           val bobOrd2 = mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, matcherFee = smartMatcherFee, version = 2)
@@ -302,28 +303,28 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
           for (assetP <- Seq(predefAssetPair, aliceWavesPair)) {
             val currTime = System.currentTimeMillis()
 
+            val oa = OrderAuthentication.OrderProofs(alice, Proofs.empty)
             val unsigned =
               OrderV2(
-                alice,
+                oa,
                 matcher,
                 assetP,
                 OrderType.BUY,
                 500,
-                2.waves * Order.PriceConstant,
+                Normalization.normalizeAmountAndFee(2, assetDecimalsMap(assetP.priceAsset)) * Order.PriceConstant,
                 currTime,
                 (30.days - 1.seconds).toMillis + currTime,
-                smartMatcherFee,
-                Proofs.empty
+                smartMatcherFee
               )
 
             val sigAlice = ByteStr(crypto.sign(alice, unsigned.bodyBytes()))
             val sigMat = ByteStr(crypto.sign(matcher.privateKey, unsigned.bodyBytes()))
-            placeAndAwaitAtDex(unsigned.copy(proofs = Proofs(Seq(sigAlice, ByteStr.empty, sigMat))))
+            placeAndAwaitAtDex(unsigned.copy(orderAuthentication = oa.updateProofs(Proofs(Seq(sigAlice, ByteStr.empty, sigMat)))))
           }
 
           setAliceScript(sc)
 
-          val bobOrd1 = mkOrder(bob, predefAssetPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
+          val bobOrd1 = mkOrder(bob, predefAssetPair, OrderType.SELL, 500, 2.usd * Order.PriceConstant, smartMatcherFee, version = 2)
           dex1.api.place(bobOrd1)
 
           val bobOrd2 = mkOrder(bob, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
@@ -348,7 +349,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
           setAliceScript(sc)
 
           dex1.tryApi.place(
-            mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
+            mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.usd * Order.PriceConstant, smartMatcherFee, version = 2)
           ) should failWith(
             AccountScriptDeniedOrder.code,
             MatcherError.Params(address = Some(alice.toAddress.stringRepr))
@@ -365,7 +366,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
         "9" in {
           setAliceScript(sc9)
           dex1.tryApi.place(
-            mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
+            mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.usd * Order.PriceConstant, smartMatcherFee, version = 2)
           ) should failWith(
             AccountScriptReturnedError.code,
             "An access to the blockchain.height is denied on DEX"
@@ -377,7 +378,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
 
       "place order and then set contract" - {
         for ((contract, i) <- Seq(sc2, sc7, sc8, sc9).zip(Seq(2, 7, 8, 9))) s"$i" in {
-          val aliceOrd1 = mkOrder(alice, predefAssetPair, OrderType.BUY, 100, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
+          val aliceOrd1 = mkOrder(alice, predefAssetPair, OrderType.BUY, 100, 2.usd * Order.PriceConstant, smartMatcherFee, version = 2)
           placeAndAwaitAtDex(aliceOrd1)
 
           val aliceOrd2 = mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
@@ -385,7 +386,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
 
           setAliceScript(contract)
 
-          val bobOrd1 = mkOrder(bob, predefAssetPair, OrderType.SELL, 100, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
+          val bobOrd1 = mkOrder(bob, predefAssetPair, OrderType.SELL, 100, 2.usd * Order.PriceConstant, smartMatcherFee, version = 2)
           dex1.api.place(bobOrd1)
 
           val bobOrd2 = mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)

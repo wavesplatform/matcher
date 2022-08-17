@@ -7,8 +7,9 @@ import scorex.crypto.signatures.{Curve25519, Signature, PrivateKey => SPrivateKe
 
 package object crypto {
 
-  val SignatureLength: Int = Curve25519.SignatureLength
-  val KeyLength: Int = Curve25519.KeyLength
+  val SignatureLength: Int = Curve25519.SignatureLength //64
+  val KeyLength: Int = Curve25519.KeyLength //32
+  val EthereumKeyLength: Int = 64
 
   val DigestSize: Int = 32
 

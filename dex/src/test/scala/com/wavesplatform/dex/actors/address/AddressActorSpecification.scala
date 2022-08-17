@@ -19,7 +19,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.crypto.Proofs
 import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV1}
 import com.wavesplatform.dex.domain.state.{LeaseBalance, Portfolio}
-import com.wavesplatform.dex.domain.transaction.{ExchangeTransactionResult, ExchangeTransactionV2}
+import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV3
 import com.wavesplatform.dex.error.{MatcherError, OrderDuplicate, UnexpectedError}
 import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
@@ -27,10 +27,10 @@ import com.wavesplatform.dex.model.Events.{OrderAdded, OrderAddedReason, OrderCa
 import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder, MarketOrder, OrderValidator}
 import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
-import org.scalatest.{BeforeAndAfterAll, EitherValues}
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
+import org.scalatest.{BeforeAndAfterAll, EitherValues}
 
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicReference
@@ -410,7 +410,9 @@ class AddressActorSpecification
           val duplicatedMarketOrder = MarketOrder(duplicatedOrder, duplicatedOrder.amount, None, None)
 
           addOrder(LimitOrder(duplicatedOrder, None, None))
-          val matchTx = ExchangeTransactionV2(
+          val matchTx = ExchangeTransactionV3.mk(
+            8,
+            8,
             duplicatedMarketOrder.order,
             counterOrder,
             duplicatedMarketOrder.amount,
@@ -421,9 +423,12 @@ class AddressActorSpecification
             System.currentTimeMillis,
             Proofs(List.empty)
           )
+          withClue(matchTx) {
+            matchTx.toOption shouldBe empty
+          }
           ref ! AddressActor.Command.ApplyOrderBookExecuted(AddressActor.OrderBookExecutedEvent(
             OrderExecuted(duplicatedMarketOrder, LimitOrder(counterOrder, None, None), System.currentTimeMillis, 0L, 0L, 0L),
-            ExchangeTransactionResult.fromEither(Right(()), matchTx)
+            matchTx
           ))
 
           val probe = TestProbe()

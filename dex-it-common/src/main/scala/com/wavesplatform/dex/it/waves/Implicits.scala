@@ -74,7 +74,7 @@ trait ToWavesJConversions {
           .sender(self.sender)
           .fee(self.fee)
           .timestamp(self.timestamp)
-          .version(2)
+          .version(self.version)
           .getUnsigned
 
       self.proofs.zipWithIndex.foldLeft(unsignedTx) {

@@ -79,6 +79,9 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
 
   private val pair: AssetPair = AssetPair(mkAssetId("WAVES"), mkAssetId("USD"))
 
+  implicit private val assetDecimalsMap: Map[Asset, Int] =
+    Map(pair.amountAsset -> 8, pair.priceAsset -> 2) ++ defaultAssetDescriptionsMap.view.mapValues(_.decimals).toMap
+
   private val addressDir = system.actorOf(
     Props(
       new AddressDirectoryActor(

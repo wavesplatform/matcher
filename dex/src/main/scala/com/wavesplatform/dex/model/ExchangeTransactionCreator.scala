@@ -4,7 +4,8 @@ import com.wavesplatform.dex.domain.account.{KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.Order
-import com.wavesplatform.dex.domain.transaction.{ExchangeTransactionResult, ExchangeTransactionV2}
+import com.wavesplatform.dex.domain.transaction.{ExchangeTransactionResult, ExchangeTransactionV3}
+import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.model.Events.OrderExecuted
 import com.wavesplatform.dex.queue.ValidatedCommandWithMeta
 import com.wavesplatform.dex.model.ExchangeTransactionCreator._
@@ -15,9 +16,9 @@ class ExchangeTransactionCreator(
   hasMatcherAccountScript: => Boolean,
   hasAssetScript: IssuedAsset => Boolean,
   shouldPassExecParams: (Option[ValidatedCommandWithMeta.Offset], PublicKey) => Boolean
-) {
+)(implicit efc: ErrorFormatterContext) {
 
-  def createTransaction(orderExecutedEvent: OrderExecuted): ExchangeTransactionResult[ExchangeTransactionV2] = {
+  def createTransaction(orderExecutedEvent: OrderExecuted): ExchangeTransactionResult[ExchangeTransactionV3] = {
     import orderExecutedEvent.{counter, executedAmount, submitted, timestamp}
     val (buy, sell) = Order.splitByType(submitted.order, counter.order)
 
@@ -45,7 +46,9 @@ class ExchangeTransactionCreator(
       // TODO This will be fixed in NODE 1.2.8+, see NODE-2183
       List(orderExecutedEvent.counter.feeAsset, orderExecutedEvent.submitted.feeAsset)
         .count(_.fold(false)(hasAssetScript)) * OrderValidator.ScriptExtraFee
-    ExchangeTransactionV2.create(
+    ExchangeTransactionV3.mkSigned(
+      efc.unsafeAssetDecimals(buy.assetPair.amountAsset),
+      efc.unsafeAssetDecimals(buy.assetPair.priceAsset),
       matcherPrivateKey,
       buyWithExecutionInfo,
       sellWithExecutionInfo,
@@ -62,7 +65,7 @@ class ExchangeTransactionCreator(
 
 object ExchangeTransactionCreator {
 
-  type CreateTransaction = OrderExecuted => ExchangeTransactionResult[ExchangeTransactionV2]
+  type CreateTransaction = OrderExecuted => ExchangeTransactionResult[ExchangeTransactionV3]
 
   /**
    * This function is used for the following purposes:

@@ -4,6 +4,7 @@ import cats.data.EitherT
 import cats.implicits.catsStdInstancesForFuture
 import cats.instances.long.catsKernelStdGroupForLong
 import cats.instances.map.catsKernelStdCommutativeMonoidForMap
+import cats.syntax.apply._
 import cats.syntax.either._
 import cats.syntax.flatMap._
 import cats.syntax.option._
@@ -18,7 +19,7 @@ import com.wavesplatform.dex.domain.feature.{BlockchainFeature, BlockchainFeatur
 import com.wavesplatform.dex.domain.model.Normalization
 import com.wavesplatform.dex.domain.model.Normalization._
 import com.wavesplatform.dex.domain.order.OrderOps._
-import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.domain.order.{EthOrders, Order, OrderType}
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.effect._
@@ -54,12 +55,22 @@ object OrderValidator extends ScorexLogging {
   private[dex] def multiplyFeeByBigDecimal(f: Long, d: BigDecimal): Long = (BigDecimal(f) * d).setScale(0, RoundingMode.CEILING).toLong
 
   private def verifySignature(order: Order): FutureResult[Unit] = liftAsync {
-    Verifier
-      .verifyAsEllipticCurveSignature(order)
-      .bimap(
-        e => error.OrderInvalidSignature(order.id(), e.toString),
-        _ => ()
-      )
+    order.eip712Signature match {
+      case Some(es) =>
+        val signerKey = EthOrders.recoverEthSignerKey(order, es.arr)
+        Either.cond(
+          signerKey == order.senderPublicKey,
+          (),
+          error.OrderInvalidSignature.eth(order.id())
+        )
+      case None =>
+        Verifier
+          .verifyAsEllipticCurveSignature(order)
+          .bimap(
+            e => error.OrderInvalidSignature(order.id(), e.toString),
+            _ => ()
+          )
+    }
   }
 
   private def verifyOrderByAccountScript(blockchain: WavesBlockchainClient, address: Address, order: Order, handleProofs: Order => Order)(
@@ -151,6 +162,7 @@ object OrderValidator extends ScorexLogging {
       case 1 => liftValueAsync(version)
       case 2 => checkFeatureSupport(BlockchainFeatures.SmartAccountTrading)
       case 3 => checkFeatureSupport(BlockchainFeatures.OrderV3)
+      case 4 => checkFeatureSupport(BlockchainFeatures.RideV6)
       case _ => liftErrorAsync(error.UnsupportedOrderVersion(version))
     }
   }
@@ -509,7 +521,13 @@ object OrderValidator extends ScorexLogging {
       } yield order
     else lift(order)
 
-  def timeAware(time: Time)(order: Order): Result[Order] =
+  def isExecutable(o: Order)(implicit efc: ErrorFormatterContext): Result[Unit] =
+    Either.catchNonFatal(o.senderPublicKey) //can throw exception while recovering eth sender
+      .leftMap[MatcherError](_ => error.OrderInvalidSignature.eth(o.id())) *>
+    o.isExecutable(efc.unsafeAssetDecimals(o.assetPair.amountAsset), efc.unsafeAssetDecimals(o.assetPair.priceAsset)).toEither
+      .leftMap[MatcherError](error.OrderCommonValidationFailed(_))
+
+  def timeAware(time: Time)(order: Order): Result[Unit] =
     for {
       _ <- cond(
         order.expiration > time.correctedTime() + MinExpiration,
@@ -517,7 +535,7 @@ object OrderValidator extends ScorexLogging {
         error.WrongExpiration(time.correctedTime(), MinExpiration, order.expiration)
       )
       _ <- order.isValid(time.correctedTime()).toEither.leftMap(error.OrderCommonValidationFailed(_))
-    } yield order
+    } yield ()
 
   private def validateBalance(acceptedOrder: AcceptedOrder, tradableBalance: Asset => Long, orderBookCache: OrderBookAggregatedSnapshot)(implicit
     efc: ErrorFormatterContext

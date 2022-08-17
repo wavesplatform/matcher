@@ -17,7 +17,7 @@ import com.wavesplatform.dex.domain.crypto.Proofs
 import com.wavesplatform.dex.domain.error.ValidationError
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.state.{LeaseBalance, Portfolio}
-import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV2
+import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV3
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
@@ -45,6 +45,7 @@ class ActorsWebSocketInteractionsSpecification
   private val testKit = ActorTestKit()
 
   implicit private val efc: ErrorFormatterContext = ErrorFormatterContext.from(asset => getDefaultAssetDescriptions(asset).decimals)
+  implicit private val assetDecimalsMap: Map[Asset, Int] = defaultAssetDescriptionsMap.view.mapValues(_.decimals).toMap
 
   class WebSocketTestEnvironment {
     val commandsProbe: TestProbe = TestProbe()
@@ -133,8 +134,10 @@ class ActorsWebSocketInteractionsSpecification
       val (counterExecutedFee, submittedExecutedFee) = Fee.getMakerTakerFee(DynamicSettings.symmetric(0.003.waves))(s, c)
       val oe = OrderExecuted(s, c, System.currentTimeMillis, counterExecutedFee, submittedExecutedFee, 0L)
       val (sellOrder, buyOrder) = if (oe.counter.isSellOrder) (oe.counter, oe.submitted) else (oe.submitted, oe.counter)
-      val tx = ExchangeTransactionV2
-        .create(
+      val tx = ExchangeTransactionV3
+        .mk(
+          amountAssetDecimals = defaultAssetDescriptionsMap(Waves).decimals,
+          priceAssetDecimals = defaultAssetDescriptionsMap(usd).decimals,
           buyOrder = buyOrder.order,
           sellOrder = sellOrder.order,
           amount = oe.executedAmount,

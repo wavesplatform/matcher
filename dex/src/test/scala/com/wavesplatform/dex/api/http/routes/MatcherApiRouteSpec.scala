@@ -43,7 +43,7 @@ import com.wavesplatform.dex.domain.order.OrderJson._
 import com.wavesplatform.dex.domain.order.OrderOps._
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV2
+import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV3
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.error.{AddressIsBlacklisted, CanNotPersistEvent, InvalidAddress, InvalidJson, OrderDuplicate, OrderNotFound, RequestInvalidSignature, UnsupportedContentType, UserPublicKeyIsNotValid}
@@ -1351,8 +1351,10 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
 
     val exchangeTxStorage = ExchangeTxStorage.levelDB(asyncLevelDb)
     exchangeTxStorage.put(
-      ExchangeTransactionV2
-        .create(
+      ExchangeTransactionV3
+        .mkSigned(
+          amountAssetDecimals = 8,
+          priceAssetDecimals = 8,
           matcherKeyPair.privateKey,
           okOrder.updateType(BUY),
           okOrder.updateType(SELL),

@@ -64,7 +64,7 @@ final class PlaceRoute(
         value = "Json with data",
         required = true,
         paramType = "body",
-        dataType = "com.wavesplatform.dex.domain.order.OrderV3"
+        dataType = "com.wavesplatform.dex.domain.order.OrderV4"
       )
     )
   )
@@ -87,7 +87,7 @@ final class PlaceRoute(
         value = "Json with data",
         required = true,
         paramType = "body",
-        dataType = "com.wavesplatform.dex.domain.order.OrderV3"
+        dataType = "com.wavesplatform.dex.domain.order.OrderV4"
       )
     )
   )

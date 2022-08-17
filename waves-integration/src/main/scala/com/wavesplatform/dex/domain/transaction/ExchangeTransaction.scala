@@ -1,17 +1,14 @@
 package com.wavesplatform.dex.domain.transaction
 
-import com.wavesplatform.dex.domain.account.{Address, PublicKey}
+import com.wavesplatform.dex.domain.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.crypto.Proven
-import com.wavesplatform.dex.domain.error.ValidationError
-import com.wavesplatform.dex.domain.error.ValidationError._
-import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.serialization.ByteAndJsonSerializable
-import com.wavesplatform.dex.domain.utils._
 import io.swagger.annotations.ApiModelProperty
 import monix.eval.Coeval
 import play.api.libs.json._
@@ -24,6 +21,7 @@ trait ExchangeTransaction extends ByteAndJsonSerializable with Proven {
   def sellOrder: Order
   def amount: Long
   def price: Long
+  def assetDecimalsPrice: Long
   def buyMatcherFee: Long
   def sellMatcherFee: Long
   def fee: Long
@@ -46,7 +44,7 @@ trait ExchangeTransaction extends ByteAndJsonSerializable with Proven {
     dataType = "string",
     example = "HBqhfdFASRQ5eBBpu2y6c6KKi1az6bMx8v1JxX4iW1Q8"
   )
-  override val sender: PublicKey = buyOrder.matcherPublicKey
+  override lazy val sender: PublicKey = buyOrder.matcherPublicKey
 
   @ApiModelProperty(
     name = "sender",
@@ -54,7 +52,7 @@ trait ExchangeTransaction extends ByteAndJsonSerializable with Proven {
     dataType = "string",
     example = "w8NXgupYEEkif24kbhnV3PEjHv3JGjcWNoG"
   )
-  val senderAddress: Address = sender.toAddress
+  lazy val senderAddress: Address = sender.toAddress
 
   @ApiModelProperty(
     name = "type",
@@ -79,6 +77,7 @@ trait ExchangeTransaction extends ByteAndJsonSerializable with Proven {
   protected def jsonBase(): JsObject =
     Json.obj(
       "type" -> typeId,
+      "chainId" -> AddressScheme.current.chainId,
       "id" -> id().base58,
       "sender" -> senderAddress.stringRepr,
       "senderPublicKey" -> Base58.encode(sender),
@@ -95,6 +94,7 @@ trait ExchangeTransaction extends ByteAndJsonSerializable with Proven {
       "order2" -> sellOrder.json(),
       "amount" -> amount,
       "price" -> price,
+      "assetDecimalsPrice" -> assetDecimalsPrice,
       "buyMatcherFee" -> buyMatcherFee,
       "sellMatcherFee" -> sellMatcherFee
     )
@@ -120,46 +120,18 @@ object ExchangeTransaction {
 
   val typeId: Byte = 7
 
+  private[transaction] def orderMark(version: Byte): Array[Byte] =
+    if (version == 1) Array(1: Byte) else Array.emptyByteArray
+
   def parse(bytes: Array[Byte]): Try[ExchangeTransaction] =
     bytes.headOption
-      .fold(Failure(new Exception("Empty array")): Try[ExchangeTransaction]) { b =>
-        val etp = if (b == 0) ExchangeTransactionV2 else ExchangeTransactionV1
-        etp.parseBytes(bytes).map(_._1).flatMap(validateExchangeParams(_).foldToTry)
+      .fold[Try[ExchangeTransaction]](Failure(new Exception("Empty array"))) { firstByte =>
+        if (firstByte == 0)
+          ExchangeTransactionV2.parseBytes(bytes).map(_._1)
+        else if (firstByte == 7)
+          ExchangeTransactionV1.parseBytes(bytes).map(_._1)
+        else //firstByte = 1
+          ExchangeTransactionV3.parseBytes(bytes).map(_._1)
       }
-
-  def validateExchangeParams(tx: ExchangeTransaction): Either[ValidationError, ExchangeTransaction] =
-    validateExchangeParams(tx.buyOrder, tx.sellOrder, tx.amount, tx.price, tx.buyMatcherFee, tx.sellMatcherFee, tx.fee, tx.timestamp).map(_ => tx)
-
-  def validateExchangeParams(
-    buyOrder: Order,
-    sellOrder: Order,
-    amount: Long,
-    price: Long,
-    buyMatcherFee: Long,
-    sellMatcherFee: Long,
-    fee: Long,
-    timestamp: Long
-  ): Either[ValidationError, Unit] =
-    for {
-      _ <- Either.cond(fee > 0, (), InsufficientFee())
-      _ <- Either.cond(amount > 0, (), NonPositiveAmount(amount, "assets"))
-      _ <- Either.cond(amount <= Order.MaxAmount, (), GenericError("amount too large"))
-      _ <- Either.cond(price > 0, (), GenericError("price should be > 0"))
-      _ <- Either.cond(price <= Order.MaxAmount, (), GenericError("price too large"))
-      _ <- Either.cond(sellMatcherFee <= Order.MaxAmount, (), GenericError("sellMatcherFee too large"))
-      _ <- Either.cond(buyMatcherFee <= Order.MaxAmount, (), GenericError("buyMatcherFee too large"))
-      _ <- Either.cond(fee <= Order.MaxAmount, (), GenericError("fee too large"))
-      _ <- Either.cond(buyOrder.orderType == OrderType.BUY, (), GenericError("buyOrder should has OrderType.BUY"))
-      _ <- Either.cond(sellOrder.orderType == OrderType.SELL, (), GenericError("sellOrder should has OrderType.SELL"))
-      _ <- Either.cond(
-        buyOrder.matcherPublicKey == sellOrder.matcherPublicKey,
-        (),
-        GenericError("buyOrder.matcher should be the same as sellOrder.matcher")
-      )
-      _ <- Either.cond(buyOrder.assetPair == sellOrder.assetPair, (), GenericError("Both orders should have same AssetPair"))
-      _ <- Either.cond(buyOrder.isValid(timestamp), (), OrderValidationError(buyOrder, buyOrder.isValid(timestamp).messages()))
-      _ <- Either.cond(sellOrder.isValid(timestamp), (), OrderValidationError(sellOrder, sellOrder.isValid(timestamp).labels.mkString("\n")))
-      _ <- Either.cond(price <= buyOrder.price && price >= sellOrder.price, (), GenericError("priceIsValid"))
-    } yield ()
 
 }

@@ -6,7 +6,8 @@ import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.crypto.Proofs
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.OrderOps._
-import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV2
+import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV3
+import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
@@ -26,6 +27,9 @@ class ExchangeTransactionCreatorSpecification
     with NoShrink
     with TableDrivenPropertyChecks {
 
+  implicit val efc: ErrorFormatterContext =
+    ErrorFormatterContext.from(defaultAssetDescriptionsMap.view.mapValues(_.decimals).toMap.getOrElse(_, 8))
+
   private def getExchangeTransactionCreator(
     hasMatcherScript: Boolean = false,
     hasAssetScripts: Asset => Boolean = _ => false
@@ -33,7 +37,7 @@ class ExchangeTransactionCreatorSpecification
     new ExchangeTransactionCreator(MatcherAccount, matcherSettings.exchangeTxBaseFee, hasMatcherScript, hasAssetScripts, (_, _) => false)
 
   "ExchangeTransactionCreator" should {
-    "create an ExchangeTransactionV2" when {
+    "create an ExchangeTransactionV3" when {
       (List(1, 2, 3) ++ List(1, 2, 3)).combinations(2).foreach {
         case List(counterVersion, submittedVersion) =>
           s"counterVersion=$counterVersion, submittedVersion=$submittedVersion" in {
@@ -43,13 +47,14 @@ class ExchangeTransactionCreatorSpecification
             val tc = getExchangeTransactionCreator()
             val oe = mkOrderExecutedRaw(submitted, counter)
 
-            tc.createTransaction(oe).transaction shouldBe a[ExchangeTransactionV2]
+            tc.createTransaction(oe).transaction shouldBe a[ExchangeTransactionV3]
           }
         case _ => throw new RuntimeException("Unexpected list")
       }
     }
 
     "take fee from order executed event" when {
+
       "orders are matched fully" in {
         val preconditions = for { ((_, buyOrder), (_, sellOrder)) <- orderV3MirrorPairGenerator } yield (buyOrder, sellOrder)
         test(preconditions)

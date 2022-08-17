@@ -8,7 +8,7 @@ import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.crypto.Proofs
-import com.wavesplatform.dex.domain.transaction.{ExchangeTransactionResult, ExchangeTransactionV2}
+import com.wavesplatform.dex.domain.transaction.{ExchangeTransactionResult, ExchangeTransactionV3}
 import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.Events.OrderExecuted
@@ -84,10 +84,12 @@ class OrderHistoryStub(system: ActorSystem, time: Time, maxActiveOrders: Int, ma
 
   def processAll(events: Events.Event*): Unit = events.foreach(process)
 
-  private def mkExchangeTx(oe: OrderExecuted): ExchangeTransactionResult[ExchangeTransactionV2] = {
+  private def mkExchangeTx(oe: OrderExecuted): ExchangeTransactionResult[ExchangeTransactionV3] = {
     val (sellOrder, buyOrder) = if (oe.counter.isSellOrder) (oe.counter, oe.submitted) else (oe.submitted, oe.counter)
-    ExchangeTransactionV2
-      .create(
+    ExchangeTransactionV3
+      .mk(
+        amountAssetDecimals = 8,
+        priceAssetDecimals = 8,
         buyOrder = buyOrder.order,
         sellOrder = sellOrder.order,
         amount = sellOrder.amount,

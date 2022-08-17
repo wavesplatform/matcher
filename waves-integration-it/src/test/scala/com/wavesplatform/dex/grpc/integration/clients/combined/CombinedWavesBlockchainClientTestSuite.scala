@@ -9,7 +9,7 @@ import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionV2}
+import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionV3}
 import com.wavesplatform.dex.grpc.integration.IntegrationSuiteBase
 import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
 import com.wavesplatform.dex.grpc.integration.clients.domain.portfolio.SynchronizedPessimisticPortfolios
@@ -200,8 +200,10 @@ class CombinedWavesBlockchainClientTestSuite extends IntegrationSuiteBase with H
       val sell = mkOrder(fakeBob, pair, OrderType.SELL, executedAmount, executedPrice, matcher = matcher)
 
       val exchangeTx =
-        ExchangeTransactionV2
-          .create(
+        ExchangeTransactionV3
+          .mkSigned(
+            amountAssetDecimals = 2,
+            priceAssetDecimals = 8,
             matcher = matcher,
             buyOrder = buy,
             sellOrder = sell,

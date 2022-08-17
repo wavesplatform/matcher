@@ -13,9 +13,8 @@ final case class ExchangeTransactionResult[A <: ExchangeTransaction](transaction
   // returns Some only if there is no error
   def toOption: Option[A] = error.fold(transaction.some)(_ => None)
 
-  // works always, because we always have a transaction
-  def map[B <: ExchangeTransaction](f: A => B): ExchangeTransactionResult[B] =
-    copy(transaction = f(transaction))
+  def map(f: A => A): ExchangeTransactionResult[A] =
+    error.fold(copy(transaction = f(transaction)))(_ => this)
 
 }
 

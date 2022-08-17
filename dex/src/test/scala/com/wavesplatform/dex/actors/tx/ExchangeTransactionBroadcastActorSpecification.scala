@@ -8,7 +8,7 @@ import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.crypto.Proofs
 import com.wavesplatform.dex.domain.order.Order
-import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionV2}
+import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionV3}
 import com.wavesplatform.dex.grpc.integration.clients.CheckedBroadcastResult
 import com.wavesplatform.dex.time.{TestTime, Time}
 import org.scalamock.scalatest.PathMockFactory
@@ -270,8 +270,10 @@ class ExchangeTransactionBroadcastActorSpecification
     ExchangeTransactionBroadcastActor.Command.Broadcast(
       clientRef = clientRef,
       addressSpendings = Map.empty,
-      tx = ExchangeTransactionV2
-        .create(
+      tx = ExchangeTransactionV3
+        .mk(
+          amountAssetDecimals = 8,
+          priceAssetDecimals = 8,
           buyOrder = Order.buy(
             sender = KeyPair(Array.emptyByteArray),
             matcher = KeyPair(Array.emptyByteArray),

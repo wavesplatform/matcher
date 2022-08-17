@@ -2,7 +2,7 @@ package com.wavesplatform.dex.model
 
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.crypto.Proofs
-import com.wavesplatform.dex.domain.order.{Order, OrderV3}
+import com.wavesplatform.dex.domain.order.{Order, OrderV3, OrderV4}
 
 import java.io.ByteArrayOutputStream
 
@@ -28,7 +28,16 @@ object ExecutionParamsInProofs {
 
   private def fillMatchInfoInProofs(order: Order, executedAmount: Long, executedPrice: Long): Order =
     order match {
-      case order: OrderV3 => order.copy(proofs = updateProofs(order.proofs, executedAmount, executedPrice))
+      case order: OrderV3 =>
+        val oa = order.orderAuthentication.updateProofs(
+          updateProofs(order.proofs, executedAmount, executedPrice)
+        )
+        order.copy(orderAuthentication = oa)
+      case order: OrderV4 =>
+        val oa = order.orderAuthentication.updateProofs(
+          updateProofs(order.proofs, executedAmount, executedPrice)
+        )
+        order.copy(orderAuthentication = oa)
       case _ => order // HACK
     }
 

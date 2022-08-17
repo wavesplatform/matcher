@@ -14,6 +14,8 @@ object PublicKey extends TaggedType[ByteStr] {
 
   private[this] val interner = Interners.newWeakInterner[PublicKey]()
 
+  def isValidSize(length: Int): Boolean = length == KeyLength || length == EthereumKeyLength
+
   val KeyStringLength: Int = base58Length(KeyLength)
 
   val empty: PublicKey = apply(ByteStr.empty)
@@ -32,7 +34,12 @@ object PublicKey extends TaggedType[ByteStr] {
   implicit def toAddress(pk: PublicKey): Address = pk.toAddress
 
   implicit class PublicKeyImplicitOps(private val pk: PublicKey) extends AnyVal {
-    def toAddress: Address = Address.fromPublicKey(pk)
+
+    def toAddress: Address = pk.size match {
+      case EthereumKeyLength => Address.fromPublicKeyHash(org.web3j.crypto.Keys.getAddress(pk.arr))
+      case _ => Address.fromPublicKey(pk)
+    }
+
   }
 
   implicit val publicKeyJsonFormat: Format[PublicKey] = Format[PublicKey](

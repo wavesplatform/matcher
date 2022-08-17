@@ -626,7 +626,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   }
 
   private def mkLevelDbEc(name: String): ExecutionContextExecutorService = {
-    val se = ExecutorInstrumentation.instrument(Executors.newSingleThreadExecutor(), name)
+    val se = ExecutorInstrumentation.instrument(Executors.newFixedThreadPool(1), name)
     ExecutionContext.fromExecutorService(se)
   }
 

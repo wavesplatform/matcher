@@ -5,7 +5,6 @@ import cats.instances.either._
 import cats.syntax.option._
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
 import com.wavesplatform.dex.app.{forceStopApplication, MatcherStateCheckingFailedError}
-import com.wavesplatform.dex.cli.Actions.withLevelDb
 import com.wavesplatform.dex.cli.WavesDexCli.Args
 import com.wavesplatform.dex.db.{AccountStorage, AssetPairsDb, AssetsDb, DbKeys, OrderBookSnapshotDb, OrderDb}
 import com.wavesplatform.dex.db.leveldb.{openDb, LevelDb}

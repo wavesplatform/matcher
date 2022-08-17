@@ -16,6 +16,7 @@ import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
+import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV3
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.{AssetPairBuilder, OrderBookSideSnapshot}
 import com.wavesplatform.dex.settings.MatcherSettings
@@ -57,13 +58,8 @@ object Actions {
   private val backend = HttpURLConnectionBackend()
 
   // noinspection ScalaStyle
-  def checkOrdersAgainstTxV3(args: Args, matcherSettings: MatcherSettings) = {
+  def checkOrdersForTxV3Compat(args: Args, matcherSettings: MatcherSettings) = {
     import scala.concurrent.ExecutionContext.Implicits.global
-
-    def checkPrice(price: Long, amountDecimals: Int, priceDecimals: Int): Try[Long] =
-      Try {
-        (BigDecimal(price) / BigDecimal(10).pow(priceDecimals - amountDecimals)).toBigInt.bigInteger.longValueExact()
-      }
 
     def getAssetDecimalsOpt(assetsDb: AssetsDb[Id], asset: Asset): Option[Int] =
       assetsDb.get(asset) match {
@@ -95,9 +91,13 @@ object Actions {
             amountAssetDecimals <- getAssetDecimalsOpt(assetsDB, validPair.amountAsset)
             priceAssetDecimals <- getAssetDecimalsOpt(assetsDB, validPair.priceAsset)
           } yield (snapshot.bids.values ++ snapshot.asks.values).flatten.foreach { limitOrder =>
-            checkPrice(limitOrder.price, amountAssetDecimals, priceAssetDecimals) match {
-              case Failure(_) => println(s"pair: ${validPair.key}  oId: ${limitOrder.order.id()}  ts: ${limitOrder.order.timestamp}")
-              case Success(_) => // do nothing
+            ExchangeTransactionV3.convertPrice(
+              limitOrder.price,
+              amountAssetDecimals,
+              priceAssetDecimals
+            ) match {
+              case Left(_) => println(s"pair: ${validPair.key}  oId: ${limitOrder.order.id()}  ts: ${limitOrder.order.timestamp}")
+              case _ =>
             }
           }
 

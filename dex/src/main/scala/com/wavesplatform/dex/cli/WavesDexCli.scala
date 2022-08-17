@@ -106,7 +106,7 @@ object WavesDexCli extends ScoptImplicits {
               case Command.InspectOrder => inspectOrder(args, matcherSettings)
               case Command.GenerateFeeSettings => generateFeeSettings(args)
               case Command.DeleteOrderBook => deleteOrderBookFromLevelDb(args, matcherSettings)
-              case Command.CheckOrdersForTxV3 => checkOrdersAgainstTxV3(args, matcherSettings)
+              case Command.CheckOrdersForTxV3Compat => checkOrdersForTxV3Compat(args, matcherSettings)
             }
             println("Done")
         }
@@ -115,8 +115,8 @@ object WavesDexCli extends ScoptImplicits {
 
   private def cmdCheckOrdersForTxV3(builder: OParserBuilder[Args]) = {
     import builder._
-    cmd(Command.CheckOrdersForTxV3.name)
-      .action((_, s) => s.copy(command = Command.CheckOrdersForTxV3.some))
+    cmd(Command.CheckOrdersForTxV3Compat.name)
+      .action((_, s) => s.copy(command = Command.CheckOrdersForTxV3Compat.some))
       .text("Prints all orders from orderbook that aren't compatible with Tx V3")
       .children(
         opt[String]("dex-config")
@@ -605,8 +605,8 @@ object WavesDexCli extends ScoptImplicits {
       override def name: String = "generate-fee-settings"
     }
 
-    case object CheckOrdersForTxV3 extends Command {
-      override def name: String = "check-for-tx-v3"
+    case object CheckOrdersForTxV3Compat extends Command {
+      override def name: String = "check-for-tx-v3-compat"
     }
 
   }

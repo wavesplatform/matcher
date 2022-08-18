@@ -435,7 +435,7 @@ object OrderValidator extends ScorexLogging {
         )
       _ <- validateBlacklistedAsset(order.feeAsset, error.FeeAssetBlacklisted(_))
       _ <- validateFeeAsset(order, getActualOrderFeeSettings)
-      _ <- validateVersion(order, lastProcessedOffset, matcherSettings.orderV4StartOffset)
+      _ <- validateVersion(order, matcherSettings.orderV4StartOffset, lastProcessedOffset)
       validatedOrder <- validateFee(order, getActualOrderFeeSettings, assetDecimals, rateCache)
     } yield validatedOrder
   }

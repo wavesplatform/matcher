@@ -7,7 +7,7 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.crypto.Proofs
 import com.wavesplatform.dex.domain.order.{EthOrders, Order, OrderAuthentication, OrderType}
-import com.wavesplatform.dex.error.{InvalidJson, OrderCommonValidationFailed, OrderInvalidSignature}
+import com.wavesplatform.dex.error.{InvalidJson, OrderCommonValidationFailed, OrderInvalidSignature, UnsupportedOrderVersion}
 import com.wavesplatform.dex.it.config.GenesisConfig
 import com.wavesplatform.dex.model.AcceptedOrder
 import com.wavesplatform.it.MatcherSuiteBase
@@ -38,6 +38,8 @@ class OrderV4TestSuite extends MatcherSuiteBase {
     Numeric.hexStringToByteArray(Keys.getAddress(bobEth)),
     GenesisConfig.chainId
   )
+
+  private val dex2 = createDex("dex-2", suiteInitialConfig = suiteInitialConfig(orderV4StartOffset = Long.MaxValue))
 
   "OrderV4TestSuite" - {
 
@@ -84,6 +86,11 @@ class OrderV4TestSuite extends MatcherSuiteBase {
         order.json() - "eip712Signature" - "sender" - "senderPublicKey" - "proofs" - "signature"
       }
       dex1.tryApi.place(orderJson) should failWith(InvalidJson.code)
+    }
+
+    "should reject order created before start offset is reached" in {
+      val order = sign(alice, mkOrderV4(wavesUsdPair, OrderType.BUY, 10.waves, 5.usd, Waves))
+      dex2.tryApi.place(order) should failWith(UnsupportedOrderVersion.code)
     }
   }
 
@@ -159,10 +166,13 @@ class OrderV4TestSuite extends MatcherSuiteBase {
     dex1.api.upsertAssetRate(usd, 1000000.0)
   }
 
-  override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(
+  override protected def dexInitialSuiteConfig: Config = suiteInitialConfig(orderV4StartOffset = -1L)
+
+  private def suiteInitialConfig(orderV4StartOffset: Long): Config = ConfigFactory.parseString(
     s"""
        |waves.dex {
        |  allowed-order-versions = [4]
+       |  order-v-4-start-offset = $orderV4StartOffset
        |  price-assets = [ "$UsdId", "WAVES" ]
        |  order-fee.-1 {
        |    mode = composite

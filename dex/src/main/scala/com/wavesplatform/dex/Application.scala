@@ -165,10 +165,12 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   private val transactionCreator = new ExchangeTransactionCreator(
     matcherKeyPair,
     settings.exchangeTxBaseFee,
+    settings.orderV4StartOffset,
     hasMatcherAccountScript,
     assetsCache.cached.unsafeGetHasScript, // Should be in the cache, because assets decimals are required during an order book creation
     (offsetOpt, sender) =>
-      offsetOpt.exists(_ > settings.passExecutionParameters.sinceOffset) && settings.passExecutionParameters.forAccounts.contains(sender)
+      offsetOpt.exists(_ > settings.passExecutionParameters.sinceOffset) && settings.passExecutionParameters.forAccounts.contains(sender),
+    lastProcessedOffset
   )
 
   private val wavesBlockchainAsyncClient = new MatcherExtensionAssetsCachingClient(
@@ -490,7 +492,8 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
         }
         .map(_.collect { case Right(version) => version })
     },
-    getActualOrderFeeSettings = () => orderFeeSettingsCache.getSettingsForOffset(lastProcessedOffset + 1)
+    getActualOrderFeeSettings = () => orderFeeSettingsCache.getSettingsForOffset(lastProcessedOffset + 1),
+    currentOffset = () => lastProcessedOffset
   )
 
   private val v0HttpRoute =

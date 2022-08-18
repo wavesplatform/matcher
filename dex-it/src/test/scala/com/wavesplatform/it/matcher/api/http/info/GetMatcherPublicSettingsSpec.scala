@@ -29,6 +29,7 @@ class GetMatcherPublicSettingsSpec extends MatcherSuiteBase with RawHttpChecks {
       settings.priceAssets should have size 2
       settings.priceAssets should contain(usd)
       settings.priceAssets should not contain btc
+      settings.orderVersions should not contain 4
     }
   }
 

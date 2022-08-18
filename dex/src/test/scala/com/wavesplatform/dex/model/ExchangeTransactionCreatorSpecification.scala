@@ -34,7 +34,15 @@ class ExchangeTransactionCreatorSpecification
     hasMatcherScript: Boolean = false,
     hasAssetScripts: Asset => Boolean = _ => false
   ): ExchangeTransactionCreator =
-    new ExchangeTransactionCreator(MatcherAccount, matcherSettings.exchangeTxBaseFee, hasMatcherScript, hasAssetScripts, (_, _) => false)
+    new ExchangeTransactionCreator(
+      MatcherAccount,
+      matcherSettings.exchangeTxBaseFee,
+      matcherSettings.orderV4StartOffset,
+      hasMatcherScript,
+      hasAssetScripts,
+      shouldPassExecParams = (_, _) => false,
+      lastProcessedOffset = -1L
+    )
 
   "ExchangeTransactionCreator" should {
     "create an ExchangeTransactionV3" when {

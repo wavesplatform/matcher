@@ -1065,7 +1065,15 @@ class OrderValidatorSpecification
     hasMatcherAccountScript: Boolean = false,
     hasAssetScript: Asset => Boolean = getDefaultAssetDescriptions(_).hasScript
   ) =
-    new ExchangeTransactionCreator(MatcherAccount, matcherSettings.exchangeTxBaseFee, hasMatcherAccountScript, hasAssetScript, (_, _) => false)
+    new ExchangeTransactionCreator(
+      MatcherAccount,
+      matcherSettings.exchangeTxBaseFee,
+      matcherSettings.orderV4StartOffset,
+      hasMatcherAccountScript,
+      hasAssetScript,
+      shouldPassExecParams = (_, _) => false,
+      lastProcessedOffset = -1L
+    )
 
   private def asa[A](
     p: Portfolio = defaultPortfolio,
@@ -1091,7 +1099,8 @@ class OrderValidatorSpecification
       matcherSettings,
       getDefaultAssetDescriptions(_).decimals,
       rateCache,
-      DynamicSettings.symmetric(matcherFee)
+      DynamicSettings.symmetric(matcherFee),
+      lastProcessedOffset = -1L
     )(_).map(_.order)
 
   private def validateByMatcherSettings(
@@ -1110,7 +1119,8 @@ class OrderValidatorSpecification
           .copy(allowedAssetPairs = allowedAssetPairs, allowedOrderVersions = allowedOrderVersions, blacklistedAssets = blacklistedAssets),
         assetDecimals,
         rateCache,
-        orderFeeSettings
+        orderFeeSettings,
+        lastProcessedOffset = -1L
       )(order).map(_.order)
   }
 

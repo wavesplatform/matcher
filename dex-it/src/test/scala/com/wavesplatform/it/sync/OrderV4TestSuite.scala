@@ -9,6 +9,7 @@ import com.wavesplatform.dex.domain.crypto.Proofs
 import com.wavesplatform.dex.domain.order.{EthOrders, Order, OrderAuthentication, OrderType}
 import com.wavesplatform.dex.error.{InvalidJson, OrderCommonValidationFailed, OrderInvalidSignature, UnsupportedOrderVersion}
 import com.wavesplatform.dex.it.config.GenesisConfig
+import com.wavesplatform.dex.it.docker.DexContainer
 import com.wavesplatform.dex.model.AcceptedOrder
 import com.wavesplatform.it.MatcherSuiteBase
 import org.web3j.crypto.{Bip32ECKeyPair, ECKeyPair, Keys}
@@ -39,7 +40,8 @@ class OrderV4TestSuite extends MatcherSuiteBase {
     GenesisConfig.chainId
   )
 
-  private val dex2 = createDex("dex-2", suiteInitialConfig = suiteInitialConfig(orderV4StartOffset = Long.MaxValue))
+  private lazy val dex2: DexContainer =
+    createDex("dex-2", suiteInitialConfig = suiteInitialConfig(orderV4StartOffset = Long.MaxValue))
 
   "OrderV4TestSuite" - {
 

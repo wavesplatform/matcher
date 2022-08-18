@@ -47,7 +47,7 @@ class ExchangeTransactionCreatorSpecification
 
   "ExchangeTransactionCreator" should {
 
-    "create an ExchangeTransactionV2" when {
+    "should create an ExchangeTransactionV2" when {
       (List(1, 2, 3) ++ List(1, 2, 3)).combinations(2).foreach {
         case List(counterVersion, submittedVersion) =>
           s"counterVersion=$counterVersion, submittedVersion=$submittedVersion" in {
@@ -63,7 +63,7 @@ class ExchangeTransactionCreatorSpecification
       }
     }
 
-    "create an ExchangeTransactionV3" when {
+    "should create an ExchangeTransactionV3" when {
       (List(1, 2, 3) ++ List(1, 2, 3)).combinations(2).foreach {
         case List(counterVersion, submittedVersion) =>
           s"counterVersion=$counterVersion, submittedVersion=$submittedVersion" in {

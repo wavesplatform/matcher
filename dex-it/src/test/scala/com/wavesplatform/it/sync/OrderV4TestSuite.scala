@@ -40,9 +40,6 @@ class OrderV4TestSuite extends MatcherSuiteBase {
     GenesisConfig.chainId
   )
 
-  private lazy val dex2: DexContainer =
-    createDex("dex-2", suiteInitialConfig = suiteInitialConfig(orderV4StartOffset = Long.MaxValue))
-
   "OrderV4TestSuite" - {
 
     "should work with proofs authentication" in {
@@ -92,7 +89,8 @@ class OrderV4TestSuite extends MatcherSuiteBase {
 
     "should reject order created before start offset is reached" in {
       val order = sign(alice, mkOrderV4(wavesUsdPair, OrderType.BUY, 10.waves, 5.usd, Waves))
-      dex2.tryApi.place(order) should failWith(UnsupportedOrderVersion.code)
+      dex1.restartWithNewSuiteConfig(suiteInitialConfig(orderV4StartOffset = Long.MaxValue))
+      dex1.tryApi.place(order) should failWith(UnsupportedOrderVersion.code)
     }
   }
 

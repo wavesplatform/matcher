@@ -79,7 +79,7 @@ inTask(docker)(
 
       val entryPointSh = s"$appPath/bin/start-matcher-server.sh"
 
-      from("openjdk:8-jre-slim-buster")
+      from("eclipse-temurin:11-jre-alpine")
 
       runRaw(s"""mkdir -p $runtimePath $appPath $runtimePath/runtime && \\
                 |groupadd -g $groupId $group && \\

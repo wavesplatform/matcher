@@ -12,7 +12,7 @@ pipeline {
         string(name: 'REPEATED_CI_RUNS', defaultValue: '10', description: 'Number of runs')
     }
     environment {
-        SBT_HOME = tool name: 'sbt-1.2.6', type: 'org.jvnet.hudson.plugins.SbtPluginBuilder$SbtInstallation'
+        SBT_HOME = tool name: 'sbt-1.5.3', type: 'org.jvnet.hudson.plugins.SbtPluginBuilder$SbtInstallation'
         SBT_THREAD_NUMBER = "${SBT_THREAD_NUMBER}"
         SBT_OPTS = '-Xmx12g -XX:ReservedCodeCacheSize=128m -XX:+CMSClassUnloadingEnabled'
         PATH = "${env.SBT_HOME}/bin:${env.PATH}"

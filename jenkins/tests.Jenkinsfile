@@ -9,7 +9,7 @@ pipeline {
         disableConcurrentBuilds()
     }
     environment {
-        SBT_HOME = tool name: 'sbt-1.2.6', type: 'org.jvnet.hudson.plugins.SbtPluginBuilder$SbtInstallation'
+        SBT_HOME = tool name: 'sbt-1.5.3', type: 'org.jvnet.hudson.plugins.SbtPluginBuilder$SbtInstallation'
         SBT_THREAD_NUMBER = "6"
         SBT_OPTS = '-Xmx12g -XX:ReservedCodeCacheSize=128m -XX:+CMSClassUnloadingEnabled'
         PATH = "${env.SBT_HOME}/bin:${env.PATH}"

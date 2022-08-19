@@ -114,7 +114,7 @@ object MatcherSettings extends ConfigReaders {
           case "composite" =>
             CompositeSettings.compositeConfigReader.from(objCur.atKeyOrUndefined("composite"))
           case m =>
-            objCur.failed(CannotConvert(objCur.objValue.toString, "OrderFeeSettings", s"unexpected mode type $m"))
+            objCur.failed(CannotConvert(objCur.objValue.toString, "OrderFeeSettings", s"Invalid mode type $m"))
         }
     } yield feeSettings
   }

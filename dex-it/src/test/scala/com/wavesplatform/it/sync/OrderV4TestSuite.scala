@@ -7,7 +7,6 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.crypto.Proofs
 import com.wavesplatform.dex.domain.order.{EthOrders, Order, OrderAuthentication, OrderType}
-import com.wavesplatform.dex.domain.transaction.{ExchangeTransactionV2, ExchangeTransactionV3}
 import com.wavesplatform.dex.error.{InvalidJson, OrderCommonValidationFailed, OrderInvalidSignature, UnsupportedOrderVersion}
 import com.wavesplatform.dex.it.config.GenesisConfig
 import com.wavesplatform.dex.model.AcceptedOrder
@@ -126,8 +125,10 @@ class OrderV4TestSuite extends MatcherSuiteBase {
     sellerUsd + spendUsd - fee shouldBe wavesNode1.api.assetBalance(seller, usd)
 
     txs.foreach { tx =>
-      if (orderVersion == 4) tx shouldBe a[ExchangeTransactionV3]
-      else tx shouldBe a[ExchangeTransactionV2]
+      if (orderVersion == 4)
+        tx.version() shouldBe 3
+      else
+        tx.version() shouldBe 2
     }
   }
 

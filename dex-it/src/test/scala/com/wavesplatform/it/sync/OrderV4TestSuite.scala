@@ -106,7 +106,7 @@ class OrderV4TestSuite extends MatcherSuiteBase {
     buySign: (OrderAuthentication => Order) => Order,
     sellSign: (OrderAuthentication => Order) => Order,
     orderVersion: Byte
-  ) = {
+  ): Unit = {
     val buyerWaves = wavesNode1.api.wavesBalance(buyer)
     val buyerUsd = wavesNode1.api.assetBalance(buyer, usd)
     val sellerWaves = wavesNode1.api.wavesBalance(seller)
@@ -186,7 +186,7 @@ class OrderV4TestSuite extends MatcherSuiteBase {
   private def suiteInitialConfig(orderV4StartOffset: Long): Config = ConfigFactory.parseString(
     s"""
        |waves.dex {
-       |  allowed-order-versions = [4]
+       |  allowed-order-versions = [3,4]
        |  order-v-4-start-offset = $orderV4StartOffset
        |  price-assets = [ "$UsdId", "WAVES" ]
        |  order-fee.-1 {

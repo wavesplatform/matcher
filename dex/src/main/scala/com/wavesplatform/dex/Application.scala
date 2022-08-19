@@ -204,7 +204,8 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
   private val pairBuilder = new AssetPairBuilder(settings, getAndCacheDescription, settings.blacklistedAssets)
 
-  private val orderFeeSettingsCache = new OrderFeeSettingsCache(settings.orderFee, pairBuilder.quickValidateAssetPair(_).isRight)
+  private val assetPairQuickValidator = { pair: AssetPair => pairBuilder.quickValidateAssetPair(pair).isRight }
+  private val orderFeeSettingsCache = new OrderFeeSettingsCache(settings.orderFee.view.mapValues(_(assetPairQuickValidator)).toMap)
 
   private val txWriterRef =
     actorSystem.actorOf(WriteExchangeTransactionActor.props(ExchangeTxStorage.levelDB(commonLevelDb)), WriteExchangeTransactionActor.name)
@@ -357,7 +358,8 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
           AcceptedOrder.correctedAmountOfAmountAsset(order.amount, order.price),
           order.price,
           settings.passExecutionParameters.forAccounts.contains(order.sender)
-        )
+        ),
+      assetPairQuickValidator
     )(_)
     new PlaceRoute(
       responseTimeout = settings.actorResponseTimeout,

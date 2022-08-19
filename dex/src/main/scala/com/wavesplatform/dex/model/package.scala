@@ -1,5 +1,6 @@
 package com.wavesplatform.dex
 
+import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.model.Price
 import com.wavesplatform.dex.domain.order.Order
@@ -7,6 +8,9 @@ import com.wavesplatform.dex.domain.order.Order
 import scala.collection.immutable.{Queue, TreeMap}
 
 package object model {
+
+  type AssetPairValidator = AssetPair => Boolean
+
   type Level = Queue[LimitOrder]
   type OrderBookSideSnapshot = Map[Price, Seq[LimitOrder]]
 

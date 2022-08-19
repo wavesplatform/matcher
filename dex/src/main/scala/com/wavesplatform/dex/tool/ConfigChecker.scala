@@ -11,6 +11,7 @@ import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.error.Implicits.ThrowableOps
+import com.wavesplatform.dex.settings.MatcherSettings.RawOrderFeeSettings
 import com.wavesplatform.dex.settings.OrderFeeSettings._
 import com.wavesplatform.dex.settings._
 import pureconfig.ConfigWriter
@@ -149,7 +150,11 @@ sealed trait ConfigWriters {
         )
     }
 
-  implicit val longOrderFeeConfigWriter: ConfigWriter[Map[Long, OrderFeeSettings]] = genericMapWriter(_.toString)
+  implicit val orderFeeSettingsWriter: ConfigWriter[RawOrderFeeSettings] =
+    semiauto.deriveWriter[OrderFeeSettings]
+      .contramap[RawOrderFeeSettings](uofs => uofs(_ => true))
+
+  implicit val longOrderFeeConfigWriter: ConfigWriter[Map[Long, RawOrderFeeSettings]] = genericMapWriter(_.toString)
 
   implicit val assetPairOrderFeeSettingsConfigWriter: ConfigWriter[Map[AssetPair, OrderFeeSettings]] =
     genericMapWriter(assetPairToString)

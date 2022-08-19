@@ -12,11 +12,11 @@ class OrderFeeSettingsCacheSpecification extends AnyWordSpecLike with Matchers w
   "OrderFeeSettingsCache" should {
 
     "prevent matcher start if settings wasn't set" in {
-      a[IllegalArgumentException] should be thrownBy new OrderFeeSettingsCache(Map.empty[Long, OrderFeeSettings], _ => true)
+      a[IllegalArgumentException] should be thrownBy new OrderFeeSettingsCache(Map.empty[Long, OrderFeeSettings])
     }
 
     "throw error if there is no settings for the given offset" in {
-      a[IllegalStateException] should be thrownBy new OrderFeeSettingsCache(Map(100L -> DynamicSettings.symmetric(0.003.waves)), _ => true)
+      a[IllegalStateException] should be thrownBy new OrderFeeSettingsCache(Map(100L -> DynamicSettings.symmetric(0.003.waves)))
         .getSettingsForOffset(1)
     }
 
@@ -30,7 +30,7 @@ class OrderFeeSettingsCacheSpecification extends AnyWordSpecLike with Matchers w
           1000L -> PercentSettings(AssetType.Amount, 0.005, defaultWavesFee)
         )
 
-      val ofsc = new OrderFeeSettingsCache(settingsMap, _ => true)
+      val ofsc = new OrderFeeSettingsCache(settingsMap)
 
       def check(offset: Long, current: OrderFeeSettings, actual: OrderFeeSettings): Unit = {
         ofsc.getSettingsForOffset(offset) should matchTo(current)

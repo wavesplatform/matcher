@@ -9,13 +9,17 @@ import com.wavesplatform.dex.api.http.OrderBookHttpInfo
 import com.wavesplatform.dex.db.{AccountStorage, OrderDb}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.grpc.integration.settings.WavesBlockchainClientSettings
+import com.wavesplatform.dex.model.AssetPairValidator
 import com.wavesplatform.dex.model.OrderValidator.exchangeTransactionCreationFee
+import com.wavesplatform.dex.settings.MatcherSettings.RawOrderFeeSettings
+import com.wavesplatform.dex.settings.OrderFeeSettings._
+import com.wavesplatform.dex.settings.OrderFeeSettings.CompositeSettings._
 import com.wavesplatform.dex.settings.utils.ConfigReaderOps.Implicits
 import com.wavesplatform.dex.settings.utils.{validationOf, ConfigReaders, RawFailureReason}
 import com.wavesplatform.dex.tool.ComparisonTool
 import pureconfig.ConfigReader
 import pureconfig.configurable.genericMapReader
-import pureconfig.error.{ExceptionThrown, FailureReason}
+import pureconfig.error.{CannotConvert, ExceptionThrown, FailureReason}
 import pureconfig.generic.auto._
 import pureconfig.generic.semiauto
 import pureconfig.module.cats.nonEmptyListReader
@@ -51,7 +55,7 @@ case class MatcherSettings(
   orderBookHttp: OrderBookHttpInfo.Settings,
   eventsQueue: EventsQueueSettings,
   processConsumedTimeout: FiniteDuration,
-  orderFee: Map[Long, OrderFeeSettings],
+  orderFee: Map[Long, RawOrderFeeSettings],
   maxPriceDeviations: DeviationsSettings,
   orderRestrictions: Map[AssetPair, OrderRestrictionsSettings],
   matchingRules: Map[AssetPair, NonEmptyList[DenormalizedMatchingRule]],
@@ -77,10 +81,11 @@ case class MatcherSettings(
     orderRestrictions.keySet.flatMap(_.assets) ++
     matchingRules.keySet.flatMap(_.assets) ++
     allowedAssetPairs.flatMap(_.assets) ++
-    orderFee.values.toSet[OrderFeeSettings].flatMap {
-      case x: OrderFeeSettings.FixedSettings => Set(x.asset)
-      case _ => Set.empty[Asset]
-    }
+    orderFee.values.map(func => func(_ => true)) // we don't care about pair ordering here, so it might be like that
+      .toSet[OrderFeeSettings].flatMap {
+        case x: OrderFeeSettings.FixedSettings => Set(x.asset)
+        case _ => Set.empty[Asset]
+      }
 
 }
 
@@ -88,7 +93,33 @@ object MatcherSettings extends ConfigReaders {
 
   implicit val byteStrConfigReader = byteStr58ConfigReader
 
-  implicit val longOrderFeeConfigReader = genericMapReader[Long, OrderFeeSettings] { x =>
+  type RawOrderFeeSettings = AssetPairValidator => OrderFeeSettings
+
+  implicit val orderFeeSettingsReader: ConfigReader[RawOrderFeeSettings] = ConfigReader.fromCursor[RawOrderFeeSettings] { cursor =>
+    for {
+      objCur <- cursor.asObjectCursor
+      modeCur <- objCur.atKey("mode")
+      modeStr <- modeCur.asString
+      feeSettings <-
+        modeStr match {
+          case "dynamic" => DynamicSettings.dynamicConfigReader.from(objCur.atKeyOrUndefined("dynamic")).map {
+              settings => _: AssetPairValidator => settings
+            }
+          case "percent" => PercentSettings.percentConfigReader.from(objCur.atKeyOrUndefined("percent")).map {
+              settings => _: AssetPairValidator => settings
+            }
+          case "fixed" => FixedSettings.fixedConfigReader.from(objCur.atKeyOrUndefined("fixed")).map {
+              settings => _: AssetPairValidator => settings
+            }
+          case "composite" =>
+            CompositeSettings.compositeConfigReader.from(objCur.atKeyOrUndefined("composite"))
+          case m =>
+            objCur.failed(CannotConvert(objCur.objValue.toString, "OrderFeeSettings", s"unexpected mode type $m"))
+        }
+    } yield feeSettings
+  }
+
+  implicit val longOrderFeeConfigReader = genericMapReader[Long, RawOrderFeeSettings] { x =>
     x.toLongOption.fold[Either[FailureReason, Long]](RawFailureReason(s"'$x' should be numeric").asLeft)(_.asRight)
   }
 

@@ -1,10 +1,12 @@
 package com.wavesplatform.dex.settings
 
 import cats.syntax.option._
-import com.typesafe.config.Config
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
-import com.wavesplatform.dex.settings.OrderFeeSettings.{CompositeSettings, DynamicSettings, PercentSettings}
+import com.wavesplatform.dex.settings.MatcherSettings.RawOrderFeeSettings
+import com.wavesplatform.dex.settings.OrderFeeSettings.CompositeSettings.RawCompositeSettings
+import com.wavesplatform.dex.settings.OrderFeeSettings.{CompositeSettings, DynamicSettings, PercentSettings, RawCustomAssetSettings}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.test.matchers.ProduceError.produce
 import org.scalatest.OptionValues
@@ -190,12 +192,20 @@ final class MatcherFeeSettingsSpecification extends BaseSettingsSpecification wi
        """.stripMargin
 
   "OrderFeeSettings" should "read values" in {
+    val validPairs = Set(assetPair1Waves, assetPair2Waves, assetPair3Waves, assetPair12)
 
     val config = configWithSettings(orderFeeStr = feeStringConfig)
-    val orderFeeSettings = ConfigSource.fromConfig(config).at("waves.dex").loadOrThrow[MatcherSettings].orderFee
-
+    val orderFeeSettings =
+      ConfigSource.fromConfig(config).at("waves.dex").loadOrThrow[MatcherSettings].orderFee.map(v => (v._1, v._2(validPairs.contains)))
     orderFeeSettings.get(-1).value shouldBe PercentSettings(AssetType.Amount, minFee = 0.1, minFeeInWaves = 300000)
-    orderFeeSettings.get(5).value shouldBe CompositeSettings(
+
+    val compositeSettings = orderFeeSettings.get(5).value.asInstanceOf[CompositeSettings]
+    compositeSettings.customAssets.value.customPairs shouldBe CompositeSettings.CustomAssetsSettings(
+      assets = Set(asset2, Waves, asset1),
+      settings = PercentSettings(AssetType.Spending, minFee = 0.1, minFeeInWaves = 300000)
+    )(validPairs.contains).customPairs
+
+    compositeSettings shouldBe CompositeSettings(
       default = DynamicSettings(baseMakerFee = 350000, baseTakerFee = 350000),
       custom = Map(
         assetPair1Waves -> PercentSettings(AssetType.Amount, minFee = 0.01, minFeeInWaves = 1000),
@@ -204,10 +214,8 @@ final class MatcherFeeSettingsSpecification extends BaseSettingsSpecification wi
       customAssets = CompositeSettings.CustomAssetsSettings(
         assets = Set(asset2, Waves, asset1),
         settings = PercentSettings(AssetType.Spending, minFee = 0.1, minFeeInWaves = 300000)
-      ).some
+      )(validPairs.contains).some
     )
-    val compositeSettings = orderFeeSettings.get(5).value.asInstanceOf[CompositeSettings]
-
     // specified for these pairs
     compositeSettings.getOrderFeeSettings(assetPair1Waves) shouldBe PercentSettings(AssetType.Amount, minFee = 0.01, minFeeInWaves = 1000)
     compositeSettings.getOrderFeeSettings(assetPair2Waves) shouldBe PercentSettings(AssetType.Amount, minFee = 0.01, minFeeInWaves = 1000)

@@ -8,9 +8,9 @@ import com.wavesplatform.dex.actors.OrderBookAskAdapter
 import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.MarketStatus
 import com.wavesplatform.dex.caches.{MatchingRulesCache, OrderFeeSettingsCache, RateCache}
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
-import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.Order
-import com.wavesplatform.dex.effect.{liftFutureAsync, liftValueAsync, FutureResult}
+import com.wavesplatform.dex.effect.{FutureResult, liftFutureAsync, liftValueAsync}
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
@@ -35,7 +35,8 @@ object ValidationStages {
     lastProcessedOffset: => Long,
     blacklistedAddresses: Set[Address],
     hasMatcherAccountScript: Boolean,
-    handleProofs: Order => Order
+    handleProofs: Order => Order,
+    pairValidator: AssetPair => Boolean
   )(o: Order)(implicit efc: ErrorFormatterContext, ec: ExecutionContext): FutureResult[OrderValidator.ValidatedOrder] = {
     import OrderValidator._
 

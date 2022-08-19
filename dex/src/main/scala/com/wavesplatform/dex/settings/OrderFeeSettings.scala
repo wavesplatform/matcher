@@ -4,6 +4,7 @@ import cats.syntax.option._
 import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.model.AssetPairValidator
 import com.wavesplatform.dex.settings.MatcherSettings.assetPairKeyParser
 import com.wavesplatform.dex.settings.utils.ConfigReaderOps.Implicits
 import com.wavesplatform.dex.settings.utils._
@@ -13,15 +14,26 @@ import pureconfig.configurable.genericMapReader
 import pureconfig.error.CannotConvert
 import pureconfig.generic.semiauto
 
-sealed trait OrderFeeSettings extends Product with Serializable
+sealed trait OrderFeeSettings extends Product with Serializable {
+
+  def filterPairs(pairValidator: AssetPairValidator): OrderFeeSettings
+
+}
 
 object OrderFeeSettings {
+
+  type RawCustomAssetSettings = (AssetPair => Boolean) => CompositeSettings.CustomAssetsSettings
+
+  final case class UnfilteredOrderFeeSettings(prepareValue: AssetPairValidator => OrderFeeSettings)
 
   final case class DynamicSettings(baseMakerFee: Long, baseTakerFee: Long, zeroFeeAccounts: Set[PublicKey] = Set.empty)
       extends OrderFeeSettings {
     val maxBaseFee: Long = math.max(baseMakerFee, baseTakerFee)
     val makerRatio = BigDecimal(baseMakerFee) / maxBaseFee
     val takerRatio = BigDecimal(baseTakerFee) / maxBaseFee
+
+    override def filterPairs(pairValidator: AssetPairValidator): OrderFeeSettings = this
+
   }
 
   object DynamicSettings extends ConfigReaders {
@@ -44,7 +56,11 @@ object OrderFeeSettings {
 
   }
 
-  final case class FixedSettings(asset: Asset, minFee: Long) extends OrderFeeSettings
+  final case class FixedSettings(asset: Asset, minFee: Long) extends OrderFeeSettings {
+
+    override def filterPairs(pairValidator: AssetPairValidator): OrderFeeSettings = this
+
+  }
 
   object FixedSettings extends ConfigReaders {
 
@@ -67,6 +83,8 @@ object OrderFeeSettings {
         case AssetType.Spending => Order.getSpendAssetId(assetPair, orderType)
       }
 
+    override def filterPairs(pairValidator: AssetPairValidator): OrderFeeSettings = this
+
   }
 
   object PercentSettings {
@@ -88,26 +106,38 @@ object OrderFeeSettings {
     zeroFeeAccounts: Set[PublicKey] = Set.empty
   ) extends OrderFeeSettings {
 
-    def filterPairs(pairChecker: AssetPair => Boolean): CompositeSettings =
-      customAssets.fold(this)(v => copy(customAssets = Some(v.filterCustomPairs(pairChecker))))
-
     def getOrderFeeSettings(assetPair: AssetPair): OrderFeeSettings =
       custom.get(assetPair).orElse {
         customAssets.flatMap(_.getSettings(assetPair))
       }.getOrElse(default)
 
     def getAllPairs: Map[AssetPair, OrderFeeSettings] =
-      customAssets.fold(Map.empty[AssetPair, OrderFeeSettings])(_.settingsMap) ++ custom // custom must override any values from customAssets
+      customAssets.fold(Map.empty[AssetPair, OrderFeeSettings])(
+        _.settingsMap
+      ) ++ custom // custom must override any values from customAssets
+
+    override def filterPairs(pairValidator: AssetPairValidator): OrderFeeSettings =
+      copy(
+        default = default.filterPairs(pairValidator),
+        custom = custom.filter(v => pairValidator(v._1)),
+        customAssets = customAssets.map(_.filterCustomPairs(pairValidator))
+      )
 
   }
 
   object CompositeSettings extends ConfigReaders {
 
-    final case class CustomAssetsSettings(assets: Set[Asset], settings: OrderFeeSettings, customPairs: Set[AssetPair]) {
+    final case class CustomAssetsSettings(assets: Set[Asset], settings: OrderFeeSettings)(validator: AssetPairValidator) {
+
+      val customPairs =
+        assets.foldLeft(Set.empty[AssetPair]) {
+          case (acc, elem) =>
+            acc ++ assets.map(asset => AssetPair(asset, elem)).filter(validator)
+        }
 
       lazy val settingsMap = customPairs.map(p => (p, settings)).toMap
 
-      def filterCustomPairs(pred: AssetPair => Boolean): CustomAssetsSettings = copy(customPairs = customPairs.filter(pred))
+      def filterCustomPairs(pred: AssetPair => Boolean): CustomAssetsSettings = ???
 
       def getSettings(assetPair: AssetPair): Option[OrderFeeSettings] =
         settingsMap.get(assetPair)
@@ -116,20 +146,17 @@ object OrderFeeSettings {
 
     object CustomAssetsSettings {
 
-      def apply(assets: Set[Asset], settings: OrderFeeSettings): CustomAssetsSettings = {
-        val customPairs =
-          assets.foldLeft(Set.empty[AssetPair]) {
-            case (acc, elem) =>
-              acc ++ assets.map(asset => AssetPair(asset, elem))
-          }
-        CustomAssetsSettings(assets, settings, customPairs)
-      }
+      type RawCustomAssetsSettings = AssetPairValidator => CustomAssetsSettings
 
-      implicit val customAssetsSettingsReader =
-        ConfigReader.forProduct2[CustomAssetsSettings, Set[Asset], OrderFeeSettings]("assets", "settings") {
-          case (assets, settings) =>
-            CustomAssetsSettings(assets, settings) // to explicitly call a constructor with 2 args
-        }
+      implicit val customAssetsSettingsReader: ConfigReader[RawCustomAssetsSettings] = ConfigReader.forProduct2[
+        RawCustomAssetsSettings,
+        Set[Asset],
+        OrderFeeSettings
+      ]("assets", "settings") {
+        case (assets, settings) =>
+          println("[1] " + assets)
+          CustomAssetsSettings(assets, settings)
+      }
 
     }
 
@@ -164,8 +191,21 @@ object OrderFeeSettings {
     implicit private val feeSettingsMapReader =
       genericMapReader[AssetPair, OrderFeeSettings](assetPairKeyParser)(feeSettingsReader)
 
-    implicit val compositeConfigReader =
-      semiauto.deriveReader[CompositeSettings]
+    type RawCompositeSettings = AssetPairValidator => CompositeSettings
+
+    implicit val compositeConfigReader: ConfigReader[RawCompositeSettings] = ConfigReader.forProduct5[
+      RawCompositeSettings,
+      OrderFeeSettings,
+      Map[AssetPair, OrderFeeSettings],
+      Option[RawCustomAssetSettings],
+      Option[CompositeSettings.DiscountAssetSettings],
+      Option[Set[PublicKey]]
+    ]("default", "custom", "custom-assets", "discount", "zero-fee-accounts") {
+      case (default, custom, customAssets, discount, zeroFeeAccounts) =>
+        pairValidator: AssetPairValidator =>
+          CompositeSettings(default, custom, customAssets.map(_(pairValidator)), discount, zeroFeeAccounts.getOrElse(Set.empty))
+
+    }
 
   }
 

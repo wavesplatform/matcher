@@ -53,7 +53,6 @@ import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.MatcherModel.Denormalized
 import com.wavesplatform.dex.model.{LimitOrder, OrderInfo, OrderStatus, _}
 import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
-import com.wavesplatform.dex.settings.OrderFeeSettings.CompositeSettings.CustomAssetsSettings
 import com.wavesplatform.dex.settings.OrderFeeSettings.{CompositeSettings, DynamicSettings, PercentSettings}
 import com.wavesplatform.dex.settings.{AssetType, MatcherSettings, OrderFeeSettings, OrderRestrictionsSettings}
 import org.scalamock.scalatest.PathMockFactory
@@ -158,7 +157,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     customAssets = CompositeSettings.CustomAssetsSettings(
       assets = Set(assetPair1.amountAsset, assetPair2.amountAsset, assetPair1.priceAsset),
       settings = PercentSettings(AssetType.Spending, minFee = 0.1, minFeeInWaves = 20000)
-    ).filterCustomPairs(possiblePairs.contains).some
+    )(possiblePairs.contains).some
   )
 
   private val settings = ConfigSource

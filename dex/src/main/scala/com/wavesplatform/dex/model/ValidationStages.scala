@@ -10,7 +10,7 @@ import com.wavesplatform.dex.caches.{MatchingRulesCache, OrderFeeSettingsCache, 
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.Order
-import com.wavesplatform.dex.effect.{FutureResult, liftFutureAsync, liftValueAsync}
+import com.wavesplatform.dex.effect.{liftFutureAsync, liftValueAsync, FutureResult}
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription

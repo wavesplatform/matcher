@@ -2,6 +2,7 @@ package com.wavesplatform.dex.settings
 
 import cats.data.NonEmptyList
 import cats.implicits._
+import com.typesafe.config.ConfigRenderOptions
 import com.wavesplatform.dex.actors.address.AddressActor
 import com.wavesplatform.dex.actors.events.OrderEventsCoordinatorActor
 import com.wavesplatform.dex.actors.tx.ExchangeTransactionBroadcastActor

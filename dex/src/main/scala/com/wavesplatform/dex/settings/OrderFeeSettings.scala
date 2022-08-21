@@ -196,14 +196,20 @@ object OrderFeeSettings {
     implicit val compositeConfigReader: ConfigReader[RawCompositeSettings] = ConfigReader.forProduct5[
       RawCompositeSettings,
       OrderFeeSettings,
-      Map[AssetPair, OrderFeeSettings],
+      Option[Map[AssetPair, OrderFeeSettings]],
       Option[RawCustomAssetSettings],
       Option[CompositeSettings.DiscountAssetSettings],
       Option[Set[PublicKey]]
     ]("default", "custom", "custom-assets", "discount", "zero-fee-accounts") {
       case (default, custom, customAssets, discount, zeroFeeAccounts) =>
         pairValidator: AssetPairValidator =>
-          CompositeSettings(default, custom, customAssets.map(_(pairValidator)), discount, zeroFeeAccounts.getOrElse(Set.empty))
+          CompositeSettings(
+            default,
+            custom.getOrElse(Map.empty),
+            customAssets.map(_(pairValidator)),
+            discount,
+            zeroFeeAccounts.getOrElse(Set.empty)
+          )
 
     }
 

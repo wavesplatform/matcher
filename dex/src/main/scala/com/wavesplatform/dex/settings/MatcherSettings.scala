@@ -20,8 +20,9 @@ import com.wavesplatform.dex.settings.utils.{validationOf, ConfigReaders, RawFai
 import com.wavesplatform.dex.tool.ComparisonTool
 import pureconfig.ConfigReader
 import pureconfig.configurable.genericMapReader
-import pureconfig.error.{CannotConvert, ExceptionThrown, FailureReason}
+import pureconfig.error.{CannotConvert, ConfigReaderFailures, ExceptionThrown, FailureReason}
 import pureconfig.generic.auto._
+import pureconfig.generic.error.UnexpectedValueForFieldCoproductHint
 import pureconfig.generic.semiauto
 import pureconfig.module.cats.nonEmptyListReader
 
@@ -115,7 +116,7 @@ object MatcherSettings extends ConfigReaders {
           case "composite" =>
             CompositeSettings.compositeConfigReader.from(objCur.atKeyOrUndefined("composite"))
           case m =>
-            objCur.failed(CannotConvert(objCur.objValue.toString, "OrderFeeSettings", s"Mode type $m is invalid"))
+            ConfigReaderFailures(modeCur.failureFor(UnexpectedValueForFieldCoproductHint(modeCur.valueOpt.get))).asLeft[RawOrderFeeSettings]
         }
     } yield feeSettings
   }

@@ -6,11 +6,13 @@ import org.scalatest.flatspec.AnyFlatSpec
 import pureconfig.ConfigSource
 
 import scala.util.Try
+import scala.util.chaining._
 
 class BaseSettingsSpecification extends AnyFlatSpec {
 
-  def getSettingByConfig(conf: Config): Either[String, MatcherSettings] =
-    Try(ConfigSource.fromConfig(conf).at("waves.dex").loadOrThrow[MatcherSettings]).toEither.leftMap(_.getMessage)
+  def getSettingByConfig(conf: Config): Either[String, MatcherSettings] = {
+    Try(ConfigSource.fromConfig(conf).at("waves.dex").loadOrThrow[MatcherSettings]).toEither.leftMap(_.getMessage).tap(println)
+  }
 
   val correctSecureKeys: Set[String] = Set("foo", "bar", "baz")
 

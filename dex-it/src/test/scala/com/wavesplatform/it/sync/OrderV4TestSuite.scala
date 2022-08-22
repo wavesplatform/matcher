@@ -172,10 +172,10 @@ class OrderV4TestSuite extends MatcherSuiteBase {
     broadcastAndAwait(IssueUsdTx)
     broadcastAndAwait(
       mkTransfer(alice, aliceEthAdr, 10_000.waves, Waves),
-      mkTransfer(alice, aliceEthAdr, 10_000.usd, usd),
+      mkTransfer(alice, aliceEthAdr, 100_000.usd, usd),
       mkTransfer(alice, bobEthAdr, 10_000.waves, Waves),
-      mkTransfer(alice, bobEthAdr, 10_000.usd, usd),
-      mkTransfer(alice, bob, 10_000.usd, usd)
+      mkTransfer(alice, bobEthAdr, 100_000.usd, usd),
+      mkTransfer(alice, bob, 100_000.usd, usd)
     )
     dex1.start()
     dex1.api.upsertAssetRate(usd, 1000000.0)

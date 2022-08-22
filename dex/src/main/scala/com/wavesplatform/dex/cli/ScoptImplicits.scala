@@ -11,4 +11,11 @@ trait ScoptImplicits {
     }
   }
 
+  implicit val byteScoptREad: scopt.Read[Byte] = scopt.Read.reads { x =>
+    x.toByteOption match {
+      case Some(x: Byte) => x
+      case _ => throw new IllegalArgumentException("'" + x + "' is not a byte.")
+    }
+  }
+
 }

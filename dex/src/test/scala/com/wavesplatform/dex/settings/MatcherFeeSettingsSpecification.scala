@@ -204,18 +204,18 @@ final class MatcherFeeSettingsSpecification extends BaseSettingsSpecification wi
       validPairs.contains
     ).settingsMap.keySet
 
-    compositeSettings shouldBe CompositeSettings(
-      default = DynamicSettings(baseMakerFee = 350000, baseTakerFee = 350000),
-      custom = Map(
-        assetPair1Waves -> PercentSettings(AssetType.Amount, minFee = 0.01, minFeeInWaves = 1000),
-        assetPair2Waves -> PercentSettings(AssetType.Amount, minFee = 0.01, minFeeInWaves = 1000)
-      ),
-      customAssets = CompositeSettings.CustomAssetsSettings(
-        assets = Set(asset2, Waves, asset1),
-        settings = PercentSettings(AssetType.Spending, minFee = 0.1, minFeeInWaves = 300000),
-        validPairs.contains
-      ).some
+    compositeSettings.default shouldBe DynamicSettings(baseMakerFee = 350000, baseTakerFee = 350000)
+    compositeSettings.custom shouldBe Map(
+      assetPair1Waves -> PercentSettings(AssetType.Amount, minFee = 0.01, minFeeInWaves = 1000),
+      assetPair2Waves -> PercentSettings(AssetType.Amount, minFee = 0.01, minFeeInWaves = 1000)
     )
+
+    compositeSettings.customAssets.value.settingsMap shouldBe CompositeSettings.CustomAssetsSettings(
+      assets = Set(asset2, Waves, asset1),
+      settings = PercentSettings(AssetType.Spending, minFee = 0.1, minFeeInWaves = 300000),
+      validPairs.contains
+    ).settingsMap
+    
     // specified for these pairs
     compositeSettings.getOrderFeeSettings(assetPair1Waves) shouldBe PercentSettings(AssetType.Amount, minFee = 0.01, minFeeInWaves = 1000)
     compositeSettings.getOrderFeeSettings(assetPair2Waves) shouldBe PercentSettings(AssetType.Amount, minFee = 0.01, minFeeInWaves = 1000)

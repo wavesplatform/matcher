@@ -133,7 +133,7 @@ object HttpOrderFeeMode {
       case cs @ OrderFeeSettings.CompositeSettings(default, _, _, discount, _) =>
         FeeModeComposite(
           fromSettings(default, matcherAccountFee),
-          cs.getAllPairs.view.mapValues(fromSettings(_, matcherAccountFee)).toMap,
+          cs.getAllCustomFeeSettings.view.mapValues(fromSettings(_, matcherAccountFee)).toMap,
           discount.map(HttpDiscount.fromDiscountSettings)
         )
     }

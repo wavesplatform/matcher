@@ -156,8 +156,9 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     ),
     customAssets = CompositeSettings.CustomAssetsSettings(
       assets = Set(assetPair1.amountAsset, assetPair2.amountAsset, assetPair1.priceAsset),
-      settings = PercentSettings(AssetType.Spending, minFee = 0.1, minFeeInWaves = 20000)
-    )(possiblePairs.contains).some
+      settings = PercentSettings(AssetType.Spending, minFee = 0.1, minFeeInWaves = 20000),
+      possiblePairs.contains
+    ).some
   )
 
   private val settings = ConfigSource

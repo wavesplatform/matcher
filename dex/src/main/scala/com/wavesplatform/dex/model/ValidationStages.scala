@@ -35,8 +35,7 @@ object ValidationStages {
     lastProcessedOffset: => Long,
     blacklistedAddresses: Set[Address],
     hasMatcherAccountScript: Boolean,
-    handleProofs: Order => Order,
-    pairValidator: AssetPair => Boolean
+    handleProofs: Order => Order
   )(o: Order)(implicit efc: ErrorFormatterContext, ec: ExecutionContext): FutureResult[OrderValidator.ValidatedOrder] = {
     import OrderValidator._
 

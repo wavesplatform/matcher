@@ -9,7 +9,7 @@ import scala.collection.immutable.{Queue, TreeMap}
 
 package object model {
 
-  type AssetPairValidator = AssetPair => Boolean
+  type AssetPairQuickValidator = AssetPair => Boolean
 
   type Level = Queue[LimitOrder]
   type OrderBookSideSnapshot = Map[Price, Seq[LimitOrder]]

@@ -11,8 +11,8 @@ import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.error.Implicits.ThrowableOps
-import com.wavesplatform.dex.model.AssetPairValidator
-import com.wavesplatform.dex.settings.MatcherSettings.RawOrderFeeSettings
+import com.wavesplatform.dex.model.AssetPairQuickValidator
+import com.wavesplatform.dex.settings.MatcherSettings.PartialOrderFeeSettings
 import com.wavesplatform.dex.settings.OrderFeeSettings._
 import com.wavesplatform.dex.settings._
 import pureconfig.ConfigWriter
@@ -150,11 +150,11 @@ sealed trait ConfigWriters {
         )
     }
 
-  implicit val orderFeeSettingsWriter: ConfigWriter[RawOrderFeeSettings] =
+  implicit val orderFeeSettingsWriter: ConfigWriter[PartialOrderFeeSettings] =
     orderFeeWriter
-      .contramap[RawOrderFeeSettings](uofs => uofs(_ => true))
+      .contramap[PartialOrderFeeSettings](_(_ => true))
 
-  implicit val longOrderFeeConfigWriter: ConfigWriter[Map[Long, RawOrderFeeSettings]] = genericMapWriter(_.toString)
+  implicit val longOrderFeeConfigWriter: ConfigWriter[Map[Long, PartialOrderFeeSettings]] = genericMapWriter(_.toString)
 
   implicit val assetPairOrderFeeSettingsConfigWriter: ConfigWriter[Map[AssetPair, OrderFeeSettings]] =
     genericMapWriter(assetPairToString)
@@ -207,7 +207,7 @@ case class AllOrderFeeSettings(
 )
 
 object AllOrderFeeSettings {
-  type RawAllOrderFeeSettings = AssetPairValidator => AllOrderFeeSettings
+  type RawAllOrderFeeSettings = AssetPairQuickValidator => AllOrderFeeSettings
 }
 
 case class AllAccountStorageSettings(

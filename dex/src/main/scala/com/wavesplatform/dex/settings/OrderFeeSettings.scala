@@ -14,11 +14,7 @@ import pureconfig.configurable.genericMapReader
 import pureconfig.error.CannotConvert
 import pureconfig.generic.semiauto
 
-sealed trait OrderFeeSettings extends Product with Serializable {
-
-  def filterPairs(pairValidator: AssetPairValidator): OrderFeeSettings
-
-}
+sealed trait OrderFeeSettings extends Product with Serializable
 
 object OrderFeeSettings {
 
@@ -31,8 +27,6 @@ object OrderFeeSettings {
     val maxBaseFee: Long = math.max(baseMakerFee, baseTakerFee)
     val makerRatio = BigDecimal(baseMakerFee) / maxBaseFee
     val takerRatio = BigDecimal(baseTakerFee) / maxBaseFee
-
-    override def filterPairs(pairValidator: AssetPairValidator): OrderFeeSettings = this
 
   }
 
@@ -56,11 +50,7 @@ object OrderFeeSettings {
 
   }
 
-  final case class FixedSettings(asset: Asset, minFee: Long) extends OrderFeeSettings {
-
-    override def filterPairs(pairValidator: AssetPairValidator): OrderFeeSettings = this
-
-  }
+  final case class FixedSettings(asset: Asset, minFee: Long) extends OrderFeeSettings
 
   object FixedSettings extends ConfigReaders {
 
@@ -82,8 +72,6 @@ object OrderFeeSettings {
         case AssetType.Receiving => Order.getReceiveAssetId(assetPair, orderType)
         case AssetType.Spending => Order.getSpendAssetId(assetPair, orderType)
       }
-
-    override def filterPairs(pairValidator: AssetPairValidator): OrderFeeSettings = this
 
   }
 
@@ -116,13 +104,6 @@ object OrderFeeSettings {
         _.settingsMap
       ) ++ custom // custom must override any values from customAssets
 
-    override def filterPairs(pairValidator: AssetPairValidator): OrderFeeSettings =
-      copy(
-        default = default.filterPairs(pairValidator),
-        custom = custom.filter(v => pairValidator(v._1)),
-        customAssets = customAssets.map(_.filterCustomPairs(pairValidator))
-      )
-
   }
 
   object CompositeSettings extends ConfigReaders {
@@ -136,8 +117,6 @@ object OrderFeeSettings {
         }
 
       lazy val settingsMap = customPairs.map(p => (p, settings)).toMap
-
-      def filterCustomPairs(pred: AssetPair => Boolean): CustomAssetsSettings = ???
 
       def getSettings(assetPair: AssetPair): Option[OrderFeeSettings] =
         settingsMap.get(assetPair)

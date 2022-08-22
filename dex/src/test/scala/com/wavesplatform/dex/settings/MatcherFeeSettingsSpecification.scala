@@ -1,12 +1,10 @@
 package com.wavesplatform.dex.settings
 
 import cats.syntax.option._
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.Config
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
-import com.wavesplatform.dex.settings.MatcherSettings.RawOrderFeeSettings
-import com.wavesplatform.dex.settings.OrderFeeSettings.CompositeSettings.RawCompositeSettings
-import com.wavesplatform.dex.settings.OrderFeeSettings.{CompositeSettings, DynamicSettings, PercentSettings, RawCustomAssetSettings}
+import com.wavesplatform.dex.settings.OrderFeeSettings.{CompositeSettings, DynamicSettings, PercentSettings}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.test.matchers.ProduceError.produce
 import org.scalatest.OptionValues

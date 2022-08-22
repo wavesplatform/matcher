@@ -2,7 +2,6 @@ package com.wavesplatform.dex.settings
 
 import cats.data.NonEmptyList
 import cats.implicits._
-import com.typesafe.config.ConfigRenderOptions
 import com.wavesplatform.dex.actors.address.AddressActor
 import com.wavesplatform.dex.actors.events.OrderEventsCoordinatorActor
 import com.wavesplatform.dex.actors.tx.ExchangeTransactionBroadcastActor
@@ -20,7 +19,7 @@ import com.wavesplatform.dex.settings.utils.{validationOf, ConfigReaders, RawFai
 import com.wavesplatform.dex.tool.ComparisonTool
 import pureconfig.ConfigReader
 import pureconfig.configurable.genericMapReader
-import pureconfig.error.{CannotConvert, ConfigReaderFailures, ExceptionThrown, FailureReason}
+import pureconfig.error.{ConfigReaderFailures, ExceptionThrown, FailureReason}
 import pureconfig.generic.auto._
 import pureconfig.generic.error.UnexpectedValueForFieldCoproductHint
 import pureconfig.generic.semiauto

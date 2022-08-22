@@ -154,7 +154,6 @@ object OrderFeeSettings {
         OrderFeeSettings
       ]("assets", "settings") {
         case (assets, settings) =>
-          println("[1] " + assets)
           CustomAssetsSettings(assets, settings)
       }
 

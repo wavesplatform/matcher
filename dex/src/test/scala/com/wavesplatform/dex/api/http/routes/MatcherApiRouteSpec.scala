@@ -148,7 +148,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     )
   )
 
-  private val customCompositeSettings = CompositeSettings(
+  private val complexCompositeSettings = CompositeSettings(
     default = DynamicSettings(baseMakerFee = 350000, baseTakerFee = 350000),
     custom = Map(
       assetPair1 -> PercentSettings(AssetType.Amount, minFee = 0.01, minFeeInWaves = 1000),
@@ -341,7 +341,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
             )
           )
         },
-      feeSettings = customCompositeSettings
+      feeSettings = complexCompositeSettings
     )
   }
 

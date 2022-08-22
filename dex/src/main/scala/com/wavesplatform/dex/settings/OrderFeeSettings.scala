@@ -18,7 +18,7 @@ sealed trait OrderFeeSettings extends Product with Serializable
 
 object OrderFeeSettings {
 
-  type PartialCustomAssetSettings = (AssetPair => Boolean) => CompositeSettings.CustomAssetsSettings
+  type PartialCustomAssetSettings = AssetPairQuickValidator => CompositeSettings.CustomAssetsSettings
 
   final case class DynamicSettings(baseMakerFee: Long, baseTakerFee: Long, zeroFeeAccounts: Set[PublicKey] = Set.empty)
       extends OrderFeeSettings {
@@ -100,7 +100,7 @@ object OrderFeeSettings {
     def getAllCustomFeeSettings: Map[AssetPair, OrderFeeSettings] =
       customAssets.fold(Map.empty[AssetPair, OrderFeeSettings])(
         _.settingsMap
-      ) ++ custom // "custom" has higher priority compared to "customAssets"
+      ) ++ custom // "custom" has higher priority than "customAssets"
 
   }
 
@@ -114,7 +114,7 @@ object OrderFeeSettings {
             acc ++ assets.map(asset => AssetPair(asset, elem))
         }.filter(validator)
 
-      lazy val settingsMap: Map[AssetPair, OrderFeeSettings] = customPairs.map(p => (p, settings)).toMap
+      val settingsMap: Map[AssetPair, OrderFeeSettings] = customPairs.map(p => (p, settings)).toMap
 
       def getSettings(assetPair: AssetPair): Option[OrderFeeSettings] =
         settingsMap.get(assetPair)
@@ -167,10 +167,10 @@ object OrderFeeSettings {
     implicit private val feeSettingsMapReader =
       genericMapReader[AssetPair, OrderFeeSettings](assetPairKeyParser)(feeSettingsReader)
 
-    type RawCompositeSettings = AssetPairQuickValidator => CompositeSettings
+    type PartialCompositeSettings = AssetPairQuickValidator => CompositeSettings
 
-    implicit val compositeConfigReader: ConfigReader[RawCompositeSettings] = ConfigReader.forProduct5[
-      RawCompositeSettings,
+    implicit val partialCompositeConfigReader: ConfigReader[PartialCompositeSettings] = ConfigReader.forProduct5[
+      PartialCompositeSettings,
       OrderFeeSettings,
       Option[Map[AssetPair, OrderFeeSettings]],
       Option[PartialCustomAssetSettings],

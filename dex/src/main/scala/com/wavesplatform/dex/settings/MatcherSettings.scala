@@ -114,7 +114,7 @@ object MatcherSettings extends ConfigReaders {
                 settings => _: AssetPairQuickValidator => settings
               }
             case "composite" =>
-              CompositeSettings.compositeConfigReader.from(objCur.atKeyOrUndefined("composite"))
+              CompositeSettings.partialCompositeConfigReader.from(objCur.atKeyOrUndefined("composite"))
             case m =>
               ConfigReaderFailures(modeCur.failureFor(UnexpectedValueForFieldCoproductHint(modeCur.valueOpt.get))).asLeft[PartialOrderFeeSettings]
           }

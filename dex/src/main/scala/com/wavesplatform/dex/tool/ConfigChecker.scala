@@ -206,10 +206,6 @@ case class AllOrderFeeSettings(
   composite: Option[CompositeSettings]
 )
 
-object AllOrderFeeSettings {
-  type RawAllOrderFeeSettings = AssetPairQuickValidator => AllOrderFeeSettings
-}
-
 case class AllAccountStorageSettings(
   `type`: String,
   inMem: AccountStorage.Settings.InMem,

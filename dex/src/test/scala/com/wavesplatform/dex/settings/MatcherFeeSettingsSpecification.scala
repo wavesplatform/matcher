@@ -1,6 +1,5 @@
 package com.wavesplatform.dex.settings
 
-import cats.syntax.option._
 import com.typesafe.config.Config
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair

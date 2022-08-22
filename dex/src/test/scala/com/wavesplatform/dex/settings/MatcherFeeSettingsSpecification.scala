@@ -215,7 +215,7 @@ final class MatcherFeeSettingsSpecification extends BaseSettingsSpecification wi
       settings = PercentSettings(AssetType.Spending, minFee = 0.1, minFeeInWaves = 300000),
       validPairs.contains
     ).settingsMap
-    
+
     // specified for these pairs
     compositeSettings.getOrderFeeSettings(assetPair1Waves) shouldBe PercentSettings(AssetType.Amount, minFee = 0.01, minFeeInWaves = 1000)
     compositeSettings.getOrderFeeSettings(assetPair2Waves) shouldBe PercentSettings(AssetType.Amount, minFee = 0.01, minFeeInWaves = 1000)

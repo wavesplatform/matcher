@@ -91,7 +91,6 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
   private val blacklistedAddresses = settings.blacklistedAddresses.map(Address.fromString(_).explicitGet())
   private val matchingRulesCache = new MatchingRulesCache(settings)
-  private val orderFeeSettingsCache = new OrderFeeSettingsCache(settings.orderFee)
 
   private val apiKeyHashes: List[Array[Byte]] = settings.restApi.apiKeyHashes filter (_.nonEmpty) map Base58.decode
   private val processConsumedTimeout = new Timeout(settings.processConsumedTimeout * 2)
@@ -204,6 +203,9 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   private val rateCache = Await.result(cacheAndAssetFutures, 5.minutes)
 
   private val pairBuilder = new AssetPairBuilder(settings, getAndCacheDescription, settings.blacklistedAssets)
+
+  private val orderFeeSettingsCache =
+    new OrderFeeSettingsCache(settings.orderFee.view.mapValues(_(pairBuilder.quickValidateAssetPair(_).isRight)).toMap)
 
   private val txWriterRef =
     actorSystem.actorOf(WriteExchangeTransactionActor.props(ExchangeTxStorage.levelDB(commonLevelDb)), WriteExchangeTransactionActor.name)

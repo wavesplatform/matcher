@@ -122,7 +122,11 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
       )
     )
     settings.processConsumedTimeout shouldBe 663.seconds
-    settings.orderFee should matchTo(Map[Long, OrderFeeSettings](-1L -> PercentSettings(AssetType.Amount, 0.1, 300000)))
+    settings.orderFee.map(v => (v._1, v._2(_ => true))) should matchTo(Map[Long, OrderFeeSettings](-1L -> PercentSettings(
+      AssetType.Amount,
+      0.1,
+      300000
+    )))
     settings.maxPriceDeviations shouldBe DeviationsSettings(enable = true, 1000000, 1000000, 1000000)
     settings.allowedAssetPairs shouldBe Set.empty[AssetPair]
     settings.allowedOrderVersions shouldBe Set(11, 22)
@@ -218,145 +222,6 @@ baz"""
     Seq("waves.dex.max-price-deviations.max-fee-deviation", "waves.dex.max-price-deviations.max-price-loss").foreach { message =>
       settingsInvalidLossAndFee should produce(message)
     }
-  }
-
-  "OrderFeeSettings in MatcherSettings" should "be validated" in {
-
-    def invalidMode(invalidModeName: String = "invalid"): String =
-      s"""
-         |order-fee {
-         |  -1: {
-         |    mode = $invalidModeName
-         |    dynamic {
-         |      base-maker-fee = 300000
-         |      base-taker-fee = 300000
-         |    }
-         |    fixed {
-         |      asset = WAVES
-         |      min-fee = 300000
-         |    }
-         |    percent {
-         |      asset-type = amount
-         |      min-fee = 0.1
-         |    }
-         |  }
-         |}
-       """.stripMargin
-
-    val invalidAssetType =
-      s"""
-         |order-fee {
-         |  -1: {
-         |    mode = percent
-         |    dynamic {
-         |      base-maker-fee = 300000
-         |      base-taker-fee = 300000
-         |    }
-         |    fixed {
-         |      asset = WAVES
-         |      min-fee = 300000
-         |    }
-         |    percent {
-         |      asset-type = test
-         |      min-fee = 121.2
-         |    }
-         |  }
-         |}
-       """.stripMargin
-
-    val invalidPercent =
-      s"""
-         |order-fee {
-         |  -1: {
-         |    mode = percent
-         |    dynamic {
-         |      base-maker-fee = 300000
-         |      base-taker-fee = 300000
-         |    }
-         |    fixed {
-         |      asset = WAVES
-         |      min-fee = 300000
-         |    }
-         |    percent {
-         |      asset-type = spending
-         |      min-fee = 121.2
-         |    }
-         |  }
-         |}
-       """.stripMargin
-
-    val invalidAsset =
-      s"""
-         |order-fee {
-         |  -1: {
-         |    mode = fixed
-         |    dynamic {
-         |      base-maker-fee = 300000
-         |      base-taker-fee = 300000
-         |    }
-         |    fixed {
-         |      asset = ;;;;
-         |      min-fee = -300000
-         |    }
-         |    percent {
-         |      asset-type = test
-         |      min-fee = 50
-         |    }
-         |  }
-         |}
-       """.stripMargin
-
-    val invalidFee =
-      s"""
-         |order-fee {
-         |  -1: {
-         |    mode = fixed
-         |    dynamic {
-         |      base-maker-fee = 300000
-         |      base-taker-fee = 300000
-         |    }
-         |    fixed {
-         |      asset = DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J
-         |      min-fee = -300000
-         |    }
-         |    percent {
-         |      asset-type = test
-         |      min-fee = 121
-         |    }
-         |  }
-         |}
-       """.stripMargin
-
-    val invalidFeeInDynamicMode =
-      s"""
-         |order-fee {
-         |  -1: {
-         |    mode = dynamic
-         |    dynamic {
-         |      base-maker-fee = -350000
-         |      base-taker-fee = 350000
-         |    }
-         |    fixed {
-         |      asset = ;;;;
-         |      min-fee = -300000
-         |    }
-         |    percent {
-         |      asset-type = test
-         |      min-fee = 121
-         |    }
-         |  }
-         |}
-       """.stripMargin
-
-    def configStr(x: String): Config = configWithSettings(orderFeeStr = x)
-
-    getSettingByConfig(configStr(invalidMode())) should produce("waves.dex.order-fee.-1.mode.+\n.+invalid".r)
-    getSettingByConfig(configStr(invalidMode("waves"))) should produce("waves.dex.order-fee.-1.mode.+\n.+waves".r)
-    getSettingByConfig(configStr(invalidAssetType)) should produce("waves.dex.order-fee.-1.percent.asset-type.+\n.+test".r)
-    getSettingByConfig(configStr(invalidPercent)) should produce("order-fee.-1.percent.min-fee")
-    getSettingByConfig(configStr(invalidAsset)) should produce("order-fee.-1.fixed.asset.+\n.+;".r)
-    getSettingByConfig(configStr(invalidFee)) should produce("order-fee.-1.fixed.min-fee")
-    getSettingByConfig(configStr(invalidFeeInDynamicMode)) should produce("order-fee.-1.dynamic.base-maker-fee")
   }
 
   "Allowed asset pairs in MatcherSettings" should "be validated" in {

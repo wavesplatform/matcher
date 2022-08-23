@@ -125,16 +125,17 @@ object HttpOrderFeeMode {
 
   private def toJson[T](key: String, x: T)(implicit w: Writes[T]): JsObject = Json.obj(key -> w.writes(x))
 
-  def fromSettings(settings: OrderFeeSettings, matcherAccountFee: Long): HttpOrderFeeMode = settings match {
-    case x: OrderFeeSettings.DynamicSettings => FeeModeDynamic(x.maxBaseFee + matcherAccountFee)
-    case OrderFeeSettings.FixedSettings(assetId, minFee) => FeeModeFixed(assetId, minFee)
-    case OrderFeeSettings.PercentSettings(assetType, minFee, minFeeInWaves) => FeeModePercent(assetType, minFee, minFeeInWaves)
-    case OrderFeeSettings.CompositeSettings(default, custom, discount, _) =>
-      FeeModeComposite(
-        fromSettings(default, matcherAccountFee),
-        custom.view.mapValues(fromSettings(_, matcherAccountFee)).toMap,
-        discount.map(HttpDiscount.fromDiscountSettings)
-      )
-  }
+  def fromSettings(settings: OrderFeeSettings, matcherAccountFee: Long): HttpOrderFeeMode =
+    settings match {
+      case x: OrderFeeSettings.DynamicSettings => FeeModeDynamic(x.maxBaseFee + matcherAccountFee)
+      case OrderFeeSettings.FixedSettings(assetId, minFee) => FeeModeFixed(assetId, minFee)
+      case OrderFeeSettings.PercentSettings(assetType, minFee, minFeeInWaves) => FeeModePercent(assetType, minFee, minFeeInWaves)
+      case cs @ OrderFeeSettings.CompositeSettings(default, _, _, discount, _) =>
+        FeeModeComposite(
+          fromSettings(default, matcherAccountFee),
+          cs.getAllCustomFeeSettings.view.mapValues(fromSettings(_, matcherAccountFee)).toMap,
+          discount.map(HttpDiscount.fromDiscountSettings)
+        )
+    }
 
 }

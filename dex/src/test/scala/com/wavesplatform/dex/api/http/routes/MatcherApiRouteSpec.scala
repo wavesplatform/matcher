@@ -53,8 +53,8 @@ import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.MatcherModel.Denormalized
 import com.wavesplatform.dex.model.{LimitOrder, OrderInfo, OrderStatus, _}
 import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
-import com.wavesplatform.dex.settings.OrderFeeSettings.DynamicSettings
-import com.wavesplatform.dex.settings.{MatcherSettings, OrderRestrictionsSettings}
+import com.wavesplatform.dex.settings.OrderFeeSettings.{CompositeSettings, DynamicSettings, PercentSettings}
+import com.wavesplatform.dex.settings.{AssetType, MatcherSettings, OrderFeeSettings, OrderRestrictionsSettings}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 import play.api.libs.json.{JsArray, JsString, Json, JsonFacade => _}
@@ -133,6 +133,33 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
 
   private val amountAssetDesc = BriefAssetDescription("AmountAsset", 8, hasScript = false, isNft = false)
   private val priceAssetDesc = BriefAssetDescription("PriceAsset", 8, hasScript = false, isNft = false)
+
+  private val assetPair1 = assetPairGen.sample.get
+  private val assetPair2 = assetPairGen.sample.get
+
+  private val possiblePairs =
+    Set(assetPair1, AssetPair(assetPair1.amountAsset, assetPair2.amountAsset), AssetPair(assetPair2.amountAsset, assetPair1.priceAsset))
+
+  private val simpleCompositeSettings = CompositeSettings(
+    default = DynamicSettings(baseMakerFee = 350000, baseTakerFee = 350000),
+    custom = Map(
+      assetPair1 -> PercentSettings(AssetType.Amount, minFee = 0.01, minFeeInWaves = 1000),
+      assetPair2 -> PercentSettings(AssetType.Amount, minFee = 0.02, minFeeInWaves = 1000)
+    )
+  )
+
+  private val complexCompositeSettings = CompositeSettings(
+    default = DynamicSettings(baseMakerFee = 350000, baseTakerFee = 350000),
+    custom = Map(
+      assetPair1 -> PercentSettings(AssetType.Amount, minFee = 0.01, minFeeInWaves = 1000),
+      assetPair2 -> PercentSettings(AssetType.Amount, minFee = 0.02, minFeeInWaves = 1000)
+    ),
+    customAssets = CompositeSettings.CustomAssetsSettings(
+      assets = Set(assetPair1.amountAsset, assetPair2.amountAsset, assetPair1.priceAsset),
+      settings = PercentSettings(AssetType.Spending, minFee = 0.1, minFeeInWaves = 20000),
+      possiblePairs.contains
+    ).some
+  )
 
   private val settings = ConfigSource
     .fromConfig(ConfigFactory.load())
@@ -236,6 +263,86 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         )
       }
     }
+  }
+
+  routePath("/matcher/settings") - {
+    "return correct composite fee settings" in test(
+      route =>
+        Get(routePath("/settings")) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          responseAs[HttpMatcherPublicSettings] should matchTo(
+            HttpMatcherPublicSettings(
+              matcherPublicKey = matcherKeyPair.publicKey,
+              matcherVersion = Version.VersionString,
+              priceAssets = List(
+                blackListedOrder.assetPair.priceAsset,
+                badOrder.assetPair.priceAsset,
+                someOrder.assetPair.priceAsset,
+                okOrder.assetPair.priceAsset,
+                priceAsset,
+                Waves
+              ),
+              orderFee = HttpOrderFeeMode.FeeModeComposite(
+                default = HttpOrderFeeMode.FeeModeDynamic(650000),
+                custom = Map(
+                  assetPair1 -> HttpOrderFeeMode.FeeModePercent(AssetType.Amount, 0.01, 1000),
+                  assetPair2 -> HttpOrderFeeMode.FeeModePercent(AssetType.Amount, 0.02, 1000)
+                ),
+                discount = None
+              ),
+              rates = Map(Waves -> 1.0),
+              orderVersions = List[Byte](1, 2, 3),
+              networkByte = AddressScheme.current.chainId.toInt
+            )
+          )
+        },
+      feeSettings = simpleCompositeSettings
+    )
+  }
+
+  routePath("/matcher/settings") - {
+    "return correct composite fee settings with custom assets" in test(
+      route =>
+        Get(routePath("/settings")) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          responseAs[HttpMatcherPublicSettings] should matchTo(
+            HttpMatcherPublicSettings(
+              matcherPublicKey = matcherKeyPair.publicKey,
+              matcherVersion = Version.VersionString,
+              priceAssets = List(
+                blackListedOrder.assetPair.priceAsset,
+                badOrder.assetPair.priceAsset,
+                someOrder.assetPair.priceAsset,
+                okOrder.assetPair.priceAsset,
+                priceAsset,
+                Waves
+              ),
+              orderFee = HttpOrderFeeMode.FeeModeComposite(
+                default = HttpOrderFeeMode.FeeModeDynamic(650000),
+                custom = Map(
+                  assetPair1 -> HttpOrderFeeMode.FeeModePercent(AssetType.Amount, 0.01, 1000),
+                  assetPair2 -> HttpOrderFeeMode.FeeModePercent(AssetType.Amount, 0.02, 1000),
+                  AssetPair(assetPair1.amountAsset, assetPair2.amountAsset) -> HttpOrderFeeMode.FeeModePercent(
+                    AssetType.Spending,
+                    minFee = 0.1,
+                    minFeeInWaves = 20000
+                  ),
+                  AssetPair(assetPair2.amountAsset, assetPair1.priceAsset) -> HttpOrderFeeMode.FeeModePercent(
+                    AssetType.Spending,
+                    minFee = 0.1,
+                    minFeeInWaves = 20000
+                  )
+                ),
+                discount = None
+              ),
+              rates = Map(Waves -> 1.0),
+              orderVersions = List[Byte](1, 2, 3),
+              networkByte = AddressScheme.current.chainId.toInt
+            )
+          )
+        },
+      feeSettings = complexCompositeSettings
+    )
   }
 
   // getAssetRates
@@ -1216,7 +1323,12 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     db.put(orderKey.keyBytes, orderKey.encode(Some(okOrder)))
   }
 
-  private def test[U](f: Route => U, apiKeys: List[String] = List.empty, maybeRateCache: Option[RateCache] = None): U = {
+  private def test[U](
+    f: Route => U,
+    apiKeys: List[String] = List.empty,
+    maybeRateCache: Option[RateCache] = None,
+    feeSettings: OrderFeeSettings = DynamicSettings.symmetric(matcherFee)
+  ): U = {
     val rateCache = maybeRateCache.getOrElse(RateCache(TestRateDb()).futureValue)
 
     val odb = OrderDb.levelDb(settings.orderDb, asyncLevelDb)
@@ -1494,7 +1606,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       apiKeys map crypto.secureHash,
       rateCache,
       () => Future.successful(Set(1, 2, 3)),
-      () => DynamicSettings.symmetric(matcherFee)
+      () => feeSettings
     )
 
     val routes = Seq(

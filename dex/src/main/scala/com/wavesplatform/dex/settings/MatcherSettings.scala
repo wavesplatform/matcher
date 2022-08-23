@@ -9,14 +9,19 @@ import com.wavesplatform.dex.api.http.OrderBookHttpInfo
 import com.wavesplatform.dex.db.{AccountStorage, OrderDb}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.grpc.integration.settings.WavesBlockchainClientSettings
+import com.wavesplatform.dex.model.AssetPairQuickValidator
 import com.wavesplatform.dex.model.OrderValidator.exchangeTransactionCreationFee
+import com.wavesplatform.dex.settings.MatcherSettings.PartialOrderFeeSettings
+import com.wavesplatform.dex.settings.OrderFeeSettings._
+import com.wavesplatform.dex.settings.OrderFeeSettings.CompositeSettings._
 import com.wavesplatform.dex.settings.utils.ConfigReaderOps.Implicits
 import com.wavesplatform.dex.settings.utils.{validationOf, ConfigReaders, RawFailureReason}
 import com.wavesplatform.dex.tool.ComparisonTool
 import pureconfig.ConfigReader
 import pureconfig.configurable.genericMapReader
-import pureconfig.error.{ExceptionThrown, FailureReason}
+import pureconfig.error.{ConfigReaderFailures, ExceptionThrown, FailureReason}
 import pureconfig.generic.auto._
+import pureconfig.generic.error.UnexpectedValueForFieldCoproductHint
 import pureconfig.generic.semiauto
 import pureconfig.module.cats.nonEmptyListReader
 
@@ -51,7 +56,7 @@ case class MatcherSettings(
   orderBookHttp: OrderBookHttpInfo.Settings,
   eventsQueue: EventsQueueSettings,
   processConsumedTimeout: FiniteDuration,
-  orderFee: Map[Long, OrderFeeSettings],
+  orderFee: Map[Long, PartialOrderFeeSettings],
   maxPriceDeviations: DeviationsSettings,
   orderRestrictions: Map[AssetPair, OrderRestrictionsSettings],
   matchingRules: Map[AssetPair, NonEmptyList[DenormalizedMatchingRule]],
@@ -77,10 +82,11 @@ case class MatcherSettings(
     orderRestrictions.keySet.flatMap(_.assets) ++
     matchingRules.keySet.flatMap(_.assets) ++
     allowedAssetPairs.flatMap(_.assets) ++
-    orderFee.values.toSet[OrderFeeSettings].flatMap {
-      case x: OrderFeeSettings.FixedSettings => Set(x.asset)
-      case _ => Set.empty[Asset]
-    }
+    orderFee.values.map(_(_ => true)) // we don't care about pair ordering here, so it might be like that
+      .toSet[OrderFeeSettings].flatMap {
+        case x: OrderFeeSettings.FixedSettings => Set(x.asset)
+        case _ => Set.empty[Asset]
+      }
 
 }
 
@@ -88,7 +94,34 @@ object MatcherSettings extends ConfigReaders {
 
   implicit val byteStrConfigReader = byteStr58ConfigReader
 
-  implicit val longOrderFeeConfigReader = genericMapReader[Long, OrderFeeSettings] { x =>
+  type PartialOrderFeeSettings = AssetPairQuickValidator => OrderFeeSettings
+
+  implicit val partialOrderFeeSettingsReader: ConfigReader[PartialOrderFeeSettings] =
+    ConfigReader.fromCursor[PartialOrderFeeSettings] { cursor =>
+      for {
+        objCur <- cursor.asObjectCursor
+        modeCur <- objCur.atKey("mode")
+        modeStr <- modeCur.asString
+        feeSettings <-
+          modeStr match {
+            case "dynamic" => DynamicSettings.dynamicConfigReader.from(objCur.atKeyOrUndefined("dynamic")).map {
+                settings => _: AssetPairQuickValidator => settings
+              }
+            case "percent" => PercentSettings.percentConfigReader.from(objCur.atKeyOrUndefined("percent")).map {
+                settings => _: AssetPairQuickValidator => settings
+              }
+            case "fixed" => FixedSettings.fixedConfigReader.from(objCur.atKeyOrUndefined("fixed")).map {
+                settings => _: AssetPairQuickValidator => settings
+              }
+            case "composite" =>
+              CompositeSettings.partialCompositeConfigReader.from(objCur.atKeyOrUndefined("composite"))
+            case m =>
+              ConfigReaderFailures(modeCur.failureFor(UnexpectedValueForFieldCoproductHint(modeCur.valueOpt.get))).asLeft[PartialOrderFeeSettings]
+          }
+      } yield feeSettings
+    }
+
+  implicit val longOrderFeeConfigReader = genericMapReader[Long, PartialOrderFeeSettings] { x =>
     x.toLongOption.fold[Either[FailureReason, Long]](RawFailureReason(s"'$x' should be numeric").asLeft)(_.asRight)
   }
 

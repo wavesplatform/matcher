@@ -61,7 +61,8 @@ object ValidationStages {
           settings,
           orderAssetsDecimals,
           rateCache,
-          actualOrderFeeSettings
+          actualOrderFeeSettings,
+          lastProcessedOffset
         )(o)
         _ <- timeAware(time)(o)
         _ <- tickSizeAware(actualTickSize)(o)

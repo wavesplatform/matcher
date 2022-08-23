@@ -27,7 +27,7 @@ import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.model.Denormalization.denormalizeAmountAndFee
 import com.wavesplatform.dex.domain.order.Order
-import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionResult, ExchangeTransactionV3}
+import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionResult}
 import com.wavesplatform.dex.domain.utils.LoggerFacade
 import com.wavesplatform.dex.effect.Implicits.FutureOps
 import com.wavesplatform.dex.error
@@ -896,7 +896,7 @@ object AddressActor {
     override def toString: String = orderId.toString
   }
 
-  private case class AcceptedOrderWithTx(order: AcceptedOrder, tx: ExchangeTransactionResult[ExchangeTransactionV3], isTaker: Boolean)
+  private case class AcceptedOrderWithTx(order: AcceptedOrder, tx: ExchangeTransactionResult[ExchangeTransaction], isTaker: Boolean)
 
   private case class WsOrderExecutedUpdates(
     ownerRemainingOrders: List[AcceptedOrderWithTx] = List.empty,
@@ -908,7 +908,7 @@ object AddressActor {
 
   }
 
-  case class OrderBookExecutedEvent(event: Events.OrderExecuted, expectedTx: ExchangeTransactionResult[ExchangeTransactionV3])
+  case class OrderBookExecutedEvent(event: Events.OrderExecuted, expectedTx: ExchangeTransactionResult[ExchangeTransaction])
       extends HasOrderBookEvents {
     override def affectedAddresses: Set[Address] = getAffectedAddresses(event.counter, event.submitted)
   }

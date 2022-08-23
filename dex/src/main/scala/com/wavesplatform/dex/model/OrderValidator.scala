@@ -19,7 +19,7 @@ import com.wavesplatform.dex.domain.feature.{BlockchainFeature, BlockchainFeatur
 import com.wavesplatform.dex.domain.model.Normalization
 import com.wavesplatform.dex.domain.model.Normalization._
 import com.wavesplatform.dex.domain.order.OrderOps._
-import com.wavesplatform.dex.domain.order.{EthOrders, Order, OrderType}
+import com.wavesplatform.dex.domain.order.{EthOrders, Order, OrderType, OrderV4}
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.effect._
@@ -405,13 +405,22 @@ object OrderValidator extends ScorexLogging {
         )
     }
 
+  def validateVersion(order: Order, orderV4StartOffset: Long, lastProcessedOffset: => Long): Result[Order] =
+    order match {
+      case _: OrderV4 if lastProcessedOffset < orderV4StartOffset =>
+        error.UnsupportedOrderVersion(order.version).asLeft[Order]
+      case _ =>
+        order.asRight[MatcherError]
+    }
+
   def matcherSettingsAware(
     matcherPublicKey: PublicKey,
     blacklistedAddresses: Set[Address],
     matcherSettings: MatcherSettings,
     assetDecimals: Asset => Int,
     rateCache: RateCache,
-    getActualOrderFeeSettings: => OrderFeeSettings
+    getActualOrderFeeSettings: => OrderFeeSettings,
+    lastProcessedOffset: => Long
   )(order: Order)(implicit efc: ErrorFormatterContext): Result[ValidatedOrder] = {
 
     def validateBlacklistedAsset(asset: Asset, e: IssuedAsset => MatcherError): Result[Unit] =
@@ -426,6 +435,7 @@ object OrderValidator extends ScorexLogging {
         )
       _ <- validateBlacklistedAsset(order.feeAsset, error.FeeAssetBlacklisted(_))
       _ <- validateFeeAsset(order, getActualOrderFeeSettings)
+      _ <- validateVersion(order, matcherSettings.orderV4StartOffset, lastProcessedOffset)
       validatedOrder <- validateFee(order, getActualOrderFeeSettings, assetDecimals, rateCache)
     } yield validatedOrder
   }

@@ -1,7 +1,10 @@
 package com.wavesplatform.dex.domain.transaction
 
 import com.google.common.primitives.{Ints, Longs}
+import com.wavesplatform.dex.domain.account.PrivateKey
+import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.deser.EntityParser.{ConsumedBytesOffset, Stateful}
+import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.crypto.Proofs
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction._
@@ -39,6 +42,64 @@ case class ExchangeTransactionV2(
 }
 
 object ExchangeTransactionV2 extends ExchangeTransactionParser[ExchangeTransactionV2] {
+
+  def mkSigned(
+    amountAssetDecimals: Int,
+    priceAssetDecimals: Int,
+    matcher: PrivateKey,
+    buyOrder: Order,
+    sellOrder: Order,
+    amount: Long,
+    price: Long,
+    buyMatcherFee: Long,
+    sellMatcherFee: Long,
+    fee: Long,
+    timestamp: Long
+  ): ExchangeTransactionResult[ExchangeTransactionV2] =
+    mk(
+      amountAssetDecimals,
+      priceAssetDecimals,
+      buyOrder,
+      sellOrder,
+      amount,
+      price,
+      buyMatcherFee,
+      sellMatcherFee,
+      fee,
+      timestamp,
+      proofs = Proofs.empty
+    ).map { unverified =>
+      unverified.copy(proofs = Proofs(List(ByteStr(crypto.sign(matcher, unverified.bodyBytes())))))
+    }
+
+  def mk(
+    amountAssetDecimals: Int,
+    priceAssetDecimals: Int,
+    buyOrder: Order,
+    sellOrder: Order,
+    amount: Long,
+    price: Long,
+    buyMatcherFee: Long,
+    sellMatcherFee: Long,
+    fee: Long,
+    timestamp: Long,
+    proofs: Proofs
+  ): ExchangeTransactionResult[ExchangeTransactionV2] =
+    ExchangeTransactionResult.fromEither(
+      validateExchangeParams(
+        amountAssetDecimals,
+        priceAssetDecimals,
+        buyOrder,
+        sellOrder,
+        amount,
+        price,
+        buyMatcherFee,
+        sellMatcherFee,
+        fee,
+        timestamp
+      ),
+      ExchangeTransactionV2(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, proofs)
+    )
 
   override protected def parseHeader(bytes: Array[Byte]): Try[Int] = Try {
 

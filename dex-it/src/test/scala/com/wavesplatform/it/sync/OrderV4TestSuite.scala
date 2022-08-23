@@ -7,7 +7,7 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.crypto.Proofs
 import com.wavesplatform.dex.domain.order.{EthOrders, Order, OrderAuthentication, OrderType}
-import com.wavesplatform.dex.error.{InvalidJson, OrderCommonValidationFailed, OrderInvalidSignature}
+import com.wavesplatform.dex.error.{InvalidJson, OrderCommonValidationFailed, OrderInvalidSignature, UnsupportedOrderVersion}
 import com.wavesplatform.dex.it.config.GenesisConfig
 import com.wavesplatform.dex.model.AcceptedOrder
 import com.wavesplatform.it.MatcherSuiteBase
@@ -42,19 +42,29 @@ class OrderV4TestSuite extends MatcherSuiteBase {
   "OrderV4TestSuite" - {
 
     "should work with proofs authentication" in {
-      test(alice, bob, f => sign(alice, f), f => sign(bob, f))
+      test(alice, bob, f => sign(alice, f), f => sign(bob, f), orderVersion = 4, txVersion = 3)
     }
 
     "should work with eip712Signature authentication" in {
-      test(aliceEthAdr, bobEthAdr, f => signEth(aliceEth, f), f => signEth(bobEth, f))
+      test(aliceEthAdr, bobEthAdr, f => signEth(aliceEth, f), f => signEth(bobEth, f), orderVersion = 4, txVersion = 3)
     }
 
     "should work with mixed authentication" in {
-      test(alice, bobEthAdr, f => sign(alice, f), f => signEth(bobEth, f))
+      test(alice, bobEthAdr, f => sign(alice, f), f => signEth(bobEth, f), orderVersion = 4, txVersion = 3)
+    }
+
+    "should work with start offset" in {
+      val order = sign(alice, mkOrder(wavesUsdPair, OrderType.BUY, 10.waves, 5.usd, Waves, version = 4))
+      val orderV4StartOffset = dex1.tryApi.getLastOffset.value + 4L
+      dex1.restartWithNewSuiteConfig(suiteInitialConfig(orderV4StartOffset))
+      dex1.tryApi.place(order) should failWith(UnsupportedOrderVersion.code)
+      test(alice, bob, f => sign(alice, f), f => sign(bob, f), orderVersion = 3, txVersion = 2)
+      test(alice, bob, f => sign(alice, f), f => sign(bob, f), orderVersion = 3, txVersion = 3)
+      test(alice, bob, f => sign(alice, f), f => sign(bob, f), orderVersion = 4, txVersion = 3)
     }
 
     "should reject invalid eip712Signature" in {
-      val order = signEth(aliceEth, mkOrderV4(wavesUsdPair, OrderType.BUY, 10.waves, 5.usd, Waves))
+      val order = signEth(aliceEth, mkOrder(wavesUsdPair, OrderType.BUY, 10.waves, 5.usd, Waves, version = 4))
       val orderJson = order.json() ++ Json.obj(
         "eip712Signature" -> JsString(eip712SignatureSample)
       )
@@ -62,7 +72,7 @@ class OrderV4TestSuite extends MatcherSuiteBase {
     }
 
     "should reject corrupted eip712Signature" in {
-      val order = signEth(aliceEth, mkOrderV4(wavesUsdPair, OrderType.BUY, 10.waves, 5.usd, Waves))
+      val order = signEth(aliceEth, mkOrder(wavesUsdPair, OrderType.BUY, 10.waves, 5.usd, Waves, version = 4))
       val orderJson = order.json() ++ Json.obj(
         "eip712Signature" -> JsString("corrupted")
       )
@@ -71,7 +81,7 @@ class OrderV4TestSuite extends MatcherSuiteBase {
 
     "should reject order with price that doesn't fit into FIXED_DECIMALS" in {
       val price = 2L * Order.PriceConstant * Order.PriceConstant
-      val order = sign(alice, mkOrderV4(wavesUsdPair, OrderType.BUY, 10.waves, price, Waves))
+      val order = sign(alice, mkOrder(wavesUsdPair, OrderType.BUY, 10.waves, price, Waves, version = 4))
       dex1.tryApi.place(order) should failWith(
         OrderCommonValidationFailed.code,
         "The order is invalid: Price is not convertible to fixed decimals format"
@@ -79,7 +89,7 @@ class OrderV4TestSuite extends MatcherSuiteBase {
     }
 
     "should reject order without sender, proofs and eip712Signature" in {
-      val order = sign(alice, mkOrderV4(wavesUsdPair, OrderType.BUY, 10.waves, 5.usd, Waves))
+      val order = sign(alice, mkOrder(wavesUsdPair, OrderType.BUY, 10.waves, 5.usd, Waves, version = 4))
       val orderJson = {
         order.json() - "eip712Signature" - "sender" - "senderPublicKey" - "proofs" - "signature"
       }
@@ -91,24 +101,29 @@ class OrderV4TestSuite extends MatcherSuiteBase {
     buyer: Address,
     seller: Address,
     buySign: (OrderAuthentication => Order) => Order,
-    sellSign: (OrderAuthentication => Order) => Order
-  ) = {
+    sellSign: (OrderAuthentication => Order) => Order,
+    orderVersion: Byte,
+    txVersion: Byte
+  ): Unit = {
     val buyerWaves = wavesNode1.api.wavesBalance(buyer)
     val buyerUsd = wavesNode1.api.assetBalance(buyer, usd)
     val sellerWaves = wavesNode1.api.wavesBalance(seller)
     val sellerUsd = wavesNode1.api.assetBalance(seller, usd)
 
-    val buy = buySign(mkOrderV4(wavesUsdPair, OrderType.BUY, 10.waves, 5.usd, Waves))
-    val sell = sellSign(mkOrderV4(wavesUsdPair, OrderType.SELL, 10.waves, 5.usd, usd))
+    val buy = buySign(mkOrder(wavesUsdPair, OrderType.BUY, 10.waves, 5.usd, Waves, orderVersion))
+    val sell = sellSign(mkOrder(wavesUsdPair, OrderType.SELL, 10.waves, 5.usd, usd, orderVersion))
 
     placeAndAwaitAtDex(buy)
-    placeAndAwaitAtNode(sell)
+    val txs = placeAndAwaitAtNode(sell)
 
     val spendUsd = AcceptedOrder.calcAmountOfPriceAsset(10.waves, 5.usd)
     buyerWaves + 10.waves - fee shouldBe wavesNode1.api.wavesBalance(buyer)
     buyerUsd - spendUsd shouldBe wavesNode1.api.assetBalance(buyer, usd)
     sellerWaves - 10.waves shouldBe wavesNode1.api.wavesBalance(seller)
     sellerUsd + spendUsd - fee shouldBe wavesNode1.api.assetBalance(seller, usd)
+
+    txs should not be empty
+    txs.foreach(_.version() shouldBe txVersion)
   }
 
   private def sign(signer: KeyPair, f: OrderAuthentication => Order): Order = {
@@ -121,13 +136,14 @@ class OrderV4TestSuite extends MatcherSuiteBase {
     EthOrders.signOrder(f(sig), signer)
   }
 
-  private def mkOrderV4(
+  private def mkOrder(
     assetPair: AssetPair,
     orderType: OrderType,
     amount: Long,
     price: Long,
-    feeAsset: Asset
-  ) =
+    feeAsset: Asset,
+    version: Byte
+  ): OrderAuthentication => Order =
     (oa: OrderAuthentication) => {
       val ts = System.currentTimeMillis
       Order(
@@ -140,7 +156,7 @@ class OrderV4TestSuite extends MatcherSuiteBase {
         ts,
         ts + (30.days - 1.seconds).toMillis,
         fee,
-        4,
+        version,
         feeAsset
       )
     }
@@ -150,19 +166,22 @@ class OrderV4TestSuite extends MatcherSuiteBase {
     broadcastAndAwait(IssueUsdTx)
     broadcastAndAwait(
       mkTransfer(alice, aliceEthAdr, 10_000.waves, Waves),
-      mkTransfer(alice, aliceEthAdr, 10_000.usd, usd),
+      mkTransfer(alice, aliceEthAdr, 100_000.usd, usd),
       mkTransfer(alice, bobEthAdr, 10_000.waves, Waves),
-      mkTransfer(alice, bobEthAdr, 10_000.usd, usd),
-      mkTransfer(alice, bob, 10_000.usd, usd)
+      mkTransfer(alice, bobEthAdr, 100_000.usd, usd),
+      mkTransfer(alice, bob, 100_000.usd, usd)
     )
     dex1.start()
     dex1.api.upsertAssetRate(usd, 1000000.0)
   }
 
-  override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(
+  override protected def dexInitialSuiteConfig: Config = suiteInitialConfig(orderV4StartOffset = -1L)
+
+  private def suiteInitialConfig(orderV4StartOffset: Long): Config = ConfigFactory.parseString(
     s"""
        |waves.dex {
-       |  allowed-order-versions = [4]
+       |  allowed-order-versions = [3,4]
+       |  order-v-4-start-offset = $orderV4StartOffset
        |  price-assets = [ "$UsdId", "WAVES" ]
        |  order-fee.-1 {
        |    mode = composite

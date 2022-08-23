@@ -8,6 +8,7 @@ class GetMatcherPublicSettingsSpec extends MatcherSuiteBase with RawHttpChecks {
 
   override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(
     s"""waves.dex {
+       |  order-v-4-start-offset = 9223372036854775807
        |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
        |  blacklisted-assets = [ "$BtcId" ]
        |}""".stripMargin
@@ -29,6 +30,7 @@ class GetMatcherPublicSettingsSpec extends MatcherSuiteBase with RawHttpChecks {
       settings.priceAssets should have size 2
       settings.priceAssets should contain(usd)
       settings.priceAssets should not contain btc
+      settings.orderVersions should not contain 4
     }
   }
 

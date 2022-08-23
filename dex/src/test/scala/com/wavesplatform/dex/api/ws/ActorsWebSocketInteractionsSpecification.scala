@@ -17,7 +17,7 @@ import com.wavesplatform.dex.domain.crypto.Proofs
 import com.wavesplatform.dex.domain.error.ValidationError
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.state.{LeaseBalance, Portfolio}
-import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV3
+import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionResult, ExchangeTransactionV3}
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
@@ -147,7 +147,8 @@ class ActorsWebSocketInteractionsSpecification
           fee = 300000L,
           timestamp = nowTs,
           proofs = Proofs.empty
-        ).copy(error = ValidationError.GenericError("Some error").some)
+        )
+        .copy(error = ValidationError.GenericError("Some error").some)
       addressDir ! AddressActor.Command.ApplyOrderBookExecuted(AddressActor.OrderBookExecutedEvent(oe, tx))
       oe
     }

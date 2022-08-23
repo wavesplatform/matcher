@@ -1606,7 +1606,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       apiKeys map crypto.secureHash,
       rateCache,
       () => Future.successful(Set(1, 2, 3)),
-      () => feeSettings
+      () => feeSettings,
+      () => -1L
     )
 
     val routes = Seq(

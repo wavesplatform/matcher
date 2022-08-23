@@ -6,7 +6,7 @@ import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.crypto.Proofs
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.OrderOps._
-import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV3
+import com.wavesplatform.dex.domain.transaction.{ExchangeTransactionV2, ExchangeTransactionV3}
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
 import org.scalacheck.Gen
@@ -32,19 +32,45 @@ class ExchangeTransactionCreatorSpecification
 
   private def getExchangeTransactionCreator(
     hasMatcherScript: Boolean = false,
-    hasAssetScripts: Asset => Boolean = _ => false
+    hasAssetScripts: Asset => Boolean = _ => false,
+    orderV4StartOffset: Long = Long.MaxValue
   ): ExchangeTransactionCreator =
-    new ExchangeTransactionCreator(MatcherAccount, matcherSettings.exchangeTxBaseFee, hasMatcherScript, hasAssetScripts, (_, _) => false)
+    new ExchangeTransactionCreator(
+      MatcherAccount,
+      matcherSettings.exchangeTxBaseFee,
+      orderV4StartOffset,
+      hasMatcherScript,
+      hasAssetScripts,
+      shouldPassExecParams = (_, _) => false,
+      lastProcessedOffset = 0L
+    )
 
   "ExchangeTransactionCreator" should {
-    "create an ExchangeTransactionV3" when {
+
+    "should create an ExchangeTransactionV2" when {
       (List(1, 2, 3) ++ List(1, 2, 3)).combinations(2).foreach {
         case List(counterVersion, submittedVersion) =>
           s"counterVersion=$counterVersion, submittedVersion=$submittedVersion" in {
             val counter = buy(wavesBtcPair, 100000, 0.0008, matcherFee = Some(2000L), version = counterVersion.toByte)
             val submitted = sell(wavesBtcPair, 100000, 0.0007, matcherFee = Some(1000L), version = submittedVersion.toByte)
 
-            val tc = getExchangeTransactionCreator()
+            val tc = getExchangeTransactionCreator(orderV4StartOffset = 1L)
+            val oe = mkOrderExecutedRaw(submitted, counter)
+
+            tc.createTransaction(oe).transaction shouldBe a[ExchangeTransactionV2]
+          }
+        case _ => throw new RuntimeException("Unexpected list")
+      }
+    }
+
+    "should create an ExchangeTransactionV3" when {
+      (List(1, 2, 3) ++ List(1, 2, 3)).combinations(2).foreach {
+        case List(counterVersion, submittedVersion) =>
+          s"counterVersion=$counterVersion, submittedVersion=$submittedVersion" in {
+            val counter = buy(wavesBtcPair, 100000, 0.0008, matcherFee = Some(2000L), version = counterVersion.toByte)
+            val submitted = sell(wavesBtcPair, 100000, 0.0007, matcherFee = Some(1000L), version = submittedVersion.toByte)
+
+            val tc = getExchangeTransactionCreator(orderV4StartOffset = -1L)
             val oe = mkOrderExecutedRaw(submitted, counter)
 
             tc.createTransaction(oe).transaction shouldBe a[ExchangeTransactionV3]

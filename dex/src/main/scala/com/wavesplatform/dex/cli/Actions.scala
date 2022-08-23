@@ -16,7 +16,7 @@ import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
-import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV3
+import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.{AssetPairBuilder, OrderBookSideSnapshot}
 import com.wavesplatform.dex.settings.MatcherSettings
@@ -91,7 +91,7 @@ object Actions {
             amountAssetDecimals <- getAssetDecimalsOpt(assetsDB, validPair.amountAsset)
             priceAssetDecimals <- getAssetDecimalsOpt(assetsDB, validPair.priceAsset)
           } yield (snapshot.bids.values ++ snapshot.asks.values).flatten.foreach { limitOrder =>
-            ExchangeTransactionV3.convertPrice(
+            ExchangeTransaction.convertPrice(
               limitOrder.price,
               amountAssetDecimals,
               priceAssetDecimals

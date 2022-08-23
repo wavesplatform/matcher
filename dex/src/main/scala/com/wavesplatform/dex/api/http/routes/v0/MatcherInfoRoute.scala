@@ -29,7 +29,8 @@ final class MatcherInfoRoute(
   override val apiKeyHashes: List[Array[Byte]],
   rateCache: RateCache,
   validatedAllowedOrderVersions: () => Future[Set[Byte]],
-  getActualOrderFeeSettings: () => OrderFeeSettings
+  getActualOrderFeeSettings: () => OrderFeeSettings,
+  currentOffset: () => Long
 )(implicit mat: Materializer)
     extends ApiRoute
     with ProtectDirective
@@ -79,7 +80,8 @@ final class MatcherInfoRoute(
                   matcherAccountFee = matcherAccountFee
                 ),
                 rates = rateCache.getAllRates,
-                orderVersions = allowedOrderVersions.toSeq.sorted,
+                orderVersions =
+                  allowedOrderVersions.filterNot(v => v == 4 && currentOffset() < matcherSettings.orderV4StartOffset).toSeq.sorted,
                 networkByte = matcherSettings.addressSchemeCharacter.toInt
               )
             )

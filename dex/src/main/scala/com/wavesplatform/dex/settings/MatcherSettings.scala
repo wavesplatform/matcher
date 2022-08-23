@@ -39,6 +39,7 @@ case class MatcherSettings(
   passExecutionParameters: PassExecutionParamsSettings,
   exchangeTxBaseFee: Long,
   exchangeTxTsStartOffset: Long,
+  orderV4StartOffset: Long,
   actorResponseTimeout: FiniteDuration,
   dataDirectory: String,
   snapshotsInterval: Int,

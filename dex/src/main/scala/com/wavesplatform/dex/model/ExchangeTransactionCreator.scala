@@ -4,7 +4,7 @@ import com.wavesplatform.dex.domain.account.{KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.Order
-import com.wavesplatform.dex.domain.transaction.{ExchangeTransactionResult, ExchangeTransactionV3}
+import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionResult, ExchangeTransactionV2, ExchangeTransactionV3}
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.model.Events.OrderExecuted
 import com.wavesplatform.dex.queue.ValidatedCommandWithMeta
@@ -13,12 +13,14 @@ import com.wavesplatform.dex.model.ExchangeTransactionCreator._
 class ExchangeTransactionCreator(
   matcherPrivateKey: KeyPair,
   exchangeTxBaseFee: Long,
+  orderV4StartOffset: Long,
   hasMatcherAccountScript: => Boolean,
   hasAssetScript: IssuedAsset => Boolean,
-  shouldPassExecParams: (Option[ValidatedCommandWithMeta.Offset], PublicKey) => Boolean
+  shouldPassExecParams: (Option[ValidatedCommandWithMeta.Offset], PublicKey) => Boolean,
+  lastProcessedOffset: => Long
 )(implicit efc: ErrorFormatterContext) {
 
-  def createTransaction(orderExecutedEvent: OrderExecuted): ExchangeTransactionResult[ExchangeTransactionV3] = {
+  def createTransaction(orderExecutedEvent: OrderExecuted): ExchangeTransactionResult[ExchangeTransaction] = {
     import orderExecutedEvent.{counter, executedAmount, submitted, timestamp}
     val (buy, sell) = Order.splitByType(submitted.order, counter.order)
 
@@ -46,26 +48,44 @@ class ExchangeTransactionCreator(
       // TODO This will be fixed in NODE 1.2.8+, see NODE-2183
       List(orderExecutedEvent.counter.feeAsset, orderExecutedEvent.submitted.feeAsset)
         .count(_.fold(false)(hasAssetScript)) * OrderValidator.ScriptExtraFee
-    ExchangeTransactionV3.mkSigned(
-      efc.unsafeAssetDecimals(buy.assetPair.amountAsset),
-      efc.unsafeAssetDecimals(buy.assetPair.priceAsset),
-      matcherPrivateKey,
-      buyWithExecutionInfo,
-      sellWithExecutionInfo,
-      executedAmount,
-      orderExecutedEvent.executedPrice,
-      buyFee,
-      sellFee,
-      txFee,
-      timestamp
-    )
+    val offset = orderExecutedEvent.commandOffset.getOrElse(lastProcessedOffset)
+    if (offset < orderV4StartOffset)
+      ExchangeTransactionV2
+        .mkSigned(
+          efc.unsafeAssetDecimals(buy.assetPair.amountAsset),
+          efc.unsafeAssetDecimals(buy.assetPair.priceAsset),
+          matcherPrivateKey,
+          buyWithExecutionInfo,
+          sellWithExecutionInfo,
+          executedAmount,
+          orderExecutedEvent.executedPrice,
+          buyFee,
+          sellFee,
+          txFee,
+          timestamp
+        )
+    else
+      ExchangeTransactionV3
+        .mkSigned(
+          efc.unsafeAssetDecimals(buy.assetPair.amountAsset),
+          efc.unsafeAssetDecimals(buy.assetPair.priceAsset),
+          matcherPrivateKey,
+          buyWithExecutionInfo,
+          sellWithExecutionInfo,
+          executedAmount,
+          orderExecutedEvent.executedPrice,
+          buyFee,
+          sellFee,
+          txFee,
+          timestamp
+        )
   }
 
 }
 
 object ExchangeTransactionCreator {
 
-  type CreateTransaction = OrderExecuted => ExchangeTransactionResult[ExchangeTransactionV3]
+  type CreateTransaction = OrderExecuted => ExchangeTransactionResult[ExchangeTransaction]
 
   /**
    * This function is used for the following purposes:

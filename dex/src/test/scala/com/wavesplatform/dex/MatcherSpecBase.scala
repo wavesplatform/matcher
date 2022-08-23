@@ -16,7 +16,7 @@ import com.wavesplatform.dex.domain.crypto.Proofs
 import com.wavesplatform.dex.domain.model.{Normalization, Price}
 import com.wavesplatform.dex.domain.order.OrderOps._
 import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV3}
-import com.wavesplatform.dex.domain.transaction.{ExchangeTransactionResult, ExchangeTransactionV3}
+import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionResult, ExchangeTransactionV3}
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.domain.{crypto => wcrypto}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
@@ -550,27 +550,28 @@ trait MatcherSpecBase
   protected def privateKey(seed: String): KeyPair = KeyPair(seed.getBytes("utf-8"))
   protected def nowTs: Long = System.currentTimeMillis()
 
-  protected def mkExchangeTx(oe: OrderExecuted)(implicit assetDecimals: Map[Asset, Int]): ExchangeTransactionResult[ExchangeTransactionV3] = {
+  protected def mkExchangeTx(oe: OrderExecuted)(implicit assetDecimals: Map[Asset, Int]): ExchangeTransactionResult[ExchangeTransaction] = {
     val (sellOrder, buyOrder) = if (oe.counter.isSellOrder) (oe.counter, oe.submitted) else (oe.submitted, oe.counter)
     mkExchangeTx(buyOrder.order, sellOrder.order)
   }
 
   protected def mkExchangeTx(buyOrder: Order, sellOrder: Order)(implicit
     assetDecimals: Map[Asset, Int]
-  ): ExchangeTransactionResult[ExchangeTransactionV3] =
-    ExchangeTransactionV3.mk(
-      amountAssetDecimals = assetDecimals(buyOrder.assetPair.amountAsset),
-      priceAssetDecimals = assetDecimals(buyOrder.assetPair.priceAsset),
-      buyOrder = buyOrder,
-      sellOrder = sellOrder,
-      amount = sellOrder.amount,
-      price = sellOrder.price,
-      buyMatcherFee = buyOrder.matcherFee,
-      sellMatcherFee = sellOrder.matcherFee,
-      fee = 300000L,
-      timestamp = nowTs,
-      proofs = Proofs.empty
-    )
+  ): ExchangeTransactionResult[ExchangeTransaction] =
+    ExchangeTransactionV3
+      .mk(
+        amountAssetDecimals = assetDecimals(buyOrder.assetPair.amountAsset),
+        priceAssetDecimals = assetDecimals(buyOrder.assetPair.priceAsset),
+        buyOrder = buyOrder,
+        sellOrder = sellOrder,
+        amount = sellOrder.amount,
+        price = sellOrder.price,
+        buyMatcherFee = buyOrder.matcherFee,
+        sellMatcherFee = sellOrder.matcherFee,
+        fee = 300000L,
+        timestamp = nowTs,
+        proofs = Proofs.empty
+      )
 
   protected def mkSeqWsMatchTxInfo(price: Double, amount: Double, isTaker: Boolean): Seq[WsMatchTransactionInfo] =
     Seq(mkWsMatchTxInfo(price, amount, isTaker))

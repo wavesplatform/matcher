@@ -13,7 +13,7 @@ import com.wavesplatform.dex.domain.crypto.{Authorized, Proofs, Proven}
 import com.wavesplatform.dex.domain.error.ValidationError
 import com.wavesplatform.dex.domain.error.ValidationError.GenericError
 import com.wavesplatform.dex.domain.order.OrderOps._
-import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV3
+import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.domain.validation.Validation
 import com.wavesplatform.dex.domain.validation.Validation.booleanOperators
 import io.swagger.annotations.ApiModelProperty
@@ -93,7 +93,7 @@ trait Order extends Proven with Authorized {
     eip712Signature.map(bs => org.web3j.utils.Numeric.toHexString(bs.arr))
 
   def isExecutable(amountAssetDecimals: Int, priceAssetDecimals: Int): Validation =
-    ExchangeTransactionV3.convertPrice(
+    ExchangeTransaction.convertPrice(
       price,
       amountAssetDecimals,
       priceAssetDecimals

@@ -42,23 +42,25 @@ class OrderV4TestSuite extends MatcherSuiteBase {
   "OrderV4TestSuite" - {
 
     "should work with proofs authentication" in {
-      test(alice, bob, f => sign(alice, f), f => sign(bob, f), orderVersion = 4)
+      test(alice, bob, f => sign(alice, f), f => sign(bob, f), orderVersion = 4, txVersion = 3)
     }
 
     "should work with eip712Signature authentication" in {
-      test(aliceEthAdr, bobEthAdr, f => signEth(aliceEth, f), f => signEth(bobEth, f), orderVersion = 4)
+      test(aliceEthAdr, bobEthAdr, f => signEth(aliceEth, f), f => signEth(bobEth, f), orderVersion = 4, txVersion = 3)
     }
 
     "should work with mixed authentication" in {
-      test(alice, bobEthAdr, f => sign(alice, f), f => signEth(bobEth, f), orderVersion = 4)
+      test(alice, bobEthAdr, f => sign(alice, f), f => signEth(bobEth, f), orderVersion = 4, txVersion = 3)
     }
 
     "should work with start offset" in {
       val order = sign(alice, mkOrder(wavesUsdPair, OrderType.BUY, 10.waves, 5.usd, Waves, version = 4))
-      dex1.restartWithNewSuiteConfig(suiteInitialConfig(orderV4StartOffset = 1L))
+      val orderV4StartOffset = dex1.tryApi.getLastOffset.value + 4L
+      dex1.restartWithNewSuiteConfig(suiteInitialConfig(orderV4StartOffset))
       dex1.tryApi.place(order) should failWith(UnsupportedOrderVersion.code)
-      test(alice, bob, f => sign(alice, f), f => sign(bob, f), orderVersion = 3)
-      test(alice, bob, f => sign(alice, f), f => sign(bob, f), orderVersion = 4)
+      test(alice, bob, f => sign(alice, f), f => sign(bob, f), orderVersion = 3, txVersion = 2)
+      test(alice, bob, f => sign(alice, f), f => sign(bob, f), orderVersion = 3, txVersion = 3)
+      test(alice, bob, f => sign(alice, f), f => sign(bob, f), orderVersion = 4, txVersion = 3)
     }
 
     "should reject invalid eip712Signature" in {
@@ -100,7 +102,8 @@ class OrderV4TestSuite extends MatcherSuiteBase {
     seller: Address,
     buySign: (OrderAuthentication => Order) => Order,
     sellSign: (OrderAuthentication => Order) => Order,
-    orderVersion: Byte
+    orderVersion: Byte,
+    txVersion: Byte
   ): Unit = {
     val buyerWaves = wavesNode1.api.wavesBalance(buyer)
     val buyerUsd = wavesNode1.api.assetBalance(buyer, usd)
@@ -120,12 +123,7 @@ class OrderV4TestSuite extends MatcherSuiteBase {
     sellerUsd + spendUsd - fee shouldBe wavesNode1.api.assetBalance(seller, usd)
 
     txs should not be empty
-    txs.foreach { tx =>
-      if (orderVersion == 4)
-        tx.version() shouldBe 3
-      else
-        tx.version() shouldBe 2
-    }
+    txs.foreach(_.version() shouldBe txVersion)
   }
 
   private def sign(signer: KeyPair, f: OrderAuthentication => Order): Order = {

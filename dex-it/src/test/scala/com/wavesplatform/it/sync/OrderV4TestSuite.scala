@@ -53,10 +53,11 @@ class OrderV4TestSuite extends MatcherSuiteBase {
       test(alice, bobEthAdr, f => sign(alice, f), f => signEth(bobEth, f), orderVersion = 4)
     }
 
-    "should work with different exchange transactions" in {
-      dex1.restartWithNewSuiteConfig(suiteInitialConfig(orderV4StartOffset = Long.MaxValue))
+    "should work with start offset" in {
+      val order = sign(alice, mkOrder(wavesUsdPair, OrderType.BUY, 10.waves, 5.usd, Waves, version = 4))
+      dex1.restartWithNewSuiteConfig(suiteInitialConfig(orderV4StartOffset = 0L))
+      dex1.tryApi.place(order) should failWith(UnsupportedOrderVersion.code)
       test(alice, bob, f => sign(alice, f), f => sign(bob, f), orderVersion = 3)
-      dex1.restartWithNewSuiteConfig(dexInitialSuiteConfig)
       test(alice, bob, f => sign(alice, f), f => sign(bob, f), orderVersion = 4)
     }
 
@@ -92,12 +93,6 @@ class OrderV4TestSuite extends MatcherSuiteBase {
       }
       dex1.tryApi.place(orderJson) should failWith(InvalidJson.code)
     }
-
-    "should reject order created before start offset is reached" in {
-      val order = sign(alice, mkOrder(wavesUsdPair, OrderType.BUY, 10.waves, 5.usd, Waves, version = 4))
-      dex1.restartWithNewSuiteConfig(suiteInitialConfig(orderV4StartOffset = Long.MaxValue))
-      dex1.tryApi.place(order) should failWith(UnsupportedOrderVersion.code)
-    }
   }
 
   private def test(
@@ -124,6 +119,7 @@ class OrderV4TestSuite extends MatcherSuiteBase {
     sellerWaves - 10.waves shouldBe wavesNode1.api.wavesBalance(seller)
     sellerUsd + spendUsd - fee shouldBe wavesNode1.api.assetBalance(seller, usd)
 
+    txs should not be empty
     txs.foreach { tx =>
       if (orderVersion == 4)
         tx.version() shouldBe 3

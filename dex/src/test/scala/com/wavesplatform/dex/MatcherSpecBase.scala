@@ -572,7 +572,6 @@ trait MatcherSpecBase
         timestamp = nowTs,
         proofs = Proofs.empty
       )
-      .asInstanceOf[ExchangeTransactionResult[ExchangeTransaction]]
 
   protected def mkSeqWsMatchTxInfo(price: Double, amount: Double, isTaker: Boolean): Seq[WsMatchTransactionInfo] =
     Seq(mkWsMatchTxInfo(price, amount, isTaker))

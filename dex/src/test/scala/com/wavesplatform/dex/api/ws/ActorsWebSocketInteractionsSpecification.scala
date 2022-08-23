@@ -149,7 +149,6 @@ class ActorsWebSocketInteractionsSpecification
           proofs = Proofs.empty
         )
         .copy(error = ValidationError.GenericError("Some error").some)
-        .asInstanceOf[ExchangeTransactionResult[ExchangeTransaction]]
       addressDir ! AddressActor.Command.ApplyOrderBookExecuted(AddressActor.OrderBookExecutedEvent(oe, tx))
       oe
     }

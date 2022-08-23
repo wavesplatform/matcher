@@ -43,7 +43,7 @@ case class ExchangeTransactionV2(
 
 object ExchangeTransactionV2 extends ExchangeTransactionParser[ExchangeTransactionV2] {
 
-  def create(
+  def mkSigned(
     amountAssetDecimals: Int,
     priceAssetDecimals: Int,
     matcher: PrivateKey,
@@ -56,7 +56,7 @@ object ExchangeTransactionV2 extends ExchangeTransactionParser[ExchangeTransacti
     fee: Long,
     timestamp: Long
   ): ExchangeTransactionResult[ExchangeTransactionV2] =
-    create(
+    mk(
       amountAssetDecimals,
       priceAssetDecimals,
       buyOrder,
@@ -72,7 +72,7 @@ object ExchangeTransactionV2 extends ExchangeTransactionParser[ExchangeTransacti
       unverified.copy(proofs = Proofs(List(ByteStr(crypto.sign(matcher, unverified.bodyBytes())))))
     }
 
-  def create(
+  def mk(
     amountAssetDecimals: Int,
     priceAssetDecimals: Int,
     buyOrder: Order,

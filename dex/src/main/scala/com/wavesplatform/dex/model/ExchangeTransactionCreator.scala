@@ -51,7 +51,7 @@ class ExchangeTransactionCreator(
     val offset = orderExecutedEvent.commandOffset.getOrElse(lastProcessedOffset)
     if (offset < orderV4StartOffset)
       ExchangeTransactionV2
-        .create(
+        .mkSigned(
           efc.unsafeAssetDecimals(buy.assetPair.amountAsset),
           efc.unsafeAssetDecimals(buy.assetPair.priceAsset),
           matcherPrivateKey,
@@ -64,7 +64,6 @@ class ExchangeTransactionCreator(
           txFee,
           timestamp
         )
-        .asInstanceOf[ExchangeTransactionResult[ExchangeTransaction]]
     else
       ExchangeTransactionV3
         .mkSigned(
@@ -80,7 +79,6 @@ class ExchangeTransactionCreator(
           txFee,
           timestamp
         )
-        .asInstanceOf[ExchangeTransactionResult[ExchangeTransaction]]
   }
 
 }

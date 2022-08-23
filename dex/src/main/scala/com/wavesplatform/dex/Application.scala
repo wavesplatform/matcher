@@ -116,6 +116,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
   private val db = openDb(settings.dataDirectory)
   private val commonLevelDb = LevelDb.async(db)(levelDbCommonEc)
+  private val concurrentLevelDb = LevelDb.async(db)(ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(10)))
   private val ratesLevelDb = LevelDb.async(db)(levelDbRatesEc)
   private val snapshotsLevelDb = LevelDb.async(db)(levelDbSnapshotsEc)
 
@@ -135,7 +136,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
   private val assetPairsDb = AssetPairsDb.levelDb(commonLevelDb)
   private val orderBookSnapshotDb = OrderBookSnapshotDb.levelDb(snapshotsLevelDb)
-  private val orderDb = OrderDb.levelDb(settings.orderDb, commonLevelDb)
+  private val orderDb = OrderDb.levelDb(settings.orderDb, concurrentLevelDb)
 
   private val assetsCache = AssetsCache.from(AssetsDb.levelDb(commonLevelDb))
 

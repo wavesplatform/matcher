@@ -141,7 +141,7 @@ inConfig(Debian)(
     linuxPackageMappings ++= {
       val upstartScript = {
         val src = packageSource.value / "upstart.conf"
-        val dest = (target in Debian).value / "upstart" / s"${packageName.value}.conf"
+        val dest = (Debian / target).value / "upstart" / s"${packageName.value}.conf"
         val result = TemplateWriter.generateScript(src.toURI.toURL, linuxScriptReplacements.value)
         IO.write(dest, result)
         dest

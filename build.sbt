@@ -5,7 +5,7 @@ import sbt._
 import sbt.internal.inc.ReflectUtilities
 
 // Scalafix
-scalafixDependencies in ThisBuild ++= List(
+ThisBuild / scalafixDependencies ++= List(
   "org.scalatest" %% "autofix" % "3.1.0.0",
   "org.scala-lang.modules" %% "scala-collection-migrations" % "2.1.4"
 )
@@ -123,7 +123,7 @@ inScope(Global)(
       "-Xlint",
       "-Ymacro-annotations",
       "-opt:l:inline",
-      "-opt-inline-from:**",
+      "-opt-inline-from:scala.**",
       "-Yrangepos", // required for scalafix
       "-P:semanticdb:synthetics:on",
       // Excluding -byname-implicit is required for Scala 2.13 due to https://github.com/scala/bug/issues/12072

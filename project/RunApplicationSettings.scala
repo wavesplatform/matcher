@@ -6,7 +6,7 @@ object RunApplicationSettings extends AutoPlugin {
   override def projectSettings: Seq[Def.Setting[_]] = inConfig(Compile)(
     Seq(
       mainClass := Some("com.wavesplatform.Application"),
-      discoveredMainClasses := (mainClass in Compile).value.toSeq,
+      discoveredMainClasses := (Compile / mainClass).value.toSeq,
       run / fork := true
     )
   )

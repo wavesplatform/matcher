@@ -55,7 +55,7 @@ class OrderV4TestSuite extends MatcherSuiteBase {
 
     "should work with start offset" in {
       val order = sign(alice, mkOrder(wavesUsdPair, OrderType.BUY, 10.waves, 5.usd, Waves, version = 4))
-      dex1.restartWithNewSuiteConfig(suiteInitialConfig(orderV4StartOffset = 0L))
+      dex1.restartWithNewSuiteConfig(suiteInitialConfig(orderV4StartOffset = 1L))
       dex1.tryApi.place(order) should failWith(UnsupportedOrderVersion.code)
       test(alice, bob, f => sign(alice, f), f => sign(bob, f), orderVersion = 3)
       test(alice, bob, f => sign(alice, f), f => sign(bob, f), orderVersion = 4)

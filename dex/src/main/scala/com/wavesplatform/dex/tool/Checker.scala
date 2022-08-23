@@ -44,7 +44,7 @@ class Checker(superConnector: SuperConnector) {
 
   private def printOrder(assetPairInfo: AssetPairInfo)(order: Order): String =
     String.join(
-      s"$CommaString$SpaceString",
+      CommaSpaceString,
       String.join(
         SpaceString,
         order.orderType.toString,
@@ -108,7 +108,7 @@ class Checker(superConnector: SuperConnector) {
 
     Either.cond(
       balance.get(Waves).exists(_._2 > minMatcherValidBalance),
-      balance -> balance.values.map { case (d, b) => s"${denormalize(b)} ${d.name}" }.mkString(", "),
+      balance -> balance.values.map { case (d, b) => s"${denormalize(b)} ${d.name}" }.mkString(CommaSpaceString),
       s"Matcher Waves balance $wavesBalance is less than ${denormalizeWavesBalance(minMatcherValidBalance)} Waves!"
     )
   }
@@ -162,7 +162,10 @@ class Checker(superConnector: SuperConnector) {
       _ <- activeOrders.traverse(id => dexRest.waitForOrderStatus(id, assetPair, OrderStatus.Cancelled.name))
     } yield
       if (activeOrders.isEmpty) (assetPairInfo, s"Matcher didn't have any active orders on a test asset pair ${assetPair.toString}")
-      else (assetPairInfo, s"Matcher had active orders on a test asset pair ${assetPair.toString}: ${activeOrders.mkString(", ")} cancelled")
+      else (
+        assetPairInfo,
+        s"Matcher had active orders on a test asset pair ${assetPair.toString}: ${activeOrders.mkString(CommaSpaceString)} cancelled"
+      )
   }
 
   private def checkPlacement(assetPairInfo: AssetPairInfo, orderVersion: Byte): CheckLoggedResult[Order] = {
@@ -218,10 +221,18 @@ class Checker(superConnector: SuperConnector) {
       txs <- awaitSubmittedOrderAtNode
     } yield {
       val printOrder: Order => String = this.printOrder(assetPairInfo)(_)
+      val printTxIds: Seq[JsValue] => String = txs =>
+        txs
+          .map { tx =>
+            val id = (tx \ "id").as[String]
+            val version = (tx \ "version").as[String]
+            s"$id (version = $version)"
+          }
+          .mkString(CommaSpaceString)
       s"""\n
          |    Counter   = ${printOrder(counter)}, json status = ${counterStatus.toString}
          |    Submitted = ${printOrder(submitted)}, json status = ${submittedStatus.toString}
-         |    Tx ids    = ${txs.map(tx => (tx \ "id").as[String]).mkString(", ")}\n""".stripMargin
+         |    Tx ids    = ${printTxIds(txs)}\n""".stripMargin
     }
   }
 
@@ -293,6 +304,7 @@ object Checker {
 
   private val CommaString: String = ","
   private val SpaceString: String = " "
+  private val CommaSpaceString: String = s"$CommaString$SpaceString"
 
   private val firstTestAssetName = "IIIuJIo"
   private val secondTestAssetName = "MbIJIo"

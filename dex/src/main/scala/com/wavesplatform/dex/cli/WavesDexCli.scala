@@ -437,6 +437,16 @@ object WavesDexCli extends ScoptImplicits {
           .valueName("<raw-string>")
           .required()
           .action((x, s) => s.copy(version = x)),
+        opt[Byte]("order-version")
+          .abbr("ov")
+          .text("Issued order version")
+          .valueName("<1-4>")
+          .optional()
+          .validate { x =>
+            if (x < 1 || x > 4) Left("Should be in [1; 4]")
+            else Right(())
+          }
+          .action((x, s) => s.copy(orderVersion = x)),
         opt[String]("dex-config")
           .abbr("dc")
           .text("DEX config path")
@@ -623,6 +633,7 @@ object WavesDexCli extends ScoptImplicits {
     dexRestApi: String = "",
     nodeRestApi: String = "",
     version: String = "",
+    orderVersion: Byte = 4,
     configPath: String = "",
     assetPair: String = "",
     assetId: String = "",

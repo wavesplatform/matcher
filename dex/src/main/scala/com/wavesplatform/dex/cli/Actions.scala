@@ -58,7 +58,7 @@ object Actions {
   private val backend = HttpURLConnectionBackend()
 
   // noinspection ScalaStyle
-  def checkOrdersForTxV3Compat(args: Args, matcherSettings: MatcherSettings) = {
+  def checkOrdersForTxV3Compat(args: Args, matcherSettings: MatcherSettings): Unit = {
     import scala.concurrent.ExecutionContext.Implicits.global
 
     def getAssetDecimalsOpt(assetsDb: AssetsDb[Id], asset: Asset): Option[Int] =
@@ -247,13 +247,14 @@ object Actions {
              |  DEX REST API          : ${args.dexRestApi}
              |  Waves Node REST API   : ${args.nodeRestApi}
              |  Expected DEX version  : ${args.version}
+             |  Issued order version  : ${args.orderVersion}
              |  DEX config path       : ${args.configPath}
              |  Auth Service REST API : ${args.authServiceRestApi.getOrElse("")}
              |  Account seed          : ${args.accountSeed.getOrElse("")}
                    """.stripMargin
         )
         superConnector <- SuperConnector.create(matcherSettings, args.dexRestApi, args.nodeRestApi, args.authServiceRestApi, apiKey)
-        checkResult <- new Checker(superConnector).checkState(args.version, args.accountSeed, config, matcherSettings)
+        checkResult <- new Checker(superConnector).checkState(args.version, args.orderVersion, args.accountSeed, config, matcherSettings)
         _ <- cli.lift(superConnector.close())
       } yield checkResult
     ) match {

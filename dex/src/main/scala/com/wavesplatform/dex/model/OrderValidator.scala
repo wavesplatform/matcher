@@ -19,7 +19,7 @@ import com.wavesplatform.dex.domain.feature.{BlockchainFeature, BlockchainFeatur
 import com.wavesplatform.dex.domain.model.Normalization
 import com.wavesplatform.dex.domain.model.Normalization._
 import com.wavesplatform.dex.domain.order.OrderOps._
-import com.wavesplatform.dex.domain.order.{EthOrders, Order, OrderType, OrderV4}
+import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV4}
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.effect._
@@ -56,13 +56,7 @@ object OrderValidator extends ScorexLogging {
 
   private def verifySignature(order: Order): FutureResult[Unit] = liftAsync {
     order.eip712Signature match {
-      case Some(es) =>
-        val signerKey = EthOrders.recoverEthSignerKey(order, es.arr)
-        Either.cond(
-          signerKey == order.senderPublicKey,
-          (),
-          error.OrderInvalidSignature.eth(order.id())
-        )
+      case Some(_) => Either.unit
       case None =>
         Verifier
           .verifyAsEllipticCurveSignature(order)

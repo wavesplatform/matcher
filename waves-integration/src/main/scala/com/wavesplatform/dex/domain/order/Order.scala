@@ -104,7 +104,8 @@ trait Order extends Proven with Authorized {
     (matcherFee < MaxAmount) :| "matcherFee too large" &&
     (timestamp > 0) :| "timestamp should be > 0" &&
     (expiration - atTime <= MaxLiveTime) :| "expiration should be earlier than 30 days" &&
-    (expiration >= atTime) :| "expiration should be > currentTime"
+    (expiration >= atTime) :| "expiration should be > currentTime" &&
+    eip712SignatureValid
 
   lazy val eip712SignatureValid: Validation =
     (eip712Signature.isEmpty || version >= 4) :| "eip712Signature available only since V4" &&

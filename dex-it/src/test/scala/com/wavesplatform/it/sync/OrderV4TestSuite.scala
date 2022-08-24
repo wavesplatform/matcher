@@ -68,7 +68,10 @@ class OrderV4TestSuite extends MatcherSuiteBase {
       val orderJson = order.json() ++ Json.obj(
         "eip712Signature" -> JsString(eip712SignatureSample)
       )
-      dex1.tryApi.place(orderJson) should failWith(OrderInvalidSignature.code)
+      dex1.tryApi.place(orderJson) should failWith(
+        OrderInvalidSignature.code,
+        "Ethereum signature is invalid"
+      )
     }
 
     "should reject corrupted eip712Signature" in {
@@ -76,7 +79,10 @@ class OrderV4TestSuite extends MatcherSuiteBase {
       val orderJson = order.json() ++ Json.obj(
         "eip712Signature" -> JsString("corrupted")
       )
-      dex1.tryApi.place(orderJson) should failWith(OrderInvalidSignature.code)
+      dex1.tryApi.place(orderJson) should failWith(
+        OrderInvalidSignature.code,
+        "Ethereum signature is invalid: eip712Signature should be of length 65 or 129"
+      )
     }
 
     "should reject order with price that doesn't fit into FIXED_DECIMALS" in {

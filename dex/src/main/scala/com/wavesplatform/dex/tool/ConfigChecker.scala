@@ -11,7 +11,6 @@ import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.error.Implicits.ThrowableOps
-import com.wavesplatform.dex.model.AssetPairQuickValidator
 import com.wavesplatform.dex.settings.MatcherSettings.PartialOrderFeeSettings
 import com.wavesplatform.dex.settings.OrderFeeSettings._
 import com.wavesplatform.dex.settings._

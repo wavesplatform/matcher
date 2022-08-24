@@ -165,7 +165,10 @@ final case class OrderInvalidSignature(orderId: Order.Id, details: String)
 object OrderInvalidSignature extends MatcherErrorCodeProvider(order, signature, commonClass, C.BadRequest) {
 
   def eth(orderId: Order.Id): OrderInvalidSignature =
-    OrderInvalidSignature(orderId, "Ethereum signature is invalid")
+    OrderInvalidSignature(orderId, s"Ethereum signature is invalid")
+
+  def eth(orderId: Order.Id, details: String): OrderInvalidSignature =
+    OrderInvalidSignature(orderId, s"Ethereum signature is invalid: $details")
 
 }
 

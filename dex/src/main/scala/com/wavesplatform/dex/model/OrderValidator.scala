@@ -528,8 +528,12 @@ object OrderValidator extends ScorexLogging {
     else lift(order)
 
   def isExecutable(o: Order)(implicit efc: ErrorFormatterContext): Result[Unit] =
-    o.isExecutable(efc.unsafeAssetDecimals(o.assetPair.amountAsset), efc.unsafeAssetDecimals(o.assetPair.priceAsset))
-      .toEither.leftMap[MatcherError](error.OrderCommonValidationFailed(_)) *>
+    ExchangeTransaction.convertPrice(
+      o.price,
+      efc.unsafeAssetDecimals(o.assetPair.amountAsset),
+      efc.unsafeAssetDecimals(o.assetPair.priceAsset)
+    ).leftMap[MatcherError](_ => error.OrderCommonValidationFailed("Price is not convertible to fixed decimals format")) *>
+    o.eip712SignatureValid.toEither.leftMap[MatcherError](details => error.OrderInvalidSignature.eth(o.id(), details)) *>
     Either.catchNonFatal(o.senderPublicKey) //can throw exception while recovering eth sender
       .leftMap[MatcherError](_ => error.OrderInvalidSignature.eth(o.id()))
       .as(())

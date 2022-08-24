@@ -2,11 +2,13 @@ package com.wavesplatform.dex.model
 
 import cats.data.EitherT
 import cats.implicits.catsStdInstancesForFuture
+import cats.instances.either._
 import cats.instances.long.catsKernelStdGroupForLong
 import cats.instances.map.catsKernelStdCommutativeMonoidForMap
 import cats.syntax.apply._
 import cats.syntax.either._
 import cats.syntax.flatMap._
+import cats.syntax.functor._
 import cats.syntax.option._
 import cats.syntax.semigroup.catsSyntaxSemigroup
 import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.MarketStatus
@@ -526,10 +528,11 @@ object OrderValidator extends ScorexLogging {
     else lift(order)
 
   def isExecutable(o: Order)(implicit efc: ErrorFormatterContext): Result[Unit] =
+    o.isExecutable(efc.unsafeAssetDecimals(o.assetPair.amountAsset), efc.unsafeAssetDecimals(o.assetPair.priceAsset))
+      .toEither.leftMap[MatcherError](error.OrderCommonValidationFailed(_)) *>
     Either.catchNonFatal(o.senderPublicKey) //can throw exception while recovering eth sender
-      .leftMap[MatcherError](_ => error.OrderInvalidSignature.eth(o.id())) *>
-    o.isExecutable(efc.unsafeAssetDecimals(o.assetPair.amountAsset), efc.unsafeAssetDecimals(o.assetPair.priceAsset)).toEither
-      .leftMap[MatcherError](error.OrderCommonValidationFailed(_))
+      .leftMap[MatcherError](_ => error.OrderInvalidSignature.eth(o.id()))
+      .as(())
 
   def timeAware(time: Time)(order: Order): Result[Unit] =
     for {

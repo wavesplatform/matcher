@@ -1100,7 +1100,7 @@ class OrderValidatorSpecification
       getDefaultAssetDescriptions(_).decimals,
       rateCache,
       DynamicSettings.symmetric(matcherFee),
-      lastProcessedOffset = -1L
+      currentOffset = -1L
     )(_).map(_.order)
 
   private def validateByMatcherSettings(
@@ -1120,7 +1120,7 @@ class OrderValidatorSpecification
         assetDecimals,
         rateCache,
         orderFeeSettings,
-        lastProcessedOffset = -1L
+        currentOffset = -1L
       )(order).map(_.order)
   }
 

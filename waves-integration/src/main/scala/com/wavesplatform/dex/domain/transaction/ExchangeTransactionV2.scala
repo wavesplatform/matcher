@@ -87,6 +87,7 @@ object ExchangeTransactionV2 extends ExchangeTransactionParser[ExchangeTransacti
   ): ExchangeTransactionResult[ExchangeTransactionV2] =
     ExchangeTransactionResult.fromEither(
       validateExchangeParams(
+        2,
         amountAssetDecimals,
         priceAssetDecimals,
         buyOrder,

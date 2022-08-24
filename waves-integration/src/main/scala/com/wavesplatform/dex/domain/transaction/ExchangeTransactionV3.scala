@@ -99,6 +99,7 @@ object ExchangeTransactionV3 extends ExchangeTransactionParser[ExchangeTransacti
   ): ExchangeTransactionResult[ExchangeTransactionV3] =
     ExchangeTransactionResult.fromEither(
       validateExchangeParams(
+        3,
         amountAssetDecimals,
         priceAssetDecimals,
         buyOrder,

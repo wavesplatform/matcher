@@ -405,9 +405,9 @@ object OrderValidator extends ScorexLogging {
         )
     }
 
-  def validateVersion(order: Order, orderV4StartOffset: Long, lastProcessedOffset: => Long): Result[Order] =
+  def validateVersion(order: Order, orderV4StartOffset: Long, currentOffset: Long): Result[Order] =
     order match {
-      case _: OrderV4 if lastProcessedOffset < orderV4StartOffset =>
+      case _: OrderV4 if currentOffset < orderV4StartOffset =>
         error.UnsupportedOrderVersion(order.version).asLeft[Order]
       case _ =>
         order.asRight[MatcherError]
@@ -420,7 +420,7 @@ object OrderValidator extends ScorexLogging {
     assetDecimals: Asset => Int,
     rateCache: RateCache,
     getActualOrderFeeSettings: => OrderFeeSettings,
-    lastProcessedOffset: => Long
+    currentOffset: Long
   )(order: Order)(implicit efc: ErrorFormatterContext): Result[ValidatedOrder] = {
 
     def validateBlacklistedAsset(asset: Asset, e: IssuedAsset => MatcherError): Result[Unit] =
@@ -435,7 +435,7 @@ object OrderValidator extends ScorexLogging {
         )
       _ <- validateBlacklistedAsset(order.feeAsset, error.FeeAssetBlacklisted(_))
       _ <- validateFeeAsset(order, getActualOrderFeeSettings)
-      _ <- validateVersion(order, matcherSettings.orderV4StartOffset, lastProcessedOffset)
+      _ <- validateVersion(order, matcherSettings.orderV4StartOffset, currentOffset)
       validatedOrder <- validateFee(order, getActualOrderFeeSettings, assetDecimals, rateCache)
     } yield validatedOrder
   }

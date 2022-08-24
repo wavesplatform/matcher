@@ -144,6 +144,7 @@ object ExchangeTransaction {
     }.leftMap(_ => GenericError(s"price is not convertible to FIXED_DECIMALS: $price, $amountAssetDecimals, $priceAssetDecimals"))
 
   def validateExchangeParams(
+    version: Int,
     amountAssetDecimals: Int,
     priceAssetDecimals: Int,
     buyOrder: Order,
@@ -175,7 +176,11 @@ object ExchangeTransaction {
       _ <- Either.cond(buyOrder.isValid(timestamp), (), OrderValidationError(buyOrder, buyOrder.isValid(timestamp).messages()))
       _ <- Either.cond(sellOrder.isValid(timestamp), (), OrderValidationError(sellOrder, sellOrder.isValid(timestamp).labels.mkString("\n")))
       _ <- Either.cond(price <= buyOrder.price && price >= sellOrder.price, (), GenericError("priceIsValid"))
-      _ <- convertPrice(price, amountAssetDecimals, priceAssetDecimals)
+      _ <-
+        if (version >= 3)
+          convertPrice(price, amountAssetDecimals, priceAssetDecimals)
+        else
+          Either.unit
     } yield ()
 
 }

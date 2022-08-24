@@ -123,7 +123,7 @@ inScope(Global)(
       "-Xlint",
       "-Ymacro-annotations",
       "-opt:l:inline",
-      "-opt-inline-from:**",
+      "-opt-inline-from:scala.**",
       "-Yrangepos", // required for scalafix
       "-P:semanticdb:synthetics:on",
       // Excluding -byname-implicit is required for Scala 2.13 due to https://github.com/scala/bug/issues/12072

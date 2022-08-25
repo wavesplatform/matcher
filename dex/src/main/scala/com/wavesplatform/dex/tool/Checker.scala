@@ -225,7 +225,7 @@ class Checker(superConnector: SuperConnector) {
         txs
           .map { tx =>
             val id = (tx \ "id").as[String]
-            val version = (tx \ "version").as[String]
+            val version = (tx \ "version").as[Byte]
             s"$id (version = $version)"
           }
           .mkString(CommaSpaceString)

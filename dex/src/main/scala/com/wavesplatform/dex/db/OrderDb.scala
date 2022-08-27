@@ -110,7 +110,7 @@ object OrderDb {
       levelDbEcMap((id.base58.hashCode & 0x7fffffff) % levelDbEcMap.size)
 
     private def getEcBySender(sender: Address): ExecutionContextExecutorService =
-      levelDbEcMap(Math.abs(sender.stringRepr.hashCode & 0x7fffffff) % levelDbEcMap.size)
+      levelDbEcMap((sender.stringRepr.hashCode & 0x7fffffff) % levelDbEcMap.size)
 
   }
 

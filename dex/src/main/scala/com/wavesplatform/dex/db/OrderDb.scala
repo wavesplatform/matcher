@@ -54,34 +54,30 @@ object OrderDb {
       db.readOnly(_.get(DbKeys.order(id)))
     }(getEcByOrderId(id))
 
-    override def saveOrderInfo(id: Order.Id, oi: FinalOrderInfo): Future[Unit] = {
+    override def saveOrderInfo(id: Order.Id, oi: FinalOrderInfo): Future[Unit] = Future {
       val orderInfoKey = DbKeys.orderInfo(id)
-      Future {
-        db.readWrite { rw =>
-          if (!rw.has(orderInfoKey))
-            rw.put(orderInfoKey, Some(oi))
-        }
-      }(getEcByOrderId(id))
-    }
+      db.readWrite { rw =>
+        if (!rw.has(orderInfoKey))
+          rw.put(orderInfoKey, Some(oi))
+      }
+    }(getEcByOrderId(id))
 
-    override def saveOrderInfoForHistory(id: Order.Id, sender: Address, oi: OrderInfo[OrderStatus.Final]): Future[Unit] = {
+    override def saveOrderInfoForHistory(id: Order.Id, sender: Address, oi: OrderInfo[OrderStatus.Final]): Future[Unit] = Future {
       val orderInfoKey = DbKeys.orderInfoForHistory(id)
-      Future {
-        db.readWrite { rw =>
-          if (!rw.has(orderInfoKey)) {
-            val newCommonSeqNr = rw.inc(DbKeys.finalizedCommonSeqNr(sender))
-            rw.put(DbKeys.finalizedCommon(sender, newCommonSeqNr), Some(id))
+      db.readWrite { rw =>
+        if (!rw.has(orderInfoKey)) {
+          val newCommonSeqNr = rw.inc(DbKeys.finalizedCommonSeqNr(sender))
+          rw.put(DbKeys.finalizedCommon(sender, newCommonSeqNr), Some(id))
 
-            val newPairSeqNr = rw.inc(DbKeys.finalizedPairSeqNr(sender, oi.assetPair))
-            rw.put(DbKeys.finalizedPair(sender, oi.assetPair, newPairSeqNr), Some(id))
-            if (newPairSeqNr > settings.maxOrders) // Indexes start with 1, so if maxOrders=100 and newPairSeqNr=101, we delete 1 (the first)
-              rw.get(DbKeys.finalizedPair(sender, oi.assetPair, newPairSeqNr - settings.maxOrders))
-                .map(DbKeys.order)
-                .foreach(x => rw.delete(x))
-          }
+          val newPairSeqNr = rw.inc(DbKeys.finalizedPairSeqNr(sender, oi.assetPair))
+          rw.put(DbKeys.finalizedPair(sender, oi.assetPair, newPairSeqNr), Some(id))
+          if (newPairSeqNr > settings.maxOrders) // Indexes start with 1, so if maxOrders=100 and newPairSeqNr=101, we delete 1 (the first)
+            rw.get(DbKeys.finalizedPair(sender, oi.assetPair, newPairSeqNr - settings.maxOrders))
+              .map(DbKeys.order)
+              .foreach(x => rw.delete(x))
         }
-      }(getEcBySender(sender))
-    }
+      }
+    }(getEcBySender(sender))
 
     override def getFinalizedOrders(owner: Address, maybePair: Option[AssetPair]): Future[Seq[(Order.Id, OrderInfo[OrderStatus])]] = {
       val ec = getEcBySender(owner)

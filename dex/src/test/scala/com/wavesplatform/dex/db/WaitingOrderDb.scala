@@ -7,7 +7,6 @@ import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.Order.Id
-import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.model.OrderInfo.FinalOrderInfo
 import com.wavesplatform.dex.model.{OrderInfo, OrderStatus}
 
@@ -45,7 +44,6 @@ final class WaitingOrderDb private (implicit ex: ExecutionContext) extends Order
     Seq.empty.pure[Future].widen
 
   override def getOrderInfo(id: Id): Future[Option[FinalOrderInfo]] = None.pure[Future].widen
-  override def transactionsByOrder(orderId: Id): Future[Seq[ExchangeTransaction]] = Seq.empty.pure[Future].widen
 
 }
 

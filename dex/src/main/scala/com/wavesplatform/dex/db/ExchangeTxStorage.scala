@@ -2,10 +2,12 @@ package com.wavesplatform.dex.db
 
 import com.wavesplatform.dex.db.leveldb.{LevelDb, ReadWriteDb}
 import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 
 trait ExchangeTxStorage[F[_]] {
   def put(tx: ExchangeTransaction): F[Unit]
+  def transactionsByOrder(orderId: ByteStr): F[Seq[ExchangeTransaction]]
 }
 
 object ExchangeTxStorage {
@@ -26,6 +28,14 @@ object ExchangeTxStorage {
       val nextSeqNr = rw.get(key) + 1
       rw.put(key, nextSeqNr)
       rw.put(DbKeys.orderTxId(orderId, nextSeqNr), txId)
+    }
+
+    override def transactionsByOrder(orderId: Order.Id): F[Seq[ExchangeTransaction]] = db.readOnly { ro =>
+      for {
+        seqNr <- 1 to ro.get(DbKeys.orderTxIdsSeqNr(orderId))
+        txId = ro.get(DbKeys.orderTxId(orderId, seqNr))
+        tx <- ro.get(DbKeys.exchangeTransaction(txId))
+      } yield tx
     }
 
   }

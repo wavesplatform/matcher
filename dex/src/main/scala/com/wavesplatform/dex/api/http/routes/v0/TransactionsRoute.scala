@@ -9,7 +9,7 @@ import com.wavesplatform.dex.api.http.{HasStatusBarrier, _}
 import com.wavesplatform.dex.api.routes.PathMatchers.OrderPM
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
 import com.wavesplatform.dex.app.MatcherStatus
-import com.wavesplatform.dex.db.OrderDb
+import com.wavesplatform.dex.db.ExchangeTxStorage
 import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV3
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import io.swagger.annotations._
@@ -22,7 +22,7 @@ import scala.concurrent.{ExecutionContext, Future}
 @Api()
 final class TransactionsRoute(
   override val matcherStatus: () => MatcherStatus,
-  orderDb: OrderDb[Future],
+  exchangeTxStorage: ExchangeTxStorage[Future],
   override val apiKeyHashes: List[Array[Byte]]
 )(implicit mat: Materializer)
     extends ApiRoute
@@ -53,7 +53,7 @@ final class TransactionsRoute(
       (withMetricsAndTraces("getTransactionsByOrderId") & protect) {
         withOrderId(orderIdOrError) { orderId =>
           complete {
-            orderDb.transactionsByOrder(orderId).map(x => ToResponseMarshallable(Json.toJson(x))).recover {
+            exchangeTxStorage.transactionsByOrder(orderId).map(x => ToResponseMarshallable(Json.toJson(x))).recover {
               case th =>
                 log.error("error while retrieving order transactions", th)
                 ToResponseMarshallable(entities.InternalError)

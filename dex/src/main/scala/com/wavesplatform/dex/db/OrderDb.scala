@@ -7,8 +7,6 @@ import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
-import com.wavesplatform.dex.domain.order.Order.Id
-import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.model.OrderInfo.FinalOrderInfo
 import com.wavesplatform.dex.model.{OrderInfo, OrderStatus}
 
@@ -23,7 +21,6 @@ trait OrderDb[F[_]] {
   def get(id: Order.Id): F[Option[Order]]
   def getFinalizedOrders(owner: Address, maybePair: Option[AssetPair]): F[Seq[(Order.Id, OrderInfo[OrderStatus])]]
   def getOrderInfo(id: Order.Id): F[Option[FinalOrderInfo]]
-  def transactionsByOrder(orderId: ByteStr): F[Seq[ExchangeTransaction]]
 }
 
 object OrderDb {
@@ -83,16 +80,8 @@ object OrderDb {
         } yield id -> oi
       }.map(_.sorted(orderInfoOrdering))
 
-    override def getOrderInfo(id: Id): F[Option[FinalOrderInfo]] =
+    override def getOrderInfo(id: Order.Id): F[Option[FinalOrderInfo]] =
       levelDb.readOnly(_.get(DbKeys.orderInfo(id)))
-
-    override def transactionsByOrder(orderId: Id): F[Seq[ExchangeTransaction]] = levelDb.readOnly { ro =>
-      for {
-        seqNr <- 1 to ro.get(DbKeys.orderTxIdsSeqNr(orderId))
-        txId = ro.get(DbKeys.orderTxId(orderId, seqNr))
-        tx <- ro.get(DbKeys.exchangeTransaction(txId))
-      } yield tx
-    }
 
   }
 

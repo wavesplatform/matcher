@@ -1,14 +1,13 @@
 package com.wavesplatform.dex.db
 
 import cats.Applicative
+import cats.instances.future._
 import cats.syntax.applicative._
 import cats.syntax.functor._
-import cats.instances.future._
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.Order.Id
-import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.model.OrderInfo.FinalOrderInfo
 import com.wavesplatform.dex.model.{OrderInfo, OrderStatus}
 
@@ -20,7 +19,6 @@ class TestOrderDb[F[_]: Applicative] private (maxFinalizedOrders: Int) extends O
   private var orderInfo = Map.empty[Order.Id, OrderInfo[OrderStatus.Final]]
   private var idsForPair = Map.empty[(Address, AssetPair), Seq[Order.Id]].withDefaultValue(Seq.empty)
   private var idsForAddress = Map.empty[Address, Seq[Order.Id]].withDefaultValue(Seq.empty)
-  private val txsByOrder = Map.empty[Order.Id, Seq[ExchangeTransaction]]
 
   override def containsInfo(id: Order.Id): F[Boolean] =
     synchronized(orderInfo.contains(id)).pure[F]
@@ -54,9 +52,6 @@ class TestOrderDb[F[_]: Applicative] private (maxFinalizedOrders: Int) extends O
 
   override def getOrderInfo(id: Id): F[Option[FinalOrderInfo]] =
     synchronized(orderInfo.get(id)).pure[F]
-
-  override def transactionsByOrder(orderId: Id): F[Seq[ExchangeTransaction]] =
-    synchronized(txsByOrder.getOrElse(orderId, Seq.empty)).pure[F]
 
 }
 

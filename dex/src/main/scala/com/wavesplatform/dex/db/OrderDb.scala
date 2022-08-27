@@ -104,11 +104,13 @@ object OrderDb {
       db.readOnly(_.get(DbKeys.orderInfo(id)))
     }(getEcByOrderId(id))
 
+    //0x7FFFFFFF "hack" is taken from java.util.Hashtable in order to deal with negative hash codes
+
     private def getEcByOrderId(id: Order.Id): ExecutionContextExecutorService =
-      levelDbEcMap(id.base58.hashCode % levelDbEcMap.size)
+      levelDbEcMap((id.base58.hashCode & 0x7fffffff) % levelDbEcMap.size)
 
     private def getEcBySender(sender: Address): ExecutionContextExecutorService =
-      levelDbEcMap(sender.stringRepr.hashCode % levelDbEcMap.size)
+      levelDbEcMap(Math.abs(sender.stringRepr.hashCode & 0x7fffffff) % levelDbEcMap.size)
 
   }
 

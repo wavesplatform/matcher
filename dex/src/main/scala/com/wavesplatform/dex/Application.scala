@@ -58,18 +58,18 @@ import com.wavesplatform.dex.tool.{KamonTraceUtils, WaitOffsetTool}
 import kamon.Kamon
 import kamon.instrumentation.executor.ExecutorInstrumentation
 import monix.execution.ExecutionModel
-import mouse.any.anySyntaxMouse
 import org.slf4j.LoggerFactory
 import pureconfig.ConfigSource
 
 import java.io.File
 import java.security.Security
-import java.util.concurrent.{Executors, ThreadLocalRandom, TimeUnit}
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.{blocking, Await, ExecutionContext, ExecutionContextExecutorService, Future, Promise}
+import java.util.concurrent.{Executors, ThreadLocalRandom, TimeUnit}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
+import scala.concurrent._
 import scala.jdk.CollectionConverters._
+import scala.util.chaining._
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
@@ -80,6 +80,11 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   private val levelDbCommonEc = mkLevelDbEc("leveldb-common-ec")
   private val levelDbSnapshotsEc = mkLevelDbEc("leveldb-snapshots-ec")
   private val levelDbRatesEc = mkLevelDbEc("leveldb-rates-ec")
+
+  private val levelDbEcMap =
+    (0 until 6).map { i =>
+      i -> mkLevelDbEc(s"leveldb-map-ec-$i")
+    }.toMap
 
   private val cs = CoordinatedShutdown(actorSystem)
 
@@ -95,7 +100,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   private val apiKeyHashes: List[Array[Byte]] = settings.restApi.apiKeyHashes filter (_.nonEmpty) map Base58.decode
   private val processConsumedTimeout = new Timeout(settings.processConsumedTimeout * 2)
 
-  private val matcherKeyPair = AccountStorage.load(settings.accountStorage).map(_.keyPair).explicitGet().unsafeTap { x =>
+  private val matcherKeyPair = AccountStorage.load(settings.accountStorage).map(_.keyPair).explicitGet().tap { x =>
     log.info(s"The DEX's public key: ${Base58.encode(x.publicKey.arr)}, account address: ${x.publicKey.toAddress.stringRepr}")
   }
 
@@ -135,7 +140,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
   private val assetPairsDb = AssetPairsDb.levelDb(commonLevelDb)
   private val orderBookSnapshotDb = OrderBookSnapshotDb.levelDb(snapshotsLevelDb)
-  private val orderDb = OrderDb.levelDb(settings.orderDb, commonLevelDb)
+  private val orderDb = OrderDb.levelDb(settings.orderDb, db, levelDbEcMap)
 
   private val assetsCache = AssetsCache.from(AssetsDb.levelDb(commonLevelDb))
 

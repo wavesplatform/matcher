@@ -1347,7 +1347,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
   ): U = {
     val rateCache = maybeRateCache.getOrElse(RateCache(TestRateDb()).futureValue)
 
-    val odb = OrderDb.levelDb(settings.orderDb, asyncLevelDb)
+    val odb = OrderDb.levelDb(settings.orderDb, db)
     odb.saveOrder(orderToCancel).futureValue
 
     val apdb = AssetPairsDb.levelDb(asyncLevelDb)

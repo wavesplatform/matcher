@@ -178,7 +178,12 @@ class AddressActor(
               remaining.status match {
                 case status: OrderStatus.Final =>
                   expiration.remove(remaining.id).foreach(_.cancel())
-                  orderDb.saveOrderInfo(remaining.id, owner, OrderInfo.v6(remaining, status)).onComplete { t =>
+                  Future.sequence(
+                    List(
+                      orderDb.saveOrderInfo(remaining.id, OrderInfo.v6(remaining, status)),
+                      orderDb.saveOrderInfoForHistory(remaining.id, owner, OrderInfo.v6(remaining, status))
+                    )
+                  ).onComplete { t =>
                     //TODO probably inconsistent state can be introduced
                     t.failed.foreach(log.error("error while saving order info", _))
                     processingOrders.remove(remaining.id)
@@ -248,7 +253,12 @@ class AddressActor(
         case None => // Can be received twice, because multiple matchers can cancel same order
         case Some(origActiveOrder) =>
           expiration.remove(id).foreach(_.cancel())
-          orderDb.saveOrderInfo(id, owner, OrderInfo.v6(acceptedOrder, orderStatus)).onComplete { t =>
+          Future.sequence(
+            List(
+              orderDb.saveOrderInfo(id, OrderInfo.v6(acceptedOrder, orderStatus)),
+              orderDb.saveOrderInfoForHistory(id, owner, OrderInfo.v6(acceptedOrder, orderStatus))
+            )
+          ).onComplete { t =>
             //TODO probably inconsistent state can be introduced
             t.failed.foreach(log.error("error while saving order info", _))
             processingOrders.remove(id)

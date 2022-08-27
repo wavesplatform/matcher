@@ -209,8 +209,10 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   private val orderFeeSettingsCache =
     new OrderFeeSettingsCache(settings.orderFee.view.mapValues(_(pairBuilder.quickValidateAssetPair(_).isRight)).toMap)
 
+  private val exchangeTxStorage = ExchangeTxStorage.levelDB(commonLevelDb)
+
   private val txWriterRef =
-    actorSystem.actorOf(WriteExchangeTransactionActor.props(ExchangeTxStorage.levelDB(commonLevelDb)), WriteExchangeTransactionActor.name)
+    actorSystem.actorOf(WriteExchangeTransactionActor.props(exchangeTxStorage), WriteExchangeTransactionActor.name)
 
   private val wavesNetTxBroadcasterRef = actorSystem.spawn(
     ExchangeTransactionBroadcastActor(
@@ -409,7 +411,8 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       apiKeyHashes = apiKeyHashes
     )
 
-  private val transactionsRoute = new TransactionsRoute(matcherStatus = () => status, orderDb = orderDb, apiKeyHashes = apiKeyHashes)
+  private val transactionsRoute =
+    new TransactionsRoute(matcherStatus = () => status, exchangeTxStorage = exchangeTxStorage, apiKeyHashes = apiKeyHashes)
 
   private val debugRoute = new DebugRoute(
     responseTimeout = settings.actorResponseTimeout,

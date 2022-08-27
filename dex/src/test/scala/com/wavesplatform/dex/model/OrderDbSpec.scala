@@ -50,7 +50,8 @@ class OrderDbSpec extends AnyFreeSpec with Matchers with WithDb with MatcherSpec
       "order info for terminated orders" in test { odb =>
         forAll(finalizedOrderInfoGen) {
           case (o, oi) =>
-            odb.saveOrderInfo(o.id(), o.sender, oi).futureValue
+            odb.saveOrderInfo(o.id(), oi).futureValue
+            odb.saveOrderInfoForHistory(o.id(), o.sender, oi).futureValue
             odb.containsInfo(o.id()).futureValue shouldBe true
             odb.status(o.id()).futureValue shouldBe oi.status
         }
@@ -73,8 +74,10 @@ class OrderDbSpec extends AnyFreeSpec with Matchers with WithDb with MatcherSpec
 
       forAll(dualFinalizedOrderInfoGen) {
         case (o, oi1, oi2) =>
-          odb.saveOrderInfo(o.id(), o.sender, oi1).futureValue
-          odb.saveOrderInfo(o.id(), o.sender, oi2).futureValue
+          odb.saveOrderInfo(o.id(), oi1).futureValue
+          odb.saveOrderInfoForHistory(o.id(), o.sender, oi1)
+          odb.saveOrderInfo(o.id(), oi2).futureValue
+          odb.saveOrderInfoForHistory(o.id(), o.sender, oi2).futureValue
 
           odb.status(o.id()).futureValue shouldBe oi1.status
       }
@@ -85,7 +88,8 @@ class OrderDbSpec extends AnyFreeSpec with Matchers with WithDb with MatcherSpec
         case (sender, pair, orders) =>
           for ((o, i) <- orders) {
             odb.saveOrder(o).futureValue
-            odb.saveOrderInfo(o.id(), o.sender, i).futureValue
+            odb.saveOrderInfo(o.id(), i).futureValue
+            odb.saveOrderInfoForHistory(o.id(), o.sender, i).futureValue
           }
 
           val tuples = odb.getFinalizedOrders(sender, Some(pair)).futureValue
@@ -102,7 +106,8 @@ class OrderDbSpec extends AnyFreeSpec with Matchers with WithDb with MatcherSpec
         case (sender, pair, finalized) =>
           for ((o, i) <- finalized) {
             odb.saveOrder(o).futureValue
-            odb.saveOrderInfo(o.id(), o.sender, i).futureValue
+            odb.saveOrderInfo(o.id(), i).futureValue
+            odb.saveOrderInfoForHistory(o.id(), o.sender, i).futureValue
           }
 
           val loadedOrders = odb.getFinalizedOrders(sender, Some(pair)).futureValue

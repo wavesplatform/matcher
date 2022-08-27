@@ -16,7 +16,8 @@ import com.wavesplatform.dex.model.{OrderInfo, OrderStatus}
 trait OrderDb[F[_]] {
   def containsInfo(id: Order.Id): F[Boolean]
   def status(id: Order.Id): F[OrderStatus.Final]
-  def saveOrderInfo(id: Order.Id, sender: Address, oi: OrderInfo[OrderStatus.Final]): F[Unit]
+  def saveOrderInfo(id: Order.Id, oi: OrderInfo[OrderStatus.Final]): F[Unit]
+  def saveOrderInfoForHistory(id: Order.Id, sender: Address, oi: OrderInfo[OrderStatus.Final]): F[Unit]
   def saveOrder(o: Order): F[Unit]
   def get(id: Order.Id): F[Option[Order]]
   def getFinalizedOrders(owner: Address, maybePair: Option[AssetPair]): F[Seq[(Order.Id, OrderInfo[OrderStatus])]]
@@ -43,9 +44,16 @@ object OrderDb {
 
     override def get(id: Order.Id): F[Option[Order]] = levelDb.readOnly(_.get(DbKeys.order(id)))
 
-    override def saveOrderInfo(id: Order.Id, sender: Address, oi: FinalOrderInfo): F[Unit] = {
+    override def saveOrderInfo(id: Order.Id, oi: FinalOrderInfo): F[Unit] = {
       val orderInfoKey = DbKeys.orderInfo(id)
+      levelDb.readWrite { rw =>
+        if (!rw.has(orderInfoKey))
+          rw.put(orderInfoKey, Some(oi))
+      }
+    }
 
+    override def saveOrderInfoForHistory(id: Order.Id, sender: Address, oi: OrderInfo[OrderStatus.Final]): F[Unit] = {
+      val orderInfoKey = DbKeys.orderInfoForHistory(id)
       levelDb.readWrite { rw =>
         if (!rw.has(orderInfoKey)) {
           val newCommonSeqNr = rw.inc(DbKeys.finalizedCommonSeqNr(sender))
@@ -57,8 +65,6 @@ object OrderDb {
             rw.get(DbKeys.finalizedPair(sender, oi.assetPair, newPairSeqNr - settings.maxOrders))
               .map(DbKeys.order)
               .foreach(x => rw.delete(x))
-
-          rw.put(orderInfoKey, Some(oi))
         }
       }
     }

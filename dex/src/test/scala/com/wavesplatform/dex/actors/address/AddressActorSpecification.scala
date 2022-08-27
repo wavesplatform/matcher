@@ -442,6 +442,7 @@ class AddressActorSpecification
           probe.expectMsg[MatcherError](OrderDuplicate(duplicatedOrder.id()))
 
           waitingOrderDb.saveOrderInfoLatch.countDown()
+          waitingOrderDb.saveOrderInfoForHistoryLatch.countDown()
 
           ref.tell(AddressDirectoryActor.Command.ForwardMessage(duplicatedOrder.sender, msg), probe.ref)
           probe.expectMsg[MatcherError](OrderDuplicate(duplicatedOrder.id()))

@@ -63,7 +63,7 @@ object OrderDb {
     }(getEcByOrderId(id))
 
     override def saveOrderInfoForHistory(id: Order.Id, sender: Address, oi: OrderInfo[OrderStatus.Final]): Future[Unit] = Future {
-      val orderInfoKey = DbKeys.orderInfoForHistory(id, sender)
+      val orderInfoKey = DbKeys.orderInfoForHistory(sender, id)
       db.readWrite { rw =>
         if (!rw.has(orderInfoKey)) {
           val newCommonSeqNr = rw.inc(DbKeys.finalizedCommonSeqNr(sender))
@@ -95,7 +95,7 @@ object OrderDb {
           for {
             offset <- 0 until math.min(seqNr, settings.maxOrders)
             id <- ro.get(key(seqNr - offset))
-            oi <- ro.get(DbKeys.orderInfoForHistory(id, owner))
+            oi <- ro.get(DbKeys.orderInfoForHistory(owner, id))
           } yield id -> oi
         }
       }(ec).map(_.sorted(orderInfoOrdering))(ec)

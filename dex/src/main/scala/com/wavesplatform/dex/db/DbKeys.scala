@@ -34,7 +34,7 @@ object DbKeys {
     Key.opt("matcher-order-info", bytes(2, orderId.arr), OrderInfo.decode, OrderInfo.encode)
 
   def orderInfoForHistory(orderId: ByteStr, sender: Address): Key[Option[FinalOrderInfo]] =
-    Key.opt("matcher-order-info-for-history", bytes(27, orderId.arr ++ sender.bytes.arr), OrderInfo.decode, OrderInfo.encode)
+    Key.opt("matcher-order-info-for-history", bytes(27, sender.bytes.arr ++ orderId.arr), OrderInfo.decode, OrderInfo.encode)
 
   // activeOrdersOldestSeqNr = 3
   // activeOrdersSeqNr = 4

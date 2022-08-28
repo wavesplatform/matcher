@@ -75,6 +75,7 @@ object OrderDb {
             rw.get(DbKeys.finalizedPair(sender, oi.assetPair, newPairSeqNr - settings.maxOrders))
               .map(DbKeys.order)
               .foreach(x => rw.delete(x))
+          rw.put(orderInfoKey, oi)
         }
       }
     }(getEcBySender(sender))
@@ -94,7 +95,7 @@ object OrderDb {
           for {
             offset <- 0 until math.min(seqNr, settings.maxOrders)
             id <- ro.get(key(seqNr - offset))
-            oi <- ro.get(DbKeys.orderInfo(id))
+            oi <- ro.get(DbKeys.orderInfoForHistory(id))
           } yield id -> oi
         }
       }(ec).map(_.sorted(orderInfoOrdering))(ec)

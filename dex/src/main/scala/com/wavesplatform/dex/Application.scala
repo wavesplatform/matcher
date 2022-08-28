@@ -127,7 +127,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   cs.addTask(CoordinatedShutdown.PhaseActorSystemTerminate, "DB") { () =>
     Future {
       blocking {
-        val levelDbEcs = List(levelDbCommonEc, levelDbRatesEc, levelDbSnapshotsEc)
+        val levelDbEcs = List(levelDbCommonEc, levelDbRatesEc, levelDbSnapshotsEc) ++ levelDbEcMap.values
         levelDbEcs.foreach { ec =>
           ec.shutdown()
           ec.awaitTermination(60, TimeUnit.SECONDS)

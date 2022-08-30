@@ -7,9 +7,6 @@ import com.wavesplatform.dex.domain.utils._
 case class LpAccountsSettings(seed: AccountStorage.Settings, num: Int, custom: Set[PublicKey]) {
 
   // TODO generate lp accounts
-  val accounts: Set[PublicKey] = {
-    val accountStorage = AccountStorage.load(seed).explicitGet()
-    custom
-  }
+  val accounts: Set[PublicKey] = custom
 
 }

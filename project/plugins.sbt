@@ -8,7 +8,7 @@ resolvers ++= Seq(
 Seq(
   "com.thesamet" %% "sbt-protoc" % "1.0.6", // Have to wait NODE: https://github.com/wavesplatform/Waves/blob/master/project/plugins.sbt#L7
   "org.jetbrains" % "sbt-ide-settings" % "1.0.0",
-  "com.github.sbt" % "sbt-native-packager" % "1.9.9",
+  "com.github.sbt" % "sbt-native-packager" % "1.9.11",
   "pl.project13.scala" % "sbt-jmh" % "0.3.7",
   "org.scalastyle" %% "scalastyle-sbt-plugin" % "1.0.0",
   "org.scoverage" % "sbt-scoverage" % "1.5.1",

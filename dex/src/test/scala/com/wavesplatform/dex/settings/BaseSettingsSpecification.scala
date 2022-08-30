@@ -92,6 +92,14 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |      type = "in-mem"
          |      in-mem.seed-in-base-64 = "c3lrYWJsZXlhdA=="
          |    }
+         |    lp-accounts {
+         |      seed {
+         |        type = "in-mem"
+         |        in-mem.seed-in-base-64 = "gwkfJVRVCx9HN6aD"
+         |      }
+         |      num = 10000
+         |      custom = []
+         |    }
          |    secure-keys = [${secureKeys.mkString(",")}]
          |    order-db {
          |      max-orders = 199

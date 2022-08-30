@@ -14,11 +14,11 @@ import scala.annotation.tailrec
 //submitter = taker
 object Fee {
 
-  def getMakerTakerFeeByOffset(ofsc: OrderFeeSettingsCache)(offset: Long)(
+  def getMakerTakerFeeByOffset(ofsc: OrderFeeSettingsCache, initialZeroFeeAccounts: Set[PublicKey] = Set.empty)(offset: Long)(
     s: AcceptedOrder,
     c: LimitOrder
   ): (Long, Long) =
-    getMakerTakerFee(ofsc getSettingsForOffset offset)(s, c)
+    getMakerTakerFee(ofsc.getSettingsForOffset(offset), initialZeroFeeAccounts)(s, c)
 
   @tailrec
   def getMakerTakerFee(ofs: => OrderFeeSettings, zeroFeeAccounts: Set[PublicKey] = Set.empty)(

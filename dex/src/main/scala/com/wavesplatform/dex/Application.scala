@@ -274,6 +274,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     recovered,
     addressActorBlockchainInteraction,
     settings.addressActor,
+    settings.lpAccounts.accounts,
     asset => assetsCache.cached.unsafeGet(asset)
   )
 
@@ -311,7 +312,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
         matchingRules = matchingRulesCache.getMatchingRules(assetPair, amountAssetDecimals, priceAssetDecimals),
         updateCurrentMatchingRules = actualMatchingRule => matchingRulesCache.updateCurrentMatchingRule(assetPair, actualMatchingRule),
         normalizeMatchingRule = denormalizedMatchingRule => denormalizedMatchingRule.normalize(amountAssetDecimals, priceAssetDecimals),
-        getMakerTakerFeeByOffset = Fee.getMakerTakerFeeByOffset(orderFeeSettingsCache),
+        getMakerTakerFeeByOffset = Fee.getMakerTakerFeeByOffset(orderFeeSettingsCache, settings.lpAccounts.accounts),
         getOrderExecutedTs = MatchTimestamp.getMatchTimestamp(settings.exchangeTxTsStartOffset),
         restrictions = settings.orderRestrictions.get(assetPair) // TODO Move this and webSocketSettings to OrderBook's settings
       )

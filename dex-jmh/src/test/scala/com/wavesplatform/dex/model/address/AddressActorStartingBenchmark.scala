@@ -6,7 +6,7 @@ import cats.syntax.either._
 import com.wavesplatform.dex.actors.address.AddressActor.Query
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.db.TestOrderDb
-import com.wavesplatform.dex.domain.account.{Address, KeyPair}
+import com.wavesplatform.dex.domain.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.OrderOps._
@@ -111,6 +111,7 @@ object AddressActorStartingBenchmark {
             recovered = true,
             blockchain = (_: Address, _: Set[Asset]) => Future.successful(AddressBalanceUpdates.empty),
             settings = AddressActor.Settings.default,
+            lpAccounts = Set.empty[PublicKey],
             getAssetDescription = assetBriefInfo
           )
         )

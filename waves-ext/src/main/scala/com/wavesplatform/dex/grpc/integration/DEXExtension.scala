@@ -2,9 +2,6 @@ package com.wavesplatform.dex.grpc.integration
 
 import com.typesafe.config.{Config, ConfigException}
 import com.wavesplatform.common.state.ByteStr
-
-import java.net.InetSocketAddress
-import java.util.concurrent.TimeUnit
 import com.wavesplatform.dex.grpc.integration.services._
 import com.wavesplatform.extensions.{Extension, Context => ExtensionContext}
 import com.wavesplatform.utils.ScorexLogging
@@ -14,6 +11,8 @@ import monix.execution.{ExecutionModel, Scheduler}
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
 
+import java.net.InetSocketAddress
+import java.util.concurrent.TimeUnit
 import scala.concurrent.Future
 
 class DEXExtension(context: ExtensionContext) extends Extension with ScorexLogging {
@@ -44,9 +43,11 @@ class DEXExtension(context: ExtensionContext) extends Extension with ScorexLoggi
     val port: Int = context.settings.config.as[Int]("waves.dex.grpc.integration.port")
     val allowedBlockchainStateAccounts: Set[ByteStr] =
       context.settings.config.as[Set[ByteStr]]("waves.dex.order-script-validation.allowed-blockchain-state-accounts")
+    val lpAccounts: Set[ByteStr] = Set.empty[ByteStr]
+
+    apiService = new WavesBlockchainApiGrpcService(context, allowedBlockchainStateAccounts, lpAccounts)
 
     val bindAddress = new InetSocketAddress(host, port)
-    apiService = new WavesBlockchainApiGrpcService(context, allowedBlockchainStateAccounts)
 
     val builder = NettyServerBuilder
       .forAddress(bindAddress)
@@ -58,6 +59,7 @@ class DEXExtension(context: ExtensionContext) extends Extension with ScorexLoggi
     InternalNettyServerBuilder.setTracingEnabled(builder, false)
 
     server = builder.build().start()
+
     log.info(s"gRPC DEX extension was bound to $bindAddress")
   }
 

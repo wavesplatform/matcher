@@ -48,15 +48,19 @@ import scala.concurrent.Future
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
-class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchainStateAccounts: Set[ByteStr])(implicit sc: Scheduler)
-    extends WavesBlockchainApiGrpc.WavesBlockchainApi
+class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchainStateAccounts: Set[ByteStr], lpAccounts: Set[ByteStr])(implicit
+  sc: Scheduler
+) extends WavesBlockchainApiGrpc.WavesBlockchainApi
     with ScorexLogging {
 
   private val descKey = Metadata.Key.of("desc", Metadata.ASCII_STRING_MARSHALLER)
 
-  private val utxState = Atomic(UtxState(accounts = allowedBlockchainStateAccounts.map { publicKey =>
-    PublicKey(publicKey).toAddress(context.settings.blockchainSettings.addressSchemeCharacter.toByte)
-  }))
+  private val utxState =
+    Atomic(
+      UtxState(
+        accounts = toAddresses(allowedBlockchainStateAccounts) ++ toAddresses(lpAccounts)
+      )
+    )
 
   private val empty = Empty()
 
@@ -242,7 +246,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
         val newEvaluatorMode = context.blockchain.newEvaluatorMode
         val checkWeakPk = context.blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
 
-        if (allowedBlockchainStateAccounts.contains(order.senderPublicKey)) {
+        if (allowedBlockchainStateAccounts.contains(order.senderPublicKey) || lpAccounts.contains(order.senderPublicKey)) {
           val blockchain = CompositeBlockchain(context.blockchain, utxState.get().getAccountsDiff(context.blockchain))
           parseScriptResult(MatcherScriptRunner(
             scriptInfo.script,
@@ -408,5 +412,9 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
       try f(subscriber)
       catch { case e: Throwable => log.warn(s"$subscriber: can't $label", e) }
     }
+
+  private def toAddresses(accounts: Set[ByteStr]): Set[Address] = accounts.map { publicKey =>
+    PublicKey(publicKey).toAddress(context.settings.blockchainSettings.addressSchemeCharacter.toByte)
+  }
 
 }

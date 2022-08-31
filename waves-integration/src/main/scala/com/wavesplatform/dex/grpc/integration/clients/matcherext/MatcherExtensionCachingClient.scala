@@ -56,5 +56,7 @@ class MatcherExtensionCachingClient(underlying: MatcherExtensionClient, defaultC
 
   override def currentBlockInfo: Future[BlockRef] = underlying.currentBlockInfo
 
+  override def checkAddress(address: Address): Future[Boolean] = underlying.checkAddress(address)
+
   override def close(): Future[Unit] = underlying.close()
 }

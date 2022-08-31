@@ -1568,7 +1568,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       () => MatcherStatus.Working,
       () => 0L,
       () => Future.successful(0L),
-      apiKeys map crypto.secureHash
+      apiKeys map crypto.secureHash,
+      _ => Future.successful((true, true))
     )
 
     val marketsRoute = new MarketsRoute(

@@ -416,11 +416,12 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     safeConfig = config,
     matcher = orderBookDirectoryActorRef,
     addressActor = addressDirectoryRef,
-    wavesBlockchainAsyncClient.status(),
+    blockchainStatus = wavesBlockchainAsyncClient.status(),
     matcherStatus = () => status,
     currentOffset = () => lastProcessedOffset,
     lastOffset = () => matcherQueue.lastOffset,
-    apiKeyHashes
+    apiKeyHashes = apiKeyHashes,
+    checkAddress = (address: Address) => checkAddress(address)
   )
 
   private val marketsRoute = new MarketsRoute(
@@ -721,6 +722,13 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
           case Some(x) => x.asRight
           case None => error.AssetNotFound(asset).asLeft
         })
+    }
+
+  private def checkAddress(address: Address): Future[Tuple2[Boolean, Boolean]] =
+    wavesBlockchainAsyncClient.checkAddress(address).map { blockchain =>
+      val publicKey = PublicKey(address.bytes)
+      val matcher = settings.lpAccounts.accounts.contains(publicKey)
+      (matcher, blockchain)
     }
 
 }

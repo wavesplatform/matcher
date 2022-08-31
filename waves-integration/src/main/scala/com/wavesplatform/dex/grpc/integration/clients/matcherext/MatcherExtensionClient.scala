@@ -40,5 +40,7 @@ trait MatcherExtensionClient {
 
   def currentBlockInfo: Future[BlockRef]
 
+  def checkAddress(address: Address): Future[Boolean]
+
   def close(): Future[Unit]
 }

@@ -46,6 +46,8 @@ trait WavesBlockchainClient {
 
   def isOrderConfirmed(orderId: ByteStr): Future[Boolean]
 
+  def checkAddress(address: Address): Future[Boolean]
+
   def close(): Future[Unit]
 
   def status(): CombinedStream.Status

@@ -387,6 +387,11 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
     )
   }
 
+  override def checkAddress(request: CheckAddressRequest): Future[CheckAddressResponse] = Future {
+    val successfullyChecked = lpAccounts.contains(request.address.toVanilla)
+    CheckAddressResponse(successfullyChecked)
+  }
+
   private def parseScriptResult(raw: => Either[ExecutionError, Terms.EVALUATED]): RunScriptResponse.Result = {
     import RunScriptResponse.Result
     try raw match {

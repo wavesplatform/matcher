@@ -239,6 +239,9 @@ class CombinedWavesBlockchainClient(
   override def isOrderConfirmed(orderId: ByteStr): Future[Boolean] =
     meClient.isOrderConfirmed(orderId)
 
+  override def checkAddress(address: Address): Future[Boolean] =
+    meClient.checkAddress(address)
+
   override def close(): Future[Unit] =
     meClient.close().zip(bClient.close()).map(_ => ())
 

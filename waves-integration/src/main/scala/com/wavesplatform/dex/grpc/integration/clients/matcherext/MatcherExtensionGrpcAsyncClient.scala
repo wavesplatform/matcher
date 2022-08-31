@@ -166,6 +166,10 @@ class MatcherExtensionGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: M
     asyncUnaryCall(METHOD_GET_CURRENT_BLOCK_INFO, empty).map(x => BlockRef(x.height, x.blockId.toVanilla))
   }
 
+  override def checkAddress(address: Address): Future[Boolean] = handlingErrors {
+    asyncUnaryCall(METHOD_CHECK_ADDRESS, CheckAddressRequest(address.toPB)).map(_.successfullyChecked)
+  }
+
   override def close(): Future[Unit] = {
     shuttingDown.set(true)
     utxEvents.close()

@@ -27,6 +27,7 @@ import org.scalatest.matchers.should.Matchers
 import pureconfig.ConfigSource
 import sttp.client3.UriContext
 
+import java.nio.charset.StandardCharsets
 import scala.concurrent.duration._
 
 class MatcherSettingsSpecification extends BaseSettingsSpecification with Matchers with DiffMatcherWithImplicits {
@@ -38,12 +39,10 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
 
     settings.id shouldBe "matcher-1"
     settings.accountStorage shouldBe AccountStorage.Settings.InMem(ByteStr.decodeBase64("c3lrYWJsZXlhdA==").get)
-    settings.lpAccounts shouldBe LpAccountsSettings(
-      seed = AccountStorage.Settings.InMem(ByteStr.decodeBase64("gwkfJVRVCx9HN6aD").get),
-      num = 10000,
-      custom = Set.empty[PublicKey]
+    settings.lpAccounts shouldBe LpAccountsSettings(filePath = "dex/src/test/resources/lp/accounts")
+    settings.lpAccounts.accounts shouldBe Set(
+      PublicKey("MIGeMA0GCSqGSIb3DQEBAQUAA4GMADCBiAKBgHLq6tu8xVC0PidYzEYss9b64Cbv".getBytes(StandardCharsets.UTF_8))
     )
-    settings.lpAccounts.accounts shouldBe Set.empty[PublicKey]
     settings.restApi shouldBe RestAPISettings(
       address = "127.1.2.3",
       port = 6880,

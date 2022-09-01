@@ -92,7 +92,7 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |      type = "in-mem"
          |      in-mem.seed-in-base-64 = "c3lrYWJsZXlhdA=="
          |    }
-         |    lp-accounts.file-path = "dex/src/test/resources/lp/accounts"
+         |    lp-accounts.file-path = "/lp/accounts"
          |    secure-keys = [${secureKeys.mkString(",")}]
          |    order-db {
          |      max-orders = 199

@@ -71,8 +71,7 @@ class DEXExtension(context: ExtensionContext) extends Extension with ScorexLoggi
 
   private def lpAccountsFromPath(filePath: String, config: Config): Set[ByteStr] =
     try {
-      val file = new File(filePath)
-      val stream = new FileInputStream(file)
+      val stream = getClass.getResourceAsStream(filePath)
       val streamReader = new InputStreamReader(stream)
       val bufferedReader = new BufferedReader(streamReader)
       bufferedReader.lines

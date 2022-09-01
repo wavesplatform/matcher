@@ -9,8 +9,7 @@ import scala.jdk.CollectionConverters._
 case class LpAccountsSettings(filePath: String) {
 
   val accounts: Set[PublicKey] = {
-    val file = new File(filePath)
-    val stream = new FileInputStream(file)
+    val stream = getClass.getResourceAsStream(filePath)
     val streamReader = new InputStreamReader(stream)
     val bufferedReader = new BufferedReader(streamReader)
     bufferedReader.lines

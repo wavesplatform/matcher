@@ -41,7 +41,7 @@ final class DebugRoute(
   currentOffset: () => ValidatedCommandWithMeta.Offset,
   lastOffset: () => Future[ValidatedCommandWithMeta.Offset],
   override val apiKeyHashes: List[Array[Byte]],
-  checkAddress: Address => Future[Tuple2[Boolean, Boolean]]
+  checkAddressPred: Address => Future[Tuple2[Boolean, Boolean]]
 )(implicit mat: Materializer)
     extends ApiRoute
     with ProtectDirective
@@ -54,7 +54,7 @@ final class DebugRoute(
 
   override lazy val route: Route = pathPrefix("matcher" / "debug") {
     getMatcherStatus ~ getAddressState ~ getMatcherConfig ~ getCurrentOffset ~ getLastOffset ~
-    getOldestSnapshotOffset ~ getAllSnapshotOffsets ~ saveSnapshots ~ printMessage
+    getOldestSnapshotOffset ~ getAllSnapshotOffsets ~ saveSnapshots ~ checkAddress ~ printMessage
   }
 
   // Hidden
@@ -235,7 +235,7 @@ final class DebugRoute(
       (withMetricsAndTraces("checkAddress") & withAuth) {
         withAddress(addressOrError) { address =>
           complete {
-            checkAddress(address).map {
+            checkAddressPred(address).map {
               case (matcher, blockchain) =>
                 HttpAddressCheck(matcher, blockchain)
             }

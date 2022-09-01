@@ -421,7 +421,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     currentOffset = () => lastProcessedOffset,
     lastOffset = () => matcherQueue.lastOffset,
     apiKeyHashes = apiKeyHashes,
-    checkAddress = (address: Address) => checkAddress(address)
+    checkAddressPred = (address: Address) => checkAddress(address)
   )
 
   private val marketsRoute = new MarketsRoute(

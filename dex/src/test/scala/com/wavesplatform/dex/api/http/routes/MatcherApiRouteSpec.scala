@@ -433,7 +433,19 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     "returns that all is fine" in test(
       route =>
         Post(routePath("/debug/saveSnapshots")).withHeaders(apiKeyHeader()) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
           responseAs[HttpMessage] should matchTo(HttpMessage("Saving started"))
+        },
+      apiKeys
+    )
+  }
+
+  routePath("/debug/address/{address}/check") - {
+    "returns successful address check" in test(
+      route =>
+        Get(routePath(s"/debug/address/${okOrder.senderPublicKey.toAddress}/check")).withHeaders(apiKeyHeader()) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          responseAs[HttpAddressCheck] should matchTo(HttpAddressCheck(matcher = true, blockchain = true))
         },
       apiKeys
     )

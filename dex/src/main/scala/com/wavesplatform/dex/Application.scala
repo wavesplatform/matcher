@@ -82,7 +82,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   private val levelDbRatesEc = mkLevelDbEc("leveldb-rates-ec")
 
   private val levelDbEcMap =
-    (0 until 1).map { i =>
+    (0 until 3).map { i =>
       i -> mkLevelDbEc(s"leveldb-map-ec-$i")
     }.toMap
 

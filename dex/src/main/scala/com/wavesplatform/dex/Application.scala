@@ -81,8 +81,10 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   private val levelDbSnapshotsEc = mkLevelDbEc("leveldb-snapshots-ec")
   private val levelDbRatesEc = mkLevelDbEc("leveldb-rates-ec")
 
+  private val tNum = config.getInt("waves.dex.t-num")
+
   private val levelDbEcMap =
-    (0 until 3).map { i =>
+    (0 until tNum).map { i =>
       i -> mkLevelDbEc(s"leveldb-map-ec-$i")
     }.toMap
 

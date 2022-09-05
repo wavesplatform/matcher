@@ -5,7 +5,7 @@ import sbt._
 import sbt.internal.inc.ReflectUtilities
 
 // Scalafix
-scalafixDependencies in ThisBuild ++= List(
+ThisBuild / scalafixDependencies ++= List(
   "org.scalatest" %% "autofix" % "3.1.0.0",
   "org.scala-lang.modules" %% "scala-collection-migrations" % "2.1.4"
 )
@@ -208,7 +208,7 @@ fullCheckRaw := Def
 def mkCheckCommand(name: String, task: TaskKey[Unit]): Command = Command.command(name) { state =>
   val updatedState = Project
     .extract(state)
-    .appendWithoutSession(Seq(Global / scalacOptions ++= Seq("-Xfatal-warnings", "-Ywarn-unused:-imports")), state)
+    .appendWithoutSession(Seq(Global / scalacOptions += "-Xfatal-warnings"), state)
 
   Project.extract(updatedState).runTask(task, updatedState)
   state

@@ -441,12 +441,12 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
   }
 
   routePath("/debug/address/{address}/check") - {
-    "returns successful address check" in test(route =>
+    "returns successful address check" in test { route =>
       Get(routePath(s"/debug/address/${okOrder.senderPublicKey.toAddress}/check")) ~> route ~> check {
         status shouldEqual StatusCodes.OK
-        responseAs[HttpAddressCheck] should matchTo(HttpAddressCheck(matcher = true, blockchain = true, message = ""))
+        responseAs[HttpAddressCheck] should matchTo(HttpAddressCheck(matcher = true, blockchain = true))
       }
-    )
+    }
   }
 
   // getOrderBook
@@ -1579,8 +1579,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       () => 0L,
       () => Future.successful(0L),
       apiKeys map crypto.secureHash,
-      _ => Future.successful((true, true)),
-      Set.empty[Address]
+      _ => Future.successful((true, true))
     )
 
     val marketsRoute = new MarketsRoute(

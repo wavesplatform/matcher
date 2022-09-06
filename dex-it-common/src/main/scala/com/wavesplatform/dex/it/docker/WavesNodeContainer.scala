@@ -133,7 +133,8 @@ object WavesNodeContainer extends ScorexLogging {
         ("run.conf", runConfig.rendered, true),
         ("suite.conf", suiteInitialConfig.rendered, true),
         ("logback-container.xml", getRawContentFromResource("nodes/logback-container.xml"), false),
-        ("jul.properties", getRawContentFromResource("nodes/jul.properties"), false)
+        ("jul.properties", getRawContentFromResource("nodes/jul.properties"), false),
+        ("/lp/accounts", "", false)
       ).foreach {
         case (fileName, content, logContent) =>
           val containerPath = Paths.get(baseContainerPath, fileName).toString

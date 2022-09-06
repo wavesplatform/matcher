@@ -69,9 +69,9 @@ class DEXExtension(context: ExtensionContext) extends Extension with ScorexLoggi
     Future.successful(())
   }
 
-  private def lpAccountsFromPath(filePath: String, config: Config): Set[ByteStr] =
+  private def lpAccountsFromPath(filePath: String, config: Config): Set[ByteStr] = {
+    val stream = new FileInputStream(filePath)
     try {
-      val stream = getClass.getResourceAsStream(filePath)
       val streamReader = new InputStreamReader(stream)
       val bufferedReader = new BufferedReader(streamReader)
       bufferedReader.lines
@@ -83,7 +83,8 @@ class DEXExtension(context: ExtensionContext) extends Extension with ScorexLoggi
     } catch {
       case ce: ConfigException => throw ce
       case e: Throwable => throw new ConfigException.BadPath(filePath, s"couldn't access the file $filePath", e)
-    }
+    } finally stream.close()
+  }
 
   private def decodeBase58(str: String, config: Config): ByteStr =
     ByteStr.decodeBase58(str).fold(

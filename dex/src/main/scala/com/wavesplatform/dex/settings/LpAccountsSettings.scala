@@ -8,18 +8,20 @@ import scala.jdk.CollectionConverters._
 
 case class LpAccountsSettings(filePath: String) {
 
-  val publicKeys: Set[PublicKey] = {
-    val stream = getClass.getResourceAsStream(filePath)
-    val streamReader = new InputStreamReader(stream)
-    val bufferedReader = new BufferedReader(streamReader)
-    bufferedReader.lines
-      .filter(_.nonEmpty)
-      .map[PublicKey](line => PublicKey(Base58.decode(line)))
-      .iterator
-      .asScala
-      .toSet
+  lazy val publicKeys: Set[PublicKey] = {
+    val stream = new FileInputStream(filePath)
+    try {
+      val streamReader = new InputStreamReader(stream)
+      val bufferedReader = new BufferedReader(streamReader)
+      bufferedReader.lines
+        .filter(_.nonEmpty)
+        .map[PublicKey](line => PublicKey(Base58.decode(line)))
+        .iterator
+        .asScala
+        .toSet
+    } finally stream.close()
   }
 
-  val addresses: Set[Address] = publicKeys.map(_.toAddress)
+  lazy val addresses: Set[Address] = publicKeys.map(_.toAddress)
 
 }

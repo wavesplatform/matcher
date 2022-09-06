@@ -55,10 +55,12 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
 
   private val descKey = Metadata.Key.of("desc", Metadata.ASCII_STRING_MARSHALLER)
 
+  private val lpAccountsAddresses: Set[Address] = toAddresses(lpAccounts)
+
   private val utxState =
     Atomic(
       UtxState(
-        accounts = toAddresses(allowedBlockchainStateAccounts) ++ toAddresses(lpAccounts)
+        accounts = toAddresses(allowedBlockchainStateAccounts) ++ lpAccountsAddresses
       )
     )
 
@@ -388,7 +390,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
   }
 
   override def checkAddress(request: CheckAddressRequest): Future[CheckAddressResponse] = Future {
-    val successfullyChecked = toAddresses(lpAccounts).contains(request.address.toVanillaAddress)
+    val successfullyChecked = lpAccountsAddresses.contains(request.address.toVanillaAddress)
     CheckAddressResponse(successfullyChecked)
   }
 

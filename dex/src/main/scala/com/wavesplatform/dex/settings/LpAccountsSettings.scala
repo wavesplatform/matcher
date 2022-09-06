@@ -1,14 +1,14 @@
 package com.wavesplatform.dex.settings
 
 import com.wavesplatform.crypto.base.Base58
-import com.wavesplatform.dex.domain.account.PublicKey
+import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 
 import java.io._
 import scala.jdk.CollectionConverters._
 
 case class LpAccountsSettings(filePath: String) {
 
-  val accounts: Set[PublicKey] = {
+  val publicKeys: Set[PublicKey] = {
     val stream = getClass.getResourceAsStream(filePath)
     val streamReader = new InputStreamReader(stream)
     val bufferedReader = new BufferedReader(streamReader)
@@ -19,5 +19,7 @@ case class LpAccountsSettings(filePath: String) {
       .asScala
       .toSet
   }
+
+  val addresses: Set[Address] = publicKeys.map(_.toAddress)
 
 }

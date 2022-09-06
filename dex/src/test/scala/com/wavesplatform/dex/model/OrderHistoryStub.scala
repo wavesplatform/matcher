@@ -42,7 +42,7 @@ class OrderHistoryStub(system: ActorSystem, time: Time, maxActiveOrders: Int, ma
       recovered,
       blockchainInteraction,
       AddressActor.Settings.default.copy(maxActiveOrders = maxActiveOrders),
-      Set.empty[PublicKey],
+      _ => false,
       assetBriefInfo
     )
 

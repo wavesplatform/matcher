@@ -41,7 +41,7 @@ final class DebugRoute(
   currentOffset: () => ValidatedCommandWithMeta.Offset,
   lastOffset: () => Future[ValidatedCommandWithMeta.Offset],
   override val apiKeyHashes: List[Array[Byte]],
-  checkAddressPred: Address => Future[Tuple2[Boolean, Boolean]]
+  isLpAccount: Address => Future[(Boolean, Boolean)]
 )(implicit mat: Materializer)
     extends ApiRoute
     with ProtectDirective
@@ -221,7 +221,6 @@ final class DebugRoute(
   @ApiOperation(
     value = "Check that address has access to websocket & blockchain and has zero fee. Requires API Key",
     httpMethod = "GET",
-    authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
     tags = Array("debug"),
     response = classOf[HttpAddressCheck]
   )
@@ -232,10 +231,10 @@ final class DebugRoute(
   )
   def checkAddress: Route =
     (path("address" / AddressPM / "check") & get) { addressOrError =>
-      (withMetricsAndTraces("checkAddress") & withAuth) {
+      withMetricsAndTraces("checkAddress") {
         withAddress(addressOrError) { address =>
           complete {
-            checkAddressPred(address).map {
+            isLpAccount(address).map {
               case (matcher, blockchain) =>
                 HttpAddressCheck(matcher, blockchain)
             }

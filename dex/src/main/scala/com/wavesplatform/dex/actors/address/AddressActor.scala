@@ -64,7 +64,7 @@ class AddressActor(
   recovered: Boolean,
   blockchain: BlockchainInteraction,
   settings: AddressActor.Settings = AddressActor.Settings.default,
-  lpAccounts: Set[PublicKey] = Set.empty[PublicKey],
+  isLpAccount: Address => Boolean = _ => false,
   getAssetDescription: Asset => BriefAssetDescription,
   log: LoggerFacade
 ) extends Actor
@@ -79,7 +79,7 @@ class AddressActor(
   private val enableRealtimeWs =
     settings.realtimeWsAddresses.contains(owner) ||
     settings.wsMessagesInterval.length == 0 ||
-    lpAccounts.map(_.toAddress).contains(owner)
+    isLpAccount(owner)
 
   private var isWorking = false
 
@@ -866,7 +866,7 @@ object AddressActor {
     recovered: Boolean,
     blockchain: BlockchainInteraction,
     settings: AddressActor.Settings = AddressActor.Settings.default,
-    lpAccounts: Set[PublicKey] = Set.empty[PublicKey],
+    isLpAccount: Address => Boolean = _ => false,
     getAssetDescription: Asset => BriefAssetDescription
   ): Props = Props(
     new AddressActor(
@@ -878,7 +878,7 @@ object AddressActor {
       recovered,
       blockchain,
       settings,
-      lpAccounts,
+      isLpAccount,
       getAssetDescription,
       logger.copy(prefix = s"AddressActor[$owner]")
     )

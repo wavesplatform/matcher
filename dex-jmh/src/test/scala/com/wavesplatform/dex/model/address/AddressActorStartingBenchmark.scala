@@ -111,7 +111,7 @@ object AddressActorStartingBenchmark {
             recovered = true,
             blockchain = (_: Address, _: Set[Asset]) => Future.successful(AddressBalanceUpdates.empty),
             settings = AddressActor.Settings.default,
-            lpAccounts = Set.empty[PublicKey],
+            isLpAccount = _ => false,
             getAssetDescription = assetBriefInfo
           )
         )

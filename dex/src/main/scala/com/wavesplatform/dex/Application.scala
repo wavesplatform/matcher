@@ -274,7 +274,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     recovered,
     addressActorBlockchainInteraction,
     settings.addressActor,
-    settings.lpAccounts.accounts,
+    settings.lpAccounts.addresses.contains,
     asset => assetsCache.cached.unsafeGet(asset)
   )
 
@@ -312,7 +312,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
         matchingRules = matchingRulesCache.getMatchingRules(assetPair, amountAssetDecimals, priceAssetDecimals),
         updateCurrentMatchingRules = actualMatchingRule => matchingRulesCache.updateCurrentMatchingRule(assetPair, actualMatchingRule),
         normalizeMatchingRule = denormalizedMatchingRule => denormalizedMatchingRule.normalize(amountAssetDecimals, priceAssetDecimals),
-        getMakerTakerFeeByOffset = Fee.getMakerTakerFeeByOffset(orderFeeSettingsCache, settings.lpAccounts.accounts),
+        getMakerTakerFeeByOffset = Fee.getMakerTakerFeeByOffset(orderFeeSettingsCache, settings.lpAccounts.publicKeys),
         getOrderExecutedTs = MatchTimestamp.getMatchTimestamp(settings.exchangeTxTsStartOffset),
         restrictions = settings.orderRestrictions.get(assetPair) // TODO Move this and webSocketSettings to OrderBook's settings
       )
@@ -421,7 +421,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     currentOffset = () => lastProcessedOffset,
     lastOffset = () => matcherQueue.lastOffset,
     apiKeyHashes = apiKeyHashes,
-    checkAddressPred = (address: Address) => checkAddress(address)
+    isLpAccount = isLpAccount
   )
 
   private val marketsRoute = new MarketsRoute(
@@ -724,9 +724,9 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
         })
     }
 
-  private def checkAddress(address: Address): Future[Tuple2[Boolean, Boolean]] =
+  private def isLpAccount(address: Address): Future[(Boolean, Boolean)] =
     wavesBlockchainAsyncClient.checkAddress(address).map { blockchain =>
-      val matcher = settings.lpAccounts.accounts.map(_.toAddress).contains(address)
+      val matcher = settings.lpAccounts.addresses.contains(address)
       (matcher, blockchain)
     }
 

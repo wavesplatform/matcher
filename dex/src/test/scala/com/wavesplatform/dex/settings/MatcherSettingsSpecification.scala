@@ -40,7 +40,7 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
     settings.id shouldBe "matcher-1"
     settings.accountStorage shouldBe AccountStorage.Settings.InMem(ByteStr.decodeBase64("c3lrYWJsZXlhdA==").get)
     settings.lpAccounts shouldBe LpAccountsSettings(filePath = "/lp/accounts")
-    settings.lpAccounts.accounts shouldBe Set(
+    settings.lpAccounts.publicKeys shouldBe Set(
       PublicKey("MIGeMA0GCSqGSIb3DQEBAQUAA4GMADCBiAKBgHLq6tu8xVC0PidYzEYss9b64Cbv".getBytes(StandardCharsets.UTF_8))
     )
     settings.restApi shouldBe RestAPISettings(

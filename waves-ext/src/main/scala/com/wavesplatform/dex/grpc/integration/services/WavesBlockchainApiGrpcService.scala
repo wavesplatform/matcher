@@ -388,7 +388,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
   }
 
   override def checkAddress(request: CheckAddressRequest): Future[CheckAddressResponse] = Future {
-    val successfullyChecked = lpAccounts.contains(request.address.toVanilla)
+    val successfullyChecked = toAddresses(lpAccounts).contains(request.address.toVanillaAddress)
     CheckAddressResponse(successfullyChecked)
   }
 

@@ -726,8 +726,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
   private def checkAddress(address: Address): Future[Tuple2[Boolean, Boolean]] =
     wavesBlockchainAsyncClient.checkAddress(address).map { blockchain =>
-      val publicKey = PublicKey(address.bytes)
-      val matcher = settings.lpAccounts.accounts.contains(publicKey)
+      val matcher = settings.lpAccounts.accounts.map(_.toAddress).contains(address)
       (matcher, blockchain)
     }
 

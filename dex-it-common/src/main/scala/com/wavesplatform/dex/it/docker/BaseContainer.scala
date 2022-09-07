@@ -190,9 +190,7 @@ abstract class BaseContainer(protected val baseContainerPath: String, private va
     log.debug(
       s"""$prefix Information:
          |Exit code:  ${containerState.getExitCodeLong}
-
          |Error:      ${containerState.getError}
-
          |Status:     ${containerState.getStatus}
          |OOM killed: ${containerState.getOOMKilled}""".stripMargin
     )

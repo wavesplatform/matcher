@@ -4,10 +4,10 @@ import cats.Id
 import cats.instances.either._
 import cats.syntax.option._
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
-import com.wavesplatform.dex.app.{MatcherStateCheckingFailedError, forceStopApplication}
+import com.wavesplatform.dex.app.{forceStopApplication, MatcherStateCheckingFailedError}
 import com.wavesplatform.dex.cli.WavesDexCli.Args
 import com.wavesplatform.dex.db.{AccountStorage, AssetPairsDb, AssetsDb, DbKeys, OrderBookSnapshotDb, OrderDb}
-import com.wavesplatform.dex.db.leveldb.{LevelDb, openDb}
+import com.wavesplatform.dex.db.leveldb.{openDb, LevelDb}
 import com.wavesplatform.dex.doc.MatcherErrorDoc
 import com.wavesplatform.dex.{cli, domain}
 import com.wavesplatform.dex.domain.account.KeyPair
@@ -587,9 +587,8 @@ object Actions {
     } yield withDb(dataDirectory) { db =>
       import scala.concurrent.ExecutionContext.Implicits.global
 
-      def mkLevelDbEc: ExecutionContextExecutorService = {
+      def mkLevelDbEc: ExecutionContextExecutorService =
         ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(1))
-      }
 
       val levelDbEcMap: Map[Int, ExecutionContextExecutorService] =
         (0 until args.threadNumber).map { i =>
@@ -605,19 +604,20 @@ object Actions {
           Await.ready(
             Future.sequence(entities.map {
               case (order, orderInfo) =>
-                val f = Future {
-                  val sender = order.sender.toAddress
-                  orderDb.saveOrder(order)
-                  orderDb.saveOrderInfo(order.id(), orderInfo)
-                  orderDb.saveOrderInfoForHistory(order.id(), sender, orderInfo)
+                val sender = order.sender.toAddress
+                val f = for {
+                  _ <- orderDb.saveOrder(order)
+                  _ <- orderDb.saveOrderInfo(order.id(), orderInfo)
+                  _ <- orderDb.saveOrderInfoForHistory(order.id(), sender, orderInfo)
 
-                  orderDb.containsInfo(order.id())
-                  orderDb.status(order.id())
-                  orderDb.get(order.id())
+                  _ <- orderDb.containsInfo(order.id())
+                  _ <- orderDb.status(order.id())
+                  _ <- orderDb.get(order.id())
 
-                  orderDb.getFinalizedOrders(sender, order.assetPair.some)
-                  orderDb.getOrderInfo(order.id())
-                }
+                  _ <- orderDb.getFinalizedOrders(sender, order.assetPair.some)
+                  _ <- orderDb.getOrderInfo(order.id())
+                } yield ()
+
                 f.onComplete {
                   case Failure(exception) =>
                     println(s"Error handling order ${exception.getMessage}")
@@ -635,7 +635,8 @@ object Actions {
             ec.awaitTermination(60, TimeUnit.SECONDS)
           }
 
-        case None => println("Couldn't generate order info, please, try again")
+        case None =>
+          println("Couldn't generate order info, please, try again")
           levelDbEcMap.values.foreach { ec =>
             ec.shutdown()
             ec.awaitTermination(60, TimeUnit.SECONDS)

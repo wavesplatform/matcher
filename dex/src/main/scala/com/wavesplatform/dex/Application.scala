@@ -749,6 +749,7 @@ object Application {
 
     val configFile = args.headOption
     val (config, settings) = loadApplicationConfig(configFile.map(new File(_)))
+    val _ = settings.lpAccounts.publicKeys
 
     val excludedConfigKeys = settings.secureKeys
     val filterredConfig = config.withoutKeys(excludedConfigKeys)

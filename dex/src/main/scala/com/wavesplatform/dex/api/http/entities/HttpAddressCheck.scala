@@ -10,5 +10,5 @@ case class HttpAddressCheck(
 
 object HttpAddressCheck {
 
-  implicit val HttpAddressCheckFormat: Format[HttpAddressCheck] = Json.format
+  implicit val httpAddressCheckFormat: Format[HttpAddressCheck] = Json.format
 }

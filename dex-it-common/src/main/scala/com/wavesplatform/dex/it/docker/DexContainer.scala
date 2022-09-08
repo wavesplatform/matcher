@@ -162,7 +162,8 @@ object DexContainer extends ScorexLogging {
         ("run.conf", runConfig.rendered, true),
         ("suite.conf", suiteInitialConfig.rendered, true),
         ("/doc/logback-container.xml", getRawContentFromResource("dex-servers/logback-container.xml"), false),
-        ("jul.properties", getRawContentFromResource("dex-servers/jul.properties"), false)
+        ("jul.properties", getRawContentFromResource("dex-servers/jul.properties"), false),
+        ("/lp/accounts", "", false)
       ).map {
         case (fileName, content, logContent) =>
           val containerPath = Paths.get(baseContainerPath, fileName).toString

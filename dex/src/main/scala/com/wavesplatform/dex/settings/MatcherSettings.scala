@@ -72,7 +72,8 @@ case class MatcherSettings(
   orderEventsCoordinatorActor: OrderEventsCoordinatorActor.Settings,
   comparisonTool: ComparisonTool.Settings,
   cli: CliSettings,
-  secureKeys: Set[String]
+  secureKeys: Set[String],
+  lpAccounts: LpAccountsSettings
 ) {
 
   val recoverOrderHistory = !new File(dataDirectory).exists()

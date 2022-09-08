@@ -44,6 +44,8 @@ service WavesBlockchainApi {
   rpc GetAddressFullRegularBalance (GetAddressFullRegularBalanceRequest) returns (GetAddressFullRegularBalanceResponse);
 
   rpc GetBalances (GetBalancesRequest) returns (GetBalancesResponse);
+
+  rpc CheckAddress (CheckAddressRequest) returns (CheckAddressResponse);
 }
 
 // Common requests
@@ -246,6 +248,14 @@ message GetBalancesResponse {
     bytes address = 1;
     int64 amount = 2;
   }
+}
+
+message CheckAddressRequest {
+  bytes address = 1;
+}
+
+message CheckAddressResponse {
+  bool successfully_checked = 1;
 }
 
 // Other entities

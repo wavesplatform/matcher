@@ -69,6 +69,8 @@ class MatcherExtensionAssetsCachingClient(
 
   override def isOrderConfirmed(orderId: ByteStr): Future[Boolean] = underlying.isOrderConfirmed(orderId)
 
+  override def checkAddress(address: Address): Future[Boolean] = underlying.checkAddress(address)
+
   override def close(): Future[Unit] = underlying.close()
 
   private def saveAssetsDescription(assets: Set[Asset]): Future[Unit] = {

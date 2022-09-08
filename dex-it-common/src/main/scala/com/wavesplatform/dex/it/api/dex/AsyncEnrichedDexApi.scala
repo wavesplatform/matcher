@@ -541,6 +541,10 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
     basicRequest.get(uri"$apiUri/matcher")
   }
 
+  override def checkAddress(address: Address): R[HttpAddressCheck] = mk {
+    basicRequest.get(uri"$apiUri/matcher/debug/address/$address/check")
+  }
+
   override def printMessage(message: String): R[Unit] = mkIgnore {
     basicRequest
       .post(uri"$apiUri/matcher/debug/print")

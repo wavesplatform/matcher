@@ -235,6 +235,8 @@ trait DexApi[F[_]] {
 
   def getMatcherPKInBase58: F[String]
 
+  def checkAddress(address: Address): F[HttpAddressCheck]
+
   def printMessage(message: String): F[Unit]
 
   def wsConnections: F[HttpWebSocketConnections]

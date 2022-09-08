@@ -52,14 +52,8 @@ abstract class BaseContainer(protected val baseContainerPath: String, private va
 
   protected def getInternalAddress(internalPort: Int): InetSocketAddress = new InetSocketAddress(internalIp, internalPort)
 
-  private def printState(): Unit = {
-    val containerState = getState()
-    log.debug(s"""$prefix Information:
-                 |Exit code:  ${containerState.getExitCodeLong}
-                 |Error:      ${containerState.getError}
-                 |Status:     ${containerState.getStatus}
-                 |OOM killed: ${containerState.getOOMKilled}""".stripMargin)
-  }
+  override def copyFileToContainer(transferable: Transferable, filePath: String): Unit =
+    super.copyFileToContainer(transferable, s"$baseContainerPath$filePath")
 
   def replaceSuiteConfig(newSuiteConfig: Config): Unit = underlying.configure { c =>
     val containerPath = Paths.get(baseContainerPath, "suite.conf").toString
@@ -189,6 +183,17 @@ abstract class BaseContainer(protected val baseContainerPath: String, private va
   def restartWithNewSuiteConfig(newSuiteConfig: Config): Unit = {
     replaceSuiteConfig(newSuiteConfig)
     restart()
+  }
+
+  private def printState(): Unit = {
+    val containerState = getState()
+    log.debug(
+      s"""$prefix Information:
+         |Exit code:  ${containerState.getExitCodeLong}
+         |Error:      ${containerState.getError}
+         |Status:     ${containerState.getStatus}
+         |OOM killed: ${containerState.getOOMKilled}""".stripMargin
+    )
   }
 
   private def logExposedPortsInfo(prefix: String): Unit = {

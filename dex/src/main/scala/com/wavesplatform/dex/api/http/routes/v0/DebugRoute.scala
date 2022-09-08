@@ -18,6 +18,7 @@ import com.wavesplatform.dex.api.http.{HasStatusBarrier, _}
 import com.wavesplatform.dex.api.routes.PathMatchers.AddressPM
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
 import com.wavesplatform.dex.app.MatcherStatus
+import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedStream
 import com.wavesplatform.dex.queue.ValidatedCommandWithMeta
@@ -39,7 +40,8 @@ final class DebugRoute(
   override val matcherStatus: () => MatcherStatus,
   currentOffset: () => ValidatedCommandWithMeta.Offset,
   lastOffset: () => Future[ValidatedCommandWithMeta.Offset],
-  override val apiKeyHashes: List[Array[Byte]]
+  override val apiKeyHashes: List[Array[Byte]],
+  isLpAccount: Address => Future[(Boolean, Boolean)]
 )(implicit mat: Materializer)
     extends ApiRoute
     with ProtectDirective
@@ -52,7 +54,7 @@ final class DebugRoute(
 
   override lazy val route: Route = pathPrefix("matcher" / "debug") {
     getMatcherStatus ~ getAddressState ~ getMatcherConfig ~ getCurrentOffset ~ getLastOffset ~
-    getOldestSnapshotOffset ~ getAllSnapshotOffsets ~ saveSnapshots ~ printMessage
+    getOldestSnapshotOffset ~ getAllSnapshotOffsets ~ saveSnapshots ~ checkAddress ~ printMessage
   }
 
   // Hidden
@@ -212,6 +214,32 @@ final class DebugRoute(
     (path("status") & get) {
       (withMetricsAndTraces("getMatcherStatus") & withAuth) {
         complete(HttpSystemStatus(matcherStatus(), blockchainStatus))
+      }
+    }
+
+  @Path("/debug/address/{address}/check#checkAddress")
+  @ApiOperation(
+    value = "Check that address has access to websocket & blockchain and has zero fee. Requires API Key",
+    httpMethod = "GET",
+    tags = Array("debug"),
+    response = classOf[HttpAddressCheck]
+  )
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "address", value = "Address", dataType = "string", paramType = "path")
+    )
+  )
+  def checkAddress: Route =
+    (path("address" / AddressPM / "check") & get) { addressOrError =>
+      withMetricsAndTraces("checkAddress") {
+        withAddress(addressOrError) { address =>
+          complete {
+            isLpAccount(address).map {
+              case (matcher, blockchain) =>
+                HttpAddressCheck(matcher, blockchain)
+            }
+          }
+        }
       }
     }
 

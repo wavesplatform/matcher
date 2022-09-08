@@ -15,23 +15,26 @@ import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
+import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
-import com.wavesplatform.dex.model.{AssetPairBuilder, OrderBookSideSnapshot}
+import com.wavesplatform.dex.model.{AssetPairBuilder, OrderBookSideSnapshot, OrderInfo, OrderStatus}
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.dex.tool.{Checker, ComparisonTool, ConfigChecker, PrettyPrinter}
 import com.wavesplatform.dex.tool.connectors.SuperConnector
 import monix.eval.Task
 import monix.execution.{ExecutionModel, Scheduler}
 import monix.execution.schedulers.SchedulerService
+import org.scalacheck.Gen
 import sttp.client3._
 
 import java.io.PrintWriter
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
+import java.util.concurrent.Executors
 import java.util.{Base64, Scanner}
 import java.util.concurrent.atomic.AtomicLong
-import scala.concurrent.{Await, TimeoutException}
+import scala.concurrent.{Await, ExecutionContext, Future, TimeoutException}
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try, Using}
 
@@ -563,6 +566,75 @@ object Actions {
       .setJson(false)
 
     print(config.root().render(options))
+  }
+
+  // noinspection ScalaStyle
+  def loadLevelDbTest(args: Args, dataDirectory: String, odbSettings: OrderDb.Settings): Unit =
+    for {
+      _ <- cli.log(
+        s"""
+           |Passed arguments:
+           |  DEX config path : ${if (args.configPath.isEmpty) dataDirectory else args.configPath}
+           |  Orders number : ${args.ordersNumber}
+           |  Threads number : ${args.threadNumber}
+           |""".stripMargin
+      )
+    } yield withLevelDb(dataDirectory) { levelDb =>
+      import scala.concurrent.ExecutionContext.Implicits.global
+
+      val orderDb = OrderDb.levelDb(odbSettings, levelDb)
+      val gen = WavesEntitiesGenForLevelDb.orderAndOrderInfoGen()
+
+      Gen.containerOfN[Seq, (Order, OrderInfo[OrderStatus.Final])](args.ordersNumber, gen).sample match {
+        case Some(entities) =>
+          val startTime = System.currentTimeMillis()
+          Await.ready(
+            Future.sequence(entities.map {
+              case (order, orderInfo) =>
+                val f = Future {
+                  val sender = order.sender.toAddress
+                  orderDb.saveOrder(order)
+                  orderDb.saveOrderInfo(order.id(), sender, orderInfo)
+
+                  orderDb.containsInfo(order.id())
+                  orderDb.status(order.id())
+                  orderDb.get(order.id())
+
+                  orderDb.getFinalizedOrders(sender, order.assetPair.some)
+                  orderDb.getOrderInfo(order.id())
+                }
+              f.onComplete {
+                case Failure(exception) =>
+                  println(s"Error handling order ${exception.getMessage}")
+                  exception.printStackTrace()
+                case _ =>
+              }
+              f
+            }),
+            Duration.Inf
+          )
+          val endTime = System.currentTimeMillis()
+          printTimeDelta(startTime, endTime)
+
+        case None => println("Couldn't generate order info, please, try again")
+      }
+
+    }
+
+  private def printTimeDelta(start: Long, end: Long): Unit = {
+
+    def handleTimeUnits(unitAmount: Long, unitName: String) =
+      if (unitAmount > 0) s"$unitAmount $unitName "
+      else ""
+
+    val deltaTime = end - start
+    val ms = deltaTime % 1000
+    val seconds = deltaTime / 1000
+    val mins = seconds / 60
+    val finalSeconds = seconds % 60
+    println(s"Finished for ${handleTimeUnits(mins, "min")}${handleTimeUnits(finalSeconds, "s")}${handleTimeUnits(ms, "ms")}")
+    println(s"Started at $start, finished at $end, delta is $deltaTime")
+
   }
 
   private def seedPromptText(accountNonce: Option[Int]): String =

@@ -56,7 +56,8 @@ object WavesDexCli extends ScoptImplicits {
         cmdInspectOrder(builder),
         cmdGenerateFeeSettings(builder),
         cmdDeleteOrderbook(builder),
-        cmdCheckOrdersForTxV3(builder)
+        cmdCheckOrdersForTxV3(builder),
+        cmdLoadLevelDbTest(builder)
       )
     }
 
@@ -107,6 +108,7 @@ object WavesDexCli extends ScoptImplicits {
               case Command.GenerateFeeSettings => generateFeeSettings(args)
               case Command.DeleteOrderBook => deleteOrderBookFromLevelDb(args, matcherSettings)
               case Command.CheckOrdersForTxV3Compat => checkOrdersForTxV3Compat(args, matcherSettings)
+              case Command.LoadLevelDbTest => loadLevelDbTest(args, matcherSettings.dataDirectory, matcherSettings.orderDb)
             }
             println("Done")
         }
@@ -537,6 +539,31 @@ object WavesDexCli extends ScoptImplicits {
       )
   }
 
+  private def cmdLoadLevelDbTest(builder: OParserBuilder[Args]) = {
+    import builder._
+    cmd(Command.LoadLevelDbTest.name)
+      .action((_, s) => s.copy(command = Command.LoadLevelDbTest.some))
+      .text("Runs load test for levelDB")
+      .children(
+        opt[String]("dex-config")
+          .abbr("dc")
+          .text("DEX config path")
+          .valueName("<raw-string>")
+          .required()
+          .action((x, s) => s.copy(configPath = x)),
+        opt[Int]("orders-number")
+          .abbr("on")
+          .text("Number of orders and its entities to load levelDB, by default 100 000")
+          .valueName("<number>")
+          .action((x, s) => s.copy(ordersNumber = x)),
+        opt[Int]("thread-number")
+          .abbr("tn")
+          .text("Number of threads to run test, by default 1")
+          .valueName("<number>")
+          .action((x, s) => s.copy(threadNumber = x))
+      )
+  }
+
   sealed trait Command {
     def name: String
   }
@@ -619,6 +646,10 @@ object WavesDexCli extends ScoptImplicits {
       override def name: String = "check-for-tx-v3-compat"
     }
 
+    case object LoadLevelDbTest extends Command {
+      override def name: String = "load-level-db-test"
+    }
+
   }
 
   private val defaultFile = new File(".")
@@ -648,7 +679,9 @@ object WavesDexCli extends ScoptImplicits {
     amountAssets: Seq[String] = Seq.empty,
     priceAssets: Seq[String] = Seq.empty,
     minFee: Double = 0.01,
-    minFeeInWaves: Long = 1000000
+    minFeeInWaves: Long = 1000000,
+    ordersNumber: Int = 100000,
+    threadNumber: Int = 1
   )
 
 }

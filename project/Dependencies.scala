@@ -266,7 +266,8 @@ object Dependencies {
       wavesJ,
       web3jCore,
       betterMonadicFor,
-      iq80leveldb
+      iq80leveldb,
+      scalaCheck
     ) ++ pureConfig ++ enumeratum ++ testKit ++ quill ++ monocle ++ levelDBJNA
 
     lazy val dexLoad: Seq[ModuleID] = Seq(diffx) ++ pureConfig ++ silencer

@@ -605,18 +605,17 @@ object Actions {
             Future.sequence(entities.map {
               case (order, orderInfo) =>
                 val sender = order.sender.toAddress
-                val f = for {
-                  _ <- orderDb.saveOrder(order)
-                  _ <- orderDb.saveOrderInfo(order.id(), orderInfo)
-                  _ <- orderDb.saveOrderInfoForHistory(order.id(), sender, orderInfo)
-
-                  _ <- orderDb.containsInfo(order.id())
-                  _ <- orderDb.status(order.id())
-                  _ <- orderDb.get(order.id())
-
-                  _ <- orderDb.getFinalizedOrders(sender, order.assetPair.some)
-                  _ <- orderDb.getOrderInfo(order.id())
-                } yield ()
+                val f = Future.sequence(Seq(
+                  orderDb.saveOrder(order),
+                  orderDb.saveOrderInfo(order.id(), orderInfo),
+                  orderDb.saveOrderInfoForHistory(order.id(), sender, orderInfo),
+                  orderDb.get(order.id()),
+                  orderDb.containsInfo(order.id()),
+                  orderDb.status(order.id()),
+                  orderDb.get(order.id()),
+                  orderDb.getFinalizedOrders(sender, order.assetPair.some),
+                  orderDb.getOrderInfo(order.id())
+                ))
 
                 f.onComplete {
                   case Failure(exception) =>

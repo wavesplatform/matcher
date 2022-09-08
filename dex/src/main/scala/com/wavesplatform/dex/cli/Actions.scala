@@ -4,36 +4,40 @@ import cats.Id
 import cats.instances.either._
 import cats.syntax.option._
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
-import com.wavesplatform.dex.app.{forceStopApplication, MatcherStateCheckingFailedError}
+import com.wavesplatform.dex.app.{MatcherStateCheckingFailedError, forceStopApplication}
 import com.wavesplatform.dex.cli.WavesDexCli.Args
-import com.wavesplatform.dex.db.leveldb.{openDb, LevelDb}
-import com.wavesplatform.dex.db._
+import com.wavesplatform.dex.db.{AccountStorage, AssetPairsDb, AssetsDb, DbKeys, OrderBookSnapshotDb, OrderDb}
+import com.wavesplatform.dex.db.leveldb.{LevelDb, openDb}
 import com.wavesplatform.dex.doc.MatcherErrorDoc
+import com.wavesplatform.dex.{cli, domain}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
+import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
-import com.wavesplatform.dex.model.{AssetPairBuilder, OrderBookSideSnapshot}
+import com.wavesplatform.dex.model.{AssetPairBuilder, OrderBookSideSnapshot, OrderInfo, OrderStatus}
 import com.wavesplatform.dex.settings.MatcherSettings
-import com.wavesplatform.dex.tool.connectors.SuperConnector
 import com.wavesplatform.dex.tool.{Checker, ComparisonTool, ConfigChecker, PrettyPrinter}
-import com.wavesplatform.dex.{cli, domain}
+import com.wavesplatform.dex.tool.connectors.SuperConnector
+import kamon.instrumentation.executor.ExecutorInstrumentation
 import monix.eval.Task
-import monix.execution.schedulers.SchedulerService
 import monix.execution.{ExecutionModel, Scheduler}
+import monix.execution.schedulers.SchedulerService
 import org.iq80.leveldb.DB
+import org.scalacheck.Gen
 import sttp.client3._
 
 import java.io.PrintWriter
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
-import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.{ExecutorService, Executors, TimeUnit}
 import java.util.{Base64, Scanner}
+import java.util.concurrent.atomic.AtomicLong
+import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutorService, Future, TimeoutException}
 import scala.concurrent.duration._
-import scala.concurrent.{Await, TimeoutException}
 import scala.util.{Failure, Success, Try, Using}
 
 object Actions {
@@ -569,6 +573,93 @@ object Actions {
     print(config.root().render(options))
   }
 
+  // noinspection ScalaStyle
+  def loadLevelDbTest(args: Args, dataDirectory: String, odbSettings: OrderDb.Settings): Unit =
+    for {
+      _ <- cli.log(
+        s"""
+           |Passed arguments:
+           |  DEX config path : ${if (args.configPath.isEmpty) dataDirectory else args.configPath}
+           |  Orders number : ${args.ordersNumber}
+           |  Threads number : ${args.threadNumber}
+           |""".stripMargin
+      )
+    } yield withDb(dataDirectory) { db =>
+      import scala.concurrent.ExecutionContext.Implicits.global
+
+      def mkLevelDbEc: ExecutionContextExecutorService = {
+        ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(1))
+      }
+
+      val levelDbEcMap: Map[Int, ExecutionContextExecutorService] =
+        (0 until args.threadNumber).map { i =>
+          i -> mkLevelDbEc
+        }.toMap
+
+      val orderDb = OrderDb.levelDb(odbSettings, db, levelDbEcMap)
+      val gen = WavesEntitiesGenForLevelDb.orderAndOrderInfoGen()
+
+      Gen.containerOfN[Seq, (Order, OrderInfo[OrderStatus.Final])](args.ordersNumber, gen).sample match {
+        case Some(entities) =>
+          val startTime = System.currentTimeMillis()
+          Await.ready(
+            Future.sequence(entities.map {
+              case (order, orderInfo) =>
+                val f = Future {
+                  val sender = order.sender.toAddress
+                  orderDb.saveOrder(order)
+                  orderDb.saveOrderInfo(order.id(), orderInfo)
+                  orderDb.saveOrderInfoForHistory(order.id(), sender, orderInfo)
+
+                  orderDb.containsInfo(order.id())
+                  orderDb.status(order.id())
+                  orderDb.get(order.id())
+
+                  orderDb.getFinalizedOrders(sender, order.assetPair.some)
+                  orderDb.getOrderInfo(order.id())
+                }
+                f.onComplete {
+                  case Failure(exception) =>
+                    println(s"Error handling order ${exception.getMessage}")
+                    exception.printStackTrace()
+                  case _ =>
+                }
+                f
+            }),
+            Duration.Inf
+          )
+          val endTime = System.currentTimeMillis()
+          printTimeDelta(startTime, endTime)
+          levelDbEcMap.values.foreach { ec =>
+            ec.shutdown()
+            ec.awaitTermination(60, TimeUnit.SECONDS)
+          }
+
+        case None => println("Couldn't generate order info, please, try again")
+          levelDbEcMap.values.foreach { ec =>
+            ec.shutdown()
+            ec.awaitTermination(60, TimeUnit.SECONDS)
+          }
+      }
+
+    }
+
+  private def printTimeDelta(start: Long, end: Long): Unit = {
+
+    def handleTimeUnits(unitAmount: Long, unitName: String) =
+      if (unitAmount > 0) s"$unitAmount $unitName "
+      else ""
+
+    val deltaTime = end - start
+    val ms = deltaTime % 1000
+    val seconds = deltaTime / 1000
+    val mins = seconds / 60
+    val finalSeconds = seconds % 60
+    println(s"Finished for ${handleTimeUnits(mins, "min")}${handleTimeUnits(finalSeconds, "s")}${handleTimeUnits(ms, "ms")}")
+    println(s"Started at $start, finished at $end, delta is $deltaTime")
+
+  }
+
   private def seedPromptText(accountNonce: Option[Int]): String =
     s"Enter the${if (accountNonce.isEmpty) " seed of DEX's account" else " base seed"}: "
 
@@ -582,7 +673,9 @@ object Actions {
     }
 
   private def withDb[T](dataDirectory: String)(f: DB => T): T =
-    f(openDb(dataDirectory))
+    Using.resource(openDb(dataDirectory)) { db =>
+      f(db)
+    }
 
   private def sendRequest(url: String, apiKey: String, method: String = "get"): String = {
     print(s"Sending ${method.toUpperCase} $url... Response: ")

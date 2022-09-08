@@ -6,6 +6,7 @@ import com.dimafeng.testcontainers.GenericContainer
 import com.github.dockerjava.api.model.Capability
 import com.typesafe.config.Config
 import com.wavesplatform.dex.app.MatcherStatus.Working
+import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.clients.combined.CombinedStream.Status
 import com.wavesplatform.dex.it.api._
@@ -132,7 +133,8 @@ object DexContainer extends ScorexLogging {
     runConfig: Config,
     suiteInitialConfig: Config,
     localLogsDir: Path,
-    image: String
+    image: String,
+    lpAccounts: Seq[PublicKey] = Seq.empty[PublicKey]
   )(implicit
     tryHttpBackend: LoggingSttpBackend[Try, Any],
     futureHttpBackend: LoggingSttpBackend[Future, Any],
@@ -163,7 +165,7 @@ object DexContainer extends ScorexLogging {
         ("suite.conf", suiteInitialConfig.rendered, true),
         ("/doc/logback-container.xml", getRawContentFromResource("dex-servers/logback-container.xml"), false),
         ("jul.properties", getRawContentFromResource("dex-servers/jul.properties"), false),
-        ("/lp/accounts", "", false)
+        ("/lp/accounts", lpAccounts.map(_.base58).mkString("\n"), false)
       ).map {
         case (fileName, content, logContent) =>
           val containerPath = Paths.get(baseContainerPath, fileName).toString

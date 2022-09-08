@@ -3,6 +3,7 @@ package com.wavesplatform.dex.it.docker
 import cats.tagless.FunctorK
 import com.dimafeng.testcontainers.GenericContainer
 import com.typesafe.config.Config
+import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.it.api.Transformations
 import com.wavesplatform.dex.it.api.node.{AsyncEnrichedNodeApi, NodeApi}
@@ -105,7 +106,8 @@ object WavesNodeContainer extends ScorexLogging {
     suiteInitialConfig: Config,
     localLogsDir: Path,
     image: String,
-    netAlias: Option[String] = Some(wavesNodeNetAlias)
+    netAlias: Option[String] = Some(wavesNodeNetAlias),
+    lpAccounts: Seq[PublicKey] = Seq.empty[PublicKey]
   )(implicit
     tryHttpBackend: LoggingSttpBackend[Try, Any],
     futureHttpBackend: LoggingSttpBackend[Future, Any],
@@ -134,7 +136,7 @@ object WavesNodeContainer extends ScorexLogging {
         ("suite.conf", suiteInitialConfig.rendered, true),
         ("logback-container.xml", getRawContentFromResource("nodes/logback-container.xml"), false),
         ("jul.properties", getRawContentFromResource("nodes/jul.properties"), false),
-        ("/lp/accounts", "", false)
+        ("/lp/accounts", lpAccounts.map(_.base58).mkString("\n"), false)
       ).foreach {
         case (fileName, content, logContent) =>
           val containerPath = Paths.get(baseContainerPath, fileName).toString

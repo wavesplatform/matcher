@@ -5,6 +5,7 @@ import java.util.concurrent.ThreadLocalRandom
 import cats.Functor
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.Version.VersionString
+import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.it.api.BaseContainersKit
 import com.wavesplatform.dex.it.docker.DexContainer
 import com.wavesplatform.dex.it.fp.CanRepeat
@@ -44,9 +45,20 @@ trait HasDex { self: BaseContainersKit =>
     name: String,
     runConfig: Config = dexRunConfig,
     suiteInitialConfig: Config = dexInitialSuiteConfig,
-    image: String = dexImage
+    image: String = dexImage,
+    lpAccounts: Seq[PublicKey] = Seq.empty[PublicKey]
   ): DexContainer =
-    DexContainer(name, networkName, network, getIp(name), runConfig, suiteInitialConfig, localLogsDir, image) unsafeTap addKnownContainer
+    DexContainer(
+      name,
+      networkName,
+      network,
+      getIp(name),
+      runConfig,
+      suiteInitialConfig,
+      localLogsDir,
+      image,
+      lpAccounts
+    ) unsafeTap addKnownContainer
 
   protected lazy val dex1: DexContainer = createDex("dex-1")
 

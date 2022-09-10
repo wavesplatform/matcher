@@ -30,9 +30,9 @@ object OrderDb {
   case class Settings(maxOrders: Int)
 
   def levelDb(settings: Settings, db: DB): OrderDb[Future] =
-    levelDb(settings, db, Map(0 -> ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(1))), useVar = false)
+    levelDb(settings, db, Map(0 -> ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(1))))
 
-  def levelDb(settings: Settings, db: DB, levelDbEcMap: Map[Int, ExecutionContextExecutorService], useVar: Boolean): OrderDb[Future] =
+  def levelDb(settings: Settings, db: DB, levelDbEcMap: Map[Int, ExecutionContextExecutorService], useVar: Boolean = false): OrderDb[Future] =
     new OrderDb[Future] {
 
       private val ec = ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(1))

@@ -595,7 +595,12 @@ object Actions {
           i -> mkLevelDbEc
         }.toMap
 
-      val orderDb = OrderDb.levelDb(odbSettings, db, levelDbEcMap)
+      val orderDb = OrderDb.levelDb(
+        odbSettings,
+        db,
+        levelDbEcMap,
+        useVar = args.threadNumber == 1
+      )
       val gen = WavesEntitiesGenForLevelDb.orderAndOrderInfoGen()
 
       Gen.containerOfN[Seq, (Order, OrderInfo[OrderStatus.Final])](args.ordersNumber, gen).sample match {

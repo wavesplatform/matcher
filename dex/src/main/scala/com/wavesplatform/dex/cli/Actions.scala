@@ -6,10 +6,9 @@ import cats.syntax.option._
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
 import com.wavesplatform.dex.app.{forceStopApplication, MatcherStateCheckingFailedError}
 import com.wavesplatform.dex.cli.WavesDexCli.Args
-import com.wavesplatform.dex.db.{AccountStorage, AssetPairsDb, AssetsDb, DbKeys, OrderBookSnapshotDb, OrderDb}
 import com.wavesplatform.dex.db.leveldb.{openDb, LevelDb}
+import com.wavesplatform.dex.db._
 import com.wavesplatform.dex.doc.MatcherErrorDoc
-import com.wavesplatform.dex.{cli, domain}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -20,22 +19,23 @@ import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.{AssetPairBuilder, OrderBookSideSnapshot, OrderInfo, OrderStatus}
 import com.wavesplatform.dex.settings.MatcherSettings
-import com.wavesplatform.dex.tool.{Checker, ComparisonTool, ConfigChecker, PrettyPrinter}
 import com.wavesplatform.dex.tool.connectors.SuperConnector
+import com.wavesplatform.dex.tool.{Checker, ComparisonTool, ConfigChecker, PrettyPrinter}
+import com.wavesplatform.dex.{cli, domain}
 import monix.eval.Task
-import monix.execution.{ExecutionModel, Scheduler}
 import monix.execution.schedulers.SchedulerService
+import monix.execution.{ExecutionModel, Scheduler}
+import org.iq80.leveldb.DB
 import org.scalacheck.Gen
 import sttp.client3._
 
 import java.io.PrintWriter
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
-import java.util.concurrent.Executors
-import java.util.{Base64, Scanner}
 import java.util.concurrent.atomic.AtomicLong
-import scala.concurrent.{Await, ExecutionContext, Future, TimeoutException}
+import java.util.{Base64, Scanner}
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Future, TimeoutException}
 import scala.util.{Failure, Success, Try, Using}
 
 object Actions {
@@ -579,10 +579,10 @@ object Actions {
            |  Threads number : ${args.threadNumber}
            |""".stripMargin
       )
-    } yield withLevelDb(dataDirectory) { levelDb =>
+    } yield withDb(dataDirectory) { levelDb =>
       import scala.concurrent.ExecutionContext.Implicits.global
 
-      val orderDb = OrderDb.levelDb(odbSettings, levelDb)
+      val orderDb = OrderDb.levelDb(odbSettings, LevelDb.async(levelDb))
       val gen = WavesEntitiesGenForLevelDb.orderAndOrderInfoGen()
 
       Gen.containerOfN[Seq, (Order, OrderInfo[OrderStatus.Final])](args.ordersNumber, gen).sample match {
@@ -591,32 +591,34 @@ object Actions {
           Await.ready(
             Future.sequence(entities.map {
               case (order, orderInfo) =>
-                val f = Future {
-                  val sender = order.sender.toAddress
-                  orderDb.saveOrder(order)
-                  orderDb.saveOrderInfo(order.id(), sender, orderInfo)
-
-                  orderDb.containsInfo(order.id())
-                  orderDb.status(order.id())
-                  orderDb.get(order.id())
-
-                  orderDb.getFinalizedOrders(sender, order.assetPair.some)
+                val sender = order.sender.toAddress
+                val seq = Seq(
+                  orderDb.saveOrder(order),
+                  orderDb.saveOrderInfo(order.id(), sender, orderInfo),
+                  orderDb.get(order.id()),
+                  orderDb.containsInfo(order.id()),
+                  orderDb.status(order.id()),
+                  orderDb.get(order.id()),
+                  orderDb.getFinalizedOrders(sender, order.assetPair.some),
                   orderDb.getOrderInfo(order.id())
+                )
+                val f = Future.sequence(seq)
+
+                f.onComplete {
+                  case Failure(exception) =>
+                    println(s"Error handling order ${exception.getMessage}")
+                    exception.printStackTrace()
+                  case _ =>
                 }
-              f.onComplete {
-                case Failure(exception) =>
-                  println(s"Error handling order ${exception.getMessage}")
-                  exception.printStackTrace()
-                case _ =>
-              }
-              f
+                f
             }),
             Duration.Inf
           )
           val endTime = System.currentTimeMillis()
           printTimeDelta(startTime, endTime)
 
-        case None => println("Couldn't generate order info, please, try again")
+        case None =>
+          println("Couldn't generate order info, please, try again")
       }
 
     }
@@ -647,6 +649,11 @@ object Actions {
   private def withLevelDb[T](dataDirectory: String)(f: LevelDb[Id] => T): T =
     Using.resource(openDb(dataDirectory)) { db =>
       f(LevelDb.sync(db))
+    }
+
+  private def withDb[T](dataDirectory: String)(f: DB => T): T =
+    Using.resource(openDb(dataDirectory)) { db =>
+      f(db)
     }
 
   private def sendRequest(url: String, apiKey: String, method: String = "get"): String = {

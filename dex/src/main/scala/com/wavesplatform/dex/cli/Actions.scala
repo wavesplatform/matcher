@@ -32,10 +32,11 @@ import sttp.client3._
 import java.io.PrintWriter
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
+import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicLong
 import java.util.{Base64, Scanner}
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future, TimeoutException}
+import scala.concurrent.{Await, ExecutionContext, Future, TimeoutException}
 import scala.util.{Failure, Success, Try, Using}
 
 object Actions {
@@ -582,7 +583,7 @@ object Actions {
     } yield withDb(dataDirectory) { levelDb =>
       import scala.concurrent.ExecutionContext.Implicits.global
 
-      val orderDb = OrderDb.levelDb(odbSettings, LevelDb.async(levelDb))
+      val orderDb = OrderDb.levelDb(odbSettings, LevelDb.async(levelDb)(ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(1))))
       val gen = WavesEntitiesGenForLevelDb.orderAndOrderInfoGen()
 
       Gen.containerOfN[Seq, (Order, OrderInfo[OrderStatus.Final])](args.ordersNumber, gen).sample match {

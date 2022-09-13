@@ -145,7 +145,10 @@ class AddressActor(
         case _ =>
           origActiveOrder match {
             case None => reserve(orderReserve) // Received a partially filled order
-            case Some(origActiveOrder) => throw new IllegalStateException(s"Address already registered $origActiveOrder")
+            case Some(origActiveOrder) =>
+              val exception = new IllegalStateException(s"Address already registered $origActiveOrder")
+              log.error(message = s"$FailurePrefix: address already registered", exception)
+              throw exception
           }
       }
 
@@ -182,13 +185,19 @@ class AddressActor(
                   }
                   activeOrders.remove(remaining.id) match {
                     case Some(origActiveOrder) => origActiveOrder.reservableBalance.inverse()
-                    case None => throw new IllegalStateException(s"Can't find order ${remaining.id} during finalization")
+                    case None =>
+                      val exception = new IllegalStateException(s"Can't find order ${remaining.id} during finalization")
+                      log.error(message = s"$FailurePrefix: order not found during finalization", exception)
+                      throw exception
                   }
 
                 case _ =>
                   activeOrders.put(remaining.id, remaining) match {
                     case Some(origActiveOrder) => (remaining.reservableBalance |-| origActiveOrder.reservableBalance).filterNot(_._2 == 0)
-                    case None => throw new IllegalStateException(s"Can't find order ${remaining.id}")
+                    case None =>
+                      val exception = new IllegalStateException(s"Can't find order ${remaining.id}")
+                      log.error(message = s"$FailurePrefix: order not found", exception)
+                      throw exception
                   }
               }
             }
@@ -668,9 +677,11 @@ class AddressActor(
       Kamon.runWithSpan(span) {
         pendingCommands.get(firstOrderId) match {
           case None =>
-            throw new IllegalStateException(
+            val exception = new IllegalStateException(
               s"Can't find command for order $firstOrderId among pending commands: ${pendingCommands.keySet.mkString(", ")}"
             )
+            log.error(message = s"$FailurePrefix: command for order not found", exception)
+            throw exception
           case Some(nextCommand) =>
             nextCommand.command match {
               case command: Command.PlaceOrder =>
@@ -692,7 +703,10 @@ class AddressActor(
                   }
                   .pipeTo(self)
 
-              case x => throw new IllegalStateException(s"Can't process $x, only PlaceOrder is allowed")
+              case x =>
+                val exception = new IllegalStateException(s"Can't process $x, only PlaceOrder is allowed")
+                log.error(message = s"$FailurePrefix: not allowed order", exception)
+                throw exception
             }
         }
       }
@@ -811,7 +825,7 @@ class AddressActor(
       .onComplete {
         case Success(Some(error)) => self ! Event.StoreFailed(orderId, error, command)
         case Success(None) => self ! Event.StoreSucceeded(orderId, command); log.trace(s"$command saved")
-        case _ => throw new IllegalStateException("Impossibru")
+        case _ => throw new IllegalStateException("Unreachable failure")
       }
 
   private def totalActiveOrders: Int = activeOrders.size + placementQueue.size
@@ -854,6 +868,8 @@ object AddressActor {
 
   type Resp = MatcherResponse
 
+  private val FailurePrefix: String = "Address actor failure"
+
   private val ExpirationThreshold = 50.millis
   private val logger = LoggerFacade(LoggerFactory.getLogger(AddressActor.getClass))
 
@@ -868,7 +884,15 @@ object AddressActor {
     settings: AddressActor.Settings = AddressActor.Settings.default,
     isLpAccount: Address => Boolean = _ => false,
     getAssetDescription: Asset => BriefAssetDescription
-  ): Props = Props(
+  ): Props = Props {
+    val log: LoggerFacade = logger.copy(prefix = s"AddressActor[$owner]")
+    val loggedGetAssetDescription: Asset => BriefAssetDescription = asset =>
+      Try(getAssetDescription(asset)) match {
+        case Success(description) => description
+        case Failure(exception) =>
+          log.error(message = s"$FailurePrefix: an error occurred while getting asset $asset description", exception)
+          throw exception
+      }
     new AddressActor(
       owner,
       time,
@@ -879,10 +903,10 @@ object AddressActor {
       blockchain,
       settings,
       isLpAccount,
-      getAssetDescription,
-      logger.copy(prefix = s"AddressActor[$owner]")
+      loggedGetAssetDescription,
+      log
     )
-  )
+  }
 
   /**
    * r = currentBalance |-| requiredBalance

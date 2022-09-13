@@ -19,6 +19,9 @@ import scala.util.chaining._
 import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions._
 
 class DefaultPessimisticPortfolios() extends PessimisticPortfolios with ScorexLogging {
+
+  import DefaultPessimisticPortfolios._
+
   // Longs are negative in both maps, see getPessimisticPortfolio
   private val portfolios = new mutable.AnyRefMap[Address, Map[Asset, Long]]()
   private val txs = new mutable.AnyRefMap[ByteString, Map[Address, Map[Asset, Long]]]
@@ -49,7 +52,8 @@ class DefaultPessimisticPortfolios() extends PessimisticPortfolios with ScorexLo
       }
 
       val subtractPortfolios = removeTxIds.toList.foldMap(txs.remove(_).getOrElse(Map.empty))
-      log.info(s"[replace] added: ${putTxIds.map(_.toVanilla).mkString(",")}; removed: ${removeTxIds.map(_.toVanilla).mkString(",")}")
+
+      log.info(s"[replace] added: ${serialize(putTxIds, setTxs)}; removed: ${serialize(removeTxIds, setTxs)}")
 
       val diff = addPortfolios |-| subtractPortfolios
       diff.foreach { case (address, diff) =>
@@ -67,7 +71,8 @@ class DefaultPessimisticPortfolios() extends PessimisticPortfolios with ScorexLo
     val newTxs = addTxs.filterNot(addTxs => txs.contains(addTxs.txId))
     if (newTxs.isEmpty) Set.empty
     else {
-      log.info(s"[add] ${newTxs.map(_.txId.toVanilla).mkString(", ")}")
+      log.info(s"[add] ${serialize(newTxs.map(_.txId), addTxs)}")
+
       val pessimisticChanges = newTxs.foldMap[AddressAssets](tx => tx.pessimisticPortfolio.tap(txs.put(tx.txId, _)))
 
       pessimisticChanges.foreach { case (address, p) => portfolios.updateWith(address)(_.foldLeft(p)(Semigroup.combine).some) }
@@ -81,11 +86,12 @@ class DefaultPessimisticPortfolios() extends PessimisticPortfolios with ScorexLo
   override def processConfirmed(txIds: Iterable[ByteString]): (Set[Address], List[ByteString]) =
     if (txIds.isEmpty) (Set.empty, Nil)
     else {
-      log.info(s"[confirmed] ${txIds.map(_.toVanilla).mkString(", ")}")
+      log.info(s"[confirmed] ${serialize(txIds)}")
 
       val (pessimisticChangesToRevert, unknownTxIds) = txIds.foldMap[(AddressAssets, List[ByteString])] { txId =>
         txs.remove(txId).fold[(AddressAssets, List[ByteString])]((Map.empty, List(txId)))((_, Nil))
       }
+
       revert(pessimisticChangesToRevert)
       (pessimisticChangesToRevert.keySet, unknownTxIds)
     }
@@ -93,8 +99,9 @@ class DefaultPessimisticPortfolios() extends PessimisticPortfolios with ScorexLo
   override def removeFailed(txIds: Iterable[ByteString]): Set[Address] =
     if (txIds.isEmpty) Set.empty
     else {
+      log.info(s"[failed] ${serialize(txIds)}")
+
       val pessimisticChangesToRevert = txIds.foldMap[AddressAssets](txs.remove(_).getOrElse(Map.empty))
-      log.info(s"[failed] ${txIds.map(_.toVanilla).mkString(", ")}")
 
       revert(pessimisticChangesToRevert)
       pessimisticChangesToRevert.keySet
@@ -107,4 +114,40 @@ class DefaultPessimisticPortfolios() extends PessimisticPortfolios with ScorexLo
     }
   }
 
+  private def serialize(
+    txIds: Iterable[ByteString],
+    pessimisticTxs: Iterable[PessimisticTransaction] = Iterable.empty[PessimisticTransaction]
+  ): String = {
+    val txAddressAssets = pessimisticTxs.map(x => x.txId -> x.pessimisticPortfolio).toMap
+    txIds
+      .toSet
+      .map { txId =>
+        val addresses = txAddressAssets
+          .get(txId)
+          .orElse(txs.get(txId))
+          .toSeq
+          .flatMap(_.keySet)
+          .map(_.stringRepr.take(LoggedAddressLength))
+        val vanillaTxId = txId.toVanilla
+        val addressesCount = addresses.size
+        val serializedAddresses = addresses
+          .take(LoggedAddressesCount)
+          .appendedAll {
+            if (addressesCount > LoggedAddressesCount) Seq(TripleDotString)
+            else Seq.empty[String]
+          }
+          .mkString(CommaSpaceString)
+        s"($vanillaTxId, $addressesCount, [$serializedAddresses])"
+      }
+      .mkString(CommaSpaceString)
+  }
+
+}
+
+object DefaultPessimisticPortfolios {
+
+  private val CommaSpaceString: String = ", "
+  private val TripleDotString: String = "..."
+  private val LoggedAddressLength: Int = 5
+  private val LoggedAddressesCount: Int = 10
 }

@@ -127,10 +127,10 @@ class DefaultPessimisticPortfolios() extends PessimisticPortfolios with ScorexLo
           .orElse(txs.get(txId))
           .toSeq
           .flatMap(_.keySet)
-          .map(_.stringRepr.take(LoggedAddressLength))
         val vanillaTxId = txId.toVanilla
         val addressesCount = addresses.size
         val serializedAddresses = addresses
+          .map(_.stringRepr.take(LoggedAddressLength))
           .take(LoggedAddressesCount)
           .appendedAll {
             if (addressesCount > LoggedAddressesCount) Seq(TripleDotString)

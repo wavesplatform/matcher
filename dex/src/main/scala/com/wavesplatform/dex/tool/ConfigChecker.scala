@@ -16,6 +16,7 @@ import com.wavesplatform.dex.settings.OrderFeeSettings._
 import com.wavesplatform.dex.settings._
 import pureconfig.ConfigWriter
 import pureconfig.configurable.genericMapWriter
+import pureconfig.CollectionWriters.arrayWriter
 import pureconfig.generic.auto._
 import pureconfig.generic.semiauto
 import pureconfig.module.cats.nonEmptyListWriter
@@ -122,6 +123,15 @@ sealed trait ConfigWriters {
         )
     }
 
+  implicit val customAssetsSettingsWriter: ConfigWriter[CompositeSettings.CustomAssetsSettings] = ConfigWriter.fromFunction { settings =>
+    ConfigValueFactory.fromMap(
+      Map(
+        "assets" -> arrayWriter[Asset].contramap[Set[Asset]](_.toArray).to(settings.assets),
+        "settings" -> orderFeeWriter.to(settings.settings)
+      ).asJava
+    )
+  }
+
   implicit val discountAssetSettingsWriter: ConfigWriter[CompositeSettings.DiscountAssetSettings] =
     semiauto.deriveWriter[CompositeSettings.DiscountAssetSettings]
 
@@ -177,8 +187,9 @@ sealed trait ConfigWriters {
       Map(
         "default" -> orderFeeWriter.to(settings.default),
         "custom" -> genericMapWriter[AssetPair, OrderFeeSettings](assetPairToString).to(settings.custom),
-        "zero-fee-accounts" -> implicitly[ConfigWriter[Set[PublicKey]]].to(settings.zeroFeeAccounts),
-        "discount" -> implicitly[ConfigWriter[Option[CompositeSettings.DiscountAssetSettings]]].to(settings.discount)
+        "custom-assets" -> implicitly[ConfigWriter[Option[CompositeSettings.CustomAssetsSettings]]].to(settings.customAssets),
+        "discount" -> implicitly[ConfigWriter[Option[CompositeSettings.DiscountAssetSettings]]].to(settings.discount),
+        "zero-fee-accounts" -> implicitly[ConfigWriter[Set[PublicKey]]].to(settings.zeroFeeAccounts)
       ).asJava
     )
   }

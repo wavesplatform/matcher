@@ -147,7 +147,7 @@ class AddressActor(
             case None => reserve(orderReserve) // Received a partially filled order
             case Some(origActiveOrder) =>
               val exception = new IllegalStateException(s"Address already registered $origActiveOrder")
-              log.error(message = s"$FailurePrefix: address already registered", exception)
+              log.error(s"$FailurePrefix: address already registered", exception)
               throw exception
           }
       }
@@ -187,7 +187,7 @@ class AddressActor(
                     case Some(origActiveOrder) => origActiveOrder.reservableBalance.inverse()
                     case None =>
                       val exception = new IllegalStateException(s"Can't find order ${remaining.id} during finalization")
-                      log.error(message = s"$FailurePrefix: order not found during finalization", exception)
+                      log.error(s"$FailurePrefix: order not found during finalization", exception)
                       throw exception
                   }
 
@@ -196,7 +196,7 @@ class AddressActor(
                     case Some(origActiveOrder) => (remaining.reservableBalance |-| origActiveOrder.reservableBalance).filterNot(_._2 == 0)
                     case None =>
                       val exception = new IllegalStateException(s"Can't find order ${remaining.id}")
-                      log.error(message = s"$FailurePrefix: order not found", exception)
+                      log.error(s"$FailurePrefix: order not found", exception)
                       throw exception
                   }
               }
@@ -680,7 +680,7 @@ class AddressActor(
             val exception = new IllegalStateException(
               s"Can't find command for order $firstOrderId among pending commands: ${pendingCommands.keySet.mkString(", ")}"
             )
-            log.error(message = s"$FailurePrefix: command for order not found", exception)
+            log.error(s"$FailurePrefix: command for order not found", exception)
             throw exception
           case Some(nextCommand) =>
             nextCommand.command match {
@@ -705,7 +705,7 @@ class AddressActor(
 
               case x =>
                 val exception = new IllegalStateException(s"Can't process $x, only PlaceOrder is allowed")
-                log.error(message = s"$FailurePrefix: not allowed order", exception)
+                log.error(s"$FailurePrefix: not allowed order", exception)
                 throw exception
             }
         }
@@ -825,7 +825,9 @@ class AddressActor(
       .onComplete {
         case Success(Some(error)) => self ! Event.StoreFailed(orderId, error, command)
         case Success(None) => self ! Event.StoreSucceeded(orderId, command); log.trace(s"$command saved")
-        case _ => throw new IllegalStateException("Unreachable failure")
+        case Failure(exception) =>
+          log.error(s"$FailurePrefix: Unreachable failure", exception)
+          throw exception
       }
 
   private def totalActiveOrders: Int = activeOrders.size + placementQueue.size
@@ -890,7 +892,7 @@ object AddressActor {
       Try(getAssetDescription(asset)) match {
         case Success(description) => description
         case Failure(exception) =>
-          log.error(message = s"$FailurePrefix: an error occurred while getting asset $asset description", exception)
+          log.error(s"$FailurePrefix: an error occurred while getting asset $asset description", exception)
           throw exception
       }
     new AddressActor(

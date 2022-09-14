@@ -122,6 +122,9 @@ sealed trait ConfigWriters {
         )
     }
 
+  implicit val customAssetsSettingsWriter: ConfigWriter[CompositeSettings.CustomAssetsSettings] =
+    semiauto.deriveWriter[CompositeSettings.CustomAssetsSettings]
+
   implicit val discountAssetSettingsWriter: ConfigWriter[CompositeSettings.DiscountAssetSettings] =
     semiauto.deriveWriter[CompositeSettings.DiscountAssetSettings]
 

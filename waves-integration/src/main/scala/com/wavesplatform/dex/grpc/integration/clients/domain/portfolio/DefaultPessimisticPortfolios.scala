@@ -121,7 +121,7 @@ class DefaultPessimisticPortfolios() extends PessimisticPortfolios with ScorexLo
     val txAddressAssets = pessimisticTxs.map(x => x.txId -> x.pessimisticPortfolio).toMap
     txIds
       .toSet
-      .map { txId =>
+      .map { txId: ByteString =>
         val addresses = txAddressAssets
           .get(txId)
           .orElse(txs.get(txId))

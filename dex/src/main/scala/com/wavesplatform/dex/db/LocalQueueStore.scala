@@ -93,13 +93,13 @@ class LevelDbLocalQueueStore[F[_]](levelDb: LevelDb[F]) extends LocalQueueStore[
     levelDb.readWrite { rw =>
       //firstConsumedOffset = earliestSnapshotOffset + 1, see Application
       //so we can safely delete commands only up to "offset - 1"
-      val earliestSnapshotOffset = offset - 1
+      val safeOffset = offset - 1
       val idx = rw.get(lqOldestIdx)
       val oldestIdx = math.max(idx, 0)
-      (oldestIdx until earliestSnapshotOffset).foreach { o =>
+      (oldestIdx until safeOffset).foreach { o =>
         rw.delete(lpqElement(o))
       }
-      rw.put(lqOldestIdx, earliestSnapshotOffset)
+      rw.put(lqOldestIdx, safeOffset)
     }
 
   private def getNewestIdx(ro: ReadOnlyDb): Long = ro.get(lqNewestIdx)

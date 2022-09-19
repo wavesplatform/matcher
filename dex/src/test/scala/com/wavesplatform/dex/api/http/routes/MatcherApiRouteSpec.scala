@@ -134,11 +134,17 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
   private val amountAssetDesc = BriefAssetDescription("AmountAsset", 8, hasScript = false, isNft = false)
   private val priceAssetDesc = BriefAssetDescription("PriceAsset", 8, hasScript = false, isNft = false)
 
-  private val assetPair1 = assetPairGen.sample.get
-  private val assetPair2 = assetPairGen.sample.get
+  private val assetPair1 = AssetPair(Asset.IssuedAsset(ByteStr.decodeBase58("DWgwcZTMhSvnyYCoWLRUXXSH1RSkzThXLJhww9gwkqdn").get), Asset.Waves)
 
-  private val possiblePairs =
-    Set(assetPair1, AssetPair(assetPair1.amountAsset, assetPair2.amountAsset), AssetPair(assetPair2.amountAsset, assetPair1.priceAsset))
+  private val assetPair2 = AssetPair(
+    Asset.IssuedAsset(ByteStr.decodeBase58("7TMu26hAs7B2oW6c5sfx45KSZT7GQA3TZNYuCav8Dcqt").get),
+    Asset.IssuedAsset(ByteStr.decodeBase58("8zUYbdB8Q6mDhpcXYv52ji8ycfj4SDX4gJXS7YY3dA4R").get)
+  )
+
+  private val assetPair3 = AssetPair(assetPair1.amountAsset, assetPair2.amountAsset)
+  private val assetPair4 = AssetPair(assetPair2.amountAsset, assetPair1.priceAsset)
+
+  private val possiblePairs = Set(assetPair1, assetPair3, assetPair4)
 
   private val simpleCompositeSettings = CompositeSettings(
     default = DynamicSettings(baseMakerFee = 350000, baseTakerFee = 350000),
@@ -322,12 +328,12 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
                 custom = Map(
                   assetPair1 -> HttpOrderFeeMode.FeeModePercent(AssetType.Amount, 0.01, 1000),
                   assetPair2 -> HttpOrderFeeMode.FeeModePercent(AssetType.Amount, 0.02, 1000),
-                  AssetPair(assetPair1.amountAsset, assetPair2.amountAsset) -> HttpOrderFeeMode.FeeModePercent(
+                  assetPair3 -> HttpOrderFeeMode.FeeModePercent(
                     AssetType.Spending,
                     minFee = 0.1,
                     minFeeInWaves = 20000
                   ),
-                  AssetPair(assetPair2.amountAsset, assetPair1.priceAsset) -> HttpOrderFeeMode.FeeModePercent(
+                  assetPair4 -> HttpOrderFeeMode.FeeModePercent(
                     AssetType.Spending,
                     minFee = 0.1,
                     minFeeInWaves = 20000

@@ -1,8 +1,9 @@
 package com.wavesplatform.it.sync.compat
 
-import com.typesafe.config.ConfigFactory
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.it.api.HasKafka
 import com.wavesplatform.it.api.MatcherCommand
 import com.wavesplatform.it.tags.DexMultipleVersions
 import com.wavesplatform.it.{executePlaces, orderGen}
@@ -13,7 +14,7 @@ import scala.concurrent.duration.DurationInt
 import scala.util.Random
 
 @DexMultipleVersions
-class DatabaseBackwardCompatTestSuite extends BackwardCompatSuiteBase {
+class DatabaseBackwardCompatTestSuite extends BackwardCompatSuiteBase with HasKafka {
 
   val assetPairs = List(ethWavesPair, wavesUsdPair)
   val additionalAssetPair = ethUsdPair
@@ -97,8 +98,12 @@ class DatabaseBackwardCompatTestSuite extends BackwardCompatSuiteBase {
     state1 should matchTo(state2)
   }
 
+  override protected lazy val dexRunConfig: Config = dexKafkaConfig()
+
   override protected def beforeAll(): Unit = {
     super.beforeAll()
+
+    kafka.start()
 
     val containerDataDir = "/opt/waves-dex/data"
     List(dex1, dex2).foreach {

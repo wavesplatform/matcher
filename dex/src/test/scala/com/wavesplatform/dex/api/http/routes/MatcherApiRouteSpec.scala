@@ -7,7 +7,6 @@ import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.Route
 import akka.testkit.{TestActor, TestProbe}
-import cats.instances.future._
 import cats.syntax.either._
 import cats.syntax.option._
 import com.google.common.primitives.Longs

@@ -186,7 +186,8 @@ sealed trait ConfigWriters {
     ConfigValueFactory.fromMap(
       Map(
         "default" -> orderFeeWriter.to(settings.default),
-        "custom" -> genericMapWriter[AssetPair, OrderFeeSettings](assetPairToString).to(settings.custom),
+        "dynamic-custom-assets" -> settings.dynamicCustomAssets,
+        "custom-pairs" -> genericMapWriter[AssetPair, OrderFeeSettings](assetPairToString).to(settings.customPairs),
         "custom-assets" -> implicitly[ConfigWriter[Option[CompositeSettings.CustomAssetsSettings]]].to(settings.customAssets),
         "discount" -> implicitly[ConfigWriter[Option[CompositeSettings.DiscountAssetSettings]]].to(settings.discount),
         "zero-fee-accounts" -> implicitly[ConfigWriter[Set[PublicKey]]].to(settings.zeroFeeAccounts)

@@ -3,6 +3,7 @@ package com.wavesplatform.dex
 import com.google.common.base.Charsets
 import com.google.common.primitives.{Bytes, Ints}
 import com.softwaremill.diffx.{Derived, Diff}
+import com.wavesplatform.dex.actors.OrderBookDirectoryActor.ApplyValidatedCommandWithPair
 import com.wavesplatform.dex.api.ws.protocol.WsError
 import com.wavesplatform.dex.api.ws.entities.WsMatchTransactionInfo
 import com.wavesplatform.dex.asset.DoubleOps
@@ -23,7 +24,7 @@ import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.Events.{OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model.{BuyLimitOrder, LimitOrder, OrderValidator, SellLimitOrder, _}
 import com.wavesplatform.dex.queue.ValidatedCommand.{CancelOrder, DeleteOrderBook, PlaceMarketOrder, PlaceOrder}
-import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
+import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithPair}
 import com.wavesplatform.dex.settings.OrderFeeSettings._
 import com.wavesplatform.dex.settings.{loadConfig, AssetType, MatcherSettings, OrderFeeSettings}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
@@ -116,18 +117,18 @@ trait MatcherSpecBase
 
   protected def toNormalized(value: Long): Long = value * Order.PriceConstant
 
-  protected def wrapCommand(n: Long, command: ValidatedCommand): ValidatedCommandWithMeta =
-    ValidatedCommandWithMeta(n, System.currentTimeMillis(), command)
+  protected def wrapCommand(n: Long, command: ValidatedCommandWithPair): ApplyValidatedCommandWithPair =
+    ApplyValidatedCommandWithPair(n, System.currentTimeMillis(), command)
 
-  protected def wrapCommand(command: ValidatedCommand): ValidatedCommandWithMeta =
-    ValidatedCommandWithMeta(seqNr.incrementAndGet(), System.currentTimeMillis(), command)
+  protected def wrapCommand(command: ValidatedCommandWithPair): ApplyValidatedCommandWithPair =
+    ApplyValidatedCommandWithPair(seqNr.incrementAndGet(), System.currentTimeMillis(), command)
 
-  protected def wrapLimitOrder(x: Order): ValidatedCommandWithMeta = wrapLimitOrder(seqNr.incrementAndGet(), x)
+  protected def wrapLimitOrder(x: Order): ApplyValidatedCommandWithPair = wrapLimitOrder(seqNr.incrementAndGet(), x)
 
-  protected def wrapLimitOrder(n: Long, x: Order): ValidatedCommandWithMeta =
+  protected def wrapLimitOrder(n: Long, x: Order): ApplyValidatedCommandWithPair =
     wrapCommand(n, ValidatedCommand.PlaceOrder(LimitOrder(x, None, None)))
 
-  protected def wrapMarketOrder(mo: MarketOrder): ValidatedCommandWithMeta =
+  protected def wrapMarketOrder(mo: MarketOrder): ApplyValidatedCommandWithPair =
     wrapCommand(ValidatedCommand.PlaceMarketOrder(mo))
 
   protected def getSpentAmountWithFee(order: Order): Long = {

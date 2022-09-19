@@ -17,8 +17,17 @@ import kamon.context.Context
 import scala.util.hashing.MurmurHash3.productHash
 
 sealed trait ValidatedCommand extends Product with Serializable {
+  def maybeCtx: Option[Context]
+}
+
+sealed trait ValidatedCommandWithPair extends ValidatedCommand {
   def assetPair: AssetPair
   def maybeCtx: Option[Context]
+}
+
+sealed trait ValidatedCommandFeeAssets extends ValidatedCommand {
+  def assets: Set[Asset]
+  def maybeCtx: Option[Context] = None
 }
 
 object ValidatedCommand {
@@ -26,7 +35,7 @@ object ValidatedCommand {
   final case class PlaceOrder(
     limitOrder: LimitOrder,
     maybeCtx: Option[Context] = Some(Kamon.currentContext())
-  ) extends ValidatedCommand {
+  ) extends ValidatedCommandWithPair {
     override def assetPair: AssetPair = limitOrder.order.assetPair
     override def toString: String = s"PlaceOrder(${limitOrder.order.idStr()})"
     override def hashCode(): Int = productHash(Tuple1(limitOrder))
@@ -42,7 +51,7 @@ object ValidatedCommand {
   final case class PlaceMarketOrder(
     marketOrder: MarketOrder,
     maybeCtx: Option[Context] = Some(Kamon.currentContext())
-  ) extends ValidatedCommand {
+  ) extends ValidatedCommandWithPair {
     override def assetPair: AssetPair = marketOrder.order.assetPair
 
     override def toString: String =
@@ -64,7 +73,7 @@ object ValidatedCommand {
     source: Source,
     maybeOwner: Option[Address],
     maybeCtx: Option[Context] = Some(Kamon.currentContext())
-  ) extends ValidatedCommand {
+  ) extends ValidatedCommandWithPair {
     override def toString: String = s"CancelOrder($orderId, ${assetPair.key}, $source, $maybeOwner)"
 
     override def hashCode(): Int = productHash((assetPair, orderId, source, maybeOwner))
@@ -77,7 +86,8 @@ object ValidatedCommand {
 
   }
 
-  final case class DeleteOrderBook(assetPair: AssetPair, maybeCtx: Option[Context] = Some(Kamon.currentContext())) extends ValidatedCommand {
+  final case class DeleteOrderBook(assetPair: AssetPair, maybeCtx: Option[Context] = Some(Kamon.currentContext()))
+      extends ValidatedCommandWithPair {
     override def toString: String = s"DeleteOrderBook(${assetPair.key})"
     override def hashCode(): Int = productHash(Tuple1(assetPair))
 
@@ -89,7 +99,8 @@ object ValidatedCommand {
 
   }
 
-  final case class CancelAllOrders(assetPair: AssetPair, maybeCtx: Option[Context] = Some(Kamon.currentContext())) extends ValidatedCommand {
+  final case class CancelAllOrders(assetPair: AssetPair, maybeCtx: Option[Context] = Some(Kamon.currentContext()))
+      extends ValidatedCommandWithPair {
     override def toString: String = s"CancelAllOrders(${assetPair.key})"
     override def hashCode(): Int = productHash(Tuple1(assetPair))
 
@@ -101,6 +112,10 @@ object ValidatedCommand {
 
   }
 
+  final case class AddCustomAssetToFee(assets: Set[Asset]) extends ValidatedCommandFeeAssets
+
+  final case class DeleteCustomAssetToFee(assets: Set[Asset]) extends ValidatedCommandFeeAssets
+
   implicit final class ValidatedCommandOps(val self: ValidatedCommand) extends AnyVal {
 
     def assets: Set[Asset] = self match {
@@ -109,6 +124,8 @@ object ValidatedCommand {
       case x: CancelOrder => x.assetPair.assets
       case x: DeleteOrderBook => x.assetPair.assets
       case x: CancelAllOrders => x.assetPair.assets
+      case x: AddCustomAssetToFee => x.assets
+      case x: DeleteCustomAssetToFee => x.assets
     }
 
   }

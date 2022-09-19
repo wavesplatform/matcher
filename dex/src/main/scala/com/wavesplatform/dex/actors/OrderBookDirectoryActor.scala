@@ -16,7 +16,7 @@ import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.queue.ValidatedCommandWithMeta.{Offset => EventOffset}
-import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
+import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithPair}
 import com.wavesplatform.dex.settings.MatcherSettings
 import kamon.Kamon
 import scorex.utils._
@@ -147,7 +147,7 @@ class OrderBookDirectoryActor(
   private def createSnapshotFor(orderbook: ActorRef, offset: EventOffset): Unit =
     orderbook ! SaveSnapshot(offset)
 
-  private def createSnapshotFor(offset: ValidatedCommandWithMeta.Offset): Unit =
+  private def createSnapshotFor(offset: EventOffset): Unit =
     snapshotsState.requiredSnapshot(offset).foreach { case (assetPair, updatedSnapshotState) =>
       orderBook(assetPair) match {
         case Some(Right(actorRef)) =>
@@ -171,7 +171,7 @@ class OrderBookDirectoryActor(
     case GetSnapshotOffsets => sender() ! SnapshotOffsetsResponse(snapshotsState.snapshotOffsets)
 
     // DEX-1192 docs/places-and-cancels.md
-    case request: ValidatedCommandWithMeta =>
+    case request: ApplyValidatedCommandWithPair =>
       val currentLastProcessedNr = math.max(request.offset, lastProcessedNr)
       request.command match {
         case ValidatedCommand.DeleteOrderBook(assetPair, _) =>
@@ -385,6 +385,8 @@ object OrderBookDirectoryActor {
 
   case object GetSnapshotOffsets
   case class SnapshotOffsetsResponse(offsets: Map[AssetPair, Option[EventOffset]])
+
+  final case class ApplyValidatedCommandWithPair(offset: EventOffset, timestamp: Long, command: ValidatedCommandWithPair)
 
   case class MatcherRecovered(oldestEventNr: Long)
 

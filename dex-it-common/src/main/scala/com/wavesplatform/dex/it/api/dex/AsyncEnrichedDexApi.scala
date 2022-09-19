@@ -444,6 +444,28 @@ class AsyncEnrichedDexApi(apiKey: String, host: => InetSocketAddress)(implicit e
       .headers(headers)
   }
 
+  override def addCustomFeeAssets(assets: Set[Asset], headers: Map[String, String]): AsyncEnrichedDexApi.R[HttpMessage] = mk {
+    basicRequest
+      .post(uri"$apiUri/matcher/settings/custom-fee-assets")
+      .followRedirects(false)
+      .headers(headers)
+      .body(Json.stringify(Json.toJson(HttpCustomFeeAssets(assets))))
+  }
+
+  override def addCustomFeeAssets(assets: Set[Asset]): AsyncEnrichedDexApi.R[HttpMessage] =
+    addCustomFeeAssets(assets, apiKeyHeaders)
+
+  override def deleteCustomFeeAssets(assets: Set[Asset], headers: Map[String, String]): AsyncEnrichedDexApi.R[HttpMessage] = mk {
+    basicRequest
+      .delete(uri"$apiUri/matcher/settings/custom-fee-assets")
+      .followRedirects(false)
+      .headers(headers)
+      .body(Json.stringify(Json.toJson(HttpCustomFeeAssets(assets))))
+  }
+
+  override def deleteCustomFeeAssets(assets: Set[Asset]): AsyncEnrichedDexApi.R[HttpMessage] =
+    deleteCustomFeeAssets(assets, apiKeyHeaders)
+
   override def deleteOrderBookWithKey(amountAsset: String, priceAsset: String, headers: Map[String, String]): R[HttpMessage] = mk {
     basicRequest
       .delete(uri"$apiUri/matcher/orderbook/$amountAsset/$priceAsset")

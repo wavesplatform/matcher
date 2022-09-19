@@ -3,10 +3,11 @@ package com.wavesplatform.dex.db
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 import com.google.common.primitives.{Ints, Longs, Shorts}
+import com.wavesplatform.dex.caches.OrderFeeSettingsCache.AssetsActionForOffset
 import com.wavesplatform.dex.db.leveldb.Key
 import com.wavesplatform.dex.domain.account.Address
-import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
-import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.asset.Asset.{AssetIdLength, IssuedAsset}
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
@@ -145,6 +146,39 @@ object DbKeys {
       }
     )
 
-  private def encodeBoolean(value: Boolean): Byte = if (value) 1 else 0
+  val FeeAssetsPrefix: Short = 27
+
+  def customFeeAsset(offset: Long): Key[Option[AssetsActionForOffset]] =
+    Key.opt(
+      "matcher-custom-fee-assets",
+      bytes(FeeAssetsPrefix, Longs.toByteArray(offset)),
+      bytes => {
+        val bb = ByteBuffer.wrap(bytes)
+        val assetsSize = bb.getInt
+        val assets = (1 to assetsSize).foldLeft(Set.empty[Asset]) {
+          case (acc, _) =>
+            val byte = bb.get()
+            val asset =
+              if (byte == (1: Byte)) {
+                val assetIdByteArray = new Array[Byte](AssetIdLength)
+                bb.get(assetIdByteArray)
+                IssuedAsset(ByteStr.fromByteArray(assetIdByteArray))
+              } else
+                Asset.Waves
+            acc + asset
+        }
+        val isAdded = bb.get == 1
+
+        AssetsActionForOffset(offset, assets, isAdded)
+      },
+      x => {
+        val assetsSizeByte = Ints.toByteArray(x.assets.size)
+        val assetsBytes = x.assets.map(_.byteRepr).reduce(_ ++ _)
+        val isAdded = encodeBoolean(x.isAdded)
+        assetsSizeByte ++ assetsBytes ++ Array(isAdded)
+      }
+    )
+
+  private def encodeBoolean(value: Boolean): Byte = if (value) 1: Byte else 0: Byte
 
 }

@@ -33,6 +33,7 @@ import com.wavesplatform.dex.api.routes.ApiRoute
 import com.wavesplatform.dex.api.ws.actors.{WsExternalClientDirectoryActor, WsInternalBroadcastActor}
 import com.wavesplatform.dex.api.ws.routes.MatcherWebSocketRoute
 import com.wavesplatform.dex.app._
+import com.wavesplatform.dex.caches.OrderFeeSettingsCache.{AssetsActionForOffset, CustomAssetFeeState}
 import com.wavesplatform.dex.caches.{MatchingRulesCache, OrderFeeSettingsCache, RateCache}
 import com.wavesplatform.dex.db._
 import com.wavesplatform.dex.db.leveldb.{openDb, LevelDb}
@@ -72,6 +73,7 @@ import scala.jdk.CollectionConverters._
 import scala.util.chaining._
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
+import scala.util.chaining._
 
 class Application(settings: MatcherSettings, config: Config)(implicit val actorSystem: ActorSystem) extends ScorexLogging {
 
@@ -141,6 +143,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   private val assetPairsDb = AssetPairsDb.levelDb(commonLevelDb)
   private val orderBookSnapshotDb = OrderBookSnapshotDb.levelDb(snapshotsLevelDb)
   private val orderDb = OrderDb.levelDb(settings.orderDb, db, levelDbEcMap)
+  private val customFeeAssetsDb = CustomFeeAssetsDb.levelDb(commonLevelDb)
 
   private val assetsCache = AssetsCache.from(AssetsDb.levelDb(commonLevelDb))
 
@@ -211,8 +214,14 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
   private val pairBuilder = new AssetPairBuilder(settings, getAndCacheDescription, settings.blacklistedAssets)
 
+  private val allFeeAssetsActions = Await.result(customFeeAssetsDb.all(), 1.minute)
+
+  private val cfaState = allFeeAssetsActions.foldLeft(CustomAssetFeeState()) {
+    case (state, action) => state.applyAssetsActionForOffset(action)
+  }
+
   private val orderFeeSettingsCache =
-    new OrderFeeSettingsCache(settings.orderFee.view.mapValues(_(pairBuilder.quickValidateAssetPair(_).isRight)).toMap)
+    new OrderFeeSettingsCache(settings.orderFee.view.mapValues(_(pairBuilder.quickValidateAssetPair(_).isRight)).toMap, cfaState)
 
   private val exchangeTxStorage = ExchangeTxStorage.levelDB(commonLevelDb)
 
@@ -506,8 +515,21 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     currentOffset = () => lastProcessedOffset
   )
 
+  private val customFeeAssetsRoute = new CustomAssetsFeeRoute(apiKeyHashes, orderFeeSettingsCache, storeCommand)
+
   private val v0HttpRoute =
-    Seq(infoRoute, ratesRoute, debugRoute, marketsRoute, historyRoute, placeRoute, cancelRoute, balancesRoute, transactionsRoute)
+    Seq(
+      infoRoute,
+      ratesRoute,
+      debugRoute,
+      marketsRoute,
+      historyRoute,
+      placeRoute,
+      cancelRoute,
+      balancesRoute,
+      transactionsRoute,
+      customFeeAssetsRoute
+    )
 
   private val v1HttpRoute = Seq(OrderBookRoute(
     assetPairBuilder = pairBuilder,
@@ -659,44 +681,76 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     }
 
   // DEX-1192 docs/places-and-cancels.md
-  private def consumeMessages(xs: List[ValidatedCommandWithMeta]): Future[Unit] =
+  private def consumeMessages(xs: List[ValidatedCommandWithMeta]): Future[Unit] = {
+
+    def handleValidatedCommandWithPair(withPairs: Seq[OrderBookDirectoryActor.ApplyValidatedCommandWithPair]) = {
+      val assetPairs: Set[AssetPair] = withPairs
+        .map { cmd =>
+          lazy val handleCommand = {
+            orderBookDirectoryActorRef ! cmd
+            lastProcessedOffset = cmd.offset
+            cmd.command.assetPair
+          }
+          cmd.command.maybeCtx.fold(handleCommand) { ctx =>
+            if (status == MatcherStatus.Working) {
+              val parentSpan = ctx.get(kamon.trace.Span.Key)
+              val span =
+                Kamon.spanBuilder(s"consumedValidatedCommandWithMeta")
+                  .asChildOf(parentSpan)
+                  .traceId(parentSpan.trace.id)
+                  .tag(ctx.tags)
+                  .samplingDecision(KamonTraceUtils.Sample)
+                  .doNotTrackMetrics()
+                  .start()
+              Kamon.runWithSpan[AssetPair](span)(handleCommand)
+            } else
+              handleCommand
+          }
+        }.to(Set)
+
+      orderBookDirectoryActorRef
+        .ask(OrderBookDirectoryActor.PingAll(assetPairs))(processConsumedTimeout)
+        .recover { case NonFatal(e) => log.error("PingAll is timed out!", e) }
+    }
+
     if (xs.isEmpty) Future.unit
     else {
       val eventAssets = xs.flatMap(_.command.assets)
       val loadAssets = eventAssets.traverse(getAndCacheDescription).value
 
+      val (withPairs, customFeeAssets) =
+        xs.foldLeft((Seq.empty[OrderBookDirectoryActor.ApplyValidatedCommandWithPair], Seq.empty[AssetsActionForOffset])) {
+          case ((pairedAcc, feeAcc), validatedCommand) =>
+            log.debug(s"Consumed $validatedCommand")
+            validatedCommand.command match {
+              case cmd: ValidatedCommandWithPair =>
+                (
+                  pairedAcc :+ OrderBookDirectoryActor.ApplyValidatedCommandWithPair(validatedCommand.offset, validatedCommand.timestamp, cmd),
+                  feeAcc
+                )
+              case cmd: ValidatedCommandFeeAssets =>
+                val isAdding = cmd match {
+                  case ValidatedCommand.AddCustomAssetToFee(_) => true
+                  case ValidatedCommand.DeleteCustomAssetToFee(_) => false
+                }
+                (pairedAcc, feeAcc :+ AssetsActionForOffset(assets = cmd.assets, offset = validatedCommand.offset, isAdded = isAdding))
+            }
+        }
+
       loadAssets.flatMap { _ =>
-        val assetPairs: Set[AssetPair] = xs
-          .map { validatedCommandWithMeta =>
-            lazy val handleValidatedCommandWithMeta = {
-              log.debug(s"Consumed $validatedCommandWithMeta")
-              orderBookDirectoryActorRef ! validatedCommandWithMeta
-              lastProcessedOffset = validatedCommandWithMeta.offset
-              validatedCommandWithMeta.command.assetPair
-            }
-
-            validatedCommandWithMeta.command.maybeCtx.fold(handleValidatedCommandWithMeta) { ctx =>
-              if (status == MatcherStatus.Working) {
-                val parentSpan = ctx.get(kamon.trace.Span.Key)
-                val span =
-                  Kamon.spanBuilder(s"consumedValidatedCommandWithMeta")
-                    .asChildOf(parentSpan)
-                    .traceId(parentSpan.trace.id)
-                    .tag(ctx.tags)
-                    .samplingDecision(KamonTraceUtils.Sample)
-                    .doNotTrackMetrics()
-                    .start()
-                Kamon.runWithSpan[AssetPair](span)(handleValidatedCommandWithMeta)
-              } else
-                handleValidatedCommandWithMeta
-            }
-          }
-          .to(Set)
-
-        orderBookDirectoryActorRef
-          .ask(OrderBookDirectoryActor.PingAll(assetPairs))(processConsumedTimeout)
-          .recover { case NonFatal(e) => log.error("PingAll is timed out!", e) }
-          .map(_ => ())
+        for {
+          _ <- Future.sequence(customFeeAssets.map { action =>
+            customFeeAssetsDb.save(action).tap(_.onComplete {
+              case Failure(ex) =>
+                log.error("Error while event processing occurred: ", ex)
+                forceStopApplication(EventProcessingError)
+              case Success(_) =>
+                orderFeeSettingsCache.applyAssetsActionForOffset(action)
+                lastProcessedOffset = action.offset
+            })
+          })
+          _ <- handleValidatedCommandWithPair(withPairs)
+        } yield ()
       } andThen {
         case Failure(ex) =>
           log.error("Error while event processing occurred: ", ex)
@@ -704,6 +758,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
         case _ =>
       }
     }
+  }
 
   private def setStatus(newStatus: MatcherStatus): Unit = {
     status = newStatus

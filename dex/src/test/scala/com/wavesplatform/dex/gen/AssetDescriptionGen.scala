@@ -9,9 +9,9 @@ import org.scalatest.Suite
 trait AssetDescriptionGen extends MatcherSpecBase { _: Suite =>
 
   protected def assertDescriptionsGen(n: Int): Gen[Map[Asset.IssuedAsset, BriefAssetDescription]] =
-    Gen.containerOfN[Seq, (Asset.IssuedAsset, BriefAssetDescription)](n, assertDescriptionGen).map(_.toMap)
+    Gen.containerOfN[Seq, (Asset.IssuedAsset, BriefAssetDescription)](n, assetDescriptionGen).map(_.toMap)
 
-  protected val assertDescriptionGen: Gen[(Asset.IssuedAsset, BriefAssetDescription)] = for {
+  protected val assetDescriptionGen: Gen[(Asset.IssuedAsset, BriefAssetDescription)] = for {
     asset <- issuedAssetGen(1.toByte)
     name <- Arbitrary.arbString.arbitrary
     decimals <- Gen.choose(0, 8)

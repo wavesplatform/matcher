@@ -7,7 +7,7 @@ import cats.Id
 import cats.data.NonEmptyList
 import cats.implicits.catsSyntaxEitherId
 import com.wavesplatform.dex.MatcherSpecBase
-import com.wavesplatform.dex.actors.OrderBookDirectoryActor.{GetMarkets, MarketData, SaveSnapshot}
+import com.wavesplatform.dex.actors.OrderBookDirectoryActor.{ApplyValidatedCommandWithPair, GetMarkets, MarketData, SaveSnapshot}
 import com.wavesplatform.dex.actors.OrderBookDirectoryActorSpecification.{DeletingActor, FailAtStartActor, NothingDoActor, _}
 import com.wavesplatform.dex.actors.orderbook.OrderBookActor.{OrderBookRecovered, OrderBookSnapshotUpdateCompleted}
 import com.wavesplatform.dex.actors.orderbook.OrderBookSnapshotStoreActor.{Message, Response}
@@ -242,7 +242,7 @@ class OrderBookDirectoryActorSpecification
       )
 
       val probe = TestProbe()
-      probe.send(actor, ValidatedCommandWithMeta(10L, 0L, ValidatedCommand.DeleteOrderBook(pair)))
+      probe.send(actor, ApplyValidatedCommandWithPair(10L, 0L, ValidatedCommand.DeleteOrderBook(pair)))
 
       eventually {
         probe.send(actor, GetMarkets)
@@ -367,7 +367,7 @@ class OrderBookDirectoryActorSpecification
         )
 
         val probe = TestProbe()
-        probe.send(actor, ValidatedCommandWithMeta(10L, 0L, ValidatedCommand.DeleteOrderBook(pair)))
+        probe.send(actor, ApplyValidatedCommandWithPair(10L, 0L, ValidatedCommand.DeleteOrderBook(pair)))
 
         withClue("Removed from snapshots rotation") {
           eventually {
@@ -437,7 +437,7 @@ class OrderBookDirectoryActorSpecification
       private var nr = -1L
 
       override def receive: Receive = {
-        case x: ValidatedCommandWithMeta if x.offset > nr => nr = x.offset
+        case x: ApplyValidatedCommandWithPair if x.offset > nr => nr = x.offset
         case SaveSnapshot(globalNr) =>
           val event = OrderBookSnapshotUpdateCompleted(assetPair, Some(globalNr))
           context.system.scheduler.scheduleOnce(200.millis) {
@@ -573,7 +573,7 @@ object OrderBookDirectoryActorSpecification {
   private class DeletingActor(owner: ActorRef, assetPair: AssetPair, startOffset: Option[Long] = None)
       extends RecoveringActor(owner, assetPair, startOffset) {
     override def receive: Receive = handleDelete orElse super.receive
-    private def handleDelete: Receive = { case ValidatedCommandWithMeta(_, _, _: ValidatedCommand.DeleteOrderBook) => context.stop(self) }
+    private def handleDelete: Receive = { case ApplyValidatedCommandWithPair(_, _, _: ValidatedCommand.DeleteOrderBook) => context.stop(self) }
   }
 
   private def emptySnapshotStoreActor(implicit actorSystem: ActorSystem): ActorRef = {

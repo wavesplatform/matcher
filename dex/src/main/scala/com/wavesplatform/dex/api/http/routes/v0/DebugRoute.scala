@@ -219,7 +219,7 @@ final class DebugRoute(
 
   @Path("/debug/address/{address}/check#checkAddress")
   @ApiOperation(
-    value = "Check that address has access to websocket & blockchain and has zero fee. Requires API Key",
+    value = "Check that address has access to websocket & blockchain and has zero fee",
     httpMethod = "GET",
     tags = Array("debug"),
     response = classOf[HttpAddressCheck]

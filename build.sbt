@@ -4,7 +4,7 @@ import sbt.Keys._
 import sbt._
 import sbt.internal.inc.ReflectUtilities
 
-// Scalafix  
+// Scalafix   
 ThisBuild / scalafixDependencies ++= List(
   "org.scalatest" %% "autofix" % "3.1.0.0",
   "org.scala-lang.modules" %% "scala-collection-migrations" % "2.1.4"

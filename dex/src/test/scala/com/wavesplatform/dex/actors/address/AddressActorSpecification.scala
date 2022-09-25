@@ -20,11 +20,11 @@ import com.wavesplatform.dex.domain.crypto.Proofs
 import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV1}
 import com.wavesplatform.dex.domain.state.{LeaseBalance, Portfolio}
 import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV3
-import com.wavesplatform.dex.error.{MatcherError, OrderDuplicate, UnexpectedError}
+import com.wavesplatform.dex.error.{MatcherError, OrderDuplicate, OrderFull}
 import com.wavesplatform.dex.grpc.integration.clients.domain.AddressBalanceUpdates
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderAddedReason, OrderCancelFailed, OrderExecuted}
-import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder, MarketOrder, OrderValidator}
+import com.wavesplatform.dex.model.{AcceptedOrder, AcceptedOrderType, LimitOrder, MarketOrder, OrderInfo, OrderStatus, OrderValidator}
 import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithMeta}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import org.scalatest.concurrent.Eventually
@@ -32,6 +32,7 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 import org.scalatest.{BeforeAndAfterAll, EitherValues}
 
+import java.math.BigInteger
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.Future
@@ -64,6 +65,20 @@ class AddressActorSpecification
     timestamp = System.currentTimeMillis(),
     expiration = System.currentTimeMillis() + 5.days.toMillis,
     matcherFee = matcherFee
+  )
+
+  private val sellTokenOrder1Info = OrderInfo.v6(
+    sellTokenOrder1.orderType,
+    sellTokenOrder1.amount,
+    sellTokenOrder1.price,
+    sellTokenOrder1.matcherFee,
+    sellTokenOrder1.feeAsset,
+    sellTokenOrder1.timestamp,
+    OrderStatus.Filled(sellTokenOrder1.amount, sellTokenOrder1.amount),
+    sellTokenOrder1.assetPair,
+    AcceptedOrderType.Limit,
+    sellTokenOrder1.version,
+    BigInteger.valueOf(1L)
   )
 
   private val sellToken1Portfolio = requiredPortfolio(sellTokenOrder1)
@@ -368,25 +383,33 @@ class AddressActorSpecification
           )
           ref.tell(msg, probe.ref)
           commandsProbe.expectMsg(ValidatedCommand.PlaceOrder(lo))
-          ref ! OrderCancelFailed(sellTokenOrder1.id(), UnexpectedError, None)
-          probe.expectMsg[MatcherError](UnexpectedError)
+          orderDb.saveOrderInfo(sellTokenOrder1.id(), sellTokenOrder1.sender, sellTokenOrder1Info).futureValue
+          ref ! OrderCancelFailed(sellTokenOrder1.id(), None)
+          probe.expectMsgType[OrderFull]
         },
         orderDb
       )
     }
 
-    "forward OrderCancelFailed (owner is non empty) to AddressActor" in test { (ref, commandsProbe, _, updatePortfolio) =>
-      updatePortfolio(sellToken1Portfolio)
-      val lo = LimitOrder(sellTokenOrder1, None, None)
-      val probe = TestProbe()
-      val msg = AddressDirectoryActor.Command.ForwardMessage(
-        testAddress,
-        AddressActor.Command.PlaceOrder(OrderValidator.ValidatedOrder(lo.order, None, None), lo.isMarket)
+    "forward OrderCancelFailed (owner is non empty) to AddressActor" in {
+      val orderDb = TestOrderDb(100)
+      test(
+        { (ref, commandsProbe, _, updatePortfolio) =>
+          updatePortfolio(sellToken1Portfolio)
+          val lo = LimitOrder(sellTokenOrder1, None, None)
+          val probe = TestProbe()
+          val msg = AddressDirectoryActor.Command.ForwardMessage(
+            testAddress,
+            AddressActor.Command.PlaceOrder(OrderValidator.ValidatedOrder(lo.order, None, None), lo.isMarket)
+          )
+          ref.tell(msg, probe.ref)
+          commandsProbe.expectMsg(ValidatedCommand.PlaceOrder(lo))
+          orderDb.saveOrderInfo(sellTokenOrder1.id(), sellTokenOrder1.sender, sellTokenOrder1Info).futureValue
+          ref ! OrderCancelFailed(sellTokenOrder1.id(), Some(sellTokenOrder1.sender.toAddress))
+          probe.expectMsgType[OrderFull]
+        },
+        orderDb
       )
-      ref.tell(msg, probe.ref)
-      commandsProbe.expectMsg(ValidatedCommand.PlaceOrder(lo))
-      ref ! OrderCancelFailed(sellTokenOrder1.id(), UnexpectedError, Some(sellTokenOrder1.sender.toAddress))
-      probe.expectMsg[MatcherError](UnexpectedError)
     }
 
     "Bug DEX-1435" in {

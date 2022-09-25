@@ -213,7 +213,7 @@ class OrderBookActor(
       case _ =>
         log.warn(s"Can't apply $command: order not found")
         eventsCoordinatorRef ! OrderEventsCoordinatorActor.Command.ProcessError(
-          OrderCancelFailed(cancelCommand.orderId, error.OrderNotFound(cancelCommand.orderId), cancelCommand.maybeOwner)
+          OrderCancelFailed(cancelCommand.orderId, cancelCommand.maybeOwner)
         )
     }
   }

@@ -280,13 +280,26 @@ class AddressActor(
 
     case command: Command.MarkTxsObserved => markTxsObserved(command.txsWithSpending)
 
-    case command @ OrderCancelFailed(id, reason, _) =>
+    case command @ OrderCancelFailed(id, _) =>
       if (isWorking) {
         pendingCommands.remove(id) match {
           case None => // Ok on secondary matcher
           case Some(pc) =>
-            log.trace(s"$command, sending a response to a client")
-            pc.client ! reason
+            orderDb.status(id).map {
+              case OrderStatus.NotFound =>
+                error.OrderNotFound(id)
+              case _: OrderStatus.Cancelled =>
+                error.OrderCanceled(id)
+              case _: OrderStatus.Filled =>
+                error.OrderFull(id)
+            }.onComplete {
+              case Success(me) =>
+                log.trace(s"$command, sending $me to a client")
+                pc.client ! me
+              case Failure(th) =>
+                log.error("error while retrieving order status", th)
+                pc.client ! UnexpectedError
+            }
         }
         processingOrders.remove(id)
       }

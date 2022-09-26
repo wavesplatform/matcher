@@ -1,6 +1,5 @@
 package com.wavesplatform.dex.model
 
-import java.math.{BigDecimal, BigInteger, RoundingMode}
 import cats.instances.long.catsKernelStdGroupForLong
 import cats.syntax.group._
 import com.wavesplatform.dex.domain.account.Address
@@ -8,11 +7,12 @@ import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.model.Price
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
-import com.wavesplatform.dex.error
 import com.wavesplatform.dex.fp.MapImplicits.cleaningGroup
 import com.wavesplatform.dex.model.AcceptedOrder.FillingInfo
 import com.wavesplatform.dex.model.Events.OrderCanceledReason
 import com.wavesplatform.dex.queue.ValidatedCommandWithMeta
+
+import java.math.{BigDecimal, BigInteger, RoundingMode}
 
 object MatcherModel {
 
@@ -567,7 +567,7 @@ object Events {
 
   case object NotTracked extends EventReason with OrderAddedReason with OrderCanceledReason
 
-  case class OrderCancelFailed(id: Order.Id, reason: error.MatcherError, maybeOwner: Option[Address])
+  case class OrderCancelFailed(id: Order.Id, maybeOwner: Option[Address])
 
   case class OrderCancelFailedFinalized(orderCancelFailed: OrderCancelFailed, owner: Address)
 

@@ -6,6 +6,7 @@ import akka.{testkit => classic}
 import cats.data.NonEmptyList
 import cats.syntax.option._
 import com.softwaremill.diffx.{Derived, Diff}
+import com.wavesplatform.dex.MatcherSpecBase
 import com.wavesplatform.dex.actors.address.AddressActor.Command.ObservedTxData
 import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
 import com.wavesplatform.dex.actors.tx.ExchangeTransactionBroadcastActor
@@ -23,7 +24,6 @@ import com.wavesplatform.dex.grpc.integration.clients.domain.{AddressBalanceUpda
 import com.wavesplatform.dex.grpc.integration.protobuf.DexToPbConversions._
 import com.wavesplatform.dex.model.Events.ExchangeTransactionCreated
 import com.wavesplatform.dex.model.{AcceptedOrder, Events, LimitOrder}
-import com.wavesplatform.dex.{error, MatcherSpecBase}
 import com.wavesplatform.events.protobuf.StateUpdate
 import com.wavesplatform.protobuf.transaction.{SignedTransaction, Transaction}
 import org.scalatest.OptionValues
@@ -219,7 +219,7 @@ class OrderEventsCoordinatorActorSpec
 
     "ProcessError - passes" in {
       val orderId = ByteStr("order-id".getBytes(StandardCharsets.UTF_8))
-      val event = Events.OrderCancelFailed(orderId, error.UnexpectedError, None)
+      val event = Events.OrderCancelFailed(orderId, None)
       passToAddressDirectoryTest(OrderEventsCoordinatorActor.Command.ProcessError(event), event)
     }
 

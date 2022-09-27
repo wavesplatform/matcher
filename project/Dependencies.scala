@@ -128,7 +128,8 @@ object Dependencies {
   private val wavesJ = "com.wavesplatform" % "wavesj" % Version.wavesJ excludeAll (
     // Conflicts with specified gRPC. This is the problem for waves-integration-it.
     // Also, wavesj doesn't use gRPC, so it is safe.
-    ExclusionRule(organization = "io.grpc")
+    ExclusionRule(organization = "io.grpc"),
+    ExclusionRule(organization = "com.wavesplatform", name = "protobuf-schemas")
   )
 
   private val web3jCore = "org.web3j" % "core" % Version.web3jCore

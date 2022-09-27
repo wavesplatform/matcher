@@ -383,7 +383,7 @@ class AddressActorSpecification
           )
           ref.tell(msg, probe.ref)
           commandsProbe.expectMsg(ValidatedCommand.PlaceOrder(lo))
-          orderDb.saveOrderInfo(sellTokenOrder1.id(), sellTokenOrder1.sender, sellTokenOrder1Info).futureValue
+          orderDb.saveOrderInfo(sellTokenOrder1.id(), sellTokenOrder1Info).futureValue
           ref ! OrderCancelFailed(sellTokenOrder1.id(), None)
           probe.expectMsgType[OrderFull]
         },
@@ -404,7 +404,7 @@ class AddressActorSpecification
           )
           ref.tell(msg, probe.ref)
           commandsProbe.expectMsg(ValidatedCommand.PlaceOrder(lo))
-          orderDb.saveOrderInfo(sellTokenOrder1.id(), sellTokenOrder1.sender, sellTokenOrder1Info).futureValue
+          orderDb.saveOrderInfo(sellTokenOrder1.id(), sellTokenOrder1Info).futureValue
           ref ! OrderCancelFailed(sellTokenOrder1.id(), Some(sellTokenOrder1.sender.toAddress))
           probe.expectMsgType[OrderFull]
         },

@@ -95,7 +95,13 @@ object OrderDb {
           for {
             offset <- 0 until math.min(seqNr, settings.maxOrders)
             id <- ro.get(key(seqNr - offset))
-            oi <- ro.get(DbKeys.orderInfoForHistory(owner, id))
+            oi <- {
+              val k = DbKeys.orderInfoForHistory(owner, id)
+              if (ro.has(k))
+                ro.get(k)
+              else
+                ro.get(DbKeys.orderInfo(id)) //for backward compat
+            }
           } yield id -> oi
         }
       }(ec).map(_.sorted(orderInfoOrdering))(ec)

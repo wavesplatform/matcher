@@ -27,7 +27,7 @@ trait OrderDb[F[_]] {
 }
 
 object OrderDb {
-  case class Settings(maxOrders: Int)
+  case class Settings(maxOrders: Int, parallelism: Int)
 
   def levelDb(settings: Settings, db: DB): OrderDb[Future] =
     levelDb(settings, db, Map(0 -> ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(1))))

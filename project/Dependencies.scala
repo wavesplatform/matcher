@@ -40,7 +40,7 @@ object Dependencies {
     val kamon = "2.5.4"
 
     val wavesProtobufSchemas = "1.4.3"
-    val wavesJ = "1.4.2"
+    val wavesJ = "1.4.3"
 
     val postgresql = "42.2.23"
     val quillJdbc = "3.8.0"

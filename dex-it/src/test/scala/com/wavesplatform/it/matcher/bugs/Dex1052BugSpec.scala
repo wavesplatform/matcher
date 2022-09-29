@@ -61,6 +61,7 @@ class Dex1052BugSpec extends MatcherSuiteBase {
     }
 
     wavesNode1.api.waitForHeightArise()
+    Thread.sleep(1000L)
     dex1.api.getTradableBalanceByAssetPairAndAddress(bob, wavesUsdPair).get(usd) should matchTo(transferAmount.some)
   }
 

@@ -58,18 +58,18 @@ import com.wavesplatform.dex.tool.{KamonTraceUtils, WaitOffsetTool}
 import kamon.Kamon
 import kamon.instrumentation.executor.ExecutorInstrumentation
 import monix.execution.ExecutionModel
-import mouse.any.anySyntaxMouse
 import org.slf4j.LoggerFactory
 import pureconfig.ConfigSource
 
 import java.io.File
 import java.security.Security
-import java.util.concurrent.{Executors, ThreadLocalRandom, TimeUnit}
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.{blocking, Await, ExecutionContext, ExecutionContextExecutorService, Future, Promise}
+import java.util.concurrent.{Executors, ThreadLocalRandom, TimeUnit}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
+import scala.concurrent._
 import scala.jdk.CollectionConverters._
+import scala.util.chaining._
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
@@ -80,6 +80,11 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   private val levelDbCommonEc = mkLevelDbEc("leveldb-common-ec")
   private val levelDbSnapshotsEc = mkLevelDbEc("leveldb-snapshots-ec")
   private val levelDbRatesEc = mkLevelDbEc("leveldb-rates-ec")
+
+  private val levelDbEcMap =
+    (0 until settings.orderDb.parallelism).map { i =>
+      i -> mkLevelDbEc(s"leveldb-map-ec-$i")
+    }.toMap
 
   private val cs = CoordinatedShutdown(actorSystem)
 
@@ -95,7 +100,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   private val apiKeyHashes: List[Array[Byte]] = settings.restApi.apiKeyHashes filter (_.nonEmpty) map Base58.decode
   private val processConsumedTimeout = new Timeout(settings.processConsumedTimeout * 2)
 
-  private val matcherKeyPair = AccountStorage.load(settings.accountStorage).map(_.keyPair).explicitGet().unsafeTap { x =>
+  private val matcherKeyPair = AccountStorage.load(settings.accountStorage).map(_.keyPair).explicitGet().tap { x =>
     log.info(s"The DEX's public key: ${Base58.encode(x.publicKey.arr)}, account address: ${x.publicKey.toAddress.stringRepr}")
   }
 
@@ -122,7 +127,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   cs.addTask(CoordinatedShutdown.PhaseActorSystemTerminate, "DB") { () =>
     Future {
       blocking {
-        val levelDbEcs = List(levelDbCommonEc, levelDbRatesEc, levelDbSnapshotsEc)
+        val levelDbEcs = List(levelDbCommonEc, levelDbRatesEc, levelDbSnapshotsEc) ++ levelDbEcMap.values
         levelDbEcs.foreach { ec =>
           ec.shutdown()
           ec.awaitTermination(60, TimeUnit.SECONDS)
@@ -135,7 +140,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
   private val assetPairsDb = AssetPairsDb.levelDb(commonLevelDb)
   private val orderBookSnapshotDb = OrderBookSnapshotDb.levelDb(snapshotsLevelDb)
-  private val orderDb = OrderDb.levelDb(settings.orderDb, commonLevelDb)
+  private val orderDb = OrderDb.levelDb(settings.orderDb, db, levelDbEcMap)
 
   private val assetsCache = AssetsCache.from(AssetsDb.levelDb(commonLevelDb))
 
@@ -209,8 +214,10 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   private val orderFeeSettingsCache =
     new OrderFeeSettingsCache(settings.orderFee.view.mapValues(_(pairBuilder.quickValidateAssetPair(_).isRight)).toMap)
 
+  private val exchangeTxStorage = ExchangeTxStorage.levelDB(commonLevelDb)
+
   private val txWriterRef =
-    actorSystem.actorOf(WriteExchangeTransactionActor.props(ExchangeTxStorage.levelDB(commonLevelDb)), WriteExchangeTransactionActor.name)
+    actorSystem.actorOf(WriteExchangeTransactionActor.props(exchangeTxStorage), WriteExchangeTransactionActor.name)
 
   private val wavesNetTxBroadcasterRef = actorSystem.spawn(
     ExchangeTransactionBroadcastActor(
@@ -409,7 +416,8 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       apiKeyHashes = apiKeyHashes
     )
 
-  private val transactionsRoute = new TransactionsRoute(matcherStatus = () => status, orderDb = orderDb, apiKeyHashes = apiKeyHashes)
+  private val transactionsRoute =
+    new TransactionsRoute(matcherStatus = () => status, exchangeTxStorage = exchangeTxStorage, apiKeyHashes = apiKeyHashes)
 
   private val debugRoute = new DebugRoute(
     responseTimeout = settings.actorResponseTimeout,

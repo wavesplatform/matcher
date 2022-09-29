@@ -7,7 +7,6 @@ import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.Route
 import akka.testkit.{TestActor, TestProbe}
-import cats.instances.future._
 import cats.syntax.either._
 import cats.syntax.option._
 import com.google.common.primitives.Longs
@@ -1347,7 +1346,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
   ): U = {
     val rateCache = maybeRateCache.getOrElse(RateCache(TestRateDb()).futureValue)
 
-    val odb = OrderDb.levelDb(settings.orderDb, asyncLevelDb)
+    val odb = OrderDb.levelDb(settings.orderDb, db)
     odb.saveOrder(orderToCancel).futureValue
 
     val apdb = AssetPairsDb.levelDb(asyncLevelDb)
@@ -1574,7 +1573,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       () => MatcherStatus.Working,
       apiKeys map crypto.secureHash
     )
-    val transactionsRoute = new TransactionsRoute(() => MatcherStatus.Working, odb, apiKeys map crypto.secureHash)
+    val transactionsRoute = new TransactionsRoute(() => MatcherStatus.Working, exchangeTxStorage, apiKeys map crypto.secureHash)
     val debugRoute = new DebugRoute(
       settings.actorResponseTimeout,
       ConfigFactory.load().atKey("waves.dex"),

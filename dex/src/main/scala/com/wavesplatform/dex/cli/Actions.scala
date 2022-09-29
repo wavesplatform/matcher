@@ -6,10 +6,9 @@ import cats.syntax.option._
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
 import com.wavesplatform.dex.app.{forceStopApplication, MatcherStateCheckingFailedError}
 import com.wavesplatform.dex.cli.WavesDexCli.Args
-import com.wavesplatform.dex.db.{AccountStorage, AssetPairsDb, AssetsDb, DbKeys, OrderBookSnapshotDb, OrderDb}
 import com.wavesplatform.dex.db.leveldb.{openDb, LevelDb}
+import com.wavesplatform.dex.db._
 import com.wavesplatform.dex.doc.MatcherErrorDoc
-import com.wavesplatform.dex.{cli, domain}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -19,20 +18,22 @@ import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.{AssetPairBuilder, OrderBookSideSnapshot}
 import com.wavesplatform.dex.settings.MatcherSettings
-import com.wavesplatform.dex.tool.{Checker, ComparisonTool, ConfigChecker, PrettyPrinter}
 import com.wavesplatform.dex.tool.connectors.SuperConnector
+import com.wavesplatform.dex.tool.{Checker, ComparisonTool, ConfigChecker, PrettyPrinter}
+import com.wavesplatform.dex.{cli, domain}
 import monix.eval.Task
-import monix.execution.{ExecutionModel, Scheduler}
 import monix.execution.schedulers.SchedulerService
+import monix.execution.{ExecutionModel, Scheduler}
+import org.iq80.leveldb.DB
 import sttp.client3._
 
 import java.io.PrintWriter
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
-import java.util.{Base64, Scanner}
 import java.util.concurrent.atomic.AtomicLong
-import scala.concurrent.{Await, TimeoutException}
+import java.util.{Base64, Scanner}
 import scala.concurrent.duration._
+import scala.concurrent.{Await, TimeoutException}
 import scala.util.{Failure, Success, Try, Using}
 
 object Actions {
@@ -523,13 +524,16 @@ object Actions {
            |""".stripMargin
       )
       oid <- ByteStr.decodeBase58(args.orderId).toEither
-    } yield withLevelDb(matcherSettings.dataDirectory) { db =>
+    } yield withDb(matcherSettings.dataDirectory) { db =>
       println("Getting an order...")
-      val orderDb = OrderDb.levelDb(matcherSettings.orderDb, db)
-      val order = orderDb.get(oid)
+      val orderDb = OrderDb.levelDb(
+        matcherSettings.orderDb,
+        db
+      )
+      val order = Await.result(orderDb.get(oid), 60.seconds)
       println(order.fold("  not found")(_.jsonStr))
       println("Getting an order info...")
-      val orderInfo = orderDb.getOrderInfo(oid)
+      val orderInfo = Await.result(orderDb.getOrderInfo(oid), 60.seconds)
       println(orderInfo.fold("  not found")(_.toString))
     }
 
@@ -576,6 +580,9 @@ object Actions {
     Using.resource(openDb(dataDirectory)) { db =>
       f(LevelDb.sync(db))
     }
+
+  private def withDb[T](dataDirectory: String)(f: DB => T): T =
+    f(openDb(dataDirectory))
 
   private def sendRequest(url: String, apiKey: String, method: String = "get"): String = {
     print(s"Sending ${method.toUpperCase} $url... Response: ")

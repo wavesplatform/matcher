@@ -1,6 +1,5 @@
 package com.wavesplatform.dex.model
 
-import cats.instances.future._
 import com.wavesplatform.dex.db.{OrderDb, WithDb}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -12,7 +11,6 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 import scala.concurrent.Future
-import scala.concurrent.ExecutionContext.Implicits.global
 
 class OrderDbSpec extends AnyFreeSpec with Matchers with WithDb with MatcherSpecBase with PropertyChecks with NoShrink {
   import OrderDbSpec._
@@ -36,7 +34,7 @@ class OrderDbSpec extends AnyFreeSpec with Matchers with WithDb with MatcherSpec
     result <- finalizedOrderInfoGen(o)
   } yield result
 
-  private def test(f: OrderDb[Future] => Any): Any = f(OrderDb.levelDb(matcherSettings.orderDb, asyncLevelDb))
+  private def test(f: OrderDb[Future] => Any): Any = f(OrderDb.levelDb(matcherSettings.orderDb, db))
 
   "Default OrderDB implementation" - {
     "stores" - {
@@ -50,7 +48,7 @@ class OrderDbSpec extends AnyFreeSpec with Matchers with WithDb with MatcherSpec
       "order info for terminated orders" in test { odb =>
         forAll(finalizedOrderInfoGen) {
           case (o, oi) =>
-            odb.saveOrderInfo(o.id(), o.sender, oi).futureValue
+            odb.saveOrderInfo(o.id(), oi).futureValue
             odb.containsInfo(o.id()).futureValue shouldBe true
             odb.status(o.id()).futureValue shouldBe oi.status
         }
@@ -73,8 +71,8 @@ class OrderDbSpec extends AnyFreeSpec with Matchers with WithDb with MatcherSpec
 
       forAll(dualFinalizedOrderInfoGen) {
         case (o, oi1, oi2) =>
-          odb.saveOrderInfo(o.id(), o.sender, oi1).futureValue
-          odb.saveOrderInfo(o.id(), o.sender, oi2).futureValue
+          odb.saveOrderInfo(o.id(), oi1).futureValue
+          odb.saveOrderInfo(o.id(), oi2).futureValue
 
           odb.status(o.id()).futureValue shouldBe oi1.status
       }
@@ -85,7 +83,8 @@ class OrderDbSpec extends AnyFreeSpec with Matchers with WithDb with MatcherSpec
         case (sender, pair, orders) =>
           for ((o, i) <- orders) {
             odb.saveOrder(o).futureValue
-            odb.saveOrderInfo(o.id(), o.sender, i).futureValue
+            odb.saveOrderInfo(o.id(), i).futureValue
+            odb.saveOrderInfoForHistory(o.id(), o.sender, i).futureValue
           }
 
           val tuples = odb.getFinalizedOrders(sender, Some(pair)).futureValue
@@ -95,14 +94,15 @@ class OrderDbSpec extends AnyFreeSpec with Matchers with WithDb with MatcherSpec
 
     "does not load more orders than limit" in {
       val settings = matcherSettings.orderDb.copy(maxOrders = 30)
-      val odb = OrderDb.levelDb(settings, asyncLevelDb)
+      val odb = OrderDb.levelDb(settings, db)
       val paramGen = finalizedOrderSeqGen(40)
 
       forAll(paramGen) {
         case (sender, pair, finalized) =>
           for ((o, i) <- finalized) {
             odb.saveOrder(o).futureValue
-            odb.saveOrderInfo(o.id(), o.sender, i).futureValue
+            odb.saveOrderInfo(o.id(), i).futureValue
+            odb.saveOrderInfoForHistory(o.id(), o.sender, i).futureValue
           }
 
           val loadedOrders = odb.getFinalizedOrders(sender, Some(pair)).futureValue

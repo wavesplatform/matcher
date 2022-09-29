@@ -35,11 +35,11 @@ object OrderDb {
   def levelDb(settings: Settings, db: DB, levelDbEcMap: Map[Int, ExecutionContextExecutorService]): OrderDb[Future] = new OrderDb[Future] {
 
     override def containsInfo(id: Order.Id): Future[Boolean] = Future {
-      db.readOnly(_.has(DbKeys.orderInfo(id)))
+      db.has(DbKeys.orderInfo(id))
     }(getEcByOrderId(id))
 
     override def status(id: Order.Id): Future[OrderStatus.Final] = Future {
-      db.readOnly(ro => ro.get(DbKeys.orderInfo(id)).fold[OrderStatus.Final](OrderStatus.NotFound)(_.status))
+      db.get(DbKeys.orderInfo(id)).fold[OrderStatus.Final](OrderStatus.NotFound)(_.status)
     }(getEcByOrderId(id))
 
     override def saveOrder(o: Order): Future[Unit] = Future {
@@ -51,7 +51,7 @@ object OrderDb {
     }(getEcByOrderId(o.id()))
 
     override def get(id: Order.Id): Future[Option[Order]] = Future {
-      db.readOnly(_.get(DbKeys.order(id)))
+      db.get(DbKeys.order(id))
     }(getEcByOrderId(id))
 
     override def saveOrderInfo(id: Order.Id, oi: FinalOrderInfo): Future[Unit] = Future {
@@ -108,7 +108,7 @@ object OrderDb {
     }
 
     override def getOrderInfo(id: Order.Id): Future[Option[FinalOrderInfo]] = Future {
-      db.readOnly(_.get(DbKeys.orderInfo(id)))
+      db.get(DbKeys.orderInfo(id))
     }(getEcByOrderId(id))
 
     //0x7FFFFFFF "hack" is taken from java.util.Hashtable in order to deal with negative hash codes

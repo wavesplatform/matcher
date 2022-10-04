@@ -10,9 +10,20 @@ trait AssetsDb[F[_]] extends AssetsReadOnlyDb[F] {
 
 object AssetsDb {
 
+  private val cls = "AssetsDb"
+
   def levelDb[F[_]](levelDb: LevelDb[F]): AssetsDb[F] = new AssetsDb[F] {
-    override def put(asset: IssuedAsset, record: BriefAssetDescription): F[Unit] = levelDb.put(DbKeys.asset(asset), Some(record))
-    override def get(asset: IssuedAsset): F[Option[BriefAssetDescription]] = levelDb.get(DbKeys.asset(asset))
+
+    override def put(asset: IssuedAsset, record: BriefAssetDescription): F[Unit] =
+      measureDb(cls, "put") { () =>
+        levelDb.put(DbKeys.asset(asset), Some(record))
+      }
+
+    override def get(asset: IssuedAsset): F[Option[BriefAssetDescription]] =
+      measureDb(cls, "get") { () =>
+        levelDb.get(DbKeys.asset(asset))
+      }
+
   }
 
 }

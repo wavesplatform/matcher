@@ -94,7 +94,11 @@ object ExchangeTransactionBroadcastActor {
             }
 
           case Command.Tick =>
-            val updatedInProgress = inProgress.view.mapValues(_.decreasedAttempts)
+            //noinspection SortFilter
+            val updatedInProgress = inProgress.view
+              .mapValues(_.decreasedAttempts)
+              .toList
+              .sortBy { case (_, v) => v.tx.timestamp }
               .filter {
                 case (txId, x) =>
                   val valid = x.isValid // This could be in Event.Broadcasted

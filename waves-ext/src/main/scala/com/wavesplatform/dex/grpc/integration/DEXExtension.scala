@@ -31,6 +31,8 @@ class DEXExtension(context: ExtensionContext) extends Extension with ScorexLoggi
     executionModel = ExecutionModel.AlwaysAsyncExecution
   )
 
+  private val broadcastEc = context.actorSystem.dispatchers.lookup("akka.actor.broadcast-dispatcher")
+
   implicit val byteStrValueReader: ValueReader[ByteStr] = (config: Config, path: String) => {
     val str = config.as[String](path)
     decodeBase58(str, config)
@@ -45,7 +47,7 @@ class DEXExtension(context: ExtensionContext) extends Extension with ScorexLoggi
     val lpAccountsFilePath: String = context.settings.config.as[String]("waves.dex.lp-accounts.file-path")
     val lpAccounts: Set[ByteStr] = lpAccountsFromPath(lpAccountsFilePath, context.settings.config)
 
-    apiService = new WavesBlockchainApiGrpcService(context, allowedBlockchainStateAccounts, lpAccounts)
+    apiService = new WavesBlockchainApiGrpcService(context, allowedBlockchainStateAccounts, lpAccounts, broadcastEc)
 
     val bindAddress = new InetSocketAddress(host, port)
 

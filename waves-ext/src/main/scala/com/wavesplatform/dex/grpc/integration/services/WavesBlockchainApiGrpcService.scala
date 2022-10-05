@@ -136,7 +136,7 @@ class WavesBlockchainApiGrpcService(
     val maybeTx = request.transaction
       .fold(GenericError("The signed transaction must be specified").asLeft[SignedExchangeTransaction])(_.asRight[GenericError])
       .flatMap(_.toVanilla)
-    log.info(s"Broadcasting (1) ${maybeTx.toOption.map(_.id()).getOrElse("*")}")
+    log.info(s"Broadcasting (1) ${maybeTx.map(_.id().toString).getOrElse("*")}")
 
     Future {
       for {

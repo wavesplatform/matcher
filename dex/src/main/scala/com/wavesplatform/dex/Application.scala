@@ -81,8 +81,6 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
   private val levelDbSnapshotsEc = mkLevelDbEc("leveldb-snapshots-ec")
   private val levelDbRatesEc = mkLevelDbEc("leveldb-rates-ec")
 
-  private implicit val onComplete: OnComplete[Future] = OnComplete.deriveOnCompleteForFuture(levelDbCommonEc)
-
   private val levelDbEcMap =
     (0 until settings.orderDb.parallelism).map { i =>
       i -> mkLevelDbEc(s"leveldb-map-ec-$i")

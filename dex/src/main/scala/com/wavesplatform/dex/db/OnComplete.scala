@@ -15,10 +15,10 @@ object OnComplete {
 
   def apply[F[_]: OnComplete[*[_]]]: OnComplete[F] = implicitly
 
-  implicit def deriveOnCompleteForFuture(implicit ec: ExecutionContext): OnComplete[Future] = new OnComplete[Future] {
+  implicit val deriveOnCompleteForFuture: OnComplete[Future] = new OnComplete[Future] {
 
     override def onComplete[A, B](fa: Future[A])(f: Try[A] => B): Unit =
-      fa.onComplete(f)
+      fa.onComplete(f)(ExecutionContext.parasitic)
 
   }
 

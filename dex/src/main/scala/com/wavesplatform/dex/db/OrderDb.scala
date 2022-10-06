@@ -40,21 +40,21 @@ object OrderDb {
   ): OrderDb[Future] = new OrderDb[Future] {
 
     override def containsInfo(id: Order.Id): Future[Boolean] =
-      measureDb(cls, "containsInfo") { () =>
+      measureDb(cls, "containsInfo") {
         Future {
           db.has(DbKeys.orderInfo(id))
         }(getEcByOrderId(id))
       }
 
     override def status(id: Order.Id): Future[OrderStatus.Final] =
-      measureDb(cls, "status") { () =>
+      measureDb(cls, "status") {
         Future {
           db.get(DbKeys.orderInfo(id)).fold[OrderStatus.Final](OrderStatus.NotFound)(_.status)
         }(getEcByOrderId(id))
       }
 
     override def saveOrder(o: Order): Future[Unit] =
-      measureDb(cls, "saveOrder") { () =>
+      measureDb(cls, "saveOrder") {
         Future {
           db.readWrite { rw =>
             val k = DbKeys.order(o.id())
@@ -65,14 +65,14 @@ object OrderDb {
       }
 
     override def get(id: Order.Id): Future[Option[Order]] =
-      measureDb(cls, "get") { () =>
+      measureDb(cls, "get") {
         Future {
           db.get(DbKeys.order(id))
         }(getEcByOrderId(id))
       }
 
     override def saveOrderInfo(id: Order.Id, oi: FinalOrderInfo): Future[Unit] =
-      measureDb(cls, "saveOrderInfo") { () =>
+      measureDb(cls, "saveOrderInfo") {
         Future {
           val orderInfoKey = DbKeys.orderInfo(id)
           db.readWrite { rw =>
@@ -83,7 +83,7 @@ object OrderDb {
       }
 
     override def saveOrderInfoForHistory(id: Order.Id, sender: Address, oi: OrderInfo[OrderStatus.Final]): Future[Unit] =
-      measureDb(cls, "saveOrderInfoForHistory") { () =>
+      measureDb(cls, "saveOrderInfoForHistory") {
         Future {
           val orderInfoKey = DbKeys.orderInfoForHistory(sender, id)
           db.readWrite { rw =>
@@ -104,7 +104,7 @@ object OrderDb {
       }
 
     override def getFinalizedOrders(owner: Address, maybePair: Option[AssetPair]): Future[Seq[(Order.Id, OrderInfo[OrderStatus])]] =
-      measureDb(cls, "getFinalizedOrders") { () =>
+      measureDb(cls, "getFinalizedOrders") {
         val ec = getEcBySender(owner)
         Future {
           db.readOnly { ro =>
@@ -132,7 +132,7 @@ object OrderDb {
       }
 
     override def getOrderInfo(id: Order.Id): Future[Option[FinalOrderInfo]] =
-      measureDb(cls, "getOrderInfo") { () =>
+      measureDb(cls, "getOrderInfo") {
         Future {
           db.get(DbKeys.orderInfo(id))
         }(getEcByOrderId(id))

@@ -17,7 +17,7 @@ object ExchangeTxStorage {
   def levelDB[F[_]: OnComplete](db: LevelDb[F]): ExchangeTxStorage[F] = new ExchangeTxStorage[F] {
 
     override def put(tx: ExchangeTransaction): F[Unit] =
-      measureDb(cls, "put") { () =>
+      measureDb(cls, "put") {
         db.readWrite { rw =>
           val txKey = DbKeys.exchangeTransaction(tx.id())
           if (!rw.has(txKey)) {
@@ -29,7 +29,7 @@ object ExchangeTxStorage {
       }
 
     override def transactionsByOrder(orderId: Order.Id): F[Seq[ExchangeTransaction]] =
-      measureDb(cls, "transactionsByOrder") { () =>
+      measureDb(cls, "transactionsByOrder") {
         db.readOnly { ro =>
           for {
             seqNr <- 1 to ro.get(DbKeys.orderTxIdsSeqNr(orderId))

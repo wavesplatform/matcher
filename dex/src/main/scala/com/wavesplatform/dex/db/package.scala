@@ -7,9 +7,9 @@ package object db {
 
   private val timer = Kamon.timer("matcher.leveldb")
 
-  def measureDb[F[_]: OnComplete, T](cls: String, method: String)(block: () => F[T]): F[T] = {
+  def measureDb[F[_]: OnComplete, T](cls: String, method: String)(block: => F[T]): F[T] = {
     val startedTimer = mkTimer(cls, method).start()
-    val startedBlock = block()
+    val startedBlock = block
     OnComplete[F].onComplete(startedBlock)(_ => startedTimer.stop())
     startedBlock
   }

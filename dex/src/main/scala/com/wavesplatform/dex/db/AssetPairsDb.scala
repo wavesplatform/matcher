@@ -17,17 +17,17 @@ object AssetPairsDb {
   def levelDb[F[_]: OnComplete](levelDb: LevelDb[F]): AssetPairsDb[F] = new AssetPairsDb[F] {
 
     def add(pair: AssetPair): F[Unit] =
-      measureDb(cls, "add") { () =>
+      measureDb(cls, "add") {
         levelDb.put(DbKeys.assetPair(pair), ())
       }
 
     def remove(pair: AssetPair): F[Unit] =
-      measureDb(cls, "remove") { () =>
+      measureDb(cls, "remove") {
         levelDb.delete(DbKeys.assetPair(pair))
       }
 
     def all(): F[Set[AssetPair]] =
-      measureDb(cls, "all") { () =>
+      measureDb(cls, "all") {
         levelDb.readOnly { ro =>
           val r = Set.newBuilder[AssetPair]
 
@@ -40,7 +40,7 @@ object AssetPairsDb {
       }
 
     def contains(pair: AssetPair): F[Boolean] =
-      measureDb(cls, "contains") { () =>
+      measureDb(cls, "contains") {
         levelDb.has(DbKeys.assetPair(pair))
       }
 

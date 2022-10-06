@@ -25,7 +25,7 @@ object OrderBookSnapshotDb {
   def levelDb[F[_]: OnComplete](levelDb: LevelDb[F]): OrderBookSnapshotDb[F] = new OrderBookSnapshotDb[F] {
 
     override def get(assetPair: AssetPair): F[Option[(Offset, OrderBookSnapshot)]] =
-      measureDb(cls, "get") { () =>
+      measureDb(cls, "get") {
         levelDb.readOnly { ro =>
           val (obOffsetKey, obKey) = keys(assetPair)
           (ro.get(obOffsetKey), ro.get(obKey)).tupled
@@ -33,7 +33,7 @@ object OrderBookSnapshotDb {
       }
 
     override def update(assetPair: AssetPair, offset: Offset, newSnapshot: Option[OrderBookSnapshot]): F[Unit] =
-      measureDb(cls, "update") { () =>
+      measureDb(cls, "update") {
         levelDb.readWrite { rw =>
           val (obOffsetKey, obKey) = keys(assetPair)
           rw.put(obOffsetKey, Some(offset))
@@ -42,7 +42,7 @@ object OrderBookSnapshotDb {
       }
 
     override def delete(assetPair: AssetPair): F[Unit] =
-      measureDb(cls, "delete") { () =>
+      measureDb(cls, "delete") {
         levelDb.readWrite { rw =>
           val (obOffsetKey, obKey) = keys(assetPair)
           rw.delete(obOffsetKey)
@@ -51,7 +51,7 @@ object OrderBookSnapshotDb {
       }
 
     def iterateOffsets(pred: AssetPair => Boolean): F[Map[AssetPair, Offset]] =
-      measureDb(cls, "iterateOffsets") { () =>
+      measureDb(cls, "iterateOffsets") {
         levelDb.readOnly { ro =>
           val m = Map.newBuilder[AssetPair, Offset]
           ro.iterateOver(DbKeys.OrderBookSnapshotOffsetPrefix) { entry =>
@@ -64,7 +64,7 @@ object OrderBookSnapshotDb {
       }
 
     def iterateSnapshots(pred: AssetPair => Boolean): F[Map[AssetPair, OrderBookSnapshot]] =
-      measureDb(cls, "iterateSnapshots") { () =>
+      measureDb(cls, "iterateSnapshots") {
         levelDb.readOnly { ro =>
           val m = Map.newBuilder[AssetPair, OrderBookSnapshot]
           ro.iterateOver(DbKeys.OrderBookSnapshotPrefix) { entry =>

@@ -22,12 +22,12 @@ object RateDb {
   def apply[F[_]: OnComplete](levelDb: LevelDb[F]): RateDb[F] = new RateDb[F] {
 
     def upsertRate(asset: IssuedAsset, value: Double): F[Unit] =
-      measureDb(cls, "upsertRate") { () =>
+      measureDb(cls, "upsertRate") {
         levelDb.put(DbKeys.rate(asset), value)
       }
 
     def getAllRates: F[Map[IssuedAsset, Double]] =
-      measureDb(cls, "getAllRates") { () =>
+      measureDb(cls, "getAllRates") {
         levelDb.readOnly { ro =>
           val ratesListBuffer = ListBuffer[(IssuedAsset, Double)]()
           ro.iterateOver(DbKeys.ratePrefix) { dbEntry =>
@@ -40,7 +40,7 @@ object RateDb {
       }
 
     def deleteRate(asset: IssuedAsset): F[Unit] =
-      measureDb(cls, "deleteRate") { () =>
+      measureDb(cls, "deleteRate") {
         levelDb.delete(DbKeys.rate(asset))
       }
 

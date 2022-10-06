@@ -15,12 +15,12 @@ object AssetsDb {
   def levelDb[F[_]: OnComplete](levelDb: LevelDb[F]): AssetsDb[F] = new AssetsDb[F] {
 
     override def put(asset: IssuedAsset, record: BriefAssetDescription): F[Unit] =
-      measureDb(cls, "put") { () =>
+      measureDb(cls, "put") {
         levelDb.put(DbKeys.asset(asset), Some(record))
       }
 
     override def get(asset: IssuedAsset): F[Option[BriefAssetDescription]] =
-      measureDb(cls, "get") { () =>
+      measureDb(cls, "get") {
         levelDb.get(DbKeys.asset(asset))
       }
 

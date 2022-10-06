@@ -20,9 +20,6 @@ trait WithDb extends BeforeAndAfterEach { this: Suite =>
   implicit private val ec: ExecutionContext =
     ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor(new ThreadFactoryBuilder().setDaemon(true).build()))
 
-  implicit protected val onCompleteFuture: OnComplete[Future] = OnComplete.deriveOnCompleteForFuture
-  implicit protected val onCompleteId: OnComplete[Id] = OnComplete.deriveOnCompleteForId
-
   private val path = Files.createTempDirectory("lvl").toAbsolutePath
   private var currentDBInstance: DB = _
 

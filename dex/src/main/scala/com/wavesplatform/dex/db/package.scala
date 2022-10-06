@@ -1,5 +1,6 @@
 package com.wavesplatform.dex
 
+import com.wavesplatform.dex.tool.OnComplete
 import kamon.Kamon
 import kamon.tag.TagSet
 

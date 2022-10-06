@@ -4,6 +4,8 @@ import com.wavesplatform.dex.db.leveldb.{LevelDb, ReadWriteDb}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
+import com.wavesplatform.dex.meta.getSimpleName
+import com.wavesplatform.dex.tool.OnComplete
 
 trait ExchangeTxStorage[F[_]] {
   def put(tx: ExchangeTransaction): F[Unit]
@@ -12,7 +14,7 @@ trait ExchangeTxStorage[F[_]] {
 
 object ExchangeTxStorage {
 
-  private val cls = getClass.getSimpleName.filter(_ != '$')
+  private val cls = getSimpleName(this)
 
   def levelDB[F[_]: OnComplete](db: LevelDb[F]): ExchangeTxStorage[F] = new ExchangeTxStorage[F] {
 

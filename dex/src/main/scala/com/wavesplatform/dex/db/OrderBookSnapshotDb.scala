@@ -5,8 +5,10 @@ import cats.syntax.apply.catsSyntaxTuple2Semigroupal
 import com.google.common.primitives.Longs
 import com.wavesplatform.dex.db.leveldb.{Key, LevelDb}
 import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.meta.getSimpleName
 import com.wavesplatform.dex.model.OrderBookSnapshot
 import com.wavesplatform.dex.queue.ValidatedCommandWithMeta.Offset
+import com.wavesplatform.dex.tool.OnComplete
 
 import java.nio.ByteBuffer
 
@@ -20,7 +22,7 @@ trait OrderBookSnapshotDb[F[_]] {
 
 object OrderBookSnapshotDb {
 
-  private val cls = getClass.getSimpleName.filter(_ != '$')
+  private val cls = getSimpleName(this)
 
   def levelDb[F[_]: OnComplete](levelDb: LevelDb[F]): OrderBookSnapshotDb[F] = new OrderBookSnapshotDb[F] {
 

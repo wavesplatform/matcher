@@ -3,6 +3,8 @@ package com.wavesplatform.dex.db
 import com.wavesplatform.dex.db.leveldb.LevelDb
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.meta.getSimpleName
+import com.wavesplatform.dex.tool.OnComplete
 
 import scala.collection.mutable.ListBuffer
 
@@ -17,7 +19,7 @@ trait RateDb[F[_]] {
 
 object RateDb {
 
-  private val cls = getClass.getSimpleName.filter(_ != '$')
+  private val cls = getSimpleName(this)
 
   def apply[F[_]: OnComplete](levelDb: LevelDb[F]): RateDb[F] = new RateDb[F] {
 

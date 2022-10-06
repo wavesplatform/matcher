@@ -1,4 +1,4 @@
-package com.wavesplatform.dex.db
+package com.wavesplatform.dex.tool
 
 import cats.Id
 
@@ -22,7 +22,7 @@ object OnComplete {
 
   }
 
-  implicit def deriveOnCompleteForId: OnComplete[Id] = new OnComplete[Id] {
+  implicit val deriveOnCompleteForId: OnComplete[Id] = new OnComplete[Id] {
 
     override def onComplete[A, B](fa: Id[A])(f: Try[A] => B): Unit =
       f(Success(fa))

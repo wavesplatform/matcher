@@ -2,6 +2,8 @@ package com.wavesplatform.dex.db
 
 import com.wavesplatform.dex.db.leveldb.LevelDb
 import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.meta.getSimpleName
+import com.wavesplatform.dex.tool.OnComplete
 
 trait AssetPairsDb[F[_]] {
   def add(pair: AssetPair): F[Unit]
@@ -12,7 +14,7 @@ trait AssetPairsDb[F[_]] {
 
 object AssetPairsDb {
 
-  private val cls = getClass.getSimpleName.filter(_ != '$')
+  private val cls = getSimpleName(this)
 
   def levelDb[F[_]: OnComplete](levelDb: LevelDb[F]): AssetPairsDb[F] = new AssetPairsDb[F] {
 

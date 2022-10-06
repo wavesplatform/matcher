@@ -5,8 +5,10 @@ import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.meta.getSimpleName
 import com.wavesplatform.dex.model.OrderInfo.FinalOrderInfo
 import com.wavesplatform.dex.model.{OrderInfo, OrderStatus}
+import com.wavesplatform.dex.tool.OnComplete
 import org.iq80.leveldb.DB
 
 import java.util.concurrent.Executors
@@ -28,7 +30,7 @@ trait OrderDb[F[_]] {
 
 object OrderDb {
 
-  private val cls = getClass.getSimpleName.filter(_ != '$')
+  private val cls = getSimpleName(this)
 
   case class Settings(maxOrders: Int, parallelism: Int)
 

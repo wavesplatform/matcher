@@ -12,9 +12,9 @@ trait ExchangeTxStorage[F[_]] {
 
 object ExchangeTxStorage {
 
-  private val cls = "ExchangeTxStorage"
+  private val cls = getClass.getSimpleName.filter(_ != '$')
 
-  def levelDB[F[_]](db: LevelDb[F]): ExchangeTxStorage[F] = new ExchangeTxStorage[F] {
+  def levelDB[F[_]: OnComplete](db: LevelDb[F]): ExchangeTxStorage[F] = new ExchangeTxStorage[F] {
 
     override def put(tx: ExchangeTransaction): F[Unit] =
       measureDb(cls, "put") { () =>
@@ -28,14 +28,6 @@ object ExchangeTxStorage {
         }
       }
 
-    private def appendTxId(rw: ReadWriteDb, orderId: ByteStr, txId: ByteStr): Unit =
-      measureDb(cls, "appendTxId") { () =>
-        val key = DbKeys.orderTxIdsSeqNr(orderId)
-        val nextSeqNr = rw.get(key) + 1
-        rw.put(key, nextSeqNr)
-        rw.put(DbKeys.orderTxId(orderId, nextSeqNr), txId)
-      }
-
     override def transactionsByOrder(orderId: Order.Id): F[Seq[ExchangeTransaction]] =
       measureDb(cls, "transactionsByOrder") { () =>
         db.readOnly { ro =>
@@ -46,6 +38,13 @@ object ExchangeTxStorage {
           } yield tx
         }
       }
+
+    private def appendTxId(rw: ReadWriteDb, orderId: ByteStr, txId: ByteStr): Unit = {
+      val key = DbKeys.orderTxIdsSeqNr(orderId)
+      val nextSeqNr = rw.get(key) + 1
+      rw.put(key, nextSeqNr)
+      rw.put(DbKeys.orderTxId(orderId, nextSeqNr), txId)
+    }
 
   }
 

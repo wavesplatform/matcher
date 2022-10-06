@@ -28,14 +28,16 @@ trait OrderDb[F[_]] {
 
 object OrderDb {
 
-  private val cls = "OrderDb"
+  private val cls = getClass.getSimpleName.filter(_ != '$')
 
   case class Settings(maxOrders: Int, parallelism: Int)
 
-  def levelDb(settings: Settings, db: DB): OrderDb[Future] =
+  def levelDb(settings: Settings, db: DB)(implicit onComplete: OnComplete[Future]): OrderDb[Future] =
     levelDb(settings, db, Map(0 -> ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(1))))
 
-  def levelDb(settings: Settings, db: DB, levelDbEcMap: Map[Int, ExecutionContextExecutorService]): OrderDb[Future] = new OrderDb[Future] {
+  def levelDb(settings: Settings, db: DB, levelDbEcMap: Map[Int, ExecutionContextExecutorService])(implicit
+    onComplete: OnComplete[Future]
+  ): OrderDb[Future] = new OrderDb[Future] {
 
     override def containsInfo(id: Order.Id): Future[Boolean] =
       measureDb(cls, "containsInfo") { () =>
@@ -44,11 +46,12 @@ object OrderDb {
         }(getEcByOrderId(id))
       }
 
-    override def status(id: Order.Id): Future[OrderStatus.Final] = measureDb(cls, "status") { () =>
-      Future {
-        db.get(DbKeys.orderInfo(id)).fold[OrderStatus.Final](OrderStatus.NotFound)(_.status)
-      }(getEcByOrderId(id))
-    }
+    override def status(id: Order.Id): Future[OrderStatus.Final] =
+      measureDb(cls, "status") { () =>
+        Future {
+          db.get(DbKeys.orderInfo(id)).fold[OrderStatus.Final](OrderStatus.NotFound)(_.status)
+        }(getEcByOrderId(id))
+      }
 
     override def saveOrder(o: Order): Future[Unit] =
       measureDb(cls, "saveOrder") { () =>

@@ -20,9 +20,9 @@ trait OrderBookSnapshotDb[F[_]] {
 
 object OrderBookSnapshotDb {
 
-  private val cls = "OrderBookSnapshotDb"
+  private val cls = getClass.getSimpleName.filter(_ != '$')
 
-  def levelDb[F[_]](levelDb: LevelDb[F]): OrderBookSnapshotDb[F] = new OrderBookSnapshotDb[F] {
+  def levelDb[F[_]: OnComplete](levelDb: LevelDb[F]): OrderBookSnapshotDb[F] = new OrderBookSnapshotDb[F] {
 
     override def get(assetPair: AssetPair): F[Option[(Offset, OrderBookSnapshot)]] =
       measureDb(cls, "get") { () =>

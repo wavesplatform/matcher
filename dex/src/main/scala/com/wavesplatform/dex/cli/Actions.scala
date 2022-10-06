@@ -4,9 +4,9 @@ import cats.Id
 import cats.instances.either._
 import cats.syntax.option._
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
-import com.wavesplatform.dex.app.{forceStopApplication, MatcherStateCheckingFailedError}
+import com.wavesplatform.dex.app.{MatcherStateCheckingFailedError, forceStopApplication}
 import com.wavesplatform.dex.cli.WavesDexCli.Args
-import com.wavesplatform.dex.db.leveldb.{openDb, LevelDb}
+import com.wavesplatform.dex.db.leveldb.{LevelDb, openDb}
 import com.wavesplatform.dex.db._
 import com.wavesplatform.dex.doc.MatcherErrorDoc
 import com.wavesplatform.dex.domain.account.KeyPair
@@ -33,7 +33,7 @@ import java.nio.file.Files
 import java.util.concurrent.atomic.AtomicLong
 import java.util.{Base64, Scanner}
 import scala.concurrent.duration._
-import scala.concurrent.{Await, TimeoutException}
+import scala.concurrent.{Await, Future, TimeoutException}
 import scala.util.{Failure, Success, Try, Using}
 
 object Actions {
@@ -514,7 +514,10 @@ object Actions {
   }
 
   // noinspection ScalaStyle
-  def inspectOrder(args: Args, matcherSettings: MatcherSettings): Unit =
+  def inspectOrder(args: Args, matcherSettings: MatcherSettings): Unit = {
+    import scala.concurrent.ExecutionContext.Implicits.global
+
+    implicit val onComplete: OnComplete[Future] = OnComplete.deriveOnCompleteForFuture
     for {
       _ <- cli.log(
         s"""
@@ -536,6 +539,7 @@ object Actions {
       val orderInfo = Await.result(orderDb.getOrderInfo(oid), 60.seconds)
       println(orderInfo.fold("  not found")(_.toString))
     }
+  }
 
   // noinspection ScalaStyle
   def generateFeeSettings(args: Args): Unit = {

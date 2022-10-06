@@ -12,9 +12,9 @@ trait AssetPairsDb[F[_]] {
 
 object AssetPairsDb {
 
-  private val cls = "AssetPairsDb"
+  private val cls = getClass.getSimpleName.filter(_ != '$')
 
-  def levelDb[F[_]](levelDb: LevelDb[F]): AssetPairsDb[F] = new AssetPairsDb[F] {
+  def levelDb[F[_] : OnComplete](levelDb: LevelDb[F]): AssetPairsDb[F] = new AssetPairsDb[F] {
 
     def add(pair: AssetPair): F[Unit] =
       measureDb(cls, "add") { () =>

@@ -17,9 +17,9 @@ trait RateDb[F[_]] {
 
 object RateDb {
 
-  private val cls = "RateDb"
+  private val cls = getClass.getSimpleName.filter(_ != '$')
 
-  def apply[F[_]](levelDb: LevelDb[F]): RateDb[F] = new RateDb[F] {
+  def apply[F[_]: OnComplete](levelDb: LevelDb[F]): RateDb[F] = new RateDb[F] {
 
     def upsertRate(asset: IssuedAsset, value: Double): F[Unit] =
       measureDb(cls, "upsertRate") { () =>

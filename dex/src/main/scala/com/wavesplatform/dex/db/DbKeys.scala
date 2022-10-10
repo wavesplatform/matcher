@@ -146,7 +146,7 @@ object DbKeys {
       }
     )
 
-  val FeeAssetsPrefix: Short = 27
+  val FeeAssetsPrefix: Short = 28
 
   def customFeeAsset(offset: Long): Key[Option[AssetsActionForOffset]] =
     Key.opt(

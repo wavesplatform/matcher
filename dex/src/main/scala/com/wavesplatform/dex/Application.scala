@@ -73,7 +73,6 @@ import scala.jdk.CollectionConverters._
 import scala.util.chaining._
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
-import scala.util.chaining._
 
 class Application(settings: MatcherSettings, config: Config)(implicit val actorSystem: ActorSystem) extends ScorexLogging {
 

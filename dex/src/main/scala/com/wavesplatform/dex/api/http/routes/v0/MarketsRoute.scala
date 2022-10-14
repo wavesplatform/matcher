@@ -2,7 +2,6 @@ package com.wavesplatform.dex.api.http.routes.v0
 
 import akka.actor.ActorRef
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
-import akka.http.scaladsl.model.headers.`User-Agent`
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.directives.FutureDirectives
 import akka.http.scaladsl.server.{Route, _}
@@ -308,34 +307,32 @@ final class MarketsRoute(
     (pathEndOrSingleSlash & get) {
       (withMetricsAndTraces("getOrderBooks") & protect) {
         extractClientIP { ip =>
-          optionalHeaderValueByType(`User-Agent`) { userAgent =>
-            log.info(s"Retrieving all order books by $ip, $userAgent")
-            complete(
-              (matcher ? GetMarkets).mapTo[List[MarketData]].flatMap { markets =>
-                markets
-                  .map { md =>
-                    getOrderBookRestrictions(md.pair)
-                      .map { meta =>
-                        HttpMarketDataWithMeta(
-                          md.pair.amountAsset,
-                          md.amountAssetName,
-                          md.amountAssetInfo.map(HttpAssetInfo.fromAssetInfo),
-                          md.pair.priceAsset,
-                          md.priceAssetName,
-                          md.priceAssetInfo.map(HttpAssetInfo.fromAssetInfo),
-                          md.created,
-                          meta.restrictions,
-                          meta.matchingRules
-                        )
-                      }
-                      .value
-                  }
-                  .sequence
-                  .map(_.collect { case Right(x) => x })
-                  .map(x => SimpleResponse(HttpTradingMarkets(matcherPublicKey, x)))
-              }
-            )
-          }
+          log.info(s"Retrieving all order books by $ip")
+          complete(
+            (matcher ? GetMarkets).mapTo[List[MarketData]].flatMap { markets =>
+              markets
+                .map { md =>
+                  getOrderBookRestrictions(md.pair)
+                    .map { meta =>
+                      HttpMarketDataWithMeta(
+                        md.pair.amountAsset,
+                        md.amountAssetName,
+                        md.amountAssetInfo.map(HttpAssetInfo.fromAssetInfo),
+                        md.pair.priceAsset,
+                        md.priceAssetName,
+                        md.priceAssetInfo.map(HttpAssetInfo.fromAssetInfo),
+                        md.created,
+                        meta.restrictions,
+                        meta.matchingRules
+                      )
+                    }
+                    .value
+                }
+                .sequence
+                .map(_.collect { case Right(x) => x })
+                .map(x => SimpleResponse(HttpTradingMarkets(matcherPublicKey, x)))
+            }
+          )
         }
       }
     }

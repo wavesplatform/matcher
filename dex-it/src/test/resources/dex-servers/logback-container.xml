@@ -33,6 +33,8 @@
         <appender-ref ref="DETAILED"/>
     </root>
 
+    <logger name="com.wavesplatform.dex.api.http.routes.v0" level="DEBUG"/>
+
     <!-- Networking -->
     <logger name="io.netty" level="INFO" additivity="false">
         <appender-ref ref="DETAILED"/>

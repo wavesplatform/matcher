@@ -2,7 +2,7 @@ package com.wavesplatform.dex.api.http.routes.v0
 
 import akka.actor.ActorRef
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
-import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.model.{AttributeKeys, StatusCodes}
 import akka.http.scaladsl.server.directives.FutureDirectives
 import akka.http.scaladsl.server.{Route, _}
 import akka.pattern.ask
@@ -306,8 +306,8 @@ final class MarketsRoute(
   def getOrderBooks: Route =
     (pathEndOrSingleSlash & get) {
       (withMetricsAndTraces("getOrderBooks") & protect) {
-        extractClientIP { ip =>
-          log.info(s"Retrieving all order books by $ip")
+        attribute(AttributeKeys.remoteAddress) { remoteAddress =>
+          log.info(s"Retrieving all order books by $remoteAddress")
           complete(
             (matcher ? GetMarkets).mapTo[List[MarketData]].flatMap { markets =>
               markets

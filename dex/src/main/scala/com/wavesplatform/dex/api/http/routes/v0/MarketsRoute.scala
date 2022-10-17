@@ -307,7 +307,7 @@ final class MarketsRoute(
     (pathEndOrSingleSlash & get) {
       (withMetricsAndTraces("getOrderBooks") & protect) {
         optionalAttribute(AttributeKeys.remoteAddress) { remoteAddress =>
-          log.info(s"Retrieving all order books ${remoteAddress.fold("")(v => s"by $v")}")
+          log.info(s"Retrieving all order books ${remoteAddress.flatMap(_.toOption.map(_.getHostAddress)).fold("")(v => s"by $v")}")
           complete(
             (matcher ? GetMarkets).mapTo[List[MarketData]].flatMap { markets =>
               markets

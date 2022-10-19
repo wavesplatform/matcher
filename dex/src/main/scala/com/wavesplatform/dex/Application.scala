@@ -680,38 +680,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
     }
 
   // DEX-1192 docs/places-and-cancels.md
-  private def consumeMessages(xs: List[ValidatedCommandWithMeta]): Future[Unit] = {
-
-    def handleValidatedCommandWithPair(withPairs: Seq[OrderBookDirectoryActor.ApplyValidatedCommandWithPair]) = {
-      val assetPairs: Set[AssetPair] = withPairs
-        .map { cmd =>
-          lazy val handleCommand = {
-            orderBookDirectoryActorRef ! cmd
-            lastProcessedOffset = lastProcessedOffset.max(cmd.offset)
-            cmd.command.assetPair
-          }
-          cmd.command.maybeCtx.fold(handleCommand) { ctx =>
-            if (status == MatcherStatus.Working) {
-              val parentSpan = ctx.get(kamon.trace.Span.Key)
-              val span =
-                Kamon.spanBuilder(s"consumedValidatedCommandWithMeta")
-                  .asChildOf(parentSpan)
-                  .traceId(parentSpan.trace.id)
-                  .tag(ctx.tags)
-                  .samplingDecision(KamonTraceUtils.Sample)
-                  .doNotTrackMetrics()
-                  .start()
-              Kamon.runWithSpan[AssetPair](span)(handleCommand)
-            } else
-              handleCommand
-          }
-        }.to(Set)
-
-      orderBookDirectoryActorRef
-        .ask(OrderBookDirectoryActor.PingAll(assetPairs))(processConsumedTimeout)
-        .recover { case NonFatal(e) => log.error("PingAll is timed out!", e) }
-    }
-
+  private def consumeMessages(xs: List[ValidatedCommandWithMeta]): Future[Unit] =
     if (xs.isEmpty) Future.unit
     else {
       val eventAssets = xs.flatMap(_.command.assets)
@@ -792,7 +761,6 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
         case _ =>
       }
     }
-  }
 
   private def setStatus(newStatus: MatcherStatus): Unit = {
     status = newStatus

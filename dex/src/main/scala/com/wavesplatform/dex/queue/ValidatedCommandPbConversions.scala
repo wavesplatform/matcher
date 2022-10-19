@@ -106,7 +106,7 @@ object ValidatedCommandPbConversions {
     pbValidatedCommand: PbValidatedCommand,
     assetPair: AssetPair,
     maybeCtx: Option[Context]
-  ): Either[ValidationError, ValidatedCommandWithPair] = {
+  ): Either[ValidationError, OrderBookValidatedCommand] = {
     val pbCmd = pbValidatedCommand.command
     if (pbCmd.isPlaceLimitOrder)
       for {

@@ -687,7 +687,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
         .map { cmd =>
           lazy val handleCommand = {
             orderBookDirectoryActorRef ! cmd
-            lastProcessedOffset = cmd.offset
+            lastProcessedOffset = lastProcessedOffset.max(cmd.offset)
             cmd.command.assetPair
           }
           cmd.command.maybeCtx.fold(handleCommand) { ctx =>
@@ -717,39 +717,74 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
       val eventAssets = xs.flatMap(_.command.assets)
       val loadAssets = eventAssets.traverse(getAndCacheDescription).value
 
-      val (withPairs, customFeeAssets) =
-        xs.foldLeft((Seq.empty[OrderBookDirectoryActor.ApplyValidatedCommandWithPair], Seq.empty[AssetsActionForOffset])) {
-          case ((pairedAcc, feeAcc), validatedCommand) =>
+      loadAssets.flatMap { _ =>
+        val (pairs, future) = xs.foldLeft((Set.empty[AssetPair], Future.unit)) {
+          case ((pairs, future), validatedCommand) =>
             log.debug(s"Consumed $validatedCommand")
             validatedCommand.command match {
-              case cmd: ValidatedCommandWithPair =>
-                (
-                  pairedAcc :+ OrderBookDirectoryActor.ApplyValidatedCommandWithPair(validatedCommand.offset, validatedCommand.timestamp, cmd),
-                  feeAcc
-                )
-              case cmd: ValidatedCommandFeeAssets =>
-                val isAdding = cmd match {
-                  case ValidatedCommand.AddCustomAssetToFee(_) => true
-                  case ValidatedCommand.DeleteCustomAssetToFee(_) => false
+              case cmd: OrderBookValidatedCommand =>
+                lazy val handleCommand = {
+                  orderBookDirectoryActorRef ! cmd
+                  lastProcessedOffset = validatedCommand.offset
+                  cmd.assetPair
                 }
-                (pairedAcc, feeAcc :+ AssetsActionForOffset(assets = cmd.assets, offset = validatedCommand.offset, isAdded = isAdding))
+
+                val newFuture = future.map { _ =>
+                  cmd.maybeCtx.fold(handleCommand) { ctx =>
+                    if (status == MatcherStatus.Working) {
+                      val parentSpan = ctx.get(kamon.trace.Span.Key)
+                      val span =
+                        Kamon.spanBuilder(s"consumedValidatedCommandWithMeta")
+                          .asChildOf(parentSpan)
+                          .traceId(parentSpan.trace.id)
+                          .tag(ctx.tags)
+                          .samplingDecision(KamonTraceUtils.Sample)
+                          .doNotTrackMetrics()
+                          .start()
+                      Kamon.runWithSpan[AssetPair](span)(handleCommand)
+                    } else
+                      handleCommand
+                  }
+                  ()
+                }
+                (pairs + cmd.assetPair, newFuture)
+              case cmd: ValidatedCommand.AddCustomAssetToFee =>
+                val action = AssetsActionForOffset(assets = cmd.assets, offset = validatedCommand.offset, isAdded = true)
+                val newFuture = customFeeAssetsDb.save(action).tap(_.onComplete {
+                  case Failure(ex) =>
+                    log.error("Error while event processing occurred: ", ex)
+                    forceStopApplication(EventProcessingError)
+                  case Success(_) =>
+                    orderFeeSettingsCache.applyAssetsActionForOffset(action)
+                    lastProcessedOffset = action.offset
+                })
+                (pairs, newFuture)
+
+              case cmd: ValidatedCommand.DeleteCustomAssetToFee =>
+                val action = AssetsActionForOffset(assets = cmd.assets, offset = validatedCommand.offset, isAdded = false)
+                val newFuture = customFeeAssetsDb.save(action).tap(_.onComplete {
+                  case Failure(ex) =>
+                    log.error("Error while event processing occurred: ", ex)
+                    forceStopApplication(EventProcessingError)
+                  case Success(_) =>
+                    orderFeeSettingsCache.applyAssetsActionForOffset(action)
+                    lastProcessedOffset = action.offset
+                })
+                (pairs, newFuture)
             }
         }
 
-      loadAssets.flatMap { _ =>
-        for {
-          _ <- Future.sequence(customFeeAssets.map { action =>
-            customFeeAssetsDb.save(action).tap(_.onComplete {
-              case Failure(ex) =>
-                log.error("Error while event processing occurred: ", ex)
-                forceStopApplication(EventProcessingError)
-              case Success(_) =>
-                orderFeeSettingsCache.applyAssetsActionForOffset(action)
-                lastProcessedOffset = action.offset
-            })
-          })
-          _ <- handleValidatedCommandWithPair(withPairs)
-        } yield ()
+        if (pairs.nonEmpty)
+          future.flatMap { _ =>
+            orderBookDirectoryActorRef
+              .ask(OrderBookDirectoryActor.PingAll(pairs))(processConsumedTimeout)
+              .recover {
+                case NonFatal(e) =>
+                  log.error("PingAll is timed out!", e)
+              }.map(_ => ())
+          }
+        else future
+
       } andThen {
         case Failure(ex) =>
           log.error("Error while event processing occurred: ", ex)

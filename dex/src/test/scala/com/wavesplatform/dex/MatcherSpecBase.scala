@@ -24,7 +24,7 @@ import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.Events.{OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model.{BuyLimitOrder, LimitOrder, OrderValidator, SellLimitOrder, _}
 import com.wavesplatform.dex.queue.ValidatedCommand.{CancelOrder, DeleteOrderBook, PlaceMarketOrder, PlaceOrder}
-import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithPair}
+import com.wavesplatform.dex.queue.{ValidatedCommand, OrderBookValidatedCommand}
 import com.wavesplatform.dex.settings.OrderFeeSettings._
 import com.wavesplatform.dex.settings.{loadConfig, AssetType, MatcherSettings, OrderFeeSettings}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
@@ -117,10 +117,10 @@ trait MatcherSpecBase
 
   protected def toNormalized(value: Long): Long = value * Order.PriceConstant
 
-  protected def wrapCommand(n: Long, command: ValidatedCommandWithPair): ApplyValidatedCommandWithPair =
+  protected def wrapCommand(n: Long, command: OrderBookValidatedCommand): ApplyValidatedCommandWithPair =
     ApplyValidatedCommandWithPair(n, System.currentTimeMillis(), command)
 
-  protected def wrapCommand(command: ValidatedCommandWithPair): ApplyValidatedCommandWithPair =
+  protected def wrapCommand(command: OrderBookValidatedCommand): ApplyValidatedCommandWithPair =
     ApplyValidatedCommandWithPair(seqNr.incrementAndGet(), System.currentTimeMillis(), command)
 
   protected def wrapLimitOrder(x: Order): ApplyValidatedCommandWithPair = wrapLimitOrder(seqNr.incrementAndGet(), x)

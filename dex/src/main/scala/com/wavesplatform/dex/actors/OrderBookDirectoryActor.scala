@@ -16,7 +16,7 @@ import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.queue.ValidatedCommandWithMeta.{Offset => EventOffset}
-import com.wavesplatform.dex.queue.{ValidatedCommand, ValidatedCommandWithPair}
+import com.wavesplatform.dex.queue.{OrderBookValidatedCommand, ValidatedCommand}
 import com.wavesplatform.dex.settings.MatcherSettings
 import kamon.Kamon
 import scorex.utils._
@@ -386,7 +386,7 @@ object OrderBookDirectoryActor {
   case object GetSnapshotOffsets
   case class SnapshotOffsetsResponse(offsets: Map[AssetPair, Option[EventOffset]])
 
-  final case class ApplyValidatedCommandWithPair(offset: EventOffset, timestamp: Long, command: ValidatedCommandWithPair)
+  final case class ApplyValidatedCommandWithPair(offset: EventOffset, timestamp: Long, command: OrderBookValidatedCommand)
 
   case class MatcherRecovered(oldestEventNr: Long)
 

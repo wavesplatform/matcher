@@ -693,7 +693,11 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
             validatedCommand.command match {
               case cmd: OrderBookValidatedCommand =>
                 lazy val handleCommand = {
-                  orderBookDirectoryActorRef ! cmd
+                  orderBookDirectoryActorRef ! OrderBookDirectoryActor.ApplyValidatedCommandWithPair(
+                    validatedCommand.offset,
+                    validatedCommand.timestamp,
+                    cmd
+                  )
                   lastProcessedOffset = validatedCommand.offset
                   cmd.assetPair
                 }

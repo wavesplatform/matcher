@@ -190,12 +190,12 @@ object OrderFeeSettings {
       Option[CompositeSettings.DiscountAssetSettings],
       Option[Set[PublicKey]]
     ]("default", "dynamic-custom-assets", "custom-pairs", "custom-assets", "discount", "zero-fee-accounts") {
-      case (default, dynamicCustomAssets, custom, customAssets, discount, zeroFeeAccounts) =>
+      case (default, dynamicCustomAssets, customPairs, customAssets, discount, zeroFeeAccounts) =>
         pairValidator: AssetPairQuickValidator =>
           CompositeSettings(
             default,
             dynamicCustomAssets.getOrElse(false),
-            custom.getOrElse(Map.empty),
+            customPairs.getOrElse(Map.empty),
             customAssets.map(_(pairValidator)),
             discount,
             zeroFeeAccounts.getOrElse(Set.empty)

@@ -26,7 +26,7 @@ final class CustomAssetFeeStateSpec extends AnyWordSpecLike with Matchers {
   "CustomAssetFeeState" should {
 
     "return empty Set[Asset] if there is no actions" in {
-      val state = CustomAssetFeeState()
+      val state = CustomAssetFeeState.empty
       state.getForLatestOffset() shouldBe empty
       state.latestAssetOffsetOpt shouldBe empty
       (0 to 10).map { i =>
@@ -48,7 +48,7 @@ final class CustomAssetFeeStateSpec extends AnyWordSpecLike with Matchers {
         AssetsActionForOffset(16L, Set(asset5), isAdded = true),
         AssetsActionForOffset(18L, Set(asset3), isAdded = false)
       )
-      val state = actions.foldLeft(CustomAssetFeeState()) {
+      val state = actions.foldLeft(CustomAssetFeeState.empty) {
         case (acc, elem) => acc.applyAssetsActionForOffset(elem)
       }
       checkAccordingToMap(state)

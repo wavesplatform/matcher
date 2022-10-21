@@ -215,7 +215,7 @@ class Application(settings: MatcherSettings, config: Config)(implicit val actorS
 
   private val allFeeAssetsActions = Await.result(customFeeAssetsDb.all(), 1.minute)
 
-  private val cfaState = allFeeAssetsActions.foldLeft(CustomAssetFeeState()) {
+  private val cfaState = allFeeAssetsActions.foldLeft(CustomAssetFeeState.empty) {
     case (state, action) => state.applyAssetsActionForOffset(action)
   }
 

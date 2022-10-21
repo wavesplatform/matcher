@@ -11,7 +11,7 @@ import scala.collection.immutable.TreeMap
 
 class OrderFeeSettingsCache(
   orderFeeSettingsMap: Map[Offset, OrderFeeSettings],
-  initialAssetsState: CustomAssetFeeState = CustomAssetFeeState()
+  initialAssetsState: CustomAssetFeeState = CustomAssetFeeState.empty
 ) extends ScorexLogging {
 
   log.debug(s"Initial assets state $initialAssetsState")
@@ -43,7 +43,7 @@ object OrderFeeSettingsCache {
 
   final case class AssetsActionForOffset(offset: Offset, assets: Set[Asset], isAdded: Boolean)
 
-  final case class CustomAssetFeeState(assetFeeState: Map[Offset, Set[Asset]] = Map.empty) {
+  final case class CustomAssetFeeState(assetFeeState: Map[Offset, Set[Asset]]) {
 
     private val assetsMapKeys = assetFeeState.keySet.toSeq.sorted
 
@@ -80,6 +80,12 @@ object OrderFeeSettingsCache {
 
     def getForLatestOffset(): Set[Asset] =
       latestAssetOffsetOpt.flatMap(assetFeeState.get).getOrElse(Set.empty)
+
+  }
+
+  object CustomAssetFeeState {
+
+    val empty: CustomAssetFeeState = CustomAssetFeeState(Map.empty[Offset, Set[Asset]])
 
   }
 

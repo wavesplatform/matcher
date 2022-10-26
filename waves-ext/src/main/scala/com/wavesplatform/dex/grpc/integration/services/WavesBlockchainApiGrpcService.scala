@@ -44,11 +44,16 @@ import monix.reactive.subjects.ConcurrentSubject
 import shapeless.Coproduct
 
 import java.util.concurrent.ConcurrentHashMap
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
-class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchainStateAccounts: Set[ByteStr], lpAccounts: Set[ByteStr])(implicit
+class WavesBlockchainApiGrpcService(
+  context: ExtensionContext,
+  allowedBlockchainStateAccounts: Set[ByteStr],
+  lpAccounts: Set[ByteStr],
+  broadcastEc: ExecutionContext
+)(implicit
   sc: Scheduler
 ) extends WavesBlockchainApiGrpc.WavesBlockchainApi
     with ScorexLogging {
@@ -124,12 +129,18 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
       .explicitGetErr()
   }
 
-  override def checkedBroadcast(request: CheckedBroadcastRequest): Future[CheckedBroadcastResponse] =
+  override def checkedBroadcast(request: CheckedBroadcastRequest): Future[CheckedBroadcastResponse] = {
+    //"sc" name is mandatory here in order to override outer "implicit sc"
+    implicit val sc: ExecutionContext = broadcastEc
+
+    val maybeTx = request.transaction
+      .fold(GenericError("The signed transaction must be specified").asLeft[SignedExchangeTransaction])(_.asRight[GenericError])
+      .flatMap(_.toVanilla)
+    log.info(s"Broadcasting (1) ${maybeTx.map(_.id().toString).getOrElse("*")}")
+
     Future {
       for {
-        grpcTx <- request.transaction
-          .fold(GenericError("The signed transaction must be specified").asLeft[SignedExchangeTransaction])(_.asRight[GenericError])
-        tx <- grpcTx.toVanilla
+        tx <- maybeTx
         isConfirmed <- context.transactionsApi.transactionById(tx.id()).fold(false)(_ => true).asRight
         isInUtx <- context.transactionsApi.unconfirmedTransactionById(tx.id()).fold(false)(_ => true).asRight
       } yield (tx, isConfirmed, isInUtx)
@@ -153,6 +164,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
           val message = Option(e.getMessage).getOrElse(e.getClass.getName)
           CheckedBroadcastResponse(CheckedBroadcastResponse.Result.Failed(CheckedBroadcastResponse.Failure(message)))
       }
+  }
 
   private def handleTxInUtx(tx: exchange.ExchangeTransaction): Future[CheckedBroadcastResponse.Result] =
     broadcastTransaction(tx).map {
@@ -164,11 +176,13 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, allowedBlockchain
       }
     }
 
-  private def broadcastTransaction(tx: exchange.ExchangeTransaction): Future[TracedResult[ValidationError, Boolean]] =
+  private def broadcastTransaction(tx: exchange.ExchangeTransaction): Future[TracedResult[ValidationError, Boolean]] = {
+    log.info(s"Broadcasting (2) ${tx.id()}")
     context.transactionsApi.broadcastTransaction(tx).andThen {
-      case Success(r) => log.info(s"Broadcast ${tx.id()}: ${r.resultE}")
+      case Success(r) => log.info(s"Broadcasting (3) ${tx.id()}: ${r.resultE}")
       case Failure(e) => log.warn(s"Can't broadcast ${tx.id()}", e)
     }
+  }
 
   override def isFeatureActivated(request: IsFeatureActivatedRequest): Future[IsFeatureActivatedResponse] = Future {
     IsFeatureActivatedResponse(

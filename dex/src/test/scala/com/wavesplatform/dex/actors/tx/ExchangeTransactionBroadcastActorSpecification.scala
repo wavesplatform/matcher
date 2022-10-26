@@ -51,6 +51,38 @@ class ExchangeTransactionBroadcastActorSpecification
         broadcasted shouldBe Seq(event.tx)
       }
 
+      "ordered transactions broadcast on retry" in {
+        var broadcasted = Seq.empty[ExchangeTransaction]
+        val attempts = new AtomicInteger(0)
+        val actor = defaultActorWithSettings(
+          Settings(
+            interval = 20.millis,
+            maxPendingTime = 200.millis
+          )
+        ) { tx =>
+          if (attempts.incrementAndGet() > 2) {
+            broadcasted = broadcasted :+ tx
+            Future.successful(CheckedBroadcastResult.Confirmed)
+          } else Future.successful(CheckedBroadcastResult.Failed("Couldn't broadcast transaction", canRetry = true))
+        }
+
+        val client = testKit.createTestProbe[Observed]()
+
+        val createdTs = System.currentTimeMillis()
+        val time = new TestTime(createdTs)
+        val event1 = sampleEvent(client.ref, createdTs - 500L, time)
+        val event2 = sampleEvent(client.ref, createdTs, time)
+
+        actor ! event2
+        actor ! event1
+
+        (1 to 2).foreach(_ => manualTime.timePasses(21.millis))
+
+        eventually {
+          broadcasted shouldBe Seq(event1.tx, event2.tx)
+        }
+      }
+
       "send a response to a client, if a transaction" - {
         def test(result: CheckedBroadcastResult): Unit = {
           val actor = defaultActor { _ =>
@@ -264,45 +296,51 @@ class ExchangeTransactionBroadcastActorSpecification
     clientRef: ActorRef[Observed],
     createdTs: Long = System.currentTimeMillis(),
     time: Time = new TestTime()
-  ): ExchangeTransactionBroadcastActor.Command.Broadcast = {
-    val now = time.getTimestamp()
-    val expiration = now + 1.day.toMillis
+  ): ExchangeTransactionBroadcastActor.Command.Broadcast =
     ExchangeTransactionBroadcastActor.Command.Broadcast(
       clientRef = clientRef,
       addressSpendings = Map.empty,
-      tx = ExchangeTransactionV3
-        .mk(
-          amountAssetDecimals = 8,
-          priceAssetDecimals = 8,
-          buyOrder = Order.buy(
-            sender = KeyPair(Array.emptyByteArray),
-            matcher = KeyPair(Array.emptyByteArray),
-            pair = pair,
-            amount = 100,
-            price = 6000000L,
-            timestamp = now,
-            expiration = expiration,
-            matcherFee = 100
-          ),
-          sellOrder = Order.sell(
-            sender = KeyPair(Array.emptyByteArray),
-            matcher = KeyPair(Array.emptyByteArray),
-            pair = pair,
-            amount = 100,
-            price = 6000000L,
-            timestamp = now,
-            expiration = expiration,
-            matcherFee = 100
-          ),
+      tx = sampleTransaction(createdTs, time)
+    )
+
+  private def sampleTransaction(
+    createdTs: Long = System.currentTimeMillis(),
+    time: Time = new TestTime()
+  ): ExchangeTransaction = {
+    val now = time.getTimestamp()
+    val expiration = now + 1.day.toMillis
+    ExchangeTransactionV3
+      .mk(
+        amountAssetDecimals = 8,
+        priceAssetDecimals = 8,
+        buyOrder = Order.buy(
+          sender = KeyPair(Array.emptyByteArray),
+          matcher = KeyPair(Array.emptyByteArray),
+          pair = pair,
           amount = 100,
           price = 6000000L,
-          buyMatcherFee = 0L,
-          sellMatcherFee = 0L,
-          fee = 300000L,
-          timestamp = createdTs,
-          proofs = Proofs.empty
-        ).transaction
-    )
+          timestamp = now,
+          expiration = expiration,
+          matcherFee = 100
+        ),
+        sellOrder = Order.sell(
+          sender = KeyPair(Array.emptyByteArray),
+          matcher = KeyPair(Array.emptyByteArray),
+          pair = pair,
+          amount = 100,
+          price = 6000000L,
+          timestamp = now,
+          expiration = expiration,
+          matcherFee = 100
+        ),
+        amount = 100,
+        price = 6000000L,
+        buyMatcherFee = 0L,
+        sellMatcherFee = 0L,
+        fee = 300000L,
+        timestamp = createdTs,
+        proofs = Proofs.empty
+      ).transaction
   }
 
 }

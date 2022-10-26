@@ -79,7 +79,7 @@ inTask(docker)(
 
       val entryPointSh = s"$appPath/bin/start-matcher-server.sh"
 
-      from("openjdk:8-jre-slim-buster")
+      from("eclipse-temurin:11-jre-focal")
 
       runRaw(s"""mkdir -p $runtimePath $appPath $runtimePath/runtime && \\
                 |groupadd -g $groupId $group && \\
@@ -135,7 +135,7 @@ inConfig(Linux)(
 inConfig(Debian)(
   Seq(
     linuxStartScriptTemplate := (packageSource.value / "systemd.service").toURI.toURL,
-    debianPackageDependencies += "java8-runtime-headless",
+    debianPackageDependencies += "adoptopenjdk-11-hotspot",
     serviceAutostart := false,
     maintainerScripts := maintainerScriptsFromDirectory(packageSource.value / "debian", Seq("preinst", "postinst", "postrm", "prerm")),
     linuxPackageMappings ++= {

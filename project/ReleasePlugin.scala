@@ -3,7 +3,7 @@ import java.nio.file.{Files, Path}
 
 import CommonSettings.autoImport.network
 import Hashes.mk
-import com.github.sbt.GitPlugin.autoImport.git
+import com.github.sbt.git.GitPlugin.autoImport.git
 import com.typesafe.sbt.SbtNativePackager.Universal
 import com.typesafe.sbt.packager.debian.DebianPlugin.autoImport.Debian
 import com.typesafe.sbt.packager.debian.JDebPackaging

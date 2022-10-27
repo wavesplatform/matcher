@@ -1,4 +1,4 @@
-import com.typesafe.sbt.GitPlugin.autoImport.git
+import com.github.sbt.GitPlugin.autoImport.git
 import sbt.Keys.isSnapshot
 import sbt.{inTask, settingKey, AutoPlugin, Def, PluginTrigger, Plugins}
 import sbtdocker.DockerPlugin.autoImport.{docker, imageNames, ImageName}

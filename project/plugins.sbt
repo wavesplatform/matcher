@@ -13,7 +13,7 @@ Seq(
   "org.scalastyle" %% "scalastyle-sbt-plugin" % "1.0.0",
   "org.scoverage" % "sbt-scoverage" % "1.5.1",
   "se.marcuslonnberg" % "sbt-docker" % "1.7.0",
-  "com.typesafe.sbt" % "sbt-git" % "2.0.0",
+  "com.github.sbt" % "sbt-git" % "2.0.0",
   "org.scalameta" % "sbt-scalafmt" % "2.0.1",
   "ch.epfl.scala" % "sbt-scalafix" % "0.9.29",
   "com.github.tkawachi" % "sbt-repeat" % "0.1.0",
